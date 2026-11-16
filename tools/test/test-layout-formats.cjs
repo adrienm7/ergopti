@@ -658,6 +658,15 @@ check(
 	refuses(() => F.lossMessage({ what: 'mystery', detail: 'x' }), 'format_loss_unknown'),
 	'a loss without words is accepted'
 );
+// The app's native open panel offers what the pages' pickers offer.
+const layoutDefaults = JSON.parse(
+	fs.readFileSync(shared('layouts', 'data', 'defaults.json'), 'utf8')
+);
+check(
+	JSON.stringify(layoutDefaults.source.pick_extensions) ===
+		JSON.stringify(Array.from(F.EXTENSIONS)),
+	'source.pick_extensions differs from LAYOUT_FORMATS.EXTENSIONS'
+);
 // The editor reads a picked UTF-16 KLC as the Comparer does.
 check(
 	F.decode(new Uint8Array(fs.readFileSync(path.join(BUILT, 'ergo_1dk.klc')))) === klcText,

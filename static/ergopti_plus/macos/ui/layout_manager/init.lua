@@ -115,7 +115,7 @@ local function pick_source(on_done)
 		return
 	end
 	local path = DialogUtil.choose_layout_source(i18n.get("layout_editor.pick_message"),
-		i18n.get("layout_editor.pick_title"))
+		i18n.get("layout_editor.pick_title"), settings.pick_extension_list)
 	if not path then
 		on_done({})
 		return

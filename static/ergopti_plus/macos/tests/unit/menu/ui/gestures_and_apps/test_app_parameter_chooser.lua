@@ -156,22 +156,29 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 		helpers.assert_nil(tostring(err):find("private native failure payload", 1, true), "native error details stay private")
 	end)
 
-	helpers.it("opens one layout source or .keylayout for the layout editor and reports native failure", function()
+	helpers.it("opens one layout file of the given types for the layout editor and reports native failure", function()
 		local Dialog = helpers.load_with_stubs("core.ui.engine.dialog_util")
-		local script = Dialog.layout_source_picker_script("Choose a file", "Open a layout")
-		helpers.assert_true(script:find([[setAllowedFileTypes:{"toml", "keylayout"}]], 1, true) ~= nil, script)
+		local types = { "toml", "keylayout", "json", "xkb_symbols" }
+		local script = Dialog.layout_source_picker_script("Choose a file", "Open a layout", types)
+		helpers.assert_true(script:find([[setAllowedFileTypes:{"toml", "keylayout", "json", "xkb_symbols"}]], 1, true)
+			~= nil, script)
 		helpers.assert_true(script:find("setCanChooseDirectories:false", 1, true) ~= nil, script)
 		helpers.assert_true(script:find("setAllowsMultipleSelection:false", 1, true) ~= nil, script)
+		-- A type that could close its quotes never reaches the script.
+		local refused = pcall(Dialog.layout_source_picker_script, "Choose a file", "Open a layout", { 'json"}' })
+		helpers.assert_eq(refused, false)
+		helpers.assert_eq((pcall(Dialog.layout_source_picker_script, "Choose a file", "Open a layout", {})), false)
 		local failing = helpers.load_with_stubs("core.ui.engine.dialog_util", { osascript = { applescript = function()
 			return false, nil, "private native failure payload"
 		end } })
-		local ok, err = pcall(failing.choose_layout_source, "Choose a file", "Open a layout")
+		local ok, err = pcall(failing.choose_layout_source, "Choose a file", "Open a layout", types)
 		helpers.assert_eq(ok, false)
 		helpers.assert_true(tostring(err):find("the native open panel failed", 1, true) ~= nil)
 		local cancelled = helpers.load_with_stubs("core.ui.engine.dialog_util", { osascript = { applescript = function()
 			return true, nil, ""
 		end } })
-		helpers.assert_nil(cancelled.choose_layout_source("Choose a file", "Open a layout"), "a cancel opens nothing")
+		helpers.assert_nil(cancelled.choose_layout_source("Choose a file", "Open a layout", types),
+			"a cancel opens nothing")
 	end)
 
 end)

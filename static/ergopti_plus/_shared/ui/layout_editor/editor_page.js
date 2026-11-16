@@ -963,11 +963,19 @@ var LayoutEditorPage = (function () {
 			return { text: `${JSON.stringify(json, null, 2)}\n`, unmapped };
 		}
 
-		/** Opens a file through the host's native panel (macOS), where the webview shows none. */
+		/**
+		 * Opens a file through the host's native panel (macOS), where the webview
+		 * shows none: its UTF-8 text, or the base64 bytes of another tool's file
+		 * that is not UTF-8 (a UTF-16 KLC, a KbdEdit .kbe).
+		 */
 		function pickWithHost() {
 			fromHost(() => host.pickFile()).then(
 				(picked) => {
 					if (picked && typeof picked.text === 'string') openText(picked.filename, picked.text);
+					else if (picked && typeof picked.data === 'string') {
+						const bytes = Uint8Array.from(atob(picked.data), (ch) => ch.charCodeAt(0));
+						openText(picked.filename, LAYOUT_FORMATS.decode(bytes), bytes);
+					}
 				},
 				(error) => notify('error', problemText(error))
 			);
@@ -3594,7 +3602,13 @@ var LayoutEditorPage = (function () {
 									return;
 								}
 								const filename = `${doc().layout.id}.${extension}`;
-								fromHost(() => host.saveFile(filename, file.text, mime)).then(
+								// A download, not a file of the app's layout store: the app's
+								// store keeps only sources, so the app writes it to Downloads.
+								fromHost(() =>
+									host.saveBinary
+										? host.saveBinary(filename, new TextEncoder().encode(file.text), mime)
+										: host.saveFile(filename, file.text, mime)
+								).then(
 									() =>
 										notify(
 											'ok',

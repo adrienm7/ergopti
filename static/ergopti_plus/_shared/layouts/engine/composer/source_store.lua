@@ -55,7 +55,8 @@ local EXPORT_NAME = "^[A-Za-z0-9][A-Za-z0-9_.-]*%.([a-z]+)$"
 --- Validates the [source] table of the shared layout defaults.
 --- @param layout_defaults table Decoded _shared/layouts/data/defaults.json.
 --- @return table|nil settings { folder, last_file, nav_file, max_file_bytes,
----   max_name_length, export_extensions = { [extension] = true }, max_export_suffix,
+---   max_name_length, export_extensions = { [extension] = true }, pick_extension_list,
+---   pick_extensions = { [extension] = true }, max_export_suffix,
 ---   failures = { invalid, write } }
 --- @return string|nil error
 function M.settings(layout_defaults)
@@ -82,6 +83,17 @@ function M.settings(layout_defaults)
 		end
 		extensions[extension] = true
 	end
+	local pick_list, pick_set = {}, {}
+	if type(source.pick_extensions) ~= "table" or #source.pick_extensions == 0 then
+		return nil, "the source pick_extensions is not a list of extensions"
+	end
+	for _, extension in ipairs(source.pick_extensions) do
+		if type(extension) ~= "string" or not extension:match("^[a-z_]+$") then
+			return nil, "the source pick_extensions holds a value that is not a lowercase extension"
+		end
+		pick_list[#pick_list + 1] = extension
+		pick_set[extension] = true
+	end
 	local failures = source.failures
 	for _, code in ipairs({ "invalid", "write" }) do
 		if type(failures) ~= "table" or type(failures[code]) ~= "string" or not failures[code]:match(CODE) then
@@ -96,6 +108,9 @@ function M.settings(layout_defaults)
 		max_file_bytes = source.max_file_bytes,
 		max_name_length = source.max_name_length,
 		export_extensions = extensions,
+		-- The file types the native open panel offers (list) and accepts (set).
+		pick_extension_list = pick_list,
+		pick_extensions = pick_set,
 		max_export_suffix = source.max_export_suffix,
 		failures = { invalid = failures.invalid, write = failures.write },
 	}, nil
@@ -161,15 +176,18 @@ function M.check(settings, payload)
 end
 
 --- Reads a file the user picked in a native panel for the editor to open.
---- The name may be any the user chose; the type, size and encoding are bounded.
+--- The name may be any the user chose; the type and size are bounded. An
+--- Ergopti source or a .keylayout must be UTF-8 text; another tool's layout
+--- file that is not UTF-8 (a UTF-16 KLC, a KbdEdit .kbe) goes to the page as
+--- base64 bytes, which its format readers decode or refuse with their reason.
 --- @param settings table From M.settings.
 --- @param path string The chosen file.
 --- @param read function read(path) -> text|nil.
---- @return table { filename, text } or { code, detail } when refused.
+--- @return table { filename, text }, { filename, data } or { code, detail } when refused.
 function M.read_picked(settings, path, read)
 	local name = type(path) == "string" and NativePath.basename(path) or nil
-	local extension = name and name:match("%.([A-Za-z]+)$")
-	if not extension or not EXTENSIONS[extension:lower()] then
+	local extension = name and name:match("%.([A-Za-z_]+)$")
+	if not extension or not settings.pick_extensions[extension:lower()] then
 		return { code = settings.failures.invalid, detail = "the file type is not one the editor opens" }
 	end
 	local text = read(path)
@@ -177,8 +195,11 @@ function M.read_picked(settings, path, read)
 	if #text > settings.max_file_bytes then
 		return { code = settings.failures.invalid, detail = "the file is larger than its bound" }
 	end
-	if not M.is_utf8(text) then return { code = settings.failures.invalid, detail = "the file is not UTF-8 text" } end
-	return { filename = name, text = text }
+	if M.is_utf8(text) then return { filename = name, text = text } end
+	if EXTENSIONS[extension:lower()] then
+		return { code = settings.failures.invalid, detail = "the file is not UTF-8 text" }
+	end
+	return { filename = name, data = Base64.encode(text) }
 end
 
 --- Checks one download the page wants written and decodes its bytes.

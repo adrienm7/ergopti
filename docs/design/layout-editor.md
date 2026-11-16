@@ -70,8 +70,11 @@ Decided by the coordinator on 2026-11-11, to review by the maintainer.
   « Fill a layer from a layout » takes the host's `composer_open` sources (its `composerData` is routed to the
   editor too), so on these hosts the page hides « Compose »: the editor does the composer's job. macOS also sets
   `source_pick` in `initData`: the editor's « Open » posts `source_pick`, the host opens an `NSOpenPanel` limited
-  to `.toml` and `.keylayout` (`infra/dialog_util.lua`), bounds the file with `SourceStore.read_picked` and answers
-  `window.sourcePicked({filename, text} | {} | {code, detail})`. Linux keeps WebKitGTK's own file chooser.
+  to the layout defaults' `source.pick_extensions` (the file types `LAYOUT_FORMATS.EXTENSIONS` gives the pages'
+  pickers; `core/ui/engine/dialog_util.lua`), bounds the file with `SourceStore.read_picked` and answers
+  `window.sourcePicked({filename, text} | {filename, data} | {} | {code, detail})`: another tool's file that is not
+  UTF-8 (a UTF-16 KLC, a KbdEdit .kbe) comes as base64 `data`, which the page's format readers decode or refuse.
+  Linux keeps WebKitGTK's own file chooser.
   « Apply the navigation layer » (shown when the source has the `nav` layer and `initData` carries
   `nav_apply: true`) posts `{action: "nav_save", text}` with the `layers.toml` text `LayoutSourceIO.navLayerFile`
   builds; the shared bridge hands it to the host's `apply_nav`, which runs the navigation layer editor's own save
@@ -104,7 +107,7 @@ folder layout and `tools/kbd-dll.cjs`. Decided by the coordinator on 2026-11-11,
 | ------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `source_open`            | —                                                            | `sourceData {text, filename, folder}` (the last saved source, else `text: null`) | —                                                                                                                     |
 | `source_save`            | `{filename, text}`                                           | `sourceResult {ok, code, detail, filename}`                                      | `source_invalid_file`, `write_failed` (`source_store.lua`)                                                            |
-| `source_pick` (optional) | —                                                            | `sourcePicked {filename, text} \| {} \| {code, detail}`                          | as `source_save`                                                                                                      |
+| `source_pick` (optional) | —                                                            | `sourcePicked {filename, text \| data} \| {} \| {code, detail}`                  | as `source_save`                                                                                                      |
 | `composer_save`          | `{source, keylayout, emulation?, use: true, dll_name, dlls}` | `composerResult {action, ok, code, detail, used, pending}`                       | `invalid`, `write_failed`, `use_failed`, `install_failed`, `elevation_refused`, `foreign_layout`, `profile_not_added` |
 | `composer_emulate`       | `{source, keylayout, emulation?}`                            | `composerResult {action: "composer_emulate", ok, code, detail, used}`            | `invalid`, `write_failed`, `emulate_not_saved`, `emulate_failed`                                                      |
 | `composer_remove`        | —                                                            | `composerResult {action, ok, code, detail}`                                      | `write_failed`, `uninstall_failed`                                                                                    |

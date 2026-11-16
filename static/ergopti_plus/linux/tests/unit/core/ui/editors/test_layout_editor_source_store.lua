@@ -278,6 +278,44 @@ helpers.describe("layout editor source store", function()
 		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/missing.toml", read).code, settings().failures.invalid)
 	end)
 
+	helpers.it("hands another tool's layout file to the page as text, or as base64 bytes when it is not UTF-8", function()
+		local Base64 = require("core.lifecycle.engine.compat.base64")
+		local kbe = "\19\0KbdEdit export file\5\0\0\0\127\0\0\0\2\0\255\254"
+		local files = {
+			["/u/ergol.json"] = "{\"keys\": []}",
+			["/u/ergo_1dk.klc"] = "\255\254K\0B\0D\0",
+			["/u/bepo.kbe"] = kbe,
+			["/u/ergo.xkb_symbols"] = "xkb_symbols \"x\" {};",
+		}
+		local read = function(path) return files[path] end
+		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/ergol.json", read).text, files["/u/ergol.json"])
+		helpers.assert_eq(SourceStore.read_picked(settings(), "/u/ergo.xkb_symbols", read).text,
+			files["/u/ergo.xkb_symbols"], "an extension with an underscore is a type")
+		local klc = SourceStore.read_picked(settings(), "/u/ergo_1dk.klc", read)
+		helpers.assert_eq(klc.text, nil, "a UTF-16 KLC is not sent as text")
+		helpers.assert_eq(Base64.decode(klc.data), files["/u/ergo_1dk.klc"], "a UTF-16 KLC keeps its bytes")
+		helpers.assert_eq(Base64.decode(SourceStore.read_picked(settings(), "/u/bepo.kbe", read).data), kbe)
+		-- The panel offers exactly the types the store accepts, from the shared defaults.
+		local s = settings()
+		helpers.assert_eq(#s.pick_extension_list > 0, true)
+		for _, extension in ipairs(s.pick_extension_list) do helpers.assert_true(s.pick_extensions[extension]) end
+		helpers.assert_true(s.pick_extensions.kbe and s.pick_extensions.json and s.pick_extensions.klc)
+	end)
+
+	helpers.it("refuses layout defaults whose pick extensions are missing or not lowercase", function()
+		local Json = require("core.text.engine.json")
+		local Paths = require("core.fs.engine.paths")
+		local handle = assert(io.open(Paths.shared(DEFAULTS_PATH), "r"))
+		local defaults = Json.decode(handle:read("*a"))
+		handle:close()
+		defaults.source.pick_extensions = {}
+		local _, err = SourceStore.settings(defaults)
+		helpers.assert_contains(err, "pick_extensions")
+		defaults.source.pick_extensions = { "JSON" }
+		_, err = SourceStore.settings(defaults)
+		helpers.assert_contains(err, "pick_extensions")
+	end)
+
 	helpers.it("accepts multi-byte UTF-8 and refuses overlong forms", function()
 		helpers.assert_true(SourceStore.is_utf8("ffi🦆 ễ"))
 		helpers.assert_true(not SourceStore.is_utf8("\192\175"))
