@@ -128,6 +128,17 @@
 	border-radius: 3px;
 	height: 8px;
 	overflow: hidden;
+	position: relative;
+}
+
+/* The ideal load of the finger, a mark across its bar. */
+.la-panel-target {
+	background: var(--theme-text);
+	bottom: 0;
+	margin-left: -1px;
+	position: absolute;
+	top: 0;
+	width: 2px;
 }
 
 .la-panel-bar {

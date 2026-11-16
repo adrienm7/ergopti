@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Left hand",
 	"layout_analysis.details.hand_right": "Right hand",
 	"layout_analysis.heat.scale": "{metric}: the colour of each key on this scale, from least to most.",
-	"layout_analysis.settings.title": "Score settings: weights, ideal finger load, shortcuts, compact keyboards, fingering"
+	"layout_analysis.settings.title": "Score settings: weights, ideal finger load, shortcuts, compact keyboards, fingering",
+	"layout_analysis.panel.rank.label": "Rank among",
+	"layout_analysis.panel.rank.library": "Every library layout",
+	"layout_analysis.panel.rank.selection": "The layouts ticked in the comparison",
+	"layout_analysis.panel.rank.none_ticked": "No layout is ticked in the comparison yet: tick some there to rank this one among them."
 }

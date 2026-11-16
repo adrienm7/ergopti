@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Venstre hånd",
 	"layout_analysis.details.hand_right": "Højre hånd",
 	"layout_analysis.heat.scale": "{metric}: hver tasts farve på denne skala, fra mindst til mest.",
-	"layout_analysis.settings.title": "Indstillinger for scoren: vægte, ideel fingerbelastning, genveje, kompakte tastaturer, fingersætning"
+	"layout_analysis.settings.title": "Indstillinger for scoren: vægte, ideel fingerbelastning, genveje, kompakte tastaturer, fingersætning",
+	"layout_analysis.panel.rank.label": "Rangér blandt",
+	"layout_analysis.panel.rank.library": "Alle bibliotekets layouts",
+	"layout_analysis.panel.rank.selection": "De layouts, der er markeret i sammenligningen",
+	"layout_analysis.panel.rank.none_ticked": "Intet layout er markeret i sammenligningen endnu: markér nogle der for at rangere dette blandt dem."
 }

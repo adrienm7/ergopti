@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Mano izquierda",
 	"layout_analysis.details.hand_right": "Mano derecha",
 	"layout_analysis.heat.scale": "{metric}: el color de cada tecla en esta escala, de menos a más.",
-	"layout_analysis.settings.title": "Ajustes de la puntuación: pesos, carga ideal de los dedos, atajos, teclados compactos, digitación"
+	"layout_analysis.settings.title": "Ajustes de la puntuación: pesos, carga ideal de los dedos, atajos, teclados compactos, digitación",
+	"layout_analysis.panel.rank.label": "Clasificar entre",
+	"layout_analysis.panel.rank.library": "Todas las distribuciones de la biblioteca",
+	"layout_analysis.panel.rank.selection": "Las distribuciones marcadas en la comparación",
+	"layout_analysis.panel.rank.none_ticked": "Aún no hay ninguna distribución marcada en la comparación: marque algunas allí para clasificar esta entre ellas."
 }

@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Mão esquerda",
 	"layout_analysis.details.hand_right": "Mão direita",
 	"layout_analysis.heat.scale": "{metric}: a cor de cada tecla nesta escala, do menos ao mais.",
-	"layout_analysis.settings.title": "Ajustes da pontuação: pesos, carga ideal dos dedos, atalhos, teclados compactos, dedilhado"
+	"layout_analysis.settings.title": "Ajustes da pontuação: pesos, carga ideal dos dedos, atalhos, teclados compactos, dedilhado",
+	"layout_analysis.panel.rank.label": "Classificar entre",
+	"layout_analysis.panel.rank.library": "Todos os layouts da biblioteca",
+	"layout_analysis.panel.rank.selection": "Os layouts marcados na comparação",
+	"layout_analysis.panel.rank.none_ticked": "Ainda não há nenhum layout marcado na comparação: marque alguns lá para classificar este entre eles."
 }

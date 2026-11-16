@@ -91,6 +91,13 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	const HEAT_DIGITS = 2;
 	// How many metrics a key's global-score tooltip names, worst first.
 	const HEAT_SCORE_PARTS = 3;
+	// What the edited layout is ranked among: the whole library, or the
+	// layouts ticked in « Comparer ».
+	const RANK_LIBRARY = 'library';
+	const RANK_SELECTION = 'selection';
+	const RANK_CHOICES = [RANK_LIBRARY, RANK_SELECTION];
+	// A finger's share of the presses is drawn against this full-bar share.
+	const FINGER_SCALE_PERCENT = 25;
 
 	function el(tag, className, text) {
 		const node = document.createElement(tag);
@@ -198,6 +205,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			corpus: corpora.some((c) => c.id === saved.corpus) ? saved.corpus : corpora[0].id,
 			keyboard: KEYBOARDS.includes(saved.keyboard) ? saved.keyboard : SOURCE_BOARD,
 			heat: HEAT_CHOICES.includes(saved.heat) ? saved.heat : HEAT_SCORE,
+			rank: RANK_CHOICES.includes(saved.rank) ? saved.rank : RANK_LIBRARY,
 			doc: null,
 			previous: null,
 			library: null,
@@ -223,6 +231,10 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		heatSelect.id = 'la-panel-heat';
 		const heatLabel = el('label');
 		heatLabel.htmlFor = heatSelect.id;
+		const rankSelect = el('select');
+		rankSelect.id = 'la-panel-rank';
+		const rankLabel = el('label');
+		rankLabel.htmlFor = rankSelect.id;
 		const controls = el('div', 'la-panel-controls');
 		controls.append(
 			corpusLabel,
@@ -230,7 +242,9 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			keyboardLabel,
 			keyboardSelect,
 			heatLabel,
-			heatSelect
+			heatSelect,
+			rankLabel,
+			rankSelect
 		);
 		const compareButton = onCompare ? el('button', 'la-panel-compare') : null;
 		if (compareButton) {
@@ -261,6 +275,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		}
 		const headline = el('p', 'la-panel-score');
 		headline.setAttribute('role', 'status');
+		const rankNote = el('p', 'la-panel-note');
+		rankNote.hidden = true;
 		const note = el('p', 'la-panel-note');
 		const metrics = el('table', 'la-panel-metrics');
 		const fingersTitle = el('h3');
@@ -275,6 +291,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			summary,
 			controls,
 			headline,
+			rankNote,
 			note,
 			metrics,
 			fingersTitle,
@@ -296,6 +313,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 						corpus: state.corpus,
 						keyboard: state.keyboard,
 						heat: state.heat,
+						rank: state.rank,
 						open: node.open
 					})
 				);
@@ -341,6 +359,19 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				})
 			);
 			heatSelect.value = state.heat;
+			rankLabel.textContent = t('layout_analysis.panel.rank.label');
+			rankNote.textContent = t('layout_analysis.panel.rank.none_ticked');
+			rankSelect.replaceChildren(
+				...[
+					[RANK_LIBRARY, t('layout_analysis.panel.rank.library')],
+					[RANK_SELECTION, t('layout_analysis.panel.rank.selection')]
+				].map(([id, label]) => {
+					const option = el('option', '', label);
+					option.value = id;
+					return option;
+				})
+			);
+			rankSelect.value = state.rank;
 		}
 
 		async function tables() {
@@ -349,11 +380,44 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			return E.prepareNgrams(await FILES.builtinTables(corpus.builtin));
 		}
 
-		/** The library's scores on these settings, computed once for them. */
+		/**
+		 * The layouts the edited one is ranked among: the whole library, or the
+		 * library and imported layouts ticked in « Comparer » (its saved selection;
+		 * the layouts open in « Éditer » are not among them).
+		 */
+		function rankPool() {
+			if (state.rank === RANK_LIBRARY) return E.libraryLayouts();
+			const saved = readStorage(FILES.SETTINGS_KEY);
+			const ticked = new Set(Array.isArray(saved.selected) ? saved.selected : []);
+			const imported = (Array.isArray(saved.imported) ? saved.imported : []).flatMap((value) => {
+				try {
+					return [E.layoutFromRows(value)];
+				} catch {
+					return [];
+				}
+			});
+			return E.libraryLayouts()
+				.concat(imported)
+				.filter((layout) => ticked.has(layout.id));
+		}
+
+		/** What a ranking depends on: corpus, keyboard, format, settings and the ranked layouts. */
+		function rankKey(settings, pool) {
+			return JSON.stringify([
+				state.corpus,
+				state.keyboard,
+				keyboardFormat(),
+				settings,
+				pool.map((layout) => layout.id)
+			]);
+		}
+
+		/** The ranked layouts' scores on these settings, computed once for them. */
 		function libraryScores(prepared, settings) {
-			const key = JSON.stringify([state.corpus, state.keyboard, keyboardFormat(), settings]);
+			const pool = rankPool();
+			const key = rankKey(settings, pool);
 			if (state.libraryKey !== key) {
-				state.library = E.compare(E.libraryLayouts(), prepared, {
+				state.library = E.compare(pool, prepared, {
 					keyboard: state.keyboard,
 					format: keyboardFormat(),
 					weights: settings.weights,
@@ -415,10 +479,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			note.textContent = settings.profile
 				? `${t('layout_analysis.panel.weights_note')} ${t('layout_analysis.fingering.custom')}`
 				: t('layout_analysis.panel.weights_note');
-			if (
-				state.libraryKey !==
-				JSON.stringify([state.corpus, state.keyboard, keyboardFormat(), settings])
-			)
+			if (state.libraryKey !== rankKey(settings, rankPool()))
 				headline.textContent = t('layout_analysis.panel.ranking');
 			// The first ranking of a corpus takes a moment: let the page paint first.
 			await new Promise((resolve) => setTimeout(resolve, 0));
@@ -431,6 +492,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				rank,
 				count: scores.length + 1
 			});
+			// Ranked among the Comparer's ticks while none is ticked: say so.
+			rankNote.hidden = !(state.rank === RANK_SELECTION && scores.length === 0);
 			const same =
 				state.previous &&
 				state.previous.corpus === state.corpus &&
@@ -469,25 +532,32 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			}
 		}
 
+		/**
+		 * Each finger's share of the non-thumb presses beside the ideal load the
+		 * score measures it against (the engine's fingerShares and idealLoad:
+		 * the two sides of finger_imbalance), the ideal drawn as a mark.
+		 */
 		function drawFingers(result) {
 			fingers.replaceChildren();
-			const ideal = comparerSettings(state.keyboard).idealLoad || E.defaultIdealLoad();
-			for (const id of DATA.model.fingers) {
+			const scale = Math.max(
+				FINGER_SCALE_PERCENT,
+				...Object.values(result.fingerShares),
+				...Object.values(result.idealLoad)
+			);
+			for (const [id, share] of Object.entries(result.fingerShares)) {
 				const row = el('div', 'la-panel-finger');
-				const share = result.fingers[id];
 				const bar = el('span', 'la-panel-bar');
-				bar.style.width = `${Math.min(100, share * 2)}%`;
-				const target = ideal[id];
-				row.title =
-					target === undefined
-						? `${format(share, 1)} %`
-						: `${format(share, 1)} % / ${format(target, 1)} %`;
+				bar.style.width = `${(share / scale) * 100}%`;
+				const target = result.idealLoad[id];
+				const mark = el('span', 'la-panel-target');
+				mark.style.left = `${(target / scale) * 100}%`;
+				row.title = `${format(share, 1)} % (${t('layout_analysis.details.ideal_mark')}: ${format(target, 1)} %)`;
 				row.append(
 					el('span', 'la-panel-finger-name', t(`layout_analysis.finger.${id}`)),
 					el('span', 'la-panel-track'),
 					el('span', 'la-panel-finger-value', `${format(share, 1)} %`)
 				);
-				row.children[1].append(bar);
+				row.children[1].append(bar, mark);
 				fingers.append(row);
 			}
 		}
@@ -632,6 +702,11 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			state.keyboard = keyboardSelect.value;
 			fingeringView.draw();
 			state.previous = null;
+			persist();
+			schedule();
+		});
+		rankSelect.addEventListener('change', () => {
+			state.rank = rankSelect.value;
 			persist();
 			schedule();
 		});

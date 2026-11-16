@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "왼손",
 	"layout_analysis.details.hand_right": "오른손",
 	"layout_analysis.heat.scale": "{metric}: 이 척도에서 각 키의 색, 적음에서 많음까지.",
-	"layout_analysis.settings.title": "점수 설정: 가중치, 이상적인 손가락 부하, 단축키, 컴팩트 키보드, 운지"
+	"layout_analysis.settings.title": "점수 설정: 가중치, 이상적인 손가락 부하, 단축키, 컴팩트 키보드, 운지",
+	"layout_analysis.panel.rank.label": "순위 기준",
+	"layout_analysis.panel.rank.library": "라이브러리의 모든 배열",
+	"layout_analysis.panel.rank.selection": "비교에서 선택한 배열",
+	"layout_analysis.panel.rank.none_ticked": "비교에서 아직 선택한 배열이 없습니다. 거기서 몇 개를 선택하면 그 안에서 순위를 매깁니다."
 }

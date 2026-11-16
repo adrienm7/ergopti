@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Lewa dłoń",
 	"layout_analysis.details.hand_right": "Prawa dłoń",
 	"layout_analysis.heat.scale": "{metric}: kolor każdego klawisza na tej skali, od najmniej do najwięcej.",
-	"layout_analysis.settings.title": "Ustawienia wyniku: wagi, idealne obciążenie palców, skróty, klawiatury kompaktowe, palcowanie"
+	"layout_analysis.settings.title": "Ustawienia wyniku: wagi, idealne obciążenie palców, skróty, klawiatury kompaktowe, palcowanie",
+	"layout_analysis.panel.rank.label": "Klasyfikuj wśród",
+	"layout_analysis.panel.rank.library": "Wszystkich układów biblioteki",
+	"layout_analysis.panel.rank.selection": "Układów zaznaczonych w porównaniu",
+	"layout_analysis.panel.rank.none_ticked": "W porównaniu nie zaznaczono jeszcze żadnego układu: zaznacz tam kilka, aby sklasyfikować wśród nich ten."
 }

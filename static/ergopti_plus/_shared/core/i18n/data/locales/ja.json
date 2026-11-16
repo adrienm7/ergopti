@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "左手",
 	"layout_analysis.details.hand_right": "右手",
 	"layout_analysis.heat.scale": "{metric}：このスケール上の各キーの色（少ない→多い）。",
-	"layout_analysis.settings.title": "スコア設定：重み、理想の指の負荷、ショートカット、コンパクトキーボード、運指"
+	"layout_analysis.settings.title": "スコア設定：重み、理想の指の負荷、ショートカット、コンパクトキーボード、運指",
+	"layout_analysis.panel.rank.label": "順位の対象",
+	"layout_analysis.panel.rank.library": "ライブラリのすべての配列",
+	"layout_analysis.panel.rank.selection": "比較でチェックした配列",
+	"layout_analysis.panel.rank.none_ticked": "比較でまだ配列がチェックされていません。そこでいくつかチェックすると、その中での順位を表示します。"
 }

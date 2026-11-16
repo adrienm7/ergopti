@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "اليد اليسرى",
 	"layout_analysis.details.hand_right": "اليد اليمنى",
 	"layout_analysis.heat.scale": "{metric}: لون كل مفتاح على هذا المقياس، من الأقل إلى الأكثر.",
-	"layout_analysis.settings.title": "إعدادات النتيجة: الأوزان، الحمل المثالي للأصابع، الاختصارات، اللوحات المدمجة، توزيع الأصابع"
+	"layout_analysis.settings.title": "إعدادات النتيجة: الأوزان، الحمل المثالي للأصابع، الاختصارات، اللوحات المدمجة، توزيع الأصابع",
+	"layout_analysis.panel.rank.label": "الترتيب بين",
+	"layout_analysis.panel.rank.library": "كل تخطيطات المكتبة",
+	"layout_analysis.panel.rank.selection": "التخطيطات المحددة في المقارنة",
+	"layout_analysis.panel.rank.none_ticked": "لم يُحدَّد أي تخطيط في المقارنة بعد: حدّد بعضها هناك لترتيب هذا التخطيط بينها."
 }

@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Main gauche",
 	"layout_analysis.details.hand_right": "Main droite",
 	"layout_analysis.heat.scale": "{metric} : la couleur de chaque touche sur cette échelle, du moins au plus.",
-	"layout_analysis.settings.title": "Réglages du score : poids, charge idéale des doigts, raccourcis, claviers compacts, doigté"
+	"layout_analysis.settings.title": "Réglages du score : poids, charge idéale des doigts, raccourcis, claviers compacts, doigté",
+	"layout_analysis.panel.rank.label": "Classer parmi",
+	"layout_analysis.panel.rank.library": "Toutes les dispositions de la bibliothèque",
+	"layout_analysis.panel.rank.selection": "Les dispositions cochées dans la comparaison",
+	"layout_analysis.panel.rank.none_ticked": "Aucune disposition n’est encore cochée dans la comparaison : cochez-en pour y classer celle-ci."
 }

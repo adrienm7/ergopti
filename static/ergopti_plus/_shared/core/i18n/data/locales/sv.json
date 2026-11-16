@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Vänster hand",
 	"layout_analysis.details.hand_right": "Höger hand",
 	"layout_analysis.heat.scale": "{metric}: varje tangents färg på denna skala, från minst till mest.",
-	"layout_analysis.settings.title": "Inställningar för betyget: vikter, ideal fingerbelastning, kortkommandon, kompakta tangentbord, fingersättning"
+	"layout_analysis.settings.title": "Inställningar för betyget: vikter, ideal fingerbelastning, kortkommandon, kompakta tangentbord, fingersättning",
+	"layout_analysis.panel.rank.label": "Rangordna bland",
+	"layout_analysis.panel.rank.library": "Alla layouter i biblioteket",
+	"layout_analysis.panel.rank.selection": "De layouter som är markerade i jämförelsen",
+	"layout_analysis.panel.rank.none_ticked": "Ingen layout är markerad i jämförelsen än: markera några där för att rangordna den här bland dem."
 }

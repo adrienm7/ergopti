@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Venstre hånd",
 	"layout_analysis.details.hand_right": "Høyre hånd",
 	"layout_analysis.heat.scale": "{metric}: fargen på hver tast på denne skalaen, fra minst til mest.",
-	"layout_analysis.settings.title": "Innstillinger for poengsummen: vekter, ideell fingerbelastning, snarveier, kompakte tastaturer, fingersetting"
+	"layout_analysis.settings.title": "Innstillinger for poengsummen: vekter, ideell fingerbelastning, snarveier, kompakte tastaturer, fingersetting",
+	"layout_analysis.panel.rank.label": "Ranger blant",
+	"layout_analysis.panel.rank.library": "Alle oppsett i biblioteket",
+	"layout_analysis.panel.rank.selection": "Oppsettene som er krysset av i sammenligningen",
+	"layout_analysis.panel.rank.none_ticked": "Ingen oppsett er krysset av i sammenligningen ennå: kryss av noen der for å rangere dette blant dem."
 }

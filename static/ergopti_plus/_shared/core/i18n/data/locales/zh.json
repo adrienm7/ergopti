@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "左手",
 	"layout_analysis.details.hand_right": "右手",
 	"layout_analysis.heat.scale": "{metric}：每个键在此色阶上的颜色，从少到多。",
-	"layout_analysis.settings.title": "评分设置：权重、理想手指负荷、快捷键、紧凑键盘、指法"
+	"layout_analysis.settings.title": "评分设置：权重、理想手指负荷、快捷键、紧凑键盘、指法",
+	"layout_analysis.panel.rank.label": "排名范围",
+	"layout_analysis.panel.rank.library": "库中所有布局",
+	"layout_analysis.panel.rank.selection": "对比中勾选的布局",
+	"layout_analysis.panel.rank.none_ticked": "对比中尚未勾选任何布局：在那里勾选几个，即可在其中为此布局排名。"
 }

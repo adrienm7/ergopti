@@ -1832,6 +1832,35 @@ async function exerciseHeatmap(browser, origin) {
 		);
 	// The default is the global score: every key says the points it loses.
 	await settle('KeyE', 'heat !== null');
+	// (panel-rank-selection) « Rank among » ranks the edited layout among the
+	// layouts ticked in the Comparer (its saved selection) instead of the library;
+	// the finger load marks each finger's ideal.
+	const rankCount = () =>
+		page.evaluate(() => {
+			const m = document.querySelector('.la-panel-score').textContent.match(/of (\d+)/);
+			return m ? Number(m[1]) : null;
+		});
+	await page.waitForFunction(() =>
+		/of \d+/.test(document.querySelector('.la-panel-score').textContent)
+	);
+	assert.ok((await rankCount()) > 100, 'ranked among the whole library');
+	assert.equal(await page.locator('.la-panel-target').count(), 8, 'eight ideal marks');
+	await page.evaluate(() => {
+		const key = 'ergopti.layout_analysis.v1';
+		const saved = JSON.parse(window.localStorage.getItem(key) || '{}');
+		window.localStorage.setItem(
+			key,
+			JSON.stringify(Object.assign(saved, { selected: ['qwerty', 'dvorak', 'bepo'] }))
+		);
+	});
+	await page.selectOption('#la-panel-rank', 'selection');
+	await page.waitForFunction(() =>
+		/of 4\b/.test(document.querySelector('.la-panel-score').textContent)
+	);
+	await page.selectOption('#la-panel-rank', 'library');
+	await page.waitForFunction(() =>
+		/of \d{3}/.test(document.querySelector('.la-panel-score').textContent)
+	);
 	assert.match((await heatOf('KeyE')).title, /points lost/);
 	await page.selectOption('#la-panel-heat', 'sfb');
 	await page.waitForFunction(() =>

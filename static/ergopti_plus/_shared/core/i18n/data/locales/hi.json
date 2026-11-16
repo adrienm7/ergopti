@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "बायाँ हाथ",
 	"layout_analysis.details.hand_right": "दायाँ हाथ",
 	"layout_analysis.heat.scale": "{metric}: इस पैमाने पर हर कुंजी का रंग, सबसे कम से सबसे अधिक तक।",
-	"layout_analysis.settings.title": "स्कोर सेटिंग: भार, उंगलियों का आदर्श भार, शॉर्टकट, कॉम्पैक्ट कीबोर्ड, उंगली-विन्यास"
+	"layout_analysis.settings.title": "स्कोर सेटिंग: भार, उंगलियों का आदर्श भार, शॉर्टकट, कॉम्पैक्ट कीबोर्ड, उंगली-विन्यास",
+	"layout_analysis.panel.rank.label": "इनमें स्थान",
+	"layout_analysis.panel.rank.library": "लाइब्रेरी के सभी लेआउट",
+	"layout_analysis.panel.rank.selection": "तुलना में चुने गए लेआउट",
+	"layout_analysis.panel.rank.none_ticked": "तुलना में अभी कोई लेआउट चुना नहीं गया है: इसे उनमें स्थान देने के लिए वहाँ कुछ चुनें।"
 }

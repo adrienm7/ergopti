@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Levá ruka",
 	"layout_analysis.details.hand_right": "Pravá ruka",
 	"layout_analysis.heat.scale": "{metric}: barva každé klávesy na této stupnici, od nejméně po nejvíce.",
-	"layout_analysis.settings.title": "Nastavení skóre: váhy, ideální zatížení prstů, zkratky, kompaktní klávesnice, prstoklad"
+	"layout_analysis.settings.title": "Nastavení skóre: váhy, ideální zatížení prstů, zkratky, kompaktní klávesnice, prstoklad",
+	"layout_analysis.panel.rank.label": "Zařadit mezi",
+	"layout_analysis.panel.rank.library": "Všechna rozložení knihovny",
+	"layout_analysis.panel.rank.selection": "Rozložení zaškrtnutá v porovnání",
+	"layout_analysis.panel.rank.none_ticked": "V porovnání zatím není zaškrtnuté žádné rozložení: zaškrtněte tam některá, abyste mezi ně zařadili toto."
 }

@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "יד שמאל",
 	"layout_analysis.details.hand_right": "יד ימין",
 	"layout_analysis.heat.scale": "{metric}: צבע כל מקש בסולם הזה, מהמעט ביותר לרב ביותר.",
-	"layout_analysis.settings.title": "הגדרות הציון: משקלים, עומס אצבעות אידיאלי, קיצורי דרך, מקלדות קומפקטיות, אצבוע"
+	"layout_analysis.settings.title": "הגדרות הציון: משקלים, עומס אצבעות אידיאלי, קיצורי דרך, מקלדות קומפקטיות, אצבוע",
+	"layout_analysis.panel.rank.label": "דירוג בין",
+	"layout_analysis.panel.rank.library": "כל הפריסות בספרייה",
+	"layout_analysis.panel.rank.selection": "הפריסות המסומנות בהשוואה",
+	"layout_analysis.panel.rank.none_ticked": "עדיין לא סומנה אף פריסה בהשוואה: סמנו שם כמה כדי לדרג ביניהן את זו."
 }

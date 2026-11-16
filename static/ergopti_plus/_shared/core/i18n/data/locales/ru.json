@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Левая рука",
 	"layout_analysis.details.hand_right": "Правая рука",
 	"layout_analysis.heat.scale": "{metric}: цвет каждой клавиши на этой шкале, от меньшего к большему.",
-	"layout_analysis.settings.title": "Настройки оценки: веса, идеальная нагрузка пальцев, сочетания клавиш, компактные клавиатуры, аппликатура"
+	"layout_analysis.settings.title": "Настройки оценки: веса, идеальная нагрузка пальцев, сочетания клавиш, компактные клавиатуры, аппликатура",
+	"layout_analysis.panel.rank.label": "Место среди",
+	"layout_analysis.panel.rank.library": "Всех раскладок библиотеки",
+	"layout_analysis.panel.rank.selection": "Раскладок, отмеченных в сравнении",
+	"layout_analysis.panel.rank.none_ticked": "В сравнении пока не отмечено ни одной раскладки: отметьте там несколько, чтобы определить место этой среди них."
 }

@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Linke Hand",
 	"layout_analysis.details.hand_right": "Rechte Hand",
 	"layout_analysis.heat.scale": "{metric}: die Farbe jeder Taste auf dieser Skala, von wenig bis viel.",
-	"layout_analysis.settings.title": "Einstellungen der Wertung: Gewichte, ideale Fingerlast, Tastenkürzel, kompakte Tastaturen, Fingersatz"
+	"layout_analysis.settings.title": "Einstellungen der Wertung: Gewichte, ideale Fingerlast, Tastenkürzel, kompakte Tastaturen, Fingersatz",
+	"layout_analysis.panel.rank.label": "Einordnen unter",
+	"layout_analysis.panel.rank.library": "Allen Layouts der Bibliothek",
+	"layout_analysis.panel.rank.selection": "Den im Vergleich angehakten Layouts",
+	"layout_analysis.panel.rank.none_ticked": "Im Vergleich ist noch kein Layout angehakt: Haken Sie dort welche an, um dieses darunter einzuordnen."
 }

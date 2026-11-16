@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Mano sinistra",
 	"layout_analysis.details.hand_right": "Mano destra",
 	"layout_analysis.heat.scale": "{metric}: il colore di ogni tasto su questa scala, dal meno al più.",
-	"layout_analysis.settings.title": "Impostazioni del punteggio: pesi, carico ideale delle dita, scorciatoie, tastiere compatte, diteggiatura"
+	"layout_analysis.settings.title": "Impostazioni del punteggio: pesi, carico ideale delle dita, scorciatoie, tastiere compatte, diteggiatura",
+	"layout_analysis.panel.rank.label": "Classifica tra",
+	"layout_analysis.panel.rank.library": "Tutti i layout della libreria",
+	"layout_analysis.panel.rank.selection": "I layout spuntati nel confronto",
+	"layout_analysis.panel.rank.none_ticked": "Nel confronto non è ancora spuntato nessun layout: spuntane alcuni per classificare questo tra di essi."
 }

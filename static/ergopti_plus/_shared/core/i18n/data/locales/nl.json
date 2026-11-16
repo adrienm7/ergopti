@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Linkerhand",
 	"layout_analysis.details.hand_right": "Rechterhand",
 	"layout_analysis.heat.scale": "{metric}: de kleur van elke toets op deze schaal, van minst tot meest.",
-	"layout_analysis.settings.title": "Score-instellingen: gewichten, ideale vingerbelasting, sneltoetsen, compacte toetsenborden, vingerzetting"
+	"layout_analysis.settings.title": "Score-instellingen: gewichten, ideale vingerbelasting, sneltoetsen, compacte toetsenborden, vingerzetting",
+	"layout_analysis.panel.rank.label": "Rangschikken onder",
+	"layout_analysis.panel.rank.library": "Alle indelingen van de bibliotheek",
+	"layout_analysis.panel.rank.selection": "De aangevinkte indelingen in de vergelijking",
+	"layout_analysis.panel.rank.none_ticked": "Er is nog geen indeling aangevinkt in de vergelijking: vink er daar enkele aan om deze ertussen te rangschikken."
 }

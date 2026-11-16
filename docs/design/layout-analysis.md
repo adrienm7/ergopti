@@ -569,7 +569,13 @@ does not load the panel's scripts gets no panel.
 - Each edit is analysed 150 ms after the last change. In Chromium the
   conversion takes about 0.3 ms and the analysis about 5 ms.
 - The library is ranked once per corpus, keyboard, weights and ideal finger
-  load. The rank is « N of library + 1 ».
+  load. The rank is « N of library + 1 ». « Rank among » (`#la-panel-rank`,
+  saved with the corpus) ranks it instead among the library and imported
+  layouts ticked in « Comparer » (its saved selection); with none ticked, a
+  note says so and the rank is 1 of 1.
+- The finger load is each finger's share of the non-thumb presses
+  (`fingerShares`) with a mark at its ideal load (`idealLoad`), the two sides
+  of `finger_imbalance`.
 - The panel reads the weights, ideal finger load, shortcut table and form
   factor weights the Comparer saved (key
   `LAYOUT_ANALYSIS_FILES.SETTINGS_KEY`), so both pages score alike.

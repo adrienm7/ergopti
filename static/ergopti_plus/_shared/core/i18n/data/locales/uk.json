@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Ліва рука",
 	"layout_analysis.details.hand_right": "Права рука",
 	"layout_analysis.heat.scale": "{metric}: колір кожної клавіші на цій шкалі, від меншого до більшого.",
-	"layout_analysis.settings.title": "Налаштування оцінки: ваги, ідеальне навантаження пальців, сполучення клавіш, компактні клавіатури, аплікатура"
+	"layout_analysis.settings.title": "Налаштування оцінки: ваги, ідеальне навантаження пальців, сполучення клавіш, компактні клавіатури, аплікатура",
+	"layout_analysis.panel.rank.label": "Місце серед",
+	"layout_analysis.panel.rank.library": "Усіх розкладок бібліотеки",
+	"layout_analysis.panel.rank.selection": "Розкладок, позначених у порівнянні",
+	"layout_analysis.panel.rank.none_ticked": "У порівнянні ще не позначено жодної розкладки: позначте там кілька, щоб визначити місце цієї серед них."
 }

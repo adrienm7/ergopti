@@ -4746,5 +4746,9 @@
 	"layout_analysis.details.hand_left": "Sol el",
 	"layout_analysis.details.hand_right": "Sağ el",
 	"layout_analysis.heat.scale": "{metric}: her tuşun bu ölçekteki rengi, en azdan en çoğa.",
-	"layout_analysis.settings.title": "Puan ayarları: ağırlıklar, ideal parmak yükü, kısayollar, kompakt klavyeler, parmak düzeni"
+	"layout_analysis.settings.title": "Puan ayarları: ağırlıklar, ideal parmak yükü, kısayollar, kompakt klavyeler, parmak düzeni",
+	"layout_analysis.panel.rank.label": "Sıralama kümesi",
+	"layout_analysis.panel.rank.library": "Kitaplıktaki tüm düzenler",
+	"layout_analysis.panel.rank.selection": "Karşılaştırmada işaretli düzenler",
+	"layout_analysis.panel.rank.none_ticked": "Karşılaştırmada henüz işaretli düzen yok: bunu aralarında sıralamak için orada birkaçını işaretleyin."
 }
