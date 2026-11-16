@@ -414,6 +414,33 @@ _DynHSTest_InternationalPhoneDropsOnlyTheTrunkZero() {
 Test("dynamic hotstrings: the +33 form drops only a leading 0, never another first digit",
 	_DynHSTest_InternationalPhoneDropsOnlyTheTrunkZero)
 
+_DynHSTest_InternationalPrefixReplaysCorpus() {
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\prefix_vectors.json", "UTF-8"))
+	Assert(Corpus["international_prefix_vectors"].Length >= 2, "the corpus must hold its international prefix vectors")
+	for Vector in Corpus["international_prefix_vectors"]
+		AssertEqual(Vector["expected"], _DynHS_InternationalPrefix(Vector["phone"], Vector["plain_count"]), Vector["id"])
+}
+Test("dynamic hotstrings: every international_prefix vector replays on the +33 trigger builder (HCM-007)",
+	_DynHSTest_InternationalPrefixReplaysCorpus)
+
+; A number stored without its trunk zero registered +33 and digits 2 to 4
+; (+33123 for 612345678), skipping its first digit, where macOS and Linux
+; register +336123. The registry is read directly: typed, +336123 is shadowed
+; by the shorter +3361 star trigger of the same number on every driver.
+_DynHSTest_IntlShortTriggerKeepsEveryDigitBody() {
+	global HSE_StarSpecs
+	Triggers := Map()
+	for Spec in HSE_StarSpecs
+		Triggers[Spec.Trigger] := Spec
+	AssertTrue(Triggers.Has("+336123"), "+33 and the first three national digits are registered")
+	AssertEqual("+33612345678", Triggers["+336123"].Replacement.Call(), "the +33 trigger types the international number")
+	AssertFalse(Triggers.Has("+33123"), "no trigger skips the first digit of a number stored without its 0")
+}
+Test("dynamic hotstrings: the short +33 trigger of a number stored without its 0 keeps every digit (intl-short-trigger)",
+	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_IntlShortTriggerKeepsEveryDigitBody, [],
+		Map("phone_number", "612345678", "phone_number_clean", "6 12 34 56 78",
+			"social_security_number", "1 99 99 99 999 999 99", "iban", "FR76 1234 5678 9012 3456 789")))
+
 _DynHSTest_SsnAndIbanReplacementsBody() {
 	AssertEqual("199999999999999", _DynHSTest_ExpandsTo("19999"), "the raw SSN trigger types the SSN without spaces")
 	AssertEqual("1 99 99 99 999 999 99", _DynHSTest_ExpandsTo("1 99 99"), "the spaced SSN trigger types the SSN with spaces")

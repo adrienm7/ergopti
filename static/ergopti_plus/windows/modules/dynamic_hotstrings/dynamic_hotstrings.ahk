@@ -128,6 +128,19 @@ _DynHS_InternationalPhone(Phone) {
 	return "+33" . (SubStr(Phone, 1, 1) == "0" ? SubStr(Phone, 2) : Phone)
 }
 
+; The "+33" trigger standing for the first PlainCount characters of a stored
+; number: the country code, then the number without its trunk zero, one digit
+; shorter when that zero was there, so 0612 and 612 both give +33612 and
+; 612345678 gives +336123 (port of the shared international_prefix, pinned by
+; the international_prefix_vectors of prefix_vectors.json).
+; @param Phone {String} The stored phone number.
+; @param PlainCount {Integer} Characters of the plain prefix this trigger mirrors.
+; @returns {String}
+_DynHS_InternationalPrefix(Phone, PlainCount) {
+	Trunk := SubStr(Phone, 1, 1) == "0"
+	return "+33" . SubStr(Trunk ? SubStr(Phone, 2) : Phone, 1, PlainCount - (Trunk ? 1 : 0))
+}
+
 
 
 ; ==========================================
@@ -188,7 +201,7 @@ _DynHS_RegisterAll() {
 
 	if Features["hotstrings"]["dynamic"][ConfigLeaf.PHONE_PREFIXES]["enabled"] {
 		IntlPhone := _DynHS_InternationalPhone(Phone)
-		; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33+phone[2:4], phone[2:5], fphone[1:5]
+		; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33 and the national digits of phone[1:4], phone[2:5], fphone[1:5]
 		MK := ScriptInformation["MagicKey"]
 		if StrLen(Phone) >= 2 {
 			CreateHotstring("*C", SubStr(Phone, 1, 2) . MK, (*) => Phone, _DynPrivateOpts)
@@ -196,7 +209,7 @@ _DynHS_RegisterAll() {
 		}
 		if StrLen(Phone) >= 4 {
 			CreateHotstring("*C", SubStr(Phone, 1, 4), (*) => Phone, _DynPrivateOpts)
-			CreateHotstring("*C", "+33" . SubStr(Phone, 2, 3), (*) => IntlPhone, _DynPrivateOpts)
+			CreateHotstring("*C", _DynHS_InternationalPrefix(Phone, 4), (*) => IntlPhone, _DynPrivateOpts)
 		}
 		if StrLen(Phone) >= 6 {
 			CreateHotstring("*C", SubStr(Phone, 2, 4), (*) => Phone, _DynPrivateOpts)

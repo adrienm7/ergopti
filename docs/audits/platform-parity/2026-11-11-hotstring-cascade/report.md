@@ -149,6 +149,10 @@ had no unit test of the undo at all: `test_backspace_undo.lua` is the first.
   (`612345678`), the short `+33` trigger still drops the first digit
   (`+33123`, `SubStr(Phone, 2, 3)` in `dynamic_hotstrings.ahk:199`); macOS and
   Linux now register `+336123`.
+  Done on 2026-11-16: `_DynHS_InternationalPrefix` ports the shared
+  `international_prefix`, and the `international_prefix_vectors` of
+  `prefix_vectors.json` pin it on Windows and against the shared reference
+  (`intl-short-trigger` in `test_dynamic_hotstrings_module.ahk`).
 - **Windows (report only):** the inventory still declares no repeat activation
   window on Windows although `HSE_RepeatWindowSeconds` gates it (decision of
   2026-11-06); its row in `behaviors.json` needs the maintainer's review of the
