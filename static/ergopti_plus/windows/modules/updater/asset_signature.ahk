@@ -141,12 +141,14 @@ AssetSignature_Verify(SpkiBase64, Record, SignatureBase64) {
  * @returns {string} "" when admitted, otherwise bad_policy or required_without_key.
  */
 AssetSignature_AdmitPolicy(Policy) {
-	if !(Policy is Map) || Policy.Get("schema_version", 0) != 1 || Policy.Get("algorithm", "") != "ecdsa-p256-sha256"
+	; Text fields compare case-sensitively (==, !==), as the Lua drivers do: AHK's
+	; = and != ignore case, which admitted « Required » or « OFF » (UPW-005).
+	if !(Policy is Map) || Policy.Get("schema_version", 0) != 1 || Policy.Get("algorithm", "") !== "ecdsa-p256-sha256"
 			|| Policy.Get("signature_bytes", 0) != 64 || !(Policy.Get("record_header", 0) is String)
 			|| !(Policy.Get("signature_suffix", 0) is String) || !(Policy.Get("public_key_spki_base64", 0) is String)
-			|| !(Policy.Get("enforcement", "") = "off" || Policy.Get("enforcement", "") = "required")
+			|| !(Policy.Get("enforcement", "") == "off" || Policy.Get("enforcement", "") == "required")
 		return "bad_policy"
-	if Policy["enforcement"] = "required" && Policy["public_key_spki_base64"] == ""
+	if Policy["enforcement"] == "required" && Policy["public_key_spki_base64"] == ""
 		return "required_without_key"
 	return ""
 }
@@ -159,7 +161,7 @@ AssetSignature_AdmitPolicy(Policy) {
  * @returns {Map} "verdict" (verified, not_enforced or refused) and "reason".
  */
 AssetSignature_Evaluate(Policy, Asset, SignatureBase64) {
-	Required := (Policy["enforcement"] = "required")
+	Required := (Policy["enforcement"] == "required")
 	Record := AssetSignature_Record(Policy["record_header"], Asset["name"], Asset["size"], Asset["sha256"])
 	if Record == ""
 		return Map("verdict", Required ? "refused" : "not_enforced", "reason", "bad_asset")

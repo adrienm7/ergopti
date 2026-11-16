@@ -115,6 +115,12 @@ _TAS_PolicyAdmission() {
 	AssertEqual("required_without_key", AssetSignature_AdmitPolicy(_TAS_Policy(V, "required", "")))
 	AssertEqual("bad_policy", AssetSignature_AdmitPolicy(_TAS_Policy(V, "maybe")))
 	AssertEqual("bad_policy", AssetSignature_AdmitPolicy(0))
+	; UPW-005: the Lua drivers refuse another casing, so Windows must too.
+	for Spelling in ["Required", "OFF", "Off", "REQUIRED"]
+		AssertEqual("bad_policy", AssetSignature_AdmitPolicy(_TAS_Policy(V, Spelling)), "enforcement " . Spelling)
+	Policy := _TAS_Policy(V)
+	Policy["algorithm"] := "ECDSA-P256-SHA256"
+	AssertEqual("bad_policy", AssetSignature_AdmitPolicy(Policy), "an algorithm in another casing")
 }
 
 Test("AssetSignature: the policy admits only what it can honour (asset-signature)", _TAS_PolicyAdmission)
