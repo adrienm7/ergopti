@@ -101,10 +101,14 @@ function Invoke-InMsvc {
 		[Parameter(Mandatory = $true)][string]$WorkDirectory
 	)
 	$script = Join-Path $WorkDirectory "build.cmd"
-	$lines = @("@echo off", "call `"$VcVars`" $Target >nul || exit /b 90")
-	foreach ($command in $Commands) { $lines += "$command || exit /b 91" }
+	# cmd joins each tool's stderr to its stdout (vcvarsall's stdout alone is
+	# dropped): Windows PowerShell 5.1 turns every stderr line it captures into
+	# an error record, which $ErrorActionPreference = "Stop" throws on, so a
+	# warning line of vcvarsall stopped a successful build there.
+	$lines = @("@echo off", "call `"$VcVars`" $Target 2>&1 1>nul || exit /b 90")
+	foreach ($command in $Commands) { $lines += "$command 2>&1 || exit /b 91" }
 	Set-Content -LiteralPath $script -Value $lines -Encoding ascii
-	$output = & $env:ComSpec /d /c "`"$script`"" 2>&1
+	$output = & $env:ComSpec /d /c "`"$script`""
 	$code = $LASTEXITCODE
 	if ($code -ne 0) {
 		throw "MSVC $Target build failed (exit $code):`n$($output -join "`n")"

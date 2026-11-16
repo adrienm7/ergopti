@@ -210,6 +210,7 @@
 		"test:linux-ships-keylayout-converter": "node ./tools/test/test-linux-ships-keylayout-converter.cjs",
 		"test:keylayout-canonical-parity": "node ./tools/test/test-keylayout-canonical-parity.cjs",
 		"test:windows-keyboard-layout-codegen": "node ./tools/test/test-windows-keyboard-layout-codegen.cjs",
+		"test:windows-keyboard-layout-builder": "node ./tools/test/test-windows-keyboard-layout-builder.cjs",
 		"test:xkb-row-options": "node ./tools/test/test-xkb-row-options.cjs",
 		"test:keylayout-row-options": "node ./tools/test/test-keylayout-row-options.cjs",
 		"test:xkb": "node ./tools/test/run-xkb-python-tests.cjs",
