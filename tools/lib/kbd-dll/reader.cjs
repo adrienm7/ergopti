@@ -20,7 +20,16 @@
  *    cbLgEntry against nLgMax, ModNumber against the columns, the KBD_VERSION
  *    word, list terminators inside their section.
  * 3. The pointer width of a 32-bit image is detected from its tables: a SysWOW64
- *    image stores 64-bit pointers (high word zero) in the same layout as x64.
+ *    image stores 64-bit pointers (high word zero) in the same layout as x64,
+ *    and its KbdLayerDescriptor must return kbd.h's 64-bit KBD_LONG_POINTER in
+ *    EDX:EAX (mov eax, imm32; cdq; ret), as Microsoft's SysWOW64 layouts do; a
+ *    32-bit return there, or a 64-bit one from a native x86 image, is refused.
+ * 4. Images another toolchain built (Microsoft's own layouts, the MSVC builder's)
+ *    read with { foreign: true }: their tables may sit in a writable section (the
+ *    MSVC builder merges them into .data) or share the code section (the older
+ *    SysWOW64 layouts), and kbd.h's optional dwType may be any value (Microsoft
+ *    leaves it 0). Every other check stays. This tool's own images take neither
+ *    liberty: read-only tables and dwType 4 (KEYBOARD_TYPE_GENERIC_101).
  * ==============================================================================
  */
 
@@ -164,9 +173,15 @@ function descriptorTarget(img) {
 	if (!s || !(s.flags & SCN_EXECUTE)) refuse('KbdLayerDescriptor is not in code');
 	const at = img.offset(exp.rva, 12);
 	const code = img.b.subarray(at, at + 12);
-	if (img.machine === 'x86' && code[0] === 0xb8 && code[5] === 0xc3) {
+	// x86: mov eax, imm32; ret (32 bits) or mov eax, imm32; cdq; ret (64 bits in EDX:EAX).
+	const cdq = code[5] === 0x99 && code[6] === 0xc3;
+	if (img.machine === 'x86' && code[0] === 0xb8 && (code[5] === 0xc3 || cdq)) {
 		if (img.relocs.get(exp.rva + 1) !== REL_HIGHLOW) refuse('descriptor address not relocated');
-		return { rva: code.readUInt32LE(1) - img.imageBase, ordinal: exp.ordinal };
+		return {
+			rva: code.readUInt32LE(1) - img.imageBase,
+			ordinal: exp.ordinal,
+			bits: cdq ? 64 : 32
+		};
 	}
 	if (
 		img.machine === 'x64' &&
@@ -175,7 +190,7 @@ function descriptorTarget(img) {
 		code[2] === 0x05 &&
 		code[7] === 0xc3
 	)
-		return { rva: exp.rva + 7 + code.readInt32LE(3), ordinal: exp.ordinal };
+		return { rva: exp.rva + 7 + code.readInt32LE(3), ordinal: exp.ordinal, bits: 64 };
 	if (img.machine === 'arm64') {
 		const adrp = code.readUInt32LE(0);
 		const add = code.readUInt32LE(4);
@@ -188,7 +203,7 @@ function descriptorTarget(img) {
 			const imm = (((adrp >> 5) & 0x7ffff) << 2) | ((adrp >> 29) & 3);
 			const signed = imm & 0x100000 ? imm - 0x200000 : imm;
 			const page = (exp.rva & ~0xfff) + signed * 4096;
-			return { rva: page + ((add >> 10) & 0xfff), ordinal: exp.ordinal };
+			return { rva: page + ((add >> 10) & 0xfff), ordinal: exp.ordinal, bits: 64 };
 		}
 	}
 	refuse('unrecognized KbdLayerDescriptor code');
@@ -197,19 +212,22 @@ function descriptorTarget(img) {
 /**
  * Reads and checks every table of a layout DLL.
  * @param {Uint8Array} bytes
- * @param {{trace?: boolean}} [options] - trace: also return every value the
- *   reader read from the tables, in reading order, each pointer as the order in
- *   which its target was first named, so two images holding the same tables at
- *   other addresses give the same trace.
- * @returns {{machine: string, pointer: number, wow64: boolean, checks: string[], layout: object,
- *   trace?: Array<number|string>}}
+ * @param {{trace?: boolean, foreign?: boolean}} [options] - trace: also return
+ *   every value the reader read from the tables, in reading order, each pointer
+ *   as the order in which its target was first named, so two images holding the
+ *   same tables at other addresses give the same trace. foreign: an image another
+ *   toolchain built (see FEATURES 4).
+ * @returns {{machine: string, pointer: number, wow64: boolean, descriptor_bits: number,
+ *   keyboard_type: number, checks: string[], layout: object, trace?: Array<number|string>}}
  */
 function readDll(bytes, options = {}) {
 	const img = parsePe(bytes);
 	if (img.entry !== 0) refuse('a layout DLL has no entry point');
-	for (const s of img.sections)
-		if (s.flags & SCN_WRITE && s.rawSize > 0 && s.name !== '.reloc')
-			refuse('writable section', s.name);
+	const foreign = options.foreign === true;
+	if (!foreign)
+		for (const s of img.sections)
+			if (s.flags & SCN_WRITE && s.rawSize > 0 && s.name !== '.reloc')
+				refuse('writable section', s.name);
 	const target = descriptorTarget(img);
 	const b = img.b;
 	const trace = options.trace ? [] : null;
@@ -226,6 +244,13 @@ function readDll(bytes, options = {}) {
 	// A 32-bit image's own pointer width: SysWOW64 tables are 64 bits wide.
 	const width = img.plus ? 8 : b.readUInt32LE(img.offset(tablesRva + 4, 4)) === 0 ? 8 : 4;
 	const wow64 = !img.plus && width === 8;
+	// kbd.h's KBD_LONG_POINTER: the descriptor is as wide as the table pointers.
+	if (target.bits !== width * 8)
+		refuse(
+			wow64
+				? 'the wow64 KbdLayerDescriptor returns 32 bits, not the 64-bit KBD_LONG_POINTER'
+				: 'a 32-bit KbdLayerDescriptor returns 64 bits'
+		);
 	const checked = new Set();
 	/** A pointer slot: null, or the RVA it names, after every check. */
 	const pointer = (slot, align, what) => {
@@ -265,8 +290,11 @@ function readDll(bytes, options = {}) {
 		const rva = va - img.imageBase;
 		const s = img.section(rva);
 		if (!s) refuse('pointer outside the image', what);
-		if (s.flags & SCN_WRITE || s.flags & SCN_EXECUTE || !(s.flags & SCN_INITIALIZED))
+		if (!foreign && (s.flags & SCN_WRITE || s.flags & SCN_EXECUTE))
 			refuse('pointer into a code or writable section', what);
+		// A foreign image's tables may share the code section (initialized code, not data).
+		if (!(s.flags & SCN_INITIALIZED) && !(foreign && s.flags & SCN_EXECUTE))
+			refuse('pointer into uninitialized data', what);
 		if (rva % align) refuse('misaligned table', what);
 		checked.add(what);
 		return rva;
@@ -296,7 +324,7 @@ function readDll(bytes, options = {}) {
 	if (t.flags >>> 16 !== 1) refuse('KBD_VERSION is not 1');
 	if (t.modifiers === null || t.wchTables === null || t.scan === null)
 		refuse('a mandatory table is missing');
-	if (t.type !== 4) refuse('keyboard type is not 4');
+	if (!foreign && t.type !== 4) refuse('keyboard type is not 4');
 
 	// Modifiers: VK_TO_BIT list, then wMaxModBits and its ModNumber bytes.
 	const toBit = pointer(t.modifiers, 1, 'pVkToBit');
@@ -467,6 +495,8 @@ function readDll(bytes, options = {}) {
 		machine: img.machine,
 		pointer: width,
 		wow64,
+		descriptor_bits: target.bits,
+		keyboard_type: t.type,
 		subsystem: img.subsystem,
 		ordinal: target.ordinal,
 		checks: [...checked].sort(),

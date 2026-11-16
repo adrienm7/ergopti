@@ -19,8 +19,10 @@
  *    ordinal 1 returning &KbdTables, base relocations for every table pointer
  *    (HIGHLOW in a 32-bit image, DIR64 in a 64-bit one) and the PE checksum.
  * 2. The same code the clang build produces for KbdLayerDescriptor: mov eax /
- *    ret (x86), lea rax,[rip] / ret (x64), adrp / add / ret (arm64), which the
- *    independent reader (reader.cjs) decodes.
+ *    ret (x86), mov eax / cdq / ret (wow64: kbd.h returns a KBD_LONG_POINTER,
+ *    64 bits wide under BUILD_WOW6432, in EDX:EAX, as Microsoft's SysWOW64
+ *    layouts and the MSVC build do), lea rax,[rip] / ret (x64), adrp / add /
+ *    ret (arm64), which the independent reader (reader.cjs) decodes.
  * 3. Deterministic: the same model gives the same bytes (no timestamp).
  * ==============================================================================
  */
@@ -328,7 +330,10 @@ function rdata(model, image, rva) {
 /** KbdLayerDescriptor's code: return &KbdTables. */
 function descriptorCode(image, codeRva, tablesRva) {
 	if (image.machine === 0x014c) {
-		const code = Bytes.of([0xb8, 0, 0, 0, 0, 0xc3]);
+		// cdq: the wow64 descriptor is 64 bits wide, its high half EAX's sign (0 below 2 GB).
+		const code = Bytes.of(
+			image.width === 8 ? [0xb8, 0, 0, 0, 0, 0x99, 0xc3] : [0xb8, 0, 0, 0, 0, 0xc3]
+		);
 		Bytes.u32(code, image.base + tablesRva, 1);
 		return { code, relocations: [{ rva: codeRva + 1, type: REL_HIGHLOW }] };
 	}
@@ -526,7 +531,8 @@ function writeImage(model, arch) {
 	const image = IMAGES[arch];
 	if (!image) throw new Model.ModelError('kbd_arch_unknown', arch);
 	const codeRva = SECTION_ALIGN;
-	const codeSize = image.machine === 0x014c ? 6 : image.machine === 0x8664 ? 8 : 12;
+	const codeSize =
+		image.machine === 0x014c ? (image.width === 8 ? 7 : 6) : image.machine === 0x8664 ? 8 : 12;
 	const rdataRva = codeRva + align(codeSize, SECTION_ALIGN);
 	const data = rdata(model, image, rdataRva);
 	const code = descriptorCode(image, codeRva, data.tablesRva);

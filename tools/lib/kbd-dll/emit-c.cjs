@@ -18,9 +18,12 @@
  *    kbd.h's KBD_LONG_POINTER makes them under BUILD_WOW6432), x64 and arm64.
  *    A wow64 pointer is a 32-bit pointer followed by a zero word, 8-aligned: the
  *    64-bit layout, filled by a 32-bit image's relocations.
- * 2. Every table is const, so it lands in read-only data; static assertions pin
+ * 2. KbdLayerDescriptor returns kbd.h's KBD_LONG_POINTER: 64 bits in EDX:EAX
+ *    for wow64 (mov eax, imm32; cdq; ret, the code of Microsoft's SysWOW64
+ *    layouts and of MSVC), the native pointer elsewhere.
+ * 3. Every table is const, so it lands in read-only data; static assertions pin
  *    each structure's size to the layout the reader checks independently.
- * 3. Deterministic: the same model gives the same text.
+ * 4. Deterministic: the same model gives the same text.
  * ==============================================================================
  */
 
@@ -292,7 +295,20 @@ function emitC(input) {
 	line('};');
 	line('');
 	line('/* The one export (ordinal 1): the system calls it to get the tables. */');
+	line('#if defined(KBD_WOW64)');
+	line('/* kbd.h returns a KBD_LONG_POINTER, 64 bits wide under BUILD_WOW6432: EDX:EAX, the high');
+	line(
+		"   half the sign of EAX, as Microsoft's SysWOW64 layouts do (mov eax, imm32; cdq; ret). */"
+	);
+	line('unsigned long long __stdcall KbdLayerDescriptor(void)');
+	line('{');
+	line('\tunsigned long long tables;');
+	line('\t__asm__("movl %1, %%eax\\n\\tcltd" : "=A"(tables) : "i"(&KbdTables));');
+	line('\treturn tables;');
+	line('}');
+	line('#else');
 	line('const KBDTABLES *__stdcall KbdLayerDescriptor(void) { return &KbdTables; }');
+	line('#endif');
 	return `${out.join('\n')}\n`;
 }
 

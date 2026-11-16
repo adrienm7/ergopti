@@ -65,6 +65,15 @@ function resourceLeaves(bytes) {
 	return leaves;
 }
 
+/** A 32-bit image's KbdLayerDescriptor bytes up to its ret, the address it loads zeroed. */
+function x86Descriptor(bytes) {
+	const img = parsePe(bytes);
+	const exp = img.exports.find((e) => e.name === 'KbdLayerDescriptor');
+	const at = img.offset(exp.rva, 8);
+	const code = Buffer.from(img.b.subarray(at, at + 8)).fill(0, 1, 5);
+	return [...code.subarray(0, code.indexOf(0xc3, 5) + 1)];
+}
+
 /**
  * The compiler-free writer (pe-writer.cjs) against the clang image of the same
  * model: the reader reads the same tables (every value it reads, pointers as the
@@ -82,9 +91,22 @@ function provePeWriter(model, label, clangDlls) {
 		assert.deepEqual(mine.trace, clang.trace, `${label} ${arch}: the same tables as clang's`);
 		assert.deepEqual(mine.layout, clang.layout, `${label} ${arch}: the same layout as clang's`);
 		assert.deepEqual(
-			[mine.machine, mine.pointer, mine.wow64, mine.ordinal, mine.subsystem],
-			[clang.machine, clang.pointer, clang.wow64, clang.ordinal, clang.subsystem]
+			[mine.machine, mine.pointer, mine.wow64, mine.descriptor_bits, mine.ordinal, mine.subsystem],
+			[
+				clang.machine,
+				clang.pointer,
+				clang.wow64,
+				clang.descriptor_bits,
+				clang.ordinal,
+				clang.subsystem
+			]
 		);
+		if (mine.machine === 'x86')
+			assert.deepEqual(
+				x86Descriptor(bytes),
+				x86Descriptor(clangDlls[arch]),
+				`${label} ${arch}: KbdLayerDescriptor is clang's code`
+			);
 		assert.deepEqual(
 			resourceLeaves(bytes),
 			resourceLeaves(clangDlls[arch]),
@@ -118,6 +140,11 @@ function proveBuild(model, label) {
 	assert.equal(reads.x86.pointer, 4);
 	assert.equal(reads.wow64.pointer, 8, 'the SysWOW64 image stores 64-bit pointers');
 	assert.equal(reads.wow64.wow64, true);
+	// kbd.h's KBD_LONG_POINTER: the wow64 descriptor returns 64 bits (EDX:EAX), x86 32.
+	assert.equal(reads.wow64.descriptor_bits, 64, 'the wow64 descriptor returns 64 bits');
+	assert.equal(reads.x86.descriptor_bits, 32);
+	assert.deepEqual(x86Descriptor(dlls.wow64), [0xb8, 0, 0, 0, 0, 0x99, 0xc3], 'mov eax; cdq; ret');
+	assert.deepEqual(x86Descriptor(dlls.x86), [0xb8, 0, 0, 0, 0, 0xc3], 'mov eax; ret');
 	assert.equal(reads.x64.machine, 'x64');
 	assert.equal(reads.arm64.machine, 'arm64');
 	for (const read of Object.values(reads)) {

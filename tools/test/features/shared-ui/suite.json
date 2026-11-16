@@ -501,6 +501,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-pdf-text.cjs"],
 			"repro": "npm run test:pdf-text"
+		},
+		{
+			"id": "kbd-dll-wow64",
+			"ordinal": 680,
+			"name": "the compiler-free SysWOW64 layout DLL returns kbd.h's 64-bit descriptor and holds the MSVC build's tables, and the reader refuses a truncated descriptor",
+			"cmd": "node",
+			"args": ["tools/test/test-kbd-dll-wow64.cjs"],
+			"repro": "npm run test:kbd-dll-wow64"
 		}
 	]
 }

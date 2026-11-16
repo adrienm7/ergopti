@@ -724,9 +724,12 @@ module.exports = {
  *    kbd.h's KBD_LONG_POINTER makes them under BUILD_WOW6432), x64 and arm64.
  *    A wow64 pointer is a 32-bit pointer followed by a zero word, 8-aligned: the
  *    64-bit layout, filled by a 32-bit image's relocations.
- * 2. Every table is const, so it lands in read-only data; static assertions pin
+ * 2. KbdLayerDescriptor returns kbd.h's KBD_LONG_POINTER: 64 bits in EDX:EAX
+ *    for wow64 (mov eax, imm32; cdq; ret, the code of Microsoft's SysWOW64
+ *    layouts and of MSVC), the native pointer elsewhere.
+ * 3. Every table is const, so it lands in read-only data; static assertions pin
  *    each structure's size to the layout the reader checks independently.
- * 3. Deterministic: the same model gives the same text.
+ * 4. Deterministic: the same model gives the same text.
  * ==============================================================================
  */
 
@@ -998,7 +1001,20 @@ function emitC(input) {
 	line('};');
 	line('');
 	line('/* The one export (ordinal 1): the system calls it to get the tables. */');
+	line('#if defined(KBD_WOW64)');
+	line('/* kbd.h returns a KBD_LONG_POINTER, 64 bits wide under BUILD_WOW6432: EDX:EAX, the high');
+	line(
+		"   half the sign of EAX, as Microsoft's SysWOW64 layouts do (mov eax, imm32; cdq; ret). */"
+	);
+	line('unsigned long long __stdcall KbdLayerDescriptor(void)');
+	line('{');
+	line('\tunsigned long long tables;');
+	line('\t__asm__("movl %1, %%eax\\n\\tcltd" : "=A"(tables) : "i"(&KbdTables));');
+	line('\treturn tables;');
+	line('}');
+	line('#else');
 	line('const KBDTABLES *__stdcall KbdLayerDescriptor(void) { return &KbdTables; }');
+	line('#endif');
 	return `${out.join('\n')}\n`;
 }
 
@@ -1757,8 +1773,10 @@ module.exports = { toSource, fromSource, SourceMappingError };
  *    ordinal 1 returning &KbdTables, base relocations for every table pointer
  *    (HIGHLOW in a 32-bit image, DIR64 in a 64-bit one) and the PE checksum.
  * 2. The same code the clang build produces for KbdLayerDescriptor: mov eax /
- *    ret (x86), lea rax,[rip] / ret (x64), adrp / add / ret (arm64), which the
- *    independent reader (reader.cjs) decodes.
+ *    ret (x86), mov eax / cdq / ret (wow64: kbd.h returns a KBD_LONG_POINTER,
+ *    64 bits wide under BUILD_WOW6432, in EDX:EAX, as Microsoft's SysWOW64
+ *    layouts and the MSVC build do), lea rax,[rip] / ret (x64), adrp / add /
+ *    ret (arm64), which the independent reader (reader.cjs) decodes.
  * 3. Deterministic: the same model gives the same bytes (no timestamp).
  * ==============================================================================
  */
@@ -2066,7 +2084,10 @@ function rdata(model, image, rva) {
 /** KbdLayerDescriptor's code: return &KbdTables. */
 function descriptorCode(image, codeRva, tablesRva) {
 	if (image.machine === 0x014c) {
-		const code = Bytes.of([0xb8, 0, 0, 0, 0, 0xc3]);
+		// cdq: the wow64 descriptor is 64 bits wide, its high half EAX's sign (0 below 2 GB).
+		const code = Bytes.of(
+			image.width === 8 ? [0xb8, 0, 0, 0, 0, 0x99, 0xc3] : [0xb8, 0, 0, 0, 0, 0xc3]
+		);
 		Bytes.u32(code, image.base + tablesRva, 1);
 		return { code, relocations: [{ rva: codeRva + 1, type: REL_HIGHLOW }] };
 	}
@@ -2264,7 +2285,8 @@ function writeImage(model, arch) {
 	const image = IMAGES[arch];
 	if (!image) throw new Model.ModelError('kbd_arch_unknown', arch);
 	const codeRva = SECTION_ALIGN;
-	const codeSize = image.machine === 0x014c ? 6 : image.machine === 0x8664 ? 8 : 12;
+	const codeSize =
+		image.machine === 0x014c ? (image.width === 8 ? 7 : 6) : image.machine === 0x8664 ? 8 : 12;
 	const rdataRva = codeRva + align(codeSize, SECTION_ALIGN);
 	const data = rdata(model, image, rdataRva);
 	const code = descriptorCode(image, codeRva, data.tablesRva);
@@ -2420,7 +2442,9 @@ function layoutIni(model) {
 			values[key] !== values[key].trim()
 		)
 			throw new Error(`kbd_installer_text: ${key}`);
-	const text = ['[layout]', ...STUB_INI_KEYS.map((key) => `${key}=${values[key]}`), ''].join('\r\n');
+	const text = ['[layout]', ...STUB_INI_KEYS.map((key) => `${key}=${values[key]}`), ''].join(
+		'\r\n'
+	);
 	const bytes = new Uint8Array(2 + text.length * 2);
 	bytes[0] = 0xff;
 	bytes[1] = 0xfe;

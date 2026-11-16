@@ -7,3 +7,15 @@ under CC BY-SA 3.0 and the GNU Free Documentation License; it is redistributed
 here under the Creative Commons Attribution-ShareAlike 3.0 Unported licence,
 whose text is static/layouts/registry/bepo/LICENSE. The DLLs the tests build
 from it are adaptations under the same licence and are not committed.
+
+kbdergop.klc and kbdergop-wow64-msvc.dll: this project's registry Ergopti
+(static/layouts/registry/ergopti, Ergopti 2.2.2) as the MSVC builder's generator
+writes it, recorded on 2026-11-16 for tools/test/test-kbd-dll-wow64.cjs.
+kbdergop.klc is `node tools/codegen/codegen-windows-keyboard-layout.cjs --klc
+<dir>` (SHA-256 b2ca216699369870c32adb0e2ab9f48ff52e974d8580428b3de699e08baec3b8).
+kbdergop-wow64-msvc.dll is the wow64 build of the C sources the same run wrote,
+with the cl, rc and link command lines of
+tools/build/build_windows_keyboard_layout.ps1 (/DBUILD_WOW6432 /D_WOW6432_),
+MSVC 14.29.30133 and Windows SDK 10.0.19041, x64_x86 target
+(SHA-256 360a7eaa55d6e71d7657e94a71b1ba1093ea50d925ab5849c18bda17be0413a3).
+The two are one pair: regenerate both together, never one alone.
