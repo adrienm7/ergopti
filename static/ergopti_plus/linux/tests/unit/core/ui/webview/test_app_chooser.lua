@@ -274,7 +274,7 @@ helpers.describe("application lookup owns its bounded native worker", function()
 		local Shell = require("core.process.adapters.shell_runner")
 		local made, root = Shell.exec_checked("mktemp -d"); assert(made); root = root:gsub("[\r\n]+$", "")
 		local driver, user = root .. "/driver;?literal", root .. "/user"
-		assert(Shell.run("mkdir -p " .. Shell.quote(driver .. "/ui") .. " " .. Shell.quote(driver .. "/_generated")
+		assert(Shell.run("mkdir -p " .. Shell.quote(driver .. "/apps/ui") .. " " .. Shell.quote(driver .. "/_generated")
 			.. " " .. Shell.quote(user .. "/applications")))
 		-- The sources are resolved by module name, never by a path pinned to the tree.
 		local modules = { "apps.ui.desktop_application_resolution", "apps.ui.desktop_application_resolution_worker",
