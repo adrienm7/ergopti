@@ -25,7 +25,8 @@
  * 4. The Studio's shared state: the keyboard format its editor and Comparer
  *    share (stored once for both), the layout the site's editor hands to the
  *    Comparer framed beside it (this tab's storage, taken once), and the
- *    layouts open in « Éditer », which the Comparer lists and follows.
+ *    layouts open in « Éditer », which the Comparer lists and follows; the
+ *    layout the optimizer hands to « Éditer » the same way.
  * ==============================================================================
  */
 
@@ -203,6 +204,10 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	const EDITOR_LAYOUTS_EVENT = 'ergopti-studio:editor-layouts';
 	// The message the editor's frame posts to the site's Studio to open « Comparer ».
 	const OPEN_COMPARER_MESSAGE = 'ergopti-studio:open-comparer';
+	// A layout another Studio tool (the optimizer) hands to « Éditer » for this
+	// tab, and the message that asks the site's Studio to open « Éditer ».
+	const EDITOR_HANDOFF_KEY = 'ergopti.studio.editor_handoff.v1';
+	const OPEN_EDITOR_MESSAGE = 'ergopti-studio:open-editor';
 
 	/**
 	 * The keyboard format chosen in the Studio, if storage keeps one.
@@ -254,6 +259,34 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	}
 
 	/**
+	 * Hands a layout (library shape) to « Éditer » of this tab, which opens it in
+	 * a new tab of its own.
+	 * @throws {Error} studio_handoff_failed when the tab's storage refuses it.
+	 */
+	function handOffToEditor(layout) {
+		try {
+			window.sessionStorage.setItem(EDITOR_HANDOFF_KEY, JSON.stringify(layout));
+		} catch {
+			throw failure('studio_handoff_failed');
+		}
+	}
+
+	/**
+	 * Takes the layout handed to « Éditer », once.
+	 * @returns {object|null} The layout, or null when none waits.
+	 */
+	function takeEditorHandoff() {
+		let text = null;
+		try {
+			text = window.sessionStorage.getItem(EDITOR_HANDOFF_KEY);
+			window.sessionStorage.removeItem(EDITOR_HANDOFF_KEY);
+		} catch {
+			return null;
+		}
+		return text === null ? null : JSON.parse(text);
+	}
+
+	/**
 	 * Tells the Comparer which layouts « Éditer » has open (library shape).
 	 * @param {object[]} layouts
 	 */
@@ -293,6 +326,9 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 		publishEditorLayouts,
 		onEditorLayouts,
 		OPEN_COMPARER_MESSAGE,
+		OPEN_EDITOR_MESSAGE,
+		handOffToEditor,
+		takeEditorHandoff,
 		readText,
 		builtinTables,
 		savedFormat,

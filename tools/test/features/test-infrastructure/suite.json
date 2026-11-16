@@ -542,7 +542,7 @@
 		},
 		{
 			"id": "js-0540",
-			"ordinal": 668,
+			"ordinal": 669,
 			"name": "commit identity gate refuses AI assistant identities and attribution trailers",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-commit-identity.cjs"],
@@ -550,7 +550,7 @@
 		},
 		{
 			"id": "js-0543",
-			"ordinal": 679,
+			"ordinal": 680,
 			"name": "startup benchmark fixture paths follow app_dirs.toml",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-bench-ahk-startup-paths.cjs"],

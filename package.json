@@ -59,6 +59,7 @@
 		"test:layout-composer-model": "node ./tools/test/test-layout-composer-model.cjs",
 		"test:layout-analysis-engine": "node ./tools/test/test-layout-analysis-engine.cjs",
 		"test:layout-optimizer": "node ./tools/test/test-layout-optimizer.cjs",
+		"test:layout-optimizer-page": "node ./tools/test/test-layout-optimizer-page.cjs",
 		"test:corpus-count-tables": "node ./tools/test/test-corpus-count-tables.cjs",
 		"test:corpus-text-sources": "node ./tools/test/test-corpus-text-sources.cjs",
 		"test:analyser-scores": "node ./tools/test/test-analyser-scores.cjs",

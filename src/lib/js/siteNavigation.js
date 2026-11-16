@@ -113,10 +113,11 @@ export const ERGOPTI_PLUS_PAGES = Object.freeze([
 	})
 ]);
 
-/** Tabs of Ergopti Studio: the editor and the layout comparison. */
+/** Tabs of Ergopti Studio: the editor, the layout comparison and the layout optimizer. */
 export const STUDIO_PAGES = Object.freeze([
 	Object.freeze({ route: '/studio', label: 'Éditer' }),
-	Object.freeze({ route: '/studio/comparer', label: 'Comparer' })
+	Object.freeze({ route: '/studio/comparer', label: 'Comparer' }),
+	Object.freeze({ route: '/studio/optimiser', label: 'Optimiser' })
 ]);
 
 /**

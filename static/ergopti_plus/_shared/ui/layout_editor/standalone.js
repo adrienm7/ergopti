@@ -17,6 +17,8 @@
  * Framed by the site (/studio, « Éditer »), it posts its height to the parent
  * ({type: 'ergopti-layout-editor:height', height}) on load and on every
  * resize (the analysis panel opening, a panel unfolding), so the frame fits.
+ * A layout the Studio's optimizer hands over (LAYOUT_ANALYSIS_FILES
+ * .takeEditorHandoff) opens in a new tab.
  * ==============================================================================
  */
 
@@ -147,6 +149,10 @@
 					}
 				: undefined
 	});
+
+	// A layout the Studio's optimizer handed to « Éditer » opens in a tab of its own.
+	const handed = window.LAYOUT_ANALYSIS_FILES.takeEditorHandoff();
+	if (handed) window.layoutEditor.openLayout(handed);
 
 	// The message the framing page (the site's /studio) listens for to size its frame.
 	const HEIGHT_MESSAGE = 'ergopti-layout-editor:height';

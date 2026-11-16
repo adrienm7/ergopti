@@ -285,7 +285,8 @@ var LayoutEditorPage = (function () {
 	 *   persist?(): Promise<boolean>} keeps the tabs (LayoutEditorWorkspace);
 	 *   startNav {text, hold} opens the editor on its navigation layer, as
 	 *   showNav does (the drivers' « Navigation layer » entries).
-	 * @returns {{open: function(string, string): void, current: function(): object,
+	 * @returns {{open: function(string, string): void, openLayout: function(object): Promise<void>,
+	 *   current: function(): object,
 	 *   showNav: function(object): void}}
 	 */
 	function mount(root, host) {
@@ -4057,8 +4058,39 @@ var LayoutEditorPage = (function () {
 			if (state.message && state.message.translate) state.message.text = state.message.translate();
 			render();
 		});
+		/**
+		 * Opens a layout another Studio tool made (library shape: the optimizer's
+		 * result) in a new tab, once the first document is in place, so the
+		 * restored tabs are kept beside it.
+		 * @param {object} layout - {id, name, rows, dead, command}.
+		 * @returns {Promise<void>}
+		 */
+		function openLayout(layout) {
+			return initialSettled.then(() => {
+				let started;
+				try {
+					const id = LayoutSourceIO.identifierFrom(layout.id, 'layout');
+					started = LayoutSourceIO.startFromDocument(
+						LAYOUT_FORMATS.toSource(layout),
+						id,
+						layout.name
+					);
+				} catch (error) {
+					notify('error', problemText(error));
+					return;
+				}
+				commitFocused();
+				keepActive();
+				state.tabs.push(newTab(started.doc, true));
+				showTab(state.tabs.length - 1);
+				state.message = null;
+				render();
+			});
+		}
+
 		return {
 			open: (name, text) => openText(name, text),
+			openLayout,
 			current: () => doc(),
 			showNav,
 			// Saves the tabs now instead of after the delay.

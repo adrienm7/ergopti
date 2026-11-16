@@ -1,0 +1,284 @@
+/* _shared/ui/layout_optimizer/style.css */
+
+/* =========================================================================== */
+/* Layout Optimizer — setup panels, pin boards, budget, live best layout and   */
+/* its metrics against the start. Light and dark through theme.css tokens.     */
+/* =========================================================================== */
+
+/* =============================== */
+/* =============================== */
+/* ======= 1/ Tokens & Base ====== */
+/* =============================== */
+/* =============================== */
+
+.layout-optimizer,
+.layout-optimizer *,
+.layout-optimizer *::before,
+.layout-optimizer *::after {
+	box-sizing: border-box;
+}
+
+/* The site's standalone page only: a host that mounts the page styles its own body. */
+body:has(> main.layout-optimizer) {
+	background: var(--theme-bg);
+	color: var(--theme-text);
+	margin: 0;
+}
+
+.layout-optimizer {
+	--lo-surface: var(--theme-surface);
+	--lo-surface-2: var(--theme-surface-2);
+	--lo-border: var(--theme-separator);
+	--lo-sub: var(--theme-sub);
+	--lo-accent: var(--theme-accent);
+	--lo-accent-soft: var(--theme-accent-soft);
+	--lo-good: var(--theme-green);
+	--lo-bad: var(--theme-danger);
+	font:
+		14px/1.45 system-ui,
+		sans-serif;
+	margin: 0 auto;
+	max-width: 1200px;
+	padding: 16px;
+}
+
+.layout-optimizer h1 {
+	font-size: 1.4em;
+	margin: 0 0 6px;
+}
+
+.layout-optimizer h2 {
+	font-size: 1.1em;
+	margin: 0 0 8px;
+}
+
+.layout-optimizer h3 {
+	font-size: 1em;
+	margin: 14px 0 4px;
+}
+
+.layout-optimizer [hidden] {
+	display: none;
+}
+
+.lo-muted {
+	color: var(--lo-sub);
+	margin: 4px 0;
+}
+
+.lo-error {
+	color: var(--lo-bad);
+}
+
+.layout-optimizer button,
+.layout-optimizer select,
+.layout-optimizer input[type='number'] {
+	background: var(--lo-surface);
+	border: 1px solid var(--lo-border);
+	border-radius: 6px;
+	color: inherit;
+	font: inherit;
+	max-width: 100%;
+	padding: 5px 8px;
+}
+
+.layout-optimizer button {
+	cursor: pointer;
+}
+
+.layout-optimizer button:hover:not(:disabled) {
+	background: var(--lo-accent-soft);
+}
+
+.layout-optimizer button:disabled {
+	cursor: default;
+	opacity: 0.55;
+}
+
+.layout-optimizer .lo-primary {
+	background: var(--lo-accent);
+	border-color: var(--lo-accent);
+	color: var(--theme-white);
+	font-weight: 600;
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 2/ Panels ============ */
+/* ============================== */
+/* ============================== */
+
+.lo-grid {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+	margin-top: 12px;
+}
+
+.lo-panel {
+	background: var(--lo-surface-2);
+	border: 1px solid var(--lo-border);
+	border-radius: 10px;
+	min-width: 0;
+	padding: 12px;
+}
+
+.lo-wide {
+	grid-column: 1 / -1;
+}
+
+#lo-result {
+	margin-top: 12px;
+}
+
+.lo-panel summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.lo-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-bottom: 8px;
+	min-width: 0;
+}
+
+.lo-radios {
+	border: 0;
+	padding: 0;
+}
+
+.lo-radios label {
+	display: flex;
+	gap: 6px;
+}
+
+.lo-row {
+	display: grid;
+	gap: 8px 12px;
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.lo-switch {
+	align-items: flex-start;
+	display: flex;
+	font-weight: 600;
+	gap: 6px;
+}
+
+.lo-help {
+	font-size: 0.92em;
+	margin: 0 0 8px 22px;
+}
+
+.lo-weights {
+	display: grid;
+	gap: 6px 16px;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	margin: 10px 0;
+}
+
+.lo-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 8px 0;
+}
+
+#lo-progress {
+	width: 100%;
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 3/ Boards ============ */
+/* ============================== */
+/* ============================== */
+
+/* A board wider than a phone scrolls inside its box, not the page. */
+.lo-board-box {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+.lo-board {
+	margin: 6px 0;
+	position: relative;
+}
+
+.layout-optimizer .lo-key {
+	align-items: center;
+	background: var(--lo-surface);
+	border: 1px solid var(--lo-border);
+	border-radius: 6px;
+	color: var(--theme-text);
+	display: flex;
+	font-size: inherit;
+	font-weight: 600;
+	justify-content: center;
+	padding: 0;
+	position: absolute;
+}
+
+.layout-optimizer .lo-key.lo-marked {
+	background: var(--lo-accent);
+	border-color: var(--lo-accent);
+	color: var(--theme-white);
+}
+
+.layout-optimizer .lo-key.lo-changed {
+	border-color: var(--lo-good);
+	box-shadow: inset 0 0 0 1px var(--lo-good);
+}
+
+.lo-key.key-legend-dead::before {
+	border-color: currentColor currentColor transparent transparent;
+	border-style: solid;
+	border-width: 4px;
+	content: '';
+	position: absolute;
+	right: 3px;
+	top: 3px;
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 4/ Result ============ */
+/* ============================== */
+/* ============================== */
+
+.lo-score {
+	font-size: 1.1em;
+	font-weight: 600;
+}
+
+.lo-good {
+	color: var(--lo-good);
+}
+
+.lo-bad {
+	color: var(--lo-bad);
+}
+
+.lo-table-box {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+.lo-table {
+	border-collapse: collapse;
+	margin: 8px 0;
+}
+
+.lo-table th,
+.lo-table td {
+	border-bottom: 1px solid var(--lo-border);
+	padding: 4px 10px;
+	text-align: left;
+}
+
+.lo-table .lo-num {
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}

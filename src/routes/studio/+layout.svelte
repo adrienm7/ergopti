@@ -5,11 +5,12 @@
 MODULE: Ergopti Studio Section Layout
 DESCRIPTION:
 Ergopti Studio is an app-like workspace: under the site header, a slim tab
-bar (« Éditer », « Comparer », from siteNavigation.js) and the framed tool,
+bar (« Éditer », « Comparer », « Optimiser », from siteNavigation.js) and the framed tool,
 which takes the full width and the rest of the viewport height and scrolls
 inside itself. The site page around it does not scroll. The editor's
 « Compare with other layouts » opens the « Comparer » tab, which takes the
-layout the editor stored for this tab.
+layout the editor stored for this tab; the optimizer's « Open in the editor »
+opens « Éditer », which takes the layout the optimizer stored the same way.
 ==============================================================================
 -->
 
@@ -27,12 +28,16 @@ layout the editor stored for this tab.
 	// layout for this tab, then asks for the Comparer (the message type of
 	// layout_analysis/corpus_files.js OPEN_COMPARER_MESSAGE).
 	const OPEN_COMPARER_MESSAGE = 'ergopti-studio:open-comparer';
+	// The optimizer's « Open in the editor »: the layout waits in this tab's
+	// storage (corpus_files.js handOffToEditor, OPEN_EDITOR_MESSAGE).
+	const OPEN_EDITOR_MESSAGE = 'ergopti-studio:open-editor';
 
 	onMount(() => {
 		const open = (event) => {
 			if (event.origin !== location.origin) return;
-			if (!event.data || event.data.type !== OPEN_COMPARER_MESSAGE) return;
-			goto(resolve('/studio/comparer'));
+			if (!event.data) return;
+			if (event.data.type === OPEN_COMPARER_MESSAGE) goto(resolve('/studio/comparer'));
+			else if (event.data.type === OPEN_EDITOR_MESSAGE) goto(resolve('/studio'));
 		};
 		window.addEventListener('message', open);
 		return () => window.removeEventListener('message', open);
