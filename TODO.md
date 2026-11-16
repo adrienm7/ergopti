@@ -300,6 +300,46 @@ runs on `ubuntu-24.04`, since setup-python has no 3.8 build for 26.04 (775f0dd0e
 - **Hardware checks** are in [TODO-tests-macos.md](TODO-tests-macos.md),
   [TODO-tests-windows.md](TODO-tests-windows.md) and [TODO-tests-linux.md](TODO-tests-linux.md).
 
+## Full accessibility (maintainer request, 2026-11-16, very important)
+
+The goal is a totally accessible project: the site (ergopti.fr), Ergopti Studio (editor, Comparer, Optimiser,
+benchmarks) on the site and inside the app, and Ergopti+ itself (menus, windows, dialogs, tooltips, onboarding) on
+Windows, macOS and Linux. Target WCAG 2.2 level AA everywhere, AAA where it costs little; every new page or window
+is held to it from now on.
+
+- [ ] **Audit first.** An automated pass (axe-core or equivalent in the browser tests, a CI gate that fails on new
+      violations with a ratchet baseline) plus a manual checklist per page and per native window; record the
+      findings in docs/audits/accessibility/ with severity and owner.
+- [ ] **Images and media.** Every image, icon, SVG, chart and keyboard drawing has a text alternative (meaningful
+      `alt`, `aria-label`, or `alt=""` when decorative); charts and heatmaps also offer their numbers as a table;
+      videos get captions and transcripts.
+- [ ] **Colour vision.** No information by colour alone (shapes, labels, patterns as well); palettes checked for
+      deuteranopia, protanopia and tritanopia; text contrast ≥ 4.5:1 (3:1 for large text and UI parts) in light and
+      dark themes; a high-contrast option.
+- [ ] **Motion sickness and vestibular disorders.** Honour `prefers-reduced-motion` everywhere (no parallax, no
+      auto-playing or looping animation, no smooth-scroll jumps, instant transitions when reduced); a site setting
+      to turn motion off; nothing flashes more than 3 times per second.
+- [ ] **Dyslexia and reading.** A dyslexia-friendly font option (e.g. OpenDyslexic or Atkinson Hyperlegible),
+      adjustable text size and line/letter spacing without breaking layouts (WCAG 1.4.12), plain-language texts,
+      no justified text, comfortable line length; settings remembered per viewer.
+- [ ] **Blind and low-vision users.** Full screen-reader support (NVDA, JAWS, Narrator, VoiceOver, Orca): semantic
+      HTML and landmarks, headings in order, labelled forms and buttons, live regions for results and progress
+      (Optimiser, Comparer), accessible names for every key of the keyboard drawings, a text/table view of every
+      layout; zoom to 400 % and reflow at 320 px wide without horizontal scroll.
+- [ ] **Keyboard and motor.** Everything usable with the keyboard alone, visible focus, logical focus order, skip
+      links, no keyboard traps, generous target sizes (≥ 24×24 px), no time limits or a way to extend them, drag
+      operations with a click alternative (WCAG 2.5.7).
+- [ ] **Cognitive.** Consistent navigation, clear error messages with how to fix them, confirmations before
+      destructive actions, help text for every metric and setting.
+- [ ] **Ergopti+ native UI.** The menus, windows (WebView2 and native), tooltips, notifications and onboarding on
+      the three OS expose names and roles to the platform accessibility APIs (UI Automation, NSAccessibility,
+      AT-SPI), follow the system's high-contrast, reduced-motion and text-size settings, and are usable with a
+      screen reader and keyboard only; the hotstring and prediction tooltips are announced or can be.
+- [ ] **Languages.** Correct `lang` attributes per page and per passage; the 21 locales keep the same
+      accessibility texts (alt texts and labels are translated, not left in English).
+- [ ] **Accessibility statement.** A public page stating the conformance level, known gaps and a contact to
+      report a barrier.
+
 ## Commit identity (maintainer request, 2026-11-14)
 
 - [x] **Commits in the maintainer's name.** From 2026-11-14 23:00 Paris every agent commits as the maintainer
