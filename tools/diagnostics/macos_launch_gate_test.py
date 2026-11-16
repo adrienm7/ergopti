@@ -1373,9 +1373,7 @@ class LauncherHelperTests(unittest.TestCase):
         failures = gate.evaluate(
             "symlinked_applications",
             observe(
-                driver_log=helper_line(
-                    "/Users/runner/Downloads/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
-                )
+                driver_log=helper_line("/Volumes/Other/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus")
                 + "[SUCCESS] [onboarding] Onboarding wizard opened.\n"
             ),
         )
