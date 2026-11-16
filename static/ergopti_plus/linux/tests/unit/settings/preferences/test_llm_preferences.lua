@@ -16,7 +16,7 @@ local SETTINGS = { "settings", "trigger_settings", "display_settings", "navigati
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
 		local names = { "settings.engine.paths", "ai.engine.preferences", "core.fs.adapters.storage" }
-		for _, name in ipairs(SETTINGS) do names[#names + 1] = "modules.llm." .. name end
+		for _, name in ipairs(SETTINGS) do names[#names + 1] = "ai.engine.settings." .. name end
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, err = pcall(function()

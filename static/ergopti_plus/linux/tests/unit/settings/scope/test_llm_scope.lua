@@ -18,8 +18,11 @@ local function with_scope(body)
 			"core.network.adapters.http_client", "platform.focus.secure_field_detector", "core.ui.ui.tooltip.llm",
 			"core.fs.adapters.storage", "modules.hotstrings.magic_key" }
 		for _, name in ipairs({ "settings", "trigger_settings", "display_settings", "navigation_settings",
-			"profile_settings", "profiles", "prediction_engine", "api_ollama", "api_remote" }) do
-			names[#names + 1] = "modules.llm." .. name
+			"profile_settings", "profiles" }) do
+			names[#names + 1] = "ai.engine.settings." .. name
+		end
+		for _, name in ipairs({ "ai.engine.prediction.engine", "ai.engine.api.api_ollama", "ai.engine.api.api_remote" }) do
+			names[#names + 1] = name
 		end
 		local previous, controls = {}, { requests = 0, stops = 0, timers = {} }
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end

@@ -27,10 +27,10 @@
 local helpers = require("tests.helpers")
 
 local FILES_WITH_STUB = {
-	"unit/ui/menu/menu_llm/backend/test_startup_controller_generation_guard.lua",
+	"unit/ai/ui/menu/backend/test_startup_controller_generation_guard.lua",
 	"unit/modules/keymap/expansion/test_utf8_offset_pcall.lua",
 	"unit/modules/keymap/llm_bridge/test_llm_bridge_no_duplicate_init.lua",
-	"unit/ui/menu/menu_llm/profiles/test_profile_label.lua",
+	"unit/ai/ui/menu/profiles/test_label.lua",
 }
 
 --- Reads a tests/-relative source file.

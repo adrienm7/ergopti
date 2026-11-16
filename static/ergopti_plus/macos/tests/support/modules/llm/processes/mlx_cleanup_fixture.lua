@@ -72,7 +72,7 @@ function M.with_commands(callback)
 			package.loaded["ai.engine.api.common"] = { protected_call = protected }
 			package.loaded["ai.engine.local_servers.mlx_stream_retirement"] = {}
 			for _, name in ipairs({ "inference", "fetch", "discovery" }) do
-				package.loaded["modules.llm.api_mlx_" .. name] = { init = noop }
+				package.loaded["ai.engine.api.mlx_" .. name] = { init = noop }
 			end
 			local api = require("ai.engine.api.mlx")
 			api.set_active_server_pgid(700)
