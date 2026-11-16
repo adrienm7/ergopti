@@ -62,6 +62,8 @@ class EmittedServeCommand(unittest.TestCase):
                 "static/ergopti_plus/_shared/ai/adapters/python",
                 "static/ergopti_plus/_shared/core/network/adapters",
                 "static/ergopti_plus/macos/ai/engine",
+                "static/ergopti_plus/macos/ai/engine/bootstrap",
+                "static/ergopti_plus/macos/ai/engine/ollama",
                 "static/ergopti_plus/macos/platform",
                 "static/ergopti_plus/macos/ai/adapters",
                 "static/ergopti_plus/macos/core/network/adapters",
