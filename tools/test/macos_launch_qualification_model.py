@@ -14,6 +14,9 @@ from types import SimpleNamespace
 
 data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 source = Path(data["source"]).read_text(encoding="utf-8")
+sys.path.insert(0, str(Path(data["source"]).parent))
+import macos_app_relocation as _relocation  # noqa: E402
+
 tree = ast.parse(source)
 names = {
     "evaluate",
@@ -61,7 +64,8 @@ scope.update(
     bounded_refusal=str,
     HELPER_RESOLVED=re.compile(r"^helper (.+)$"),
     HELPER_REFUSED="refused helper",
-    relocation=SimpleNamespace(SCENARIOS=()),
+    # The real path comparison: the verdict admits the decomposed spelling macOS logs.
+    relocation=SimpleNamespace(SCENARIOS=(), same_path_text=_relocation.same_path_text),
 )
 # Validators accept only what the active model step admits.
 accepted = {"features": False, "transport": False}
