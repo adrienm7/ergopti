@@ -1148,6 +1148,14 @@ local _ignored_win_context_generation = 0
 -- before the owning event taps exist.
 local _ignored_win_stopped = true
 local _ignored_win_last_identity = nil
+-- The window and application half of the last identity, and whether its title
+-- half is still the window's: a title-only change advances the context without
+-- reading the new title, so the next probe compares the window half only.
+local _ignored_win_last_window_key = nil
+local _ignored_win_last_title_known = true
+-- What woke the classification since the module loaded: the idle field check
+-- names the source of every Accessibility probe a quiet window paid for.
+local _ignored_win_activity = { probes = 0, retitle = 0, invalidations = {} }
 local _secure_field_cache_value = nil
 local _text_destination = nil
 local schedule_ignored_win_refresh
@@ -1203,8 +1211,12 @@ end
 
 --- Invalidates the ignored-window cache. Called from focus-change watchers;
 --- also safe to call from anywhere else (tests, manual overrides).
-local function invalidate_ignored_win_cache()
+--- @param source string What changed (app, window, title,
+---   element, rules, selftest, ttl).
+local function invalidate_ignored_win_cache(source)
 	if _ignored_win_stopped then return end
+	local counts = _ignored_win_activity.invalidations
+	counts[source] = (counts[source] or 0) + 1
 	_ignored_win_cache_dirty = true
 	_ignored_win_cache_value = nil
 	_secure_field_cache_value = nil
@@ -1223,6 +1235,49 @@ local function invalidate_ignored_win_cache()
 	end
 end
 
+--- Whether a title can change the classification: only an ignored-title rule
+--- reads the title. Unknown rules count as present.
+--- @return boolean present
+local function ignored_win_title_rules_present()
+	local titles, patterns = _ignored_win_titles_ref, _ignored_win_patterns_ref
+	if type(titles) ~= "table" or type(patterns) ~= "table" then return true end
+	return next(titles) ~= nil or next(patterns) ~= nil
+end
+
+--- Answers a title change of the watched window. The title is part of the
+--- typing context (a browser tab switch keeps the window), so the context
+--- always advances; but with no title rule the title cannot change whether the
+--- window is ignored nor which field is focused. A full Accessibility probe
+--- per change is the likeliest source of the largest idle cost the field run
+--- measured (report 2026-11-15: 14 refreshes, 252 ms in 30 s, about 18 ms
+--- each): a terminal names its running process in its title, so the collector
+--- polling in it retitles it every few seconds while nobody types.
+local function on_ignored_win_title_changed()
+	if _ignored_win_stopped then return end
+	if ignored_win_title_rules_present() or _ignored_win_cache_dirty
+		or _ignored_win_cache_value == nil or _secure_field_cache_value == nil then
+		invalidate_ignored_win_cache("title")
+		return
+	end
+	_ignored_win_activity.retitle = _ignored_win_activity.retitle + 1
+	_ignored_win_context_generation = _ignored_win_context_generation + 1
+	_ignored_win_last_title_known = false
+	-- A receipt taken before the change stays bound to the old context; one
+	-- taken after it carries the new generation. Copy, never mutate: an
+	-- outstanding receipt is this same table.
+	local destination = _text_destination
+	if destination ~= nil then
+		_text_destination = { pid = destination.pid, app = destination.app,
+			window_id = destination.window_id, element = destination.element,
+			generation = _ignored_win_context_generation }
+	end
+end
+
+--- Answers a focused-element change reported by the secure-field adapter.
+local function on_ignored_win_focused_element_changed()
+	invalidate_ignored_win_cache("element")
+end
+
 --- Starts the cheap global application watcher. Context-specific AX watchers
 --- are bound by probe_ignored_window(), which already runs outside CGEventTap.
 local function ensure_ignored_win_watchers()
@@ -1237,7 +1292,7 @@ local function ensure_ignored_win_watchers()
 					or _ignored_win_app_watcher_committed ~= true then return end
 				if event == hs.application.watcher.activated
 					or event == hs.application.watcher.deactivated then
-					invalidate_ignored_win_cache()
+					invalidate_ignored_win_cache("app")
 					notify_context_change()
 				end
 			end)
@@ -1341,7 +1396,7 @@ local function ensure_ignored_win_context_watchers(app, win, watch_title)
 			candidate = app:newWatcher(function()
 				if _ignored_win_focus_watcher ~= candidate
 					or _ignored_win_focus_watcher_committed ~= true then return end
-				invalidate_ignored_win_cache()
+				invalidate_ignored_win_cache("window")
 				notify_context_change()
 			end)
 			if not candidate then error("focused-window watcher construction returned nil", 0) end
@@ -1367,7 +1422,7 @@ local function ensure_ignored_win_context_watchers(app, win, watch_title)
 	end
 	if not _secure_field_focus_watcher then
 		local watcher, detail, committed = SecureFieldDetector.watchFocusedElementChanges(
-			app, invalidate_ignored_win_cache)
+			app, on_ignored_win_focused_element_changed)
 		if not watcher then
 			Logger.warn(LOG, "Secure-field focus watcher setup failed: %s.", tostring(detail))
 			return false
@@ -1397,7 +1452,7 @@ local function ensure_ignored_win_context_watchers(app, win, watch_title)
 			candidate = win:newWatcher(function()
 				if _ignored_win_title_watcher ~= candidate
 					or _ignored_win_title_watcher_committed ~= true then return end
-				invalidate_ignored_win_cache()
+				on_ignored_win_title_changed()
 			end)
 			if not candidate then error("title watcher construction returned nil", 0) end
 			_ignored_win_title_watcher = candidate
@@ -1427,6 +1482,8 @@ local function mark_ignored_win_unknown()
 	_secure_field_cache_value = nil
 	_ignored_win_context_generation = _ignored_win_context_generation + 1
 	_ignored_win_last_identity = nil
+	_ignored_win_last_window_key = nil
+	_ignored_win_last_title_known = true
 	return nil
 end
 
@@ -1436,12 +1493,22 @@ local function observe_ignored_win_identity(win, app_name, title)
 	local ok_id, window_id = pcall(function() return win:id() end)
 	-- A browser/editor can reuse one native window while its title crosses an
 	-- ignored rule. Window id alone therefore is not text-context identity.
-	local identity = tostring(ok_id and window_id or "<no-id>")
-		.. "\0" .. tostring(app_name) .. "\0" .. tostring(title)
-	if _ignored_win_last_identity ~= nil and identity ~= _ignored_win_last_identity then
+	local window_key = tostring(ok_id and window_id or "<no-id>") .. "\0" .. tostring(app_name)
+	local identity = window_key .. "\0" .. tostring(title)
+	-- After a title-only change the context already advanced for the new title:
+	-- only another window or application is a transition the watchers missed.
+	local changed
+	if _ignored_win_last_title_known then
+		changed = _ignored_win_last_identity ~= nil and identity ~= _ignored_win_last_identity
+	else
+		changed = _ignored_win_last_window_key ~= nil and window_key ~= _ignored_win_last_window_key
+	end
+	if changed then
 		_ignored_win_context_generation = _ignored_win_context_generation + 1
 	end
 	_ignored_win_last_identity = identity
+	_ignored_win_last_window_key = window_key
+	_ignored_win_last_title_known = true
 end
 
 --- A probe slower than this names its stages; the Mac field log showed 1 s
@@ -1466,6 +1533,7 @@ end
 --- @return boolean|nil ignored Nil means the classification could not be read.
 local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	if not now then now = hs.timer.secondsSinceEpoch() end
+	_ignored_win_activity.probes = _ignored_win_activity.probes + 1
 	_ignored_win_cache_time  = now
 	_ignored_win_cache_dirty = false
 	_ignored_win_cache_value = false
@@ -1708,14 +1776,14 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 	end
 
 	if FieldRunSelftest.window_id() ~= _ignored_win_cache_selftest_window then
-		invalidate_ignored_win_cache()
+		invalidate_ignored_win_cache("selftest")
 		return nil, _ignored_win_context_generation
 	end
 
 	if now < _ignored_win_cache_time or (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
 		-- The periodic timer should normally have refreshed first. If the main
 		-- runloop delayed it, never authorize the previous window's answer.
-		invalidate_ignored_win_cache()
+		invalidate_ignored_win_cache("ttl")
 		return nil, _ignored_win_context_generation
 	end
 	return _ignored_win_cache_value, _ignored_win_context_generation
@@ -1732,7 +1800,7 @@ end
 function M.selftest_window_context()
 	if _ignored_win_stopped then return nil, _ignored_win_context_generation end
 	if FieldRunSelftest.window_id() ~= _ignored_win_cache_selftest_window then
-		invalidate_ignored_win_cache()
+		invalidate_ignored_win_cache("selftest")
 		return nil, _ignored_win_context_generation
 	end
 	if _ignored_win_cache_dirty or _ignored_win_cache_value == nil then
@@ -1757,7 +1825,7 @@ function M.is_secure_field(now)
 		return nil, _ignored_win_context_generation
 	end
 	if now < _ignored_win_cache_time or (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
-		invalidate_ignored_win_cache()
+		invalidate_ignored_win_cache("ttl")
 		return nil, _ignored_win_context_generation
 	end
 	return _secure_field_cache_value, _ignored_win_context_generation
@@ -1826,9 +1894,20 @@ function M.start_ignored_win_tracking(ignored_titles, ignored_patterns)
 	return _ignored_win_context_generation
 end
 
+--- Counts what woke the classification since the module loaded, for the idle
+--- field check: probes paid, title changes answered without a probe, and
+--- invalidations by source.
+--- @return table snapshot { probes, retitle, invalidations = { [source] = n } }
+function M.ignored_window_activity()
+	local invalidations = {}
+	for source, count in pairs(_ignored_win_activity.invalidations) do invalidations[source] = count end
+	return { probes = _ignored_win_activity.probes, retitle = _ignored_win_activity.retitle,
+		invalidations = invalidations }
+end
+
 --- Invalidates a clean classification after the runtime ignore rules mutate.
 function M.ignored_window_rules_changed()
-	invalidate_ignored_win_cache()
+	invalidate_ignored_win_cache("rules")
 end
 
 --- Prepares the narrow app/window AX watchers before the keyDown tap is armed.

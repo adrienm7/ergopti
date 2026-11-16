@@ -1037,6 +1037,12 @@ function M.new()
 		collect_garbage = function() collectgarbage("collect") end,
 		begin_callback_accounting = function() require("core.logger.engine.logger").begin_callback_accounting() end,
 		end_callback_accounting = function() return require("core.logger.engine.logger").end_callback_accounting() end,
+		-- Read only when the keymap loaded it: the idle check must not load it.
+		window_activity = function()
+			local utils = package.loaded["modules.keymap.utils"]
+			return type(utils) == "table" and type(utils.ignored_window_activity) == "function"
+				and utils.ignored_window_activity() or nil
+		end,
 		now_ms = function() return hs.timer.absoluteTime() / 1000000 end,
 	}
 end

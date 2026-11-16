@@ -107,7 +107,7 @@ local function new_fixture()
 		inspectFocusedElementWithReceipt = function()
 			state.secure_reads = state.secure_reads + 1
 			if state.secure_read_fail then return nil, "secure read refused" end
-			return state.secure, nil, {}
+			return state.secure, nil, state.element or {}
 		end,
 		inspectFocusedElement = function()
 			state.secure_reads = state.secure_reads + 1
@@ -583,5 +583,112 @@ helpers.describe("ignored-window cache lifecycle: an application that does not a
 		f.state.now = f.state.now + 31
 		f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns)
 		helpers.assert_eq(f.state.ax_reads, 4, "the backoff ends after its delay")
+	end)
+end)
+
+
+
+
+
+-- ====================================================
+-- ====================================================
+-- ======= 3/ Title changes without title rules =======
+-- ====================================================
+-- ====================================================
+
+helpers.describe("ignored-window cache lifecycle: title changes (idle-title-probe-2026-11-15)", function()
+	--- Tracks a window with no ignored-title rule and returns the fixture.
+	local function tracked_without_rules()
+		local f = new_fixture()
+		f.titles, f.patterns = {}, {}
+		f.state.element = { role = "AXTextArea" }
+		f.Utils.start_ignored_win_tracking(f.titles, f.patterns)
+		helpers.assert_eq(f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns), true)
+		return f
+	end
+
+	helpers.it("idle-title-probe-2026-11-15: a retitled window costs no Accessibility probe without a title rule", function()
+		local f = tracked_without_rules()
+		local normal, initial_generation = f.Utils.is_ignored_window(f.titles, f.patterns, f.state.now)
+		helpers.assert_eq(normal, false, "the prewarm must establish a known-normal cache")
+		local reads_before, secure_before = f.state.ax_reads, f.state.secure_reads
+
+		-- A terminal names its running process in its title: a polling script
+		-- retitles it every few seconds while the person does nothing.
+		for index = 1, 14 do
+			f.state.title = "user - sleep - " .. index
+			f.state.title_callback()
+			f.scheduler.fire_all(0)
+		end
+
+		helpers.assert_eq(f.state.ax_reads, reads_before,
+			"a title change with no title rule must not read the focused window again")
+		helpers.assert_eq(f.state.secure_reads, secure_before,
+			"a title change must not classify the focused field again")
+		local still_normal, generation = f.Utils.is_ignored_window(f.titles, f.patterns, f.state.now)
+		helpers.assert_eq(still_normal, false,
+			"no title rule can make a retitled window ignored: the answer stays known")
+		helpers.assert_eq(f.Utils.is_secure_field(f.state.now), false,
+			"the focused field did not change with the title")
+		helpers.assert_eq(generation, initial_generation + 14,
+			"each title change still starts a new typing context (a browser tab switch)")
+		local activity = f.Utils.ignored_window_activity()
+		helpers.assert_eq(activity.retitle, 14, "the idle check counts the title changes answered")
+		helpers.assert_nil(activity.invalidations.title, "no title change paid an invalidation")
+	end)
+
+	helpers.it("idle-title-probe-2026-11-15: the next probe does not start a second context for the same title", function()
+		local f = tracked_without_rules()
+		f.state.title = "Retitled"
+		f.state.title_callback()
+		local _, after_title = f.Utils.is_ignored_window(f.titles, f.patterns, f.state.now)
+		local reads_before = f.state.ax_reads
+
+		f.scheduler.fire_all(5.0)
+
+		helpers.assert_eq(f.state.ax_reads, reads_before + 1, "the safety TTL still probes")
+		local normal, after_ttl = f.Utils.is_ignored_window(f.titles, f.patterns, f.state.now)
+		helpers.assert_eq(normal, false)
+		helpers.assert_eq(after_ttl, after_title,
+			"the title change already advanced the context: the probe reading that title must not reset the word again")
+
+		f.state.window_id = 43
+		f.scheduler.fire_all(5.0)
+		local _, after_window = f.Utils.is_ignored_window(f.titles, f.patterns, f.state.now)
+		helpers.assert_true(after_window > after_ttl,
+			"a window change the watchers missed is still seen by the probe")
+	end)
+
+	helpers.it("idle-title-probe-2026-11-15: a receipt is bound to the context of its capture", function()
+		local f = tracked_without_rules()
+		local before = f.Utils.capture_text_destination()
+		helpers.assert_true(before ~= nil, "a classified normal field yields a receipt")
+		f.state.title = "Retitled"
+		f.state.title_callback()
+		local after = f.Utils.capture_text_destination()
+		helpers.assert_true(after ~= nil and after ~= before, "the receipt after the change is a new one")
+
+		helpers.assert_eq(f.Utils.owns_text_destination(before), false,
+			"a receipt taken before the title change belongs to the previous context")
+		helpers.assert_eq(f.Utils.owns_text_destination(after), true,
+			"a receipt taken after the title change owns the same field")
+	end)
+
+	helpers.it("idle-title-probe-2026-11-15: a title rule still reclassifies a retitled window", function()
+		local f = new_fixture()
+		f.Utils.start_ignored_win_tracking(f.titles, f.patterns)
+		helpers.assert_eq(f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns), true)
+		local reads_before = f.state.ax_reads
+
+		f.state.title = "Sensitive Entry"
+		f.state.title_callback()
+		helpers.assert_nil(f.Utils.is_ignored_window(f.titles, f.patterns, f.state.now),
+			"with a title rule the previous answer is unsafe until the probe reads the new title")
+		f.scheduler.fire_all(0)
+
+		helpers.assert_eq(f.state.ax_reads, reads_before + 1, "the refresh probes the new title")
+		helpers.assert_eq(f.Utils.is_ignored_window(f.titles, f.patterns, f.state.now), true,
+			"the matching title is ignored")
+		helpers.assert_eq(f.Utils.ignored_window_activity().invalidations.title, 1)
 	end)
 end)

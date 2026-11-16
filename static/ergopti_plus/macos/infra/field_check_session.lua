@@ -114,6 +114,28 @@ function M.timer_site_token(entry)
 		math.floor((entry.ms or 0) + 0.5))
 end
 
+--- What woke the ignored-window classification between two snapshots: the
+--- Accessibility probes paid, and each source as `<source>:<count>` joined by
+--- `+` in name order, within the report's value grammar (retitle names the
+--- title changes answered without a probe).
+--- @param before table|nil Snapshot { probes, retitle, invalidations }.
+--- @param after table|nil Snapshot of the same shape.
+--- @return string|integer probes Count, or "unreadable" without both snapshots.
+--- @return string wakers Sources, "none", or "unreadable".
+function M.window_activity_delta(before, after)
+	if type(before) ~= "table" or type(after) ~= "table" then return "unreadable", "unreadable" end
+	local counts = { retitle = (after.retitle or 0) - (before.retitle or 0) }
+	for source, count in pairs(after.invalidations or {}) do
+		counts[source] = count - ((before.invalidations or {})[source] or 0)
+	end
+	local parts = {}
+	for source, count in pairs(counts) do
+		if count > 0 then parts[#parts + 1] = source .. ":" .. count end
+	end
+	table.sort(parts)
+	return (after.probes or 0) - (before.probes or 0), #parts > 0 and table.concat(parts, "+") or "none"
+end
+
 --- The driver's own CPU share and memory over a quiet window.
 --- The window starts from a collected heap: the garbage the field run's earlier
 --- steps left would otherwise be collected inside it and billed to idleness
@@ -123,7 +145,8 @@ end
 --- touch frames, Accessibility, task callbacks, other threads) is one figure.
 --- ports: pid(), cpu_ms() (process CPU), now_ms() (monotonic), exec, after,
 --- hold_counts(), lua_heap_kb(), collect_garbage(), begin_callback_accounting(),
---- end_callback_accounting().
+--- end_callback_accounting(), window_activity() (the ignored-window
+--- classification's counters, nil while the keymap is not loaded).
 function M.idle_cost(ports, report, finish)
 	local pid = tostring(ports.pid())
 	local function rss(callback)
@@ -137,6 +160,7 @@ function M.idle_cost(ports, report, finish)
 		report.step("idle_pre_collect_ms", INFO, math.floor(ports.now_ms() - collect_started + 0.5))
 		local cpu_start, wall_start = ports.cpu_ms(), ports.now_ms()
 		local holds_start, heap_start = ports.hold_counts(), ports.lua_heap_kb()
+		local window_start = ports.window_activity()
 		ports.begin_callback_accounting()
 		ports.after(M.IDLE_WINDOW_SECONDS, function()
 			local timers = ports.end_callback_accounting()
@@ -163,6 +187,9 @@ function M.idle_cost(ports, report, finish)
 			for index = 1, M.IDLE_TIMERS_REPORTED do
 				report.step("idle_timer_" .. index, INFO, timers[index] and M.timer_site_token(timers[index]) or "none")
 			end
+			local probes, wakers = M.window_activity_delta(window_start, ports.window_activity())
+			report.step("idle_window_probes", INFO, probes)
+			report.step("idle_window_wakers", INFO, wakers)
 			local holds_end = ports.hold_counts()
 			-- The counters restart at each phase summary: a smaller end is a restart.
 			local holds = (holds_end.over_250ms or 0) - (holds_start.over_250ms or 0)

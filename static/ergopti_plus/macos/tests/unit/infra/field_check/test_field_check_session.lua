@@ -37,6 +37,7 @@ local function idle_ports(cpu_used_ms)
 		begin_callback_accounting = function() end,
 		end_callback_accounting = function() return {} end,
 		keystats_recovering = function() return false end,
+		window_activity = function() return nil end,
 	}
 end
 
@@ -96,6 +97,23 @@ helpers.describe("field check session: costs and edge cases a program can answer
 		helpers.assert_eq(steps.idle_timer_ms.value, "73")
 		helpers.assert_eq(steps.idle_other_cpu_ms.value, "17")
 		helpers.assert_true(steps.idle_pre_collect_ms ~= nil, "the collection's cost is reported")
+		helpers.assert_eq(steps.idle_window_probes.value, "unreadable",
+			"a keymap that is not loaded is said, not counted as zero")
+	end)
+
+	helpers.it("(idle-title-probe-2026-11-15) names what woke the window classification in the window", function()
+		local ports = idle_ports(90)
+		local snapshots = {
+			{ probes = 7, retitle = 2, invalidations = { element = 1 } },
+			{ probes = 10, retitle = 16, invalidations = { element = 2, app = 2 } },
+		}
+		ports.window_activity = function() return table.remove(snapshots, 1) end
+		local report = Report.new_report("idle_cost")
+		Session.idle_cost(ports, report, function() end)
+		local steps = steps_of(report)
+		helpers.assert_eq(steps.idle_window_probes.value, "3")
+		helpers.assert_eq(steps.idle_window_wakers.value, "app:2+element:1+retitle:14")
+		helpers.assert_eq(#snapshots, 0, "one snapshot opens the window and one closes it")
 	end)
 
 	helpers.it("names the boot's totals, and fails a boot that never completed", function()
