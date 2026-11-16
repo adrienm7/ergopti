@@ -63,7 +63,7 @@ local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "mlx_deps"
 
--- Marker line printed by ../ensure-mlx-deps.sh on its FIRST stdout flush
+-- Marker line printed by ensure-mlx-deps.sh on its FIRST stdout flush
 -- whenever it is about to run a non-trivial sync. Absence of the marker
 -- means the script took the silent fast path.
 local SYNC_MARKER_LINE   = "VENV_SYNC_RAN"
@@ -202,7 +202,7 @@ local function resolve_hs_root()
 	return nil
 end
 
---- Resolves the absolute path to ../ensure-mlx-deps.sh in both dev and bundled
+--- Resolves the absolute path to ensure-mlx-deps.sh in both dev and bundled
 --- layouts by first using this module's own location, then falling back to an
 --- upward search from hs.configdir.
 --- @return string|nil script_path Absolute script path, or nil if not found.
@@ -218,10 +218,10 @@ local function resolve_bootstrap_script_path()
 	return Paths.find_from_configdir("ai/engine/ensure-mlx-deps.sh", 12)
 end
 
--- The import statement ../ensure-mlx-deps.sh runs, read once from the script.
+-- The import statement ensure-mlx-deps.sh runs, read once from the script.
 local _import_probe = nil
 
---- Returns the import statement ../ensure-mlx-deps.sh runs on a venv before it
+--- Returns the import statement ensure-mlx-deps.sh runs on a venv before it
 --- publishes or reuses it. The script is its one source: the PTY guardian
 --- verifies that script's digest before running it, so it cannot source a
 --- second file, and the menu's probe of a published venv reads the statement
@@ -230,7 +230,7 @@ local _import_probe = nil
 function M.import_probe()
 	if _import_probe then return _import_probe end
 	local path = resolve_bootstrap_script_path()
-	assert(path, "mlx_deps_checker.import_probe: ../ensure-mlx-deps.sh cannot be resolved")
+	assert(path, "mlx_deps_checker.import_probe: ensure-mlx-deps.sh cannot be resolved")
 	local handle = assert(io.open(path, "rb"))
 	local source = handle:read("*a")
 	handle:close()
@@ -238,12 +238,12 @@ function M.import_probe()
 	-- The menu embeds it in a single-quoted shell argument: modules, dots,
 	-- spaces and semicolons only.
 	assert(probe and probe:match("^import [%w_%.; ]+$") and not probe:find("'", 1, true),
-		"mlx_deps_checker.import_probe: ../ensure-mlx-deps.sh declares no usable MLX_IMPORT_PROBE")
+		"mlx_deps_checker.import_probe: ensure-mlx-deps.sh declares no usable MLX_IMPORT_PROBE")
 	_import_probe = probe
 	return probe
 end
 
---- Names the virtualenv ../ensure-mlx-deps.sh publishes: the launcher's
+--- Names the virtualenv ensure-mlx-deps.sh publishes: the launcher's
 --- read-only bundle redirects it to Application Support, a checkout keeps it
 --- beside the driver. Mirrors the script's own ERGOPTI_CONFIG_DIR rule.
 --- @return string|nil venv_dir Absolute folder, or nil when unresolvable.
@@ -297,7 +297,7 @@ end
 --- Names the venv only when it is exactly the folder Ergopti owns and may
 --- delete: the path venv_dir() derives, absolute, named mlx-venv (launcher) or
 --- .venv (checkout), without "." or ".." segments, and not a link or a file.
---- ../ensure-mlx-deps.sh checks the same folder again before it removes it.
+--- ensure-mlx-deps.sh checks the same folder again before it removes it.
 --- @return string|nil venv Owned folder, or nil when it must not be removed.
 --- @return string|nil refusal Why the folder is not treated as Ergopti's.
 function M.owned_venv_dir()
@@ -994,8 +994,8 @@ function M.check_and_install_deps(on_complete, replay_token)
 	Logger.start(LOG, "Bootstrapping MLX virtualenv…")
 	local script_path = resolve_bootstrap_script_path()
 	if not script_path then
-		Logger.error(LOG, "Unable to resolve ../ensure-mlx-deps.sh from current runtime paths — bootstrap aborted.")
-		return settle_preflight_failure("../ensure-mlx-deps.sh introuvable.")
+		Logger.error(LOG, "Unable to resolve ensure-mlx-deps.sh from current runtime paths — bootstrap aborted.")
+		return settle_preflight_failure("ensure-mlx-deps.sh introuvable.")
 	end
 
 	local hs_root = script_path:match("^(.*)/ai/engine/ensure%-mlx%-deps%.sh$") or ""
@@ -1538,7 +1538,7 @@ function M.is_task_running() return _task_running == true end
 --- even when removing the sync fingerprint is refused (a permission error
 --- used to leave it "installed" and every later selection did nothing). The
 --- fingerprint is then removed so a reload keeps the verdict, and the next
---- selection runs ../ensure-mlx-deps.sh in repair mode. Nothing is fetched here;
+--- selection runs ensure-mlx-deps.sh in repair mode. Nothing is fetched here;
 --- the selection that follows owns the download.
 --- @param cause table|nil Cause of the failed probe (mlx_bootstrap_diagnosis).
 --- @return boolean invalidated True when the runtime now reads as not installed.

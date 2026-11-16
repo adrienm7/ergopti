@@ -601,10 +601,10 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 	end
 
 	local script_path = project_root .. "/static/ergopti_plus/macos/ai/engine/"
-		.. (native_choice and "../ensure-ollama-native-deps.sh" or "../ensure-ollama-deps.sh")
+		.. (native_choice and "ensure-ollama-native-deps.sh" or "ensure-ollama-deps.sh")
 	if not hs.fs.attributes(script_path, "mode") then
-		Logger.error(LOG, "The ../ensure-ollama-deps.sh script is absent at %s — bootstrap aborted.", script_path)
-		return settle_preflight_failure("Script ../ensure-ollama-deps.sh introuvable.")
+		Logger.error(LOG, "The ensure-ollama-deps.sh script is absent at %s — bootstrap aborted.", script_path)
+		return settle_preflight_failure("Script ensure-ollama-deps.sh introuvable.")
 	end
 
 	-- Detection belongs to the resolver; the script only publishes a download

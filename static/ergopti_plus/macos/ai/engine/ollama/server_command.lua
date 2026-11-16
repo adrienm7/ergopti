@@ -12,7 +12,7 @@
 --- settings (ai/engine/api/network_env.lua), since Ollama reads only its own
 --- relay variables and a managed network lets nothing else out. A relay that
 --- demands an NTLM or Negotiate sign-in is answered by Ergopti's local relay
---- (run_with_proxy_sign_in_relay in ../network-retry.sh,
+--- (run_with_proxy_sign_in_relay in network-retry.sh,
 --- docs/design/proxy-auth-relay.md), with deadlines from the timings registry.
 --- A refused sign-in starts it without the proxy and leaves a receipt
 --- (ai/engine/api/proxy_relay_receipt.lua) that refuses the pull.

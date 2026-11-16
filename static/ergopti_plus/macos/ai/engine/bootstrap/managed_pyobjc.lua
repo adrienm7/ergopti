@@ -7,7 +7,7 @@
 --- installed into Ergopti's managed Python instead of read from /usr/bin/python3
 --- (owned_runtimes.json, the macOS /usr/bin/python3 row). Readiness is a stat
 --- of the versionless link the installer publishes; the install runs
---- ../ensure-managed-pyobjc.sh under the signed native PTY guardian, as the AI
+--- ensure-managed-pyobjc.sh under the signed native PTY guardian, as the AI
 --- installers do, and only when a caller that holds the user's consent asks.
 ---
 --- FEATURES & RATIONALE:

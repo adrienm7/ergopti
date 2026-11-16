@@ -60,7 +60,7 @@ local function report_failure(reason, next_step)
 end
 
 --- Opens App Cloner, installing the managed PyObjC first when the user agrees.
---- @param owner table modules/llm/managed_pyobjc owner { ready, link, install }.
+--- @param owner table ai/engine/bootstrap/managed_pyobjc owner { ready, link, install }.
 --- @param launch function fn(environment) opening App Cloner with extra `KEY=VALUE` entries.
 function M.open(owner, launch)
 	assert(type(owner) == "table" and type(launch) == "function", "app_cloner_python_offer.open needs an owner and a launch")

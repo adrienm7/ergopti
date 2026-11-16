@@ -59,7 +59,7 @@ M.NETWORK_KINDS = { certificate = true, proxy = true, host_blocked = true, offli
 
 -- Case-insensitive plain substrings proving each kind.
 local SIGNATURES = {
-	-- ../ensure-mlx-deps.sh refused to delete a folder it does not own
+	-- ensure-mlx-deps.sh refused to delete a folder it does not own
 	foreign_path = { "refusing to remove" },
 	developer_tools = {
 		"no developer tools were found", "command line developer tools",

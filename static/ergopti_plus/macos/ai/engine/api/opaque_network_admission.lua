@@ -63,7 +63,7 @@ function M.new()
 	return phase
 end
 
--- Printed by ../network-retry.sh, the Swift download spool and the Python receiver
+-- Printed by network-retry.sh, the Swift download spool and the Python receiver
 -- when an unusable automatic configuration (PAC, WPAD) sent a download direct.
 M.pac_fallback_marker = "__ERGOPTI_PAC_DIRECT_FALLBACK_V1__:"
 local _fallback_stages

@@ -4,7 +4,7 @@
 --- MODULE: Proxy Sign-In Refusal Receipt
 --- DESCRIPTION:
 --- The closed reason the sign-in relay refused with when the stock daemon last
---- started (run_with_proxy_sign_in_relay in ../network-retry.sh). That daemon runs
+--- started (run_with_proxy_sign_in_relay in network-retry.sh). That daemon runs
 --- without the proxy for the models on disk; a pull reads this receipt and is
 --- refused with the relay's own message, as on Windows and Linux.
 ---
