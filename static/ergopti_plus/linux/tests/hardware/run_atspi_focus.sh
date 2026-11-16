@@ -47,9 +47,19 @@ FAILURES=0
 probe() {
 	luajit -e "local m=require('platform.focus.atspi_focus'); local s,ok=m._get_native_snapshot(); print(ok and ('role='..s.role) or 'inconclusive')" 2>"${WORK}/probe.err" | tail -1
 }
+# A window's own is-active and focus signals can run before its accessible
+# frame and field publish ACTIVE and FOCUSED on the bus, so a probe right after the
+# ready file can still read two ACTIVE frames or no focused field (CI run
+# 43951206595, third probe). Only "inconclusive" is read again, until the
+# ready timeout; a wrong role fails at once.
 check() {
 	local what="$1" expected="$2" got
+	local deadline=$((SECONDS + READY_TIMEOUT_SECONDS))
 	got="$(probe)"
+	while [ "${got}" = inconclusive ] && [ "${SECONDS}" -lt "${deadline}" ]; do
+		sleep 0.1
+		got="$(probe)"
+	done
 	if [ "${got}" = "${expected}" ]; then
 		echo "  ok   ${what} (${got})"
 	else
