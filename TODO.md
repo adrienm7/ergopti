@@ -313,7 +313,7 @@ runs on `ubuntu-24.04`, since setup-python has no 3.8 build for 26.04 (775f0dd0e
       maintainer on 2026-11-16: identity and trailers only; the technical mentions (CLAUDE.md, the Anthropic API
       provider, model names) stay in the messages. main had none. The old dev is kept as the local ref
       backup/dev-before-rewrite-2026-11-16 on the maintainer's Windows clone.
-      [LATER] The 230 remote topic branches (claude/*, wip/*, tmp/*, dependabot/*) still hold the old history:
+      [LATER] The 230 remote topic branches (`claude/*`, `wip/*`, `tmp/*`, `dependabot/*`) still hold the old history:
       28 are contained in dev, 5 merge cleanly with new work (claude/ergopti-todo-mlc005-rows,
       claude/ergopti-devfix-full-save-reschedule, claude/ergopti-todo-linux-macos-tqq3lp, two dependabot), 185
       conflict with dev; sort them (land or drop) so only dev, main, gh-pages and sparkle-appcasts remain.
