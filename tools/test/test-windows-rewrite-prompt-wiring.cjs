@@ -161,7 +161,7 @@ for (const [label, list, prefix] of [
 	);
 }
 check(
-	includesOf(read('ai/ui/menu/_index.ahk')).includes('menu_agent.ahk') &&
+	includesOf(read('ai/ui/menu/_index.ahk')).includes('agent.ahk') &&
 		runAll.includes('../ai/ui/menu/agent.ahk'),
 	'the AI agent submenu must be included by the AI menu index and by the AHK suite'
 );
@@ -390,8 +390,8 @@ check(
 
 // 7. Live mode: one owner, the automatic trigger's override, pause and menu.
 check(
-	includesOf(read('ai/engine/prediction/engine.ahk')).includes('prediction_live.ahk'),
-	'the prediction engine must include prediction_live.ahk, the owner of live mode'
+	includesOf(read('ai/engine/prediction/engine.ahk')).includes('live.ahk'),
+	'the prediction engine must include live.ahk, the owner of live mode'
 );
 check(
 	actions.includes('"llm_live_prompt_toggle", {') &&
