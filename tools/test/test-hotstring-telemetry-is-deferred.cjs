@@ -11,7 +11,7 @@
  * application.
  *
  * WHY A GATE AND NOT JUST THE FIX:
- * both call sites in modules/keymap/ now enter schedule_prediction_deferred,
+ * both call sites on the keymap hot path now enter schedule_prediction_deferred,
  * whose callback is dispatched by TimerScheduler.after(0, ...). The helper owns
  * the exact timer until settlement, but a new call site could still bypass that
  * boundary and run synchronously. Nothing else would say so: the suite would
@@ -37,6 +37,9 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const HOT_PATH = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'modules', 'keymap');
+// The keymap's prediction bridge, which owns both calls, lives with the ai
+// feature since the structure plan moved it out of modules/keymap.
+const BRIDGE = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'ai', 'engine', 'bridge.lua');
 const DEFER_HELPER = 'schedule_prediction_deferred';
 
 const CENTRAL_DEFERRAL = new RegExp(
@@ -45,7 +48,7 @@ const CENTRAL_DEFERRAL = new RegExp(
 		'[\\s\\S]{0,250}?\\bcallback\\s*\\(\\s*\\)'
 );
 
-// Measured when this landed: two calls, both in llm_bridge.lua. Set below that so
+// Measured when this landed: two calls, both in the bridge (then llm_bridge.lua). Set below that so
 // a third one does not trip it, far enough above zero that a broken scan fails.
 const MIN_CALLS = 2;
 
@@ -67,6 +70,9 @@ function hotPathFiles(dir) {
 }
 
 const files = hotPathFiles(HOT_PATH);
+if (!fs.existsSync(BRIDGE))
+	errors.push(`${path.relative(ROOT, BRIDGE)} is missing: re-point this gate`);
+else files.push(BRIDGE);
 if (files.length === 0) {
 	errors.push(`no Lua file under ${path.relative(ROOT, HOT_PATH)} — the scan is broken`);
 }
