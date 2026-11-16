@@ -20,7 +20,6 @@ local helpers = require("tests.helpers")
 
 local SHARED_ROOT = helpers.driver_root() .. "/../_shared"
 local FIXTURE = SHARED_ROOT .. "/tests/corpus/layer_editor/edited_layers.toml"
-local MODULE_PATH = helpers.driver_root() .. "/modules/keymap/nav_layer_save.lua"
 
 
 
@@ -118,7 +117,8 @@ helpers.describe("Linux navigation layer save", function()
 	end)
 
 	helpers.it("owns no window (retire-layer-editor)", function()
-		local source = read_file(MODULE_PATH)
+		local source, missing = helpers.read_module_source("modules.keymap.nav_layer_save")
+		helpers.assert_true(source ~= nil, "the save module resolves: " .. tostring(missing))
 		helpers.assert_true(source:find('require%("ui%.') == nil, "the save requires nothing under ui/")
 	end)
 end)
