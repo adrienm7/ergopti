@@ -473,6 +473,12 @@ const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
 // The Linux tray root took the macOS name once its sections moved to menu_*.lua.
 const CURRENT_SOURCE_RENAMES = Object.freeze([
 	Object.freeze({ from: /keylogger/g, to: 'keystats' }),
+	// The structure plan follows the oracle's other paths; this one only reads
+	// as a moved file once keylogger above is renamed.
+	Object.freeze({
+		from: /^windows\/modules\/llm\/prediction_keystats\.ahk$/,
+		to: 'windows/ai/engine/prediction/keystats.ahk'
+	}),
 	Object.freeze({
 		from: /^linux\/ui\/menu\/menu_builder\.lua$/,
 		to: 'linux/menu/ui/builder/builder.lua'
