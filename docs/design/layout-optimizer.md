@@ -119,7 +119,10 @@ shows for it.
 
 ## Page
 
-Pick the language and corpus (the built-in corpora of the Comparer), the
+Pick the language and corpus (the built-in corpora of the Comparer, or « your
+own text »: pasted, or a file the Comparer's reader opens — text, HTML,
+.docx, .odt, PDF — counted on the device; a text needs 200 to 5 000 000
+characters and a file at most 50 MB, each refusal said under the box), the
 start layout (the library, and the layouts open in « Éditer »), « this
 layout » or « a random arrangement of its keys », the keyboard; the
 switches, each explained; keys kept in place (click them on the start
@@ -160,6 +163,5 @@ only), keyboard ISO, format TKL, default weights, 1 restart of 3 000 swaps on
   shares of ways changed, and re-plans only their contexts.
 - The app: mount `LAYOUT_OPTIMIZER_PAGE` in the Studio window of ErgoptiPlus
   (Windows, macOS, Linux), with the keystats corpus « My typing ».
-- Pasted texts and files as corpora, as the Comparer offers.
 - Zones in the page (a letter restricted to some keys by clicking them).
 - Saving the page's choices per viewer (localStorage), as the Comparer does.

@@ -72,6 +72,7 @@ body:has(> main.layout-optimizer) {
 
 .layout-optimizer button,
 .layout-optimizer select,
+.layout-optimizer textarea,
 .layout-optimizer input[type='number'] {
 	background: var(--lo-surface);
 	border: 1px solid var(--lo-border);
@@ -125,6 +126,23 @@ body:has(> main.layout-optimizer) {
 
 .lo-wide {
 	grid-column: 1 / -1;
+}
+
+/* « Your own text »: the box takes the panel's width; the file picker wraps under it. */
+.lo-custom textarea {
+	resize: vertical;
+	width: 100%;
+}
+
+.lo-file {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	max-width: 100%;
+}
+
+.lo-file input[type='file'] {
+	max-width: 100%;
 }
 
 #lo-result {

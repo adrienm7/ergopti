@@ -76,6 +76,15 @@
 	// The best layout's metrics are measured again at most this often (ms).
 	const METRICS_MS = 500;
 	const HEIGHT_MESSAGE = 'ergopti-layout-optimizer:height';
+	// The corpus a pasted text or an opened file makes.
+	const CUSTOM_ID = 'custom';
+	// A text shorter than this gives the search too few n-grams to measure; a
+	// longer one would hold the page while it is counted and sent to the workers.
+	const MIN_TEXT_CHARS = 200;
+	const MAX_TEXT_CHARS = 5000000;
+	// Files larger than this are refused before they are read (MB).
+	const MAX_FILE_MB = 50;
+	const TEXT_DEBOUNCE_MS = 400;
 	const STANDALONE_ROOT_ID = 'layout-optimizer';
 
 	// The site passes ?lang=<code>; i18n.js loads that locale, then English and French.
@@ -92,6 +101,12 @@
 			<select id="lo-language"></select></label>
 		<label class="lo-field"><span data-i18n="layout_optimizer.corpus.label"></span>
 			<select id="lo-corpus"></select></label>
+		<div id="lo-custom" class="lo-field lo-custom" hidden>
+			<textarea id="lo-text" rows="4" data-i18n-placeholder="layout_optimizer.corpus.paste_placeholder"></textarea>
+			<label class="lo-file"><span data-i18n="layout_optimizer.corpus.file"></span>
+				<input id="lo-file" type="file" accept=".txt,.md,.csv,.tsv,.html,.htm,.json,.tex,.docx,.odt,.pdf" /></label>
+			<p id="lo-text-status" class="lo-muted" role="status" aria-live="polite"></p>
+		</div>
 		<label class="lo-field"><span data-i18n="layout_optimizer.start.label"></span>
 			<select id="lo-start"></select></label>
 		<fieldset class="lo-field lo-radios">
@@ -222,6 +237,8 @@
 		function applyStrings() {
 			for (const node of root.querySelectorAll('[data-i18n]'))
 				node.textContent = t(node.dataset.i18n);
+			for (const node of root.querySelectorAll('[data-i18n-placeholder]'))
+				node.placeholder = t(node.dataset.i18nPlaceholder);
 			for (const select of root.querySelectorAll('select[data-i18n-option-prefix]'))
 				for (const option of select.options)
 					option.textContent = t(`${select.dataset.i18nOptionPrefix}.${option.value}`);
@@ -248,6 +265,8 @@
 			qwertyPins: new Set(),
 			weights: E.defaultWeights(),
 			tables: new Map(),
+			// The pasted or opened text's tables: {hash, chars, tables}.
+			custom: null,
 			running: null,
 			startResult: null,
 			best: null,
@@ -286,15 +305,95 @@
 			const select = $('lo-corpus');
 			const kept = select.value;
 			const shown = DATA.corpora.filter((corpus) => corpus.language === $('lo-language').value);
+			const custom = el('option', '', t(`${PREFIX}corpus.custom`));
+			custom.value = CUSTOM_ID;
 			select.replaceChildren(
 				...shown.map((corpus) => {
 					const option = el('option', '', corpus.title);
 					option.value = corpus.id;
 					return option;
-				})
+				}),
+				custom
 			);
-			if (shown.some((corpus) => corpus.id === kept)) select.value = kept;
-			else if (shown.some((corpus) => corpus.id === DEFAULT_CORPUS)) select.value = DEFAULT_CORPUS;
+			const values = Array.from(select.options, (option) => option.value);
+			if (values.includes(kept)) select.value = kept;
+			else if (values.includes(DEFAULT_CORPUS)) select.value = DEFAULT_CORPUS;
+			syncCorpus();
+		}
+
+		/** Shows the text box under « Your own text » only. */
+		function syncCorpus() {
+			$('lo-custom').hidden = $('lo-corpus').value !== CUSTOM_ID;
+		}
+
+		/**
+		 * Reduces the user's text to tables, once per distinct text, and says
+		 * whether the optimizer can use it.
+		 * @param {string} text - The pasted or opened text.
+		 */
+		function useText(text) {
+			const trimmed = text.trim();
+			const chars = Array.from(trimmed).length;
+			const status = $('lo-text-status');
+			let problem = null;
+			if (chars > 0 && chars < MIN_TEXT_CHARS)
+				problem = t(`${PREFIX}corpus.text_short`, {
+					chars: number(chars, 0),
+					min: number(MIN_TEXT_CHARS, 0)
+				});
+			else if (chars > MAX_TEXT_CHARS)
+				problem = t(`${PREFIX}corpus.text_long`, {
+					chars: number(chars, 0),
+					max: number(MAX_TEXT_CHARS, 0)
+				});
+			if (chars === 0 || problem) {
+				state.custom = null;
+				status.textContent = problem || '';
+				status.classList.toggle('lo-error', Boolean(problem));
+				return;
+			}
+			const hash = E.hashText(trimmed);
+			if (!state.custom || state.custom.hash !== hash)
+				state.custom = { hash, chars, tables: E.ngramsFromText(trimmed) };
+			status.textContent = t(`${PREFIX}corpus.text_ready`, { chars: number(chars, 0) });
+			status.classList.remove('lo-error');
+		}
+
+		/** Reads an opened file into the text box, or says why it cannot. */
+		async function useFile(file) {
+			const status = $('lo-text-status');
+			const fail = (text) => {
+				state.custom = null;
+				status.textContent = text;
+				status.classList.add('lo-error');
+			};
+			const megabytes = file.size / (1024 * 1024);
+			if (megabytes > MAX_FILE_MB) {
+				fail(
+					t(`${PREFIX}corpus.file_large`, {
+						size: number(megabytes, 1),
+						max: number(MAX_FILE_MB, 0)
+					})
+				);
+				return;
+			}
+			let text;
+			try {
+				text = await FILES.readText(file);
+			} catch (failure) {
+				// The Comparer's words for each refusal: an unknown type, a PDF that is
+				// locked or holds no text (a scan), or a file that could not be read.
+				const known = {
+					file_unsupported: 'layout_analysis.corpus.file_unsupported',
+					pdf_encrypted: 'layout_analysis.corpus.pdf_encrypted',
+					pdf_no_text: 'layout_analysis.corpus.pdf_no_text'
+				};
+				fail(t(known[failure.code] || 'layout_analysis.corpus.file_unreadable'));
+				return;
+			}
+			// A text over the limit is not put in the box, where it would hold the page.
+			if (text.length <= MAX_TEXT_CHARS * 2) $('lo-text').value = text;
+			useText(text);
 		}
 
 		function fillStarts() {
@@ -539,6 +638,10 @@
 		}
 
 		async function loadTables(id) {
+			if (id === CUSTOM_ID) {
+				if (!state.custom) throw Object.assign(new Error('no text'), { code: 'text_missing' });
+				return state.custom.tables;
+			}
 			if (state.tables.has(id)) return state.tables.get(id);
 			const corpus = DATA.corpora.find((entry) => entry.id === id);
 			const tables = await FILES.builtinTables(corpus);
@@ -593,11 +696,13 @@
 				return;
 			}
 			setStatus(t(`${PREFIX}status.loading`));
+			// A text typed just now is read before the run, not after its pause.
+			if ($('lo-corpus').value === CUSTOM_ID) useText($('lo-text').value);
 			let tables;
 			try {
 				tables = await loadTables($('lo-corpus').value);
 			} catch (error) {
-				setStatus(errorText('corpus', error.message), true);
+				setStatus(errorText(error.code || 'corpus', error.message), true);
 				return;
 			}
 			const identity = {
@@ -828,6 +933,17 @@
 
 		function bind() {
 			$('lo-language').addEventListener('change', fillCorpora);
+			$('lo-corpus').addEventListener('change', syncCorpus);
+			let textTimer = null;
+			$('lo-text').addEventListener('input', (event) => {
+				clearTimeout(textTimer);
+				textTimer = setTimeout(() => useText(event.target.value), TEXT_DEBOUNCE_MS);
+			});
+			$('lo-file').addEventListener('change', (event) => {
+				const file = event.target.files && event.target.files[0];
+				if (file) useFile(file);
+				event.target.value = '';
+			});
 			$('lo-start').addEventListener('change', () => {
 				state.pinnedCodes.clear();
 				drawPinBoards();

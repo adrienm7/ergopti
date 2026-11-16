@@ -46,6 +46,7 @@ const SCRIPTS = [
 	'../_generated/key_legend.js',
 	'../layout_analysis/_generated/analysis_data.js',
 	'../layout_analysis/analysis_engine.js',
+	'../layout_analysis/pdf_text.js',
 	'../layout_analysis/corpus_files.js',
 	'optimizer_core.js',
 	'optimizer_runner.js',
@@ -99,11 +100,13 @@ const DATA = vm.runInContext('LAYOUT_ANALYSIS_DATA', sandbox);
 const RUNNER = vm.runInContext('LAYOUT_OPTIMIZER_RUNNER', sandbox);
 const page = read(path.join(PAGE_DIR, 'optimizer_page.js'));
 const keys = new Set();
-for (const m of page.matchAll(/data-i18n="([^"]+)"/g)) keys.add(m[1]);
+for (const m of page.matchAll(/data-i18n(?:-placeholder)?="([^"]+)"/g)) keys.add(m[1]);
 for (const m of page.matchAll(/data-i18n-option-prefix="([^"]+)"[^>]*>([\s\S]*?)<\/select>/g))
 	for (const option of m[2].matchAll(/value="([^"]+)"/g)) keys.add(`${m[1]}.${option[1]}`);
 for (const m of page.matchAll(/t\(`\$\{PREFIX\}([a-z_.]+)`/g)) keys.add(PREFIX + m[1]);
 for (const m of page.matchAll(/\bt\('([a-z_.]+)'/g)) keys.add(m[1]);
+// The Comparer's words the page borrows (the file refusals).
+for (const m of page.matchAll(/'(layout_analysis\.[a-z_.]+)'/g)) keys.add(m[1]);
 // Keys the page builds from lists.
 const switches = (page.match(/const SWITCHES = \[([\s\S]*?)\]/) || ['', ''])[1];
 const switchIds = Array.from(switches.matchAll(/'([A-Za-z]+)'/g), (m) => m[1]);
@@ -127,6 +130,9 @@ const codes = new Set(
 	)
 );
 check(codes.has('pin_conflict') && codes.has('no_dead_key'), 'optimizer codes');
+// The refusals the page raises itself (a missing text, …).
+for (const m of page.matchAll(/\{ code: '([a-z_]+)' \}/g)) codes.add(m[1]);
+check(codes.has('text_missing'), 'the page refuses a run without its text');
 for (const code of [...codes, 'failed', 'corpus', 'worker', 'studio_handoff_failed'])
 	keys.add(`${PREFIX}error.${code}`);
 for (const id of Object.keys(E.defaultWeights())) keys.add(`layout_analysis.metric.${id}`);
