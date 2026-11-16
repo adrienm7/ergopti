@@ -36,7 +36,13 @@ local function make_ports()
 		end,
 		count_keys = function(seconds, callback)
 			world.count_seconds = seconds
-			world.finish_count = function() callback({ tap_running = true, presses = world.presses }) end
+			world.finish_count = function()
+				local classes = world.classes or { selftest = world.presses, selftest_distinct = world.presses, owned = 0,
+					foreign = 0, unreadable = 0, autorepeats = 0 }
+				callback({ tap_running = true, presses = world.presses, selftest = classes.selftest,
+					selftest_distinct = classes.selftest_distinct, owned = classes.owned, foreign = classes.foreign,
+					unreadable = classes.unreadable, autorepeats = classes.autorepeats })
+			end
 		end,
 		scratch_typing = function(keys, callback)
 			world.keys = keys
@@ -110,6 +116,31 @@ helpers.describe("typing self-test probe", function()
 		steps = run("typing_selftest", ports)
 		helpers.assert_eq(steps.presses_seen.value, "seen_8_of_4")
 		helpers.assert_eq(steps.presses_seen.state, "fail")
+	end)
+
+	helpers.it("(key-count-classes-2026-11-15) names the class of every press and where the field text departs", function()
+		local ports, world = make_ports()
+		world.typed = { focused = true, posted = 4, text = "wkkjx", restored = true }
+		world.presses = 12
+		world.classes = { selftest = 12, selftest_distinct = 4, owned = 0, foreign = 0, unreadable = 0, autorepeats = 2 }
+		local steps, result = run("typing_selftest", ports)
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(steps.presses_seen.value, "seen_12_of_4")
+		helpers.assert_eq(steps.presses_seen.state, "fail", "a key delivered three times still fails")
+		helpers.assert_eq(steps.key_down_classes.state, "info")
+		helpers.assert_eq(steps.key_down_classes.value, "self_12_4:owned_0:foreign_0:unread_0")
+		helpers.assert_eq(steps.autorepeats_seen.value, "2")
+		helpers.assert_eq(steps.field_text.value, "mismatch_5_chars")
+		helpers.assert_eq(steps.field_text_shape.value, "len_5:prefix_2:suffix_2:extra_typed",
+			"the doubled k is named by position, never by character")
+		world.reads = 0
+		world.typed = { focused = true, posted = 4, text = "wkjx", restored = true }
+		world.presses = 4
+		world.classes = nil
+		steps = run("typing_selftest", ports)
+		helpers.assert_eq(steps.key_down_classes.value, "self_4_4:owned_0:foreign_0:unread_0")
+		helpers.assert_nil(steps.field_text_shape, "an exact field has no shape to name")
+		helpers.assert_nil(steps.autorepeats_seen)
 	end)
 
 	helpers.it("fails a focus that did not come back and a typing that did not settle", function()

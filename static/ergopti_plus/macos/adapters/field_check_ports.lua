@@ -12,8 +12,9 @@
 ---    or with nil when it timed out or could not start. A timed-out child is
 ---    terminated.
 --- 2. Counting tap: the key counter is a passive hs.eventtap that returns false
----    for every event and keeps one integer. It never reads a key code, a
----    character or a flag, and it does not count autorepeat.
+---    for every event and keeps integers: the presses, and each one's
+---    provenance class. It never reads a key code, a character or a flag, and
+---    it counts autorepeat apart.
 --- 3. Read-only facts: remap, keystats and health data are read through their
 ---    public getters; nothing here changes driver state.
 --- ==============================================================================
@@ -104,22 +105,51 @@ end
 -- ============================
 -- ============================
 
---- Counts key-down events for a while, without reading what they are.
+--- Counts key-down events for a while, without reading what they are. Each
+--- counted press is also sorted by its provenance, read without claiming it:
+--- a field-run selftest key (its deliveries, and how many distinct keys they
+--- were), other output of this driver, a foreign event (a physical key or
+--- another process) and an unreadable one. The typing selftest saw 12 presses
+--- for 4 posted keys (field report 2026-11-15) and the bare total could not
+--- say whether its keys were delivered several times or other events were
+--- counted: the classes name it.
 --- @param seconds number Watch duration.
---- @param callback function fn({ tap_running = boolean, presses = integer }).
+--- @param callback function fn({ tap_running, presses, autorepeats, selftest,
+---        selftest_distinct, owned, foreign, unreadable }), every count an integer.
 local function count_keys(seconds, callback)
-	local presses = 0
+	local EventProvenance = require("adapters.event_provenance")
+	local counts = { presses = 0, autorepeats = 0, selftest = 0, selftest_distinct = 0, owned = 0, foreign = 0,
+		unreadable = 0 }
+	local selftest_tags = {}
 	local property = hs.eventtap.event.properties.keyboardEventAutorepeat
 	local tap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
 		local ok, repeated = pcall(event.getProperty, event, property)
-		if not (ok and repeated ~= nil and repeated ~= 0) then presses = presses + 1 end
+		if ok and repeated ~= nil and repeated ~= 0 then
+			counts.autorepeats = counts.autorepeats + 1
+			return false
+		end
+		counts.presses = counts.presses + 1
+		local classified, metadata, status = pcall(EventProvenance.classify, event, nil)
+		if not classified or status == EventProvenance.STATUS_UNREADABLE then
+			counts.unreadable = counts.unreadable + 1
+		elseif status ~= EventProvenance.STATUS_OWNED then
+			counts.foreign = counts.foreign + 1
+		elseif metadata.selftest == true then
+			counts.selftest = counts.selftest + 1
+			if not selftest_tags[metadata.tag] then
+				selftest_tags[metadata.tag] = true
+				counts.selftest_distinct = counts.selftest_distinct + 1
+			end
+		else
+			counts.owned = counts.owned + 1
+		end
 		return false
 	end)
 	local started = tap:start()
-	local running = started ~= nil and tap:isEnabled() == true
+	counts.tap_running = started ~= nil and tap:isEnabled() == true
 	Timer.after(seconds, function()
 		tap:stop()
-		callback({ tap_running = running, presses = presses })
+		callback(counts)
 	end)
 end
 
@@ -473,6 +503,9 @@ end
 
 --- The bounded command runner, shared with adapters/runtime_owner_ports.lua.
 M.exec = exec
+
+--- The passive key counter, exposed for its provenance-class test.
+M.count_keys = count_keys
 
 --- The ports of the real Mac.
 --- @return table ports

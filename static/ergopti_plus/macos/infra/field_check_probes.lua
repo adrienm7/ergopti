@@ -1087,6 +1087,33 @@ M.SELFTEST_KEYS = { "w", "k", "j", "x" }
 -- Seconds the passive counter watches; the scratch typing ends well before.
 M.SELFTEST_COUNT_SECONDS = 6
 
+--- Where a field's text departs from the expected text, without any
+--- character: its byte length, the bytes it shares with the expected text at
+--- the start and at the end, and whether what it holds in between is only
+--- bytes of the typed keys (`extra_typed`, a key delivered twice) or anything
+--- else (`extra_other`). The 2026-11-15 field run held one byte too many in
+--- both typed steps, and the bare length could not say which key it was.
+--- @param expected string Expected text.
+--- @param actual string Text read from the field.
+--- @param typed string Every byte the keys typed.
+--- @return string shape Closed token, e.g. "len_5:prefix_2:suffix_2:extra_typed".
+function M.text_shape(expected, actual, typed)
+	local limit = math.min(#expected, #actual)
+	local prefix = 0
+	while prefix < limit and expected:byte(prefix + 1) == actual:byte(prefix + 1) do prefix = prefix + 1 end
+	local suffix = 0
+	while suffix < limit - prefix and expected:byte(#expected - suffix) == actual:byte(#actual - suffix) do
+		suffix = suffix + 1
+	end
+	local shape = "len_" .. #actual .. ":prefix_" .. prefix .. ":suffix_" .. suffix
+	local middle = actual:sub(prefix + 1, #actual - suffix)
+	if #actual <= #expected or middle == "" then return shape end
+	for index = 1, #middle do
+		if not typed:find(middle:sub(index, index), 1, true) then return shape .. ":extra_other" end
+	end
+	return shape .. ":extra_typed"
+end
+
 --- The automatic key accounting. The app opens a scratch text field of its
 --- own, brings it to the front and types the fixed sequence there, checking
 --- before each key that the field still has the focus: a key never reaches the
@@ -1117,11 +1144,19 @@ function M.typing_selftest(ports, report, finish)
 		local presses = observed.presses or 0
 		report.step("presses_seen", posted > 0 and presses == posted and STATE.pass or STATE.fail,
 			"seen_" .. presses .. "_of_" .. posted)
+		-- Each press by provenance: the selftest key's deliveries and distinct
+		-- keys, the driver's other output, foreign and unreadable events.
+		report.step("key_down_classes", STATE.info, string.format("self_%d_%d:owned_%d:foreign_%d:unread_%d",
+			observed.selftest, observed.selftest_distinct, observed.owned, observed.foreign, observed.unreadable))
+		if observed.autorepeats > 0 then report.step("autorepeats_seen", STATE.info, observed.autorepeats) end
 		if typed.text == nil then
 			report.step("field_text", posted > 0 and STATE.fail or STATE.skip, "unreadable")
 		else
 			report.step("field_text", typed.text == expected and STATE.pass or STATE.fail,
 				typed.text == expected and "exact" or ("mismatch_" .. #typed.text .. "_chars"))
+			if typed.text ~= expected then
+				report.step("field_text_shape", STATE.info, M.text_shape(expected, typed.text, expected))
+			end
 		end
 		if typed.latency_ms then report.step("type_latency_ms", STATE.info, math.floor(typed.latency_ms)) end
 		report.step("ledger_credits", STATE.info,
@@ -1278,6 +1313,10 @@ function M.hotstring_roundtrip(ports, report, finish)
 			report.step("hotstring_expanded", STATE.fail, complete and "not_expanded" or "typing_incomplete")
 		else
 			report.step("hotstring_expanded", STATE.fail, "mismatch_" .. #typed.text .. "_bytes")
+			-- A leftover trigger byte after the leading Space and a doubled
+			-- terminator at the end read differently here.
+			report.step("hotstring_text_shape", STATE.info,
+				M.text_shape(expected, typed.text, " " .. candidate.trigger))
 		end
 		if typed.effect_ms then
 			report.step("terminator_to_text_ms", STATE.info, math.floor(typed.effect_ms))

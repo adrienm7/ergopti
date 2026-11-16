@@ -2118,14 +2118,21 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
   warning per run), keystats never counts them, and typing stops before a key
   while the keymap taps are off (`keymap_tap_off`). They are posted after
   Karabiner, so the virtual keyboard path and the ledger's double count stay
-  `physical_keys_only`.
+  `physical_keys_only`. `presses_seen` stays the strict total; the counter
+  also sorts each press by provenance, read with `EventProvenance.classify(e,
+nil)` so it never takes a consumer's dedupe slot (`key_down_classes`
+  `self_<deliveries>_<distinct>:owned_:foreign_:unread_`), and a mismatched
+  field is located by `field_text_shape` (`len_:prefix_:suffix_` and
+  `extra_typed|extra_other`), never by its characters.
 - `hotstring_roundtrip` runs after `key_accounting`: the first shipped, enabled
   terminator hotstring with a plain lowercase trigger no other file registers,
   typed after a Space and followed by Space; the field holds the Space and the
   expansion (plus the Space unless Space is a consumed terminator);
   `terminator_to_text_ms` is named. Codes: `keymap_absent`,
   `no_enabled_trigger`, `space_not_terminator`, `not_expanded`,
-  `mismatch_<n>_bytes`, `typing_incomplete`.
+  `mismatch_<n>_bytes` (with `hotstring_text_shape`: `prefix_1` and a long
+  suffix is a leftover trigger byte, a zero suffix a doubled terminator),
+  `typing_incomplete`.
 - `prediction_tooltip`: the active model must already be on the Mac (listed
   by a running Ollama, or an MLX model in the cache; nothing is started or
   downloaded); it types `le chat dort sur le ` and waits 45 s;
