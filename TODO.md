@@ -970,9 +970,11 @@ with the analysis engine's own global score and never measures anything itself.
       layout with its changed keys, score and metrics against the start; stop; « Open in the editor » (new tab of
       « Éditer », `openLayout`) and « Compare with other layouts ». Web Workers (one share of the restarts each),
       page-thread fallback. 21 locales, light and dark, phone width. Proof: `tools/test/test-layout-optimizer-page.cjs`.
-- [ ] **Incremental scoring.** One analysis costs 5–12 ms, so a run scores about 100 layouts per second per worker.
-      An engine hook giving the key n-grams a swap touches would make an iteration cost microseconds; it belongs to
-      the engine (coordinate with its owner) and must keep the engine's metric code as the only one.
+- [x] **Incremental scoring.** `LAYOUT_ANALYSIS.scoreSession` re-walks only the n-grams of the characters whose
+      key sequence a swap changed, through `analyse()`'s own visitor (key pair and triple effects probed once);
+      the optimizer's `incrementalObjective` drives it. 94 → 288 layouts per second per worker (×3, loaded laptop).
+      Proof: the property test of `tools/test/test-layout-analysis-engine.cjs` (480 random swaps, gap ≤ 1e-9) and
+      the incremental section of `tools/test/test-layout-optimizer.cjs` (same scores, same search result).
 - [ ] **The optimizer in Ergopti+.** Mount `LAYOUT_OPTIMIZER_PAGE` in the app's Studio window on Windows, macOS and
       Linux, with « My typing » (keystats) as a corpus; the page already runs without workers where a host inlines it.
 - [ ] **Optimizer follow-ups.** Pasted texts and files as corpora (as the Comparer); zones in the page (restrict a

@@ -86,9 +86,27 @@ follow the clock, so a run stopped by time depends on the machine's speed.
 
 **Speed.** One analysis costs about 5–12 ms on a 1 MB corpus (Node, Windows
 laptop), most of it in the key-stream walk and the compact-form reachability
-of `compact_fit`. The optimizer scores through the engine's public API only,
-so it cannot update a score incrementally; it gains its speed from:
+of `compact_fit`. The optimizer scores through the engine's public API only;
+it gains its speed from:
 
+- incremental scoring (`LAYOUT_OPTIMIZER.incrementalObjective`, the engine's
+  `LAYOUT_ANALYSIS.scoreSession`): the session holds the stream counters of
+  the arrangement the search stands on; a trial compiles the new layout,
+  compares each corpus character's key sequence with the current one, and
+  takes out and puts back only the uni-, bi- and trigrams holding a changed
+  character, through `analyse()`'s own visitor. Each key bigram's and key
+  trigram's effect (the counters it raises) is probed once from that visitor
+  and then added to a typed array. A compact form factor is measured again
+  only when the cells on the keys it keeps, or the dead-key rules, changed.
+  The search tells the objective the arrangement it keeps (`accept`); a
+  trial is correct from any arrangement, `accept` only keeps the next ones
+  small. Equal to the full score within 1e-9 (property test: 480 random
+  swaps of any cells and dead-key rules on four layouts, boards and formats,
+  largest gap 6e-14; `analyse()` itself is byte-identical before and after
+  the refactor on the whole library). Measured (Node, « Swann », AZERTY,
+  99 % of the n-grams, 2 000 swaps, a loaded Ryzen 5 3500U): 94 → 288
+  layouts per second per worker (×3). A swap of a frequent letter still
+  walks about 15 % of the trigrams, which bounds the gain;
 - Web Workers, one share of the restarts each (up to 8, one thread left to the
   page), so the Studio stays responsive and a run uses every core;
 - the « 99 % of the n-grams » accuracy (`searchTables`), which keeps the most
@@ -127,10 +145,12 @@ only), keyboard ISO, format TKL, default weights, 1 restart of 3 000 swaps on
 
 ## Follow-ups
 
-- Incremental scoring: an engine hook returning the key n-gram counts
-  touched by a swap would make an iteration cost microseconds instead of
-  milliseconds. It belongs to the engine (coordinate with its owner): the
-  optimizer must keep using the engine's own metric code.
+- Faster incremental scoring: a trial still compiles the whole layout and
+  re-measures the layout-level metrics (shortcuts, digits, coverage), about
+  1 ms; caching each entry's last key pattern would halve the walk. If the
+  engine starts choosing a character's keys by its context (a best path over
+  the text), `scoreSession` must widen what it re-walks to the affected spans
+  or fall back to a full re-score: its property test fails otherwise.
 - The app: mount `LAYOUT_OPTIMIZER_PAGE` in the Studio window of ErgoptiPlus
   (Windows, macOS, Linux), with the keystats corpus « My typing ».
 - Pasted texts and files as corpora, as the Comparer offers.

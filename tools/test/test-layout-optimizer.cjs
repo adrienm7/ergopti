@@ -21,7 +21,9 @@
  *    case pairs, digits (fixed, number row, anywhere), letters off the number
  *    row, punctuation, symbols, the AltGr levels, the dead key's layer,
  *    zones; unknown options and impossible pins are refused with their code.
- * 5. Budget: a time budget stops the search on the clock it is given.
+ * 5. Incremental scoring: the incremental objective gives every layout the
+ *    search scores the engine's full score, and the same search result.
+ * 6. Budget: a time budget stops the search on the clock it is given.
  * ==============================================================================
  */
 
@@ -413,8 +415,43 @@ check(
 	'non-boolean switch refused'
 );
 
+// ======================================
+// ======= 5/ Incremental scoring =======
+// ======================================
+
+// The incremental objective gives every layout the search scores the full
+// engine score, with the AltGr levels and the dead key's layer moving too,
+// and the search it drives returns the same layout as the full objective.
+for (const [start, options] of [
+	[azerty, {}],
+	[ergol, { altgr: true, movePunctuation: true, moveSymbols: true }],
+	[ergol, { deadKeyLayer: true }]
+]) {
+	const p = O.problem(E, start, options);
+	const fullObjective = O.engineObjective(E, tables, ANALYSIS);
+	const incremental = O.incrementalObjective(E, tables, ANALYSIS);
+	let worst = 0;
+	let scored = 0;
+	const checked = (layout) => {
+		const value = incremental(layout);
+		worst = Math.max(worst, Math.abs(value - fullObjective(layout)));
+		scored += 1;
+		return value;
+	};
+	checked.accept = incremental.accept;
+	const settings = { seed: 4, restarts: 2, iterations: 80, start: 'random' };
+	const viaIncremental = O.run(p, Object.assign({ objective: checked }, settings));
+	check(scored > 100, `incremental (${start.id}): only ${scored} layouts scored`);
+	check(worst <= TOLERANCE, `incremental (${start.id}): a score is ${worst} off the engine's`);
+	const viaFull = O.run(p, Object.assign({ objective: fullObjective }, settings));
+	check(
+		JSON.stringify(viaIncremental.layout) === JSON.stringify(viaFull.layout),
+		`incremental (${start.id}): the search returns the layout the full objective finds`
+	);
+}
+
 // ===========================
-// ======= 5/ Budget =========
+// ======= 6/ Budget =========
 // ===========================
 
 let clock = 0;

@@ -430,6 +430,42 @@ var LAYOUT_OPTIMIZER = (function () {
 	}
 
 	/**
+	 * The engine's global score as the objective, scored incrementally
+	 * (LAYOUT_ANALYSIS.scoreSession): a swap walks only the n-grams of the
+	 * characters it moves. The search tells it which layout it keeps
+	 * (objective.accept), and each later layout is scored against that one.
+	 * Equal to engineObjective up to float rounding (the property test of
+	 * tools/test/test-layout-optimizer.cjs).
+	 * @param {object} engine - LAYOUT_ANALYSIS.
+	 * @param {object} tables - Counts or prepareNgrams() output.
+	 * @param {object} [analysis] - The analyse() options.
+	 * @returns {function(object): number} layout → score.total, with accept(layout).
+	 */
+	function incrementalObjective(engine, tables, analysis) {
+		const prepared = engine.prepareNgrams(tables);
+		let session = null;
+		let pending = null;
+		const objective = (layout) => {
+			if (session === null) {
+				session = engine.scoreSession(layout, prepared, analysis);
+				pending = { layout, commit() {} };
+				return session.total;
+			}
+			const trial = session.trial(layout);
+			pending = { layout, commit: trial.commit };
+			return trial.total;
+		};
+		/** Makes layout the one the next layouts are scored against. */
+		objective.accept = (layout) => {
+			if (session === null) objective(layout);
+			else if (pending && pending.layout === layout) pending.commit();
+			else session.trial(layout).commit();
+			pending = null;
+		};
+		return objective;
+	}
+
+	/**
 	 * Keeps the most frequent n-grams that make `share` of each table's count:
 	 * a smaller corpus for the search, whose last word is always the full one.
 	 * @param {object} engine - LAYOUT_ANALYSIS.
@@ -546,15 +582,25 @@ var LAYOUT_OPTIMIZER = (function () {
 
 		const cache = new Map();
 		let evaluations = 0;
+		// The layout scored last, which an incremental objective may keep (accept).
+		let scored = { key: '', layout: null };
 		const score = (assignment) => {
 			const key = assignment.join(',');
 			if (cache.has(key)) return cache.get(key);
-			const value = s.objective(layoutOf(p, assignment));
+			const layout = layoutOf(p, assignment);
+			const value = s.objective(layout);
 			if (!Number.isFinite(value)) throw new Error('layout_optimizer: the objective is not finite');
+			scored = { key, layout };
 			evaluations += 1;
 			if (cache.size >= CACHE_LIMIT) cache.clear();
 			cache.set(key, value);
 			return value;
+		};
+		/** Tells an incremental objective the arrangement the run now stands on. */
+		const accept = (assignment) => {
+			if (typeof s.objective.accept !== 'function') return;
+			const key = assignment.join(',');
+			s.objective.accept(scored.key === key ? scored.layout : layoutOf(p, assignment));
 		};
 
 		const startScore = score(p.start);
@@ -569,6 +615,7 @@ var LAYOUT_OPTIMIZER = (function () {
 			const assignment = s.start === 'random' ? shuffled(p, next) : p.start.slice();
 			const slotOf = slotsOf(assignment);
 			let current = score(assignment);
+			accept(assignment);
 			// The mean worsening of a few random swaps sets the first temperature.
 			let worse = 0;
 			let counted = 0;
@@ -637,6 +684,7 @@ var LAYOUT_OPTIMIZER = (function () {
 				const delta = value - run.current;
 				if (delta >= 0 || run.next() < Math.exp(delta / run.temperature)) {
 					run.current = value;
+					accept(run.assignment);
 					if (value > best.score)
 						best = { score: value, assignment: run.assignment.slice(), restart: run.k };
 				} else swap(run.assignment, run.slotOf, pair[0], pair[1]);
@@ -715,6 +763,7 @@ var LAYOUT_OPTIMIZER = (function () {
 		allowed,
 		layoutOf,
 		engineObjective,
+		incrementalObjective,
 		searchTables,
 		createSearch,
 		run,

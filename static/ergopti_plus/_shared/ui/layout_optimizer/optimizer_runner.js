@@ -51,7 +51,8 @@ var LAYOUT_OPTIMIZER_RUNNER = (function () {
 		try {
 			const p = O.problem(E, request.start, request.options);
 			full = O.engineObjective(E, request.tables, request.analysis);
-			const objective = O.engineObjective(
+			// The search scores each swap incrementally; the last word is the full analysis.
+			const objective = O.incrementalObjective(
 				E,
 				O.searchTables(E, request.tables, request.share),
 				request.analysis
