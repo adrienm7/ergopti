@@ -245,12 +245,18 @@ function hotstringsRenderTimes(configRoot) {
 // neutral-defaults boot reads the same documents and seeds the generated
 // template, which gained [tap_holds] sticky_timeout_ms (c81728c4fa): measured
 // 2250 -> 2271 on run 43514634523, its slow steps 12841 -> 12838.
+// Raised on 2026-11-16, measured on dev runs 43923292049 and 43932070178:
+// every boot reads one more flat value (fresh-config 1179 -> 1180, realistic
+// 1212 -> 1213). TimingsLoadShared parses the whole timing registry, which
+// gained [ui] paused_refusal_repeat_ms (353f777c1f) and [adapters]
+// wayland_keymap_dump_timeout_ms (b69e9542de) and lost [ui]
+// gnome_input_source_settle_ms (097abc914d): net +1, the same for each fixture.
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },
 	'toml.document_parse': { all: 15, [REALISTIC_HOTSTRINGS_FIXTURE]: 18 },
 	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
 	'toml.document_slow_steps': { all: 12841, [REALISTIC_HOTSTRINGS_FIXTURE]: 13582 },
-	'toml.flat_values': { all: 2271, [REALISTIC_HOTSTRINGS_FIXTURE]: 1212 }
+	'toml.flat_values': { all: 2271, [REALISTIC_HOTSTRINGS_FIXTURE]: 1213 }
 };
 
 /**
