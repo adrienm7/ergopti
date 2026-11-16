@@ -1056,6 +1056,15 @@ and the next module candidates. The audit is paused at the maintainer's request.
       [CODE] Left (2026-11-15): census areas outside the campaigned modules, the macOS bindings.lua and Linux
       key_combinations.lua deep pass, and the Windows rows of each report. [DECISION] THD-1 to THD-4, HCD-1/2/4/5,
       TCL-004, and the agent's GSD-1 and HCD-3.
+      Windows rows rechecked 2026-11-16 against the source: ADD-1 (`SFD_IsSecureAppWindow`), UPD-1 (an HTML 200
+      reads the feed), UPD-2, ILD-2, SCD-2 and SCD-3 were already done. Fixed that day: the `+33` short trigger of a
+      number stored without its 0 (HCM-007's Windows row, `_DynHS_InternationalPrefix`, shared
+      `international_prefix_vectors`) and UPW-005 (the signing policy read case-sensitively). Also fixed that day,
+      from the tooltips and WPM report: Linux has the Delays submenu's AI row and its overlay reads the
+      `llm_prediction` override (`tooltips-wpm-llm-delay-row`), and a lifetime of 0 keeps the prediction until the
+      next activity on Windows too, which hid it after the 50 ms floor (`llm-zero-lifetime`). Still open on
+      Windows: KMD-1 (UTC metrics rows, a cache migration) and the Notepad and terminal Backspace undo (item
+      below); TWD-1 and TWD-2 are under « Maintainer decisions pending ».
 
 ## Dead-key composition parity follow-up
 
@@ -1955,3 +1964,20 @@ under « Maintainer decisions of 2026-11-13, to implement » at the top.
   2. Add `-Builds amd64,x86,wow64` for a local check into a folder of its choosing, never packaged and never
      written to `vendor/keyboard_layout`.
   3. Install the « MSVC ARM64 build tools » component on the PC (administrator, Visual Studio Installer).
+- [ ] **TWD-1: a hotstring preview with no delay, hide it after 3 s? (asked 2026-11-16, tooltips and WPM campaign)**
+      Windows hides a zero-delay preview after a typed 3.0 s (`_TOOLTIP_SAFETY_SEC`,
+      `windows/core/ui/ui/tooltip/core.ahk`); macOS and Linux keep it until the next key. The shared
+      `[timing] safety_timeout_sec = 3.0` (`_shared/core/ui/data/tooltip/constants.toml`) has no reader on any OS.
+      Kept meanwhile: each OS as today.
+  1. **(recommended) Read the shared `safety_timeout_sec` on the three OS**: a zero-delay preview hides after 3 s
+     everywhere, the Windows literal goes, and a shared vector pins the hide.
+  2. Keep the bubble until the next key on the three OS: Windows drops its safety hide and the shared key is
+     deleted.
+  3. Keep today's difference and delete the unread shared key.
+- [ ] **TWD-2: the WPM widget after a key that types nothing (asked 2026-11-16, tooltips and WPM campaign).**
+      macOS and Linux show « 0 » for 3 s after a shortcut or an arrow key; Windows shows the widget only with a
+      speed or a recent typing source (possibly the deliberate pointer alignment of 2026-11-06). Kept meanwhile:
+      each OS as today.
+  1. **(recommended) Follow Windows:** a key that types nothing never shows « 0 » on macOS and Linux.
+  2. Follow macOS and Linux: Windows shows « 0 » for 3 s after such a key.
+  3. Keep the difference and record it as intentional in the parity register.

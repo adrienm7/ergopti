@@ -54,6 +54,8 @@ apply).
   are admitted where Lua (`linux/infra/asset_signature.lua`) refuses them as
   a bad policy. It matters only for a hand-edited `asset_signing.json` (the
   shipped value is « off »). Counterpart: compare with `==`.
+  Done on 2026-11-16: the policy's text fields compare with `==` and `!==`
+  (`test_asset_signature.ahk`, « the policy admits only what it can honour »).
 
 ## Refuted
 
