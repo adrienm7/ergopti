@@ -335,15 +335,15 @@ Test("(bundled-apps-entry) reads the app, the locale and the files of its comman
 
 _BAT_TrayLaunch() {
 	Env := Map("compiled", false, "script_path", "C:\E\ErgoptiPlus.ahk", "ahk_path", "C:\AHK\AutoHotkey64.exe",
-		"entry", "C:\E\apps\bundled_app_entry.ahk", "locales_dir", "C:\S\data\locales", "locale", "fr")
+		"entry", "C:\E\bundled_app_entry.ahk", "locales_dir", "C:\S\data\locales", "locale", "fr")
 	Started := [], Shortcuts := []
 	AssertTrue(BundledApps_Launch(BUNDLED_APPS[2], Env, (Exe, Args) => Started.Push([Exe, Args]),
 		(Path, Fields) => Shortcuts.Push([Path, Fields])))
 	AssertEqual("C:\AHK\AutoHotkey64.exe", Started[1][1])
-	AssertEqual("/force C:\E\apps\bundled_app_entry.ahk --bundled-app encryptor --locales-dir C:\S\data\locales --locale fr",
+	AssertEqual("/force C:\E\bundled_app_entry.ahk --bundled-app encryptor --locales-dir C:\S\data\locales --locale fr",
 		BundledAppsNative_CommandLine(Started[1][2]))
 	AssertContains(Shortcuts[1][1], "\Microsoft\Windows\SendTo\Encryptor.lnk")
-	AssertEqual("/force C:\E\apps\bundled_app_entry.ahk --bundled-app encryptor --locales-dir C:\S\data\locales --locale fr --",
+	AssertEqual("/force C:\E\bundled_app_entry.ahk --bundled-app encryptor --locales-dir C:\S\data\locales --locale fr --",
 		Shortcuts[1][2]["arguments"])
 	Env["compiled"] := true
 	Command := BundledApps_Command(BUNDLED_APPS[1], Env)
