@@ -20,9 +20,9 @@ return {
 	-- Gesture recognition, probe loop, swipe events.
 	{ name = "ErgoptiPlus_gestures.log", patterns = { "[gestures", "gesture" } },
 	-- Ollama backend server, API calls, dependency installer.
-	{ name = "ErgoptiPlus_ollama.log", patterns = { "[ollama", "[llm.api_ollama]", "[ollama_deps]", "[LLM.ollama", "[modules.llm.api_ollama]", "[modules.llm.managed_ollama_proxy]" } },
+	{ name = "ErgoptiPlus_ollama.log", patterns = { "[ollama", "[llm.api_ollama]", "[ollama_deps]", "[LLM.ollama", "[modules.llm.api_ollama]", "[modules.llm.managed_ollama_proxy]", "[ai.engine.api.api_ollama]", "[ai.engine.ollama.managed_ollama_proxy]" } },
 	-- LLM menu, model switching, warmup, toggle events.
-	{ name = "ErgoptiPlus_llm.log", patterns = { "[llm.", "[menu_llm", "[keymap.llm", "WARMUP", "[TOGGLE]", "[LLM", "[modules.llm.", "[infra.llm_", "[ui.llm_", "[ui.menu.llm_", "[ui.tooltip.llm]" } },
+	{ name = "ErgoptiPlus_llm.log", patterns = { "[llm.", "[menu_llm", "[keymap.llm", "WARMUP", "[TOGGLE]", "[LLM", "[modules.llm.", "[ai.", "[infra.llm_", "[ui.llm_", "[ui.menu.llm_", "[ui.tooltip.llm]" } },
 	-- Keymap processing, dynamic hotstrings, personal info, TOML reader.
 	{ name = "ErgoptiPlus_hotstrings.log", patterns = { "[keymap.", "[dynamic_hotstring", "[personal_info]", "[toml_reader]", "hotstring", "[Hotstring", "[HSE", "[UserHotstrings", "[PersonalToml", "[PersonalInfo", "[modules.dynamic_hotstrings.", "[infra.personal_info_fields]" } },
 	-- Keystroke logging, SQLite writes, rotation, export.

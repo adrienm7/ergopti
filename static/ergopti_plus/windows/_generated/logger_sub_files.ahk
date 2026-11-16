@@ -26,9 +26,9 @@ LoggerSubFilesData() {
 		; Gesture recognition, probe loop, swipe events.
 		Map("name", "ErgoptiPlus_gestures.log", "tags", ["[gestures", "gesture"]),
 		; Ollama backend server, API calls, dependency installer.
-		Map("name", "ErgoptiPlus_ollama.log", "tags", ["[ollama", "[llm.api_ollama]", "[ollama_deps]", "[LLM.ollama", "[modules.llm.api_ollama]", "[modules.llm.managed_ollama_proxy]"]),
+		Map("name", "ErgoptiPlus_ollama.log", "tags", ["[ollama", "[llm.api_ollama]", "[ollama_deps]", "[LLM.ollama", "[modules.llm.api_ollama]", "[modules.llm.managed_ollama_proxy]", "[ai.engine.api.api_ollama]", "[ai.engine.ollama.managed_ollama_proxy]"]),
 		; LLM menu, model switching, warmup, toggle events.
-		Map("name", "ErgoptiPlus_llm.log", "tags", ["[llm.", "[menu_llm", "[keymap.llm", "WARMUP", "[TOGGLE]", "[LLM", "[modules.llm.", "[infra.llm_", "[ui.llm_", "[ui.menu.llm_", "[ui.tooltip.llm]"]),
+		Map("name", "ErgoptiPlus_llm.log", "tags", ["[llm.", "[menu_llm", "[keymap.llm", "WARMUP", "[TOGGLE]", "[LLM", "[modules.llm.", "[ai.", "[infra.llm_", "[ui.llm_", "[ui.menu.llm_", "[ui.tooltip.llm]"]),
 		; Keymap processing, dynamic hotstrings, personal info, TOML reader.
 		Map("name", "ErgoptiPlus_hotstrings.log", "tags", ["[keymap.", "[dynamic_hotstring", "[personal_info]", "[toml_reader]", "hotstring", "[Hotstring", "[HSE", "[UserHotstrings", "[PersonalToml", "[PersonalInfo", "[modules.dynamic_hotstrings.", "[infra.personal_info_fields]"]),
 		; Keystroke logging, SQLite writes, rotation, export.

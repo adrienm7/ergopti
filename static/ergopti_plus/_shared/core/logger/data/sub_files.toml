@@ -65,6 +65,8 @@ patterns    = [
     "[LLM.ollama",
     "[modules.llm.api_ollama]",
     "[modules.llm.managed_ollama_proxy]",
+    "[ai.engine.api.api_ollama]",
+    "[ai.engine.ollama.managed_ollama_proxy]",
 ]
 
 [[sub_files]]
@@ -79,6 +81,7 @@ patterns    = [
     "[TOGGLE]",
     "[LLM",
     "[modules.llm.",
+    "[ai.",
     "[infra.llm_",
     "[ui.llm_",
     "[ui.menu.llm_",
