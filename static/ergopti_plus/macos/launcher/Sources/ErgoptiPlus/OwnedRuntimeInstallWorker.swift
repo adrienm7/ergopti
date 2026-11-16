@@ -50,6 +50,49 @@ enum OwnedRuntimeInstallTrail {
 	}
 }
 
+/// The installer helper's descriptor budget. Custody keeps one open descriptor per entry of every tree it holds
+/// (the helper bundle, the staged payload, the scratch, the copied stage and the published Runtime, with their
+/// ancestors), so one install holds several hundred at once; the administrator shell hands the helper the default
+/// soft limit of 256. Field report 2026-11-15: the install published Runtime, then ran out of descriptors pinning
+/// it (`refused-source-root-dup-errno-24`), and a journal past its publication intent refuses a rollback, so every
+/// attempt left cleanup pending (exit 75) and the services were never written.
+enum OwnedRuntimeDescriptorBudget {
+	/// The soft limit the helper asks for: the most a macOS process may set (OPEN_MAX), bounded by the hard limit.
+	static let wanted = rlim_t(OPEN_MAX)
+	/// Raises the soft RLIMIT_NOFILE before any custody is taken, and names the change on the install trail.
+	/// - Parameters:
+	///   - read: Reads the current limits (getrlimit by default; a test supplies its own).
+	///   - write: Sets new limits (setrlimit by default).
+	/// - Returns: The soft limit in force afterwards.
+	@discardableResult
+	static func raiseSoftLimit(read: (inout rlimit) -> Int32 = { getrlimit(RLIMIT_NOFILE, &$0) },
+		write: (inout rlimit) -> Int32 = { setrlimit(RLIMIT_NOFILE, &$0) }) -> rlim_t {
+		var limit = rlimit()
+		guard read(&limit) == 0 else { OwnedRuntimeInstallTrail.note("fd-limit-unreadable-errno-" + String(errno)); return 0 }
+		let target = min(wanted, limit.rlim_max)
+		guard limit.rlim_cur < target else { return limit.rlim_cur }
+		let before = limit.rlim_cur
+		limit.rlim_cur = target
+		guard write(&limit) == 0 else {
+			OwnedRuntimeInstallTrail.note("fd-limit-" + String(before) + "-kept-errno-" + String(errno)); return before
+		}
+		OwnedRuntimeInstallTrail.note("fd-limit-" + String(before) + "-to-" + String(target))
+		return target
+	}
+	/// An errno for a refusal's check; descriptor exhaustion also names how many are open and the soft limit, so a
+	/// field report tells a leak from a limit that is merely too low.
+	/// - Parameter code: The errno the failing call left.
+	/// - Returns: `errno-<n>`, or `errno-<n>-fds-<open>-of-<limit>` for EMFILE and ENFILE.
+	static func errnoDetail(_ code: Int32) -> String {
+		guard code == EMFILE || code == ENFILE else { return "errno-" + String(code) }
+		var limit = rlimit()
+		let soft = getrlimit(RLIMIT_NOFILE, &limit) == 0 ? limit.rlim_cur : 0
+		let scanned = Int32(clamping: min(soft == 0 ? 4096 : soft, 65_536))
+		let open = (0..<scanned).reduce(0) { $0 + (fcntl($1, F_GETFD) != -1 ? 1 : 0) }
+		return "errno-" + String(code) + "-fds-" + String(open) + "-of-" + String(soft)
+	}
+}
+
 /// A scratch owns only vnodes created with exclusive native operations; cleanup never walks unknown children.
 final class OwnedRuntimeInstallScratch {
 	private struct Node {
@@ -216,7 +259,7 @@ final class OwnedRuntimeInstallTree {
 		let parts = root.path.dropFirst().split(separator: "/", omittingEmptySubsequences: false).map(String.init)
 		guard !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else { throw OwnedRuntimeInstallFailure.refusedSource("root-parts") }
 		var parent = open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
-		guard parent >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("root-open-errno-" + String(errno)) }
+		guard parent >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("root-open-" + OwnedRuntimeDescriptorBudget.errnoDetail(errno)) }
 		ancestors.append(parent)
 		for part in parts {
 			var named = stat(), observed = stat()
@@ -227,7 +270,7 @@ final class OwnedRuntimeInstallTree {
 				throw OwnedRuntimeInstallFailure.refusedSource("ancestor-not-directory-" + part)
 			}
 			let descriptor = openat(parent, part, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
-			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("ancestor-open-errno-" + String(errno) + "-" + part) }
+			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("ancestor-open-" + OwnedRuntimeDescriptorBudget.errnoDetail(errno) + "-" + part) }
 			ancestors.append(descriptor)
 			guard fstat(descriptor, &observed) == 0, same(named, observed) else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 			if protected { try protection(descriptor, observed) }
@@ -236,7 +279,7 @@ final class OwnedRuntimeInstallTree {
 		}
 		// A separate root descriptor gives the root node normal recursive custody.
 		let descriptor = dup(parent)
-		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("root-dup-errno-" + String(errno)) }
+		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("root-dup-" + OwnedRuntimeDescriptorBudget.errnoDetail(errno)) }
 		var observed = stat()
 		guard fstat(descriptor, &observed) == 0 else {
 			let failure = OwnedRuntimeInstallFailure.refusedSource("root-fstat-errno-" + String(errno)); Darwin.close(descriptor); throw failure
@@ -276,7 +319,7 @@ final class OwnedRuntimeInstallTree {
 				throw OwnedRuntimeInstallFailure.refusedSource("entry-kind-" + kind + "-links-" + String(named.st_nlink) + "-" + relative)
 			}
 			let descriptor = openat(parent.descriptor, name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK | (directory ? O_DIRECTORY : 0))
-			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("entry-open-errno-" + String(errno) + "-" + relative) }
+			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("entry-open-" + OwnedRuntimeDescriptorBudget.errnoDetail(errno) + "-" + relative) }
 			// Retain before any throwing validation; rejected entries still close their exact FD.
 			entries.append(Entry(relative: relative, descriptor: descriptor, parent: parent.descriptor, name: name,
 				observed: named, directory: directory, digest: nil))
@@ -358,7 +401,7 @@ final class OwnedRuntimeInstallTree {
 		guard !descriptorsClosed else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		guard let root = entries.first else { throw OwnedRuntimeInstallFailure.refusedSource("duplicate-no-root") }
 		let descriptor = fcntl(root.descriptor, F_DUPFD_CLOEXEC, STDERR_FILENO + 1)
-		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("duplicate-errno-" + String(errno)) }
+		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("duplicate-" + OwnedRuntimeDescriptorBudget.errnoDetail(errno)) }
 		return descriptor
 	}
 	func copy(into destination: URL, custody: ((OwnedRuntimeInstallScratch) -> Void)? = nil,

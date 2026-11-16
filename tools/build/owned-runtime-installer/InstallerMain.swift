@@ -5,6 +5,9 @@ import Foundation
 struct OwnedRuntimeInstallerMain {
 	static func main() {
 		umask(kPrivateProcessUmask)
+		// Before any custody: the trees an install holds need more descriptors than the inherited 256 (field
+		// report 2026-11-15, OwnedRuntimeDescriptorBudget).
+		OwnedRuntimeDescriptorBudget.raiseSoftLimit()
 		#if ERGOPTI_DAEMON_REPORT
 		if CommandLine.arguments.count == 2 && CommandLine.arguments[1] == "--query-vhd-daemon-report-purpose" {
 			do { try FileHandle.standardOutput.write(contentsOf: Data("OWNED_VHD_DAEMON_REPORT_PURPOSE|1|readonly-historical\n".utf8)) }

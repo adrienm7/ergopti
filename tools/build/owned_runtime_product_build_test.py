@@ -306,6 +306,23 @@ class DaemonReportBuildControls(unittest.TestCase):
         self.assertIn("OwnedRuntimeInstallerEntry.runFirstInstallation()", files_only)
         self.assertNotIn("OwnedRuntimeIdleServiceEntry", files_only)
 
+    def test_installer_main_raises_the_descriptor_limit_before_any_entry(self):
+        # Field report 2026-11-15: the install ran out of descriptors under the
+        # inherited soft limit of 256 after publishing Runtime (exit 75).
+        text = (
+            Path(__file__).resolve().parent / "owned-runtime-installer/InstallerMain.swift"
+        ).read_text(encoding="utf-8")
+        body = text.partition("static func main()")[2]
+        raise_at = body.find("OwnedRuntimeDescriptorBudget.raiseSoftLimit()")
+        self.assertGreater(raise_at, -1)
+        for entry in (
+            "OwnedVirtualHIDDaemonReportWorker",
+            "OwnedRuntimeServiceRepairEntry.run()",
+            "OwnedRuntimeIdleServiceEntry.runFirstInstallation()",
+            "OwnedRuntimeInstallerEntry.runFirstInstallation()",
+        ):
+            self.assertLess(raise_at, body.index(entry), entry)
+
     def test_service_repair_entry_is_dispatched_only_in_the_live_profile(self):
         # MRT-004: the files-only profile carries no service owner to repair with.
         text = (
