@@ -1488,8 +1488,7 @@ migration (byte identity confirmed on the PC on 2026-11-16).
   `'unsafe-eval'`), so the hosts build XKB and KLC with the native Lua export
   step (`composer/export_step.lua`, `lua_export`): macOS and Linux in process,
   Windows through the pinned, restricted Lua 5.4 exe `ergopti_lua_export`.
-  fengari stays the site's runner. Downloads go to the Downloads folder, never
-  replacing a file (Hammerspoon and WebKitGTK have no save panel).
+  fengari stays the site's runner.
 - **One format of record.** The Ergopti TOML source is saved and compiled to
   XKB, KLC and `.keylayout`; the export section has one « Format » drop-down and
   one « Download » button; a KbdEdit `.kbe` is refused (its body is encrypted,

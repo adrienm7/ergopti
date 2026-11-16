@@ -80,718 +80,72 @@ is held to it from now on.
 - [ ] **Accessibility statement.** A public page stating the conformance level, known gaps and a contact to
       report a barrier.
 
-## Ergopti Studio inside Ergopti+ (maintainer request, 2026-11-14)
+## Ergopti Studio
 
-Naming (maintainer, 2026-11-14): « Ergopti » is the project; « Disposition Ergopti » the layout; « Ergopti+ » the
-software (name kept everywhere); « Ergopti Studio » the layout editor.
+Design: [layout-editor.md](docs/design/layout-editor.md), [layout-analysis.md](docs/design/layout-analysis.md),
+[analyser-scores.md](docs/design/analyser-scores.md), [layout-optimizer.md](docs/design/layout-optimizer.md); the
+analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-analysers/report.md) (its section 15
+waits for the maintainer's review).
 
-- [x] **Ergopti Studio tab in Ergopti+.** On Windows, macOS and Linux, the app menu gets an « Ergopti Studio » entry
-      next to the layout and tap-hold sections; it opens the layout editor's WebView window
-      (`_shared/ui/layout_editor_window`, already its own window) so a user edits a layout and installs it on the
-      machine from there. Name the in-app window and its menu row « Ergopti Studio » (21 locales, i18n skill); the window title is
-      exactly « Ergopti Studio », without the « ErgoptiPlus — » prefix (maintainer, 2026-11-14).
-      Done 2026-11-14: the top-level « 🎨 Ergopti Studio… » command right after « Keyboard layout » (place decided by
-      the agent, to review by the maintainer), greyed with the feature rows while the Windows driver is paused. The
-      window title is exactly « Ergopti Studio » on the three OS (maintainer, 2026-11-14): a product name of
-      `apps.manifest.json` `window_title.product_names`, which the generated composers show without the brand
-      prefix (`window-title-product-name`). Real-machine checks: the `layout_editor_window` lines of the three
-      TODO-tests files.
-- [x] **Live analysis from the user's own typing.** The Studio reads the local keystats SQLite store (read only, never
-      sent anywhere) and shows, for the layout being edited, the metrics computed on what this user really types:
-      SFBs (same-finger bigrams), hand alternation, rolls, redirects, finger and row load. The numbers update as keys
-      are moved. Reuse one shared metrics engine (the site's benchmark computation, `src/routes/benchmarks`, and
-      `_shared/metrics`), not a second implementation; keystats keeps its privacy rules (local only, the user's own
-      data, documented in the Studio).
-      Bridge done 2026-11-14 (`claude/ergopti-todo-studio-app`): « Analyse my typing » reads the store read only on
-      the three OS (docs/design/layout-editor.md, « Ergopti Studio: My typing »); the metrics wait for the shared
-      engine.
-      Checked 2026-11-15: done on dev (5751c907fa, 9e01fc138b, 7fa1dec8d2, ffbf598420): the editor's analysis panel
-      shows the metrics and finger load on « My typing » on the three OS, so « the metrics wait for the shared engine »
-      above is out of date; proof: test_layout_manager_bridge.lua (Linux, macOS),
-      test_keystats_reader_ngram_sources.ahk, tools/test/test-layout-manager-page.cjs. Real-machine checks: the
-      `layout_editor_window` lines of the three TODO-tests files.
-- [x] **Corpus analysis.** Load a text corpus (file picker, local) and analyse the edited layout on it with the same
-      metrics; keep the corpora the site already uses as built-in choices.
-      [CODE] Left (2026-11-15): the Comparer reads a local file or pasted text (34fa1ff045, 0cc1ddfbc3, b6223f47b5;
-      test-layout-comparer-page.cjs), but the edited layout cannot be analysed on it: the editor's panel offers only the
-      built-in corpora and « My typing ».
-      In the app 2026-11-15 (`claude/ergopti-todo-edited-into-comparer`): « Compare with other layouts » in the
-      editor's panel puts the edited layout in « Comparer », where a pasted text or a file is the corpus.
-      On the site 2026-11-15 (`claude/ergopti-todo-site-studio-handoff`): the framed editor keeps the layout in the
-      tab's storage and the Studio opens « Comparer », which ranks it; proof: `studio-site-handoff` in
-      site-structure.playwright.cjs.
-- [x] **Comparison with other layouts.** Compare the edited layout with a library of about a hundred layouts
-      (Bépo, Ergopti, Ergo-L, AZERTY, QWERTY, Colemak, Dvorak and the other ones of the benchmark pages): table and
-      charts per metric, on the user's keystats data or on a chosen corpus. One shared source for the layout library,
-      read by the site's benchmarks and by the Studio.
-      In the app 2026-11-14 (`claude/ergopti-todo-studio-app`): Ergopti Studio's « Éditer » and « Comparer » tabs on
-      the three OS. « Comparer » is worker R's comparer, embedded without a frame. The imported layouts are kept in
-      the user's data folder, the built-in corpus tables are served by the host on request, and « My typing » is
-      the default corpus once loaded (docs/design/layout-editor.md). Tabs and embedding decided by the agent, to
-      review by the maintainer.
-      [CODE] Left (2026-11-15): the library (115 layouts, ef57760eaf), the Comparer tables and charts and the app tabs
-      are done (e06a7c35e8, 4fbf8ab41b; test-layout-analysis-engine.cjs, test-layout-comparer-page.cjs); the layout
-      being edited is not in the Comparer's tables, only ranked in the editor panel (done in the app 2026-11-15:
-      « Compare with other layouts », ranked against the layouts ticked there). The benchmark page is rebuilt on the
-      shared library and engine (maintainer decision, 2026-11-15; `claude/ergopti-todo-studio-w-bench-2`, 225367b4,
-      a10f7a21): /ergopti/benchmarks frames the Studio's Comparer opened on `fr_nemolivier` and ISO through its
-      `?corpus=&keyboard=&format=` link; its KLAnext screenshots are gone, its Ergo-L PDF reports too (maintainer
-      decision, 2026-11-15: one source of truth, the live Comparer), and /benchmarks still redirects there; proof:
-      site-structure.playwright.cjs (exerciseBenchmarks), layout-editor.playwright.cjs (exerciseComparerLink).
-      Checked 2026-11-16: the layouts open in « Éditer » are in the Comparer's tables on the site and in the app
-      (3954240242, 97525eb71d, 7a1af4db81; `editor-layouts-in-comparer` and `studio-compare-edited` in
-      layout-editor.playwright.cjs, `studio-site-handoff` in site-structure.playwright.cjs), so the gap above is closed.
-
-- [x] **The same comparison online on ergopti.fr.** The Studio page of the site (`/studio`) runs the same analysis and
-      comparison in the browser (corpus upload, layout library, the layout being edited), with the same shared engine
-      as the app, so ergopti.fr is a full alternative to the online layout analysers. No upload of the user's text to
-      a server: the analysis runs in the page.
-      [CODE] Left (2026-11-15): /studio and /studio/comparer analyse in the page, nothing uploaded (f555c231e5,
-      61ee756d7b, 34fa1ff045; layout-editor.playwright.cjs); the layout being edited does not enter the comparison (same
-      gap as the item above).
-      Checked 2026-11-16: the edited layout enters the comparison on the site too (7a1af4db81, the site handoff above).
-- [x] **Study of the existing layout analysers, then match and exceed them.** First write a detailed report
-      (`docs/audits/layout-analysers/`): Keyboard Layout Analyzer (KLA), KLAnext, the Ergo-L site's analyser and the
-      other public analysers and generators found (online sites and open-source tools), including the Kalamine
-      repository (the open-source tool that builds Windows, macOS and Linux layouts from a TOML description and has
-      a small keystroke-statistics analyser): compare its TOML format and generators with Ergopti's layout source
-      and compilers, and its statistics with ours; each tool with its metrics, its
-      definitions, its corpora, its UI, its strengths and its weaknesses, with links. Then implement in the shared
-      engine every metric that matters, each with a written definition and tests on a small reference corpus: finger
-      load per finger and per hand, row usage (home row versus top, bottom and number rows), finger travel distance,
-      SFBs and same-finger skipgrams, rolls (inward and outward, two- and three-key), alternation, redirects (one-hand
-      direction changes), lateral stretches and scissors, trigram classes, and any other one the study shows to be
-      useful. Every metric is shown per layout and compared across layouts, in the app's Studio and on the site.
-      Checked 2026-11-15: done on dev (b4f91af4d9, 208bed59da, ef57760eaf, a9d3b93192):
-      docs/audits/layout-analysers/report.md and every metric defined in docs/design/layout-analysis.md; proof:
-      tools/test/test-layout-analysis-engine.cjs over metric_vectors.json, tools/test/test-analyser-scores.cjs. The
-      report's section 15 « to review by the maintainer » stays for the maintainer.
-
-- [x] **One global score with editable weights.** Aggregate the metrics (SFB %, roll %, alternation, redirects,
-      finger load balance, home-row usage, travel distance, skipgrams…) into one global score per layout. Default
-      weights chosen and justified in the analyser study (cite what each source tool weighs and why), stored in one
-      shared data file; the Studio (app and site) shows the score, the contribution of each metric, and lets the user
-      change every weight (and restore the defaults), the ranking updating live. Score and weights tested on the
-      reference corpus.
-      Checked 2026-11-15: done on dev (ef57760eaf, b4f91af4d9, 576ab5d8eb): score_weights.json, weights editor with
-      restore, live rescore and per-metric contributions; proof: tools/test/test-layout-analysis-engine.cjs (total
-      equals the sum of contributions, rescore). The default weights still await the maintainer's review.
-
-- [x] **Shortcut placement metric (maintainer, 2026-11-14), worth about 5-10 % of the global score.** Rewards a
-      layout whose useful Ctrl/Cmd shortcut letters sit on the left hand (the right hand stays on the mouse). One
-      shared, documented table of letters with a usefulness weight: highest for Z (undo), X, C, V (cut, copy, paste),
-      A (select all), S (save); then F (find), W (close), T (new tab), N, O, R, P, Y, Q (quit on macOS, lower);
-      zero for letters whose shortcut is useless (e.g. E). Score = weighted share of those letters on the left hand,
-      better on easy keys (home and lower row, near the index) than on hard ones. The table and the metric weight are
-      editable in the Studio like the other weights. Goal of the whole analyser (maintainer): do better than every
-      existing tool, Kalamine included.
-      Done 2026-11-15: `shortcut_left` and its editable weight (ef57760eaf, 576ab5d8eb;
-      metric_vectors.json). Done 2026-11-15 (`claude/ergopti-todo-editable-tables`): the letter usefulness table and
-      the key ease are edited in the Comparer, checked by the engine (`shortcuts()`), saved, reset and read by the
-      editor's panel; proof: test-layout-analysis-engine.cjs, `editable-tables` in layout-editor.playwright.cjs.
-
-- [x] **Instant analysis (maintainer, 2026-11-14, very important).** Analysing and comparing layouts must feel
-      instant, unlike KLAnext, which re-processes the corpus for every selected layout. Pre-process each corpus once
-      into character, bigram, trigram and skipgram frequency tables (the way Kalamine does), cache them (built-in
-      corpora shipped pre-computed; a user's corpus or keystats data processed once and kept in the browser/app
-      cache with a content hash), then score any layout by mapping those tables onto its keys: no pass over the text
-      per layout. Target: a hundred layouts compared on a large corpus in well under a second; measure it and keep a
-      performance test.
-      Checked 2026-11-15: done on dev (ef57760eaf, 0cc1ddfbc3, 9e01fc138b): pre-computed corpus tables, hashed user
-      texts kept in the cache, about 0.3 s for 115 layouts on 2.5 MB; proof: the speed gate of
-      tools/test/test-layout-analysis-engine.cjs (budget 1500 ms, could be tightened below 1 s).
-- [x] **Direct-access digits metric (maintainer, 2026-11-14), a small bonus in the global score.** A layout whose
-      digits are typed without a modifier (direct access) scores a little better; weight editable like the others.
-      Checked 2026-11-15: done on dev (ef57760eaf): `direct_digits`, weight 0.03, editable; proof: metric_vectors.json
-      through tools/test/test-layout-analysis-engine.cjs.
-
-- [x] **Character coverage bonus (maintainer, 2026-11-14).** The more characters a layout gives access to (on its
-      layers and dead keys), the better; layouts such as Bépo or Optimot gain on this criterion. Weight editable.
-      Checked 2026-11-15: done on dev (ef57760eaf, b4f91af4d9): `char_coverage` over `reference_characters`, weight 0.1,
-      editable; proof: metric_vectors.json through tools/test/test-layout-analysis-engine.cjs.
-- [x] **Outer-column penalty (maintainer, 2026-11-14).** Using a 7th right-hand column (keys beyond the right pinky's
-      normal column) is penalised twice: in finger travel distance, and through a compact-keyboard criterion below.
-      Checked 2026-11-15: done on dev (ef57760eaf): `outer_column`, the travel in `distance` and the 40 % and 3×10 form
-      factors of `compact_fit`; proof: metric_vectors.json through tools/test/test-layout-analysis-engine.cjs.
-- [x] **Compact-keyboard fitness bonus (maintainer, 2026-11-14).** The more of a layout works on a compact keyboard
-      (80 %, 75 %, 65 %, 60 %, 40 %…), the better: score each layout by the share of its characters (weighted by
-      frequency) still reachable on each form factor without extra keys, and fold it into the global score. Weights
-      and form factors editable.
-      Done 2026-11-15: `compact_fit` with an editable weight (ef57760eaf; metric_vectors.json); the 100 %, TKL, 75 %,
-      65 % and 60 % formats scored apart through the chosen keyboard format (`claude/ergopti-todo-keyboard-format`);
-      each form factor's weight edited in the Comparer, checked (`formFactorWeights()`), saved, reset and read by the
-      editor's panel (`claude/ergopti-todo-editable-tables`); proof: test-layout-analysis-engine.cjs, `editable-tables`
-      in layout-editor.playwright.cjs.
-
-- [x] **Live key heatmap in the Studio (maintainer, 2026-11-14).** While editing, each key is coloured in real
-      time from green to red by how much the character placed on it costs (its share of SFBs, same-finger skipgrams,
-      redirects, finger overload, distance…), with a selectable metric (or the global score) and a tooltip naming the
-      worst pairs it causes; moving or swapping a key updates the colours and the score at once. Same view in the
-      app's Studio and on the site.
-      Done 2026-11-15 (`claude/ergopti-todo-studio-w-heat`; b40ca10d, 2430dd55, 3273078f): the analysis panel's « Key colours »
-      (global score by default, presses, or any of sfb, sfs, lsb, scissors, half scissors, redirects, bad redirects,
-      distance, finger imbalance, pinky load, outer column) colours the editor's own keys from green to red after each
-      edit, on the site and in the app (same panel and editor); each tooltip gives the key's exact part of the metric
-      and its three worst pairs or trigrams, or the points it loses and the metrics behind them. One engine:
-      keyReport's per-key parts add up to each metric, keyScoreCost to the score (docs/design/layout-analysis.md).
-      Proof: test-layout-analysis-engine.cjs (« Per-key costs »), layout-editor.playwright.cjs (exerciseHeatmap).
-      Selector placement and the green-to-red scale decided by the agent, to review by the maintainer. The
-      Comparer's own heatmap still names SFB partners only, now read from the engine's `worst.sfb`; its other metrics
-      can name their worst groups by analysing the shown layout with `keyGroups`.
-
-- [x] **Two tabs in Ergopti Studio (maintainer, 2026-11-14).** One product, two tabs, in the app and on the site:
-      « Éditer » (the editor, with a right-hand side panel showing the current layout's metrics, its global score and
-      its rank against all library layouts or a chosen selection, updated live) and « Comparer » (layout battles: pick
-      layouts, see every metric, the global score and the ranking side by side, with charts). A layout being edited
-      enters the comparison in one click. Site routes: /studio and /studio/comparer.
-      [CODE] Left (2026-11-15): both tabs, the routes and the live side panel are done (f555c231e5, 61ee756d7b,
-      577223005a, e06a7c35e8, ffbf598420; layout-editor.playwright.cjs, site-structure.playwright.cjs); the panel ranks
-      against the whole library only, not a chosen selection, and no one-click « send to Comparer » exists. Real-machine
-      tab checks: the three TODO-tests files.
-      Done 2026-11-16: « Compare with other layouts » is the one-click send (7b4f2886c2, 7a1af4db81); the panel's
-      « Rank among » ranks the edited layout among the whole library or the layouts ticked in « Comparer » (its saved
-      selection), and its finger load marks each finger's ideal load; proof: `panel-rank-selection` in
-      layout-editor.playwright.cjs.
-
-- [x] **Comparer design and comparison pass (2026-11-16).** « Compare with » in a layout's details puts a second
-      layout's value and the difference beside every metric and the score, each with its verdict in words (the
-      engine's `diff`); the finger chart shows each finger's share of the non-thumb presses against its ideal load
-      (`fingerShares`, `idealLoad`: the two sides of `finger_imbalance`), then hands and rows; « Copy the link »
-      shares the corpus, keyboard, format, compared layouts, details and versus (the site's /studio/comparer and
-      /ergopti/benchmarks hand them on to the frame; the user's own layouts and texts stay out). Design: score chart
-      with a zero line, legend and units; sortable headers as buttons with units; chart rows and table rows open the
-      details from the keyboard; the key heatmap in one blue hue with its scale, shrinking with the page instead of
-      scrolling; loading state (`aria-busy`); the score settings folded under the results (the phone page went from
-      8 200 to 4 300 px); validated chart tokens in theme.css « Chart look » for light and dark; 30 new strings in the
-      21 locales. Proof: test-layout-analysis-engine.cjs (hand-worked « asdf » shares and « ed » diff),
-      test-layout-comparer-page.cjs (link parameters shared with src/lib/js/comparerLink.js), `comparer-diff`,
-      `comparer-share` in layout-editor.playwright.cjs. Colours, folding and the share wording decided by the agent,
-      to review by the maintainer.
-  - [ ] Let the ranking table choose its metric columns (today the 12 of TABLE_METRICS; every metric is in the
-        details) and filter its rows.
-  - [ ] Heatmap of the Comparer: offer the other per-key metrics of `KEY_COST_METRICS` and name each key's worst
-        groups for every event (analyse the shown layout with `keyGroups: true`), as the editor's panel does.
-  - [ ] theme.css follows only `prefers-color-scheme`; the site has no light/dark toggle reaching the framed pages.
-  - [ ] `layout_analysis.panel.ranking` (« Ranking against the library… ») also shows while ranking among the
-        Comparer's ticks: reword it in the 21 locales.
-  - [ ] Locally (2026-11-16, Edge on a French Windows) `exerciseLongLabels` of layout-editor.playwright.cjs fails
-        (« the tooltip holds the whole label »), and every `toLocaleString` without a locale prints French digits
-        unless the browser is launched with `--lang=en-US`; check both against CI before calling either a regression.
-  - [ ] `codegen-native-theme.cjs` on dev drops two palette hues (`hue-2e9d4f`, `hue-c77700`) from
-        native_theme_data.lua: regenerate it through its owner.
-
-- [ ] **Read every common layout format (maintainer, 2026-11-14).** A layout is only what each physical key types
-      (base, Shift, AltGr, AltGr+Shift, dead keys). The Studio (app and site) imports, at least: the Keyboard Layout
-      Analyzer JSON format (used by KLA, KLAnext and similar tools), Kalamine's TOML (Ergo-L), the Ergopti TOML source,
-      and the other formats the analyser study finds in use (e.g. XKB symbols, KLC, macOS .keylayout, and the JSON or
-      text formats of open-source analysers/generators). Each importer converts to the Ergopti source model, reports
-      what it could not map, and is tested on real files from those tools. Saving stays in the Ergopti TOML source
-      (one format of record, already compiled to XKB, KLC and keylayout); export to KLA JSON and Kalamine TOML is
-      offered for interoperability (decided by the coordinator on 2026-11-14, to review by the maintainer). The
-      layout library starts from the layouts listed by KLAnext and the other analysers and online lists. Basis
-      (2026-11-14): a public discussion the maintainer recalls (a Linux forum) and the precedent of SAS Institute v
-      World Programming (CJEU C-406/10, 2012: a program's functionality, language and data formats are not protected
-      by copyright, only its implementation) suggest a key arrangement is not copyrightable; the study confirms the
-      sources and states the limits (not legal advice). So the library
-      re-encodes each arrangement as our own TOML (what each key types), never copies another tool's files verbatim,
-      and credits each layout's author and source.
-      Done 2026-11-15 (`claude/ergopti-todo-read-every-format`): « Open » in « Éditer » reads every format the
-      Comparer reads (KLA, Kalamine TOML and JSON, XKB, KLC, DOF, cmini, rows) into a new Ergopti source and lists
-      what it could not carry; « Download KLA JSON » and « Download Kalamine TOML » say what each format cannot hold;
-      the readers are tested on real files Ergo-L and Kalamine publish (tools/test/fixtures/layout-formats/third-party,
-      sources and licences in its README); proof: test-layout-formats.cjs, `editor-reads-every-format` in
-      layout-editor.playwright.cjs.
-      [CODE] Left (2026-11-15): the library comes only from Oxeylyzer and cmini; another source (genkey, GPL-3.0 like
-      cmini; KLA's built-in list) needs its layout list, which this session cannot list (no GitHub directory access);
-      no third-party KLA JSON, XKB symbols, KLC or DOF file under a licence that allows shipping it was found.
-      [DECISION] confirm the KLA JSON and Kalamine TOML exports.
-      KLAnext JSON, .keylayout and KbdEdit .kbe, import and export (2026-11-16, on dev; proof:
-      test-layout-formats.cjs sections 6-10, test_layout_editor_source_store.lua, test_app_parameter_chooser.lua): - KLAnext JSON: import and export done. Every committed KLAnext file (52, ISO and ErgoDox) reads, and
-      import → export as « KLA / KLAnext JSON » → import gives the same layout; an ErgoDox key the ISO board lacks
-      is listed with what it types (« key 39 (z Z % ‰) has no place on this keyboard »), never dropped silently. - .keylayout: import (verbatim, then « Convert ») and export (bundle, ISO or ANSI)
-      were already there; now held by an import → export → import round trip through the source compiler on
-      bépo, KbdEdit's own .keylayout exports (`static/ergopti/macos/raw_kbdedit_keylayouts`) and the Ergopti 2.2.2
-      bundle, the output checked against Apple's DTD structure. - KbdEdit .kbe: neither import nor export is possible. The header is read (signature, version 5, length), but
-      the body is encrypted: random-looking bytes, no deflate stream, and the 2.2.0 and 2.2.1 exports, a few keys
-      apart, share no 8-byte run (a ratchet test keeps that evidence); only KbdEdit holds the key, and decompiling
-      it breaks the clean-room rule. « Open » recognises a .kbe and says so in the user's language, pointing to
-      KbdEdit's .keylayout export; the export section says KbdEdit imports the .keylayout and KLC downloads
-      (docs/design/layout-analysis.md, « Layout file formats »). - Every refusal and loss is worded in the 21 locales (`layout_analysis.formats.*`), on the site and in the
-      app; malformed files are refused with a stable code, never a crash (fixed: a KLC `DEADKEY` without its
-      character, a Kalamine JSON dead-key table that is not a table, a DOF or cmini row of another type, a KLA
-      key that is not an object; a KLC chained dead key `0022@` was read as « " »). - In the app: the macOS « Open » panel offered only .toml and .keylayout, so no KLAnext JSON, KLC or other
-      file could be opened there; it now offers `source.pick_extensions` (= `LAYOUT_FORMATS.EXTENSIONS`, held
-      equal by the gate) and hands a non-UTF-8 file to the page as bytes. The KLA and Kalamine downloads went
-      to the app's source store, which keeps only sources and refused them on the three OS; they now go to
-      Downloads (`source.export_extensions` gains json and toml). « Open » also decodes a UTF-16 KLC by its
-      byte-order mark (it read it as UTF-8 before).
-      [CODE] Left: KLAnext's `matrix` board is refused (`format_unsupported_board`): KLAnext is closed source and
-      no matrix file was found to read its key indexes from. The ErgoDox index → ISO key table (`KLA_KEYS.ergodox`)
-      maps 27 to Backslash and 60-62 to the brackets and quote, while the committed bépo and Optimot ErgoDox files
-      put on 27 what their ISO files put on BracketLeft and on 39 what they put on Quote: check it against KLA's
-      ErgoDox key set before changing it. The Playwright `editor-reads-every-format` scenario does not open a .kbe
-      yet (to add with the next browser run). Real-machine checks: the macOS « Open » panel with a .json, a UTF-16
-      .klc and a .kbe, and the KLA and Kalamine downloads landing in Downloads (TODO-tests-macos.md,
-      TODO-tests-windows.md, TODO-tests-linux.md, `layout_editor_window`).
-      Export « Format » drop-down (maintainer decision of 2026-11-15, done 2026-11-16): the export section has one
-      « Format » drop-down (Ergopti source, macOS bundle, .keylayout ISO and ANSI, XKB, KLC, Windows installer,
-      KLA / KLAnext JSON, Kalamine TOML, navigation layer: each when the host can produce it) and one « Download »
-      button, on the site and in the app; the viewer's last choice is kept in the browser's storage
-      (`ergopti.studio.export_format`). The macOS drop-down that wrote `exports.macos.format` into the source is
-      gone: the format is chosen per download; a source keeps its `exports.macos.format` (TOML) for the default
-      bundle. Install, emulate and « Apply the navigation layer » stay buttons. Proof: `export-format-dropdown`
-      in layout-editor.playwright.cjs.
-- [x] **Edit, evaluate, then install (maintainer, 2026-11-14).** In « Éditer », start from any layout (AZERTY…), swap
-      two keys in one gesture, see the score change, and generate the installable layout for Windows, macOS and Linux
-      (the existing compilers and offline downloads, and in the app the one-click install): the feature analysers such
-      as KLAnext lack, since they only produce JSON.
-      Checked 2026-11-15: done on dev (ffbf598420, 7b3a1c9f88 and the `hostInstall` path of
-      layout_editor_window/script.js): start from AZERTY and the built-ins, drag-swap two keys, live score, downloads
-      and one-click install on the three OS; proof: tools/test/browser/layout-editor.playwright.cjs. Real-machine
-      install checks: the three TODO-tests files.
-
-- [ ] **« Comparer » is a full analyser on its own (maintainer, 2026-11-14), like KLAnext.** Most visitors only run
-      battles, so the tab stands alone: select a list of layouts to analyse or analyse all of them at once; pick a
-      corpus from a long drop-down of built-in corpora; or bring a custom corpus by pasting text (Ctrl+V into a text
-      box) or loading a file (.txt, .md, .docx, .odt, .html, .pdf text, .csv…, converted to plain text in the page,
-      never uploaded). Built-in corpora in the repository must be free to redistribute (public domain or an open
-      licence), each with its source and licence recorded; others are linked, not shipped. The user's own layouts
-      made in « Éditer » (several personal layouts, saved locally) appear in the comparison list beside the library.
-      [CODE] Left (2026-11-15): layout checkboxes, 25 built-in corpora with their register, paste and file reading are
-      done (c5100fc6b5, 970e06a08a, 8e83c754da; test-layout-comparer-page.cjs); PDF text is read in the page
-      (2026-11-15, `claude/ergopti-todo-pdf-text`: pdf_text.js, no library; proof: test-pdf-text.cjs on the
-      repository's Chrome, Firefox and Google Docs exports, `comparer-reads-pdf` in layout-editor.playwright.cjs).
-      The layouts open in « Éditer » are in the comparison list, ticked and kept in step with the editor (2026-11-15,
-      `claude/ergopti-todo-workspace-in-comparer`; proof: `editor-layouts-in-comparer` in layout-editor.playwright.cjs
-      and site-structure.playwright.cjs).
-
-- [x] **Several personal layouts, never lost (maintainer, 2026-11-14).** « Éditer » holds several layouts in its own
-      tabs; a « + » button opens a new one (blank, from a library layout, or from a file). Everything is saved
-      locally on the user's machine as they type: on the site in the browser's persistent storage (IndexedDB, with
-      navigator.storage.persist() requested), in the app in the user's data folder; a reload, a crash or F5 restores
-      every tab and its unsaved edits; export/import of all personal layouts as files for backup. Nothing is sent to a
-      server.
-      Done 2026-11-15 (`claude/ergopti-todo-studio-w-2`; 42e96af5, 24cc6098, c4a99e83): one tab per layout with its own
-      undo, « + » with « Start from » (file, blank, reference or catalogue layout); every tab saved 300 ms after the
-      last change and restored on the next mount, on the site in IndexedDB with storage.persist() asked, in the app in
-      `layout_sources/studio_workspace.json` through the host on Windows, macOS and Linux; « Export all » (one ZIP of
-      sources) and « Import » (.toml, .keylayout, ZIP); a damaged store is reported and never saved over
-      (docs/design/layout-editor.md, « several layouts, never lost »). Proof: layout-editor.playwright.cjs
-      (exerciseWorkspace: F5, crash, damaged store, export and import; exerciseAppWorkspace), test-layout-editor-model.cjs,
-      test_layout_registry.lua and test_layout_manager_bridge.lua (Linux, macOS), test_layout_source_store.ahk and
-      test_keystats_reader_ngram_sources.ahk (Windows). Limit: an archive deflated by another tool needs the webview's
-      DecompressionStream (WebKitGTK 2.40 or later on Linux); the editor's own backups are stored and read
-      everywhere. Tab bar placement decided by the agent, to review by the maintainer. Real-machine checks: the
-      `layout_editor_window` lines of the three TODO-tests files.
-- [x] **« My typing » is the default corpus in the app (maintainer, 2026-11-14).** In the app's Studio, the user's own
-      keystats tables are an extra corpus and the default one for comparing layouts (the site has no such data and
-      defaults to a built-in corpus).
-      [CODE] Left (2026-11-15): « My typing » becomes the default once loaded (5751c907fa, 9e01fc138b;
-      test-layout-manager-page.cjs), but it loads only on « Analyse my typing »; load it when the window opens if
-      keystats exist.
-      Checked 2026-11-16: done on dev (2bb35e5d6b: the window reads the store once when it opens if keystats exist;
-      proof: test-layout-manager-page.cjs).
-- [x] **Each layout's score as every major analyser computes it (maintainer, 2026-11-14).** Besides Ergopti's own
-      global score, « Comparer » and the « Éditer » side panel show each layout's score as KLAnext, Oxeylyzer, genkey,
-      cmini, the Ergo-L analyser / Kalamine statistics, KLA, a200, Keyboard Layout Optimizer (dariogoetz) and any
-      other widely used analyser would compute it: the most complete comparison available anywhere. Each analyser is
-      a scorer module on the shared engine's cached n-gram tables (no second engine), reimplemented from its
-      published source or documentation (no GPL code copied), with its formula, default weights, corpus, geometry,
-      revision read, licence and fidelity (exact, close or approximate) in `docs/design/layout-analysis.md`, and a
-      test vector reproducing a published result where one exists. A column or tab per analyser, with an « i »
-      popover giving the source and a link.
-      Checked 2026-11-15: done on dev (a9d3b93192, 1c36fa5064, 08298f1288, 8112f75a45, 1acb22004d): eleven scorers on
-      the shared tables, documented in docs/design/analyser-scores.md with fidelity (KLAnext and genkey approximate);
-      proof: tools/test/test-analyser-scores.cjs over analyser_vectors.json. Same work as « Scores of the other
-      analysers » below.
-
-- [ ] **Analysis review decisions (maintainer, 2026-11-14 evening).** Digit6 typed by the right index; the space
-      bar by the LEFT thumb; the default global-score weights kept as justified in the study. Ideal finger load: the
-      pinky below 8 % (about 6-7 %), with index >= middle >= ring >= pinky enforced (worker R proposed 6.5 / 11.5 /
-      15.5 / 16.5 % per hand, editable). Every sourced value, metric, weight, fingering, load and table gets a small
-      « i » button opening a popover that names its source with a link (site and app, 21 locales).
-      [CODE] Left (2026-11-15): Digit6, the space bar, the weights, the 6.5/11.5/15.5/16.5 % load and the « i » popovers
-      are done (576ab5d8eb, 1acb22004d; test-layout-analysis-engine.cjs); index >= middle >= ring >= pinky is checked on
-      the default only, not on a user-edited load. [LATER] the 19 other locales keep pending English.
-      Order on an edited load done 2026-11-15 (worker X, 0a0e5610): idealLoad refuses it as `ideal_load_order`; proof:
-      test-layout-analysis-engine.cjs (pinky and ring swapped on each hand); the ideal-load box says the refusal
-      (fd6a2ae7).
-- [x] **Shortcut table covers A-Z (maintainer, 2026-11-14 evening).** Every letter gets a usefulness score, very low
-      for rarely used shortcut letters; add the text-editing shortcuts Ctrl+B (bold), Ctrl+I (italic), Ctrl+U
-      (underline), Ctrl+K (link / command palette), Ctrl+Y (redo) and other very common ones; the maintainer would
-      like B, I and U on the left hand. Justified in the study behind an « i » popover.
-      Checked 2026-11-15: done on dev (576ab5d8eb): all 26 letters scored, B/I/U/K/Y included, justified at study anchor
-      `17-shortcut-letters`; proof: tools/test/test-layout-analysis-engine.cjs (`shortcut_letters` info value).
-- [ ] **Layout library credits (maintainer, 2026-11-14 evening).** Keep the 35 cmini-sourced layouts, credited; show
-      credits known « from knowledge » now and verify each against the author's own page in a later pass.
-      [LATER] Left (2026-11-15): the 35 cmini layouts and 25 credits are shown (1bb0e5b158;
-      test-layout-analysis-engine.cjs); the later pass that checks each « knowledge » credit on its author's page
-      remains.
-- [x] **Scores of the other analysers (maintainer, 2026-11-14 evening).** Besides Ergopti's own global score, show
-      each layout's score as every major analyser computes it (KLAnext, Oxeylyzer, Genkey, cmini, the Ergo-L
-      analyser / Kalamine, KLA, a200, dariogoetz's optimizer and any other widely used one), reproduced from their
-      published source, docs and default weights (reverse-engineered from published results only where nothing else
-      exists), each documented with its formula, corpus, version, licence and fidelity, and a test vector. A column
-      per analyser in « Comparer » and in the « Éditer » side panel, each with an « i » popover (worker Q).
-      Decided 2026-11-14 night: every analyser shows two numbers, its official score (the tool's own fingering) and
-      the score under the user's custom finger model.
-      Checked 2026-11-15: done on dev (a9d3b93192, 1c36fa5064, 08298f1288, 8112f75a45, 1acb22004d): official and
-      custom-fingering scores of eleven analysers in « Comparer » and the « Éditer » panel, with « i » popovers; proof:
-      tools/test/test-analyser-scores.cjs, tools/test/test-layout-comparer-page.cjs.
-- [x] **Corpora: only what we can rely on (maintainer, 2026-11-14 evening).** Delete from the repository every corpus
-      without a clearly compatible, recorded licence, or that could expose the project to a claim; starting from zero
-      is acceptable. Deleted by decision: romans.txt, Python for Everybody, Projet GLM, Auxlang_X, the unverified
-      KLAnext-style texts, and Johnix mail unless its source page and licence are confirmed. Kept: the public-domain
-      books, Autonomie (CC BY-SA), the Hello World files (MIT), Leipzig (kept by the maintainer's choice, the
-      project being non-commercial; its licence page blocks automated readers). Every shipped corpus is in
-      static/corpus/register.json with source, licence and attribution, shown in the UI.
-      [DECISION] Left (2026-11-15): the refused texts are deleted and every register entry ships with its licence shown
-      (247a668142, c5100fc6b5, 1b199a7bb9, 36a61bacc7; test-layout-comparer-page.cjs); static/corpus/frequences_lettres/
-      (LdS tables, xlsx, images) has no licence or register entry: delete it or record a licence; and the Johnix « prog
-      » file predates its MIT grant: rebuild it from the upstream helloworld repository or accept it.
-      Decided 2026-11-15 (maintainer): delete both. static/corpus/frequences_lettres/ and the two Johnix Hello World
-      files (« prog » and its punctuation-only derivative) are deleted with their register and analysis entries;
-      the frequency tables come back from licensed sources under « Large published frequency tables ».
-- [ ] **More corpora from the internet (maintainer, 2026-11-14 evening).** Rebuild a rich set of built-in corpora under
-      compatible licences (public domain, CC0, CC BY, CC BY-SA): French first, then English and the other languages
-      Ergopti users type; prose, e-mail and chat-like text, code. Candidates: Wikisource, Project Gutenberg, Wikipedia
-      extracts, Tatoeba, permissively licensed code.
-      [CODE] Left (2026-11-15): French and English books, Tatoeba, Wikipedia and MIT code are in (970e06a08a,
-      8e83c754da, 97472f6fb5, b6223f47b5); no text corpus in another language, nothing from Wikisource, no e-mail or
-      chat register.
-      [CODE] Done (2026-11-15): German, Spanish and Italian books from pinned Project Gutenberg ebooks, two per
-      language, through tools/build/import-corpus-texts.cjs, which also reproduces and pins the four French and
-      English books (4beeed6b; test-corpus-text-sources.cjs). Left: nothing from Wikisource; no e-mail or chat register,
-      its candidates not cleared (Enron mails hold personal data, the Ubuntu IRC logs' licence is unchecked, Wikipedia
-      talk pages sign each message with a user name): the maintainer's choice.
-- [ ] **Large published frequency tables (maintainer, 2026-11-14 evening).** Use existing large-scale language
-      analyses as built-in corpora: char, bigram and trigram counts from huge corpora (Google Books Ngram and Peter
-      Norvig's counts, Wikipedia-derived frequency data per language, the Leipzig frequency lists, Lexique for French,
-      FrequencyWords, Tatoeba), imported as count tables through a generator with source, version, licence and
-      attribution; word-level lists miss cross-word bigrams, said in their popover.
-      [CODE] Left (2026-11-15): only FrequencyWords word lists are imported (b6223f47b5) with the cross-word caveat; no
-      char, bigram or trigram count-table format, and none of Norvig, Leipzig lists, Lexique or Wikipedia frequency
-      data.
-      [CODE] Done (2026-11-15): the « ergopti-count-table » format, its strict reader and the pinned importer
-      tools/build/import-count-tables.cjs (b073da48), offering Leipzig's French Wikipedia 2021 table and Lexique
-      4.10 as corpora (d7d8c4eb); then pruning checked against the analysis (every metric of seven layouts within
-      0.05 of the full counts, threshold 5e-8 recorded in the register), the word-list caveat on the Lexique table,
-      and Leipzig under CC BY 4.0 by the maintainer's decision: English Wikipedia 2016 and French news 2024 tables
-      (2adfdf6e; test-corpus-count-tables.cjs).
-      [LATER] Norvig's counts: www.norvig.com is refused by the build environment's proxy (403); import them once
-      it is reachable. Not imported either: Google Books Ngram, Tatoeba counts, other languages.
-
-- [x] **Maximum keyboard-model customisation (maintainer, 2026-11-14 night).** In Studio (Comparer and Éditer, site
-      and app) the user sets, per physical key, the finger and hand that press it; then, for each finger, its home key
-      anywhere inside the zone of keys assigned to that finger (e.g. the right pinky covers 3 columns × 4 rows and its
-      home key can be any of those 12 keys); no global home-row setting, metrics use each finger's own home key. Defaults stay the
-      current model (Digit6 right index, space bar left thumb). Every metric and every other analyser's scorer follows
-      the user's mapping; the profile is saved with the user's layouts, exportable, importable and resettable.
-      Geometry (maintainer, 2026-11-14 night): the analyser works on every keyboard geometry the user picks: ISO,
-      ANSI, ortholinear/matrix, column-staggered ergonomic splits (Ergodox, Corne, Moonlander, Kinesis-like thumb
-      clusters), with real key positions and thumb keys, a default fingering and home keys per geometry; keys a
-      geometry lacks are reported per layout, never dropped silently.
-      Checked 2026-11-15: per-key fingers and home keys, nine QMK geometries, missing keys reported, profile
-      saved, exported and reset are done (fbb21aa8e4, 1cce34899e, 1c36fa5064, bf0935799f, 4fbf8ab41b;
-      test-layout-analysis-engine.cjs). Done 2026-11-15 (`claude/ergopti-todo-keyboard-model`): the fingering editor
-      is also in the editor's analysis panel (« Éditer », site and app); each keyboard model keeps its own profile
-      (stored as version 2; the version 1 single profile is not carried over, decided by the agent, to review by
-      the maintainer); a home key outside its finger's keys is refused (`home_key_other_finger`, already in
-      test-layout-analysis-engine.cjs); proof: `fingering-per-keyboard` in layout-editor.playwright.cjs.
-- [x] **The editor lives under /studio (maintainer, 2026-11-14 night).** « Éditer » at /studio, « Comparer » at
-      /studio/comparer; /editeur redirects to /studio; menus, links and docs point to /studio.
-      Checked 2026-11-15: done on dev (f555c231e5, 141c94a2d5): src/routes/editeur redirects to /studio, the site
-      navigation and docs point to /studio; proof: tools/test/browser/site-structure.playwright.cjs (`/editeur` →
-      `/studio`).
-
-- [x] **Redesign the layout editor (maintainer, 2026-11-14 night).** Today it is cluttered: buttons everywhere,
-      everything packed together. Rework « Éditer » (site and app, one shared page) into a clean, responsive, well
-      designed UI: tabs or collapsible sections for the secondary tools (stickers, navigation layer import, export,
-      metadata), more horizontal space, clear hierarchy, works from phone width to wide screens, light and dark.
-      Add a visible layer selector to show and edit the Base, Shift, AltGr and Shift+AltGr layers (and other layers
-      the layout defines); the maintainer could not find how to display them.
-      Checked 2026-11-15: done on dev (38476c3b68, b01f3ef67a): layer selector for Base, Shift, AltGr, Shift+AltGr and
-      extra layers, tool tabs, container queries, light and dark; proof:
-      tools/test/browser/layout-editor.playwright.cjs.
-
-- [ ] **Studio and editor i18n: English and French first (maintainer, 2026-11-14 night).** Every user-facing string
-      of Studio, the layout editor and the analyser goes through the i18n system, written in English and French only
-      for now; improve the labels first, translate into the other locales afterwards.
-      [CODE] Left (2026-11-15): Studio labels go through i18n with English and French (dc645310c8, 42d8124edc;
-      test-locale-catalogue-complete.cjs); the fingering refusal embeds the engine's raw English error
-      (analysis_engine.js), and no label-improvement pass has been made.
-      Fingering refusal done 2026-11-15 (worker X, 4acf7ac9, fd6a2ae7): engine refusals carry codes and the fingering
-      editor and the ideal-load box say them as layout_analysis.error.<code> (en, fr; others pending); proof:
-      test-layout-comparer-page.cjs. Left: the label-improvement pass; the 19 other locales.
-
-- [ ] **Site keyboard display from a layout file, later (maintainer, 2026-11-14 night; not now).** The site's
-      Ergopti keyboard display is hand-coded today. Make it render from a layout source instead (the Ergopti TOML
-      source or a .keylayout), so the site can display and emulate any layout. The maintainer's display tweaks on top
-      of the raw layout (labels, visual adjustments) become code: a documented display patch applied after loading
-      the TOML or keylayout, reproducing today's Ergopti display exactly (pixel or DOM comparison test against the
-      current hand-coded rendering). Not started: queued after the current Studio work.
-      [LATER] Left (2026-11-15): not started, by the maintainer's choice.
-
-- [x] **Studio site page uses all the space (maintainer, 2026-11-14 night).** No hero title, introduction or
-      « Contenu de la page » column on /studio and /studio/comparer: a full-width, full-height workspace under the
-      header with a slim « Éditer » / « Comparer » bar. Sticker printing, size and levels move out of the main toolbar
-      into a secondary export/print place. Key labels never overflow their key (fit, wrap or ellipsis with tooltip).
-      Checked 2026-11-15: done on dev (61ee756d7b, 33e919019a, b01f3ef67a, 38476c3b68): full-screen workspace without
-      hero, sidebar or footer, stickers in the tool tabs, labels fit or ellipsis; proof: `expectStudioWorkspace` in
-      site-structure.playwright.cjs, the label-overflow check of layout-editor.playwright.cjs.
-- [x] **Floating Ergopti layout button only on /ergopti (maintainer, 2026-11-14 night).** The fixed bottom-right
-      button that shows the Ergopti layout appears on /ergopti pages only, not on the home, Ergopti+, Studio or others.
-      Checked 2026-11-15: done on dev (c86eeec3ff): src/routes/+layout.svelte shows it inside /ergopti only; proof:
-      tools/test/browser/site-structure.playwright.cjs (present on four /ergopti pages, absent from home, Ergopti+ and
-      both Studio tabs).
-
-- [x] **Editor feedback, 2026-11-14 night (maintainer).** On phones the board keeps a minimum key size and gets
-      its own horizontal scroll bar (the page itself never scrolls sideways). Non-base layer views show only that
-      layer's value, without the small base-layer hint. Extra layer chips read as their modifiers, not raw ids.
-      Checked 2026-11-15: done on dev (470a99ffc4, c92bb57a85, 0721402171): own scroll bar and minimum key size on
-      phones, no base hint, chips named by modifiers; proof: tools/test/browser/layout-editor.playwright.cjs.
-- [x] **Custom shortcuts in the editor (maintainer, 2026-11-14 night).** No layer view per modifier combination.
-      One « Raccourcis » view gives each key its default shortcut rule for every non-text modifier combination
-      (e.g. same as the base key, or acts as physical key X); the key inspector adds overrides for any specific
-      combination of Ctrl, Alt, Shift, Win/Cmd/Super sending any combination + key (Ctrl+é → Ctrl+Shift+C,
-      Ctrl+A → Ctrl+B), listed and editable. Stored in the Ergopti TOML shortcut model; each export target says
-      honestly what it cannot carry, Ergopti+ emulation keeps it. Playwright checks through save and reload.
-- [x] **XKB and KLC downloads in the app Studio window (maintainer decision, 2026-11-15).** The app windows'
-      CSP has no 'unsafe-eval', so fengari-web.js cannot load and the editor's XKB/KLC downloads cannot run there
-      (seen on Linux under WebKitGTK; macOS uses the same inlining host and CSP builder; Windows WebView2 unchecked).
-      Decision: keep the CSP strict and have the host build these files with the native Lua engine through the
-      host bridge on Windows, macOS and Linux; fengari stays for the site only.
-      Done 2026-11-15 (`claude/ergopti-todo-native-export`): the macOS and Linux hosts answer `lua_export` with
-      the shared `composer/export_step.lua` through the shared bridge; the export test checks the files built that
-      way are the site's bytes (Lua 5.4; LuaJIT checked locally), and under xvfb the Linux window wrote
-      `ergopti_xkb.zip` and `kbdergop.klc` with the same SHA-256 as the site's. Windows has no Lua engine and its
-      WebView2 pages carry no content policy, so its page keeps fengari (decided by the agent, to review by the
-      maintainer: a Lua runtime for the AutoHotkey driver would be a new dependency). A host with neither keeps
-      the « converters cannot run in this window » notice. Real-machine checks: the XKB and KLC downloads of the
-      layout editor window on macOS and Windows (TODO-tests files).
-- [ ] **Windows export step in native Lua (maintainer, 2026-11-15).** The Windows app builds XKB and KLC with
-      the same export step as macOS and Linux, not with fengari, which stays the site's runner.
-      Code done 2026-11-15 (worker X, 254d9300, 9077b793, c69f77a9): the restricted host
-      `windows/native/ergopti_lua_export.c` on the pinned lua.org Lua 5.4.6 (`ergopti_lua_export.pin.json`), built
-      by `tools/build/build_windows_lua_export.ps1` in package-windows and uploaded with its identity; the AHK host
-      offers `lua_export` only when the committed exe matches its identity, with a private input file and the
-      defaults' `export_step_timeout_ms`. Proofs: the host's self-test, and test-layout-editor-target-exports.cjs
-      gives the site's bytes through a gcc build of it (`tools/build/build-lua-export-host.cjs`).
-      [RELEASE] Left (2026-11-15): commit the CI artifact's `ergopti_lua_export.exe` and `.json` into
-      `windows/vendor` with their `required` entries in `tools/build/windows_bundle_manifest.json`; then
-      test-windows-lua-export-identity.cjs checks them, and the Windows lane runs the byte-equality proof.
-- [x] **No site footer on /studio (maintainer decision, 2026-11-15).** The Studio workspace fills the screen like
-      an app; the footer made every Studio page 80 px taller than the screen.
-- [x] **Studio screenshot remarks (maintainer, 2026-11-15).** Taken by worker T in this order: (a), 2, 6, 7, 8,
-      5, then 3, 4, 9, then 1.
-      (a) [x] The site's editor opens on a copy of Ergopti too, like the app's (`startFrom` in standalone.js; one
-      `openInitial` decides the first document, so a restored draft can come first). Done 2026-11-15
-      (`claude/ergopti-todo-studio-tabs`); proof: `site-opens-on-ergopti` in layout-editor.playwright.cjs.
-      2 [x] The « Éditer » / « Comparer » tabs in the top menu's style, with no blue band under the header: the
-      tab bar continues the header's dark band, its tabs are text links, the current one in the purple gradient
-      and underlined. Done 2026-11-15 (`claude/ergopti-todo-studio-tabs`); proof: `expectStudioWorkspace` in
-      site-structure.playwright.cjs (header colour, no gap above or below, full width, no pills).
-      6 [x] Each key's legend centred horizontally and vertically, clear of the small key-name label: centred in
-      the space the label leaves, the whole key on a character key. Done 2026-11-15
-      (`claude/ergopti-todo-key-legends`); proof: `centred-legend` in layout-editor.playwright.cjs (within 2 px).
-      7 [x] Dead keys as the bare accent, centred, with a marker class or badge (no combining mark on U+25CC),
-      through one shared legend formatter: editor board, magnifier, Comparer previews, site keyboard. Done
-      2026-11-15 (`claude/ergopti-todo-key-legends`): src/lib/keyboard/keyLegend.js, generated for the app pages
-      as `_shared/ui/_generated/key_legend.js`; marker class `key-legend-dead`, the accent colour and a corner
-      mark on the editor's and Comparer's keys (look decided by the agent, to review by the maintainer); proof:
-      test-key-legend.cjs, `dead-key-legend` in layout-editor.playwright.cjs (board, magnifier, Comparer
-      heatmap) and site-structure.playwright.cjs (the /ergopti keyboard).
-      8 [x] « Essayer » as one input bar in the site's style with the clear button inside the field, the same
-      component on the site and in the app, light and dark. Done 2026-11-15 (`claude/ergopti-todo-try-bar`): the
-      editor page's one bar (rounded border, accent focus ring, placeholder, its own caret, × inside at the end, no
-      « Effacer » button), in the theme's light and dark colours; proof: `try-input-bar` in
-      layout-editor.playwright.cjs.
-      5 [x] Proper display names for every library layout, from the library's single data source; ids stay keys.
-      Done 2026-11-15 (`claude/ergopti-todo-library-names`): the 91 lower-case or id-like names of
-      layout_library.json written as their authors do (Colemak-DH, Hands Down, Semimak JQ, MTGAP 3.0…); the
-      spelling of BEO, INTS, UCIEA, AHEI, MTGAP-T and CTGAP 3, which their sources only give in lower case, was
-      decided by the agent, to review by the maintainer; proof: test-layout-comparer-page.cjs (no layout shows
-      its id, an underscore or a lower-case slug, no two share a name).
-      3 [x] A « Format » dropdown (100 % / TKL / 75 % / 65 % / 60 %) instead of « Pavé numérique », hiding the
-      blocks each format lacks; the same value feeds the Comparer's keyboard model and the compact-keyboard bonus.
-      Done 2026-11-15 (`claude/ergopti-todo-keyboard-format`): one table, `keyboard_formats` and `keyboard_blocks`
-      of analysis_model.json (TKL by default, as the old unchecked box); the editor's « Format », the Comparer's,
-      and `compact_fit`'s ISO and ANSI 60–100 % form factors measured on the chosen format (the metric vectors are
-      unchanged: no layout types on those blocks); in the app window the editor's format goes to the Comparer;
-      on the site the two framed pages share one stored choice (`claude/ergopti-todo-site-studio-handoff`, proof:
-      `studio-site-handoff` in site-structure.playwright.cjs);
-      proof: test-layout-comparer-page.cjs (formats nested, refusal of an unknown one), `keyboard-format` in
-      layout-editor.playwright.cjs (what each format shows, the hand-off to the Comparer).
-      4 [x] The Comparer's default selection follows the keyboard: ISO checks Ergopti and Ergopti+, ANSI their
-      ANSI versions, the other geometry stays listed and unchecked. Done 2026-11-15
-      (`claude/ergopti-todo-comparer-geometry`): an optional `geometry` in the registry's meta.toml (Ergopti and
-      Ergopti+ iso, their ANSI versions ansi, bépo iso), carried by index.json and the analysis data; until the
-      user ticks or unticks a layout, the ticks follow the keyboard (ISO for a split or ortholinear board, decided
-      by the agent, to review by the maintainer); proof: `comparer-default-geometry` in
-      layout-editor.playwright.cjs.
-      9 [x] The start dialog keeps its quick picks and adds a searchable, sorted list of every library layout.
-      Done 2026-11-15 (`claude/ergopti-todo-start-any-layout`): « New » lists the analysis data's every layout by
-      display name with a search field, on the site and in the app; a layout the host lists as a fill source
-      starts through its exact importer, any other from its library entry (base, Shift, AltGr and dead keys,
-      LAYOUT_FORMATS.toSource); proof: `start-any-layout` in layout-editor.playwright.cjs (site and app window:
-      sorted, searchable, Colemak-DH's letters on the board).
-      1 [x] An installable Windows package (the keyboard DLLs and a setup installer) from the editor, on the site
-      and in the app. Done 2026-11-15 (`claude/ergopti-todo-windows-package`): « Download the Windows installer »
-      gives `<dll>-windows.zip` (the four DLLs, a strict layout.ini, the generic installer as `<dll>-setup.exe`),
-      the same code on the site and in the app; the installer is one NSIS stub built by its generator
-      (approved by the coordinator 2026-11-15, to review by the maintainer); proof: test-kbd-installer.cjs (the
-      same registry entries as bepo-setup.exe, the strict layout.ini, the stub current), test-layout-editor-model.cjs
-      and `windows-package` in layout-editor.playwright.cjs; the install itself is in TODO-tests-windows.md.
-- [x] **Linux live updater E2E across the test-folder move (maintainer decision, 2026-11-15).** While the newest
-      published release predates the move, the live E2E requires the installer's exact ownership refusal and the
-      old build to stay installed; it becomes a full install and restart proof again once a post-move release is
-      published. Delete the pre-move fixtures with the legacy probes.
-- [x] **Native carriage of `shortcut_key` (2026-11-15).** The editor stores `keys.<code>.shortcut_key`; the native
-      exports do not carry it yet. Windows: write the shortcut VK into the KLC and the built DLL. macOS: write the
-      .keylayout Command level. Linux: state in the export what XKB cannot carry. Ergopti+ emulation already keeps it.
-      Done 2026-11-15 (worker X, ff6d4ceb): the .keylayout writes the named key's row on every Command and Control
-      keyMap; Linux XKB carries it too, on ERGOPTI_SEVEN_LEVEL's Control/Alt/Super level (its preserve keeps those
-      modifiers), and the export's limitations say what that one level cannot tell apart; the KLC and DLL exchange
-      virtual keys with the named key (tools/lib/kbd-dll/shortcut-keys.cjs), a displaced or refused key reported.
-      Proof: tools/test/test-layout-shortcut-keys.cjs (goldens of shortcut_keys.toml). The real-OS proofs
-      stay in the three TODO-tests files.
-- [x] **JSON decoder `null` follow-up (worker P, 2026-11-15).** The default Lua decode turns `null` into `{}`.
-      Audit every caller first, then make the default decode give `nil` for `null` and keep holes in arrays, with a
-      regression test that fails on the old behaviour.
-      Done 2026-11-15 (worker X, 39fd1087, 08ee9765): the audit of the 210 default-decode sites (both Lua suites on a
-      base and a patched tree) found the rules that need a present null. The default decode now drops a null
-      member, keeps array holes and gives nil for a null root; decode_lossless and AutoHotkey's JSON_NULL keep it.
-      The Linux multi-step provider answers check `"error": null` losslessly; the physical shortcuts page sends JSON
-      text that every host decodes keeping null, so a null `previous_slot` is refused on the three OS (maintainer
-      decision, through the coordinator). Proof: `_shared/tests/lua/core_text/json_null_contract.lua` (macOS and
-      Linux), the « original-null » contract case on the three drivers.
-- [ ] **Google Books Ngram letter tables, later (2026-11-14 night).** The 1-gram files are several GB per language:
-      a one-off offline streaming import that ships only letter and bigram tables, with licence and attribution.
-      [LATER] Left (2026-11-15): not started.
-
-## Layout optimizer in Ergopti Studio (maintainer request, 2026-11-16)
-
-Design: [docs/design/layout-optimizer.md](docs/design/layout-optimizer.md). The optimizer scores every arrangement
-with the analysis engine's own global score and never measures anything itself.
-
-- [x] **Optimizer core.** `_shared/ui/layout_optimizer/optimizer_core.js`: simulated annealing over swaps of case
-      pairs, seeded restarts (same seed and swap budget, same layout), time and iteration budgets, progress
-      callbacks, a score cache, an optional « 99 % of the n-grams » search table; the final score is the engine's on
-      the whole corpus. Proof: `tools/test/test-layout-optimizer.cjs` (brute-force optimum of a 4-key toy problem,
-      reported score equals the engine's, determinism, restarts split between workers give the same winner).
-- [x] **Constraints (maintainer, 2026-11-16).** Start from a base layout (library, or a layout open in « Éditer »)
-      or from a seeded random arrangement of its keys; letters always move with their capital on Shift, space never
-      moves; switches, each explained in the page and each unit-tested: move the digits, digits outside the number
-      row, letters on the number row, move the punctuation, move the other symbols, use the AltGr levels, place
-      characters behind a dead key (Ergo-L's ★ layer, scored with the engine's dead-key cost); keys kept in place
-      (click on the start layout's board); letters kept at their QWERTY place for the Ctrl shortcuts (click on a
-      QWERTY board, presets « Ctrl Z X C V » and « Ctrl A S »), placed first even from a random start; zones (core).
-- [x] **Studio tab « Optimiser ».** `_shared/ui/layout_optimizer/` framed at `/studio/optimiser`: corpus and
-      language, start, keyboard, switches, pins, weights, budget (seconds, swaps, restarts, seed, accuracy); live best
-      layout with its changed keys, score and metrics against the start; stop; « Open in the editor » (new tab of
-      « Éditer », `openLayout`) and « Compare with other layouts ». Web Workers (one share of the restarts each),
-      page-thread fallback. 21 locales, light and dark, phone width. Proof: `tools/test/test-layout-optimizer-page.cjs`.
-- [x] **Incremental scoring.** `LAYOUT_ANALYSIS.scoreSession` re-walks only the n-grams of the characters whose
-      key sequence a swap changed, through `analyse()`'s own visitor (key pair and triple effects probed once);
-      the optimizer's `incrementalObjective` drives it. 94 → 288 layouts per second per worker (×3, loaded laptop).
-      Proof: the property test of `tools/test/test-layout-analysis-engine.cjs` (480 random swaps, gap ≤ 1e-9) and
-      the incremental section of `tools/test/test-layout-optimizer.cjs` (same scores, same search result).
+- [ ] **Comparer follow-ups (2026-11-16).**
+  - Let the ranking table choose its metric columns (today the 12 of `TABLE_METRICS` in `comparer_page.js`; every
+    metric is in the details) and filter its rows.
+  - The Comparer's heatmap: offer the other per-key metrics of `KEY_COST_METRICS` and name each key's worst groups
+    for every event (analyse the shown layout with `keyGroups: true`), as the editor's panel does.
+  - theme.css follows only `prefers-color-scheme`; the site has no light/dark toggle reaching the framed pages.
+  - `layout_analysis.panel.ranking` (« Ranking against the library… ») also shows while ranking among the Comparer's
+    ticks: reword it in the 21 locales.
+  - Locally (Edge on a French Windows) `exerciseLongLabels` of layout-editor.playwright.cjs fails (« the tooltip
+    holds the whole label »), and every `toLocaleString` without a locale prints French digits unless the browser
+    runs with `--lang=en-US`; check both against CI before calling either a regression.
+- [ ] **Layout formats, what is left.** The library comes only from Oxeylyzer and cmini: add another source (genkey,
+      GPL-3.0 like cmini; KLA's built-in list) once its layout list can be read. No third-party KLA JSON, XKB
+      symbols, KLC or DOF file under a licence that allows shipping it has been found for the reader tests.
+      KLAnext's `matrix` board is refused (`format_unsupported_board`): no matrix file was found to read its key
+      indexes from. The ErgoDox index → ISO key table (`KLA_KEYS.ergodox`) maps 27 to Backslash and 60-62 to the
+      brackets and quote, while the committed bépo and Optimot ErgoDox files put on 27 what their ISO files put on
+      BracketLeft and on 39 what they put on Quote: check it against KLA's ErgoDox key set before changing it.
+- [ ] **Studio i18n.** Every Studio, editor and analyser string goes through i18n in English and French; left: a
+      label-improvement pass, then the 19 other locales (the analysis strings and `layout_analysis.error.<code>` keep
+      pending English).
+- [ ] **[LATER] Layout library credits.** The 35 cmini layouts and 25 credits are shown; check each credit known
+      « from knowledge » against its author's own page.
+- [ ] **More corpora.** French, English, German, Spanish and Italian books, Tatoeba, Wikipedia and MIT code are in.
+      [CODE] Nothing from Wikisource yet. [DECISION] An e-mail or chat register: no candidate is cleared (Enron mails
+      hold personal data, the Ubuntu IRC logs' licence is unchecked, Wikipedia talk pages sign each message with a
+      user name).
+- [ ] **[LATER] Large published frequency tables.** The `ergopti-count-table` format and its importer
+      (`tools/build/import-count-tables.cjs`) ship Leipzig and Lexique tables. Not imported: Norvig's counts
+      (www.norvig.com refused by the build environment's proxy), Google Books Ngram (several GB per language: a
+      one-off offline streaming import that ships only letter and bigram tables, with licence and attribution),
+      Tatoeba counts, other languages.
+- [ ] **[LATER] Site keyboard display from a layout file (maintainer, 2026-11-14; not now).** The site's Ergopti
+      keyboard display is hand-coded. Render it from a layout source (Ergopti TOML or `.keylayout`) so the site can
+      display and emulate any layout; the maintainer's display tweaks become a documented display patch applied after
+      loading, reproducing today's display exactly (pixel or DOM comparison test against the current rendering).
+- [ ] **[RELEASE] Windows export step in native Lua.** The restricted host `windows/native/ergopti_lua_export.c`
+      (pinned Lua 5.4.6, built by `tools/build/build_windows_lua_export.ps1` in package-windows) is done. Left: once a
+      dev run builds « Windows / Build », commit its artifact `windows-lua-export-*` (`ergopti_lua_export.exe` and
+      its `.json`) into `windows/vendor` with their `required` entries in `tools/build/windows_bundle_manifest.json`;
+      then `test-windows-lua-export-identity.cjs` checks them and the Windows lane runs the byte-equality proof.
 - [ ] **The optimizer in Ergopti+.** Mount `LAYOUT_OPTIMIZER_PAGE` in the app's Studio window on Windows, macOS and
       Linux, with « My typing » (keystats) as a corpus; the page already runs without workers where a host inlines it.
 - [ ] **Optimizer follow-ups.** Pasted texts and files as corpora (as the Comparer); zones in the page (restrict a
       letter to keys by clicking them); per-viewer saved choices (localStorage); a browser test of the tab in
       `layout-editor.playwright.cjs` style.
 
-## Windows CI reliability (2026-11-07)
+## Layout generator from an Ergopti TOML source
 
-- Moved to TODO-tests-macos.md (2026-11-15): Issue #106, owned Karabiner runtime not admitted.
-- [ ] **[RELEASE] Dev naming handoff:** everything is on `dev`. `v0.0.0-dev.169` is the bridge (ci.yml keeps the
-      legacy core up to counter 169), then `v1.0.10-dev.170`; the next merge to `main` carries
-      `Release-As: 1.0.10`. Delete the orphan draft `v0.0.0-dev.167` by hand (this session cannot delete releases).
-      [RELEASE] Left (2026-11-15): dev.174 and dev.175 are published as v1.0.10; main is still at 4d834c866a: merge with
-      `Release-As: 1.0.10`, and delete the draft dev.167 by hand if it still exists.
+Kalamine and KbdEdit give ideas, never code: every generator is written from the formats' own documentation
+([layout-source-format.md](docs/design/layout-source-format.md),
+[layout-windows-dll.md](docs/design/layout-windows-dll.md)).
 
-## Layout generator from an Ergopti TOML source (maintainer request, 2026-11-06)
-
-Large project: an Ergopti equivalent of [kalamine](https://github.com/OneDeadKey/kalamine), going further. Take
-ideas from kalamine and KbdEdit, never their code: write every generator from the formats' own documentation, so
-that no MIT notice has to ship.
-
-Decided 2026-11-06: the source of truth is an Ergopti layout file in TOML, a superset of every target. A macOS
-`.keylayout` cannot hold extra modifiers (Kana, Roya, Loya, a held key as a layer), lock layers other than Caps
-Lock, physical key remapping, shortcuts that send another key than the typed character (Ctrl+A giving Ctrl+B),
-KbdEdit's special functions and Windows flags, export settings, nor Ergopti's own features (tap-hold, emulated
-layers). The `.keylayout` stays a first-class format: imported without loss and exported. No custom element goes
-into an exported `.keylayout`, since macOS may refuse to load it.
-
-- [x] **The same UI inside ErgoptiPlus.** The editor page runs locally in the app's webview on Windows, macOS and
-      Linux. It installs or emulates the result and switches to it from the menu.
-      Code done 2026-11-14 (worker C, checked): the editor window runs on the three OS (« Layout editor in its own
-      window »), « Create or edit a layout… » is no longer greyed on Windows (`open_layout_editor` has no platform
-      restriction), the Windows composer takes the source form, and the XKB/KLC downloads are built offline. Left
-      for the maintainer, all hardware: the install on a Mac and on a real Linux desktop, the PC install, and the
-      macOS open panel (`source_pick`), in the `layout_editor_window` items of the three TODO-tests files.
-      Progress (2026-11-11): macOS and Linux open the editor from the layout manager window and save its files through the host (`layouts/source_store.lua`, `layout_sources/` of the configuration folder). Windows: the WebView2 host needs `source_open`/`source_save` and `source_editor` in `windows/ui/layout_manager/init.ahk` as described in [layout-editor.md](docs/design/layout-editor.md#hosts); the page hides the button there meanwhile (decided by the coordinator on 2026-11-11 overnight, to review by the maintainer). « Install and use » sends the source and its compiled `.keylayout` through the composer host, which installs it as the composed layout and switches to it (macOS defers to the next login when it must). Linux, in a container (2026-11-11): `tests/hardware/run_layout_editor_webview.lua` opens the real layout manager window in WebKit2GTK under Xvfb, clicks « Editor », opens the Ergopti source, « Install and use », « Yes »; the composer host stores the source and the page's Linux emulation table, installs the composed layout, and the server's keymap read back after loading it types a/A, the Kana level on AltGr (<, œ), ê on the ISO key and $ on `TLDE` (CI step « Install a layout source from the editor in the daemon's WebView », desktop-webview shard). The installer refuses to write a desktop setting as root, so a root run checks that refusal and a user run checks the switch. Proven as a regular user on CI run 43105583384 (desktop-webview): installed and selected, the GNOME input sources start with the composed layout, 27/27. The same probe first runs « Emulate without installing »: nothing installed, `composed` becomes the emulated layout, and the daemon's emulation types a, ê and $ for KeyA, IntlBackslash and Backquote from the composer folder's copy. Entry point (2026-11-11, maintainer request): « Create or edit a layout… » in the Keyboard layout menu opens the editor directly (macOS, Linux; greyed on Windows with its reason); « New » starts blank or from QWERTY, AZERTY, Bépo, Ergo-L or Ergopti; « Install on the system » and « Emulate without installing » (`composer_emulate`: no system install, no admin; the emulation reads the composer folder's copy) each say what they do; the site page links ErgoptiPlus and its downloads and says the Windows DLL and installer come from `tools/kbd-dll.cjs`. Left: a native check of that install on a Mac and on a real Linux desktop (GNOME, KDE), the Windows host (`windows/ui/layout_manager/composer.ahk` accepts no source yet), and a Mac check of the native open panel the macOS host now shows for « Open » (`source_pick`).
-
-- [x] **[CODE] The wow64 image's KbdLayerDescriptor returns a 32-bit pointer (found 2026-11-16 on the PC).** kbd.h
-      types the descriptor's return as `KBD_LONG_POINTER` (`__ptr64` under `BUILD_WOW6432`), and Microsoft's own
-      `C:\Windows\SysWOW64\KBDFR.DLL` returns it in EDX:EAX (`B8 imm32 99 C3`: `mov eax, imm32; cdq; ret`), as the
-      MSVC builder's wow64 `kbdergop.dll` does. The `kbd-dll` wow64 image (clang `const KBDTABLES *__stdcall`, and
-      `pe-writer.cjs`) returns EAX only (`B8 imm32 C3`), leaving EDX to chance for a 32-bit caller that reads the
-      64-bit return, and `reader.cjs` (`descriptorTarget`) refuses Microsoft's form. Left: emit the 64-bit return for
-      wow64 in `emit-c.cjs` and `pe-writer.cjs`, make the reader require `cdq` for a wow64 image (and accept it), then
-      regenerate the page writer bundle and `kbd_setup_stub.js` if they embed it. The same comparison found two
-      differences that are not bugs: Microsoft leaves `dwType` at 0 (`kbd-dll` writes 4 and its reader requires 4;
-      kbd.h calls the field optional), and the MSVC builder's merged `.data` is writable where Microsoft's is
-      read-only.
-      Done 2026-11-16 on the PC: `pe-writer.cjs` and `emit-c.cjs` write `mov eax, imm32; cdq; ret` for wow64 (x86,
-      x64 and arm64 images byte-identical to before); `reader.cjs` requires the descriptor as wide as the table
-      pointers (refuses wow64 EAX alone and x86 EDX:EAX) and reads another toolchain's image with `{ foreign: true }`
-      (writable or code-section tables, any `dwType`); the page bundle is regenerated (`kbd_setup_stub.js` embeds no
-      DLL). Proof: `test-kbd-dll-wow64.cjs` (no compiler) compares the writer's wow64 image with a committed MSVC
-      wow64 build of the registry Ergopti: same export, descriptor code, 64-bit pointers and tables; all 216
-      Microsoft SysWOW64 layouts on the PC use `cdq`. Re-checked: `dwType` is 0 in every Microsoft layout the reader
-      accepts (178 SysWOW64, 179 System32), kept at 4 (`KEYBOARD_TYPE_GENERIC_101`, optional field); Microsoft keeps
-      tables read-only (214 of 216; KBDJPN and KBDKOR carry code), so `kbd-dll` stays read-only. Left: the clang
-      build's wow64 code is checked by CI (`test-kbd-dll.cjs`, no LLVM on the PC), and a native 32-bit typing check
-      stays with the PC install items.
-- [ ] **Sign the generated Windows layout DLLs.** The four DLLs, the uninstaller, `<dll>-setup.exe` and the layout
-      editor's generic installer (`ergopti-layout-setup.exe`, `_generated/kbd_setup_stub.js`; added 2026-11-15) (SHA-256,
-      RFC 3161 timestamp) once SignPath or the release PFX is on, as `docs/design/layout-windows-dll.md` « Signing » says.
-      [RELEASE] Left (2026-11-15): not started; tools/kbd-dll.cjs reports `signed: false` until SignPath or the PFX
-      exists (the job wiring itself is [CODE] once it does).
-
-- [ ] **Keyboard types JIS and ABNT.** Deferred on 2026-11-11: their keys (Yen, Ro, Henkan, Muhenkan, Kana, keypad
-      comma) would enter `physical_keys.json`, which the Windows driver parses at boot; add them once that cost is measured.
-      [DECISION] Left (2026-11-15): not started; physical_keys.json has none of those keys; measure their Windows boot
-      parse cost, then decide.
-
-- [x] **Retire the composer and the navigation layer editor.** The Windows host takes a source since 2026-11-12: delete
-      the composer section (`layout_composer/composer_page.js` and its markup), then retire `_shared/ui/layer_editor` and
-      its three hosts once every driver reads the source's `nav` layer.
-      Composer part done 2026-11-14 (worker C): the manager page lost its composer view, its three composer messages
-      and its 66 strings; the hosts refuse a page's `composer_remove` and declaration (the composer field check keeps
-      both through the registry). Left: the navigation layer editor, which waits until every driver reads the
-      source's `nav` layer instead of `layers.toml` (today the editor's « Apply the navigation layer » still writes
-      `layers.toml` through it).
-      [CODE] Left (2026-11-15): the composer part is done (8c463b4009); `_shared/ui/layer_editor` and `nav_save` remain,
-      and no driver reads the source's `nav` layer yet (Linux nav_layer.lua reads layers.toml).
-      Single source (decided by the coordinator on 2026-11-15, to review by the maintainer): the layout source's `nav`
-      layer, edited in Ergopti Studio, is the one source; `layers.toml` is its compiled form, written only by « Apply
-      the navigation layer », and the drivers keep reading it through their proven loaders. The compiled file opens
-      with `# source: <id>` and `# body-fnv1a32: <hash>` (source_io.js navLayerFile); the loaders do not refuse a
-      hand-edited file, since files written before this header have none.
-      Step 1 done (2026-11-15, `claude/ergopti-todo-retire-layer-editor-2`): the save and apply moved out of
-      `ui/layer_editor` (Linux and macOS modules/keymap/nav_layer_save.lua, Windows platform/remap/nav_layer_save.ahk).
-      Step 2 done (2026-11-15, `claude/ergopti-todo-studio-nav-entry`): the « Navigation layer » menu row, gesture and
-      shortcut (`open_layer_editor`, id kept for users' bindings) open the Studio on its `nav` layer, importing the
-      user's layers.toml (else the preset) held by the current layer key; proof: `studio-nav-entry` in
-      layout-editor.playwright.cjs, test_layout_manager_bridge.lua and test_layer_editor_host.lua (macOS).
-      Step 3 done (2026-11-15): 3a `claude/ergopti-todo-retire-layer-editor-hosts` deleted the Linux and macOS
-      hosts; 3b `claude/ergopti-todo-retire-layer-editor-window` deleted the Windows host, the page (index.html,
-      script.js, style.css), its manifest entry, its Playwright and page gates, the CI step and 38 page-only
-      strings. layer_model.js and \_generated/layer_data.js stay: the layout editor reads them. The save's cases
-      live in the nav_layer_save suites of each driver; test-nav-layer-keys.cjs replaces the legends gate.
+- [ ] **[RELEASE] Sign the generated Windows layout DLLs.** The four DLLs, the uninstaller, `<dll>-setup.exe` and
+      the editor's generic installer (`ergopti-layout-setup.exe`, `_generated/kbd_setup_stub.js`), SHA-256 with an
+      RFC 3161 timestamp, once SignPath or the release PFX is on (`layout-windows-dll.md` « Signing »);
+      `tools/kbd-dll.cjs` reports `signed: false` until then, and the job wiring is [CODE] once it exists.
+- [ ] **Keyboard types JIS and ABNT.** Their keys (Yen, Ro, Henkan, Muhenkan, Kana, keypad comma) would enter
+      `physical_keys.json`, which the Windows driver parses at boot: measure that parse cost, then decide.
 
 ## Parity audit pause and resumption
 
@@ -1609,9 +963,10 @@ Each closes on a named green hosted or native run, recorded here.
       TODO-tests-windows.md (2026-11-15).
 - Moved to TODO-tests-macos.md and TODO-tests-windows.md (2026-11-15): 121, 123, 137, the AI Agent submenu
   composed-menu qualification.
-- [ ] **First `main` push after 1.0.9.** CodeQL scans `main` only: the 32 alerts fixed on dev on 4 November
-      (a3d69950e5..89b0b774c8) close only once that scan accepts the fixes.
-      [RELEASE] Left (2026-11-15): main is still at 4d834c866a; push main, then check the alerts close.
+- [ ] **[RELEASE] First `main` push after 1.0.9.** `main` is still at 4d834c866a; dev.174 and dev.175 are published
+      as v1.0.10 (ci.yml keeps the legacy core up to counter 169, the `v0.0.0-dev.169` bridge). Merge to `main` with
+      `Release-As: 1.0.10`, then check that CodeQL, which scans `main` only, closes the 32 alerts fixed on dev on
+      4 November (a3d69950e5..89b0b774c8).
 - [ ] **CodeQL Go.** Claimed by worker K (2026-11-13). After the `native_http` Go module is published, re-enable Go and check a non-empty analysis.
       Worker K 2026-11-13, code side: there is no CodeQL workflow in the repository (default setup, a repository
       setting), so re-enabling Go is the maintainer's. Both shared modules carry their own `go.mod` at the package root
@@ -1776,7 +1131,10 @@ Each question names the default kept meanwhile; an answer moves into the item or
   - compilers: Kana keeps AltGr in a KLC when its key is Right Alt;
   - Ergopti Studio: one page per window; the menu row right after « Keyboard layout »; the editor's tab bar
     placement; the key-colour selector and its green-to-red scale; the Comparer's colours, folding and share
-    wording; one fingering profile per keyboard model (version 1 profiles not carried over);
+    wording; one fingering profile per keyboard model (version 1 profiles not carried over); app downloads land
+    in the Downloads folder rather than a save dialog (Hammerspoon and WebKitGTK have none); the KLA JSON and
+    Kalamine TOML exports (coordinator, 2026-11-14); the source's `nav` layer as the one navigation source,
+    `layers.toml` its compiled form with a `# source:` and `# body-fnv1a32:` header (coordinator, 2026-11-15);
   - Linux: the GNOME extension's `org.ergopti.InputSource1` admits any client of the session bus; GTK 3 Compose
     sets `GTK_IM_MODULE` only, from the user installer only;
   - pause: a dead key pending in the system's own layout (no emulation) stays the OS's state.
