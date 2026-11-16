@@ -739,7 +739,7 @@ helpers.describe("AI preferences decode identical bytes once (llm-preferences-de
 			local decodes, original = 0, Codec.decode
 			Codec.decode = function(...)
 				local caller = debug.getinfo(2, "S")
-				if caller and caller.source:find("llm_preferences%.lua$") then decodes = decodes + 1 end
+				if caller and caller.source:find("ai[/\\]engine[/\\]preferences%.lua$") then decodes = decodes + 1 end
 				return original(...)
 			end
 			local ok, err = pcall(function()
