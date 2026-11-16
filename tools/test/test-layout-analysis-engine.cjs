@@ -167,6 +167,145 @@ check(heat.KeyF.sfb === 0 && heat.KeyE.presses === 50, 'keys: other keys carry n
 	check(refused, 'diff: a result without metrics is refused');
 }
 
+// The good events per key, worked by hand. « asdf » on QWERTY: as, sd and df
+// each roll inward on the left hand, so roll_in is 100 %; A and F take part in
+// one of the three bigrams (33.3 %), S and D in two (66.7 %), and each roll is
+// shared by its two keys: 16.7, 33.3, 33.3 and 16.7, adding up to 100.
+// « fjf » is one trigram alternating hands: F takes part twice, J once, so
+// F holds two thirds of alternation's 100 % and J one third.
+{
+	const rolls = E.analyse(byId.get('qwerty'), E.ngramsFromText('asdf'), { keyboard: 'iso' });
+	check(near(rolls.metrics.roll_in, 100), `gain: roll_in = ${rolls.metrics.roll_in}`);
+	const expected = { KeyA: 100 / 6, KeyS: 100 / 3, KeyD: 100 / 3, KeyF: 100 / 6, KeyJ: 0 };
+	for (const [code, part] of Object.entries(expected))
+		check(
+			near(rolls.keys[code].gain.roll_in, part),
+			`gain: ${code} roll_in part ${rolls.keys[code].gain.roll_in}`
+		);
+	check(
+		Object.values(rolls.keys).every((key) => key.gain.alternation === 0 && key.gain.roll_out === 0),
+		'gain: « asdf » neither alternates nor rolls outward'
+	);
+	const values = E.keyValues(rolls, 'roll_in');
+	check(near(values.KeyS, 100 / 3) && near(values.KeyA, 100 / 6), 'keyValues: reads a gain');
+	check(near(E.keyValues(rolls, 'presses').KeyA, 25), 'keyValues: reads the presses');
+	const alternate = E.analyse(byId.get('qwerty'), E.ngramsFromText('fjf'), { keyboard: 'iso' });
+	check(
+		near(alternate.metrics.alternation, 100),
+		`gain: alternation = ${alternate.metrics.alternation}`
+	);
+	check(
+		near(alternate.keys.KeyF.gain.alternation, 200 / 3) &&
+			near(alternate.keys.KeyJ.gain.alternation, 100 / 3),
+		`gain: F ${alternate.keys.KeyF.gain.alternation}, J ${alternate.keys.KeyJ.gain.alternation}`
+	);
+	let refused = false;
+	try {
+		E.keyValues(rolls, 'home_row');
+	} catch {
+		refused = true;
+	}
+	check(refused, 'keyValues: a metric that is not per key is refused');
+}
+
+// Each finger's part of the travel, worked by hand: « ed » on QWERTY presses E
+// (the left middle finger's top-row key) and D (its home key, no travel) over
+// two characters, so the left middle finger travels half of E's reach per
+// character, which is the whole distance; every other finger travels nothing.
+{
+	const result = E.analyse(byId.get('qwerty'), E.ngramsFromText('ed'), { keyboard: 'iso' });
+	const board = E.keyboard('iso');
+	const reachE = board.reach[board.codes.indexOf('KeyE')];
+	check(reachE > 0, `fingerDistance: KeyE reaches ${reachE} mm`);
+	check(
+		near(result.fingerDistance.lm, reachE / 2) &&
+			near(result.fingerDistance.lm, result.metrics.distance),
+		`fingerDistance: lm = ${result.fingerDistance.lm}, distance ${result.metrics.distance}`
+	);
+	check(
+		Object.entries(result.fingerDistance).every(([id, mm]) => id === 'lm' || mm === 0),
+		'fingerDistance: the other fingers travel nothing'
+	);
+}
+
+// The heaviest groups of the whole board, worked by hand: « eded » holds the
+// bigrams ed, de, ed, three SFBs of the same pair E-D (100 % of the bigrams);
+// its trigrams ede and ded repeat a key, so they are no skipgram. Counted only
+// for a layout analysed in detail (keyGroups).
+{
+	const tables = E.ngramsFromText('eded');
+	const result = E.analyse(byId.get('qwerty'), tables, { keyboard: 'iso', keyGroups: true });
+	const sfb = result.topGroups.sfb;
+	check(
+		sfb.length === 1 &&
+			sfb[0].keys.slice().sort().join(' ') === 'KeyD KeyE' &&
+			sfb[0].count === 3 &&
+			near(sfb[0].share, 100),
+		`topGroups: sfb ${JSON.stringify(sfb)}`
+	);
+	check(result.topGroups.sfs.length === 0, 'topGroups: no skipgram in « eded »');
+	check(
+		E.analyse(byId.get('qwerty'), tables, { keyboard: 'iso' }).topGroups === undefined,
+		'topGroups: a ranking (no keyGroups) does not count them'
+	);
+}
+
+// keyDiff, worked by hand: on « ed », QWERTY's E and D each carry half of the
+// 100 % of SFB (50) and Dvorak's none; the presses move from QWERTY's E and D
+// to Dvorak's KeyD (its e) and KeyH (its d): E +50, D 0, H −50.
+{
+	const tables = E.ngramsFromText('ed');
+	const qwerty = E.analyse(byId.get('qwerty'), tables, { keyboard: 'iso' });
+	const dvorak = E.analyse(byId.get('dvorak'), tables, { keyboard: 'iso' });
+	const sfb = E.keyDiff(qwerty, dvorak, 'sfb');
+	check(
+		near(sfb.KeyE, 50) && near(sfb.KeyD, 50) && sfb.KeyH === 0,
+		`keyDiff: sfb ${sfb.KeyE} ${sfb.KeyD}`
+	);
+	const presses = E.keyDiff(qwerty, dvorak, 'presses');
+	check(
+		near(presses.KeyE, 50) && near(presses.KeyD, 0) && near(presses.KeyH, -50),
+		`keyDiff: presses E ${presses.KeyE}, D ${presses.KeyD}, H ${presses.KeyH}`
+	);
+	let refused = false;
+	try {
+		E.keyDiff(qwerty, E.analyse(byId.get('dvorak'), tables, { keyboard: 'ansi' }), 'sfb');
+	} catch {
+		refused = true;
+	}
+	check(refused, 'keyDiff: two keyboards are refused');
+}
+
+// standing, worked by hand: three results equal but for their SFB (1, 2 and
+// 2 %, lower is better): the first beats both, the second ties the third and
+// loses to the first; a metric shown but not scored is left out.
+{
+	const base = E.analyse(byId.get('qwerty'), E.ngramsFromText('ed'), { keyboard: 'iso' });
+	const fake = (id, sfb) => ({
+		layout: { id },
+		metrics: Object.assign({}, base.metrics, { sfb })
+	});
+	const results = [fake('a', 1), fake('b', 2), fake('c', 2)];
+	const a = E.standing(results, 'a');
+	const b = E.standing(results, 'b');
+	check(
+		JSON.stringify(a.sfb) === JSON.stringify({ beats: 2, ties: 0, loses: 0, others: 2 }),
+		`standing: a ${JSON.stringify(a.sfb)}`
+	);
+	check(
+		JSON.stringify(b.sfb) === JSON.stringify({ beats: 0, ties: 1, loses: 1, others: 2 }),
+		`standing: b ${JSON.stringify(b.sfb)}`
+	);
+	check(b.roll_in.ties === 2 && !('hand_change' in b), 'standing: ties and unscored metrics');
+	let refused = false;
+	try {
+		E.standing(results, 'z');
+	} catch {
+		refused = true;
+	}
+	check(refused, 'standing: a layout not among the results is refused');
+}
+
 // =====================================
 // ======= 2/ Exact key n-grams ========
 // =====================================

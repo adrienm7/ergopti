@@ -676,6 +676,8 @@ var LAYOUT_ANALYSIS = (function () {
 			perKey[event] = new Float64Array(board.codes.length);
 			groups[event] = new Map();
 		}
+		// The good events each key takes part in (rolls, alternation), never grouped.
+		for (const gain of KEY_GAINS) perKey[gain] = new Float64Array(board.codes.length);
 		// A pair's or a trigram's group id holds its keys in increasing order.
 		// Counting every event's groups costs about 40 % on a whole library, so
 		// only the SFB partners the ranking shows are counted unless asked.
@@ -733,6 +735,7 @@ var LAYOUT_ANALYSIS = (function () {
 				Object.keys(m.ideal).map((id) => [id, pct(m.fingerLoad[fingerIds.indexOf(id)], m.pressed)])
 			),
 			idealLoad: Object.assign({}, m.ideal),
+			fingerDistance: m.fingerDistance,
 			hands: { left: pct(m.left, m.left + m.right), right: pct(m.right, m.left + m.right) },
 			rows: {
 				number: metrics.number_row,
@@ -773,6 +776,8 @@ var LAYOUT_ANALYSIS = (function () {
 				trigrams: c.trigrams
 			}
 		};
+		// One layout analysed in detail: each event's heaviest groups over the board.
+		if (opts.keyGroups === true) result.topGroups = topGroups(board, groups, c);
 		result.score = score(result, opts.weights);
 		return result;
 	}
@@ -874,8 +879,9 @@ var LAYOUT_ANALYSIS = (function () {
 						blame2('lsb', n, k1, k2);
 					}
 				}
-				if (o2 > o1) c.roll_in += n;
-				else c.roll_out += n;
+				const roll = o2 > o1 ? 'roll_in' : 'roll_out';
+				c[roll] += n;
+				blame2(roll, n, k1, k2);
 			},
 			trigram(k1, k2, k3, n) {
 				if (thumb[k1] || thumb[k2] || thumb[k3]) return;
@@ -910,8 +916,10 @@ var LAYOUT_ANALYSIS = (function () {
 					}
 					return;
 				}
-				if (h1 !== h2 && h2 !== h3) c.alternation += n;
-				else c.roll_mixed += n;
+				if (h1 !== h2 && h2 !== h3) {
+					c.alternation += n;
+					blame3('alternation', n, k1, k2, k3);
+				} else c.roll_mixed += n;
 			}
 		};
 	}
@@ -926,7 +934,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {Float64Array} keyCount - Presses per key.
 	 * @param {object} opts - The analyse() options.
 	 * @param {number} compact - compact_fit, measured by the caller.
-	 * @returns {object} {metrics, fingers, fingerLoad, ideal, pressed, allPresses, left, right}.
+	 * @returns {object} {metrics, fingers, fingerLoad, fingerDistance (each finger's
+	 *   part of the travel, mm per character), ideal, pressed, allPresses, left, right}.
 	 */
 	function streamMetrics(layout, board, best, c, keyCount, opts, compact) {
 		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
@@ -956,6 +965,15 @@ var LAYOUT_ANALYSIS = (function () {
 		const fingers = {};
 		fingerIds.forEach((id, f) => {
 			fingers[id] = pct(fingerLoad[f], allPresses);
+		});
+		// Each finger's part of the travel distance (mm per typed character):
+		// the parts add up to the distance metric.
+		const travel = new Float64Array(fingerIds.length);
+		for (let k = 0; k < keyCount.length; k++)
+			travel[board.finger[k]] += board.reach[k] * keyCount[k];
+		const fingerDistance = {};
+		fingerIds.forEach((id, f) => {
+			fingerDistance[id] = c.chars > 0 ? travel[f] / c.chars : 0;
 		});
 		const ideal = idealLoad(opts.idealLoad);
 		let imbalance = 0;
@@ -995,7 +1013,43 @@ var LAYOUT_ANALYSIS = (function () {
 			direct_digits: directDigits(layout, board),
 			shortcut_left: shortcutLeft(layout, board, shortcuts(opts.shortcuts))
 		};
-		return { metrics, fingers, fingerLoad, ideal, pressed, allPresses, left, right };
+		return {
+			metrics,
+			fingers,
+			fingerLoad,
+			fingerDistance,
+			ideal,
+			pressed,
+			allPresses,
+			left,
+			right
+		};
+	}
+
+	/**
+	 * Each bad event's TOP_GROUPS heaviest key groups over the whole board,
+	 * heaviest first: the keys (board order), how often the corpus has them,
+	 * and their share of the bigrams (or trigrams) the event is counted on.
+	 * @param {object} board - From keyboard().
+	 * @param {object} groups - event → Map group id → count (analyse()).
+	 * @param {object} c - analyse()'s counts (bigrams, trigrams).
+	 * @returns {object} event → [{keys: string[], count: number, share: number}].
+	 */
+	function topGroups(board, groups, c) {
+		const out = {};
+		for (const event of KEY_EVENTS) {
+			const whole = TRIGRAM_EVENTS.has(event) ? c.trigrams : c.bigrams;
+			out[event] = Array.from(groups[event])
+				.sort((x, y) => y[1] - x[1] || x[0] - y[0])
+				.slice(0, TOP_GROUPS)
+				.map(([id, n]) => {
+					const keys = [];
+					for (let i = 0, rest = id; i < EVENT_KEYS[event]; i++, rest = Math.floor(rest / KEY_BASE))
+						keys.unshift(board.codes[rest % KEY_BASE]);
+					return { keys, count: n, share: whole > 0 ? (100 * n) / whole : 0 };
+				});
+		}
+		return out;
 	}
 
 	/**
@@ -1093,8 +1147,16 @@ var LAYOUT_ANALYSIS = (function () {
 		'pinky_load',
 		'outer_column'
 	]);
+	// The good events the keys share the same way (keyReport gain): rolls over
+	// bigrams, alternation over trigrams; not part of the score's key costs.
+	const GAIN_KEYS = { roll_in: 2, roll_out: 2, alternation: 3 };
+	const KEY_GAINS = Object.keys(GAIN_KEYS);
+	// Every per-key value keyValues() reads: the presses, the costs, the gains.
+	const KEY_METRICS = ['presses'].concat(KEY_COST_METRICS, KEY_GAINS);
 	// How many of its worst pairs or trigrams each key names.
 	const WORST_GROUPS = 3;
+	// How many groups of each event topGroups() lists for the whole board.
+	const TOP_GROUPS = 10;
 	const keyNgramCache = new WeakMap();
 
 	/**
@@ -1478,6 +1540,9 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   involves, so the keys' parts add up to the metric (finger_imbalance
 	 *   goes to the keys of the fingers above their ideal load, in proportion
 	 *   to their presses);
+	 * - gain: the same for the good events of KEY_GAINS (rolls in and out over
+	 *   the bigrams, alternation over the trigrams): the keys' parts add up to
+	 *   the metric;
 	 * - worst: for each event metric, the key's WORST_GROUPS heaviest groups
 	 *   with it (the other key of a pair, the two others of a redirect), each
 	 *   [codes, % of the bigrams or trigrams].
@@ -1512,6 +1577,11 @@ var LAYOUT_ANALYSIS = (function () {
 				cost[event] = share(event) / EVENT_KEYS[event];
 				worst[event] = [];
 			}
+			const gain = {};
+			for (const id of KEY_GAINS) {
+				const whole = id === 'alternation' ? c.trigrams : c.bigrams;
+				gain[id] = pct(m.perKey[id][k], whole) / GAIN_KEYS[id];
+			}
 			keys[code] = {
 				presses: pct(m.keyCount[k], m.allPresses),
 				sfb: share('sfb'),
@@ -1520,6 +1590,7 @@ var LAYOUT_ANALYSIS = (function () {
 				scissors: share('scissors') + share('half_scissors'),
 				redirect: share('redirect'),
 				cost,
+				gain,
 				worst
 			};
 		});
@@ -1565,6 +1636,76 @@ var LAYOUT_ANALYSIS = (function () {
 			let points = 0;
 			for (const id of KEY_COST_METRICS) points += (used[id] || 0) * key.cost[id];
 			out[code] = points;
+		}
+		return out;
+	}
+
+	/**
+	 * One per-key value of every key: its share of the presses, its part of a
+	 * cost metric (KEY_COST_METRICS) or of a good event (KEY_GAINS).
+	 * @param {object} result - analyse() output.
+	 * @param {string} metric - One of KEY_METRICS.
+	 * @returns {object} code → value (% of the presses, or the metric's unit).
+	 * @throws {Error} On a metric that is not per key.
+	 */
+	function keyValues(result, metric) {
+		if (!KEY_METRICS.includes(metric))
+			throw new Error(`layout_analysis: ${metric} is not a per-key value`);
+		const out = {};
+		for (const [code, key] of Object.entries(result.keys))
+			out[code] =
+				metric === 'presses'
+					? key.presses
+					: KEY_GAINS.includes(metric)
+						? key.gain[metric]
+						: key.cost[metric];
+		return out;
+	}
+
+	/**
+	 * Key by key, how much more of a per-key value one layout puts on each
+	 * physical key than another, both measured on the same keyboard.
+	 * @param {object} a - analyse() output, the layout read.
+	 * @param {object} b - analyse() output, the layout it is compared with.
+	 * @param {string} metric - One of KEY_METRICS.
+	 * @returns {object} code → a's value − b's value.
+	 * @throws {Error} On results measured on different keyboards, or a metric
+	 *   that is not per key.
+	 */
+	function keyDiff(a, b, metric) {
+		if (a.keyboard !== b.keyboard)
+			throw new Error(`layout_analysis: keyDiff needs one keyboard (${a.keyboard}, ${b.keyboard})`);
+		const x = keyValues(a, metric);
+		const y = keyValues(b, metric);
+		const out = {};
+		for (const code of Object.keys(x)) out[code] = x[code] - y[code];
+		return out;
+	}
+
+	/**
+	 * Where one layout stands among compared ones, metric by metric: how many
+	 * of the others it beats, ties and loses to on each scored metric (one
+	 * whose `better` is higher or lower).
+	 * @param {object[]} results - analyse() or compare() outputs.
+	 * @param {string} id - The layout id read.
+	 * @returns {object} metric → {beats, ties, loses, others}.
+	 * @throws {Error} When the layout is not among the results.
+	 */
+	function standing(results, id) {
+		const own = results.find((r) => r.layout.id === id);
+		if (!own) throw new Error(`layout_analysis: standing needs the layout ${id} among the results`);
+		const out = {};
+		for (const [metric, definition] of Object.entries(METRICS)) {
+			if (definition.better === 'none') continue;
+			const entry = { beats: 0, ties: 0, loses: 0, others: results.length - 1 };
+			for (const other of results) {
+				if (other === own) continue;
+				const delta = own.metrics[metric] - other.metrics[metric];
+				if (delta === 0) entry.ties++;
+				else if ((definition.better === 'higher') === delta > 0) entry.beats++;
+				else entry.loses++;
+			}
+			out[metric] = entry;
 		}
 		return out;
 	}
@@ -1938,6 +2079,8 @@ var LAYOUT_ANALYSIS = (function () {
 		AnalysisError,
 		KEY_EVENTS,
 		KEY_COST_METRICS,
+		KEY_GAINS,
+		KEY_METRICS,
 		hashText,
 		keyboard,
 		fingeringProfile,
@@ -1956,6 +2099,9 @@ var LAYOUT_ANALYSIS = (function () {
 		scoreSession,
 		score,
 		keyScoreCost,
+		keyValues,
+		keyDiff,
+		standing,
 		defaultWeights,
 		defaultIdealLoad,
 		idealLoad,
