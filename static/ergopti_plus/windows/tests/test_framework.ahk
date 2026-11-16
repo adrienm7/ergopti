@@ -794,7 +794,7 @@ global TEST_MODULE_GROUPS := [
 	; Configuration version transitions.
 	["config-transition", "^unit/settings/engine/transition/"],
 	; Whole-configuration scope: global scope, recommended restore, scope manifest, menus.
-	["config-scope-global", "^unit/infra/config/scope/test_(global_config_scope|restore_recommended_no_confirm|config_scope_menus|config_scope_shortcuts)\.ahk$|^unit/test_config_scope_manifest\.ahk$"],
+	["config-scope-global", "^unit/settings/engine/scope/test_(global_config_scope|restore_recommended_no_confirm|menus|shortcuts)\.ahk$|^unit/test_config_scope_manifest\.ahk$"],
 	; Per-feature configuration scope: hotstrings, tap-hold, personal files.
 	["config-scope-features", "^unit/settings/engine/scope/"],
 	; Configuration storage, TOML and the updater.
@@ -806,9 +806,9 @@ global TEST_MODULE_GROUPS := [
 	; Keystats capture, storage and metrics.
 	["keystats", "^unit/modules/keystats/"],
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.
-	["ui", "^unit/ui/"],
+	["ui", "^unit/(ui|menu)/"],
 	; Adapters, platform services, shared infrastructure and the test runner.
-	["core", "^unit/(adapters|platform|infra|suite|core|settings|menu|tray)/"]
+	["core", "^unit/(adapters|platform|infra|suite|core|settings|tray)/"]
 ]
 
 ; The test category of a registering test file; a file no category declares is refused.
