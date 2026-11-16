@@ -1390,9 +1390,9 @@ between workers) green alone. All live checks pass, typed by the harness.
       in the launcher/helper proof, then land the rows of branch `claude/ergopti-todo-ci-acceptance-3` (faa1ade6,
       13af8690, b74741e8, 14d21718, 365dae29) with a green macOS 26 Install-and-launch row. Needs a Mac or the hosted
       macOS 26 lane; the failed-launch artifact (13983003738) holds the launcher logs.
-      [CODE] Left (2026-11-15): 5fcb564b04 proves the helper by device and inode (test_lease_helper_identity.lua); the
-      relocation-row commits of `claude/ergopti-todo-ci-acceptance-3` are not on dev: rebase and land them with a green
-      macOS 26 Install-and-launch row.
+      [CODE] Left (2026-11-15): 5fcb564b04 proves the helper by device and inode (test_lease_helper_identity.lua).
+      The five relocation-row commits are on dev since 2026-11-16 (ported from `claude/ergopti-todo-mlc005-rows`,
+      branch deleted). Left: confirm the three relocation rows green in the next hosted macOS 26 Install-and-launch run.
 
 - **Field report 2026-11-03 (`mac-2026-11-03_102716`), branch `fix/macos-field-2026-11-03`.** Done: ai_local no
   longer lists the owned endpoint without its binary (no ERROR); n-gram history merges paced (458 ms slice); the
