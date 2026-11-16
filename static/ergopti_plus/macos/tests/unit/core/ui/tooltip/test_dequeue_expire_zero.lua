@@ -71,4 +71,25 @@ helpers.assert_true(
 	"prune_expired mixed: surviving ids must be 5, 7, 8 (not 6) (ui-tooltip-2)"
 )
 
+-- Test 5 (twd1-stacked-safety): in a stack of timed rows, a row with no delay
+-- left only at the next key. With the shared safety lifetime it leaves after it,
+-- as a lone no-delay preview does (TWD-1, decided by the maintainer on 2026-11-16).
+local Config = helpers.load_with_stubs("core.ui.ui.tooltip.config")
+local stack_opts = {
+	timeout_decrement_sec = Config.timing.timeout_decrement_sec,
+	timeout_floor_sec = Config.timing.timeout_floor_sec,
+	safety_timeout_sec = Config.timing.safety_timeout_sec,
+}
+helpers.assert_true(type(stack_opts.safety_timeout_sec) == "number" and stack_opts.safety_timeout_sec > 0,
+	"the shared safety lifetime is loaded (twd1-stacked-safety)")
+local stacked = Dequeue.stamp_expiry_times({ { id = "timed", duration = 1 }, { id = "timed2", duration = 2 },
+	{ id = "free", duration = 0 } }, 100, stack_opts)
+helpers.assert_eq(stacked[3].expire_at, 100 + stack_opts.safety_timeout_sec,
+	"a no-delay row in a timed stack leaves after the shared safety lifetime (twd1-stacked-safety)")
+helpers.assert_eq(#Dequeue.prune_expired(stacked, 100 + stack_opts.safety_timeout_sec + 0.01), 0,
+	"no row of the stack survives past the safety lifetime (twd1-stacked-safety)")
+local reference = Dequeue.stamp_expiry_times({ { id = "free", duration = 0 } }, 100, {
+	timeout_decrement_sec = stack_opts.timeout_decrement_sec, timeout_floor_sec = stack_opts.timeout_floor_sec })
+helpers.assert_eq(reference[1].expire_at, nil, "without the option the reference behaviour stands")
+
 print("[PASS] test_tooltip_dequeue_expire_zero")

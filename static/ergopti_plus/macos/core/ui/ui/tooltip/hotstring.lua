@@ -59,6 +59,9 @@ local _dequeue_opts = {
 	expire_field   = "expire_at",
 	timeout_decrement_sec = Config.timing.timeout_decrement_sec,
 	timeout_floor_sec     = Config.timing.timeout_floor_sec,
+	-- A row with no delay inside a stack of timed rows leaves after the shared
+	-- safety lifetime, as a lone no-delay preview does (TWD-1).
+	safety_timeout_sec    = Config.timing.safety_timeout_sec,
 }
 
 --- Invalidates work classified against an older tooltip render.
