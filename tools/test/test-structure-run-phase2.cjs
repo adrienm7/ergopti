@@ -112,6 +112,34 @@ function run() {
 		/S: npm run gen failed/
 	);
 	assert.ok(source.indexOf('runGenerators(key') < source.indexOf('settleCodegen(key'));
+	// The first S21 run on Windows stopped at once: git status and git add were
+	// handed 2,700 paths, past the 32,767 characters a Windows command line
+	// holds (spawnSync ENAMETOOLONG), and npm, a .cmd shim there, never started
+	// without a shell. Paths go to Git in batches; npm gets a shell on Windows.
+	const { pathBatches } = require('../audit/structure/apply-step.cjs');
+	const many = Array.from({ length: 2700 }, (_, i) => `static/ergopti_plus/linux/tests/x/${i}.lua`);
+	const batches = pathBatches(many);
+	assert.ok(batches.length > 1, 'a step of thousands of paths is split');
+	assert.deepEqual(batches.flat(), many, 'every path is kept, in order');
+	for (const b of batches) assert.ok(b.join(' ').length < 32767 / 2);
+	assert.deepEqual(pathBatches([]), []);
+	assert.equal(Runner.needsShell('npm', 'win32'), true);
+	assert.equal(Runner.needsShell('npm', 'linux'), false);
+	assert.equal(Runner.needsShell(process.execPath, 'win32'), false);
+	assert.doesNotMatch(
+		source,
+		/git\('add', '--', \.\.\.(?!batch\))/,
+		'the runner stages in batches'
+	);
+	const applySource = require('node:fs').readFileSync(
+		path.join(__dirname, '..', 'audit', 'structure', 'apply-step.cjs'),
+		'utf8'
+	);
+	assert.doesNotMatch(
+		applySource,
+		/git\(\s*'(?:add|status)',[^)]*'--'/,
+		'apply-step lists paths in batches'
+	);
 	// S33 empties windows/adapters: gates that found a driver by its adapters/
 	// folder saw two drivers. A driver is found by its _generated tree.
 	const { driverNames } = require('../lib/driver-roots.cjs');

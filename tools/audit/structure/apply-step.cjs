@@ -47,6 +47,41 @@ function git(...args) {
 	return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 }
 
+// Windows refuses a command line over 32,767 characters, and a step of a
+// thousand moves names far more paths than that: the path lists go to Git in
+// batches that stay well below it.
+const PATH_BATCH_CHARS = 16000;
+
+/**
+ * Splits `paths` into batches whose joined length stays under `limit`.
+ * @param {string[]} paths The repository paths.
+ * @param {number} [limit] The largest batch length in characters.
+ * @returns {string[][]}
+ */
+function pathBatches(paths, limit = PATH_BATCH_CHARS) {
+	const batches = [];
+	let batch = [];
+	let length = 0;
+	for (const p of paths) {
+		if (batch.length > 0 && length + p.length + 1 > limit) {
+			batches.push(batch);
+			batch = [];
+			length = 0;
+		}
+		batch.push(p);
+		length += p.length + 1;
+	}
+	if (batch.length > 0) batches.push(batch);
+	return batches;
+}
+
+/** Runs `git <args> -- <paths>` in batches and joins their outputs. */
+function gitPaths(args, paths) {
+	return pathBatches(paths)
+		.map((batch) => git(...args, '--', ...batch))
+		.join('');
+}
+
 /** True when Git ignores `repoPath`: a build output, never a source. */
 function isIgnored(repoPath) {
 	const run = spawnSync('git', ['check-ignore', '-q', '--no-index', '--', repoPath], { cwd: ROOT });
@@ -706,12 +741,9 @@ function main() {
 		...retiredRepo,
 		...edits.keys()
 	]);
-	const dirty = git(
-		'status',
-		'--porcelain',
-		'-z',
-		'--',
-		...[...touched].filter((f) => fs.existsSync(path.join(ROOT, f)))
+	const dirty = gitPaths(
+		['status', '--porcelain', '-z'],
+		[...touched].filter((f) => fs.existsSync(path.join(ROOT, f)))
 	)
 		.split('\0')
 		.filter(Boolean);
@@ -817,14 +849,15 @@ function main() {
 	if (movesOut) fs.writeFileSync(movesOut, `${JSON.stringify([...movedRepo], null, '\t')}\n`);
 	// A rewritten file this step also moved is staged at its new path: the old
 	// one no longer exists once the move ran.
-	git(
-		'add',
-		'--',
-		...new Set([
-			...[...edits.keys()].map((f) => movedRepo.get(f) || f),
-			...movedRepo.values(),
-			...markers
-		])
+	gitPaths(
+		['add'],
+		[
+			...new Set([
+				...[...edits.keys()].map((f) => movedRepo.get(f) || f),
+				...movedRepo.values(),
+				...markers
+			])
+		]
 	);
 	console.log(
 		'applied and staged; run the step gates of docs/design/structure-plan.md before committing.'
@@ -834,6 +867,7 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
+	pathBatches,
 	platformMarkers,
 	followGuardNeedles,
 	newPathToken,

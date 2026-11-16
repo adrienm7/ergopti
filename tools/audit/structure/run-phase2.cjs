@@ -39,11 +39,20 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync, execFileSync } = require('node:child_process');
 const Repin = require('./repin.cjs');
+const { pathBatches } = require('./apply-step.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const APPLY = path.join('tools', 'audit', 'structure', 'apply-step.cjs');
 const REPIN = path.join('tools', 'audit', 'structure', 'repin.cjs');
 const MAX_SETTLE_ROUNDS = 3;
+
+/**
+ * True when `cmd` needs a shell to start: on Windows npm is a .cmd shim, and
+ * Node refuses to spawn one without a shell (status null, read as a failure).
+ */
+function needsShell(cmd, platform = process.platform) {
+	return platform === 'win32' && cmd === 'npm';
+}
 
 /** Runs a command from the repository root; returns its status and output tail. */
 function run(cmd, args, options = {}) {
@@ -52,7 +61,7 @@ function run(cmd, args, options = {}) {
 		cwd: ROOT,
 		encoding: 'utf8',
 		maxBuffer: 256 * 1024 * 1024,
-		shell: options.shell || false,
+		shell: options.shell || needsShell(cmd),
 		env: { ...process.env, ...(options.env || {}) }
 	});
 	const output = `${result.stdout || ''}${result.stderr || ''}`;
@@ -67,6 +76,11 @@ function run(cmd, args, options = {}) {
 
 function git(...args) {
 	return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+}
+
+/** Stages `paths` in batches a Windows command line can hold. */
+function stagePaths(paths) {
+	for (const batch of pathBatches(paths)) git('add', '--', ...batch);
 }
 
 /** The step keys of today's index, in order. */
@@ -141,7 +155,7 @@ function runGenerators(key, receipt, before, io = {}) {
 function settleCodegen(key, receipt, io = {}) {
 	const codegen = io.codegen || (() => run('npm', ['run', '--silent', 'codegen']));
 	const unstaged = io.unstaged || unstagedPaths;
-	const stage = io.stage || ((paths) => git('add', '--', ...paths));
+	const stage = io.stage || stagePaths;
 	const fail = (message) => Object.assign(new Error(`${key}: ${message}`), { receipt });
 	const first = codegen();
 	receipt.actions.push({ label: 'codegen', ...first });
@@ -271,7 +285,7 @@ function runStep(key, opts) {
 		.filter((l) => l.startsWith('[RISE] '))
 		.map((l) => l.slice('[RISE] '.length));
 	const after = unstagedPaths();
-	if (after.changed.length > 0) git('add', '--', ...after.changed);
+	if (after.changed.length > 0) stagePaths(after.changed);
 	for (const [label, cmd, args] of [
 		['format check', process.execPath, ['tools/lint/format.cjs', '--check']],
 		[
@@ -356,4 +370,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { parseArgs, settleCodegen, runGenerators, failedGenerators };
+module.exports = { needsShell, parseArgs, settleCodegen, runGenerators, failedGenerators };
