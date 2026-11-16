@@ -608,13 +608,19 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- Reads the EFFECTIVE value through resolve() so the number matches what the
 	--- settings window shows and what the engine actually applies, and writes
 	--- through set_override() so both UIs share one store.
+	---
+	--- A category with no hotstring TOML of its own (the AI suggestion's
+	--- llm_prediction) passes its default: without an override, the row shows that
+	--- default rather than the inherited expansion delay, as on Windows.
 	--- @param category string
 	--- @param label_key string
+	--- @param default_sec number|nil The category's own default in seconds.
 	--- @return table
-	local function category_delay_row(category, label_key)
+	local function category_delay_row(category, label_key, default_sec)
 		local title = i18n_safe(label_key)
 		local ok, resolved = pcall(config.resolve, category, nil)
 		local current = ok and type(resolved) == "table" and tonumber(resolved.delay) or nil
+		if current ~= nil and default_sec ~= nil and resolved.has_override ~= true then current = default_sec end
 		if type(current) ~= "number" then
 			Logger.error(LOG, "No resolvable delay for category '%s' — its row shows no value.", tostring(category))
 			return {
@@ -964,6 +970,12 @@ local function _manifest_hotstring_rows(ctx, config)
 				["parameter_delay_default"] = function() return { global_delay_row() } end,
 				["parameter_delay_magic_key"] = function() return { category_delay_row("magickey", captions.magic_key) } end,
 				["parameter_delay_autocorrection"] = function() return { category_delay_row("autocorrection", captions.autocorrection) } end,
+				-- The AI suggestion's lifetime, the row Windows and macOS have too.
+				["parameter_delay_ai_acceptance"] = function()
+					local TooltipConfig = require("core.ui.ui.tooltip.config")
+					return { category_delay_row(TooltipConfig.LLM_DELAY_CATEGORY, captions.ai_acceptance,
+						TooltipConfig.llm_timeout_default()) }
+				end,
 			})
 			if not sub then return {} end
 			return ManifestMenu.template_rows("hotstrings_delays_parent", {},

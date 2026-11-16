@@ -3143,6 +3143,14 @@ local function main()
 				on_expire = function()
 					if prediction_engine then prediction_engine.dismiss() end
 				end,
+				-- The Delays submenu's AI row overrides that lifetime, as on Windows
+				-- and macOS.
+				lifetime_override = function()
+					local resolved = hotstrings_config.resolve(
+						require("core.ui.ui.tooltip.config").LLM_DELAY_CATEGORY, nil)
+					if type(resolved) == "table" and resolved.has_override == true then return resolved.delay end
+					return nil
+				end,
 			}) then llm_overlay = nil end
 			Logger.info(LOG, "Preview tooltip initialised (renderer available: %s).",
 				tostring(require("core.ui.adapters.graphics_renderer").is_available()))

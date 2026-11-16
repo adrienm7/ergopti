@@ -40,6 +40,8 @@ local _companion = nil
 -- { handle, token }, and the owner told when it runs out (the engine's dismiss).
 local _expiry = nil
 local _on_expire = nil
+--- Answers the user's llm_prediction delay in seconds, nil when none is set.
+local _lifetime_override = nil
 
 --- The pieces a candidate's line reads, each with its role.
 ---
@@ -128,7 +130,8 @@ function M.build_rows(candidates, active_index, meta)
 end
 
 --- Initialises the presentation adapter.
---- @param opts table { style, renderer?, anchor_provider?, screen_provider? }
+--- @param opts table { style, renderer?, anchor_provider?, screen_provider?, companion?,
+---   on_expire?, lifetime_override? (answers the user's llm_prediction delay, nil when unset) }
 --- @return boolean
 function M.init(opts)
 	if _retiring or _presenting ~= nil or (_cleanup_pending and not settle_cleanup()) then return false end
@@ -143,6 +146,7 @@ function M.init(opts)
 	_screen_provider = opts.screen_provider
 	_companion = type(opts.companion) == "table" and opts.companion or nil
 	_on_expire = type(opts.on_expire) == "function" and opts.on_expire or nil
+	_lifetime_override = type(opts.lifetime_override) == "function" and opts.lifetime_override or nil
 	if type(_style) ~= "table" or type(_renderer) ~= "table" then
 		Logger.error(LOG, "Suggestion overlay initialisation failed: style or renderer unavailable.")
 		return false
@@ -316,13 +320,41 @@ local function cancel_expiry()
 	if old then pcall(require("core.events.timer_scheduler").cancel, old.handle) end
 end
 
+--- The offer's lifetime in seconds: the user's llm_prediction delay when one is
+--- set, else the shared one; 0 when it never expires.
+--- @return number|nil seconds nil when the user's delay is not a valid duration.
+local function offer_lifetime()
+	local override = nil
+	if _lifetime_override then
+		local read, value = pcall(_lifetime_override)
+		if not read then
+			Logger.warn(LOG, "AI suggestion delay unreadable, the shared lifetime applies: %s", tostring(value))
+		else
+			override = value
+		end
+	end
+	local computed, seconds = pcall(Config.llm_timeout_seconds, override)
+	if not computed then
+		Logger.error(LOG, "AI suggestion lifetime refused: %s", tostring(seconds))
+		return nil
+	end
+	return seconds
+end
+
 --- Arms the offer's lifetime once, at its first shown answer (a loading
 --- placeholder starts nothing), as Windows and macOS do.
 local function arm_expiry()
 	if _expiry or not _on_expire or _meta.loading == true then return end
+	local lifetime = offer_lifetime()
+	if lifetime == nil then
+		Logger.warn(LOG, "AI suggestion lifetime could not be armed; it stays until the next activity.")
+		return
+	end
+	-- A delay of 0 is the user's choice to keep the offer until the next activity.
+	if lifetime == 0 then return end
 	local token = {}
 	local Scheduler = require("core.events.timer_scheduler")
-	local called, handle = pcall(Scheduler.after, Config.llm_timeout_seconds(), function()
+	local called, handle = pcall(Scheduler.after, lifetime, function()
 		if not _expiry or _expiry.token ~= token then return end
 		_expiry = nil
 		local ok, err = pcall(_on_expire)

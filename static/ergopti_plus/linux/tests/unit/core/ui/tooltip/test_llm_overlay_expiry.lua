@@ -23,7 +23,8 @@ local helpers = require("tests.helpers")
 
 --- Runs a body with a recording scheduler and a fresh overlay.
 --- @param body function Receives (overlay, timers, expired).
-local function with_overlay(body)
+--- @param lifetime_override function|nil The user's llm_prediction delay reader.
+local function with_overlay(body, lifetime_override)
 	local saved = package.loaded["core.events.timer_scheduler"]
 	local timers, expired = {}, { count = 0 }
 	local ok, err = pcall(function()
@@ -42,6 +43,7 @@ local function with_overlay(body)
 			anchor_provider = function() return { type = "window", x = 0, y = 0, h = 0 } end,
 			screen_provider = function() return { x = 0, y = 0, w = 100, h = 100 } end,
 			on_expire = function() expired.count = expired.count + 1 end,
+			lifetime_override = lifetime_override,
 		})
 		body(overlay, timers, expired)
 	end)
@@ -77,6 +79,38 @@ helpers.describe("AI overlay: an offer left alone runs out (twl-003-llm-timeout)
 		end)
 	end)
 
+	helpers.it("the user's llm_prediction delay replaces the shared lifetime (tooltips-wpm-llm-delay-row)", function()
+		with_overlay(function(overlay, timers)
+			overlay.show({ { to_type = "a", deletes = 0 } }, {})
+			local Config = require("core.ui.ui.tooltip.config")
+			helpers.assert_eq(#timers, 1)
+			helpers.assert_eq(timers[1].delay, Config.llm_timeout_seconds(45))
+			helpers.assert_true(timers[1].delay > Config.llm_timeout_seconds(), "a longer delay is not the shared one")
+		end, function() return 45 end)
+	end)
+
+	helpers.it("a delay of 0 keeps the offer until the next activity, as on macOS", function()
+		with_overlay(function(overlay, timers, expired)
+			overlay.show({ { to_type = "a", deletes = 0 } }, {})
+			helpers.assert_eq(#timers, 0, "no lifetime is armed")
+			helpers.assert_eq(expired.count, 0)
+		end, function() return 0 end)
+	end)
+
+	helpers.it("no user delay keeps the shared lifetime", function()
+		with_overlay(function(overlay, timers)
+			overlay.show({ { to_type = "a", deletes = 0 } }, {})
+			helpers.assert_eq(timers[1].delay, require("core.ui.ui.tooltip.config").llm_timeout_seconds())
+		end, function() return nil end)
+	end)
+
+	helpers.it("a malformed user delay arms nothing rather than a guessed lifetime", function()
+		with_overlay(function(overlay, timers)
+			overlay.show({ { to_type = "a", deletes = 0 } }, {})
+			helpers.assert_eq(#timers, 0)
+		end, function() return -1 end)
+	end)
+
 	helpers.it("the daemon dismisses the engine's offer when it runs out", function()
 		local fh = assert(io.open("ergopti_hotstrings.lua", "r"))
 		local source = fh:read("*a")
@@ -84,5 +118,7 @@ helpers.describe("AI overlay: an offer left alone runs out (twl-003-llm-timeout)
 		local init = source:match("llm_overlay%.init(%b())")
 		helpers.assert_true(init ~= nil and init:find("on_expire", 1, true) ~= nil
 			and init:find("prediction_engine.dismiss()", 1, true) ~= nil, "on_expire dismisses the offer")
+		helpers.assert_true(init:find("lifetime_override", 1, true) ~= nil
+			and init:find("LLM_DELAY_CATEGORY", 1, true) ~= nil, "the daemon hands the overlay the user's AI delay")
 	end)
 end)

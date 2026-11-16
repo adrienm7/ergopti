@@ -186,11 +186,29 @@ function M.effective_delay(delay)
 	return math.max(floor, delay - decrement)
 end
 
---- An AI suggestion's lifetime: the shared [timing] llm_timeout_sec less the
---- shared decrement, never below the floor, as on Windows and macOS.
+--- The hotstring category whose delay override sets an AI suggestion's
+--- lifetime: the Delays submenu's AI row, the key Windows and macOS read too.
+M.LLM_DELAY_CATEGORY = "llm_prediction"
+
+--- The shared default lifetime of an AI suggestion before the decrement, the
+--- value the Delays submenu's AI row shows while the user has set none.
 --- @return number seconds
-function M.llm_timeout_seconds()
-	local timeout = require_key("timing", "llm_timeout_sec")
+function M.llm_timeout_default()
+	return require_key("timing", "llm_timeout_sec")
+end
+
+--- An AI suggestion's lifetime: the user's llm_prediction delay when one is set,
+--- else the shared [timing] llm_timeout_sec, less the shared decrement and never
+--- below the floor, as on Windows and macOS. A delay of 0 keeps the suggestion
+--- until the next activity, as on macOS.
+--- @param override number|nil The user's llm_prediction delay in seconds.
+--- @return number seconds 0 when the suggestion never expires.
+function M.llm_timeout_seconds(override)
+	if override ~= nil and (type(override) ~= "number" or override ~= override or override < 0) then
+		error("llm_timeout_seconds: the override must be a non-negative number of seconds, got " .. tostring(override), 2)
+	end
+	local timeout = override or M.llm_timeout_default()
+	if timeout == 0 then return 0 end
 	return math.max(require_key("timing", "timeout_floor_sec"),
 		timeout - require_key("timing", "timeout_decrement_sec"))
 end

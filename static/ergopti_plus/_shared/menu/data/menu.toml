@@ -3790,7 +3790,7 @@ unavailable = "hide"
 
 [[menu.hotstrings_delays_frame]]
 type = "---"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 unavailable = "hide"
 
 [[menu.hotstrings_delays_frame]]
@@ -3814,7 +3814,7 @@ unavailable = "hide"
 [[menu.hotstrings_delays_frame]]
 type = "list"
 id = "parameter_delay_ai_acceptance"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 unavailable = "hide"
 
 [[menu.hotstrings_delays_frame]]

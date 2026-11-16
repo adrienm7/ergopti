@@ -32,7 +32,9 @@
 			"separator",
 			"parameter_delay_default",
 			"parameter_delay_magic_key",
-			"parameter_delay_autocorrection"
+			"parameter_delay_autocorrection",
+			"separator",
+			"parameter_delay_ai_acceptance"
 		]
 	},
 	"preview": {

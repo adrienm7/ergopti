@@ -29,5 +29,9 @@ through the real Linux modules; no desktop was rendered.
   recent source. Possibly deliberate (the 2026-11-06 pointer alignment).
 - The user's `llm_prediction` delay override (Windows and macOS Delays row)
   has no Linux row: Linux uses the shared default.
+  Done on 2026-11-16: Linux shows the row after the separator, as Windows,
+  and the overlay reads that override (`lifetime_override`), 0 keeping the
+  offer until the next activity as on macOS; Windows, which hid a 0 lifetime
+  after the 50 ms floor, now keeps it too (`llm-zero-lifetime`).
 - Per-row expiry inside a stacked Linux bubble (Windows and macOS dequeue each
   row at its own delay) is not ported.

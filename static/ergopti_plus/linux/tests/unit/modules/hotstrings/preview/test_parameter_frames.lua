@@ -44,7 +44,7 @@ helpers.describe("complete shared Hotstrings parameter frames", function()
 	helpers.it("preserves Linux delay and preview orders without Mac-only quick actions", function()
 		with_frames(function(rows, i18n)
 			local delays = assert(find(rows, i18n.get("menu.hotstrings.delays_colors"))).menu
-			helpers.assert_eq(#delays, 5)
+			helpers.assert_eq(#delays, 7)
 			helpers.assert_eq(delays[1].title, i18n.get("menu.hotstrings.config_item"))
 			helpers.assert_eq(delays[2].title, "-")
 			for index, key in ipairs({ "tooltip_default", "delay_magic_key", "delay_autocorrection" }) do
@@ -52,6 +52,14 @@ helpers.describe("complete shared Hotstrings parameter frames", function()
 				helpers.assert_eq(delays[index + 2].title:sub(1, #caption), caption)
 				helpers.assert_true(delays[index + 2].title:find("750 ms", 1, true) ~= nil)
 			end
+			-- The AI suggestion's lifetime, after a separator as on Windows
+			-- (tooltips-wpm-llm-delay-row): its own default, never the expansion delay.
+			helpers.assert_eq(delays[6].title, "-")
+			local ai_caption = i18n.get(require("menu.engine.manifest_menu").get_root().hotstrings_delay_captions.ai_acceptance)
+			helpers.assert_eq(delays[7].title:sub(1, #ai_caption), ai_caption)
+			local default_ms = math.floor(require("core.ui.ui.tooltip.config").llm_timeout_default() * 1000 + 0.5)
+			helpers.assert_true(delays[7].title:find(default_ms .. " ms", 1, true) ~= nil, delays[7].title)
+			helpers.assert_true(delays[7].title:find(i18n.get("menu.settings.default_indicator"), 1, true) ~= nil)
 			local preview = assert(find(rows, i18n.get("menu.hotstrings.preview_bubbles"))).menu
 			helpers.assert_eq(#preview, 5); helpers.assert_eq(preview[4].title, "-")
 			for index, key in ipairs({ "tooltip_magic", "tooltip_autocorrect", "tooltip_ai" }) do
@@ -79,7 +87,7 @@ helpers.describe("complete shared Hotstrings parameter frames", function()
 	helpers.it("reads the declared quick caption map in the actual native provider", function()
 		with_frames(function(rows, i18n)
 			local delays = assert(find(rows, i18n.get("menu.hotstrings.delays_colors"))).menu
-			for _, index in ipairs({ 3, 4, 5 }) do
+			for _, index in ipairs({ 3, 4, 5, 7 }) do
 				local caption = i18n.get("button.ok")
 				helpers.assert_eq(delays[index].title:sub(1, #caption), caption)
 			end

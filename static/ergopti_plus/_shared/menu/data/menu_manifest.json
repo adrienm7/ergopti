@@ -4347,7 +4347,8 @@
 		{
 			"type": "---",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"linux"
 			],
 			"unavailable": "hide"
 		},
@@ -4379,7 +4380,8 @@
 			"type": "list",
 			"id": "parameter_delay_ai_acceptance",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"linux"
 			],
 			"unavailable": "hide"
 		},
