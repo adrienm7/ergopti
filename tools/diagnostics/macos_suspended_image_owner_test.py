@@ -25,7 +25,7 @@ def load(name, path):
 
 WORKER = load("qualified_outgoing", Path(__file__).with_name("macos_qualified_outgoing_worker.py"))
 OWNER = load(
-    "suspended_owner", PACKET / "static/ergopti_plus/macos/platform/suspended_image_owner.py"
+    "suspended_owner", PACKET / "static/ergopti_plus/macos/ai/adapters/suspended_image_owner.py"
 )
 
 PEER = r"""
@@ -632,7 +632,7 @@ class DaemonLogProtocolControls(unittest.TestCase):
         )
         subject = load(
             "daily_log_serve",
-            PACKET / "static/ergopti_plus/macos/modules/llm/managed_ollama_serve.py",
+            PACKET / "static/ergopti_plus/macos/ai/engine/ollama/managed_ollama_serve.py",
         )
         retired = []
         caller = SimpleNamespace(

@@ -201,21 +201,21 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 		local engine_calls = 0
 		local engine_guard_calls = 0
 		local tooltip_guard_calls = 0
-		with_stubbed_module("modules.keymap.llm_bridge", {
+		with_stubbed_module("ai.engine.bridge", {
 			["modules.keymap.utils"] = {},
 			["adapters.event_provenance"] = {},
 			["platform.input.synthetic_input"] = {
 				current_action_epoch = function() return 0 end,
 			},
 			["core.text.engine.utils"] = {},
-			["modules.llm"] = { DEFAULT_STATE = {} },
+			["ai.engine"] = { DEFAULT_STATE = {} },
 			["core.logger.engine.logger"] = LOGGER_STUB,
 			["platform.input.keycodes"] = { ESCAPE = 53, RETURN = 36, F16_LLM_CHAIN_SIGNAL = 106 },
 			["modules.keystats"] = {},
 			["core.ui.ui.tooltip"] = {
 				set_runtime_guard = function() tooltip_guard_calls = tooltip_guard_calls + 1 end,
 			},
-			["modules.llm.prediction_engine"] = {
+			["ai.engine.prediction.engine"] = {
 				init = function()
 					engine_calls = engine_calls + 1
 					return false
@@ -257,7 +257,7 @@ helpers.describe("leaf init ownership: exact dependencies only", function()
 	end)
 
 	helpers.it("WarmupController refuses a different dependency set", function()
-		with_stubbed_module("modules.llm.warmup_controller", {
+		with_stubbed_module("ai.engine.local_servers.warmup_controller", {
 			["core.logger.engine.logger"] = LOGGER_STUB,
 			["core.timing.engine.timings"] = { sec = function() return 0.1 end },
 			["core.events.timer_scheduler"] = {},
@@ -281,8 +281,8 @@ helpers.describe("leaf init ownership: exact dependencies only", function()
 	end)
 
 	helpers.it("StreamingHandler refuses a different dependency set", function()
-		with_stubbed_module("modules.llm.streaming_handler", {
-			["modules.llm.parser"] = {},
+		with_stubbed_module("ai.engine.api.streaming_handler", {
+			["ai.engine.api.parser"] = {},
 			["core.logger.engine.logger"] = LOGGER_STUB,
 			["core.timing.engine.timings"] = { sec = function() return 0.1 end },
 			["core.i18n.engine.i18n"] = {},
@@ -317,12 +317,12 @@ end)
 --- @param callback function
 local function with_prediction_results(warmup_result, streaming_result, callback)
 	local calls = { warmup = 0, streaming = 0 }
-	with_stubbed_module("modules.llm.prediction_engine", {
-		["modules.llm"] = {
+	with_stubbed_module("ai.engine.prediction.engine", {
+		["ai.engine"] = {
 			DEFAULT_STATE = {},
 			get_current_model = function() return "test-model" end,
 		},
-		["modules.llm.warmup_controller"] = {
+		["ai.engine.local_servers.warmup_controller"] = {
 			init = function(deps)
 				calls.warmup = calls.warmup + 1
 				if type(warmup_result) == "function" then
@@ -331,8 +331,8 @@ local function with_prediction_results(warmup_result, streaming_result, callback
 				return warmup_result
 			end,
 		},
-		["modules.llm.prompt_builder"] = {},
-		["modules.llm.streaming_handler"] = {
+		["ai.engine.prediction.prompt_builder"] = {},
+		["ai.engine.api.streaming_handler"] = {
 			init = function(deps)
 				calls.streaming = calls.streaming + 1
 				if type(streaming_result) == "function" then
@@ -341,8 +341,8 @@ local function with_prediction_results(warmup_result, streaming_result, callback
 				return streaming_result
 			end,
 		},
-		["modules.llm.app_filter"] = {},
-		["modules.llm.api_common"] = {},
+		["ai.engine.prediction.app_filter"] = {},
+		["ai.engine.api.common"] = {},
 		["core.logger.engine.logger"] = LOGGER_STUB,
 		["core.timing.engine.timings"] = { sec = function() return 0.1 end },
 		["core.events.timer_scheduler"] = PortFakes.timer_scheduler(),

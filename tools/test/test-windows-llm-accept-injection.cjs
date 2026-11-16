@@ -132,7 +132,7 @@ check(
 );
 
 // 3. The accepted text itself reaches TextSend.
-const bridge = stripComments(read('modules/keymap/llm_bridge.ahk'));
+const bridge = stripComments(read('ai/engine/bridge.ahk'));
 const dispatch = bodyOf(bridge, '_LLM_Accept_ClaimAndDispatch');
 check(
 	/LLM_Bridge_OnAccept\(\s*Presented\.Text,/.test(dispatch),
@@ -151,9 +151,9 @@ check(
 );
 
 // 4. The behavioural regression runs in the AHK suite.
-const testFile = 'tests/unit/modules/llm/navigation/test_llm_accept_injects_exact_text.ahk';
+const testFile = 'tests/unit/ai/navigation/test_accept_injects_exact_text.ahk';
 check(
-	/^#Include unit\/modules\/llm\/navigation\/test_llm_accept_injects_exact_text\.ahk\s*$/m.test(
+	/^#Include unit\/ai\/navigation\/test_accept_injects_exact_text\.ahk\s*$/m.test(
 		read('tests/run_all.ahk')
 	),
 	`tests/run_all.ahk must include ${testFile}`

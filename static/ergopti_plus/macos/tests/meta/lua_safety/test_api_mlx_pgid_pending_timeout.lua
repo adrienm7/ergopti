@@ -17,17 +17,17 @@ local function read_source(selector)
 	return src
 end
 
-helpers.describe("modules/llm/api_mlx.lua: PGID-pending safety timeout (audit-v5)", function()
+helpers.describe("ai/engine/api/mlx.lua: PGID-pending safety timeout (audit-v5)", function()
 
 	helpers.it("declares _pgid_pending_timeout variable", function()
-		local src = read_source("local function read_user_port_override") -- modules/llm/api_mlx.lua
+		local src = read_source("local function read_user_port_override") -- ai/engine/api/mlx.lua
 		helpers.assert_true(
 			src:find("_pgid_pending_timeout", 1, true) ~= nil,
 			"api_mlx.lua must declare _pgid_pending_timeout for the safety-timeout handle")
 	end)
 
 	helpers.it("reset_endpoints arms the canonical 15-second PGID timeout", function()
-		local src = read_source("local function read_user_port_override") -- modules/llm/api_mlx.lua
+		local src = read_source("local function read_user_port_override") -- ai/engine/api/mlx.lua
 		helpers.assert_true(
 			src:find("local PGID_PENDING_TIMEOUT_SEC%s*=%s*15%.0", 1, false) ~= nil,
 			"api_mlx.lua must keep the canonical PGID-pending timeout at 15 seconds")
@@ -44,7 +44,7 @@ helpers.describe("modules/llm/api_mlx.lua: PGID-pending safety timeout (audit-v5
 	end)
 
 	helpers.it("timeout callback clears _server_pgid_pending", function()
-		local src = read_source("local function read_user_port_override") -- modules/llm/api_mlx.lua
+		local src = read_source("local function read_user_port_override") -- ai/engine/api/mlx.lua
 		local idx = src:find("function M%.reset_endpoints%(", 1, false)
 		local rest = src:sub(idx)
 		local _, stop = rest:find("\nend\n")

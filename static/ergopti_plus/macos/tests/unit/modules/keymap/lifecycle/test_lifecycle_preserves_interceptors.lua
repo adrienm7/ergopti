@@ -48,7 +48,7 @@ local function load_keymap_capturing_taps()
 	-- raise here for a reason unrelated to what this test asserts.
 	for name in pairs(package.loaded) do
 		if type(name) == "string"
-			and (helpers.in_module_family(name, "modules.keymap") or helpers.in_module_family(name, "modules.llm")) then
+			and (helpers.in_module_family(name, "modules.keymap") or helpers.in_module_family(name, "ai.engine")) then
 			package.loaded[name] = nil
 		end
 	end
@@ -166,7 +166,7 @@ helpers.describe("keymap lifecycle: a stop/start cycle preserves runtime hooks",
 		-- Drive the preview path. Autocorrect preview must be on, otherwise
 		-- update_preview early-returns before reaching the provider loop.
 		KM.set_preview_autocorrect_enabled(true)
-		local LLMBridge = require("modules.keymap.llm_bridge")
+		local LLMBridge = require("ai.engine.bridge")
 		LLMBridge.update_preview("abc")
 		helpers.assert_true(provider_calls > 0,
 			"the preview provider registered at boot must still run after a stop/start cycle — "

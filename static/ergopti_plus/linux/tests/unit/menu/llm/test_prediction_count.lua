@@ -38,7 +38,7 @@ end
 --- @param rows table AI submenu rows.
 --- @return table row, number index
 local function count_row(rows)
-	local current = require("modules.llm.profile_settings").get("num_predictions")
+	local current = require("ai.engine.settings.profile_settings").get("num_predictions")
 	local label = string.format(require("core.i18n.engine.i18n").get("menu.llm.num_predictions_label"), current)
 	for index, row in ipairs(rows) do
 		if row.title == label then return row, index end
@@ -156,7 +156,7 @@ local function with_numeric_menu(options, exercise)
 		local rendered = mb.build(ctx)
 		exercise({ rows = rendered, declaration = declaration, renderer = renderer, strings = strings,
 			log = log, path = path, initial = initial, webview = webview,
-			writer = writer, settings = require("modules.llm.settings"), trigger = require("modules.llm.trigger_settings"),
+			writer = writer, settings = require("ai.engine.settings.settings"), trigger = require("ai.engine.settings.trigger_settings"),
 			set_paused = function(value) paused = value; ctx.paused = value end,
 			rebuild = function() return mb.build(ctx) end })
 	end, debug.traceback)
@@ -313,7 +313,7 @@ helpers.describe("tray (linux): declared free numeric tails", function()
 				helpers.assert_eq(f.log.changed, 0)
 				helpers.assert_type(f.writer.write_refusal(f.path), "string")
 				package.loaded["core.text.engine.toml_codec.writer"] = nil
-				package.loaded["infra.llm_preferences"] = nil
+				package.loaded["ai.engine.preferences"] = nil
 				helpers.assert_eq(spec.on_save(context.candidate), false,
 					"replacement preference owners cannot adopt the retained request")
 				helpers.assert_eq(NumericSandbox.read_bytes(f.path), f.initial)

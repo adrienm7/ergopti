@@ -272,7 +272,7 @@ function receiveWindowsFilePort() {
 	].join(';');
 	const helper = path.join(
 		repository,
-		'static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1'
+		'static/ergopti_plus/windows/ai/engine/ollama/ollama_managed_files.ps1'
 	);
 	let models = 0;
 	for (const [script, count] of [
@@ -360,10 +360,13 @@ function receiveWindowsRuntimeHandoff() {
 			'-File',
 			path.join(
 				repository,
-				'static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_ollama_runtime_launch.ps1'
+				'static/ergopti_plus/windows/tests/unit/ai/servers/test_ollama_runtime_launch.ps1'
 			),
 			'-Source',
-			path.join(repository, 'static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1'),
+			path.join(
+				repository,
+				'static/ergopti_plus/windows/ai/engine/ollama/ollama-runtime-launch.ps1'
+			),
 			'-PrivateRoot',
 			owned
 		],
@@ -405,7 +408,7 @@ function receiveWindowsModelEnvironment() {
 				'-NoProfile',
 				'-NonInteractive',
 				'-File',
-				path.join(repository, 'static/ergopti_plus/windows/tests/unit/modules/llm/servers', script)
+				path.join(repository, 'static/ergopti_plus/windows/tests/unit/ai/servers', script)
 			],
 			{ cwd: owned, env, encoding: 'utf8', timeout: 60000, windowsHide: true }
 		);

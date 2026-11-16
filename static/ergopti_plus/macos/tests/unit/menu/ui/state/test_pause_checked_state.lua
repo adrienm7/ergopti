@@ -60,7 +60,7 @@ local MENU_MODULES = {
 	"ui.menu.menu_hotstrings",
 	"ui.menu.menu_shortcuts",
 	"menu.ui.builder.builder",
-	"ui.menu.menu_llm.init",
+	"ai.ui.menu.init",
 }
 
 helpers.describe("pause: checked state must not depend on pause", function()

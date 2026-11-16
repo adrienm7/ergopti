@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Runs the REAL run_with_proxy_sign_in_relay of network-retry.sh under bash
  * with a scripted relay beside a modelled launcher, the way the stock daemon
- * start uses it (modules/llm/ollama_server_command.lua). Pins that a proxy
+ * start uses it (ai/engine/ollama/server_command.lua). Pins that a proxy
  * that demands NTLM or Negotiate starts the daemon under `relay run`, that
  * every other answer starts it directly, and that the shell reads the probe
  * line exactly as the Lua policy does: the same shared vectors
@@ -31,8 +31,8 @@ const SCRIPT = path.join(
 	'static',
 	'ergopti_plus',
 	'macos',
-	'modules',
-	'llm',
+	'ai',
+	'engine',
 	'network-retry.sh'
 );
 const VECTORS = JSON.parse(
@@ -42,7 +42,16 @@ const VECTORS = JSON.parse(
 	)
 ).vectors;
 const COMMAND = fs.readFileSync(
-	path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'modules', 'llm', 'ollama_server_command.lua'),
+	path.join(
+		ROOT,
+		'static',
+		'ergopti_plus',
+		'macos',
+		'ai',
+		'engine',
+		'ollama',
+		'server_command.lua'
+	),
 	'utf8'
 );
 const PROXY = 'http://proxy.corp.example:3128';

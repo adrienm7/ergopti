@@ -35,7 +35,7 @@ helpers.describe("MLX orphan kill resolves its port", function()
 		assert(init_src:find("terminate_orphan_mlx_server", 1, true),
 			"init.lua: shutdownCallback must delegate to the shared terminate_orphan_mlx_server")
 
-		local menu_src = read_source("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
+		local menu_src = read_source("local function format_shortcut_title") -- ai/ui/menu/init.lua
 		assert(menu_src, "menu_llm/init.lua must be readable")
 		assert(not menu_src:find("tiTCP:49317", 1, true),
 			"menu_llm: terminate_orphan_mlx_server must not hard-code port 49317")

@@ -243,10 +243,10 @@ local PREVIEW_OWNERSHIP = {
 	"modules.keymap.terminators",
 	"modules.keymap.expander",
 	"modules.keymap.terminator_replay",
-	"modules.keymap.llm_bridge",
-	"modules.llm.prediction_engine",
-	"modules.llm.warmup_controller",
-	"modules.llm.streaming_handler",
+	"ai.engine.bridge",
+	"ai.engine.prediction.engine",
+	"ai.engine.local_servers.warmup_controller",
+	"ai.engine.api.streaming_handler",
 	"core.events.timer_scheduler",
 }
 
@@ -260,7 +260,7 @@ local function capture_rows(register, buf)
 		-- Dropped so it is re-required under the fresh stub the bridge load installs;
 		-- see trap 2 above. Registry and Expander are stateful singletons too: leaving
 		-- either cached makes the resolver answer for a previous test's CoreState.
-		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+		local Bridge = helpers.load_with_stubs("ai.engine.bridge")
 
 		-- The registry instance the BRIDGE resolved, not a separately loaded one: the
 		-- bridge captured its Registry upvalue at require time, and a second instance
@@ -284,7 +284,7 @@ local function capture_rows(register, buf)
 		register(Registry)
 		Registry.sort_mappings()
 
-		require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
+		require("ai.engine.api.context").seed(state, state.buffer or "", "")
 
 		helpers.assert_eq(Bridge.init(state,
 			{ preview_star_enabled = true, preview_autocorrect_enabled = true }), true)

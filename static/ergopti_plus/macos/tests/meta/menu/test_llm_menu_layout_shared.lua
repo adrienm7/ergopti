@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The IA submenu's disabled-when-off POLICY (and row order) is a single shared
 --- source of truth — the menu manifest's ``llm_menu`` key — consumed by BOTH the
---- macOS renderer (ui/menu/menu_llm/init.lua via ui.menu.menu_llm.menu_layout) and
+--- macOS renderer (ai/ui/menu/init.lua via ui.menu.menu_llm.menu_layout) and
 --- the Windows renderer (windows .../menu_main.ahk). This test pins the macOS half
 --- of that contract so the two menus can never drift again (a greying mismatch —
 --- backend/model wrongly greyed while the feature is off — was the motivating bug):
@@ -118,7 +118,7 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 	end)
 
 	helpers.it("the live MenuLayout policy matches the canonical policy", function()
-		local MenuLayout = helpers.load_with_stubs("ui.menu.menu_llm.menu_layout")
+		local MenuLayout = helpers.load_with_stubs("ai.ui.menu.layout")
 		for _, c in ipairs(CANON) do
 			helpers.assert_true(MenuLayout.greys_when_off(c.id) == c.greys_off,
 				"MenuLayout.greys_when_off('" .. c.id .. "') must be " .. tostring(c.greys_off))
@@ -145,13 +145,13 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 		helpers.assert_eq(llm_top.health_dot.ready, "🟢")
 		helpers.assert_eq(llm_top.health_dot.warming, "🟡")
 		helpers.assert_eq(llm_top.health_dot.unreachable, "🔴")
-		local MenuLayout = helpers.load_with_stubs("ui.menu.menu_llm.menu_layout")
+		local MenuLayout = helpers.load_with_stubs("ai.ui.menu.layout")
 		for status, glyph in pairs(llm_top.health_dot) do
 			helpers.assert_eq(MenuLayout.title_health_dot(status), glyph,
 				"title_health_dot('" .. status .. "') must read the manifest glyph")
 		end
 		helpers.assert_eq(MenuLayout.title_health_dot("unknown"), nil)
-		local src = read_source("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
+		local src = read_source("local function format_shortcut_title") -- ai/ui/menu/init.lua
 		helpers.assert_true(src:find("MenuLayout%.title_health_dot%(health_status%)") ~= nil,
 			"init.lua must take the title glyph from the manifest, not a literal")
 		helpers.assert_true(src:find('"🟢 "', 1, true) == nil and src:find('"🔴 "', 1, true) == nil,
@@ -159,7 +159,7 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 	end)
 
 	helpers.it("the menu_layout.lua fallback mirrors the canonical policy", function()
-		local src = read_source("local function load_policy") -- ui/menu/menu_llm/menu_layout.lua
+		local src = read_source("local function load_policy") -- ai/ui/menu/layout.lua
 		local block = src:match("FALLBACK_GREYS_WHEN_OFF%s*=%s*{(.-)}")
 		helpers.assert_true(block ~= nil, "menu_layout.lua must define FALLBACK_GREYS_WHEN_OFF")
 		for _, c in ipairs(CANON) do
@@ -171,7 +171,7 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 	end)
 
 	helpers.it("init.lua resolves every settings row's greying via the shared spec", function()
-		local src = read_source("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
+		local src = read_source("local function format_shortcut_title") -- ai/ui/menu/init.lua
 		for _, c in ipairs(CANON) do
 			helpers.assert_true(src:find('MenuLayout%.row_disabled%("' .. c.id .. '"', 1, false) ~= nil,
 				"init.lua must resolve the '" .. c.id .. "' row greying via MenuLayout.row_disabled (shared spec) — not a hardcoded is_disabled/paused")
@@ -179,7 +179,7 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 	end)
 
 	helpers.it("the manifest PLACES the rows — init.lua no longer orders them itself", function()
-		local src = read_source("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
+		local src = read_source("local function format_shortcut_title") -- ai/ui/menu/init.lua
 		helpers.assert_true(src:find('ManifestMenu%.build%("llm_menu"') ~= nil,
 			"init.lua must build this menu through the shared renderer")
 		-- The settings rows that are not groups are declared `list` rows: init.lua

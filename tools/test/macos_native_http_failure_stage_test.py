@@ -66,7 +66,7 @@ class NativeFailureStages(unittest.TestCase):
     def setUp(self):
         self.engine = load("failure_stage_engine", MACOS / "core/network/adapters/native_http.py")
         self.reporter = load(
-            "failure_stage_reporter", MACOS / "modules/llm/managed_bootstrap_http.py"
+            "failure_stage_reporter", MACOS / "ai/engine/managed_bootstrap_http.py"
         )
         self.children = []
         self.directory = tempfile.TemporaryDirectory(prefix="native-failure-stage-")
@@ -321,7 +321,7 @@ class NativeRouteFallback(unittest.TestCase):
     def setUp(self):
         self.engine = load("route_fallback_engine", MACOS / "core/network/adapters/native_http.py")
         self.reporter = load(
-            "route_fallback_reporter", MACOS / "modules/llm/managed_bootstrap_http.py"
+            "route_fallback_reporter", MACOS / "ai/engine/managed_bootstrap_http.py"
         )
         self.directory = tempfile.TemporaryDirectory(prefix="native-route-fallback-")
         self.addCleanup(self.directory.cleanup)
@@ -441,7 +441,9 @@ class NetworkCheckHelper(unittest.TestCase):
     """The Debug menu's network check prints closed step lines, never an address."""
 
     def setUp(self):
-        self.helper = load("network_check_helper", MACOS / "modules/llm/managed_network_check.py")
+        self.helper = load(
+            "network_check_helper", MACOS / "ai/engine/bootstrap/managed_network_check.py"
+        )
 
     def lines(self, function, *arguments):
         captured = io.StringIO()
@@ -504,7 +506,9 @@ class NetworkCheckDigest(unittest.TestCase):
     """Issue #101 follow-up (6): the check proves the pinned input's SHA-256, not only a HEAD."""
 
     def setUp(self):
-        self.helper = load("network_check_digest", MACOS / "modules/llm/managed_network_check.py")
+        self.helper = load(
+            "network_check_digest", MACOS / "ai/engine/bootstrap/managed_network_check.py"
+        )
         self.release = json.loads(
             (ROOT / "static/ergopti_plus/_shared/ai/data/managed_python_release.json").read_text()
         )["source"]
@@ -595,7 +599,9 @@ class HostReachability(unittest.TestCase):
     """The field run's --hosts mode: one HEAD per declared host, named by its key."""
 
     def setUp(self):
-        self.helper = load("network_check_hosts", MACOS / "modules/llm/managed_network_check.py")
+        self.helper = load(
+            "network_check_hosts", MACOS / "ai/engine/bootstrap/managed_network_check.py"
+        )
 
     def run_hosts(self, outcomes):
         """Runs main_hosts over a stand-in transport; outcomes maps a URL to a status or a reason."""
@@ -675,7 +681,9 @@ class OllamaBlobHost(unittest.TestCase):
     """The field run's --ollama-blob mode: is the registry's blob host planned?"""
 
     def setUp(self):
-        self.helper = load("network_check_blob", MACOS / "modules/llm/managed_network_check.py")
+        self.helper = load(
+            "network_check_blob", MACOS / "ai/engine/bootstrap/managed_network_check.py"
+        )
         self.registry, self.planned = self.helper.ollama_planned_hosts()
         self.ranges = []
 

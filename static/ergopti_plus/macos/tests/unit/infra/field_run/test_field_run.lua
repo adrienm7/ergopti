@@ -1202,7 +1202,7 @@ helpers.describe("field run ports: the MLX model step", function()
 	local function run_mlx_model(initial, write_ok)
 		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "settings.engine.paths",
 			"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.fs.engine.paths", "infra.field_run",
-			"modules.llm.backend_detector", "modules.llm.mlx_deps_checker", "modules.llm", "ui.menu.menu_llm" }
+			"ai.engine.api.backend_detector", "ai.engine.local_servers.mlx_deps_checker", "ai.engine", "ai.ui.menu" }
 		local outcome = {}
 		helpers.with_stub_scope(stubbed, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
@@ -1231,9 +1231,9 @@ helpers.describe("field run ports: the MLX model step", function()
 			package.loaded["infra.field_run"] = {
 				smallest_model = function() return { name = "LFM2.5-350M", download_gb = 0.38 } end,
 			}
-			package.loaded["modules.llm.backend_detector"] = { mlx_support = function() return true end }
-			package.loaded["modules.llm.mlx_deps_checker"] = { runtime_installed = function() return true end }
-			package.loaded["modules.llm"] = {
+			package.loaded["ai.engine.api.backend_detector"] = { mlx_support = function() return true end }
+			package.loaded["ai.engine.local_servers.mlx_deps_checker"] = { runtime_installed = function() return true end }
+			package.loaded["ai.engine"] = {
 				get_backend = function() return "ollama" end,
 				get_runtime_llm_enabled = function() return false end,
 			}
@@ -1246,7 +1246,7 @@ helpers.describe("field run ports: the MLX model step", function()
 				end,
 				delete_mlx_model = function() error("the step must keep the downloaded model", 0) end,
 			}
-			package.loaded["ui.menu.menu_llm"] = {
+			package.loaded["ai.ui.menu"] = {
 				active_models_manager = function() return manager end,
 				stop_mlx_server = function(callback) callback(true) end,
 			}
@@ -1285,8 +1285,8 @@ end)
 helpers.describe("field run ports: Ollama model step", function()
 	helpers.it("waits for the runtime metadata an install just changed instead of skipping", function()
 		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "core.process.adapters.shell_runner",
-			"core.events.timer_scheduler", "core.fs.engine.paths", "infra.field_run", "modules.llm.ollama_binary",
-			"modules.llm.api_ollama", "modules.llm.ollama_deps_checker", "ui.menu.menu_llm" }
+			"core.events.timer_scheduler", "core.fs.engine.paths", "infra.field_run", "ai.engine.ollama.binary",
+			"ai.engine.api.ollama", "ai.engine.ollama.deps_checker", "ai.ui.menu" }
 		helpers.with_stub_scope(stubbed, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.fs.adapters.file_system"] = { read = function() return "{}" end }
@@ -1303,7 +1303,7 @@ helpers.describe("field run ports: Ollama model step", function()
 			-- The 19:17 Mac run: the install had just rewritten the runtime files,
 			-- so the hint was pending twice before it named the executable.
 			local looks = 0
-			package.loaded["modules.llm.ollama_binary"] = {
+			package.loaded["ai.engine.ollama.binary"] = {
 				native_candidate = function()
 					looks = looks + 1
 					if looks <= 2 then return nil, nil, "pending" end
@@ -1315,17 +1315,17 @@ helpers.describe("field run ports: Ollama model step", function()
 				end,
 			}
 			-- What the step read before: the pending hint answers "absent".
-			package.loaded["modules.llm.ollama_deps_checker"] = {
-				runtime_available = function() return package.loaded["modules.llm.ollama_binary"].resolve() ~= nil end,
+			package.loaded["ai.engine.ollama.deps_checker"] = {
+				runtime_available = function() return package.loaded["ai.engine.ollama.binary"].resolve() ~= nil end,
 			}
-			package.loaded["modules.llm.api_ollama"] = {
+			package.loaded["ai.engine.api.ollama"] = {
 				forget_local_models = function() end,
 				verify_local_model = function(_, callback) callback(true) end,
 				ensure_running = function() end,
 			}
 			local pulled = false
 			local manager = { pull_ollama_model = function(_, on_success) pulled = true; on_success(); return true end }
-			package.loaded["ui.menu.menu_llm"] = { active_models_manager = function() return manager end }
+			package.loaded["ai.ui.menu"] = { active_models_manager = function() return manager end }
 			package.loaded["adapters.field_run_ports"] = nil
 			local ports = require("adapters.field_run_ports").new("/repo")
 			local verdict, codes

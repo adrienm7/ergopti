@@ -118,11 +118,11 @@ _CRSB_CurlAdapterRejectsOversizeHeaders() {
 _CRSB_EveryCurlTransportDeclaresTheCap() {
 	Http := FileRead(A_ScriptDir . "\..\core\network\adapters\http_client.ahk", "UTF-8")
 	Shell := FileRead(A_ScriptDir . "\..\core\process\adapters\shell_runner.ahk", "UTF-8")
-	Remote := FileRead(A_ScriptDir . "\..\modules\llm\api_remote.ahk", "UTF-8")
+	Remote := FileRead(A_ScriptDir . "\..\ai\engine\api\remote.ahk", "UTF-8")
 	OllamaHttp := FileRead(A_ScriptDir
-		. "\..\modules\llm\api_ollama\ollama_http.ahk", "UTF-8")
+		. "\..\ai\engine\api_ollama\ollama_http.ahk", "UTF-8")
 	OllamaStreaming := FileRead(A_ScriptDir
-		. "\..\modules\llm\api_ollama\ollama_streaming.ahk", "UTF-8")
+		. "\..\ai\engine\api_ollama\ollama_streaming.ahk", "UTF-8")
 	Transport := FileRead(A_ScriptDir . "\..\vendor\ergopti_winhttp_transport.ps1", "UTF-8")
 	Assert(RegExMatch(Http, '"max_response_bytes":.\s*\.\s*HTTP_CURL_MAX_RESPONSE_BYTES') > 0,
 		"CurlAsyncRequest must hand the shared response byte ceiling to the managed worker")

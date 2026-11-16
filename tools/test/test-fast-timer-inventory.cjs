@@ -65,7 +65,7 @@ const INVENTORY = {
 		'Armed only during a bounded local collection or retained worker retirement. ' +
 		'100 ms observes atomic progress and explicit guided Ctrl/Shift transitions; ' +
 		'no ambient input is retained, and acknowledged task completion disarms the timer.',
-	'modules/llm/ollama_managed_bootstrap.ahk:this':
+	'ai/engine/ollama/managed_bootstrap.ahk:this':
 		'Armed only while a managed Ollama session owns installation, startup, model work or ' +
 		'READY service custody. 150 ms bounds cancellation, stale configuration and pause ' +
 		'observation; READY retains the ownership watch after the progress window closes. ' +
@@ -75,7 +75,7 @@ const INVENTORY = {
 		'25 ms bounds cooperative cancellation and stale source/focus/input publication; ' +
 		'the final acknowledged cleanup disarms it. ShellRunner owns process completion, ' +
 		'but exposes no progress subscription for these source and lifecycle receipts.',
-	'adapters/llm_nav_event_owner.ahk:_LLM_NavEventOwnerServiceFn':
+	'ai/adapters/nav_event_owner.ahk:_LLM_NavEventOwnerServiceFn':
 		'Drains receipts from the native navigation owner when its wake message is delayed or ' +
 		'lost, and observes fail-open native delivery faults. 100 ms bounds how long a ' +
 		'physically suppressed key or suspended native owner can wait for exact recovery; the ' +
@@ -96,7 +96,7 @@ const INVENTORY = {
 		'Armed only while keep-awake is active, to cancel it the instant the user moves the ' +
 		'mouse. 150 ms because a cancel the user has to wait for reads as the feature ignoring ' +
 		'them. Disarmed with the feature.',
-	'ui/menu/menu_llm/menu_api_entries.ahk:_LLM_Menu_ApiTestProgressTick':
+	'ai/ui/menu/api_entries.ahk:_LLM_Menu_ApiTestProgressTick':
 		'Armed only while an API test probe shows its progress window, and stopped by ' +
 		'_LLM_Menu_ApiTestProgressHide when the probe answers, times out or is cancelled. ' +
 		'150 ms keeps the elapsed-time label and bar moving smoothly; a slower pulse makes ' +

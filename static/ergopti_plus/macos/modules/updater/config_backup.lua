@@ -170,7 +170,7 @@ local function read_defaults()
 	return decoded
 end
 
--- The hs.settings key of the remote API entries (modules/llm/init.lua
+-- The hs.settings key of the remote API entries (ai/engine/init.lua
 -- API_STATE_KEY; test_config_backup_api_entries pins the two together).
 M.API_STATE_KEY = "llm_api_state_v1"
 

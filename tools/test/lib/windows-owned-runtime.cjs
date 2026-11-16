@@ -37,7 +37,7 @@ const ROOT = path.resolve(__dirname, '..', '..', '..');
 const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const VENDOR = path.join(WINDOWS, 'vendor');
-const LLM = path.join(WINDOWS, 'modules', 'llm');
+const LLM = path.join(WINDOWS, 'ai', 'engine');
 const HOST_SCRIPT = path.join(__dirname, 'windows-job-host.ps1');
 const POWERSHELL = path.join(
 	process.env.SystemRoot || 'C:\\Windows',
@@ -194,7 +194,7 @@ function createProfile({ stubExecutable, releaseDirectory }) {
 				}
 			})
 		);
-		const helper = path.join(LLM, 'ollama_managed_files.ps1');
+		const helper = path.join(LLM, 'ollama/ollama_managed_files.ps1');
 		const ticket = crypto.randomBytes(16).toString('hex');
 		const prepared = lastJsonLine(
 			runPowerShellFile(helper, [
@@ -327,7 +327,7 @@ function launcherArguments(profile, { port, runtimeTicket, relayPath, relaySha25
 	const shared = path.join(SHARED, '.');
 	const pinned = (name, file) => [`-${name}Path`, file, `-${name}Sha256`, sha256File(file)];
 	const row = [
-		...pinned('ManagedHelper', path.join(LLM, 'ollama_managed_files.ps1')),
+		...pinned('ManagedHelper', path.join(LLM, 'ollama/ollama_managed_files.ps1')),
 		'-ManagedRoot',
 		profile.managedRoot,
 		'-RootIdentity',
@@ -392,7 +392,7 @@ function powerShellCommandLine(script, argumentsList) {
 async function launch(profile, options) {
 	const port = options.port ?? (await freePort());
 	const runtimeTicket = crypto.randomBytes(16).toString('hex');
-	const script = options.launcher ?? path.join(LLM, 'ollama-runtime-launch.ps1');
+	const script = options.launcher ?? path.join(LLM, 'ollama/ollama-runtime-launch.ps1');
 	const hosted = startHosted(
 		profile,
 		powerShellCommandLine(script, launcherArguments(profile, { ...options, port, runtimeTicket })),
@@ -440,9 +440,9 @@ async function pull(profile, run, ready, model, { netOnly = null, environment = 
 	const pinned = (name, file) => [`-${name}Path`, file, `-${name}Sha256`, sha256File(file)];
 	const hosted = startHosted(
 		profile,
-		powerShellCommandLine(path.join(LLM, 'ollama-model-pull.ps1'), [
-			...pinned('ManagedHelper', path.join(LLM, 'ollama_managed_files.ps1')),
-			...pinned('RuntimeLauncher', path.join(LLM, 'ollama-runtime-launch.ps1')),
+		powerShellCommandLine(path.join(LLM, 'ollama/ollama-model-pull.ps1'), [
+			...pinned('ManagedHelper', path.join(LLM, 'ollama/ollama_managed_files.ps1')),
+			...pinned('RuntimeLauncher', path.join(LLM, 'ollama/ollama-runtime-launch.ps1')),
 			...pinned(
 				'ServeEnvironment',
 				path.join(shared, 'ai', 'data', 'managed_ollama_environment.json')

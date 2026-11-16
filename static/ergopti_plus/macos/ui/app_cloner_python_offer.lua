@@ -6,7 +6,7 @@
 --- Opens App Cloner with the managed Python and its pinned PyObjC: when they
 --- are installed the launch carries the interpreter's versionless link, and
 --- when they are not the user is asked once per click to install them first
---- (modules/llm/managed_pyobjc.lua). Declining, or a failed install, still
+--- (ai/engine/bootstrap/managed_pyobjc.lua). Declining, or a failed install, still
 --- opens App Cloner, which says itself what it lacks.
 ---
 --- FEATURES & RATIONALE:

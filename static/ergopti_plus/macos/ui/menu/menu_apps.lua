@@ -413,7 +413,7 @@ function M.build(ctx)
 				-- App Cloner's helpers run on Ergopti's managed Python and its
 				-- pinned PyObjC, installed on the user's first agreement.
 				if app_name == APP_CLONER then
-					return require("ui.app_cloner_python_offer").open(require("modules.llm.managed_pyobjc").default(), launch)
+					return require("ui.app_cloner_python_offer").open(require("ai.engine.bootstrap.managed_pyobjc").default(), launch)
 				end
 				return launch({})
 			end,

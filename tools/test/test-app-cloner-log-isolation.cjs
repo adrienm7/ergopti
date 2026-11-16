@@ -338,9 +338,9 @@ try:
         staged_launcher.parent.mkdir(parents=True)
         shutil.copyfile(launcher_path, staged_launcher)
         # The installed payload ships the managed PyObjC manifest the launcher checks.
-        staged_manifest = installed / "macos/modules/llm/managed-pyobjc.json"
+        staged_manifest = installed / "macos/ai/engine/managed-pyobjc.json"
         staged_manifest.parent.mkdir(parents=True)
-        shutil.copyfile(Path(launcher_path).parents[4] / "modules/llm/managed-pyobjc.json", staged_manifest)
+        shutil.copyfile(Path(launcher_path).parents[4] / "ai/engine/managed-pyobjc.json", staged_manifest)
         staged_locales = installed / "_shared/core/i18n/data/locales"
         staged_locales.mkdir(parents=True)
         for name in ("en.json", "fr.json"):

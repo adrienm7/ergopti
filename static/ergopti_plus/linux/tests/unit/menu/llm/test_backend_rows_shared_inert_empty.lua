@@ -6,7 +6,7 @@
 --- Adding and removing an API entry from the model selector page (2026-10-27)
 --- publishes through the one private writer: a non-chat key never selects
 --- itself, an oMLX entry keeps every field, and a refused retirement removes
---- nothing (ui/menu/llm_backend_rows.lua api_page).
+--- nothing (ai/ui/menu/backend_rows.lua api_page).
 --- ==============================================================================
 
 package.loaded["tests.support.ui.menu.llm.llm_backend_rows_fixture"] = nil
@@ -33,7 +33,7 @@ helpers.describe("Atomic non-chat addition (ai-menu-nonchat-add)", function()
 	end
 	for _, refused in ipairs({ false, true }) do
 		helpers.it("(ai-menu-nonchat-add) uses one actual private publication refusal=" .. tostring(refused), function()
-			local names = { "modules.llm.api_entries", "modules.llm.api_remote", "ui.menu.llm_backend_rows" }
+			local names = { "ai.engine.settings.api_entries", "ai.engine.api.api_remote", "ai.ui.menu.backend_rows" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local path, rename = assert(os.tmpname()), os.rename
@@ -42,14 +42,14 @@ helpers.describe("Atomic non-chat addition (ai-menu-nonchat-add)", function()
 			local stages, changes, probes, active, count, after = 0, 0, 0
 			local ok, failure = pcall(function()
 				local provider = { id = "typesafe", label = "TypeSafe (Jev)", base_url = "https://example.invalid/v1", default_model = "jev-latest" }
-				package.loaded["modules.llm.api_remote"] = {
+				package.loaded["ai.engine.api.api_remote"] = {
 					provider_config_receipt = function() return { published = false, ids = { cerebras = true, typesafe = true } } end,
 					provider = function() return provider end,
 					providers = function() return { provider } end,
 					serves = function(id) return id ~= "typesafe" end,
 					test = function() probes = probes + 1; return true end,
 				}
-				local owner = helpers.load_module("modules.llm.api_entries"); owner._set_path_for_test(path)
+				local owner = helpers.load_module("ai.engine.settings.api_entries"); owner._set_path_for_test(path)
 				os.rename = function(from, to)
 					if to == path then
 						stages = stages + 1
@@ -58,7 +58,7 @@ helpers.describe("Atomic non-chat addition (ai-menu-nonchat-add)", function()
 					return rename(from, to)
 				end
 				local answers = { "inert-key", "jev-latest" }
-				local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(helpers.load_module("ui.menu.llm_backend_rows"),
+				local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(helpers.load_module("ai.ui.menu.backend_rows"),
 					{ get_backend = function() return "api" end, set_backend = function() error("non-chat addition must preserve the backend") end },
 					{ prompt = function() return table.remove(answers, 1) end, error = function() end },
 					function() changes = changes + 1 end)

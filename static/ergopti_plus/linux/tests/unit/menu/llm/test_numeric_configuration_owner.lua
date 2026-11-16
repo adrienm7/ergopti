@@ -39,7 +39,7 @@ helpers.describe("numeric menu originating configuration", function()
 			f.writer.batch_write = original
 			helpers.assert_true(called)
 			local current = f.preferences.get_many({ "llm.display.show_info_bar" })
-			helpers.assert_eq(require("modules.llm.display_settings").get("show_info_bar"), current["llm.display.show_info_bar"], "successor configuration must not inherit the previous commit")
+			helpers.assert_eq(require("ai.engine.settings.display_settings").get("show_info_bar"), current["llm.display.show_info_bar"], "successor configuration must not inherit the previous commit")
 			helpers.assert_eq(redraws, 0, "new configuration must not be redrawn as though its setting changed")
 			helpers.assert_eq(result, false, "retained old menu cannot acknowledge new owner")
 			helpers.assert_eq(f.bytes("b"), f.initial.b)
@@ -47,9 +47,9 @@ helpers.describe("numeric menu originating configuration", function()
 	end)
 
 	for _, sample in ipairs({
-		{ title="menu.llm.instant_on_word_end", module="modules.llm.trigger_settings", name="instant_on_word_end", path="llm.trigger.instant_on_word_end" },
-		{ title="menu.llm.generation.temperature", module="modules.llm.settings", name="temperature", path="llm.generation.temperature", picker=true },
-		{ title="menu.llm.num_predictions_label", module="modules.llm.profile_settings", name="num_predictions", path="llm.profiles.num_predictions", picker=true },
+		{ title="menu.llm.instant_on_word_end", module="ai.engine.settings.trigger_settings", name="instant_on_word_end", path="llm.trigger.instant_on_word_end" },
+		{ title="menu.llm.generation.temperature", module="ai.engine.settings.settings", name="temperature", path="llm.generation.temperature", picker=true },
+		{ title="menu.llm.num_predictions_label", module="ai.engine.settings.profile_settings", name="num_predictions", path="llm.profiles.num_predictions", picker=true },
 	}) do
 		helpers.it("independent: post-commit owner switch " .. sample.name, function()
 			Fixture.with_configuration(function(f)
@@ -69,8 +69,8 @@ helpers.describe("numeric menu originating configuration", function()
 	end
 
 	for _, sample in ipairs({
-		{ name = "temperature", value = 0.9, module = "modules.llm.settings", path = "llm.generation.temperature" },
-		{ name = "debounce_ms", value = 450, module = "modules.llm.trigger_settings", path = "llm.trigger.debounce_ms" },
+		{ name = "temperature", value = 0.9, module = "ai.engine.settings.settings", path = "llm.generation.temperature" },
+		{ name = "debounce_ms", value = 450, module = "ai.engine.settings.trigger_settings", path = "llm.trigger.debounce_ms" },
 	}) do
 		helpers.it("does not publish an old deferred save after commit: " .. sample.name, function()
 			Fixture.with_configuration(function(f)
@@ -103,7 +103,7 @@ helpers.describe("numeric menu originating configuration", function()
 	end
 	helpers.it("classifies invalid choices without changing the historical setter arity", function()
 		Fixture.with_configuration(function(f)
-			local display = require("modules.llm.display_settings")
+			local display = require("ai.engine.settings.display_settings")
 			local trigger = f.trigger
 			local result, reason, noticed = display.set_with_reason_notice("pred_indent", 999)
 			helpers.assert_eq({ result, reason, noticed }, { false, "invalid", false })

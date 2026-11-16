@@ -14,11 +14,11 @@ local helpers = require("tests.helpers")
 --- @param logger table|nil A fresh canonical logger for native sink reentry.
 local function with_editor(body, logger)
 	-- Load real transitives before replacing the one configuration-path owner.
-	require("infra.llm_preferences")
-	require("modules.llm.profile_settings")
+	require("ai.engine.preferences")
+	require("ai.engine.settings.profile_settings")
 	local names = {
-		"settings.engine.paths", "infra.llm_preferences", "modules.llm.profile_settings",
-		"core.ui.ui.webview_manager", "ui.prompt_editor.bridge", "core.logger.engine.shim",
+		"settings.engine.paths", "ai.engine.preferences", "ai.engine.settings.profile_settings",
+		"core.ui.ui.webview_manager", "ai.ui.prompt_editor.bridge", "core.logger.engine.shim",
 	}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -35,8 +35,8 @@ local function with_editor(body, logger)
 	paths.config = function() return path end
 	package.loaded["settings.engine.paths"] = paths
 	if logger then package.loaded["core.logger.engine.shim"] = logger end
-	local profiles = helpers.load_module("modules.llm.profile_settings")
-	package.loaded["infra.llm_preferences"] = nil
+	local profiles = helpers.load_module("ai.engine.settings.profile_settings")
+	package.loaded["ai.engine.preferences"] = nil
 	local seen = { epoch = 0, visible = false, notices = {}, candidates = {}, closes = 0 }
 	local manager = {
 		show = function() seen.epoch = seen.epoch + 1; seen.visible = true; return true end,
@@ -47,7 +47,7 @@ local function with_editor(body, logger)
 		eval_js = function() return true end,
 	}
 	package.loaded["core.ui.ui.webview_manager"] = manager
-	local bridge = helpers.load_module("ui.prompt_editor.bridge")
+	local bridge = helpers.load_module("ai.ui.prompt_editor.bridge")
 	local state = { webview_manager = manager, notify_error = function(key)
 		seen.notices[#seen.notices + 1] = key
 		if seen.on_notice then seen.on_notice() end

@@ -111,7 +111,7 @@ for (const line of [
 // ===== 2) Every production source =====
 
 const files = SCOPES.flatMap((scope) => sources(path.join(PRODUCT, scope)));
-const macosOwner = path.join(PRODUCT, 'macos', 'modules', 'llm', 'api_ollama.lua');
+const macosOwner = path.join(PRODUCT, 'macos', 'ai', 'engine', 'api', 'ollama.lua');
 assert.ok(files.includes(macosOwner), 'the scan must cover the macOS Ollama owner');
 const offenders = files.flatMap((file) =>
 	broadTerminations(fs.readFileSync(file, 'utf8')).map(

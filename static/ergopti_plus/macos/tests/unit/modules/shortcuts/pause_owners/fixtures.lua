@@ -174,20 +174,20 @@ local function load_inventory_context(options)
 		every = function() return { kind = "watchdog" }, true end,
 		cancel = function() return true end,
 	}
-	package.loaded["modules.llm.api_mlx"] = {
+	package.loaded["ai.engine.api.mlx"] = {
 		pause_warmup = invoke("mlx_warmup", "pause"),
 		stop_warmup = invoke("mlx_warmup", "pause"),
 		resume_warmup = invoke("mlx_warmup", "resume"),
 	}
-	package.loaded["modules.llm.warmup_controller"] = {
+	package.loaded["ai.engine.local_servers.warmup_controller"] = {
 		pause_warmup = invoke("warmup_controller", "pause"),
 		resume_warmup = invoke("warmup_controller", "resume"),
 	}
-	package.loaded["modules.llm.api_ollama"] = options.ollama or {
+	package.loaded["ai.engine.api.ollama"] = options.ollama or {
 		pause_warmup = invoke("ollama_warmup", "pause"),
 		resume_warmup = invoke("ollama_warmup", "resume"),
 	}
-	package.loaded["modules.llm.api_remote"] = options.remote or {
+	package.loaded["ai.engine.api.remote"] = options.remote or {
 		pause_warmup = invoke("remote_warmup", "pause"),
 		resume_warmup = invoke("remote_warmup", "resume"),
 	}

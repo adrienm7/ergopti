@@ -53,7 +53,7 @@ local function daemon_handlers()
 	local ScriptActions = helpers.load_module("modules.shortcuts.script_actions")
 	local ActionHandlers = helpers.load_module("modules.shortcuts.action_handlers")
 	local Shortcuts = helpers.load_module("modules.shortcuts.manager")
-	local Prediction = helpers.load_module("modules.llm.prediction_engine")
+	local Prediction = helpers.load_module("ai.engine.prediction.engine")
 	local noop = function() end
 	return ActionHandlers.compose(
 		ScriptActions.new({ reset = noop, reload = noop, quit = noop }).handlers, Shortcuts, Prediction)
@@ -310,7 +310,7 @@ helpers.describe("action picker items (Linux)", function()
 	end)
 
 	helpers.it("greys the agent's manual actions with the AI notice while the AI is off (ai-off-picker)", function()
-		local engine = "modules.llm.prediction_engine"
+		local engine = "ai.engine.prediction.engine"
 		local previous, switch = package.loaded[engine], { enabled = false }
 		package.loaded[engine] = { is_enabled = function() return switch.enabled end }
 		local ok, err = pcall(function()

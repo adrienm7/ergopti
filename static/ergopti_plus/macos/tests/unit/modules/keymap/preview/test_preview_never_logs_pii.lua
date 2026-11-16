@@ -12,7 +12,7 @@
 --- lands in a log retained 14 days. It applied that contract to the two EXPANSION
 --- sinks (try_auto_expand and the terminator path) and stopped there.
 ---
---- The PREVIEW sink in modules/keymap/llm_bridge.lua ran on every keystroke and
+--- The PREVIEW sink in ai/engine/bridge.lua ran on every keystroke and
 --- logged unconditionally:
 ---   Logger.debug(LOG, "Hotstring '%s' → '%s' [%s].", tostring(m.input), m.plain_repl, m.type)
 --- Worse than the expansion path, because a preview fires while the user is still
@@ -69,15 +69,15 @@ local PREVIEW_OWNERSHIP = {
 	"modules.keymap.terminators",
 	"modules.keymap.expander",
 	"modules.keymap.terminator_replay",
-	"modules.keymap.llm_bridge",
-	"modules.llm.prediction_engine",
-	"modules.llm.warmup_controller",
-	"modules.llm.streaming_handler",
+	"ai.engine.bridge",
+	"ai.engine.prediction.engine",
+	"ai.engine.local_servers.warmup_controller",
+	"ai.engine.api.streaming_handler",
 }
 
 local function load_bridge(provider)
 	return helpers.with_fresh_modules(PREVIEW_OWNERSHIP, function()
-		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+		local Bridge = helpers.load_with_stubs("ai.engine.bridge")
 
 		local state = {
 			buffer                    = "",
@@ -89,7 +89,7 @@ local function load_bridge(provider)
 			SECTION_DELAYS            = {},
 		}
 
-		require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
+		require("ai.engine.api.context").seed(state, state.buffer or "", "")
 
 		helpers.assert_eq(Bridge.init(state,
 			{ preview_star_enabled = true, preview_autocorrect_enabled = true }), true)
@@ -180,7 +180,7 @@ helpers.describe("hotstring preview never logs personal-info content", function(
 		-- replacement to still appear.
 		local Bridge = helpers.with_fresh_modules(PREVIEW_OWNERSHIP, function()
 			local State = helpers.load_with_stubs("modules.keymap.state")
-			local fresh_bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+			local fresh_bridge = helpers.load_with_stubs("ai.engine.bridge")
 
 			-- Take the registry instance the BRIDGE resolved, not a separately loaded
 			-- one: the bridge captured its Registry upvalue at require time, and a
@@ -197,7 +197,7 @@ helpers.describe("hotstring preview never logs personal-info content", function(
 			Registry.add("pub★", PUBLIC_REPL, { auto_expand = true })
 			Registry.sort_mappings()
 
-			require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
+			require("ai.engine.api.context").seed(state, state.buffer or "", "")
 
 			helpers.assert_eq(fresh_bridge.init(state,
 				{ preview_star_enabled = true, preview_autocorrect_enabled = true }), true)

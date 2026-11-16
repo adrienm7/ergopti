@@ -2,8 +2,8 @@
 
 **Item:** 6.3.1  
 **Date:** 2026-05-26  
-**Scope:** `static/ergopti_plus/macos/modules/llm/api_token_crypto.lua` (macOS)  
-and `static/ergopti_plus/windows/modules/llm/api_token_crypto.ahk` (Windows)
+**Scope:** `static/ergopti_plus/macos/ai/engine/api/token_crypto.lua` (macOS)  
+and `static/ergopti_plus/windows/ai/engine/api/token_crypto.ahk` (Windows)
 
 ---
 
@@ -170,7 +170,7 @@ old cleartext value in `hs.settings` / `config.toml` is never migrated.
 
 ### 5.1 macOS — replace `hs.execute` with `hs.task` in `decrypt`/`delete`
 
-**File:** `static/ergopti_plus/macos/modules/llm/api_token_crypto.lua`
+**File:** `static/ergopti_plus/macos/ai/engine/api/token_crypto.lua`
 
 `decrypt` and `delete` currently call `hs.execute(cmd)` with a shell-quoted
 command string. The write path correctly avoids the shell (`hs.task:setInput`).
@@ -200,7 +200,7 @@ remaining call sites are ported.
 
 ### 5.2 Windows — document 64-bit-only assumption
 
-**File:** `static/ergopti_plus/windows/modules/llm/api_token_crypto.ahk`
+**File:** `static/ergopti_plus/windows/ai/engine/api/token_crypto.ahk`
 
 Add a comment at the top of `_LLM_DPAPI_Protect` / `_LLM_DPAPI_Unprotect`
 noting that the `8`-byte offset for `pbData` in the `DATA_BLOB` struct is

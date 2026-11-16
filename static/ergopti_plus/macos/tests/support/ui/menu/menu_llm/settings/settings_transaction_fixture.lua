@@ -11,31 +11,31 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"modules.llm.backend_detector",
+	"ai.engine.api.backend_detector",
 	"menu.engine.manifest_reader",
 	"core.fs.adapters.storage",
-	"ui.menu.menu_llm",
-	"ui.menu.menu_llm.settings_manager",
-	"ui.menu.menu_llm.trigger_panel",
-	"ui.menu.menu_llm.streaming_panel",
-	"ui.menu.menu_llm.temperature_panel",
-	"ui.menu.menu_llm.models_manager",
-	"ui.menu.menu_llm.profiles_manager",
-	"ui.menu.menu_llm.profile_label",
-	"modules.llm.profiles",
-	"ui.menu.menu_llm.warmup_controller",
-	"ui.menu.menu_llm.backend_panel",
-	"ui.menu.menu_llm.api_panel",
-	"ui.menu.menu_llm.model_selector_page",
-	"ui.menu.menu_llm.custom_models",
-	"ui.menu.menu_llm.model_switcher",
-	"ui.menu.menu_llm.startup_controller",
-	"ui.menu.menu_llm.trigger_orchestrator",
-	"ui.menu.menu_llm.menu_layout",
-	"modules.llm",
-	"modules.llm.api_mlx",
-	"modules.llm.mlx_deps_checker",
-	"modules.llm.ollama_deps_checker",
+	"ai.ui.menu",
+	"ai.ui.menu.settings_manager",
+	"ai.ui.menu.panels.trigger_panel",
+	"ai.ui.menu.panels.streaming_panel",
+	"ai.ui.menu.panels.temperature_panel",
+	"ai.ui.menu.models.manager",
+	"ai.ui.menu.profiles_manager",
+	"ai.ui.menu.profile_label",
+	"ai.engine.settings.profiles",
+	"ai.ui.menu.warmup_controller",
+	"ai.ui.menu.panels.backend_panel",
+	"ai.ui.menu.panels.api_panel",
+	"ai.ui.menu.models.selector_page",
+	"ai.ui.menu.models.custom_models",
+	"ai.ui.menu.models.switcher",
+	"ai.ui.menu.startup_controller",
+	"ai.ui.menu.trigger_orchestrator",
+	"ai.ui.menu.layout",
+	"ai.engine",
+	"ai.engine.api.mlx",
+	"ai.engine.local_servers.mlx_deps_checker",
+	"ai.engine.ollama.deps_checker",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
@@ -292,7 +292,7 @@ local function with_fixture(options, callback)
 		},
 	}
 
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = clone_value(DEFAULT_STATE),
 		streaming_snapshot = function()
 			return { owner = runtime, generation = display_generation,
@@ -474,10 +474,10 @@ local function with_fixture(options, callback)
 		for index = #errors, 1, -1 do errors[index] = nil end
 	end
 
-	local Settings = require("ui.menu.menu_llm.settings_manager")
-	local TriggerPanel = require("ui.menu.menu_llm.trigger_panel")
-	local StreamingPanel = require("ui.menu.menu_llm.streaming_panel")
-	local TemperaturePanel = require("ui.menu.menu_llm.temperature_panel")
+	local Settings = require("ai.ui.menu.settings_manager")
+	local TriggerPanel = require("ai.ui.menu.panels.trigger_panel")
+	local StreamingPanel = require("ai.ui.menu.panels.streaming_panel")
+	local TemperaturePanel = require("ai.ui.menu.panels.temperature_panel")
 	if options.corrupt_trigger_child then
 		local real_build = TriggerPanel.build
 		local detached = {}; for key, value in pairs(TriggerPanel) do detached[key] = value end
@@ -488,7 +488,7 @@ local function with_fixture(options, callback)
 			elseif options.corrupt_trigger_child == "cycle" then children[1].menu = children end
 			return children
 		end
-		package.loaded["ui.menu.menu_llm.trigger_panel"] = detached
+		package.loaded["ai.ui.menu.panels.trigger_panel"] = detached
 	end
 	local manager = Settings.new({
 		state = state,
@@ -512,13 +512,13 @@ local function with_fixture(options, callback)
 			models.get_installed_models = function() return {} end
 			models.is_model_installed = function() return false end
 		end
-		package.loaded["ui.menu.menu_llm.models_manager"] = {
+		package.loaded["ai.ui.menu.models.manager"] = {
 			new = function() return models end,
 		}
 		local prior_dependencies = {}
 		for name, value in pairs(package.loaded) do prior_dependencies[name] = value end
-		local core = package.loaded["modules.llm"]
-		core.BUILTIN_PROFILES = require("modules.llm.profiles").BUILTIN_PROFILES
+		local core = package.loaded["ai.engine"]
+		core.BUILTIN_PROFILES = require("ai.engine.settings.profiles").BUILTIN_PROFILES
 		local profile_constructor_sync = {}
 		core.set_user_profiles = function()
 			profile_constructor_sync[#profile_constructor_sync + 1] = "users"
@@ -528,23 +528,23 @@ local function with_fixture(options, callback)
 			profile_constructor_sync[#profile_constructor_sync + 1] = "active"
 			return true
 		end
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
-		require("ui.menu.menu_llm.profiles_manager")
+		package.loaded["ai.ui.menu.profiles_manager"] = nil
+		require("ai.ui.menu.profiles_manager")
 		for name, value in pairs(package.loaded) do
 			if not rawequal(value, rawget(prior_dependencies, name)) then
 				profile_loaded_dependencies[name] = { value = rawget(prior_dependencies, name) }
 			end
 		end
-		package.loaded["ui.menu.menu_llm.warmup_controller"] = {warmup = noop}
-		package.loaded["ui.menu.menu_llm.backend_panel"] = {
+		package.loaded["ai.ui.menu.warmup_controller"] = {warmup = noop}
+		package.loaded["ai.ui.menu.panels.backend_panel"] = {
 			is_apple_silicon = function() return false end,
 			build = function() return "backend", {} end,
 		}
-		package.loaded["ui.menu.menu_llm.api_panel"] = {
+		package.loaded["ai.ui.menu.panels.api_panel"] = {
 			build = function() return nil, nil end,
 			active_entry_caption_text = function() return nil end,
 		}
-		package.loaded["ui.menu.menu_llm.model_switcher"] = {
+		package.loaded["ai.ui.menu.models.switcher"] = {
 			new = function()
 				return {
 					switch_model = noop,
@@ -561,8 +561,8 @@ local function with_fixture(options, callback)
 			local prior_dependencies = {}
 			for name, value in pairs(package.loaded) do prior_dependencies[name] = value end
 			package.loaded["core.fs.adapters.json_codec"] = nil
-			package.loaded["modules.llm.api_mlx"] = nil
-			package.loaded["modules.llm.api_mlx"] = require("modules.llm.api_mlx")
+			package.loaded["ai.engine.api.mlx"] = nil
+			package.loaded["ai.engine.api.mlx"] = require("ai.engine.api.mlx")
 			-- Restore only actual dependency entries changed by this genuine API, including false.
 			for name, value in pairs(package.loaded) do
 				if not rawequal(value, rawget(prior_dependencies, name)) then
@@ -570,12 +570,12 @@ local function with_fixture(options, callback)
 				end
 			end
 		else
-			package.loaded["modules.llm.api_mlx"] = {}
+			package.loaded["ai.engine.api.mlx"] = {}
 		end
-		package.loaded["ui.menu.menu_llm.startup_controller"] = {
+		package.loaded["ai.ui.menu.startup_controller"] = {
 			new = function() return noop end,
 		}
-		package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = {
+		package.loaded["ai.ui.menu.trigger_orchestrator"] = {
 			new = function()
 				return {
 					bind_hotkey = noop,
@@ -585,17 +585,17 @@ local function with_fixture(options, callback)
 				}
 			end,
 		}
-		package.loaded["ui.menu.menu_llm.menu_layout"] = nil
+		package.loaded["ai.ui.menu.layout"] = nil
 
-		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
+		package.loaded["ai.engine.local_servers.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = noop,
 		})
-		package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({
+		package.loaded["ai.engine.ollama.deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = noop,
 		})
 
-		package.loaded["ui.menu.menu_llm"] = nil
-		local MenuLLM = require("ui.menu.menu_llm")
+		package.loaded["ai.ui.menu"] = nil
+		local MenuLLM = require("ai.ui.menu")
 		local handler = MenuLLM.create({
 			state = state,
 			keymap = keymap,

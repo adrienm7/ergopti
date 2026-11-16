@@ -49,8 +49,8 @@ local MODULE_KEYS = {
 	"ui.menu.menu_tap_holds",
 	"ui.menu.menu_apps",
 	"ui.menu.menu_about",
-	"ui.menu.menu_llm",
-	"modules.llm",
+	"ai.ui.menu",
+	"ai.engine",
 	"modules.keystats",
 	"modules.shortcuts",
 	"modules.dynamic_hotstrings",
@@ -530,8 +530,8 @@ local function with_menu_fixture(options, callback)
 	}) do
 		package.loaded[module_name] = {}
 	end
-	package.loaded["ui.menu.menu_llm"] = { create = function() return {} end }
-	package.loaded["modules.llm"] = { set_backend = noop }
+	package.loaded["ai.ui.menu"] = { create = function() return {} end }
+	package.loaded["ai.engine"] = { set_backend = noop }
 	package.loaded["modules.keystats"] = {}
 	package.loaded["modules.dynamic_hotstrings"] = {}
 	package.loaded["infra.personal_shortcuts"] = { load = noop }

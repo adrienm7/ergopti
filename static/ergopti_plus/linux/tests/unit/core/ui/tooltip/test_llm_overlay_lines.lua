@@ -66,13 +66,13 @@ end)
 --- @param indent integer
 --- @return table overlay, table chrome
 local function overlay_with_indent(indent)
-	local previous = package.loaded["modules.llm.display_settings"]
-	package.loaded["modules.llm.display_settings"] = {
+	local previous = package.loaded["ai.engine.settings.display_settings"]
+	package.loaded["ai.engine.settings.display_settings"] = {
 		get = function(name) return name == "pred_indent" and indent or false end,
 	}
 	package.loaded["core.ui.ui.tooltip.llm"] = nil
 	local overlay = require("core.ui.ui.tooltip.llm")
-	package.loaded["modules.llm.display_settings"] = previous
+	package.loaded["ai.engine.settings.display_settings"] = previous
 	package.loaded["core.ui.ui.tooltip.llm"] = nil
 	return overlay, require("core.ui.ui.tooltip.config").llm_line()
 end

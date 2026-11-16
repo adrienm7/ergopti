@@ -10,8 +10,8 @@
 --- transport cancelled, and the next request is sent with the new settings.
 ---
 --- FEATURES & RATIONALE:
---- 1. One field list for macOS (modules/llm/prediction_engine.lua) and Linux
----    (modules/llm/prediction_engine.lua); each driver reads its own sources.
+--- 1. One field list for macOS (ai/engine/prediction/engine.lua) and Linux
+---    (ai/engine/prediction/engine.lua); each driver reads its own sources.
 --- 2. Values are compared, never logged: the key is held only as long as the
 ---    request.
 --- ==============================================================================

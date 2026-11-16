@@ -17,7 +17,7 @@ local M = {}
 --- @return function|nil select
 --- @return function|nil delete
 function M.capture(owner)
-	local Prefs = require("infra.llm_preferences")
+	local Prefs = require("ai.engine.preferences")
 	local Paths = require("settings.engine.paths")
 	local list, snapshot, save = owner.list_user, owner.configuration_snapshot, owner.save_user_profile
 	local select_profile, delete_profile = owner.set, owner.delete_user_profile
@@ -28,10 +28,10 @@ function M.capture(owner)
 		or type(config) ~= "function" or type(get_many) ~= "function" or type(generation) ~= "function"
 		or type(revision_current) ~= "function" or type(publish) ~= "function" then return nil end
 	local function ports_current()
-		return package.loaded["modules.llm.profile_settings"] == owner and owner.list_user == list
+		return package.loaded["ai.engine.settings.profile_settings"] == owner and owner.list_user == list
 			and owner.configuration_snapshot == snapshot and owner.save_user_profile == save
 			and owner.set == select_profile and owner.delete_user_profile == delete_profile
-			and package.loaded["infra.llm_preferences"] == Prefs and Prefs.get_many == get_many
+			and package.loaded["ai.engine.preferences"] == Prefs and Prefs.get_many == get_many
 			and Prefs.generation == generation and Prefs.is_current_revision == revision_current
 			and Prefs.set_many == publish and package.loaded["settings.engine.paths"] == Paths and Paths.config == config
 	end

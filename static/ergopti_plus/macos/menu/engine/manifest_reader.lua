@@ -35,7 +35,7 @@ local platform_resolved = false
 local function resolve_platform(reader, path)
 	if platform_resolved then return end
 	if path ~= nil and path ~= BACKEND_PATH and BACKEND_PATH:sub(1, #path + 1) ~= path .. "." then return end
-	local backend = require("modules.llm.backend_detector").auto_default()
+	local backend = require("ai.engine.api.backend_detector").auto_default()
 	local entry = assert(reader.find_declared_entry_by_path(BACKEND_PATH), "platform backend declaration missing")
 	entry.default, entry.recommended = backend, backend
 	platform_resolved = true

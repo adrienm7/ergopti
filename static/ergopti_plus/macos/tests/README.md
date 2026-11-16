@@ -7,7 +7,7 @@ Windows** under plain Lua 5.4 — no external dependencies required.
 ## Layout
 
 The tree mirrors the driver source: a test of `modules/keymap/…` lives in
-`tests/unit/modules/keymap/<stage>/`, a test of `ui/menu/…` in
+`tests/unit/<stage>/`, a test of `ui/menu/…` in
 `tests/unit/<submenu>/`.
 
 ```
@@ -92,7 +92,7 @@ constructs from `tests/helpers`.
 | `meta/`          | Invariants no runtime call can check: boot order, teardown paths, ports, Lua and Hammerspoon foot-guns, the test harness itself.   |
 | `unit/`          | The OS-isolation layer, one folder per port family, plus the cross-driver contract vectors.                                        |
 | `unit/`          | Infrastructure: configuration, preferences, logger, TOML, file watchers, i18n, lifecycle.                                          |
-| `unit/modules/`  | Domain modules: keymap, keystats, llm, gestures, shortcuts, dynamic_hotstrings, hotstrings, updater, diagnostics.                  |
+| `unit/`          | Domain modules: keymap, keystats, llm, gestures, shortcuts, dynamic_hotstrings, hotstrings, updater, diagnostics.                  |
 | `unit/platform/` | The Karabiner remap bridge.                                                                                                        |
 | `unit/`          | Windows, dialogs, tooltips and the tray menu.                                                                                      |
 | `integration/`   | Mac-only — exercised via a "Run Self-Tests" menu item inside Hammerspoon to validate end-to-end behavior with the real `hs.*` API. |

@@ -31,32 +31,32 @@ let fail = 0;
 // Each check: a file, a forbidden regex, and why it must stay gone.
 const CHECKS = [
 	{
-		file: 'windows/infra/llm_defaults.ahk',
+		file: 'windows/ai/engine/defaults.ahk',
 		forbid: /_LLM_DEFAULTS_FALLBACK/,
 		why: 'the 20-key AHK defaults mirror is gone — read every shared key from defaults.json (fail fast)'
 	},
 	{
-		file: 'windows/ui/menu/menu_llm/menu_settings.ahk',
+		file: 'windows/ai/ui/menu/settings.ahk',
 		forbid: /_LLM_DEFAULTS_FALLBACK/,
 		why: '_LLM_DefaultFor must read LLM_Defaults, never the deleted fallback mirror'
 	},
 	{
-		file: 'windows/modules/llm/api_common.ahk',
+		file: 'windows/ai/engine/api/common.ahk',
 		forbid: /LLM_COMMON_FALLBACK/,
 		why: 'the inference-tunables mirror is gone — read every tunable from inference.json (fail fast)'
 	},
 	{
-		file: 'macos/modules/llm/profiles.lua',
+		file: 'macos/ai/engine/settings/profiles.lua',
 		forbid: /llm_(min|max)_words\s+or\s+\d/,
 		why: 'word bounds come from the single source (DEFAULT_STATE), never a divergent `or 4` / `or 20`'
 	},
 	{
-		file: 'macos/modules/llm/init.lua',
+		file: 'macos/ai/engine/init.lua',
 		forbid: /get_port\(\)\)?\s*or\s*8080/,
 		why: 'the MLX boot sweep must resolve the canonical port, never fall back to the forbidden 8080'
 	},
 	{
-		file: 'macos/modules/llm/api_ollama.lua',
+		file: 'macos/ai/engine/api/ollama.lua',
 		forbid: /"http:\/\/127\.0\.0\.1:11434/,
 		why: 'Ollama URLs must derive from get_base_url() (configurable port), not a hardcoded host:port'
 	}

@@ -20,8 +20,8 @@ SetWorkingDir(A_ScriptDir)
 #Warn VarUnset, Off
 
 #Include ../core/text/engine/json.ahk
-#Include ../modules/llm/rewrite.ahk
-#Include ../modules/llm/parser.ahk
+#Include ../ai/engine/prediction/rewrite.ahk
+#Include ../ai/engine/api/parser.ahk
 
 _OUT := A_Temp . "\ergopti_parity_pp.txt"
 _Emit(Line) {

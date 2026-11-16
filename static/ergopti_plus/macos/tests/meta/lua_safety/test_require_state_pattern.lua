@@ -37,11 +37,11 @@ local KNOWN_VIOLATIONS = {
 	-- Additional for max coverage: personal, karabiner, llm api, gestures actions must not bypass pause
 	["modules.dynamic_hotstrings.personal_info"] = true,
 	["platform.remap"] = true,
-	["modules.llm.api_common"] = true,
+	["ai.engine.api.common"] = true,
 	["modules.gestures.actions"] = true,
 
 	-- Encore plus: more modules for full pause coverage
-	["modules.llm.prediction_engine"] = true,
+	["ai.engine.prediction.engine"] = true,
 	["modules.metrics.aggregator"] = true,
 	["menu.ui.builder.builder"] = true,
 }

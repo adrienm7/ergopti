@@ -18,7 +18,7 @@
 ---    without the typing-buffer alignment of the prediction parser, because a
 ---    selection is replaced whole.
 ---
---- The AutoHotkey port is windows/modules/llm/tone.ahk. Both are pinned by
+--- The AutoHotkey port is windows/ai/engine/prediction/tone.ahk. Both are pinned by
 --- _shared/tests/corpus/llm/tone_vectors.json.
 --- ==============================================================================
 

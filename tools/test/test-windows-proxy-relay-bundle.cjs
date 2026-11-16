@@ -72,7 +72,7 @@ for (const name of ['ergopti-proxy-relay.exe', 'ergopti-proxy-relay.json'])
 	assert.ok(shipped.includes(`vendor/${name}`), `the bundle ships ${name}`);
 
 const bootstrap = fs.readFileSync(
-	path.join(ROOT, 'static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk'),
+	path.join(ROOT, 'static/ergopti_plus/windows/ai/engine/ollama/managed_bootstrap.ahk'),
 	'utf8'
 );
 assert.match(bootstrap, /LLM_OLLAMA_PROXY_RELAY_MANIFEST := "ergopti-proxy-relay\.json"/);

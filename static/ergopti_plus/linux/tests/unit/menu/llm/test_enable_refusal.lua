@@ -17,7 +17,7 @@ file:close()
 
 local function with_notice(tool, body)
 	local names = { "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "platform.input.keyboard_hook",
-		"platform.system.notifier", "ui.llm_enable_refusal", "core.ui.engine.window_titles" }
+		"platform.system.notifier", "ai.ui.enable_refusal", "core.ui.engine.window_titles" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local world = { order = {}, commands = {}, notifications = {}, captions = {}, release_ok = true, restore_ok = true }
@@ -55,8 +55,8 @@ local function with_notice(tool, body)
 	package.loaded["platform.system.notifier"] = { send = function(message, options)
 		world.notifications[#world.notifications + 1] = { message, options }; return true
 	end }
-	package.loaded["ui.llm_enable_refusal"] = nil
-	world.notice = require("ui.llm_enable_refusal")
+	package.loaded["ai.ui.enable_refusal"] = nil
+	world.notice = require("ai.ui.enable_refusal")
 	local ok, err = xpcall(function() body(world) end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 	if not ok then error(err, 0) end

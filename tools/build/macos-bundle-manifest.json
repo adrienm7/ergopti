@@ -86,7 +86,7 @@
 			"reason": "Maintainer scripts and source-review declarations consumed by code generators, and installer scripts no driver invokes.",
 			"patterns": [
 				"ergopti_plus/_shared/settings/data/features/behaviors.json",
-				"ergopti_plus/macos/data/generate_models.py",
+				"ergopti_plus/macos/ai/data/generate_models.py",
 				"ergopti_plus/_shared/ai/data/validate_*.py",
 				"ergopti_plus/_shared/core/network/native/**"
 			]

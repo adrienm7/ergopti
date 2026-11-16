@@ -12,7 +12,7 @@
 ; 1. One Root: paths.toml, the configuration, the cache, the updater state and
 ;    the bundle and the managed Ollama runtime all live under one folder; the
 ;    runtime folder keeps its own protected ACL (app_dirs.toml
-;    [runtime.windows], modules/llm/ollama_managed_files.ps1).
+;    [runtime.windows], ai/engine/ollama/ollama_managed_files.ps1).
 ; 2. Fail Fast: an empty base variable raises instead of resolving a folder
 ;    relative to the working directory.
 ; 3. Functions, not globals: boot reads them before most includes have run.

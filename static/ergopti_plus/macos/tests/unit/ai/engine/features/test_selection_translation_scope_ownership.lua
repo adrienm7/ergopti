@@ -1,0 +1,151 @@
+--- tests/unit/ai/engine/features/test_selection_translation_scope_ownership.lua
+
+--- ==============================================================================
+--- MODULE: Selection Translation Fixture Scope Ownership
+--- DESCRIPTION:
+--- Builds the real selection pipeline with a cold MLX retirement dependency.
+--- Successful construction and an assertion failure must restore every exact
+--- package entry, native hs identity and the preloaded logger/profile owners.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+-- Stateless generated constants every owner now reads; loaded before any snapshot so they are
+-- not mistaken for residue of the fixture under test.
+require("settings.engine.keys")
+require("diagnostics.engine.adapter_errors") -- the adapters compare its ids
+require("core.fs.engine.ports") -- the file-system owner checks itself against it when it loads
+require("core.lifecycle.engine.dev_source") -- the updater identity reads it; it only caches this process's mode
+require("ai.engine.api.url_template") -- pure: the remote backend fills per-account addresses with it
+require("ai.engine.api.token_exchange") -- pure: the remote backend reads auth blocks with it
+require("ai.engine.policy.failure_class") -- pure: every LLM backend asks it whether a refused key failed the call
+require("ai.engine.settings.request_settings") -- pure: the prediction engine compares a request's settings with it
+require("core.logger.engine.perf_budget") -- pure: the remote backend judges its request time with it
+require("core.lifecycle.engine.main_thread_hold") -- pure: the logger reads its read-only hold bounds from it
+require("ai.engine.local_servers.fingerprint") -- pure: the local server rows identify a server by its models answer
+require("ai.engine.local_servers.menu") -- pure: the remote backend names the local server rows with it
+require("platform.input.keycodes.key_names") -- pure, with its data: the gesture actions name their chord keys with it
+require("shortcuts.engine.actions.sticky_label") -- pure: the gesture actions name their sticky holds with it
+require("gestures.engine.incremental") -- pure: the gesture geometry steps an incremental swipe with it
+require("gestures.engine.contact_join") -- pure: the gesture geometry judges a third contact with it
+local World = require("tests.support.modules.llm.selection_translation_fixture")
+local Scope = require("tests.support.modules.llm.selection_translation_scope")
+local SharedLogger = require("core.logger.engine")
+local NATIVE_GLOBALS = {
+	"ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME", "ERGOPTI_TOUCH_DEVICES",
+	"ERGOPTI_TOUCH_WATCHERS", "ERGOPTI_TOUCH_WATCHER_TOKENS", "lfs",
+}
+
+--- Owns only the test's explicit native-global preconditions, even on failure.
+--- @param cold boolean Whether the five native globals must initially be absent.
+--- @param scenario function Receives the old sentinel owners.
+local function with_native_globals(cold, scenario)
+	local previous, sentinels = {}, {}
+	for index, name in ipairs(NATIVE_GLOBALS) do
+		previous[index] = rawget(_G, name)
+		local value
+		if not cold then value = index == 1 and true or {} end
+		sentinels[index] = value
+		rawset(_G, name, value)
+	end
+	local result = table.pack(xpcall(function() scenario(sentinels) end, debug.traceback))
+	for index, name in ipairs(NATIVE_GLOBALS) do rawset(_G, name, previous[index]) end
+	if not result[1] then error(result[2], 0) end
+end
+
+--- Captures exact cache identities without clearing unrelated owners.
+--- @return table snapshot
+local function snapshot()
+	local entries = {}
+	for name, value in pairs(package.loaded) do entries[name] = value end
+	local globals = {}
+	for name, value in pairs(_G) do globals[name] = value end
+	return { entries = entries, globals = globals, hs = rawget(_G, "hs"), logger = package.loaded["core.logger.engine.logger"] }
+end
+
+--- Checks both removed entries and newly published values without rewriting them.
+--- @param before table Exact prior namespace.
+--- @param after table Current namespace.
+--- @param label string Diagnostic namespace.
+local function assert_entries(before, after, label)
+	local changed = {}
+	for name, value in pairs(before) do
+		if not rawequal(after[name], value) then changed[name] = true end
+	end
+	for name, value in pairs(after) do
+		if not rawequal(before[name], value) then changed[name] = true end
+	end
+	local names = {}
+	for name in pairs(changed) do names[#names + 1] = name end
+	table.sort(names)
+	helpers.assert_eq(#names, 0, "fixture changed " .. label .. ": " .. table.concat(names, ", "))
+end
+
+--- Checks every cache/global identity before the outer precondition cleanup.
+--- @param before table Snapshot from before fixture construction.
+local function assert_restored(before)
+	assert_entries(before.entries, package.loaded, "package.loaded entries")
+	assert_entries(before.globals, _G, "globals")
+	helpers.assert_true(rawequal(rawget(_G, "hs"), before.hs), "fixture changed the native hs identity")
+	helpers.assert_true(rawequal(package.loaded["core.logger.engine.logger"], before.logger), "fixture replaced the native logger owner")
+	helpers.assert_true(rawequal(package.loaded["core.logger.engine"], SharedLogger), "fixture replaced the preloaded shared logger")
+end
+
+--- Exercises the actual fixture without letting outer cleanup mask its leaks.
+--- @param cold boolean Native owners start absent instead of pre-existing.
+--- @param forced boolean Raise the exact assertion after fixture construction.
+local function check_scope(cold, forced)
+	with_native_globals(cold, function(sentinels)
+		if cold then
+			for _, name in ipairs(NATIVE_GLOBALS) do
+				helpers.assert_nil(rawget(_G, name), "native precondition must be cold: " .. name)
+			end
+		end
+		-- These are fixture preconditions, not a whole-cache rollback. The inner
+		-- scope itself must restore its cold dependency and a pre-existing owner.
+		helpers.with_fresh_modules({ "ai.engine.settings.profiles", "ai.engine.local_servers.mlx_stream_retirement", "adapters.event_provenance",
+			"core.text.engine.json", "ai.engine.prediction.translate", "core.lifecycle.engine.compat.utf8", "tests.support.modules.llm.selection_translation_destination" }, function()
+			local profile = {}
+			package.loaded["ai.engine.settings.profiles"] = profile
+			for _, name in ipairs({ "ai.engine.local_servers.mlx_stream_retirement", "adapters.event_provenance",
+				"core.text.engine.json", "ai.engine.prediction.translate", "core.lifecycle.engine.compat.utf8", "tests.support.modules.llm.selection_translation_destination" }) do
+				helpers.assert_nil(package.loaded[name], "the transitive fixture owner must start cold: " .. name)
+			end
+			local before = snapshot()
+			local ok, detail = pcall(function()
+				Scope.run(function()
+					local world = World.build_world()
+					helpers.assert_type(world.flow.run, "function", "the actual selection pipeline must be constructed")
+					helpers.assert_type(package.loaded["ai.engine.local_servers.mlx_stream_retirement"], "table",
+						"the real MLX transport must acquire its transitive retirement helper")
+					for _, name in ipairs(NATIVE_GLOBALS) do
+						local owner = rawget(_G, name)
+						if type(owner) == "table" then owner.__scope_fixture_write = true end
+					end
+					if forced then helpers.assert_true(false, "forced selection fixture scope failure") end
+				end)
+			end)
+			if forced then
+				helpers.assert_true(not ok and tostring(detail):find("forced selection fixture scope failure", 1, true) ~= nil,
+					"the fixture must unwind the intended assertion failure")
+			else
+				helpers.assert_true(ok, tostring(detail))
+			end
+			assert_restored(before)
+			if not cold then
+				for index = 2, #NATIVE_GLOBALS do
+					helpers.assert_nil(next(sentinels[index]), "fixture mutated a pre-existing native owner: " .. NATIVE_GLOBALS[index])
+				end
+			end
+			helpers.assert_true(rawequal(package.loaded["ai.engine.settings.profiles"], profile), "the exact prior profile must survive")
+		end)
+	end)
+end
+
+helpers.describe("selection translation fixture restores transitive owners", function()
+	for _, cold in ipairs({ true, false }) do
+		for _, forced in ipairs({ false, true }) do
+			helpers.it("restores " .. (cold and "cold" or "pre-existing") .. " native owners after "
+				.. (forced and "an assertion failure" or "successful construction"), function() check_scope(cold, forced) end)
+		end
+	end
+end)

@@ -252,9 +252,9 @@ const MACOS_MODULES = {
 	config_cleanup: 'settings/ui/cleanup.lua',
 	action_picker: 'ui/action_picker/init.lua',
 	hotstrings_config_window: 'ui/hotstrings_config_window/init.lua',
-	prompt_editor: 'ui/prompt_editor/init.lua',
+	prompt_editor: 'ai/ui/prompt_editor/init.lua',
 	changelog: 'ui/changelog/init.lua',
-	model_browser: 'ui/model_browser/init.lua',
+	model_browser: 'ai/ui/model_browser/init.lua',
 	hotstring_editor: 'ui/hotstring_editor/init.lua',
 	personal_info_editor: 'ui/personal_info_editor/init.lua',
 	physical_shortcuts: 'ui/physical_shortcuts/init.lua',
@@ -353,7 +353,7 @@ const WINDOWS_APPS = {
 		checks: (m) => [new RegExp(`\\bw${m.width}\\s+h${m.height}\\b`)]
 	},
 	model_browser: {
-		file: 'ui/model_browser/init.ahk',
+		file: 'ai/ui/model_browser/init.ahk',
 		checks: (m) => [new RegExp(`\\bw${m.width}\\s+h${m.height}\\b`)]
 	},
 	hotstrings_config_window: {
@@ -364,7 +364,7 @@ const WINDOWS_APPS = {
 		]
 	},
 	prompt_editor: {
-		file: 'ui/prompt_editor/init.ahk',
+		file: 'ai/ui/prompt_editor/init.ahk',
 		checks: (m) => [
 			new RegExp(`PROMPTED_WIDTH\\s*:=\\s*${m.width}\\b`),
 			new RegExp(`PROMPTED_HEIGHT\\s*:=\\s*${m.height}\\b`)
@@ -412,7 +412,7 @@ const WINDOWS_APPS = {
 		validate: resolvesUpdateGeometry
 	},
 	download_window: {
-		file: 'modules/llm/ollama_webview.ahk',
+		file: 'ai/engine/ollama/webview.ahk',
 		checks: (m) => [
 			new RegExp(`_OllamaWV_W\\s*:=\\s*${m.width}\\b`),
 			new RegExp(`_OllamaWV_H\\s*:=\\s*${m.height}\\b`)

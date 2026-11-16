@@ -17,7 +17,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location(
     "cleanup_receiving",
-    ROOT / "static/ergopti_plus/macos/modules/llm/managed_ollama_cleanup.py",
+    ROOT / "static/ergopti_plus/macos/ai/engine/ollama/managed_ollama_cleanup.py",
 )
 CLEANUP = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = CLEANUP
@@ -674,7 +674,7 @@ class OriginalCallerHandoff(unittest.TestCase):
     def setUp(self):
         specification = importlib.util.spec_from_file_location(
             "cleanup_original_caller",
-            ROOT / "static/ergopti_plus/macos/modules/llm/managed_ollama_pull.py",
+            ROOT / "static/ergopti_plus/macos/ai/engine/ollama/managed_ollama_pull.py",
         )
         self.caller = importlib.util.module_from_spec(specification)
         sys.modules[specification.name] = self.caller

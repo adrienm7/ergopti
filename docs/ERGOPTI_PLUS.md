@@ -229,7 +229,7 @@ profonde, chaque saut vérifié :
 macos/init.lua
  → ui/menu/init.lua → ui/menu/menu_hotstrings.lua
  → modules/keymap/init.lua → modules/keymap/llm_bridge.lua
- → modules/llm/prediction_engine.lua
+ → ai/engine/prediction/engine.lua
  → modules/keystats/init.lua → watchers → log_manager → aggregator → aggregator/events → aggregator/core
  → lib/timings.lua → lib/toml/reader.lua → _shared/core/text/engine/toml_codec/reader.lua → _shared/core/logger/engine/shim.lua
 ```

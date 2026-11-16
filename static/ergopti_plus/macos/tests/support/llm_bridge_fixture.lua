@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: LLM Bridge Fixture
 --- DESCRIPTION:
---- Loads the real modules/keymap/llm_bridge.lua over strict tooltip and
+--- Loads the real ai/engine/bridge.lua over strict tooltip and
 --- prediction-engine doubles and restores package.loaded and the hs global
 --- exactly afterwards, so a scenario can never inherit another test's partial
 --- double.
@@ -157,10 +157,10 @@ local function with_bridge_fixture(callback, options)
 		fixture.tooltip = make_tooltip(fixture)
 		fixture.engine = make_prediction_engine(fixture)
 		package.loaded["core.ui.ui.tooltip"] = fixture.tooltip
-		package.loaded["modules.llm.prediction_engine"] = fixture.engine
+		package.loaded["ai.engine.prediction.engine"] = fixture.engine
 		package.loaded["core.logger.engine.logger"] = nil
 		package.loaded["adapters.event_provenance"] = options.event_provenance
-		fixture.bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+		fixture.bridge = helpers.load_with_stubs("ai.engine.bridge")
 		fixture.hs = rawget(_G, "hs")
 		fixture.logger = package.loaded["core.logger.engine.logger"]
 		return callback(fixture)

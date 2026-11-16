@@ -56,7 +56,7 @@ local function build_tray(on)
 	end
 	local mb = helpers.load_module("menu.ui.builder.builder")
 	local ok, items = pcall(mb.build, {
-		llm = require("modules.llm.prediction_engine"),
+		llm = require("ai.engine.prediction.engine"),
 		config = fake_config(),
 		_version = "0.0.0-dev.12",
 		on_toggle_pause = function() end,

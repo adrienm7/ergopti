@@ -98,7 +98,7 @@ local function with_action(route, mode, action, body)
 			environment.script_actions = require("modules.shortcuts.script_actions").new({ reset = lifecycle, reload = lifecycle, quit = lifecycle })
 			for field, name in pairs({ shortcuts = "modules.shortcuts.manager", event_loop = "core.events.loop",
 				gestures = "modules.gestures.manager", ActionHandlers = "modules.shortcuts.action_handlers",
-				prediction_engine = "modules.llm.prediction_engine", keyboard_shortcuts = "modules.shortcuts.keyboard_shortcuts",
+				prediction_engine = "ai.engine.prediction.engine", keyboard_shortcuts = "modules.shortcuts.keyboard_shortcuts",
 				keyboard_hook = "platform.input.keyboard_hook", keystats = "modules.keystats.keystats", Monotonic = "core.logger.engine.monotonic",
 				MagicKeySource = "modules.hotstrings.magic_key_source", script_chords = "modules.shortcuts.script_chords",
 				tap_keys = "modules.shortcuts.tap_keys", hotstrings_config = "modules.hotstrings.hotstrings_config",

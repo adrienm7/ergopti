@@ -4,8 +4,8 @@
 			"parent": "llm_model",
 			"section": "llm_thinking_info",
 			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_main.ahk",
-				"hs": "macos/ui/menu/menu_llm/init.lua"
+				"ahk": "windows/ai/ui/menu/menu_main.ahk",
+				"hs": "macos/ai/ui/menu/init.lua"
 			},
 			"signatures": {
 				"ahk": "_LLM_Menu_EmitRow(id, disabled) {",
@@ -16,7 +16,7 @@
 			"parent": "llm_model",
 			"section": "llm_install_warning_frame",
 			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_main.ahk"
+				"ahk": "windows/ai/ui/menu/menu_main.ahk"
 			},
 			"signatures": {
 				"ahk": "LLM_Menu_BuildSubmenu(Target := 0) {"
@@ -26,7 +26,7 @@
 			"parent": "llm",
 			"section": "llm_download_shortcut_frame",
 			"owners": {
-				"hs": "macos/ui/menu/menu_llm/init.lua"
+				"hs": "macos/ai/ui/menu/init.lua"
 			},
 			"signatures": {
 				"hs": "local function build_download_item()"
@@ -36,7 +36,7 @@
 			"parent": "llm_profile",
 			"section": "llm_profile_app_override_frame",
 			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_profiles.ahk"
+				"ahk": "windows/ai/ui/menu/profiles.ahk"
 			},
 			"signatures": {
 				"ahk": "_LLM_Menu_PerAppProfileRows() {"
@@ -46,7 +46,7 @@
 			"parent": "llm_navigation",
 			"section": "llm_modifier_picker_frame",
 			"owners": {
-				"hs": "macos/ui/menu/menu_llm/settings_manager.lua"
+				"hs": "macos/ai/ui/menu/settings_manager.lua"
 			},
 			"signatures": {
 				"hs": "local function build_modifier_menu(key, default_mods, hs_fn)"
@@ -56,7 +56,7 @@
 			"parent": "llm_model",
 			"section": "llm_api_active_boundary",
 			"owners": {
-				"hs": "macos/ui/menu/menu_llm/api_panel.lua"
+				"hs": "macos/ai/ui/menu/panels/api_panel.lua"
 			},
 			"signatures": {
 				"hs": "function M.build(ctx)"
@@ -66,7 +66,7 @@
 			"parent": "llm_model",
 			"section": "llm_api_system1_frame",
 			"owners": {
-				"hs": "macos/ui/menu/menu_llm/api_panel.lua"
+				"hs": "macos/ai/ui/menu/panels/api_panel.lua"
 			},
 			"signatures": {
 				"hs": "function M.build(ctx)"
@@ -76,8 +76,8 @@
 			"parent": "llm_generation_settings",
 			"section": "llm_generation_count_control",
 			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk",
-				"hs": "macos/ui/menu/menu_llm/init.lua"
+				"ahk": "windows/ai/ui/menu/settings.ahk",
+				"hs": "macos/ai/ui/menu/init.lua"
 			},
 			"signatures": {
 				"ahk": "_LLM_Menu_GenerationRows() {",
@@ -88,7 +88,7 @@
 			"parent": "llm_generation_settings",
 			"section": "llm_generation_count_reset_control",
 			"owners": {
-				"hs": "macos/ui/menu/menu_llm/init.lua"
+				"hs": "macos/ai/ui/menu/init.lua"
 			},
 			"signatures": {
 				"hs": "local function build_item()"
@@ -98,8 +98,8 @@
 			"parent": "llm_generation_settings",
 			"section": "llm_generation_context_controls",
 			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk",
-				"hs": "macos/ui/menu/menu_llm/init.lua"
+				"ahk": "windows/ai/ui/menu/settings.ahk",
+				"hs": "macos/ai/ui/menu/init.lua"
 			},
 			"signatures": {
 				"ahk": "_LLM_Menu_GenerationContextRows() {",
@@ -110,8 +110,8 @@
 			"parent": "llm_generation_settings",
 			"section": "llm_generation_word_controls",
 			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk",
-				"hs": "macos/ui/menu/menu_llm/init.lua"
+				"ahk": "windows/ai/ui/menu/settings.ahk",
+				"hs": "macos/ai/ui/menu/init.lua"
 			},
 			"signatures": {
 				"ahk": "_LLM_Menu_GenerationRows() {",
@@ -122,7 +122,7 @@
 			"parent": "llm_generation_settings",
 			"section": "llm_native_numeric_reset",
 			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk"
+				"ahk": "windows/ai/ui/menu/settings.ahk"
 			},
 			"signatures": {
 				"ahk": "_LLM_MaybeResetRow(Rows, current, default_val, on_click) {"
@@ -132,8 +132,8 @@
 			"parent": "llm_generation_settings",
 			"section": "llm_generation_temperature_controls",
 			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk",
-				"hs": "macos/ui/menu/menu_llm/temperature_panel.lua"
+				"ahk": "windows/ai/ui/menu/settings.ahk",
+				"hs": "macos/ai/ui/menu/panels/temperature_panel.lua"
 			},
 			"signatures": {
 				"ahk": "_LLM_Menu_GenerationRows() {",
@@ -144,7 +144,7 @@
 			"parent": "llm_trigger",
 			"section": "llm_trigger_debounce_control",
 			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk"
+				"ahk": "windows/ai/ui/menu/settings.ahk"
 			},
 			"signatures": {
 				"ahk": "_LLM_Menu_TriggerRows(Position := \"all\") {"
@@ -154,7 +154,7 @@
 			"parent": "llm_display",
 			"section": "llm_display_inline_control",
 			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk"
+				"ahk": "windows/ai/ui/menu/settings.ahk"
 			},
 			"signatures": {
 				"ahk": "_LLM_Menu_DisplayRows(Position := \"all\") {"
@@ -166,7 +166,7 @@
 	"outer_boundaries": {
 		"section": "llm_menu",
 		"rows": [],
-		"owner": "macos/ui/menu/menu_llm/init.lua",
+		"owner": "macos/ai/ui/menu/init.lua",
 		"signature": "local function build_item()",
 		"adjacent_without_boundary": ["llm_model", "llm_profile", "llm_test_prediction"]
 	}

@@ -15,21 +15,21 @@ local helpers = require("tests.helpers")
 --- Exercises the browser provider with its unrelated tray surfaces isolated.
 --- @param callback function Receives native rows and observable browser ports.
 local function with_browser(callback)
-	local names = { "menu.ui.builder.builder", "ui.menu.llm_backend_rows", "menu.engine.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
+	local names = { "menu.ui.builder.builder", "ai.ui.menu.backend_rows", "menu.engine.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
 		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
 		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "core.ui.ui.modal",
 		"core.ui.ui.text_prompt", "ai.engine.policy.trigger_policy", "infra.version", "core.lifecycle.engine.installation",
-		"updater.engine.version_label", "updater.engine.schedule", "ui.model_browser.bridge" }
+		"updater.engine.version_label", "updater.engine.schedule", "ai.ui.model_browser.bridge" }
 	local saved = {}
 	for _, name in ipairs(names) do
 		saved[name] = package.loaded[name]
-		if name == "ui.menu.llm_backend_rows" then package.loaded[name] = nil
+		if name == "ai.ui.menu.backend_rows" then package.loaded[name] = nil
 		else package.loaded[name] = {} end
 	end
 	local ok, err = xpcall(function()
 		local controls = { shows = 0, result = true }
-		package.loaded["ui.model_browser.bridge"] = { bind = function(options) controls.bound = options end }
+		package.loaded["ai.ui.model_browser.bridge"] = { bind = function(options) controls.bound = options end }
 		local source = debug.getinfo(1, "S").source:gsub("^@", "")
 		local driver = assert(source:match("^(.*)/tests/unit/"))
 		-- The Delete question's dialog command reads the driver root from here.
@@ -93,7 +93,7 @@ end
 --- @param rows table Native rows.
 --- @return table|nil row, table|nil siblings The rows that hold it.
 local function selector_row(rows)
-	local emoji = require("modules.llm.backend_brands").emoji("ollama")
+	local emoji = require("ai.engine.api.backend_brands").emoji("ollama")
 	for _, row in ipairs(rows or {}) do
 		if type(row.title) == "string" and row.title:sub(1, #emoji) == emoji then return row, rows end
 		local nested, siblings = selector_row(row.menu)
@@ -108,7 +108,7 @@ helpers.describe("the model selector button (model-selector-page)", function()
 			local row, siblings = selector_row(fixture.builder.build(fixture.ctx))
 			helpers.assert_type(row, "table")
 			helpers.assert_eq(#siblings, 1, "the AI menu draws one button, no model list")
-			helpers.assert_eq(row.title, require("modules.llm.backend_brands").emoji("ollama") .. " qwen3:4b")
+			helpers.assert_eq(row.title, require("ai.engine.api.backend_brands").emoji("ollama") .. " qwen3:4b")
 			helpers.assert_eq(row.menu, nil, "the button opens the page, never a submenu")
 			helpers.assert_true(row.disabled ~= true)
 			helpers.assert_eq(row.fn(), true)

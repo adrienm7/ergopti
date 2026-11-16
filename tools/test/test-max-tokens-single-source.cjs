@@ -48,14 +48,14 @@ const SSOT_FILE = path.join(
 
 // Backend adapters that must defer to the shared constant for their default.
 const ADAPTERS = [
-	'static/ergopti_plus/windows/modules/llm/api_remote.ahk',
+	'static/ergopti_plus/windows/ai/engine/api/remote.ahk',
 	// api_ollama.ahk is a redirect shim; the payload builder (where max_tokens
 	// resolves) lives in the api_ollama/ sub-directory after the god-file split.
-	'static/ergopti_plus/windows/modules/llm/api_ollama/ollama_payload.ahk',
-	'static/ergopti_plus/macos/modules/llm/api_remote.lua',
+	'static/ergopti_plus/windows/ai/engine/api_ollama/ollama_payload.ahk',
+	'static/ergopti_plus/macos/ai/engine/api/remote.lua',
 	// The MLX request builder (where max_tokens resolves) moved out of api_mlx.lua
 	// into the api_mlx_inference sibling during the P6 god-file split.
-	'static/ergopti_plus/macos/modules/llm/api_mlx_inference.lua'
+	'static/ergopti_plus/macos/ai/engine/api/mlx_inference.lua'
 ];
 
 // Each builder file must positively reference the shared constant so the default

@@ -37,7 +37,7 @@ const LINUX_MENU_ROOT = 'linux/menu/ui/builder/builder.lua';
 // every listed module must exist.
 const PART_MODULES = new Set([
 	'ui.menu.menu_about',
-	'ui.menu.menu_agent',
+	'ai.ui.menu.agent',
 	'ui.menu.menu_apps',
 	'settings.ui.menu.configuration',
 	'ui.menu.menu_debug',
@@ -47,7 +47,7 @@ const PART_MODULES = new Set([
 	'ui.menu.menu_hotstrings',
 	'settings.ui.menu.language',
 	'ui.menu.menu_layouts',
-	'ui.menu.menu_llm',
+	'ai.ui.menu.llm',
 	'ui.menu.menu_metrics',
 	'menu.ui.builder.quit',
 	'menu.ui.builder.reload',

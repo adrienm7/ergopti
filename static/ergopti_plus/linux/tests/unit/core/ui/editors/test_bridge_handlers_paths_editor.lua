@@ -367,7 +367,7 @@ end)
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("model_browser_bridge", function()
-    local handler = helpers.load_module("ui.model_browser.bridge")
+    local handler = helpers.load_module("ai.ui.model_browser.bridge")
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "model_browser_bridge")

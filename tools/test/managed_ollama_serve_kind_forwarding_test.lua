@@ -7,7 +7,7 @@ local function read(name)
 	local file = assert(io.open(root .. "/static/ergopti_plus/macos/" .. name, "rb"))
 	local source = assert(file:read("*a")); assert(file:close()); return source
 end
-local api = read("modules/llm/api_ollama.lua")
+local api = read("ai/engine/api/ollama.lua")
 local body = assert(api:match("(local resolved_ok, ollama_bin, binary_err, source_kind.-)\n%s*local serve_handle"),
 	"The canonical API must classify before foreground acquisition")
 local Choice = assert(loadfile(root .. "/static/ergopti_plus/_shared/core/lifecycle/engine/core/ollama_runtime_choice.lua"))()

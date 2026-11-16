@@ -410,7 +410,7 @@ for (const driver of ['windows', 'macos', 'linux']) {
 // 5. MLX on macOS, with its reason.
 assert.equal(recommended('llm.models', 'selected', 'hs'), 'mlx');
 assert.match(
-	read('macos/ui/menu/menu_llm/backend_labels.lua'),
+	read('macos/ai/ui/menu/backend_labels.lua'),
 	/\bmlx\s*=\s*"menu\.llm\.backend_mlx_suffix"/
 );
 assert.match(en['menu.llm.backend_mlx_suffix'], /Apple Silicon/);

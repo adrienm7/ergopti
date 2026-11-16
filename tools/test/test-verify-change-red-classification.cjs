@@ -120,8 +120,7 @@ console.log(
 	'verify-change report coverage: standalone, covering and unrelated failures classified correctly.'
 );
 
-const ahkTest =
-	'static/ergopti_plus/windows/tests/unit/modules/llm/menu/test_llm_menu_regressions.ahk';
+const ahkTest = 'static/ergopti_plus/windows/tests/unit/ai/menu/test_regressions.ahk';
 cli = reportCli('test:ahk-loop-capture', false, [ahkTest]);
 assert.equal(cli.exitCode, 1, 'a static loop-capture refusal must block an AHK-only change');
 assert.deepEqual(cli.commands, ['test:ahk-encoding', 'test:ahk-loop-capture']);

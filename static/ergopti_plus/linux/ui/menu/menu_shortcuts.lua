@@ -572,7 +572,7 @@ local function _build_shortcuts(ctx)
 					return require("ui.user_action_editor").ask(spec, title, gestures.get_action_parameter_prompt(action), prior)
 				end
 				-- A backend is picked from a list, as on the action picker page.
-				if spec == "llm_vision" then return require("ui.vision_parameter_prompt").ask(title, prior) end
+				if spec == "llm_vision" then return require("ai.ui.vision_parameter_prompt").ask(title, prior) end
 				return prompt_text(title, plain_markup(gestures.get_action_parameter_prompt(action)), prior)
 			end,
 		})

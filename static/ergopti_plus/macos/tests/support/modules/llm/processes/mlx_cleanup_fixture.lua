@@ -13,11 +13,11 @@ local OWNED = {
 	"core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n", "settings.engine.paths",
 	"core.text.engine.utils", "core.timing.engine.timings", "core.fs.engine.paths", "core.fs.adapters.storage",
 	"core.network.adapters.http_client", "core.fs.adapters.json_codec", "core.process.adapters.shell_runner",
-	"core.events.timer_scheduler", "core.process.adapters.task_lifecycle", "modules.llm.profiles",
-	"modules.llm.api_common", "modules.llm.api_mlx_inference", "modules.llm.api_mlx_fetch",
-	"modules.llm.api_mlx_discovery", "modules.llm.mlx_stream_retirement",
-	"modules.llm.api_mlx", "modules.llm.boot_cleanup",
-	"ui.menu.menu_llm.models_manager_mlx_server",
+	"core.events.timer_scheduler", "core.process.adapters.task_lifecycle", "ai.engine.settings.profiles",
+	"ai.engine.api.common", "ai.engine.api.mlx_inference", "ai.engine.api.mlx_fetch",
+	"ai.engine.api.mlx_discovery", "ai.engine.local_servers.mlx_stream_retirement",
+	"ai.engine.api.mlx", "ai.engine.bootstrap.boot_cleanup",
+	"ai.ui.menu.models.manager_mlx_server",
 }
 
 --- Quotes one opaque argument for the receiving POSIX shell.
@@ -68,24 +68,24 @@ function M.with_commands(callback)
 				end,
 				start = function(task) return task.start() end,
 			}
-			package.loaded["modules.llm.profiles"] = {}
-			package.loaded["modules.llm.api_common"] = { protected_call = protected }
-			package.loaded["modules.llm.mlx_stream_retirement"] = {}
+			package.loaded["ai.engine.settings.profiles"] = {}
+			package.loaded["ai.engine.api.common"] = { protected_call = protected }
+			package.loaded["ai.engine.local_servers.mlx_stream_retirement"] = {}
 			for _, name in ipairs({ "inference", "fetch", "discovery" }) do
 				package.loaded["modules.llm.api_mlx_" .. name] = { init = noop }
 			end
-			local api = require("modules.llm.api_mlx")
+			local api = require("ai.engine.api.mlx")
 			api.set_active_server_pgid(700)
 			helpers.assert_eq(#commands, 1, "the guarded API must emit its real cleanup")
 			local guarded = commands[1]
-			helpers.assert_true(require("modules.llm.boot_cleanup").run_selective_cleanup(noop))
+			helpers.assert_true(require("ai.engine.bootstrap.boot_cleanup").run_selective_cleanup(noop))
 			helpers.assert_eq(#commands, 2)
 			local boot = commands[2]
 			api.reset_endpoints = function() return true end
 			api.set_model_hf_path = noop
 			_G.hs = { execute = function() return "" end }
 			local obj = { get_mlx_repo = function() return "fixture/repo" end }
-			require("ui.menu.menu_llm.models_manager_mlx_server").install({
+			require("ai.ui.menu.models.manager_mlx_server").install({
 				obj = obj, deps = { active_tasks = {} }, active_tasks_gc_root = {},
 				project_venv_python_escaped = "/Users/Example/Library/Application Support/mlx/bin/python3",
 			})

@@ -279,10 +279,13 @@ foreach ($Case in $Corpus.vectors) {
 // The launcher hashes its proxy dependencies in the order it lists them, and
 // the AHK bootstrap hashes the same names in its own list: a different order
 // or name refuses every launch. The pull's login exit code is mirrored too.
-const LLM_DIR = 'static/ergopti_plus/windows/modules/llm';
-const launcher = fs.readFileSync(path.join(ROOT, LLM_DIR, 'ollama-runtime-launch.ps1'), 'utf8');
-const pull = fs.readFileSync(path.join(ROOT, LLM_DIR, 'ollama-model-pull.ps1'), 'utf8');
-const bootstrap = fs.readFileSync(path.join(ROOT, LLM_DIR, 'ollama_managed_bootstrap.ahk'), 'utf8');
+const LLM_DIR = 'static/ergopti_plus/windows/ai/engine';
+const launcher = fs.readFileSync(
+	path.join(ROOT, LLM_DIR, 'ollama/ollama-runtime-launch.ps1'),
+	'utf8'
+);
+const pull = fs.readFileSync(path.join(ROOT, LLM_DIR, 'ollama/ollama-model-pull.ps1'), 'utf8');
+const bootstrap = fs.readFileSync(path.join(ROOT, LLM_DIR, 'ollama/managed_bootstrap.ahk'), 'utf8');
 const launcherNames = /function Get-OllamaRuntimeVendorNames \{\s*return @\(([^)]*)\)/.exec(
 	launcher
 );
@@ -303,7 +306,7 @@ assert.equal(ahkCode[1], pullCode[1], 'one login exit code');
 
 // The AHK owner admits a readiness receipt only with exactly these fields: a
 // field the launcher adds alone leaves the daemon never ready, with no error.
-const receiptOwner = fs.readFileSync(path.join(ROOT, LLM_DIR, 'ollama_runtime_owner.ahk'), 'utf8');
+const receiptOwner = fs.readFileSync(path.join(ROOT, LLM_DIR, 'ollama/runtime_owner.ahk'), 'utf8');
 const launcherReceipt = /\$receipt = \[ordered\]@\{([\s\S]*?)\}\r?\n/.exec(launcher);
 const ownerReceipt = /global OLLAMA_RUNTIME_RECEIPT_FIELDS := \[([^\]]*)\]/.exec(receiptOwner);
 assert.ok(launcherReceipt && ownerReceipt, 'both sides declare the receipt fields');

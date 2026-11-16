@@ -5,7 +5,7 @@
 _ASC_GestureUsesCanonicalToggle() {
 	; Move-resilient: scope the gesture-specific usage to the modules tree and the
 	; "must be deleted" checks to the whole driver source (strengthens them)
-	Src := _DriverDirConcat("modules")
+	Src := _DriverDirsConcat("modules", "ai/engine")
 	Whole := _DriverSourceConcat()
 	Assert(InStr(Src, "IsSet(ToggleActivitySimulation) ? ToggleActivitySimulation()") > 0, "gestures.ahk must use the canonical ToggleActivitySimulation() from shortcuts/win.ahk (activitysim-global-collision)")
 	Assert(InStr(Whole, "GestureToggleActivitySimulation") == 0, "GestureToggleActivitySimulation must be deleted in favor of ToggleActivitySimulation (activitysim-global-collision)")

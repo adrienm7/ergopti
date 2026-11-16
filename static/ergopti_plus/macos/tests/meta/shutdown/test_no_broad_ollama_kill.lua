@@ -125,7 +125,7 @@ helpers.describe("Item 120: no broad Ollama termination", function()
 		end
 		local clean = {
 			'start_detached_sweep(sweep.label, PKILL_BIN, { "-f", "ergopti_plus_expander" })',
-			'local ApiOllama = require("modules.llm.api_ollama")',
+			'local ApiOllama = require("ai.engine.api.ollama")',
 			'pcall_log("owned Ollama retirement", ApiOllama.stop_owned_server)',
 			'-- pkill -f ollama would kill the user\'s own server',
 			'"lsof -nP -tiTCP:8080 -sTCP:LISTEN | xargs kill -9"',

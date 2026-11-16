@@ -136,7 +136,7 @@ const globalOf = (source, name) => {
 };
 
 // 1. The consuming hotkeys cycle.
-const tabAccept = stripComments(read('ui/menu/menu_llm/tab_accept.ahk'));
+const tabAccept = stripComments(read('ai/ui/menu/tab_accept.ahk'));
 const routes = globalOf(tabAccept, 'LLM_NAV_CYCLE_ROUTES');
 const routeCodes = new Map();
 const routeDeltas = new Map();
@@ -281,7 +281,7 @@ check(
 );
 
 // 2. No native cycle route matches a consumed key.
-const adapter = stripComments(read('adapters/llm_nav_event_owner.ahk'));
+const adapter = stripComments(read('ai/adapters/nav_event_owner.ahk'));
 const parked = [
 	...globalOf(adapter, 'LLM_NAV_EVENT_OWNER_PARKED_CYCLE_ROUTES').matchAll(
 		/Map\("axis", (\d+), "code", (0x[0-9A-F]+|\d+), "modifiers", (0x[0-9A-F]+|\d+)\)/gi
@@ -351,9 +351,9 @@ check(
 );
 
 // 4. The behavioural regression runs in the AHK suite.
-const testFile = 'tests/unit/modules/llm/navigation/test_llm_nav_cycle_windows.ahk';
+const testFile = 'tests/unit/ai/navigation/test_nav_cycle_windows.ahk';
 check(
-	/^#Include unit\/modules\/llm\/navigation\/test_llm_nav_cycle_windows\.ahk\s*$/m.test(
+	/^#Include unit\/ai\/navigation\/test_nav_cycle_windows\.ahk\s*$/m.test(
 		read('tests/run_all.ahk')
 	),
 	`tests/run_all.ahk must include ${testFile}`

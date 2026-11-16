@@ -9,15 +9,15 @@
 --- internet only through its company proxy could not install the remap engine
 --- and was told it was offline (NET-001). Each download now runs behind the
 --- same system network prelude as the Ollama and MLX children
---- (modules/llm/network_env.lua), resolved for the `karabiner` client of
+--- (ai/engine/api/network_env.lua), resolved for the `karabiner` client of
 --- _shared/core/network/data/route_origins.json, and a refused route is named
 --- through the shared managed network failure classes.
 --- ==============================================================================
 
 local M = {}
 
-local NetworkEnv = require("modules.llm.network_env")
-local Admission = require("modules.llm.opaque_network_admission")
+local NetworkEnv = require("ai.engine.api.network_env")
+local Admission = require("ai.engine.api.opaque_network_admission")
 
 -- curl is exec'd by the prelude's shell, so its PID, exit status and output
 -- remain the task's own.

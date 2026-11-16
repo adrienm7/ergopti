@@ -53,7 +53,7 @@ _ARP_CallLinePos(Src, Name) {
 _ARP_RollsRegisteredLast() {
 	; Move-resilient: both call sites live in modules/keymap/layout.ahk; scope to the
 	; modules tree so their relative registration order is preserved in the concat
-	Src := _DriverDirConcat("modules")
+	Src := _DriverDirsConcat("modules", "ai/engine")
 	PosLayer := _ARP_CallLinePos(Src, "RegisterAltGrLayer")
 	PosRolls := _ARP_CallLinePos(Src, "_RegisterRollsAltGrHotkeys")
 	Assert(PosLayer > 0, "RegisterAltGrLayer() call site must exist in modules/keymap/layout.ahk")

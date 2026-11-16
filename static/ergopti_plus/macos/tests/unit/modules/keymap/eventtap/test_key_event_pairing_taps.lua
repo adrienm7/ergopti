@@ -22,7 +22,7 @@ local function load_fixture()
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
 			helpers.in_module_family(name, "modules.keymap")
-			or helpers.in_module_family(name, "modules.llm")
+			or helpers.in_module_family(name, "ai.engine")
 			or name:match("^modules%.keystats")
 			or name:match("^core%.ui%.ui%.tooltip")
 			or name == "platform.input.synthetic_input"

@@ -39,14 +39,14 @@ chain_fallback_ms = 500
 # How long an automatic request that found its backend busy waits before it
 # asks again. The wait is at least the user's request interval; this keeps it
 # positive when that interval is 0 (llm.trigger.min_request_interval_ms).
-# LX: modules/llm/prediction_engine.lua send_when_free.
+# LX: ai/engine/prediction/engine.lua send_when_free.
 backend_busy_recheck_ms = 300
 
 # How often a just-installed owned Ollama re-reads its runtime metadata
 # before the daemon starts: the metadata is read off the UI thread, so the
 # first read after the install is still pending; the wait stops at the
 # metadata admission budget (_shared/core/network/data/bootstrap_retry.json).
-# HS: modules/llm/ollama_deps_checker.lua RUNTIME_METADATA_POLL_SEC.
+# HS: ai/engine/ollama/deps_checker.lua RUNTIME_METADATA_POLL_SEC.
 ollama_runtime_metadata_poll_ms = 250
 
 # HTTP request hard timeout for the remote LLM API.
@@ -63,7 +63,7 @@ ollama_request_timeout_ms = 180000
 # Period of the AI health watch that repaints the AI menu title's dot when
 # the active backend turns ready or fails after the menu was built (any
 # backend: local API, MLX, Ollama). It only reads in-memory state.
-# HS: ui/menu/menu_llm/init.lua HEALTH_WATCH_SEC.
+# HS: ai/ui/menu/init.lua HEALTH_WATCH_SEC.
 ai_health_watch_ms = 1000
 
 # Deadline of one models probe of a local OpenAI-compatible server
@@ -112,7 +112,7 @@ keychain_operation_timeout_ms = 10000
 # answers). Retry: delay before the next attempt, doubled after each failure
 # other than a locked keyring up to retry_max (a locked keyring is probed again
 # after retry, since the probe never prompts).
-# LX: modules/llm/api_key_migration.lua.
+# LX: ai/engine/settings/api_key_migration.lua.
 api_key_migration_probe_timeout_ms = 5000
 api_key_migration_store_timeout_ms = 20000
 api_key_migration_retry_ms = 60000
@@ -125,13 +125,13 @@ dependency_bootstrap_timeout_ms = 1800000
 
 # Longest wait for the desktop's proxy answer (a company PAC is downloaded and
 # evaluated) before the managed Ollama server is started with that proxy.
-# LX: modules/llm/runtime_factory.lua managed proxy lookup.
+# LX: ai/engine/local_servers/runtime_factory.lua managed proxy lookup.
 managed_proxy_lookup_timeout_ms = 30000
 
 # Longest TCP connect to a relay a PAC names before another entry ("PROXY a;
 # DIRECT"): an unreachable relay sends the managed Ollama server to the next
-# entry, as a browser does. LX: modules/llm/managed_ollama_proxy.lua.
-# AHK: modules/llm/ollama_managed_bootstrap.ahk (ProxyListProbeMs).
+# entry, as a browser does. LX: ai/engine/ollama/managed_ollama_proxy.lua.
+# AHK: ai/engine/ollama/managed_bootstrap.ahk (ProxyListProbeMs).
 managed_proxy_probe_timeout_ms = 1000
 
 # HTTP polling interval when the remote driver polls a streaming response.
@@ -157,7 +157,7 @@ warmup_post_timeout_ms = 30000
 non_stream_timeout_ms = 8000
 
 # Initial delay before the first warmup attempt after startup.
-# HS: warmup_controller.lua. LX: modules/llm/warmup.lua (also its retry base and cap).
+# HS: warmup_controller.lua. LX: ai/engine/local_servers/warmup.lua (also its retry base and cap).
 warmup_initial_delay_ms = 2000
 
 # Base retry interval for the exponential-backoff warmup retry loop.
@@ -199,7 +199,7 @@ installed_cache_ttl_ms = 2000
 # Ceiling of one Ollama DELETE /api/delete round trip (the "Delete this model
 # from cache" row); Ollama answers in well under a second once it holds no lock.
 # AHK: api_ollama/init.ahk LLM_OLLAMA_DELETE_TIMEOUT_MS.
-# LX: modules/llm/model_delete.lua.
+# LX: ai/engine/local_servers/model_delete.lua.
 ollama_delete_timeout_ms = 10000
 
 # Validation chord (val_modifiers + digit N): the prediction is inserted only
@@ -235,7 +235,7 @@ infinite_ttl_ms = 86400000
 hotstring_min_ttl_ms = 50
 
 # Auto-hide delay for success banners in the deps-checker UI.
-# HS: modules/llm/ollama_deps_checker.lua and mlx_deps_checker.lua SUCCESS_AUTO_HIDE_SEC.
+# HS: ai/engine/ollama/deps_checker.lua and mlx_deps_checker.lua SUCCESS_AUTO_HIDE_SEC.
 success_banner_autohide_ms = 1500
 
 # Auto-dismiss delay for error dialogs in the download window.
@@ -243,7 +243,7 @@ success_banner_autohide_ms = 1500
 error_dialog_autodismiss_ms = 8000
 
 # Webview auto-close delay after a successful Ollama operation.
-# AHK: modules/llm/ollama_webview.ahk OllamaWV_Done.
+# AHK: ai/engine/ollama/webview.ahk OllamaWV_Done.
 ollama_webview_autoclose_ms = 1800
 
 
@@ -1032,7 +1032,7 @@ webview_navigation_flush_delay_ms = 150
 webview_ready_safety_flush_ms = 1500
 
 # Windows: the same safety flush of the Ollama, changelog and model browser pages.
-# AHK: modules/llm/ollama_webview.ahk, ui/changelog/init.ahk, ui/model_browser/init.ahk.
+# AHK: ai/engine/ollama/webview.ahk, ui/changelog/init.ahk, ai/ui/model_browser/init.ahk.
 webview_page_safety_flush_ms = 2000
 
 # Windows: the same safety flush of the shared webview host and of onboarding.
@@ -1058,7 +1058,7 @@ webkit_warmup_hold_ms = 5000
 metrics_typing_poll_ms = 300
 
 # macOS: delay before the model manager retries a deferred delivery.
-# HS: ui/menu/menu_llm/models_manager.lua.
+# HS: ai/ui/menu/models/manager.lua.
 model_manager_retry_ms = 100
 
 # macOS: delay before the dialog focus is claimed after a modal opens.
@@ -1226,13 +1226,13 @@ menu_rebuild_ms = 250
 
 # One request to a local AI server (Ollama, MLX, a local OpenAI-compatible
 # server), request to answer. Measured local time to first token p50 1573 ms.
-# HS: modules/llm/api_ollama.lua. AHK: modules/llm/llm_request_latency.ahk.
+# HS: modules/llm/api_ollama.lua. AHK: ai/engine/prediction/request_latency.ahk.
 llm_local_request_ms = 2000
 
 # One request to a cloud AI provider, request to answer. Measured 706 to 1479 ms;
 # 3000 ms leaves room for a provider's own queue.
 # HS: modules/llm/api_remote.lua. LX: modules/llm/api_remote.lua.
-# AHK: modules/llm/llm_request_latency.ahk.
+# AHK: ai/engine/prediction/request_latency.ahk.
 llm_remote_request_ms = 3000
 
 # A streamed prediction: chain start to the tooltip's first display (TTFT).
@@ -1302,7 +1302,7 @@ window_switch_worker_sleep_ms = 10
 # client's request head; idle: an open tunnel with no byte in either direction;
 # probe: the whole probe child, from start to its JSON line.
 # LX: core/network/engine/proxy_auth_relay.lua. HS: adapters/field_check_ports.lua,
-# modules/llm/ollama_server_command.lua (network-retry.sh run_with_proxy_sign_in_relay).
+# ai/engine/ollama/server_command.lua (network-retry.sh run_with_proxy_sign_in_relay).
 proxy_relay_dial_timeout_ms = 10000
 proxy_relay_handshake_timeout_ms = 15000
 proxy_relay_idle_timeout_ms = 300000
@@ -1327,11 +1327,11 @@ proxy_relay_probe_timeout_ms = 30000
 process_output_bytes = 65536
 
 # Bytes of one /proc/<pid>/cmdline the Linux local-server scan reads: ports and
-# server names sit well inside it. LX: modules/llm/local_server_ports.lua.
+# server names sit well inside it. LX: ai/engine/local_servers/ports.lua.
 proc_cmdline_bytes = 65536
 
 # Largest managed-Ollama environment declaration file the Linux driver reads.
-# LX: modules/llm/managed_ollama_environment.lua.
+# LX: ai/engine/ollama/managed_ollama_environment.lua.
 declaration_file_bytes = 65536
 
 # Largest changelog feed the Linux changelog window downloads (ten releases'

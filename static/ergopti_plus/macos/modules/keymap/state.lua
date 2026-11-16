@@ -264,7 +264,7 @@ function M.new(defaults, delays_default)
 	--- rounded to milliseconds against the elapsed milliseconds) and Linux: the exact
 	--- deadline instant still fires, one millisecond later does not. A missing elapsed
 	--- time fails closed, as there. The tooltip never promises a zero-length window
-	--- (see literal_preview_allowed in llm_bridge.lua).
+	--- (see literal_preview_allowed in ../../ai/engine/bridge.lua).
 	--- @param elapsed number|nil Seconds since the preceding physical key.
 	--- @param complex_mult number|nil Modifier timing multiplier (defaults to 1).
 	--- @return boolean allowed

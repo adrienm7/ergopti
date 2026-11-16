@@ -13,7 +13,7 @@
 ; dispatch a network request and mutate module state -- violating the
 ; "pause = tout éteint" invariant.
 ;
-; SCOPE: source introspection of ui/model_browser/init.ahk and
+; SCOPE: source introspection of ai/ui/model_browser/init.ahk and
 ; ui/changelog/init.ahk.
 ; ==============================================================================
 
@@ -28,7 +28,7 @@
 
 _WBSG_CheckModelBrowserGuard() {
 	Body := _DriverFuncBody("_LLM_MBW_OnWebMessage")
-	Assert(Body != "", "_LLM_MBW_OnWebMessage must exist in ui/model_browser/init.ahk")
+	Assert(Body != "", "_LLM_MBW_OnWebMessage must exist in ai/ui/model_browser/init.ahk")
 
 	SuspendPos := InStr(Body, "A_IsSuspended")
 	Assert(SuspendPos > 0,

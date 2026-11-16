@@ -20,13 +20,13 @@ end
 
 local function with_profile(body)
 	Fixture.with_configuration(function(f)
-		local profiles = require("modules.llm.profile_settings")
+		local profiles = require("ai.engine.settings.profile_settings")
 		assert(profiles.save_user_profile({ id = "user_owned", label = "Owned draft",
 			system_single = "Original prompt", batch = false }, false, false))
 		local baseline = f.bytes("a")
 		local file = assert(io.open(f.dirs.b .. "/config.toml", "wb"))
 		assert(file:write(baseline)); assert(file:close())
-		local bridge = helpers.load_module("ui.prompt_editor.bridge")
+		local bridge = helpers.load_module("ai.ui.prompt_editor.bridge")
 		local i18n = require("core.i18n.engine.i18n")
 		local rows = require("menu.ui.builder.builder").build({
 			_version = "0.0.0-dev.12", paused = false, is_paused = function() return false end,
@@ -76,11 +76,11 @@ end
 helpers.describe("profile editor originating configuration", function()
 	helpers.it("retains whitespace in an existing raw prompt through the real profile owner", function()
 		Fixture.with_configuration(function(f)
-			local profiles = require("modules.llm.profile_settings")
+			local profiles = require("ai.engine.settings.profile_settings")
 			local raw = "  \tRésumé 漢字  \t"
 			local profile = { id = "user_raw", label = "Raw", system_single = "hidden", raw_prompt = raw, batch = false }
 			helpers.assert_true(profiles.save_user_profile(profile, false, false))
-			local bridge = helpers.load_module("ui.prompt_editor.bridge")
+			local bridge = helpers.load_module("ai.ui.prompt_editor.bridge")
 			helpers.assert_true(bridge.open(profile, function(value) return profiles.save_user_profile(value, false, true) end))
 			local context = { app_name = "prompt_editor", epoch = f.host.current_epoch("prompt_editor"),
 				close_owned_window = function() return f.host.hide("prompt_editor") end }

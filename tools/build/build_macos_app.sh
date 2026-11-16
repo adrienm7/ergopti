@@ -80,7 +80,7 @@ LAUNCHER_LOCALIZATIONS="$(python3 "$REPO_ROOT/tools/build/launcher_localizations
 
 # Ollama is not bundled either: the first selection of the Ollama backend
 # offers to install Ergopti's own pinned runtime into Application Support
-# (modules/llm/ensure-ollama-native-deps.sh). The 79.6 MB binary this build
+# (ai/engine/ensure-ollama-native-deps.sh). The 79.6 MB binary this build
 # used to copy under Resources/Tools/ weighed 29.4 MB of the zip.
 
 # Developer source mode: 1 records this clone's root in the launcher Info.plist
@@ -124,7 +124,7 @@ GH_REPO="${GH_REPO:-${UPDATER_REPOSITORY#*/}}"
 . "$REPO_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 # One owner of the file digest: shasum escapes the digest of a name holding a
 # backslash, which sha256_file_digest strips (the checkout path is the user's).
-. "$REPO_ROOT/static/ergopti_plus/macos/modules/llm/network-retry.sh"
+. "$REPO_ROOT/static/ergopti_plus/macos/ai/engine/network-retry.sh"
 BUNDLE_ID="$ERGOPTI_BUNDLE_ID_LAUNCHER"
 HAMMERSPOON_BUNDLE_ID="$ERGOPTI_BUNDLE_ID_HAMMERSPOON"
 

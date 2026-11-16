@@ -38,7 +38,7 @@ local PromptAction = require("ai.engine.prediction.prompt_action")
 --- @param body function
 --- @param initial table|nil Stored preference values.
 local function with_profiles(body, initial)
-	local ProfileSettings = require("modules.llm.profile_settings")
+	local ProfileSettings = require("ai.engine.settings.profile_settings")
 	ProfileSettings._reset()
 	local ok, err = pcall(PreferencesFixture.with, function() body(ProfileSettings) end,
 		{ initial = initial })

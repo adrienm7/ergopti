@@ -60,7 +60,7 @@ local function load_remote()
 		post = function() error("the parser corpus must not reach the network") end,
 		cancel = function() return true end,
 	}
-	local remote = helpers.load_module("modules.llm.api_remote")
+	local remote = helpers.load_module("ai.engine.api.api_remote")
 	package.loaded["core.network.adapters.http_client"] = saved_client
 	for name in pairs(package.loaded) do
 		if not before[name] then package.loaded[name] = nil end

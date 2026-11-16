@@ -175,7 +175,7 @@ return function(helpers)
 		end)
 		if Manifest.resolves_platform_defaults == true then
 			helpers.it("does not resolve an included native backend for direct planning", function()
-				local name = "modules.llm.backend_detector"
+				local name = "ai.engine.api.backend_detector"
 				local previous, calls = package.loaded[name], 0
 				package.loaded[name] = { auto_default = function() calls = calls + 1; return "llama_cpp" end }
 				local ok, err = pcall(function()

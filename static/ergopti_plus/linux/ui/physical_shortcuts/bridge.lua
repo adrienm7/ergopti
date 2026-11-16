@@ -168,7 +168,7 @@ function M.open(options)
 								Gestures.get_action_parameter_prompt(id),Gestures.get_action_parameter(binding,id))
 						elseif spec == "llm_vision" then
 							-- A backend is picked from a list, as on the action picker page.
-							parameter = require("ui.vision_parameter_prompt").ask(I18n.get("physical_shortcuts.window_title"),
+							parameter = require("ai.ui.vision_parameter_prompt").ask(I18n.get("physical_shortcuts.window_title"),
 								Gestures.get_action_parameter(binding,id))
 						else
 							parameter = require("core.ui.ui.text_prompt").ask(I18n.get("physical_shortcuts.window_title"),

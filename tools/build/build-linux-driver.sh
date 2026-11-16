@@ -263,7 +263,7 @@ REQUIRED_FILES=(
 	"_shared/metrics/engine/metrics.lua"
 	"_shared/metrics/engine/aggregator/helpers.lua"
 	"_shared/ai/engine/prediction/prompt_builder_core.lua"
-	"linux/infra/llm_bridge.lua"
+	"linux/ai/engine/bridge.lua"
 	"_shared/tray/protocol.lua"
 	# The tray logo. Without it the icon silently falls back to a generic glyph.
 	"_shared/tray/data/ergopti_tray.png"

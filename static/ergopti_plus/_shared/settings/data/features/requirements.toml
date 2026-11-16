@@ -126,19 +126,19 @@ file_name = 'ollama'
 
 [detection.macos.ollama.owners]
 "adapters/managed_ollama_" = ["llm.**", "!llm.models.mlx"]
-"modules/llm/" = ["llm.**", "!llm.models.mlx"]
+"ai/engine/" = ["llm.**", "!llm.models.mlx"]
 
 [detection.macos.ollama.plumbing]
-"ui/menu/menu_llm/" = "the LLM menu edits the settings; the modules/llm owners run the features"
+"ai/ui/menu/" = "the LLM menu edits the settings; the ai/engine owners run the features"
 
 [detection.macos.mlx]
 file_name = 'mlx'
 
 [detection.macos.mlx.owners]
-"modules/llm/" = ["llm.**", "!llm.models.ollama"]
+"ai/engine/" = ["llm.**", "!llm.models.ollama"]
 
 [detection.macos.mlx.plumbing]
-"ui/menu/menu_llm/" = "the LLM menu edits the settings and offers the MLX repair; the modules/llm owners run the features"
+"ai/ui/menu/" = "the LLM menu edits the settings and offers the MLX repair; the ai/engine owners run the features"
 
 
 
@@ -245,7 +245,7 @@ content = ['["\x27]wmctrl[ "\x27]', 'has_command\("wmctrl"']
 file_name = 'ollama'
 
 [detection.linux.ollama.owners]
-"modules/llm/" = ["llm.**"]
+"ai/engine/" = ["llm.**"]
 
 
 
@@ -259,14 +259,14 @@ file_name = 'ollama'
 file_name = 'ollama'
 
 [detection.windows.ollama.owners]
-"adapters/ollama_identity.ahk" = ["llm.**"]
-"modules/llm/" = ["llm.**"]
+"ai/adapters/ollama_identity.ahk" = ["llm.**"]
+"ai/engine/" = ["llm.**"]
 
 [detection.windows.webview2]
 content = ['WebView2Loader', 'CreateCoreWebView2']
 
 [detection.windows.webview2.owners]
-"modules/llm/ollama_webview.ahk" = ["llm.**"]
+"ai/engine/ollama/webview.ahk" = ["llm.**"]
 "modules/keystats/keystats_webview.ahk" = ["metrics.*"]
 "ui/error_dialog/" = ["script.show_error_dialog"]
 

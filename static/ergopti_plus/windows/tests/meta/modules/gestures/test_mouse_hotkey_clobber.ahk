@@ -14,7 +14,7 @@
 ; Two modules were guilty:
 ; - infra/hotstrings/hotstring_prefix_watcher.ahk: _InstallMouseClickResetHooks()
 ;   called Hotkey("~LButton", _OnMouseClickReset) directly.
-; - modules/keymap/llm_bridge.ahk: _LLM_PointerWatch_Start() called
+; - ai/engine/bridge.ahk: _LLM_PointerWatch_Start() called
 ;   Hotkey(key, _LLM_PointerWatch_ActivityFn, "On") for ~LButton through
 ;   ~WheelRight.
 ;
@@ -65,7 +65,7 @@ Test("prefix_watcher: _InstallMouseClickResetHooks does not call Hotkey(~LButton
 
 _MHCB_LLMStartUsesDispatcher() {
 	Body := _DriverFuncBody("_LLM_PointerWatch_Start")
-	Assert(Body != "", "_LLM_PointerWatch_Start must exist in modules/keymap/llm_bridge.ahk")
+	Assert(Body != "", "_LLM_PointerWatch_Start must exist in ai/engine/bridge.ahk")
 	Assert(InStr(Body, "HookDispatcher.Register") > 0
 			&& InStr(Body, "RegisterFn.Call") > 0,
 		"_LLM_PointerWatch_Start must route dispatcher-owned mouse keys through the injectable HookDispatcher.Register port (mouse-hotkey-clobber)")
@@ -74,7 +74,7 @@ Test("llm_bridge: _LLM_PointerWatch_Start uses HookDispatcher.Register (mouse-ho
 
 _MHCB_LLMStartNoDirectLButton() {
 	Body := _DriverFuncBody("_LLM_PointerWatch_Start")
-	Assert(Body != "", "_LLM_PointerWatch_Start must exist in modules/keymap/llm_bridge.ahk")
+	Assert(Body != "", "_LLM_PointerWatch_Start must exist in ai/engine/bridge.ahk")
 	DQ := Chr(34)
 	HotkeyLButton := "Hotkey(" . DQ . "~LButton" . DQ
 	Assert(InStr(Body, HotkeyLButton) = 0,
@@ -84,7 +84,7 @@ Test("llm_bridge: _LLM_PointerWatch_Start does not call Hotkey(~LButton) directl
 
 _MHCB_LLMStopUsesUnregister() {
 	Body := _DriverFuncBody("_LLM_PointerWatch_Stop")
-	Assert(Body != "", "_LLM_PointerWatch_Stop must exist in modules/keymap/llm_bridge.ahk")
+	Assert(Body != "", "_LLM_PointerWatch_Stop must exist in ai/engine/bridge.ahk")
 	Assert(InStr(Body, "HookDispatcher.Unregister") > 0,
 		"_LLM_PointerWatch_Stop must call HookDispatcher.Unregister to undo the dispatcher-registered subscriptions (mouse-hotkey-clobber)")
 }

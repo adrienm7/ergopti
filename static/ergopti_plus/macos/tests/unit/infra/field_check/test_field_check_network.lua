@@ -48,7 +48,7 @@ local function run(world)
 			local answer = world.relay_answer or { { status = "not_needed" } }
 			callback(answer[1], answer[2])
 		end,
-		relay_policy = function() return require("modules.llm.network_env").proxy_auth_relay() end,
+		relay_policy = function() return require("ai.engine.api.network_env").proxy_auth_relay() end,
 	}
 	local result
 	helpers.with_stub_scope(MODULES, function()
@@ -222,7 +222,7 @@ helpers.describe("network check", function()
 	end)
 
 	helpers.it("names as many Ollama origins as the shared inventory holds", function()
-		local origins = assert(require("modules.llm.network_env").route_origins("ollama"))
+		local origins = assert(require("ai.engine.api.network_env").route_origins("ollama"))
 		helpers.assert_eq(#origins, #require("core.network.engine.field_check_network").OLLAMA_ORIGIN_TOKENS)
 	end)
 

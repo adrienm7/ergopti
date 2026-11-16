@@ -40,7 +40,7 @@ function M.daemon()
 	local preset = require("layouts.engine.layers.editor").read_shipped(require("core.fs.engine.paths").shared("layouts/data/layers.recommended.toml"))
 	assert(Files.write(directory .. "/layers.toml", preset), "the live navigation fixture must explicitly import its preset")
 	if os.getenv("ERGOPTI_LIVE_LLM_PORT") then
-		assert(require("infra.llm_preferences").set_many({
+		assert(require("ai.engine.preferences").set_many({
 			["llm.enabled"] = true, ["llm.models.selected"] = "api", ["llm.profiles.num_predictions"] = 1,
 			["llm.navigation.val_modifiers"] = {},
 		}), "the live API choices must reach canonical preferences")

@@ -16,9 +16,9 @@ helpers.describe("Linux AI menu: per-application profile overrides", function()
 	helpers.it("app-profile rows: map the last application, list it, clear it", function()
 		Preferences.with(function()
 			local I18n = require("core.i18n.engine.i18n")
-			local Settings = helpers.load_module("modules.llm.profile_settings")
+			local Settings = helpers.load_module("ai.engine.settings.profile_settings")
 			Settings._reset()
-			local engine = require("modules.llm.prediction_engine")
+			local engine = require("ai.engine.prediction.engine")
 			-- A fresh builder over the current module state: an earlier test may have
 			-- retired the separator or manifest sources the cached one captured.
 			local MenuBuilder = helpers.load_module("menu.ui.builder.builder")

@@ -121,9 +121,9 @@ at every boot for the input-source probe, and on an Apple silicon Mac migrated
 from Intel macOS started it under Rosetta and posted "support for Intel-based
 apps is ending … Python". Nothing at boot may run Python (the probe reads
 `defaults read` through `core/fs/engine/openstep_plist.lua`), and every helper takes
-its interpreter from `adapters/python_interpreter.lua`, which reads Mach-O
+its interpreter from `ai/adapters/python_interpreter.lua`, which reads Mach-O
 slices without executing anything and refuses one without the native slice;
-a refusal opens `ui/python_runtime_offer.lua`. Never start `python3` by a
+a refusal opens `ai/ui/python_runtime_offer.lua`. Never start `python3` by a
 fixed path or PATH, and never run an interpreter to ask its architecture.
 Unit tests get the real resolver over a modelled Mac through
 `helpers.load_with_stubs` (`HEALTHY_PYTHON`); the boot harness declares each
@@ -140,8 +140,8 @@ a TLS-inspecting company relay uv and curl refused every download ("error
 sending request for url"), and a company filter denying uv network access
 ("tcp connect error: Operation not permitted") read as a file permission.
 Every macOS download child now sources `apply_system_network` from
-`modules/llm/network-retry.sh` (the scripts directly, the Ollama service and
-the MLX model download through `modules/llm/network_env.lua`): relay from
+`ai/engine/network-retry.sh` (the scripts directly, the Ollama service and
+the MLX model download through `ai/engine/api/network_env.lua`): relay from
 `scutil --proxy`, loopback always in NO_PROXY, `UV_SYSTEM_CERTS=1`, and never
 a CA file: an inherited `SSL_CERT_FILE` or `SSL_CERT_DIR` is unset with one INFO
 line, the launcher's `--managed-http` and `--managed-bootstrap-download` roles
@@ -261,7 +261,7 @@ Neither AI runtime ships in the app or downloads at boot, on AI enable with
 another backend, or after an update: only `install_native_for_selection()` of
 `ollama_deps_checker` (under an issued `ollama_runtime_choice`) and
 `install_for_selection()` of `mlx_deps_checker` install, their sole caller is
-`ui/menu/menu_llm/runtime_install_offer.lua`, and any other check settles
+`ai/ui/menu/runtime_install_offer.lua`, and any other check settles
 `missing` without a task. The stock Ollama download and its installers are
 retired (owned-runtimes row "Ollama installers (legacy)"):
 `ensure-ollama-deps.sh` only verifies the resolved runtime and exits 64 when
@@ -280,7 +280,7 @@ link or a folder without a Python environment. hs.task hands the streaming
 callback everything it reads, so a failure's cause must be kept while it
 streams (`mlx_bootstrap_diagnosis.new_tail`); the completion's own output was
 empty and every MLX failure read "cause inconnue". Every failure goes to
-`ui/menu/menu_llm/mlx_repair_offer.lua`, whose dialog names the cause and
+`ai/ui/menu/models/mlx_repair_offer.lua`, whose dialog names the cause and
 carries the button (`mlx-bootstrap-*`). An absent runtime (the import probe,
 or a click on the boot notice of `notify_if_missing`) opens the same offer
 with kind `missing`: its install button runs `select_mlx()` without the repair
@@ -303,7 +303,7 @@ or `vision.json`, which nothing downloads; Ollama 0.24 answers `/api/chat`
 with 404 `{"error":"model 'X' not found"}` (or `model "X" not found, try
 pulling it first`). `api_ollama.request_prebuilt` therefore posts a model only
 after `/api/tags` listed it (exact name, implicit `:latest`), fails both cases
-with `MODEL_MISSING` and the name, and `modules/llm/local_model_offer.lua`
+with `MODEL_MISSING` and the name, and `ai/engine/ollama/local_model_offer.lua`
 names it with a Download button that the AI menu's installer
 (`models_mgr.pull_ollama_model`) serves; the automatic mode notifies instead of
 opening a modal. Route any new local-model consumer through that transport and
@@ -368,7 +368,7 @@ Servers the user runs (oMLX, LM Studio, llama-server/LocalAI, Jan) come from
 so a menu lists one only while `local_servers.lua`'s last sweep saw it answer.
 A chosen model is the server's one API entry (`local-<id>`), the only entry
 kind whose token may be `""`: `key_missing()` in `api_remote` and
-`validate_api_entries` in `modules/llm/init.lua` must agree on that exception.
+`validate_api_entries` in `ai/engine/init.lua` must agree on that exception.
 The engine menu gets its rows through `ctx.local_server_rows`, not a
 `backend_panel` require, because the backend fixtures stub `modules.llm`
 without `api_remote`. Extend `test_local_openai_backends_*.lua`.
@@ -1521,7 +1521,7 @@ XCTest. Put them in a normal source file even when bootstrap is their main user.
 
 Restored profile/model state never authorizes model loading. Only the live LLM
 enable gate may trigger warmup side effects, the Ollama daemon included:
-`modules/llm/init.lua` starts it from `set_backend` or auto-detection only
+`ai/engine/init.lua` starts it from `set_backend` or auto-detection only
 through `ollama_start_admitted()`, the gate on and `ollama_binary.resolve()`
 finding an executable. `manifest_reader` resolves the default of
 `llm.models.selected` through `backend_detector.auto_default()`, Ollama on

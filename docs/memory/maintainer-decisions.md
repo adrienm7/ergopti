@@ -596,7 +596,7 @@ key. Do not keep Keychain items alive for backups.
 
 Decided by the maintainer on 2026-11-11: the boot-time move of a plaintext API
 key to the Linux keyring never blocks the daemon. The daemon starts at once;
-`modules/llm/api_key_migration.lua` runs the move in the background, each
+`ai/engine/settings/api_key_migration.lua` runs the move in the background, each
 secret-service call an owned child with a bounded deadline, and retries until
 the keyring is unlocked (a D-Bus read of the default collection's `Locked`
 property, which never prompts, gates each attempt; the retry is periodic and

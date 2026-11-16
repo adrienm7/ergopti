@@ -258,7 +258,7 @@ const BLOB_PROBE = String.raw`
 import importlib.util, sys, urllib.error, urllib.request
 port = sys.argv[1]
 spec = importlib.util.spec_from_file_location(
-    "network_check", "static/ergopti_plus/macos/modules/llm/managed_network_check.py")
+    "network_check", "static/ergopti_plus/macos/ai/engine/bootstrap/managed_network_check.py")
 helper = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(helper)
 class Refuse(urllib.request.HTTPRedirectHandler):

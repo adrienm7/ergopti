@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 package.loaded["core.logger.engine.logger"] = nil
 local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
-local ApiOllama = helpers.load_with_stubs("modules.llm.api_ollama")
+local ApiOllama = helpers.load_with_stubs("ai.engine.api.ollama")
 
 local function set_upvalue(fn, target, value)
 	for index = 1, 64 do
@@ -51,9 +51,9 @@ end
 
 local function with_pending_warmup(callback)
 	helpers.with_stub_scope({
-		"modules.llm.api_ollama", "core.network.adapters.http_client", "core.events.timer_scheduler",
-		"modules.llm", "modules.llm.warmup_controller",
-		"modules.llm.ollama_endpoint", "core.logger.engine.logger", "core.ui.engine.notifications",
+		"ai.engine.api.ollama", "core.network.adapters.http_client", "core.events.timer_scheduler",
+		"ai.engine", "ai.engine.local_servers.warmup_controller",
+		"ai.engine.ollama.endpoint", "core.logger.engine.logger", "core.ui.engine.notifications",
 	}, function()
 		local fixture = { requests = {}, timers = {}, origin = "http://localhost:16107" }
 		local function post(url, body, _, done)
@@ -64,7 +64,7 @@ local function with_pending_warmup(callback)
 			-- The native API returns nil; the actual HTTP adapter retains activity.
 			return nil
 		end
-		local api = helpers.load_with_stubs("modules.llm.api_ollama", {
+		local api = helpers.load_with_stubs("ai.engine.api.ollama", {
 			http = {
 				asyncPost = post,
 				doAsyncRequest = function(url, method, body, headers, done)

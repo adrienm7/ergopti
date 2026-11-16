@@ -1,0 +1,86 @@
+--- ai/engine/local_servers/catalogue.lua
+
+--- ==============================================================================
+--- MODULE: Local API Catalogue Port
+--- DESCRIPTION:
+--- Reads shared optional-auth descriptors without initializing an HTTP client or
+--- credential store. Missing capability stays unavailable rather than guessed.
+--- ==============================================================================
+
+local M = {}
+local Json = require("core.text.engine.json")
+local Paths = require("core.fs.engine.paths")
+local Logger = require("core.logger.engine.shim")
+local Policy = require("ai.engine.local_servers.auth")
+local PortPolicy = require("ai.engine.local_servers.ports_core")
+local Fingerprint = require("ai.engine.local_servers.fingerprint")
+local Reader = require("core.fs.engine.regular_file_reader")
+
+--- Reads only admitted regular sources whose read and close both acknowledge.
+--- A partial receipt cannot grant optional-auth capability to downstream callers.
+--- @param path string|nil Resolved packaged source.
+--- @return string|nil bytes
+local function read_source(path)
+	local acquired, file = pcall(Reader.open_source, path)
+	if not acquired or not file then return nil end
+	local read, bytes = pcall(file.read, file, "*a")
+	local closed, acknowledged = pcall(file.close, file)
+	if not read or type(bytes) ~= "string" or not closed or acknowledged ~= true then return nil end
+	return bytes
+end
+
+--- Reads the current shared catalogue and refuses collisions with cloud ids.
+--- @param occupied table Registered cloud provider descriptors.
+--- @return table order
+--- @return table servers
+--- @return boolean published Complete admitted nonempty local inventory.
+--- @return table discovery Server id -> validated discovery descriptor; a server
+---         without one is never probed (ai/engine/local_servers/local_servers.lua).
+--- @return table request_fields Body fields of every request to a local server.
+--- @return table dialect The reasoning controls of every request to a local server.
+--- @return table identities Server id -> the address group and fingerprint of a
+---         row whose default address another row shares (llm.local_server_fingerprint).
+function M.load(occupied)
+	local path = Paths.shared("ai/data/local_servers.json")
+	local raw = read_source(path)
+	local root = type(raw) == "string" and Json.decode(raw) or nil
+	if type(root) ~= "table" then
+		Logger.error("llm.local_server_catalogue", "The local API catalogue is unavailable; optional authentication is refused.")
+		return {}, {}, false, {}, {}, {}, {}
+	end
+	-- Storage and transport consult the same authoritative cloud identities.
+	-- A local descriptor cannot shadow a registered cloud provider.
+	local cloud_path = Paths.shared("ai/data/api_providers.json")
+	local cloud_raw = read_source(cloud_path)
+	local cloud = type(cloud_raw) == "string" and Json.decode(cloud_raw) or nil
+	if type(cloud) ~= "table" or type(cloud.providers) ~= "table" then
+		Logger.error("llm.local_server_catalogue", "The cloud API catalogue is unavailable; local server identities cannot be admitted.")
+		return {}, {}, false, {}, {}, {}, {}
+	end
+	local claimed = {}
+	for id in pairs(cloud.providers) do claimed[id] = true end
+	for id in pairs(occupied or {}) do claimed[id] = true end
+	local order, servers = Policy.catalogue(root, claimed)
+	local published = #order > 0
+	local discovery = {}
+	for _, id in ipairs(order) do
+		local descriptor, reason = PortPolicy.descriptor(id, root.servers[id].discovery)
+		if descriptor then discovery[id] = descriptor
+		else Logger.error("llm.local_server_catalogue", "local_servers.json: %s; that server is never probed.", reason) end
+	end
+	-- The family controls a local server carries, on top of request_fields
+	local dialect, dialect_reason = require("ai.engine.policy.thinking_off").parse_dialect(root.thinking_dialect)
+	if not dialect then
+		Logger.error("llm.local_server_catalogue", "local_servers.json thinking_dialect is invalid (%s); only request_fields apply.",
+			tostring(dialect_reason))
+		dialect = {}
+	end
+	-- A refused fingerprint leaves its row to its address's default row
+	local identities, refused = Fingerprint.parse(root, order)
+	for _, reason in ipairs(refused) do
+		Logger.error("llm.local_server_catalogue", "local_servers.json: %s; that row is not fingerprinted.", reason)
+	end
+	return order, servers, published, discovery, Policy.request_fields(root), dialect, identities
+end
+
+return M

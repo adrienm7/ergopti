@@ -848,7 +848,7 @@ tests it with a real press on a chord Windows holds.
 
 A key bound to an `llm_*` action is unarmed while the AI is off, so it stays the
 application's and the switch-on needs no reload: `AiActionBlocked`
-(`infra/ai_action_gate.ahk`) is asked at each press by `TapHoldTapAction`, whose
+(`ai/engine/action_gate.ahk`) is asked at each press by `TapHoldTapAction`, whose
 blocked answer is the native tap, by `TapKeyShouldFire`,
 `ScriptShortcutSlotRunsAction`, `KeyCombinationOwns`/`KeyCombinationFire`,
 `GestureDispatch` and `_MagicEditorBrokerWinner`. Native keyboard slots cannot ask,

@@ -1,5 +1,5 @@
 {
-	"_comment": "Rows of one API entry in the model selector page: the ids a provider listing yields, and the plan drawn from a listing or its fallback. _shared/ai/engine/api/model_listing.lua (macOS and Linux unit suites) and its port in windows/modules/llm/api_remote.ahk (AHK suite) each replay this corpus; tools/test/test-model-selector-page.cjs checks that all three do.",
+	"_comment": "Rows of one API entry in the model selector page: the ids a provider listing yields, and the plan drawn from a listing or its fallback. _shared/ai/engine/api/model_listing.lua (macOS and Linux unit suites) and its port in windows/ai/engine/api/remote.ahk (AHK suite) each replay this corpus; tools/test/test-model-selector-page.cjs checks that all three do.",
 	"max_models": 200,
 	"max_id_length": 200,
 	"max_entries": 16,
@@ -588,7 +588,7 @@
 		}
 	],
 	"unlisted_providers": {
-		"_comment": "Chat providers of api_providers.json with no listing recorded in ids (an ids vector naming a provider is a trimmed listing it answered, with its source), and why. tests/unit/modules/llm/vectors/test_api_provider_catalogue.lua (macOS and Linux) requires one or the other.",
+		"_comment": "Chat providers of api_providers.json with no listing recorded in ids (an ids vector naming a provider is a trimmed listing it answered, with its source), and why. tests/unit/ai/engine/vectors/test_api_provider_catalogue.lua (macOS and Linux) requires one or the other.",
 		"openai": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
 		"anthropic": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",
 		"gemini": "No listing recorded yet: the provider joined the catalogue before the recorded-listing rule; its listing reads the format's documented shape.",

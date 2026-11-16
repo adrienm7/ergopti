@@ -41,7 +41,7 @@ local PAGES = {
 	layout_manager           = { module = "ui.layout_manager", open = "open" },
 	-- Ergopti Studio opened on the source's navigation layer (open_layer_editor).
 	studio_nav               = { module = "ui.layout_manager", window = "editor_window", close = "close_editor" },
-	model_browser            = { module = "ui.model_browser" },
+	model_browser            = { module = "ai.ui.model_browser" },
 	changelog                = { module = "ui.changelog" },
 	healthcheck              = { module = "ui.healthcheck", close = "close_window" },
 }

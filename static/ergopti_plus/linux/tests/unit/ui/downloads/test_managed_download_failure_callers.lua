@@ -104,8 +104,8 @@ local function model_fixture(replace)
 		complete = function(...) world.completions[#world.completions + 1] = { ... }; return true end,
 		retire = function() world.retired = true; return true end,
 	})
-	replace("modules.llm.model_download", nil)
-	return require("modules.llm.model_download"), world
+	replace("ai.engine.local_servers.model_download", nil)
+	return require("ai.engine.local_servers.model_download"), world
 end
 
 local function updater_fixture(replace)
@@ -408,8 +408,8 @@ helpers.describe("actual model cancellation preserves caller UI ownership", func
 		local bridge = setmetatable({ on_message = function(payload, state)
 			return routed.on_message(payload, state)
 		end }, { __index = native_bridge })
-		replace("modules.llm.model_download", nil)
-		return require("modules.llm.model_download"), world, bridge
+		replace("ai.engine.local_servers.model_download", nil)
+		return require("ai.engine.local_servers.model_download"), world, bridge
 	end
 
 	helpers.it("model-cancel-settlement: synchronous ACK leaves actual UI caller its cancellation presentation", function()

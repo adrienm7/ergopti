@@ -181,7 +181,7 @@ local KEY_MAP = {
 	llm_pred_indent                      = { sec = "llm", path = "display", key = ConfigKeys.LEAF.PRED_INDENT   },
 	llm_arrow_nav_enabled                = { sec = "llm", path = "navigation", key = ConfigKeys.LEAF.ARROW_NAV_ENABLED },
 	llm_val_modifiers                    = { sec = "llm", path = "navigation", key = ConfigKeys.LEAF.VAL_MODIFIERS },
-	-- The AI agent (modules/llm/agent_runner.lua): System 1 and System 2 backends and the mode
+	-- The AI agent (ai/engine/agent/runner.lua): System 1 and System 2 backends and the mode
 	llm_agent_system1                    = { sec = "llm", key = ConfigKeys.LEAF.AGENT_SYSTEM1                     },
 	llm_agent_system2                    = { sec = "llm", key = ConfigKeys.LEAF.AGENT_SYSTEM2                     },
 	llm_agent_mode                       = { sec = "llm", key = ConfigKeys.LEAF.AGENT_MODE                        },

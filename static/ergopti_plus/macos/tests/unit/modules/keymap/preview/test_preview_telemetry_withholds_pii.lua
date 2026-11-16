@@ -111,8 +111,8 @@ local function load_bridge_with_recording_keystats()
 	local real_show_stacked = tooltip.show_stacked
 	tooltip.show_stacked = function() end
 
-	package.loaded["modules.keymap.llm_bridge"] = nil
-	local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+	package.loaded["ai.engine.bridge"] = nil
+	local Bridge = helpers.load_with_stubs("ai.engine.bridge")
 	persisted.restore = function() tooltip.show_stacked = real_show_stacked end
 	return Bridge, persisted
 end
@@ -134,7 +134,7 @@ local function preview_via_provider(bridge, value, buf)
 		DELAYS                    = {},
 		SECTION_DELAYS            = {},
 	}
-	require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
+	require("ai.engine.api.context").seed(state, state.buffer or "", "")
 	bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
 	bridge.set_preview_star_enabled(true)
 	bridge.set_preview_autocorrect_enabled(true)
@@ -173,7 +173,7 @@ end
 
 helpers.describe("preview telemetry: what may be persisted", function()
 
-	local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+	local Bridge = helpers.load_with_stubs("ai.engine.bridge")
 	local may = Bridge._may_persist_preview
 
 	helpers.it("refuses a private match", function()
@@ -220,11 +220,11 @@ helpers.describe("preview telemetry: both call sites consult it", function()
 		-- buys one thing the predicate test cannot — that a future change deleting
 		-- the two calls outright, which would satisfy every privacy case above
 		-- because absence and withholding look identical from outside, fails here.
-		-- Selected by a declaration unique to modules/keymap/llm_bridge.lua rather than by
+		-- Selected by a declaration unique to ai/engine/bridge.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function invalidate_pending_preview")
-		helpers.assert_true(src ~= nil, "modules/keymap/llm_bridge.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "ai/engine/bridge.lua source must be locatable")
 
 		helpers.assert_contains(src, "keystats.log_hotstring_suggested",
 			"the suggested sink must still be called: the dashboard's suggested and "

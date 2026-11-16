@@ -22,11 +22,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("llm_bridge: chain delay must not be the INFINITE tooltip sentinel when no preview is shown (F-MED-4)", function()
 	local function read_src()
-		-- Selected by a declaration unique to modules/keymap/llm_bridge.lua rather than by
+		-- Selected by a declaration unique to ai/engine/bridge.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("function M.set_preview_autocorrect_enabled")
-		helpers.assert_true(src ~= nil, "modules/keymap/llm_bridge.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "ai/engine/bridge.lua source must be locatable")
 		return src
 	end
 

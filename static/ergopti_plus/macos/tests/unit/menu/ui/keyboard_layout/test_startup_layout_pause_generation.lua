@@ -160,14 +160,14 @@ package.loaded["ui.menu.menu_keyboard_layout"] = {
 	end,
 	prime = function() prime_counts.keyboard_layout = prime_counts.keyboard_layout + 1 end,
 }
-package.loaded["ui.menu.menu_llm"] = { create = function() return {} end }
+package.loaded["ai.ui.menu"] = { create = function() return {} end }
 package.loaded["ui.menu.menu_apps"] = {
 	prime = function() prime_counts.apps = prime_counts.apps + 1 end,
 }
 package.loaded["ui.menu.menu_tap_holds"] = {
 	prime = function() prime_counts.karabiner = prime_counts.karabiner + 1 end,
 }
-package.loaded["modules.llm"] = { set_backend = function() end }
+package.loaded["ai.engine"] = { set_backend = function() end }
 package.loaded["modules.keystats"] = {}
 package.loaded["modules.shortcuts"] = shortcuts
 package.loaded["modules.dynamic_hotstrings"] = {}

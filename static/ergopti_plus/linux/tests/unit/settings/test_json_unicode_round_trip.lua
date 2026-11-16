@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Bridge = helpers.load_module("infra.llm_bridge")
+local Bridge = helpers.load_module("ai.engine.bridge")
 
 for _, codec in ipairs({
 	{ name = "shared json", decode = Json.decode, encode = Json.encode },

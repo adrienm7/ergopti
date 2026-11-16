@@ -25,7 +25,8 @@ FIXTURE = load(
     "alias_selection_fixture", Path(__file__).with_name("macos_ollama_daemon_authority_test.py")
 )
 CALLER = load(
-    "alias_selection_caller", ROOT / "static/ergopti_plus/macos/modules/llm/managed_ollama_pull.py"
+    "alias_selection_caller",
+    ROOT / "static/ergopti_plus/macos/ai/engine/ollama/managed_ollama_pull.py",
 )
 
 

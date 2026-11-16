@@ -26,13 +26,13 @@ local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", to
 
 -- Modules loaded afresh for each scenario, so they bind the recording ports
 local RELOADED = {
-	"modules.llm.prediction_engine", "modules.llm.settings", "modules.llm.profile_settings",
-	"modules.llm.display_settings", "modules.llm.trigger_settings", "modules.llm.navigation_settings",
-	"modules.llm.api_remote",
+	"ai.engine.prediction.engine", "ai.engine.settings.settings", "ai.engine.settings.profile_settings",
+	"ai.engine.settings.display_settings", "ai.engine.settings.trigger_settings", "ai.engine.settings.navigation_settings",
+	"ai.engine.api.api_remote",
 }
 local FAKED = {
-	"platform.focus.secure_field_detector", "modules.llm.api_entries",
-	"modules.llm.profiles", "modules.llm.api_ollama",
+	"platform.focus.secure_field_detector", "ai.engine.settings.api_entries",
+	"ai.engine.settings.profiles", "ai.engine.api.api_ollama",
 }
 
 --- Runs body against a fresh engine on recording ports.
@@ -76,15 +76,15 @@ function M.with_world(config, body)
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
-		package.loaded["modules.llm.api_entries"] = { active = function() return ENTRY end }
+		package.loaded["ai.engine.settings.api_entries"] = { active = function() return ENTRY end }
 		local profiles = ProfilesFixture.without_inventory({
 			init = function() return true end,
 			is_enabled = function() return true end,
 			get_current_model = function() return world.model_label end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		})
-		package.loaded["modules.llm.profiles"] = profiles
-		package.loaded["modules.llm.api_ollama"] = {
+		package.loaded["ai.engine.settings.profiles"] = profiles
+		package.loaded["ai.engine.api.api_ollama"] = {
 			chat = function() error("the scenario runs through the API") end,
 			cancel = function() return true end,
 		}
@@ -97,7 +97,7 @@ function M.with_world(config, body)
 		end
 		local buffer = ""
 		local showing = false
-		local engine = require("modules.llm.prediction_engine")
+		local engine = require("ai.engine.prediction.engine")
 		engine.init({ focus_id = function() return "owned-prediction-window" end,
 			scheduler = scheduler,
 			http_client = http_client,
@@ -134,11 +134,11 @@ function M.with_world(config, body)
 		end
 		function world.toggle_live(value) return handlers.llm_live_prompt_toggle("tap_3", value) end
 		function world.delete_prompt(id)
-			helpers.assert_true(require("modules.llm.profile_settings").delete_user_profile(id))
+			helpers.assert_true(require("ai.engine.settings.profile_settings").delete_user_profile(id))
 		end
 		function world.base_tokens(text)
 			return PromptBuilder.build_params(text,
-				{ max_words = require("modules.llm.settings").get("max_words") }).max_tokens
+				{ max_words = require("ai.engine.settings.settings").get("max_words") }).max_tokens
 		end
 		function world.profile_label(id)
 			return InfoBar.short_profile_label(require("core.i18n.engine.i18n").get("llm.profile." .. id .. ".label"))

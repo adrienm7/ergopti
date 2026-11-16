@@ -57,7 +57,7 @@ end
 
 helpers.describe("quit teardown helper sweeps never block (hs-quit-never-blocks)", function()
 	helpers.it("(hs-quit-never-blocks) LLM helper and orphan MLX sweeps are async tasks", function()
-		helpers.with_stub_scope({ "core.process.adapters.shell_runner", "ui.menu.menu_llm" }, function()
+		helpers.with_stub_scope({ "core.process.adapters.shell_runner", "ai.ui.menu" }, function()
 			local spawns = {}
 			package.loaded["core.process.adapters.shell_runner"] = {
 				_active_tasks = {},
@@ -68,7 +68,7 @@ helpers.describe("quit teardown helper sweeps never block (hs-quit-never-blocks)
 					return { start = function() record.started = true; return true end }
 				end,
 			}
-			local MenuLLM = helpers.load_with_stubs("ui.menu.menu_llm")
+			local MenuLLM = helpers.load_with_stubs("ai.ui.menu")
 			local helper_result, orphan_result
 			local blocked = with_blocking_primitives_forbidden(function()
 				helper_result = MenuLLM.terminate_helper_processes()
@@ -103,7 +103,7 @@ helpers.describe("quit teardown helper sweeps never block (hs-quit-never-blocks)
 	end)
 
 	helpers.it("(ollama-owned-retirement) Quit reports retained daemon debt without a global kill", function()
-		helpers.with_stub_scope({ "core.process.adapters.shell_runner", "ui.menu.menu_llm", "modules.llm.api_ollama" }, function()
+		helpers.with_stub_scope({ "core.process.adapters.shell_runner", "ai.ui.menu", "ai.engine.api.ollama" }, function()
 			local spawns, retirements = {}, 0
 			package.loaded["core.process.adapters.shell_runner"] = {
 				_active_tasks = {},
@@ -112,8 +112,8 @@ helpers.describe("quit teardown helper sweeps never block (hs-quit-never-blocks)
 					return { start = function() return true end }
 				end,
 			}
-			local MenuLLM = helpers.load_with_stubs("ui.menu.menu_llm")
-			local Api = require("modules.llm.api_ollama")
+			local MenuLLM = helpers.load_with_stubs("ai.ui.menu")
+			local Api = require("ai.engine.api.ollama")
 			Api.stop_owned_server = function() retirements = retirements + 1; return false end
 			local result
 			local blocked = with_blocking_primitives_forbidden(function()
@@ -127,14 +127,14 @@ helpers.describe("quit teardown helper sweeps never block (hs-quit-never-blocks)
 	end)
 
 	helpers.it("(hs-quit-never-blocks) a refused sweep is reported, never waited on", function()
-		helpers.with_stub_scope({ "core.process.adapters.shell_runner", "ui.menu.menu_llm" }, function()
+		helpers.with_stub_scope({ "core.process.adapters.shell_runner", "ai.ui.menu" }, function()
 			package.loaded["core.process.adapters.shell_runner"] = {
 				_active_tasks = {},
 				spawn = function()
 					return { start = function() return false end }
 				end,
 			}
-			local MenuLLM = helpers.load_with_stubs("ui.menu.menu_llm")
+			local MenuLLM = helpers.load_with_stubs("ai.ui.menu")
 			local result
 			local blocked = with_blocking_primitives_forbidden(function()
 				result = MenuLLM.terminate_helper_processes()

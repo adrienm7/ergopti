@@ -42,8 +42,8 @@ M.MARKER_VALUE = 1
 -- reads and persists it.
 M.LISTS = {
 	{ path = ConfigKeys.KEY.METRICS_DISABLED_APPS, owner = "infra.metrics_preferences" },
-	{ path = ConfigKeys.KEY.LLM_TRIGGER_DISABLED_APPS, owner = "infra.llm_preferences" },
-	{ path = ConfigKeys.KEY.LLM_AGENT_DISABLED_APPS, owner = "infra.llm_preferences" },
+	{ path = ConfigKeys.KEY.LLM_TRIGGER_DISABLED_APPS, owner = "ai.engine.preferences" },
+	{ path = ConfigKeys.KEY.LLM_AGENT_DISABLED_APPS, owner = "ai.engine.preferences" },
 }
 
 

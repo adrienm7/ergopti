@@ -33,7 +33,7 @@ end
 
 local Gestures = helpers.load_module("modules.gestures.manager")
 local Translate = require("ai.engine.prediction.translate")
-local Translation = require("modules.llm.translation")
+local Translation = require("ai.engine.prediction.translation")
 
 helpers.describe("llm_language parameter replays the shared translate corpus", function()
 	local corpus = read_json("tests/corpus/llm/translate_vectors.json")

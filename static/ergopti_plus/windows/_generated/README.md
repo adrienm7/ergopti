@@ -9,7 +9,7 @@ Run the corresponding npm script to regenerate.
 | `terminators.ahk`        | `npm run codegen:terminators`                | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk`                      |
 | `personal_shortcuts.ahk` | generated at runtime by `PersonalTomlEditor` | ✅ Wired — loaded dynamically                                     |
 | `prompt_builder.ahk`     | `npm run codegen:prompt-builder:ahk`         | ✅ Wired — `#Include`'d in tests, used by `prediction_engine.ahk` |
-| `llm_profiles_data.ahk`  | `npm run codegen:llm-profiles-data:ahk`      | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk` before `modules/llm/profiles.ahk` (DL-2/DL-3) |
+| `llm_profiles_data.ahk`  | `npm run codegen:llm-profiles-data:ahk`      | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk` before `ai/engine/settings/profiles.ahk` (DL-2/DL-3) |
 | `touchpad_registry.ahk`  | `npm run codegen:touchpad-registry`          | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk` before `modules/gestures/touchpad_registry.ahk` |
 | `native_theme.ahk`       | `node tools/codegen/codegen-native-theme.cjs` | ✅ Wired — `#Include`'d by `ui/hotstrings_config_window/hcw_helpers.ahk` |
 | `unicode_title.ahk`      | `npm run codegen:unicode-case`               | ✅ Wired — `#Include`'d by `infra/text_case.ahk` |

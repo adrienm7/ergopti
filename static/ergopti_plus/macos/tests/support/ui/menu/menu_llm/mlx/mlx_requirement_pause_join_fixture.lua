@@ -27,30 +27,30 @@ local OWNED_MODULES = {
 	"modules.gestures.engine",
 	"modules.gestures.actions",
 	"modules.keystats",
-	"modules.llm",
-	"modules.llm.api_common",
-	"modules.llm.api_mlx",
-	"modules.llm.mlx_deps_checker",
-	"modules.llm.mlx_bootstrap_diagnosis",
-	"modules.llm.api_ollama",
-	"modules.llm.api_remote",
-	"modules.llm.warmup_controller",
+	"ai.engine",
+	"ai.engine.api.common",
+	"ai.engine.api.mlx",
+	"ai.engine.local_servers.mlx_deps_checker",
+	"ai.engine.local_servers.mlx_bootstrap_diagnosis",
+	"ai.engine.api.ollama",
+	"ai.engine.api.remote",
+	"ai.engine.local_servers.warmup_controller",
 	"modules.shortcuts.script_control",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
 	"core.ui.ui.tooltip",
-	"ui.menu.menu_llm.profile_label",
-	"ui.menu.menu_llm.prediction_lock_registry",
-	"ui.menu.menu_llm.requirement_operation_registry",
-	"ui.menu.menu_llm.models_manager_mlx_hf",
-	"ui.menu.menu_llm.models_manager_mlx_server",
-	"ui.menu.menu_llm.models_manager_mlx_download",
-	"ui.menu.menu_llm.models_manager_mlx",
-	"ui.menu.menu_llm.mlx_repair_offer",
-	"ui.menu.menu_llm.activation_pause_owner",
-	"ui.menu.menu_llm.model_switcher",
-	"ui.menu.menu_llm.startup_controller",
+	"ai.ui.menu.profile_label",
+	"ai.ui.menu.prediction_lock_registry",
+	"ai.ui.menu.requirement_operation_registry",
+	"ai.ui.menu.models.manager_mlx_hf",
+	"ai.ui.menu.models.manager_mlx_server",
+	"ai.ui.menu.models.manager_mlx_download",
+	"ai.ui.menu.models.manager_mlx",
+	"ai.ui.menu.models.mlx_repair_offer",
+	"ai.ui.menu.activation_pause_owner",
+	"ai.ui.menu.models.switcher",
+	"ai.ui.menu.startup_controller",
 }
 
 
@@ -157,39 +157,39 @@ local function install_subject_stubs(native)
 		RETURN = 36,
 		ESCAPE = 53,
 	}
-	package.loaded["modules.llm.api_common"] = {
+	package.loaded["ai.engine.api.common"] = {
 		protected_call = function(callback, _, ...)
 			if type(callback) ~= "function" then return false end
 			return xpcall(callback, debug.traceback, ...)
 		end,
 	}
-	package.loaded["modules.llm.api_mlx"] = {
+	package.loaded["ai.engine.api.mlx"] = {
 		get_port = function() return 8080 end,
 		pause_warmup = function() return true end,
 		resume_warmup = function() return true end,
 	}
-	package.loaded["modules.llm.mlx_deps_checker"] = { import_probe = require("tests.support.modules.llm.mlx_import_probe").read }
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine.local_servers.mlx_deps_checker"] = { import_probe = require("tests.support.modules.llm.mlx_import_probe").read }
+	package.loaded["ai.engine"] = {
 		BUILTIN_PROFILES = {},
 		DEFAULT_STATE = { llm_num_predictions = 1 },
 		set_active_profile = function() return true end,
 		set_llm_model_mlx = function() return true end,
 		set_llm_model_ollama = function() return true end,
 	}
-	package.loaded["ui.menu.menu_llm.profile_label"] = {
+	package.loaded["ai.ui.menu.profile_label"] = {
 		format = function(label) return label end,
 	}
-	package.loaded["ui.menu.menu_llm.prediction_lock_registry"] = {
+	package.loaded["ai.ui.menu.prediction_lock_registry"] = {
 		new = function() error("fixture injects an exact prediction-lock registry") end,
 	}
-	package.loaded["ui.menu.menu_llm.models_manager_mlx_hf"] = {
+	package.loaded["ai.ui.menu.models.manager_mlx_hf"] = {
 		install = function(ctx)
 			ctx.obj.get_mlx_repo = function(name)
 				return "fixture/" .. tostring(name)
 			end
 		end,
 	}
-	package.loaded["ui.menu.menu_llm.models_manager_mlx_server"] = {
+	package.loaded["ai.ui.menu.models.manager_mlx_server"] = {
 		install = function(ctx)
 			ctx.obj.start_server = function(target, on_success, _, opts)
 				native.server_starts[#native.server_starts + 1] = target
@@ -201,7 +201,7 @@ local function install_subject_stubs(native)
 			end
 		end,
 	}
-	package.loaded["ui.menu.menu_llm.models_manager_mlx_download"] = {
+	package.loaded["ai.ui.menu.models.manager_mlx_download"] = {
 		install = function(ctx)
 			ctx.obj.pull_model = function() return true end
 		end,
@@ -288,9 +288,9 @@ local function install_subject_stubs(native)
 		AX_NAMES = {},
 	}
 	for _, module_name in ipairs({
-		"modules.llm.warmup_controller",
-		"modules.llm.api_ollama",
-		"modules.llm.api_remote",
+		"ai.engine.local_servers.warmup_controller",
+		"ai.engine.api.ollama",
+		"ai.engine.api.remote",
 	}) do
 		package.loaded[module_name] = {
 			pause_warmup = function() return true end,
@@ -321,7 +321,7 @@ end
 --- @return table module Manager module exposing the canonical GC root.
 local function build_manager(script_control, shared_system_check)
 	package.loaded["core.process.adapters.task_lifecycle"] = nil
-	local manager_module = require("ui.menu.menu_llm.models_manager_mlx")
+	local manager_module = require("ai.ui.menu.models.manager_mlx")
 	local presets = {
 		{
 			families = {

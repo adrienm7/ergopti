@@ -259,7 +259,7 @@ end
 
 helpers.describe("restore-recommended-no-confirm: the menu's scope wiring (macOS)", function()
 	helpers.it("no restore or clear row asks, and no owner is handed a question port", function()
-		local owners = { "ui.menu.gesture_scope", "ui.menu.shortcuts_scope", "ui.menu.llm_scope",
+		local owners = { "ui.menu.gesture_scope", "ui.menu.shortcuts_scope", "ai.ui.menu.scope",
 			"ui.menu.metrics_scope", "ui.menu.hotstrings_scope", "settings.ui.menu.scoped_preferences",
 			"menu.ui.transactions.global_scope" }
 		local names = { "core.ui.engine.dialog_util", "modules.hotstrings.hotstrings_config" }

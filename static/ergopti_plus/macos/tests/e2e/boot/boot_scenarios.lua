@@ -640,7 +640,7 @@ end
 
 --- How many MLX port cleanup shells a child started during its boot: the
 --- world records each task start, and the cleanup is the one that lists the
---- port's listeners (modules/llm/boot_cleanup.lua).
+--- port's listeners (ai/engine/bootstrap/boot_cleanup.lua).
 --- @param output string Child output.
 --- @return integer count E2E_TASK lines before E2E_PHASE that run lsof on a port.
 local function boot_port_cleanups(output)

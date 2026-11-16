@@ -95,8 +95,8 @@ function M.with_configuration(body)
 			llm = { is_enabled = function() return Codec.decode(read(Paths.config("config.toml"))).llm.enabled end },
 			webview = host, on_quit = function() error("quit is outside this fixture") end }
 		local f = { paths = Paths, dirs = dirs, initial = initial, prompt = prompt, host = host,
-			preferences = require("infra.llm_preferences"), settings = require("modules.llm.settings"),
-			trigger = require("modules.llm.trigger_settings"), notifications = notifications, received = received, writer = require("core.text.engine.toml_codec.writer") }
+			preferences = require("ai.engine.preferences"), settings = require("ai.engine.settings.settings"),
+			trigger = require("ai.engine.settings.trigger_settings"), notifications = notifications, received = received, writer = require("core.text.engine.toml_codec.writer") }
 		function f.bytes(id) return read(dirs[id] .. "/config.toml") end
 		function f.document(id) return Codec.decode(f.bytes(id)) end
 		function f.switch(id)

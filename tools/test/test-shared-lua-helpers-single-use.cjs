@@ -171,7 +171,7 @@ const ALLOWED = {
 			reason: 'boot code that runs before the shared Lua root is on package.path'
 		}
 	},
-	'macos/ui/menu/menu_llm/models_manager.lua': {
+	'macos/ai/ui/menu/models/manager.lua': {
 		basename: { count: 1, reason: 'last segment of an Ollama library URL, not a native path' }
 	},
 	'macos/platform/remap/runtime_manifest.lua': {

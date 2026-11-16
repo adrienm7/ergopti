@@ -51,7 +51,7 @@ local function build(paused, resumed)
 	return mb.build({
 		-- This fixture tests pause policy with the genuine present native owner.
 		-- No engine initialization, bootstrap or network action runs here.
-		llm = require("modules.llm.prediction_engine"),
+		llm = require("ai.engine.prediction.engine"),
 		config = fake_config(),
 		_version = "0.0.0-dev.12",
 		paused = paused,
@@ -214,7 +214,7 @@ local function with_shared_header(options, body)
 		local builder = require("menu.ui.builder.builder")
 		if options.before == "template" then ManifestMenu.template_rows = nil
 		elseif options.before == "command" then ManifestMenu.command_row = nil end
-		local context = { llm = require("modules.llm.prediction_engine"), config = fake_config(),
+		local context = { llm = require("ai.engine.prediction.engine"), config = fake_config(),
 			_version = options.version or "local", paused = options.paused == true,
 			on_toggle_pause = function() fixture.resumes = fixture.resumes + 1 end,
 			on_quit = function() end }

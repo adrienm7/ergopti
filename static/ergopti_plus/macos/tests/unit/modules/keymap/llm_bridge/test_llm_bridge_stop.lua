@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: LLM Bridge Lifecycle and Fallback Regression Tests
 --- DESCRIPTION:
---- Guards the escape-trap lifecycle in modules/keymap/llm_bridge.lua with a
+--- Guards the escape-trap lifecycle in ai/engine/bridge.lua with a
 --- self-contained dependency fixture that cannot inherit another test's partial
 --- tooltip or prediction-engine double. It also exercises fallback key routing
 --- after the tooltip deliberately passes through a physical input event.
@@ -225,7 +225,7 @@ helpers.describe("llm_bridge M.stop(): stops the escape trap (escape-trap-ghost-
 
 	helpers.it("restores package.loaded and _G.hs when a scenario assertion raises (escape-trap-ghost-tap)", function()
 		local original_tooltip = package.loaded["core.ui.ui.tooltip"]
-		local original_engine = package.loaded["modules.llm.prediction_engine"]
+		local original_engine = package.loaded["ai.engine.prediction.engine"]
 		local original_hs = rawget(_G, "hs")
 		local partial_tooltip = { hide = noop }
 		local ok, err = pcall(function()
@@ -238,7 +238,7 @@ helpers.describe("llm_bridge M.stop(): stops the escape trap (escape-trap-ghost-
 		helpers.assert_true(tostring(err):find("EXPECTED_FIXTURE_ASSERTION", 1, true) ~= nil,
 			"the fixture must preserve the original assertion failure")
 		helpers.assert_eq(package.loaded["core.ui.ui.tooltip"], original_tooltip)
-		helpers.assert_eq(package.loaded["modules.llm.prediction_engine"], original_engine)
+		helpers.assert_eq(package.loaded["ai.engine.prediction.engine"], original_engine)
 		helpers.assert_eq(rawget(_G, "hs"), original_hs)
 	end)
 

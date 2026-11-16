@@ -79,15 +79,15 @@ const NOTICE_FLOORS = { macos: 100, windows: 30, linux: 8 };
 const REQUIRED_OFFERS = [
 	{ file: 'macos/ui/legacy_rules_cleanup.lua', why: 'legacy Karabiner rules (9ed15dcf9)' },
 	{
-		file: 'macos/modules/llm/local_model_offer.lua',
+		file: 'macos/ai/engine/ollama/local_model_offer.lua',
 		why: 'a local model that is not pulled (2ffedefc1)'
 	},
 	{
-		file: 'macos/ui/menu/menu_llm/unreachable_backend_offer.lua',
+		file: 'macos/ai/ui/menu/unreachable_backend_offer.lua',
 		why: 'an unreachable Ollama (d9a8fd580)'
 	},
 	{
-		file: 'macos/ui/menu/menu_llm/runtime_install_offer.lua',
+		file: 'macos/ai/ui/menu/runtime_install_offer.lua',
 		why: 'an AI runtime missing at startup, whose notice opens its install offer'
 	}
 ];
@@ -106,17 +106,17 @@ const EXCEPTIONS = [
 		why: 'the generated features manifest is absent: a checkout the build step never ran, not a user state'
 	},
 	{
-		file: 'macos/ui/menu/menu_llm/models_manager_mlx.lua',
+		file: 'macos/ai/ui/menu/models/manager_mlx.lua',
 		key: 'mlx.deps_missing_body',
 		why: 'posted only while the MLX runtime the user selected installs: the fix is already running in its progress window'
 	},
 	{
-		file: 'macos/ui/menu/menu_llm/models_manager_ollama.lua',
+		file: 'macos/ai/ui/menu/models/manager_ollama.lua',
 		key: 'ollama.model_repair',
 		why: 'announces the re-download of a model that does not load, which the line after it starts: the fix is already running'
 	},
 	{
-		file: 'macos/ui/menu/menu_llm/models_manager_mlx_hf.lua',
+		file: 'macos/ai/ui/menu/models/manager_mlx_hf.lua',
 		key: 'mlx.token_missing_body',
 		why: 'the user submitted the HuggingFace login window with no token; only the user has the token, and the login row asks again'
 	}

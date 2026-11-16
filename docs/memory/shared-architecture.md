@@ -869,7 +869,7 @@ direct; two relays are refused. Ergopti's own managed HTTP clients (Linux
 `infra/managed_http.lua`, Windows WinHTTP worker, macOS native workers)
 re-resolve the route at every redirect hop, so a precomputed plan would only
 weaken them. On Windows the managed Ollama daemon
-(`modules/llm/ollama-runtime-launch.ps1`) gets no relay variable, and Go's
+(`ai/engine/ollama/ollama-runtime-launch.ps1`) gets no relay variable, and Go's
 net/http there reads only the environment: a PAC-only network cannot pull a
 model until that launcher applies the plan. Action: add a new
 environment-driven client to `route_origins.json` and plan it; never put a

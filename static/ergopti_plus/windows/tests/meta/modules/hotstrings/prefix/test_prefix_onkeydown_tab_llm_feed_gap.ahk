@@ -19,7 +19,7 @@
 ; flush is wired end-to-end through the watcher.
 ;
 ; Meta-static because _OnPrefixKeyDown and LLM_Bridge_FeedKeyDownIfActive
-; (modules/keymap/llm_bridge.ahk) are not both in the run_all include graph and
+; (ai/engine/bridge.ahk) are not both in the run_all include graph and
 ; have OS / tooltip side effects.
 ; ==============================================================================
 

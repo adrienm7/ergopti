@@ -196,7 +196,7 @@ const JUDGED = [
 		why: 'the interpolation is the bounded tap-hold config path, never hotstring content.'
 	},
 	{
-		file: 'ui/menu/menu_llm/actions.ahk',
+		file: 'ai/ui/menu/actions.ahk',
 		match: 'is not installed — switched to',
 		verdict: 'not-personal',
 		why: 'replacement is the fallback LLM model name; all interpolations are model identifiers and fixed backend tags.'
@@ -280,7 +280,7 @@ const JUDGED = [
 		why: 'the interpolation is a bounded SWAP_ERROR receipt produced by the native updater worker; it contains a filesystem or process failure, never hotstring content.'
 	},
 	{
-		file: 'ui/menu/menu_llm/actions.ahk',
+		file: 'ai/ui/menu/actions.ahk',
 		match: 'direct install trigger',
 		verdict: 'not-personal',
 		why: 'the word "trigger" in prose about a debug hotkey; no interpolated value.'

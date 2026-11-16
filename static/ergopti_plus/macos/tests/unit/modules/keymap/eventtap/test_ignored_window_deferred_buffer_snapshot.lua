@@ -29,11 +29,11 @@ local function install_collaborators(effects)
 	hs_stub.__reset()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = true },
 		check_modifiers = function() effects.llm_calls = effects.llm_calls + 1; return false end,
 	}
-	package.loaded["modules.llm.prediction_engine"] = {
+	package.loaded["ai.engine.prediction.engine"] = {
 		init = function() return true end,
 		set_runtime_guard = function() end,
 		get_llm_enabled = function() return false end,
@@ -384,7 +384,7 @@ helpers.describe("ignored-window eventtap boundary", function()
 		local Keymap = helpers.load_with_stubs("modules.keymap")
 		local hs_stub = _G.hs
 		local Utils = package.loaded["modules.keymap.utils"]
-		local LLMBridge = package.loaded["modules.keymap.llm_bridge"]
+		local LLMBridge = package.loaded["ai.engine.bridge"]
 		Keymap.ignore_window_title("Sensitive Entry")
 		Keymap.set_preview_autocorrect_enabled(true)
 		local preview_action = {}

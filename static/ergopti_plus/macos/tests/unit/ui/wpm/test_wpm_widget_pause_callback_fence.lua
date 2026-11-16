@@ -27,10 +27,10 @@ local FIXTURE_MODULES = {
 	"platform.input.key_state",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
-	"modules.llm.api_mlx",
-	"modules.llm.warmup_controller",
-	"modules.llm.api_ollama",
-	"modules.llm.api_remote",
+	"ai.engine.api.mlx",
+	"ai.engine.local_servers.warmup_controller",
+	"ai.engine.api.ollama",
+	"ai.engine.api.remote",
 	"platform.remap.onboarding",
 	"core.ui.ui.tooltip",
 	"modules.shortcuts.script_control",
@@ -243,19 +243,19 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 				SG_NAMES = { "none", "script_pause_toggle" },
 				AX_NAMES = {},
 			}
-			package.loaded["modules.llm.api_mlx"] = {
+			package.loaded["ai.engine.api.mlx"] = {
 				pause_warmup = function() return true end,
 				resume_warmup = function() return true end,
 			}
-			package.loaded["modules.llm.warmup_controller"] = {
+			package.loaded["ai.engine.local_servers.warmup_controller"] = {
 				pause_warmup = function() return true end,
 				resume_warmup = function() return true end,
 			}
-			package.loaded["modules.llm.api_ollama"] = {
+			package.loaded["ai.engine.api.ollama"] = {
 				pause_warmup = function() return true end,
 				resume_warmup = function() return true end,
 			}
-			package.loaded["modules.llm.api_remote"] = {
+			package.loaded["ai.engine.api.remote"] = {
 				pause_warmup = function() return true end,
 				resume_warmup = function() return true end,
 			}

@@ -14,10 +14,10 @@ local uv = require("luv")
 --- Isolates the real profile registry and native window port.
 --- @param body function
 local function with_editor(body)
-	require("infra.llm_preferences")
-	require("modules.llm.profile_settings")
-	local names = { "settings.engine.paths", "infra.llm_preferences", "modules.llm.profile_settings",
-		"core.ui.ui.webview_manager", "ui.prompt_editor.bridge" }
+	require("ai.engine.preferences")
+	require("ai.engine.settings.profile_settings")
+	local names = { "settings.engine.paths", "ai.engine.preferences", "ai.engine.settings.profile_settings",
+		"core.ui.ui.webview_manager", "ai.ui.prompt_editor.bridge" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-profiles-XXXXXX"))
@@ -32,8 +32,8 @@ local function with_editor(body)
 	for key, value in pairs(previous["settings.engine.paths"]) do paths[key] = value end
 	paths.config = function() return path end
 	package.loaded["settings.engine.paths"] = paths
-	package.loaded["infra.llm_preferences"] = nil
-	local profiles = helpers.load_module("modules.llm.profile_settings")
+	package.loaded["ai.engine.preferences"] = nil
+	local profiles = helpers.load_module("ai.engine.settings.profile_settings")
 	local seen = { epoch = 0, visible = false, closes = 0 }
 	local host = {
 		show = function() seen.epoch = seen.epoch + 1; seen.visible = true; return true end,
@@ -44,7 +44,7 @@ local function with_editor(body)
 		eval_js = function() return true end,
 	}
 	package.loaded["core.ui.ui.webview_manager"] = host
-	local bridge = helpers.load_module("ui.prompt_editor.bridge")
+	local bridge = helpers.load_module("ai.ui.prompt_editor.bridge")
 	local f = { profiles = profiles, read = read, path = path, seen = seen, bridge = bridge }
 	function f.seed(overrides)
 		local profile = { id = "user_original", label = "Original", batch = false,
@@ -69,7 +69,7 @@ local function with_editor(body)
 	end
 	function f.disk(id)
 		-- A fresh settings instance must observe the same registry as the live one.
-		local fresh = helpers.load_module("modules.llm.profile_settings")
+		local fresh = helpers.load_module("ai.engine.settings.profile_settings")
 		local persisted = assert(fresh.resolve_id(id))
 		helpers.assert_eq(persisted, assert(profiles.resolve_id(id)))
 		assert(read():find("keep = 'sentinel'", 1, true), "unrelated TOML bytes were changed")

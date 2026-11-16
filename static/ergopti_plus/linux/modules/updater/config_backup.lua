@@ -24,7 +24,7 @@
 local M = {}
 
 local Logger      = require("core.logger.engine.shim")
-local TokenStore  = require("modules.llm.api_token_store")
+local TokenStore  = require("ai.engine.settings.api_token_store")
 local Paths       = require("core.fs.engine.paths")
 local ConfigPaths = require("settings.engine.paths")
 local Json        = require("core.text.engine.json")
@@ -197,7 +197,7 @@ local function default_roots()
 	-- beside storage.json. The file names each key by its secret-service
 	-- reference, so it is copied only while no row holds a key an earlier
 	-- build wrote in plaintext (a backup may sit in a synced folder).
-	local ok_entries, Entries = pcall(require, "modules.llm.api_entries")
+	local ok_entries, Entries = pcall(require, "ai.engine.settings.api_entries")
 	if not (ok_entries and type(Entries) == "table" and type(Entries.path) == "function") then
 		return nil, "API entries store unavailable",
 			"Configuration backup refused: the API entries path is unknown."

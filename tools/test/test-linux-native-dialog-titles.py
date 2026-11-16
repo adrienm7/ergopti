@@ -325,7 +325,7 @@ try:
                             else "local value=require('settings.ui.dir_picker').pick(shell,{default_config_dir=function() return '/tmp' end},{get=function() return 'Select configuration folder' end},'/tmp')\n"
                             if mode == "directory"
                             else "local dialogs\n"
-                            "package.loaded['ui.menu.llm_backend_rows']={bind_page=function(_,options) dialogs=options.dialogs end,caption=function() return 'model button' end}\n"
+                            "package.loaded['ai.ui.menu.backend_rows']={bind_page=function(_,options) dialogs=options.dialogs end,caption=function() return 'model button' end}\n"
                             "package.loaded['ui.menu.start_at_login']={enabled=function() return false end,command_available=function() return false end}\n"
                             "package.loaded['core.fs.adapters.storage']={get=function(key,default) if key=='locale' then return 'en' end;return default end,set=function() return false end}\n"
                             "require('core.i18n.engine.locale').set_locale('en')\n"

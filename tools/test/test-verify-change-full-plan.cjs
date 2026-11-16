@@ -118,7 +118,7 @@ for (const file of [
 assert.equal(GATE_COMMANDS['linux-http-stream'].npm, 'test:linux:http-stream');
 for (const file of [
 	'static/ergopti_plus/linux/core/network/adapters/http_client.lua',
-	'static/ergopti_plus/linux/modules/llm/api_ollama.lua',
+	'static/ergopti_plus/linux/ai/engine/api/api_ollama.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_http_stream_receipts.lua',
 	'static/ergopti_plus/_shared/ai/engine/ollama/local_model_policy.lua'
 ])
@@ -135,7 +135,7 @@ for (const file of [
 	'static/ergopti_plus/_shared/ai/engine/policy/process_limits.lua',
 	'static/ergopti_plus/_shared/ai/engine/ollama/archive_installer.lua',
 	'static/ergopti_plus/linux/core/process/adapters/owned_process.lua',
-	'static/ergopti_plus/linux/modules/llm/ollama_install_files.lua',
+	'static/ergopti_plus/linux/ai/engine/ollama/install_files.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_owned_process_native.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_finite_process_port_native.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_service_process_port_native.lua',
@@ -262,7 +262,7 @@ assert.equal(
 // A green native suite cannot expose UnsetError accepted by AssertThrows.
 // Every AHK edit must retain the portable static guard even without Windows.
 for (const file of [
-	'static/ergopti_plus/windows/tests/unit/modules/llm/menu/test_llm_menu_regressions.ahk',
+	'static/ergopti_plus/windows/tests/unit/ai/menu/test_regressions.ahk',
 	'static/ergopti_plus/windows/tests/meta/test_probe.ahk',
 	'static/ergopti_plus/windows/modules/llm/probe.ahk',
 	'probe.ahk'
@@ -276,10 +276,7 @@ assert.equal(GATE_COMMANDS['ahk-loop-capture'].npm, 'test:ahk-loop-capture');
 assert.equal(GATE_COMMANDS['ahk-loop-capture'].coveredBy, 'js');
 for (const files of [
 	['static/ergopti_plus/_shared/modules/future/owner.ahk'],
-	[
-		'static/ergopti_plus/windows/tests/unit/modules/llm/menu/test_llm_menu_regressions.ahk',
-		'tools/test/probe.cjs'
-	]
+	['static/ergopti_plus/windows/tests/unit/ai/menu/test_regressions.ahk', 'tools/test/probe.cjs']
 ]) {
 	const gates = selectGates(files);
 	assert(gates.has('js'), 'the covering suite must remain selected');

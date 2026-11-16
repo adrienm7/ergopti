@@ -25,10 +25,10 @@ local RESET_MODULES = {
 	"core.logger.engine.logger", "core.text.engine.utils",
 	"modules.hotstrings.hotstrings_config", "modules.keystats",
 	"modules.keymap", "modules.keymap.init", "modules.keymap.expander",
-	"modules.keymap.llm_bridge", "modules.keymap.registry",
+	"ai.engine.bridge", "modules.keymap.registry",
 	"modules.keymap.state", "modules.keymap.terminator_replay",
 	"modules.keymap.utils", "modules.keymap.magic_key_source",
-	"modules.llm", "modules.llm.prediction_engine", "core.ui.ui.tooltip",
+	"ai.engine", "ai.engine.prediction.engine", "core.ui.ui.tooltip",
 }
 
 local function registry()
@@ -52,7 +52,7 @@ local function load_keymap()
 	package.loaded["platform.input.keyboard_geometry"] = nil
 	for _, name in ipairs(RESET_MODULES) do package.loaded[name] = nil end
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (helpers.in_module_family(name, "modules.keymap") or helpers.in_module_family(name, "modules.llm")) then
+		if type(name) == "string" and (helpers.in_module_family(name, "modules.keymap") or helpers.in_module_family(name, "ai.engine")) then
 			package.loaded[name] = nil
 		end
 	end

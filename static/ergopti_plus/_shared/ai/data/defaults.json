@@ -30,5 +30,5 @@
 	"llm_ollama_owned_port": 11435,
 	"llm_ollama_keep_alive": "30m",
 
-	"_comment_platform": "Per-platform model/backend defaults are intentionally NOT in this shared file: the available models and default backend differ by platform, so each driver owns them (windows/lib/llm_defaults.ahk, macos/modules/llm/init.lua)."
+	"_comment_platform": "Per-platform model/backend defaults are intentionally NOT in this shared file: the available models and default backend differ by platform, so each driver owns them (windows/lib/llm_defaults.ahk, macos/ai/engine/init.lua)."
 }

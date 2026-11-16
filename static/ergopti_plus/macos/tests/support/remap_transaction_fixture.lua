@@ -34,10 +34,10 @@ local OWNED_MODULES = {
 	"platform.input.keycodes",
 	"modules.gestures.actions",
 	"platform.input.key_state",
-	"modules.llm.warmup_controller",
-	"modules.llm.api_mlx",
-	"modules.llm.api_ollama",
-	"modules.llm.api_remote",
+	"ai.engine.local_servers.warmup_controller",
+	"ai.engine.api.mlx",
+	"ai.engine.api.ollama",
+	"ai.engine.api.remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"core.ui.ui.tooltip",
@@ -800,16 +800,16 @@ return function(run, dependencies)
 				is_right_altgr_held = function() return false end,
 				describe_held_modifiers = function() return "(none)" end,
 			}
-			package.loaded["modules.llm.warmup_controller"] = {
+			package.loaded["ai.engine.local_servers.warmup_controller"] = {
 				stop = record("warmup_stop"),
 				schedule_warmup_with_retry = record("warmup_resume"),
 			}
-			package.loaded["modules.llm.api_mlx"] = {
+			package.loaded["ai.engine.api.mlx"] = {
 				stop_warmup = record("mlx_stop"),
 				resume_warmup = record("mlx_resume"),
 			}
-			package.loaded["modules.llm.api_ollama"] = { stop_warmup = record("ollama_stop") }
-			package.loaded["modules.llm.api_remote"] = { stop_warmup = function() return true end }
+			package.loaded["ai.engine.api.ollama"] = { stop_warmup = record("ollama_stop") }
+			package.loaded["ai.engine.api.remote"] = { stop_warmup = function() return true end }
 			package.loaded["ui.wpm.wpm_menubar"] = {
 				is_running = function() return false end,
 			}

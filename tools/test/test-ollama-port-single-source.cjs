@@ -9,7 +9,7 @@
  * llm_ollama_owned_port on Windows, macOS and Linux, and the stock llm_ollama_port
  * names only the port a user's own Ollama keeps. Linux mirrors both in
  * infra/llm_bridge.lua, pinned by test-linux-llm-defaults-single-source.cjs. The AHK driver loads it
- * into LLM_Defaults (infra/llm_defaults.ahk) and sources every default from there:
+ * into LLM_Defaults (ai/engine/defaults.ahk) and sources every default from there:
  * api_ollama.ahk seeds LLM_OLLAMA_PORT at boot (LLM_Ollama_LoadDefaults), the
  * tray menu seeds _LLM_Menu["ollama_port"] (LLM_Menu_ApplySharedDefaults) and
  * reads the default via _LLM_DefaultFor("llm_ollama_owned_port"). macOS reads the same
@@ -43,11 +43,11 @@ const SSOT_FILE = path.join(ROOT, 'static/ergopti_plus/_shared/ai/data/defaults.
 // the init sub-file which is the authoritative gate for this invariant.
 const OWNED_KEY = 'llm_ollama_owned_port';
 const FILES = [
-	['static/ergopti_plus/windows/modules/llm/api_ollama/init.ahk', OWNED_KEY],
-	['static/ergopti_plus/windows/ui/menu/menu_llm/_index.ahk', OWNED_KEY],
+	['static/ergopti_plus/windows/ai/engine/api_ollama/init.ahk', OWNED_KEY],
+	['static/ergopti_plus/windows/ai/ui/menu/_index.ahk', OWNED_KEY],
 	// The Ollama port tool moved from the tray's model list to the selector page.
-	['static/ergopti_plus/windows/ui/model_browser/init.ahk', OWNED_KEY],
-	['static/ergopti_plus/windows/ui/menu/menu_llm/menu_settings.ahk', OWNED_KEY]
+	['static/ergopti_plus/windows/ai/ui/model_browser/init.ahk', OWNED_KEY],
+	['static/ergopti_plus/windows/ai/ui/menu/settings.ahk', OWNED_KEY]
 ];
 
 const RETIRED_SYSTEM_INSTALLERS = [

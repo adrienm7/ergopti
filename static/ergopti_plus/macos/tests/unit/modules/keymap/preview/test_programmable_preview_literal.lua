@@ -74,8 +74,8 @@ local function render_provider_row(provider_result)
 	helpers.with_stub_scope({
 		"platform.input.synthetic_input", "core.events.timer_scheduler", "core.logger.engine.logger",
 		"menu.engine.manifest_reader", "modules.hotstrings.hotstrings_config",
-		"modules.keymap.expander", "modules.keystats", "modules.llm",
-		"modules.llm.prediction_engine", "core.ui.ui.tooltip", "modules.keymap.llm_bridge",
+		"modules.keymap.expander", "modules.keystats", "ai.engine",
+		"ai.engine.prediction.engine", "core.ui.ui.tooltip", "ai.engine.bridge",
 	}, function()
 		local scheduled = {}
 		local action_epoch = {}
@@ -102,10 +102,10 @@ local function render_provider_row(provider_result)
 			log_hotstring_suggested = function() end,
 			log_hotstring_dismissed = function() end,
 		}
-		package.loaded["modules.llm"] = {
+		package.loaded["ai.engine"] = {
 			DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = true },
 		}
-		package.loaded["modules.llm.prediction_engine"] = {
+		package.loaded["ai.engine.prediction.engine"] = {
 			set_runtime_guard = function() end,
 			init = function() return true end,
 			get_llm_enabled = function() return false end,
@@ -123,7 +123,7 @@ local function render_provider_row(provider_result)
 				return true
 			end,
 		}
-		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+		local Bridge = helpers.load_with_stubs("ai.engine.bridge")
 		local state = {
 			buffer = "@u",
 			mappings = {},
@@ -133,7 +133,7 @@ local function render_provider_row(provider_result)
 			preview_providers = { function() return provider_result, {} end },
 			is_repeat_feature_enabled = function() return false end,
 		}
-		require("modules.keymap.llm_context").seed(state, state.buffer, "")
+		require("ai.engine.api.context").seed(state, state.buffer, "")
 		Bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
 		Bridge.update_preview(state.buffer)
 		local delivered = 0

@@ -11,10 +11,10 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"ui.menu.menu_llm.agent_panel", "modules.llm.agent_runner", "modules.llm.agent_connectors",
-	"core.ui.engine.dialog_util", "core.ui.ui.tooltip", "infra.app_picker", "menu.engine.manifest_menu", "modules.llm.api_remote",
-	"core.logger.engine.logger", "core.i18n.engine.locale", "modules.llm.api_ollama", "modules.llm.local_model_offer",
-	"modules.llm.local_servers", "ui.menu.menu_llm.local_server_panel",
+	"ai.ui.menu.panels.agent_panel", "ai.engine.agent.runner", "ai.engine.agent.connectors",
+	"core.ui.engine.dialog_util", "core.ui.ui.tooltip", "infra.app_picker", "menu.engine.manifest_menu", "ai.engine.api.remote",
+	"core.logger.engine.logger", "core.i18n.engine.locale", "ai.engine.api.ollama", "ai.engine.ollama.local_model_offer",
+	"ai.engine.local_servers.local_servers", "ai.ui.menu.panels.local_server_panel",
 }
 
 --- Builds the panel over a state and faked owners.
@@ -37,7 +37,7 @@ local function with_panel(state, scenario, language)
 				return world.alert_answer == "first" and first or second
 			end,
 		}
-		package.loaded["modules.llm.api_ollama"] = {
+		package.loaded["ai.engine.api.ollama"] = {
 			MODEL_MISSING = "model_missing",
 			get_base_url = function() return "http://127.0.0.1:11470" end,
 			capture_service_owner = function() return function() return true end end,
@@ -63,10 +63,10 @@ local function with_panel(state, scenario, language)
 				return { { label = "picker-row", action = function() end } }
 			end,
 		}
-		package.loaded["modules.llm.agent_connectors"] = {
+		package.loaded["ai.engine.agent.connectors"] = {
 			list_tools = function(_, on_done) world.tool_lists = (world.tool_lists or 0) + 1; on_done({}) end,
 		}
-		local Panel = helpers.load_with_stubs("ui.menu.menu_llm.agent_panel")
+		local Panel = helpers.load_with_stubs("ai.ui.menu.panels.agent_panel")
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local i18n = require("core.i18n.engine.i18n")
 		local Locale = require("core.i18n.engine.locale")
@@ -84,7 +84,7 @@ local function with_panel(state, scenario, language)
 			return text
 		end
 		world.i18n = i18n
-		require("modules.llm.local_model_offer").set_installer(function(model)
+		require("ai.engine.ollama.local_model_offer").set_installer(function(model)
 			world.installs[#world.installs + 1] = model
 			return true
 		end)

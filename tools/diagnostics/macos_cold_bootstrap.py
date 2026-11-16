@@ -20,15 +20,15 @@ import macos_app_dirs as app_dirs
 REPOSITORY = Path(__file__).resolve().parents[2]
 PREFIX = Path("static/ergopti_plus")
 SOURCE_PATHS = (
-    "macos/modules/llm/network-retry.sh",
-    "macos/modules/llm/ensure-mlx-deps.sh",
-    "macos/modules/llm/managed_bootstrap_http.py",
-    "macos/modules/llm/mlx_deps_checker.lua",
-    "macos/modules/llm/uv-release.sh",
-    "macos/modules/llm/managed-python-release.sh",
-    "macos/modules/llm/managed-python-downloads.json",
-    "macos/adapters/native_bootstrap_pty.lua",
-    "macos/adapters/python_interpreter.lua",
+    "macos/ai/engine/network-retry.sh",
+    "macos/ai/engine/ensure-mlx-deps.sh",
+    "macos/ai/engine/managed_bootstrap_http.py",
+    "macos/ai/engine/local_servers/mlx_deps_checker.lua",
+    "macos/ai/engine/uv-release.sh",
+    "macos/ai/engine/managed-python-release.sh",
+    "macos/ai/engine/managed-python-downloads.json",
+    "macos/ai/adapters/native_bootstrap_pty.lua",
+    "macos/ai/adapters/python_interpreter.lua",
     "macos/core/network/adapters/native_http.py",
     "_shared/core/network/adapters/python_network_proxy_policy.py",
     "_shared/core/lifecycle/engine/core/native_pty_receipt.lua",
@@ -218,7 +218,7 @@ def validate(result, config):
     ):
         raise RuntimeError("Native cold physical receipt is incomplete")
     if result.get("source_sha256") != digest(
-        Path(config["driver"]) / "modules/llm/ensure-mlx-deps.sh"
+        Path(config["driver"]) / "ai/engine/ensure-mlx-deps.sh"
     ):
         raise RuntimeError("Native cold executed source differs from admitted source")
     if (

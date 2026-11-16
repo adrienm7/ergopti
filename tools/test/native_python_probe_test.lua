@@ -6,7 +6,7 @@ local repository = arg[1] or root
 -- The provider names its folders through the generated app_dirs table.
 package.path = root .. "/static/ergopti_plus/_shared/?.lua;" .. package.path
 package.loaded["core.logger.engine.logger"] = { error = function() end }
-local Parser = assert(loadfile(repository .. "/static/ergopti_plus/macos/adapters/python_interpreter.lua"))()
+local Parser = assert(loadfile(repository .. "/static/ergopti_plus/macos/ai/adapters/python_interpreter.lua"))()
 local locator = assert(loadfile(root .. "/static/ergopti_plus/_shared/core/lifecycle/engine/core/managed_python_locator.lua"))()
 local cases, assertions = 0, 0
 local function check(value, expected, label)
@@ -22,13 +22,13 @@ local function with_case(options, callback)
 	local prefix = assert(os.getenv("HOME")):gsub("/+$", "")
 		.. "/Library/Application Support/Ergopti/native-bootstrap/python/"
 	fixture.expected = prefix .. "cpython-3.11.16-macos-aarch64-none/bin/python3.11"
-	package.loaded["adapters.python_interpreter"] = { parse_header = Parser.parse_header,
+	package.loaded["ai.adapters.python_interpreter"] = { parse_header = Parser.parse_header,
 		resolve = function()
 			fixture.clock = fixture.clock + (options.system_delay or 0)
 			return fixture.system
 		end }
 	package.loaded["core.lifecycle.engine.core.managed_python_locator"] = locator
-	package.loaded["modules.llm.bootstrap_retry_generated"] = { admission_seconds = 30, idle_seconds = 60, retirement_seconds = 600 }
+	package.loaded["ai.engine.bootstrap.retry_generated"] = { admission_seconds = 30, idle_seconds = 60, retirement_seconds = 600 }
 	package.loaded["core.logger.engine.logger"] = { error = function() end }
 	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function() error("GUI catalogue byte reads are forbidden") end,
@@ -102,9 +102,9 @@ local function with_case(options, callback)
 			return true
 		end,
 	}
-	fixture.probe = assert(loadfile(root .. "/static/ergopti_plus/macos/adapters/native_python_probe.lua"))()
-	package.loaded["adapters.native_python_probe"] = fixture.probe
-	fixture.provider = assert(loadfile(root .. "/static/ergopti_plus/macos/modules/llm/managed_native_python.lua"))()
+	fixture.probe = assert(loadfile(root .. "/static/ergopti_plus/macos/ai/adapters/native_python_probe.lua"))()
+	package.loaded["ai.adapters.native_python_probe"] = fixture.probe
+	fixture.provider = assert(loadfile(root .. "/static/ergopti_plus/macos/ai/engine/bootstrap/managed_native_python.lua"))()
 	function fixture.finish(status, closed, stderr)
 		local task = assert(fixture.tasks[1])
 		task.done(status or 0, fixture.header, stderr or "")

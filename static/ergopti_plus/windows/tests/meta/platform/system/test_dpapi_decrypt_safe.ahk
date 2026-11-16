@@ -6,7 +6,7 @@
 ; Static source guard for the "DPAPI decrypt failure silently wipes token"
 ; finding (dpapi-decrypt-fail-wipes-token).
 ;
-; modules/llm/api_token_crypto.ahk — LLM_ApiToken_Decrypt() — previously
+; ai/engine/api/token_crypto.ahk — LLM_ApiToken_Decrypt() — previously
 ; called _LLM_DPAPI_Unprotect and returned its result directly. When DPAPI
 ; fails (corrupted blob, domain account not available, key inaccessible) that
 ; primitive returns "". The caller (menu_api_entries.ahk) stores "" into the
@@ -47,7 +47,7 @@ _DPAPI_ReadSource(FileName) {
 ; ===================================================
 
 _DPAPI_DecryptDoesNotReturnUnprotectDirectly() {
-	Src := _DPAPI_ReadSource("api_token_crypto.ahk")
+	Src := _DPAPI_ReadSource("token_crypto.ahk")
 	Seg := _DriverFuncBody("LLM_ApiToken_Decrypt")
 	Assert(Seg != "", "LLM_ApiToken_Decrypt declaration must exist in api_token_crypto.ahk")
 	; Old code ended with `return _LLM_DPAPI_Unprotect(b64)` — the direct return
@@ -58,7 +58,7 @@ _DPAPI_DecryptDoesNotReturnUnprotectDirectly() {
 Test("api_token_crypto: LLM_ApiToken_Decrypt does not return _LLM_DPAPI_Unprotect result directly", _DPAPI_DecryptDoesNotReturnUnprotectDirectly)
 
 _DPAPI_DecryptChecksForEmptyResult() {
-	Src := _DPAPI_ReadSource("api_token_crypto.ahk")
+	Src := _DPAPI_ReadSource("token_crypto.ahk")
 	Seg := _DriverFuncBody("LLM_ApiToken_Decrypt")
 	Assert(InStr(Seg, "result == ") > 0 or InStr(Seg, "result =  ") > 0 or InStr(Seg, "result =`t") > 0,
 		"LLM_ApiToken_Decrypt must inspect the result of _LLM_DPAPI_Unprotect before returning it")
@@ -66,7 +66,7 @@ _DPAPI_DecryptChecksForEmptyResult() {
 Test("api_token_crypto: LLM_ApiToken_Decrypt checks _LLM_DPAPI_Unprotect result before returning", _DPAPI_DecryptChecksForEmptyResult)
 
 _DPAPI_DecryptPreservesStoredOnFailure() {
-	Src := _DPAPI_ReadSource("api_token_crypto.ahk")
+	Src := _DPAPI_ReadSource("token_crypto.ahk")
 	Seg := _DriverFuncBody("LLM_ApiToken_Decrypt")
 	; The failure branch must return `stored` (the encrypted form) not "".
 	Assert(InStr(Seg, "return stored") > 0,

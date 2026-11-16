@@ -65,28 +65,28 @@ const CASES = [
 	],
 	[
 		WINDOWS,
-		'modules/llm/api_ollama/ollama_streaming.ahk',
+		'ai/engine/api_ollama/ollama_streaming.ahk',
 		'Prediction received ({1} chars): «{2}».',
 		['11', CANARY],
 		'(11 chars)'
 	],
 	[
 		WINDOWS,
-		'modules/llm/api_ollama/ollama_streaming.ahk',
+		'ai/engine/api_ollama/ollama_streaming.ahk',
 		'Ollama returned an empty prediction (parse miss). Body: «{1}».{2}',
 		[CANARY, ` Payload: «${CANARY}».`],
 		'parse miss'
 	],
 	[
 		WINDOWS,
-		'modules/llm/parser.ahk',
+		'ai/engine/api/parser.ahk',
 		'ProcessPrediction crashed on model output — variant dropped: {1} | block: «{2}».',
 		['boom', CANARY],
 		'boom'
 	],
 	[
 		WINDOWS,
-		'modules/llm/api_ollama/ollama_payload.ahk',
+		'ai/engine/api_ollama/ollama_payload.ahk',
 		'JSON parse failed in ChatResponse: {1}. Raw (200c): {2}',
 		['boom', CANARY],
 		'boom'

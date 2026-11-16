@@ -74,7 +74,7 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //                    concatenated further down, which no adjacency pattern can
 //                    reach. Fifteen files do not call driver_root() at all: they
 //                    rebuild the root from debug.getinfo, or open
-//                    "modules/keymap/llm_bridge.lua" relative to the runner's
+//                    "ai/engine/bridge.lua" relative to the runner's
 //                    cwd. What a `git mv` breaks is the string naming the file,
 //                    not the syntax around it. Not one test changed; 63 files
 //                    that had been pinned the whole time became visible.

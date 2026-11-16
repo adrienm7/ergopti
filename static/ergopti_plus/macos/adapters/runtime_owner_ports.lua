@@ -260,7 +260,7 @@ function M.automatic_observer(notify)
 			and require("platform.remap").OWNED_INSTALL_REASONS[reason] == true then
 			offered = true
 			local committed = require("core.timing.engine.deferred_work").after(0, function()
-				require("ui.owned_runtime_install").open(require("platform.remap"))
+				require("ai.ui.owned_runtime_install").open(require("platform.remap"))
 			end, "owned_runtime_install.offer")
 			if committed == true then return end
 		elseif state == "unavailable" and reason == require("platform.remap.runtime_vhid").REASON_NOT_ACTIVE then

@@ -60,7 +60,7 @@ function M.new(...)
 	local shared_backspace = engine.backspace
 	local shared_apply_expansion = engine.apply_expansion
 	local shared_reset = engine.reset
-	-- The AI typing context (modules/llm/context.lua), nil on an engine whose
+	-- The AI typing context (ai/engine/api/context.lua), nil on an engine whose
 	-- owner has none: the hotstring matcher itself never depends on it.
 	local ai_context = nil
 	-- The buffer text, as of the last private expansion the matcher kept, that

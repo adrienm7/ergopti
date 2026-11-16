@@ -386,7 +386,7 @@ function M.network(ports, report, finish)
 		relay = assert(ports.relay_policy(), "the shared relay contract is unreadable"),
 		-- The shared policy, not a platform call: a lookup the PAC fallback covers goes direct.
 		pac_fallback = function(stage)
-			return require("modules.llm.opaque_network_admission").is_pac_fallback_stage(stage)
+			return require("ai.engine.api.opaque_network_admission").is_pac_fallback_stage(stage)
 		end,
 	}, report, finish)
 end

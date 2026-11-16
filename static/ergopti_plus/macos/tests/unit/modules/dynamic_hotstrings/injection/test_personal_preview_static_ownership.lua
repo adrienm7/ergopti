@@ -34,11 +34,11 @@ local function install_collaborators(effects)
 	hs_stub.__reset()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = true },
 		check_modifiers = function() return false end,
 	}
-	package.loaded["modules.llm.prediction_engine"] = {
+	package.loaded["ai.engine.prediction.engine"] = {
 		init = function() return true end,
 		set_runtime_guard = function() end,
 		get_llm_enabled = function() return false end,

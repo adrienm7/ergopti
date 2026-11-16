@@ -24,7 +24,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 	end,
 }
 _G.hs = { host = { uuid = function() return NONCE end } }
-local Adapter = assert(loadfile(root .. "/static/ergopti_plus/macos/adapters/managed_ollama_pull.lua"))()
+local Adapter = assert(loadfile(root .. "/static/ergopti_plus/macos/ai/adapters/managed_ollama_pull.lua"))()
 local assertions = 0
 local function check(value, expected)
 	assert(value == expected); assertions = assertions + 1

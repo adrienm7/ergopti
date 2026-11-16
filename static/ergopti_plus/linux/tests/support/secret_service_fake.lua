@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: In-Memory Secret Service
 --- DESCRIPTION:
---- Stands in for secret-tool behind modules/llm/api_token_store.lua, with the
+--- Stands in for secret-tool behind ai/engine/settings/api_token_store.lua, with the
 --- results the real tool gives: a missing item reads as "absent", an absent
 --- item deletes as success. A test can make the service unavailable or refuse
 --- a store, and reads what it holds.
@@ -11,7 +11,7 @@
 
 local M = {}
 
-local STORE = "modules.llm.api_token_store"
+local STORE = "ai.engine.settings.api_token_store"
 
 --- A fresh fake service and the backend that serves it.
 --- @return table fake { items, unavailable_reason, store_refusal, lookup_refusal, calls }

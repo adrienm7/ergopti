@@ -123,9 +123,9 @@ helpers.describe("configured Linux ordered pair ownership", function()
 		local _,action,_,frame = process(state,15,0,100); helpers.assert_eq(action,nil); helpers.assert_true(frame.ack(true))
 	end)
 	helpers.it("leaves a tap-only AI pair to the keys while the AI is off and takes it once on (ai-off-pair)", function()
-		local previous = package.loaded["modules.llm.prediction_engine"]
+		local previous = package.loaded["ai.engine.prediction.engine"]
 		local switch = { enabled = false }
-		package.loaded["modules.llm.prediction_engine"] = { is_enabled = function() return switch.enabled end }
+		package.loaded["ai.engine.prediction.engine"] = { is_enabled = function() return switch.enabled end }
 		local ok, err = pcall(function()
 			local text = base_text:gsub('caps_lock_then_tab = "shift"', 'caps_lock_then_tab = "none"')
 				:gsub('caps_lock_then_tab = "run_program"', 'caps_lock_then_tab = "llm_generate_prediction"')
@@ -143,7 +143,7 @@ helpers.describe("configured Linux ordered pair ownership", function()
 			helpers.assert_eq(slot, binding)
 			helpers.assert_true(frame.ack(true))
 		end)
-		package.loaded["modules.llm.prediction_engine"] = previous
+		package.loaded["ai.engine.prediction.engine"] = previous
 		if not ok then error(err, 0) end
 	end)
 	helpers.it("refuses a cross-keyboard pair and a duplicate-code source collision", function()

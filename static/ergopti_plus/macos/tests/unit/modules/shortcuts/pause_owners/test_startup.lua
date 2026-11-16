@@ -512,9 +512,9 @@ helpers.describe("HS-012 real reattached MLX work fence", function()
 				return true
 			end,
 		}
-		reset_module("ui.menu.menu_llm.models_manager_mlx_download")
+		reset_module("ai.ui.menu.models.manager_mlx_download")
 		local obj = {}
-		require("ui.menu.menu_llm.models_manager_mlx_download").install({
+		require("ai.ui.menu.models.manager_mlx_download").install({
 			obj = obj,
 			deps = {
 				active_tasks = {},

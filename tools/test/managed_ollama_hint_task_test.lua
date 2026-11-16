@@ -25,7 +25,7 @@ local function fresh(options)
 		if configuration.directory_missing then return nil, "native observation unavailable" end
 		return { mode = configuration.directory_mode or "directory" }
 	end } }
-	package.loaded["modules.llm.bootstrap_retry_generated"] = { admission_seconds = 30, source_sha256 = string.rep("a", 64) }
+	package.loaded["ai.engine.bootstrap.retry_generated"] = { admission_seconds = 30, source_sha256 = string.rep("a", 64) }
 	-- A refused hint is logged with the check the script names.
 	package.loaded["core.logger.engine.logger"] = { warn = function() end }
 	package.loaded["core.events.timer_scheduler"] = { awake_time = function()
@@ -39,7 +39,7 @@ local function fresh(options)
 	package.loaded["core.fs.adapters.file_system"] = { classify_no_follow = function()
 		return { mode = "file", size = 512, modification = version, permissions = "rw-r--r--" }, "ok"
 	end, read_with_status = function() error("GUI synchronous metadata read forbidden") end }
-	package.loaded["modules.llm.managed_native_python"] = {
+	package.loaded["ai.engine.bootstrap.managed_native_python"] = {
 		resolve = function(remaining)
 			check(remaining <= 30 and remaining > 0, true)
 			if configuration.preflight then return nil, "pending" end
@@ -83,7 +83,7 @@ local function fresh(options)
 		current = handle; calls[#calls + 1] = handle
 		return handle
 	end }
-	adapter = assert(loadfile(root .. "/static/ergopti_plus/macos/adapters/managed_ollama_hint.lua"))()
+	adapter = assert(loadfile(root .. "/static/ergopti_plus/macos/ai/adapters/managed_ollama_hint.lua"))()
 end
 case(function()
 	fresh(); local value, state = adapter.get(directory, driver)
@@ -255,8 +255,8 @@ case(function()
 end)
 case(function()
 	fresh()
-	local original = package.loaded["modules.llm.managed_native_python"].resolve
-	package.loaded["modules.llm.managed_native_python"].resolve = function(budget)
+	local original = package.loaded["ai.engine.bootstrap.managed_native_python"].resolve
+	package.loaded["ai.engine.bootstrap.managed_native_python"].resolve = function(budget)
 		local python = original(budget)
 		configuration.clock_missing = true
 		return python

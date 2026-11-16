@@ -20,9 +20,9 @@ end
 require("core.lifecycle.engine.compat.utf8").install()
 
 local Http = require("core.network.adapters.http_client")
-local Ollama = require("modules.llm.api_ollama")
+local Ollama = require("ai.engine.api.api_ollama")
 local Policy = require("ai.engine.ollama.local_model_policy")
-local Offer = require("modules.llm.local_model_offer")
+local Offer = require("ai.engine.ollama.local_model_offer")
 local MODEL = "ergopti-stream-receipt:latest"
 local failures, checks, sockets = {}, 0, {}
 local requests = {}

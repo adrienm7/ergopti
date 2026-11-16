@@ -42,7 +42,7 @@ if ]] .. string.format("%q", mode) .. [[ == "warm" then require("core.timing.eng
 local helpers = require("tests.helpers")
 helpers.reset_results()
 local logger = require("core.logger.engine.shim")
-require("ui.menu.llm_config_guard")
+require("ai.ui.menu.config_guard")
 local modules = { ]] .. table.concat(owned, ", ") .. [[ }
 local previous = {}
 for _, name in ipairs(modules) do

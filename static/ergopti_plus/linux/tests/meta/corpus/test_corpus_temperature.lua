@@ -43,7 +43,7 @@ helpers.describe("temperature corpus: the shared diversity temperature on Linux"
 	local corpus = read_json("tests/corpus/llm/temperature_vectors.json")
 	local shipped = read_json("ai/data/inference.json").diversity_temperature
 	local Temperature = helpers.load_module("ai.engine.policy.temperature")
-	local Inference = helpers.load_module("modules.llm.inference")
+	local Inference = helpers.load_module("ai.engine.local_servers.inference")
 
 	helpers.it("the corpus holds the base thresholds, the floor and the clamp", function()
 		helpers.assert_true(#corpus.vectors >= 12, "vectors")

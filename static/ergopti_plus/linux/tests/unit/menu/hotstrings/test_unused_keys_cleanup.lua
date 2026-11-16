@@ -307,15 +307,15 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 			-- The wrong-typed AI leaf is read as absent; its neighbours still read.
 			Sandbox.with_config(source, function(path)
 				local paths = require("settings.engine.paths")
-				local previous_config, previous_preferences = paths.config, package.loaded["infra.llm_preferences"]
+				local previous_config, previous_preferences = paths.config, package.loaded["ai.engine.preferences"]
 				paths.config = function() return path end
-				package.loaded["infra.llm_preferences"] = nil
+				package.loaded["ai.engine.preferences"] = nil
 				local ok, err = pcall(function()
-					local preferences = require("infra.llm_preferences")
+					local preferences = require("ai.engine.preferences")
 					helpers.assert_eq(preferences.get("llm.enabled", nil), true)
 					helpers.assert_nil(preferences.get("llm.trigger.debounce_ms", nil))
 				end)
-				paths.config, package.loaded["infra.llm_preferences"] = previous_config, previous_preferences
+				paths.config, package.loaded["ai.engine.preferences"] = previous_config, previous_preferences
 				if not ok then error(err, 0) end
 			end)
 		end)

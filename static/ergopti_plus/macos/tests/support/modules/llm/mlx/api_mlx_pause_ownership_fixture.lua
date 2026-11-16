@@ -17,11 +17,11 @@ local MODULE_NAMES = {
 	"core.events.timer_scheduler",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
-	"modules.llm.api_mlx",
-	"modules.llm.api_mlx_discovery",
-	"modules.llm.api_mlx_fetch",
-	"modules.llm.api_mlx_inference",
-	"modules.llm.warmup_controller",
+	"ai.engine.api.mlx",
+	"ai.engine.api.mlx_discovery",
+	"ai.engine.api.mlx_fetch",
+	"ai.engine.api.mlx_inference",
+	"ai.engine.local_servers.warmup_controller",
 	"modules.shortcuts.script_control",
 }
 
@@ -207,12 +207,12 @@ local function with_real_mlx_stack(fn)
 	local api
 	local discovery
 	local ok, err = xpcall(function()
-		api = helpers.load_with_stubs("modules.llm.api_mlx", {
+		api = helpers.load_with_stubs("ai.engine.api.mlx", {
 			timer = make_timer_stub(state),
 			http = make_http_stub(state),
 			task = make_task_stub(state),
 		})
-		discovery = package.loaded["modules.llm.api_mlx_discovery"]
+		discovery = package.loaded["ai.engine.api.mlx_discovery"]
 		helpers.assert_not_nil(discovery,
 			"positive control must load the real MLX discovery module")
 		fn({ api = api, discovery = discovery, state = state })
@@ -273,15 +273,15 @@ local function install_script_control_dependencies(options)
 		SG_NAMES = { "none", "script_pause_toggle" },
 		AX_NAMES = {},
 	}
-	package.loaded["modules.llm.warmup_controller"] = options.warmup_controller or {
+	package.loaded["ai.engine.local_servers.warmup_controller"] = options.warmup_controller or {
 		pause_warmup = settled,
 		resume_warmup = options.warmup_controller_resume or settled,
 	}
-	package.loaded["modules.llm.api_ollama"] = {
+	package.loaded["ai.engine.api.ollama"] = {
 		pause_warmup = settled,
 		resume_warmup = settled,
 	}
-	package.loaded["modules.llm.api_remote"] = {
+	package.loaded["ai.engine.api.remote"] = {
 		pause_warmup = settled,
 		resume_warmup = settled,
 	}
@@ -299,8 +299,8 @@ end
 --- @param env table Real MLX harness environment.
 --- @return table controller Initialised WarmupController module.
 local function init_idle_real_warmup_controller(env)
-	package.loaded["modules.llm.warmup_controller"] = nil
-	local controller = require("modules.llm.warmup_controller")
+	package.loaded["ai.engine.local_servers.warmup_controller"] = nil
+	local controller = require("ai.engine.local_servers.warmup_controller")
 	helpers.assert_true(controller.init({
 		core_llm = {
 			is_backend_ready = env.api.is_ready,

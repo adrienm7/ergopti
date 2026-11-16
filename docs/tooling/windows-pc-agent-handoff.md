@@ -152,7 +152,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
   `key_combinations.ahk:956`.
 
 - Logger scalar gate on dev a9198f7f: the Vertex AI files landed with
-  free-form reasons, `windows/modules/llm/api_token_exchange.ahk` (22, baseline 0) and `windows/modules/llm/rs256_signer.ahk` (19, baseline 0) in
+  free-form reasons, `windows/ai/engine/api/token_exchange.ahk` (22, baseline 0) and `windows/ai/engine/api/rs256_signer.ahk` (19, baseline 0) in
   `tools/test/test-logger-scalars-single-source.cjs`. Use closed `reason`
   values from `_shared/core/logger/data/vocabulary.json` (add any missing one
   there, then `npm run codegen:contracts`) and move the detail to the message.
@@ -250,10 +250,10 @@ readable through `archive/2026-10-31/<branch>`. Then:
 downloaded again`). Ollama deletes that layer before it reports the
   mismatch, so macOS now pulls once more and then fails with the localized
   `ollama.digest_mismatch` (3939a569ad). The Windows managed pull
-  (`modules/llm/ollama_managed_bootstrap.ahk`, `_PullResult` and the menu pull
+  (`ai/engine/ollama/managed_bootstrap.ahk`, `_PullResult` and the menu pull
   `_MenuPulled`) only reads the exit code and fails as `model_pull`. It needs
   the pull output classified (the closed vocabulary of
-  `macos/modules/llm/managed_ollama_pull.py` `ERROR_CLASSES`), one automatic
+  `macos/ai/engine/ollama/managed_ollama_pull.py` `ERROR_CLASSES`), one automatic
   retry on `digest_mismatch`, then `ollama.digest_mismatch` (the key exists in
   all 21 locales), with an AHK test that fails without the retry.
 - Local servers on Windows: GPT4All's Windows executable is `chat.exe` in the
@@ -332,7 +332,7 @@ downloaded again`). Ollama deletes that layer before it reports the
     nothing to remove.
 - Owned runtimes on Windows (decided 2026-10-31; rows with `os = "windows"`
   and status `follow_up` in `_shared/core/network/data/owned_runtimes.json`): delete the
-  winget Ollama.Ollama fallback in `windows/modules/llm/ollama_deps_checker.ahk`
+  winget Ollama.Ollama fallback in `windows/ai/engine/ollama/deps_checker.ahk`
   (around lines 257 and 327-357); add a WebView2 Evergreen minimum-version
   check with a clear refusal (keeping the native fallback); check the Windows
   PowerShell 5.1 version at start and refuse in words; pin `curl.exe` (an own
@@ -359,7 +359,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   per answering address the identified row, else the group's default; turn the
   others into `{status: down, shadowed_by}`, set `server` on a kept row the
   listing names differently, and count both in the verdict-change check; pass
-  the identities from `windows/modules/llm/local_servers.ahk`. (3) Port
+  the identities from `windows/ai/engine/local_servers/local_servers.ahk`. (3) Port
   `label_of` into `local_server_menu.ahk` and use it for row, page-row and view
   labels. (4) `local_server_auth.ahk`: record `address_default` and make
   `EntryMatches` refuse a generic openai/openai_compat entry for a non-default
@@ -440,7 +440,7 @@ fix after them). Nothing below ever ran under AutoHotkey or `pwsh`; the JS and
 meta tests pin names, not behaviour. Run, in order:
 
 1. Parse and the full AHK suite: `core/logger/engine/perf_budget.ahk`,
-   `modules/llm/llm_request_latency.ahk` (included by `prediction_exec.ahk`,
+   `ai/engine/prediction/request_latency.ahk` (included by `prediction_exec.ahk`,
    which the LLM suites load), `infra/field_run.ahk`, and the edits in
    `ErgoptiPlus.ahk` (boot budget, field run start) and `core/lifecycle/engine/lifecycle.ahk`
    (field run stop).
@@ -463,28 +463,28 @@ ready (3 step(s)).` and `build/field-run/ready.json` names the driver's pid.
    runtime layer expects the `no_ready_driver` skip line in a fixture clone.
 
 - Branch `feat/menu-no-dynamic` (retired `dynamic` menu rows) changed
-  `windows/ui/menu/menu_llm/menu_main.ahk` without running AutoHotkey: the
+  `windows/ai/ui/menu/menu_main.ahk` without running AutoHotkey: the
   model and profile rows are now `list` rows (`LLM_Menu_BuildSubmenu` passes
   `ListProviders` bound to `_LLM_Menu_EmitCapturedRow`, and
   `_LLM_MenuLayout_Rows` keeps the rows that declare `disabled_when_off`), and
   `agent_system1` / `agent_system2` are one `list` declaration for every driver
   (no `platforms`). Run these AHK tests and fix what fails:
-  - `tests/meta/modules/llm/menu/test_llm_menu_layout_shared.ahk` (edited: row
+  - `tests/meta/ai/menu/test_layout_shared.ahk` (edited: row
     filter, `list` type policy and its withdrawal messages);
-  - `tests/meta/modules/llm/menu/test_llm_menu_disabled_greyed.ahk` (edited:
+  - `tests/meta/ai/menu/test_disabled_greyed.ahk` (edited:
     the `MenuRenderer_Build` statement regex);
-  - `tests/unit/modules/llm/prediction/test_llm_live_mode.ahk` (edited: the
+  - `tests/unit/ai/prediction/test_live_mode.ahk` (edited: the
     same regex in `_LLV_GenerationRoute`);
-  - `tests/unit/modules/llm/actions/test_llm_agent_requester.ahk` (edited: the
+  - `tests/unit/ai/actions/test_agent_requester.ahk` (edited: the
     System row has no `platforms` to save and restore);
   - unchanged but covering the edited code:
-    `tests/unit/modules/llm/menu/test_llm_menu_build_submenu.ahk`,
+    `tests/unit/ai/menu/test_build_submenu.ahk`,
     `tests/unit/menu/test_manifest_menu_parent_groups.ahk`,
-    `tests/unit/modules/llm/actions/test_llm_agent_system_menu.ahk`,
-    `tests/unit/modules/llm/menu/test_llm_menu_test_prediction.ahk`,
-    `tests/meta/modules/llm/menu/test_llm_menu_build_critical.ahk`,
-    `tests/meta/modules/llm/menu/test_llm_menu_build_coordinator.ahk`,
-    `tests/meta/modules/llm/menu/test_llm_menu_caller_child_full_root.ahk`,
+    `tests/unit/ai/actions/test_agent_system_menu.ahk`,
+    `tests/unit/ai/menu/test_test_prediction.ahk`,
+    `tests/meta/ai/menu/test_build_critical.ahk`,
+    `tests/meta/ai/menu/test_build_coordinator.ahk`,
+    `tests/meta/ai/menu/test_caller_child_full_root.ahk`,
     `tests/unit/menu/test_manifest_menu_no_double_separator.ahk`;
   - then the full `run_all.ahk` and `e2e/run_e2e.ahk`, and open the AI submenu
     once: the model button, the profile submenu and both agent Systems must
@@ -528,7 +528,7 @@ change touched is the generated `windows/_generated/config_keys.ahk`
 - Read the stored value with an AHK twin of the parser (refuse anything else,
   never read it as automatic) and apply it before WinINet/PAC in the managed
   routes (`ui/field_check/network_check.ahk`, `modules/updater/self_update.ahk`,
-  `modules/llm/ollama_managed_bootstrap.ahk` and the route plan twin
+  `ai/engine/ollama/managed_bootstrap.ahk` and the route plan twin
   `vendor/ergopti_route_plan.ps1`): a relay is every origin's route, `direct`
   is DIRECT for every origin, loopback stays direct.
 - The menu row: add `"ahk"` to the row's platforms, drop its `reason_key`
@@ -722,8 +722,8 @@ To do on the PC, after the Windows token exchange itself (the TODO's
    exchange lands, the native `llm_vision` request must wait for the token the
    same way instead of refusing while it is fetched.
 
-Done on Windows on 1 November (`modules/llm/api_token_exchange.ahk`,
-`modules/llm/rs256_signer.ahk`), with two departures from the steps above, both
+Done on Windows on 1 November (`ai/engine/api/token_exchange.ahk`,
+`ai/engine/api/rs256_signer.ahk`), with two departures from the steps above, both
 forced by the corpus. The DER is read by the signer itself: the blob of
 `CNG_RSA_PRIVATE_KEY_BLOB` holds no `dp`, `dq` or `qinv`, and the decoder cannot
 tell the refusals apart. CNG also recomputes those values, so a wrong `dq` would

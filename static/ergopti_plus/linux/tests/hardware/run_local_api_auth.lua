@@ -18,7 +18,7 @@ require("core.lifecycle.engine.compat.utf8").install()
 require("tests.support.secret_service_fake").isolate()
 local Http = require("core.network.adapters.http_client")
 local EventLoop = require("core.events.loop")
-local Remote = require("modules.llm.api_remote")
+local Remote = require("ai.engine.api.api_remote")
 local Json = require("core.text.engine.json")
 local failures, checks, sockets, requests = {}, 0, {}, {}
 local response = { status = 200, body = '{"data":[{"id":"fixture-model"}]}' }
@@ -150,7 +150,7 @@ check(cancelled == true, "cancellation requires the actual native transport ackn
 check(run_until(function() return not Http.isActive() end) and not Remote.is_active() and calls == 0, "cancelled owner settles without a late models publication")
 -- The actual discovery/menu consumer uses independent native GET owners, then
 -- the acknowledged private entry and existing chat owner, at this configured URL.
-local Entries = require("modules.llm.api_entries")
+local Entries = require("ai.engine.settings.api_entries")
 local private_path = os.tmpname(); os.remove(private_path)
 Entries._set_path_for_test(private_path)
 -- The catalogue lists more servers than these four; only the ones given an
@@ -160,7 +160,7 @@ for _, id in ipairs(NATIVE_IDS) do
 	check(Entries.add({ provider = id, label = id, token = "", model = "before", base_url = base_url }) ~= nil,
 		"native discovery stores the configured " .. id .. " source through its private owner")
 end
-local Servers = require("modules.llm.local_servers")
+local Servers = require("ai.engine.local_servers.local_servers")
 response = { status = 200, body = '{"data":[{"id":"discovered-model"}]}' }
 local discovery_done, discovery_calls = false, 0
 check(Servers.rescan(function() return true end, function()
@@ -170,7 +170,7 @@ check(run_until(function() return discovery_done end), "native discovery jointly
 check(discovery_calls == 1 and #Servers.detected() == 4 and Servers.result("omlx").models[1] == "discovered-model",
 	"actual strict models receipts populate the catalogue menu")
 local backend, writes = "ollama", 0
-local rows = require("ui.menu.local_server_rows").rows({
+local rows = require("ai.ui.menu.local_server_rows").rows({
 	get_backend = function() return backend end,
 	can_configure_local_servers = function() return true end, is_enabled = function() return true end,
 	set_backend = function(value) backend, writes = value, writes + 1; return true end,
@@ -195,7 +195,7 @@ check(Remote.chat(selected_entry, nil, {{ role = "user", content = "inert discov
 	function(value) chat_text, chat_done = value, true end), "the selected discovery entry acquires the actual chat consumer")
 check(run_until(function() return chat_done end) and chat_text == "native reply",
 	"discovery to model choice to actual curl chat succeeds")
-local reloaded = require("tests.helpers").load_module("modules.llm.api_entries")
+local reloaded = require("tests.helpers").load_module("ai.engine.settings.api_entries")
 reloaded._set_path_for_test(private_path)
 check(reloaded.active() and reloaded.active().model == "discovered-model",
 	"the acknowledged discovered model survives actual private-file restart")
@@ -253,7 +253,7 @@ for index, configured in ipairs(configured_entries) do
 	end
 	check(observed_matches == 1 and observed_auth == expected,
 		configured.provider .. " actual configured discovery retains its exact optional authentication")
-	local configured_rows = require("ui.menu.local_server_rows").rows({
+	local configured_rows = require("ai.ui.menu.local_server_rows").rows({
 		get_backend = function() return backend end,
 		can_configure_local_servers = function() return true end, is_enabled = function() return true end,
 		set_backend = function(value) backend, writes = value, writes + 1; return true end,
@@ -282,7 +282,7 @@ for index, configured in ipairs(configured_entries) do
 	check(run_until(function() return native_done end) and native_text == "native reply"
 		and Json.decode(requests[#requests].body).model == "mlx-community/Qwen3-8B-4bit"
 		and requests[#requests].authorization == expected, configured.provider .. " actual configured chat preserves model and authentication")
-	local restarted = require("tests.helpers").load_module("modules.llm.api_entries")
+	local restarted = require("tests.helpers").load_module("ai.engine.settings.api_entries")
 	restarted._set_path_for_test(private_path)
 	check(restarted.active() and restarted.active().id == configured.id and restarted.active().provider == configured.provider
 		and restarted.active().model == "mlx-community/Qwen3-8B-4bit", configured.provider .. " selected row survives actual private-file restart")
@@ -306,7 +306,7 @@ for _, id in ipairs(probed_ids()) do
 		id .. " valid empty models list is reachable without selectable model IDs")
 end
 check(#Servers.detected() == 6, "empty model lists retain all actual reachable server views")
-local empty_rows = require("ui.menu.local_server_rows").rows({
+local empty_rows = require("ai.ui.menu.local_server_rows").rows({
 	get_backend = function() return backend end,
 	can_configure_local_servers = function() return true end, is_enabled = function() return true end,
 	set_backend = function() error("empty model rows cannot acquire the backend setter") end,

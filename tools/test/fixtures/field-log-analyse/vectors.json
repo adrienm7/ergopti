@@ -213,7 +213,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/modules/llm/api_remote.lua",
+			"source": "static/ergopti_plus/macos/ai/engine/api/remote.lua",
 			"template": "[%s] #%d PARSED -> %d result(s) in %dms",
 			"line": "2026-10-30 10:00:00:123 [DEBUG] [llm.api_remote] [mlx-community--Qwen3.5-4B-MLX-4bit] #3 PARSED -> 1 result(s) in 1479ms",
 			"expect": {
@@ -229,7 +229,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/modules/llm/api_remote.lua",
+			"source": "static/ergopti_plus/macos/ai/engine/api/remote.lua",
 			"template": "Agent answer of provider '%s' received in %dms.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [llm.api_remote] Agent answer of provider 'mistral' received in 812ms.",
 			"expect": {
@@ -245,7 +245,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/modules/llm/api_ollama.lua",
+			"source": "static/ergopti_plus/macos/ai/engine/api/ollama.lua",
 			"template": "%s answer of the local server received in %dms (%d char(s)).",
 			"line": "2026-10-30 10:00:00:123 [INFO] [llm.api_ollama] Rewrite answer of the local server received in 950ms (40 char(s)).",
 			"expect": {
@@ -261,7 +261,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/modules/llm/streaming_handler.lua",
+			"source": "static/ergopti_plus/macos/ai/engine/api/streaming_handler.lua",
 			"template": "%d prediction(s) received in %dms from '%s'.",
 			"line": "2026-10-30 10:00:00:123 [SUCCESS] [llm.streaming_handler] 3 prediction(s) received in 3052ms from 'mlx-community--Qwen3.5-4B-MLX-4bit'.",
 			"expect": {
@@ -412,7 +412,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_server.lua",
+			"source": "static/ergopti_plus/macos/ai/ui/menu/models/manager_mlx_server.lua",
 			"template": "MLX server for ‘%s’ crashed — giving up. Reason: %s",
 			"line": "2026-10-30 10:00:00:123 [ERROR] [menu_llm.mlx] MLX server for ‘Qwen3.5-2B’ crashed — giving up. Reason: ModuleNotFoundError.",
 			"expect": {
@@ -506,7 +506,7 @@
 		},
 		{
 			"driver": "linux",
-			"source": "static/ergopti_plus/linux/modules/llm/api_remote.lua",
+			"source": "static/ergopti_plus/linux/ai/engine/api/api_remote.lua",
 			"template": "Remote completion received (%d chars in %d ms).",
 			"line": "2026-10-30 10:00:00:123 [DEBUG] [llm.api_remote] Remote completion received (120 chars in 640 ms).",
 			"expect": {
@@ -734,7 +734,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/ui/menu/menu_llm/menu_main.ahk",
+			"source": "static/ergopti_plus/windows/ai/ui/menu/menu_main.ahk",
 			"template": "LLM_Menu_Build: pre-emit staging took {1} ms.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [LLM] LLM_Menu_Build: pre-emit staging took 46 ms.",
 			"expect": {
@@ -750,7 +750,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/modules/llm/api_ollama/ollama_streaming.ahk",
+			"source": "static/ergopti_plus/windows/ai/engine/api_ollama/ollama_streaming.ahk",
 			"template": "Streaming timed out after {1} ms.",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [LLM.ollama] Streaming timed out after 30000 ms.",
 			"expect": {
@@ -767,7 +767,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/ui/menu/menu_llm/menu_api_entries.ahk",
+			"source": "static/ergopti_plus/windows/ai/ui/menu/api_entries.ahk",
 			"template": "API test for '{1}' succeeded in {2} ms ({3} reply chars).",
 			"line": "2026-10-30 10:00:00:123 [INFO] [LLM] API test for 'mistral' succeeded in 640 ms (12 reply chars).",
 			"expect": {
@@ -894,7 +894,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/modules/llm/llm_request_latency.ahk",
+			"source": "static/ergopti_plus/windows/ai/engine/prediction/request_latency.ahk",
 			"template": "LLM request: kind={1} provider={2} family={3} outcome={4} in {5} ms.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [LLM] LLM request: kind=remote provider=mistral family=mistral-small outcome=ok in 640 ms.",
 			"expect": {
@@ -910,7 +910,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/modules/llm/llm_request_latency.ahk",
+			"source": "static/ergopti_plus/windows/ai/engine/prediction/request_latency.ahk",
 			"template": "LLM request: kind={1} provider={2} family={3} outcome={4} in {5} ms.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [LLM] LLM request: kind=local provider=ollama family=qwen3.5 outcome=ok in 2210 ms.",
 			"expect": {
@@ -926,7 +926,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/modules/llm/llm_request_latency.ahk",
+			"source": "static/ergopti_plus/windows/ai/engine/prediction/request_latency.ahk",
 			"template": "LLM request: kind={1} provider={2} family={3} outcome={4} in {5} ms.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [LLM] LLM request: kind=local provider=ollama family=qwen3.5 outcome=failed in 30010 ms.",
 			"expect": {

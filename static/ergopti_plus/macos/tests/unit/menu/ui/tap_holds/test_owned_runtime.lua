@@ -230,7 +230,7 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 		-- WP8: the « not installed » row said the tap-holds were off and offered no way to install.
 		local INSTALL = "menu.tapholds.owned_install"
 		local opened = {}
-		package.loaded["ui.owned_runtime_install"] = {
+		package.loaded["ai.ui.owned_runtime_install"] = {
 			open = function(remap) opened[#opened + 1] = remap; return true end,
 		}
 		local function rows_for(status, with_facade)
@@ -260,14 +260,14 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 		end
 		helpers.assert_nil(find(rows_for({ state = "unavailable", reason = "runtime_not_installed" }, false), INSTALL),
 			"no offer without the facade that performs it")
-		package.loaded["ui.owned_runtime_install"] = nil
+		package.loaded["ai.ui.owned_runtime_install"] = nil
 	end)
 
 	helpers.it("offers « Réparer le service » under a stopped service of an installed runtime and only there (MRT-004)", function()
 		-- The advertised retry ran the first install, which always refuses an already published runtime.
 		local REPAIR = "menu.tapholds.owned_repair"
 		local opened = {}
-		package.loaded["ui.owned_runtime_install"] = {
+		package.loaded["ai.ui.owned_runtime_install"] = {
 			open = function() error("the repair row must never open the first install") end,
 			open_repair = function(remap) opened[#opened + 1] = remap; return true end,
 		}
@@ -296,6 +296,6 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 		end
 		helpers.assert_nil(find(rows_for({ state = "unavailable", reason = "runtime_job_not_loaded" }, false), REPAIR),
 			"no offer without the facade that performs it")
-		package.loaded["ui.owned_runtime_install"] = nil
+		package.loaded["ai.ui.owned_runtime_install"] = nil
 	end)
 end)

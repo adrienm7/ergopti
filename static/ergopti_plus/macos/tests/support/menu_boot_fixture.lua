@@ -216,7 +216,7 @@ function M.boot(opts)
 	}) do
 		package.loaded[module_name] = {}
 	end
-	package.loaded["ui.menu.menu_llm"] = { create = function() return {} end }
+	package.loaded["ai.ui.menu"] = { create = function() return {} end }
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
 	package.loaded["modules.dynamic_hotstrings"] = {}
 	package.loaded["modules.gestures"] = {
@@ -225,7 +225,7 @@ function M.boot(opts)
 	package.loaded["modules.keystats.text_cipher"] = { set_enabled = function() return true end }
 
 	local identity = function() return true end
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		set_backend = identity,
 		set_user_profiles = identity,
 		set_active_profile = identity,

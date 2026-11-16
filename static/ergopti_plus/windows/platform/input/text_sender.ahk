@@ -565,7 +565,7 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 	; restore — the caller's Saved snapshot is simply never consumed.
 	;
 	; Every bail-out below calls Callback() before returning. Callers such as
-	; modules/keymap/llm_bridge.ahk's _InjectCallback own depth-counter guards
+	; ai/engine/bridge.ahk's _InjectCallback own depth-counter guards
 	; (PrefixWatcherSuppress/KL_MarkSynthetic) that are released exactly once,
 	; by the callback, on any path where TextSend itself did not throw --  a
 	; bail-out here that never invokes Callback leaked those guards forever,

@@ -23,7 +23,7 @@
  * unit that gets ratcheted.
  *
  * ROOT CAUSE ENCODED:
- * A test that FileReads a quoted "(modules|lib|ui|core|platform|settings|menu|tray)/…*.ahk" path and does not use
+ * A test that FileReads a quoted "(modules|lib|ui|core|platform|settings|menu|tray|ai)/…*.ahk" path and does not use
  * a _Driver* helper is location-pinned. This ratchet counts them and fails if
  * the count rises above the frozen baseline. Lower (never raise) the baseline as
  * tests migrate to _DriverFuncBody("Fn") / _DriverSourceConcat(). It is the test
@@ -86,7 +86,7 @@ const BASELINE = 22;
 // _DriverFuncBody(Name) takes a SYMBOL, not a path, so a file can call it once,
 // earn the exemption, and go on reading twenty driver sources by hardcoded path
 // through a local FileRead wrapper of its own — test_webview2_temp_leak.ahk's
-// _TWTL_ReadSource("modules/llm/ollama_webview.ahk") is the shape. None of that
+// _TWTL_ReadSource("ai/engine/ollama/webview.ahk") is the shape. None of that
 // was counted. Do not read 326 as a regression; read 16 as an illusion.
 // History: 326 (first honest measurement, 2026-07-31 — but see below: it was not)
 //      326 → 380 (2026-08-02: 326 was frozen 91 above the measured 235, and the
@@ -105,7 +105,7 @@ const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirs?Concat/;
 // rename to infra/ and is kept only so a stray lib/ path cannot slip back in
 // unseen; `platform` is listed before it exists so Lot 3 cannot land unseen.
 const SOURCE_PATH_RE =
-	/["'][^"'\n]*(?:modules|lib|infra|ui|adapters|platform|core|settings|menu|tray)[\\/][^"'\n]*\.ahk["']|["'][.\\/]*ErgoptiPlus\.ahk["']/i;
+	/["'][^"'\n]*(?:modules|lib|infra|ui|adapters|platform|core|settings|menu|tray|ai)[\\/][^"'\n]*\.ahk["']|["'][.\\/]*ErgoptiPlus\.ahk["']/i;
 const SOURCE_PATH_RE_G = new RegExp(SOURCE_PATH_RE.source, 'gi');
 
 /**

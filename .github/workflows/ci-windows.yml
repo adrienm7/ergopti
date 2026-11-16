@@ -624,7 +624,7 @@ jobs:
               $env:PSModulePath = (Join-Path $windowsPowerShellDirectory 'Modules') + ';' + $oldModulePath
               $out = Join-Path $evidence 'native.stdout'
               $err = Join-Path $evidence 'native.stderr'
-              & "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_ollama_install_files.ps1" 1> $out 2> $err
+              & "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/ai/servers/test_ollama_install_files.ps1" 1> $out 2> $err
               $nativeExit = $LASTEXITCODE
               $stdout = [IO.File]::ReadAllText($out)
               $stderr = [IO.File]::ReadAllText($err)
@@ -650,7 +650,7 @@ jobs:
               # retirement cases; it runs on the same pinned portable archive.
               $bootstrapOut = Join-Path $evidence 'bootstrap.stdout'
               $bootstrapErr = Join-Path $evidence 'bootstrap.stderr'
-              & "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_ollama_managed_bootstrap.ps1" 1> $bootstrapOut 2> $bootstrapErr
+              & "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/ai/servers/test_ollama_managed_bootstrap.ps1" 1> $bootstrapOut 2> $bootstrapErr
               $bootstrapExit = $LASTEXITCODE
               $bootstrapStdout = [IO.File]::ReadAllText($bootstrapOut)
               $bootstrapStderr = [IO.File]::ReadAllText($bootstrapErr)

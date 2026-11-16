@@ -66,7 +66,7 @@ API_KEY = "container-proof-key"
 PORT = 18000 + os.getpid() % 1000
 
 PREPARE = r"""
-assert(require("infra.llm_preferences").set_many({ ["llm.trigger.inline_autotype"] = true }),
+assert(require("ai.engine.preferences").set_many({ ["llm.trigger.inline_autotype"] = true }),
 	"the inline switch must reach canonical preferences")
 """
 

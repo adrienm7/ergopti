@@ -9,7 +9,7 @@
  * can execute, and that suite runs on Windows CI only. This gate checks, from
  * the sources, what can be checked anywhere:
  *
- * 1. The two ports (modules/llm/rewrite.ahk, modules/llm/prompt_action.ahk) are
+ * 1. The two ports (ai/engine/prediction/rewrite.ahk, ai/engine/prediction/prompt_action.ahk) are
  *    #Included by the driver and by the AHK suite, rewrite.ahk before the parser
  *    that calls it, and their tests are registered in run_all.ahk and replay the
  *    shared corpora.
@@ -20,32 +20,32 @@
  *    erasures without the exact deleted text and span; accepting erases in one SendInput
  *    batch as the text, for both the direct and the clipboard sender.
  * 4. The action picker host sends what the page's prompt editor needs.
- * 5. The tone ladder port (modules/llm/tone.ahk) and its actions
- *    (modules/llm/tone_action.ahk) are included before the gesture actions
+ * 5. The tone ladder port (ai/engine/prediction/tone.ahk) and its actions
+ *    (ai/engine/prediction/tone_action.ahk) are included before the gesture actions
  *    registered from them, and their test replays the shared tone corpus.
- * 6. The screen reading port (modules/llm/vision.ahk) and its actions
- *    (modules/llm/vision_action.ahk) are included the same way, their test
+ * 6. The screen reading port (ai/engine/prediction/vision.ahk) and its actions
+ *    (ai/engine/prediction/vision_action.ahk) are included the same way, their test
  *    replays the shared vision corpus, the llm_vision parameter kind is
  *    validated, prompted and sent to the picker, and the capture and request
  *    seams they run through exist.
- * 7. Live mode (modules/llm/prediction_live.ahk) is included by the prediction
+ * 7. Live mode (ai/engine/prediction/live.ahk) is included by the prediction
  *    engine, its action is registered, the automatic trigger and the hotstring
  *    chain arm its override and pausing ends it; the duplicate menu is retired.
  * 8. "Why this error?" (llm_screen_error) is a screen action drafting
  *    vision.json's error_answers; the selection translation port
- *    (modules/llm/translate.ahk) and its action (translate_action.ahk) are
+ *    (ai/engine/prediction/translate.ahk) and its action (translate_action.ahk) are
  *    included after the screen actions whose sender they share, their test
  *    replays the shared translate corpus, the llm_language kind is validated,
  *    prompted and sent to the picker, and an accepted translation is selected
  *    again by the bridge's completion.
- * 9. The AI agent's port (modules/llm/agent.ahk), its connectors and its
+ * 9. The AI agent's port (ai/engine/agent/agent.ahk), its connectors and its
  *    actions are included after the translation and before the gesture actions
  *    registered from them, its test replays the shared agent corpus, the
  *    bridge feeds the typing to its automatic mode and runs an accepted
  *    candidate's own handler instead of typing, the tray builds its top-level
  *    submenu, its settings ride the AI menu's persistence, every COM and
  *    process call goes through the adapters and a mail is never sent.
- * 10. The remote formats port (modules/llm/remote_formats.ahk: Backboard and
+ * 10. The remote formats port (ai/engine/api/remote_formats.ahk: Backboard and
  *    TypeSafe's decisions) is included before the remote API layer that calls
  *    it, its test replays the shared remote formats corpus, and System 1 has
  *    its Jev transport next to the chat one.
@@ -108,50 +108,50 @@ for (const [label, list, prefix] of [
 	['ErgoptiPlus.ahk', entry, ''],
 	['tests/run_all.ahk', runAll, '../']
 ]) {
-	const rewrite = position(list, `${prefix}modules/llm/rewrite.ahk`);
-	const action = position(list, `${prefix}modules/llm/prompt_action.ahk`);
-	check(rewrite >= 0, `${label} must #Include modules/llm/rewrite.ahk`);
-	check(action >= 0, `${label} must #Include modules/llm/prompt_action.ahk`);
+	const rewrite = position(list, `${prefix}ai/engine/prediction/rewrite.ahk`);
+	const action = position(list, `${prefix}ai/engine/prediction/prompt_action.ahk`);
+	check(rewrite >= 0, `${label} must #Include ai/engine/prediction/rewrite.ahk`);
+	check(action >= 0, `${label} must #Include ai/engine/prediction/prompt_action.ahk`);
 	check(
-		rewrite >= 0 && rewrite < position(list, `${prefix}modules/llm/parser.ahk`),
+		rewrite >= 0 && rewrite < position(list, `${prefix}ai/engine/api/parser.ahk`),
 		`${label} must include rewrite.ahk before parser.ahk, whose rewrite record calls it`
 	);
 	check(
-		rewrite >= 0 && rewrite < position(list, `${prefix}modules/llm/prediction_engine.ahk`),
+		rewrite >= 0 && rewrite < position(list, `${prefix}ai/engine/prediction/engine.ahk`),
 		`${label} must include rewrite.ahk before the prediction engine`
 	);
-	const validation = position(list, `${prefix}modules/llm/option_validation.ahk`);
+	const validation = position(list, `${prefix}ai/engine/api/option_validation.ahk`);
 	const gestures = position(list, `${prefix}modules/gestures/init.ahk`);
 	check(
 		validation >= 0 && gestures > validation,
 		`${label} must include option_validation.ahk (LLM_PROFILE_BUILTIN_ORDER) before the gesture actions registered from it`
 	);
-	const tone = position(list, `${prefix}modules/llm/tone.ahk`);
-	const toneAction = position(list, `${prefix}modules/llm/tone_action.ahk`);
+	const tone = position(list, `${prefix}ai/engine/prediction/tone.ahk`);
+	const toneAction = position(list, `${prefix}ai/engine/prediction/tone_action.ahk`);
 	check(
 		tone >= 0 && toneAction > tone && gestures > toneAction,
 		`${label} must include tone.ahk, then tone_action.ahk, before the gesture actions registered from them`
 	);
-	const vision = position(list, `${prefix}modules/llm/vision.ahk`);
-	const visionAction = position(list, `${prefix}modules/llm/vision_action.ahk`);
+	const vision = position(list, `${prefix}ai/engine/prediction/vision.ahk`);
+	const visionAction = position(list, `${prefix}ai/engine/prediction/vision_action.ahk`);
 	check(
 		vision >= 0 && visionAction > vision && gestures > visionAction,
 		`${label} must include vision.ahk, then vision_action.ahk, before the gesture actions registered from them`
 	);
-	const translate = position(list, `${prefix}modules/llm/translate.ahk`);
-	const translateAction = position(list, `${prefix}modules/llm/translate_action.ahk`);
+	const translate = position(list, `${prefix}ai/engine/prediction/translate.ahk`);
+	const translateAction = position(list, `${prefix}ai/engine/prediction/translate_action.ahk`);
 	check(
 		translate > visionAction && translateAction > translate && gestures > translateAction,
 		`${label} must include translate.ahk, then translate_action.ahk, after vision_action.ahk and before the gesture actions`
 	);
-	const remoteFormats = position(list, `${prefix}modules/llm/remote_formats.ahk`);
+	const remoteFormats = position(list, `${prefix}ai/engine/api/remote_formats.ahk`);
 	check(
-		remoteFormats >= 0 && remoteFormats < position(list, `${prefix}modules/llm/api_remote.ahk`),
+		remoteFormats >= 0 && remoteFormats < position(list, `${prefix}ai/engine/api/remote.ahk`),
 		`${label} must include remote_formats.ahk before api_remote.ahk, which builds its requests with it`
 	);
-	const agent = position(list, `${prefix}modules/llm/agent.ahk`);
-	const agentConnectors = position(list, `${prefix}modules/llm/agent_connectors.ahk`);
-	const agentAction = position(list, `${prefix}modules/llm/agent_action.ahk`);
+	const agent = position(list, `${prefix}ai/engine/agent/agent.ahk`);
+	const agentConnectors = position(list, `${prefix}ai/engine/agent/connectors.ahk`);
+	const agentAction = position(list, `${prefix}ai/engine/agent/action.ahk`);
 	check(
 		agent > translateAction &&
 			agentConnectors > agent &&
@@ -161,27 +161,28 @@ for (const [label, list, prefix] of [
 	);
 }
 check(
-	includesOf(read('ui/menu/menu_llm/_index.ahk')).includes('menu_agent.ahk') &&
-		runAll.includes('../ui/menu/menu_llm/menu_agent.ahk'),
+	includesOf(read('ai/ui/menu/_index.ahk')).includes('menu_agent.ahk') &&
+		runAll.includes('../ai/ui/menu/agent.ahk'),
 	'the AI agent submenu must be included by the AI menu index and by the AHK suite'
 );
 check(
-	position(bench, '../modules/llm/rewrite.ahk') >= 0 &&
-		position(bench, '../modules/llm/rewrite.ahk') < position(bench, '../modules/llm/parser.ahk'),
+	position(bench, '../ai/engine/prediction/rewrite.ahk') >= 0 &&
+		position(bench, '../ai/engine/prediction/rewrite.ahk') <
+			position(bench, '../ai/engine/api/parser.ahk'),
 	'the parity bench must include rewrite.ahk before parser.ahk'
 );
 
 const TESTS = {
-	'unit/modules/llm/actions/test_llm_rewrite.ahk': 'rewrite_vectors.json',
-	'unit/modules/llm/actions/test_llm_prompt_action.ahk': 'llm_prompt_vectors.json',
-	'unit/modules/llm/prediction/test_llm_prompt_prediction.ahk': 'llm_prompt_prediction',
-	'unit/modules/llm/prediction/test_llm_parser.ahk': 'process_prediction_vectors.json',
-	'unit/modules/llm/actions/test_llm_tone.ahk': 'tone_vectors.json',
-	'unit/modules/llm/actions/test_llm_vision.ahk': 'vision_vectors.json',
-	'unit/modules/llm/actions/test_llm_translate.ahk': 'translate_vectors.json',
-	'unit/modules/llm/actions/test_llm_agent.ahk': 'agent_vectors.json',
-	'unit/modules/llm/api/test_llm_remote_formats.ahk': 'remote_formats_vectors.json',
-	'unit/modules/llm/prediction/test_llm_live_mode.ahk': 'llm_live_prompt_toggle'
+	'unit/ai/actions/test_rewrite.ahk': 'rewrite_vectors.json',
+	'unit/ai/actions/test_prompt_action.ahk': 'llm_prompt_vectors.json',
+	'unit/ai/prediction/test_prompt_prediction.ahk': 'llm_prompt_prediction',
+	'unit/ai/prediction/test_parser.ahk': 'process_prediction_vectors.json',
+	'unit/ai/actions/test_tone.ahk': 'tone_vectors.json',
+	'unit/ai/actions/test_vision.ahk': 'vision_vectors.json',
+	'unit/ai/actions/test_translate.ahk': 'translate_vectors.json',
+	'unit/ai/actions/test_agent.ahk': 'agent_vectors.json',
+	'unit/ai/api/test_remote_formats.ahk': 'remote_formats_vectors.json',
+	'unit/ai/prediction/test_live_mode.ahk': 'llm_live_prompt_toggle'
 };
 for (const [test, needle] of Object.entries(TESTS)) {
 	check(runAll.includes(test), `tests/run_all.ahk must #Include ${test}`);
@@ -192,7 +193,7 @@ for (const [test, needle] of Object.entries(TESTS)) {
 const profileIds = JSON.parse(
 	fs.readFileSync(path.join(SP, '_shared', 'ai', 'data', 'profiles.json'), 'utf8')
 ).map((profile) => profile.id);
-const validation = read('modules/llm/option_validation.ahk');
+const validation = read('ai/engine/api/option_validation.ahk');
 const orderBlock =
 	(validation.match(/global LLM_PROFILE_BUILTIN_ORDER := \[([\s\S]*?)\]/) || [])[1] || '';
 const order = [...orderBlock.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
@@ -214,7 +215,7 @@ check(
 	/for _ToneActionId, _ToneStep in LLM_ToneActions\(\) \{/.test(actions),
 	'the llm_tone_* actions must be registered from LLM_ToneActions'
 );
-const toneActions = read('modules/llm/tone_action.ahk');
+const toneActions = read('ai/engine/prediction/tone_action.ahk');
 for (const id of [
 	'llm_tone_more_formal',
 	'llm_tone_more_familiar',
@@ -223,14 +224,14 @@ for (const id of [
 ]) {
 	check(toneActions.includes(`"${id}", {`), `LLM_ToneActions must declare ${id}`);
 }
-const menuProfiles = read('ui/menu/menu_llm/menu_profiles.ahk');
+const menuProfiles = read('ai/ui/menu/profiles.ahk');
 check(
 	!/for id in \["raw"/.test(menuProfiles) && !/Map\("raw", true/.test(menuProfiles),
 	'the profile menu must list the built-ins from LLM_PROFILE_BUILTIN_ORDER, not a hand-written copy'
 );
 
 // 3. Parser rewrite mode and the erase step.
-const parser = read('modules/llm/parser.ahk');
+const parser = read('ai/engine/api/parser.ahk');
 const impl = bodyOf(parser, '_LLM_Parser_ProcessPredictionImpl');
 check(impl !== '', 'parser.ahk must define _LLM_Parser_ProcessPredictionImpl');
 for (const [needle, why] of [
@@ -286,7 +287,7 @@ check(
 	),
 	'the clipboard sender must send the erasure and the paste as one SendInput batch'
 );
-const bridge = read('modules/keymap/llm_bridge.ahk');
+const bridge = read('ai/engine/bridge.ahk');
 check(
 	bodyOf(bridge, '_LLM_Bridge_InjectionOptions').includes('"erase_before", Transaction.Deletes'),
 	'the accept transaction must hand its erasure to the sender'
@@ -324,7 +325,7 @@ check(
 	/for _VisionActionId, _VisionKind in LLM_VisionActions\(\) \{/.test(actions),
 	'the llm_screen_* actions must be registered from LLM_VisionActions'
 );
-const visionActions = read('modules/llm/vision_action.ahk');
+const visionActions = read('ai/engine/prediction/vision_action.ahk');
 for (const id of ['llm_screen_region', 'llm_screen_full']) {
 	check(visionActions.includes(`"${id}", "`), `LLM_VisionActions must declare ${id}`);
 }
@@ -351,14 +352,14 @@ check(
 	picker.includes('_ActPickWeb_Kv("llm_vision"'),
 	'the picker host must send the llm_vision prompt and refusal'
 );
-const remote = read('modules/llm/api_remote.ahk');
+const remote = read('ai/engine/api/remote.ahk');
 check(
 	bodyOf(remote, 'LLM_RemotePostBody_Async').includes(
 		'_LLMRemote_DispatchCurl(req_id, Resolved, Url, Payload'
 	),
 	'a caller-written remote body must go through the curl transport'
 );
-const streaming = read('modules/llm/api_ollama/ollama_streaming.ahk');
+const streaming = read('ai/engine/api_ollama/ollama_streaming.ahk');
 check(
 	bodyOf(streaming, '_LLM_Ollama_DispatchAsync').includes('job.Get("payload", "")'),
 	'the local dispatcher must send a caller-written chat body as it is'
@@ -389,7 +390,7 @@ check(
 
 // 7. Live mode: one owner, the automatic trigger's override, pause and menu.
 check(
-	includesOf(read('modules/llm/prediction_engine.ahk')).includes('prediction_live.ahk'),
+	includesOf(read('ai/engine/prediction/engine.ahk')).includes('prediction_live.ahk'),
 	'the prediction engine must include prediction_live.ahk, the owner of live mode'
 );
 check(
@@ -397,7 +398,7 @@ check(
 		bodyOf(actions, 'GestureLivePromptToggle').includes('LLM_Menu_ToggleLiveMode('),
 	'llm_live_prompt_toggle must be a registered action running the live toggle'
 );
-const keystrokes = read('modules/llm/prediction_keystats.ahk');
+const keystrokes = read('ai/engine/prediction/keystats.ahk');
 // StartTimer's signature spans two lines, which bodyOf does not follow.
 const bodyFrom = (source, name) => {
 	const start = source.search(new RegExp(`^${name}\\(`, 'm'));
@@ -424,10 +425,10 @@ check(
 	),
 	'pausing must turn live mode off'
 );
-const menuSettings = read('ui/menu/menu_llm/menu_settings.ahk');
+const menuSettings = read('ai/ui/menu/settings.ahk');
 // Judged by the retired id across the whole AI menu, not by one dispatch
 // spelling: the declared groups left the row dispatch for a builder map.
-const menuMain = read('ui/menu/menu_llm/menu_main.ahk');
+const menuMain = read('ai/ui/menu/menu_main.ahk');
 check(
 	bodyOf(menuMain, '_LLM_Menu_GroupBuilders') !== '' && !menuMain.includes('llm_live_mode'),
 	'the genuine AI menu must not reintroduce a duplicate live selector'
@@ -481,7 +482,9 @@ check(
 	'the screen flow must draft the answer list it was started with, never a fixed one'
 );
 check(
-	bodyOf(read('modules/llm/vision.ahk'), '_LLM_Vision_ValidateConfig').includes('"error_answers"'),
+	bodyOf(read('ai/engine/prediction/vision.ahk'), '_LLM_Vision_ValidateConfig').includes(
+		'"error_answers"'
+	),
 	'vision.json must be refused without its error answers'
 );
 check(
@@ -489,7 +492,7 @@ check(
 		bodyOf(actions, 'GestureTranslateSelection').includes('LLM_Translate_Trigger('),
 	'llm_translate_selection must be a registered action running the translation'
 );
-const translateAction = read('modules/llm/translate_action.ahk');
+const translateAction = read('ai/engine/prediction/translate_action.ahk');
 check(
 	bodyOf(translateAction, 'LLM_Translate_Trigger').includes('LLM_Menu_ManualPredictionRefusal(') &&
 		bodyOf(translateAction, 'LLM_Translate_Trigger').includes('LLM_SelectionReader()'),
@@ -577,10 +580,10 @@ check(
 for (const id of ['llm_agent_selection', 'llm_agent_command', 'llm_agent_auto_toggle']) {
 	check(actions.includes(`"${id}", {`), `${id} must be a registered gesture action`);
 }
-const agentPort = read('modules/llm/agent.ahk');
-const agentAction = read('modules/llm/agent_action.ahk');
-const agentConnectors = read('modules/llm/agent_connectors.ahk');
-const agentMenu = read('ui/menu/menu_llm/menu_agent.ahk');
+const agentPort = read('ai/engine/agent/agent.ahk');
+const agentAction = read('ai/engine/agent/action.ahk');
+const agentConnectors = read('ai/engine/agent/connectors.ahk');
+const agentMenu = read('ai/ui/menu/agent.ahk');
 for (const name of [
 	'LLM_Agent_System1Prompt',
 	'LLM_Agent_System2Prompt',
@@ -670,10 +673,10 @@ check(
 	'the tray must build the top-level agent row from the manifest agent_menu'
 );
 check(
-	bodyOf(read('ui/menu/menu_llm/persist.ahk'), '_LLM_Menu_SyncToFeatures').includes(
+	bodyOf(read('ai/ui/menu/persist.ahk'), '_LLM_Menu_SyncToFeatures').includes(
 		'LLM_AGENT_SETTING_KEYS'
 	) &&
-		bodyOf(read('ui/menu/menu_llm/persist.ahk'), 'LLM_Menu_BuildSavedOpts').includes(
+		bodyOf(read('ai/ui/menu/persist.ahk'), 'LLM_Menu_BuildSavedOpts').includes(
 			'LLM_AGENT_SETTING_KEYS'
 		),
 	'the agent settings must ride the AI menu persistence both ways'
@@ -879,7 +882,7 @@ function validateAgentPickerTail(actionSource, menuSource, transactionSource) {
 		'Actual durable transaction supplies exactly the final candidate.'
 	);
 }
-const pickerTransactions = read('ui/menu/menu_llm/transactions.ahk');
+const pickerTransactions = read('ai/ui/menu/transactions.ahk');
 validateAgentPickerTail(agentAction, agentMenu, pickerTransactions);
 for (const [original, replacement] of [
 	[

@@ -16,10 +16,10 @@ local MODULES = {
 	"core.fs.engine.dir",
 	"core.ui.engine.notifications",
 	"core.text.engine.utils",
-	"modules.llm.ollama_binary",
-	"modules.llm.ollama_server_command",
-	"modules.llm.network_env",
-	"modules.llm.opaque_network_admission",
+	"ai.engine.ollama.binary",
+	"ai.engine.ollama.server_command",
+	"ai.engine.api.network_env",
+	"ai.engine.api.opaque_network_admission",
 	"core.process.adapters.shell_runner",
 	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
@@ -29,8 +29,8 @@ local MODULES = {
 	"core.fs.engine.paths", "core.timing.engine.timings",
 	"core.timing.engine.deferred_work",
 	"ui.download_window.javascript",
-	"ui.menu.menu_llm.requirement_operation_registry",
-	"ui.menu.menu_llm.models_manager_ollama",
+	"ai.ui.menu.requirement_operation_registry",
+	"ai.ui.menu.models.manager_ollama",
 }
 
 local function with_fixture(options, callback)
@@ -75,14 +75,14 @@ local function with_fixture(options, callback)
 		end,
 	}
 	package.loaded["core.text.engine.utils"] = nil
-	package.loaded["modules.llm.ollama_binary"] = {
+	package.loaded["ai.engine.ollama.binary"] = {
 		resolve = function() return options.binary_path or "/fixture/ollama", nil, options.binary_source end,
 	}
-	package.loaded["modules.llm.ollama_server_command"] = {
+	package.loaded["ai.engine.ollama.server_command"] = {
 		build = function() return "fixture restart" end,
 	}
-	if options.network_admission then package.loaded["modules.llm.opaque_network_admission"] = options.network_admission end
-	package.loaded["modules.llm.network_env"] = options.network_env or {
+	if options.network_admission then package.loaded["ai.engine.api.opaque_network_admission"] = options.network_admission end
+	package.loaded["ai.engine.api.network_env"] = options.network_env or {
 		prelude = function() return "", nil end,
 		opaque_prelude = function() return "", nil end,
 	}
@@ -194,7 +194,7 @@ local function with_fixture(options, callback)
 	}
 
 	-- Its loader reads the shared tree through hs.fs, which this fixture omits
-	package.loaded["modules.llm.thinking_families"] = { ollama_think = function() return false end }
+	package.loaded["ai.engine.api.thinking_families"] = { ollama_think = function() return false end }
 	_G.hs = {
 		execute = function() return "", true end,
 		http = {
@@ -207,7 +207,7 @@ local function with_fixture(options, callback)
 		},
 		urlevent = { openURL = noop },
 	}
-	package.loaded["ui.menu.menu_llm.models_manager_ollama"] = nil
+	package.loaded["ai.ui.menu.models.manager_ollama"] = nil
 	local real_window, native_window
 	if options.real_window then
 		helpers.provide_timings()
@@ -243,7 +243,7 @@ local function with_fixture(options, callback)
 	local active_tasks = {}
 	local state = { llm_model = "old-model" }
 	local effects = { runtime = 0, display = 0, saves = 0 }
-	local manager = require("ui.menu.menu_llm.models_manager_ollama").new({
+	local manager = require("ai.ui.menu.models.manager_ollama").new({
 		active_tasks = active_tasks,
 		state = state,
 		keymap = {

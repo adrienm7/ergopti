@@ -16,10 +16,10 @@ local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 local function with_owner(body, options)
 	options = options or {}
-	local names = { "core.network.adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
-		"modules.llm.prediction_engine", "modules.llm.profiles", "modules.llm.model_inventory", "infra.llm_preferences",
-		"modules.llm.local_servers", "modules.llm.api_entries", "platform.input.keyboard_hook",
-		"core.process.adapters.shell_runner", "core.i18n.engine.i18n", "core.ui.engine.window_titles", "modules.llm.runtime_factory" }
+	local names = { "core.network.adapters.http_client", "ai.engine.settings.enable_admission", "ai.ui.enable_refusal",
+		"ai.engine.prediction.engine", "ai.engine.settings.profiles", "ai.engine.local_servers.model_inventory", "ai.engine.preferences",
+		"ai.engine.local_servers.local_servers", "ai.engine.settings.api_entries", "platform.input.keyboard_hook",
+		"core.process.adapters.shell_runner", "core.i18n.engine.i18n", "core.ui.engine.window_titles", "ai.engine.local_servers.runtime_factory" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local world = { calls = {}, commits = {}, rejects = {}, changes = 0, cancels = {}, cancel_ok = true }
@@ -38,8 +38,8 @@ local function with_owner(body, options)
 	}
 	world.owned_http = {}
 	package.loaded["core.network.adapters.http_client"] = require("tests.support.owned_http_fixture").attach(Http, world.owned_http)
-	package.loaded["modules.llm.enable_admission"] = nil
-	world.owner = require("modules.llm.enable_admission").new({
+	package.loaded["ai.engine.settings.enable_admission"] = nil
+	world.owner = require("ai.engine.settings.enable_admission").new({
 		snapshot = function()
 			if world.unreadable then error("unreadable source") end
 			local snapshot = {}
@@ -64,10 +64,10 @@ local function with_owner(body, options)
 			["llm.enabled"] = false, ["llm.models.selected"] = backend or "ollama",
 			["llm.models.ollama"] = "model:2b",
 		} })
-		package.loaded["infra.llm_preferences"] = preferences
-		package.loaded["modules.llm.profiles"] = nil
-		package.loaded["modules.llm.model_inventory"] = nil
-		package.loaded["modules.llm.prediction_engine"] = nil
+		package.loaded["ai.engine.preferences"] = preferences
+		package.loaded["ai.engine.settings.profiles"] = nil
+		package.loaded["ai.engine.local_servers.model_inventory"] = nil
+		package.loaded["ai.engine.prediction.engine"] = nil
 		world.private_source, world.private_current, world.view_current = {}, true, true
 		world.servers = {
 			is_stale = function() return world.discovery_stale ~= false end,
@@ -87,20 +87,20 @@ local function with_owner(body, options)
 				return { saved = true, entry = world.active_entry }
 			end,
 		}
-		package.loaded["modules.llm.local_servers"] = world.servers
-		package.loaded["modules.llm.api_entries"] = {
+		package.loaded["ai.engine.local_servers.local_servers"] = world.servers
+		package.loaded["ai.engine.settings.api_entries"] = {
 			capture_source = function() return world.private_source end,
 			source_is_current = function(source) return world.private_current and source == world.private_source end,
 			active = function() return world.active_entry end,
 		}
-		package.loaded["ui.llm_enable_refusal"] = { show = function(origin, replacements)
+		package.loaded["ai.ui.enable_refusal"] = { show = function(origin, replacements)
 			world.rejects[#world.rejects + 1] = { origin }
 			world.replacements = replacements
 			if world.on_notice then world.on_notice(preferences) end
 			local selected = replacements and replacements[world.choice_index or 0]
 			return true, false, selected and selected.value
 		end }
-		world.engine = require("modules.llm.prediction_engine")
+		world.engine = require("ai.engine.prediction.engine")
 		world.engine.init({ is_paused = function() return world.live.paused end })
 		return world.engine, preferences
 	end
@@ -116,7 +116,7 @@ local function with_owner(body, options)
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.ui.engine.window_titles"] = { compose = function(value) return value end }
 		local Hook = helpers.load_module("platform.input.keyboard_hook")
-		package.loaded["ui.llm_enable_refusal"] = nil
+		package.loaded["ai.ui.enable_refusal"] = nil
 		return Hook
 	end
 	local ok, err = xpcall(function() body(world) end, debug.traceback)
@@ -135,7 +135,7 @@ local function runtime_fixture(world, during_start)
 		return world.native_closed
 	end
 	function request:on_result(observer) world.result_observer = observer; return true end
-	package.loaded["modules.llm.runtime_factory"] = {
+	package.loaded["ai.engine.local_servers.runtime_factory"] = {
 		new = function()
 			world.factory_calls = world.factory_calls + 1
 			return {
@@ -164,15 +164,15 @@ end
 --- Runs the real repair, engine, profiles, probe and chat graph over owned OS ports.
 --- @param body function Receives actual producers and the retained service capability.
 local function with_managed_responses(body)
-	local names = { "modules.llm.api_ollama", "modules.llm.local_model_probe", "ai.engine.local_servers.runtime_repair",
-		"modules.llm.model_inventory", "core.network.engine.managed_http_deadline" }
+	local names = { "ai.engine.api.api_ollama", "ai.engine.ollama.local_model_probe", "ai.engine.local_servers.runtime_repair",
+		"ai.engine.local_servers.model_inventory", "core.network.engine.managed_http_deadline" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local popen = io.popen
 	local ok, failure = xpcall(function()
 		with_owner(function(world)
 			require("tests.support.modules.llm.runtime.inventory_fixture").install(world)
 			local engine = world.load_engine()
-			local profiles = require("modules.llm.profiles")
+			local profiles = require("ai.engine.settings.profiles")
 			local Repair = require("ai.engine.local_servers.runtime_repair")
 			world.responses, world.posts, world.observations = {}, {}, 0
 			world.runtime_valid, world.service_current = true, true
@@ -231,7 +231,7 @@ local function with_managed_responses(body)
 				compensate = function() return false end,
 			}
 			world.controller = Repair.new(ports, { bootstrap_timeout_ms = 100, poll_ms = 10 })
-			package.loaded["modules.llm.runtime_factory"] = { new = function(captured)
+			package.loaded["ai.engine.local_servers.runtime_factory"] = { new = function(captured)
 				engine_port = captured
 				return { controller = world.controller, resolve = function() return { status = "installed" } end,
 					source = { capture = function() return { origin = engine.get_base_url() } end, diagnostic_current = function() return false end } }
@@ -245,7 +245,7 @@ local function with_managed_responses(body)
 			Http.postStream = function(url, _, _, _, chunk, done)
 				world.posts[#world.posts + 1] = { url = url, chunk = chunk, done = done }; return true
 			end
-			world.api = helpers.load_module("modules.llm.api_ollama")
+			world.api = helpers.load_module("ai.engine.api.api_ollama")
 			world.profiles = profiles
 			function world:chat(verify)
 				return self.api.chat(engine.get_base_url(), "model:2b", {}, { verify_local_model = verify == true },

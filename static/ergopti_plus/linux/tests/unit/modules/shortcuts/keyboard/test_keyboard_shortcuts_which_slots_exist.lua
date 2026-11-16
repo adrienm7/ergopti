@@ -393,8 +393,8 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 	end)
 
 	helpers.it("binds Super+Space to an explicitly configured prediction action", function()
-		local previous_engine = package.loaded["modules.llm.prediction_engine"]
-		package.loaded["modules.llm.prediction_engine"] = { is_enabled = function() return true end }
+		local previous_engine = package.loaded["ai.engine.prediction.engine"]
+		package.loaded["ai.engine.prediction.engine"] = { is_enabled = function() return true end }
 		local ok, detail = xpcall(function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.meta_space"] = "llm_generate_prediction" })
 			local action = shortcuts.get_action("meta_space")
@@ -407,7 +407,7 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 			helpers.assert_eq(slot, "meta_space")
 		end, debug.traceback)
 		drop_config()
-		package.loaded["modules.llm.prediction_engine"] = previous_engine
+		package.loaded["ai.engine.prediction.engine"] = previous_engine
 		if not ok then error(detail, 0) end
 	end)
 

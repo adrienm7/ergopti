@@ -41,7 +41,7 @@ port them faithfully and validate against their test vectors.
 > **Note — LLM output diff-coloring.** It used to have a JS reference here
 > (`TokenParser.js`, a word-level prefix diff). That was superseded by the
 > 2-tier intra-word semantic diff `process_prediction`, whose canonical home is
-> `_shared/ai/engine/api/parser_core.lua` (AHK port `windows/modules/llm/parser.ahk`),
+> `_shared/ai/engine/api/parser_core.lua` (AHK port `windows/ai/engine/api/parser.ahk`),
 > pinned cross-driver by `_shared/tests/corpus/llm/process_prediction_vectors.json`.
 > `TokenParser.js` was removed (2026-06-13) as superseded, orphaned dead code.
 
@@ -84,14 +84,14 @@ Domain modules:
 
 ## 5. Driver Compliance
 
-| Module            | AHK adapter                                       | HS adapter                       |
-| ----------------- | ------------------------------------------------- | -------------------------------- |
-| Registry          | `lib/hotstrings/hotstring_engine.ahk`             | `modules/keymap/registry.lua`    |
-| Expander          | `modules/hotstrings.ahk` + `hotstring_engine.ahk` | `modules/keymap/expander.lua`    |
-| Terminators       | `lib/hotstrings/hotstring_prefix_watcher.ahk`     | `modules/keymap/terminators.lua` |
-| PromptBuilder     | `modules/llm/api_common.ahk`                      | `modules/llm/prompt_builder.lua` |
-| ProfileSelector   | `modules/llm/profiles.ahk`                        | `modules/llm/profiles.lua`       |
-| GestureRecognizer | `modules/gestures.ahk` (registry-only)            | `modules/gestures/engine.lua`    |
+| Module            | AHK adapter                                       | HS adapter                                |
+| ----------------- | ------------------------------------------------- | ----------------------------------------- |
+| Registry          | `lib/hotstrings/hotstring_engine.ahk`             | `modules/keymap/registry.lua`             |
+| Expander          | `modules/hotstrings.ahk` + `hotstring_engine.ahk` | `modules/keymap/expander.lua`             |
+| Terminators       | `lib/hotstrings/hotstring_prefix_watcher.ahk`     | `modules/keymap/terminators.lua`          |
+| PromptBuilder     | `ai/engine/api/common.ahk`                        | `ai/engine/prediction/prompt_builder.lua` |
+| ProfileSelector   | `ai/engine/settings/profiles.ahk`                 | `ai/engine/settings/profiles.lua`         |
+| GestureRecognizer | `modules/gestures.ahk` (registry-only)            | `modules/gestures/engine.lua`             |
 
 ---
 

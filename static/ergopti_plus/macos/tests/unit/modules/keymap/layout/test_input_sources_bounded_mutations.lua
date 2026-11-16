@@ -181,7 +181,7 @@ local function status_test(name, body)
 		helpers.with_stub_scope({
 			"modules.keymap.input_sources", "modules.keymap.layout_install",
 			"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.process.adapters.task_lifecycle",
-			"adapters.python_interpreter", "core.fs.engine.openstep_plist",
+			"ai.adapters.python_interpreter", "core.fs.engine.openstep_plist",
 			"adapters.input_source_selector", "platform.remap.lease_helper",
 		}, body)
 	end)
@@ -727,11 +727,11 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 	helpers.it("starts no Intel Python to edit the enabled sources and offers a native one", function()
 		local f = load_fixture()
 		local offers = {}
-		package.loaded["ui.python_runtime_offer"] = {
+		package.loaded["ai.ui.python_runtime_offer"] = {
 			offer = function(state) offers[#offers + 1] = state; return true end,
 		}
 		local intel = "\207\250\237\254" .. "\7\0\0\1" .. string.rep("\0", 24)
-		package.loaded["adapters.python_interpreter"]._set_deps({
+		package.loaded["ai.adapters.python_interpreter"]._set_deps({
 			read_head = function(path)
 				if path == helpers.HEALTHY_PYTHON or path == "/usr/local/bin/python3" then return intel end
 				return nil
@@ -752,7 +752,7 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		helpers.assert_eq(terminals[1].reason, "python_unavailable")
 		helpers.assert_eq(#offers, 1)
 		helpers.assert_eq(offers[1].kind, "python_not_native")
-		package.loaded["ui.python_runtime_offer"] = nil
+		package.loaded["ai.ui.python_runtime_offer"] = nil
 		reset_fixture_modules()
 	end)
 end)

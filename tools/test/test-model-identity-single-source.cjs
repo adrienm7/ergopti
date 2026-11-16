@@ -37,7 +37,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SSOT = 'static/ergopti_plus/_shared/ai/engine/local_servers/model_catalogue.lua';
 
 // Every driver file that compares model identities and must borrow the rule.
-const CONSUMERS = ['static/ergopti_plus/linux/ui/model_browser/bridge.lua'];
+const CONSUMERS = ['static/ergopti_plus/linux/ai/ui/model_browser/bridge.lua'];
 
 // Any Lua tree that must not grow a second implementation. The shared module is
 // scanned too — its own declaration is recognised and allowed by name.

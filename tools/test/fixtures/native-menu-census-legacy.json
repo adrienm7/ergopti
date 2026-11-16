@@ -14,21 +14,21 @@
 				"windows/ui/menu/menu_hotstrings.ahk:1265 append",
 				"windows/menu/ui/builder/menu_init.ahk:48 append",
 				"windows/menu/ui/builder/menu_init.ahk:67 add",
-				"windows/ui/menu/menu_llm/menu_agent.ahk:50 append",
-				"windows/ui/menu/menu_llm/menu_agent.ahk:55 append",
-				"windows/ui/menu/menu_llm/menu_main.ahk:177 append",
-				"windows/ui/menu/menu_llm/menu_main.ahk:257 add",
-				"windows/ui/menu/menu_llm/menu_main.ahk:388 append",
-				"windows/ui/menu/menu_llm/menu_main.ahk:397 append",
-				"windows/ui/menu/menu_llm/menu_main.ahk:399 append",
-				"windows/ui/menu/menu_llm/menu_main.ahk:403 append",
-				"windows/ui/menu/menu_llm/menu_main.ahk:407 append",
-				"windows/ui/menu/menu_llm/menu_main.ahk:411 append",
-				"windows/ui/menu/menu_llm/menu_main.ahk:415 append",
-				"windows/ui/menu/menu_llm/menu_models.ahk:257 append",
-				"windows/ui/menu/menu_llm/menu_models.ahk:289 append",
-				"windows/ui/menu/menu_llm/menu_models.ahk:295 append",
-				"windows/ui/menu/menu_llm/menu_models.ahk:336 append",
+				"windows/ai/ui/menu/agent.ahk:50 append",
+				"windows/ai/ui/menu/agent.ahk:55 append",
+				"windows/ai/ui/menu/menu_main.ahk:177 append",
+				"windows/ai/ui/menu/menu_main.ahk:257 add",
+				"windows/ai/ui/menu/menu_main.ahk:388 append",
+				"windows/ai/ui/menu/menu_main.ahk:397 append",
+				"windows/ai/ui/menu/menu_main.ahk:399 append",
+				"windows/ai/ui/menu/menu_main.ahk:403 append",
+				"windows/ai/ui/menu/menu_main.ahk:407 append",
+				"windows/ai/ui/menu/menu_main.ahk:411 append",
+				"windows/ai/ui/menu/menu_main.ahk:415 append",
+				"windows/ai/ui/menu/models/models.ahk:257 append",
+				"windows/ai/ui/menu/models/models.ahk:289 append",
+				"windows/ai/ui/menu/models/models.ahk:295 append",
+				"windows/ai/ui/menu/models/models.ahk:336 append",
 				"windows/ui/menu/menu_shortcuts.ahk:195 append",
 				"windows/ui/menu/menu_shortcuts.ahk:200 append",
 				"windows/menu/ui/builder/submenus.ahk:62 separator",
@@ -51,10 +51,10 @@
 				"macos/ui/menu/menu_keyboard_slots.lua:153 static",
 				"macos/ui/menu/menu_keyboard_slots.lua:218 static",
 				"macos/ui/menu/menu_keyboard_slots.lua:219 static",
-				"macos/ui/menu/menu_llm/init.lua:1955 static",
-				"macos/ui/menu/menu_llm/init.lua:2003 native",
-				"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:830 static",
-				"macos/ui/menu/menu_llm/profiles_manager.lua:1068 static",
+				"macos/ai/ui/menu/init.lua:1955 static",
+				"macos/ai/ui/menu/init.lua:2003 native",
+				"macos/ai/ui/menu/models/manager_mlx_hf.lua:830 static",
+				"macos/ai/ui/menu/profiles_manager.lua:1068 static",
 				"macos/settings/ui/menu/paths.lua:537 static",
 				"macos/settings/ui/menu/paths.lua:610 static",
 				"macos/ui/menu/menu_shortcuts.lua:541 static",
@@ -116,7 +116,7 @@
 				"windows/core/network/adapters/http_client.ahk",
 				"windows/platform/input/key_state.ahk",
 				"windows/platform/input/keyboard_hook.ahk",
-				"windows/adapters/llm_nav_event_owner.ahk",
+				"windows/ai/adapters/nav_event_owner.ahk",
 				"windows/adapters/mouse_control.ahk",
 				"windows/core/ui/adapters/native_folder_picker.ahk",
 				"windows/core/ui/adapters/native_number.ahk",
@@ -197,7 +197,7 @@
 				"windows/infra/key_combinations.ahk",
 				"windows/core/lifecycle/engine/lifecycle.ahk",
 				"windows/core/lifecycle/engine/transition.ahk",
-				"windows/infra/llm_defaults.ahk",
+				"windows/ai/engine/defaults.ahk",
 				"windows/core/i18n/engine/locale.ahk",
 				"windows/core/logger/engine/logger.ahk",
 				"windows/infra/magic_editor.ahk",
@@ -339,44 +339,44 @@
 				"windows/modules/keymap/layout/layout_ergopti.ahk",
 				"windows/modules/keymap/layout/layout_shift_caps.ahk",
 				"windows/modules/keymap/layout_poll_helper.ahk",
-				"windows/modules/keymap/llm_bridge.ahk",
+				"windows/ai/engine/bridge.ahk",
 				"windows/modules/keymap/uia_selection_worker.ahk",
 				"windows/modules/keymap/uia_selection_worker_entry.ahk",
-				"windows/modules/llm/agent.ahk",
-				"windows/modules/llm/agent_action.ahk",
-				"windows/modules/llm/agent_connectors.ahk",
-				"windows/modules/llm/api_common.ahk",
-				"windows/modules/llm/api_ollama.ahk",
-				"windows/modules/llm/api_ollama/curl_environment.ahk",
-				"windows/modules/llm/api_ollama/init.ahk",
-				"windows/modules/llm/api_ollama/ollama_http.ahk",
-				"windows/modules/llm/api_ollama/ollama_payload.ahk",
-				"windows/modules/llm/api_ollama/ollama_streaming.ahk",
-				"windows/modules/llm/api_ollama/ollama_warmup.ahk",
-				"windows/modules/llm/api_remote.ahk",
-				"windows/modules/llm/api_token_crypto.ahk",
-				"windows/modules/llm/local_model_offer.ahk",
-				"windows/modules/llm/local_server_models.ahk",
-				"windows/modules/llm/local_servers.ahk",
-				"windows/modules/llm/models.ahk",
-				"windows/modules/llm/ollama_deps_checker.ahk",
-				"windows/modules/llm/ollama_webview.ahk",
-				"windows/modules/llm/option_validation.ahk",
-				"windows/modules/llm/parser.ahk",
-				"windows/modules/llm/prediction_engine.ahk",
-				"windows/modules/llm/prediction_exec.ahk",
+				"windows/ai/engine/agent/agent.ahk",
+				"windows/ai/engine/agent/action.ahk",
+				"windows/ai/engine/agent/connectors.ahk",
+				"windows/ai/engine/api/common.ahk",
+				"windows/ai/engine/api/ollama.ahk",
+				"windows/ai/engine/api_ollama/curl_environment.ahk",
+				"windows/ai/engine/api_ollama/init.ahk",
+				"windows/ai/engine/api_ollama/ollama_http.ahk",
+				"windows/ai/engine/api_ollama/ollama_payload.ahk",
+				"windows/ai/engine/api_ollama/ollama_streaming.ahk",
+				"windows/ai/engine/api_ollama/ollama_warmup.ahk",
+				"windows/ai/engine/api/remote.ahk",
+				"windows/ai/engine/api/token_crypto.ahk",
+				"windows/ai/engine/ollama/local_model_offer.ahk",
+				"windows/ai/engine/local_servers/models.ahk",
+				"windows/ai/engine/local_servers/local_servers.ahk",
+				"windows/ai/engine/settings/models.ahk",
+				"windows/ai/engine/ollama/deps_checker.ahk",
+				"windows/ai/engine/ollama/webview.ahk",
+				"windows/ai/engine/api/option_validation.ahk",
+				"windows/ai/engine/api/parser.ahk",
+				"windows/ai/engine/prediction/engine.ahk",
+				"windows/ai/engine/prediction/exec.ahk",
 				"windows/modules/llm/prediction_keylogger.ahk",
-				"windows/modules/llm/prediction_live.ahk",
-				"windows/modules/llm/profiles.ahk",
-				"windows/modules/llm/prompt_action.ahk",
-				"windows/modules/llm/remote_formats.ahk",
-				"windows/modules/llm/rewrite.ahk",
-				"windows/modules/llm/tone.ahk",
-				"windows/modules/llm/tone_action.ahk",
-				"windows/modules/llm/translate.ahk",
-				"windows/modules/llm/translate_action.ahk",
-				"windows/modules/llm/vision.ahk",
-				"windows/modules/llm/vision_action.ahk",
+				"windows/ai/engine/prediction/live.ahk",
+				"windows/ai/engine/settings/profiles.ahk",
+				"windows/ai/engine/prediction/prompt_action.ahk",
+				"windows/ai/engine/api/remote_formats.ahk",
+				"windows/ai/engine/prediction/rewrite.ahk",
+				"windows/ai/engine/prediction/tone.ahk",
+				"windows/ai/engine/prediction/tone_action.ahk",
+				"windows/ai/engine/prediction/translate.ahk",
+				"windows/ai/engine/prediction/translate_action.ahk",
+				"windows/ai/engine/prediction/vision.ahk",
+				"windows/ai/engine/prediction/vision_action.ahk",
 				"windows/modules/shortcuts.ahk",
 				"windows/modules/shortcuts/capsword.ahk",
 				"windows/modules/shortcuts/ctrl.ahk",
@@ -446,30 +446,30 @@
 				"windows/ui/menu/menu_hotstrings.ahk",
 				"windows/menu/ui/builder/menu_init.ahk",
 				"windows/ui/menu/menu_layout.ahk",
-				"windows/ui/menu/menu_llm/_index.ahk",
-				"windows/ui/menu/menu_llm/actions.ahk",
-				"windows/ui/menu/menu_llm/aux_ownership.ahk",
-				"windows/ui/menu/menu_llm/backend_lifecycle.ahk",
-				"windows/ui/menu/menu_llm/enable_admission.ahk",
-				"windows/ui/menu/menu_llm/hotkey_identity.ahk",
-				"windows/ui/menu/menu_llm/init.ahk",
-				"windows/ui/menu/menu_llm/local_server_panel.ahk",
-				"windows/ui/menu/menu_llm/menu_agent.ahk",
-				"windows/ui/menu/menu_llm/menu_api_entries.ahk",
-				"windows/ui/menu/menu_llm/menu_build_coordinator.ahk",
-				"windows/ui/menu/menu_llm/menu_main.ahk",
-				"windows/ui/menu/menu_llm/menu_models.ahk",
-				"windows/ui/menu/menu_llm/menu_profiles.ahk",
-				"windows/ui/menu/menu_llm/menu_settings.ahk",
-				"windows/ui/menu/menu_llm/persist.ahk",
-				"windows/ui/menu/menu_llm/tab_accept.ahk",
-				"windows/ui/menu/menu_llm/transactions.ahk",
+				"windows/ai/ui/menu/_index.ahk",
+				"windows/ai/ui/menu/actions.ahk",
+				"windows/ai/ui/menu/aux_ownership.ahk",
+				"windows/ai/ui/menu/backend_lifecycle.ahk",
+				"windows/ai/ui/menu/enable_admission.ahk",
+				"windows/ai/ui/menu/hotkey_identity.ahk",
+				"windows/ai/ui/menu/init.ahk",
+				"windows/ai/ui/menu/panels/local_server_panel.ahk",
+				"windows/ai/ui/menu/agent.ahk",
+				"windows/ai/ui/menu/api_entries.ahk",
+				"windows/ai/ui/menu/build_coordinator.ahk",
+				"windows/ai/ui/menu/menu_main.ahk",
+				"windows/ai/ui/menu/models/models.ahk",
+				"windows/ai/ui/menu/profiles.ahk",
+				"windows/ai/ui/menu/settings.ahk",
+				"windows/ai/ui/menu/persist.ahk",
+				"windows/ai/ui/menu/tab_accept.ahk",
+				"windows/ai/ui/menu/transactions.ahk",
 				"windows/ui/menu/menu_metrics.ahk",
 				"windows/ui/menu/menu_metrics_actions.ahk",
 				"windows/ui/menu/menu_shortcuts.ahk",
 				"windows/menu/ui/builder/submenus.ahk",
 				"windows/ui/menu/menu_taphold.ahk",
-				"windows/ui/model_browser/init.ahk",
+				"windows/ai/ui/model_browser/init.ahk",
 				"windows/ui/onboarding/answers.ahk",
 				"windows/ui/onboarding/core.ahk",
 				"windows/ui/onboarding/finish.ahk",
@@ -480,7 +480,7 @@
 				"windows/ui/personal_info_editor/init.ahk",
 				"windows/ui/personal_toml_editor.ahk",
 				"windows/ui/personal_toml_editor_webview.ahk",
-				"windows/ui/prompt_editor/init.ahk",
+				"windows/ai/ui/prompt_editor/init.ahk",
 				"windows/core/ui/ui/spotlight/init.ahk",
 				"windows/core/ui/ui/spotlight/ownership.ahk",
 				"windows/core/ui/ui/tooltip/border_gdi_ownership.ahk",
@@ -555,95 +555,95 @@
 					]
 				},
 				{
-					"path": "windows/ui/menu/menu_llm/menu_agent.ahk",
+					"path": "windows/ai/ui/menu/agent.ahk",
 					"sourceSha256": "7120ce73672ea0cba2b5be99ec59a464257c3beec400996613a555639b3855a4",
 					"lines": [
 						{
 							"line": 50,
 							"source": "\tMenuRenderer_AppendRows(Target, \"agent_menu\", Key, [_LLM_Agent_SystemRow(Key)])",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_agent.ahk:50 append"
+							"expectedSite": "windows/ai/ui/menu/agent.ahk:50 append"
 						},
 						{
 							"line": 55,
 							"source": "\tMenuRenderer_AppendRows(Target, \"agent_menu\", \"agent_disabled_apps\", [_LLM_Agent_AppsRow()])",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_agent.ahk:55 append"
+							"expectedSite": "windows/ai/ui/menu/agent.ahk:55 append"
 						}
 					]
 				},
 				{
-					"path": "windows/ui/menu/menu_llm/menu_main.ahk",
+					"path": "windows/ai/ui/menu/menu_main.ahk",
 					"sourceSha256": "ed74417ce0dcb3e4483ef1018b9954fb6f756fc762fd7a4b1e8c9887897ccb0b",
 					"lines": [
 						{
 							"line": 177,
 							"source": "\t\tMenuRenderer_AppendRows(TargetMenu, \"llm_menu\", \"install_warning\", WarningRows)",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:177 append"
+							"expectedSite": "windows/ai/ui/menu/menu_main.ahk:177 append"
 						},
 						{
 							"line": 257,
 							"source": "\t_LLM_Menu_Handle.Add(label, target)",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:257 add"
+							"expectedSite": "windows/ai/ui/menu/menu_main.ahk:257 add"
 						},
 						{
 							"line": 388,
 							"source": "\t\t\tMenuRenderer_AppendRows(_LLM_Menu_Handle, \"llm_menu\", \"llm_thinking_info\", InfoRows)",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:388 append"
+							"expectedSite": "windows/ai/ui/menu/menu_main.ahk:388 append"
 						},
 						{
 							"line": 397,
 							"source": "\t\tMenuRenderer_AppendRows(_LLM_Menu_Handle, \"llm_menu\", \"llm_after_profile_boundary\", BoundaryRows)",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:397 append"
+							"expectedSite": "windows/ai/ui/menu/menu_main.ahk:397 append"
 						},
 						{
 							"line": 399,
 							"source": "\t\tif !MenuRenderer_AppendGroup(_LLM_Menu_Handle, \"llm_menu\", \"llm_trigger\",",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:399 append"
+							"expectedSite": "windows/ai/ui/menu/menu_main.ahk:399 append"
 						},
 						{
 							"line": 403,
 							"source": "\t\tif !MenuRenderer_AppendGroup(_LLM_Menu_Handle, \"llm_menu\", \"llm_live_mode\",",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:403 append"
+							"expectedSite": "windows/ai/ui/menu/menu_main.ahk:403 append"
 						},
 						{
 							"line": 407,
 							"source": "\t\tif !MenuRenderer_AppendGroup(_LLM_Menu_Handle, \"llm_menu\", \"llm_generation_settings\",",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:407 append"
+							"expectedSite": "windows/ai/ui/menu/menu_main.ahk:407 append"
 						},
 						{
 							"line": 411,
 							"source": "\t\tif !MenuRenderer_AppendGroup(_LLM_Menu_Handle, \"llm_menu\", \"llm_display\",",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:411 append"
+							"expectedSite": "windows/ai/ui/menu/menu_main.ahk:411 append"
 						},
 						{
 							"line": 415,
 							"source": "\t\tif !MenuRenderer_AppendGroup(_LLM_Menu_Handle, \"llm_menu\", \"llm_navigation\",",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:415 append"
+							"expectedSite": "windows/ai/ui/menu/menu_main.ahk:415 append"
 						}
 					]
 				},
 				{
-					"path": "windows/ui/menu/menu_llm/menu_models.ahk",
+					"path": "windows/ai/ui/menu/models/models.ahk",
 					"sourceSha256": "6ca16b808fe16052aca941eb2620253a0f9e34e59ab7d360bb7c88696813b01a",
 					"lines": [
 						{
 							"line": 257,
 							"source": "\tMenuRenderer_AppendRows(m, \"llm_menu\", \"llm_model\", HeadRows)",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_models.ahk:257 append"
+							"expectedSite": "windows/ai/ui/menu/models/models.ahk:257 append"
 						},
 						{
 							"line": 289,
 							"source": "\t\tMenuRenderer_AppendRows(m, \"llm_menu\", \"llm_model\", TagRows)",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_models.ahk:289 append"
+							"expectedSite": "windows/ai/ui/menu/models/models.ahk:289 append"
 						},
 						{
 							"line": 295,
 							"source": "\tMenuRenderer_AppendRows(m, \"llm_menu\", \"llm_model\", _LLM_Menu_ModelTailRows())",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_models.ahk:295 append"
+							"expectedSite": "windows/ai/ui/menu/models/models.ahk:295 append"
 						},
 						{
 							"line": 336,
 							"source": "\tMenuRenderer_AppendRows(m, \"llm_menu\", \"llm_model\", Rows)",
-							"expectedSite": "windows/ui/menu/menu_llm/menu_models.ahk:336 append"
+							"expectedSite": "windows/ai/ui/menu/models/models.ahk:336 append"
 						}
 					]
 				},
@@ -698,7 +698,7 @@
 				"macos/ui/menu/hotstrings_scope.lua",
 				"macos/menu/ui/init.lua",
 				"macos/menu/ui/keyboard/keymap_lifecycle.lua",
-				"macos/ui/menu/llm_scope.lua",
+				"macos/ai/ui/menu/scope.lua",
 				"macos/ui/menu/magic_key_source_menu.lua",
 				"macos/ui/menu/menu_about.lua",
 				"macos/ui/menu/menu_apps.lua",
@@ -708,40 +708,40 @@
 				"macos/ui/menu/menu_hotstrings_management.lua",
 				"macos/ui/menu/menu_keyboard_layout.lua",
 				"macos/ui/menu/menu_keyboard_slots.lua",
-				"macos/ui/menu/menu_llm/activation_pause_owner.lua",
-				"macos/ui/menu/menu_llm/agent_panel.lua",
-				"macos/ui/menu/menu_llm/api_panel.lua",
-				"macos/ui/menu/menu_llm/backend_labels.lua",
-				"macos/ui/menu/menu_llm/backend_panel.lua",
-				"macos/ui/menu/menu_llm/init.lua",
+				"macos/ai/ui/menu/activation_pause_owner.lua",
+				"macos/ai/ui/menu/panels/agent_panel.lua",
+				"macos/ai/ui/menu/panels/api_panel.lua",
+				"macos/ai/ui/menu/backend_labels.lua",
+				"macos/ai/ui/menu/panels/backend_panel.lua",
+				"macos/ai/ui/menu/init.lua",
 				"macos/ui/menu/menu_llm/live_mode_panel.lua",
-				"macos/ui/menu/menu_llm/local_server_panel.lua",
-				"macos/ui/menu/menu_llm/menu_layout.lua",
-				"macos/ui/menu/menu_llm/mlx_repair_offer.lua",
-				"macos/ui/menu/menu_llm/model_switcher.lua",
-				"macos/ui/menu/menu_llm/models_manager.lua",
-				"macos/ui/menu/menu_llm/models_manager_mlx.lua",
-				"macos/ui/menu/menu_llm/models_manager_mlx_download.lua",
-				"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua",
-				"macos/ui/menu/menu_llm/models_manager_mlx_repo.lua",
-				"macos/ui/menu/menu_llm/models_manager_mlx_server.lua",
-				"macos/ui/menu/menu_llm/models_manager_ollama.lua",
+				"macos/ai/ui/menu/panels/local_server_panel.lua",
+				"macos/ai/ui/menu/layout.lua",
+				"macos/ai/ui/menu/models/mlx_repair_offer.lua",
+				"macos/ai/ui/menu/models/switcher.lua",
+				"macos/ai/ui/menu/models/manager.lua",
+				"macos/ai/ui/menu/models/manager_mlx.lua",
+				"macos/ai/ui/menu/models/manager_mlx_download.lua",
+				"macos/ai/ui/menu/models/manager_mlx_hf.lua",
+				"macos/ai/ui/menu/models/manager_mlx_repo.lua",
+				"macos/ai/ui/menu/models/manager_mlx_server.lua",
+				"macos/ai/ui/menu/models/manager_ollama.lua",
 				"macos/ui/menu/menu_llm/models_selector.lua",
-				"macos/ui/menu/menu_llm/ollama_enable_probe.lua",
-				"macos/ui/menu/menu_llm/prediction_lock_registry.lua",
-				"macos/ui/menu/menu_llm/profile_label.lua",
-				"macos/ui/menu/menu_llm/profiles_manager.lua",
-				"macos/ui/menu/menu_llm/requirement_operation_registry.lua",
-				"macos/ui/menu/menu_llm/runtime_install_offer.lua",
-				"macos/ui/menu/menu_llm/scope_runtime.lua",
-				"macos/ui/menu/menu_llm/settings_manager.lua",
-				"macos/ui/menu/menu_llm/startup_controller.lua",
-				"macos/ui/menu/menu_llm/streaming_panel.lua",
-				"macos/ui/menu/menu_llm/temperature_panel.lua",
-				"macos/ui/menu/menu_llm/trigger_orchestrator.lua",
-				"macos/ui/menu/menu_llm/trigger_panel.lua",
-				"macos/ui/menu/menu_llm/unreachable_backend_offer.lua",
-				"macos/ui/menu/menu_llm/warmup_controller.lua",
+				"macos/ai/ui/menu/models/ollama_enable_probe.lua",
+				"macos/ai/ui/menu/prediction_lock_registry.lua",
+				"macos/ai/ui/menu/profile_label.lua",
+				"macos/ai/ui/menu/profiles_manager.lua",
+				"macos/ai/ui/menu/requirement_operation_registry.lua",
+				"macos/ai/ui/menu/runtime_install_offer.lua",
+				"macos/ai/ui/menu/scope_runtime.lua",
+				"macos/ai/ui/menu/settings_manager.lua",
+				"macos/ai/ui/menu/startup_controller.lua",
+				"macos/ai/ui/menu/panels/streaming_panel.lua",
+				"macos/ai/ui/menu/panels/temperature_panel.lua",
+				"macos/ai/ui/menu/trigger_orchestrator.lua",
+				"macos/ai/ui/menu/panels/trigger_panel.lua",
+				"macos/ai/ui/menu/unreachable_backend_offer.lua",
+				"macos/ai/ui/menu/warmup_controller.lua",
 				"macos/ui/menu/menu_metrics.lua",
 				"macos/settings/ui/menu/paths.lua",
 				"macos/ui/menu/menu_shortcuts.lua",
@@ -865,40 +865,40 @@
 					]
 				},
 				{
-					"path": "macos/ui/menu/menu_llm/init.lua",
+					"path": "macos/ai/ui/menu/init.lua",
 					"sourceSha256": "62e7b28037a623ebcf508b48bc91c758d4cdfb186cfa6d88f7d4e7452d6ed30d",
 					"lines": [
 						{
 							"line": 1955,
 							"source": "\t\t\t\t\t\tlabel   = i18n.get(\"menu.llm.title\"),",
-							"expectedSite": "macos/ui/menu/menu_llm/init.lua:1955 static"
+							"expectedSite": "macos/ai/ui/menu/init.lua:1955 static"
 						},
 						{
 							"line": 2003,
 							"source": "\t\t\t\treturn { title = row.label, fn = row.action }",
-							"expectedSite": "macos/ui/menu/menu_llm/init.lua:2003 native"
+							"expectedSite": "macos/ai/ui/menu/init.lua:2003 native"
 						}
 					]
 				},
 				{
-					"path": "macos/ui/menu/menu_llm/models_manager_mlx_hf.lua",
+					"path": "macos/ai/ui/menu/models/manager_mlx_hf.lua",
 					"sourceSha256": "84c2a38c82125fdac6c0a606b20b3120ba350e28b70c900b050e3eda8c3d92bb",
 					"lines": [
 						{
 							"line": 830,
 							"source": "\t\t\t\ttitle             = i18n.get(\"mlx.hf_login_title\"),",
-							"expectedSite": "macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:830 static"
+							"expectedSite": "macos/ai/ui/menu/models/manager_mlx_hf.lua:830 static"
 						}
 					]
 				},
 				{
-					"path": "macos/ui/menu/menu_llm/profiles_manager.lua",
+					"path": "macos/ai/ui/menu/profiles_manager.lua",
 					"sourceSha256": "d376dfa8fcef416df95e15892cac152addb0fc3ff9dfa42b5f28f00bed9d6341",
 					"lines": [
 						{
 							"line": 1068,
 							"source": "\t\t\t\t\t\t\ttitle = i18n.get(\"menu.profiles.shortcut_title\"),",
-							"expectedSite": "macos/ui/menu/menu_llm/profiles_manager.lua:1068 static"
+							"expectedSite": "macos/ai/ui/menu/profiles_manager.lua:1068 static"
 						}
 					]
 				},
@@ -960,10 +960,10 @@
 		},
 		"linux": {
 			"sourceFiles": [
-				"linux/ui/menu/agent_rows.lua",
+				"linux/ai/ui/menu/agent_rows.lua",
 				"linux/ui/menu/key_combinations.lua",
-				"linux/ui/menu/llm_backend_rows.lua",
-				"linux/ui/menu/local_server_rows.lua",
+				"linux/ai/ui/menu/backend_rows.lua",
+				"linux/ai/ui/menu/local_server_rows.lua",
 				"linux/ui/menu/menu_builder.lua",
 				"linux/ui/menu/programmatic_hotstrings.lua",
 				"linux/ui/menu/start_at_login.lua",

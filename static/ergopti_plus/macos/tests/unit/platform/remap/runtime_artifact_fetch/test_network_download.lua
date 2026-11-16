@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "core.fs.adapters.file_system", "modules.llm.network_env", "modules.llm.opaque_network_admission",
+local MODULES = { "core.fs.adapters.file_system", "ai.engine.api.network_env", "ai.engine.api.opaque_network_admission",
 	"platform.remap.network_download" }
 
 --- Loads the route over the real shared files.
@@ -59,7 +59,7 @@ helpers.describe("remap download network route (net-001-remap-route)", function(
 
 	helpers.it("names a refused route by its shared class and leaves curl's own failures alone", function()
 		with_route(function(Route)
-			local Admission = require("modules.llm.opaque_network_admission")
+			local Admission = require("ai.engine.api.opaque_network_admission")
 			local named = Route.describe_failure(Admission.refusal_exit_code, Admission.refusal_prefix .. "verified:unavailable\n")
 			helpers.assert_true(type(named) == "string" and named:find("proxy route could not be resolved", 1, true) ~= nil,
 				tostring(named))

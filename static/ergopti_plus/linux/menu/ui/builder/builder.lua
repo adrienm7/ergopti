@@ -209,9 +209,9 @@ local _build_ergopti_studio = require("menu.ui.ergopti_studio").build
 
 local _build_hotstrings = require("ui.menu.menu_hotstrings").build
 
-local _build_llm = require("ui.menu.menu_llm").build
+local _build_llm = require("ai.ui.menu.llm").build
 
-local _build_agent = require("ui.menu.menu_agent").build
+local _build_agent = require("ai.ui.menu.agent").build
 
 local _build_metrics = require("ui.menu.menu_metrics").build
 

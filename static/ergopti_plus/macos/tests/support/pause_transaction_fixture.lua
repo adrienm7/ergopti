@@ -17,10 +17,10 @@ local OWNERS = {
 	"modules.gestures.actions",
 	"platform.input.key_state",
 	"platform.input.synthetic_input",
-	"modules.llm.warmup_controller",
-	"modules.llm.api_mlx",
-	"modules.llm.api_ollama",
-	"modules.llm.api_remote",
+	"ai.engine.local_servers.warmup_controller",
+	"ai.engine.api.mlx",
+	"ai.engine.api.ollama",
+	"ai.engine.api.remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
@@ -159,21 +159,21 @@ local function load_context(options)
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	}
-	package.loaded["modules.llm.warmup_controller"] = {
+	package.loaded["ai.engine.local_servers.warmup_controller"] = {
 		pause_warmup = record("warmup_stop"),
 		resume_warmup = inverse("warmup_resume"),
 	}
-	package.loaded["modules.llm.api_mlx"] = {
+	package.loaded["ai.engine.api.mlx"] = {
 		stop_warmup = record("mlx_stop"),
 		resume_warmup = inverse("mlx_resume"),
 	}
-	package.loaded["modules.llm.api_ollama"] = {
+	package.loaded["ai.engine.api.ollama"] = {
 		stop_warmup = record("ollama_stop"),
 	}
 	-- HS-012 added these fixed pause owners. Keep this older transaction harness
 	-- independent from whichever real/cache-backed instance a prior test loaded;
 	-- the class-wide owner matrix exercises their refusal paths separately.
-	package.loaded["modules.llm.api_remote"] = {
+	package.loaded["ai.engine.api.remote"] = {
 		stop_warmup = function() return true end,
 	}
 	package.loaded["ui.wpm.wpm_menubar"] = {

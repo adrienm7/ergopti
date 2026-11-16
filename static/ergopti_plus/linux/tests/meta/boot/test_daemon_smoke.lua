@@ -720,7 +720,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       "core.text.engine.json",
       "tray.protocol",
       "ai.engine.prediction.prompt_builder_core",
-      "infra.llm_bridge",
+      "ai.engine.bridge",
       "updater.engine.version_core",
     }
     for _, name in ipairs(shared_mods) do

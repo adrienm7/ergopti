@@ -334,7 +334,7 @@ end)
 
 helpers.describe("neither side reimplements the match decision", function()
 	helpers.it("the preview owns no word-boundary rule of its own", function()
-		-- Selected by a declaration unique to modules/keymap/llm_bridge.lua rather
+		-- Selected by a declaration unique to ai/engine/bridge.lua rather
 		-- than by path, so moving the module cannot turn this into a path error.
 		local src = helpers.read_driver_source("function M.update_preview")
 		helpers.assert_true(src ~= nil, "llm_bridge source must be locatable")

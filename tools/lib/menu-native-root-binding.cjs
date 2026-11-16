@@ -105,7 +105,7 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 	const init = sources?.['macos/menu/ui/init.lua'];
 	const builder = sources?.['macos/menu/ui/builder/builder.lua'];
 	const badge = sources?.['macos/menu/ui/builder/canvas_badge.lua'];
-	const llm = sources?.['macos/ui/menu/menu_llm/init.lua'];
+	const llm = sources?.['macos/ai/ui/menu/init.lua'];
 	if (
 		![init, builder, badge, llm].every((source) => typeof source === 'string' && source.length > 0)
 	)

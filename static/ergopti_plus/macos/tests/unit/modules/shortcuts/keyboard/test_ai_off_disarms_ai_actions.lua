@@ -16,7 +16,7 @@
 
 local helpers = require("tests.helpers")
 
-local ENGINE = "modules.llm.prediction_engine"
+local ENGINE = "ai.engine.prediction.engine"
 
 --- Runs a body with a stub prediction engine whose AI switch the body flips.
 --- @param body function(state: table) state.enabled is the AI switch.

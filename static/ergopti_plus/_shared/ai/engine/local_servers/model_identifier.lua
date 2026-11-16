@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One rule per backend, three implementations pinned to one corpus:
----    this module (macOS, Linux), the page script and windows/modules/llm/models.ahk
+---    this module (macOS, Linux), the page script and windows/ai/engine/settings/models.ahk
 ---    all validate _shared/tests/corpus/llm/model_identifiers.json.
 --- 2. Pure: no I/O, so the drivers' unit suites call it directly.
 --- ==============================================================================

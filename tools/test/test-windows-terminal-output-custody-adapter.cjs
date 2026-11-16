@@ -183,7 +183,7 @@ const source = fs.readFileSync(
 	'utf8'
 );
 const tests = fs.readFileSync(
-	path.join(DRIVER, 'tests/unit/modules/llm/nav_event_owner/test_terminal_output_custody.ahk'),
+	path.join(DRIVER, 'tests/unit/ai/nav_event_owner/test_terminal_output_custody.ahk'),
 	'utf8'
 );
 validate(source, tests);
@@ -474,7 +474,7 @@ function validatePackets(source, tests, headers, loader) {
 const markerHeaders = ['nav_event_owner.h', 'terminal_output_plan.h']
 	.map((name) => fs.readFileSync(path.join(DRIVER, 'platform/native', name), 'utf8'))
 	.join('\n');
-const packetLoader = fs.readFileSync(path.join(DRIVER, 'adapters/llm_nav_event_owner.ahk'), 'utf8');
+const packetLoader = fs.readFileSync(path.join(DRIVER, 'ai/adapters/nav_event_owner.ahk'), 'utf8');
 validatePackets(source, tests, markerHeaders, packetLoader);
 const packetInverses = [
 	[
@@ -1709,7 +1709,7 @@ function validateTerminalRegistrationCustody(loader, authored) {
 		assert.ok(authored.includes(literal), `Missing independent custody vector ${literal}.`);
 }
 const registrationTests = fs.readFileSync(
-	path.join(DRIVER, 'tests/unit/modules/llm/nav_event_owner/test_terminal_route_metadata.ahk'),
+	path.join(DRIVER, 'tests/unit/ai/nav_event_owner/test_terminal_route_metadata.ahk'),
 	'utf8'
 );
 validateTerminalRegistrationCustody(packetLoader, registrationTests);

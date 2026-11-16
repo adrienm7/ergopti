@@ -6,7 +6,7 @@
 --- The Linux AI menu listed Ollama's models and nothing else: there was no way
 --- to enter an API key. The API entries, one "add" per provider, a test and a
 --- removal moved to the model selector page on 2026-10-27; these cases drive
---- the page's own transactions (ui/menu/llm_backend_rows.lua api_page).
+--- the page's own transactions (ai/ui/menu/backend_rows.lua api_page).
 --- ==============================================================================
 
 package.loaded["tests.support.ui.menu.llm.llm_backend_rows_fixture"] = nil
@@ -239,7 +239,7 @@ helpers.describe("AI menu: adding and testing a Cerebras key", function()
 	helpers.it("acknowledges a saved entry if its optional test raises", function()
 		local build, state, restore = setup("api")
 		state.answers = { "test-key", "qwen" }
-		package.loaded["modules.llm.api_remote"].test = function() error("synthetic test failure") end
+		package.loaded["ai.engine.api.api_remote"].test = function() error("synthetic test failure") end
 		local ok, result = pcall(find(build(), "➕ Cerebras").action)
 		local count = #state.entries
 		restore()
@@ -252,7 +252,7 @@ helpers.describe("AI menu: adding and testing a Cerebras key", function()
 		helpers.it("acknowledges a saved " .. kind .. " entry when its test request is refused", function()
 			local build, state, restore = setup("api")
 			state.answers = { "test-key", kind == "chat" and "qwen" or "jev-latest" }
-			package.loaded["modules.llm.api_remote"].test = function() return false end
+			package.loaded["ai.engine.api.api_remote"].test = function() return false end
 			local result = find(build(), kind == "chat" and "➕ Cerebras" or "➕ TypeSafe").action()
 			local count, changed = #state.entries, state.changed
 			restore()
@@ -477,10 +477,10 @@ end)
 helpers.describe("Local API optional-auth tray consumer", function()
 	helpers.it("stores an explicitly empty local key and tests the selected model (local-api-optional-auth-ui)", function()
 		local build, state, restore = setup("api")
-		local remote = package.loaded["modules.llm.api_remote"]
+		local remote = package.loaded["ai.engine.api.api_remote"]
 		local provider = { id = "lmstudio", label = "LM Studio", base_url = "http://localhost:1234/v1", default_model = "" }
 		local providers, lookup = remote.providers, remote.provider
-		local _, servers = require("modules.llm.local_server_catalogue").load({})
+		local _, servers = require("ai.engine.local_servers.catalogue").load({})
 		remote.providers = function() local list = providers(); list[#list + 1] = provider; return list end
 		remote.provider = function(id) return id == provider.id and provider or lookup(id) end
 		remote.token_allowed = function(id, token) return require("ai.engine.local_servers.auth").token_allowed(id, token, servers) end
@@ -505,7 +505,7 @@ end)
 helpers.describe("AI active API commands: acknowledged private removal", function()
 	for _, refused in ipairs({ true, false }) do
 		helpers.it("publishes a removal only after the real private writer ACK " .. tostring(not refused), function()
-			local names = { "modules.llm.api_entries", "modules.llm.api_remote", "ui.menu.llm_backend_rows" }
+			local names = { "ai.engine.settings.api_entries", "ai.engine.api.api_remote", "ai.ui.menu.backend_rows" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local path = assert(os.tmpname())
@@ -514,9 +514,9 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 			local file = assert(io.open(path, "wb")); assert(file:write(original)); assert(file:close())
 			local changed, result, after, count, active, foreign, stage_calls, backend_calls, errors = 0, nil, nil, nil, nil, nil, 0, 0, 0
 			local ok, failure = pcall(function()
-				local owner = helpers.load_module("modules.llm.api_entries")
+				local owner = helpers.load_module("ai.engine.settings.api_entries")
 				owner._set_path_for_test(path)
-				package.loaded["modules.llm.api_remote"] = {
+				package.loaded["ai.engine.api.api_remote"] = {
 					-- The chosen provider is known; this removal does not publish a catalogue.
 					provider_config_receipt = function() return { published = false, ids = { cerebras = true } } end,
 					provider = function() return { default_model = "qwen", base_url = "https://example.invalid/v1" } end,
@@ -531,7 +531,7 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 					end
 					return rename(from, to)
 				end
-				local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(helpers.load_module("ui.menu.llm_backend_rows"),
+				local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(helpers.load_module("ai.ui.menu.backend_rows"),
 					{ get_backend = function() return "api" end, set_backend = function(kind)
 						backend_calls = backend_calls + 1
 						return kind == "api"
@@ -567,7 +567,7 @@ end)
 helpers.describe("AI menu selection through the private writer (ai-menu-selection-native-ack)", function()
 	for _, refused in ipairs({ true, false }) do
 		helpers.it("(ai-menu-selection-native-ack) preserves the actual store on refusal=" .. tostring(refused), function()
-			local names = { "modules.llm.api_entries", "modules.llm.api_remote", "ui.menu.llm_backend_rows" }
+			local names = { "ai.engine.settings.api_entries", "ai.engine.api.api_remote", "ai.ui.menu.backend_rows" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local path = assert(os.tmpname())
@@ -577,14 +577,14 @@ helpers.describe("AI menu selection through the private writer (ai-menu-selectio
 			local changes, stages, result, active, after, mode = 0, 0
 			local backend_calls, errors = 0, 0
 			local ok, failure = pcall(function()
-				package.loaded["modules.llm.api_remote"] = {
+				package.loaded["ai.engine.api.api_remote"] = {
 					provider_config_receipt = function() return { published = false, ids = { cerebras = true } } end,
 					provider = function() return { default_model = "qwen", base_url = "https://example.invalid/v1" } end,
 					providers = function() return {} end,
 					serves = function() return true end,
 					test = function() error("selection must not dispatch a request") end,
 				}
-				local owner = helpers.load_module("modules.llm.api_entries")
+				local owner = helpers.load_module("ai.engine.settings.api_entries")
 				owner._set_path_for_test(path)
 				os.rename = function(from, to)
 					if to == path then
@@ -593,7 +593,7 @@ helpers.describe("AI menu selection through the private writer (ai-menu-selectio
 					end
 					return rename(from, to)
 				end
-				local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(helpers.load_module("ui.menu.llm_backend_rows"),
+				local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(helpers.load_module("ai.ui.menu.backend_rows"),
 					{ get_backend = function() return "api" end,
 						set_backend = function(kind) backend_calls = backend_calls + 1; return kind == "api" end },
 					{ error = function() errors = errors + 1 end },

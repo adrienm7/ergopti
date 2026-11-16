@@ -44,16 +44,16 @@ local MODULES = {
 	"core.lifecycle.engine.compat.utf8",
 	-- The application identity owner normalizes names through these helpers.
 	"core.text.engine.utils_core",
-	"modules.llm",
-	"ui.menu.menu_llm.profile_label",
-	"ui.menu.menu_llm.model_switcher",
-	"ui.menu.menu_llm.prediction_lock_registry",
-	"ui.menu.menu_llm.profiles_manager",
-	"ui.menu.menu_llm.trigger_orchestrator",
-	"ui.menu.menu_llm.trigger_panel",
+	"ai.engine",
+	"ai.ui.menu.profile_label",
+	"ai.ui.menu.models.switcher",
+	"ai.ui.menu.prediction_lock_registry",
+	"ai.ui.menu.profiles_manager",
+	"ai.ui.menu.trigger_orchestrator",
+	"ai.ui.menu.panels.trigger_panel",
 	"ui.menu.shortcut_utils",
 	"settings.ui.menu.preferences_transaction",
-	"ui.prompt_editor",
+	"ai.ui.prompt_editor",
 }
 
 --- Clones plain state so durable snapshots never alias the live candidate.
@@ -247,7 +247,7 @@ local function with_trigger_fixture(options, body)
 			}
 		end
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["modules.llm"] = {
+		package.loaded["ai.engine"] = {
 			DEFAULT_STATE = {llm_num_predictions = 1},
 			BUILTIN_PROFILES = {
 				{id = "basic", label = "Basic"},
@@ -364,8 +364,8 @@ local function with_trigger_fixture(options, body)
 			return true
 		end
 
-		package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = nil
-		local orchestrator = require("ui.menu.menu_llm.trigger_orchestrator").new({
+		package.loaded["ai.ui.menu.trigger_orchestrator"] = nil
+		local orchestrator = require("ai.ui.menu.trigger_orchestrator").new({
 			state = state,
 			keymap = keymap,
 			save_prefs = save_prefs,
@@ -449,10 +449,10 @@ local function with_delete_fixture(options, body)
 			get_array = renderer.get_array,
 		}
 		package.loaded["core.ui.engine.notifications"] = {notify = function() return true end}
-		package.loaded["ui.menu.menu_llm.profile_label"] = {
+		package.loaded["ai.ui.menu.profile_label"] = {
 			format = function(label) return label end,
 		}
-		package.loaded["ui.prompt_editor"] = {open = function() return true end}
+		package.loaded["ai.ui.prompt_editor"] = {open = function() return true end}
 
 		fixture.state.llm_backend = options.pending_model and "mlx" or "ollama"
 		fixture.state.llm_enabled = true
@@ -497,8 +497,8 @@ local function with_delete_fixture(options, body)
 		}
 		local switcher = nil
 		if options.real_switcher then
-			package.loaded["ui.menu.menu_llm.model_switcher"] = nil
-			switcher = require("ui.menu.menu_llm.model_switcher").new({
+			package.loaded["ai.ui.menu.models.switcher"] = nil
+			switcher = require("ai.ui.menu.models.switcher").new({
 				state = fixture.state,
 				models_mgr = models_mgr,
 				keymap = {
@@ -528,8 +528,8 @@ local function with_delete_fixture(options, body)
 
 		-- The trigger fixture exposes its save through the orchestrator only for
 		-- this real multi-owner transaction; production receives the same closure
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
-		local manager = require("ui.menu.menu_llm.profiles_manager").new(deps, models_mgr)
+		package.loaded["ai.ui.menu.profiles_manager"] = nil
+		local manager = require("ai.ui.menu.profiles_manager").new(deps, models_mgr)
 		local profile_rows = manager.get_menu_item().menu
 		local custom = find_row(profile_rows, "Profile P")
 		local advanced = find_row(profile_rows, "Advanced")

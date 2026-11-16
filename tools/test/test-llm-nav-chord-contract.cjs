@@ -165,7 +165,7 @@ const luaTable = (source, name) =>
 
 // 2. macOS.
 {
-	const bridge = read('macos/modules/keymap/llm_bridge.lua');
+	const bridge = read('macos/ai/engine/bridge.lua');
 	const steps = new Map();
 	for (const entry of luaTable(bridge, 'ARROW_NAVIGATION_DELTA').matchAll(
 		/\[(\d+)\]\s*=\s*(-?1)\b/g
@@ -205,7 +205,7 @@ const luaTable = (source, name) =>
 	for (const entry of codes.matchAll(/^M\.(KEY_[A-Z]+)\s*=\s*(\d+)/gm)) {
 		named.set(entry[1], Number(entry[2]));
 	}
-	const engine = read('linux/modules/llm/prediction_engine.lua');
+	const engine = read('linux/ai/engine/prediction/engine.lua');
 	const arrows = new Map();
 	for (const entry of luaTable(engine, 'ARROW_NAVIGATION_DELTA').matchAll(
 		/\[EvdevCodes\.(KEY_[A-Z]+)\]\s*=\s*(-?1)\b/g
@@ -238,7 +238,7 @@ const luaTable = (source, name) =>
 
 // 4. Windows.
 {
-	const tabAccept = read('windows/ui/menu/menu_llm/tab_accept.ahk');
+	const tabAccept = read('windows/ai/ui/menu/tab_accept.ahk');
 	const routes = new Map();
 	for (const route of tabAccept.matchAll(
 		/"(\w+)", Map\("index", \d+, "code", "sc[0-9a-f]{4}", "delta", (-?1)\)/gi
@@ -277,7 +277,7 @@ const luaTable = (source, name) =>
 	}
 	expectSteps('Windows LLM_NAV_SHIFT_TAB_STEPS', contract.shiftTab, shiftTab);
 
-	const bridge = read('windows/modules/keymap/llm_bridge.ahk');
+	const bridge = read('windows/ai/engine/bridge.ahk');
 	check(
 		/_LLM_Accept_TapHoldTapKey\(TabProvenance\) != ""\s*&& LLM_Menu_NavShiftTabTap\(ModifierIsHeldFn\)/.test(
 			bridge

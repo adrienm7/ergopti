@@ -18,8 +18,8 @@ local Preferences = require("tests.support.llm_preferences_fixture")
 --- @param body function Test body accepting the actual context and renderer.
 --- @param public_policy boolean|nil Keep the current public declaration when true.
 local function with_world(body, public_policy)
-	local names = { "modules.llm.prediction_engine", "modules.llm.agent_settings",
-		"menu.ui.builder.builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }
+	local names = { "ai.engine.prediction.engine", "ai.engine.settings.agent_settings",
+		"menu.ui.builder.builder", "ai.ui.menu.agent_rows", "ai.ui.menu.parent" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local renderer, build, group_row, top, agent_index, public_agent
@@ -59,7 +59,7 @@ local function with_world(body, public_policy)
 			top[agent_index] = available
 		end
 		Preferences.with(function()
-			local engine = require("modules.llm.prediction_engine")
+			local engine = require("ai.engine.prediction.engine")
 			local ctx = { llm = engine, paused = false, on_quit = function() end,
 				on_menu_changed = function() end }
 			ctx.is_paused = function() return ctx.paused end
@@ -96,8 +96,8 @@ end
 helpers.describe("Linux AI persistence rows under a configuration saved by a newer version", function()
 	helpers.it("names the newer configuration on the greyed rows and refuses their retained commands", function()
 		with_world(function(ctx, renderer)
-			local Preferences = require("infra.llm_preferences")
-			local Scope = require("infra.llm_scope")
+			local Preferences = require("ai.engine.preferences")
+			local Scope = require("ai.engine.scope")
 			local Migrate = require("settings.engine.migration.migrate")
 			local I18n = require("core.i18n.engine.i18n")
 			local old_admit, old_apply, old_status = Preferences.admit, Scope.apply, Migrate.read_only_status
@@ -214,9 +214,9 @@ helpers.describe("Linux shared AI outer parents with published available compone
 				end
 				helpers.assert_type(callback, "function", "the old native command route survives projection")
 				if kind == "llm" then helpers.assert_eq(row.checked, ctx.llm.is_enabled())
-				else helpers.assert_eq(row.checked, require("modules.llm.agent_settings").get_mode() ~= "off") end
+				else helpers.assert_eq(row.checked, require("ai.engine.settings.agent_settings").get_mode() ~= "off") end
 				if kind == "agent" then
-					local settings = require("modules.llm.agent_settings")
+					local settings = require("ai.engine.settings.agent_settings")
 					helpers.assert_eq(settings.get_mode(), "off", "the genuine initial mode gives the callback a real transition")
 					local refreshes = 0
 					ctx.on_menu_changed = function() refreshes = refreshes + 1 end
@@ -232,7 +232,7 @@ helpers.describe("Linux shared AI outer parents with published available compone
 				local engine = ctx.llm
 				local method = kind == "llm" and "toggle" or "set_agent_mode"
 				local original = engine[method]
-				local settings = require("modules.llm.agent_settings")
+				local settings = require("ai.engine.settings.agent_settings")
 				local enabled, mode, refreshes = engine.is_enabled(), settings.get_mode(), 0
 				ctx.on_menu_changed = function() refreshes = refreshes + 1 end
 				engine[method] = nil
@@ -365,7 +365,7 @@ helpers.describe("Linux shared AI outer parents with published available compone
 			helpers.it("refuses final " .. kind .. " getter withdrawal of the " .. withdrawal, function()
 				with_world(function(ctx, renderer)
 					local engine = ctx.llm
-					local owner = kind == "llm" and engine or require("modules.llm.agent_settings")
+					local owner = kind == "llm" and engine or require("ai.engine.settings.agent_settings")
 					local getter = kind == "llm" and "is_enabled" or "get_mode"
 					local command = kind == "llm" and "toggle" or "set_agent_mode"
 					local native_getter, native_command = owner[getter], engine[command]
@@ -467,8 +467,8 @@ helpers.describe("Linux shared AI outer parents with published available compone
 		local root, original, position = renderer.get_root()
 		for index, row in ipairs(root.top_level) do if row.id == "agent" then original, position = row, index end end
 		local build, group_row = renderer.build, renderer.group_row
-		local names = { "modules.llm.prediction_engine", "modules.llm.agent_settings",
-			"menu.ui.builder.builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }
+		local names = { "ai.engine.prediction.engine", "ai.engine.settings.agent_settings",
+			"menu.ui.builder.builder", "ai.ui.menu.agent_rows", "ai.ui.menu.parent" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local replaced = false

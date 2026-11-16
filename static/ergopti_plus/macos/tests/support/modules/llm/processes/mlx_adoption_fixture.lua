@@ -12,10 +12,10 @@ local OWNED = {
 	"core.logger.engine.logger", "core.logger.engine", "diagnostics.engine.reports.redact", "core.text.engine.json", "core.fs.engine.app_dirs",
 	"core.logger.engine.log_folders", "_generated.logger_sub_files", "core.logger.adapters.log_transport",
 	"core.lifecycle.engine.launcher_environment", "core.ui.engine.notifications", "core.i18n.engine.i18n",
-	"settings.engine.paths", "core.text.engine.utils", "modules.llm.api_common",
+	"settings.engine.paths", "core.text.engine.utils", "ai.engine.api.common",
 	"core.process.adapters.task_lifecycle", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
-	"core.fs.adapters.json_codec", "modules.llm.api_mlx",
-	"ui.menu.menu_llm.models_manager_mlx_server",
+	"core.fs.adapters.json_codec", "ai.engine.api.mlx",
+	"ai.ui.menu.models.manager_mlx_server",
 }
 
 --- Runs the actual Logger sink and server lifecycle with recording native ports.
@@ -55,13 +55,13 @@ local function with_adoption(scenario)
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["settings.engine.paths"] = { get = function() return "/fixture/model.txt" end }
 			package.loaded["core.text.engine.utils"] = { shell_quote = function(value) return "'" .. value .. "'" end }
-			package.loaded["modules.llm.api_common"] = {
+			package.loaded["ai.engine.api.common"] = {
 				protected_call = function(fn, _, ...)
 					if type(fn) ~= "function" then return false end
 					return pcall(fn, ...)
 				end,
 			}
-			package.loaded["modules.llm.api_mlx"] = {
+			package.loaded["ai.engine.api.mlx"] = {
 				get_port = function() return 3460 end, reset_endpoints = function() return true end,
 				set_model_hf_path = noop, set_active_server_pgid = noop, mark_load_failed = noop,
 			}
@@ -88,7 +88,7 @@ local function with_adoption(scenario)
 			_G.hs = { execute = function() return '{"data":[{"id":"org/Model-A"}]}' end }
 			local deps = { active_tasks = {} }
 			local obj = { get_mlx_repo = function(model) return "org/" .. model end }
-			require("ui.menu.menu_llm.models_manager_mlx_server").install({
+			require("ai.ui.menu.models.manager_mlx_server").install({
 				obj = obj, deps = deps, active_tasks_gc_root = {}, project_venv_python_escaped = "/fixture/python",
 			})
 			function state.start_a(guarded)

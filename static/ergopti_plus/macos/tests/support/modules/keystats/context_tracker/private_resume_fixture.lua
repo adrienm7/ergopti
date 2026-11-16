@@ -53,10 +53,10 @@ local OWNERS = {
 	"platform.input.key_state",
 	"infra.script_chord_catalogue",
 	"keyboard.engine.layers.script_chords",
-	"modules.llm.api_mlx",
-	"modules.llm.api_ollama",
-	"modules.llm.api_remote",
-	"modules.llm.warmup_controller",
+	"ai.engine.api.mlx",
+	"ai.engine.api.ollama",
+	"ai.engine.api.remote",
+	"ai.engine.local_servers.warmup_controller",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
@@ -116,16 +116,16 @@ local OWNERS = {
 	"modules.keymap.terminator_replay",
 	"modules.keymap.terminators",
 	"modules.keymap.utils",
-	"modules.llm",
-	"modules.llm.api_common",
-	"modules.llm.api_token_crypto",
-	"modules.llm.app_filter",
-	"modules.llm.local_servers",
-	"modules.llm.ollama_binary",
-	"modules.llm.parser",
-	"modules.llm.profiles",
-	"modules.llm.prompt_builder",
-	"modules.llm.streaming_handler",
+	"ai.engine",
+	"ai.engine.api.common",
+	"ai.engine.api.token_crypto",
+	"ai.engine.prediction.app_filter",
+	"ai.engine.local_servers.local_servers",
+	"ai.engine.ollama.binary",
+	"ai.engine.api.parser",
+	"ai.engine.settings.profiles",
+	"ai.engine.prediction.prompt_builder",
+	"ai.engine.api.streaming_handler",
 	"platform.remap.lease_helper",
 	"core.text.engine.utils_core",
 }
@@ -298,12 +298,12 @@ function M.with_runtime(callback)
 			package.loaded["platform.input.key_state"] = {}
 			package.loaded["infra.script_chord_catalogue"] = {}
 			local function yes() return true end
-			for _, name in ipairs({ "modules.llm.api_mlx", "modules.llm.api_ollama", "modules.llm.api_remote", "modules.llm.warmup_controller" }) do
+			for _, name in ipairs({ "ai.engine.api.mlx", "ai.engine.api.ollama", "ai.engine.api.remote", "ai.engine.local_servers.warmup_controller" }) do
 				-- retry_deferred_warmup: a restored remote API entry replays the deferred warmup.
 				package.loaded[name] = { pause_warmup = yes, resume_warmup = yes, stop_warmup = yes, stop = yes,
 					retry_deferred_warmup = yes }
 			end
-			local remote = package.loaded["modules.llm.api_remote"]
+			local remote = package.loaded["ai.engine.api.remote"]
 			local remote_entries, remote_active = {}, nil
 			remote.set_entries = function(entries) remote_entries = entries end
 			remote.get_entries = function() return remote_entries end

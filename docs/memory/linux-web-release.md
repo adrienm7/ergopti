@@ -293,7 +293,7 @@ three drivers understand (Linux `requirement_holds`).
 The prediction engine does not read the hotstring word buffer on Linux. The
 Linux `modules/hotstrings/engine.lua` wrapper reports each edit the shared
 engine applies (typed text, Backspace, `apply_expansion`, `reset`, a
-navigation) to the AI context of `modules/llm/context.lua`, a rolling window
+navigation) to the AI context of `ai/engine/api/context.lua`, a rolling window
 from `_shared/ai/engine/policy/context_buffer.lua`, which macOS shares for its
 navigation rule and pins with `context_buffer_vectors.json`. A navigation key,
 Escape, Enter, a click, a shortcut and a tap-hold command clear it only while
@@ -1100,7 +1100,7 @@ domain.
 ### project-linux-owned-ollama-gets-the-desktop-proxy-as-https-proxy
 
 The Ollama daemon Ergopti starts cannot evaluate a PAC, so a pull behind a
-PAC-only network failed. `modules/llm/managed_ollama_proxy.lua` runs a stage in
+PAC-only network failed. `ai/engine/ollama/managed_ollama_proxy.lua` runs a stage in
 the shared runtime repair before the daemon starts: the shared proxy policy
 routes the registry URL, and only a `system` route calls the owned GIO lookup
 (`core/network/adapters/system_proxy.lua`); the first usable selection becomes `HTTPS_PROXY`
@@ -1121,7 +1121,7 @@ than its first PAC entry.
 ### project-linux-ollama-runs-on-the-owned-port-only
 
 Ergopti's Linux Ollama listens on `llm_ollama_owned_port` (11435), mirrored as
-`infra/llm_bridge.lua` `OLLAMA_OWNED_PORT` and pinned to `defaults.json` by
+`ai/engine/bridge.lua` `OLLAMA_OWNED_PORT` and pinned to `defaults.json` by
 `tools/test/test-linux-llm-defaults-single-source.cjs`. The engine origin feeds
 the repair's serve address (`OLLAMA_HOST`) and its `/api/version` readiness
 probe, so an origin on the stock port 11434 adopted a user's own daemon there;

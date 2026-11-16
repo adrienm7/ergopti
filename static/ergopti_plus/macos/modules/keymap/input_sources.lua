@@ -29,7 +29,7 @@ local install = require("modules.keymap.layout_install")
 local ShellRunner = require("core.process.adapters.shell_runner")
 local TimerScheduler = require("core.events.timer_scheduler")
 local OpenStepPlist = require("core.fs.engine.openstep_plist")
-local PythonInterpreter = require("adapters.python_interpreter")
+local PythonInterpreter = require("ai.adapters.python_interpreter")
 local InputSourceSelector = require("adapters.input_source_selector")
 local LOG     = "menu.keyboard_layout"
 
@@ -910,7 +910,7 @@ local function edit_enabled_list_async(mode, target, display, accepted, on_done)
 	-- offers the install (hardening-h-no-rosetta).
 	local python_bin, python_state = PythonInterpreter.resolve()
 	if not python_bin then
-		require("ui.python_runtime_offer").offer(python_state)
+		require("ai.ui.python_runtime_offer").offer(python_state)
 		invoke_mutation_done(label .. ".done", on_done, false, nil, "python_unavailable")
 		return false
 	end
@@ -1079,7 +1079,7 @@ local function confirm_source_async(keyboard_name, options, on_done)
 	end
 	local python_bin, python_state = PythonInterpreter.resolve()
 	if not python_bin then
-		require("ui.python_runtime_offer").offer(python_state)
+		require("ai.ui.python_runtime_offer").offer(python_state)
 		invoke_mutation_done("confirm_source.done", on_done, false, nil, "python_unavailable")
 		return false
 	end
@@ -1197,7 +1197,7 @@ print(json.dumps({"selected": selected, "enabled": enabled}, sort_keys=True, def
 local function read_sources_state_async(on_done)
 	local python_bin, python_state = PythonInterpreter.resolve()
 	if not python_bin then
-		require("ui.python_runtime_offer").offer(python_state)
+		require("ai.ui.python_runtime_offer").offer(python_state)
 		invoke_mutation_done("sources_state.done", on_done, false, nil, "python_unavailable")
 		return false
 	end

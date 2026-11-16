@@ -17,9 +17,9 @@ helpers.describe("Linux AI menu: trigger application exclusions", function()
 	helpers.it("trigger-apps rows: exclude the last application, list it, remove it", function()
 		Preferences.with(function()
 			local I18n = require("core.i18n.engine.i18n")
-			local Triggers = helpers.load_module("modules.llm.trigger_settings")
+			local Triggers = helpers.load_module("ai.engine.settings.trigger_settings")
 			Triggers._reset()
-			local engine = require("modules.llm.prediction_engine")
+			local engine = require("ai.engine.prediction.engine")
 			-- A fresh builder over the current module state: an earlier test may have
 			-- retired the separator or manifest sources the cached one captured.
 			local MenuBuilder = helpers.load_module("menu.ui.builder.builder")

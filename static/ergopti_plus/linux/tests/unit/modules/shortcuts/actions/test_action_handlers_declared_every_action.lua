@@ -42,7 +42,7 @@ helpers.describe("linux actions: every action this driver declares runs", functi
 			local noop = function() end
 			local script = require("modules.shortcuts.script_actions").new({ reset = noop, reload = noop, quit = noop })
 			local handlers = require("modules.shortcuts.action_handlers").compose(script.handlers,
-				require("modules.shortcuts.manager"), require("modules.llm.prediction_engine"))
+				require("modules.shortcuts.manager"), require("ai.engine.prediction.engine"))
 			Gestures.init({ enabled = false, persist = false, action_handlers = handlers })
 		end)
 		helpers.assert_eq(unknown, {},

@@ -1484,7 +1484,7 @@ M.task = { new = function(_, _)
 	return task
 end }
 -- usercontent is the JavaScript bridge every webview UI builds at module load
--- time (ui/download_window, ui/model_browser, …). Omitting it made those modules
+-- time (ui/download_window, ai/ui/model_browser, …). Omitting it made those modules
 -- unloadable under the harness, so their logic could only ever be source-guarded.
 M.webview = {
 	new = function() return {} end,

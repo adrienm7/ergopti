@@ -71,7 +71,7 @@ end
 --- @param body function Functional test body.
 --- @param options table|nil Initial values and refused-write switch.
 function M.with(body, options)
-	local preferences = require("infra.llm_preferences")
+	local preferences = require("ai.engine.preferences")
 	local old_get, old_set, old_delete = preferences.get, preferences.set, preferences.delete
 	local old_get_with_status = preferences.get_with_status
 	local old_many = preferences.set_many

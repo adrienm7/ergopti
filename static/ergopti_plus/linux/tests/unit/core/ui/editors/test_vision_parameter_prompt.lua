@@ -37,7 +37,7 @@ local function scripted(backend, model)
 end
 
 helpers.describe("screen action vision parameter (linux-vision-choice-list)", function()
-	local Prompt = helpers.load_module("ui.vision_parameter_prompt")
+	local Prompt = helpers.load_module("ai.ui.vision_parameter_prompt")
 
 	helpers.it("(linux-vision-choice-list) picks the backend from the list and keeps its default model", function()
 		local asked, deps = scripted("openai", "")
@@ -86,10 +86,10 @@ helpers.describe("screen action vision parameter (linux-vision-choice-list)", fu
 		local typed, listed, stored = 0, 0, nil
 		local TextPrompt = require("core.ui.ui.text_prompt")
 		local held_ask = TextPrompt.ask
-		local held_prompt = package.loaded["ui.vision_parameter_prompt"]
+		local held_prompt = package.loaded["ai.ui.vision_parameter_prompt"]
 		local held_tx = package.loaded["settings.engine.preferences.program_binding_transaction"]
 		TextPrompt.ask = function() typed = typed + 1; return "openai" end
-		package.loaded["ui.vision_parameter_prompt"] = { ask = function(_, prior)
+		package.loaded["ai.ui.vision_parameter_prompt"] = { ask = function(_, prior)
 			listed = listed + 1; helpers.assert_eq(prior, "local"); return "openai|gpt-4o"
 		end }
 		package.loaded["settings.engine.preferences.program_binding_transaction"] = { pending = function() return false end,
@@ -108,7 +108,7 @@ helpers.describe("screen action vision parameter (linux-vision-choice-list)", fu
 			helpers.assert_eq(Dialogs.assign_parameterized_action({}, gestures, "slot", "screen_read", function() return true end), true)
 		end)
 		TextPrompt.ask = held_ask
-		package.loaded["ui.vision_parameter_prompt"] = held_prompt
+		package.loaded["ai.ui.vision_parameter_prompt"] = held_prompt
 		package.loaded["settings.engine.preferences.program_binding_transaction"] = held_tx
 		if not ok then error(failure, 0) end
 		helpers.assert_eq({ typed, listed, stored }, { 0, 1, "openai|gpt-4o" })

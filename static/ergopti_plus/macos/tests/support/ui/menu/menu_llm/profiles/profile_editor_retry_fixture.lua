@@ -30,7 +30,7 @@ local function with_fixture(options, callback)
 			local saved_json, saved_webview = native.json, native.webview
 			local json = require("core.text.engine.json")
 			local state = { views = {}, bridges = {}, deletes = 0, save_callbacks = {} }
-			local editor_port = package.loaded["ui.prompt_editor"]
+			local editor_port = package.loaded["ai.ui.prompt_editor"]
 			local saved_open, saved_idle = editor_port.open, editor_port.scope_idle
 			local editor
 			local ok, err = xpcall(function()
@@ -59,7 +59,7 @@ local function with_fixture(options, callback)
 						return view
 					end,
 				}
-				editor = assert(loadfile(helpers.driver_root() .. "ui/prompt_editor/init.lua"))()
+				editor = assert(loadfile(helpers.driver_root() .. "ai/ui/prompt_editor/init.lua"))()
 				editor_port.open = function(profile, save)
 					state.save_callbacks[#state.save_callbacks + 1] = save
 					return editor.open(profile, function(value)

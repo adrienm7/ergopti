@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Run by run_keyring_receipts.sh inside a private session bus with a real
 --- gnome-keyring-daemon, an X server and its unlock prompter (gcr-prompter).
---- Drives the production modules/llm/api_token_store.lua through the real
+--- Drives the production ai/engine/settings/api_token_store.lua through the real
 --- secret-tool, never a stand-in:
 ---   1. unlocked: a key is stored and read back byte for byte (UTF-8, and the
 ---      8192-byte stdin capacity exactly), a longer key is refused with no
@@ -21,7 +21,7 @@
 --- Usage: luajit run_keyring_receipts.lua <keyring password>
 --- ==============================================================================
 
-local Store = require("modules.llm.api_token_store")
+local Store = require("ai.engine.settings.api_token_store")
 local Shell = require("core.process.adapters.shell_runner")
 
 local PASSWORD = assert(arg[1], "usage: run_keyring_receipts.lua <keyring password>")

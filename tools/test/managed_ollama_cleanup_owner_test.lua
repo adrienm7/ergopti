@@ -14,10 +14,10 @@ local function check(actual, expected)
 end
 local function with_owned(options, run)
 	options = options or {}
-	local names = { "adapters.managed_ollama_pull", "core.fs.adapters.file_system", "core.crypto.crypto" }
+	local names = { "ai.adapters.managed_ollama_pull", "core.fs.adapters.file_system", "core.crypto.crypto" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-	package.loaded["adapters.managed_ollama_pull"] = nil
+	package.loaded["ai.adapters.managed_ollama_pull"] = nil
 	local files, sequence, cleanup_tasks, fresh_count = {}, 0, {}, 0
 	local handle, adapter, input, allocation, cleanup_hook
 	local directory_closes = 0
@@ -25,7 +25,7 @@ local function with_owned(options, run)
 	local function write(path, raw) assert(files[path]); files[path].raw = raw end
 	package.loaded["core.fs.adapters.file_system"] = {
 		-- No refused proxy sign-in left its receipt: the pull these cases own goes
-		-- ahead (modules/llm/proxy_relay_receipt.lua).
+		-- ahead (ai/engine/api/proxy_relay_receipt.lua).
 		exists = function(path) return not path:find("proxy_relay_refusal", 1, true) end,
 		create_secure_temp_file = function()
 			sequence = sequence + 1
@@ -95,7 +95,7 @@ local function with_owned(options, run)
 			if fresh_count == 1 or options.repeated_nonce then return FRESH end
 			return string.format("abcdef12-abcd-4321-abcd-%012d", fresh_count)
 		end }
-		adapter = require("adapters.managed_ollama_pull")
+		adapter = require("ai.adapters.managed_ollama_pull")
 		local ready
 		handle, ready = adapter.prepare_owned("owned/model:tiny", 11434, "/native/python")
 		if options.imprecise_anchor then check(ready, false); return "" end

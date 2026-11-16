@@ -1,0 +1,190 @@
+--- tests/unit/ai/engine/features/screen_answer/test_capture_admission.lua
+
+--- ==============================================================================
+--- MODULE: Screen Answer Capture Admission Regression
+--- DESCRIPTION:
+--- Drives the actual screen-answer and prediction-engine owners around a delayed
+--- screenshot boundary. A revoked admission must prevent a private image POST;
+--- a replaced capture must not regain authority while opening its loading UI.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local PortFakes = require("tests.support.port_fakes")
+local Json = require("core.text.engine.json")
+
+local MODULES = {
+	"ai.engine.prediction.screen_answer", "ai.engine.prediction.engine", "ai.engine",
+	"ai.engine.local_servers.warmup_controller", "ai.engine.api.streaming_handler",
+	"ai.engine.prediction.prompt_builder", "ai.engine.prediction.app_filter", "ai.engine.api.common",
+	"ai.engine.api.remote", "ai.engine.api.mlx", "ai.engine.api.ollama",
+	"ai.engine.settings.profiles", "modules.keystats", "modules.shortcuts.script_control",
+	"modules.shortcuts.actions.screenshot_save", "core.fs.adapters.file_system",
+	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.events.timer_scheduler",
+	"adapters.mouse_control", "core.logger.engine.logger", "core.timing.engine.timings", "platform.input.keycodes",
+	"core.ui.ui.tooltip", "ai.engine.prediction.vision", "ai.engine.prediction.rewrite", "ai.engine.prediction.prompt_action", "ai.engine.prediction.translate",
+	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
+}
+
+local function with_capture(callback)
+	helpers.with_stub_scope(MODULES, function()
+		local f = { captures = {}, posts = {}, loading = 0, hidden = 0, notices = {}, ready = true, paused = false }
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.fs.adapters.file_system"] = {
+			read = function(path)
+				local file = assert(io.open(path, "rb"))
+				local bytes = assert(file:read("*a"))
+				assert(file:close())
+				return bytes
+			end,
+		}
+		package.loaded["core.fs.adapters.json_codec"] = { decode = Json.decode }
+		package.loaded["core.fs.adapters.storage"] = {
+			-- The real adapter's read and write pair (api_remote's refused thinking fields)
+			get = function() return nil end,
+			read_exact = function() return true, nil end,
+			set = function() return true end,
+		}
+		package.loaded["adapters.mouse_control"] = {
+			screen_frame_under_cursor = function() return { x = 0, y = 0, w = 640, h = 480 } end,
+		}
+		package.loaded["core.events.timer_scheduler"] = PortFakes.timer_scheduler({
+			now = function() return 0 end,
+		})
+		package.loaded["ai.engine"] = {
+			DEFAULT_STATE = { llm_enabled = true, llm_min_words = 1, llm_max_words = 0, llm_debounce = 0, llm_min_request_interval = 0 },
+			get_current_model = function() return "text-model" end,
+			is_backend_ready = function() return f.ready end,
+			set_runtime_llm_enabled = function() return true end,
+			cancel_streaming = function() return true end,
+		}
+		package.loaded["ai.engine.local_servers.warmup_controller"] = {
+			init = function() return true end, stop = function() return true end,
+		}
+		package.loaded["ai.engine.api.streaming_handler"] = {
+			init = function() return true end,
+			reset_failure_count = function() end,
+		}
+		package.loaded["ai.engine.api.mlx"] = { stop_warmup = function() return true end }
+		package.loaded["ai.engine.api.ollama"] = { stop_warmup = function() return true end }
+		package.loaded["ai.engine.api.common"] = {}
+		package.loaded["ai.engine.prediction.prompt_builder"] = {}
+		package.loaded["ai.engine.prediction.app_filter"] = {}
+		package.loaded["modules.keystats"] = {}
+		package.loaded["ai.engine.settings.profiles"] = { prompt_language = function() return "en" end }
+		package.loaded["modules.shortcuts.script_control"] = {
+			is_paused = function() return f.paused end,
+		}
+		package.loaded["ai.engine.api.remote"] = {
+			stop_warmup = function() return true end,
+			vision_provider_status = function() return true end,
+			provider_format = function() return "openai" end,
+			request_vision = function(_, _, body)
+				f.posts[#f.posts + 1] = body
+				return true
+			end,
+		}
+		package.loaded["modules.shortcuts.actions.screenshot_save"] = {
+			capture_image = function(_, _, _, on_image)
+				f.captures[#f.captures + 1] = on_image
+				return true
+			end,
+		}
+		package.loaded["core.ui.ui.tooltip"] = PortFakes.complete_tooltip({
+			set_navigate_callback = function() end,
+			set_enter_validates = function() end,
+			set_llm_timeout = function() end,
+			mark_chain_complete = function() return true end,
+			tint = function() return {} end,
+			hide_forced_silent = function() f.hidden = f.hidden + 1; return true end,
+			show_loading = function()
+				f.loading = f.loading + 1
+				if f.on_loading then f.on_loading() end
+				return true
+			end,
+			show = function(text) f.notices[#f.notices + 1] = text; return true end,
+		})
+		local flow = helpers.load_with_stubs("ai.engine.prediction.screen_answer")
+		package.loaded["core.timing.engine.timings"] = { sec = function() return 0.1 end }
+		package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+		local engine = require("ai.engine.prediction.engine")
+		helpers.assert_true(engine.init({ buffer = "", llm_buffer = "", mappings = {}, DELAYS = {} }))
+		f.flow, f.engine = flow, engine
+		f.start = function()
+			return flow.run("openai|vision-model", flow.MODE_REGION, "gestures", flow.ANSWERS_SCREEN)
+		end
+		callback(f)
+	end)
+end
+
+helpers.describe("screen capture completion revalidates private dispatch", function()
+	for _, change in ipairs({ "AI off", "preview off", "paused", "backend unavailable" }) do
+		helpers.it("never sends a captured image after " .. change, function()
+			with_capture(function(f)
+				helpers.assert_true(f.start())
+				if change == "AI off" then helpers.assert_true(f.engine.set_llm_enabled(false))
+				elseif change == "preview off" then helpers.assert_true(f.engine.set_preview_ai_enabled(false))
+				elseif change == "paused" then f.paused = true
+				else f.ready = false end
+				f.captures[1]("image", "private-image-base64")
+				helpers.assert_eq(#f.posts, 0, "lost admission must prevent private image transport")
+				helpers.assert_eq(f.loading, 0, "a cancelled admission must not reopen its UI")
+			end)
+		end)
+	end
+
+	helpers.it("sends the currently admitted captured image", function()
+		with_capture(function(f)
+			helpers.assert_true(f.start())
+			f.captures[1]("image", "private-image-base64")
+			helpers.assert_eq(#f.posts, 1)
+			helpers.assert_eq(f.loading, 1)
+		end)
+	end)
+
+	helpers.it("keeps a superseded capture from sending or opening UI", function()
+		with_capture(function(f)
+			helpers.assert_true(f.start())
+			helpers.assert_true(f.start())
+			f.captures[1]("image", "old-private-image")
+			helpers.assert_eq(#f.posts, 0)
+			f.captures[2]("image", "new-private-image")
+			helpers.assert_eq(#f.posts, 1)
+			helpers.assert_eq(f.loading, 1)
+		end)
+	end)
+
+	helpers.it("drops a capture reset while its loading UI opens", function()
+		with_capture(function(f)
+			helpers.assert_true(f.start())
+			f.on_loading = function() f.flow.reset() end
+			f.captures[1]("image", "old-private-image")
+			helpers.assert_eq(#f.posts, 0, "UI callbacks can revoke the screen reading before private dispatch")
+			helpers.assert_eq(f.hidden, 1, "a revoked capture closes its loading surface")
+		end)
+	end)
+
+	helpers.it("revalidates admission after opening its loading UI", function()
+		with_capture(function(f)
+			helpers.assert_true(f.start())
+			f.on_loading = function() f.paused = true end
+			f.captures[1]("image", "old-private-image")
+			helpers.assert_eq(#f.posts, 0)
+			helpers.assert_eq(f.hidden, 1, "the refused dispatch releases its own loading surface")
+		end)
+	end)
+
+	helpers.it("preserves the successor surface opened from its loading callback", function()
+		with_capture(function(f)
+			helpers.assert_true(f.start())
+			f.on_loading = function()
+				f.on_loading = nil
+				helpers.assert_true(f.start())
+				f.captures[2]("image", "new-private-image")
+			end
+			f.captures[1]("image", "old-private-image")
+			helpers.assert_eq(#f.posts, 1, "only the successor image is dispatched")
+			helpers.assert_eq(f.loading, 2)
+			helpers.assert_eq(f.hidden, 0, "the superseded callback cannot hide the successor")
+		end)
+	end)
+end)

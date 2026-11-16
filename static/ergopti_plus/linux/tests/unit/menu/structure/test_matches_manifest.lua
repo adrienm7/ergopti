@@ -62,7 +62,7 @@ local RENDERED_TYPES = { action = true, group = true, section_header = true }
 local STATE_GATED_SECTIONS = {
 	-- Drawn only when the user registry holds a profile (llm_profile_custom_present),
 	-- a section header since 2026-11; the profile-headings cases of
-	-- tests/unit/modules/llm/settings/test_profile_preferences_canonical_prompt_profiles.lua
+	-- tests/unit/ai/engine/settings/test_profile_preferences_canonical_prompt_profiles.lua
 	-- draw it, and prove it absent with an empty registry.
 	llm_profile_custom_heading = true,
 }
@@ -121,7 +121,7 @@ end
 -- Fresh backend and builder modules must capture this exact private owner, not
 -- a prior module whose source path or cached entries belong to another test.
 local API_SOURCE_MODULES = {
-	"modules.llm.api_entries", "ui.menu.llm_backend_rows", "menu.ui.builder.builder",
+	"ai.engine.settings.api_entries", "ai.ui.menu.backend_rows", "menu.ui.builder.builder",
 }
 
 --- Builds with a genuine private API source and restores the complete module cohort.
@@ -137,9 +137,9 @@ local function with_api_source(scenario)
 		file = assert(io.open(path, "wb"))
 		assert(file:write(source)); assert(file:close()); file = nil
 		for _, name in ipairs(API_SOURCE_MODULES) do rawset(package.loaded, name, nil) end
-		local entries = require("modules.llm.api_entries")
+		local entries = require("ai.engine.settings.api_entries")
 		entries._set_path_for_test(path)
-		require("ui.menu.llm_backend_rows")
+		require("ai.ui.menu.backend_rows")
 		local builder = require("menu.ui.builder.builder")
 		return scenario(builder, entries, path)
 	end, debug.traceback)
@@ -165,9 +165,9 @@ end
 -- Its profiles read an owned physical neutral source through the real preference
 -- transaction preview; engine initialization and native output are not exercised.
 local LIVE_SOURCE_MODULES = {
-	"infra.llm_preferences", "modules.llm.profile_settings", "modules.llm.prediction_engine",
+	"ai.engine.preferences", "ai.engine.settings.profile_settings", "ai.engine.prediction.engine",
 	-- Settings cache source values, and Agent rows retain that actual module table.
-	"modules.llm.agent_settings", "ui.menu.agent_rows",
+	"ai.engine.settings.agent_settings", "ai.ui.menu.agent_rows",
 }
 
 -- The agent reads on: an off category greys every row of its submenu and drops
@@ -184,13 +184,13 @@ local function with_live_source(context, scenario)
 	local ok, detail = xpcall(function()
 		descriptor = assert(io.open(path, "wb")); assert(descriptor:write(AGENT_ON_SOURCE)); assert(descriptor:close()); descriptor = nil
 		for _, name in ipairs(LIVE_SOURCE_MODULES) do rawset(package.loaded, name, nil) end
-		preferences = require("infra.llm_preferences")
+		preferences = require("ai.engine.preferences")
 		local bytes, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 		assert(status == "ok" and bytes == AGENT_ON_SOURCE)
 		assert(preferences.acquire(owner)); acquired = true
 		assert(preferences.with_configuration(owner, { status = status, content = bytes }, function()
 			-- Independent physical input: the agent on, both systems Off, no model or excluded app.
-			local settings = require("modules.llm.agent_settings")
+			local settings = require("ai.engine.settings.agent_settings")
 			for _, system in ipairs({ "system1", "system2" }) do
 				helpers.assert_eq(settings.get_spec(system), "")
 				local model, reason = settings.resolve(system)
@@ -199,7 +199,7 @@ local function with_live_source(context, scenario)
 			end
 			helpers.assert_eq(#settings.get_disabled_apps(), 0)
 			helpers.assert_eq(settings.get_mode(), "auto")
-			local engine = require("modules.llm.prediction_engine")
+			local engine = require("ai.engine.prediction.engine")
 			assert(engine.get_live() == nil)
 			context.llm.get_live, context.llm.set_live = engine.get_live, engine.set_live
 			result = scenario()
@@ -466,16 +466,16 @@ end
 --- @return function Protected registered test body.
 local function with_uncached_ai_parent(body)
 	return function()
-		local previous = rawget(package.loaded, "ui.menu.ai_parent")
+		local previous = rawget(package.loaded, "ai.ui.menu.parent")
 		local ok, result = xpcall(function()
-			package.loaded["ui.menu.ai_parent"] = nil
+			package.loaded["ai.ui.menu.parent"] = nil
 			body()
-			helpers.assert_nil(rawget(package.loaded, "ui.menu.ai_parent"),
+			helpers.assert_nil(rawget(package.loaded, "ai.ui.menu.parent"),
 				"the inner component journal removes the genuine newly inserted owner")
 		end, debug.traceback)
-		package.loaded["ui.menu.ai_parent"] = previous
+		package.loaded["ai.ui.menu.parent"] = previous
 		if not ok then error(result, 0) end
-		helpers.assert_true(rawequal(rawget(package.loaded, "ui.menu.ai_parent"), previous),
+		helpers.assert_true(rawequal(rawget(package.loaded, "ai.ui.menu.parent"), previous),
 			"the outer finally restores the exact original native owner cache state")
 	end
 end
@@ -486,7 +486,7 @@ end
 --- @param body function Builds with the existing real native builder fixture.
 --- @return table rows
 local function with_actual_ai_parent_probe(body)
-	local owner = require("ui.menu.ai_parent")
+	local owner = require("ai.ui.menu.parent")
 	local begin, agent_calls = owner.begin, 0
 	owner.begin = function(renderer, kind, ...)
 		if kind == "agent" then agent_calls = agent_calls + 1 end
@@ -496,7 +496,7 @@ local function with_actual_ai_parent_probe(body)
 	owner.begin = begin
 	if not ok then error(rows, 0) end
 	helpers.assert_eq(agent_calls, 1, "the fresh actual builder consumes the inserted native Agent owner exactly once")
-	helpers.assert_true(rawequal(rawget(package.loaded, "ui.menu.ai_parent"), owner),
+	helpers.assert_true(rawequal(rawget(package.loaded, "ai.ui.menu.parent"), owner),
 		"the native construction uses the actual newly inserted cache entry")
 	return rows
 end
@@ -738,7 +738,7 @@ end)
 --- The model selector button, at any depth: its title starts with the API
 --- emoji of the shared brand table (the full context selects the API backend).
 local function selector_button(items)
-	local emoji = require("modules.llm.backend_brands").emoji("api")
+	local emoji = require("ai.engine.api.backend_brands").emoji("api")
 	for _, item in ipairs(items or {}) do
 		if type(item.title) == "string" and item.title:sub(1, #emoji) == emoji then return item end
 		local nested = selector_button(item.menu)
@@ -757,13 +757,13 @@ helpers.describe("menu certification: actual API context reachability", function
 		helpers.assert_eq(context.llm.get_backend(), "api")
 		with_api_source(function(mb)
 			local menu = mb.build(context)
-			local remote = require("modules.llm.api_remote")
-			local entries = require("modules.llm.api_entries")
+			local remote = require("ai.engine.api.api_remote")
+			local entries = require("ai.engine.settings.api_entries")
 			-- model-selector-page: the tray holds the one button; the providers
 			-- an entry is added for are the page's.
 			helpers.assert_nil(find_item(menu, i18n.get("menu.llm.api_add_entry")), "the tray lists no API provider")
 			helpers.assert_not_nil(selector_button(menu), "the complete context must reach the model selector button")
-			local page = require("ui.menu.llm_backend_rows").api_page(context.llm,
+			local page = require("ai.ui.menu.backend_rows").api_page(context.llm,
 				{ prompt = function() end, error = function() end, info = function() end, confirm = function() end },
 				function() end, { paused = false, is_paused = function() return false end })
 			local providers = remote.providers()
@@ -776,8 +776,8 @@ helpers.describe("menu certification: actual API context reachability", function
 			helpers.assert_eq(page.providers[1].label, "OpenAI")
 			helpers.assert_eq(page.providers[2].label, "Anthropic")
 			helpers.assert_eq(page.providers[3].label, "Google Gemini")
-			helpers.assert_true(rawequal(remote, package.loaded["modules.llm.api_remote"]))
-			helpers.assert_true(rawequal(entries, package.loaded["modules.llm.api_entries"]))
+			helpers.assert_true(rawequal(remote, package.loaded["ai.engine.api.api_remote"]))
+			helpers.assert_true(rawequal(entries, package.loaded["ai.engine.settings.api_entries"]))
 			helpers.assert_eq(mutations, 0, "building the whole tray must not change the runtime backend")
 		end)
 	end)
@@ -843,7 +843,7 @@ helpers.describe("menu certification: private API source lifecycle", function()
 		local preload = rawget(package.preload, name)
 		local private_path
 		rawset(package.preload, name, function()
-			private_path = assert(rawget(package.loaded, "modules.llm.api_entries")).path()
+			private_path = assert(rawget(package.loaded, "ai.engine.settings.api_entries")).path()
 			error("private builder construction sentinel")
 		end)
 		local ok, detail = pcall(function() build_full_menu(full_context()) end)
@@ -1050,13 +1050,13 @@ local function with_control_trigger_source(scenario, source)
 	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 	Sandbox.with_config(source or ('# hand trigger source\n[llm]\nenabled = true\n[llm.models]\nselected = "api"\n'
 		.. '[llm.trigger]\ndebounce_ms = 500\nfuture = "keep exact" # retained\n'), function(path)
-		local names = { "infra.llm_preferences", "modules.llm.trigger_settings" }
+		local names = { "ai.engine.preferences", "ai.engine.settings.trigger_settings" }
 		local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name); rawset(package.loaded, name, nil) end
 		local Paths = require("settings.engine.paths")
 		local original = Paths.config
 		Paths.config = function(relative) helpers.assert_eq(relative, "config.toml"); return path end
 		local ok, detail = xpcall(function()
-			local settings = require("modules.llm.trigger_settings")
+			local settings = require("ai.engine.settings.trigger_settings")
 			scenario(settings, path, Sandbox)
 		end, debug.traceback)
 		Paths.config = original
@@ -1165,7 +1165,7 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 	end)
 
 	helpers.it("restores original source-routing and module identities after raised native construction (llm-control-boundaries)", function()
-		local names = { "infra.llm_preferences", "modules.llm.trigger_settings" }
+		local names = { "ai.engine.preferences", "ai.engine.settings.trigger_settings" }
 		local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
 		local Paths = require("settings.engine.paths"); local original = Paths.config
 		local path
@@ -1320,12 +1320,12 @@ helpers.describe("Whole LLM tray genuine live owner scope", function()
 					local survived, result = pcall(function()
 						return with_live_source(context, function()
 							ran = true
-							local engine = assert(rawget(package.loaded, "modules.llm.prediction_engine"))
+							local engine = assert(rawget(package.loaded, "ai.engine.prediction.engine"))
 							helpers.assert_true(rawequal(context.llm.get_live, engine.get_live))
 							helpers.assert_true(rawequal(context.llm.set_live, engine.set_live))
 							helpers.assert_nil(context.llm.get_live())
 							helpers.assert_eq(context.llm.set_live(nil), true)
-							local values, source = require("infra.llm_preferences").get_many({ "llm.profiles.num_predictions" })
+							local values, source = require("ai.engine.preferences").get_many({ "llm.profiles.num_predictions" })
 							helpers.assert_eq(source.content, AGENT_ON_SOURCE)
 							helpers.assert_type(values["llm.profiles.num_predictions"], "number")
 							if raises then error("actual live scope sentinel") end
@@ -1544,12 +1544,12 @@ helpers.describe("menu certification: current disabled public Agent policy", fun
 				helpers.assert_eq(declaration.disabled, true, "the current public source explicitly disables Agent")
 				helpers.assert_eq(declaration.i18n, "menu.agent.title")
 				helpers.assert_eq(declaration.reason_key, "menu.agent.not_ready")
-				for _, name in ipairs({ "modules.llm.prediction_engine", "modules.llm.agent_settings",
-					"menu.ui.builder.builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }) do
+				for _, name in ipairs({ "ai.engine.prediction.engine", "ai.engine.settings.agent_settings",
+					"menu.ui.builder.builder", "ai.ui.menu.agent_rows", "ai.ui.menu.parent" }) do
 					package.loaded[name] = nil
 				end
 				require("tests.support.llm_preferences_fixture").with(function()
-					local engine = require("modules.llm.prediction_engine")
+					local engine = require("ai.engine.prediction.engine")
 					local context = { llm = engine, paused = state == "paused",
 						on_quit = function() end, on_menu_changed = function() end }
 					context.is_paused = function() return context.paused end

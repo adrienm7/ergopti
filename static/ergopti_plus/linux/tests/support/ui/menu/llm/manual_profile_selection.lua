@@ -25,7 +25,7 @@ function M.assert_selection(helpers)
 	for _, kind in ipairs({ "active", "absent", "stop_refused", "stop_throws", "stop_stale",
 		"read_throws", "missing", "save_refused", "foreign_root", "foreign_during_stop" }) do
 		Fixture.with_configuration(function(f)
-			local settings = require("modules.llm.profile_settings")
+			local settings = require("ai.engine.settings.profile_settings")
 			assert(settings.save_user_profile({ id = "user_manual", label = "Manual contract",
 				system_single = "Continue.", batch = false }, false, false))
 			local baseline = f.bytes("a")

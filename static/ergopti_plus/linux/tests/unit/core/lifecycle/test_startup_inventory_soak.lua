@@ -20,8 +20,8 @@ local function fixture(options)
 	options = options or {}
 	local world = { now = 0, runs = 0, sleeps = 0, closing = false, closed = false, expired = false, reads = 0 }
 	local profiles = {}
-	local loaded = { ["modules.llm.profiles"] = profiles }
-	if options.no_owner then loaded["modules.llm.profiles"] = nil end
+	local loaded = { ["ai.engine.settings.profiles"] = profiles }
+	if options.no_owner then loaded["ai.engine.settings.profiles"] = nil end
 	local uv = {
 		hrtime = function() return world.now end,
 		sleep = function(ms)
@@ -33,7 +33,7 @@ local function fixture(options)
 	local env = setmetatable({ clock_seconds = 0, SOAK_SECONDS = 30, package = { loaded = loaded } }, { __index = _G })
 	profiles.model_inventory_pending = function()
 		world.reads = world.reads + 1
-		if options.read_replaces_owner then loaded["modules.llm.profiles"] = {} end
+		if options.read_replaces_owner then loaded["ai.engine.settings.profiles"] = {} end
 		if options.non_boolean then return "false" end
 		return not world.closed
 	end
@@ -45,8 +45,8 @@ local function fixture(options)
 		helpers.assert_eq(mode, "nowait")
 		world.runs = world.runs + 1
 		world.closing = true
-		if options.replace_owner then loaded["modules.llm.profiles"] = {} end
-		if options.remove_owner then loaded["modules.llm.profiles"] = nil end
+		if options.replace_owner then loaded["ai.engine.settings.profiles"] = {} end
+		if options.remove_owner then loaded["ai.engine.settings.profiles"] = nil end
 		if options.replace_api then profiles.model_inventory_pending = function() return false end end
 		if options.exhaust or options.late_ack then world.now = 30 * 1e9 end
 		if options.late_ack then world.closed = true end

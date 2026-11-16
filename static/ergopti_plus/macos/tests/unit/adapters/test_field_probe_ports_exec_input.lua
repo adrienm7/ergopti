@@ -6,7 +6,7 @@
 --- The launcher's HTTP worker reads its JSON request on stdin to EOF, and
 --- xmllint reads a whole layout there. hs.task queues setInput bytes written
 --- BEFORE the start and closes stdin itself, on a task with no streaming
---- callback (modules/llm/api_token_crypto.lua relies on it). Writing after the
+--- callback (ai/engine/api/token_crypto.lua relies on it). Writing after the
 --- start lost the request (exit_64:not_reached on 2026-10-30 20:51 and 21:53)
 --- and cut layouts short (keylayout_xml refused_7_of_8). The port must queue
 --- the input before the start, never stream, never call closeInput.

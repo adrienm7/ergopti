@@ -29,11 +29,11 @@ const read = (relative) => fs.readFileSync(path.join(SP, relative), 'utf8');
 
 const SOURCES = {
 	page: read('_shared/ui/model_browser/script.js'),
-	macBridge: read('macos/ui/model_browser/init.lua'),
-	macPage: read('macos/ui/menu/menu_llm/model_selector_page.lua'),
-	linuxBridge: read('linux/ui/model_browser/bridge.lua'),
-	linuxRows: read('linux/ui/menu/llm_backend_rows.lua'),
-	windows: read('windows/ui/model_browser/init.ahk')
+	macBridge: read('macos/ai/ui/model_browser/init.lua'),
+	macPage: read('macos/ai/ui/menu/models/selector_page.lua'),
+	linuxBridge: read('linux/ai/ui/model_browser/bridge.lua'),
+	linuxRows: read('linux/ai/ui/menu/backend_rows.lua'),
+	windows: read('windows/ai/ui/model_browser/init.ahk')
 };
 
 /** The distinct first captures of a pattern. */

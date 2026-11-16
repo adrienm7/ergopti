@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: Model Selector API Listing and Ollama Install State (Linux)
 --- DESCRIPTION:
---- Drives the real page rows (ui/menu/llm_backend_rows.lua api_page), the real
---- install state (modules/llm/ollama_install_state.lua) and the real listing
---- request (modules/llm/api_remote.lua list_models) with doubles at their
+--- Drives the real page rows (ai/ui/menu/backend_rows.lua api_page), the real
+--- install state (ai/engine/ollama/install_state.lua) and the real listing
+--- request (ai/engine/api/api_remote.lua list_models) with doubles at their
 --- outer boundaries.
 ---
 --- ROOT CAUSE ENCODED:
@@ -17,8 +17,8 @@
 
 local helpers = require("tests.helpers")
 
-local SAVED = { "modules.llm.api_remote", "modules.llm.api_entries", "ui.menu.llm_backend_rows",
-	"ui.menu.local_server_rows", "modules.llm.ollama_install_state", "core.network.adapters.http_client" }
+local SAVED = { "ai.engine.api.api_remote", "ai.engine.settings.api_entries", "ai.ui.menu.backend_rows",
+	"ai.ui.menu.local_server_rows", "ai.engine.ollama.install_state", "core.network.adapters.http_client" }
 
 --- Runs a body with doubles of the API owners the page rows read.
 --- @param opts table { model, listings }
@@ -28,7 +28,7 @@ local function with_rows(opts, body)
 	for _, name in ipairs(SAVED) do saved[name] = package.loaded[name] end
 	local calls = { set_model = {}, set_active = {}, backend = {} }
 	local entry = { id = "e1", provider = "openai", label = "x", token = "sk-secret", model = opts.model or "gpt-4o", base_url = "" }
-	package.loaded["modules.llm.api_remote"] = {
+	package.loaded["ai.engine.api.api_remote"] = {
 		provider = function(id)
 			if id ~= "openai" then return nil end
 			return { id = "openai", label = "OpenAI", base_url = "https://api.openai.com/v1", default_model = "gpt-4o-mini",
@@ -38,7 +38,7 @@ local function with_rows(opts, body)
 		serves = function() return true end,
 		token_allowed = function() return true end,
 	}
-	package.loaded["modules.llm.api_entries"] = {
+	package.loaded["ai.engine.settings.api_entries"] = {
 		active = function() return opts.current or entry end,
 		list = function() return { opts.current or entry } end,
 		set_active = function(id) calls.set_active[#calls.set_active + 1] = id; return true end,
@@ -47,9 +47,9 @@ local function with_rows(opts, body)
 		set_token = function(id, token) calls.set_token = id .. ":" .. token; return true end,
 		remove = function(id) calls.removed = id; return true end,
 	}
-	package.loaded["ui.menu.llm_backend_rows"] = nil
+	package.loaded["ai.ui.menu.backend_rows"] = nil
 	local ok, err = xpcall(function()
-		local Rows = require("ui.menu.llm_backend_rows")
+		local Rows = require("ai.ui.menu.backend_rows")
 		local dialogs = {
 			prompt = function() return opts.typed or "" end,
 			error = function() calls.error = true end,
@@ -95,7 +95,7 @@ helpers.describe("model selector API listing on Linux", function()
 		with_rows({}, function(Rows, calls, dialogs)
 			local owner = function() return true end
 			local captured
-			package.loaded["ui.menu.local_server_rows"] = { page_rows = function(_, _, _, context)
+			package.loaded["ai.ui.menu.local_server_rows"] = { page_rows = function(_, _, _, context)
 				captured = context
 				return {}, {}
 			end }
@@ -206,7 +206,7 @@ helpers.describe("model selector API listing on Linux", function()
 
 	helpers.it("(model-selector-api-listing) list_models maps answers and keeps the key out of the log", function()
 		local saved = package.loaded["core.network.adapters.http_client"]
-		local saved_remote = package.loaded["modules.llm.api_remote"]
+		local saved_remote = package.loaded["ai.engine.api.api_remote"]
 		local answers, requests = {}, {}
 		package.loaded["core.network.adapters.http_client"] = setmetatable({
 			get = function(url, headers, options, callback)
@@ -215,9 +215,9 @@ helpers.describe("model selector API listing on Linux", function()
 				return true
 			end,
 		}, { __index = saved })
-		package.loaded["modules.llm.api_remote"] = nil
+		package.loaded["ai.engine.api.api_remote"] = nil
 		local ok, err = xpcall(function()
-			local Remote = require("modules.llm.api_remote")
+			local Remote = require("ai.engine.api.api_remote")
 			local entry = { id = "e1", provider = "openai", token = "sk-secret", model = "gpt-4o", base_url = "" }
 			local got = {}
 			local function done(state) got[#got + 1] = state end
@@ -240,7 +240,7 @@ helpers.describe("model selector API listing on Linux", function()
 			helpers.assert_eq(got[5].reason, "unsupported")
 		end, debug.traceback)
 		package.loaded["core.network.adapters.http_client"] = saved
-		package.loaded["modules.llm.api_remote"] = saved_remote
+		package.loaded["ai.engine.api.api_remote"] = saved_remote
 		assert(ok, err)
 	end)
 end)
@@ -260,7 +260,7 @@ helpers.describe("Ollama install state on Linux", function()
 	end
 
 	helpers.it("(linux-ollama-install-state) greys an absent or failed runtime with its reason", function()
-		local State = helpers.load_module("modules.llm.ollama_install_state")
+		local State = helpers.load_module("ai.engine.ollama.install_state")
 		local cases = {
 			{ fields = {}, available = false, cause = "absent" },
 			{ fields = { managed = "installed" }, available = true, cause = "installed" },
@@ -279,7 +279,7 @@ helpers.describe("Ollama install state on Linux", function()
 	end)
 
 	helpers.it("(linux-ollama-install-state) a failed repair greys Ollama until the next success", function()
-		local State = helpers.load_module("modules.llm.ollama_install_state")
+		local State = helpers.load_module("ai.engine.ollama.install_state")
 		State._reset()
 		local live = ports({ managed = "installed" })
 		live.failure = State.failure
@@ -298,7 +298,7 @@ helpers.describe("Ollama install state on Linux", function()
 	-- docs/design/proxy-auth-relay.md: a refused proxy sign-in leaves the models on
 	-- disk usable, and names its own fix on the pull alone.
 	helpers.it("(proxy-auth-relay) a refused proxy sign-in keeps Ollama usable and refuses the pull with the relay's message", function()
-		local State = helpers.load_module("modules.llm.ollama_install_state")
+		local State = helpers.load_module("ai.engine.ollama.install_state")
 		State._reset()
 		local live = ports({ managed = "installed" })
 		live.failure = State.failure
@@ -338,10 +338,10 @@ helpers.describe("Ollama install state on Linux", function()
 		helpers.assert_true(code:find('backend_entry("ollama", { available = blocked == nil and ollama_ok, reason_key = blocked or ollama_reason', 1, true) ~= nil,
 			"the Ollama group is greyed with the state's reason")
 		local bind = assert(helpers.read_driver_unit("local function save_failed("))
-		helpers.assert_true(bind:find('require("modules.llm.ollama_install_state").capture(engine)', 1, true) ~= nil,
+		helpers.assert_true(bind:find('require("ai.engine.ollama.install_state").capture(engine)', 1, true) ~= nil,
 			"the menu binds the real install state")
 		local engine_code = assert(helpers.read_driver_unit("local function SYSTEM_CLOCK("))
-		helpers.assert_true(engine_code:find('require("modules.llm.ollama_install_state").note_repair(result)', 1, true) ~= nil,
+		helpers.assert_true(engine_code:find('require("ai.engine.ollama.install_state").note_repair(result)', 1, true) ~= nil,
 			"the owned repair records its result")
 	end)
 end)

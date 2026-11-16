@@ -68,7 +68,8 @@ const DRIVER_SUBDIRS = [
 	'core',
 	'settings',
 	'menu',
-	'tray'
+	'tray',
+	'ai'
 ];
 
 /** Supported target languages. */

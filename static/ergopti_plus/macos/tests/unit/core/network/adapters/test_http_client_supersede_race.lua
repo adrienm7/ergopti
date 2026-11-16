@@ -8,7 +8,7 @@
 --- _cancelled unconditionally for the new one — but cancel() cannot GUARANTEE
 --- the underlying hs.http.asyncPost/asyncGet has not already queued its OS-level
 --- completion before cancel() runs. Two backends share exactly this pattern
---- (modules/llm/api_ollama.lua's warmup() and post_and_parse() both post()
+--- (ai/engine/api/ollama.lua's warmup() and post_and_parse() both post()
 --- through the same _infer_client instance) — a superseded warmup POST's stale
 --- callback firing after a newer real-inference POST has reused the shared
 --- slots would deliver a wrong/stale result to the wrong caller.

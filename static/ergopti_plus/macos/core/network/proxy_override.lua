@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Debug > proxy for downloads: runs the shared edit flow
 --- (core/network/engine/proxy_override.lua) over this driver's dialogs and settings store.
---- The download preludes (modules/llm/network_env.lua) read the stored value
+--- The download preludes (ai/engine/api/network_env.lua) read the stored value
 --- each time a download starts, so a change applies to the next download.
 --- ==============================================================================
 
@@ -15,7 +15,7 @@ local Dialog = require("core.ui.engine.dialog_util")
 local I18n = require("core.i18n.engine.i18n")
 local Logger = require("core.logger.engine.logger")
 local Storage = require("core.fs.adapters.storage")
-local NetworkEnv = require("modules.llm.network_env")
+local NetworkEnv = require("ai.engine.api.network_env")
 local Override = require("core.network.engine.proxy_override")
 
 local LOG = "core.network.proxy_override"

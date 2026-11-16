@@ -122,11 +122,11 @@ names the closed reason; only the pull is refused, with that reason's message.
   daemon is started under `run`. On a refusal the repair result carries
   `relay_refusal` and `ollama_install_state` holds it for that daemon's origin;
   `model_download` refuses there, and on its retry.
-- macOS: the stock daemon start (`modules/llm/ollama_server_command.lua`) runs
+- macOS: the stock daemon start (`ai/engine/ollama/server_command.lua`) runs
   `ollama serve` through `run_with_proxy_sign_in_relay` (`network-retry.sh`),
   which probes the relay the system settings named and, on `required`, starts
   the daemon under `run`. The receipt is a file each start removes first
-  (`modules/llm/proxy_relay_receipt.lua`), read by the pull of a daemon Ergopti
+  (`ai/engine/api/proxy_relay_receipt.lua`), read by the pull of a daemon Ergopti
   started; the user's own Ollama has its own network settings and is not refused.
   The Debug network check reports the same probe (`proxy_relay`). The Swift-owned
   managed daemon (`managed_ollama_serve.py`) does not use the relay yet, so it has

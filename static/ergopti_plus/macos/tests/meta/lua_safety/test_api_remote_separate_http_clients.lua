@@ -24,8 +24,8 @@ helpers.describe("api_remote.lua separates inference and check clients", functio
 	-- =====================================================================
 
 	helpers.it("api_remote.lua must use separate _infer_client and _check_client", function()
-		local src = read_src("local function load_api_providers") -- modules/llm/api_remote.lua
-		assert(src, "modules/llm/api_remote.lua must be readable")
+		local src = read_src("local function load_api_providers") -- ai/engine/api/remote.lua
+		assert(src, "ai/engine/api/remote.lua must be readable")
 		-- The bug: single HttpClient used for both POST inference and GET health-checks.
 		-- http_client.lua cancels the in-flight request on every new call, so a
 		-- background ping would silently abort a user's LLM completion.

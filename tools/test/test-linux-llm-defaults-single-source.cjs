@@ -54,7 +54,7 @@ function esc(v) {
 const errors = [];
 
 // ── 1. linux_bridge mirrors must equal the canonical values ───────────────
-const bridge = stripLua(read('linux/infra/llm_bridge.lua'));
+const bridge = stripLua(read('linux/ai/engine/bridge.lua'));
 const bridgeChecks = [
 	['OLLAMA_OWNED_PORT', DEFAULTS.llm_ollama_owned_port, 'defaults.json llm_ollama_owned_port'],
 	['OLLAMA_STOCK_PORT', DEFAULTS.llm_ollama_port, 'defaults.json llm_ollama_port'],
@@ -101,7 +101,7 @@ if (/M\.CONTEXT_TAIL_WORDS\s*=\s*\d/.test(bridge)) {
 }
 
 // ── 2. prediction_engine must not re-type the old divergent literals ──────
-const pred = stripLua(read('linux/modules/llm/prediction_engine.lua'));
+const pred = stripLua(read('linux/ai/engine/prediction/engine.lua'));
 const predForbidden = [
 	[/temperature\s*=\s*0\.3\b/, 'temperature 0.3 (use HttpBridge.DEFAULT_TEMPERATURE)'],
 	[/max_tokens\s*=\s*200\b/, 'max_tokens 200 (use PromptBuilder.DEFAULT_MAX_TOKENS)'],
@@ -119,7 +119,7 @@ for (const ref of ['HttpBridge', 'PromptBuilder']) {
 }
 
 // ── 3. model browser must not own or re-type the Ollama endpoint ─────────
-const modelBrowser = stripLua(read('linux/ui/model_browser/bridge.lua'));
+const modelBrowser = stripLua(read('linux/ai/ui/model_browser/bridge.lua'));
 if (/localhost:11434/.test(modelBrowser)) {
 	errors.push(
 		'model_browser_bridge.lua: forbidden hardcoded URL — the prediction engine owns endpoint resolution'
@@ -127,21 +127,21 @@ if (/localhost:11434/.test(modelBrowser)) {
 }
 
 // ── 4. profiles must resolve port/host from the shared bridge ─────────────
-const profiles = stripLua(read('linux/modules/llm/profiles.lua'));
+const profiles = stripLua(read('linux/ai/engine/settings/profiles.lua'));
 for (const ref of ['HttpBridge.OLLAMA_OWNED_PORT', 'HttpBridge.OLLAMA_DEFAULT_HOST']) {
 	if (!profiles.includes(ref)) errors.push(`profiles.lua: must resolve endpoint via ${ref}`);
 }
 
 // ── 4. macOS Ollama backend must read keep_alive from the shared default ──
-const macOllama = stripLua(read('macos/modules/llm/api_ollama.lua'));
+const macOllama = stripLua(read('macos/ai/engine/api/ollama.lua'));
 if (/keep_alive\s*=\s*"30m"/.test(macOllama)) {
 	errors.push(
-		'macos/modules/llm/api_ollama.lua: keep_alive "30m" literal — use ApiCommon.OLLAMA_KEEP_ALIVE'
+		'macos/ai/engine/api/ollama.lua: keep_alive "30m" literal — use ApiCommon.OLLAMA_KEEP_ALIVE'
 	);
 }
 if (!macOllama.includes('ApiCommon.OLLAMA_KEEP_ALIVE')) {
 	errors.push(
-		'macos/modules/llm/api_ollama.lua: must read keep_alive from ApiCommon.OLLAMA_KEEP_ALIVE'
+		'macos/ai/engine/api/ollama.lua: must read keep_alive from ApiCommon.OLLAMA_KEEP_ALIVE'
 	);
 }
 
@@ -164,17 +164,17 @@ const readsKey = (src, key) =>
 const TYPED_DEADLINE = /--max-time \d|timeout_ms\s*=\s*\d|\b(?:30000|180000)\b/;
 const deadlineOwners = [
 	{
-		file: 'linux/modules/llm/api_ollama.lua',
+		file: 'linux/ai/engine/api/api_ollama.lua',
 		key: 'ollama_request_timeout_ms',
 		other: 'request_timeout_ms'
 	},
 	{
-		file: 'macos/modules/llm/api_ollama.lua',
+		file: 'macos/ai/engine/api/ollama.lua',
 		key: 'ollama_request_timeout_ms',
 		other: 'request_timeout_ms'
 	},
 	{
-		file: 'linux/modules/llm/api_remote.lua',
+		file: 'linux/ai/engine/api/api_remote.lua',
 		key: 'request_timeout_ms',
 		other: 'ollama_request_timeout_ms'
 	}

@@ -19,7 +19,7 @@ class ColdReceiptTests(unittest.TestCase):
         self.root = tempfile.TemporaryDirectory()
         self.addCleanup(self.root.cleanup)
         driver = Path(self.root.name) / "driver"
-        source = driver / "modules/llm/ensure-mlx-deps.sh"
+        source = driver / "ai/engine/ensure-mlx-deps.sh"
         source.parent.mkdir(parents=True)
         source.write_text("independent source bytes\n")
         self.config = {

@@ -132,8 +132,8 @@ local function load_fixture(opts)
 	}) do
 		package.loaded[module_name] = {}
 	end
-	package.loaded["ui.menu.menu_llm"] = { create = function() return {} end }
-	package.loaded["modules.llm"] = { set_backend = noop }
+	package.loaded["ai.ui.menu"] = { create = function() return {} end }
+	package.loaded["ai.engine"] = { set_backend = noop }
 	package.loaded["modules.keystats"] = {}
 	local shortcuts = {
 		is_paused = function() return false end,
