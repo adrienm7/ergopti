@@ -37,7 +37,7 @@ _ITG_ReadSource(FileName) {
 ; ===================================================
 
 _ITG_IngestHasIdleGuards() {
-	Src := _ITG_ReadSource("keystats.ahk")
+	Src := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("KL_MarkSynthetic"), "UTF-8"))
 	Body := _DriverFuncBody("KL_IngestOnce")
 	Assert(Body != "", "KL_IngestOnce must exist in keystats.ahk")
 	

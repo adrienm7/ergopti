@@ -38,7 +38,7 @@ _TLTBM_StripLineComments(Src) {
 ; ==============================================================
 
 _TLTBM_TokenBudgetMin5() {
-	Src := _TLTBM_StripLineComments(_TLTBM_ReadSource("prediction_engine.ahk"))
+	Src := _TLTBM_StripLineComments(_DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("LLM_BackendCapabilities"), "UTF-8")))
 	Assert(Src != "", "modules/llm/prediction_engine.ahk must be readable")
 
 	Body := _DriverFuncBody("_LLM_Engine_CallTokenBudget")

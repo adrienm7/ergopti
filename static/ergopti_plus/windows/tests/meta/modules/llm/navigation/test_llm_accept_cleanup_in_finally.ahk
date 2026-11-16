@@ -91,7 +91,7 @@ Test("llm_bridge: acceptance owns no queue-wide prefix guard (llm-accept-cleanup
 ; The inline auto-type path in LLM_Engine_OnResults has the same invariant:
 ; the cleanup timers must be in a finally block, not inline after TextSend.
 _LACF_EngineHasFinally() {
-	Src := _LACF_ReadSource("prediction_engine.ahk")
+	Src := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("LLM_BackendCapabilities"), "UTF-8"))
 	Body := _DriverFuncBody("LLM_Engine_OnResults")
 	Assert(Body != "", "LLM_Engine_OnResults must exist in modules/llm/prediction_exec.ahk")
 	Assert(InStr(Body, "_LLM_Bridge_InjectionOptions(Transaction)") > 0
@@ -101,7 +101,7 @@ _LACF_EngineHasFinally() {
 Test("prediction_engine: inline accept delegates cleanup to sender completion (llm-accept-cleanup-in-finally)", _LACF_EngineHasFinally)
 
 _LACF_EngineKLClearInFinally() {
-	Src := _LACF_ReadSource("prediction_engine.ahk")
+	Src := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("LLM_BackendCapabilities"), "UTF-8"))
 	Body := _DriverFuncBody("LLM_Engine_OnInlineInjectComplete")
 	Producer := _DriverFuncBody("LLM_Engine_OnResults")
 	Assert(InStr(Body, "if !Ok") > 0,

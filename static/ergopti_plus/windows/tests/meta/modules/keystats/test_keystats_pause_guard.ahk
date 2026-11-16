@@ -47,7 +47,7 @@ _KLPG_ReadSource(FileName) {
 ; ==================================================
 
 _KLPG_AppendLogHasPauseGuard() {
-	Src := _KLPG_ReadSource("keystats.ahk")
+	Src := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("KL_MarkSynthetic"), "UTF-8"))
 	Seg := _DriverFuncBody("KL_AppendLog")
 	Assert(Seg != "", "KL_AppendLog(entry) declaration must exist in keystats.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
@@ -56,7 +56,7 @@ _KLPG_AppendLogHasPauseGuard() {
 Test("keystats: KL_AppendLog has an A_IsSuspended pause guard (chokepoint)", _KLPG_AppendLogHasPauseGuard)
 
 _KLPG_AppendLogExemptsSystemEvent() {
-	Src := _KLPG_ReadSource("keystats.ahk")
+	Src := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("KL_MarkSynthetic"), "UTF-8"))
 	Seg := _DriverFuncBody("KL_AppendLog")
 	Assert(InStr(Seg, "system_event") > 0,
 		"KL_AppendLog pause guard must exempt type system_event so the pause/resume lifecycle markers still log while suspended")

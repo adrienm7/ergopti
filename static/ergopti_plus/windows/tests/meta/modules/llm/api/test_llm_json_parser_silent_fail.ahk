@@ -24,7 +24,7 @@ _TLJ_Check() {
 	; (provider-error-prefix): a cut surrogate pair would corrupt the log line.
 	Assert(InStr(Body, "TextHeadWithinUnits(raw, 200)") > 0, "LLM_ParseOllamaChatResponse must log the raw response payload")
 
-	Src2 := _TLJ_ReadSource("models.ahk")
+	Src2 := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("LLM_GetModelPresets"), "UTF-8"))
 	Assert(Src2 != "", "Source file models.ahk must exist")
 	Assert(InStr(Src2, "TextHeadWithinUnits(raw, 200)") > 0, "models.ahk must log the raw response payload")
 }

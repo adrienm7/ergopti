@@ -47,7 +47,7 @@ _KLFA_StripComments(Src) {
 }
 
 _KLFA_FlushBufferCritical() {
-	Raw := _KLFA_ReadSource("keystats.ahk")
+	Raw := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("KL_MarkSynthetic"), "UTF-8"))
 	Src := _KLFA_StripComments(Raw)
 	Body := _DriverFuncBody("KL_FlushBuffer")
 	Assert(Body != "", "KL_FlushBuffer() must exist in modules/keystats/keystats.ahk")

@@ -46,7 +46,7 @@ _LPBN_ReadSource(FileName) {
 ; ===================================================
 
 _LPBN_CheckGuardRejectsObjects() {
-	Src := _LPBN_ReadSource("models.ahk")
+	Src := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("LLM_GetModelPresets"), "UTF-8"))
 	Assert(Src != "", "modules/llm/models.ahk must be readable")
 
 	Body := _DriverFuncBody("_LLM_ParseBillions")
@@ -62,7 +62,7 @@ _LPBN_CheckGuardRejectsObjects() {
 }
 
 _LPBN_CheckGuardComesBeforeRegExMatch() {
-	Src := _LPBN_ReadSource("models.ahk")
+	Src := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("LLM_GetModelPresets"), "UTF-8"))
 	Assert(Src != "", "modules/llm/models.ahk must be readable")
 
 	Body := _DriverFuncBody("_LLM_ParseBillions")
