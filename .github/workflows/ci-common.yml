@@ -184,7 +184,7 @@ jobs:
       - name: Install native integration tools
         timeout-minutes: 10
         run: |
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 lua-luv libxml2-utils luajit sqlite3
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 lua-luv libxml2-utils luajit sqlite3 nsis
 
       - name: Run shared integration suite
         env:
