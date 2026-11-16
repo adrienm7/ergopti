@@ -175,7 +175,7 @@ class HintSelection(unittest.TestCase):
         self.binary = self.directory / "ollama"
         self.binary.write_bytes(b"provisional executable, deliberately not native authority")
         self.binary.chmod(0o755)
-        (self.driver / "modules/llm").mkdir(parents=True)
+        (self.driver / "ai/engine").mkdir(parents=True)
         self.retry = self.driver / "ai/engine/network-retry.sh"
         self.retry.write_bytes(
             b"CURL_CONNECT_TIMEOUT_SEC=30\nCURL_STALL_SEC=60\nCURL_MAX_TIME_SEC=600\n"
@@ -313,7 +313,7 @@ class IsolatedBytecodeControls(unittest.TestCase):
             ROOT / "static/ergopti_plus/macos/ai/adapters/managed_ollama_hint.lua"
         ).read_text()
         matched = re.search(
-            r'pcall\(ShellRunner\.spawn, python, \{\s*"([^"]+)", driver \.\. "/modules/llm/managed_ollama_hint\.py"',
+            r'pcall\(ShellRunner\.spawn, python, \{\s*"([^"]+)", driver \.\. "/ai/engine/ollama/managed_ollama_hint\.py"',
             source,
         )
         self.assertIsNotNone(matched)

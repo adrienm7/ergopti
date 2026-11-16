@@ -62,7 +62,7 @@ local function fresh(options)
 		created = created + 1
 		if configuration.construct_delay then now = now + configuration.construct_delay end
 		check(executable, "/actual/native/python"); check(arguments[1], "-IB")
-		check(arguments[2], driver .. "/modules/llm/managed_ollama_hint.py"); check(chunk, nil); check(env, nil); check(private, true)
+		check(arguments[2], driver .. "/ai/engine/ollama/managed_ollama_hint.py"); check(chunk, nil); check(env, nil); check(private, true)
 		if configuration.construct_throw then error("controlled constructor refusal") end
 		local handle = { arguments = arguments, retired = configuration.pre_retired == true, observers = {}, start_count = 0, stops = 0 }
 		handle.isSettled = function() return handle.retired end

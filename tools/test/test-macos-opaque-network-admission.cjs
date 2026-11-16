@@ -408,7 +408,7 @@ function receivingNetworkSource(fixturePolicy) {
 		// the host Lua file-name convention. No NetworkEnv method is replaced.
 		`package.loaded["core.fs.adapters.file_system"] = { exists = function(p) return p == ${luaString(shellPath(managedReceiver))} end,
 			read_with_status = function(p) if p:match("/core/network/data/route_origins%.json$") then return ${luaString(fs.readFileSync(path.join(root, 'static/ergopti_plus/_shared/core/network/data/route_origins.json'), 'utf8'))}, "ok" end return nil, "missing" end }`,
-		`local Network = assert(load(${luaString(networkSource)}, ${luaString('@' + shellPath(managedRoot) + '/modules/llm/network_env.lua')}))()`,
+		`local Network = assert(load(${luaString(networkSource)}, ${luaString('@' + shellPath(managedRoot) + '/ai/engine/api/network_env.lua')}))()`,
 		`Network.policy_path = function() return ${luaString(shellPath(fixturePolicy))} end`,
 		`local receiver = { path = ${luaString(shellPath(managedReceiver))}, source = ${luaString(fs.readFileSync(managedReceiver, 'utf8'))} }`
 	];
@@ -514,7 +514,7 @@ function emittedBootstrapPrelude(fixturePolicy, ownerRoot, interpreter) {
 		'package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
 		`local admitted = ${luaStringArray(admitted)}`,
 		'package.loaded["core.fs.adapters.file_system"] = { exists = function(p) for _, v in ipairs(admitted) do if p == v then return true end end return false end }',
-		`local Network = assert(load(${luaString(networkSource)}, ${luaString('@' + owner + '/modules/llm/network_env.lua')}))()`,
+		`local Network = assert(load(${luaString(networkSource)}, ${luaString('@' + owner + '/ai/engine/api/network_env.lua')}))()`,
 		`Network.policy_path = function() return ${luaString(shellPath(fixturePolicy))} end`,
 		`local prelude, detail = Network.bootstrap_prelude("BOOTSTRAP", ${luaString(shellPath(interpreter))})`,
 		'assert(prelude, detail); io.write(prelude)'
@@ -535,7 +535,7 @@ function emittedPrelude(fixturePolicy) {
 	const source = [
 		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
 		'package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
-		`local Network = assert(loadfile(${luaString(`${macos}/modules/llm/network_env.lua`)}))()`,
+		`local Network = assert(loadfile(${luaString(`${macos}/ai/engine/api/network_env.lua`)}))()`,
 		`Network.policy_path = function() return ${luaString(shellPath(fixturePolicy))} end`,
 		'local prelude, detail = Network.opaque_prelude("TEST")',
 		'assert(prelude, detail); io.write(prelude)'
@@ -1195,7 +1195,7 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 		'Bootstrap.app/Contents/Resources/static/ergopti_plus/macos'
 	);
 	fs.mkdirSync(path.join(bootstrapRoot, 'core/network/adapters'), { recursive: true });
-	fs.mkdirSync(path.join(bootstrapRoot, 'modules/llm'), { recursive: true });
+	fs.mkdirSync(path.join(bootstrapRoot, 'ai/engine'), { recursive: true });
 	// A shipped bundle carries the shared proxy policy the guard's precedence is built from.
 	const bundledPolicy = path.join(bootstrapRoot, '../_shared/core/network/data');
 	fs.mkdirSync(bundledPolicy, { recursive: true });

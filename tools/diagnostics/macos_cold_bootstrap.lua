@@ -56,7 +56,7 @@ guarded(function()
 		local handle, ready = prepare(...)
 		assert(ready == true and handle ~= nil, "Native source admission refused")
 		local request = assert(hs.json.decode(handle.input))
-		assert(request.source_path == driver .. "/modules/llm/ensure-mlx-deps.sh")
+		assert(request.source_path == driver .. "/ai/engine/ensure-mlx-deps.sh")
 		assert(handle.executable == config.helper and handle.arguments[1] == "--managed-pty-worker")
 		result.native_cli = handle.arguments
 		result.source_sha256 = request.source_sha256

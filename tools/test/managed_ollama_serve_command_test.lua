@@ -45,8 +45,8 @@ local function seed()
 		[driver .. "/../_shared/ai/data/managed_ollama_runtime.json"] = raw_contract,
 		[driver .. "/../_shared/ai/data/managed_ollama_release.json"] = raw_catalogue,
 		[driver .. "/../_shared/ai/data/managed_ollama_bootstrap.json"] = '{"maximum_metadata_bytes":1048576}',
-		[driver .. "/modules/llm/network-retry.sh"] = "CURL_CONNECT_TIMEOUT_SEC=30\nCURL_STALL_SEC=60\nCURL_MAX_TIME_SEC=600\n",
-		[driver .. "/modules/llm/managed_ollama_serve.py"] = "bundled source owner; port fixture only",
+		[driver .. "/ai/engine/network-retry.sh"] = "CURL_CONNECT_TIMEOUT_SEC=30\nCURL_STALL_SEC=60\nCURL_MAX_TIME_SEC=600\n",
+		[driver .. "/ai/engine/ollama/managed_ollama_serve.py"] = "bundled source owner; port fixture only",
 	}
 end
 seed()
@@ -85,7 +85,7 @@ package.loaded["ai.adapters.managed_ollama_hint"] = { get = function(directory)
 	if not ok or not files[driver .. "/../_shared/ai/data/managed_ollama_release.json"]
 		or not Hint.matches(contract, catalogue, value, "macos-arm64", cd, rd) then return nil end
 	local budgets = { admission = 30, idle = 60, retirement = 600 }
-	local raw_retry = files[driver .. "/modules/llm/network-retry.sh"]
+	local raw_retry = files[driver .. "/ai/engine/network-retry.sh"]
 	local count = 0; for _ in raw_retry:gmatch("CURL_STALL_SEC=60") do count = count + 1 end
 	if count ~= 1 then budgets = nil end
 	return { candidate = directory .. "/ollama", budgets = budgets }
@@ -130,7 +130,7 @@ case(function()
 	local command, reason = Builder.build(native, "/private/logs/today.log", 11434)
 	check(command, nil); check(reason, "managed native daemon admission is unavailable")
 	python = arg[4] or "/fixture/native/python"
-	files[driver .. "/modules/llm/network-retry.sh"] = files[driver .. "/modules/llm/network-retry.sh"] .. "CURL_STALL_SEC=60\n"
+	files[driver .. "/ai/engine/network-retry.sh"] = files[driver .. "/ai/engine/network-retry.sh"] .. "CURL_STALL_SEC=60\n"
 	command, reason = Builder.build(native, "/private/logs/today.log", 11434)
 	check(command, nil); check(reason, "managed native budgets are unavailable"); seed()
 end)

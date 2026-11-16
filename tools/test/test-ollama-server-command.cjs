@@ -69,7 +69,7 @@ function buildCommand(fakeBinary, logFile) {
 		'FileSystem.read_with_status = function(p, ...) if p:match("/core/network/data/route_origins%.json$") then local f = assert(io.open(p, "rb")); local bytes = f:read("*a"); f:close(); return bytes, "ok" end; return read_with_status(p, ...) end',
 		// Native Windows Lua expands module dots with backslashes. Load this
 		// path-sensitive macOS module with its real POSIX filename on every host.
-		`package.loaded["ai.engine.api.network_env"] = assert(loadfile(${JSON.stringify(`${moduleRoot}/modules/llm/network_env.lua`)}))()`,
+		`package.loaded["ai.engine.api.network_env"] = assert(loadfile(${JSON.stringify(`${moduleRoot}/ai/engine/api/network_env.lua`)}))()`,
 		// The timings owner resolves the shared tree through Hammerspoon paths; the
 		// stand-in serves the real registry values the builder reads (relay deadlines).
 		`package.loaded["core.timing.engine.timings"] = { ms = function(section, key) return assert((${luaTimings()})[section .. "." .. key], key) end }`,
