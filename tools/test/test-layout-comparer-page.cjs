@@ -187,6 +187,35 @@ check(
 	'the page no longer posts its height to the framing site'
 );
 
+// A shared comparison is the framing site page's address: the site hands on
+// exactly the parameters the page reads (src/lib/js/comparerLink.js).
+{
+	const listOf = (text, name) => {
+		const m = text.match(new RegExp(`${name}\\s*=\\s*(?:Object\\.freeze\\()?\\[([^\\]]*)\\]`));
+		return m ? Array.from(m[1].matchAll(/'([a-z]+)'/g), (x) => x[1]) : null;
+	};
+	const site = fs.readFileSync(
+		path.join(__dirname, '..', '..', 'src', 'lib', 'js', 'comparerLink.js'),
+		'utf8'
+	);
+	const pageParams = listOf(page, 'LINK_PARAMS');
+	check(pageParams && pageParams.length >= 6, 'the page lost its LINK_PARAMS list');
+	check(
+		JSON.stringify(listOf(site, 'COMPARER_LINK_PARAMS')) === JSON.stringify(pageParams),
+		`link parameters: the site hands on ${listOf(site, 'COMPARER_LINK_PARAMS')}, the page reads ${pageParams}`
+	);
+	for (const route of ['studio/comparer/+page.svelte', 'ergopti/benchmarks/+page.svelte'])
+		check(
+			fs
+				.readFileSync(
+					path.join(__dirname, '..', '..', 'src', 'routes', ...route.split('/')),
+					'utf8'
+				)
+				.includes('#lib/js/comparerLink.js'),
+			`${route} does not hand the link parameters on to the Comparer`
+		);
+}
+
 // The app delivers « My typing » late, through this event (contract with T's bridge).
 check(
 	page.includes("'studio-ngrams'") && page.includes('LAYOUT_ANALYSIS_COMPARER'),

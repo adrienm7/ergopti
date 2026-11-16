@@ -44,7 +44,14 @@
  * 11. A link may open the comparison on a corpus, a keyboard and a keyboard
  *    format (?corpus=<id>&keyboard=<id>&format=<id>, the site's benchmark page), over the saved
  *    choice; a value the page does not know is named in the console and the
- *    saved choice stays.
+ *    saved choice stays. It may also name the compared layouts, the one shown
+ *    in detail and the one it is compared with (&layouts=a,b&details=a&versus=b),
+ *    shown without replacing the visitor's saved selection; « Copy the link »
+ *    writes that address (the user's own layouts and texts stay out of it).
+ * 12. Details: a layout against another (the engine's diff, each difference
+ *    with its verdict in words), each finger's share against its ideal load,
+ *    hands and rows, and a one-hue key heatmap with its scale that shrinks
+ *    with the page. The score settings are folded under the results.
  * ==============================================================================
  */
 
@@ -76,8 +83,20 @@
 	// Layouts ticked on a first visit: the registry and the two references.
 	const DEFAULT_ORIGINS = ['registry', 'reference'];
 	const CHART_MAX_BARS = 40;
-	// Size of one key unit of the heatmap, in pixels.
+	// Widest size of one key unit of the heatmap, in pixels; narrower screens
+	// shrink the whole board instead of scrolling it.
 	const HEAT_UNIT_PX = 44;
+	// Width of the space bar in key units.
+	const SPACE_UNITS = 6;
+	// A key at least this share of the heatmap's maximum is dark enough for light ink.
+	const HEAT_STRONG_SHARE = 0.55;
+	// Where a shared link opens when the page has no web address of its own
+	// (the app's Studio window): the site's Comparer.
+	const SITE_COMPARER_URL = 'https://ergopti.fr/studio/comparer';
+	// The link parameters this page reads; the others of the address are dropped.
+	const LINK_PARAMS = ['corpus', 'keyboard', 'format', 'layouts', 'details', 'versus'];
+	// The layout origins a link can name: the user's own layouts stay on their device.
+	const SHAREABLE_ORIGINS = ['registry', 'reference', 'library'];
 	const TEXT_DEBOUNCE_MS = 400;
 	// The message the framing page listens for to size its frame.
 	const HEIGHT_MESSAGE = 'ergopti-layout-analysis:height';
@@ -165,10 +184,19 @@
 	<div id="la-layout-list" class="la-layout-list"></div>
 </section>
 
-<p id="la-status" class="la-status" role="status"></p>
+<p id="la-status" class="la-status" role="status" aria-live="polite"></p>
 
-<section class="la-results">
-	<h2 data-i18n="layout_analysis.chart.title"></h2>
+<section id="la-results" class="la-results" aria-labelledby="la-chart-label">
+	<div class="la-heading la-heading-wide">
+		<h2 id="la-chart-label" data-i18n="layout_analysis.chart.title"></h2>
+		<button id="la-share" type="button" data-i18n="layout_analysis.share.button"></button>
+	</div>
+	<p id="la-share-status" class="la-muted" role="status" hidden></p>
+	<p class="la-muted" data-i18n="layout_analysis.chart.caption"></p>
+	<ul class="la-legend">
+		<li><span class="la-swatch la-swatch-gain"></span><span data-i18n="layout_analysis.chart.gain"></span></li>
+		<li><span class="la-swatch la-swatch-loss"></span><span data-i18n="layout_analysis.chart.loss"></span></li>
+	</ul>
 	<div id="la-chart" class="la-chart"></div>
 	<div class="la-table-wrap">
 		<table id="la-table" class="la-table"></table>
@@ -183,7 +211,12 @@
 		<span id="la-details-credit"></span>
 		<a id="la-details-link" target="_blank" rel="noopener" hidden></a>
 	</p>
+	<div class="la-field la-versus">
+		<label for="la-versus" data-i18n="layout_analysis.details.versus"></label>
+		<select id="la-versus"></select>
+	</div>
 	<h3 data-i18n="layout_analysis.details.heatmap"></h3>
+	<label class="la-sr-only" for="la-heat-metric" data-i18n="layout_analysis.details.heatmap"></label>
 	<select id="la-heat-metric" data-i18n-option-prefix="layout_analysis.heat">
 		<option value="presses"></option>
 		<option value="sfb"></option>
@@ -193,15 +226,33 @@
 		<option value="redirect"></option>
 	</select>
 	<div id="la-heatmap" class="la-heatmap"></div>
-	<h3 data-i18n="layout_analysis.details.contributions"></h3>
-	<div id="la-contributions" class="la-bars"></div>
-	<h3 data-i18n="layout_analysis.details.fingers"></h3>
-	<div id="la-fingers" class="la-bars"></div>
+	<div id="la-heat-legend" class="la-heat-legend"></div>
+	<div class="la-detail-grid">
+		<div>
+			<h3 data-i18n="layout_analysis.details.contributions"></h3>
+			<div id="la-contributions" class="la-bars"></div>
+		</div>
+		<div>
+			<h3 data-i18n="layout_analysis.details.fingers"></h3>
+			<p class="la-muted" data-i18n="layout_analysis.details.fingers_caption"></p>
+			<ul class="la-legend">
+				<li><span class="la-swatch la-swatch-load"></span><span data-i18n="layout_analysis.details.share_mark"></span></li>
+				<li><span class="la-swatch la-swatch-ideal"></span><span data-i18n="layout_analysis.details.ideal_mark"></span></li>
+			</ul>
+			<div id="la-fingers" class="la-bars"></div>
+			<h3 data-i18n="layout_analysis.details.hands_rows"></h3>
+			<div id="la-hands-rows" class="la-bars"></div>
+		</div>
+	</div>
 	<h3 data-i18n="layout_analysis.details.metrics"></h3>
-	<table id="la-metrics" class="la-table"></table>
+	<div class="la-table-wrap">
+		<table id="la-metrics" class="la-table"></table>
+	</div>
 	<p id="la-unsupported" class="la-muted"></p>
 </section>
 
+<details id="la-settings" class="la-settings">
+<summary data-i18n="layout_analysis.settings.title"></summary>
 <section class="la-weights" aria-labelledby="la-weights-label">
 	<div class="la-heading">
 		<h2 id="la-weights-label" data-i18n="layout_analysis.weights.title"></h2>
@@ -284,7 +335,8 @@
 	<p id="la-forms-status" class="la-muted" role="status"></p>
 </section>
 
-<section id="la-fingering" class="la-weights la-fingering"></section>`;
+<section id="la-fingering" class="la-weights la-fingering"></section>
+</details>`;
 
 	let mounted = null;
 	// The app's last keystats tables, kept when they arrive before the mount.
@@ -357,8 +409,9 @@
 					JSON.stringify({
 						corpus: state.corpus,
 						keyboard: state.keyboard,
-						selected: Array.from(state.selected),
-						selectionChosen: state.selectionChosen,
+						// Until the visitor ticks a layout, a link's selection is not theirs to keep.
+						selected: state.linkedSelection ? saved.selected : Array.from(state.selected),
+						selectionChosen: state.linkedSelection ? saved.selectionChosen : state.selectionChosen,
 						weights: state.weights,
 						idealLoad: state.idealLoad,
 						shortcuts: state.shortcuts,
@@ -439,11 +492,20 @@
 			results: [],
 			sort: { key: 'rank', descending: false },
 			heat: 'presses',
-			details: null
+			details: linked.details || null,
+			// The layout the details compare with (diff), null for none.
+			versus: linked.versus || null
 		};
-		state.selected = state.selectionChosen
-			? new Set(saved.selected.filter((id) => byId.has(id)))
-			: defaultSelection(state.keyboard);
+		// A link's layouts are shown, not saved: the visitor's own choice stays.
+		state.linkedSelection = Boolean(linked.layouts);
+		if (linked.layouts) {
+			state.selected = new Set(linked.layouts);
+			state.selectionChosen = true;
+		} else {
+			state.selected = state.selectionChosen
+				? new Set(saved.selected.filter((id) => byId.has(id)))
+				: defaultSelection(state.keyboard);
+		}
 		if (HOST.corpora && HOST.corpora.length > 0 && saved.corpus === undefined && !linked.corpus)
 			state.corpus = HOST.corpora[0].id;
 
@@ -470,6 +532,21 @@
 			if (format !== null) {
 				if (E.keyboardFormats().some((f) => f.id === format)) out.format = format;
 				else console.warn(`layout comparer: the link names no keyboard format ${format}`);
+			}
+			// The compared layouts, the one shown in detail and the one it is compared with.
+			const named = query.get('layouts');
+			if (named !== null) {
+				const ids = named.split(',').filter((id) => id !== '');
+				for (const id of ids)
+					if (!byId.has(id)) console.warn(`layout comparer: the link names no layout ${id}`);
+				const kept = ids.filter((id) => byId.has(id));
+				if (kept.length > 0) out.layouts = kept;
+			}
+			for (const name of ['details', 'versus']) {
+				const id = query.get(name);
+				if (id === null) continue;
+				if (byId.has(id)) out[name] = id;
+				else console.warn(`layout comparer: the link names no layout ${id} (${name})`);
 			}
 			return out;
 		}
@@ -555,14 +632,19 @@
 		/** Analyses the selected layouts on the chosen corpus and redraws. */
 		async function analyse() {
 			const mine = ++generation;
+			// A built-in corpus loads its tables once (up to a few megabytes): say so meanwhile.
+			setBusy(true);
 			let tables;
 			try {
 				tables = await corpusTables();
 			} catch {
+				if (mine !== generation) return;
+				setBusy(false);
 				showStatus(t('layout_analysis.status.corpus_failed'));
 				return;
 			}
 			if (mine !== generation) return;
+			setBusy(false);
 			state.tables = tables;
 			const chosen = layouts.filter((layout) => state.selected.has(layout.id));
 			if (!tables || chosen.length === 0) {
@@ -608,6 +690,16 @@
 			$('la-status').textContent = text;
 		}
 
+		/**
+		 * Marks the results as being computed: the status says so at once and
+		 * assistive technology waits for the new ranking before reading it.
+		 */
+		function setBusy(busy) {
+			$('la-results').setAttribute('aria-busy', String(busy));
+			$('la-results').classList.toggle('la-busy', busy);
+			if (busy) showStatus(t('layout_analysis.status.loading'));
+		}
+
 		// ==========================
 		// ======= 5/ Rendering =====
 		// ==========================
@@ -618,7 +710,23 @@
 			renderDetails();
 		}
 
-		/** Horizontal bars of the global score, best first. */
+		/**
+		 * Makes a row act as a button: a click or Enter / Space opens the
+		 * layout's details, and it takes the keyboard focus in reading order.
+		 */
+		function openOnActivate(node, id, label) {
+			node.tabIndex = 0;
+			node.setAttribute('role', 'button');
+			node.setAttribute('aria-label', label);
+			node.addEventListener('click', () => showDetails(id));
+			node.addEventListener('keydown', (event) => {
+				if (event.key !== 'Enter' && event.key !== ' ') return;
+				event.preventDefault();
+				showDetails(id);
+			});
+		}
+
+		/** Horizontal bars of the global score around zero, best first. */
 		function renderChart() {
 			const box = $('la-chart');
 			box.replaceChildren();
@@ -628,21 +736,38 @@
 			const min = Math.min(0, ...totals);
 			const max = Math.max(0, ...totals);
 			const span = max - min || 1;
+			const zero = ((0 - min) / span) * 100;
 			for (const result of shown) {
 				const row = el('div', 'la-chart-row');
+				const value = format(result.score.total, 1);
+				openOnActivate(
+					row,
+					result.layout.id,
+					t('layout_analysis.chart.row', {
+						layout: result.layout.name,
+						rank: result.rank,
+						score: value
+					})
+				);
+				if (state.details === result.layout.id) row.classList.add('la-selected');
 				row.append(el('span', 'la-chart-label', result.layout.name));
 				const track = el('span', 'la-chart-track');
+				// The zero line, so a negative score reads as one.
+				if (min < 0) {
+					const axis = el('span', 'la-zero');
+					axis.style.left = `${zero}%`;
+					track.append(axis);
+				}
 				const bar = el(
 					'span',
-					result.score.total >= 0 ? 'la-bar la-bar-good' : 'la-bar la-bar-bad'
+					result.score.total >= 0 ? 'la-bar la-bar-gain' : 'la-bar la-bar-loss'
 				);
-				const zero = ((0 - min) / span) * 100;
 				const end = ((result.score.total - min) / span) * 100;
 				bar.style.left = `${Math.min(zero, end)}%`;
 				bar.style.width = `${Math.abs(end - zero)}%`;
 				track.append(bar);
-				row.append(track, el('span', 'la-chart-value', format(result.score.total, 1)));
-				row.addEventListener('click', () => showDetails(result.layout.id));
+				row.title = `${result.layout.name}: ${value} ${t('layout_analysis.unit.points')}`;
+				row.append(track, el('span', 'la-chart-value', value));
 				box.append(row);
 			}
 		}
@@ -664,25 +789,29 @@
 			].concat(
 				TABLE_METRICS.map((id) => ({
 					key: id,
-					label: t(`layout_analysis.metric.${id}`),
+					label: `${t(`layout_analysis.metric.${id}`)} (${unitText(id)})`,
 					value: (r) => r.metrics[id],
 					digits: metricDigits(id)
 				}))
 			);
 			const head = el('tr');
 			for (const column of columns) {
-				const th = el('th', 'la-sortable', column.label);
+				const th = el('th', 'la-sortable');
 				th.scope = 'col';
-				if (DATA.sources.items[column.key]) th.append(' ', infoButton(column.key));
-				if (state.sort.key === column.key)
-					th.setAttribute('aria-sort', state.sort.descending ? 'descending' : 'ascending');
-				th.addEventListener('click', () => {
+				// The sort is a button, so the keyboard reaches it.
+				const sort = el('button', 'la-sort', column.label);
+				sort.type = 'button';
+				sort.addEventListener('click', () => {
 					state.sort =
 						state.sort.key === column.key
 							? { key: column.key, descending: !state.sort.descending }
 							: { key: column.key, descending: column.key === 'score' };
 					renderTable();
 				});
+				th.append(sort);
+				if (DATA.sources.items[column.key]) th.append(' ', infoButton(column.key));
+				if (state.sort.key === column.key)
+					th.setAttribute('aria-sort', state.sort.descending ? 'descending' : 'ascending');
 				head.append(th);
 			}
 			const thead = el('thead');
@@ -704,7 +833,13 @@
 						el('td', '', column.digits === undefined ? String(value) : format(value, column.digits))
 					);
 				}
+				tr.tabIndex = 0;
 				tr.addEventListener('click', () => showDetails(result.layout.id));
+				tr.addEventListener('keydown', (event) => {
+					if (event.key !== 'Enter') return;
+					event.preventDefault();
+					showDetails(result.layout.id);
+				});
 				tbody.append(tr);
 			}
 			table.append(thead, tbody);
@@ -712,33 +847,75 @@
 
 		function showDetails(id) {
 			state.details = id;
+			if (state.versus === id) state.versus = null;
 			render();
 			$('la-details').scrollIntoView({ block: 'nearest' });
 		}
 
-		/** Bars around zero: one per entry, labelled, signed. */
-		function signedBars(box, entries, digits) {
+		/**
+		 * Bars around zero: one per entry, labelled, signed (points gained in
+		 * the gain colour, lost in the loss colour, the value's sign written).
+		 */
+		function signedBars(box, entries, digits, unit) {
 			box.replaceChildren();
 			const extent = Math.max(...entries.map(([, v]) => Math.abs(v)), 1e-9);
 			for (const [label, value] of entries) {
 				const row = el('div', 'la-chart-row');
 				row.append(el('span', 'la-chart-label', label));
 				const track = el('span', 'la-chart-track la-signed');
-				const bar = el('span', value >= 0 ? 'la-bar la-bar-good' : 'la-bar la-bar-bad');
+				const bar = el('span', value >= 0 ? 'la-bar la-bar-gain' : 'la-bar la-bar-loss');
 				const width = (Math.abs(value) / extent) * 50;
 				bar.style.left = value >= 0 ? '50%' : `${50 - width}%`;
 				bar.style.width = `${width}%`;
 				track.append(bar);
-				row.append(track, el('span', 'la-chart-value', format(value, digits)));
+				const text = `${value > 0 ? '+' : ''}${format(value, digits)}`;
+				row.title = `${label}: ${text} ${unit}`;
+				row.append(track, el('span', 'la-chart-value', text));
 				box.append(row);
 			}
 		}
 
 		/**
+		 * Magnitude bars from zero, in one colour, each with an optional target
+		 * mark (the ideal finger load); the value is written in its unit.
+		 * @param {HTMLElement} box
+		 * @param {Array<{label: string, value: number, target?: number}>} entries
+		 * @param {number} scale The value a full bar stands for.
+		 */
+		function loadBars(box, entries, scale) {
+			box.replaceChildren();
+			for (const entry of entries) {
+				const row = el('div', 'la-chart-row');
+				row.append(el('span', 'la-chart-label', entry.label));
+				const track = el('span', 'la-chart-track');
+				const bar = el('span', 'la-bar la-bar-load');
+				bar.style.left = '0';
+				bar.style.width = `${Math.min(100, (entry.value / scale) * 100)}%`;
+				track.append(bar);
+				let title = `${entry.label}: ${format(entry.value, 1)} %`;
+				if (entry.target !== undefined) {
+					const mark = el('span', 'la-target');
+					mark.style.left = `${Math.min(100, (entry.target / scale) * 100)}%`;
+					track.append(mark);
+					title += ` (${t('layout_analysis.details.ideal_mark')}: ${format(entry.target, 1)} %)`;
+				}
+				row.title = title;
+				row.append(track, el('span', 'la-chart-value', `${format(entry.value, 1)} %`));
+				box.append(row);
+			}
+		}
+
+		/** A metric's unit as written beside its value. */
+		function unitText(id) {
+			return E.METRICS[id].unit === 'mm' ? t('layout_analysis.unit.mm') : '%';
+		}
+
+		/**
 		 * The board of the chosen keyboard, each key showing the layout's base
-		 * character and coloured from green to red by its share of the chosen
-		 * per-key value (presses or a bad event); the tooltip gives the value and,
-		 * for SFBs, the worst partners.
+		 * character and shaded light to dark (one hue) by its share of the
+		 * chosen per-key value (presses or a bad event); the legend gives the
+		 * scale, the tooltip the value and, for SFBs, the worst partners. The
+		 * board shrinks with the page instead of scrolling.
 		 */
 		function renderHeatmap(result) {
 			const box = $('la-heatmap');
@@ -751,8 +928,12 @@
 			const minX = Math.min(...board.x) - 0.5;
 			const maxX = Math.max(...board.x) + 0.5;
 			const maxY = Math.max(...board.y);
-			box.style.width = `${(maxX - minX) * HEAT_UNIT_PX}px`;
-			box.style.height = `${maxY * HEAT_UNIT_PX}px`;
+			const width = maxX - minX;
+			// Positions in % of the board, so the whole board scales with its box.
+			const across = (units) => `${(units / width) * 100}%`;
+			const down = (units) => `${(units / maxY) * 100}%`;
+			box.style.maxWidth = `${width * HEAT_UNIT_PX}px`;
+			box.style.aspectRatio = `${width} / ${maxY}`;
 			board.codes.forEach((code, k) => {
 				if (modifiers.has(code)) return;
 				const row = layout.rows[code];
@@ -767,11 +948,14 @@
 				const key = el('span', 'la-key', code === 'Space' ? '␣' : base);
 				if (dead !== null) key.classList.add(KEY_LEGEND.DEAD_KEY_CLASS);
 				const share = values[k] / max;
-				key.style.left = `${(board.x[k] - 0.5 - minX) * HEAT_UNIT_PX}px`;
-				key.style.top = `${(board.y[k] - 1) * HEAT_UNIT_PX}px`;
-				key.style.width = `${(code === 'Space' ? 6 : 1) * HEAT_UNIT_PX - 4}px`;
-				if (code === 'Space') key.style.left = `${(board.x[k] - 3 - minX) * HEAT_UNIT_PX}px`;
-				key.style.background = `color-mix(in srgb, var(--la-bad) ${Math.round(share * 100)}%, var(--la-good))`;
+				const span = code === 'Space' ? SPACE_UNITS : 1;
+				const left = code === 'Space' ? board.x[k] - SPACE_UNITS / 2 : board.x[k] - 0.5;
+				key.style.left = across(left - minX);
+				key.style.top = down(board.y[k] - 1);
+				key.style.width = across(span);
+				key.style.height = down(1);
+				key.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
+				if (share >= HEAT_STRONG_SHARE) key.classList.add('la-key-strong');
 				const partners = result.keys[code].worst.sfb
 					.map(
 						([[other], pct]) => `${(layout.rows[other] || [''])[0] || other} ${format(pct, 2)} %`
@@ -782,6 +966,108 @@
 				}`;
 				box.append(key);
 			});
+			// The scale: what the lightest and the darkest key stand for.
+			const legend = $('la-heat-legend');
+			legend.replaceChildren(
+				el('span', '', `${format(0, 2)} %`),
+				el('span', 'la-heat-ramp'),
+				el('span', '', `${format(max === 1e-9 ? 0 : max, 2)} %`),
+				el(
+					'span',
+					'la-muted',
+					t('layout_analysis.heat.scale', { metric: t(`layout_analysis.heat.${state.heat}`) })
+				)
+			);
+		}
+
+		/** The versus choice: every other compared layout, or none. */
+		function fillVersus(result) {
+			const select = $('la-versus');
+			const none = el('option', '', t('layout_analysis.details.versus_none'));
+			none.value = '';
+			const others = state.results
+				.filter((r) => r.layout.id !== result.layout.id)
+				.map((r) => {
+					const option = el('option', '', r.layout.name);
+					option.value = r.layout.id;
+					return option;
+				});
+			select.replaceChildren(none, ...others);
+			if (!state.results.some((r) => r.layout.id === state.versus)) state.versus = null;
+			select.value = state.versus || '';
+		}
+
+		/**
+		 * Every metric of the layout; with a layout to compare with, its value
+		 * and the difference beside it, with which one the metric prefers in
+		 * words (the engine's diff).
+		 */
+		function renderMetrics(result) {
+			const table = $('la-metrics');
+			table.replaceChildren();
+			const other = state.results.find((r) => r.layout.id === state.versus) || null;
+			const diff = other ? E.diff(result, other) : null;
+			const head = el('tr');
+			const columns = [t('layout_analysis.details.metric_column'), result.layout.name];
+			if (other) columns.push(other.layout.name, t('layout_analysis.details.delta'));
+			for (const label of columns) {
+				const th = el('th', '', label);
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const tbody = el('tbody');
+			// Each verdict in words with a mark, never by colour alone.
+			const verdicts = {
+				better: ['▲', t('layout_analysis.details.verdict_better')],
+				worse: ['▼', t('layout_analysis.details.verdict_worse')],
+				same: ['=', t('layout_analysis.details.verdict_same')],
+				none: ['', t('layout_analysis.details.verdict_none')]
+			};
+			const verdictCell = (verdict) => {
+				const cell = el('span', `la-verdict la-verdict-${verdict}`);
+				const [mark, words] = verdicts[verdict];
+				if (mark) cell.append(el('span', 'la-verdict-mark', mark), ' ');
+				cell.append(words);
+				return cell;
+			};
+			const addRow = (th, values, delta) => {
+				const tr = el('tr');
+				tr.append(th, ...values.map((text) => el('td', '', text)));
+				if (delta) {
+					const td = el('td', 'la-delta');
+					td.append(delta.text, ' ', verdictCell(delta.verdict));
+					tr.append(td);
+				}
+				tbody.append(tr);
+			};
+			const signed = (value, digits) => `${value > 0 ? '+' : ''}${format(value, digits)}`;
+			if (diff) {
+				const th = el('th', '', t('layout_analysis.table.score'));
+				th.scope = 'row';
+				addRow(th, [format(diff.score.a, 1), format(diff.score.b, 1)], {
+					text: signed(diff.score.delta, 1),
+					verdict: diff.score.verdict
+				});
+			}
+			for (const id of Object.keys(E.METRICS)) {
+				const th = el('th', '', t(`layout_analysis.metric.${id}`));
+				th.scope = 'row';
+				th.append(' ', infoButton(id));
+				if (id === 'shortcut_left') th.append(' ', infoButton('shortcut_letters'));
+				const digits = metricDigits(id);
+				const unit = unitText(id);
+				const values = [`${format(result.metrics[id], digits)} ${unit}`];
+				let delta = null;
+				if (diff) {
+					const entry = diff.metrics[id];
+					values.push(`${format(entry.b, digits)} ${unit}`);
+					delta = { text: `${signed(entry.delta, digits)} ${unit}`, verdict: entry.verdict };
+				}
+				addRow(th, values, delta);
+			}
+			table.append(thead, tbody);
 		}
 
 		/** One layout's contributions, finger load and every metric. */
@@ -807,29 +1093,42 @@
 			link.href = layout.url || '#';
 			link.textContent = layout.url;
 			INFO.routeLink(link);
+			fillVersus(result);
 			renderHeatmap(result);
 			const contributions = Object.entries(result.score.contributions)
 				.filter(([, v]) => v !== 0)
 				.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
 				.map(([id, v]) => [t(`layout_analysis.metric.${id}`), v]);
-			signedBars($('la-contributions'), contributions, 1);
-			signedBars(
-				$('la-fingers'),
-				DATA.model.fingers.map((id) => [t(`layout_analysis.finger.${id}`), result.fingers[id]]),
-				1
+			signedBars($('la-contributions'), contributions, 1, t('layout_analysis.unit.points'));
+			// Each finger against the ideal load the score aims for, on one scale.
+			const shares = Object.entries(result.fingerShares);
+			const fingerScale = Math.max(
+				...shares.map(([id, v]) => Math.max(v, result.idealLoad[id])),
+				1e-9
 			);
-			const table = $('la-metrics');
-			table.replaceChildren();
-			for (const id of Object.keys(E.METRICS)) {
-				const tr = el('tr');
-				const th = el('th', '', t(`layout_analysis.metric.${id}`));
-				th.scope = 'row';
-				th.append(' ', infoButton(id));
-				if (id === 'shortcut_left') th.append(' ', infoButton('shortcut_letters'));
-				const unit = E.METRICS[id].unit === 'mm' ? t('layout_analysis.unit.mm') : '%';
-				tr.append(th, el('td', '', `${format(result.metrics[id], metricDigits(id))} ${unit}`));
-				table.append(tr);
-			}
+			loadBars(
+				$('la-fingers'),
+				shares.map(([id, value]) => ({
+					label: t(`layout_analysis.finger.${id}`),
+					value,
+					target: result.idealLoad[id]
+				})),
+				fingerScale
+			);
+			loadBars(
+				$('la-hands-rows'),
+				[
+					{ label: t('layout_analysis.details.hand_left'), value: result.hands.left },
+					{ label: t('layout_analysis.details.hand_right'), value: result.hands.right }
+				].concat(
+					['number_row', 'top_row', 'home_row', 'bottom_row'].map((id) => ({
+						label: t(`layout_analysis.metric.${id}`),
+						value: result.metrics[id]
+					}))
+				),
+				100
+			);
+			renderMetrics(result);
 			const missing = Object.entries(result.coverage.unsupportedChars)
 				.sort((a, b) => b[1] - a[1])
 				// An invisible character is named by its code point.
@@ -849,6 +1148,61 @@
 			]
 				.filter(Boolean)
 				.join(' ');
+		}
+
+		/**
+		 * The address of this comparison: the site's Comparer (or the page the
+		 * visitor sees it framed in) with the corpus, keyboard, format, the
+		 * shareable compared layouts and the details shown.
+		 * @returns {{url: string, personal: boolean}} personal: some compared
+		 *   layouts are the visitor's own and are not in the link.
+		 */
+		function shareLink() {
+			let base = HOST.shareUrl || null;
+			if (!base) {
+				let shown = location;
+				try {
+					// The site frames this page; the link is the framing page's.
+					if (window.top !== window && window.top.location.origin === location.origin)
+						shown = window.top.location;
+				} catch {
+					// A frame from another origin: this page's own address.
+				}
+				base = /^https?:$/.test(shown.protocol)
+					? `${shown.origin}${shown.pathname}`
+					: SITE_COMPARER_URL;
+			}
+			const chosen = layouts.filter((l) => state.selected.has(l.id));
+			const shareable = chosen.filter((l) => SHAREABLE_ORIGINS.includes(l.origin));
+			const query = new URLSearchParams();
+			const corpus = corpora.find((c) => c.id === state.corpus);
+			if (corpus && corpus.builtin) query.set('corpus', state.corpus);
+			query.set('keyboard', state.keyboard);
+			query.set('format', state.format);
+			query.set('layouts', shareable.map((l) => l.id).join(','));
+			const canShare = (id) => shareable.some((l) => l.id === id);
+			if (state.details && canShare(state.details)) query.set('details', state.details);
+			if (state.versus && canShare(state.versus)) query.set('versus', state.versus);
+			if (lang) query.set('lang', lang);
+			return {
+				url: `${base}?${query.toString().replace(/%2C/g, ',')}`,
+				personal: shareable.length < chosen.length || !(corpus && corpus.builtin)
+			};
+		}
+
+		/** Copies the comparison's link, or shows it when the clipboard refuses. */
+		async function share() {
+			const { url, personal } = shareLink();
+			const status = $('la-share-status');
+			status.hidden = false;
+			try {
+				await navigator.clipboard.writeText(url);
+				status.textContent = personal
+					? t('layout_analysis.share.copied_partial')
+					: t('layout_analysis.share.copied');
+			} catch {
+				status.textContent = t('layout_analysis.share.failed', { url });
+			}
 		}
 
 		// ===========================
@@ -891,6 +1245,12 @@
 				$('la-corpus-info').textContent += ` ${t('layout_analysis.corpus.word_list')}`;
 		}
 
+		/** The visitor picks the layouts: from now on the selection is theirs and kept. */
+		function chooseSelection() {
+			state.selectionChosen = true;
+			state.linkedSelection = false;
+		}
+
 		function fillLayouts() {
 			const list = $('la-layout-list');
 			list.replaceChildren();
@@ -905,7 +1265,7 @@
 				box.addEventListener('change', () => {
 					if (box.checked) state.selected.add(layout.id);
 					else state.selected.delete(layout.id);
-					state.selectionChosen = true;
+					chooseSelection();
 					save();
 					analyse();
 				});
@@ -1225,16 +1585,21 @@
 				state.heat = event.target.value;
 				renderDetails();
 			});
+			$('la-versus').addEventListener('change', (event) => {
+				state.versus = event.target.value || null;
+				renderDetails();
+			});
+			$('la-share').addEventListener('click', share);
 			$('la-all').addEventListener('click', () => {
 				for (const id of visibleLayoutIds()) state.selected.add(id);
-				state.selectionChosen = true;
+				chooseSelection();
 				save();
 				fillLayouts();
 				analyse();
 			});
 			$('la-none').addEventListener('click', () => {
 				for (const id of visibleLayoutIds()) state.selected.delete(id);
-				state.selectionChosen = true;
+				chooseSelection();
 				save();
 				fillLayouts();
 				analyse();

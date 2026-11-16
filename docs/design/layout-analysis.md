@@ -403,13 +403,39 @@ report.
 
 ## Comparer page
 
+Layout of the page, top to bottom: corpus, keyboard and format; layouts; the
+global score chart (points, a zero line, gained in blue and lost in orange,
+with a legend; each bar opens the details with a click or Enter) and the
+sortable ranking (header buttons, units in the headers); the other analysers;
+the details; then the score settings folded in one « Réglages du score »
+section. While a corpus loads, the status says so and the results carry
+`aria-busy`. The details show: « Compare with » (`#la-versus`, another
+compared layout: its value and the difference beside every metric and the
+score, from `diff`, each with ▲ better, ▼ worse, = equal or « not scored » in
+words); the key heatmap in one blue hue from light to dark with its scale
+(0 to the largest key's value), board positions in % so it shrinks with the
+page; the contributions; each finger's share of the non-thumb presses with
+its ideal load marked; hands and rows. The chart colours are tokens of
+`style.css` checked with the dataviz palette validator in light and dark.
+
+« Copy the link » (`#la-share`) writes the comparison's address: the framing
+page's (the site's `/studio/comparer` or `/ergopti/benchmarks`, which hand
+the link parameters on to the frame through `src/lib/js/comparerLink.js`),
+or `https://ergopti.fr/studio/comparer` from a page with no web address (the
+app), or `LAYOUT_ANALYSIS_HOST.shareUrl`. It names `corpus` (a built-in one),
+`keyboard`, `format`, `layouts` (comma-separated ids of the library layouts
+ticked), `details` and `versus`. The user's own layouts and texts never go in
+it, and the message says so. A link's layouts are shown without replacing
+the visitor's saved selection until they tick or untick one.
+
 `_shared/ui/layout_analysis/index.html` is the « Comparer » tab: corpus
 (built-in, pasted text, or a .txt, .md, .csv, .html, .docx, .odt or .pdf file (`pdf_text.js`: its text, no library; a locked or scanned PDF refused) read in
 the page), keyboard, layout selection, the global score chart, the sortable
 ranking, each layout's contributions, finger load and metrics, and the weights
 editor with « restore the defaults ». The site embeds it like the editor
 (`?lang=<code>`); the app's Studio window loads the same page. A link may add
-`corpus=<built-in id>`, `keyboard=<id>` and `format=<id>`: the page opens on them over the
+`corpus=<built-in id>`, `keyboard=<id>`, `format=<id>`, `layouts=<id,id>`,
+`details=<id>` and `versus=<id>`: the page opens on them over the
 visitor's saved choice without saving them, and names an unknown value in the
 console, keeping the saved choice. The site's benchmark page
 (`/ergopti/benchmarks`) frames it this way (`fr_nemolivier`, `iso`), so its

@@ -1143,6 +1143,10 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["es", "fr", "it", "nl", "pt"]
 		},
+		"layout_analysis.unit.points": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
 		"layout_analysis.error.studio_handoff_failed": {
 			"reason": "pending-translation",
 			"locales": [

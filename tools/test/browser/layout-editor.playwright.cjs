@@ -777,8 +777,37 @@ async function exerciseStudioComparer(page) {
 		),
 		'the Comparer heatmap names SFB partners'
 	);
+	// (comparer-diff) « Compare with » puts a second layout's value and the
+	// difference beside each metric, its verdict in words; the finger chart
+	// marks each finger's ideal load.
+	const versusId = await page.$eval(
+		'#la-versus',
+		(select) => [...select.options].find((option) => option.value !== '').value
+	);
+	await page.selectOption('#la-versus', versusId);
+	assert.equal(
+		await page.locator('#la-metrics thead th').count(),
+		4,
+		'metric, layout, the other layout, difference'
+	);
+	assert.ok(
+		(await page.locator('#la-metrics .la-verdict').count()) > 20,
+		'every metric has its verdict'
+	);
+	assert.equal(await page.locator('#la-fingers .la-target').count(), 8, 'eight ideal marks');
+	// (comparer-share) « Copy the link » names the compared layouts and the
+	// details; opening it shows them.
+	await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+	await page.click('#la-share');
+	await page.waitForFunction(() => !document.getElementById('la-share-status').hidden);
+	const sharedLink = await page.evaluate(() => navigator.clipboard.readText());
+	const sharedQuery = new URL(sharedLink).searchParams;
+	assert.ok(sharedQuery.get('layouts').split(',').length >= 2, `shared layouts: ${sharedLink}`);
+	assert.equal(sharedQuery.get('versus'), versusId, 'the shared link names the compared layout');
 	// (editable-tables) The shortcut letters, their keys' ease and the compact
 	// form factors' weights are edited, refused when out of range, saved and reset.
+	// They sit in the folded score settings.
+	await page.click('#la-settings > summary');
 	assert.equal(await page.locator('#la-shortcut-letters input').count(), 26, 'every letter');
 	assert.equal(await page.locator('#la-form-list input').count(), 4, 'every form factor');
 	const letterZ = '#la-shortcut-letters input[data-id="z"]';
@@ -1956,6 +1985,25 @@ async function exerciseComparerLink(browser, origin) {
 	assert.ok(warnings.some((text) => /no built-in corpus nowhere/.test(text)));
 	assert.ok(warnings.some((text) => /no keyboard nokeyboard/.test(text)));
 	assert.ok(warnings.some((text) => /no keyboard format nope/.test(text)));
+	// (comparer-share) A link names the compared layouts, the one in detail and
+	// the one it is compared with; an unknown layout is named in the console.
+	await choices('layouts=qwerty,dvorak,nolayout&details=qwerty&versus=dvorak');
+	assert.deepEqual(
+		(
+			await page.$$eval('#la-table tbody tr', (rows) => rows.map((row) => row.cells[1].textContent))
+		).sort(),
+		['Dvorak', 'QWERTY (US)'],
+		'the two linked layouts'
+	);
+	assert.equal(await page.isVisible('#la-details'), true, 'the linked details are open');
+	assert.equal(await page.inputValue('#la-versus'), 'dvorak');
+	assert.ok(warnings.some((text) => /no layout nolayout/.test(text)));
+	// The link's layouts are shown, not saved: the next plain visit has the saved selection.
+	await choices('');
+	assert.ok(
+		(await page.locator('#la-table tbody tr').count()) > 2,
+		'a plain visit keeps the visitor’s own selection'
+	);
 	assert.deepEqual(errors, [], 'comparer link: page errors');
 	await context.close();
 }

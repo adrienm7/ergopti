@@ -6,7 +6,9 @@
 	import { version } from '#lib/stores_infos.js';
 	import { asset, resolve } from '$app/paths';
 	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import SiteFrame from '#lib/components/SiteFrame.svelte';
+	import { comparerSrc as frameSrc } from '#lib/js/comparerLink.js';
 	import IntroductionBenchmarks from './introduction_benchmarks.svelte';
 	import AnalyseErgoptiPlus from './analyse_ergopti_plus.svelte';
 	import CommentComparer from './comment_comparer.svelte';
@@ -25,9 +27,12 @@
 	// an ISO keyboard; every choice stays the visitor's.
 	const BENCHMARK_CORPUS = 'fr_nemolivier';
 	const BENCHMARK_KEYBOARD = 'iso';
-	const comparerSrc =
-		asset('ergopti_plus/_shared/ui/layout_analysis/index.html') +
-		`?lang=fr&corpus=${BENCHMARK_CORPUS}&keyboard=${BENCHMARK_KEYBOARD}`;
+	// A comparison shared from this page (« Copy the link ») reopens here.
+	const comparerSrc = frameSrc(
+		asset('ergopti_plus/_shared/ui/layout_analysis/index.html'),
+		{ lang: 'fr', corpus: BENCHMARK_CORPUS, keyboard: BENCHMARK_KEYBOARD },
+		browser ? location.search : ''
+	);
 	// The framed Comparer posts its height ({type, height}, comparer_page.js) so the
 	// frame grows with it instead of scrolling inside the page.
 	const HEIGHT_MESSAGE = 'ergopti-layout-analysis:height';

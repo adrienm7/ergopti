@@ -329,3 +329,30 @@
 		--theme-metrics-td-hover: #3d3d3d;
 	}
 }
+
+/* ========================================= */
+/* ========================================= */
+/* ======= 5/ Chart look (analyses) ======== */
+/* ========================================= */
+/* ========================================= */
+
+/* Checked with the dataviz palette validator on the light and dark surfaces
+   (lightness band, colour-blind separation, contrast): gain and loss are a
+   diverging blue / orange pair, the ramp one blue hue from low to high. */
+:root {
+	--theme-chart-gain: #2a78d6;
+	--theme-chart-loss: #eb6834;
+	--theme-chart-ramp-low: #e6effb;
+	--theme-chart-ramp-high: #104281;
+	--theme-chart-ramp-ink-strong: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--theme-chart-gain: #3987e5;
+		--theme-chart-loss: #d95926;
+		--theme-chart-ramp-low: #2a3442;
+		--theme-chart-ramp-high: #9ec5f4;
+		--theme-chart-ramp-ink-strong: #0d1a2b;
+	}
+}

@@ -35,6 +35,17 @@ body:has(> main.layout-analysis) {
 	--la-accent-soft: var(--theme-accent-soft);
 	--la-good: var(--theme-green);
 	--la-bad: var(--theme-danger);
+	/* Chart colours (theme.css « Chart look », validated in light and dark):
+	   points gained blue, points lost orange; one-hue blue ramp for the
+	   heatmap and the loads. */
+	--la-gain: var(--theme-chart-gain);
+	--la-loss: var(--theme-chart-loss);
+	--la-load: var(--theme-chart-gain);
+	--la-heat-low: var(--theme-chart-ramp-low);
+	--la-heat-high: var(--theme-chart-ramp-high);
+	--la-heat-ink: var(--theme-text);
+	--la-heat-ink-strong: var(--theme-chart-ramp-ink-strong);
+	--la-target: var(--theme-text);
 	font:
 		14px/1.45 system-ui,
 		sans-serif;
@@ -90,6 +101,73 @@ body:has(> main.layout-analysis) {
 
 .layout-analysis button:hover {
 	background: var(--la-accent-soft);
+}
+
+.layout-analysis a {
+	color: var(--la-accent);
+}
+
+.layout-analysis :focus-visible {
+	outline: 2px solid var(--la-accent);
+	outline-offset: 1px;
+}
+
+/* A label read by assistive technology only (the heatmap's metric choice). */
+.la-sr-only {
+	clip-path: inset(50%);
+	height: 1px;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+.la-heading-wide {
+	align-items: baseline;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	justify-content: space-between;
+}
+
+.la-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 16px;
+	list-style: none;
+	margin: 4px 0 8px;
+	padding: 0;
+}
+
+.la-legend li {
+	align-items: center;
+	color: var(--la-sub);
+	display: inline-flex;
+	gap: 6px;
+}
+
+.la-swatch {
+	border-radius: 3px;
+	display: inline-block;
+	height: 10px;
+	width: 14px;
+}
+
+.la-swatch-gain {
+	background: var(--la-gain);
+}
+
+.la-swatch-loss {
+	background: var(--la-loss);
+}
+
+.la-swatch-load {
+	background: var(--la-load);
+}
+
+.la-swatch-ideal {
+	background: var(--la-target);
+	width: 3px;
 }
 
 /* ============================== */
@@ -202,13 +280,29 @@ body:has(> main.layout-analysis) {
 /* ============================== */
 /* ============================== */
 
+/* While a corpus loads, the old results stay but read as stale. */
+.la-busy .la-chart,
+.la-busy .la-table-wrap {
+	opacity: 0.5;
+	transition: opacity 0.2s;
+}
+
 .la-chart-row {
 	align-items: center;
-	cursor: pointer;
+	border-radius: 4px;
 	display: grid;
 	gap: 8px;
-	grid-template-columns: minmax(90px, 180px) 1fr 56px;
-	padding: 1px 0;
+	grid-template-columns: minmax(72px, 180px) minmax(0, 1fr) minmax(44px, auto);
+	padding: 2px 4px;
+}
+
+.la-chart-row[role='button'] {
+	cursor: pointer;
+}
+
+.la-chart-row[role='button']:hover,
+.la-chart-row.la-selected {
+	background: var(--la-accent-soft);
 }
 
 .la-chart-label {
@@ -240,12 +334,36 @@ body:has(> main.layout-analysis) {
 	top: 0;
 }
 
-.la-bar-good {
-	background: var(--la-good);
+.la-bar-gain {
+	background: var(--la-gain);
 }
 
-.la-bar-bad {
-	background: var(--la-bad);
+.la-bar-loss {
+	background: var(--la-loss);
+}
+
+.la-bar-load {
+	background: var(--la-load);
+}
+
+/* The zero line of the score chart and the ideal-load mark of a finger. */
+.la-zero,
+.la-target {
+	bottom: -2px;
+	position: absolute;
+	top: -2px;
+	z-index: 1;
+}
+
+.la-zero {
+	border-left: 1px solid var(--la-sub);
+}
+
+.la-target {
+	background: var(--la-target);
+	border-radius: 1px;
+	margin-left: -1px;
+	width: 3px;
 }
 
 .la-chart-value {
@@ -286,6 +404,28 @@ body:has(> main.layout-analysis) {
 	cursor: pointer;
 }
 
+/* The header text is the sort button: plain text that the keyboard reaches. */
+.layout-analysis .la-sort {
+	background: none;
+	border: 0;
+	font-weight: 600;
+	padding: 0;
+	text-align: inherit;
+}
+
+.la-delta {
+	white-space: nowrap;
+}
+
+.la-verdict {
+	color: var(--la-sub);
+	font-size: 0.9em;
+}
+
+.la-verdict-mark {
+	font-size: 0.8em;
+}
+
 .la-sortable[aria-sort]::after {
 	content: ' ▾';
 }
@@ -323,26 +463,84 @@ body:has(> main.layout-analysis) {
 	text-align: left;
 }
 
-.la-heatmap {
-	margin: 8px 0;
-	max-width: 100%;
-	position: relative;
+.la-versus {
+	margin: 4px 0 8px;
+	max-width: 320px;
 }
 
-.la-key {
+.la-detail-grid {
+	display: grid;
+	gap: 0 24px;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+}
+
+/* The board scales with the page (positions in %, width from the script);
+   its legends shrink with it through the container query unit. */
+.la-heatmap {
+	container-type: inline-size;
+	margin: 8px 0 4px;
+	position: relative;
+	width: 100%;
+}
+
+.la-heatmap .la-key {
 	align-items: center;
+	background: color-mix(in oklab, var(--la-heat-high) var(--la-share), var(--la-heat-low));
+	border: 2px solid var(--la-surface);
 	border-radius: 6px;
-	color: var(--theme-bg);
+	color: var(--la-heat-ink);
 	cursor: default;
 	display: flex;
+	font-size: clamp(9px, 2.6cqw, 15px);
 	font-weight: 600;
-	height: 40px;
 	justify-content: center;
 	position: absolute;
 }
 
+.la-heatmap .la-key-strong {
+	color: var(--la-heat-ink-strong);
+}
+
+.la-heat-legend {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	font-variant-numeric: tabular-nums;
+	gap: 4px 8px;
+	margin-bottom: 8px;
+}
+
+.la-heat-ramp {
+	background: linear-gradient(to right, var(--la-heat-low), var(--la-heat-high));
+	border: 1px solid var(--la-border);
+	border-radius: 3px;
+	display: inline-block;
+	height: 10px;
+	width: 120px;
+}
+
+/* The score settings, folded by default: the ranking comes first. */
+.la-settings {
+	background: var(--la-surface);
+	border: 1px solid var(--la-border);
+	border-radius: 8px;
+	margin-top: 20px;
+	padding: 4px 12px;
+}
+
+.la-settings > summary {
+	cursor: pointer;
+	font-size: 1.1em;
+	font-weight: 600;
+	padding: 8px 0;
+}
+
+.la-settings > .la-weights > .la-heading h2 {
+	margin-top: 12px;
+}
+
 /* A dead key shows its bare accent with a corner mark, as on the editor's board. */
-.la-key.key-legend-dead::before {
+.la-heatmap .la-key.key-legend-dead::before {
 	border-color: currentColor currentColor transparent transparent;
 	border-style: solid;
 	border-width: 4px;
