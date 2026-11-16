@@ -835,6 +835,37 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       a one-off offline streaming import that ships only letter and bigram tables, with licence and attribution.
       [LATER] Left (2026-11-15): not started.
 
+## Layout optimizer in Ergopti Studio (maintainer request, 2026-11-16)
+
+Design: [docs/design/layout-optimizer.md](docs/design/layout-optimizer.md). The optimizer scores every arrangement
+with the analysis engine's own global score and never measures anything itself.
+
+- [x] **Optimizer core.** `_shared/ui/layout_optimizer/optimizer_core.js`: simulated annealing over swaps of case
+      pairs, seeded restarts (same seed and swap budget, same layout), time and iteration budgets, progress
+      callbacks, a score cache, an optional « 99 % of the n-grams » search table; the final score is the engine's on
+      the whole corpus. Proof: `tools/test/test-layout-optimizer.cjs` (brute-force optimum of a 4-key toy problem,
+      reported score equals the engine's, determinism, restarts split between workers give the same winner).
+- [x] **Constraints (maintainer, 2026-11-16).** Start from a base layout (library, or a layout open in « Éditer »)
+      or from a seeded random arrangement of its keys; letters always move with their capital on Shift, space never
+      moves; switches, each explained in the page and each unit-tested: move the digits, digits outside the number
+      row, letters on the number row, move the punctuation, move the other symbols, use the AltGr levels, place
+      characters behind a dead key (Ergo-L's ★ layer, scored with the engine's dead-key cost); keys kept in place
+      (click on the start layout's board); letters kept at their QWERTY place for the Ctrl shortcuts (click on a
+      QWERTY board, presets « Ctrl Z X C V » and « Ctrl A S »), placed first even from a random start; zones (core).
+- [x] **Studio tab « Optimiser ».** `_shared/ui/layout_optimizer/` framed at `/studio/optimiser`: corpus and
+      language, start, keyboard, switches, pins, weights, budget (seconds, swaps, restarts, seed, accuracy); live best
+      layout with its changed keys, score and metrics against the start; stop; « Open in the editor » (new tab of
+      « Éditer », `openLayout`) and « Compare with other layouts ». Web Workers (one share of the restarts each),
+      page-thread fallback. 21 locales, light and dark, phone width. Proof: `tools/test/test-layout-optimizer-page.cjs`.
+- [ ] **Incremental scoring.** One analysis costs 5–12 ms, so a run scores about 100 layouts per second per worker.
+      An engine hook giving the key n-grams a swap touches would make an iteration cost microseconds; it belongs to
+      the engine (coordinate with its owner) and must keep the engine's metric code as the only one.
+- [ ] **The optimizer in Ergopti+.** Mount `LAYOUT_OPTIMIZER_PAGE` in the app's Studio window on Windows, macOS and
+      Linux, with « My typing » (keystats) as a corpus; the page already runs without workers where a host inlines it.
+- [ ] **Optimizer follow-ups.** Pasted texts and files as corpora (as the Comparer); zones in the page (restrict a
+      letter to keys by clicking them); per-viewer saved choices (localStorage); a browser test of the tab in
+      `layout-editor.playwright.cjs` style.
+
 ## Windows CI reliability (2026-11-07)
 
 - Moved to TODO-tests-macos.md (2026-11-15): Issue #106, owned Karabiner runtime not admitted.
