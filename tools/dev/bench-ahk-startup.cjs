@@ -15,6 +15,9 @@
  * 2. No generated-code cache: the production entry resolves its ordinary shared
  *    caches, so a source edit invalidates them through their real owners.
  * 3. Private copies are deleted; measurements remain in stdout for archiving.
+ * 4. The fixture stands for %LOCALAPPDATA%: its paths.toml and logs folder come
+ *    from app_dirs.toml, as the startup smoke's do, so a folder rename cannot
+ *    leave the copied configuration unread and the logs looked for elsewhere.
  * ==============================================================================
  */
 
@@ -29,9 +32,22 @@ const {
 	createStartupCodeFixture,
 	prepareStartupPersonalInclude
 } = require('../test/lib/ahk-startup-fixture.cjs');
+const AppDirs = require('../test/lib/app-dirs.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const WINDOWS = path.join(ROOT, 'static/ergopti_plus/windows');
+
+/**
+ * Where a boot under LOCALAPPDATA=<fixture> reads its paths.toml and writes its logs.
+ * @param {string} fixture The private folder that stands for %LOCALAPPDATA%.
+ * @returns {{pathsFile: string, logDir: string}}
+ */
+function benchmarkFixturePaths(fixture) {
+	return {
+		pathsFile: path.join(fixture, ...AppDirs.segments('config.windows', 'windows', 'paths_file')),
+		logDir: path.join(fixture, ...AppDirs.segments('logs.windows', 'windows'))
+	};
+}
 
 async function main() {
 	if (process.platform !== 'win32') throw new Error('This benchmark requires Windows.');
@@ -98,12 +114,10 @@ async function main() {
 					recursive: true,
 					filter: (file) => !/[\\/](metrics|logs|cache)([\\/]|$)/.test(file)
 				});
-			fs.writeFileSync(
-				path.join(fixture, 'paths.toml'),
-				`ConfigDirPath = "${config.replace(/\\/g, '/')}"\n`
-			);
+			const { pathsFile, logDir } = benchmarkFixturePaths(fixture);
+			fs.mkdirSync(path.dirname(pathsFile), { recursive: true });
+			fs.writeFileSync(pathsFile, `ConfigDirPath = "${config.replace(/\\/g, '/')}"\n`);
 			prepareStartupPersonalInclude(code.windows, config);
-			const logDir = path.join(fixture, 'ergopti_plus/logs');
 			const logOffsets = new Map(
 				fs.existsSync(logDir)
 					? fs
@@ -178,7 +192,10 @@ async function main() {
 	}
 }
 
-main().catch((error) => {
-	console.error(error);
-	process.exitCode = 1;
-});
+if (require.main === module)
+	main().catch((error) => {
+		console.error(error);
+		process.exitCode = 1;
+	});
+
+module.exports = { benchmarkFixturePaths };

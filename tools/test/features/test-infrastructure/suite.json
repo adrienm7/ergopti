@@ -547,6 +547,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-commit-identity.cjs"],
 			"repro": "npm run test:commit-identity"
+		},
+		{
+			"id": "js-0543",
+			"ordinal": 678,
+			"name": "startup benchmark fixture paths follow app_dirs.toml",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-bench-ahk-startup-paths.cjs"],
+			"repro": "npm run test:bench-ahk-startup-paths"
 		}
 	]
 }
