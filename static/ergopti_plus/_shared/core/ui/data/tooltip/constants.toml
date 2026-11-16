@@ -362,6 +362,11 @@ shortcut_joiner_linux = "+"
 # Vertical gap between stacked prediction lines (HS canvas gap font size).
 prediction_line_gap_hs = 3
 
+# The hotstring category whose delay override sets an AI suggestion's lifetime:
+# the Delays submenu's AI row stores the user's value under this name. Linux
+# reads it here (core/ui/ui/tooltip/config.lua); Windows and macOS still spell it.
+delay_category = "llm_prediction"
+
 # Navigation hints of the footer. Their words are locale text
 # (llm.tooltip.hint_accept_single, hint_accept_center, hint_or), and each key is
 # named from the shared key name table on the platform that shows it

@@ -119,6 +119,6 @@ helpers.describe("AI overlay: an offer left alone runs out (twl-003-llm-timeout)
 		helpers.assert_true(init ~= nil and init:find("on_expire", 1, true) ~= nil
 			and init:find("prediction_engine.dismiss()", 1, true) ~= nil, "on_expire dismisses the offer")
 		helpers.assert_true(init:find("lifetime_override", 1, true) ~= nil
-			and init:find("LLM_DELAY_CATEGORY", 1, true) ~= nil, "the daemon hands the overlay the user's AI delay")
+			and init:find("llm_delay_category()", 1, true) ~= nil, "the daemon hands the overlay the user's AI delay")
 	end)
 end)

@@ -3156,7 +3156,7 @@ local function main()
 				-- and macOS.
 				lifetime_override = function()
 					local resolved = hotstrings_config.resolve(
-						require("core.ui.ui.tooltip.config").LLM_DELAY_CATEGORY, nil)
+						require("core.ui.ui.tooltip.config").llm_delay_category(), nil)
 					if type(resolved) == "table" and resolved.has_override == true then return resolved.delay end
 					return nil
 				end,

@@ -196,7 +196,10 @@ end
 
 --- The hotstring category whose delay override sets an AI suggestion's
 --- lifetime: the Delays submenu's AI row, the key Windows and macOS read too.
-M.LLM_DELAY_CATEGORY = "llm_prediction"
+--- @return string category
+function M.llm_delay_category()
+	return require_key("llm_ui", "delay_category")
+end
 
 --- The shared default lifetime of an AI suggestion before the decrement, the
 --- value the Delays submenu's AI row shows while the user has set none.

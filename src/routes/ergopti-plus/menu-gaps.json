@@ -1525,13 +1525,9 @@
 		"path": "hotstrings_delays_frame.parameter_delay_ai_acceptance",
 		"visibility": "hide",
 		"labels": { "fr": "parameter_delay_ai_acceptance", "en": "parameter_delay_ai_acceptance" },
-		"platforms": { "windows": true, "macos": false, "linux": false },
+		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {
-				"en": "Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control.",
-				"fr": "Chaque pilote construit cette partie du menu à partir de ses propres lignes parent, cadre et enfants, car les boîtes à outils de menus natives diffèrent (menus AutoHotkey, tables de barre de menus Hammerspoon, zone de notification Linux). Les autres pilotes portent les mêmes commandes sous des lignes qui leur sont propres : c’est une différence de structure de menu, pas une commande manquante."
-			},
-			"linux": {
 				"en": "Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control.",
 				"fr": "Chaque pilote construit cette partie du menu à partir de ses propres lignes parent, cadre et enfants, car les boîtes à outils de menus natives diffèrent (menus AutoHotkey, tables de barre de menus Hammerspoon, zone de notification Linux). Les autres pilotes portent les mêmes commandes sous des lignes qui leur sont propres : c’est une différence de structure de menu, pas une commande manquante."
 			}

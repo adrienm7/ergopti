@@ -973,7 +973,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- The AI suggestion's lifetime, the row Windows and macOS have too.
 				["parameter_delay_ai_acceptance"] = function()
 					local TooltipConfig = require("core.ui.ui.tooltip.config")
-					return { category_delay_row(TooltipConfig.LLM_DELAY_CATEGORY, captions.ai_acceptance,
+					return { category_delay_row(TooltipConfig.llm_delay_category(), captions.ai_acceptance,
 						TooltipConfig.llm_timeout_default()) }
 				end,
 			})
