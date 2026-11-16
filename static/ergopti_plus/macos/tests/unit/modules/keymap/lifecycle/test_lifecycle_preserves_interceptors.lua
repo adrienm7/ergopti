@@ -48,7 +48,7 @@ local function load_keymap_capturing_taps()
 	-- raise here for a reason unrelated to what this test asserts.
 	for name in pairs(package.loaded) do
 		if type(name) == "string"
-			and (name:match("^modules%.keymap") or name:match("^modules%.llm")) then
+			and (helpers.in_module_family(name, "modules.keymap") or helpers.in_module_family(name, "modules.llm")) then
 			package.loaded[name] = nil
 		end
 	end

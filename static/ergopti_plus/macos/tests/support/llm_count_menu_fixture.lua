@@ -14,7 +14,7 @@ return function(callback, options)
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local ok, err = xpcall(function()
 		for name in pairs(package.loaded) do
-			if name:match("^ui%.menu%.menu_llm") or name:match("^modules%.llm")
+			if helpers.in_module_family(name, "ui.menu.menu_llm") or helpers.in_module_family(name, "modules.llm")
 				or name == "menu.engine.renderer" then package.loaded[name] = nil end
 		end
 		helpers.load_with_stubs("core.text.engine.toml.codec")

@@ -56,7 +56,7 @@ local function install_collaborators(effects)
 	-- singletons makes this behavioral repro depend on discovery order.
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
-			name:match("^modules%.keymap")
+			helpers.in_module_family(name, "modules.keymap")
 			or helpers.is_driver_module(name)
 		) then
 			package.loaded[name] = nil

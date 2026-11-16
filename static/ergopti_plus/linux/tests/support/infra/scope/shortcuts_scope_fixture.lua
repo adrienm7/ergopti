@@ -311,7 +311,7 @@ local function with_prediction_preflight(source, body)
 		local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
 		local ok, failure = pcall(function()
 			for name in pairs(package.loaded) do
-				if name:match("^modules%.llm%.") or name == "infra.llm_preferences" then package.loaded[name] = nil end
+				if helpers.in_module_family(name, "modules.llm", true) or name == "infra.llm_preferences" then package.loaded[name] = nil end
 			end
 			local prediction = require("modules.llm.prediction_engine")
 			prediction.init({ scheduler = require("tests.fakes").timer_scheduler(), overlay = {

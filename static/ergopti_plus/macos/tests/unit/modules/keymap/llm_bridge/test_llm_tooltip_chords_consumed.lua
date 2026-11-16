@@ -372,7 +372,7 @@ local function load_keymap()
 	local original_awake = scheduler.hotstring_time
 	scheduler.hotstring_time = function() return original_awake() + 10000 end
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:match("^modules%.keymap") or name:match("^modules%.llm")
+		if type(name) == "string" and (helpers.in_module_family(name, "modules.keymap") or helpers.in_module_family(name, "modules.llm")
 			or name == "platform.input.synthetic_input" or name == "adapters.event_provenance") then
 			package.loaded[name] = nil
 		end
@@ -460,7 +460,7 @@ local function load_keymap()
 		cleanup = function()
 			scheduler.hotstring_time = original_awake
 			for name in pairs(package.loaded) do
-				if type(name) == "string" and name:match("^modules%.keymap") then package.loaded[name] = nil end
+				if type(name) == "string" and helpers.in_module_family(name, "modules.keymap") then package.loaded[name] = nil end
 			end
 		end,
 	}

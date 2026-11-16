@@ -32,7 +32,7 @@ local function load_fixture()
 	for _, name in ipairs(RESET_MODULES) do package.loaded[name] = nil end
 	for name in pairs(package.loaded) do
 		if type(name) == "string"
-			and (name:match("^modules%.keymap") or name:match("^modules%.llm")) then
+			and (helpers.in_module_family(name, "modules.keymap") or helpers.in_module_family(name, "modules.llm")) then
 			package.loaded[name] = nil
 		end
 	end

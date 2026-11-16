@@ -59,7 +59,7 @@ end
 local function load_fixture(buffer)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
-			name:match("^modules%.keymap")
+			helpers.in_module_family(name, "modules.keymap")
 			or name == "modules.keystats"
 			or helpers.is_driver_module(name)
 			or name == "core.logger.engine.logger"

@@ -46,7 +46,7 @@ function M.with_configuration(body)
 			assert(uv.fs_mkdir(directory, 448)); assert(uv.os_setenv(key, directory))
 		end
 		for name in pairs(package.loaded) do
-			if name:match("^modules%.llm%.") or name:match("^infra%.llm_") or name == "settings.engine.paths"
+			if helpers.in_module_family(name, "modules.llm", true) or helpers.in_module_family(name, "infra.llm_") or name == "settings.engine.paths"
 				or name == "core.fs.adapters.storage" or name == "core.text.engine.toml_codec.writer" or name == "menu.ui.builder.builder" or name == "core.ui.ui.numeric_prompt"
 				or name == "settings.ui.paths_editor.bridge" then package.loaded[name] = nil end
 		end

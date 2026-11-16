@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local function fresh_runtime(effects)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
-			name:match("^modules%.keymap")
+			helpers.in_module_family(name, "modules.keymap")
 			or helpers.is_driver_module(name)
 			or name == "modules.keystats"
 			or name == "modules.llm"

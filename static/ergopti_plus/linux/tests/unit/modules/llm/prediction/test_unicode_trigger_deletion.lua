@@ -26,7 +26,7 @@ local function exercise(trigger, characters, raw_bytes)
 	local previous = {}
 	for name, module in pairs(package.loaded) do previous[name] = module end
 	for name in pairs(package.loaded) do
-		if name:match("^modules%.llm%.") then package.loaded[name] = nil end
+		if helpers.in_module_family(name, "modules.llm", true) then package.loaded[name] = nil end
 	end
 	for _, name in ipairs(names) do package.loaded[name] = nil end
 	local profiles = ProfilesFixture.without_inventory({
@@ -105,10 +105,10 @@ local function exercise(trigger, characters, raw_bytes)
 	-- module can initialize it twice when the next scenario needs it. Restore
 	-- only this fixture's domain modules and explicitly replaced boundaries.
 	for name in pairs(package.loaded) do
-		if name:match("^modules%.llm%.") then package.loaded[name] = nil end
+		if helpers.in_module_family(name, "modules.llm", true) then package.loaded[name] = nil end
 	end
 	for name, module in pairs(previous) do
-		if name:match("^modules%.llm%.") then package.loaded[name] = module end
+		if helpers.in_module_family(name, "modules.llm", true) then package.loaded[name] = module end
 	end
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 	if not ok then error(err, 0) end

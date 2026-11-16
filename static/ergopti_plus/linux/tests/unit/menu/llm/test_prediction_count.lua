@@ -118,7 +118,7 @@ local function with_numeric_menu(options, exercise)
 	NumericSandbox.write_bytes(path, initial)
 	local ok, err = xpcall(function()
 		for name in pairs(package.loaded) do
-			if name:match("^modules%.llm%.") or name:match("^infra%.llm_") then package.loaded[name] = nil end
+			if helpers.in_module_family(name, "modules.llm", true) or helpers.in_module_family(name, "infra.llm_") then package.loaded[name] = nil end
 		end
 		package.loaded["core.text.engine.toml_codec.writer"] = nil
 		local writer = require("core.text.engine.toml_codec.writer")

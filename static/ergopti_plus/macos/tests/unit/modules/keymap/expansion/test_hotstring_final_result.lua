@@ -38,7 +38,7 @@ local function fresh_engine(rules, max_arrows)
 		log_hotstring    = function() end,
 	}
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and name:match("^modules%.keymap%.")
+		if type(name) == "string" and helpers.in_module_family(name, "modules.keymap", true)
 			and name ~= "modules.keymap.state" then
 			package.loaded[name] = nil
 		end

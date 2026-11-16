@@ -214,7 +214,7 @@ local function with_keymap(body)
 	pcall(Keymap.stop)
 	Utils.is_ignored_window, Utils.is_secure_field = original_ignored, original_secure
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:match("^modules%.keymap") or name == "core.text.engine.toml.reader") then
+		if type(name) == "string" and (helpers.in_module_family(name, "modules.keymap") or name == "core.text.engine.toml.reader") then
 			package.loaded[name] = nil
 		end
 	end

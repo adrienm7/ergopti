@@ -588,4 +588,85 @@ end
 --- @return boolean failed True if clock or output diagnostics were incomplete.
 function M.timing_failed() return _timing ~= nil and _timing.has_errors() end
 
+--- The modules of a feature family a test forgets or stubs as one set: the
+--- names that once shared one prefix (modules.keymap, modules.llm). The
+--- structure plan moves them into several feature folders over several steps,
+--- so no prefix pattern follows them; each member is listed by its module name,
+--- which every step respells. A name under the family's original prefix (a
+--- module not moved yet, or a stub's made-up name) belongs to it too.
+local MODULE_FAMILIES = {
+	["modules.llm"] = {
+		"modules.llm.agent_connectors",
+		"modules.llm.agent_learning",
+		"modules.llm.agent_settings",
+		"modules.llm.api_entries",
+		"modules.llm.api_key_migration",
+		"modules.llm.api_ollama",
+		"modules.llm.api_remote",
+		"modules.llm.api_token_store",
+		"modules.llm.backend_brands",
+		"modules.llm.context",
+		"modules.llm.display_settings",
+		"modules.llm.enable_admission",
+		"modules.llm.error_log",
+		"modules.llm.inference",
+		"modules.llm.local_model_offer",
+		"modules.llm.local_model_probe",
+		"modules.llm.local_server_catalogue",
+		"modules.llm.local_server_ports",
+		"modules.llm.local_servers",
+		"modules.llm.managed_ollama_environment",
+		"modules.llm.managed_ollama_proxy",
+		"modules.llm.model_delete",
+		"modules.llm.model_download",
+		"modules.llm.model_inventory",
+		"modules.llm.model_profile",
+		"modules.llm.navigation_settings",
+		"modules.llm.ollama_install_admission",
+		"modules.llm.ollama_install_files",
+		"modules.llm.ollama_install_resolver",
+		"modules.llm.ollama_install_state",
+		"modules.llm.ollama_installed_runtime",
+		"modules.llm.owned_timer",
+		"modules.llm.prediction_engine",
+		"modules.llm.profile_settings",
+		"modules.llm.profiles",
+		"modules.llm.runtime_composition",
+		"modules.llm.runtime_factory",
+		"modules.llm.runtime_source",
+		"modules.llm.settings",
+		"modules.llm.translation",
+		"modules.llm.trigger_settings",
+		"modules.llm.vision_request",
+		"modules.llm.warmup",
+	},
+	["infra.llm_"] = {
+		"infra.llm_bridge",
+		"infra.llm_preferences",
+		"infra.llm_scope",
+	},
+}
+local _family_members = {}
+for family, members in pairs(MODULE_FAMILIES) do
+	local set = {}
+	for _, name in ipairs(members) do set[name] = true end
+	_family_members[family] = set
+end
+
+--- Whether a module name belongs to a feature family of MODULE_FAMILIES.
+--- @param name any A package.loaded key.
+--- @param family string The family's original prefix, as MODULE_FAMILIES keys it.
+--- @param members_only boolean|nil true excludes the family's own root module name.
+--- @return boolean
+function M.in_module_family(name, family, members_only)
+	local members = assert(_family_members[family], "unknown module family " .. tostring(family))
+	if type(name) ~= "string" then return false end
+	if name == family then return not members_only end
+	if members[name] then return true end
+	-- A prefix that ends a name segment (infra.llm_) continues it; any other is a parent.
+	local stem = family:sub(-1) == "_" and family or family .. "."
+	return name:sub(1, #stem) == stem
+end
+
+
 return M

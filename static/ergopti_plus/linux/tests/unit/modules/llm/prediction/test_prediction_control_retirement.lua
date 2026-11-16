@@ -56,7 +56,7 @@ local function scenario(options, body)
 	local prediction, guard, injector
 	local ok, failure = xpcall(function()
 		for name in pairs(package.loaded) do
-			if name:match("^modules%.llm%.") then package.loaded[name] = nil end
+			if helpers.in_module_family(name, "modules.llm", true) then package.loaded[name] = nil end
 		end
 		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "platform.focus.secure_field_detector",
 			"modules.hotstrings.word_reset", "infra.hotstring_preferences", "adapters.keyboard_layout",
@@ -650,7 +650,7 @@ do
 		local fixture_state, fixture_prediction
 		local ok, failure = xpcall(function()
 			for name in pairs(package.loaded) do
-				if name:match("^modules%.llm%.") or name:match("^modules%.keystats%.")
+				if helpers.in_module_family(name, "modules.llm", true) or name:match("^modules%.keystats%.")
 					or name:match("^modules%.hotstrings%.") or name:match("^modules%.shortcuts%.") then package.loaded[name] = nil end
 			end
 			for _, name in ipairs({ "platform.input.keyboard_hook", "platform.input.evdev_reader", "platform.input.modifier_broker",

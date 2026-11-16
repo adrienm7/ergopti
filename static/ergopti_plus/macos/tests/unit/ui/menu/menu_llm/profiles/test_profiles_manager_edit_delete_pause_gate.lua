@@ -54,7 +54,7 @@ end
 --- every cached modules.llm* entry so the whole require chain reloads fresh.
 local function ensure_real_llm_module()
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and name:match("^modules%.llm") then
+		if type(name) == "string" and helpers.in_module_family(name, "modules.llm") then
 			package.loaded[name] = nil
 		end
 	end

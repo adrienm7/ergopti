@@ -16,7 +16,7 @@ local function with_runtime(scenario)
 	for name, module in pairs(package.loaded) do saved[name] = module end
 	local ok, err = xpcall(function()
 		for name in pairs(package.loaded) do
-			if type(name) == "string" and name:match("^modules%.llm") then
+			if type(name) == "string" and helpers.in_module_family(name, "modules.llm") then
 				package.loaded[name] = nil
 			end
 		end

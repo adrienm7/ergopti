@@ -42,7 +42,7 @@ local function with_scope(body, source, chord_j_identity)
 			-- Complete the actual prediction construction for this enabled software
 			-- intake fixture; no provider, overlay or native runtime is started.
 			for name in pairs(package.loaded) do
-				if name:match("^modules%.llm%.") or name == "infra.llm_preferences" then package.loaded[name] = nil end
+				if helpers.in_module_family(name, "modules.llm", true) or name == "infra.llm_preferences" then package.loaded[name] = nil end
 			end
 			local prediction = require("modules.llm.prediction_engine")
 			prediction.init({ scheduler = require("tests.fakes").timer_scheduler() })

@@ -21,8 +21,8 @@ local KEYCODE_E = 14
 local function load_fixture()
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
-			name:match("^modules%.keymap")
-			or name:match("^modules%.llm")
+			helpers.in_module_family(name, "modules.keymap")
+			or helpers.in_module_family(name, "modules.llm")
 			or name:match("^modules%.keystats")
 			or name:match("^core%.ui%.ui%.tooltip")
 			or name == "platform.input.synthetic_input"

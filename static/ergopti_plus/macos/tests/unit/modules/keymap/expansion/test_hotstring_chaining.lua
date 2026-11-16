@@ -43,7 +43,7 @@ local function fresh_engine(entries)
 	-- Every keymap module keeps the state it was initialised with and refuses a
 	-- different one, so a fresh engine needs a fresh copy of each of them.
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and name:match("^modules%.keymap%.")
+		if type(name) == "string" and helpers.in_module_family(name, "modules.keymap", true)
 			and name ~= "modules.keymap.state" then
 			package.loaded[name] = nil
 		end

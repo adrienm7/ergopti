@@ -38,8 +38,8 @@ end
 local function load_fixture()
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
-			name:match("^modules%.keymap")
-			or name:match("^modules%.llm")
+			helpers.in_module_family(name, "modules.keymap")
+			or helpers.in_module_family(name, "modules.llm")
 			or name == "platform.input.synthetic_input"
 			or name == "adapters.event_provenance"
 		) then
@@ -114,7 +114,7 @@ local function load_fixture()
 		accept_calls = function() return accept_calls end,
 		cleanup = function()
 			for name in pairs(package.loaded) do
-				if type(name) == "string" and name:match("^modules%.keymap") then
+				if type(name) == "string" and helpers.in_module_family(name, "modules.keymap") then
 					package.loaded[name] = nil
 				end
 			end

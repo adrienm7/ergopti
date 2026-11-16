@@ -15,7 +15,7 @@ local SyntheticStack = require("tests.support.synthetic_input_stack")
 local function load_fixture(keystats)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
-			name:match("^modules%.keymap")
+			helpers.in_module_family(name, "modules.keymap")
 			or name == "modules.keystats"
 			or helpers.is_driver_module(name)
 			or name == "core.logger.engine.logger"

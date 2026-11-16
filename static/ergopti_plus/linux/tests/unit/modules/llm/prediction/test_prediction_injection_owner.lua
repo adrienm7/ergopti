@@ -19,7 +19,7 @@ local function scenario(action, phase, body)
 	local engine, guard, injector
 	local ok, detail = pcall(function()
 		for name in pairs(package.loaded) do
-			if name:match("^modules%.llm%.") then package.loaded[name] = nil end
+			if helpers.in_module_family(name, "modules.llm", true) then package.loaded[name] = nil end
 		end
 		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "platform.focus.secure_field_detector",
 			"adapters.clipboard", "adapters.keyboard_layout", "modules.hotstrings.injector" }) do package.loaded[name] = nil end

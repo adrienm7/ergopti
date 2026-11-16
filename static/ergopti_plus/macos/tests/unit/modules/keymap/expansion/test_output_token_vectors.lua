@@ -85,7 +85,7 @@ end)
 local function load_expander(buffer)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
-			name:match("^modules%.keymap") or name == "modules.keystats"
+			helpers.in_module_family(name, "modules.keymap") or name == "modules.keystats"
 			or helpers.is_driver_module(name) or name == "core.logger.engine.logger" or name == "core.timing.engine.timings"
 		) then
 			package.loaded[name] = nil

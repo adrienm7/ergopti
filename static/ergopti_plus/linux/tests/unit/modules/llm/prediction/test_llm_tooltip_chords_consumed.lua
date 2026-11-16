@@ -598,7 +598,7 @@ local function with_configured_prediction(source, body, options)
 	local ok, failure = pcall(function()
 		Sandbox.with_config(source, function(path)
 			for name in pairs(package.loaded) do
-				if name:match("^modules%.llm%.") or name == "infra.llm_preferences" then package.loaded[name] = nil end
+				if helpers.in_module_family(name, "modules.llm", true) or name == "infra.llm_preferences" then package.loaded[name] = nil end
 			end
 			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			local observations = { polls = 0, requests = 0, applied = {}, visible = false, path = path }

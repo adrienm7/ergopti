@@ -1065,4 +1065,151 @@ end
 --- @return boolean failed True if clock or output diagnostics were incomplete.
 function M.timing_failed() return _timing ~= nil and _timing.has_errors() end
 
+--- The modules of a feature family a test forgets or stubs as one set: the
+--- names that once shared one prefix (modules.keymap, modules.llm). The
+--- structure plan moves them into several feature folders over several steps,
+--- so no prefix pattern follows them; each member is listed by its module name,
+--- which every step respells. A name under the family's original prefix (a
+--- module not moved yet, or a stub's made-up name) belongs to it too.
+local MODULE_FAMILIES = {
+	["modules.keymap"] = {
+		"modules.keymap",
+		"modules.keymap.composer_check",
+		"modules.keymap.control_sentinels",
+		"modules.keymap.expander",
+		"modules.keymap.input_sources",
+		"modules.keymap.layout",
+		"modules.keymap.layout_emulation",
+		"modules.keymap.layout_install",
+		"modules.keymap.layout_registry",
+		"modules.keymap.layout_rows_build",
+		"modules.keymap.llm_bridge",
+		"modules.keymap.llm_context",
+		"modules.keymap.magic_key_source",
+		"modules.keymap.number_row_live",
+		"modules.keymap.one_shot_shift",
+		"modules.keymap.pending_layout_activation",
+		"modules.keymap.registry",
+		"modules.keymap.registry_groups",
+		"modules.keymap.registry_index",
+		"modules.keymap.section_keys",
+		"modules.keymap.selftest_gate",
+		"modules.keymap.state",
+		"modules.keymap.tap_copy",
+		"modules.keymap.terminator_replay",
+		"modules.keymap.terminators",
+		"modules.keymap.utils",
+	},
+	["modules.llm"] = {
+		"modules.llm",
+		"modules.llm.agent_connectors",
+		"modules.llm.agent_learning",
+		"modules.llm.agent_runner",
+		"modules.llm.api_common",
+		"modules.llm.api_mlx",
+		"modules.llm.api_mlx_discovery",
+		"modules.llm.api_mlx_fetch",
+		"modules.llm.api_mlx_inference",
+		"modules.llm.api_ollama",
+		"modules.llm.api_remote",
+		"modules.llm.api_token_crypto",
+		"modules.llm.app_filter",
+		"modules.llm.backend_detector",
+		"modules.llm.boot_cleanup",
+		"modules.llm.bootstrap_exit_signal",
+		"modules.llm.bootstrap_output",
+		"modules.llm.bootstrap_retry_generated",
+		"modules.llm.dependency_bootstrap_pause_owner",
+		"modules.llm.local_model_offer",
+		"modules.llm.local_server_ports",
+		"modules.llm.local_servers",
+		"modules.llm.managed_native_python",
+		"modules.llm.managed_pyobjc",
+		"modules.llm.mlx_bootstrap_diagnosis",
+		"modules.llm.mlx_deps_checker",
+		"modules.llm.mlx_stream_retirement",
+		"modules.llm.network_env",
+		"modules.llm.ollama_binary",
+		"modules.llm.ollama_deps_checker",
+		"modules.llm.ollama_endpoint",
+		"modules.llm.ollama_server_command",
+		"modules.llm.opaque_network_admission",
+		"modules.llm.parser",
+		"modules.llm.prediction_engine",
+		"modules.llm.profiles",
+		"modules.llm.progressive_reveal",
+		"modules.llm.prompt_builder",
+		"modules.llm.provider_uses",
+		"modules.llm.proxy_relay_receipt",
+		"modules.llm.pty_process_group",
+		"modules.llm.screen_answer",
+		"modules.llm.selection_publication",
+		"modules.llm.selection_translation",
+		"modules.llm.stream_payload_cleanup",
+		"modules.llm.streaming_handler",
+		"modules.llm.thinking_families",
+		"modules.llm.tone_rewrite",
+		"modules.llm.warmup_controller",
+	},
+	["ui.menu.menu_llm"] = {
+		"ui.menu.menu_llm",
+		"ui.menu.menu_llm.activation_pause_owner",
+		"ui.menu.menu_llm.agent_panel",
+		"ui.menu.menu_llm.api_panel",
+		"ui.menu.menu_llm.backend_labels",
+		"ui.menu.menu_llm.backend_panel",
+		"ui.menu.menu_llm.config_guard",
+		"ui.menu.menu_llm.custom_models",
+		"ui.menu.menu_llm.local_server_panel",
+		"ui.menu.menu_llm.menu_layout",
+		"ui.menu.menu_llm.mlx_repair_offer",
+		"ui.menu.menu_llm.model_selector_page",
+		"ui.menu.menu_llm.model_switcher",
+		"ui.menu.menu_llm.models_manager",
+		"ui.menu.menu_llm.models_manager_mlx",
+		"ui.menu.menu_llm.models_manager_mlx_download",
+		"ui.menu.menu_llm.models_manager_mlx_hf",
+		"ui.menu.menu_llm.models_manager_mlx_repo",
+		"ui.menu.menu_llm.models_manager_mlx_server",
+		"ui.menu.menu_llm.models_manager_ollama",
+		"ui.menu.menu_llm.ollama_enable_probe",
+		"ui.menu.menu_llm.prediction_lock_registry",
+		"ui.menu.menu_llm.profile_label",
+		"ui.menu.menu_llm.profiles_manager",
+		"ui.menu.menu_llm.requirement_operation_registry",
+		"ui.menu.menu_llm.runtime_install_offer",
+		"ui.menu.menu_llm.scope_runtime",
+		"ui.menu.menu_llm.settings_manager",
+		"ui.menu.menu_llm.startup_controller",
+		"ui.menu.menu_llm.streaming_panel",
+		"ui.menu.menu_llm.temperature_panel",
+		"ui.menu.menu_llm.trigger_orchestrator",
+		"ui.menu.menu_llm.trigger_panel",
+		"ui.menu.menu_llm.unreachable_backend_offer",
+		"ui.menu.menu_llm.warmup_controller",
+	},
+}
+local _family_members = {}
+for family, members in pairs(MODULE_FAMILIES) do
+	local set = {}
+	for _, name in ipairs(members) do set[name] = true end
+	_family_members[family] = set
+end
+
+--- Whether a module name belongs to a feature family of MODULE_FAMILIES.
+--- @param name any A package.loaded key.
+--- @param family string The family's original prefix, as MODULE_FAMILIES keys it.
+--- @param members_only boolean|nil true excludes the family's own root module name.
+--- @return boolean
+function M.in_module_family(name, family, members_only)
+	local members = assert(_family_members[family], "unknown module family " .. tostring(family))
+	if type(name) ~= "string" then return false end
+	if name == family then return not members_only end
+	if members[name] then return true end
+	-- A prefix that ends a name segment (infra.llm_) continues it; any other is a parent.
+	local stem = family:sub(-1) == "_" and family or family .. "."
+	return name:sub(1, #stem) == stem
+end
+
+
 return M
