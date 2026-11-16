@@ -533,7 +533,11 @@ Test("config full save meta: pending/path snapshot survives same-gap settlement 
 
 ; Regression: SaveFullConfig returns without rescheduling when !_DriverReady
 TestAuditV4_SaveFullConfigReschedule() {
-	Src := _DriverSourceConcat()
+	; SaveFullConfig's own body: the first guard of the whole concatenation
+	; belongs to whichever file sorts first (the startup smoke, since the
+	; settings engine left infra/), not to the save.
+	Src := _DriverFuncBody("SaveFullConfig")
+	AssertTrue(Src != "", "SaveFullConfig must be readable")
 
 	; The bug: boot timer is one-shot (-500 ms); if SaveFullConfig runs before
 	; _DriverReady is set, it returns immediately, silently dropping the save.
