@@ -8,8 +8,8 @@ $ProgressPreference = 'SilentlyContinue'
 if (-not $BuilderOnly -and [Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
 	throw 'Native Windows PowerShell is required for declaration admission.'
 }
-$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../../../../../../..'))
-$directory = Join-Path $repository 'static/ergopti_plus/windows/ai/engine'
+$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../../../../../..'))
+$directory = Join-Path $repository 'static/ergopti_plus/windows/ai/engine/ollama'
 foreach ($file in @('ollama-runtime-launch.ps1', 'ollama-model-pull.ps1')) {
 	$tokens = $null; $errors = $null
 	$ast = [Management.Automation.Language.Parser]::ParseFile((Join-Path $directory $file), [ref]$tokens, [ref]$errors)

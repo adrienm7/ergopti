@@ -450,7 +450,7 @@ _AP70_RootHelper(Scope, Action, Root, Nonce, ReceiptPath := "", Identity := "") 
 _AP70_Run(Scope, Action, Request) {
 	global _DriverDir
 	Args := ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-		FSResolveDirectoryPath(_DriverDir . "\ai\engine") . "\ollama_managed_files.ps1", "-Action", Action]
+		FSResolveDirectoryPath(_DriverDir . "\ai\engine\ollama") . "\ollama_managed_files.ps1", "-Action", Action]
 	for Name, Value in Request
 		Args.Push("-" . Name, String(Value))
 	State := _AP70_Launch(Scope, Args)

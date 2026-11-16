@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 # PSScriptRoot is established for the body, after default parameter binding.
 # Resolve only omitted arguments; explicit fixture overrides keep their owner.
 if (-not $PSBoundParameters.ContainsKey('CandidateRoot')) {
-	$CandidateRoot = [IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, '..\..\..\..\ai\engine'))
+	$CandidateRoot = [IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, '..\..\..\..\ai\engine\ollama'))
 }
 if (-not $PSBoundParameters.ContainsKey('FixtureRoot')) {
 	$FixtureRoot = [IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, '..\..\..\fixtures\ollama-install-files'))

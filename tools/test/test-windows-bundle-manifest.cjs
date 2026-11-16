@@ -393,11 +393,11 @@ const UNIVERSE_PREFIXES = [
 	'static/img',
 	'static/favicon.ico',
 	VENDOR_REL,
-	`${DRIVER_REL}/modules/llm/ollama_managed_files.ps1`,
-	`${DRIVER_REL}/modules/llm/ollama_managed_acquisition.ps1`,
-	`${DRIVER_REL}/modules/llm/ollama_download_archive.ps1`,
-	`${DRIVER_REL}/modules/llm/ollama-runtime-launch.ps1`,
-	`${DRIVER_REL}/modules/llm/ollama-model-pull.ps1`,
+	`${DRIVER_REL}/ai/engine/ollama/ollama_managed_files.ps1`,
+	`${DRIVER_REL}/ai/engine/ollama/ollama_managed_acquisition.ps1`,
+	`${DRIVER_REL}/ai/engine/ollama/ollama_download_archive.ps1`,
+	`${DRIVER_REL}/ai/engine/ollama/ollama-runtime-launch.ps1`,
+	`${DRIVER_REL}/ai/engine/ollama/ollama-model-pull.ps1`,
 	`${DRIVER_REL}/_generated`
 ];
 // A generated .ahk is an #Include Ahk2Exe compiles in, like every other driver
@@ -948,7 +948,7 @@ if (selection && refs) {
 			'ollama-model-pull.ps1'
 		].map((name) => [
 			'drop',
-			`${DRIVER_REL}/modules/llm/${name}`,
+			`${DRIVER_REL}/ai/engine/ollama/${name}`,
 			'a separately executed managed Ollama worker'
 		]),
 		['drop', 'vendor/ergopti_user_hotstrings.ahk', 'the separately executed user callback worker'],

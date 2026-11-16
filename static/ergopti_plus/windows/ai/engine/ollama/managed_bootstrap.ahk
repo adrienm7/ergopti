@@ -336,7 +336,7 @@ class OllamaManagedBootstrap {
 		NativeArchitecture := OllamaRuntime_HostArchitecture()
 		Asset := NativeArchitecture == "arm64" ? "windows-arm64" : "windows-amd64"
 		Root := AppFoldersManagedOllamaRoot()
-		Directory := _StaticDir . "\ergopti_plus\windows\ai\engine"
+		Directory := _StaticDir . "\ergopti_plus\windows\ai\engine\ollama"
 		Catalogue := _SharedDir . "\ai\data\ollama_release.json"
 		Updater := _SharedDir . "\updater\data\defaults.json"
 		Policy := _SharedDir . "\core\network\data\proxy_policy.json"
