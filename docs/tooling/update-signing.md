@@ -48,6 +48,31 @@ first real download of the `.sig` asset through the managed transport, so an
 `"off"` log saying the signature could not be downloaded must be resolved before
 step 5.
 
+## Installing from the public feed (Windows and Linux)
+
+When the GitHub API gives the Versions window no list, the window reads the
+public Atom feed, which names no assets and no digests. Decided 2026-11-06 (as
+macOS hands that release to Sparkle): only the newest release of the channel on
+screen, when the shared offer rule offers it, may install from it, and only
+through its signature, which is then required whatever `enforcement` says:
+
+- Windows: `AssetSignature_AuthenticateFeedAsset` downloads `ErgoptiPlus.exe`
+  and `ErgoptiPlus.exe.sig` under their conventional release path, computes the
+  size and SHA-256 of the downloaded bytes, verifies the rebuilt record and
+  hands that size and digest to the staging worker, which downloads the asset
+  again and enforces them as it does an API digest.
+- Linux: `manager.feed_release_record` names the bundle, its `.sha256` and its
+  `.sig` under their conventional names, marked `signature_required`; the
+  transfer verifies the archive against the checksum, then the gate requires
+  the signature over the sealed size and that digest.
+
+With no key provisioned every feed row keeps the no-details refusal; an older
+row is refused with `install_error_feed_not_newest`, and a signature that does
+not verify with `install_error_feed_signature`. The update check's own feed
+fallback still only announces a release (check-only). Tests use the throwaway
+key of `_shared/tests/corpus/updater/feed_install_vectors.json` and local fake
+feeds.
+
 macOS needs nothing more: Sparkle verifies the EdDSA signature of the appcast
 download, and the in-app release installer checks the GitHub API digest and the
 code-signature requirement of the staged app.
@@ -77,7 +102,11 @@ code-signature requirement of the staged app.
 4. Cut one release with `enforcement` still `"off"`. The release lanes sign and
    publish the `.sig` files; the updaters verify them and log the result.
    Check that both `ErgoptiPlus.exe.sig` and `ergopti-plus-linux.tar.gz.sig` are
-   attached and that the update log says `verified`.
+   attached and that the update log says `verified`. Then, with the API
+   blocked (for example after the 60-request limit), install that release from
+   the Versions window's feed list on Windows and on Linux: the log must say
+   `Feed release ... authenticated` (Windows) or `Update signature verified.`
+   after the feed row was chosen (Linux), and an older feed row must be refused.
 5. Set `enforcement` to `"required"` in a following commit. From then on a release
    without the signatures fails in CI, and an updater refuses an asset whose
    signature is missing or wrong.

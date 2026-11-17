@@ -159,11 +159,12 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     pauses whole (`menu/ui/builder/state.lua:710-713`, `modules/shortcuts/init.lua:337-341`); on Windows and Linux
     only the layer gates it, and the macOS menu says it is no shortcut. Give it its own owner outside the
     Shortcuts-gated layer, still held back by a script pause, with a unit test that `pause_bindings` leaves it bound.
-- [ ] **[RELEASE] Windows/Linux feed-only update fallback.** The unavailable-features diagnostics section is
-      published on both. Left: a feed-only list may install the channel's newest release only through authenticated
-      metadata (decided 2026-11-06, as macOS): download the asset under its conventional name, compute size and
-      SHA-256, rebuild the `asset_signing.json` record and verify `<asset>.sig` against the pinned key. Blocked until
-      `public_key_spki_base64` is provisioned and enforcement leaves `off` ([update-signing](docs/tooling/update-signing.md)).
+- [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
+      channel's newest release through its required detached signature on both (`feed-only-install` tests, throwaway
+      key in `feed_install_vectors.json`); without a key every feed row keeps the no-details refusal. Left, at release
+      time once `public_key_spki_base64` is provisioned: the step-4 check of
+      [update-signing](docs/tooling/update-signing.md) (a real feed-only install on Windows and Linux, the log saying
+      the signature verified, an older row refused), then enforcement `required`.
 - [ ] **[CI] Number-row cohort still selects in the XCTest process (macOS).** The refused restores were not a stale
       test-process cache: the TIS probe (`probe-macos-tis-cache.yml`) left HIToolbox's own current layout
       (`AppleCurrentKeyboardLayoutInputSourceID`, read by every process, the launcher included) on the old source while

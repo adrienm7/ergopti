@@ -840,10 +840,14 @@ restarts and send `If-None-Match`; every driver names an exhausted limit (403 or
 sentence (`_shared/updater/engine/rate_limit.lua`). When the API gives no list,
 the macOS checks read the public releases Atom feed
 (`release_sources.feed_release_list`): Sparkle installs from the appcast, so
-tags suffice. A Versions-window install needs the API's asset digests, so a
-feed-only list refuses it with a warning on every driver; the Windows and
-Linux checks keep the API only for the same reason. Action: never install a
-release whose digest did not come from the API.
+tags suffice. A Versions-window install from a feed-only list takes only the
+channel's newest release: macOS hands it to Sparkle, Windows and Linux install
+it once the downloaded asset's size and SHA-256 match a detached signature of
+the pinned key, required whatever the enforcement
+([update-signing](../tooling/update-signing.md)); older rows, and every row
+while no key is provisioned, refuse with a warning. The Windows and Linux
+update checks still only announce a feed release. Action: never install a
+release whose digest came neither from the API nor from a verified signature.
 
 ### project-loopback-probes-use-the-ipv4-literal
 
