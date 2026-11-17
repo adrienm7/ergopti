@@ -294,7 +294,13 @@ var LAYOUT_ANALYSIS = (function () {
 		const baseFingering = board3d
 			? board3d.fingers
 			: model.fingerings[checked && checked.base ? checked.base : spec.fingering];
-		const fingering = Object.assign({}, baseFingering, checked ? checked.fingers : {});
+		// A JIS or ABNT board adds its own keys (Yen, Ro) to the base fingering.
+		const fingering = Object.assign(
+			{},
+			baseFingering,
+			board3d ? {} : spec.extra_fingers || {},
+			checked ? checked.fingers : {}
+		);
 		const homeKeys = Object.assign(
 			{},
 			board3d ? board3d.home_keys : model.home_keys,

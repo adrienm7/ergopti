@@ -16,6 +16,7 @@
  *   - _shared/layouts/data/analysis/analyser_models.json (the constants of the
  *     scorers that reproduce other analysers, analyser_scores.js);
  *   - _shared/layouts/data/keycodes/physical_keys.json (key geometry);
+ *   - _shared/layouts/data/keycodes/keyboard_forms.json (the JIS and ABNT boards);
  *   - the registry layouts and the reference QWERTY and AZERTY, read through
  *     the layout composer model (tools/lib/layout-composer.cjs).
  *
@@ -36,6 +37,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { REPO_ROOT, shared, sharedRel } = require('../lib/paths.cjs');
+const KeyboardForms = require('../lib/keyboard-forms.cjs');
 const { loadComposer, REGISTRY_DIR } = require('../lib/layout-composer.cjs');
 const { parse: parseToml } = require('smol-toml');
 
@@ -115,6 +117,7 @@ const SOURCES = [
 	'static/corpus/register.json',
 	'layouts/data/analysis/analyser_models.json',
 	'layouts/data/keycodes/physical_keys.json',
+	'layouts/data/keycodes/keyboard_forms.json',
 	'../../layouts/registry (through layout_composer)'
 ];
 
@@ -162,21 +165,42 @@ const LIBRARY_LEVELS = 4;
 // ======================
 
 /**
- * The centre of each finger-assigned key on the ISO and ANSI boards.
+ * The keys the row-staggered keyboards finger: the standard fingering's, then
+ * the keys a JIS or ABNT keyboard adds (its extra_fingers).
  * @param {object} model - analysis_model.json.
- * @returns {object} code → {iso: {x, y, col, width}, ansi: {...}}.
- * @throws {Error} When a key has no geometry.
+ * @returns {string[]}
+ */
+function fingeredCodes(model) {
+	const codes = new Set(Object.keys(model.fingerings.standard));
+	for (const spec of Object.values(model.keyboards))
+		for (const code of Object.keys(spec.extra_fingers || {})) codes.add(code);
+	return [...codes];
+}
+
+/**
+ * The geometry of each finger-assigned key on the ISO and ANSI boards, and on
+ * the JIS and ABNT boards a keyboard measures on (keyboard_forms.json).
+ * @param {object} model - analysis_model.json.
+ * @returns {object} code → {iso: {row, col, width}, ansi: {...}, jis: {...}, abnt: {...}}.
+ * @throws {Error} When a key has no geometry, or a keyboard names an unknown board.
  */
 function buildGeometry(model) {
-	const physical = JSON.parse(fs.readFileSync(PHYSICAL_KEYS_PATH, 'utf8')).keys;
+	const registry = JSON.parse(fs.readFileSync(PHYSICAL_KEYS_PATH, 'utf8'));
+	const forms = KeyboardForms.readForms(registry);
+	const measured = ['iso', 'ansi'];
+	for (const [id, spec] of Object.entries(model.keyboards)) {
+		if (!spec.geometry || ['iso', 'ansi', 'ortho'].includes(spec.geometry)) continue;
+		if (!forms[spec.geometry]) throw new Error(`keyboard ${id}: no board ${spec.geometry}`);
+		if (!measured.includes(spec.geometry)) measured.push(spec.geometry);
+	}
 	const out = {};
-	for (const code of Object.keys(model.fingerings.standard)) {
-		const record = physical[code];
+	for (const code of fingeredCodes(model)) {
+		const record = registry.keys[code];
 		if (!record || !record.geometry)
 			throw new Error(`${code} has no geometry in physical_keys.json`);
 		out[code] = {};
-		for (const form of ['iso', 'ansi']) {
-			const g = record.geometry[form];
+		for (const form of measured) {
+			const g = KeyboardForms.geometryOn(registry, forms, code, form);
 			if (!g) continue;
 			out[code][form] = { row: g.row, col: g.col, width: g.width };
 		}
@@ -193,7 +217,7 @@ function buildGeometry(model) {
 function buildScancodes(model) {
 	const physical = JSON.parse(fs.readFileSync(PHYSICAL_KEYS_PATH, 'utf8')).keys;
 	const out = {};
-	for (const code of Object.keys(model.fingerings.standard)) {
+	for (const code of fingeredCodes(model)) {
 		const match = /^SC([0-9A-F]{3})$/.exec(physical[code].ahk);
 		if (!match) throw new Error(`${code} has no scan code in physical_keys.json`);
 		out[parseInt(match[1], 16).toString(16).padStart(2, '0')] = code;

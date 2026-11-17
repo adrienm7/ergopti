@@ -1,5 +1,5 @@
 {
-	"_description": "Shared parameters of the layout analysis engine (_shared/ui/layout_analysis/analysis_engine.js): which finger types each physical key (KeyboardEvent.code), which keys are home (the space bar rests both thumbs: shared_home_keys) or outer (7th right-hand column); lateral keys are derived from each finger's home column, the keyboards it measures on, the reference character set, the keyboard formats (100 %, TKL, 75 %, 65 %, 60 %: the blocks each lacks, shown by the editor and the Comparer and measured by the compact form factors), the compact form factors and the shortcut letters. Every value is defined in docs/design/layout-analysis.md. Geometry comes from _shared/layouts/data/keycodes/physical_keys.json. « substitutions » lists the plain character typed instead of a typographic one the layout lacks (the Kalamine analyser's rule).",
+	"_description": "Shared parameters of the layout analysis engine (_shared/ui/layout_analysis/analysis_engine.js): which finger types each physical key (KeyboardEvent.code), which keys are home (the space bar rests both thumbs: shared_home_keys) or outer (7th right-hand column); lateral keys are derived from each finger's home column, the keyboards it measures on, the reference character set, the keyboard formats (100 %, TKL, 75 %, 65 %, 60 %: the blocks each lacks, shown by the editor and the Comparer and measured by the compact form factors), the compact form factors and the shortcut letters. Every value is defined in docs/design/layout-analysis.md. Geometry comes from _shared/layouts/data/keycodes/physical_keys.json, and for the JIS and ABNT keyboards from keyboard_forms.json beside it; such a keyboard adds its own keys to its fingering (extra_fingers) and ticks the layouts made for its layout_geometry (ISO). « substitutions » lists the plain character typed instead of a typographic one the layout lacks (the Kalamine analyser's rule).",
 	"schema_version": 1,
 	"key_unit_mm": 19.05,
 	"fingers": ["lp", "lr", "lm", "li", "lt", "rt", "ri", "rm", "rr", "rp"],
@@ -144,6 +144,18 @@
 			"geometry": "ansi",
 			"fingering": "standard"
 		},
+		"jis": {
+			"geometry": "jis",
+			"fingering": "standard",
+			"extra_fingers": { "IntlYen": "rp", "IntlRo": "rp" },
+			"layout_geometry": "iso"
+		},
+		"abnt": {
+			"geometry": "abnt",
+			"fingering": "standard",
+			"extra_fingers": { "IntlRo": "rp" },
+			"layout_geometry": "iso"
+		},
 		"ortho": {
 			"geometry": "ortho",
 			"fingering": "standard"
@@ -200,7 +212,8 @@
 			"Numpad3",
 			"NumpadEnter",
 			"Numpad0",
-			"NumpadDecimal"
+			"NumpadDecimal",
+			"NumpadComma"
 		],
 		"editing": ["Insert", "Delete", "Home", "End", "PageUp", "PageDown"],
 		"function": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"],

@@ -605,7 +605,9 @@
 		 * @returns {Set<string>} The ids to tick.
 		 */
 		function defaultSelection(keyboard) {
-			const geometry = DATA.model.keyboards[keyboard].geometry || 'iso';
+			const spec = DATA.model.keyboards[keyboard];
+			// A JIS or ABNT board takes the layouts made for ISO (its layout_geometry).
+			const geometry = spec.layout_geometry || spec.geometry || 'iso';
 			const otherBoard = (layout) =>
 				layout.geometry !== '' &&
 				layout.geometry !== geometry &&
