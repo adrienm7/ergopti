@@ -365,7 +365,7 @@ async function main() {
 		}
 	}
 	const linuxGestures = fs.readFileSync(
-		paths.shared('..', 'linux', 'modules', 'gestures', 'manager.lua'),
+		paths.shared('..', 'linux', 'gestures', 'engine', 'manager.lua'),
 		'utf8'
 	);
 	const projectedSlots = [
