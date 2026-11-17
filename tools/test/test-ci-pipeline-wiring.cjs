@@ -2556,7 +2556,7 @@ function commonSiteProblems(source) {
 		command(
 			test,
 			'Test received production site — ${{ matrix.lot }}',
-			'set -euo pipefail\nnode tools/test/browser/site-artifact-smoke.playwright.cjs "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-testbuild.json"\nnode tools/test/browser/site-structure.playwright.cjs "$RUNNER_TEMP/received-site/site" "$BASE_PATH"\nmkdir "$RUNNER_TEMP/site-proof"\ncp "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-proof/build.json"\ncp "$RUNNER_TEMP/site-testbuild.json" "$RUNNER_TEMP/site-proof/site-testbuild.json"\n'
+			'set -euo pipefail\nnode tools/test/browser/site-artifact-smoke.playwright.cjs "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-testbuild.json"\nnode tools/test/browser/site-structure.playwright.cjs "$RUNNER_TEMP/received-site/site" "$BASE_PATH"\nnode tools/test/browser/site-accessibility.playwright.cjs "$RUNNER_TEMP/received-site/site" "$BASE_PATH"\nmkdir "$RUNNER_TEMP/site-proof"\ncp "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-proof/build.json"\ncp "$RUNNER_TEMP/site-testbuild.json" "$RUNNER_TEMP/site-proof/site-testbuild.json"\n'
 		);
 		same(
 			test.steps[7],

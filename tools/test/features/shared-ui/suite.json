@@ -525,6 +525,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-kbd-dll-wow64.cjs"],
 			"repro": "npm run test:kbd-dll-wow64"
+		},
+		{
+			"id": "js-0544",
+			"ordinal": 683,
+			"name": "site accessibility ratchet refuses new violations, its baseline is well formed and every site page is audited",
+			"cmd": "node",
+			"args": ["tools/test/test-site-accessibility-ratchet.cjs"],
+			"repro": "npm run test:site-accessibility-ratchet"
 		}
 	]
 }
