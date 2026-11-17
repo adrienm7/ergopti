@@ -2666,6 +2666,9 @@ async function exerciseComparerLink(browser, origin) {
 			'dll',
 			'kla',
 			'kalamine',
+			'dof',
+			'genkey',
+			'cmini',
 			'nav'
 		]);
 		assert.equal(await page.locator('#le-export button[id^="le-export-"]').count(), 1);

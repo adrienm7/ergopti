@@ -154,8 +154,9 @@ helpers.describe("layout editor source store", function()
 		export(".hidden.zip", good)
 		export("a..zip", good)
 		export("script.sh", good)
-		-- A Kalamine TOML is a download since ac1a78f713; a text file is not.
-		export("mine.txt", good)
+		-- A Kalamine TOML is a download since ac1a78f713 and a genkey text file
+		-- since 0576daf71d; a program is not.
+		export("mine.exe", good)
 		export("mine.zip", "")
 		export("mine.zip", "not base64!")
 		export("mine.zip", "QQ")

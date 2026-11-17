@@ -183,7 +183,7 @@ _LSS_DownloadRefusalsCase() {
 	Settings := SourceStore_SharedSettings()
 	Big := Format("{:" . (Ceil(Settings["max_file_bytes"] / 3) * 4 + 4) . "}", "")
 	Samples := [["../evil.zip", "UEs="], ["sub\dir.zip", "UEs="], [".hidden.zip", "UEs="], ["a..zip", "UEs="],
-		["script.sh", "UEs="], ["mine.txt", "UEs="], ["mine.zip", ""], ["mine.zip", "not base64!"],
+		["script.sh", "UEs="], ["mine.exe", "UEs="], ["mine.zip", ""], ["mine.zip", "not base64!"],
 		["mine.zip", "QQ"], ["mine.zip", "UE s="], ["mine.zip", StrReplace(Big, " ", "A")]]
 	for Sample in Samples {
 		Result := SourceStore_Export(Settings, Map("filename", Sample[1], "data", Sample[2]), _LSS_ExportPorts(Disk))
