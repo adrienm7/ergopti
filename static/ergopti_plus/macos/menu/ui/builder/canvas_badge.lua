@@ -158,9 +158,12 @@ function M.prepend_to(items, ctx, on_click)
 		Logger.error(LOG, "Canvas badge rendering failed: %s.", tostring(img))
 		return false
 	end
+	-- The pill is an image with an empty title, which VoiceOver reads as
+	-- nothing: the tooltip carries its text (state and pause action) in words.
 	local badge = {
 		title = "",
 		image = img,
+		tooltip = display_text,
 		fn    = on_click,
 	}
 	local boundary = { title = frame[2].separator and "-" }

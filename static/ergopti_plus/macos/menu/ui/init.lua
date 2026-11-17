@@ -335,9 +335,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		-- once from the listener and once from the menu refresh that follows.
 		-- The icon depends on exactly two inputs; when neither moved there is
 		-- nothing to redraw.
-		local icon_key = tostring(variant) .. "|" .. tostring(paused)
+		-- The tooltip names the item for VoiceOver, paused or not.
+		local tooltip = i18n.get(paused and "accessibility.tray_tip_paused" or "accessibility.tray_tip")
+		local icon_key = tostring(variant) .. "|" .. tostring(paused) .. "|" .. tostring(tooltip)
 		if custom_text == nil and icon_key == _last_icon_key then return end
 		_last_icon_key = (custom_text == nil) and icon_key or nil
+		local ok_tip, tip_err = pcall(function() myMenu:setTooltip(tooltip) end)
+		if not ok_tip then
+			Logger.error(LOG, "Menu-bar tooltip could not be set: %s.", tostring(tip_err))
+		end
 
 		-- The shared logo directory lives at static/img/logo (two levels up from
 		-- static/ergopti_plus/macos, where base_dir points)

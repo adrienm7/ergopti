@@ -316,6 +316,9 @@ helpers.describe("canvas badge consumes declared captions and boundary before na
 					helpers.assert_eq(effects.texts[#effects.texts], prior[state.caption])
 					helpers.assert_eq(items[1].title, "")
 					helpers.assert_eq(items[1].image, DUMMY_IMAGE)
+					-- An image with an empty title is silent for VoiceOver
+					-- (a11y-canvas-badge-tooltip): its text is the tooltip.
+					helpers.assert_eq(items[1].tooltip, prior[state.caption])
 					helpers.assert_eq(items[2].title, "-")
 					helpers.assert_true(rawequal(items[3], body), "native root row identity and placement survive")
 				end

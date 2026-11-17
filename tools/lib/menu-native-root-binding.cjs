@@ -491,7 +491,11 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		!unique(release, 'local canvas = pending_canvas') ||
 		!once(release, 'local ok = pcall(function() canvas:delete() end)') ||
 		!unique(release, 'if pending_canvas == canvas then pending_canvas = nil end') ||
-		!soleLocal(prepend, 'badge', 'local badge = { title = "", image = img, fn = on_click, }') ||
+		!soleLocal(
+			prepend,
+			'badge',
+			'local badge = { title = "", image = img, tooltip = display_text, fn = on_click, }'
+		) ||
 		!soleLocal(prepend, 'boundary', 'local boundary = { title = frame[2].separator and "-" }') ||
 		!unique(
 			prepend,

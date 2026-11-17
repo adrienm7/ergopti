@@ -866,8 +866,11 @@ function M.new(deps)
 					for field in next, row do
 						if field ~= "title" and field ~= "fn" and field ~= "menu" and field ~= "image"
 							and field ~= "checked" and field ~= "disabled" and field ~= "joins_reload"
-							and field ~= "bypasses_reload" then return false end
+							and field ~= "bypasses_reload" and field ~= "tooltip" then return false end
 					end
+					-- A row drawn as an image names itself through its tooltip,
+					-- the text VoiceOver reads for it (the macOS canvas badge).
+					if rawget(row, "tooltip") ~= nil and type(rawget(row, "tooltip")) ~= "string" then return false end
 					if rawget(row, "joins_reload") ~= nil and rawget(row, "joins_reload") ~= true then return false end
 					if rawget(row, "bypasses_reload") ~= nil and rawget(row, "bypasses_reload") ~= true then return false end
 					local title, action, menu = rawget(row, "title"), rawget(row, "fn"), rawget(row, "menu")
