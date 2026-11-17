@@ -125,6 +125,7 @@ function makeDocument() {
 	return {
 		elements,
 		body: element('body', 'body'),
+		documentElement: {},
 		readyState: 'complete',
 		addEventListener() {},
 		createElement: (tag) => element('', tag),
