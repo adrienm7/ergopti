@@ -87,6 +87,9 @@ const USAGE_EXTENSIONS = new Set([
 
 // The usage walk skips the catalogues themselves, build output, recorded
 // history and the tests (a key that only a test names is not user-facing).
+// Names are matched at any depth, so none may name a source folder: the
+// field reports live in the repository's /reports/, outside the walked
+// roots, while diagnostics/engine/reports/ holds the crash reporters.
 const USAGE_SKIPPED = new Set([
 	'node_modules',
 	'.git',
@@ -95,7 +98,6 @@ const USAGE_SKIPPED = new Set([
 	'build',
 	'.claude',
 	'.tmp',
-	'reports',
 	'docs',
 	'tests'
 ]);
