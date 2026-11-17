@@ -342,10 +342,12 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 	return true
 }
 
-; Readiness initializes the admitted page under pause; user commands do not.
+; A command belongs to the page session that sent it. A pause stops typing, not
+; configuration (EDD-1): a paused driver still installs, selects and removes a
+; layout, and the emulation it selects stays inert until the resume.
 _LayMgrWeb_CommandCurrent(SessionEpoch, Action) {
 	global _LayMgrWeb_SessionEpoch
-	return SessionEpoch == _LayMgrWeb_SessionEpoch && (Action == "ready" || !A_IsSuspended)
+	return SessionEpoch == _LayMgrWeb_SessionEpoch
 }
 
 _LayMgrWeb_PresentationCurrent(Deps) {
@@ -1002,12 +1004,6 @@ _LayMgrWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	try Payload := JsonParse(Msg)
 	catch {
 		LoggerWarn("LayoutManager", "Refused a layout manager message that is not JSON.")
-		return
-	}
-	; A COM callback bypasses Suspend: a paused driver must not install or
-	; reload from a page click, but the page's own ready signal still loads it.
-	if A_IsSuspended && !((Payload is Map) && Payload.Get("action", "") == "ready") {
-		NotifyPausedRefusal("A layout manager page action")
 		return
 	}
 	SetTimer(_LayMgrWeb_SessionCall.Bind(SessionEpoch, LayoutManager_HandleMessage, Payload), -1)

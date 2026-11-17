@@ -466,15 +466,8 @@ _PromptEdWeb_OnWebMessage(Handler, Args) {
 		return
 
 	Action := Payload.Has("action") ? Payload["action"] : ""
-	; WebMessageReceived is a COM callback: it bypasses native Suspend, which only
-	; disarms hotkeys. Without this a paused driver still lets a page click write
-	; config, re-register hotstrings or launch an elevated install.
-	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
-	; the SafetyFlush and leaves the page permanently un-initialised.
-	if (A_IsSuspended && Action != "ready") {
-		NotifyPausedRefusal("A prompt editor page action")
-		return
-	}
+	; A pause stops typing, not configuration (EDD-1): a paused driver still
+	; saves a profile, which the prediction runtime reads at the resume.
 	_PromptEdWeb_HandlePayload(Payload, Action)
 }
 
@@ -546,8 +539,6 @@ _PromptEdWeb_PushInit(EditId, Epoch) {
 ; (label, system_single, batch).
 _PromptEdWeb_Save(EditId, Epoch, Name, Batch, Prompt) {
 	global _PromptEdWeb_ContextEpoch
-	if A_IsSuspended
-		return false
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
@@ -607,7 +598,7 @@ _PromptEdWeb_ApplyProfile(MenuState, EditId, Name, Batch, Prompt) {
 
 _PromptEdWeb_ApplyProfileForContext(MenuState, EditId, Epoch, Name, Batch,
 		Prompt) {
-	if A_IsSuspended or !_PromptEdWeb_IsCurrentContext(EditId, Epoch)
+	if !_PromptEdWeb_IsCurrentContext(EditId, Epoch)
 		return false
 	return _PromptEdWeb_ApplyProfile(MenuState, EditId, Name, Batch, Prompt)
 }

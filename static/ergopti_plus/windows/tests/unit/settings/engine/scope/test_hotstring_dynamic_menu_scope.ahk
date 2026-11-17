@@ -87,7 +87,7 @@ _HSCS_WithDynamicBootState(Body) {
 }
 
 ; Walk the real native order subtree, including dispatcher ownership and the
-; edge/pause restrictions. A new parent cannot replace a family or its editor.
+; edge restrictions. A new parent cannot replace a family or its editor.
 _HSCS_DynamicOrderSubtree(Built, Position, Labels) {
 	global _MenuDispatchCallbacks
 	AssertEqual(t("menu.hotstrings.section_order"), _CTC_LabelAt(Built, Position), "the order parent follows the complete family list")
@@ -107,8 +107,10 @@ _HSCS_DynamicOrderSubtree(Built, Position, Labels) {
 			Assert(_MenuDispatchCallbacks.Has(Id), "each order command belongs to the real menu dispatcher")
 			State := DllCall("GetMenuState", "ptr", ChildHandle, "uint", Direction - 1, "uint", 0x400, "uint")
 			Assert(State != 0xFFFFFFFF, "the native command state must be readable")
-			Disabled := A_IsSuspended || Direction == 1 && Index == 1 || Direction == 2 && Index == Labels.Length
-			AssertEqual(Disabled, !!(State & 3), "edge moves and every paused move are disabled")
+			; A pause stops typing, not configuration (EDD-1): only the edge moves
+			; are disabled, paused or not (paused-order).
+			Disabled := Direction == 1 && Index == 1 || Direction == 2 && Index == Labels.Length
+			AssertEqual(Disabled, !!(State & 3), "only the edge moves are disabled, paused or not")
 		}
 	}
 	AssertTrue(TrayMenuIsSeparatorAt(OrderMenu, Labels.Length), "reset is separated from the family moves")
@@ -117,7 +119,7 @@ _HSCS_DynamicOrderSubtree(Built, Position, Labels) {
 	Assert(_MenuDispatchCallbacks.Has(ResetId), "reset belongs to the same native dispatcher")
 	State := DllCall("GetMenuState", "ptr", Handle, "uint", Labels.Length + 1, "uint", 0x400, "uint")
 	Assert(State != 0xFFFFFFFF, "the reset state must be readable")
-	AssertEqual(A_IsSuspended, !!(State & 3), "reset respects pause")
+	AssertEqual(0, !!(State & 3), "reset stays live, paused or not")
 }
 
 ; Dynamic scopes have eight canonical families and their master,
@@ -349,6 +351,19 @@ _HSCS_OrderNativePublication() {
 			AssertTrue(TOML_SameValue(Original["private_root"], ResetDocument["private_root"]), "reset retains unrelated root data too")
 			AssertTrue(ConfigSchemaCanPrepareWrite(Fixture.path), "reset keeps the native source generation admitted")
 			AssertEqual(2, Repaints, "only the two native commits repaint")
+			; A pause stops typing, not configuration (EDD-1): a section order moved
+			; while paused commits and repaints as an active one does (paused-order).
+			Suspend(true)
+			Snapshot := _HS_OrderSnapshot("dynamichotstrings", Fixture.path)
+			Assert(Snapshot is Map, "the paused menu must capture its admitted configuration source")
+			Moved := _HS_OrderMove(["datefr", "date"], "date", -1)
+			AssertEqual('["date","datefr"]', KL_JsonEncode(Moved), "the move computes the new order")
+			AssertTrue(_HS_OrderCommit(Snapshot, Moved, 0, Repaint, Notify),
+				"a paused move must commit: " . KL_JsonEncode(Refusals))
+			AssertEqual(3, Repaints, "the paused commit repaints")
+			AssertTrue(A_IsSuspended, "the paused move commits without lifting the pause")
+			Parsed := TOML_ParseFreshFile(Fixture.path)
+			AssertEqual('["date","datefr"]', KL_JsonEncode(Parsed["hotstrings.order_overrides"]["dynamichotstrings"]))
 		} finally Suspend(SavedSuspend)
 	}
 }

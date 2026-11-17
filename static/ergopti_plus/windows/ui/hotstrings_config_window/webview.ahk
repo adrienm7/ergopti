@@ -281,15 +281,8 @@ _HCWWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 		return
 
 	Action := Payload.Has("action") ? Payload["action"] : ""
-	; WebMessageReceived is a COM callback: it bypasses native Suspend, which only
-	; disarms hotkeys. Without this a paused driver still lets a page click write
-	; config, re-register hotstrings or launch an elevated install.
-	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
-	; the SafetyFlush and leaves the page permanently un-initialised.
-	if (A_IsSuspended && Action != "ready") {
-		NotifyPausedRefusal("A hotstrings window page action")
-		return
-	}
+	; A pause stops typing, not configuration (EDD-1): a paused driver still
+	; writes every toggle, and the hotstrings it registers stay inert until resume.
 	if (Action == "ready") {
 		SetTimer(_HCWWeb_SessionCall.Bind(SessionEpoch, _HCWWeb_PushState), -1)
 		return
@@ -337,10 +330,6 @@ _HCWWeb_SessionCall(SessionEpoch, Callback, Params*) {
 ; on_message dispatch: bulk actions hit every category, per-entry actions resolve
 ; the entry by its key and route through the shared write helpers.
 _HCWWeb_Dispatch(Payload) {
-	if A_IsSuspended {
-		NotifyPausedRefusal("A hotstrings window page action")
-		return false
-	}
 	Action := Payload.Has("action") ? Payload["action"] : ""
 
 	if (Action == "close") {

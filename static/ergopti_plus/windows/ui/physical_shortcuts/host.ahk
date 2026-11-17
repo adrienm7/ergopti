@@ -311,13 +311,14 @@ class PhysicalShortcutsHost {
 	}
 
 	/**
-	 * Opens one shared page over the admitted scope.
-	 * @param {Map} Options "scope" and the live "is_paused" getter.
+	 * Opens one shared page over the admitted scope. A pause stops typing, not
+	 * configuration (EDD-1): the page opens and saves while paused, as on macOS,
+	 * and what it saves is delivered at the resume.
+	 * @param {Map} Options "scope".
 	 * @returns {Integer} 1 when the page is up.
 	 */
 	static Open(Options) {
-		if !(Options is Map) || !HasMethod(Options.Get("is_paused", 0), "Call")
-				|| Options["is_paused"].Call() != 0 || !PhysicalShortcutsHost.Available(Options.Get("scope", 0))
+		if !(Options is Map) || !PhysicalShortcutsHost.Available(Options.Get("scope", 0))
 			return false
 		Existing := PhysicalShortcutsHost.Current
 		if IsObject(Existing) && !Existing.ResetDone {
@@ -334,7 +335,6 @@ class PhysicalShortcutsHost {
 		Host := PhysicalShortcutsWindow()
 		Host.AppId := PhysicalShortcutsHost.APP_ID
 		PageCurrent() => PhysicalShortcutsHost.Current == Host && !Host.ResetDone && !Host.CloseRequested
-			&& Options["is_paused"].Call() == 0
 		SendPage(Name, Packet) {
 			if !PageCurrent()
 				return false
@@ -405,14 +405,14 @@ class PhysicalShortcutsHost {
 
 /**
  * Binds the editor command to native readiness and the retained scope. Port
- * of physical_editor_menu.lua. Options (Map): "scope", "host", "paused" and
- * "refused" functions.
+ * of physical_editor_menu.lua. Options (Map): "scope", "host" and "refused"
+ * functions. A pause is not a cause (EDD-1): the editor opens while paused.
  */
 class PhysicalEditorMenu {
 	Busy := false
 
 	__New(Options) {
-		for Name in ["scope", "host", "paused", "refused"] {
+		for Name in ["scope", "host", "refused"] {
 			if !(Options is Map) || !HasMethod(Options.Get(Name, 0), "Call")
 				throw ValueError("The physical editor menu port is incomplete.", -1, Name)
 		}
@@ -420,15 +420,12 @@ class PhysicalEditorMenu {
 	}
 
 	_Inspect() {
-		if this.Options["paused"].Call() != 0
-			return 0
 		Host := this.Options["host"].Call()
 		for Name in ["NativeAvailable", "Open", "PhysicalDeliveryAvailable", "Available"] {
 			if !IsObject(Host) || !HasMethod(Host, Name)
 				return 0
 		}
 		if Host.PhysicalDeliveryAvailable() != true || Host.NativeAvailable() != true
-				|| this.Options["paused"].Call() != 0
 			return 0
 		return Host
 	}
@@ -461,8 +458,8 @@ class PhysicalEditorMenu {
 			Host := this._Inspect()
 			if IsObject(Host) {
 				Scope := this.Options["scope"].Call()
-				if Host.Available(Scope) == true && this.Options["paused"].Call() == 0
-					Accepted := Host.Open(Map("scope", Scope, "is_paused", this.Options["paused"])) == true
+				if Host.Available(Scope) == true
+					Accepted := Host.Open(Map("scope", Scope)) == true
 			}
 		} catch as Err
 			LoggerError("PhysicalShortcuts", "The editor could not open: {1}.", Err.Message)
@@ -481,7 +478,6 @@ class PhysicalEditorMenu {
  */
 PhysicalShortcutsMenuPort() {
 	static Port := PhysicalEditorMenu(Map(
-		"paused", () => A_IsSuspended ? 1 : 0,
 		"scope", () => PhysicalShortcutsScope(),
 		"host", () => PhysicalShortcutsHost,
 		"refused", () => Ui_MsgBox(t("physical_shortcuts.window_unavailable"), t("physical_shortcuts.window_title"), "Icon!")))

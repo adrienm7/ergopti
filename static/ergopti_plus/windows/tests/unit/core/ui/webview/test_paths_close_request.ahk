@@ -152,5 +152,5 @@ for _PCRT_Mode in ["after-close", "during-close"]
 	Test("Paths retirement request: " . _PCRT_Mode . " is retained after the actual Close returns (paths-close-request-owner)",
 		_PCRT_Case.Bind(_PCRT_Mode))
 
-Test("Native paths editor: a real OK callback refuses mutation while paused (native-paths-pause-owner)",
+Test("Native paths editor: a real OK callback reaches the writer while paused (native-paths-pause-owner)",
 	_PCRT_Case.Bind("native-paused", true))

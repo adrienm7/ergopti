@@ -154,13 +154,18 @@ _FPB_ResultOwnsSession(Host, Target, Mode) {
 		else
 			_PathsEdNative_Browse(World.Window, World.Edit, Pick,
 				(Hwnd) => World.Window.Live && World.Window.Hwnd == Hwnd)
-		AssertEqual(Mode == "already-paused" ? 0 : 1, World.Picks)
-		AssertEqual(Mode == "live" && Host != "native" ? 1 : 0, World.Scripts.Length,
-			"only a still-current unpaused session may receive the picked folder")
+		; A pause stops typing, not configuration (EDD-1): the paths editor and its
+		; native fallback pick a folder while paused, so a pause delivers as a live
+		; session does. The onboarding keeps its pause guard.
+		Paused := Mode == "pause" || Mode == "already-paused"
+		Delivered := Mode == "live" || (Paused && Host != "onboarding")
+		AssertEqual(Mode == "already-paused" && Host == "onboarding" ? 0 : 1, World.Picks)
+		AssertEqual(Delivered && Host != "native" ? 1 : 0, World.Scripts.Length,
+			"only a still-current session may receive the picked folder, paused or not")
 		if Host == "native"
-			AssertEqual(Mode == "live" ? "D:/Picked folder" : "C:/Private configuration", World.Edit.Value,
+			AssertEqual(Delivered ? "D:/Picked folder" : "C:/Private configuration", World.Edit.Value,
 				"the original native field changes only while its window is current")
-		else if Mode == "live" {
+		else if Delivered {
 			if Host == "paths" {
 				AssertContains(World.Scripts[1], '"D:/Picked folder/"')
 				AssertContains(World.Scripts[1], '"' . Target . '"')

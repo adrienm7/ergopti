@@ -4,7 +4,8 @@
 ; MODULE: Native Paths Editor Pause Admission Child
 ; DESCRIPTION:
 ; Genuine fallback GUI and its nested ConfirmPath callback receive native button
-; events. The writer is an explicit refusal port; this test claims no persistence.
+; events, paused (EDD-1) or not. The writer is an explicit refusal port; this
+; test claims no persistence, only that a paused click reaches the writer.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -78,18 +79,22 @@ _NPPA_Exercise() {
 	Candidate := A_Args[2] . "\changed\"
 	PathEdit.Value := Candidate
 	_NPPA_Require(Candidate != _ConfigDir, "The candidate must differ from the retained folder.")
+	; A pause stops typing, not configuration (EDD-1): a paused OK click reaches
+	; the writer with the exact candidate, as an unpaused one does.
 	Suspend(true)
 	try {
 		_NPPA_Click(Button, 1)
-		_NPPA_Require(_NPPA.Writes.Length == 0 && DllCall("IsWindowVisible", "Ptr", _NPPA.Windows[1].Hwnd, "Int")
-			&& PathEdit.Value == Candidate, "A paused OK callback must not enter the writer or retire its exact native editor.")
-		_NPPA_Require(_NPPA.Notices.Length == 1, "A paused OK click must tell the user that it waits for the resume.")
+		_NPPA_Require(_NPPA.Writes.Length == 1 && _NPPA.Writes[1].Path == Candidate && _NPPA.Writes[1].Paused,
+			"A paused OK click must reach the writer admission once with the exact normalized candidate.")
+		_NPPA_Require(DllCall("IsWindowVisible", "Ptr", _NPPA.Windows[1].Hwnd, "Int") && PathEdit.Value == Candidate,
+			"The explicit writer refusal must keep the paused editor available for correction.")
+		_NPPA_Require(_NPPA.Notices.Length == 0, "A paused OK click is not refused, so it tells no pause.")
 	} finally Suspend(false)
 	_NPPA_Observe()
-	_NPPA_Require(_NPPA.Writes.Length == 0 && _NPPA.Returned == 1, "Resume alone must not replay a refused folder change.")
+	_NPPA_Require(_NPPA.Writes.Length == 1 && _NPPA.Returned == 1, "Resume alone must not replay a folder change.")
 	_NPPA_Click(Button, 2)
-	_NPPA_Require(_NPPA.Notices.Length == 1, "An unpaused OK click tells no pause.")
-	_NPPA_Require(_NPPA.Writes.Length == 1 && _NPPA.Writes[1].Path == Candidate && !_NPPA.Writes[1].Paused,
+	_NPPA_Require(_NPPA.Notices.Length == 0, "An unpaused OK click tells no pause.")
+	_NPPA_Require(_NPPA.Writes.Length == 2 && _NPPA.Writes[2].Path == Candidate && !_NPPA.Writes[2].Paused,
 		"A fresh unpaused OK click must reach the writer admission once with the exact normalized candidate.")
 	_NPPA_Require(DllCall("IsWindowVisible", "Ptr", _NPPA.Windows[1].Hwnd, "Int"),
 		"The explicit writer refusal must keep the editor available for correction.")

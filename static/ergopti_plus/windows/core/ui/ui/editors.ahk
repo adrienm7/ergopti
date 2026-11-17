@@ -23,11 +23,11 @@ global _MagicKeyEditorGui := ""
 
 MagicKeyEditor(*) {
 		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt, _MagicKeyEditorGui
-		; Tray callbacks remain reachable while native Suspend is active. Refuse a
-		; fresh capture before creating UI, then re-check atomically at publication
-		; because a suspend callback can still interrupt between ordinary lines.
-		if A_IsSuspended
-				return
+		; A pause stops typing, not configuration (EDD-1): the capture runs while
+		; paused and saves the character at once, inert until the resume, as the
+		; magic key source capture does. The pause state the capture belongs to
+		; is re-checked at publication: a pause or a resume ends it.
+		StartedSuspended := A_IsSuspended
 		if IsObject(_MagicKeyEditorInputHook) {
 				; An active editor keeps its owner. Only a terminal Stop debt from an
 				; earlier rollback may be retried before opening a successor.
@@ -58,18 +58,18 @@ MagicKeyEditor(*) {
 				GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 				Critical("On")
 				try {
-						if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
+						if A_IsSuspended != StartedSuspended or IsObject(_MagicKeyEditorInputHook)
 								return
 						_MagicKeyEditorInputHook := IH
 						_MagicKeyEditorGui := GuiToShow
 						_MagicKeyEditorStopDebt := false
 						IH.Start()
-						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+						if A_IsSuspended != StartedSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
 								return
 						; Show pumps messages. Its Close handler must already own the
 						; started hook, with no later Start able to revive that capture.
 						GuiToShow.Show("Center")
-						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+						if A_IsSuspended != StartedSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
 								return
 				} finally {
 						; Wait must never inherit a Critical menu caller.
@@ -95,7 +95,7 @@ MagicKeyEditor(*) {
 		; Close or a complete pause/resume may retire this exact owner while a
 		; completed native hook still retains its reason and captured units. Only the
 		; terminal path which actually retires that owner may persist its result.
-		if !CaptureSettled || A_IsSuspended
+		if !CaptureSettled || A_IsSuspended != StartedSuspended
 				return
 		Capture := _SIHO_ReadScalar(IH, "{Escape}")
 		if Capture.Reason != ""

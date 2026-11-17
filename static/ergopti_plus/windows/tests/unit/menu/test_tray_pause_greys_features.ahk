@@ -4,8 +4,8 @@
 ; MODULE: Tray Pause Keeps Feature Submenus Live
 ; DESCRIPTION:
 ; A pause stops typing, not configuration (EDD-1, maintainer 2026-11-12): every
-; tray row stays live while the driver is paused, as on macOS and Linux, and the
-; rows that wait for the resume are greyed inside their own submenu, with why.
+; tray row stays live while the driver is paused, as on macOS and Linux, and no
+; row inside a submenu is greyed by the pause either.
 ;
 ; ROOT CAUSE ENCODED: the tray greyed every feature head on a pause
 ; (tray-pause-greys-features), so the configuration a pause must keep was out of
@@ -15,14 +15,6 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-
-_TPGF_IsGreyed(TargetMenu, Position) {
-	static MF_BYPOSITION := 0x400, MF_GRAYED := 0x1, MF_DISABLED := 0x2
-	State := DllCall("GetMenuState", "ptr", TargetMenu.Handle, "uint", Position,
-		"uint", MF_BYPOSITION, "uint")
-	Assert(State != 0xFFFFFFFF, "GetMenuState must find row " . Position)
-	return (State & (MF_GRAYED | MF_DISABLED)) != 0
-}
 
 ; The greying owners are gone, and nothing on the pause path disables a head row.
 _TPGF_NoHeadGreying() {
@@ -75,36 +67,17 @@ _TPGF_TransitionRebuildsThePublishedRoot() {
 	}
 }
 
-; The Layout rows that wait for the resume are greyed with why while paused, and
-; the others, the magic key capture among them, stay live (paused-layout-live).
-_TPGF_LayoutRowsWaitOnlyWhereNeeded() {
-	Target := Menu()
-	Noop := (*) => 0
-	Keys := _LAY_PausedRowKeys()
-	AssertEqual(2, Keys.Length, "the layout manager and the layout editor wait for the resume")
-	for Key in Keys
-		Target.Add(t(Key), Noop)
-	Capture := t("menu.layout.magic_key_source.capture")
-	Target.Add(Capture, Noop)
-	AssertEqual(0, _LAY_GreyPausedRows(Target, false), "an active driver greys no Layout row")
-	Loop 3
-		AssertFalse(_TPGF_IsGreyed(Target, A_Index - 1), "row " . A_Index . " is live while active")
-	AssertEqual(2, _LAY_GreyPausedRows(Target, true))
-	Reason := _MR_ReasonHead(t("menu.shortcuts.keyboard.magic_editor_reason.paused"))
-	for Index, Key in Keys {
-		AssertTrue(_TPGF_IsGreyed(Target, Index - 1), Key . " waits for the resume")
-		AssertEqual(t(Key) . " — " . Reason, _TPGF_Label(Target, Index - 1), Key . " says why")
-	}
-	AssertFalse(_TPGF_IsGreyed(Target, 2), "the magic key capture runs while paused")
-	AssertEqual(Capture, _TPGF_Label(Target, 2))
-}
-
-_TPGF_Label(TargetMenu, Position) {
-	static MF_BYPOSITION := 0x400
-	Buf := Buffer(1024, 0)
-	DllCall("GetMenuStringW", "ptr", TargetMenu.Handle, "uint", Position, "ptr", Buf, "int", 512,
-		"uint", MF_BYPOSITION, "int")
-	return StrGet(Buf, "UTF-16")
+; No Layout row waits for the resume any more: the layout manager and the
+; layout editor save while paused (EDD-1), so the pause greying of their rows is
+; gone with its owners, and the Layout build reads no pause state
+; (paused-layout-live).
+_TPGF_LayoutRowsAllLive() {
+	for Name in ["_LAY_GreyPausedRows", "_LAY_PausedRowKeys"]
+		AssertEqual("", _DriverFuncBodyOrEmpty(Name), Name . " must stay deleted (EDD-1)")
+	Build := _StripFullLineComments(_DriverFuncBody("_LAY_BuildLayoutMenu"))
+	Assert(InStr(Build, "MenuRenderer_Build(") > 0, "the Layout submenu is built by the shared renderer")
+	AssertEqual(0, InStr(Build, "A_IsSuspended"), "the Layout build reads no pause state")
+	AssertEqual(0, InStr(Build, ".Disable("), "the Layout build greys no row")
 }
 
 ; A pause or a resume builds the live Layout submenu again at its next open, so
@@ -132,7 +105,7 @@ Test("tray pause: a root builder stages a plain row without a pause mark (pause-
 	_TPGF_StudioRowStagedPlain)
 Test("tray pause: a settled transition rebuilds the published root, never the boot one (pause-root-rebuild)",
 	_TPGF_TransitionRebuildsThePublishedRoot)
-Test("tray pause: the Layout rows that wait for the resume are greyed with why, the others live (paused-layout-live)",
-	_TPGF_LayoutRowsWaitOnlyWhereNeeded)
+Test("tray pause: every Layout row stays live while paused (paused-layout-live)",
+	_TPGF_LayoutRowsAllLive)
 Test("tray pause: a pause or a resume builds the live Layout submenu again (paused-layout-live)",
 	_TPGF_RearmRebuildsAtNextOpen)

@@ -105,6 +105,10 @@ for _MESC_Editor in ["character", "source"]
 ; resume. Before, a paused driver refused it (paused-magic-capture).
 Test("Magic Key capture settlement: source paused-live persists the key captured while paused (paused-magic-capture)",
 	_MESC_Case.Bind("source", "paused-live"))
+; The magic key character capture follows (EDD-1): it refused in silence while
+; paused, its tray row live (paused-magic-capture).
+Test("Magic Key capture settlement: character paused-live persists the character captured while paused (paused-magic-capture)",
+	_MESC_Case.Bind("character", "paused-live"))
 
 for _MESC_ScalarMode in ["scalar-pair", "invalid-high-BMP", "invalid-low", "invalid-max"]
 	Test("Magic Key scalar settlement: " . _MESC_ScalarMode . " never persists partial units (magic-key-scalar-settlement)",

@@ -413,15 +413,8 @@ _ActPickWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 		return
 
 	Action := Payload.Has("action") ? Payload["action"] : ""
-	; WebMessageReceived is a COM callback: it bypasses native Suspend, which only
-	; disarms hotkeys. Without this a paused driver still lets a page click write
-	; config, re-register hotstrings or launch an elevated install.
-	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
-	; the SafetyFlush and leaves the page permanently un-initialised.
-	if (A_IsSuspended && Action != "ready") {
-		NotifyPausedRefusal("An action picker page action")
-		return
-	}
+	; A pause stops typing, not configuration (EDD-1): a paused driver still
+	; saves the picked action, which its gesture or shortcut runs at the resume.
 	if (Action == "ready") {
 		SetTimer(_ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_PushInit), -1)
 	} else if (Action == "cancel") {
@@ -474,7 +467,7 @@ _ActPickWeb_PushInit() {
 _ActPickWeb_Confirm(Id, HasParameter := false, Parameter := "", HasProvider := false, Provider := false) {
 	global _ActPickWeb_OnConfirm, _ActPickWeb_ProgramOwner, _ActPickWeb_SessionEpoch
 	global _ActPickWeb_Confirming, _ActPickWeb_ResetDone, _ActPickWeb_AfterClose
-	if A_IsSuspended || _ActPickWeb_Confirming
+	if _ActPickWeb_Confirming
 		return false
 	_ActPickWeb_Confirming := true
 	Epoch := _ActPickWeb_SessionEpoch
@@ -499,7 +492,7 @@ _ActPickWeb_Confirm(Id, HasParameter := false, Parameter := "", HasProvider := f
 			if Id != "run_program" || !(Provider is Map) || !(Owner is ProgramProviderSession)
 				return false
 			Resolved := Owner.Resolve(Provider["key"], Provider["arguments"])
-			if !(Resolved is String) || A_IsSuspended || !_ActPickWeb_SessionCurrent(Epoch)
+			if !(Resolved is String) || !_ActPickWeb_SessionCurrent(Epoch)
 					|| _ActPickWeb_ProgramOwner != Owner {
 				if _ActPickWeb_SessionCurrent(Epoch)
 					_ActPickWeb_Eval("if(window.programProviderRefused)window.programProviderRefused()")
@@ -516,7 +509,7 @@ _ActPickWeb_Confirm(Id, HasParameter := false, Parameter := "", HasProvider := f
 			return false
 		Mapped := (Id == "__native__") ? "" : Id
 		_ActPickWeb_Close()
-		if !Retired || A_IsSuspended || !_ActPickWeb_ResetDone
+		if !Retired || !_ActPickWeb_ResetDone
 				|| _ActPickWeb_SessionEpoch != Epoch + 1
 			return false
 		if (cb == 0 || cb == "")
@@ -882,12 +875,12 @@ _ActPickWeb_ProgramCapture() {
 	global _ActPickWeb_ProgramOwner, _ActPickWeb_ProgramPacket
 	global _ActPickWeb_ProgramDebt, _ActPickWeb_ProgramCapturing, _ActPickWeb_SessionEpoch
 	global _ActPickWeb_ProgramRetiring
-	if A_IsSuspended || _ActPickWeb_ProgramCapturing || _ActPickWeb_ProgramRetiring
+	if _ActPickWeb_ProgramCapturing || _ActPickWeb_ProgramRetiring
 		return false
 	_ActPickWeb_ProgramCapturing := true
 	Epoch := _ActPickWeb_SessionEpoch
 	try {
-		if !_ActPickWeb_ProgramRetire() || A_IsSuspended || !_ActPickWeb_SessionCurrent(Epoch)
+		if !_ActPickWeb_ProgramRetire() || !_ActPickWeb_SessionCurrent(Epoch)
 			return false
 		Owner := ProgramProviders_Create()
 		if !(Owner is ProgramProviderSession)
@@ -895,7 +888,7 @@ _ActPickWeb_ProgramCapture() {
 		; Publish custody before discovery can enter a native acquisition.
 		_ActPickWeb_ProgramOwner := Owner
 		Packet := Owner.Discover()
-		if !(Packet is Map) || !_ActPickWeb_SessionCurrent(Epoch) || A_IsSuspended
+		if !(Packet is Map) || !_ActPickWeb_SessionCurrent(Epoch)
 				|| _ActPickWeb_ProgramOwner != Owner {
 			if _ActPickWeb_ProgramOwner == Owner
 				_ActPickWeb_ProgramRetire()

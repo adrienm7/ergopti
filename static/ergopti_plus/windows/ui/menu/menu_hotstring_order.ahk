@@ -121,9 +121,12 @@ _HS_OrderWrite(Snapshot, Path, Updates) {
 	return TOML_ConfigBatchWrite(Path, Updates, [], 0, Snapshot["content"], Snapshot["presence"])
 }
 
-/** Commits one order or its reset before repainting; a refused write changes nothing. */
+/**
+ * Commits one order or its reset before repainting; a refused write changes
+ * nothing. A pause is not a cause (EDD-1): the order commits while paused.
+ */
 _HS_OrderCommit(Snapshot, Candidate, WriterFn := 0, RebuildFn := 0, NotifyFn := 0) {
-	if !(Snapshot is Map) || A_IsSuspended
+	if !(Snapshot is Map)
 		return false
 	if !(Candidate is Array) && !(Candidate is Integer && Candidate == 0)
 		return false
@@ -147,8 +150,6 @@ _HS_OrderCommit(Snapshot, Candidate, WriterFn := 0, RebuildFn := 0, NotifyFn := 
 
 /** Rechecks a captured click before calculating and committing its named move. */
 _HS_OrderClick(Snapshot, Order, Name, Delta, *) {
-	if A_IsSuspended
-		return false
 	Candidate := _HS_OrderMove(Order, Name, Delta)
 	return Candidate is Array && _HS_OrderCommit(Snapshot, Candidate)
 }
@@ -164,8 +165,8 @@ _HS_OrderMenu(Snapshot, Order, ByName) {
 		Children := MenuRenderer_TemplateRows("hotstring_order_moves",
 			Map(MenuCommand.HOTSTRING_ORDER_UP, _HS_OrderClick.Bind(Snapshot, Order, Name, -1),
 				MenuCommand.HOTSTRING_ORDER_DOWN, _HS_OrderClick.Bind(Snapshot, Order, Name, 1)),
-			Map("hotstring_order_up_ready", ((Ready) => (*) => Ready && !A_IsSuspended)(CanUp),
-				"hotstring_order_down_ready", ((Ready) => (*) => Ready && !A_IsSuspended)(CanDown)), Map())
+			Map("hotstring_order_up_ready", ((Ready) => (*) => Ready)(CanUp),
+				"hotstring_order_down_ready", ((Ready) => (*) => Ready)(CanDown)), Map())
 		if !(Children is Array)
 			return []
 		Entries.Push(Map("label", ByName[Name]["label"], "items", Children))
@@ -174,7 +175,7 @@ _HS_OrderMenu(Snapshot, Order, ByName) {
 		return []
 	ResetRows := MenuRenderer_TemplateRows("hotstring_order_footer",
 		Map(MenuCommand.HOTSTRING_ORDER_RESET, (*) => _HS_OrderCommit(Snapshot, 0)),
-		Map("hotstring_order_ready", (*) => !A_IsSuspended), Map())
+		Map("hotstring_order_ready", (*) => true), Map())
 	if !(ResetRows is Array)
 		return []
 	for Row in ResetRows

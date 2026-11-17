@@ -29,13 +29,13 @@ _PSH_WithGui(Ready, Body) {
 	finally PhysicalShortcutsHost.NativeProbe := Saved
 }
 
-; The shared menu port over the real host, counting captures and refusals.
-_PSH_Menu(Paused, Counts) {
+; The shared menu port over the real host, counting captures and refusals. It
+; takes no pause reader: a pause stops typing, not configuration (EDD-1).
+_PSH_Menu(Counts) {
 	Counts["captured"] := 0, Counts["refused"] := 0
 	return PhysicalEditorMenu(Map(
 		"host", () => PhysicalShortcutsHost,
 		"scope", () => (Counts["captured"] += 1, PhysicalShortcutsScope(Map("read", _PSH_NoRead))),
-		"paused", () => Paused,
 		"refused", () => Counts["refused"] += 1))
 }
 
@@ -66,7 +66,7 @@ Test("physical shortcuts: the production delivery getter answers false (physical
 Test("physical shortcuts: GUI ready, the real host and menu port keep the editor closed (physical-delivery-unqualified)", () =>
 	_PSH_WithGui(true, () => (
 		Counts := Map(),
-		Menu := _PSH_Menu(0, Counts),
+		Menu := _PSH_Menu(Counts),
 		AssertTrue(PhysicalShortcutsHost.NativeAvailable(), "the GUI is ready"),
 		AssertFalse(Menu.Ready(), "the editor row is not ready"),
 		AssertFalse(Menu.Open(), "the editor stays closed"),
@@ -75,17 +75,29 @@ Test("physical shortcuts: GUI ready, the real host and menu port keep the editor
 		AssertFalse(IsObject(PhysicalShortcutsHost.Current), "no window was built")
 	)))
 
-Test("physical shortcuts: a paused script or a GUI not ready also refuse (physical-delivery-unqualified)", () => (
-	_PSH_WithGui(true, () => (
-		Counts := Map(),
-		Menu := _PSH_Menu(1, Counts),
-		AssertFalse(Menu.Ready()),
-		AssertFalse(Menu.Open()),
-		AssertEqual(0, Counts["captured"], "paused: no scope is captured")
-	)),
+; A pause is no cause of refusal any more (EDD-1): the port, the host and the
+; page read no pause state, so only the GUI and the delivery decide.
+_PSH_PauseIsNoCause() {
+	Port := _StripFullLineComments(_DriverFuncBody("PhysicalShortcutsMenuPort"))
+	AssertEqual(0, InStr(Port, "A_IsSuspended"), "the production port reads no pause state")
+	AssertEqual(0, InStr(Port, '"paused"'), "the production port binds no pause reader")
+	; The port is complete without a pause reader, and answers alike paused or not.
+	Counts := Map()
+	Menu := _PSH_Menu(Counts)
+	Saved := A_IsSuspended
+	try {
+		Suspend(false)
+		Active := Menu.Ready()
+		Suspend(true)
+		AssertEqual(Active, Menu.Ready(), "a pause does not change the editor's readiness")
+	} finally Suspend(Saved)
+}
+Test("physical shortcuts: a pause is no cause of refusal for the editor (physical-editor-paused)", _PSH_PauseIsNoCause)
+
+Test("physical shortcuts: a GUI not ready also refuses (physical-delivery-unqualified)", () => (
 	_PSH_WithGui(false, () => (
 		Counts := Map(),
-		Menu := _PSH_Menu(0, Counts),
+		Menu := _PSH_Menu(Counts),
 		AssertFalse(Menu.Ready()),
 		AssertFalse(Menu.Open()),
 		AssertEqual(0, Counts["captured"], "no GUI: no scope is captured"),
@@ -96,7 +108,7 @@ Test("physical shortcuts: a paused script or a GUI not ready also refuse (physic
 Test("physical shortcuts: the manifest row greys with the unqualified delivery (physical-delivery-unqualified)", () =>
 	_PSH_WithGui(true, () => (
 		Counts := Map(),
-		Menu := _PSH_Menu(0, Counts),
+		Menu := _PSH_Menu(Counts),
 		Getters := PhysicalShortcutsMenuGetters(Menu),
 		AssertFalse(Getters["physical_shortcuts_editor_ready"].Call()),
 		AssertTrue(Getters["physical_shortcuts_delivery_unqualified"].Call()),

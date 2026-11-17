@@ -365,12 +365,14 @@ _LMCS_Main() {
 		_LMCS_Pump(Command)
 		PausedSnapshot := _LMCS_Snapshot()
 		_LMCS.BeforeResume := PausedSnapshot
+		; A pause stops typing, not configuration (EDD-1): the queued command
+		; settles under the pause, and one arriving already paused is admitted.
 		if _LMCS.Mode == "queued-pause" {
-			_LMCS_Require(Command.Cancels > 0 || Command.Paused,
-				"The command must actually settle under pause or have an observed SUT cancellation.")
+			_LMCS_Require(Command.Cancels == 0 && Command.Paused,
+				"The queued command must actually settle under the pause.")
 			Count := _LMCS.Timers.Count
 			_LMCS_Send(Record, "uninstall")
-			_LMCS_Require(_LMCS.Timers.Count == Count, "A command arriving already paused must be terminally refused at the real producer.")
+			_LMCS_Require(_LMCS.Timers.Count == Count + 1, "A command arriving already paused must reach the real producer.")
 			_LMCS_Resume()
 			_LMCS_Opportunity()
 		}
@@ -380,16 +382,20 @@ _LMCS_Main() {
 		if IsObject(_LMCS.Failure)
 			throw _LMCS.Failure
 		After := _LMCS_Snapshot()
-		if _LMCS.Mode == "current-uninstall" {
-			_LMCS_Require(Command.Calls == 1 && Command.Settled == 1 && !Command.Paused
+		if _LMCS.Mode == "current-uninstall" || _LMCS.Mode == "queued-pause" {
+			Paused := _LMCS.Mode == "queued-pause"
+			_LMCS_Require(Command.Calls == 1 && Command.Settled == 1 && Command.Paused == Paused
 				&& !After.Exists && !After.Installed && _LayMgrWeb_RuntimeRefresh == 0
 				&& _LayMgrWeb_Result is Map && _LayMgrWeb_Result["ok"] == 1,
-				"The actual current command must delete the private file and record through the genuine no-reload completion.")
+				"The actual command must delete the private file and record through the genuine no-reload completion, paused or not.")
+			if Paused
+				_LMCS_Require(!PausedSnapshot.Exists && !PausedSnapshot.Installed && _LMCS.Notices == 0,
+					"The paused command must apply under the pause itself and refuse nothing.")
 		} else {
 			_LMCS_Require(PausedSnapshot.Exists && PausedSnapshot.Installed
 				&& PausedSnapshot.Layout == _LMCS.Before.Layout && PausedSnapshot.Record == _LMCS.Before.Record
 				&& After.Exists && After.Installed && After.Layout == _LMCS.Before.Layout && After.Record == _LMCS.Before.Record,
-				"A queued suspended or retired command must not delete, rewrite or later replay against the private layout owner.")
+				"A retired command must not delete, rewrite or later replay against the private layout owner.")
 			if _LMCS.Mode == "retired-epoch"
 				_LMCS_Require(_LayMgrWeb_Gui == Successor.Window && _LayMgrWeb_Controller == Successor.Controller
 					&& _LayMgrWeb_WebView == Successor.View && _LayMgrWeb_SessionEpoch == Successor.Epoch

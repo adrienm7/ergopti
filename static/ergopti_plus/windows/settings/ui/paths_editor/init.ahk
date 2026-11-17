@@ -232,15 +232,8 @@ _PathsEdWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 		return
 
 	Action := Payload.Has("action") ? Payload["action"] : ""
-	; WebMessageReceived is a COM callback: it bypasses native Suspend, which only
-	; disarms hotkeys. Without this a paused driver still lets a page click write
-	; config, re-register hotstrings or launch an elevated install.
-	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
-	; the SafetyFlush and leaves the page permanently un-initialised.
-	if (A_IsSuspended && Action != "ready") {
-		NotifyPausedRefusal("A paths editor page action")
-		return
-	}
+	; A pause stops typing, not configuration (EDD-1): a paused driver still
+	; saves the folders, and the owned reload keeps the pause (suspend marker).
 	if (Action == "ready") {
 		SetTimer(_PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_PushInitData), -1)
 	} else if (Action == "browse") {
@@ -289,13 +282,11 @@ _PathsEdWeb_PushInitData() {
 ; @param Target {String} "logs" for the logs folder, else the configuration folder.
 _PathsEdWeb_Browse(Target := "config", PickFn := Ui_DirSelect, EvalFn := _PathsEdWeb_Eval) {
 	global _ConfigDir, _PathsEdWeb_SessionEpoch
-	if A_IsSuspended
-		return false
 	SessionEpoch := _PathsEdWeb_SessionEpoch
 	StartDir := StrReplace(Trim(Target == "logs" ? LoggerLogsDir() : _ConfigDir), "/", "\")
 	Picked := PickFn.Call("*" . StartDir, 1, t("dialog.config_folder.select_title"), t("dialog.config_folder.select_title"), 0)
 	; Native modals pump close/reopen and pause callbacks before returning.
-	if (Picked == "" || A_IsSuspended || !_PathsEdWeb_SessionCurrent(SessionEpoch))
+	if (Picked == "" || !_PathsEdWeb_SessionCurrent(SessionEpoch))
 		return false
 	Fwd := StrReplace(Picked, "\", "/")
 	if !RegExMatch(Fwd, "/$")
@@ -319,10 +310,6 @@ _PathsEdNative_Cancel(Window, *) {
 ; The native fallback owns a concrete control rather than a WebView epoch.
 ; Closing its window while the picker pumps must not write the dead control.
 _PathsEdNative_Browse(Window, Edit, PickFn := Ui_DirSelect, ExistsFn := WMHandleExists) {
-	if A_IsSuspended {
-		NotifyPausedRefusal("The configuration folder browse")
-		return false
-	}
 	try Hwnd := Window.Hwnd
 	catch
 		return false
@@ -330,7 +317,7 @@ _PathsEdNative_Browse(Window, Edit, PickFn := Ui_DirSelect, ExistsFn := WMHandle
 		return false
 	Picked := PickFn.Call("*" . StrReplace(Trim(Edit.Value), "/", "\"), 1,
 		t("dialog.config_folder.select_title"), t("dialog.config_folder.select_title"), 0)
-	if Picked == "" || A_IsSuspended
+	if Picked == ""
 		return false
 	try {
 		if Window.Hwnd != Hwnd || !ExistsFn.Call(Hwnd)
@@ -379,8 +366,6 @@ _PathsEdWeb_PrepareLogsFolder(Override) {
 ; @param LogsDir {String|Integer} Logs folder from the page, or 0 to keep it.
 _PathsEdWeb_Save(ConfigDir, LogsDir := 0) {
 	global _ConfigDir, _PathsFile, _DefaultConfigDir
-	if A_IsSuspended
-		return false
 	N := StrReplace(Trim(ConfigDir), "/", "\")
 	if (N == "")
 		N := _DefaultConfigDir

@@ -70,17 +70,12 @@ Test("webview: deferred actions cannot cross singleton sessions (AHK-054)",
 
 
 _A0720WV_DeferredMutationsRecheckSuspend() {
+	; The onboarding keeps its pause guard; the configuration effects left this
+	; list for the one below (EDD-1).
 	Effects := [
-		"_ActPickWeb_Confirm",
 		"_OnbWeb_Finish",
 		"_OnbWeb_RegisterGesturesAuto",
-		"_OnbWeb_RegisterGesturesManual",
-		"_PathsEdWeb_Browse",
-		"_PathsEdWeb_Save",
-		"_PromptEdWeb_Save",
-		"_PromptEdWeb_ApplyProfileForContext",
-		"_LLM_MBW_ApplyModel",
-		"_HCWWeb_Dispatch"
+		"_OnbWeb_RegisterGesturesManual"
 	]
 	for _, Fn in Effects {
 		Body := _DriverFuncBody(Fn)
@@ -93,10 +88,12 @@ Test("webview: deferred mutations recheck Suspend at effect time (AHK-061)",
 	_A0720WV_DeferredMutationsRecheckSuspend)
 
 ; A pause stops typing, not configuration (EDD-1, maintainer decision
-; 2026-11-12): the personal hotstrings editor's deferred effects save while
+; 2026-11-12): the configuration editors' deferred effects save while
 ; suspended (edd1-paused-writes).
 _A0720WV_ConfigurationEffectsIgnoreSuspend() {
-	for _, Fn in ["_HsEdWeb_SavePref", "_HsEdWeb_Save"] {
+	for _, Fn in ["_HsEdWeb_SavePref", "_HsEdWeb_Save", "_ActPickWeb_Confirm", "_PathsEdWeb_Browse",
+			"_PathsEdWeb_Save", "_PromptEdWeb_Save", "_PromptEdWeb_ApplyProfileForContext",
+			"_LLM_MBW_ApplyModel", "_HCWWeb_Dispatch"] {
 		Body := _DriverFuncBody(Fn)
 		Assert(Body != "", Fn . " must exist")
 		Assert(InStr(Body, "A_IsSuspended") == 0,
