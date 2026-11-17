@@ -955,8 +955,9 @@ check(
 		// the input-display shard; 214: the layout editor's WebView install joined
 		// desktop-webview; 216: the real-WebKit editor and diagnostics flows; 218:
 		// the file-manager actions proof and its install step; 219: the case and
-		// wrap transforms in a real GTK field.
-		assert.equal(Scoped.contract.slots.length, 219);
+		// wrap transforms in a real GTK field; 220: the multi-field expansions
+		// and character deletion in real GTK fields.
+		assert.equal(Scoped.contract.slots.length, 220);
 		const retained = Raw.step(job.body, 'Retain scoped native Brew qualification receipt');
 		assert.ok(
 			retained.includes(

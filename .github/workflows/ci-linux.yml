@@ -3460,6 +3460,27 @@ jobs:
           fi
         timeout-minutes: 5
 
+      # The hotstring injector in real GTK fields with the daemon's text owner:
+      # a multi-field expansion erases its trigger and types each value after a
+      # real Tab into its own field (an accented value pasted), and one
+      # Backspace deletes one whole emoji, ZWJ, flag or combining-accent
+      # character, the unit Undo's erase count uses.
+      - name: Multi-field expansions settle on Tab and erase whole characters in real GTK fields
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          timeout 180s bash static/ergopti_plus/linux/tests/hardware/run_gtk_fields_live.sh tests/hardware/run_hotstring_fields_live.lua
+          else
+              exit 1
+          fi
+        timeout-minutes: 5
+
       - name: Install prerequisites for API keys in a real locked and unlocked keyring
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         run: |

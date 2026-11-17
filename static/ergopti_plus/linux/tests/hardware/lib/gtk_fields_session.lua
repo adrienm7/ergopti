@@ -26,6 +26,8 @@ local WAIT_SECONDS = 10
 local POLL_MS = 20
 -- AT-SPI's ATSPI_ROLE_PASSWORD_TEXT, the role an invisible GtkEntry reports.
 local PASSWORD_ROLE = 40
+-- How long a field's identity must hold before it counts as joined.
+local QUIET_NS = 300 * 1e6
 
 
 
@@ -153,9 +155,21 @@ function M.privacy_owner()
 	--- @param admitted boolean True for an ordinary field, false for a password.
 	--- @return boolean joined
 	function privacy.join(admitted)
+		-- An ordinary field counts as joined once its identity has stayed the
+		-- same for a quiet window: the focus events of a window just activated
+		-- keep arriving after the first conclusive reading, and a destination
+		-- retained between them goes stale at once (as a real one does).
+		local identity, since = nil, nil
 		local joined = M.settle(function()
 			Guard.refresh(true)
-			if admitted then return Guard.capture_text_owner() ~= nil end
+			if admitted then
+				local now = Guard.capture_text_owner() and Guard.focused_text_identity() or nil
+				if now == nil or now ~= identity then
+					identity, since = now, uv.hrtime()
+					return false
+				end
+				return uv.hrtime() - since >= QUIET_NS
+			end
 			local snapshot = Watch.snapshot()
 			return type(snapshot) == "table" and snapshot.role == PASSWORD_ROLE and Guard.blocks_text()
 				and Guard.capture_text_owner() == nil
