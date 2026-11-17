@@ -117,7 +117,10 @@ _LSPV_Refusal(Kind) {
 		global _DriverReady
 		_DriverReady := true
 		switch Kind {
-			case "pause": Suspend(true)
+			; The pause step retires a preparation of the pre-pause source (EDD-1).
+			case "pause":
+				Suspend(true)
+				AssertTrue(LLM_Menu_LocalServersOnSuspend())
 			case "transition": Fixture.Transition("resume")
 			case "cancel": AssertTrue(Fixture.Panel.Retire(false))
 		}
@@ -616,5 +619,74 @@ Test("local-server-retire-final-settlement: final retry can complete reversible 
 Test("local-server-retire-final-settlement: final retry can complete closed-owner cancellation", _LSPN_FinalSettlementRetirement.Bind(true, true))
 Test("local-server-retire-final-settlement: unsettled reversible cancellation remains owned", _LSPN_FinalSettlementRetirement.Bind(false, false))
 Test("local-server-retire-final-settlement: unsettled closed-owner cancellation remains owned", _LSPN_FinalSettlementRetirement.Bind(false, true))
+
+; A pause stops typing, not configuration (EDD-1): under a real Suspend the
+; local server rows stay live and a model choice commits, while the sweep, which
+; talks to the servers, waits for the resume and says so. The pause greyed every
+; row and the panel refused each choice (paused-local-server-rows).
+_LSPR_PausedRowsCommit() {
+	global _SharedDir, _LLM_Menu
+	Fixture := _LSPN_Fixture()
+	WasSuspended := A_IsSuspended
+	try {
+		Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\llm\local_server_affinity.json"))
+		_LSCF_InstallSource(Fixture)
+		Fixture.ConfiguredStatus := 200
+		Fixture.ConfiguredBody := Corpus["omlx_models_body"]
+		Fixture.NativeSpawn := _LSCF_ConfiguredChildFactory.Bind(Fixture)
+		AssertTrue(Fixture.Native.Rescan())
+		Cache := Fixture.Native.Cache
+		Requests := Fixture.Requests.Length
+		Suspend(true)
+		AssertTrue(LLM_Menu_LocalServersOnSuspend(), "the pause step settles an idle owner")
+		AssertTrue(Fixture.Native.Cache == Cache, "the pause keeps the accepted verdicts")
+		AssertEqual("local_servers_paused", Fixture.Builds[Fixture.Builds.Length],
+			"the pause rebuilds the rows on the paused source")
+		; The verdicts do not age while paused: their sweep waits for the resume.
+		Fixture.Time += TimingsGet("llm", "local_server_detection_max_age_ms") + 1
+		Rows := _LSPV_PreparedRows(Fixture)
+		Found := 0, Rescan := 0
+		for Row in Rows {
+			if InStr(Row.Get("label", ""), "19423", true)
+				Found := Row
+			if Row.Get("label", "") == t("menu.llm.local_servers.rescan")
+				Rescan := Row
+		}
+		AssertTrue(Found is Map, "the paused view keeps the configured server")
+		for Item in Found["items"]
+			if !Item.Get("separator", false) {
+				AssertFalse(Item["disabled"], "a pause greys no local server row: " . Item["label"])
+				AssertTrue(Item.Has("action"), "a paused row keeps its action: " . Item["label"])
+			}
+		AssertTrue(Rescan is Map && !Rescan["disabled"] && Rescan.Has("action"), "the rescan row stays clickable")
+		Sent := []
+		Fixture.Panel.Options["paused_send"] := (Text, Opts) => (Sent.Push(Text), true)
+		AssertFalse(Rescan["action"].Call(), "the sweep waits for the resume")
+		AssertEqual(1, Sent.Length, "the waiting sweep is told once")
+		AssertEqual(t("notify.paused_refused"), Sent[1])
+		AssertEqual(Requests, Fixture.Requests.Length, "no probe leaves a paused driver")
+		AssertFalse(Fixture.Panel.Discovery is Map, "no discovery is queued while paused")
+		Chosen := Corpus["omlx_model_ids"][2]
+		AssertTrue(Found["items"][2]["action"].Call(), "a model choice commits while paused")
+		AssertEqual(Chosen, _LLM_Menu["api_entries"][2]["Model"])
+		AssertEqual(Requests, Fixture.Requests.Length, "the paused write sends no probe")
+		; Its verdicts need the resume's sweep: they stay shown, inert, with the
+		; new model checked.
+		Rows := _LSPV_PreparedRows(Fixture)
+		Found := 0
+		for Row in Rows
+			if InStr(Row.Get("label", ""), "19423", true)
+				Found := Row
+		AssertTrue(Found is Map, "the paused view still lists the server after the write")
+		AssertTrue(Found["items"][2]["checked"], "the paused rows check the model just chosen")
+		AssertTrue(Found["items"][2]["disabled"], "verdicts awaiting the resume's sweep are inert")
+		AssertEqual(Requests, Fixture.Requests.Length)
+	} finally {
+		Suspend(WasSuspended)
+		Fixture.Dispose()
+	}
+}
+Test("pause: the local server rows commit a model choice while paused, the sweep waits (paused-local-server-rows)",
+	_LSPR_PausedRowsCommit)
 
 #Include test_local_server_record_lifetime.ahk

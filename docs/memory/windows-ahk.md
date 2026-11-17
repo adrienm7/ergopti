@@ -465,6 +465,18 @@ page, a menu row, a settings writer) must not: a pause stops typing, not
 configuration (EDD-1), and one that must wait calls `NotifyPausedRefusal`;
 `test_paused_handlers_never_silent.ahk` fails on any other pause reader there.
 
+A private API source receipt commits only in the pause state it was captured
+in (`Held["paused"]`), so a view holding one cannot cross a pause: the local
+server panel retires its view at the pause (`Pause`) and at the resume
+(`ResumeRequested`) and a build prepares the next one. Its accepted sweep
+verdicts must survive, so the local server owner's read ports
+(`source_current`, `entry_bound`, `entries_bound`, `views_bound`) ignore the
+pause fence (`_PausedReadPort`) while `Apply` keeps it; `LocalServersOwner`
+splits `_Admitted` (views, receipts, writes) from `_NetworkAdmitted` (sweeps),
+and a paused view does not age. Action: a new owner whose cache is bound to a
+source receipt reads it through the paused read ports, or its cache dies with
+every pause.
+
 ### project-a-pause-guard-is-not-a-shutdown-debt
 
 A function that refuses to run under a pause returns the same `false` as one

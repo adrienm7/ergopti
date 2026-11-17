@@ -275,6 +275,24 @@ pause reader of the configuration surfaces is told or classified),
 model browser, layout manager, magic key capture, hotstring order and
 physical editor suites.
 
+## Ninth pass (2026-11-17): the Windows local server rows
+
+The AI menu's local server rows greyed under a pause and the panel refused a
+model choice, an address or a key while paused; the pause also retired the
+panel. They now commit while paused, and only the rescan, which talks to the
+servers, waits for the resume and says so. The pause stops the panel's network
+work (a sweep or a port scan in flight is cancelled) and keeps the accepted
+verdicts, which do not age while paused. A source receipt commits only in the
+pause state it was captured in, so the pause and the resume each retire the
+panel's view and a build prepares the next one; the local server owner's reads
+cross a pause (`_PausedReadPort`), so the verdicts stay usable. After a paused
+write the verdicts need the resume's sweep and show inert, with the new choice
+checked. macOS and Linux still grey these rows (`menu.lua` `paused`), which
+this pass found: the report's earlier passes did not list them (TODO).
+Regressions: `test_local_server_panel_view_preparation.ahk`
+`(paused-local-server-rows)` under a real Suspend, and the panel case of
+`test_paused_handlers_never_silent.ahk`.
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a
@@ -282,7 +300,7 @@ paused driver act at once instead of « on resume », or the change needs its
 source proofs reworked first:
 
 - AI menus: turning the AI on (it starts model warmups and may offer an
-  install), on the three OS, greyed with its reason; on Windows the local
-  server rows (TODO).
+  install), on the three OS, greyed with its reason; on macOS and Linux the
+  local server rows (TODO).
 - Windows: the onboarding page, the touchpad auto-configure, the programmable
   hotstrings switch and the metrics page refuse while paused and say so.

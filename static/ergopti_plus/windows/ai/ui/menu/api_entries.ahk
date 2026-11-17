@@ -1544,16 +1544,21 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		this.Writing := false
 		this.RegistryProof := { registry: 0, shadow: 0 }
 		this.SweepAdmission := false
+		this.PausedRead := false
 	}
 
-	/** Returns native ports without exporting private snapshots through the receipt. */
+	/**
+	 * Returns native ports without exporting private snapshots through the receipt.
+	 * The local server owner's reads cross a pause (PausedRead), so a sweep's
+	 * cache outlives it; its writes keep the pause fence through Apply.
+	 */
 	Ports() {
 		return Map("capture_source", ObjBindMethod(this, "Capture"),
 			"source_current", ObjBindMethod(this, "SweepCurrent"),
 			"entry", ObjBindMethod(this, "Entry"),
-			"entry_bound", ObjBindMethod(this, "EntryBound"),
-			"entries_bound", ObjBindMethod(this, "EntriesBound"),
-			"views_bound", ObjBindMethod(this, "ViewsBound"),
+			"entry_bound", ObjBindMethod(this, "_PausedReadPort", "EntryBound"),
+			"entries_bound", ObjBindMethod(this, "_PausedReadPort", "EntriesBound"),
+			"views_bound", ObjBindMethod(this, "_PausedReadPort", "ViewsBound"),
 			"admit", ObjBindMethod(this, "SweepAdmit"),
 			"apply", ObjBindMethod(this, "Apply"))
 	}
@@ -1597,8 +1602,21 @@ class LLM_Menu_ApiPrivateSourceOwner {
 	_WithSweepAdmission(Operation) {
 		Previous := this.SweepAdmission
 		this.SweepAdmission := true
-		try return Operation.Call()
+		try return this._PausedReadPort("_CallOperation", Operation)
 		finally this.SweepAdmission := Previous
+	}
+
+	_CallOperation(Operation) {
+		return Operation.Call()
+	}
+
+	; A read for the local server owner: a pause between its capture and now
+	; does not retire it (EDD-1); the source images still must match.
+	_PausedReadPort(Method, Args*) {
+		Previous := this.PausedRead
+		this.PausedRead := true
+		try return this.%Method%(Args*)
+		finally this.PausedRead := Previous
 	}
 
 	; This context fence grants no schema or source permission by itself.
@@ -1645,7 +1663,8 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			return false
 		Lifecycle := _LLM_Menu_ApiPrivateLifecycleState()
 		; The pause state is a fence, not a refusal (EDD-1): a capture taken paused
-		; commits paused, and a pause or a resume in between retires it.
+		; commits paused, and a pause or a resume in between retires it. Only the
+		; local server owner's reads cross it (_PausedReadPort).
 		Held := Map("owner", this, "lifecycle", Lifecycle, "lifecycle_generation", Lifecycle["generation"],
 			"paused", A_IsSuspended ? 1 : 0, "features", Features, "menu", _LLM_Menu,
 			"config_path", ConfigurationFile, "api_path", _LLM_Menu_ApiEntriesPath(),
@@ -2117,7 +2136,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			&& this._EntriesEqual(_LLM_Menu.Get("api_entries", 0), Held["entries"])
 			&& Held["lifecycle"]["attempt"] == 0
 			&& Held["lifecycle"]["generation"] == Held["lifecycle_generation"]
-			&& (A_IsSuspended ? 1 : 0) == Held["paused"]
+			&& (this.PausedRead || (A_IsSuspended ? 1 : 0) == Held["paused"])
 	}
 
 	_Snapshot(Path) {

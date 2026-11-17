@@ -149,13 +149,16 @@ _LSWA_SeparatePostDurableAdmission(Control := "", FinalControl := "") {
 		AssertFalse(Observed["forged_private_authority"], "a nominal candidate instance has no private writer authority")
 		AssertFalse(Observed["source_as_candidate"], "ordinary source tokens never inherit committed authority")
 		AssertFalse(Observed["wrong_phase"], "phase identity is exact")
-		AssertEqual(Control == "", Observed["post"], "committed admission checks the retained native view")
+		; A pause is no native refusal (EDD-1): the private publication claim
+		; retires a capture that a pause or a resume separates from its commit.
+		Admitted := Control == "" || Control == "pause"
+		AssertEqual(Admitted, Observed["post"], "committed admission checks the retained native view")
 		AssertEqual(0, Observed["post_source_calls"], "committed branch must not consult ordinary old source authority")
 		AssertEqual(0, Observed["post_entry_calls"], "committed branch must not read old native entries through general ports")
 		AssertEqual(0, Observed["post_admit_calls"], "private candidate validation owns native lease admission")
 		AssertFalse(Observed["ordinary_after"], "ordinary old-source authority stays revoked after durability")
 		AssertFalse(Observed["claim_outside"], "final claim requires the publisher's inherited Critical region")
-		AssertEqual(Control == "" && FinalControl == "", Observed["claim"], "final generation change refuses RAM publication")
+		AssertEqual(Admitted && FinalControl == "", Observed["claim"], "final generation change refuses RAM publication")
 		AssertTrue(Observed["critical_before"] > 0)
 		AssertEqual(Observed["critical_before"], Observed["critical_after"], "final claim preserves the publisher's atomic boundary")
 		AssertFalse(Fixture.Native.WriteClaim is Map)
@@ -175,7 +178,7 @@ Test("local write admission: rescan intent change refuses committed admission", 
 Test("local write admission: pending owner replacement refuses committed admission", _LSWA_SeparatePostDurableAdmission.Bind("pending_owner"))
 Test("local write admission: pending scalar change refuses committed admission", _LSWA_SeparatePostDurableAdmission.Bind("pending_values"))
 Test("local write admission: retained target replacement refuses committed admission", _LSWA_SeparatePostDurableAdmission.Bind("target"))
-Test("local write admission: pause refuses committed admission", _LSWA_SeparatePostDurableAdmission.Bind("pause"))
+Test("local write admission: a pause leaves its fence to the private claim (EDD-1)", _LSWA_SeparatePostDurableAdmission.Bind("pause"))
 Test("local write admission: shutdown refuses committed admission", _LSWA_SeparatePostDurableAdmission.Bind("shutdown"))
 Test("local write admission: late view change refuses the final atomic claim", _LSWA_SeparatePostDurableAdmission.Bind("", "view"))
 Test("local write admission: late controller change refuses the final atomic claim", _LSWA_SeparatePostDurableAdmission.Bind("", "controller"))

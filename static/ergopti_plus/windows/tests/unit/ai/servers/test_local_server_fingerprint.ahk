@@ -134,7 +134,7 @@ _LSF_SweepVector(Vector) {
 		Actions := Map("select", (*) => 0, "address", (*) => 0, "key", (*) => 0, "rescan", (*) => 0)
 		Rows := LocalServerMenuRows(Map("order", Catalogue["order"], "servers", Catalogue["servers"],
 			"detected", Controller.Detected(), "result", ObjBindMethod(Controller, "Result"), "backend", "ollama",
-			"active", 0, "sweeping", false, "paused", false, "tr", _LSF_Label, "format", _LSF_Label, "actions", Actions))
+			"active", 0, "sweeping", false, "inert", false, "tr", _LSF_Label, "format", _LSF_Label, "actions", Actions))
 		Labels := []
 		for Row in Rows
 			if Row.Has("items") && !(Row["label"] == "menu.llm.local_servers.other_address:")

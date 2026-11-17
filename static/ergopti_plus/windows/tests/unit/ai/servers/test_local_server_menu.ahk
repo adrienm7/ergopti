@@ -4,7 +4,7 @@
 ; MODULE: Shared Local Server Menu Policy Tests
 ; DESCRIPTION:
 ; Checks existing Lua row behavior with independent literal expectations: ordered
-; model identity, authenticated status, selected model and paused action absence.
+; model identity, authenticated status, selected model and inert action absence.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -19,7 +19,7 @@
 ; ======================================
 ; ======================================
 
-_LSMR_Options(Paused := false) {
+_LSMR_Options(Inert := false) {
 	Servers := Map("lmstudio", Map("label", "LM Studio"), "llamacpp", Map("label", "llama.cpp"))
 	Verdicts := Map("lmstudio", Map("status", "up", "base_url", "http://Configured-HOST:1234/custom/v1",
 		"models", ["second", "first", "second"]), "llamacpp", Map("status", "needs_key",
@@ -29,7 +29,7 @@ _LSMR_Options(Paused := false) {
 		"address", (Id) => Observed.Push(["address", Id]),
 		"key", (Id) => Observed.Push(["key", Id]), "rescan", (*) => Observed.Push(["rescan"]))
 	return Map("order", ["lmstudio", "llamacpp"], "servers", Servers, "detected", ["lmstudio", "llamacpp"],
-		"result", (Id) => Verdicts[Id], "sweeping", false, "paused", Paused,
+		"result", (Id) => Verdicts[Id], "sweeping", false, "inert", Inert,
 		"backend", "api", "active", Map("provider", "lmstudio", "model", "first"),
 		"tr", (Key) => Key, "format", (Key, Value) => Key . "|" . Value,
 		"actions", Actions, "observed", Observed)
@@ -64,13 +64,13 @@ _LSMR_OrderedIdentityAndAuthRows() {
 }
 Test("local server menu: ordered identity and existing authentication rows", _LSMR_OrderedIdentityAndAuthRows)
 
-_LSMR_PausedActionsAndSearching() {
+_LSMR_InertActionsAndSearching() {
 	Options := _LSMR_Options(true)
 	Rows := LocalServerMenuRows(Options)
 	for Index in [1, 2, 3, 5, 6] {
 		Row := Rows[3]["items"][Index]
 		AssertTrue(Row["disabled"])
-		AssertFalse(Row.Has("action"), "paused models/address/key rows expose no action")
+		AssertFalse(Row.Has("action"), "inert models/address/key rows expose no action")
 	}
 	AssertTrue(Rows[5]["disabled"])
 	AssertFalse(Rows[5].Has("action"))
@@ -87,7 +87,7 @@ _LSMR_PausedActionsAndSearching() {
 	Rows := LocalServerMenuRows(Options)
 	AssertEqual("menu.llm.local_servers.none_detected", Rows[3]["label"])
 }
-Test("local server menu: pause suppresses actions and retains honest search status", _LSMR_PausedActionsAndSearching)
+Test("local server menu: an inert view suppresses actions and retains honest search status", _LSMR_InertActionsAndSearching)
 
 _LSMR_GenericCheckedIdentity() {
 	Options := _LSMR_Options()

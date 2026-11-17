@@ -167,7 +167,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		}
 		PreviousCritical := Critical("On")
 		try {
-			if this.Closed || A_IsSuspended
+			if this.Closed
 				return false
 			if Changed {
 				this.Controller.SetOrder(Order, true)
@@ -213,7 +213,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 	_ScanThenRescan(OnDone) {
 		if OnDone != 0 && !HasMethod(OnDone, "Call")
 			throw TypeError("Local server completion observer must be callable.")
-		if !this._Admitted() || this.Closed || A_IsSuspended
+		if !this._NetworkAdmitted() || this.Closed || A_IsSuspended
 			return false
 		if this.ScanWaiters is Array {
 			this.ScanWaiters.Push(OnDone)
@@ -290,7 +290,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 	_Rescan(OnDone) {
 		if OnDone != 0 && !HasMethod(OnDone, "Call")
 			throw TypeError("Local server completion observer must be callable.")
-		if !this._Admitted()
+		if !this._NetworkAdmitted()
 			return false
 		PreviousCritical := Critical("On")
 		try {
@@ -336,7 +336,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 
 	_SetupRescan(Request) {
 		Intent := Request["intent"]
-		if !this._Admitted()
+		if !this._NetworkAdmitted()
 			return false
 		PreviousCritical := Critical("On")
 		try {
@@ -368,7 +368,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 				Target["port_source"] == "user" ? "address set by the user" : "port from " Target["port_source"])
 			Targets.Push(Map("id", Id, "base_url", Target["base_url"]))
 		}
-		if !this._Admitted() || !this._True("source_current", Source)
+		if !this._NetworkAdmitted() || !this._True("source_current", Source)
 			return false
 		if Intent != this.RescanGeneration || Configuration != this.ConfigurationGeneration || this.Closed || A_IsSuspended
 			return false
@@ -444,7 +444,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 			return false
 		Ticket := Job["ticket"]
 		Valid := Ticket.Call()
-		if !((Valid is Integer) && Valid == true) || !this._Admitted()
+		if !((Valid is Integer) && Valid == true) || !this._NetworkAdmitted()
 			return false
 		if this.Options.Has("entries_bound") {
 			; The existing native batch owner fences private resolution before and
@@ -462,7 +462,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		}
 		if !this._SameTarget(Job["target"], Target)
 			return false
-		if !this._Admitted()
+		if !this._NetworkAdmitted()
 			return false
 		Valid := Ticket.Call()
 		; A ticket callback can reenter source replacement. Its result must not
@@ -692,7 +692,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 			CapturedModels := Verdict is Map ? Verdict["models"].Clone() : []
 			ClaimCritical := Critical("On")
 			try {
-				if this.Closed || A_IsSuspended || View != this.ViewGeneration
+				if this.Closed || View != this.ViewGeneration
 						|| Configuration != this.ConfigurationGeneration || Models != this.ModelGeneration
 					return false
 				Receipt := {}
@@ -741,7 +741,10 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 			}
 		}
 		Sweeping := this.Controller.IsSweeping()
-		Stale := !Sweeping && (!CacheCurrent || Cache["generation"] != Stamp["controller"] || this.Controller.IsStale())
+		; A paused view does not age: its sweep waits for the resume (EDD-1).
+		; A changed source or an invalidated sweep still makes it stale.
+		Stale := !Sweeping && (!CacheCurrent || Cache["generation"] != Stamp["controller"]
+			|| (!A_IsSuspended && this.Controller.IsStale()))
 		Results := CacheCurrent ? this._CopyResults(Cache["results"]) : Map()
 		Receipts := Map(), Views := Map(), Detected := []
 		for Id in this.Order {
@@ -762,7 +765,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 			return false
 		PreviousCritical := Critical("On")
 		try {
-			if this.Closed || A_IsSuspended || this.ViewGeneration != Stamp["view"]
+			if this.Closed || this.ViewGeneration != Stamp["view"]
 					|| this.ConfigurationGeneration != Stamp["configuration"] || this.ModelGeneration != Stamp["models"]
 					|| this.RescanGeneration != Stamp["rescan"] || this.Controller.Generation != Stamp["controller"]
 					|| this.Cache != Cache || this.Controller.IsSweeping() != Sweeping
@@ -857,7 +860,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 
 	_HeldViewCurrent(Held, Receipt) {
 		Current := this.Views.Get(ObjPtr(Receipt), 0)
-		return Current is Map && ObjPtr(Current) == ObjPtr(Held) && !this.Closed && !A_IsSuspended
+		return Current is Map && ObjPtr(Current) == ObjPtr(Held) && !this.Closed
 			&& Held["view"] == this.ViewGeneration
 			&& Held["configuration"] == this.ConfigurationGeneration
 			&& Held["models_generation"] == this.ModelGeneration
@@ -1028,6 +1031,21 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		}
 	}
 
+	/**
+	 * Stops the network work for a pause and keeps an idle owner's views and
+	 * cache, so a paused menu still commits (EDD-1). A sweep, a port scan or a
+	 * probe in flight is cancelled as Cancel does: its verdicts are not proven.
+	 * @returns {Boolean} Whether every exact native owner settled.
+	 */
+	Pause() {
+		PreviousCritical := Critical("On")
+		try Idle := !this.Closed && this.Jobs.Count == 0 && this.Models.Records.Count == 0
+			&& !this.Controller.IsSweeping() && !this.RescanBusy && !(this.QueuedRescan is Map)
+			&& !(this.ScanWaiters is Array)
+		finally Critical(PreviousCritical)
+		return Idle ? true : this.Cancel(false)
+	}
+
 	/** Logical invalidation precedes cancellation; unresolved exact owners stay retained. */
 	Cancel(Shutdown := false) {
 		PreviousCritical := Critical("Off")
@@ -1073,8 +1091,14 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		} finally Critical(PreviousCritical)
 	}
 
+	; Views, receipts and writes are configuration: a pause admits them (EDD-1).
 	_Admitted() {
-		return !this.Closed && !A_IsSuspended && this._True("admit") && !this.Closed && !A_IsSuspended
+		return !this.Closed && this._True("admit") && !this.Closed
+	}
+
+	; A sweep talks to the servers: it waits for the resume.
+	_NetworkAdmitted() {
+		return !A_IsSuspended && this._Admitted() && !A_IsSuspended
 	}
 
 	_SameTarget(Before, After) {
@@ -1097,7 +1121,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 			return false
 		PreviousCritical := Critical("On")
 		try return this.Cache is Map && ObjPtr(this.Cache) == ObjPtr(Cache)
-			&& Cache["configuration"] == this.ConfigurationGeneration && !this.Closed && !A_IsSuspended
+			&& Cache["configuration"] == this.ConfigurationGeneration && !this.Closed
 		finally Critical(PreviousCritical)
 	}
 
@@ -1193,12 +1217,12 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		PrivateResults := this._CopyResults(Fresh)
 		Accepted := false
 		try {
-			if !this._Admitted() || !this._True("source_current", Sweep["source"])
+			if !this._NetworkAdmitted() || !this._True("source_current", Sweep["source"])
 				return
 			for Id, Target in Sweep["targets"]
 				if !this._SameTarget(Target, this._Target(Id, Sweep["source"]))
 					return
-			if !this._Admitted() || !this._True("source_current", Sweep["source"])
+			if !this._NetworkAdmitted() || !this._True("source_current", Sweep["source"])
 				return
 			PreviousCritical := Critical("On")
 			try {

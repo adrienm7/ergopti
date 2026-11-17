@@ -19,10 +19,12 @@
 ; A new pause gate in these surfaces fails here until it is told or classified,
 ; and a classified function that no longer reads the pause must leave the list.
 ; Methods of classes are not scanned: the ones in these surfaces are runtime
-; owners (local server sweeps, menu prewarming, boot replay).
+; owners (menu prewarming, boot replay). The local server panel is the one
+; class whose rows are configuration: its own case below names its methods.
 ; The behaviour of each handler made to run paused is exercised by its own unit
 ; suite under a real Suspend (paths editor, model browser, layout manager, magic
-; key capture, hotstring order, physical editor, AI scope restore).
+; key capture, hotstring order, physical editor, AI scope restore, local
+; server rows).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -167,3 +169,30 @@ _PHNS_ConfigurationHandlersReadNoPause() {
 }
 Test("pause: the configuration handlers made to run while paused read no pause (paused-handlers-never-silent)",
 	_PHNS_ConfigurationHandlersReadNoPause)
+
+; The AI menu's local server rows are built by a class, which the scans above
+; do not reach. A model choice, an address and a key commit while paused, so the
+; methods on their path read no pause, the shared row builder greys no row for a
+; pause, and the rescan, which talks to the servers, tells its wait
+; (paused-local-server-rows).
+_PHNS_LocalServerRowsRunPaused() {
+	Panel := _DriverFileSource("local_server_panel.ahk")
+	for Method in ["Rows", "_PrepareRows", "_Render", "_Current", "_HeldCurrent", "_PromptAddress",
+			"_PromptKey", "_ApplyNonCritical", "_QueuePreparation", "_PreparationFence"] {
+		Body := _DriverExtractFunctionBody(&Panel, Method)
+		Assert(Body != "", "LLM_LocalServerPanel." . Method . " must exist")
+		AssertEqual(0, InStr(Body, "A_IsSuspended"),
+			"LLM_LocalServerPanel." . Method . " is on a local server row's configuration path (EDD-1)")
+	}
+	Rescan := _DriverExtractFunctionBody(&Panel, "_RescanNonCritical")
+	Assert(RegExMatch(Rescan, "s)A_IsSuspended[^\n]*\{\s*NotifyPausedRefusal\("),
+		"the paused rescan must say it waits for the resume")
+	global _SharedDir
+	Owner := _DriverProductionFileForSymbol("LocalServerMenuRows", _SharedDir)
+	Assert(Owner != "", "the shared local server row builder must exist")
+	Builder := FileRead(Owner, "UTF-8")
+	AssertEqual(0, InStr(_DriverExtractFunctionBody(&Builder, "LocalServerMenuRows"), "paused"),
+		"the shared local server rows must not grey for a pause")
+}
+Test("pause: the local server rows run while paused and their rescan tells its wait (paused-handlers-never-silent)",
+	_PHNS_LocalServerRowsRunPaused)

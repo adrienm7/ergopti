@@ -6,6 +6,9 @@
 ; Binds the shared row policy to exact private source/view ownership, the native
 ; models transport and existing joint API publisher. Initialization waits for
 ; restored runtime state. Discovery never installs or starts a server.
+; A pause stops typing, not configuration (EDD-1): the view stays current across
+; a pause, so a model choice, an address or a key commits while paused; only the
+; sweep, which talks to the servers, waits for the resume and says so.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -89,11 +92,11 @@ LLM_Menu_LocalServersBackendLabel(Fallback) {
 		? _LLM_LocalServerPanel.BackendLabel(Fallback) : Fallback
 }
 
-/** Pausing invalidates publication before requesting exact native retirement. */
+/** Pausing stops the panel's network work and keeps its view (EDD-1). */
 LLM_Menu_LocalServersOnSuspend() {
 	global _LLM_LocalServerPanel
 	return !IsSet(_LLM_LocalServerPanel) || !(_LLM_LocalServerPanel is LLM_LocalServerPanel)
-		|| _LLM_LocalServerPanel.Retire(false)
+		|| _LLM_LocalServerPanel.Pause()
 }
 
 /** Resumes retained resource cleanup and asks for a fresh menu/source capture. */
@@ -254,7 +257,8 @@ class LLM_LocalServerPanel {
 			} finally Critical(ClaimCritical)
 			; With the AI off the rows stay inert: no source capture and no
 			; discovery sweep may start behind a disabled feature (issue #97).
-			if !A_IsSuspended && !this.Writing && !this.Native.Closed && LLM_Menu_AiEnabled()
+			; A pause prepares the view too: it reads the source, not the network.
+			if !this.Writing && !this.Native.Closed && LLM_Menu_AiEnabled()
 				this._QueuePreparation()
 			return this.LastSnapshot is Map ? this._Render(this.LastSnapshot, true, 0) : this._UnavailableRows()
 		} catch as Err {
@@ -270,7 +274,7 @@ class LLM_LocalServerPanel {
 		try {
 			if !this._PreparationCurrent(Record)
 				return this._UnavailableRows()
-			if A_IsSuspended || this.Writing
+			if this.Writing
 				return this.LastSnapshot is Map ? this._Render(this.LastSnapshot, true, 0) : this._UnavailableRows()
 			if !this.Source.Admit()
 				return this._UnavailableRows()
@@ -282,14 +286,8 @@ class LLM_LocalServerPanel {
 				return this._UnavailableRows()
 			this.Order := Projection["order"].Clone()
 			this.Servers := Projection["servers"]
-			if Projection["stale"] {
-				; A freshly checked source cannot display the old source's model list.
-				this.LastSnapshot := 0
-				; Discovery is optional work: a menu build must not enter managed
-				; HTTP acquisition or hold the driver's startup readiness stack.
-				this._QueueDiscovery(Source)
-				return this._UnavailableRows()
-			}
+			if Projection["stale"]
+				return this._StaleRows(Source)
 			Entries := Projection["entries"]
 			Owner := Map("source", Source, "receipts", Projection["receipts"],
 				"native_view", Projection["view"], "native_models", Projection["models"],
@@ -336,6 +334,47 @@ class LLM_LocalServerPanel {
 		} finally Critical(PreviousCritical)
 	}
 
+	_StaleRows(Source) {
+		; Paused, the sweep waits for the resume: the last verdicts stay shown
+		; without actions, with the entry checked now.
+		if A_IsSuspended
+			return this._PausedStaleRows()
+		; A freshly checked source cannot display the old source's model list.
+		this.LastSnapshot := 0
+		; Discovery is optional work: a menu build must not enter managed
+		; HTTP acquisition or hold the driver's startup readiness stack.
+		this._QueueDiscovery(Source)
+		return this._UnavailableRows()
+	}
+
+	/**
+	 * A paused view that needs a new sweep (after a paused write, or a sweep the
+	 * pause cut short): its verdicts are no current evidence for an action, so
+	 * Rows shows them inert until the resume's sweep, with the entry checked now.
+	 * A changed check asks for one build; the next preparation finds it equal.
+	 */
+	_PausedStaleRows() {
+		Snapshot := this.LastSnapshot
+		if !(Snapshot is Map)
+			return this._UnavailableRows()
+		for Id in Snapshot["detected"]
+			if !this.Servers.Has(Id) {
+				this.LastSnapshot := 0
+				return this._UnavailableRows()
+			}
+		Shown := Snapshot.Clone()
+		Shown["active"] := 0
+		if !this._ActiveSnapshot(Shown)
+			return this._UnavailableRows()
+		Before := Snapshot["active"], After := Shown["active"]
+		Changed := Snapshot["backend"] != Shown["backend"] || (Before is Map) != (After is Map)
+			|| (After is Map && (Before["id"] !== After["id"] || Before["model"] !== After["model"]))
+		this.LastSnapshot := Shown
+		if Changed
+			this._Build("local_servers_paused_view")
+		return this._Render(Shown, true, 0)
+	}
+
 	_ActiveSnapshot(Snapshot) {
 		global _LLM_Menu
 		LlmMenu := _LLM_Menu
@@ -366,12 +405,12 @@ class LLM_LocalServerPanel {
 		return Entries.Get(Id, "")
 	}
 
-	_Render(Snapshot, Paused, Owner) {
+	_Render(Snapshot, Inert, Owner) {
 		return LocalServerMenuRows(Map("order", this.Order, "servers", this.Servers,
 			"detected", Snapshot["detected"], "result", ObjBindMethod(this, "_SnapshotResult", Snapshot),
 			"backend", Snapshot["backend"], "active", Snapshot["active"],
 			"entry_id", ObjBindMethod(this, "_SnapshotEntryId", Snapshot),
-			"sweeping", Snapshot["sweeping"], "paused", Paused, "tr", t,
+			"sweeping", Snapshot["sweeping"], "inert", Inert, "tr", t,
 			"format", ObjBindMethod(this, "_Format"), "actions", Map(
 				"select", ObjBindMethod(this, "_Select", Owner),
 				"address", ObjBindMethod(this, "_Address", Owner),
@@ -409,7 +448,7 @@ class LLM_LocalServerPanel {
 	}
 
 	_Current(Owner, Id := "", Model := "") {
-		if !(Owner is Map) || A_IsSuspended || this.Writing || !this.Source.Current(Owner["source"])
+		if !(Owner is Map) || this.Writing || !this.Source.Current(Owner["source"])
 			return false
 		if Id != "" && (!Owner["receipts"].Has(Id) || !this.Native.IsCurrent(Owner["receipts"][Id], Model))
 			return false
@@ -430,7 +469,7 @@ class LLM_LocalServerPanel {
 			&& Owner["native_rescan"] == this.Native.RescanGeneration
 			&& Owner["native_controller"] == this.Native.Controller.Generation
 			&& Owner["authority"] == _LLM_Menu_ApiPrivateAuthorityGeneration
-			&& !A_IsSuspended && !this.Writing
+			&& !this.Writing
 	}
 
 
@@ -500,7 +539,7 @@ class LLM_LocalServerPanel {
 			return false
 		PreviousCritical := Critical("On")
 		try {
-			if this.Writing || A_IsSuspended || !(this.View is Map) || ObjPtr(this.View) != ObjPtr(Owner)
+			if this.Writing || !(this.View is Map) || ObjPtr(this.View) != ObjPtr(Owner)
 				return false
 			this.Writing := true
 		} finally Critical(PreviousCritical)
@@ -522,8 +561,14 @@ class LLM_LocalServerPanel {
 		} finally Critical(PreviousCritical)
 		LLM_Menu_RequestBuild("local_servers_applied")
 		if Model == ""
-			this.Native.Rescan(ObjBindMethod(this, "_ReportSweep", Id))
+			this._RescanAfterWrite(Id)
 		return true
+	}
+
+	; Paused, a new address or key is swept by the resume's view preparation.
+	_RescanAfterWrite(Id) {
+		if !A_IsSuspended
+			this.Native.Rescan(ObjBindMethod(this, "_ReportSweep", Id))
 	}
 
 	_Rescan(Owner, *) {
@@ -533,6 +578,11 @@ class LLM_LocalServerPanel {
 	}
 
 	_RescanNonCritical(Owner) {
+		; The sweep talks to the servers: it waits for the resume and says so.
+		if A_IsSuspended {
+			NotifyPausedRefusal("The local server rescan", this.Options.Get("paused_send", 0))
+			return false
+		}
 		if !this._Current(Owner)
 			return false
 		Started := this.Native.Rescan()
@@ -628,7 +678,7 @@ class LLM_LocalServerPanel {
 			}
 			global _LifecycleLatestTransition, _LLM_Menu_ApiPrivateAuthorityGeneration
 			State := _LLM_Menu_ApiPrivateLifecycleState()
-			if A_IsSuspended || this.Writing || this.Native.Closed || State["attempt"] != 0
+			if this.Writing || this.Native.Closed || State["attempt"] != 0
 				return false
 			Record := Map("kind", "view", "generation", this.Generation, "epoch", State["generation"],
 				"transition", _LifecycleLatestTransition, "authority", _LLM_Menu_ApiPrivateAuthorityGeneration,
@@ -645,7 +695,7 @@ class LLM_LocalServerPanel {
 	_PreparationFence(Record) {
 		global _LifecycleLatestTransition, _LLM_Menu_ApiPrivateAuthorityGeneration
 		State := _LLM_Menu_ApiPrivateLifecycleState()
-		return !A_IsSuspended && !this.Writing && !this.Native.Closed
+		return !this.Writing && !this.Native.Closed
 			&& Record["generation"] == this.Generation && Record["epoch"] == State["generation"]
 			&& State["attempt"] == 0 && Record["transition"] == _LifecycleLatestTransition
 			&& Record["authority"] == _LLM_Menu_ApiPrivateAuthorityGeneration
@@ -808,6 +858,13 @@ class LLM_LocalServerPanel {
 		Transition := _LifecycleLatestTransition
 		if !(Transition is Object) || !(Transition.phase == "resume")
 			return false
+		; A view prepared while paused holds a paused source, which the resume
+		; fences: the build after Finish prepares the resumed one.
+		ClaimCritical := Critical("On")
+		try {
+			this.Generation += 1
+			this.View := 0
+		} finally Critical(ClaimCritical)
 		this.ResumeIntent := Map("transition", Transition, "generation", this.Generation,
 			"epoch", _LLM_Menu_ApiPrivateLifecycleState()["generation"])
 		return true
@@ -1009,6 +1066,37 @@ class LLM_LocalServerPanel {
 		else
 			SetTimer(Callback, -Abs(Period))
 		return true
+	}
+
+	/**
+	 * Stops the network work a pause must not run (discovery, a running sweep)
+	 * and keeps the accepted verdicts, so the paused menu commits (EDD-1). The
+	 * source a view captured before the pause is fenced by it (a capture commits
+	 * in the pause state it was taken in), so that view retires here and a build
+	 * prepares the paused one, which the resume retires in turn. A sweep the
+	 * pause cuts short leaves the last verdicts inert until the resume's sweep
+	 * (_PausedStaleRows).
+	 * @returns {Boolean} Whether the native network work settled.
+	 */
+	Pause() {
+		PreviousCritical := Critical("Off")
+		try {
+			ClaimCritical := Critical("On")
+			try {
+				this.Generation += 1
+				this.View := 0
+				this.PreparedRows := 0
+				this.PreparedOwner := 0
+				this.PreparedRecord := 0
+				this.ResumeIntent := 0
+				this.RepairGeneration += 1
+				this.DiscoveryGeneration += 1
+			} finally Critical(ClaimCritical)
+			try RepairSettled := this._DropRepairs()
+			finally Settled := this.Native.Pause()
+			this._Build("local_servers_paused")
+			return RepairSettled && Settled
+		} finally Critical(PreviousCritical)
 	}
 
 	/** Cleanup acknowledges only this owner; ShellRunner keeps its separate debts. */

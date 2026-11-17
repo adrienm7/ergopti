@@ -224,12 +224,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Windows
 
-- [ ] **EDD-1 on AHK: the AI menu's local server rows while paused** ([decision](docs/memory/maintainer-decisions.md)).
-      The shared `LocalServerMenuRows` greys every local server row under a pause, and `LLM_LocalServerPanel`
-      (`_Current`, `_HeldCurrent`, `_ApplyNonCritical`, `_PrepareRows`) refuses a model choice, an address or a key
-      while paused. As on macOS, those three must commit while paused and only the rescan wait for the resume (told by
-      `NotifyPausedRefusal`); the panel's view must then stay current across a pause, which `Retire(false)` at the
-      pause ends today. Then the PC run in TODO-tests-windows.md.
 - [ ] **Immediate-Backspace restoration after Notepad-paste and terminal expansions.** Those owners emit after the
       keystroke and keep no undo record, so `HSE_UndoExpansion` refuses both hosts. Keep the record in
       `_HSE_CommitNotepadOwner` and `_HSE_CommitTerminalOwner` (as `_HSE_RememberUndo` does) and send the undo burst
@@ -275,6 +269,11 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### All drivers
 
+- [ ] **EDD-1 on macOS and Linux: the AI menu's local server rows while paused**
+      ([decision](docs/memory/maintainer-decisions.md)). Windows commits a model choice, an address and a key while
+      paused since 2026-11-17 and only its rescan waits, told by the paused notice (`local_server_panel.ahk`
+      `Pause`). The shared `ai/engine/local_servers/menu.lua` still greys every row under `paused`, and macOS
+      `local_server_panel.lua` (`admitted`) and Linux `local_server_rows.lua` (`admit`) refuse the three while paused.
 - [ ] **Structure plan, phase 2** ([plan](docs/design/structure-plan.md), resume point
       [docs/plans/structure-migration-resume.md](docs/plans/structure-migration-resume.md)). Left: S23 (clipboard) to
       S38, one step per commit with `tools/audit/structure/run-phase2.cjs`, two or three per push after a CI proof.

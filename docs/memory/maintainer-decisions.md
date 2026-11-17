@@ -119,7 +119,9 @@ saves, the physical shortcuts editor and capture, every scope owner's restore
 and clear). Windows follows since 2026-11-17: its editors, model page, AI
 scope restore and hotstring order run while paused, and
 `test_paused_handlers_never_silent.ahk` fails on a new silent pause gate in
-the configuration surfaces; the AI menu's local server rows are left (TODO). Pages that are not configuration
+the configuration surfaces, the AI menu's local server rows included (their
+rescan waits for the resume). macOS and Linux still grey those rows while
+paused (TODO). Pages that are not configuration
 (changelog, update check) keep their own rules. Do not add a pause gate to a
 configuration action; gate the typing runtime instead.
 

@@ -196,10 +196,12 @@ physical size`); X and Y match the pad's width and height (logical span over mil
 
 - [ ] EDD-1, a pause stops typing, not configuration: paused, save once from each editor (prompt, paths, hotstrings
       window, layout manager install/select/remove, action picker, model page choice, download and removal, magic key
-      capture) and from the AI scope restore and the hotstring order rows; each writes the file at once, the Layout
-      rows stay live, the AI submenu shows the change before the resume, and nothing that acts on typing (hotstrings,
-      remaps, tap-holds, predictions) runs until the resume, after which each change applies. A click that still waits
-      (API entry test, test prediction, touchpad auto-configure, programmable hotstrings) shows the paused notice once.
+      capture), from the AI scope restore and the hotstring order rows, and from the AI menu's local server rows with
+      LM Studio or oMLX running (a model choice, then an address and a key in their dialogs); each writes the file at
+      once, the Layout rows stay live, the AI submenu shows the change before the resume, and nothing that acts on
+      typing (hotstrings, remaps, tap-holds, predictions) runs until the resume, after which each change applies and
+      the local servers are searched again. A click that still waits (API entry test, test prediction, local server
+      rescan, touchpad auto-configure, programmable hotstrings) shows the paused notice once.
 - [ ] Boot and menu timings: a toggle must not rebuild 1000 rows; compare base and candidate with interleaved smoke
       boots (summed `process_cpu`); the 2026-11-16 smoke boots gave `Boot complete` between 5.9 and 8.7 s.
 - [ ] Hot-path span lines: at DEBUG, switch the layout once; the field log then holds a `layout.switch` pair beside the
