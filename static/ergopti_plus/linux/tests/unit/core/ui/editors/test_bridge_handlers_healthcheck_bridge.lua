@@ -16,17 +16,17 @@ local helpers, build_mock_state =
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("healthcheck_bridge", function()
-    local handler = helpers.load_module("ui.healthcheck.bridge")
+    local handler = helpers.load_module("diagnostics.ui.healthcheck.bridge")
     local state = build_mock_state()
     local Snapshot = helpers.load_module("diagnostics.engine.healthcheck.snapshot")
 
     -- The probes run curl and child processes; these cases answer the page
     -- without starting any.
     local function without_probes(fn)
-      local previous = package.loaded["ui.healthcheck.probes"]
-      package.loaded["ui.healthcheck.probes"] = { start = function() return { cancel = function() end } end }
+      local previous = package.loaded["diagnostics.ui.healthcheck.probes"]
+      package.loaded["diagnostics.ui.healthcheck.probes"] = { start = function() return { cancel = function() end } end }
       local ok, err = pcall(fn)
-      package.loaded["ui.healthcheck.probes"] = previous
+      package.loaded["diagnostics.ui.healthcheck.probes"] = previous
       if not ok then error(err, 0) end
     end
 

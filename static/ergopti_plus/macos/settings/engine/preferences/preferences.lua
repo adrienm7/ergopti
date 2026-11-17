@@ -63,7 +63,7 @@ local function schema_read_admitted(check, content, status)
 end
 local Logger    = require("core.logger.engine.logger")
 local FileSystem = require("core.fs.adapters.file_system")
-local MetadataCommandStats = require("adapters.metadata_command_stats")
+local MetadataCommandStats = require("diagnostics.adapters.metadata_command_stats")
 local Manifest = require("menu.engine.manifest_reader")
 local LEAF = require("settings.engine.keys").LEAF
 local HotstringLanguages = require("hotstrings.engine.languages")

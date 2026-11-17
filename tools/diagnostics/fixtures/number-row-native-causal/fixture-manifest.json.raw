@@ -70,7 +70,7 @@
     "projection-manifest.original-c15.json.raw": {
       "bytes": 26551,
       "retained_original_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/number-row-one-causal-private-v1/projection-manifest.json",
-      "sha256": "b54206a20b70c4903d6001e8d24af2a71b0e9d6f571109046750db6564be06e1"
+      "sha256": "69e17d89ffba083400084d6c1c40739daab6d4c200703d3bcf81bacf6ef89f3b"
     }
   },
   "historical_native_head": "3c2a4bbb1cef1c71a24b10a28972123bd81ba193",

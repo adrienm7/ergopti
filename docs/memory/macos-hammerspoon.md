@@ -56,7 +56,7 @@ and still vanished for a user with config.toml: the untrusted packaged runtime
 (its own identity, never asked because onboarding was skipped) died at the
 first eventtap, and the launcher took the exit status 0 after logger readiness
 for a Quit. Never infer a clean exit from Hammerspoon's status: every fatal Lua
-path writes `adapters/boot_fatal.lua`'s report, which the launcher turns into
+path writes `diagnostics/adapters/boot_fatal.lua`'s report, which the launcher turns into
 a modal alert. `configured_symlink` now requires that named refusal, and
 `plain_open` launches without `open -n`. Logs left the configuration folder
 (2026-09): `symlink_logs` keeps a legacy linked `hammerspoon/logs` that must
@@ -1152,7 +1152,7 @@ counted by `test-hardening-d-native-timeout-contract.cjs`.
 
 A controlled reload writes `reload_breadcrumb.txt` in the default logs folder
 synchronously, one `<stage> <ms since the Mac's boot>` line per coordinator
-stage and teardown step (`adapters/reload_breadcrumb.lua`), because a reload
+stage and teardown step (`diagnostics/adapters/reload_breadcrumb.lua`), because a reload
 that loses the app discards its queued log lines (2026-10-30 21:06: the day log
 stopped at the lease revocation, no boot and no crash report followed). The
 next boot appends `boot`; the macOS field-report collector copies the file.
@@ -1995,8 +1995,8 @@ fatal dialog.
 
 `tools/dev/collect-macos-field-report.sh` asks a developer ErgoptiPlus.app to
 run every Debug field check, the diagnostics snapshot and the Ollama and MLX
-flows through `infra/field_run.lua`: a request file in the clone folder that
-`static/ergopti_plus/macos/data/field_run.json` names, one JSON result per
+flows through `diagnostics/engine/field_run/field_run.lua`: a request file in the clone folder that
+`static/ergopti_plus/macos/diagnostics/data/field_run.json` names, one JSON result per
 step, then a done marker. It starts only behind `core/lifecycle/engine/dev_source.lua`; a
 packaged runtime never loads it. Runtime installs go through
 `runtime_install_offer` (the only grantor), never the checkers' install
@@ -2012,7 +2012,7 @@ it out on the ad hoc developer app and runs it only with `--installed`.
 A `com.apple.FinderInfo` xattr on the Karabiner-Elements bundle root makes
 `codesign --verify --strict` refuse a bundle that Gatekeeper accepts (Notarized
 Developer ID, team G43BCU2T37; maintainer's Mac 2026-10-27, ledger L43).
-`infra/field_check_checks.lua` (`only_finder_detritus`) therefore reports a
+`diagnostics/engine/field_check/checks.lua` (`only_finder_detritus`) therefore reports a
 trusted bundle whose only strict failure is that detritus as
 `info strict_only:finder_detritus`, not a failure. Action: treat any other
 strict cause as a real signature failure; do not widen the benign list.
@@ -2220,7 +2220,7 @@ baseline` line (item 38).
   (each suppressed key has exactly one outcome; a stop inside the running action
   leaves its outcome to the action). Delivery unavailable, no slot bound or no
   press skip by name.
-- The guided steps (`kind = "guided"`, `infra/field_run_guided.lua`) run as
+- The guided steps (`kind = "guided"`, `diagnostics/engine/field_run/guided.lua`) run as
   one block before `field_owned_pause`: each publishes its gesture in
   `prompt.json`, the collector prints it (👉 GUIDED) and, on a terminal, writes
   `answer.json` from y, n or s. `observe` steps read their check before the
@@ -2233,7 +2233,7 @@ baseline` line (item 38).
   the configuration: the guard puts it back and names it. No mode leaves
   the block out: one report does everything. `tools/dev/field-todo-summary.py` then gives every
   TODO « To confirm on the Mac » point its verdict in `todo_summary.md`
-  (`data/field_todo_coverage.json`; docs/tooling/macos-field-report-coverage.md).
+  (`diagnostics/data/field_todo_coverage.json`; docs/tooling/macos-field-report-coverage.md).
 - `field_fifo_safety` works in its own folder under `TMPDIR`, attaches a reader
   first so a regressed guard cannot freeze the app, checks `followed_mode`
   gives `named_pipe` and `exists` sees it, and removes the folder.
@@ -2327,7 +2327,7 @@ The macOS consumers of physical key positions and media events exist
 (`keystats/media_store` replays through `aggregator/core.media_policy`; the
 shortcut editor reads `physical_capture.position_available`), but their only
 producer is `modules/keystats/physical_capture.lua`, which only the owned
-Karabiner runtime starts (`adapters/runtime_capture_port.lua`, dormant behind
+Karabiner runtime starts (`diagnostics/adapters/runtime_capture_port.lua`, dormant behind
 `[karabiner] runtime = "owned"`; checked 2026-10-31). Action: native position
 capture on macOS is item 31's production capture owner; do not plan it as
 separate work.

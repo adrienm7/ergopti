@@ -17,7 +17,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "core.logger.engine.shim", "ui.field_check.composer_check" }
+local MODULES = { "core.logger.engine.shim", "diagnostics.ui.field_check.composer_check" }
 
 --- A composer environment that completes every step.
 --- @param calls table Receives "save" / "remove".
@@ -61,9 +61,9 @@ local function with_window(build_env, body)
 	logger.evidence = function(_, message, ...) world.evidence[#world.evidence + 1] = string.format(message, ...) end
 	logger.error = function(_, message, ...) world.errors[#world.errors + 1] = string.format(message, ...) end
 	package.loaded["core.logger.engine.shim"] = logger
-	package.loaded["ui.field_check.composer_check"] = nil
+	package.loaded["diagnostics.ui.field_check.composer_check"] = nil
 	local ok, err = xpcall(function()
-		local Window = require("ui.field_check.composer_check")
+		local Window = require("diagnostics.ui.field_check.composer_check")
 		Window._reset()
 		world.services = {
 			-- The label-value join is the locale's own template (common.label_value).
@@ -188,7 +188,7 @@ helpers.describe("composer check window (Linux)", function()
 		local main = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
 		local daemon = main:read("*a")
 		main:close()
-		helpers.assert_true(daemon:find('on_composer_check = function() require("ui.field_check.composer_check").run() end', 1, true) ~= nil,
+		helpers.assert_true(daemon:find('on_composer_check = function() require("diagnostics.ui.field_check.composer_check").run() end', 1, true) ~= nil,
 			"the daemon supplies the row's action")
 	end)
 end)

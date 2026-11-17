@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The engine behind the diagnostics page's buttons and the Debug menu's
 --- "Report a bug" and "Suggest a feature" rows on macOS and Linux
---- (ui/healthcheck/report.lua): one action runs under an exact owner, through
+--- (diagnostics/ui/healthcheck/report.lua): one action runs under an exact owner, through
 --- an explicit completion, with every side effect (clipboard, file save,
 --- folder creation, opener, notification) injected.
 ---

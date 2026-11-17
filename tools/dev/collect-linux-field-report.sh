@@ -34,7 +34,7 @@
 # reads the session (uinput, evdev, autostart, polkit, the focus reporter) and
 # prompts the gestures of TODO « To confirm on Linux » in this terminal; the
 # report ends with todo_summary.md, one verdict per TODO point
-# (static/ergopti_plus/linux/data/field_todo_coverage.json).
+# (static/ergopti_plus/linux/diagnostics/data/field_todo_coverage.json).
 #
 # The machine facts (tools/dev/linux-field-diagnostics.sh): every Ergopti
 # daemon and helper at the start, before the run, every FIELD_SAMPLER_SECONDS
@@ -49,7 +49,7 @@
 # stopped at its bound.
 #
 # The field run: tools/dev/linux-field-run.sh asks the running daemon to run its
-# Debug field checks with no window (linux/infra/field_run.lua, the macOS field
+# Debug field checks with no window (linux/diagnostics/engine/field_run/field_run.lua, the macOS field
 # run's protocol), copies one result per step into field_run/ and prints their
 # marks; no click is needed.
 #
@@ -428,7 +428,7 @@ warn_multiple_drivers instances_end
 FIELD_STEP_HINT="keep your hands off the keyboard and mouse for ${FIELD_IDLE_SECONDS} s (idle CPU)"
 bstep idle_cpu $((FIELD_IDLE_SECONDS + 30)) field_linux_idle_cpu
 FIELD_STEP_HINT=""
-# The collector's own steps (static/ergopti_plus/linux/data/field_guided_steps.json):
+# The collector's own steps (static/ergopti_plus/linux/diagnostics/data/field_guided_steps.json):
 # probes read the session once (uinput, evdev, autostart, polkit, the focus
 # reporter), guided steps print a gesture and count what it left in today's
 # day log or the Metrics database, attested steps take y, n or s. Only counts

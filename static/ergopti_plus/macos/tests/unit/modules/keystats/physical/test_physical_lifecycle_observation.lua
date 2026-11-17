@@ -541,7 +541,7 @@ end)
 
 local root_fixture = require("tests.unit.modules.keystats.lifecycle.test_activation_callback_fail_closed")
 local function with_root(options, scenario)
-	local names={"adapters.event_provenance","adapters.input_source_broker","platform.input.keyboard_hook","adapters.physical_observation_clock","core.process.adapters.lifecycle","platform.input.synthetic_input","settings.engine.paths","core.ui.engine.dialog_util","core.logger.engine.logger","menu.engine.manifest_reader","metrics.engine.capture.physical_lifecycle_observation","modules.keystats.context_tracker","modules.keystats.init","modules.keystats.kc_bridge","modules.keystats.log_manager","modules.keystats.watchers","modules.keymap"}
+	local names={"diagnostics.adapters.event_provenance","adapters.input_source_broker","platform.input.keyboard_hook","adapters.physical_observation_clock","core.process.adapters.lifecycle","platform.input.synthetic_input","settings.engine.paths","core.ui.engine.dialog_util","core.logger.engine.logger","menu.engine.manifest_reader","metrics.engine.capture.physical_lifecycle_observation","modules.keystats.context_tracker","modules.keystats.init","modules.keystats.kc_bridge","modules.keystats.log_manager","modules.keystats.watchers","modules.keymap"}
 	helpers.with_stub_scope(names,function()
 		local original=helpers.load_with_stubs
 		local records,owner,token,clock= {},{},nil,0

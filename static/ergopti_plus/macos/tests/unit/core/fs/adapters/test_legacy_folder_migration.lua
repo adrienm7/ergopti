@@ -380,7 +380,7 @@ helpers.describe("macOS legacy folder migration", function()
 		local source = assert(helpers.read_driver_source(call), "init.lua runs it")
 		local run_at = source:find(call, 1, true)
 		local admission_at = source:find("InstanceAdmission.ADMIT", 1, true)
-		local breadcrumb_at = source:find('require("adapters.reload_breadcrumb")', 1, true)
+		local breadcrumb_at = source:find('require("diagnostics.adapters.reload_breadcrumb")', 1, true)
 		local paths_at = source:find('require("settings.engine.paths")', 1, true)
 		helpers.assert_true(admission_at ~= nil and breadcrumb_at ~= nil and paths_at ~= nil, "init.lua anchors")
 		-- A refused process must leave every folder as it found it.

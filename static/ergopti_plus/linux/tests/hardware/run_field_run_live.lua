@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: The Linux Field Run, Between Real Processes
 --- DESCRIPTION:
---- A daemon host starts the production infra/field_run.lua with its native ports
+--- A daemon host starts the production diagnostics/engine/field_run/field_run.lua with its native ports
 --- (an inotify watcher on the folder, libuv timers, real files) and the real
 --- headless Debug field checks (the composer check over a private user XKB tree,
 --- the network check over this machine's network); the collector's own
@@ -58,7 +58,7 @@ if arg[1] == "daemon" then
 		end)
 		return true
 	end
-	session = assert(require("infra.field_run").start({ pid = uv.os_getpid(), reload = reload, reload_ms = reload_ms }))
+	session = assert(require("diagnostics.engine.field_run.field_run").start({ pid = uv.os_getpid(), reload = reload, reload_ms = reload_ms }))
 	local term = uv.new_signal()
 	term:start("sigterm", function()
 		session:stop()

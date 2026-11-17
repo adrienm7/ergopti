@@ -1041,7 +1041,7 @@ const cases = [
 		'ErgoptiGlobalErrorHandler(Exc, Mode) {\nMsgBox("Fatal", "ErgoptiPlus — erreur de démarrage")\n}',
 		1,
 		'the original startup error caption no longer bypasses policy',
-		'static/ergopti_plus/windows/infra/error_net.ahk'
+		'static/ergopti_plus/windows/diagnostics/engine/reports/error_net.ahk'
 	],
 	[
 		'windows',
@@ -1055,14 +1055,14 @@ const cases = [
 		'ErgoptiGlobalErrorHandler(Exc, Mode) {\nUi_MsgBox("Fatal", "erreur de démarrage")\n}',
 		0,
 		'the startup error supplies a brandless caption',
-		'static/ergopti_plus/windows/infra/error_net.ahk'
+		'static/ergopti_plus/windows/diagnostics/engine/reports/error_net.ahk'
 	],
 	[
 		'windows',
 		'Other() {\nMsgBox("Fatal", "ErgoptiPlus")\n}',
 		1,
 		'bootstrap file cannot authorize another native owner',
-		'static/ergopti_plus/windows/infra/error_net.ahk'
+		'static/ergopti_plus/windows/diagnostics/engine/reports/error_net.ahk'
 	],
 	[
 		'windows',
@@ -1279,7 +1279,7 @@ try {
 		for (const relative of [
 			'core/ui/engine/native_dialogs.ahk',
 			'core/lifecycle/engine/bundle.ahk',
-			'infra/error_net.ahk'
+			'diagnostics/engine/reports/error_net.ahk'
 		])
 			fs.rmSync(path.join(root, 'static/ergopti_plus/windows', relative), { force: true });
 		for (const other of ['windows', 'macos', 'linux'])

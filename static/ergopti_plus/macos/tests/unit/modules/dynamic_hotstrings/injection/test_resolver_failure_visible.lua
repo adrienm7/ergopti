@@ -29,7 +29,7 @@ local function run_scenario()
 		"hotstrings.engine.dynamic.core",
 		"core.logger.engine.logger",
 		"core.logger.engine.shim",
-		"modules.diagnostics.hid_diagnostic_mailbox",
+		"diagnostics.engine.hid_diagnostic_mailbox",
 		"modules.dynamic_hotstrings.rules_engine",
 		"modules.keystats",
 	}
@@ -92,7 +92,7 @@ local function run_scenario()
 		package.loaded["hotstrings.engine.dynamic.core"] = nil
 		package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
 		local RulesEngine = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
-		local Mailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
+		local Mailbox = require("diagnostics.engine.hid_diagnostic_mailbox")
 		local SharedEngine = require("hotstrings.engine.dynamic.core")
 		helpers.assert_true(Mailbox.start())
 		helpers.assert_eq(pump_arm_calls, 1)
@@ -182,8 +182,8 @@ local function run_scenario()
 	if package.loaded["modules.dynamic_hotstrings.rules_engine"] then
 		pcall(package.loaded["modules.dynamic_hotstrings.rules_engine"].stop)
 	end
-	if package.loaded["modules.diagnostics.hid_diagnostic_mailbox"] then
-		pcall(package.loaded["modules.diagnostics.hid_diagnostic_mailbox"].stop)
+	if package.loaded["diagnostics.engine.hid_diagnostic_mailbox"] then
+		pcall(package.loaded["diagnostics.engine.hid_diagnostic_mailbox"].stop)
 	end
 	for _, name in ipairs(dependency_names) do package.loaded[name] = previous[name] end
 	if not ok then error(err, 0) end

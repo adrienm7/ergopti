@@ -6,7 +6,7 @@
 --- What the error window (_shared/ui/error_dialog/) shows, copies and sends to
 --- GitHub for one logged error, for the macOS and Linux drivers: the Markdown
 --- report and the prefilled fields of the bug form. The
---- AHK port (windows/infra/error_report.ahk) replays the same vectors
+--- AHK port (windows/diagnostics/engine/reports/error_report.ahk) replays the same vectors
 --- (_shared/tests/corpus/diagnostics/error_report_vectors.json).
 ---
 --- FEATURES & RATIONALE:

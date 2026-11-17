@@ -28,7 +28,7 @@ local function make_fixture(schedule_ok, start_event)
 	local tap_enabled = false
 
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function()
 			return nil, "foreign", nil

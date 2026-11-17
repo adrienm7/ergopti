@@ -27,7 +27,7 @@ package.loaded["core.i18n.engine.i18n"] = {get=function(key)
  return value
 end}
 local baseline = os.getenv("ERGOPTI_REPORT_TEST_MODULE")
-local Report = baseline and assert(loadfile(baseline))() or require("ui.healthcheck.report")
+local Report = baseline and assert(loadfile(baseline))() or require("diagnostics.ui.healthcheck.report")
 local directory = assert(os.getenv("ERGOPTI_REPORT_DIRECTORY"))
 local raw = assert(os.getenv("ERGOPTI_REPORT_TEXT"))
 local snapshot = {driver="linux",schema_version=2,detailed=false,generated_at="2026-10-04T00:00:00Z",

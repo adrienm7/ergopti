@@ -17,7 +17,7 @@ io.open = function(path, mode) if path == target then return old_open(endpoint, 
 local reader = require("core.fs.engine.regular_file_reader")
 local old_source = reader.open_source
 reader.open_source = function(path) return old_source(path == target and endpoint or path) end
-local bridge = require("ui.healthcheck.bridge")
+local bridge = require("diagnostics.ui.healthcheck.bridge")
 if kind == "snapshot" then
     local snapshot = bridge.build_snapshot({}, false, false)
     assert(type(snapshot) == "table" and type(snapshot.sections) == "table", "snapshot must complete")
@@ -37,7 +37,7 @@ elseif kind == "cpu" then
     package.loaded["core.network.adapters.http_client"] = { HAS_ASYNC = false }
     package.loaded["core.process.adapters.shell_runner"] = { HAS_ASYNC = false, has_command = function() return false end }
     local results = {}
-    local run = require("ui.healthcheck.probes").start(schema, {}, {}, function(id, result) results[id] = result end)
+    local run = require("diagnostics.ui.healthcheck.probes").start(schema, {}, {}, function(id, result) results[id] = result end)
     if regular then assert(results.cpu_load == nil, "valid first sample must wait for the timer")
     else assert(results.cpu_load and results.cpu_load.state == "error", "special source must fail closed") end
     run.cancel()

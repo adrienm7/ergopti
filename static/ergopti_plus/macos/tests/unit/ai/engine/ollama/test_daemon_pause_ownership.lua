@@ -226,7 +226,7 @@ local function load_fixture()
 		get_label = function(value) return value end,
 		execute_single = function() return true end,
 	}
-	package.loaded["adapters.event_provenance"] = {}
+	package.loaded["diagnostics.adapters.event_provenance"] = {}
 	package.loaded["platform.input.key_state"] = {
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,

@@ -42,7 +42,7 @@ OpenPersonalShortcuts(*) {
 }
 
 ; The three log rows of the Debug menu, shared with the gesture and shortcut
-; actions. The work lives in ui/log_openers.ahk, which asks the logger for every
+; actions. The work lives in diagnostics/ui/log_openers.ahk, which asks the logger for every
 ; path at the moment of the click; three copies of the old
 ; <ConfigDir>\autohotkey\logs\ formula used to live here.
 

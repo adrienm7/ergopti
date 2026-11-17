@@ -26,7 +26,7 @@ function M.build(configure, options)
 		end
 	end
 	package.loaded["platform.input.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["core.fs.adapters.storage"] = nil
 	if configure then configure(world, quartz) end

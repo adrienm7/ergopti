@@ -16,7 +16,7 @@ local log={}
 package.loaded['core.logger.engine.logger']={error=function(...) log[#log+1]={...} end}
 local provenance={STATUS_FOREIGN='foreign',STATUS_OWNED='owned',STATUS_UNREADABLE='unreadable'}
 function provenance.classify_with_fence(event) return event.owned and {} or nil,event.status or 'foreign',event.fence end
-package.loaded['adapters.event_provenance']=provenance
+package.loaded['diagnostics.adapters.event_provenance']=provenance
 local Timer={}
 function Timer.after(_,fn)
  local timer={fn=fn};timers[timer]=true

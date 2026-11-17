@@ -7,7 +7,7 @@ require("core.logger.engine.logger")
 local M = {}
 function M.with_world(options, callback)
 	return helpers.with_stub_scope({ "platform.focus.window_manager", "core.ui.engine.native_app_switcher_owner",
-		"core.fs.adapters.storage", "adapters.event_provenance", "tests.stubs.hs", "hs", "core.logger.engine.shim" }, function()
+		"core.fs.adapters.storage", "diagnostics.adapters.event_provenance", "tests.stubs.hs", "hs", "core.logger.engine.shim" }, function()
 		return Gesture.with_fixture(function(fresh)
 			fresh()
 			local f = Native.make({ absolute_time = 0, epoch = 1900000000 })

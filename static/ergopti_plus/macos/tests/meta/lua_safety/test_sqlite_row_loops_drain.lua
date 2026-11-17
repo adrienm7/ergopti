@@ -29,6 +29,7 @@ local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "ai",
 	DRIVER_ROOT .. "apps",
 	DRIVER_ROOT .. "clipboard",
+	DRIVER_ROOT .. "diagnostics",
 	helpers.shared(""),
 }
 local ROW_ITERATOR = "^%s*for%s.-%sin%s+[%w_%.]*db:[nu]?rows%("

@@ -14,7 +14,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"core.logger.engine.logger", "platform.input.synthetic_input", "infra.field_run_selftest", "modules.keymap.selftest_gate",
+	"core.logger.engine.logger", "platform.input.synthetic_input", "diagnostics.engine.field_run.selftest", "modules.keymap.selftest_gate",
 }
 
 local SCRATCH_WINDOW = 4242
@@ -36,9 +36,9 @@ local function with_gate(world, body)
 				return true
 			end,
 		}
-		package.loaded["infra.field_run_selftest"] = nil
+		package.loaded["diagnostics.engine.field_run.selftest"] = nil
 		package.loaded["modules.keymap.selftest_gate"] = nil
-		local Publisher = require("infra.field_run_selftest")
+		local Publisher = require("diagnostics.engine.field_run.selftest")
 		local Gate = require("modules.keymap.selftest_gate")
 		Gate._ports = {
 			field_run_running = function()
@@ -173,10 +173,10 @@ helpers.describe("keymap selftest gate", function()
 	helpers.it("the production read admits the installed app's running field run", function()
 		with_gate({ running = true, focused = SCRATCH_WINDOW }, function(Gate, Publisher)
 			Gate._ports = nil
-			local saved_run, saved_window, saved_dev = package.loaded["infra.field_run"],
+			local saved_run, saved_window, saved_dev = package.loaded["diagnostics.engine.field_run.field_run"],
 				package.loaded["core.ui.adapters.own_window"], package.loaded["core.lifecycle.engine.dev_source"]
 			local running = true
-			package.loaded["infra.field_run"] = { holds_reload = function() return running end }
+			package.loaded["diagnostics.engine.field_run.field_run"] = { holds_reload = function() return running end }
 			package.loaded["core.ui.adapters.own_window"] = { focused_window_id = function() return SCRATCH_WINDOW end }
 			package.loaded["core.lifecycle.engine.dev_source"] = { is_active = function() return false end }
 			local ok, err = pcall(function()
@@ -187,7 +187,7 @@ helpers.describe("keymap selftest gate", function()
 				helpers.assert_true(admitted == false)
 				helpers.assert_eq(reason, "no_field_run")
 			end)
-			package.loaded["infra.field_run"], package.loaded["core.ui.adapters.own_window"],
+			package.loaded["diagnostics.engine.field_run.field_run"], package.loaded["core.ui.adapters.own_window"],
 				package.loaded["core.lifecycle.engine.dev_source"] = saved_run, saved_window, saved_dev
 			assert(ok, err)
 		end)

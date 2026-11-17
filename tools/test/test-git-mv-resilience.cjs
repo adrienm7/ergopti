@@ -45,7 +45,7 @@ const LUA_HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 // macOS shape: driver_root() .. "modules|lib|ui/….lua".
 const MACOS_PIN_RE =
-	/driver_root\(\)\s*\.\.\s*["']([^"'\n]*(?:modules|lib|ui|core|platform|settings|menu|tray|ai|apps)[\\/][^"'\n]*\.lua)["']/g;
+	/driver_root\(\)\s*\.\.\s*["']([^"'\n]*(?:modules|lib|ui|core|platform|settings|menu|tray|ai|apps|diagnostics)[\\/][^"'\n]*\.lua)["']/g;
 
 // Linux shape: helpers.driver_root() .. "/…" — any depth, files and directories,
 // including the "/../_shared/…" escapes into the shared tree.
@@ -58,7 +58,7 @@ const AHK_DIRS_CALL_RE = /_DriverDirsConcat\(([^)\n]*)\)/g;
 
 // Windows file pins — a driver-relative .ahk path written as a string literal.
 const AHK_FILE_PIN_RE =
-	/["']((?:lib|modules|ui|adapters|infra|platform|_generated|data|core|settings|menu|tray|ai|apps|clipboard)[\\/][A-Za-z0-9_\\/.-]+\.ahk)["']/g;
+	/["']((?:lib|modules|ui|adapters|infra|platform|_generated|data|core|settings|menu|tray|ai|apps|clipboard|diagnostics)[\\/][A-Za-z0-9_\\/.-]+\.ahk)["']/g;
 
 /**
  * Paths a test names precisely BECAUSE they must not exist. Each entry carries

@@ -141,7 +141,7 @@ local function load_fixture()
 		clipboard = clipboard,
 		paused = paused,
 		synthetic = require("platform.input.synthetic_input"),
-		provenance = require("adapters.event_provenance"),
+		provenance = require("diagnostics.adapters.event_provenance"),
 		hs = require("hs"),
 		cleanup = function()
 			for _, name in ipairs({
@@ -153,7 +153,7 @@ local function load_fixture()
 				"modules.keystats.watchers",
 				"core.process.adapters.lifecycle",
 				"platform.input.keyboard_hook",
-				"adapters.event_provenance",
+				"diagnostics.adapters.event_provenance",
 				"platform.input.synthetic_input",
 				"modules.keymap",
 				"menu.engine.manifest_reader",

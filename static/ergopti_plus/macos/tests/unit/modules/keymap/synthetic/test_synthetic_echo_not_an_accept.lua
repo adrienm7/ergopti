@@ -41,7 +41,7 @@ local function load_fixture()
 			helpers.in_module_family(name, "modules.keymap")
 			or helpers.in_module_family(name, "ai.engine")
 			or name == "platform.input.synthetic_input"
-			or name == "adapters.event_provenance"
+			or name == "diagnostics.adapters.event_provenance"
 		) then
 			package.loaded[name] = nil
 		end

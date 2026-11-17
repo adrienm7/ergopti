@@ -10,9 +10,9 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Three conditions, read for every key: a field run is running
----    (infra/field_run.lua, in a developer runtime or in the installed app the
+---    (diagnostics/engine/field_run/field_run.lua, in a developer runtime or in the installed app the
 ---    collector opened with its clone), the field run published its scratch
----    window (infra/field_run_selftest.lua), and that window is the focused
+---    window (diagnostics/engine/field_run/selftest.lua), and that window is the focused
 ---    one. Requiring a developer runtime swallowed every key of the installed
 ---    app's field run (field report 2026-11-05).
 --- 2. Fail closed: any other answer, a duplicate Quartz delivery or a read that
@@ -27,7 +27,7 @@ local M = {}
 
 local Logger           = require("core.logger.engine.logger")
 local SyntheticInput   = require("platform.input.synthetic_input")
-local FieldRunSelftest = require("infra.field_run_selftest")
+local FieldRunSelftest = require("diagnostics.engine.field_run.selftest")
 local LOG = "keymap.selftest_gate"
 
 -- Test seam: the two system reads; nil in production, which reads them below.
@@ -44,7 +44,7 @@ local function ports()
 		-- Read from package.loaded: the keymap must not load the field run, and
 		-- a runtime that never started one has none to admit keys for.
 		field_run_running = function()
-			local field_run = package.loaded["infra.field_run"]
+			local field_run = package.loaded["diagnostics.engine.field_run.field_run"]
 			return type(field_run) == "table" and field_run.holds_reload() == true
 		end,
 		focused_own_window_id = function() return require("core.ui.adapters.own_window").focused_window_id() end,

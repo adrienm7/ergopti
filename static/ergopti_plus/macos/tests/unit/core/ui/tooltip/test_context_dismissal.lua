@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"platform.input.key_state",
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",

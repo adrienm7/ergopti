@@ -86,7 +86,7 @@ func fieldRunRoot(_ candidate: String?) -> String? {
 	guard lstat(path, &info) == 0, info.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR), info.st_uid == getuid(),
 		info.st_mode & 0o022 == 0 else { return nil }
 	var declaration = stat()
-	guard lstat(path + "/static/ergopti_plus/macos/data/field_run.json", &declaration) == 0,
+	guard lstat(path + "/static/ergopti_plus/macos/diagnostics/data/field_run.json", &declaration) == 0,
 		declaration.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), declaration.st_uid == getuid() else { return nil }
 	return path
 }

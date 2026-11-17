@@ -370,16 +370,16 @@ end)
 --- @param body function(Window, world)
 local function with_window(ports, body)
 	local saved = {}
-	for _, name in ipairs({ "core.logger.engine.shim", "ui.field_check.network_check", "ui.field_check.window" }) do saved[name] = package.loaded[name] end
+	for _, name in ipairs({ "core.logger.engine.shim", "diagnostics.ui.field_check.network_check", "diagnostics.ui.field_check.window" }) do saved[name] = package.loaded[name] end
 	local world = { evidence = {}, errors = {}, notes = {}, dialogs = {}, copies = {}, deferred = {}, click = "close" }
 	local logger = helpers.make_logger_stub()
 	logger.evidence = function(_, message, ...) world.evidence[#world.evidence + 1] = string.format(message, ...) end
 	logger.error = function(_, message, ...) world.errors[#world.errors + 1] = string.format(message, ...) end
 	package.loaded["core.logger.engine.shim"] = logger
-	package.loaded["ui.field_check.network_check"] = nil
-	package.loaded["ui.field_check.window"] = nil
+	package.loaded["diagnostics.ui.field_check.network_check"] = nil
+	package.loaded["diagnostics.ui.field_check.window"] = nil
 	local ok, err = xpcall(function()
-		local Window = require("ui.field_check.network_check")
+		local Window = require("diagnostics.ui.field_check.network_check")
 		Window._reset()
 		world.services = {
 			-- The label-value join is the locale's own template (common.label_value).

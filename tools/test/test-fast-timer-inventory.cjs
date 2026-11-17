@@ -61,7 +61,7 @@ const FAST_MS = 1000;
  * The interval is read from the source, not repeated here — one source of truth.
  */
 const INVENTORY = {
-	'ui/healthcheck/collection.ahk:this':
+	'diagnostics/ui/healthcheck/collection.ahk:this':
 		'Armed only during a bounded local collection or retained worker retirement. ' +
 		'100 ms observes atomic progress and explicit guided Ctrl/Shift transitions; ' +
 		'no ambient input is retained, and acknowledged task completion disarms the timer.',

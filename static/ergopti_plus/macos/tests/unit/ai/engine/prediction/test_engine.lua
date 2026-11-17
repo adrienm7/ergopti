@@ -215,7 +215,7 @@ local function load_real_setting_bridge()
 	local noop = function() end
 	local replacements = {
 		["modules.keymap.utils"] = {},
-		["adapters.event_provenance"] = {STATUS_UNREADABLE = "unreadable"},
+		["diagnostics.adapters.event_provenance"] = {STATUS_UNREADABLE = "unreadable"},
 		["platform.input.synthetic_input"] = {current_action_epoch = function() return 0 end},
 		["core.text.engine.utils"] = {},
 		["platform.input.keycodes"] = {
@@ -231,7 +231,7 @@ local function load_real_setting_bridge()
 		["modules.keymap.expander"] = {},
 		["core.events.timer_scheduler"] = {after = noop},
 		["menu.engine.manifest_reader"] = {},
-		["modules.diagnostics.hid_diagnostic_mailbox"] = {},
+		["diagnostics.engine.hid_diagnostic_mailbox"] = {},
 		["ai.engine.prediction.engine"] = PE,
 	}
 	local saved = {}

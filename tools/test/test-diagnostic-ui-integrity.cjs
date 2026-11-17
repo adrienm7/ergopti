@@ -129,12 +129,15 @@ report(
 );
 report(
 	'Windows: the host states it runs the guided collection',
-	read('windows/ui/healthcheck/core.ahk').includes(
+	read('windows/diagnostics/ui/healthcheck/core.ahk').includes(
 		`',"capabilities":{"diagnostic_collection":true}}`
 	),
 	'_HC_InitJson must send capabilities.diagnostic_collection = true'
 );
-for (const host of ['linux/ui/healthcheck/bridge.lua', 'macos/ui/healthcheck/core.lua'])
+for (const host of [
+	'linux/diagnostics/ui/healthcheck/bridge.lua',
+	'macos/diagnostics/ui/healthcheck/core.lua'
+])
 	report(
 		`${host}: the host states it runs no guided collection`,
 		/capabilities = \{ diagnostic_collection = false \}/.test(read(host)),
@@ -304,7 +307,7 @@ function rowPattern(label, value) {
 // =================================
 // =================================
 
-const macCore = withoutComments(readFolder('macos/ui/healthcheck'));
+const macCore = withoutComments(readFolder('macos/diagnostics/ui/healthcheck'));
 report(
 	'macOS: the window registers the "healthcheck" message handler the page posts to',
 	/hs\.webview\.usercontent\.new,\s*BRIDGE/.test(macCore) &&
@@ -318,14 +321,14 @@ report(
 );
 // Any reference, not only a call: the old collectors ran pcall(hs.execute, "sysctl …"),
 // which a pattern requiring "hs.execute(" never saw. The behaviour is pinned by
-// macos/tests/unit/ui/healthcheck/test_healthcheck_phase_a_no_subprocess.lua.
+// macos/tests/unit/diagnostics/ui/healthcheck/test_phase_a_no_subprocess.lua.
 report(
 	'macOS: no synchronous subprocess in the diagnostics window',
 	!/\bhs\.execute\b|\bio\.popen\b|\bos\.execute\b/.test(macCore) && macCore.length > 1000,
 	'an hs.execute, io.popen or os.execute runs on the run loop that dispatches the event taps'
 );
 
-const winCore = withoutComments(readFolder('windows/ui/healthcheck'));
+const winCore = withoutComments(readFolder('windows/diagnostics/ui/healthcheck'));
 report(
 	"Windows: the window subscribes to the page's messages, bound to its epoch",
 	/WebMessageReceived\(_HC_OnWebMessage\.Bind\(WindowEpoch\)\)/.test(winCore),
@@ -350,13 +353,14 @@ report(
 	'no schema-driven native view'
 );
 
-const linuxBridge = withoutComments(read('linux/ui/healthcheck/bridge.lua'));
+const linuxBridge = withoutComments(read('linux/diagnostics/ui/healthcheck/bridge.lua'));
 report(
 	'Linux: every page message goes through the shared action allowlist',
 	/Actions\.validate\(payload/.test(linuxBridge),
 	'the bridge does not validate page messages'
 );
-const linuxCollect = linuxBridge + withoutComments(read('linux/ui/healthcheck/probes.lua'));
+const linuxCollect =
+	linuxBridge + withoutComments(read('linux/diagnostics/ui/healthcheck/probes.lua'));
 report(
 	'Linux: no blocking child in the collection or the probes',
 	!/io\.popen\s*\(|os\.execute\s*\(|Shell\.(run|exec[a-z_]*)\s*\(/.test(linuxCollect),
@@ -371,9 +375,9 @@ report(
 		fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'schema.json'), 'utf8')
 	);
 	const probeModules = {
-		windows: withoutComments(read('windows/ui/healthcheck/probes.ahk')),
-		macos: withoutComments(read('macos/ui/healthcheck/probes.lua')),
-		linux: withoutComments(read('linux/ui/healthcheck/probes.lua'))
+		windows: withoutComments(read('windows/diagnostics/ui/healthcheck/probes.ahk')),
+		macos: withoutComments(read('macos/diagnostics/ui/healthcheck/probes.lua')),
+		linux: withoutComments(read('linux/diagnostics/ui/healthcheck/probes.lua'))
 	};
 	let declared = 0;
 	for (const [driver, source] of Object.entries(probeModules)) {
@@ -516,7 +520,7 @@ function receiveOwnedStream(source) {
 				collectionSource.indexOf('Value := JsonParse(Raw)')
 	};
 }
-const collectionSource = read('windows/ui/healthcheck/collection.ahk');
+const collectionSource = read('windows/diagnostics/ui/healthcheck/collection.ahk');
 const ownedStream = receiveOwnedStream(collectorSource);
 for (const [name, required] of [
 	['exclusive acquired update', '(Get-CollectionStreamHash $taskOutput) -cne $taskPrior.sha256'],

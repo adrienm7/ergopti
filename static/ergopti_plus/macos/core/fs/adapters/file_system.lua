@@ -29,7 +29,7 @@ local OperationReporter = require("diagnostics.engine.operation_reporter")
 local FsDir  = require("core.fs.engine.dir")
 local TextUtils = require("core.text.engine.utils")
 local NativePath = require("core.fs.engine.native_path")
-local MetadataCommandStats = require("adapters.metadata_command_stats")
+local MetadataCommandStats = require("diagnostics.adapters.metadata_command_stats")
 local WriteLockPath = require("core.fs.adapters.write_lock_path")
 
 local LOG = "core.fs.adapters.file_system"

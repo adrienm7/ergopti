@@ -622,7 +622,7 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/ui/error_dialog/bridge.lua",
+				"static/ergopti_plus/linux/diagnostics/ui/error_dialog.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/tests/unit/core/ui/webview/test_error_dialog_bridge.lua"
 			]

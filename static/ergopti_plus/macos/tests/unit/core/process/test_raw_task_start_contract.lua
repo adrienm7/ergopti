@@ -30,7 +30,7 @@ local function all_driver_sources()
 				end
 			end
 		end
-		for _, dir in ipairs({ "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard" }) do
+		for _, dir in ipairs({ "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics" }) do
 			walk(dir .. "/", dir .. "/")
 		end
 		for entry in lfs.dir(DRIVER_ROOT) do

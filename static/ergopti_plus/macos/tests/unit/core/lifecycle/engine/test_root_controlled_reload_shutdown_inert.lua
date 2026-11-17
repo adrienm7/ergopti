@@ -29,7 +29,7 @@ local MODULE_NAMES = {
 	"core.logger.adapters.boot_journal",
 	"core.i18n.engine.i18n",
 	"core.i18n.engine.locale",
-	"modules.diagnostics.crash_reporter",
+	"diagnostics.engine.reports.crash_reporter",
 	"core.lifecycle.engine.reload.guard",
 	"core.lifecycle.engine.shutdown.emergency_exit",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
@@ -58,7 +58,7 @@ local MODULE_NAMES = {
 	"ai.engine.ollama.deps_checker",
 	"ai.engine.api.backend_detector",
 	"core.ui.engine.notifications",
-	"ui.error_dialog",
+	"diagnostics.ui.error_dialog",
 	"menu.engine.ui_restore",
 	"ui.onboarding",
 }
@@ -294,7 +294,7 @@ local function run_isolated(options, assertions)
 				set_locale = function() end,
 				set_trigger_provider = function() end,
 			},
-			["modules.diagnostics.crash_reporter"] = {
+			["diagnostics.engine.reports.crash_reporter"] = {
 				report = function() return {} end,
 				prompt_user = function() end,
 			},
@@ -385,7 +385,7 @@ local function run_isolated(options, assertions)
 			["ai.engine.ollama.deps_checker"] = {},
 			["ai.engine.api.backend_detector"] = {},
 			["core.ui.engine.notifications"] = { notify = function() return true end },
-			["ui.error_dialog"] = {
+			["diagnostics.ui.error_dialog"] = {
 				init = function()
 					state.error_dialog_inits = state.error_dialog_inits + 1
 					return true

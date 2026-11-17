@@ -24,7 +24,7 @@ local M = {}
 
 local hs              = hs
 local Logger          = require("core.logger.engine.logger")
-local EventProvenance = require("adapters.event_provenance")
+local EventProvenance = require("diagnostics.adapters.event_provenance")
 local SyntheticInput  = require("platform.input.synthetic_input")
 local Timings         = require("core.timing.engine.timings")
 local TimerScheduler  = require("core.events.timer_scheduler")

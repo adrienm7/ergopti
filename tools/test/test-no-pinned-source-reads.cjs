@@ -23,7 +23,7 @@
  * unit that gets ratcheted.
  *
  * ROOT CAUSE ENCODED:
- * A test that FileReads a quoted "(modules|lib|ui|core|platform|settings|menu|tray|ai|apps)/…*.ahk" path and does not use
+ * A test that FileReads a quoted "(modules|lib|ui|core|platform|settings|menu|tray|ai|apps|diagnostics)/…*.ahk" path and does not use
  * a _Driver* helper is location-pinned. This ratchet counts them and fails if
  * the count rises above the frozen baseline. Lower (never raise) the baseline as
  * tests migrate to _DriverFuncBody("Fn") / _DriverSourceConcat(). It is the test
@@ -105,7 +105,7 @@ const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirs?Concat/;
 // rename to infra/ and is kept only so a stray lib/ path cannot slip back in
 // unseen; `platform` is listed before it exists so Lot 3 cannot land unseen.
 const SOURCE_PATH_RE =
-	/["'][^"'\n]*(?:modules|lib|infra|ui|adapters|platform|core|settings|menu|tray|ai|apps|clipboard)[\\/][^"'\n]*\.ahk["']|["'][.\\/]*ErgoptiPlus\.ahk["']/i;
+	/["'][^"'\n]*(?:modules|lib|infra|ui|adapters|platform|core|settings|menu|tray|ai|apps|clipboard|diagnostics)[\\/][^"'\n]*\.ahk["']|["'][.\\/]*ErgoptiPlus\.ahk["']/i;
 const SOURCE_PATH_RE_G = new RegExp(SOURCE_PATH_RE.source, 'gi');
 
 /**

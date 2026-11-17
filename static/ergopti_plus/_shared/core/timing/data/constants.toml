@@ -867,7 +867,7 @@ ui_handoff_ms = 50
 
 # Linux: the delay before a health-check probe starts its work off the click that
 # requested it, so the click returns first (one event-loop turn).
-# Linux: ui/healthcheck/probes.lua configuration probe.
+# Linux: diagnostics/ui/healthcheck/probes.lua configuration probe.
 healthcheck_probe_defer_ms = 1
 
 # Delay before the post-install keyboard-layout menu refresh fires.
@@ -958,7 +958,7 @@ magic_key_capture_poll_ms = 10
 
 # Windows: how often a developer driver looks for a field run request in its
 # clone (_shared/diagnostics/data/field_run_protocol.json); a request waits at most this long.
-# AHK: infra/field_run.ahk.
+# AHK: diagnostics/engine/field_run/field_run.ahk.
 field_run_poll_ms = 1000
 
 # Hammerspoon reload debounce after a config file change, and the settle poll
@@ -1072,7 +1072,7 @@ slot_conflict_notice_delay_ms = 300
 
 # macOS and Linux: the health check yields once before it builds the configuration
 # context, so its probe never runs inside the caller's turn.
-# HS: ui/healthcheck/probes.lua. Linux: ui/healthcheck/probes.lua.
+# HS: diagnostics/ui/healthcheck/probes.lua. Linux: diagnostics/ui/healthcheck/probes.lua.
 healthcheck_probe_yield_ms = 1
 
 # macOS: the run-loop yield between two hotstring categories whose metadata is
@@ -1301,7 +1301,7 @@ window_switch_worker_sleep_ms = 10
 # selected proxy; handshake: a CONNECT with its NTLM/Negotiate legs, and a
 # client's request head; idle: an open tunnel with no byte in either direction;
 # probe: the whole probe child, from start to its JSON line.
-# LX: core/network/engine/proxy_auth_relay.lua. HS: adapters/field_check_ports.lua,
+# LX: core/network/engine/proxy_auth_relay.lua. HS: diagnostics/adapters/field_check_ports.lua,
 # ai/engine/ollama/server_command.lua (network-retry.sh run_with_proxy_sign_in_relay).
 proxy_relay_dial_timeout_ms = 10000
 proxy_relay_handshake_timeout_ms = 15000
@@ -1323,7 +1323,7 @@ proxy_relay_probe_timeout_ms = 30000
 # What a child process may print before it is stopped: a version line, a df row,
 # a probe reply, never a stream. Lua canon: _shared/ai/engine/policy/process_limits.lua
 # (every Linux process owner takes it from there; pinned to this key).
-# AHK: adapters/crash_report_worker.ahk and core/network/adapters/http_client.ahk, pinned copies.
+# AHK: diagnostics/adapters/crash_report_worker.ahk and core/network/adapters/http_client.ahk, pinned copies.
 process_output_bytes = 65536
 
 # Bytes of one /proc/<pid>/cmdline the Linux local-server scan reads: ports and
@@ -1367,7 +1367,7 @@ release_list_body_bytes = 8388608
 file_digest_output_bytes = 1024
 
 # Head of one crash report the macOS field run reads for its closed tokens (the
-# header and the exception record). HS: adapters/field_probe_ports.lua.
+# header and the exception record). HS: diagnostics/adapters/field_probe_ports.lua.
 crash_report_head_bytes = 65536
 
 # Longest keyboard input-source identifier the macOS driver selects or probes.

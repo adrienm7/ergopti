@@ -513,8 +513,8 @@ local function make_fixture(options)
 			"platform.input.synthetic_input", fixture.hs_overrides)
 		package.loaded["core.fs.adapters.storage"] = nil
 		package.loaded["core.logger.engine.logger"] = fixture.logger
-		package.loaded["adapters.event_provenance"] = nil
-		local provenance = require("adapters.event_provenance")
+		package.loaded["diagnostics.adapters.event_provenance"] = nil
+		local provenance = require("diagnostics.adapters.event_provenance")
 		return synthetic, provenance
 	end
 

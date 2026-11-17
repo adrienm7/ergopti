@@ -13,7 +13,7 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 --- Runs one isolated broker with independently revocable full and cached guards.
 --- @param scenario function Receives native fixture, real adapter and authority.
 local function with_broker(scenario)
-	helpers.with_stub_scope({ "platform.input.synthetic_input", "adapters.event_provenance",
+	helpers.with_stub_scope({ "platform.input.synthetic_input", "diagnostics.adapters.event_provenance",
 		"core.fs.adapters.storage", "core.events.timer_scheduler", "core.logger.engine.logger" }, function()
 		local fixture = Fixture.make({ deliver_trigger = false })
 		local synthetic = fixture.load()

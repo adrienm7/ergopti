@@ -19,8 +19,8 @@
 # is not running (tools/dev/run-macos-dev-app.sh, which builds it first when
 # no developer app exists), asks it through the clone folder it declares to run
 # every Debug field check, the diagnostics collection and the Ollama and MLX
-# download flows (infra/field_run.lua; contract in
-# static/ergopti_plus/macos/data/field_run.json), waits for its done marker
+# download flows (diagnostics/engine/field_run/field_run.lua; contract in
+# static/ergopti_plus/macos/diagnostics/data/field_run.json), waits for its done marker
 # until the request's own deadline plus a grace, and copies its results.
 #
 # The analysis: tools/dev/field-log-analyse.py, the analyser the three
@@ -53,7 +53,7 @@
 #
 # The TODO summary: tools/dev/field-todo-summary.py maps every point of
 # TODO-tests-macos.md « To confirm on the Mac » to its verdict in todo_summary.md and
-# todo_summary.json (static/ergopti_plus/macos/data/field_todo_coverage.json).
+# todo_summary.json (static/ergopti_plus/macos/diagnostics/data/field_todo_coverage.json).
 #
 # The machine facts (tools/dev/macos-field-diagnostics.sh): every Ergopti
 # launcher, embedded Hammerspoon and owned runtime helper at the start, before
@@ -120,7 +120,7 @@ field_paths="$(python3 "${REPO_ROOT}/tools/dev/field-report-paths.py" "${REPO_RO
 	|| { printf '[field-report] ERROR: cannot resolve the driver folders.\n' >&2; exit 1; }
 eval "${field_paths}"
 BUNDLED_HOTSTRINGS="static/ergopti_plus/_shared/hotstrings/data/catalogue"
-FIELD_RUN_SPEC="static/ergopti_plus/macos/data/field_run.json"
+FIELD_RUN_SPEC="static/ergopti_plus/macos/diagnostics/data/field_run.json"
 # How long the collector keeps waiting for done after the request's own
 # deadline (the declared default, which covers every step at its bound): the
 # app needs a moment to settle the last step, run the guard and write done.
@@ -307,7 +307,7 @@ finalize() {
 			printf '%-28s missing\n' "${f}" >> "${steps}"
 		fi
 	done
-	# The last controlled reload's stage trail (adapters/reload_breadcrumb.lua):
+	# The last controlled reload's stage trail (diagnostics/adapters/reload_breadcrumb.lua):
 	# stage names and monotonic times only, so it travels unscrubbed. Its last
 	# line names the stage a lost reload stopped in; `boot` proves one followed.
 	if [ -f "${RELOAD_BREADCRUMB}" ]; then

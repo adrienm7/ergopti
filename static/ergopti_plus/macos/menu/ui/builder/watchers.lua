@@ -14,7 +14,7 @@
 local M = {}
 local hs          = hs
 local Logger      = require("core.logger.engine.logger")
-local git_status  = require("infra.git_status")
+local git_status  = require("diagnostics.engine.reports.git_status")
 local reload_gate = require("core.lifecycle.engine.reload.gate")
 local Timings     = require("core.timing.engine.timings")
 local TimerScheduler = require("core.events.timer_scheduler")
@@ -52,11 +52,11 @@ local DEBOUNCE_SEC = Timings.sec("ui", "hs_reload_debounce_ms")
 -- reload a half-checked-out tree. Kept identical to infra/file_watchers.
 local GIT_HOLD_WARN_DEFERRALS = 120   -- 120 * 0.5s = 60s before one warning
 
---- Whether a developer field run is running (infra/field_run.lua), read through
+--- Whether a developer field run is running (diagnostics/engine/field_run/field_run.lua), read through
 --- package.loaded: only a developer app ever loads that module.
 --- @return boolean
 local function field_run_holds_reload()
-	local field_run = package.loaded["infra.field_run"]
+	local field_run = package.loaded["diagnostics.engine.field_run.field_run"]
 	return type(field_run) == "table" and type(field_run.holds_reload) == "function"
 		and field_run.holds_reload() == true
 end

@@ -197,7 +197,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/ui/healthcheck/core.lua",
+			"source": "static/ergopti_plus/macos/diagnostics/ui/healthcheck/core.lua",
 			"template": "The synchronous diagnostics took %.1f ms, over the %d ms budget%s.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [healthcheck] The synchronous diagnostics took 164.7 ms, over the 5 ms budget; slowest: keystats=61.2 ms, karabiner=40.0 ms.",
 			"expect": {
@@ -549,7 +549,7 @@
 		},
 		{
 			"driver": "linux",
-			"source": "static/ergopti_plus/linux/ui/healthcheck/bridge.lua",
+			"source": "static/ergopti_plus/linux/diagnostics/ui/healthcheck/bridge.lua",
 			"template": "The synchronous diagnostics took %.1f ms, over the %d ms budget%s.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [healthcheck] The synchronous diagnostics took 12.0 ms, over the 5 ms budget.",
 			"expect": {
@@ -565,7 +565,7 @@
 		},
 		{
 			"driver": "linux",
-			"source": "static/ergopti_plus/linux/ui/field_check/window.lua",
+			"source": "static/ergopti_plus/linux/diagnostics/ui/field_check/window.lua",
 			"template": "%s result: %s",
 			"line": "2026-10-30 10:00:00:123 [INFO] [network_check] Network check result: check=network verdict=fail steps=3 pac_download=fail:dns",
 			"expect": {
@@ -783,7 +783,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/ui/healthcheck/core.ahk",
+			"source": "static/ergopti_plus/windows/diagnostics/ui/healthcheck/core.ahk",
 			"template": "The synchronous diagnostics took {1} ms, over the {2} ms budget{3}.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [Healthcheck] The synchronous diagnostics took 41 ms, over the 5 ms budget.",
 			"expect": {

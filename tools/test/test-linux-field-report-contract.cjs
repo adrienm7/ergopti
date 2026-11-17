@@ -54,10 +54,10 @@ const REPORT_REDACT = 'tools/dev/field-report-redact.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
 // The collector's guided and probe steps, and the per-TODO-point summary.
 const GUIDED = 'tools/dev/field-guided.py';
-const GUIDED_STEPS = 'static/ergopti_plus/linux/data/field_guided_steps.json';
+const GUIDED_STEPS = 'static/ergopti_plus/linux/diagnostics/data/field_guided_steps.json';
 const TODO_SUMMARY = 'tools/dev/field-todo-summary.py';
-const TODO_COVERAGE = 'static/ergopti_plus/linux/data/field_todo_coverage.json';
-const RUN_STEPS = 'static/ergopti_plus/linux/data/field_run_steps.json';
+const TODO_COVERAGE = 'static/ergopti_plus/linux/diagnostics/data/field_todo_coverage.json';
+const RUN_STEPS = 'static/ergopti_plus/linux/diagnostics/data/field_run_steps.json';
 const SHELL_CHECKS = 'tools/dev/linux-field-shell-checks.sh';
 const FIELD_RUN = 'tools/dev/linux-field-run.sh';
 const SERVICE = 'static/ergopti_plus/linux/ergopti-hotstrings.service';
@@ -349,7 +349,7 @@ function read(folder, name) {
 				const runner = fs.readFileSync(path.join(ROOT, FIELD_RUN), 'utf8');
 				assert.match(runner, /layout_registry"\)\.install_python\(/);
 				assert.match(runner, /running this collector is the consent/);
-				assert.match(runner, /require\("infra\.field_run"\)/);
+				assert.match(runner, /require\("diagnostics\.engine\.field_run\.field_run"\)/);
 				assert.match(runner, /FieldRun\.load\(/);
 				assert.doesNotMatch(
 					runner.replace(/^\s*#.*$/gm, ''),

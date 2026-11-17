@@ -31,7 +31,7 @@ local function with_dynamic_fixture(body)
 	helpers.with_stub_scope({ "modules.dynamic_hotstrings", "modules.dynamic_hotstrings.rules_engine",
 		"modules.dynamic_hotstrings.personal_info", "modules.dynamic_hotstrings.user_code",
 		"hotstrings.engine.dynamic.core", "hotstrings.engine.dynamic.user_source", "platform.input.synthetic_input",
-		"core.events.timer_scheduler", "adapters.event_provenance", "modules.keymap.utils",
+		"core.events.timer_scheduler", "diagnostics.adapters.event_provenance", "modules.keymap.utils",
 		"core.fs.adapters.file_system", "settings.engine.paths", "platform.focus.application_notifier" }, function()
 		local previous = active_fixture
 		local fixture = { captures = 0, factory_loads = 0 }

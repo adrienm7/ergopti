@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The text of a bug report, for the macOS and Linux drivers: the full
 --- diagnostics as Markdown, copied to the clipboard and prefilled into the
---- GitHub issue form. Pure; the AHK port (windows/infra/issue_report.ahk)
+--- GitHub issue form. Pure; the AHK port (windows/diagnostics/engine/reports/issue_report.ahk)
 --- replays the same vectors
 --- (_shared/tests/corpus/diagnostics/issue_report_vectors.json).
 ---

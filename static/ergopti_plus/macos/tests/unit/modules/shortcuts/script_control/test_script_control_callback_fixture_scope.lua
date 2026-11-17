@@ -13,7 +13,7 @@ local Fixture = require("tests.support.script_control_callback_fixture")
 local OWNERS = {
 	"core.logger.engine.logger", "core.ui.engine.notifications", "platform.input.keycodes", "core.i18n.engine.i18n", "core.fs.engine.paths",
 	"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
-	"adapters.event_provenance", "platform.input.synthetic_input", "core.events.timer_scheduler",
+	"diagnostics.adapters.event_provenance", "platform.input.synthetic_input", "core.events.timer_scheduler",
 	"platform.input.key_state", "modules.shortcuts.script_control", "core.fs.adapters.file_system",
 	"platform.input.hotkey_registrar", "core.fs.adapters.storage", "modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord",
 	"settings.engine.paths", "settings.engine.preferences.preferences",

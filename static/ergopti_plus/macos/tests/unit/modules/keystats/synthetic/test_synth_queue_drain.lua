@@ -19,8 +19,8 @@ local FOREIGN_PID = 8002
 --- @return table fixture
 local function load_fixture()
 	package.loaded["platform.input.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
-	local provenance = helpers.load_with_stubs("adapters.event_provenance", {
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
+	local provenance = helpers.load_with_stubs("diagnostics.adapters.event_provenance", {
 		processInfo = { processID = CURRENT_PID },
 	})
 	return {
@@ -152,9 +152,9 @@ helpers.describe("event provenance: explicit tags are the only ownership authori
 			end
 		end
 		package.loaded["platform.input.synthetic_input"] = nil
-		package.loaded["adapters.event_provenance"] = nil
+		package.loaded["diagnostics.adapters.event_provenance"] = nil
 		local ok, err = pcall(helpers.load_with_stubs,
-			"adapters.event_provenance", { eventtap = eventtap })
+			"diagnostics.adapters.event_provenance", { eventtap = eventtap })
 		helpers.assert_eq(ok, false)
 		helpers.assert_true(tostring(err):find("eventSourceUserData", 1, true) ~= nil,
 			"the fail-fast error must identify the missing immutable-tag contract")

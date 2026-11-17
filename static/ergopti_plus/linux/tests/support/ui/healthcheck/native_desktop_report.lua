@@ -15,10 +15,10 @@ local uv, Json = require("luv"), require("core.text.engine.json")
 local mode = assert(arg[1])
 local baseline = os.getenv("ERGOPTI_DESKTOP_BASELINE_ROOT")
 if baseline then
-	package.loaded["ui.healthcheck.report"] = assert(loadfile(baseline .. "/ui/healthcheck/report.lua"))()
+	package.loaded["diagnostics.ui.healthcheck.report"] = assert(loadfile(baseline .. "/diagnostics/ui/healthcheck/report.lua"))()
 	require("tests.helpers").driver_root = function() return baseline end
 end
-local Report, Loop = require("ui.healthcheck.report"), require("core.events.loop")
+local Report, Loop = require("diagnostics.ui.healthcheck.report"), require("core.events.loop")
 local Scenario = require("tests.support.ui.healthcheck.desktop_scenario")
 local original_spawn, spawned = uv.spawn, {}
 uv.spawn = function(program, options, callback)

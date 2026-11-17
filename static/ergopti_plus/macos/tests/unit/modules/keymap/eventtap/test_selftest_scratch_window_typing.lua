@@ -53,9 +53,9 @@ end
 
 helpers.describe("layouts.engine.utils: the field run's scratch window (selftest-scratch-window-typing)", function()
 	helpers.it("types hotstrings in the published scratch window only, while it is published", function()
-		package.loaded["infra.field_run_selftest"] = nil
+		package.loaded["diagnostics.engine.field_run.selftest"] = nil
 		package.loaded["modules.keymap.utils"] = nil
-		local Selftest = require("infra.field_run_selftest")
+		local Selftest = require("diagnostics.engine.field_run.selftest")
 		local KU = helpers.load_with_stubs("modules.keymap.utils")
 		local state = { window_id = SCRATCH_ID }
 		install_hammerspoon_focus(state)

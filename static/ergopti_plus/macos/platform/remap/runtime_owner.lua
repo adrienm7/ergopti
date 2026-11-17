@@ -66,7 +66,7 @@ M.READY_POLL_INTERVAL_SEC = 0.25
 --- Seconds the runtime may take to reach its first admitted stream.
 M.READY_TIMEOUT_SEC = 30
 
---- The capture states the owner understands (adapters/runtime_capture_port.lua).
+--- The capture states the owner understands (diagnostics/adapters/runtime_capture_port.lua).
 M.CAPTURE_STARTING = "starting"
 M.CAPTURE_ADMITTED = "admitted"
 M.CAPTURE_STOPPED = "stopped"

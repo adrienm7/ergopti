@@ -591,7 +591,7 @@ class NetworkCheckDigest(unittest.TestCase):
                 self.assertEqual(calls, [])
 
     def test_the_head_and_the_download_fit_the_field_run_helper_timeout(self):
-        # adapters/field_check_ports.lua network_chain: 40 s before the helper is killed
+        # diagnostics/adapters/field_check_ports.lua network_chain: 40 s before the helper is killed
         self.assertLess(self.helper.TIMEOUT + self.helper.DIGEST_TIMEOUT, 40)
 
 

@@ -196,8 +196,8 @@ local function run_fixture(body, source)
 	local timers, callback = {}, nil
 	local prior_timer = package.loaded["core.events.timer_scheduler"]
 	local prior_broker = package.loaded["adapters.input_source_broker"]
-	local prior_provenance = require("adapters.event_provenance")
-	package.loaded["adapters.event_provenance"]={STATUS_FOREIGN="foreign",classify_with_fence=function(event, consumer)
+	local prior_provenance = require("diagnostics.adapters.event_provenance")
+	package.loaded["diagnostics.adapters.event_provenance"]={STATUS_FOREIGN="foreign",classify_with_fence=function(event, consumer)
 		if type(event.getProperty) == "function" then return prior_provenance.classify_with_fence(event, consumer) end
 		return nil,"foreign"
 	end}
@@ -209,7 +209,7 @@ local function run_fixture(body, source)
 	package.loaded["adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
 	package.loaded["adapters.physical_shortcut_hook"]=nil
 	local Hook=require("adapters.physical_shortcut_hook")
-	package.loaded["core.events.timer_scheduler"],package.loaded["adapters.input_source_broker"],package.loaded["adapters.event_provenance"] = prior_timer,prior_broker,prior_provenance
+	package.loaded["core.events.timer_scheduler"],package.loaded["adapters.input_source_broker"],package.loaded["diagnostics.adapters.event_provenance"] = prior_timer,prior_broker,prior_provenance
 	local actual_new=hs.eventtap.new
 	hs.eventtap.new=function(types,fn)
 		if debug.getinfo(fn,"S").source:match("physical_shortcut_hook%.lua$") then callback=fn end

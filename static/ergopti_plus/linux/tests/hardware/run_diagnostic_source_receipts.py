@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 
 WORKER = r"""
-local Collector = require("infra.diagnostic_snapshot")
+local Collector = require("diagnostics.engine.reports.snapshot")
 if os.getenv("ERGOPTI_DIAGNOSTIC_CONTROL") == "pid" then
     assert(tonumber(Collector.pid()) and tonumber(Collector.pid()) > 0, "native /proc pid missing")
 elseif os.getenv("ERGOPTI_DIAGNOSTIC_CONTROL") == "facts" then

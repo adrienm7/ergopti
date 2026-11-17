@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"core.fs.engine.file_watchers", "menu.engine.ui_restore", "infra.git_status", "core.fs.engine.dir",
+	"core.fs.engine.file_watchers", "menu.engine.ui_restore", "diagnostics.engine.reports.git_status", "core.fs.engine.dir",
 	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "core.lifecycle.engine.reload.gate",
 	"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "core.fs.adapters.file_system",
 }
@@ -46,7 +46,7 @@ function M.with_watchers(body, options)
 				snapshot = function() end,
 				restore = function() end,
 			}
-			package.loaded["infra.git_status"] = {
+			package.loaded["diagnostics.engine.reports.git_status"] = {
 				operation_in_progress = options.git_probe or function() return false end,
 			}
 			package.loaded["core.fs.engine.file_watchers"] = nil

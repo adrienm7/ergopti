@@ -35,7 +35,7 @@ local OWNED_MODULES = {
 	"ai.engine.ollama.deps_checker",
 	"core.events.timer_scheduler",
 	"ai.ui.menu.activation_pause_owner",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"platform.input.keycodes",
 	"modules.gestures.engine",

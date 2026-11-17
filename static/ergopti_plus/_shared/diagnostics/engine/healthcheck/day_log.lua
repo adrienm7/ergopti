@@ -7,7 +7,7 @@
 --- today's log file, collect it (diagnostics.day_log), keep the redacted text
 --- for the snapshot it was prepared for, and hand the report actions the file to
 --- save next to the report. The Windows host has the same part in
---- windows/ui/healthcheck/day_log.ahk.
+--- windows/diagnostics/ui/healthcheck/day_log.ahk.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The text never travels in the snapshot the page receives: the snapshot

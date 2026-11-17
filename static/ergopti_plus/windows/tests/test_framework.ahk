@@ -806,9 +806,9 @@ global TEST_MODULE_GROUPS := [
 	; Keystats capture, storage and metrics.
 	["keystats", "^unit/modules/keystats/"],
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.
-	["ui", "^unit/(ui|menu|ai|apps)/"],
+	["ui", "^unit/(ui|menu|ai|apps|diagnostics)/"],
 	; Adapters, platform services, shared infrastructure and the test runner.
-	["core", "^unit/(adapters|platform|infra|suite|core|settings|tray|ai|apps|clipboard)/"]
+	["core", "^unit/(adapters|platform|infra|suite|core|settings|tray|ai|apps|clipboard|diagnostics)/"]
 ]
 
 ; The test category of a registering test file; a file no category declares is refused.

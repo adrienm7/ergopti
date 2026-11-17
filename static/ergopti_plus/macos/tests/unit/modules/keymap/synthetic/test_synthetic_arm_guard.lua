@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 --- @return table hs_stub
 local function load_adapter()
 	package.loaded["platform.input.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 	local synthetic = helpers.load_with_stubs("platform.input.synthetic_input")
 	return synthetic, require("hs")
 end

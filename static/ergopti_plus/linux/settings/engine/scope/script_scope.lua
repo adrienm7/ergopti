@@ -26,7 +26,7 @@ local ALIAS_NAMES = {
 local NATIVE_OWNERS = {
 	[ConfigKeys.KEY.SCRIPT_LOCALE] = "core.i18n.engine.i18n",
 	[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = "settings.engine.scope.script_settings",
-	[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = "ui.error_dialog.bridge",
+	[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = "diagnostics.ui.error_dialog",
 }
 
 --- Binds the actual native aliases; policy and available rows come from metadata.

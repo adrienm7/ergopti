@@ -114,7 +114,7 @@ local function load_fixture(plans, timer_plans)
 			return native
 		end,
 	})
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		STATUS_FOREIGN = "foreign",
 		classify_with_fence = function() return nil, "foreign", nil end,

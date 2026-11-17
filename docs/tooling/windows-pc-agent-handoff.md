@@ -441,7 +441,7 @@ meta tests pin names, not behaviour. Run, in order:
 
 1. Parse and the full AHK suite: `core/logger/engine/perf_budget.ahk`,
    `ai/engine/prediction/request_latency.ahk` (included by `prediction_exec.ahk`,
-   which the LLM suites load), `infra/field_run.ahk`, and the edits in
+   which the LLM suites load), `diagnostics/engine/field_run/field_run.ahk`, and the edits in
    `ErgoptiPlus.ahk` (boot budget, field run start) and `core/lifecycle/engine/lifecycle.ahk`
    (field run stop).
 2. A prediction with Ollama and one with an API provider: the log carries
@@ -527,7 +527,7 @@ change touched is the generated `windows/_generated/config_keys.ahk`
 
 - Read the stored value with an AHK twin of the parser (refuse anything else,
   never read it as automatic) and apply it before WinINet/PAC in the managed
-  routes (`ui/field_check/network_check.ahk`, `modules/updater/self_update.ahk`,
+  routes (`diagnostics/ui/field_check/network_check.ahk`, `modules/updater/self_update.ahk`,
   `ai/engine/ollama/managed_bootstrap.ahk` and the route plan twin
   `vendor/ergopti_route_plan.ps1`): a relay is every origin's route, `direct`
   is DIRECT for every origin, loopback stays direct.

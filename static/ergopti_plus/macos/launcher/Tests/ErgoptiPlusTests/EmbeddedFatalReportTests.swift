@@ -3,7 +3,7 @@
 // ==============================================================================
 // MODULE: Embedded Fatal Report Tests
 // DESCRIPTION:
-// Proves the launcher reads exactly what adapters/boot_fatal.lua writes and turns
+// Proves the launcher reads exactly what diagnostics/adapters/boot_fatal.lua writes and turns
 // it into an alert that names the failed stage and the log to read.
 //
 // FEATURES & RATIONALE:

@@ -9,7 +9,7 @@
 --- the folder and file names under the configuration directory and e-mail
 --- addresses. The rules are data in
 --- _shared/diagnostics/data/redaction.json; the AHK port
---- (windows/infra/redact.ahk) replays the same vectors
+--- (windows/diagnostics/engine/reports/redact.ahk) replays the same vectors
 --- (_shared/tests/corpus/diagnostics/redaction_vectors.json).
 ---
 --- FEATURES & RATIONALE:

@@ -30,7 +30,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const TOOL = path.join(ROOT, 'tools/dev/field-todo-summary.py');
 const coverage = JSON.parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/macos/data/field_todo_coverage.json'),
+		path.join(ROOT, 'static/ergopti_plus/macos/diagnostics/data/field_todo_coverage.json'),
 		'utf8'
 	)
 );
@@ -209,7 +209,7 @@ check('a Linux report reads the field run and the collector steps of its own cov
 	const byId = Object.fromEntries(summary.points.map((point) => [point.id, point]));
 	const linux = JSON.parse(
 		fs.readFileSync(
-			path.join(ROOT, 'static/ergopti_plus/linux/data/field_todo_coverage.json'),
+			path.join(ROOT, 'static/ergopti_plus/linux/diagnostics/data/field_todo_coverage.json'),
 			'utf8'
 		)
 	);

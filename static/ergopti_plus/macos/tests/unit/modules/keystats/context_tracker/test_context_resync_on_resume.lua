@@ -57,7 +57,7 @@ helpers.describe("context is re-synchronised on resume", function()
 		local tracker = helpers.load_with_stubs(
 			"modules.keystats.context_tracker", make_overrides(VAULT_APP))
 		local synthetic_input = require("platform.input.synthetic_input")
-		local provenance = require("adapters.event_provenance")
+		local provenance = require("diagnostics.adapters.event_provenance")
 		local tagged = provenance_fixture.tagged_key(
 			synthetic_input, "test.resume-context", "replacement", "x")
 		local state = {

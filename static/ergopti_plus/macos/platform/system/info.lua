@@ -7,7 +7,7 @@
 --- Hammerspoon versions, architecture, screens, keyboard input source and the
 --- process owner; the system time zone the AI agent resolves dates in; and how
 --- long the user's input devices have been idle. Kept in the adapter layer so
---- the collector in infra/diagnostic_snapshot.lua and the remap layer stay free
+--- the collector in diagnostics/engine/reports/snapshot.lua and the remap layer stay free
 --- of hs.* calls and are testable with a plain table.
 ---
 --- FEATURES & RATIONALE:

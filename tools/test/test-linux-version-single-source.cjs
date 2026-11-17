@@ -69,7 +69,7 @@ if (!/Snapshot\.parse_build_version\(/.test(installerSrc) || /M%\.VERSION/.test(
 // ── Consumers must read Version.VERSION, never re-type the literal ────────
 const CONSUMERS = [
 	'menu/ui/builder/builder.lua',
-	'ui/healthcheck/bridge.lua',
+	'diagnostics/ui/healthcheck/bridge.lua',
 	'ui/changelog/bridge.lua',
 	'settings/ui/paths_editor/bridge.lua',
 	'ergopti_hotstrings.lua'

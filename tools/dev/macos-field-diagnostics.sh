@@ -256,7 +256,7 @@ field_mac_environment() {
 # when it spent more than the idle budget. $1: clone root.
 field_mac_idle_cpu() {
 	local root="$1" pids pid name before after percent budget hs="" hs_percent=0 tmp
-	budget="$(sed -n 's/^M\.IDLE_CPU_PERCENT_MAX = \([0-9.]*\)$/\1/p' "${root}/static/ergopti_plus/macos/infra/field_check_session.lua")"
+	budget="$(sed -n 's/^M\.IDLE_CPU_PERCENT_MAX = \([0-9.]*\)$/\1/p' "${root}/static/ergopti_plus/macos/diagnostics/engine/field_check/session.lua")"
 	pids="$(pgrep -f "${FIELD_INSTANCE_PATTERN}|org.pqrs" 2>/dev/null | tr '\n' ' ')"
 	# Without a driver the window still runs: the busiest processes of an
 	# idle Mac are evidence too.

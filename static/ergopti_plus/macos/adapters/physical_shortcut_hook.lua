@@ -15,7 +15,7 @@
 local M = {}
 
 local hs = hs
-local Provenance = require("adapters.event_provenance")
+local Provenance = require("diagnostics.adapters.event_provenance")
 local Timer = require("core.events.timer_scheduler")
 local Broker = require("adapters.input_source_broker")
 local Logger = require("core.logger.engine.logger")
@@ -24,7 +24,7 @@ local LOG = "adapters.physical_shortcut_hook"
 local CONSUMER = "shortcuts.physical"
 
 -- What this process suppressed and what became of each, for the field run
--- (infra/field_check_physical_shortcuts.lua). Counts only, never a key.
+-- (diagnostics/engine/field_check/physical_shortcuts.lua). Counts only, never a key.
 local _counts = { suppressed = 0, delivered = 0, unacknowledged = 0, dropped = 0 }
 
 --- Counts one suppressed record's outcome, once: a stop inside its own turn

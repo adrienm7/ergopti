@@ -26,7 +26,7 @@ local OWNERS = {
 	"platform.remap.onboarding",
 	"core.ui.ui.tooltip",
 	"modules.keystats",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"core.events.timer_scheduler",
 	"hs", "tests.stubs.hs", "hs.timer",
 }
@@ -40,7 +40,7 @@ helpers.describe("Pause transaction fixture ownership", function()
 					if predecessor_kind == "false" then predecessor = false end
 					if predecessor_kind == "table" then predecessor = {} end
 					for _, name in ipairs(OWNERS) do
-						if name ~= "adapters.event_provenance" and name ~= "core.events.timer_scheduler" then
+						if name ~= "diagnostics.adapters.event_provenance" and name ~= "core.events.timer_scheduler" then
 							package.loaded[name] = predecessor
 						end
 					end

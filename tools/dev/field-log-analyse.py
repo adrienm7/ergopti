@@ -90,7 +90,7 @@ SLOWEST_SHOWN = 10
 # The idle CPU budget the macOS idle field check declares; the collectors'
 # quiet-window measure on every OS is read against it.
 IDLE_BUDGET = (
-    "static/ergopti_plus/macos/infra/field_check_session.lua",
+    "static/ergopti_plus/macos/diagnostics/engine/field_check/session.lua",
     r"(?m)^M\.IDLE_CPU_PERCENT_MAX = (\d+(?:\.\d+)?)",
 )
 

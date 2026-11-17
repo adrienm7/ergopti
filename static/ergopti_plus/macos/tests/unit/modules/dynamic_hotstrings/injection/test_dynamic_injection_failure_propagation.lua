@@ -101,7 +101,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		package.loaded["ai.engine.bridge"] = api({ init = function() return true end })
 		package.loaded["modules.keymap.terminator_replay"] = api()
 		package.loaded["modules.keymap.utils"] = api()
-		package.loaded["adapters.event_provenance"] = api()
+		package.loaded["diagnostics.adapters.event_provenance"] = api()
 		local epoch = {}
 		package.loaded["platform.input.synthetic_input"] = api({
 			current_action_epoch = function() return epoch end,
@@ -173,7 +173,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		})
 		package.loaded["modules.keymap.terminator_replay"] = api()
 		package.loaded["modules.keymap.utils"] = api()
-		package.loaded["adapters.event_provenance"] = api()
+		package.loaded["diagnostics.adapters.event_provenance"] = api()
 		package.loaded["platform.input.synthetic_input"] = api({
 			current_action_epoch = function() return {} end,
 		})

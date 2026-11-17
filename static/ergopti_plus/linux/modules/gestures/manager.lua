@@ -498,7 +498,7 @@ local OPEN_WINDOW = {
 --- The pages whose opener is not the manager's show(), by app name: the
 --- diagnostics window starts its probes in its bridge's open().
 local OPEN_WINDOW_OPENER = {
-	[ConfigKeys.COMMAND.HEALTHCHECK] = function() return require("ui.healthcheck.bridge").open() end,
+	[ConfigKeys.COMMAND.HEALTHCHECK] = function() return require("diagnostics.ui.healthcheck.bridge").open() end,
 	-- Opened by open_layer_editor only, so on its navigation layer.
 	["layout_editor_window"] = function()
 		return require("ui.layout_manager.bridge").open_editor_window(require("core.ui.ui.webview_manager"),
@@ -807,7 +807,7 @@ local function _execute_action(action_name, go_next, binding)
 
 		local log_opener = OPEN_LOG[name]
 		if log_opener then
-			require("ui.log_openers")[log_opener](function(target)
+			require("diagnostics.ui.log_openers")[log_opener](function(target)
 				_run("xdg-open " .. shell_quote(target))
 				return true
 			end)

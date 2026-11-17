@@ -15,7 +15,7 @@
  * FEATURES & RATIONALE:
  * 1. One algorithm, three languages: the Lua port
  *    (_shared/diagnostics/engine/reports/redact.lua) and the AHK port
- *    (windows/infra/redact.ahk) replay the same vectors
+ *    (windows/diagnostics/engine/reports/redact.ahk) replay the same vectors
  *    (_shared/tests/corpus/diagnostics/redaction_vectors.json).
  * 2. Secrets first, so a token that happens to contain the account name is
  *    removed whole rather than half-rewritten.

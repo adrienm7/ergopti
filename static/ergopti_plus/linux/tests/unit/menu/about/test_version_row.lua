@@ -83,7 +83,7 @@ local CHECKOUTS = {
 
 -- The identity chain, reloaded per case: earlier suites leave logger stubs in
 -- package.loaded, and a module cached under one of them logs nowhere.
-local IDENTITY_MODULES = { "core.logger.engine.shim", "infra.diagnostic_snapshot", "infra.version" }
+local IDENTITY_MODULES = { "core.logger.engine.shim", "diagnostics.engine.reports.snapshot", "infra.version" }
 
 --- Runs body(Version) over a freshly loaded identity chain bound to the real
 --- logger, with every log line captured at DEBUG; restores the chain after.
@@ -238,7 +238,7 @@ helpers.describe("tray (linux): the About version row names the build and its co
 	helpers.it("a resolver that raises is logged as an ERROR and reads as an unknown commit", function()
 		local identity
 		local lines = capture_logs(function(Version)
-			package.loaded["infra.diagnostic_snapshot"] = {
+			package.loaded["diagnostics.engine.reports.snapshot"] = {
 				resolve_commit = function() error("stamp read exploded", 0) end,
 			}
 			identity = Version.resolve_identity({ source = Version.SOURCE_BUILD, version = "1.2.3" })
@@ -250,7 +250,7 @@ helpers.describe("tray (linux): the About version row names the build and its co
 	helpers.it("the identity is resolved once, then served to every rebuild", function()
 		local calls = 0
 		capture_logs(function(Version)
-			package.loaded["infra.diagnostic_snapshot"] = {
+			package.loaded["diagnostics.engine.reports.snapshot"] = {
 				resolve_commit = function()
 					calls = calls + 1
 					return SHORT, Snapshot.COMMIT_SOURCE_GIT

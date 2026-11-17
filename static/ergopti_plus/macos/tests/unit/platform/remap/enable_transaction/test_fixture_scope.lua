@@ -52,7 +52,7 @@ local OWNED_MODULES = {
 	"modules.keymap.layout",
 	"core.fs.adapters.file_system",
 	"core.fs.engine.dir",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"core.fs.adapters.storage",
 	"platform.remap.managed_rule_removal",
 }

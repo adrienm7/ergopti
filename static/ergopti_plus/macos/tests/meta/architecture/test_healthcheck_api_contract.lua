@@ -4,7 +4,7 @@
 --- MODULE: Healthcheck Diagnostic API Contract
 --- DESCRIPTION:
 --- Pins every external module symbol that the diagnostics collectors, probes
---- and actions call (ui/healthcheck/helpers.lua, probes.lua, report.lua), so a
+--- and actions call (diagnostics/ui/healthcheck/helpers.lua, probes.lua, report.lua), so a
 --- renamed or removed API fails CI here instead of silently degrading the
 --- user-facing diagnostic.
 ---
@@ -31,9 +31,9 @@ local CONTRACT = {
 	{ mod = "core.logger.engine.logger",                       fns = { "ring_buffer_snapshot", "session_issues",
 		"logs_dir", "today_log_path", "today_errors_path", "crash_reports_dir" } },
 	{ mod = "settings.engine.paths",               fns = { "is_initialized", "get_config_dir" } },
-	{ mod = "infra.diagnostic_snapshot",        fns = { "resolve_commit" } },
-	{ mod = "modules.diagnostics.crash_reporter", fns = { "reports_dir" } },
-	{ mod = "adapters.boot_fatal",              constants = { "LAUNCHER_LOG_ENV" } },
+	{ mod = "diagnostics.engine.reports.snapshot",        fns = { "resolve_commit" } },
+	{ mod = "diagnostics.engine.reports.crash_reporter", fns = { "reports_dir" } },
+	{ mod = "diagnostics.adapters.boot_fatal",              constants = { "LAUNCHER_LOG_ENV" } },
 	{ mod = "platform.system.info",             fns = { "runtime_version", "arch", "os_version", "keyboard_layout",
 		"elevated" } },
 	{ mod = "modules.updater",                  fns = { "current_version", "installed_channel" } },
@@ -135,7 +135,7 @@ helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
 	local failures = {}
 	local ok_run, snap
 	local scope = {
-		"core.logger.engine.logger", "core.logger.engine", "ai.engine", "ui.healthcheck", "ui.healthcheck.core", "ui.healthcheck.helpers",
+		"core.logger.engine.logger", "core.logger.engine", "ai.engine", "diagnostics.ui.healthcheck", "diagnostics.ui.healthcheck.core", "diagnostics.ui.healthcheck.helpers",
 	}
 	for _, name in ipairs(HS_READERS) do scope[#scope + 1] = name end
 	helpers.with_stub_scope(scope, function()
@@ -144,9 +144,9 @@ helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
 		for _, name in ipairs(HS_READERS) do package.loaded[name] = nil end
 		-- Force the real llm module (load_with_stubs injects a DEFAULT_STATE-only stub).
 		package.loaded["ai.engine"] = nil
-		package.loaded["ui.healthcheck"] = nil
-		package.loaded["ui.healthcheck.core"] = nil
-		package.loaded["ui.healthcheck.helpers"] = nil
+		package.loaded["diagnostics.ui.healthcheck"] = nil
+		package.loaded["diagnostics.ui.healthcheck.core"] = nil
+		package.loaded["diagnostics.ui.healthcheck.helpers"] = nil
 		local orig_warn, orig_error = Logger.warn, Logger.error
 		local function capture(original)
 			return function(tag, fmt, ...)
@@ -159,7 +159,7 @@ helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
 			end
 		end
 		Logger.warn, Logger.error = capture(orig_warn), capture(orig_error)
-		ok_run, snap = pcall(function() return require("ui.healthcheck").run({ detailed = true }) end)
+		ok_run, snap = pcall(function() return require("diagnostics.ui.healthcheck").run({ detailed = true }) end)
 		Logger.warn, Logger.error = orig_warn, orig_error
 	end)
 

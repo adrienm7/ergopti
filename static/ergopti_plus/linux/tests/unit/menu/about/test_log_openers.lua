@@ -21,7 +21,7 @@ local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 --- @param body function Receives the openers module.
 local function with_openers(state, body)
 	local saved_sink = package.loaded["core.logger.engine.sink"]
-	local saved_openers = package.loaded["ui.log_openers"]
+	local saved_openers = package.loaded["diagnostics.ui.log_openers"]
 	local saved_reader = package.loaded["core.fs.engine.regular_file_reader"]
 	local reader = require("core.fs.engine.regular_file_reader")
 	package.loaded["core.logger.engine.sink"] = {
@@ -29,7 +29,7 @@ local function with_openers(state, body)
 		main_log_path = function() return "/fixture/logs/" .. FOLDER .. "/unified-" .. state.day .. ".log" end,
 		errors_log_path = function() return state.path or "/fixture/logs/" .. FOLDER .. "/errors-" .. state.day .. ".log" end,
 	}
-	package.loaded["ui.log_openers"] = nil
+	package.loaded["diagnostics.ui.log_openers"] = nil
 	if not state.native then
 		package.loaded["core.fs.engine.regular_file_reader"] = { ENOENT = reader.ENOENT, open = function(path)
 			if state.existing[path] then
@@ -41,10 +41,10 @@ local function with_openers(state, body)
 			return nil, "absent", reader.ENOENT
 		end }
 	end
-	local ok, err = pcall(function() body(require("ui.log_openers")) end)
+	local ok, err = pcall(function() body(require("diagnostics.ui.log_openers")) end)
 	package.loaded["core.fs.engine.regular_file_reader"] = saved_reader
 	package.loaded["core.logger.engine.sink"] = saved_sink
-	package.loaded["ui.log_openers"] = saved_openers
+	package.loaded["diagnostics.ui.log_openers"] = saved_openers
 	if not ok then error(err, 0) end
 end
 
@@ -136,7 +136,7 @@ helpers.describe("log-openers-native-refusal", function()
 			package.path = %q
 			package.loaded["core.logger.engine.sink"] = { errors_log_path = function() return %q end }
 			local opened, notified = 0, 0
-			local handled = require("ui.log_openers").open_today_errors(
+			local handled = require("diagnostics.ui.log_openers").open_today_errors(
 				function() opened = opened + 1; return true end,
 				function() notified = notified + 1; return true end)
 			assert(handled == false and opened == 0 and notified == 0)

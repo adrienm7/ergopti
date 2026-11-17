@@ -262,8 +262,8 @@ const MACOS_MODULES = {
 	paths_editor: 'settings/ui/menu/paths.lua',
 	layout_manager: 'ui/layout_manager/init.lua',
 	layout_editor_window: 'ui/layout_manager/init.lua',
-	healthcheck: 'ui/healthcheck/core.lua',
-	error_dialog: 'ui/error_dialog/init.lua',
+	healthcheck: 'diagnostics/ui/healthcheck/core.lua',
+	error_dialog: 'diagnostics/ui/error_dialog.lua',
 	permission_dialog: 'ui/permission_dialog/init.lua',
 	download_window: 'ui/download_window/init.lua',
 	update_check: 'ui/update_check/init.lua'
@@ -335,14 +335,14 @@ const WINDOWS_APPS = {
 		checks: (m) => [new RegExp(`\\bw${m.width}\\s+h${m.height}\\b`)]
 	},
 	healthcheck: {
-		file: 'ui/healthcheck/core.ahk',
+		file: 'diagnostics/ui/healthcheck/core.ahk',
 		checks: (m) => [
 			new RegExp(`HC_WIDTH\\s*:=\\s*${m.width}\\b`),
 			new RegExp(`HC_HEIGHT\\s*:=\\s*${m.height}\\b`)
 		]
 	},
 	error_dialog: {
-		file: 'ui/error_dialog/init.ahk',
+		file: 'diagnostics/ui/error_dialog.ahk',
 		checks: (m) => [
 			new RegExp(`ED_WIDTH\\s*:=\\s*${m.width}\\b`),
 			new RegExp(`ED_HEIGHT\\s*:=\\s*${m.height}\\b`)
@@ -597,8 +597,8 @@ function productionSources(directory, extension) {
 }
 
 for (const [driver, language, owner, expected] of [
-	['macos', 'lua', 'ui/console_window.lua', 1],
-	['windows', 'ahk', 'adapters/console_window.ahk', 2]
+	['macos', 'lua', 'diagnostics/ui/console_window.lua', 1],
+	['windows', 'ahk', 'diagnostics/adapters/console_window.ahk', 2]
 ]) {
 	const directory = path.join(ROOT, SP, driver);
 	const files = productionSources(directory, `.${language}`);

@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- The part of the error window that does not depend on the host: loading the
 --- shared policy once, the Debug menu switch, the report of one error and the
---- page's first message. The macOS host (ui/error_dialog/init.lua) and the
---- Linux bridge (ui/error_dialog/bridge.lua) keep their windows, timers and
+--- page's first message. The macOS host (diagnostics/ui/error_dialog.lua) and the
+--- Linux bridge (diagnostics/ui/error_dialog.lua) keep their windows, timers and
 --- scope ownership, and call these with their own logger, storage and paths.
 ---
 --- FEATURES & RATIONALE:

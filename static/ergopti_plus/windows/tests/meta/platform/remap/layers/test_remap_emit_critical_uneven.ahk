@@ -75,7 +75,7 @@ _RECU_AssertNumberRowRoutesThroughHelpers() {
 	; Move-resilient: scan the modules dir via the framework helper. _DigitRowDown(
 	; and _DigitRowUp( are unique to layout.ahk within modules, so these present
 	; checks are unambiguous.
-	Src := _DriverDirsConcat("modules", "ai/engine")
+	Src := _DriverDirsConcat("modules", "diagnostics/engine/reports", "ai/engine")
 	; The inline number-row hotkeys must delegate to the serialised helpers
 	; rather than calling SendEvent("{1 Down}") directly (the old non-Critical
 	; path). A regression that inlines a bare SendEvent again drops this token.

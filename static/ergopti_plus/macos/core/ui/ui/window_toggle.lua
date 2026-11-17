@@ -43,7 +43,7 @@ local PAGES = {
 	studio_nav               = { module = "ui.layout_manager", window = "editor_window", close = "close_editor" },
 	model_browser            = { module = "ai.ui.model_browser" },
 	changelog                = { module = "ui.changelog" },
-	healthcheck              = { module = "ui.healthcheck", close = "close_window" },
+	healthcheck              = { module = "diagnostics.ui.healthcheck", close = "close_window" },
 }
 M.PAGES = PAGES
 

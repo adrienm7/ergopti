@@ -30,7 +30,7 @@ helpers.describe("ui.bridge_handlers", function()
     end
 
     helpers.it("the healthcheck window opens in the persisted locale, not a hardcoded 'fr'", function()
-      local hc = helpers.load_module("ui.healthcheck.bridge")
+      local hc = helpers.load_module("diagnostics.ui.healthcheck.bridge")
       local previous = package.loaded["core.ui.ui.webview_manager"]
       local shown = nil
       package.loaded["core.ui.ui.webview_manager"] = {

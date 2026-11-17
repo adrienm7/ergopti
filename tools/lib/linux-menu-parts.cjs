@@ -40,7 +40,7 @@ const PART_MODULES = new Set([
 	'ai.ui.menu.agent',
 	'apps.ui.menu.apps',
 	'settings.ui.menu.configuration',
-	'ui.menu.menu_debug',
+	'diagnostics.ui.menu_debug',
 	'menu.ui.builder.dialogs',
 	'menu.ui.ergopti_studio',
 	'ui.menu.menu_gestures',

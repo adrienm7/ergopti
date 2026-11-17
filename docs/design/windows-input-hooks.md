@@ -14,9 +14,9 @@ reassertion" below.
 Both rows are in the shared Debug menu (`menu.debug_menu` in
 `_shared/settings/data/features/manifest.toml`), declared for `ahk` only with the
 reason `platform_reason.input_probe_is_autohotkey_specific` (no other driver has
-SendInput or an AutoHotkey hook). Code: `windows/infra/input_probe.ahk`; pure
+SendInput or an AutoHotkey hook). Code: `windows/diagnostics/engine/field_run/input_probe.ahk`; pure
 cores and menu declaration are pinned by
-`windows/tests/unit/infra/input_probe/test_input_probe.ahk`.
+`windows/tests/unit/diagnostics/engine/input_probe/test_input_probe.ahk`.
 
 Each click asks for a confirmation, opens a small window the check owns, types
 only into it, shows pass or fail with one line per step (all text through i18n,
@@ -219,12 +219,12 @@ the consumers that could have depended on the order no longer do. Nothing in
 AutoHotkey is left to implement; `tools/test/test-windows-sendinput-consumers.cjs`
 pins this list, so a new site needs a decision here first.
 
-| Site                                  | Keeps SendInput because                                                                                                                                                                                                                                                |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `platform/input/text_sender.ahk`      | Predictions and paste: measured 56 against 191 ms, and the burst is atomic, so a physical key cannot land inside an accepted text. SendEvent would trade that for nothing, since the order no longer decides anything.                                                 |
-| `infra/hotstrings/hotstring_send.ahk` | The HSE dispatch: measured 51 against 137 ms, one atomic erase and replacement. The terminal burst stays SendEvent, for its pacing only.                                                                                                                               |
-| `settings/engine/io.ahk`              | One key given back when a script chord lost its action. It must stay: its hotkey is at a higher `#InputLevel` than a level-0 SendEvent, which could fire the chord again, while SendInput hides the key from this script's own hook. It is rare and outside any burst. |
-| `infra/input_probe.ahk`               | The measurements of items 49 and 50 themselves, in a window the check owns.                                                                                                                                                                                            |
+| Site                                           | Keeps SendInput because                                                                                                                                                                                                                                                |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `platform/input/text_sender.ahk`               | Predictions and paste: measured 56 against 191 ms, and the burst is atomic, so a physical key cannot land inside an accepted text. SendEvent would trade that for nothing, since the order no longer decides anything.                                                 |
+| `infra/hotstrings/hotstring_send.ahk`          | The HSE dispatch: measured 51 against 137 ms, one atomic erase and replacement. The terminal burst stays SendEvent, for its pacing only.                                                                                                                               |
+| `settings/engine/io.ahk`                       | One key given back when a script chord lost its action. It must stay: its hotkey is at a higher `#InputLevel` than a level-0 SendEvent, which could fire the chord again, while SendInput hides the key from this script's own hook. It is rare and outside any burst. |
+| `diagnostics/engine/field_run/input_probe.ahk` | The measurements of items 49 and 50 themselves, in a window the check owns.                                                                                                                                                                                            |
 
 Why the order no longer decides anything:
 

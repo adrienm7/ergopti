@@ -23,7 +23,7 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
-local STUBS = { "adapters.update_launcher", "ui.changelog", "ui.error_dialog", "ui.log_openers", "core.ui.ui.builder" }
+local STUBS = { "adapters.update_launcher", "ui.changelog", "diagnostics.ui.error_dialog", "diagnostics.ui.log_openers", "core.ui.ui.builder" }
 
 --- Loads the host with recording doubles of the launcher, the Versions window,
 --- the error window and the log opener. ctx: Host, requests, reports, changelogs.
@@ -36,10 +36,10 @@ local function load_host()
 	package.loaded["ui.changelog"] = {
 		open = function(opts) ctx.changelogs[#ctx.changelogs + 1] = opts.channel end,
 	}
-	package.loaded["ui.error_dialog"] = {
+	package.loaded["diagnostics.ui.error_dialog"] = {
 		report = function(record, complete) ctx.reports[#ctx.reports + 1] = record; complete(true); return { cancel = function() end } end,
 	}
-	package.loaded["ui.log_openers"] = { open_today_log = function() return true end }
+	package.loaded["diagnostics.ui.log_openers"] = { open_today_log = function() return true end }
 	ctx.urls = {}
 	package.loaded["core.ui.ui.builder"] = {
 		force_focus = function(_, _, lifecycle)
@@ -257,7 +257,7 @@ helpers.describe("update-check native report completion", function()
 				ctx.Host._set_window(view, session)
 				session.start()
 				local native_records = {}
-				package.loaded["ui.error_dialog"].report = function(record, complete)
+				package.loaded["diagnostics.ui.error_dialog"].report = function(record, complete)
 					native_records[#native_records + 1] = record
 					complete(reported)
 					return { cancel = function() end }
@@ -284,7 +284,7 @@ helpers.describe("update-check native report completion", function()
 			ctx.Host._set_window(view, session)
 			session.start()
 			local replacement, replacement_messages, reopened
-			package.loaded["ui.error_dialog"].report = function(_, complete)
+			package.loaded["diagnostics.ui.error_dialog"].report = function(_, complete)
 				reopened = ctx.Host.open(owners)
 				replacement = ctx.Host._session()
 				replacement_messages = #view.messages
@@ -312,7 +312,7 @@ helpers.describe("update report asynchronous native receipt", function()
 				ctx.Host._set_window(view, session)
 				session.start()
 				local complete, current, cancelled
-				package.loaded["ui.error_dialog"].report = function(_, callback, predicate)
+				package.loaded["diagnostics.ui.error_dialog"].report = function(_, callback, predicate)
 					complete, current = callback, predicate
 					return { cancel = function() cancelled = true end }
 				end
@@ -357,7 +357,7 @@ helpers.describe("update host report cancellation reentry", function()
 			local second = ctx.Host._session()
 			helpers.assert_true(second ~= first)
 			local complete, current, cancelled
-			package.loaded["ui.error_dialog"].report = function(_, callback, predicate)
+			package.loaded["diagnostics.ui.error_dialog"].report = function(_, callback, predicate)
 				complete, current = callback, predicate
 				return { cancel = function() cancelled = true end }
 			end
@@ -380,7 +380,7 @@ helpers.describe("update host report cancellation reentry", function()
 			ctx.Host._set_window(view, session)
 			session.start()
 			local replacement, reentered
-			package.loaded["ui.error_dialog"].report = function()
+			package.loaded["diagnostics.ui.error_dialog"].report = function()
 				return { cancel = function()
 					if not reentered then
 						reentered = true

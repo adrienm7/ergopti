@@ -21,7 +21,7 @@ local KEYCODE_ESCAPE = 53
 local MODULES = {
 	"ui.menu.magic_key_source_menu", "core.events.timer_scheduler", "core.ui.engine.notifications",
 	"modules.keymap.magic_key_source", "modules.shortcuts.tap_keys", "menu.engine.manifest_menu",
-	"platform.input.keyboard_geometry", "adapters.event_provenance", "modules.shortcuts.script_control",
+	"platform.input.keyboard_geometry", "diagnostics.adapters.event_provenance", "modules.shortcuts.script_control",
 }
 
 --- Runs body against the real menu module, its timers, notifications and
@@ -65,14 +65,14 @@ local function with_menu(body, faults)
 			end,
 		}
 		if world.faults.provenance then
-			local original = require("adapters.event_provenance")
+			local original = require("diagnostics.adapters.event_provenance")
 			local recording = {}
 			for key, value in pairs(original) do recording[key] = value end
 			recording.classify_with_fence = function(event, consumer)
 				if world.faults.fence then return nil, nil, world.faults.fence end
 				return original.classify_with_fence(event, consumer)
 			end
-			package.loaded["adapters.event_provenance"] = recording
+			package.loaded["diagnostics.adapters.event_provenance"] = recording
 		end
 
 		local base = require("tests.stubs.hs").eventtap

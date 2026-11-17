@@ -158,7 +158,7 @@ const PINS = [
 	pin(
 		'limits',
 		'process_output_bytes',
-		'windows/adapters/crash_report_worker.ahk',
+		'windows/diagnostics/adapters/crash_report_worker.ahk',
 		'CRASH_REPORT_WORKER_MAX_OUTPUT_BYTES'
 	),
 	pin(

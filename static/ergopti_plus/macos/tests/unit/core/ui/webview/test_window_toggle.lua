@@ -137,7 +137,7 @@ helpers.describe("window toggle (macOS)", function()
 		for page, spec in pairs(WindowToggle.PAGES) do
 			-- Resolved by module name, as require would, so a move keeps the check;
 			-- the health check defines its window hooks in its core submodule.
-			local name = spec.module == "ui.healthcheck" and "ui.healthcheck.core" or spec.module
+			local name = spec.module == "diagnostics.ui.healthcheck" and "diagnostics.ui.healthcheck.core" or spec.module
 			local path = package.searchpath(name, package.path)
 			helpers.assert_true(path ~= nil, page .. ": page module " .. name .. " resolves")
 			local handle = io.open(path)

@@ -19,7 +19,7 @@
 --- 4. A cut field can carry a note (one line saying where the complete text is),
 ---    appended after the truncation marker and counted in the budget: the caller
 ---    passes it only for the field that holds the complete report.
---- 5. The JS original and the AHK port (windows/infra/issue_link.ahk) replay the
+--- 5. The JS original and the AHK port (windows/diagnostics/engine/reports/issue_link.ahk) replay the
 ---    same vectors: _shared/tests/corpus/diagnostics/issue_link_vectors.json.
 --- ==============================================================================
 

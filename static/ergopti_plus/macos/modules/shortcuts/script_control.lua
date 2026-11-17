@@ -31,7 +31,7 @@ local M = {}
 
 local hs            = hs
 local notifications = require("core.ui.engine.notifications")
-local EventProvenance = require("adapters.event_provenance")
+local EventProvenance = require("diagnostics.adapters.event_provenance")
 local SyntheticInput = require("platform.input.synthetic_input")
 local TimerScheduler = require("core.events.timer_scheduler")
 local Timings       = require("core.timing.engine.timings")

@@ -44,7 +44,7 @@ local OWNED_MODULES = {
 	"core.i18n.engine.i18n",
 	"core.text.engine.utils",
 	"platform.input.keycodes",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"platform.input.key_state",
 	"core.process.adapters.shell_runner",
@@ -348,7 +348,7 @@ local function with_fixture(callback)
 				F15_KARABINER_ESCAPE = 108,
 				BACKSPACE = 51, RETURN = 36, ESCAPE = 53,
 			}
-			package.loaded["adapters.event_provenance"] = {
+			package.loaded["diagnostics.adapters.event_provenance"] = {
 				STATUS_UNREADABLE = "unreadable",
 				classify_with_fence = function() return nil, "physical", nil end,
 			}

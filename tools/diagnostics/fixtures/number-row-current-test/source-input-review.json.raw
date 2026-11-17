@@ -26,10 +26,10 @@
   },
   "historical_owner_images_unchanged_sha256": {
     "tools/diagnostics/keyboard_geometry_xctest_receipt.py": "9cef4f9256f3604ac07d710d77c95424718012f23c6a8b472f9e5936253ac094",
-    "tools/diagnostics/number_row_current_network_causal.py": "8faeedb65aeaa9cf65fe4f75c077e4a79c017e0fb5cbb0ac5d45bc6fc4f4fe02",
-    "tools/diagnostics/number_row_native_causal.py": "dd35b5f5fca4a164ae6f94e387081f781a5b9795f42c8626bb2425baf1c1998f",
-    "tools/diagnostics/test_number_row_native_causal.py": "5331dc0899db4fa8b9a021407b0cad93a82cfc1d476bcfae51fce3636755d867",
-    "tools/diagnostics/test_number_row_source_composition.py": "fa8d34eb3dc65695d6df6e83c33fbbf97fe479a1a1e2dea9855fd172f1c39aab",
+    "tools/diagnostics/number_row_current_network_causal.py": "8968ced164b7505591c224cfb0b080e7f3964a4e39b7a2b8b752ea6e416a6654",
+    "tools/diagnostics/number_row_native_causal.py": "9b0e58b852518c6c73545b6f395681bc35594a0a8b0512f66fe9e0b614d5e11b",
+    "tools/diagnostics/test_number_row_native_causal.py": "cc89a1980e5b4d42a81e4471a1aae62ee1592d23783e1c7012aba062d7d11fb6",
+    "tools/diagnostics/test_number_row_source_composition.py": "7dfec6f95addfd89e217483cf1720f393c953f2f46e7048edd4f14d5b0f5c1cc",
     "tools/diagnostics/tis_evidence_transport.cjs": "f62344840267ab207370df974cc344fce83cbe3b758f2a25c986837a41d04269"
   },
   "independent_source_review": {
@@ -46,9 +46,9 @@
   "reviewed_images_sha256": {
     "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift": "6b09c1ba4203f7b20bdabeac2800c2547898a75b9fdd6135dfa5bb18b680cd02",
     "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift": "105820510cbe3c5c13dee94d30d7ef1ea738fa9131907ae3cc12278dc10a96f7",
-    "tools/diagnostics/fixtures/number-row-current-test/build-inputs.json.raw": "4f3504e325c37fd17b14571492ba49c9e1188b261096c5098fee915ea9c18fc7",
-    "tools/diagnostics/number_row_current_test_causal.py": "14620c0aab289bac929038f8768c8e84c343d9e8d4ce00065dec888092a86bb1",
-    "tools/diagnostics/test_number_row_current_test_causal.py": "0b9df5911452e29af3ff9ed11de276bfa02637670f7381a856a494f48c9cb78a",
+    "tools/diagnostics/fixtures/number-row-current-test/build-inputs.json.raw": "3c6216840a55ad0c7add3f7e86a0ac0d940f14a7fa89d1535d4dc5547d9d8a96",
+    "tools/diagnostics/number_row_current_test_causal.py": "506b94773068753be949fa55f0f34a74c477f9bd5758adbdb118400e35f74a56",
+    "tools/diagnostics/test_number_row_current_test_causal.py": "60ea40d7777e0f3f5e7f1bd77b80fc85f61da10a78bd3e4334228a8e3270e933",
     "tools/test/test-number-row-current-test-causal.cjs": "d7cfab001f15825ec57a3c0f96cd53837f54acc593c079860018dcee1bc4d60e"
   },
   "role": "current-carbon-source-input-admission-review-not-native-qualification",

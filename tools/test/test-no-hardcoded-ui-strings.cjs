@@ -76,7 +76,7 @@ const ALLOWED = [
 		reason: 'bundle extraction runs before the locale catalogue is on disk (audit I10)'
 	},
 	{
-		file: 'windows/infra/error_net.ahk',
+		file: 'windows/diagnostics/engine/reports/error_net.ahk',
 		sink: 'Ui_MsgBox',
 		reason: 'the fatal boot handler can fire before i18n is loaded (audit I10)'
 	},

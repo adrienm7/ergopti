@@ -8,7 +8,7 @@
 # field run: state probes read once with no person (a device node's access,
 # a unit's autostart, a count of log lines), and guided steps that print one
 # gesture, wait for it under a bound and record what they saw. The Linux
-# collector runs static/ergopti_plus/linux/data/field_guided_steps.json; the
+# collector runs static/ergopti_plus/linux/diagnostics/data/field_guided_steps.json; the
 # macOS field run does the same inside the app (infra/field_run_guided.lua).
 #
 # FEATURES & RATIONALE:

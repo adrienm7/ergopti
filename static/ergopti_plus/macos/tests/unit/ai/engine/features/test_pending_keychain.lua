@@ -24,7 +24,7 @@ local FLOWS = {
 --- @param scenario function Complete native request scenario.
 local function with_keychain(scenario, backboard)
 	return helpers.with_fresh_modules({
-		"ai.engine.prediction.tone_rewrite", "ai.engine.local_servers.mlx_stream_retirement", "adapters.event_provenance",
+		"ai.engine.prediction.tone_rewrite", "ai.engine.local_servers.mlx_stream_retirement", "diagnostics.adapters.event_provenance",
 		"tests.support.modules.llm.selection_translation_scope",
 		"tests.support.modules.llm.selection_translation_destination",
 	}, function()

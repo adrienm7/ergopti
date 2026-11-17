@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Input Probe Native Adapter
 ; DESCRIPTION:
-; The Win32 surface of the opt-in input probe (infra/input_probe.ahk): the
+; The Win32 surface of the opt-in input probe (diagnostics/engine/field_run/input_probe.ahk): the
 ; low-level keyboard hook the hook-order check installs, the focus test of its
 ; target window, and the hotkey whose only job is to swallow the probe key. The
 ; probe keeps its measurements and verdicts; every native call stays here.

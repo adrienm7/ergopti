@@ -46,7 +46,7 @@
 ; ====================================================
 
 _ADRA_ReadSource() {
-	return _DriverDirsConcat("infra", "apps/engine", "ai/engine", "tray", "menu/engine", "settings/engine", "platform/input", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
+	return _DriverDirsConcat("infra", "diagnostics/engine/reports", "diagnostics/engine/field_run", "apps/engine", "ai/engine", "tray", "menu/engine", "settings/engine", "platform/input", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 }
 
 

@@ -77,7 +77,7 @@ PE comparison of v1.0.0, v1.0.3 and v1.0.4 (7-Zip PE resource listing):
    clipboard lock and sequence check, from AHK. This is justified on its own engineering merits:
    `Add-Type -TypeDefinition` runs the C# compiler on every region capture (hundreds of ms to
    seconds), and so does a PowerShell process start. Keep the custody rules
-   (`tests/unit/adapters/crash_report/test_screenshot_region_sequence.ahk` pins the current needles
+   (`tests/unit/diagnostics/adapters/crash_report/test_screenshot_region_sequence.ahk` pins the current needles
    and must be rewritten against the new owner). The smallest interim alternative is to move the
    type definition into a bundled `vendor/*.ps1` worker. Bundled workers with `DllImport` passed in
    v1.0.3, but the PowerShell launch and the compile cost stay.

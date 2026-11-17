@@ -289,7 +289,7 @@ local function new_session(updater)
 		end,
 		open_changelog = function() return manager.show("changelog") == true end,
 		report = function(result, complete, current)
-			return require("ui.error_dialog.bridge").report({
+			return require("diagnostics.ui.error_dialog").report({
 				kind = "error",
 				module = "updater",
 				message = string.format("Update check failed on channel %s: %s", tostring(result.channel),

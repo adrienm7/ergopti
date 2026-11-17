@@ -208,7 +208,7 @@ describe("Driver version: the crash dump names the version and the app dir", fun
 		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
 			local Paths = require("core.fs.engine.paths")
 			local Version = require("infra.version")
-			local Reporter = helpers.load_module("modules.diagnostics.crash_reporter")
+			local Reporter = helpers.load_module("diagnostics.engine.reports.crash_reporter")
 			local ok, err = pcall(Reporter.dump, "ergopti_hotstrings", "boom")
 			if not ok then error(err, 0) end
 			assert_true(err == true, "metadata dump must acknowledge its retained redacted output")

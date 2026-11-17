@@ -27,7 +27,7 @@ local helpers = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
-local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics" }
 
 local SHELL_CALL_PATTERNS = {
 	"pcall%s*%(%s*hs%.execute%s*,",

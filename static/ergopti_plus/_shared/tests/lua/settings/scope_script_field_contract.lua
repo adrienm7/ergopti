@@ -4,7 +4,7 @@
 return function(helpers, driver)
 	local function with_native(kind, callback)
 		local name = kind == "locale" and "core.i18n.engine.i18n"
-			or (driver == "macos" and "ui.error_dialog" or "ui.error_dialog.bridge")
+			or (driver == "macos" and "diagnostics.ui.error_dialog" or "diagnostics.ui.error_dialog")
 		local saved, names = {}, { name, "core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.adapters.storage" }
 		for _, module in ipairs(names) do saved[module] = package.loaded[module]; package.loaded[module] = nil end
 		local writes = 0
@@ -104,7 +104,7 @@ return function(helpers, driver)
 			helpers.it("keeps exact live-parent admission through an equal-valued module replacement", function()
 				with_native(kind, function(native)
 					local name = kind == "locale" and "core.i18n.engine.i18n"
-						or (driver == "macos" and "ui.error_dialog" or "ui.error_dialog.bridge")
+						or (driver == "macos" and "diagnostics.ui.error_dialog" or "diagnostics.ui.error_dialog")
 					local owner = token()
 					helpers.assert_eq(native.scope_acquire(owner), true)
 					local receipt = native.scope_capture(owner)

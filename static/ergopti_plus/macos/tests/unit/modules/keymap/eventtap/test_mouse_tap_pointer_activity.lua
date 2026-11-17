@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 local function load_keymap()
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (helpers.in_module_family(name, "modules.keymap") or helpers.in_module_family(name, "ai.engine")
-			or name == "platform.input.synthetic_input" or name == "adapters.event_provenance") then
+			or name == "platform.input.synthetic_input" or name == "diagnostics.adapters.event_provenance") then
 			package.loaded[name] = nil
 		end
 	end

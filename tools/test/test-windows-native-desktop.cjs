@@ -131,7 +131,7 @@ function checkNativeEntry(source) {
 		assert.equal(code.split('#Include ../' + owner + '\n').length, 2);
 	}
 	assert.deepEqual(code.match(/^#Include unit\/.*$/gm), [
-		'#Include unit/adapters/test_console_window.ahk',
+		'#Include unit/diagnostics/adapters/test_console_window.ahk',
 		'#Include unit/platform/remap/key_combinations/test_key_combinations.ahk'
 	]);
 	assert.doesNotMatch(code, /#Include .*run_all\.ahk|#Include .*ErgoptiPlus\.ahk/);
@@ -155,8 +155,8 @@ for (const [before, after] of [
 	['#Include ../platform/input/text_sender.ahk', '; omitted sender owner'],
 	['#Include ../platform/remap/altgr_criteria.ahk', '; omitted AltGr criteria owner'],
 	[
-		'#Include unit/adapters/test_console_window.ahk',
-		'#Include unit/adapters/test_console_window.ahk\n#Include unit/core/text/toml/test_numeric_strings.ahk'
+		'#Include unit/diagnostics/adapters/test_console_window.ahk',
+		'#Include unit/diagnostics/adapters/test_console_window.ahk\n#Include unit/core/text/toml/test_numeric_strings.ahk'
 	],
 	[
 		'#Include unit/platform/remap/key_combinations/test_key_combinations.ahk',
@@ -207,7 +207,7 @@ for (const [before, after] of [
 	assert.throws(() => admittedNativeWorkflow(changed), /ambiguous\/missing job/);
 }
 const registrations = [
-	'unit/adapters/test_console_window.ahk',
+	'unit/diagnostics/adapters/test_console_window.ahk',
 	'unit/platform/remap/key_combinations/test_key_combinations.ahk'
 ].map((file) =>
 	stripComments(

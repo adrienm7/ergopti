@@ -34,7 +34,7 @@ local KEYCODE_LEFT_COMMAND = 55
 local BUFFER_EVENT_CAP = 1024
 
 local RESET_MODULES = {
-	"adapters.event_provenance", "core.fs.adapters.file_system",
+	"diagnostics.adapters.event_provenance", "core.fs.adapters.file_system",
 	"adapters.input_source_broker", "platform.input.keyboard_hook",
 	"core.process.adapters.lifecycle", "platform.input.synthetic_input",
 	"core.events.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
@@ -232,7 +232,7 @@ local function load_fixture(options)
 		register_action_listener = function() return true end,
 		unregister_action_listener = function() return true end,
 	}
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
 		STATUS_UNREADABLE = "unreadable",

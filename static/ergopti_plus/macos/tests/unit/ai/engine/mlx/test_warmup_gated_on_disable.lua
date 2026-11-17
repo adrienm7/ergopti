@@ -102,7 +102,7 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"platform.input.keycodes",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 	"platform.input.key_state",
@@ -150,7 +150,7 @@ local function exercise_script_control_warmup_transaction(use_exact_owner_api)
 			RETURN = 36,
 			ESCAPE = 53,
 		}
-		package.loaded["adapters.event_provenance"] = {}
+		package.loaded["diagnostics.adapters.event_provenance"] = {}
 		package.loaded["platform.input.key_state"] = {
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "(none)" end,

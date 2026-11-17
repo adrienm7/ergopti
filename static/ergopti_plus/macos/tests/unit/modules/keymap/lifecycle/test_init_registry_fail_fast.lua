@@ -24,7 +24,7 @@ local function load_keymap_with_results(results)
 	local saved = {}
 	local stubs = {
 		["core.text.engine.utils"] = {},
-		["adapters.event_provenance"] = {},
+		["diagnostics.adapters.event_provenance"] = {},
 		["platform.input.synthetic_input"] = {
 			current_action_epoch = function() return 0 end,
 		},
@@ -64,7 +64,7 @@ local function load_keymap_with_results(results)
 		["layouts.engine.layers.terminators"] = {},
 		["core.logger.engine.perf"] = {},
 		["infra.hotpath_profiler"] = {},
-		["modules.diagnostics.hid_diagnostic_mailbox"] = {},
+		["diagnostics.engine.hid_diagnostic_mailbox"] = {},
 	}
 
 	saved["modules.keymap"] = package.loaded["modules.keymap"]

@@ -38,7 +38,7 @@ function M.load_keystats()
 	-- owns their reload rather than making the generic helper erase intentional
 	-- adapter stubs installed by unrelated tests.
 	package.loaded["platform.input.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["menu.engine.manifest_reader"] = {
@@ -152,7 +152,7 @@ function M.load_keystats()
 		flushes = flushes,
 		hs = _G.hs,
 		synthetic_input = require("platform.input.synthetic_input"),
-		provenance = require("adapters.event_provenance"),
+		provenance = require("diagnostics.adapters.event_provenance"),
 	}
 	--- Runs deferred keystats builders after the simulated eventtap returns.
 	function fixture.drain()

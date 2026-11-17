@@ -103,10 +103,10 @@ const resolveConfigLeaves = (source) =>
 		configLeaves.has(name) ? `"${configLeaves.get(name)}"` : spelled
 	);
 
-const ahkSnapshot = resolveConfigLeaves(read('windows/infra/diagnostic_snapshot.ahk'));
+const ahkSnapshot = resolveConfigLeaves(read('windows/diagnostics/engine/reports/snapshot.ahk'));
 const ahkBlock = ahkSnapshot.match(/static Fields := \[([\s\S]*?)\]/);
 if (!ahkBlock)
-	errors.push('windows/infra/diagnostic_snapshot.ahk no longer declares its field list');
+	errors.push('windows/diagnostics/engine/reports/snapshot.ahk no longer declares its field list');
 else
 	compareList(
 		'AutoHotkey',
@@ -117,17 +117,18 @@ if (!ahkSnapshot.includes(`return "${contract.module}"`))
 
 // 3. Every collector assigns every field ---------------------------------------
 const collectors = {
-	'linux/infra/diagnostic_snapshot.lua': (name) => new RegExp(`\\b${name}\\s*=`),
-	'macos/infra/diagnostic_snapshot.lua': (name) => new RegExp(`\\b${name}\\s*=`),
-	'windows/infra/diagnostic_snapshot.ahk': (name) =>
+	'linux/diagnostics/engine/reports/snapshot.lua': (name) => new RegExp(`\\b${name}\\s*=`),
+	'macos/diagnostics/engine/reports/snapshot.lua': (name) => new RegExp(`\\b${name}\\s*=`),
+	'windows/diagnostics/engine/reports/snapshot.ahk': (name) =>
 		new RegExp(`(Values\\["${name}"\\]\\s*:=|"${name}",)`)
 };
 // Only the collecting function is searched: the field list itself names every
 // field, and a scan of the whole file would pass without a single assignment.
 const collectorBodies = {
-	'linux/infra/diagnostic_snapshot.lua': /function M\.collect\([\s\S]*?\nend\n/,
-	'macos/infra/diagnostic_snapshot.lua': /function M\.collect\([\s\S]*?\nend\n/,
-	'windows/infra/diagnostic_snapshot.ahk': /DiagSnapshot_Collect\(BootMs\) \{[\s\S]*?\n\}\n/
+	'linux/diagnostics/engine/reports/snapshot.lua': /function M\.collect\([\s\S]*?\nend\n/,
+	'macos/diagnostics/engine/reports/snapshot.lua': /function M\.collect\([\s\S]*?\nend\n/,
+	'windows/diagnostics/engine/reports/snapshot.ahk':
+		/DiagSnapshot_Collect\(BootMs\) \{[\s\S]*?\n\}\n/
 };
 for (const [rel, pattern] of Object.entries(collectors)) {
 	const body = resolveConfigLeaves(read(rel)).match(collectorBodies[rel]);

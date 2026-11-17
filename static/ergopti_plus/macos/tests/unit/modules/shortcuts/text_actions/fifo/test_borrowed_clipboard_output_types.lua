@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 
 local STUBS = {
 	"platform.input.text_sender", "clipboard.adapters.clipboard", "platform.input.synthetic_input",
-	"core.events.timer_scheduler", "adapters.event_provenance", "core.fs.adapters.storage",
+	"core.events.timer_scheduler", "diagnostics.adapters.event_provenance", "core.fs.adapters.storage",
 	"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 	"clipboard.borrowers", "modules.keymap.utils",
 }

@@ -220,10 +220,10 @@ helpers.describe("logs folder resolution (logs-dir-resolver)", function()
 
 	helpers.it("writes crash dumps into the logs folder", function()
 		with_paths({ XDG_STATE_HOME = "/state" }, {}, function()
-			package.loaded["modules.diagnostics.crash_reporter"] = nil
-			local CrashReporter = require("modules.diagnostics.crash_reporter")
+			package.loaded["diagnostics.engine.reports.crash_reporter"] = nil
+			local CrashReporter = require("diagnostics.engine.reports.crash_reporter")
 			helpers.assert_eq(CrashReporter.get_crash_dir(), "/state/" .. FOLDER .. "/logs/crash_reports")
-			package.loaded["modules.diagnostics.crash_reporter"] = nil
+			package.loaded["diagnostics.engine.reports.crash_reporter"] = nil
 		end)
 	end)
 end)

@@ -32,7 +32,7 @@ local i18n          = require("core.i18n.engine.i18n")
 local notifications = require("core.ui.engine.notifications")
 local ui_restore    = require("menu.engine.ui_restore")
 local fs_dir        = require("core.fs.engine.dir")
-local git_status    = require("infra.git_status")
+local git_status    = require("diagnostics.engine.reports.git_status")
 local reload_gate   = require("core.lifecycle.engine.reload.gate")
 local RuntimeLog    = require("diagnostics.engine.runtime_log")
 local TimerScheduler = require("core.events.timer_scheduler")
@@ -83,11 +83,11 @@ local function is_hotstring_source(path)
 		or path:match("%.local_ahk_path$") ~= nil
 end
 
---- Whether a developer field run is running (infra/field_run.lua). Read
+--- Whether a developer field run is running (diagnostics/engine/field_run/field_run.lua). Read
 --- through package.loaded: only a developer app ever loads that module.
 --- @return boolean
 local function field_run_holds_reload()
-	local field_run = package.loaded["infra.field_run"]
+	local field_run = package.loaded["diagnostics.engine.field_run.field_run"]
 	return type(field_run) == "table" and type(field_run.holds_reload) == "function"
 		and field_run.holds_reload() == true
 end

@@ -33,7 +33,7 @@ const DECIDED = {
 	'platform/input/text_sender.ahk': 1,
 	'settings/engine/io.ahk': 1,
 	'infra/hotstrings/hotstring_send.ahk': 5,
-	'infra/input_probe.ahk': 3
+	'diagnostics/engine/field_run/input_probe.ahk': 3
 };
 
 const found = {};

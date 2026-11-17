@@ -100,8 +100,8 @@ const WINDOWS_MECHANICS = {
 		'fingerprint the executable when parser sources are embedded',
 	'core/lifecycle/engine/lifecycle.ahk': 'which executable a reload relaunches',
 	'core/text/engine/toml/helpers.ahk': "the compiled exe's former paths.toml location",
-	'infra/diagnostic_snapshot.ahk': 'the snapshot reports the flag itself',
-	'infra/startup_smoke.ahk':
+	'diagnostics/engine/reports/snapshot.ahk': 'the snapshot reports the flag itself',
+	'diagnostics/engine/field_run/startup_smoke.ahk':
 		'the startup receipt identity owner reports its executable and compiled flag',
 	'modules/keymap/uia_selection_worker.ahk': 'how a worker process is spawned',
 	'modules/keystats/keystats_prefetch.ahk': 'how a worker process is spawned',
@@ -123,7 +123,10 @@ for (const file of sources('windows', '.ahk')) {
 			'decision, or list the file here with the launch mechanics it chooses.'
 	);
 }
-const readinessPublisher = ahkBody('infra/startup_smoke.ahk', 'StartupSmokePublishReady');
+const readinessPublisher = ahkBody(
+	'diagnostics/engine/field_run/startup_smoke.ahk',
+	'StartupSmokePublishReady'
+);
 const programInventory = code('windows', 'core/process/adapters/program_providers.ahk', ahkComment);
 expect(
 	programInventory.split('A_IsCompiled').length === 2 &&
@@ -134,13 +137,21 @@ expect(
 	'the provider uses the compiled flag only to refuse its executable as an AHK interpreter'
 );
 expect(readinessPublisher !== '', 'the native readiness publisher must exist');
-const fullSavePublisher = ahkBody('infra/startup_smoke.ahk', 'StartupSmokePublishFullSave');
-const startupIdentity = ahkBody('infra/startup_smoke.ahk', '_StartupSmokeRuntimeIdentity');
+const fullSavePublisher = ahkBody(
+	'diagnostics/engine/field_run/startup_smoke.ahk',
+	'StartupSmokePublishFullSave'
+);
+const startupIdentity = ahkBody(
+	'diagnostics/engine/field_run/startup_smoke.ahk',
+	'_StartupSmokeRuntimeIdentity'
+);
 expect(fullSavePublisher !== '', 'the native full-save publisher must exist');
 expect(startupIdentity !== '', 'both startup receipts must have a native runtime identity owner');
 expect(
 	startupIdentity.split('A_IsCompiled').length === 2 &&
-		code('windows', 'infra/startup_smoke.ahk', ahkComment).split('A_IsCompiled').length === 2 &&
+		code('windows', 'diagnostics/engine/field_run/startup_smoke.ahk', ahkComment).split(
+			'A_IsCompiled'
+		).length === 2 &&
 		/Compiled := A_IsCompiled/.test(startupIdentity) &&
 		/SystemControl\(\)\.OwnPid\(\)/.test(startupIdentity) &&
 		/executable: Compiled \? A_ScriptFullPath : A_AhkPath, compiled: Compiled/.test(
