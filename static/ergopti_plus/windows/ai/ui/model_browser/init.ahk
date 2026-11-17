@@ -1365,6 +1365,15 @@ _LLM_MBW_LocalServerRows(Rows, Tools, Models, ApiTools) {
  */
 _LLM_MBW_InstallOllama() {
 	global _LLM_Menu, _LLM_MBW_InstallRefusedKey
+	; The runtime install starts what serves predictions, so it waits for the
+	; resume like the bridge (EDD-1): the page greys its button with
+	; model_browser.install_paused, as on macOS, and a click a page painted
+	; before the pause still sends is told, never run.
+	if A_IsSuspended {
+		NotifyPausedRefusal("An Ollama install")
+		LLM_ModelBrowser_Refresh()
+		return false
+	}
 	_LLM_MBW_InstallRefusedKey := ""
 	try {
 		LoggerInfo("LLM.browser", "Installing Ollama from the model selector page.")
