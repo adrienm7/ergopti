@@ -67,7 +67,15 @@ package.loaded["core.fs.adapters.file_system"] = {
 package.loaded["core.crypto.crypto"] = { sha256_bytes = function(raw)
 	if raw == raw_contract then return cd end; if raw == raw_catalogue then return rd end; return ""
 end }
-package.loaded["ai.engine.api.network_env"] = { prelude = function() network_calls = network_calls + 1; return "STATIC-PRELUDE; " end }
+local relay_contract = true
+package.loaded["ai.engine.api.network_env"] = {
+	prelude = function() network_calls = network_calls + 1; return "STATIC-PRELUDE; " end,
+	route_origins = function(client) return client == "ollama" and { "https://registry.ollama.ai" } or nil end,
+	proxy_auth_relay = function()
+		if not relay_contract then return nil, "the relay contract is unreadable" end
+		return { authority = function(origin) return origin == "https://registry.ollama.ai" and "registry.ollama.ai:443" or nil end }
+	end,
+}
 package.loaded["ai.engine.bootstrap.managed_native_python"] = { resolve = function() return python end }
 package.loaded["ai.adapters.python_interpreter"] = { resolve = function() return python end }
 -- The real app_dirs names the daily log. The real timing registry reads the
@@ -107,6 +115,10 @@ case(function()
 	check(command:find("--port 45678 --timeout 30 --idle-timeout 60 --retirement-timeout 600", 1, true) ~= nil, true)
 	check(command:find("while IFS=", 1, true), nil); check(command:find("STATIC-PRELUDE", 1, true), nil)
 	check(network_calls, 0); check(command:find("OLLAMA_MODELS", 1, true), nil)
+	-- The sign-in relay inputs (docs/design/proxy-auth-relay.md, "macOS managed daemon")
+	check(command:find(" --proxy-relay-receipt '/private/Owned O'\\''Brien/$home/Library/Caches/Ergopti/proxy_relay_refusal'", 1, true) ~= nil, true)
+	check(command:find(" --proxy-relay-authority 'registry.ollama.ai:443' --proxy-relay-dial-ms 10000"
+		.. " --proxy-relay-handshake-ms 15000 --proxy-relay-idle-ms 300000 --proxy-relay-probe-ms 30000", 1, true) ~= nil, true)
 	if arg[3] == "emit" then print(command) end
 end)
 case(function()
@@ -133,6 +145,13 @@ case(function()
 	files[driver .. "/ai/engine/network-retry.sh"] = files[driver .. "/ai/engine/network-retry.sh"] .. "CURL_STALL_SEC=60\n"
 	command, reason = Builder.build(native, "/private/logs/today.log", 11434)
 	check(command, nil); check(reason, "managed native budgets are unavailable"); seed()
+end)
+case(function()
+	relay_contract = false
+	local command, reason = Builder.build(native, "/private/logs/today.log", 11434)
+	check(command, nil)
+	check(reason, "the proxy sign-in relay inputs are unavailable (the relay contract is unreadable)")
+	relay_contract = true
 end)
 case(function()
 	files[driver .. "/../_shared/ai/data/managed_ollama_release.json"] = nil

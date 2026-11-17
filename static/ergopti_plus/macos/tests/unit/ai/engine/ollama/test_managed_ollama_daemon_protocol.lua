@@ -497,4 +497,50 @@ helpers.describe("Managed daemon refusal diagnostic", function()
 			helpers.assert_eq(#logs, 1, "a clean exit logs no refusal")
 		end)
 	end)
+
+	helpers.it("(daemon-relay-logged) logs the sign-in relay's fixed lines as they arrive, split or not", function()
+		helpers.with_stub_scope({ "adapters.managed_ollama_daemon", "core.process.adapters.shell_runner",
+			"core.lifecycle.engine.core.managed_ollama_daemon_lifecycle", "core.logger.engine.logger" }, function()
+			local logs = {}
+			local Logger = helpers.make_logger_stub()
+			for _, level in ipairs({ "info", "warn" }) do
+				Logger[level] = function(_log, format_string, ...)
+					logs[#logs + 1] = level .. " " .. string.format(format_string, ...)
+				end
+			end
+			package.loaded["core.logger.engine.logger"] = Logger
+			local callbacks = {}
+			package.loaded["core.process.adapters.shell_runner"] = {
+				spawn = function(_, _, on_done, on_chunk)
+					callbacks.done, callbacks.chunk = on_done, on_chunk
+					local task = {}
+					function task.start() return true end
+					function task.terminate() return true end
+					function task.isSettled() return false end
+					function task.wasStartAttempted() return true end
+					function task.onSettled() return true end
+					return task
+				end,
+			}
+			package.loaded["core.lifecycle.engine.core.managed_ollama_daemon_lifecycle"] = {
+				new = function()
+					return { complete = function() end, feed = function() end }
+				end,
+			}
+			local Daemon = helpers.load_with_stubs("adapters.managed_ollama_daemon")
+			assert(Daemon.prepare("exec /fixture/serve", string.rep("a", 32), {}))
+			callbacks.chunk(nil, "", "Managed Ollama proxy sign-in relay: required neg")
+			helpers.assert_eq(#logs, 0, "a partial line waits for its end")
+			callbacks.chunk(nil, "", "otiate.\nManaged Ollama proxy sign-in relay: started.\n")
+			callbacks.chunk(nil, "", "Managed Ollama proxy sign-in relay: http://proxy.corp:8080.\n")
+			callbacks.chunk(nil, "", "Managed Ollama proxy sign-in relay: refused relay_listen_failed.\n")
+			callbacks.chunk(nil, "", "Managed Ollama proxy sign-in relay: not_installed.\n")
+			helpers.assert_eq(table.concat(logs, "\n"), table.concat({
+				"info Managed Ollama proxy sign-in relay: required negotiate.",
+				"info Managed Ollama proxy sign-in relay: started.",
+				"warn Managed Ollama proxy sign-in relay: refused relay_listen_failed.",
+				"warn Managed Ollama proxy sign-in relay: not_installed.",
+			}, "\n"), "a line that names a proxy is never logged")
+		end)
+	end)
 end)

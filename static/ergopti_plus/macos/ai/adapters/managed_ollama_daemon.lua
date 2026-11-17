@@ -16,6 +16,30 @@ local MAX_PROTOCOL_BYTES = require("core.process.adapters.owned_program_runner")
 -- (a traceback names paths) is never logged.
 local REFUSAL_PATTERN = "Managed Ollama daemon admission refused: [%w_.:=, %-]+%."
 local DIAGNOSTIC_LIMIT = 4096
+-- The serve owner's sign-in relay decisions (ai/engine/ollama/managed_ollama_proxy_relay.py,
+-- docs/design/proxy-auth-relay.md): fixed words only, logged as they arrive.
+local RELAY_PATTERN = "^Managed Ollama proxy sign%-in relay: ([a-z_]+) ?([a-z_]*)%.$"
+local RELAY_WARNINGS = { not_installed = true, refused = true, receipt_failed = true }
+
+--- Builds the per-daemon reader of the relay lines in the serve owner's stderr.
+--- @return function feed Takes each stderr chunk; logs every complete relay line.
+local function relay_reader()
+	local pending = ""
+	return function(stderr)
+		if type(stderr) ~= "string" or stderr == "" then return end
+		pending = (pending .. stderr):sub(-DIAGNOSTIC_LIMIT)
+		while true do
+			local line, rest = pending:match("^([^\n]*)\n(.*)$")
+			if not line then return end
+			pending = rest
+			local event, word = line:match(RELAY_PATTERN)
+			if event then
+				local log = RELAY_WARNINGS[event] and Logger.warn or Logger.info
+				log(LOG, "Managed Ollama proxy sign-in relay: %s.", word ~= "" and (event .. " " .. word) or event)
+			end
+		end
+	end
+end
 
 --- Logs the serve owner's fixed refusal line once, when its stderr carries one.
 --- @param status integer|nil Exit status of the serve owner.
@@ -64,7 +88,9 @@ function M.prepare(command, nonce, callbacks)
 	local acquiring = true
 	local early_delivery = false
 	local diagnostic = ""
+	local read_relay = relay_reader()
 	local function capture(stderr)
+		read_relay(stderr)
 		if type(stderr) == "string" and stderr ~= "" and #diagnostic < DIAGNOSTIC_LIMIT then
 			diagnostic = (diagnostic .. stderr):sub(1, DIAGNOSTIC_LIMIT)
 		end

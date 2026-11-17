@@ -15,7 +15,10 @@
 --- (run_with_proxy_sign_in_relay in network-retry.sh,
 --- docs/design/proxy-auth-relay.md), with deadlines from the timings registry.
 --- A refused sign-in starts it without the proxy and leaves a receipt
---- (ai/engine/api/proxy_relay_receipt.lua) that refuses the pull.
+--- (ai/engine/api/proxy_relay_receipt.lua) that refuses the pull. The managed
+--- daemon's owner (managed_ollama_serve.py) asks the same relay for its captured
+--- route and writes the same receipt, so the pull reads one file whichever
+--- owner started the daemon.
 --- ==============================================================================
 
 local M = {}
@@ -55,6 +58,30 @@ local function resolve_log_dir(unified_log_file)
 	return log_dir, nil
 end
 
+--- The sign-in relay arguments of the managed serve owner
+--- (docs/design/proxy-auth-relay.md, "macOS managed daemon"): the receipt a
+--- refusal lands in, which the pull reads whichever owner started the daemon,
+--- the registry's CONNECT authority and the relay deadlines.
+--- @return string|nil arguments Shell-quoted, with a leading space.
+--- @return string|nil reason Why the relay inputs are unavailable.
+local function managed_relay_arguments()
+	local receipt = require("ai.engine.api.proxy_relay_receipt").path()
+	if not receipt then return nil, "the proxy sign-in receipt has no home folder" end
+	local relay, relay_err = NetworkEnv.proxy_auth_relay()
+	if not relay then return nil, tostring(relay_err) end
+	local origins, origins_err = NetworkEnv.route_origins(M.NETWORK_OPTIONS.pac_probe_client)
+	if not origins then return nil, tostring(origins_err) end
+	local authority = relay.authority(origins[1])
+	if not authority then return nil, "the registry origin is not a plain https origin" end
+	local parts = { " --proxy-relay-receipt ", text_utils.shell_quote(receipt),
+		" --proxy-relay-authority ", text_utils.shell_quote(authority) }
+	for _, entry in ipairs({ { "dial", "proxy_relay_dial_timeout_ms" }, { "handshake", "proxy_relay_handshake_timeout_ms" },
+		{ "idle", "proxy_relay_idle_timeout_ms" }, { "probe", "proxy_relay_probe_timeout_ms" } }) do
+		parts[#parts + 1] = " --proxy-relay-" .. entry[1] .. "-ms " .. string.format("%.0f", Timings.ms("adapters", entry[2]))
+	end
+	return table.concat(parts), nil
+end
+
 --- Builds the source-admitted optional server command without rewriting relays.
 --- @param executable string Exact native managed candidate.
 --- @param port integer Canonical local port.
@@ -74,11 +101,13 @@ local function managed_service(executable, port, log_dir)
 	if not FileSystem.exists(script) then return nil, "managed native daemon owner is unavailable" end
 	local admission, idle, retirement = budgets and budgets.admission, budgets and budgets.idle, budgets and budgets.retirement
 	if not admission or not idle or not retirement then return nil, "managed native budgets are unavailable" end
+	local relay, relay_err = managed_relay_arguments()
+	if not relay then return nil, "the proxy sign-in relay inputs are unavailable (" .. relay_err .. ")" end
 	return text_utils.shell_quote(python) .. " -IB " .. text_utils.shell_quote(script)
 		.. " --log-directory " .. text_utils.shell_quote(log_dir) .. " --port " .. string.format("%.0f", port)
 		.. " --timeout " .. string.format("%.0f", admission)
 		.. " --idle-timeout " .. string.format("%.0f", idle)
-		.. " --retirement-timeout " .. string.format("%.0f", retirement), nil
+		.. " --retirement-timeout " .. string.format("%.0f", retirement) .. relay, nil
 end
 
 --- Builds the foreground `ollama serve` pipeline.

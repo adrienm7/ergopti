@@ -757,7 +757,7 @@ for (const [script, expectedCases, expectedAssertions] of [
 // New command composers receive both candidate and canonical source roots.
 for (const [script, expectedCases, expectedAssertions] of [
 	['tools/test/managed_ollama_restart_envelope_test.lua', 5, 83],
-	['tools/test/managed_ollama_serve_command_test.lua', 7, 50],
+	['tools/test/managed_ollama_serve_command_test.lua', 8, 54],
 	['tools/test/managed_ollama_serve_kind_forwarding_test.lua', 6, 47],
 	['tools/test/managed_ollama_hint_task_test.lua', 29, 361]
 ]) {

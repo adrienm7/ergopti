@@ -3,8 +3,9 @@
 --- ==============================================================================
 --- MODULE: Proxy Sign-In Refusal Receipt
 --- DESCRIPTION:
---- The closed reason the sign-in relay refused with when the stock daemon last
---- started (run_with_proxy_sign_in_relay in network-retry.sh). That daemon runs
+--- The closed reason the sign-in relay refused with when the daemon last
+--- started: the stock one (run_with_proxy_sign_in_relay in network-retry.sh) or
+--- the managed one (managed_ollama_serve.py, --proxy-relay-receipt). That daemon runs
 --- without the proxy for the models on disk; a pull reads this receipt and is
 --- refused with the relay's own message, as on Windows and Linux.
 ---
