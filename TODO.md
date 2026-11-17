@@ -247,9 +247,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### macOS
 
-- [ ] **[CI] MLC-005 relocation rows.** The helper is proved by device and inode (`test_lease_helper_identity.lua`)
-      and the five relocation-row commits are on dev since 2026-11-16: confirm the `symlinked_applications`,
-      `spaced_accented_path` and `translocated` rows green in the next hosted macOS 26 Install-and-launch run.
 - [ ] **Field report follow-ups (2026-11-03).** Decide from the next report which half of the 230 ms cold
       `karabiner.layout_actions` phase to reduce (`karabiner_layout_actions` in TODO-tests-macos.md; the
       regeneration itself stays synchronous, see the rejected proposals). A Metrics toggle still reads the hardware
@@ -264,13 +261,16 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       runtime).
 - [ ] **Item 31, owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
       [handoff](docs/tooling/next-release-handoff.md)). After the maintainer's WP9 pass (`owned_runtime_wp9` in
-      TODO-tests-macos.md), delete the shared mode. The managed-daemon row of
-      `_shared/core/network/data/owned_runtimes.json` under the proxy relay waits for a short design note (who
-      launches the relay, how its refusal receipt reaches the Swift owner; Swift and Go).
-- [ ] **[LATER] Owned runtime with a Developer ID (maintainer: not now, 2026-11-04).** It would allow
-      `SMAppService.daemon` for both jobs (no password, one « Ergopti » Login Items group) and an Ergopti-signed
-      DriverKit extension activated with `OSSystemExtensionRequest` (needs Apple's DriverKit HID entitlements); the
-      root Core keeps its own Input Monitoring row either way.
+      TODO-tests-macos.md), delete the shared mode and set the three macOS `follow_up` rows of
+      `_shared/core/network/data/owned_runtimes.json` to done. [BLOCKED] on that pass.
+- [ ] **Sign-in relay for the Swift-owned managed Ollama.** The design is written
+      ([proxy-auth-relay.md « macOS managed daemon »](docs/design/proxy-auth-relay.md#macos-managed-daemon-design-not-built)):
+      a Go `listen` command (bind `127.0.0.1:0`, one JSON line with port and token, serve until stdin EOF); the Swift
+      worker behind `SuspendedImageOwner` starts it as the daemon's sibling before resuming the daemon;
+      `managed_ollama_serve.py` runs `probe` before its bootstrap snapshot; Lua passes the `proxy_relay_receipt` path
+      so a refusal lands in the receipt the pull reads. Until then, behind a proxy that requires a Negotiate sign-in,
+      the managed daemon's pull fails while the stock start signs in. [CODE] Swift, Go, Python, Lua; the Swift tests
+      run only on the macOS lane.
 
 ### All drivers
 
@@ -395,10 +395,16 @@ Each question names the default kept meanwhile; an answer moves into the item or
   - performance: no `input.latency` span on Windows (its InputHook callbacks receive no event time, and a second
     permanent low-level hook for a metric would add a hook timeout risk to every key); the Linux `migrations.toml`
     parse is not cached (about 7 ms cold under LuaJIT).
-- [ ] **macOS `migrations.toml` boot parse (about 30 ms of Lua 5.4).** Port the Windows typed SHA-256 registry cache
-      (`settings/engine/publication/registry_cache.ahk`: a typed codec that evaluates no cached code, validation kept
-      on a hit) to Lua, or not? Config migration is where a wrong cache would rewrite a user's settings; the Mac
-      measurement of the saving is `migrations_registry_parse` in TODO-tests-macos.md. Kept meanwhile: no cache.
+- [ ] **macOS `migrations.toml` boot parse (about 30 ms of Lua 5.4): cache it?** Windows skips the parse with a typed
+      cache keyed by the registry's SHA-256 and the parser files' identity
+      (`settings/engine/publication/registry_cache.ahk`, validation still runs on a hit); config migration is where a
+      wrong cache would rewrite a user's settings. The Mac measurement is `migrations_registry_parse` in
+      TODO-tests-macos.md. Kept meanwhile: no cache.
+  1. **(recommended) Wait for the Mac measurement,** then port the Windows cache to Lua only if the parse costs over
+     20 ms (native `hs.hash.SHA256` of the source and parser files, a typed codec that evaluates no cached code,
+     validation kept on a hit).
+  2. Port the Windows typed cache now, before the measurement.
+  3. Never cache: 30 ms at boot is accepted.
 - [ ] **Linux keystats boot: a persistent sqlite3 child?** Registration, the two migration checks and the open walk
       cost one sqlite3 process each (about 4 ms); the remaining cut is a persistent child for the synchronous writer
       ([design](docs/design/linux-sqlite-persistent-child.md)). Approve it, then implement ([CODE]). Kept meanwhile:
