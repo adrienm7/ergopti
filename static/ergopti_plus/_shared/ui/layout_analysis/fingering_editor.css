@@ -50,25 +50,34 @@
 	width: 36px;
 }
 
-/* One hue per finger, the same on both hands; thumbs neutral. */
+/* One hue per finger, the same on both hands, thumbs neutral: the chart
+   look's categorical hues in their fixed order from the pinky (theme.css),
+   validated in light and dark. The full hue is the key's edge; the key's
+   tint keeps its printed finger at text contrast; the finger is printed on
+   every key, so the colour is never the only cue. */
+.la-fingering-map .la-fingering-key[data-finger] {
+	background: color-mix(in oklab, var(--la-finger, var(--theme-surface)) 22%, var(--theme-surface));
+	border: 2px solid var(--la-finger, var(--theme-separator));
+}
+
 .la-fingering-map .la-fingering-key[data-finger='lp'],
 .la-fingering-map .la-fingering-key[data-finger='rp'] {
-	background: color-mix(in srgb, var(--theme-red) 30%, var(--theme-surface));
+	--la-finger: var(--theme-chart-cat-1);
 }
 
 .la-fingering-map .la-fingering-key[data-finger='lr'],
 .la-fingering-map .la-fingering-key[data-finger='rr'] {
-	background: color-mix(in srgb, var(--theme-orange) 30%, var(--theme-surface));
+	--la-finger: var(--theme-chart-cat-2);
 }
 
 .la-fingering-map .la-fingering-key[data-finger='lm'],
 .la-fingering-map .la-fingering-key[data-finger='rm'] {
-	background: color-mix(in srgb, var(--theme-green) 30%, var(--theme-surface));
+	--la-finger: var(--theme-chart-cat-3);
 }
 
 .la-fingering-map .la-fingering-key[data-finger='li'],
 .la-fingering-map .la-fingering-key[data-finger='ri'] {
-	background: color-mix(in srgb, var(--theme-blue) 30%, var(--theme-surface));
+	--la-finger: var(--theme-chart-cat-4);
 }
 
 .la-fingering-map .la-fingering-home {

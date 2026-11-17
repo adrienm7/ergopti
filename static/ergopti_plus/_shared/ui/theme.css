@@ -337,7 +337,9 @@
 	--theme-metrics-bg: var(--theme-page-background);
 	--theme-metrics-panel: #ffffff;
 	--theme-metrics-text: var(--theme-label);
-	--theme-metrics-text-muted: #86868b;
+	/* 5.5:1 on the page, 4.8:1 on the table headers (WCAG 1.4.3); the system
+	   tertiary grey was 3.3:1 and 3.6:1. */
+	--theme-metrics-text-muted: var(--theme-hue-636366);
 	--theme-metrics-strong: var(--theme-label);
 	--theme-metrics-border: #d2d2d7;
 	--theme-metrics-th-bg: var(--theme-gray5);
@@ -379,13 +381,26 @@
 
 /* Checked with the dataviz palette validator on the light and dark surfaces
    (lightness band, colour-blind separation, contrast): gain and loss are a
-   diverging blue / orange pair, the ramp one blue hue from low to high. */
+   diverging blue / orange pair, the ramp one blue hue from low to high.
+   The ramp's light end is 1.16:1 (light) and 1.11:1 (dark) against the
+   surface, so a key worth zero would vanish: every key wears a 1 px edge of
+   the same hue, 3.7:1 and 4.2:1 against the surface and 3.2:1 and 3.8:1
+   against the light end (WCAG 1.4.11 non-text contrast). The four
+   categorical hues (the fingers) are the validator's first four slots, in
+   their fixed order: every adjacent pair passes the colour-blind and
+   normal-vision floors in both modes; aqua and yellow are 2.8:1 and 2.2:1
+   on white, so each mark also prints its name (the relief rule). */
 :root {
 	--theme-chart-gain: #2a78d6;
 	--theme-chart-loss: #eb6834;
 	--theme-chart-ramp-low: #e6effb;
 	--theme-chart-ramp-high: #104281;
+	--theme-chart-ramp-edge: #5f86bf;
 	--theme-chart-ramp-ink-strong: #ffffff;
+	--theme-chart-cat-1: #2a78d6;
+	--theme-chart-cat-2: #eb6834;
+	--theme-chart-cat-3: #1baf7a;
+	--theme-chart-cat-4: #eda100;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -394,7 +409,12 @@
 		--theme-chart-loss: #d95926;
 		--theme-chart-ramp-low: #2a3442;
 		--theme-chart-ramp-high: #9ec5f4;
+		--theme-chart-ramp-edge: #6d8fbd;
 		--theme-chart-ramp-ink-strong: #0d1a2b;
+		--theme-chart-cat-1: #3987e5;
+		--theme-chart-cat-2: #d95926;
+		--theme-chart-cat-3: #199e70;
+		--theme-chart-cat-4: #c98500;
 	}
 }
 
@@ -403,7 +423,12 @@
 	--theme-chart-loss: #d95926;
 	--theme-chart-ramp-low: #2a3442;
 	--theme-chart-ramp-high: #9ec5f4;
+	--theme-chart-ramp-edge: #6d8fbd;
 	--theme-chart-ramp-ink-strong: #0d1a2b;
+	--theme-chart-cat-1: #3987e5;
+	--theme-chart-cat-2: #d95926;
+	--theme-chart-cat-3: #199e70;
+	--theme-chart-cat-4: #c98500;
 }
 
 /* Status text (a better value, an error message): the system green and red

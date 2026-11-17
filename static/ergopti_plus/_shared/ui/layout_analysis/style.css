@@ -43,6 +43,7 @@ body:has(> main.layout-analysis) {
 	--la-load: var(--theme-chart-gain);
 	--la-heat-low: var(--theme-chart-ramp-low);
 	--la-heat-high: var(--theme-chart-ramp-high);
+	--la-heat-edge: var(--theme-chart-ramp-edge);
 	--la-heat-ink: var(--theme-text);
 	--la-heat-ink-strong: var(--theme-chart-ramp-ink-strong);
 	--la-target: var(--theme-text);
@@ -493,6 +494,9 @@ body:has(> main.layout-analysis) {
 	background: color-mix(in oklab, var(--la-heat-high) var(--la-share), var(--la-heat-low));
 	border: 2px solid var(--la-surface);
 	border-radius: 6px;
+	/* The edge inside the surface gap: a key worth zero, as light as the
+	   surface, still shows its shape (theme.css « Chart look »). */
+	box-shadow: inset 0 0 0 1px var(--la-heat-edge);
 	color: var(--la-heat-ink);
 	cursor: default;
 	display: flex;
