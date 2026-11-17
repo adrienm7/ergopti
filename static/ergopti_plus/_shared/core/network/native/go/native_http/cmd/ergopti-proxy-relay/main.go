@@ -5,8 +5,11 @@
 //	ergopti-proxy-relay probe --upstream URL --authority HOST:PORT --dial-timeout-ms N --handshake-timeout-ms N
 //	ergopti-proxy-relay run --upstream URL --variable NAME [--variable NAME...] \
 //	    --dial-timeout-ms N --handshake-timeout-ms N --idle-timeout-ms N -- COMMAND [ARGS...]
+//	ergopti-proxy-relay listen --upstream URL --dial-timeout-ms N --handshake-timeout-ms N --idle-timeout-ms N
 //
-// probe prints one JSON line on stdout. Both log fixed event names and closed
+// probe prints one JSON line on stdout. listen prints one JSON line with the
+// port and the run token on stdout, its owner's private pipe, and serves until
+// stdin reaches EOF (the macOS managed daemon's sibling relay). All three log fixed event names and closed
 // reasons on stderr, never a URL, host, header or token. Exit codes follow
 // proxy_auth_relay.json "exit_codes".
 package main
@@ -63,9 +66,9 @@ func emit(stdout io.Writer, result proxyrelay.ProbeResult) int {
 
 func milliseconds(value int) time.Duration { return time.Duration(value) * time.Millisecond }
 
-func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
+func main() { os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }
 
-func run(arguments []string, stdout, stderr io.Writer) int {
+func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	log := logTo(stderr)
 	if len(arguments) == 0 {
 		log("relay_refused", proxyrelay.RefusalInvalidArguments)
@@ -129,6 +132,28 @@ func run(arguments []string, stdout, stderr io.Writer) int {
 			return exitRefused
 		}
 		return code
+	case "listen":
+		timings := proxyrelay.Timings{Dial: milliseconds(*dial), Handshake: milliseconds(*handshake), Idle: milliseconds(*idle)}
+		if *authority != "" || len(names) != 0 || flags.NArg() != 0 || !timings.Valid() {
+			log("relay_refused", proxyrelay.RefusalInvalidArguments)
+			return exitInvalidArguments
+		}
+		token, err := proxyrelay.NewToken()
+		if err != nil {
+			log("relay_refused", proxyrelay.RefusalRelayListenFailed)
+			return exitRefused
+		}
+		server := &proxyrelay.Server{Upstream: upstream, Auth: proxyrelay.DefaultAuthenticator(),
+			Token: token, Timings: timings, Log: log}
+		if err := proxyrelay.Listen(server, stdin, stdout); err != nil {
+			reason := proxyrelay.ReasonOf(err)
+			log("relay_refused", reason)
+			if reason == proxyrelay.RefusalInvalidArguments {
+				return exitInvalidArguments
+			}
+			return exitRefused
+		}
+		return exitOK
 	}
 	log("relay_refused", proxyrelay.RefusalInvalidArguments)
 	return exitInvalidArguments

@@ -46,6 +46,8 @@ const REQUIRED_TESTS = [
 	'TestContractMirrorsTheCanonicalJSON',
 	'TestGSSWithoutATicketIsSignInUnavailable',
 	'TestRunServesTheChildAndReturnsItsExitCode',
+	'TestListenServesUntilItsOwnerClosesStdin',
+	'TestListenPrintsItsLineAndEndsAtEOF',
 	'TestProbeLineMatchesTheSharedVectors'
 ];
 

@@ -24,7 +24,7 @@ One Go program, `ergopti-proxy-relay`, in the standard-library-only
 splice lists files in `managed_ollama_runtime.json`), and the module keeps no
 `require`.
 
-Two subcommands, both given every bound and deadline on the command line by the
+Three subcommands, all given every bound and deadline on the command line by the
 caller, which reads them from `_shared/core/timing/data/constants.toml`
 (`[adapters]` `proxy_relay_*`):
 
@@ -43,6 +43,12 @@ caller, which reads them from `_shared/core/timing/data/constants.toml`
   terminating signal is forwarded to the child, and on Linux the child also gets
   `Pdeathsig`. The token never leaves the relay and its child: it is not printed,
   logged or written to disk.
+- `listen --upstream URL --dial-timeout-ms N --handshake-timeout-ms N --idle-timeout-ms N`:
+  the same listener and token for an owner that must start the client itself
+  (the macOS managed daemon, below). It prints one JSON line,
+  `{"schema":1,"port":N,"token":"HEX"}`, on stdout, its owner's private pipe, and
+  serves until stdin reaches EOF: the owner holds the other end, so the relay ends
+  with it even when the owner is killed outright. Bytes before EOF are ignored.
 
 The caller runs the relay only when the probe answered `required`. A direct
 route, a proxy that needs no sign-in, a Basic proxy with credentials in its URL,
