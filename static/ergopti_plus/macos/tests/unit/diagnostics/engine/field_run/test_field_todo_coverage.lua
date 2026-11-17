@@ -48,7 +48,7 @@ end
 --- Every source a check writes its report steps from.
 local function check_sources()
 	local parts = {}
-	local pipe = assert(io.popen("ls '" .. DRIVER .. "infra/'field_check*.lua"))
+	local pipe = assert(io.popen("ls '" .. DRIVER .. "diagnostics/engine/field_check/'*.lua"))
 	for path in pipe:lines() do parts[#parts + 1] = read(path) end
 	pipe:close()
 	parts[#parts + 1] = read(DRIVER .. "../_shared/core/network/engine/field_check_network.lua")
