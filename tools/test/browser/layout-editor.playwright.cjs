@@ -211,8 +211,14 @@ async function exerciseStudioLayout(browser, origin) {
 			messageHandlers: { layout_editor_window_bridge: { postMessage: () => {} } }
 		};
 	});
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
 	await page.goto(`${origin}/ui/layout_editor_window/index.html`);
-	await page.evaluate(() => window.initData({ strings: {}, state: { platform: 'linux' } }));
+	await page.evaluate(
+		(strings) => window.initData({ strings, state: { platform: 'linux' } }),
+		strings
+	);
 	await page.evaluate(
 		(text) => window.sourceData({ filename: 'source.toml', text, folder: 'layout_sources/' }),
 		fs.readFileSync(SOURCE_FIXTURE, 'utf8')
@@ -251,6 +257,54 @@ async function exerciseStudioLayout(browser, origin) {
 		`the tab's ring stays inside the window: ${JSON.stringify(ring)}`
 	);
 	await page.click('#studio-tab-compare');
+	// « My typing » first, under its own heading, at once while the app reads it,
+	// then chosen when it arrives (maintainer, 2026-11-17).
+	await page.evaluate(() =>
+		document.dispatchEvent(
+			new CustomEvent('studio-ngrams-state', { detail: { state: 'loading', reason: '' } })
+		)
+	);
+	const first = await page.evaluate(() => {
+		const option = document.querySelector('#la-corpus optgroup option');
+		return { value: option.value, disabled: option.disabled };
+	});
+	assert.deepEqual(first, { value: 'my_typing', disabled: true }, 'listed first while it is read');
+	await page.evaluate(() =>
+		document.dispatchEvent(
+			new CustomEvent('studio-ngrams', {
+				detail: {
+					schema: 1,
+					source: 'keystats',
+					total: 60,
+					chars: { e: 20, s: 12, a: 10, n: 8, ' ': 10 },
+					bigrams: { es: 6, en: 5, 'e ': 8, ' a': 4 },
+					trigrams: { 'es ': 3 }
+				}
+			})
+		)
+	);
+	await page.waitForFunction(() => document.querySelectorAll('#la-chart .la-bar').length > 1);
+	const comparer = await page.evaluate(() => ({
+		corpus: document.getElementById('la-corpus').value,
+		mine: document.getElementById('la-corpus').classList.contains('la-corpus-mine'),
+		listOpen: document.getElementById('la-layouts-box').open,
+		summary: document.getElementById('la-layouts-summary').textContent,
+		widths: [...document.querySelectorAll('#la-chart .la-bar')].map((bar) =>
+			parseFloat(bar.style.width)
+		),
+		zero: document.querySelectorAll('#la-chart .la-zero').length
+	}));
+	assert.equal(comparer.corpus, 'my_typing', 'the user’s typing becomes the corpus');
+	assert.ok(comparer.mine, 'and the picker shows it');
+	assert.equal(comparer.listOpen, false, 'the layout list is folded');
+	assert.match(comparer.summary, /^\d+ layouts compared: /, 'its line counts the compared layouts');
+	assert.equal(comparer.widths[0], 100, 'the best layout has the full bar');
+	assert.deepEqual(
+		comparer.widths,
+		[...comparer.widths].sort((a, b) => b - a),
+		'the bars shorten from the best to the weakest'
+	);
+	assert.equal(comparer.zero, 0, 'no zero line');
 	const heading = await page.evaluate(
 		() => getComputedStyle(document.querySelector('#studio-comparer')).color
 	);

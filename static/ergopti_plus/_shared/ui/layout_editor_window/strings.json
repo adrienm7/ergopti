@@ -5,10 +5,6 @@
 		"layout_editor.studio.tab.edit",
 		"layout_editor.studio.tab.compare",
 		"layout_editor.studio.tab.optimize",
-		"layout_editor.studio.keystats.load",
-		"layout_editor.studio.keystats.privacy",
-		"layout_editor.studio.keystats.loading",
-		"layout_editor.studio.keystats.loaded",
 		"layout_editor.studio.keystats.keystats_absent",
 		"layout_editor.studio.keystats.keystats_unreadable"
 	]

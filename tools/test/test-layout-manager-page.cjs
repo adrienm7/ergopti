@@ -844,7 +844,7 @@ check('the editor window declares its strings for the hosts, present in every lo
 });
 
 check(
-	'Ergopti Studio reads « My typing » when the window opens and on a click, from a host that offers it',
+	'Ergopti Studio reads « My typing » when the window opens, from a host that offers it',
 	() => {
 		const keys = JSON.parse(fs.readFileSync(path.join(EDITOR_PAGE, 'strings.json'), 'utf8')).keys;
 		const strings = Object.fromEntries(keys.map((key) => [key, 'T:' + key + ' {1}']));
@@ -856,37 +856,41 @@ check(
 			Object.values(contract.codes).sort(),
 			'the page translates exactly the refusal codes the hosts send'
 		);
+		// « My typing » is a corpus, not a bar with its own button (maintainer,
+		// 2026-11-17): the page announces each state of its read to the Comparer.
+		const states = (document) =>
+			document.events
+				.filter((event) => event.type === 'studio-ngrams-state')
+				.map((event) => plain(event.detail));
 		const quiet = loadEditorPage();
 		quiet.window.initData({ strings, state: { platform: 'linux' } });
-		assert.equal(
-			quiet.byId.get('studio-keystats').hidden,
-			true,
-			'a host without keystats hides the bar'
-		);
-		const { window, byId, messages, document } = loadEditorPage();
+		assert.equal(quiet.byId.get('studio-keystats'), undefined, 'the page has no keystats bar');
+		assert.deepEqual(states(quiet.document), [], 'a host without keystats offers no « My typing »');
+		const { window, messages, document } = loadEditorPage();
 		window.initData({ strings, state: { platform: 'linux' }, keystats: true });
-		assert.equal(byId.get('studio-keystats').hidden, false);
 		const reads = () => messages.filter((m) => m.action === 'keystats_ngrams').length;
 		// « My typing » is the app's default corpus: the window reads it once when it opens.
 		assert.equal(reads(), 1, 'the window reads the store when it opens');
 		window.initData({ strings, state: { platform: 'linux' }, keystats: true });
-		byId.get('studio-keystats-load').click();
-		assert.equal(reads(), 1, 'one read at a time, and none again for a second initData');
-		assert.equal(byId.get('studio-keystats-load').disabled, true);
-		const status = byId.get('studio-keystats-status');
-		// No store yet, at the read the window makes by itself: said, not an error.
+		assert.equal(reads(), 1, 'none again for a second initData');
+		assert.deepEqual(states(document), [{ state: 'loading', reason: '' }]);
+		// No store yet, at the read the window makes by itself: no corpus to offer.
 		window.keystatsNgrams({ ok: false, code: 'keystats_absent' });
-		assert.match(status.textContent, /^T:layout_editor\.studio\.keystats\.keystats_absent/);
-		assert.ok(!status.classList.contains('error'), 'an absent store at open is not an error');
-		// Asked by the user, the same refusal is an error.
-		byId.get('studio-keystats-load').click();
-		assert.equal(reads(), 2);
-		window.keystatsNgrams({ ok: false, code: 'keystats_absent' });
-		assert.ok(status.classList.contains('error'), 'the button reports an absent store as an error');
+		assert.deepEqual(states(document)[1], {
+			state: 'absent',
+			reason: 'T:layout_editor.studio.keystats.keystats_absent {1}'
+		});
 		const published = () => document.events.filter((event) => event.type === 'studio-ngrams');
 		assert.equal(published().length, 0, 'a refusal publishes no data');
 		window.keystatsNgrams({ ok: false, code: 'something_else' });
-		assert.match(status.textContent, /keystats_unreadable/, 'an unknown code reads as unreadable');
+		assert.deepEqual(
+			states(document)[2],
+			{
+				state: 'failed',
+				reason: 'T:layout_editor.studio.keystats.keystats_unreadable {1}'
+			},
+			'an unknown code reads as unreadable'
+		);
 		const ngrams = {
 			schema: 1,
 			source: 'keystats',
@@ -896,9 +900,6 @@ check(
 			total: 7
 		};
 		window.keystatsNgrams({ ok: true, ngrams });
-		assert.match(status.textContent, /^T:layout_editor\.studio\.keystats\.loaded 7/);
-		assert.ok(!status.classList.contains('error'));
-		assert.equal(byId.get('studio-keystats-load').disabled, false);
 		assert.equal(published().length, 1);
 		assert.deepEqual(plain(published()[0].detail), ngrams);
 		// The analysis panels open their « i » links through the host.

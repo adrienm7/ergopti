@@ -249,6 +249,26 @@ body:has(> main.layout-analysis) {
 	flex: 1 1 200px;
 }
 
+/* The layout list folds under one line naming the compared layouts. */
+.la-layouts-box > summary {
+	cursor: pointer;
+	overflow: hidden;
+	padding: 4px 0;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.la-layouts-box[open] > summary {
+	white-space: normal;
+}
+
+/* « My typing » chosen: the corpus picker carries the accent. */
+.layout-analysis select.la-corpus-mine {
+	border-color: var(--la-accent);
+	box-shadow: 0 0 0 1px var(--la-accent);
+	font-weight: 600;
+}
+
 .la-layout-list {
 	border: 1px solid var(--la-border);
 	border-radius: 6px;
@@ -342,6 +362,16 @@ body:has(> main.layout-analysis) {
 	background: var(--la-gain);
 }
 
+/* The global score: one colour for the library, the accent for the user's own. */
+.la-bar-score {
+	background: var(--la-gain);
+}
+
+.la-bar-mine {
+	background: var(--la-accent);
+	box-shadow: 0 0 0 1px var(--la-heat-ink);
+}
+
 .la-bar-loss {
 	background: var(--la-loss);
 }
@@ -373,6 +403,13 @@ body:has(> main.layout-analysis) {
 .la-chart-value {
 	font-variant-numeric: tabular-nums;
 	text-align: right;
+	white-space: nowrap;
+}
+
+/* The gap to the first layout, after the score. */
+.la-chart-gap {
+	color: var(--la-sub);
+	font-size: 0.9em;
 }
 
 /* Positioned, so screen-reader text in a cell stays inside the scrolling box. */

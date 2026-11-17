@@ -165,6 +165,8 @@
 	// The app's keystats n-grams: the event its Studio window dispatches and the
 	// corpus id they take (the default corpus in the app, maintainer 2026-11-14).
 	const NGRAMS_EVENT = 'studio-ngrams';
+	// The state of that read: 'loading', then the tables, or 'failed'.
+	const NGRAMS_STATE_EVENT = 'studio-ngrams-state';
 	const MY_TYPING_ID = 'my_typing';
 
 	// The site's standalone page mounts the Comparer into this element.
@@ -225,6 +227,8 @@
 
 <section class="la-layouts" aria-labelledby="la-layouts-label">
 	<h2 id="la-layouts-label" data-i18n="layout_analysis.layouts.label"></h2>
+	<details id="la-layouts-box" class="la-layouts-box">
+	<summary id="la-layouts-summary"></summary>
 	<div class="la-row">
 		<input
 			id="la-filter"
@@ -240,6 +244,7 @@
 	</div>
 	<p id="la-import-report" class="la-muted" hidden></p>
 	<div id="la-layout-list" class="la-layout-list"></div>
+	</details>
 </section>
 
 <p id="la-status" class="la-status" role="status" aria-live="polite"></p>
@@ -251,10 +256,6 @@
 	</div>
 	<p id="la-share-status" class="la-muted" role="status" hidden></p>
 	<p class="la-muted" data-i18n="layout_analysis.chart.caption"></p>
-	<ul class="la-legend">
-		<li><span class="la-swatch la-swatch-gain"></span><span data-i18n="layout_analysis.chart.gain"></span></li>
-		<li><span class="la-swatch la-swatch-loss"></span><span data-i18n="layout_analysis.chart.loss"></span></li>
-	</ul>
 	<div id="la-chart" class="la-chart"></div>
 	<details id="la-table-options" class="la-table-options">
 		<summary data-i18n="layout_analysis.table.options"></summary>
@@ -495,9 +496,23 @@
 <section id="la-fingering" class="la-weights la-fingering"></section>
 </details>`;
 
+	/**
+	 * The « My typing » read as the Comparer lists it: none when the user has no
+	 * keystats store yet.
+	 * @param {{state: string, reason?: string}} detail
+	 * @returns {{state: string, reason: string}|null}
+	 */
+	function readingState(detail) {
+		if (!detail || (detail.state !== 'loading' && detail.state !== 'failed')) return null;
+		return { state: detail.state, reason: String(detail.reason || '') };
+	}
+
 	let mounted = null;
 	// The app's last keystats tables, kept when they arrive before the mount.
 	let lastNgrams = null;
+	// The app's keystats read: null (none: the site, or no store yet), else
+	// { state: 'loading' | 'failed', reason }.
+	let myTypingState = null;
 
 	/**
 	 * Mounts the Comparer into an element: the site's page mounts it into its
@@ -868,7 +883,17 @@
 		const resultListeners = [];
 
 		/** Analyses the selected layouts on the chosen corpus and redraws. */
+		/** The collapsed list's line: how many layouts are compared, and which. */
+		function showLayoutsSummary() {
+			const names = layouts.filter((l) => state.selected.has(l.id)).map((l) => l.name);
+			$('la-layouts-summary').textContent = t('layout_analysis.layouts.summary', {
+				count: names.length,
+				names: names.join(', ')
+			});
+		}
+
 		async function analyse() {
+			showLayoutsSummary();
 			const mine = ++generation;
 			// A built-in corpus loads its tables once (up to a few megabytes): say so meanwhile.
 			setBusy(true);
@@ -957,20 +982,26 @@
 			});
 		}
 
-		/** Horizontal bars of the global score around zero, best first. */
+		/**
+		 * Horizontal bars of the global score, best first. The score has no
+		 * natural zero (each metric adds or removes its weighted value), so the
+		 * bars run from the weakest layout shown to the best one: the longest is
+		 * the best, and each value names its gap to the first. The user's own
+		 * layouts take the accent colour.
+		 */
 		function renderChart() {
 			const box = $('la-chart');
 			box.replaceChildren();
 			const shown = state.results.slice(0, CHART_MAX_BARS);
 			if (shown.length === 0) return;
 			const totals = shown.map((r) => r.score.total);
-			const min = Math.min(0, ...totals);
-			const max = Math.max(0, ...totals);
-			const span = max - min || 1;
-			const zero = ((0 - min) / span) * 100;
+			const best = Math.max(...totals);
+			const worst = Math.min(...totals);
+			const span = best - worst;
 			for (const result of shown) {
 				const row = el('div', 'la-chart-row');
 				const value = format(result.score.total, 1);
+				const gap = result.score.total - best;
 				openOnActivate(
 					row,
 					result.layout.id,
@@ -986,22 +1017,18 @@
 				// two words apart in that visible text.
 				row.append(el('span', 'la-chart-label', result.layout.name), ' ');
 				const track = el('span', 'la-chart-track');
-				// The zero line, so a negative score reads as one.
-				if (min < 0) {
-					const axis = el('span', 'la-zero');
-					axis.style.left = `${zero}%`;
-					track.append(axis);
-				}
-				const bar = el(
-					'span',
-					result.score.total >= 0 ? 'la-bar la-bar-gain' : 'la-bar la-bar-loss'
-				);
-				const end = ((result.score.total - min) / span) * 100;
-				bar.style.left = `${Math.min(zero, end)}%`;
-				bar.style.width = `${Math.abs(end - zero)}%`;
+				const layout = byId.get(result.layout.id);
+				const personal = !layout || !SHAREABLE_ORIGINS.includes(layout.origin);
+				const bar = el('span', personal ? 'la-bar la-bar-mine' : 'la-bar la-bar-score');
+				// The weakest keeps a sliver, so every row shows a bar; one layout alone is full.
+				const share = span > 0 ? (result.score.total - worst) / span : 1;
+				bar.style.left = '0%';
+				bar.style.width = `${3 + share * 97}%`;
 				track.append(bar);
 				row.title = `${result.layout.name}: ${value} ${t('layout_analysis.unit.points')}`;
-				row.append(track, ' ', el('span', 'la-chart-value', value));
+				const cell = el('span', 'la-chart-value', value);
+				if (gap < 0) cell.append(' ', el('span', 'la-chart-gap', `(${format(gap, 1)})`));
+				row.append(track, ' ', cell);
 				box.append(row);
 			}
 		}
@@ -2194,6 +2221,29 @@
 		function fillCorpora() {
 			const select = $('la-corpus');
 			select.replaceChildren();
+			// The user's own text first, under its own heading (maintainer,
+			// 2026-11-17): « My typing » while the app reads it, then the pasted
+			// text; the built-in texts below.
+			const mine = el('optgroup');
+			mine.label = t('layout_analysis.corpus.group_mine');
+			const texts = el('optgroup');
+			texts.label = t('layout_analysis.corpus.group_texts');
+			const hasMyTyping = corpora.some((c) => c.id === MY_TYPING_ID);
+			if (!hasMyTyping && myTypingState) {
+				const waiting = el(
+					'option',
+					'',
+					t(
+						myTypingState.state === 'loading'
+							? 'layout_analysis.corpus.my_typing_loading'
+							: 'layout_analysis.corpus.my_typing_unavailable'
+					)
+				);
+				waiting.value = MY_TYPING_ID;
+				waiting.disabled = true;
+				if (myTypingState.reason) waiting.title = myTypingState.reason;
+				mine.append(waiting);
+			}
 			for (const corpus of corpora) {
 				const label =
 					corpus.id === CUSTOM_ID
@@ -2205,9 +2255,11 @@
 								: corpus.title;
 				const option = el('option', '', label);
 				option.value = corpus.id;
-				select.append(option);
+				(corpus.builtin ? texts : mine).append(option);
 			}
+			select.append(...[mine, texts].filter((group) => group.children.length > 0));
 			select.value = state.corpus;
+			select.classList.toggle('la-corpus-mine', state.corpus === MY_TYPING_ID);
 			showCorpusInfo();
 		}
 
@@ -2832,6 +2884,11 @@
 		document.addEventListener(NGRAMS_EVENT, (event) =>
 			setCorpus({ id: MY_TYPING_ID, tables: event.detail, default: true })
 		);
+		// « My typing » listed at once, greyed while the app reads it or when it cannot.
+		document.addEventListener(NGRAMS_STATE_EVENT, (event) => {
+			myTypingState = readingState(event.detail);
+			fillCorpora();
+		});
 
 		// The fingering editor, drawn on the chosen keyboard.
 		let fingeringView = null;
@@ -2882,9 +2939,12 @@
 		setFormat: (id) => instance().setFormat(id),
 		onResults: (listener) => instance().onResults(listener)
 	};
-	// Keystats tables that arrive before the mount wait for it.
+	// Keystats tables that arrive before the mount wait for it, and so does their state.
 	document.addEventListener(NGRAMS_EVENT, (event) => {
 		if (!mounted) lastNgrams = event.detail;
+	});
+	document.addEventListener(NGRAMS_STATE_EVENT, (event) => {
+		if (!mounted) myTypingState = readingState(event.detail);
 	});
 
 	/** The site's page: mount into its <main>, and size the framing page. */

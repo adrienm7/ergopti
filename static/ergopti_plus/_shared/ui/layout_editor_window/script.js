@@ -156,7 +156,6 @@ window.initData = function (data) {
 	_hostExports = data.source_export === true;
 	_hostLuaExport = data.lua_export === true;
 	_hostWorkspace = data.studio_workspace === true;
-	showKeystatsSource(data.keystats === true);
 	// « My typing » is the app's default corpus (maintainer, 2026-11-14): the
 	// window reads the local store once when it opens, as the button does; the
 	// counts stay in this window, as the bar's privacy line says.
@@ -547,22 +546,15 @@ function tr(key) {
 }
 
 /**
- * Shows the « My typing » bar when the host reads keystats.
- * @param {boolean} offered
+ * Tells the Comparer how the read of « My typing » stands: it lists the corpus
+ * first at once, greyed while the read runs or when it cannot be made.
+ * @param {string} state 'loading', 'failed' or 'absent' (no keystats store yet).
+ * @param {string} [reason] The translated refusal, shown on the greyed corpus.
  */
-function showKeystatsSource(offered) {
-	document.getElementById('studio-keystats').hidden = !offered;
-}
-
-/**
- * Writes the bar's status line.
- * @param {string} text
- * @param {boolean} [error]
- */
-function setKeystatsStatus(text, error) {
-	const status = document.getElementById('studio-keystats-status');
-	status.textContent = text;
-	status.classList.toggle('error', error === true);
+function announceKeystats(state, reason) {
+	document.dispatchEvent(
+		new CustomEvent('studio-ngrams-state', { detail: { state: state, reason: reason || '' } })
+	);
 }
 
 /**
@@ -573,8 +565,7 @@ function loadKeystats(automatic) {
 	if (_keystatsPending) return;
 	_keystatsPending = true;
 	_keystatsAutomatic = automatic === true;
-	document.getElementById('studio-keystats-load').disabled = true;
-	setKeystatsStatus(tr('layout_editor.studio.keystats.loading'));
+	announceKeystats('loading');
 	send('keystats_ngrams');
 }
 
@@ -585,7 +576,6 @@ function loadKeystats(automatic) {
  */
 window.keystatsNgrams = function (result) {
 	_keystatsPending = false;
-	document.getElementById('studio-keystats-load').disabled = false;
 	const ngrams = result && result.ok === true ? result.ngrams : null;
 	if (!ngrams || typeof ngrams !== 'object' || typeof ngrams.chars !== 'object') {
 		const code = result && typeof result.code === 'string' ? result.code : '';
@@ -593,23 +583,16 @@ window.keystatsNgrams = function (result) {
 			? KEYSTATS_REFUSALS[code]
 			: KEYSTATS_REFUSALS.keystats_unreadable;
 		// No store yet is not a failure of the read the window makes by itself:
-		// the built-in corpus stays chosen, and the bar says why.
-		setKeystatsStatus(tr(key), !(_keystatsAutomatic && code === 'keystats_absent'));
+		// the built-in corpus stays chosen and « My typing » is not offered.
+		announceKeystats(
+			_keystatsAutomatic && code === 'keystats_absent' ? 'absent' : 'failed',
+			tr(key)
+		);
 		return;
 	}
 	_keystatsNgrams = ngrams;
-	setKeystatsStatus(
-		tr(
-			'layout_editor.studio.keystats.loaded',
-			window.LAYOUT_ANALYSIS_INFO.format(Math.round(ngrams.total || 0), 0)
-		)
-	);
 	document.dispatchEvent(new CustomEvent('studio-ngrams', { detail: ngrams }));
 };
-
-document.getElementById('studio-keystats-load').addEventListener('click', function () {
-	loadKeystats(false);
-});
 
 // The analysis panels (_shared/ui/layout_analysis) open their « i » links
 // through the host, in the system browser, instead of a WebView tab. The

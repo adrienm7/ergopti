@@ -20,6 +20,11 @@ body {
 	height: 100%;
 }
 
+/* The native controls (scrollbars, drop-downs) follow the light or dark page. */
+:root {
+	color-scheme: light dark;
+}
+
 /* The light and dark tokens of theme.css: the page's own colours follow the
    system appearance, so the Comparer and the optimiser, which inherit them, are
    never dark text on a light page inside a dark window. */
@@ -33,42 +38,9 @@ body {
 	padding: 0;
 }
 
-/* ============================================ */
-/* ============================================ */
-/* ======= 2/ Ergopti Studio: My typing ======= */
-/* ============================================ */
-/* ============================================ */
-
-.studio-keystats {
-	align-items: center;
-	border-bottom: 1px solid var(--theme-separator);
-	display: flex;
-	flex-wrap: wrap;
-	gap: 4px 12px;
-	padding: 8px clamp(12px, 2.5vw, 28px);
-}
-
-.studio-keystats[hidden] {
-	display: none;
-}
-
-.studio-keystats-status {
-	font-weight: 600;
-}
-
-.studio-keystats-status.error {
-	color: var(--theme-bad-text);
-}
-
-.studio-keystats-privacy {
-	color: var(--theme-sub);
-	flex-basis: 100%;
-	margin: 0;
-}
-
 /* =================================== */
 /* =================================== */
-/* ======= 3/ Ergopti Studio tabs ==== */
+/* ======= 2/ Ergopti Studio tabs ==== */
 /* =================================== */
 /* =================================== */
 
