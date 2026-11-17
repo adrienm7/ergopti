@@ -41,6 +41,29 @@
 var LAYOUT_ANALYSIS = (function () {
 	'use strict';
 
+	// The built-ins as locals. The Node tests and the codegen run the engine in
+	// a vm context, where each read of a global goes through the context's
+	// interceptor, about a thousand times slower than a local one; the walks
+	// read Math, Map, the typed arrays and Infinity millions of times.
+	const {
+		Array,
+		Error,
+		Float64Array,
+		Int32Array,
+		JSON,
+		Map,
+		Math,
+		Number,
+		Object,
+		Set,
+		String,
+		Uint8Array,
+		Uint16Array,
+		Uint32Array,
+		WeakMap
+	} = globalThis;
+	const INFINITY = Number.POSITIVE_INFINITY;
+
 	// ============================
 	// ======= 1/ Constants =======
 	// ============================
@@ -89,6 +112,9 @@ var LAYOUT_ANALYSIS = (function () {
 	const MAX_WAYS = 4;
 	// Separates two tokens in a map key (no layout types this control character).
 	const TOKEN_SEP = '\u0001';
+	// How many times over the key stream may count a table's whole total (a
+	// character's keys, both keys of a pair): its sums must stay exact.
+	const WHOLE_SUM_MARGIN = 64;
 
 	/**
 	 * Every metric: unit, direction and what it is a share of. The definitions
@@ -147,15 +173,20 @@ var LAYOUT_ANALYSIS = (function () {
 	// ======= 2/ Data =======
 	// =======================
 
+	let loadedData = null;
+
 	/**
 	 * The generated data, read on first use.
 	 * @returns {object} LAYOUT_ANALYSIS_DATA.
 	 * @throws {Error} When _generated/analysis_data.js was not loaded first.
 	 */
 	function data() {
+		// Kept once found: a read of the global costs dearly in a vm context.
+		if (loadedData) return loadedData;
 		if (typeof LAYOUT_ANALYSIS_DATA === 'undefined' || !LAYOUT_ANALYSIS_DATA)
 			throw new Error('layout_analysis: load _generated/analysis_data.js before the engine');
-		return LAYOUT_ANALYSIS_DATA;
+		loadedData = LAYOUT_ANALYSIS_DATA;
+		return loadedData;
 	}
 
 	/** Splits a string into code points. */
@@ -676,18 +707,30 @@ var LAYOUT_ANALYSIS = (function () {
 				else if (rule.outText !== null) [map, target] = [texts, rule.outText];
 				for (const prefix of prefixes.slice())
 					for (const tail of tails.slice()) {
-						const candidate = join(prefix, tail, rule.state);
+						// join(prefix, tail, rule.state), with only what offer compares
+						// until it keeps the candidate: most chains are refused.
+						const candidate = {
+							keys: prefix.keys.concat(tail.keys),
+							layers: null,
+							shift: prefix.shift + tail.shift,
+							altgr: prefix.altgr + tail.altgr,
+							dead: true,
+							cost: prefix.cost + tail.cost,
+							level: null,
+							state: rule.state
+						};
+						if (!offer(map, target, candidate)) continue;
+						changed = true;
+						const list = map.get(target);
+						versions.set(list, version(list) + 1);
+						candidate.layers = prefix.layers.concat(tail.layers);
+						candidate.level = `${rule.state}/${tail.level}`;
 						// A dead key closed by a thumb key (the space bar, on any level)
 						// types its own sign: the fallback, never an alternative to
 						// another way (planTyping).
 						const closing = board.finger[candidate.keys[candidate.keys.length - 1]];
 						if (closing === LEFT_THUMB || closing === RIGHT_THUMB) candidate.terminated = true;
 						if (map === texts) candidate.width = codeLength(target);
-						if (offer(map, target, candidate)) {
-							changed = true;
-							const list = map.get(target);
-							versions.set(list, version(list) + 1);
-						}
 					}
 			}
 			if (!changed) break;
@@ -829,6 +872,76 @@ var LAYOUT_ANALYSIS = (function () {
 		prepared.totalChars = prepared.uni.reduce((sum, entry) => sum + entry[1], 0);
 		preparedCache.set(ngrams, prepared);
 		return prepared;
+	}
+
+	const tableIdsCache = new WeakMap();
+
+	/**
+	 * A prepared table's tokens as ids and its n-grams as typed arrays, in the
+	 * table's order: a walk indexes arrays instead of looking each token up
+	 * by string. Cached per table.
+	 * @param {object} table - From prepareNgrams() or tokenTable().
+	 * @returns {{tokens: string[], uniId: Int32Array, uniN: Float64Array,
+	 *   biA: Int32Array, biB: Int32Array, biN: Float64Array, triA: Int32Array,
+	 *   triB: Int32Array, triC: Int32Array, triN: Float64Array, allBi: Int32Array,
+	 *   allTri: Int32Array, whole: boolean}} Ids; allBi, allTri: every entry's
+	 *   index; whole: every count an integer, small enough for exact sums.
+	 */
+	function tableIds(table) {
+		let out = tableIdsCache.get(table);
+		if (out) return out;
+		const tokens = [];
+		const idOf = new Map();
+		const id = (token) => {
+			let i = idOf.get(token);
+			if (i === undefined) {
+				i = tokens.length;
+				idOf.set(token, i);
+				tokens.push(token);
+			}
+			return i;
+		};
+		const ids = (entries, j) => {
+			const column = new Int32Array(entries.length);
+			for (let i = 0; i < entries.length; i++) column[i] = id(entries[i][j]);
+			return column;
+		};
+		let whole = true;
+		let total = 0;
+		const counts = (entries, j) => {
+			const column = new Float64Array(entries.length);
+			for (let i = 0; i < entries.length; i++) {
+				const n = entries[i][j];
+				column[i] = n;
+				total += n;
+				if (whole && !Number.isInteger(n)) whole = false;
+			}
+			return column;
+		};
+		out = {
+			tokens,
+			uniId: ids(table.uni, 0),
+			uniN: counts(table.uni, 1),
+			biA: ids(table.bi, 0),
+			biB: ids(table.bi, 1),
+			biN: counts(table.bi, 2),
+			triA: ids(table.tri, 0),
+			triB: ids(table.tri, 1),
+			triC: ids(table.tri, 2),
+			triN: counts(table.tri, 3)
+		};
+		// Whole counts whose sums stay exact integers whatever their order (a
+		// character's own keys can count it a few times over).
+		out.whole = whole && total * WHOLE_SUM_MARGIN <= Number.MAX_SAFE_INTEGER;
+		const indexes = (length) => {
+			const all = new Int32Array(length);
+			for (let i = 0; i < length; i++) all[i] = i;
+			return all;
+		};
+		out.allBi = indexes(out.biN.length);
+		out.allTri = indexes(out.triN.length);
+		tableIdsCache.set(table, out);
+		return out;
 	}
 
 	// ==========================
@@ -1020,6 +1133,74 @@ var LAYOUT_ANALYSIS = (function () {
 		return opts.typing;
 	}
 
+	// What a key trigram is (tripleKind): one class, plus a flag when its first
+	// and last keys are another same-finger skipgram; 0 is « not yet known ».
+	const TRIPLE_CLASS = 7;
+	const TRIPLE_SAME_FINGER = 1;
+	const TRIPLE_ROLL_IN = 2;
+	const TRIPLE_ROLL_OUT = 3;
+	const TRIPLE_REDIRECT = 4;
+	const TRIPLE_REDIRECT_BAD = 5;
+	const TRIPLE_ALTERNATION = 6;
+	const TRIPLE_ROLL_MIXED = 7;
+	const TRIPLE_SFS = 8;
+	const TRIPLE_THUMB = 16;
+	const tripleKindCache = new WeakMap();
+
+	/**
+	 * The classification of streamVisitor's trigram rule for one key trigram:
+	 * a thumb key leaves it out (TRIPLE_THUMB); otherwise TRIPLE_SFS when the
+	 * first and last keys are different keys of one finger, and its class: a
+	 * finger repeated in a row, then on one hand a roll in or out or a
+	 * redirect (bad without the index), else alternation or a mixed roll.
+	 */
+	function tripleKind(board, k1, k2, k3) {
+		const thumb = thumbKeys(board);
+		if (thumb[k1] || thumb[k2] || thumb[k3]) return TRIPLE_THUMB;
+		const f1 = board.finger[k1];
+		const f2 = board.finger[k2];
+		const f3 = board.finger[k3];
+		const sfs = f1 === f3 && k1 !== k3 ? TRIPLE_SFS : 0;
+		if (f1 === f2 || f2 === f3) return sfs | TRIPLE_SAME_FINGER;
+		const h1 = board.hand[k1];
+		const h2 = board.hand[k2];
+		const h3 = board.hand[k3];
+		if (h1 === h2 && h2 === h3) {
+			const d = (board.order[k2] - board.order[k1]) * (board.order[k3] - board.order[k2]);
+			if (d > 0)
+				return sfs | (board.order[k2] > board.order[k1] ? TRIPLE_ROLL_IN : TRIPLE_ROLL_OUT);
+			const index =
+				board.order[k1] === INDEX_ORDER ||
+				board.order[k2] === INDEX_ORDER ||
+				board.order[k3] === INDEX_ORDER;
+			return sfs | (index ? TRIPLE_REDIRECT : TRIPLE_REDIRECT_BAD);
+		}
+		return sfs | (h1 !== h2 && h2 !== h3 ? TRIPLE_ALTERNATION : TRIPLE_ROLL_MIXED);
+	}
+
+	/** A board's tripleKind memo, (k1 * K + k2) * K + k3, filled as read. */
+	function tripleKinds(board) {
+		let out = tripleKindCache.get(board);
+		if (!out) {
+			const K = board.codes.length;
+			out = new Uint8Array(K * K * K);
+			tripleKindCache.set(board, out);
+		}
+		return out;
+	}
+
+	const thumbCache = new WeakMap();
+
+	/** Whether each key of a board is a thumb's (1) or not (0). */
+	function thumbKeys(board) {
+		let out = thumbCache.get(board);
+		if (!out) {
+			out = Uint8Array.from(board.finger, (f) => (f === LEFT_THUMB || f === RIGHT_THUMB ? 1 : 0));
+			thumbCache.set(board, out);
+		}
+		return out;
+	}
+
 	/** The counters the key stream adds to: every one a sum over the n-grams. */
 	function streamCounts() {
 		return {
@@ -1062,7 +1243,9 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @returns {object} The visitor.
 	 */
 	function streamVisitor(board, c, keyCount, unsupportedChars, blame) {
-		const thumb = board.finger.map((f) => f === LEFT_THUMB || f === RIGHT_THUMB);
+		const thumb = thumbKeys(board);
+		const K = board.codes.length;
+		const kinds = tripleKinds(board);
 		const blame2 = blame ? blame.pair : () => {};
 		const blame3 = blame ? blame.triple : () => {};
 		return {
@@ -1124,42 +1307,41 @@ var LAYOUT_ANALYSIS = (function () {
 				blame2(roll, n, k1, k2);
 			},
 			trigram(k1, k2, k3, n) {
-				if (thumb[k1] || thumb[k2] || thumb[k3]) return;
+				const at = (k1 * K + k2) * K + k3;
+				let kind = kinds[at];
+				if (kind === 0) kind = kinds[at] = tripleKind(board, k1, k2, k3);
+				if (kind === TRIPLE_THUMB) return;
 				c.trigrams += n;
-				const f1 = board.finger[k1];
-				const f2 = board.finger[k2];
-				const f3 = board.finger[k3];
-				if (f1 === f3 && k1 !== k3) {
+				if (kind & TRIPLE_SFS) {
 					c.sfs += n;
 					blame2('sfs', n, k1, k3);
 				}
-				if (f1 === f2 || f2 === f3) {
-					c.same_finger_trigram += n;
-					return;
-				}
-				const h1 = board.hand[k1];
-				const h2 = board.hand[k2];
-				const h3 = board.hand[k3];
-				if (h1 === h2 && h2 === h3) {
-					const d = (board.order[k2] - board.order[k1]) * (board.order[k3] - board.order[k2]);
-					if (d > 0) {
-						if (board.order[k2] > board.order[k1]) c.roll3_in += n;
-						else c.roll3_out += n;
-					} else {
+				switch (kind & TRIPLE_CLASS) {
+					case TRIPLE_SAME_FINGER:
+						c.same_finger_trigram += n;
+						break;
+					case TRIPLE_ROLL_IN:
+						c.roll3_in += n;
+						break;
+					case TRIPLE_ROLL_OUT:
+						c.roll3_out += n;
+						break;
+					case TRIPLE_REDIRECT:
+					case TRIPLE_REDIRECT_BAD:
 						c.redirect += n;
 						blame3('redirect', n, k1, k2, k3);
-						const index = [k1, k2, k3].some((k) => board.order[k] === INDEX_ORDER);
-						if (!index) {
+						if ((kind & TRIPLE_CLASS) === TRIPLE_REDIRECT_BAD) {
 							c.redirect_bad += n;
 							blame3('redirect_bad', n, k1, k2, k3);
 						}
-					}
-					return;
+						break;
+					case TRIPLE_ALTERNATION:
+						c.alternation += n;
+						blame3('alternation', n, k1, k2, k3);
+						break;
+					default:
+						c.roll_mixed += n;
 				}
-				if (h1 !== h2 && h2 !== h3) {
-					c.alternation += n;
-					blame3('alternation', n, k1, k2, k3);
-				} else c.roll_mixed += n;
 			}
 		};
 	}
@@ -1326,10 +1508,147 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   (modifiers included), bigram(k1, k2, n), trigram(k1, k2, k3, n).
 	 */
 	function walkKeyStream(board, best, table, visit) {
-		for (const [char, n] of table.uni) walkChar(board, best.get(char), char, n, visit);
-		for (const [a, b, n] of table.bi) walkPair(best.get(a), best.get(b), n, visit);
-		for (const [a, b, d, n] of table.tri)
-			walkTriple(best.get(a), best.get(b), best.get(d), n, visit);
+		const t = tableIds(table);
+		const seqs = t.tokens.map((token) => best.get(token));
+		for (let i = 0; i < t.uniId.length; i++)
+			walkChar(board, seqs[t.uniId[i]], t.tokens[t.uniId[i]], t.uniN[i], visit);
+		walkRest(board, t, seqs, t.allBi, t.allTri, visit);
+	}
+
+	/**
+	 * Walks the pairs then the triples of a table whose tokens each have one
+	 * sequence (seqs, by token id), the entries given by index. With whole
+	 * counts, each step sums its key bigrams and trigrams and passes each
+	 * distinct one on once, in the order it first came: every counter of the
+	 * stream is a sum of exact integers, so the visitor ends with the very
+	 * same values (and its maps with the same insertion order) for a
+	 * fraction of the calls. Other counts are passed on one by one.
+	 * @param {object} board - From keyboard().
+	 * @param {object} t - From tableIds().
+	 * @param {Array} seqs - Token id → sequence, undefined when unsupported.
+	 * @param {Int32Array} bi - Indexes of the pairs to walk.
+	 * @param {Int32Array} tri - Indexes of the triples to walk.
+	 * @param {object} visit - As walkKeyStream.
+	 */
+	function walkRest(board, t, seqs, bi, tri, visit) {
+		if (!t.whole) {
+			for (let j = 0; j < bi.length; j++) {
+				const i = bi[j];
+				walkPair(seqs[t.biA[i]], seqs[t.biB[i]], t.biN[i], visit);
+			}
+			for (let j = 0; j < tri.length; j++) {
+				const i = tri[j];
+				walkTriple(seqs[t.triA[i]], seqs[t.triB[i]], seqs[t.triC[i]], t.triN[i], visit);
+			}
+			return;
+		}
+		// Each token's keys that reach across its neighbours (-1: none): its
+		// first and last, its second and the one before its last.
+		const size = seqs.length;
+		const first = new Int32Array(size).fill(-1);
+		const last = new Int32Array(size).fill(-1);
+		const second = new Int32Array(size).fill(-1);
+		const penult = new Int32Array(size).fill(-1);
+		const single = new Uint8Array(size);
+		for (let id = 0; id < size; id++) {
+			const seq = seqs[id];
+			if (!seq) continue;
+			const keys = seq.keys;
+			first[id] = keys[0];
+			last[id] = keys[keys.length - 1];
+			if (keys.length >= 2) {
+				second[id] = keys[1];
+				penult[id] = keys[keys.length - 2];
+			} else single[id] = 1;
+		}
+		const s = summingBuffers(board);
+		const { K, slot, ids, sums } = s;
+		const K2 = K * K;
+		let count = 0;
+		const add = (id, n) => {
+			let at = slot[id];
+			if (at === 0) {
+				if (count + 1 >= sums.length) flush();
+				at = slot[id] = ++count;
+				ids[at] = id;
+				sums[at] = 0;
+			}
+			sums[at] += n;
+		};
+		function flush() {
+			for (let at = 1; at <= count; at++) {
+				const id = ids[at];
+				const n = sums[at];
+				slot[id] = 0;
+				if (id < K2) visit.bigram((id / K) | 0, id % K, n);
+				else {
+					const rest = id - K2;
+					visit.trigram((rest / K2) | 0, ((rest / K) | 0) % K, rest % K, n);
+				}
+			}
+			count = 0;
+		}
+		let clean = false;
+		try {
+			// walkPair: the pair across, then the triples across.
+			const { biA, biB, biN } = t;
+			for (let j = 0; j < bi.length; j++) {
+				const i = bi[j];
+				const a = biA[i];
+				const b = biB[i];
+				if (first[a] < 0 || first[b] < 0) continue;
+				const n = biN[i];
+				add(last[a] * K + first[b], n);
+				if (penult[a] >= 0) add(K2 + (penult[a] * K + last[a]) * K + first[b], n);
+				if (second[b] >= 0) add(K2 + (last[a] * K + first[b]) * K + second[b], n);
+			}
+			flush();
+			// walkTriple: the key trigram across a one-key middle.
+			const { triA, triB, triC, triN } = t;
+			for (let j = 0; j < tri.length; j++) {
+				const i = tri[j];
+				const b = triB[i];
+				if (single[b] === 0) continue;
+				const a = triA[i];
+				const d = triC[i];
+				if (first[a] < 0 || first[d] < 0) continue;
+				add(K2 + (last[a] * K + first[b]) * K + first[d], triN[i]);
+			}
+			flush();
+			clean = true;
+		} finally {
+			// A visitor that threw leaves sums behind: those buffers are dropped.
+			if (!clean && summingCache.get(board) === s) summingCache.delete(board);
+			s.busy = false;
+		}
+	}
+
+	const summingCache = new WeakMap();
+
+	// Distinct key n-grams walkRest sums before it passes them on: a slot
+	// index fits 16 bits, so the slot table of a board stays in cache.
+	const SUM_SLOTS = 65535;
+
+	/**
+	 * walkRest's sums on a board: key bigram k1 k2 has id k1 * K + k2,
+	 * trigram k1 k2 k3 id K² + (k1 * K + k2) * K + k3; slot[id] is its place
+	 * (1-based, 0: not seen) in ids and sums, filled in the order the ids
+	 * first come. Kept per board, released with every slot at 0.
+	 */
+	function summingBuffers(board) {
+		let s = summingCache.get(board);
+		if (!s || s.busy) {
+			const K = board.codes.length;
+			s = {
+				K,
+				slot: new Uint16Array(K * K + K * K * K),
+				ids: new Int32Array(SUM_SLOTS + 1),
+				sums: new Float64Array(SUM_SLOTS + 1)
+			};
+			if (!summingCache.has(board)) summingCache.set(board, s);
+		}
+		s.busy = true;
+		return s;
 	}
 
 	/**
@@ -1361,11 +1680,11 @@ var LAYOUT_ANALYSIS = (function () {
 		const ka = sa.keys;
 		const kb = sb.keys;
 		const la = ka.length;
-		const length = la + kb.length;
-		const at = (j) => (j < la ? ka[j] : kb[j - la]);
 		visit.bigram(ka[la - 1], kb[0], n);
-		for (let i = Math.max(0, la - 2); i < la; i++)
-			if (i + 2 < length) visit.trigram(at(i), at(i + 1), at(i + 2), n);
+		// The triples across: the last two keys of a with b's first, then a's
+		// last key with b's first two.
+		if (la >= 2) visit.trigram(ka[la - 2], ka[la - 1], kb[0], n);
+		if (kb.length >= 2) visit.trigram(ka[la - 1], kb[0], kb[1], n);
 	}
 
 	/** The key trigram across one character trigram whose middle is one key. */
@@ -2242,6 +2561,10 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @returns {Array<{weight: number, missing: string[]}>} The form factors.
 	 */
 	function compactForms(format, weights) {
+		// The model's weights give the same forms every time: built once per format.
+		const cacheKey = weights === undefined ? String(format) : null;
+		if (cacheKey !== null && defaultFormsCache.has(cacheKey))
+			return defaultFormsCache.get(cacheKey);
 		const formats =
 			format === undefined ? keyboardFormats() : [{ hidden: formatHiddenKeys(format) }];
 		const chosen = formFactorWeights(weights);
@@ -2257,7 +2580,21 @@ var LAYOUT_ANALYSIS = (function () {
 					missing: form.missing.concat([...entry.hidden])
 				});
 		}
+		if (cacheKey !== null) defaultFormsCache.set(cacheKey, forms);
 		return forms;
+	}
+
+	const defaultFormsCache = new Map();
+	const formSetsCache = new WeakMap();
+
+	/** Each form's missing keys as a Set, once per forms list (compactForms). */
+	function formSets(forms) {
+		let out = formSetsCache.get(forms);
+		if (!out) {
+			out = forms.map((form) => new Set(form.missing));
+			formSetsCache.set(forms, out);
+		}
+		return out;
 	}
 
 	/**
@@ -2266,9 +2603,18 @@ var LAYOUT_ANALYSIS = (function () {
 	 */
 	function compactFit(layout, board, table, format, formWeights) {
 		const forms = compactForms(format, formWeights);
+		// Forms that take away the same keys of this layout (most differ only by
+		// keys it leaves empty, a numpad or arrows) keep the same characters.
+		const used = Object.keys(layout.rows).filter((code) => board.index.has(code));
+		const fits = new Map();
+		const sets = formSets(forms);
 		return weightedFit(
 			forms,
-			forms.map((form) => formFit(layout, board, table, form))
+			forms.map((form, i) => {
+				const key = used.filter((code) => sets[i].has(code)).join(' ');
+				if (!fits.has(key)) fits.set(key, formFit(layout, board, table, form));
+				return fits.get(key);
+			})
 		);
 	}
 
@@ -2742,7 +3088,11 @@ var LAYOUT_ANALYSIS = (function () {
 			const d = (board.order[k2] - board.order[k1]) * (board.order[k3] - board.order[k2]);
 			if (d > 0) return points - (board.order[k2] > board.order[k1] ? w.roll3_in : w.roll3_out);
 			points += w.redirect;
-			if (![k1, k2, k3].some((k) => board.order[k] === INDEX_ORDER)) points += w.redirect_bad;
+			const index =
+				board.order[k1] === INDEX_ORDER ||
+				board.order[k2] === INDEX_ORDER ||
+				board.order[k3] === INDEX_ORDER;
+			if (!index) points += w.redirect_bad;
 			return points;
 		}
 		if (h1 !== h2 && h2 !== h3) points -= w.alternation;
@@ -2761,7 +3111,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 * finger_imbalance and hand_imbalance are not sums over keystrokes and
 	 * do not take part.
 	 * @param {object} board - From keyboard().
-	 * @returns {{w: object, n: number, press: Float64Array, pair: Float64Array}}
+	 * @returns {{w: object, n: number, press: Float64Array, pair: Float64Array,
+	 *   triple: Float64Array}}
 	 */
 	function typingCosts(board) {
 		if (typingCostCache.has(board)) return typingCostCache.get(board);
@@ -2780,7 +3131,10 @@ var LAYOUT_ANALYSIS = (function () {
 		const pair = new Float64Array(n * n);
 		for (let k1 = 0; k1 < n; k1++)
 			for (let k2 = 0; k2 < n; k2++) pair[k1 * n + k2] = 100 * bigramPoints(board, w, k1, k2);
-		const costs = { w, n, press, pair };
+		// trigramPoints by the same weights, k1 k2 k3 at (k1 * n + k2) * n + k3,
+		// each worked out the first time it is read (NaN until then).
+		const triple = new Float64Array(n * n * n).fill(Number.NaN);
+		const costs = { w, n, press, pair, triple };
 		typingCostCache.set(board, costs);
 		return costs;
 	}
@@ -2964,7 +3318,12 @@ var LAYOUT_ANALYSIS = (function () {
 		const rb = charMaps.bigrams > 0 ? nc / charMaps.bigrams : 0;
 		const rt = charMaps.trigrams > 0 ? nc / charMaps.trigrams : 0;
 		const pair = (k1, k2) => base.pair[k1 * base.n + k2] * rb;
-		const tri = (k1, k2, k3) => 100 * rt * trigramPoints(board, w, k1, k2, k3);
+		const tri = (k1, k2, k3) => {
+			const at = (k1 * base.n + k2) * base.n + k3;
+			let points = base.triple[at];
+			if (Number.isNaN(points)) points = base.triple[at] = trigramPoints(board, w, k1, k2, k3);
+			return 100 * rt * points;
+		};
 		const first = (way) => way.keys[0];
 		const last = (way) => way.keys[way.keys.length - 1];
 		const unitMemo = new Map();
@@ -3009,14 +3368,14 @@ var LAYOUT_ANALYSIS = (function () {
 			if (!n) continue;
 			const a = compiled.ways.get(parts[0]);
 			const b = compiled.ways.get(parts[1]);
-			const taps = a && b ? unit(a[0]) + unit(b[0]) + cross(a[0], b[0]) : Infinity;
+			const taps = a && b ? unit(a[0]) + unit(b[0]) + cross(a[0], b[0]) : INFINITY;
 			const chord = unit(list[0]);
 			if (chord < taps)
 				candidates.push({
 					text,
 					x: parts[0],
 					y: parts[1],
-					gain: taps === Infinity ? Infinity : (taps - chord) * n
+					gain: taps === INFINITY ? INFINITY : (taps - chord) * n
 				});
 		}
 		candidates.sort((p, q) =>
@@ -3187,7 +3546,7 @@ var LAYOUT_ANALYSIS = (function () {
 			const wa = a === null ? null : ways.get(a)[0];
 			const wc = c === null ? null : ways.get(c)[0];
 			let pick = 0;
-			let lowest = Infinity;
+			let lowest = INFINITY;
 			for (let i = 0; i < list.length; i++) {
 				let cost = own[i];
 				if (left) cost += left[i];
@@ -3451,7 +3810,9 @@ var LAYOUT_ANALYSIS = (function () {
 	 * typed the fast way. Cached per table and set of multi-way tokens.
 	 * @param {object} table - A prepared (token) table.
 	 * @param {Set<string>} multi - The multi-way tokens.
-	 * @returns {{touchBi: Array, touchTri: Array, restBi: Array, restTri: Array}}
+	 * @returns {{touchBi: Array, touchTri: Array, restBi: Array, restTri: Array,
+	 *   restBiAt: Int32Array, restTriAt: Int32Array}} restBiAt, restTriAt: the
+	 *   rest's entry indexes in the table.
 	 */
 	function partition(table, multi) {
 		const key = Array.from(multi).sort().join(TOKEN_SEP);
@@ -3467,6 +3828,19 @@ var LAYOUT_ANALYSIS = (function () {
 				? out.touchTri
 				: out.restTri
 			).push(entry);
+		// The rest again as entry indexes of the table, for walkRest.
+		const t = tableIds(table);
+		const many = new Uint8Array(t.tokens.length);
+		t.tokens.forEach((token, i) => {
+			if (multi.has(token)) many[i] = 1;
+		});
+		const restBiAt = [];
+		const restTriAt = [];
+		for (let i = 0; i < t.biN.length; i++) if (!many[t.biA[i]] && !many[t.biB[i]]) restBiAt.push(i);
+		for (let i = 0; i < t.triN.length; i++)
+			if (!many[t.triA[i]] && !many[t.triB[i]] && !many[t.triC[i]]) restTriAt.push(i);
+		out.restBiAt = Int32Array.from(restBiAt);
+		out.restTriAt = Int32Array.from(restTriAt);
 		if (byKey.size >= PARTITIONS_PER_TABLE) byKey.clear();
 		byKey.set(key, out);
 		return out;
@@ -3490,10 +3864,10 @@ var LAYOUT_ANALYSIS = (function () {
 			return;
 		}
 		for (const [token, n] of table.uni) walkTypedToken(board, plan, token, n, 1, visit);
-		const { best } = plan;
-		const { restBi, restTri, touchBi, touchTri } = plan.parts;
-		for (const [a, b, n] of restBi) walkPair(best.get(a), best.get(b), n, visit);
-		for (const [a, b, d, n] of restTri) walkTriple(best.get(a), best.get(b), best.get(d), n, visit);
+		const { restBiAt, restTriAt, touchBi, touchTri } = plan.parts;
+		const t = tableIds(table);
+		const seqs = t.tokens.map((token) => plan.best.get(token));
+		walkRest(board, t, seqs, restBiAt, restTriAt, visit);
 		for (let i = 0; i < touchBi.length; i++) walkTypedPair(plan, i, 1, visit);
 		for (let i = 0; i < touchTri.length; i++) walkTypedTriple(plan, i, 1, visit);
 	}
