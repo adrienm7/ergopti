@@ -827,9 +827,8 @@ var LayoutEditorPage = (function () {
 					el('button', {
 						type: 'button',
 						class: 'le-layout-tab',
-						role: 'tab',
 						'data-tab': String(index),
-						'aria-selected': String(active),
+						'aria-current': active ? 'true' : 'false',
 						title: tl(tab.dirty ? 'toolbar.unsaved' : 'toolbar.saved'),
 						text: `${name}${tab.dirty ? ' •' : ''}`,
 						onclick: () => switchTab(index)
@@ -855,11 +854,13 @@ var LayoutEditorPage = (function () {
 			});
 			return el('div', { class: 'le-layout-tabs', id: 'le-layout-tabs' }, [
 				el('div', { class: 'le-layout-tab-list' }, [
-					// Only tabs belong to the tablist (WCAG 4.1.2); the add button
-					// stays in the same row (display: contents, style.css).
+					// A named group of buttons, the current one marked: a tablist
+					// may hold only tabs, and each layout has a close button
+					// (WCAG 4.1.2). The add button stays in the same row
+					// (display: contents, style.css).
 					el(
 						'div',
-						{ class: 'le-layout-tab-roles', role: 'tablist', 'aria-label': tl('tabs.label') },
+						{ class: 'le-layout-tab-roles', role: 'group', 'aria-label': tl('tabs.label') },
 						tabs
 					),
 					el('button', {

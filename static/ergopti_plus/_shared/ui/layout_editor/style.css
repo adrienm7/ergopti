@@ -1000,7 +1000,7 @@ body {
 	}
 }
 
-/* The tablist wrapper only carries the role: its tabs and the add button stay
+/* The group wrapper only carries the role: its tabs and the add button stay
    one flex row of .le-layout-tab-list. */
 .le-layout-tab-roles {
 	display: contents;

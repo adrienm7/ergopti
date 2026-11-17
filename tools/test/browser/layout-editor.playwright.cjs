@@ -1669,7 +1669,7 @@ async function exerciseWorkspace(browser, origin) {
 	await page.waitForSelector('#le-board');
 	await settled(page);
 	assert.deepEqual(await tabNames(page), ['My layout •', 'Second •']);
-	assert.equal(await page.getAttribute('#le-layout-tabs [data-tab="1"]', 'aria-selected'), 'true');
+	assert.equal(await page.getAttribute('#le-layout-tabs [data-tab="1"]', 'aria-current'), 'true');
 	assert.equal(await legendOf(page, 'KeyW'), 'ŷ');
 	await page.click('#le-layout-tabs [data-tab="0"]');
 	assert.equal(await legendOf(page, 'KeyQ'), 'ŵ');

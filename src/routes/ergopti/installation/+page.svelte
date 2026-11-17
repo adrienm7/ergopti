@@ -54,20 +54,17 @@
 	</p>
 	<tiny-space></tiny-space>
 	<div style="display: flex; gap: 1rem; justify-content:center; font-size:1.5rem">
-		<a href="#windows">
-			<button class="alt-button"
-				><i class="icon-windows" style="vertical-align:0"></i> Windows</button
-			>
-		</a>
-		<a href="#macos">
-			<button class="alt-button"
-				><i class="icon-appleinc" style="vertical-align:-0.05em"></i>
-				macOS</button
-			>
-		</a>
-		<a href="#linux">
-			<button class="alt-button"><i class="icon-linux"></i> Linux</button>
-		</a>
+		<!-- Links styled as buttons: a button inside a link is two focus stops
+		     for one action (WCAG 4.1.2). -->
+		<a href="#windows" class="alt-button anchor-button"
+			><i class="icon-windows" style="vertical-align:0" aria-hidden="true"></i> Windows</a
+		>
+		<a href="#macos" class="alt-button anchor-button"
+			><i class="icon-appleinc" style="vertical-align:-0.05em" aria-hidden="true"></i> macOS</a
+		>
+		<a href="#linux" class="alt-button anchor-button"
+			><i class="icon-linux" aria-hidden="true"></i> Linux</a
+		>
 	</div>
 	<div style="height:1rem"></div>
 	<div style="display: flex; gap: 1rem; justify-content:center;">
@@ -82,3 +79,10 @@
 	<InstallationMac />
 	<InstallationLinux />
 </PageWrapper>
+
+<style>
+	.anchor-button {
+		display: inline-block;
+		text-decoration: none;
+	}
+</style>
