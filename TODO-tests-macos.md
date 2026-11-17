@@ -40,9 +40,8 @@ Field run, no person needed (read the next report):
       below 8 %, and `granite4:350m-h` pulled with no `digest_mismatch`. A remaining one is a code entry with its
       report lines.
 - [ ] <!-- field-point: two_copies_accessibility --> Two copies and one Accessibility switch: field report: `field_login_items` (each copy and whose it is) and `field_permissions` (`accessibility`, bundle identity), run once with a `build/macos` copy registered beside the `/Applications` prerelease: no `tccutil reset`, the dialog names `…/build/macos/ErgoptiPlus.app`, the boot resumes once that copy is trashed and the switch on.
-- [ ] <!-- field-point: owned_install_launcher --> Owned runtime install through the launcher (after the next runtime rebuild): field report: `field_owned_install` then `owned_install_reload` (`files-published-services-observed-staging-retired`, no `helper_signature` or report refusal); the administrator prompt is its one human step. Run
-  `tools/dev/reset-macos-owned-runtime.sh` first (that Mac still holds a published Runtime and its journal, which
-  refuse a new install at `destination`). The next report must show `installed=pass`, or else the `install_cause`
+- [ ] <!-- field-point: owned_install_launcher --> Owned runtime install through the launcher (after the next runtime rebuild): field report: `field_owned_install` then `owned_install_reload` (`files-published-services-observed-staging-retired`, no `helper_signature` or report refusal); the administrator prompt is its one human step (the
+  --installed run removes the leftovers of an unfinished install itself). The next report must show `installed=pass`, or else the `install_cause`
   step (`...-errno-24-fds-<open>-of-<limit>` tells a leak from a
   low limit) and a launcher.log trail starting `fd-limit-256-to-10240`. With Karabiner-Elements running, check
   that the trail has no `vhid-bootstrap-<n>` and that `field_owned_start` passes.

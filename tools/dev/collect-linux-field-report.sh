@@ -36,6 +36,18 @@
 # report ends with todo_summary.md, one verdict per TODO point
 # (static/ergopti_plus/linux/data/field_todo_coverage.json).
 #
+# The machine facts (tools/dev/linux-field-diagnostics.sh): every Ergopti
+# daemon and helper at the start, before the run, every FIELD_SAMPLER_SECONDS
+# during it and at the end, the other remappers, text expanders and input
+# methods, which processes hold each keyboard's evdev node, the uinput and
+# evdev access, the machine, the idle CPU per daemon process, the unit's state
+# and restarts, its journal since the collector started (scrubbed) and the app
+# folders. tools/dev/field-report-facts.py turns their fact lines into
+# 0_main/env.json and the step timings into 0_main/timeline.txt; the analysis
+# reads both. Every step prints "step k/N", a heartbeat every 15 s while it
+# runs and its duration (tools/dev/field-report-steps.sh); a new step is
+# stopped at its bound.
+#
 # The field run: tools/dev/linux-field-run.sh asks the running daemon to run its
 # Debug field checks with no window (linux/infra/field_run.lua, the macOS field
 # run's protocol), copies one result per step into field_run/ and prints their
@@ -86,6 +98,10 @@ set -e
 . "$REPO_ROOT/tools/dev/linux-field-shell-checks.sh"
 # shellcheck source=linux-field-run.sh
 . "$REPO_ROOT/tools/dev/linux-field-run.sh"
+# shellcheck source=field-report-steps.sh
+. "$REPO_ROOT/tools/dev/field-report-steps.sh"
+# shellcheck source=linux-field-diagnostics.sh
+. "$REPO_ROOT/tools/dev/linux-field-diagnostics.sh"
 set +e
 DRIVER_ROOT="$REPO_ROOT/static/ergopti_plus/linux"
 SHARED_LUA="$REPO_ROOT/static/ergopti_plus/_shared"
@@ -113,6 +129,10 @@ field_report_enter_branch linux
 
 field_report_update_from_base "${REPO_ROOT}/tools/dev/collect-linux-field-report.sh" "$@"
 field_report_open_folder linux
+# Every step prints its progress and heartbeat and is timed (field-report-steps.sh).
+field_steps_begin "${REPO_ROOT}/tools/dev/collect-linux-field-report.sh" linux
+# The daemon journal of the run window starts here.
+run_started_epoch="$(date +%s)"
 # Set by the INT/TERM trap; the remaining evidence is still collected.
 interrupted=false
 finalized=false
@@ -128,16 +148,30 @@ mask_file() {
 	printf '%s' "${text}" > "${file}"
 }
 
-# Runs one named step, captures its output into a file and records its status.
+# Runs one named step, captures its output into a file and records its status;
+# it prints its progress, its heartbeat and its duration (field_step_run).
 step() {
 	local name="$1"; shift
-	local file="${out}/${name}.txt"
-	"$@" > "${file}" 2>&1
-	local status=$?
-	mask_file "${file}"
-	printf '%-28s exit=%s\n' "${name}" "${status}" >> "${steps}"
-	[ "${status}" -eq 0 ] || log "step '${name}' exited ${status} (kept in ${file})"
+	field_step_run "${name}" 0 "$@"
+	mask_file "${out}/${name}.txt"
 	return 0
+}
+
+# A step stopped at its bound. $1: name, $2: bound in seconds, then the command.
+bstep() {
+	local name="$1" bound="$2"; shift 2
+	field_step_run "${name}" "${bound}" "$@"
+	mask_file "${out}/${name}.txt"
+	return 0
+}
+
+# Says at once, in the terminal, when one phase saw two Ergopti daemons: the
+# second one types every expansion twice. $1: the instance step's name.
+warn_multiple_drivers() {
+	local count
+	count="$(grep -cE "^fact	instance	.*	role=driver	" "${out}/$1.txt" 2>/dev/null)"
+	[ "${count:-0}" -gt 1 ] || return 0
+	log "⚠️  ${count} Ergopti daemons are running at once (see $1.txt): stop the one you are not testing."
 }
 
 # Maps a check verdict to the mark the maintainer scans the output for, as the
@@ -212,6 +246,8 @@ scrub_log() {
 finalize() {
 	"${finalized}" && return 0
 	finalized=true
+	# No heartbeat, watchdog or sampler may outlive the collection.
+	field_steps_stop_background
 	local start_day today d f subject layout log_dir main errors ext bootstrap crashes personal
 	local days=() day_logs=()
 	# A run that crosses midnight spans two day logs: keep both, oldest first.
@@ -232,8 +268,11 @@ finalize() {
 				[ -f "${f}" ] && scrub_log "${f}"
 			done
 		done
-		# The LLM sub-log keeps the download and server lines of earlier days.
-		for f in "${log_dir}/${main}llm${ext}" "${log_dir}/${bootstrap}"; do
+		# The topical sub-logs keep the download, server, boot, menu and gesture
+		# lines of earlier days; the hotstring and keystats ones can carry typed
+		# text and stay.
+		for f in "${log_dir}/${main}llm${ext}" "${log_dir}/${main}ollama${ext}" "${log_dir}/${main}boot${ext}" \
+			"${log_dir}/${main}menu${ext}" "${log_dir}/${main}gestures${ext}" "${log_dir}/${bootstrap}"; do
 			[ -f "${f}" ] && scrub_log "${f}"
 		done
 		# Crash reports are named, not copied: a dump is read on request.
@@ -278,6 +317,18 @@ finalize() {
 		printf '%-28s unavailable\n' "journal_warnings" >> "${steps}"
 	fi
 	[ -z "${journal_dir}" ] || rm -rf "${journal_dir}"
+	# Every line the daemon's unit logged since the collector started: what it
+	# printed around the field run, its restarts. Scrubbed like a log.
+	journal_dir=""
+	if command -v journalctl >/dev/null 2>&1 && journal_dir="$(mktemp -d)" \
+		&& journalctl --user --since "@${run_started_epoch}" -o short-iso --no-pager -u 'ergopti*' 2>/dev/null \
+			| tail -n 2000 > "${journal_dir}/journal_run.txt"; then
+		scrub_log "${journal_dir}/journal_run.txt"
+		[ -f "${out}/journal_run.txt" ] && mask_file "${out}/journal_run.txt"
+	else
+		printf '%-28s unavailable\n' "journal_run" >> "${steps}"
+	fi
+	[ -z "${journal_dir}" ] || rm -rf "${journal_dir}"
 	# One verdict per TODO « To confirm on Linux » point, from the field run,
 	# the guided and probe steps and steps.txt; printed so the terminal ends on
 	# what to tick.
@@ -286,6 +337,9 @@ finalize() {
 		log "TODO « To confirm on Linux », one verdict per point (todo_summary.md):"
 		sed 's/^/[field-report]   /' "${out}/todo_summary.txt"
 	fi
+	# env.json and the timeline from the fact lines, the step timings, the field
+	# run's results and the scrubbed day logs; the analysis reads both.
+	field_report_facts linux
 	# Last: it also reads the check verdicts the steps above wrote.
 	field_report_analyse ${day_logs[@]+"${day_logs[@]}"}
 	# After every step that reads the flat names: the synthesis goes to 0_main,
@@ -305,6 +359,7 @@ finalize() {
 on_interrupt() {
 	trap '' INT TERM HUP
 	interrupted=true
+	field_steps_stop_background
 	printf '\n'
 	log "Interrupted: keeping the evidence collected so far."
 	printf '%-28s interrupted\n' "collector" >> "${steps}"
@@ -340,13 +395,39 @@ step proxy sh -c 'for v in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_prox
 step crash_dumps sh -c 'command -v coredumpctl >/dev/null || { echo "no coredumpctl"; exit 0; }; coredumpctl list --since today --no-pager 2>&1 | grep -iE "luajit|ergopti|ydotool|ollama|COMMAND|No coredumps" || echo "no core dump today"'
 # The checks that need no person (tools/dev/linux-field-shell-checks.sh).
 step collector_checks field_linux_checks "${REPO_ROOT}"
+# Every Ergopti daemon and helper now, before the run, every
+# FIELD_SAMPLER_SECONDS during it and after it: two daemons or a restart are
+# on record; then the other remappers, the access the daemon needs and the
+# machine.
+bstep instances_start 30 field_linux_instances start
+warn_multiple_drivers instances_start
+bstep remappers 60 field_linux_remappers
+bstep permissions 30 field_linux_permissions
+bstep environment 30 field_linux_environment
+bstep service_state 30 field_linux_service_state
+bstep app_folders 60 field_linux_app_folders
 # The daemon's Debug field checks, run with no window (tools/dev/linux-field-run.sh).
 # The composer check needs Ergopti's Python; running the collector is the consent.
 field_linux_ensure_python "${REPO_ROOT}" 2>&1 | tee "${out}/field_python.txt" | sed 's/^/[field-report] /'
 printf '%-28s exit=%s\n' "field_python" "${PIPESTATUS[0]}" >> "${steps}"
-log "Field run: asking the daemon to run its field checks…"
+bstep instances_before_run 30 field_linux_instances before_run
+warn_multiple_drivers instances_before_run
+field_sampler_start field_linux_instances
+log "▶ field run: asking the daemon to run its field checks (each verdict prints here)…"
+phase_started="$(date +%s)"
+field_step_ticker_start field_run "${out}/field_run.txt" "${phase_started}"
 field_linux_run "${REPO_ROOT}" "${out}" 2>&1 | tee "${out}/field_run.txt" | sed 's/^/[field-report] /'
-printf '%-28s exit=%s\n' "field_run" "${PIPESTATUS[0]}" >> "${steps}"
+phase_status="${PIPESTATUS[0]}"
+field_step_ticker_stop
+printf '%-28s exit=%s\n' "field_run" "${phase_status}" >> "${steps}"
+field_sampler_stop
+field_phase_done field_run "${phase_started}" "${phase_status}" 0
+log "  field run ended (exit ${phase_status}, $(( $(date +%s) - phase_started )) s)."
+bstep instances_end 30 field_linux_instances end
+warn_multiple_drivers instances_end
+FIELD_STEP_HINT="keep your hands off the keyboard and mouse for ${FIELD_IDLE_SECONDS} s (idle CPU)"
+bstep idle_cpu $((FIELD_IDLE_SECONDS + 30)) field_linux_idle_cpu
+FIELD_STEP_HINT=""
 # The collector's own steps (static/ergopti_plus/linux/data/field_guided_steps.json):
 # probes read the session once (uinput, evdev, autostart, polkit, the focus
 # reporter), guided steps print a gesture and count what it left in today's
@@ -357,9 +438,18 @@ if layout="$(driver_log_layout 2>/dev/null)"; then
 	{ read -r g_log_dir; read -r g_main; read -r _; read -r g_ext; read -r _; read -r _; read -r _; read -r g_metrics; } <<< "${layout}"
 	guided_sources=(--log "${g_log_dir}/${g_main}$(date +%Y-%m-%d)${g_ext}" --metrics "${g_metrics}")
 fi
+log "▶ guided steps: each prints its gesture here and waits for it."
+phase_started="$(date +%s)"
+FIELD_STEP_HINT="the gesture or the y, n or s answer the guided step above asks for"
+field_step_ticker_start field_guided "${out}/field_guided.txt" "${phase_started}"
 python3 "${REPO_ROOT}/tools/dev/field-guided.py" --steps "${DRIVER_ROOT}/data/field_guided_steps.json" \
 	--out "${out}" ${guided_sources[@]+"${guided_sources[@]}"} 2>&1 | tee "${out}/field_guided.txt"
-printf '%-28s exit=%s\n' "field_guided" "${PIPESTATUS[0]}" >> "${steps}"
+phase_status="${PIPESTATUS[0]}"
+field_step_ticker_stop
+FIELD_STEP_HINT=""
+printf '%-28s exit=%s\n' "field_guided" "${phase_status}" >> "${steps}"
+field_phase_done field_guided "${phase_started}" "${phase_status}" 0
+log "  guided steps ended (exit ${phase_status}, $(( $(date +%s) - phase_started )) s)."
 
 # ===========================================
 # ======= 3/ Logs, commit and push ==========

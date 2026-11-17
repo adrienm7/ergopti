@@ -55,6 +55,26 @@
 # TODO-tests-macos.md « To confirm on the Mac » to its verdict in todo_summary.md and
 # todo_summary.json (static/ergopti_plus/macos/data/field_todo_coverage.json).
 #
+# The machine facts (tools/dev/macos-field-diagnostics.sh): every Ergopti
+# launcher, embedded Hammerspoon and owned runtime helper at the start, before
+# the run, every FIELD_SAMPLER_SECONDS during it and at the end (a second
+# driver is said at once in the terminal and first in the analysis), the other
+# remappers and text expanders with Karabiner-Elements in detail, the TCC
+# permissions when readable, Secure Event Input, the keyboards, the machine,
+# the idle CPU per driver process with a `sample` of Hammerspoon over budget,
+# the unified log of the run window, the launchd jobs and the app folders.
+# tools/dev/field-report-facts.py turns their fact lines into 0_main/env.json
+# and the step timings into 0_main/timeline.txt; the analysis reads both.
+#
+# The progress (tools/dev/field-report-steps.sh): every step prints
+# "step k/N" with the previous report's duration, a heartbeat every 15 s while
+# it runs (with the hint when it waits for the person), then its verdict and
+# duration; a new step is stopped at its bound.
+#
+# Not raised: the driver's log level. The field run protocol has no request
+# for it and the collector never writes the user's configuration; the analysis
+# says when the logs hold no DEBUG line, so the next run sets Debug > Log level.
+#
 # By default the field run tests the branch itself: the developer app of this
 # clone, which any tester builds, with no release and no certificate. The
 # owned Karabiner runtime installs only under the stable certificate the CI
@@ -82,6 +102,10 @@ set -e
 . "$REPO_ROOT/tools/dev/macos-field-shell-checks.sh"
 # shellcheck source=field-report-git.sh
 . "$REPO_ROOT/tools/dev/field-report-git.sh"
+# shellcheck source=field-report-steps.sh
+. "$REPO_ROOT/tools/dev/field-report-steps.sh"
+# shellcheck source=macos-field-diagnostics.sh
+. "$REPO_ROOT/tools/dev/macos-field-diagnostics.sh"
 # A pending Xcode license blocks every /usr/bin shim (python3, swift, clang):
 # it is accepted first, before any of them runs (field report 2026-11-15).
 bash "$REPO_ROOT/tools/dev/macos-accept-xcode-license.sh" \
@@ -90,7 +114,7 @@ set +e
 # The folders and file names come from their shared declarations, never from
 # a copy here (tools/dev/field-report-paths.py). The topical logs that help a
 # diagnosis; the hotstring and keystroke logs can carry typed text and stay.
-FIELD_TOPICAL_LOGS="llm ollama mlx boot karabiner menu"
+FIELD_TOPICAL_LOGS="llm ollama mlx boot karabiner menu gestures"
 # shellcheck disable=SC2086 # one word per log name
 field_paths="$(python3 "${REPO_ROOT}/tools/dev/field-report-paths.py" "${REPO_ROOT}/static/ergopti_plus/_shared" ${FIELD_TOPICAL_LOGS})" \
 	|| { printf '[field-report] ERROR: cannot resolve the driver folders.\n' >&2; exit 1; }
@@ -148,48 +172,38 @@ field_report_enter_branch mac
 
 field_report_update_from_base "${REPO_ROOT}/tools/dev/collect-macos-field-report.sh" "$@"
 field_report_open_folder mac
+# Every step prints its progress and heartbeat and is timed (field-report-steps.sh).
+field_steps_begin "${REPO_ROOT}/tools/dev/collect-macos-field-report.sh" mac
 # The crash report summaries keep the reports written from here on.
 run_started_epoch="$(date +%s)"
 # Set by the INT/TERM trap; the remaining evidence is still collected.
 interrupted=false
 finalized=false
 
-# Runs one named step, captures its output into a file and records its status.
+# Runs one named step, captures its output into a file and records its status;
+# it prints its progress, its heartbeat and its duration (field_step_run).
 step() {
 	local name="$1"; shift
-	local file="${out}/${name}.txt"
-	"$@" > "${file}" 2>&1
-	local status=$?
-	printf '%-28s exit=%s\n' "${name}" "${status}" >> "${steps}"
-	[ "${status}" -eq 0 ] || log "step '${name}' exited ${status} (kept in ${file})"
+	field_step_run "${name}" 0 "$@"
 	return 0
 }
 
-# A step that runs for minutes says so: its label first, then a line every
-# 20 s with the elapsed time and the last line of its output, then its
-# verdict. The input-source probe stayed silent for minutes and a tester
-# could not tell it from a hang (field report 2026-11-15).
-# $1: label printed, $2: step name, then the command.
+# A step stopped at its bound. $1: name, $2: bound in seconds, then the command.
+bstep() {
+	local name="$1" bound="$2"; shift 2
+	field_step_run "${name}" "${bound}" "$@"
+	return 0
+}
+
+# A step that runs for minutes says what it does first; its heartbeat prints
+# the elapsed time and the last line of its output (the input-source probe
+# stayed silent for minutes and a tester could not tell it from a hang, field
+# report 2026-11-15). $1: label printed, $2: step name, then the command.
 loud_step() {
 	local label="$1" name="$2"; shift 2
-	local file="${out}/${name}.txt" started ticker status
-	started="$(date +%s)"
 	log "${label}..."
-	(
-		while sleep 20; do
-			last="$(tail -n 1 "${file}" 2>/dev/null | cut -c1-100)"
-			log "  ... ${name} still running ($(( $(date +%s) - started )) s)${last:+: ${last}}"
-		done
-	) &
-	ticker=$!
-	step "${name}" "$@"
-	kill "${ticker}" 2>/dev/null; wait "${ticker}" 2>/dev/null
-	status="$(sed -n "s/^${name}  *exit=\([0-9]*\)$/\1/p" "${steps}" | tail -n 1)"
-	if [ "${status}" = 0 ]; then
-		log "  ✅ ${name} done in $(( $(date +%s) - started )) s."
-	else
-		log "  ❌ ${name} exited ${status:-?} after $(( $(date +%s) - started )) s (see ${name}.txt)."
-	fi
+	FIELD_STEP_BUDGET=600 field_step_run "${name}" 0 "$@"
+	return 0
 }
 
 # Reads one value of the field run declaration.
@@ -233,6 +247,8 @@ scrub_log() {
 finalize() {
 	"${finalized}" && return 0
 	finalized=true
+	# No heartbeat, watchdog or sampler may outlive the collection.
+	field_steps_stop_background
 	# The clone's own field_run.json comes back before git touches the tree.
 	restore_field_run_spec
 	local start_day today d f subject
@@ -313,6 +329,9 @@ finalize() {
 		log "TODO « To confirm on the Mac », one verdict per point (todo_summary.md):"
 		sed 's/^/[field-report]   /' "${out}/todo_summary.txt"
 	fi
+	# env.json and the timeline from the fact lines, the step timings, the field
+	# run's results and the scrubbed day logs; the analysis reads both.
+	field_report_facts mac
 	# Last: it also reads the check verdicts the steps above wrote.
 	field_report_analyse ${day_logs[@]+"${day_logs[@]}"}
 	# After every step that reads the flat names: the synthesis goes to 0_main,
@@ -332,6 +351,7 @@ finalize() {
 on_interrupt() {
 	trap '' INT TERM HUP
 	interrupted=true
+	field_steps_stop_background
 	printf '\n'
 	log "Interrupted: keeping the results and logs collected so far."
 	printf '%-28s interrupted\n' "collector" >> "${steps}"
@@ -340,6 +360,20 @@ on_interrupt() {
 	exit 130
 }
 trap on_interrupt INT TERM HUP
+
+# Says at once, in the terminal, when one phase saw two Ergopti drivers: a
+# release beside a developer app spoils every key check of the run.
+# $1: the instance step's name.
+warn_multiple_drivers() {
+	local launchers engines
+	# One driver is one launcher and its engine; two of either is two drivers.
+	launchers="$(grep -cE "^fact	instance	.*	role=driver	" "${out}/$1.txt" 2>/dev/null)"
+	engines="$(grep -cE "^fact	instance	.*	role=engine	" "${out}/$1.txt" 2>/dev/null)"
+	[ "${launchers:-0}" -gt 1 ] || [ "${engines:-0}" -gt 1 ] || return 0
+	log "⚠️  Two Ergopti drivers are running at once (see $1.txt): quit the one you are not testing."
+	grep -E "^fact	instance	.*	role=(driver|engine)	" "${out}/$1.txt" \
+		| sed -n 's/.*	name=\([^	]*\)	pid=\([0-9]*\).*	origin=\([a-z_]*\)	path=\([^	]*\).*/[field-report]    \1 pid \2 (\3): \4/p'
+}
 
 # ===========================================
 # ======= 2/ System and toolchain ===========
@@ -430,7 +464,20 @@ step owned_runtime_files sh -c "${OWNED_RUNTIME_FILES}"
 # root-only (mode 600) and the run's reset removes it, so it is copied here
 # before the run and again after it (field report 2026-11-15).
 OWNED_RUNTIME_JOURNAL='j="/Library/Application Support/ErgoptiPlus/.runtime-install-journal"; if sudo /bin/test -e "$j"; then sudo /bin/cat "$j"; echo; sudo /bin/ls -le "$j"; else echo "absent: $j"; fi'
+FIELD_STEP_HINT="type your administrator password if sudo asks (the journal is root-only)"
 step owned_runtime_journal sh -c "${OWNED_RUNTIME_JOURNAL}"
+FIELD_STEP_HINT=""
+# Every Ergopti launcher, embedded Hammerspoon and owned runtime helper now,
+# before the run, every FIELD_SAMPLER_SECONDS during it and after it: a second
+# driver (release and developer app) or a restart is on record (2026-11-15).
+bstep instances_start 30 field_mac_instances start
+warn_multiple_drivers instances_start
+bstep remappers 60 field_mac_remappers "${REPO_ROOT}"
+bstep permissions 30 field_mac_permissions
+bstep input_devices 30 field_mac_input_devices "${REPO_ROOT}"
+bstep environment 60 field_mac_environment
+bstep services 30 field_mac_services
+bstep app_folders 60 field_mac_app_folders
 
 # ===========================================
 # ======= 3/ Field run in the app ===========
@@ -724,13 +771,20 @@ run_field_run() {
 # One request of the field run: readiness, request, acceptance, done.
 # Returns 0 when done, 2 when the app closed it as interrupted, 1 otherwise.
 run_field_attempt() {
-	local now pid
+	local now pid ready_note
 	log "Waiting for the developer app to publish its readiness..."
+	ready_note="$(date +%s)"
 	while ! pid="$(ready_pid)"; do
 		now="$(date +%s)"
 		if [ $((now - started_at)) -ge "${FIELD_RUN_READY_SECONDS}" ]; then
 			log "No ready developer app after ${FIELD_RUN_READY_SECONDS} s. If an installed ${ERGOPTI_APP_NAME} is running, quit it and run this again."
 			return 1
+		fi
+		# A first boot waits for Accessibility: the wait says so, at the heartbeat.
+		if [ $((now - ready_note)) -ge "${FIELD_HEARTBEAT_SECONDS}" ]; then
+			ready_note="${now}"
+			log "  ... waiting for the app's readiness ($((now - started_at)) s of at most ${FIELD_RUN_READY_SECONDS} s)."
+			log "  ... waiting for you: if System Settings shows Accessibility, switch on the entry Ergopti's dialog names."
 		fi
 		sleep "${FIELD_RUN_POLL_SECONDS}"
 	done
@@ -749,7 +803,12 @@ print(json.dumps([s["id"] for s in steps if not s.get("signed_app")]))' "${REPO_
 	# leaves them out.
 	log "Stay at the Mac: the guided steps print a gesture here (👉 GUIDED), each waits for it, and the attested"
 	log "ones take y, n or s then Enter. Nothing done in time is recorded needs_person, never a pass."
-	log "Developer app ready (pid ${pid}); requesting the field run within ${deadline_seconds} s."
+	local requested_total
+	requested_total="$(python3 -c 'import json, sys
+requested = json.loads(sys.argv[2])
+steps = json.load(open(sys.argv[1]))["steps"]
+print(len(steps) if requested == ["all"] else len(requested))' "${REPO_ROOT}/${FIELD_RUN_SPEC}" "${steps_json}" 2>/dev/null || echo "?")"
+	log "Developer app ready (pid ${pid}); requesting the field run (${requested_total} steps) within ${deadline_seconds} s."
 	log "The run is working now: do not reload or quit Ergopti; each step prints its verdict here."
 
 	rm -f "${run_folder}/${refused_name}"
@@ -758,9 +817,10 @@ print(json.dumps([s["id"] for s in steps if not s.get("signed_app")]))' "${REPO_
 		|| { log "Cannot write the field run request."; return 1; }
 	mv -f "${run_folder}/.${request_name}.tmp" "${run_folder}/${request_name}" \
 		|| { log "Cannot publish the field run request."; return 1; }
-	local sent_at last_note gone_since=""
+	local sent_at last_note gone_since="" seen_count last_count=0 last_change
 	sent_at="$(date +%s)"
 	last_note="${sent_at}"
+	last_change="${sent_at}"
 	wait_for_acceptance || return 1
 
 	while [ ! -f "${results_dir}/${done_name}" ]; do
@@ -790,11 +850,21 @@ print(json.dumps([s["id"] for s in steps if not s.get("signed_app")]))' "${REPO_
 			fi
 		fi
 		report_new_results
-		# A download can stay silent for minutes: say the run is still alive
-		if [ $((now - last_note)) -ge 60 ]; then
+		# A download or an install can stay silent for minutes: a heartbeat says
+		# how far the run is, how long the current step has run and, on the
+		# signed app, which prompt may be waiting for the person.
+		seen_count="$(printf '%s\n' ${seen_results} | grep -c .)"
+		if [ "${seen_count}" != "${last_count}" ]; then
+			last_count="${seen_count}"
+			last_change="${now}"
+		fi
+		if [ $((now - last_note)) -ge "${FIELD_HEARTBEAT_SECONDS}" ]; then
 			last_note="${now}"
-			[ -f "${run_folder}/${guided_prompt_name}" ] \
-				|| log "  field run still running, $((now - sent_at)) s since the request..."
+			if [ ! -f "${run_folder}/${guided_prompt_name}" ]; then
+				log "  ... field run still running: ${seen_count} of ${requested_total} step results, $((now - sent_at)) s since the request, the current step for $((now - last_change)) s."
+				[ "${installed}" != true ] \
+					|| log "  ... waiting for you if macOS asks: your administrator password, or the Karabiner driver switch in System Settings > Login Items & Extensions."
+			fi
 		fi
 		guided_poll
 	done
@@ -809,14 +879,33 @@ print(json.dumps([s["id"] for s in steps if not s.get("signed_app")]))' "${REPO_
 	return 0
 }
 
+bstep instances_before_run 30 field_mac_instances before_run
+warn_multiple_drivers instances_before_run
+field_sampler_start field_mac_instances
+field_run_started="$(date +%s)"
+log "▶ field run: the app runs its steps now; each verdict prints here, with a heartbeat every ${FIELD_HEARTBEAT_SECONDS} s."
 run_field_run 2>&1 | tee "${out}/field_run.txt"
 field_run_status=${PIPESTATUS[0]}
+field_sampler_stop
+field_phase_done field_run "${field_run_started}" "${field_run_status}" \
+	"$(( $(spec_value deadline_seconds.default 2>/dev/null || echo 0) + FIELD_RUN_GRACE_SECONDS ))"
+bstep instances_end 30 field_mac_instances end
+warn_multiple_drivers instances_end
+# The CPU each driver process spends while nothing is typed, with a sample of
+# the embedded Hammerspoon when it is over the idle budget: the 2026-11-15 run
+# spent 785 ms of idle CPU that no timer explained.
+FIELD_STEP_HINT="keep your hands off the keyboard and mouse for ${FIELD_IDLE_SECONDS} s (idle CPU)"
+bstep idle_cpu $((FIELD_IDLE_SECONDS + 40)) field_mac_idle_cpu "${REPO_ROOT}"
+FIELD_STEP_HINT=""
+bstep unified_log 180 field_mac_unified_log "${run_started_epoch}"
 # After the run, on the app it installed: the managed Ollama guardian refuses a
 # launcher whose strict signature fails
 # (OwnedSuspendedImageGuardian); a file written into the bundle breaks it.
 step app_signature sh -c 'app="/Applications/$1"; verdict=$(codesign --verify --deep --strict "$app" 2>&1); status=$?; printf "%s\n" "$verdict" | sed "s#$HOME#~#g"; echo "codesign exit=$status"; n=$(find "$app/Contents" -name __pycache__ 2>/dev/null | wc -l | tr -d " "); echo "pycache_folders=$n"' sh "${ERGOPTI_APP_BUNDLE}"
 step owned_runtime_files_after sh -c "${OWNED_RUNTIME_FILES}"
+FIELD_STEP_HINT="type your administrator password if sudo asks (the journal is root-only)"
 step owned_runtime_journal_after sh -c "${OWNED_RUNTIME_JOURNAL}"
+FIELD_STEP_HINT=""
 # What no command can do on its own, said once instead of faked.
 cat > "${out}/not_automated.txt" <<'NOTE'
 typing through the owned runtime: refused. Karabiner captures the keyboards at the HID level, below the event system;
@@ -855,6 +944,10 @@ step native_runtime sh -c '
 # signal, termination and the faulting thread's frames of the app's own
 # images, scrubbed of paths and user data (tools/dev/field-ips-summary.py).
 step crash_summaries python3 "${REPO_ROOT}/tools/dev/field-ips-summary.py" --since "${run_started_epoch}" \
+	"${HOME}/Library/Logs/DiagnosticReports"
+# The day's reports too: a crash before the run (often the reason it was
+# started) is named with the same scrubbing.
+bstep crash_summaries_day 60 python3 "${REPO_ROOT}/tools/dev/field-ips-summary.py" --since "$((run_started_epoch - 86400))" \
 	"${HOME}/Library/Logs/DiagnosticReports"
 
 # The native PTY guardian runs its installer as /bin/bash /dev/fd/3 over an

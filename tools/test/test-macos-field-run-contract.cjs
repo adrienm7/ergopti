@@ -54,6 +54,10 @@ const TODO_COVERAGE = 'static/ergopti_plus/macos/data/field_todo_coverage.json';
 const IPS_SUMMARY = 'tools/dev/field-ips-summary.py';
 // The analyser and the declarations it reads its budgets from.
 const ANALYSER = 'tools/dev/field-log-analyse.py';
+// The step runner, the machine diagnostics and the facts builder.
+const STEPS_LIB = 'tools/dev/field-report-steps.sh';
+const DIAGNOSTICS = 'tools/dev/macos-field-diagnostics.sh';
+const FACTS = 'tools/dev/field-report-facts.py';
 const ANALYSER_SOURCES = JSON.parse(
 	spawnSync('python3', [path.join(ROOT, ANALYSER), '--repo', ROOT, '--describe'], {
 		encoding: 'utf8'
@@ -144,6 +148,9 @@ function fixture(name, { onDev = false } = {}) {
 		SUB_FILES,
 		ACCESSIBILITY_WAIT,
 		ANALYSER,
+		STEPS_LIB,
+		DIAGNOSTICS,
+		FACTS,
 		...ANALYSER_SOURCES
 	]) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
@@ -184,7 +191,11 @@ function fixture(name, { onDev = false } = {}) {
 		...GIT_IDENTITY,
 		HOME: home,
 		FIELD_RUN_POLL_SECONDS_OVERRIDE: '1',
-		FIELD_FILELESS_PROBE_SECONDS_OVERRIDE: '0'
+		FIELD_FILELESS_PROBE_SECONDS_OVERRIDE: '0',
+		// A one-second heartbeat and sampler and a two-second idle window.
+		FIELD_HEARTBEAT_SECONDS_OVERRIDE: '1',
+		FIELD_IDLE_SECONDS_OVERRIDE: '2',
+		FIELD_SAMPLER_SECONDS: '1'
 	};
 	const run = (...args) => {
 		const result = spawnSync('git', args, { cwd: clone, encoding: 'utf8', env });
@@ -680,6 +691,96 @@ function reportFolder(paths) {
 			);
 		});
 
+		// The 2026-11-15 report could not say whether a release and a developer
+		// app ran at once, nor which process spent the idle CPU no timer explained.
+		await check(
+			'the collector samples the instances and adds the machine facts, each bounded',
+			() => {
+				assert.match(collector, /^\. "\$REPO_ROOT\/tools\/dev\/field-report-steps\.sh"$/m);
+				assert.match(collector, /^\. "\$REPO_ROOT\/tools\/dev\/macos-field-diagnostics\.sh"$/m);
+				for (const [name, fn] of [
+					['instances_start', 'field_mac_instances start'],
+					['remappers', 'field_mac_remappers'],
+					['permissions', 'field_mac_permissions'],
+					['input_devices', 'field_mac_input_devices'],
+					['environment', 'field_mac_environment'],
+					['services', 'field_mac_services'],
+					['app_folders', 'field_mac_app_folders'],
+					['instances_before_run', 'field_mac_instances before_run'],
+					['instances_end', 'field_mac_instances end'],
+					['unified_log', 'field_mac_unified_log']
+				])
+					assert.match(
+						collector,
+						new RegExp(`^bstep ${name} \\d+ ${fn}\\b`, 'm'),
+						`${name} is bounded`
+					);
+				assert.match(
+					collector,
+					/^bstep idle_cpu \$\(\(FIELD_IDLE_SECONDS \+ 40\)\) field_mac_idle_cpu/m
+				);
+				// The sampler runs exactly around the field run, and every helper dies with the collector.
+				const sampler = collector.indexOf('field_sampler_start field_mac_instances');
+				assert(sampler > 0 && sampler < collector.indexOf('run_field_run 2>&1 | tee'));
+				assert(
+					collector.indexOf('field_sampler_stop') > collector.indexOf('run_field_run 2>&1 | tee')
+				);
+				assert.match(
+					collector,
+					/on_interrupt\(\) \{\n\ttrap '' INT TERM HUP\n\tinterrupted=true\n\tfield_steps_stop_background/
+				);
+				assert.match(
+					collector,
+					/^\tfield_report_facts mac\n\t# Last: it also reads/m,
+					'the facts precede the analysis'
+				);
+				// The heartbeat of every wait: readiness, the run, the steps.
+				assert.match(collector, /waiting for the app's readiness/);
+				assert.match(
+					collector,
+					/field run still running: \$\{seen_count\} of \$\{requested_total\} step results/
+				);
+				const diagnostics = fs.readFileSync(path.join(ROOT, DIAGNOSTICS), 'utf8');
+				// The shell function log() would shadow macOS log(1).
+				assert.match(diagnostics, /\/usr\/bin\/log show --style compact --start/);
+				assert.doesNotMatch(diagnostics, /^\tlog show/m);
+				// Read only: the TCC databases are opened read-only and never written.
+				assert.match(diagnostics, /sqlite3 -readonly/);
+				assert.doesNotMatch(diagnostics, /tccutil|defaults write|INSERT|UPDATE access/);
+				const steps = fs.readFileSync(path.join(ROOT, STEPS_LIB), 'utf8');
+				assert.match(
+					steps,
+					/^FIELD_HEARTBEAT_SECONDS="\$\{FIELD_HEARTBEAT_SECONDS_OVERRIDE:-15\}"$/m
+				);
+				assert.match(steps, /kill -TERM "\$\{FIELD_STEP_BOUNDED\}"/, 'a bound stops its step');
+				assert.match(
+					steps,
+					/while sleep "\$\{FIELD_HEARTBEAT_SECONDS\}" <\/dev\/null >\/dev\/null 2>&1; do/
+				);
+			}
+		);
+
+		// The tester must never run the reset by hand: an --installed run
+		// removes an unfinished install's leftovers before it installs.
+		await check(
+			'an --installed run resets an unfinished owned runtime install before installing',
+			() => {
+				const reset = collector.indexOf(
+					'bash "${REPO_ROOT}/tools/dev/reset-macos-owned-runtime.sh"'
+				);
+				const install = collector.indexOf(
+					'bash "${REPO_ROOT}/tools/dev/install-macos-dev-prerelease.sh"'
+				);
+				assert(reset > 0 && reset < install, 'the reset runs before the install');
+				assert(
+					reset > collector.indexOf('if [ "${installed}" = true ]; then'),
+					'only for --installed'
+				);
+				const todo = fs.readFileSync(path.join(ROOT, 'TODO-tests-macos.md'), 'utf8');
+				assert.doesNotMatch(todo, /Run\s+`tools\/dev\/reset-macos-owned-runtime\.sh` first/);
+			}
+		);
+
 		await check('the collector runs the shell checklist steps from their own file', () => {
 			assert.match(collector, /^\. "\$REPO_ROOT\/tools\/dev\/macos-field-shell-checks\.sh"$/m);
 			assert.match(
@@ -1009,6 +1110,52 @@ function reportFolder(paths) {
 					// The maintainer scans the output for the marks, not the words.
 					assert.match(result.stdout, /✅ field run 01_field_lease: pass/);
 					assert.match(result.stdout, /Field run summary: ✅ \d+ pass, ❌ \d+ fail, \d+ other\./);
+					// The machine facts, the timing and the live progress (2026-11-17).
+					const stepsText = fs.readFileSync(reportFile(folder, 'steps.txt'), 'utf8');
+					for (const name of [
+						'instances_start',
+						'remappers',
+						'permissions',
+						'input_devices',
+						'environment',
+						'services',
+						'app_folders',
+						'instances_before_run',
+						'instances_end',
+						'idle_cpu',
+						'unified_log'
+					])
+						assert.match(stepsText, new RegExp(`^${name}\\s+exit=\\d+$`, 'm'), `step ${name}`);
+					assert.match(stepsText, /^facts\s+exit=0$/m);
+					assert.match(result.stdout, /^\[field-report\] ▶ step 1\/\d+ versions$/m, 'step k/N');
+					assert.match(result.stdout, /^\[field-report\] {3}✅ versions \(\d+ s\)$/m);
+					assert.match(
+						result.stdout,
+						/^\[field-report\] {3}\.\.\. idle_cpu still running \(\d+ s\)/m,
+						'heartbeat'
+					);
+					assert.match(result.stdout, /waiting for you: keep your hands off the keyboard/);
+					assert.match(
+						fs.readFileSync(reportFile(folder, 'instances_start.txt'), 'utf8'),
+						/^fact\tsample\tphase=start\tt=\d+$/m
+					);
+					const env = JSON.parse(fs.readFileSync(reportFile(folder, 'env.json'), 'utf8'));
+					assert.equal(env.os, 'mac');
+					assert(
+						env.remappers.some((row) => row.name === 'Karabiner-Elements'),
+						'Karabiner is always named'
+					);
+					const times = fs.readFileSync(reportFile(folder, 'step_times.tsv'), 'utf8');
+					assert.match(times, /^versions\tcollector\t\d+\t\d+\t\d+\t30$/m);
+					assert.match(times, /^field_run\tphase\t\d+\t\d+\t0\t\d+$/m);
+					assert.match(
+						fs.readFileSync(reportFile(folder, 'timeline.txt'), 'utf8'),
+						/^## Slowest steps$/m
+					);
+					assert.match(
+						fs.readFileSync(reportFile(folder, 'analysis.md'), 'utf8'),
+						/^## Slowest steps$/m
+					);
 					// The analysis runs even without a day log, on the probes' verdicts.
 					assert.match(result.stdout, /Check verdicts summary: ✅ \d+ pass, ❌ \d+ fail, /);
 					assert.match(result.stdout, /Log analysis: \d+ error group\(s\)/);

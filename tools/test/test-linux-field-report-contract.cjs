@@ -63,6 +63,10 @@ const FIELD_RUN = 'tools/dev/linux-field-run.sh';
 const SERVICE = 'static/ergopti_plus/linux/ergopti-hotstrings.service';
 // The analyser and the declarations it reads its budgets from.
 const ANALYSER = 'tools/dev/field-log-analyse.py';
+// The step runner, the machine diagnostics and the facts builder.
+const STEPS_LIB = 'tools/dev/field-report-steps.sh';
+const DIAGNOSTICS = 'tools/dev/linux-field-diagnostics.sh';
+const FACTS = 'tools/dev/field-report-facts.py';
 const ANALYSER_SOURCES = JSON.parse(
 	spawnSync('python3', [path.join(ROOT, ANALYSER), '--repo', ROOT, '--describe'], {
 		encoding: 'utf8'
@@ -159,6 +163,9 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 		FIELD_RUN,
 		SERVICE,
 		ANALYSER,
+		STEPS_LIB,
+		DIAGNOSTICS,
+		FACTS,
 		...ANALYSER_SOURCES
 	]) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
@@ -191,7 +198,12 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 		...GIT_IDENTITY,
 		HOME: home,
 		USER: 'fixtureuser',
-		FIELD_GUIDED_SECONDS_OVERRIDE: '1'
+		FIELD_GUIDED_SECONDS_OVERRIDE: '1',
+		// A one-second heartbeat and a two-second idle window: the idle step then
+		// outlives one heartbeat, which the run must print.
+		FIELD_HEARTBEAT_SECONDS_OVERRIDE: '1',
+		FIELD_IDLE_SECONDS_OVERRIDE: '2',
+		FIELD_SAMPLER_SECONDS: '1'
 	};
 	git(clone, 'init', '-q', '-b', 'dev');
 	git(clone, 'add', '-A');
@@ -474,6 +486,40 @@ function read(folder, name) {
 				assert.match(result.stdout, /✅ check network: pass/);
 				assert.match(result.stdout, /❌ check daemon_unit: fail/);
 				assert.match(result.stdout, /Check verdicts summary: ✅ \d+ pass, ❌ \d+ fail, /);
+				// The machine facts, the timing and the live progress (2026-11-17).
+				for (const name of [
+					'instances_start',
+					'remappers',
+					'permissions',
+					'environment',
+					'service_state',
+					'app_folders',
+					'instances_before_run',
+					'instances_end',
+					'idle_cpu'
+				])
+					assert.match(steps, new RegExp(`^${name}\\s+exit=\\d+$`, 'm'), `step ${name}`);
+				assert.match(steps, /^facts\s+exit=0$/m);
+				assert.match(result.stdout, /^\[field-report\] ▶ step 1\/\d+ versions$/m, 'step k/N');
+				assert.match(result.stdout, /^\[field-report\] {3}✅ versions \(\d+ s\)$/m);
+				assert.match(
+					result.stdout,
+					/^\[field-report\] {3}\.\.\. idle_cpu still running \(\d+ s\)/m,
+					'heartbeat'
+				);
+				assert.match(result.stdout, /waiting for you: keep your hands off the keyboard/);
+				assert.match(read(folder, 'instances_start.txt'), /^fact\tsample\tphase=start\tt=\d+$/m);
+				assert.match(
+					read(folder, 'permissions.txt'),
+					/^fact\tpermission\tname=uinput_write\tstate=(granted|denied)\t/m
+				);
+				const env = JSON.parse(read(folder, 'env.json'));
+				assert.equal(env.os, 'linux');
+				assert(env.environment.arch, 'the environment facts reach env.json');
+				assert.match(read(folder, 'timeline.txt'), /^## Slowest steps$/m);
+				assert.match(read(folder, 'step_times.tsv'), /^versions\tcollector\t\d+\t\d+\t\d+\t30$/m);
+				assert.match(read(folder, 'step_times.tsv'), /^field_run\tphase\t/m);
+				assert.match(read(folder, 'analysis.md'), /^## Slowest steps$/m);
 				const layout = read(folder, 'keyboard_layout.txt');
 				assert.match(layout, /VC Keymap: fr in ~\/keymaps for <user>/);
 				assert(!layout.includes(paths.home), 'the home folder is masked');
