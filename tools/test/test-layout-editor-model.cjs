@@ -18,6 +18,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { shared } = require('../lib/paths.cjs');
+const { pythonExecutable } = require('../lib/python.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const UI = shared('ui');
@@ -46,7 +47,13 @@ const PAGE_SCRIPTS = [
 function loadEditor() {
 	const html = fs.readFileSync(path.join(UI, 'layout_editor', 'index.html'), 'utf8');
 	const loaded = [...html.matchAll(/<script src="([^"]+)"/g)]
-		.map((m) => path.relative(UI, path.resolve(path.join(UI, 'layout_editor'), m[1])))
+		// index.html names its scripts by URL: compare them with '/' on every OS.
+		.map((m) =>
+			path
+				.relative(UI, path.resolve(path.join(UI, 'layout_editor'), m[1]))
+				.split(path.sep)
+				.join('/')
+		)
 		.filter((file) => PAGE_SCRIPTS.includes(file));
 	assert.deepEqual(loaded, PAGE_SCRIPTS, 'index.html loads the model scripts in this order');
 	// The globals a page has that the scripts use.
@@ -317,9 +324,11 @@ test('the repository tool writes the payload « Install and use » sends', () =>
 		guard,
 		[
 			"const Module = require('node:module');",
+			"const { isAbsolute } = require('node:path');",
 			'const resolve = Module._resolveFilename;',
 			'Module._resolveFilename = function (request, ...rest) {',
-			'\tif (!/^[./]/.test(request) && !Module.isBuiltin(request))',
+			// A path is a file, never a package; Windows starts an absolute one with its drive.
+			'\tif (!/^[./]/.test(request) && !isAbsolute(request) && !Module.isBuiltin(request))',
 			'\t\tthrow new Error(`npm package ${request} is not installed in the E2E rows`);',
 			'\treturn resolve.call(this, request, ...rest);',
 			'};',
@@ -655,7 +664,8 @@ test('the ZIP writer produces an archive any unzip reads back, byte for byte', (
 		const archive = path.join(dir, 'a.zip');
 		fs.writeFileSync(archive, bytes);
 		const listing = execFileSync(
-			'python3',
+			// The CPython on PATH: python3 on macOS and Linux, python on Windows.
+			pythonExecutable(),
 			[
 				'-I',
 				'-c',

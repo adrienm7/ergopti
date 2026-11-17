@@ -41,7 +41,13 @@ const ON_DEMAND = ['vendor/fengari-web.js', 'layout_editor/_generated/klc_genera
 function loadPage() {
 	const html = fs.readFileSync(path.join(UI, 'layout_editor', 'index.html'), 'utf8');
 	const scripts = [...html.matchAll(/<script src="([^"]+)"/g)]
-		.map((m) => path.relative(UI, path.resolve(path.join(UI, 'layout_editor'), m[1])))
+		// index.html names its scripts by URL: compare them with '/' on every OS.
+		.map((m) =>
+			path
+				.relative(UI, path.resolve(path.join(UI, 'layout_editor'), m[1]))
+				.split(path.sep)
+				.join('/')
+		)
 		.filter(
 			(file) =>
 				![
@@ -301,7 +307,10 @@ async function main() {
 		assert.equal(fs.readFileSync(assetsCodegen.OUT_PATH, 'utf8'), assetsCodegen.buildSource());
 		const html = fs.readFileSync(path.join(UI, 'layout_editor_window', 'index.html'), 'utf8');
 		const tags = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) =>
-			path.relative(UI, path.resolve(path.join(UI, 'layout_editor_window'), m[1]))
+			path
+				.relative(UI, path.resolve(path.join(UI, 'layout_editor_window'), m[1]))
+				.split(path.sep)
+				.join('/')
 		);
 		for (const needed of [
 			'layout_composer/target_export.js',
