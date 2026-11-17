@@ -79,6 +79,9 @@ DisableLayer(Owner := 0) {
 	return true
 }
 
+; The tray text the active layer replaced, held until the layer restores it.
+global _NavLayerIndicatorOwner := 0
+
 ; Publishes the layer's translated status through the tray presentation owner.
 ; Capture before the first publication and retain that exact text until its
 ; restoration is acknowledged. A refused write may already have taken effect,
@@ -87,7 +90,8 @@ DisableLayer(Owner := 0) {
 ; @param IsActive {Boolean} Whether the navigation layer is visibly active.
 ; @returns {Boolean} Whether the requested tray state was acknowledged.
 NavigationLayerUpdateIndicator(IsActive, ReadFn := 0, WriteFn := 0, LabelFn := 0) {
-	static Owner := 0
+	global _NavLayerIndicatorOwner
+	Owner := _NavLayerIndicatorOwner
 	if !IsObject(ReadFn)
 		ReadFn := TrayMenuGetTooltip
 	if !IsObject(WriteFn)
@@ -97,19 +101,31 @@ NavigationLayerUpdateIndicator(IsActive, ReadFn := 0, WriteFn := 0, LabelFn := 0
 	try {
 		if IsActive {
 			if !IsObject(Owner)
-				Owner := {PreviousText: ReadFn.Call()}
+				Owner := _NavLayerIndicatorOwner := {PreviousText: ReadFn.Call()}
 			if WriteFn.Call(LabelFn.Call()) != true
 				throw Error("The navigation layer indicator publication was not acknowledged")
 		} else if IsObject(Owner) {
 			if WriteFn.Call(Owner.PreviousText) != true
 				throw Error("The navigation layer indicator restoration was not acknowledged")
-			Owner := 0
+			_NavLayerIndicatorOwner := 0
 		}
 		return true
 	} catch as Err {
 		try LoggerWarn("NavLayer", "Navigation layer indicator failed: {1}.", Err.Message)
 		return false
 	}
+}
+
+; Retargets the text the active layer restores, so a state change while the
+; layer holds the tray (a pause) is not undone when the layer ends.
+; @param Text {String} The tray text to restore.
+; @returns {Boolean} Whether the layer holds the tray (the caller writes nothing).
+NavigationLayerIndicatorRebase(Text) {
+	global _NavLayerIndicatorOwner
+	if !IsObject(_NavLayerIndicatorOwner)
+		return false
+	_NavLayerIndicatorOwner.PreviousText := Text
+	return true
 }
 
 _TapHoldLayerWaitRelease(KeyName, TimeoutSec) {

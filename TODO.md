@@ -70,13 +70,13 @@ baseline as violations go.
       in the status line (an in-page question, since a WebView host may not show `window.confirm`); check that every
       error message says how to fix it and every metric and setting has its help text.
 - [ ] **Ergopti+ native UI.** The clear fixes of the code audit
-      ([table](docs/audits/accessibility/README.md#native-ergopti-ui-code-audit-2026-11-17)), each on the three OS
-      with its driver tests: the tray / menu-bar item's accessible name with the paused state (Windows `A_IconTip`,
-      macOS `setTooltip`, Linux AppIndicator description), labels before the unlabelled Windows fields, words on the
-      « ↺ » buttons, the swapped `TrayTip` arguments, the GTK dialog captions bound to their fields, the Swift
-      progress bar's label; then the opt-in announcement of hotstring and prediction tooltips (UIA notification,
-      `hs.speech`, AT-SPI) and the system high-contrast / reduced-motion / text-size settings in the native windows.
-      The screen-reader checks are the « Accessibility » items of the three TODO-tests files.
+      ([table](docs/audits/accessibility/README.md#native-ergopti-ui-code-audit-2026-11-17)) on macOS and Linux:
+      the menu-bar / indicator name with the paused state, the canvas badge, the Swift progress bar's label, the GTK
+      dialog captions bound to their fields, the tooltip announcements (`hs.speech`, AT-SPI) and the system
+      reduced-motion / contrast / text-size settings (Windows done: tray name, labels, named « ↺ » buttons,
+      `TrayTip` order, tooltips under high contrast and « Make text bigger », live-region announcements). Left on
+      Windows: fixed font sizes in the native windows other than the tooltips. The screen-reader checks are the
+      « Accessibility » items of the three TODO-tests files.
 - [ ] **Languages.** The English Ergopti+ page sets `lang="en"` since the second pass, but a string with no English
       translation falls back to French inside it: mark those passages `lang="fr"` or translate them; `lang` on
       foreign passages across the site (English names, quotes); decide whether the accessibility texts get the 21
@@ -336,6 +336,9 @@ Each closes on a named green hosted or native run, recorded here.
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
+- [ ] **Screen-reader announcements of tooltips, decided by the agent on 2026-11-17.** Hotstring previews and
+      finished AI predictions are announced only while the system says a screen reader runs (Windows
+      `SPI_GETSCREENREADER`, VoiceOver, Orca), with no Ergopti+ setting; add a menu switch if users find them noisy.
 - [ ] **Site placements decided by the agent on 2026-11-14 (implemented: fb510e1113, f555c231e5).** The former
       Utilisation page is split into `/ergopti/utilisation` (« Essayer » : online typing and text replacements) and
       `/ergopti/installation` (downloads, OS guides, printable layouts); `/utilisation` without an anchor lands on

@@ -77,6 +77,11 @@ global UI_LABEL_COLOR_HEX  := ""
 global UI_HINT_COLOR_HEX   := ""
 global UI_INFO_COLOR_HEX   := ""
 global UI_LOADING_TEXT_HEX := ""
+; The main text colour of a tooltip row (white, as macOS and Linux draw it).
+global UI_TEXT_HEX         := "FFFFFF"   ; AHK-only constant, not in TOML
+; Whether Windows high contrast replaced the colours above with system ones
+; (UiStyle_ApplySystemAccessibility); the tint wash is dropped then.
+global UI_HIGH_CONTRAST    := false
 
 ; ── Tint mixing ─────────────────────────────────────────────────────────────
 global UI_TINT_LIGHTNESS   := 0
@@ -259,11 +264,159 @@ UiStyle_LoadSharedConst() {
 	LoggerDone("UiStyle", "Shared tooltip constants loaded (pad_x={1} corner_r={2} bg={3} tmo={4}s corr={5} nw={6}).",
 		UI_PAD_X, UI_CORNER_RADIUS, UI_BG_HEX, UI_HOTSTRING_TIMEOUT_SEC, UI_LLM_CORR_SEL_HEX, UI_LLM_NW_SEL_HEX)
 
+	; The values just read are the base the system's accessibility settings
+	; adjust; a later settings change starts again from them.
+	global _UiStyleBase := _UiStyleSnapshot()
+	global _UiStyleAppliedKey := ""
+	if IsSet(A11ySystem_State)
+		UiStyle_ApplySystemAccessibility(A11ySystem_State())
+
 	; Refresh dependent modules that captured these values at include-time.
 	if IsSet(Tooltip_UpdateStyles)
 		Tooltip_UpdateStyles()
 	if IsSet(Tooltip_LlmUiSyncFromShared)
 		Tooltip_LlmUiSyncFromShared()
+}
+
+; The colour globals a high-contrast theme repaints in its tooltip text colour.
+global UI_STYLE_TEXT_COLOR_NAMES := ["UI_TEXT_HEX", "UI_LABEL_COLOR_HEX", "UI_HINT_COLOR_HEX",
+	"UI_INFO_COLOR_HEX", "UI_DIM_COLOR_HEX", "UI_LOADING_TEXT_HEX", "UI_SEP_COLOR_HEX",
+	"UI_BORDER_COLOR_HEX", "UI_LLM_CORR_SEL_HEX", "UI_LLM_NW_SEL_HEX", "UI_LLM_UNSEL_GRAY_HEX",
+	"UI_LLM_LOADING_HEX", "UI_LLM_CURSOR_HEX", "UI_LLM_CMD_DIM_HEX"]
+; The font sizes « Make text bigger » scales.
+global UI_STYLE_FONT_SIZE_NAMES := ["UI_FONT_SIZE_MAIN", "UI_FONT_SIZE_HINT", "UI_FONT_SIZE_INFO"]
+
+; Base values loaded from constants.toml, before the system settings apply.
+global _UiStyleBase := 0
+; The settings last applied, so a repeated settings broadcast changes nothing.
+global _UiStyleAppliedKey := ""
+
+; The current values of the globals the system settings adjust.
+; @returns {Map} Global name to value.
+_UiStyleSnapshot() {
+	global UI_STYLE_TEXT_COLOR_NAMES, UI_STYLE_FONT_SIZE_NAMES, UI_BG_HEX
+	Values := Map("UI_BG_HEX", UI_BG_HEX)
+	for Name in UI_STYLE_TEXT_COLOR_NAMES
+		Values[Name] := _UiStyleRead(Name)
+	for Name in UI_STYLE_FONT_SIZE_NAMES
+		Values[Name] := _UiStyleRead(Name)
+	return Values
+}
+
+; The tooltip style for a system state: high contrast paints every text, rule
+; and border in the theme's tooltip text colour on its tooltip background, and
+; the text scale enlarges the fonts (the tooltip measures its text, so it grows
+; with them).
+; @param Base {Map} Values from _UiStyleSnapshot.
+; @param State {Object} { HighContrast, TextScalePercent, InfoBkHex, InfoTextHex }.
+; @returns {Map} Global name to value, UI_HIGH_CONTRAST included.
+UiStyle_AccessibleValues(Base, State) {
+	global UI_STYLE_TEXT_COLOR_NAMES, UI_STYLE_FONT_SIZE_NAMES
+	Values := Base.Clone()
+	for Name in UI_STYLE_FONT_SIZE_NAMES
+		Values[Name] := Round(Base[Name] * State.TextScalePercent / 100)
+	Values["UI_HIGH_CONTRAST"] := State.HighContrast ? true : false
+	if State.HighContrast {
+		Values["UI_BG_HEX"] := State.InfoBkHex
+		for Name in UI_STYLE_TEXT_COLOR_NAMES
+			Values[Name] := State.InfoTextHex
+	}
+	return Values
+}
+
+; Applies the system's high contrast and text scale to the tooltip style.
+; @param State {Object} As A11ySystem_State returns it.
+; @returns {Boolean} Whether the style changed.
+UiStyle_ApplySystemAccessibility(State) {
+	global _UiStyleBase, _UiStyleAppliedKey
+	if !(_UiStyleBase is Map)
+		throw Error("UiStyle_ApplySystemAccessibility needs UiStyle_LoadSharedConst first")
+	Key := Format("{1}|{2}|{3}|{4}", State.HighContrast ? 1 : 0, State.TextScalePercent,
+		State.InfoBkHex, State.InfoTextHex)
+	if (Key == _UiStyleAppliedKey)
+		return false
+	for Name, Value in UiStyle_AccessibleValues(_UiStyleBase, State)
+		_UiStyleWrite(Name, Value)
+	_UiStyleAppliedKey := Key
+	try LoggerInfo("UiStyle", "Tooltip style follows the system: high contrast {1}, text {2} %.",
+		State.HighContrast ? "on" : "off", State.TextScalePercent)
+	return true
+}
+
+; Re-reads the system settings after Windows broadcast a change (a contrast
+; theme, colours or text size), on a fresh timer turn: a WM_SETTINGCHANGE
+; handler must return at once.
+UiStyle_WatchSystemAccessibility() {
+	OnMessage(0x001A, _UiStyleOnSystemChange)   ; WM_SETTINGCHANGE
+	OnMessage(0x0015, _UiStyleOnSystemChange)   ; WM_SYSCOLORCHANGE
+	try LoggerInfo("UiStyle", "Watching the system accessibility settings.")
+}
+
+_UiStyleOnSystemChange(*) {
+	SetTimer(_UiStyleRefreshFromSystem, -1)
+}
+
+_UiStyleRefreshFromSystem() {
+	try {
+		if UiStyle_ApplySystemAccessibility(A11ySystem_State()) && IsSet(Tooltip_UpdateStyles)
+			Tooltip_UpdateStyles()
+	} catch as Err {
+		try LoggerError("UiStyle", "The system accessibility settings could not be applied: {1}.", Err.Message)
+	}
+}
+
+; Reads one of the adjusted globals by name; an unknown name is a bug.
+_UiStyleRead(Name) {
+	global
+	switch Name {
+		case "UI_BG_HEX": return UI_BG_HEX
+		case "UI_TEXT_HEX": return UI_TEXT_HEX
+		case "UI_LABEL_COLOR_HEX": return UI_LABEL_COLOR_HEX
+		case "UI_HINT_COLOR_HEX": return UI_HINT_COLOR_HEX
+		case "UI_INFO_COLOR_HEX": return UI_INFO_COLOR_HEX
+		case "UI_DIM_COLOR_HEX": return UI_DIM_COLOR_HEX
+		case "UI_LOADING_TEXT_HEX": return UI_LOADING_TEXT_HEX
+		case "UI_SEP_COLOR_HEX": return UI_SEP_COLOR_HEX
+		case "UI_BORDER_COLOR_HEX": return UI_BORDER_COLOR_HEX
+		case "UI_LLM_CORR_SEL_HEX": return UI_LLM_CORR_SEL_HEX
+		case "UI_LLM_NW_SEL_HEX": return UI_LLM_NW_SEL_HEX
+		case "UI_LLM_UNSEL_GRAY_HEX": return UI_LLM_UNSEL_GRAY_HEX
+		case "UI_LLM_LOADING_HEX": return UI_LLM_LOADING_HEX
+		case "UI_LLM_CURSOR_HEX": return UI_LLM_CURSOR_HEX
+		case "UI_LLM_CMD_DIM_HEX": return UI_LLM_CMD_DIM_HEX
+		case "UI_FONT_SIZE_MAIN": return UI_FONT_SIZE_MAIN
+		case "UI_FONT_SIZE_HINT": return UI_FONT_SIZE_HINT
+		case "UI_FONT_SIZE_INFO": return UI_FONT_SIZE_INFO
+		case "UI_HIGH_CONTRAST": return UI_HIGH_CONTRAST
+	}
+	throw ValueError("Unknown tooltip style global", -1, Name)
+}
+
+; Writes one of the adjusted globals by name; an unknown name is a bug.
+_UiStyleWrite(Name, Value) {
+	global
+	switch Name {
+		case "UI_BG_HEX": UI_BG_HEX := Value
+		case "UI_TEXT_HEX": UI_TEXT_HEX := Value
+		case "UI_LABEL_COLOR_HEX": UI_LABEL_COLOR_HEX := Value
+		case "UI_HINT_COLOR_HEX": UI_HINT_COLOR_HEX := Value
+		case "UI_INFO_COLOR_HEX": UI_INFO_COLOR_HEX := Value
+		case "UI_DIM_COLOR_HEX": UI_DIM_COLOR_HEX := Value
+		case "UI_LOADING_TEXT_HEX": UI_LOADING_TEXT_HEX := Value
+		case "UI_SEP_COLOR_HEX": UI_SEP_COLOR_HEX := Value
+		case "UI_BORDER_COLOR_HEX": UI_BORDER_COLOR_HEX := Value
+		case "UI_LLM_CORR_SEL_HEX": UI_LLM_CORR_SEL_HEX := Value
+		case "UI_LLM_NW_SEL_HEX": UI_LLM_NW_SEL_HEX := Value
+		case "UI_LLM_UNSEL_GRAY_HEX": UI_LLM_UNSEL_GRAY_HEX := Value
+		case "UI_LLM_LOADING_HEX": UI_LLM_LOADING_HEX := Value
+		case "UI_LLM_CURSOR_HEX": UI_LLM_CURSOR_HEX := Value
+		case "UI_LLM_CMD_DIM_HEX": UI_LLM_CMD_DIM_HEX := Value
+		case "UI_FONT_SIZE_MAIN": UI_FONT_SIZE_MAIN := Value
+		case "UI_FONT_SIZE_HINT": UI_FONT_SIZE_HINT := Value
+		case "UI_FONT_SIZE_INFO": UI_FONT_SIZE_INFO := Value
+		case "UI_HIGH_CONTRAST": UI_HIGH_CONTRAST := Value
+		default: throw ValueError("Unknown tooltip style global", -1, Name)
+	}
 }
 
 

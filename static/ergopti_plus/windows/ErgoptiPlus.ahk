@@ -413,6 +413,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include ../_shared/shortcuts/data/magic_editor.ahk
 #Include infra/magic_editor.ahk
 #Include platform/system/notifier.ahk
+#Include platform/system/accessibility.ahk
 #Include tray/adapters/menu.ahk
 #Include platform/input/text_sender.ahk
 #Include ../_shared/core/network/data/failure.ahk
@@ -738,6 +739,7 @@ try {
 }
 BootProfile_Stamp("Personal shortcuts file ensured")
 #Include tray/bootstrap.ahk
+#Include tray/state_tip.ahk
 #Include tray/adapters/startup_click.ahk
 #Include tray/adapters/startup_commands.ahk
 
@@ -882,6 +884,9 @@ ConfigNotifyOlderSchemaAtBoot()
 ; runtime values stay in sync with the TOML single source of truth.
 ; Must run after _SharedDir is set (line ~51) and ParseTomlFile is available.
 UiStyle_LoadSharedConst()
+; A contrast theme or a text size chosen while the driver runs restyles the
+; next tooltip without a restart.
+UiStyle_WatchSystemAccessibility()
 ; Now that UI_AI_LOADING_HEX is loaded, source the llm_prediction hotstring tint
 ; from it (single canonical AI loading colour) — must run after the line above
 ; and before the tray menu build / any HotstringsResolve.

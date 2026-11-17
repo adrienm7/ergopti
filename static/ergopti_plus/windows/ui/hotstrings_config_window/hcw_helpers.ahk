@@ -505,22 +505,25 @@ OpenHotstringsConfigWindow() {
 	PriorityReset := G.Add("Button", "x512 yp-3 w28 h24", "↺")
 
 	; ----- Color row -------------------------------------------------------
-	; The swatch is a filled Progress at value=100 — the BAR fills the whole
-	; rectangle, so we set its bar color (cXXXXXX) AND background to the same
-	; hex. Setting only Background, as we used to, left the bar painted in
-	; the OS default tint (system blue) regardless of what the user picked.
+	; The swatch is an empty Text painted with the colour: a filled Progress, as
+	; it used to be, was read as a progress bar at 100 % by a screen reader. The
+	; colour's name is in the drop-down before it.
 	G.Add("Text", "xm y+10 w70 h20", t("hs_config.label_color"))
 	ColorDD := G.Add("DropDownList", "x+6 yp-3 w180", _HCW_ColorLabels())
 	InitSwatchHex := _HCW_HexNoHash(GLOBAL_DEFAULT_COLOR)
-	ColorSwatch := G.Add("Progress",
-		"x+8 yp+1 w22 h22 c" . InitSwatchHex . " Background" . InitSwatchHex,
-		100)
+	ColorSwatch := G.Add("Text", "x+8 yp+1 w22 h22 +Border Background" . InitSwatchHex, "")
 	ColorDefault := G.Add("Text", "x+10 yp+2 w194 Right", "")
 	ColorReset := G.Add("Button", "x512 yp-2 w28 h24", "↺")
 
 	; ----- Tooltip toggle row (same group as delay/color, no HR before) ---
 	TooltipChk := G.Add("Checkbox", "xm y+10", t("hs_config.label_tooltip"))
 	TooltipReset := G.Add("Button", "x512 yp-2 w28 h24", "↺")
+
+	; A « ↺ » reads as a symbol to a screen reader: each button is named by
+	; what it restores.
+	for Pair in [[DelayReset, "hs_config.label_delay"], [PriorityReset, "hs_config.label_priority"],
+			[ColorReset, "hs_config.label_color"], [TooltipReset, "hs_config.label_tooltip"]]
+		A11ySystem_SetAccessibleName(Pair[1].Hwnd, StrReplace(t("hs_config.btn_reset_field"), "{1}", t(Pair[2])))
 
 	G.Add("Text", "xm y+14 w526 h1 0x10")   ; horizontal rule before the close button
 
@@ -717,7 +720,8 @@ _HCW_LoadCurrent() {
 	; the bar (cXXXXXX) and the background so the swatch fills with the
 	; selected color end-to-end.
 	SwatchHex := _HCW_HexNoHash(ColorHex)
-	_HCWWidgets.ColorSwatch.Opt("+c" . SwatchHex . " +Background" . SwatchHex)
+	_HCWWidgets.ColorSwatch.Opt("+Background" . SwatchHex)
+	_HCWWidgets.ColorSwatch.Redraw()
 
 	ColorOverridden := (Override.HasOwnProp("Color") and Override.Color != "")
 	DefColor := (Defaults.Color != "") ? Defaults.Color : t("hs_config.none")

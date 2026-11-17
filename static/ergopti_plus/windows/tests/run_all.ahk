@@ -171,6 +171,7 @@ OnError(_FatalErrorHandler)
 ; are invoked directly by the regression test.
 #Include ../core/lifecycle/engine/bundle.ahk
 #Include ../tray/bootstrap.ahk
+#Include ../tray/state_tip.ahk
 #Include ../tray/adapters/startup_click.ahk
 #Include ../tray/adapters/startup_commands.ahk
 #Include ../core/lifecycle/engine/reload/single_instance_gate.ahk
@@ -360,6 +361,7 @@ InstallHotstringHooks()
 
 ; ── Adapter contract: include all port adapters so contract vector tests can call them ──
 #Include ../platform/system/notifier.ahk
+#Include ../platform/system/accessibility.ahk
 #Include ../core/lifecycle/engine/shutdown/quit_admission.ahk
 #Include ../core/events/timer_scheduler.ahk
 #Include ../core/fs/adapters/file_system.ahk
@@ -1378,6 +1380,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/test_keystats_password_fail_closed.ahk
 #Include unit/core/lifecycle/test_single_instance_gate.ahk
 #Include unit/platform/system/test_worker_tray_icon_hidden.ahk
+#Include unit/platform/system/test_accessibility.ahk
 #Include unit/tray/test_notify_icon.ahk
 #Include unit/modules/keystats/test_keystats_network_transitions.ahk
 #Include ../menu/engine/command_origin.ahk
@@ -1946,6 +1949,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/input/test_textsend_callback_wired.ahk
 #Include meta/settings/persistence/test_is_category_all_enabled_loop.ahk
 #Include meta/platform/system/test_regread_no_type_arg.ahk
+#Include meta/platform/system/test_accessibility_sources.ahk
 #Include meta/core/logger/test_dedup_tick.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_watcher_magic_suffix.ahk
 #Include meta/modules/hotstrings/magic_key/test_deadkey_uses_dynamic_magic_key.ahk

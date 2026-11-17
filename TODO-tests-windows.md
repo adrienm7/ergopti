@@ -180,17 +180,20 @@ physical size`); X and Y match the pad's width and height (logical span over mil
 - [ ] Review the machine translations of 1 November (curl, proxy, token exchange, WebView2, chord and case-twin keys).
 
 - [ ] **Accessibility with Narrator and NVDA** ([audit](docs/audits/accessibility/README.md)): 1. Tray: Win+B
-      reaches the icon, its name is read (today none: `A_IconTip` is never set) and the menu opens with
-      Shift+F10 or the menu key; every item and submenu is read and runs from the keyboard. 2. Open Studio, the
-      metrics, the hotstring settings and the onboarding: the focus lands inside the page when the window opens
-      (else call the WebView2 controller's `MoveFocus`), Tab walks every control in order and Escape closes. 3. A
-      hotstring preview and an AI prediction tooltip: say whether Narrator or NVDA reads anything (nothing is
-      announced today) and whether the selected prediction is told by more than its colour. 4. The error dialog,
-      the download window and the config cleanup open without focus: is anything read? 5. Windows high contrast
-      (Settings > Accessibility > Contrast themes): which native windows and tooltips keep fixed colours, and do the
-      Studio's bars and heatmap stay visible (`forced-colors`). 6. Text size at 150 % (Settings > Accessibility >
-      Text size) and display scale 200 %: clipped text in native windows and tooltips. 7. The four « ↺ » buttons
-      and the colour swatch of the hotstring settings: what is read.
+      reaches the icon; its name is « Ergopti+ », and « Ergopti+ (paused) » after a pause from the menu and after
+      a pause taken while CapsLock holds the navigation layer; the menu opens with Shift+F10 or the menu key; every
+      item and submenu is read and runs from the keyboard. 2. Open Studio, the metrics, the hotstring settings and
+      the onboarding: the focus lands inside the page when the window opens (else call the WebView2 controller's
+      `MoveFocus`), Tab walks every control in order and Escape closes. 3. Type a trigger with a preview, then ask
+      an AI prediction: Narrator and NVDA each say the preview once (not the struck-through alternates) and the
+      selected prediction when it is complete (the tooltip window is a polite live region); with no screen reader
+      running nothing changes; say whether the speech interrupts typing or lags. 4. The error dialog, the download
+      window and the config cleanup open without focus: is anything read? 5. Windows high contrast (Settings >
+      Accessibility > Contrast themes), switched while Ergopti+ runs: the next hotstring and AI tooltips take the
+      theme's tooltip colours with no tint; which native windows keep fixed colours, and do the Studio's bars and heatmap stay visible (`forced-colors`). 6. Text size at 150 % (Settings > Accessibility > Text size): the tooltips' text grows without clipping;
+      display scale 200 %: clipped text in native windows. 7. The hotstring settings window: the four « ↺ »
+      buttons read « Restore default: Delay (ms) » and so on, the colour swatch is not read as a progress bar. 8. Fields named by their label: the Win + G link editor (« Link: »), the Releases window's channel picker
+      (« Update channel ») and notes (« Changelog »), the input check's field.
 
 ### Pause, startup, updates and network
 

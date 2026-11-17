@@ -844,6 +844,8 @@ GPTLinkEditor(*) {
 		GuiToShow := Gui_Create(, t("dialog.gpt_link.title"))
 		GuiToShow.OnEvent("Close", _GPTLinkEditorClose)
 		GuiToShow.OnEvent("Escape", _GPTLinkEditorClose)
+		; A screen reader names an Edit by the text just before it.
+		GuiToShow.Add("Text", "w300", t("dialog.gpt_link.label"))
 		NewValue := GuiToShow.Add("Edit", "w300", CurrentLink)
 		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ModifyLink(GuiToShow, NewValue.Text))
 		GuiToShow.Show("Center")

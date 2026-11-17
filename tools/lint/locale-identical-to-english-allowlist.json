@@ -35,6 +35,10 @@
 				"zh"
 			]
 		},
+		"dialog.gpt_link.label": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "it", "nl", "pl", "pt"]
+		},
 		"layout_analysis.typing.shift": {
 			"reason": "keyboard-key-name",
 			"locales": [

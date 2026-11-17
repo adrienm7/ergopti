@@ -220,6 +220,44 @@ The screen-reader checks only a real machine can answer are in
 TODO-tests-windows.md, TODO-tests-macos.md and TODO-tests-linux.md
 (« Accessibility » items).
 
+### Windows fixes (third pass, 2026-11-17)
+
+Every Windows row of the table above is fixed, with the tests
+`tests/unit/platform/system/test_accessibility.ahk` and
+`tests/meta/platform/system/test_accessibility_sources.ahk` (slug
+`a11y-native-2026-11-17`); `platform/system/accessibility.ahk` holds the
+native calls.
+
+- **Tray.** `A_IconTip` says « Ergopti+ » or « Ergopti+ (paused) » in the
+  active language (`tray/state_tip.ahk`, from `UpdateTrayIcon`); a pause taken
+  while the navigation layer shows its name there becomes the text the layer
+  restores. The three swapped `TrayTip` calls of the AI menu take the text
+  first; a source guard refuses a title key as the first argument anywhere.
+- **Names.** Labels before the Win + G link field, the Releases window's
+  channel picker and the input check's field; the release notes and the four
+  « ↺ » buttons are named through dynamic annotation (`IAccPropServices`,
+  « Restore default: Delay (ms) »…); the colour swatch is a painted Text, no
+  longer a progress bar at 100 %.
+- **High contrast and text size.** The hotstring and AI tooltips read
+  `SPI_GETHIGHCONTRAST` and `TextScaleFactor` at boot and on
+  `WM_SETTINGCHANGE` / `WM_SYSCOLORCHANGE`: under a contrast theme every
+  text, rule and border takes `COLOR_INFOTEXT` on `COLOR_INFOBK` with no tint
+  wash, and « Make text bigger » scales their fonts. No native Windows surface
+  animates, and WebView2 gives the pages `prefers-reduced-motion` and
+  `forced-colors` from the same settings, so `SPI_GETCLIENTAREAANIMATION` is
+  not read.
+- **Announcements.** While `SPI_GETSCREENREADER` says a screen reader runs,
+  a presented tooltip becomes a polite live region named by its previews (not
+  the struck-through alternates) or by the selected line of a finished
+  prediction, then raises `EVENT_OBJECT_LIVEREGIONCHANGED`; the same text is
+  not repeated within 3 s. A UI Automation notification was tried first and
+  refused: releasing the host provider of a driver window blocked the window's
+  own thread, which is the keyboard driver's. No setting: the screen reader's
+  running flag is the opt-in (decision pending in TODO.md).
+- **Left.** Whether Narrator, NVDA and JAWS speak the live region is a
+  TODO-tests-windows.md check; native windows other than the tooltips keep
+  fixed font sizes at a larger text size.
+
 ## What remains
 
 The open items live in TODO.md, section « Full accessibility ». The rows of

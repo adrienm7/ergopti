@@ -403,6 +403,78 @@ _TooltipNotifySurfacePresented(Items, SurfaceToken) {
 				"Visible-decision post-present callback failed: " . Err.Message)
 }
 
+; A tooltip appears beside the caret and never takes the focus, so a screen
+; reader says nothing of it. While one runs, the text a sighted user reads is
+; announced to it through the tooltip window as a live region: the previews that would fire
+; (not the struck-through alternates) and a finished prediction's selected
+; line (not the streaming partials). A re-render of the same text within
+; TOOLTIP_ANNOUNCE_REPEAT_MS is not said again. Decided by the agent on 2026-11-17, to review by the maintainer: the
+; screen reader's own running flag is the opt-in, with no Ergopti+ setting.
+global TOOLTIP_ANNOUNCE_REPEAT_MS := 3000
+global _TooltipLastAnnouncement := ""
+global _TooltipLastAnnouncementTick := 0
+
+; The words a screen reader says for a presented tooltip.
+; @param Items {Array} The hotstring rows the surface shows.
+; @param LlmRecord {Object|Integer} The surface's prediction record, or 0.
+; @returns {String} "" when there is nothing to say.
+_TooltipAnnouncementText(Items, LlmRecord) {
+		Parts := []
+		if (Items is Array) {
+			for Item in Items {
+				if !IsObject(Item) || !Item.HasOwnProp("Text") || Item.Text == ""
+					continue
+				if Item.HasOwnProp("IsDimmed") && Item.IsDimmed
+					continue
+				Parts.Push(Item.Text)
+			}
+		}
+		if IsObject(LlmRecord) && LlmRecord.HasOwnProp("IsFinal") && LlmRecord.IsFinal
+				&& LlmRecord.HasOwnProp("Slots") && (LlmRecord.Slots is Array)
+				&& LlmRecord.Slots.Length >= LlmRecord.ActiveIdx {
+			Slot := LlmRecord.Slots[LlmRecord.ActiveIdx]
+			if !_LLM_SlotIsPlaceholder(Slot)
+				Parts.Push(_LLM_SlotGetText(Slot))
+		}
+		Text := ""
+		for Part in Parts
+			Text .= (Text == "" ? "" : "`n") . Part
+		return Text
+}
+
+; Sends a presented tooltip's text to the running screen reader, on a fresh
+; timer turn: the caller is the keyboard's hot path.
+; @param ScreenReaderFn {Func|Integer} Replaces A11ySystem_ScreenReaderOn (tests).
+; @param AnnounceFn {Func|Integer} Replaces A11ySystem_Announce (tests).
+; @returns {String} The text handed to the screen reader, "" when none was.
+_TooltipAnnouncePresented(Items, Surface, ScreenReaderFn := 0, AnnounceFn := 0) {
+		global _TooltipLastAnnouncement, _TooltipLastAnnouncementTick
+		global TOOLTIP_ANNOUNCE_REPEAT_MS
+		try {
+			ReaderOn := IsObject(ScreenReaderFn) ? ScreenReaderFn.Call() : A11ySystem_ScreenReaderOn()
+			if !ReaderOn {
+				_TooltipLastAnnouncement := ""
+				return ""
+			}
+			Record := (IsObject(Surface) && Surface.HasOwnProp("LlmPresented")) ? Surface.LlmPresented : 0
+			Text := _TooltipAnnouncementText(Items, Record)
+			if (Text == "")
+				return ""
+			if (Text == _TooltipLastAnnouncement
+					&& A_TickCount - _TooltipLastAnnouncementTick < TOOLTIP_ANNOUNCE_REPEAT_MS)
+				return ""
+			Hwnd := (IsObject(Surface) && IsObject(Surface.Gui)) ? Surface.Gui.Hwnd : 0
+			_TooltipLastAnnouncement := Text
+			_TooltipLastAnnouncementTick := A_TickCount
+			Announce := IsObject(AnnounceFn) ? AnnounceFn : A11ySystem_Announce
+			SetTimer(() => Announce.Call(Hwnd, Text), -1)
+			return Text
+		} catch Error as Err {
+			_UiOracleReportError("Tooltip screen-reader notice failed: " . Err.Message)
+			return ""
+		}
+}
+
 ; Oracle hooks are intentionally invoked inside short presentation/hide
 ; transactions. Their exceptional diagnostics must not turn an inherited
 ; keyboard-path Critical span into synchronous logger I/O.
@@ -646,6 +718,9 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 			_TooltipNotifySurfacePresented(PublishItems, PreparedSurface)
 			HotPath_BreakdownMark("notify", _hpPostPresent, Breakdown)
 			_hpPostPresent := HotPath_Now()
+			_TooltipAnnouncePresented(PublishItems, PreparedSurface)
+			HotPath_BreakdownMark("announce", _hpPostPresent, Breakdown)
+			_hpPostPresent := HotPath_Now()
 		}
 		if IsSet(_LLM_TooltipScheduleMetricDrain)
 			_LLM_TooltipScheduleMetricDrain()
@@ -791,7 +866,7 @@ _TooltipDequeueRebuild(Items, ExpectedGeneration, ExpectedSurface) {
 _TooltipDrawSharedHotstringRows(G, Items, Header, TotalW) {
 	global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_LABEL_FONT_SIZE
 	global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_DIM_COLOR_HEX
-	global _TOOLTIP_LABEL_COLOR_HEX, _TOOLTIP_SEP_COLOR_HEX
+	global _TOOLTIP_LABEL_COLOR_HEX, _TOOLTIP_SEP_COLOR_HEX, _TOOLTIP_TEXT_HEX
 	for Idx, Item in Items {
 		RowY := Header.RowY[Idx]
 		RowH := Header.RowH[Idx]
@@ -802,7 +877,7 @@ _TooltipDrawSharedHotstringRows(G, Items, Header, TotalW) {
 		if IsDimmed
 			G.SetFont("norm c" . _TOOLTIP_DIM_COLOR_HEX . " strike s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 		else
-			G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+			G.SetFont("norm c" . _TOOLTIP_TEXT_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}", _TOOLTIP_PADDING_X,
 			RowY + _TOOLTIP_PADDING_Y, Header.TextW, Header.Sizes[Idx].H), Item.Text)
 		Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
@@ -842,7 +917,7 @@ _TooltipRowNeedsBand(BgHex, GuiBgHex) {
 ; is a single window with a single GDI region, exactly like the Hammerspoon canvas.
 _TooltipBuildGui(Items) {
 		global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_LABEL_GAP
-		global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
+		global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_TEXT_HEX, _TOOLTIP_DIM_COLOR_HEX, UI_HIGH_CONTRAST
 
 		G := 0
 		try {
@@ -937,7 +1012,7 @@ _TooltipBuildGui(Items) {
 						; shared loading_text colour.
 						G.SetFont("norm italic c" . Item.TextColorHex . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 				} else {
-						G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+						G.SetFont("norm c" . _TOOLTIP_TEXT_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 				}
 				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
 						_TOOLTIP_PADDING_X, RowY + _TOOLTIP_PADDING_Y, MaxW, S.H), Item.Text)
@@ -958,7 +1033,7 @@ _TooltipBuildGui(Items) {
 						LabelY := RowY + _TOOLTIP_PADDING_Y + CenterOffset - DescenderFix + StarFix
 						; Dimmed rows get a darker label so the entire row reads as
 						; "disabled" — same visual treatment as the main text.
-						LabelColorHex := IsDimmed ? "707070" : _TOOLTIP_LABEL_COLOR_HEX
+						LabelColorHex := IsDimmed ? (UI_HIGH_CONTRAST ? _TOOLTIP_DIM_COLOR_HEX : "707070") : _TOOLTIP_LABEL_COLOR_HEX
 						G.SetFont("norm c" . LabelColorHex . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
 						G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
 								LabelX + RightFix, LabelY, MaxLabelW, LS.H), Label)
@@ -1526,8 +1601,12 @@ _TooltipResolveAccent(contextKey) {
 ; hex falls back to the neutral default background. Returns a hex string
 ; without the leading '#', upper-case (the form Gui.BackColor expects).
 _TooltipMixTintHex(AccentHex) {
-		global _TOOLTIP_DEFAULT_BG_HEX, _TOOLTIP_LIGHTNESS, _TOOLTIP_SATURATION
+		global _TOOLTIP_DEFAULT_BG_HEX, _TOOLTIP_LIGHTNESS, _TOOLTIP_SATURATION, UI_HIGH_CONTRAST
 
+		; A contrast theme gives every row its own tooltip background: a hue wash
+		; would sit under the theme text colour at an unknown contrast.
+		if UI_HIGH_CONTRAST
+				return _TOOLTIP_DEFAULT_BG_HEX
 		H := Trim(AccentHex)
 		if (SubStr(H, 1, 1) == "#") {
 				H := SubStr(H, 2)

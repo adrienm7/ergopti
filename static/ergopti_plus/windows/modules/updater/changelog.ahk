@@ -511,7 +511,9 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 
 	PickerW       := LeftColW                                     ; 260
 	BtnSubscribeW := InnerW - PickerW - ColGap                    ; 640
-	Picker := G.Add("DropDownList", "xm yp+4 w" . PickerW . " Choose" . ShownIndex, ChannelLabels)
+	; A screen reader names a drop-down by the text just before it.
+	G.Add("Text", "xm w" . InnerW, t("healthcheck.field.channel"))
+	Picker := G.Add("DropDownList", "xm y+4 w" . PickerW . " Choose" . ShownIndex, ChannelLabels)
 	BtnSubscribe := G.Add("Button", "x+10 yp w" . BtnSubscribeW, SubscribeLabel)
 	BtnSubscribe.Enabled := (Channel !== UPDATER_CHANNEL)
 
@@ -590,6 +592,9 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 	RightPaneEdit := G.Add("Edit", "x" . rpx . " y" . rpy . " w" . rpw . " h" . rph
 		. " ReadOnly +Multi -Wrap +VScroll", "")
 	RightPaneEdit.SetFont("s9", "Consolas")
+	; No label sits before the notes (the empty placeholder does), so a screen
+	; reader gets their name from the section they show.
+	A11ySystem_SetAccessibleName(RightPaneEdit.Hwnd, t("changelog_window.section_changelog"))
 	if (HasReleases) {
 		Lb.Choose(1)
 		ShowBody(Releases[1].Body)

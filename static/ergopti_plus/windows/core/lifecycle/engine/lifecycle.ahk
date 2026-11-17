@@ -1800,6 +1800,9 @@ UpdateTrayIcon() {
 				if FileExist(IconPath)
 						TraySetIcon(IconPath)
 		}
+		; The icon tells the pause to the eye; the tooltip, which a screen
+		; reader reads as the icon's name, tells it in words.
+		TrayPublishStateTip(A_IsSuspended)
 		MenuPopulation_Resume()
 }
 ; The tray menu's own « Recharger » item — the single most obviously
