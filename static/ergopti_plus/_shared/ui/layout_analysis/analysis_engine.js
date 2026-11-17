@@ -904,6 +904,75 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
+	 * finishWays of a core compiled in part (compileCoreFrom) from the
+	 * finished ways of the core it was compiled from: the characters it
+	 * compiled again take their new lists, the substitutes are made again in
+	 * the same order, the other lists and best ways are shared. The same
+	 * lists as finishWays(new Map(core.ways), core.texts) (only the order of
+	 * the maps differs), and the accent rule's counts (simplicity) carried
+	 * over: only the characters compiled again, and the accented letters
+	 * whose base letter was, are counted again.
+	 * @param {object} previous - The finishWays() result of the core before.
+	 * @param {object} core - From compileCoreFrom(), with changedChars.
+	 * @returns {object} As finishWays.
+	 */
+	function finishWaysFrom(previous, core) {
+		const ways = new Map(previous.ways);
+		const best = new Map(previous.best);
+		const changed = new Set(core.changedChars);
+		const substitutions = substitutionParts();
+		// The previous substitutes leave (a cell's own list is never a substitute).
+		for (const [fancy] of substitutions) {
+			const list = ways.get(fancy);
+			if (!list || !list[0].substituted) continue;
+			ways.delete(fancy);
+			best.delete(fancy);
+			changed.add(fancy);
+		}
+		for (const char of core.changedChars) {
+			const list = core.ways.get(char);
+			if (list) {
+				ways.set(char, list);
+				best.set(char, list[0]);
+			} else {
+				ways.delete(char);
+				best.delete(char);
+			}
+		}
+		let distinct = core.ways.size;
+		const extra = new Set();
+		for (const text of core.texts.keys())
+			for (const char of textPoints(text)) if (!core.ways.has(char)) extra.add(char);
+		distinct += extra.size;
+		for (const [fancy, plain] of substitutions) {
+			if (ways.has(fancy)) continue;
+			const parts = plain.map((c) => ways.get(c));
+			if (parts.some((part) => !part)) continue;
+			const way = parts.map((list) => list[0]).reduce((a, b) => joinWays(a, b, null));
+			const list = [Object.assign({}, way, { substituted: true })];
+			ways.set(fancy, list);
+			best.set(fancy, list[0]);
+			changed.add(fancy);
+		}
+		const out = { ways, texts: core.texts, best, distinct };
+		if (!previous.accents) previous.accents = accentCounts(previous.ways);
+		let { accented, mnemonic } = previous.accents;
+		const recount = new Set(changed);
+		for (const char of changed) {
+			const users = accentUsers.get(char.toLowerCase());
+			if (users && char.length === 1) for (const user of users) recount.add(user);
+		}
+		for (const char of recount) {
+			const was = accentState(previous.ways, char, previous.ways.get(char));
+			const now = accentState(ways, char, ways.get(char));
+			accented += (now > ACCENT_NONE ? 1 : 0) - (was > ACCENT_NONE ? 1 : 0);
+			mnemonic += (now === ACCENT_MNEMONIC ? 1 : 0) - (was === ACCENT_MNEMONIC ? 1 : 0);
+		}
+		out.accents = { accented, mnemonic };
+		return out;
+	}
+
+	/**
 	 * Every way a layout types each character, best first: a key on a level, a
 	 * dead key (itself on a level, possibly chained) followed by the key it
 	 * composes with, and the multi-character outputs (a cell or a dead-key rule
@@ -978,7 +1047,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {object} previous - From compileCore() or compileCoreFrom(), on the same board.
 	 * @param {object} layout - Library shape.
 	 * @param {object} board - From keyboard().
-	 * @returns {object} As compileCore, plus whole: true when compiled from nothing.
+	 * @returns {object} As compileCore, plus whole: true when compiled from
+	 *   nothing, or changedChars: the characters compiled again.
 	 */
 	function compileCoreFrom(previous, layout, board) {
 		const before = previous.layout;
@@ -1052,6 +1122,8 @@ var LAYOUT_ANALYSIS = (function () {
 		}
 		const core = {
 			layout,
+			// The characters whose lists were compiled again (finishWaysFrom).
+			changedChars: only.chars,
 			ways: new Map(previous.ways),
 			deadWays: new Map(previous.deadWays),
 			texts: new Map(previous.texts)
@@ -2577,7 +2649,9 @@ var LAYOUT_ANALYSIS = (function () {
 			const nextCompiled =
 				nextCore === state.core
 					? state.compiled
-					: finishWays(new Map(nextCore.ways), nextCore.texts);
+					: nextCore.whole
+						? finishWays(new Map(nextCore.ways), nextCore.texts)
+						: finishWaysFrom(state.compiled, nextCore);
 			// Planned from the current plan: only the choices a changed token can reach are made again.
 			const nextPlan = planTyping(nextCompiled, board, table, fixed, state.plan);
 			const seqs = sequences(nextCompiled.best);
@@ -3477,7 +3551,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 * « The key right of » is the next key of the same row (a split board's
 	 * other half included). Every way of each character is tried.
 	 * @param {object} board - From keyboard().
-	 * @param {object} compiled - From compileWays().
+	 * @param {object} compiled - From compileWays(); the accent rule's counts are kept
+	 *   on it (accents), or carried over by finishWaysFrom.
 	 * @returns {{value: number, rules: {accents, pairs, digits}}} Each rule
 	 *   {value, measured} or null.
 	 */
@@ -3489,43 +3564,8 @@ var LAYOUT_ANALYSIS = (function () {
 		const share = (got, measured) =>
 			measured > 0 ? { value: (100 * got) / measured, measured } : null;
 
-		// Whether char has a way of one key k, without AltGr (its base keys).
-		const baseKey = (char, k) => {
-			const list = ways.get(char);
-			if (list)
-				for (const way of list)
-					if (!way.substituted && way.keys.length === 1 && way.altgr === 0 && way.keys[0] === k)
-						return true;
-			return false;
-		};
-		let accented = 0;
-		let mnemonic = 0;
-		for (const [char, list] of ways) {
-			const letter = accentBase(char);
-			if (letter === null) continue;
-			// Its own ways (not substitutes), none of them direct.
-			let own = 0;
-			let direct = false;
-			for (const way of list) {
-				if (way.substituted) continue;
-				own++;
-				if (way.altgr === 0 && !way.dead) {
-					direct = true;
-					break;
-				}
-			}
-			if (own === 0 || direct) continue;
-			accented++;
-			const [lower, upper] = letter;
-			for (const way of list) {
-				if (way.substituted) continue;
-				const k = way.keys[way.keys.length - 1];
-				if (baseKey(lower, k) || baseKey(upper, k)) {
-					mnemonic++;
-					break;
-				}
-			}
-		}
+		if (!compiled.accents) compiled.accents = accentCounts(ways);
+		const { accented, mnemonic } = compiled.accents;
 
 		let pairScore = 0;
 		let pairs = 0;
@@ -3571,6 +3611,64 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	const accentCache = new Map();
+	// Lower-case base letter → every accented character seen with it (accentBase).
+	const accentUsers = new Map();
+
+	/** The accent rule's counts over every character of a compile (simplicity). */
+	function accentCounts(ways) {
+		let accented = 0;
+		let mnemonic = 0;
+		for (const [char, list] of ways) {
+			const state = accentState(ways, char, list);
+			if (state > ACCENT_NONE) accented++;
+			if (state === ACCENT_MNEMONIC) mnemonic++;
+		}
+		return { accented, mnemonic };
+	}
+
+	// What one character adds to the accent rule (accentState).
+	const ACCENT_NONE = 0;
+	const ACCENT_ONLY = 1;
+	const ACCENT_MNEMONIC = 2;
+
+	/**
+	 * One character's part of the accent rule: none (not an accented letter,
+	 * not typed, or typed on a key of its own), measured, or measured and
+	 * mnemonic (a way ends on a base key of its base letter).
+	 * @param {Map} ways - The compile's ways.
+	 * @param {string} char - The character.
+	 * @param {object[]|undefined} list - Its ways.
+	 * @returns {number} ACCENT_NONE, ACCENT_ONLY or ACCENT_MNEMONIC.
+	 */
+	function accentState(ways, char, list) {
+		if (!list) return ACCENT_NONE;
+		const letter = accentBase(char);
+		if (letter === null) return ACCENT_NONE;
+		// Its own ways (not substitutes), none of them direct.
+		let own = 0;
+		for (const way of list) {
+			if (way.substituted) continue;
+			own++;
+			if (way.altgr === 0 && !way.dead) return ACCENT_NONE;
+		}
+		if (own === 0) return ACCENT_NONE;
+		// Whether a letter has a way of one key k, without AltGr (its base keys).
+		const baseKey = (base, k) => {
+			const ofBase = ways.get(base);
+			if (ofBase)
+				for (const way of ofBase)
+					if (!way.substituted && way.keys.length === 1 && way.altgr === 0 && way.keys[0] === k)
+						return true;
+			return false;
+		};
+		const [lower, upper] = letter;
+		for (const way of list) {
+			if (way.substituted) continue;
+			const k = way.keys[way.keys.length - 1];
+			if (baseKey(lower, k) || baseKey(upper, k)) return ACCENT_MNEMONIC;
+		}
+		return ACCENT_ONLY;
+	}
 	let pairList = null;
 
 	/** The model's simplicity pairs, each as [opening, closing] character. */
@@ -3597,6 +3695,8 @@ var LAYOUT_ANALYSIS = (function () {
 				? [parts[0].toLowerCase(), parts[0].toUpperCase()]
 				: null;
 		accentCache.set(char, base);
+		if (base !== null)
+			(accentUsers.get(base[0]) || accentUsers.set(base[0], new Set()).get(base[0])).add(char);
 		return base;
 	}
 
