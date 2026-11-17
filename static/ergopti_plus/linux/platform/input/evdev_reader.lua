@@ -53,6 +53,7 @@ local original_reconciliation_ports = {}
 
 local Logger = require("core.logger.engine.shim")
 local InputEvent = require("platform.input.event")
+local EvdevAbs = require("platform.input.keycodes.evdev_abs")
 
 local LOG = "platform.input.evdev_reader"
 
@@ -88,13 +89,8 @@ local EVENT_TYPE_BYTES = 4 -- EV_MAX is 0x1f: one complete event-type bitmap.
 -- EVIOCGMTSLOTS(len): a __u32 axis code in, then one __s32 per slot out.
 local EVIOCGMTSLOTS_NR = 0x0a
 -- EVIOCGABS(abs) = _IOR('E', 0x40 + abs, struct input_absinfo): six __s32.
+-- The axis codes and the slot bound: _shared/platform/input/keycodes/evdev_abs.lua.
 local EVIOCGABS_BASE = 0x80184540
-local ABS_MAX = 0x3f
--- linux/input-event-codes.h ABS_MT_SLOT .. ABS_MT_TOOL_Y: the axes a slot holds.
-local ABS_MT_FIRST, ABS_MT_LAST = 0x2f, 0x3d
--- No touchpad reports more slots than this: a larger ABS_MT_SLOT maximum is a
--- corrupt answer, not a buffer to allocate.
-local MT_MAX_SLOTS = 64
 
 -- poll(2) event mask for "there is something to read".
 local POLLIN = 0x001
@@ -698,7 +694,7 @@ end
 --- @return table|nil info { value, minimum, maximum, fuzz, flat, resolution }
 --- @return string|nil reason
 function M.abs_info(slot, code)
-	if type(code) ~= "number" or code < 0 or code > ABS_MAX or code % 1 ~= 0 then
+	if not EvdevAbs.is_axis(code) then
 		return nil, "not an absolute axis code"
 	end
 	local called, values, detail = state_query(slot, "read_abs", EVIOCGABS_BASE + code)
@@ -720,10 +716,10 @@ end
 --- @return table|nil values Indexed by slot number from 0.
 --- @return string|nil reason
 function M.mt_slot_values(slot, code, count)
-	if type(code) ~= "number" or code <= ABS_MT_FIRST or code > ABS_MT_LAST or code % 1 ~= 0 then
+	if not EvdevAbs.is_slot_axis(code) then
 		return nil, "not a multitouch slot axis"
 	end
-	if type(count) ~= "number" or count < 1 or count > MT_MAX_SLOTS or count % 1 ~= 0 then
+	if not EvdevAbs.is_slot_count(count) then
 		return nil, "slot count out of range"
 	end
 	local bytes = 4 * (count + 1)
