@@ -150,7 +150,7 @@ for (const consumer of CONSUMERS) {
 }
 const linuxManifest = fs.readFileSync(path.join(SP, 'linux', 'tests', 'test_manifest.lua'), 'utf8');
 check(
-	linuxManifest.includes('"tests.unit.modules.gestures.actions.test_desktop_navigation_vectors"'),
+	linuxManifest.includes('"tests.unit.gestures.engine.actions.test_desktop_navigation_vectors"'),
 	'the Linux test manifest must list test_desktop_navigation_vectors'
 );
 const ahkRunner = fs.readFileSync(path.join(SP, 'windows', 'tests', 'run_all.ahk'), 'utf8');

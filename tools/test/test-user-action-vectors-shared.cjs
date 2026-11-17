@@ -177,7 +177,7 @@ check(
 );
 const linuxManifest = fs.readFileSync(path.join(SP, 'linux', 'tests', 'test_manifest.lua'), 'utf8');
 check(
-	linuxManifest.includes('"tests.unit.modules.gestures.actions.test_user_actions"'),
+	linuxManifest.includes('"tests.unit.gestures.engine.actions.test_user_actions"'),
 	'the Linux test manifest must list test_user_actions'
 );
 
