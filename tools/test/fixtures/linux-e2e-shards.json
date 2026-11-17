@@ -78,6 +78,8 @@
 			"Launch the bounded accessibility helper with Lua interpreter options",
 			"Install prerequisites for The whole daemon, live — a trigger typed, a tray shown",
 			"The whole daemon, live — a trigger typed, a tray shown",
+			"Install prerequisites for The daemon counts a real mouse's clicks, wheel and travel into its metrics store",
+			"The daemon counts a real mouse's clicks, wheel and travel into its metrics store",
 			"The clipboard owner serves every target from a real X server",
 			"Install WebKit2GTK and lgi",
 			"Install virtual screenshot capture tools",
@@ -373,6 +375,9 @@
 		],
 		"The whole daemon, live — a trigger typed, a tray shown": [
 			"Install prerequisites for The whole daemon, live — a trigger typed, a tray shown"
+		],
+		"The daemon counts a real mouse's clicks, wheel and travel into its metrics store": [
+			"Install prerequisites for The daemon counts a real mouse's clicks, wheel and travel into its metrics store"
 		],
 		"Qualify genuine Nix installed runtime": [
 			"Install prerequisites for Qualify genuine Nix installed runtime"

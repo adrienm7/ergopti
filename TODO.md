@@ -206,11 +206,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       `process_current_source_stale` from the recorded system layout. Left: `NumberRowSourceProbeTests.swift` keeps
       its own in-process selection because its bytes are the reviewed image `number_row_current_test_causal.py` pins
       (`CURRENT_TEST_SHA`); moving it to the shared fixture needs that review renewed. No retry is added.
-- [ ] **Linux native acceptance: pointer metrics.** Write a hosted-CI flow for the pointer metrics
-      (`pointer_metrics.lua`, keystats' mouse columns): a uinput mouse the runner creates (`run_daemon_live.sh` already
-      gets /dev/uinput) moved, clicked and scrolled under the daemon, then the stored rows read back from the metrics
-      store ([18-scope review](docs/audits/platform-parity/2026-11-04-deep/report.md)). The KDE live layout switch and
-      the agent's calendar and mail connectors are field checks (TODO-tests-linux.md).
 
 ## Carried over from the 1.0.9 requests
 
@@ -310,6 +305,12 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       `install_resolver` stats of every ancestor): about 30 ms per chunk on a loaded 8-core WSL. Wake the idle
       wait on libuv's backend descriptor (as the tray's GLib companion does for D-Bus) and keep the per-chunk
       source check cheap without weakening the revocation it gives, then time a first install on the PC.
+- [ ] **A touchpad tap's click meets an unknown field.** A button press is now counted before the click
+      callback withdraws the field's privacy verdict (`keyboard_hook`, pointer-press-before-click), but a
+      tap-to-click is counted on the frame that ends the tap, after the touch's own press already withdrew it:
+      until the focus is read again (the periodic refresh after the settle delay) its click, and any wheel turn
+      or travel just after a click, is not recorded. Count the tap in the context its touch began in, then
+      extend `run_pointer_metrics_live.lua` with a uinput touchpad.
 - [ ] **[LATER] Legacy Linux updater probes.** `tools/build/add-linux-legacy-update-probes.sh` adds
       `_shared/data/locales/en.json` and an empty `_shared/lua/` to the release tarball so pre-move updaters (v1.0.9
       … v1.0.10-dev.175) admit it. Remove that step, its call, `test-linux-legacy-update-probes.cjs` and the frozen

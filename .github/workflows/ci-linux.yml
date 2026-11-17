@@ -3715,6 +3715,46 @@ jobs:
           fi
         timeout-minutes: 6
 
+      - name: Install prerequisites for The daemon counts a real mouse's clicks, wheel and travel into its metrics store
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \
+            dbus-x11 xvfb x11-xkb-utils luajit lua-luv lua-lgi xdotool sqlite3
+          else
+              exit 1
+          fi
+        timeout-minutes: 20
+
+      # The pointer metrics (pointer_metrics.lua, keystats' mouse columns) of
+      # the real daemon: a uinput mouse pinned with --pointer is moved, scrolled
+      # and clicked while a GTK field is focused, the harness putting the X
+      # cursor where a desktop would, and the rows read back from metrics.sqlite
+      # count two clicks (not the middle one), five wheel turns (not their
+      # high-resolution repeats) and the cursor's 1300 px path.
+      - name: The daemon counts a real mouse's clicks, wheel and travel into its metrics store
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo modprobe uinput
+          timeout 300s sudo bash static/ergopti_plus/linux/tests/hardware/run_pointer_metrics_live.sh
+          else
+              exit 1
+          fi
+        timeout-minutes: 7
+
       # The multi-format clipboard owner against a real X server: text, HTML
       # and a 300 kB binary target (INCR) read back byte for byte through xclip.
       - name: The clipboard owner serves every target from a real X server
