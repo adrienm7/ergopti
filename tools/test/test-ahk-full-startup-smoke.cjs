@@ -251,12 +251,19 @@ function hotstringsRenderTimes(configRoot) {
 // gained [ui] paused_refusal_repeat_ms (353f777c1f) and [adapters]
 // wayland_keymap_dump_timeout_ms (b69e9542de) and lost [ui]
 // gnome_input_source_settle_ms (097abc914d): net +1, the same for each fixture.
+// Raised on 2026-11-17, measured on verify run 44012261707 against dev run
+// 43959165676: every boot reads seven more flat values (fresh-config 1180 ->
+// 1187, realistic 1213 -> 1220), the same for each of the 15 fixtures that ran.
+// The whole-file reads gained [typing_burst] in the WPM canon (5 lists,
+// e4343af912 and 3181451c68), [gestures] touchpad_rescan_ms in the timing
+// registry (d6375159c8) and [llm_ui] delay_category in the tooltip constants
+// (bb95e3dc72). neutral-defaults reads the same files once: 2268 -> 2275.
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },
 	'toml.document_parse': { all: 15, [REALISTIC_HOTSTRINGS_FIXTURE]: 18 },
 	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
 	'toml.document_slow_steps': { all: 12841, [REALISTIC_HOTSTRINGS_FIXTURE]: 13582 },
-	'toml.flat_values': { all: 2271, [REALISTIC_HOTSTRINGS_FIXTURE]: 1213 }
+	'toml.flat_values': { all: 2275, [REALISTIC_HOTSTRINGS_FIXTURE]: 1220 }
 };
 
 /**
