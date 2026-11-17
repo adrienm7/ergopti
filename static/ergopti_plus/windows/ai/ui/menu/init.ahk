@@ -218,7 +218,7 @@ _LLM_Menu_DegradeFirstRestoreHotkeys(Detail, NotifyFn := 0) {
 		if HasMethod(NotifyFn, "Call")
 			NotifyFn.Call(Title, Body)
 		else
-			TrayTip(Body, Title, "Icon!")
+			NotifierSend(Body, Map("title", Title, "level", "warning", "sound", true))
 	} catch as Err {
 		LoggerWarn("LLM", "The AI hotkeys notification could not be shown: {1}", Err.Message)
 	}

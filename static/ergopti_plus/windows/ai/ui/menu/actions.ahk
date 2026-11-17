@@ -60,12 +60,12 @@ _LLM_Menu_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 	; this function (binding broken, menu not bound to A_TrayMenu,
 	; AHK message loop saturated). Either way the answer is in the
 	; TrayTip's presence, not in a buried log line.
-	try TrayTip(t("llm.deps.tray_title"), t("llm.deps.install_launching"), 0x1)
+	try NotifierSend(t("llm.deps.install_launching"), Map("title", t("llm.deps.tray_title"), "sound", true))
 	try {
 		LLM_Menu_BootstrapOllama(true)
 	} catch as err {
 		LoggerError("LLM", "Bootstrap raised: " err.Message ".")
-		try TrayTip(t("llm.deps.tray_title"), t("common.error_prefix") . err.Message, 0x3)
+		try NotifierSend(t("common.error_prefix") . err.Message, Map("title", t("llm.deps.tray_title"), "level", "error", "sound", true))
 	}
 }
 
@@ -88,7 +88,7 @@ _LLM_Menu_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 		return
 	}
 	try LoggerInfo("LLM", "Debug hotkey Ctrl+Alt+Shift+I — direct install trigger.")
-	try TrayTip(t("llm.deps.tray_title"), t("llm.deps.install_launching_hotkey"), 0x1)
+	try NotifierSend(t("llm.deps.install_launching_hotkey"), Map("title", t("llm.deps.tray_title"), "sound", true))
 	try LLM_Menu_BootstrapOllama(true)
 }
 

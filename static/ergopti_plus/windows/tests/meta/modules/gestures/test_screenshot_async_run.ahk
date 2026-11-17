@@ -110,7 +110,7 @@ _SAR_HotkeyBoundariesAreContained() {
 		"SC029 must hand desktop, filesystem, process, and publication failures to the shared owner")
 	Assert(InStr(block, "MsgBox") = 0,
 		"SC029 must not open a modal dialog from the keyboard hotkey thread")
-	Assert(InStr(block, "TrayTip") = 0 && InStr(block, "FileMove") = 0,
+	Assert(InStr(block, "TrayTip") = 0 && InStr(block, "NotifierSend(") = 0 && InStr(block, "FileMove") = 0,
 		"SC029 must not duplicate terminal feedback or publication outside the shared owner")
 }
 Test("Screenshot hotkey: SC029 delegates every OS boundary to one owner", _SAR_HotkeyBoundariesAreContained)
@@ -120,7 +120,7 @@ _SAR_GestureInstantBoundariesAreContained() {
 	Assert(Body != "", "GestureScreenshotInstant must exist")
 	Assert(InStr(Body, "try") > 0 && InStr(Body, "catch as Err") > 0,
 		"GestureScreenshotInstant must contain desktop, filesystem, and Run failures")
-	Assert(InStr(Body, "LoggerError") > 0 && InStr(Body, "TrayTip") > 0,
+	Assert(InStr(Body, "LoggerError") > 0 && InStr(Body, "NotifierSend(") > 0,
 		"a failed instant gesture screenshot must be logged and reported non-modally")
 	Assert(InStr(Body, "MsgBox") = 0,
 		"GestureScreenshotInstant must not stall the driver's message thread with a modal dialog")

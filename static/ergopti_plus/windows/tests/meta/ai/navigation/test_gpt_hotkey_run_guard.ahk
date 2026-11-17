@@ -25,7 +25,7 @@ _GHG_ConfiguredUrlLaunchIsGuarded() {
         "GestureOpenChatGpt must contain Run/config failures")
     Assert(InStr(Body, "Run(Link)") > 0,
         "GestureOpenChatGpt must launch the configured link only inside its guard")
-    Assert(InStr(Body, "LoggerError") > 0 && InStr(Body, "TrayTip") > 0,
+    Assert(InStr(Body, "LoggerError") > 0 && InStr(Body, "NotifierSend(") > 0,
         "a failed Win+G launch must be logged and reported without a modal dialog")
     ; The framework spells generated key constants as their values.
     Assert(InStr(Body, 'ValueCheckRequire("shortcuts.chatgpt_url",') > 0,

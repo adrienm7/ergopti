@@ -949,7 +949,7 @@ _SelectionReportClipboardBusy() {
 		Message := Holder["process"] != ""
 				? StrReplace(t("selection.clipboard_busy"), "%s", Holder["process"])
 				: t("selection.clipboard_busy_unknown")
-		try TrayTip(Message, t("notify.clipboard"), "Iconx Mute")
+		try NotifierSend(Message, Map("title", t("notify.clipboard"), "level", "error"))
 		catch as Err {
 				try LoggerError("hotstring_engine", "The busy-clipboard notice could not be shown: {1}.", Err.Message)
 		}

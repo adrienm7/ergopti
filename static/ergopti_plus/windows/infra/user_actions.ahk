@@ -149,7 +149,7 @@ global _UserActionPorts := 0
 
 _UserActionDefaultPorts() {
 	static Ports := Map(
-		"notify", (Text) => TrayTip(Text, "ErgoptiPlus", "Iconx Mute"),
+		"notify", (Text) => NotifierSend(Text, Map("level", "error")),
 		"copy", CB_Write,
 		"type", (Text) => SendFinalResult(Text, true, true),
 		"open_terminal", _UserActionOpenTerminal,

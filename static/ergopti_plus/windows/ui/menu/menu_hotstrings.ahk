@@ -582,7 +582,7 @@ _HS_DelimCommit(CommitFn, NotifyFn := 0, NoticeFn := 0, RebuildFn := 0) {
 			if HasMethod(NotifyFn, "Call")
 				NotifyFn.Call(Message, "", "Iconi Mute")
 			else
-				TrayTip(Message, "", "Iconi Mute")
+				NotifierSend(Message, 0)
 		}
 	} catch as Err {
 		; The durable mutation already succeeded; confine a notifier failure so a

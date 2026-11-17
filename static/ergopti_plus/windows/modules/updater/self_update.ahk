@@ -767,8 +767,11 @@ _Updater_AnnounceCheckOnlyRelease(Latest, Current, Request, ShowFn := 0) {
 }
 
 ; The one balloon both release announcements show, under the same title.
+; Raises when the notifier refused it, so the caller keeps the release unannounced
+; and offers it again at the next check.
 _Updater_ShowReleaseBalloon(Text) {
-	TrayTip(Text, t("updater.tray_new_version_title"))
+	if !NotifierSend(Text, Map("title", t("updater.tray_new_version_title"), "sound", true))
+		throw Error("The notifier did not show the release balloon.")
 }
 
 ; Balloon ownership. Every balloon of the driver is a TrayTip on the one tray
@@ -3415,8 +3418,8 @@ _Updater_FailSwapTransaction(TransactionId, Message, ShowUi := true) {
 _Updater_ShowDeferredSwapFailureNotice(*) {
 	; A failure balloon is not an update offer: a click on it must not open the
 	; update prompt.
-	NotifyFn := (*) => (_Updater_ReleaseBalloon(), TrayTip(t("updater.install_error"),
-		t("updater.title_update"), "Iconx Mute"))
+	NotifyFn := (*) => (_Updater_ReleaseBalloon(), NotifierSend(t("updater.install_error"),
+		Map("title", t("updater.title_update"), "level", "error")))
 	ArmRetryFn := (DelayMs) => TimerArmOneShotMs(
 		_Updater_ShowDeferredSwapFailureNotice, DelayMs)
 	if _Updater_AttemptLifecycleRecovery(NotifyFn, ArmRetryFn,

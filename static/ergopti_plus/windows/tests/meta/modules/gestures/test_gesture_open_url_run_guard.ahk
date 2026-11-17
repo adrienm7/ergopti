@@ -20,7 +20,7 @@ _GOURG_ConfiguredUrlLaunchIsGuarded() {
         "gesture URL launch must remain after parameter validation")
     Assert(CatchPos > RunPos,
         "gesture URL shell failure must be caught after Run(URL)")
-    Assert(InStr(Body, "LoggerError") > CatchPos && InStr(Body, "TrayTip") > CatchPos,
+    Assert(InStr(Body, "LoggerError") > CatchPos && InStr(Body, "NotifierSend(") > CatchPos,
         "failed gesture URL launch must be logged and reported non-modally")
 }
 Test("gestures: configured URL shell launch failures are contained", _GOURG_ConfiguredUrlLaunchIsGuarded)

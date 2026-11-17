@@ -54,16 +54,23 @@ reload can replace the VM before `request_reload` returns. The duration is
   notice is now sent once per burst. Regression
   `nui-005-refused-reload-notice`.
 
-## Windows only (reported)
+## Windows only (fixed on November 17, 2026)
 
-- Direct `TrayTip` calls with the literal title "ErgoptiPlus"
-  (`modules/gestures/actions.ahk:492,572,589`,
-  `adapters/system_control.ahk:650`, `infra/user_actions.ahk:152`) bypass
-  `NotifierSend`'s "Ergopti+" title and failure logging.
-- `TrayTip` calls without `try` (`modules/gestures/screenshots.ahk:853,856,1212`,
-  `ui/menu/menu_hotstrings.ahk:582`,
-  `ui/hotstrings_config_window/hcw_mutations.ahk:130`) can interrupt their
-  action when the shell refuses the balloon.
+- **NUI-008 (Windows):** direct `TrayTip` calls titled "ErgoptiPlus" (the
+  program file name; the product is « Ergopti+ » per
+  `docs/design/studio-glossary.md`), some without `try`, so a refused balloon
+  interrupted the action that raised it (gestures, screenshots, search, take
+  note, downloads, user actions, system control, the hotstrings editor and
+  menu, the AI menu, the updater, the composer check), and the error dialog's
+  WebView2-less notice passed the same title to `NotifierSend`. Every one now goes
+  through `NotifierSend`: the product name as the default title, the level's
+  icon, silent unless the caller asks for the sound (`sound`, kept for the
+  notices that played it: the update offer, the AI notices, the composer
+  check), never thrown, a failure logged without the notice text. The AI
+  install notices also had their title and body swapped. Regressions
+  `test_notifier_single_owner.ahk` (no `TrayTip` outside `NotifierSend`, no
+  "ErgoptiPlus" title) and `test_notifier_send.ahk` (title, sound, failures,
+  the user actions' port).
 
 ## Checked and kept
 

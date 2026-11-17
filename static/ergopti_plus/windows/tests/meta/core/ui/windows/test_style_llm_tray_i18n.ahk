@@ -25,12 +25,12 @@ _MetaUiStyleAndLlmTrayI18n() {
 	Assert(InStr(Src, 't("dialog.fatal_error.toml_not_found")') > 0,
 		'UiStyle_LoadSharedConst`'s missing-file branch must use t("dialog.fatal_error.toml_not_found")')
 
-	; ai/ui/menu/actions.ahk must not hardcode the French install TrayTip.
+	; ai/ui/menu/actions.ahk must not hardcode the French install notification.
 	Assert(!InStr(Src, "Lancement de l'installation Ollama"),
-		'ai/ui/menu/actions.ahk must not hardcode the French install TrayTip — use t("llm.deps.install_launching")')
+		'ai/ui/menu/actions.ahk must not hardcode the French install notification — use t("llm.deps.install_launching")')
 	Assert(!InStr(Src, "Installation Ollama (déclenchée par raccourci)"),
 		'ai/ui/menu/actions.ahk`'s debug hotkey must not hardcode French — use t("llm.deps.install_launching_hotkey")')
 	Assert(InStr(Src, 't("llm.deps.tray_title")') > 0,
-		'menu_llm/actions.ahk`'s install TrayTip title must use t("llm.deps.tray_title") instead of the hardcoded "Ergopti — IA"')
+		'menu_llm/actions.ahk`'s install notification title must use t("llm.deps.tray_title") instead of the hardcoded "Ergopti — IA"')
 }
-Test("i18n: ui_style fatal MsgBox and LLM install TrayTip route through t() instead of hardcoded French", _MetaUiStyleAndLlmTrayI18n)
+Test("i18n: ui_style fatal MsgBox and LLM install notification route through t() instead of hardcoded French", _MetaUiStyleAndLlmTrayI18n)

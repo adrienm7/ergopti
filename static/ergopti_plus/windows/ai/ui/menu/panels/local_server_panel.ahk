@@ -633,7 +633,7 @@ class LLM_LocalServerPanel {
 			; Production publication is the bounded native effect. Observer ports
 			; run outside Critical and only observe current-at-claim authority.
 			if !this.Options.Has("notify") {
-				TrayTip(Body, Label, Icon)
+				NotifierSend(Body, Map("title", Label, "level", Icon == "Iconi" ? "info" : "warning", "sound", true))
 				return true
 			}
 		} finally Critical(ClaimCritical)

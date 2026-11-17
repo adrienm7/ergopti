@@ -308,13 +308,13 @@ _LAT_MsgBoxContract() {
 	Surface := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_ApiTestSurface"))
 	Assert(InStr(Surface, "MsgBox(") > 0,
 		"the surface seam must pop a MsgBox in production")
-	Assert(InStr(Surface, "TrayTip(") == 0,
+	Assert(InStr(Surface, "TrayTip(") == 0 && InStr(Surface, "NotifierSend(") == 0,
 		"the surface seam must never fall back to a TrayTip")
 	for FnName in ["_LLM_Menu_TestActiveApiEntry", "_LLM_Menu_OnApiTestDone"] {
 		Code := _StripFullLineComments(_DriverFuncBody(FnName))
 		Assert(InStr(Code, "_LLM_Menu_ApiTestSurface(") > 0,
 			FnName . " must route its verdict through the surface seam")
-		Assert(InStr(Code, "TrayTip(") == 0,
+		Assert(InStr(Code, "TrayTip(") == 0 && InStr(Code, "NotifierSend(") == 0,
 			FnName . " must not show a bare TrayTip for a Test verdict")
 	}
 }

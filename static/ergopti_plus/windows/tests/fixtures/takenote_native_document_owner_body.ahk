@@ -23,6 +23,11 @@ LoggerWarn(Args*) {
 	FileAppend("DIAGNOSTIC unexpected logger warning`n", "*")
 }
 t(Key) => Key
+; The overridden ReportError never notifies; the base one names the notifier.
+NotifierSend(Args*) {
+	FileAppend("DIAGNOSTIC unexpected notification`n", "*")
+	return false
+}
 SendFinalResult(Args*) {
 	throw Error("This document-identity probe never authorizes final text input.")
 }

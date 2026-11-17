@@ -476,7 +476,7 @@ GestureScreenshotInstant() {
 		try {
 				WinGetPos(&WX, &WY, &WW, &WH, "A")
 				if (WW = 0 or WH = 0) {
-						try TrayTip(t("shortcuts.no_active_window"), t("shortcuts.screenshot_title"), "Iconx Mute")
+						try NotifierSend(t("shortcuts.no_active_window"), Map("title", t("shortcuts.screenshot_title"), "level", "error"))
 						return
 				}
 				FilePath := GestureScreenshotPath()
@@ -491,7 +491,7 @@ GestureScreenshotInstant() {
 				GestureCaptureRegion(WX, WY, WW, WH, "save", FilePath, GestureScreenshotComplete.Bind("Instant", "save", FilePath))
 		} catch as Err {
 				LoggerError("gestures", "GestureScreenshotInstant launch failed: {1}", Err.Message)
-				try TrayTip(t("notify.screenshot_start_failed"), "ErgoptiPlus", "Iconx Mute")
+				try NotifierSend(t("notify.screenshot_start_failed"), Map("level", "error"))
 		}
 }
 
@@ -571,7 +571,7 @@ GestureOpenConfiguredURL(BindingId := "") {
 		try Run(URL)
 		catch as Err {
 				LoggerError("gestures", "open_url launch failed for binding '{1}': {2}", BindingId, Err.Message)
-				try TrayTip(t("notify.open_url_failed"), "ErgoptiPlus", "Iconx Mute")
+				try NotifierSend(t("notify.open_url_failed"), Map("level", "error"))
 		}
 }
 
@@ -588,7 +588,7 @@ GestureOpenChatGpt() {
 				Run(Link)
 		} catch as Err {
 				LoggerError("gestures", "open_chatgpt failed: {1}", Err.Message)
-				try TrayTip(t("notify.open_gpt_failed"), "ErgoptiPlus", "Iconx Mute")
+				try NotifierSend(t("notify.open_gpt_failed"), Map("level", "error"))
 		}
 }
 
@@ -611,10 +611,10 @@ GesturePickColor() {
 				HexColor := "#" . StrLower(SubStr(PixelGetColor(MouseX, MouseY, "RGB"), 3))
 				if !CB_Write(HexColor)
 						throw Error("clipboard write failed")
-				TrayTip(HexColor, "ErgoptiPlus", "Iconi Mute")
+				NotifierSend(HexColor, 0)
 		} catch as Err {
 				LoggerError("gestures", "GesturePickColor failed: {1}", Err.Message)
-				TrayTip(t("notify.color_copy_failed"), "ErgoptiPlus", "Iconx Mute")
+				NotifierSend(t("notify.color_copy_failed"), Map("level", "error"))
 		}
 }
 

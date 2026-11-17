@@ -455,7 +455,7 @@ ComposerCheck_CopyReport(Text, WriteFn := 0, NoticeFn := 0, TitleKey := "menu.de
 	if !HasMethod(WriteFn, "Call")
 		WriteFn := CB_Write
 	if !HasMethod(NoticeFn, "Call")
-		NoticeFn := (Notice) => TrayTip(Notice, WindowTitle(t(TitleKey)))
+		NoticeFn := (Notice) => NotifierSend(Notice, Map("title", t(TitleKey), "sound", true))
 	; The clipboard takes Windows line breaks, as the window's own text has.
 	if WriteFn.Call(StrReplace(Text, "`n", "`r`n")) != true {
 		LoggerWarn(COMPOSER_CHECK_TAG, "Report not copied: the clipboard refused the write.")

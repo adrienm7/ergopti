@@ -850,10 +850,10 @@ GestureScreenshotComplete(Kind, Mode, Path, Ok, Reason := "") {
 	}
 	if Mode == "save" {
 		LoggerSuccess("gestures", "{1} screenshot saved: '{2}'.", Kind, Path)
-		TrayTip(t("notify.screenshot_saved"), Path, "Iconi Mute")
+		NotifierSend(t("notify.screenshot_saved"), Map("title", Path))
 	} else {
 		LoggerSuccess("gestures", "{1} screenshot copied to clipboard.", Kind)
-		TrayTip(t("notify.screenshot_copied"), t("notify.clipboard"), "Iconi Mute")
+		NotifierSend(t("notify.screenshot_copied"), Map("title", t("notify.clipboard")))
 	}
 }
 
@@ -1209,7 +1209,7 @@ GestureRegionSaveWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 	; A capture with its own completion (the screen reading) reads a private
 	; file: the saved-screenshot notification would name it to the user.
 	if !IsObject(State.Get("callback", 0))
-		TrayTip(t("notify.screenshot_saved"), State["path"], "Iconi Mute")
+		NotifierSend(t("notify.screenshot_saved"), Map("title", State["path"]))
 }
 
 GestureRegionCaptureFinish(Epoch, Reason, CancelWorker := false) {

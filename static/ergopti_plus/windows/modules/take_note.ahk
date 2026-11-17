@@ -194,7 +194,7 @@ class _TakeNoteNative {
 
 	static ReportError(Message) {
 		LoggerError("TakeNote", "Deferred note-window transaction failed: {1}", Message)
-		try TrayTip(t("notify.take_note_failed"), "ErgoptiPlus", "Iconx Mute")
+		try NotifierSend(t("notify.take_note_failed"), Map("level", "error"))
 	}
 }
 

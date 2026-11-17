@@ -23,7 +23,7 @@ _CPHNB_KeyboardAndGesturePickersFailFast() {
             Name . " must use the guarded clipboard adapter")
         Assert(InStr(Body, "LoggerError") > 0,
             Name . " must log a failed color copy instead of silently losing the action")
-        Assert(InStr(Body, "TrayTip") > 0,
+        Assert(InStr(Body, "NotifierSend(") > 0,
             Name . " must give nonblocking user feedback")
         Assert(InStr(Body, "MsgBox") = 0,
             Name . " must not open a modal dialog on the driver message thread")

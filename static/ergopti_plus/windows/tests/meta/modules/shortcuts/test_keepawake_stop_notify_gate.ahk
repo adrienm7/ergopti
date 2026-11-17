@@ -44,7 +44,7 @@ _KASNG_CheckGuardedNotification() {
 	Assert(GuardPos > 0,
 		"StopActivitySimulation must guard its 'stopped' notification on the captured prior state (keepawake-stop-notify-gate)")
 	Assert(NotifyPos > GuardPos,
-		"The 'keepawake.stopped' TrayTip must sit inside the WasActive guard, not fire unconditionally")
+		"The 'keepawake.stopped' notification must sit inside the WasActive guard, not fire unconditionally")
 }
 
 

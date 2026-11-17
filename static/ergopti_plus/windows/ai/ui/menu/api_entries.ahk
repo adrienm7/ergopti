@@ -561,12 +561,12 @@ _LLM_Menu_OnApiValidationDone(reachable, Name, EntryId, Owner, NotifyFn := 0) {
 		if HasMethod(NotifyFn, "Call") {
 			NotifyFn.Call(reachable ? true : false, CurrentName)
 		} else if reachable {
-			TrayTip(StrReplace(t("menu.llm.api_validated_body"), "%s", CurrentName),
-				t("menu.llm.api_validated_title"), "Iconi")
+			NotifierSend(StrReplace(t("menu.llm.api_validated_body"), "%s", CurrentName),
+				Map("title", t("menu.llm.api_validated_title"), "sound", true))
 		} else {
 			Prefix := _LLM_Menu_ApiValidationFailurePrefix(Owner)
-			TrayTip(StrReplace(t(Prefix . "body"), "%s", CurrentName),
-				t(Prefix . "title"), "Icon!")
+			NotifierSend(StrReplace(t(Prefix . "body"), "%s", CurrentName),
+				Map("title", t(Prefix . "title"), "level", "warning", "sound", true))
 		}
 		return true
 	} finally Critical(PreviousCritical)

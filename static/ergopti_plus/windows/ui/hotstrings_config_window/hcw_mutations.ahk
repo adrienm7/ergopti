@@ -127,7 +127,7 @@ _HCW_CompleteNativeReset(Owner, Outcome) {
 		}
 	} finally Critical(PreviousCritical)
 	_HCW_RetryRetiredNativeResets()
-	TrayTip(t("hs_config.notify_reset_all"), t("hs_config.btn_reset_all"), "Iconi Mute")
+	NotifierSend(t("hs_config.notify_reset_all"), Map("title", t("hs_config.btn_reset_all")))
 }
 
 ; A refused retirement never restores A over a successor. Its independent

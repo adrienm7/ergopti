@@ -404,7 +404,7 @@ _HCWWeb_ReconcileReset(Outcome) {
 }
 
 _HCWWeb_ReportResetSuccess(Outcome) {
-	TrayTip(t("hs_config.notify_reset_all"), t("hs_config.btn_reset_all"), "Iconi Mute")
+	NotifierSend(t("hs_config.notify_reset_all"), Map("title", t("hs_config.btn_reset_all")))
 }
 
 ; Clear every override across all categories (common / personal / extension),

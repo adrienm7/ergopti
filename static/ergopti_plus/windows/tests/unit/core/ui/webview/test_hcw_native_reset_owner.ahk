@@ -39,12 +39,16 @@ _HNRT_Source() {
 	Code .= "#Include " . _HCWT_LocaleOwner() . "`n"
 	Owners := Map()
 	for Symbol in ["_HCWWeb_TryOpen", "HotstringsLanguagePacks", "ReadTomlFile", "Gui_Create",
-		"WMPresentWindow", "RebuildHotstringsLive", "_HSE_SourcePriority", "_PersonalTomlOverrideFields"] {
+		"WMPresentWindow", "RebuildHotstringsLive", "_HSE_SourcePriority", "_PersonalTomlOverrideFields",
+		"NotifierSend"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "" && !Owners.Has(Owner), "Each real component owner is uniquely admitted: " . Symbol)
 		Owners[Owner] := true
 		Code .= "#Include " . Owner . "`n"
 	}
+	; The reset's success notice reaches a recorder, never the desktop: after
+	; the notifier's include, whose top level resets the seam.
+	Code .= "NotifierSetDisplaySink((*) => 1)`n"
 	return Code . "#Include " . _DriverDir . "\tests\fixtures\hcw_native_reset_owner_body.ahk`n"
 }
 

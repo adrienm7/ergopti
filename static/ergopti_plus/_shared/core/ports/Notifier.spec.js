@@ -45,6 +45,8 @@ const portContract = {
 	 *   @param {string} [opts.title]      Notification title. Defaults to "Ergopti+".
 	 *   @param {string} [opts.level]      Severity: "info"|"success"|"warning"|"error".
 	 *          Default: "info".
+	 *   @param {boolean} [opts.sound]     Plays the system sound. Default: false,
+	 *          a silent notice (the macOS and Linux adapters ask for none).
 	 *   @param {Function} [opts.onClick]  Called with no args if the user clicks
 	 *          the notification. Ignored on platforms that do not support it.
 	 *   @returns {void}

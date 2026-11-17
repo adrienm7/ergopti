@@ -365,7 +365,7 @@ _ErrorDialog_Open(Record) {
 			Heading := t("error_dialog.heading")
 			if !_ErrorDialog_IsCurrent(Epoch)
 				return false
-			NotifierSend(Heading . "`n`n" . Record["message"], Map("title", "ErgoptiPlus", "level", "error"))
+			NotifierSend(Heading . "`n`n" . Record["message"], Map("level", "error"))
 			if _ErrorDialog_IsCurrent(Epoch)
 				LoggerWarn("ErrorDialog", "WebView2 is unavailable; the error was announced by a notification.")
 			return false

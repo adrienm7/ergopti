@@ -788,7 +788,7 @@ _PTME_NoMutationSiteDropsAResultOrRunsBareSuccessEffects() {
 	]
 	BareWrite := "m)^[ \t]*(?:_HCW_(?:FlushNumericWrite|SetOverride|ClearOverride|PatchTomlMeta)"
 		. "|_HCWWeb_(?:ResetAll|SetAllGrey)|Hotstrings(?:SetOverride|ClearOverride))\s*\("
-	BareSuccessEffect := "m)^[ \t]*(?:try[ \t]+)?TrayTip\s*\("
+	BareSuccessEffect := "m)^[ \t]*(?:try[ \t]+)?(?:TrayTip|NotifierSend)\s*\("
 	for Name in Sites {
 		Body := _DriverFuncBody(Name)
 		SearchBody := RegExReplace(Body, "s)^[^{]*\{", "",, 1)

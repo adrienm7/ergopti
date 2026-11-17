@@ -647,7 +647,7 @@ class SystemControl {
 
 	; Shows a short notice.
 	Notify(Text) {
-		TrayTip(Text, "ErgoptiPlus", "Iconi Mute")
+		NotifierSend(Text, 0)
 	}
 
 	; Asks OK/Cancel with Cancel as the default button.

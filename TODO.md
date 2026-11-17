@@ -396,6 +396,10 @@ more`, macOS and WebKit) does not switch the Studio frames to the black-and-yell
     sets `GTK_IM_MODULE` only, from the user installer only;
   - pause: a dead key pending in the system's own layout (no emulation) stays the OS's state; the macOS pause and
     resume notices are kept (Linux shows them too);
+  - Windows notifications (decided by the agent on 2026-11-17): every notice goes through `NotifierSend`, silent
+    by default as the macOS and Linux adapters (which ask for no sound); only the notices that played the system
+    sound keep it (`sound`: the update offer, the AI notices, the composer check). Feature, pause and quit notices
+    lost their sound;
   - parity: GSD-1, the macOS live x1 swipe fires twice for a touch going right then back left (Windows and Linux
     once), kept as it is; HCD-3, macOS and Linux type one field for the named personal tags, as Windows;
   - performance: no `input.latency` span on Windows (its InputHook callbacks receive no event time, and a second

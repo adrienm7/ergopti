@@ -426,6 +426,7 @@ InstallSendNoOps()
 #Include meta/suite/test_isset_no_property_arg.ahk
 #Include unit/platform/system/test_adapter_contract_vectors.ahk
 #Include unit/platform/system/test_adapter_contract_vectors_system.ahk
+#Include unit/platform/system/test_notifier_send.ahk
 #Include unit/platform/input/test_clipboard_paste_transaction_ownership.ahk
 #Include unit/platform/input/test_selection_capture_receiving.ahk
 #Include unit/platform/input/test_suppressive_inputhook_ownership.ahk
@@ -2301,6 +2302,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/settings/persistence/test_toggle_category_all_features_atomic.ahk
 #Include meta/core/crypto/test_djb2_fallback_logged.ahk
 #Include meta/platform/system/test_adapter_callback_swallow_logged.ahk
+#Include meta/platform/system/test_notifier_single_owner.ahk
 #Include meta/ai/prediction/test_callbacks_never_swallowed.ahk
 #Include meta/ai/prediction/test_inflight_hygiene.ahk
 #Include meta/ai/api/test_semantic_config_class.ahk

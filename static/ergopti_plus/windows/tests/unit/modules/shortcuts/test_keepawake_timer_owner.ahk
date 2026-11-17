@@ -112,7 +112,7 @@ _KATO_Source(Receipt) {
 		Source .= 'Features["shortcuts"]["' . Nested . '"] := Map("enabled", false)' . "`n"
 	Seen := Map()
 	for Symbol in ["LoggerInfo", "WallClockTimestamp", "TickElapsed", "KS_AltGrKeyName", "CryptoSha256Bytes",
-		"KL_JsonEncode", "JsonStringLiteral", "t"] {
+		"KL_JsonEncode", "JsonStringLiteral", "t", "NotifierSend"] {
 		Path := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Path != "" && _DriverFuncBody(Symbol) != "", "the real child dependency must resolve: " . Symbol)
 		if !Seen.Has(Path) {
@@ -120,6 +120,9 @@ _KATO_Source(Receipt) {
 			Seen[Path] := true
 		}
 	}
+	; After the notifier's include, whose top level resets the seam: the
+	; keep-awake notices reach a recorder, never the desktop.
+	Source .= "NotifierSetDisplaySink((*) => 1)`n"
 	BodyPath := _DriverDir . "\tests\fixtures\keepawake_timer_owner_body.ahk"
 	Body := FSReadStrict(BodyPath)
 	AssertTrue(Body != "")

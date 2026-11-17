@@ -88,7 +88,7 @@ StartActivitySimulation(*) {
 				StopActivitySimulation(false)
 				return false
 		}
-		try TrayTip(t("keepawake.started"), t("keepawake.title"), "Iconi Mute")
+		try NotifierSend(t("keepawake.started"), Map("title", t("keepawake.title")))
 		return true
 }
 
@@ -123,7 +123,7 @@ StopActivitySimulation(Notify := true) {
 		; Stop the keypress detector
 		HookStopped := AwakeStopCancellationHook()
 		if WasActive and Notify
-				try TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Iconi Mute")
+				try NotifierSend(t("keepawake.stopped"), Map("title", t("keepawake.title")))
 		return HookStopped
 }
 
@@ -392,7 +392,7 @@ SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened, Pat
 ; @param {String} Reason English detail for the log.
 _SearchReportUnopened(MessageKey, Target, Reason) {
 		LoggerError("Search", "Could not open '{1}': {2}.", Target, Reason)
-		try TrayTip(StrReplace(t(MessageKey), "%s", Target), "ErgoptiPlus", "Iconx Mute")
+		try NotifierSend(StrReplace(t(MessageKey), "%s", Target), Map("level", "error"))
 		catch as Err {
 				LoggerError("Search", "The notice for '{1}' could not be shown: {2}.", Target, Err.Message)
 		}
@@ -531,7 +531,7 @@ OpenDownloads(*) {
 				return _OpenDownloadsWith(GetKnownFolderDownloads, Run)
 		} catch as Err {
 				LoggerError("Shortcuts", "OpenDownloads failed: {1}", Err.Message)
-				try TrayTip(t("notify.open_downloads_failed"), "ErgoptiPlus", "Iconx Mute")
+				try NotifierSend(t("notify.open_downloads_failed"), Map("level", "error"))
 				return false
 		}
 }
