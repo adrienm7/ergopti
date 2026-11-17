@@ -2982,6 +2982,8 @@
 			if (at >= 0) {
 				corpora.splice(at, 1, entry);
 				fillCorpora();
+				// A refresh may bring or drop the final text: the « + » boxes follow it.
+				fillLayouts();
 				if (state.corpus === corpus.id) analyse();
 				return;
 			}
