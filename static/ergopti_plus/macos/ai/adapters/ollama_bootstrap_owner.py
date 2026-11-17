@@ -55,6 +55,18 @@ class NetworkSnapshot:
     def store_fields(self):
         return self.shared.store_fields()
 
+    def environment(self):
+        try:
+            return self.shared.environment()
+        except POLICY.BootstrapRefusal as error:
+            raise ImageRefusal(str(error)) from error
+
+    def with_environment(self, changes):
+        try:
+            return NetworkSnapshot(self.shared.with_environment(changes))
+        except POLICY.BootstrapRefusal as error:
+            raise ImageRefusal(str(error)) from error
+
     def authenticated_bytes(self, session_bytes, token):
         try:
             return self.shared.authenticated_bytes(session_bytes, token)
@@ -69,6 +81,9 @@ class EmptyNetworkBootstrap(OWNER.EmptySession):
     def acquire(cls, session, snapshot, *, register):
         value = cls.acquire_sibling(session, "network", register=register)
         value.snapshot = snapshot
+        # Set by the serve owner when the sign-in relay was asked for: it maps
+        # the guardian's relay answer to the snapshot the daemon reads.
+        value.relayed = None
         return value
 
     def fields(self):
@@ -93,9 +108,10 @@ class EmptyNetworkBootstrap(OWNER.EmptySession):
         self.validate()
         self.session.validate()
         operation.recheck_source()
-        payload = self.snapshot.authenticated_bytes(
-            self.session._written, self.session.data["token"]
-        )
+        snapshot = self.snapshot
+        if self.relayed is not None:
+            snapshot = self.relayed(operation.relay)
+        payload = snapshot.authenticated_bytes(self.session._written, self.session.data["token"])
         while len(self._written) < len(payload):
             operation.progress()
             count = os.write(self._file_fd, payload[len(self._written) :])

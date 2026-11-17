@@ -474,6 +474,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/test/macos_managed_ollama_explicit_stream_test.py', 6]);
 	cases.push(['tools/diagnostics/macos_managed_ollama_receiving_test.py', 42]);
 	cases.push(['tools/test/managed_ollama_sessions_test.py', 11]);
+	cases.push(['tools/test/managed_ollama_proxy_relay_test.py', 14]);
 	cases.push(['tools/diagnostics/macos_ollama_alias_selector_test.py', 8]);
 	cases.push(['tools/diagnostics/macos_ollama_hint_metadata_test.py', 19]);
 	cases.push(['tools/diagnostics/macos_ollama_serve_command_receiving_test.py', 2]);
@@ -488,12 +489,12 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_owned_private_session_test.py', 5]);
 	cases.push(['tools/test/macos_bootstrap_tls_numeric_binding_test.py', 8]);
 	cases.push(['tools/test/owned_suspended_image_portable_test.py', 3]);
-	cases.push(['tools/diagnostics/macos_suspended_image_owner_test.py', 39]);
+	cases.push(['tools/diagnostics/macos_suspended_image_owner_test.py', 44]);
 	cases.push(['tools/diagnostics/macos_ollama_bootstrap_owner_test.py', 24]);
 	cases.push(['tools/diagnostics/macos_trusted_native_guardian_test.py', 10]);
 	cases.push(['tools/diagnostics/macos_guardian_retirement_order_test.py', 6]);
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_test.py', 14]);
-	cases.push(['tools/diagnostics/macos_managed_ollama_serve_test.py', 47]);
+	cases.push(['tools/diagnostics/macos_managed_ollama_serve_test.py', 50]);
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_reader_test.py', 13]);
 	cases.push(['tools/diagnostics/macos_native_wire_swift_dependencies_test.py', 11]);
 	// Preserve the original 37 controls, seven atomic-result receiving laws and

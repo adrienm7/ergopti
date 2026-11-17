@@ -43,6 +43,7 @@ PROXY = load(
 NATIVE = load("ergopti_serve_native_helper", DRIVER / "core/network/adapters/native_http.py")
 API = load("ergopti_serve_native_api", DRIVER / "core/network/adapters/native_ollama_api.py")
 PULL = load("ergopti_serve_admission_owner", SHARED / "ai/adapters/python/managed_ollama_pull.py")
+RELAY = load("ergopti_serve_proxy_relay", Path(__file__).with_name("managed_ollama_proxy_relay.py"))
 
 
 class ServeRefusal(RuntimeError):
@@ -199,7 +200,12 @@ class ServeOwner:
         register,
         listener_event=False,
         log_directory=None,
+        relay_options=None,
     ):
+        if relay_options is not None and not isinstance(relay_options, RELAY.RelayOptions):
+            raise ServeRefusal("protocol")
+        self._relay_options = relay_options
+        self.relay_decision = None
         if (
             type(port) is not int
             or not 1024 <= port <= 65535
@@ -301,6 +307,7 @@ class ServeOwner:
         # only route by which Go and the native worker would read one. The field
         # run of 2026-10-27 19:47 inherited a bundle the worker refused.
         snapshot = self.policy.capture(math.ceil(self.idle_timeout * 1000), inherited_trust=False)
+        snapshot = self._decide_relay(snapshot)
         self.target = RUNTIME.owned_directory()
         self.expected_receipt = RUNTIME.POLICY.receipt(
             contract_bytes, catalogue_bytes, host, self.asset
@@ -380,7 +387,14 @@ class ServeOwner:
                 "network_policy": str(SHARED / "core/network/data/proxy_policy.json"),
                 "host": "127.0.0.1:" + str(self.port),
                 **self.bootstrap.fields(),
+                **(
+                    self.relay_decision.request_fields(self._relay_options)
+                    if self.relay_decision is not None
+                    else {}
+                ),
             }
+            if self.relay_decision is not None and self.relay_decision.outcome == "required":
+                self.bootstrap.relayed = self._relayed_snapshot
             if self._log_directory is not None:
                 public["log_directory"] = self._log_directory
             if self._listener_event:
@@ -414,6 +428,45 @@ class ServeOwner:
                     "operation", primary=primary, cleanup=self._cleanup_debt
                 ) from primary
             raise
+
+    def _decide_relay(self, snapshot):
+        """Ask the sign-in relay's probe about the captured route, before any seal.
+
+        docs/design/proxy-auth-relay.md, "macOS managed daemon". A refusal
+        removes every proxy from the snapshot, as start_without_proxy_after_refusal
+        does for the stock daemon; "required" is answered at release_key time.
+        """
+        if self._relay_options is None:
+            return snapshot
+        proxies = PROXY.ProxyPolicy()
+        self._relay_proxy_names = tuple(proxies.system_lookup_environment_exclusions)
+        try:
+            launcher = NATIVE._resolve_worker()
+        except NATIVE.NativeHTTPError:
+            # The same resolution refuses the start below, by its own name.
+            return snapshot
+        self.relay_decision = RELAY.decide(
+            self._relay_options,
+            snapshot.environment(),
+            proxies.orders["https"],
+            launcher,
+            remaining=max(0.001, self.deadline - time.monotonic()),
+        )
+        if self.relay_decision.outcome == "refused":
+            return snapshot.with_environment({name: None for name in self._relay_proxy_names})
+        return snapshot
+
+    def _relayed_snapshot(self, answer):
+        """The snapshot the daemon reads once the guardian answered for listen."""
+        snapshot = self.bootstrap.snapshot
+        if answer is not None and answer[0] == "route":
+            RELAY.log("started")
+            return snapshot.with_environment(
+                {self.relay_decision.name: RELAY.route(answer[1], answer[2])}
+            )
+        reason = answer[1] if answer is not None else RELAY.UNAVAILABLE
+        self.relay_decision = RELAY.refuse(self._relay_options, reason)
+        return snapshot.with_environment({name: None for name in self._relay_proxy_names})
 
     def start(self):
         if not self._prepared or self._started or self._retirement_deadline is not None:
@@ -659,6 +712,7 @@ def serve(
     acquire_readiness=False,
     owned_stdin=False,
     log_directory=None,
+    relay_options=None,
 ):
     # The caller binding is public randomness, never the daemon session token.
     # Only this native owner may project its authenticated lifecycle to stdout.
@@ -702,6 +756,7 @@ def serve(
         register=lambda value: None,
         listener_event=acquire_readiness,
         log_directory=log_directory,
+        relay_options=relay_options,
     )
 
     def cancelled(signum, frame):
@@ -761,7 +816,26 @@ def main():
     parser.add_argument("--acquire-readiness", action="store_true")
     parser.add_argument("--owned-stdin", action="store_true")
     parser.add_argument("--log-directory")
+    # The sign-in relay (docs/design/proxy-auth-relay.md): all six or none.
+    parser.add_argument("--proxy-relay-receipt")
+    parser.add_argument("--proxy-relay-authority")
+    for name in ("dial", "handshake", "idle", "probe"):
+        parser.add_argument("--proxy-relay-%s-ms" % name, type=int)
     arguments = parser.parse_args()
+    relay_values = (
+        arguments.proxy_relay_receipt,
+        arguments.proxy_relay_authority,
+        arguments.proxy_relay_dial_ms,
+        arguments.proxy_relay_handshake_ms,
+        arguments.proxy_relay_idle_ms,
+        arguments.proxy_relay_probe_ms,
+    )
+    relay_options = None
+    if any(value is not None for value in relay_values):
+        try:
+            relay_options = RELAY.RelayOptions(*relay_values)
+        except ValueError:
+            return 64
     if not 1024 <= arguments.port <= 65535 or any(
         not math.isfinite(value) or value <= 0
         for value in (arguments.timeout, arguments.idle_timeout, arguments.retirement_timeout)
@@ -777,6 +851,7 @@ def main():
             acquire_readiness=arguments.acquire_readiness,
             owned_stdin=arguments.owned_stdin,
             log_directory=arguments.log_directory,
+            relay_options=relay_options,
         )
     except ServeRefusal as refusal:
         # The driver logs this line. The reason is a fixed word, never a path

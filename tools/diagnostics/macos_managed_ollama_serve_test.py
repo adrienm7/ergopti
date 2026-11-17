@@ -40,6 +40,11 @@ mode = pathlib.Path(__file__).parents[2] / 'mode'
 if mode.read_text() == 'refuse':
     print('V1 REFUSED 116', flush=True)
     raise SystemExit(0)
+relayed = 'relay_upstream' in request
+if relayed and mode.read_text() == 'relay-refused':
+    print('V1 RELAY_REFUSED relay_listen_failed', flush=True)
+elif relayed:
+    print('V1 RELAY 40123 ' + '0123456789abcdef' * 4, flush=True)
 child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])
 try:
     print('V1 IMAGE_READY', child.pid, os.geteuid(), '123', '456', request['device'], request['inode'], flush=True)
@@ -61,6 +66,7 @@ try:
                 print('V1 LISTENER_BOUND', session.name[7:-5], flush=True)
         elif line == 'CANCEL\n' or line == '':
             child.terminate(); child.wait()
+            if relayed: print('V1 RELAY_CLOSED 0', flush=True)
             print('V1 OUTGOING_CLOSED 0', flush=True)
             print('V1 BOOTSTRAP_CLOSED 0', flush=True)
             print('V1 RETIRED 143 1 1 0 0 0 0', flush=True)
@@ -97,6 +103,9 @@ class ProductionServeControls(unittest.TestCase):
             "_shared/core/network/adapters/python_network_proxy_policy.py",
             "_shared/core/network/data/proxy_policy.json",
             "_shared/ai/data/managed_ollama_bootstrap.json",
+            "_shared/core/network/adapters/python_proxy_auth_relay.py",
+            "_shared/core/network/data/proxy_auth_relay.json",
+            "macos/ai/engine/ollama/managed_ollama_proxy_relay.py",
         ]
         for relative in dependencies:
             target = payload / relative
@@ -271,6 +280,77 @@ class ProductionServeControls(unittest.TestCase):
             self.assertNotIn("synthetic-secret", public)
             self.assertNotIn("account.pem", public)
             self.assertEqual(owner.operation.request["proxy_url"], "")
+
+    # The sibling sign-in relay (docs/design/proxy-auth-relay.md, "macOS managed daemon")
+    def relay_owner(self, answer, mode):
+        relay = self.launcher.with_name("ergopti-proxy-relay")
+        relay.write_text(
+            "#!" + sys.executable + "\nimport pathlib, sys\n"
+            "code, line = pathlib.Path(__file__).with_name('relay-answer').read_text().split(' ', 1)\n"
+            "sys.stdout.write(line)\nraise SystemExit(int(code))\n"
+        )
+        relay.chmod(0o755)
+        relay.with_name("relay-answer").write_text(answer)
+        (self.app / "mode").write_text(mode)
+        self.receipt = self.home / "caches/proxy_relay_refusal"
+        options = self.subject.RELAY.RelayOptions(
+            str(self.receipt), "registry.ollama.ai:443", 1000, 1000, 1000, 5000
+        )
+        self.owner = self.subject.ServeOwner(
+            11434,
+            5,
+            60,
+            5,
+            register=lambda value: setattr(self, "owner", value),
+            relay_options=options,
+        )
+        settings = {"HTTPS_PROXY": "http://relay.invalid:8080", "NO_PROXY": ".corp.invalid"}
+        with patch.dict(os.environ, settings), contextlib.redirect_stderr(io.StringIO()) as log:
+            owner = self.owner.prepare().start()
+        payload = json.loads(
+            owner.policy.shared.authenticate(
+                owner.bootstrap._written, owner.session._written, owner.session.data["token"]
+            )
+        )
+        return owner, dict(payload["environment"]), log.getvalue()
+
+    def test_relay_route_replaces_the_selected_proxy_in_the_sealed_snapshot(self):
+        token = "0123456789abcdef" * 4
+        owner, environment, log = self.relay_owner(
+            '0 {"schema":1,"status":"required","scheme":"negotiate"}\n', "relay"
+        )
+        self.assertEqual(
+            environment,
+            {
+                "HTTPS_PROXY": "http://ergopti:%s@127.0.0.1:40123" % token,
+                "NO_PROXY": ".corp.invalid",
+            },
+        )
+        self.assertEqual(owner.operation.request["relay_upstream"], "http://relay.invalid:8080")
+        self.assertNotIn(token, json.dumps(owner.operation.request))
+        self.assertNotIn(token, log)
+        self.assertNotIn("relay.invalid", log)
+        self.assertFalse(self.receipt.exists())
+        self.assertTrue(owner.retire(5))
+
+    def test_refused_listen_starts_without_proxy_and_writes_the_receipt(self):
+        owner, environment, log = self.relay_owner(
+            '0 {"schema":1,"status":"required","scheme":"negotiate"}\n', "relay-refused"
+        )
+        self.assertEqual(environment, {"NO_PROXY": ".corp.invalid"})
+        self.assertEqual(self.receipt.read_text(), "relay_listen_failed\n")
+        self.assertIn("Managed Ollama proxy sign-in relay: refused relay_listen_failed.", log)
+        self.assertTrue(owner.retire(5))
+
+    def test_refused_probe_asks_no_relay_and_starts_without_proxy(self):
+        owner, environment, log = self.relay_owner(
+            '3 {"schema":1,"status":"refused","reason":"sign_in_unavailable"}\n', "normal"
+        )
+        self.assertEqual(environment, {"NO_PROXY": ".corp.invalid"})
+        self.assertNotIn("relay_upstream", owner.operation.request)
+        self.assertEqual(self.receipt.read_text(), "sign_in_unavailable\n")
+        self.assertEqual(log, "Managed Ollama proxy sign-in relay: refused sign_in_unavailable.\n")
+        self.assertTrue(owner.retire(5))
 
     def test_missing_source_bound_policy_fingerprint_refuses_before_fd_or_alias(self):
         values = list(self.input_values)

@@ -231,6 +231,11 @@ class SuspendedImageOwner:
         self._outgoing_closed = None
         self._bootstrap_closed = None
         self._logs_closed = None
+        # The sibling sign-in relay (docs/design/proxy-auth-relay.md): ("route",
+        # port, token) or ("refused", reason) before IMAGE_READY; the token only
+        # reaches the bootstrap snapshot, never a receipt or a log.
+        self.relay = None
+        self._relay_closed = None
         self._failure = None
         self._protocol_debt = False
         self._close_debt = None
@@ -316,6 +321,9 @@ class SuspendedImageOwner:
         os.set_blocking(self.process.stdin.fileno(), False)
         self._send(wire, self._startup_deadline)
         self._wait(lambda: self.image_ready, self._startup_deadline)
+        if "relay_upstream" in self.request and self.relay is None:
+            # The guardian answers the relay before the image proof, or refuses.
+            raise ImageRefusal("protocol")
         self.recheck_source()
         self.session.release_key(self)
         if self.bootstrap is not None:
@@ -398,6 +406,31 @@ class SuspendedImageOwner:
                 # retiring this exact owner. It cannot grant listener readiness.
                 if time.monotonic() < self._startup_deadline:
                     self.listener_bound = True
+            elif role == "RELAY" and len(fields) == 4:
+                if (
+                    "relay_upstream" not in self.request
+                    or self.relay is not None
+                    or self.image_ready
+                ):
+                    raise ImageRefusal("protocol")
+                port = decimal(fields[2], 65535, positive=True)
+                if re.fullmatch(r"[0-9a-f]{64}", fields[3]) is None:
+                    raise ImageRefusal("protocol")
+                self.relay = ("route", port, fields[3])
+            elif role == "RELAY_REFUSED" and len(fields) == 3:
+                if (
+                    "relay_upstream" not in self.request
+                    or self.relay is not None
+                    or self.image_ready
+                    or fields[2] not in ("relay_listen_failed", "relay_unavailable")
+                ):
+                    raise ImageRefusal("protocol")
+                self.relay = ("refused", fields[2])
+            elif role == "RELAY_CLOSED" and len(fields) == 3:
+                if "relay_upstream" not in self.request or self._relay_closed is not None:
+                    raise ImageRefusal("protocol")
+                self._relay_closed = decimal(fields[2], 2**31 - 1)
+                self._retirement_started = True
             elif role == "PENDING" and len(fields) == 3:
                 decimal(fields[2], 2**31 - 1)
                 self._retirement_started = True
@@ -431,6 +464,8 @@ class SuspendedImageOwner:
                 if self.bootstrap is not None and self._bootstrap_closed is None:
                     raise ImageRefusal("protocol")
                 if "log_directory" in self.request and self._logs_closed is None:
+                    raise ImageRefusal("protocol")
+                if "relay_upstream" in self.request and self._relay_closed is None:
                     raise ImageRefusal("protocol")
                 closes = tuple(decimal(value, 2**31 - 1) for value in fields[6:])
                 self._retired = (status, closes)
@@ -529,6 +564,8 @@ class SuspendedImageOwner:
             receipt["log_write_errno"] = self._logs_closed
         if self.bootstrap is not None:
             receipt["bootstrap_close_errno"] = self._bootstrap_closed
+        if "relay_upstream" in self.request:
+            receipt["relay_close_errno"] = self._relay_closed
         return receipt
 
     def settle(self, timeout=15):
@@ -583,6 +620,7 @@ class SuspendedImageOwner:
             or self._outgoing_closed != 0
             or any(self._retired[1])
             or (self.bootstrap is not None and self._bootstrap_closed != 0)
+            or ("relay_upstream" in self.request and self._relay_closed != 0)
         ):
             self._failure = ImageRefusal("cleanup")
         return self._failure is None

@@ -281,7 +281,8 @@ const CURATED_READS = [
 			'SHARED / "core/network/adapters/python_network_proxy_policy.py"',
 			'DRIVER / "core/network/adapters/native_http.py"',
 			'SHARED / "ai/data/managed_ollama_bootstrap.json"',
-			'SHARED / "core/network/data/proxy_policy.json"'
+			'SHARED / "core/network/data/proxy_policy.json"',
+			'Path(__file__).with_name("managed_ollama_proxy_relay.py")'
 		],
 		targets: [
 			'ergopti_plus/macos/ai/engine/ollama/managed_ollama_runtime.py',
@@ -292,9 +293,22 @@ const CURATED_READS = [
 			'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
 			'ergopti_plus/macos/core/network/adapters/native_http.py',
 			'ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json',
-			'ergopti_plus/_shared/core/network/data/proxy_policy.json'
+			'ergopti_plus/_shared/core/network/data/proxy_policy.json',
+			'ergopti_plus/macos/ai/engine/ollama/managed_ollama_proxy_relay.py'
 		],
 		why: 'the serve owner binds original source, empty bootstrap and sealed daemon authority'
+	},
+	{
+		reader: 'ergopti_plus/macos/ai/engine/ollama/managed_ollama_proxy_relay.py',
+		needles: ['SHARED / "core/network/adapters/python_proxy_auth_relay.py"'],
+		targets: ['ergopti_plus/_shared/core/network/adapters/python_proxy_auth_relay.py'],
+		why: 'the managed daemon owner reads the sign-in relay probe through the shared policy'
+	},
+	{
+		reader: 'ergopti_plus/_shared/core/network/adapters/python_proxy_auth_relay.py',
+		needles: ['parents[1] / "data/proxy_auth_relay.json"'],
+		targets: ['ergopti_plus/_shared/core/network/data/proxy_auth_relay.json'],
+		why: 'the relay policy reads the closed refusal and probe sets'
 	},
 	{
 		reader: 'ergopti_plus/macos/ai/adapters/suspended_image_owner.py',

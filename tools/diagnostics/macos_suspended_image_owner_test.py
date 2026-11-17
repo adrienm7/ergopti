@@ -39,6 +39,11 @@ kind = mode.read_text()
 if kind == 'refuse':
     print('V1 REFUSED 116', flush=True)
     raise SystemExit(0)
+relayed = kind.startswith('relay')
+if kind in ('relay', 'relay-unclosed'):
+    print('V1 RELAY 40123 ' + '0123456789abcdef' * 4, flush=True)
+elif kind == 'relay-refused':
+    print('V1 RELAY_REFUSED relay_listen_failed', flush=True)
 child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])
 try:
     inode = request['inode'] if kind != 'wrong-image' else '7'
@@ -54,6 +59,7 @@ try:
         elif line == 'CANCEL\n' or line == '':
             child.terminate()
             child.wait()
+            if relayed and kind != 'relay-unclosed': print('V1 RELAY_CLOSED 0', flush=True)
             if kind != 'missing-outgoing': print('V1 OUTGOING_CLOSED 0', flush=True)
             print('V1 RETIRED 143 1 1 0 0 0 0', flush=True)
             if kind == 'held-eof':
@@ -138,7 +144,9 @@ class ActualOwnerControls(unittest.TestCase):
         )
         return self.session
 
-    def guardian(self, *, source_check=lambda: None, mode="normal", inode="9007199254740993"):
+    def guardian(
+        self, *, source_check=lambda: None, mode="normal", inode="9007199254740993", relay=False
+    ):
         self.build()
         self.mode.write_text(mode)
         self.empty_session()
@@ -151,6 +159,13 @@ class ActualOwnerControls(unittest.TestCase):
             "session_path": str(self.session.path),
             **fields,
         }
+        if relay:
+            request.update(
+                relay_upstream="http://proxy.example:8080",
+                relay_dial_ms=1000,
+                relay_handshake_ms=1000,
+                relay_idle_ms=1000,
+            )
         self.operation = OWNER.SuspendedImageOwner(
             self.binary,
             request,
@@ -445,6 +460,49 @@ class ActualOwnerControls(unittest.TestCase):
         operation.start()
         self.assertTrue(operation.settle())
         self.assertEqual(len(operation._buffers["stderr"]), 65536)
+
+    # The sibling sign-in relay (docs/design/proxy-auth-relay.md, "macOS managed daemon")
+    def test_relay_route_precedes_the_image_and_its_close_is_required(self):
+        operation = self.guardian(mode="relay", relay=True)
+        operation.start()
+        self.assertEqual(operation.relay, ("route", 40123, "0123456789abcdef" * 4))
+        self.assertTrue(operation.settle())
+        receipt = operation.public_receipt()
+        self.assertEqual(receipt["relay_close_errno"], 0)
+        self.assertNotIn("0123456789abcdef" * 4, json.dumps(receipt))
+
+    def test_relay_refusal_is_carried_to_the_caller(self):
+        operation = self.guardian(mode="relay-refused", relay=True)
+        operation.start()
+        self.assertEqual(operation.relay, ("refused", "relay_listen_failed"))
+        self.assertTrue(operation.settle())
+
+    def test_relay_request_without_an_answer_never_releases_the_key(self):
+        operation = self.guardian(mode="relay-silent", relay=True)
+        with self.assertRaisesRegex(OWNER.ImageRefusal, "protocol"):
+            operation.start()
+        self.assertEqual(self.session.path.read_bytes(), b"")
+        self.assertTrue(operation.settle())
+
+    def test_relay_answer_without_a_request_is_a_protocol_refusal(self):
+        operation = self.guardian(mode="relay")
+        with self.assertRaisesRegex(OWNER.ImageRefusal, "protocol"):
+            operation.start()
+        self.assertIsNone(operation.relay)
+        self.assertEqual(self.session.path.read_bytes(), b"")
+
+    def test_missing_relay_close_never_qualifies_native_retirement(self):
+        operation = self.guardian(mode="relay-unclosed", relay=True)
+        operation.start()
+        self.assertFalse(operation.settle())
+        self.assertFalse(operation.physically_retired)
+        operation.process.wait(timeout=3)
+        for name in ("stdin", "stdout", "stderr"):
+            operation._close_stream(name)
+        operation._close_selector()
+        self.operation = None
+        self.session._operation = None
+        self.worker._operation = None
 
     def test_missing_outgoing_close_never_qualifies_native_retirement(self):
         operation = self.guardian(mode="missing-outgoing")
