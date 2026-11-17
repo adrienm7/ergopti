@@ -113,6 +113,15 @@ export class Keyboard {
 				}
 			}
 		}
+
+		// A row whose keys are all removed (data-key '' is display: none, such as
+		// the thumb rows of a standard board) would be an empty row of the
+		// keyboard's table for assistive technology (KeyboardBasis.svelte).
+		for (const row of this.location.querySelectorAll('keyboard-row')) {
+			const filled = [...row.querySelectorAll('keyboard-key')].some((key) => key.dataset['key']);
+			if (filled) row.removeAttribute('aria-hidden');
+			else row.setAttribute('aria-hidden', 'true');
+		}
 	}
 
 	cleanKey(location, row, column) {
