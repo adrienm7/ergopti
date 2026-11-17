@@ -248,6 +248,32 @@ _I18nLazyCacheRoundTripsEscapes() {
 }
 Test("i18n cache: backslash + newline round-trip through the .tsv", _I18nLazyCacheRoundTripsEscapes)
 
+; perf-i18n-tsv-keys-2026-11-17: every key of the boot's 4,830-key locale went
+; through the per-character unescape, most of the 360 ms i18n stage. A key is
+; unescaped only when it holds a backslash, as a value already was, and an
+; escaped key still decodes exactly.
+_I18nTsvUnescapesOnlyEscapedKeys() {
+	BS := Chr(0x5C)
+	M := _I18nParseTSV("plain.key`tValue`n"
+		. "tab" . BS . "tkey" . BS . BS . "x`tv" . BS . "nw`n"
+		. _I18N_TSV_SENTINEL . "2`n", Chr(0x2605), Status := { Complete: false })
+	AssertTrue(Status.Complete, "both records count toward the sentinel")
+	AssertEqual("Value", M["plain.key"])
+	AssertTrue(M.Has("tab`tkey" . BS . "x"), "an escaped key must still decode exactly")
+	AssertEqual("v`nw", M["tab`tkey" . BS . "x"])
+	Body := _StripFullLineComments(_DriverFuncBody("_I18nParseTSV"))
+	Calls := StrSplit(Body, "_I18nUnescapeTSV(").Length - 1
+	Guarded := 0, Pos := 1
+	while (Pos := RegExMatch(Body, 'if InStr\((\w+), "\\"\)\s+\1 := _I18nUnescapeTSV\(\1\)', &Match, Pos)) {
+		Guarded += 1
+		Pos += Match.Len
+	}
+	AssertEqual(2, Calls, "the TSV parse unescapes its key and its value")
+	AssertEqual(Calls, Guarded,
+		"every field unescape of the TSV parse must sit behind its backslash check")
+}
+Test("i18n cache: the .tsv parse unescapes only the fields that hold a backslash", _I18nTsvUnescapesOnlyEscapedKeys)
+
 _I18nLazyCacheStoresRawStar() {
 	_I18nTestReset()
 	global _I18nCache, ScriptInformation

@@ -79,8 +79,8 @@ _I18nLocalePath(Code) {
 }
 
 ; Invert _I18nWriteTsvCache's value escaping in a single left-to-right scan so
-; "\\" never collides with "\n"/"\r". Only called for values that contain a
-; backslash, so the common case pays nothing.
+; "\\" never collides with "\n"/"\r". Only called for keys and values that
+; contain a backslash, so the common case pays nothing.
 _I18nUnescapeTSV(s) {
 	out := ""
 	i := 1
@@ -139,7 +139,11 @@ _I18nParseTSV(Content, MagicKey, Status := unset) {
 		}
 		if (!p)
 			continue
-		k := _I18nUnescapeTSV(SubStr(line, 1, p - 1))
+		; Keys take the values' shortcut too: the per-character unescape of every
+		; key was most of the boot's i18n stage (perf-i18n-tsv-keys-2026-11-17).
+		k := SubStr(line, 1, p - 1)
+		if InStr(k, "\")
+			k := _I18nUnescapeTSV(k)
 		v := SubStr(line, p + 1)
 		if InStr(v, "\")
 			v := _I18nUnescapeTSV(v)
