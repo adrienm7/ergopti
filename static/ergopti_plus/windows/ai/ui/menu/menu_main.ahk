@@ -33,8 +33,15 @@
 
 global _LLM_MenuBuildCoordinator := 0
 
-_LLM_Menu_IsSuspended(*) {
-	return A_IsSuspended
+; A pause stops typing, not configuration (EDD-1): the AI submenu is rebuilt
+; under a settled pause too, so a change made while paused shows at once, as
+; the tray root does. Only a pause transition still in flight holds a build;
+; the watchdog serves it once that transition settled (_SuspendStateWatchdog).
+; @returns {Integer} 1 while a pause transition is in flight, 0 otherwise.
+_LLM_Menu_BuildHeld(*) {
+	global _LifecycleLatestTransition
+	return (A_IsSuspended && IsSet(_LifecycleLatestTransition) && IsObject(_LifecycleLatestTransition)
+		&& _LifecycleLatestTransition.phase == "suspend" && !_LifecycleLatestTransition.finished) ? 1 : 0
 }
 
 _LLM_Menu_ReportBuildError(Err) {
@@ -48,7 +55,7 @@ _LLM_Menu_GetBuildCoordinator() {
 	try {
 		if !(_LLM_MenuBuildCoordinator is LLMMenuBuildCoordinator)
 			_LLM_MenuBuildCoordinator := LLMMenuBuildCoordinator(
-				LLM_Menu_Build, _LLM_Menu_IsSuspended,
+				LLM_Menu_Build, _LLM_Menu_BuildHeld,
 				_LLM_Menu_ReportBuildError)
 		return _LLM_MenuBuildCoordinator
 	} finally Critical(PreviousCritical)
@@ -256,10 +263,11 @@ _LLM_Menu_StateGetters() {
 	; A pause stops typing, not configuration (EDD-1): the switch turns the AI
 	; off while paused, which only stops work. Turning it on waits for resume:
 	; it starts model warmups and may offer an install (decided by the agent on
-	; 2026-11-14, to review by the maintainer).
+	; 2026-11-14, accepted by the coordinator, alike on the three OS). The
+	; whole-scope restore runs while paused.
 	return Map("llm_enabled", () => _LLM_Menu["enabled"],
 		"llm_toggle_ready", () => (!A_IsSuspended || _LLM_Menu["enabled"]) && ConfigFullStateCanPersist(),
-		"llm_scope_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
+		"llm_scope_ready", () => ConfigFullStateCanPersist(),
 		"config_newer_schema", () => ConfigNewerSchemaReadOnly(),
 		"config_older_schema", () => ConfigOlderSchemaReadOnly())
 }
@@ -615,17 +623,14 @@ _LLM_ScopeCommands(Options := unset) {
 
 _LLM_ApplyScope(Mode, Options) {
 	global ConfigurationFile
-	; A retained row callback rechecks what greyed the row when it was built:
-	; a pause or a configuration refused for the session (a newer schema) stops
-	; it before any scope transaction.
+	; A retained row callback rechecks what greyed the row when it was built: a
+	; configuration refused for the session (a newer schema) stops it before any
+	; scope transaction. A pause does not: the whole-scope restore runs while
+	; paused (EDD-1), and what serves predictions waits for the resume.
 	Path := Options.Get("path", IsSet(ConfigurationFile) ? ConfigurationFile : "")
 	Refusal := (Path is String) && Path != "" ? TOML_WriteRefusal(Path) : "no configuration destination"
-	if A_IsSuspended || Refusal != "" {
-		if A_IsSuspended {
-			try LoggerWarn("LLM", "AI settings {1} scope refused: the script is paused.", Mode)
-		} else {
-			ConfigReportPersistenceFailure("the AI settings " . Mode . " scope", Options.Get("notify", 0), Refusal)
-		}
+	if Refusal != "" {
+		ConfigReportPersistenceFailure("the AI settings " . Mode . " scope", Options.Get("notify", 0), Refusal)
 		return Map("status", "refused", "scope", "llm", "mode", Mode)
 	}
 	CandidateOptions := Options.Clone()

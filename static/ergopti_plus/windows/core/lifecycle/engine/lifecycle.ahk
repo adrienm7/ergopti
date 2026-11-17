@@ -933,6 +933,10 @@ _SuspendStateWatchdog() {
 		; resume, and lifts it again on resume (pause-root-rebuild).
 		if IsSet(TrayMenu_RebuildForPauseState)
 				TrayMenu_RebuildForPauseState()
+		; An AI submenu build held while the transition was in flight is served
+		; now that it settled, the pause included (EDD-1).
+		if IsSet(LLM_Menu_ServiceBuilds)
+				LLM_Menu_ServiceBuilds()
 }
 ; Single global shutdown handler wired to OnExit (see the auto-execute section
 ; after the keystats is started). AHK v2 Reload() and ExitApp() tear the process

@@ -876,6 +876,12 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 	global _LLM_Menu_ApiFailureEpoch, _LLM_Menu_ApiPrivateAuthorityGeneration
 	global _LLM_Menu, LLM_REMOTE_TEST_REQUEST, LLM_REMOTE_KIND_API_TEST,
 		LLM_API_TEST_TIMEOUT_MS, LLM_REMOTE_DECISIONS_TEST
+	; The test sends a prediction request, which a pause stops (EDD-1), as on
+	; macOS: it waits for the resume and says so, never ending in silence.
+	if A_IsSuspended {
+		NotifyPausedRefusal("The API entry test")
+		return false
+	}
 	active_id := (EntryId != "") ? EntryId
 		: (_LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : "")
 	entry := ""
@@ -1552,7 +1558,11 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			"apply", ObjBindMethod(this, "Apply"))
 	}
 
-	/** Refuses paused, incomplete, transitioning and foreign-owned configuration. */
+	/**
+	 * Refuses incomplete, transitioning and foreign-owned configuration. A pause
+	 * is not a cause (EDD-1): API entries change while paused, and what serves
+	 * predictions (the bridge, readiness probes) waits for the resume.
+	 */
 	Admit() {
 		PreviousCritical := Critical("Off")
 		try return this._AdmitNonCritical()
@@ -1566,8 +1576,6 @@ class LLM_Menu_ApiPrivateSourceOwner {
 	; nothing, reuse the proof; each sweep's Capture compares again, and so does a
 	; bound bundle's admission and the transaction's own port.
 	_AdmitNonCritical() {
-		if A_IsSuspended
-			return false
 		Standing := this.RegistryProof
 		if !this.SweepAdmission || (this.Bundle is Object)
 			Standing.registry := 0, Standing.shadow := 0
@@ -1596,7 +1604,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 	; This context fence grants no schema or source permission by itself.
 	_AdmitContextNonCritical() {
 		global _LLM_Menu_Loaded, _LifecycleLatestTransition
-		if A_IsSuspended || !IsSet(_LLM_Menu_Loaded) || !_LLM_Menu_Loaded
+		if !IsSet(_LLM_Menu_Loaded) || !_LLM_Menu_Loaded
 				|| ReloadTerminalHandoffActive()
 				|| _LLM_Menu_ApiPrivateLifecycleState()["attempt"] != 0
 			return false
@@ -1636,8 +1644,10 @@ class LLM_Menu_ApiPrivateSourceOwner {
 				|| !LLM_Defaults.Has("llm_backend")
 			return false
 		Lifecycle := _LLM_Menu_ApiPrivateLifecycleState()
+		; The pause state is a fence, not a refusal (EDD-1): a capture taken paused
+		; commits paused, and a pause or a resume in between retires it.
 		Held := Map("owner", this, "lifecycle", Lifecycle, "lifecycle_generation", Lifecycle["generation"],
-			"features", Features, "menu", _LLM_Menu,
+			"paused", A_IsSuspended ? 1 : 0, "features", Features, "menu", _LLM_Menu,
 			"config_path", ConfigurationFile, "api_path", _LLM_Menu_ApiEntriesPath(),
 			"locator", _PathsFile, "providers", LLM_API_PROVIDERS,
 			"servers", LLM_LOCAL_API_SERVERS, "defaults", LLM_Defaults,
@@ -2048,7 +2058,8 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		global _ConfigBootReadFailed, _ConfigBootRejectedOverrides
 		Held := Stamp["held"], State := Stamp["lease_state"]
 		Transition := Stamp["transition"], Handoff := Stamp["handoff"]
-		return !A_IsSuspended && _LLM_Menu_Loaded && !_ConfigBootReadFailed && !_ConfigBootRejectedOverrides
+		return _LLM_Menu_Loaded && !_ConfigBootReadFailed && !_ConfigBootRejectedOverrides
+			&& (A_IsSuspended ? 1 : 0) == Held["paused"]
 			&& Stamp["lifecycle"]["attempt"] == 0
 			&& Stamp["lifecycle"]["generation"] == Stamp["lifecycle_generation"]
 			&& _LifecycleLatestTransition == Transition
@@ -2106,6 +2117,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			&& this._EntriesEqual(_LLM_Menu.Get("api_entries", 0), Held["entries"])
 			&& Held["lifecycle"]["attempt"] == 0
 			&& Held["lifecycle"]["generation"] == Held["lifecycle_generation"]
+			&& (A_IsSuspended ? 1 : 0) == Held["paused"]
 	}
 
 	_Snapshot(Path) {

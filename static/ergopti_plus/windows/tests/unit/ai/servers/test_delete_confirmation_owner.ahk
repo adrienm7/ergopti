@@ -86,7 +86,10 @@ _LDCO_ConfirmationRetainsOwner(Mode) {
 	State := { Mode: Mode, Tag: "private-confirmed-model:latest", ConfirmCalls: 0,
 		WriteCalls: 0, RunCalls: 0, PollCalls: 0, TerminateCalls: 0, CloseCalls: 0, Payload: "", Owner: 0, Successor: 0 }
 	try {
-		Suspend(false)
+		; A pause stops typing, not configuration (EDD-1): a driver already paused
+		; removes a model as an active one does; only a pause that lands during
+		; the question retires it, through the auxiliary generation.
+		Suspend(Mode == "already-paused")
 		_LLM_Menu := Map("backend", "ollama", "enabled", Mode != "disabled")
 		LLM_OLLAMA_BASE_URL := "http://localhost:12434"
 		_LLM_ManagedBootstrap := 0
@@ -111,7 +114,7 @@ _LDCO_ConfirmationRetainsOwner(Mode) {
 		AssertEqual(Mode == "confirm-error" ? "injected confirmation failure" : "", ConfirmationError,
 			"A confirmation exception must propagate after ownership cleanup, retaining the original API contract.")
 		AssertEqual(1, State.ConfirmCalls, "Every scenario must reach the actual confirmation boundary.")
-		Retained := Mode == "yes" || Mode == "disabled"
+		Retained := Mode == "yes" || Mode == "disabled" || Mode == "already-paused"
 		Launched := Retained || Mode == "poll-endpoint"
 		AssertEqual(Launched, State.RunCalls, "Only a current Yes may launch the real DELETE transport.")
 		AssertEqual(Launched, State.PollCalls, "Only a launched DELETE may hand ownership to its poller.")
@@ -156,6 +159,6 @@ _LDCO_ConfirmationRetainsOwner(Mode) {
 		AssertTrue(_LLM_Menu_DeleteReconcilePending == SavedPending,
 			"The fixture must restore the exact pre-existing reconciliation owner.")
 }
-for _LDCO_Mode in ["yes", "disabled", "no", "pause", "retired", "backend", "endpoint", "payload-endpoint", "poll-endpoint", "confirm-error"]
+for _LDCO_Mode in ["yes", "disabled", "already-paused", "no", "pause", "retired", "backend", "endpoint", "payload-endpoint", "poll-endpoint", "confirm-error"]
 	Test("Ollama delete confirmation: " . _LDCO_Mode . " (llm-delete-confirmation-owner)",
 		_LDCO_ConfirmationRetainsOwner.Bind(_LDCO_Mode))

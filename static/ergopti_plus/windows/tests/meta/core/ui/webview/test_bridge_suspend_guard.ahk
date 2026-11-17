@@ -27,24 +27,24 @@
 ; ======================================================================
 
 _WBSG_CheckModelBrowserGuard() {
-	Body := _DriverFuncBody("_LLM_MBW_OnWebMessage")
+	Body := _StripFullLineComments(_DriverFuncBody("_LLM_MBW_OnWebMessage"))
 	Assert(Body != "", "_LLM_MBW_OnWebMessage must exist in ai/ui/model_browser/init.ahk")
 
-	SuspendPos := InStr(Body, "A_IsSuspended")
-	Assert(SuspendPos > 0,
-		"_LLM_MBW_OnWebMessage must check A_IsSuspended -- WebMessageReceived is a COM callback that bypasses native Suspend (webview-bridge-suspend-guard)")
+	; A pause stops typing, not configuration (EDD-1, maintainer 2026-11-12): the
+	; model page chooses, downloads and removes a model while paused, as on
+	; macOS, so neither the handler nor its deferred continuations read the
+	; pause; the prediction runtime they feed waits for the resume itself.
+	for _, Fn in ["_LLM_MBW_OnWebMessage", "_LLM_MBW_RunAction", "_LLM_MBW_ApplyModel",
+			"_LLM_ModelBrowser_PickRow", "_LLM_ModelBrowser_NativeCurrent"]
+		AssertEqual(0, InStr(_StripFullLineComments(_DriverFuncBody(Fn)), "A_IsSuspended"),
+			Fn . " is a configuration path: a paused driver still applies it (EDD-1)")
 
 	; The model application moved OUT of this handler in F-27: doing it inline
 	; released the WebMessageReceived subscription that was still dispatching and
-	; then destroyed the host window, an uncatchable access-violation class. The
-	; invariant is unchanged — a paused driver must not mutate the live LLM
-	; config/engine — so it is re-encoded across the handler AND its deferred
-	; continuation rather than dropped.
+	; then destroyed the host window, an uncatchable access-violation class.
 	CallPos := InStr(Body, "_LLM_MBW_ApplyModel")
 	Assert(CallPos > 0,
 		"_LLM_MBW_OnWebMessage must still dispatch a select_model action, now via the deferred _LLM_MBW_ApplyModel hand-off")
-	Assert(SuspendPos < CallPos,
-		"_LLM_MBW_OnWebMessage: the A_IsSuspended guard must precede the select_model dispatch, otherwise a paused driver still mutates the live LLM config/engine (webview-bridge-suspend-guard)")
 
 	Apply := _DriverFuncBody("_LLM_MBW_ApplyModel")
 	Assert(Apply != "", "_LLM_MBW_ApplyModel must exist — it is where the select_model action now lands")
@@ -53,7 +53,7 @@ _WBSG_CheckModelBrowserGuard() {
 	Assert(InStr(Apply, "_LLM_MBW_OnClose(") > 0,
 		"_LLM_MBW_ApplyModel must close the browser before applying the model, preserving the original ordering")
 }
-Test("model browser: _LLM_MBW_OnWebMessage guards A_IsSuspended before select_model mutates config/engine (webview-bridge-suspend-guard)",
+Test("model browser: a paused driver still chooses a model through the deferred hand-off (webview-bridge-suspend-guard)",
 	_WBSG_CheckModelBrowserGuard)
 
 
@@ -194,7 +194,10 @@ _A0720WV_ManualBridgeHasSuspendPolicy(Fn, Body) {
 ; handlers must NOT gate on A_IsSuspended (edd1-paused-writes). Every other
 ; handler keeps its guard until its own page joins this list.
 _A0720WV_ConfigurationHandlers() {
-	return Map("_HsEdWeb_OnWebMessage", true, "_PiEdWeb_OnWebMessage", true)
+	return Map("_HsEdWeb_OnWebMessage", true, "_PiEdWeb_OnWebMessage", true,
+		"_PromptEdWeb_OnWebMessage", true, "_PathsEdWeb_OnWebMessage", true,
+		"_HCWWeb_OnWebMessage", true, "_ActPickWeb_OnWebMessage", true,
+		"_LayMgrWeb_OnWebMessage", true, "_LLM_MBW_OnWebMessage", true)
 }
 
 _A0720WV_EveryHandlerIsSuspendGuarded() {
@@ -226,8 +229,9 @@ Test("webview: every message handler honours the suspend invariant (F-25)",
 ; The guard must not swallow page-lifecycle signals. Dropping `ready` is how the
 ; model browser ended up with a permanently empty table (F-32's class).
 _A0720WV_ReadyIsNotGatedAway() {
-	for _, Fn in ["_OnbWeb_OnWebMessage", "_HCWWeb_OnWebMessage", "_PathsEdWeb_OnWebMessage"
-	            , "_ActPickWeb_OnWebMessage"] {
+	; The configuration pages no longer gate at all (EDD-1); the onboarding,
+	; which can launch an elevated install, keeps its guard.
+	for _, Fn in ["_OnbWeb_OnWebMessage"] {
 		Body := _DriverFuncBody(Fn)
 		if (Body == "" or InStr(Body, "ready") = 0)
 			continue
@@ -243,11 +247,12 @@ Test("webview: the suspend guard exempts page-lifecycle signals (F-25)",
 ; that the action waits for the resume: a refusal that reached only the log made
 ; the click look dead (paused-refusal-notice).
 _WBSG_PausedRefusalsAreTold() {
-	for _, Fn in ["_OnbWeb_OnWebMessage", "_HCWWeb_OnWebMessage", "_HCWWeb_Dispatch",
-			"_PathsEdWeb_OnWebMessage", "_PathsEdNative_Browse", "_PromptEdWeb_OnWebMessage",
-			"_ActPickWeb_OnWebMessage", "_LayMgrWeb_OnWebMessage", "KLWV_OnWebMessage",
-			"_LLM_MBW_RunAction", "_LLM_MBW_ApplyModel", "_LLM_Menu_PromptDeleteCachedModel",
-			"_HS_ToggleProgrammableHotstrings", "GestureAutoConfigureAction", "FilePathsEditor"] {
+	; The configuration editors left this list when they stopped refusing
+	; (EDD-1): what remains waits for the resume because it acts on input or
+	; sends a prediction request.
+	for _, Fn in ["_OnbWeb_OnWebMessage", "KLWV_OnWebMessage",
+			"_HS_ToggleProgrammableHotstrings", "GestureAutoConfigureAction",
+			"_LLM_Menu_TestActiveApiEntry"] {
 		Body := _StripFullLineComments(_DriverFuncBody(Fn))
 		GuardPos := InStr(Body, "A_IsSuspended")
 		Assert(GuardPos > 0, Fn . " must keep its pause guard")
@@ -257,3 +262,14 @@ _WBSG_PausedRefusalsAreTold() {
 }
 Test("webview and menu: a click refused while paused is told (paused-refusal-notice)",
 	_WBSG_PausedRefusalsAreTold)
+
+; The tray's « Test a prediction » refuses while paused through the manual
+; prediction refusal, whose tooltip paints nothing under a pause: the paused
+; notice tells it instead (paused-refusal-notice).
+_WBSG_PausedManualPredictionIsTold() {
+	Body := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_ShowManualPredictionRefusal"))
+	Assert(RegExMatch(Body, 's)Reason\s*==\s*"paused"[^\n]*\{\s*NotifyPausedRefusal\(') > 0,
+		"a manual prediction refused while paused must be told by the paused notice")
+}
+Test("menu: a test prediction refused while paused is told (paused-refusal-notice)",
+	_WBSG_PausedManualPredictionIsTold)

@@ -1000,8 +1000,8 @@ LLM_Menu_ManualPredictionRefusal(IsSuspended, Enabled, BackendReady, Context) {
  * Every refusal is logged at INFO with its reason and shown as a tooltip. A
  * chord that silently does nothing reads as a broken shortcut, and the buffer
  * it completes is cleared by every caret, focus or pointer move. While paused
- * the tooltip layer paints nothing (« pause = tout éteint »), so the log line
- * is then the only trace, and a suspended hotkey cannot reach here anyway.
+ * the tooltip layer paints nothing, so a pause refusal is told by the paused
+ * notice; a suspended hotkey cannot reach here anyway.
  * @param {Func} FireFn Receives the context; the engine when omitted.
  * @returns {Boolean} True when a prediction was requested.
  */
@@ -1266,6 +1266,12 @@ _LLM_Menu_ShowManualPredictionRefusal(Reason, ContextLength) {
 	global _LLM_Menu, LLM_MANUAL_PREDICTION_REFUSALS
 	LoggerInfo("LLM", "Manual prediction refused ({1}): backend '{2}', {3} context character(s).",
 		Reason, _LLM_Menu.Get("backend", ""), ContextLength)
+	; The tooltip layer paints nothing while paused, so a pause refusal (the
+	; tray's « Test a prediction ») is told by the paused notice instead.
+	if (Reason == "paused") {
+		NotifyPausedRefusal("A manual prediction")
+		return
+	}
 	_LLM_Menu_ShowManualPredictionNotice(LLM_MANUAL_PREDICTION_REFUSALS[Reason])
 }
 

@@ -423,8 +423,6 @@ _LLM_ModelBrowser_GetInstalledTags() {
  */
 _LLM_ModelBrowser_PickRow(LV, RowNumber) {
 	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LifecycleLatestTransition, _LLM_Menu
-	if A_IsSuspended
-		return false
 	Window := LV.Gui
 	PreviousCritical := Critical("On")
 	try {
@@ -493,13 +491,15 @@ _LLM_ModelBrowser_BackendWriteCurrent(Owner) {
 }
 
 ; Independent of the model lifecycle epoch, which this selection itself bumps.
+; A pause stops typing, not configuration (EDD-1): a paused driver still
+; chooses a model, which the prediction runtime warms at the resume.
 _LLM_ModelBrowser_NativeCurrent(Owner) {
 	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LifecycleLatestTransition, _LLM_Menu
 	if Owner.HasOwnProp("model") && (!IsSet(_LLM_Menu) || !(_LLM_Menu is Map) || !(_LLM_Menu.Get("model", "") == Owner.model))
 		return false
 	if Owner.HasOwnProp("backend") && (!IsSet(_LLM_Menu) || !(_LLM_Menu is Map) || !(_LLM_Menu.Get("backend", "") == Owner.backend))
 		return false
-	return !A_IsSuspended && IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == Owner.window
+	return IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == Owner.window
 		&& _LLM_ModelBrowser_Epoch == Owner.epoch && _LifecycleLatestTransition == Owner.lifecycle
 		&& (!(Owner.lifecycle is Object) || Owner.lifecycle.finished)
 }
@@ -1500,14 +1500,9 @@ _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 		_LLM_MBW_OnPageReady(ExpectedEpoch)
 		return
 	}
-	; WebMessageReceived is a COM callback that bypasses native Suspend, so
-	; without this guard a paused driver would still let select_model mutate
-	; the live LLM config/engine ("pause = tout éteint" invariant).
-	if A_IsSuspended {
-		_LLM_MBW_RepaintRefusal(ExpectedEpoch)
-		return
-	}
-
+	; A pause stops typing, not configuration (EDD-1): a paused driver still
+	; chooses, downloads and removes a model. The work that serves predictions
+	; (warmups, streaming) waits for the resume in its own owners.
 	try Payload := JsonParse(Msg)
 	if !IsSet(Payload)
 		return
@@ -1571,10 +1566,6 @@ _LLM_MBW_RunAction(Payload, ExpectedEpoch) {
 	global _LLM_MBW_SessionEpoch, _LLM_MBW_Rows, _LLM_MBW_Tools, _LLM_Menu
 	if ExpectedEpoch != _LLM_MBW_SessionEpoch
 		return
-	if A_IsSuspended {
-		NotifyPausedRefusal("A model browser page action")
-		return
-	}
 	Action := Payload["action"]
 	Backend := Payload.Has("backend") && Payload["backend"] is String ? Payload["backend"] : ""
 	Name := Payload.Has("name") && Payload["name"] is String ? Payload["name"] : ""
@@ -1683,10 +1674,6 @@ _LLM_MBW_ApplyModel(Name, ExpectedEpoch) {
 	global _LLM_MBW_SessionEpoch
 	if ExpectedEpoch != _LLM_MBW_SessionEpoch
 		return
-	if A_IsSuspended {
-		NotifyPausedRefusal("A model choice")
-		return
-	}
 	; Teardown can pump a pause or a new browser session. Commit the selection
 	; before those callouts, and close only the session which requested it.
 	try Applied := LLM_Menu_SetModel(Name)

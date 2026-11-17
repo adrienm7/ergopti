@@ -174,6 +174,8 @@ _CMJ_CurrentSchemaAiAdmission(Path) {
 	; A pause stops typing, not configuration (EDD-1): an AI that is on can be switched off.
 	_LLM_Menu["enabled"] := true
 	AssertTrue(Getters["llm_toggle_ready"].Call(), "an enabled AI can be switched off while paused")
+	; The whole-scope restore runs while paused too (EDD-1, paused-scope-restore).
+	AssertTrue(Getters["llm_scope_ready"].Call(), "the restore stays available while paused")
 	_LLM_Menu["enabled"] := false
 	Suspend(false)
 	AssertTrue(Getters["llm_toggle_ready"].Call())

@@ -232,10 +232,9 @@ _LLM_Menu_PullModel(name, IsTag := false, BaseUrl := "", RunFn := 0, ScheduleFn 
 _LLM_Menu_PromptDeleteCachedModel(name, ConfirmFn := Ui_MsgBox, TransportPort := 0) {
 	global _LLM_Menu
 	MenuOwner := _LLM_Menu
-	if A_IsSuspended {
-		NotifyPausedRefusal("A cached model deletion")
-		return false
-	}
+	; A pause stops typing, not configuration (EDD-1): a paused driver still
+	; removes an installed model, as Linux does; a completion that lands under
+	; the pause is reconciled at the resume (_LLM_Menu_ServiceDeleteReconcile).
 	if !(MenuOwner is Map) || MenuOwner.Get("backend", "") != "ollama"
 		return false
 	tag := LLM_ResolveOllamaTag(name)
@@ -271,9 +270,9 @@ _LLM_Menu_PromptDeleteCachedModel(name, ConfirmFn := Ui_MsgBox, TransportPort :=
 
 _LLM_Menu_DeleteConfirmationCurrent(Owner, MenuOwner) {
 	global _LLM_Menu
-	return !A_IsSuspended && _LLM_Menu == MenuOwner
+	return _LLM_Menu == MenuOwner
 		&& _LLM_Menu_DeleteOwnerIsCurrent(Owner)
 		&& LLM_OllamaOriginCustodyCurrent(Owner["origin_custody"], Owner["endpoint"])
-		&& !A_IsSuspended && _LLM_Menu == MenuOwner
+		&& _LLM_Menu == MenuOwner
 		&& _LLM_Menu_DeleteOwnerIsCurrent(Owner)
 }

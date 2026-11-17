@@ -118,9 +118,13 @@ _A0720B4_SafetyFlushMatchesReadyHandler() {
 
 	Handler := _DriverFuncBody("_LLM_MBW_OnWebMessage")
 	ReadyPos := InStr(Handler, "_LLM_MBW_OnPageReady(")
-	GuardPos := InStr(Handler, "A_IsSuspended")
+	; The suspend guard is gone (EDD-1): the page runs while paused. `ready` must
+	; still be handled first, ahead of every refusal and of the JSON parse.
+	GuardPos := InStr(Handler, "_LLM_Menu_ConfigBlockReason(")
 	Assert(ReadyPos > 0 and GuardPos > 0 and ReadyPos < GuardPos,
-		"the `ready` page-lifecycle signal must be handled BEFORE the suspend guard — gating it is what made the SafetyFlush fallback reachable in the first place")
+		"the `ready` page-lifecycle signal must be handled BEFORE any refusal — gating it is what made the SafetyFlush fallback reachable in the first place")
+	AssertEqual(0, InStr(_StripFullLineComments(Handler), "A_IsSuspended"),
+		"the model page runs while paused (EDD-1)")
 }
 Test("model-browser: the safety flush does the same work as ready (F-32)",
 	_A0720B4_SafetyFlushMatchesReadyHandler)

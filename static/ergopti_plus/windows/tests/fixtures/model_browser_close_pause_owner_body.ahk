@@ -290,20 +290,11 @@ _MBPO_NativeRefused() {
 	}
 	_MBPO_Require(ButtonHwnd != 0, "the actual native Pick button must resolve")
 	_MBPO.NativePick := ButtonHwnd
-	if _MBPO.Mode == "native-paused" {
+	; A pause stops typing, not configuration (EDD-1): the native Pick click
+	; below commits while paused, exactly as the unpaused retry does.
+	Paused := _MBPO.Mode == "native-paused"
+	if Paused {
 		Suspend(true)
-		try {
-			_MBPO_NativeClick(ButtonHwnd, 0)
-			_MBPO_Require(_MBPO.WriterEntries == 0 && _MBPO.Errors.Length == 0
-				&& CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash
-				&& _LLM_Menu["model"] == _MBPO.ModelA && Features["llm"]["models"]["ollama"] == _MBPO.ModelA
-				&& DllCall("User32\IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
-				"a real native Pick click while paused must not enter persistence or hide its browser")
-		} finally Suspend(false)
-		_MBPO_Observe()
-		_MBPO_Require(_MBPO.MutationReturns == 0
-			&& CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash,
-			"resuming must not replay a native selection refused while paused")
 	} else {
 		Lease := _ConfigWriteLeaseTryAcquire(ConfigurationFile, "native-browser-test")
 		_MBPO_Require(Lease is Object, "a genuine configuration lease must own the deterministic refusal")
@@ -321,6 +312,11 @@ _MBPO_NativeRefused() {
 	}
 	ExpectedCommits := _LLM_Menu["backend"] == "ollama" ? 1 : 2
 	_MBPO_NativeClick(ButtonHwnd, _MBPO.MutationReturns + ExpectedCommits)
+	if Paused {
+		_MBPO_Require(A_IsSuspended && _MBPO.PausedWriterEntries == ExpectedCommits,
+			"a real native Pick click while paused must commit through the durable writer under the pause")
+		Suspend(false)
+	}
 	Parsed := TOML_ParseFreshFile(ConfigurationFile)
 	_MBPO_Require(Parsed is Map && Parsed.Has("llm.models") && Parsed["llm.models"] is Map
 		&& Parsed["llm.models"].Has("ollama"),
@@ -429,16 +425,23 @@ _MBPO_Run() {
 	_MBPO_Require(!IsObject(_MBPO.Failure) && _MBPO.Errors.Length == 0,
 		"A startup, schema, collector or runtime diagnostic cannot qualify as a model-selection refusal.")
 	_MBPO_Require(_MBPO.Args.Reads == 1 && Hash != "", "The real SDK must consume the transport and the final RAW image must be read.")
-	if _MBPO.Mode == "current" {
+	; A pause stops typing, not configuration (EDD-1): an SDK selection sent
+	; while paused commits exactly as a current one does, under the pause.
+	if _MBPO.Mode == "current" || _MBPO.Mode == "paused-entry" {
+		Paused := _MBPO.Mode == "paused-entry"
 		_MBPO_Require(_MBPO.DestroyCalls == 1 && !DllCall("User32\IsWindow", "Ptr", _MBPO.Hwnd, "Int"),
 			"The real deferred SDK action must close and destroy its exact native component host.")
 		_MBPO_Require(_MBPO.WriterEntries == 1 && _MBPO.WriterConfirmed == 1
-			&& _MBPO.PausedWriterEntries == 0 && _MBPO.MutationConfirmed == 1,
-			"The current positive must confirm the real collector/writer/transaction, not only call a fake sink.")
+			&& _MBPO.PausedWriterEntries == (Paused ? 1 : 0) && _MBPO.MutationConfirmed == 1,
+			"The positive must confirm the real collector/writer/transaction, not only call a fake sink.")
 		Parsed := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
 		_MBPO_Require(_LLM_Menu["model"] == _MBPO.ModelB && Features["llm"]["models"]["ollama"] == _MBPO.ModelB
 			&& Parsed["llm"]["models"]["ollama"] == _MBPO.ModelB && Hash != _MBPO.OriginalHash,
 			"Model B must be durable in independently parsed private TOML and published into both real RAM owners.")
+		if Paused {
+			_MBPO_Require(A_IsSuspended, "The paused selection must commit without lifting the pause.")
+			Suspend(false)
+		}
 		return
 	}
 	if _MBPO.Mode == "during-close" {
@@ -451,15 +454,7 @@ _MBPO_Run() {
 			"The actual file image captured at pause must survive; a legitimate commit before Close is permitted.")
 		return
 	}
-	_MBPO_Require(A_IsSuspended && _MBPO.DestroyCalls == 0 && _MBPO.WriterEntries == 0
-		&& _LLM_Menu["model"] == _MBPO.ModelA && Hash == _MBPO.OriginalHash
-		&& _LLM_MBW_SessionEpoch == _MBPO.Epoch && DllCall("User32\IsWindow", "Ptr", _MBPO.Hwnd, "Int"),
-		"An already paused SDK command must leave its host and durable selection untouched.")
-	Suspend(false)
-	_MBPO_Observe()
-	_MBPO_Require(_MBPO.DestroyCalls == 0 && _MBPO.WriterEntries == 0
-		&& CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash,
-		"Resume alone cannot replay the refused paused-entry command.")
+	_MBPO_Require(false, "Unknown SDK selection mode: " . _MBPO.Mode)
 }
 
 _MBPO_Main() {
