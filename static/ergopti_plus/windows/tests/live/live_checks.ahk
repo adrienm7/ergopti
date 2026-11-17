@@ -438,6 +438,92 @@ LiveCmdEditClose(Args) {
 	return "closed"
 }
 
+global _LiveApp := 0
+
+/**
+ * Opens a real application the driver treats as its own kind of output host and
+ * gives it the foreground: "notepad" opens Notepad on the new private file Path,
+ * "console" a conhost window whose prompt writes the entered line to Path. The
+ * window and its process are this session's own; a running Notepad is refused,
+ * since its windows could share the process this one is closed with.
+ */
+LiveCmdAppOpen(Args) {
+	global _LiveApp
+	if IsObject(_LiveApp)
+		throw Error("an application target is already open")
+	Kind := Args[1], Path := Args[2]
+	if FileExist(Path)
+		throw Error("the application target's file must be new")
+	if Kind == "notepad" {
+		if ProcessExist("notepad.exe")
+			throw Error("a Notepad is already running: close it first")
+		FileAppend("", Path, "UTF-8-RAW")
+		SplitPath(Path, &Name)
+		Run('notepad.exe "' . Path . '"')
+		Hwnd := WinWait(Name . " ahk_exe notepad.exe", , 20)
+	} else if Kind == "console" {
+		Title := "Ergopti live console " . A_TickCount
+		Script := "$Host.UI.RawUI.WindowTitle = '" . Title . "'; $line = Read-Host 'line';"
+			. " [IO.File]::WriteAllText('" . Path . "', $line)"
+		; conhost itself, never the default terminal application.
+		Run('conhost.exe powershell.exe -NoProfile -NoLogo -Command "' . Script . '"')
+		Hwnd := WinWait(Title, , 20)
+	} else
+		throw Error("unknown application target " . Kind)
+	if !Hwnd
+		throw Error("the " . Kind . " window did not appear")
+	_LiveApp := {Kind: Kind, Hwnd: Hwnd, Pid: WinGetPID("ahk_id " . Hwnd), Path: Path}
+	WinActivate("ahk_id " . Hwnd)
+	if !WinWaitActive("ahk_id " . Hwnd, , 5)
+		throw Error("the " . Kind . " window did not take the foreground")
+	LivePump(1500)
+	return "hwnd=" . Hwnd . " exe=" . WinGetProcessName("ahk_id " . Hwnd)
+}
+
+/** The text of the application target: Notepad's document, or the console's entered line. */
+LiveCmdAppValue(Args) {
+	global _LiveApp
+	if !IsObject(_LiveApp)
+		throw Error("no application target is open")
+	Text := ""
+	if _LiveApp.Kind == "console" {
+		if FileExist(_LiveApp.Path)
+			Text := FileRead(_LiveApp.Path, "UTF-8")
+	} else {
+		for Control in WinGetControlsHwnd("ahk_id " . _LiveApp.Hwnd) {
+			if RegExMatch(WinGetClass("ahk_id " . Control), "i)^(?:Edit|RichEdit.*)$") {
+				Text := ControlGetText(Control)
+				break
+			}
+		}
+	}
+	return "value=" . StrReplace(StrReplace(Text, "`r", ""), "`n", "\n")
+}
+
+/**
+ * Closes the application target. Notepad saves its document and closes the tab,
+ * so no unsaved tab of this session is restored at its next start.
+ */
+LiveCmdAppClose(Args) {
+	global _LiveApp
+	if !IsObject(_LiveApp)
+		return "closed"
+	App := _LiveApp
+	_LiveApp := 0
+	if App.Kind == "notepad" && WinExist("ahk_id " . App.Hwnd) {
+		WinActivate("ahk_id " . App.Hwnd)
+		if WinWaitActive("ahk_id " . App.Hwnd, , 5) {
+			Send("^s")
+			LivePump(800)
+			Send("^w")
+			WinWaitClose("ahk_id " . App.Hwnd, , 5)
+		}
+	}
+	if WinExist("ahk_id " . App.Hwnd)
+		ProcessClose(App.Pid)
+	return "closed"
+}
+
 
 
 
@@ -784,6 +870,9 @@ LiveRegister("preview_state", LiveCmdPreviewState)
 LiveRegister("capsword_toggle", LiveCmdCapsWordToggle)
 LiveRegister("capsword_state", LiveCmdCapsWordState)
 LiveRegister("edit_close", LiveCmdEditClose)
+LiveRegister("app_open", LiveCmdAppOpen)
+LiveRegister("app_value", LiveCmdAppValue)
+LiveRegister("app_close", LiveCmdAppClose)
 LiveRegister("versions_tabs", LiveCmdVersionsTabs)
 LiveRegister("lease_hold", LiveCmdLeaseHold)
 LiveRegister("lease_release", LiveCmdLeaseRelease)

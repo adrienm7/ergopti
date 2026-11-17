@@ -98,6 +98,7 @@ single-owner mutex.
 | `asa-space-fast`                        | `asa` then Space fast, 20 times                               | `test_text_carrier_avoids_held_key.lua` (macOS)                         |
 | `personal-priority-and-left`            | Personal `sru` at priority 100; a hotstring with `{left}`     | `final_result_vectors.json`                                             |
 | `cascade-fb-item-50`                    | Item 50: `fb` at 1, 2 and 3 arrows, consumed and not          | `cascade_vectors.json`, `test_hotstring_cascade.ahk`                    |
+| `backspace-undo-hosts`                  | Immediate-Backspace restoration: edit, Notepad, console       | `test_backspace_undo.ahk`, `test_hse_send_failure_transaction.ahk`      |
 
 ## What stays manual
 

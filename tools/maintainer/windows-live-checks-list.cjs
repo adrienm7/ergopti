@@ -2560,6 +2560,88 @@ const CHECKS = [
 			if (problems.length > 0) return fail(problems.join('; '));
 			return pass(`one "${caption}" row; it opened "${seen.title}" with the Windows reason`);
 		}
+	},
+	{
+		id: 'backspace-undo-hosts',
+		title:
+			'An immediate Backspace after sru + Space restores sru in an edit, in Notepad and in a console',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const bundled = shippedRule('french/autocorrection.toml', 'sru');
+			if (!bundled || !/output = "sur"/.test(bundled.line))
+				return notExecuted('the shipped French autocorrection no longer holds sru -> sur');
+			const { session } = await bootEnglish(
+				context,
+				'undo',
+				`[category_enabled]\nhotstrings = true\nfrench_autocorrection = true\n[hotstrings.french_autocorrection.${bundled.section}]\nenabled = true\n`
+			);
+			await session.run('pump', ['3000']);
+			const typeKeys = (steps) =>
+				session.type([['mode', 'event'], ['level', '100'], ['gap', '120'], ...steps]);
+			const word = [
+				['text', 'sru'],
+				['key', '{SC039}'],
+				['wait', '1200']
+			];
+			const backspace = [
+				['key', '{SC00E}'],
+				['wait', '1200']
+			];
+			const enter = [
+				['key', '{SC01C}'],
+				['wait', '1500']
+			];
+			const problems = [];
+			const seen = [];
+			const judge = (label, answer, expected) => {
+				const value = answer.replace(/^value=/, '');
+				seen.push(`${label} "${value}"`);
+				if (value !== expected) problems.push(`${label} holds "${value}", "${expected}" expected`);
+			};
+			// Each target is read after the expansion and after the Backspace: an
+			// expansion that never fired would leave sru on screen as well.
+			await session.run('edit_open');
+			try {
+				typeKeys(word);
+				judge('edit after the Space', await session.run('edit_value'), 'sur ');
+				typeKeys(backspace);
+				judge('edit after the Backspace', await session.run('edit_value'), 'sru');
+			} finally {
+				await session.run('edit_close');
+			}
+			const inApp = async (kind, name, body) => {
+				await session.run('app_open', [kind, path.join(session.root, name)]);
+				try {
+					await body();
+				} finally {
+					await session.run('app_close');
+				}
+			};
+			// Notepad takes both outputs through its verified editor.
+			await inApp('notepad', 'undo-notepad.txt', async () => {
+				typeKeys(word);
+				judge('Notepad after the Space', await session.run('app_value'), 'sur ');
+				typeKeys(backspace);
+				judge('Notepad after the Backspace', await session.run('app_value'), 'sru');
+			});
+			// A console line is read once entered, so one console proves the expansion and
+			// another the restoration. conhost reports its client as the window's owner,
+			// so the driver types into it atomically; Windows Terminal's paced capture is
+			// not driven here, its process being the user's own.
+			await inApp('console', 'undo-console-expansion.txt', async () => {
+				typeKeys([...word, ...enter]);
+				judge('console after the Space', await session.run('app_value'), 'sur ');
+			});
+			await inApp('console', 'undo-console-restoration.txt', async () => {
+				typeKeys([...word, ...backspace, ...enter]);
+				judge('console after the Backspace', await session.run('app_value'), 'sru');
+			});
+			const errors = session.loggedErrors();
+			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+			if (problems.length > 0) return fail(`${problems.join('; ')} (${seen.join(', ')})`);
+			return pass(seen.join(', '));
+		}
 	}
 ];
 
