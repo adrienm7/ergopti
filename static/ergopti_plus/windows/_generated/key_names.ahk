@@ -42,6 +42,10 @@ KeyNamesData() {
 			"arrow_right", "key_name.arrow_right",
 			"context_menu", "key_name.context_menu",
 			"num_lock", "key_name.num_lock",
+			"muhenkan", "key_name.muhenkan",
+			"henkan", "key_name.henkan",
+			"kana_mode", "key_name.kana_mode",
+			"ro", "key_name.ro",
 			"volume_mute", "key_name.volume_mute",
 			"volume_down", "key_name.volume_down",
 			"volume_up", "key_name.volume_up"
@@ -78,6 +82,10 @@ KeyNamesData() {
 			"arrowright", "arrow_right",
 			"contextmenu", "context_menu",
 			"numlock", "num_lock",
+			"nonconvert", "muhenkan",
+			"convert", "henkan",
+			"kanamode", "kana_mode",
+			"intlro", "ro",
 			"audiovolumemute", "volume_mute",
 			"audiovolumedown", "volume_down",
 			"audiovolumeup", "volume_up"
@@ -100,7 +108,9 @@ KeyNamesData() {
 			"NumpadMultiply", "*",
 			"NumpadSubtract", "-",
 			"NumpadAdd", "+",
-			"NumpadDecimal", "."
+			"NumpadDecimal", ".",
+			"IntlYen", "¥",
+			"NumpadComma", ","
 		)
 	)
 	return Data
