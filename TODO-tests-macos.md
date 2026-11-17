@@ -199,6 +199,15 @@ Hands needed:
       Logs, Caches and `ergopti_plus` support folders are gone, the stale `ErgoptiPlus/` entries are deleted after the
       next login and `ErgoptiPlus/karabiner` is kept; the migration is removed only once the maintainer's machines
       pass.
+- [ ] **Accessibility with VoiceOver** ([audit](docs/audits/accessibility/README.md)): 1. The menu-bar item
+      (VO+M then the extras): its name (today an image with no title or tooltip) and the paused state; every menu
+      row is read, including the first canvas row, and runs from the keyboard. 2. Studio, metrics, hotstring
+      settings, onboarding and the update panel: VO reads the window title, the focus starts in the page, Tab and
+      VO keys walk every control; the update panel's progress bar is named. 3. A hotstring preview, an AI
+      prediction and the WPM widget (`hs.canvas`): confirm VoiceOver reads nothing, and note what an
+      announcement should say. 4. The keep-awake banner (`hs.alert`): read or not. 5. System Settings >
+      Accessibility > Display: Reduce motion, Increase contrast and Reduce transparency, then the menu badge,
+      tooltips and the Studio pages: what follows the setting.
 - [ ] <!-- field-point: owned_runtime_wp9 --> Owned Karabiner runtime, the WP9 pass
       ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
       [handoff](docs/tooling/next-release-handoff.md)): the handoff checklist on a physical Mac, on the CI-signed dev

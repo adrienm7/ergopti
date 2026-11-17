@@ -54,29 +54,33 @@ baseline as violations go.
 - [ ] **Manual audit.** A checklist per page and per native window (keyboard walk, NVDA, JAWS, Narrator, VoiceOver,
       Orca, 400 % zoom and 320 px reflow), recorded in docs/audits/accessibility/; extend the axe scan to the app's
       own WebView windows (onboarding, menus' pages, metrics), not only those the site embeds.
-- [ ] **Images and media.** Charts and heatmaps (Comparer, benchmarks) offer their numbers as a table and their bars
-      say the visible label (axe `label-content-name-mismatch` on the score bars); videos get captions and
-      transcripts.
-- [ ] **Colour vision.** No information by colour alone (shapes, labels, patterns as well); palettes checked for
-      deuteranopia, protanopia and tritanopia; non-text contrast ≥ 3:1 for UI parts and chart marks (axe does not
-      check it).
-- [ ] **Motion.** A pause button for the auto-advancing Ergopti+ hero demo when motion is not reduced (WCAG 2.2.2).
+- [ ] **Images and media.** Videos get captions and transcripts (the charts, heatmaps and keyboard drawings have
+      their tables since the second pass).
+- [ ] **Colour vision.** The heatmap ramps' light end is 1.16:1 (light) and 1.11:1 (dark) against the surface: a key
+      worth zero is told by its character, name and table, not its shade; outline the keys or lift the light end
+      (dataviz validator, `--ordinal`), keeping the look. The fingering editor's four finger hues and the app windows
+      (metrics, AI tooltips) still need the validator and a colour-only review.
 - [ ] **Dyslexia and reading.** Check every page at 200 % text with the wide spacing setting for clipped or
       overlapping text; plain-language texts, no justified text, comfortable line length.
-- [ ] **Blind and low-vision users.** Screen-reader runs; heading order and landmarks per page; accessible names
-      for the keys of the Studio's keyboard drawings (editor, Comparer, Optimiser) and a table view of a layout
-      there (the site's drawings are tables since this pass).
-- [ ] **Keyboard and motor.** Keyboard walk of the Studio (no traps, logical order), a click alternative for every
-      drag (WCAG 2.5.7), no time limits; the download buttons nested in links on the installation pages (two
-      focus stops each) become links styled as buttons; the legacy /ergopti-plus-old lists hold paragraphs.
-- [ ] **Cognitive.** Consistent navigation, clear error messages with how to fix them, confirmations before
-      destructive actions, help text for every metric and setting.
-- [ ] **Ergopti+ native UI.** The menus, windows (WebView2 and native), tooltips, notifications and onboarding on
-      the three OS expose names and roles to the platform accessibility APIs (UI Automation, NSAccessibility,
-      AT-SPI), follow the system's high-contrast, reduced-motion and text-size settings, and are usable with a
-      screen reader and keyboard only; the hotstring and prediction tooltips are announced or can be.
-- [ ] **Languages.** `lang` on foreign passages across the site (English names, quotes); the site is French
-      only and the Ergopti+ page French and English: decide whether the accessibility texts get the 21 locales.
+- [ ] **Blind and low-vision users.** Screen-reader runs; heading order and landmarks per page; the Optimiser's
+      result board (plain characters) has no table view of its own (« Open in the editor » gives one).
+- [ ] **Keyboard and motor.** Keyboard walk of the Studio (no traps, logical order), no time limits.
+- [ ] **Cognitive.** Consistent navigation; the Comparer's four « Restore » buttons (weights, ideal load, shortcut
+      letters, keyboard forms) and the fingering editor's reset act at once with no confirmation or undo: add an undo
+      in the status line (an in-page question, since a WebView host may not show `window.confirm`); check that every
+      error message says how to fix it and every metric and setting has its help text.
+- [ ] **Ergopti+ native UI.** The clear fixes of the code audit
+      ([table](docs/audits/accessibility/README.md#native-ergopti-ui-code-audit-2026-11-17)), each on the three OS
+      with its driver tests: the tray / menu-bar item's accessible name with the paused state (Windows `A_IconTip`,
+      macOS `setTooltip`, Linux AppIndicator description), labels before the unlabelled Windows fields, words on the
+      « ↺ » buttons, the swapped `TrayTip` arguments, the GTK dialog captions bound to their fields, the Swift
+      progress bar's label; then the opt-in announcement of hotstring and prediction tooltips (UIA notification,
+      `hs.speech`, AT-SPI) and the system high-contrast / reduced-motion / text-size settings in the native windows.
+      The screen-reader checks are the « Accessibility » items of the three TODO-tests files.
+- [ ] **Languages.** The English Ergopti+ page sets `lang="en"` since the second pass, but a string with no English
+      translation falls back to French inside it: mark those passages `lang="fr"` or translate them; `lang` on
+      foreign passages across the site (English names, quotes); decide whether the accessibility texts get the 21
+      locales.
 
 ## Ergopti Studio
 
@@ -352,6 +356,12 @@ Each question names the default kept meanwhile; an answer moves into the item or
       key in containers whose home is the root account's (left unchanged); the casing of BEO, INTS, UCIEA, AHEI,
       MTGAP-T and CTGAP 3 (the agent's spelling kept); the dead-key marker style (`key-legend-dead`: accent colour
       and corner mark); ISO ticks for split and ortholinear boards.
+- [ ] **Accessibility choices of the second pass (decided by the agent on 2026-11-17, to review by the
+      maintainer).** The legacy `/ergopti-plus-old` page is kept and fixed, not retired, since the new Ergopti+ page
+      links to it (« Ancienne version de cette page »); the system's « increase contrast » (`prefers-contrast:
+  more`, macOS and WebKit) does not switch the Studio frames to the black-and-yellow high-contrast theme, which
+      stays the site setting's (the site itself has no such rule); the heatmap table lists keys by value, largest
+      first, not in board order. Approve or change.
 - [ ] **Agent decisions to review.** Each is implemented as written; confirm or change:
   - one-shot modifiers: one `sticky_altgr` covers AltGr and Kana (Windows sends the layout's own AltGr key, Kana on
     a Kana-style layout); the shipped AltGr key keeps its Tab tap;
