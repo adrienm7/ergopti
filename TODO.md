@@ -108,10 +108,11 @@ waits for the maintainer's review).
       (www.norvig.com refused by the build environment's proxy), Google Books Ngram (several GB per language: a
       one-off offline streaming import that ships only letter and bigram tables, with licence and attribution),
       Tatoeba counts, other languages.
-- [ ] **[LATER] Site keyboard display from a layout file (maintainer, 2026-11-14; not now).** The site's Ergopti
-      keyboard display is hand-coded. Render it from a layout source (Ergopti TOML or `.keylayout`) so the site can
-      display and emulate any layout; the maintainer's display tweaks become a documented display patch applied after
-      loading, reproducing today's display exactly (pixel or DOM comparison test against the current rendering).
+- [ ] **[LATER] Site keyboard for other layouts.** The site's Ergopti drawing is generated from
+      `static/layouts/sources/ergopti.toml` (`tools/codegen/codegen-site-keyboard.cjs`, display patch
+      `src/lib/keyboard/data/ergopti_display_patch.json`). Left from the maintainer's 2026-11-14 request: display and
+      emulate any layout source the same way (a patch per layout, or a default patch for layouts without Ergopti+
+      levels); the selector's older Ergopti versions (1.1 to 2.1) stay frozen snapshots without a source.
 - [ ] **[RELEASE] Windows export step in native Lua.** The restricted host `windows/native/ergopti_lua_export.c`
       (pinned Lua 5.4.6, built by `tools/build/build_windows_lua_export.ps1` in package-windows) is done. Left: once a
       dev run builds « Windows / Build », commit its artifact `windows-lua-export-*` (`ergopti_lua_export.exe` and

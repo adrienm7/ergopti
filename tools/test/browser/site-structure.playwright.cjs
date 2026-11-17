@@ -526,11 +526,85 @@ async function exerciseStudioHandoff(page, origin, basePath) {
 		.waitFor();
 }
 
+/**
+ * (generated-keyboard) The drawing renders the data generated from the layout
+ * source (tools/codegen/codegen-site-keyboard.cjs, its drift gate
+ * test-site-keyboard-data.cjs): a table of rows and cells, every key showing
+ * its generated character, every dead key named, and a dead key opening the
+ * level the source gives it.
+ */
+async function exerciseGeneratedKeyboard(page, origin, basePath) {
+	const data = JSON.parse(
+		fs.readFileSync(
+			path.join(__dirname, '../../../static/layouts/visualisation/ergopti_v2.2.json'),
+			'utf8'
+		)
+	);
+	const cell = (key) => data.keys.find((candidate) => candidate.key === key);
+	await visit(page, origin, basePath, '/ergopti');
+	const board = page.locator('#keyboard_presentation');
+	await board.locator("keyboard-key[data-key='a']").waitFor({ state: 'attached' });
+	const read = () =>
+		board.evaluate((node) => ({
+			role: node.getAttribute('role'),
+			label: node.getAttribute('aria-label'),
+			rows: [...node.querySelectorAll('keyboard-row')].map((row) => row.getAttribute('role')),
+			keys: [...node.querySelectorAll('keyboard-key')]
+				.filter((key) => key.dataset.key)
+				.map((key) => ({
+					key: key.dataset.key,
+					role: key.getAttribute('role'),
+					style: key.dataset.style ?? '',
+					label: key.getAttribute('aria-label'),
+					text: (key.querySelector('div') ?? key).textContent
+				}))
+		}));
+	const press = (key) => board.locator(`keyboard-key[data-key='${key}']`).dispatchEvent('click');
+	let drawn = await read();
+	assert.equal(drawn.role, 'table', 'The keyboard drawing is a table');
+	assert.ok(drawn.label, 'The keyboard table is named');
+	assert.ok(
+		drawn.rows.every((role) => role === 'row'),
+		'Each keyboard row is a table row'
+	);
+	assert.ok(
+		drawn.keys.every((key) => key.role === 'cell'),
+		'Each key is a table cell'
+	);
+	// Base level: the letters, digits and symbols show the generated characters.
+	const plain = drawn.keys.filter((key) =>
+		['letter', 'french', 'chiffre', 'symbole'].includes(cell(key.key)?.type)
+	);
+	assert.ok(plain.length >= 40, 'The ISO drawing shows the character keys');
+	for (const key of plain)
+		assert.equal(key.text, cell(key.key).Primary, `Key ${key.key} shows its base character`);
+	// Shift + AltGr: every dead key of that level is marked and named.
+	await press('RAlt');
+	await press('LShift');
+	drawn = await read();
+	const dead = drawn.keys.filter((key) => cell(key.key)?.['ShiftAltGr-style'] === 'deadkey');
+	assert.ok(dead.length >= 7, 'The Shift AltGr level shows the dead keys');
+	for (const key of dead) {
+		assert.equal(key.style, 'deadkey', `Dead key on ${key.key} is marked`);
+		assert.equal(key.label, 'Touche morte ' + key.text.trim(), `Dead key on ${key.key} is named`);
+	}
+	// The circumflex dead key opens the circumflex level of the source.
+	await press('ê');
+	drawn = await read();
+	for (const name of ['a', 'w', 'e'])
+		assert.equal(
+			drawn.keys.find((key) => key.key === name).text,
+			cell(name).Circonflexe,
+			`The circumflex level shows ${cell(name).Circonflexe} on ${name}`
+		);
+}
+
 /** The whole structure check, in one browser page. */
 async function exerciseSiteStructure(page, origin, basePath) {
 	await exerciseHome(page, origin, basePath);
 	await exerciseSections(page, origin, basePath);
 	await exerciseDeadKeyLegends(page, origin, basePath);
+	await exerciseGeneratedKeyboard(page, origin, basePath);
 	await exerciseStudioHandoff(page, origin, basePath);
 	await exerciseRedirects(page, origin, basePath);
 	await exercisePhone(page, origin, basePath);
@@ -645,6 +719,7 @@ module.exports = {
 	REDIRECTS,
 	STUDIO_TABS,
 	exerciseSiteStructure,
+	exerciseGeneratedKeyboard,
 	runEngine,
 	main
 };

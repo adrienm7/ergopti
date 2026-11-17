@@ -539,6 +539,24 @@ native loading proof of the generated bundle on a Mac. More detailed hardware,
 printing/palette and NLS semantics should evolve through an explicit versioned
 schema change if they cannot fit the declared records.
 
+## The site's keyboard drawings
+
+The keyboards of ergopti.fr (`src/lib/keyboard/Keyboard.js`) read
+`static/layouts/visualisation/ergopti_v2.2.json`, which
+`tools/codegen/codegen-site-keyboard.cjs` (`npm run codegen:site-keyboard`)
+writes from `static/layouts/sources/ergopti.toml` through this model: the base,
+Shift, AltGr (the Kana level) and Shift AltGr cells, the dead keys on their
+terminator, and what each dead key gives after every base and Shift character.
+What the source cannot say stays in the display patch
+`src/lib/keyboard/data/ergopti_display_patch.json`: the ISO and ErgoDox
+drawings, the keys the source does not own, the Ctrl shortcuts beyond letters
+and digits, the Ergopti+ levels and the space bar's « ␣ ». The generator
+refuses a patch value that would hide a source cell and a source dead key the
+patch does not name; `tools/test/test-site-keyboard-data.cjs` re-reads every
+source cell from the raw TOML, and `site-structure.playwright.cjs`
+(generated-keyboard) checks the rendered table. After editing the source, run
+the codegen; the older versions of the site's selector are frozen snapshots.
+
 ## A key's shortcut key
 
 `keys.<physical>.shortcut_key = "KeyC"` makes every modifier combination of the
