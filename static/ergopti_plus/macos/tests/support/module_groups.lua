@@ -47,8 +47,22 @@ M.GROUPS = {
 		"tests/unit/menu/ui/wrap/test_preferences_round_trip.lua",
 	} },
 	{ name = "meta", prefixes = { "tests/meta/" } },
-	{ name = "core", prefixes = { "tests/unit/adapters/", "tests/unit/infra/", "tests/unit/platform/" } },
-	{ name = "modules", prefixes = { "tests/unit/modules/", "tests/unit/ai/engine/", "tests/unit/ai/adapters/" } },
+	{ name = "core", prefixes = {
+		"tests/unit/adapters/",
+		"tests/unit/infra/",
+		"tests/unit/platform/",
+		"tests/unit/diagnostics/adapters/",
+		"tests/unit/diagnostics/engine/field_check/",
+		"tests/unit/diagnostics/engine/field_run/",
+		"tests/unit/diagnostics/engine/test_driver_control.lua",
+	} },
+	{ name = "modules", prefixes = {
+		"tests/unit/modules/",
+		"tests/unit/ai/engine/",
+		"tests/unit/ai/adapters/",
+		"tests/unit/diagnostics/engine/reports/",
+		"tests/unit/diagnostics/engine/test_hid_diagnostic_mailbox.lua",
+	} },
 	{ name = "menu_llm", prefixes = { "tests/unit/ai/ui/menu/" } },
 	{ name = "menu_input", prefixes = {
 		"tests/unit/menu/ui/hotstrings/",
@@ -56,7 +70,7 @@ M.GROUPS = {
 		"tests/unit/menu/ui/shortcuts_and_gestures/",
 		"tests/unit/menu/ui/keyboard_layout/",
 	} },
-	{ name = "ui", prefixes = { "tests/unit/ui/", "tests/unit/menu/" } },
+	{ name = "ui", prefixes = { "tests/unit/ui/", "tests/unit/menu/", "tests/unit/diagnostics/ui/" } },
 	{ name = "other", prefixes = {} },
 }
 

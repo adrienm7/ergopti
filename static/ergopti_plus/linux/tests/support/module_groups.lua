@@ -51,7 +51,7 @@ M.GROUPS = {
 	} },
 	{ name = "meta", prefixes = { "tests/meta/" } },
 	{ name = "core", prefixes = { "tests/unit/adapters/", "tests/unit/platform/" } },
-	{ name = "infra", prefixes = { "tests/unit/infra/" } },
+	{ name = "infra", prefixes = { "tests/unit/infra/", "tests/unit/diagnostics/engine/control/" } },
 	{ name = "input", prefixes = {
 		"tests/unit/modules/hotstrings/",
 		"tests/unit/modules/dynamic_hotstrings/",
@@ -59,7 +59,7 @@ M.GROUPS = {
 		"tests/unit/modules/keymap/",
 		"tests/unit/modules/gestures/",
 	} },
-	{ name = "modules", prefixes = { "tests/unit/modules/", "tests/unit/ai/" } },
+	{ name = "modules", prefixes = { "tests/unit/modules/", "tests/unit/ai/", "tests/unit/diagnostics/engine/reports/" } },
 	{ name = "ui", prefixes = {} },
 }
 
