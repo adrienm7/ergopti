@@ -296,21 +296,18 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		// Who presses each key on the keyboard analysed, editable here as in the
 		// Comparer (one profile per keyboard, shared with it).
 		const fingering = el('div', 'la-panel-fingering');
-		node.append(
-			summary,
-			controls,
-			headline,
-			rankNote,
-			note,
-			metrics,
-			typing,
-			fingersTitle,
-			fingers,
-			analysersTitle,
-			analysers,
-			extra,
-			fingering
-		);
+		// Three columns that stack in a narrow panel and sit side by side when the
+		// panel spans the editor's width: the settings and score, the finger load
+		// and analysers, then the fingering board.
+		const scoreColumn = el('div', 'la-panel-column');
+		scoreColumn.append(controls, headline, rankNote, note, metrics, typing);
+		const loadColumn = el('div', 'la-panel-column');
+		loadColumn.append(fingersTitle, fingers, analysersTitle, analysers, extra);
+		const fingeringColumn = el('div', 'la-panel-column');
+		fingeringColumn.append(fingering);
+		const body = el('div', 'la-panel-body');
+		body.append(scoreColumn, loadColumn, fingeringColumn);
+		node.append(summary, body);
 		const fingeringView = window.LAYOUT_ANALYSIS_FINGERING.mount(fingering, {
 			keyboard: () => state.keyboard
 		});

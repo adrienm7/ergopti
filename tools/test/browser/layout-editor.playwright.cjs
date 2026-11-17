@@ -191,6 +191,74 @@ async function serveCorpora(page) {
  * @param {import('playwright').Browser} browser
  * @param {string} origin
  */
+/**
+ * The Studio window in a dark system appearance and a wide window: the page
+ * and the Comparer it hosts follow the dark theme (they were dark text on a
+ * light page, from light-only tokens), the analysis panel spans the editor's
+ * width in columns (a later 420 px cap left it one tall strip), and the tab
+ * bar keeps its tabs' focus ring inside the window.
+ */
+async function exerciseStudioLayout(browser, origin) {
+	const context = await browser.newContext({
+		colorScheme: 'dark',
+		viewport: { width: 1400, height: 900 }
+	});
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.addInitScript(() => {
+		window.webkit = {
+			messageHandlers: { layout_editor_window_bridge: { postMessage: () => {} } }
+		};
+	});
+	await page.goto(`${origin}/ui/layout_editor_window/index.html`);
+	await page.evaluate(() => window.initData({ strings: {}, state: { platform: 'linux' } }));
+	await page.evaluate(
+		(text) => window.sourceData({ filename: 'source.toml', text, folder: 'layout_sources/' }),
+		fs.readFileSync(SOURCE_FIXTURE, 'utf8')
+	);
+	await page.waitForSelector('#le-side-slot > .la-panel');
+	const luminance = (color) => {
+		const [r, g, b] = color.match(/\d+(\.\d+)?/g).map(Number);
+		return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+	};
+	const colours = await page.evaluate(() => ({
+		body: getComputedStyle(document.body).backgroundColor,
+		text: getComputedStyle(document.body).color,
+		tabs: getComputedStyle(document.querySelector('.studio-tabs')).backgroundColor
+	}));
+	assert.ok(luminance(colours.body) < 0.3, `a dark page, got ${colours.body}`);
+	assert.ok(luminance(colours.tabs) < 0.3, `a dark tab bar, got ${colours.tabs}`);
+	assert.ok(luminance(colours.text) > 0.7, `light text, got ${colours.text}`);
+	const widths = await page.evaluate(() => ({
+		slot: document.getElementById('le-side-slot').getBoundingClientRect().width,
+		panel: document.querySelector('#le-side-slot > .la-panel').getBoundingClientRect().width,
+		columns: getComputedStyle(document.querySelector('.la-panel-body')).gridTemplateColumns.split(
+			' '
+		).length
+	}));
+	assert.ok(widths.panel >= widths.slot - 1, `the panel fills its slot: ${JSON.stringify(widths)}`);
+	assert.equal(widths.columns, 3, 'a wide panel lays its sections out in three columns');
+	const ring = await page.evaluate(() => {
+		const tab = document.getElementById('studio-tab-edit');
+		const box = tab.getBoundingClientRect();
+		const offset = parseFloat(getComputedStyle(tab).outlineOffset);
+		const width = parseFloat(getComputedStyle(tab).outlineWidth);
+		return { top: box.top, left: box.left, reach: Math.max(0, width + offset) };
+	});
+	assert.ok(
+		ring.top >= ring.reach && ring.left >= ring.reach,
+		`the tab's ring stays inside the window: ${JSON.stringify(ring)}`
+	);
+	await page.click('#studio-tab-compare');
+	const heading = await page.evaluate(
+		() => getComputedStyle(document.querySelector('#studio-comparer')).color
+	);
+	assert.ok(luminance(heading) > 0.7, `the Comparer's text is light, got ${heading}`);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 async function exerciseCompareEdited(browser, origin) {
 	const strings = JSON.parse(
 		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
@@ -2663,6 +2731,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseDownloadWithoutLuaVm(browser, origin);
 		await exerciseOpensOnErgopti(browser, origin);
 		await exerciseStudioNav(browser, origin);
+		await exerciseStudioLayout(browser, origin);
 		await exerciseCompareEdited(browser, origin);
 		await exerciseSiteOpensOnErgopti(browser, origin);
 		await exerciseLayerSelector(browser, origin);

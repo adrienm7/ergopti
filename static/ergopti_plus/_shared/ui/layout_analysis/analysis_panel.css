@@ -16,6 +16,8 @@
 	background: var(--theme-surface);
 	border: 1px solid var(--theme-separator);
 	border-radius: 8px;
+	/* The body's columns follow the panel's own width (section 1's queries). */
+	container-type: inline-size;
 	flex: 1 1 300px;
 	max-width: 420px;
 	padding: 10px 12px;
@@ -24,6 +26,42 @@
 .la-panel-title {
 	cursor: pointer;
 	font-weight: 600;
+}
+
+/* The settings and score, the finger load and analysers, and the fingering
+   board: one column in a narrow panel, side by side when the panel spans the
+   editor's width, so a wide window is not left with one tall strip. */
+.la-panel-body {
+	align-items: start;
+	display: grid;
+	gap: 8px 28px;
+	grid-template-columns: minmax(0, 1fr);
+}
+
+.la-panel-column {
+	min-width: 0;
+}
+
+/* Two columns: the score beside the finger load, the fingering board below. */
+@container (min-width: 640px) {
+	.la-panel-body {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.la-panel-column:last-child {
+		grid-column: 1 / -1;
+	}
+}
+
+/* Three columns; the fingering board gets the width of its full keyboard. */
+@container (min-width: 1180px) {
+	.la-panel-body {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(560px, 1.2fr);
+	}
+
+	.la-panel-column:last-child {
+		grid-column: auto;
+	}
 }
 
 .la-panel-controls {
@@ -37,6 +75,12 @@
 .la-panel-controls select {
 	min-width: 0;
 	width: 100%;
+}
+
+/* The button takes its own row, so its length never widens the label column. */
+.la-panel-compare {
+	grid-column: 1 / -1;
+	justify-self: start;
 }
 
 .la-panel-score {

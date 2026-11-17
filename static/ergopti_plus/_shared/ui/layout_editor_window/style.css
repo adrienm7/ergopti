@@ -20,9 +20,12 @@ body {
 	height: 100%;
 }
 
+/* The light and dark tokens of theme.css: the page's own colours follow the
+   system appearance, so the Comparer and the optimiser, which inherit them, are
+   never dark text on a light page inside a dark window. */
 body {
-	background: var(--theme-page-background);
-	color: var(--theme-grey-333);
+	background: var(--theme-bg);
+	color: var(--theme-text);
 	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
 	font-size: 13px;
 	margin: 0;
@@ -38,12 +41,11 @@ body {
 
 .studio-keystats {
 	align-items: center;
-	border-bottom: 1px solid var(--theme-grey-ccc);
+	border-bottom: 1px solid var(--theme-separator);
 	display: flex;
 	flex-wrap: wrap;
 	gap: 4px 12px;
-	margin-bottom: 12px;
-	padding-bottom: 8px;
+	padding: 8px clamp(12px, 2.5vw, 28px);
 }
 
 .studio-keystats[hidden] {
@@ -59,7 +61,7 @@ body {
 }
 
 .studio-keystats-privacy {
-	color: var(--theme-grey-666);
+	color: var(--theme-sub);
 	flex-basis: 100%;
 	margin: 0;
 }
@@ -71,26 +73,47 @@ body {
 /* =================================== */
 
 .studio-tabs {
-	border-bottom: 1px solid var(--theme-grey-ccc);
+	background: var(--theme-surface);
+	border-bottom: 1px solid var(--theme-separator);
 	display: flex;
 	flex-wrap: wrap;
 	gap: 4px;
-	margin-bottom: 12px;
+	/* Room around the tabs so their focus ring is never cut by the window edge. */
+	padding: 8px clamp(12px, 2.5vw, 28px);
+	position: sticky;
+	top: 0;
+	z-index: 10;
 }
 
 .studio-tabs button {
 	background: none;
 	border: 0;
-	border-bottom: 2px solid transparent;
-	color: inherit;
+	border-radius: 6px;
+	color: var(--theme-sub);
 	cursor: pointer;
 	font: inherit;
-	padding: 6px 12px;
+	font-size: 14px;
+	font-weight: 500;
+	padding: 7px 16px;
+}
+
+.studio-tabs button:hover {
+	background: var(--theme-accent-soft);
+	color: var(--theme-text);
 }
 
 .studio-tabs button[aria-selected='true'] {
-	border-bottom-color: var(--theme-accent);
+	background: var(--theme-accent-soft);
+	/* The selected tab's underline sits inside its own box, never clipped. */
+	box-shadow: inset 0 -2px 0 var(--theme-accent);
+	color: var(--theme-text);
 	font-weight: 600;
+}
+
+/* An inset ring: the tabs touch nothing, but the bar scrolls with the page. */
+.studio-tabs button:focus-visible {
+	outline: 2px solid var(--theme-accent);
+	outline-offset: -2px;
 }
 
 .layout-editor[hidden],
