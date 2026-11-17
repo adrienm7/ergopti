@@ -1,5 +1,5 @@
 {
-	"_description": "Authors of the layouts of the analysis library, shown with each layout. The registry layouts take theirs from static/layouts/registry/<id>/meta.toml. « basis » says where a credit comes from: « source » when the author's own page, file or repository states it (« checked » is the date it was read, « evidence » what it says), « knowledge » when it is the generally known author no page has confirmed yet (to verify by the maintainer). A layout without an entry is credited to the collection it was taken from.",
+	"_description": "Authors of the layouts of the analysis library, shown with each layout. The registry layouts take theirs from static/layouts/registry/<id>/meta.toml. « basis » says where a credit comes from: « source » when the author's own page, file or repository states it (« checked » is the date it was read, « evidence » what it says), « collection » when it is the author the collection's file names (KLA's « author » field, written by tools/build/import-kla-layouts.cjs, which can be the person who submitted the layout), « knowledge » when it is the generally known author no page has confirmed yet (to verify by the maintainer). A layout without an entry is credited to the collection it was taken from.",
 	"schema_version": 1,
 	"credits": {
 		"qwerty": {
@@ -105,13 +105,6 @@
 			"checked": "2026-11-17",
 			"evidence": "Hands Down site: « … are trademarks of R. Alan Reiser »; its menu names Hands Down Neu and Hands Down Reference."
 		},
-		"hands_down_reference": {
-			"authors": ["R. Alan Reiser"],
-			"url": "https://sites.google.com/alanreiser.com/handsdown",
-			"basis": "source",
-			"checked": "2026-11-17",
-			"evidence": "Hands Down site: « … are trademarks of R. Alan Reiser »; its menu names Hands Down Neu and Hands Down Reference."
-		},
 		"capewell": {
 			"authors": ["Michael Capewell"],
 			"url": "http://www.michaelcapewell.com/projects/keyboard/",
@@ -171,6 +164,250 @@
 			"evidence": "neo-layout.org/Layouts names KOY « Weiterentwicklung von AdNW » without an author; adnw.de has no page that names one.",
 			"checked": "2026-11-17",
 			"url": "https://neo-layout.org/Layouts/"
+		},
+		"bvofrak1": {
+			"authors": ["Hugues Dumez"],
+			"url": "http://bvofrak.blogspot.com",
+			"basis": "collection"
+		},
+		"colemak_estonian": {
+			"authors": ["Ivar Smolin"],
+			"basis": "collection"
+		},
+		"colemak_hu": {
+			"authors": ["Gabor Debrei"],
+			"basis": "collection"
+		},
+		"germandvorak2": {
+			"authors": ["Lion Vollnhals"],
+			"basis": "collection"
+		},
+		"qwerty_danish": {
+			"authors": ["Rasmus Buhl"],
+			"url": "http://en.wikipedia.org/wiki/QWERTY#Danish",
+			"basis": "collection"
+		},
+		"qwerty_estonian": {
+			"authors": ["Ivar Smolin"],
+			"url": "http://et.wikipedia.org/wiki/Pilt:KB_Estonian.svg",
+			"basis": "collection"
+		},
+		"qwerty_spanish": {
+			"authors": ["David López"],
+			"url": "http://en.wikipedia.org/wiki/QWERTY#Spanish",
+			"basis": "collection"
+		},
+		"acemak1": {
+			"authors": ["Ulrich Atz"],
+			"basis": "collection"
+		},
+		"adnw_kla": {
+			"authors": ["Andreas Wettstein"],
+			"url": "http://www.adnw.de",
+			"basis": "collection"
+		},
+		"anglian": {
+			"authors": ["Ashley Crane"],
+			"basis": "collection"
+		},
+		"ashley_gudyr": {
+			"authors": ["Ashley Crane"],
+			"basis": "collection"
+		},
+		"asset_kla": {
+			"authors": ["Mason Armstrong"],
+			"basis": "collection"
+		},
+		"balance_twelve": {
+			"authors": ["Sasha Viminitz"],
+			"basis": "collection"
+		},
+		"bvofrak": {
+			"authors": ["Hugues Dumez"],
+			"url": "http://bvofrak.blogspot.com",
+			"basis": "collection"
+		},
+		"carpalxq": {
+			"authors": ["Dave Ferree"],
+			"url": "http://jumpedthesynapse.blogspot.com/2007/07/carpalxq.html",
+			"basis": "collection"
+		},
+		"chin": {
+			"authors": ["Zhang Xiaobin"],
+			"basis": "collection"
+		},
+		"chin_programmer": {
+			"authors": ["Zhang Xiaobin"],
+			"basis": "collection"
+		},
+		"colemakjph": {
+			"authors": ["Joshua Caine"],
+			"basis": "collection"
+		},
+		"colemakss": {
+			"authors": ["Robbie"],
+			"url": "http://colemak.com/",
+			"basis": "collection"
+		},
+		"colemakuk": {
+			"authors": ["Joshua Caine"],
+			"basis": "collection"
+		},
+		"dangvu": {
+			"authors": ["Vu Dang"],
+			"basis": "collection"
+		},
+		"dvorakmod": {
+			"authors": ["Anthony L."],
+			"url": "https://en.wikipedia.org/wiki/Dvorak_Simplified_Keyboard",
+			"basis": "collection"
+		},
+		"eaton": {
+			"authors": ["Eric Aguiar"],
+			"url": "http://toxprox.tumblr.com/",
+			"basis": "collection"
+		},
+		"hieamtsrn": {
+			"authors": ["Michael Viminitz"],
+			"basis": "collection"
+		},
+		"jppe": {
+			"authors": ["Joshua Caine"],
+			"basis": "collection"
+		},
+		"kaeteker": {
+			"authors": ["Quinn Sufi"],
+			"url": "https://en.wikipedia.org/wiki/Dvorak_Simplified_Keyboard",
+			"basis": "collection"
+		},
+		"klausler": {
+			"authors": ["Kaimakides"],
+			"url": "http://deskthority.net/wiki/Keyboard_layouts#Custom_layout-generators",
+			"basis": "collection"
+		},
+		"minimak_12": {
+			"authors": ["Ted Lilley"],
+			"url": "http://www.minimak.org/",
+			"basis": "collection"
+		},
+		"minimak8key": {
+			"authors": ["Ted Lilley"],
+			"url": "http://www.minimak.org/",
+			"basis": "collection"
+		},
+		"neo2_new": {
+			"authors": ["Julian Asamer"],
+			"url": "http://neo-layout.org",
+			"basis": "collection"
+		},
+		"ohdvorakl": {
+			"authors": ["Deborah Pickett"],
+			"url": "https://en.wikipedia.org/wiki/Dvorak_Simplified_Keyboard#One-handed_versions",
+			"basis": "collection"
+		},
+		"ohdvorakr": {
+			"authors": ["Deborah Pickett"],
+			"url": "http://blog.modernmechanix.com/dvoraks-one-handed-keyboard/",
+			"basis": "collection"
+		},
+		"oiseau": {
+			"authors": ["maouAOUT"],
+			"basis": "collection"
+		},
+		"programmer_dvorak_on": {
+			"authors": ["Andrew DeMaria"],
+			"url": "http://www.kaufmann.no/roland/dvorak/",
+			"basis": "collection"
+		},
+		"qwerfj": {
+			"authors": ["Laur"],
+			"basis": "collection"
+		},
+		"qwerty_programmer": {
+			"authors": ["Artem Vyalkov"],
+			"url": "https://en.wikipedia.org/wiki/QWERTY",
+			"basis": "collection"
+		},
+		"qwerty_sux": {
+			"authors": ["Shaan Iqbal"],
+			"url": "http://forum.colemak.com/viewtopic.php?pid=13603#p13603",
+			"basis": "collection"
+		},
+		"qwertywm": {
+			"authors": ["Dave Ferree"],
+			"url": "http://forum.colemak.com/viewtopic.php?id=839",
+			"basis": "collection"
+		},
+		"qwpr": {
+			"authors": ["Satish"],
+			"url": "http://sourceforge.net/p/qwpr/wiki/Home/",
+			"basis": "collection"
+		},
+		"siwei": {
+			"authors": ["How Si Wei"],
+			"basis": "collection"
+		},
+		"spanish_dvorak": {
+			"authors": ["Jorge Sanz"],
+			"url": "http://jorgesanz.net",
+			"basis": "collection"
+		},
+		"stndc": {
+			"authors": ["Sasha Viminitz"],
+			"basis": "collection"
+		},
+		"tallus": {
+			"authors": ["Erich Spaker"],
+			"url": "http://erichspaker.tumblr.com/",
+			"basis": "collection"
+		},
+		"tarmak1": {
+			"authors": ["DreymaR"],
+			"url": "http://www.reddit.com/r/Colemak/comments/1dupw9/tarmak_transitional_layouts_for_learning_qwerty/",
+			"basis": "collection"
+		},
+		"tarmak2": {
+			"authors": ["DreymaR"],
+			"url": "http://www.reddit.com/r/Colemak/comments/1dupw9/tarmak_transitional_layouts_for_learning_qwerty/",
+			"basis": "collection"
+		},
+		"tarmak3_etr": {
+			"authors": ["DreymaR"],
+			"url": "http://www.reddit.com/r/Colemak/comments/1dupw9/tarmak_transitional_layouts_for_learning_qwerty/",
+			"basis": "collection"
+		},
+		"tarmak3": {
+			"authors": ["DreymaR"],
+			"url": "http://www.reddit.com/r/Colemak/comments/1dupw9/tarmak_transitional_layouts_for_learning_qwerty/",
+			"basis": "collection"
+		},
+		"tarmak4_etro": {
+			"authors": ["DreymaR"],
+			"url": "http://www.reddit.com/r/Colemak/comments/1dupw9/tarmak_transitional_layouts_for_learning_qwerty/",
+			"basis": "collection"
+		},
+		"tarmak4": {
+			"authors": ["DreymaR"],
+			"url": "http://www.reddit.com/r/Colemak/comments/1dupw9/tarmak_transitional_layouts_for_learning_qwerty/",
+			"basis": "collection"
+		},
+		"tnwmlc": {
+			"authors": ["Michael Rouse"],
+			"basis": "collection"
+		},
+		"typehack": {
+			"authors": ["TypeHacK"],
+			"url": "http://typehack.web.fc2.com/",
+			"basis": "collection"
+		},
+		"vukeys": {
+			"authors": ["Vu Dang"],
+			"basis": "collection"
+		},
+		"workman_for_programmers": {
+			"authors": ["Artem Vyalkov"],
+			"url": "http://www.workmanlayout.com/",
+			"basis": "collection"
 		}
 	}
 }

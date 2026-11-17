@@ -94,17 +94,19 @@ waits for the maintainer's review).
         docs/design/layout-analysis.md first, coordinated with the agent changing the engine's typing paths.
   - [ ] Check the figures again once the engine types through best paths (alternative copies, AltGr, dead keys):
         they read the engine's per-key output (keyValues, topGroups, fingerDistance), so they should follow.
-- [ ] **Layout formats, what is left.** The library comes only from Oxeylyzer and cmini: add another source: genkey
-      (GPL-3.0 like cmini) once its layout list can be read, or KLA's built-in list (107 files under MIT in
-      `layouts/` of patorjk/keyboard-layout-analyzer at c4f2f9bb43, which the KLA reader reads: four are reader
-      fixtures in `tools/test/fixtures/layout-formats/third-party`). No third-party XKB symbols,
-      KLC or DOF file under a licence that allows shipping it has been found for the reader tests.
-      KLAnext's `matrix` board is refused (`format_unsupported_board`): no matrix file was found to read its key
-      indexes from.
+- [ ] **Layout formats, what is left.** The library imports Oxeylyzer, cmini and KLA's built-in layouts
+      (`tools/build/import-kla-layouts.cjs`; KLA's 16 files with characters on keys the library's keyboards lack,
+      12 of them ErgoDox, are listed in `not_imported` of `layout_library.json`). Left: genkey (GPL-3.0 like cmini)
+      once its layout list can be read; the ErgoDox files once the KLA reader and the library can place ErgoDox
+      thumb and outer keys. No third-party XKB symbols, KLC or DOF file under a licence that allows shipping it has
+      been found for the reader tests. KLAnext's `matrix` board is refused (`format_unsupported_board`): no matrix
+      file was found to read its key indexes from.
 - [ ] **[LATER] Layout library credits, what is left.** The credits were read on their authors' pages on 2026-11-17
       (`checked` and `evidence` in `layout_credits.json`). Still « knowledge »: QWERTY (US patent 207,559 is Sholes's,
       but its text names no letter order: read its drawings or another primary source) and KOY (neo-layout.org names
-      no author, adnw.de has no page for it).
+      no author, adnw.de has no page for it). The 53 « collection » credits come from KLA's « author » field, which
+      can name the person who submitted the layout: check each against its author's page, first the doubtful ones
+      (Klausler « Kaimakides », Neo 2.0 « Julian Asamer », CarpalxQ and QWERTY Wide Mod « Dave Ferree »).
 - [ ] **More corpora.** French, English, German, Spanish and Italian books, Tatoeba, Wikipedia and MIT code are in.
       [CODE] Nothing from Wikisource yet. [DECISION] An e-mail or chat register: no candidate is cleared (Enron mails
       hold personal data, the Ubuntu IRC logs' licence is unchecked, Wikipedia talk pages sign each message with a

@@ -17,7 +17,7 @@ definition and of the default weights, is
 | `static/ergopti_plus/_shared/ui/layout_analysis/_generated/analysis_data.js`   | Generated global `LAYOUT_ANALYSIS_DATA`; load it first. `npm run codegen:layout-analysis-data:js`.                          |
 | `static/ergopti_plus/_shared/layouts/data/analysis/analysis_model.json`        | Fingers, home keys, lateral and outer keys, keyboards, keyboard formats, ideal finger load, form factors, shortcut letters… |
 | `static/ergopti_plus/_shared/layouts/data/analysis/score_weights.json`         | The default weights of the global score (one source).                                                                       |
-| `static/ergopti_plus/_shared/layouts/data/analysis/layout_library.json`        | The alphabetic blocks of the imported layouts, with their source.                                                           |
+| `static/ergopti_plus/_shared/layouts/data/analysis/layout_library.json`        | The imported layouts (alphabetic blocks, or whole layouts), their source, and the files left out with the reason.           |
 | `static/ergopti_plus/_shared/layouts/data/analysis/sources.json`               | The references behind every metric and sourced value, shown by the « i » popovers.                                          |
 | `static/ergopti_plus/_shared/tests/corpus/layout_analysis/metric_vectors.json` | Hand-computed reference vectors; `npm run test:layout-analysis-engine`.                                                     |
 
@@ -25,6 +25,20 @@ Key geometry comes from `_shared/layouts/data/keycodes/physical_keys.json`; the
 registry layouts and the reference QWERTY and AZERTY join the library through
 the layout composer's reader (`tools/lib/layout-composer.cjs`), converted by
 the engine's own `layoutFromComposerSource`.
+
+The library imports three collections (`sources` in `layout_library.json`):
+Oxeylyzer's and cmini's layouts as alphabetic blocks (`keys`, base characters
+of the three letter rows), which the codegen completes with the US number row
+and Shift pairs, and Keyboard Layout Analyzer's built-in layouts as whole
+layouts (`rows`, every key and level its file states), taken as they are.
+`tools/build/import-kla-layouts.cjs <KLA checkout>` re-encodes KLA's files
+through the Studio's own reader (`fromKla`). A file is left out, and listed in
+`not_imported` with its reason, when it has characters on keys the library's
+keyboards have no code for (ErgoDox thumbs and outer columns, TypeMatrix's
+middle column, a modifier key), places a letter twice, or has the same letters
+on the same keys and the same digits as a layout already in the library
+(`same_as`); a duplicate only credits that layout when it has no credit. The
+codegen refuses a `same_as` the library does not hold.
 
 A page loads, from the `_shared/ui/<page>/` folder:
 
@@ -429,7 +443,9 @@ Every library layout names its authors (`authors`, with `year`, `url` and
 `_shared/layouts/data/analysis/layout_credits.json`, whose `basis` says whether
 the author's own page, file or repository states the credit (`source`, with
 `checked`, the date it was read, and `evidence`, what it says) or it is the
-generally known author still to be checked (`knowledge`). The « Comparer »
+generally known author still to be checked (`knowledge`); a KLA layout's
+credit is the author its file names (`collection`: KLA's « author » field,
+which can be the person who submitted the layout). The « Comparer »
 shows the credit and the link in each layout's details.
 
 ## Other analysers' scores
@@ -814,8 +830,9 @@ relative to `corpus_files.js`, from any page folder. The « i » popovers
 
 ## Performance
 
-The library (115 layouts) on a 2.5 MB French corpus takes about 0.3 s from
-prepared tables in Node; the gate holds it under 1.5 s. A page computes the
+The library (115 layouts when measured, 165 since the KLA import) on a 2.5 MB
+French corpus took about 0.3 s from prepared tables in Node, before the ways
+of typing (below); the gate holds the whole library under 1.5 s. A page computes the
 tables of a corpus once (`prepareNgrams`) and keeps them under `hashText` of
 the text; built-in corpora can ship their tables pre-computed.
 

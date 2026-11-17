@@ -846,6 +846,16 @@ check(
 				`credits: ${id} was checked but records no date, evidence or page`
 			);
 	}
+	// One entry per arrangement: no two layouts have the same letters on the
+	// same keys and the same digits (the import's duplicate rule).
+	const { signature } = require('../build/import-kla-layouts.cjs');
+	const codes = E.typingCodes();
+	const seen = new Map();
+	for (const layout of library) {
+		const key = signature(layout.rows, codes);
+		check(!seen.has(key), `library: ${layout.id} has the keys of ${seen.get(key)}`);
+		seen.set(key, layout.id);
+	}
 	check(
 		byId.get('hands_down').authors[0] === 'R. Alan Reiser' &&
 			byId.get('hands_down').url === 'https://sites.google.com/alanreiser.com/handsdown',

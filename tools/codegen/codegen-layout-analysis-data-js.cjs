@@ -8,7 +8,8 @@
  * datum the layout analysis engine reads, from:
  *   - _shared/layouts/data/analysis/analysis_model.json (fingers, keyboards…);
  *   - _shared/layouts/data/analysis/score_weights.json (default weights);
- *   - _shared/layouts/data/analysis/layout_library.json (alphabetic blocks);
+ *   - _shared/layouts/data/analysis/layout_library.json (alphabetic blocks
+ *     and whole layouts);
  *   - _shared/layouts/data/analysis/sources.json (the « i » references);
  *   - _shared/layouts/data/analysis/corpora.json and static/corpus/register.json
  *     (the built-in corpora and the licence of every corpus text);
@@ -23,7 +24,8 @@
  *    the hosts inline them, so the data is a top-level const, not a fetch.
  * 2. One library for the site and the app: registry layouts keep all their
  *    layers and dead keys; an alphabetic block of the library JSON gets the US
- *    number row and the US Shift pairs, the convention of its source.
+ *    number row and the US Shift pairs, the convention of its source; a whole
+ *    layout of the library JSON (KLA's) is taken as it is.
  * 3. Deterministic: no timestamp, keys in a fixed order.
  * ==============================================================================
  */
@@ -143,6 +145,8 @@ const OUTER_KEYS = ['Quote', 'BracketLeft', 'BracketRight', 'Backslash', 'IntlBa
 const REGISTRY_ORIGIN = 'registry';
 const REFERENCE_ORIGIN = 'reference';
 const LIBRARY_ORIGIN = 'library';
+// The levels of a whole layout's row: base, Shift, AltGr, Shift+AltGr.
+const LIBRARY_LEVELS = 4;
 
 // ======================
 // ======= 1/ Keys ======
@@ -285,6 +289,60 @@ function fromAlphaBlock(entry, qwerty) {
 }
 
 /**
+ * A whole layout of the library JSON (every key and level its source states),
+ * taken as it is: nothing is completed.
+ * @param {object} entry - One layout_library.json entry with rows.
+ * @param {string[]} codes - The measured codes.
+ * @returns {object} The library entry.
+ * @throws {Error} On a key the engine does not measure or a malformed row.
+ */
+function fromWholeRows(entry, codes) {
+	const measured = new Set(codes);
+	const rows = {};
+	for (const [code, row] of Object.entries(entry.rows)) {
+		if (!measured.has(code)) throw new Error(`${entry.id}: ${code} is not a measured key`);
+		if (
+			!Array.isArray(row) ||
+			row.length !== LIBRARY_LEVELS ||
+			!row.every((cell) => cell === null || (typeof cell === 'string' && cell !== ''))
+		)
+			throw new Error(`${entry.id}: ${code} is not ${LIBRARY_LEVELS} characters or null`);
+		rows[code] = row.slice();
+	}
+	return {
+		id: entry.id,
+		name: entry.name,
+		language: entry.language,
+		origin: LIBRARY_ORIGIN,
+		fingering: entry.fingering,
+		source: entry.source,
+		rows,
+		command: {},
+		dead: {}
+	};
+}
+
+/**
+ * Checks the files a collection import left out: each names its source and
+ * reason, and a duplicate names a layout the library holds.
+ * @param {object} library - layout_library.json.
+ * @param {Set<string>} ids - The library ids.
+ * @throws {Error} On a malformed entry or an unknown layout.
+ */
+function checkNotImported(library, ids) {
+	for (const entry of library.not_imported || []) {
+		if (!library.sources[entry.source] || !entry.source_path || !entry.reason)
+			throw new Error(
+				`not_imported: ${JSON.stringify(entry)} needs a known source, a path and a reason`
+			);
+		if (entry.same_as !== undefined && !ids.has(entry.same_as))
+			throw new Error(
+				`not_imported: ${entry.source_path} names ${entry.same_as}, not in the library`
+			);
+	}
+}
+
+/**
  * The whole library, registry layouts first.
  * @param {object} model - analysis_model.json.
  * @returns {object[]} The library entries.
@@ -321,9 +379,17 @@ function buildLibrary(model) {
 		out.push(layout);
 	}
 	const library = JSON.parse(fs.readFileSync(LIBRARY_PATH, 'utf8'));
-	for (const entry of library.layouts)
-		out.push(fromAlphaBlock(entry, composer.REFERENCE.qwerty.rows));
+	for (const entry of library.layouts) {
+		if ((entry.keys === undefined) === (entry.rows === undefined))
+			throw new Error(`${entry.id}: a library entry has either keys or rows`);
+		out.push(
+			entry.rows
+				? fromWholeRows(entry, codes)
+				: fromAlphaBlock(entry, composer.REFERENCE.qwerty.rows)
+		);
+	}
 	credit(out);
+	checkNotImported(library, new Set(out.map((layout) => layout.id)));
 	const seen = new Set();
 	for (const layout of out) {
 		if (seen.has(layout.id)) throw new Error(`duplicate layout id ${layout.id}`);

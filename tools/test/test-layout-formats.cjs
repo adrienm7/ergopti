@@ -424,6 +424,41 @@ for (const [file, expected] of Object.entries(klaThirdParty)) {
 	);
 	klaResults.push([file, result]);
 }
+// The library's KLA layouts are the reader's reading of KLA's published files
+// (tools/build/import-kla-layouts.cjs): the codegen keeps every key and level
+// and completes nothing; a file left out names its reason, a duplicate the
+// layout it repeats; all 107 files are accounted for.
+{
+	const library = JSON.parse(
+		fs.readFileSync(shared('layouts', 'data', 'analysis', 'layout_library.json'), 'utf8')
+	);
+	const imported = new Map(
+		library.layouts.filter((e) => e.source === 'kla').map((e) => [e.source_path, e.id])
+	);
+	const left = new Map(
+		library.not_imported.filter((e) => e.source === 'kla').map((e) => [e.source_path, e])
+	);
+	const KLA_BUILT_IN = 107;
+	check(
+		imported.size + left.size === KLA_BUILT_IN,
+		`KLA library: ${imported.size} imported and ${left.size} left out, not ${KLA_BUILT_IN} files`
+	);
+	const dvorakmod = DATA.layouts.find((l) => l.id === imported.get('layouts/standard.dvorakmod'));
+	const read = klaResults.find(([file]) => file === 'kla-standard.dvorakmod.json')[1];
+	check(
+		dvorakmod !== undefined && dvorakmod.source === 'kla' && same(dvorakmod.rows, read.layout.rows),
+		'KLA library: Dvorak IU Swap is not the reader’s reading of KLA’s file'
+	);
+	for (const [file, sameAs] of [
+		['layouts/european.bepo', 'bepo'],
+		['layouts/european.azerty', 'azerty']
+	])
+		check(left.get(file)?.same_as === sameAs, `KLA library: ${file} is not left out as ${sameAs}`);
+	check(
+		/no code for: ~ ` = \+ - _$/.test(left.get('layouts/ergodox.workman')?.reason || ''),
+		'KLA library: the ErgoDox Workman does not name the characters it would lose'
+	);
+}
 for (const [name, result] of [
 	['ergol.toml', ergolToml],
 	['ergol.json', ergolJson],

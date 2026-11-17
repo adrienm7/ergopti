@@ -306,7 +306,7 @@ r³·skip3)` with `r = 1/7`, times the distance scaled by `5.5/finger weight`;
 | ISO / ANSI / ortho / angle fingering | ANSI, ISO, ErgoDox | 4 boards | display only      | yes    | yes       | yes   | yes        | yes                |
 | Coverage, compact boards, shortcuts  | no                 | no       | warning only      | no     | no        | no    | no         | yes                |
 | One global score, editable weights   | fixed              | fixed    | none              | yes    | yes       | none  | yes        | yes, contributions |
-| Layout library                       | 107                | many     | 22                | 30     | 815       | 4 121 | some       | 115                |
+| Layout library                       | 107                | many     | 22                | 30     | 815       | 4 121 | some       | 165                |
 
 ## 10. What the Ergopti engine takes and adds
 
@@ -452,13 +452,25 @@ Colemak 1.5 %).
 ## 13. Layout library
 
 `static/ergopti_plus/_shared/layouts/data/analysis/layout_library.json` holds
-107 alphabetic blocks: 72 from the Oxeylyzer layout set (Apache-2.0
-repository; the `data-files` branch has no licence file of its own) and, for 35
-classics that set lacks (Graphite, Gallium, Minimak, Asset, Capewell, BEAKL,
-Hands Down Neu…), from cmini (GPL-3.0 repository, user-submitted data; the
-Discord user ids were not imported). The codegen adds the six registry layouts
-and the reference QWERTY and AZERTY with all their layers and dead keys: 115
-layouts. Each entry names its `source` and `source_path`.
+104 alphabetic blocks: 72 from the Oxeylyzer layout set (Apache-2.0
+repository; the `data-files` branch has no licence file of its own) and, for 32
+classics that set lacks (Graphite, Minimak, Asset, Capewell, BEAKL, Hands Down
+Neu…), from cmini (GPL-3.0 repository, user-submitted data; the Discord user
+ids were not imported); cmini's APT, Gallium and Hands Down Reference were
+dropped on 2026-11-17 as the same keys as Oxeylyzer's APTv3, Gallium Colstag
+and Hands Down. It also holds 53 whole layouts (every key and level) from
+Keyboard Layout Analyzer's 107 built-in files (MIT repository,
+patorjk/keyboard-layout-analyzer at c4f2f9bb43), re-encoded through the
+Studio's KLA reader by `tools/build/import-kla-layouts.cjs`: 35 files repeat a
+layout already there, 16 have characters on keys the library's keyboards have
+no code for (12 ErgoDox files, TypeMatrix, AOEYK, the full Arensito and the
+ANSI copy of BvoFRak 1.0, whose ISO copy is imported), one places letters
+twice (Ina) and two
+are left out by judgement (an older Neo 2 file without umlauts, a second copy
+of Programmer Dvorak); `not_imported` lists each with its reason. The codegen
+adds the six registry layouts and the reference QWERTY and AZERTY with all
+their layers and dead keys: 165 layouts. Each entry names its `source` and
+`source_path`.
 
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not
@@ -485,9 +497,9 @@ name can be a trademark. The library therefore:
   KeyboardEvent.code), never copies a file of another tool;
 - takes only the arrangement (no comment, no metadata, and no Discord user id
   from cmini);
-- names the source file of every layout (`source`, `source_path`) and the
-  layout's name; the authors are not yet recorded, because neither collection
-  gives them in a structured field (a next step for the Studio's layout cards);
+- names the source file of every layout (`source`, `source_path`), the
+  layout's name and its authors (`layout_credits.json`: read on the author's
+  own page where one was found, else as the collection's file states them);
 - removes a layout on a credible request from its author.
 
 A further step can complete the French library layouts (Optimot, Béopy, the
