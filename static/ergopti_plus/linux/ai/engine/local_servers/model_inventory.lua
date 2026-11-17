@@ -156,8 +156,12 @@ function M.new(context)
 		frame.finishing = false
 		if active == frame then active = nil end
 		local published = cache
-		if names and published and published.frame == frame and source_current(frame) and cache == published
-			and type(changed) == "function" then
+		-- An unavailable inventory is a change too: the probe held the runtime
+		-- pending, and the menu and the model page drew that (the page's install
+		-- button as running) until they hear it settled.
+		local outcome_current = names and published ~= nil and published.frame == frame and cache == published
+			or not names and cache == nil and active == nil
+		if outcome_current and source_current(frame) and type(changed) == "function" then
 			local notified = pcall(changed)
 			if not notified then Logger.error(LOG, "Model inventory notification raised.") end
 		end

@@ -94,6 +94,35 @@ helpers.describe("model inventory projections", function()
 	end)
 end)
 
+-- run_model_browser_runtime_webkit.lua: with Ollama absent, the model page drew
+-- the install button as running while its inventory probe was pending, and
+-- the probe's failure notified nobody, so the button stayed disabled.
+helpers.describe("an unavailable inventory is announced (linux-inventory-unavailable-notifies)", function()
+	test("(linux-inventory-unavailable-notifies) a failed probe notifies once it settled", function()
+		with_initialization(function(world, engine)
+			local notified = {}
+			helpers.assert_true(world.profiles.init({ on_models_changed = function()
+				notified[#notified + 1] = { pending = engine.runtime_pending(), known = select(2, engine.get_cached_models_status()) }
+			end }))
+			engine.get_models(); world:inventory_defer()
+			helpers.assert_true(engine.runtime_pending(), "the probe holds the runtime pending while it runs")
+			world.inventory_requests[#world.inventory_requests]:answer({ ok = false, status = 0, error = "curl exited with code 7" })
+			helpers.assert_eq(#notified, 1, "the settled failure must reach the menu and the model page")
+			helpers.assert_eq(notified[1], { pending = false, known = false })
+		end)
+	end)
+	test("(linux-inventory-unavailable-notifies) a revoked probe notifies nobody", function()
+		with_initialization(function(world, engine)
+			local notified = 0
+			helpers.assert_true(world.profiles.init({ on_models_changed = function() notified = notified + 1 end }))
+			engine.get_models(); world:inventory_defer()
+			helpers.assert_true(world.profiles.cancel_model_inventory())
+			world.inventory_requests[#world.inventory_requests]:answer({ ok = false, status = 0, error = "cancelled" })
+			helpers.assert_eq(notified, 0)
+		end)
+	end)
+end)
+
 helpers.describe("post-install inventory observation", function()
 	test("(linux-inventory-mutation) actual pull success waits old HTTP ACK then observes installed models afresh", function()
 		with_model_pull(function(world, engine, pulls, completions)
