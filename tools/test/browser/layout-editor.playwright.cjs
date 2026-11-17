@@ -1630,7 +1630,7 @@ async function exerciseLongLabels(browser, origin) {
 		);
 	for (const width of [1440, 375]) {
 		await page.setViewportSize({ width, height: 900 });
-		for (const form of ['iso', 'ansi']) {
+		for (const form of ['iso', 'ansi', 'jis', 'abnt']) {
 			await page.selectOption('#le-board-form', form);
 			for (const layer of ['base', 'altgr']) {
 				await page.click(`[data-layer="${layer}"]`);
@@ -2504,6 +2504,24 @@ async function exerciseComparerLink(browser, origin) {
 		// The ANSI board has no ISO extra key; Windows flags and exact stickers apply.
 		await page.selectOption('#le-board-form', 'ansi');
 		assert.equal(await page.locator('#le-board [data-code="IntlBackslash"]').count(), 0);
+		// (jis-abnt-boards) The JIS and ABNT boards draw their own keys, each named by its tooltip.
+		const drawn = async (code) => page.locator(`#le-board [data-code="${code}"]`).count();
+		await page.selectOption('#le-board-form', 'jis');
+		for (const code of ['IntlYen', 'IntlRo', 'NonConvert', 'Convert', 'KanaMode'])
+			assert.equal(await drawn(code), 1, `JIS draws ${code}`);
+		assert.equal(await drawn('IntlBackslash'), 0, 'JIS has no ISO key left of Z');
+		const henkan = await page.getAttribute('#le-board [data-code="Convert"]', 'title');
+		assert.ok(henkan && henkan !== 'Convert', `Henkan has a translated name: ${henkan}`);
+		// The keypad comma is a keypad key: drawn on the full-size format.
+		const shownFormat = await page.inputValue('#le-board-format');
+		await page.selectOption('#le-board-format', 'full');
+		await page.selectOption('#le-board-form', 'abnt');
+		for (const code of ['IntlRo', 'NumpadComma', 'IntlBackslash'])
+			assert.equal(await drawn(code), 1, `ABNT draws ${code}`);
+		assert.equal(await drawn('IntlYen'), 0, 'ABNT has no Yen');
+		await page.selectOption('#le-board-format', 'tkl');
+		assert.equal(await drawn('NumpadComma'), 0, 'a TKL board has no keypad comma');
+		await page.selectOption('#le-board-format', shownFormat);
 		await page.selectOption('#le-board-form', 'iso');
 		await tool(page, 'windows');
 		await page.fill('#le-win-flags', 'kllf_altgr');

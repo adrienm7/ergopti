@@ -305,6 +305,17 @@ var LayoutEditorModel = (function () {
 		return commit(next);
 	}
 
+	/**
+	 * Sets the keyboard the layout is for beyond ISO (physical.keyboard: 'jis'
+	 * or 'abnt'), or clears it with '' (an ISO keyboard).
+	 */
+	function setKeyboard(doc, keyboard) {
+		const next = copy(doc);
+		if (keyboard === '') delete next.physical.keyboard;
+		else next.physical.keyboard = keyboard;
+		return commit(next);
+	}
+
 	/** Changes one target's export settings, or clears them with null. */
 	function setExport(doc, target, settings) {
 		const next = copy(doc);
@@ -642,6 +653,7 @@ var LayoutEditorModel = (function () {
 		setTapHold,
 		removeTapHold,
 		setLayout,
+		setKeyboard,
 		setExport,
 		transferMapping,
 		caseLayer,

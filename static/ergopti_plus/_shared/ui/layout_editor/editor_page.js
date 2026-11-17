@@ -64,6 +64,9 @@ var LayoutEditorPage = (function () {
 		{ id: 'math', from: 0x2200, to: 0x22ff }
 	];
 	const STICKER_LAYERS = ['base', 'shift', 'altgr', 'shift_altgr'];
+	// The boards the editor draws: the registry's ANSI and ISO, and the JIS and
+	// ABNT ones of keyboard_forms.json (LayoutSource.KEYBOARDS).
+	const BOARD_FORMS = ['iso', 'ansi'].concat(LayoutSource.KEYBOARDS);
 	// Physical modifier keys and the sided modifier ids the format names them by.
 	const SIDED_MODIFIERS = {
 		ShiftLeft: 'shift_left',
@@ -356,8 +359,9 @@ var LayoutEditorPage = (function () {
 			confirm: null,
 			// Whether the exact import refused the file, so the approximate one is offered.
 			approximate: false,
-			// The board drawn: ISO or ANSI geometry (the source itself is described on ISO).
-			board: 'iso',
+			// The board drawn: ISO, ANSI, JIS or ABNT geometry (the source itself is
+			// described on ISO); null follows the source's physical.keyboard.
+			board: null,
 			// A mapping copied with « Copy », pasted on another key.
 			clipboard: null,
 			// Sticker size: null fits the page, a number is the key size in millimetres.
@@ -1301,6 +1305,21 @@ var LayoutEditorPage = (function () {
 						})
 					]),
 					el('label', { class: 'le-field' }, [
+						tl('meta.keyboard'),
+						select(
+							[['', tl('physical.iso')]].concat(
+								LayoutSource.KEYBOARDS.map((id) => [id, tl(`physical.${id}`)])
+							),
+							doc().physical.keyboard || '',
+							(value) => {
+								// The board follows the keyboard the layout is now for.
+								state.board = null;
+								apply((d) => LayoutEditorModel.setKeyboard(d, value));
+							},
+							{ id: 'le-keyboard', disabled: LayoutSourceIO.isPreserved(doc()) }
+						)
+					]),
+					el('label', { class: 'le-field' }, [
 						tl('import_convention'),
 						select(
 							[
@@ -1593,11 +1612,8 @@ var LayoutEditorPage = (function () {
 					el('label', { class: 'le-inline' }, [
 						tl('board.label'),
 						select(
-							[
-								['iso', tl('physical.iso')],
-								['ansi', tl('physical.ansi')]
-							],
-							state.board,
+							BOARD_FORMS.map((form) => [form, tl(`physical.${form}`)]),
+							boardForm(),
 							(value) => {
 								state.board = value;
 								render();
@@ -1864,8 +1880,13 @@ var LayoutEditorPage = (function () {
 			event.preventDefault();
 		}
 
+		/** The board drawn: the one chosen, else the keyboard the source is for. */
+		function boardForm() {
+			return state.board || doc().physical.keyboard || 'iso';
+		}
+
 		function board() {
-			const form = state.board;
+			const form = boardForm();
 			const hidden = LAYOUT_ANALYSIS.formatHiddenKeys(state.format);
 			const keys = data.keys.filter(
 				(k) => k.kind === 'key' && k.geometry && k.geometry[form] && !hidden.has(k.code)
