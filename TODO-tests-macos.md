@@ -199,7 +199,7 @@ Hands needed:
       Logs, Caches and `ergopti_plus` support folders are gone, the stale `ErgoptiPlus/` entries are deleted after the
       next login and `ErgoptiPlus/karabiner` is kept; the migration is removed only once the maintainer's machines
       pass.
-- [ ] **Accessibility with VoiceOver** ([audit](docs/audits/accessibility/README.md)): 1. The menu-bar item
+- [ ] <!-- field-point: accessibility_voiceover --> **Accessibility with VoiceOver** ([audit](docs/audits/accessibility/README.md)): 1. The menu-bar item
       (VO+M then the extras): its name (today an image with no title or tooltip) and the paused state; every menu
       row is read, including the first canvas row, and runs from the keyboard. 2. Studio, metrics, hotstring
       settings, onboarding and the update panel: VO reads the window title, the focus starts in the page, Tab and

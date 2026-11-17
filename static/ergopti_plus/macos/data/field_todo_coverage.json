@@ -899,6 +899,12 @@
 			"title": "AI Agent submenu composed menu on an installed driver",
 			"checks": [],
 			"not_testable": "The composed menu is what a person sees when opening the AI Agent submenu of an installed driver; the field run reads no menu it does not build itself."
+		},
+		{
+			"id": "accessibility_voiceover",
+			"title": "Accessibility with VoiceOver: the menu-bar item, the dialogs, the WebKit windows and the overlays",
+			"checks": [],
+			"not_testable": "A field run reads no screen reader: a person runs VoiceOver and checks what it reads in the menu-bar item, the dialogs and the WebKit windows, and that it reads nothing of the overlays."
 		}
 	]
 }

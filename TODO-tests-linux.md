@@ -115,7 +115,7 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       `~/.local/share/ergopti_plus` gone, the daemon log listing each move, the old
       `~/.cache/ergopti_updater_etag_*.txt` files deleted); the migration is removed only once the maintainer's
       machines pass.
-- [ ] **Accessibility with Orca** ([audit](docs/audits/accessibility/README.md)): 1. The AppIndicator icon and
+- [ ] <!-- field-point: accessibility_orca --> **Accessibility with Orca** ([audit](docs/audits/accessibility/README.md)): 1. The AppIndicator icon and
       menu from the keyboard (GNOME with its extension, KDE): the icon's name (today an empty description) and the
       paused state; every item runs. 2. The GTK dialogs (text entry, list): Orca reads each field with its caption
       (today the caption is not bound to the field). 3. Studio and the other WebKit windows: title read, focus inside
