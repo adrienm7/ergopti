@@ -43,13 +43,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { shared } = require('../lib/paths.cjs');
+const identifiers = require('../lib/identifiers.cjs');
 
 const LIBRARY_PATH = shared('layouts', 'data', 'analysis', 'layout_library.json');
 const CREDITS_PATH = shared('layouts', 'data', 'analysis', 'layout_credits.json');
 const UI_DIR = shared('ui');
 const SOURCE_ID = 'kla';
 const SOURCE = {
-	url: 'https://github.com/patorjk/keyboard-layout-analyzer/tree/c4f2f9bb43ca8de98c8cb0cd28a78043602c7dcb/layouts',
+	url: `https://${identifiers.hosts.github}/patorjk/keyboard-layout-analyzer/tree/c4f2f9bb43ca8de98c8cb0cd28a78043602c7dcb/layouts`,
 	commit: 'c4f2f9bb43',
 	licence:
 		'MIT (repository, « Copyright (C) 2015-present Patrick Gillespie and other contributors »); arrangements re-encoded'
