@@ -44,6 +44,7 @@ src/routes/ergopti-plus/input-inventory.json
 src/routes/ergopti-plus/menu-gaps.json
 static/ergopti_plus/_shared/shortcuts/data/actions/README.md
 static/layouts/registry/index.json
+static/layouts/visualisation/ergopti_v2.2.json
 
 # The Claude skills tree is a generated mirror of .agents/skills
 .claude/
