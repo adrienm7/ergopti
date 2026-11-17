@@ -22,7 +22,7 @@ sub-pages does not refetch them. Each sub-page renders only its own sections.
 
 	import './ergopti-plus.css';
 	import { ui, restoreOS } from './state.svelte.js';
-	import { t, restoreLang } from './i18n.svelte.js';
+	import { i18n, t, restoreLang } from './i18n.svelte.js';
 	import LangToggle from './LangToggle.svelte';
 	import StickyCta from './StickyCta.svelte';
 
@@ -38,6 +38,16 @@ sub-pages does not refetch them. Each sub-page renders only its own sections.
 	);
 	// The installation page holds the real download section.
 	let onInstallation = $derived(pathname === resolve('/ergopti-plus/installation'));
+
+	// The page's language is the one it is read in (WCAG 3.1.1): a screen
+	// reader reads the English page with English rules. The rest of the site is
+	// French, so leaving these pages gives the document its French back.
+	$effect(() => {
+		document.documentElement.lang = i18n.lang;
+		return () => {
+			document.documentElement.lang = 'fr';
+		};
+	});
 
 	onMount(async () => {
 		restoreLang();

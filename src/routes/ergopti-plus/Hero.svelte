@@ -51,6 +51,10 @@ FEATURES & RATIONALE:
 	let typed = $state('');
 	let phase = $state('typing');
 	let demoStepTimer;
+	// The visitor's pause (WCAG 2.2.2): an automatic cycle longer than five
+	// seconds needs a way to stop it. Without motion the demo never cycles.
+	let paused = $state(false);
+	let cycles = $state(false);
 	// Generation counter — incremented on every runCycle / goToDemo call so a
 	// pending setTimeout from the previous cycle bails out the moment it fires.
 	let cycleGen = 0;
@@ -86,9 +90,10 @@ FEATURES & RATIONALE:
 	function runCycle() {
 		cycleGen++;
 		const gen = cycleGen;
-		// Less motion asked (system or site setting): the demo shows its
-		// result at once and waits for the pager instead of cycling on its own.
-		if (window.ErgoptiA11yPrefs.reducedMotion()) {
+		// Less motion asked (system or site setting) or a pause: the demo shows
+		// its result at once and waits for the pager instead of cycling on its own.
+		cycles = !window.ErgoptiA11yPrefs.reducedMotion();
+		if (!cycles || paused) {
 			typed = demos[demoIndex].output;
 			phase = 'expanded';
 			return;
@@ -105,6 +110,13 @@ FEATURES & RATIONALE:
 	function goToDemo(i) {
 		clearTimeout(demoStepTimer);
 		demoIndex = i;
+		runCycle();
+	}
+
+	/** Pause the automatic cycle, or start it again from the current demo. */
+	function togglePause() {
+		paused = !paused;
+		clearTimeout(demoStepTimer);
 		runCycle();
 	}
 
@@ -225,6 +237,12 @@ FEATURES & RATIONALE:
 				</div>
 			</div>
 
+			{#if cycles}
+				<button type="button" class="demo-pause" onclick={togglePause}>
+					<span aria-hidden="true">{paused ? '▶' : '❚❚'}</span>
+					{paused ? t('Relancer la démo') : t('Mettre la démo en pause')}
+				</button>
+			{/if}
 			<ul class="demo-pager" aria-label={t('Sélectionner une démo')}>
 				{#each demos as d, i}
 					<li>
@@ -609,6 +627,28 @@ FEATURES & RATIONALE:
 			background-color 0.25s var(--ease),
 			border-color 0.25s var(--ease),
 			color 0.25s var(--ease);
+	}
+
+	/* The pause of the automatic cycle, above the pager it pairs with. */
+	.demo-pause {
+		align-items: center;
+		background: var(--surface);
+		border: 1px solid var(--border-strong);
+		border-radius: 999px;
+		color: var(--ink);
+		cursor: pointer;
+		display: flex;
+		font: inherit;
+		font-size: 0.82rem;
+		gap: 8px;
+		margin: 18px auto 0;
+		min-height: 32px;
+		padding: 6px 14px;
+		width: fit-content;
+	}
+
+	.demo-pause:hover {
+		border-color: var(--ink-soft);
 	}
 
 	.demo-pager button:hover {

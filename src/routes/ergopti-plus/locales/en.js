@@ -199,6 +199,8 @@ export default {
 	'Vos doigts vous diront merci.': 'Your fingers will thank you.',
 	'★ {n} sur GitHub': '★ {n} on GitHub',
 	'Sélectionner une démo': 'Choose a demo',
+	'Mettre la démo en pause': 'Pause the demo',
+	'Relancer la démo': 'Play the demo',
 	'{input} → {output}, démo {n} sur {total}': '{input} → {output}, demo {n} of {total}',
 	'Sur macOS, aussi avec Homebrew :': 'On macOS, also with Homebrew:',
 	'Vous tapez déjà en Ergopti&nbsp;? Installez la disposition pour le combo complet →':
