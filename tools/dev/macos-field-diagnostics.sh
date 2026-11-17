@@ -326,7 +326,7 @@ field_mac_services() {
 field_mac_app_folders() {
 	local dir
 	for dir in "/Applications/${ERGOPTI_APP_BUNDLE}" "${HOME}/Library/Application Support/Ergopti" \
-		"${HOME}/Library/Application Support/${ERGOPTI_APP_NAME}" "${HOME}/Library/Logs/ergopti_plus" \
+		"${HOME}/Library/Application Support/${ERGOPTI_APP_NAME}" "${HOME}/Library/Logs/Ergopti" \
 		"/Library/Application Support/${ERGOPTI_APP_NAME}" "${HOME}/.config/karabiner"; do
 		if [ -e "${dir}" ]; then
 			printf '%s  %s\n' "$(ls -ld "${dir}" 2>&1)" "$(du -sh "${dir}" 2>/dev/null | cut -f1)"
