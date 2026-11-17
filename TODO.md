@@ -103,9 +103,9 @@ waits for the maintainer's review).
       indexes from. The ErgoDox index → ISO key table (`KLA_KEYS.ergodox`) maps 27 to Backslash and 60-62 to the
       brackets and quote, while the committed bépo and Optimot ErgoDox files put on 27 what their ISO files put on
       BracketLeft and on 39 what they put on Quote: check it against KLA's ErgoDox key set before changing it.
-- [ ] **Studio i18n.** Every Studio, editor and analyser string goes through i18n in English and French; left: a
-      label-improvement pass, then the 19 other locales (the analysis strings and `layout_analysis.error.<code>` keep
-      pending English).
+- [ ] **Studio i18n.** Left: a label-improvement pass over the Studio, editor and analyser strings; a label it
+      rewrites is translated again in the 19 other locales, and a new label enters as `pending-translation` in
+      `tools/lint/locale-identical-to-english-allowlist.json` until it is.
 - [ ] **[LATER] Layout library credits.** The 35 cmini layouts and 25 credits are shown; check each credit known
       « from knowledge » against its author's own page.
 - [ ] **More corpora.** French, English, German, Spanish and Italian books, Tatoeba, Wikipedia and MIT code are in.
