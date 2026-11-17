@@ -356,6 +356,23 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 			{ "reset", nil, nil, source } })
 	end)
 
+	-- The click callback withdraws the focused field's privacy verdict; the
+	-- metrics must see the press first, in the field the click lands in. Reported
+	-- after, every click met an unknown field and the clicks column stayed 0
+	-- (run_pointer_metrics_live.lua).
+	helpers.it("reports a button press before the click callback (pointer-press-before-click)", function()
+		local order = {}
+		drive("mouse", {}, {
+			{ EV_KEY, BTN_LEFT, 1, 3000 }, { EV_SYN, 0, 0, 3000 }, { EV_KEY, BTN_LEFT, 0, 4000 },
+		}, nil, function(kind, code)
+			if kind == "press" then order[#order + 1] = "press:" .. code end
+		end, nil, nil, function(_, code)
+			order[#order + 1] = "click:" .. code
+		end)
+		helpers.assert_eq(order, { "press:" .. BTN_LEFT, "click:" .. BTN_LEFT },
+			"one press, reported before the click callback")
+	end)
+
 	helpers.it("remaps the wheel without optional pointer observers (wheel-no-observers)", function()
 		local emitted, grabs, _, running, _, opened = drive("mouse", HOLD, {
 			{ EV_REL, REL_WHEEL, 1, 3000 },
@@ -547,7 +564,10 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		local reports = {}
 		local emitted = drive("mouse", HOLD, { { EV_KEY, BTN_LEFT, 1, 3000 } }, nil,
 			function(kind) reports[#reports + 1] = kind end, false, false, function(hook) hook.stop() end)
-		helpers.assert_eq(reports, { "reset" }, "only the source reset is published after capture stops")
+		-- The press is published first, while capture is live, so the metrics
+		-- count it in its field (pointer-press-before-click); after the click
+		-- callback stops capture, only the source reset may follow.
+		helpers.assert_eq(reports, { "press", "reset" }, "only the source reset is published after capture stops")
 		helpers.assert_true(not has(emitted, "key:" .. BTN_LEFT .. ":1"))
 	end)
 	helpers.it("compiles a wheel direction under its own code, never a key's", function()

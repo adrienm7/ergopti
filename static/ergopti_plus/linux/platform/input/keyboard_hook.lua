@@ -2844,6 +2844,7 @@ local function _dispatch_pointer(ev, slot)
 	end
 	local pointer_key = ev.type == EVDEV_TYPE_KEY and (InputEvent.is_pointer_button(ev.code)
 		or ev.code >= 0x140 and ev.code <= 0x14f) -- BTN_DIGI contacts and tools
+	local press_reported = false
 	if ev.type == EVDEV_TYPE_KEY and ev.code >= 1 and not pointer_key then
 		-- A mouse may also expose keyboard/media keys on the same node. Those
 		-- keys reach the desktop and count as activity for a held tap-hold.
@@ -2864,6 +2865,15 @@ local function _dispatch_pointer(ev, slot)
 		-- the kernel reports a touch and no BTN_LEFT, and that touch moves the
 		-- caret all the same, so the password-field verdict and the typing
 		-- buffer must be dropped as on a click.
+		-- A button's press is reported first: the click happened in the field
+		-- the click callback is about to withdraw, and the metrics count it
+		-- there, as macOS counts a click in the context it lands in. Reported
+		-- after, every click met a field already unknown and went uncounted.
+		if ev.value == InputEvent.VALUE_DOWN and _on_pointer_event and InputEvent.is_pointer_button(ev.code) then
+			if not _running or _capture_session ~= session then return end
+			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)
+			press_reported = true
+		end
 		if ev.value == InputEvent.VALUE_DOWN and _on_click then
 			if not _running or _capture_session ~= session then return end
 			_call_callback("pointer callback", _on_click, ev.code)
@@ -2904,7 +2914,7 @@ local function _dispatch_pointer(ev, slot)
 				_call_callback("pointer event callback", _on_pointer_event, "contact", ev.code, ev.value, slot)
 				if not _running or _capture_session ~= session then return end
 			end
-			if ev.value == InputEvent.VALUE_DOWN then
+			if ev.value == InputEvent.VALUE_DOWN and not press_reported then
 				_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)
 			end
 		elseif ev.type == InputEvent.EV_SYN then
