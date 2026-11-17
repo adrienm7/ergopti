@@ -196,6 +196,73 @@ check(
 	'the editor exposes openLayout'
 );
 
+// The app's Studio window mounts the page in its « Optimiser » tab: it loads
+// the optimizer after the engine and the corpus reader (and before its own
+// script), the optimizer's stylesheet, lists the tab's label, and opens the
+// result in its own tabs. The Windows host sends the layout_optimizer.* keys
+// (macOS and Linux seed the whole catalogue).
+{
+	const windowDir = shared('ui', 'layout_editor_window');
+	const windowHtml = read(path.join(windowDir, 'index.html'));
+	const windowScripts = Array.from(windowHtml.matchAll(/<script src="([^"]+)"/g), (m) => m[1]);
+	const at = (src) => windowScripts.indexOf(src);
+	const needed = [
+		'../_generated/key_legend.js',
+		'../layout_analysis/analysis_engine.js',
+		'../layout_analysis/pdf_text.js',
+		'../layout_analysis/corpus_files.js',
+		'../layout_optimizer/optimizer_core.js',
+		'../layout_optimizer/optimizer_runner.js',
+		'../layout_optimizer/optimizer_page.js',
+		'script.js'
+	];
+	for (let i = 0; i < needed.length; i++) {
+		check(at(needed[i]) >= 0, `layout_editor_window: no ${needed[i]}`);
+		if (i > 0) check(at(needed[i - 1]) < at(needed[i]), `layout_editor_window: ${needed[i]} order`);
+	}
+	check(
+		windowHtml.includes('href="../layout_optimizer/style.css"'),
+		'layout_editor_window: no optimizer stylesheet'
+	);
+	check(
+		windowHtml.includes('id="studio-tab-optimize"') &&
+			windowHtml.includes('data-i18n="layout_editor.studio.tab.optimize"') &&
+			windowHtml.includes('id="studio-optimizer"'),
+		'layout_editor_window: no « Optimiser » tab'
+	);
+	const windowStrings = JSON.parse(read(path.join(windowDir, 'strings.json'))).keys;
+	check(
+		windowStrings.includes('layout_editor.studio.tab.optimize'),
+		'layout_editor_window/strings.json: no tab label'
+	);
+	for (const file of locales)
+		check(
+			typeof JSON.parse(read(path.join(LOCALES_DIR, file)))['layout_editor.studio.tab.optimize'] ===
+				'string',
+			`${file}: layout_editor.studio.tab.optimize`
+		);
+	const windowScript = read(path.join(windowDir, 'script.js'));
+	check(
+		/LAYOUT_OPTIMIZER_PAGE\.mount\(optimizer, \{\s*host: \{ openEditor: editOptimized, openComparer: compareEdited \}/.test(
+			windowScript
+		),
+		'layout_editor_window: the tab mounts the optimizer with the window as host'
+	);
+	check(
+		/function editOptimized\(layout\) \{\s*showTab\('edit'\);\s*if \(_editor\) _editor\.openLayout\(layout\);/.test(
+			windowScript
+		),
+		'layout_editor_window: the optimizer opens its layout in « Éditer »'
+	);
+	const windowsHost = read(
+		path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows', 'ui', 'layout_manager', 'init.ahk')
+	);
+	check(
+		windowsHost.includes('SubStr(Key, 1, 17) == "layout_optimizer."'),
+		'the Windows Studio window sends the layout_optimizer.* strings'
+	);
+}
+
 // =========================
 // ======= 4/ Runner =======
 // =========================

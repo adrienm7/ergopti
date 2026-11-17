@@ -610,6 +610,7 @@
 	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.tab.edit": "편집",
 	"layout_editor.studio.tab.compare": "비교",
+	"layout_editor.studio.tab.optimize": "최적화",
 	"layout_editor.studio.keystats.load": "내 타이핑 분석",
 	"layout_editor.studio.keystats.privacy": "타이핑 통계는 이 컴퓨터에서만 Ergopti+의 로컬 측정값에서 읽으며 어디에도 전송되지 않습니다.",
 	"layout_editor.studio.keystats.loading": "타이핑 통계를 읽는 중…",

@@ -610,6 +610,7 @@
 	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.tab.edit": "עריכה",
 	"layout_editor.studio.tab.compare": "השוואה",
+	"layout_editor.studio.tab.optimize": "מיטוב",
 	"layout_editor.studio.keystats.load": "נתח את ההקלדה שלי",
 	"layout_editor.studio.keystats.privacy": "סטטיסטיקות ההקלדה שלך נקראות במחשב זה בלבד, מהמדדים המקומיים של Ergopti+, ואינן נשלחות לשום מקום.",
 	"layout_editor.studio.keystats.loading": "קורא את סטטיסטיקות ההקלדה שלך…",

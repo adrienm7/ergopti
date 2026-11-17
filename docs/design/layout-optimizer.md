@@ -151,6 +151,19 @@ that refuses storage, or a text over the quota, gets the same page unsaved.
 Where a worker cannot start (a page a host inlines, without a script URL),
 the same runner runs on the page in 40 ms slices.
 
+**In Ergopti+.** The Studio window of the app
+(`_shared/ui/layout_editor_window`, on Windows, macOS and Linux) has a third
+tab, « Optimiser », that mounts the page the first time it opens, with the
+window as host: « Open in the editor » opens the layout in a new tab of its
+« Éditer » (`openLayout`) and « Compare with other layouts » adds it in its
+« Comparer ». The keystats n-grams the window reads (`studio-ngrams`) become
+the corpus « My typing », listed first and chosen, even when they arrive
+before the tab opens. macOS and Linux inline the scripts (and their document
+CSP forbids workers), so the search runs on the page; Windows serves them
+from its virtual host, so workers start there. The tab reads its strings from
+the catalogue macOS and Linux seed, and from the `layout_optimizer.*` keys the
+Windows host sends with the editor's (`LayoutManager_EditorStrings`).
+
 ## Example
 
 Start AZERTY, corpus « Du côté de chez Swann », default switches (letters
@@ -173,5 +186,3 @@ only), keyboard ISO, format TKL, default weights, 1 restart of 3 000 swaps on
   trials per second). The exact partial walk re-walks the n-grams of the
   characters whose ways changed and of the multi-way characters whose
   shares of ways changed, and re-plans only their contexts.
-- The app: mount `LAYOUT_OPTIMIZER_PAGE` in the Studio window of ErgoptiPlus
-  (Windows, macOS, Linux), with the keystats corpus « My typing ».

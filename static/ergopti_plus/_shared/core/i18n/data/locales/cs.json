@@ -610,6 +610,7 @@
 	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.tab.edit": "Upravit",
 	"layout_editor.studio.tab.compare": "Porovnat",
+	"layout_editor.studio.tab.optimize": "Optimalizovat",
 	"layout_editor.studio.keystats.load": "Analyzovat mé psaní",
 	"layout_editor.studio.keystats.privacy": "Vaše statistiky psaní se čtou pouze na tomto počítači z místních metrik Ergopti+ a nikam se neodesílají.",
 	"layout_editor.studio.keystats.loading": "Načítání statistik psaní…",

@@ -610,6 +610,7 @@
 	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.tab.edit": "Redigera",
 	"layout_editor.studio.tab.compare": "Jämför",
+	"layout_editor.studio.tab.optimize": "Optimera",
 	"layout_editor.studio.keystats.load": "Analysera mitt skrivande",
 	"layout_editor.studio.keystats.privacy": "Din skrivstatistik läses bara på den här datorn, från Ergopti+:s lokala mätvärden, och skickas aldrig någonstans.",
 	"layout_editor.studio.keystats.loading": "Läser din skrivstatistik…",

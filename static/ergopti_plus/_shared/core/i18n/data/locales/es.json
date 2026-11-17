@@ -610,6 +610,7 @@
 	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.tab.edit": "Editar",
 	"layout_editor.studio.tab.compare": "Comparar",
+	"layout_editor.studio.tab.optimize": "Optimizar",
 	"layout_editor.studio.keystats.load": "Analizar mi escritura",
 	"layout_editor.studio.keystats.privacy": "Tus estadísticas de escritura se leen solo en este ordenador, desde las métricas locales de Ergopti+, y nunca se envían a ningún sitio.",
 	"layout_editor.studio.keystats.loading": "Leyendo tus estadísticas de escritura…",

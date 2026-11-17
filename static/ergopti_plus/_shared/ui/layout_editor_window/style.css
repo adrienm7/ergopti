@@ -73,6 +73,7 @@ body {
 .studio-tabs {
 	border-bottom: 1px solid var(--theme-grey-ccc);
 	display: flex;
+	flex-wrap: wrap;
 	gap: 4px;
 	margin-bottom: 12px;
 }
@@ -93,6 +94,7 @@ body {
 }
 
 .layout-editor[hidden],
-.studio-comparer[hidden] {
+.studio-comparer[hidden],
+.studio-optimizer[hidden] {
 	display: none;
 }

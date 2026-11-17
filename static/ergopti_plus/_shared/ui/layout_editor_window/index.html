@@ -10,6 +10,7 @@
 		<link rel="stylesheet" href="../layout_analysis/info_popover.css" />
 		<link rel="stylesheet" href="../layout_analysis/fingering_editor.css" />
 		<link rel="stylesheet" href="../layout_analysis/style.css" />
+		<link rel="stylesheet" href="../layout_optimizer/style.css" />
 		<link rel="stylesheet" href="style.css" />
 		<script src="../host_bridge.js"></script>
 		<script src="../_generated/key_legend.js"></script>
@@ -47,6 +48,9 @@
 		<script src="../layout_analysis/analysis_panel.js"></script>
 		<script src="../layout_analysis/layout_formats.js"></script>
 		<script src="../layout_analysis/comparer_page.js"></script>
+		<script src="../layout_optimizer/optimizer_core.js"></script>
+		<script src="../layout_optimizer/optimizer_runner.js"></script>
+		<script src="../layout_optimizer/optimizer_page.js"></script>
 		<script src="../layout_editor/editor_page.js"></script>
 		<!-- The XKB and KLC downloads: the Lua VM, the KLC generator and the shipped export data. -->
 		<script src="../vendor/fengari-web.js"></script>
@@ -64,7 +68,7 @@
 			<span id="studio-keystats-status" class="studio-keystats-status" role="status"></span>
 			<p class="studio-keystats-privacy" data-i18n="layout_editor.studio.keystats.privacy"></p>
 		</section>
-		<!-- Ergopti Studio's two tabs: the editor, and the comparison of layouts. -->
+		<!-- Ergopti Studio's tabs: the editor, the comparison of layouts, and the optimizer. -->
 		<nav class="studio-tabs" role="tablist">
 			<button
 				type="button"
@@ -80,10 +84,19 @@
 				aria-selected="false"
 				data-i18n="layout_editor.studio.tab.compare"
 			></button>
+			<button
+				type="button"
+				id="studio-tab-optimize"
+				role="tab"
+				aria-selected="false"
+				data-i18n="layout_editor.studio.tab.optimize"
+			></button>
 		</nav>
 		<main id="layout-editor" class="layout-editor"></main>
 		<!-- The Comparer (_shared/ui/layout_analysis) mounts here when its tab first opens. -->
 		<section id="studio-comparer" class="studio-comparer" hidden></section>
+		<!-- The optimizer (_shared/ui/layout_optimizer) mounts here when its tab first opens. -->
+		<section id="studio-optimizer" class="studio-optimizer" hidden></section>
 
 		<script src="script.js"></script>
 	</body>

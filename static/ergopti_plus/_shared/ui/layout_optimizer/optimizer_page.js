@@ -84,6 +84,10 @@
 	const HEIGHT_MESSAGE = 'ergopti-layout-optimizer:height';
 	// The corpus a pasted text or an opened file makes.
 	const CUSTOM_ID = 'custom';
+	// The app's keystats corpus (« My typing ») and the event its Studio window
+	// dispatches with those n-grams (layout_editor_window/script.js).
+	const MY_TYPING_ID = 'my_typing';
+	const NGRAMS_EVENT = 'studio-ngrams';
 	// A text shorter than this gives the search too few n-grams to measure; a
 	// longer one would hold the page while it is counted and sent to the workers.
 	const MIN_TEXT_CHARS = 200;
@@ -204,13 +208,24 @@
 </section>`;
 
 	let mounted = null;
+	// The app's last keystats tables, kept when they arrive before the mount
+	// (the Studio window mounts this tab the first time it opens).
+	let lastNgrams = null;
+	let onNgrams = null;
+	document.addEventListener(NGRAMS_EVENT, (event) => {
+		lastNgrams = event.detail;
+		if (onNgrams) onNgrams(event.detail);
+	});
 
 	/**
 	 * Fills an element with the optimizer.
 	 * @param {HTMLElement} root - The element the page fills.
-	 * @param {{reportHeight?: boolean}} [options] - reportHeight: post the
-	 *   page height to a framing parent (the site).
-	 * @returns {{}} The mounted page.
+	 * @param {{reportHeight?: boolean, host?: {openEditor?: function(object): void,
+	 *   openComparer?: function(object): void}}} [options] - reportHeight: post
+	 *   the page height to a framing parent (the site); host: the app's Studio
+	 *   window, which opens the result in its own « Éditer » and « Comparer »
+	 *   tabs instead of the site's.
+	 * @returns {{setCorpus: function(object): void}} The mounted page.
 	 * @throws {Error} On a missing root or a second mount.
 	 */
 	function mount(root, options) {
@@ -218,6 +233,7 @@
 			throw new Error('layout_optimizer: mount needs an element');
 		if (mounted) throw new Error('layout_optimizer: the page is already mounted');
 		const opts = options || {};
+		const HOST = opts.host || {};
 		root.classList.add('layout-optimizer');
 		// A constant of this script, no user data: safe as markup.
 		root.innerHTML = MARKUP;
@@ -290,6 +306,8 @@
 			custom: null,
 			// The saved start layout, until the reader picks another.
 			savedStart: null,
+			// The host's corpora: {id, title, tables}, listed first.
+			hostCorpora: [],
 			running: null,
 			startResult: null,
 			best: null,
@@ -330,8 +348,9 @@
 			const shown = DATA.corpora.filter((corpus) => corpus.language === $('lo-language').value);
 			const custom = el('option', '', t(`${PREFIX}corpus.custom`));
 			custom.value = CUSTOM_ID;
+			// The host's corpora (« My typing ») first, whatever the language.
 			select.replaceChildren(
-				...shown.map((corpus) => {
+				...state.hostCorpora.concat(shown).map((corpus) => {
 					const option = el('option', '', corpus.title);
 					option.value = corpus.id;
 					return option;
@@ -728,6 +747,8 @@
 				if (!state.custom) throw Object.assign(new Error('no text'), { code: 'text_missing' });
 				return state.custom.tables;
 			}
+			const hosted = state.hostCorpora.find((corpus) => corpus.id === id);
+			if (hosted) return hosted.tables;
 			if (state.tables.has(id)) return state.tables.get(id);
 			const corpus = DATA.corpora.find((entry) => entry.id === id);
 			const tables = await FILES.builtinTables(corpus);
@@ -990,6 +1011,10 @@
 
 		function openEditor() {
 			if (!state.bestLayout) return;
+			if (typeof HOST.openEditor === 'function') {
+				HOST.openEditor(state.bestLayout);
+				return;
+			}
 			try {
 				FILES.handOffToEditor(state.bestLayout);
 			} catch (error) {
@@ -1001,6 +1026,10 @@
 
 		function openComparer() {
 			if (!state.bestLayout) return;
+			if (typeof HOST.openComparer === 'function') {
+				HOST.openComparer(state.bestLayout);
+				return;
+			}
 			try {
 				FILES.handOff(state.bestLayout);
 			} catch (error) {
@@ -1204,7 +1233,34 @@
 			post();
 			if (typeof ResizeObserver === 'function') new ResizeObserver(post).observe(document.body);
 		}
-		mounted = {};
+		/**
+		 * Adds or replaces a corpus the host provides (the app's keystats), listed
+		 * first, and selects it when it is the default.
+		 * @param {{id: string, title: string, tables: object, default?: boolean}} corpus
+		 * @throws {Error} On tables the engine cannot read.
+		 */
+		function setCorpus(corpus) {
+			E.prepareNgrams(corpus.tables);
+			const entry = { id: corpus.id, title: corpus.title, tables: corpus.tables };
+			const at = state.hostCorpora.findIndex((c) => c.id === corpus.id);
+			if (at >= 0) state.hostCorpora.splice(at, 1, entry);
+			else state.hostCorpora.unshift(entry);
+			fillCorpora();
+			if (corpus.default) $('lo-corpus').value = corpus.id;
+			syncCorpus();
+			save();
+		}
+
+		// « My typing »: the app's keystats n-grams, the default corpus in the app.
+		onNgrams = (ngrams) =>
+			setCorpus({
+				id: MY_TYPING_ID,
+				title: t('layout_analysis.corpus.my_typing'),
+				tables: ngrams,
+				default: true
+			});
+		if (lastNgrams) onNgrams(lastNgrams);
+		mounted = { setCorpus };
 		return mounted;
 	}
 

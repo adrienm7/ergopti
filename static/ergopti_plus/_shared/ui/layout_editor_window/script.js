@@ -760,18 +760,36 @@ const hostWorkspace = Object.freeze({
 // costs no analysis; « My typing » loaded before then waits for the mount
 // (comparer_page.js).
 let _comparerMounted = false;
+// The optimizer mounts the same way; it runs its search on the page, in short
+// slices, where the host inlines the scripts (no URL to start a worker from).
+let _optimizerMounted = false;
 
 /**
- * Shows one of the two tabs.
- * @param {'edit'|'compare'} tab
+ * Shows one of the three tabs.
+ * @param {'edit'|'compare'|'optimize'} tab
  */
 function showTab(tab) {
 	const compare = tab === 'compare';
+	const optimize = tab === 'optimize';
 	const comparer = document.getElementById('studio-comparer');
-	document.getElementById('studio-tab-edit').setAttribute('aria-selected', String(!compare));
+	const optimizer = document.getElementById('studio-optimizer');
+	document.getElementById('studio-tab-edit').setAttribute('aria-selected', String(tab === 'edit'));
 	document.getElementById('studio-tab-compare').setAttribute('aria-selected', String(compare));
-	document.getElementById('layout-editor').hidden = compare;
+	document.getElementById('studio-tab-optimize').setAttribute('aria-selected', String(optimize));
+	document.getElementById('layout-editor').hidden = tab !== 'edit';
 	comparer.hidden = !compare;
+	optimizer.hidden = !optimize;
+	if (optimize) {
+		// One keyboard format for every tab: the optimizer reads the shared one.
+		if (_editor) window.LAYOUT_ANALYSIS_FILES.saveFormat(_editor.format());
+		if (!_optimizerMounted) {
+			_optimizerMounted = true;
+			window.LAYOUT_OPTIMIZER_PAGE.mount(optimizer, {
+				host: { openEditor: editOptimized, openComparer: compareEdited }
+			});
+		}
+		return;
+	}
 	if (!compare) return;
 	if (!_comparerMounted) {
 		_comparerMounted = true;
@@ -797,8 +815,20 @@ function compareEdited(layout) {
 document.getElementById('studio-tab-edit').addEventListener('click', function () {
 	showTab('edit');
 });
+/**
+ * Opens the optimizer's layout in « Éditer », in a new tab of the editor.
+ * @param {Object} layout - Library shape.
+ */
+function editOptimized(layout) {
+	showTab('edit');
+	if (_editor) _editor.openLayout(layout);
+}
+
 document.getElementById('studio-tab-compare').addEventListener('click', function () {
 	showTab('compare');
+});
+document.getElementById('studio-tab-optimize').addEventListener('click', function () {
+	showTab('optimize');
 });
 
 // ========================================

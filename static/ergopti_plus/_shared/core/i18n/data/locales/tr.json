@@ -610,6 +610,7 @@
 	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.tab.edit": "Düzenle",
 	"layout_editor.studio.tab.compare": "Karşılaştır",
+	"layout_editor.studio.tab.optimize": "İyileştir",
 	"layout_editor.studio.keystats.load": "Yazımımı analiz et",
 	"layout_editor.studio.keystats.privacy": "Yazma istatistikleriniz yalnızca bu bilgisayarda, Ergopti+'nın yerel ölçümlerinden okunur ve hiçbir yere gönderilmez.",
 	"layout_editor.studio.keystats.loading": "Yazma istatistikleriniz okunuyor…",

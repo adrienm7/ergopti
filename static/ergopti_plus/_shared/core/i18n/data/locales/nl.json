@@ -610,6 +610,7 @@
 	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.tab.edit": "Bewerken",
 	"layout_editor.studio.tab.compare": "Vergelijken",
+	"layout_editor.studio.tab.optimize": "Optimaliseren",
 	"layout_editor.studio.keystats.load": "Mijn typen analyseren",
 	"layout_editor.studio.keystats.privacy": "Je typstatistieken worden alleen op deze computer gelezen, uit de lokale metingen van Ergopti+, en nooit ergens heen gestuurd.",
 	"layout_editor.studio.keystats.loading": "Je typstatistieken worden gelezen…",

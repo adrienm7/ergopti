@@ -610,6 +610,7 @@
 	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.tab.edit": "संपादित करें",
 	"layout_editor.studio.tab.compare": "तुलना करें",
+	"layout_editor.studio.tab.optimize": "ऑप्टिमाइज़ करें",
 	"layout_editor.studio.keystats.load": "मेरी टाइपिंग का विश्लेषण करें",
 	"layout_editor.studio.keystats.privacy": "आपके टाइपिंग आँकड़े केवल इसी कंप्यूटर पर, Ergopti+ के स्थानीय मेट्रिक्स से पढ़े जाते हैं, और कहीं नहीं भेजे जाते।",
 	"layout_editor.studio.keystats.loading": "आपके टाइपिंग आँकड़े पढ़े जा रहे हैं…",
