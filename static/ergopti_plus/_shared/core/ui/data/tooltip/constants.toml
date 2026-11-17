@@ -198,6 +198,10 @@ sep_alpha_ahk = 0.25   # alpha-blended onto 0x1A → 0x54 (#545454) in AHK
 sep_alpha_hs  = 0.09   # hs.canvas fillColor alpha (darker on macOS)
 sep_alpha_linux = 0.09 # cairo fill alpha
 
+# Main text of a tooltip row, white. AHK turns it into the grey it paints;
+# macOS and Linux draw the same white from their RGBA tables.
+text_white = 1.0
+
 # Trigger-label color (★ ↵ symbols, right column in stacked tooltips).
 label_white = 0.45
 label_alpha = 1.0

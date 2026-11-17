@@ -93,11 +93,7 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; projection, keyed by the keystats folder stamp. It starts empty at its
 	; declaration and the editor window fills it after a complete worker read;
 	; an empty cache only means the next read starts a worker.
-	"ui/layout_manager/editor_window.ahk", true,
-	; _NavLayerIndicatorOwner — the tray text the active navigation layer replaced,
-	; 0 while no layer shows its name. It starts 0 at its declaration, the layer
-	; sets and clears it, and a pause rebases it; there is no init to guard.
-	"infra/nav_layer_helpers.ahk", true
+	"ui/layout_manager/editor_window.ahk", true
 )
 
 ; Captured 2026-07-21 after excluding UPPER_SNAKE constants from the state

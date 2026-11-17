@@ -408,9 +408,8 @@ _TooltipNotifySurfacePresented(Items, SurfaceToken) {
 ; announced to it through the tooltip window as a live region: the previews that would fire
 ; (not the struck-through alternates) and a finished prediction's selected
 ; line (not the streaming partials). A re-render of the same text within
-; TOOLTIP_ANNOUNCE_REPEAT_MS is not said again. Decided by the agent on 2026-11-17, to review by the maintainer: the
+; [ui] tooltip_announce_repeat_ms is not said again. Decided by the agent on 2026-11-17, to review by the maintainer: the
 ; screen reader's own running flag is the opt-in, with no Ergopti+ setting.
-global TOOLTIP_ANNOUNCE_REPEAT_MS := 3000
 global _TooltipLastAnnouncement := ""
 global _TooltipLastAnnouncementTick := 0
 
@@ -449,7 +448,6 @@ _TooltipAnnouncementText(Items, LlmRecord) {
 ; @returns {String} The text handed to the screen reader, "" when none was.
 _TooltipAnnouncePresented(Items, Surface, ScreenReaderFn := 0, AnnounceFn := 0) {
 		global _TooltipLastAnnouncement, _TooltipLastAnnouncementTick
-		global TOOLTIP_ANNOUNCE_REPEAT_MS
 		try {
 			ReaderOn := IsObject(ScreenReaderFn) ? ScreenReaderFn.Call() : A11ySystem_ScreenReaderOn()
 			if !ReaderOn {
@@ -461,7 +459,7 @@ _TooltipAnnouncePresented(Items, Surface, ScreenReaderFn := 0, AnnounceFn := 0) 
 			if (Text == "")
 				return ""
 			if (Text == _TooltipLastAnnouncement
-					&& A_TickCount - _TooltipLastAnnouncementTick < TOOLTIP_ANNOUNCE_REPEAT_MS)
+					&& A_TickCount - _TooltipLastAnnouncementTick < TimingsGet("ui", "tooltip_announce_repeat_ms"))
 				return ""
 			Hwnd := (IsObject(Surface) && IsObject(Surface.Gui)) ? Surface.Gui.Hwnd : 0
 			_TooltipLastAnnouncement := Text

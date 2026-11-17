@@ -79,8 +79,11 @@ DisableLayer(Owner := 0) {
 	return true
 }
 
-; The tray text the active layer replaced, held until the layer restores it.
-global _NavLayerIndicatorOwner := 0
+; The tray text the active layer replaced, held until the layer restores it
+; (Owner is 0 while no layer shows its name).
+class _NavLayerIndicator {
+	static Owner := 0
+}
 
 ; Publishes the layer's translated status through the tray presentation owner.
 ; Capture before the first publication and retain that exact text until its
@@ -90,8 +93,7 @@ global _NavLayerIndicatorOwner := 0
 ; @param IsActive {Boolean} Whether the navigation layer is visibly active.
 ; @returns {Boolean} Whether the requested tray state was acknowledged.
 NavigationLayerUpdateIndicator(IsActive, ReadFn := 0, WriteFn := 0, LabelFn := 0) {
-	global _NavLayerIndicatorOwner
-	Owner := _NavLayerIndicatorOwner
+	Owner := _NavLayerIndicator.Owner
 	if !IsObject(ReadFn)
 		ReadFn := TrayMenuGetTooltip
 	if !IsObject(WriteFn)
@@ -101,13 +103,13 @@ NavigationLayerUpdateIndicator(IsActive, ReadFn := 0, WriteFn := 0, LabelFn := 0
 	try {
 		if IsActive {
 			if !IsObject(Owner)
-				Owner := _NavLayerIndicatorOwner := {PreviousText: ReadFn.Call()}
+				Owner := _NavLayerIndicator.Owner := {PreviousText: ReadFn.Call()}
 			if WriteFn.Call(LabelFn.Call()) != true
 				throw Error("The navigation layer indicator publication was not acknowledged")
 		} else if IsObject(Owner) {
 			if WriteFn.Call(Owner.PreviousText) != true
 				throw Error("The navigation layer indicator restoration was not acknowledged")
-			_NavLayerIndicatorOwner := 0
+			_NavLayerIndicator.Owner := 0
 		}
 		return true
 	} catch as Err {
@@ -121,10 +123,9 @@ NavigationLayerUpdateIndicator(IsActive, ReadFn := 0, WriteFn := 0, LabelFn := 0
 ; @param Text {String} The tray text to restore.
 ; @returns {Boolean} Whether the layer holds the tray (the caller writes nothing).
 NavigationLayerIndicatorRebase(Text) {
-	global _NavLayerIndicatorOwner
-	if !IsObject(_NavLayerIndicatorOwner)
+	if !IsObject(_NavLayerIndicator.Owner)
 		return false
-	_NavLayerIndicatorOwner.PreviousText := Text
+	_NavLayerIndicator.Owner.PreviousText := Text
 	return true
 }
 

@@ -28,7 +28,7 @@ _A11yT_SettingsAreReadable() {
 	AssertTrue(A11ySystem_ScreenReaderOn() is Integer, "the screen-reader flag is a boolean")
 	Scale := A11ySystem_TextScalePercent()
 	AssertTrue(Scale >= 100 && Scale <= 225, "the text scale is 100 to 225 %, got " . Scale)
-	AssertTrue(RegExMatch(A11ySystem_SysColorHex(A11Y_COLOR_INFOBK), "^[0-9A-F]{6}$"), "a system colour is RRGGBB")
+	AssertTrue(RegExMatch(A11ySystem_SysColorHex(A11Y_SYSINDEX_INFOBK), "^[0-9A-F]{6}$"), "a system colour is RRGGBB")
 }
 Test("a11y native: the system settings read as typed values (a11y-native-2026-11-17)", _A11yT_SettingsAreReadable)
 

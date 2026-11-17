@@ -322,6 +322,11 @@ global _DefaultLogsDir := _LogsDir
 #Include ../modules/keymap/layout_registry_watch.ahk
 #Include ../modules/keymap/pause_layout_switch.ahk
 #Include ../modules/keymap/system_layout_install.ahk
+; The headless harness does not run UiStyle_LoadSharedConst: the tooltip rows'
+; text colour is read from the constants it would read, before the tooltip
+; module captures it.
+UI_TEXT_HEX := Format("{1:02X}{1:02X}{1:02X}", Round(255 * Float(IniCacheGet(
+	ParseTomlFile(_SharedDir . "\core\ui\data\tooltip\constants.toml"), "colors", "text_white"))))
 #Include ../core/ui/ui/tooltip/init.ahk
 #Include ../core/ui/adapters/tooltip_renderer.ahk
 #Include ../modules/updater.ahk

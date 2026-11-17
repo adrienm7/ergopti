@@ -36,14 +36,13 @@ global A11Y_SPI_GETSCREENREADER := 0x0046
 global A11Y_HCF_HIGHCONTRASTON := 0x0001
 
 ; GetSysColor indexes of the tooltip pair Windows recolours in high contrast.
-global A11Y_COLOR_INFOTEXT := 23
-global A11Y_COLOR_INFOBK := 24
+global A11Y_SYSINDEX_INFOTEXT := 23
+global A11Y_SYSINDEX_INFOBK := 24
 
 ; « Make text bigger » (Settings > Accessibility > Text size): 100 to 225 %.
 global A11Y_TEXT_SCALE_KEY := "HKCU\Software\Microsoft\Accessibility"
 global A11Y_TEXT_SCALE_VALUE := "TextScaleFactor"
 global A11Y_TEXT_SCALE_DEFAULT := 100
-global A11Y_TEXT_SCALE_MAX := 225
 
 ; Dynamic annotation (IAccPropServices) of a control's MSAA name, which the UI
 ; Automation proxy of a Win32 control reports as its Name.
@@ -102,7 +101,9 @@ A11ySystem_ScreenReaderOn() {
 ; The « Make text bigger » scale, in percent (100 when never set).
 ; @returns {Integer} 100 to 225.
 A11ySystem_TextScalePercent() {
-	global A11Y_TEXT_SCALE_KEY, A11Y_TEXT_SCALE_VALUE, A11Y_TEXT_SCALE_DEFAULT, A11Y_TEXT_SCALE_MAX
+	global A11Y_TEXT_SCALE_KEY, A11Y_TEXT_SCALE_VALUE, A11Y_TEXT_SCALE_DEFAULT
+	; The largest scale Settings > Accessibility > Text size offers (an OS fact).
+	static ScaleMax := 225
 	try Value := RegRead(A11Y_TEXT_SCALE_KEY, A11Y_TEXT_SCALE_VALUE, A11Y_TEXT_SCALE_DEFAULT)
 	catch as Err {
 		try LoggerWarn("A11ySystem", "The text scale could not be read: {1}.", Err.Message)
@@ -110,11 +111,11 @@ A11ySystem_TextScalePercent() {
 	}
 	if !IsInteger(Value)
 		return A11Y_TEXT_SCALE_DEFAULT
-	return Max(A11Y_TEXT_SCALE_DEFAULT, Min(A11Y_TEXT_SCALE_MAX, Integer(Value)))
+	return Max(A11Y_TEXT_SCALE_DEFAULT, Min(ScaleMax, Integer(Value)))
 }
 
 ; A system colour as the "RRGGBB" text a Gui option takes.
-; @param Index {Integer} A GetSysColor index (A11Y_COLOR_*).
+; @param Index {Integer} A GetSysColor index (A11Y_SYSINDEX_*).
 ; @returns {String}
 A11ySystem_SysColorHex(Index) {
 	Bgr := DllCall("GetSysColor", "Int", Index, "UInt")
@@ -124,12 +125,12 @@ A11ySystem_SysColorHex(Index) {
 ; The settings the native tooltips follow, read in one place.
 ; @returns {Object} { HighContrast, TextScalePercent, InfoBkHex, InfoTextHex }.
 A11ySystem_State() {
-	global A11Y_COLOR_INFOBK, A11Y_COLOR_INFOTEXT
+	global A11Y_SYSINDEX_INFOBK, A11Y_SYSINDEX_INFOTEXT
 	return {
 		HighContrast: A11ySystem_HighContrastOn(),
 		TextScalePercent: A11ySystem_TextScalePercent(),
-		InfoBkHex: A11ySystem_SysColorHex(A11Y_COLOR_INFOBK),
-		InfoTextHex: A11ySystem_SysColorHex(A11Y_COLOR_INFOTEXT)
+		InfoBkHex: A11ySystem_SysColorHex(A11Y_SYSINDEX_INFOBK),
+		InfoTextHex: A11ySystem_SysColorHex(A11Y_SYSINDEX_INFOTEXT)
 	}
 }
 

@@ -77,8 +77,8 @@ global UI_LABEL_COLOR_HEX  := ""
 global UI_HINT_COLOR_HEX   := ""
 global UI_INFO_COLOR_HEX   := ""
 global UI_LOADING_TEXT_HEX := ""
-; The main text colour of a tooltip row (white, as macOS and Linux draw it).
-global UI_TEXT_HEX         := "FFFFFF"   ; AHK-only constant, not in TOML
+; The main text colour of a tooltip row ([colors] text_white as a grey).
+global UI_TEXT_HEX         := ""
 ; Whether Windows high contrast replaced the colours above with system ones
 ; (UiStyle_ApplySystemAccessibility); the tint wash is dropped then.
 global UI_HIGH_CONTRAST    := false
@@ -198,6 +198,8 @@ UiStyle_LoadSharedConst() {
 
 	; [colors]
 	global UI_BG_HEX               := _UiStyleRequireHex(c, "colors", "bg_hex")
+	text_v := Round(255 * Float(_UiStyleRequire(c, "colors", "text_white")))
+	global UI_TEXT_HEX             := Format("{1:02X}{1:02X}{1:02X}", text_v)
 	global UI_LABEL_COLOR_HEX      := _UiStyleRequireHex(c, "colors", "label_hex")
 	global UI_HINT_COLOR_HEX       := _UiStyleRequireHex(c, "colors", "hint_hex")
 	global UI_INFO_COLOR_HEX       := _UiStyleRequireHex(c, "colors", "info_hex")

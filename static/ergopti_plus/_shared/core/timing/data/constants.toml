@@ -844,6 +844,11 @@ onboarding_gesture_done_ms = 100
 # AHK: platform/system/notifier.ahk.
 paused_refusal_repeat_ms = 3000
 
+# Windows: while a screen reader runs, a tooltip's text is told to it once in
+# this window; a re-render of the same preview is not said again.
+# AHK: core/ui/ui/tooltip/helpers.ahk.
+tooltip_announce_repeat_ms = 3000
+
 # Linux diagnostics owns an asynchronous desktop launcher until its exit/EOF receipt.
 desktop_open_timeout_ms = 30000
 
