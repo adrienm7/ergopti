@@ -8,6 +8,7 @@
  * navigation layer editor page knows about keys and actions, from the shared
  * layer sources:
  *   - _shared/layouts/data/keycodes/physical_keys.json (codes, kinds, geometry);
+ *   - _shared/layouts/data/keycodes/keyboard_forms.json (the JIS and ABNT boards);
  *   - _shared/layouts/data/layer_actions.toml (actions, groups, OS availability);
  *   - _shared/layouts/data/layers.recommended.toml (Ergopti's recommended layer);
  *   - _shared/tap_hold/data/defaults.toml (the layers a hold key can enter).
@@ -38,12 +39,14 @@ const path = require('path');
 const TOML = require('smol-toml');
 const { shared, sharedRel } = require('../lib/paths.cjs');
 const { loadContext, loadLayers, RECOMMENDED_PATH } = require('../lib/keymap-layers.cjs');
+const KeyboardForms = require('../lib/keyboard-forms.cjs');
 
 const OUT_PATH = shared('ui', 'layer_editor', '_generated', 'layer_data.js');
 const TAP_HOLD_DEFAULTS_PATH = shared('tap_hold', 'data', 'defaults.toml');
 const EN_LOCALE_PATH = shared('core', 'i18n', 'data', 'locales', 'en.json');
 const SOURCES = [
 	'layouts/data/keycodes/physical_keys.json',
+	'layouts/data/keycodes/keyboard_forms.json',
 	'layouts/data/layer_actions.toml',
 	'layouts/data/layers.recommended.toml',
 	'tap_hold/data/defaults.toml'
@@ -165,10 +168,12 @@ function buildData() {
 	// A key the registry sends by its scan code rather than by name
 	// (`ahk_send: null`) types whatever the active layout puts there: its
 	// legend is the host's to send (script.js init), never a guess of the page.
+	// Each drawn key carries its geometry on every board, the JIS and ABNT ones included.
+	const forms = KeyboardForms.readForms(registry);
 	const keys = Object.entries(registry.keys).map(([code, entry]) => {
 		const key = { code, kind: entry.kind, group: entry.group };
 		if (entry.kind === 'key' && entry.ahk_send === null) key.character = true;
-		if (entry.geometry) key.geometry = entry.geometry;
+		if (entry.geometry) key.geometry = KeyboardForms.geometryOfKey(registry, forms, code);
 		return key;
 	});
 

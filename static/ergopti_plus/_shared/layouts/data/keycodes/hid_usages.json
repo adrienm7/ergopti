@@ -109,6 +109,12 @@
 		"NumpadEnter": { "page": 7, "usage": 88 },
 		"Numpad0": { "page": 7, "usage": 98 },
 		"NumpadDecimal": { "page": 7, "usage": 99 },
+		"IntlYen": { "page": 7, "usage": 137 },
+		"IntlRo": { "page": 7, "usage": 135 },
+		"NonConvert": { "page": 7, "usage": 139 },
+		"Convert": { "page": 7, "usage": 138 },
+		"KanaMode": { "page": 7, "usage": 136 },
+		"NumpadComma": { "page": 7, "usage": 133 },
 		"AudioVolumeMute": { "page": 12, "usage": 226, "aliases": [{ "page": 7, "usage": 127 }] },
 		"AudioVolumeDown": { "page": 12, "usage": 234, "aliases": [{ "page": 7, "usage": 129 }] },
 		"AudioVolumeUp": { "page": 12, "usage": 233, "aliases": [{ "page": 7, "usage": 128 }] }
@@ -126,9 +132,6 @@
 		"F18": { "page": 7, "usage": 109, "hs": 79 },
 		"F19": { "page": 7, "usage": 110, "hs": 80 },
 		"F20": { "page": 7, "usage": 111, "hs": 90 },
-		"NumpadComma": { "page": 7, "usage": 133, "hs": 95 },
-		"IntlRo": { "page": 7, "usage": 135, "hs": 94 },
-		"IntlYen": { "page": 7, "usage": 137, "hs": 93 },
 		"Lang1": { "page": 7, "usage": 144, "hs": 104 },
 		"Lang2": { "page": 7, "usage": 145, "hs": 102 }
 	}

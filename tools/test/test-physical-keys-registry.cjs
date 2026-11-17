@@ -36,8 +36,12 @@
  *    one, each agrees with the USB HID Usage Tables, and a raw usage resolves to
  *    the macOS keycode of its form with the ISO swap of 0x35 and 0x64 only.
  *    Aliases (Non-US # on Backslash) and the unregistered keys (F13 to F20,
- *    keypad =, the JIS keys) agree with the same tables and with macOS keycodes.
- *    The registry itself carries no HID column: Windows parses it at boot.
+ *    keypad =, the Mac JIS Eisu and Kana keys) agree with the same tables and
+ *    with macOS keycodes. The registry itself carries no HID column: Windows
+ *    parses it at boot.
+ * 6. The JIS and ABNT keys sit on no ANSI or ISO board; keyboard_forms.json
+ *    draws the JIS and ABNT boards from the ISO one and each is checked as the
+ *    ANSI and ISO boards are (no overlap, a gap-free 15-unit main block).
  * ==============================================================================
  */
 
@@ -50,6 +54,22 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const REGISTRY = path.join(SP, '_shared', 'layouts', 'data', 'keycodes', 'physical_keys.json');
 const HID_USAGES = path.join(SP, '_shared', 'layouts', 'data', 'keycodes', 'hid_usages.json');
+const KEYBOARD_FORMS = path.join(
+	SP,
+	'_shared',
+	'layouts',
+	'data',
+	'keycodes',
+	'keyboard_forms.json'
+);
+
+// The keys only JIS and ABNT keyboards have (W3C UI Events code values §3.1).
+const JIS_ABNT_KEYS = ['IntlYen', 'IntlRo', 'NonConvert', 'Convert', 'KanaMode', 'NumpadComma'];
+// The JIS keys macOS reports no keycode for: IOHIDFamily's Cosmo_USB2ADB.c maps
+// HID usages 0x88 (Katakana/Hiragana), 0x8A (Henkan) and 0x8B (Muhenkan) to
+// DEADKEY, while 0x85, 0x87 and 0x89 become kVK_JIS_KeypadComma (95),
+// kVK_JIS_Underscore (94) and kVK_JIS_Yen (93).
+const MACOS_UNREPORTED = new Set(['NonConvert', 'Convert', 'KanaMode']);
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -170,7 +190,9 @@ for (const code of codes) {
 			fail(`${code}: ahk_send must be null or an AutoHotkey key name`);
 		if (!isInt(k.evdev) || k.evdev < 1 || k.evdev > 255)
 			fail(`${code}: evdev must be a KEY_* code, found ${k.evdev}`);
-		if (!isInt(k.hs) || k.hs < 0 || k.hs > 127)
+		if (MACOS_UNREPORTED.has(code)) {
+			if (k.hs !== null) fail(`${code}: macOS reports no keycode for this key, hs must be null`);
+		} else if (!isInt(k.hs) || k.hs < 0 || k.hs > 127)
 			fail(`${code}: hs must be a kVK_* keycode, found ${k.hs}`);
 		if (!karabinerEvent(k.karabiner, ['key_code', 'consumer_key_code']))
 			fail(`${code}: karabiner must be one {key_code} or {consumer_key_code} event`);
@@ -205,8 +227,10 @@ for (const code of codes) {
 			if (!isInt(g.row) || typeof g.col !== 'number' || typeof g.width !== 'number' || g.width <= 0)
 				fail(`${code}.${form}: row/col/width malformed`);
 		}
-		// Only IntlBackslash is absent from an ANSI board.
-		const expected = code === 'IntlBackslash' ? ['iso'] : ['ansi', 'iso'];
+		// Only IntlBackslash is absent from an ANSI board; the JIS and ABNT keys
+		// are on neither (keyboard_forms.json places them).
+		const expected =
+			code === 'IntlBackslash' ? ['iso'] : JIS_ABNT_KEYS.includes(code) ? [] : ['ansi', 'iso'];
 		if (JSON.stringify(Object.keys(k.geometry).sort()) !== JSON.stringify(expected))
 			fail(
 				`${code}: geometry forms ${JSON.stringify(Object.keys(k.geometry))}, expected ${JSON.stringify(expected)}`
@@ -275,11 +299,57 @@ for (const form of registry.forms) {
 // =====================================
 // =====================================
 
-for (const form of registry.forms) {
+const keyboardForms = JSON.parse(fs.readFileSync(KEYBOARD_FORMS, 'utf8'));
+if (keyboardForms.schema_version !== 1) fail('keyboard_forms.json: schema_version must be 1');
+if (JSON.stringify(Object.keys(keyboardForms.forms || {})) !== JSON.stringify(['jis', 'abnt']))
+	fail('keyboard_forms.json: forms must be jis and abnt');
+for (const [form, spec] of Object.entries(keyboardForms.forms || {})) {
+	if (!registry.forms.includes(spec.base)) fail(`${form}: unknown base form ${spec.base}`);
+	for (const code of spec.absent)
+		if (!keys[code] || !keys[code].geometry || !keys[code].geometry[spec.base])
+			fail(`${form}: absent ${code} is not on the ${spec.base} board`);
+	for (const [code, g] of Object.entries(spec.keys)) {
+		if (!keys[code] || !keys[code].geometry) fail(`${form}: ${code} is not a board key`);
+		if (!isInt(g.row) || typeof g.col !== 'number' || typeof g.width !== 'number' || g.width <= 0)
+			fail(`${code}.${form}: row/col/width malformed`);
+	}
+}
+// Every JIS and ABNT key is on at least one of those boards.
+for (const code of JIS_ABNT_KEYS)
+	if (!Object.values(keyboardForms.forms || {}).some((spec) => spec.keys[code]))
+		fail(`${code}: on no keyboard of keyboard_forms.json`);
+// Their driver identities are free on every board (the ANSI and ISO uniqueness
+// above skips keys absent from those boards).
+for (const code of JIS_ABNT_KEYS)
+	for (const driver of ['ahk', 'evdev', 'hs', 'karabiner', 'kanata']) {
+		const value = keys[code][driver];
+		if (value === null) continue;
+		const other = codes.find(
+			(c) =>
+				c !== code &&
+				keys[c].kind === 'key' &&
+				[keys[c][driver], keys[c].macos_iso && keys[c].macos_iso[driver]].some(
+					(v) => JSON.stringify(v) === JSON.stringify(value)
+				)
+		);
+		if (other) fail(`${driver}: ${code} and ${other} share ${JSON.stringify(value)}`);
+	}
+
+/** A key's geometry on any form: physical_keys.json's, or keyboard_forms.json's. */
+function formGeometry(code, form) {
+	const own = keys[code].geometry;
+	if (registry.forms.includes(form)) return own && own[form];
+	const spec = keyboardForms.forms[form];
+	if (spec.keys[code]) return spec.keys[code];
+	if (spec.absent.includes(code)) return undefined;
+	return own && own[spec.base];
+}
+
+for (const form of registry.forms.concat(Object.keys(keyboardForms.forms || {}))) {
 	// row -> list of [start, end, code]; tall keys also occupy the next row.
 	const rows = new Map();
 	for (const code of codes) {
-		const g = keys[code].geometry && keys[code].geometry[form];
+		const g = formGeometry(code, form);
 		if (!g) continue;
 		for (let r = g.row; r < g.row + (g.height || 1); r++) {
 			if (!rows.has(r)) rows.set(r, []);
@@ -744,6 +814,12 @@ for (const [code, entry] of Object.entries(unregistered)) {
 		NumpadEnter: [7, 0x58],
 		Numpad0: [7, 0x62],
 		NumpadDecimal: [7, 0x63],
+		NumpadComma: [7, 0x85],
+		IntlRo: [7, 0x87],
+		KanaMode: [7, 0x88],
+		IntlYen: [7, 0x89],
+		Convert: [7, 0x8a],
+		NonConvert: [7, 0x8b],
 		IntlBackslash: [7, 0x64],
 		ContextMenu: [7, 0x65],
 		ControlLeft: [7, 0xe0],
@@ -832,9 +908,6 @@ for (const [code, entry] of Object.entries(unregistered)) {
 		ScrollLock: [0x47, fKeys.F14],
 		Pause: [0x48, fKeys.F15],
 		NumpadEqual: [0x67, 81],
-		NumpadComma: [0x85, 95],
-		IntlRo: [0x87, 94],
-		IntlYen: [0x89, 93],
 		Lang1: [0x90, 104],
 		Lang2: [0x91, 102]
 	};
@@ -850,6 +923,10 @@ for (const [code, entry] of Object.entries(unregistered)) {
 	for (const code of Object.keys(unregistered))
 		if (!UNREGISTERED[code])
 			fail(`hid: unregistered ${code} is not in this test's oracle — extend it`);
+	// The JIS keys macOS does report keep HIToolbox's kVK_JIS_* codes.
+	const JIS_KVK = { IntlYen: 93, IntlRo: 94, NumpadComma: 95 };
+	for (const [code, hs] of Object.entries(JIS_KVK))
+		if (!keys[code] || keys[code].hs !== hs) fail(`hid: ${code} must have kVK ${hs}`);
 }
 
 // --- 5.6 fn/globe has no registry position, so the macOS keycode it resolves to

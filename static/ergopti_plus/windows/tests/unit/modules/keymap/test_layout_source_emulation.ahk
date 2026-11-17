@@ -219,6 +219,11 @@ _LSE_RegistrationCase() {
 		; An emulated layer takes every alphanumeric key; the modifiers stay the OS's.
 		AssertTrue(Names.Has("*SC015 I0"), "KeyY, unmapped, is taken while an emulated layer is selected")
 		AssertFalse(Names.Has("*SC02A I0"), "Shift is never taken")
+		; The JIS character keys are taken, its input-method keys stay the IME's.
+		AssertTrue(Names.Has("*SC073 I0"), "IntlRo is taken while an emulated layer is selected")
+		AssertTrue(Names.Has("*SC07D I0"), "IntlYen is taken while an emulated layer is selected")
+		for Sc in ["SC079", "SC07B", "SC070"]
+			AssertFalse(Names.Has("*" . Sc . " I0"), Sc . " (an input-method key) is never taken")
 		AssertFalse(Names.Has("install"), "the composed layout is never downloaded")
 		AssertTrue(KLE_SourceSession is Map, "the session is loaded")
 	} finally KeylayoutEmulation_SourceUnload()

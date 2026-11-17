@@ -34,6 +34,7 @@ const path = require('path');
 const vm = require('vm');
 const TOML = require('smol-toml');
 const { shared } = require('../lib/paths.cjs');
+const KeyboardForms = require('../lib/keyboard-forms.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const GENERATOR = path.join(ROOT, 'tools', 'codegen', 'codegen-layer-editor-data-js.cjs');
@@ -87,6 +88,7 @@ const vocabulary = TOML.parse(
 const registry = JSON.parse(
 	fs.readFileSync(shared('layouts', 'data', 'keycodes', 'physical_keys.json'), 'utf8')
 );
+const keyboardForms = KeyboardForms.readForms(registry);
 const recommendedDoc = TOML.parse(
 	fs.readFileSync(shared('layouts', 'data', 'layers.recommended.toml'), 'utf8')
 );
@@ -239,8 +241,18 @@ for (const key of data.keys) {
 	if (!entry) continue;
 	if (key.kind !== entry.kind || key.group !== entry.group)
 		fail(`${key.code}: kind/group ${key.kind}/${key.group}, registry ${entry.kind}/${entry.group}`);
-	if (JSON.stringify(key.geometry || null) !== JSON.stringify(entry.geometry || null))
+	// The registry's ANSI and ISO geometry, then the JIS and ABNT boards of keyboard_forms.json.
+	const expected = entry.geometry
+		? KeyboardForms.geometryOfKey(registry, keyboardForms, key.code)
+		: null;
+	if (JSON.stringify(key.geometry || null) !== JSON.stringify(expected))
 		fail(`${key.code}: geometry differs from the registry`);
+	for (const form of registry.forms)
+		if (
+			entry.geometry &&
+			JSON.stringify((key.geometry || {})[form]) !== JSON.stringify(entry.geometry[form])
+		)
+			fail(`${key.code}: ${form} geometry differs from the registry`);
 	const character = entry.kind === 'key' && entry.ahk_send === null;
 	if (
 		(key.character === true) !== character ||

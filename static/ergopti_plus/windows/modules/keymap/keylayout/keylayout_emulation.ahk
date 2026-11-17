@@ -1870,7 +1870,9 @@ KeylayoutEmulation_CaptureCanonicalSource() {
 ; state of, and the keys the source compiler reports as not emulated.
 _KLE_SourceUntaken() {
 	static Untaken := Map("ShiftLeft", true, "ShiftRight", true, "ControlLeft", true, "ControlRight", true,
-		"AltLeft", true, "AltRight", true, "MetaLeft", true, "MetaRight", true, "CapsLock", true, "ContextMenu", true)
+		"AltLeft", true, "AltRight", true, "MetaLeft", true, "MetaRight", true, "CapsLock", true, "ContextMenu", true,
+		; The JIS input-method keys stay the IME's, as the menu key stays the system's.
+		"NonConvert", true, "Convert", true, "KanaMode", true)
 	return Untaken
 }
 

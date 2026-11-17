@@ -23,8 +23,10 @@
  *    keycode per form, so the consumer needs a keyboard type for those keys only.
  * 3. Every usage a keyboard sends for a known key: a registry key's aliases
  *    (the PC ISO Non-US # usage is Backslash) resolve like its main usage, and
- *    the keys no layer can bind (F13 to F20, keypad =, the JIS keys) come from
- *    hid_usages.json's unregistered table with their macOS keycode.
+ *    the keys no layer can bind (F13 to F20, keypad =, the Mac JIS Eisu and Kana
+ *    keys) come from hid_usages.json's unregistered table with their macOS
+ *    keycode. A registry key macOS gives no keycode (hs null: the PC JIS Henkan,
+ *    Muhenkan and Katakana/Hiragana keys) is left out: macOS never reports it.
  * 4. Refuses instead of guessing: a key without a HID usage, a usage for an
  *    unknown key, an unregistered key the registry does know, a duplicate usage
  *    or a usage outside its page's range fails the generation.
@@ -98,6 +100,10 @@ function record(code, hid, byForm) {
 for (const [code, entry] of Object.entries(registry.keys || {})) {
 	if (entry.kind !== 'key') continue;
 	const hid = hidUsages[code];
+	if (entry.hs === null) {
+		if (!hid || typeof hid !== 'object') fail(`${code} has no HID usage in hid_usages.json.`);
+		continue;
+	}
 	const byForm = forms.map((form) => keycodeOn(entry, form));
 	record(code, hid, byForm);
 	for (const alias of (hid && hid.aliases) || []) record(code, alias, byForm);
