@@ -317,7 +317,7 @@
 		},
 		{
 			"id": "macos-tis-cache-probe",
-			"ordinal": 680,
+			"ordinal": 681,
 			"name": "the macOS TIS current-source cache probe stays a manual workflow on the hosted images of the refusals, runs every run-loop mode the probe accepts in its own process, uploads its evidence on failure and is run by no other workflow",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-tis-cache-probe.cjs"],

@@ -92,7 +92,7 @@
 		},
 		{
 			"id": "windows-keyboard-layout-builder",
-			"ordinal": 682,
+			"ordinal": 683,
 			"name": "Windows keyboard layout builder: MSVC stderr stays output under Windows PowerShell 5.1, a failing step still stops the build",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-keyboard-layout-builder.cjs"],

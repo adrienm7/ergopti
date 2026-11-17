@@ -3715,17 +3715,7 @@ function header(title, source) {
 
 /** Formats one repository file in place with the repository's Prettier. */
 function prettier(rel) {
-	const bin = path.join(
-		ROOT,
-		'node_modules',
-		'.bin',
-		process.platform === 'win32' ? 'prettier.cmd' : 'prettier'
-	);
-	if (!fs.existsSync(bin)) throw new Error('Prettier is not installed: run npm ci before --write');
-	require('node:child_process').execFileSync(bin, ['--write', '--log-level', 'warn', rel], {
-		cwd: ROOT,
-		stdio: 'inherit'
-	});
+	require('../../lint/format.cjs').prettierWrite([rel]);
 }
 
 function write(rel, text) {

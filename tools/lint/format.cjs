@@ -100,6 +100,17 @@ function prettier(args) {
 	return run(process.execPath, [prettierBin(), ...args]);
 }
 
+/**
+ * Formats the given files in place with the repository's Prettier, through
+ * Node itself: on Windows the node_modules/.bin shim is a .cmd file, which
+ * Node refuses to spawn without a shell. Throws when Prettier fails.
+ */
+function prettierWrite(paths) {
+	const status = prettier(['--write', '--log-level', 'warn', '--', ...paths]);
+	if (status !== 0)
+		throw new Error(`prettier --write failed (status ${status}) on ${paths.join(', ')}`);
+}
+
 // Prettier formats one file at a time. The whole-tree check took most of the
 // CI formatting job, which every lane waits for, so the tree is split into
 // disjoint path groups that separate processes check at once.
@@ -328,4 +339,4 @@ if (require.main === module) {
 		);
 }
 
-module.exports = { RUFF_VERSION, PRETTIER_EXTENSIONS, prettierGroups, prettierTree };
+module.exports = { RUFF_VERSION, PRETTIER_EXTENSIONS, prettierGroups, prettierTree, prettierWrite };

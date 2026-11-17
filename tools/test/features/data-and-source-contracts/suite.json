@@ -970,6 +970,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-macos-installer-cohort.cjs"],
 			"repro": "npm run test:structure-macos-installer-cohort"
+		},
+		{
+			"id": "structure-plan-prettier",
+			"ordinal": 677,
+			"name": "structure plan appendices format through Prettier without a shell on every OS",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-plan-prettier.cjs"],
+			"repro": "npm run test:structure-plan-prettier"
 		}
 	]
 }
