@@ -132,13 +132,15 @@ _MetaListAhkFilesGuardV2(Dir) {
 ; Whether a stateful file guards its state: a lazy check on a private global
 ; (if !_X), or an owner start that rejects a duplicate initialization
 ; (if IsObject(_X), or if IsSet(_X) && IsObject(_X) for an owner whose stop can
-; run before its top-level assignment, followed by a throw), as AGENTS.md asks
-; of a stateful module.
+; run before its top-level assignment, followed by a throw), or a use before
+; initialization that fails fast on the state's type (if !(_X is Map), followed
+; by a throw), as AGENTS.md asks of a stateful module.
 ; @param Body {String} The file's source.
 ; @returns {Boolean}
 _MetaRequireStateHasGuard(Body) {
 	return (Body ~= "i)if\s*\(!_\w") or (Body ~= "i)if\s+!_\w")
 		or (Body ~= "im)^\s*if\s*\(?\s*(?:IsSet\((_\w+)\)\s*&&\s*IsObject\(\1\)|IsObject\(_\w+\))\s*\)?[ \t]*\r?\n\s*throw\b")
+		or (Body ~= "im)^\s*if\s+!\(\s*_\w+\s+is\s+\w+\s*\)[ \t]*\r?\n\s*throw\b")
 }
 
 _MetaGuardRatchet() {
@@ -204,6 +206,10 @@ _MetaRequireStateGuardShapes() {
 	AssertFalse(_MetaRequireStateHasGuard('Start() {`n`tif IsSet(_Other) && IsObject(_Owner)`n`t`tthrow Error("started")`n}'),
 		"the IsSet half must test the owner itself")
 	AssertFalse(_MetaRequireStateHasGuard('Stop() {`n`tif IsObject(_Owner)`n`t`t_Owner := ""`n}'))
+	AssertTrue(_MetaRequireStateHasGuard('Apply() {`n`tif !(_Base is Map)`n`t`tthrow Error("load first")`n}'),
+		"a use before initialization that fails fast on the state's type is a guard")
+	AssertFalse(_MetaRequireStateHasGuard('Apply() {`n`tif !(_Base is Map)`n`t`t_Base := Map()`n}'),
+		"a type check that only branches is not")
 	AssertFalse(_MetaRequireStateHasGuard("Read() {`n`treturn _Owner`n}"))
 }
 Test("meta require_state: a duplicate-start rejection counts as an init guard", _MetaRequireStateGuardShapes)
