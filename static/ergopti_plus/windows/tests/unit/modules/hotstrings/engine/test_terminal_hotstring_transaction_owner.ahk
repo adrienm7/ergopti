@@ -586,4 +586,53 @@ Test("terminal capture: refused Begin preserves successor (terminal-capture-begi
 Test("terminal capture: throwing Begin preserves successor (terminal-capture-begin-owner)",
 	_THTO_BeginRefusalKeepsSuccessor.Bind("throw"))
 
+; A terminal expansion keeps its undo record once committed, and the immediate
+; Backspace's restoration goes out through the same paced capture.
+_THTO_UndoRestoresThroughTheCapture() {
+	global HSE_Buffer, HSE_Undoable, _THTO_Runner, _THTO_NativeState
+	global _PrefixFocusedControlToken, _PrefixWatcherSuppressed, _SendHook, _HSE_FireLogQueue
+	SavedFocus := _PrefixFocusedControlToken
+	SavedHook := _SendHook
+	try {
+		_THTO_Reset()
+		_PrefixFocusedControlToken := 1
+		Owner := _THTO_MakeOwner()
+		Owner["UndoTriggerUnits"] := 7
+		AssertTrue(_HSE_BeginOwnedTerminalTransaction(Owner, _THTO_Schedule) is Map)
+		_THTO_Runner.Call()
+		AssertEqual("XGBoost", HSE_Buffer, "control: the expansion committed")
+		Undo := HSE_Undoable
+		AssertTrue(IsObject(Undo), "a committed terminal expansion keeps its undo record")
+		AssertEqual("terminal", Undo.Route, "through the terminal capture")
+		AssertEqual("xgboost", Undo.Trigger, "the trigger is the text the fire erased")
+		AssertEqual("XGBoost", Undo.Typed, "the typed text is the replacement")
+		HSE_Undoable := ""
+		Payloads := []
+		_SendHook := (Name, Payload, *) => (Payloads.Push(Name . "|" . Payload), true)
+		_THTO_Runner := 0
+		AssertTrue(HSE_UndoExpansion(Undo, 1, , _THTO_Schedule), "the immediate Backspace owns its effect")
+		AssertEqual("", HSE_Buffer, "the restored trigger stays out of the buffer")
+		AssertEqual(0, Payloads.Length, "nothing is typed before the capture's own turn")
+		AssertTrue(HasMethod(_THTO_Runner, "Call"), "the restoration is scheduled on the terminal owner")
+		_THTO_Runner.Call()
+		Expected := "SendTerminalResult|"
+		loop 6
+			Expected .= "{BackSpace}"
+		AssertEqual(1, Payloads.Length, "one paced burst")
+		AssertEqual(Expected . "{Text}xgboost", Payloads[1],
+			"the last letter is already gone: six paced Backspaces, then the trigger")
+		AssertEqual(2, _THTO_NativeState["CommitCalls"].Length, "the expansion's and the undo's captures commit")
+		AssertEqual(0, _PrefixWatcherSuppressed, "the owner released the suppression")
+		AssertEqual("", HSE_Buffer, "the line stays unknown")
+		AssertEqual(1, _HSE_FireLogQueue.Length, "the undo is no second fire")
+		AssertEqual("", HSE_Undoable, "and keeps no undo of its own")
+	} finally {
+		_SendHook := SavedHook
+		_PrefixFocusedControlToken := SavedFocus
+		_THTO_Reset()
+	}
+}
+Test("terminal undo: an immediate Backspace restores the trigger through the paced capture (backspace-undo)",
+	_THTO_UndoRestoresThroughTheCapture)
+
 OutputHostResolverConfigure()

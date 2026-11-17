@@ -1754,3 +1754,84 @@ _HNPG_ContextMutationRefuses() {
 }
 Test("Notepad publication: callback context mutation is checked afterward (notepad-publication)",
 	_HNPG_ContextMutationRefuses)
+
+
+/** Settles one recorded native request through its real commit and completion hooks. */
+_HNPU_Settle(Request, Ok := true) {
+	Finalizer := 0
+	if Ok {
+		PreviousCritical := Critical("On")
+		try Finalizer := Request.Opts["atomic_commit"].Call()
+		finally Critical(PreviousCritical)
+		if HasMethod(Finalizer, "Call")
+			Finalizer.Call()
+	}
+	Request.Callback.Call(Ok, Ok ? "" : "recorded native refusal")
+}
+
+/** A Notepad expansion keeps its undo record, and the undo goes through the editor too. */
+_HNPU_BackspaceRestoresThroughTheEditor(Mode) {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, HSE_Undoable, _PrefixFocusedControlToken
+		global _PrefixWatcherSuppressed, _HSE_FireLogQueue
+		_PrefixFocusedControlToken := 1
+		State := Map("Requests", [])
+		Owner := _HNP_Dispatch(State, "xxab ", " ")
+		AssertTrue(Owner is Map, "the Notepad expansion is pending on its editor owner")
+		AssertEqual("", HSE_Undoable, "a pending expansion keeps no undo yet")
+		_HNPU_Settle(State["Requests"][1])
+		AssertEqual("xxZ ", HSE_Buffer, "control: the expansion committed")
+		Undo := HSE_Undoable
+		AssertTrue(IsObject(Undo), "a committed Notepad expansion keeps its undo record")
+		AssertEqual("notepad", Undo.Route, "through the Notepad editor")
+		AssertEqual("ab", Undo.Trigger, "the trigger is the text the fire erased")
+		AssertEqual("Z ", Undo.Typed, "the typed text includes the replayed Space")
+		HSE_Undoable := ""
+		AssertTrue(HSE_UndoExpansion(Undo, 1, _HNP_Record.Bind(State)),
+			"the immediate Backspace owns its effect")
+		AssertEqual(2, State["Requests"].Length, "one editor request restores the trigger")
+		Request := State["Requests"][2]
+		AssertEqual("native", Request.Opts["mode"], "the same verified editor, never a keyboard burst")
+		AssertEqual("ab", Request.Text, "the trigger comes back")
+		AssertEqual(1, Request.Opts["erase_before"], "the Space is already gone: the rest of the output is erased")
+		AssertEqual("Z", Request.Opts["deleted_text"], "and named exactly")
+		AssertEqual("", HSE_Buffer, "the restored trigger stays out of the buffer")
+		AssertEqual(1, _PrefixWatcherSuppressed, "the pending undo holds the suppression")
+		; The editor refuses before any change while the Backspace has not reached
+		; the document: the same request is asked again, until the settle window ends.
+		Refusals := Mode == "late" ? 1 : Mode == "never" ? 1000 : 0
+		Deadline := A_TickCount + 5000
+		while Refusals > 0 && A_TickCount < Deadline {
+			Count := State["Requests"].Length
+			_HNPU_Settle(State["Requests"][Count], false)
+			Refusals -= 1
+			; The isolated fixture runs Critical, which holds the retry timer back.
+			PreviousCritical := Critical("Off")
+			try {
+				while State["Requests"].Length == Count && _PrefixWatcherSuppressed && A_TickCount < Deadline
+					Sleep(10)
+			} finally Critical(PreviousCritical)
+			if State["Requests"].Length == Count
+				break
+			Retry := State["Requests"][State["Requests"].Length]
+			AssertEqual("ab", Retry.Text, "a retry asks for the same trigger")
+			AssertEqual("Z", Retry.Opts["deleted_text"], "over the same remaining output")
+		}
+		if Mode != "never" {
+			AssertEqual(Mode == "late" ? 3 : 2, State["Requests"].Length, "one request per refusal, then the accepted one")
+			_HNPU_Settle(State["Requests"][State["Requests"].Length], true)
+		} else
+			AssertTrue(State["Requests"].Length < 100, "the retries stop at the settle window")
+		AssertEqual("", HSE_Buffer, "settled or refused, the line stays unknown")
+		AssertEqual(0, _PrefixWatcherSuppressed, "completion releases the suppression")
+		AssertEqual(1, _HSE_FireLogQueue.Length, "the undo is no second fire")
+		AssertEqual("", HSE_Undoable, "and keeps no undo of its own")
+	}
+}
+Test("Notepad undo: an immediate Backspace restores the trigger through the editor (backspace-undo)",
+	_HNPU_BackspaceRestoresThroughTheEditor.Bind("ok"))
+Test("Notepad undo: a request refused before the Backspace lands is asked again (backspace-undo)",
+	_HNPU_BackspaceRestoresThroughTheEditor.Bind("late"))
+Test("Notepad undo: a restoration refused past its window leaves the line unknown (backspace-undo)",
+	_HNPU_BackspaceRestoresThroughTheEditor.Bind("never"))

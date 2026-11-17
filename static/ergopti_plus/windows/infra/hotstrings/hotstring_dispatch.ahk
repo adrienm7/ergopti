@@ -46,7 +46,7 @@ global _HSE_TerminalOwnerSerial := 0
 global _HSE_TerminalReplayPending := 0
 global _HSE_TerminalReplaying := false
 ; The literal expansion an immediate Backspace may still undo (HSE_UndoExpansion),
-; "" when none: set by the atomic fire, taken by the very next key.
+; "" when none: set when a literal expansion commits, taken by the very next key.
 global HSE_Undoable := ""
 
 /** Known terminal executables need no cross-process caption to select pacing. */
@@ -229,6 +229,11 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 				HSE_PrivateAncestry := Effect.IsPrivate ? HSE_Buffer : ""
 				if Owner.Get("OutputIsFinal", false)
 					_HSE_ForgetFinalOutput(Effect)
+				; Characters typed before the capture are typed again after the
+				; expansion and fed afterwards, which would void the record anyway.
+				if TrailingText == "" && Owner.Get("UndoTriggerUnits", 0)
+					_HSE_RememberUndoRecord(Owner["UndoTriggerUnits"], PreviousBuffer,
+						Effect, Owner["Hwnd"], "terminal")
 			}
 			_HSE_MirrorCanonicalEffectToLlm(Effect)
 		} catch {
@@ -505,6 +510,8 @@ _HSE_FinishTerminalOwner(Owner, OutputSucceeded, TrailingText := "") {
 	} finally {
 		Owner["Pending"] := false
 		Owner["FinalSucceeded"] := Committed
+		if !Committed && Owner.Get("UndoRestore", false)
+			try LoggerError("HSE", "Undo: restoring the trigger in the terminal failed; the context is reset.")
 		if (_HSE_TerminalOwner == Owner)
 			_HSE_TerminalOwner := 0
 		_HSE_ClearTerminalOutputOwnership(Owner)
@@ -733,6 +740,9 @@ _HSE_CommitNotepadOwner(Owner) {
 	}
 	if Owner["IsPrivate"]
 		_PrefixPrivateResidue := true
+	if Owner.Get("UndoTriggerUnits", 0)
+		_HSE_RememberUndoRecord(Owner["UndoTriggerUnits"], PreviousBuffer, Effect,
+			Owner["Hwnd"], "notepad")
 	Owner["Effect"] := Effect
 	Owner["CommitBuffer"] := HSE_Buffer
 	Owner["CommitContextGeneration"] := _PrefixInputContextGeneration
@@ -803,7 +813,11 @@ _HSE_CompleteNotepadOwner(Owner, Ok := true, ErrorMessage := "") {
 	try {
 		if AppendTrigger && _PrefixContentGeneration == Owner["RefusalContentGeneration"]
 			_PrefixScheduleRender()
-		if Yielded
+		if Owner.Get("UndoRestore", false) {
+			if !Owner["FinalSucceeded"]
+				LoggerError("HSE", "Undo: restoring the trigger in Notepad failed ({1}); the context is reset.",
+					ErrorMessage != "" ? ErrorMessage : "not committed")
+		} else if Yielded
 			LoggerWarn("HSE", "Notepad expansion yielded to {1} character(s) typed before its keyboard capture: {2}.",
 				_TextCodepointLength(Owner["TrailingText"]), ErrorMessage)
 		else if !Owner["FinalSucceeded"]
@@ -862,7 +876,7 @@ _HSE_BeginOwnedNotepadTransaction(Owner, SendFn := unset) {
 	Opts := Map("mode", "native", "erase_before", Owner["Backspaces"],
 		"deleted_text", Owner["DeletedText"],
 		"admission", _HSE_NotepadOwnerIsCurrent.Bind(Owner),
-		"atomic_commit", _HSE_CommitNotepadOwner.Bind(Owner),
+		"atomic_commit", Owner.Has("CommitFn") ? Owner["CommitFn"] : _HSE_CommitNotepadOwner.Bind(Owner),
 		"commit_failure", _HSE_RecoverNotepadOwner.Bind(Owner))
 	try SendFn.Call(Owner["PlainInsertedText"], Opts,
 		_HSE_CompleteNotepadOwner.Bind(Owner))
@@ -1500,6 +1514,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					DeferredOwner := _HSE_NewNotepadOwner(Spec, Replacement,
 						EndCharPart, EraseUnits, BSCount, OutputHost, SyntheticOwner, DispatchState)
 					DeferredOwner["OutputIsFinal"] := OutputIsFinal
+					DeferredOwner["UndoTriggerUnits"] := _HSE_UndoTriggerUnits(Spec, CascadeUnits)
 					TerminalOwnershipTransferred := true
 					return _HSE_BeginOwnedNotepadTransaction(DeferredOwner, NativeSendFn?)
 				} else if IsTerminalApp {
@@ -1529,6 +1544,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 									"EndCharPart", EndCharPart,
 									"OnlyText", OnlyText,
 									"OutputIsFinal", OutputIsFinal,
+									"UndoTriggerUnits", _HSE_UndoTriggerUnits(Spec, CascadeUnits),
 									"DelayMs", TerminalDelayMs,
 									"EmitFn", EmitFn,
 									"DelayFn", 0,
@@ -1706,28 +1722,58 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		return true
 }
 
-; Keeps an atomic literal expansion for an immediate Backspace, as Linux and macOS
-; do (decision of 2026-11-06): that Backspace means « not what I wanted » and
-; brings the trigger back. Only literal text is kept: a Send-key payload, a
-; dynamic or user-code replacement does not say what it typed, and a raw callback
-; never reaches this path. The Notepad and terminal owners emit later, outside
-; this keystroke, and keep no record. The typed trigger is read from the buffer
-; the fire erased, so a case-conformed or cascaded trigger comes back as typed.
+; How many typed units of a literal expansion an immediate Backspace may bring
+; back, as Linux and macOS do (decision of 2026-11-06): that Backspace means
+; « not what I wanted » and restores the trigger. Only literal text is kept: a
+; Send-key payload, a dynamic or user-code replacement does not say what it
+; typed, and a raw callback never reaches this path.
+; @param Spec {Object} The matched Spec.
+; @param CascadeUnits {Integer} Typed units a cascade erased beyond the trigger.
+; @returns {Integer} The trigger's typed units, 0 when no undo may be kept.
+_HSE_UndoTriggerUnits(Spec, CascadeUnits) {
+		if HasMethod(Spec.Replacement) or Spec.HasOwnProp("UserCodeGeneration")
+				return 0
+		return Spec.Length + CascadeUnits
+}
+
+; Which owned output an expansion to Host goes through; its undo takes the same.
+; @param Host {Map} An output host receipt.
+; @returns {String} "notepad", "terminal" or "atomic".
+_HSE_UndoRoute(Host) {
+		if OutputHostTakesTextByPaste(Host)
+				return "notepad"
+		return _HSE_IsTerminalInputHost(Host["Exe"], Host["Title"]) ? "terminal" : "atomic"
+}
+
+; Keeps the atomic expansion's undo record (see _HSE_RememberUndoRecord).
 ; @param Spec {Object} The matched Spec.
 ; @param BufferBefore {String} HSE_Buffer before the expansion was applied.
 ; @param Effect {Object} The committed canonical effect of HSE_ApplyExpansion.
 ; @param CascadeUnits {Integer} Typed units a cascade erased beyond the trigger.
 ; @param OutputHost {Map} The receipt of the window the burst went to.
 _HSE_RememberUndo(Spec, BufferBefore, Effect, CascadeUnits, OutputHost) {
+		_HSE_RememberUndoRecord(_HSE_UndoTriggerUnits(Spec, CascadeUnits), BufferBefore,
+				Effect, OutputHost["Hwnd"], "atomic")
+}
+
+; Keeps a committed literal expansion for an immediate Backspace. The atomic
+; burst commits on its keystroke; the Notepad and terminal owners commit when
+; their output is verified, and their undo goes out through the same owner. The
+; typed trigger is read from the buffer the fire erased, so a case-conformed or
+; cascaded trigger comes back as typed.
+; @param TriggerUnits {Integer} The trigger's typed units, 0 for no undo.
+; @param BufferBefore {String} HSE_Buffer before the expansion was applied.
+; @param Effect {Object} The committed canonical effect.
+; @param Hwnd {Integer} The window the expansion went to.
+; @param Route {String} The owned output: "atomic", "notepad" or "terminal".
+_HSE_RememberUndoRecord(TriggerUnits, BufferBefore, Effect, Hwnd, Route) {
 		global HSE_Undoable, HSE_Buffer, _PrefixInputContextGeneration, _PrefixFocusedControlToken
 		HSE_Undoable := ""
-		if Effect.ClearAll or Effect.InsertedText == "" or HasMethod(Spec.Replacement)
-				or Spec.HasOwnProp("UserCodeGeneration")
-				or !IsSet(_PrefixInputContextGeneration) or !IsSet(_PrefixFocusedControlToken)
+		if (TriggerUnits < 1 or Effect.ClearAll or Effect.InsertedText == ""
+				or !IsSet(_PrefixInputContextGeneration) or !IsSet(_PrefixFocusedControlToken))
 				return
-		TriggerUnits := Spec.Length + CascadeUnits
 		Start := StrLen(BufferBefore) - Effect.DeleteFromEnd + 1
-		if (Start < 1 or TriggerUnits < 1 or TriggerUnits > Effect.DeleteFromEnd)
+		if (Start < 1 or TriggerUnits > Effect.DeleteFromEnd)
 				return
 		HSE_Undoable := {
 				Trigger: SubStr(BufferBefore, Start, TriggerUnits),
@@ -1736,7 +1782,8 @@ _HSE_RememberUndo(Spec, BufferBefore, Effect, CascadeUnits, OutputHost) {
 				BufferAfter: HSE_Buffer,
 				InputGeneration: _PrefixInputContextGeneration,
 				FocusToken: _PrefixFocusedControlToken,
-				Hwnd: OutputHost["Hwnd"]
+				Hwnd: Hwnd,
+				Route: Route
 		}
 }
 
@@ -1744,12 +1791,16 @@ _HSE_RememberUndo(Spec, BufferBefore, Effect, CascadeUnits, OutputHost) {
 ; physical Backspace has already reached the application and removed the last
 ; character the expansion typed, so the burst erases what is left of it and types
 ; the trigger, outside the buffers so it cannot fire again at once (Linux's undo).
-; Any edit, click, focus change or other window in between voids the record.
-; @param Undo {Object} The record _HSE_RememberUndo kept, already taken.
+; Any edit, click, focus change or other window in between voids the record, and
+; the burst takes the expansion's own output: Notepad's verified editor, the
+; terminal's paced capture or the atomic SendInput.
+; @param Undo {Object} The record _HSE_RememberUndoRecord kept, already taken.
 ; @param FocusToken {Integer} The focused control, probed live when unset.
+; @param NativeSendFn {Func} The Notepad editor sender, TextSend when unset.
+; @param SchedulerFn {Func|0} The terminal owner's scheduler, a timer when 0.
 ; @returns {Boolean} True when this function owns the Backspace's buffer effect:
-;   the trigger went out, or a failed send left the context reset.
-HSE_UndoExpansion(Undo, FocusToken := unset) {
+;   the trigger went out or is going out, or a failure left the context reset.
+HSE_UndoExpansion(Undo, FocusToken := unset, NativeSendFn := unset, SchedulerFn := 0) {
 		global HSE_Buffer, HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook
 		global _PrefixInputContextGeneration, _PrefixFocusedControlToken
 		if !IsObject(Undo) or A_IsSuspended or !IsSet(_PrefixInputContextGeneration)
@@ -1760,12 +1811,13 @@ HSE_UndoExpansion(Undo, FocusToken := unset) {
 				or _PrefixFocusedControlToken != Undo.FocusToken)
 				return false
 		Host := OutputHostResolve(_HSE_OutputHostNeedsTitle)
-		if !Host["Valid"] or Host["Hwnd"] != Undo.Hwnd or OutputHostTakesTextByPaste(Host)
-				or _HSE_IsTerminalInputHost(Host["Exe"], Host["Title"])
+		if !Host["Valid"] or Host["Hwnd"] != Undo.Hwnd or _HSE_UndoRoute(Host) != Undo.Route
 				return false
 		Remaining := _TextCodepointLength(Undo.Typed)
 		if (Remaining < 1)
 				return false
+		if Undo.Route != "atomic"
+				return _HSE_UndoThroughOwner(Undo, Remaining - 1, Host, NativeSendFn?, SchedulerFn)
 		Burst := (Remaining > 1 ? "{BackSpace " . (Remaining - 1) . "}" : "") . "{Text}" . Undo.Trigger
 		PrefixWatcherSuppress(true)
 		SyntheticOwner := 0
@@ -1789,21 +1841,125 @@ HSE_UndoExpansion(Undo, FocusToken := unset) {
 				SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
 				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -HSE_SUPPRESS_RELEASE_DELAY_MS)
 		}
-		; The restored trigger is not in the buffers and the caret follows it: the
-		; next key starts no known word, so a word-start rule cannot fire inside it.
-		; A failed or partial send leaves the line unknown, which the same reset says.
-		_PrefixInvalidateInputContext(_PrefixFocusedControlToken, false)
-		_LSCResetFrom([])
-		if IsSet(LLM_Bridge_OnUnknownEdit)
-				try LLM_Bridge_OnUnknownEdit("Backspace undo")
+		_HSE_ResetUndoContext()
 		if !Sent {
 				LoggerError("HSE", "Undo: restoring the trigger failed ({1}); the context is reset.",
 						SendError != "" ? SendError : "send refused")
 				return true
 		}
+		_HSE_LogUndoRestored(Undo)
+		return true
+}
+
+; The restored trigger is not in the buffers and the caret follows it: the next
+; key starts no known word, so a word-start rule cannot fire inside it. A failed
+; or partial send leaves the line unknown, which the same reset says.
+_HSE_ResetUndoContext() {
+		global _PrefixFocusedControlToken
+		_PrefixInvalidateInputContext(_PrefixFocusedControlToken, false)
+		_LSCResetFrom([])
+		if IsSet(LLM_Bridge_OnUnknownEdit)
+				try LLM_Bridge_OnUnknownEdit("Backspace undo")
+}
+
+; Sends the undo through Notepad's verified editor. The physical Backspace may
+; reach the document after the request: the editor then still shows the last
+; typed character and refuses before any change. The same request is asked
+; again within [debounce] notepad_undo_settle_ms, while the keyboard capture
+; holds the later keys; an effect the editor could not verify is never retried.
+; @param SendFn {Func} The native text sender.
+; @param Owner {Map} The undo's Notepad owner.
+; @param Started {Integer} A_TickCount of the first request.
+_HSE_UndoNativeSend(SendFn, Owner, Started, Text, Opts, Callback) {
+		SendFn.Call(Text, Opts,
+				_HSE_UndoNativeSettled.Bind(SendFn, Owner, Started, Text, Opts, Callback))
+}
+
+_HSE_UndoNativeSettled(SendFn, Owner, Started, Text, Opts, Callback, Ok, Message := "") {
+		if (!Ok && Owner["Pending"] && !Owner["Committed"] && !Owner.Get("Recovered", false)
+				&& A_TickCount - Started < TimingsGet("debounce", "notepad_undo_settle_ms")) {
+				SetTimer(_HSE_UndoNativeSend.Bind(SendFn, Owner, Started, Text, Opts, Callback),
+						-TimingsGet("debounce", "notepad_undo_retry_ms"))
+				return
+		}
+		Callback.Call(Ok, Message)
+}
+
+; The undo's Notepad commit: it publishes no expansion, its context being reset
+; already, and only claims the verified output for the same owner and context.
+; @returns {Func} The success log, run after the transaction.
+_HSE_CommitUndoNotepadOwner(Owner, Undo) {
+		if !A_IsCritical
+				throw Error("The Notepad undo commit requires a Critical transaction.")
+		if Owner["CompletionClaimed"] || Owner["Committed"] || !_HSE_NotepadOwnerIsCurrent(Owner)
+				throw Error("The Notepad undo commit lost its owner or its context.")
+		Owner["Committed"] := true
+		return _HSE_LogUndoRestored.Bind(Undo)
+}
+
+_HSE_LogUndoRestored(Undo) {
 		if Undo.IsPrivate
 				LoggerInfo("HSE", "Undo: restored a private trigger (content withheld).")
 		else
 				LoggerInfo("HSE", "Undo: restored the trigger ({1} char(s)).", _TextCodepointLength(Undo.Trigger))
+}
+
+; Sends the undo through the Notepad editor or the terminal capture, as the
+; expansion went. The context is reset first, so each owner admits its output
+; against that reset context: a key typed meanwhile revokes it, and a refusal
+; leaves the line unknown as a failed atomic undo does.
+; @param Undo {Object} The record, already taken.
+; @param Erased {Integer} Codepoints of the expansion still on screen to erase.
+; @param Host {Map} The output host the undo was admitted on.
+; @param NativeSendFn {Func} The Notepad editor sender, TextSend when unset.
+; @param SchedulerFn {Func|0} The terminal owner's scheduler, a timer when 0.
+; @returns {Boolean} Always true: the Backspace's buffer effect is the reset.
+_HSE_UndoThroughOwner(Undo, Erased, Host, NativeSendFn := unset, SchedulerFn := 0) {
+		global _HSE_TerminalOwnerSerial, HSE_Buffer, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
+		global _PrefixInputContextGeneration, _PrefixDeferredGeneration, _PrefixContentGeneration
+		global _SendHook
+		Typed := Undo.Typed
+		Owner := Map("Id", ++_HSE_TerminalOwnerSerial, "Pending", true, "UndoRestore", true,
+			"Backspaces", Erased, "EraseUnits", 0,
+			"DeletedText", SubStr(Typed, 1, StrLen(Typed) - _TextTailCodeUnits(Typed, 1)),
+			"PlainInsertedText", Undo.Trigger, "SendPayload", "{Text}" . Undo.Trigger,
+			"EndCharPart", "", "OnlyText", true, "TrailingText", "", "TrailingChars", [],
+			"Hwnd", Host["Hwnd"], "Pid", Host["Pid"], "IsPrivate", Undo.IsPrivate, "Port", 0)
+		if Undo.Route == "notepad" {
+			for Name, Value in Map("NativeLiteral", true, "FinalSucceeded", false, "Committed", false,
+					"CompletionClaimed", false, "OutputOwnershipReleased", false,
+					"FinalizerClaimed", false, "CaptureAdmitted", false)
+				Owner[Name] := Value
+			Owner["CommitFn"] := _HSE_CommitUndoNotepadOwner.Bind(Owner, Undo)
+		} else {
+			Hook := _SendHook
+			Owner["DelayMs"] := TimingsGet("debounce", "terminal_hotstring_key_delay_ms")
+			Owner["EmitFn"] := Hook ? (Payload) => Hook("SendTerminalResult", Payload, false) : 0
+			Owner["DelayFn"] := 0
+			Owner["CommitFn"] := (*) => _HSE_LogUndoRestored(Undo)
+		}
+		; From here the owner holds both releases, as for the expansion.
+		PrefixWatcherSuppress(true)
+		Owner["SyntheticOwner"] := 0
+		try Owner["SyntheticOwner"] := KL_MarkSynthetic("hotstring", Undo.IsPrivate)
+		_HSE_ResetUndoContext()
+		Owner["BufferSnapshot"] := HSE_Buffer
+		Owner["RegistryGeneration"] := HSE_RegistryGeneration
+		Owner["DecisionGeneration"] := HSE_RuntimeDecisionGeneration
+		Owner["InputGeneration"] := _PrefixInputContextGeneration
+		Owner["ContentGeneration"] := _PrefixContentGeneration
+		Owner["LifecycleGeneration"] := _PrefixDeferredGeneration
+		; Each owner logs its own refusal of a Notepad output.
+		if Undo.Route == "notepad" {
+			SendFn := IsSet(NativeSendFn) ? NativeSendFn : TextSend
+			try _HSE_BeginOwnedNotepadTransaction(Owner,
+				_HSE_UndoNativeSend.Bind(SendFn, Owner, A_TickCount))
+			return true
+		}
+		try Begun := _HSE_BeginOwnedTerminalTransaction(Owner, SchedulerFn)
+		catch
+			Begun := false
+		if !Begun
+			LoggerError("HSE", "Undo: the terminal output refused the restoration; the context is reset.")
 		return true
 }

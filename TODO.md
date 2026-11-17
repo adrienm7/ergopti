@@ -222,11 +222,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       tone, a ZWJ sequence, a flag or a combining accent loses a character typed before it on Undo. Linux now counts
       `injector.caret_steps()` (measured in GTK by `run_hotstring_fields_live.lua`); count clusters the same way and
       check Notepad, Word and a browser field on the PC.
-- [ ] **Immediate-Backspace restoration after Notepad-paste and terminal expansions.** Those owners emit after the
-      keystroke and keep no undo record, so `HSE_UndoExpansion` refuses both hosts. Keep the record in
-      `_HSE_CommitNotepadOwner` and `_HSE_CommitTerminalOwner` (as `_HSE_RememberUndo` does) and send the undo burst
-      through the same owned output as the expansion (the clipboard owner of `_HSE_BeginOwnedNotepadTransaction`, the
-      paced capture of `_HSE_BeginOwnedTerminalTransaction`); the PC qualification is in TODO-tests-windows.md.
 - [ ] **TakeNote and the Windows 11 tabbed Notepad.** The Store Notepad opens a second file as a tab of the open
       window, so a same-named note of another folder shares one window with the first, and the module, which binds
       one window to one path, waits for a window that never comes (`takenote-native-document-owner` mode

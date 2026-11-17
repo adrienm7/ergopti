@@ -285,6 +285,15 @@ layout_tis_settle_ms = 500
 # state snapshot before the replacement text arrives.
 terminal_hotstring_key_delay_ms = 20
 
+# Windows Notepad: the immediate-Backspace undo of an expansion asks Notepad's
+# verified editor to erase the rest of the expansion, which it refuses before
+# any change while the physical Backspace has not reached the document yet. The
+# request is asked again every retry interval, within the settle window, while
+# the keyboard capture holds the keys typed after the Backspace.
+# AHK: infra/hotstrings/hotstring_dispatch.ahk.
+notepad_undo_settle_ms = 600
+notepad_undo_retry_ms = 25
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Gestures
