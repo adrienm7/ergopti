@@ -802,7 +802,7 @@ global TEST_MODULE_GROUPS := [
 	; Hotstrings, dynamic hotstrings and shortcuts.
 	["hotstrings-shortcuts", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
 	; Keyboard remapping, layouts and gestures.
-	["keymap-gestures", "^unit/(platform/remap|modules/(keymap|gestures))/"],
+	["keymap-gestures", "^unit/(platform/remap|modules/keymap|gestures)/"],
 	; Keystats capture, storage and metrics.
 	["keystats", "^unit/modules/keystats/"],
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.
