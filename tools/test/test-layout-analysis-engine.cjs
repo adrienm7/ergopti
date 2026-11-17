@@ -946,6 +946,183 @@ for (const layout of library) {
 	const plainKeys = E.analyse(qwerty, tiny, {}).keys;
 	check(plainKeys.KeyA.worst.redirect_bad.length === 0, 'worst groups: counted only when asked');
 	check(plainKeys.KeyE.worst.sfb.length === 1, 'worst groups: the SFB partners are always counted');
+	// The events shown but not scored split over their keys the same way.
+	const r = E.analyse(byId.get('ergopti'), swann, {});
+	for (const metric of E.KEY_INFO_METRICS) {
+		const sum = Object.values(E.keyValues(r, metric)).reduce((total, v) => total + v, 0);
+		check(near(sum, r.metrics[metric]), `key parts: ${metric} keys add up to ${sum}`);
+	}
+}
+
+// ============================================
+// ======= 4c/ Row jumps, pairs and words =====
+// ============================================
+
+// (row-jump) Worked by hand on QWERTY ISO, whose rows are 1 (digits) to 4
+// (bottom). « qz ex ea 4d ej » has five key bigrams without a thumb (the
+// space is the left thumb's): Q→Z (left pinky, rows 2 and 4), E→X (left
+// middle then ring, 2 and 4), 4→D (left index then middle, 1 and 3) jump two
+// rows; E→A is one row, E→J changes hands. Row jumps are 3 of 5 = 60 %, each
+// key of a jump takes half of its 20 %, and the score does not weigh them.
+{
+	const qwerty = byId.get('qwerty');
+	const tables = E.ngramsFromText('qz ex ea 4d ej');
+	const result = E.analyse(qwerty, tables, { keyboard: 'iso', keyGroups: true });
+	check(near(result.metrics.row_jump, 60), `row jumps: ${result.metrics.row_jump} %, expected 60`);
+	check(E.METRICS.row_jump.better === 'none', 'row jumps: shown, not scored');
+	check(!('row_jump' in result.score.contributions), 'row jumps: no part of the score');
+	check(
+		!E.KEY_COST_METRICS.includes('row_jump') && E.KEY_INFO_METRICS.includes('row_jump'),
+		'row jumps: a per-key value outside the points a key costs'
+	);
+	const parts = E.keyValues(result, 'row_jump');
+	for (const [code, expected] of Object.entries({
+		KeyQ: 10,
+		KeyZ: 10,
+		KeyE: 10,
+		KeyX: 10,
+		Digit4: 10,
+		KeyD: 10,
+		KeyA: 0,
+		KeyJ: 0
+	}))
+		check(
+			near(parts[code], expected),
+			`row jumps: ${code} carries ${parts[code]}, not ${expected}`
+		);
+	const groups = result.topGroups.row_jump.map((g) => `${g.keys.join('+')}:${g.count}:${g.share}`);
+	check(
+		JSON.stringify(groups.slice().sort()) ===
+			JSON.stringify(['Digit4+KeyD:1:20', 'KeyE+KeyX:1:20', 'KeyQ+KeyZ:1:20']),
+		`row jumps: the board's jumps are ${JSON.stringify(groups)}`
+	);
+	// One row apart, or the other hand, is no jump.
+	const none = E.analyse(qwerty, E.ngramsFromText('ea ej rf'), { keyboard: 'iso' });
+	check(none.metrics.row_jump === 0, `row jumps: « ea ej rf » has ${none.metrics.row_jump} %`);
+
+	// (bigram-matrix) The same text, pair by pair: each pair's class from the
+	// one visitor, its share of the five bigrams, and its points with the
+	// default weights: Q→Z an SFB (−10 × 20 = −200), 4→D a full scissor and
+	// an outward roll (−3 × 20 + 0.5 × 20 = −50), E→A and E→X outward rolls
+	// (+10), E→J a hand change (0).
+	const matrix = E.bigramMatrix(qwerty, tables, { keyboard: 'iso' });
+	check(matrix.bigrams === 5, `bigram matrix: ${matrix.bigrams} bigrams, expected 5`);
+	const byPair = new Map(matrix.pairs.map((p) => [p.keys.join('+'), p]));
+	const expected = {
+		'KeyQ+KeyZ': [['row_jump', 'sfb'], -200],
+		'Digit4+KeyD': [['roll_out', 'row_jump', 'scissors'], -50],
+		'KeyE+KeyA': [['roll_out'], 10],
+		'KeyE+KeyX': [['roll_out', 'row_jump'], 10],
+		'KeyE+KeyJ': [['hand_change'], 0]
+	};
+	check(matrix.pairs.length === 5, `bigram matrix: ${matrix.pairs.length} pairs, expected 5`);
+	for (const [pair, [events, points]] of Object.entries(expected)) {
+		const got = byPair.get(pair);
+		check(got, `bigram matrix: no pair ${pair}`);
+		if (!got) continue;
+		check(
+			JSON.stringify(got.events.slice().sort()) === JSON.stringify(events),
+			`bigram matrix: ${pair} is ${got.events.join(', ')}`
+		);
+		check(got.count === 1 && near(got.share, 20), `bigram matrix: ${pair} share ${got.share}`);
+		check(near(got.points, points), `bigram matrix: ${pair} = ${got.points} points, not ${points}`);
+	}
+	check(matrix.keys[0] === 'KeyE', `bigram matrix: the busiest key is ${matrix.keys[0]}`);
+	check(!matrix.keys.includes('Space'), 'bigram matrix: no thumb key');
+	const heavier = E.bigramMatrix(qwerty, tables, { keyboard: 'iso', weights: { sfb: 1 } });
+	check(
+		near(heavier.pairs.find((p) => p.keys.join('+') === 'KeyQ+KeyZ').points, -20),
+		'bigram matrix: the points follow the weights'
+	);
+	// On a real text, the pairs add up to analyse()'s bigram metrics and their part of the score.
+	const swann = E.ngramsFromText(fs.readFileSync(SPEED_CORPUS, 'utf8').slice(0, 20000));
+	for (const id of ['azerty', 'ergopti']) {
+		const r = E.analyse(byId.get(id), swann, {});
+		const m = E.bigramMatrix(byId.get(id), swann, {});
+		check(m.bigrams === r.coverage.bigrams, `bigram matrix: ${id} counts ${m.bigrams} bigrams`);
+		const bigramMetrics = Object.keys(E.METRICS).filter((k) => E.METRICS[k].of === 'bigrams');
+		for (const metric of bigramMetrics) {
+			const share = m.pairs
+				.filter((p) => p.events.includes(metric))
+				.reduce((sum, p) => sum + p.share, 0);
+			check(near(share, r.metrics[metric]), `bigram matrix: ${id} ${metric} pairs ${share}`);
+		}
+		const points = m.pairs.reduce((sum, p) => sum + p.points, 0);
+		const scored = bigramMetrics.reduce((sum, k) => sum + (r.score.contributions[k] || 0), 0);
+		check(near(points, scored), `bigram matrix: ${id} pairs give ${points} points, not ${scored}`);
+	}
+
+	// (word-effort) Words: letters and marks folded to lower case, an
+	// apostrophe or a digit cuts them, one letter is no word, the most
+	// frequent first and the table bounded.
+	const words = E.wordsFromText("L'homme a vu l'Homme. Ça, ça 4d ÇA");
+	check(
+		JSON.stringify(words) === JSON.stringify({ ça: 3, homme: 2, vu: 1 }),
+		`words: ${JSON.stringify(words)}`
+	);
+	const many = {};
+	for (let i = 0; i < E.WORD_TABLE_SIZE + 50; i++)
+		many[`w${String.fromCharCode(97 + (i % 26))}${i}`] = i + 1;
+	const bounded = E.wordTable(many);
+	check(
+		Object.keys(bounded).length === E.WORD_TABLE_SIZE,
+		'words: the table keeps WORD_TABLE_SIZE'
+	);
+	check(Object.values(bounded)[0] === E.WORD_TABLE_SIZE + 50, 'words: the most frequent first');
+	check(E.countWords('ab ab', 3).ab === 6, 'words: a word list counts each word its count');
+	// (word-prototype) A word named like an Object property counts from zero.
+	const proto = E.wordsFromText('constructor Constructor hasOwnProperty');
+	check(proto.constructor === 2 && proto.hasownproperty === 1, `words: ${JSON.stringify(proto)}`);
+	// Each word measured alone, worked by hand on QWERTY with the default
+	// weights: « qz » is one bigram, an SFB (100 % × 10 = 1000 points) with a
+	// mean travel of (19.636 + 21.299) / 2 mm (Q and Z from the pinky's home);
+	// « ea » is a roll from the top row to home (19.636 / 2 mm, no event).
+	const efforts = E.wordEfforts(qwerty, { qz: 1, ea: 3, qé: 2 }, { keyboard: 'iso' });
+	const board = E.keyboard('iso');
+	const reach = (code) => board.reach[board.index.get(code)];
+	const qz = efforts.words.find((w) => w.word === 'qz');
+	const ea = efforts.words.find((w) => w.word === 'ea');
+	check(near(qz.parts.sfb, 1000), `word effort: qz SFB part ${qz.parts.sfb}`);
+	check(
+		near(qz.parts.distance, (reach('KeyQ') + reach('KeyZ')) / 2),
+		`word effort: qz travel ${qz.parts.distance}`
+	);
+	check(
+		near(qz.effort, 1000 + (reach('KeyQ') + reach('KeyZ')) / 2),
+		`word effort: qz ${qz.effort}`
+	);
+	check(near(ea.effort, reach('KeyE') / 2), `word effort: ea ${ea.effort}`);
+	check(efforts.words[0].word === 'qz', 'word effort: the hardest first');
+	check(
+		efforts.unsupported.length === 1 && efforts.unsupported[0].word === 'qé',
+		'word effort: a word QWERTY cannot type is listed apart'
+	);
+	check(near(efforts.mean, (qz.effort + 3 * ea.effort) / 4), `word effort: mean ${efforts.mean}`);
+	check(
+		near(
+			E.wordEfforts(qwerty, { qz: 1 }, { keyboard: 'iso', weights: { sfb: 1, distance: 0 } })
+				.words[0].effort,
+			100
+		),
+		'word effort: the weights apply'
+	);
+	// The distribution: two ranges from 0 to the hardest word, by occurrences.
+	const bins = E.effortDistribution(efforts.words, 2);
+	check(bins.length === 2 && bins[1].to === qz.effort, 'word effort: ranges up to the hardest');
+	check(bins[0].count === 3 && bins[1].count === 1, `word effort: ${JSON.stringify(bins)}`);
+	check(near(bins[0].share, 75) && bins[0].words === 1, 'word effort: shares of the occurrences');
+	let refused = 0;
+	for (const bad of [
+		() => E.effortDistribution([], 0),
+		() => E.wordEfforts(qwerty, { '': 1 }),
+		() => E.wordEfforts(qwerty, { ab: 0 })
+	])
+		try {
+			bad();
+		} catch {
+			refused++;
+		}
+	check(refused === 3, `word effort: ${refused} of 3 bad inputs refused`);
 }
 
 // ====================================

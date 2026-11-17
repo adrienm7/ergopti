@@ -518,6 +518,23 @@ function wordListCounts(text, id) {
 }
 
 /**
+ * The words of a word-frequency list (« word count » lines, wordListCounts
+ * checked them), each counted as often as the list says, by the engine's word
+ * rule (countWords).
+ * @param {object} engine - LAYOUT_ANALYSIS.
+ * @param {string} text - The list.
+ * @returns {object} word → count, unbounded.
+ */
+function wordListWords(engine, text) {
+	const counts = {};
+	for (const line of text.split('\n')) {
+		const match = /^(\S+) ([1-9][0-9]*)$/.exec(line);
+		if (match) engine.countWords(match[1], Number(match[2]), counts);
+	}
+	return counts;
+}
+
+/**
  * The tables of a count-table file, checked: each of chars, bigrams and trigrams
  * maps a string of exactly 1, 2 or 3 characters to a positive integer count,
  * and pruned_below gives, per table, the smallest count it kept.
@@ -626,6 +643,14 @@ function buildCorpora(engine) {
 				: format === 'count_table'
 					? countTableCounts(text, corpus.id)
 					: engine.ngramsFromText(text);
+		// Its most frequent words, counted from the same text by the engine's rule;
+		// a count table holds n-grams only, so it has none.
+		const words =
+			format === 'word_frequencies'
+				? engine.wordTable(wordListWords(engine, text))
+				: format === 'count_table'
+					? null
+					: engine.wordsFromText(text);
 		const sorted = (table) =>
 			Object.fromEntries(
 				Object.entries(table).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
@@ -635,6 +660,7 @@ function buildCorpora(engine) {
 			bigrams: sorted(counts.bigrams),
 			trigrams: sorted(counts.trigrams)
 		};
+		if (words) tables[corpus.id].words = words;
 		const characters = Object.values(counts.chars).reduce((sum, n) => sum + n, 0);
 		catalogue.push({
 			id: corpus.id,
@@ -650,6 +676,8 @@ function buildCorpora(engine) {
 			source: entry.source,
 			url: entry.url || '',
 			characters,
+			// How many words its word table keeps (0: none, a count table).
+			words: words ? Object.keys(words).length : 0,
 			script: `_generated/corpus_${corpus.id}.js`
 		});
 	}
@@ -717,13 +745,15 @@ function corpusSource(id, table, licence) {
 		'// Run: npm run codegen:layout-analysis-data:js',
 		'// ==========================================',
 		'',
-		'// The n-gram tables of one built-in corpus; the page loads this file when',
-		'// the corpus is chosen.',
+		'// The n-gram tables of one built-in corpus, and the most frequent words of',
+		'// its text when it has one; the page loads this file when the corpus is chosen.',
 		`// Licence of these tables: ${licence.licence}. Attribution: ${licence.attribution}.`,
 		'// eslint-disable-next-line no-var',
 		'var LAYOUT_ANALYSIS_CORPORA = typeof LAYOUT_ANALYSIS_CORPORA === "object" ? LAYOUT_ANALYSIS_CORPORA : {};',
 		`LAYOUT_ANALYSIS_CORPORA[${JSON.stringify(id)}] = {"chars":${tableText(table.chars, patterns)},` +
-			`"bigrams":${tableText(table.bigrams, patterns)},"trigrams":${tableText(table.trigrams, patterns)}};`,
+			`"bigrams":${tableText(table.bigrams, patterns)},"trigrams":${tableText(table.trigrams, patterns)}` +
+			(table.words ? `,"words":${tableText(table.words, patterns)}` : '') +
+			'};',
 		''
 	].join('\n');
 }

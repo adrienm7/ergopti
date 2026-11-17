@@ -140,6 +140,39 @@ count}`), `chords` the multi-character outputs used with their counts.
   about 40 % of a ranking (one layout, as the editor asks, costs nothing
   visible).
 
+  The events shown but not scored (`KEY_INFO_METRICS`: `row_jump`) are shared
+  over their keys the same way, in `cost` and `worst`, but stay out of
+  `KEY_COST_METRICS` and of the points a key costs.
+
+- `bigramMatrix(layout, ngrams, {keyboard?, profile?, weights?, typing?})` →
+  `{keyboard, bigrams, keys, pairs}`: every key pair the layout makes, the key
+  bigrams of the stream `analyse()` types (its chosen ways) without a thumb
+  key (the ones every bigram metric is a share of). `keys` lists the keys of a
+  pair, the busiest first;
+  each pair `{keys: [first, second], count, share, events, points}` gives its
+  share of the bigrams (%), the counters the engine's one visitor raises for
+  it (`sfb`, `lsb`, `scissors`, `half_scissors`, `row_jump`, `roll_in`,
+  `roll_out`, `hand_change`, `repeat`) and its score points, Σ sign × weight ×
+  share over those metrics. The pairs add up to `analyse()`'s bigram metrics
+  and their part of the score (pinned by `test-layout-analysis-engine.cjs`).
+- `countWords(text, n?, into?)`, `wordTable(counts)`, `wordsFromText(text)`:
+  the word table of a text. A word is a run of letters and combining marks
+  (Unicode L and M) folded to lower case; an apostrophe, a hyphen, a digit or
+  a space ends it, and a one-character word is dropped (no key pair to
+  measure). The table keeps the `WORD_TABLE_SIZE` (1,000) most frequent words.
+- `wordEfforts(layout, words, {keyboard?, profile?, weights?, typing?})` →
+  `{words, unsupported, mean}`: each word typed alone, as `analyse()` types a
+  text, and its **effort**: the points the score would take off a text made of
+  that word only, Σ weight × value over `WORD_EFFORT_METRICS` (`sfb`, `sfs`,
+  `lsb`, `scissors`, `half_scissors`, `redirect`, `redirect_bad` as shares of
+  the word's own key bigrams or trigrams, and `distance` in mm per character).
+  The loads (finger, pinky, outer column) belong to a whole text and are left
+  out. `words` is hardest first, each `{word, count, effort, parts}`;
+  a word with a character the layout cannot type goes to `unsupported`;
+  `mean` is the effort averaged over the occurrences.
+  `effortDistribution(words, bins)` spreads those occurrences over equal
+  ranges of effort from 0 to the hardest word's.
+
 - `keyScoreCost(result, weights?)` → `{code: points}`: what each key costs the
   global score, Σ weight × `cost` over `KEY_COST_METRICS`; the keys' points add
   up to those metrics' part of the score.
@@ -206,12 +239,15 @@ the Kalamine rule), but does not count as covered. A character with no way is
 
 **What is cached.** A corpus, a pasted text or the keystats store is reduced
 once to layout-independent counts: characters, character bigrams and character
-trigrams (no text, no word list). The distance-2 character pairs that the
+trigrams (no text). The distance-2 character pairs that the
 same-finger skipgram metric needs are the first and last characters of those
 trigrams, so they need no table of their own. Whether a pair is an SFB, a
 skipgram, a roll, an alternation or a redirect depends on the layout: that
 classification happens when a layout is scored, by mapping the cached n-grams
-onto its keys.
+onto its keys. A built-in corpus with a text (not a count table) also ships
+its word table (`wordsFromText`, the 1,000 most frequent words, a few
+kilobytes) for the effort per word; a pasted text gets one the same way, and
+the keystats send none.
 
 **Key n-grams.** The key bigrams and trigrams are those of the stream of
 expanded keystrokes. They are rebuilt exactly from the character tables: the
@@ -279,6 +315,7 @@ metric a share of the typed characters.
 | `lsb`              | %     | lower  | Lateral stretch bigram: one hand, adjacent fingers, one key lateral (index inner column Digit5/T/G/B, Digit6/Y/H/N; pinky outer keys Backquote, IntlBackslash, Minus, Equal, brackets, Quote, Backslash).                                                                                                                                                                                                                                                                                                |
 | `scissors`         | %     | lower  | Full scissor: one hand, adjacent fingers, the longer finger two or more rows below the shorter one (lengths: middle > ring > index > pinky).                                                                                                                                                                                                                                                                                                                                                             |
 | `half_scissors`    | %     | lower  | Half scissor: the same, one row apart.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `row_jump`         | %     | none   | Row jump: two consecutive keys of one hand at least two logical rows apart (top and bottom row, number and home row), whatever the fingers (it may also be an SFB or a scissor); informative, not in the global score.                                                                                                                                                                                                                                                                                   |
 | `roll_in`          | %     | higher | Two-key inward roll: one hand, different fingers, toward the index.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `roll_out`         | %     | higher | Two-key outward roll: toward the pinky.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `hand_change`      | %     | none   | Two keys on different hands.                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -551,6 +588,13 @@ Shipped as of 2026-11-14:
 `static/corpus/frequency/` holds the downloaded frequency lists and count
 tables, which the register covers like the texts.
 
+Each word table is counted from the same shipped text as its n-grams (the
+sentence column of a Tatoeba export, the « word count » lines of a frequency
+list, each word as often as the list says), so it carries the same licence and
+attribution, written in the generated file's header; a count table ships
+n-grams only and has none. `LAYOUT_ANALYSIS_DATA.corpora[].words` gives how
+many words each corpus keeps.
+
 The study (`docs/audits/layout-analysers/report.md`, section 18) lists what
 is refused, and why.
 
@@ -637,6 +681,22 @@ twelve most frequent characters concerned, each way with its share,
 The ranking has a column each for the distinct characters (a count), the
 coverage bonus and the simplicity bonus. The chart colours are tokens of
 `style.css` checked with the dataviz palette validator in light and dark.
+
+Two folded figures follow the worst pairs (row jumps are among their events
+and the heatmap's choices):
+
+- « Key pair matrix » (`#la-matrix`, from `bigramMatrix`): the 32 busiest keys
+  on both axes, first key by row and second by column, each cell coloured by
+  its share of the pairs (the heatmap's blue ramp) or by its score points
+  (gained blue with « + », lost orange with « − », into the neutral surface),
+  with a legend and units. It scrolls inside its own focusable box, never the
+  page, at phone width; each cell names its pair, share, count, kind and
+  points to assistive technology, and the 100 most frequent pairs are a
+  sortable table below.
+- « Effort per word » (from `wordEfforts` on the corpus's word table): the
+  mean per word typed, the share of the occurrences in ten ranges of effort,
+  and the 15 hardest words with the metric that costs each most. A corpus
+  without a word table (count tables, « My typing ») says so.
 
 « Copy the link » (`#la-share`) writes the comparison's address: the framing
 page's (the site's `/studio/comparer` or `/ergopti/benchmarks`, which hand
@@ -901,3 +961,9 @@ finger load and the shortcut letters on 2026-11-14. Still to review: the ISO
 key left of Z, the shortcut key ease, the reference character set, the scissor rule (the Keyboard Layouts Doc's « the finger that
 prefers being higher is not ») and the default weights; see the study's last
 section.
+
+Decided by the agent on 2026-11-17, to review by the maintainer: `row_jump`
+(two rows or more, any fingers, logical rows) is shown but not scored, since
+the study gives it no weight; a word's effort is measured on its lower-case
+form with the score's own weights, typed alone (no space around it); a word
+table keeps 1,000 words.

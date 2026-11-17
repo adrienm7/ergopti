@@ -6,8 +6,8 @@
 // Run: npm run codegen:layout-analysis-data:js
 // ==========================================
 
-// The n-gram tables of one built-in corpus; the page loads this file when
-// the corpus is chosen.
+// The n-gram tables of one built-in corpus, and the most frequent words of
+// its text when it has one; the page loads this file when the corpus is chosen.
 // Licence of these tables: CC BY-SA 4.0. Attribution: Lexique 4 by B. New, C. Pallier, G. Schalchli, J. Bourgin and M. Gimenes (Behavior Research Methods, 2026), www.lexique.org (CC BY-SA 4.0).
 // eslint-disable-next-line no-var
 var LAYOUT_ANALYSIS_CORPORA = typeof LAYOUT_ANALYSIS_CORPORA === "object" ? LAYOUT_ANALYSIS_CORPORA : {};

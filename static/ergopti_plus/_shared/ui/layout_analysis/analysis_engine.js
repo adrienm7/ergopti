@@ -107,6 +107,9 @@ var LAYOUT_ANALYSIS = (function () {
 	const LATERAL_MIN_STEP = 0.75;
 	// Dead-key chains deeper than this are not followed.
 	const MAX_DEAD_DEPTH = 4;
+	// A row jump: two keys of one hand at least this many rows apart (top and
+	// bottom row, number and home row).
+	const ROW_JUMP_ROWS = 2;
 	// Ways to type one character kept for the context choice: a symbol on two
 	// keys, on AltGr and behind a dead key all stay; more never occur in the
 	// library and would multiply the cost of the choice.
@@ -128,6 +131,7 @@ var LAYOUT_ANALYSIS = (function () {
 		lsb: { unit: '%', better: 'lower', of: 'bigrams' },
 		scissors: { unit: '%', better: 'lower', of: 'bigrams' },
 		half_scissors: { unit: '%', better: 'lower', of: 'bigrams' },
+		row_jump: { unit: '%', better: 'none', of: 'bigrams' },
 		roll_in: { unit: '%', better: 'higher', of: 'bigrams' },
 		roll_out: { unit: '%', better: 'higher', of: 'bigrams' },
 		hand_change: { unit: '%', better: 'none', of: 'bigrams' },
@@ -1516,6 +1520,7 @@ var LAYOUT_ANALYSIS = (function () {
 			lsb: 0,
 			scissors: 0,
 			half_scissors: 0,
+			row_jump: 0,
 			roll_in: 0,
 			roll_out: 0,
 			hand_change: 0,
@@ -1573,6 +1578,15 @@ var LAYOUT_ANALYSIS = (function () {
 				if (k1 === k2) {
 					c.repeat += n;
 					return;
+				}
+				// A row jump, whatever the fingers (an SFB or a scissor may be one
+				// too): shown, not scored.
+				if (
+					board.hand[k1] === board.hand[k2] &&
+					Math.abs(board.row[k1] - board.row[k2]) >= ROW_JUMP_ROWS
+				) {
+					c.row_jump += n;
+					blame2('row_jump', n, k1, k2);
 				}
 				if (f1 === f2) {
 					c.sfb += n;
@@ -1713,6 +1727,7 @@ var LAYOUT_ANALYSIS = (function () {
 			lsb: pct(c.lsb, c.bigrams),
 			scissors: pct(c.scissors, c.bigrams),
 			half_scissors: pct(c.half_scissors, c.bigrams),
+			row_jump: pct(c.row_jump, c.bigrams),
 			roll_in: pct(c.roll_in, c.bigrams),
 			roll_out: pct(c.roll_out, c.bigrams),
 			hand_change: pct(c.hand_change, c.bigrams),
@@ -2005,12 +2020,17 @@ var LAYOUT_ANALYSIS = (function () {
 		scissors: 2,
 		half_scissors: 2,
 		redirect: 3,
-		redirect_bad: 3
+		redirect_bad: 3,
+		row_jump: 2
 	};
 	const KEY_EVENTS = Object.keys(EVENT_KEYS);
 	const TRIGRAM_EVENTS = new Set(['sfs', 'redirect', 'redirect_bad']);
-	// The metrics whose value the keys share exactly (keyReport cost).
-	const KEY_COST_METRICS = KEY_EVENTS.concat([
+	// The scored events (an event shown but not scored, row_jump, is shared
+	// over its keys the same way but stays out of the points a key costs).
+	const SCORED_EVENTS = KEY_EVENTS.filter((event) => METRICS[event].better !== 'none');
+	const KEY_INFO_METRICS = KEY_EVENTS.filter((event) => METRICS[event].better === 'none');
+	// The metrics whose value the keys share exactly (keyReport cost) and the score weighs.
+	const KEY_COST_METRICS = SCORED_EVENTS.concat([
 		'distance',
 		'finger_imbalance',
 		'pinky_load',
@@ -2020,12 +2040,22 @@ var LAYOUT_ANALYSIS = (function () {
 	// bigrams, alternation over trigrams; not part of the score's key costs.
 	const GAIN_KEYS = { roll_in: 2, roll_out: 2, alternation: 3 };
 	const KEY_GAINS = Object.keys(GAIN_KEYS);
-	// Every per-key value keyValues() reads: the presses, the costs, the gains.
-	const KEY_METRICS = ['presses'].concat(KEY_COST_METRICS, KEY_GAINS);
+	// Every per-key value keyValues() reads: the presses, the costs, the gains,
+	// the events shown but not scored.
+	const KEY_METRICS = ['presses'].concat(KEY_COST_METRICS, KEY_GAINS, KEY_INFO_METRICS);
 	// How many of its worst pairs or trigrams each key names.
 	const WORST_GROUPS = 3;
 	// How many groups of each event topGroups() lists for the whole board.
 	const TOP_GROUPS = 10;
+	// A word: a run of letters and combining marks (countWords).
+	const WORD_PATTERN = /[\p{L}\p{M}]+/gu;
+	// How many words a corpus's word table keeps, the most frequent ones: enough
+	// for the hardest frequent words, a few kilobytes per corpus.
+	const WORD_TABLE_SIZE = 1000;
+	// The penalty metrics a word's effort adds up (wordEfforts): the scored key
+	// events and the travel; the loads (finger, pinky, outer column) belong to a
+	// whole text, not to a word.
+	const WORD_EFFORT_METRICS = SCORED_EVENTS.concat(['distance']);
 	const keyNgramCache = new WeakMap();
 
 	/**
@@ -2837,6 +2867,249 @@ var LAYOUT_ANALYSIS = (function () {
 			}
 			out[metric] = entry;
 		}
+		return out;
+	}
+
+	/**
+	 * The scored metrics a key pair or a word can raise, with their weight and
+	 * direction: one place for the points of a pair (bigramMatrix) and of a
+	 * word (wordEfforts).
+	 * @param {object} [weights] - As score(); the defaults when absent.
+	 * @returns {function(string): number} metric → signed points per unit (0
+	 *   for a metric shown but not scored, or a counter that is no metric).
+	 */
+	function signedWeights(weights) {
+		const used = weights ? Object.assign(defaultWeights(), weights) : defaultWeights();
+		return (id) => {
+			const metric = METRICS[id];
+			if (!metric || metric.better === 'none') return 0;
+			return (metric.better === 'higher' ? 1 : -1) * (used[id] || 0);
+		};
+	}
+
+	/**
+	 * Every key pair a layout makes on a corpus, key × key, with how often it
+	 * occurs and what it is: the bigrams of the key stream analyse() measures
+	 * (the ways of typing it chose, typing option included) without a thumb
+	 * key, the ones every bigram metric is a share of, each classified by the
+	 * one visitor analyse() uses. The pairs' counts and points add up to
+	 * analyse()'s bigram metrics and their part of the score.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {{keyboard?: string, profile?: object, weights?: object, typing?: string}} [options]
+	 *   - As analyse().
+	 * @returns {{keyboard: string, bigrams: number, keys: string[], pairs:
+	 *   Array<{keys: string[], count: number, share: number, events: string[],
+	 *   points: number}>}} bigrams: the key bigrams counted; keys: every key of
+	 *   a pair, the busiest first; pairs: the most frequent first, each with its
+	 *   share of the bigrams (%), the counters it raises (metric ids such as
+	 *   sfb, roll_in, row_jump, hand_change, repeat) and the score points it
+	 *   gains (> 0) or costs (< 0): Σ sign × weight × share over those metrics.
+	 */
+	function bigramMatrix(layoutInput, ngrams, options) {
+		const opts = options || {};
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const table = prepareNgrams(ngrams);
+		const compiled = compileWays(layout, board, null);
+		const plan = planTyping(compiled, board, table, typingMode(opts) === 'fixed');
+		const K = board.codes.length;
+		const names = Object.keys(streamCounts()).filter((name) => name !== 'bigrams');
+		// A pair's class, probed once from the visitor: the counters it raises.
+		const classes = new Map();
+		const classOf = (k1, k2) => {
+			const at = k1 * K + k2;
+			if (!classes.has(at)) {
+				const counts = streamCounts();
+				streamVisitor(board, counts, new Float64Array(K), {}, null).bigram(k1, k2, 1);
+				classes.set(at, counts.bigrams === 0 ? null : names.filter((name) => counts[name] !== 0));
+			}
+			return classes.get(at);
+		};
+		const pairs = new Map();
+		let total = 0;
+		walkTyped(board, plan, {
+			char() {},
+			unsupported() {},
+			press() {},
+			bigram(k1, k2, n) {
+				// A pair with a thumb key is in no bigram metric.
+				if (classOf(k1, k2) === null) return;
+				total += n;
+				const at = k1 * K + k2;
+				pairs.set(at, (pairs.get(at) || 0) + n);
+			},
+			trigram() {}
+		});
+		const signed = signedWeights(opts.weights);
+		const busy = new Float64Array(K);
+		const out = Array.from(pairs, ([at, n]) => {
+			const k1 = Math.floor(at / K);
+			const k2 = at % K;
+			busy[k1] += n;
+			busy[k2] += n;
+			const events = classOf(k1, k2);
+			const share = total > 0 ? (100 * n) / total : 0;
+			const points = events.reduce((sum, id) => sum + signed(id) * share, 0);
+			return { keys: [board.codes[k1], board.codes[k2]], count: n, share, events, points, at };
+		})
+			.filter((pair) => pair.count !== 0)
+			.sort((x, y) => y.count - x.count || x.at - y.at)
+			.map(({ at, ...pair }) => pair);
+		const keys = board.codes
+			.map((code, k) => [code, k])
+			.filter(([, k]) => busy[k] > 0)
+			.sort((x, y) => busy[y[1]] - busy[x[1]] || x[1] - y[1])
+			.map(([code]) => code);
+		return { keyboard: board.id, bigrams: total, keys, pairs: out };
+	}
+
+	/**
+	 * Adds every word of a text to a word count. A word is a run of letters and
+	 * combining marks (Unicode L and M), folded to lower case: an apostrophe, a
+	 * hyphen, a digit or a space ends it (« l'homme » is « l » and « homme »).
+	 * A word of one character is not kept: it has no key pair to measure.
+	 * @param {string} text - The text.
+	 * @param {number} [n] - How many times the text counts (a word list's count); 1.
+	 * @param {object} [into] - The count to add to; a new one when absent.
+	 * @returns {object} word → count.
+	 * @throws {Error} On a text that is not a string or a count that is not positive.
+	 */
+	function countWords(text, n, into) {
+		if (typeof text !== 'string') throw new Error('layout_analysis: countWords needs a text');
+		const times = n === undefined ? 1 : n;
+		if (!(times > 0) || !Number.isFinite(times))
+			throw new Error('layout_analysis: countWords needs a positive count');
+		const counts = into || {};
+		for (const match of text.matchAll(WORD_PATTERN)) {
+			const word = match[0].toLowerCase();
+			if (isOneCodePoint(word)) continue;
+			// An own count only: « constructor » is a word, not Object.prototype's.
+			counts[word] =
+				(Object.prototype.hasOwnProperty.call(counts, word) ? counts[word] : 0) + times;
+		}
+		return counts;
+	}
+
+	/**
+	 * The WORD_TABLE_SIZE most frequent words of a count, the most frequent
+	 * first (ties in code point order): the bounded word table a corpus ships.
+	 * @param {object} counts - word → count (countWords).
+	 * @returns {object} word → count, in that order.
+	 */
+	function wordTable(counts) {
+		return Object.fromEntries(
+			Object.entries(counts)
+				.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+				.slice(0, WORD_TABLE_SIZE)
+		);
+	}
+
+	/** The bounded word table of a text: wordTable(countWords(text)). */
+	function wordsFromText(text) {
+		return wordTable(countWords(text));
+	}
+
+	/**
+	 * How hard each word is to type on a layout: the points the global score
+	 * would take off a text made of that word alone, from the score's penalty
+	 * metrics measured on the word's own key stream (WORD_EFFORT_METRICS: its
+	 * SFBs, skipgrams, lateral stretches, scissors and redirects as shares of
+	 * its key bigrams or trigrams, and its travel in mm per character), each
+	 * times its weight. The word is typed alone as analyse() types a text, the
+	 * ways of typing chosen the same way (typing option included). A word with
+	 * a character the layout cannot type is listed apart.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object|Array} words - word → count, or [[word, count], ...].
+	 * @param {{keyboard?: string, profile?: object, weights?: object, typing?: string}} [options]
+	 *   - As analyse().
+	 * @returns {{words: Array<{word: string, count: number, effort: number,
+	 *   parts: object}>, unsupported: Array<{word: string, count: number}>,
+	 *   mean: number}} words: the hardest first (then the most frequent);
+	 *   effort in points ≥ 0, parts: metric → its points; mean: the effort
+	 *   averaged over the words' occurrences.
+	 * @throws {Error} On a word that is not a non-empty string without line
+	 *   breaks or tabs, or a count that is not positive.
+	 */
+	function wordEfforts(layoutInput, words, options) {
+		const opts = options || {};
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const compiled = compileWays(layout, board, null);
+		const fixed = typingMode(opts) === 'fixed';
+		const signed = signedWeights(opts.weights);
+		const entries = Array.isArray(words) ? words : Object.entries(words || {});
+		const out = [];
+		const unsupported = [];
+		let occurrences = 0;
+		let sum = 0;
+		for (const [word, count] of entries) {
+			if (typeof word !== 'string' || word === '' || /[\r\n\t]/.test(word))
+				throw new Error(`layout_analysis: ${JSON.stringify(word)} is not a word`);
+			if (!(count > 0) || !Number.isFinite(count))
+				throw new Error(`layout_analysis: the word ${word} needs a positive count`);
+			const c = streamCounts();
+			const plan = planTyping(compiled, board, prepareNgrams(ngramsFromText(word)), fixed);
+			walkTyped(
+				board,
+				plan,
+				streamVisitor(board, c, new Float64Array(board.codes.length), {}, null)
+			);
+			if (c.unsupported > 0) {
+				unsupported.push({ word, count });
+				continue;
+			}
+			const parts = {};
+			let effort = 0;
+			for (const id of WORD_EFFORT_METRICS) {
+				const whole = id === 'distance' ? c.chars : TRIGRAM_EVENTS.has(id) ? c.trigrams : c.bigrams;
+				const value = whole > 0 ? ((id === 'distance' ? 1 : 100) * c[id]) / whole : 0;
+				// A penalty metric's signed weight is negative: the points it takes off.
+				parts[id] = -signed(id) * value;
+				effort += parts[id];
+			}
+			out.push({ word, count, effort, parts });
+			occurrences += count;
+			sum += count * effort;
+		}
+		out.sort(
+			(x, y) =>
+				y.effort - x.effort || y.count - x.count || (x.word < y.word ? -1 : x.word > y.word ? 1 : 0)
+		);
+		return { words: out, unsupported, mean: occurrences > 0 ? sum / occurrences : 0 };
+	}
+
+	/**
+	 * How the occurrences of measured words spread over equal ranges of effort,
+	 * from 0 to the hardest word's: the distribution the Comparer draws.
+	 * @param {Array<{effort: number, count: number}>} words - wordEfforts().words.
+	 * @param {number} bins - How many ranges (an integer ≥ 1).
+	 * @returns {Array<{from: number, to: number, count: number, words: number,
+	 *   share: number}>} Each range [from, to) (the last one closed): the
+	 *   occurrences it holds, the distinct words, and its share of all the
+	 *   occurrences (%).
+	 * @throws {Error} On a bin count that is not a positive integer.
+	 */
+	function effortDistribution(words, bins) {
+		if (!Number.isInteger(bins) || bins < 1)
+			throw new Error('layout_analysis: effortDistribution needs a positive integer of bins');
+		const max = words.reduce((m, w) => Math.max(m, w.effort), 0);
+		const width = max / bins;
+		const out = Array.from({ length: bins }, (_, i) => ({
+			from: i * width,
+			to: i === bins - 1 ? max : (i + 1) * width,
+			count: 0,
+			words: 0,
+			share: 0
+		}));
+		let all = 0;
+		for (const w of words) {
+			const i = width > 0 ? Math.min(bins - 1, Math.floor(w.effort / width)) : 0;
+			out[i].count += w.count;
+			out[i].words += 1;
+			all += w.count;
+		}
+		for (const bin of out) bin.share = all > 0 ? (100 * bin.count) / all : 0;
 		return out;
 	}
 
@@ -4428,7 +4701,10 @@ var LAYOUT_ANALYSIS = (function () {
 		KEY_EVENTS,
 		KEY_COST_METRICS,
 		KEY_GAINS,
+		KEY_INFO_METRICS,
 		KEY_METRICS,
+		WORD_TABLE_SIZE,
+		WORD_EFFORT_METRICS,
 		hashText,
 		keyboard,
 		fingeringProfile,
@@ -4454,6 +4730,12 @@ var LAYOUT_ANALYSIS = (function () {
 		keyValues,
 		keyDiff,
 		standing,
+		bigramMatrix,
+		countWords,
+		wordTable,
+		wordsFromText,
+		wordEfforts,
+		effortDistribution,
 		defaultWeights,
 		defaultIdealLoad,
 		idealLoad,

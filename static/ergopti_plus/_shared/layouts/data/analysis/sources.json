@@ -210,6 +210,7 @@
 		"lsb": ["engine_doc", "kld", "ergol_stats", "genkey", "km_metrics"],
 		"scissors": ["engine_doc", "kld", "ergol_stats", "oxeylyzer", "keygen"],
 		"half_scissors": ["engine_doc", "kld"],
+		"row_jump": ["engine_doc", "carpalx"],
 		"roll_in": ["engine_doc", "kld", "oxeylyzer", "dariogoetz"],
 		"roll_out": ["engine_doc", "kld", "oxeylyzer", "dariogoetz"],
 		"hand_change": ["engine_doc", "ergol_stats"],
