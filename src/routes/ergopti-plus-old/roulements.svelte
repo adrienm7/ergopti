@@ -40,33 +40,39 @@
 
 	<h3>Roulements avec des lettres</h3>
 	<ul class="margin-top-2">
-		<li><kbd>hc</kbd> ➜ <kbd-output>wh</kbd-output> ;</li>
-		<p>
-			Le roulement <kbd>CH</kbd> était déjà l’un des grands atouts de la disposition <Ergopti />,
-			car cette combinaison est très fréquente et se produit en roulement, ce qui la rend
-			extrêmement confortable. L’ajout du roulement donnant <kbd-output>WH</kbd-output> permet d’avoir
-			une frappe en anglais encore plus fluide.
-		</p>
-		<li><kbd>p'</kbd> ➜ <kbd-output>ct</kbd-output> ;</li>
-		<p>
-			Ce roulement donnant <kbd-output>ct</kbd-output> permet d’éviter le pire <SFB></SFB> de la disposition
-			pour le transformer en roulement très confortable.
-		</p>
 		<li>
-			<kbd>sx</kbd> ➜ <kbd-output>sk</kbd-output> et <kbd>cx</kbd> ➜ <kbd-output>ck</kbd-output> ;
+			<kbd>hc</kbd> ➜ <kbd-output>wh</kbd-output> ;
+			<p>
+				Le roulement <kbd>CH</kbd> était déjà l’un des grands atouts de la disposition <Ergopti />,
+				car cette combinaison est très fréquente et se produit en roulement, ce qui la rend
+				extrêmement confortable. L’ajout du roulement donnant <kbd-output>WH</kbd-output> permet d’avoir
+				une frappe en anglais encore plus fluide.
+			</p>
 		</li>
-		<p>
-			La lettre <kbd>K</kbd> est rarement utilisée. Lorsqu’elle l’est, c’est souvent pour réaliser
-			les combinaisons <kbd-output>SK</kbd-output> et <kbd-output>CK</kbd-output>. Ainsi, ces
-			roulements permettent d’éviter d’aller appuyer sur la vraie touche <kbd>K</kbd> pour une frappe
-			beaucoup plus confortable.
-		</p>
+		<li>
+			<kbd>p'</kbd> ➜ <kbd-output>ct</kbd-output> ;
+			<p>
+				Ce roulement donnant <kbd-output>ct</kbd-output> permet d’éviter le pire <SFB></SFB> de la disposition
+				pour le transformer en roulement très confortable.
+			</p>
+		</li>
+		<li>
+			<kbd>sx</kbd> ➜ <kbd-output>sk</kbd-output> et <kbd>cx</kbd> ➜ <kbd-output>ck</kbd-output> ;
+
+			<p>
+				La lettre <kbd>K</kbd> est rarement utilisée. Lorsqu’elle l’est, c’est souvent pour réaliser
+				les combinaisons <kbd-output>SK</kbd-output> et <kbd-output>CK</kbd-output>. Ainsi, ces
+				roulements permettent d’éviter d’aller appuyer sur la vraie touche <kbd>K</kbd> pour une frappe
+				beaucoup plus confortable.
+			</p>
+		</li>
 		<li>
 			<kbd>à★</kbd> ➜ <kbd-output>bu</kbd-output> et <kbd>àu</kbd> ➜ <kbd-output>ub</kbd-output>.
+
+			<p>
+				Ces roulements très confortables suppriment le plus gros <SFB></SFB> présent sur la main gauche.
+			</p>
 		</li>
-		<p>
-			Ces roulements très confortables suppriment le plus gros <SFB></SFB> présent sur la main gauche.
-		</p>
 	</ul>
 
 	<h3>Roulements avec des symboles</h3>
@@ -80,13 +86,14 @@
 		</li>
 		<li>
 			<kbd>{'(#'}</kbd> ➜ <kbd-output>{'("'}</kbd-output> et <kbd>{'[#'}</kbd> ➜
-			<kbd-output>{'["'}</kbd-output> ;
+			<kbd-output>{'["'}</kbd-output> ;
+
+			<p>
+				Une fois qu’on a l’habitude de ce roulement, on ne peut plus s’en passer. Le <kbd>#</kbd>
+				devient un <kbd-output>"</kbd-output>, ce qui permet d’avoir des roulements très logiques et
+				ultra-confortables.
+			</p>
 		</li>
-		<p>
-			Une fois qu’on a l’habitude de ce roulement, on ne peut plus s’en passer. Le <kbd>#</kbd>
-			devient un <kbd-output>"</kbd-output>, ce qui permet d’avoir des roulements très logiques et
-			ultra-confortables.
-		</p>
 		<li>
 			<kbd>{'<@'}</kbd> ➜ <kbd-output>{'</'}</kbd-output> ;
 		</li>
@@ -95,20 +102,22 @@
 			<kbd-output>{'>='}</kbd-output> ;
 		</li>
 		<li>
-			<kbd>{'[)'}</kbd> ➜ <kbd-output>{'=""'}</kbd-output> ;
+			<kbd>{'[)'}</kbd> ➜ <kbd-output>{'=""'}</kbd-output> ;
+
+			<p>
+				Cette suite de symboles est extrêmement utilisée en programmation, où elle permet
+				généralement d’assigner un texte à une variable. L’avoir en roulement vers l’intérieur, sur
+				la homerow en plus, est un véritable luxe.
+			</p>
 		</li>
-		<p>
-			Cette suite de symboles est extrêmement utilisée en programmation, où elle permet généralement
-			d’assigner un texte à une variable. L’avoir en roulement vers l’intérieur, sur la homerow en
-			plus, est un véritable luxe.
-		</p>
 		<li>
-			<kbd>\"</kbd> ➜ <kbd-output>/*</kbd-output> et <kbd>"\</kbd> ➜ <kbd-output>*/</kbd-output> ;
+			<kbd>\"</kbd> ➜ <kbd-output>/*</kbd-output> et <kbd>"\</kbd> ➜ <kbd-output>*/</kbd-output> ;
+
+			<p>
+				Ce roulement permet de réaliser un commentaire en programmation, et ce extrêmement
+				confortablement.
+			</p>
 		</li>
-		<p>
-			Ce roulement permet de réaliser un commentaire en programmation, et ce extrêmement
-			confortablement.
-		</p>
 		<li>
 			<kbd>$=</kbd> ➜ <kbd-output>{'=>'}</kbd-output> et <kbd>=$</kbd> ➜
 			<kbd-output>{'<='}</kbd-output> ;

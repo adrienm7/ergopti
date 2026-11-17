@@ -21,11 +21,14 @@
 </h2>
 <tiny-space></tiny-space>
 <div class="download-buttons">
-	<a href={urlMacosBundle} download={!!release}>
-		<button disabled={!release}
-			><i class="icon-appleinc" style="font-size:0.8em; vertical-align:0"></i>
-			Ergopti {tag}.bundle</button
-		>
+	<a
+		class="button-link"
+		href={release ? urlMacosBundle : undefined}
+		aria-disabled={release ? undefined : 'true'}
+		download={!!release}
+	>
+		<i class="icon-appleinc" style="font-size:0.8em; vertical-align:0"></i>
+		Ergopti {tag}.bundle
 	</a>
 </div>
 

@@ -68,11 +68,11 @@
 	</div>
 	<div style="height:1rem"></div>
 	<div style="display: flex; gap: 1rem; justify-content:center;">
-		<a href={asset('documents/printable_layout_v2.2.pdf')} download>
-			<button>Layout à imprimer</button>
+		<a class="button-link" href={asset('documents/printable_layout_v2.2.pdf')} download>
+			Layout à imprimer
 		</a>
-		<a href={asset('documents/printable_layout_v2.2_full.pdf')} download>
-			<button>Layout à imprimer complet</button>
+		<a class="button-link" href={asset('documents/printable_layout_v2.2_full.pdf')} download>
+			Layout à imprimer complet
 		</a>
 	</div>
 	<InstallationWindows />

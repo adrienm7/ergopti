@@ -30,11 +30,14 @@
 </p>
 
 <div class="download-buttons">
-	<a href={urlKbdEdit} download={!!release}>
-		<button disabled={!release}
-			><i class="icon-windows" style="vertical-align:-0.05em"></i>
-			Installateur KbdEdit d'Ergopti {tag}</button
-		>
+	<a
+		class="button-link"
+		href={release ? urlKbdEdit : undefined}
+		aria-disabled={release ? undefined : 'true'}
+		download={!!release}
+	>
+		<i class="icon-windows" style="vertical-align:-0.05em"></i>
+		Installateur KbdEdit d'Ergopti {tag}
 	</a>
 </div>
 

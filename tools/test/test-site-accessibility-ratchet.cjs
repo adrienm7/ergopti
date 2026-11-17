@@ -190,8 +190,56 @@ function checkPreferences() {
 	assert.equal(loadPreferences({ storage: memoryStorage({ [key]: '{' }) }).attributes.size, 0);
 }
 
+/**
+ * No button inside a link anywhere on the site: two focus stops for one
+ * action and an invalid tree for assistive technology (axe does not flag a
+ * button in a link). A download or a page reached from a button look is a
+ * link styled as one (src/lib/css/buttons.css, .button-link).
+ */
+function checkNoButtonInLink() {
+	const offenders = [];
+	const walk = (directory) => {
+		for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+			const full = path.join(directory, entry.name);
+			if (entry.isDirectory()) walk(full);
+			else if (entry.name.endsWith('.svelte')) {
+				const source = fs.readFileSync(full, 'utf8');
+				// A link's opening tag, then a button before that link closes.
+				for (const match of source.matchAll(/<a\b[^>]*>((?:(?!<\/a\s*>)[\s\S])*?)<button\b/g))
+					offenders.push(path.relative(ROOT, full) + ' @' + match.index);
+			}
+		}
+	};
+	walk(path.join(ROOT, 'src'));
+	assert.deepEqual(offenders, [], 'A button nested in a link');
+	// The check itself finds the shape it forbids.
+	assert.match('<a href="x" download>\n\t<button>y</button></a>', /<a\b[^>]*>[\s\S]*?<button\b/);
+}
+
+/**
+ * The Ergopti+ hero demo cycles on its own for longer than five seconds, so
+ * it offers a pause (WCAG 2.2.2): the button exists, stops the cycle and
+ * starts it again, and the page translates its words.
+ */
+function checkHeroPause() {
+	const hero = fs.readFileSync(path.join(ROOT, 'src/routes/ergopti-plus/Hero.svelte'), 'utf8');
+	assert.match(
+		hero,
+		/class="demo-pause"[^>]*onclick=\{togglePause\}/,
+		'The hero has a pause button'
+	);
+	assert.match(hero, /if \(!cycles \|\| paused\) \{/, 'A pause stops the cycle');
+	const english = fs.readFileSync(path.join(ROOT, 'src/routes/ergopti-plus/locales/en.js'), 'utf8');
+	for (const words of ['Mettre la démo en pause', 'Relancer la démo'])
+		assert.ok(english.includes(`'${words}'`), 'English for ' + words);
+}
+
 checkComparison();
 checkBaseline();
 checkRouteCoverage();
 checkPreferences();
-console.log('ok - site accessibility ratchet, baseline, page coverage and preferences');
+checkNoButtonInLink();
+checkHeroPause();
+console.log(
+	'ok - site accessibility ratchet, baseline, page coverage, preferences, links and hero pause'
+);

@@ -52,15 +52,17 @@
 	<tiny-space></tiny-space>
 	<div>
 		<span>Version ISO :&nbsp;</span><a
+			class="button-link"
 			href={asset(`layouts/kla_iso/ergopti.v${version_mineure_kla_iso}.fr.iso.json`)}
-			download><button>ergopti.v{version_mineure_kla_iso}.fr.iso.json</button></a
+			download>ergopti.v{version_mineure_kla_iso}.fr.iso.json</a
 		>
 	</div>
 	<tiny-space></tiny-space>
 	<div>
 		<span>Version ISO+ :&nbsp;</span><a
+			class="button-link"
 			href={asset(`layouts/kla_iso/ergopti.v${version_mineure_kla_iso_plus}.fr.iso+.json`)}
-			download><button>ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json</button></a
+			download>ergopti.v{version_mineure_kla_iso_plus}.fr.iso+.json</a
 		>
 		<p>
 			➜ Il n’y a de loin pas toutes les fonctionnalités d’<ErgoptiPlus></ErgoptiPlus> dans ce fichier
@@ -76,8 +78,9 @@
 	<tiny-space></tiny-space>
 	<div>
 		<span>Version Ergodox :&nbsp;</span><a
+			class="button-link"
 			href={asset(`layouts/kla_ergodox/ergopti.v${version_mineure_kla_ergodox}.fr.ergodox.json`)}
-			download><button>ergopti.v{version_mineure_kla_ergodox}.fr.ergodox.json</button></a
+			download>ergopti.v{version_mineure_kla_ergodox}.fr.ergodox.json</a
 		>
 	</div>
 
@@ -95,13 +98,12 @@
 		</div>
 		<tiny-space></tiny-space>
 		<span>Version pour l’analyseur Ergo‑L :&nbsp;</span><a
+			class="button-link"
 			href={asset(
 				`ergopti_plus/old/kalamine/${variante_kalamine}/${nom_variante_kalamine}_v${version_mineure_kalamine}${suffixe_nom_variante_kalamine}.toml`
 			)}
 			download
-			><button
-				>{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml</button
-			></a
+			>{nom_variante_kalamine}_v{version_mineure_kalamine}{suffixe_nom_variante_kalamine}.toml</a
 		>
 		<p>
 			À noter que sur <a href="https://github.com/Nuclear-Squid/ergol" target="_blank" class="link"

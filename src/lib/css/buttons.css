@@ -103,3 +103,30 @@ kbd-output.deadkey {
 kbd-output.deadkey {
 	--key-opacity: 100% !important;
 }
+
+/* A link that looks like a button (a download, a page): one focus stop and the
+   link's own semantics, never a button nested in a link (two focus stops, an
+   invalid tree for assistive technology). */
+.button-link {
+	background-color: white;
+	border: 1px solid rgba(0, 0, 0, 0.6);
+	border-radius: 3px;
+	color: black;
+	cursor: pointer;
+	display: inline-block;
+	padding: 10px;
+	text-decoration: none;
+}
+
+.button-link.alt-button {
+	background-color: rgba(0, 0, 0, 0.8);
+	border-color: rgba(255, 255, 255, 0.6);
+	color: white;
+	padding: 0.5em;
+}
+
+/* A download not available yet (no release read): shown, not followable. */
+.button-link[aria-disabled='true'] {
+	cursor: not-allowed;
+	opacity: 0.6;
+}

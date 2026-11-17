@@ -58,16 +58,16 @@
 			<kbd>ê,</kbd> ➜ <kbd-output>u,</kbd-output> ;
 		</li>
 		<li>
-			<kbd>ê.</kbd> ➜ <kbd-output>u.</kbd-output> ;
+			<kbd>ê.</kbd> ➜ <kbd-output>u.</kbd-output> ;
+			<tiny-space></tiny-space>
 		</li>
-		<tiny-space></tiny-space>
 		<li>
 			<kbd>èy</kbd> ➜ <kbd-output>aî</kbd-output> ;
 		</li>
 		<li>
 			<kbd>yè</kbd> ➜ <kbd-output>â</kbd-output>.
+			<tiny-space></tiny-space>
 		</li>
-		<tiny-space></tiny-space>
 		<li>
 			<kbd>éà</kbd> ➜ <kbd-output>ié</kbd-output> ;
 		</li>
