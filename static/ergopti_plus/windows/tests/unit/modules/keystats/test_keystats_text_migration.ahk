@@ -776,6 +776,44 @@ _KLMig_NewLedgerPublishesUniformPostureWithoutScan() {
 Test("KL_Mig lifecycle: a new uniform ledger records posture and skips proof scan",
     _KLMig_NewLedgerPublishesUniformPostureWithoutScan)
 
+; A paused boot (a restored pause, or a startup smoke quarantined beside a
+; resident driver) created data.sql, refused the marker I/O and then aborted the
+; whole startup as if the ledger were unusable.
+_KLMig_PausedNewLedgerDefersItsMarker() {
+    global _KLMigTimers
+    oldTimer := KLMigration.timer_fn
+    _KLMig_Reset()
+    FileAppend("-- brand-new ledger created while paused`n", Keystats.data_sql_path, "UTF-8")
+    KLMigration.timer_fn := _KLMig_RecordTimer
+    _KLMigTimers := []
+    KLMigration.paused := true
+    try {
+        AssertTrue(KL_Mig_RecordNewLedgerPosture(),
+            "a paused boot must keep its new ledger usable instead of aborting startup")
+        AssertEqual("", KL_Mig_ReadMarker(),
+            "a paused boot must not write the marker")
+        AssertEqual("off", KLMigration.pendingMarker,
+            "the posture must be retained for the resume")
+        KLMigration.paused := false
+        AssertTrue(KL_Mig_RetryMarker(),
+            "the retained retry must publish the marker once the pause ends")
+        AssertEqual("off", KL_Mig_ReadMarker(),
+            "the resumed retry must commit the posture of the new ledger")
+        ; The boot's posture sync is refused the same way while paused; KL_Init
+        ; must keep it for the resume instead of rolling keystats back.
+        AssertTrue(RegExMatch(_DriverFuncBody("KL_Init"),
+            "KL_Mig_RequestPostureSync\([^)]*\)\s*&&\s*!KLMigration\.paused"),
+            "KL_Init must accept a posture sync retained by a paused boot")
+    } finally {
+        KL_Mig_Cancel()
+        KLMigration.paused := false
+        KLMigration.timer_fn := oldTimer
+    }
+}
+
+Test("KL_Mig lifecycle: a new ledger created while paused defers its marker to resume",
+    _KLMig_PausedNewLedgerDefersItsMarker)
+
 _KLMig_DriverLifecycleOwnsSuspendAndResume() {
     enter := _DriverFuncBody("Ergopti_OnSuspendEnter")
     resume := _DriverFuncBody("Ergopti_OnSuspendResume")

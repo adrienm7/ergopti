@@ -1152,8 +1152,9 @@ KL_Init(metrics_dir) {
 		; Bring data.sql in line with the at-rest posture the config just restored.
 		; A no-op unless they disagree, and deferred either way: the comparison is
 		; cheap but the rewrite it may start is not, and neither belongs on the boot
-		; critical path.
-		if !KL_Mig_RequestPostureSync(KL_MIG_BOOT_DELAY_MS)
+		; critical path. A paused boot retains the request and KL_Mig_OnResume
+		; replays it, so only a refused timer on a running boot is a failure.
+		if !KL_Mig_RequestPostureSync(KL_MIG_BOOT_DELAY_MS) && !KLMigration.paused
 			throw Error("at-rest posture sync could not be scheduled")
 	} catch as Err {
 		try KL_TimerGroupStop(Keystats,

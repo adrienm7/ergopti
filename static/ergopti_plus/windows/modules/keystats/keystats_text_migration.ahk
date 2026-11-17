@@ -605,12 +605,20 @@ KL_Mig_RetryMarker() {
 
 ; Called only after bootstrap has created a brand-new ledger. With no legacy
 ; rows present, the cipher flag is a trustworthy O(1) description of every
-; local row that can subsequently be appended.
+; local row that can subsequently be appended. A paused boot (a restored pause,
+; or a startup smoke quarantined beside a resident driver) does no marker I/O:
+; the retained retry publishes it on resume, and a process that ends paused
+; leaves the next boot the ledger proof scan, so the new ledger stays usable.
 KL_Mig_RecordNewLedgerPosture() {
 		posture := KL_Enc_IsEnabled() ? "on" : "off"
 		if KL_Mig_WriteMarker(posture)
 				return true
 		_KL_Mig_RememberMarkerRetry(posture, 0, 0, false)
+		if KLMigration.paused {
+				try LoggerInfo("Keystats",
+						"Created data.sql while paused; its posture marker is committed on resume.")
+				return true
+		}
 		try LoggerError("Keystats",
 				"Created data.sql but could not commit its initial posture marker; marker retry remains pending.")
 		return false
