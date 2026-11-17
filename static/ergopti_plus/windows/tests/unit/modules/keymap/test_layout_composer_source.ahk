@@ -439,7 +439,8 @@ _LCS_StudioRowCase() {
 	AssertTrue(Builders.Has("ergopti_studio"), "the tray root has a builder for the row")
 	Body := _DriverFuncBody(Builders["ergopti_studio"].Name)
 	; The test source view reads generated constants as their values (test_framework.ahk).
-	AssertContains(Body, 'Map("ergopti_studio", LayoutManager_OpenEditor)')
+	; The row reopens the Studio on the tab it was left on (studio-edit-tab).
+	AssertContains(Body, 'Map("ergopti_studio", LayoutEditorWindow_Open)')
 	Stage := TrayMenuStage_Begin()
 	try {
 		Builders["ergopti_studio"].Call()
@@ -482,7 +483,7 @@ Test("layout editor window: « Create or edit a layout… » shows the editor ta
 _LCS_StudioEditTabCase() {
 	AssertContains(_DriverFuncBody("LayoutManager_OpenEditor"), "LayoutEditorWindow_OpenOnEdit()",
 		"the layout submenu's row and the manager's button ask for the editor tab")
-	AssertContains(_DriverFuncBody("_MI_StageErgoptiStudio"), "LayoutEditorWindow_Open)",
+	AssertContains(_DriverFuncBody("_MI_StageErgoptiStudio"), "LayoutEditorWindow_Open))",
 		"the top-level Studio row keeps the tab the Studio was left on")
 	Body := _DriverFuncBody("_LayEdWin_PushTab")
 	AssertContains(Body, '_LayEdWin_Push(Host, "studioTab", Tab)')
