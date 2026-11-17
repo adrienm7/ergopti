@@ -706,6 +706,16 @@ def dependency_paths(output):
             continue
         if re.fullmatch(r"(?:linux-vdso[^\s]*|/[^\n]+) \(0x[0-9a-fA-F]+\)", line):
             continue
+        # Fixed reasons for the shapes ldd prints instead of a mapping, so a
+        # refusal says which one without printing the host's output.
+        if re.search(r"version `[^']+' not found", line):
+            raise RuntimeRefused(
+                "Native packaging dependency needs a newer C library than the build host's."
+            )
+        if line in ("statically linked", "not a dynamic executable"):
+            raise RuntimeRefused("Native packaging seed is not dynamically linked.")
+        if " => " in line:
+            raise RuntimeRefused("Unknown native packaging dependency mapping shape.")
         raise RuntimeRefused("Unknown native packaging dependency observation.")
     return dependencies
 
