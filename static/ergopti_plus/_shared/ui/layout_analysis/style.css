@@ -374,9 +374,11 @@ body:has(> main.layout-analysis) {
 	text-align: right;
 }
 
+/* Positioned, so screen-reader text in a cell stays inside the scrolling box. */
 .la-table-wrap {
 	margin-top: 12px;
 	overflow-x: auto;
+	position: relative;
 }
 
 .la-table {
@@ -588,6 +590,10 @@ body:has(> main.layout-analysis) {
 	margin-top: 8px;
 	max-width: 100%;
 	overflow: auto;
+	/* The containing block of the cells' screen-reader text (.la-sr-only is
+	   absolute): without it that text escapes the scrolling box and widens the
+	   page at phone width (WCAG 1.4.10). */
+	position: relative;
 }
 
 .la-matrix-wrap:focus-visible {

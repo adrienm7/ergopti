@@ -336,7 +336,7 @@
 		</div>
 		<h4 data-i18n="layout_analysis.matrix.table"></h4>
 		<p id="la-matrix-count" class="la-muted"></p>
-		<div class="la-table-wrap">
+		<div class="la-table-wrap" tabindex="0">
 			<table id="la-matrix-pairs" class="la-table"></table>
 		</div>
 	</details>
@@ -346,10 +346,10 @@
 		<p id="la-words-none" class="la-muted" data-i18n="layout_analysis.words.none" hidden></p>
 		<div id="la-words-body">
 			<p id="la-words-mean" class="la-muted"></p>
-			<h4 data-i18n="layout_analysis.words.distribution"></h4>
-			<div id="la-words-bins" class="la-bars"></div>
+			<h4 id="la-words-bins-label" data-i18n="layout_analysis.words.distribution"></h4>
+			<div id="la-words-bins" class="la-bars" aria-labelledby="la-words-bins-label"></div>
 			<h4 data-i18n="layout_analysis.words.hardest"></h4>
-			<div class="la-table-wrap">
+			<div class="la-table-wrap" tabindex="0">
 				<table id="la-words" class="la-table"></table>
 			</div>
 		</div>
