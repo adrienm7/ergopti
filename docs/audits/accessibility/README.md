@@ -257,13 +257,28 @@ app's WebViews do not keep across restarts.
 | Windows | `core/ui/ui/editors.ahk` (GPT link), `modules/updater/changelog.ahk` (channel), `infra/input_probe.ahk` | an Edit or drop-down without a label before it                                 | a Text label before the control                                     |
 | Windows | `ui/hotstrings_config_window/hcw_helpers.ahk`                                                           | four « ↺ » buttons read as a symbol; a colour swatch read as a progress bar    | a translated word; a Text control painted with its colour           |
 | Windows | `core/ui/ui/tooltip/helpers.ahk`, `llm.ahk`                                                             | previews and predictions never announced; colours fixed, high contrast ignored | opt-in UIA notification; system colours when high contrast is on    |
-| macOS   | `menu/ui/init.lua`                                                                                      | the menu-bar item is an image with no title or tooltip                         | `setTooltip("Ergopti+")` / « (paused) »                             |
-| macOS   | `menu/ui/builder/canvas_badge.lua`                                                                      | the first menu row is an untitled canvas image                                 | a styled-text title, or a tooltip                                   |
-| macOS   | `launcher/Sources/ErgoptiPlus/UpdatePromptPanel.swift`                                                  | unlabelled progress bar                                                        | `setAccessibilityLabel`                                             |
-| macOS   | `core/ui/ui/tooltip/renderer.lua`, `ui/wpm/wpm_widget.lua`                                              | `hs.canvas` is invisible to VoiceOver                                          | announce through `hs.speech`/notifications as an option             |
-| Linux   | `tray/adapters/appindicator.lua`                                                                        | empty accessible description; paused told by the icon only                     | pass « Ergopti+ » / « Ergopti+ (paused) »                           |
-| Linux   | `core/ui/ui/dialog_host.lua`                                                                            | caption not bound to its entry or list; empty window title fallback            | `gtk_label_set_mnemonic_widget`; the product name as fallback title |
-| Linux   | `core/ui/adapters/graphics_renderer.lua`, `wpm_surface.lua`, `spotlight_overlay.lua`                    | cairo-drawn, no text for AT-SPI                                                | an accessible name and the tooltip role on the window               |
+| macOS   | `menu/ui/init.lua`                                                                                      | the menu-bar item is an image with no title or tooltip                         | done: tooltip « Ergopti+ » / « Ergopti+ (paused) », 21 locales      |
+| macOS   | `menu/ui/builder/canvas_badge.lua`                                                                      | the first menu row is an untitled canvas image                                 | done: the pill's text is its tooltip                                |
+| macOS   | `launcher/Sources/ErgoptiPlus/UpdatePromptPanel.swift`                                                  | unlabelled progress bar                                                        | done: named by its step, each new step announced                    |
+| macOS   | `core/ui/ui/tooltip/renderer.lua`, `ui/wpm/wpm_widget.lua`                                              | `hs.canvas` is invisible to VoiceOver                                          | previews spoken while VoiceOver runs; WPM widget open               |
+| Linux   | `tray/adapters/appindicator.lua`                                                                        | empty accessible description; paused told by the icon only                     | done: the icon's description, paused or not, 21 locales             |
+| Linux   | `core/ui/ui/dialog_host.lua`                                                                            | caption not bound to its entry or list; empty window title fallback            | done: caption bound to its field; « Ergopti+ » as fallback          |
+| Linux   | `core/ui/adapters/graphics_renderer.lua`, `wpm_surface.lua`, `spotlight_overlay.lua`                    | cairo-drawn, no text for AT-SPI                                                | previews named (notification with Orca); WPM, spotlight open        |
+
+Third pass on macOS and Linux (2026-11-17): the rows marked « done » above,
+and the system settings the previews follow. macOS reads Reduce transparency
+and Increase contrast (`hs.screen.accessibilitySettings`, at most once a
+second) and draws the hotstring and AI previews opaque under either; while
+VoiceOver runs, each new preview is spoken once through VoiceOver's own
+AppleScript `output` (allowed in VoiceOver Utility), never otherwise. Linux
+reads `screen-reader-enabled`, `high-contrast` and `enable-animations` with
+background `gsettings` children every five seconds (never on the keystroke
+path): high contrast makes the previews opaque and, with the screen reader on,
+the preview window is an AT-SPI notification Orca speaks, a tooltip otherwise.
+Announcements follow the screen reader's state, with no setting of their own
+(decided on 2026-11-17, to review by the maintainer). Still open: the WPM
+widgets and the spotlight overlay, the GNOME text scale (not read yet),
+`hs.alert` banners; Reduce motion is read, but no native preview animates.
 
 The screen-reader checks only a real machine can answer are in
 TODO-tests-windows.md, TODO-tests-macos.md and TODO-tests-linux.md

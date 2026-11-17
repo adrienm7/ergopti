@@ -122,9 +122,14 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       `~/.cache/ergopti_updater_etag_*.txt` files deleted); the migration is removed only once the maintainer's
       machines pass.
 - [ ] <!-- field-point: accessibility_orca --> **Accessibility with Orca** ([audit](docs/audits/accessibility/README.md)): 1. The AppIndicator icon and
-      menu from the keyboard (GNOME with its extension, KDE): the icon's name (today an empty description) and the
-      paused state; every item runs. 2. The GTK dialogs (text entry, list): Orca reads each field with its caption
-      (today the caption is not bound to the field). 3. Studio and the other WebKit windows: title read, focus inside
-      the page on open, Tab walks every control. 4. A hotstring preview, an AI prediction, the WPM widget and the
-      spotlight overlay (cairo): confirm Orca reads nothing. 5. GNOME high contrast, « Reduce animation » and
-      « Large text » (`org.gnome.desktop.interface`): what the native tooltips and windows follow.
+      menu from the keyboard (GNOME with its extension, KDE): Orca reads « Ergopti+ », and « Ergopti+ (en pause) »
+      once paused (the icon's description, set since the third pass); every item runs. 2. The GTK dialogs (text
+      entry, entry with choices, list): Orca reads each field with its caption, and a dialog opened without a
+      title is « Ergopti+ » in Alt+Tab. 3. Studio and the other WebKit windows: title read, focus inside the page
+      on open, Tab walks every control. 4. With the screen reader on (Super+Alt+S, so
+      `org.gnome.desktop.a11y.applications screen-reader-enabled` is true): a hotstring preview and an AI
+      prediction are spoken when they appear (the window is an AT-SPI notification named by its rows; check
+      Accerciser if Orca stays silent), within five seconds of turning it on; off, nothing is spoken. The WPM
+      widget and the spotlight overlay are still read as nothing. 5. GNOME high contrast
+      (`org.gnome.desktop.a11y.interface high-contrast`): the previews turn opaque within five seconds; note what
+      should follow « Reduce animation » and « Large text » (read, not applied yet).

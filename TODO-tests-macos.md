@@ -207,14 +207,17 @@ Hands needed:
       next login and `ErgoptiPlus/karabiner` is kept; the migration is removed only once the maintainer's machines
       pass.
 - [ ] <!-- field-point: accessibility_voiceover --> **Accessibility with VoiceOver** ([audit](docs/audits/accessibility/README.md)): 1. The menu-bar item
-      (VO+M then the extras): its name (today an image with no title or tooltip) and the paused state; every menu
-      row is read, including the first canvas row, and runs from the keyboard. 2. Studio, metrics, hotstring
-      settings, onboarding and the update panel: VO reads the window title, the focus starts in the page, Tab and
-      VO keys walk every control; the update panel's progress bar is named. 3. A hotstring preview, an AI
-      prediction and the WPM widget (`hs.canvas`): confirm VoiceOver reads nothing, and note what an
-      announcement should say. 4. The keep-awake banner (`hs.alert`): read or not. 5. System Settings >
-      Accessibility > Display: Reduce motion, Increase contrast and Reduce transparency, then the menu badge,
-      tooltips and the Studio pages: what follows the setting.
+      (VO+M then the extras): VO says « Ergopti+ », and « Ergopti+ (en pause) » once paused (its tooltip, set
+      since the third pass); the first menu row (the canvas pill) is read by its text, « Ergopti+ » or
+      « Ergopti+ ⏸ » (its tooltip); every row runs from the keyboard. 2. Studio, metrics, hotstring settings, onboarding and the
+      update panel: VO reads the window title, the focus starts in the page, Tab and VO keys walk every control;
+      the update panel's progress bar is named by its step message (checking, downloading) and VO announces each
+      new step. 3. With VoiceOver on and VoiceOver Utility > General > « Allow VoiceOver to be controlled with
+      AppleScript » checked: a hotstring preview and an AI prediction are spoken once each in VO's voice (the
+      struck-through alternatives are not), nothing is spoken with VoiceOver off, and with the box unchecked a
+      single warning reaches the log; the WPM widget stays silent. 4. The keep-awake banner (`hs.alert`): read or
+      not. 5. System Settings > Accessibility > Display: with Increase contrast or Reduce transparency on, the
+      hotstring and AI previews are opaque within a second; note what else should follow Reduce motion.
 - [ ] <!-- field-point: owned_runtime_wp9 --> Owned Karabiner runtime, the WP9 pass
       ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
       [handoff](docs/tooling/next-release-handoff.md)): the handoff checklist on a physical Mac, on the CI-signed dev

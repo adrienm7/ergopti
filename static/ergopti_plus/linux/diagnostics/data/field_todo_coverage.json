@@ -207,7 +207,7 @@
 			"id": "accessibility_orca",
 			"title": "Accessibility with Orca: the tray menu, the GTK dialogs, the WebKit windows and the overlays",
 			"checks": [],
-			"not_testable": "A field run reads no screen reader: a person runs Orca on GNOME and KDE and checks what it reads in the tray menu, the dialogs and the WebKit windows, and that it reads nothing of the overlays."
+			"not_testable": "A field run reads no screen reader: a person runs Orca on GNOME and KDE and checks what it reads in the tray menu, the dialogs and the WebKit windows, and what it says when a preview appears."
 		}
 	]
 }
