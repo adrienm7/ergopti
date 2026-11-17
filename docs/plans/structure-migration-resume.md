@@ -6,16 +6,25 @@ same commit as each step or checkpoint. Times are Paris time.
 
 ## Where things stand (2026-11-17)
 
-- S01 to S22 are on dev; S23 (clipboard) is next. The sections below are the
-  history of S01–S20 and stay for their lessons.
+- S01 to S24 are on dev (S23 clipboard and S24 diagnostics landed on
+  2026-11-17); S25 (gestures) is next. The sections below are the history of
+  S01–S20 and stay for their lessons.
 - Run each step on the Windows PC with
   `ERGOPTI_STRUCTURE_PHASE=2 node tools/audit/structure/run-phase2.cjs --from <key> --to <key>`
   in an own worktree (one step takes 15 to 25 minutes); the runner now passes
   paths to Git in batches and tolerates the domain build stopping at
   build:linux, the step the host alone cannot run.
-- Then push a proof branch (`claude/ergopti-structure-<step>-proof-<n>`),
-  dispatch `ci.yml` with `os_lanes=all`, and fix what it finds in follow-up
-  commits after the step before landing. Dev baseline reds at the S21/S22
+- The runner refuses a tree that `npm run gen` changes before the step: when
+  dev left a generated file stale (the native theme data on 2026-11-17),
+  regenerate it in its own commit first. Never commit the appendices
+  `npm run audit:structure-plan` writes while steps remain: `repin.cjs` finds
+  files an earlier step moved through the committed move map, and a map
+  regenerated on a stepped tree no longer lists them (derived pins then stop
+  the runner on `_shared/go/native_http/go.mod`).
+- Then push a proof branch (`ci/verify-structure-<shortsha>`, its own
+  concurrency group), dispatch `ci.yml` with `os_lanes=all`, and fix what it
+  finds in follow-up commits after the step before landing. A full dev
+  baseline is a `ci/verify-<sha>` run of dev (44000968901 on 3cbd759da7). Dev baseline reds at the S21/S22
   landing: Linux E2E platform-metrics; Common Data and source contracts
   (behavior owner `windows/infra/hotstrings/hotstring_engine_main.ahk` needs
   its source review, from dev 6436cc2d6c); a racy Windows llm case
@@ -34,7 +43,14 @@ same commit as each step or checkpoint. Times are Paris time.
     leaks appear;
   - log tags follow module names: check `_shared/core/logger/data/sub_files.toml`;
   - the plan split a shell cohort that sources siblings by `$SCRIPT_DIR`
-    (fixed with a `keep` rule in `rules.cjs` SPLITS before the step).
+    (fixed with a `keep` rule in `rules.cjs` SPLITS before the step);
+  - the Windows `TEST_MODULE_GROUPS` alternations gain the new top folder in
+    every group that named an old one; `ui` comes before `core`, so name
+    only the sub-folder each group owned (S24: `diagnostics/ui` in ui);
+  - a scan of the driver's top `adapters/` folder loses each adapter a step
+    moves into a feature folder (S23: the Linux port adapter presence test
+    now lists every `adapters/` folder; the macOS shell-quote scan still
+    names the old roots and keeps working only while they hold files).
 
 ## History (2026-11-14, 17:20)
 

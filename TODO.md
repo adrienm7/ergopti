@@ -277,7 +277,7 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       `Pause`). The shared `ai/engine/local_servers/menu.lua` still greys every row under `paused`, and macOS
       `local_server_panel.lua` (`admitted`) and Linux `local_server_rows.lua` (`admit`) refuse the three while paused.
 - [ ] **Structure plan, phase 2** ([plan](docs/design/structure-plan.md), resume point
-      [docs/plans/structure-migration-resume.md](docs/plans/structure-migration-resume.md)). Left: S23 (clipboard) to
+      [docs/plans/structure-migration-resume.md](docs/plans/structure-migration-resume.md)). Left: S25 (gestures) to
       S38, one step per commit with `tools/audit/structure/run-phase2.cjs`, two or three per push after a CI proof.
       Paths that describe a published artifact (a prior release's payload, a historical pin) keep their old spelling.
 - **Provider flags inferred, not read.** Only provable with a live key: SambaNova's `enable_thinking: false` (off is
