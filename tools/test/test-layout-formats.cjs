@@ -16,7 +16,8 @@
  *    .keylayout of it is refused with its reason, and the registry's bépo
  *    .keylayout reads to the library's entry.
  * 2. KLA: Ergopti's published ISO and ErgoDox JSON files place the same
- *    characters on the same physical keys.
+ *    characters on the same physical keys, and the ErgoDox key indexes are
+ *    those of KLA's own ErgoDox QWERTY key set.
  * 3. Writers: every imported layout becomes an Ergopti source the source
  *    model validates; Kalamine TOML and KLA JSON read back to what was written.
  * 4. Plain rows, DOF and cmini blocks; unknown and malformed files refused.
@@ -24,7 +25,10 @@
  *    sources and licences in its README): Ergo-L's own Kalamine TOML and the
  *    JSON its project publishes give the same keys, the TOML reporting only
  *    the dead keys whose rules Kalamine keeps built in; Kalamine's qwerty-prog
- *    example reads on its ANSI board; each becomes a valid Ergopti source.
+ *    example reads on its ANSI board; four of KLA's own built-in layouts (its
+ *    european, standard and ergodox boards) read with their home row, the
+ *    ErgoDox keys the ISO model lacks named as unread; each becomes a valid
+ *    Ergopti source.
  * 6. KbdEdit .kbe: every committed KbdEdit export is recognised by its header
  *    (as bytes, renamed, or as text) and refused as encrypted, a truncated one
  *    as damaged; a ratchet keeps the evidence that the body is encrypted.
@@ -209,6 +213,39 @@ for (const code of [
 	);
 	compared++;
 }
+// KLA's own ErgoDox key set: the primary character of every index of
+// KB.keySet.ergodox.qwerty in common/pat/keyboard/js/kb.js (MIT, commit
+// c4f2f9bb43ca8de98c8cb0cd28a78043602c7dcb). Each character index must map to
+// the physical key that types it in QWERTY, and no other index may carry a key:
+// 27 is Backslash and 60-62 the brackets and quote there, whatever a third-party
+// ErgoDox file chooses to put on them.
+const KLA_ERGODOX_QWERTY =
+	"1 1 2 2 3 3 4 4 5 5 6 - 7 = 8 6 9 7 10 8 11 9 12 0 15 q 16 w 17 e 18 r 19 t 22 y 23 u 24 i 25 o 26 p 27 \\ 29 a 30 s 31 d 32 f 33 g 34 h 35 j 36 k 37 l 38 ; 41 z 42 x 43 c 44 v 45 b 48 n 49 m 50 , 51 . 52 / 58 ` 60 [ 61 ] 62 ' 66 space 74 space";
+const QWERTY_CODE = {
+	space: 'Space',
+	'-': 'Minus',
+	'=': 'Equal',
+	'\\': 'Backslash',
+	';': 'Semicolon',
+	',': 'Comma',
+	'.': 'Period',
+	'/': 'Slash',
+	'`': 'Backquote',
+	'[': 'BracketLeft',
+	']': 'BracketRight',
+	"'": 'Quote'
+};
+const klaErgodoxExpected = {};
+const klaErgodoxTokens = KLA_ERGODOX_QWERTY.split(' ');
+for (let i = 0; i < klaErgodoxTokens.length; i += 2) {
+	const char = klaErgodoxTokens[i + 1];
+	klaErgodoxExpected[klaErgodoxTokens[i]] =
+		QWERTY_CODE[char] ?? (/[0-9]/.test(char) ? `Digit${char}` : `Key${char.toUpperCase()}`);
+}
+check(
+	JSON.stringify(F.KLA_KEYS.ergodox) === JSON.stringify(klaErgodoxExpected),
+	`KLA ErgoDox key indexes differ from KLA's own key set: ${JSON.stringify(F.KLA_KEYS.ergodox)}`
+);
 
 // ========================
 // ======= 3/ Writers =====
@@ -344,10 +381,54 @@ check(
 		prog.unmapped.length === 0,
 	`Kalamine qwerty-prog: ${JSON.stringify(prog.layout.rows.KeyQ)} ${JSON.stringify(prog.unmapped)}`
 );
+// KLA's own built-in layouts, one per board: the home row each one types, and
+// the keys only KLA's ErgoDox board has (index 39, its QWERTY Enter, among
+// them) named as unread instead of dropped.
+const klaThirdParty = {
+	'kla-european.azerty.json': { name: 'AZERTY', home: 'qsdfghjklm', unmapped: [] },
+	'kla-european.bepo.json': { name: 'BÉPO', home: 'auie,ctsrn', unmapped: [] },
+	'kla-standard.dvorakmod.json': {
+		name: 'Dvorak IU Swap W/ caps as backspace',
+		home: 'aoeiudhtns',
+		unmapped: []
+	},
+	'kla-ergodox.workman.json': {
+		name: 'Ergodox/Workman/Cub',
+		home: 'ashtgyneoi',
+		unmapped: ['key:0 (~ `)', 'key:13 (= +)', 'key:39 (- _)', 'key:75 ( )']
+	}
+};
+const HOME_ROW = [
+	'KeyA',
+	'KeyS',
+	'KeyD',
+	'KeyF',
+	'KeyG',
+	'KeyH',
+	'KeyJ',
+	'KeyK',
+	'KeyL',
+	'Semicolon'
+];
+const klaResults = [];
+for (const [file, expected] of Object.entries(klaThirdParty)) {
+	const result = thirdParty(file);
+	const home = HOME_ROW.map((code) => result.layout.rows[code]?.[0] ?? '?').join('');
+	const unmapped = result.unmapped.map((u) => `${u.what}:${u.detail}`);
+	check(
+		result.format === 'kla' &&
+			result.layout.name === expected.name &&
+			home === expected.home &&
+			JSON.stringify(unmapped) === JSON.stringify(expected.unmapped),
+		`${file}: ${result.format} « ${result.layout.name} », home row ${home}, unread ${JSON.stringify(unmapped)}`
+	);
+	klaResults.push([file, result]);
+}
 for (const [name, result] of [
 	['ergol.toml', ergolToml],
 	['ergol.json', ergolJson],
-	['kalamine-qwerty-prog.toml', prog]
+	['kalamine-qwerty-prog.toml', prog],
+	...klaResults
 ])
 	try {
 		Source.validate(F.toSource(result.layout));
@@ -679,5 +760,5 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 console.log(
-	`test-layout-formats: OK (4 formats of one layout, 3 third-party files, ${Object.keys(reference).length} characters, ${compared} KLA keys, ${klaRoundTrips} KLAnext and ${keylayoutRoundTrips} .keylayout round trips, ${kbeFiles.length} .kbe refused, malformed files refused)`
+	`test-layout-formats: OK (4 formats of one layout, ${3 + klaResults.length} third-party files, ${Object.keys(reference).length} characters, ${compared} KLA keys, ${klaRoundTrips} KLAnext and ${keylayoutRoundTrips} .keylayout round trips, ${kbeFiles.length} .kbe refused, malformed files refused)`
 );

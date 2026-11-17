@@ -96,13 +96,13 @@ waits for the maintainer's review).
         docs/design/layout-analysis.md first, coordinated with the agent changing the engine's typing paths.
   - [ ] Check the figures again once the engine types through best paths (alternative copies, AltGr, dead keys):
         they read the engine's per-key output (keyValues, topGroups, fingerDistance), so they should follow.
-- [ ] **Layout formats, what is left.** The library comes only from Oxeylyzer and cmini: add another source (genkey,
-      GPL-3.0 like cmini; KLA's built-in list) once its layout list can be read. No third-party KLA JSON, XKB
-      symbols, KLC or DOF file under a licence that allows shipping it has been found for the reader tests.
+- [ ] **Layout formats, what is left.** The library comes only from Oxeylyzer and cmini: add another source: genkey
+      (GPL-3.0 like cmini) once its layout list can be read, or KLA's built-in list (107 files under MIT in
+      `layouts/` of patorjk/keyboard-layout-analyzer at c4f2f9bb43, which the KLA reader reads: four are reader
+      fixtures in `tools/test/fixtures/layout-formats/third-party`). No third-party XKB symbols,
+      KLC or DOF file under a licence that allows shipping it has been found for the reader tests.
       KLAnext's `matrix` board is refused (`format_unsupported_board`): no matrix file was found to read its key
-      indexes from. The ErgoDox index → ISO key table (`KLA_KEYS.ergodox`) maps 27 to Backslash and 60-62 to the
-      brackets and quote, while the committed bépo and Optimot ErgoDox files put on 27 what their ISO files put on
-      BracketLeft and on 39 what they put on Quote: check it against KLA's ErgoDox key set before changing it.
+      indexes from.
 - [ ] **Studio i18n.** Left: a label-improvement pass over the Studio, editor and analyser strings; a label it
       rewrites is translated again in the 19 other locales, and a new label enters as `pending-translation` in
       `tools/lint/locale-identical-to-english-allowlist.json` until it is.
