@@ -2231,7 +2231,8 @@ const CHECKS = [
 			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
 			await session.stop();
 
-			// A stored id that is neither built in nor installed keeps its own row, ticked.
+			// A stored id that is neither built in nor installed keeps its own row, ticked;
+			// the submenu names it with « cannot be emulated » (decided on 2026-11-12).
 			const absent = 'zz_live_absent';
 			const stale = await bootEnglish(
 				context,
@@ -2242,7 +2243,7 @@ const CHECKS = [
 			const kept = await choices(stale.session);
 			if (ticked(kept) !== absent)
 				problems.push(`an absent stored layout ticks "${ticked(kept)}", "${absent}" expected`);
-			if (!kept.some((row) => row.path[1].endsWith(absent)))
+			if (!kept.some((row) => row.path[1].includes(absent)))
 				problems.push(`the submenu does not name ${absent}: ${kept[0]?.path[1]}`);
 			if (live.configSnapshot(stale.session)[KEY.LAYOUT_EMULATED_LAYOUT] !== `"${absent}"`)
 				problems.push('the boot dropped the absent stored layout');
