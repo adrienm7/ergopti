@@ -98,6 +98,17 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       the drive off through udisks and polkit, with no root prompt: the stick leaves `lsblk` and the file manager,
       and the system's own disks stay mounted. The hosted CI runner has no removable or hot-plugged disk, and a loop
       device is neither, so the action rightly skips it there.
+- [ ] <!-- field-point: kde_input_sources_live --> Live layout switch on KDE Plasma: with two layouts in System
+      Settings > Keyboard, Layout > « Input sources » switches the active layout at once through the Plasma keyboard
+      daemon (`org.kde.keyboard /Layouts setLayout`), on Wayland and on X11; the daemon's `getLayout` answers the
+      chosen index, the next typed letter follows it, and kxkbrc's LayoutList keeps its order. GNOME is proved in CI
+      by `run_input_sources_live.sh gnome`; no hosted runner starts a Plasma session with kded.
+- [ ] <!-- field-point: agent_desktop_connectors --> AI agent desktop connectors: an accepted calendar event and an
+      accepted reminder open the default calendar application (GNOME Calendar, KOrganizer or Thunderbird) on the
+      `.ics` import with the agent's title, date and time, and the private temporary file is gone after the daemon
+      stops; an accepted mail opens a draft in the default mail client through xdg-email (or the mailto: link when
+      xdg-email is missing) with its subject, body and recipients, and nothing is sent. The runner has no
+      calendar or mail client, so the unit lane checks only the argument vectors.
 - [ ] <!-- field-point: one_folder_name --> One folder name
       ([handoff](docs/tooling/one-folder-name-handoff.md#what-the-maintainer-checks-on-each-machine)): check the Linux
       machine against the handoff's Linux list (`~/.config/ergopti_plus`, `~/.local/state/ergopti_plus` and

@@ -180,6 +180,18 @@
 			"not_testable": "No field run or guided step drives eject_all_disks yet: a person plugs and mounts a USB stick, fires the bound gesture and checks the stick left lsblk and the file manager while the system disks stayed mounted."
 		},
 		{
+			"id": "kde_input_sources_live",
+			"title": "Live layout switch on KDE Plasma through the keyboard daemon",
+			"checks": [],
+			"not_testable": "No field run or guided step drives the KDE switch yet: a person on a Plasma session with two layouts picks the other one in Layout > Input sources and checks the daemon's getLayout, the next typed letter and kxkbrc's order."
+		},
+		{
+			"id": "agent_desktop_connectors",
+			"title": "AI agent calendar, reminder and mail connectors in real desktop applications",
+			"checks": [],
+			"not_testable": "No field run or guided step accepts an agent action yet: a person with a configured AI accepts a calendar event, a reminder and a mail and checks the calendar import and the unsent draft in their own applications."
+		},
+		{
 			"id": "one_folder_name",
 			"title": "One folder name: the legacy folders migrated on the maintainer's Linux machine",
 			"checks": [],

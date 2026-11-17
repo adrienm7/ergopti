@@ -187,17 +187,22 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       `process_current_source_stale` from the recorded system layout. Left: `NumberRowSourceProbeTests.swift` keeps
       its own in-process selection because its bytes are the reviewed image `number_row_current_test_causal.py` pins
       (`CURRENT_TEST_SHA`); moving it to the shared fixture needs that review renewed. No retry is added.
-- [ ] **Linux live runtime receiving.** Write the runtime flow in the hosted desktop-webview CI shard: the model
-      browser page in real WebKit reading the managed Ollama runtime absent, then installed after a real first install
-      without a restart (LRT-001), as the editor and diagnostics flows do
-      ([native UI audit](docs/audits/platform-parity/2026-11-05-native-ui/report.md)).
-- [ ] **Linux flow receiving.** The case/wrap transforms inside a native editor field: a focused GTK field on the
-      accessibility bus, the shortcuts manager's transform with the real text owner (`focus_guard.capture_text_owner`)
-      and XTest output, as `tests/hardware/llm_selection_focus.lua` drives it
-      ([flow review](docs/audits/platform-parity/2026-11-04-flows/report.md)).
-- [ ] **Linux native acceptance.** Multi-field Tab settling and grapheme deletion in host editors (hotstrings), pointer
-      metrics, live layout apply on KDE (GNOME is proved by `run_input_sources_live.sh gnome`), desktop connectors and
-      real mail/calendar (llm) ([18-scope review](docs/audits/platform-parity/2026-11-04-deep/report.md)).
+- [ ] **Linux live runtime receiving: the page's first install hangs after GitHub's redirect.** A flow is written
+      (`tests/hardware/run_model_browser_runtime_webkit.{lua,sh}`, kept out of CI until it passes): the model page in
+      real WebKit greys Ollama as missing and offers its install (proved in hosted CI, with the inventory notification
+      fixed by 4dbb51564d), and its button runs the AI enable, which asks the consent and starts the pinned archive
+      download. Then nothing for 870 s: the trace shows `download-start github.com`, « HTTP request failed: HTTP 302 »
+      2 s later, and the enable pending until the step's limit (dispatched runs 44038031815 and 44045162053, job
+      133909564507), although the dispatch-only « Run manual official runtime and model acceptance », same transport
+      without a GTK loop, completes (runs 44000968901, 43978912112). Find why the archive's redirect hop never settles
+      under the page (GTK main loop beside libuv, the page's reprojection or its inventory probe during the install),
+      fix it at its cause, then register the flow in the desktop-webview shard (LRT-001,
+      [native UI audit](docs/audits/platform-parity/2026-11-05-native-ui/report.md)).
+- [ ] **Linux native acceptance: pointer metrics.** Write a hosted-CI flow for the pointer metrics
+      (`pointer_metrics.lua`, keystats' mouse columns): a uinput mouse the runner creates (`run_daemon_live.sh` already
+      gets /dev/uinput) moved, clicked and scrolled under the daemon, then the stored rows read back from the metrics
+      store ([18-scope review](docs/audits/platform-parity/2026-11-04-deep/report.md)). The KDE live layout switch and
+      the agent's calendar and mail connectors are field checks (TODO-tests-linux.md).
 
 ## Carried over from the 1.0.9 requests
 
@@ -224,6 +229,11 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Windows
 
+- [ ] **Hotstring Undo by characters.** `HSE_UndoExpansion` erases `_TextCodepointLength(Undo.Typed)` minus one, but
+      a host editor's Backspace deletes a whole user-perceived character: an expansion ending in an emoji with a skin
+      tone, a ZWJ sequence, a flag or a combining accent loses a character typed before it on Undo. Linux now counts
+      `injector.caret_steps()` (measured in GTK by `run_hotstring_fields_live.lua`); count clusters the same way and
+      check Notepad, Word and a browser field on the PC.
 - [ ] **Immediate-Backspace restoration after Notepad-paste and terminal expansions.** Those owners emit after the
       keystroke and keep no undo record, so `HSE_UndoExpansion` refuses both hosts. Keep the record in
       `_HSE_CommitNotepadOwner` and `_HSE_CommitTerminalOwner` (as `_HSE_RememberUndo` does) and send the undo burst
@@ -362,6 +372,8 @@ Each question names the default kept meanwhile; an answer moves into the item or
       stays the site setting's (the site itself has no such rule); the heatmap table lists keys by value, largest
       first, not in board order. Approve or change.
 - [ ] **Agent decisions to review.** Each is implemented as written; confirm or change:
+  - a transform whose field changed after its Ctrl+C now puts the saved clipboard back over what the copy's own
+    wait left (the selection), instead of keeping it as a possible user copy (decided by the agent on 2026-11-17);
   - one-shot modifiers: one `sticky_altgr` covers AltGr and Kana (Windows sends the layout's own AltGr key, Kana on
     a Kana-style layout); the shipped AltGr key keeps its Tab tap;
   - value limits ([inventory](docs/design/value-validation-inventory.md), « Migration status »): LLM temperature 0
