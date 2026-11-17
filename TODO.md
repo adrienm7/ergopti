@@ -248,11 +248,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Windows
 
-- [ ] **Hotstring Undo by characters.** `HSE_UndoExpansion` erases `_TextCodepointLength(Undo.Typed)` minus one, but
-      a host editor's Backspace deletes a whole user-perceived character: an expansion ending in an emoji with a skin
-      tone, a ZWJ sequence, a flag or a combining accent loses a character typed before it on Undo. Linux now counts
-      `injector.caret_steps()` (measured in GTK by `run_hotstring_fields_live.lua`); count clusters the same way and
-      check Notepad, Word and a browser field on the PC.
 - [ ] **TakeNote probe and Notepad's restored session.** TakeNote binds each note to its UI Automation tab
       (a1cd4d2891), but the probe `takenote-native-document-owner` still cannot qualify it on the PC: Notepad there
       restores about 50 « Notes.txt » tabs of earlier probe runs when it starts, the probe most likely reads the first

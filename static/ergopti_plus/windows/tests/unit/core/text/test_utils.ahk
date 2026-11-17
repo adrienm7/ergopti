@@ -103,6 +103,18 @@ _SU_UnicodeEraseAndReplaySpans() {
 Test("text utils: Unicode replay and erasure preserve independent character spans (unicode-erase)",
 	_SU_UnicodeEraseAndReplaySpans)
 
+/** The shared corpus Linux and macOS replay: one step per user-perceived character. */
+_SU_CaretStepsVectors() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadStrict(_SharedDir . "\tests\corpus\hotstrings\caret_steps_vectors.json"))
+	AssertTrue(Corpus["vectors"].Length >= 10, "the corpus lists its vectors")
+	for Vector in Corpus["vectors"]
+		AssertEqual(Vector["steps"], _TextCaretSteps(Vector["text"]), Vector["name"])
+	AssertThrows(() => _TextCaretSteps(42), "counting rejects a non-string")
+}
+Test("text utils: characters are counted as one Backspace deletes them (caret-steps-vectors)",
+	_SU_CaretStepsVectors)
+
 _UCAP_TextTailBudget() {
 	Text := "A" . Chr(0x1F600) . "bc"
 	Expected := ["", "c", "bc", "bc", Chr(0x1F600) . "bc", Text]

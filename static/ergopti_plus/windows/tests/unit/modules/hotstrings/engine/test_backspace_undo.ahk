@@ -75,6 +75,42 @@ _BSU_BackspaceRestoresTheTrigger() {
 }
 Test("hotstrings: an immediate Backspace restores the trigger (backspace-undo)", _BSU_BackspaceRestoresTheTrigger)
 
+; One Backspace deletes a whole emoji, flag or accent cluster: the Undo counted
+; the replacement in code points and also erased characters typed before it.
+_BSU_EmojiReplacementErasedByCharacter() {
+	global HSE_Undoable, _PrefixFocusedControlToken
+	Cases := [
+		["Z" . Chr(0x1F44D) . Chr(0x1F3FD), "skin tone"],
+		["Z" . Chr(0x1F468) . Chr(0x200D) . Chr(0x1F469) . Chr(0x200D) . Chr(0x1F467), "ZWJ family"],
+		["Z" . Chr(0x1F1EB) . Chr(0x1F1F7), "flag"],
+		["Ze" . Chr(0x301), "combining accent"]
+	]
+	try {
+		for Row in Cases {
+			ResetHotstringRecorders()
+			SimulateRegularApp()
+			HSE_TestReset()
+			_PrefixFocusedControlToken := 1
+			CreateHotstring("C", "adn", Row[1])
+			HSE_FeedReset(true)
+			HSE_FeedChar("a")
+			HSE_FeedChar("d")
+			HSE_FeedChar("n")
+			Match := HSE_FeedChar(" ")
+			Assert(IsObject(Match), "control: adn + Space matches (" . Row[2] . ")")
+			AssertTrue(HSE_DispatchMatch(Match, " "), "control: the expansion fires (" . Row[2] . ")")
+			Undo := HSE_Undoable
+			Assert(IsObject(Undo), "a literal expansion keeps its undo record (" . Row[2] . ")")
+			HSE_Undoable := ""
+			AssertTrue(HSE_UndoExpansion(Undo, 1), "the immediate Backspace restores the trigger (" . Row[2] . ")")
+			AssertEqual("{BackSpace 2}{Text}adn", _BSU_LastBurst(),
+				"the Space is gone: Z and the " . Row[2] . " are two characters to erase")
+		}
+	} finally HSE_TestReset()
+}
+Test("hotstrings: the Backspace undo erases an emoji or accent replacement by character (windows-undo-graphemes)",
+	_BSU_EmojiReplacementErasedByCharacter)
+
 _BSU_AnEditVoidsTheUndo() {
 	global HSE_Undoable
 	try {

@@ -1791,6 +1791,10 @@ _HSE_RememberUndoRecord(TriggerUnits, BufferBefore, Effect, Hwnd, Route) {
 ; physical Backspace has already reached the application and removed the last
 ; character the expansion typed, so the burst erases what is left of it and types
 ; the trigger, outside the buffers so it cannot fire again at once (Linux's undo).
+; What is left is counted in user-perceived characters, the unit one Backspace
+; deletes: an emoji with a skin tone, a ZWJ sequence, a flag or an accent typed as
+; a combining mark is one character of several code points, and counting code
+; points erased characters typed before the expansion.
 ; Any edit, click, focus change or other window in between voids the record, and
 ; the burst takes the expansion's own output: Notepad's verified editor, the
 ; terminal's paced capture or the atomic SendInput.
@@ -1813,7 +1817,7 @@ HSE_UndoExpansion(Undo, FocusToken := unset, NativeSendFn := unset, SchedulerFn 
 		Host := OutputHostResolve(_HSE_OutputHostNeedsTitle)
 		if !Host["Valid"] or Host["Hwnd"] != Undo.Hwnd or _HSE_UndoRoute(Host) != Undo.Route
 				return false
-		Remaining := _TextCodepointLength(Undo.Typed)
+		Remaining := _TextCaretSteps(Undo.Typed)
 		if (Remaining < 1)
 				return false
 		if Undo.Route != "atomic"
