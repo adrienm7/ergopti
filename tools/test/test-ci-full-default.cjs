@@ -953,8 +953,8 @@ check(
 		// proof and the Wayland clipboard owner receipt (each with its install step)
 		// joined the desktop-webview shard; 213: the live layout source install joined
 		// the input-display shard; 214: the layout editor's WebView install joined
-		// desktop-webview.
-		assert.equal(Scoped.contract.slots.length, 214);
+		// desktop-webview; 216: the real-WebKit editor and diagnostics flows.
+		assert.equal(Scoped.contract.slots.length, 216);
 		const retained = Raw.step(job.body, 'Retain scoped native Brew qualification receipt');
 		assert.ok(
 			retained.includes(

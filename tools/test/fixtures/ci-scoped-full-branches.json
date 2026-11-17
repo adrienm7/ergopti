@@ -1385,6 +1385,18 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "The hotstring editor refuses, saves, closes and retires in real WebKit",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "The diagnostics window admits its native timer and retires it in real WebKit",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Install prerequisites for The release list window lists GitHub's releases in real WebKit",
 			"protocol": 10
 		},

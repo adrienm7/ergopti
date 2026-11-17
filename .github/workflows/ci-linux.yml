@@ -4503,6 +4503,57 @@ jobs:
           fi
         timeout-minutes: 5
 
+      # The personal hotstring editor driven only through its own page: a save
+      # refused by a read-only folder keeps the file's bytes and the window open
+      # with the translated error, the next save writes and its shortcut
+      # auto-close retires the exact window and its input capture, a save or close
+      # stamped with a retired epoch changes nothing, and shutdown leaves no
+      # toplevel (native UI audit, linux-webview).
+      - name: The hotstring editor refuses, saves, closes and retires in real WebKit
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          timeout 180s xvfb-run -a luajit tests/hardware/run_editor_receiving_webkit.lua
+          else
+              exit 1
+          fi
+        timeout-minutes: 5
+
+      # The diagnostics window on the real libuv loop: the configuration check
+      # pending then answered by a real timer, failed (never pending) when
+      # luv.new_timer refuses, a refresh from a retired epoch refused, Refresh
+      # redrawing the page, and GTK's delete-event leaving no armed timer
+      # (native UI audit, linux-diagnostics LDG-003).
+      - name: The diagnostics window admits its native timer and retires it in real WebKit
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          timeout 180s dbus-run-session -- xvfb-run -a luajit tests/hardware/run_diagnostics_receiving_webkit.lua
+          else
+              exit 1
+          fi
+        timeout-minutes: 5
+
       - name: Install prerequisites for The release list window lists GitHub's releases in real WebKit
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
