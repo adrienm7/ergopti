@@ -258,12 +258,16 @@ function hotstringsRenderTimes(configRoot) {
 // e4343af912 and 3181451c68), [gestures] touchpad_rescan_ms in the timing
 // registry (d6375159c8) and [llm_ui] delay_category in the tooltip constants
 // (bb95e3dc72). neutral-defaults reads the same files once: 2268 -> 2275.
+// Raised on 2026-11-17 by the maintainer to leave headroom (realistic 1220 ->
+// 1500, all 2275 -> 2600): every new shared constant moved this count by one
+// and blocked CI. It still catches an order-of-magnitude regression; replacing
+// these exact-count ceilings with a meaningful budget is a TODO.md item.
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },
 	'toml.document_parse': { all: 15, [REALISTIC_HOTSTRINGS_FIXTURE]: 18 },
 	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
 	'toml.document_slow_steps': { all: 12841, [REALISTIC_HOTSTRINGS_FIXTURE]: 13582 },
-	'toml.flat_values': { all: 2275, [REALISTIC_HOTSTRINGS_FIXTURE]: 1220 }
+	'toml.flat_values': { all: 2600, [REALISTIC_HOTSTRINGS_FIXTURE]: 1500 }
 };
 
 /**

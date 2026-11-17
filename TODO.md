@@ -40,6 +40,37 @@ every maintainer request here.
   live only in the TODO-tests files. Never commit a non-anonymized field report, never cancel a CI run you did not
   start, never use `git stash`, `reset` or `clean` as shortcuts.
 
+## Next session (state on 2026-11-17, read first)
+
+- **Goal unchanged:** a fully green `dev` CI, then publish dev prerelease 176; then empty this file.
+- **Load and disk (maintainer):** at most 5-6 agents at once and at most 2 running heavy local suites (full AHK
+  groups, WSL Lua suites, interactive desktop checks); prefer CI on temporary `ci/verify-<sha>` branches (deleted
+  after reading). After each agent: remove its worktree and scratch files; purge stale scratch dirs, WSL `/root`
+  copies and the npm cache regularly; compact the WSL disk image when no agent uses WSL (C: reached 2.8 GB free).
+- [ ] **Land the optimizer speed-up.** Branch `perf-typing-ids` (6 commits, rebased on c8cd556bab): Ergopti 57 →
+      110, Ergo-L 39 → 93, bépo 35 → 57 optimizer trials/s; golden gap 0, property and stress tests exact. Rebase
+      on `dev`, push, then delete the remote branch.
+- [ ] **CI reds left after verify run 44072500520** (decisions taken 2026-11-17):
+  - Windows SSPI curl flake: the TLS test server closes while the client's TLS close is still in flight (reset
+    10054). Maintainer decision: half-close then wait (bounded) for the client's close, and revise the pinned test
+    « queued peer TLS close is processed without a peer wait ».
+  - macOS Intel « managed Ollama build handoff never arrived »: maintainer decision: make the consuming cell
+    `needs` the Intel build job and update `macos-stage-contract.json` with its review.
+  - Shared-literal ratchet: `windows.path_name` 49/48 (`NOTIFIER_PRODUCT_NAME`, 11de860899) and
+    `macos+linux.lua_function` 105/104 (`reload_emulation`, e13e110319): move them to a shared home.
+  - Linux desktop-webview: `programmable_publication_stale` in the real-GTK field test (5b4110f703), maybe flaky.
+  - Re-read the first complete run after these; keylayout owner pin and Menus « cold command section » to confirm.
+- [ ] **Exact-count ceilings in tests (maintainer: « ces tests avec seuil magic value c'est vraiment mauvais »).**
+      `toml.flat_values` was raised to 1500/2600 on 2026-11-17 to unblock CI. Replace exact operation counts and
+      similar magic thresholds (boot operation ceilings, literal ratchets where they only count) with budgets that
+      mean something (time, order of magnitude, or a named single source), one ratchet at a time.
+- [ ] **Intermittent tests to redo on a quiet PC** (the agent was stopped because the PC was overloaded): the
+      « [CI] Intermittent fixtures » item below plus healthcheck collection, SendInstant, Ollama native,
+      `groups247-*` order dependence, native clipboard/picker, WebView picker cleanup, `idle-caret-context`,
+      `key-state-dllcall-uncaught`.
+- [ ] **Register row** in `docs/platform-parity-audit.md` (module « Key combinations and macOS bindings ») for
+      `docs/audits/platform-parity/2026-11-17-key-combinations-bindings/report.md`.
+
 ## Full accessibility (maintainer request, 2026-11-16, very important)
 
 The goal is a totally accessible project: the site (ergopti.fr), Ergopti Studio (editor, Comparer, Optimiser,
