@@ -46,8 +46,8 @@ local function check(condition, text)
 end
 
 local Session = require("tests.hardware.lib.gtk_fields_session")
-local Clipboard = require("adapters.clipboard")
-local ComboEmitter = require("modules.gestures.combo_emitter")
+local Clipboard = require("clipboard.adapters.clipboard")
+local ComboEmitter = require("gestures.engine.combo_emitter")
 local Injector = require("modules.hotstrings.injector")
 local Json = require("core.text.engine.json")
 
