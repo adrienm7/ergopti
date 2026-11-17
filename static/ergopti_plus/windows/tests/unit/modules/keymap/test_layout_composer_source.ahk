@@ -464,7 +464,7 @@ _LCS_StudioTitleCase() {
 	AssertEqual("ErgoptiPlus — Ergopti Studio 2", WindowTitle("Ergopti Studio 2"))
 	; Both entry points (the plain opener and the navigation-layer one) open
 	; through the one host opener, which owns the caption.
-	for Opener in ["LayoutEditorWindow_Open", "LayoutEditorWindow_OpenOnNav"] {
+	for Opener in ["LayoutEditorWindow_Open", "LayoutEditorWindow_OpenOnNav", "LayoutEditorWindow_OpenOnEdit"] {
 		Body := _DriverFuncBody(Opener)
 		Assert(Body != "", "the editor window opener " . Opener . " must be readable")
 		AssertContains(Body, "_LayEdWin_TryOpen()", Opener . " opens through the shared host opener")
@@ -472,4 +472,20 @@ _LCS_StudioTitleCase() {
 	Body := _DriverFuncBody("_LayEdWin_TryOpen")
 	Assert(Body != "", "the editor window host opener must be readable")
 	AssertContains(Body, '"Title", t("layout_editor.title")', "the window passes its caption to the composing host")
+}
+
+Test("layout editor window: « Create or edit a layout… » shows the editor tab, the Studio row keeps its tab (studio-edit-tab)",
+	_LCS_StudioEditTabCase)
+
+; The maintainer, 2026-11-17: the row brought an open Studio left on
+; « Comparer » to the front without its editor.
+_LCS_StudioEditTabCase() {
+	AssertContains(_DriverFuncBody("LayoutManager_OpenEditor"), "LayoutEditorWindow_OpenOnEdit()",
+		"the layout submenu's row and the manager's button ask for the editor tab")
+	AssertContains(_DriverFuncBody("_MI_StageErgoptiStudio"), "LayoutEditorWindow_Open)",
+		"the top-level Studio row keeps the tab the Studio was left on")
+	Body := _DriverFuncBody("_LayEdWin_PushTab")
+	AssertContains(Body, '_LayEdWin_Push(Host, "studioTab", Tab)')
+	AssertContains(Body, '_LayEdWin_TabWanted := ""', "the tab is pushed once")
+	AssertContains(_DriverFuncBody("_LayEdWin_OnReady"), "_LayEdWin_PushTab(Host)", "a new page takes it on its ready")
 }

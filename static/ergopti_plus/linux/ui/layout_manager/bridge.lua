@@ -65,6 +65,10 @@ local function page_strings(i18n, strings_file)
 	return strings
 end
 
+-- The module, declared before the handlers: the manager window's « Layout
+-- editor » asks the editor window's handler for its tab.
+local M
+
 --- Builds the bridge handler of one window.
 --- @param spec table MANAGER_SPEC or EDITOR_SPEC.
 --- @return table handler { bridge_name, on_message, on_window_closed, _reset }
@@ -74,6 +78,8 @@ local function new_handler(spec)
 	local _controller, _controller_owner, _registry_observer = nil, nil, nil
 	-- Whether a « Navigation layer » entry waits for this window's page.
 	local _nav_wanted = false
+	-- The Studio tab an entry waits for this window's page to show.
+	local _tab_wanted = nil
 
 	--- The controller wired to this daemon.
 	--- @param state table
@@ -187,6 +193,11 @@ local function new_handler(spec)
 			editor_window = spec.editor_window,
 			-- The navigation layer a « Navigation layer » entry asked for, read
 			-- when the page takes it (modules/keymap/nav_layer_save.lua).
+			take_tab = spec.editor_window and function()
+				local tab = _tab_wanted
+				_tab_wanted = nil
+				return tab
+			end or nil,
 			take_nav = spec.editor_window and function()
 				if not _nav_wanted then return nil end
 				_nav_wanted = false
@@ -198,6 +209,7 @@ local function new_handler(spec)
 			-- The manager page's « Layout editor » shows the editor's own window.
 			open_editor_window = not spec.editor_window and function()
 				if not current() or type(manager.show) ~= "function" then return false end
+				M.editor.want_tab("edit")
 				return manager.show(EDITOR_SPEC.app_name) ~= false
 			end or nil,
 			open_url = function(url)
@@ -316,16 +328,25 @@ local function new_handler(spec)
 		if _controller then _controller.show_nav() end
 	end
 
+	--- Asks this window's page to show one of its tabs: at once when its page
+	--- is ready, else when it says so.
+	--- @param tab string « edit », « compare » or « optimize ».
+	function H.want_tab(tab)
+		_tab_wanted = tab
+		if _controller then _controller.show_tab() end
+	end
+
 	--- Test seam: forgets the controller and revokes all retained callbacks.
 	function H._reset()
 		_controller, _controller_owner, _registry_observer = nil, nil, nil
 		_nav_wanted = false
+		_tab_wanted = nil
 	end
 
 	return H
 end
 
-local M = new_handler(MANAGER_SPEC)
+M = new_handler(MANAGER_SPEC)
 M.editor = new_handler(EDITOR_SPEC)
 
 --- Opens the layout editor in its own window (the menu's « Create or edit a
@@ -333,7 +354,8 @@ M.editor = new_handler(EDITOR_SPEC)
 --- page's ready with the last saved source, and an open editor keeps its work.
 --- @param manager table The webview manager (ui.webview_manager).
 --- @param opts table|nil { nav = true } opens it on the navigation layer: the
----   « Navigation layer » menu row, gesture and shortcut (open_layer_editor).
+---   « Navigation layer » menu row, gesture and shortcut (open_layer_editor);
+---   { tab = "edit" } on the editor's tab, which an open Studio may have left.
 --- @return boolean shown
 function M.open_editor_window(manager, opts)
 	if type(manager) ~= "table" or type(manager.show) ~= "function" then
@@ -341,6 +363,7 @@ function M.open_editor_window(manager, opts)
 		return false
 	end
 	if type(opts) == "table" and opts.nav == true then M.editor.want_nav() end
+	if type(opts) == "table" and type(opts.tab) == "string" then M.editor.want_tab(opts.tab) end
 	return manager.show(EDITOR_SPEC.app_name) ~= false
 end
 

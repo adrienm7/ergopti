@@ -705,7 +705,7 @@ function M.generate(ctx, menu_mods, actions)
 			local command = require("settings.engine.keys").COMMAND.ERGOPTI_STUDIO
 			local row = ManifestMenu.command_row("top_level", command, {
 				-- Required on click: the window module is not loaded to draw the tray.
-				[command] = function() return require("ui.layout_manager").editor_menu_command()() end,
+				[command] = function() return require("ui.layout_manager").studio_menu_command()() end,
 			})
 			return row and { row } or {}
 		end,

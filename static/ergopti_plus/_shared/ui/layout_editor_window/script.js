@@ -439,8 +439,19 @@ let _pendingNavShow = null;
  */
 window.studioNav = function (nav) {
 	if (!nav || typeof nav !== 'object') return;
+	// The layer is shown in the editor: a Studio left on another tab comes back.
+	showTab('edit');
 	if (_editor) _editor.showNav(nav);
 	else _pendingNavShow = nav;
+};
+
+/**
+ * Called by the host to show one tab: « Create or edit a layout… » and the
+ * layout manager's « Layout editor » bring an open Studio back to « edit ».
+ * @param {string} tab 'edit', 'compare' or 'optimize'.
+ */
+window.studioTab = function (tab) {
+	if (tab === 'edit' || tab === 'compare' || tab === 'optimize') showTab(tab);
 };
 
 window.sourceData = function (data) {

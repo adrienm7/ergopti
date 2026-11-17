@@ -157,6 +157,8 @@ local function new_window(spec)
 	-- The reader of the navigation layer a « Navigation layer » entry asked
 	-- this window to show, until its page takes it.
 	local _nav_reader = nil
+	-- The Studio tab an entry waits for this window's page to show.
+	local _tab_wanted = nil
 
 	--- Settles exact window and callback owners before admitting another window.
 	--- @return boolean settled Native cleanup committed or already consumed the window.
@@ -237,6 +239,11 @@ local function new_window(spec)
 			end or nil,
 			strings = function() return page_strings(spec.strings_file) end,
 			editor_window = spec.editor_window,
+			take_tab = spec.editor_window and function()
+				local tab = _tab_wanted
+				_tab_wanted = nil
+				return tab
+			end or nil,
 			take_nav = spec.editor_window and function()
 				local reader = _nav_reader
 				_nav_reader = nil
@@ -319,6 +326,14 @@ local function new_window(spec)
 	function W.want_nav(reader)
 		_nav_reader = reader
 		if _controller then _controller.show_nav() end
+	end
+
+	--- Asks this window's page to show one of its tabs: at once when its page
+	--- is ready, else when it says so.
+	--- @param tab string « edit », « compare » or « optimize ».
+	function W.want_tab(tab)
+		_tab_wanted = tab
+		if _controller then _controller.show_tab() end
 	end
 
 	--- Opens this window, or focuses it when it is already open.
@@ -503,9 +518,18 @@ M.open = Manager.open
 --- Opens the layout editor in its own window (the menu's « Create or edit a
 --- layout… », the manager's « Layout editor »), or focuses it when it is
 --- already open: an open editor keeps its unsaved work. A new window shows the
---- last saved source once its page is ready.
+--- last saved source once its page is ready; an open Studio comes back to its
+--- editor tab.
 --- @return boolean opened
-M.open_editor = Editor.open
+function M.open_editor()
+	Editor.want_tab("edit")
+	return Editor.open()
+end
+
+--- Opens Ergopti Studio, or focuses it on the tab it was left on (the top-level
+--- « Ergopti Studio… » row).
+--- @return boolean opened
+M.open_studio = Editor.open
 
 --- Opens Ergopti Studio on the source's navigation layer: the « Navigation
 --- layer » menu row, gesture and shortcut (open_layer_editor). The page imports
@@ -547,6 +571,15 @@ function M.editor_menu_command()
 	return function()
 		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), M.open_editor,
 			"layout_manager.open_editor")
+	end
+end
+
+--- Builds the top-level « Ergopti Studio… » command: the Studio on its last tab.
+--- @return function
+function M.studio_menu_command()
+	return function()
+		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), M.open_studio,
+			"layout_manager.open_studio")
 	end
 end
 

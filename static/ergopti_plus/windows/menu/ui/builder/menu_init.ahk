@@ -274,7 +274,7 @@ _MI_LayoutRearmForPause() {
 ; paused (EDD-1).
 _MI_StageErgoptiStudio() {
 	Row := MenuRenderer_CommandRow("top_level", MenuCommand.ERGOPTI_STUDIO,
-		Map(MenuCommand.ERGOPTI_STUDIO, LayoutManager_OpenEditor))
+		Map(MenuCommand.ERGOPTI_STUDIO, LayoutEditorWindow_Open))
 	if !(Row is Map) || !Row.Has("action")
 		throw Error("The declared Ergopti Studio row was refused before native construction.")
 	TrayMenuStage_AddAction(Row["label"], Row["action"])

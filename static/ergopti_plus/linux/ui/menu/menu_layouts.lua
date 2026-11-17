@@ -57,7 +57,7 @@ local function _build_layouts(ctx)
 			Logger.error(LOG, "No webview manager in the menu context — the layout editor cannot open.")
 			return false
 		end
-		return require("ui.layout_manager.bridge").open_editor_window(ctx.webview)
+		return require("ui.layout_manager.bridge").open_editor_window(ctx.webview, { tab = "edit" })
 	end
 
 

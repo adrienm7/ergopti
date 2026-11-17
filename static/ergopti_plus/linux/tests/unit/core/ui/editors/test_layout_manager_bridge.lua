@@ -255,6 +255,32 @@ helpers.describe("layout manager bridge (Linux)", function()
 		Editor._reset()
 	end)
 
+	helpers.it("« Create or edit a layout… » brings the Studio back to its editor tab (studio-edit-tab)", function()
+		local Bridge, state, daemon_state = emulating_bridge()
+		local Editor = Bridge.editor
+		Editor._reset()
+		daemon_state.webview_manager.show = function() return true end
+		local function tabs()
+			local found = {}
+			for _, push in ipairs(state.pushes) do
+				if push.js:find("window.studioTab(", 1, true) then found[#found + 1] = push.js end
+			end
+			return found
+		end
+		-- Asked before the window exists: the page takes it on its ready, once.
+		helpers.assert_true(Bridge.open_editor_window(daemon_state.webview_manager, { tab = "edit" }))
+		Editor.on_message({ action = "ready" }, daemon_state)
+		helpers.assert_eq(#tabs(), 1, "the page receives the tab once")
+		helpers.assert_contains(tabs()[1], '"edit"')
+		-- Asked again while the page is ready (left on « Comparer »): pushed at once.
+		Bridge.open_editor_window(daemon_state.webview_manager, { tab = "edit" })
+		helpers.assert_eq(#tabs(), 2)
+		-- The top-level « Ergopti Studio… » row keeps the tab the Studio was left on.
+		Bridge.open_editor_window(daemon_state.webview_manager)
+		helpers.assert_eq(#tabs(), 2)
+		Editor._reset()
+	end)
+
 	helpers.it("the manager's « Layout editor » shows the editor window (layout-editor-own-window)", function()
 		local Bridge, state, daemon_state = emulating_bridge()
 		local shown = {}

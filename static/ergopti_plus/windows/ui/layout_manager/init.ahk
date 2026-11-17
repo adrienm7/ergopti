@@ -552,7 +552,7 @@ LayoutManager_HandleEditorAction(Action, Payload, Deps) {
  * @returns {Boolean} Whether the window is shown.
  */
 LayoutManager_OpenEditor(*) {
-	return LayoutEditorWindow_Open()
+	return LayoutEditorWindow_OpenOnEdit()
 }
 
 /**

@@ -255,6 +255,22 @@ async function exerciseStudioLayout(browser, origin) {
 		() => getComputedStyle(document.querySelector('#studio-comparer')).color
 	);
 	assert.ok(luminance(heading) > 0.7, `the Comparer's text is light, got ${heading}`);
+	// « Create or edit a layout… » on a Studio left on « Comparer » (maintainer,
+	// 2026-11-17): the host's studioTab brings the editor back, and so does a
+	// « Navigation layer » entry's studioNav.
+	const shown = () =>
+		page.evaluate(() => ({
+			editor: !document.getElementById('layout-editor').hidden,
+			comparer: !document.getElementById('studio-comparer').hidden,
+			selected: document.getElementById('studio-tab-edit').getAttribute('aria-selected')
+		}));
+	await page.evaluate(() => window.studioTab('edit'));
+	assert.deepEqual(await shown(), { editor: true, comparer: false, selected: 'true' });
+	await page.click('#studio-tab-compare');
+	await page.evaluate(() => window.studioTab('nowhere'));
+	assert.equal((await shown()).comparer, true, 'an unknown tab changes nothing');
+	await page.evaluate(() => window.studioNav({ text: '', hold: null }));
+	assert.deepEqual(await shown(), { editor: true, comparer: false, selected: 'true' });
 	assert.deepEqual(errors, []);
 	await context.close();
 }

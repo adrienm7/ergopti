@@ -497,6 +497,10 @@ end
 --- deps.take_nav() returns, once, the { text, hold } the drivers' « Navigation
 ---   layer » entries asked that window to show (nil when none is pending); the
 ---   page receives it as studioNav once it is ready.
+--- deps.take_tab() returns, once, the Studio tab an entry asked that window to
+---   show (« edit » for « Create or edit a layout… » and the manager's « Layout
+---   editor »; nil when none is pending); the page receives it as studioTab once
+---   it is ready, so an open Studio left on another tab comes back to the editor.
 --- deps.read_keystats(on_done) optionally reads the user's keystats n-grams for
 ---   Ergopti Studio; on_done({ ok = true, ngrams } or { ok = false, code }).
 ---   Only the editor window offers it; elsewhere keystats_ngrams is refused.
@@ -568,7 +572,10 @@ function M.new(deps)
 				lua_export = editor_window and type(deps.registry.source_export_step) == "function" })
 			-- The editor window lists no catalogue: it needs the platform alone.
 			if not editor_window then deps.registry.refresh(function() push_state() end) end
-			if editor_window then controller.show_nav() end
+			if editor_window then
+				controller.show_tab()
+				controller.show_nav()
+			end
 			if editor_wanted then
 				editor_wanted = false
 				M.handle_source(deps, "source_open", {})
@@ -735,6 +742,16 @@ function M.new(deps)
 		if page_ready then return M.handle_source(deps, "source_open", {}) end
 		editor_wanted = true
 		return true
+	end
+
+	--- Shows the Studio tab an entry asked for, now when the page is ready, else
+	--- on its ready.
+	--- @return boolean pushed
+	function controller.show_tab()
+		if not editor_window or not page_ready or type(deps.take_tab) ~= "function" then return false end
+		local tab = deps.take_tab()
+		if tab == nil then return false end
+		return deps.push("studioTab", tab) ~= false
 	end
 
 	--- Shows the navigation layer a « Navigation layer » entry asked for, now

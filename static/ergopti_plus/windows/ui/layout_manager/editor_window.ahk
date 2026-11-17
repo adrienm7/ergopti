@@ -476,6 +476,26 @@ LayoutEditorWindow_Open(*) {
 
 ; Whether a « Navigation layer » entry waits for the Studio's page to show it.
 global _LayEdWin_NavWanted := false
+; The Studio tab an entry waits for the page to show ("" when none).
+global _LayEdWin_TabWanted := ""
+
+/**
+ * Opens Ergopti Studio on its editor tab: « Create or edit a layout… » and the
+ * layout manager's « Layout editor ». An open Studio left on « Comparer » or
+ * « Optimiser » comes back to the editor, with its unsaved work.
+ * @returns {Boolean} Whether the window is shown.
+ */
+LayoutEditorWindow_OpenOnEdit(*) {
+	global _LayEdWin_TabWanted
+	_LayEdWin_TabWanted := "edit"
+	Host := _LayEdWin_TryOpen()
+	if !Host
+		return false
+	; A page that already answered its ready takes it now; a new one on its ready.
+	if Host.ReadyFired
+		_LayEdWin_PushTab(Host)
+	return true
+}
 
 /**
  * Opens Ergopti Studio on the source's navigation layer: the « Navigation
@@ -504,6 +524,16 @@ _LayEdWin_TryOpen() {
 	if !Host
 		LoggerError("LayoutEditorWindow", "The layout editor could not open: WebView2 is unavailable.")
 	return Host
+}
+
+; Sends the page the tab an entry asked for, once.
+_LayEdWin_PushTab(Host) {
+	global _LayEdWin_TabWanted
+	if _LayEdWin_TabWanted == ""
+		return
+	Tab := _LayEdWin_TabWanted
+	_LayEdWin_TabWanted := ""
+	_LayEdWin_Push(Host, "studioTab", Tab)
 }
 
 ; Sends the page the navigation layer a « Navigation layer » entry asked for, once.
@@ -569,6 +599,7 @@ _LayEdWin_OnReady(Host) {
 	try LayoutEditorWindow_HandleMessage(Map("action", "ready"), _LayEdWin_Deps(Host))
 	catch as Err
 		LoggerError("LayoutEditorWindow", "The layout editor could not be initialized: {1}.", Err.Message)
+	_LayEdWin_PushTab(Host)
 	_LayEdWin_PushNav(Host)
 }
 
