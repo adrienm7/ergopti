@@ -1830,7 +1830,14 @@ var LAYOUT_ANALYSIS = (function () {
 			compact_fit: compact,
 			char_coverage: charCoverage(compiled.best),
 			direct_digits: directDigits(layout, board),
-			shortcut_left: shortcutLeft(layout, board, shortcuts(opts.shortcuts)),
+			// The model's own table when none is given, read as is (no copy).
+			shortcut_left: shortcutLeft(
+				layout,
+				board,
+				opts.shortcuts === undefined
+					? { letters: data().model.shortcut_letters, ease: data().model.shortcut_key_ease }
+					: shortcuts(opts.shortcuts)
+			),
 			distinct_chars: compiled.distinct,
 			coverage_bonus: coverageBonus(compiled.distinct)
 		};
@@ -2466,12 +2473,15 @@ var LAYOUT_ANALYSIS = (function () {
 			const out = [];
 			const cellAt = (layout, code, i) =>
 				layout.rows[code] && layout.rows[code][i] !== undefined ? layout.rows[code][i] : null;
-			for (const code of new Set(Object.keys(before.rows).concat(Object.keys(after.rows))))
+			const differs = (code) => {
+				if (before.rows[code] === after.rows[code]) return false;
 				for (let i = 0; i < LAYER_IDS.length; i++)
-					if (cellToken(cellAt(before, code, i)) !== cellToken(cellAt(after, code, i))) {
-						out.push(code);
-						break;
-					}
+					if (!sameCell(cellAt(before, code, i), cellAt(after, code, i))) return true;
+				return false;
+			};
+			for (const code of Object.keys(after.rows)) if (differs(code)) out.push(code);
+			for (const code of Object.keys(before.rows))
+				if (!(code in after.rows) && differs(code)) out.push(code);
 			return out;
 		}
 
@@ -2527,11 +2537,17 @@ var LAYOUT_ANALYSIS = (function () {
 			const before = state.layout;
 			const deadSame = sameDead(before.dead, layout.dead);
 			const codes = changedCodes(before, layout);
-			const nextForms = forms.map((form, i) =>
-				deadSame && sameForm(before, layout, codes, formMissing[i])
-					? state.formValues[i]
-					: formFit(layout, board, table, form)
-			);
+			// Forms that keep the same changed keys share one comparison.
+			const kept = new Map();
+			const nextForms = forms.map((form, i) => {
+				if (!deadSame) return formFit(layout, board, table, form);
+				let key = '';
+				for (const code of codes) key += formMissing[i].has(code) ? '0' : '1';
+				let same = kept.get(key);
+				if (same === undefined)
+					kept.set(key, (same = sameForm(before, layout, codes, formMissing[i])));
+				return same ? state.formValues[i] : formFit(layout, board, table, form);
+			});
 			const total = totalOf(layout, nextCompiled, next.c, next.counts, next.keyCount, nextForms);
 			return {
 				total,
@@ -3341,11 +3357,18 @@ var LAYOUT_ANALYSIS = (function () {
 		return weights > 0 ? sum / weights : 0;
 	}
 
+	// The reference character set, split once (charCoverage).
+	let referenceChars = null;
+
 	/** Share of the reference character set the layout can type. */
 	function charCoverage(best) {
-		const reference = codePoints(data().model.reference_characters);
-		const typed = reference.filter((char) => best.has(char) && !best.get(char).substituted).length;
-		return (100 * typed) / reference.length;
+		if (referenceChars === null) referenceChars = codePoints(data().model.reference_characters);
+		let typed = 0;
+		for (const char of referenceChars) {
+			const way = best.get(char);
+			if (way !== undefined && !way.substituted) typed++;
+		}
+		return (100 * typed) / referenceChars.length;
 	}
 
 	/**
@@ -3388,30 +3411,47 @@ var LAYOUT_ANALYSIS = (function () {
 		const share = (got, measured) =>
 			measured > 0 ? { value: (100 * got) / measured, measured } : null;
 
-		const baseKeys = new Map();
-		for (const [char, list] of ways)
-			for (const way of list)
-				if (!way.substituted && way.keys.length === 1 && way.altgr === 0)
-					(baseKeys.get(char) || baseKeys.set(char, new Set()).get(char)).add(way.keys[0]);
+		// Whether char has a way of one key k, without AltGr (its base keys).
+		const baseKey = (char, k) => {
+			const list = ways.get(char);
+			if (list)
+				for (const way of list)
+					if (!way.substituted && way.keys.length === 1 && way.altgr === 0 && way.keys[0] === k)
+						return true;
+			return false;
+		};
 		let accented = 0;
 		let mnemonic = 0;
 		for (const [char, list] of ways) {
 			const letter = accentBase(char);
 			if (letter === null) continue;
-			const own = list.filter((way) => !way.substituted);
-			if (own.length === 0 || own.some((way) => way.altgr === 0 && !way.dead)) continue;
+			// Its own ways (not substitutes), none of them direct.
+			let own = 0;
+			let direct = false;
+			for (const way of list) {
+				if (way.substituted) continue;
+				own++;
+				if (way.altgr === 0 && !way.dead) {
+					direct = true;
+					break;
+				}
+			}
+			if (own === 0 || direct) continue;
 			accented++;
-			const letterKeys = new Set([
-				...(baseKeys.get(letter.toLowerCase()) || []),
-				...(baseKeys.get(letter.toUpperCase()) || [])
-			]);
-			if (own.some((way) => letterKeys.has(way.keys[way.keys.length - 1]))) mnemonic++;
+			const [lower, upper] = letter;
+			for (const way of list) {
+				if (way.substituted) continue;
+				const k = way.keys[way.keys.length - 1];
+				if (baseKey(lower, k) || baseKey(upper, k)) {
+					mnemonic++;
+					break;
+				}
+			}
 		}
 
 		let pairScore = 0;
 		let pairs = 0;
-		for (const pair of data().model.simplicity_pairs) {
-			const [open, close] = codePoints(pair);
+		for (const [open, close] of simplicityPairs()) {
 			const o = placed(open);
 			const c = placed(close);
 			if (o.length === 0 || c.length === 0) continue;
@@ -3453,21 +3493,30 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	const accentCache = new Map();
+	let pairList = null;
+
+	/** The model's simplicity pairs, each as [opening, closing] character. */
+	function simplicityPairs() {
+		if (pairList === null) pairList = data().model.simplicity_pairs.map((pair) => codePoints(pair));
+		return pairList;
+	}
 
 	/**
 	 * The base letter of an accented Latin letter (a letter A–Z followed by
-	 * combining marks once decomposed: ê → e, Ǘ → U), null for anything else.
+	 * combining marks once decomposed: ê → e, Ǘ → U), in lower and upper
+	 * case, null for anything else.
 	 * @param {string} char - One character.
-	 * @returns {string|null} The base letter.
+	 * @returns {string[]|null} [lower, upper] of the base letter.
 	 */
 	function accentBase(char) {
-		if (accentCache.has(char)) return accentCache.get(char);
+		let base = accentCache.get(char);
+		if (base !== undefined) return base;
 		const parts = codePoints(char.normalize('NFD'));
-		const base =
+		base =
 			parts.length >= 2 &&
 			/^[A-Za-z]$/.test(parts[0]) &&
 			parts.slice(1).every((mark) => /^\p{M}$/u.test(mark))
-				? parts[0]
+				? [parts[0].toLowerCase(), parts[0].toUpperCase()]
 				: null;
 		accentCache.set(char, base);
 		return base;
@@ -3544,9 +3593,11 @@ var LAYOUT_ANALYSIS = (function () {
 	/** Share of the ten digits typed on the base layer. */
 	function directDigits(layout, board) {
 		const digits = new Set();
-		for (const [code, row] of Object.entries(layout.rows)) {
+		for (const code in layout.rows) {
 			if (!board.index.has(code)) continue;
-			if (typeof row[0] === 'string' && /^[0-9]$/.test(row[0])) digits.add(row[0]);
+			const cell = layout.rows[code][0];
+			if (typeof cell === 'string' && cell.length === 1 && cell >= '0' && cell <= '9')
+				digits.add(cell);
 		}
 		return digits.size * 10;
 	}
@@ -3683,6 +3734,15 @@ var LAYOUT_ANALYSIS = (function () {
 		return load;
 	}
 
+	const lowerCache = new Map();
+
+	/** A cell's lower case, kept once worked out (shortcutLeft reads every cell of every layout). */
+	function lowerCase(text) {
+		let lower = lowerCache.get(text);
+		if (lower === undefined) lowerCache.set(text, (lower = text.toLowerCase()));
+		return lower;
+	}
+
 	/**
 	 * Usefulness-weighted share of the shortcut letters on easy left-hand keys:
 	 * a letter counts its weight times the ease of its key (0 on the right hand).
@@ -3690,14 +3750,15 @@ var LAYOUT_ANALYSIS = (function () {
 	function shortcutLeft(layout, board, table) {
 		const { letters, ease } = table;
 		const where = {};
-		for (const [code, row] of Object.entries(layout.rows)) {
-			const letter = layout.command[code] !== undefined ? layout.command[code] : row[0];
+		for (const code in layout.rows) {
+			const letter =
+				layout.command[code] !== undefined ? layout.command[code] : layout.rows[code][0];
 			if (typeof letter !== 'string') continue;
-			const lower = letter.toLowerCase();
+			const lower = lowerCase(letter);
 			if (letters[lower] !== undefined && where[lower] === undefined) where[lower] = code;
 		}
-		for (const [code, letter] of Object.entries(layout.command)) {
-			const lower = letter.toLowerCase();
+		for (const code in layout.command) {
+			const lower = lowerCase(layout.command[code]);
 			if (letters[lower] !== undefined) where[lower] = code;
 		}
 		let got = 0;
