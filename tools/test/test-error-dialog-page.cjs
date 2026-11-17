@@ -74,6 +74,8 @@ function makeDocument() {
 	}
 	return {
 		elements,
+		// i18n.js gives the root the active locale (WCAG 3.1.1, ce1740a67a).
+		documentElement: { lang: (/<html lang="([^"]+)"/.exec(html) || [])[1] },
 		readyState: 'complete',
 		addEventListener() {},
 		getElementById(id) {

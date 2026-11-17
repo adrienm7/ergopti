@@ -48,6 +48,8 @@ function loadPage() {
 					'i18n.js',
 					// The site's chosen theme: a page concern, no export reads it.
 					'theme_choice.js',
+					// The visitor's display preferences: also a page concern.
+					'a11y_prefs.js',
 					'layout_editor/editor_page.js',
 					'layout_editor/standalone.js'
 				].includes(file)
