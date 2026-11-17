@@ -506,7 +506,7 @@ else
 			"metrics.engine.metrics"
 			"metrics.engine.aggregator.helpers"
 			"ai.engine.prediction.prompt_builder_core"
-			"infra.llm_bridge"
+			"ai.engine.bridge"
 			"tray.protocol"
 			"core.lifecycle.engine.compat.utf8"
 			"layouts.engine.layers.terminators"
