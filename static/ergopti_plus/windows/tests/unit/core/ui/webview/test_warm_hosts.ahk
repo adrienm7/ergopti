@@ -360,6 +360,7 @@ _UIWH_BuildShow(State, Host, Window, Options) {
 
 _UIWH_BuildCreate(State, Host, PlaceholderHwnd, Loader) {
 	State["creates"] += 1
+	State["placeholder"] := PlaceholderHwnd
 	_UIWH_BuildCancel(State, State["phase"] == "create-error" ? "create-error" : "create")
 	if State["phase"] == "create-error"
 		throw Error("Private cancelled controller acquisition failure.")
@@ -370,6 +371,9 @@ class _UIWH_BuildController {
 	__New(State) {
 		this.State := State
 	}
+	; The real controller's parent is the placeholder it was created on; the
+	; host fits that control to the window before filling it.
+	ParentWindow => this.State["placeholder"]
 	CoreWebView2 {
 		get {
 			this.State["core_reads"] += 1

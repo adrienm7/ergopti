@@ -165,17 +165,6 @@ class ConfigCleanupWindow extends WebViewHost {
 		}
 	}
 
-	_Geometry() {
-		Geo := super._Geometry()
-		MonitorGetWorkArea(MonitorGetPrimary(), &Left, &Top, &Right, &Bottom)
-		Scale := A_ScreenDPI / 96
-		Geo.w := Min(Geo.w, Floor((Right - Left) / Scale))
-		Geo.h := Min(Geo.h, Floor((Bottom - Top - SysGet(4) - 2 * SysGet(33)) / Scale))
-		Geo.min_w := Min(Geo.min_w, Geo.w)
-		Geo.min_h := Min(Geo.min_h, Geo.h)
-		return Geo
-	}
-
 	; A confirmation can arrive while another configuration write holds its lease:
 	; the page message interrupts that writer's thread, which keeps the lease
 	; until this one returns, so running the cleanup now could only be refused.

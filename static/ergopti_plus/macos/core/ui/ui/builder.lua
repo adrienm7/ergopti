@@ -451,7 +451,21 @@ function M.get_app_geometry(app_id)
 		height     = entry.height,
 		min_width  = entry.min_width or entry.width,
 		min_height = entry.min_height or entry.height,
+		maximized  = entry.maximized == true,
 	}
+end
+
+--- Returns the frame a manifest geometry opens at: the main screen's visible
+--- frame (menu bar and Dock excluded) for a « maximized » app, else centred.
+--- @param geo table The result of M.get_app_geometry.
+--- @return table The dictionary containing x, y, w, h coordinates.
+function M.get_app_frame(geo)
+	if geo.maximized then
+		local screen = hs.screen.mainScreen()
+		local sf = screen and type(screen.frame) == "function" and screen:frame() or nil
+		if sf then return { x = sf.x, y = sf.y, w = sf.w, h = sf.h } end
+	end
+	return M.get_centered_frame(geo.width, geo.height)
 end
 
 --- Calculates a perfectly centered frame for a given width and height on the main screen.
@@ -461,6 +475,10 @@ end
 function M.get_centered_frame(w, h)
 	local screen = hs.screen.mainScreen()
 	local sf = screen and type(screen.frame) == "function" and screen:frame() or {x = 0, y = 0, w = 1920, h = 1080}
+	-- A window larger than the visible frame would put its title bar under the
+	-- menu bar or off the screen: it is kept inside the frame.
+	w = math.min(w, sf.w)
+	h = math.min(h, sf.h)
 	return {
 		x = math.floor(sf.x + (sf.w - w) / 2),
 		y = math.floor(sf.y + (sf.h - h) / 2),

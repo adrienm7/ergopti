@@ -327,7 +327,9 @@ const WINDOWS_APPS = {
 		checks: () => [
 			/class ConfigCleanupWindow extends WebViewHost/,
 			/Host\.AppId\s*:=\s*"config_cleanup"/,
-			/Geo\s*:=\s*super\._Geometry\(\)/
+			// The base WebViewHost._Geometry reads the manifest and keeps the window
+			// inside the work area; the host no longer overrides it.
+			/^(?![\s\S]*_Geometry\(\)\s*\{)/
 		]
 	},
 	hotstring_editor: {
@@ -729,6 +731,60 @@ for (const d of DRIVERS) {
 				`${d.name}: EXCLUSIONS names "${id}", which is not in apps.manifest.json — stale entry, delete it.`
 			);
 		}
+	}
+}
+
+// ---- « maximized »: an app the manifest opens maximized does so everywhere -----
+// Ergopti Studio opened at its 1180x820 manifest size centred on a 150 % display,
+// taller than the screen, so its title bar and its buttons were out of reach.
+// The manifest's « maximized » key is read by each host, and the Windows host
+// keeps every window inside the work area.
+{
+	const read = (rel) => fs.readFileSync(path.join(ROOT, SP, rel), 'utf8');
+	const maximizedApps = Object.keys(apps).filter((id) => apps[id].maximized === true);
+	if (!maximizedApps.includes('layout_editor_window')) {
+		errors.push('apps.manifest.json: Ergopti Studio (layout_editor_window) must open maximized.');
+	}
+	for (const id of Object.keys(apps)) {
+		if ('maximized' in apps[id] && typeof apps[id].maximized !== 'boolean') {
+			errors.push(`apps.manifest.json: "${id}".maximized must be a boolean.`);
+		}
+	}
+	const windowsHost = read('windows/core/ui/engine/webview/utils.ahk');
+	const geometry = (windowsHost.match(/\n\t\t_Geometry\(\) \{[\s\S]*?\n\t\t\}/) || [''])[0];
+	if (!/Entry\["maximized"\]/.test(geometry) || !/MonitorGetWorkArea/.test(geometry)) {
+		errors.push(
+			'Windows: WebViewHost._Geometry must read « maximized » and clamp to the work area.'
+		);
+	}
+	if (!/Geo\.maximized \? " Maximize"/.test(windowsHost)) {
+		errors.push('Windows: WebViewHost must show a « maximized » app with the Maximize option.');
+	}
+	if (
+		!/WebView_FitToWindow\(this\.Controller\)\s*\n\s*if this\.CloseRequested\s*\n\s*return false\s*\n\s*\n\s*; ── Safety flush/.test(
+			windowsHost
+		)
+	) {
+		errors.push(
+			'Windows: the first fit after navigation must size the controller to the window, not the placeholder.'
+		);
+	}
+	const linuxHost = read('linux/core/ui/ui/webview_manager.lua');
+	if (
+		!/maximized\s*=\s*app\.maximized == true/.test(linuxHost) ||
+		!/window:maximize\(\)/.test(linuxHost)
+	) {
+		errors.push('Linux: webview_manager must read « maximized » and maximize the GTK window.');
+	}
+	const macBuilder = read('macos/core/ui/ui/builder.lua');
+	if (
+		!/maximized\s*=\s*entry\.maximized == true/.test(macBuilder) ||
+		!/function M\.get_app_frame/.test(macBuilder)
+	) {
+		errors.push('macOS: ui_builder must read « maximized » and offer get_app_frame.');
+	}
+	if (!/frame = ui_builder\.get_app_frame\(geo\)/.test(read('macos/ui/layout_manager/init.lua'))) {
+		errors.push('macOS: the Studio window must open at ui_builder.get_app_frame(geo).');
 	}
 }
 

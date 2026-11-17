@@ -958,7 +958,7 @@ end
 
 --- Reads per-app geometry from _shared/ui/apps.manifest.json.
 --- @param app_name string The app directory name.
---- @return table { width, height, min_width, min_height }
+--- @return table { width, height, min_width, min_height, maximized }
 local function _read_app_geometry(app_name)
 	local defaults = { width = 800, height = 600, min_width = 400, min_height = 300 }
 	-- One resolver, no "try the other depth" dance. The alternate path this used
@@ -977,6 +977,7 @@ local function _read_app_geometry(app_name)
 			height     = app.height     or defaults.height,
 			min_width  = app.min_width  or defaults.min_width,
 			min_height = app.min_height or defaults.min_height,
+			maximized  = app.maximized == true,
 		}
 	end
 	return defaults
@@ -1085,6 +1086,15 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 		end)
 		if not ok_size then
 			Logger.warn(LOG, "Minimum size not applied to '%s': %s.", app_name, tostring(size_err))
+		end
+
+		-- A manifest « maximized » app fills the work area and keeps its title bar
+		-- and buttons; its default size is the size it restores to.
+		if geometry.maximized then
+			local ok_max, max_err = pcall(function() window:maximize() end)
+			if not ok_max then
+				Logger.warn(LOG, "Maximize not applied to '%s': %s.", app_name, tostring(max_err))
+			end
 		end
 
 		-- Register only the capability owned by this page. A UserContentManager is

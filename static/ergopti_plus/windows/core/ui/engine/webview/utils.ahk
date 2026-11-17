@@ -452,7 +452,11 @@ class WebViewHost {
 		}
 
 		; --------------------------------------------------------------------------
-		; Reads geometry from the manifest. Returns {w, h, min_w, min_h}.
+		; Reads geometry from the manifest. Returns {w, h, min_w, min_h, maximized}.
+		; The size is in DPI-scaled units (the Gui scales it), so a manifest size
+		; larger than the work area at 150 % or 200 % would push the centred
+		; window's title bar off the screen: it is clamped to the primary work area
+		; less the frame and caption.
 		; --------------------------------------------------------------------------
 		_Geometry() {
 				Entry := this._ManifestEntry()
@@ -460,7 +464,12 @@ class WebViewHost {
 				H := Entry.Has("height")    && IsNumber(Entry["height"])    ? Entry["height"]    : 400
 				MW := Entry.Has("min_width") && IsNumber(Entry["min_width"]) ? Entry["min_width"] : W
 				MH := Entry.Has("min_height") && IsNumber(Entry["min_height"]) ? Entry["min_height"] : H
-				return {w: W, h: H, min_w: MW, min_h: MH}
+				Maximized := Entry.Has("maximized") && Entry["maximized"] == true
+				MonitorGetWorkArea(MonitorGetPrimary(), &Left, &Top, &Right, &Bottom)
+				Scale := A_ScreenDPI / 96
+				W := Min(W, Floor((Right - Left - 2 * SysGet(32)) / Scale))
+				H := Min(H, Floor((Bottom - Top - SysGet(4) - 2 * SysGet(33)) / Scale))
+				return {w: W, h: H, min_w: Min(MW, W), min_h: Min(MH, H), maximized: Maximized}
 		}
 
 		/**
@@ -542,7 +551,9 @@ class WebViewHost {
 				g.OnEvent("Size",  this._OnResize.Bind(this))
 
 				; Show BEFORE creating the control — a hidden Gui has a zero client rect
-				this._ShowWindow(g, (Opts.Get("NoActivate", false) ? "NoActivate " : "") . "w" . Geo.w . " h" . Geo.h . " Center")
+				; A maximized app (manifest "maximized") restores to its clamped size.
+				this._ShowWindow(g, (Opts.Get("NoActivate", false) ? "NoActivate " : "") . "w" . Geo.w . " h" . Geo.h . " Center"
+						. (Geo.maximized ? " Maximize" : ""))
 				if this.CloseRequested
 						return false
 
@@ -620,7 +631,8 @@ class WebViewHost {
 				try this.WebView.Navigate("https://" . Vhost . HtmlPath . "?cb=" . A_TickCount)
 				if this.CloseRequested
 						return false
-				try this.Controller.Fill()
+				; The window may already be larger than the placeholder (a maximized app).
+				try WebView_FitToWindow(this.Controller)
 				if this.CloseRequested
 						return false
 
