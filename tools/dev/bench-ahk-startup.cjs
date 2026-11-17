@@ -18,6 +18,12 @@
  * 4. The fixture stands for %LOCALAPPDATA%: its paths.toml and logs folder come
  *    from app_dirs.toml, as the startup smoke's do, so a folder rename cannot
  *    leave the copied configuration unread and the logs looked for elsewhere.
+ * 5. Warm-up boots: the hotstring and locale caches the shipped sources keep
+ *    are keyed by the absolute path of the code that wrote them, so the first
+ *    boot of a fresh private code copy rebuilds them (about 1 s on the
+ *    maintainer's PC) where an installed driver reuses them. One warm-up boot
+ *    (--warmup, default 1) is run and printed but kept out of the summary;
+ *    --warmup=0 measures the cold first boot after an update.
  * ==============================================================================
  */
 
@@ -49,11 +55,15 @@ function benchmarkFixturePaths(fixture) {
 	};
 }
 
-async function main() {
-	if (process.platform !== 'win32') throw new Error('This benchmark requires Windows.');
-	const args = process.argv.slice(2);
+/**
+ * Reads the command line.
+ * @param {string[]} args The arguments after the script name.
+ * @returns {{configArg: string|undefined, samples: number, warmup: number, menuLatency: boolean, webviewWarmup: boolean}}
+ */
+function parseArgs(args) {
 	const configArg = args.find((arg) => arg.startsWith('--config-dir='));
 	const samplesArg = args.find((arg) => arg.startsWith('--samples='));
+	const warmupArg = args.find((arg) => arg.startsWith('--warmup='));
 	const menuLatency = args.includes('--menu-latency');
 	const webviewWarmup = args.includes('--webview-warmup');
 	if (
@@ -61,20 +71,51 @@ async function main() {
 			(arg) =>
 				arg !== configArg &&
 				arg !== samplesArg &&
+				arg !== warmupArg &&
 				arg !== '--menu-latency' &&
 				arg !== '--webview-warmup'
 		)
 	)
 		throw new Error(
-			'Usage: --config-dir=<existing configuration folder> [--samples=3] [--menu-latency] [--webview-warmup]'
+			'Usage: --config-dir=<existing configuration folder> [--samples=3] [--warmup=1] [--menu-latency] [--webview-warmup]'
 		);
+	const samples = samplesArg ? Number(samplesArg.slice('--samples='.length)) : 3;
+	if (!Number.isInteger(samples) || samples < 1 || samples > 100)
+		throw new Error('--samples must be an integer from 1 to 100.');
+	const warmup = warmupArg ? Number(warmupArg.slice('--warmup='.length)) : 1;
+	if (!Number.isInteger(warmup) || warmup < 0 || warmup > 10)
+		throw new Error('--warmup must be an integer from 0 to 10.');
+	return { configArg, samples, warmup, menuLatency, webviewWarmup };
+}
+
+/**
+ * The summary of the measured samples; warm-up boots are left out.
+ * @param {{elapsed_ms: number, warmup: boolean}[]} results Every boot, in order.
+ * @returns {{samples: number, warmup: number, median_ms: number, max_ms: number, min_ms: number}}
+ */
+function summarizeSamples(results) {
+	const measured = results.filter((result) => !result.warmup);
+	if (!measured.length) throw new Error('No measured sample to summarize.');
+	const times = measured.map((result) => result.elapsed_ms).sort((a, b) => a - b);
+	return {
+		samples: measured.length,
+		warmup: results.length - measured.length,
+		median_ms:
+			(times[Math.floor((times.length - 1) / 2)] + times[Math.floor(times.length / 2)]) / 2,
+		max_ms: times[times.length - 1],
+		min_ms: times[0]
+	};
+}
+
+async function main() {
+	if (process.platform !== 'win32') throw new Error('This benchmark requires Windows.');
+	const { configArg, samples, warmup, menuLatency, webviewWarmup } = parseArgs(
+		process.argv.slice(2)
+	);
 	if (!configArg) throw new Error('--config-dir is required; the live configuration is read only.');
 	const configSource = path.resolve(configArg.slice('--config-dir='.length));
 	if (!fs.statSync(configSource).isDirectory())
 		throw new Error('The configuration folder is missing.');
-	const samples = samplesArg ? Number(samplesArg.slice('--samples='.length)) : 3;
-	if (!Number.isInteger(samples) || samples < 1 || samples > 100)
-		throw new Error('--samples must be an integer from 1 to 100.');
 	const ahk = process.env.ERGOPTI_AHK_EXE || 'C:/Program Files/AutoHotkey/v2/AutoHotkey64.exe';
 	if (!fs.existsSync(ahk)) throw new Error('AutoHotkey v2 is missing; set ERGOPTI_AHK_EXE.');
 	const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-startup-benchmark-'));
@@ -106,7 +147,7 @@ async function main() {
 			fs.writeFileSync(entry, source.replace(guard, 'WebView_BeginBrowserWarmup()'));
 		}
 		fs.writeFileSync(wrapper, `\uFEFF#Requires AutoHotkey v2.0+\n#Include ${app.ahk}\n`);
-		for (let sample = 0; sample < samples; sample++) {
+		for (let sample = 0; sample < warmup + samples; sample++) {
 			const fixture = path.join(scratch, menuLatency ? 'reload' : String(sample));
 			const config = path.join(fixture, 'config');
 			if (!fs.existsSync(config))
@@ -156,23 +197,15 @@ async function main() {
 				smoke_pump_ms: menuLatency ? 0 : 650,
 				cache: menuLatency ? (sample === 0 ? 'cold' : 'reused') : 'independent',
 				cache_events: lines.filter((line) =>
-					/Registry parse cache|Active locale.*cache retained/.test(line)
+					/Registry parse cache|Active locale.*cache retained|Hotstring cache ready/.test(line)
 				),
+				warmup: sample < warmup,
 				timing: lines.filter((line) => /\[(BootProfile|Perf|WebView|MetricsFilters)\]/.test(line))
 			};
 			results.push(result);
 			console.log(JSON.stringify(result));
 		}
-		const times = results.map((result) => result.elapsed_ms).sort((a, b) => a - b);
-		console.log(
-			JSON.stringify({
-				samples,
-				median_ms:
-					(times[Math.floor((times.length - 1) / 2)] + times[Math.floor(times.length / 2)]) / 2,
-				max_ms: times[times.length - 1],
-				min_ms: times[0]
-			})
-		);
+		console.log(JSON.stringify(summarizeSamples(results)));
 	} finally {
 		code.close();
 		fs.rmSync(wrapper, { force: true });
@@ -198,4 +231,4 @@ if (require.main === module)
 		process.exitCode = 1;
 	});
 
-module.exports = { benchmarkFixturePaths };
+module.exports = { benchmarkFixturePaths, parseArgs, summarizeSamples };
