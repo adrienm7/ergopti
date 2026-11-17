@@ -61,6 +61,7 @@ local function environment_for(state, recorded)
 		keyboard_hook = {
 			source_device_identity = function() return "device" end,
 			held_modifiers = function() return {} end,
+			held_modifier_role = function() return false end,
 		},
 		Monotonic = { now_ms = function() return 0 end },
 		script_actions = {

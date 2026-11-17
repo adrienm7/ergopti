@@ -26,7 +26,7 @@ local function fixture(body, asynchronous)
 		local environment = setmetatable({ _cached_app_id = "code", keystats = logger,
 			TapHold = { observe_copy_activity = function() end },
 			-- Bare keys: the shared expansion delay reads the held modifiers per key.
-			keyboard_hook = { held_modifiers = function() return {} end },
+			keyboard_hook = { held_modifiers = function() return {} end, held_modifier_role = function() return false end },
 			InputEvent = require("platform.input.event"), Monotonic = { now_ms = function() return state.now end },
 			injector = { _is_injecting = function() return false end },
 			script_actions = { is_paused = function() return false end },
@@ -35,7 +35,7 @@ local function fixture(body, asynchronous)
 				terminator_is_consumed = function() return false end },
 			engine = { on_char = function() state.engine_calls = (state.engine_calls or 0) + 1; return nil end },
 			RepeatKey = { is_enabled = function() return false end },
-			keyboard_hook = { held_modifiers = function() return {} end },
+			keyboard_hook = { held_modifiers = function() return {} end, held_modifier_role = function() return false end },
 		}, { __index = _G })
 		local function snapshot()
 			if state.unknown then return nil end

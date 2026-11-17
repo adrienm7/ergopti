@@ -155,7 +155,7 @@ local function scenario(options, body)
 			Monotonic = { now_ms = function() return 1000 + scheduler.now * 1000 end }, _cached_app_id = "owned-editor",
 			terminators_mod = { is_terminator = function() return false end },
 			-- Main sizes the expansion delay from the physically held modifiers.
-			keyboard_hook = { held_modifiers = function() return {} end },
+			keyboard_hook = { held_modifiers = function() return {} end, held_modifier_role = function() return false end },
 			RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false }, Logger = logger,
 			input_capture_gate = gate, MagicKeySource = { on_key = function() return false end },
 			script_chords = { on_key = function() return false end }, tap_keys = { on_key = function() return false end },
