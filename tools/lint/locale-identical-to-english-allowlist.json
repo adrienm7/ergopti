@@ -3629,6 +3629,50 @@
 		"layout_optimizer.stop": {
 			"reason": "loanword-or-cognate",
 			"locales": ["da"]
+		},
+		"layout_analysis.typing.shift": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_analysis.typing.altgr": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
 		}
 	}
 }
