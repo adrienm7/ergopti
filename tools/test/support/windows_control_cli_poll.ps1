@@ -18,11 +18,13 @@ $starts = @(for ($index = 0; $index -lt $statements.Count; $index++) {
 })
 if ($starts.Count -ne 1) { throw 'The actual public result receiver is not unique.' }
 $prelude = @'
-param([string]$Folder, [string]$SpecPath, [string]$RequestId, [int]$DriverPid, [int]$TimeoutMs)
+param([string]$Folder, [string]$SpecPath, [string]$RequestId, [int]$DriverPid, [int]$TimeoutMs, [string]$ReadyPath)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $spec = Get-Content -Raw -Encoding UTF8 -LiteralPath $SpecPath | ConvertFrom-Json
 '@
+# A held-record control releases its lock only once the receiver starts polling.
 $body = $prelude + "`n" + (($definitions | ForEach-Object { $_.Extent.Text }) -join "`n") + "`n" +
+	'if ($ReadyPath) { [IO.File]::WriteAllText($ReadyPath, ''ready'') }' + "`n" +
 	(($statements[$starts[0]..($statements.Count - 1)] | ForEach-Object { $_.Extent.Text }) -join "`n") + "`n"
 [IO.File]::WriteAllText($Destination, $body, [Text.UTF8Encoding]::new($false))

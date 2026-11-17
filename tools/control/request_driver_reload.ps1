@@ -44,9 +44,21 @@ function Write-Outcome($outcome) {
 	$outcome | ConvertTo-Json -Compress
 }
 
+# The driver replaces a record by renaming a stage over it, then keeps that
+# handle open until its flush ends. Share read, write and delete so this read
+# never fails the driver's rename; an IOException means the record is held.
+function Read-DriverControlText([string]$Path) {
+	$stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read,
+		[IO.FileShare]'ReadWrite, Delete')
+	try {
+		$reader = [IO.StreamReader]::new($stream, [Text.UTF8Encoding]::new($false), $true)
+		return $reader.ReadToEnd()
+	} finally { $stream.Dispose() }
+}
+
 # Keep the original JSON root kind before PowerShell unwraps single-item arrays.
 function Read-DriverControlObject([string]$Path, [string]$Kind) {
-	$text = Get-Content -Raw -Encoding UTF8 -LiteralPath $Path
+	$text = Read-DriverControlText $Path
 	if ($null -eq $text -or -not $text.TrimStart().StartsWith('{', [StringComparison]::Ordinal)) {
 		throw "The driver $Kind is malformed."
 	}
@@ -224,8 +236,14 @@ $resultPath = Join-Path $folder $spec.files.result
 $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMs)
 $last = $null
 while ([DateTime]::UtcNow -lt $deadline) {
+	$result = $null
 	if (Test-Path -LiteralPath $resultPath -PathType Leaf) {
-		$result = Read-DriverControlObject $resultPath 'result'
+		# A record still held by its publication, or replaced since the test, is
+		# read on the next poll; a malformed one still ends the request.
+		try { $result = Read-DriverControlObject $resultPath 'result' }
+		catch [IO.IOException] { $result = $null }
+	}
+	if ($null -ne $result) {
 		Assert-DriverControlResult $result $spec
 		if ($result.request_id -ceq $requestId) {
 			$last = $result

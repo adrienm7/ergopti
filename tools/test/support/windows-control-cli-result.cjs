@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
+const { spawn, spawnSync } = require('node:child_process');
 
 function runResult({ root, source, spec, invoke, runtimeVersion, receiptPath }) {
 	const hash = () => createHash('sha256').update(fs.readFileSync(source)).digest('hex');
@@ -176,6 +177,7 @@ function runResult({ root, source, spec, invoke, runtimeVersion, receiptPath }) 
 			if (!passed)
 				failures.push(`${fixture.name}: exit=${actual.exit}, out=${actual.stdout.trim()}`);
 		}
+		heldRecordControl({ root, scratch, receiver, spec, baseline, requestId, controls, failures });
 		assert.equal(
 			hash(),
 			sourceHash,
@@ -202,11 +204,134 @@ function runResult({ root, source, spec, invoke, runtimeVersion, receiptPath }) 
 	}
 	assert.equal(
 		controls.length,
-		cases.length,
-		'every receiver case must produce a real child receipt'
+		cases.length + (process.platform === 'win32' ? 1 : 0),
+		'every receiver case and the held record must produce a real child receipt'
 	);
 	assert.deepEqual(failures, [], failures.join('\n'));
 	console.log('[OK] Windows control CLI result admission controls passed.');
 	console.log(`PowerShell ${runtimeVersion}; Windows message and live reload receiving UNRUN.`);
 }
+/**
+ * A completed record the driver still holds after renaming its stage over the
+ * result (it keeps the handle until the flush ends) must be read on a later
+ * poll. The receiver once read it at once and died on the sharing violation,
+ * so a completed reload reported exit 1 (live check reload-command).
+ * @param {object} context The receiver, its scratch folder and the receipts.
+ */
+function heldRecordControl({
+	root,
+	scratch,
+	receiver,
+	spec,
+	baseline,
+	requestId,
+	controls,
+	failures
+}) {
+	if (process.platform !== 'win32') return;
+	const folder = path.join(scratch, "held record O'Brien é [1]");
+	fs.mkdirSync(folder);
+	const record = path.join(folder, spec.files.result);
+	fs.writeFileSync(record, JSON.stringify(baseline) + '\n', 'utf8');
+	const marker = path.join(scratch, 'held.marker');
+	const ready = path.join(scratch, 'polling.marker');
+	const locker = path.join(scratch, 'hold.ps1');
+	fs.writeFileSync(
+		locker,
+		[
+			'param([string]$Path, [string]$Marker, [string]$Ready)',
+			"$held = [IO.File]::Open($Path, 'Open', 'Read', 'None')",
+			"[IO.File]::WriteAllText($Marker, 'held')",
+			// Held until the receiver polls, then over several of its 200 ms polls.
+			'$until = [DateTime]::UtcNow.AddSeconds(60)',
+			'while (-not (Test-Path -LiteralPath $Ready) -and [DateTime]::UtcNow -lt $until) { Start-Sleep -Milliseconds 50 }',
+			'Start-Sleep -Milliseconds 2000',
+			'$held.Dispose()'
+		].join('\n'),
+		'utf8'
+	);
+	const powershell = path.join(
+		process.env.SystemRoot,
+		'System32/WindowsPowerShell/v1.0/powershell.exe'
+	);
+	const holder = spawn(
+		powershell,
+		[
+			'-NoProfile',
+			'-NonInteractive',
+			'-File',
+			locker,
+			'-Path',
+			record,
+			'-Marker',
+			marker,
+			'-Ready',
+			ready
+		],
+		{
+			windowsHide: true,
+			stdio: 'ignore'
+		}
+	);
+	try {
+		const deadline = Date.now() + 60000;
+		while (!fs.existsSync(marker) && Date.now() < deadline)
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+		assert.ok(fs.existsSync(marker), 'the holder must open the record exclusively first');
+		const actual = spawnSync(
+			powershell,
+			[
+				'-NoProfile',
+				'-NonInteractive',
+				'-File',
+				receiver,
+				'-Folder',
+				folder,
+				'-SpecPath',
+				path.join(root, 'static/ergopti_plus/_shared/diagnostics/data/control/driver_control.json'),
+				'-RequestId',
+				requestId,
+				'-DriverPid',
+				'4000',
+				'-TimeoutMs',
+				'20000',
+				'-ReadyPath',
+				ready
+			],
+			{ encoding: 'utf8', windowsHide: true, timeout: 90000 }
+		);
+		let passed = false;
+		try {
+			passed = actual.status === 0 && JSON.parse(actual.stdout.trim()).state === 'completed';
+		} catch {
+			passed = false;
+		}
+		controls.push({
+			name: 'held-record',
+			expected_exit: 0,
+			expected_state: 'completed',
+			passed,
+			exit: actual.status,
+			stdout: actual.stdout || '',
+			stderr: actual.stderr || ''
+		});
+		if (!passed)
+			failures.push(
+				`held-record: exit=${actual.status}, out=${(actual.stdout || '').trim()}, err=${(actual.stderr || '').trim()}`
+			);
+	} finally {
+		holder.kill();
+		// The scratch cleanup needs the holder's handle gone.
+		const released = Date.now() + 30000;
+		while (Date.now() < released) {
+			try {
+				fs.closeSync(fs.openSync(record, 'r'));
+				break;
+			} catch {
+				Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+			}
+		}
+	}
+}
+
 module.exports = { runResult };
