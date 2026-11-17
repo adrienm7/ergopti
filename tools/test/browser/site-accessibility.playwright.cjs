@@ -24,9 +24,9 @@ const path = require('node:path');
 const smoke = require('./site-artifact-smoke.playwright.cjs');
 const { SITE_ROUTES } = require('../../ci/site-artifact.cjs');
 
-// Pages audited: every real page of the site, plus the Studio tabs and the
-// pages the artifact smoke list does not carry yet.
-const AUDITED_ROUTES = Object.freeze([...SITE_ROUTES, '/studio/optimiser']);
+// Pages audited: every real page of the site, plus the pages the artifact
+// smoke list does not carry (the Optimiser tab, the accessibility statement).
+const AUDITED_ROUTES = Object.freeze([...SITE_ROUTES, '/studio/optimiser', '/accessibilite']);
 const COLOR_SCHEMES = Object.freeze(['light', 'dark']);
 // WCAG 2.2 level AA is the target; axe tags each rule with the versions and
 // levels it checks.

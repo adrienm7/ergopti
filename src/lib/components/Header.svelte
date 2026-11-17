@@ -1,5 +1,6 @@
 <script>
 	import Ergopti from '../components/Ergopti.svelte';
+	import A11ySettings from '../components/A11ySettings.svelte';
 
 	import { page } from '$app/state';
 	import { asset, resolve } from '$app/paths';
@@ -120,6 +121,7 @@
 			</p>
 		</div>
 	</div>
+	<A11ySettings />
 	<input
 		class="menu-btn"
 		type="checkbox"

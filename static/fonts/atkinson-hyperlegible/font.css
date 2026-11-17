@@ -1,0 +1,38 @@
+/* static/fonts/atkinson-hyperlegible/font.css */
+
+/* Atkinson Hyperlegible, by the Braille Institute of America, under the SIL */
+/* Open Font License 1.1 (OFL.txt). Latin subset of @fontsource 5.3.0. The   */
+/* accessibility settings link this file only when the visitor picks the     */
+/* font (static/ergopti_plus/_shared/ui/a11y_prefs.js).                      */
+
+@font-face {
+	font-display: swap;
+	font-family: 'Atkinson Hyperlegible';
+	font-style: normal;
+	font-weight: 400;
+	src: url('atkinson-hyperlegible-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+	font-display: swap;
+	font-family: 'Atkinson Hyperlegible';
+	font-style: italic;
+	font-weight: 400;
+	src: url('atkinson-hyperlegible-latin-400-italic.woff2') format('woff2');
+}
+
+@font-face {
+	font-display: swap;
+	font-family: 'Atkinson Hyperlegible';
+	font-style: normal;
+	font-weight: 700;
+	src: url('atkinson-hyperlegible-latin-700-normal.woff2') format('woff2');
+}
+
+@font-face {
+	font-display: swap;
+	font-family: 'Atkinson Hyperlegible';
+	font-style: italic;
+	font-weight: 700;
+	src: url('atkinson-hyperlegible-latin-700-italic.woff2') format('woff2');
+}

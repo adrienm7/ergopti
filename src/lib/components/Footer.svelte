@@ -1,6 +1,7 @@
 <script>
 	import Ergopti from '#lib/components/Ergopti.svelte';
 	import { discordLink } from '#lib/stores_infos.js';
+	import { resolve } from '$app/paths';
 	const date = new Date().getFullYear();
 </script>
 
@@ -14,6 +15,8 @@
 		<a href={discordLink} target="_blank" class="text-white"
 			><span class="min-width-600">Serveur</span> Discord <i class="icon-discord"></i></a
 		>
+		<span style="position:relative; bottom:0.05em;">|</span>
+		<a href={resolve('/accessibilite')} class="text-white">Accessibilité</a>
 	</div>
 </footer>
 
