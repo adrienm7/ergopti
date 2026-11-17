@@ -148,12 +148,12 @@ names the closed reason; only the pull is refused, with that reason's message.
 `SuspendedImageOwner` starts the exact verified image itself, suspended, and retires
 that one child. So the relay is the daemon's sibling, under the same owner.
 
-- **Inputs.** `modules/llm/ollama_server_command.lua` passes the serve owner the
+- **Inputs.** `ai/engine/ollama/server_command.lua` passes the serve owner the
   receipt path (`proxy_relay_receipt`), the registry's CONNECT authority and the four
   `proxy_relay_*` deadlines (`--proxy-relay-*`). Without them the start is refused by
   name, as an incomplete install.
 - **Probe.** `managed_ollama_serve.py` asks `probe` once it has captured the route and
-  before it seals the bootstrap snapshot (`modules/llm/managed_ollama_proxy_relay.py`,
+  before it seals the bootstrap snapshot (`ai/engine/ollama/managed_ollama_proxy_relay.py`,
   reading the probe line through `_shared/core/network/adapters/python_proxy_auth_relay.py`,
   which the shared probe vectors pin to the Go and Lua readers). Only the plain http
   proxy without credentials the snapshot selects for https is probed, with the relay
@@ -180,7 +180,7 @@ that one child. So the relay is the daemon's sibling, under the same owner.
   before `RETIRED`; a guardian killed outright closes that stdin too. A non-zero
   value is a cleanup failure of the native retirement.
 - **Logs.** The serve owner prints `Managed Ollama proxy sign-in relay: EVENT [WORD].`
-  lines, fixed words only; `adapters/managed_ollama_daemon.lua` logs them as they
+  lines, fixed words only; `ai/adapters/managed_ollama_daemon.lua` logs them as they
   arrive (WARNING for `not_installed` and `refused`).
 
 ## Packaging

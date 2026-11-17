@@ -49,7 +49,7 @@ class RelayOptions:
 
     Args:
         receipt: Absolute path of the refusal receipt, removed at each start.
-        authority: The registry's CONNECT authority ("registry.ollama.ai:443").
+        authority: The registry's CONNECT authority (HOST:443), from route_origins.json.
         dial_ms, handshake_ms, idle_ms, probe_ms: The timing registry's
             proxy_relay_* values, positive milliseconds.
     """

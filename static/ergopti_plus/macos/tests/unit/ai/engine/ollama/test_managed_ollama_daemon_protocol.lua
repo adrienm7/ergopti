@@ -499,7 +499,7 @@ helpers.describe("Managed daemon refusal diagnostic", function()
 	end)
 
 	helpers.it("(daemon-relay-logged) logs the sign-in relay's fixed lines as they arrive, split or not", function()
-		helpers.with_stub_scope({ "adapters.managed_ollama_daemon", "core.process.adapters.shell_runner",
+		helpers.with_stub_scope({ "ai.adapters.managed_ollama_daemon", "core.process.adapters.shell_runner",
 			"core.lifecycle.engine.core.managed_ollama_daemon_lifecycle", "core.logger.engine.logger" }, function()
 			local logs = {}
 			local Logger = helpers.make_logger_stub()
@@ -527,7 +527,7 @@ helpers.describe("Managed daemon refusal diagnostic", function()
 					return { complete = function() end, feed = function() end }
 				end,
 			}
-			local Daemon = helpers.load_with_stubs("adapters.managed_ollama_daemon")
+			local Daemon = helpers.load_with_stubs("ai.adapters.managed_ollama_daemon")
 			assert(Daemon.prepare("exec /fixture/serve", string.rep("a", 32), {}))
 			callbacks.chunk(nil, "", "Managed Ollama proxy sign-in relay: required neg")
 			helpers.assert_eq(#logs, 0, "a partial line waits for its end")

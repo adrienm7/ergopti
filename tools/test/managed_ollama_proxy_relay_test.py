@@ -31,7 +31,9 @@ def load(name, path):
 POLICY = load(
     "relay_policy_under_test", STATIC / "_shared/core/network/adapters/python_proxy_auth_relay.py"
 )
-RELAY = load("managed_relay_under_test", STATIC / "macos/ai/engine/ollama/managed_ollama_proxy_relay.py")
+RELAY = load(
+    "managed_relay_under_test", STATIC / "macos/ai/engine/ollama/managed_ollama_proxy_relay.py"
+)
 PROXY = load(
     "relay_proxy_policy", STATIC / "_shared/core/network/adapters/python_network_proxy_policy.py"
 )
