@@ -7,7 +7,7 @@
 # Turns one field report into one verdict per point of its TODO-tests-<os>.md section
 # (« To confirm on the Mac », « To confirm on Linux »), so the coordinator can
 # tick lines from the report alone. The points and the evidence that decides
-# each are static/ergopti_plus/<os>/data/field_todo_coverage.json; the evidence
+# each are static/ergopti_plus/<os>/diagnostics/data/field_todo_coverage.json; the evidence
 # is the field run's step results (field_run/NN_<step>.json, with each check's
 # report steps), the collector's guided and probe steps (field_guided/, Linux,
 # tools/dev/field-guided.py) and the collector's own steps (steps.txt).

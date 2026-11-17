@@ -442,7 +442,7 @@ log "▶ guided steps: each prints its gesture here and waits for it."
 phase_started="$(date +%s)"
 FIELD_STEP_HINT="the gesture or the y, n or s answer the guided step above asks for"
 field_step_ticker_start field_guided "${out}/field_guided.txt" "${phase_started}"
-python3 "${REPO_ROOT}/tools/dev/field-guided.py" --steps "${DRIVER_ROOT}/data/field_guided_steps.json" \
+python3 "${REPO_ROOT}/tools/dev/field-guided.py" --steps "${DRIVER_ROOT}/diagnostics/data/field_guided_steps.json" \
 	--out "${out}" ${guided_sources[@]+"${guided_sources[@]}"} 2>&1 | tee "${out}/field_guided.txt"
 phase_status="${PIPESTATUS[0]}"
 field_step_ticker_stop
