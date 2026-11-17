@@ -103,6 +103,12 @@ global _MenuDispatcherEpoch := 0
 global _MenuDispatchTokens := Map()
 global _MenuDispatchTokenCounter := 0
 global _MenuDispatchClickSequences := Map()
+; The click sequence the bypass dispatch already ran, per ItemId. AutoHotkey
+; can still deliver that same click natively afterwards (its dispatcher was
+; late, not dropping it); that delivery must not run the command a second time.
+; A Pause clicked while paused resumed through the bypass, then paused again
+; 426 ms later when the native delivery arrived (the maintainer, 2026-11-17).
+global _MenuDispatchBypassedClicks := Map()
 
 ; Every HMENU an item has been registered into. MenuDispatcher_PruneMenu folds
 ; these handles into its live set because liveness is OWNERSHIP, not tray
@@ -164,6 +170,7 @@ global MENU_DISPATCH_MF_CHECKED := 0x8
 ; re-registers the dropped IDs.
 MenuDispatcher_Reset() {
 		global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
+		global _MenuDispatchBypassedClicks
 		global _MenuDispatchCheckedFns
 		_MenuDispatcherEpoch += 1
 		_MenuDispatchCallbacks := Map()
@@ -172,6 +179,7 @@ MenuDispatcher_Reset() {
 		_MenuDispatchCheckedFns := Map()
 		MenuReloadReplay_ClearIdentities()
 		_MenuDispatchClickSequences := Map()
+		_MenuDispatchBypassedClicks := Map()
 		; Nothing is tracked any more, so the ownership set must go with it —
 		; otherwise handles from the retired generation keep being walked forever.
 		_MenuDispatchOwnerHandles := Map()
@@ -184,9 +192,10 @@ MenuDispatcher_Reset() {
 ; remains live.  Clearing those Maps here would make every staged callback a
 ; silent native-dispatch-only item after publication.
 MenuDispatcher_BeginReplacement() {
-		global _MenuDispatcherEpoch, _MenuDispatchClickSequences
+		global _MenuDispatcherEpoch, _MenuDispatchClickSequences, _MenuDispatchBypassedClicks
 		_MenuDispatcherEpoch += 1
 		_MenuDispatchClickSequences := Map()
+		_MenuDispatchBypassedClicks := Map()
 }
 
 ; Per-menu prune for rebuilders that delete + repopulate a SINGLE menu in place
@@ -209,7 +218,7 @@ MenuDispatcher_BeginReplacement() {
 ; and this prune runs from a timer thread that lands inside that window.
 MenuDispatcher_PruneMenu(MenuObj) {
 		global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens, _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
-		global _MenuDispatchCheckedFns
+		global _MenuDispatchCheckedFns, _MenuDispatchBypassedClicks
 
 		; Collect the IDs currently live in this menu's HMENU.
 		LiveIds := Map()
@@ -307,6 +316,8 @@ MenuDispatcher_PruneMenu(MenuObj) {
 				if _MenuDispatchClickSequences.Has(Id) {
 						_MenuDispatchClickSequences.Delete(Id)
 				}
+				if _MenuDispatchBypassedClicks.Has(Id)
+						_MenuDispatchBypassedClicks.Delete(Id)
 		}
 		if (DeadIds.Length > 0) {
 				try LoggerDebug("MenuDispatcher",
@@ -604,6 +615,11 @@ _TrackedDispatch(TrackedObj, Args*) {
 		if (TrackedObj.ItemId
 				and _MenuDispatchTokens.Has(TrackedObj.ItemId)
 				and _MenuDispatchTokens[TrackedObj.ItemId] = TrackedObj.Token) {
+				if MenuDispatchClickAlreadyBypassed(TrackedObj.ItemId) {
+						try LoggerInfo("MenuDispatcher",
+								"Late native delivery of ItemId={1}: its bypass dispatch already ran the click, nothing done.", TrackedObj.ItemId)
+						return
+				}
 				_MenuDispatchLastFire[TrackedObj.ItemId] := A_TickCount
 				MenuCommandRun(TrackedObj.Callback, Args, 0, 0, 0,
 						_MenuDispatchClickRegistration(TrackedObj.ItemId, TrackedObj.Token, Args))
@@ -970,8 +986,22 @@ _OnMenuCommandWmCommand(wParam, lParam, msg, hwnd) {
 ; The epoch, token and per-item click sequence together fence stale retries:
 ; a recycled native ID, a rebuilt menu, or a newer click can never make an
 ; older timer dispatch the current callback.
+/**
+ * Whether the bypass dispatch already ran the click AutoHotkey is delivering
+ * now: the bypass recorded the item's current click sequence. A newer click on
+ * the same item has a new sequence and runs.
+ * @param {Integer} ItemId Native item ID.
+ * @returns {Boolean}
+ */
+MenuDispatchClickAlreadyBypassed(ItemId) {
+		global _MenuDispatchBypassedClicks, _MenuDispatchClickSequences
+		return _MenuDispatchBypassedClicks.Has(ItemId) && _MenuDispatchClickSequences.Has(ItemId)
+			&& _MenuDispatchBypassedClicks[ItemId] == _MenuDispatchClickSequences[ItemId]
+}
+
 _DispatchIfMissed(ItemId, ExpectedLastFire, ExpectedEpoch := 0, ExpectedToken := 0, ExpectedClickSequence := 0) {
 		global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchClickSequences
+		global _MenuDispatchBypassedClicks
 		; Critical is held only for the brief atomic gate — reading/updating state and
 		; extracting the callback reference. Releasing it before Callback.Call() is
 		; mandatory: holding Critical across an arbitrary menu action risks starving the
@@ -1006,6 +1036,7 @@ _DispatchIfMissed(ItemId, ExpectedLastFire, ExpectedEpoch := 0, ExpectedToken :=
 		Registration := _MenuDispatchTokens.Has(ItemId)
 			? _MenuDispatchClickRegistration(ItemId, _MenuDispatchTokens[ItemId], ["", 0, 0]) : 0
 		_MenuDispatchLastFire[ItemId] := A_TickCount
+		_MenuDispatchBypassedClicks[ItemId] := ExpectedClickSequence
 		Critical "Off"   ; Release before the callback so the keyboard hook is never starved.
 		try LoggerInfo("MenuDispatcher",
 				"AHK drop detected for ItemId={1} — firing bypass_dispatch.", ItemId)

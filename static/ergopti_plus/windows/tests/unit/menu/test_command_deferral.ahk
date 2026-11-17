@@ -726,3 +726,39 @@ _MCDF_PrivateFilterBody(Fixture) {
 }
 Test("menu check rows: two late private-browsing clicks persist, uncheck and disable the filter once (menu-toggle-replay-double-flip)",
 	(*) => _MCDR_Run(_MCDF_PrivateFilterBody))
+
+; A plain command row (the tray's Pause) clicked once: the bypass dispatch ran
+; it because AutoHotkey's own delivery was late, then that delivery arrived. It
+; must not run the command again; a new click on the row still runs. A Pause
+; clicked while paused resumed, then paused again 426 ms later (the maintainer,
+; 2026-11-17).
+_MCDF_BypassedClickRunsOnce() {
+	global _MenuDispatchTokens, _MenuDispatchCallbacks, _MenuDispatchClickSequences, _MenuDispatchLastFire
+	global _MenuDispatcherEpoch
+	State := {On: true, Runs: 0}
+	PauseMenu := Menu()
+	try {
+		AssertEqual(1, RegisterMenuItem(PauseMenu, "pause", _MCDF_Toggle.Bind(State)), "a plain command row")
+		ItemId := _MenuItemIdAtPosition(PauseMenu, 0)
+		Token := _MenuDispatchTokens[ItemId]
+		Native := {ItemId: ItemId, Token: Token, Callback: _MenuDispatchCallbacks[ItemId]}
+		; The click's WM_COMMAND numbered it; the retry timer found no native fire.
+		_MenuDispatchClickSequences[ItemId] := 1
+		LastFire := _MenuDispatchLastFire.Has(ItemId) ? _MenuDispatchLastFire[ItemId] : 0
+		_DispatchIfMissed(ItemId, LastFire, _MenuDispatcherEpoch, Token, 1)
+		AssertEqual(1, State.Runs, "the bypass ran the click")
+		_TrackedDispatch(Native, "pause", 1, PauseMenu)
+		AssertEqual(1, State.Runs, "the late native delivery of the same click runs nothing")
+		AssertFalse(State.On, "the row keeps the state the click asked for")
+		; A new click is a new sequence: AutoHotkey's delivery runs it.
+		_MenuDispatchClickSequences[ItemId] := 2
+		_TrackedDispatch(Native, "pause", 1, PauseMenu)
+		AssertEqual(2, State.Runs, "a new click still runs")
+		AssertTrue(State.On)
+	} finally {
+		PauseMenu.Delete()
+		MenuDispatcher_PruneMenu(PauseMenu)
+	}
+}
+Test("menu dispatch: a late native delivery of a click the bypass ran does not run it again (menu-bypass-double-dispatch)",
+	_MCDF_BypassedClickRunsOnce)
