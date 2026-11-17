@@ -3509,6 +3509,43 @@ jobs:
           fi
         timeout-minutes: 5
 
+      - name: Install prerequisites for Make-executable sends nothing to a real terminal and chmods a real PCManFM selection
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xterm pcmanfm xclip xdotool openbox dbus-x11 xvfb luajit lua-luv libxtst6
+          else
+              exit 1
+          fi
+        timeout-minutes: 20
+
+      # LCP-004 against real windows: make_executable_selection through the
+      # gestures' executor with its production focus query, clipboard adapter and
+      # combo emitter (last hop XTest). A focused xterm whose job traps SIGINT gets
+      # no key and no interrupt (a Ctrl+C on the same wire is the control); a
+      # focused PCManFM with its file selected gets that file chmodded +x.
+      - name: Make-executable sends nothing to a real terminal and chmods a real PCManFM selection
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          timeout 180s bash static/ergopti_plus/linux/tests/hardware/run_file_manager_actions_live.sh
+          else
+              exit 1
+          fi
+        timeout-minutes: 5
+
       - name: Install prerequisites for The clipboard owner serves every target over the Wayland data-control protocol
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         run: |

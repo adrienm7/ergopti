@@ -676,6 +676,7 @@ const PROGRAMS = {
 	pgrep: packageManager('finds the daemons of the container desktop proofs', HOST),
 	awk: packageManager('reads the process table in the container desktop proofs', HOST),
 	pulseaudio: inUbuntuJob('pulseaudio', 'sound server'),
+	pcmanfm: inUbuntuJob('\\bpcmanfm\\b', 'file manager of the file-manager actions proof'),
 	lua: inUbuntuJob('lua5\\.4', 'Lua interpreter'),
 	'lua5.4': inUbuntuJob('lua5\\.4', 'Lua interpreter'),
 	mount: inUbuntuJob('util-linux', 'util-linux'),
