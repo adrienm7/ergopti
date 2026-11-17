@@ -5,8 +5,10 @@
 # US while the test process's TISCopyCurrentKeyboardInputSource stayed French.
 # tools/diagnostics/macos_tis_cache_probe.swift runs each run-loop mode in its own
 # long-lived process on each hosted macOS image and says, step by step, whether
-# that process saw the change, what a fresh process read, and whether a stale
-# cache caught up. It never runs on push: dispatch it by hand, then read the
+# that process saw the change, what a fresh process read, what the HIToolbox
+# preferences held, and whether a stale cache caught up. The --toggle variants
+# run first, while the target is still disabled: they enable and disable it
+# around each cycle as one fixture case does. It never runs on push: dispatch it by hand, then read the
 # SUMMARY lines in the job summary and the JSON lines in the artifact.
 
 name: Probe macOS TIS current-source cache
@@ -48,7 +50,7 @@ jobs:
           sw_vers > "$evidence/sw_vers.txt"
           uname -m >> "$evidence/sw_vers.txt"
           bash tools/diagnostics/macos_text_input_agents.sh "$evidence/text-input-agents.txt" before
-          for variant in "default" "default --body" "tracking" "nsapp" "none"; do
+          for variant in "default --toggle" "default --toggle --body" "default" "default --body" "tracking" "nsapp" "none"; do
               read -r -a extra <<< "$variant"
               name="${variant// --/-}"
               "$RUNNER_TEMP/tis-cache-probe" --mode "${extra[@]}" --cycles "$CYCLES" | tee "$evidence/$name.jsonl"

@@ -64,6 +64,11 @@ assert.deepEqual(
 	'every mode the probe accepts runs'
 );
 assert(variants.includes('default --body'), 'the refused cases ran a body between the selections');
+assert.deepEqual(
+	variants.slice(0, 2),
+	['default --toggle', 'default --toggle --body'],
+	'the fixture-shaped variants run first, while the target is still disabled'
+);
 assert.match(run.run, /--cycles "\$CYCLES"/);
 assert.match(run.run, /macos_text_input_agents\.sh "\$evidence\/text-input-agents\.txt" before/);
 assert.match(run.run, /macos_text_input_agents\.sh "\$evidence\/text-input-agents\.txt" after/);
@@ -83,7 +88,9 @@ for (const needle of [
 	'kTISNotifySelectedKeyboardInputSourceChanged',
 	'"--read-current"',
 	'let stale = systemSelected == true && fresh == id',
-	'if !targetWasEnabled && originalCurrent',
+	'if !targetWasEnabled && targetEnabledNow && originalCurrent',
+	'"AppleCurrentKeyboardLayoutInputSourceID"',
+	'case "--toggle": options.toggle = true',
 	'print("SUMMARY "'
 ])
 	assert(probe.includes(needle), `the probe holds ${needle}`);
