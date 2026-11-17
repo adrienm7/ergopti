@@ -41,7 +41,7 @@ helpers.describe("gestures.actions: sg() 3-arg function-vs-label guard", functio
 		local self  = debug.getinfo(1, "S").source:gsub("^@", "")
 		-- Navigate from tests/meta/ up to the driver root.
 		local root  = self:match("^(.*)[/\\]tests[/\\]") or "."
-		local path  = root .. sep .. "modules" .. sep .. "gestures" .. sep .. "actions.lua"
+		local path  = root .. sep .. "gestures" .. sep .. "engine" .. sep .. "actions.lua"
 
 		local fh    = io.open(path, "r")
 		helpers.assert_true(fh ~= nil, "gestures/engine/actions.lua must be readable")
