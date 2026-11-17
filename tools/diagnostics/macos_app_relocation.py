@@ -52,7 +52,8 @@ APPROVED_QUARANTINE_FLAGS = "00c3"
 LAUNCHER_RELATIVE = "Contents/MacOS/ErgoptiPlus"
 # macOS releases a translocation mount some time after the app quit: umount
 # answered "Operation not permitted" right after a healthy Quit (CI run
-# 44000968901), so it is tried again for a bounded time before it is reported.
+# 44000968901), then "not currently mounted" once macOS had released it itself.
+# It is tried again for a bounded time, and a mount no longer listed is undone.
 UMOUNT_ATTEMPTS = 10
 UMOUNT_RETRY_SECONDS = 0.5
 TRANSLOCATION_MARKER = "/AppTranslocation/"
@@ -149,7 +150,9 @@ class Relocation:
             for target in self.translocation_mounts():
                 for attempt in range(UMOUNT_ATTEMPTS):
                     result = self.runner(["umount", target], capture_output=True, text=True)
-                    if result.returncode == 0:
+                    # Released by macOS itself: umount then answers "not currently
+                    # mounted" (verify run 44012261707), and nothing is left to undo.
+                    if result.returncode == 0 or target not in self.translocation_mounts():
                         break
                     if attempt + 1 < UMOUNT_ATTEMPTS:
                         self.sleep(UMOUNT_RETRY_SECONDS)

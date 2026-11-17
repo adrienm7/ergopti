@@ -1455,6 +1455,8 @@ class FakeMounts:
         self.umount_status = umount_status
         # Per-attempt umount statuses, the last one repeated once exhausted.
         self.umount_statuses = list(umount_statuses or [])
+        # macOS removes the mount itself once umount was refused.
+        self.release_on_umount = False
         self.commands = []
 
     def __call__(self, arguments, **_):
@@ -1463,6 +1465,8 @@ class FakeMounts:
         status = 0
         if arguments[0] == "umount":
             status = self.umount_statuses.pop(0) if self.umount_statuses else self.umount_status
+            if self.release_on_umount:
+                self.listing = ""
         return subprocess.CompletedProcess(arguments, status, stdout, "busy" if status else "")
 
 
@@ -1617,6 +1621,25 @@ class RelocationTests(unittest.TestCase):
             moved.enter()
             moved.leave()
             self.assertEqual(waits, [relocation.UMOUNT_RETRY_SECONDS] * 2)
+            self.assertTrue(app.is_dir())
+
+    def test_translocation_released_by_macos_is_undone(self):
+        # Verify run 44012261707: umount refused, then macOS removed the mount itself.
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve()
+            app, home = self.installed(root), root / "home"
+            downloaded = home / "gitcfg/Downloads/ErgoptiPlus.app"
+            mounts = FakeMounts(
+                f"{downloaded} on /private/var/folders/T/AppTranslocation/1 (nullfs, local)\n",
+                umount_status=1,
+            )
+            moved = relocation.Relocation(
+                "translocated", app, home, runner=mounts, sleep=lambda _: None
+            )
+            moved.enter()
+            mounts.release_on_umount = True
+            moved.leave()
+            self.assertEqual(sum(1 for command in mounts.commands if command[0] == "umount"), 1)
             self.assertTrue(app.is_dir())
 
 
