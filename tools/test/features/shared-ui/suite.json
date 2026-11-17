@@ -536,7 +536,7 @@
 		},
 		{
 			"id": "site-keyboard-data",
-			"ordinal": 685,
+			"ordinal": 686,
 			"name": "site keyboard data is generated from the Ergopti layout source and its display patch cannot hide the source",
 			"cmd": "node",
 			"args": ["tools/test/test-site-keyboard-data.cjs"],
