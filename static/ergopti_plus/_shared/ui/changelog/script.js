@@ -60,8 +60,11 @@
  *    only and only when the shared offer rule offers it, an install that posts
  *    install_through_updater: the host hands the channel to that updater,
  *    which shows its own dialog. Older rows keep the warning. Windows and
- *    Linux seed nothing: their updaters verify only against the digest or the
- *    checksum asset that the API list names.
+ *    Linux seed nothing: the page posts install_release as for any row, and
+ *    their host installs the newest feed release itself once the downloaded
+ *    asset matches a detached signature of the pinned key, refusing older rows
+ *    (install_error_feed_not_newest) and every row while no key is provisioned
+ *    (install_error_no_details).
  * ==============================================================================
  */
 

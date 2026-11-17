@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "Nie udało się utworzyć kopii konfiguracji, więc nic nie zostało zainstalowane. Szczegóły są w dzisiejszym dzienniku.",
 	"changelog_window.install_error_busy": "Trwa już inna instalacja lub aktualizacja.",
 	"changelog_window.install_error_download": "Pobieranie {tag} nie powiodło się: nic nie zostało zainstalowane. Sprawdź połączenie i spróbuj ponownie.",
+	"changelog_window.install_error_feed_not_newest": "GitHub zwrócił tylko kanał wydań: z niego można zainstalować jedynie najnowszą wersję tego kanału, po sprawdzeniu jej podpisu. Spróbuj {tag} ponownie za kilka minut.",
+	"changelog_window.install_error_feed_signature": "GitHub zwrócił tylko kanał wydań i nie udało się zweryfikować podpisu {tag}: nic nie zostało zainstalowane. Spróbuj ponownie za kilka minut.",
 	"changelog_window.install_error_handoff": "Nie udało się połączyć z wbudowanym aktualizatorem: nic nie zostało zainstalowane. Szczegóły są w dzisiejszym dzienniku.",
 	"changelog_window.install_error_install": "Instalacja {tag} nie powiodła się. Szczegóły są w dzisiejszym dzienniku.",
 	"changelog_window.install_error_previous_backup": "Nadal istnieje wcześniejsza kopia aplikacji. Przed ponowną próbą przenieś ErgoptiPlus.app.previous znajdujący się obok aplikacji.",

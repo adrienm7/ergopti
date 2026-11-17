@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "تعذّر نسخ إعداداتك احتياطيًا، لذا لم يُثبَّت شيء. التفاصيل في سجل اليوم.",
 	"changelog_window.install_error_busy": "هناك تثبيت أو تحديث آخر قيد التشغيل بالفعل.",
 	"changelog_window.install_error_download": "فشل تنزيل {tag}: لم يُثبَّت شيء. تحقّق من اتصالك وأعد المحاولة.",
+	"changelog_window.install_error_feed_not_newest": "لم يُرجع GitHub سوى موجز الإصدارات: لا يمكن منه تثبيت إلا أحدث إصدار في هذه القناة، بعد التحقق من توقيعه. أعد محاولة {tag} بعد بضع دقائق.",
+	"changelog_window.install_error_feed_signature": "لم يُرجع GitHub سوى موجز الإصدارات، وتعذّر التحقق من توقيع {tag}: لم يُثبَّت أي شيء. أعد المحاولة بعد بضع دقائق.",
 	"changelog_window.install_error_handoff": "تعذّر الوصول إلى المحدّث المدمج: لم يُثبَّت أي شيء. التفاصيل في سجل اليوم.",
 	"changelog_window.install_error_install": "فشل تثبيت {tag}. التفاصيل في سجل اليوم.",
 	"changelog_window.install_error_previous_backup": "لا تزال نسخة احتياطية سابقة للتطبيق موجودة. انقل ErgoptiPlus.app.previous الموجود بجانب التطبيق قبل إعادة المحاولة.",

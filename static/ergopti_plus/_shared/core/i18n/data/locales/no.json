@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "Konfigurasjonen din kunne ikke sikkerhetskopieres, så ingenting ble installert. Detaljene står i dagens logg.",
 	"changelog_window.install_error_busy": "En annen installasjon eller oppdatering pågår allerede.",
 	"changelog_window.install_error_download": "Nedlastingen av {tag} mislyktes: ingenting ble installert. Kontroller tilkoblingen og prøv igjen.",
+	"changelog_window.install_error_feed_not_newest": "GitHub returnerte bare utgivelsesfeeden: herfra kan bare den nyeste versjonen av denne kanalen installeres, etter at signaturen er kontrollert. Prøv {tag} igjen om noen minutter.",
+	"changelog_window.install_error_feed_signature": "GitHub returnerte bare utgivelsesfeeden, og signaturen til {tag} kunne ikke bekreftes: ingenting ble installert. Prøv igjen om noen minutter.",
 	"changelog_window.install_error_handoff": "Den innebygde oppdatereren kunne ikke nås: ingenting ble installert. Detaljer finnes i dagens logg.",
 	"changelog_window.install_error_install": "Installasjonen av {tag} mislyktes. Detaljene står i dagens logg.",
 	"changelog_window.install_error_previous_backup": "En tidligere sikkerhetskopi finnes fortsatt. Flytt ErgoptiPlus.app.previous ut av appmappen før du prøver igjen.",

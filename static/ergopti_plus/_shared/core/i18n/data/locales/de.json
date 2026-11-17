@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "Ihre Konfiguration konnte nicht gesichert werden, daher wurde nichts installiert. Details stehen im heutigen Protokoll.",
 	"changelog_window.install_error_busy": "Eine andere Installation oder Aktualisierung läuft bereits.",
 	"changelog_window.install_error_download": "Das Herunterladen von {tag} ist fehlgeschlagen: Es wurde nichts installiert. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+	"changelog_window.install_error_feed_not_newest": "GitHub hat nur den Release-Feed geliefert: Daraus lässt sich nur die neueste Version dieses Kanals installieren, nachdem ihre Signatur geprüft wurde. Versuchen Sie {tag} in ein paar Minuten erneut.",
+	"changelog_window.install_error_feed_signature": "GitHub hat nur den Release-Feed geliefert, und die Signatur von {tag} konnte nicht geprüft werden: Es wurde nichts installiert. Versuchen Sie es in ein paar Minuten erneut.",
 	"changelog_window.install_error_handoff": "Der integrierte Updater war nicht erreichbar: Es wurde nichts installiert. Details stehen im heutigen Protokoll.",
 	"changelog_window.install_error_install": "Die Installation von {tag} ist fehlgeschlagen. Details stehen im heutigen Protokoll.",
 	"changelog_window.install_error_previous_backup": "Eine ältere App-Sicherung ist noch vorhanden. Verschiebe ErgoptiPlus.app.previous aus dem App-Ordner, bevor du es erneut versuchst.",

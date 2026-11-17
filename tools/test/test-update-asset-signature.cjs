@@ -72,6 +72,33 @@ check('every tampered record is refused with the valid signature', () => {
 	}
 });
 
+check('the feed-only install fixtures verify against their throwaway key', () => {
+	const feed = JSON.parse(
+		fs.readFileSync(
+			path.join(root, 'static/ergopti_plus/_shared/tests/corpus/updater/feed_install_vectors.json'),
+			'utf8'
+		)
+	);
+	for (const driver of ['windows', 'linux']) {
+		const entry = feed[driver];
+		assert.equal(Buffer.byteLength(entry.content, 'utf8'), entry.size, driver + ' size');
+		if (driver === 'windows') {
+			assert.equal(
+				crypto.createHash('sha256').update(entry.content, 'utf8').digest('hex'),
+				entry.sha256,
+				'the Windows fake asset is hashed for real'
+			);
+		}
+		const record = Tool.canonicalRecord(policy.record_header, entry.name, entry.size, entry.sha256);
+		assert.equal(
+			Tool.verifyRecord(feed.public_key_spki_base64, record, entry.signature_base64),
+			true,
+			driver
+		);
+		assert.notEqual(feed.public_key_spki_base64, policy.public_key_spki_base64);
+	}
+});
+
 check('a malformed or truncated signature is refused, not thrown', () => {
 	const valid = vectors.valid;
 	const record = Tool.canonicalRecord(policy.record_header, valid.name, valid.size, valid.sha256);

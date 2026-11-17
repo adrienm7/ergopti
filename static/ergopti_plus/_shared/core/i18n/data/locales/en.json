@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "Your configuration could not be backed up, so nothing was installed. The details are in today’s log.",
 	"changelog_window.install_error_busy": "Another installation or update is already running.",
 	"changelog_window.install_error_download": "Downloading {tag} failed: nothing was installed. Check your connection and try again.",
+	"changelog_window.install_error_feed_not_newest": "GitHub only returned the release feed: from it, only the newest version of this channel can be installed, once its signature is checked. Try {tag} again in a few minutes.",
+	"changelog_window.install_error_feed_signature": "GitHub only returned the release feed, and the signature of {tag} could not be verified: nothing was installed. Try again in a few minutes.",
 	"changelog_window.install_error_handoff": "The built-in updater could not be reached: nothing was installed. Details are in today’s log.",
 	"changelog_window.install_error_install": "Installing {tag} failed. The details are in today’s log.",
 	"changelog_window.install_error_previous_backup": "An earlier app backup still exists. Move ErgoptiPlus.app.previous out of the application folder before retrying.",

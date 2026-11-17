@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "आपके कॉन्फ़िगरेशन का बैकअप नहीं लिया जा सका, इसलिए कुछ भी इंस्टॉल नहीं हुआ। विवरण आज के लॉग में है।",
 	"changelog_window.install_error_busy": "एक अन्य इंस्टॉलेशन या अपडेट पहले से चल रहा है।",
 	"changelog_window.install_error_download": "{tag} डाउनलोड नहीं हो सका: कुछ भी इंस्टॉल नहीं हुआ। अपना कनेक्शन जाँचें और फिर से प्रयास करें।",
+	"changelog_window.install_error_feed_not_newest": "GitHub ने केवल रिलीज़ फ़ीड लौटाया: इससे इस चैनल का केवल सबसे नया संस्करण, उसके हस्ताक्षर की जाँच के बाद, इंस्टॉल किया जा सकता है। {tag} के लिए कुछ मिनट बाद फिर से कोशिश करें।",
+	"changelog_window.install_error_feed_signature": "GitHub ने केवल रिलीज़ फ़ीड लौटाया, और {tag} के हस्ताक्षर की पुष्टि नहीं हो सकी: कुछ भी इंस्टॉल नहीं हुआ। कुछ मिनट बाद फिर से कोशिश करें।",
 	"changelog_window.install_error_handoff": "अंतर्निहित अपडेटर तक नहीं पहुँचा जा सका: कुछ भी इंस्टॉल नहीं हुआ। विवरण आज के लॉग में है।",
 	"changelog_window.install_error_install": "{tag} इंस्टॉल नहीं हो सका। विवरण आज के लॉग में है।",
 	"changelog_window.install_error_previous_backup": "ऐप का पिछला बैकअप अभी भी मौजूद है। फिर प्रयास करने से पहले ऐप के बगल से ErgoptiPlus.app.previous को हटाकर दूसरी जगह रखें।",

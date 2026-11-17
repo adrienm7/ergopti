@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "Não foi possível guardar a sua configuração, por isso nada foi instalado. Os detalhes estão no registo de hoje.",
 	"changelog_window.install_error_busy": "Já está em curso outra instalação ou atualização.",
 	"changelog_window.install_error_download": "A transferência de {tag} falhou: nada foi instalado. Verifique a ligação e tente novamente.",
+	"changelog_window.install_error_feed_not_newest": "O GitHub só devolveu o feed de versões: a partir dele só é possível instalar a versão mais recente deste canal, depois de verificada a sua assinatura. Tente {tag} novamente dentro de alguns minutos.",
+	"changelog_window.install_error_feed_signature": "O GitHub só devolveu o feed de versões e não foi possível verificar a assinatura de {tag}: nada foi instalado. Tente novamente dentro de alguns minutos.",
 	"changelog_window.install_error_handoff": "Não foi possível contactar o atualizador integrado: nada foi instalado. Os detalhes estão no registo de hoje.",
 	"changelog_window.install_error_install": "A instalação de {tag} falhou. Os detalhes estão no registo de hoje.",
 	"changelog_window.install_error_previous_backup": "Ainda existe um backup anterior. Mova ErgoptiPlus.app.previous para fora da pasta do aplicativo antes de tentar novamente.",

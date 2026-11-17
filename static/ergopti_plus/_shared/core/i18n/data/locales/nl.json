@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "Uw configuratie kon niet worden geback-upt, dus er is niets geïnstalleerd. De details staan in het logboek van vandaag.",
 	"changelog_window.install_error_busy": "Er loopt al een andere installatie of update.",
 	"changelog_window.install_error_download": "Het downloaden van {tag} is mislukt: er is niets geïnstalleerd. Controleer uw verbinding en probeer het opnieuw.",
+	"changelog_window.install_error_feed_not_newest": "GitHub gaf alleen de releasefeed terug: daaruit kan alleen de nieuwste versie van dit kanaal worden geïnstalleerd, nadat de handtekening is gecontroleerd. Probeer {tag} over een paar minuten opnieuw.",
+	"changelog_window.install_error_feed_signature": "GitHub gaf alleen de releasefeed terug en de handtekening van {tag} kon niet worden geverifieerd: er is niets geïnstalleerd. Probeer het over een paar minuten opnieuw.",
 	"changelog_window.install_error_handoff": "De ingebouwde updater was niet bereikbaar: er is niets geïnstalleerd. Details staan in het logboek van vandaag.",
 	"changelog_window.install_error_install": "Het installeren van {tag} is mislukt. De details staan in het logboek van vandaag.",
 	"changelog_window.install_error_previous_backup": "Er bestaat nog een eerdere back-up. Verplaats ErgoptiPlus.app.previous uit de app-map voordat je opnieuw probeert.",

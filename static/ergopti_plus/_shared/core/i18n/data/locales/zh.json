@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "无法备份你的配置，因此没有安装任何内容。详细信息见今天的日志。",
 	"changelog_window.install_error_busy": "另一个安装或更新已在进行中。",
 	"changelog_window.install_error_download": "下载 {tag} 失败：未安装任何内容。请检查网络连接后重试。",
+	"changelog_window.install_error_feed_not_newest": "GitHub 只返回了版本订阅源：从中只能安装此频道的最新版本，并且要先验证其签名。请几分钟后再试 {tag}。",
+	"changelog_window.install_error_feed_signature": "GitHub 只返回了版本订阅源，且无法验证 {tag} 的签名：未安装任何内容。请几分钟后再试。",
 	"changelog_window.install_error_handoff": "无法连接内置更新程序：未安装任何内容。详细信息见今天的日志。",
 	"changelog_window.install_error_install": "安装 {tag} 失败。详细信息见今天的日志。",
 	"changelog_window.install_error_previous_backup": "仍存在旧的应用备份。请先移走应用旁边的 ErgoptiPlus.app.previous，然后重试。",

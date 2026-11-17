@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "Non è stato possibile salvare la configurazione, quindi non è stato installato nulla. I dettagli sono nel registro di oggi.",
 	"changelog_window.install_error_busy": "È già in corso un’altra installazione o un altro aggiornamento.",
 	"changelog_window.install_error_download": "Il download di {tag} non è riuscito: non è stato installato nulla. Controlla la connessione e riprova.",
+	"changelog_window.install_error_feed_not_newest": "GitHub ha restituito solo il feed delle versioni: da esso si può installare solo la versione più recente di questo canale, dopo averne verificato la firma. Riprova {tag} tra qualche minuto.",
+	"changelog_window.install_error_feed_signature": "GitHub ha restituito solo il feed delle versioni e non è stato possibile verificare la firma di {tag}: non è stato installato nulla. Riprova tra qualche minuto.",
 	"changelog_window.install_error_handoff": "Impossibile contattare il programma di aggiornamento integrato: non è stato installato nulla. I dettagli sono nel registro di oggi.",
 	"changelog_window.install_error_install": "L’installazione di {tag} non è riuscita. I dettagli sono nel registro di oggi.",
 	"changelog_window.install_error_previous_backup": "Esiste ancora un backup precedente. Sposta ErgoptiPlus.app.previous fuori dalla cartella dell’app prima di riprovare.",

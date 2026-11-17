@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "No se pudo hacer una copia de seguridad de su configuración, así que no se instaló nada. Los detalles están en el registro de hoy.",
 	"changelog_window.install_error_busy": "Ya hay otra instalación o actualización en curso.",
 	"changelog_window.install_error_download": "La descarga de {tag} falló: no se instaló nada. Compruebe su conexión e inténtelo de nuevo.",
+	"changelog_window.install_error_feed_not_newest": "GitHub solo devolvió el feed de versiones: desde él solo se puede instalar la versión más reciente de este canal, tras comprobar su firma. Vuelve a intentar {tag} dentro de unos minutos.",
+	"changelog_window.install_error_feed_signature": "GitHub solo devolvió el feed de versiones y no se pudo verificar la firma de {tag}: no se instaló nada. Vuelve a intentarlo dentro de unos minutos.",
 	"changelog_window.install_error_handoff": "No se pudo contactar con el actualizador integrado: no se instaló nada. Los detalles están en el registro de hoy.",
 	"changelog_window.install_error_install": "La instalación de {tag} falló. Los detalles están en el registro de hoy.",
 	"changelog_window.install_error_previous_backup": "Aún existe una copia anterior. Saca ErgoptiPlus.app.previous de la carpeta de la aplicación antes de reintentar.",

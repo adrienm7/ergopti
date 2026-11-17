@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "לא ניתן היה לגבות את התצורה שלכם, ולכן דבר לא הותקן. הפרטים ביומן של היום.",
 	"changelog_window.install_error_busy": "התקנה או עדכון אחרים כבר מתבצעים.",
 	"changelog_window.install_error_download": "הורדת {tag} נכשלה: דבר לא הותקן. בדקו את החיבור ונסו שוב.",
+	"changelog_window.install_error_feed_not_newest": "GitHub החזיר רק את פיד הגרסאות: ממנו אפשר להתקין רק את הגרסה החדשה ביותר של הערוץ הזה, אחרי בדיקת החתימה שלה. נסו שוב את {tag} בעוד כמה דקות.",
+	"changelog_window.install_error_feed_signature": "GitHub החזיר רק את פיד הגרסאות, ולא ניתן היה לאמת את החתימה של {tag}: שום דבר לא הותקן. נסו שוב בעוד כמה דקות.",
 	"changelog_window.install_error_handoff": "לא ניתן היה להגיע למעדכן המובנה: דבר לא הותקן. הפרטים ביומן של היום.",
 	"changelog_window.install_error_install": "התקנת {tag} נכשלה. הפרטים ביומן של היום.",
 	"changelog_window.install_error_previous_backup": "עדיין קיים גיבוי קודם של היישום. יש להעביר את ErgoptiPlus.app.previous שליד היישום לפני ניסיון נוסף.",

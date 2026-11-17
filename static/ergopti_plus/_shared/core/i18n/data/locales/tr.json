@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "Yapılandırmanız yedeklenemedi, bu yüzden hiçbir şey yüklenmedi. Ayrıntılar bugünkü günlükte.",
 	"changelog_window.install_error_busy": "Başka bir yükleme veya güncelleme zaten sürüyor.",
 	"changelog_window.install_error_download": "{tag} indirilemedi: hiçbir şey yüklenmedi. Bağlantınızı kontrol edip yeniden deneyin.",
+	"changelog_window.install_error_feed_not_newest": "GitHub yalnızca sürüm akışını döndürdü: buradan yalnızca bu kanalın en yeni sürümü, imzası doğrulandıktan sonra yüklenebilir. {tag} için birkaç dakika sonra yeniden deneyin.",
+	"changelog_window.install_error_feed_signature": "GitHub yalnızca sürüm akışını döndürdü ve {tag} imzası doğrulanamadı: hiçbir şey yüklenmedi. Birkaç dakika sonra yeniden deneyin.",
 	"changelog_window.install_error_handoff": "Yerleşik güncelleyiciye ulaşılamadı: hiçbir şey yüklenmedi. Ayrıntılar bugünün günlüğünde.",
 	"changelog_window.install_error_install": "{tag} yüklenemedi. Ayrıntılar bugünkü günlükte.",
 	"changelog_window.install_error_previous_backup": "Önceki uygulama yedeği hâlâ mevcut. Yeniden denemeden önce uygulamanın yanındaki ErgoptiPlus.app.previous dosyasını taşıyın.",

@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "Konfiguraci se nepodařilo zálohovat, proto nebylo nic nainstalováno. Podrobnosti jsou v dnešním protokolu.",
 	"changelog_window.install_error_busy": "Už probíhá jiná instalace nebo aktualizace.",
 	"changelog_window.install_error_download": "Stažení {tag} selhalo: nic nebylo nainstalováno. Zkontrolujte připojení a zkuste to znovu.",
+	"changelog_window.install_error_feed_not_newest": "GitHub vrátil jen kanál vydání: z něj lze nainstalovat pouze nejnovější verzi tohoto kanálu, a to po ověření jejího podpisu. Zkuste {tag} znovu za pár minut.",
+	"changelog_window.install_error_feed_signature": "GitHub vrátil jen kanál vydání a podpis {tag} se nepodařilo ověřit: nic nebylo nainstalováno. Zkuste to znovu za pár minut.",
 	"changelog_window.install_error_handoff": "Vestavěný aktualizátor nebyl dostupný: nic nebylo nainstalováno. Podrobnosti jsou v dnešním protokolu.",
 	"changelog_window.install_error_install": "Instalace {tag} selhala. Podrobnosti jsou v dnešním protokolu.",
 	"changelog_window.install_error_previous_backup": "Stále existuje starší záloha. Před dalším pokusem přesuňte ErgoptiPlus.app.previous ze složky aplikace.",

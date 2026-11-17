@@ -182,6 +182,8 @@
 	"changelog_window.install_error_backup": "Votre configuration n’a pas pu être sauvegardée : rien n’a été installé. Les détails sont dans le journal du jour.",
 	"changelog_window.install_error_busy": "Une autre installation ou mise à jour est déjà en cours.",
 	"changelog_window.install_error_download": "Le téléchargement de {tag} a échoué : rien n’a été installé. Vérifiez votre connexion et réessayez.",
+	"changelog_window.install_error_feed_not_newest": "GitHub n’a renvoyé que le flux des versions : seule la version la plus récente de ce canal peut s’installer depuis ce flux, après vérification de sa signature. Réessayez {tag} dans quelques minutes.",
+	"changelog_window.install_error_feed_signature": "GitHub n’a renvoyé que le flux des versions, et la signature de {tag} n’a pas pu être vérifiée : rien n’a été installé. Réessayez dans quelques minutes.",
 	"changelog_window.install_error_handoff": "Le programme de mise à jour intégré n’a pas pu être joint : rien n’a été installé. Les détails sont dans le journal du jour.",
 	"changelog_window.install_error_install": "L’installation de {tag} a échoué. Les détails sont dans le journal du jour.",
 	"changelog_window.install_error_previous_backup": "Une ancienne sauvegarde existe encore. Déplacez ErgoptiPlus.app.previous hors du dossier de l’application avant de réessayer.",
