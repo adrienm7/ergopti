@@ -261,7 +261,7 @@ field_mac_idle_cpu() {
 	# Without a driver the window still runs: the busiest processes of an
 	# idle Mac are evidence too.
 	[ -n "${pids// /}" ] || echo "no driver process: only the busiest processes are listed"
-	echo "quiet window of ${FIELD_IDLE_SECONDS} s; idle budget ${budget:-unknown} % (field_check_session.lua)"
+	echo "quiet window of ${FIELD_IDLE_SECONDS} s; idle budget ${budget:-unknown} % (diagnostics/engine/field_check/session.lua)"
 	for pid in ${pids}; do
 		eval "before_${pid}=$(field_cpu_seconds "$(ps -p "${pid}" -o time= 2>/dev/null | tr -d ' ')")"
 	done

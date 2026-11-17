@@ -574,7 +574,7 @@ check(
 				idle.some((item) => /idle window/.test(item.what)),
 				"the collector's quiet window"
 			);
-			assert.match(idle[0].detail, /field_check_session\.lua/, 'the declared idle budget');
+			assert.match(idle[0].detail, /field_check\/session\.lua/, 'the declared idle budget');
 			const markdown = fs.readFileSync(path.join(folder, 'analysis.md'), 'utf8');
 			assert.match(markdown, /^## Machine and instances$/m);
 			assert.match(markdown, /^## Slowest steps$/m);
