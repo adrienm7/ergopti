@@ -262,14 +262,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       [handoff](docs/tooling/next-release-handoff.md)). After the maintainer's WP9 pass (`owned_runtime_wp9` in
       TODO-tests-macos.md), delete the shared mode and set the three macOS `follow_up` rows of
       `_shared/core/network/data/owned_runtimes.json` to done. [BLOCKED] on that pass.
-- [ ] **Sign-in relay for the Swift-owned managed Ollama.** The design is written
-      ([proxy-auth-relay.md « macOS managed daemon »](docs/design/proxy-auth-relay.md#macos-managed-daemon-design-not-built)):
-      a Go `listen` command (bind `127.0.0.1:0`, one JSON line with port and token, serve until stdin EOF); the Swift
-      worker behind `SuspendedImageOwner` starts it as the daemon's sibling before resuming the daemon;
-      `managed_ollama_serve.py` runs `probe` before its bootstrap snapshot; Lua passes the `proxy_relay_receipt` path
-      so a refusal lands in the receipt the pull reads. Until then, behind a proxy that requires a Negotiate sign-in,
-      the managed daemon's pull fails while the stock start signs in. [CODE] Swift, Go, Python, Lua; the Swift tests
-      run only on the macOS lane.
 
 ### All drivers
 

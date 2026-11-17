@@ -161,6 +161,12 @@
 			"condition": "Rebuilt with tools/build/build-macos-managed-ollama.py, behind a PAC-only or explicit proxy with no direct route."
 		},
 		{
+			"id": "managed_ollama_proxy_relay",
+			"title": "Managed Ollama behind a Negotiate proxy",
+			"checks": [],
+			"not_testable": "Needs a corporate proxy that answers 407 with Negotiate and a Kerberos ticket: launchctl setenv HTTPS_PROXY http://<proxy>:<port>, restart Ergopti, pull a model with Ergopti's own Ollama, then repeat after kdestroy."
+		},
+		{
 			"id": "physical_shortcut_delivery",
 			"title": "Physical shortcut delivery",
 			"checks": [

@@ -105,7 +105,12 @@ package, the macOS application and the Windows bundle ship the relay;
 ## Security
 
 - Loopback bind and loopback peers only; per-run token; no listener outlives
-  the child it serves.
+  the child it serves (`run`) or its owner's stdin (`listen`).
+- `listen` prints its token only to the owner's private pipe. On macOS the token
+  then crosses the suspended image guardian's private stdout to the Python owner,
+  which seals it into the daemon's HMAC-authenticated bootstrap file (0600, in the
+  0700 session directory, removed at retirement), beside the session token that
+  file already depends on. No receipt, request field or log carries it.
 - Logs carry fixed event names and closed reasons only: never a header, token,
   challenge, URL, proxy host or authority. Callers never log the relay URL; it
   only reaches the child environment, as the proxy URL did before.
@@ -129,38 +134,54 @@ names the closed reason; only the pull is refused, with that reason's message.
   (`ai/engine/api/proxy_relay_receipt.lua`), read by the pull of a daemon Ergopti
   started; the user's own Ollama has its own network settings and is not refused.
   The Debug network check reports the same probe (`proxy_relay`). The Swift-owned
-  managed daemon (`managed_ollama_serve.py`) does not use the relay yet, so it has
-  no refusal to record; see "macOS managed daemon" below.
+  managed daemon asks the same probe for its captured route and runs the relay as
+  its sibling; see "macOS managed daemon" below. Both write the same receipt.
 - Windows: `ollama-runtime-launch.ps1` runs the same probe where the tunnel probe
   answers `windows_login`, and on `required` starts the daemon under `run`, the
   listener admitted only as the child of that exact relay from the admitted image.
   The receipt is the runtime's (`proxy_relay`); the live evidence is in
   [proxy-relay-testing.md](../tooling/proxy-relay-testing.md).
 
-## macOS managed daemon (design, not built)
+## macOS managed daemon
 
 `run` makes the relay the daemon's parent, which the managed path cannot accept:
 `SuspendedImageOwner` starts the exact verified image itself, suspended, and retires
 that one child. So the relay is the daemon's sibling, under the same owner.
 
-- **Who launches it.** The Swift worker behind `SuspendedImageOwner`, before it
-  resumes the daemon, so one owner ends both and a quit leaves neither behind. Python
-  stays out of the process tree; it only decides, as below.
-- **Go.** A new `listen` command beside `run`: bind `127.0.0.1:0`, print one JSON line
-  with the port and the per-run token, serve until stdin reaches EOF. The EOF is how
-  the relay dies with its owner, and `run` stays as it is for the other callers.
-- **Probe.** `managed_ollama_serve.py` asks the same `probe` once it has captured the
-  route and before it writes the bootstrap snapshot. `not_needed` changes nothing.
-  `required` marks the snapshot, and the worker replaces the relay route with the
-  local one from `listen`, never logging the token.
-- **Refusal.** Lua passes the path of `proxy_relay_receipt` to the serve owner as an
-  argument. A refused probe writes the closed reason there and captures a snapshot
-  with no relay, the same outcome as `start_without_proxy_after_refusal`. A refusal of
-  `listen` comes back to Python in the worker's result and ends in the same receipt,
-  so the pull reads one file whichever owner started the daemon.
-
-The relay inherits the launcher's bundle admission (`managed_bootstrap_launcher_available`
-for the shell path); the Swift side must resolve it beside the admitted launcher too.
+- **Inputs.** `modules/llm/ollama_server_command.lua` passes the serve owner the
+  receipt path (`proxy_relay_receipt`), the registry's CONNECT authority and the four
+  `proxy_relay_*` deadlines (`--proxy-relay-*`). Without them the start is refused by
+  name, as an incomplete install.
+- **Probe.** `managed_ollama_serve.py` asks `probe` once it has captured the route and
+  before it seals the bootstrap snapshot (`modules/llm/managed_ollama_proxy_relay.py`,
+  reading the probe line through `_shared/core/network/adapters/python_proxy_auth_relay.py`,
+  which the shared probe vectors pin to the Go and Lua readers). Only the plain http
+  proxy without credentials the snapshot selects for https is probed, with the relay
+  beside the admitted launcher; the startup clock bounds the probe. Another route,
+  `not_installed` (one WARNING) and `not_needed` keep the snapshot as captured.
+- **Who launches it.** On `required` the request to the suspended image guardian
+  (`OwnedSuspendedImageGuardian.swift`, `SuspendedImageProxyRelay.swift`) carries the
+  upstream and the deadlines; the guardian resolves `ergopti-proxy-relay` beside the
+  admitted launcher (regular, not group or world writable, signature valid), starts
+  `listen` with the daemon log capture as its stderr, and reads its line before it
+  prepares the daemon image. It answers `V1 RELAY <port> <token>` or
+  `V1 RELAY_REFUSED <reason>` before `IMAGE_READY`. Python stays out of the process
+  tree.
+- **Route.** When the guardian answers the image proof, the Python owner replaces the
+  snapshot's selected proxy with `http://ergopti:TOKEN@127.0.0.1:PORT` before it seals
+  the bootstrap file; the daemon's Go transport sends the token as Basic credentials.
+- **Refusal.** A refused probe writes the closed reason to the receipt and seals a
+  snapshot with no proxy at all, the same outcome as `start_without_proxy_after_refusal`.
+  A refused `listen` (`relay_listen_failed` for its exit 3, `relay_unavailable` for no
+  line, a foreign line or a missing relay) ends in the same receipt and the same
+  snapshot, so the pull reads one file whichever owner started the daemon.
+- **End.** Once the daemon retires, the guardian closes the relay's stdin, reaps it
+  (a kill after `proxy_relay_stop_grace_ms`) and reports `V1 RELAY_CLOSED <errno>`
+  before `RETIRED`; a guardian killed outright closes that stdin too. A non-zero
+  value is a cleanup failure of the native retirement.
+- **Logs.** The serve owner prints `Managed Ollama proxy sign-in relay: EVENT [WORD].`
+  lines, fixed words only; `adapters/managed_ollama_daemon.lua` logs them as they
+  arrive (WARNING for `not_installed` and `refused`).
 
 ## Packaging
 
