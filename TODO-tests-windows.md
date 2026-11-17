@@ -56,9 +56,9 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
       and Caps Lock+A types ←.
 - [ ] Native carriage of `shortcut_key`: a source with `keys.<code>.shortcut_key` exported to KLC and built into the
       DLL carries the shortcut VK; with the DLL installed, the shortcut sends that VK.
-- [ ] Layout DLL builder (MSVC): `amd64`, `x86` and `wow64` build by hand on the PC (MSVC 14.29.30133); `arm64`
-      waits for the ARM64 C++ tools (TODO.md « Maintainer decisions pending »); then a native 32-bit typing check of
-      the wow64 image.
+- [ ] Layout DLL package: install the CI-built `Ergopti_windows_layout.zip` on the PC (the MSVC builder stays strict
+      and needs the ARM64 C++ tools the PC lacks, decided 2026-11-17), then a native 32-bit typing check of the wow64
+      image.
 - [ ] Layout emulation row on Windows (2026-11-06): Tray > Layout > « Disposition à émuler » lists none, Ergopti,
       Ergopti➕ and the registry layouts; choosing one restarts the driver on it (the tick follows), « none » types
       the system layout, an uninstalled stored layout stays named.

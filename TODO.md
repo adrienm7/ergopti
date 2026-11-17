@@ -180,9 +180,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     ([shortcuts campaign](docs/audits/platform-parity/2026-11-11-shortcuts/report.md));
   - the configuration, lifecycle, notification and network adapters in depth
     ([adapters campaign](docs/audits/platform-parity/2026-11-11-adapters/report.md));
-  - make the Linux runner's notify-send sentinel count fatal (`tests/run.lua`) once the ~370 notices that still reach
-    the real notifier have a `ShellRunner._set_async_runner` seam
-    ([notifications campaign](docs/audits/platform-parity/2026-11-12-notifications/report.md));
   - TWD-2 (the typing-speed widget hides when the burst ends): a Linux fifth-level key placed on a Ctrl key is
     reported as Ctrl by the input hook and ends the burst; its real-keyboard look on each OS is not yet in the
     TODO-tests files;
@@ -361,17 +358,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       télécharger), faq; no « versions » page, its changelog stays in the app. The floating reference keyboard only
       shows on the `/ergopti` pages. The Studio icon (`static/img/logo/studio.svg`: a keycap and a pencil on the dark
       disc of the logos) is new. Approve or change.
-- [ ] **Windows layout DLL builder on a PC without the ARM64 C++ tools? (asked 2026-11-16)** The PC's Visual Studio
-      2019 Build Tools have the x64/x86 tools only; `build_windows_keyboard_layout.ps1` requires ARM64 too and refuses
-      before compiling. The three other images compile there (TODO-tests-windows.md, PC run 2026-11-16).
-      `docs/design/layout-windows-dll.md` wants all four images in every package (the installer copies the one of
-      the running Windows), so an x64-only package would break an ARM64 install. Kept meanwhile: four images or
-      nothing.
-  1. **(recommended) Keep the builder strict;** the release package stays CI-built (the Windows runner has ARM64),
-     and the PC checks install the CI artifact `Ergopti_windows_layout.zip`.
-  2. Add `-Builds amd64,x86,wow64` for a local check into a folder of its choosing, never packaged and never
-     written to `vendor/keyboard_layout`.
-  3. Install the « MSVC ARM64 build tools » component on the PC (administrator, Visual Studio Installer).
 - [ ] **Open questions of the 2026-11-15 hand-off.** The identity gate's false positive on every PDF's root trailer
       key in containers whose home is the root account's (left unchanged); the casing of BEO, INTS, UCIEA, AHEI,
       MTGAP-T and CTGAP 3 (the agent's spelling kept); the dead-key marker style (`key-legend-dead`: accent colour

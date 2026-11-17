@@ -5,6 +5,17 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Windows layout DLLs come from CI and the website (2026-11-17)
+
+Decided by the maintainer on 2026-11-17 (asked 2026-11-16): the layout DLLs must
+be buildable from CI and from the website, which use the compiler-free
+`kbd-dll` generator (`tools/kbd-dll.cjs`, x86/x64/ARM64/WOW64 images). The MSVC
+builder `build_windows_keyboard_layout.ps1` stays strict: it requires the four
+toolsets and refuses before compiling when one is missing, so a package never
+lacks the ARM64 image the installer may copy. A PC without the ARM64 C++ tools
+checks the CI-built package (`Ergopti_windows_layout.zip`) rather than adding a
+partial local build.
+
 ## Hotstring short entry forms load everywhere (2026-11-12)
 
 Decided by the maintainer on 2026-11-12 (HSE-002): a bare-key entry
