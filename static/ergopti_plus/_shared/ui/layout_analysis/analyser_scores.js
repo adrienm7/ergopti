@@ -32,6 +32,26 @@
 var LAYOUT_ANALYSER_SCORES = (function () {
 	'use strict';
 
+	// The built-ins as locals. The Node tests run the scorers in a vm context,
+	// where each read of a global goes through the context's interceptor,
+	// about a thousand times slower than a local one; the scorers' loops read
+	// Math, Number and the typed arrays millions of times.
+	const {
+		Array,
+		Boolean,
+		Error,
+		Float64Array,
+		Int32Array,
+		Map,
+		Math,
+		Number,
+		Object,
+		Set,
+		String,
+		Uint8Array,
+		WeakMap
+	} = globalThis;
+
 	// ============================
 	// ======= 1/ Constants =======
 	// ============================
@@ -1779,7 +1799,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const unbalancing = (a, b) =>
 			a.hand === b.hand && !a.thumb && !b.thumb ? Math.abs(a.ux - b.ux) + Math.abs(a.uy - b.uy) : 0;
 		// The three bigram costs of each pair of keys, computed once.
-		const pairs = new Float64Array(size * size * 4).fill(NaN);
+		const pairs = new Float64Array(size * size * 4).fill(Number.NaN);
 		const costs = (a, b) => {
 			const at = (a.index * size + b.index) * 4;
 			if (Number.isNaN(pairs[at])) {
