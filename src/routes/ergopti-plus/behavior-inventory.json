@@ -187,7 +187,7 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "2109d8d065441e32601ff7a02309dacf66b5d89f0949f25a259c4c075c2e9ddf"
+					"sha256": "74e7e5dead3f9c7bc59d880248431be94af9349f64910bc5074697ac3a630662"
 				}
 			],
 			"macos": [
@@ -242,7 +242,7 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "2109d8d065441e32601ff7a02309dacf66b5d89f0949f25a259c4c075c2e9ddf"
+					"sha256": "74e7e5dead3f9c7bc59d880248431be94af9349f64910bc5074697ac3a630662"
 				}
 			],
 			"macos": [
@@ -289,7 +289,7 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "2109d8d065441e32601ff7a02309dacf66b5d89f0949f25a259c4c075c2e9ddf"
+					"sha256": "74e7e5dead3f9c7bc59d880248431be94af9349f64910bc5074697ac3a630662"
 				}
 			],
 			"macos": [
@@ -336,7 +336,7 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_Press(Sc, Shift, Caps, Option)",
-					"sha256": "2109d8d065441e32601ff7a02309dacf66b5d89f0949f25a259c4c075c2e9ddf"
+					"sha256": "74e7e5dead3f9c7bc59d880248431be94af9349f64910bc5074697ac3a630662"
 				}
 			],
 			"macos": [
