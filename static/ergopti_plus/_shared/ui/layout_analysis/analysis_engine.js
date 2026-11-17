@@ -116,6 +116,8 @@ var LAYOUT_ANALYSIS = (function () {
 	const MAX_WAYS = 4;
 	// Separates two tokens in a map key (no layout types this control character).
 	const TOKEN_SEP = '\u0001';
+	// The largest stamp a Uint32Array holds: a stamp counter starts over below it.
+	const UINT32_LAST = 0xffffffff;
 	// How many times over the key stream may count a table's whole total (a
 	// character's keys, both keys of a pair): its sums must stay exact.
 	const WHOLE_SUM_MARGIN = 64;
@@ -2263,16 +2265,21 @@ var LAYOUT_ANALYSIS = (function () {
 	 * walks only the tokens, pairs and triples whose ways, choice or shares
 	 * of ways changed ('context'). A trial that changes the chords or the
 	 * multi-way tokens walks the whole stream again ('whole'), still through
-	 * the same visitor, so its total stays exact.
+	 * the same visitor, so its total stays exact. The plan is made on ids
+	 * and typed arrays (planContext) into the buffers of the plan before the
+	 * current one, so a trial allocates almost nothing: only the last trial's
+	 * plan is whole, and committing an earlier trial scores its layout again.
 	 * @param {object} layoutInput - The current layout (library shape).
 	 * @param {object} ngrams - Counts or prepareNgrams() output.
 	 * @param {object} [options] - As analyse() (keyGroups aside).
 	 * @returns {{total: number, trial: function(object): {total: number,
 	 *   changed: number, walk: string, compile: string, compiled: object,
-	 *   commit: function(): void}}} total is the current layout's score; trial
-	 *   scores another layout on the same board without changing the session
-	 *   (compile: 'incremental', 'whole' or 'none'; compiled: its compileWays()
-	 *   result), and its commit makes that layout the current one.
+	 *   typing: function(): object, commit: function(): void}}} total is the
+	 *   current layout's score; trial scores another layout on the same board
+	 *   without changing the session (compile: 'incremental', 'whole' or
+	 *   'none'; compiled: its compileWays() result; typing: its plan's report,
+	 *   analyse()'s typing paths and chords, readable until the next trial),
+	 *   and its commit makes that layout the current one.
 	 * @throws {Error} When a trial's layout is measured on another board.
 	 */
 	function scoreSession(layoutInput, ngrams, options) {
@@ -2468,10 +2475,15 @@ var LAYOUT_ANALYSIS = (function () {
 			return out;
 		}
 
+		// Trials made so far: only the last one's plan is whole until the next trial.
+		let trials = 0;
+
 		function trial(layoutInput) {
 			const layout = layoutFromRows(layoutInput);
 			if (boardFor(layout, keyboardId, opts.profile) !== board)
 				throw new Error('layout_analysis: a score session keeps the board it started on');
+			trials += 1;
+			const serial = trials;
 			// Compiled from the current layout: only the ways the changed cells and rules reach.
 			const nextCore = compileCoreFrom(state.core, layout, board);
 			const nextCompiled =
@@ -2528,8 +2540,19 @@ var LAYOUT_ANALYSIS = (function () {
 				// How the layout was compiled: not at all (the same ways), in part, or whole.
 				compile: nextCore === state.core ? 'none' : nextCore.whole ? 'whole' : 'incremental',
 				compiled: nextCompiled,
+				/** The plan's report (analyse()'s typing paths and chords), before the next trial. */
+				typing() {
+					if (serial !== trials)
+						throw new Error("layout_analysis: a later trial replaced this trial's plan");
+					return typingReport(board, nextPlan);
+				},
 				commit() {
-					adoptPlan(nextPlan);
+					// A later trial wrote its plan over this one's (planContext's
+					// spare buffers): this layout is scored again, then kept.
+					if (serial !== trials) {
+						trial(layoutInput).commit();
+						return;
+					}
 					state = {
 						layout,
 						core: nextCore,
@@ -2617,54 +2640,79 @@ var LAYOUT_ANALYSIS = (function () {
 			delta.keyCount.fill(0);
 			const visit = deltaVisitor;
 			const { dirty, picks, leftKeys, rightKeys, tokens } = plan.changed;
-			const index = contextIndex(plan.table, plan.parts, plan.multi);
-			const { restBi, restTri } = plan.parts;
-			const marks = entryMarks(plan.table, plan.parts);
-			stamp += 1;
-			const once = (list, i) => {
-				if (list[i] === stamp) return false;
-				list[i] = stamp;
-				return true;
+			const was = old.ctx;
+			const now = plan.ctx;
+			const m = now.model;
+			const t = m.t;
+			// One stamp per entry of the partition: each entry is walked once.
+			m.walkStamp = m.walkStamp === UINT32_LAST ? 1 : m.walkStamp + 1;
+			if (m.walkStamp === 1)
+				for (const list of [m.walkUni, m.walkRestBi, m.walkRestTri, m.walkBi, m.walkTri])
+					list.fill(0);
+			const mark = m.walkStamp;
+			const { uniAt, restBiOf, restTriOf, biOf, byFirst, byLast, pairBi } = m;
+			const token = (u) => {
+				for (let k = uniAt.start[u]; k < uniAt.start[u + 1]; k++) {
+					const i = uniAt.items[k];
+					if (m.walkUni[i] === mark) continue;
+					m.walkUni[i] = mark;
+					walkTypedToken(board, was, u, t.uniN[i], -1, visit);
+					walkTypedToken(board, now, u, t.uniN[i], 1, visit);
+				}
 			};
-			for (const token of new Set([...dirty, ...tokens]))
-				for (const i of index.uniAt.get(token) || []) {
-					if (!once(marks.uni, i)) continue;
-					const [t, n] = plan.table.uni[i];
-					walkTypedToken(board, old, t, n, -1, visit);
-					walkTypedToken(board, plan, t, n, 1, visit);
+			for (let j = 0; j < dirty.size; j++) token(dirty.list[j]);
+			for (let j = 0; j < tokens.size; j++) token(tokens.list[j]);
+			const best = (st, u) => (st.wl[u] ? st.wl[u][0] : undefined);
+			for (let j = 0; j < dirty.size; j++) {
+				const u = dirty.list[j];
+				for (let k = restBiOf.start[u]; k < restBiOf.start[u + 1]; k++) {
+					const r = restBiOf.items[k];
+					if (m.walkRestBi[r] === mark) continue;
+					m.walkRestBi[r] = mark;
+					const i = m.restBiAt[r];
+					const [a, b, n] = [t.biA[i], t.biB[i], t.biN[i]];
+					walkPair(best(was, a), best(was, b), -n, visit);
+					walkPair(best(now, a), best(now, b), n, visit);
 				}
-			for (const token of dirty) {
-				for (const i of index.restBiOf.get(token) || []) {
-					if (!once(marks.restBi, i)) continue;
-					const [a, b, n] = restBi[i];
-					walkPair(old.best.get(a), old.best.get(b), -n, visit);
-					walkPair(plan.best.get(a), plan.best.get(b), n, visit);
-				}
-				for (const i of index.restTriOf.get(token) || []) {
-					if (!once(marks.restTri, i)) continue;
-					const [a, b, d, n] = restTri[i];
-					walkTriple(old.best.get(a), old.best.get(b), old.best.get(d), -n, visit);
-					walkTriple(plan.best.get(a), plan.best.get(b), plan.best.get(d), n, visit);
+				for (let k = restTriOf.start[u]; k < restTriOf.start[u + 1]; k++) {
+					const r = restTriOf.items[k];
+					if (m.walkRestTri[r] === mark) continue;
+					m.walkRestTri[r] = mark;
+					const i = m.restTriAt[r];
+					const [a, b, d, n] = [t.triA[i], t.triB[i], t.triC[i], t.triN[i]];
+					walkTriple(best(was, a), best(was, b), best(was, d), -n, visit);
+					walkTriple(best(now, a), best(now, b), best(now, d), n, visit);
 				}
 			}
 			const pair = (i) => {
-				if (i === undefined || !once(marks.touchBi, i)) return;
-				walkTypedPair(old, i, -1, visit);
-				walkTypedPair(plan, i, 1, visit);
+				if (i < 0 || m.walkBi[i] === mark) return;
+				m.walkBi[i] = mark;
+				walkTypedPair(was, i, -1, visit);
+				walkTypedPair(now, i, 1, visit);
 			};
 			const triple = (i) => {
-				if (!once(marks.touchTri, i)) return;
-				walkTypedTriple(old, i, -1, visit);
-				walkTypedTriple(plan, i, 1, visit);
+				if (m.walkTri[i] === mark) return;
+				m.walkTri[i] = mark;
+				walkTypedTriple(was, i, -1, visit);
+				walkTypedTriple(now, i, 1, visit);
 			};
-			for (const token of dirty) for (const i of index.biOf.get(token) || []) pair(i);
-			for (const key of leftKeys) pair(index.biAt.get(key));
-			for (const key of rightKeys) pair(index.biAt.get(key));
-			for (const i of picks) triple(i);
+			for (let j = 0; j < dirty.size; j++) {
+				const u = dirty.list[j];
+				for (let k = biOf.start[u]; k < biOf.start[u + 1]; k++) pair(biOf.items[k]);
+			}
+			for (let j = 0; j < leftKeys.size; j++) pair(pairBi[leftKeys.list[j]]);
+			for (let j = 0; j < rightKeys.size; j++) pair(pairBi[rightKeys.list[j]]);
+			for (let j = 0; j < picks.size; j++) triple(picks.list[j]);
 			// A triple reads the shares of its first pair (its first token's ways)
 			// and of its last pair (its last token's).
-			for (const key of leftKeys) for (const i of index.byFirst.get(key) || []) triple(i);
-			for (const key of rightKeys) for (const i of index.byLast.get(key) || []) triple(i);
+			for (let j = 0; j < leftKeys.size; j++) {
+				const p = leftKeys.list[j];
+				for (let k = byFirst.start[p]; k < byFirst.start[p + 1]; k++) triple(byFirst.items[k]);
+			}
+			for (let j = 0; j < rightKeys.size; j++) {
+				const p = rightKeys.list[j];
+				for (let k = byLast.start[p]; k < byLast.start[p + 1]; k++) triple(byLast.items[k]);
+			}
 			const nextC = Object.assign({}, state.c);
 			for (const name of names) nextC[name] += delta.c[name];
 			const nextCounts = state.counts.slice();
@@ -2680,22 +2728,6 @@ var LAYOUT_ANALYSIS = (function () {
 			},
 			trial
 		};
-	}
-
-	const entryMarkCache = new WeakMap();
-
-	/** One stamp per entry of a plan's partition, for a walk that visits each entry once. */
-	function entryMarks(table, parts) {
-		if (entryMarkCache.has(parts)) return entryMarkCache.get(parts);
-		const marks = {
-			uni: new Uint32Array(table.uni.length),
-			restBi: new Uint32Array(parts.restBi.length),
-			restTri: new Uint32Array(parts.restTri.length),
-			touchBi: new Uint32Array(parts.touchBi.length),
-			touchTri: new Uint32Array(parts.touchTri.length)
-		};
-		entryMarkCache.set(parts, marks);
-		return marks;
 	}
 
 	/**
@@ -3979,51 +4011,11 @@ var LAYOUT_ANALYSIS = (function () {
 			chords: []
 		};
 		if (fixed) return plan;
-		const charMaps = ngramMaps(charTable);
-		const base = typingCosts(board);
-		const w = base.w;
-		const nc = charTable.totalChars;
-		const rb = charMaps.bigrams > 0 ? nc / charMaps.bigrams : 0;
-		const rt = charMaps.trigrams > 0 ? nc / charMaps.trigrams : 0;
-		const pair = (k1, k2) => base.pair[k1 * base.n + k2] * rb;
-		const tri = (k1, k2, k3) => {
-			const at = (k1 * base.n + k2) * base.n + k3;
-			let points = base.triple[at];
-			if (Number.isNaN(points)) points = base.triple[at] = trigramPoints(board, w, k1, k2, k3);
-			return 100 * rt * points;
-		};
-		const first = (way) => way.keys[0];
-		const last = (way) => way.keys[way.keys.length - 1];
+		const pc = planCosts(board, charTable);
 		const unitMemo = new Map();
-		// A way's own cost: its presses (held modifiers included), the pairs
-		// and triples inside it, and the per-character metrics it adds to.
 		const unit = (way) => {
 			let cost = unitMemo.get(way);
-			if (cost !== undefined) return cost;
-			const keys = way.keys;
-			const width = way.width || 1;
-			cost = 0;
-			for (const k of keys) cost += base.press[k];
-			if (way.shift > 0) cost += way.shift * base.press[shiftKeyFor(board, last(way))];
-			if (way.altgr > 0) cost += way.altgr * base.press[board.modifiers.altgr];
-			for (let i = 0; i + 1 < keys.length; i++) cost += pair(keys[i], keys[i + 1]);
-			for (let i = 0; i + 2 < keys.length; i++) cost += tri(keys[i], keys[i + 1], keys[i + 2]);
-			if (way.shift + way.altgr > 0) cost += 100 * w.modifier_usage * width;
-			if (way.dead) cost += 100 * w.dead_key_usage * width;
-			unitMemo.set(way, cost);
-			return cost;
-		};
-		// The key pair and triples that start in way a and end in way b
-		// (walkKeyStream's bigram step).
-		const cross = (a, b) => {
-			const ka = a.keys;
-			const kb = b.keys;
-			const la = ka.length;
-			const length = la + kb.length;
-			const at = (j) => (j < la ? ka[j] : kb[j - la]);
-			let cost = pair(ka[la - 1], kb[0]);
-			for (let i = Math.max(0, la - 2); i < la; i++)
-				if (i + 2 < length) cost += tri(at(i), at(i + 1), at(i + 2));
+			if (cost === undefined) unitMemo.set(way, (cost = unitCost(pc, way)));
 			return cost;
 		};
 
@@ -4032,11 +4024,11 @@ var LAYOUT_ANALYSIS = (function () {
 		for (const [text, list] of compiled.texts) {
 			const parts = textPoints(text);
 			if (parts.length !== 2 || parts[0] === parts[1]) continue;
-			const n = charMaps.bi.get(parts[0] + TOKEN_SEP + parts[1]);
+			const n = pc.maps.bi.get(parts[0] + TOKEN_SEP + parts[1]);
 			if (!n) continue;
 			const a = compiled.ways.get(parts[0]);
 			const b = compiled.ways.get(parts[1]);
-			const taps = a && b ? unit(a[0]) + unit(b[0]) + cross(a[0], b[0]) : INFINITY;
+			const taps = a && b ? unit(a[0]) + unit(b[0]) + crossCost(pc, a[0], b[0]) : INFINITY;
 			const chord = unit(list[0]);
 			if (chord < taps)
 				candidates.push({
@@ -4089,383 +4081,894 @@ var LAYOUT_ANALYSIS = (function () {
 		}
 		const { ways, multi } = plan;
 
-		// 2. Context.
+		// 2. Context (planContext, on token ids).
 		for (const [token] of table.uni) {
 			const list = ways.get(token);
 			if (list && list.length > 1) multi.add(token);
 		}
 		if (multi.size === 0) return plan;
-		const maps = ngramMaps(table);
-		// Multi-way tokens are rare: the passes below read only the n-grams
-		// that hold one, and the walk takes the others the fast way.
+		// Multi-way tokens are rare: the passes read only the n-grams that hold
+		// one, and the walk takes the others the fast way.
 		const parts = partition(table, multi);
 		plan.parts = parts;
-		const index = contextIndex(table, parts, multi);
+		const model = contextModel(table, parts, multi);
 		// From a previous plan on the same tokens and multi-way set (a search's
 		// last layout), only what a token whose ways changed can reach is
-		// decided again; everything is computed by the same code, in the same
-		// order, as from nothing, so the plan is the same to the last bit.
+		// decided again, by the same code as from nothing: the plan is the
+		// same to the last bit.
 		const prev =
-			previous && previous.parts === parts && previous.table === table && previous.pickAt
-				? previous
+			previous &&
+			previous.parts === parts &&
+			previous.table === table &&
+			previous.ctx &&
+			previous.ctx.pc.board === board
+				? previous.ctx
 				: null;
-		const dirty = new Set();
-		if (prev)
-			for (const [token] of table.uni)
-				if (!sameWays(prev.ways.get(token), ways.get(token))) dirty.add(token);
-		// The last key of the token two places before a multi-way token, and the
-		// first key of the one two places after, with their counts.
-		const before = prev ? new Map(prev.before) : new Map();
-		const after = prev ? new Map(prev.after) : new Map();
-		const tally = (map, key, k, n) => {
-			const counts = map.get(key) || map.set(key, new Map()).get(key);
-			counts.set(k, (counts.get(k) || 0) + n);
+		const st = planContext(model, pc, ways, prev);
+		plan.ctx = st;
+		if (prev) plan.changed = model.changed;
+		plan.choose = (a, b, c) => {
+			const id = (token) => {
+				if (token === null) return -1;
+				const u = model.idOf.get(token);
+				if (u === undefined)
+					throw new Error(`layout_analysis: ${JSON.stringify(token)} is not a token of the plan`);
+				return st.wl[u] ? u : -1;
+			};
+			const ai = id(a);
+			const bi = id(b);
+			const ci = id(c);
+			const pair = (x, y) => {
+				const p = x < 0 ? undefined : model.pairOf.get(x * model.T + y);
+				return p === undefined ? -1 : p;
+			};
+			return chooseWay(st, ai, bi, ci, pair(ai, bi), ci < 0 ? -1 : pair(bi, ci));
 		};
-		// One trigram entry's part of before (side 'B'), after ('A') or both.
-		const tallyEntry = (i, side) => {
-			const [x, y, z, n] = parts.touchTri[i];
-			if (!multi.has(z) && !multi.has(x)) return;
-			const wx = ways.get(x);
-			const wy = ways.get(y);
-			const wz = ways.get(z);
-			if (!wx || !wy || !wz || wy[0].keys.length !== 1) return;
-			if (side !== 'A' && multi.has(z)) tally(before, y + TOKEN_SEP + z, last(wx[0]), n);
-			if (side !== 'B' && multi.has(x)) tally(after, x + TOKEN_SEP + y, first(wz[0]), n);
-		};
-		// The entries that hold a token whose ways changed, and the before and
-		// after keys they feed: those keys are tallied again, in table order.
-		const touched = new Set();
-		const dirtyBefore = new Set();
-		const dirtyAfter = new Set();
-		if (prev) {
-			for (const token of dirty) for (const i of index.triOf.get(token) || []) touched.add(i);
-			for (const i of touched) {
-				const [x, y, z] = parts.touchTri[i];
-				if (multi.has(z)) dirtyBefore.add(y + TOKEN_SEP + z);
-				if (multi.has(x)) dirtyAfter.add(x + TOKEN_SEP + y);
-			}
-			for (const key of dirtyBefore) {
-				before.delete(key);
-				for (const i of index.byLast.get(key) || []) tallyEntry(i, 'B');
-			}
-			for (const key of dirtyAfter) {
-				after.delete(key);
-				for (const i of index.byFirst.get(key) || []) tallyEntry(i, 'A');
-			}
-		} else for (let i = 0; i < parts.touchTri.length; i++) tallyEntry(i, null);
-		plan.before = before;
-		plan.after = after;
-		// Each way's own cost, and per pair its cost beside the token before it
-		// (the key pair and triples across, and the skipgrams with the token
-		// before that, per occurrence of the pair) or after it: every term of
-		// the choice but the triple across both neighbours, computed once.
-		const unitMemo2 = new Map();
-		const units = (b) => {
-			let out = unitMemo2.get(b);
-			if (!out) unitMemo2.set(b, (out = Float64Array.from(ways.get(b), unit)));
-			return out;
-		};
-		const sideMemo = new Map();
-		const leftCosts = (a, b) => {
-			const key = a + TOKEN_SEP + b;
-			let out = sideMemo.get('L' + key);
-			if (out) return out;
-			const list = ways.get(b);
-			const wa = ways.get(a)[0];
-			const counts = wa.keys.length === 1 ? before.get(key) : undefined;
-			const total = maps.bi.get(key);
-			out = Float64Array.from(list, (way) => {
-				let cost = cross(wa, way);
-				if (counts && total > 0) {
-					let sum = 0;
-					for (const [k, n] of counts) sum += n * tri(k, wa.keys[0], first(way));
-					cost += sum / total;
-				}
-				return cost;
-			});
-			sideMemo.set('L' + key, out);
-			return out;
-		};
-		const rightCosts = (b, c) => {
-			const key = b + TOKEN_SEP + c;
-			let out = sideMemo.get('R' + key);
-			if (out) return out;
-			const list = ways.get(b);
-			const wc = ways.get(c)[0];
-			const counts = wc.keys.length === 1 ? after.get(key) : undefined;
-			const total = maps.bi.get(key);
-			out = Float64Array.from(list, (way) => {
-				let cost = cross(way, wc);
-				if (counts && total > 0) {
-					let sum = 0;
-					for (const [k, n] of counts) sum += n * tri(last(way), wc.keys[0], k);
-					cost += sum / total;
-				}
-				return cost;
-			});
-			sideMemo.set('R' + key, out);
-			return out;
-		};
-		const choose = (a, b, c) => {
-			const list = ways.get(b);
-			const own = units(b);
-			const left = a === null ? null : leftCosts(a, b);
-			const right = c === null ? null : rightCosts(b, c);
-			const wa = a === null ? null : ways.get(a)[0];
-			const wc = c === null ? null : ways.get(c)[0];
-			let pick = 0;
-			let lowest = INFINITY;
-			for (let i = 0; i < list.length; i++) {
-				let cost = own[i];
-				if (left) cost += left[i];
-				if (right) cost += right[i];
-				if (wa && wc && list[i].keys.length === 1)
-					cost += tri(last(wa), list[i].keys[0], first(wc));
-				// A tie (within rounding) keeps the earlier, cheaper-alone way.
-				if (i === 0 || cost < lowest - 1e-9 * Math.max(1, Math.abs(lowest))) {
-					lowest = cost;
-					pick = i;
-				}
-			}
-			return pick;
-		};
-		plan.choose = choose;
+		return plan;
+	}
 
-		// 3. How often each way is used: for every occurrence of a multi-way
-		// token, its context is the trigram it is the middle of; at a segment
-		// edge, the bigram it ends or starts; alone, nothing. leftDist holds the
-		// ways of a in the pairs a b, rightDist those of b in the pairs a b;
-		// pickAt the way of the middle token of each touchTri entry (-1 when the
-		// middle has one way); edges the way and count of a multi-way token at
-		// the edge of each touchBi entry (way -1: none), on its right ('R', the
-		// second token) and left ('L', the first) side.
-		const known = (token) => (ways.has(token) ? token : null);
-		const sum = (v) => v.reduce((s, x) => s + x, 0);
-		const size = parts.touchBi.length;
-		const pickAt = prev ? prev.pickAt.slice() : new Int32Array(parts.touchTri.length).fill(-1);
-		const edges = prev
-			? {
-					R: prev.edges.R.slice(),
-					RN: prev.edges.RN.slice(),
-					L: prev.edges.L.slice(),
-					LN: prev.edges.LN.slice()
-				}
-			: {
-					R: new Int32Array(size).fill(-1),
-					RN: new Float64Array(size),
-					L: new Int32Array(size).fill(-1),
-					LN: new Float64Array(size)
-				};
-		const pickEntry = (i) => {
-			const [a, b, c] = parts.touchTri[i];
-			pickAt[i] = multi.has(b) ? choose(known(a), b, known(c)) : -1;
+	/**
+	 * What the context choice reads of a board and a character table: the
+	 * typingCosts of the board, the pair and triple factors (N / B, N / T) of
+	 * the table, and its n-gram maps.
+	 */
+	function planCosts(board, charTable) {
+		const base = typingCosts(board);
+		const maps = ngramMaps(charTable);
+		const nc = charTable.totalChars;
+		const rb = maps.bigrams > 0 ? nc / maps.bigrams : 0;
+		const rt = maps.trigrams > 0 ? nc / maps.trigrams : 0;
+		return {
+			board,
+			w: base.w,
+			n: base.n,
+			press: base.press,
+			pair: base.pair,
+			triple: base.triple,
+			rb,
+			// 100 × N / T, the factor of a key triple's points.
+			rt100: 100 * rt,
+			maps
 		};
-		// A pick reads its pair's before tally and its pair's after tally.
-		const repick = new Set(touched);
-		for (const key of dirtyBefore) for (const i of index.byFirst.get(key) || []) repick.add(i);
-		for (const key of dirtyAfter) for (const i of index.byLast.get(key) || []) repick.add(i);
-		// The entries whose middle is typed otherwise, or whose tokens' ways changed.
-		const moved = new Set(touched);
-		if (prev)
-			for (const i of repick) {
+	}
+
+	/** One key pair's cost in a plan (planCosts). */
+	function wayPair(pc, k1, k2) {
+		return pc.pair[k1 * pc.n + k2] * pc.rb;
+	}
+
+	/** One key triple's cost in a plan, its points worked out the first time. */
+	function wayTriple(pc, k1, k2, k3) {
+		const at = (k1 * pc.n + k2) * pc.n + k3;
+		let points = pc.triple[at];
+		if (points !== points) points = pc.triple[at] = trigramPoints(pc.board, pc.w, k1, k2, k3);
+		return pc.rt100 * points;
+	}
+
+	/**
+	 * A way's own cost: its presses (held modifiers included), the pairs and
+	 * triples inside it, and the per-character metrics it adds to.
+	 */
+	function unitCost(pc, way) {
+		const keys = way.keys;
+		const width = way.width || 1;
+		let cost = 0;
+		for (const k of keys) cost += pc.press[k];
+		if (way.shift > 0) cost += way.shift * pc.press[shiftKeyFor(pc.board, keys[keys.length - 1])];
+		if (way.altgr > 0) cost += way.altgr * pc.press[pc.board.modifiers.altgr];
+		for (let i = 0; i + 1 < keys.length; i++) cost += wayPair(pc, keys[i], keys[i + 1]);
+		for (let i = 0; i + 2 < keys.length; i++)
+			cost += wayTriple(pc, keys[i], keys[i + 1], keys[i + 2]);
+		if (way.shift + way.altgr > 0) cost += 100 * pc.w.modifier_usage * width;
+		if (way.dead) cost += 100 * pc.w.dead_key_usage * width;
+		return cost;
+	}
+
+	/**
+	 * The key pair and triples that start in way a and end in way b
+	 * (walkKeyStream's bigram step).
+	 */
+	function crossCost(pc, a, b) {
+		const ka = a.keys;
+		const kb = b.keys;
+		const la = ka.length;
+		const length = la + kb.length;
+		let cost = wayPair(pc, ka[la - 1], kb[0]);
+		for (let i = la < 2 ? 0 : la - 2; i < la; i++)
+			if (i + 2 < length)
+				cost += wayTriple(
+					pc,
+					ka[i],
+					i + 1 < la ? ka[i + 1] : kb[i + 1 - la],
+					i + 2 < la ? ka[i + 2] : kb[i + 2 - la]
+				);
+		return cost;
+	}
+
+	/** An insertion-ordered set of small integer ids, emptied at no cost. */
+	class IdSet {
+		/** @param {number} size - Ids are 0 … size - 1. */
+		constructor(size) {
+			this.mark = new Uint32Array(size);
+			this.list = new Int32Array(size);
+			this.size = 0;
+			this.tag = 1;
+		}
+
+		/** Empties the set. */
+		clear() {
+			this.size = 0;
+			this.tag += 1;
+			if (this.tag === UINT32_LAST) {
+				this.mark.fill(0);
+				this.tag = 1;
+			}
+		}
+
+		/** Adds an id, unless it is in already. */
+		add(id) {
+			if (this.mark[id] === this.tag) return;
+			this.mark[id] = this.tag;
+			this.list[this.size++] = id;
+		}
+
+		/** Whether an id is in. */
+		has(id) {
+			return this.mark[id] === this.tag;
+		}
+	}
+
+	const contextModelCache = new WeakMap();
+
+	/**
+	 * A partition's context n-grams on ids, for planContext and the score
+	 * session: the tokens of the table (tableIds), the touchTri and touchBi
+	 * entries as id columns, every pair they hold (as a first pair, a last
+	 * pair or a touchBi pair) as a pair id, and compressed lists (start,
+	 * items: the items of id x are items[start[x]] … items[start[x + 1] - 1],
+	 * in table order): the touchTri entries by first pair, by last pair, by
+	 * token (each entry once), by multi-way middle; the touchBi entries by
+	 * token; the uni entries by token; the rest's entries by token. Holds the
+	 * scratch buffers of the passes (a pass runs to its end before another
+	 * starts). Cached per partition.
+	 * @param {object} table - The token table.
+	 * @param {object} parts - From partition().
+	 * @param {Set<string>} multi - The multi-way tokens.
+	 * @returns {object} The model.
+	 */
+	function contextModel(table, parts, multi) {
+		let model = contextModelCache.get(parts);
+		if (model) return model;
+		const t = tableIds(table);
+		const tokens = t.tokens;
+		const T = tokens.length;
+		const idOf = new Map();
+		tokens.forEach((token, u) => idOf.set(token, u));
+		const many = new Uint8Array(T);
+		for (const token of multi) many[idOf.get(token)] = 1;
+		const pairOf = new Map();
+		const pairA = [];
+		const pairB = [];
+		const pairId = (a, b) => {
+			const key = a * T + b;
+			let p = pairOf.get(key);
+			if (p === undefined) {
+				p = pairA.length;
+				pairOf.set(key, p);
+				pairA.push(a);
+				pairB.push(b);
+			}
+			return p;
+		};
+		const M3 = parts.touchTri.length;
+		const tA = new Int32Array(M3);
+		const tB = new Int32Array(M3);
+		const tC = new Int32Array(M3);
+		const tN = new Float64Array(M3);
+		const tFirst = new Int32Array(M3);
+		const tLast = new Int32Array(M3);
+		parts.touchTri.forEach(([a, b, c, n], i) => {
+			tA[i] = idOf.get(a);
+			tB[i] = idOf.get(b);
+			tC[i] = idOf.get(c);
+			tN[i] = n;
+			tFirst[i] = pairId(tA[i], tB[i]);
+			tLast[i] = pairId(tB[i], tC[i]);
+		});
+		const M2 = parts.touchBi.length;
+		const bA = new Int32Array(M2);
+		const bB = new Int32Array(M2);
+		const bN = new Float64Array(M2);
+		const bPair = new Int32Array(M2);
+		parts.touchBi.forEach(([a, b, n], i) => {
+			bA[i] = idOf.get(a);
+			bB[i] = idOf.get(b);
+			bN[i] = n;
+			bPair[i] = pairId(bA[i], bB[i]);
+		});
+		const P = pairA.length;
+		// The touchBi entry of each pair (the last one, as a Map would keep), or -1.
+		const pairBi = new Int32Array(P).fill(-1);
+		for (let i = 0; i < M2; i++) pairBi[bPair[i]] = i;
+		const maps = ngramMaps(table);
+		const pairTotal = new Float64Array(P);
+		for (let p = 0; p < P; p++)
+			pairTotal[p] = maps.bi.get(tokens[pairA[p]] + TOKEN_SEP + tokens[pairB[p]]) || 0;
+		const lists = (size) => Array.from({ length: size }, () => []);
+		const byFirst = lists(P);
+		const byLast = lists(P);
+		const triOf = lists(T);
+		const middleOf = lists(T);
+		for (let i = 0; i < M3; i++) {
+			byFirst[tFirst[i]].push(i);
+			byLast[tLast[i]].push(i);
+			triOf[tA[i]].push(i);
+			if (tB[i] !== tA[i]) triOf[tB[i]].push(i);
+			if (tC[i] !== tA[i] && tC[i] !== tB[i]) triOf[tC[i]].push(i);
+			if (many[tB[i]]) middleOf[tB[i]].push(i);
+		}
+		const biOf = lists(T);
+		for (let i = 0; i < M2; i++) {
+			biOf[bA[i]].push(i);
+			if (bB[i] !== bA[i]) biOf[bB[i]].push(i);
+		}
+		const uniAt = lists(T);
+		const uniCount = new Float64Array(T);
+		for (let i = 0; i < t.uniId.length; i++) {
+			uniAt[t.uniId[i]].push(i);
+			uniCount[t.uniId[i]] += t.uniN[i];
+		}
+		const restBiOf = lists(T);
+		parts.restBiAt.forEach((at, j) => {
+			restBiOf[t.biA[at]].push(j);
+			if (t.biB[at] !== t.biA[at]) restBiOf[t.biB[at]].push(j);
+		});
+		const restTriOf = lists(T);
+		parts.restTriAt.forEach((at, j) => {
+			const [a, b, c] = [t.triA[at], t.triB[at], t.triC[at]];
+			restTriOf[a].push(j);
+			if (b !== a) restTriOf[b].push(j);
+			if (c !== a && c !== b) restTriOf[c].push(j);
+		});
+		const compressed = (all) => {
+			const start = new Int32Array(all.length + 1);
+			for (let x = 0; x < all.length; x++) start[x + 1] = start[x] + all[x].length;
+			const items = new Int32Array(start[all.length]);
+			all.forEach((list, x) => items.set(list, start[x]));
+			return { start, items };
+		};
+		model = {
+			table,
+			t,
+			tokens,
+			T,
+			P,
+			M2,
+			M3,
+			idOf,
+			pairOf,
+			many,
+			tA,
+			tB,
+			tC,
+			tN,
+			tFirst,
+			tLast,
+			bA,
+			bB,
+			bN,
+			bPair,
+			pairBi,
+			pairTotal,
+			byFirst: compressed(byFirst),
+			byLast: compressed(byLast),
+			triOf: compressed(triOf),
+			middleOf: compressed(middleOf),
+			biOf: compressed(biOf),
+			uniAt: compressed(uniAt),
+			uniCount,
+			restBiOf: compressed(restBiOf),
+			restTriOf: compressed(restTriOf),
+			restBiAt: parts.restBiAt,
+			restTriAt: parts.restTriAt,
+			// planContext's stamp (one per plan) and memos: a pair's side costs
+			// per way, valid for the plan whose stamp they carry; slot P holds
+			// those of a pair outside the model (plan.choose).
+			stamp: 0,
+			leftCost: new Float64Array((P + 1) * MAX_WAYS),
+			leftStamp: new Uint32Array(P),
+			rightCost: new Float64Array((P + 1) * MAX_WAYS),
+			rightStamp: new Uint32Array(P),
+			vector: new Float64Array(MAX_WAYS),
+			// The sets of an incremental pass (plan.changed reads the last five
+			// until the next pass).
+			dirty: new IdSet(T),
+			touched: new IdSet(M3),
+			dirtyBefore: new IdSet(P),
+			dirtyAfter: new IdSet(P),
+			repick: new IdSet(M3),
+			moved: new IdSet(M3),
+			rightKeys: new IdSet(P),
+			leftKeys: new IdSet(P),
+			redoTokens: new IdSet(T),
+			changedRight: new IdSet(P),
+			changedLeft: new IdSet(P),
+			changedTokens: new IdSet(T),
+			changed: null,
+			// The score session's walk: one stamp per entry, so each is walked once.
+			walkStamp: 0,
+			walkUni: new Uint32Array(t.uniId.length),
+			walkRestBi: new Uint32Array(parts.restBiAt.length),
+			walkRestTri: new Uint32Array(parts.restTriAt.length),
+			walkBi: new Uint32Array(M2),
+			walkTri: new Uint32Array(M3)
+		};
+		model.changed = {
+			dirty: model.dirty,
+			picks: model.moved,
+			rightKeys: model.changedRight,
+			leftKeys: model.changedLeft,
+			tokens: model.changedTokens
+		};
+		contextModelCache.set(parts, model);
+		return model;
+	}
+
+	/**
+	 * A plan's context state on a model (planContext): each token's ways and
+	 * their own costs, the skipgram tallies, the picks, the edge choices, the
+	 * distributions and shares of ways per pair and per token. Every array
+	 * is per id, a pair's or token's vector at id × MAX_WAYS.
+	 */
+	function contextState(model) {
+		const { T, P, M2, M3 } = model;
+		const W = MAX_WAYS;
+		return {
+			model,
+			pc: null,
+			stamp: 0,
+			// The state a plan made from this one is written into (planContext).
+			spare: null,
+			wl: new Array(T),
+			units: new Float64Array(T * W),
+			// The last key of the token two places before a multi-way token, and
+			// the first key of the one two places after, with their counts: per
+			// pair, a list of (key, count) in table order, at the pair's start in
+			// byLast (before) or byFirst (after).
+			beforeKey: new Int32Array(M3),
+			beforeSum: new Float64Array(M3),
+			beforeLen: new Int32Array(P),
+			afterKey: new Int32Array(M3),
+			afterSum: new Float64Array(M3),
+			afterLen: new Int32Array(P),
+			pickAt: new Int32Array(M3).fill(-1),
+			edgeR: new Int32Array(M2).fill(-1),
+			edgeRN: new Float64Array(M2),
+			edgeL: new Int32Array(M2).fill(-1),
+			edgeLN: new Float64Array(M2),
+			// A pair's distribution of ways (length 0: none): rightDist the ways
+			// of its second token, leftDist those of its first.
+			rightDist: new Float64Array(P * W),
+			rightLen: new Int32Array(P),
+			leftDist: new Float64Array(P * W),
+			leftLen: new Int32Array(P),
+			uniDist: new Float64Array(T * W),
+			uniLen: new Int32Array(T),
+			// The distributions normalised (length 1, share 1: none).
+			rightShare: new Float64Array(P * W),
+			rightShareLen: new Int32Array(P),
+			leftShare: new Float64Array(P * W),
+			leftShareLen: new Int32Array(P)
+		};
+	}
+
+	// The typed arrays of a context state, copied from a previous plan's.
+	const CONTEXT_ARRAYS = [
+		'units',
+		'beforeKey',
+		'beforeSum',
+		'beforeLen',
+		'afterKey',
+		'afterSum',
+		'afterLen',
+		'pickAt',
+		'edgeR',
+		'edgeRN',
+		'edgeL',
+		'edgeLN',
+		'rightDist',
+		'rightLen',
+		'leftDist',
+		'leftLen',
+		'uniDist',
+		'uniLen',
+		'rightShare',
+		'rightShareLen',
+		'leftShare',
+		'leftShareLen'
+	];
+	const ONE_SHARE = new Float64Array([1]);
+
+	/**
+	 * planTyping's context choice on ids. From nothing (prev null), or from
+	 * the state of a previous plan on the same model: then the new state is
+	 * written into the previous one's spare buffers (no allocation: a score
+	 * session keeps two states and alternates), only what a token whose ways
+	 * changed can reach is computed again, and model.changed lists what
+	 * changed for the walk. Every value is computed by the same code in the
+	 * same order either way, so both give the same state to the last bit.
+	 *
+	 * For each touchTri entry, its middle's way when it has several (pickAt);
+	 * for each pair, the ways of its multi-way token over the entries that
+	 * start (rightDist) or end (leftDist) with it, with the edge of its
+	 * bigram (the bigram's count less its trigram part, typed the way chosen
+	 * with no neighbour on the other side, kept in edgeR/edgeL); for each
+	 * multi-way token, its middles, its edges, then its occurrences alone
+	 * (uniDist).
+	 * @param {object} model - From contextModel().
+	 * @param {object} pc - From planCosts().
+	 * @param {Map} ways - Token → its ways (the plan's).
+	 * @param {object|null} prev - The previous plan's state, or null.
+	 * @returns {object} The plan's state (contextState()).
+	 */
+	function planContext(model, pc, ways, prev) {
+		const W = MAX_WAYS;
+		const { T, P, M3, many, tokens, tA, tB, tC, tN, tFirst, tLast } = model;
+		let st;
+		if (prev) {
+			st = prev.spare || (prev.spare = contextState(model));
+			for (const name of CONTEXT_ARRAYS) st[name].set(prev[name]);
+			st.spare = prev;
+		} else st = contextState(model);
+		model.stamp = model.stamp === UINT32_LAST ? 1 : model.stamp + 1;
+		if (model.stamp === 1) {
+			model.leftStamp.fill(0);
+			model.rightStamp.fill(0);
+		}
+		st.stamp = model.stamp;
+		st.pc = pc;
+		const wl = st.wl;
+		for (let u = 0; u < T; u++) {
+			const list = ways.get(tokens[u]);
+			if (list && list.length > W)
+				throw new Error(`layout_analysis: ${tokens[u]} has more than ${W} ways`);
+			wl[u] = list;
+		}
+		const { dirty, touched, dirtyBefore, dirtyAfter, repick, moved } = model;
+		const { rightKeys, leftKeys, redoTokens, changedRight, changedLeft, changedTokens } = model;
+		if (prev) {
+			dirty.clear();
+			touched.clear();
+			dirtyBefore.clear();
+			dirtyAfter.clear();
+			repick.clear();
+			moved.clear();
+			rightKeys.clear();
+			leftKeys.clear();
+			redoTokens.clear();
+			changedRight.clear();
+			changedLeft.clear();
+			changedTokens.clear();
+			const { uniId } = model.t;
+			for (let i = 0; i < uniId.length; i++)
+				if (!sameWays(prev.wl[uniId[i]], wl[uniId[i]])) dirty.add(uniId[i]);
+		}
+		// Each multi-way token's own cost per way.
+		for (let u = 0; u < T; u++)
+			if (many[u] && (!prev || dirty.has(u)))
+				for (let i = 0; i < wl[u].length; i++) st.units[u * W + i] = unitCost(pc, wl[u][i]);
+
+		// The skipgram tallies: from a previous plan, the entries that hold a
+		// token whose ways changed, and the pairs they feed, tallied again.
+		const { byFirst, byLast } = model;
+		if (prev) {
+			const { start, items } = model.triOf;
+			for (let d = 0; d < dirty.size; d++) {
+				const u = dirty.list[d];
+				for (let j = start[u]; j < start[u + 1]; j++) touched.add(items[j]);
+			}
+			for (let j = 0; j < touched.size; j++) {
+				const i = touched.list[j];
+				if (many[tC[i]]) dirtyBefore.add(tLast[i]);
+				if (many[tA[i]]) dirtyAfter.add(tFirst[i]);
+			}
+			for (let j = 0; j < dirtyBefore.size; j++) {
+				const p = dirtyBefore.list[j];
+				st.beforeLen[p] = 0;
+				for (let k = byLast.start[p]; k < byLast.start[p + 1]; k++)
+					tallyEntry(st, byLast.items[k], true, false);
+			}
+			for (let j = 0; j < dirtyAfter.size; j++) {
+				const p = dirtyAfter.list[j];
+				st.afterLen[p] = 0;
+				for (let k = byFirst.start[p]; k < byFirst.start[p + 1]; k++)
+					tallyEntry(st, byFirst.items[k], false, true);
+			}
+		} else for (let i = 0; i < M3; i++) tallyEntry(st, i, true, true);
+
+		// The picks: a pick reads its pair's before tally and its pair's after tally.
+		const pickAt = st.pickAt;
+		const pickEntry = (i) => {
+			const b = tB[i];
+			if (!many[b]) {
+				pickAt[i] = -1;
+				return;
+			}
+			const a = wl[tA[i]] ? tA[i] : -1;
+			const c = wl[tC[i]] ? tC[i] : -1;
+			pickAt[i] = chooseWay(st, a, b, c, tFirst[i], tLast[i]);
+		};
+		if (prev) {
+			for (let j = 0; j < touched.size; j++) {
+				repick.add(touched.list[j]);
+				moved.add(touched.list[j]);
+			}
+			for (let j = 0; j < dirtyBefore.size; j++) {
+				const p = dirtyBefore.list[j];
+				for (let k = byFirst.start[p]; k < byFirst.start[p + 1]; k++) repick.add(byFirst.items[k]);
+			}
+			for (let j = 0; j < dirtyAfter.size; j++) {
+				const p = dirtyAfter.list[j];
+				for (let k = byLast.start[p]; k < byLast.start[p + 1]; k++) repick.add(byLast.items[k]);
+			}
+			for (let j = 0; j < repick.size; j++) {
+				const i = repick.list[j];
 				const was = pickAt[i];
 				pickEntry(i);
 				if (pickAt[i] !== was) moved.add(i);
 			}
-		else for (let i = 0; i < parts.touchTri.length; i++) pickEntry(i);
-		plan.pickAt = pickAt;
-		plan.edges = edges;
+		} else for (let i = 0; i < M3; i++) pickEntry(i);
 
-		// The trigram part of a pair's distribution, in table order: the
-		// middles of the entries starting with the pair (side 'R', the ways of
-		// its second token) or ending with it (side 'L', its first token's).
-		const triPart = (side, key) => {
-			const list = side === 'R' ? index.byFirst.get(key) : index.byLast.get(key);
-			let v = null;
-			for (const i of list || []) {
-				const entry = parts.touchTri[i];
-				const b = entry[1];
-				if (!multi.has(b)) continue;
-				v = v || new Float64Array(ways.get(b).length);
-				v[pickAt[i]] += entry[3];
+		// The distributions.
+		const { pairBi, bA, bB } = model;
+		if (!prev) {
+			for (let p = 0; p < P; p++) {
+				const i = pairBi[p];
+				if (byFirst.start[p + 1] > byFirst.start[p] || (i >= 0 && many[bB[i]]))
+					st.rightLen[p] = pairDist(st, true, p, st.rightDist, p * W);
+				if (byLast.start[p + 1] > byLast.start[p] || (i >= 0 && many[bA[i]]))
+					st.leftLen[p] = pairDist(st, false, p, st.leftDist, p * W);
+				share(st.rightDist, st.rightLen, st.rightShare, st.rightShareLen, p);
+				share(st.leftDist, st.leftLen, st.leftShare, st.leftShareLen, p);
 			}
-			return v;
-		};
-		// A pair's whole distribution: its trigram part, then, for the bigram of
-		// a multi-way token, the way it takes at a segment edge for the bigram's
-		// count less its trigram part (recorded in edges).
-		const pairDist = (side, key) => {
-			const i = index.biAt.get(key);
-			if (i === undefined) return triPart(side, key);
-			const [a, b, n] = parts.touchBi[i];
-			const token = side === 'R' ? b : a;
-			if (!multi.has(token)) return triPart(side, key);
-			const v = triPart(side, key) || new Float64Array(ways.get(token).length);
-			const rest = n - sum(v);
-			let o = -1;
-			if (rest > 0) {
-				o = side === 'R' ? choose(known(a), b, null) : choose(null, a, known(b));
-				v[o] += rest;
-			}
-			edges[side][i] = o;
-			edges[side + 'N'][i] = rest > 0 ? rest : 0;
-			return v;
-		};
-		// A token's distribution: its middles in table order, its bigram edges
-		// in table order, then its occurrences alone.
-		const tokenDist = (token) => {
-			const v = new Float64Array(ways.get(token).length);
-			for (const i of index.middleOf.get(token) || []) v[pickAt[i]] += parts.touchTri[i][3];
-			for (const i of index.biOf.get(token) || []) {
-				const [a, b] = parts.touchBi[i];
-				if (b === token && edges.R[i] >= 0) v[edges.R[i]] += edges.RN[i];
-				if (a === token && edges.L[i] >= 0) v[edges.L[i]] += edges.LN[i];
-			}
-			const n = index.uniCount.get(token) || 0;
-			const rest = n - sum(v);
-			if (rest > 0) v[choose(null, token, null)] += rest;
-			return v;
-		};
-		const sameVector = (x, y) => {
-			if (x === y) return true;
-			if (!x || !y || x.length !== y.length) return false;
-			for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
-			return true;
-		};
-		const uniDist = prev ? new Map(prev.uniDist) : new Map();
-		const leftDist = prev ? new Map(prev.leftDist) : new Map();
-		const rightDist = prev ? new Map(prev.rightDist) : new Map();
-		const set = (map, key, v) => {
-			if (v) map.set(key, v);
-			else map.delete(key);
-		};
-		if (prev) {
-			// The pairs whose distribution a moved middle or an edge choice may
-			// change: those pairs are summed again; a token whose middles, edges
-			// or own ways changed is summed again.
-			const rightKeys = new Set();
-			const leftKeys = new Set();
-			const tokens = new Set();
-			for (const i of moved) {
-				const [a, b, c] = parts.touchTri[i];
-				if (!multi.has(b)) continue;
-				rightKeys.add(a + TOKEN_SEP + b);
-				leftKeys.add(b + TOKEN_SEP + c);
-				tokens.add(b);
-			}
-			for (const token of dirty) {
-				if (multi.has(token)) tokens.add(token);
-				for (const i of index.biOf.get(token) || []) {
-					const [a, b] = parts.touchBi[i];
-					rightKeys.add(a + TOKEN_SEP + b);
-					leftKeys.add(a + TOKEN_SEP + b);
-				}
-			}
-			for (const key of dirtyBefore) rightKeys.add(key);
-			for (const key of dirtyAfter) leftKeys.add(key);
-			const changedRight = new Set();
-			const changedLeft = new Set();
-			const redo = (side, keys, map, changed) => {
-				for (const key of keys) {
-					const i = index.biAt.get(key);
-					const was = i === undefined ? -1 : edges[side][i];
-					const wasN = i === undefined ? 0 : edges[side + 'N'][i];
-					const v = pairDist(side, key);
-					if (!sameVector(v, map.get(key))) {
-						changed.add(key);
-						set(map, key, v);
-					}
-					if (i !== undefined && (edges[side][i] !== was || edges[side + 'N'][i] !== wasN))
-						tokens.add(parts.touchBi[i][side === 'R' ? 1 : 0]);
-				}
-			};
-			redo('R', rightKeys, rightDist, changedRight);
-			redo('L', leftKeys, leftDist, changedLeft);
-			const changedTokens = new Set();
-			for (const token of tokens) {
-				const v = tokenDist(token);
-				if (sameVector(v, uniDist.get(token))) continue;
-				uniDist.set(token, v);
-				changedTokens.add(token);
-			}
-			plan.changed = {
-				dirty,
-				picks: moved,
-				rightKeys: changedRight,
-				leftKeys: changedLeft,
-				tokens: changedTokens
-			};
-			// The normalised shares of the unchanged pairs are the previous plan's.
-			plan.shareBase = prev.shareBase || (prev.shareBase = new Map());
-			plan.shareLocal = new Map();
-			plan.shareOwn = new Set();
-			for (const key of changedRight) plan.shareOwn.add('R' + key);
-			for (const key of changedLeft) plan.shareOwn.add('L' + key);
-		} else {
-			for (const key of index.byFirst.keys()) set(rightDist, key, pairDist('R', key));
-			for (const key of index.byLast.keys()) set(leftDist, key, pairDist('L', key));
-			for (const [key, i] of index.biAt) {
-				const [a, b] = parts.touchBi[i];
-				if (multi.has(b) && !index.byFirst.has(key)) set(rightDist, key, pairDist('R', key));
-				if (multi.has(a) && !index.byLast.has(key)) set(leftDist, key, pairDist('L', key));
-			}
-			for (const token of multi) uniDist.set(token, tokenDist(token));
+			for (let u = 0; u < T; u++) if (many[u]) st.uniLen[u] = tokenDist(st, u, st.uniDist, u * W);
+			return st;
 		}
-		Object.assign(plan, { uniDist, leftDist, rightDist });
-		return plan;
+		// From a previous plan: the pairs whose distribution a moved middle or
+		// an edge choice may change are summed again; a token whose middles,
+		// edges or own ways changed is summed again.
+		for (let j = 0; j < moved.size; j++) {
+			const i = moved.list[j];
+			if (!many[tB[i]]) continue;
+			rightKeys.add(tFirst[i]);
+			leftKeys.add(tLast[i]);
+			redoTokens.add(tB[i]);
+		}
+		const { biOf, bPair } = model;
+		for (let d = 0; d < dirty.size; d++) {
+			const u = dirty.list[d];
+			if (many[u]) redoTokens.add(u);
+			for (let k = biOf.start[u]; k < biOf.start[u + 1]; k++) {
+				rightKeys.add(bPair[biOf.items[k]]);
+				leftKeys.add(bPair[biOf.items[k]]);
+			}
+		}
+		for (let j = 0; j < dirtyBefore.size; j++) rightKeys.add(dirtyBefore.list[j]);
+		for (let j = 0; j < dirtyAfter.size; j++) leftKeys.add(dirtyAfter.list[j]);
+		redoPairs(st, true, rightKeys, changedRight, redoTokens);
+		redoPairs(st, false, leftKeys, changedLeft, redoTokens);
+		const vector = model.vector;
+		for (let j = 0; j < redoTokens.size; j++) {
+			const u = redoTokens.list[j];
+			const length = tokenDist(st, u, vector, 0);
+			if (sameDist(vector, 0, length, st.uniDist, u * W, st.uniLen[u])) continue;
+			st.uniDist.set(vector.subarray(0, length), u * W);
+			st.uniLen[u] = length;
+			changedTokens.add(u);
+		}
+		for (let j = 0; j < changedRight.size; j++)
+			share(st.rightDist, st.rightLen, st.rightShare, st.rightShareLen, changedRight.list[j]);
+		for (let j = 0; j < changedLeft.size; j++)
+			share(st.leftDist, st.leftLen, st.leftShare, st.leftShareLen, changedLeft.list[j]);
+		return st;
 	}
 
-	const contextIndexCache = new WeakMap();
+	/**
+	 * One touchTri entry's part of the skipgram tallies: of before (the pair
+	 * it ends with, when its last token has several ways) and of after (the
+	 * pair it starts with, when its first token has several).
+	 */
+	function tallyEntry(st, i, before, after) {
+		const m = st.model;
+		const x = m.tA[i];
+		const z = m.tC[i];
+		if (!m.many[z] && !m.many[x]) return;
+		const wx = st.wl[x];
+		const wy = st.wl[m.tB[i]];
+		const wz = st.wl[z];
+		if (!wx || !wy || !wz || wy[0].keys.length !== 1) return;
+		if (before && m.many[z]) {
+			const keys = wx[0].keys;
+			tally(
+				st.beforeKey,
+				st.beforeSum,
+				st.beforeLen,
+				m.byLast.start,
+				m.tLast[i],
+				keys[keys.length - 1],
+				m.tN[i]
+			);
+		}
+		if (after && m.many[x])
+			tally(
+				st.afterKey,
+				st.afterSum,
+				st.afterLen,
+				m.byFirst.start,
+				m.tFirst[i],
+				wz[0].keys[0],
+				m.tN[i]
+			);
+	}
+
+	/** Adds n to key k of pair p's tally (a list in the order the keys first come). */
+	function tally(keys, sums, length, start, p, k, n) {
+		const from = start[p];
+		const end = from + length[p];
+		for (let j = from; j < end; j++)
+			if (keys[j] === k) {
+				sums[j] += n;
+				return;
+			}
+		keys[end] = k;
+		sums[end] = 0 + n;
+		length[p] += 1;
+	}
 
 	/**
-	 * Where each token and pair sits among a partition's context n-grams, for
-	 * planTyping and the score session: touchTri indexes by token (any
-	 * place), by middle token, by first pair and by last pair; touchBi
-	 * indexes by token and by pair; the uni counts. Every list is in table
-	 * order. Cached per partition.
-	 * @param {object} table - The token table.
-	 * @param {object} parts - From partition().
-	 * @param {Set<string>} multi - The multi-way tokens.
-	 * @returns {object} {triOf, middleOf, byFirst, byLast, biOf, biAt, uniCount,
-	 *   uniAt, restBiOf, restTriOf}.
+	 * The way token b is typed between tokens a and c (-1: an edge): the one
+	 * of least own cost, side costs and triple across both neighbours. pl and
+	 * pr are the pair ids of a b and b c (-1: none in the model).
 	 */
-	function contextIndex(table, parts, multi) {
-		if (contextIndexCache.has(parts)) return contextIndexCache.get(parts);
-		const push = (map, key, i) => (map.get(key) || map.set(key, []).get(key)).push(i);
-		const out = {
-			triOf: new Map(),
-			middleOf: new Map(),
-			byFirst: new Map(),
-			byLast: new Map(),
-			biOf: new Map(),
-			biAt: new Map(),
-			uniCount: new Map(),
-			uniAt: new Map(),
-			restBiOf: new Map(),
-			restTriOf: new Map()
-		};
-		parts.touchTri.forEach(([a, b, c], i) => {
-			for (const token of new Set([a, b, c])) push(out.triOf, token, i);
-			if (multi.has(b)) push(out.middleOf, b, i);
-			push(out.byFirst, a + TOKEN_SEP + b, i);
-			push(out.byLast, b + TOKEN_SEP + c, i);
-		});
-		parts.touchBi.forEach(([a, b], i) => {
-			for (const token of new Set([a, b])) push(out.biOf, token, i);
-			out.biAt.set(a + TOKEN_SEP + b, i);
-		});
-		table.uni.forEach(([token, n], i) => {
-			out.uniCount.set(token, (out.uniCount.get(token) || 0) + n);
-			push(out.uniAt, token, i);
-		});
-		parts.restBi.forEach(([a, b], i) => {
-			for (const token of new Set([a, b])) push(out.restBiOf, token, i);
-		});
-		parts.restTri.forEach(([a, b, c], i) => {
-			for (const token of new Set([a, b, c])) push(out.restTriOf, token, i);
-		});
-		contextIndexCache.set(parts, out);
-		return out;
+	function chooseWay(st, a, b, c, pl, pr) {
+		const m = st.model;
+		const W = MAX_WAYS;
+		const list = st.wl[b];
+		const units = st.units;
+		const own = b * W;
+		const left = a < 0 ? -1 : leftCosts(st, a, b, pl);
+		const right = c < 0 ? -1 : rightCosts(st, b, c, pr);
+		const leftCost = m.leftCost;
+		const rightCost = m.rightCost;
+		let across = -1;
+		let after = -1;
+		if (a >= 0 && c >= 0) {
+			const ka = st.wl[a][0].keys;
+			across = ka[ka.length - 1];
+			after = st.wl[c][0].keys[0];
+		}
+		let pick = 0;
+		let lowest = INFINITY;
+		for (let i = 0; i < list.length; i++) {
+			let cost = units[own + i];
+			if (left >= 0) cost += leftCost[left + i];
+			if (right >= 0) cost += rightCost[right + i];
+			if (across >= 0 && list[i].keys.length === 1)
+				cost += wayTriple(st.pc, across, list[i].keys[0], after);
+			// A tie (within rounding) keeps the earlier, cheaper-alone way.
+			if (i === 0 || cost < lowest - 1e-9 * Math.max(1, Math.abs(lowest))) {
+				lowest = cost;
+				pick = i;
+			}
+		}
+		return pick;
+	}
+
+	/**
+	 * Each way of b's cost beside the token a before it: the key pair and
+	 * triples across, and the skipgrams with the token before that, per
+	 * occurrence of the pair (before tally of pair p). Memoised per plan.
+	 * @returns {number} The offset of the costs in model.leftCost.
+	 */
+	function leftCosts(st, a, b, p) {
+		const m = st.model;
+		const at = (p < 0 ? m.P : p) * MAX_WAYS;
+		if (p >= 0 && m.leftStamp[p] === st.stamp) return at;
+		const list = st.wl[b];
+		const wa = st.wl[a][0];
+		const length = p < 0 || wa.keys.length !== 1 ? 0 : st.beforeLen[p];
+		const total = p < 0 ? 0 : m.pairTotal[p];
+		const from = p < 0 ? 0 : m.byLast.start[p];
+		const k0 = wa.keys[0];
+		for (let i = 0; i < list.length; i++) {
+			const way = list[i];
+			let cost = crossCost(st.pc, wa, way);
+			if (length > 0 && total > 0) {
+				let sum = 0;
+				for (let j = from; j < from + length; j++)
+					sum += st.beforeSum[j] * wayTriple(st.pc, st.beforeKey[j], k0, way.keys[0]);
+				cost += sum / total;
+			}
+			m.leftCost[at + i] = cost;
+		}
+		if (p >= 0) m.leftStamp[p] = st.stamp;
+		return at;
+	}
+
+	/** rightCosts: leftCosts' mirror, beside the token c after b (after tally of pair p). */
+	function rightCosts(st, b, c, p) {
+		const m = st.model;
+		const at = (p < 0 ? m.P : p) * MAX_WAYS;
+		if (p >= 0 && m.rightStamp[p] === st.stamp) return at;
+		const list = st.wl[b];
+		const wc = st.wl[c][0];
+		const length = p < 0 || wc.keys.length !== 1 ? 0 : st.afterLen[p];
+		const total = p < 0 ? 0 : m.pairTotal[p];
+		const from = p < 0 ? 0 : m.byFirst.start[p];
+		const k0 = wc.keys[0];
+		for (let i = 0; i < list.length; i++) {
+			const way = list[i];
+			let cost = crossCost(st.pc, way, wc);
+			if (length > 0 && total > 0) {
+				const last = way.keys[way.keys.length - 1];
+				let sum = 0;
+				for (let j = from; j < from + length; j++)
+					sum += st.afterSum[j] * wayTriple(st.pc, last, k0, st.afterKey[j]);
+				cost += sum / total;
+			}
+			m.rightCost[at + i] = cost;
+		}
+		if (p >= 0) m.rightStamp[p] = st.stamp;
+		return at;
+	}
+
+	/**
+	 * A pair's distribution, written at out[at…]: the trigram part, in table
+	 * order (the middles of the entries starting with the pair, side right:
+	 * its second token's ways; or ending with it, side left: its first
+	 * token's), then, for the bigram of a multi-way token, the way it takes
+	 * at a segment edge for the bigram's count less its trigram part
+	 * (recorded in the edges).
+	 * @returns {number} The vector's length, 0 for none.
+	 */
+	function pairDist(st, right, p, out, at) {
+		const m = st.model;
+		const list = right ? m.byFirst : m.byLast;
+		let length = 0;
+		for (let k = list.start[p]; k < list.start[p + 1]; k++) {
+			const i = list.items[k];
+			const b = m.tB[i];
+			if (!m.many[b]) continue;
+			if (length === 0) {
+				length = st.wl[b].length;
+				out.fill(0, at, at + length);
+			}
+			out[at + st.pickAt[i]] += m.tN[i];
+		}
+		const i = m.pairBi[p];
+		if (i < 0) return length;
+		const a = m.bA[i];
+		const b = m.bB[i];
+		const token = right ? b : a;
+		if (!m.many[token]) return length;
+		if (length === 0) {
+			length = st.wl[token].length;
+			out.fill(0, at, at + length);
+		}
+		let sum = 0;
+		for (let j = 0; j < length; j++) sum += out[at + j];
+		const rest = m.bN[i] - sum;
+		let o = -1;
+		if (rest > 0) {
+			o = right
+				? chooseWay(st, st.wl[a] ? a : -1, b, -1, p, -1)
+				: chooseWay(st, -1, a, st.wl[b] ? b : -1, -1, p);
+			out[at + o] += rest;
+		}
+		if (right) {
+			st.edgeR[i] = o;
+			st.edgeRN[i] = rest > 0 ? rest : 0;
+		} else {
+			st.edgeL[i] = o;
+			st.edgeLN[i] = rest > 0 ? rest : 0;
+		}
+		return length;
+	}
+
+	/**
+	 * A multi-way token's distribution, written at out[at…]: its middles in
+	 * table order, its bigram edges in table order, then its occurrences
+	 * alone. @returns {number} Its length.
+	 */
+	function tokenDist(st, u, out, at) {
+		const m = st.model;
+		const length = st.wl[u].length;
+		out.fill(0, at, at + length);
+		const { middleOf, biOf } = m;
+		for (let k = middleOf.start[u]; k < middleOf.start[u + 1]; k++) {
+			const i = middleOf.items[k];
+			out[at + st.pickAt[i]] += m.tN[i];
+		}
+		for (let k = biOf.start[u]; k < biOf.start[u + 1]; k++) {
+			const i = biOf.items[k];
+			if (m.bB[i] === u && st.edgeR[i] >= 0) out[at + st.edgeR[i]] += st.edgeRN[i];
+			if (m.bA[i] === u && st.edgeL[i] >= 0) out[at + st.edgeL[i]] += st.edgeLN[i];
+		}
+		let sum = 0;
+		for (let j = 0; j < length; j++) sum += out[at + j];
+		const rest = m.uniCount[u] - sum;
+		if (rest > 0) out[at + chooseWay(st, -1, u, -1, -1, -1)] += rest;
+		return length;
+	}
+
+	/**
+	 * Sums the distributions of the given pairs again (side right or left);
+	 * a pair whose vector changed goes to changed, and the token of a bigram
+	 * whose edge choice changed to tokens.
+	 */
+	function redoPairs(st, right, keys, changed, tokens) {
+		const m = st.model;
+		const W = MAX_WAYS;
+		const dist = right ? st.rightDist : st.leftDist;
+		const lengths = right ? st.rightLen : st.leftLen;
+		const edge = right ? st.edgeR : st.edgeL;
+		const edgeN = right ? st.edgeRN : st.edgeLN;
+		const vector = m.vector;
+		for (let j = 0; j < keys.size; j++) {
+			const p = keys.list[j];
+			const i = m.pairBi[p];
+			const was = i < 0 ? -1 : edge[i];
+			const wasN = i < 0 ? 0 : edgeN[i];
+			const length = pairDist(st, right, p, vector, 0);
+			if (!sameDist(vector, 0, length, dist, p * W, lengths[p])) {
+				changed.add(p);
+				dist.set(vector.subarray(0, length), p * W);
+				lengths[p] = length;
+			}
+			if (i >= 0 && (edge[i] !== was || edgeN[i] !== wasN)) tokens.add(right ? m.bB[i] : m.bA[i]);
+		}
+	}
+
+	/** Whether two distributions (vector, offset, length) are the same. */
+	function sameDist(x, xa, xl, y, ya, yl) {
+		if (xl !== yl) return false;
+		for (let j = 0; j < xl; j++) if (x[xa + j] !== y[ya + j]) return false;
+		return true;
+	}
+
+	/** A pair's shares of ways: its distribution normalised once (none: share 1 on its first way). */
+	function share(dist, lengths, out, outLengths, p) {
+		const at = p * MAX_WAYS;
+		const length = lengths[p];
+		let total = 0;
+		for (let j = 0; j < length; j++) total += dist[at + j];
+		if (total > 0) {
+			for (let j = 0; j < length; j++) out[at + j] = dist[at + j] / total;
+			outLengths[p] = length;
+		} else {
+			out[at] = 1;
+			outLengths[p] = 1;
+		}
 	}
 
 	const partitionCache = new WeakMap();
@@ -4531,104 +5034,89 @@ var LAYOUT_ANALYSIS = (function () {
 			walkKeyStream(board, plan.best, table, visit);
 			return;
 		}
-		for (const [token, n] of table.uni) walkTypedToken(board, plan, token, n, 1, visit);
-		const { restBiAt, restTriAt, touchBi, touchTri } = plan.parts;
+		const st = plan.ctx;
 		const t = tableIds(table);
+		for (let i = 0; i < t.uniId.length; i++)
+			walkTypedToken(board, st, t.uniId[i], t.uniN[i], 1, visit);
 		const seqs = t.tokens.map((token) => plan.best.get(token));
-		walkRest(board, t, seqs, restBiAt, restTriAt, visit);
-		for (let i = 0; i < touchBi.length; i++) walkTypedPair(plan, i, 1, visit);
-		for (let i = 0; i < touchTri.length; i++) walkTypedTriple(plan, i, 1, visit);
+		walkRest(board, t, seqs, plan.parts.restBiAt, plan.parts.restTriAt, visit);
+		for (let i = 0; i < st.model.M2; i++) walkTypedPair(st, i, 1, visit);
+		for (let i = 0; i < st.model.M3; i++) walkTypedTriple(st, i, 1, visit);
 	}
 
 	/**
-	 * One token typed n times, its count times sign (-1 takes it out): alone,
-	 * or split over its ways as the plan uses them (its distribution sums to n).
+	 * One token (id u) typed n times, its count times sign (-1 takes it out):
+	 * alone, or split over its ways as the plan (state st) uses them (its
+	 * distribution sums to n).
 	 */
-	function walkTypedToken(board, plan, token, n, sign, visit) {
-		const list = plan.ways.get(token);
+	function walkTypedToken(board, st, u, n, sign, visit) {
+		const list = st.wl[u];
+		const token = st.model.tokens[u];
 		if (!list) {
 			visit.unsupported(token, sign * n);
 			return;
 		}
-		if (!plan.multi.has(token)) {
+		if (!st.model.many[u]) {
 			walkChar(board, list[0], token, sign * n, visit);
 			return;
 		}
-		const dist = plan.uniDist.get(token);
-		list.forEach((seq, i) => {
-			if (dist[i] > 0) walkChar(board, seq, token, sign * dist[i], visit);
-		});
+		const at = u * MAX_WAYS;
+		for (let i = 0; i < list.length; i++)
+			if (st.uniDist[at + i] > 0) walkChar(board, list[i], token, sign * st.uniDist[at + i], visit);
 	}
 
-	const ONE_SHARE = [1];
-
-	/**
-	 * A multi-way token's shares of its ways in one pair, normalised once. A
-	 * plan made from a previous one (planTyping's previous) shares its cache
-	 * for every pair whose distribution did not change, and keeps its own for
-	 * the others until adoptPlan() writes them into the shared one.
-	 */
-	function planShares(plan, side, a, b) {
-		const key = side + a + TOKEN_SEP + b;
-		if (!plan.shareBase) plan.shareBase = new Map();
-		const own = plan.shareOwn && plan.shareOwn.has(key);
-		const cache = own ? plan.shareLocal : plan.shareBase;
-		let out = cache.get(key);
-		if (out) return out;
-		const v = (side === 'L' ? plan.leftDist : plan.rightDist).get(a + TOKEN_SEP + b);
-		const total = v ? v.reduce((s, x) => s + x, 0) : 0;
-		out = total > 0 ? Array.from(v, (x) => x / total) : ONE_SHARE;
-		cache.set(key, out);
-		return out;
-	}
-
-	/**
-	 * Makes a plan made from a previous one the current one of its lineage:
-	 * its own shares go into the shared cache (the previous plan's are stale).
-	 * @param {object} plan - From planTyping() with a previous plan.
-	 */
-	function adoptPlan(plan) {
-		if (!plan.shareOwn) return;
-		for (const key of plan.shareOwn) {
-			if (plan.shareLocal.has(key)) plan.shareBase.set(key, plan.shareLocal.get(key));
-			else plan.shareBase.delete(key);
-		}
-		plan.shareOwn = null;
-		plan.shareLocal = null;
-	}
-
-	/** touchBi entry i of a plan, its count times sign (-1 takes it out). */
-	function walkTypedPair(plan, i, sign, visit) {
-		const { ways, multi } = plan;
-		const [a, b, n] = plan.parts.touchBi[i];
-		const la = ways.get(a);
-		const lb = ways.get(b);
+	/** touchBi entry i of a plan (state st), its count times sign (-1 takes it out). */
+	function walkTypedPair(st, i, sign, visit) {
+		const m = st.model;
+		const la = st.wl[m.bA[i]];
+		const lb = st.wl[m.bB[i]];
 		if (!la || !lb) return;
-		const pa = multi.has(a) ? planShares(plan, 'L', a, b) : ONE_SHARE;
-		const pb = multi.has(b) ? planShares(plan, 'R', a, b) : ONE_SHARE;
-		for (let x = 0; x < pa.length; x++) {
-			if (!(pa[x] > 0)) continue;
-			for (let y = 0; y < pb.length; y++)
-				if (pb[y] > 0) walkPair(la[x], lb[y], sign * n * pa[x] * pb[y], visit);
+		const n = m.bN[i];
+		const p = m.bPair[i];
+		const many = m.many[m.bA[i]];
+		const pa = many ? st.leftShare : ONE_SHARE;
+		const ao = many ? p * MAX_WAYS : 0;
+		const al = many ? st.leftShareLen[p] : 1;
+		const manyB = m.many[m.bB[i]];
+		const pb = manyB ? st.rightShare : ONE_SHARE;
+		const bo = manyB ? p * MAX_WAYS : 0;
+		const bl = manyB ? st.rightShareLen[p] : 1;
+		for (let x = 0; x < al; x++) {
+			const sx = pa[ao + x];
+			if (!(sx > 0)) continue;
+			for (let y = 0; y < bl; y++) {
+				const sy = pb[bo + y];
+				if (sy > 0) walkPair(la[x], lb[y], sign * n * sx * sy, visit);
+			}
 		}
 	}
 
-	/** touchTri entry i of a plan, its count times sign (-1 takes it out). */
-	function walkTypedTriple(plan, i, sign, visit) {
-		const { ways, multi } = plan;
-		const [a, b, d, n] = plan.parts.touchTri[i];
-		const lb = ways.get(b);
+	/** touchTri entry i of a plan (state st), its count times sign (-1 takes it out). */
+	function walkTypedTriple(st, i, sign, visit) {
+		const m = st.model;
+		const b = m.tB[i];
+		const lb = st.wl[b];
 		if (!lb) return;
-		const la = ways.get(a);
-		const ld = ways.get(d);
+		const la = st.wl[m.tA[i]];
+		const ld = st.wl[m.tC[i]];
 		if (!la || !ld) return;
-		const sb = multi.has(b) ? lb[plan.pickAt[i]] : lb[0];
-		const pa = multi.has(a) ? planShares(plan, 'L', a, b) : ONE_SHARE;
-		const pd = multi.has(d) ? planShares(plan, 'R', b, d) : ONE_SHARE;
-		for (let x = 0; x < pa.length; x++) {
-			if (!(pa[x] > 0)) continue;
-			for (let y = 0; y < pd.length; y++)
-				if (pd[y] > 0) walkTriple(la[x], sb, ld[y], sign * n * pa[x] * pd[y], visit);
+		const n = m.tN[i];
+		const sb = m.many[b] ? lb[st.pickAt[i]] : lb[0];
+		const manyA = m.many[m.tA[i]];
+		const pa = manyA ? st.leftShare : ONE_SHARE;
+		const ao = manyA ? m.tFirst[i] * MAX_WAYS : 0;
+		const al = manyA ? st.leftShareLen[m.tFirst[i]] : 1;
+		const manyD = m.many[m.tC[i]];
+		const pd = manyD ? st.rightShare : ONE_SHARE;
+		const dO = manyD ? m.tLast[i] * MAX_WAYS : 0;
+		const dl = manyD ? st.rightShareLen[m.tLast[i]] : 1;
+		for (let x = 0; x < al; x++) {
+			const sx = pa[ao + x];
+			if (!(sx > 0)) continue;
+			for (let y = 0; y < dl; y++) {
+				const sy = pd[dO + y];
+				if (sy > 0) walkTriple(la[x], sb, ld[y], sign * n * sx * sy, visit);
+			}
 		}
 	}
 
@@ -4658,9 +5146,11 @@ var LAYOUT_ANALYSIS = (function () {
 		const paths = {};
 		let changed = 0;
 		for (const token of plan.multi) {
-			const dist = plan.uniDist.get(token);
+			const st = plan.ctx;
+			const u = st.model.idOf.get(token);
+			const at = u * MAX_WAYS;
+			const dist = Array.from(st.uniDist.subarray(at, at + st.uniLen[u]));
 			const list = plan.ways.get(token);
-			if (!dist) continue;
 			paths[token] = list
 				.map((way, i) => describe(way, dist[i]))
 				.filter((entry) => entry.count > 0);

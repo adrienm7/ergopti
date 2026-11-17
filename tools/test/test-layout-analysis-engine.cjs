@@ -27,8 +27,10 @@
  *    layouts with one way per character and with several (Ergo-L, Ergopti,
  *    bépo: the incremental context plan and walk), compiles each trial's
  *    layout in part to exactly the ways a whole compile gives (dead-key
- *    tables shared or copied), keeps a trial only once committed, and
- *    refuses a layout on another board.
+ *    tables shared or copied), plans it from the current plan to exactly
+ *    the counts per way a plan from nothing gives, keeps a trial only once
+ *    committed (an earlier trial too, after a later one replaced its plan),
+ *    and refuses a layout on another board.
  * 6. Ways of typing: in context the cheaper copy of a character (« a. »,
  *    « b. »), direct, AltGr or dead key by their documented costs, a
  *    two-character output only when cheaper than its two taps, one way per
@@ -1208,6 +1210,7 @@ for (const layout of library) {
 		{ layout: 'bepo', options: { keyboard: 'corne', format: '60' } }
 	];
 	let trials = 0;
+	let planned = 0;
 	let worst = 0;
 	// How the trials were walked: the layouts with choices must take the
 	// incremental context walk, not only the whole-stream fallback.
@@ -1249,7 +1252,17 @@ for (const layout of library) {
 				check(false, `incremental: ${id} swap ${s} compiles other ways than a whole compile`);
 				break;
 			}
-			const expected = full(candidate);
+			const analysis = E.analyse(candidate, sessionTable, options);
+			// The plan made from the current one is the plan made from nothing,
+			// to the last bit: each character's count per way and the chords.
+			const typing = trial.typing();
+			const plain = (report) => JSON.stringify([report.paths, report.chords]);
+			if (plain(typing) !== plain(analysis.typing)) {
+				check(false, `incremental: ${id} swap ${s} plans other ways than a plan from nothing`);
+				break;
+			}
+			planned += 1;
+			const expected = analysis.score.total;
 			const gap = Math.abs(trial.total - expected);
 			worst = Math.max(worst, gap);
 			trials += 1;
@@ -1270,6 +1283,41 @@ for (const layout of library) {
 		}
 	}
 	check(trials >= cases.length * SWAPS, `incremental: only ${trials} trials ran`);
+	check(planned === trials, `incremental: ${planned} of ${trials} plans compared`);
+	// A trial's plan is written over by the next trial (the session keeps two
+	// plans): committing an earlier trial must still keep its own layout.
+	if (byId.has('ergol')) {
+		const ergol = clone(byId.get('ergol'));
+		const stale = E.scoreSession(ergol, sessionTable, {});
+		const first = clone(ergol);
+		[first.rows.KeyA, first.rows.KeyE] = [first.rows.KeyE, first.rows.KeyA];
+		const second = clone(ergol);
+		[second.rows.KeyI, second.rows.KeyU] = [second.rows.KeyU, second.rows.KeyI];
+		const kept = stale.trial(first);
+		const later = stale.trial(second);
+		let replaced = false;
+		try {
+			kept.typing();
+		} catch (error) {
+			replaced = /later trial/.test(error.message);
+		}
+		check(
+			replaced,
+			'incremental: an earlier trial refuses to report a plan a later trial replaced'
+		);
+		kept.commit();
+		const firstTotal = E.analyse(first, sessionTable, {}).score.total;
+		check(
+			Math.abs(stale.total - firstTotal) <= SESSION_TOLERANCE,
+			`incremental: committing an earlier trial keeps its layout (${stale.total} vs ${firstTotal})`
+		);
+		check(stale.trial(first).changed === 0, 'incremental: the earlier trial is the current layout');
+		const again = stale.trial(second);
+		check(
+			Math.abs(again.total - later.total) <= SESSION_TOLERANCE,
+			'incremental: a later trial scores the same from the earlier commit'
+		);
+	}
 	// The partial compile must carry the trials, not the whole-compile fallback.
 	for (const { layout: id } of cases)
 		check(
