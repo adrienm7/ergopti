@@ -938,7 +938,8 @@ function checkCore(
 		['Install shared UI browsers', 'node tools/ci/install-playwright.cjs chromium webkit'],
 		['Test shared hotstring editor rendering', 'npm run test:browser:hotstring-editor'],
 		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install'],
-		['Test shared layout editor page', 'npm run test:browser:layout-editor']
+		['Test shared layout editor page', 'npm run test:browser:layout-editor'],
+		['Test shared layout optimizer page', 'npm run test:browser:layout-optimizer']
 	]) {
 		const step = pipeline.step(browser, name);
 		assert.equal(pipeline.stepField(step, 'if'), null);

@@ -3250,7 +3250,8 @@ function commonProblems(files) {
 		['Test shared hotstring editor rendering', 'npm run test:browser:hotstring-editor'],
 		['Test shared physical shortcut rendering', 'npm run test:browser:physical-shortcuts'],
 		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install'],
-		['Test shared layout editor page', 'npm run test:browser:layout-editor']
+		['Test shared layout editor page', 'npm run test:browser:layout-editor'],
+		['Test shared layout optimizer page', 'npm run test:browser:layout-optimizer']
 	])
 		exactStep(browser, name, command);
 	if (browser) {

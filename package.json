@@ -787,6 +787,7 @@
 		"test:layout-editor-unicode-names": "node ./tools/test/test-layout-editor-unicode-names.cjs",
 		"test:layout-editor-target-exports": "node ./tools/test/test-layout-editor-target-exports.cjs",
 		"test:browser:layout-editor": "node ./tools/test/browser/layout-editor.playwright.cjs",
+		"test:browser:layout-optimizer": "node ./tools/test/browser/layout-optimizer.playwright.cjs",
 		"test:browser:site-accessibility": "node ./tools/test/browser/site-accessibility.playwright.cjs build \"\"",
 		"test:site-accessibility-ratchet": "node ./tools/test/test-site-accessibility-ratchet.cjs",
 		"test:layout-source-emulation": "node ./tools/test/test-layout-source-emulation.cjs",

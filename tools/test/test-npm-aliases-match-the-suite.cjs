@@ -104,6 +104,9 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Real Chromium drives the unified layout editor page separately in Core / js;
 	// test-ci-pipeline-wiring.cjs rejects a missing or redirected browser step.
 	'tools/test/browser/layout-editor.playwright.cjs',
+	// Real Chromium drives the Optimiser tab (workers, an inlined host, storage)
+	// in its own step of Core / js; test-ci-pipeline-wiring.cjs pins that step.
+	'tools/test/browser/layout-optimizer.playwright.cjs',
 	// Actual Chromium/WebKit rendering runs separately in mandatory Core / js;
 	// test-ci-pipeline-wiring.cjs rejects missing or redirected browser execution.
 	'tools/test/browser/physical-shortcuts.playwright.cjs',
