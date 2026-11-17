@@ -86,6 +86,13 @@ FEATURES & RATIONALE:
 	function runCycle() {
 		cycleGen++;
 		const gen = cycleGen;
+		// Less motion asked (system or site setting): the demo shows its
+		// result at once and waits for the pager instead of cycling on its own.
+		if (window.ErgoptiA11yPrefs.reducedMotion()) {
+			typed = demos[demoIndex].output;
+			phase = 'expanded';
+			return;
+		}
 		typed = '';
 		phase = 'typing';
 		demoStepTimer = setTimeout(() => runDemoStep(demos[demoIndex], 0, gen), 50);

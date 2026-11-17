@@ -94,8 +94,8 @@ function getObserver() {
  * @returns {{update: (next: number) => void, destroy: () => void}}
  */
 export function countup(node, value) {
-	const reduced =
-		typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+	// The system's setting or the site's own (static/ergopti_plus/_shared/ui/a11y_prefs.js).
+	const reduced = window.ErgoptiA11yPrefs.reducedMotion();
 	const st = { value: Number(value) || 0, revealed: false, active: true };
 	states.set(node, st);
 	if (reduced) {

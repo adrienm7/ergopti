@@ -106,8 +106,12 @@ in docs/audits/accessibility/; update both together.
 				leurs chiffres sous forme de tableau.
 			</li>
 			<li>
-				Les touches des dessins de clavier ne sont pas encore toutes nommées pour les lecteurs
-				d’écran, et une vue en tableau de chaque disposition reste à faire.
+				Les dessins de clavier du site se lisent comme des tableaux, mais ceux d’Ergopti Studio ne
+				nomment pas encore toutes leurs touches pour les lecteurs d’écran.
+			</li>
+			<li>
+				La démonstration animée de la page d’<ErgoptiPlus></ErgoptiPlus> défile seule et n’a pas encore
+				de bouton pause ; le réglage « réduire les animations » l’arrête.
 			</li>
 			<li>
 				Les fenêtres d’<ErgoptiPlus></ErgoptiPlus> (menus, réglages, info-bulles) n’ont pas encore été
