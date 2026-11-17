@@ -501,7 +501,9 @@ Shipped as of 2026-11-14:
 
 - Project Gutenberg books, without its header and licence footer: _Les
   Misérables_ I (Hugo), _Germinal_ (Zola), _Le Tour du monde en
-  quatre-vingts jours_ (Verne) and _Pride and Prejudice_ (Austen); in German
+  quatre-vingts jours_ (Verne), _Madame Bovary_ (Flaubert), _Pride and
+  Prejudice_ (Austen), _Alice's Adventures in Wonderland_ (Carroll) and _The
+  Adventures of Sherlock Holmes_ (Conan Doyle); in German
   _Effi Briest_ (Fontane) and _Die Verwandlung_ (Kafka), in Spanish _Don
   Quijote_ (Cervantes) and _Marianela_ (Pérez Galdós), in Italian _Le avventure
   di Pinocchio_ (Collodi) and _Ricordi d'infanzia e di scuola_ (De Amicis), all
@@ -510,10 +512,11 @@ Shipped as of 2026-11-14:
   stripping rule (the work between the START and END markers, LF line ends,
   blank edges and a closing « End of Project Gutenberg » line removed,
   indentation kept), which reproduces the French and English books byte for
-  byte. No Wikisource text is in yet. No e-mail or chat corpus either; the
-  candidates are not cleared: the Enron mails hold personal data, the Ubuntu
-  IRC logs' licence is still to be checked, and Wikipedia talk pages (CC BY-SA)
-  sign every message with a user name.
+  byte. Each register note records why the book is in the public domain in
+  the United States (published before 1931) and in the European Union and
+  France (author dead more than 70 years). No Wikisource text and no e-mail or
+  chat corpus: both wait for the maintainer (TODO.md, « Maintainer decisions
+  pending »).
 - Tatoeba: the first 30,000 French and English sentences of the « detailed »
   exports, CC BY 2.0 FR. Each line keeps its sentence id and author, as the
   licence asks. Their `format` is `tsv`, and `tsv_text_column` picks the

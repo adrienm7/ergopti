@@ -142,6 +142,15 @@
 			"status": "ship",
 			"note": "Jane Austen died in 1817. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
 		},
+		"original/en/carroll_alice_in_wonderland.txt": {
+			"title": "Alice's Adventures in Wonderland (Lewis Carroll, 1865)",
+			"source": "Project Gutenberg ebook 11 (the Millennium Fulcrum Edition 3.0)",
+			"url": "https://www.gutenberg.org/ebooks/11",
+			"licence": "Public domain",
+			"attribution": "Lewis Carroll",
+			"status": "ship",
+			"note": "Lewis Carroll (Charles Lutwidge Dodgson) died in 1898 and the book was published in 1865: in the public domain in the United States (published before 1931) and in the European Union and France (author dead more than 70 years). The ebook's « [Illustration] » marks hold no picture or caption. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
+		},
 		"original/en/don_quixote_ormsby.txt": {
 			"title": "Don Quixote (Cervantes, translated by John Ormsby, 1885)",
 			"source": "Project Gutenberg ebook 996, as kept by Ergo-L",
@@ -150,6 +159,15 @@
 			"attribution": "Miguel de Cervantes, translated by John Ormsby",
 			"status": "ship",
 			"note": "Translation published in 1885, translator died in 1895; no Project Gutenberg boilerplate left."
+		},
+		"original/en/doyle_adventures_of_sherlock_holmes.txt": {
+			"title": "The Adventures of Sherlock Holmes (Arthur Conan Doyle, 1892)",
+			"source": "Project Gutenberg ebook 1661",
+			"url": "https://www.gutenberg.org/ebooks/1661",
+			"licence": "Public domain",
+			"attribution": "Arthur Conan Doyle",
+			"status": "ship",
+			"note": "Arthur Conan Doyle died in 1930 and the twelve stories were published in 1891–1892: in the public domain in the United States (published before 1931) and in the European Union and France since 1 January 2001 (author dead more than 70 years). Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
 		},
 		"original/en/tatoeba_eng_30k.tsv": {
 			"title": "Tatoeba — 30,000 English sentences",
@@ -222,6 +240,15 @@
 			"attribution": "Miguel de Cervantes, translated by Charles Furne",
 			"status": "ship",
 			"note": "19th-century translation (the preface is signed « CH. FURNE. », line 243); no Project Gutenberg boilerplate left."
+		},
+		"original/fr/flaubert_madame_bovary.txt": {
+			"title": "Madame Bovary (Gustave Flaubert, 1857)",
+			"source": "Project Gutenberg ebook 14155 (produced by Ebooks libres et gratuits)",
+			"url": "https://www.gutenberg.org/ebooks/14155",
+			"licence": "Public domain",
+			"attribution": "Gustave Flaubert",
+			"status": "ship",
+			"note": "Gustave Flaubert died in 1880 and the novel was published in 1857: in the public domain in the United States (published before 1931) and in the European Union and France (author dead more than 70 years). Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
 		},
 		"original/fr/hugo_les_miserables_1.txt": {
 			"title": "Les Misérables, tome I : Fantine (Victor Hugo, 1862)",

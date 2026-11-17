@@ -178,10 +178,31 @@
 			"restore_dead_key_pairs": false
 		},
 		{
+			"id": "fr_flaubert_bovary",
+			"title": "Madame Bovary (Gustave Flaubert)",
+			"language": "fr",
+			"file": "static/corpus/original/fr/flaubert_madame_bovary.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
 			"id": "en_austen_pride",
 			"title": "Pride and Prejudice (Jane Austen)",
 			"language": "en",
 			"file": "static/corpus/original/en/austen_pride_and_prejudice.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "en_carroll_alice",
+			"title": "Alice's Adventures in Wonderland (Lewis Carroll)",
+			"language": "en",
+			"file": "static/corpus/original/en/carroll_alice_in_wonderland.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "en_doyle_sherlock",
+			"title": "The Adventures of Sherlock Holmes (Arthur Conan Doyle)",
+			"language": "en",
+			"file": "static/corpus/original/en/doyle_adventures_of_sherlock_holmes.txt",
 			"restore_dead_key_pairs": false
 		},
 		{

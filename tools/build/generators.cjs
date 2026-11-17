@@ -298,7 +298,10 @@ const GENERATORS = [
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_wikipedia_1m.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_news_1m.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_lexique_words.js',
-			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_wikipedia_1m.js'
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_wikipedia_1m.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_flaubert_bovary.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_carroll_alice.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_doyle_sherlock.js'
 		]
 	},
 	{

@@ -51,6 +51,21 @@
 			"output": "original/it/de_amicis_ricordi_d_infanzia.txt",
 			"gutenberg_id": 61885,
 			"sha256": "5f4ca693f86b641891ce4dfc89636f9428ffb7434056f17ed59c1ab0f98be446"
+		},
+		{
+			"output": "original/en/carroll_alice_in_wonderland.txt",
+			"gutenberg_id": 11,
+			"sha256": "01b38ea4c710a84bc18d0bd41271a5a1a92b94e97b2812f4dece97d4a694725e"
+		},
+		{
+			"output": "original/en/doyle_adventures_of_sherlock_holmes.txt",
+			"gutenberg_id": 1661,
+			"sha256": "922e2a12ccb43a4c9544c260b2166c6ad2097aeb5957faeee113f173bb857cd0"
+		},
+		{
+			"output": "original/fr/flaubert_madame_bovary.txt",
+			"gutenberg_id": 14155,
+			"sha256": "93f0a2259dbaf5fde6e7b96adc22346d52f80eb1e9319336c8381a045efe40cd"
 		}
 	]
 }

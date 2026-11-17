@@ -107,10 +107,6 @@ waits for the maintainer's review).
       no author, adnw.de has no page for it). The 53 « collection » credits come from KLA's « author » field, which
       can name the person who submitted the layout: check each against its author's page, first the doubtful ones
       (Klausler « Kaimakides », Neo 2.0 « Julian Asamer », CarpalxQ and QWERTY Wide Mod « Dave Ferree »).
-- [ ] **More corpora.** French, English, German, Spanish and Italian books, Tatoeba, Wikipedia and MIT code are in.
-      [CODE] Nothing from Wikisource yet. [DECISION] An e-mail or chat register: no candidate is cleared (Enron mails
-      hold personal data, the Ubuntu IRC logs' licence is unchecked, Wikipedia talk pages sign each message with a
-      user name).
 - [ ] **[LATER] Large published frequency tables.** The `ergopti-count-table` format and its importer
       (`tools/build/import-count-tables.cjs`) ship Leipzig and Lexique tables. Not imported: Norvig's counts
       (www.norvig.com refused by the build environment's proxy), Google Books Ngram (several GB per language: a
@@ -397,6 +393,23 @@ Each question names the default kept meanwhile; an answer moves into the item or
      starting a new one, a read deadline added), then implement ([CODE]).
   2. Keep one process per query: 30 ms at boot is accepted.
   3. Link `libsqlite3` through FFI, the largest saving, which breaks the driver's rule of never linking SQLite.
+- [ ] **Wikisource texts as corpora: under which licence?** The built-in books come from Project Gutenberg
+      (`static/corpus/text_sources.json`). Wikisource publishes its pages under CC BY-SA 4.0, while the works it
+      transcribes are in the public domain and a faithful transcription arguably adds no new right. Kept meanwhile:
+      no Wikisource text.
+  1. **(recommended) Ship Wikisource texts as CC BY-SA 4.0,** the stricter reading, as the Wikipedia articles already
+     are: only for a public-domain work Project Gutenberg lacks (author dead over 70 years, published before the US
+     cut-off), each register entry naming the pages and revisions read and « Wikisource contributors » ([CODE]).
+  2. Ship them as public domain, crediting Wikisource as the source only.
+  3. No Wikisource: Project Gutenberg only.
+- [ ] **An e-mail or chat corpus?** No candidate is cleared: the Enron mails hold personal data, the Ubuntu IRC logs'
+      licence is unchecked, Wikipedia talk pages (CC BY-SA) sign each message with a user name. Tatoeba's short
+      sentences are the conversational register meanwhile.
+  1. **(recommended) None for now:** Tatoeba stays the conversational register until a source with a clear licence
+     and no personal data is found.
+  2. Check the Ubuntu IRC logs' licence and, if it allows shipping, import a bounded sample with nicknames replaced
+     ([CODE]).
+  3. Wikipedia talk pages under CC BY-SA 4.0 with the signatures stripped ([CODE]).
 - [ ] **Parity decisions THD-1 to THD-4 and HCD-1, HCD-2, HCD-4, HCD-5.** Tap-holds
       ([report](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): THD-1 the pair tap and the layer, THD-2
       the lone window, THD-3 layer-hold pair activity, THD-4 the macOS thumb Backspace under modifiers. Hotstring
