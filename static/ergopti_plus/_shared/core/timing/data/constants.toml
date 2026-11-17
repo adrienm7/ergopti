@@ -230,6 +230,16 @@ val_chord_release_timeout_ms = 5000
 # AHK: keymap/llm_bridge.ahk _LLM_INFINITE_TOOLTIP_SEC (pinned copy, seconds).
 infinite_ttl_ms = 86400000
 
+# The system accessibility settings the previews follow (contrast, screen
+# reader): how long one read stays valid, so a preview drawn per keystroke
+# never queries the system each time.
+# HS: core/ui/adapters/system_accessibility.lua SETTINGS_TTL_SECONDS.
+accessibility_settings_ttl_ms = 1000
+# LX: core/ui/adapters/system_accessibility.lua REFRESH_SECONDS, the
+# background gsettings refresh, and READ_TIMEOUT_MS, the bound of one read.
+accessibility_settings_refresh_ms = 5000
+accessibility_settings_read_timeout_ms = 2000
+
 # Minimum hotstring tooltip duration before the chained LLM call fires.
 # AHK: keymap/llm_bridge.ahk _LLM_MIN_TOOLTIP_DURATION_SEC (pinned copy, seconds).
 hotstring_min_ttl_ms = 50

@@ -871,6 +871,7 @@ return {
 	"tests.unit.menu.about.test_version_row",
 	"tests.unit.core.ui.webview.test_app_chooser",
 	"tests.unit.core.ui.webview.test_dialog_host",
+	"tests.unit.core.ui.test_system_accessibility",
 	"tests.unit.modules.keymap.test_managed_python",
 	"tests.unit.core.ui.webview.test_native_dialog_titles",
 	"tests.unit.core.ui.webview.test_every_app_window_title",

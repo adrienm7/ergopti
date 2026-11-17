@@ -37,6 +37,7 @@ local Logger = require("core.logger.engine.shim")
 local Tint = require("core.ui.engine.tooltip.tint")
 local Layout = require("core.ui.engine.tooltip.layout")
 local LlmLine = require("core.ui.engine.tooltip.llm_line")
+local SystemA11y = require("core.ui.adapters.system_accessibility")
 
 local LOG = "core.ui.adapters.graphics_renderer"
 
@@ -95,6 +96,12 @@ local function bind()
 			cairo      = lgi.cairo,
 			Pango      = lgi.require("Pango"),
 			PangoCairo = lgi.require("PangoCairo"),
+			-- The accessibility toolkit names the window for AT-SPI; a
+			-- machine without its introspection data still draws.
+			Atk        = (function()
+				local found, atk = pcall(lgi.require, "Atk")
+				return found and atk or nil
+			end)(),
 		}
 	end)
 	if not ok or type(bound) ~= "table" then
@@ -104,6 +111,9 @@ local function bind()
 
 	_gtk = bound
 	Logger.debug(LOG, "Tooltip renderer bound (lgi + GTK 3).")
+	-- A preview can be drawn: from now on it follows the desktop's high
+	-- contrast and screen reader, read in the background.
+	SystemA11y.start()
 	return _gtk
 end
 
@@ -437,6 +447,58 @@ end
 
 
 
+--- The plain text of a preview, for AT-SPI: the rows that will be sent, each
+--- with its trigger, never the struck-through alternatives.
+--- @param rows table Array of { text, label?, dimmed?, struck? }.
+--- @return string
+function M.accessible_text(rows)
+	local parts = {}
+	for _, row in ipairs(type(rows) == "table" and rows or {}) do
+		if type(row) == "table" and type(row.text) == "string" and row.text ~= "" and not row.dimmed and not row.struck then
+			local label = type(row.label) == "string" and row.label ~= "" and (" " .. row.label) or ""
+			parts[#parts + 1] = row.text .. label
+		end
+	end
+	return table.concat(parts, "; ")
+end
+
+--- Names the window for AT-SPI. A cairo surface has no text a screen reader
+--- can read: the window carries it as its accessible name. Its role is a
+--- tooltip, or a notification while the desktop's screen reader is on, which
+--- Orca speaks when it appears (decided 2026-11-17: the announcement follows
+--- the screen-reader setting, no option of its own).
+--- @param window userdata|table The GTK window.
+--- @param atk table|nil The Atk namespace; nil leaves the window unnamed.
+--- @param rows table
+--- @param screen_reader boolean
+--- @return boolean described
+function M.describe_window(window, atk, rows, screen_reader)
+	if type(atk) ~= "table" and type(atk) ~= "userdata" then return false end
+	local ok, err = pcall(function()
+		local accessible = window:get_accessible()
+		accessible:set_role(screen_reader and atk.Role.NOTIFICATION or atk.Role.TOOL_TIP)
+		accessible:set_name(M.accessible_text(rows))
+	end)
+	if not ok then
+		Logger.debug(LOG, "The preview window could not be named for AT-SPI: %s.", tostring(err))
+		return false
+	end
+	return true
+end
+
+--- The panel colour under the desktop's high-contrast setting: opaque, so
+--- the text stands on its own colour, not on whatever lies behind.
+--- @param background table { red, green, blue, alpha }
+--- @param high_contrast boolean
+--- @return table
+function M.contrast_background(background, high_contrast)
+	if not high_contrast or type(background) ~= "table" then return background end
+	return { red = background.red, green = background.green, blue = background.blue, alpha = 1 }
+end
+
+
+
+
 -- ==============================================
 -- ==============================================
 -- ======= 4/ The window ========================
@@ -535,6 +597,9 @@ local function show_owned(rows, opts)
 		},
 	})
 
+	local desktop = SystemA11y.settings()
+	background = M.contrast_background(background, desktop.high_contrast)
+
 	_surface_rows = { rows = rows, metrics = metrics, background = background }
 
 	local position = Layout.compute_position(opts.anchor, size, opts.screen, {
@@ -546,6 +611,7 @@ local function show_owned(rows, opts)
 
 	if window:resize(math.floor(size.w + 0.5), math.floor(size.h + 0.5)) == false then return false end
 	if window:move(math.floor(position.x + 0.5), math.floor(position.y + 0.5)) == false then return false end
+	M.describe_window(window, g.Atk, rows, desktop.screen_reader)
 	if window:show_all() == false then return false end
 	make_click_through(window)
 	if window:queue_draw() == false then return false end
