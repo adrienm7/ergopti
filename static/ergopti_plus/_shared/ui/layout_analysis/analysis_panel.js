@@ -64,8 +64,13 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		'pinky_load',
 		'finger_imbalance',
 		'shortcut_left',
-		'unsupported'
+		'unsupported',
+		'distinct_chars',
+		'coverage_bonus',
+		'simplicity'
 	];
+	// How many characters the « typed via » line names.
+	const TYPING_ROWS = 3;
 	// Every keyboard of the model, in its order.
 	const KEYBOARDS = Object.keys(DATA.model.keyboards);
 	const UPDATE_DEBOUNCE_MS = 150;
@@ -108,8 +113,12 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 
 	// Every number in the language of the page's strings (info_popover.js).
 	const format = INFO.format;
-	const metricDigits = (id) => (E.METRICS[id].unit === 'mm' ? 1 : 2);
-	const unitText = (id) => (E.METRICS[id].unit === 'mm' ? t('layout_analysis.unit.mm') : '%');
+	const metricDigits = E.metricDigits;
+	const unitText = (id) => {
+		const unit = E.METRICS[id].unit;
+		if (unit === 'chars') return t('layout_analysis.unit.chars');
+		return unit === 'mm' ? t('layout_analysis.unit.mm') : '%';
+	};
 
 	/**
 	 * The engine's layout for an editor document.
@@ -276,6 +285,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		rankNote.hidden = true;
 		const note = el('p', 'la-panel-note');
 		const metrics = el('table', 'la-panel-metrics');
+		// Where the layout offers a choice: how often and which characters.
+		const typing = el('p', 'la-panel-note');
 		const fingersTitle = el('h3');
 		const fingers = el('div', 'la-panel-fingers');
 		const analysersTitle = el('h3');
@@ -291,6 +302,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			rankNote,
 			note,
 			metrics,
+			typing,
 			fingersTitle,
 			fingers,
 			analysersTitle,
@@ -433,6 +445,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			headline.textContent = text;
 			headline.className = 'la-panel-score la-panel-error';
 			metrics.replaceChildren();
+			typing.textContent = '';
 			fingers.replaceChildren();
 			analysers.replaceChildren();
 			extra.replaceChildren();
@@ -496,6 +509,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				state.previous.corpus === state.corpus &&
 				state.previous.keyboard === state.keyboard;
 			drawMetrics(result, same ? state.previous.metrics : null);
+			drawTyping(result, layout);
 			drawFingers(result);
 			drawAnalysers(layout, prepared, settings, mine);
 			extra.replaceChildren();
@@ -527,6 +541,29 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				tr.append(th, td, delta);
 				metrics.append(tr);
 			}
+		}
+
+		/**
+		 * The share of the characters typed otherwise than their cheapest way out
+		 * of context, and the most frequent of them with their ways (the
+		 * Comparer's details list more).
+		 */
+		function drawTyping(result, layout) {
+			const rows = E.typingRows(result, layout, TYPING_ROWS);
+			if (rows.length === 0) {
+				typing.textContent = t('layout_analysis.details.typing_none');
+				return;
+			}
+			const chars = rows
+				.map(
+					(row) =>
+						`${row.char} ${row.ways.map((way) => `${way.keys} ${format(way.share, 0)} %`).join(', ')}`
+				)
+				.join(' · ');
+			typing.textContent = `${t('layout_analysis.details.typing_caption', {
+				share: format(result.typing.changed, 2),
+				count: result.typing.alternatives
+			})} ${chars}`;
 		}
 
 		/**

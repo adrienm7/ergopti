@@ -130,6 +130,19 @@ var LAYOUT_ANALYSIS = (function () {
 		simplicity: { unit: '%', better: 'higher', of: 'layout' }
 	};
 
+	/**
+	 * How many decimals the pages show a metric with: a count none, a distance
+	 * one, a share two. The one source for the Comparer, the panel and the
+	 * optimizer.
+	 * @param {string} id - A METRICS id.
+	 * @returns {number} Fraction digits.
+	 */
+	function metricDigits(id) {
+		const unit = METRICS[id].unit;
+		if (unit === 'chars') return 0;
+		return unit === 'mm' ? 1 : 2;
+	}
+
 	// =======================
 	// ======= 2/ Data =======
 	// =======================
@@ -1845,6 +1858,45 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 	}
 
+	// Held modifiers of each level, as the pages write them before a key.
+	const LEVEL_PREFIX = { base: '', shift: 'Shift+', altgr: 'AltGr+', shift_altgr: 'Shift+AltGr+' };
+
+	/**
+	 * The « typed via » rows of an analysis, for the pages: each character a
+	 * choice concerned (several ways used, or a chord), most frequent first,
+	 * with each way's keys written with the layout's own characters
+	 * (« AltGr+o », a dead key as [its state]) and its share.
+	 * @param {object} result - analyse() output.
+	 * @param {object} layoutInput - The layout analysed (library shape).
+	 * @param {number} [limit] - At most this many rows; all when absent.
+	 * @returns {Array<{char: string, count: number, ways: Array<{kind: string,
+	 *   keys: string, share: number}>}>} share in % of the character's count.
+	 */
+	function typingRows(result, layoutInput, limit) {
+		const rows = layoutInput.rows || {};
+		const label = (code, level) => {
+			const base = rows[code] ? rows[code][0] : null;
+			const name = typeof base === 'string' ? base : base && base.dead ? `[${base.dead}]` : code;
+			return LEVEL_PREFIX[level] + name;
+		};
+		const out = [];
+		for (const [char, ways] of Object.entries(result.typing.paths)) {
+			const count = ways.reduce((sum, way) => sum + way.count, 0);
+			if (!(count > 0) || (ways.length < 2 && !(char in result.typing.chords))) continue;
+			out.push({
+				char,
+				count,
+				ways: ways.map((way) => ({
+					kind: way.kind,
+					keys: way.steps.map(([code, level]) => label(code, level)).join(' '),
+					share: (100 * way.count) / count
+				}))
+			});
+		}
+		out.sort((a, b) => b.count - a.count || (a.char < b.char ? -1 : 1));
+		return limit === undefined ? out : out.slice(0, limit);
+	}
+
 	/**
 	 * The per-key data of the heatmap.
 	 * - presses, sfb, sfs, lsb, scissors (full and half), redirect: the key's
@@ -3306,6 +3358,8 @@ var LAYOUT_ANALYSIS = (function () {
 		compileLayout,
 		compileWays,
 		typingPlan,
+		typingRows,
+		metricDigits,
 		keyNgrams,
 		ngramsFromText,
 		prepareNgrams,

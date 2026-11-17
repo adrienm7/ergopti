@@ -86,7 +86,10 @@
 		'redirect_bad',
 		'home_row',
 		'distance',
-		'unsupported'
+		'unsupported',
+		'distinct_chars',
+		'coverage_bonus',
+		'simplicity'
 	];
 	// What the heatmap can show: the presses, the points each key costs the
 	// score, or any per-key metric of the engine (its costs and its gains).
@@ -119,6 +122,8 @@
 		'roll_mixed',
 		'same_finger'
 	];
+	// How many characters « typed via » lists, most frequent first.
+	const TYPING_ROWS = 12;
 	// Layouts ticked on a first visit: the registry and the two references.
 	const DEFAULT_ORIGINS = ['registry', 'reference'];
 	const CHART_MAX_BARS = 40;
@@ -341,6 +346,13 @@
 		<table id="la-metrics" class="la-table"></table>
 	</div>
 	<p id="la-unsupported" class="la-muted"></p>
+	<h3 data-i18n="layout_analysis.details.typing"></h3>
+	<p id="la-typing-caption" class="la-muted"></p>
+	<div class="la-table-wrap">
+		<table id="la-typing" class="la-table"></table>
+	</div>
+	<h3 data-i18n="layout_analysis.details.simplicity"></h3>
+	<table id="la-simplicity" class="la-table"></table>
 </section>
 
 <details id="la-settings" class="la-settings">
@@ -478,7 +490,7 @@
 		const $ = (id) => document.getElementById(id);
 		// Every number in the language of the page's strings (info_popover.js).
 		const format = INFO.format;
-		const metricDigits = (id) => (E.METRICS[id].unit === 'mm' ? 1 : 2);
+		const metricDigits = E.metricDigits;
 
 		/** Reads the saved conveniences; an unavailable storage gives none. */
 		function loadSaved() {
@@ -1122,7 +1134,9 @@
 
 		/** A metric's unit as written beside its value. */
 		function unitText(id) {
-			return E.METRICS[id].unit === 'mm' ? t('layout_analysis.unit.mm') : '%';
+			const unit = E.METRICS[id].unit;
+			if (unit === 'chars') return t('layout_analysis.unit.chars');
+			return unit === 'mm' ? t('layout_analysis.unit.mm') : '%';
 		}
 
 		/** What a key types on its base layer, as the heatmap and the tables show it. */
@@ -1498,6 +1512,69 @@
 			table.append(thead, tbody);
 		}
 
+		/**
+		 * How the layout types the corpus where it offers a choice: the share of
+		 * the characters typed otherwise than their cheapest way out of context,
+		 * each concerned character's ways with their shares, then the simplicity
+		 * rules.
+		 */
+		function renderTyping(result, layout) {
+			const rows = E.typingRows(result, layout, TYPING_ROWS);
+			$('la-typing-caption').textContent =
+				rows.length > 0
+					? t('layout_analysis.details.typing_caption', {
+							share: format(result.typing.changed, 2),
+							count: result.typing.alternatives
+						})
+					: t('layout_analysis.details.typing_none');
+			const table = $('la-typing');
+			table.replaceChildren();
+			table.hidden = rows.length === 0;
+			if (rows.length > 0) {
+				const head = el('tr');
+				for (const key of ['typing_char', 'typing_ways']) {
+					const th = el('th', '', t(`layout_analysis.details.${key}`));
+					th.scope = 'col';
+					head.append(th);
+				}
+				const thead = el('thead');
+				thead.append(head);
+				const tbody = el('tbody');
+				for (const row of rows) {
+					const tr = el('tr');
+					// An invisible character is named by its code point.
+					const name = /^[\s\p{C}]$/u.test(row.char)
+						? `U+${row.char.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`
+						: row.char;
+					const th = el('th', '', name);
+					th.scope = 'row';
+					const ways = row.ways
+						.map(
+							(way) =>
+								`${t(`layout_analysis.typing.${way.kind}`)} ${way.keys} (${format(way.share, 0)} %)`
+						)
+						.join(' · ');
+					tr.append(th, el('td', '', ways));
+					tbody.append(tr);
+				}
+				table.append(thead, tbody);
+			}
+			const simplicity = $('la-simplicity');
+			simplicity.replaceChildren();
+			const body = el('tbody');
+			for (const [id, rule] of Object.entries(result.simplicity)) {
+				const tr = el('tr');
+				const th = el('th', '', t(`layout_analysis.simplicity.${id}`));
+				th.scope = 'row';
+				const value = rule
+					? `${format(rule.value, 0)} %`
+					: t('layout_analysis.simplicity.not_measured');
+				tr.append(th, el('td', '', value));
+				body.append(tr);
+			}
+			simplicity.append(body);
+		}
+
 		/** One layout's contributions, finger load and every metric. */
 		function renderDetails() {
 			const section = $('la-details');
@@ -1559,6 +1636,7 @@
 				100
 			);
 			renderMetrics(result);
+			renderTyping(result, layout);
 			const missing = Object.entries(result.coverage.unsupportedChars)
 				.sort((a, b) => b[1] - a[1])
 				// An invisible character is named by its code point.

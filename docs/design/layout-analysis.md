@@ -161,6 +161,10 @@ changed, commit()}}`: the global score of layouts that change a little at a
 - `typingPlan(layout, ngrams, options)` → `{board, chords, ways,
 choose(before, token, after)}`: how a corpus is typed, so a text can be
   typed exactly as the tables are (the gate's reference stream).
+- `typingRows(result, layout, limit?)` → the « typed via » rows the pages
+  show: each concerned character with its ways written with the layout's own
+  characters (« AltGr+o », a dead key as `[state]`) and their shares.
+- `metricDigits(id)` → the decimals a page shows a metric with.
 - `METRICS` → `{id: {unit, better, of}}`; `better` is `lower`, `higher` or
   `none` (shown, not scored); `unit` is `%`, `mm` or `chars` (a count).
 
@@ -604,7 +608,12 @@ score, from `diff`, each with ▲ better, ▼ worse, = equal or « not scored »
 words); the key heatmap in one blue hue from light to dark with its scale
 (0 to the largest key's value), board positions in % so it shrinks with the
 page; the contributions; each finger's share of the non-thumb presses with
-its ideal load marked; hands and rows. The chart colours are tokens of
+its ideal load marked; hands and rows; every metric; « Typed via » (the share
+of the characters typed otherwise than their cheapest way alone, then the
+twelve most frequent characters concerned, each way with its share,
+`typingRows`); the simplicity rules, each with its value or « not measured ».
+The ranking has a column each for the distinct characters (a count), the
+coverage bonus and the simplicity bonus. The chart colours are tokens of
 `style.css` checked with the dataviz palette validator in light and dark.
 
 « Copy the link » (`#la-share`) writes the comparison's address: the framing
@@ -770,8 +779,11 @@ does not load the panel's scripts gets no panel.
   `LAYOUT_ANALYSIS_FILES.SETTINGS_KEY`), so both pages score alike.
 - Corpus and keyboard are its own choices. « Ma frappe » arrives through the
   app's `studio-ngrams` event and becomes the default corpus.
-- It lists the main metrics with « i » buttons and the change the last edit
-  made (green better, red worse), then the finger load.
+- It lists the main metrics with « i » buttons (the distinct characters, the
+  coverage and simplicity bonuses among them) and the change the last edit
+  made (green better, red worse), a « typed via » line (the share typed
+  otherwise than the cheapest way alone, and the three most frequent
+  characters concerned with their ways), then the finger load.
 - Then every analyser's score (`LAYOUT_ANALYSER_SCORES.score`, see
   [analyser-scores.md](analyser-scores.md)): the official score is drawn with
   the analysis, the score with the user's finger model on the next tick, so

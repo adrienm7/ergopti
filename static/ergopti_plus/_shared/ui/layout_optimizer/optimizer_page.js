@@ -58,7 +58,8 @@
 		'distance',
 		'finger_imbalance',
 		'hand_imbalance',
-		'pinky_load'
+		'pinky_load',
+		'simplicity'
 	];
 	const DEFAULT_START = 'azerty';
 	const DEFAULT_CORPUS = 'fr_swann';
@@ -216,7 +217,7 @@
 				maximumFractionDigits: digits
 			});
 		const signed = (value, digits) => (value > 0 ? '+' : '') + number(value, digits);
-		const metricDigits = (id) => (E.METRICS[id].unit === 'mm' ? 1 : 2);
+		const metricDigits = E.metricDigits;
 
 		function applyStrings() {
 			for (const node of root.querySelectorAll('[data-i18n]'))
