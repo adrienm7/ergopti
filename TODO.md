@@ -172,15 +172,16 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       metadata (decided 2026-11-06, as macOS): download the asset under its conventional name, compute size and
       SHA-256, rebuild the `asset_signing.json` record and verify `<asset>.sig` against the pinned key. Blocked until
       `public_key_spki_base64` is provisioned and enforcement leaves `off` ([update-signing](docs/tooling/update-signing.md)).
-- [ ] **[CI] Native keyboard-source fixture (macOS).** The selection-deadline / cleanup-unavailable refusals of the
-      Swift keyboard-source cohorts ([sequential audit](docs/audits/platform-parity/2026-11-05-sequential/report.md)).
-      Both steps are bracketed with a text-input snapshot and `tsm-refusal.json`; the refused case now names
-      `process_current_source_stale` (`tools/test/test-macos-tsm-refusal.cjs`): the system applies the restore to US,
-      but `TISCopyCurrentKeyboardInputSource` in the test process keeps returning French, and every later case
-      captures that stale source (TextInputMenuAgent did not restart). Left: why the process misses that one change
-      (the notification that refreshes its cache, or the run-loop mode the fixture pumps), and whether the launcher's
-      own long-lived process can be left on a stale source the same way. No retry is added while the cause is
-      unproven.
+- [ ] **[CI] Number-row cohort still selects in the XCTest process (macOS).** The refused restores were not a stale
+      test-process cache: the TIS probe (`probe-macos-tis-cache.yml`) left HIToolbox's own current layout
+      (`AppleCurrentKeyboardLayoutInputSourceID`, read by every process, the launcher included) on the old source while
+      the selected list moved, 3 times in about 5,900 steps of a process that is an application and selects, under a
+      storm of selection notifications, and never when a plain child selected (runs 44025301586, 44029045918);
+      re-selecting the already-selected source does not repair it. The shared `KeyboardSourceSelectionFixture` now
+      selects through the launcher's headless role, and refusals name `system_current_layout_stale` or
+      `process_current_source_stale` from the recorded system layout. Left: `NumberRowSourceProbeTests.swift` keeps
+      its own in-process selection because its bytes are the reviewed image `number_row_current_test_causal.py` pins
+      (`CURRENT_TEST_SHA`); moving it to the shared fixture needs that review renewed. No retry is added.
 - [ ] **Linux live runtime receiving.** Write the runtime flow in the hosted desktop-webview CI shard: the model
       browser page in real WebKit reading the managed Ollama runtime absent, then installed after a real first install
       without a restart (LRT-001), as the editor and diagnostics flows do
