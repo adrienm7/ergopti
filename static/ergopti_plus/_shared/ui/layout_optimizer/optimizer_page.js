@@ -683,7 +683,8 @@
 		// ======= 5/ Run =============
 		// ============================
 
-		function options() {
+		/** The constraints of the run (LAYOUT_OPTIMIZER.problem options). */
+		function problemOptions() {
 			const out = {
 				pinnedCodes: [...state.pinnedCodes].sort(),
 				qwertyPins: [...state.qwertyPins].sort(),
@@ -766,7 +767,7 @@
 			if (state.running) return;
 			const start = startLayout();
 			if (!start) return;
-			const opts = options();
+			const opts = problemOptions();
 			const analysis = analysisOptions();
 			const seconds = readInteger('lo-seconds', 1, 3600, DEFAULT_SECONDS);
 			const iterations = readInteger('lo-iterations', 10, 1000000, DEFAULT_ITERATIONS);
@@ -1047,7 +1048,7 @@
 				switches,
 				pinnedCodes: [...state.pinnedCodes],
 				qwertyPins: [...state.qwertyPins],
-				zones: options().zones,
+				zones: problemOptions().zones,
 				weights: state.weights,
 				seconds: $('lo-seconds').value,
 				iterations: $('lo-iterations').value,

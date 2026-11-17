@@ -155,6 +155,19 @@ for (const file of locales) {
 	}
 }
 
+// A function declared inside mount() takes the name of mount's own parameter
+// for the whole body: the run's options() once hid mount's options, so the
+// site never got the page's height (reportHeight) and no host hook arrived.
+{
+	const signature = page.match(/function mount\(([^)]*)\)/);
+	check(Boolean(signature), 'the page defines mount(root, options)');
+	for (const name of signature ? signature[1].split(',').map((p) => p.trim()) : [])
+		check(
+			!new RegExp(`\\bfunction ${name}\\(`).test(page),
+			`a function named ${name} hides mount's parameter`
+		);
+}
+
 // =========================
 // ======= 3/ Studio =======
 // =========================
