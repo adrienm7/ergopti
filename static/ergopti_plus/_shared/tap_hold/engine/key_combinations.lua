@@ -200,6 +200,12 @@ function M.plan_chord_copy(source, options)
 	assert(type(source) == "string" and type(options) == "table" and type(options.entries) == "table",
 		"exact source and declared copy catalogue required")
 	assert(type(options.is_action) == "function", "native action admission required")
+	-- A tap the host admits but no chord can run (Windows and Linux refuse the
+	-- one-shot Shift, a program launch and the monitor Alt-Tab in a chord) keeps
+	-- its pair's chord as it is and is reported, as Windows has always done:
+	-- one such tap must not refuse the copy of every other pair.
+	local is_chord_action = options.is_chord_action or options.is_action
+	assert(type(is_chord_action) == "function", "native chord admission must be a function")
 	assert(options.tap_section == nil or options.tap_section == M.TAP_SECTION, "copy source section must be explicitly declared")
 	local Codec = require("core.text.engine.toml_codec")
 	local KeyPath = require("core.text.engine.toml_codec.key_path")
@@ -221,7 +227,7 @@ function M.plan_chord_copy(source, options)
 	if symmetric == nil then symmetric = declared.combo_symmetric end
 	local settings = M.chord_settings({ simultaneous_threshold_ms = delay, combo_symmetric = symmetric })
 	assert(combos.enabled == nil or type(combos.enabled) == "boolean", "chord source gate must be an exact boolean")
-	local rows, output, seen = {}, {}, {}
+	local rows, output, seen, skipped = {}, {}, {}, {}
 	for _, entry in ipairs(options.entries) do
 		assert(type(entry) == "table" and chord_token(entry.id) and not seen[entry.id], "unique copy pair required")
 		seen[entry.id] = true
@@ -237,14 +243,19 @@ function M.plan_chord_copy(source, options)
 			assert(id(value) and (value == M.NONE or options.is_action(value) == true), "chord source contains an unadmitted action")
 			slots[slot] = value
 		end
-		output[entry.id] = { tap = slots.tap, hold = slots.hold, combo = slots.tap }
-		if slots.tap ~= slots.combo then
+		if slots.tap ~= M.NONE and is_chord_action(slots.tap) ~= true then
+			skipped[#skipped + 1] = { id = entry.id, action = slots.tap }
+			output[entry.id] = { tap = slots.tap, hold = slots.hold, combo = slots.combo }
+		else
+			output[entry.id] = { tap = slots.tap, hold = slots.hold, combo = slots.tap }
+		end
+		if output[entry.id].combo ~= slots.combo then
 			local row = { section = KeyPath.render({ ConfigKeys.KEY.MOD_COMBOS, "config", entry.id }), key = "combo" }
 			if slots.tap == M.NONE then row.delete = true else row.value = slots.tap end
 			rows[#rows + 1] = row
 		end
 	end
-	return { source = source, rows = rows, changes = #rows, mod_combos_config = output,
+	return { source = source, rows = rows, changes = #rows, mod_combos_config = output, skipped = skipped,
 		mod_combos_enabled = combos.enabled, settings = settings }
 end
 

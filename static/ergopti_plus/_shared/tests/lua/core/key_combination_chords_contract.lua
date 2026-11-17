@@ -70,6 +70,20 @@ function M.register(h)
     h.assert_eq(pcall(plan, source), false, source)
    end
   end)
+  h.it("(kcl-copy-skips-chordless-tap) a tap no chord runs keeps its chord and is reported", function()
+   local source = '[mod_combos.config.caps_lock_then_tab]\ntap = "copy"\n[mod_combos.config.tab_then_caps_lock]\ntap = "paste"\ncombo = "copy"\n'
+   local candidate = Policy.plan_chord_copy(source, { entries = entries,
+    settings = { simultaneous_threshold_ms = 100, combo_symmetric = false },
+    is_action = function(action) return action == "copy" or action == "paste" end,
+    is_chord_action = function(action) return action == "copy" end })
+   h.assert_eq(candidate.changes, 1); h.assert_eq(candidate.rows[1].value, "copy")
+   h.assert_eq(candidate.rows[1].section, "mod_combos.config.caps_lock_then_tab")
+   h.assert_eq(candidate.mod_combos_config.tab_then_caps_lock, { tap = "paste", hold = "none", combo = "copy" })
+   h.assert_eq(candidate.skipped, { { id = "tab_then_caps_lock", action = "paste" } })
+   h.assert_eq(plan(source).skipped, {}, "without a chord admission every admitted tap copies")
+   h.assert_eq(pcall(Policy.plan_chord_copy, source, { entries = entries, is_action = function() return true end,
+    is_chord_action = true, settings = { simultaneous_threshold_ms = 100, combo_symmetric = false } }), false)
+  end)
   h.it("neutral document and already copied slots require no owned row", function()
    local empty = plan(""); h.assert_eq(empty.changes, 0); h.assert_eq(empty.settings.combo_symmetric, false)
    h.assert_eq(empty.settings.simultaneous_threshold_ms, 100)

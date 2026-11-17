@@ -9,6 +9,8 @@ local Codec = require("core.text.engine.toml_codec")
 local KeyPath = require("core.text.engine.toml_codec.key_path")
 local Updates = require("shortcuts.engine.physical_availability")
 local ConfigKeys = require("settings.engine.keys")
+local Logger = require("core.logger.engine.shim")
+local LOG = "infra.key_combinations_scope"
 local M = {}
 local retained, sequence, session_busy = nil, 0, false
 require("settings.engine.scope.registry").register("key_combinations_scope", function() return session_busy or (retained ~= nil and retained.pending() == true) end)
@@ -282,20 +284,30 @@ function M.new(options)
 	function owner.copy_taps_to_chords()
 		if not chord_declared() or type(combinations.configuration_entries) ~= "function"
 			or type(combinations.chord_settings) ~= "function" then return false end
+		-- Every known participant must be admitted by the actual source owner.
+		local function admitted_by_every(kind,action)
+			for _,entry in ipairs(combinations.configuration_entries()) do
+				if combinations.validate_slot(kind,entry.id,action) ~= true then return false end
+			end
+			return true
+		end
 		return perform(function()
 			local captured = combinations.configuration_source(owner)
 			if type(captured) ~= "table" then return false end
 			local plan = Shared.plan_chord_copy(captured.status=="ok" and captured.content or "",{
 				entries=combinations.configuration_entries(),settings=combinations.chord_settings(),tap_section=Shared.TAP_SECTION,
+				-- A stored slot holds an action some pair slot admits; a copied tap
+				-- must also be one a chord runs, else its pair keeps its chord.
 				is_action=function(action)
-					-- Every known participant must be admitted by the actual source owner.
-					for _,entry in ipairs(combinations.configuration_entries()) do
-						if combinations.validate_slot("combo",entry.id,action) ~= true then return false end
-					end
-					return true
+					return admitted_by_every("tap",action) or admitted_by_every("combo",action)
 				end,
+				is_chord_action=function(action) return admitted_by_every("combo",action) end,
 			})
 			if combinations.configuration_source_matches(owner,captured) ~= true then return false end
+			for _,skip in ipairs(plan.skipped) do
+				Logger.warn(LOG,"Pair '%s' tap '%s' cannot run as a chord — its chord is left as it is.",
+					skip.id,skip.action)
+			end
 			if plan.changes == 0 then
 				local doc=captured.status=="ok" and Codec.decode(captured.content) or {}
 				if parameters.parameter_configuration_matches(owner,doc,function() return true end)~=true

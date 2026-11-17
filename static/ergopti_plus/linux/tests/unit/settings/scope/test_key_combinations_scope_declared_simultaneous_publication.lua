@@ -291,6 +291,30 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
    helpers.assert_eq(doc.gesture_parameters[parameter],nil);helpers.assert_eq(doc.unrelated.keep,42)
   end,true)
  end)
+ -- A pair tap no chord runs once refused the whole copy (a save-failure dialog,
+ -- no pair named); Windows skips that pair, keeps its chord and logs it.
+ helpers.it("(kcl-copy-skips-chordless-tap) a tap no chord runs keeps its chord and the others copy",function()
+  with_menu(function(s)
+   local other="tab_then_caps_lock"
+   local text=source:gsub('future_then_tab = "future"\n','future_then_tab = "future"\n'..other..' = "run_program"\n',1)
+    ..'[mod_combos.config.'..other..']\ncombo="copy"\n'
+   seed_public(s,text)
+   helpers.assert_eq(s.pairs.get_action(other),"run_program")
+   helpers.assert_eq(s.pairs.validate_slot("combo",other,"run_program"),false)
+   local warned={};local Logger=require("core.logger.engine.shim");local warn=Logger.warn
+   Logger.warn=function(module,message,...) warned[#warned+1]=string.format(message,...);return warn(module,message,...) end
+   local copied=find_menu(s.build(),s.translate('menu.tapholds.copy_tap_to_combo'),true).fn()
+   Logger.warn=warn
+   helpers.assert_true(copied,"one chordless tap must not refuse the whole copy")
+   local doc=Codec.decode(s.bytes[path])
+   helpers.assert_eq(doc.mod_combos.config[pair].combo,'open_url')
+   helpers.assert_eq(doc.mod_combos.config[other].combo,'copy',"the chord of a chordless tap is left as it is")
+   helpers.assert_eq(s.pairs.get_chord(pair),'open_url');helpers.assert_eq(s.pairs.get_chord(other),'copy')
+   local named=false
+   for _,line in ipairs(warned) do named=named or (line:find(other,1,true)~=nil and line:find("run_program",1,true)~=nil) end
+   helpers.assert_true(named,"the skipped pair and its tap are logged")
+  end,true)
+ end)
 end)
 
 
