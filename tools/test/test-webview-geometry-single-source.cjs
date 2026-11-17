@@ -612,7 +612,10 @@ for (const [driver, language, owner, expected] of [
 			errors.push(`${driver}/${relative}: native console access must use the console window owner`);
 	}
 	assert.equal(owned, expected, `${driver} console owner must exercise the native APIs`);
-	const source = fs.readFileSync(path.join(directory, 'ui/console_window.' + language), 'utf8');
+	const source = fs.readFileSync(
+		path.join(directory, 'diagnostics/ui/console_window.' + language),
+		'utf8'
+	);
 	assert.ok(
 		source.includes('apps.manifest.json') && source.includes('native_windows'),
 		`${driver} console owner must read the shared geometry`
