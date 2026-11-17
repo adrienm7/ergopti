@@ -232,6 +232,16 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Windows
 
+- [ ] **Hotstring Undo by characters (maintainer decision needed).** `HSE_UndoExpansion` erases
+      `_TextCaretSteps(Undo.Typed)` minus one Backspaces, one per user-perceived character (4c476acba2). Measured on the
+      PC on 2026-11-17 (one Backspace after each kind, UTF-16 units removed): a Win32 EDIT removes one code point every
+      time (é decomposed 1 of 2, 👍🏽 2 of 4, 🇫🇷 2 of 4, 👨‍👩‍👧 2 of 8, ❤️ 1 of 2); RICHEDIT50W (the new Notepad,
+      WordPad) removes one code point for a combining accent and a flag but the whole cluster for a skin tone, a ZWJ
+      sequence and VS16; Chromium (Edge, Electron) removes the accent alone but the whole emoji, flag and ZWJ cluster.
+      So that cluster count, like the Linux `injector.caret_steps()` measured in GTK, is wrong in EDIT fields, and a
+      code-point count would be wrong for emoji in RichEdit and Chromium. Choose: a per-host-class count (EDIT,
+      RichEdit, Chromium, other), or an Undo that selects the expansion by its known length (Shift+Left per caret step,
+      itself host-dependent) and types the trigger over it.
 - [ ] **TakeNote probe and Notepad's restored session.** TakeNote binds each note to its UI Automation tab
       (a1cd4d2891), but the probe `takenote-native-document-owner` still cannot qualify it on the PC: Notepad there
       restores about 50 « Notes.txt » tabs of earlier probe runs when it starts, the probe most likely reads the first
