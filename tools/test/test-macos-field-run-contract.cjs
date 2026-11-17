@@ -209,6 +209,9 @@ function fixture(name, { onDev = false } = {}) {
 	run('push', '-q', 'origin', 'dev');
 	if (!onDev) run('switch', '-q', '-c', 'field/mac-fixture');
 	shim(bin, 'uname', 'echo Darwin');
+	// The versions step reads macOS facts; the hosted Linux runner has neither tool.
+	shim(bin, 'sw_vers', 'printf "ProductName:\\tmacOS\\nProductVersion:\\t15.0\\n"');
+	shim(bin, 'sysctl', 'printf "8\\n17179869184\\n"');
 	// The app is running: the collector must not try to start it
 	shim(bin, 'pgrep', 'exit 0');
 	const plutil = path.join(bin, 'plutil.cjs');

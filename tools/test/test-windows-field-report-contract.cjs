@@ -578,7 +578,14 @@ try {
 				assert.match(steps, new RegExp(`^${name}\\s+exit=\\d+$`, 'm'), `step ${name}`);
 			assert.match(steps, /^facts\s+exit=0$/m);
 			assert.match(terminal, /^\[field-report\] > step 1\/\d+ versions$/m, 'step k/N');
-			assert.match(terminal, /^\[field-report\] {3}\[OK\] versions \(\d+ s\)$/m);
+			// Off Windows, pwsh has no Get-CimInstance: the fact step fails as a
+			// recorded step (header), which the terminal says with its time.
+			assert.match(
+				terminal,
+				process.platform === 'win32'
+					? /^\[field-report\] {3}\[OK\] versions \(\d+ s\)$/m
+					: /^\[field-report\] {3}\[FAIL\] versions exited \d+ \(\d+ s, kept in .+versions\.txt\)$/m
+			);
 			assert.match(
 				terminal,
 				/^\[field-report\] {3}\.\.\. idle_cpu still running \(\d+ s\)$/m,
