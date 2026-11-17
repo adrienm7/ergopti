@@ -146,7 +146,7 @@
 			<button type="button" id="lo-run" class="lo-primary" data-i18n="layout_optimizer.run"></button>
 			<button type="button" id="lo-stop" data-i18n="layout_optimizer.stop" disabled></button>
 		</div>
-		<progress id="lo-progress" max="1" value="0"></progress>
+		<progress id="lo-progress" max="1" value="0" aria-labelledby="lo-status"></progress>
 		<p id="lo-status" class="lo-muted" role="status" aria-live="polite"></p>
 	</div>
 </section>

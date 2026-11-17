@@ -891,6 +891,7 @@
 	"editor.hotstrings.btn_view_compact": "紧凑视图",
 	"editor.hotstrings.btn_view_expanded": "展开视图",
 	"editor.hotstrings.click_to_edit": "点击编辑",
+	"editor.hotstrings.select_entry": "选择",
 	"editor.hotstrings.bulk_selected_one": "已选",
 	"editor.hotstrings.bulk_selected_other": "已选",
 	"editor.hotstrings.cmd_backspace": "向后删除 ←",

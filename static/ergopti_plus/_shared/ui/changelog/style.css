@@ -63,7 +63,7 @@ body {
 	background: var(--theme-gray5-dark);
 	border: 1px solid var(--theme-gray4-dark);
 	border-radius: 6px;
-	color: var(--theme-grey-888);
+	color: var(--theme-grey-aaa);
 	cursor: pointer;
 	flex: 1;
 	font-size: 11px;

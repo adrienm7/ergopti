@@ -36,6 +36,8 @@ const PAGE_DIR = shared('ui', 'layout_optimizer');
 const LOCALES_DIR = shared('core', 'i18n', 'data', 'locales');
 const PREFIX = 'layout_optimizer.';
 const SCRIPTS = [
+	// The website's accessibility settings, before the page paints.
+	'../a11y_prefs.js',
 	// The theme the site's visitor chose (theme_choice.js), before the first paint.
 	'../theme_choice.js',
 	'../i18n.js',

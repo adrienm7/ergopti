@@ -82,6 +82,7 @@ async function runLoader(opts) {
 	const document = {
 		readyState: 'complete',
 		currentScript: null,
+		documentElement: {},
 		addEventListener() {},
 		querySelectorAll(selector) {
 			return selector === '[data-i18n]' ? labels : [];
@@ -223,6 +224,7 @@ function loadPage(app, bridge, seed) {
 	const document = {
 		readyState: 'loading',
 		currentScript: null,
+		documentElement: {},
 		addEventListener(type, handler) {
 			if (type === 'DOMContentLoaded') ready.push(handler);
 		},

@@ -113,8 +113,8 @@ body {
 }
 
 .layout-editor button.primary {
-	background: var(--le-accent);
-	border-color: var(--le-accent);
+	background: var(--theme-accent-fill);
+	border-color: var(--theme-accent-fill);
 	color: var(--theme-white);
 	font-weight: 600;
 }
@@ -998,4 +998,10 @@ body {
 	.le-tool-panel {
 		padding: 12px;
 	}
+}
+
+/* The tablist wrapper only carries the role: its tabs and the add button stay
+   one flex row of .le-layout-tab-list. */
+.le-layout-tab-roles {
+	display: contents;
 }

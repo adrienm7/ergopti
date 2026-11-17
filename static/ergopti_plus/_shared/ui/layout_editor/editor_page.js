@@ -854,22 +854,24 @@ var LayoutEditorPage = (function () {
 				onchange: (event) => importTabs(event.target)
 			});
 			return el('div', { class: 'le-layout-tabs', id: 'le-layout-tabs' }, [
-				el(
-					'div',
-					{ class: 'le-layout-tab-list', role: 'tablist', 'aria-label': tl('tabs.label') },
-					[
-						...tabs,
-						el('button', {
-							type: 'button',
-							id: 'le-tab-add',
-							class: 'le-layout-tab-add',
-							'aria-label': tl('tabs.add'),
-							title: tl('tabs.add'),
-							text: '+',
-							onclick: addTab
-						})
-					]
-				),
+				el('div', { class: 'le-layout-tab-list' }, [
+					// Only tabs belong to the tablist (WCAG 4.1.2); the add button
+					// stays in the same row (display: contents, style.css).
+					el(
+						'div',
+						{ class: 'le-layout-tab-roles', role: 'tablist', 'aria-label': tl('tabs.label') },
+						tabs
+					),
+					el('button', {
+						type: 'button',
+						id: 'le-tab-add',
+						class: 'le-layout-tab-add',
+						'aria-label': tl('tabs.add'),
+						title: tl('tabs.add'),
+						text: '+',
+						onclick: addTab
+					})
+				]),
 				el('span', {
 					class: `le-autosave ${state.workspace.status}`,
 					id: 'le-autosave',
@@ -1494,12 +1496,13 @@ var LayoutEditorPage = (function () {
 						: null,
 					preserved
 						? null
-						: el('button', {
+						: // A toggle beside the layer tabs, not a tab: a tab must sit in
+							// a tablist (WCAG 4.1.2).
+							el('button', {
 								type: 'button',
-								role: 'tab',
 								id: 'le-shortcut-view',
 								class: `le-tab le-shortcut-tab${state.shortcutView ? ' active' : ''}`,
-								'aria-selected': String(state.shortcutView),
+								'aria-pressed': String(state.shortcutView),
 								title: tl('shortcut.view_title'),
 								text: tl('shortcut.view'),
 								onclick: showShortcuts

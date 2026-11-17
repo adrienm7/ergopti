@@ -126,6 +126,6 @@ button:hover {
 }
 
 .save {
-	background: var(--theme-blue);
+	background: var(--theme-accent-fill);
 	color: var(--theme-white);
 }

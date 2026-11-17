@@ -196,7 +196,6 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 		const keyLine = el('div', 'la-fingering-row');
 		const keyName = el('strong');
 		const fingerSelect = el('select');
-		fingerSelect.setAttribute('aria-label', '');
 		const homeButton = el('button');
 		homeButton.type = 'button';
 		keyLine.append(keyName, fingerSelect, homeButton);
@@ -239,6 +238,10 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 			reset.textContent = t('layout_analysis.fingering.reset');
 			exportButton.textContent = t('layout_analysis.fingering.export');
 			importText.textContent = t('layout_analysis.fingering.import');
+			// Named even while the key line is hidden: a hidden control is still
+			// in the accessibility tree of some readers, and nameless there.
+			fingerSelect.setAttribute('aria-label', t('layout_analysis.fingering.finger'));
+			homeButton.textContent = t('layout_analysis.fingering.set_home');
 			const board = E.keyboard(keyboardId(), profile() || undefined);
 			map.replaceChildren();
 			let width = 0;
@@ -252,6 +255,7 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 				key.title = `${code} — ${t(`layout_analysis.finger.${finger}`)}`;
 				if (board.homeOf[board.finger[k]] === k) key.classList.add('la-fingering-home');
 				if (code === selected) key.classList.add('la-selected');
+				key.setAttribute('aria-pressed', String(code === selected));
 				const left = (board.x[k] - 0.5) * KEY_UNIT_PX;
 				const top = (board.y[k] - 1) * KEY_UNIT_PX;
 				key.style.left = `${left}px`;
@@ -278,8 +282,6 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 					})
 				);
 				fingerSelect.value = DATA.model.fingers[board.finger[k]];
-				fingerSelect.setAttribute('aria-label', t('layout_analysis.fingering.finger'));
-				homeButton.textContent = t('layout_analysis.fingering.set_home');
 				homeButton.disabled = board.homeOf[board.finger[k]] === k;
 			}
 			if (status.className !== 'la-error')

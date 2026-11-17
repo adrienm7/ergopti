@@ -83,6 +83,7 @@ function make_context(elements, locale_files, active) {
 	const document = {
 		readyState: 'complete',
 		currentScript: null,
+		documentElement: {},
 		title: '',
 		addEventListener() {},
 		querySelectorAll(sel) {

@@ -201,6 +201,11 @@
 	function load() {
 		var code = window._i18n_locale || 'fr';
 
+		// The page speaks the active locale: screen readers pick their voice and
+		// browsers their hyphenation from the root lang (WCAG 3.1.1). The pages
+		// are written lang="fr", which was wrong in every other locale.
+		document.documentElement.lang = code;
+
 		// The chain always starts with the active locale, and never repeats it:
 		// with _i18n_locale === "en" the chain is en → fr, not en → en → fr.
 		var chain = [code];

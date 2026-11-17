@@ -109,6 +109,7 @@ function makeDocument() {
 	const toolbarButtons = Object.values(elements).filter((el) => el.tagName === 'BUTTON');
 	return {
 		elements,
+		documentElement: {},
 		readyState: 'complete',
 		addEventListener() {},
 		getElementById(id) {

@@ -891,6 +891,7 @@
 	"editor.hotstrings.btn_view_compact": "Компактний вигляд",
 	"editor.hotstrings.btn_view_expanded": "Розширений вигляд",
 	"editor.hotstrings.click_to_edit": "Натисніть, щоб змінити",
+	"editor.hotstrings.select_entry": "Вибрати",
 	"editor.hotstrings.bulk_selected_one": "вибрано",
 	"editor.hotstrings.bulk_selected_other": "вибрано",
 	"editor.hotstrings.cmd_backspace": "видалити ←",

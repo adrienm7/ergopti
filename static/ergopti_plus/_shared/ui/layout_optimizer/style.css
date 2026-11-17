@@ -96,8 +96,8 @@ body:has(> main.layout-optimizer) {
 }
 
 .layout-optimizer .lo-primary {
-	background: var(--lo-accent);
-	border-color: var(--lo-accent);
+	background: var(--theme-accent-fill);
+	border-color: var(--theme-accent-fill);
 	color: var(--theme-white);
 	font-weight: 600;
 }

@@ -984,6 +984,8 @@ function render() {
 					si +
 					'" data-ei="' +
 					ei +
+					'" aria-label="' +
+					escapeHtml(_t('editor.hotstrings.select_entry') + ' ' + e.trigger) +
 					'" onclick="event.stopPropagation(); updateBulk()" onmousedown="event.stopPropagation()"></div>';
 				html +=
 					'<div class="e-trig"><span class="trig-lbl" data-f="trig" title="' +

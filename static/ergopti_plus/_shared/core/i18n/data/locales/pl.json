@@ -891,6 +891,7 @@
 	"editor.hotstrings.btn_view_compact": "Widok kompaktowy",
 	"editor.hotstrings.btn_view_expanded": "Widok rozszerzony",
 	"editor.hotstrings.click_to_edit": "Kliknij, aby edytować",
+	"editor.hotstrings.select_entry": "Zaznacz",
 	"editor.hotstrings.bulk_selected_one": "zaznaczony",
 	"editor.hotstrings.bulk_selected_other": "zaznaczone",
 	"editor.hotstrings.cmd_backspace": "usuń ←",

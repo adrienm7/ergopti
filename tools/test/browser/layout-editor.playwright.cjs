@@ -1349,7 +1349,7 @@ async function exerciseShortcuts(browser, origin) {
 	await page.fill('#le-text', 'é');
 	await page.click('#le-apply');
 	await page.click('#le-shortcut-view');
-	assert.equal(await page.getAttribute('#le-shortcut-view', 'aria-selected'), 'true');
+	assert.equal(await page.getAttribute('#le-shortcut-view', 'aria-pressed'), 'true');
 	assert.equal(await page.getAttribute('[data-layer="base"]', 'aria-selected'), 'false');
 	const key = (code) =>
 		page.$eval(`#le-board [data-code="${code}"]`, (node) => ({

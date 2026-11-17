@@ -886,6 +886,7 @@
 	"editor.hotstrings.btn_view_compact": "Compact view",
 	"editor.hotstrings.btn_view_expanded": "Expanded view",
 	"editor.hotstrings.click_to_edit": "Click to edit",
+	"editor.hotstrings.select_entry": "Select",
 	"editor.hotstrings.bulk_selected_one": "selected",
 	"editor.hotstrings.bulk_selected_other": "selected",
 	"editor.hotstrings.cmd_backspace": "delete ←",

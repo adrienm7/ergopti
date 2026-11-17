@@ -55,7 +55,8 @@ const sandbox = {
 		getElementById: (id) => elements[id],
 		createElement: element,
 		readyState: 'complete',
-		querySelectorAll: () => []
+		querySelectorAll: () => [],
+		documentElement: {}
 	},
 	console,
 	TextDecoder,
@@ -74,6 +75,7 @@ vm.runInContext(fs.readFileSync(path.join(shared, 'ui/host_bridge.js'), 'utf8'),
 vm.runInContext(fs.readFileSync(path.join(shared, 'ui/i18n.js'), 'utf8'), sandbox);
 vm.runInContext(fs.readFileSync(path.join(page, 'script.js'), 'utf8'), sandbox);
 assert.equal(messages[0], 'ready');
+assert.equal(sandbox.document.documentElement.lang, 'en', 'the page speaks the active locale');
 assert.equal(elements['btn-clean'].disabled, true);
 elements['btn-clean'].click();
 assert.equal(messages.length, 1, 'no cleanup before a host-owned scan');

@@ -41,6 +41,8 @@ const PAGE_DIR = shared('ui', 'layout_analysis');
 const LOCALES_DIR = shared('core', 'i18n', 'data', 'locales');
 const PREFIX = 'layout_analysis.';
 const SCRIPTS = [
+	// The website's accessibility settings, before the page paints.
+	'../a11y_prefs.js',
 	// The theme the site's visitor chose (theme_choice.js), before the first paint.
 	'../theme_choice.js',
 	'../i18n.js',
@@ -395,13 +397,15 @@ check(
 );
 
 // The app's Studio window mounts the Comparer in a tab: it loads every script
-// of the Comparer's page (but i18n.js: its host seeds the strings; and
-// theme_choice.js: no site frames it, it follows the system), the Comparer's
-// own last, and its stylesheet.
+// of the Comparer's page (but i18n.js: its host seeds the strings;
+// theme_choice.js: no site frames it, it follows the system; and
+// a11y_prefs.js: the website's settings do not reach the app), the
+// Comparer's own last, and its stylesheet.
 const windowPage = fs.readFileSync(shared('ui', 'layout_editor_window', 'index.html'), 'utf8');
 const inWindow = (src) => (src.startsWith('../') ? src : `../layout_analysis/${src}`);
 const comparerAt = windowScripts.indexOf('../layout_analysis/comparer_page.js');
-for (const src of SCRIPTS.filter((s) => s !== '../i18n.js' && s !== '../theme_choice.js')) {
+const NOT_IN_WINDOW = ['../i18n.js', '../theme_choice.js', '../a11y_prefs.js'];
+for (const src of SCRIPTS.filter((s) => !NOT_IN_WINDOW.includes(s))) {
 	const at = windowScripts.indexOf(inWindow(src));
 	check(at >= 0, `layout_editor_window/index.html: no ${inWindow(src)} for the Comparer tab`);
 	check(

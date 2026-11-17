@@ -260,10 +260,13 @@ body:has(> main.layout-analysis) {
 	padding: 6px;
 }
 
+/* Rows of at least 26 px keep each checkbox 24 px clear of the next one
+   (WCAG 2.5.8 target size); the whole row is the checkbox's label anyway. */
 .la-layout {
 	align-items: center;
 	display: flex;
 	gap: 6px;
+	min-height: 26px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

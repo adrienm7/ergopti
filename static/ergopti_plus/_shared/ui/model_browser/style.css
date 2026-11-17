@@ -19,7 +19,8 @@
 	--row-sel: var(--theme-hue-094771);
 	--row-sel-border: var(--theme-hue-1f6feb);
 	--text: var(--theme-hue-d4d4d6);
-	--text-dim: var(--theme-hue-8a8a90);
+	/* 5.2:1 on the header and alternate rows (WCAG 1.4.3). */
+	--text-dim: var(--theme-hue-a0a0a6);
 	--border: var(--theme-hue-3a3a3d);
 	--accent: var(--theme-hue-4ea1ff);
 	--installed: var(--theme-hue-3fb950);

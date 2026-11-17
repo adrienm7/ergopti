@@ -352,8 +352,8 @@ body {
 }
 
 .tc {
-	background: var(--accent);
-	border: 1px solid var(--accent);
+	background: var(--theme-accent-fill);
+	border: 1px solid var(--theme-accent-fill);
 	border-radius: 3px;
 	color: var(--theme-white);
 	display: inline-block;
@@ -408,7 +408,7 @@ body {
 
 .btn-add {
 	align-items: center;
-	background: var(--accent);
+	background: var(--theme-accent-fill);
 	border: none;
 	border-radius: 7px;
 	color: var(--theme-white);
@@ -505,7 +505,7 @@ body {
 }
 
 .btn-p {
-	background: var(--accent);
+	background: var(--theme-accent-fill);
 	color: var(--theme-white);
 }
 
@@ -987,8 +987,8 @@ body {
    the list look identical. */
 .token-chip[data-token],
 .token-chip[data-trig-char] {
-	background: var(--accent);
-	border-color: var(--accent);
+	background: var(--theme-accent-fill);
+	border-color: var(--theme-accent-fill);
 	color: var(--theme-white);
 }
 

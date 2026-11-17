@@ -85,6 +85,9 @@ window.initData = function (data) {
 		const input = document.createElement('textarea');
 		input.setAttribute('rows', /[\r\n]/.test(original) ? '3' : '1');
 		input.setAttribute('name', f.key);
+		// The label names its field for assistive technology (WCAG 1.3.1).
+		input.id = 'field-' + f.key;
+		label.htmlFor = input.id;
 		input.setAttribute('autocomplete', 'off');
 		input.value = original;
 		// A textarea normalizes CR/CRLF; retain untouched source bytes on save.

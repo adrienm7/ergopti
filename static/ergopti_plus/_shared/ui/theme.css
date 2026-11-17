@@ -52,6 +52,7 @@
 	   appearance only writes it in the matching rule. Added because no Apple
 	   system colour holds these exact values. */
 	--theme-white: #ffffff;
+	--theme-black: #000000;
 	--theme-grey-333: #333333;
 	--theme-grey-555: #555555;
 	--theme-grey-888: #888888;
@@ -113,6 +114,9 @@
 	--theme-grey-f5f5f5: #f5f5f5;
 	--theme-grey-f9f9f9: #f9f9f9;
 	--theme-hue-005cc5: #005cc5;
+	/* The accessible accent: 5.8:1 under white text, 5.1:1 as text on the light
+	   grey background, where the Apple blue gives 4.0:1 and 3.6:1 (WCAG 1.4.3). */
+	--theme-hue-0062cc: #0062cc;
 	--theme-hue-008000: #008000;
 	--theme-hue-06243f: #06243f;
 	--theme-hue-094771: #094771;
@@ -176,7 +180,6 @@
 	--theme-hue-7a5500: #7a5500;
 	--theme-hue-7a7a80: #7a7a80;
 	--theme-hue-86868b: #86868b;
-	--theme-hue-8a8a90: #8a8a90;
 	--theme-hue-93b8f8: #93b8f8;
 	--theme-hue-9973f2: #9973f2;
 	--theme-hue-9a6700: #9a6700;
@@ -246,8 +249,11 @@
 	--theme-separator: var(--theme-gray4);
 	--theme-text: var(--theme-label);
 	--theme-sub: var(--theme-secondary-label);
-	--theme-accent: var(--theme-blue);
+	--theme-accent: var(--theme-hue-0062cc);
 	--theme-accent-soft: rgba(0, 122, 255, 0.12);
+	/* Behind white text (filled buttons, chips): no appearance's accent holds
+	   4.5:1 there, the dark one being made to be read on dark surfaces. */
+	--theme-accent-fill: var(--theme-hue-0062cc);
 	--theme-danger: var(--theme-red);
 }
 
@@ -415,5 +421,88 @@
 }
 
 :root[data-theme='dark'] {
+	color-scheme: dark;
+}
+
+/* ============================================ */
+/* ============================================ */
+/* ======= 7/ Accessibility (every page) ====== */
+/* ============================================ */
+/* ============================================ */
+
+/* A keyboard focus ring every page shows, under the page's own rules (zero
+   specificity), so a page that draws its own ring keeps it (WCAG 2.4.7). */
+:where(:focus-visible) {
+	outline: 2px solid var(--theme-accent);
+	outline-offset: 2px;
+}
+
+/* The system's reduced motion setting, and the website's own setting carried
+   into the Studio frames by a11y_prefs.js: no animation, no smooth scrolling,
+   instant transitions (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		scroll-behavior: auto !important;
+		transition-duration: 0.01ms !important;
+	}
+}
+
+:root[data-a11y-motion='reduce'] *,
+:root[data-a11y-motion='reduce'] *::before,
+:root[data-a11y-motion='reduce'] *::after {
+	animation-duration: 0.01ms !important;
+	animation-iteration-count: 1 !important;
+	scroll-behavior: auto !important;
+	transition-duration: 0.01ms !important;
+}
+
+/* The website's reading settings (a11y_prefs.js). The pages size their text
+   in pixels, so a larger text zooms the page, as the browser's own zoom does. */
+:root[data-a11y-font='hyperlegible'] :is(body, body *) {
+	font-family: 'Atkinson Hyperlegible', system-ui, sans-serif !important;
+}
+
+:root[data-a11y-text='125'] body {
+	zoom: 1.25;
+}
+
+:root[data-a11y-text='150'] body {
+	zoom: 1.5;
+}
+
+:root[data-a11y-text='200'] body {
+	zoom: 2;
+}
+
+/* The WCAG 1.4.12 text spacing. */
+:root[data-a11y-spacing='wide'] :is(body, body *) {
+	letter-spacing: 0.12em !important;
+	line-height: 1.5 !important;
+	word-spacing: 0.16em !important;
+}
+
+/* High contrast: black surfaces, white text and separators, yellow accent. */
+:root[data-a11y-contrast='high'] {
+	--theme-bg: var(--theme-black);
+	--theme-surface: var(--theme-black);
+	--theme-surface-2: var(--theme-black);
+	--theme-separator: var(--theme-white);
+	--theme-text: var(--theme-white);
+	--theme-sub: var(--theme-white);
+	--theme-accent: var(--theme-yellow-dark);
+	--theme-dialog-text: var(--theme-white);
+	--theme-dialog-muted: var(--theme-white);
+	--theme-dialog-background: var(--theme-black);
+	--theme-dialog-panel: var(--theme-black);
+	--theme-dialog-border: var(--theme-white);
+	--theme-metrics-bg: var(--theme-black);
+	--theme-metrics-panel: var(--theme-black);
+	--theme-metrics-text: var(--theme-white);
+	--theme-metrics-text-muted: var(--theme-white);
+	--theme-metrics-border: var(--theme-white);
 	color-scheme: dark;
 }
