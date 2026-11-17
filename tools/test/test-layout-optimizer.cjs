@@ -22,7 +22,9 @@
  *    row, punctuation, symbols, the AltGr levels, the dead key's layer,
  *    zones; unknown options and impossible pins are refused with their code.
  * 5. Incremental scoring: the incremental objective gives every layout the
- *    search scores the engine's full score, and the same search result.
+ *    search scores the engine's full score, and the same search result; the
+ *    result's dead-key tables are its own, not the ones the scored layouts
+ *    share.
  * 6. Budget: a time budget stops the search on the clock it is given.
  * ==============================================================================
  */
@@ -473,6 +475,18 @@ for (const [start, options] of [
 	check(
 		JSON.stringify(viaIncremental.layout) === JSON.stringify(viaFull.layout),
 		`incremental (${start.id}): the search returns the layout the full objective finds`
+	);
+	// The layouts it scores share one dead-key table; the result has its own,
+	// so a page that edits it changes nothing in the next search.
+	for (const state of Object.keys(viaIncremental.layout.dead))
+		delete viaIncremental.layout.dead[state];
+	const again = O.run(
+		p,
+		Object.assign({ objective: O.incrementalObjective(E, tables, ANALYSIS) }, settings)
+	);
+	check(
+		JSON.stringify(again.layout) === JSON.stringify(viaFull.layout),
+		`incremental (${start.id}): editing a result's dead keys changes the next search`
 	);
 }
 

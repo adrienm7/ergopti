@@ -124,8 +124,18 @@ it gains its speed from:
   the n-grams, 120 swaps, interleaved on one loaded laptop, against the
   whole-stream walk of 6a3858f2a6): Ergo-L 16.7 → 23.0, Ergopti 22.7 →
   35.1, bépo 8.7 → 15.1, AZERTY 110 → 116 trials per second, with the
-  same results. What is left is the compile of the trial's layout (dead
-  keys: 4 ms on Ergopti, 15 ms on bépo) and the plan's fixed part;
+  same results. The trial's layout is then compiled in part
+  (`compileCoreFrom`, [layout-analysis.md](layout-analysis.md#performance)):
+  only the ways the swapped cells or dead-key rules reach, to the same lists
+  as a whole compile; the layouts the search scores share one dead-key table
+  when its layer stays put, so the engine sees at once that no rule changed.
+  Measured the same way (Swann, 99 %, 300 swaps, median of 3 interleaved
+  runs on one loaded laptop, against b1b4f80799): bépo 13.2 → 27.7,
+  Ergopti 39.6 → 46.3, Ergo-L 26.3 → 32.4, AZERTY 107 → 134 trials per
+  second, with the same results. What is left
+  on the layouts with choices is the plan (`planTyping`, about 40 % of a
+  trial on Ergo-L), the context walk (15 %) and the layout-level metrics
+  (13 %, `simplicity` half of it);
 - Web Workers, one share of the restarts each (up to 8, one thread left to the
   page), so the Studio stays responsive and a run uses every core;
 - the « 99 % of the n-grams » accuracy (`searchTables`), which keeps the most
@@ -188,9 +198,10 @@ only), keyboard ISO, format TKL, default weights, 1 restart of 3 000 swaps on
 
 ## Follow-ups
 
-- Faster incremental scoring: a trial still compiles the whole layout and
-  re-measures the layout-level metrics (shortcuts, digits, coverage), about
-  1 ms; caching each entry's last key pattern would halve the walk.
-- Incremental compile: a trial compiles its whole layout, which dominates
-  on dead-key layouts (bépo 15 ms, Ergopti 4 ms of a trial); a swap only
-  changes the ways that pass through its two keys.
+- Faster incremental scoring: a trial still re-measures the layout-level
+  metrics (shortcuts, digits, coverage), about 1 ms; caching each entry's
+  last key pattern would halve the walk.
+- Faster planning: on a layout with choices, `planTyping` from the current
+  plan is about 40 % of a trial (Ergo-L), and `simplicity` walks every way
+  of every character each trial; both bound the 95–130 trials per second
+  aimed at.

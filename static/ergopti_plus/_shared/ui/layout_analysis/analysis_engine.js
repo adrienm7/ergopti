@@ -27,10 +27,11 @@
  *    come from LAYOUT_ANALYSIS_DATA (_generated/analysis_data.js), read on
  *    first use so the codegen can load this file to convert layouts.
  * 4. Fail fast: an unknown keyboard, metric or weight throws.
- * 5. Incremental: scoreSession re-scores a changed layout by walking only the
+ * 5. Incremental: scoreSession re-scores a changed layout by compiling again
+ *    only the ways its changed cells and dead-key rules reach
+ *    (compileCoreFrom, list for list a whole compile's) and walking only the
  *    n-grams of the characters whose key sequence changed, through the same
- *    visitor and metric code as analyse(), for the layout optimizer (the
- *    whole stream again when a layout offers a choice of ways).
+ *    visitor and metric code as analyse(), for the layout optimizer.
  * 6. Bonuses apart from effort: the distinct characters a layout types
  *    (coverage_bonus, over a fixed cap) and objective simplicity rules.
  * ==============================================================================
@@ -582,72 +583,85 @@ var LAYOUT_ANALYSIS = (function () {
 		return rules;
 	}
 
+	// Equal costs are settled the same way whatever order the file lists its
+	// keys in: fewer AltGr presses (the lower level, as Kalamine prefers), then
+	// fewer keys, then the lower key indexes, then fewer Shift presses.
+	function betterWay(a, b) {
+		if (a.cost !== b.cost) return a.cost < b.cost;
+		if (a.altgr !== b.altgr) return a.altgr < b.altgr;
+		if (a.keys.length !== b.keys.length) return a.keys.length < b.keys.length;
+		for (let i = 0; i < a.keys.length; i++)
+			if (a.keys[i] !== b.keys[i]) return a.keys[i] < b.keys[i];
+		if (a.shift !== b.shift) return a.shift < b.shift;
+		return false;
+	}
+
+	function sameWayKeys(a, b) {
+		if (a.keys.length !== b.keys.length) return false;
+		for (let i = 0; i < a.keys.length; i++) if (a.keys[i] !== b.keys[i]) return false;
+		return true;
+	}
+
+	/** Adds a way to a character's list (best first, at most MAX_WAYS); true when the list changed. */
+	function offerWay(map, key, candidate) {
+		const list = map.get(key);
+		if (!list) {
+			map.set(key, [candidate]);
+			return true;
+		}
+		for (let i = 0; i < list.length; i++) {
+			if (!sameWayKeys(list[i], candidate)) continue;
+			if (!betterWay(candidate, list[i])) return false;
+			list.splice(i, 1);
+			break;
+		}
+		let at = list.length;
+		while (at > 0 && betterWay(candidate, list[at - 1])) at--;
+		if (at >= MAX_WAYS) return false;
+		list.splice(at, 0, candidate);
+		if (list.length > MAX_WAYS) list.pop();
+		return true;
+	}
+
+	/** Way a then way b; state: the dead state a enters, or null for two characters in a row. */
+	function joinWays(a, b, state) {
+		return {
+			keys: a.keys.concat(b.keys),
+			layers: a.layers.concat(b.layers),
+			shift: a.shift + b.shift,
+			altgr: a.altgr + b.altgr,
+			dead: state !== null || a.dead || b.dead,
+			cost: a.cost + b.cost,
+			level: state === null ? b.level : `${state}/${b.level}`,
+			state: state === null ? b.state : state
+		};
+	}
+
 	/**
-	 * Every way a layout types each character, best first: a key on a level, a
-	 * dead key (itself on a level, possibly chained) followed by the key it
-	 * composes with, and the multi-character outputs (a cell or a dead-key rule
-	 * that types several characters at once). A way is {keys, layers (the level
-	 * of each key), shift, altgr, dead, cost, level (where the last key is
-	 * pressed: a level, or « state/level » behind a dead key), state? (the
-	 * dead state of the last key), substituted?, width? (characters typed)}.
-	 * Two ways on the same keys keep the cheaper one (it is never worse in any
-	 * context); at most MAX_WAYS are kept per character.
-	 * @param {object} layout - Library shape.
-	 * @param {object} board - From keyboard().
-	 * @param {Set<string>|null} missing - Codes absent from a compact board.
-	 * @returns {{ways: Map<string, object[]>, texts: Map<string, object[]>,
-	 *   best: Map<string, object>, distinct: number}} Character → ways,
-	 *   multi-character output → ways, character → its cheapest way, and the
-	 *   number of distinct characters typed (substitutes excluded, the
-	 *   characters of multi-character outputs included).
+	 * Offers the way each cell of a layout gives: one key on one level. With
+	 * `only`, the cells of those characters, dead states and texts alone.
+	 * @param {object} core - {ways, deadWays, texts}, filled in place.
+	 * @param {{chars: Set<string>, dead: Set<string>, texts: Set<string>}|null} only
 	 */
-	function compileWays(layout, board, missing) {
-		const ways = new Map();
-		const deadWays = new Map();
-		const texts = new Map();
-		// Equal costs are settled the same way whatever order the file lists its
-		// keys in: fewer AltGr presses (the lower level, as Kalamine prefers),
-		// then fewer keys, then the lower key indexes, then fewer Shift presses.
-		const better = (a, b) => {
-			if (a.cost !== b.cost) return a.cost < b.cost;
-			if (a.altgr !== b.altgr) return a.altgr < b.altgr;
-			if (a.keys.length !== b.keys.length) return a.keys.length < b.keys.length;
-			for (let i = 0; i < a.keys.length; i++)
-				if (a.keys[i] !== b.keys[i]) return a.keys[i] < b.keys[i];
-			if (a.shift !== b.shift) return a.shift < b.shift;
-			return false;
-		};
-		const sameKeys = (a, b) => {
-			if (a.keys.length !== b.keys.length) return false;
-			for (let i = 0; i < a.keys.length; i++) if (a.keys[i] !== b.keys[i]) return false;
-			return true;
-		};
-		// Adds a way to a character's list; true when the list changed.
-		const offer = (map, key, candidate) => {
-			const list = map.get(key);
-			if (!list) {
-				map.set(key, [candidate]);
-				return true;
-			}
-			for (let i = 0; i < list.length; i++) {
-				if (!sameKeys(list[i], candidate)) continue;
-				if (!better(candidate, list[i])) return false;
-				list.splice(i, 1);
-				break;
-			}
-			let at = list.length;
-			while (at > 0 && better(candidate, list[at - 1])) at--;
-			if (at >= MAX_WAYS) return false;
-			list.splice(at, 0, candidate);
-			if (list.length > MAX_WAYS) list.pop();
-			return true;
-		};
+	function offerCells(core, layout, board, missing, only) {
 		for (const [code, row] of Object.entries(layout.rows)) {
 			const k = board.index.get(code);
 			if (k === undefined || (missing && missing.has(code))) continue;
 			for (let layer = 0; layer < LAYER_IDS.length; layer++) {
 				const cell = row[layer];
 				if (cell === null) continue;
+				let map;
+				let key = cell;
+				let width = 1;
+				if (typeof cell !== 'string') [map, key] = [core.deadWays, cell.dead];
+				else if (codeLength(cell) === 1) map = core.ways;
+				else if (cell.length > 0) [map, width] = [core.texts, codeLength(cell)];
+				else continue;
+				if (
+					only &&
+					!(map === core.ways ? only.chars : map === core.texts ? only.texts : only.dead).has(key)
+				)
+					continue;
 				const stroke = {
 					keys: [k],
 					layers: [layer],
@@ -657,23 +671,104 @@ var LAYOUT_ANALYSIS = (function () {
 					cost: 1 + MODIFIER_COST * (LAYER_SHIFT[layer] + LAYER_ALTGR[layer]),
 					level: LAYER_IDS[layer]
 				};
-				if (typeof cell !== 'string') offer(deadWays, cell.dead, stroke);
-				else if (codeLength(cell) === 1) offer(ways, cell, stroke);
-				else if (cell.length > 0)
-					offer(texts, cell, Object.assign(stroke, { width: codeLength(cell) }));
+				if (map === core.texts) stroke.width = width;
+				offerWay(map, key, stroke);
 			}
 		}
-		const join = (a, b, state) => ({
-			keys: a.keys.concat(b.keys),
-			layers: a.layers.concat(b.layers),
-			shift: a.shift + b.shift,
-			altgr: a.altgr + b.altgr,
-			dead: state !== null || a.dead || b.dead,
-			cost: a.cost + b.cost,
-			level: state === null ? b.level : `${state}/${b.level}`,
-			state: state === null ? b.state : state
-		});
-		const rules = deadRules(layout.dead);
+	}
+
+	// When a joined way was first offered by a whole compile (followRules):
+	// way → {d: pass, r: rule index, p: prefix, t: tail}. A cell's own way has
+	// none (it is there before the first pass). Kept for scoreSession only.
+	const wayTimes = new WeakMap();
+	// Passes a partial compile may take before it gives up and compiles whole.
+	const PARTIAL_PASS_LIMIT = 4 * MAX_DEAD_DEPTH;
+
+	/**
+	 * Which of two offers of a way on the same keys a whole compile makes
+	 * first: the earlier pass, then the earlier rule, then (one rule's loop)
+	 * the better prefix, then the better tail.
+	 * @returns {number} Negative when a comes first, 0 when they tie.
+	 */
+	function compareTimes(a, b) {
+		if (a.d !== b.d) return a.d - b.d;
+		if (a.r !== b.r) return a.r - b.r;
+		if (!sameWayKeys(a.p, b.p)) return betterWay(a.p, b.p) ? -1 : 1;
+		if (!sameWayKeys(a.t, b.t)) return betterWay(a.t, b.t) ? -1 : 1;
+		return 0;
+	}
+
+	/** Whether two ways on the same keys read alike (labels, levels, flags). */
+	function sameLabels(a, b) {
+		if (a.level !== b.level || a.state !== b.state) return false;
+		if (a.terminated !== b.terminated || a.width !== b.width) return false;
+		for (let i = 0; i < a.layers.length; i++) if (a.layers[i] !== b.layers[i]) return false;
+		return true;
+	}
+
+	/**
+	 * offerWay for a partial compile, which makes its offers in another order
+	 * than a whole compile: of two offers on the same keys and of equal cost,
+	 * the one a whole compile makes first (compareTimes) stays, so the lists
+	 * read as a whole compile's.
+	 */
+	function offerTimed(map, key, candidate, time) {
+		const list = map.get(key);
+		if (!list) {
+			map.set(key, [candidate]);
+			wayTimes.set(candidate, time);
+			return true;
+		}
+		for (let i = 0; i < list.length; i++) {
+			const held = list[i];
+			if (!sameWayKeys(held, candidate)) continue;
+			if (!betterWay(candidate, held)) {
+				if (betterWay(held, candidate)) return false;
+				const order = compareTimes(time, wayTimes.get(held));
+				// An equal time is the same offer from inputs replaced since: the newer reads right.
+				if (order > 0 || (order === 0 && sameLabels(held, candidate))) return false;
+				list[i] = candidate;
+				wayTimes.set(candidate, time);
+				return true;
+			}
+			list.splice(i, 1);
+			break;
+		}
+		let at = list.length;
+		while (at > 0 && betterWay(candidate, list[at - 1])) at--;
+		if (at >= MAX_WAYS) return false;
+		list.splice(at, 0, candidate);
+		if (list.length > MAX_WAYS) list.pop();
+		wayTimes.set(candidate, time);
+		return true;
+	}
+
+	/** The first pass of a whole compile in which rule r can read a way. */
+	function readablePass(way, r) {
+		const time = wayTimes.get(way);
+		if (time === undefined) return 0;
+		return time.r < r ? time.d : time.d + 1;
+	}
+
+	/**
+	 * Follows the dead-key rules (those of `order`, in that order, or all) up
+	 * to MAX_DEAD_DEPTH passes: each joins the ways of its dead key with those
+	 * of the key typed after it, and offers them to its output.
+	 * @param {object} core - {ways, deadWays, texts}, filled in place.
+	 * @param {Array<object>} rules - From deadRules().
+	 * @param {number[]|null} order - Rule indexes, ascending; null for all.
+	 * @param {object} board - From keyboard().
+	 * @param {string} [timing] - 'record': note when each way is offered
+	 *   (wayTimes); 'partial': the rules of a partial compile, which reads the
+	 *   other lists as they end and gives each offer the time a whole compile
+	 *   would (an offer a whole compile makes after its last pass is left out).
+	 * @returns {boolean} Whether the rules were followed to their end (a pass
+	 *   changed nothing); a partial compile that is not must compile whole.
+	 */
+	function followRules(core, rules, order, board, timing) {
+		const partial = timing === 'partial';
+		const record = timing === 'record';
+		const { ways, deadWays, texts } = core;
 		// A list's version rises with each change. A rule whose prefixes and
 		// tails are the lists, at the versions, of its last pass would only
 		// offer again what it offered then: lists only get better, so every
@@ -682,9 +777,12 @@ var LAYOUT_ANALYSIS = (function () {
 		const versions = new WeakMap();
 		const version = (list) => versions.get(list) || 0;
 		const lastPass = new Array(rules.length);
-		for (let depth = 0; depth < MAX_DEAD_DEPTH; depth++) {
+		const count = order === null ? rules.length : order.length;
+		const passes = partial ? PARTIAL_PASS_LIMIT : MAX_DEAD_DEPTH;
+		for (let depth = 0; depth < passes; depth++) {
 			let changed = false;
-			for (let r = 0; r < rules.length; r++) {
+			for (let i = 0; i < count; i++) {
+				const r = order === null ? i : order[i];
 				const rule = rules[r];
 				const prefixes = deadWays.get(rule.state);
 				if (!prefixes) continue;
@@ -707,6 +805,20 @@ var LAYOUT_ANALYSIS = (function () {
 				else if (rule.outText !== null) [map, target] = [texts, rule.outText];
 				for (const prefix of prefixes.slice())
 					for (const tail of tails.slice()) {
+						if (partial) {
+							// A partial compile settles a tie of keys on the labels too (offerTimed).
+							const d = Math.max(readablePass(prefix, r), readablePass(tail, r));
+							if (d >= MAX_DEAD_DEPTH) continue;
+							const candidate = joinWays(prefix, tail, rule.state);
+							const closing = board.finger[candidate.keys[candidate.keys.length - 1]];
+							if (closing === LEFT_THUMB || closing === RIGHT_THUMB) candidate.terminated = true;
+							if (map === texts) candidate.width = codeLength(target);
+							if (!offerTimed(map, target, candidate, { d, r, p: prefix, t: tail })) continue;
+							changed = true;
+							const list = map.get(target);
+							versions.set(list, version(list) + 1);
+							continue;
+						}
 						// join(prefix, tail, rule.state), with only what offer compares
 						// until it keeps the candidate: most chains are refused.
 						const candidate = {
@@ -719,10 +831,11 @@ var LAYOUT_ANALYSIS = (function () {
 							level: null,
 							state: rule.state
 						};
-						if (!offer(map, target, candidate)) continue;
+						if (!offerWay(map, target, candidate)) continue;
 						changed = true;
 						const list = map.get(target);
 						versions.set(list, version(list) + 1);
+						if (record) wayTimes.set(candidate, { d: depth, r, p: prefix, t: tail });
 						candidate.layers = prefix.layers.concat(tail.layers);
 						candidate.level = `${rule.state}/${tail.level}`;
 						// A dead key closed by a thumb key (the space bar, on any level)
@@ -733,8 +846,32 @@ var LAYOUT_ANALYSIS = (function () {
 						if (map === texts) candidate.width = codeLength(target);
 					}
 			}
-			if (!changed) break;
+			if (!changed) return true;
 		}
+		return false;
+	}
+
+	/**
+	 * The ways of a layout before the substitutes: its cells, then its
+	 * dead-key rules followed.
+	 * @returns {{layout: object, ways: Map, deadWays: Map, texts: Map}} Lists
+	 *   best first; deadWays maps a dead state to the ways of entering it.
+	 */
+	function compileCore(layout, board, missing, timing) {
+		const core = { layout, ways: new Map(), deadWays: new Map(), texts: new Map() };
+		offerCells(core, layout, board, missing, null);
+		followRules(core, deadRules(layout.dead), null, board, timing);
+		return core;
+	}
+
+	/**
+	 * The distinct characters, the substitutes and the cheapest way of each
+	 * character, from the ways before the substitutes.
+	 * @param {Map} ways - Character → ways; the substitutes are added to it.
+	 * @param {Map} texts - Multi-character output → ways.
+	 * @returns {{ways, texts, best, distinct}} As compileWays.
+	 */
+	function finishWays(ways, texts) {
 		let distinct = ways.size;
 		const extra = new Set();
 		for (const text of texts.keys())
@@ -746,12 +883,176 @@ var LAYOUT_ANALYSIS = (function () {
 			if (ways.has(fancy)) continue;
 			const parts = textPoints(plain).map((c) => ways.get(c));
 			if (parts.some((part) => !part)) continue;
-			const way = parts.map((list) => list[0]).reduce((a, b) => join(a, b, null));
+			const way = parts.map((list) => list[0]).reduce((a, b) => joinWays(a, b, null));
 			ways.set(fancy, [Object.assign({}, way, { substituted: true })]);
 		}
 		const best = new Map();
 		for (const [char, list] of ways) best.set(char, list[0]);
 		return { ways, texts, best, distinct };
+	}
+
+	/**
+	 * Every way a layout types each character, best first: a key on a level, a
+	 * dead key (itself on a level, possibly chained) followed by the key it
+	 * composes with, and the multi-character outputs (a cell or a dead-key rule
+	 * that types several characters at once). A way is {keys, layers (the level
+	 * of each key), shift, altgr, dead, cost, level (where the last key is
+	 * pressed: a level, or « state/level » behind a dead key), state? (the
+	 * dead state of the last key), substituted?, width? (characters typed)}.
+	 * Two ways on the same keys keep the cheaper one (it is never worse in any
+	 * context); at most MAX_WAYS are kept per character.
+	 * @param {object} layout - Library shape.
+	 * @param {object} board - From keyboard().
+	 * @param {Set<string>|null} missing - Codes absent from a compact board.
+	 * @returns {{ways: Map<string, object[]>, texts: Map<string, object[]>,
+	 *   best: Map<string, object>, distinct: number}} Character → ways,
+	 *   multi-character output → ways, character → its cheapest way, and the
+	 *   number of distinct characters typed (substitutes excluded, the
+	 *   characters of multi-character outputs included).
+	 */
+	function compileWays(layout, board, missing) {
+		const core = compileCore(layout, board, missing);
+		return finishWays(core.ways, core.texts);
+	}
+
+	const ruleGraphCache = new WeakMap();
+
+	/**
+	 * The dead-key rules as a graph of symbols (« c » a character, « d » a dead
+	 * state, « t » a text): what each rule gives, and the rules that read each.
+	 * @param {Array<object>} rules - From deadRules().
+	 * @returns {{outputs: string[], users: Map<string, number[]>}} Rule index →
+	 *   its output's symbol; symbol → the indexes of the rules it is an input of.
+	 */
+	function ruleGraph(rules) {
+		if (ruleGraphCache.has(rules)) return ruleGraphCache.get(rules);
+		const users = new Map();
+		const use = (symbol, r) => (users.get(symbol) || users.set(symbol, []).get(symbol)).push(r);
+		const outputs = rules.map((rule, r) => {
+			use(`d${rule.state}`, r);
+			use(rule.typedDead !== null ? `d${rule.typedDead}` : `c${rule.typedChar}`, r);
+			if (rule.outDead !== null) return `d${rule.outDead}`;
+			return rule.outText !== null ? `t${rule.outText}` : `c${rule.outChar}`;
+		});
+		const graph = { outputs, users };
+		ruleGraphCache.set(rules, graph);
+		return graph;
+	}
+
+	/** Whether two cells (or dead-key rule results) are alike: null and undefined are no cell. */
+	function sameCell(a, b) {
+		if (a === b) return true;
+		if (a === undefined || b === undefined)
+			return (a === undefined ? null : a) === (b === undefined ? null : b);
+		return (
+			a !== null &&
+			b !== null &&
+			typeof a === 'object' &&
+			typeof b === 'object' &&
+			a.dead === b.dead
+		);
+	}
+
+	/**
+	 * compileCore of a layout a few cells or dead-key rules away from one
+	 * already compiled (scoreSession's swaps), equal to compiling it from
+	 * nothing: only the characters, dead states and texts whose ways can
+	 * change are compiled again — those of the changed cells and rules, then
+	 * every output of a rule that reads one of them, and so on — and the other
+	 * lists are shared with `previous`. A list is the best MAX_WAYS of its
+	 * candidates and each candidate is built from strictly cheaper ways, so a
+	 * list whose inputs are the same is the same; a chain left unfollowed
+	 * after MAX_DEAD_DEPTH passes compiles the layout whole.
+	 * @param {object} previous - From compileCore() or compileCoreFrom(), on the same board.
+	 * @param {object} layout - Library shape.
+	 * @param {object} board - From keyboard().
+	 * @returns {object} As compileCore, plus whole: true when compiled from nothing.
+	 */
+	function compileCoreFrom(previous, layout, board) {
+		const before = previous.layout;
+		const touched = new Set();
+		const touch = (cell) => {
+			if (cell === null || cell === undefined) return;
+			if (typeof cell !== 'string') touched.add(`d${cell.dead}`);
+			else if (codeLength(cell) === 1) touched.add(`c${cell}`);
+			else if (cell.length > 0) touched.add(`t${cell}`);
+		};
+		const compareRows = (a, b) => {
+			if (a === b) return;
+			for (let layer = 0; layer < LAYER_IDS.length; layer++) {
+				const ca = a ? a[layer] : null;
+				const cb = b ? b[layer] : null;
+				if (sameCell(ca, cb)) continue;
+				touch(ca);
+				touch(cb);
+			}
+		};
+		for (const code of Object.keys(layout.rows))
+			if (board.index.has(code)) compareRows(before.rows[code], layout.rows[code]);
+		for (const code of Object.keys(before.rows))
+			if (board.index.has(code) && !(code in layout.rows))
+				compareRows(before.rows[code], undefined);
+		const rules = deadRules(layout.dead);
+		const { outputs, users } = ruleGraph(rules);
+		if (before.dead !== layout.dead) {
+			const changedStates = new Set();
+			const compareStates = (ra, rb, state) => {
+				if (ra === rb) return;
+				const a = ra || {};
+				const b = rb || {};
+				for (const t of Object.keys(a)) if (!sameCell(a[t], b[t])) return changedStates.add(state);
+				for (const t of Object.keys(b))
+					if (!(t in a) && !sameCell(a[t], b[t])) return changedStates.add(state);
+			};
+			for (const state of Object.keys(layout.dead))
+				compareStates(before.dead[state], layout.dead[state], state);
+			for (const state of Object.keys(before.dead))
+				if (!(state in layout.dead)) compareStates(before.dead[state], undefined, state);
+			// Every output of a changed state's rules, before and after, is compiled again.
+			if (changedStates.size) {
+				const previousRules = deadRules(before.dead);
+				const previousOutputs = ruleGraph(previousRules).outputs;
+				previousRules.forEach((rule, r) => {
+					if (changedStates.has(rule.state)) touched.add(previousOutputs[r]);
+				});
+				rules.forEach((rule, r) => {
+					if (changedStates.has(rule.state)) touched.add(outputs[r]);
+				});
+			}
+		}
+		if (touched.size === 0) return previous;
+		// What reads a touched symbol is touched in turn.
+		const queue = [...touched];
+		while (queue.length) {
+			for (const r of users.get(queue.pop()) || []) {
+				const out = outputs[r];
+				if (touched.has(out)) continue;
+				touched.add(out);
+				queue.push(out);
+			}
+		}
+		const only = { chars: new Set(), dead: new Set(), texts: new Set() };
+		for (const symbol of touched) {
+			const name = symbol.slice(1);
+			if (symbol[0] === 'c') only.chars.add(name);
+			else if (symbol[0] === 'd') only.dead.add(name);
+			else only.texts.add(name);
+		}
+		const core = {
+			layout,
+			ways: new Map(previous.ways),
+			deadWays: new Map(previous.deadWays),
+			texts: new Map(previous.texts)
+		};
+		for (const char of only.chars) core.ways.delete(char);
+		for (const state of only.dead) core.deadWays.delete(state);
+		for (const text of only.texts) core.texts.delete(text);
+		offerCells(core, layout, board, null, only);
+		const order = [];
+		for (let r = 0; r < rules.length; r++) if (touched.has(outputs[r])) order.push(r);
+		if (!followRules(core, rules, order, board, 'partial'))
+			return Object.assign(compileCore(layout, board, null, 'record'), { whole: true });
+		return core;
 	}
 
 	/**
@@ -1818,6 +2119,7 @@ var LAYOUT_ANALYSIS = (function () {
 
 	/** Whether two layouts' dead-key rules are the same. */
 	function sameDead(a, b) {
+		if (a === b) return true;
 		const states = Object.keys(a);
 		if (states.length !== Object.keys(b).length) return false;
 		for (const state of states) {
@@ -1837,11 +2139,13 @@ var LAYOUT_ANALYSIS = (function () {
 	 * time (the optimizer's swaps). trial(layout).total is the global score
 	 * analyse(layout, ngrams, options).score.total gives, up to float
 	 * rounding, but a trial walks only the corpus n-grams that hold a
-	 * character whose key sequence changed: the whole layout is compiled
-	 * again (so a change anywhere in a dead-key chain or a cheapest-way
-	 * choice is seen), each character's sequence is compared with the
-	 * current one, and those n-grams are taken out with the old sequences and
-	 * put back with the new ones through the same visitor analyse() uses.
+	 * character whose key sequence changed: the layout is compiled from the
+	 * current one (compileCoreFrom: only the characters, dead states and
+	 * texts the changed cells and dead-key rules reach, through every chain,
+	 * to the same lists as a whole compile), each character's sequence is
+	 * compared with the current one, and those n-grams are taken out with the
+	 * old sequences and put back with the new ones through the same visitor
+	 * analyse() uses.
 	 * A compact form factor is measured again only when the trial changes the
 	 * cells on the keys that form keeps, or the dead-key rules.
 	 * A layout that offers a choice of ways (planTyping) is planned from the
@@ -1857,9 +2161,11 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {object} ngrams - Counts or prepareNgrams() output.
 	 * @param {object} [options] - As analyse() (keyGroups aside).
 	 * @returns {{total: number, trial: function(object): {total: number,
-	 *   changed: number, walk: string, commit: function(): void}}} total is the current
-	 *   layout's score; trial scores another layout on the same board without
-	 *   changing the session, and its commit makes that layout the current one.
+	 *   changed: number, walk: string, compile: string, compiled: object,
+	 *   commit: function(): void}}} total is the current layout's score; trial
+	 *   scores another layout on the same board without changing the session
+	 *   (compile: 'incremental', 'whole' or 'none'; compiled: its compileWays()
+	 *   result), and its commit makes that layout the current one.
 	 * @throws {Error} When a trial's layout is measured on another board.
 	 */
 	function scoreSession(layoutInput, ngrams, options) {
@@ -2004,12 +2310,15 @@ var LAYOUT_ANALYSIS = (function () {
 			walkTyped(board, plan, sessionVisitor(out.c, out.keyCount, out.counts));
 			return out;
 		};
-		const compiled = compileWays(firstLayout, board, null);
+		// The ways before the substitutes, which a trial compiles again only in part.
+		const core = compileCore(firstLayout, board, null, 'record');
+		const compiled = finishWays(new Map(core.ways), core.texts);
 		const plan = planTyping(compiled, board, table, fixed);
 		const walked = walkAll(plan);
 		const formValues = forms.map((form) => formFit(firstLayout, board, table, form));
 		let state = {
 			layout: firstLayout,
+			core,
 			compiled,
 			plan,
 			simple: simple(plan),
@@ -2056,7 +2365,12 @@ var LAYOUT_ANALYSIS = (function () {
 			const layout = layoutFromRows(layoutInput);
 			if (boardFor(layout, keyboardId, opts.profile) !== board)
 				throw new Error('layout_analysis: a score session keeps the board it started on');
-			const nextCompiled = compileWays(layout, board, null);
+			// Compiled from the current layout: only the ways the changed cells and rules reach.
+			const nextCore = compileCoreFrom(state.core, layout, board);
+			const nextCompiled =
+				nextCore === state.core
+					? state.compiled
+					: finishWays(new Map(nextCore.ways), nextCore.texts);
 			// Planned from the current plan: only the choices a changed token can reach are made again.
 			const nextPlan = planTyping(nextCompiled, board, table, fixed, state.plan);
 			const seqs = sequences(nextCompiled.best);
@@ -2104,10 +2418,14 @@ var LAYOUT_ANALYSIS = (function () {
 				total,
 				walk,
 				changed,
+				// How the layout was compiled: not at all (the same ways), in part, or whole.
+				compile: nextCore === state.core ? 'none' : nextCore.whole ? 'whole' : 'incremental',
+				compiled: nextCompiled,
 				commit() {
 					adoptPlan(nextPlan);
 					state = {
 						layout,
+						core: nextCore,
 						compiled: nextCompiled,
 						plan: nextPlan,
 						simple: simple(nextPlan),

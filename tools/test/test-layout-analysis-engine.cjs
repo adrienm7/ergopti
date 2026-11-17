@@ -25,8 +25,10 @@
  * 5. Incremental score: scoreSession gives the full analysis's score after
  *    random swaps of any cells and dead-key rules (a property test) on
  *    layouts with one way per character and with several (Ergo-L, Ergopti,
- *    bépo: the incremental context plan and walk), keeps a
- *    trial only once committed, and refuses a layout on another board.
+ *    bépo: the incremental context plan and walk), compiles each trial's
+ *    layout in part to exactly the ways a whole compile gives (dead-key
+ *    tables shared or copied), keeps a trial only once committed, and
+ *    refuses a layout on another board.
  * 6. Ways of typing: in context the cheaper copy of a character (« a. »,
  *    « b. »), direct, AltGr or dead key by their documented costs, a
  *    two-character output only when cheaper than its two taps, one way per
@@ -954,7 +956,9 @@ for (const layout of library) {
 // full analysis's score after any change. Property: random swaps of any two
 // cells (any level, dead keys and holes included), some dead-key rules
 // changed, on layouts with dead keys and AltGr levels, several boards,
-// formats and weights, with trials kept or dropped at random.
+// formats and weights, with trials kept or dropped at random. Each trial's
+// layout is compiled in part (compileCoreFrom): its ways must be those a
+// whole compile gives, list for list.
 {
 	const SWAPS = 120;
 	const SESSION_TOLERANCE = 1e-9;
@@ -967,20 +971,25 @@ for (const layout of library) {
 		return state / 4294967296;
 	};
 	const pick = (items) => items[Math.floor(next() * items.length)];
-	const clone = (layout) => ({
+	// shareDead keeps the dead-key tables as one object, as the optimizer does
+	// for the layouts it scores.
+	const clone = (layout, shareDead) => ({
 		id: layout.id,
 		fingering: layout.fingering,
 		rows: Object.fromEntries(Object.entries(layout.rows).map(([code, row]) => [code, row.slice()])),
-		dead: Object.fromEntries(
-			Object.entries(layout.dead).map(([dead, rules]) => [dead, Object.assign({}, rules)])
-		),
+		dead: shareDead
+			? layout.dead
+			: Object.fromEntries(
+					Object.entries(layout.dead).map(([dead, rules]) => [dead, Object.assign({}, rules)])
+				),
 		command: Object.assign({}, layout.command)
 	});
 	/** A copy of layout with two cells swapped, or two dead-key outputs swapped. */
 	const mutate = (layout) => {
-		const out = clone(layout);
+		const editRules = next() < 0.15;
+		const out = clone(layout, !editRules && next() < 0.5);
 		const states = Object.keys(out.dead).filter((dead) => Object.keys(out.dead[dead]).length > 1);
-		if (states.length && next() < 0.15) {
+		if (states.length && editRules) {
 			const rules = out.dead[pick(states)];
 			const [x, y] = [pick(Object.keys(rules)), pick(Object.keys(rules))];
 			[rules[x], rules[y]] = [rules[y], rules[x]];
@@ -1003,6 +1012,15 @@ for (const layout of library) {
 	// How the trials were walked: the layouts with choices must take the
 	// incremental context walk, not only the whole-stream fallback.
 	const walks = {};
+	// How the trials were compiled ('incremental', 'whole' or 'none'), per layout.
+	const compiles = {};
+	// A compiled layout as text: each character's, dead state's and text's ways in order.
+	const waysText = (compiled) =>
+		JSON.stringify([
+			[...compiled.ways].sort((a, b) => (a[0] < b[0] ? -1 : 1)),
+			[...compiled.texts].sort((a, b) => (a[0] < b[0] ? -1 : 1)),
+			compiled.distinct
+		]);
 	for (const { layout: id, options } of cases) {
 		if (!byId.has(id)) {
 			check(false, `incremental: the library has no ${id}`);
@@ -1019,6 +1037,18 @@ for (const layout of library) {
 			const candidate = mutate(current);
 			const trial = session.trial(candidate);
 			walks[`${id}:${trial.walk}`] = (walks[`${id}:${trial.walk}`] || 0) + 1;
+			compiles[`${id}:${trial.compile}`] = (compiles[`${id}:${trial.compile}`] || 0) + 1;
+			const parsed = E.layoutFromRows(candidate);
+			const board = E.keyboard(
+				(options.keyboard || 'iso') === 'iso' && parsed.fingering === 'angle'
+					? 'iso_angle'
+					: options.keyboard || 'iso'
+			);
+			const whole = waysText(E.compileWays(parsed, board, null));
+			if (waysText(trial.compiled) !== whole) {
+				check(false, `incremental: ${id} swap ${s} compiles other ways than a whole compile`);
+				break;
+			}
 			const expected = full(candidate);
 			const gap = Math.abs(trial.total - expected);
 			worst = Math.max(worst, gap);
@@ -1040,6 +1070,12 @@ for (const layout of library) {
 		}
 	}
 	check(trials >= cases.length * SWAPS, `incremental: only ${trials} trials ran`);
+	// The partial compile must carry the trials, not the whole-compile fallback.
+	for (const { layout: id } of cases)
+		check(
+			(compiles[`${id}:incremental`] || 0) >= SWAPS / 2,
+			`incremental: ${id} compiles its trials in part: ${JSON.stringify(compiles)}`
+		);
 	for (const id of ['ergol', 'ergopti', 'bepo'])
 		check(
 			(walks[`${id}:context`] || 0) >= SWAPS / 2,
@@ -1072,7 +1108,9 @@ for (const layout of library) {
 		refused = /keeps the board/.test(error.message);
 	}
 	check(refused, 'incremental: a trial on another board is refused');
-	console.log(`  incremental: ${trials} trials, largest gap ${worst.toExponential(1)}`);
+	console.log(
+		`  incremental: ${trials} trials, largest gap ${worst.toExponential(1)}, compiles ${JSON.stringify(compiles)}`
+	);
 }
 
 // =================================

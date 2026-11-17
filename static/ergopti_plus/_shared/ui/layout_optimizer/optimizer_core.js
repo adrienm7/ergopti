@@ -408,11 +408,40 @@ var LAYOUT_OPTIMIZER = (function () {
 	 * @returns {object}
 	 */
 	function layoutOf(p, assignment, identity) {
+		return arrange(p, assignment, identity, copiedDead(p.layout.dead));
+	}
+
+	/** A copy of a layout's dead-key tables, one level deep (each state's rules). */
+	const copiedDead = (source) => {
+		const dead = {};
+		for (const [state, rules] of Object.entries(source)) dead[state] = Object.assign({}, rules);
+		return dead;
+	};
+
+	// Problem → the dead-key tables its scored layouts share (read-only).
+	const sharedDeadOf = new WeakMap();
+
+	/**
+	 * The layout an arrangement gives, for the objective only: the dead-key
+	 * tables the search leaves alone are one object shared by every such
+	 * layout, so the engine's incremental compile sees at once that their
+	 * rules did not change (its caches are keyed by that object). Never handed
+	 * out: layoutOf gives the result its own copy.
+	 */
+	function scoredLayoutOf(p, assignment) {
+		if (!sharedDeadOf.has(p)) sharedDeadOf.set(p, copiedDead(p.layout.dead));
+		const shared = sharedDeadOf.get(p);
+		if (p.deadState === null) return arrange(p, assignment, null, shared);
+		// The layer's state changes with the arrangement; the other states stay shared.
+		const dead = Object.assign({}, shared);
+		dead[p.deadState] = Object.assign({}, shared[p.deadState]);
+		return arrange(p, assignment, null, dead);
+	}
+
+	/** layoutOf's body, with the dead-key tables to fill (the layer's state is written into). */
+	function arrange(p, assignment, identity, dead) {
 		const rows = {};
 		for (const [code, row] of Object.entries(p.layout.rows)) rows[code] = row.slice();
-		const dead = {};
-		for (const [state, rules] of Object.entries(p.layout.dead))
-			dead[state] = Object.assign({}, rules);
 		if (p.deadState !== null) {
 			// The layer's places replace the rules of the letters they follow.
 			for (const slot of p.slots)
@@ -621,7 +650,7 @@ var LAYOUT_OPTIMIZER = (function () {
 		const score = (assignment) => {
 			const key = assignment.join(',');
 			if (cache.has(key)) return cache.get(key);
-			const layout = layoutOf(p, assignment);
+			const layout = scoredLayoutOf(p, assignment);
 			const value = s.objective(layout);
 			if (!Number.isFinite(value)) throw new Error('layout_optimizer: the objective is not finite');
 			scored = { key, layout };
@@ -634,7 +663,7 @@ var LAYOUT_OPTIMIZER = (function () {
 		const accept = (assignment) => {
 			if (typeof s.objective.accept !== 'function') return;
 			const key = assignment.join(',');
-			s.objective.accept(scored.key === key ? scored.layout : layoutOf(p, assignment));
+			s.objective.accept(scored.key === key ? scored.layout : scoredLayoutOf(p, assignment));
 		};
 
 		const startScore = score(p.start);

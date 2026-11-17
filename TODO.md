@@ -121,10 +121,6 @@ waits for the maintainer's review).
       dev run builds « Windows / Build », commit its artifact `windows-lua-export-*` (`ergopti_lua_export.exe` and
       its `.json`) into `windows/vendor` with their `required` entries in `tools/build/windows_bundle_manifest.json`;
       then `test-windows-lua-export-identity.cjs` checks them and the Windows lane runs the byte-equality proof.
-- [ ] **Optimizer: incremental compile.** A score-session trial compiles its whole layout, which now dominates on
-      dead-key layouts (bépo 15 ms, Ergopti 4 ms of a trial; Swann, loaded laptop: Ergopti 35, Ergo-L 23, bépo 15
-      trials per second): compile only the ways that pass through the two swapped keys
-      (docs/design/layout-optimizer.md, « Follow-ups »).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 

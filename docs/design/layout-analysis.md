@@ -157,10 +157,12 @@ verdict}}`: two results side by side, `delta = a − b`, `verdict` `better` or
   `worse` for `a` by the metric's `better`, `same` when equal, `none` for a
   metric shown but not scored. The Comparer's « Compare with » column.
 - `scoreSession(layout, ngrams, options)` → `{total, trial(layout) → {total,
-changed, commit()}}`: the global score of layouts that change a little at a
-  time (the layout optimizer), equal to `analyse(...).score.total` within
-  float rounding. A trial re-walks only the n-grams of the characters whose
-  key sequence changed, through the same visitor as `analyse()`; `commit`
+changed, walk, compile, compiled, commit()}}`: the global score of layouts
+  that change a little at a time (the layout optimizer), equal to
+  `analyse(...).score.total` within float rounding. A trial compiles only the
+  ways its changed cells and dead-key rules reach (below, Performance) and
+  re-walks only the n-grams of the characters whose key sequence changed,
+  through the same visitor as `analyse()`; `commit`
   makes the trial's layout the one the next trials are measured from. A
   layout on another board is refused. See
   [layout-optimizer.md](layout-optimizer.md). The partial walk holds only
@@ -875,6 +877,22 @@ keeps it. Measured warm, 165 layouts, on a heavily loaded PC: the library
 2.5 → 1.0 s of CPU (fastest wall time 3.2 → 1.2 s), QWERTY 12 → 6 ms, bépo
 86 → 48 ms, Ergo-L 62 → 30 ms, Ergopti 52 → 28 ms; optimizer trials per second
 QWERTY 106 → 142, bépo 19 → 23, Ergo-L 25 → 32, Ergopti 25 → 30.
+
+A trial compiles from the current layout (`compileCoreFrom`): the
+characters, dead states and texts of the changed cells and of the changed
+states' rules are compiled again, then every output of a rule that reads one
+of them, through every chain; the other lists are shared. A list is the best
+`MAX_WAYS` of candidates built from strictly cheaper ways, so a list whose
+inputs are the same is the same. Two ways on the same keys can come from two
+chains (bépo's « crochet, then ê » and « circonflexe-crochet, then e »), and
+a whole compile keeps the one it offers first: the session's first compile
+notes when each way was offered (pass, rule, prefix, tail), the partial one
+gives each offer the time a whole compile would, keeps the earlier of two
+such ways, and leaves out what a whole compile would offer after its last
+pass. The result is the whole compile's, list for list, labels included (the
+property test compares them on every trial; a scratch run over the 165
+layouts of the library, 31 000 random swaps, found no difference), and
+`analyse()` is unchanged (byte-identical on the library).
 
 ## Decided by the agent, to review by the maintainer
 
