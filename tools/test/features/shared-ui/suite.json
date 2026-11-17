@@ -552,7 +552,7 @@
 		},
 		{
 			"id": "app-colour-contrast",
-			"ordinal": 688,
+			"ordinal": 689,
 			"name": "Studio heatmap keys keep a visible edge, finger hues stay told apart and readable, metrics muted text reads at 4.5:1, in both themes",
 			"cmd": "node",
 			"args": ["tools/test/test-app-colour-contrast.cjs"],
@@ -560,7 +560,7 @@
 		},
 		{
 			"id": "ergopti-plus-languages",
-			"ordinal": 689,
+			"ordinal": 690,
 			"name": "Ergopti+ sections written only in French say so under the English page and every t() key has its English entry",
 			"cmd": "node",
 			"args": ["tools/test/test-ergopti-plus-languages.cjs"],
