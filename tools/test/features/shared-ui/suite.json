@@ -528,7 +528,7 @@
 		},
 		{
 			"id": "js-0544",
-			"ordinal": 683,
+			"ordinal": 684,
 			"name": "site accessibility ratchet refuses new violations, its baseline is well formed and every site page is audited",
 			"cmd": "node",
 			"args": ["tools/test/test-site-accessibility-ratchet.cjs"],
