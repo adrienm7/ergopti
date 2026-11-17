@@ -79,6 +79,11 @@ _HCP_ProbesClassifyBothWays() {
 	AssertEqual("present", TestNonKanaLayoutReceipt(Probe(true, false))["state"], "QWERTY keeps VK_RMENU")
 	AssertEqual("absent", TestNonKanaLayoutReceipt(Probe(true, true))["state"], "a real Kana layout is active")
 	AssertEqual("unknown", TestNonKanaLayoutReceipt(Probe(false, false))["state"], "an unreadable layout decides nothing")
+	AssertEqual("present", TestPrivateNotepadReceipt(0)["state"], "no running Notepad leaves the probe its own")
+	AssertEqual("absent", TestPrivateNotepadReceipt(13012)["state"], "a running Notepad would receive the probe's files")
+	AssertEqual("unknown", TestPrivateNotepadReceipt("")["state"], "an unread process table decides nothing")
+	AssertContains(_HCP_GateOutcome(TestPrivateNotepadReceipt(13012), false),
+		"not executed: host capability a private Windows Notepad is absent: Notepad process 13012")
 }
 Test("host capability probes: each probe decides present, absent and unknown from its observation (host-capability-probes)",
 	_HCP_ProbesClassifyBothWays)

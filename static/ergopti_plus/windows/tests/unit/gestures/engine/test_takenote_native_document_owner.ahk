@@ -9,6 +9,8 @@
 
 #Requires AutoHotkey v2.0+
 
+#Include %A_LineFile%\..\..\..\..\fixtures\host_capability_probes.ahk
+
 _TNDO_Source() {
 	global _DriverDir
 	Source := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n"
@@ -36,6 +38,8 @@ _TNDO_Done(State, Code, Output, ErrorText) {
 _TNDO_Case(Mode) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "A prior native document owner must retire before its successor")
+	; Nothing is launched while another Notepad runs: it would receive the files.
+	TestRequireHostCapability(TestPrivateNotepadReceipt.Bind(ProcessExist("notepad.exe")))
 	Directory := A_Temp . "\ergopti_takenote_documents_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
 	Created := false, Handle := 0, Retired := false, PhysicalClean := false, Primary := 0
 	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}
