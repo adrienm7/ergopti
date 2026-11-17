@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 -- The cases replace these entries; the module end puts them back.
-local restore_loaded = require("tests.helpers").keep_loaded({ "modules.gestures.manager" })
+local restore_loaded = require("tests.helpers").keep_loaded({ "gestures.engine.manager" })
 local helpers   = require("tests.helpers")
 local Contract  = require("tests.lua.settings.unused_keys_contract")
 local Engine    = require("settings.engine.migration.unused_keys")
@@ -117,7 +117,7 @@ Contract.register(helpers, {
 --- @param path string
 --- @return table
 local function driver_state(path)
-	local gestures = helpers.load_module("modules.gestures.manager")
+	local gestures = helpers.load_module("gestures.engine.manager")
 	local enable_requested = false
 	gestures.enable = function() enable_requested = true end
 	gestures.init({ persist = true, config_path = path })

@@ -6,7 +6,7 @@
 --- The app parameter of the open_app action for the macOS and Linux drivers:
 --- which values name an application, and how macOS hands one to
 --- /usr/bin/open. Windows applies the same rule in
---- modules/gestures/config.ahk (GestureValidateActionParameter).
+--- gestures/engine/config.ahk (GestureValidateActionParameter).
 ---
 --- FEATURES & RATIONALE:
 --- 1. One rule, pinned by _shared/tests/corpus/action_parameters/app_vectors.json,

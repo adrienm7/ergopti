@@ -334,7 +334,7 @@ function touchpadRegistry() {
 
 /**
  * The private touchpad key an isolated driver writes instead of the machine's
- * (TouchpadRegistryPrivatePath in modules/gestures/touchpad_registry.ahk).
+ * (TouchpadRegistryPrivatePath in gestures/adapters/touchpad_registry.ahk).
  * @param {object} session The session.
  * @returns {Map<string, number>|null} name => DWORD, or null when the driver wrote none.
  */

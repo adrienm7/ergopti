@@ -164,7 +164,7 @@ TestFeatureStateBootTapBindingSourceWiring() {
 	KeyStatePos := InStr(Source, "#Include platform/input/key_state.ahk")
 	StatePos := InStr(Source, "#Include settings/engine/preferences/feature_state.ahk")
 	ApplyPos := InStr(Source, "_BootConfigApplied := ApplyBootConfigToml(")
-	GesturePos := InStr(Source, "#Include modules/gestures/init.ahk")
+	GesturePos := InStr(Source, "#Include gestures/engine/init.ahk")
 	LaterTapPos := InStr(Source, "#Include infra/tap_keys.ahk")
 	TapReadPos := InStr(Source, "TapKeysReadConfig(_IniCache)")
 	AssertTrue(KeyStatePos > 0 && StatePos > 0 && ApplyPos > 0 && GesturePos > 0 && LaterTapPos > 0 && TapReadPos > 0,

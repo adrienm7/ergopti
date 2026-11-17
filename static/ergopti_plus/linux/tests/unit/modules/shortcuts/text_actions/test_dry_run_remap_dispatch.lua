@@ -105,7 +105,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 				injector._set_uinput(session.writer)
 				local function lifecycle() world.lifecycle = world.lifecycle + 1 end
 				environment.script_actions = require("modules.shortcuts.script_actions").new({ reset = lifecycle, reload = lifecycle, quit = lifecycle })
-				environment.gestures = require("modules.gestures.manager")
+				environment.gestures = require("gestures.engine.manager")
 				environment.shortcuts = require("modules.shortcuts.manager")
 				environment.ActionHandlers = require("modules.shortcuts.action_handlers")
 				environment.secure_focus_guard = guard

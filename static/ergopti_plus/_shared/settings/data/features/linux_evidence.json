@@ -213,12 +213,12 @@
 			"proof_tier": "integration",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/gestures/manager.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/gestures/config/test_gestures_manager_config.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_dispatch.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/gestures/config/test_gesture_enable_transaction.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_pump_chain.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_axis_slots.lua"
+				"static/ergopti_plus/linux/gestures/engine/manager.lua",
+				"static/ergopti_plus/linux/tests/unit/gestures/engine/config/test_manager_config.lua",
+				"static/ergopti_plus/linux/tests/unit/gestures/engine/engine/test_dispatch.lua",
+				"static/ergopti_plus/linux/tests/unit/gestures/engine/config/test_enable_transaction.lua",
+				"static/ergopti_plus/linux/tests/unit/gestures/engine/engine/test_pump_chain.lua",
+				"static/ergopti_plus/linux/tests/unit/gestures/engine/engine/test_axis_slots.lua"
 			]
 		},
 		"gesture_modes": {
@@ -302,9 +302,9 @@
 			"proof_tier": "integration",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/gestures/manager.lua",
-				"static/ergopti_plus/linux/modules/gestures/incremental_tracker.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_incremental.lua"
+				"static/ergopti_plus/linux/gestures/engine/manager.lua",
+				"static/ergopti_plus/linux/gestures/engine/incremental_tracker.lua",
+				"static/ergopti_plus/linux/tests/unit/gestures/engine/engine/test_incremental.lua"
 			]
 		},
 		"hotstrings": {

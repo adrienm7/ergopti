@@ -86,7 +86,7 @@ helpers.describe("modifier consumers: independent causal wire and capture expect
 		Fixture.with_session(nil, function(s)
 			s.queue("a", 56, 1, 1); s.pump(); helpers.assert_true(s.inject().ok)
 			local count = #s.rows
-			local Combo = helpers.load_module("modules.gestures.combo_emitter")
+			local Combo = helpers.load_module("gestures.engine.combo_emitter")
 			helpers.assert_true(Combo.press_codes({ 56 }, { 30 }, "spent modifier control"))
 			local rows = {}; for index = count + 1, #s.rows do rows[#rows + 1] = s.rows[index] end
 			helpers.assert_eq(rows, { { 56, 1 }, { 30, 1 }, { 30, 0 }, { 56, 0 } })
@@ -115,7 +115,7 @@ helpers.describe("modifier consumers: independent causal wire and capture expect
 	helpers.it("a legitimate ComboEmitter transaction leaves the original Hook owner current", function()
 		Fixture.with_session(nil, function(s)
 			s.queue("a", 42, 1, 1); s.pump()
-			local Combo = helpers.load_module("modules.gestures.combo_emitter")
+			local Combo = helpers.load_module("gestures.engine.combo_emitter")
 			helpers.assert_true(Combo.press_codes({ 42 }, { 30 }, "borrowed Shift"))
 			s.queue("a", 42, 0, 2); s.pump()
 			helpers.assert_eq(s.rows, { { 42, 1 }, { 30, 1 }, { 30, 0 }, { 42, 0 } })
@@ -145,7 +145,7 @@ helpers.describe("modifier consumers: independent causal wire and capture expect
 	helpers.it("a gesture refuses an occupied key before lifting an owner it never acknowledged", function()
 		Fixture.with_session(nil, function(s)
 			s.queue("a", 30, 1, 1); s.pump(); local count = #s.rows
-			local Combo = helpers.load_module("modules.gestures.combo_emitter")
+			local Combo = helpers.load_module("gestures.engine.combo_emitter")
 			helpers.assert_eq(Combo.press_codes({ 56 }, { 30 }, "occupied physical key"), false)
 			helpers.assert_eq(#s.rows, count)
 			helpers.assert_eq(s.view().down, { 30 })

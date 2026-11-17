@@ -38,7 +38,7 @@ helpers.describe("keyboard shortcuts: idle stop guard", function()
 		}
 		package.loaded["core.fs.adapters.file_system"] = {read = function() return nil end}
 		package.loaded["core.fs.engine.paths"] = {shared = function() return "catalogue.json" end}
-		package.loaded["modules.gestures.actions"] = {execute_single = function() end}
+		package.loaded["gestures.engine.actions"] = {execute_single = function() end}
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
 		local subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts")

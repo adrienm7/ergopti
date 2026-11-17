@@ -87,9 +87,7 @@ _PHNS_Classified() {
 
 ; The configuration surfaces: the tray menus, the settings and the editors.
 _PHNS_Sources() {
-	return _DriverDirsConcat("menu", "ui/menu", "settings", "ai/ui",
-		"ui/hotstrings_config_window", "ui/layout_manager", "ui/action_picker",
-		"ui/physical_shortcuts")
+	return _DriverDirsConcat("menu", "ui/menu", "gestures/ui/menu", "settings", "ai/ui", "ui/hotstrings_config_window", "ui/layout_manager", "ui/action_picker", "ui/physical_shortcuts")
 		. "`n" . _DriverFileSource("action_picker_webview.ahk")
 		. "`n" . _DriverFileSource("editors.ahk")
 }

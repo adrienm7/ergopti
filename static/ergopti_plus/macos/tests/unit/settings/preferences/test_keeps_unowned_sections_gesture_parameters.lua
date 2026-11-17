@@ -46,11 +46,11 @@ helpers.describe("Published gesture parameter identity source preservation", fun
 
 	local function with_file(published, body)
 		helpers.with_stub_scope({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim",
-			"modules.gestures", "modules.gestures.actions" }, function()
-			package.loaded["modules.gestures"], package.loaded["modules.gestures.actions"] = nil, nil
+			"gestures.engine", "gestures.engine.actions" }, function()
+			package.loaded["gestures.engine"], package.loaded["gestures.engine.actions"] = nil, nil
 			local gestures
-			if published then gestures = helpers.load_with_stubs("modules.gestures")
-			else helpers.load_with_stubs("modules.gestures.actions") end
+			if published then gestures = helpers.load_with_stubs("gestures.engine")
+			else helpers.load_with_stubs("gestures.engine.actions") end
 			local warnings, errors = {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end

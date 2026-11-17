@@ -327,7 +327,7 @@ platforms = ["ahk", "hs", "linux"]
 # ⚠ OPEN QUESTION, measured 2026-08-04 and left for the maintainer.
 # This section and all 45 of its features exclude Linux — 11 are ["ahk","hs"],
 # 34 are ["hs"], none mentions linux. But the Linux driver ships
-# modules/gestures/manager.lua, a _build_gestures tray submenu, Linux-specific
+# gestures/engine/manager.lua, a _build_gestures tray submenu, Linux-specific
 # defaults (swipe_3_left, swipe_4_up, tap_3, tap_4) and a test file. What it has
 # no reader for is TOUCH INPUT: manager.lua's own header calls the libinput
 # subprocess a TODO.
@@ -2987,7 +2987,7 @@ description_key = "menu.caps_word.pointer.other_buttons"
 #   says to turn them off first (menu.gestures.recommended_reason_macos). The
 #   three-finger swipes are off in a default macOS install.
 # - Windows: every slot is a system gesture, but the driver writes the touchpad
-#   registry itself (modules/gestures/touchpad_registry.ahk, backed up first),
+#   registry itself (gestures/adapters/touchpad_registry.ahk, backed up first),
 #   so Windows runs only Ergopti's action: no double action.
 [[features.gestures]]
 id = "enabled"

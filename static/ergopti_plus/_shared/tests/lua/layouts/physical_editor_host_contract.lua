@@ -18,7 +18,7 @@ return function(helpers, Json, shared_path, load_host, platform)
 	end
 	if platform == "linux" then
 		local epoch,serial,callback,backend,picker,lastjs=0,0,nil,nil,nil,nil
-		package.loaded['modules.gestures.manager']=catalogue
+		package.loaded['gestures.engine.manager']=catalogue
 		package.loaded['ui.action_picker.bridge']={open=function(_,confirm)picker=confirm;return true end}
 		package.loaded['core.ui.ui.webview_manager']={native_available=function()return true end,current_epoch=function()return epoch>0 and epoch or nil end,page_current=function(_,exact)return epoch>0 and epoch==exact end,show=function()serial=serial+1;epoch=serial;return backend.on_window_acquiring(epoch) end,hide=function(_,exact)if exact~=epoch then return false end;local old=epoch;epoch=0;backend.on_window_closed(old);return true end,eval_js=function(_,js)lastjs=js;return true end}
 		backend=load_host()

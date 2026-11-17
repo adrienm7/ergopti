@@ -219,7 +219,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
   `/` path), so Windows needs its own drive-letter syntax in
   `user_action_parameter` and the corpus first. Add `command` and `path` to
   `GestureValidateActionParameter` / `GestureActionParameterPrompt`
-  (`modules/gestures/config.ahk`), replay the corpus in an AHK test, then add
+  (`gestures/engine/config.ahk`), replay the corpus in an AHK test, then add
   `ahk` to both `platform` lines and regenerate the catalogue. All the locale
   keys exist in the 21 locales (`sg_actions.run_command`,
   `dialog.gestures.param_command*`, `dialog.gestures.param_path*`,
@@ -275,7 +275,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   `core/logger/engine/perf_budget.ahk` with `menu.rebuild`, with an AHK test that fails
   without the line.
 - Screen action vision backend on Windows: the native parameter prompt of
-  `llm_vision` (`modules/gestures/config.ahk`, `param_llm_vision`) still
+  `llm_vision` (`gestures/engine/config.ahk`, `param_llm_vision`) still
   prints every vision backend on its own line, about forty with the API
   catalogue, for the user to type one. macOS and Linux now pick the backend
   in a list and then ask the optional model, as the action picker page does
@@ -737,7 +737,7 @@ every row that misses an OS a localized `reason_<os>` (table in
 `_shared/shortcuts/data/actions/README.md`). These Windows rows point at an equivalent
 today, but Windows could run them itself; each one is a row of `actions.toml`
 (add `ahk` to `platform`, drop its `reason_ahk`/`equivalent_ahk`) plus a handler
-in `windows/modules/gestures/actions.ahk`:
+in `windows/gestures/engine/actions.ahk`:
 
 - `home`, `end`, `page_up`, `page_down`: plain keystrokes (`emit_ahk_key`
   `Home`, `End`, `PgUp`, `PgDn`).

@@ -26,8 +26,8 @@ local DRIVER_ROOT = helpers.driver_root()
 -- Keyed by module name (helpers.module_name_of), as the code requires each one.
 local KNOWN_VIOLATIONS = {
 	["modules.dynamic_hotstrings.personal_info"] = true,
-	["modules.gestures.actions"]                 = true,
-	["modules.gestures.engine"]                  = true,
+	["gestures.engine.actions"]                 = true,
+	["gestures.engine.engine"]                  = true,
 	["modules.keystats"]                   = true,
 	["modules.keystats.rotation"]               = true,
 
@@ -38,7 +38,7 @@ local KNOWN_VIOLATIONS = {
 	["modules.dynamic_hotstrings.personal_info"] = true,
 	["platform.remap"] = true,
 	["ai.engine.api.common"] = true,
-	["modules.gestures.actions"] = true,
+	["gestures.engine.actions"] = true,
 
 	-- Encore plus: more modules for full pause coverage
 	["ai.engine.prediction.engine"] = true,

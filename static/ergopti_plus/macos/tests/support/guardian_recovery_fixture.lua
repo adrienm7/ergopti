@@ -41,7 +41,7 @@ local STUB_MODULES = {
 	"platform.remap.deploy_pacing",
 	"core.ui.engine.notifications",
 	"modules.keystats.kc_bridge",
-	"modules.gestures.engine",
+	"gestures.engine.engine",
 	"modules.shortcuts",
 	"hs.caffeinate.watcher",
 	"hs",
@@ -632,7 +632,7 @@ local function with_remap(options, body)
 			return true
 		end,
 	}
-	package.loaded["modules.gestures.engine"] = {}
+	package.loaded["gestures.engine.engine"] = {}
 	local shortcuts_stub = {
 		is_paused = function()
 			if calls.pause_query_failures_remaining > 0 then

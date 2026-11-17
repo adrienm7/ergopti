@@ -61,6 +61,7 @@ local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "apps",
 	DRIVER_ROOT .. "clipboard",
 	DRIVER_ROOT .. "diagnostics",
+	DRIVER_ROOT .. "gestures",
 	helpers.shared(""),
 }
 

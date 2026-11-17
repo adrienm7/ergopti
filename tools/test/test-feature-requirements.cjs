@@ -179,10 +179,10 @@ check('an unlisted file using a requirement fails, and a dead owner fails', () =
 		/linux\/wmctrl: modules\/probe_spawner\.lua reaches the requirement but is neither an owner nor plumbing/
 	);
 	const removed = cloneSources(sources);
-	delete removed.files.linux['modules/gestures/workspace_switcher.lua'];
+	delete removed.files.linux['gestures/adapters/workspace_switcher.lua'];
 	expectError(
 		removed,
-		/linux\/wmctrl: owner "modules\/gestures\/workspace_switcher\.lua" matches no file/
+		/linux\/wmctrl: owner "gestures\/adapters\/workspace_switcher\.lua" matches no file/
 	);
 });
 

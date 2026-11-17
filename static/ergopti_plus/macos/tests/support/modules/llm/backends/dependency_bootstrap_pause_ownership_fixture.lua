@@ -309,8 +309,8 @@ local function load_fixture(options)
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "(none)" end,
 		}
-		package.loaded["modules.gestures.engine"] = {}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.engine"] = {}
+		package.loaded["gestures.engine.actions"] = {
 			SG_NAMES = {}, AX_NAMES = {},
 			get_label = function(value) return value end,
 			execute_single = function() return true end,

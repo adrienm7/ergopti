@@ -26,10 +26,10 @@ local GESTURE_SOURCE = '[gestures]\nenabled = true\ntap_4 = "open_url"\n'
 --- @return table fixture owner, gestures, files, state, asked, writes().
 local function gesture_fixture()
 	package.loaded["core.fs.adapters.file_system"] = FileSystem
-	package.loaded["modules.gestures.engine"] = nil
-	package.loaded["modules.gestures.conflicts"] = nil
-	helpers.load_with_stubs("modules.gestures.actions")
-	local gestures = helpers.load_with_stubs("modules.gestures")
+	package.loaded["gestures.engine.engine"] = nil
+	package.loaded["gestures.engine.conflicts"] = nil
+	helpers.load_with_stubs("gestures.engine.actions")
+	local gestures = helpers.load_with_stubs("gestures.engine")
 	local files, state, asked, writes = { config = GESTURE_SOURCE }, { gestures = true }, {}, 0
 	local enabled = true
 	gestures.is_enabled = function() return enabled end
@@ -59,7 +59,7 @@ local function gesture_fixture()
 		snapshot_view = demotions.persisted_view,
 		restore_runtime = function() return true end,
 	})
-	local owner = require("ui.menu.gesture_scope").new({
+	local owner = require("gestures.ui.menu.scope").new({
 		path = "config", files = files_port, state = state, gestures = gestures,
 		preferences = prefs, checkpoint = checkpoint, demotions = demotions,
 		capture_preferences = function() return prefs.snapshot(state, {}, modules) end,
@@ -76,7 +76,7 @@ end
 --- @return table commands Row id -> click handler.
 local function gesture_commands(fixture)
 	local original_renderer = package.loaded["menu.engine.manifest_menu"]
-	local original_menu = package.loaded["ui.menu.menu_gestures"]
+	local original_menu = package.loaded["gestures.ui.menu.gestures"]
 	local original_dialog = package.loaded["core.ui.engine.dialog_util"]
 	local commands
 	package.loaded["menu.engine.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(_, _, _, _, context)
@@ -87,15 +87,15 @@ local function gesture_commands(fixture)
 		fixture.asked[#fixture.asked + 1] = message
 		return no
 	end }
-	package.loaded["ui.menu.menu_gestures"] = nil
+	package.loaded["gestures.ui.menu.gestures"] = nil
 	local ok, detail = pcall(function()
-		require("ui.menu.menu_gestures").build({ gestures = fixture.gestures, state = fixture.state, paused = false,
+		require("gestures.ui.menu.gestures").build({ gestures = fixture.gestures, state = fixture.state, paused = false,
 			apply_gesture_scope = fixture.owner.apply,
 			save_prefs = function() error("a scope row must not use the ordinary save") end,
 			updateMenu = function() end })
 	end)
 	package.loaded["menu.engine.manifest_menu"] = original_renderer
-	package.loaded["ui.menu.menu_gestures"] = original_menu
+	package.loaded["gestures.ui.menu.gestures"] = original_menu
 	if not ok then
 		package.loaded["core.ui.engine.dialog_util"] = original_dialog
 		error(detail, 0)
@@ -259,7 +259,7 @@ end
 
 helpers.describe("restore-recommended-no-confirm: the menu's scope wiring (macOS)", function()
 	helpers.it("no restore or clear row asks, and no owner is handed a question port", function()
-		local owners = { "ui.menu.gesture_scope", "ui.menu.shortcuts_scope", "ai.ui.menu.scope",
+		local owners = { "gestures.ui.menu.scope", "ui.menu.shortcuts_scope", "ai.ui.menu.scope",
 			"ui.menu.metrics_scope", "ui.menu.hotstrings_scope", "settings.ui.menu.scoped_preferences",
 			"menu.ui.transactions.global_scope" }
 		local names = { "core.ui.engine.dialog_util", "modules.hotstrings.hotstrings_config" }

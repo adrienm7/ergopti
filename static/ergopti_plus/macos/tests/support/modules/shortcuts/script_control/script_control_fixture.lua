@@ -28,13 +28,13 @@ package.loaded["platform.input.keycodes"] = {
 	FORWARD_DELETE = 0x75,
 }
 package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end, get_locale = function() return "fr" end }
-package.loaded["modules.gestures.engine"] = {
+package.loaded["gestures.engine.engine"] = {
   init = function() end
 }
-package.loaded["modules.gestures.conflicts"] = {
+package.loaded["gestures.engine.conflicts"] = {
   on_action_changed = function() end
 }
-package.loaded["modules.gestures.actions"] = {
+package.loaded["gestures.engine.actions"] = {
   init = function() end,
   get_label = function(n) return n end,
   SG_NAMES = { "none", "script_pause_toggle", "script_reload", "script_quit", "other_action" },

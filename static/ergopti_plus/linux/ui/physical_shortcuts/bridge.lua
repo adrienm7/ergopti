@@ -44,7 +44,7 @@ function M.open(options)
 	if type(options) ~= "table" or not M.available(options.scope) then return false end
 	if session ~= nil and M.close() ~= true then return false end
 	local Manager = require("core.ui.ui.webview_manager")
-	local Gestures = require("modules.gestures.manager")
+	local Gestures = require("gestures.engine.manager")
 	local Hook = require("platform.input.keyboard_hook")
 	local capture_position, cancel_position, position_available = rawget(Hook, "capture_position"),
 		rawget(Hook, "cancel_position"), rawget(Hook, "position_capture_available")

@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- Turns a swipe displacement into the axis it travelled on, the direction
 --- name a configuration slot carries, and the slot itself. The macOS geometry
---- (modules/gestures/geometry.lua) and the Linux evdev decoder
---- (modules/gestures/mt_decoder.lua) both classify through this module; they
+--- (gestures/engine/geometry.lua) and the Linux evdev decoder
+--- (gestures/engine/mt_decoder.lua) both classify through this module; they
 --- differ only in the unit their displacement is measured in, so each passes
 --- its own swipe minimum and diagonal minimum.
 ---

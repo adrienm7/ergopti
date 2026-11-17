@@ -118,8 +118,8 @@ end)
 -- actual native menu owner and renderer; only the host/runtime ports are controlled.
 local mode_fixture_modules = {
 	"core.text.engine.json", "menu.engine.renderer", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.logger.engine.logger",
-	"modules.gestures", "menu.ui.builder.utils", "core.ui.engine.dialog_util", "ui.action_picker",
-	"ui.menu.shortcut_utils", "core.timing.engine.deferred_work", "ui.menu.menu_gestures",
+	"gestures.engine", "menu.ui.builder.utils", "core.ui.engine.dialog_util", "ui.action_picker",
+	"ui.menu.shortcut_utils", "core.timing.engine.deferred_work", "gestures.ui.menu.gestures",
 }
 local function mode_json(path)
 	local file = assert(io.open(path, "rb"))
@@ -170,11 +170,11 @@ local function with_mode_fixture(options, callback)
 		package.loaded["menu.engine.manifest_menu"] = renderer
 		package.loaded["core.i18n.engine.i18n"] = i18n
 		package.loaded["core.logger.engine.logger"] = logger
-		package.loaded["modules.gestures"] = { DEFAULT_STATE = { gestures = true } }
+		package.loaded["gestures.engine"] = { DEFAULT_STATE = { gestures = true } }
 		for _, name in ipairs({ "menu.ui.builder.utils", "core.ui.engine.dialog_util", "ui.action_picker",
 			"ui.menu.shortcut_utils", "core.timing.engine.deferred_work" }) do package.loaded[name] = {} end
 		if options.dialog then package.loaded["core.ui.engine.dialog_util"] = options.dialog end
-		local owner = require("ui.menu.menu_gestures")
+		local owner = require("gestures.ui.menu.gestures")
 		function fixture.build()
 			return owner.build({
 				gestures = fixture.gestures, state = { gestures = true }, paused = false,
@@ -453,7 +453,7 @@ local function with_gesture_controls(options, callback)
 			if not options.cancel then picked("copy") end
 		end
 		package.loaded["ui.menu.shortcut_utils"].picker_parameter_fields = function() return {} end
-		local owner = require("ui.menu.menu_gestures")
+		local owner = require("gestures.ui.menu.gestures")
 		function f.control_build()
 			return owner.build({ gestures = f.gestures, state = f.control_state, paused = f.control_paused,
 				save_prefs = function()

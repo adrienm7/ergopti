@@ -460,7 +460,7 @@ function isCanonicalParameterWrite(
 		return false;
 	return Boolean(
 		executableMatch(
-			/local parameters = options\.parameters or require\("modules\.gestures\.manager"\)/,
+			/local parameters = options\.parameters or require\("gestures\.engine\.manager"\)/,
 			body
 		) &&
 			executableMatch(/parameters\.DEFAULT_GESTURES\[binding\] ~= nil/, body) &&
@@ -773,7 +773,7 @@ const actions = parseToml(
 	fs.readFileSync(path.join(DRIVERS_DIR, '_shared/shortcuts/data/actions/actions.toml'), 'utf8')
 ).sg_actions;
 const parameterStorageOwner = fs.readFileSync(
-	path.join(DRIVERS_DIR, 'linux/modules/gestures/manager.lua'),
+	path.join(DRIVERS_DIR, 'linux/gestures/engine/manager.lua'),
 	'utf8'
 );
 const parameterWriterPath = 'settings/engine/preferences/program_binding_transaction.lua';
@@ -809,7 +809,7 @@ end
 --- @return table owner Apply, retained debt and explicit compensation retry.
 function M.new(options)
 	assert(type(options) == "table" and type(options.is_paused) == "function", "program binding requires live pause ownership")
-	local parameters = options.parameters or require("modules.gestures.manager")
+	local parameters = options.parameters or require("gestures.engine.manager")
 	local binding, slot, section, provider = options.binding
 	local families = {
 		{ "keyboard__", "shortcuts.keyboard", "modules.shortcuts.keyboard_shortcuts" },

@@ -8,7 +8,7 @@ ffi.cdef[[ int prctl(int option, unsigned long arg2, unsigned long arg3, unsigne
 assert(ffi.C.prctl(36, 1, 0, 0, 0) == 0, "provider fixture requires owned child-subreaper support")
 local Providers = require("core.process.adapters.program_providers")
 local Runner = require("core.process.adapters.program_runner")
-local Owner = require("modules.gestures.program_owner")
+local Owner = require("gestures.engine.program_owner")
 local Parameter = require("settings.engine.program_parameter")
 local Logger = require("core.logger.engine.shim")
 local previous_error, messages = Logger.error, {}

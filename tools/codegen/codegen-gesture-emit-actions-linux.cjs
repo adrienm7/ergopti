@@ -80,7 +80,7 @@ lines.push('--- ================================================================
 lines.push('--- MODULE: Gesture Emit Actions (Linux)');
 lines.push('--- DESCRIPTION:');
 lines.push('--- Every action Linux performs as a single xdotool key combo, as');
-lines.push('--- action id -> combo. modules/gestures/manager.lua looks the action up here');
+lines.push('--- action id -> combo. gestures/engine/manager.lua looks the action up here');
 lines.push('--- instead of carrying one elseif branch per action.');
 lines.push('---');
 lines.push("--- The combos are X11 keysym syntax and are Linux's own: `Return`, not AHK's");

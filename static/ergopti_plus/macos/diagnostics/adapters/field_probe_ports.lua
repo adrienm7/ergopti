@@ -999,7 +999,7 @@ function M.new()
 			local MenuState = package.loaded["menu.ui.builder.state"]
 			return type(MenuState) == "table" and MenuState.keystats_start_ms() or nil
 		end,
-		gesture_frame_counts = function() return require("infra.gesture_frame_evidence").counts() end,
+		gesture_frame_counts = function() return require("gestures.engine.frame_evidence").counts() end,
 		capslock_chord_facts = function()
 			local Shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 			local counts = require("infra.capslock_chord_evidence").counts()
@@ -1029,7 +1029,7 @@ function M.new()
 		local_servers_detect = local_servers_detect,
 		boot_facts = boot_facts,
 		fifo = fifo,
-		apple_shortcut_action = function() return require("modules.gestures.apple_shortcut_action") end,
+		apple_shortcut_action = function() return require("gestures.engine.apple_shortcut_action") end,
 		today_log_path = function() return require("core.logger.engine.logger").today_log_path() end,
 		-- Process CPU and a monotonic clock, both in milliseconds
 		cpu_ms = function() return os.clock() * 1000 end,

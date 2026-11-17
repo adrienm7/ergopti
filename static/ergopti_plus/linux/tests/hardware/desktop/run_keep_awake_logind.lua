@@ -58,7 +58,7 @@ if CHILD then
 	os.exit(0)
 end
 
-local Gestures = require("modules.gestures.manager")
+local Gestures = require("gestures.engine.manager")
 local failures = 0
 
 --- Acquires the inhibitor, releases it through one path and checks logind.

@@ -78,7 +78,7 @@ helpers.describe("empty configuration boot projection", function()
 		local modules = {}
 		-- Literal module names, in load order, so each follows its file when it moves.
 		for _, entry in ipairs({ { "keymap", "modules.keymap" }, { "dynamic_hotstrings", "modules.dynamic_hotstrings" },
-			{ "shortcuts", "modules.shortcuts" }, { "gestures", "modules.gestures" }, { "keystats", "modules.keystats" } }) do
+			{ "shortcuts", "modules.shortcuts" }, { "gestures", "gestures.engine" }, { "keystats", "modules.keystats" } }) do
 			modules[entry[1]] = helpers.load_with_stubs(entry[2])
 		end
 		local preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")

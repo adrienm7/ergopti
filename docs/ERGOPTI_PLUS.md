@@ -717,9 +717,9 @@ correspondant du plan. Si l'écart vous choque, c'est l'intérêt du plan.
    `platform = "all"`, puis ajouter l'id à `[sg_order].items` dans le bon groupe.
 2. `_shared/core/i18n/data/locales/en.json` : ajouter `"sg_actions.copy_word"`, puis
    `python tools/locale/check_locales.py --fix` pour la propager aux 20 autres locales.
-3. `windows/modules/gestures/actions.ahk` : ajouter la lambda dans `GESTURE_ACTIONS`.
-4. `macos/modules/gestures/actions.lua` : ajouter l'entrée `sg(...)`.
-5. `linux/modules/gestures/manager.lua` : ajouter une branche `elseif` dans
+3. `windows/gestures/engine/actions.ahk` : ajouter la lambda dans `GESTURE_ACTIONS`.
+4. `macos/gestures/engine/actions.lua` : ajouter l'entrée `sg(...)`.
+5. `linux/gestures/engine/manager.lua` : ajouter une branche `elseif` dans
    `_execute_action` **et** une entrée dans la table `ACTION_LABELS` (français en dur).
 6. Pour la lier à un accord clavier : `windows/settings/engine/preferences/feature_state.ahk`
    `KEYBOARD_SHORTCUT_DEFAULTS`, **plus** un support de préfixe dans

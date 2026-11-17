@@ -30,7 +30,7 @@ helpers.describe("init: instance admission runs before any side effect (hs-secon
 			"Storage.migrate_legacy_namespace()",
 			'require("core.events.timer_scheduler")\n',
 			"config_paths.init(base_dir)",
-			'require("modules.gestures")',
+			'require("gestures.engine")',
 			"Storage.set(",
 		}) do
 			local at = code:find(later, 1, true)

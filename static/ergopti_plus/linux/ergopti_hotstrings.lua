@@ -306,7 +306,7 @@ local dyn_hotstrings = RuntimeGuard.optional_require("modules.dynamic_hotstrings
 local updater = RuntimeGuard.optional_require("modules.updater.manager")
 
 -- Gestures manager (optional — trackpad/mouse gesture recognition via libinput).
-local gestures = RuntimeGuard.optional_require("modules.gestures.manager")
+local gestures = RuntimeGuard.optional_require("gestures.engine.manager")
 
 -- Shortcuts manager (optional — wrap symbols, CapsWord, text manipulation).
 local shortcuts = RuntimeGuard.optional_require("modules.shortcuts.manager")
@@ -1354,7 +1354,7 @@ local function main()
 			-- A dead key pending in the emulation must not compose after the resume.
 			if paused then require("modules.keymap.layout_emulation").drop_pending_dead_key() end
 			-- The spotlight ring is an overlay of its own timer: a pause ends it.
-			if paused then require("modules.gestures.pointer_spotlight").dismiss() end
+			if paused then require("gestures.engine.pointer_spotlight").dismiss() end
 			if gestures then gestures.set_program_paused(paused); gestures.set_window_switch_paused(paused) end
 			if user_hotstring_native then user_hotstring_native.observe_input() end
 			if dyn_hotstrings then dyn_hotstrings.invalidate_user_code("script pause transition") end
@@ -2734,7 +2734,7 @@ local function main()
 			end,
 			emulating = function() return require("modules.keymap.layout_emulation").status().active == true end,
 			defer = function(fn) return event_loop.defer(fn) end,
-			press = function(combo) return (require("modules.gestures.combo_emitter").press(combo)) end,
+			press = function(combo) return (require("gestures.engine.combo_emitter").press(combo)) end,
 		})
 		if accented then
 			return { consume = true, repeat_callback = input_capture_gate.guard(accented_repeat) }
@@ -3415,7 +3415,7 @@ local function main()
 			not sources.pointer and "platform_reason.pointer_distance_needs_cursor_position" or nil)
 		local desktop, desktop_reason = sources.desktop, nil
 		if not desktop then
-			desktop, desktop_reason = require("modules.gestures.workspace_switcher")
+			desktop, desktop_reason = require("gestures.adapters.workspace_switcher")
 				.current_workspace_source(Monotonic.now_ms)
 		end
 		if system_metrics then

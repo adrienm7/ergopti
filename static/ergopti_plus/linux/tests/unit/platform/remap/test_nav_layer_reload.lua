@@ -415,7 +415,7 @@ helpers.describe("original configured Navigation source reservations", function(
 			local function start()
 				return Manager.init({ keyboard_hook = hook,
 					execute_action = function() hook.actions = hook.actions + 1 end,
-					action_names = require("modules.gestures.manager").get_executable_action_names,
+					action_names = require("gestures.engine.manager").get_executable_action_names,
 					on_text_injected = function() hook.typed = hook.typed + 1 end,
 					defaults_path = opts.shared_root .. "/tap_hold/data/defaults.toml", user_path = dir .. "/tap_hold.toml" })
 			end

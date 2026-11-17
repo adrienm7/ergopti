@@ -62,7 +62,7 @@ local function fixture(body)
 			text_prompt = function(_, _, _, save) return save, f.typed end,
 			block_alert = function(_, reason) f.warning = reason end,
 		}
-		package.loaded["modules.gestures.actions_aux_owner"] = { program_available = function() return true end }
+		package.loaded["gestures.engine.actions_aux_owner"] = { program_available = function() return true end }
 		f.native = require("adapters.apple_shortcuts_native")
 		f.utils = require("ui.menu.shortcut_utils")
 		f.locale = package.loaded["core.i18n.engine.i18n"]

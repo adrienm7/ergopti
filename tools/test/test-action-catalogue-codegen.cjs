@@ -374,8 +374,8 @@ check(!/"#+Raccourcis/.test(SOURCE), 'actions.toml must not carry a literal Fren
 //    its tests one #Include at a time; the Lua runners discover test_*.lua.
 const PARITY_SLUG = '(action-catalogue-parity)';
 const PARITY_TESTS = [
-	'windows/tests/unit/modules/gestures/test_gestures.ahk',
-	'macos/tests/unit/modules/gestures/actions/test_action_catalogue_parity.lua',
+	'windows/tests/unit/gestures/engine/test_gestures.ahk',
+	'macos/tests/unit/gestures/engine/actions/test_catalogue_parity.lua',
 	'linux/tests/unit/modules/shortcuts/actions/test_action_catalogue_parity.lua'
 ];
 for (const rel of PARITY_TESTS) {
@@ -387,8 +387,8 @@ for (const rel of PARITY_TESTS) {
 }
 const runAll = fs.readFileSync(path.join(SP, 'windows', 'tests', 'run_all.ahk'), 'utf8');
 check(
-	/^#Include unit\/modules\/gestures\/test_gestures\.ahk$/m.test(runAll),
-	'run_all.ahk must include unit/modules/gestures/test_gestures.ahk'
+	/^#Include unit\/gestures\/engine\/test_gestures\.ahk$/m.test(runAll),
+	'run_all.ahk must include unit/gestures/engine/test_gestures.ahk'
 );
 
 // 6. The website reads the same canonical registry.

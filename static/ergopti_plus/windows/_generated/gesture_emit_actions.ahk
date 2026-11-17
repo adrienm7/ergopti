@@ -7,7 +7,7 @@
 ; MODULE: Gesture Emit Actions (Windows)
 ; DESCRIPTION:
 ; Every action whose behaviour the shared catalogue fully describes: a key plus
-; modifiers, or a raw send sequence. modules/gestures/actions.ahk turns these
+; modifiers, or a raw send sequence. gestures/engine/actions.ahk turns these
 ; into registry handlers at static-init, so nothing here runs on the boot path
 ; and no TOML is parsed to register them.
 ;

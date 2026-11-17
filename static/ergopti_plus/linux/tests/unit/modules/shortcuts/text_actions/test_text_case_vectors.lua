@@ -53,7 +53,7 @@ local function transformed_by(action_name, selected)
 		manager = "modules.shortcuts.manager",
 		clipboard = "clipboard.adapters.clipboard",
 		event_loop = "core.events.loop",
-		combo = "modules.gestures.combo_emitter",
+		combo = "gestures.engine.combo_emitter",
 		injector = "modules.hotstrings.injector",
 		keystats = "modules.keystats.keystats",
 	}

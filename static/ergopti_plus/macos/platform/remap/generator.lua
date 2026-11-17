@@ -119,7 +119,7 @@ M.REQUIREMENT_STATE_FEATURES = {
 -- generated rules append to. requirements.toml holds the signature that finds
 -- them; every caller is listed here with its features or its reason.
 M.REQUIREMENT_FACADE_FEATURES = {
-	["modules/gestures/actions.lua"]        = { "gestures.*" },
+	["gestures/engine/actions.lua"]        = { "gestures.*" },
 	["modules/shortcuts/script_control.lua"] = { "shortcuts.script_control.*" },
 	["platform/remap/watchers.lua"]         = { "shortcuts.caps_word.**" },
 	["modules/keystats/kc_bridge.lua"]      = { "metrics.**" },

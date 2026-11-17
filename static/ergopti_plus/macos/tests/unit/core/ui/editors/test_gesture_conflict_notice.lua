@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 helpers.describe("gesture warning consent (gesture-conflicts)", function()
 	for _, choice in ipairs({ "menu.gestures.open_settings", "gestures.system.dismiss", "close", "refused" }) do
 		helpers.it("honours the " .. choice .. " button", function()
-			local names = { "ui.gesture_conflict_notice", "core.ui.engine.dialog_util", "core.i18n.engine.i18n", "core.fs.adapters.storage",
+			local names = { "gestures.ui.conflict_notice", "core.ui.engine.dialog_util", "core.i18n.engine.i18n", "core.fs.adapters.storage",
 				"core.timing.engine.deferred_work", "core.logger.engine.logger" }
 			local saved, store, timers = {}, {}, {}
 			local saved_shell = package.loaded["core.process.adapters.shell_runner"]
@@ -40,7 +40,7 @@ helpers.describe("gesture warning consent (gesture-conflicts)", function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.logger.engine.logger"].error = function() errors = errors + 1 end
 			local ok, err = xpcall(function()
-				local notice = require("ui.gesture_conflict_notice")
+				local notice = require("gestures.ui.conflict_notice")
 				local warning = { key = "tap_2", msg = "Conflict", url = "settings" }
 				helpers.assert_eq(notice.show(warning), false, "a refused timer is reported")
 				reject_schedule = false

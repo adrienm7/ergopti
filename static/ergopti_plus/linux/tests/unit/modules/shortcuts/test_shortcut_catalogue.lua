@@ -72,13 +72,13 @@ helpers.describe("shortcut catalogue (Linux)", function()
 	end)
 
 	helpers.it("logs and answers nil when the action catalogue cannot load", function()
-		local original = package.loaded["modules.gestures.manager"]
-		package.loaded["modules.gestures.manager"] = {}
+		local original = package.loaded["gestures.engine.manager"]
+		package.loaded["gestures.engine.manager"] = {}
 		local logged
 		local ok, failure = pcall(function()
 			helpers.assert_eq(Catalogue.action_catalogue({ error = function(_, fmt) logged = fmt end }, "t"), nil)
 		end)
-		package.loaded["modules.gestures.manager"] = original
+		package.loaded["gestures.engine.manager"] = original
 		assert(ok, failure)
 		helpers.assert_contains(logged, "action catalogue is unavailable")
 	end)

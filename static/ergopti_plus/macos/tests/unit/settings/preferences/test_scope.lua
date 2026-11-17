@@ -4,10 +4,10 @@ local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 
 local function fixture(source)
-	package.loaded["modules.gestures.engine"] = nil
-	package.loaded["modules.gestures.conflicts"] = nil
-	local Actions = helpers.load_with_stubs("modules.gestures.actions")
-	local Gestures = helpers.load_with_stubs("modules.gestures")
+	package.loaded["gestures.engine.engine"] = nil
+	package.loaded["gestures.engine.conflicts"] = nil
+	local Actions = helpers.load_with_stubs("gestures.engine.actions")
+	local Gestures = helpers.load_with_stubs("gestures.engine")
 	Actions.set_action_parameter("tap_4", "open_url", "https://apple.com")
 	Actions.set_action_parameter("keyboard__primary_k", "open_url", "https://example.com")
 	local original = source or '[gestures]\nenabled = true\naction_parameters = { tap_4__open_url = "https://apple.com", keyboard__primary_k__open_url = "https://example.com", unknown = { value = 7 } }\n[future]\nvalue = "preserve"\n'

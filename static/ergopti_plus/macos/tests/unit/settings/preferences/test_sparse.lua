@@ -10,7 +10,7 @@ helpers.describe("sparse preference transactions", function()
 			package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
 			local modules = {}
 			for key, name in pairs({ keymap = "modules.keymap", dyn_hot_mod = "modules.dynamic_hotstrings",
-				shortcuts_mod = "modules.shortcuts", gestures = "modules.gestures", keystats = "modules.keystats" }) do
+				shortcuts_mod = "modules.shortcuts", gestures = "gestures.engine", keystats = "modules.keystats" }) do
 				modules[key] = helpers.load_with_stubs(name)
 			end
 			package.loaded["core.fs.adapters.file_system"] = {
@@ -41,7 +41,7 @@ helpers.describe("sparse preference transactions", function()
 
 	helpers.it("does not reinterpret unknown gesture fields as live action assignments", function()
 		-- No action catalogue: this case is about field shape, not retirement.
-		helpers.with_fresh_modules({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "modules.gestures.actions" }, function()
+		helpers.with_fresh_modules({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "gestures.engine.actions" }, function()
 			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function()
 					return '[gestures]\ntap_2 = "copy"\nfuture = 17\n[gestures.expert]\nvalue = "keep"\n', "ok"

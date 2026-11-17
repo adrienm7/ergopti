@@ -298,7 +298,7 @@ local _on_click = nil
 -- of a touch, and with ("frame", code, value, slot, timestamp_us) per SYN_REPORT.
 local _on_pointer_event = nil
 -- Previous coordinates of the absolute pointers, per reader slot.
-local _absolute_motion = require("infra.absolute_motion").new()
+local _absolute_motion = require("gestures.engine.absolute_motion").new()
 
 -- Set while XKB cannot tell the keys' roles or capture them, so that is
 -- logged once and not at every key event; the next press XKB answers in full

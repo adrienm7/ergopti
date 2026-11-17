@@ -24,7 +24,7 @@ local uv = require("luv")
 local Display = require("core.ui.engine.display_server")
 local Monotonic = require("core.logger.engine.monotonic")
 local Navigation = require("keyboard.engine.desktop_navigation")
-local Switcher = require("modules.gestures.workspace_switcher")
+local Switcher = require("gestures.adapters.workspace_switcher")
 local SystemMetrics = require("modules.keystats.system_metrics")
 
 local UNMEASURED_REASON = "platform_reason.desktop_changes_need_workspace_interface"

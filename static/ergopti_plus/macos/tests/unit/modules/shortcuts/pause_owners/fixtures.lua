@@ -140,8 +140,8 @@ local function load_inventory_context(options)
 		RETURN = 36,
 		ESCAPE = 53,
 	}
-	package.loaded["modules.gestures.engine"] = options.gesture_engine or {}
-	package.loaded["modules.gestures.actions"] = options.gesture_actions or {
+	package.loaded["gestures.engine.engine"] = options.gesture_engine or {}
+	package.loaded["gestures.engine.actions"] = options.gesture_actions or {
 		get_label = function(name) return name end,
 		execute_single = function() return true end,
 		SG_NAMES = { "none", "script_pause_toggle" },

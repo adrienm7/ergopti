@@ -8,7 +8,7 @@
  * en.json, and every locale must carry it.
  *
  * ROOT CAUSE ENCODED:
- * macos/modules/gestures/actions.lua carried a 132-entry hardcoded English LABELS
+ * macos/gestures/engine/actions.lua carried a 132-entry hardcoded English LABELS
  * table as a last-resort fallback "so new locales never show raw keys". Every one
  * of those 132 entries had a locale key — the table was a second copy of the
  * translations, unreachable, and free to drift from the real ones without anyone
@@ -28,7 +28,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const ACTIONS = path.join(SP, 'macos', 'modules', 'gestures', 'actions.lua');
+const ACTIONS = path.join(SP, 'macos', 'gestures', 'engine', 'actions.lua');
 const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 
 const src = fs.readFileSync(ACTIONS, 'utf8');

@@ -12,7 +12,7 @@ local json = require("core.text.engine.json")
 
 helpers.describe("configured gesture menu label", function()
 	helpers.it("replaces the marker on the four-finger menu row", function()
-		helpers.with_fresh_modules({ "ui.menu.menu_gestures", "modules.gestures", "menu.ui.builder.utils",
+		helpers.with_fresh_modules({ "gestures.ui.menu.gestures", "gestures.engine", "menu.ui.builder.utils",
 			"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "menu.engine.manifest_menu", "ui.action_picker",
 			"menu.engine.renderer",
 			"ui.menu.shortcut_utils", "core.logger.engine.logger", "core.timing.engine.deferred_work" }, function()
@@ -30,7 +30,7 @@ helpers.describe("configured gesture menu label", function()
 				end,
 				get_sg_names = function() return {} end,
 			}
-			package.loaded["modules.gestures"] = { DEFAULT_STATE = { gestures = true }, DEFAULT_GESTURES = {}, SINGLE_SLOTS = { "tap_4" } }
+			package.loaded["gestures.engine"] = { DEFAULT_STATE = { gestures = true }, DEFAULT_GESTURES = {}, SINGLE_SLOTS = { "tap_4" } }
 			package.loaded["menu.ui.builder.utils"] = {}
 			package.loaded["core.ui.engine.dialog_util"] = {}
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return strings[key] or key end, section = function(key) return key end }
@@ -50,7 +50,7 @@ helpers.describe("configured gesture menu label", function()
 			package.loaded["ui.menu.shortcut_utils"] = {}
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.timing.engine.deferred_work"] = {}
-			local menu = require("ui.menu.menu_gestures").build({ gestures = gestures, state = { gestures = true }, paused = false })
+			local menu = require("gestures.ui.menu.gestures").build({ gestures = gestures, state = { gestures = true }, paused = false })
 			local prefix = assert(strings["sg_actions.open_url"]:match("^(.-)%[[^%[%]]*%]$"))
 			helpers.assert_true(menu.submenu[1].label:find(prefix .. "[" .. url .. "]", 1, true) ~= nil)
 			helpers.assert_true(menu.submenu[1].label:find("[configurable]", 1, true) == nil)

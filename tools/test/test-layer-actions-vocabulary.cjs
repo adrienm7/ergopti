@@ -53,8 +53,8 @@ const COMBO_EMITTER = path.join(
 	'static',
 	'ergopti_plus',
 	'linux',
-	'modules',
 	'gestures',
+	'engine',
 	'combo_emitter.lua'
 );
 
@@ -286,7 +286,7 @@ const MOD_ALIASES = {
 const emitterSource = fs.readFileSync(COMBO_EMITTER, 'utf8');
 const keysymBlock = /local KEYSYM_TO_CODE = \{([\s\S]*?)\n\}/.exec(emitterSource);
 const KEYSYM_TO_EVDEV = {};
-if (!keysymBlock) fail('linux/modules/gestures/combo_emitter.lua: KEYSYM_TO_CODE table not found');
+if (!keysymBlock) fail('linux/gestures/engine/combo_emitter.lua: KEYSYM_TO_CODE table not found');
 else
 	for (const m of keysymBlock[1].matchAll(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\d+),/gm))
 		KEYSYM_TO_EVDEV[m[1]] = Number(m[2]);

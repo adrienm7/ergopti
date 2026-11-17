@@ -138,7 +138,7 @@ A smoke or live-check driver shares the signed-in user's HKCU: on 2026-11-11
 `clear-restore-categories` clicked the Gestures Clear all of a fresh profile,
 which has no touchpad backup, and the owner wrote the Windows factory values
 over the maintainer's own gesture settings. Under `ERGOPTI_STARTUP_SMOKE_DIR`
-the owner (`modules/gestures/touchpad_registry.ahk`) now swaps every machine
+the owner (`gestures/adapters/touchpad_registry.ahk`) now swaps every machine
 port, a caller's included, for the profile's `touchpad_registry_private.txt`,
 and every launcher of the elevated device restart asks
 `TouchpadRegistrySkipsDeviceRestart` first. Judge a touchpad outcome from that

@@ -69,7 +69,7 @@ console.log('\n=== Hammerspoon Code Integrity Validation ===');
 // removed entirely, so it must NOT reappear in any form (local OR global leak).
 checkNegative(
 	'Gestures Actions: dead gestureInProgress flag stays removed',
-	'static/ergopti_plus/macos/modules/gestures/actions_click.lua',
+	'static/ergopti_plus/macos/gestures/engine/actions_click.lua',
 	/gestureInProgress/
 );
 
@@ -88,7 +88,7 @@ check(
 
 // --- Resource Management Audit (M.stop) ---
 const modulesWithStop = [
-	'static/ergopti_plus/macos/modules/gestures/init.lua',
+	'static/ergopti_plus/macos/gestures/engine/init.lua',
 	'static/ergopti_plus/macos/modules/keymap/init.lua',
 	'static/ergopti_plus/macos/modules/shortcuts/init.lua',
 	'static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua',
@@ -133,7 +133,7 @@ check(
 // --- Code Quality Audit ---
 check(
 	'Gestures: uses Logger.pcall for frame processing',
-	'static/ergopti_plus/macos/modules/gestures/init.lua',
+	'static/ergopti_plus/macos/gestures/engine/init.lua',
 	/Logger\.pcall\(LOG, Engine\.process_frame/
 );
 

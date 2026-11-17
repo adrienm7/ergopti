@@ -11,7 +11,7 @@ local support = require("tests.support.system_actions_fixture")
 local OWNERS = {
 	"hs", "tests.stubs.hs", "modules.shortcuts.actions.system",
 	"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
-	"modules.gestures", "platform.input.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
+	"gestures.engine", "platform.input.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
 	"diagnostics.adapters.event_provenance", "core.fs.adapters.file_system", "platform.input.key_state",
 	"core.process.adapters.shell_runner", "platform.input.synthetic_input", "core.events.timer_scheduler",
 	"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",

@@ -31,7 +31,7 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 	-- action through GestActions.execute_single. Patch the SAME table SC captured
 	-- at require time so the reference resolves to our spy.
 	local dispatched
-	package.loaded["modules.gestures.actions"].execute_single = function(a) dispatched = a end
+	package.loaded["gestures.engine.actions"].execute_single = function(a) dispatched = a end
 
 	-- Capture the eventtap handler so we can drive handle_key directly.
 	local handler
@@ -459,7 +459,7 @@ helpers.describe("ScriptControl: the extras table is actually reachable", functi
 	end)
 
 	helpers.it("the central dispatcher reports whether it handled the action", function()
-		local actions = helpers.load_with_stubs("modules.gestures.actions")
+		local actions = helpers.load_with_stubs("gestures.engine.actions")
 		helpers.assert_eq(actions.execute_single("none"), true,
 			"a registered action must report that the central dispatcher owns it")
 		helpers.assert_eq(actions.execute_single("__script_control_unknown_action__"), false,

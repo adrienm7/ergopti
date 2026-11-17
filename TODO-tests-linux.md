@@ -84,7 +84,7 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       cannot carry of `shortcut_key`, and on a real desktop the shortcut sends the shortcut key, through the installed
       layout's Control/Alt/Super level and through Ergopti+ emulation.
 - [ ] <!-- field-point: incremental_swipes --> Incremental touchpad swipes (`test_gesture_incremental.lua`): on a real
-      touchpad, an incremental slot's action fires while the fingers move (`modules/gestures/incremental_tracker.lua`),
+      touchpad, an incremental slot's action fires while the fingers move (`gestures/engine/incremental_tracker.lua`),
       with the step rule and reversal shared with macOS; the travel is in millimetres from the touchpad's own
       resolution (EVIOCGABS), so the steps set in `[gestures.sensitivities]` and in each swipe slot's submenu match
       the distance swiped; a pad that reports no resolution fires once, as x1, said in the log.

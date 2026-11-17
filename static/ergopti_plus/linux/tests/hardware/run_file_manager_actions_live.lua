@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Run by run_file_manager_actions_live.sh on Xvfb with openbox, a private
 --- session bus and a throwaway HOME. The action goes through the gesture
---- manager's public executor (modules/gestures/manager.lua execute_action) with
+--- manager's public executor (gestures/engine/manager.lua execute_action) with
 --- its production dependencies: the real X11 focus query, the real clipboard
 --- adapter over xclip, and the combo emitter on the production uinput writer,
 --- whose last hop is XTest (tests/hardware/lib/xtest_uinput_backend.lua) since
@@ -114,9 +114,9 @@ write_file(work .. "/uinput", "")
 Writer._set_path_for_test(work .. "/uinput")
 assert(require("modules.hotstrings.injector").open_fast_channel(), "the output channel must open on the XTest wire")
 
-local Manager = require("modules.gestures.manager")
-local BackgroundCommands = require("modules.gestures.background_commands")
-local ComboEmitter = require("modules.gestures.combo_emitter")
+local Manager = require("gestures.engine.manager")
+local BackgroundCommands = require("gestures.engine.background_commands")
+local ComboEmitter = require("gestures.engine.combo_emitter")
 local Clipboard = require("clipboard.adapters.clipboard")
 local function idle()
 	BackgroundCommands._collect_now()

@@ -15,7 +15,7 @@ global SubMenus := Map()
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include builder/engine.ahk
-#Include ../../ui/menu/menu_gestures.ahk
+#Include ../../gestures/ui/menu/gestures.ahk
 #Include ../../ui/menu/menu_metrics.ahk
 #Include ../../ui/menu/menu_layout.ahk
 #Include ../../ui/menu/menu_hotstrings.ahk

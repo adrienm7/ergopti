@@ -12,7 +12,7 @@
  * ROOT CAUSE ENCODED:
  * The first-run wizard's elevated PowerShell script hand-typed every value
  * name and KeyParams number again, "kept in sync" by a comment with the maps
- * of modules/gestures/init.ahk, and neither writer recorded what it replaced.
+ * of gestures/engine/init.ahk, and neither writer recorded what it replaced.
  * This gate fails when a value name or the key path is typed anywhere but the
  * data file, when a writer stops going through the owner, when the wizard can
  * launch its script before the backup, or when the generated table drifts.
@@ -43,7 +43,7 @@ const MENU_MANIFEST = path.join(
 	'data',
 	'menu_manifest.json'
 );
-const OWNER = path.join(WIN, 'modules', 'gestures', 'touchpad_registry.ahk');
+const OWNER = path.join(WIN, 'gestures', 'adapters', 'touchpad_registry.ahk');
 const GENERATED = path.join(WIN, '_generated', 'touchpad_registry.ahk');
 const KEY_TAIL = 'CurrentVersion\\PrecisionTouchPad';
 
@@ -100,7 +100,7 @@ function functionBody(source, name) {
 
 	// The slots are the driver's gesture slots, and each one's function key is
 	// the shortcut the manual-setup tutorial tells the user to bind.
-	const constants = read(path.join(WIN, 'modules', 'gestures', 'constants.ahk'));
+	const constants = read(path.join(WIN, 'gestures', 'engine', 'constants.ahk'));
 	const slotBlock = functionBody(constants, 'GestureSlotIds');
 	const slotIds = [...slotBlock.matchAll(/"([a-z0-9_]+)"/g)].map((m) => m[1]);
 	check(
@@ -164,11 +164,11 @@ function functionBody(source, name) {
 	);
 	for (const file of writers) {
 		check(
-			path.relative(WIN, file).split(path.sep).join('/') === 'modules/gestures/init.ahk',
+			path.relative(WIN, file).split(path.sep).join('/') === 'gestures/engine/init.ahk',
 			`${path.relative(ROOT, file)} reads the raw table; go through the owner`
 		);
 	}
-	const config = read(path.join(WIN, 'modules', 'gestures', 'config.ahk'));
+	const config = read(path.join(WIN, 'gestures', 'engine', 'config.ahk'));
 	const configure = functionBody(config, 'GestureAutoConfigureRegistry');
 	check(
 		configure.includes('TouchpadRegistryApply(') && !configure.includes('Reg_WriteDword'),
@@ -204,7 +204,7 @@ function functionBody(source, name) {
 		!(manifest.configuration_menu || []).some((r) => r.id === 'restore_touchpad_gestures'),
 		'Configuration must not declare a separate touchpad restore row any more'
 	);
-	const menuGestures = read(path.join(WIN, 'ui', 'menu', 'menu_gestures.ahk'));
+	const menuGestures = read(path.join(WIN, 'gestures', 'ui', 'menu', 'gestures.ahk'));
 	const clearAt = functionBody(menuGestures, '_GES_ApplyScope').indexOf(
 		'TouchpadRegistryClearFromScope('
 	);

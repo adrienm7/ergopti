@@ -15,7 +15,7 @@ local function with_manager(selected, body)
 		manager = "modules.shortcuts.manager",
 		clipboard = "clipboard.adapters.clipboard",
 		event_loop = "core.events.loop",
-		combo = "modules.gestures.combo_emitter",
+		combo = "gestures.engine.combo_emitter",
 		injector = "modules.hotstrings.injector",
 		keystats = "modules.keystats.keystats",
 		hook = "platform.input.keyboard_hook",
@@ -64,7 +64,7 @@ helpers.describe("shortcut case transforms", function()
 
 	helpers.it("retains the real text owner while a command runs asynchronously", function()
 		with_manager("unused", function(_, state, _, focus, watch)
-			local names = { "modules.gestures.user_actions", "core.process.adapters.shell_runner" }
+			local names = { "gestures.engine.user_actions", "core.process.adapters.shell_runner" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local callback
@@ -509,7 +509,7 @@ end)
 local function with_helper_menu(body)
 	with_case_menu(function(manager, item, _, rows)
 		local effects = { chords = {}, reads = 0, injections = {} }
-		package.loaded["modules.gestures.combo_emitter"].press = function(chord)
+		package.loaded["gestures.engine.combo_emitter"].press = function(chord)
 			effects.chords[#effects.chords + 1] = chord
 			return effects.refuse_chord ~= #effects.chords
 		end

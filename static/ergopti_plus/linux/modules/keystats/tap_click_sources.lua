@@ -18,8 +18,8 @@
 local M = {}
 
 local Reader = require("platform.input.evdev_reader")
-local Finder = require("modules.gestures.touchpad_finder")
-local TapDetector = require("modules.gestures.tap_detector")
+local Finder = require("gestures.adapters.touchpad_finder")
+local TapDetector = require("gestures.engine.tap_detector")
 local Setting = require("platform.system.tap_to_click_setting")
 
 --- Reads a device node's evdev name from sysfs.

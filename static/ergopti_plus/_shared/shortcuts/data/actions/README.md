@@ -51,10 +51,10 @@ and an equivalent that OS does not offer, then writes the table below.
 A parameter kind (`url`, `search_url`, `wrap_pair`, `text`, `key`,
 `shortcut`, `app`, `command`, `path`, `apple_shortcut`) is validated, prompted
 for and explained by each driver's gesture module: macOS
-`modules/gestures/actions.lua` (`validate_action_parameter`,
-`parameter_prompt`, `parameter_error`), Linux `modules/gestures/manager.lua`
+`gestures/engine/actions.lua` (`validate_action_parameter`,
+`parameter_prompt`, `parameter_error`), Linux `gestures/engine/manager.lua`
 (`validate_action_parameter`, `get_action_parameter_prompt`,
-`get_action_parameter_error`) and Windows `modules/gestures/config.ahk`
+`get_action_parameter_error`) and Windows `gestures/engine/config.ahk`
 (`GestureValidateActionParameter`, `GestureActionParameterPrompt`). A new kind
 is added to all three and to `PARAMETER_KINDS` in the generator in one change;
 the `wrap_pair` rule is pinned by
@@ -77,8 +77,8 @@ replays the corpus against the page.
 `path` and `apple_shortcut` kinds, decoded by
 `_shared/shortcuts/engine/user_action_parameter.lua` and pinned by
 `_shared/tests/corpus/action_parameters/user_action_vectors.json`. They run in
-`modules/gestures/user_actions.lua` on macOS and Linux and in
-`modules/gestures/apple_shortcut_action.lua` on macOS. On Windows the first two
+`gestures/engine/user_actions.lua` on macOS and Linux and in
+`gestures/engine/apple_shortcut_action.lua` on macOS. On Windows the first two
 run in `windows/infra/user_actions.ahk`, which owns the Windows path spelling
 (`windows_path_vectors` of the same corpus); `run_apple_shortcut` declares `hs`.
 

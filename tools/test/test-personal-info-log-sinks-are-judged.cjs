@@ -130,7 +130,7 @@ const LUA_REDACTORS = [
  */
 const JUDGED = [
 	{
-		file: 'modules/gestures/system_actions.ahk',
+		file: 'gestures/engine/system_actions.ahk',
 		match: 'The Recycle Bin could not be emptied: its PowerShell worker exited with {1}: {2}',
 		verdict: 'not-personal',
 		why: 'the interpolation is the exit status and the output of a fixed script that only empties the Recycle Bin, never hotstring content.'

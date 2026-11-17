@@ -4,7 +4,7 @@
 --- MODULE: gestures.actions sg() 3-Arg Guard Meta Test
 --- DESCRIPTION:
 --- Static source guard for the "gestures-sg-3arg-label-bound-as-fn" audit
---- finding in modules/gestures/actions.lua.
+--- finding in gestures/engine/actions.lua.
 ---
 --- ROOT CAUSE ENCODED:
 --- The local sg() helper registered discrete single-fire actions with two
@@ -44,7 +44,7 @@ helpers.describe("gestures.actions: sg() 3-arg function-vs-label guard", functio
 		local path  = root .. sep .. "modules" .. sep .. "gestures" .. sep .. "actions.lua"
 
 		local fh    = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "modules/gestures/actions.lua must be readable")
+		helpers.assert_true(fh ~= nil, "gestures/engine/actions.lua must be readable")
 		if not fh then return end
 		local src = fh:read("*a")
 		fh:close()
@@ -84,8 +84,8 @@ helpers.describe("gestures.actions: sg() 3-arg form does not crash on load", fun
 		-- If sg() misbound a label string as fn, the module-level calls to sg()
 		-- with 3 args would store strings — no crash at load time, but this
 		-- confirms the module at least loads successfully.
-		local ok, Actions = pcall(helpers.load_with_stubs, "modules.gestures.actions")
-		helpers.assert_true(ok, "modules.gestures.actions must load without error")
+		local ok, Actions = pcall(helpers.load_with_stubs, "gestures.engine.actions")
+		helpers.assert_true(ok, "gestures.engine.actions must load without error")
 		helpers.assert_true(Actions ~= nil, "Actions module must be non-nil after load")
 
 		-- SG_NAMES must be non-empty: if sg() silently dropped all 3-arg registrations

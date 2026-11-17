@@ -20,9 +20,9 @@ local AXIS   = { "swipe_3_horiz", "swipe_4_horiz" }
 --- @param body function body(commands, assigned, saves)
 local function with_commands(body)
 	local names = {
-		"modules.gestures", "menu.ui.builder.utils", "core.ui.engine.dialog_util",
+		"gestures.engine", "menu.ui.builder.utils", "core.ui.engine.dialog_util",
 		"core.i18n.engine.i18n", "menu.engine.manifest_menu", "ui.action_picker",
-		"ui.menu.shortcut_utils", "core.logger.engine.logger", "ui.menu.menu_gestures",
+		"ui.menu.shortcut_utils", "core.logger.engine.logger", "gestures.ui.menu.gestures",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do
@@ -40,7 +40,7 @@ local function with_commands(body)
 		enable_all = function() return true end,
 		disable_all = function() return true end,
 	}
-	package.loaded["modules.gestures"] = {
+	package.loaded["gestures.engine"] = {
 		DEFAULT_STATE = { gestures = true },
 		SINGLE_SLOTS = SINGLE,
 		AXIS_SLOTS = AXIS,
@@ -66,7 +66,7 @@ local function with_commands(body)
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local ok, err = xpcall(function()
-		local MenuGestures = require("ui.menu.menu_gestures")
+		local MenuGestures = require("gestures.ui.menu.gestures")
 		MenuGestures.build({
 			gestures = runtime,
 			state = { gestures = true },

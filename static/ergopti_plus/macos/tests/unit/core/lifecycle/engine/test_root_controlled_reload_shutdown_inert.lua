@@ -39,7 +39,7 @@ local MODULE_NAMES = {
 	"core.fs.engine.paths",
 	"modules.hotstrings.hotstrings_config",
 	"settings.engine.factory_reset_journal",
-	"modules.gestures",
+	"gestures.engine",
 	"modules.keymap",
 	"menu.engine.manifest_reader",
 	"core.text.engine.toml_codec.writer",
@@ -327,7 +327,7 @@ local function run_isolated(options, assertions)
 					}
 				end,
 			},
-			["modules.gestures"] = {
+			["gestures.engine"] = {
 				stop = function() return true end,
 				restore_all_overrides = function() return true end,
 			},

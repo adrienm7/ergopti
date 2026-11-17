@@ -28,8 +28,8 @@ local function install_dependency_stubs()
 		RETURN = 0x24,
 		ESCAPE = 0x35,
 	}
-	package.loaded["modules.gestures.engine"] = { init = function() end }
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.engine"] = { init = function() end }
+	package.loaded["gestures.engine.actions"] = {
 		SG_NAMES = { "none", "script_pause_toggle" },
 		get_label = function(name) return name end,
 		execute_single = function() return true end,

@@ -31,7 +31,7 @@ local function read_json(relative)
 	return assert(json.decode(raw), relative .. " is not valid JSON")
 end
 
-local Gestures = helpers.load_module("modules.gestures.manager")
+local Gestures = helpers.load_module("gestures.engine.manager")
 local Translate = require("ai.engine.prediction.translate")
 local Translation = require("ai.engine.prediction.translation")
 

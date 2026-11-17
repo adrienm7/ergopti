@@ -17,13 +17,13 @@
 ; list minimal and justify every addition, because every entry is a place the
 ; gate stops looking.
 ;
-;   modules/gestures/actions.ahk — opens "Capturing screen to…" and hands the
+;   gestures/engine/actions.ahk — opens "Capturing screen to…" and hands the
 ;   completion to GestureScreenshotComplete, which closes it at
-;   modules/gestures/screenshots.ahk:155 and :158. Genuinely asynchronous: the
+;   gestures/adapters/screenshots.ahk:155 and :158. Genuinely asynchronous: the
 ;   PowerShell worker must finish before success can be asserted, and the old
 ;   code's bug was announcing success BEFORE the worker ran.
 _MetaLoggerPairingExempt(Rel) {
-	static Exempt := Map("modules/gestures/actions.ahk", true)
+	static Exempt := Map("gestures/engine/actions.ahk", true)
 	return Exempt.Has(Rel)
 }
 

@@ -39,7 +39,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 		local saved_source = package.loaded["modules.hotstrings.magic_key_source"]
 		local saved_magic = package.loaded["modules.hotstrings.magic_key"]
 		local saved_builder = package.loaded["menu.ui.builder.builder"]
-		local gestures = require("modules.gestures.manager")
+		local gestures = require("gestures.engine.manager")
 		local saved_execute = gestures.execute_action
 		local state = { trigger = "★", generation = 1, master = true, paused = false, inhibited = false,
 			rows = { { code = "KeyJ", native_code = 36, identity = "evdev:36", text = "★", native_text = "j", direct = true, dead = false } },
@@ -393,7 +393,7 @@ helpers.describe("Keyboard consumption queue acknowledgement", function()
 		"retained false", "retained nil", "retained unknown", "retained throw" }) do
 		helpers.it("(consume-queue-ack) refuses " .. scenario .. " before any action", function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
-			local gestures = require("modules.gestures.manager")
+			local gestures = require("gestures.engine.manager")
 			local execute, pending, fired, before_ack = gestures.execute_action, nil, {}, nil
 			gestures.execute_action = function(action) fired[#fired + 1] = action end
 			local checked, failure = pcall(function()
@@ -428,7 +428,7 @@ helpers.describe("Keyboard consumption queue acknowledgement", function()
 	for _, scenario in ipairs({ "duplicate delivery", "reentrant delivery" }) do
 		helpers.it("(consume-queue-ack) acknowledges one action under " .. scenario, function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
-			local gestures = require("modules.gestures.manager")
+			local gestures = require("gestures.engine.manager")
 			local execute, pending, fired, reentered = gestures.execute_action, nil, {}, false
 			gestures.execute_action = function(action)
 				fired[#fired + 1] = action
@@ -496,7 +496,7 @@ helpers.describe("keyboard shortcuts: live deferred admission", function()
 	for _, gate in ipairs({ "master", "paused", "inhibited", "reader failure", "reader replacement" }) do
 		helpers.it("(ordinary-live-admission) cancels an ordinary action after " .. gate, function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
-			local gestures = require("modules.gestures.manager")
+			local gestures = require("gestures.engine.manager")
 			local execute = gestures.execute_action
 			local pending, fired, refuse = nil, 0, false
 			local admission = { master = true, paused = false, inhibited = false }
@@ -532,7 +532,7 @@ helpers.describe("keyboard shortcuts: live deferred admission", function()
 	for _, gate in ipairs({ "master", "paused" }) do
 		helpers.it("(ordinary-live-admission) retires a script-action slot through " .. gate .. " (scd1-slot-paused)", function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "script_pause_toggle" })
-			local gestures = require("modules.gestures.manager")
+			local gestures = require("gestures.engine.manager")
 			local execute, pending, fired = gestures.execute_action, nil, 0
 			local admission = { master = true, paused = false, inhibited = false }
 			gestures.execute_action = function() fired = fired + 1 end
@@ -561,7 +561,7 @@ helpers.describe("keyboard shortcuts: admission callback boundaries", function()
 	for _, phase in ipairs({ "capture", "queue acknowledgement", "execution log" }) do
 		helpers.it("(ordinary-live-admission) rechecks pause at " .. phase, function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
-			local gestures, logger = require("modules.gestures.manager"), require("core.logger.engine.shim")
+			local gestures, logger = require("gestures.engine.manager"), require("core.logger.engine.shim")
 			local execute, debug_log = gestures.execute_action, logger.debug
 			local pending, fired, queued = nil, 0, 0
 			local admission = { master = true, paused = phase == "capture", inhibited = false }

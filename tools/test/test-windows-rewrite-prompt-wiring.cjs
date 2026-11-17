@@ -121,7 +121,7 @@ for (const [label, list, prefix] of [
 		`${label} must include rewrite.ahk before the prediction engine`
 	);
 	const validation = position(list, `${prefix}ai/engine/api/option_validation.ahk`);
-	const gestures = position(list, `${prefix}modules/gestures/init.ahk`);
+	const gestures = position(list, `${prefix}gestures/engine/init.ahk`);
 	check(
 		validation >= 0 && gestures > validation,
 		`${label} must include option_validation.ahk (LLM_PROFILE_BUILTIN_ORDER) before the gesture actions registered from it`
@@ -201,7 +201,7 @@ check(
 	JSON.stringify(order) === JSON.stringify(profileIds),
 	`LLM_PROFILE_BUILTIN_ORDER ${JSON.stringify(order)} must equal the profiles.json ids ${JSON.stringify(profileIds)}`
 );
-const actions = read('modules/gestures/actions.ahk');
+const actions = read('gestures/engine/actions.ahk');
 check(
 	/for _PresetProfileId in LLM_PROFILE_BUILTIN_ORDER \{/.test(actions) &&
 		actions.includes('GESTURE_ACTIONS["llm_predict_" . _PresetProfileId]'),
@@ -329,14 +329,14 @@ const visionActions = read('ai/engine/prediction/vision_action.ahk');
 for (const id of ['llm_screen_region', 'llm_screen_full']) {
 	check(visionActions.includes(`"${id}", "`), `LLM_VisionActions must declare ${id}`);
 }
-const gestureConfig = read('modules/gestures/config.ahk');
+const gestureConfig = read('gestures/engine/config.ahk');
 for (const [needle, why] of [
 	['if (Spec = "llm_vision") {', 'validates the llm_vision kind'],
 	['t("dialog.gestures.param_err_llm_vision")', "refuses with the kind's error text"],
 	['case "llm_vision":', 'prompts for the llm_vision kind'],
 	['LLM_Vision_BackendChoicesText()', 'lists the vision backends in the prompt']
 ]) {
-	check(gestureConfig.includes(needle), `modules/gestures/config.ahk ${why}: ${needle}`);
+	check(gestureConfig.includes(needle), `gestures/engine/config.ahk ${why}: ${needle}`);
 }
 for (const field of [
 	'visionChoices',
@@ -369,7 +369,7 @@ check(
 		bodyOf(streaming, 'LLM_OllamaChat_Async').includes('false, "", payload, CurrentFn)'),
 	'the local server must retain the caller-written chat body and requester admission'
 );
-const screenshots = read('modules/gestures/screenshots.ahk');
+const screenshots = read('gestures/adapters/screenshots.ahk');
 // The GDI and GDI+ calls live at the native boundary, beside the owner.
 const screenCapture = read('platform/system/screen_capture.ahk');
 check(
@@ -518,7 +518,7 @@ for (const [needle, why] of [
 	['case "llm_language":', 'prompts for the llm_language kind'],
 	['LLM_Translate_Config()["max_language_bytes"]', 'declares the free-language input limit']
 ]) {
-	check(gestureConfig.includes(needle), `modules/gestures/config.ahk ${why}: ${needle}`);
+	check(gestureConfig.includes(needle), `gestures/engine/config.ahk ${why}: ${needle}`);
 }
 /** Receives the nonempty native language candidate path, never an optional empty helper. */
 function languageInputWiring(source) {

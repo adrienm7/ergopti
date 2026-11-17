@@ -32,7 +32,7 @@ local M = {}
 function M.with_sentinel(callback)
 	local names = {
 		"core.logger.engine.logger", "core.ui.engine.notifications", "platform.input.keycodes", "core.i18n.engine.i18n",
-		"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
+		"gestures.engine.engine", "gestures.engine.actions", "modules.keystats",
 		"diagnostics.adapters.event_provenance", "platform.input.synthetic_input",
 		"core.events.timer_scheduler", "platform.input.key_state",
 		"modules.shortcuts.script_control",
@@ -55,8 +55,8 @@ function M.with_sentinel(callback)
 			ESCAPE = 0x35,
 			FORWARD_DELETE = 0x75,
 		}
-		package.loaded["modules.gestures.engine"] = {init = function() end}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.engine"] = {init = function() end}
+		package.loaded["gestures.engine.actions"] = {
 			SG_NAMES = {"none", "open_config"},
 			get_label = function(name) return name end,
 			execute_single = function() return false end,
@@ -123,7 +123,7 @@ end
 function M.with_configurable(callback)
 	local names = {
 		"core.logger.engine.logger", "core.fs.engine.paths", "core.fs.adapters.file_system",
-		"platform.input.hotkey_registrar", "core.fs.adapters.storage", "modules.gestures.actions",
+		"platform.input.hotkey_registrar", "core.fs.adapters.storage", "gestures.engine.actions",
 		"modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord", "settings.engine.paths", "settings.engine.preferences.preferences",
 	}
 	return helpers.with_stub_scope(names, function()
@@ -148,7 +148,7 @@ function M.with_configurable(callback)
 			end,
 			unbind = function() return true end,
 		}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.actions"] = {
 			-- The stored action must be one the catalogue offers, or the loader
 			-- leaves the slot unbound and no callback exists to throw.
 			is_assignable = function(action_id) return action_id == "throwing_action" end,

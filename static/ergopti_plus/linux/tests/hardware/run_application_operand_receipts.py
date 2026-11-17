@@ -23,7 +23,7 @@ import tempfile
 WORKER = r"""
 io.stderr:write("ERGOPTI_APPLICATION_STAGE=load\n")
 local Chooser = require("apps.ui.chooser")
-local Actions = require("modules.gestures.manager")
+local Actions = require("gestures.engine.manager")
 io.stderr:write("ERGOPTI_APPLICATION_STAGE=chooser\n")
 local id = assert(Chooser.desktop_id(os.getenv("ERGOPTI_NATIVE_APPLICATION_ENTRY")))
 io.stderr:write("ERGOPTI_APPLICATION_STAGE=assignment\n")

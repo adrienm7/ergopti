@@ -101,7 +101,7 @@ function M.new(options)
 	local manager = options.manager or require("platform.remap.tap_hold_manager")
 	local loader = options.loader or require("platform.remap.tap_hold_loader")
 	local writer = options.writer or require("platform.remap.tap_hold_writer")
-	local parameters = options.parameters or require("modules.gestures.manager")
+	local parameters = options.parameters or require("gestures.engine.manager")
 	local files = options.files or require("core.fs.adapters.file_system")
 	local owner, held, legacy, source, layer = {}, false, {}, nil, nil
 	local layer_debt = false

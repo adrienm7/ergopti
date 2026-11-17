@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- How many actions an incremental swipe has earned over the distance it
 --- travelled, and how far it must come back before it counts as a reversal.
---- The macOS engine (modules/gestures/engine.lua) and the Linux gesture manager
---- (modules/gestures/manager.lua) both count through this module, in
+--- The macOS engine (gestures/engine/engine.lua) and the Linux gesture manager
+--- (gestures/engine/manager.lua) both count through this module, in
 --- millimetres of travel on the pad: the macOS trackpad reports them, and the
 --- Linux decoder converts evdev units with the resolution the device reports.
 ---

@@ -130,7 +130,7 @@ end)
 
 local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and name:match("^modules%.gestures%.actions") then
+		if type(name) == "string" and name:match("^gestures%.engine%.actions") then
 			package.loaded[name] = nil
 		end
 	end
@@ -156,7 +156,7 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 		emit_key_stroke = function() return true end,
 		defer_after_callback = function() return false end,
 	}, { __index = function() return function() return true end end })
-	package.loaded["modules.gestures.actions_click"] = setmetatable({
+	package.loaded["gestures.engine.actions_click"] = setmetatable({
 		force_cleanup = function()
 			if click_mode == "false" then return false end
 			if click_mode == "nil" then return nil end
@@ -164,13 +164,13 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 			return true
 		end,
 	}, { __index = function() return function() return true end end })
-	package.loaded["modules.gestures.sticky_modifiers"] = {
+	package.loaded["gestures.engine.sticky_modifiers"] = {
 		toggle = function() return true end,
 		clear = function() return true end,
 	}
 
 	search_transaction_ports(hs_stub)
-	local actions = require("modules.gestures.actions")
+	local actions = require("gestures.engine.actions")
 	local gestures = nil
 	local gesture_engine = nil
 	if compose_gestures then
@@ -183,8 +183,8 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 			init = function() return true end,
 			unblock_scroll = function() return true end,
 		})
-		package.loaded["modules.gestures.engine"] = gesture_engine
-		package.loaded["modules.gestures.conflicts"] = permissive()
+		package.loaded["gestures.engine.engine"] = gesture_engine
+		package.loaded["gestures.engine.conflicts"] = permissive()
 		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 		package.loaded["menu.engine.manifest_reader"] = {
 			default_for = function() return false end,
@@ -193,8 +193,8 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 		package.loaded["core.events.timer_scheduler"] = permissive({
 			cancel = function() return true end,
 		})
-		package.loaded["modules.gestures"] = nil
-		gestures = require("modules.gestures")
+		package.loaded["gestures.engine"] = nil
+		gestures = require("gestures.engine")
 	else
 		actions.init({ action_params = {} })
 	end
@@ -310,7 +310,7 @@ helpers.describe("HS-012 real gesture-search pause composition", function()
 			helpers.assert_eq(selection_reads(), 0)
 			helpers.assert_eq(#hs_stub.urlevent.__opened, 0)
 			script_control.stop()
-			package.loaded["modules.gestures"] = nil
+			package.loaded["gestures.engine"] = nil
 		end)
 
 		helpers.it("accepts the exact late terminal after a " .. mode .. " search stop", function()
@@ -359,7 +359,7 @@ helpers.describe("HS-012 real gesture-search pause composition", function()
 			helpers.assert_eq(selection_reads(), 0)
 			helpers.assert_eq(#hs_stub.urlevent.__opened, 0)
 			script_control.stop()
-			package.loaded["modules.gestures"] = nil
+			package.loaded["gestures.engine"] = nil
 		end)
 	end
 end)

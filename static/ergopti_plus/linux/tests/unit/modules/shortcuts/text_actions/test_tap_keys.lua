@@ -49,7 +49,7 @@ local US_INTL = keymap("dead_grave, dead_tilde", "minus, underscore", "NoSymbol,
 local function fresh(stored)
 	local log = { deferred = {}, executed = {} }
 	local previous = {}
-	for _, name in ipairs({ "core.fs.adapters.storage", "settings.engine.paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
+	for _, name in ipairs({ "core.fs.adapters.storage", "settings.engine.paths", "gestures.engine.manager", "modules.shortcuts.tap_keys" }) do
 		previous[name] = package.loaded[name]
 	end
 	local prefs = {}
@@ -66,7 +66,7 @@ local function fresh(stored)
 		get = function(key, default) if prefs[key] == nil then return default end return prefs[key] end,
 		set = function(key, value) prefs[key] = value return true end,
 	}
-	package.loaded["modules.gestures.manager"] = {
+	package.loaded["gestures.engine.manager"] = {
 		is_assignable = function(id) return id == "screen_capture" or id == "send_text" or id == "send_shortcut" end,
 		execute_action = function(action, binding) log.executed[#log.executed + 1] = action .. "@" .. binding end,
 	}
@@ -78,7 +78,7 @@ local function fresh(stored)
 		defer = function(fn) log.deferred[#log.deferred + 1] = fn return true end,
 	})
 	log.restore = function()
-		for _, name in ipairs({ "core.fs.adapters.storage", "settings.engine.paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
+		for _, name in ipairs({ "core.fs.adapters.storage", "settings.engine.paths", "gestures.engine.manager", "modules.shortcuts.tap_keys" }) do
 			package.loaded[name] = previous[name]
 		end
 		os.remove(path)
@@ -171,7 +171,7 @@ helpers.describe("Linux number-row tap keys (tap-keys)", function()
 			local cleanup = require("settings.ui.menu.unused_keys_cleanup")
 			local live_marked = {}
 			-- Other owners remain real; the action catalogue stub supplies its unused collector.
-			package.loaded["modules.gestures.manager"].mark_config_reads = function() end
+			package.loaded["gestures.engine.manager"].mark_config_reads = function() end
 			cleanup.collect(decoded, function(...) live_marked[table.concat({ ... }, ".")] = true end)
 			helpers.assert_eq(live_marked["shortcuts.tap_keys.number_row_left"], true)
 			helpers.assert_eq(live_marked["shortcuts.tap_keys.unknown"], nil)
@@ -359,8 +359,8 @@ end)
 
 helpers.describe('deferred tap during a pause cycle', function()
   helpers.it('does not run a tap admitted before two queued pause gestures', function()
-    local previous_manager = package.loaded['modules.gestures.manager']
-    local Manager = helpers.load_module('modules.gestures.manager')
+    local previous_manager = package.loaded['gestures.engine.manager']
+    local Manager = helpers.load_module('gestures.engine.manager')
     local ScriptActions = require('modules.shortcuts.script_actions')
     local Loop = require('core.events.loop')
     local controller = ScriptActions.new({reset=function() end,reload=function() end,quit=function() end})
@@ -385,7 +385,7 @@ helpers.describe('deferred tap during a pause cycle', function()
     Manager.disable()
     package.loaded['platform.input.evdev_reader'] = old_reader
     log.restore()
-    package.loaded['modules.gestures.manager'] = previous_manager
+    package.loaded['gestures.engine.manager'] = previous_manager
     if not ok then error(err,0) end
   end)
 end)

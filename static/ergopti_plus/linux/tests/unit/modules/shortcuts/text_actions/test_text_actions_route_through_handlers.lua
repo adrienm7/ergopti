@@ -27,7 +27,7 @@ local function routed_gestures()
 	local names = {
 		clipboard = "clipboard.adapters.clipboard",
 		event_loop = "core.events.loop",
-		combo = "modules.gestures.combo_emitter",
+		combo = "gestures.engine.combo_emitter",
 		injector = "modules.hotstrings.injector",
 		keystats = "modules.keystats.keystats",
 	}
@@ -60,7 +60,7 @@ local function routed_gestures()
 	local ScriptActions = helpers.load_module("modules.shortcuts.script_actions")
 	local ActionHandlers = helpers.load_module("modules.shortcuts.action_handlers")
 	local noop = function() end
-	local Gestures = helpers.load_module("modules.gestures.manager")
+	local Gestures = helpers.load_module("gestures.engine.manager")
 	Gestures.init({
 		enabled = false,
 		persist = false,
@@ -148,7 +148,7 @@ helpers.describe("Linux text actions route through the daemon handlers", functio
 	end)
 
 	helpers.it("the text actions exist only through the injected handlers", function()
-		local Gestures = helpers.load_module("modules.gestures.manager")
+		local Gestures = helpers.load_module("gestures.engine.manager")
 		Gestures.init({ enabled = false, persist = false })
 		local runnable = {}
 		for _, id in ipairs({ "select_line", "select_word", "paste_plain", "selection_uppercase" }) do

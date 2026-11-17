@@ -86,7 +86,7 @@ console.log('\n=== Click Lock Fix Structural Validation ===');
 
 // Check AHK Fixes
 //
-const clickSource = read('static/ergopti_plus/windows/modules/gestures/click.ahk');
+const clickSource = read('static/ergopti_plus/windows/gestures/engine/click.ahk');
 const startWatcherBody = ahkFunctionBody(clickSource, 'GestureStartKeyboardWatcher');
 const onKeyDownBody = ahkFunctionBody(clickSource, 'GestureOnKeyDown');
 
@@ -126,7 +126,7 @@ checkSource(
 // Check Hammerspoon Fixes
 check(
 	'HS: click_key_watcher includes flagsChanged through its event-types alias',
-	'static/ergopti_plus/macos/modules/gestures/actions_click.lua',
+	'static/ergopti_plus/macos/gestures/engine/actions_click.lua',
 	/local function construct_click_key_watcher\([\s\S]*local ev_types = hs\.eventtap\.event\.types[\s\S]*construct_eventtap\(\{\s*ev_types\.keyDown\s*,\s*ev_types\.flagsChanged\s*\}/
 );
 

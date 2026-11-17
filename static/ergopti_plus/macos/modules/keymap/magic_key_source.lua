@@ -169,7 +169,7 @@ function M.choice_reason(value)
 	if value == resolver.automatic then return nil end
 	if not resolver.is_candidate(value) then return "dialog.magic_key_source.not_a_candidate" end
 	local TapKeys = require("modules.shortcuts.tap_keys")
-	TapKeys.ensure_loaded(require("modules.gestures.actions").is_assignable)
+	TapKeys.ensure_loaded(require("gestures.engine.actions").is_assignable)
 	-- Both inputs to the shared policy name canonical physical positions. ISO
 	-- arrival aliases cannot reserve a different key in the stored settings.
 	local positions = {}

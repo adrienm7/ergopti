@@ -329,7 +329,7 @@ function checkGestureChoices(V, schema) {
 	const entry = schema.settings['gestures.sensitivities.*'];
 	const sources = [
 		['_shared/gestures/engine/sensitivity.lua', /local OPTIONS = \{([^}]*)\}/],
-		['windows/modules/gestures/raw_touchpad.ahk', /GESTURE_SENSITIVITY_OPTIONS := \[([^\]]*)\]/]
+		['windows/gestures/adapters/raw_touchpad.ahk', /GESTURE_SENSITIVITY_OPTIONS := \[([^\]]*)\]/]
 	];
 	for (const [file, pattern] of sources) {
 		const found = pattern.exec(fs.readFileSync(path.join(SP, file), 'utf8'));

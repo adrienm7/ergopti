@@ -75,7 +75,7 @@ function M.build_init_payload(opts)
 	local items = type(o.items) == "table" and o.items or nil
 	if not items then
 		items = {}
-		local ok_actions, Actions = pcall(require, "modules.gestures.manager")
+		local ok_actions, Actions = pcall(require, "gestures.engine.manager")
 		if not ok_actions or type(Actions.get_picker_items) ~= "function" then
 			Logger.error(LOG, "Cannot build the action catalogue: the gestures action registry is unavailable.")
 		else

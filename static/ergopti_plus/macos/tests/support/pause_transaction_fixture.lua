@@ -13,8 +13,8 @@ local OWNERS = {
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
 	"platform.input.keycodes",
-	"modules.gestures.engine",
-	"modules.gestures.actions",
+	"gestures.engine.engine",
+	"gestures.engine.actions",
 	"platform.input.key_state",
 	"platform.input.synthetic_input",
 	"ai.engine.local_servers.warmup_controller",
@@ -148,8 +148,8 @@ local function load_context(options)
 		RETURN = 0x24,
 		ESCAPE = 0x35,
 	}
-	package.loaded["modules.gestures.engine"] = {}
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.engine"] = {}
+	package.loaded["gestures.engine.actions"] = {
 		get_label = function(name) return name end,
 		execute_single = function() return true end,
 		SG_NAMES = { "none", "script_pause_toggle" },

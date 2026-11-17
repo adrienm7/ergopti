@@ -2755,7 +2755,7 @@ current_choice_label_value = true
 # "restricted elsewhere" rather than as the omission it was.
 [[menu.gestures_menu]]
 # Unrestricted, like the metrics toggle: Windows used to insert this row by hand
-# in ui/menu/menu_gestures.ahk and the declaration excluded it to avoid drawing a
+# in gestures/ui/menu/gestures.ahk and the declaration excluded it to avoid drawing a
 # second one. Every driver now draws it from here; Windows registers
 # ToggleGesturesEnabled as its command.
 type = "toggle"
@@ -2778,7 +2778,7 @@ i18n = "common.restore_recommended"
 # On Windows the clear also puts the Precision Touchpad registry back to its
 # system state: the values backed up before Ergopti's first gesture
 # configuration, or the Windows factory defaults without a backup
-# (windows/modules/gestures/touchpad_registry.ahk). It replaced the
+# (windows/gestures/adapters/touchpad_registry.ahk). It replaced the
 # Configuration menu's « Restaurer les gestes du pavé tactile Windows » row
 # (maintainer, 2026-11-03), and the global clear composes it too. macOS and
 # Linux read the touchpad themselves and change no system setting, so their
@@ -3397,7 +3397,7 @@ unavailable = "hide"
 
 # Fixed swipe child presentation only; native payloads remain actual child owners.
 # Windows renders it too since its raw touchpad reader follows the fingers
-# (modules/gestures/raw_touchpad.ahk); Linux draws its slot rows itself.
+# (gestures/adapters/raw_touchpad.ahk); Linux draws its slot rows itself.
 [[menu.gesture_swipe_slot_menu]]
 type = "include"
 section = "gesture_change_action"

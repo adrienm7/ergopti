@@ -180,7 +180,7 @@ for (const file of [
 	'unit/diagnostics/engine/input_probe/test_entry_owner.ahk',
 	'unit/core/ui/tooltip/test_hostile_native64.ahk',
 	'unit/modules/hotstrings/engine/test_sendinstant_clipboard_owner.ahk',
-	'unit/modules/gestures/test_gesture_plain_clipboard_owner.ahk'
+	'unit/gestures/engine/test_plain_clipboard_owner.ahk'
 ]) {
 	const source = fs.readFileSync(path.join(TESTS_DIR, file), 'utf8');
 	assert.notDeepEqual(exclusiveReasons(source, fixtures), [], file);

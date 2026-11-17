@@ -207,7 +207,7 @@ local function load_real_shortcut_delivery_owner()
 	-- module may have been bound by an earlier file to a get-only i18n double,
 	-- which made the combined run fail in `i18n.format` while this file passed alone.
 	package.loaded["core.i18n.engine.i18n"] = nil
-	package.loaded["modules.gestures.actions"] = nil
+	package.loaded["gestures.engine.actions"] = nil
 	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return "https://example.invalid" end,
 	}

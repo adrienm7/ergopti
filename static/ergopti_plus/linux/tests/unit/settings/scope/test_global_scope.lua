@@ -88,18 +88,18 @@ helpers.describe("Linux global scope: registry and composition", function()
 	end)
 
 	helpers.it("skips the gestures of a machine without a touchpad instead of refusing the row", function()
-		local names = { "modules.gestures.touchpad_finder", "modules.gestures.manager" }
+		local names = { "gestures.adapters.touchpad_finder", "gestures.engine.manager" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-		package.loaded["modules.gestures.touchpad_finder"] = {
+		package.loaded["gestures.adapters.touchpad_finder"] = {
 			read_resolution = function() return nil end,
 			read_axes = function() return nil end,
 			find = function() return nil, "no device reports multitouch slots" end,
 		}
-		package.loaded["modules.gestures.manager"] = nil
+		package.loaded["gestures.engine.manager"] = nil
 		local ok, err = pcall(with_modules, function()
 			package.loaded["settings.engine.scope.script_scope"] = { participant = function() return stub({}, "global") end }
-			local Manager = require("modules.gestures.manager")
+			local Manager = require("gestures.engine.manager")
 			helpers.assert_eq(Manager.scope_available(), false)
 			local GlobalScope = require("settings.engine.scope.global_scope")
 			local registry = GlobalScope.participants({ gestures = Manager, is_paused = function() return false end })

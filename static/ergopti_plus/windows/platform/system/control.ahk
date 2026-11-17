@@ -4,7 +4,7 @@
 ; MODULE: SystemControl Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; The Win32, COM, registry and shell primitives the system actions
-; (modules/gestures/system_actions.ahk) are built from: start a program, post
+; (gestures/engine/system_actions.ahk) are built from: start a program, post
 ; a window message, broadcast a setting change, read and write a registry
 ; value, probe a registry key, name the script's session (the virtual desktop
 ; actions and the touchpad registry owner use these two), mute the default

@@ -48,7 +48,7 @@ PE comparison of v1.0.0, v1.0.3 and v1.0.4 (7-Zip PE resource listing):
 ## Ranked candidate triggers
 
 1. **High: inline PowerShell clipboard grabber pattern, new in v1.0.4.** This is
-   `_GestureScreenshotRegionSaveScript` in `static/ergopti_plus/windows/modules/gestures/screenshots.ahk`
+   `_GestureScreenshotRegionSaveScript` in `static/ergopti_plus/windows/gestures/adapters/screenshots.ahk`
    (commits `defb01f5c0`, `c7d6d1959d`, `f1de20560f`, `bd0f94b1a4`). It launches
    `powershell.exe -NoProfile -NonInteractive -Sta -WindowStyle Hidden -Command "..."` with
    `Add-Type -TypeDefinition` C# `[DllImport("user32.dll")] OpenClipboard/GetClipboardData/CopyImage`,
@@ -209,7 +209,7 @@ SHA-256 and release URL, asking for an allow-list or re-scan).
 - Other hidden PowerShell launchers that AHK could replace, not changed (they were present in the
   builds that pass): the Recycle Bin action (`GESTURE_SYS_EMPTY_TRASH_SCRIPT`, AHK has
   `FileRecycleEmpty`), the screen brightness adapter (WMI, reachable through `ComObjGet`), and the elevated touchpad registry
-  scripts (`modules/gestures/config.ahk`, `ui/onboarding/gesture_registration.ahk`). The updater,
+  scripts (`gestures/engine/config.ahk`, `ui/onboarding/gesture_registration.ahk`). The updater,
   crash report, curl, managed network, Ollama and diagnostics workers are vendor scripts: kept.
 - Done: the updater bootstrap (base64 fragments in environment variables, `[ScriptBlock]::Create`,
   `-EncodedCommand`) is gone. The updater runs `vendor/ergopti_updater_staging.ps1` with `-File`

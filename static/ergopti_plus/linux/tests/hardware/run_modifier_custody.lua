@@ -210,7 +210,7 @@ local function run()
 	ack_observer = function(code, value)
 		if code == 30 and value == 1 and not fired then fired = true; original(a, 42, 0) end
 	end
-	local combo = require("modules.gestures.combo_emitter")
+	local combo = require("gestures.engine.combo_emitter")
 	check(combo.press_codes({ 42 }, { 30 }, "native queued original UP"), "Combo acknowledges real queued retirement")
 	ack_observer = nil
 	check(fired, "native synthetic DOWN ACK delivered the reentrant source callback")

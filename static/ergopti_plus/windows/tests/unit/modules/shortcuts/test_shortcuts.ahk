@@ -305,7 +305,7 @@ TestShortcuts_MenuItemsUseRegisterMenuItem() {
 	; the menu_dispatcher WM_COMMAND retry path and silently drops ~1 click in 3
 	; under AHK 2.0. All actionable shortcut menu items must go through
 	; RegisterMenuItem instead.
-	Src := _DriverDirsConcat("ui/menu", "apps/ui/menu", "ai/ui/menu", "menu/ui/builder")
+	Src := _DriverDirsConcat("ui/menu", "gestures/ui/menu", "apps/ui/menu", "ai/ui/menu", "menu/ui/builder")
 	Assert(Src != "", "ui/menu must be readable")
 	MenuShortcutsSrc := FileRead(A_ScriptDir . "\..\ui\menu\menu_shortcuts.ahk", "UTF-8")
 	; TWO ways to be on the retry path, and the file must be on one of them. It

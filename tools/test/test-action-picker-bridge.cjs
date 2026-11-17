@@ -40,10 +40,10 @@ const HOST_BRIDGE = 'static/ergopti_plus/_shared/ui/host_bridge.js';
 const WIN_HOST = 'static/ergopti_plus/windows/ui/action_picker_webview.ahk';
 const WIN_NATIVE = 'static/ergopti_plus/windows/ui/action_picker/init.ahk';
 const MAC_HOST = 'static/ergopti_plus/macos/ui/action_picker/init.lua';
-const MAC_MENU = 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua';
+const MAC_MENU = 'static/ergopti_plus/macos/gestures/ui/menu/gestures.lua';
 const MAC_UTILS = 'static/ergopti_plus/macos/ui/menu/shortcut_utils.lua';
 const LINUX_HOST = 'static/ergopti_plus/linux/ui/action_picker/bridge.lua';
-const LINUX_ACTIONS = 'static/ergopti_plus/linux/modules/gestures/manager.lua';
+const LINUX_ACTIONS = 'static/ergopti_plus/linux/gestures/engine/manager.lua';
 const EN_LOCALE = 'static/ergopti_plus/_shared/core/i18n/data/locales/en.json';
 const PROVIDER_PICKER = 'static/ergopti_plus/_shared/apps/engine/program_provider_picker.lua';
 

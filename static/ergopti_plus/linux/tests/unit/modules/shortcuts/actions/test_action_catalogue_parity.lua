@@ -24,7 +24,7 @@
 
 local helpers = require("tests.helpers")
 
-local MANAGER = "modules.gestures.manager"
+local MANAGER = "gestures.engine.manager"
 
 --- Loads a fresh manager whose logger records every warning and error.
 --- @return table manager, table warnings
@@ -38,7 +38,7 @@ local function recording_manager()
 	package.loaded[MANAGER] = nil
 	-- The workspace provider captures its shell and display dependencies when
 	-- required. Earlier native fixtures may have replaced either table.
-	package.loaded["modules.gestures.workspace_switcher"] = nil
+	package.loaded["gestures.adapters.workspace_switcher"] = nil
 	local ok, manager = pcall(require, MANAGER)
 	package.loaded["core.logger.engine.shim"] = saved
 	if not ok then error(manager, 0) end
@@ -354,7 +354,7 @@ helpers.describe("action picker items (Linux)", function()
 	end)
 
 	helpers.it("does not borrow tool availability from an earlier workspace fixture", function()
-		local name = "modules.gestures.workspace_switcher"
+		local name = "gestures.adapters.workspace_switcher"
 		local saved = package.loaded[name]
 		local Display = require("core.ui.engine.display_server")
 		Display._set_for_test(Display.X11, "xfce")

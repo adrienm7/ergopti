@@ -4,14 +4,14 @@
  * ==============================================================================
  * MODULE: Precision Touchpad Registry Codegen
  * DESCRIPTION:
- * Emits windows/modules/gestures/precision_touchpad_registry.toml as the data
- * the one Windows touchpad writer reads (modules/gestures/touchpad_registry.ahk),
+ * Emits windows/gestures/adapters/precision_touchpad_registry.toml as the data
+ * the one Windows touchpad writer reads (gestures/adapters/touchpad_registry.ahk),
  * for the tray action and the first-run wizard alike.
  *
  * WHY THIS EXISTS:
  * The wizard's PowerShell script once carried its own hand-typed copy of every
  * value name and every KeyParams number, "kept in sync" by a comment with the
- * maps in modules/gestures/init.ahk. Two copies of a registry contract drift, and the
+ * maps in gestures/engine/init.ahk. Two copies of a registry contract drift, and the
  * one Ergopti writes first is the one a restore must undo. A compiled AHK build
  * has no TOML reader at include time, so it gets a generated copy; the TOML file
  * stays the only place a value is written by hand. The KeyParams numbers are
@@ -28,7 +28,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const SOURCE = path.join(SP, 'windows', 'modules', 'gestures', 'precision_touchpad_registry.toml');
+const SOURCE = path.join(SP, 'windows', 'gestures', 'adapters', 'precision_touchpad_registry.toml');
 const AHK_OUTPUT = path.join(SP, 'windows', '_generated', 'touchpad_registry.ahk');
 const RUN_HINT = 'npm run codegen:touchpad-registry';
 
@@ -191,7 +191,7 @@ function emitAhk(contract) {
 	);
 	return (
 		'﻿; _generated/touchpad_registry.ahk\n' +
-		'; AUTO-GENERATED from windows/modules/gestures/precision_touchpad_registry.toml.\n' +
+		'; AUTO-GENERATED from windows/gestures/adapters/precision_touchpad_registry.toml.\n' +
 		`; DO NOT EDIT BY HAND — run \`${RUN_HINT}\` to refresh.\n` +
 		'#Requires AutoHotkey v2.0\n' +
 		'\n' +
@@ -201,13 +201,13 @@ function emitAhk(contract) {
 		'; Every registry value Ergopti writes so each gesture slot sends its\n' +
 		'; Ctrl + Win + Shift + Fn shortcut, in write order. The tray action and the\n' +
 		'; first-run wizard both write it in process, through\n' +
-		'; modules/gestures/touchpad_registry.ahk, which backs it up and restores it, or\n' +
+		'; gestures/adapters/touchpad_registry.ahk, which backs it up and restores it, or\n' +
 		'; writes factory_defaults back (and deletes every other name) when no\n' +
 		'; backup exists.\n' +
 		'; ==============================================================================\n' +
 		'\n' +
 		'; A function rather than a global initialiser so include ORDER cannot matter:\n' +
-		'; the first-run wizard reads it before modules/gestures/init.ahk runs. Each\n' +
+		'; the first-run wizard reads it before gestures/engine/init.ahk runs. Each\n' +
 		'; call returns fresh maps, so no caller can alter what another one reads.\n' +
 		'TouchpadRegistryData() {\n' +
 		'\treturn Map(\n' +

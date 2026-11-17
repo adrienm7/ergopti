@@ -43,7 +43,7 @@ const PART_MODULES = new Set([
 	'diagnostics.ui.menu_debug',
 	'menu.ui.builder.dialogs',
 	'menu.ui.ergopti_studio',
-	'ui.menu.menu_gestures',
+	'gestures.ui.menu.gestures',
 	'ui.menu.menu_hotstrings',
 	'settings.ui.menu.language',
 	'ui.menu.menu_layouts',

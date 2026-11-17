@@ -215,7 +215,7 @@ function M.with_bindings(callback)
 		"modules.shortcuts.actions.apps",
 		"modules.shortcuts.actions.system",
 		"modules.shortcuts.tap_keys",
-		"modules.gestures.actions",
+		"gestures.engine.actions",
 		"core.i18n.engine.i18n",
 		"core.logger.engine.logger",
 	}, function()
@@ -246,7 +246,7 @@ function M.with_bindings(callback)
 		}
 		-- The unassigned tap-key fixture still initializes through this owner;
 		-- loading the real action catalogue would escape the native boundary.
-		package.loaded["modules.gestures.actions"] = { is_assignable = function() return false end }
+		package.loaded["gestures.engine.actions"] = { is_assignable = function() return false end }
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...)
 			ctx.errors[#ctx.errors + 1] = string.format(message, ...)

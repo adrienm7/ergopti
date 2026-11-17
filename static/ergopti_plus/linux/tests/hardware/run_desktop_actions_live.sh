@@ -24,7 +24,7 @@ need dbus-run-session
 need gio
 need gsettings
 need xdotool
-# center_mouse reads the monitors through RandR (modules/gestures/pointer_warp.lua).
+# center_mouse reads the monitors through RandR (gestures/adapters/pointer_warp.lua).
 need xrandr
 need luajit
 export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'

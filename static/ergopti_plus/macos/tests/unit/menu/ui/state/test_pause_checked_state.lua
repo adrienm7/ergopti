@@ -17,7 +17,7 @@
 local helpers = require("tests.helpers")
 
 --- Reads a source file via the active package.path.
---- @param module_name string Dot-separated module name (e.g. "ui.menu.menu_gestures").
+--- @param module_name string Dot-separated module name (e.g. "gestures.ui.menu.gestures").
 --- @return string Source text.
 local function read_source(module_name)
 	local path = package.searchpath(module_name, package.path)
@@ -56,7 +56,7 @@ end
 -- occurrence must have been removed.
 
 local MENU_MODULES = {
-	"ui.menu.menu_gestures",
+	"gestures.ui.menu.gestures",
 	"ui.menu.menu_hotstrings",
 	"ui.menu.menu_shortcuts",
 	"menu.ui.builder.builder",

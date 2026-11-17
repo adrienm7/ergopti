@@ -74,7 +74,7 @@ local DEFAULT_DEPS = {
 	read_uri_list = function(admitted)
 		local function guarded_press(combo)
 			if admitted() ~= true then return false end
-			return require("modules.gestures.combo_emitter").press(combo)
+			return require("gestures.engine.combo_emitter").press(combo)
 		end
 		return require("clipboard.adapters.clipboard").read_selection_uri_list(
 			guarded_press, require("core.events.loop").sleep_ms)

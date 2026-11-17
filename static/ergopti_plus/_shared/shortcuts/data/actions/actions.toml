@@ -53,9 +53,9 @@
 #   confirm   true for a destructive action that must ask before it runs. Each
 #             driver's dispatcher asks, off the input thread, and runs the
 #             action only on the explicit answer: macOS execute_single
-#             (modules/gestures/action_confirm.lua), Windows GestureInvokeAction
-#             (modules/gestures/config.ahk), Linux a zenity/kdialog question
-#             chained to the command (modules/gestures/system_actions.lua),
+#             (gestures/engine/action_confirm.lua), Windows GestureInvokeAction
+#             (gestures/engine/config.ahk), Linux a zenity/kdialog question
+#             chained to the command (gestures/engine/system_actions.lua),
 #             which is why Linux refuses to load a confirm action that is not
 #             one of those commands.
 #   requires_linux / requires_hs / requires_ahk
@@ -86,8 +86,8 @@
 # Gesture slot key-space (single source of truth for the slot names)
 # ==============================================================================
 #
-# Both drivers (Linux modules/gestures/manager.lua and macOS
-# modules/gestures/init.lua) must build SINGLE_SLOTS / AXIS_SLOTS and the
+# Both drivers (Linux gestures/engine/manager.lua and macOS
+# gestures/engine/init.lua) must build SINGLE_SLOTS / AXIS_SLOTS and the
 # DEFAULT_GESTURES key-space from these lists. The DEFAULT_GESTURES key-space is
 # exactly the union of single and axis. The default action VALUES stay
 # platform-specific and are intentionally not listed here.
@@ -115,7 +115,7 @@ axis = [
 # Axis actions (continuous, optionally scalable swipes)
 # ==============================================================================
 #
-# Only macOS dispatches an axis (modules/gestures/engine.lua). Windows receives
+# Only macOS dispatches an axis (gestures/engine/engine.lua). Windows receives
 # its gestures as ten Precision Touchpad hotkeys and Linux as finished
 # direction swipes, so neither has an axis to feed. These were declared "all",
 # which promised Windows and Linux fifteen bindings neither could run; the
@@ -326,7 +326,7 @@ equivalent_linux = ["app_switcher"]
 
 # The two previous-application scopes: every screen, and only the screen under
 # the cursor. macOS activates the application directly
-# (macos/modules/gestures/app_switch.lua): a posted Cmd+Tab never switched.
+# (macos/gestures/engine/app_switch.lua): a posted Cmd+Tab never switched.
 [sg_actions.app_previous]
 platform = "hs"
 reason_ahk = "platform_reason.action_application_switching_is_macos"
@@ -528,7 +528,7 @@ equivalent_hs = ["win_app_next"]
 emit_linux = "alt+Tab"
 
 # The windows of the active application, in turn. macOS focuses them directly
-# (macos/modules/gestures/app_switch.lua), since a posted Cmd+` depends on a
+# (macos/gestures/engine/app_switch.lua), since a posted Cmd+` depends on a
 # layout carrying a backquote.
 [sg_actions.win_app_prev]
 platform = "ahk,hs"
@@ -925,9 +925,9 @@ emit_linux = "super+v"
 
 # --- System actions (D5) ---
 # Each runs one native command, asynchronously, never on the keyboard hook:
-# macOS modules/gestures/system_actions.lua, Linux
-# modules/gestures/system_actions.lua, Windows
-# modules/gestures/system_actions.ahk. Every suite pins the exact command.
+# macOS gestures/engine/system_actions.lua, Linux
+# gestures/engine/system_actions.lua, Windows
+# gestures/engine/system_actions.ahk. Every suite pins the exact command.
 
 [sg_actions.show_desktop]
 # Windows Win+D, macOS Command + the Mission Control key; Linux toggles the
@@ -961,7 +961,7 @@ platform = "all"
 
 [sg_actions.center_mouse]
 # The centre of the screen under the pointer. Linux moves it on X11 only
-# (modules/gestures/pointer_warp.lua): Wayland lets no client warp the pointer.
+# (gestures/adapters/pointer_warp.lua): Wayland lets no client warp the pointer.
 platform = "all"
 requires_linux = ["session:x11", "tool:xdotool", "tool:xrandr"]
 
@@ -1103,7 +1103,7 @@ requires_linux = ["session:x11", "tool:xdotool", "tool:xprop", "tool:gdbus", "fi
 #   - open and frontmost          -> close it through the page's own close.
 # Each driver owns the three-state rule once: macOS core/ui/ui/window_toggle.lua,
 # Linux core/ui/ui/webview_manager.lua toggle(), Windows GestureToggleOrFocusUI in
-# modules/gestures/actions.ahk. Every page listed here exists on all three
+# gestures/engine/actions.ahk. Every page listed here exists on all three
 # drivers, so none is greyed; a page one OS lacks would keep its row with
 # the menu's reason text rather than disappear (AGENTS.md).
 # Not toggles, on purpose: the onboarding wizard (closing a half-finished
@@ -1320,7 +1320,7 @@ parameter = "search_url"
 
 [sg_actions.teleport_mouse]
 # Windows in shortcuts/data, macOS in modules/shortcuts/actions/, Linux on
-# X11 only (modules/gestures/pointer_warp.lua): Wayland intentionally forbids
+# X11 only (gestures/adapters/pointer_warp.lua): Wayland intentionally forbids
 # global pointer moves.
 platform = "all"
 requires_linux = ["session:x11", "tool:xdotool", "tool:xrandr"]
@@ -1508,7 +1508,7 @@ platform = "all"
 
 [sg_actions.spotlight_mouse]
 # Windows in shortcuts/data, macOS in modules/shortcuts/actions/, Linux on
-# X11 only (modules/gestures/pointer_spotlight.lua): Wayland gives no client the
+# X11 only (gestures/engine/pointer_spotlight.lua): Wayland gives no client the
 # global pointer position nor a window placed at screen coordinates.
 platform = "all"
 requires_linux = ["session:x11", "tool:xdotool", "tool:xrandr"]
@@ -1648,7 +1648,7 @@ emit_hs_mods = ["cmd"]
 
 # What a Cmd+Shift+Tab tap selects: the least recently used application. A
 # posted Cmd+Shift+Tab switched nothing, like a posted Cmd+Tab, so macOS
-# activates it from Lua (macos/modules/gestures/app_switch.lua).
+# activates it from Lua (macos/gestures/engine/app_switch.lua).
 [sg_actions.cmd_shift_tab]
 platform = "hs"
 reason_ahk = "platform_reason.action_application_switching_is_macos"
@@ -1719,7 +1719,7 @@ emit_hs_mods = ["cmd"]
 # --- Modificateurs collants (one-shot) ---
 # Karabiner les exprime par `sticky_modifier`, une construction de manipulateur
 # qu'aucune IPC ne peut déclencher de l'extérieur. macOS les réimplémente donc
-# dans modules/gestures/sticky_modifiers.lua : chaque modificateur bascule
+# dans gestures/engine/sticky_modifiers.lua : chaque modificateur bascule
 # indépendamment, exactement comme le fait le catalogue Karabiner.
 
 [sg_actions.sticky_shift]

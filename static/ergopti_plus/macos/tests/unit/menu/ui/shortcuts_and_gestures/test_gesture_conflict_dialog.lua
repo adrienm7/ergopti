@@ -25,9 +25,9 @@ local function choose(parameter, clicked, refusal, picked)
 		return result
 	end
 	local names = {
-		"ui.menu.menu_gestures", "modules.gestures", "menu.ui.builder.utils", "core.ui.engine.dialog_util",
+		"gestures.ui.menu.gestures", "gestures.engine", "menu.ui.builder.utils", "core.ui.engine.dialog_util",
 		"core.i18n.engine.i18n", "menu.engine.manifest_menu", "ui.action_picker", "ui.menu.shortcut_utils",
-		"core.logger.engine.logger", "core.timing.engine.deferred_work", "core.fs.adapters.storage", "ui.gesture_conflict_notice",
+		"core.logger.engine.logger", "core.timing.engine.deferred_work", "core.fs.adapters.storage", "gestures.ui.conflict_notice",
 		"menu.engine.renderer", "core.text.engine.json",
 	}
 	local saved, observed = {}, { queue = {}, opened = {}, dialogs = 0, refreshed = 0, settings = 0, prompts = 0 }
@@ -73,7 +73,7 @@ local function choose(parameter, clicked, refusal, picked)
 		open_system_gestures = function() observed.settings = observed.settings + 1 end,
 		refresh_system_gestures = function(done) observed.refreshed = observed.refreshed + 1; done(); return true end,
 	}
-	package.loaded["modules.gestures"] = gestures
+	package.loaded["gestures.engine"] = gestures
 	package.loaded["menu.ui.builder.utils"] = { section = function(label) return { label = label } end }
 	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function() observed.prompts = observed.prompts + 1; return "button.save", "https://example.com" end,
@@ -112,7 +112,7 @@ local function choose(parameter, clicked, refusal, picked)
 		local state = { gestures = true }
 		local transaction = require("tests.support.program_parameter_fixture")(gestures, state, "dialog",
 			function() return assigned end, function() return true end)
-		local menu = require("ui.menu.menu_gestures").build({
+		local menu = require("gestures.ui.menu.gestures").build({
 			gestures = gestures, state = state, save_prefs = function() return true end,
 			commit_program_parameter = transaction.apply,
 			updateMenu = function() end,
@@ -175,8 +175,8 @@ end)
 -- ports remain controlled so menu construction cannot hide native work.
 local refresh_modules = {
 	"core.text.engine.json", "menu.engine.renderer", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.logger.engine.logger",
-	"modules.gestures", "menu.ui.builder.utils", "core.ui.engine.dialog_util", "ui.action_picker",
-	"ui.menu.shortcut_utils", "core.timing.engine.deferred_work", "ui.menu.menu_gestures",
+	"gestures.engine", "menu.ui.builder.utils", "core.ui.engine.dialog_util", "ui.action_picker",
+	"ui.menu.shortcut_utils", "core.timing.engine.deferred_work", "gestures.ui.menu.gestures",
 }
 local function refresh_json(path)
 	local file = assert(io.open(path, "rb"))
@@ -211,7 +211,7 @@ local function with_status_refresh(options, callback)
 				return true
 			end,
 		}
-		package.loaded["modules.gestures"] = fixture.gestures
+		package.loaded["gestures.engine"] = fixture.gestures
 		package.loaded["core.i18n.engine.i18n"] = i18n
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["menu.ui.builder.utils"] = { section = function(title) return { title = title } end }
@@ -227,7 +227,7 @@ local function with_status_refresh(options, callback)
 				return renderer.render_rows(fixture.canonical, "actual-system-gesture-status")
 			end,
 		}
-		local owner = require("ui.menu.menu_gestures")
+		local owner = require("gestures.ui.menu.gestures")
 		function fixture.build()
 			return owner.build({ gestures = fixture.gestures, state = { gestures = true },
 				updateMenu = function() fixture.updates = fixture.updates + 1 end }).submenu

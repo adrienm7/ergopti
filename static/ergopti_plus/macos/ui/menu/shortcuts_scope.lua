@@ -254,7 +254,7 @@ function M.new(options)
 	local source_owner = options.preferences or Preferences
 	local inventory = require("shortcuts.engine.physical_editor_inventory").new({
 		path = options.path, current_path = options.current_path or function() return require("settings.engine.paths").get("config.toml") end,
-		read = options.files.read_with_status, keyboard = keyboard, parameters = require("modules.gestures.actions"),
+		read = options.files.read_with_status, keyboard = keyboard, parameters = require("gestures.engine.actions"),
 		recognizes = function(binding)
 			return type(binding) == "string" and (binding:match("^keyboard__") ~= nil
 				or binding:match("^tap_key__") ~= nil or binding:match("^script__") ~= nil)

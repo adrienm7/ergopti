@@ -14,9 +14,9 @@ local load_inventory_context = fixtures.load_inventory_context
 
 local function load_real_sticky_pause_owner()
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:match("^modules%.gestures%.actions")
-			or name == "modules.gestures.sticky_modifiers"
-			or name == "modules.gestures"
+		if type(name) == "string" and (name:match("^gestures%.engine%.actions")
+			or name == "gestures.engine.sticky_modifiers"
+			or name == "gestures.engine"
 			or name == "platform.input.modifier_injector"
 			or name == "core.events.timer_scheduler") then
 			package.loaded[name] = nil
@@ -74,7 +74,7 @@ local function load_real_sticky_pause_owner()
 
 	local TimerScheduler = require("core.events.timer_scheduler")
 	local Injector = require("platform.input.modifier_injector")
-	local Sticky = require("modules.gestures.sticky_modifiers")
+	local Sticky = require("gestures.engine.sticky_modifiers")
 
 	local function permissive(overrides)
 		return setmetatable(overrides or {}, {
@@ -113,27 +113,27 @@ local function load_real_sticky_pause_owner()
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = scoped_child(
 		"pause_screenshot_actions", "resume_screenshot_actions",
 		"has_screenshot_pause_claim", "has_pending_screenshot_action")
-	package.loaded["modules.gestures.actions_click"] = permissive({
+	package.loaded["gestures.engine.actions_click"] = permissive({
 		force_cleanup = function() return true end,
 	})
-	package.loaded["modules.gestures.sticky_modifiers"] = Sticky
-	reset_module("modules.gestures.actions")
-	local actions = require("modules.gestures.actions")
+	package.loaded["gestures.engine.sticky_modifiers"] = Sticky
+	reset_module("gestures.engine.actions")
+	local actions = require("gestures.engine.actions")
 
 	local gesture_engine = permissive({
 		init = function() return true end,
 		unblock_scroll = function() return true end,
 	})
-	package.loaded["modules.gestures.engine"] = gesture_engine
-	package.loaded["modules.gestures.actions"] = actions
-	package.loaded["modules.gestures.conflicts"] = permissive()
+	package.loaded["gestures.engine.engine"] = gesture_engine
+	package.loaded["gestures.engine.actions"] = actions
+	package.loaded["gestures.engine.conflicts"] = permissive()
 	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return false end,
 		recommended_for = function() return "none" end,
 	}
 	package.loaded["core.events.timer_scheduler"] = TimerScheduler
-	reset_module("modules.gestures")
-	local gestures = require("modules.gestures")
+	reset_module("gestures.engine")
+	local gestures = require("gestures.engine")
 
 	local function flush_deferred()
 		local snapshot = deferred

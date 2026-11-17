@@ -57,7 +57,7 @@ M.GROUPS = {
 		"tests/unit/modules/dynamic_hotstrings/",
 		"tests/unit/modules/shortcuts/",
 		"tests/unit/modules/keymap/",
-		"tests/unit/modules/gestures/",
+		"tests/unit/gestures/",
 	} },
 	{ name = "modules", prefixes = { "tests/unit/modules/", "tests/unit/ai/", "tests/unit/diagnostics/engine/reports/" } },
 	{ name = "ui", prefixes = {} },

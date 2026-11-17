@@ -26,7 +26,7 @@ helpers.describe("tap-hold manager", function()
 		local install = hook.set_remapper
 		hook.set_remapper = function() return false end
 		local opts = { keyboard_hook = hook, execute_action = function() end,
-			action_names = require("modules.gestures.manager").get_executable_action_names,
+			action_names = require("gestures.engine.manager").get_executable_action_names,
 			on_text_injected = function() end, defaults_path = DEFAULTS, user_path = user_path,
 			config_path = require("tests.support.tap_hold_fixture").config_path(user_path) }
 		local first = Manager.init(opts)
@@ -210,8 +210,8 @@ os.remove(user_path)
 	end)
 
 	helpers.it("admits a monitor tap only from its active canonical tap-hold source", function()
-		local names = { "modules.gestures.manager", "platform.remap.tap_hold_manager", "adapters.window_switch",
-			"platform.input.keyboard_hook", "core.fs.adapters.file_system", "settings.engine.paths", "core.fs.adapters.storage", "ui.gesture_conflicts" }
+		local names = { "gestures.engine.manager", "platform.remap.tap_hold_manager", "adapters.window_switch",
+			"platform.input.keyboard_hook", "core.fs.adapters.file_system", "settings.engine.paths", "core.fs.adapters.storage", "gestures.ui.conflicts" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local user_path, config_path = os.tmpname(), os.tmpname()
@@ -230,7 +230,7 @@ os.remove(user_path)
 			end }
 			package.loaded["settings.engine.paths"] = { config = function() return config_path end }
 			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
-			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
+			package.loaded["gestures.ui.conflicts"] = { notify_boot = function() end }
 			package.loaded["adapters.window_switch"] = { new = function(owner_capture)
 				capture = owner_capture
 				return { run = function(binding)
@@ -239,7 +239,7 @@ os.remove(user_path)
 					accepted = accepted + 1; return true
 				end }
 			end }
-			local Gestures = helpers.load_module("modules.gestures.manager")
+			local Gestures = helpers.load_module("gestures.engine.manager")
 			Gestures.init({ persist = true, config_path = config_path, enabled = false })
 			Manager = helpers.load_module("platform.remap.tap_hold_manager")
 			package.loaded["platform.remap.tap_hold_manager"] = Manager
@@ -612,7 +612,7 @@ helpers.describe("tap-hold manager: taps this driver cannot run", function()
 	--- A manager on the real action catalogue, as the daemon wires it, and the
 	--- warnings its configuration load logged.
 	local function catalogue_manager(user_text)
-		local Gestures = helpers.load_module("modules.gestures.manager")
+		local Gestures = helpers.load_module("gestures.engine.manager")
 		local Logger = require("core.logger.engine.shim")
 		local real_warn, warnings = Logger.warn, {}
 		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
@@ -693,7 +693,7 @@ helpers.describe("tap-hold manager: the daemon's action executor", function()
 
 	helpers.it("never drops the action catalogue when the touchpad reader fails", function()
 		local src = daemon_source()
-		helpers.assert_true(src:find('local gestures = RuntimeGuard.optional_require("modules.gestures.manager")', 1, true)
+		helpers.assert_true(src:find('local gestures = RuntimeGuard.optional_require("gestures.engine.manager")', 1, true)
 			~= nil, "the scan must find the handle's declaration, or it proves nothing")
 		local offenders = {}
 		for line in src:gmatch("[^\n]+") do

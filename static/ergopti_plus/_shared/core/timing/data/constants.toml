@@ -296,8 +296,8 @@ terminal_hotstring_key_delay_ms = 20
 # diagonal; the others' diagonal is gestures.direction's factor of theirs. One
 # value for every driver (maintainer decision GSD-3 of 2026-11-11); the swipe
 # step itself is each slot's own [gestures.sensitivities] setting.
-# HS: modules/gestures/geometry.lua. LX: modules/gestures/incremental_tracker.lua.
-# AHK: modules/gestures/raw_touchpad.ahk, from the raw HID digitizer reports.
+# HS: gestures/engine/geometry.lua. LX: gestures/engine/incremental_tracker.lua.
+# AHK: gestures/adapters/raw_touchpad.ahk, from the raw HID digitizer reports.
 swipe_minimum_mm = 1.5
 pair_swipe_minimum_mm = 3.0
 pair_diagonal_minimum_mm = 5.0
@@ -310,7 +310,7 @@ pair_diagonal_minimum_mm = 5.0
 # 4 mm on one of 30 (the value kept: decided by the coordinator on 2026-11-11,
 # to review by the maintainer). A pad that reports neither its resolution nor
 # its axes is read at the fallback resolution.
-# LX: modules/gestures/mt_decoder.lua.
+# LX: gestures/engine/mt_decoder.lua.
 decoder_swipe_minimum_mm = 10.0
 pair_scroll_travel_mm = 10.0
 touchpad_fallback_units_per_mm = 12
@@ -319,7 +319,7 @@ touchpad_fallback_units_per_mm = 12
 # was unplugged, while gestures are on: one read of /proc/bus/input/devices
 # (maintainer decision of 2026-11-17). macOS and Windows receive gestures from
 # the OS, which keeps them across a reconnect.
-# LX: modules/gestures/manager.lua.
+# LX: gestures/engine/manager.lua.
 touchpad_rescan_ms = 2000
 
 # The incremental swipe step rule and the live direction lock, for a driver
@@ -331,7 +331,7 @@ touchpad_rescan_ms = 2000
 # shared corpora (_shared/tests/corpus/gestures/incremental_steps.json and
 # direction_vectors.json) pin these to the Lua constants on every driver.
 # HS, LX: _shared/gestures/engine/incremental.lua, direction.lua.
-# AHK: modules/gestures/incremental.ahk, direction.ahk.
+# AHK: gestures/engine/incremental.ahk, direction.ahk.
 incremental_first_step_mm = 4.0
 incremental_max_actions_per_frame = 100
 incremental_reverse_floor_mm = 1.0
@@ -342,7 +342,7 @@ swipe_diagonal_minimum_factor = 1.5
 # shortcut for that swipe still belongs to it. A touch that stepped while
 # moving swallows the shortcut within this window; a touch whose frames stop
 # for this long without a lift frame is over, so a deferred shortcut fires.
-# AHK: modules/gestures/raw_touchpad.ahk.
+# AHK: gestures/adapters/raw_touchpad.ahk.
 incremental_handoff_ms = 300
 
 # Windows: how long a gesture's synthetic keys stay marked, the settle after an
@@ -353,7 +353,7 @@ auto_configure_delay_ms = 250
 
 # Windows: how often a worker-authored result file is checked after a touchpad
 # restart or gesture registration.
-# AHK: modules/gestures/config.ahk, ui/onboarding/gesture_registration.ahk.
+# AHK: gestures/engine/config.ahk, ui/onboarding/gesture_registration.ahk.
 worker_result_poll_ms = 100
 
 # Touchdevice discovery: how often the startup phase checks for the first frame.
@@ -374,13 +374,13 @@ aux_shell_timeout_ms = 10000
 
 # Free names new_text_file_here tries in a folder ("New text file.txt", then
 # "New text file 2.txt"…) before it gives up on a folder that holds them all.
-# LX: modules/gestures/system_actions.lua. HS: modules/gestures/system_actions.lua
-# and AHK: modules/gestures/system_actions.ahk keep a copy of the same count.
+# LX: gestures/engine/system_actions.lua. HS: gestures/engine/system_actions.lua
+# and AHK: gestures/engine/system_actions.ahk keep a copy of the same count.
 new_text_file_name_attempts = 100
 
 # Longest a hidden run_command child may run before it is stopped and its
 # failure notified (a terminal window is the user's own and is not bounded).
-# HS: gestures/user_actions.lua. LX: modules/gestures/user_actions.lua.
+# HS: gestures/user_actions.lua. LX: gestures/engine/user_actions.lua.
 run_command_timeout_ms = 30000
 
 # Longest one `shortcuts run` of a run_apple_shortcut binding may take before it
@@ -468,7 +468,7 @@ gesture_auto_configure_delay_ms = 2000
 
 # macOS: delay before the emergency recycle of the gesture watchers runs, so the
 # frame that triggered it has been delivered.
-# HS: modules/gestures/init.lua schedule_emergency_recycle.
+# HS: gestures/engine/init.lua schedule_emergency_recycle.
 emergency_recycle_delay_ms = 20
 
 
@@ -1402,7 +1402,7 @@ shortcuts_reply_bytes = 65536
 # stopped and the run refused as too large, so a runaway command can neither
 # exhaust memory nor type for minutes.
 # HS: gestures/user_actions.lua, gestures/apple_shortcut_action.lua.
-# LX: modules/gestures/user_actions.lua.
+# LX: gestures/engine/user_actions.lua.
 user_action_output_bytes = 65536
 
 # Encoded log lines the macOS log transport prepares in one tick, also the

@@ -154,7 +154,7 @@ content = [
 	'"platform\.input\.evdev_reader"',
 	'"platform\.input\.keyboard_hook"',
 	'"modules\.hotstrings\.device_finder"',
-	'"modules\.gestures\.touchpad_finder"',
+	'"gestures\.adapters\.touchpad_finder"',
 ]
 
 [detection.linux.evdev.owners]
@@ -184,13 +184,13 @@ content = [
 "platform/remap/tap_hold_manager.lua" = ["tap_holds.*", "mod_combos.*", "shortcuts.key_combination_taps.*", "category_enabled.key_combinations"]
 "modules/keystats/" = ["metrics.**"]
 # The touchpad reader and the gesture actions.
-"modules/gestures/" = ["gestures.**"]
+"gestures/" = ["gestures.**"]
 
 [detection.linux.evdev.plumbing]
 "platform/input/" = "the evdev and uinput adapters the owners call"
 "ergopti_hotstrings.lua" = "the daemon entry point that wires the owners"
 "ui/healthcheck/" = "the health check probes the device access"
-"ui/menu/menu_gestures.lua" = "the gestures menu edits the settings"
+"gestures/ui/menu/gestures.lua" = "the gestures menu edits the settings"
 "core/ui/ui/modal.lua" = "releases the grab while a dialog is open, for every feature alike"
 "ui/physical_shortcuts/" = "the shortcut editor captures one key combination to store it"
 
@@ -203,7 +203,7 @@ content = ['/dev/uinput', 'UI_DEV_CREATE', '"platform\.input\.uinput_writer"', '
 "modules/dynamic_hotstrings/" = ["hotstrings.dynamic.*"]
 "modules/shortcuts/manager.lua" = ["shortcuts.**"]
 "platform/remap/tap_hold_manager.lua" = ["tap_holds.*", "mod_combos.*", "shortcuts.key_combination_taps.*", "category_enabled.key_combinations"]
-"modules/gestures/combo_emitter.lua" = ["gestures.**"]
+"gestures/engine/combo_emitter.lua" = ["gestures.**"]
 
 [detection.linux.uinput.plumbing]
 "adapters/" = "the evdev and uinput adapters the owners call"
@@ -215,10 +215,10 @@ content = ['/dev/uinput', 'UI_DEV_CREATE', '"platform\.input\.uinput_writer"', '
 content = ['["\x27]xdotool[ "\x27]']
 
 [detection.linux.xdotool.owners]
-"modules/gestures/" = ["gestures.*"]
+"gestures/" = ["gestures.*"]
 "adapters/window_switch.lua" = ["gestures.*"]
 # The active file manager window behind the open_terminal_here and
-# new_text_file_here gesture actions (modules/gestures/system_actions.lua).
+# new_text_file_here gesture actions (gestures/engine/system_actions.lua).
 "core/fs/adapters/file_manager_folder.lua" = ["gestures.*"]
 "core/ui/ui/tooltip/preview.lua" = [
 	"hotstrings.preview_ai_enabled",
@@ -235,8 +235,8 @@ content = ['["\x27]xdotool[ "\x27]']
 content = ['["\x27]wmctrl[ "\x27]', 'has_command\("wmctrl"']
 
 [detection.linux.wmctrl.owners]
-"modules/gestures/system_actions.lua" = ["gestures.*"]
-"modules/gestures/workspace_switcher.lua" = ["gestures.*"]
+"gestures/engine/system_actions.lua" = ["gestures.*"]
+"gestures/adapters/workspace_switcher.lua" = ["gestures.*"]
 
 [detection.linux.wmctrl.plumbing]
 "platform/focus/window_info.lua" = "the window list answers through libxcb in process; wmctrl is only its fallback when libxcb is missing"

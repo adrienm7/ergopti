@@ -73,8 +73,8 @@ local function run_every_action(Gestures, ids, configure)
 	local Logger = require("core.logger.engine.shim")
 	local saved = {
 		debug = Logger.debug, warn = Logger.warn,
-		emitter = package.loaded["modules.gestures.combo_emitter"],
-		manager = package.loaded["modules.gestures.manager"],
+		emitter = package.loaded["gestures.engine.combo_emitter"],
+		manager = package.loaded["gestures.engine.manager"],
 		shortcuts = package.loaded["modules.shortcuts.manager"],
 		webview = package.loaded["core.ui.ui.webview_manager"], popen = io.popen,
 	}
@@ -86,7 +86,7 @@ local function run_every_action(Gestures, ids, configure)
 	end
 	Logger.debug = function(_, fmt) spy(fmt) end
 	Logger.warn = function(_, fmt) spy(fmt) end
-	package.loaded["modules.gestures.combo_emitter"] = {
+	package.loaded["gestures.engine.combo_emitter"] = {
 		press = function(combo) pressed[current] = combo; return true end,
 	}
 	package.loaded["core.ui.ui.webview_manager"] = { show = function() return true end }
@@ -94,7 +94,7 @@ local function run_every_action(Gestures, ids, configure)
 		return { read = function() return "selection" end, close = function() return true end }
 	end
 	local ok, err = pcall(with_recorded_shell, function()
-		Gestures = helpers.load_module("modules.gestures.manager")
+		Gestures = helpers.load_module("gestures.engine.manager")
 		if configure then configure(Gestures) end
 		for _, id in ipairs(ids) do
 			current = id
@@ -102,8 +102,8 @@ local function run_every_action(Gestures, ids, configure)
 		end
 	end)
 	Logger.debug, Logger.warn = saved.debug, saved.warn
-	package.loaded["modules.gestures.combo_emitter"] = saved.emitter
-	package.loaded["modules.gestures.manager"] = saved.manager
+	package.loaded["gestures.engine.combo_emitter"] = saved.emitter
+	package.loaded["gestures.engine.manager"] = saved.manager
 	package.loaded["modules.shortcuts.manager"] = saved.shortcuts
 	package.loaded["core.ui.ui.webview_manager"] = saved.webview
 	io.popen = saved.popen

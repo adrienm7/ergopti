@@ -23,7 +23,7 @@ local function read_corpus()
 end
 
 local Shortcuts = helpers.load_module("modules.shortcuts.manager")
-local Gestures = helpers.load_module("modules.gestures.manager")
+local Gestures = helpers.load_module("gestures.engine.manager")
 
 helpers.describe("wrap_selection parameter replays the shared wrap-pair corpus", function()
 	local corpus = read_corpus()

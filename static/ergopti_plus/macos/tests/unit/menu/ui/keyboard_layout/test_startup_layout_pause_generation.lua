@@ -145,7 +145,7 @@ package.loaded["tray.adapters.menu"] = {
 package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = { request_exit = function() return true end }
 
 for _, module_name in ipairs({
-	"ui.menu.menu_gestures",
+	"gestures.ui.menu.gestures",
 	"ui.menu.menu_shortcuts",
 	"ui.menu.menu_hotstrings",
 	"ui.menu.menu_metrics",
@@ -171,7 +171,7 @@ package.loaded["ai.engine"] = { set_backend = function() end }
 package.loaded["modules.keystats"] = {}
 package.loaded["modules.shortcuts"] = shortcuts
 package.loaded["modules.dynamic_hotstrings"] = {}
-package.loaded["modules.gestures"] = {}
+package.loaded["gestures.engine"] = {}
 package.loaded["infra.personal_shortcuts"] = { load = function() end }
 
 package.loaded["core.events.timer_scheduler"] = nil

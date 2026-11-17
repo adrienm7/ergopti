@@ -24,7 +24,7 @@ local MODULES = {
 	"core.fs.adapters.file_system",
 	"core.fs.engine.paths",
 	"core.logger.engine.logger",
-	"modules.gestures.actions",
+	"gestures.engine.actions",
 	"modules.shortcuts.keyboard_shortcuts",
 }
 
@@ -54,7 +54,7 @@ local function with_subject(store, scenario)
 	}
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "catalogue.json" end }
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.actions"] = {
 		is_assignable = function(action_id) return OFFERED[action_id] == true end,
 		execute_single = function() return true end,
 	}

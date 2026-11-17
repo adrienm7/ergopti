@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: App Switch Desk Fixture
 --- DESCRIPTION:
---- Serves a desk of windows to modules/gestures/app_switch.lua through a
+--- Serves a desk of windows to gestures/engine/app_switch.lua through a
 --- recording window adapter, and dispatches actions through the real registry
 --- the way a gesture does, firing the switch the action schedules.
 --- ==============================================================================
@@ -17,7 +17,7 @@ M.LEFT_SCREEN, M.RIGHT_SCREEN = 1, 2
 local INJECTED = {
 	"platform.focus.window_manager",
 	"adapters.mouse_control",
-	"modules.gestures.app_switch",
+	"gestures.engine.app_switch",
 }
 
 --- @return table A standard, visible window record.
@@ -61,7 +61,7 @@ function M.with_desk(desk, body)
 	package.loaded["adapters.mouse_control"] = {
 		screen_id_under_cursor = function() return desk.cursor_screen end,
 	}
-	package.loaded["modules.gestures.app_switch"] = nil
+	package.loaded["gestures.engine.app_switch"] = nil
 	local ok, err = xpcall(body, debug.traceback, focused)
 	for _, name in ipairs(INJECTED) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end

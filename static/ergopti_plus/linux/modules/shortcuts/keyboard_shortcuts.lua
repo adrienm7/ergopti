@@ -801,7 +801,7 @@ end
 --- @param hit table The record match() returned.
 local function fire(hit, valid)
 	Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", hit.slot, hit.action)
-	local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+	local ok_gestures, Gestures = pcall(require, "gestures.engine.manager")
 	if ok_gestures and type(Gestures.execute_action) == "function" then
 		if valid ~= nil and valid() ~= true then return false end
 		pcall(Gestures.execute_action, hit.action, M.binding_id(hit.slot))

@@ -151,11 +151,11 @@ const input = {
 		linux: luaManifestSource('linux'),
 		ahk: read('windows/_generated/features_manifest.ahk')
 	},
-	hs: read('macos/modules/gestures/actions.lua'),
+	hs: read('macos/gestures/engine/actions.lua'),
 	hsSave: read('macos/modules/shortcuts/actions/screenshot_save.lua'),
-	ahk: read('windows/modules/gestures/screenshots.ahk'),
-	ahkActions: read('windows/modules/gestures/actions.ahk'),
-	linux: read('linux/modules/gestures/manager.lua')
+	ahk: read('windows/gestures/adapters/screenshots.ahk'),
+	ahkActions: read('windows/gestures/engine/actions.ahk'),
+	linux: read('linux/gestures/engine/manager.lua')
 };
 
 const result = validate(input);

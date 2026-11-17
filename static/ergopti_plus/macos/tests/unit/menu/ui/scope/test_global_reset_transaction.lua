@@ -402,7 +402,7 @@ helpers.describe("gesture scope menu composition", function()
 				dialog_args = { ... }
 				return selected
 			end }
-			package.loaded["ui.menu.gesture_scope"] = { new = function(options)
+			package.loaded["gestures.ui.menu.scope"] = { new = function(options)
 				received = options
 				return { apply = function(mode)
 					return options.admission("gesture scope fixture", function()

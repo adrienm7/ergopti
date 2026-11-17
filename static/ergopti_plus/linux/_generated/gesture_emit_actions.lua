@@ -6,7 +6,7 @@
 --- MODULE: Gesture Emit Actions (Linux)
 --- DESCRIPTION:
 --- Every action Linux performs as a single xdotool key combo, as
---- action id -> combo. modules/gestures/manager.lua looks the action up here
+--- action id -> combo. gestures/engine/manager.lua looks the action up here
 --- instead of carrying one elseif branch per action.
 ---
 --- The combos are X11 keysym syntax and are Linux's own: `Return`, not AHK's

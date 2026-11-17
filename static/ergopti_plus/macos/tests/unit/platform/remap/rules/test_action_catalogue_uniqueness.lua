@@ -18,7 +18,7 @@ local function with_config_fixture(callback)
 			"platform.remap.config",
 			"platform.remap.defaults",
 			"modules.keymap.layout",
-			"modules.gestures.actions",
+			"gestures.engine.actions",
 			"core.fs.adapters.file_system",
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
@@ -68,7 +68,7 @@ local function with_config_fixture(callback)
 				default_virtual_keyboard_product = function() return "ansi" end,
 				key_code_for_char = function(char) return char end,
 			}
-			package.loaded["modules.gestures.actions"] = {
+			package.loaded["gestures.engine.actions"] = {
 				karabiner_aliases = function() return {} end,
 			}
 			package.loaded["core.fs.adapters.file_system"] = {

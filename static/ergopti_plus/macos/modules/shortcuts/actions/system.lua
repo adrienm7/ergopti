@@ -51,7 +51,7 @@ local SHORTCUT_ACTION_PARENT = "shortcut_bindings"
 -- event tap — long enough for macOS to disable it (kCGEventTapDisabledByTimeout).
 local KEYSTROKE_NO_DELAY_US = 0
 
-local ok_gestures, gestures = pcall(require, "modules.gestures")
+local ok_gestures, gestures = pcall(require, "gestures.engine")
 if not ok_gestures then gestures = nil end
 
 local text_acts = require("modules.shortcuts.actions.text")

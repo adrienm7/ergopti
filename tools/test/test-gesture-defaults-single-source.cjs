@@ -40,9 +40,9 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const read = (rel) => fs.readFileSync(path.join(SP, rel), 'utf8');
 
-const MACOS_FILE = 'macos/modules/gestures/init.lua';
-const WINDOWS_FILE = 'windows/modules/gestures/actions.ahk';
-const WINDOWS_SLOTS_FILE = 'windows/modules/gestures/constants.ahk';
+const MACOS_FILE = 'macos/gestures/engine/init.lua';
+const WINDOWS_FILE = 'windows/gestures/engine/actions.ahk';
+const WINDOWS_SLOTS_FILE = 'windows/gestures/engine/constants.ahk';
 
 const errors = [];
 
@@ -237,7 +237,7 @@ function quoted(body) {
 // ==================================================
 // ==================================================
 
-const linuxSource = read('linux/modules/gestures/manager.lua');
+const linuxSource = read('linux/gestures/engine/manager.lua');
 if (
 	!linuxSource.includes(
 		'M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)'
@@ -310,9 +310,9 @@ const gestureSources = (dir) =>
 		: [];
 for (const rel of [
 	...gestureSources('_shared/gestures/engine'),
-	...gestureSources('macos/modules/gestures'),
-	...gestureSources('linux/modules/gestures'),
-	...gestureSources('windows/modules/gestures')
+	...gestureSources('macos/gestures'),
+	...gestureSources('linux/gestures'),
+	...gestureSources('windows/gestures')
 ]) {
 	read(rel)
 		.split('\n')

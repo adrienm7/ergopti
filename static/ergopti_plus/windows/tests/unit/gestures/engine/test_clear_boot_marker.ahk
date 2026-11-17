@@ -1,0 +1,171 @@
+﻿; tests/unit/gestures/engine/test_clear_boot_marker.ahk
+
+; The restart copy exercises the real marker reader and consumer without arming
+; a native timer or touching PrecisionTouchPad registry settings.
+_GestureClearBootMarker(Scope, Mode, Outcome := "complete") {
+	global _PersonalShortcutsRegistry, KeyboardShortcutAssignments, GestureActionParameters, _SharedDir
+	global GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS
+	global ConfigurationFile
+	OldRegistry := IsSet(_PersonalShortcutsRegistry) ? _PersonalShortcutsRegistry : unset
+	OldKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
+	OldParameters := IsSet(GestureActionParameters) ? GestureActionParameters : unset
+	OldConfigurationFile := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	; Supply queued intent before the real current-schema cohort boots.
+	QueuedGestureSource := '[gestures]`nenabled = true`ntap_4 = "open_url"`nauto_configure_on_next_start = true`nunknown_user = "keep"`n'
+	Fixture := _HotstringsScopeFixture(1, QueuedGestureSource)
+	Original := Fixture.source
+	Assert(FSWriteDurable(Fixture.path, Original))
+	TapPath := Fixture.directory . "\tap_hold.toml"
+	Assert(FSWriteDurable(TapPath, '[tap_hold.keys.space]`ntap_action = "open_url"`n'))
+	Fixture.options["tap_hold_path"] := TapPath
+	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\data\defaults.toml"
+	Bundle := 0, Accepted := 0, Refusal := 0, Launches := 0, Backups := 0
+	Launch(Success, Borrowed, Refused) {
+		Bundle := Borrowed, Accepted := Success, Refusal := Refused, Launches += 1
+		return true
+	}
+	Backup(Path, Content) {
+		Backups += 1
+		return Outcome == "backup" ? false : FSWriteCreateDurable(Path, Content)
+	}
+	Fixture.options["reload"] := Launch, Fixture.options["backup"] := Backup
+	Scheduled := 0
+	Schedule(Action, Delay) {
+		Scheduled += 1
+		AssertEqual("_DeferredGestureAutoConfigure", Action.Name)
+		AssertEqual(-GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS, Delay)
+	}
+	try {
+		AssertContains(Original, QueuedGestureSource, "boot retains the exact original queued gesture bytes")
+		_PersonalShortcutsRegistry := Map("__Order", [])
+		KeyboardShortcutAssignments := Map(), GestureActionParameters := Map()
+		Receipt := Scope == "global" ? ConfigGlobalScopeApply(Mode, Fixture.options)
+			: _GES_ApplyScope(Mode, Fixture.options)
+		Assert(Backups > 0, "the actual admitted writer must reach its backup boundary")
+		if Outcome == "backup" {
+			AssertEqual(0, Launches)
+			AssertEqual("refused", Receipt["status"])
+		} else {
+			AssertEqual(1, Launches)
+			AssertEqual("pending", Receipt["status"])
+			if Outcome == "refused" {
+				Refusal.Call("native replacement refused")
+				AssertEqual("refused", Receipt["status"])
+			} else {
+				Accepted.Call()
+				AssertEqual("committed", Receipt["status"])
+			}
+		}
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		if Outcome != "complete"
+			AssertEqual(Original, FSReadUtf8Exact(Fixture.path), "refusal restores the exact queued intent")
+		RestartPath := Fixture.directory . "\restart-config.toml"
+		RestartSource := FSReadUtf8Exact(Fixture.path)
+		Assert(FSWriteDurable(RestartPath, RestartSource))
+		PreviousConfigurationFile := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+		try {
+			ConfigurationFile := RestartPath
+			RestartDocument := TOML_ParseDocument(RestartSource)
+			AssertTrue(RestartDocument["_meta"]["schema_version"] is Integer,
+				"the copied restart source retains its actual typed schema metadata")
+			AssertEqual(ConfigMigrateCurrentVersion(), RestartDocument["_meta"]["schema_version"],
+				"the actual copied restart source is current before its own native boot")
+			RestartBoot := ConfigMigrateBoot(RestartPath)
+			AssertEqual("current", RestartBoot["status"], "the independent restart destination completes actual native startup")
+			AssertEqual(0, RestartBoot["read_only"])
+			AssertTrue(FSUtf8ExactMatches(RestartPath, RestartSource), "current-schema restart preserves the copied source exactly")
+			Parsed := TOML_ParseFreshFile(RestartPath)
+			AssertEqual("keep", Parsed["gestures"]["unknown_user"])
+			AssertEqual("keep", Parsed["private"]["credential"])
+			if Mode == "recommended" && Outcome == "complete"
+				AssertEqual("alt_tab_monitor", Parsed["gestures"]["tap_4"], "explicit restore imports the monitor-local tap")
+			; The clear once deleted the switch with the assignments, so the next
+			; gesture the user set did nothing until the switch was found again.
+			if Mode == "clear" && Outcome == "complete" {
+				Assert(!Parsed["gestures"].Has("tap_4"), "the clear removes the assignments")
+				AssertEqual(true, Parsed["gestures"]["enabled"],
+					Scope . " clear owns the assignments, not the Gestures switch (gestures-clear-keeps-switch)")
+			}
+			Raw := IniCacheGet(Parsed, "gestures", "auto_configure_on_next_start")
+			if _GestureAutoConfigureFlagEnabled(Raw)
+				Assert(GestureConsumeAutoConfigureFlag(RestartPath, 0, (*) => 0, Schedule))
+			Expected := Mode == "clear" && Outcome == "complete" ? 0 : 1
+			AssertEqual(Expected, Scheduled, "a completed Clear cannot schedule native setup on the next boot")
+			if Expected == 0
+				Assert(!Parsed["gestures"].Has("auto_configure_on_next_start"), "Clear must remain sparse")
+		} finally {
+			ConfigurationFile := IsSet(PreviousConfigurationFile) ? PreviousConfigurationFile : unset
+		}
+	} finally {
+		ConfigurationFile := IsSet(OldConfigurationFile) ? OldConfigurationFile : unset
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_PersonalShortcutsRegistry := IsSet(OldRegistry) ? OldRegistry : unset
+		KeyboardShortcutAssignments := IsSet(OldKeyboard) ? OldKeyboard : unset
+		GestureActionParameters := IsSet(OldParameters) ? OldParameters : unset
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("gesture-clear-boot: completed Gestures Clear cancels queued native setup", _GestureClearBootMarker.Bind("gestures", "clear"))
+Test("gesture-clear-boot: completed global Clear cancels queued native setup", _GestureClearBootMarker.Bind("global", "clear"))
+Test("gesture-clear-boot: explicit Gestures Restore preserves queued authorization", _GestureClearBootMarker.Bind("gestures", "recommended"))
+Test("gesture-clear-boot: explicit global Restore preserves queued authorization", _GestureClearBootMarker.Bind("global", "recommended"))
+Test("gesture-clear-boot: native refusal restores the queued Gestures intent", _GestureClearBootMarker.Bind("gestures", "clear", "refused"))
+Test("gesture-clear-boot: backup refusal preserves the queued global intent", _GestureClearBootMarker.Bind("global", "clear", "backup"))
+Test("gesture-clear-boot: native refusal restores the queued global intent", _GestureClearBootMarker.Bind("global", "clear", "refused"))
+Test("gesture-clear-boot: backup refusal preserves the queued Gestures intent", _GestureClearBootMarker.Bind("gestures", "clear", "backup"))
+
+_GMBA_ActualBootMarker(Mode) {
+	global ConfigurationFile, _ConfigBootReadFailed, GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS
+	SavedPath := ConfigurationFile, SavedFailed := _ConfigBootReadFailed
+	Root := A_Temp . "\ergopti_gesture_marker_admission_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\config.toml", Created := false
+	Scheduled := []
+	Schedule(Action, Delay) {
+		AssertEqual("_DeferredGestureAutoConfigure", Action.Name)
+		AssertEqual(-GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS, Delay)
+		Scheduled.Push({ callback: Action, delay: Delay })
+	}
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		RawSource := Mode == "numeric-one" ? "1" : Mode == "true-control" ? "true" : "false"
+		Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n[gestures]`nauto_configure_on_next_start = " . RawSource . "`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		ConfigurationFile := Path
+		Boot := ConfigMigrateBoot(Path)
+		AssertEqual("current", Boot["status"])
+		Cache := ParseConfigTomlFile(Path)
+		Snapshot := ConfigTomlBootSnapshot(Cache)
+		AssertTrue(IsObject(Snapshot))
+		Authored := Snapshot.Document["gestures"]["auto_configure_on_next_start"]
+		if Mode == "numeric-one"
+			AssertTrue(Authored is Integer && Authored == 1, "legacy bare1 retains the genuine source integer shape")
+		else
+			AssertTrue(Authored is TOML_Bool)
+		Raw := IniCacheGet(Cache, "gestures", "auto_configure_on_next_start")
+		; The real module's exact boot gate and real durable consumer, with only
+		; the existing scheduling port observed instead of starting hardware work.
+		if _GestureAutoConfigureFlagEnabled(Raw)
+			AssertTrue(GestureConsumeAutoConfigureFlag(Path, 0, (*) => 0, Schedule))
+		; The private owner accepts bare1 as legacy intent, like native true.
+		Expected := Mode == "false-control" ? 0 : 1
+		AssertEqual(Expected, Scheduled.Length, "native true and the private owner's legacy bare1 schedule exactly one setup")
+		if Expected {
+			Persisted := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			AssertTrue(Persisted["gestures"]["auto_configure_on_next_start"] is TOML_Bool)
+			AssertFalse(Persisted["gestures"]["auto_configure_on_next_start"].Value)
+		} else
+			AssertEqual(Source, FSReadUtf8Exact(Path), "a rejected marker is not consumed or rewritten")
+	} finally {
+		ConfigurationFile := SavedPath, _ConfigBootReadFailed := SavedFailed
+		if Created {
+			try _TOML_InvalidateParseCache(Path)
+			finally DirDelete(Root, true)
+		}
+	}
+}
+for _GMBA_Mode in ["numeric-one", "true-control", "false-control"]
+	Test("gesture actual boot marker admission: " . _GMBA_Mode, _GMBA_ActualBootMarker.Bind(_GMBA_Mode))

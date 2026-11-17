@@ -24,8 +24,8 @@ helpers.describe("scroll emergency reset", function()
 	-- ============================================================
 
 	helpers.it("engine.lua must export M.emergency_reset() for scroll unblock on crash", function()
-		local src = read_source("local function triggerLiveAxisIfNeeded") -- modules/gestures/engine.lua
-		assert(src, "modules/gestures/engine.lua must be readable")
+		local src = read_source("local function triggerLiveAxisIfNeeded") -- gestures/engine/engine.lua
+		assert(src, "gestures/engine/engine.lua must be readable")
 		-- The bug: process_frame can crash after startScrollBlock(); isBlockingScroll
 		-- stays true forever because no cleanup runs on the error path.
 		-- The fix: export M.emergency_reset() which calls resetGS() (and thus
@@ -46,8 +46,8 @@ helpers.describe("scroll emergency reset", function()
 	-- ======================================================================
 
 	helpers.it("gestures/init.lua frame callback must call emergency_reset on process_frame error", function()
-		local src = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
-		assert(src, "modules/gestures/init.lua must be readable")
+		local src = read_source("local function schedule_emergency_recycle") -- gestures/engine/init.lua
+		assert(src, "gestures/engine/init.lua must be readable")
 		-- The fix adds: if not Logger.pcall(...) then pcall(Engine.emergency_reset) end
 		assert(
 			src:find("Engine%.emergency_reset", 1, false),

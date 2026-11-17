@@ -7,9 +7,9 @@
 --- resting thumb joining two swiping fingers turned a two-finger swipe into a
 --- three-finger one and fired tab_close, and a thumb beside a two-finger tap
 --- fired tap_3 (Mac field report of 2026-11-05: that contact sat about 60 mm
---- from the pair). The macOS engine (modules/gestures/engine.lua) asks this
+--- from the pair). The macOS engine (gestures/engine/engine.lua) asks this
 --- module at both of its join paths and at the three-finger tap commit, and the
---- Linux decoder (modules/gestures/mt_decoder.lua) before a count of three
+--- Linux decoder (gestures/engine/mt_decoder.lua) before a count of three
 --- becomes the gesture's, in millimetres on both: the macOS trackpad reports
 --- them, and the Linux decoder converts evdev units with the pad's resolution.
 ---

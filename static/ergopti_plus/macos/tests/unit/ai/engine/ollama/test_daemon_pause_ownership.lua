@@ -220,8 +220,8 @@ local function load_fixture()
 		end,
 		resume_warmup = function() return true end,
 	}
-	package.loaded["modules.gestures.engine"] = {}
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.engine"] = {}
+	package.loaded["gestures.engine.actions"] = {
 		SG_NAMES = {}, AX_NAMES = {},
 		get_label = function(value) return value end,
 		execute_single = function() return true end,

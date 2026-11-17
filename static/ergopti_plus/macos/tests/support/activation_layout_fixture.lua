@@ -34,7 +34,7 @@ local STUB_MODULES = {
 	"platform.input.hotkey_registrar",
 	"core.events.timer_scheduler",
 	"modules.keystats.kc_bridge",
-	"modules.gestures.engine",
+	"gestures.engine.engine",
 	"modules.shortcuts",
 	"hs.caffeinate.watcher",
 	"hs",
@@ -385,7 +385,7 @@ local function with_remap(options, body)
 				return true
 			end,
 		}
-		package.loaded["modules.gestures.engine"] = {}
+		package.loaded["gestures.engine.engine"] = {}
 		package.loaded["modules.shortcuts"] = {
 			is_paused = function()
 				if type(calls.pause_queries_until_failure) == "number" then

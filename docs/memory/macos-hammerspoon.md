@@ -930,7 +930,7 @@ The shortcut layer's text, mouse, app-navigation and pixel owners keep one
 admission scope per action parent: "shortcut_bindings" when no parent is named
 (bindings.lua and keyboard slots), "gestures" for gesture dispatch. A gesture
 action passes `current_action_parent()` and its owner must be listed in
-`scoped_action_children()` of `modules/gestures/actions.lua`; a global owner
+`scoped_action_children()` of `gestures/engine/actions.lua`; a global owner
 there would let one feature's PAUSE settle or fence the other's work.
 Keep-awake is the deliberate exception: one machine session that stops at the
 first physical input.
@@ -1262,7 +1262,7 @@ one gesture did nothing and a quick second one left the switcher open. The
 switcher follows the Command key's own press and release, which the posted
 keystroke never sends; Karabiner's `cmd_tab` works because its virtual keyboard
 presses and releases Command. Action: switch applications from Lua
-(`modules/gestures/app_switch.lua`, window reads in
+(`gestures/engine/app_switch.lua`, window reads in
 `platform/focus/window_manager.lua`), never by posting Cmd+Tab or Cmd+Shift+Tab.
 
 ### project-hs-f17-actions-are-told-apart-by-modifiers
@@ -1368,7 +1368,7 @@ build or an owned relaunch helper can remove the window.
 
 The gestures native runtime (touch watchers, primer eventtap, discovery and
 30 s health-check timer, wake watcher) exists only while Gestures is ON:
-`modules/gestures/init.lua` `enable_all()` acquires it through `start()` and
+`gestures/engine/init.lua` `enable_all()` acquires it through `start()` and
 `disable_all()` releases it. Boot never calls `gestures.start()`; the menu's
 preference sync does it. Before 2026-09, boot started it unconditionally and OFF
 only cleared a flag, so the taps and "Health-check tick" lines kept running with
@@ -1380,7 +1380,7 @@ Gestures off; such a line now proves Gestures was ON. Test doubles:
 A pair of contacts is the native scroll. Until 2026-10 the engine promoted a
 third contact joining a pair on ONE frame, and a count drop shifted startPos
 without endPos, so a palm touching below two scrolling fingers committed a
-vertical three-finger swipe (tab switching). `modules/gestures/engine.lua` now
+vertical three-finger swipe (tab switching). `gestures/engine/engine.lua` now
 lets a third finger join a pair only before the pair has scrolled (direction
 locked, `Geometry.SWIPE_MIN_2` travelled, a macOS scroll phase) and within
 `multi_finger_landing_ms`, once it held `pair_join_confirm_ms`; checks that every
@@ -1392,7 +1392,7 @@ momentum phase or a locked pair lifting. A first stricter tuning (4 frames plus
 scroll phase) missed deliberate swipes on the maintainer's Mac. Every refusal
 logs `Three-finger candidate rejected by <gate>: <value>` once per touch. The
 Linux `mt_decoder.lua` applies the same rules. Gesture time is the frame's
-capture time (`modules/gestures/frame_clock.lua`, from the touchdevice callback's
+capture time (`gestures/engine/frame_clock.lua`, from the touchdevice callback's
 stamp; Linux uses the SYN_REPORT kernel stamp): a stalled main thread delivers
 queued frames in one burst, which timed at delivery read 35 held frames as 2 ms.
 Comparisons with scroll events stay on delivery time. Momentum arms the guard
@@ -1408,7 +1408,7 @@ A click-drag text selection (one finger pressing the trackpad, another
 sliding, or a drag after tap to click) reaches the touch frames as two or more
 moving contacts. Until 2026-09 the engine fired the two-finger swipe action
 (`arrow_up` in the recommended preset) or a three-finger tap mid-drag, and the
-selection was lost. `modules/gestures/engine.lua` `process_frame` now hands
+selection was lost. `gestures/engine/engine.lua` `process_frame` now hands
 every frame from the first one with a button held
 (`adapters/mouse_control.lua` `any_button_down`) to the last lift to the
 pointer. Action: keep that guard ahead of any gesture state change, and never

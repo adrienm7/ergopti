@@ -1,5 +1,5 @@
 {
-	"_comment": "Independent existing macOS mode contract; caption snapshots captured from unchanged locale sources before migrating the native provider. Linux (modules/gestures/incremental_tracker.lua) and Windows (modules/gestures/raw_touchpad.ahk, raw HID digitizer reports) follow the fingers too and render the same rows. Native callbacks remain their existing owner.",
+	"_comment": "Independent existing macOS mode contract; caption snapshots captured from unchanged locale sources before migrating the native provider. Linux (gestures/engine/incremental_tracker.lua) and Windows (gestures/adapters/raw_touchpad.ahk, raw HID digitizer reports) follow the fingers too and render the same rows. Native callbacks remain their existing owner.",
 	"section": "gesture_slot_mode_commands",
 	"rows": [
 		{

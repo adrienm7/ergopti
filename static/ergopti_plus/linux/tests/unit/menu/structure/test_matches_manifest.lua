@@ -230,7 +230,7 @@ end
 --- Native editing is not exercised by this menu-shape fixture.
 local function build_fixture_menu(context)
 	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations",
-		"core.fs.adapters.storage", "ui.hotstring_editor.bridge", "ui.gesture_conflicts",
+		"core.fs.adapters.storage", "ui.hotstring_editor.bridge", "gestures.ui.conflicts",
 		"core.i18n.engine.i18n", "menu.engine.manifest_menu"}
 	local magic_path, editor_directory, editor_source, editor_fs
 	local original_getenv, original_i18n_safe = os.getenv, rawget(_G, "i18n_safe")
@@ -288,7 +288,7 @@ local function build_fixture_menu(context)
 		-- Native delegates retain module tables. This fixture's new producer must
 		-- share the exact current locale/manifest cohort used by its assertions.
 		package.loaded["core.i18n.engine.i18n"], package.loaded["menu.engine.manifest_menu"] = i18n, ManifestMenu
-		helpers.load_module("ui.gesture_conflicts")
+		helpers.load_module("gestures.ui.conflicts")
 		local built = with_live_source(context, function()
 			return with_api_source(function(builder) return builder.build(context) end)
 		end)
@@ -380,10 +380,10 @@ local function full_context()
 		gestures = {
 			-- The cached native status producer already consumed these collaborators.
 			-- A neutral reader and genuine defaults describe fixture state only.
-			DEFAULT_GESTURES = require("modules.gestures.manager").DEFAULT_GESTURES,
+			DEFAULT_GESTURES = require("gestures.engine.manager").DEFAULT_GESTURES,
 			is_reading     = function() return false end,
-			get_action_label = require("modules.gestures.manager").get_action_label,
-			slot_label     = require("modules.gestures.manager").slot_label,
+			get_action_label = require("gestures.engine.manager").get_action_label,
+			slot_label     = require("gestures.engine.manager").slot_label,
 			is_enabled     = function() return true end,
 			toggle         = noop,
 			get_action     = function() return nil end,
@@ -392,12 +392,12 @@ local function full_context()
 			get_sg_names   = function() return {} end,
 			-- Each swipe slot's mode and step rows, read from the genuine defaults:
 			-- without them the slot submenus drop the sensitivity header.
-			MODE_SINGLE           = require("modules.gestures.manager").MODE_SINGLE,
-			MODE_INCREMENTAL      = require("modules.gestures.manager").MODE_INCREMENTAL,
-			DEFAULT_MODES         = require("modules.gestures.manager").DEFAULT_MODES,
-			DEFAULT_SENSITIVITIES = require("modules.gestures.manager").DEFAULT_SENSITIVITIES,
-			get_mode        = function(slot) return require("modules.gestures.manager").DEFAULT_MODES[slot] end,
-			get_sensitivity = function(slot) return require("modules.gestures.manager").DEFAULT_SENSITIVITIES[slot] end,
+			MODE_SINGLE           = require("gestures.engine.manager").MODE_SINGLE,
+			MODE_INCREMENTAL      = require("gestures.engine.manager").MODE_INCREMENTAL,
+			DEFAULT_MODES         = require("gestures.engine.manager").DEFAULT_MODES,
+			DEFAULT_SENSITIVITIES = require("gestures.engine.manager").DEFAULT_SENSITIVITIES,
+			get_mode        = function(slot) return require("gestures.engine.manager").DEFAULT_MODES[slot] end,
+			get_sensitivity = function(slot) return require("gestures.engine.manager").DEFAULT_SENSITIVITIES[slot] end,
 			set_mode        = noop,
 			set_sensitivity = noop,
 		},
@@ -1509,19 +1509,19 @@ require("tests.lua.menu.disabled_reasons_contract").register(helpers, "linux")
 
 helpers.describe("Complete-menu gesture status fixture owns its native cohort", function()
 	helpers.it("rebuilds the native producer against current locale and manifest despite a stale loaded producer", function()
-		local previous = rawget(package.loaded, "ui.gesture_conflicts")
+		local previous = rawget(package.loaded, "gestures.ui.conflicts")
 		local stale = { rows = function() error("a stale gesture producer cannot own this fixture") end }
-		rawset(package.loaded, "ui.gesture_conflicts", stale)
+		rawset(package.loaded, "gestures.ui.conflicts", stale)
 		local ok, rows = pcall(build_full_menu, full_context())
-		helpers.assert_true(rawequal(rawget(package.loaded, "ui.gesture_conflicts"), stale), "the exact preceding module owner is restored")
-		rawset(package.loaded, "ui.gesture_conflicts", previous)
+		helpers.assert_true(rawequal(rawget(package.loaded, "gestures.ui.conflicts"), stale), "the exact preceding module owner is restored")
+		rawset(package.loaded, "gestures.ui.conflicts", previous)
 		if not ok then error(rows, 0) end
 		helpers.assert_not_nil(find_item(rows, i18n.get("gestures.system.unknown")), "the real native unknown-status parent survives the complete tray")
 	end)
 	helpers.it("provides the original reader ABI and genuine complete native defaults without starting input", function()
 		local context = full_context()
 		helpers.assert_eq(context.gestures.is_reading(), false)
-		helpers.assert_true(rawequal(context.gestures.DEFAULT_GESTURES, require("modules.gestures.manager").DEFAULT_GESTURES),
+		helpers.assert_true(rawequal(context.gestures.DEFAULT_GESTURES, require("gestures.engine.manager").DEFAULT_GESTURES),
 			"the fixture uses the actual current native slot inventory")
 		helpers.assert_true(next(context.gestures.DEFAULT_GESTURES) ~= nil, "a fabricated empty inventory cannot satisfy the fixture")
 		local rows = build_full_menu(context)

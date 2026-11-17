@@ -137,7 +137,7 @@ helpers.describe("a paused Linux driver records no keys (EDD-1)", function()
 			"the resume starts the focused application's time again")
 		helpers.assert_true(source:find("if system_metrics and not script_actions.is_paused() then", 1, true) ~= nil,
 			"the system day sampler waits for the resume")
-		helpers.assert_true(listener:find('require("modules.gestures.pointer_spotlight").dismiss()', 1, true) ~= nil,
+		helpers.assert_true(listener:find('require("gestures.engine.pointer_spotlight").dismiss()', 1, true) ~= nil,
 			"the pause ends the spotlight overlay, as on Windows and macOS")
 	end)
 end)

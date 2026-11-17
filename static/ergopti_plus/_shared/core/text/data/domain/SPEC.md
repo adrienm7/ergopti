@@ -91,7 +91,7 @@ Domain modules:
 | Terminators       | `lib/hotstrings/hotstring_prefix_watcher.ahk`     | `modules/keymap/terminators.lua`          |
 | PromptBuilder     | `ai/engine/api/common.ahk`                        | `ai/engine/prediction/prompt_builder.lua` |
 | ProfileSelector   | `ai/engine/settings/profiles.ahk`                 | `ai/engine/settings/profiles.lua`         |
-| GestureRecognizer | `modules/gestures.ahk` (registry-only)            | `modules/gestures/engine.lua`             |
+| GestureRecognizer | `modules/gestures.ahk` (registry-only)            | `gestures/engine/engine.lua`              |
 
 ---
 

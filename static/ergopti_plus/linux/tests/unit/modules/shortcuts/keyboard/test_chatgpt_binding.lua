@@ -29,11 +29,11 @@ local function with_binding(body, options)
 				open = function() error("shortcut ownership must not acquire evdev") end,
 				close = function() error("shortcut ownership must not close evdev") end,
 			}
-			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
+			package.loaded["gestures.ui.conflicts"] = { notify_boot = function() end }
 			local function reload()
 				for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-					"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.shortcuts.key_combinations", "modules.gestures.manager", "infra.shortcuts_scope" }) do package.loaded[name] = nil end
-				local gestures = require("modules.gestures.manager")
+					"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.shortcuts.key_combinations", "gestures.engine.manager", "infra.shortcuts_scope" }) do package.loaded[name] = nil end
+				local gestures = require("gestures.engine.manager")
 				gestures.init({ persist = true, config_path = path, enabled = false,
 					action_handlers = { script_reload = function() seen.other = seen.other + 1 end } })
 				local manager = require("modules.shortcuts.manager")

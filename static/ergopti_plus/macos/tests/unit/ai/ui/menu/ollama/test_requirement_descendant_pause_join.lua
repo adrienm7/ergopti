@@ -51,8 +51,8 @@ local OWNED_MODULES = {
 	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"core.network.adapters.http_client",
-	"modules.gestures.engine",
-	"modules.gestures.actions",
+	"gestures.engine.engine",
+	"gestures.engine.actions",
 	"modules.keystats",
 	"ai.engine",
 	"ai.engine.api.mlx",
@@ -371,8 +371,8 @@ local function with_fixture(callback)
 				is_right_altgr_held = function() return false end,
 				describe_held_modifiers = function() return "(none)" end,
 			}
-			package.loaded["modules.gestures.engine"] = {}
-			package.loaded["modules.gestures.actions"] = {
+			package.loaded["gestures.engine.engine"] = {}
+			package.loaded["gestures.engine.actions"] = {
 				get_label = function(name) return name end,
 				execute_single = function() return true end,
 				SG_NAMES = { "none", "script_pause_toggle" }, AX_NAMES = {},

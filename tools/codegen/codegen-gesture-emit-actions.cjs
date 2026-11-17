@@ -95,7 +95,7 @@ lines.push('; ==================================================================
 lines.push('; MODULE: Gesture Emit Actions (Windows)');
 lines.push('; DESCRIPTION:');
 lines.push('; Every action whose behaviour the shared catalogue fully describes: a key plus');
-lines.push('; modifiers, or a raw send sequence. modules/gestures/actions.ahk turns these');
+lines.push('; modifiers, or a raw send sequence. gestures/engine/actions.ahk turns these');
 lines.push('; into registry handlers at static-init, so nothing here runs on the boot path');
 lines.push('; and no TOML is parsed to register them.');
 lines.push(';');

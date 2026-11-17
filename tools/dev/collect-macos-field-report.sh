@@ -410,7 +410,7 @@ step listeners sh -c 'lsof -nP -iTCP -sTCP:LISTEN || true'
 step input_sources sh -c 'defaults read com.apple.HIToolbox AppleEnabledInputSources; defaults read com.apple.HIToolbox AppleSelectedInputSources'
 step user_layouts sh -c 'ls -la "${HOME}/Library/Keyboard Layouts" 2>&1'
 # The Trackpad and Dock gesture keys the gesture conflict read uses
-# (modules/gestures/conflicts.lua), read only: a slot macOS still takes after
+# (gestures/engine/conflicts.lua), read only: a slot macOS still takes after
 # "Restore recommended" reads against them. The Dock domain also lists the
 # user's applications, so only its gesture switches are read.
 step trackpad_gestures sh -c '

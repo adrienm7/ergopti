@@ -51,7 +51,7 @@ local function with_scope(body, source, options)
 	local ok, err = pcall(function()
 		Sandbox.with_config(source or SOURCE, function(path)
 			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.shortcuts.key_combinations", "modules.gestures.manager",
+				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.shortcuts.key_combinations", "gestures.engine.manager",
 				"infra.shortcuts_scope", "menu.ui.builder.builder" }) do
 				package.loaded[name] = nil
 			end
@@ -65,13 +65,13 @@ local function with_scope(body, source, options)
 				TOUCHPAD = "touchpad", close = function() controls.device_calls = controls.device_calls + 1; return false end,
 				open = function() controls.device_calls = controls.device_calls + 1; return false end,
 			}
-			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
+			package.loaded["gestures.ui.conflicts"] = { notify_boot = function() end }
 			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return true end,
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function(command) controls.executed[#controls.executed + 1] = command; return true end,
 			}
-			local gestures = require("modules.gestures.manager")
+			local gestures = require("gestures.engine.manager")
 			gestures.init({ persist = true, config_path = path, enabled = false })
 			gestures.execute_action = function(action, binding)
 				controls.executed[#controls.executed + 1] = action .. "@" .. binding

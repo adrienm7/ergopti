@@ -255,16 +255,16 @@ helpers.describe("combination binding canonical program dispatch",function()
 		end
 		publish()
 		local ok,err = pcall(function()
-			protected_modules({ ["modules.gestures.manager"]=false,
+			protected_modules({ ["gestures.engine.manager"]=false,
 				["core.fs.adapters.file_system"]={read_with_status=function() return state.bytes,"ok" end},
 				["modules.shortcuts.key_combinations"]={ get_action=state.owner.get_action,capture_action=state.owner.capture_action },
-				["modules.gestures.program_owner"]={new=function(capture) return {
+				["gestures.engine.program_owner"]={new=function(capture) return {
 					stop=function() return true end,run=function(slot) captured,admission = capture(slot); return captured ~= nil and admission() == true end,
 				} end},
 				["adapters.window_switch"]={new=function() return {stop=function() return true end} end},
-				["ui.gesture_conflicts"]={notify_boot=function() end},
+				["gestures.ui.conflicts"]={notify_boot=function() end},
 			},function()
-				local manager = require("modules.gestures.manager")
+				local manager = require("gestures.engine.manager")
 				manager.init({persist=true,enabled=false,config_path=config_path,is_paused=function() return state.paused end})
 				helpers.assert_eq(manager.get_action_parameter(binding,"run_program"),scalar)
 				helpers.assert_true(manager.run_program(binding)); helpers.assert_eq(captured,scalar)

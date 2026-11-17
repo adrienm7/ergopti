@@ -49,7 +49,7 @@ local TOOL_SECONDS = 10
 --- patterns are the canonical Logger lines "TS [LEVEL] [module] message".
 --- @type table { { step, name } } in report order
 M.ERROR_SIGNALS = {
-	-- modules/gestures/init.lua: a touch frame without the trackpad's stamp.
+	-- gestures/engine/init.lua: a touch frame without the trackpad's stamp.
 	{ step = "log_capture_stamp_errors", name = "capture_stamp" },
 	-- core/ui/ui/window_toggle.lua: a window-toggle action that could not act.
 	{ step = "log_window_toggle_errors", name = "window_toggle" },
@@ -79,7 +79,7 @@ M.COUNT_SIGNALS = {
 	-- ai/engine: an API entry restored without its Keychain key, then given one.
 	{ step = "log_api_key_absent", name = "api_key_absent" },
 	{ step = "log_api_key_reentered", name = "api_key_reentered" },
-	-- modules/gestures/engine.lua: a three-finger swipe slot that dispatched its action.
+	-- gestures/engine/engine.lua: a three-finger swipe slot that dispatched its action.
 	{ step = "log_gesture_swipe_dispatches", name = "swipe_dispatch" },
 	-- menu/ui/init.lua and the shared global composition: a committed restore or clear.
 	{ step = "log_scope_commits", name = "scope_commit" },

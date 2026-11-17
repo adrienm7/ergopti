@@ -93,7 +93,7 @@ if (files.length < 40) {
 //
 // Both encode the checkout's depth as a fact. The second is the one that
 // mattered: core/timing/engine/timings.lua, infra/wpm_constants.lua,
-// infra/personal_info_fields.lua and modules/gestures/manager.lua all used it,
+// infra/personal_info_fields.lua and gestures/engine/manager.lua all used it,
 // none was exempt, and none was ever reported — this guard printed "All 99
 // Linux module(s) reach _shared through core/fs/engine/paths.lua" while four did not.
 // On an installed package the driver sits flat in /usr/lib/ergopti, so three

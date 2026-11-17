@@ -36,7 +36,7 @@ const MODEL_SSOT = 'ai/engine/defaults.ahk';
 const MODEL_LITERAL = 'Qwen3.5-0.8B';
 // The GPT link literal must not be re-typed in the gesture action (it reads the
 // manifest-backed Features map instead).
-const GPT_FILE = 'modules/gestures/init.ahk';
+const GPT_FILE = 'gestures/engine/init.ahk';
 const GPT_LITERAL = 'chatgpt.com';
 
 // Strip AHK line comments (";" at line start or after whitespace) so a mention

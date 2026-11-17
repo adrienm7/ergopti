@@ -295,7 +295,7 @@ local MANIFEST_CHILD_TABLES = {
 function M.action_is_retired(value)
 	if value == "none" then return false end
 	if type(value) ~= "string" then return true, "the value is not an action id" end
-	local catalogue = package.loaded["modules.gestures.actions"]
+	local catalogue = package.loaded["gestures.engine.actions"]
 	if type(catalogue) ~= "table" or type(catalogue.is_assignable) ~= "function" then return false end
 	if catalogue.is_assignable(value) == true then return false end
 	return true, "action '" .. value .. "' no longer exists"
@@ -313,7 +313,7 @@ end
 --- @return boolean known
 --- @return string|nil detail
 local function action_parameter_fits(key, value)
-	local catalogue = package.loaded["modules.gestures.actions"]
+	local catalogue = package.loaded["gestures.engine.actions"]
 	if type(catalogue) ~= "table" or type(catalogue.split_action_parameter_key) ~= "function"
 		or type(catalogue.validate_action_parameter) ~= "function" then return true end
 	local binding, action = catalogue.split_action_parameter_key(key)

@@ -6,7 +6,7 @@
 --- The index maths of the previous/next desktop actions, for the macOS and
 --- Linux drivers: which desktop one step lands on, with or without wrapping at
 --- the edges. Windows ports the same rule in
---- windows/modules/gestures/virtual_desktops.ahk.
+--- windows/gestures/adapters/virtual_desktops.ahk.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Pure: the caller reads the current position and the desktop count from

@@ -27,7 +27,7 @@ local function save_once(source, mutate)
 		if not modules then
 			modules = {}
 			for key, name in pairs({ keymap = "modules.keymap", dyn_hot_mod = "modules.dynamic_hotstrings",
-				shortcuts_mod = "modules.shortcuts", gestures = "modules.gestures", keystats = "modules.keystats" }) do
+				shortcuts_mod = "modules.shortcuts", gestures = "gestures.engine", keystats = "modules.keystats" }) do
 				modules[key] = helpers.load_with_stubs(name)
 			end
 		end

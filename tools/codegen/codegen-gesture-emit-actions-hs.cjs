@@ -81,7 +81,7 @@ lines.push('--- ================================================================
 lines.push('--- MODULE: Gesture Emit Actions (macOS)');
 lines.push('--- DESCRIPTION:');
 lines.push('--- Every action macOS performs as a plain keystroke, as { key, mods } for');
-lines.push('--- hs.eventtap.keyStroke. modules/gestures/actions.lua registers these instead');
+lines.push('--- hs.eventtap.keyStroke. gestures/engine/actions.lua registers these instead');
 lines.push('--- of spelling each one out as its own closure.');
 lines.push('---');
 lines.push('--- These are macOS values, NOT shared ones. Of the 24 actions both drivers');

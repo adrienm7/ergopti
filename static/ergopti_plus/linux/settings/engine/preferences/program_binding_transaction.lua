@@ -27,7 +27,7 @@ end
 --- @return table owner Apply, retained debt and explicit compensation retry.
 function M.new(options)
 	assert(type(options) == "table" and type(options.is_paused) == "function", "program binding requires live pause ownership")
-	local parameters = options.parameters or require("modules.gestures.manager")
+	local parameters = options.parameters or require("gestures.engine.manager")
 	local binding, slot, section, provider = options.binding
 	local action = options.action == nil and "run_program" or options.action
 	local families = {

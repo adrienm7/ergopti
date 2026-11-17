@@ -6,7 +6,7 @@
 --- Turns what a file manager reports about its selection into absolute paths,
 --- for the file-selection actions (remove_quarantine_selection,
 --- make_executable_selection) of the macOS and Linux drivers. Windows reads
---- Explorer's SelectedItems through COM (modules/gestures/system_actions.ahk).
+--- Explorer's SelectedItems through COM (gestures/engine/system_actions.ahk).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Pure: the caller runs the native query and passes its text, so both
