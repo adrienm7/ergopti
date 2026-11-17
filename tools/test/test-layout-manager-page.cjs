@@ -32,6 +32,10 @@ const hostBridge = fs.readFileSync(path.join(SHARED, 'ui/host_bridge.js'), 'utf8
 const EDITOR_PAGE = path.join(SHARED, 'ui/layout_editor_window');
 const editorSource = fs.readFileSync(path.join(EDITOR_PAGE, 'script.js'), 'utf8');
 const editorHtml = fs.readFileSync(path.join(EDITOR_PAGE, 'index.html'), 'utf8');
+const infoPopoverSource = fs.readFileSync(
+	path.join(SHARED, 'ui/layout_analysis/info_popover.js'),
+	'utf8'
+);
 const LOCALE_DIR = path.join(SHARED, 'core/i18n/data/locales');
 const LOCALES = [
 	'ar',
@@ -150,6 +154,8 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 	const events = [];
 	const document = {
 		title: '',
+		// The page's declared language, the formatter's last resort.
+		documentElement: { lang: (/<html lang="([^"]+)"/.exec(page.html) || [])[1] },
 		events,
 		dispatchEvent: (event) => events.push(event),
 		getElementById: (id) => byId.get(id) || null,
@@ -209,7 +215,16 @@ function loadEditorPage() {
 	return loadPage({
 		html: editorHtml,
 		source: editorSource,
-		bridge: 'layout_editor_window_bridge'
+		bridge: 'layout_editor_window_bridge',
+		// The page's own Studio formatter (index.html loads it before script.js);
+		// a browser makes its top-level var a window property, as the second line does.
+		preludes: [
+			{ source: infoPopoverSource, filename: 'info_popover.js' },
+			{
+				source: 'window.LAYOUT_ANALYSIS_INFO = LAYOUT_ANALYSIS_INFO;',
+				filename: 'window-binding.js'
+			}
+		]
 	});
 }
 
