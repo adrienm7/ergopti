@@ -708,23 +708,52 @@ function scannerPatterns() {
 }
 
 /**
- * One table as JSON text. A token a text scanner would read as a forbidden word
- * (the trigram "uac" matches /\bUAC\b/, "hs." the purity scan) is written
- * with its first character as a \u escape: the same string to JavaScript, no
- * longer the word to a text scan.
+ * One token as a JSON string key. A token a text scanner would read as a
+ * forbidden word (the trigram "uac" matches /\bUAC\b/, "hs." the purity scan,
+ * the Rust word "completepowershell" the bundle's powershell ceiling) has the
+ * character where each match starts written as a \u escape: the same string to
+ * JavaScript, no longer the word to a text scan. Escaping only the first
+ * character missed a word inside a longer token.
+ * @param {string} token - The table token.
+ * @param {RegExp[]} patterns - From scannerPatterns().
+ * @returns {string} The JSON string text.
+ * @throws {Error} When escaping cannot hide a match.
+ */
+function keyText(token, patterns) {
+	const escaped = new Set();
+	for (let round = 0; round <= token.length; round++) {
+		// Each code unit's rendering and where it starts in the key text.
+		const pieces = [];
+		let text = '"';
+		for (let i = 0; i < token.length; i++) {
+			const piece = escaped.has(i)
+				? `\\u${token.charCodeAt(i).toString(16).padStart(4, '0')}`
+				: JSON.stringify(token[i]).slice(1, -1);
+			pieces.push(text.length);
+			text += piece;
+		}
+		text += '"';
+		const match = patterns.map((pattern) => pattern.exec(text)).find(Boolean);
+		if (!match) return text;
+		// The code unit whose rendering holds the start of the match (a match
+		// starting on the opening quote starts at the first code unit).
+		let unit = 0;
+		while (unit + 1 < pieces.length && pieces[unit + 1] <= match.index) unit++;
+		if (escaped.has(unit))
+			throw new Error(`the escaped token ${JSON.stringify(token)} still matches ${match[0]}`);
+		escaped.add(unit);
+	}
+	throw new Error(`no escaping hides the token ${JSON.stringify(token)} from the scanners`);
+}
+
+/**
+ * One table as JSON text, each key written by keyText().
  * @param {object} table - token → count.
  * @param {RegExp[]} patterns - From scannerPatterns().
  * @returns {string} The JSON object text.
  */
 function tableText(table, patterns) {
-	const entries = Object.entries(table).map(([token, n]) => {
-		let key = JSON.stringify(token);
-		if (patterns.some((pattern) => pattern.test(key))) {
-			const unit = token.charCodeAt(0).toString(16).padStart(4, '0');
-			key = `"\\u${unit}${JSON.stringify(token.slice(1)).slice(1)}`;
-		}
-		return `${key}:${n}`;
-	});
+	const entries = Object.entries(table).map(([token, n]) => `${keyText(token, patterns)}:${n}`);
 	return `{${entries.join(',')}}`;
 }
 

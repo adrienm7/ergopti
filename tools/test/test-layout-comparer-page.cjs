@@ -273,6 +273,28 @@ try {
 	refusedLine = true;
 }
 check(refusedLine, 'word list counts: a line without a count must be refused');
+// A scanned word inside a longer token is escaped where it starts, not only
+// at the token's first character (the Rust corpus word "completepowershell"
+// raised the exe bundle's powershell ceiling).
+{
+	const { corpusSource } = require('../codegen/codegen-layout-analysis-data-js.cjs');
+	const words = { completepowershell: 3, uac: 2, plain: 1 };
+	const source = corpusSource(
+		'scan_probe',
+		{ chars: { a: 1 }, bigrams: { ab: 1 }, trigrams: { abc: 1 }, words },
+		{ licence: 'test', attribution: 'test' }
+	);
+	check(!/powershell/i.test(source), 'corpus source: a scanned word inside a token is escaped');
+	check(!/\bUAC\b/i.test(source), 'corpus source: a scanned token is escaped');
+	const sandbox = {};
+	new Function('LAYOUT_ANALYSIS_CORPORA', source.replace(/^var LAYOUT_ANALYSIS_CORPORA.*$/m, ''))(
+		sandbox
+	);
+	check(
+		JSON.stringify(sandbox.scan_probe.words) === JSON.stringify(words),
+		`corpus source: escaped keys read back unchanged: ${JSON.stringify(sandbox.scan_probe?.words)}`
+	);
+}
 // Each shipped corpus shows the licence and attribution static/corpus/register.json records.
 for (const corpus of DATA.corpora)
 	check(
