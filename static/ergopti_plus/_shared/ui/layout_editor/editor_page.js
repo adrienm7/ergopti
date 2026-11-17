@@ -3787,12 +3787,17 @@ var LayoutEditorPage = (function () {
 					}
 					saveBytes(file, 'application/zip');
 				});
-			// Interoperability (coordinator, 2026-11-14): the KLA / KLAnext JSON and
-			// Kalamine TOML of the layout, each saying what it cannot hold.
+			// Interoperability (coordinator, 2026-11-14): the KLA / KLAnext JSON,
+			// Kalamine TOML, Oxeylyzer DOF, genkey and cmini files of the layout,
+			// each saying what it cannot hold. Every extension is one the app's
+			// hosts write (source.export_extensions of the layout defaults).
 			if (!preserved)
 				for (const [target, write, extension, mime] of [
 					['kla', klaExport, 'kla.json', 'application/json'],
-					['kalamine', LAYOUT_FORMATS.toKalamineToml, 'kalamine.toml', 'application/toml']
+					['kalamine', LAYOUT_FORMATS.toKalamineToml, 'kalamine.toml', 'application/toml'],
+					['dof', LAYOUT_FORMATS.toDof, 'dof', 'application/json'],
+					['genkey', LAYOUT_FORMATS.toGenkey, 'genkey.txt', 'text/plain'],
+					['cmini', LAYOUT_FORMATS.toCmini, 'cmini.json', 'application/json']
 				])
 					offer(target, () => {
 						let file;

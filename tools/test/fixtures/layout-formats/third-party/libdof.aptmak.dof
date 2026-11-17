@@ -1,0 +1,12 @@
+{
+    "name": "Aptmak",
+    "board": "colstag",
+    "layers": {
+        "main": [
+            "v w f p b  j l u y '",
+            "r s t h k  x n a i o",
+            "; c g d q  z m , . /",
+            "  ~ spc ~  ~ e ~     "
+        ]
+    }
+}

@@ -7,17 +7,20 @@
  * Reads the layout files people already have into the one layout shape the
  * analysis engine and the Studio use (what each physical key types on the
  * base, Shift, AltGr and Shift+AltGr layers, and the dead keys), writes that
- * shape back as an Ergopti layout source, a Keyboard Layout Analyzer JSON or a
- * Kalamine TOML. Every reader returns what it could not map instead of
- * guessing it. The formats are described in docs/design/layout-analysis.md.
+ * shape back as an Ergopti layout source, a Keyboard Layout Analyzer JSON, a
+ * Kalamine TOML, an Oxeylyzer DOF, a genkey layout or a cmini JSON. Every
+ * reader and writer returns what it could not map instead of guessing it. The
+ * formats are described in docs/design/layout-analysis.md.
  *
  * FEATURES & RATIONALE:
  * 1. Formats read: Keyboard Layout Analyzer JSON (KLA, KLAnext and their
- *    forks), Kalamine TOML and JSON (Ergo-L and its family), XKB symbols,
- *    Windows KLC, Oxeylyzer DOF, cmini JSON and plain rows of characters. A
- *    macOS .keylayout goes through the layout composer's reader, which the
- *    editor already loads. A KbdEdit .kbe is recognised and refused: its body
- *    is encrypted (KBE_SIGNATURE).
+ *    forks, on the standard, european, ErgoDox and KLAnext matrix boards),
+ *    Kalamine TOML and JSON (Ergo-L and its family), XKB symbols, Windows
+ *    KLC, Oxeylyzer DOF (libdof's boards, anchors and layers), genkey
+ *    layouts, cmini JSON and plain rows of characters. A macOS .keylayout
+ *    goes through the layout composer's reader, which the editor already
+ *    loads. A KbdEdit .kbe is recognised and refused: its body is encrypted
+ *    (KBE_SIGNATURE).
  * 2. Dead keys of the standard accents compose by Unicode normalisation (the
  *    accent's combining mark after the letter, NFC), the same table XKB's
  *    Compose and Kalamine's built-in dead keys hold for those accents; any
@@ -83,7 +86,11 @@ var LAYOUT_FORMATS = (function () {
 		'ligature',
 		'dead_key_rules',
 		'dead_key',
-		'multi_character'
+		'multi_character',
+		'layer',
+		'rule',
+		'special',
+		'character'
 	];
 	// XKB and Kalamine key names of the keys a layout defines.
 	const XKB_KEYS = (() => {
@@ -188,6 +195,118 @@ var LAYOUT_FORMATS = (function () {
 		],
 		['KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyB', 'KeyN', 'KeyM', 'Comma', 'Period', 'Slash']
 	];
+	// The boards of libdof (src/keyboard.rs, PhysicalKeyboard from FormFactor):
+	// each row's keys from the left, null for a key without a character (Tab,
+	// Caps, Shift, Enter, Backspace, the modifiers, ortho thumbs), the default
+	// anchor (dofinitions.rs, FormFactor::anchor) and, for the staggered ones,
+	// how many keys each row holds (a custom relative board of that shape is
+	// that board). On ISO, a 3x10 block's bottom row starts on the ISO key.
+	const DOF_BOARDS = (() => {
+		const number = [
+			'Backquote',
+			'Digit1',
+			'Digit2',
+			'Digit3',
+			'Digit4',
+			'Digit5',
+			'Digit6',
+			'Digit7',
+			'Digit8',
+			'Digit9',
+			'Digit0',
+			'Minus',
+			'Equal',
+			null
+		];
+		const thumbs = [null, null, null, 'Space', null, null, null, null];
+		const letters = ROW_CODES.map((row) => row.slice(0, 10));
+		const ortho = { rows: [...letters, [null, null, null, null, null, null]], anchor: [0, 0] };
+		return {
+			ansi: {
+				rows: [
+					number,
+					[null, ...ROW_CODES[0], 'Backslash'],
+					[null, ...ROW_CODES[1].slice(0, 11), null],
+					[null, ...ROW_CODES[2], null],
+					thumbs
+				],
+				anchor: [1, 1],
+				shape: [14, 14, 13, 12, 8]
+			},
+			iso: {
+				rows: [
+					number,
+					[null, ...ROW_CODES[0], null],
+					[null, ...ROW_CODES[1]],
+					[null, 'IntlBackslash', ...ROW_CODES[2], null],
+					thumbs
+				],
+				anchor: [1, 1],
+				shape: [14, 14, 13, 13, 8]
+			},
+			ortho,
+			colstag: ortho
+		};
+	})();
+	// The DOF layers the four levels hold; `shift_altgr` is the name the
+	// writer gives the fourth (libdof reserves only main and shift).
+	const DOF_LEVELS = { main: 0, shift: 1, altgr: 2, shift_altgr: 3 };
+	// libdof's special keys (dofinitions.rs, Key::from), by every name it accepts.
+	const DOF_SPECIALS = (() => {
+		const out = {};
+		const names = {
+			esc: 'esc',
+			repeat: 'repeat rpt',
+			space: 'space spc',
+			tab: 'tab tb',
+			enter: 'enter return ret ent rt',
+			shift: 'shift shft sft st',
+			caps: 'caps cps cp',
+			ctrl: 'ctrl ctl ct',
+			alt: 'alt lalt ralt lt',
+			meta: 'meta mta met mt super sup sp',
+			menu: 'menu mnu mn',
+			fn: 'fn',
+			backspace: 'backspace bksp bcsp bsp',
+			del: 'del'
+		};
+		for (const [kind, list] of Object.entries(names))
+			for (const name of list.split(' ')) out[name] = kind;
+		return out;
+	})();
+	// The Shift character libdof gives a main-layer character when the file has
+	// no Shift layer (dofinitions.rs, Key::shifted); any other character takes
+	// its upper case. Its table has no entry for 8, which stays 8.
+	const DOF_SHIFTED = {
+		'`': '~',
+		1: '!',
+		2: '@',
+		3: '#',
+		4: '$',
+		5: '%',
+		6: '^',
+		7: '*',
+		9: '(',
+		0: ')',
+		'[': '{',
+		']': '}',
+		'<': '>',
+		"'": '"',
+		',': '<',
+		'.': '>',
+		';': ':',
+		'/': '?',
+		'=': '+',
+		'-': '_',
+		'\\': '|'
+	};
+	// genkey's finger numbers (0 left pinky … 7 right pinky) for its three rows:
+	// the standard ones, and the bottom row the angle fingering types.
+	const GENKEY_FINGERS = ['0', '1', '2', '3', '3', '4', '4', '5', '6', '7', '7', '7'];
+	const GENKEY_ANGLE_BOTTOM = ['1', '2', '3', '3', '3', '4', '4', '5', '6', '7'];
+	// cmini's finger names, by column of the three letter rows.
+	const CMINI_FINGERS = ['LP', 'LR', 'LM', 'LI', 'LI', 'RI', 'RI', 'RM', 'RR', 'RP', 'RP', 'RP'];
+	const CMINI_ANGLE_BOTTOM = ['LR', 'LM', 'LI', 'LI', 'LI', 'RI', 'RI', 'RM', 'RR', 'RP'];
 	// Keyboard Layout Analyzer key index → physical key, per keyboardType, from
 	// the QWERTY key sets of its source (common/pat/keyboard/js/kb.js).
 	const KLA_KEYS = (() => {
@@ -278,7 +397,29 @@ var LAYOUT_FORMATS = (function () {
 		ergodox[62] = 'Quote';
 		ergodox[66] = 'Space';
 		ergodox[74] = 'Space';
-		return { standard, european, ergodox };
+		// KLAnext's split matrix (its kb.js, KB.keyMap.matrix: rows of 12, 12,
+		// 12, 14 and 16 keys, each row's left half then its right half, then a
+		// 29-key centre block at 66-94), read from KLAnext's own QWERTY on it
+		// (layouts/qwerty.en.matrix.json): each index takes the key its QWERTY
+		// character has on an ANSI board. Its Tab, Shift, Ctrl, Alt, AltGr,
+		// Enter, Backspace, page and arrow keys and the centre block have no
+		// character key here, so a character placed there is reported.
+		const matrix = {};
+		at(0, top.slice(0, 6), matrix);
+		at(6, top.slice(6, 11), matrix);
+		matrix[11] = 'Backslash';
+		at(13, tab.slice(0, 5), matrix);
+		at(18, tab.slice(5, 10), matrix);
+		matrix[23] = 'Equal';
+		at(25, home.slice(0, 5), matrix);
+		at(30, home.slice(5, 11), matrix);
+		at(37, bottom.slice(0, 5), matrix);
+		at(44, bottom.slice(5, 10), matrix);
+		matrix[52] = 'BracketLeft';
+		matrix[53] = 'Minus';
+		matrix[54] = 'BracketRight';
+		matrix[56] = 'Space';
+		return { standard, european, ergodox, matrix };
 	})();
 	// The KLA finger number of each engine finger (1 left pinky … 10 right pinky).
 	const KLA_FINGERS = { lp: 1, lr: 2, lm: 3, li: 4, lt: 5, rt: 6, ri: 7, rm: 8, rr: 9, rp: 10 };
@@ -661,6 +802,37 @@ var LAYOUT_FORMATS = (function () {
 		return rules;
 	}
 
+	/**
+	 * The level list of an XKB key statement: the first bracket that is a
+	 * list of keysyms (bare, or `symbols[Group1] =`), never an index such as
+	 * `type[Group1]` or another statement's list such as `actions[Group1] =`.
+	 * @param {string} body - The text between the key statement's braces.
+	 * @returns {string|null} The keysyms between the brackets, or null.
+	 */
+	function xkbLevels(body) {
+		for (const bracket of body.matchAll(/\[([^\]]*)\]/g)) {
+			const before = body.slice(0, bracket.index);
+			// An index ([Group1]) follows a name.
+			if (/\w\s*$/.test(before)) continue;
+			const statement = before.slice(before.lastIndexOf(',') + 1);
+			if (/^\s*$/.test(statement) || /^\s*symbols\s*\[\s*group1\s*\]\s*=\s*$/i.test(statement))
+				return bracket[1];
+		}
+		return null;
+	}
+
+	/**
+	 * The character of an XKB keysym named letter then accent (scircumflex,
+	 * Ubreve, Iabovedot), composed by Unicode normalisation; undefined for any
+	 * other name.
+	 */
+	function accentedKeysym(sym) {
+		const match = /^([A-Za-z])([a-z]+)$/.exec(sym);
+		if (!match || !ACCENTS[match[2]]) return undefined;
+		const composed = (match[1] + ACCENTS[match[2]]).normalize('NFC');
+		return Array.from(composed).length === 1 ? composed : undefined;
+	}
+
 	/** Completes the standard accents once every key is known. */
 	function finishAccents(result, accents) {
 		for (const [state, accent] of accents) {
@@ -693,8 +865,15 @@ var LAYOUT_FORMATS = (function () {
 				return String.fromCodePoint(value);
 			return NONE;
 		};
+		// A key sits at its « id » when it has one (KLAnext's fixKeys orders the
+		// keys by id, a later key replacing an earlier one at the same id), else
+		// at its place in the list (KLA's own files).
+		const placed = new Map();
 		json.keys.forEach((key, index) => {
 			if (!key || typeof key !== 'object') fail('format_invalid', `keys[${index}]`);
+			placed.set(Number.isInteger(key.id) && key.id >= 0 ? key.id : index, key);
+		});
+		placed.forEach((key, index) => {
 			const cells = ['primary', 'shift', 'altGr', 'shiftAltGr'].map((field) => cellOf(key[field]));
 			if (cells.every((cell) => cell === NONE)) return;
 			const code = board[index];
@@ -862,17 +1041,13 @@ var LAYOUT_FORMATS = (function () {
 			result.unmapped.push({ what: 'include', detail: include[1] });
 		for (const key of block[2].matchAll(/key\s+<([A-Z0-9]+)>\s*\{([^}]*)\}/g)) {
 			const code = XKB_KEYS[key[1]];
-			// A key type declaration (type[group1] = "…", as this repository's own
-			// exports write) is not the key's levels.
-			const levels = /\[([^\]]*)\]/.exec(
-				key[2].replace(/\btype(\[[^\]]*\])?\s*=\s*"[^"]*"\s*,?/g, '')
-			);
-			if (!levels) continue;
+			const levels = xkbLevels(key[2]);
+			if (levels === null) continue;
 			if (!code) {
 				result.unmapped.push({ what: 'key', detail: key[1] });
 				continue;
 			}
-			levels[1]
+			levels
 				.split(',')
 				.map((s) => s.trim())
 				.slice(0, LAYERS)
@@ -885,7 +1060,10 @@ var LAYOUT_FORMATS = (function () {
 						return;
 					}
 					const unicode = /^U([0-9A-Fa-f]{4,6})$/.exec(sym);
-					let char = unicode ? String.fromCodePoint(parseInt(unicode[1], 16)) : KEYSYMS[sym];
+					const point = unicode ? parseInt(unicode[1], 16) : -1;
+					let char =
+						point >= 0 && point <= MAX_CODE_POINT ? String.fromCodePoint(point) : KEYSYMS[sym];
+					if (char === undefined) char = accentedKeysym(sym);
 					if (char === undefined && Array.from(sym).length === 1) char = sym;
 					if (char === undefined && /^[0-9]$/.test(sym)) char = sym;
 					if (char === undefined)
@@ -975,8 +1153,9 @@ var LAYOUT_FORMATS = (function () {
 	}
 
 	/**
-	 * Reads three rows of base characters: an Oxeylyzer DOF, a cmini JSON or
-	 * plain text (one row per line, characters separated by spaces or not).
+	 * Reads three rows of base characters: a cmini JSON or plain text (one row
+	 * per line, characters separated by spaces or not); an Oxeylyzer DOF goes
+	 * to fromDof.
 	 * @param {object|string} input - The parsed JSON, or the text.
 	 * @param {string} [name] - A name when the input has none.
 	 * @returns {object} {format, layout, unmapped}.
@@ -985,22 +1164,31 @@ var LAYOUT_FORMATS = (function () {
 		let rows;
 		let format = 'rows';
 		let label = name || 'Layout';
+		const outside = [];
 		if (typeof input === 'string') rows = input.split('\n').filter((l) => l.trim() !== '');
-		else if (input && input.layers && Array.isArray(input.layers.main)) {
-			rows = input.layers.main;
-			format = 'dof';
-			label = input.name || label;
-		} else if (input && input.keys && !Array.isArray(input.keys)) {
+		else if (input && input.layers) return fromDof(input);
+		else if (input && input.keys && !Array.isArray(input.keys)) {
 			format = 'cmini';
-			label = input.name || label;
+			label = typeof input.name === 'string' && input.name !== '' ? input.name : label;
 			rows = [[], [], []];
 			for (const [char, pos] of Object.entries(input.keys)) {
 				if (!pos || typeof pos !== 'object') fail('format_invalid', `keys ${char}`);
-				if (!rows[pos.row]) continue;
-				rows[pos.row][pos.col] = char;
+				if (!Number.isInteger(pos.row) || !Number.isInteger(pos.col) || pos.row < 0 || pos.col < 0)
+					fail('format_invalid', `keys ${char}`);
+				// cmini's thumb row (3) has no key here: say what it types.
+				if (!rows[pos.row])
+					outside.push({ what: 'key', detail: `${pos.row}:${pos.col} (${char})` });
+				else rows[pos.row][pos.col] = char;
 			}
 		} else fail('format_invalid', 'rows');
 		const result = start(format, slug(label), label);
+		result.unmapped.push(...outside);
+		rows.slice(ROW_CODES.length).forEach((row, r) =>
+			result.unmapped.push({
+				what: 'key',
+				detail: `${ROW_CODES.length + r}:* (${String(row).trim()})`
+			})
+		);
 		rows.slice(0, ROW_CODES.length).forEach((row, r) => {
 			if (!Array.isArray(row) && typeof row !== 'string') fail('format_invalid', `rows[${r}]`);
 			const chars = Array.isArray(row)
@@ -1022,7 +1210,186 @@ var LAYOUT_FORMATS = (function () {
 		});
 		put(result, 'Space', 0, ' ');
 		if (input && input.board === 'angle') result.layout.fingering = 'angle';
-		if (input && input.fingering === 'angle') result.layout.fingering = 'angle';
+		return result;
+	}
+
+	/** One DOF key, as libdof reads it (its Key::from): a character, a word, or what it does. */
+	function dofKey(token) {
+		if (token === '~') return { empty: true };
+		if (token === '*') return { transparent: true };
+		if (Array.from(token).length === 1) return { text: token };
+		const lower = token.toLowerCase();
+		if (lower === '\\~') return { text: '~' };
+		if (lower === '\\*') return { text: '*' };
+		if (DOF_SPECIALS[lower]) return { special: DOF_SPECIALS[lower], token };
+		if (token[0] === '@') return { layer: token.slice(1), token };
+		if (token[0] === '&') return { magic: token.slice(1), token };
+		if (/^(#|\\[#@&])/.test(token)) return { text: token.slice(1) };
+		return { text: token };
+	}
+
+	/** The physical grid a DOF board's rows and anchor place keys on. */
+	function dofGrid(json) {
+		const board = json.board;
+		if (typeof board === 'string') {
+			const named = DOF_BOARDS[board.toLowerCase()];
+			if (!named) fail('format_unsupported_board', board);
+			return named;
+		}
+		if (!Array.isArray(board)) fail('format_invalid', 'board');
+		// A relative board (« k 2k 1.5k », a bare number is a gap) whose rows
+		// hold as many keys as the ANSI or ISO preset is that keyboard; any
+		// other shape has no keys here to place its characters on.
+		const shape = board.map((row) =>
+			typeof row === 'string'
+				? row
+						.trim()
+						.split(/\s+/)
+						.filter((w) => /k$/.test(w)).length
+				: -1
+		);
+		// A custom board anchors at its top left key unless the file says otherwise.
+		for (const named of Object.values(DOF_BOARDS))
+			if (named.shape && JSON.stringify(named.shape) === JSON.stringify(shape))
+				return { rows: named.rows, anchor: [0, 0] };
+		return fail('format_unsupported_board', 'custom');
+	}
+
+	/**
+	 * Reads an Oxeylyzer DOF (libdof's format): the `main`, `shift`, `altgr`
+	 * and `shift_altgr` layers placed on the board from its anchor, a missing
+	 * Shift layer made as libdof makes it (QWERTY's shifted symbols, letters
+	 * upper case), word keys as several characters. Other layers, magic keys
+	 * and combos are reported, as are characters off the board's keys.
+	 * @param {object} json - The parsed file.
+	 * @returns {object} {format, layout, unmapped}.
+	 */
+	function fromDof(json) {
+		if (!json || typeof json.layers !== 'object' || json.layers === null)
+			fail('format_invalid', 'layers');
+		if (!Array.isArray(json.layers.main)) fail('format_invalid', 'layers.main');
+		const grid = dofGrid(json);
+		const anchor = json.anchor === undefined ? grid.anchor : json.anchor;
+		if (
+			!Array.isArray(anchor) ||
+			anchor.length !== 2 ||
+			!anchor.every((n) => Number.isInteger(n) && n >= 0)
+		)
+			fail('format_invalid', 'anchor');
+		const name = typeof json.name === 'string' && json.name !== '' ? json.name : 'DOF layout';
+		const result = start('dof', slug(name), name);
+		const tokens = (layer, id) =>
+			layer.map((row, r) => {
+				if (typeof row !== 'string') fail('format_invalid', `layers.${id}[${r}]`);
+				return row.trim() === '' ? [] : row.trim().split(/\s+/);
+			});
+		const main = tokens(json.layers.main, 'main');
+		const reported = new Set();
+		const lose = (what, detail) => {
+			if (reported.has(`${what} ${detail}`)) return;
+			reported.add(`${what} ${detail}`);
+			result.unmapped.push({ what, detail });
+		};
+		/**
+		 * Places one layer. A transparent key (*) types what the main layer types
+		 * without the layer held, which the main layer already says: it adds no
+		 * character to this level.
+		 */
+		const place = (rows, level) =>
+			rows.forEach((row, r) =>
+				row.forEach((token, c) => {
+					const key = dofKey(token);
+					if (key.empty || key.transparent) return;
+					const code = (grid.rows[r + anchor[1]] || [])[c + anchor[0]];
+					if (key.magic !== undefined) return lose('rule', `&${key.magic}`);
+					if (key.special === 'space' && code) return put(result, code, level, ' ');
+					// A modifier, Tab, Enter or a layer key types no character: it belongs
+					// on a key without one, and is left out where a character would be.
+					if (key.special || key.layer !== undefined)
+						return code ? lose('special', `${code}: ${key.token}`) : undefined;
+					if (!code) return lose('key', `${r}:${c} (${key.text})`);
+					put(result, code, level, key.text);
+				})
+			);
+		place(main, 0);
+		for (const [id, layer] of Object.entries(json.layers)) {
+			if (id === 'main') continue;
+			if (!Array.isArray(layer)) fail('format_invalid', `layers.${id}`);
+			const level = DOF_LEVELS[id];
+			if (level === undefined) lose('layer', id);
+			else place(tokens(layer, id), level);
+		}
+		// libdof makes the Shift layer when the file has none (generate_shift_layer).
+		if (json.layers.shift === undefined)
+			main.forEach((row, r) =>
+				row.forEach((token, c) => {
+					const key = dofKey(token);
+					const code = (grid.rows[r + anchor[1]] || [])[c + anchor[0]];
+					if (!code || key.text === undefined) return;
+					put(result, code, 1, DOF_SHIFTED[key.text] || key.text.toUpperCase());
+				})
+			);
+		for (const kind of ['combos', 'magic'])
+			if (json[kind] && typeof json[kind] === 'object')
+				for (const [id, rules] of Object.entries(json[kind]))
+					if (rules && typeof rules === 'object')
+						Object.keys(rules).forEach((rule) => lose('rule', kind === 'magic' ? `&${id}` : rule));
+		if (!result.layout.rows.Space || result.layout.rows.Space[0] === NONE)
+			put(result, 'Space', 0, ' ');
+		if (json.fingering === 'angle') result.layout.fingering = 'angle';
+		return result;
+	}
+
+	/** Whether a text is a genkey layout: a name, three rows of keys, three rows of fingers. */
+	function isGenkey(text) {
+		const lines = text.replace(/\r/g, '').split('\n');
+		if (lines.length < 7 || lines[0].trim() === '') return false;
+		const words = (line) =>
+			line
+				.trim()
+				.split(/\s+/)
+				.filter((w) => w !== '');
+		return (
+			lines.slice(1, 4).every((line) => words(line).length > 0) &&
+			lines
+				.slice(4, 7)
+				.every((line) => words(line).length > 0 && words(line).every((w) => /^[0-9]$/.test(w)))
+		);
+	}
+
+	/**
+	 * Reads a genkey layout (semilin/genkey, layout.go LoadLayout): its name,
+	 * three rows of keys (the first character of each word, lower case, as
+	 * genkey takes it) and three rows of finger numbers. The keys are the base
+	 * layer of the three letter rows, upper case on Shift; a bottom row typed
+	 * with the angle fingering (fingers 1 2 3 3 3) keeps it.
+	 * @param {string} text - The file.
+	 * @returns {object} {format, layout, unmapped}.
+	 */
+	function fromGenkey(text) {
+		if (!isGenkey(text)) fail('format_invalid', 'genkey');
+		const lines = text.replace(/\r/g, '').split('\n');
+		const name = lines[0].trim();
+		const result = start('genkey', slug(name), name);
+		const words = (line) =>
+			line
+				.trim()
+				.split(/\s+/)
+				.filter((w) => w !== '');
+		lines.slice(1, 4).forEach((line, r) =>
+			words(line).forEach((word, c) => {
+				const char = Array.from(word)[0].toLowerCase();
+				if (char === '~' || char === '*') return;
+				const code = ROW_CODES[r][c];
+				if (!code) return result.unmapped.push({ what: 'key', detail: `${r}:${c} (${char})` });
+				put(result, code, 0, char);
+				const upper = char.toUpperCase();
+				if (upper !== char && Array.from(upper).length === 1) put(result, code, 1, upper);
+			})
+		);
+		put(result, 'Space', 0, ' ');
+		if (words(lines[6]).slice(0, 5).join(' ') === GENKEY_ANGLE_BOTTOM.slice(0, 5).join(' '))
+			result.layout.fingering = 'angle';
 		return result;
 	}
 
@@ -1115,7 +1482,8 @@ var LAYOUT_FORMATS = (function () {
 
 	/** The reader of a file's format, by extension and content. */
 	function recognise(name, text, tools) {
-		const extension = (name.split('.').pop() || '').toLowerCase();
+		// A genkey layout is a file without an extension (genkey's layouts folder).
+		const extension = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
 		if (extension === 'kbe' || isKbe(text)) return fromKbe(text);
 		if (extension === 'keylayout' || /<keyboard\s/.test(text))
 			return fromKeylayout(text, name.replace(/\.[^.]+$/, ''), tools.convention || 'iso', tools);
@@ -1143,6 +1511,7 @@ var LAYOUT_FORMATS = (function () {
 			if (json.keymap) return fromKalamineJson(json);
 			return fromRows(json, name.replace(/\.[^.]+$/, ''));
 		}
+		if ((extension === 'txt' || extension === '') && isGenkey(text)) return fromGenkey(text);
 		if (extension === 'txt') return fromRows(text, name.replace(/\.[^.]+$/, ''));
 		return fail('format_unknown', name);
 	}
@@ -1342,6 +1711,180 @@ var LAYOUT_FORMATS = (function () {
 		return { text, unmapped };
 	}
 
+	/**
+	 * Writes a layout as an Oxeylyzer DOF on libdof's ISO board, anchored at
+	 * its top left key so the number row and the ISO key are written: the
+	 * base layer as `main`, then `shift`, `altgr` and `shift_altgr` (each
+	 * written in full, so nothing depends on libdof's generated Shift). DOF has
+	 * no dead keys, and a character libdof splits words on (a space other than
+	 * the space bar's) cannot be written; both are reported.
+	 * @param {object} layout - The layout (library shape).
+	 * @returns {{text: string, unmapped: object[]}} The JSON text and the losses.
+	 */
+	function toDof(layout) {
+		const unmapped = [];
+		const reported = new Set();
+		const lose = (what, detail) => {
+			if (!reported.has(`${what} ${detail}`)) unmapped.push({ what, detail });
+			reported.add(`${what} ${detail}`);
+		};
+		// The keys without a character, at the start and the end of each row.
+		const first = ['', 'tb', 'cps', 'shft', '~'];
+		const last = ['bsp', 'ret', '', 'shft', '~'];
+		const token = (code, level, r, c) => {
+			if (code === null) return c === 0 ? first[r] : last[r];
+			const cell = (layout.rows[code] || [])[level];
+			if (cell === NONE || cell === undefined) return '~';
+			if (typeof cell !== 'string') {
+				lose('dead_key', cell.dead);
+				return '~';
+			}
+			if (cell === ' ') return 'spc';
+			if (/\s/.test(cell)) {
+				lose(
+					'character',
+					`${code}: U+${cell.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`
+				);
+				return '~';
+			}
+			if (cell === '~' || cell === '*') return `\\${cell}`;
+			if (Array.from(cell).length === 1) return cell;
+			// A word libdof would read as something else keeps its text behind a « # ».
+			const lower = cell.toLowerCase();
+			if (DOF_SPECIALS[lower] || /^[#@&]/.test(cell) || /^\\[~*#@&]/.test(cell)) return `#${cell}`;
+			return cell;
+		};
+		const board = DOF_BOARDS.iso;
+		const layer = (level) =>
+			board.rows.map((row, r) => row.map((code, c) => token(code, level, r, c)).join(' '));
+		const used = (level) =>
+			Object.values(layout.rows).some((row) => row[level] !== NONE && row[level] !== undefined);
+		// A key the ISO board lacks (a JIS or ABNT key) is named with what it types.
+		const placed = new Set(board.rows.flat());
+		for (const [code, row] of Object.entries(layout.rows))
+			if (!placed.has(code) && row.some((cell) => typeof cell === 'string'))
+				lose('key', `${code} (${row.filter((cell) => typeof cell === 'string').join(' ')})`);
+		const layers = { main: layer(0), shift: layer(1) };
+		if (used(2)) layers.altgr = layer(2);
+		if (used(3)) layers.shift_altgr = layer(3);
+		const json = {
+			name: layout.name || layout.id,
+			board: 'iso',
+			anchor: [0, 0],
+			layers,
+			fingering: layout.fingering === 'angle' ? 'angle' : 'traditional'
+		};
+		return { text: `${JSON.stringify(json, null, 4)}\n`, unmapped };
+	}
+
+	/**
+	 * The base characters of the three letter rows for a letter-block format
+	 * (genkey, cmini), and what such a format leaves out: a dead key, several
+	 * characters on a key, a character typed twice, and the layers above the
+	 * base when they hold more than its upper case.
+	 */
+	function letterBlock(layout, unmapped) {
+		const seen = new Set();
+		const rows = ROW_CODES.map((codes) =>
+			codes.map((code) => {
+				const cell = (layout.rows[code] || [])[0];
+				if (cell === NONE || cell === undefined) return NONE;
+				if (typeof cell !== 'string') {
+					unmapped.push({ what: 'dead_key', detail: cell.dead });
+					return NONE;
+				}
+				if (Array.from(cell).length !== 1) {
+					unmapped.push({ what: 'multi_character', detail: cell });
+					return NONE;
+				}
+				if (/\s/.test(cell) || seen.has(cell)) {
+					unmapped.push({ what: 'character', detail: `${code}: ${cell}` });
+					return NONE;
+				}
+				seen.add(cell);
+				return cell;
+			})
+		);
+		const lost = new Set();
+		ROW_CODES.flat().forEach((code) => {
+			const row = layout.rows[code] || [];
+			const base = row[0];
+			if (typeof row[1] === 'string' && (typeof base !== 'string' || row[1] !== base.toUpperCase()))
+				lost.add('Shift');
+			if (row[2] !== NONE && row[2] !== undefined) lost.add('AltGr');
+			if (row[3] !== NONE && row[3] !== undefined) lost.add('Shift+AltGr');
+		});
+		lost.forEach((level) => unmapped.push({ what: 'layer', detail: level }));
+		return rows;
+	}
+
+	/**
+	 * Writes a layout as a genkey layout: its name, the base characters of
+	 * the three letter rows (~ where a key has none) and genkey's finger rows,
+	 * the bottom one angled when the layout uses the angle fingering. genkey
+	 * reads every key lower case.
+	 * @param {object} layout - The layout (library shape).
+	 * @returns {{text: string, unmapped: object[]}} The text and the losses.
+	 */
+	function toGenkey(layout) {
+		const unmapped = [];
+		const rows = letterBlock(layout, unmapped);
+		const keys = rows.map((row) => {
+			const out = row.map((cell) => {
+				// genkey reads a key lower case, and the reader takes ~ and * for no key.
+				if (cell !== NONE && (cell !== cell.toLowerCase() || cell === '~' || cell === '*')) {
+					unmapped.push({ what: 'character', detail: cell });
+					return '~';
+				}
+				return cell === NONE ? '~' : cell;
+			});
+			// genkey's rows hold ten keys; a key beyond is kept only when it types something.
+			while (out.length > 10 && out[out.length - 1] === '~') out.pop();
+			return out;
+		});
+		const fingers = keys.map((row, r) =>
+			(r === 2 && layout.fingering === 'angle' ? GENKEY_ANGLE_BOTTOM : GENKEY_FINGERS).slice(
+				0,
+				row.length
+			)
+		);
+		const name = String(layout.name || layout.id).replace(/\s+/g, ' ');
+		const text = [
+			name,
+			...keys.map((row) => row.join(' ')),
+			...fingers.map((row) => row.join(' ')),
+			''
+		];
+		return { text: text.join('\n'), unmapped };
+	}
+
+	/**
+	 * Writes a layout as a cmini JSON: each base character of the three
+	 * letter rows with its row, column and finger, on cmini's « angle » board
+	 * when the layout uses the angle fingering, else « stagger ».
+	 * @param {object} layout - The layout (library shape).
+	 * @returns {{text: string, unmapped: object[]}} The JSON text and the losses.
+	 */
+	function toCmini(layout) {
+		const unmapped = [];
+		const angle = layout.fingering === 'angle';
+		const keys = {};
+		letterBlock(layout, unmapped).forEach((row, r) =>
+			row.forEach((cell, col) => {
+				if (cell === NONE) return;
+				const finger = (r === 2 && angle ? CMINI_ANGLE_BOTTOM : CMINI_FINGERS)[col];
+				keys[cell] = { row: r, col, finger };
+			})
+		);
+		const json = {
+			name: layout.name || layout.id,
+			user: 0,
+			board: angle ? 'angle' : 'stagger',
+			keys
+		};
+		return { text: `${JSON.stringify(json, null, 4)}\n`, unmapped };
+	}
+
 	return {
 		EXTENSIONS,
 		XKB_KEYS,
@@ -1353,6 +1896,8 @@ var LAYOUT_FORMATS = (function () {
 		fromXkb,
 		fromKlc,
 		fromRows,
+		fromDof,
+		fromGenkey,
 		fromKeylayout,
 		fromKbe,
 		decode,
@@ -1362,7 +1907,10 @@ var LAYOUT_FORMATS = (function () {
 		lossMessage,
 		toSource,
 		toKla,
-		toKalamineToml
+		toKalamineToml,
+		toDof,
+		toGenkey,
+		toCmini
 	};
 })();
 

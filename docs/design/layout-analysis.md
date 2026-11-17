@@ -629,29 +629,45 @@ map (`{format, layout, unmapped: [{what, detail}]}`); a file it cannot read at
 all is refused with a stable code (`format_unknown`, `format_invalid`,
 `format_unsupported_board`).
 
-| Reader                                       | Format                                                 | Notes                                                                                                                                           |
-| -------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fromKla(json)`                              | Keyboard Layout Analyzer JSON (KLA, KLAnext and forks) | `standard` (ANSI), `european` (ISO) and `ergodox` boards, key indexes from KLA's QWERTY key sets; no dead keys exist in the format.             |
-| `fromKalamineToml(doc)`                      | Kalamine TOML (parsed)                                 | ISO, ANSI and ERGO drawings; `full`, or `base` (with the 1dk column) and `altgr`; `[spacebar]`; a blank level takes the case Kalamine gives it. |
-| `fromKalamineJson(json)`                     | Kalamine / x-keyboard JSON                             | `keymap` and `deadkeys`.                                                                                                                        |
-| `fromXkb(text, variant?)`                    | XKB symbols                                            | four levels; `dead_*` keysyms; `include` lines and levels beyond four are reported.                                                             |
-| `fromKlc(text, scancodes)`                   | Windows KLC                                            | SHIFTSTATE columns 0, 1, 6, 7; `DEADKEY` tables; ligatures reported.                                                                            |
-| `fromKeylayout(text, id, convention, tools)` | macOS .keylayout                                       | through the layout composer's reader; its refusals become `format_invalid`.                                                                     |
-| `fromRows(input)`                            | Oxeylyzer DOF, cmini JSON, plain rows                  | base layer, upper case on Shift.                                                                                                                |
-| `fromKbe(bytes)`                             | KbdEdit .kbe                                           | header checked, then refused (`format_kbe_encrypted`): the body is encrypted with a key only KbdEdit holds (below).                             |
-| `read(name, text, tools)`                    | any of the above                                       | recognised by content and extension; a file that places no character is refused.                                                                |
-| `readBytes(name, bytes, tools)`              | any of the above, from a picked file's bytes           | a .kbe by its header, else `decode(bytes)` (UTF-16 by its byte-order mark, else UTF-8) then `read`.                                             |
+| Reader                                       | Format                                                 | Notes                                                                                                                                                                                                                     |
+| -------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fromKla(json)`                              | Keyboard Layout Analyzer JSON (KLA, KLAnext and forks) | `standard` (ANSI), `european` (ISO), `ergodox` and KLAnext's `matrix` boards, key indexes from their QWERTY key sets; a key sits at its `id` (KLAnext's order); no dead keys exist in the format.                         |
+| `fromKalamineToml(doc)`                      | Kalamine TOML (parsed)                                 | ISO, ANSI and ERGO drawings; `full`, or `base` (with the 1dk column) and `altgr`; `[spacebar]`; a blank level takes the case Kalamine gives it.                                                                           |
+| `fromKalamineJson(json)`                     | Kalamine / x-keyboard JSON                             | `keymap` and `deadkeys`.                                                                                                                                                                                                  |
+| `fromXkb(text, variant?)`                    | XKB symbols                                            | four levels; `dead_*` keysyms; `include` lines and levels beyond four are reported.                                                                                                                                       |
+| `fromKlc(text, scancodes)`                   | Windows KLC                                            | SHIFTSTATE columns 0, 1, 6, 7; `DEADKEY` tables; ligatures reported.                                                                                                                                                      |
+| `fromKeylayout(text, id, convention, tools)` | macOS .keylayout                                       | through the layout composer's reader; its refusals become `format_invalid`.                                                                                                                                               |
+| `fromDof(json)`                              | Oxeylyzer DOF (libdof)                                 | `ansi`, `iso`, `ortho`, `colstag` boards and a custom board of the ANSI or ISO shape, from the anchor; `main`, `shift` (or libdof's generated one), `altgr`, `shift_altgr`; other layers, magic keys and combos reported. |
+| `fromGenkey(text)`                           | genkey layout                                          | name, three key rows (first character of each word, lower case), three finger rows; a file without an extension or a `.txt`.                                                                                              |
+| `fromRows(input)`                            | cmini JSON, plain rows                                 | base layer, upper case on Shift; a key off the three rows (a cmini thumb) is reported.                                                                                                                                    |
+| `fromKbe(bytes)`                             | KbdEdit .kbe                                           | header checked, then refused (`format_kbe_encrypted`): the body is encrypted with a key only KbdEdit holds (below).                                                                                                       |
+| `read(name, text, tools)`                    | any of the above                                       | recognised by content and extension; a file that places no character is refused.                                                                                                                                          |
+| `readBytes(name, bytes, tools)`              | any of the above, from a picked file's bytes           | a .kbe by its header, else `decode(bytes)` (UTF-16 by its byte-order mark, else UTF-8) then `read`.                                                                                                                       |
 
 Every refusal has a stable code (`format_unknown`, `format_invalid`,
 `format_unsupported_board`, `format_kbe_encrypted`) and every loss a kind
 (`key`, `keysym`, `include`, `ligature`, `dead_key_rules`, `dead_key`,
-`multi_character`); `refusalMessage(error)` and `lossMessage(entry)` turn them
+`multi_character`, `layer`, `rule` for a DOF magic key or combo, `special` for
+a DOF modifier or layer key on a character key, `character` for one a writer
+cannot write); `refusalMessage(error)` and `lossMessage(entry)` turn them
 into `layout_analysis.formats.*` locale keys, which the editor and the Comparer
 show in the user's language. A malformed file is refused with one of those
 codes, never a crash (`tools/test/test-layout-formats.cjs` cuts and overwrites
 real files from a fixed seed). `EXTENSIONS` lists the file types the pages'
-pickers offer; the app's macOS open panel offers the same list from the layout
-defaults (`source.pick_extensions`).
+pickers offer: the site's and the Windows and Linux app's webview pickers take
+it as their `accept` list, the macOS app's open panel offers the same list from
+the layout defaults (`source.pick_extensions`). A genkey layout has no
+extension in genkey's own folder: the pickers offer `.txt`, which the editor's
+genkey download writes, and a file opened without an extension is read when
+its content is a genkey layout.
+
+KLAnext's boards beyond KLA's are its `matrix` (read), `ergolinear` and
+`janiso` (refused with `format_unsupported_board`): the matrix key set is the
+key each index of KLAnext's own QWERTY matrix layout types
+(`layouts/qwerty.en.matrix.json`, `kb.js` `KB.keyMap.matrix`), its centre
+block, thumb, page and arrow keys reported when they carry a character.
+KLAnext's layout list (`db.js`) holds no `ergolinear` layout, and `janiso`
+waits for the model's JIS keys.
 
 KbdEdit .kbe, reverse-engineered from the committed exports
 (`static/layouts/registry/bepo/kbdedit`, `static/ergopti/windows`): a UInt16
@@ -672,14 +688,23 @@ followed by the accent's combining mark, normalised to one character. Writers:
 `toSource(layout)` gives an Ergopti layout source the source model validates;
 `toKla(layout, fingering)` a KLA JSON on the european board; `toKalamineToml`
 a Kalamine ISO `full` drawing, listing what Kalamine cannot hold (another dead
-key, several characters on one key). A .keylayout is written by the layout
+key, several characters on one key); `toDof` a DOF on libdof's ISO board
+anchored at its top left key, all four levels written; `toGenkey` and
+`toCmini` the base characters of the three letter rows with their fingers,
+listing a dead key, a repeated character and the levels above the base. A
+.keylayout is written by the layout
 source compiler from the source `toSource` builds (the editor's macOS
 download). `tools/test/test-layout-formats.cjs` holds the readers to the
 repository's own files of Ergopti 1DK v2.1.2 (its Kalamine TOML, JSON, KLC,
-XKB and .keylayout), and holds import, export, import to the same layout on
-every committed KLAnext JSON (ISO and ErgoDox) and on bépo's, Ergopti's and
-KbdEdit's own .keylayout files. A KLC `DEADKEY` result ending in `@` chains to
-another dead key. The
+XKB and .keylayout) and to third-party files (xkeyboard-config's XKB, Colemak
+Mod-DH's KLC, libdof's DOF, their sources and licences in
+`tools/test/fixtures/layout-formats/third-party/README.md`), and holds import,
+export, import to the same layout on every committed KLAnext JSON (ISO and
+ErgoDox), on bépo's, Ergopti's and KbdEdit's own .keylayout files and, for
+DOF, genkey and cmini, on each of those layouts. A KLC `DEADKEY` result ending
+in `@` chains to another dead key. An XKB key's levels are its first keysym
+list, after a `type[Group1] = …` assignment or as `symbols[Group1] = [ … ]`;
+a keysym named letter then accent (`scircumflex`) composes. The
 « Comparer » page adds an imported layout to the comparison and shows that
 report.
 

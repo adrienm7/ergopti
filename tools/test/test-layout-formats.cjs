@@ -6,7 +6,8 @@
  * DESCRIPTION:
  * _shared/ui/layout_analysis/layout_formats.js reads the layout files people
  * have (KLA JSON, Kalamine TOML and JSON, XKB symbols, KLC, .keylayout, DOF,
- * cmini, plain rows) and writes Ergopti sources, KLA JSON and Kalamine TOML.
+ * cmini, genkey, plain rows) and writes Ergopti sources, KLA JSON, Kalamine
+ * TOML, DOF, genkey and cmini.
  * This gate holds it to real files of the repository.
  *
  * WHAT IS CHECKED:
@@ -39,10 +40,19 @@
  *    bundle (ISO and ANSI) read, compile back through the source compiler to a
  *    file that follows Apple's schema, and read to the same layout; a KLAnext
  *    layout written as a .keylayout types the same keys.
- * 9. Malformed files (hand-made, and real ones cut short or overwritten from a
- *    fixed seed) are refused with a stable code, never a crash.
- * 10. Every refusal and loss has words in all 21 locales; the app's native
- *    open panel offers the pages' file types; a UTF-16 KLC decodes.
+ * 9. KLAnext's matrix board maps each index to the key its own QWERTY types
+ *    there, and a matrix file's keys are placed by id; xkeyboard-config's
+ *    bépo and Esperanto XKB symbols, Colemak Mod-DH's UTF-8 and UTF-16 KLC
+ *    files and libdof's own DOF examples read with what they type and what
+ *    they leave out; a genkey layout reads from a file without an extension;
+ *    every real layout written as DOF, genkey and cmini reads back to the
+ *    same keys, the losses named.
+ * 10. Malformed files (hand-made, and real ones cut short or overwritten from
+ *    a fixed seed) are refused with a stable code, never a crash.
+ * 11. Every refusal and loss has words in all 21 locales; the app's native
+ *    open panel offers the pages' file types; the editor's interoperability
+ *    downloads have words and a file type the hosts write; a UTF-16 KLC
+ *    decodes.
  * ==============================================================================
  */
 
@@ -679,8 +689,315 @@ check(
 	'a KLAnext layout written as a .keylayout types other keys'
 );
 
+// ====================================================================
+// ======= 9/ KLAnext matrix, XKB, KLC, DOF, genkey, cmini: real files ===
+// ====================================================================
+
+// KLAnext's matrix board: the primary character of every index of KLAnext's
+// own QWERTY on it (klanext.keyboard-design.com, layouts/qwerty.en.matrix.json,
+// read on 2026-11-17; no licence is stated, so only these facts are kept, not
+// the file). Each character index maps to the key that types it in QWERTY;
+// Tab, the modifiers, Backspace, Enter, the page and arrow keys and the centre
+// block (66-94) carry none.
+const KLANEXT_MATRIX_QWERTY =
+	"0 ` 1 1 2 2 3 3 4 4 5 5 6 6 7 7 8 8 9 9 10 0 11 \\ 13 q 14 w 15 e 16 r 17 t 18 y 19 u 20 i 21 o 22 p 23 = 25 a 26 s 27 d 28 f 29 g 30 h 31 j 32 k 33 l 34 ; 35 ' 37 z 38 x 39 c 40 v 41 b 44 n 45 m 46 , 47 . 48 / 52 [ 53 - 54 ] 56 space";
+const matrixTokens = KLANEXT_MATRIX_QWERTY.split(' ');
+const matrixExpected = {};
+const matrixKeys = Array.from({ length: 95 }, (_, id) => ({ id, primary: -1, shift: -1 }));
+for (let i = 0; i < matrixTokens.length; i += 2) {
+	const char = matrixTokens[i + 1];
+	matrixExpected[matrixTokens[i]] =
+		QWERTY_CODE[char] ?? (/[0-9]/.test(char) ? `Digit${char}` : `Key${char.toUpperCase()}`);
+	matrixKeys[Number(matrixTokens[i])].primary = (char === 'space' ? ' ' : char).codePointAt(0);
+}
+check(
+	JSON.stringify(F.KLA_KEYS.matrix) === JSON.stringify(matrixExpected),
+	`KLAnext matrix key indexes differ from KLAnext's QWERTY: ${JSON.stringify(F.KLA_KEYS.matrix)}`
+);
+// A KLAnext matrix file: its keys placed by id (KLAnext's fixKeys), a later key
+// replacing an earlier one with the same id, as its own Dvorak preset does; a
+// character on the centre block or a thumb named as unread.
+const matrixFile = {
+	label: 'matrix test',
+	keyboardType: 'matrix',
+	keys: [
+		{ id: 13, primary: -1 },
+		...matrixKeys,
+		{ id: 13, primary: 'é'.codePointAt(0), shift: 'É'.codePointAt(0) },
+		{ id: 70, primary: 'ŝ'.codePointAt(0) },
+		{ id: 57, primary: 'e'.codePointAt(0) }
+	]
+};
+const matrix = F.read('matrix.json', JSON.stringify(matrixFile), {});
+const qwerty = E.libraryLayouts().find((layout) => layout.id === 'qwerty');
+const matrixWrong = Object.values(F.KLA_KEYS.matrix).filter(
+	(code) =>
+		code !== 'KeyQ' && code !== 'Space' && matrix.layout.rows[code][0] !== qwerty.rows[code][0]
+);
+check(
+	matrix.format === 'kla' &&
+		matrixWrong.length === 0 &&
+		JSON.stringify(matrix.layout.rows.KeyQ.slice(0, 2)) === JSON.stringify(['é', 'É']) &&
+		JSON.stringify(matrix.unmapped.map((u) => u.detail)) === JSON.stringify(['57 (e)', '70 (ŝ)']),
+	`KLAnext matrix: ${matrixWrong.join(' ')} differ from QWERTY, KeyQ ${JSON.stringify(matrix.layout.rows.KeyQ)}, unread ${JSON.stringify(matrix.unmapped)}`
+);
+
+const thirdPartyBytes = (file) =>
+	F.readBytes(file, new Uint8Array(fs.readFileSync(path.join(THIRD_PARTY, file))), {
+		parseToml,
+		scancodes: DATA.scancodes
+	});
+const row = (layout, codes, level = 0) =>
+	codes.map((code) => (layout.rows[code] || [])[level] ?? '?').join('');
+const LETTER_ROWS = [
+	['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT', 'KeyY', 'KeyU', 'KeyI', 'KeyO', 'KeyP'],
+	HOME_ROW,
+	['KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyB', 'KeyN', 'KeyM', 'Comma', 'Period', 'Slash']
+];
+const moreResults = [];
+
+// XKB symbols as xkeyboard-config publishes them: bépo states its number row
+// after a `type[group1] = …` assignment, Esperanto names its letters by keysym
+// (scircumflex, Ubreve…).
+const xkbFr = fs.readFileSync(path.join(THIRD_PARTY, 'xkeyboard-config.fr.xkb_symbols'), 'utf8');
+const xkbBepo = F.fromXkb(xkbFr, 'bepo');
+const bepoLibrary = E.libraryLayouts().find((layout) => layout.id === 'bepo');
+// Dead keys compare by being dead keys: the two files name their states differently.
+const baseShift = (layout, code) =>
+	JSON.stringify(
+		layout.rows[code].slice(0, 2).map((cell) => (typeof cell === 'string' ? cell : 'dead'))
+	);
+// xkeyboard-config's « bepo » keeps bépo 1.0's straight apostrophe on KeyN,
+// where the registry's bépo 1.1 types ’.
+const bepoDiffers = [...LETTER_ROWS.flat(), 'Digit1', 'Digit5', 'Minus', 'Equal'].filter(
+	(code) => code !== 'KeyN' && baseShift(xkbBepo.layout, code) !== baseShift(bepoLibrary, code)
+);
+check(
+	xkbBepo.layout.name === 'French (BEPO)' &&
+		bepoDiffers.length === 0 &&
+		xkbBepo.layout.rows.KeyN[0] === "'" &&
+		JSON.stringify(xkbBepo.layout.rows.Digit1) === JSON.stringify(['"', '1', '—', '„']) &&
+		!xkbBepo.unmapped.some((u) => /group1/i.test(u.detail)),
+	`xkeyboard-config bépo: ${bepoDiffers.join(' ')} differ from the registry's bépo, Digit1 ${JSON.stringify(xkbBepo.layout.rows.Digit1)}, unread ${JSON.stringify(xkbBepo.unmapped)}`
+);
+const epo = thirdParty('xkeyboard-config.epo.xkb_symbols');
+check(
+	epo.layout.name === 'Esperanto' &&
+		JSON.stringify(epo.layout.rows.KeyQ) === JSON.stringify(['ŝ', 'Ŝ', 'q', 'Q']) &&
+		JSON.stringify(epo.layout.rows.KeyY.slice(0, 2)) === JSON.stringify(['ŭ', 'Ŭ']) &&
+		JSON.stringify(epo.unmapped.map((u) => `${u.what}:${u.detail}`)) ===
+			JSON.stringify(['include:us(basic)', 'include:level3(ralt_switch)']),
+	`xkeyboard-config Esperanto: KeyQ ${JSON.stringify(epo.layout.rows.KeyQ)}, unread ${JSON.stringify(epo.unmapped)}`
+);
+moreResults.push(['xkeyboard-config bépo', xkbBepo], ['xkeyboard-config.epo', epo]);
+
+// Windows KLC as the Colemak Mod-DH project publishes them (CC0): one UTF-8,
+// one UTF-16, each with its dead keys and their tables.
+for (const [file, bottom] of [
+	['mod-dh.colemak_dh_iso_uk.klc', 'zxcdv\\kh,./'],
+	['mod-dh.colemak_dh_ansi_us.klc', 'zxcdvzkh,./']
+]) {
+	const result = thirdPartyBytes(file);
+	const codes = ['IntlBackslash', ...LETTER_ROWS[2]];
+	const acute = Object.entries(result.layout.dead).find(([, rules]) => rules.e === 'é');
+	check(
+		result.format === 'klc' &&
+			row(result.layout, LETTER_ROWS[0]) === 'qwfpbjluy;' &&
+			row(result.layout, LETTER_ROWS[1]) === 'arstgmneio' &&
+			row(result.layout, codes) === bottom &&
+			Object.keys(result.layout.dead).length >= 10 &&
+			acute !== undefined &&
+			result.unmapped.length === 0,
+		`${file}: rows ${row(result.layout, LETTER_ROWS[1])} ${row(result.layout, codes)}, ${Object.keys(result.layout.dead).length} dead keys, unread ${JSON.stringify(result.unmapped)}`
+	);
+	moreResults.push([file, result]);
+}
+
+// DOF as libdof's own examples write it (Apache-2.0): a full ANSI-shaped
+// board anchored at its top left key with Shift and AltGr layers, magic keys
+// and combos; libdof's minimal valid file on its ANSI preset; a colstag block
+// with a letter on a thumb; a board shape the Studio has no keys for.
+const maximal = thirdParty('libdof.maximal.dof');
+check(
+	maximal.format === 'dof' &&
+		JSON.stringify(maximal.layout.rows.Backquote) === JSON.stringify(['`', '~', null, null]) &&
+		JSON.stringify(maximal.layout.rows.Digit8.slice(0, 2)) === JSON.stringify(['8', '*']) &&
+		JSON.stringify(maximal.layout.rows.KeyU) === JSON.stringify(['u', 'U', 'ü', null]) &&
+		JSON.stringify(maximal.layout.rows.KeyT) === JSON.stringify(['t', 'T', 'tb', null]) &&
+		JSON.stringify(maximal.layout.rows.Space.slice(0, 2)) === JSON.stringify([' ', ' ']) &&
+		JSON.stringify(maximal.unmapped.map((u) => `${u.what}:${u.detail}`)) ===
+			JSON.stringify([
+				'rule:&mgc',
+				'key:4:7 (ß)',
+				'key:4:4 (altgr)',
+				'key:4:7 (SS)',
+				'rule:&mgc2',
+				'rule:d f',
+				'rule:j k',
+				'rule:sft-2 ?'
+			]),
+	`libdof maximal: Backquote ${JSON.stringify(maximal.layout.rows.Backquote)}, KeyU ${JSON.stringify(maximal.layout.rows.KeyU)}, unread ${JSON.stringify(maximal.unmapped)}`
+);
+const minimal = thirdParty('libdof.minimal_valid.dof');
+check(
+	LETTER_ROWS.every((codes) => row(minimal.layout, codes) === row(qwerty, codes)) &&
+		minimal.layout.rows.Semicolon[1] === ':' &&
+		minimal.layout.rows.Quote[1] === '"' &&
+		minimal.layout.fingering === 'angle' &&
+		minimal.unmapped.length === 0,
+	`libdof minimal: ${LETTER_ROWS.map((codes) => row(minimal.layout, codes)).join(' ')}`
+);
+const aptmak = thirdParty('libdof.aptmak.dof');
+check(
+	row(aptmak.layout, LETTER_ROWS[1]) === 'rsthkxnaio' &&
+		JSON.stringify(aptmak.unmapped) === JSON.stringify([{ what: 'key', detail: '3:4 (e)' }]),
+	`libdof aptmak: home ${row(aptmak.layout, LETTER_ROWS[1])}, unread ${JSON.stringify(aptmak.unmapped)}`
+);
+const buggy = thrown(() => thirdParty('libdof.buggy.dof'));
+check(
+	buggy && buggy.code === 'format_unsupported_board' && buggy.detail === 'custom',
+	`libdof buggy: a custom board is not refused (${buggy && buggy.message})`
+);
+moreResults.push(['libdof.maximal.dof', maximal], ['libdof.aptmak.dof', aptmak]);
+
+// genkey (semilin/genkey, GPL-3.0, so no file of it is shipped here): a layout
+// written the way its layouts folder holds them, a file without an extension.
+const GENKEY_TEXT = [
+	'Colemak DH Angle',
+	'q w f p b j l u y ;',
+	'a r s t g m n e i o Quote',
+	'x c d v z k h , . /',
+	'0 1 2 3 3 4 4 5 6 7',
+	'0 1 2 3 3 4 4 5 6 7 7',
+	'1 2 3 3 3 4 4 5 6 7',
+	''
+].join('\n');
+const genkey = F.read('colemak_dh_angle', GENKEY_TEXT, {});
+check(
+	genkey.format === 'genkey' &&
+		genkey.layout.name === 'Colemak DH Angle' &&
+		row(genkey.layout, [...HOME_ROW, 'Quote']) === 'arstgmneioq' &&
+		row(genkey.layout, LETTER_ROWS[2]) === 'xcdvzkh,./' &&
+		genkey.layout.fingering === 'angle' &&
+		F.read('rows.txt', 'q w e\na s d\nz x c\n', {}).format === 'rows',
+	`genkey: ${genkey.format} ${row(genkey.layout, HOME_ROW)} ${genkey.layout.fingering}`
+);
+
+// Writers: every real layout above, and the repository's own, written as DOF,
+// genkey and cmini, reads back to the same keys; what a format cannot hold is
+// reported, never dropped.
+const ISO_GRID = Object.values(F.XKB_KEYS);
+const cells = (layout, codes, levels) =>
+	JSON.stringify(
+		codes.map((code) =>
+			levels.map((level) => {
+				const cell = (layout.rows[code] || [])[level];
+				return typeof cell === 'string' ? cell : null;
+			})
+		)
+	);
+let writerRoundTrips = 0;
+for (const [name, result] of [
+	['Ergo-L TOML', ergolToml],
+	['bépo .keylayout', bepo],
+	['Ergopti 1DK KLC', read.klc],
+	...moreResults
+]) {
+	const dofOut = F.toDof(result.layout);
+	const dofBack = F.fromDof(JSON.parse(dofOut.text));
+	// A file that states no space bar (an XKB variant over another) gets the
+	// space every DOF reading gives it.
+	const expected = JSON.parse(JSON.stringify(result.layout));
+	if (!expected.rows.Space) expected.rows.Space = [' ', null, null, null];
+	const deadCount = Object.values(result.layout.rows)
+		.flat()
+		.filter((cell) => cell && typeof cell === 'object').length;
+	check(
+		cells(dofBack.layout, ISO_GRID, [0, 1, 2, 3]) ===
+			cells(expected, ISO_GRID, [0, 1, 2, 3]).replace(/" "|" "/g, 'null') &&
+			dofBack.unmapped.length === 0 &&
+			dofOut.unmapped.filter((u) => u.what === 'dead_key').length <= deadCount,
+		`${name}: DOF import, export, import gives other keys (${JSON.stringify(dofOut.unmapped.slice(0, 4))})`
+	);
+	check(
+		dofOut.unmapped.every((u) => u.what === 'dead_key' || u.what === 'character'),
+		`${name}: DOF reports ${JSON.stringify(dofOut.unmapped)}`
+	);
+	for (const [format, write, readBack] of [
+		['genkey', F.toGenkey, (text) => F.read('layout', text, {})],
+		['cmini', F.toCmini, (text) => F.read('layout.json', text, {})]
+	]) {
+		const out = write(result.layout);
+		const back = readBack(out.text);
+		const kept = (layout) =>
+			LETTER_ROWS.map((codes) =>
+				codes.map((code) => {
+					const cell = (layout.rows[code] || [])[0];
+					return typeof cell === 'string' &&
+						Array.from(cell).length === 1 &&
+						cell === cell.toLowerCase() &&
+						!/[\s~*]/.test(cell)
+						? cell
+						: null;
+				})
+			);
+		check(
+			back.format === format &&
+				JSON.stringify(kept(back.layout)) === JSON.stringify(kept(result.layout)) &&
+				back.unmapped.length === 0 &&
+				back.layout.fingering === result.layout.fingering,
+			`${name}: ${format} import, export, import gives other keys`
+		);
+		writerRoundTrips++;
+	}
+	writerRoundTrips++;
+}
+// A letter-block format names what it leaves out: Ergo-L's dead keys and its
+// AltGr layer, bépo's dead key on KeyY.
+const ergolGenkey = F.toGenkey(ergolToml.layout);
+check(
+	ergolGenkey.unmapped.some((u) => u.what === 'layer' && u.detail === 'AltGr') &&
+		ergolGenkey.unmapped.some((u) => u.what === 'dead_key'),
+	`Ergo-L genkey: losses ${JSON.stringify(ergolGenkey.unmapped)}`
+);
+// A cmini thumb key and a DOF space other than the space bar's are named.
+const cminiThumb = F.read(
+	'thumb.json',
+	JSON.stringify({
+		name: 't',
+		board: 'stagger',
+		keys: { a: { row: 1, col: 0 }, e: { row: 3, col: 0 } }
+	}),
+	{}
+);
+check(
+	JSON.stringify(cminiThumb.unmapped) === JSON.stringify([{ what: 'key', detail: '3:0 (e)' }]),
+	`cmini: a thumb key is not named (${JSON.stringify(cminiThumb.unmapped)})`
+);
+// A JIS key the ISO board lacks is named too.
+const nbsp = F.toDof({
+	id: 'n',
+	name: 'n',
+	rows: { Space: [' ', '\u00a0', null, null], IntlRo: ['\\', '_', null, null] },
+	dead: {}
+});
+check(
+	JSON.stringify(nbsp.unmapped) ===
+		JSON.stringify([
+			{ what: 'key', detail: 'IntlRo (\\ _)' },
+			{ what: 'character', detail: 'Space: U+00A0' }
+		]),
+	`DOF: a JIS key or a non-breaking space is not reported (${JSON.stringify(nbsp.unmapped)})`
+);
+for (const [name, result] of [...moreResults, ['genkey', genkey], ['libdof minimal', minimal]])
+	try {
+		Source.validate(F.toSource(result.layout));
+	} catch (error) {
+		check(false, `${name}: toSource is invalid (${error.code} ${error.path})`);
+	}
+
 // ====================================================
-// ======= 9/ Malformed files: refused, never a crash ===
+// ======= 10/ Malformed files: refused, never a crash ===
 // ====================================================
 
 const REFUSAL_CODES = new Set([
@@ -712,7 +1029,26 @@ for (const [name, text] of [
 	['a.toml', 'name = "'],
 	['a.txt', ''],
 	['a.keylayout', '<keyboard group="0"'],
-	['a.xkb', 'xkb_symbols "x" {\n key <AC01> { [ ] };\n};']
+	['a.xkb', 'xkb_symbols "x" {\n key <AC01> { [ ] };\n};'],
+	['a.xkb', 'xkb_symbols "x" {\n key <AC01> { [ UFFFFFF, U110000 ] };\n};'],
+	['a.xkb', 'xkb_symbols "x" {\n key <AC01> { type[group1] = "A", actions[Group1] = [ x ] };\n};'],
+	['a.dof', '{"name": "x", "board": "moon", "layers": {"main": ["a"]}}'],
+	['a.dof', '{"board": "ansi", "anchor": [-1, 0], "layers": {"main": ["a"]}}'],
+	['a.dof', '{"board": "ansi", "anchor": [99, 99], "layers": {"main": ["a"]}}'],
+	['a.dof', '{"board": ["k k", 3], "layers": {"main": ["a"]}}'],
+	['a.dof', '{"board": "ortho", "layers": {"main": "a b c"}}'],
+	['a.dof', '{"board": "ortho", "layers": {"main": ["a"], "shift": [7]}}'],
+	['a.dof', '{"board": "ortho", "layers": {"main": ["& @ * ~ \\\\~ #"]}, "magic": {"m": 3}}'],
+	['a.dof', '{"layers": {"main": ["a"]}}'],
+	['a.json', '{"keys": {"a": {"row": 0.5, "col": 1}}}'],
+	['a.json', '{"keys": {"a": {"row": -1, "col": 1}}}'],
+	['a.txt', 'name\na\nb\nc\n0\n1\nx'],
+	['genkey', 'name\na\nb\nc\n0\n1\n2'],
+	['genkey', '\n\n\n\n\n\n\n'],
+	[
+		'a.json',
+		'{"keyboardType": "matrix", "keys": [{"id": -3, "primary": 97}, {"id": 1e9, "primary": 98}]}'
+	]
 ])
 	tryRead(`${name} ${JSON.stringify(text)}`, () => F.read(name, text, readTools));
 // Real files cut short or with bytes overwritten, from a fixed seed.
@@ -725,10 +1061,21 @@ for (const file of [
 	path.join(BUILT, 'ergo_1dk.xkb_symbols'),
 	path.join(BUILT, 'ergo_1dk.json'),
 	path.join(THIRD_PARTY, 'ergol.toml'),
-	kbeFiles[0]
+	kbeFiles[0],
+	path.join(THIRD_PARTY, 'xkeyboard-config.epo.xkb_symbols'),
+	path.join(THIRD_PARTY, 'mod-dh.colemak_dh_iso_uk.klc'),
+	path.join(THIRD_PARTY, 'mod-dh.colemak_dh_ansi_us.klc'),
+	path.join(THIRD_PARTY, 'libdof.maximal.dof'),
+	path.join(THIRD_PARTY, 'libdof.aptmak.dof'),
+	// Files the writers make: a genkey layout (no extension) and a DOF.
+	['colemak_dh_angle', GENKEY_TEXT],
+	['written.dof', F.toDof(ergolToml.layout).text],
+	['written.cmini.json', F.toCmini(ergolToml.layout).text]
 ]) {
-	const bytes = new Uint8Array(fs.readFileSync(file));
-	const name = path.basename(file);
+	const bytes = Array.isArray(file)
+		? new TextEncoder().encode(file[1])
+		: new Uint8Array(fs.readFileSync(file));
+	const name = Array.isArray(file) ? file[0] : path.basename(file);
 	for (const cut of [0, 1, 21, 100, Math.floor(bytes.length / 2)])
 		tryRead(`${name} cut at ${cut}`, () => F.readBytes(name, bytes.subarray(0, cut), readTools));
 	for (let i = 0; i < 20; i++) {
@@ -743,7 +1090,7 @@ const empty = thrown(() => F.read('a.txt', '\n\n', readTools));
 check(empty && empty.code === 'format_invalid', 'a file that places no character is imported');
 
 // =================================================
-// ======= 10/ Messages, pickers and decoding ======
+// ======= 11/ Messages, pickers and decoding ======
 // =================================================
 
 // Every refusal and every loss the readers and writers report has words in
@@ -754,7 +1101,10 @@ const catalogues = fs
 	.filter((file) => /^[a-z]{2}\.json$/.test(file))
 	.map((file) => [file, JSON.parse(fs.readFileSync(path.join(LOCALES, file), 'utf8'))]);
 check(catalogues.length === 21, `${catalogues.length} locales`);
-['dead_key', 'multi_character'].forEach((what) => lossKinds.add(what));
+// The writers' losses, and every kind the module declares, whether or not a file above showed it.
+['dead_key', 'multi_character', 'layer', 'rule', 'special', 'character'].forEach((what) =>
+	lossKinds.add(what)
+);
 for (const what of lossKinds) {
 	const { key } = F.lossMessage({ what, detail: 'x' });
 	for (const [file, strings] of catalogues)
@@ -783,6 +1133,28 @@ check(
 		JSON.stringify(Array.from(F.EXTENSIONS)),
 	'source.pick_extensions differs from LAYOUT_FORMATS.EXTENSIONS'
 );
+// Each interoperability download of the editor's « Format » list has words in
+// every locale and a file type the app's hosts write to Downloads.
+const editorPage = fs.readFileSync(path.join(UI, 'layout_editor', 'editor_page.js'), 'utf8');
+const interop = Array.from(
+	editorPage.matchAll(/\['(\w+)', (?:klaExport|LAYOUT_FORMATS\.to\w+), '([\w.]+)', '[\w/+.-]+'\]/g)
+);
+check(
+	JSON.stringify(interop.map((m) => m[1])) ===
+		JSON.stringify(['kla', 'kalamine', 'dof', 'genkey', 'cmini']),
+	`editor interoperability downloads: ${interop.map((m) => m[1]).join(' ')}`
+);
+for (const [, id, extension] of interop) {
+	check(
+		layoutDefaults.source.export_extensions.includes(extension.split('.').pop()),
+		`the ${id} download (.${extension}) is not in source.export_extensions`
+	);
+	for (const [file, strings] of catalogues)
+		check(
+			typeof strings[`layout_editor.export.option.${id}`] === 'string',
+			`${file}: layout_editor.export.option.${id}`
+		);
+}
 // The editor reads a picked UTF-16 KLC as the Comparer does.
 check(
 	F.decode(new Uint8Array(fs.readFileSync(path.join(BUILT, 'ergo_1dk.klc')))) === klcText,
@@ -795,5 +1167,5 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 console.log(
-	`test-layout-formats: OK (4 formats of one layout, ${3 + klaResults.length} third-party files, ${Object.keys(reference).length} characters, ${compared} KLA keys, ${klaRoundTrips} KLAnext and ${keylayoutRoundTrips} .keylayout round trips, ${kbeFiles.length} .kbe refused, malformed files refused)`
+	`test-layout-formats: OK (4 formats of one layout, ${3 + klaResults.length + moreResults.length + 2} third-party files, ${Object.keys(reference).length} characters, ${compared} KLA keys, ${klaRoundTrips} KLAnext, ${keylayoutRoundTrips} .keylayout and ${writerRoundTrips} DOF, genkey and cmini round trips, ${kbeFiles.length} .kbe refused, malformed files refused)`
 );

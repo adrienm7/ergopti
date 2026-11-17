@@ -44,7 +44,7 @@
 		"max_file_bytes": 4194304,
 		"max_name_length": 80,
 		"nav_file": "layers.toml",
-		"export_extensions": ["zip", "klc", "json", "toml"],
+		"export_extensions": ["zip", "klc", "json", "toml", "dof", "txt"],
 		"pick_extensions": [
 			"toml",
 			"keylayout",
