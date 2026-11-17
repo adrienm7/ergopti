@@ -131,6 +131,30 @@ waits for the maintainer's review).
 - [ ] **Optimizer follow-ups.** Pasted texts and files as corpora (as the Comparer); zones in the page (restrict a
       letter to keys by clicking them); per-viewer saved choices (localStorage); a browser test of the tab in
       `layout-editor.playwright.cjs` style.
+- [ ] **Incremental scoring with context choices.** Since the engine types each character the way that costs least
+      in its context, `scoreSession` falls back to a whole-stream walk whenever the layout or the trial offers a
+      choice of ways or uses a chord (exact, but Swann: Ergopti 95 → 17, Ergo-L 130 → 18 trials per second; AZERTY
+      unchanged). Re-walk only the n-grams of the characters whose ways changed and of the multi-way characters whose
+      shares of ways changed, re-planning only their contexts; keep the property test's 1e-9 bound
+      (docs/design/layout-optimizer.md, « Follow-ups »).
+
+## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
+
+Design: [docs/design/layout-analysis.md](docs/design/layout-analysis.md), « Ways of typing » and « Coverage and
+simplicity bonuses ».
+
+- [ ] **To review by the maintainer** (decided by the agent on 2026-11-16):
+  - the choice of ways uses the default weights, not the user's, so live weight editing (`rescore`) stays exact;
+  - a dead key closed by the space bar (any level) is never a context alternative: the pair metrics leave thumb keys
+    out, so it hid SFBs behind an extra press (bépo typed « . » that way 6,936 times on Nemolivier);
+  - `coverage_cap` 1,000 and the weights `coverage_bonus` 0.05, `simplicity` 0.03 (each bonus worth less than one
+    point of SFB);
+  - `char_coverage` (share of `reference_characters`, weight 0.1) is kept beside the new coverage bonus: retire it,
+    or keep both;
+  - simplicity rules left out as not objective: shifted sign related to its base sign, consistent layer logic, few
+    mechanisms;
+  - the trigram metrics of a layout with choices complete a fourth character as a Markov chain (SFS within 0.04
+    points of the text’s own stream on Swann and Nemolivier).
 
 ## Layout generator from an Ergopti TOML source
 
