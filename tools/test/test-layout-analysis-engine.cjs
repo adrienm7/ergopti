@@ -25,7 +25,12 @@
  * 5. Incremental score: scoreSession gives the full analysis's score after
  *    random swaps of any cells and dead-key rules (a property test), keeps a
  *    trial only once committed, and refuses a layout on another board.
- * 6. Speed: the whole library on a 2.5 MB corpus, from prepared tables, well
+ * 6. Ways of typing: in context the cheaper copy of a character (« a. »,
+ *    « b. »), direct, AltGr or dead key by their documented costs, a
+ *    two-character output only when cheaper than its two taps, one way per
+ *    character exactly as the fixed path, and the best path never above the
+ *    fixed one (seeded random layouts).
+ * 7. Speed: the whole library on a 2.5 MB corpus, from prepared tables, well
  *    under a second.
  * ==============================================================================
  */
@@ -311,27 +316,69 @@ check(heat.KeyF.sfb === 0 && heat.KeyE.presses === 50, 'keys: other keys carry n
 // =====================================
 
 /**
+ * Types a text the way the engine's typing plan does, token by token: a
+ * chord where its two characters follow each other, then each token's way
+ * chosen from the tokens before and after it (null at an edge or beside an
+ * unsupported character).
+ * @returns {Array<object|null>} One way per token, null for an unsupported one.
+ */
+function typeSegment(plan, segment) {
+	const chars = Array.from(segment);
+	const tokens = [];
+	for (let i = 0; i < chars.length; i++) {
+		if (i + 1 < chars.length && plan.chords.includes(chars[i] + chars[i + 1])) {
+			tokens.push(chars[i] + chars[i + 1]);
+			i++;
+		} else tokens.push(chars[i]);
+	}
+	const known = (token) => (token !== undefined && plan.ways.has(token) ? token : null);
+	return tokens.map((token, i) => {
+		const ways = plan.ways.get(token);
+		if (!ways) return null;
+		return { token, way: ways[plan.choose(known(tokens[i - 1]), token, known(tokens[i + 1]))] };
+	});
+}
+
+/**
  * Counts SFBs and alternations on the expanded key stream of a text, the
- * definition the tables must reproduce.
+ * definition the tables must reproduce. The tables complete as a Markov chain
+ * only the n-grams whose way needs a fourth character: a pair of two
+ * multi-way tokens, a triple whose first or last token (not the middle one's)
+ * has several ways; those are counted apart (markovBigrams, markovTrigrams),
+ * everything else must match exactly.
  */
 function streamCounts(layout, text, keyboardId) {
-	const board = E.keyboard(keyboardId);
-	const best = E.compileLayout(layout, board, null);
+	const plan = E.typingPlan(layout, E.ngramsFromText(text), { keyboard: keyboardId });
+	const board = plan.board;
 	const thumb = (k) => board.finger[k] === 4 || board.finger[k] === 5;
-	const counts = { bigrams: 0, sfb: 0, trigrams: 0, alternation: 0, sfs: 0 };
+	const counts = {
+		bigrams: 0,
+		sfb: 0,
+		trigrams: 0,
+		alternation: 0,
+		sfs: 0,
+		markovBigrams: 0,
+		markovTrigrams: 0
+	};
 	for (const segment of text.split(/[\r\n\t]+/)) {
+		// Each key with the index of its token and whether that token has several ways.
 		const keys = [];
 		const flush = () => {
 			for (let i = 0; i + 1 < keys.length; i++) {
-				const [a, b] = [keys[i], keys[i + 1]];
+				const [x, y] = [keys[i], keys[i + 1]];
+				const [a, b] = [x.k, y.k];
 				if (thumb(a) || thumb(b)) continue;
 				counts.bigrams++;
+				if (x.token !== y.token && x.multi && y.multi) counts.markovBigrams++;
 				if (a !== b && board.finger[a] === board.finger[b]) counts.sfb++;
 			}
 			for (let i = 0; i + 2 < keys.length; i++) {
-				const [a, b, c] = [keys[i], keys[i + 1], keys[i + 2]];
+				const [x, y, z] = [keys[i], keys[i + 1], keys[i + 2]];
+				const [a, b, c] = [x.k, y.k, z.k];
 				if (thumb(a) || thumb(b) || thumb(c)) continue;
 				counts.trigrams++;
+				if ((x.multi && x.token !== y.token) || (z.multi && z.token !== y.token))
+					counts.markovTrigrams++;
 				if (board.finger[a] === board.finger[c] && a !== c) counts.sfs++;
 				const sameFinger =
 					board.finger[a] === board.finger[b] || board.finger[b] === board.finger[c];
@@ -340,12 +387,15 @@ function streamCounts(layout, text, keyboardId) {
 			}
 			keys.length = 0;
 		};
-		for (const char of Array.from(segment)) {
-			const seq = best.get(char);
+		typeSegment(plan, segment).forEach((seq, token) => {
 			// An unsupported character cuts the stream, as it cuts the tables.
-			if (!seq) flush();
-			else keys.push(...seq.keys);
-		}
+			if (!seq) {
+				flush();
+				return;
+			}
+			const multi = plan.ways.get(seq.token).length > 1;
+			for (const k of seq.way.keys) keys.push({ k, token, multi });
+		});
 		flush();
 	}
 	return counts;
@@ -367,18 +417,40 @@ for (const id of ['azerty', 'bepo', 'ergol', 'ergopti_plus', 'qwerty']) {
 		`${id}: ${result.coverage.trigrams} key trigrams from tables, ${expected.trigrams} on the stream`
 	);
 	const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
+	// Exact, but for the share of the n-grams the Markov completion estimates.
+	const within = (got, want, markov, whole) =>
+		Math.abs(got - want) <= pct(markov, whole) + TOLERANCE * Math.max(1, Math.abs(want));
 	check(
-		near(result.metrics.sfb, pct(expected.sfb, expected.bigrams)),
+		within(
+			result.metrics.sfb,
+			pct(expected.sfb, expected.bigrams),
+			expected.markovBigrams,
+			expected.bigrams
+		),
 		`${id}: SFB differs from the stream`
 	);
 	check(
-		near(result.metrics.sfs, pct(expected.sfs, expected.trigrams)),
+		within(
+			result.metrics.sfs,
+			pct(expected.sfs, expected.trigrams),
+			expected.markovTrigrams,
+			expected.trigrams
+		),
 		`${id}: SFS differs from the stream`
 	);
 	check(
-		near(result.metrics.alternation, pct(expected.alternation, expected.trigrams)),
+		within(
+			result.metrics.alternation,
+			pct(expected.alternation, expected.trigrams),
+			expected.markovTrigrams,
+			expected.trigrams
+		),
 		`${id}: alternation differs from the stream`
 	);
+	// The completion has something to do on this text for some layout, and on
+	// one with a single way per character (QWERTY) nothing at all.
+	if (id === 'qwerty')
+		check(expected.markovBigrams + expected.markovTrigrams === 0, 'qwerty: no n-gram to complete');
 }
 // keyNgrams, the input of the analyser scorers, holds the same stream.
 {
@@ -924,8 +996,179 @@ for (const layout of library) {
 	console.log(`  incremental: ${trials} trials, largest gap ${worst.toExponential(1)}`);
 }
 
+// =================================
+// ======= 6/ Ways of typing =======
+// =================================
+
+// A toy layout: code → base cell (string or {dead}), or the four cells.
+const toy = (id, cells, dead) =>
+	E.layoutFromRows({
+		id,
+		rows: Object.fromEntries(
+			Object.entries(cells).map(([code, cell]) => [
+				code,
+				Array.isArray(cell) ? cell : [cell, null, null, null]
+			])
+		),
+		dead: dead || {}
+	});
+const firstStep = (result, char) => result.typing.paths[char][0].steps[0][0];
+const onlyKind = (result, char) =>
+	result.typing.paths[char].length === 1 ? result.typing.paths[char][0].kind : 'several';
+
+// « a. » and « b. »: the dot on KeyE (left middle finger, like a on KeyD) and
+// on KeyU (right index, like b on KeyJ). Out of context both cost one press
+// (the lower key, KeyE, is the fixed way); after a, KeyE is a same-finger
+// bigram, so the dot is typed on KeyU, and after b on KeyE.
+{
+	const layout = toy('toy_dots', { KeyD: 'a', KeyJ: 'b', KeyE: '.', KeyU: '.' });
+	const afterA = E.analyse(layout, E.ngramsFromText('a.'), { keyboard: 'iso' });
+	const afterB = E.analyse(layout, E.ngramsFromText('b.'), { keyboard: 'iso' });
+	check(
+		firstStep(afterA, '.') === 'KeyU',
+		`ways: « a. » types the dot on ${firstStep(afterA, '.')}`
+	);
+	check(
+		firstStep(afterB, '.') === 'KeyE',
+		`ways: « b. » types the dot on ${firstStep(afterB, '.')}`
+	);
+	check(
+		afterA.metrics.sfb === 0 && afterB.metrics.sfb === 0,
+		'ways: neither « a. » nor « b. » is an SFB'
+	);
+	const fixed = E.analyse(layout, E.ngramsFromText('a.'), { keyboard: 'iso', typing: 'fixed' });
+	check(fixed.metrics.sfb === 100, 'ways: the fixed path types « a. » as an SFB');
+	check(afterA.typing.cost < fixed.typing.cost, 'ways: the best path of « a. » costs less');
+}
+
+// Direct, AltGr or dead key, by the documented costs (default weights:
+// distance 1/mm, home_row 0.3, pinky_load 0.3, modifier and dead-key use 0.5,
+// sfb 10; ISO reaches KeyR, KeyP, KeyE 19.636 mm, AltRight 69.056 mm). In
+// « fé » there are 2 characters and 1 bigram, so a pair counts 100 × 2 per
+// point of weight:
+// - é on KeyR (left index, like f): 19.636 + 10 × 200 (SFB) = 2019.636;
+// - AltGr+KeyL (home): −30 (home) + 69.056 (AltRight) + 50 (modifier) = 89.056;
+// - dead key KeyP then e on KeyE: 19.636 + 30 (pinky) + 19.636 + 50 (dead key)
+//   = 119.272, both pairs changing hands.
+// Alone, é is typed directly (19.636 is the least).
+{
+	const cells = {
+		KeyF: 'f',
+		KeyR: 'é',
+		KeyE: 'e',
+		KeyL: [null, null, 'é', null],
+		KeyP: { dead: 'acute' }
+	};
+	const dead = { acute: { e: 'é' } };
+	const full = toy('toy_access', cells, dead);
+	const alone = E.analyse(full, E.ngramsFromText('é'), { keyboard: 'iso' });
+	check(onlyKind(alone, 'é') === 'direct', `ways: é alone is typed ${onlyKind(alone, 'é')}`);
+	const afterF = E.analyse(full, E.ngramsFromText('fé'), { keyboard: 'iso' });
+	check(onlyKind(afterF, 'é') === 'altgr', `ways: « fé » types é by ${onlyKind(afterF, 'é')}`);
+	// f on the home row (−30), é through AltGr (89.056), over 2 characters.
+	check(
+		Math.abs(afterF.typing.cost - (-30 + 89.056) / 2) < 1e-3,
+		`ways: « fé » costs ${afterF.typing.cost}`
+	);
+	const noAltGr = toy('toy_access_dead', Object.assign({}, cells, { KeyL: null }), dead);
+	const deadKey = E.analyse(noAltGr, E.ngramsFromText('fé'), { keyboard: 'iso' });
+	check(
+		onlyKind(deadKey, 'é') === 'dead',
+		`ways: without AltGr, « fé » types é by ${onlyKind(deadKey, 'é')}`
+	);
+	check(deadKey.metrics.dead_key_usage === 50, 'ways: the dead key types one character of two');
+}
+
+// A two-character output: AltGr+KeyR types « ab ». With a on KeyQ and b on
+// KeyA (both the left pinky) the two taps cost 49.636 + 0 + 2000 (SFB), the
+// chord 19.636 + 69.056 + 2 × 50 (two characters with AltGr) = 188.692: the
+// chord wins. With a on KeyF and b on KeyJ the taps cost −30 − 30 = −60.
+{
+	const chord = [null, null, 'ab', null];
+	const sfbLayout = toy('toy_chord', { KeyQ: 'a', KeyA: 'b', KeyR: chord });
+	const viaChord = E.analyse(sfbLayout, E.ngramsFromText('ab'), { keyboard: 'iso' });
+	check(viaChord.typing.chords.ab === 1, 'chords: « ab » is typed with its chord');
+	check(
+		viaChord.metrics.sfb === 0 && viaChord.coverage.typed === 2,
+		'chords: no SFB, two characters'
+	);
+	check(near(viaChord.metrics.modifier_usage, 100), 'chords: both characters typed with AltGr');
+	const apart = toy('toy_chord_apart', { KeyF: 'a', KeyJ: 'b', KeyR: chord });
+	const viaTaps = E.analyse(apart, E.ngramsFromText('ab'), { keyboard: 'iso' });
+	check(Object.keys(viaTaps.typing.chords).length === 0, 'chords: two cheap taps beat the chord');
+	check(
+		viaTaps.coverage.typed === 2 && viaTaps.metrics.modifier_usage === 0,
+		'chords: typed by two taps'
+	);
+}
+
+// One way per character: the best path is the fixed path, metric for metric.
+for (const id of ['qwerty', 'azerty']) {
+	const tables = E.ngramsFromText(STREAM_TEXT);
+	const best = E.analyse(byId.get(id), tables, { keyboard: 'iso' });
+	const fixed = E.analyse(byId.get(id), tables, { keyboard: 'iso', typing: 'fixed' });
+	for (const metric of Object.keys(E.METRICS))
+		check(
+			best.metrics[metric] === fixed.metrics[metric],
+			`ways: ${id} ${metric} moved without a choice`
+		);
+	check(
+		best.typing.changed === 0 && best.typing.alternatives === 0,
+		`ways: ${id} has no alternative`
+	);
+}
+let refused = false;
+try {
+	E.analyse(byId.get('qwerty'), E.ngramsFromText('a'), { typing: 'fastest' });
+} catch {
+	refused = true;
+}
+check(refused, 'ways: an unknown typing mode is refused');
+
+// Property: where the characters with several ways stand at least three
+// places apart, the best path never costs more than the fixed one (random
+// toy layouts and texts from a fixed seed).
+{
+	let seed = 20261116;
+	const random = () => {
+		seed = (seed + 0x6d2b79f5) | 0;
+		let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
+	const pick = (list) => list[Math.floor(random() * list.length)];
+	const codes = E.typingCodes().filter((code) => /^Key/.test(code));
+	const singles = 'abcdefghijkl'.split('');
+	const multis = ['.', ',', 'é'];
+	for (let trial = 0; trial < 40; trial++) {
+		const free = codes.slice().sort(() => random() - 0.5);
+		const rows = {};
+		for (const char of singles) rows[free.pop()] = [char, null, null, null];
+		for (const char of multis)
+			for (let copy = 0; copy < 2 + Math.floor(random() * 2); copy++) {
+				const code = free.pop();
+				rows[code] = [null, null, null, null];
+				rows[code][random() < 0.5 ? 0 : 2] = char;
+			}
+		const layout = E.layoutFromRows({ id: `toy_random_${trial}`, rows });
+		let text = '';
+		for (let i = 0; i < 300; i++) {
+			text += pick(singles) + pick(singles) + pick(singles);
+			if (random() < 0.7) text += pick(multis);
+			if (random() < 0.1) text += '\n';
+		}
+		const tables = E.ngramsFromText(text);
+		const best = E.analyse(layout, tables, { keyboard: 'iso' });
+		const fixed = E.analyse(layout, tables, { keyboard: 'iso', typing: 'fixed' });
+		check(
+			best.typing.cost <= fixed.typing.cost + 1e-9,
+			`ways: trial ${trial} best path ${best.typing.cost} above the fixed ${fixed.typing.cost}`
+		);
+	}
+}
+
 // ========================
-// ======= 6/ Speed =======
+// ======= 7/ Speed =======
 // ========================
 
 const prepared = E.prepareNgrams(E.ngramsFromText(fs.readFileSync(SPEED_CORPUS, 'utf8')));

@@ -72,11 +72,14 @@ shortcut_key_ease}`; `shortcuts(table)` → `table` checked (the model's
   `formFactorWeights(weights)` → `weights` checked (every form factor, no
   other, each ≥ 0, not all zero), refused as `form_weights_not_object`,
   `form_factor_unknown`, `form_factor_weight` or `form_weights_zero`.
-- `analyse(layout, ngrams, {keyboard?, weights?, idealLoad?, shortcuts?, formWeights?, profile?, keyGroups?})` → one
+- `analyse(layout, ngrams, {keyboard?, weights?, idealLoad?, shortcuts?, formWeights?, profile?, keyGroups?, typing?})` → one
   result (`idealLoad` replaces the default target of `finger_imbalance`,
   `shortcuts` the table of `shortcut_left`, `formWeights` the weights of
   `compact_fit`;
-  `keyGroups: true` counts every key's worst groups for every event, below):
+  `keyGroups: true` counts every key's worst groups for every event, below;
+  `typing: 'fixed'` types every character its cheapest way out of context, the
+  path the best one is compared with, `'best'` (the default) is described in
+  [Ways of typing](#ways-of-typing)):
 
   ```js
   {
@@ -92,9 +95,17 @@ shortcut_key_ease}`; `shortcuts(table)` → `table` checked (the model's
     keys: {KeyE: {presses, sfb, sfs, lsb, scissors, redirect, cost: {metric: part},
                   worst: {event: [[[codes], %], ...]}}, ...},
     coverage: {typed, unsupported, unsupportedChars: {char: count}, bigrams, trigrams},
+    typing: {mode, cost, alternatives, changed, paths, chords},  // Ways of typing
     score: {total, contributions: {metric: points}, weights}
   }
   ```
+
+  `typing.cost` is the points the keystroke metrics take along the path typed
+  (what the choice minimises), `alternatives` the corpus characters with
+  several ways, `changed` the % of the typed characters typed otherwise than
+  their cheapest way alone, `paths` each such character's ways
+  (`{kind: direct|shift|altgr|dead|chord|substitution, steps: [[code, level]],
+count}`), `chords` the multi-character outputs used with their counts.
 
   `keys` feeds the Studio's live heatmaps: each key's share of the presses and
   the share of the bigrams (`sfb`, `lsb`, `scissors` full and half) or trigrams
@@ -137,7 +148,18 @@ changed, commit()}}`: the global score of layouts that change a little at a
   key sequence changed, through the same visitor as `analyse()`; `commit`
   makes the trial's layout the one the next trials are measured from. A
   layout on another board is refused. See
-  [layout-optimizer.md](layout-optimizer.md).
+  [layout-optimizer.md](layout-optimizer.md). The partial walk holds only
+  while the current layout and the trial each type every corpus character
+  one way (no character with several ways, no chord); otherwise the trial
+  walks the whole stream again, exact but at the cost of an analysis
+  (below, Performance).
+- `compileWays(layout, board, missing)` → `{ways, texts, best, distinct}`:
+  each character's ways best first, the multi-character outputs' ways, the
+  cheapest way of each (`compileLayout` returns that map), and the number of
+  distinct characters typed.
+- `typingPlan(layout, ngrams, options)` → `{board, chords, ways,
+choose(before, token, after)}`: how a corpus is typed, so a text can be
+  typed exactly as the tables are (the gate's reference stream).
 - `METRICS` → `{id: {unit, better, of}}`; `better` is `lower`, `higher` or
   `none` (shown, not scored).
 
@@ -150,12 +172,15 @@ No text leaves the machine and none is needed. Worker T owns that bridge.
 
 ## Model
 
-**Keystrokes.** Each character becomes the cheapest key sequence that types it:
-a key on a layer, or a dead key (itself on a layer, possibly chained) followed
-by the key of the character it composes with. A press costs 1 and each held
-modifier 0.5. A typographic character the layout lacks is typed as its plain
-form (« » “ ” „ → ", ’ ‘ → ', – — → -, … → ..., no-break spaces → space; the
-Kalamine rule), but does not count as covered. A character with no sequence is
+**Keystrokes.** A character is typed by a key on a layer, by a dead key (itself
+on a layer, possibly chained) followed by the key of the character it composes
+with, or as part of a key or dead-key rule that types several characters at
+once. When a layout offers several ways, each occurrence is typed the way that
+costs least in its context ([Ways of typing](#ways-of-typing)); out of context
+the cheapest is the one with the fewest presses, a press costing 1 and each
+held modifier 0.5. A typographic character the layout lacks is typed as its
+plain form (« » “ ” „ → ", ’ ‘ → ', – — → -, … → ..., no-break spaces → space;
+the Kalamine rule), but does not count as covered. A character with no way is
 **unsupported**.
 
 **What is cached.** A corpus, a pasted text or the keystats store is reduced
@@ -266,6 +291,87 @@ is a finite number ≥ 0, in points per percentage point (or per millimetre).
 The defaults and their justification are in the study, section « Default
 weights ». A weight of 0 removes a metric from the score; the Studio shows each
 contribution beside the metric.
+
+## Ways of typing
+
+A layout may type a character in several ways: « . » on two keys, « é » on
+its own key, through AltGr and behind a dead key, « où » with one AltGr chord
+or two taps. The engine types each occurrence the way a typist would: the one
+that costs least where it stands (maintainer, 2026-11-16).
+
+**Ways.** `compileWays` lists every way of each character, best first by the
+out-of-context order (fewer presses and held modifiers, then fewer AltGr
+presses, fewer keys, lower key indexes, fewer Shift presses, the same order as
+before). Two ways on the same keys keep the cheaper one, which no context can
+reverse; at most four are kept (`MAX_WAYS`; the library never has more). A
+dead key closed by a thumb key (the space bar on any level) types the dead
+key's own sign: it stays the way of a character that has no other, and the
+fixed path keeps it, but it is never a context alternative. The pair metrics
+leave thumb keys out, so such a way would hide an SFB behind an extra press no
+typist makes.
+
+**Cost.** The choice minimises the score points the keystroke metrics take,
+by the default weights `w` (`score_weights.json`; not the user's, so a way of
+typing does not follow the ranking weights and `rescore` stays exact). For a
+corpus of `N` characters, `B` bigrams and `T` trigrams, typing one occurrence
+costs `cost / N` points with:
+
+- each press of key `k`, held modifiers included:
+  `w.distance × reach(k) + 100 × (w.pinky_load [pinky] + w.outer_column [outer
+column] − w.home_row [home row, not a modifier])`, thumbs carrying only their
+  distance;
+- per character: `100 × w.modifier_usage` if a modifier is held,
+  `100 × w.dead_key_usage` behind a dead key (times the characters of a
+  multi-character output);
+- each key pair, times `N / B`: `100 × (w.sfb [SFB] + w.scissors [full] +
+w.half_scissors [half] + w.lsb [lateral] − w.roll_in [inward] − w.roll_out
+[outward])`, the classification of the `sfb` … `roll_out` metrics;
+- each key triple, times `N / T`: `100 × (w.sfs + w.redirect + w.redirect_bad −
+w.roll3_in − w.roll3_out − w.alternation)` by the same classification.
+
+`finger_imbalance` and `hand_imbalance` are not sums over keystrokes and take
+no part. `result.typing.cost` is that sum over the path typed, in points.
+
+**Choice.** For a character `b` with several ways between `a` and `c`, the
+engine picks the way `v` of least
+
+```text
+own(v) + across(wa, v) + across(v, wc) + triple(wa, v, wc)
+       + Σz P(z | a, b) × triple(wz, wa, v) + Σd P(d | b, c) × triple(v, wc, wd)
+```
+
+where `wa`, `wc`, `wz`, `wd` are the neighbours' cheapest ways, `across` the key
+pair and triples between two ways (the walk's own step), and
+`P(z | a, b) = tri(z, a, b) / bi(a, b)`. At a segment edge the missing side is
+left out; a tie keeps the earlier way, so a layout with one way per
+character, or whose cheapest way always wins, is typed exactly as before.
+
+**Multi-character outputs.** A two-character output (a cell or a dead-key
+rule typing « où ») replaces the two taps of its bigram when its own cost is
+less than the taps' (their own costs and the pair between them). Outputs that
+would overlap (one ending in the character the other starts with) keep the
+one that saves the most; an output repeating its character is not used.
+Each chosen output becomes one token of the tables (`tokenTable`); longer
+outputs are not typed as one.
+
+**Tables, not text.** The corpus is known by its n-gram counts only (the
+keystats store holds no text), so the choice is a function of each
+character's trigram context, and the walk splits each n-gram over the ways
+used. An occurrence's way is read from the trigram it is the middle of (its
+bigram at a segment edge), which the tables count exactly. A statistic that
+needs a fourth character (a pair of two characters that both have several
+ways, a triple whose first or last character has several ways) completes the
+trigram table as a second-order Markov chain (each side's share of ways,
+independent given the pair or triple). On « Du côté de chez Swann » and the
+Nemolivier anthology this moves SFS by at most 0.04 points and alternation by
+0.01 against typing the text itself; the gate holds the tables to the text's
+own stream, exactly except for those n-grams.
+
+**Guarantee.** Where the characters with several ways stand at least three
+places apart, the best path costs no more than the fixed one (the gate's
+seeded property test); across the library on the two French corpora it never
+does either. The global score may still move the other way by a fraction of
+a point, through `finger_imbalance`, which the choice does not see.
 
 ## Credits
 
@@ -655,6 +761,20 @@ The library (115 layouts) on a 2.5 MB French corpus takes about 0.3 s from
 prepared tables in Node; the gate holds it under 1.5 s. A page computes the
 tables of a corpus once (`prepareNgrams`) and keeps them under `hashText` of
 the text; built-in corpora can ship their tables pre-computed.
+
+The ways of typing cost nothing measurable on a layout whose corpus
+characters each have one way (the walk is the plain one); on a layout with
+choices only the n-grams holding a character with several ways go through
+the choice (`partition`, cached per table), each pair's context costs are
+computed once, and the compact form factors use a reachability pass instead of
+a full compile. Measured on Nemolivier, Node 22, on a loaded Windows laptop
+(minimum of 7, warm), against the engine before (b9ea9b50e8): QWERTY
+9.2 → 10.0 ms, AZERTY 8.9 → 9.6 ms, bépo 133 → 99 ms (the reachability pass),
+Ergo-L 38 → 60 ms, Ergopti 24 → 49 ms, the library 1.38 → 1.69 s.
+`scoreSession` keeps its partial walk for layouts without choices (AZERTY,
+the optimizer's default start: about 100 → 94 trials per second on Swann);
+from a layout with choices each trial walks the whole stream (Ergopti 95 →
+17, Ergo-L 130 → 18 trials per second).
 
 ## Decided by the agent, to review by the maintainer
 

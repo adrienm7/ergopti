@@ -147,10 +147,17 @@ only), keyboard ISO, format TKL, default weights, 1 restart of 3 000 swaps on
 
 - Faster incremental scoring: a trial still compiles the whole layout and
   re-measures the layout-level metrics (shortcuts, digits, coverage), about
-  1 ms; caching each entry's last key pattern would halve the walk. If the
-  engine starts choosing a character's keys by its context (a best path over
-  the text), `scoreSession` must widen what it re-walks to the affected spans
-  or fall back to a full re-score: its property test fails otherwise.
+  1 ms; caching each entry's last key pattern would halve the walk.
+- Incremental scoring with context choices: the engine now types each
+  character the way that costs least in its context
+  ([layout-analysis.md](layout-analysis.md#ways-of-typing)), and
+  `scoreSession` keeps its partial walk only while the current layout and the
+  trial type every corpus character one way, with no chord. From AZERTY (the
+  default start) nothing changes; from a layout with choices each trial walks
+  the whole stream, exact but slow (Swann: Ergopti 95 → 17, Ergo-L 130 → 18
+  trials per second). The exact partial walk re-walks the n-grams of the
+  characters whose ways changed and of the multi-way characters whose
+  shares of ways changed, and re-plans only their contexts.
 - The app: mount `LAYOUT_OPTIMIZER_PAGE` in the Studio window of ErgoptiPlus
   (Windows, macOS, Linux), with the keystats corpus « My typing ».
 - Pasted texts and files as corpora, as the Comparer offers.
