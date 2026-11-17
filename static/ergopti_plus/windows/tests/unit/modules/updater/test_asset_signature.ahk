@@ -11,7 +11,10 @@
 ;    refusals, never a pass or a raised error;
 ; 3. the policy decides: off reports "not enforced", required refuses everything
 ;    that does not verify, and a policy that requires a key without one is
-;    refused at admission.
+;    refused at admission;
+; 4. a release read from the public feed is admitted only with the size and the
+;    digest computed over its downloaded bytes and covered by a signature of the
+;    pinned key, whatever the enforcement, and never without a key.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -241,3 +244,110 @@ _TAS_GateWired() {
 }
 
 Test("AssetSignature: every install path passes the gate before its transaction (asset-signature)", _TAS_GateWired)
+
+
+
+
+
+; ==================================
+; ==================================
+; ======= 4/ The public feed =======
+; ==================================
+; ==================================
+
+; The throwaway key and the signed record of the fake asset the feed tests serve.
+_TAS_FeedVectors() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\updater\feed_install_vectors.json", "UTF-8"))
+}
+
+; Runs the feed authentication against a local fake transport: Signature is the
+; served .sig text (or a Func that throws), Content the served asset bytes.
+_TAS_FeedRun(Policy, Signature, Content) {
+	F := _TAS_FeedVectors()
+	Seen := { Fetched: [], Downloaded: [], Paths: [] }
+	Fetch(Url, Request) {
+		Seen.Fetched.Push(Url)
+		return IsObject(Signature) ? Signature.Call() : Signature
+	}
+	Download(Url, Path, Request) {
+		Seen.Downloaded.Push(Url)
+		Seen.Paths.Push(Path)
+		FileAppend(Content, Path, "UTF-8-RAW")
+	}
+	Seen.Asset := AssetSignature_AuthenticateFeedAsset(F["windows"]["name"], "v9.9.9", 0, () => Policy, Fetch, Download)
+	return Seen
+}
+
+_TAS_FeedAuthenticates() {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	V := _TAS_Vectors()
+	F := _TAS_FeedVectors()
+	W := F["windows"]
+	Url := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases/download/v9.9.9/" . W["name"]
+	AssertEqual(Url, AssetSignature_FeedAssetUrl(W["name"], "v9.9.9"), "the conventional name and path")
+	AssertEqual("", AssetSignature_FeedAssetUrl(W["name"], "v1/../x"), "a tag is one path segment")
+	; The shipped enforcement stays off: the feed path requires the signature anyway.
+	Policy := _TAS_Policy(V, "off", F["public_key_spki_base64"])
+	Seen := _TAS_FeedRun(Policy, W["signature_base64"] . "`n", W["content"])
+	Assert(IsObject(Seen.Asset), "a verified feed asset is admitted")
+	AssertEqual(Url, Seen.Asset.Url)
+	AssertEqual(W["size"], Seen.Asset.Size, "the size is computed over the downloaded bytes")
+	AssertEqual(W["sha256"], Seen.Asset.Digest, "the digest is computed over the downloaded bytes")
+	AssertEqual(Url . ".sig", Seen.Fetched[1], "the signature has the conventional name")
+	AssertEqual(Url, Seen.Downloaded[1])
+	AssertFalse(FileExist(Seen.Paths[1]), "the verification copy is removed")
+}
+
+Test("AssetSignature: the feed's newest asset is admitted with the size and digest its signature covers (feed-only-install)",
+	_TAS_FeedAuthenticates)
+
+
+_TAS_FeedRefuses() {
+	V := _TAS_Vectors()
+	F := _TAS_FeedVectors()
+	W := F["windows"]
+	Keyed := _TAS_Policy(V, "off", F["public_key_spki_base64"])
+	Tampered := _TAS_FeedRun(Keyed, W["signature_base64"], W["content"] . "x")
+	AssertEqual(0, Tampered.Asset, "other bytes than the signed ones are refused")
+	AssertFalse(FileExist(Tampered.Paths[1]), "a refused copy is removed too")
+	AssertEqual(0, _TAS_FeedRun(Keyed, "", W["content"]).Asset, "a feed release without a signature is refused")
+	Thrower() {
+		throw Error("HTTP 404")
+	}
+	Unfetched := _TAS_FeedRun(Keyed, Thrower, W["content"])
+	AssertEqual(0, Unfetched.Asset, "an undownloadable signature is refused")
+	AssertEqual(0, Unfetched.Downloaded.Length, "nothing is downloaded without a signature")
+	AssertEqual(0, _TAS_FeedRun(Keyed, V["valid"]["signature_base64"], W["content"]).Asset,
+		"another record's signature is refused")
+	AssertEqual(0, _TAS_FeedRun(_TAS_Policy(V, "off", V["public_key_spki_base64"]), W["signature_base64"],
+		W["content"]).Asset, "a signature of another key is refused")
+	Unprovisioned := _TAS_FeedRun(_TAS_Policy(V, "off", ""), W["signature_base64"], W["content"])
+	AssertEqual(0, Unprovisioned.Asset, "without a key the feed path refuses")
+	AssertEqual(0, Unprovisioned.Fetched.Length + Unprovisioned.Downloaded.Length, "and downloads nothing")
+	AssertFalse(AssetSignature_FeedInstallAvailable(() => _TAS_Policy(V, "off", "")), "no key: no feed install")
+	AssertTrue(AssetSignature_FeedInstallAvailable(() => Keyed), "a key: the feed's newest release can install")
+	Unreadable() {
+		throw Error("no file")
+	}
+	AssertFalse(AssetSignature_FeedInstallAvailable(Unreadable), "an unreadable policy: no feed install")
+}
+
+Test("AssetSignature: a feed asset is refused unless its signature verifies, whatever the enforcement (feed-only-install)",
+	_TAS_FeedRefuses)
+
+; The feed path authenticates before the transaction and replaces the API gate,
+; and its refusal names the signature on the Versions page.
+_TAS_FeedWired() {
+	Body := _StripFullLineComments(_DriverFuncBody("Updater_DownloadAndInstall"))
+	Assert(Body != "", "Updater_DownloadAndInstall not found")
+	Feed := InStr(Body, "AssetSignature_AuthenticateFeedAsset(AssetName, Release.Tag, Request)")
+	Begin := InStr(Body, "_Updater_BeginDownloadTransaction(")
+	Assert(Feed > 0 && Begin > Feed, "a feed release is authenticated before the download transaction")
+	Refused := InStr(Body, "changelog_window.install_error_feed_signature", , Feed)
+	Assert(Refused > Feed && Refused < Begin, "a refused feed release stops the install with its reason")
+	Assert(InStr(Body, "_Updater_StartStagingWorker(AssetUrl, Asset.Digest,") > Begin,
+		"the staging worker enforces the authenticated digest")
+}
+
+Test("AssetSignature: a feed release is authenticated before its transaction (feed-only-install)", _TAS_FeedWired)

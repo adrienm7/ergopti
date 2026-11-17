@@ -2178,7 +2178,14 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	}
 	AssetName := IsSet(BUNDLE_RELEASE_ASSET) and BUNDLE_RELEASE_ASSET != ""
 		? BUNDLE_RELEASE_ASSET : Identifiers.App.EXE
-	Asset := _Updater_FindAsset(Release.RawJson, AssetName, Release.Tag)
+	; A release the public feed names (the Versions window's newest feed row)
+	; carries no asset list: its asset has the conventional URL, and its size and
+	; digest come from its signature below, never from the feed.
+	FeedOnly := Release.HasProp("FeedOnly") && Release.FeedOnly == true
+	Asset := FeedOnly ? {Url: AssetSignature_FeedAssetUrl(AssetName, Release.Tag)}
+		: _Updater_FindAsset(Release.RawJson, AssetName, Release.Tag)
+	if FeedOnly && Asset.Url == ""
+		Asset := 0
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
@@ -2212,8 +2219,24 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	}
 
 	; Before the transaction and the download: every install path, the release
-	; installer's included, ends here. The fetch can pump messages.
-	SignatureAllows := AssetSignature_AllowsInstall(AssetName, Asset, Release, Request)
+	; installer's included, ends here. The fetch can pump messages. A feed
+	; release is downloaded once here to compute the size and the digest its
+	; required signature covers; the staging worker then enforces both.
+	if FeedOnly {
+		Asset := AssetSignature_AuthenticateFeedAsset(AssetName, Release.Tag, Request)
+		if HasSuspendOverride {
+			if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
+				return false
+		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
+			return false
+		}
+		if !IsObject(Asset) {
+			_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_feed_signature", "Icon!", 0, InstallObserver)
+			return false
+		}
+		AssetUrl := Asset.Url
+	}
+	SignatureAllows := FeedOnly ? true : AssetSignature_AllowsInstall(AssetName, Asset, Release, Request)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false

@@ -27,7 +27,7 @@ _RIT_Deps(Opts := 0) {
 	return Map(
 		"busy", () => Opts.Get("busy", false),
 		"blocked", () => Opts.Get("blocked", ""),
-		"find", (Tag) => _RIT_Find(Opts, Tag),
+		"find", (Tag, Channel) => _RIT_Find(Opts, Tag),
 		"backup", (Release) => _RIT_Backup(Opts, Release),
 		"asset", (Release) => _RIT_Asset(Opts, Release),
 		"install", (Release, Observer) => _RIT_Install(Opts, Release, Observer),
@@ -212,6 +212,60 @@ _RIT_FeedOnlyRefusalIsAWarning() {
 }
 Test("Release install: a feed-only list refuses with a warning, not an error (install-no-details-warning-99)",
 	_RIT_FeedOnlyRefusalIsAWarning)
+
+; Decided 2026-11-06 (align on macOS): a feed-only list installs the channel's
+; newest release, through its detached signature; an older row is refused, and
+; every row while the signing policy holds no key.
+_RIT_FeedListOffersTheNewestOnly() {
+	global _CLW_LastList, UPDATER_GH_OWNER, UPDATER_GH_REPO
+	Saved := IsSet(_CLW_LastList) ? _CLW_LastList : 0
+	Entry(Tag) => '<entry><updated>2026-11-01T10:00:00Z</updated><link rel="alternate" href="https://github.com/'
+		. UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases/tag/" . Tag . '"/><title>' . Tag . "</title></entry>"
+	Feed := '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">'
+		. Entry("v99.0.1") . Entry("v99.0.0") . "</feed>"
+	_CLW_LastList := Map("kind", "feed", "json", Feed, "request_epoch", 0)
+	try {
+		Found := _CLW_FindFeedRelease("v99.0.1", "main", () => true)
+		Assert(Found.Has("release"), "the channel's newest feed release may install")
+		Release := Found["release"]
+		AssertEqual("v99.0.1", Release.Tag)
+		AssertTrue(Release.FeedOnly, "it is marked for the signature path")
+		Asset := _CLW_ReleaseAsset(Release)
+		AssertEqual(AssetSignature_FeedAssetUrl(BUNDLE_RELEASE_ASSET, "v99.0.1"), Asset.Url,
+			"its asset is the conventional one, with no digest from the feed")
+		AssertFalse(Asset.HasProp("Digest"))
+		AssertEqual("changelog_window.install_error_feed_not_newest",
+			_CLW_FindFeedRelease("v99.0.0", "main", () => true)["reason"], "an older row is refused")
+		AssertEqual("changelog_window.install_error_unknown_release",
+			_CLW_FindFeedRelease("v98.0.0", "main", () => true)["reason"], "a tag the feed does not name")
+		AssertEqual("changelog_window.install_error_no_details",
+			_CLW_FindFeedRelease("v99.0.1", "main", () => false)["reason"], "no key: the refusal stays")
+	} finally {
+		_CLW_LastList := Saved
+	}
+}
+Test("Release install: a feed-only list offers its channel's newest release only (feed-only-install)",
+	_RIT_FeedListOffersTheNewestOnly)
+
+_RIT_FeedNotNewestIsAWarning() {
+	_RIT_Reset()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		AssertFalse(ReleaseInstall_Start("v1.0.6", "main", _RIT_Deps(Map("found", false,
+			"reason", "changelog_window.install_error_feed_not_newest"))))
+	} finally {
+		LoggerClearTestSink()
+		_RIT_Reset()
+	}
+	Line := ""
+	for Each in Captured
+		if InStr(Each, "v1.0.6")
+			Line := Each
+	Assert(InStr(Line, "[WARNING]") > 0 && InStr(Line, "newest") > 0,
+		"an older feed row refuses with a warning. Got: " . Line)
+}
+Test("Release install: an older feed row refuses with a warning (feed-only-install)", _RIT_FeedNotNewestIsAWarning)
 
 _RIT_FailuresReachTheObserver() {
 	global _UpdaterInstallObserver

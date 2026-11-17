@@ -923,7 +923,7 @@ _CLW_InstallDeps(Request) {
 		"blocked", _CLW_InstallBlocked,
 		"find", _CLW_FindRelease,
 		"backup", (Release) => ConfigBackup_Create(_ConfigDir, "pre_install", Release.Tag, Updater_CurrentVersion()),
-		"asset", (Release) => _Updater_FindAsset(Release.RawJson, BUNDLE_RELEASE_ASSET, Release.Tag),
+		"asset", _CLW_ReleaseAsset,
 		"install", (Release, Observer) => _CLW_StartUpdatePath(Release, Observer, Request),
 		"report", _CLW_ReportInstall,
 		"failure_owner", () => Owner,
@@ -951,17 +951,72 @@ _CLW_RetryUpdatePath(Owner, Observer) {
 }
 
 /**
- * Finds a release in the list this window last fetched from the GitHub API.
+ * The asset a release installs from: the authenticated one of an API release,
+ * or the conventional URL of a feed release, whose size and digest the update
+ * path takes from its required signature.
+ * @param {Object} Release
+ * @returns {Object|Integer} The asset, or 0 when the release has none for Windows.
+ */
+_CLW_ReleaseAsset(Release) {
+	global BUNDLE_RELEASE_ASSET
+	if Release.HasProp("FeedOnly") && Release.FeedOnly == true {
+		Url := AssetSignature_FeedAssetUrl(BUNDLE_RELEASE_ASSET, Release.Tag)
+		return Url == "" ? 0 : {Url: Url}
+	}
+	return _Updater_FindAsset(Release.RawJson, BUNDLE_RELEASE_ASSET, Release.Tag)
+}
+
+/**
+ * Finds the release of a feed-only list that may install: the newest release
+ * of the channel on screen when the shared offer rule offers it, as macOS hands
+ * that one release to Sparkle. The feed names no files and no digests, so the
+ * release installs only through its detached signature: without a provisioned
+ * key every row keeps the no-details refusal.
  * @param {string} Tag
+ * @param {string} Channel - Registry channel on screen, posted by the page.
+ * @param {Func|Integer} AvailableFn - Replaces the signing-key probe (tests only).
  * @returns {Map} Map("release", Release) or Map("reason", page locale key).
  */
-_CLW_FindRelease(Tag) {
+_CLW_FindFeedRelease(Tag, Channel, AvailableFn := 0) {
+	global _CLW_LastList, RELEASE_INSTALL_REASONS, UPDATER_GH_OWNER, UPDATER_GH_REPO
+	if !(IsObject(AvailableFn) ? AvailableFn.Call() : AssetSignature_FeedInstallAvailable())
+		return Map("reason", RELEASE_INSTALL_REASONS["no_details"])
+	if !(Channel is String) || Channel == "" || UpdateChannels_ForTag(Tag) == ""
+		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
+	List := _Updater_ParseReleaseFeed(_CLW_LastList["json"], UPDATER_GH_OWNER, UPDATER_GH_REPO, &Detail)
+	if (List == "")
+		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
+	Wanted := _Updater_NormalizeTag(Tag)
+	Listed := false
+	for _, Row in Updater_ParseReleasesList(List)
+		if (_Updater_NormalizeTag(Row.Tag) == Wanted)
+			Listed := true
+	if !Listed
+		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
+	Newest := _Updater_SelectChannelRelease(List, Channel, _Updater_ReleaseListIndex(List))
+	NewestTag := (Newest is String && Newest != "") ? Updater_ParseTagName(Newest) : ""
+	if (NewestTag == "" || _Updater_NormalizeTag(NewestTag) != Wanted
+			|| !UpdateChannels_ShouldOffer(NewestTag, Updater_CurrentVersion(), Channel, _Updater_InstalledChannel()))
+		return Map("reason", RELEASE_INSTALL_REASONS["feed_not_newest"])
+	try LoggerInfo("Changelog", "Release {1} is the newest of channel {2} in the public feed: it installs only once its detached signature verifies.",
+		NewestTag, Channel)
+	return Map("release", {Tag: NewestTag, RawJson: Newest, FeedOnly: true, Body: "",
+		HtmlUrl: "", PublishedAt: "", Prerelease: false})
+}
+
+/**
+ * Finds a release in the list this window last fetched.
+ * @param {string} Tag
+ * @param {string} Channel - Registry channel on screen, posted by the page.
+ * @returns {Map} Map("release", Release) or Map("reason", page locale key).
+ */
+_CLW_FindRelease(Tag, Channel := "") {
 	global _CLW_LastList, _CLW_RequestEpoch, RELEASE_INSTALL_REASONS
 	if !(_CLW_LastList is Map) || _CLW_LastList.Get("request_epoch", 0) != _CLW_RequestEpoch
 		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
 	; The Atom feed carries no asset list and no digest.
 	if (_CLW_LastList["kind"] != "json")
-		return Map("reason", RELEASE_INSTALL_REASONS["no_details"])
+		return _CLW_FindFeedRelease(Tag, Channel)
 	if (UpdateChannels_ForTag(Tag) == "")
 		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
 	Wanted := _Updater_NormalizeTag(Tag)

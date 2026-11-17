@@ -20,6 +20,13 @@
 ;    every update; "required" refuses everything that does not verify.
 ; 3. CNG, because it ships with every supported Windows: no binary and no
 ;    PowerShell. P-256 and not Ed25519 because CNG only gained Ed25519 recently.
+; 4. A release read from the public feed (the API unavailable) has no digest
+;    from GitHub: AssetSignature_AuthenticateFeedAsset downloads the asset
+;    under its conventional name, computes its size and SHA-256, and admits
+;    them only when the detached signature of the pinned key covers them,
+;    whatever the enforcement. The staging worker then enforces that size and
+;    digest as it does an API digest (decided 2026-11-06, as macOS hands the
+;    channel's newest release to Sparkle).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -53,7 +60,9 @@ global ASSET_SIGNATURE_REASON_TEXT := Map(
 	"bad_policy", "the signing policy file is invalid",
 	"required_without_key", "the signing policy requires a signature but holds no key",
 	"bad_asset", "the executable's name, size or digest cannot be signed",
-	"fetch_failed", "the signature could not be downloaded")
+	"fetch_failed", "the signature could not be downloaded",
+	"feed_without_key", "the signing policy holds no key, so a release read from the public feed cannot be verified",
+	"asset_download_failed", "the executable could not be downloaded to compute its size and digest")
 
 
 
@@ -272,4 +281,160 @@ AssetSignature_AllowsInstall(AssetName, Asset, Release, Request, ReadPolicyFn :=
 	}
 	try LoggerError("Updater", "Update refused: {1}.", ASSET_SIGNATURE_REASON_TEXT[Reason])
 	return false
+}
+
+
+
+
+
+; ==================================
+; ==================================
+; ======= 5/ The public feed =======
+; ==================================
+; ==================================
+
+/**
+ * The conventional repository URL of a release asset: the one URL
+ * _Updater_FindAsset admits for that name and tag.
+ * @param {string} AssetName - Asset file name.
+ * @param {string} Tag - Release tag.
+ * @returns {string} "" when the name or the tag is not a plain path segment.
+ */
+AssetSignature_FeedAssetUrl(AssetName, Tag) {
+	global UPDATER_GITHUB_WEB_ROOT, UPDATER_GH_OWNER, UPDATER_GH_REPO
+	if !(AssetName is String) || !RegExMatch(AssetName, "^[A-Za-z0-9._-]{1,128}$")
+		|| !(Tag is String) || !RegExMatch(Tag, "^[A-Za-z0-9._+-]+$")
+		return ""
+	return UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+		. "/releases/download/" . Tag . "/" . AssetName
+}
+
+/**
+ * Whether a release read from the public feed can be authenticated: the policy
+ * is admitted and names a verification key. Without one every feed release
+ * keeps the no-details refusal.
+ * @param {Func|Integer} ReadPolicyFn - Replaces the policy read (tests only).
+ * @returns {Boolean}
+ */
+AssetSignature_FeedInstallAvailable(ReadPolicyFn := 0) {
+	try {
+		Policy := IsObject(ReadPolicyFn) ? ReadPolicyFn.Call() : _AssetSignature_ReadPolicy()
+		return AssetSignature_AdmitPolicy(Policy) == "" && Policy["public_key_spki_base64"] != ""
+	} catch as Err {
+		try LoggerError("Updater", "The update signing policy could not be read: {1}.", Err.Message)
+		return false
+	}
+}
+
+; Downloads an asset byte for byte to Path, bounded, on the install's lifetime.
+; @param Url {String} The conventional repository URL of the asset.
+; @param Path {String} The file the bytes are written to (the caller removes it).
+; @param Request {Object} The install's request context.
+; @throws {Error} When the request gives no complete 200 answer.
+_AssetSignature_DownloadAsset(Url, Path, Request) {
+	global UPDATER_REQUEST_POLICY_ALLOW, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
+	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
+	Started := A_TickCount
+	Req := CurlAsyncRequest()
+	; The download belongs to an install, which stops at a pause (UPD-2).
+	Req.SetManagedRouting(0, () => _Updater_InstallRequestPolicy(Request) == UPDATER_REQUEST_POLICY_ALLOW)
+	Req.SetDeadline(Started, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS)
+	Req.Open("GET", Url, true)
+	Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
+	; One budget for the whole transfer, the archive phase's, as the staging worker's.
+	Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS, 0,
+		UPDATER_HTTP_DOWNLOAD_DEADLINE_MS)
+	Req.SetOutputFile(Path)
+	if !Req.Send() || !_HTTP_ManagedWait(Req)
+		throw Error("the request did not complete")
+	if (Req.Status != 200)
+		throw Error("HTTP " . Req.Status)
+}
+
+/**
+ * Authenticates a release the public feed names, which lists no assets and no
+ * digests: downloads the asset and its detached signature under their
+ * conventional names, computes the asset's size and SHA-256 over the exact
+ * bytes, rebuilds the signed record and verifies it against the pinned key.
+ * The signature is required whatever the policy's enforcement: it is the only
+ * authentication of this path. The downloaded copy is removed; the staging
+ * worker downloads the asset again and enforces this size and digest.
+ * @param {string} AssetName - The executable's asset name.
+ * @param {string} Tag - The release tag the feed names.
+ * @param {Object} Request - The install's request context.
+ * @param {Func|Integer} ReadPolicyFn - Replaces the policy read (tests only).
+ * @param {Func|Integer} FetchFn - Replaces the signature download (tests only), called as (Url, Request).
+ * @param {Func|Integer} DownloadFn - Replaces the asset download (tests only), called as (Url, Path, Request).
+ * @returns {Object|Integer} {Url, Digest, Size} once verified, otherwise 0.
+ */
+AssetSignature_AuthenticateFeedAsset(AssetName, Tag, Request, ReadPolicyFn := 0, FetchFn := 0, DownloadFn := 0) {
+	global ASSET_SIGNATURE_REASON_TEXT
+	try LoggerStart("Updater", "Authenticating {1} of {2} from the public feed through its signature…", AssetName, Tag)
+	Url := AssetSignature_FeedAssetUrl(AssetName, Tag)
+	if (Url == "") {
+		try LoggerError("Updater", "Feed install refused: {1}.", ASSET_SIGNATURE_REASON_TEXT["bad_asset"])
+		return 0
+	}
+	Why := "bad_policy"
+	try {
+		Policy := IsObject(ReadPolicyFn) ? ReadPolicyFn.Call() : _AssetSignature_ReadPolicy()
+		Why := AssetSignature_AdmitPolicy(Policy)
+	} catch as Err
+		try LoggerError("Updater", "The update signing policy could not be read: {1}.", Err.Message)
+	if (Why == "" && Policy["public_key_spki_base64"] == "")
+		Why := "feed_without_key"
+	if (Why != "") {
+		try LoggerError("Updater", "Feed install refused: {1}.", ASSET_SIGNATURE_REASON_TEXT[Why])
+		return 0
+	}
+	Signature := ""
+	try Signature := Trim((IsObject(FetchFn) ? FetchFn : _AssetSignature_Fetch).Call(
+		Url . Policy["signature_suffix"], Request), " `t`r`n")
+	catch as Err {
+		try LoggerError("Updater", "Feed install refused: {1} ({2}).", ASSET_SIGNATURE_REASON_TEXT["fetch_failed"], Err.Message)
+		return 0
+	}
+	if (Signature == "") {
+		try LoggerError("Updater", "Feed install refused: {1}.", ASSET_SIGNATURE_REASON_TEXT["no_signature"])
+		return 0
+	}
+	Path := A_Temp . "\ergopti_feed_asset_" . DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount . ".bin"
+	Size := 0, Digest := ""
+	try {
+		(IsObject(DownloadFn) ? DownloadFn : _AssetSignature_DownloadAsset).Call(Url, Path, Request)
+		Bytes := FileRead(Path, "RAW")
+		Size := Bytes.Size
+		Digest := CryptoSha256Bytes(Bytes)
+	} catch as Err {
+		try LoggerError("Updater", "Feed install refused: {1} ({2}).", ASSET_SIGNATURE_REASON_TEXT["asset_download_failed"], Err.Message)
+		_AssetSignature_RemoveFeedCopy(Path)
+		return 0
+	}
+	_AssetSignature_RemoveFeedCopy(Path)
+	if !(Size is Integer) || Size <= 0 || Size > 2147483647 {
+		try LoggerError("Updater", "Feed install refused: {1}.", ASSET_SIGNATURE_REASON_TEXT["bad_asset"])
+		return 0
+	}
+	; Required whatever the shipped enforcement: an "off" policy must not let an
+	; unauthenticated asset through on the one path without a GitHub digest.
+	Strict := Map()
+	for Key, Value in Policy
+		Strict[Key] := Value
+	Strict["enforcement"] := "required"
+	Result := AssetSignature_Evaluate(Strict, Map("name", AssetName, "size", Size, "sha256", Digest), Signature)
+	if (Result["verdict"] != "verified") {
+		try LoggerError("Updater", "Feed install refused: {1}.", ASSET_SIGNATURE_REASON_TEXT[Result["reason"]])
+		return 0
+	}
+	try LoggerSuccess("Updater", "Feed release {1} authenticated: {2} bytes, SHA-256 {3}, signature verified.", Tag, Size, Digest)
+	return { Url: Url, Digest: Digest, Size: Size }
+}
+
+; Removes the verification copy of a feed asset; a copy left behind is logged.
+_AssetSignature_RemoveFeedCopy(Path) {
+	if !FileExist(Path)
+		return
+	try FileDelete(Path)
+	catch as Err
+		try LoggerWarn("Updater", "The feed verification copy {1} could not be removed: {2}.", Path, Err.Message)
 }
