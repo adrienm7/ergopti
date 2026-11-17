@@ -62,6 +62,7 @@ M.GROUPS = {
 		"tests/unit/ai/adapters/",
 		"tests/unit/diagnostics/engine/reports/",
 		"tests/unit/diagnostics/engine/test_hid_diagnostic_mailbox.lua",
+		"tests/unit/gestures/",
 	} },
 	{ name = "menu_llm", prefixes = { "tests/unit/ai/ui/menu/" } },
 	{ name = "menu_input", prefixes = {

@@ -105,6 +105,7 @@ helpers.describe("test module groups (macos-test-shards)", function()
 		helpers.assert_eq(ModuleGroups.group_of("tests.unit.diagnostics.engine.reports.test_x"), "modules")
 		helpers.assert_eq(ModuleGroups.group_of("tests.unit.diagnostics.engine.test_hid_diagnostic_mailbox"), "modules")
 		helpers.assert_eq(ModuleGroups.group_of("tests.unit.diagnostics.ui.healthcheck.test_x"), "ui")
+		helpers.assert_eq(ModuleGroups.group_of("tests.unit.gestures.engine.actions.test_x"), "modules")
 		helpers.assert_eq(ModuleGroups.group_of("tests.unit.test_x"), "other")
 	end)
 
