@@ -1,0 +1,76 @@
+{
+	"schema_version": 1,
+	"description": "User-perceived characters (cursor steps) of a text: what one Backspace or one Left arrow crosses in GTK, Qt, Chromium, Firefox and Cocoa; the Windows hosts are a field check (TODO-tests-windows.md). The hotstring Undo erases an expansion by these steps. Replayed by the Linux injector (modules/hotstrings/injector.lua caret_steps) and the macOS composed-text walk (infra/composed_text.lua count), both through _shared/tests/lua/hotstrings/caret_steps_contract.lua, and by the AutoHotkey port (windows/core/text/engine/utils.ahk _TextCaretSteps, tests/unit/core/text/test_utils.ahk). Not a complete UAX #29 engine: the rules cover what an expansion types.",
+	"vectors": [
+		{
+			"name": "ascii",
+			"text": "Merci",
+			"steps": 5
+		},
+		{
+			"name": "precomposed accent",
+			"text": "été",
+			"steps": 3
+		},
+		{
+			"name": "combining accent",
+			"text": "été",
+			"steps": 3
+		},
+		{
+			"name": "plain emoji",
+			"text": "ok 😀",
+			"steps": 4
+		},
+		{
+			"name": "skin tone",
+			"text": "👍🏽",
+			"steps": 1
+		},
+		{
+			"name": "letter then skin tone",
+			"text": "Z👍🏽",
+			"steps": 2
+		},
+		{
+			"name": "zwj family",
+			"text": "👨‍👩‍👧",
+			"steps": 1
+		},
+		{
+			"name": "two flags",
+			"text": "🇫🇷🇩🇪",
+			"steps": 2
+		},
+		{
+			"name": "odd regional indicator",
+			"text": "🇫🇷🇩",
+			"steps": 2
+		},
+		{
+			"name": "variation selector",
+			"text": "❤️",
+			"steps": 1
+		},
+		{
+			"name": "tag sequence flag",
+			"text": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+			"steps": 1
+		},
+		{
+			"name": "supplementary letters",
+			"text": "𐐀𐐁",
+			"steps": 2
+		},
+		{
+			"name": "crlf",
+			"text": "a\r\nb",
+			"steps": 3
+		},
+		{
+			"name": "empty",
+			"text": "",
+			"steps": 0
+		}
+	]
+}
