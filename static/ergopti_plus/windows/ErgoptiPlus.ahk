@@ -415,6 +415,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include platform/system/notifier.ahk
 #Include platform/system/accessibility.ahk
 #Include tray/adapters/menu.ahk
+#Include tray/state_tip.ahk
 #Include platform/input/text_sender.ahk
 #Include ../_shared/core/network/data/failure.ahk
 #Include core/network/adapters/http_client.ahk
@@ -739,7 +740,6 @@ try {
 }
 BootProfile_Stamp("Personal shortcuts file ensured")
 #Include tray/bootstrap.ahk
-#Include tray/state_tip.ahk
 #Include tray/adapters/startup_click.ahk
 #Include tray/adapters/startup_commands.ahk
 
