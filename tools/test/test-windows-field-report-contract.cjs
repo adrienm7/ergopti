@@ -279,6 +279,23 @@ check('every step is timed with progress and a heartbeat, and the instances are 
 	assert.match(instances, /\$script:ProcessDetails/);
 });
 
+// The maintainer's PC (2026-11-17): the driver's UIA selection worker, a child
+// .ahk entry, was reported as « another remapper »; a compiled release's
+// workers reuse the exe and would have counted as a second driver.
+check("the driver's children are helpers, never a second driver or a remapper", () => {
+	const instances = code.match(/^function Get-FieldInstances\(.*\) \{\n([\s\S]*?)^\}$/m)[1];
+	const helper = instances.indexOf("$Role = 'helper'");
+	assert.ok(helper > 0, 'a helper role exists');
+	assert.match(
+		instances,
+		/if \(\$ParentId -and \$DriverIds\.ContainsKey\(\[string\]\$ParentId\)\) \{/
+	);
+	assert.ok(
+		helper < instances.indexOf("$Role = 'driver'; $Name = $Identifiers.app.name"),
+		'the parent decides before the process name'
+	);
+});
+
 // The maintainer's PC (2026-11-17) has no MSFT_MpComputerStatus class: the
 // step failed instead of saying so, and named no antivirus at all.
 check(

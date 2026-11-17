@@ -624,12 +624,28 @@ function Get-FieldInstances([string]$Phase) {
 			if ($Match) { $script:ProcessDetails["$($Match.Id)@$($Match.StartTime)"] = @([string]$Row.CommandLine, $Row.ParentProcessId) }
 		}
 	}
+	# The driver's own workers (the UIA selection and keystats prefetch workers,
+	# the bundled apps) are its children: the compiled exe again, or a source
+	# run's other .ahk entry. They are helpers, never a second driver or another
+	# remapper; an orphan whose driver has exited is still reported as one.
+	$DriverIds = @{}
+	foreach ($Process in $Candidates) {
+		$Key = "$($Process.Id)@$($Process.StartTime)"
+		$Command = ''
+		if ($script:ProcessDetails.ContainsKey($Key)) { $Command = $script:ProcessDetails[$Key][0] }
+		if ($Process.ProcessName -eq $Identifiers.app.name -or $Command -match $Ahk) { $DriverIds[[string]$Process.Id] = $true }
+	}
 	foreach ($Process in $Candidates) {
 		$Key = "$($Process.Id)@$($Process.StartTime)"
 		$Command = ''
 		$ParentId = ''
 		if ($script:ProcessDetails.ContainsKey($Key)) { $Command = $script:ProcessDetails[$Key][0]; $ParentId = $script:ProcessDetails[$Key][1] }
-		if ($Process.ProcessName -eq $Identifiers.app.name) { $Role = 'driver'; $Name = $Identifiers.app.name; $Origin = 'release' }
+		if ($ParentId -and $DriverIds.ContainsKey([string]$ParentId)) {
+			$Role = 'helper'; $Origin = 'driver_child'
+			$Script = [regex]::Match($Command, '([^\\/"]+\.ahk)').Groups[1].Value
+			if ($Script) { $Name = "$($Identifiers.app.name) helper $Script" } else { $Name = "$($Identifiers.app.name) helper" }
+		}
+		elseif ($Process.ProcessName -eq $Identifiers.app.name) { $Role = 'driver'; $Name = $Identifiers.app.name; $Origin = 'release' }
 		elseif ($Command -match $Ahk) {
 			$Role = 'driver'; $Name = $Identifiers.app.ahk
 			if ($Command -match [regex]::Escape($RepoRoot)) { $Origin = 'dev' } else { $Origin = 'other_source' }
