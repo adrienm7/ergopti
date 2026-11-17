@@ -374,7 +374,7 @@ async function runOwnerRegression(context, ahk) {
 	const startedTick = Number(launcherArguments[launcherArguments.indexOf('-StartedTick') + 1]);
 	const named = (name) => launcherArguments[launcherArguments.indexOf(`-${name}`) + 1];
 	const plan = {
-		launcher: path.join(runtime.LLM, 'ollama-runtime-launch.ps1'),
+		launcher: path.join(runtime.LLM, 'ollama/ollama-runtime-launch.ps1'),
 		helper: named('ManagedHelperPath'),
 		helper_sha256: named('ManagedHelperSha256'),
 		environment: named('ServeEnvironmentPath'),
