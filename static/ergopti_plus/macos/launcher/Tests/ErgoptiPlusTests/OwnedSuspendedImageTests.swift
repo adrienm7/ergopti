@@ -100,7 +100,10 @@ private final class SuspendedImageNativeSession {
 			request["bootstrap_device"] = String(UInt64(UInt32(bitPattern: networkIdentity.st_dev)))
 			request["bootstrap_inode"] = String(UInt64(networkIdentity.st_ino))
 			request["store_mode"] = "default"
-			request["store_cwd"] = directory.path
+			// The guardian compares the store directory with its getcwd(), which
+			// keeps the /private prefix resolvingSymlinksInPath strips.
+			guard let resolved = realpath(directory.path, nil) else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+			request["store_cwd"] = String(cString: resolved); free(resolved)
 			request["relay_upstream"] = "http://proxy.example:8080"
 			request["relay_dial_ms"] = 1000; request["relay_handshake_ms"] = 1000; request["relay_idle_ms"] = 1000
 			process.currentDirectoryURL = directory
@@ -310,7 +313,8 @@ final class OwnedSuspendedImageTests: XCTestCase {
 			+ "printf '%s\\n' '{\"schema\":1,\"port\":40123,\"token\":\"\(Self.relayToken)\"}'\nexec cat > /dev/null\n"
 	}
 	private func activate(_ fixture: SuspendedImageNativeSession) throws {
-		try fixture.wait { fixture.markers.contains(where: { $0.hasPrefix("V1 IMAGE_READY ") }) }
+		do { try fixture.wait { fixture.markers.contains(where: { $0.hasPrefix("V1 IMAGE_READY ") }) } }
+		catch { XCTFail("no image proof; markers \(fixture.markers.map { $0.prefix(24) })"); throw error }
 		try fixture.sessionWriter.write(contentsOf: Data("POST_IMAGE_PROOF_FIXTURE_KEY".utf8)); try fixture.sessionWriter.synchronize()
 		let bootstrap = try XCTUnwrap(fixture.bootstrapWriter)
 		try bootstrap.write(contentsOf: Data("POST_IMAGE_PROOF_NETWORK".utf8)); try bootstrap.synchronize()
