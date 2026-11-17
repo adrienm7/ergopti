@@ -56,19 +56,16 @@ baseline as violations go.
       own WebView windows (onboarding, menus' pages, metrics), not only those the site embeds.
 - [ ] **Images and media.** Videos get captions and transcripts (the charts, heatmaps and keyboard drawings have
       their tables since the second pass).
-- [ ] **Colour vision.** The heatmap ramps' light end is 1.16:1 (light) and 1.11:1 (dark) against the surface: a key
-      worth zero is told by its character, name and table, not its shade; outline the keys or lift the light end
-      (dataviz validator, `--ordinal`), keeping the look. The fingering editor's four finger hues and the app windows
-      (metrics, AI tooltips) still need the validator and a colour-only review.
+- [ ] **Colour vision.** Left after the third pass (heatmap key edges, finger hues, metrics muted text, AI tooltip
+      hint and info lines): a colour-only review with the dataviz validator of the other app windows (onboarding,
+      download window, the hotstrings window's 14-colour palette in `native_theme.toml`).
 - [ ] **Dyslexia and reading.** Check every page at 200 % text with the wide spacing setting for clipped or
       overlapping text; plain-language texts, no justified text, comfortable line length.
 - [ ] **Blind and low-vision users.** Screen-reader runs; heading order and landmarks per page; the Optimiser's
       result board (plain characters) has no table view of its own (« Open in the editor » gives one).
 - [ ] **Keyboard and motor.** Keyboard walk of the Studio (no traps, logical order), no time limits.
-- [ ] **Cognitive.** Consistent navigation; the Comparer's four « Restore » buttons (weights, ideal load, shortcut
-      letters, keyboard forms) and the fingering editor's reset act at once with no confirmation or undo: add an undo
-      in the status line (an in-page question, since a WebView host may not show `window.confirm`); check that every
-      error message says how to fix it and every metric and setting has its help text.
+- [ ] **Cognitive.** Consistent navigation; check that every error message says how to fix it and every metric and
+      setting has its help text.
 - [ ] **Ergopti+ native UI.** The clear fixes of the code audit
       ([table](docs/audits/accessibility/README.md#native-ergopti-ui-code-audit-2026-11-17)) on macOS and Linux:
       the menu-bar / indicator name with the paused state, the canvas badge, the Swift progress bar's label, the GTK
@@ -77,10 +74,8 @@ baseline as violations go.
       `TrayTip` order, tooltips under high contrast and « Make text bigger », live-region announcements). Left on
       Windows: fixed font sizes in the native windows other than the tooltips. The screen-reader checks are the
       « Accessibility » items of the three TODO-tests files.
-- [ ] **Languages.** The English Ergopti+ page sets `lang="en"` since the second pass, but a string with no English
-      translation falls back to French inside it: mark those passages `lang="fr"` or translate them; `lang` on
-      foreign passages across the site (English names, quotes); decide whether the accessibility texts get the 21
-      locales.
+- [ ] **Languages.** `lang` on foreign passages across the rest of the site (English names, quotes); decide whether
+      the accessibility texts get the 21 locales.
 
 ## Ergopti Studio
 
@@ -339,6 +334,17 @@ Each question names the default kept meanwhile; an answer moves into the item or
 - [ ] **Screen-reader announcements of tooltips, decided by the agent on 2026-11-17.** Hotstring previews and
       finished AI predictions are announced only while the system says a screen reader runs (Windows
       `SPI_GETSCREENREADER`, VoiceOver, Orca), with no Ergopti+ setting; add a menu switch if users find them noisy.
+- [ ] **Ergopti+ sections in French under the English page (decided by the agent on 2026-11-17, to review by the
+      maintainer).** Ten sections of the Ergopti+ pages have no English text; they now say `lang="fr"`, so a screen
+      reader reads them as French (`tools/test/test-ergopti-plus-languages.cjs`). Kept meanwhile: marked, not
+      translated.
+  1. **(recommended) Translate them** through `t()` and `locales/en.js`, dropping each `lang="fr"` as it goes.
+  2. Keep them French on the English page.
+- [ ] **Undo with no timer (decided by the agent on 2026-11-17, to review by the maintainer).** The Studio's restores
+      offer « Undo » until the section is edited again or another restore replaces it, not for a few seconds (WCAG
+      2.2.1, no time limits). Kept meanwhile: no timer.
+  1. **(recommended) Keep it without a timer.**
+  2. Hide the offer after a delay, paused while it has the focus or the pointer.
 - [ ] **Site placements decided by the agent on 2026-11-14 (implemented: fb510e1113, f555c231e5).** The former
       Utilisation page is split into `/ergopti/utilisation` (« Essayer » : online typing and text replacements) and
       `/ergopti/installation` (downloads, OS guides, printable layouts); `/utilisation` without an anchor lands on

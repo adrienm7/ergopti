@@ -190,6 +190,55 @@ cannot reach and holds it at zero (`exerciseStudio`, `exerciseHeroPause`).
   Comparer still computing dims its ranking, which once read as 66 contrast
   failures in one run.
 
+## Third pass, Studio and site (2026-11-17, Paris time)
+
+The axe gate stays at 0 nodes; it now also restores, undoes and scans the
+Comparer's « Undo » lines.
+
+- **Undo after a restore (WCAG 3.3.4).** The Comparer's four « Restore »
+  buttons (weights, ideal load, shortcut letters, keyboard forms) and the
+  fingering editor's reset still act at once, then a polite status line
+  right after the button says « … : defaults restored. » with an « Undo »
+  button one Tab away (`layout_analysis/undo_offer.js`, 21 locales). No
+  timer (WCAG 2.2.1): the offer stays until the section is edited again or
+  another restore replaces it; after an undo the focus returns to the
+  restore button. A section already at its defaults offers nothing.
+- **Heatmap keys (WCAG 1.4.11).** The ramp keeps its look; every key wears
+  a 1 px edge of the ramp's hue (`--theme-chart-ramp-edge`, `#5f86bf` light,
+  `#6d8fbd` dark) inside the surface gap: 3.7:1 and 4.2:1 against the
+  surface, 3.2:1 and 3.8:1 against the light end, so a key worth zero keeps
+  its shape. The dataviz validator (`--ordinal`) still reports the light end
+  itself below 2:1, which the edge answers.
+- **Fingering editor.** The four finger tints (30 % of the system red,
+  orange, green and blue) failed every validator check (normal-vision ΔE
+  7.7, colour-blind ΔE 3.3, 1.3:1 on the surface). The fingers now take the
+  validator's first four categorical slots in their fixed order from the
+  pinky (`--theme-chart-cat-1..4`): light `#2a78d6 #eb6834 #1baf7a #eda100`
+  passes (worst adjacent colour-blind ΔE 9.1 protanopia, normal vision
+  22.9; aqua and yellow 2.8:1 and 2.2:1 on white, answered by the finger
+  printed on every key), dark `#3987e5 #d95926 #199e70 #c98500` passes every
+  check (8.4, 19.8, all ≥ 3:1). The hue is the key's 2 px edge; the key is a
+  22 % tint, so its printed finger stays above 4.5:1.
+- **App windows.** The metrics dashboards' muted text (units, help, table
+  headers) was the system tertiary grey `#86868b`, 3.3:1 to 3.6:1 in light:
+  now `#636366` (5.5:1 on the page, 4.8:1 on the headers; dark was already
+  above 4.5:1). The AI prediction tooltip's hint line and info bar were
+  2.7:1 and 1.8:1 on its `#242424` panel: now `#999999` and `#8f8f8f`
+  (5.5:1 and 4.8:1) on Windows and macOS, which read them from
+  `_shared/core/ui/data/tooltip/constants.toml`; the Linux prediction
+  tooltip draws neither line. The site's tooltip demo
+  was fixed in the first pass.
+- **Languages (WCAG 3.1.2).** Under the English Ergopti+ page, ten sections
+  written only in French (hotstrings, AI, keyboard, metrics, trackpad,
+  customization, Ergopti bonuses, the live typing demos) and five blocks
+  of the installation page were read as English: they now say `lang="fr"`, their English example words
+  `lang="en"`, and the interface languages' names their own language. Every
+  literal `t()` key has an English entry (five words spelled alike).
+- **Gates.** `tools/test/test-app-colour-contrast.cjs` (edge, finger hues,
+  metrics text, both themes), `tools/test/test-ergopti-plus-languages.cjs`,
+  a text-contrast rule in `test-tooltip-style-single-source.cjs`, and the
+  undo walk in the axe gate (`exerciseUndo`).
+
 ## Native Ergopti+ UI (code audit, 2026-11-17)
 
 A read of the three drivers, no screen reader yet. No native layer reads the
