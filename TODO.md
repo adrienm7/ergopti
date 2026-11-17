@@ -125,11 +125,6 @@ waits for the maintainer's review).
       dev run builds « Windows / Build », commit its artifact `windows-lua-export-*` (`ergopti_lua_export.exe` and
       its `.json`) into `windows/vendor` with their `required` entries in `tools/build/windows_bundle_manifest.json`;
       then `test-windows-lua-export-identity.cjs` checks them and the Windows lane runs the byte-equality proof.
-- [ ] **The optimizer in Ergopti+.** Mount `LAYOUT_OPTIMIZER_PAGE` in the app's Studio window on Windows, macOS and
-      Linux, with « My typing » (keystats) as a corpus; the page already runs without workers where a host inlines it.
-- [ ] **Optimizer follow-ups.** Pasted texts and files as corpora (as the Comparer); zones in the page (restrict a
-      letter to keys by clicking them); per-viewer saved choices (localStorage); a browser test of the tab in
-      `layout-editor.playwright.cjs` style.
 - [ ] **Incremental scoring with context choices.** Since the engine types each character the way that costs least
       in its context, `scoreSession` falls back to a whole-stream walk whenever the layout or the trial offers a
       choice of ways or uses a chord (exact, but Swann: Ergopti 95 → 17, Ergo-L 130 → 18 trials per second; AZERTY

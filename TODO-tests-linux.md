@@ -69,6 +69,10 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       « Navigation layer » open the Studio on its « nav » layer, holding the current layer key, with the user's
       layers.toml bindings; « Apply the navigation layer » then changes the layer live, and layers.toml starts with
       « # source: » and « # body-fnv1a32: ».
+      Optimiser: the « Optimiser » tab opens the optimizer; after « Analyse my typing », « My typing » is its chosen
+      corpus; « Optimize » with 10 s runs to « Done » with a score, the window staying usable while it runs on the page;
+      « Open in the editor » opens the result in a new tab of « Éditer » and « Compare with other layouts » adds it in «
+      Comparer »; its choices are back after closing and reopening the window.
 - [ ] <!-- field-point: direct_xkb_levels --> Direct XKB compiler: the XKB export of
       `_shared/tests/corpus/layouts/source/direct_levels.toml` installed with the user layout installer types a, α
       (Right Ctrl, XKB's fifth level), æ (AltGr) and β (Right Ctrl) on a real GNOME or KDE session.
