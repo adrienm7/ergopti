@@ -143,10 +143,25 @@ it gains its speed from:
   Measured the same way (Swann, 99 %, 300 swaps, median of 3 interleaved
   runs on one loaded laptop, against b1b4f80799): bépo 13.2 → 27.7,
   Ergopti 39.6 → 46.3, Ergo-L 26.3 → 32.4, AZERTY 107 → 134 trials per
-  second, with the same results. What is left
-  on the layouts with choices is the plan (`planTyping`, about 40 % of a
-  trial on Ergo-L), the context walk (15 %) and the layout-level metrics
-  (13 %, `simplicity` half of it);
+  second, with the same results. The plan from the current plan then
+  moved to ids and typed arrays (`planContext`,
+  [layout-analysis.md](layout-analysis.md#performance)): a trial writes
+  its plan into the buffers of the plan before the current one and
+  allocates almost nothing; the layout-level metrics stopped copying
+  (simplicity's accent rule is carried over from the current compile, and
+  counted again only for the characters a trial compiled again), compact
+  forms follow the dead-key rules on ids, and a partial compile finishes
+  from the ways before it. Measured (Swann, 99 %, 600 swaps from the start
+  layout, each run its own Node process, median of 3 runs alternating old
+  and new on one heavily loaded PC, against 12a3d5e460), trials per second
+  of wall time (of CPU time): Ergopti 56.8 → 110.4 (81.8 → 138.0), Ergo-L
+  39.4 → 92.5 (61.1 → 128.2), bépo 35.3 → 57.0 (49.6 → 94.9), AZERTY
+  145 → 207 (163 → 228), QWERTY 160 → 193 (186 → 256), every run ending on
+  the same best score. What is left on bépo is its compile (a quarter of a
+  trial: 2,181 dead-key rules, a few thousand joins per swap of a letter
+  the rules read) and its finish (15 %); on Ergo-L, the plan (20 %) and the
+  context walk (20 %, two thirds of it the corpus trigrams of the swapped
+  characters that hold no multi-way token);
 - Web Workers, one share of the restarts each (up to 8, one thread left to the
   page), so the Studio stays responsive and a run uses every core;
 - the « 99 % of the n-grams » accuracy (`searchTables`), which keeps the most
@@ -231,10 +246,9 @@ only), keyboard ISO, format TKL, default weights, 1 restart of 3 000 swaps on
 
 ## Follow-ups
 
-- Faster incremental scoring: a trial still re-measures the layout-level
-  metrics (shortcuts, digits, coverage), about 1 ms; caching each entry's
-  last key pattern would halve the walk.
-- Faster planning: on a layout with choices, `planTyping` from the current
-  plan is about 40 % of a trial (Ergo-L), and `simplicity` walks every way
-  of every character each trial; both bound the 95–130 trials per second
-  aimed at.
+- Faster bépo trials: the partial compile (a quarter of a trial) joins
+  every way of each dead key with every way of a swapped letter, through
+  all 92 dead states, and its finish still copies the maps of 1,769
+  characters; bépo is at about 57 trials per second of the 95–130 aimed
+  at. Tried without gain: keeping each pair's side costs across trials,
+  and summing the walk's rest n-grams per key n-gram before the visitor.

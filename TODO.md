@@ -47,9 +47,6 @@ every maintainer request here.
   groups, WSL Lua suites, interactive desktop checks); prefer CI on temporary `ci/verify-<sha>` branches (deleted
   after reading). After each agent: remove its worktree and scratch files; purge stale scratch dirs, WSL `/root`
   copies and the npm cache regularly; compact the WSL disk image when no agent uses WSL (C: reached 2.8 GB free).
-- [ ] **Land the optimizer speed-up.** Branch `perf-typing-ids` (6 commits, rebased on c8cd556bab): Ergopti 57 →
-      110, Ergo-L 39 → 93, bépo 35 → 57 optimizer trials/s; golden gap 0, property and stress tests exact. Rebase
-      on `dev`, push, then delete the remote branch.
 - [ ] **CI reds left after verify run 44072500520** (decisions taken 2026-11-17):
   - Windows SSPI curl flake: the TLS test server closes while the client's TLS close is still in flight (reset
     10054). Maintainer decision: half-close then wait (bounded) for the client's close, and revise the pinned test
@@ -114,6 +111,9 @@ Design: [layout-editor.md](docs/design/layout-editor.md), [layout-analysis.md](d
 analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-analysers/report.md) (its section 15
 waits for the maintainer's review).
 
+- [ ] **Optimiser speed on bépo.** The aim is 95–130 trials per second on the layouts with choices; measured on
+      2026-11-17 (Swann, 99 %, loaded PC): Ergopti 110, Ergo-L 93, bépo 57. Left on bépo: the partial compile of its
+      2,181 dead-key rules (a quarter of a trial) and its finish (layout-optimizer.md, « Follow-ups »).
 - [ ] **Layout formats, what is left.** KLA's 16 files with characters on keys the library's keyboards lack (12 of
       them ErgoDox) stay in `not_imported` of `layout_library.json` until the keyboard model, the KLA reader and the
       library can place ErgoDox thumb and outer keys. KLAnext's `janiso` board is refused

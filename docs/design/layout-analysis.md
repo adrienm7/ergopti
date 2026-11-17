@@ -1174,6 +1174,26 @@ property test compares them on every trial; a scratch run over the 165
 layouts of the library, 31 000 random swaps, found no difference), and
 `analyse()` is unchanged (byte-identical on the library).
 
+The plan from the current plan works on ids (`planContext`): a context
+model per partition (`contextModel`: the touchTri and touchBi entries as id
+columns, every pair they hold as a pair id, compressed per-pair and
+per-token entry lists) and a plan state of typed arrays (skipgram tallies,
+picks, edge choices, distributions and shares per pair and per token). A
+trial copies the current state into the spare one
+and computes again only what a token whose ways changed can reach, with
+insertion-ordered id sets in place of string-keyed Sets and Maps, in the
+same order as from nothing: the plan is the same to the last bit (the
+property test compares each trial's counts per way with `analyse()`'s; a
+scratch run of 16,500 random swaps over the library compared every typed
+state with a plan made from nothing). Only the last trial's plan stays
+whole, so a session refuses to report an earlier trial's plan and scores
+an earlier trial again when it is committed. A partial compile names the
+characters it compiled again: `finishWaysFrom` takes their lists into the
+previous finished maps and carries the accent rule's counts over
+(simplicity), and a joined way is filled in only once it may be kept.
+`compact_fit` follows the dead-key rules on ids (`reachGraph`). Every
+value is unchanged (golden gap 0).
+
 ## Decided by the agent, to review by the maintainer
 
 The maintainer settled the space bar thumb, Digit6, the weights, the ideal
