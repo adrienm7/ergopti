@@ -65,6 +65,10 @@ def main():
     parser.add_argument("personal", type=pathlib.Path, help="personal_hotstrings.toml")
     parser.add_argument("bundled", type=pathlib.Path, help="the bundled hotstrings folder")
     arguments = parser.parse_args()
+    # A Windows console encodes stdout in its ANSI code page, which has no « ★ »
+    # or most emoji triggers: the step died on the first such collision.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     if not arguments.personal.is_file():
         print(f"no personal hotstrings file at {arguments.personal.name}")
         return 0

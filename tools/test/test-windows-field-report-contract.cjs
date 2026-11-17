@@ -397,6 +397,35 @@ const python = ['python3', 'python', 'py'].find(
 );
 assert(python, 'the collector runtime needs a Python interpreter');
 
+// The maintainer's PC (2026-11-17): a personal trigger « ★… » shared with a
+// bundled one killed the step with UnicodeEncodeError under the console's
+// cp1252 stdout.
+check('the hotstring collisions print a non-ANSI trigger under a cp1252 console', () => {
+	const folder = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-collisions-')));
+	try {
+		const bundled = path.join(folder, 'bundled');
+		fs.mkdirSync(bundled);
+		fs.writeFileSync(
+			path.join(bundled, 'symbols.toml'),
+			'[[symbols]]\n"★x" = { output = "a", is_word = true }\n'
+		);
+		fs.writeFileSync(
+			path.join(folder, 'personal.toml'),
+			'[[mine]]\n"★x" = { output = "b", is_word = false }\n'
+		);
+		const result = spawnSync(
+			python,
+			[path.join(ROOT, COLLISIONS), path.join(folder, 'personal.toml'), bundled],
+			{ encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'cp1252', PYTHONUTF8: '0' } }
+		);
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(result.stdout, /'★x' personal is_word=False/);
+		assert.match(result.stdout, /1 personal trigger\(s\) shared with a bundled one/);
+	} finally {
+		fs.rmSync(folder, { recursive: true, force: true });
+	}
+});
+
 const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-windows-field-')));
 
 /**
