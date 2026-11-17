@@ -653,7 +653,11 @@ function Get-FieldInstances([string]$Phase) {
 			}
 		}
 		$Parent = ''
-		if ($ParentId) { $Parent = (Get-Process -Id $ParentId -ErrorAction SilentlyContinue).Name }
+		# A parent that has exited returns nothing; StrictMode refuses .Name on it.
+		if ($ParentId) {
+			$ParentProcess = Get-Process -Id $ParentId -ErrorAction SilentlyContinue
+			if ($ParentProcess) { $Parent = $ParentProcess.Name }
+		}
 		$Started = ''
 		if ($Process.StartTime) { $Started = $Process.StartTime.ToString('s') }
 		$Cpu = ''
