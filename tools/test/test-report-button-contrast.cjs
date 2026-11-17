@@ -68,8 +68,10 @@ function variables(block) {
 function appearances(css) {
 	const dark = {};
 	const light = {};
+	// A dark block may yield to a chosen light theme (:root:not([data-theme='light']),
+	// bece58b83a); its :root[data-theme='dark'] twin is pinned equal by the theme guard.
 	const blocks =
-		/@media\s*\(prefers-color-scheme:\s*dark\)\s*\{\s*:root\s*\{([^}]*)\}\s*\}|:root\s*\{([^}]*)\}/g;
+		/@media\s*\(prefers-color-scheme:\s*dark\)\s*\{\s*:root(?::not\(\[data-theme='light'\]\))?\s*\{([^}]*)\}\s*\}|:root\s*\{([^}]*)\}/g;
 	for (const match of css.matchAll(blocks)) {
 		if (match[1] !== undefined) Object.assign(dark, variables(match[1]));
 		else Object.assign(light, variables(match[2]));
