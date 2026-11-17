@@ -467,6 +467,7 @@
 		"starting",
 		"stopping",
 		"string",
+		"suspend",
 		"synchronous-candidate",
 		"terminal-preflight",
 		"trigger",
