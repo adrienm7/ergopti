@@ -47,6 +47,7 @@ enum LauncherTimings {
 	static let vhidReportQueryPoll = RegistryDuration(section: "launcher", key: "vhid_report_query_poll_ms", milliseconds: 10)
 	static let vhidReportMainPoll = RegistryDuration(section: "launcher", key: "vhid_report_main_poll_ms", milliseconds: 20)
 	static let vhidReportRequestPoll = RegistryDuration(section: "launcher", key: "vhid_report_request_poll_ms", milliseconds: 20)
+	static let proxyRelayStopGrace = RegistryDuration(section: "launcher", key: "proxy_relay_stop_grace_ms", milliseconds: 5000)
 	static let automationFixtureWait = RegistryDuration(section: "launcher", key: "automation_fixture_wait_ms", milliseconds: 30000)
 	static let programFixturePoll = RegistryDuration(section: "launcher", key: "program_fixture_poll_ms", milliseconds: 1)
 	static let ollamaFixtureReapPoll = RegistryDuration(section: "launcher", key: "ollama_fixture_reap_poll_ms", milliseconds: 10)

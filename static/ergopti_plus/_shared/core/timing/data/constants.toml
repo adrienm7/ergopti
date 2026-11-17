@@ -1487,6 +1487,12 @@ vhid_report_query_poll_ms = 10
 vhid_report_main_poll_ms = 20
 vhid_report_request_poll_ms = 20
 
+# The managed Ollama daemon's sibling sign-in relay (docs/design/proxy-auth-relay.md,
+# "macOS managed daemon"): how long the suspended image guardian waits for the
+# relay to exit once its stdin is closed before it kills it.
+# Swift: SuspendedImageProxyRelay.swift.
+proxy_relay_stop_grace_ms = 5000
+
 # Test fixtures compiled into the launcher: the automation query fixture's
 # hold, the owned program fixture's poll, and the managed Ollama listener's
 # reap poll and its progress and stall chunk pauses.

@@ -28,7 +28,13 @@ private final class SuspendedImageNativeSession {
 	var receivingCloseFailed = false
 	let loggedFixture: Bool
 
-	init(launcher: URL, inodeDelta: UInt64 = 0, prefillSession: Bool = false, listenerEvent: Bool = false, loggedFixture: Bool = false) throws {
+	var bootstrapWriter: FileHandle?
+
+	/// - Parameter relayScript: The sibling relay placed beside the outgoing worker
+	///   (signed ad hoc), "" for none on disk, nil for a request without relay
+	///   fields. A relay request carries the bootstrap binding it needs.
+	init(launcher: URL, inodeDelta: UInt64 = 0, prefillSession: Bool = false, listenerEvent: Bool = false, loggedFixture: Bool = false,
+		relayScript: String? = nil) throws {
 		self.loggedFixture = loggedFixture
 		let temporary = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
 		directory = temporary.appendingPathComponent("ergopti-image-\(UUID().uuidString)")
@@ -83,6 +89,34 @@ private final class SuspendedImageNativeSession {
 			"outgoing_inode": String(UInt64(outgoing.st_ino)), "outgoing_sha256": outgoingSHA,
 		]
 		if listenerEvent { request["listener_event"] = true }
+		if let relayScript {
+			let network = sessions.appendingPathComponent("network-0123456789abcdef0123456789abcdef.json")
+			let networkDescriptor = Darwin.open(network.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+			guard networkDescriptor >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+			bootstrapWriter = FileHandle(fileDescriptor: networkDescriptor, closeOnDealloc: true)
+			var networkIdentity = stat()
+			guard lstat(network.path, &networkIdentity) == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+			request["bootstrap_path"] = network.path
+			request["bootstrap_device"] = String(UInt64(UInt32(bitPattern: networkIdentity.st_dev)))
+			request["bootstrap_inode"] = String(UInt64(networkIdentity.st_ino))
+			request["store_mode"] = "default"
+			request["store_cwd"] = directory.path
+			request["relay_upstream"] = "http://proxy.example:8080"
+			request["relay_dial_ms"] = 1000; request["relay_handshake_ms"] = 1000; request["relay_idle_ms"] = 1000
+			process.currentDirectoryURL = directory
+			if !relayScript.isEmpty {
+				let relay = worker.deletingLastPathComponent().appendingPathComponent(SuspendedImageProxyRelay.executableName)
+				try Data(relayScript.utf8).write(to: relay, options: .withoutOverwriting)
+				try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: relay.path)
+				let signer = Process(); signer.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+				signer.arguments = ["--force", "-s", "-", relay.path]
+				signer.standardOutput = FileHandle.nullDevice; signer.standardError = FileHandle.nullDevice
+				try signer.run(); signer.waitUntilExit()
+				guard signer.terminationReason == .exit, signer.terminationStatus == 0 else {
+					throw NSError(domain: "RelayFixtureCodesign", code: 1)
+				}
+			}
+		}
 		if loggedFixture {
 			let logs = directory.appendingPathComponent("logs")
 			try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: false,
@@ -172,6 +206,7 @@ private final class SuspendedImageNativeSession {
 			}
 			if loggedFixture { try closeLoggedReceiving() }
 			try sessionWriter.close()
+			try bootstrapWriter?.close()
 			guard Darwin.close(outgoingDescriptor) == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
 			outgoingDescriptor = -1
 			try FileManager.default.removeItem(at: directory)
@@ -267,6 +302,100 @@ final class OwnedSuspendedImageTests: XCTestCase {
 		XCTAssertFalse(fixture.markers.contains("V1 ACTIVE"))
 		XCTAssertFalse(fixture.markers.contains(where: { $0.hasPrefix("V1 LISTENER_BOUND ") }))
 		XCTAssertEqual(fixture.markers.last, "V1 RETIRED 137 1 1 0 0 0 0")
+	}
+	// The macOS managed daemon's sibling sign-in relay (docs/design/proxy-auth-relay.md).
+	private static let relayToken = String(repeating: "0123456789abcdef", count: 4)
+	private func relayScript(pidFile: URL) -> String {
+		"#!/bin/sh\n[ \"$1\" = listen ] || exit 2\necho $$ > '\(pidFile.path)'\n"
+			+ "printf '%s\\n' '{\"schema\":1,\"port\":40123,\"token\":\"\(Self.relayToken)\"}'\nexec cat > /dev/null\n"
+	}
+	private func activate(_ fixture: SuspendedImageNativeSession) throws {
+		try fixture.wait { fixture.markers.contains(where: { $0.hasPrefix("V1 IMAGE_READY ") }) }
+		try fixture.sessionWriter.write(contentsOf: Data("POST_IMAGE_PROOF_FIXTURE_KEY".utf8)); try fixture.sessionWriter.synchronize()
+		let bootstrap = try XCTUnwrap(fixture.bootstrapWriter)
+		try bootstrap.write(contentsOf: Data("POST_IMAGE_PROOF_NETWORK".utf8)); try bootstrap.synchronize()
+		try fixture.send("ACTIVATE"); try fixture.finish()
+	}
+	func testRelayRequestNeedsTheBootstrapAndAPlainProxy() throws {
+		let home = "/private/tmp/ergopti-image-request-test"
+		let sessions = home + "/Library/Application Support/Ergopti/ollama-native-sessions/"
+		let request: [String: Any] = [
+			"version": 1, "executable": home + "/Library/Application Support/Ergopti/ollama-native-http/.ergopti-image-0123456789abcdef0123456789abcdef",
+			"arguments": ["serve"], "device": "1", "inode": "2",
+			"session_path": sessions + "daemon-0123456789abcdef0123456789abcdef.json",
+			"remaining_ms": 1000, "home": home, "models_path": "", "network_policy": home + "/policy.json",
+			"host": "127.0.0.1:11434", "proxy_url": "",
+			"bootstrap_path": sessions + "network-0123456789abcdef0123456789abcdef.json", "bootstrap_device": "1",
+			"bootstrap_inode": "3", "store_mode": "default", "store_cwd": FileManager.default.currentDirectoryPath,
+			"relay_upstream": "http://proxy.example:8080/", "relay_dial_ms": 10_000, "relay_handshake_ms": 15_000,
+			"relay_idle_ms": 300_000,
+		]
+		func parse(_ fields: [String: Any]) throws -> OwnedSuspendedImageRequest? {
+			OwnedSuspendedImageRequest.parse(try JSONSerialization.data(withJSONObject: fields), launcher: "/usr/bin/true")
+		}
+		let relay = try XCTUnwrap(try XCTUnwrap(parse(request)).relay)
+		XCTAssertEqual(relay.upstream, "http://proxy.example:8080/")
+		XCTAssertEqual([relay.dialMilliseconds, relay.handshakeMilliseconds, relay.idleMilliseconds], [10_000, 15_000, 300_000])
+		var withoutRelay = request
+		for key in ManagedProxyRelayRequest.keys { withoutRelay[key] = nil }
+		XCTAssertNil(try XCTUnwrap(parse(withoutRelay)).relay)
+		var withoutBootstrap = request
+		for key in ["bootstrap_path", "bootstrap_device", "bootstrap_inode", "store_mode", "store_cwd"] { withoutBootstrap[key] = nil }
+		XCTAssertNil(try parse(withoutBootstrap), "a relay route needs the sealed bootstrap snapshot")
+		var partial = request; partial["relay_idle_ms"] = nil
+		XCTAssertNil(try parse(partial), "the relay fields come as one set")
+		let rejected: [(String, Any)] = [
+			("relay_upstream", "http://user:secret@proxy.example:8080"), ("relay_upstream", "https://proxy.example:8080"),
+			("relay_upstream", "http://proxy.example"), ("relay_upstream", "http://proxy.example:0"),
+			("relay_upstream", "http://proxy.example:65536"), ("relay_upstream", "http://proxy example:8080"),
+			("relay_dial_ms", 0), ("relay_dial_ms", true), ("relay_handshake_ms", NSNumber(value: 1.5)),
+			("relay_idle_ms", 600_001), ("relay_idle_ms", "1000"),
+		]
+		for (field, value) in rejected { var altered = request; altered[field] = value; XCTAssertNil(try parse(altered), "\(field) \(value)") }
+	}
+	func testRelayLineIsTheExactListenShape() {
+		let token = Self.relayToken
+		XCTAssertEqual(SuspendedImageProxyRelay.parseLine(Data("{\"schema\":1,\"port\":40123,\"token\":\"\(token)\"}".utf8)),
+			.route(port: 40123, token: token))
+		for line in ["{\"schema\":2,\"port\":40123,\"token\":\"\(token)\"}", "{\"schema\":1,\"port\":0,\"token\":\"\(token)\"}",
+			"{\"schema\":1,\"port\":40123,\"token\":\"\(token.uppercased())\"}", "{\"schema\":1,\"port\":40123,\"token\":\"abc\"}",
+			"{\"schema\":1,\"port\":40123.5,\"token\":\"\(token)\"}", "{\"schema\":1,\"port\":40123,\"token\":\"\(token)\",\"extra\":1}",
+			"{\"schema\":true,\"port\":40123,\"token\":\"\(token)\"}", "not json"] {
+			XCTAssertNil(SuspendedImageProxyRelay.parseLine(Data(line.utf8)), line)
+		}
+	}
+	func testSiblingRelayRouteReachesTheCallerBeforeTheImageAndEndsWithTheDaemon() throws {
+		let pidFile = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent("ergopti-relay-\(UUID().uuidString).pid")
+		defer { try? FileManager.default.removeItem(at: pidFile) }
+		let fixture = try SuspendedImageNativeSession(launcher: launcher(), relayScript: relayScript(pidFile: pidFile)); defer { fixture.cleanup() }
+		try activate(fixture)
+		let route = "V1 RELAY 40123 " + Self.relayToken
+		let routeIndex = try XCTUnwrap(fixture.markers.firstIndex(of: route), "\(fixture.markers.count) markers")
+		let imageIndex = try XCTUnwrap(fixture.markers.firstIndex(where: { $0.hasPrefix("V1 IMAGE_READY ") }))
+		XCTAssertLessThan(routeIndex, imageIndex, "the route precedes the image proof, so the snapshot can carry it")
+		XCTAssertTrue(fixture.markers.contains("V1 ACTIVE"))
+		XCTAssertTrue(fixture.markers.contains("V1 RELAY_CLOSED 0"))
+		XCTAssertEqual(fixture.markers.last, "V1 RETIRED 0 1 1 0 0 0 0")
+		let relayPID = try XCTUnwrap(pid_t(String(decoding: try Data(contentsOf: pidFile), as: UTF8.self)
+			.trimmingCharacters(in: .whitespacesAndNewlines)))
+		let signalled = Darwin.kill(relayPID, 0), signalError = errno
+		XCTAssertEqual(signalled, -1, "the relay outlived its guardian")
+		XCTAssertEqual(signalError, ESRCH)
+	}
+	func testRefusedListenStartsTheDaemonWithoutTheRelay() throws {
+		let fixture = try SuspendedImageNativeSession(launcher: launcher(), relayScript: "#!/bin/sh\nexit 3\n"); defer { fixture.cleanup() }
+		try activate(fixture)
+		XCTAssertTrue(fixture.markers.contains("V1 RELAY_REFUSED relay_listen_failed"))
+		XCTAssertFalse(fixture.markers.contains(where: { $0.hasPrefix("V1 RELAY ") }))
+		XCTAssertTrue(fixture.markers.contains("V1 ACTIVE"))
+		XCTAssertTrue(fixture.markers.contains("V1 RELAY_CLOSED 0"))
+		XCTAssertEqual(fixture.markers.last, "V1 RETIRED 0 1 1 0 0 0 0")
+	}
+	func testMissingRelayIsRelayUnavailable() throws {
+		let fixture = try SuspendedImageNativeSession(launcher: launcher(), relayScript: ""); defer { fixture.cleanup() }
+		try activate(fixture)
+		XCTAssertTrue(fixture.markers.contains("V1 RELAY_REFUSED relay_unavailable"))
+		XCTAssertEqual(fixture.markers.last, "V1 RETIRED 0 1 1 0 0 0 0")
 	}
  private func receiveNativeListenerEvent(_ mode: String) throws {
   let process = Process(); let output = Pipe(); let error = Pipe()

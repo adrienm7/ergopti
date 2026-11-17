@@ -29,6 +29,7 @@ struct OwnedSuspendedImageRequest {
 	let bootstrap: ManagedNetworkBootstrapBinding?
 	let listenerEvent: Bool
 	let logDirectory: String?
+	let relay: ManagedProxyRelayRequest?
 
 	private static func unsigned(_ value: Any?) -> UInt64? {
 		guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
@@ -51,10 +52,12 @@ struct OwnedSuspendedImageRequest {
 		let listenerKeys: Set<String> = ["listener_event"]
 		let logKeys: Set<String> = ["log_directory"]
 		let permitted = [keys, keys.union(outgoingKeys), keys.union(bootstrapKeys), keys.union(outgoingKeys).union(bootstrapKeys)]
+		// The sign-in relay fields are checked as one set below; they need the bootstrap.
 		guard data.count <= 65_536,
 			let fields = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
 			(permitted + permitted.map { $0.union(listenerKeys) } + permitted.map { $0.union(logKeys) }
-				+ permitted.map { $0.union(listenerKeys).union(logKeys) }).contains(Set(fields.keys)),
+				+ permitted.map { $0.union(listenerKeys).union(logKeys) }).contains(Set(fields.keys).subtracting(ManagedProxyRelayRequest.keys)),
+			let relaySelection = ManagedProxyRelayRequest.parse(fields),
 			fields["log_directory"] == nil || (fields["log_directory"] as? String).map({ validPath($0) }) == true,
 			fields["listener_event"] == nil || (fields["listener_event"] as? NSNumber).map({ CFGetTypeID($0) == CFBooleanGetTypeID() && $0.boolValue }) == true,
 			unsigned(fields["version"]) == 1,
@@ -96,6 +99,8 @@ struct OwnedSuspendedImageRequest {
 				cwd == FileManager.default.currentDirectoryPath else { return nil }
 			bootstrap = ManagedNetworkBootstrapBinding(path: path, device: device, inode: inode, storeMode: mode, cwd: cwd)
 		} else { bootstrap = nil }
+		// The relay route replaces a proxy of the sealed bootstrap snapshot only.
+		guard relaySelection == nil || bootstrap != nil else { return nil }
 		let outgoing: String
 		let outgoingDevice: UInt64
 		let outgoingInode: UInt64
@@ -136,7 +141,8 @@ struct OwnedSuspendedImageRequest {
 		if !proxy.isEmpty { environment["https_proxy"] = proxy }
 		return OwnedSuspendedImageRequest(executable: executable, arguments: arguments, device: device,
 			inode: inode, sessionPath: session, remainingMilliseconds: UInt32(remaining), environment: environment,
-			outgoingWorker: outgoing, outgoingSHA256: outgoingSHA256, bootstrap: bootstrap, listenerEvent: fields["listener_event"] != nil, logDirectory: fields["log_directory"] as? String)
+			outgoingWorker: outgoing, outgoingSHA256: outgoingSHA256, bootstrap: bootstrap, listenerEvent: fields["listener_event"] != nil, logDirectory: fields["log_directory"] as? String,
+			relay: relaySelection)
 	}
 
 	private static func validPath(_ value: String) -> Bool {
@@ -458,7 +464,18 @@ enum OwnedSuspendedImageGuardian {
 				&& (empty ? held.st_size == 0 : held.st_size > 0 && held.st_size <= ManagedNetworkBootstrapPolicy.maximumMetadataBytes)
 		}
 		guard bootstrapAdmitted(empty: true) else { _ = send("V1 REFUSED \(ESTALE)"); return 0 }
+		// The sign-in relay is the daemon's sibling (docs/design/proxy-auth-relay.md,
+		// "macOS managed daemon"); it holds the log capture's stderr writer, so it
+		// stops before the capture can settle.
+		var relay: SuspendedImageProxyRelay?
+		var relayClose: Int32 = 0
+		func stopRelay() {
+			guard let current = relay else { return }
+			relay = nil
+			relayClose = current.stop(pause: { logCapture?.drain(); wait() })
+		}
 		func refuseBeforeChild(_ error: Int32) -> Int32 {
+			stopRelay()
 			logCapture?.closeWriters()
 			while let capture = logCapture, !capture.settleAfterRetirement() { _ = readLines(); wait() }
 			_ = send("V1 REFUSED \(error)")
@@ -492,6 +509,22 @@ enum OwnedSuspendedImageGuardian {
 			logCapture = SuspendedImageLogCapture(directory: directory)
 			guard let capture = logCapture, capture.setupError == 0, admissionRemaining() else {
 				return refuseBeforeChild(logCapture?.setupError == 0 ? ETIMEDOUT : (logCapture?.setupError ?? EIO))
+			}
+		}
+		if let relayRequest = request.relay {
+			guard admissionRemaining(), let home = request.environment["HOME"] else { return refuseBeforeChild(ETIMEDOUT) }
+			let started = SuspendedImageProxyRelay()
+			relay = started
+			let outcome = started.start(path: SuspendedImageProxyRelay.path(beside: request.outgoingWorker), request: relayRequest,
+				home: home, errorDescriptor: logCapture?.errorDescriptor ?? -1, remaining: admissionRemaining,
+				pause: { logCapture?.drain(); wait() })
+			// The route carries the run token to the Python owner, which seals it
+			// into the bootstrap snapshot; a refusal starts the daemon without the proxy.
+			switch outcome {
+			case .route(let port, let token):
+				guard send("V1 RELAY \(port) \(token)") else { return refuseBeforeChild(EPIPE) }
+			case .refused(let reason):
+				guard send("V1 RELAY_REFUSED " + reason) else { return refuseBeforeChild(EPIPE) }
 			}
 		}
 		var mutableArgv = argv; var mutableEnvp = envp; var owner: OpaquePointer?
@@ -557,6 +590,7 @@ enum OwnedSuspendedImageGuardian {
 			if cancelled { _ = ergopti_owned_program_cancel(retained) }
 			let receipt = ergopti_owned_program_poll(retained)
 			if receipt.retired && receipt.leader_exited && receipt.status_valid && receipt.error_code == 0 {
+				stopRelay()
 				if let capture = logCapture, !capture.settleAfterRetirement() {
 					cancelled = true
 					if !pendingSent { pendingSent = true; _ = send("V1 PENDING \(EIO)") }
@@ -569,6 +603,7 @@ enum OwnedSuspendedImageGuardian {
 				}
 				if ergopti_owned_program_destroy(&owner) {
 					if let capture = logCapture { _ = send("V1 LOGS_CLOSED \(capture.writeError)") }
+					if request.relay != nil { _ = send("V1 RELAY_CLOSED \(relayClose)") }
 					var bootstrapClose: Int32 = 0
 					if bootstrapDescriptor >= 0 {
 						bootstrapClose = Darwin.close(bootstrapDescriptor) == 0 ? 0 : (errno == 0 ? EIO : errno)
@@ -588,7 +623,7 @@ enum OwnedSuspendedImageGuardian {
 					// handles_closed=0 remains incomplete until the receiver proves exact
 					// guardian reap plus EOF and closure of every retained control pipe.
 					_ = send("V1 RETIRED \(receipt.exit_status) 1 1 0 \(aliasClose) \(sessionClose) \(directoryClose)")
-					return outputOpen && bootstrapClose == 0 && outgoingClose == 0 && aliasClose == 0 && sessionClose == 0 && directoryClose == 0 ? 0 : 74
+					return outputOpen && bootstrapClose == 0 && outgoingClose == 0 && aliasClose == 0 && sessionClose == 0 && directoryClose == 0 && relayClose == 0 ? 0 : 74
 				}
 				// A refused destruction keeps the owner and native cleanup capability.
 				cancelled = true
