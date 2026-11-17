@@ -109,7 +109,7 @@
 			>
 			d’Ergopti Studio et que le Studio d’<ErgoptiPlus></ErgoptiPlus>. Choisissez le corpus
 			(français, anglais, code…), le clavier (ISO, Ergodox, Corne…) et les dispositions comparées.
-			Chaque métrique est expliquée par son bouton « i », et les colonnes des autres analyseurs
+			Chaque mesure est expliquée par son bouton « i », et les colonnes des autres analyseurs
 			(KLAnext, Ergo‑L, Oxeylyzer…) donnent le score que chacun de ces outils calculerait.
 		</p>
 		<SiteFrame

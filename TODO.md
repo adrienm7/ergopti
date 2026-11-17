@@ -103,9 +103,6 @@ waits for the maintainer's review).
       KLC or DOF file under a licence that allows shipping it has been found for the reader tests.
       KLAnext's `matrix` board is refused (`format_unsupported_board`): no matrix file was found to read its key
       indexes from.
-- [ ] **Studio i18n.** Left: a label-improvement pass over the Studio, editor and analyser strings; a label it
-      rewrites is translated again in the 19 other locales, and a new label enters as `pending-translation` in
-      `tools/lint/locale-identical-to-english-allowlist.json` until it is.
 - [ ] **[LATER] Layout library credits.** The 35 cmini layouts and 25 credits are shown; check each credit known
       « from knowledge » against its author's own page.
 - [ ] **More corpora.** French, English, German, Spanish and Italian books, Tatoeba, Wikipedia and MIT code are in.

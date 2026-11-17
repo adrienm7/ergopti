@@ -160,7 +160,7 @@ for (const file of locales) {
 	const load = Object.assign({}, engine.defaultIdealLoad(), { lp: 11.5, lr: 6.5 });
 	check(
 		said(() => engine.idealLoad(load)) ===
-			'Annulaire gauche porte moins que Auriculaire gauche : chaque main garde index ≥ majeur ≥ annulaire ≥ auriculaire',
+			'Annulaire gauche porte moins que Auriculaire gauche : chaque main garde index ≥ majeur ≥ annulaire ≥ auriculaire',
 		`refusal: ${said(() => engine.idealLoad(load))}`
 	);
 	check(

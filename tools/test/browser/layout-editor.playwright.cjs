@@ -1103,7 +1103,7 @@ async function exerciseManager(browser, origin) {
 	await page.evaluate(() =>
 		window.sourceResult({ ok: true, detail: '/c/my_layout.toml', filename: 'my_layout.toml' })
 	);
-	assert.match(await page.textContent('#le-message'), /ErgoptiPlus/);
+	assert.match(await page.textContent('#le-message'), /Ergopti\+/);
 
 	// Fill sources come from the composer host's own list.
 	await tool(page, 'fill');
@@ -1424,7 +1424,7 @@ async function exerciseShortcuts(browser, origin) {
 	// The export tab names the targets that cannot hold them.
 	await tool(page, 'export');
 	assert.match(await page.textContent('#le-export-shortcuts'), /\(4\)/);
-	assert.match(await page.textContent('#le-export-shortcuts'), /ErgoptiPlus/);
+	assert.match(await page.textContent('#le-export-shortcuts'), /Ergopti\+/);
 	// Save and reload: both overrides come back from the TOML.
 	const saved = await downloaded(page, () => page.click('#le-save'));
 	const sorted = (list) => list.slice().sort();
