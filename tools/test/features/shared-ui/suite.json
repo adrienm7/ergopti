@@ -541,6 +541,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-site-keyboard-data.cjs"],
 			"repro": "npm run test:site-keyboard-data"
+		},
+		{
+			"id": "layout-jis-abnt",
+			"ordinal": 686,
+			"name": "the JIS and ABNT keyboards: their boards in the editor and the analysis engine, and their keys through the .keylayout, KLC, XKB and keyboard DLL round trips, with Microsoft's own JIS and ABNT layouts read where present",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-jis-abnt.cjs"],
+			"repro": "npm run test:layout-jis-abnt"
 		}
 	]
 }

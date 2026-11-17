@@ -192,7 +192,7 @@ does not claim that every syntactically valid name is implemented.
 | -------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Root                 | `format`, `version`, `layout`, `physical`            | The records below. A new source without an import requires a layer named `base`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `layout`             | `id`, `name`                                         | `description`, `author`, unique `languages` strings; these describe the source, not installation state.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `physical`           | `base` (`iso` or `ansi`)                             | `ansi_extra_key`: where the ANSI derivation moves the ISO key left of Z (default `Backquote`); `ansi_swaps`: further `[key, key]` position pairs swapped for ANSI, each key in one pair at most. A structured source is always `iso`.                                                                                                                                                                                                                                                                                                                                                                               |
+| `physical`           | `base` (`iso` or `ansi`)                             | `keyboard`: `jis` or `abnt`, the hardware an `iso` source is for (see [JIS and ABNT keyboards](#jis-and-abnt-keyboards)); `ansi_extra_key`: where the ANSI derivation moves the ISO key left of Z (default `Backquote`); `ansi_swaps`: further `[key, key]` position pairs swapped for ANSI, each key in one pair at most. A structured source is always `iso`.                                                                                                                                                                                                                                                     |
 | `imported_keylayout` | `text`, `convention` (`iso` or `ansi`)               | The exact original XML; no cached conversion projection.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `modifiers[]`        | `id`, `mode`, nonempty unique `keys[]`               | Mode is `held` or `locked`. Custom IDs, such as `roya` and `loya`, cannot shadow built-ins (`kana` is one, see [The Kana level](#the-kana-level)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `layers[]`           | `id`, `required[]`, `optional[]`, `keys`             | Ordered layers (the first matching selector wins); required and optional modifier IDs cannot overlap. `alternatives[]` holds further `{required, optional}` combinations selecting the same layer. `platform_keys` contains optional `windows`, `macos`, `linux` mapping tables, each overriding `keys` by physical position for that target. This retains the navigation editor's per-OS ownership. `ansi_keys` overrides `keys` in the ANSI variant only, after the derivation rule (an imported ANSI hardware map that the rule does not reproduce).                                                             |
@@ -411,6 +411,55 @@ mapping of `IntlBackslash` with `ansi_extra_key` (default `Backquote`), then eac
 (`keylayout_ansi_creation.py`: macOS codes 10↔50 and 42↔30) is
 `ansi_swaps = [["Backslash", "BracketRight"]]`; with it the compiled ANSI
 variants of Ergopti and Ergopti+ behave exactly as the registry ANSI files.
+
+### JIS and ABNT keyboards
+
+A JIS (Japanese 106/109-key) or ABNT (Brazilian ABNT 2) keyboard is an ISO board with
+keys of its own, which `physical_keys.json` registers by their W3C codes: `IntlYen`
+(right of Equal), `IntlRo` (right of Slash, ABNT C1), `NonConvert`, `Convert` and
+`KanaMode` (around the JIS space bar) and `NumpadComma` (ABNT C2, the Brazilian keypad
+point). Their boards are `keyboard_forms.json`, which no driver parses: the registry
+every driver loads at boot grew by six records (a few percent of its AutoHotkey parse
+time, measured on 2026-11-17) instead of a JIS and an ABNT entry per key (about 40 %).
+`physical.keyboard` names the hardware; the editor draws that board by default.
+
+| Key                                 | macOS `.keylayout` | Linux XKB | Windows KLC    | Windows DLL (`kbd-dll`)       |
+| ----------------------------------- | ------------------ | --------- | -------------- | ----------------------------- |
+| `IntlYen`                           | code 93            | `<AE13>`  | 7D `OEM_AX`    | 7D `VK_OEM_AX`                |
+| `IntlRo`                            | code 94            | `<AB11>`  | 73 `ABNT_C1`   | 73 `VK_ABNT_C1`               |
+| `NumpadComma`                       | code 95            | `<KPPT>`  | 7E (`ABNT_C2`) | 7E `VK_ABNT_C2`               |
+| `NonConvert`, `Convert`, `KanaMode` | none               | none      | none           | 7B, 79, 70 (`VK_NONCONVERT`…) |
+
+- The macOS codes are HIToolbox's `kVK_JIS_Yen`, `kVK_JIS_Underscore` and
+  `kVK_JIS_KeypadComma`; macOS reports no keycode for Henkan, Muhenkan and
+  Katakana/Hiragana (IOHIDFamily's `Cosmo_USB2ADB.c` maps their HID usages to none), so
+  the `.keylayout` compiler and the XKB and KLC exports, which compile through the same
+  macOS-coded canonical form, list a character on them as `physical_key_not_in_<format>`.
+  The Mac JIS Eisu and Kana keys (codes 102 and 104) stay `Lang2` and `Lang1`.
+- XKB names come from xkeyboard-config's `keycodes/evdev` (`<KPPT>` is its alias of
+  `<I129>`, `KEY_KPCOMMA`). `mac_keycodes.json` lists the three keys apart
+  (`extra_keys`), and the XKB converter writes such a key, after the template's level3
+  include, only when the layout types on it; the KLC generator writes no row for a key no
+  column types on. A layout without them keeps its bytes.
+- Virtual keys: kbd.h's type-4 table gives 0x73 and 0x7E `VK_ABNT_C1` and `VK_ABNT_C2`
+  (Microsoft's KBDBR.DLL keeps them). Yen has none there; KBD106.DLL's `VK_OEM_5` is the
+  type-4 table's Backslash, so Yen takes `VK_OEM_AX` (KLC and DLL alike). A character on
+  the key wins over this default by the generator's usual rules (a « . » takes
+  `OEM_PERIOD` in a KLC).
+- A `jis` source's DLL states the keyboard type 7 (KEYBOARD_TYPE_JAPAN) with the 106-key
+  sub-type 2, as KBD106.DLL does, and sends the input-method keys' virtual keys
+  (`VK_DBE_HIRAGANA`, `VK_CONVERT`, `VK_NONCONVERT`) even where it types nothing on
+  them; an `abnt` one is a type-4 DLL ([layout-windows-dll.md](layout-windows-dll.md)).
+  A DLL read back gives `keyboard = "jis"` again, never `abnt` (Windows has no ABNT type).
+- Importers: the structured `.keylayout` import names codes 93 to 95 by the registry,
+  the KLC reader (`kbd-dll` and the Comparer's) by scan code, the Comparer's XKB reader
+  by `<AE13>`, `<AB11>`, `<KPPT>` and `<I129>`. Keyboard Layout Analyzer has no JIS
+  or ABNT board, so a KLA file carries none of these keys.
+- On Windows the emulated layers of the source emulation take Yen and Ro like every
+  character key and leave the input-method keys to the IME, as they leave the menu key.
+- `tools/test/test-layout-jis-abnt.cjs` proves the boards, the analysis keyboards and
+  the round trips of `_shared/tests/corpus/layouts/source/jis.toml` and `abnt.toml`
+  through every format, and reads Microsoft's KBDJPN, KBD106 and KBDBR where present.
 
 ### macOS bundle
 

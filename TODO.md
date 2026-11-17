@@ -147,8 +147,6 @@ Kalamine and KbdEdit give ideas, never code: every generator is written from the
       the editor's generic installer (`ergopti-layout-setup.exe`, `_generated/kbd_setup_stub.js`), SHA-256 with an
       RFC 3161 timestamp, once SignPath or the release PFX is on (`layout-windows-dll.md` « Signing »);
       `tools/kbd-dll.cjs` reports `signed: false` until then, and the job wiring is [CODE] once it exists.
-- [ ] **Keyboard types JIS and ABNT.** Their keys (Yen, Ro, Henkan, Muhenkan, Kana, keypad comma) would enter
-      `physical_keys.json`, which the Windows driver parses at boot: measure that parse cost, then decide.
 
 ## Parity audit
 

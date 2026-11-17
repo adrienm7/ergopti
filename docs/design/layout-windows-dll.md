@@ -35,6 +35,9 @@ JSON, `format = "ergopti-kbd-tables"`, `version = 1`. Characters are UTF-16 code
 - `dll_name` (1 to 8 lowercase letters or digits), `layout_text`, `locale_name`, `lcid` (4 hex digits),
   `version_string`, `copyright`, `company`, `descriptions`, `language_names`.
 - `flags`: `altgr` (KLLF_ALTGR), `shiftlock` (KLLF_SHIFTLOCK), `lrm_rlm` (KLLF_LRM_RLM).
+- `keyboard_type` (optional): `jis` for a Japanese 106/109-key keyboard, which sets `dwType` 7
+  (KEYBOARD_TYPE_JAPAN) and `dwSubType` 2 (the 106-key sub-type), the pair Windows' own KBD106.DLL
+  states; absent, the 101/102-key `dwType` 4 and `dwSubType` 0.
 - `columns`: the modifier-bit combination of each column, base (0) first. A bit is Shift 1, Ctrl 2, Alt 4, Kana 8,
   Roya 16 or Loya 32, so the Kana level is a column like AltGr (Ctrl+Alt, 6); up to 126 columns.
 - `keys[]`: `vk`, `attributes` (CAPLOK 1, SGCAPS 2, CAPLOKALTGR 4, KANALOK 8), `cells[]` one per column, each
@@ -62,6 +65,15 @@ the maintainer), and lists what Windows has no key or column for. `tools/test/te
 `static/layouts/sources/bepo.toml` gives back the official `bepo.klc` table for table and that the four DLLs of
 bépo and of Ergopti (Kana included) read back as their tables.
 
+A JIS key's character takes the virtual key of constants `JIS_VKS` unless the source names one:
+`VK_OEM_AX` for Yen (0x7D has none in the type-4 table, and KBD106's `VK_OEM_5` is that table's
+Backslash), and KBD106's own `VK_CONVERT`, `VK_NONCONVERT` and `VK_DBE_HIRAGANA` for Henkan,
+Muhenkan and Katakana/Hiragana (without its `KBDSPECIAL` flag, which only its NLS functions read).
+A `physical.keyboard = "jis"` source also moves the input-method keys to those virtual keys when it
+types nothing on them, so the input method still reads them. Ro and the ABNT keypad key keep the
+type-4 table's `VK_ABNT_C1` and `VK_ABNT_C2`. See
+[layout-source-format.md](layout-source-format.md#jis-and-abnt-keyboards).
+
 `fromKlc` follows MSKLC: KLLF_ALTGR when a column is Ctrl+Alt (6) unless an ATTRIBUTES section states the flags;
 a DEADKEY result written `xxxx@` is a chain; a keypad scan code keeps its navigation virtual key.
 
@@ -79,7 +91,8 @@ each size is pinned by `_Static_assert` in the generated C and checked again by 
   `MAKELONG(KLLF_*, KBD_VERSION = 1)`, `dwType = 4` (`KEYBOARD_TYPE_GENERIC_101`: kbd.h calls the field optional,
   and Microsoft's own layouts and the MSVC builder leave it 0; checked on 2026-11-16 over the 178 SysWOW64 and
   179 System32 layouts the reader accepts on the PC, every one 0. Kept: it states the 101/102-key PC keyboard the
-  tables are for, and changing it would change every image); `MODIFIERS` with `VK_TO_BIT` and `ModNumber[wMaxModBits + 1]`
+  tables are for, and changing it would change every image); a `keyboard_type = "jis"` model writes
+  7 and 2 instead; `MODIFIERS` with `VK_TO_BIT` and `ModNumber[wMaxModBits + 1]`
   (`SHFT_INVALID` for a combination without column); one main `VK_TO_WCHARS` table as wide as the columns, then the
   one-column keypad table last, as VkKeyScan expects; a dead key's cells are `WCH_DEAD` followed by a `0xFF` row
   holding the dead characters, an SGCAPS key by a `0xFF` row holding its Caps Lock characters; `WCH_LGTR` cells
@@ -112,8 +125,8 @@ and a non-BMP ligature, and seeded random models, in all four images. For each i
   arm64 `adrp; add; ret`), and refuses a descriptor narrower or wider than the table pointers;
 - requires every table pointer to land in a read-only initialized section, aligned, with the base relocation of its
   width, every list terminated inside its section, `cbSize = 2 + 2 * nModifications`, `cbLgEntry` against `nLgMax`,
-  each column selected by exactly one modifier combination, `KBD_VERSION = 1`, `dwType = 4`, every dead cell,
-  chain and dead name tied to a declared dead key;
+  each column selected by exactly one modifier combination, `KBD_VERSION = 1`, `dwType` 4 (or 7 with the 106-key
+  sub-type 2), no entry point, every dead cell, chain and dead name tied to a declared dead key;
 - returns the logical layout, compared with the model: every key × column (Kana included) × dead key × chain ×
   ligature, the names, scan codes and keypad table. Every image of every model compares with no difference.
 
@@ -139,6 +152,12 @@ differences that are choices (`dwType`, MSVC's writable `.data`), refuses a wow6
 native x86 one widened to EDX:EAX, and reads KBDFR-shaped data (tables in the code section, `dwType = 0`) as a
 foreign image (`readDll(bytes, { foreign: true })`, which the tool's own images never use); on Windows it also
 reads Microsoft's `SysWOW64\KBDFR.DLL` and `KBDUS.DLL`.
+
+`test-layout-jis-abnt.cjs` needs no compiler either: it writes the four images of the JIS and ABNT source fixtures
+with the compiler-free writer and reads them back (the JIS keyboard type 7/2, the input-method virtual keys, the
+wow64 image's 64-bit descriptor), and on Windows reads Microsoft's `KBDJPN.DLL` (System32 and SysWOW64: it carries
+code, so only a foreign reading accepts its entry point and its zero `KBD_VERSION` word), `KBD106.DLL` (dwType 7,
+dwSubType 2, the input-method virtual keys the writer takes) and `KBDBR.DLL` (`VK_ABNT_C1`, `VK_ABNT_C2`).
 
 The files themselves differ: lld-link adds a reproducibility debug entry and places sections and tables its own
 way, which the loader does not read. Decided by the coordinator on 2026-11-11, to review by the maintainer: the

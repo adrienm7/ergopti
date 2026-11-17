@@ -266,9 +266,16 @@ pressed by the left thumb and Digit6 by the right index (maintainer,
 left-hand key), AltGr by the right thumb. The **order** of a finger runs from the pinky (0) to the index (3);
 moving to a higher order is **inward**.
 
-**Boards.** Besides the row-staggered `iso`, `iso_angle`, `ansi` and
-`ortho`, the keyboards include `corne`, `planck`, `ergodox`, `moonlander` and
+**Boards.** Besides the row-staggered `iso`, `iso_angle`, `ansi`, `jis`, `abnt`
+and `ortho`, the keyboards include `corne`, `planck`, `ergodox`, `moonlander` and
 `kinesis_advantage` (`board_geometries.json`).
+
+- `jis` (Japanese 106/109 keys) and `abnt` (Brazilian ABNT 2) take their positions from
+  `_shared/layouts/data/keycodes/keyboard_forms.json`, the ISO board with the keys each
+  moves or adds, and the standard fingering with their own keys (`extra_fingers`: Yen and
+  Ro on the right pinky). JIS has no ISO key left of Z. The Comparer ticks the ISO
+  variant of a family for them (`layout_geometry`). Adding them changed no ISO or ANSI
+  result (`library_golden.json` unchanged).
 
 - Each board records the centre of each key in key units, its logical row,
   its default finger and each finger's home key.
