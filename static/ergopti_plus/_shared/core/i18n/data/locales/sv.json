@@ -4569,6 +4569,7 @@
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Engelska Wikipedia — 1 miljon meningar (frekvenser)",
 	"layout_analysis.corpus.name.es_news_1m": "Spanska nyheter — 1 miljon meningar (frekvenser)",
 	"layout_analysis.corpus.name.es_wikipedia_1m": "Spanska Wikipedia — 1 miljon meningar (frekvenser)",
+	"layout_analysis.corpus.name.fr_books_words": "Google Books 1950–2019 — franska ord (frekvenser)",
 	"layout_analysis.corpus.name.fr_lexique_words": "Lexique 4.10 — franska ordformer (frekvenser)",
 	"layout_analysis.corpus.name.fr_news_1m": "Franska nyheter — 1 miljon meningar (frekvenser)",
 	"layout_analysis.corpus.name.fr_wikipedia_1m": "Franska Wikipedia — 1 miljon meningar (frekvenser)",

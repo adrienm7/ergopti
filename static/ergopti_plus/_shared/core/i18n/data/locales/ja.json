@@ -4569,6 +4569,7 @@
 	"layout_analysis.corpus.name.en_wikipedia_1m": "英語版ウィキペディア — 100万文（集計）",
 	"layout_analysis.corpus.name.es_news_1m": "スペイン語ニュース — 100万文（集計）",
 	"layout_analysis.corpus.name.es_wikipedia_1m": "スペイン語版ウィキペディア — 100万文（集計）",
+	"layout_analysis.corpus.name.fr_books_words": "Google Books 1950–2019 — フランス語の単語（集計）",
 	"layout_analysis.corpus.name.fr_lexique_words": "Lexique 4.10 — フランス語の語形（集計）",
 	"layout_analysis.corpus.name.fr_news_1m": "フランス語ニュース — 100万文（集計）",
 	"layout_analysis.corpus.name.fr_wikipedia_1m": "フランス語版ウィキペディア — 100万文（集計）",

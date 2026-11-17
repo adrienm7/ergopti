@@ -324,6 +324,14 @@
 			"language": "en",
 			"file": "static/corpus/frequency/leipzig/en_news_2024_1M.json",
 			"format": "count_table"
+		},
+		{
+			"id": "fr_books_words",
+			"title": "Google Books 1950-2019 — French words (counts)",
+			"language": "fr",
+			"file": "static/corpus/frequency/google_books/fr_1grams_2020.json",
+			"format": "count_table",
+			"title_key": "layout_analysis.corpus.name.fr_books_words"
 		}
 	]
 }

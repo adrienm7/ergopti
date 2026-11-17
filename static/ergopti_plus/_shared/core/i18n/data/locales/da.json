@@ -4569,6 +4569,7 @@
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Engelsk Wikipedia — 1 million sætninger (optællinger)",
 	"layout_analysis.corpus.name.es_news_1m": "Spanske nyheder — 1 million sætninger (optællinger)",
 	"layout_analysis.corpus.name.es_wikipedia_1m": "Spansk Wikipedia — 1 million sætninger (optællinger)",
+	"layout_analysis.corpus.name.fr_books_words": "Google Books 1950–2019 — franske ord (optællinger)",
 	"layout_analysis.corpus.name.fr_lexique_words": "Lexique 4.10 — franske ordformer (optællinger)",
 	"layout_analysis.corpus.name.fr_news_1m": "Franske nyheder — 1 million sætninger (optællinger)",
 	"layout_analysis.corpus.name.fr_wikipedia_1m": "Fransk Wikipedia — 1 million sætninger (optællinger)",

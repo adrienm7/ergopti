@@ -4569,6 +4569,7 @@
 	"layout_analysis.corpus.name.en_wikipedia_1m": "English Wikipedia — 1 million sentences (counts)",
 	"layout_analysis.corpus.name.es_news_1m": "Spanish news — 1 million sentences (counts)",
 	"layout_analysis.corpus.name.es_wikipedia_1m": "Spanish Wikipedia — 1 million sentences (counts)",
+	"layout_analysis.corpus.name.fr_books_words": "Google Books 1950–2019 — French words (counts)",
 	"layout_analysis.corpus.name.fr_lexique_words": "Lexique 4.10 — French word forms (counts)",
 	"layout_analysis.corpus.name.fr_news_1m": "French news — 1 million sentences (counts)",
 	"layout_analysis.corpus.name.fr_wikipedia_1m": "French Wikipedia — 1 million sentences (counts)",

@@ -3,6 +3,16 @@
 	"schema_version": 1,
 	"audited": "2026-11-14",
 	"files": {
+		"frequency/google_books/fr_1grams_2020.json": {
+			"title": "Character, bigram and trigram counts and word table of the French words of Google Books, 1950-2019",
+			"source": "Google Books Ngram Viewer dataset, version 20200217, French 1-grams (fre, 6 shards), counted by tools/build/import-count-tables.cjs",
+			"url": "https://storage.googleapis.com/books/ngrams/books/datasetsv3.html",
+			"licence": "CC BY 3.0",
+			"attribution": "Google Books Ngram Viewer dataset, version 20200217 (Google, CC BY 3.0); J.-B. Michel et al., « Quantitative Analysis of Culture Using Millions of Digitized Books », Science 331 (2011)",
+			"status": "ship",
+			"prune_ratio": 5e-8,
+			"note": "Licence read on the dataset page (fetched 2026-11-17): « This compilation is licensed under a Creative Commons Attribution 3.0 Unported License », which allows sharing adapted material with attribution. Each 1-gram line gives a token and its match count per year; a token counts the sum of its matches from 1950 to 2019 (modern spelling, less OCR of old print), if that sum is at least min_count (100). Kept tokens are letters with inner or final apostrophes and hyphens: the part-of-speech tagged copies (« livre_NOUN ») and tokens with digits or other signs are left out. A word list counted by the word-list rule: its n-grams are those inside words and at word boundaries, with capitals as printed but no punctuation or letter pairs across words. Its word table keeps the 1,000 most frequent words by the engine’s word rule. The six shards (3.2 GB) are streamed, never stored, each checked against its SHA-256 pin. N-grams rarer than prune_ratio of their table are dropped (pruned_below)."
+		},
 		"frequency/leipzig/de_news_2024_1M.json": {
 			"title": "Character, bigram and trigram counts and word table of 1,000,000 sentences of German news, 2024",
 			"source": "Leipzig Corpora Collection (deu_news_2024_1M), counted by tools/build/import-count-tables.cjs",

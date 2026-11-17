@@ -94,12 +94,13 @@ waits for the maintainer's review).
       no author, adnw.de has no page for it). The 53 « collection » credits come from KLA's « author » field, which
       can name the person who submitted the layout: check each against its author's page, first the doubtful ones
       (Klausler « Kaimakides », Neo 2.0 « Julian Asamer », CarpalxQ and QWERTY Wide Mod « Dave Ferree »).
-- [ ] **[LATER] Google Books Ngram tables and more Leipzig languages.** The `ergopti-count-table` importer
-      (`tools/build/import-count-tables.cjs`) ships Leipzig and Lexique tables with their word tables. Left: Google
-      Books Ngram 2020 1-grams (CC BY 3.0, several GB per language: stream the shards, never store them, pin each
-      shard's SHA-256), and languages with no Optimiser label yet (Portuguese, Dutch: Leipzig has
-      `por_wikipedia_2021_1M` and `nld_wikipedia_2021_1M`), which also need their `layout_optimizer.language.<code>`
-      string and a library layout.
+- [ ] **[LATER] More Google Books and Leipzig languages.** The importer (`tools/build/import-count-tables.cjs`)
+      streams Google Books 1-gram shards without storing them (`google_books_1grams`, French shipped). Left, one
+      language per session at about 1 MB/s: English (24 shards, 6.4 GB), German (8, 6.2 GB), Spanish (3, 1.9 GB),
+      Italian (2, 2.3 GB): add each to `static/corpus/count_table_sources.json` with empty `sha256` pins, its
+      register entry and corpus with a `title_key` in the 21 locales, then run the importer with `--record-pins`.
+      Languages with no Optimiser label yet (Portuguese, Dutch: Leipzig has `por_wikipedia_2021_1M` and
+      `nld_wikipedia_2021_1M`) also need their `layout_optimizer.language.<code>` string and a library layout.
 - [ ] **[LATER] Site keyboard for other layouts.** The site's Ergopti drawing is generated from
       `static/layouts/sources/ergopti.toml` (`tools/codegen/codegen-site-keyboard.cjs`, display patch
       `src/lib/keyboard/data/ergopti_display_patch.json`). Left from the maintainer's 2026-11-14 request: display and

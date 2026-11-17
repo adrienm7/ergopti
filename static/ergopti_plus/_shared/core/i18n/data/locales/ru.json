@@ -4569,6 +4569,7 @@
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Википедия на английском — 1 миллион предложений (частоты)",
 	"layout_analysis.corpus.name.es_news_1m": "Новости на испанском — 1 миллион предложений (частоты)",
 	"layout_analysis.corpus.name.es_wikipedia_1m": "Википедия на испанском — 1 миллион предложений (частоты)",
+	"layout_analysis.corpus.name.fr_books_words": "Google Books 1950–2019 — французские слова (частоты)",
 	"layout_analysis.corpus.name.fr_lexique_words": "Lexique 4.10 — французские словоформы (частоты)",
 	"layout_analysis.corpus.name.fr_news_1m": "Новости на французском — 1 миллион предложений (частоты)",
 	"layout_analysis.corpus.name.fr_wikipedia_1m": "Википедия на французском — 1 миллион предложений (частоты)",

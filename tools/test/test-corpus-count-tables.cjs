@@ -424,6 +424,56 @@ let checks = 0;
 	checks++;
 }
 
-console.log(
-	`[OK] corpus count tables: ${checks} checks (committed tables, Leipzig and Lexique rules, word tables, pruning, reader, zip, tar)`
+// A Google Books 1-gram shard: the years outside the range, a tagged token, a
+// token with a digit and one under min_count are left out; a kept token counts
+// by the word-list rule, its words by the word rule; the hash is the gzip's.
+async function booksShard() {
+	const { Readable } = require('node:stream');
+	const crypto = require('node:crypto');
+	const shard = zlib.gzipSync(
+		[
+			'Le\t1949,100,1\t1950,3,1\t2019,2,1',
+			'livre_NOUN\t1990,50,5',
+			'l2\t1990,50,5',
+			"l'\t2000,4,2",
+			'rare\t2000,1,1'
+		].join('\n') + '\n'
+	);
+	const engine = Analysis.loadEngine();
+	const counts = { chars: {}, bigrams: {}, trigrams: {}, words: {} };
+	const result = await Import.booksShardCounts(
+		Readable.from([shard]),
+		{ output: 'test', years: [1950, 2019], min_count: 2 },
+		engine,
+		counts
+	);
+	assert.equal(result.kept, 2, "Le (5 from 1950) and l' (4) are kept");
+	assert.equal(result.sha256, crypto.createHash('sha256').update(shard).digest('hex'));
+	const expected = Analysis.wordListCounts("Le 5\nl' 4", 'test');
+	for (const name of ['chars', 'bigrams', 'trigrams'])
+		assert.deepEqual(plain(counts[name]), plain(expected[name]), name);
+	assert.deepEqual(plain(counts.words), { le: 5 }, 'the word rule folds case and drops « l »');
+	assert(Import.BOOKS_WORD.test('peut-être') && !Import.BOOKS_WORD.test('-x'));
+	// A cut download fails the shard (its caller counts it again), never a short count.
+	await assert.rejects(
+		Import.booksShardCounts(
+			Readable.from([shard.subarray(0, shard.length - 8)]),
+			{ output: 'test', years: [1950, 2019], min_count: 2 },
+			engine,
+			{ chars: {}, bigrams: {}, trigrams: {}, words: {} }
+		),
+		/unexpected end of file/
+	);
+	checks++;
+}
+
+booksShard().then(
+	() =>
+		console.log(
+			`[OK] corpus count tables: ${checks} checks (committed tables, Leipzig, Lexique and Google Books rules, word tables, pruning, reader, zip, tar)`
+		),
+	(error) => {
+		console.error(error);
+		process.exit(1);
+	}
 );

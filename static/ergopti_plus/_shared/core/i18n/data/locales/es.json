@@ -4569,6 +4569,7 @@
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Wikipedia en inglés — 1 millón de frases (recuentos)",
 	"layout_analysis.corpus.name.es_news_1m": "Noticias en español — 1 millón de frases (recuentos)",
 	"layout_analysis.corpus.name.es_wikipedia_1m": "Wikipedia en español — 1 millón de frases (recuentos)",
+	"layout_analysis.corpus.name.fr_books_words": "Google Books 1950–2019 — palabras en francés (recuentos)",
 	"layout_analysis.corpus.name.fr_lexique_words": "Lexique 4.10 — formas de palabras en francés (recuentos)",
 	"layout_analysis.corpus.name.fr_news_1m": "Noticias en francés — 1 millón de frases (recuentos)",
 	"layout_analysis.corpus.name.fr_wikipedia_1m": "Wikipedia en francés — 1 millón de frases (recuentos)",

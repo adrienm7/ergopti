@@ -608,8 +608,16 @@ Shipped as of 2026-11-14:
   corpus size. Not imported, waiting for the maintainer (TODO.md, « Maintainer
   decisions pending »): Norvig's counts (derived from the LDC-licensed Google
   Web 1T, no licence for the data) and Tatoeba's full exports as counts
-  (CC BY 2.0 FR asks each sentence's author to be credited). Google Books
-  Ngram (CC BY 3.0) waits for a streaming importer (TODO.md).
+  (CC BY 2.0 FR asks each sentence's author to be credited).
+- Google Books Ngram (version 20200217, CC BY 3.0): the French 1-grams,
+  counted by the word-list rule (`google_books_1grams`). The six shards
+  (3.2 GB) are streamed through curl and gunzip, never stored, each hashed as
+  it streams and refused unless its SHA-256 is its pin (`--record-pins` writes
+  the first hashes); a shard cut by a reset connection is counted again, up
+  to three times. A token weighs its matches from 1950 to 2019, if at least
+  `min_count` (100); tagged copies (« livre_NOUN ») and tokens with digits or
+  signs are left out, capitals are kept. The other languages wait (TODO.md,
+  « More Google Books and Leipzig languages »).
 
 `static/corpus/frequency/` holds the downloaded frequency lists and count
 tables, which the register covers like the texts.

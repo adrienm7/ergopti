@@ -4569,6 +4569,7 @@
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Wikipédia en anglais — 1 million de phrases (comptages)",
 	"layout_analysis.corpus.name.es_news_1m": "Presse en espagnol — 1 million de phrases (comptages)",
 	"layout_analysis.corpus.name.es_wikipedia_1m": "Wikipédia en espagnol — 1 million de phrases (comptages)",
+	"layout_analysis.corpus.name.fr_books_words": "Google Books 1950–2019 — mots français (comptages)",
 	"layout_analysis.corpus.name.fr_lexique_words": "Lexique 4.10 — formes de mots françaises (comptages)",
 	"layout_analysis.corpus.name.fr_news_1m": "Presse en français — 1 million de phrases (comptages)",
 	"layout_analysis.corpus.name.fr_wikipedia_1m": "Wikipédia en français — 1 million de phrases (comptages)",

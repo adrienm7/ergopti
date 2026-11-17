@@ -4569,6 +4569,7 @@
 	"layout_analysis.corpus.name.en_wikipedia_1m": "영어 위키백과 — 100만 문장 (집계)",
 	"layout_analysis.corpus.name.es_news_1m": "스페인어 뉴스 — 100만 문장 (집계)",
 	"layout_analysis.corpus.name.es_wikipedia_1m": "스페인어 위키백과 — 100만 문장 (집계)",
+	"layout_analysis.corpus.name.fr_books_words": "Google Books 1950–2019 — 프랑스어 단어 (집계)",
 	"layout_analysis.corpus.name.fr_lexique_words": "Lexique 4.10 — 프랑스어 단어 형태 (집계)",
 	"layout_analysis.corpus.name.fr_news_1m": "프랑스어 뉴스 — 100만 문장 (집계)",
 	"layout_analysis.corpus.name.fr_wikipedia_1m": "프랑스어 위키백과 — 100만 문장 (집계)",

@@ -4569,6 +4569,7 @@
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Wikipedie v angličtině — 1 milion vět (četnosti)",
 	"layout_analysis.corpus.name.es_news_1m": "Zprávy ve španělštině — 1 milion vět (četnosti)",
 	"layout_analysis.corpus.name.es_wikipedia_1m": "Wikipedie ve španělštině — 1 milion vět (četnosti)",
+	"layout_analysis.corpus.name.fr_books_words": "Google Books 1950–2019 — francouzská slova (četnosti)",
 	"layout_analysis.corpus.name.fr_lexique_words": "Lexique 4.10 — francouzské tvary slov (četnosti)",
 	"layout_analysis.corpus.name.fr_news_1m": "Zprávy ve francouzštině — 1 milion vět (četnosti)",
 	"layout_analysis.corpus.name.fr_wikipedia_1m": "Wikipedie ve francouzštině — 1 milion vět (četnosti)",

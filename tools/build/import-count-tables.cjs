@@ -10,6 +10,7 @@
  * words, never its text. The layout analysis codegen reads the tables
  * (corpora.json format count_table).
  * USAGE: node tools/build/import-count-tables.cjs [--only <output>] [--archive-dir <dir>]
+ *        [--record-pins]
  *
  * FEATURES & RATIONALE:
  * 1. One counting rule: sentences go through the analysis engine's own
@@ -31,6 +32,11 @@
  * 6. One word rule: the words of the same sentences or list, counted by the
  *    engine's countWords and bounded by its wordTable (WORD_TABLE_SIZE, the
  *    most frequent first), as a built-in corpus's word table is.
+ * 7. Streamed shards: a Google Books 1-gram export (several GB per language)
+ *    is never stored: each shard is read from curl's output (or from
+ *    --archive-dir), hashed and unzipped as it streams, and refused at its
+ *    end unless its SHA-256 is its pin. A shard with no pin yet is refused
+ *    too, unless --record-pins writes the hash it streamed into the sources.
  * ==============================================================================
  */
 
@@ -42,7 +48,8 @@ const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
 const zlib = require('node:zlib');
-const { spawnSync } = require('node:child_process');
+const readline = require('node:readline');
+const { spawn, spawnSync } = require('node:child_process');
 const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 const Analysis = require('../codegen/codegen-layout-analysis-data-js.cjs');
 
@@ -50,7 +57,15 @@ const CORPUS_DIR = path.join(REPO_ROOT, 'static', 'corpus');
 const SOURCES_PATH = path.join(CORPUS_DIR, 'count_table_sources.json');
 const ANALYSIS_DATA_PATH = shared('ui', 'layout_analysis', '_generated', 'analysis_data.js');
 const REGISTER_PATH = path.join(CORPUS_DIR, 'register.json');
-const KINDS = ['leipzig_sentences', 'lexique_words'];
+const KINDS = ['leipzig_sentences', 'lexique_words', 'google_books_1grams'];
+// A Google Books token kept as a word: letters and combining marks, with
+// apostrophes and hyphens inside or at the end (« l' », « peut-être »). A
+// tagged token (« livre_NOUN ») or one holding digits or punctuation is not.
+const BOOKS_WORD = /^[\p{L}\p{M}]+(?:['\u2019-][\p{L}\p{M}]*)*$/u;
+// How many times a streamed shard is tried before the import fails.
+const SHARD_ATTEMPTS = 3;
+// Words counted by the word-list rule per call (wordListCounts).
+const WORDS_PER_BATCH = 50000;
 const TABLES = ['chars', 'bigrams', 'trigrams'];
 // Lines counted per call of the engine: its segments end at a newline, so
 // counting chunk by chunk gives exactly the counts of the whole text.
@@ -310,6 +325,123 @@ function lexiqueCounts(text, source, engine) {
 }
 
 /**
+ * Counts one Google Books 1-gram shard as it streams: each kept token (BOOKS_WORD)
+ * weighs the sum of its match counts over source.years, and one weighing at
+ * least source.min_count joins the counts by the word-list rule, as a word of
+ * a frequency list does.
+ * @param {NodeJS.ReadableStream} gzipped - The shard's gzip bytes.
+ * @param {object} source - With years ([first, last]) and min_count.
+ * @param {object} engine - LAYOUT_ANALYSIS.
+ * @param {object} counts - The counts to add to (chars, bigrams, trigrams, words).
+ * @returns {Promise<{sha256: string, kept: number}>} The shard's hash and how
+ *   many tokens it added.
+ */
+async function booksShardCounts(gzipped, source, engine, counts) {
+	const [first, last] = source.years;
+	const hash = crypto.createHash('sha256');
+	gzipped.on('data', (chunk) => hash.update(chunk));
+	const gunzip = zlib.createGunzip();
+	const lines = readline.createInterface({ input: gzipped.pipe(gunzip), crlfDelay: Infinity });
+	// A cut download ends the gzip early: the shard fails, its caller retries it.
+	let failure = null;
+	gunzip.on('error', (error) => {
+		failure = error;
+		lines.close();
+	});
+	let batch = [];
+	let kept = 0;
+	const flush = () => {
+		if (batch.length === 0) return;
+		const list = batch.join('\n');
+		merge(counts, Analysis.wordListCounts(list, source.output));
+		Analysis.wordListWords(engine, list, counts.words);
+		batch = [];
+	};
+	for await (const line of lines) {
+		const tab = line.indexOf('\t');
+		const token = line.slice(0, tab);
+		if (tab < 1 || !BOOKS_WORD.test(token)) continue;
+		let total = 0;
+		for (const cell of line.slice(tab + 1).split('\t')) {
+			const [year, matches] = cell.split(',');
+			if (Number(year) >= first && Number(year) <= last) total += Number(matches);
+		}
+		if (total < source.min_count) continue;
+		batch.push(`${token} ${total}`);
+		kept++;
+		if (batch.length === WORDS_PER_BATCH) flush();
+	}
+	if (failure) throw failure;
+	flush();
+	return { sha256: hash.digest('hex'), kept };
+}
+
+/**
+ * The counts of a Google Books 1-gram export, shard by shard (booksShardCounts),
+ * each shard checked against its pin once streamed.
+ * @param {object} source - A google_books_1grams entry.
+ * @param {object} engine - LAYOUT_ANALYSIS.
+ * @param {{archiveDir: string|undefined, recordPins: boolean}} options
+ * @returns {Promise<object>} The counts, with words.
+ * @throws {Error} When a shard is not its pin (or has none without --record-pins).
+ */
+async function booksCounts(source, engine, { archiveDir, recordPins }) {
+	if (
+		!Array.isArray(source.years) ||
+		source.years.length !== 2 ||
+		!source.years.every(Number.isInteger) ||
+		!Number.isInteger(source.min_count) ||
+		source.min_count < 1 ||
+		!Array.isArray(source.shards) ||
+		source.shards.length === 0
+	)
+		throw new Error(`${source.output}: years, min_count and shards are required`);
+	const counts = { chars: {}, bigrams: {}, trigrams: {}, words: {} };
+	for (const shard of source.shards) {
+		const name = path.basename(new URL(shard.url).pathname);
+		let streamed = '';
+		let kept = 0;
+		// A shard is counted apart and added once whole: a reset connection
+		// (seen on the 535 MB French shards) restarts that shard only.
+		for (let attempt = 1; ; attempt++) {
+			const own = { chars: {}, bigrams: {}, trigrams: {}, words: {} };
+			let child = null;
+			let input;
+			if (archiveDir) input = fs.createReadStream(path.join(archiveDir, name));
+			else {
+				child = spawn('curl', ['-sSfL', '--retry', '3', shard.url], {
+					stdio: ['ignore', 'pipe', 'inherit']
+				});
+				input = child.stdout;
+			}
+			const exited = child
+				? new Promise((resolve) => child.on('close', (code) => resolve(code)))
+				: Promise.resolve(0);
+			try {
+				({ sha256: streamed, kept } = await booksShardCounts(input, source, engine, own));
+				if ((await exited) !== 0) throw new Error(`download of ${shard.url} failed`);
+			} catch (error) {
+				if (child) child.kill();
+				if (attempt >= SHARD_ATTEMPTS) throw error;
+				console.log(`import-count-tables: ${name}: ${error.message}, attempt ${attempt + 1}`);
+				continue;
+			}
+			merge(counts, own);
+			for (const [word, n] of Object.entries(own.words))
+				counts.words[word] = (counts.words[word] || 0) + n;
+			break;
+		}
+		if (shard.sha256 !== streamed) {
+			if (!(recordPins && shard.sha256 === ''))
+				throw new Error(`${shard.url} is not its pin (SHA-256 ${streamed})`);
+			shard.sha256 = streamed;
+		}
+		console.log(`import-count-tables: ${source.output}: ${name}, ${kept} tokens kept`);
+	}
+	return counts;
+}
+
+/**
  * The counts kept: in each table, the n-grams at least `ratio` of its total,
  * as [n-gram, count] pairs sorted by count, then by n-gram.
  * @returns {{tables: object, prunedBelow: object}}
@@ -421,21 +553,30 @@ function archiveOf(source, archiveDir, scratch) {
 }
 
 /**
- * Builds one table from its source.
+ * The counts of a source read from one pinned archive.
+ * @param {object} source - A leipzig_sentences or lexique_words entry.
+ * @param {string} archivePath - Its checked archive.
+ * @param {object} engine - LAYOUT_ANALYSIS.
+ * @returns {object} The counts, with words.
+ */
+function archiveCounts(source, archivePath, engine) {
+	const text = memberText(source, archivePath);
+	return source.kind === 'leipzig_sentences'
+		? leipzigCounts(text, engine)
+		: lexiqueCounts(text, source, engine);
+}
+
+/**
+ * Builds one table from its counts.
  * @param {object} source - A count_table_sources.json entry.
  * @param {number} ratio - Its register entry's prune_ratio.
- * @param {string} archivePath - Its checked archive.
+ * @param {object} counts - Its full counts, with words.
  * @param {object} engine - LAYOUT_ANALYSIS with its library.
  * @returns {string} The table file's text.
  * @throws {Error} When pruning changes a metric by more than PRUNE_TOLERANCE.
  */
-function buildTable(source, ratio, archivePath, engine) {
+function buildTable(source, ratio, counts, engine) {
 	if (!KINDS.includes(source.kind)) throw new Error(`${source.output}: kind ${source.kind}`);
-	const text = memberText(source, archivePath);
-	const counts =
-		source.kind === 'leipzig_sentences'
-			? leipzigCounts(text, engine)
-			: lexiqueCounts(text, source, engine);
 	const { tables, prunedBelow } = prune(counts, ratio);
 	const check = pruneDeviation(engine, counts, tables);
 	console.log(
@@ -446,7 +587,7 @@ function buildTable(source, ratio, archivePath, engine) {
 			`${source.output}: pruning at ${ratio} changes ${check.at} by ${check.max_metric_change}, over ${PRUNE_TOLERANCE}`
 		);
 	return tableText(
-		source.kind === 'lexique_words' ? 'word_list' : 'text',
+		source.kind === 'leipzig_sentences' ? 'text' : 'word_list',
 		tables,
 		prunedBelow,
 		check,
@@ -454,13 +595,14 @@ function buildTable(source, ratio, archivePath, engine) {
 	);
 }
 
-function main() {
+async function main() {
 	const sources = JSON.parse(fs.readFileSync(SOURCES_PATH, 'utf8'));
 	if (sources.schema_version !== 1 || !Array.isArray(sources.tables))
 		fail('count_table_sources.json is refused');
 	const register = JSON.parse(fs.readFileSync(REGISTER_PATH, 'utf8')).files;
 	const only = option('only');
 	const archiveDir = option('archive-dir');
+	const recordPins = process.argv.includes('--record-pins');
 	const engine = engineWithLibrary();
 	const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-count-sources-'));
 	try {
@@ -469,12 +611,14 @@ function main() {
 			const entry = register[source.output];
 			if (!entry || entry.url !== source.url)
 				fail(`${source.output}: static/corpus/register.json must list it with url ${source.url}`);
-			const text = buildTable(
-				source,
-				entry.prune_ratio,
-				archiveOf(source, archiveDir, scratch),
-				engine
-			);
+			if (!KINDS.includes(source.kind)) fail(`${source.output}: kind ${source.kind}`);
+			const counts =
+				source.kind === 'google_books_1grams'
+					? await booksCounts(source, engine, { archiveDir, recordPins })
+					: archiveCounts(source, archiveOf(source, archiveDir, scratch), engine);
+			const text = buildTable(source, entry.prune_ratio, counts, engine);
+			// The hashes a first streaming recorded (--record-pins), kept once the table is.
+			if (recordPins) fs.writeFileSync(SOURCES_PATH, `${JSON.stringify(sources, null, '\t')}\n`);
 			const target = path.join(CORPUS_DIR, source.output);
 			fs.mkdirSync(path.dirname(target), { recursive: true });
 			fs.writeFileSync(target, text);
@@ -486,11 +630,17 @@ function main() {
 	}
 }
 
-if (require.main === module) main();
+if (require.main === module)
+	main().catch((error) => {
+		console.error(error);
+		process.exit(1);
+	});
 
 module.exports = {
 	memberText,
 	tarMember,
+	booksShardCounts,
+	BOOKS_WORD,
 	PRUNE_CHECK_LAYOUTS,
 	PRUNE_TOLERANCE,
 	zipMember,

@@ -4569,6 +4569,7 @@
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Вікіпедія англійською — 1 мільйон речень (частоти)",
 	"layout_analysis.corpus.name.es_news_1m": "Новини іспанською — 1 мільйон речень (частоти)",
 	"layout_analysis.corpus.name.es_wikipedia_1m": "Вікіпедія іспанською — 1 мільйон речень (частоти)",
+	"layout_analysis.corpus.name.fr_books_words": "Google Books 1950–2019 — французькі слова (частоти)",
 	"layout_analysis.corpus.name.fr_lexique_words": "Lexique 4.10 — французькі словоформи (частоти)",
 	"layout_analysis.corpus.name.fr_news_1m": "Новини французькою — 1 мільйон речень (частоти)",
 	"layout_analysis.corpus.name.fr_wikipedia_1m": "Вікіпедія французькою — 1 мільйон речень (частоти)",

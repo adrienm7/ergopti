@@ -4569,6 +4569,7 @@
 	"layout_analysis.corpus.name.en_wikipedia_1m": "英语维基百科 — 100 万句（计数）",
 	"layout_analysis.corpus.name.es_news_1m": "西班牙语新闻 — 100 万句（计数）",
 	"layout_analysis.corpus.name.es_wikipedia_1m": "西班牙语维基百科 — 100 万句（计数）",
+	"layout_analysis.corpus.name.fr_books_words": "Google Books 1950–2019 — 法语词语（计数）",
 	"layout_analysis.corpus.name.fr_lexique_words": "Lexique 4.10 — 法语词形（计数）",
 	"layout_analysis.corpus.name.fr_news_1m": "法语新闻 — 100 万句（计数）",
 	"layout_analysis.corpus.name.fr_wikipedia_1m": "法语维基百科 — 100 万句（计数）",
