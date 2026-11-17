@@ -722,11 +722,14 @@ var LAYOUT_ANALYSIS = (function () {
 	 * offerWay for a partial compile, which makes its offers in another order
 	 * than a whole compile: of two offers on the same keys and of equal cost,
 	 * the one a whole compile makes first (compareTimes) stays, so the lists
-	 * read as a whole compile's.
+	 * read as a whole compile's. A joined candidate is filled in
+	 * (completeJoin, on the board) only once it may be kept: most are refused
+	 * on their keys and costs alone.
 	 */
-	function offerTimed(map, key, candidate, time) {
+	function offerTimed(map, key, candidate, time, board) {
 		const list = map.get(key);
 		if (!list) {
+			completeJoin(candidate, time, board);
 			map.set(key, [candidate]);
 			wayTimes.set(candidate, time);
 			return true;
@@ -737,8 +740,10 @@ var LAYOUT_ANALYSIS = (function () {
 			if (!betterWay(candidate, held)) {
 				if (betterWay(held, candidate)) return false;
 				const order = compareTimes(time, wayTimes.get(held));
+				if (order > 0) return false;
+				completeJoin(candidate, time, board);
 				// An equal time is the same offer from inputs replaced since: the newer reads right.
-				if (order > 0 || (order === 0 && sameLabels(held, candidate))) return false;
+				if (order === 0 && sameLabels(held, candidate)) return false;
 				list[i] = candidate;
 				wayTimes.set(candidate, time);
 				return true;
@@ -749,10 +754,28 @@ var LAYOUT_ANALYSIS = (function () {
 		let at = list.length;
 		while (at > 0 && betterWay(candidate, list[at - 1])) at--;
 		if (at >= MAX_WAYS) return false;
+		completeJoin(candidate, time, board);
 		list.splice(at, 0, candidate);
 		if (list.length > MAX_WAYS) list.pop();
 		wayTimes.set(candidate, time);
 		return true;
+	}
+
+	/**
+	 * Fills in a joined way of a partial compile (followRules) as joinWays
+	 * would, once offerTimed may keep it: its levels, its label, the thumb
+	 * that closes it (terminated) and the characters it types (width).
+	 * @param {object} way - keys, shift, altgr, dead, cost and state set.
+	 * @param {{p: object, t: object, width: number}} time - Its prefix and tail.
+	 * @param {object} board - From keyboard().
+	 */
+	function completeJoin(way, time, board) {
+		if (way.layers !== null) return;
+		way.layers = time.p.layers.concat(time.t.layers);
+		way.level = `${way.state}/${time.t.level}`;
+		const closing = board.finger[way.keys[way.keys.length - 1]];
+		if (closing === LEFT_THUMB || closing === RIGHT_THUMB) way.terminated = true;
+		if (time.width > 0) way.width = time.width;
 	}
 
 	/** The first pass of a whole compile in which rule r can read a way. */
@@ -821,11 +844,25 @@ var LAYOUT_ANALYSIS = (function () {
 							// A partial compile settles a tie of keys on the labels too (offerTimed).
 							const d = Math.max(readablePass(prefix, r), readablePass(tail, r));
 							if (d >= MAX_DEAD_DEPTH) continue;
-							const candidate = joinWays(prefix, tail, rule.state);
-							const closing = board.finger[candidate.keys[candidate.keys.length - 1]];
-							if (closing === LEFT_THUMB || closing === RIGHT_THUMB) candidate.terminated = true;
-							if (map === texts) candidate.width = codeLength(target);
-							if (!offerTimed(map, target, candidate, { d, r, p: prefix, t: tail })) continue;
+							// Built in full only when offerTimed keeps it or compares labels.
+							const candidate = {
+								keys: prefix.keys.concat(tail.keys),
+								layers: null,
+								shift: prefix.shift + tail.shift,
+								altgr: prefix.altgr + tail.altgr,
+								dead: true,
+								cost: prefix.cost + tail.cost,
+								level: null,
+								state: rule.state
+							};
+							const time = {
+								d,
+								r,
+								p: prefix,
+								t: tail,
+								width: map === texts ? codeLength(target) : 0
+							};
+							if (!offerTimed(map, target, candidate, time, board)) continue;
 							changed = true;
 							const list = map.get(target);
 							versions.set(list, version(list) + 1);
