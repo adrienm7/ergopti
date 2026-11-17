@@ -74,7 +74,7 @@ print("OWNED_PROFILE " .. profile)
 
 local Timers = require("core.events.timer_scheduler")
 local Manager = require("core.ui.ui.webview_manager")
-local Bridge = require("ui.healthcheck.bridge")
+local Bridge = require("diagnostics.ui.healthcheck.bridge")
 local APP = "healthcheck"
 Manager.set_daemon_state({})
 local PENDING = require("core.i18n.engine.i18n").get("healthcheck.probe.pending")

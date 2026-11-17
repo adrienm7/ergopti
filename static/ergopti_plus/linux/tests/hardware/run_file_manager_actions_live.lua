@@ -117,7 +117,7 @@ assert(require("modules.hotstrings.injector").open_fast_channel(), "the output c
 local Manager = require("modules.gestures.manager")
 local BackgroundCommands = require("modules.gestures.background_commands")
 local ComboEmitter = require("modules.gestures.combo_emitter")
-local Clipboard = require("adapters.clipboard")
+local Clipboard = require("clipboard.adapters.clipboard")
 local function idle()
 	BackgroundCommands._collect_now()
 	return BackgroundCommands.pending_count() == 0
