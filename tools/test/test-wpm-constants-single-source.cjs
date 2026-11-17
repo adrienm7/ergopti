@@ -74,6 +74,13 @@ function modelKeys(src) {
 	for (const block of names.matchAll(/([a-z_]+) = \{([^}]*)\}/g)) {
 		for (const key of block[2].matchAll(/([a-z_]+) = true/g)) keys.add(`${block[1]}.${key[1]}`);
 	}
+	// The name lists (the typing burst rule) live in REQUIRED_LISTS (`key = true`).
+	const listsStart = src.indexOf('local REQUIRED_LISTS = {');
+	if (listsStart === -1) throw new Error('model.lua has no REQUIRED_LISTS table');
+	const lists = src.slice(listsStart, src.indexOf('\n}\n', listsStart));
+	for (const block of lists.matchAll(/([a-z_]+) = \{([^}]*)\}/g)) {
+		for (const key of block[2].matchAll(/([a-z_]+) = true/g)) keys.add(`${block[1]}.${key[1]}`);
+	}
 	return keys;
 }
 

@@ -66,6 +66,14 @@ local REQUIRED_NAMES = {
 	position = { storage_x = true, storage_y = true, storage_pair = true },
 }
 
+-- Non-empty lists of names: the typing burst rule's KeyboardEvent.code names and
+-- registry groups. hs_level_codes is macOS's own extra list, which
+-- wpm/typing_keys.lua reads as "<field>_level_codes".
+local REQUIRED_LISTS = {
+	typing_burst = { ending_groups = true, modifier_codes = true, neutral_codes = true, level_codes = true,
+		hs_level_codes = true },
+}
+
 --- Checks a decoded canon.
 --- @param canon table|nil
 --- @return table|nil canon, string|nil error
@@ -93,16 +101,17 @@ function M.validate(canon)
 			end
 		end
 	end
-	-- The typing burst rule: lists of KeyboardEvent.code names and registry groups.
-	if type(canon.typing_burst) ~= "table" then return nil, "missing [typing_burst]" end
-	for _, key in ipairs({ "ending_groups", "modifier_codes", "neutral_codes", "level_codes" }) do
-		local list = canon.typing_burst[key]
-		if type(list) ~= "table" or #list == 0 then
-			return nil, string.format("[typing_burst].%s must be a non-empty list", key)
-		end
-		for _, value in ipairs(list) do
-			if type(value) ~= "string" or value == "" then
-				return nil, string.format("[typing_burst].%s holds a value that is not a name", key)
+	for section, keys in pairs(REQUIRED_LISTS) do
+		if type(canon[section]) ~= "table" then return nil, "missing [" .. section .. "]" end
+		for key in pairs(keys) do
+			local list = canon[section][key]
+			if type(list) ~= "table" or #list == 0 then
+				return nil, string.format("[%s].%s must be a non-empty list", section, key)
+			end
+			for _, value in ipairs(list) do
+				if type(value) ~= "string" or value == "" then
+					return nil, string.format("[%s].%s holds a value that is not a name", section, key)
+				end
 			end
 		end
 	end
