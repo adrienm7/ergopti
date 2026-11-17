@@ -210,6 +210,7 @@ local DECLARATIONS = [[
 	void       gtk_label_set_markup(GtkWidget *label, const char *markup);
 	void       gtk_label_set_line_wrap(GtkWidget *label, gboolean wrap);
 	void       gtk_label_set_xalign(GtkWidget *label, float xalign);
+	void       gtk_label_set_mnemonic_widget(GtkWidget *label, GtkWidget *widget);
 	GtkWidget* gtk_entry_new(void);
 	void       gtk_entry_set_text(GtkWidget *entry, const char *text);
 	const char* gtk_entry_get_text(GtkWidget *entry);
@@ -274,6 +275,20 @@ local function bind()
 	return { ffi = ffi, gtk = gtk, glib = glib, gobject = gobject }
 end
 
+--- The window title: the caller's, else the product name. A window with no
+--- title is announced nameless by a screen reader and is a blank row in the
+--- window list (Alt+Tab). A title the caller gives empty stays empty: that is
+--- the unbranded-titles choice (test-linux-native-dialog-titles.py).
+--- @param request table
+--- @return string
+function M.window_title(request)
+	local title = request.options.title
+	if type(title) == "string" then return title end
+	-- The product's name, a brand spelled the same in every locale (this
+	-- child loads no catalogue), as the tray's own title.
+	return "Ergopti+"
+end
+
 --- A button label: the caller's, else GTK's own translated stock word.
 --- @param lib table
 --- @param given string|nil
@@ -289,7 +304,7 @@ end
 --- @param window userdata
 --- @param request table
 local function frame(lib, window, request)
-	lib.gtk.gtk_window_set_title(window, request.options.title or "")
+	lib.gtk.gtk_window_set_title(window, M.window_title(request))
 	lib.gtk.gtk_window_set_position(window, GTK_WIN_POS_CENTER)
 	-- Focused when it opens (gtk_dialog_run presents it), never kept on top:
 	-- tools/test/test-ui-focus-fix.cjs holds every window to that rule.
@@ -303,19 +318,30 @@ end
 --- @param dialog userdata
 --- @param request table
 --- @return userdata content The dialog's content box.
+--- @return userdata|nil caption The text's label, to bind to the field it names.
 local function content_with_text(lib, dialog, request)
 	local content = lib.gtk.gtk_dialog_get_content_area(dialog)
 	lib.gtk.gtk_container_set_border_width(content, 12)
 	lib.gtk.gtk_box_set_spacing(content, 8)
 	local text = request.options.text
+	local caption
 	if text ~= nil and text ~= "" then
-		local caption = lib.gtk.gtk_label_new(request.options["no-markup"] and text or nil)
+		caption = lib.gtk.gtk_label_new(request.options["no-markup"] and text or nil)
 		if not request.options["no-markup"] then lib.gtk.gtk_label_set_markup(caption, text) end
 		lib.gtk.gtk_label_set_line_wrap(caption, 1)
 		lib.gtk.gtk_label_set_xalign(caption, 0)
 		lib.gtk.gtk_box_pack_start(content, caption, 0, 0, 0)
 	end
-	return content
+	return content, caption
+end
+
+--- Makes the caption the accessible name of the field it introduces (ATK
+--- « labelled by »): Orca otherwise reads an unnamed text field or table.
+--- @param lib table
+--- @param caption userdata|nil
+--- @param field userdata
+local function bind_caption(lib, caption, field)
+	if caption ~= nil then lib.gtk.gtk_label_set_mnemonic_widget(caption, field) end
 end
 
 --- Adds Cancel and OK to a dialog, OK the default.
@@ -362,7 +388,7 @@ end
 local function run_entry(lib, request)
 	local dialog = lib.gtk.gtk_dialog_new()
 	frame(lib, dialog, request)
-	local content = content_with_text(lib, dialog, request)
+	local content, caption = content_with_text(lib, dialog, request)
 	local field, entry
 	if #request.values > 0 then
 		field = lib.gtk.gtk_combo_box_text_new_with_entry()
@@ -375,6 +401,7 @@ local function run_entry(lib, request)
 	lib.gtk.gtk_entry_set_text(entry, request.options["entry-text"] or "")
 	if request.options["hide-text"] then lib.gtk.gtk_entry_set_visibility(entry, 0) end
 	lib.gtk.gtk_entry_set_activates_default(entry, 1)
+	bind_caption(lib, caption, entry)
 	lib.gtk.gtk_box_pack_start(content, field, 0, 0, 0)
 	add_answer_buttons(lib, dialog, request)
 	lib.gtk.gtk_widget_show_all(dialog)
@@ -408,8 +435,9 @@ local function run_list(lib, request)
 	if not (request.options.width or request.options.height) then
 		gtk.gtk_window_set_default_size(dialog, LIST_DEFAULT_WIDTH, LIST_DEFAULT_HEIGHT)
 	end
-	local content = content_with_text(lib, dialog, request)
+	local content, caption = content_with_text(lib, dialog, request)
 	local view = gtk.gtk_tree_view_new_with_model(store)
+	bind_caption(lib, caption, view)
 	gtk.gtk_tree_view_set_headers_visible(view, request.options["hide-header"] and 0 or 1)
 	for column = 1, count do
 		local renderer = gtk.gtk_cell_renderer_text_new()
@@ -453,7 +481,7 @@ end
 local function run_file(lib, request)
 	local ffi, gtk = lib.ffi, lib.gtk
 	local folder = request.options.directory == true
-	local dialog = gtk.gtk_file_chooser_dialog_new(request.options.title or "", nil,
+	local dialog = gtk.gtk_file_chooser_dialog_new(M.window_title(request), nil,
 		folder and GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER or GTK_FILE_CHOOSER_ACTION_OPEN,
 		label(lib, request.options["cancel-label"], "_Cancel"), ffi.cast("int", GTK_RESPONSE_CANCEL),
 		label(lib, request.options["ok-label"], folder and "_Select" or "_Open"), ffi.cast("int", GTK_RESPONSE_OK),

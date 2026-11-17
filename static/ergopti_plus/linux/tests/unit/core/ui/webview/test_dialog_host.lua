@@ -199,3 +199,81 @@ h.describe("owned dialog resolver (owned-dialog-host)", function()
 		h.assert_eq(NativeDialog.plain_markup("a < b & c > d"), "a &lt; b &amp; c &gt; d")
 	end)
 end)
+
+
+--- A GTK double recording every call, its handles distinct tables.
+--- @return table lib, table calls
+local function recording_lib()
+	local calls = {}
+	local gtk = setmetatable({
+		gtk_dialog_run = function() return -6 end,
+	}, { __index = function(_, name)
+		return function(...)
+			calls[#calls + 1] = { name = name, args = { ... } }
+			return { from = name }
+		end
+	end })
+	local ffi = {
+		new = function() return {} end,
+		cast = function(_, value) return value end,
+		string = function(value) return value end,
+	}
+	return { gtk = gtk, ffi = ffi, glib = {}, gobject = { g_signal_connect_data = function() return 0 end } }, calls
+end
+
+--- The arguments of the recorded calls to one GTK function.
+--- @param calls table
+--- @param name string
+--- @return table
+local function calls_to(calls, name)
+	local found = {}
+	for _, call in ipairs(calls) do
+		if call.name == name then found[#found + 1] = call.args end
+	end
+	return found
+end
+
+h.describe("owned dialog host names its windows and fields (a11y-dialog-host)", function()
+	h.it("(a11y-dialog-host) a window without a title is named after the product", function()
+		h.assert_eq(Host.window_title({ options = {} }), "Ergopti+")
+		h.assert_eq(Host.window_title({ options = { title = "" } }), "",
+			"an empty title the caller gives is the unbranded-titles choice, kept")
+		h.assert_eq(Host.window_title({ options = { title = "Clé" } }), "Clé")
+		local lib, calls = recording_lib()
+		Host.main({ "--question", "--no-markup", "--text=Q", "--ok-label=Y", "--cancel-label=N" }, sink(), sink(),
+			function() return lib end)
+		h.assert_eq(calls_to(calls, "gtk_window_set_title")[1][2], "Ergopti+")
+	end)
+
+	h.it("(a11y-dialog-host) an entry's caption names its text field", function()
+		local lib, calls = recording_lib()
+		Host.main({ "--entry", "--no-markup", "--text=Key", "--ok-label=OK", "--cancel-label=Cancel" }, sink(), sink(),
+			function() return lib end)
+		local bound = calls_to(calls, "gtk_label_set_mnemonic_widget")
+		h.assert_eq(#bound, 1, "the caption is bound to exactly one field")
+		h.assert_eq(bound[1][1].from, "gtk_label_new")
+		h.assert_eq(bound[1][2].from, "gtk_entry_new")
+	end)
+
+	h.it("(a11y-dialog-host) an entry with offered values binds the combo's own entry", function()
+		local lib, calls = recording_lib()
+		Host.main({ "--entry", "--no-markup", "--text=Key", "--ok-label=OK", "--cancel-label=Cancel", "a", "b" },
+			sink(), sink(), function() return lib end)
+		h.assert_eq(calls_to(calls, "gtk_label_set_mnemonic_widget")[1][2].from, "gtk_bin_get_child")
+	end)
+
+	h.it("(a11y-dialog-host) a list's caption names its table", function()
+		local lib, calls = recording_lib()
+		Host.main({ "--list", "--no-markup", "--text=Pick", "--column=Value", "--ok-label=OK", "--cancel-label=Cancel",
+			"one" }, sink(), sink(), function() return lib end)
+		local bound = calls_to(calls, "gtk_label_set_mnemonic_widget")
+		h.assert_eq(#bound, 1)
+		h.assert_eq(bound[1][2].from, "gtk_tree_view_new_with_model")
+	end)
+
+	h.it("(a11y-dialog-host) no caption, no binding", function()
+		local lib, calls = recording_lib()
+		Host.main({ "--entry", "--ok-label=OK", "--cancel-label=Cancel" }, sink(), sink(), function() return lib end)
+		h.assert_eq(#calls_to(calls, "gtk_label_set_mnemonic_widget"), 0)
+	end)
+end)
