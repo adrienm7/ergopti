@@ -395,9 +395,19 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			rankSelect.value = state.rank;
 		}
 
+		/**
+		 * The Comparer's text mode (FILES.TEXT_MODES), the keys typed until it is
+		 * chosen: « My typing » is analysed on the same text as the Comparer's
+		 * layouts not ticked « + » (those are the Comparer's alone).
+		 */
+		function textMode() {
+			const mode = readStorage(FILES.SETTINGS_KEY).textMode;
+			return Object.values(FILES.TEXT_MODES).includes(mode) ? mode : FILES.TEXT_MODES.typed;
+		}
+
 		async function tables() {
 			const corpus = corpora.find((c) => c.id === state.corpus);
-			if (corpus.host) return E.prepareNgrams(corpus.host);
+			if (corpus.host) return E.prepareNgrams(FILES.plainTables(corpus.host, textMode()));
 			return E.prepareNgrams(await FILES.builtinTables(corpus.builtin));
 		}
 
@@ -426,6 +436,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		function rankKey(settings, pool) {
 			return JSON.stringify([
 				state.corpus,
+				textMode(),
 				state.keyboard,
 				keyboardFormat(),
 				settings,
@@ -814,6 +825,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		 */
 		function useMyTyping(ngrams) {
 			E.prepareNgrams(ngrams);
+			// The final text of « My typing » (schema 2) is read the same way.
+			if (ngrams.final !== undefined) E.prepareNgrams(ngrams.final);
 			const entry = { id: MY_TYPING_ID, title: '', host: ngrams };
 			const at = corpora.findIndex((c) => c.id === MY_TYPING_ID);
 			if (at >= 0) {

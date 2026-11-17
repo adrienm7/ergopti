@@ -26,7 +26,8 @@
  *    share (stored once for both), the layout the site's editor hands to the
  *    Comparer framed beside it (this tab's storage, taken once), and the
  *    layouts open in « Éditer », which the Comparer lists and follows; the
- *    layout the optimizer hands to « Éditer » the same way.
+ *    layout the optimizer hands to « Éditer » the same way; the text modes
+ *    of « My typing » (the keys typed or the final text) both pages follow.
  * ==============================================================================
  */
 
@@ -61,6 +62,28 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	// How long a pasted or typed corpus text rests before the Comparer and the
 	// Optimiser read it, so each keystroke does not restart the analysis.
 	const TEXT_DEBOUNCE_MS = 400;
+	// Which text each layout types (maintainer, 2026-11-17), stored as the
+	// Comparer's textMode: the keys typed (the raw text, hotstring abbreviations
+	// included), the final text (after hotstring expansions and AI completions),
+	// or the final text except the layouts ticked « + » (Ergopti+ hotstrings),
+	// which type the keys typed. The editor panel follows the same choice.
+	const TEXT_MODES = Object.freeze({ typed: 'typed', final: 'final', mixed: 'mixed' });
+
+	/**
+	 * The tables the layouts not ticked « + » type: a corpus of two texts (« My
+	 * typing » since schema 2: the keys typed at the top level, the final text
+	 * under `final`) gives its final text in the final and mixed modes, its keys
+	 * typed in the typed mode; a corpus of one text gives it in every mode.
+	 * @param {object} tables - A corpus's n-gram tables.
+	 * @param {string} mode - A TEXT_MODES value.
+	 * @returns {object} The tables to analyse.
+	 * @throws {Error} On an unknown mode.
+	 */
+	function plainTables(tables, mode) {
+		if (!Object.values(TEXT_MODES).includes(mode))
+			throw new Error(`layout_analysis: unknown text mode ${mode}`);
+		return tables.final && mode !== TEXT_MODES.typed ? tables.final : tables;
+	}
 
 	/** A rejection the page localizes. */
 	const failure = (code) => Object.assign(new Error(code), { code });
@@ -327,6 +350,8 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	return {
 		SETTINGS_KEY,
 		TEXT_DEBOUNCE_MS,
+		TEXT_MODES,
+		plainTables,
 		publishEditorLayouts,
 		onEditorLayouts,
 		OPEN_COMPARER_MESSAGE,

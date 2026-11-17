@@ -283,7 +283,9 @@ body:has(> main.layout-analysis) {
 
 /* Rows of at least 26 px keep each checkbox 24 px clear of the next one
    (WCAG 2.5.8 target size); the whole row is the checkbox's label anyway. */
-.la-layout {
+/* A layout's « + » box (text mode « final, except + »): laid out as a layout. */
+.la-layout,
+.la-plus {
 	align-items: center;
 	display: flex;
 	gap: 6px;

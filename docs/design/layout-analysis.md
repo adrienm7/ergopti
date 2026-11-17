@@ -850,6 +850,42 @@ layout object compared. A host `store` (`{list(), save(layout), remove(id)}`, ea
 promise; the app's data folder, the site's IndexedDB) replaces `localStorage`
 for the layouts imported from files.
 
+### Text modes
+
+« Text typed » (`#la-text-mode`, saved as `textMode`; maintainer, 2026-11-17)
+chooses which text each layout types:
+
+- **Keys typed** (`typed`, the default, « Ma frappe » as it was): every layout
+  types the raw text, the keys the fingers pressed, hotstring abbreviations
+  included.
+- **Final text** (`final`): every layout types the text after the hotstring
+  expansions and the AI completions, the text the user wanted.
+- **Final text, keys typed for « + »** (`mixed`): every layout types the final
+  text, and each layout ticked « + » in the list (`.la-plus`, saved as `plus`)
+  also ranks as « <name>+ » (id `<id>+`), typing the keys typed with the
+  Ergopti+ hotstrings: QWERTY against QWERTY+, Optimot against Optimot+, in one
+  ranking. The « + » box is its own tick, so a layout can rank with, without or
+  beside its « + » twin. Both kinds rank together (`E.rank`, incomplete layouts
+  last), and the details, the key pair matrix and the other analysers' scores
+  of a « + » layout are measured on the keys typed (`onResults` gives each
+  result's tables through `tablesOf`).
+
+Only a corpus of two texts tells them apart: « My typing » since schema 2 of
+the keystats payload (keys typed at the top level, the final text under
+`final`; [Keystats input](#keystats-input)). A built-in corpus, a pasted text
+or a file is one text: the choice and the « + » boxes are greyed with the
+reason, and every layout types that text. The raw text of a built-in corpus is
+not derived from the Ergopti+ hotstring catalogue, because that is not sound
+at n-gram level: an abbreviation replaces whole words and their spaces, and a
+character trigram table does not say where a word starts or ends, so the
+counts of the abbreviated text cannot be rebuilt from it (only a text could be
+rewritten, and the corpora ship as tables). The final text of « My typing »
+still counts the abbreviation a hotstring erased: the store keeps each
+token's sources, not its erasures. `corpus_files.js` owns the modes
+(`TEXT_MODES`) and `plainTables(tables, mode)`, the text the layouts not ticked
+« + » type; the editor's panel follows the Comparer's mode for « My typing »
+(the « + » layouts are the Comparer's alone).
+
 The Comparer mounts into an element:
 `LAYOUT_ANALYSIS_COMPARER.mount(root, {host?, reportHeight?})` fills `root`
 from the markup in `comparer_page.js` and returns `{setCorpus, addLayouts,
@@ -1053,6 +1089,14 @@ finger load and the shortcut letters on 2026-11-14. Still to review: the ISO
 key left of Z, the shortcut key ease, the reference character set, the scissor rule (the Keyboard Layouts Doc's « the finger that
 prefers being higher is not ») and the default weights; see the study's last
 section.
+
+Decided by the agent on 2026-11-17, to review by the maintainer, for the text
+modes: the keys typed stay the default mode (today's « Ma frappe »); the « + »
+box is a tick of its own beside the layout's, so a « + » twin can rank with
+or without its plain layout; a built-in corpus has one text (the hotstring
+catalogue is not applied to n-gram tables, above); the editor's panel follows
+the Comparer's mode; a « + » name may repeat a library name (« Ergopti » ticked
+« + » ranks as « Ergopti+ », the name of the registry's Ergopti+ layout).
 
 Decided by the agent on 2026-11-17, to review by the maintainer: `row_jump`
 (two rows or more, any fingers, logical rows) is shown but not scored, since

@@ -169,6 +169,17 @@
 	// The state of that read: 'loading', then the tables, or 'failed'.
 	const NGRAMS_STATE_EVENT = 'studio-ngrams-state';
 	const MY_TYPING_ID = 'my_typing';
+	// Which text each layout types (maintainer, 2026-11-17): the keys typed
+	// (the raw text, hotstring abbreviations included), the final text (after
+	// hotstring expansions and AI completions), or the final text except the
+	// layouts ticked « + » (Ergopti+ hotstrings), which type the keys typed. Only
+	// a corpus that brings both texts (« My typing », schema 2) tells them apart.
+	const TEXT_TYPED = window.LAYOUT_ANALYSIS_FILES.TEXT_MODES.typed;
+	const TEXT_MIXED = window.LAYOUT_ANALYSIS_FILES.TEXT_MODES.mixed;
+	const TEXT_MODES = Object.values(window.LAYOUT_ANALYSIS_FILES.TEXT_MODES);
+	// A layout ticked « + » is ranked as « <name>+ » under the id « <id>+ »: a
+	// library id never holds a « + », so the two never collide.
+	const PLUS_SUFFIX = '+';
 
 	// The site's standalone page mounts the Comparer into this element.
 	const STANDALONE_ROOT_ID = 'layout-analysis';
@@ -205,6 +216,15 @@
 			<span id="la-file-name" class="la-muted"></span>
 		</label>
 		<p id="la-file-error" class="la-error" hidden></p>
+	</div>
+	<div class="la-field">
+		<label for="la-text-mode" data-i18n="layout_analysis.text_mode.label"></label>
+		<select id="la-text-mode" data-i18n-option-prefix="layout_analysis.text_mode">
+			<option value="typed"></option>
+			<option value="final"></option>
+			<option value="mixed"></option>
+		</select>
+		<p id="la-text-mode-info" class="la-muted"></p>
 	</div>
 	<div class="la-field">
 		<div class="la-heading">
@@ -587,6 +607,8 @@
 						shortcuts: state.shortcuts,
 						formWeights: state.formWeights,
 						custom: state.custom,
+						textMode: state.textMode,
+						plus: Array.from(state.plus),
 						imported,
 						// The ranking table's columns and filters, and the heatmap's choice.
 						table: state.table,
@@ -665,7 +687,12 @@
 			shortcuts: validOr(E.shortcuts, saved.shortcuts, E.defaultShortcuts),
 			formWeights: validOr(E.formFactorWeights, saved.formWeights, E.defaultFormFactorWeights),
 			custom: saved.custom && saved.custom.tables ? saved.custom : null,
+			// Which text each layout types, and the layouts ticked « + » (TEXT_MIXED).
+			textMode: TEXT_MODES.includes(saved.textMode) ? saved.textMode : TEXT_TYPED,
+			plus: new Set(Array.isArray(saved.plus) ? saved.plus : []),
 			tables: null,
+			// The keys typed, which the « + » layouts type in TEXT_MIXED; null otherwise.
+			rawTables: null,
 			results: [],
 			sort: { key: 'rank', descending: false },
 			table: validTable(saved.table),
@@ -801,14 +828,49 @@
 		// ======= 3/ Corpora =======
 		// ==========================
 
-		/** The prepared tables of the chosen corpus, or null when it has none yet. */
+		/**
+		 * The final-text tables of a corpus that brings two texts (« My typing »
+		 * since schema 2: the keys typed at the top level, the final text under
+		 * `final`), or null for a corpus of one text. A built-in corpus is a
+		 * book's n-gram tables: no keys were typed for it, and the Ergopti+
+		 * hotstrings cannot be undone at n-gram level (an abbreviation replaces
+		 * whole words, which character trigrams do not delimit), so it has one.
+		 */
+		function finalTables(corpus) {
+			return corpus && corpus.host && corpus.host.tables.final ? corpus.host.tables.final : null;
+		}
+
+		/** Whether the chosen corpus tells the keys typed from the final text. */
+		function hasTwoTexts() {
+			return Boolean(finalTables(corpora.find((c) => c.id === state.corpus)));
+		}
+
+		/**
+		 * The prepared tables of the chosen corpus by the text mode: `plain`, the
+		 * text every layout types (null when the corpus has none yet), and `raw`,
+		 * the keys typed that the layouts ticked « + » type (TEXT_MIXED on a
+		 * corpus of two texts; null otherwise).
+		 * @returns {Promise<{plain: object|null, raw: object|null}>}
+		 */
 		async function corpusTables() {
 			const corpus = corpora.find((c) => c.id === state.corpus);
-			if (corpus.host) return E.prepareNgrams(corpus.host.tables);
-			if (corpus.builtin) {
-				return E.prepareNgrams(await window.LAYOUT_ANALYSIS_FILES.builtinTables(corpus.builtin));
+			if (corpus.host) {
+				const plain = window.LAYOUT_ANALYSIS_FILES.plainTables(corpus.host.tables, state.textMode);
+				return {
+					plain: E.prepareNgrams(plain),
+					raw:
+						finalTables(corpus) && state.textMode === TEXT_MIXED
+							? E.prepareNgrams(corpus.host.tables)
+							: null
+				};
 			}
-			return state.custom ? E.prepareNgrams(state.custom.tables) : null;
+			if (corpus.builtin) {
+				return {
+					plain: E.prepareNgrams(await window.LAYOUT_ANALYSIS_FILES.builtinTables(corpus.builtin)),
+					raw: null
+				};
+			}
+			return { plain: state.custom ? E.prepareNgrams(state.custom.tables) : null, raw: null };
 		}
 
 		/**
@@ -862,6 +924,28 @@
 			};
 		}
 
+		// The « + » layouts compared (id « <id>+ » → the layout under its « + »
+		// name), rebuilt by each analysis; they are not in the layout list.
+		const plusById = new Map();
+
+		/** A compared layout by its result's id: a listed layout or a « + » one. */
+		function layoutOf(id) {
+			return byId.get(id) || plusById.get(id);
+		}
+
+		/** The prepared tables a result was analysed on: a « + » layout types the keys typed. */
+		function tablesOf(result) {
+			return plusById.has(result.layout.id) ? state.rawTables : state.tables;
+		}
+
+		/** A layout ticked « + »: the same keys under « <name>+ ». */
+		function plusLayout(layout) {
+			return Object.assign({}, layout, {
+				id: layout.id + PLUS_SUFFIX,
+				name: layout.name + PLUS_SUFFIX
+			});
+		}
+
 		// The layout shown in detail, analysed again with every key's worst groups
 		// (keyGroups): a ranking counts only the SFB ones. Kept per result, so a new
 		// analysis (new results) analyses it again.
@@ -871,8 +955,8 @@
 				detailed.set(
 					result,
 					E.analyse(
-						byId.get(result.layout.id),
-						state.tables,
+						layoutOf(result.layout.id),
+						tablesOf(result),
 						Object.assign(analysisOptions(), { keyGroups: true })
 					)
 				);
@@ -899,8 +983,9 @@
 			// A built-in corpus loads its tables once (up to a few megabytes): say so meanwhile.
 			setBusy(true);
 			let tables;
+			let raw;
 			try {
-				tables = await corpusTables();
+				({ plain: tables, raw } = await corpusTables());
 			} catch {
 				if (mine !== generation) return;
 				setBusy(false);
@@ -910,25 +995,49 @@
 			if (mine !== generation) return;
 			setBusy(false);
 			state.tables = tables;
+			state.rawTables = raw;
 			state.words = tables ? corpusWords() : null;
+			showTextMode();
 			const chosen = layouts.filter((layout) => state.selected.has(layout.id));
-			if (!tables || chosen.length === 0) {
+			// The « + » layouts type the keys typed, beside the others on the final text.
+			plusById.clear();
+			if (raw)
+				for (const layout of layouts)
+					if (state.plus.has(layout.id)) {
+						const plus = plusLayout(layout);
+						plusById.set(plus.id, plus);
+					}
+			if (!tables || chosen.length + plusById.size === 0) {
 				state.results = [];
 				showStatus(t('layout_analysis.status.empty'));
 				render();
 				return;
 			}
 			const start = performance.now();
-			state.results = E.compare(chosen, tables, analysisOptions());
+			const options = analysisOptions();
+			state.results =
+				plusById.size === 0
+					? E.compare(chosen, tables, options)
+					: E.rank(
+							chosen
+								.map((layout) => E.analyse(layout, tables, options))
+								.concat(Array.from(plusById.values(), (layout) => E.analyse(layout, raw, options)))
+						);
 			const ms = Math.round(performance.now() - start);
 			// The compared layouts themselves (rows, dead keys…), for extra scorers.
-			const compared = new Map(chosen.map((layout) => [layout.id, layout]));
+			const compared = new Map(
+				chosen.concat(Array.from(plusById.values())).map((layout) => [layout.id, layout])
+			);
 			state.compared = compared;
 			for (const listener of resultListeners)
-				listener(state.results, tables, { keyboard: state.keyboard, layouts: compared });
+				listener(state.results, tables, {
+					keyboard: state.keyboard,
+					layouts: compared,
+					tablesOf
+				});
 			showStatus(
 				t('layout_analysis.status.ready', {
-					count: chosen.length,
+					count: state.results.length,
 					chars: format(tables.totalChars, 0),
 					ms
 				})
@@ -1046,7 +1155,7 @@
 				if (flag) label.append(' ', flag);
 				row.append(label, ' ');
 				const track = el('span', 'la-chart-track');
-				const layout = byId.get(result.layout.id);
+				const layout = layoutOf(result.layout.id);
 				const personal = !layout || !SHAREABLE_ORIGINS.includes(layout.origin);
 				const bar = el('span', personal ? 'la-bar la-bar-mine' : 'la-bar la-bar-score');
 				// The weakest keeps a sliver, so every row shows a bar; one layout alone is full.
@@ -1066,7 +1175,7 @@
 
 		/** A compared layout's family ('' for none). */
 		function familyOf(result) {
-			const layout = byId.get(result.layout.id);
+			const layout = layoutOf(result.layout.id);
 			return (layout && layout.family) || '';
 		}
 
@@ -1472,7 +1581,7 @@
 			$('la-heat-diff').checked = state.heatDiff;
 			const other = versus && state.heatDiff ? versus : null;
 			const board = E.keyboard(result.keyboard, result.profile || undefined);
-			const layout = byId.get(result.layout.id);
+			const layout = layoutOf(result.layout.id);
 			const modifiers = new Set(Object.values(DATA.model.modifier_keys));
 			const byCode = heatValues(detail, other);
 			const shown = board.codes.filter((code) => !modifiers.has(code));
@@ -1585,7 +1694,7 @@
 		 */
 		function renderWorst(result) {
 			const detail = detailOf(result);
-			const layout = byId.get(result.layout.id);
+			const layout = layoutOf(result.layout.id);
 			const event = $('la-worst-event').value || E.KEY_EVENTS[0];
 			const table = $('la-worst');
 			const head = el('tr');
@@ -1669,9 +1778,9 @@
 		 * its pair, share, count, kind and points to assistive technology.
 		 */
 		function renderMatrix(result) {
-			const layout = byId.get(result.layout.id);
+			const layout = layoutOf(result.layout.id);
 			const matrix = cachedFigure(result, 'matrix', () =>
-				E.bigramMatrix(layout, state.tables, analysisOptions())
+				E.bigramMatrix(layout, tablesOf(result), analysisOptions())
 			);
 			const byPoints = state.matrixBy === MATRIX_POINTS;
 			const keys = matrix.keys.slice(0, MATRIX_MAX_KEYS);
@@ -1849,7 +1958,7 @@
 			$('la-words-none').hidden = Boolean(words);
 			$('la-words-body').hidden = !words;
 			if (!words) return;
-			const layout = byId.get(result.layout.id);
+			const layout = layoutOf(result.layout.id);
 			const efforts = cachedFigure(result, 'words', () =>
 				E.wordEfforts(layout, words, analysisOptions())
 			);
@@ -2119,7 +2228,7 @@
 				layout: result.layout.name,
 				rank: result.rank
 			});
-			const layout = byId.get(result.layout.id);
+			const layout = layoutOf(result.layout.id);
 			const credit = $('la-details-credit');
 			credit.textContent =
 				layout.authors.length > 0
@@ -2303,6 +2412,21 @@
 			showCorpusInfo();
 		}
 
+		/**
+		 * The text mode control: its value, and why it is greyed on a corpus of
+		 * one text (a book has no keys typed; the hotstrings cannot be undone at
+		 * n-gram level), or what the chosen mode does.
+		 */
+		function showTextMode() {
+			const select = $('la-text-mode');
+			const two = hasTwoTexts();
+			select.value = state.textMode;
+			select.disabled = !two;
+			$('la-text-mode-info').textContent = two
+				? t(`layout_analysis.text_mode.info_${state.textMode}`)
+				: t('layout_analysis.text_mode.one_text');
+		}
+
 		function showCorpusInfo() {
 			const corpus = corpora.find((c) => c.id === state.corpus);
 			$('la-custom').hidden = corpus.id !== CUSTOM_ID;
@@ -2347,6 +2471,25 @@
 				});
 				label.append(box, el('span', '', layout.name));
 				list.append(label);
+				// « + »: this layout also ranks as « <name>+ », typing the keys typed with
+				// the Ergopti+ hotstrings, while the others type the final text.
+				if (state.textMode !== TEXT_MIXED) continue;
+				const plusLabel = el('label', 'la-plus');
+				const plus = el('input');
+				plus.type = 'checkbox';
+				plus.checked = state.plus.has(layout.id);
+				plus.disabled = !hasTwoTexts();
+				plusLabel.title = hasTwoTexts()
+					? t('layout_analysis.text_mode.plus_title', { layout: layout.name + PLUS_SUFFIX })
+					: t('layout_analysis.text_mode.one_text');
+				plus.addEventListener('change', () => {
+					if (plus.checked) state.plus.add(layout.id);
+					else state.plus.delete(layout.id);
+					save();
+					analyse();
+				});
+				plusLabel.append(plus, el('span', '', layout.name + PLUS_SUFFIX));
+				list.append(plusLabel);
 			}
 		}
 
@@ -2587,6 +2730,14 @@
 			$('la-corpus').addEventListener('change', (event) => {
 				state.corpus = event.target.value;
 				showCorpusInfo();
+				showTextMode();
+				fillLayouts();
+				save();
+				analyse();
+			});
+			$('la-text-mode').addEventListener('change', (event) => {
+				state.textMode = event.target.value;
+				fillLayouts();
 				save();
 				analyse();
 			});
@@ -2824,6 +2975,8 @@
 		 */
 		function setCorpus(corpus) {
 			E.prepareNgrams(corpus.tables);
+			// The final text of « My typing » (schema 2) is read the same way.
+			if (corpus.tables.final !== undefined) E.prepareNgrams(corpus.tables.final);
 			const entry = { id: corpus.id, title: corpus.title || '', host: { tables: corpus.tables } };
 			const at = corpora.findIndex((c) => c.id === corpus.id);
 			if (at >= 0) {
@@ -2835,6 +2988,7 @@
 			corpora.unshift(entry);
 			if (corpus.default) state.corpus = corpus.id;
 			fillCorpora();
+			fillLayouts();
 			save();
 			analyse();
 		}
@@ -2901,7 +3055,8 @@
 
 		/**
 		 * Calls a listener after each comparison with (results, tables, {keyboard,
-		 * layouts: Map id → the compared layout object}),
+		 * layouts: Map id → the compared layout object, tablesOf: result → the
+		 * prepared tables it was analysed on (a « + » layout types the keys typed)}),
 		 * and at once with the current ones: the hook of extra views.
 		 * @param {function(object[], object, object): void} listener
 		 */
@@ -2912,7 +3067,8 @@
 			if (state.tables)
 				listener(state.results, state.tables, {
 					keyboard: state.keyboard,
-					layouts: state.compared || new Map()
+					layouts: state.compared || new Map(),
+					tablesOf
 				});
 		}
 
@@ -2944,6 +3100,7 @@
 		function start() {
 			applyStrings();
 			fillCorpora();
+			showTextMode();
 			fillLayouts();
 			fillWeights();
 			fillIdealLoad();

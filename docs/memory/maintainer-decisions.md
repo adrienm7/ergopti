@@ -1534,6 +1534,15 @@ migration (byte identity confirmed on the PC on 2026-11-16).
   enforced on edited loads; every sourced value has an « i » popover; every
   other analyser shows its official score and the score under the user's
   fingering.
+- **Comparer ranking and texts (2026-11-17).** A layout that cannot type the
+  space, a letter a–z or a letter A–Z (each case on its own) is incomplete:
+  flagged with what it lacks and ranked after every complete layout (engine
+  `rankOrder`, model `required_characters`); accents, digits and symbols only
+  take the `unsupported` penalty, so English layouts rank normally on French.
+  « Text typed » chooses the keys typed, the final text (after hotstrings and
+  AI), or the final text with « + » layouts on the keys typed, ranked as
+  « <name>+ »; only « My typing » (keystats payload schema 2, `final`) has two
+  texts, a built-in corpus has one (docs/design/layout-analysis.md).
 - **Personal info.** `pattern_max_length` is retired on the three OS
   (2026-11-16): Windows registers the single-letter combos only and resolves
   longer ones at fire time, as macOS and Linux do; a config that still holds the

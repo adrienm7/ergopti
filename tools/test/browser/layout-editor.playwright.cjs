@@ -351,6 +351,110 @@ async function exerciseStudioLayout(browser, origin) {
 	);
 	assert.ok(incomplete.rank > incomplete.ergopti, 'it ranks after Ergopti, which scores the same');
 	assert.equal(incomplete.tableFlag, 'incomplete: lacks k K', 'the ranking table says so too');
+	// (comparer-text-modes) Three texts to type (maintainer, 2026-11-17): the keys
+	// typed, the final text (after hotstrings and AI), or the final text except
+	// the layouts ticked « + », which type the keys typed and rank as « name+ ».
+	// « My typing » of schema 2 brings both texts; a corpus of one text greys the
+	// choice and says why.
+	const status = () => page.evaluate(() => document.getElementById('la-status').textContent);
+	await page.evaluate(() =>
+		document.dispatchEvent(
+			new CustomEvent('studio-ngrams', {
+				detail: {
+					schema: 2,
+					source: 'keystats',
+					total: 60,
+					chars: { e: 20, s: 12, a: 10, n: 8, ' ': 10 },
+					bigrams: { es: 6, en: 5, 'e ': 8, ' a': 4 },
+					trigrams: { 'es ': 3 },
+					final: {
+						total: 90,
+						chars: { e: 30, s: 18, a: 15, n: 12, ' ': 15 },
+						bigrams: { es: 9, en: 7, 'e ': 12, ' a': 6 },
+						trigrams: { 'es ': 5 }
+					}
+				}
+			})
+		)
+	);
+	await page.waitForFunction(() =>
+		/ on 60 characters/.test(document.getElementById('la-status').textContent)
+	);
+	assert.equal(await page.isDisabled('#la-text-mode'), false, 'two texts: the choice is open');
+	assert.equal(await page.inputValue('#la-text-mode'), 'typed', 'the keys typed until chosen');
+	await page.selectOption('#la-text-mode', 'final');
+	await page.waitForFunction(() =>
+		/ on 90 characters/.test(document.getElementById('la-status').textContent)
+	);
+	assert.equal(
+		await page.locator('#la-layout-list .la-plus').count(),
+		0,
+		'no « + » outside its mode'
+	);
+	await page.selectOption('#la-text-mode', 'mixed');
+	const before = await page.locator('#la-chart .la-chart-row').count();
+	// The layout list is folded under its summary line.
+	await page.click('#la-layouts-summary');
+	await page
+		.locator('#la-layout-list .la-plus', { hasText: /^QWERTY \(US\)\+$/ })
+		.locator('input')
+		.check();
+	await page.waitForFunction(
+		(count) => document.querySelectorAll('#la-chart .la-chart-row').length === count + 1,
+		before
+	);
+	const mixed = await page.evaluate(() =>
+		[...document.querySelectorAll('#la-table tbody tr')].map((tr) => tr.cells[1].textContent)
+	);
+	assert.ok(
+		mixed.includes('QWERTY (US)') && mixed.includes('QWERTY (US)+'),
+		`QWERTY and QWERTY+ in one ranking: ${mixed.join(' | ')}`
+	);
+	assert.match(await status(), / on 90 characters/, 'the others type the final text');
+	// A « + » layout's details are measured on the keys typed, like its rank.
+	await page.evaluate(() =>
+		[...document.querySelectorAll('#la-table tbody tr')]
+			.find((tr) => tr.cells[1].textContent === 'QWERTY (US)+')
+			.click()
+	);
+	assert.match(await page.textContent('#la-details-title'), /QWERTY \(US\)\+/);
+	// A corpus of one text (« My typing » of schema 1 here, a book's tables
+	// alike) greys the choice and the « + » boxes, and says why.
+	await page.evaluate(() =>
+		document.dispatchEvent(
+			new CustomEvent('studio-ngrams', {
+				detail: {
+					schema: 1,
+					source: 'keystats',
+					total: 60,
+					chars: { e: 20, s: 12, a: 10, n: 8, ' ': 10 },
+					bigrams: { es: 6 },
+					trigrams: {}
+				}
+			})
+		)
+	);
+	await page.waitForFunction(() => document.getElementById('la-text-mode').disabled);
+	assert.match(
+		await page.textContent('#la-text-mode-info'),
+		/^This corpus is one text/,
+		'the greyed choice says why'
+	);
+	assert.ok(
+		await page.$$eval(
+			'#la-layout-list .la-plus input',
+			(boxes) => boxes.length > 0 && boxes.every((box) => box.disabled)
+		),
+		'the « + » boxes are greyed'
+	);
+	assert.ok(
+		!(
+			await page.evaluate(() =>
+				[...document.querySelectorAll('#la-table tbody tr')].map((tr) => tr.cells[1].textContent)
+			)
+		).includes('QWERTY (US)+'),
+		'one text: no « + » layout is ranked'
+	);
 	const heading = await page.evaluate(
 		() => getComputedStyle(document.querySelector('#studio-comparer')).color
 	);

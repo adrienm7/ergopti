@@ -114,6 +114,20 @@ for (const id of Object.keys(E.METRICS)) keys.add(`${PREFIX}metric.${id}`);
 for (const id of DATA.model.fingers) keys.add(`${PREFIX}finger.${id}`);
 for (const id of Object.keys(DATA.model.keyboards)) keys.add(`${PREFIX}keyboard.${id}`);
 for (const format of E.keyboardFormats()) keys.add(`${PREFIX}format.${format.id}`);
+// Each text mode explains itself (comparer_page.js showTextMode); the modes are
+// corpus_files.js TEXT_MODES, shared with the editor panel.
+const textModes = Array.from(
+	fs
+		.readFileSync(path.join(PAGE_DIR, 'corpus_files.js'), 'utf8')
+		.match(/const TEXT_MODES = Object\.freeze\(\{([^}]*)\}\)/)[1]
+		.matchAll(/'([a-z]+)'/g),
+	(m) => m[1]
+);
+check(
+	JSON.stringify(textModes) === JSON.stringify(['typed', 'final', 'mixed']),
+	`text modes: ${textModes.join(' ')}`
+);
+for (const mode of textModes) keys.add(`${PREFIX}text_mode.info_${mode}`);
 // The fingering editor's base choices and the errors it reports.
 for (const id of Object.keys(DATA.model.fingerings)) keys.add(`${PREFIX}fingering.base_${id}`);
 for (const m of fs

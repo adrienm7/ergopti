@@ -191,7 +191,7 @@ var LAYOUT_ANALYSER_TAB = (function () {
 					throw new Error(`analyser_tab: no layout ${result.layout.id} from the Comparer`);
 				state.scores.set(
 					result.layout.id,
-					S.scoreAll(layout, state.tables, {
+					S.scoreAll(layout, state.tablesOf(result), {
 						keyboard: state.keyboard,
 						profile: FINGERING.current(state.keyboard) || undefined
 					})
@@ -215,10 +215,14 @@ var LAYOUT_ANALYSER_TAB = (function () {
 			if (visible) compute();
 			else render();
 		};
-		comparer.onResults((results, tables, { keyboard, layouts }) => {
+		comparer.onResults((results, tables, { keyboard, layouts, tablesOf }) => {
+			// Each result's own tables: the Comparer's « + » layouts type another text.
+			if (typeof tablesOf !== 'function')
+				throw new Error('analyser_tab: the Comparer names the tables of each result');
 			state.results = results;
 			state.layouts = layouts;
 			state.tables = tables;
+			state.tablesOf = tablesOf;
 			state.keyboard = keyboard;
 			restart();
 		});
