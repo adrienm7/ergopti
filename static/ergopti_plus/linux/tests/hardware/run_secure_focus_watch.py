@@ -3,7 +3,8 @@
 
 """Exercise the real resident privacy owner against owned GTK/AT-SPI controls.
 
-Requires Xvfb, a session bus, openbox, LuaJIT/luv and Python GTK3 bindings.
+Requires Xvfb, a session bus, openbox, xdotool, xprop, LuaJIT/luv and Python GTK3
+bindings.
 No /dev/uinput or physical keyboard is needed. DUMMY enters the original logical
 input callback seam; no claim of native text injection is made. Exit 2 means an
 explicit missing prerequisite, and every regression or cleanup failure exits 1.
@@ -436,7 +437,7 @@ def main():
         if os.getenv(name):
             print("ENVIRONMENT: unset " + name + " to load the original modules", file=sys.stderr)
             return 2
-    for name in ("Xvfb", "dbus-run-session", "openbox", "xdotool", "luajit", "ps"):
+    for name in ("Xvfb", "dbus-run-session", "openbox", "xdotool", "xprop", "luajit", "ps"):
         if shutil.which(name) is None:
             print("ENVIRONMENT: required executable missing: " + name, file=sys.stderr)
             return 2
