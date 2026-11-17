@@ -1077,6 +1077,10 @@ HashtagOrQuote() {
 	_QuoteSection := (LastSentCharacter == "(") ? "paren_quote"
 		: (LastSentCharacter == "[") ? "bracket_quote"
 		: ""
+	if LoggerIsDebugEnabled()
+		LoggerDebug("Rolls", "# roll: last sent '{1}', prior hotkey '{2}' {3} ms ago, delay {4} s, section '{5}'.",
+			LastSentCharacter, A_PriorHotkey, A_TimeSincePriorHotkey,
+			HotstringsResolve("rolls", "hashtag_quote").Delay, _QuoteSection)
 	if (_QuoteSection != ""
 		and A_TimeSincePriorHotkey < (HotstringsResolve("rolls", "hashtag_quote").Delay * 1000)
 		and Features["hotstrings"]["rolls"].Has(_QuoteSection)
@@ -1092,30 +1096,44 @@ HashtagOrQuote() {
 ; the onboarding wizard can defer it (the wizard temporarily blocks it by
 ; registering its hotkeys AFTER Onboarding_Run() to keep SC138 native during
 ; first-run setup).
+; Each roll takes the chord the AltGr base row binds, so it carries that row's
+; own conditions too (the AltGr layer on, the row emulated): registered first,
+; a roll whose criterion ignored them would type its key with the layer off.
 _RegisterRollsAltGrHotkeys() {
-	HotIf((*) => Features["hotstrings"]["rolls"]["chevron_equal"]["enabled"] and IsRealAltGrPress())
+	HotIf((Name := "", *) => Features["hotstrings"]["rolls"]["chevron_equal"]["enabled"]
+		and _RollAltGrRowLive(Name))
 	Hotkey("SC138 & SC012", _RollChevronEqualHandler, "I2")
-	HotIf((*) => Features["hotstrings"]["rolls"]["hashtag_quote"]["enabled"] and IsRealAltGrPress())
+	HotIf((Name := "", *) => Features["hotstrings"]["rolls"]["hashtag_quote"]["enabled"]
+		and _RollAltGrRowLive(Name))
 	Hotkey("SC138 & SC017", _RollHashtagQuoteHandler, "I2")
 	HotIf()
+}
+
+; Whether the AltGr base row a roll shares is live: the conditions
+; RegisterAltGrLayer gives its base rows.
+; @param Name {String} The hotkey name the criterion receives.
+; @return {Boolean}
+_RollAltGrRowLive(Name) {
+	return Features["layout"][ConfigLeaf.ERGOPTI_ALT_GR] and IsRealAltGrPress() and LayoutRowIsEmulatedHotkey(Name)
 }
 
 ; ─────────────────────────────────────────────────────────────────────────────
 ; AltGr layer (ErgoptiPlus overrides + ErgoptiAltGr Number row + base rows).
 ; The original ~390 lines of repetitive ``SC138 & SCxxx::`` blocks are now
 ; defined as data in modules/keymap/layout/layout_altgr.ahk and registered here through a
-; single dispatcher. Registration order matters: AHK fires the
-; "most-recently-defined variant" whose #HotIf criterion is true. The AltGr
-; layer is registered FIRST, then the two rolls (SC138 & SC012 chevron_equal,
-; SC138 & SC017 hashtag_quote) LAST, so the roll variant wins the shared chord.
-; The roll handlers already replicate the exact base-row/override fallback
-; (AddRollEqual: "%" wrap under ergopti_plus else "œ"; HashtagOrQuote: "#" wrap),
-; so registering them last makes the roll feature live without changing the
-; non-roll output. Previously the rolls were registered FIRST, so the base rows
-; shadowed them and the rolls were silently dead (altgr-rolls-dead-precedence).
+; single dispatcher. Registration order matters: when several variants of one
+; hotkey are eligible, AHK fires the one CREATED EARLIEST (the #HotIf
+; documentation; test_altgr_rolls_precedence proves it on the interpreter). The
+; two rolls (SC138 & SC012 chevron_equal, SC138 & SC017 hashtag_quote) are
+; therefore registered FIRST, so their variant wins the chord the base rows also
+; bind. The roll handlers replicate the base-row/override fallback (AddRollEqual:
+; "%" wrap under ergopti_plus else "œ"; HashtagOrQuote: "#" wrap), so the
+; non-roll output is unchanged. The order was once reversed on the belief that
+; the most recent variant wins, which left both rolls dead: « (# » typed « (# »
+; (the maintainer, 2026-11-17).
 ; ─────────────────────────────────────────────────────────────────────────────
-RegisterAltGrLayer()
 _RegisterRollsAltGrHotkeys()
+RegisterAltGrLayer()
 
 
 
