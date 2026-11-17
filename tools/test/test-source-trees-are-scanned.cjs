@@ -123,6 +123,9 @@ const tracked = trackedPaths
 // is carved out of modules/ and infra/, so a list naming either of those and
 // not platform/ has a hole created by that migration, whatever it meant to
 // cover. That is the exact shape that silently dropped 19 tests.
+// A feature folder that shares its name with a settings section (gestures
+// now; hotstrings, metrics, shortcuts later) is not listed: the section lists
+// of the settings and menus name it beside ui, and they are no tree scans.
 const REQUIRES_PLATFORM = [
 	'modules',
 	'infra',
@@ -134,8 +137,7 @@ const REQUIRES_PLATFORM = [
 	'ai',
 	'apps',
 	'clipboard',
-	'diagnostics',
-	'gestures'
+	'diagnostics'
 ];
 
 const incomplete = [];
