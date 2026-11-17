@@ -145,307 +145,70 @@ Kalamine and KbdEdit give ideas, never code: every generator is written from the
 - [ ] **Keyboard types JIS and ABNT.** Their keys (Yen, Ro, Henkan, Muhenkan, Kana, keypad comma) would enter
       `physical_keys.json`, which the Windows driver parses at boot: measure that parse cost, then decide.
 
-## Parity audit pause and resumption
+## Parity audit
 
 The [coverage and remaining-work register](docs/platform-parity-audit.md#review-status-at-pause--november-5-2026)
-records the focused campaigns already completed, broader reviews, exact limits
-and the next module candidates. The audit is paused at the maintainer's request.
+and the campaign reports under [docs/audits/platform-parity/](docs/audits/platform-parity/) record what is done.
+Native receiving stays unqualified everywhere; the real-machine scenarios are in the TODO-tests files.
 
-- [ ] **What a pause must stop (maintainer, 2026-11-14 evening), on Windows, macOS and Linux.** Keystroke metrics
-      (keystats), application usage metrics, the Ctrl+M action that moves the mouse (and every other mouse-moving
-      action), and any other background behaviour driven by keys or by the active app; the census lists each feature
-      × OS with whether it stops at pause, and every gap gets a fix and a regression test (worker P). Decided the same
-      evening: a shortcut slot changed while paused is saved at once and applies on resume, the resume chord staying
-      the one active when the pause started (Windows too, across a suspended reload); the magic key capture runs
-      while paused on all three OS, the key inert until resume; the Windows tray stops greying the rows the pause
-      allows; macOS ends CapsWord at pause like Windows and Linux. Keep-awake / activity simulation stops at pause and is restored
-      on resume on all three OS (maintainer, 2026-11-14 night).
-      [CODE] Left (2026-11-15): the census rows all stop (a0c00a3449, a4c0290550, 72e1bd30cc, fe94a73c13, 66fbe6d003,
-      2f1c555ffc, 734fc9001d, 4a27438e76; test_keepawake_restored_on_resume.ahk, test_pause_closes_app_interval,
-      test_paused_driver_records_no_keys); the Windows tray still greys 11 rows (`greyed_when_paused` in menu.toml,
-      menu_init.ahk), overlapping EDD-1 below.
-- [ ] **[CODE] Parity audit continuation** (claimed by worker H, 2026-11-13)**:** on resumption, reconcile current source areas with the linked coverage register, then deepen tap-holds/chords/layers as one bounded module across Windows/macOS/Linux/shared before moving to another. Keep native receiving and implementation of existing finding IDs separate; do not restart completed focused campaigns without source drift or a new hypothesis.
-      Progress (10 November 2026, [tap-hold campaign](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): census reconciled (375 areas, 12 new and 206 changed since the last pinned census, still to review outside tap-holds). Fixed on Linux/shared: LAlt's Tab tap with no hold is tap-only (THL-001), the Alt-Tab and RCtrl Tab taps keep their strict threshold (THL-002), a pair starts from the earliest held first key (THL-003), a pair's release tap respects the decided tap minimum (THL-004), chord defaults pinned across drivers (THS-001). Decisions pending: THD-1, THD-3, THD-4 (pair tap and the layer, layer-hold pair activity, macOS thumb Backspace under modifiers) and THD-2's lone window. Minimum tap (decided 2026-11-10): Linux complete; macOS needs a Karabiner mechanism qualified on a Mac (`to_if_alone` has no minimum); Windows is the maintainer's change. Left: the report's Linux and macOS remaining rows; native receiving unqualified. Next module after this one: hotstring cascade.
-      Progress (12 November 2026, [tap-hold follow-up](docs/audits/platform-parity/2026-11-12-tap-holds-followup/report.md)): register reconciled with the 24 campaigns since the pause (381 areas). Drift since `36d88cc2` reviewed: fixed a single foreign chord action turning every Linux key combination off (TCL-003). Open for the shared tap-hold file series (`wt/taphold-landed`): TCL-001 (manifest rows still in `tap_hold.toml`), TCL-002 (action ids not translated between macOS and Linux), TCL-004 (Mac thumb-key ids, a decision), TCL-005 to 007; the two 2026-11-10 macOS rows are fixed in the generator, proven on the model (Left Command's one-shot Shift holds Shift and stands down under modifiers; a pair takes the first key held earliest), with field points `lalt_one_shot` and `pair_press_order`.
-      macOS minimum tap (11 November 2026): done in the generator. Each release-judged tap, a pair's included, is gated on a lease-scoped variable a `to_delayed_action` raises after `tap_hold.tap_min_duration_ms` (Karabiner v16 evaluates a to-event's own conditions when it posts it); the rollover keys keep no minimum, as the Linux roll keys. Generator test `test_generator_tap_minimum.lua`, corpus vectors without their macOS divergence; native timing under « To confirm on the Mac ».
-      Progress (11 November 2026, [hotstring cascade campaign](docs/audits/platform-parity/2026-11-11-hotstring-cascade/report.md)): census 377 areas (14 new, 212 changed since the pinned census); module taken: hotstring cascade and trigger arbitration. Fixed: macOS takes each cascade link from the typed matcher's winner (HCM-001 to 004), macOS undoes the magic-key repeat and a stripped-space expansion (HCM-005, 006), Linux restores the typed casing and reports a refused or private undo correctly (HCL-001 to 003), inventory rows for the macOS undo and the Linux repeat window (HCS-001). Decisions pending: HCD-1 (an expired best candidate: macOS falls to a lower rule), HCD-2 (bare `:`/`;` end a trigger on macOS only), HCD-3 (named personal tags) done 2026-11-13 by worker F, decided by the agent, to review by the maintainer: macOS and Linux type one field for `@bic @cb @cc @iban @rib @ss @tel @tél`, as Windows does, from the shared `hotstrings/engine/personal_info/tags.lua` (Windows map pinned by `test-personal-info-tags-single-source.cjs`; regressions `hcd-3-named-tags`); before, the letters' aliases typed more personal data than asked. HCD-4 and 5 (delay on `@` tags, uppercase one-letter tag; privacy) stay pending. The macOS date delay and `+33` short trigger were fixed later on 2026-11-11 (HCM-007, HCM-008; checked by worker F on 2026-11-13). Left: the `+33` short trigger on Windows and the Windows rows of the report; native receiving unqualified.
-      Progress (12 November 2026, [hotstrings engine campaign](docs/audits/platform-parity/2026-11-12-hotstrings-engine/report.md)): drift since the cascade campaign and the sending path reviewed. Fixed: the Linux terminal erase is paced after each Backspace, as on Windows and macOS (HSE-001). Decided by the maintainer on 2026-11-12 and done: the short entry forms load everywhere (HSE-002), a no-break space counts as a space inside a trigger (HSE-003), a letter magic key follows the word's case on macOS as on Windows (HSE-004); Windows lines below.
-      Continued (11 November 2026, branch `claude/ergopti-todo-parity-audit`): the two reports' Linux, macOS and docs rows. Linux: LAlt's Tab under RCtrl's one-shot Shift types Shift+Tab (THL-005), LAlt tapping Backspace on the layer is swallowed before a user binding (THL-006). macOS: the `+33` short trigger keeps every digit of a number stored without its zero, through one shared helper (HCM-007), the date hotstrings respect the dynamic family's delay (HCM-008). Windows, report only: the `+33` short trigger drops the first digit of such a number (`dynamic_hotstrings.ahk:199`). Left: the macOS one-shot rows of the tap-hold report (Karabiner generator), the Windows rows; native receiving unqualified.
-      Progress (11 November 2026, [gestures campaign](docs/audits/platform-parity/2026-11-11-gestures/report.md)): module taken: gestures and touchpad event ownership. Fixed: an incremental diagonal is counted and reversed along its own axis on macOS and Linux (GSS-001), a moving swipe locks or counts only a decided axis outside the diagonal band (GSM-001, GSL-001; a drift with its diagonal unbound falls back to its dominant straight slot on macOS and Linux, a bound diagonal still wins inside the band: decided by the maintainer on 2026-11-11), Linux releases a gesture's click hold at the next key press (GSL-002). Decided by the maintainer on 2026-11-11: GSD-3 (a pair swipe decides from 3.0 mm, diagonal 5.0 mm, on Linux as on macOS, one value in the shared timings registry `[gestures]`; the slot's step stays the user's). Decided by the maintainer on 2026-11-11: GSD-2 (the Linux decoder's swipe minimum and pair-scroll travel are millimetres through the pad's resolution, 10 mm each from the shared timings registry). GSD-1 (macOS live x1 fires, so a touch going right then back left fires two actions where Windows and Linux fire one from the finished swipe): kept as it is, decided by the agent on 2026-11-13, to review by the maintainer; the live feel can only be judged on a real trackpad, and changing it unseen is the riskier choice. Left: a physical mouse click releasing the Linux click hold (no pointer observer), native receiving unqualified.
-      Progress (11 November 2026, [metrics campaign](docs/audits/platform-parity/2026-11-11-metrics/report.md)): module taken: metrics beyond the WPM widget. Fixed: the Linux ledger import admits text carrying a CR or a NUL (KML-001, a stuck device before), an imported Windows device's Wi-Fi changes on Linux and macOS (KML-002, KMM-003), no connectivity, topology or capture row under an excluded context on Linux and macOS (KML-003, KMM-002), an imported device's system rows on their own date on Linux (KML-004 part). macOS also arms right_option's no-hold one-shot Shift only on a quick release (tap-hold report). Decided by the maintainer on 2026-11-11: KMD-2 (non-typing rows are refused under an excluded app on every OS; verified on Linux and macOS, closed) and KMD-3 (Linux `awake_ms` is keep-awake time as on Windows and macOS; old Linux days cleared once and marked, decided by the coordinator on 2026-11-11, to review by the maintainer). KMD-1 (rows store `ts` in UTC and `utc_offset_min`, hours, night wakes and days use the recorded offset, an older Linux row the reader's current offset; Linux and macOS writers, migration, purge triggers and rebuilds done). The Windows counterpart of KMD-1 is in since 650a49bdb2 (2026-11-11: cache migration before `KLR_LoadPurgeSchema`, UTC writers and tombstone, `keystats_walker_events.ahk`); checked on the PC 2026-11-16, which added the no-loss, idempotence, partial-image and refused-migration cases to `test_klr_utc_offset_migration.ahk`. Left: native receiving unqualified.
-      Progress (11 November 2026, [AI flows campaign](docs/audits/platform-parity/2026-11-11-ai-flows/report.md)): module taken: AI request-to-output flows. Fixed on Linux: a refused Backboard assistant creation (AIL-001) and a refused token exchange (AIS-001) are refused credentials, never retried; a failed streamed attempt's partial is withdrawn before its retry, which no longer streams (AIL-002). Decided by the maintainer on 2026-11-11: AID-1 (the macOS quick retry spends an attempt of `max_attempts`, two requests at most for one prediction at multiplier 2, as on Windows and Linux) and AID-2 (a token exchange answering 400 is a refused key, never retried, failing with the service's message; shared classifier and exchange reader, Windows mirror of both corpora left to the maintainer) and AID-3 (a model, key, provider or endpoint change retires the request in flight on macOS and Linux, as on Windows; shared `llm.request_settings`). The macOS counterparts of AIS-001 and AIL-002, checked 2026-11-13 (worker F): already covered, the report's remaining work records that AIS-001 does not reproduce (`post_and_parse` fails a refused exchange as `no_credential`) and AIM-001 withdraws a failed stream, and `api_ollama` streams only the first attempt. Left: native receiving unqualified.
-      Progress (11 November 2026, [input/layout campaign](docs/audits/platform-parity/2026-11-11-input-layout/report.md)): module taken: remaining input/layout engine joins. Fixed: a moved macOS Cmd chord is released on its own key code (ILM-001), an emulated shortcut falls back to its character's US key under a non-Latin layout on Linux and macOS (ILL-003, ILM-002), an emulated Linux chord repeats while held (ILL-004). Fixed (order decided by the coordinator on 2026-11-11, to review by the maintainer): a bound shortcut slot and the prediction's digit run before the Linux layout emulation (ILL-001, ILL-002); open: the slot still matches the system layout's key, not the emulated letter. ILD-1 decided by the maintainer on 2026-11-11 (a two-modifier chord sends the logical key everywhere): macOS and Linux pinned, Windows counterpart in the report. ILD-2 decided by the maintainer on 2026-11-11 (Ctrl+AltGr sends Ctrl and the logical key, AltGr suspended, on every OS: Linux already, macOS done, shared vector, Windows counterpart below). Left: a tap-hold modifier's repeat over a passed key on Linux, native receiving unqualified.
-      Progress (11 November 2026, [shortcuts campaign](docs/audits/platform-parity/2026-11-11-shortcuts/report.md)): census 377 areas (47 changed areas under modules campaigned since); module taken: keyboard shortcuts and text actions. Fixed on Linux: a held accented shortcut repeats like Windows (SCL-001), the accented shortcuts stand aside while a layout is emulated (SCL-002). SCD-1 decided by the maintainer on 2026-11-11 (no Linux keyboard slot runs through a pause; the shared paused actions list replaces the prefix test). SCD-2 and 3 settled with ILD-1 and ILD-2 (Ctrl+Alt+é sends Ctrl+Alt and the logical key; a Ctrl slot fires under AltGr, AltGr suspended; Linux already does both, Windows counterparts below). Next module: the updater. Left: macOS `bindings.lua` and Linux `key_combinations.lua` in depth, native receiving unqualified.
-      Progress (11 November 2026, [updater campaign](docs/audits/platform-parity/2026-11-11-updater/report.md)): module taken: the updater, from the census. Fixed on Linux: a failed background check announces no release (UPL-001), the notification of a manual check without its window words each outcome (UPL-002), a release read from the public feed says it cannot be installed yet (UPL-003). UPD-1 decided by the maintainer on 2026-11-11 (a 200 that does not open a JSON array, and a Linux 304 with no usable cached page, are « no connection » with the feed fallback, through the shared `opens_release_array`; Linux and macOS done, Windows counterpart below). Windows, report only: UPW-005 (the signing policy compared case-insensitively). Left: the macOS manual check without its window, native receiving unqualified.
-      Progress (12 November 2026, [network campaign](docs/audits/platform-parity/2026-11-12-network/report.md)): areas taken: proxies, trust, deadlines, downloads, request privacy. Fixed on Linux: a Negotiate company proxy is answered with the session's ticket (NET-002), the AppImage trusts openSUSE's CA bundle (NET-006), the unread download timeout copy is gone (NET-004); on Linux and macOS a local Ollama request gets the shared 180 s cold-load budget (NET-003). After review: the macOS remap downloads run behind the system network route (NET-001). Decided by the maintainer on 2026-11-12: the macOS no-token stream watchdog is removed, and the release archive has one shared budget (1,200 s absolute, 600 s idle) read on macOS and Linux, the Windows side listed below. ExcludeSimpleHostnames on macOS (NET-005): checked 2026-11-13 (worker F), no opaque child targets a dot-free host (every origin comes from `route_origins.json`, all public dotted hosts), so no request goes through the relay against the system rule; `test-managed-proxy-route-contract.cjs` now fails on a single-label origin, which would first need a route-plan step.
-      Progress (12 November 2026, [layout manager campaign](docs/audits/platform-parity/2026-11-12-layout-manager/report.md)): module taken: the layout manager window's host on macOS and Linux. Fixed: the emulation reloads when the emulated layout is uninstalled, removed, updated or re-saved, the stored choice kept as decided by the maintainer on 2026-11-12 (LMH-001, 002; Windows line below); a paused driver admits only the page's ready signal (LMH-003); a layout shipping hotstrings reloads the driver (LMH-004); the Linux tray follows « Emulate without installing » (LMH-005); the last source reopens through a bounded UTF-8 read (LMH-006) and the store reads its export name and codes from the shared defaults (LMH-007). Native receiving unqualified.
-      Progress (12 November 2026, [bundled apps campaign](docs/audits/platform-parity/2026-11-12-bundled-apps/report.md)): module taken: App Cloner and Encryptor on macOS and Linux. Fixed: a folder destination is refused instead of reported as decrypted (BAP-001), macOS browser clones get their own profile (BAP-002), cancelling one overwrite skips only that file on macOS (BAP-003), the Linux item to open is validated as on macOS (BAP-005), a second clone of a name gets its own Linux menu name (BAP-006), a refused write names its reason (BAP-007). Open: BAP-004 (VSCodium and Insiders settings, a catalogue change Windows reads too), BAP-008 (the Linux Encryptor's « Open with » registration); `main.scpt` to recompile on the Mac.
-      Progress (12 November 2026, [layer editor campaign](docs/audits/platform-parity/2026-11-12-layer-editor/report.md)): module taken: the navigation layer editor host on macOS and Linux. Fixed: keys show the emulated layout's characters while one is emulated (LEH-001), the Linux page gets its answer when the folder moves during a save (LEH-002). LEH-003 (a macOS regeneration failing after the window closed is only logged): decided and fixed on 2026-11-12, an error notification names the window (`leh-003-late-regeneration-failure`; noted by worker F on 2026-11-13).
-      Progress (12 November 2026, [webview hosts campaign](docs/audits/platform-parity/2026-11-12-webview-hosts/report.md)): module taken: the page window hosts. Fixed: the Linux hotstrings settings window no longer opens empty (WVH-001), the macOS editor windows are resizable (WVH-002), the native context menu stays closed outside text fields on macOS and Linux (WVH-003). Left: a macOS minimum window size, which hs.webview cannot set.
-      Progress (12 November 2026, [AI flows follow-up](docs/audits/platform-parity/2026-11-12-ai-flows-followup/report.md)): drift since the AI-flows campaign and the selection actions reviewed. Fixed: the tone and translation actions refuse in an app excluded from the AI on Linux and macOS, as on Windows (AIX-001); the Linux key migration ends quietly when a save moved the keys (AIX-002) and a shutdown discards the keys an attempt stored (AIX-003). The campaign's leftover Linux retry row is parity with Windows. Native receiving unqualified.
-      Progress (12 November 2026, [configuration follow-up](docs/audits/platform-parity/2026-11-12-config-followup/report.md)): the campaign's enum row and the cleanup of the same leaves. Fixed: an enum written in another case reads in its manifest spelling, as on Windows, in the Linux AI, hotstring, number-row and gesture readers and the shared emulation settings (CFX-001) and in the macOS preference loader (CFX-002); the Linux cleanup no longer offers saved swipe modes and steps for deletion (CFX-003). The macOS preference hydration beyond `load` and `current_view`, checked 2026-11-13 (worker F): `merge_saved_data` and `build_initial_state` consume only what `load` flattened, so they inherit its enum case adoption; no gap. NFD and NFC paths need a Mac: moved to TODO-tests-macos.md (`config_nfd_paths`). Left: native receiving unqualified.
-      Progress (12 November 2026, [updater follow-up](docs/audits/platform-parity/2026-11-12-updater-followup/report.md)): the campaign's two uncompared rows. Fixed: a macOS manual check whose window cannot open runs and notifies its answer, through the shared `updater.check_notice` (UPX-001); the Linux bundle, checksum and signature are bound to the repository's download path for the release's tag, as on Windows and macOS (UPX-002). UPD-2 decided by the coordinator on 2026-11-12 from the maintainer's pause rule (a manual check runs during a pause, as on macOS and Linux; Windows line below). Native receiving unqualified.
-      Progress (12 November 2026, [input/layout follow-up](docs/audits/platform-parity/2026-11-12-input-layout-followup/report.md)): the campaign's two open Linux rows. Fixed: a keyboard slot follows the emulated letter, as on Windows (ILX-001, through the shared `keylayout_emulation.chord_char`); a key passed under a tap-hold's held modifier repeats (ILX-002). Left: the macOS Carbon slots against the tap rewrite, to confirm on a Mac; native receiving unqualified.
-      Progress (12 November 2026, [gestures follow-up](docs/audits/platform-parity/2026-11-12-gestures-followup/report.md)): the campaign's open Linux row. Fixed: a physical mouse click releases a gesture's click hold, as on Windows and macOS, a touchpad touch keeping it for the drag (GSX-001). Left: GSD-1, the modules not reviewed in depth; native receiving unqualified.
-      Progress (12 November 2026, [notifications campaign](docs/audits/platform-parity/2026-11-12-notifications/report.md)): areas taken: notifications, their logs, levels and lifetime, tooltips and tray state. Fixed: a refused shortcut or gesture Quit is told on macOS and Linux (NUI-001); a refused macOS menu Reload is told (NUI-002); macOS logs a notice by its shape, never its text (NUI-004); one notification lifetime in the timings registry (NUI-006); Linux system action failures are error notices (NUI-007). After review: a notify-send that runs and fails is logged and kept in the log (NUI-003), a refused macOS source-change reload is told once per burst (NUI-005). The macOS pause and resume notices: kept, decided by the agent on 2026-11-13, to review by the maintainer (Linux announces them too through the same shared keys and levels, so only Windows, which ticks its row, goes without; removing a notice the user already sees on two OS is the riskier change). Left: make the Linux runner's notify-send sentinel count fatal (`tests/run.lua`) once the ~370 notices that still reach it through the real notifier have a `ShellRunner._set_async_runner` seam.
-      Progress (12 November 2026, [lifecycle campaign](docs/audits/platform-parity/2026-11-12-lifecycle/report.md)): areas taken: reload, user Quit, signals and logout, wake, first run. Fixed on Linux: input that stops at run time exits non-zero so systemd restarts the daemon (LCY-001); a first run follows the session language, English fallback (LCY-002); a shortcut or gesture Quit takes the user Quit owner (LCY-003); a signal during an update's probation keeps the update (LCY-004); the degraded tray Quit takes the same owner. Left: native receiving unqualified.
-      Progress (11 November 2026, [adapters campaign](docs/audits/platform-parity/2026-11-11-adapters/report.md)): areas taken: the Lua drivers' `adapters/` and `infra/` (clipboard, privacy, focus identity). Fixed on Linux: an X11 clipboard holding only an image is borrowed and restored whole (CBL-001). ADD-1 to 3 decided by the maintainer on 2026-11-11 (a password manager of the one shared list `_shared/data/secure_apps.json` is a secure field as a whole on macOS and Linux, Windows counterpart below; a borrowed unowned Linux clipboard goes back unowned, as on macOS; the Linux application identity is the WM class or app_id under X11 and Wayland, comm only as fallback, saved exclusion lists converted once). Left: configuration, lifecycle, notification and network adapters in depth, native receiving unqualified.
-      Progress (11 November 2026, [configuration campaign](docs/audits/platform-parity/2026-11-11-config/report.md)): configuration, scopes and migration of the Lua drivers. Fixed: a `[script]` enum written in another case is adopted in its manifest spelling on macOS and Linux (CFS-001), a Linux setting edit removes its rollback copies once it commits (CFL-002), `storage.json` is private on the LuaJIT runtime (CFL-003). CFD-1 decided by the maintainer on 2026-11-11 (Linux stages are named per process, pid and start tick, and a dead process's stages are reaped at start; a foreign stage is still refused). The case variants of the other enum readers were done by the configuration follow-up (CFX-001, CFX-002, 12 November). Left: native receiving unqualified.
-      Progress (11 November 2026, [macOS launcher campaign](docs/audits/platform-parity/2026-11-11-macos-launcher/report.md)): source reading only (no Swift toolchain here), nothing fixed. Findings for a Mac: MLC-001 (MJConfigFile seeded before the single-launcher lock, so a second launcher repoints the running runtime; the `.cjs` guard misses the top-level write), MLC-002 (a quit from outside skips the controlled exit and can report a runtime failure), MLC-003 (a second launch after boot shows nothing; product decision), MLC-004 (the leftover-runtime grace is a literal below the quit deadline), MLC-005 (exact-path check under App Translocation, to probe). Checked 2026-11-13 (worker F) against current source: MLC-001 is fixed (MJConfigFile is seeded only once the launcher holds the sole-launcher lock, before each runtime launch, `main.swift`), MLC-004 is fixed (the grace is `LauncherTimings.userQuitDeadline`, the poll `stale_runtime_poll_ms`, both from the registry). MLC-002 is implemented too (the launcher defers `applicationShouldTerminate`, posts the launcher quit request and the child runs its controlled exit through `launcher_guard.watch_quit_request`). Open: MLC-003 (product decision). MLC-005 fixed 2026-11-13 (worker F): `platform/remap/lease_helper.lua` compared the launcher's exported helper path with the bundle-derived one as text, so a translocated app (`/var` against `/private/var`), a symlinked Applications folder or an accented folder spelled NFC on one side and NFD on the other was refused although both name the running launcher; it now proves the same regular file by the exported device and inode (no symlink at the helper, the real path still an app's `Contents/MacOS/ErgoptiPlus`); regressions `mlc-005-relocated-launcher`. Linux compares the realpaths of both spellings on byte-exact filesystems, so it has no such gap; Windows has no counterpart identity proof. The gate's relocated rows (symlinked, « Applications de Léa », translocated) judge it on the next hosted Install-and-launch run.
-      Progress (12 November 2026, [start-at-login campaign](docs/audits/platform-parity/2026-11-12-start-at-login/report.md), branch `claude/ergopti-todo-parity-b`): census 381 areas (18 new, 220 changed since the pinned census); never-campaigned changed areas listed in the report (menus, i18n, editors, healthcheck, onboarding, Linux install). Fixed: macOS tells the Login Items approval step instead of the failure dialog (SAM-001) and logs a failed startup read (SAM-002); Linux logs a failed startup read and each refused change (SAL-001). The macOS memory note on ordinary Hammerspoon over a checkout corrected. SAD-1 decided by the maintainer on 2026-11-12 (B: start at login on a source run): Linux writes the checkout launcher's autostart entry and reports a stale one (warning, rewritten on enable); the macOS developer app resolves its own launcher (native `SMAppService` answer for an ad hoc bundle to confirm on a Mac). Stale-entry row reason decided by the coordinator on 2026-11-12 (none: the warning, and the next enable repairs the entry). Left: the developer-app login item under « To confirm on the Mac », native receiving unqualified.
-      Progress (12 November 2026, [i18n run-time campaign](docs/audits/platform-parity/2026-11-12-i18n-runtime/report.md), branch `claude/ergopti-todo-parity-b`): areas taken: locale choice, lookup chain and miss reporting at run time. Fixed: macOS and Linux warn once for each raw key shown, probes go through `has()` (I18-001); macOS warns about a saved locale without a catalogue (I18-002) and takes its fallback from `locales.system_fallback` (I18-003). Left: native receiving unqualified.
-      Progress (12 November 2026, [menus/tray campaign](docs/audits/platform-parity/2026-11-12-menus-tray/report.md), branch `claude/ergopti-todo-parity-b`): composition from the shared manifest, pause greying, rebuild after a menu change and after a change behind Ergopti's back: no finding. The Linux About build's two synchronous startup reads measured (about 10 ms each), not proposed. Traced 2026-11-13 (worker H): the Linux agent mode switched by its binding now redraws the tray (agent-mode-tray-redraw); the updaters already rebuild and the Lua programmable source loads synchronously. Left: native rendering unqualified.
-      Progress (12 November 2026, [onboarding campaign](docs/audits/platform-parity/2026-11-12-onboarding/report.md), branch `claude/ergopti-todo-parity-b`): the wizard's bridges, catalogue and answers. Fixed on macOS: the chosen language waits for Finish, as on Windows and Linux (OBM-001), and a missing or unshipped locale is refused instead of becoming English (OBM-002). Done 2026-11-13 (worker H): the Linux wizard's dialogs speak the chosen language (`(onboarding-host-dialog-locale)`). Left: native WebView receiving unqualified.
-      Progress (12 November 2026, [diagnostics page campaign](docs/audits/platform-parity/2026-11-12-healthcheck/report.md), branch `claude/ergopti-todo-parity-b`): actions, pause, stale results: no finding (one shared validator and report owner, the collection a Windows capability). Left: native receiving unqualified.
-      Progress (12 November 2026, [Linux install campaign](docs/audits/platform-parity/2026-11-12-linux-install/report.md), branch `claude/ergopti-todo-parity-b`): startup ownership, uninstall, configuration cleanup (download steps left to the other track). Fixed: a checkout's startup entry no longer takes the standalone installation's name, which blocked a later install (LIN-001). Left: a deleted checkout's entry stays until a checkout run rewrites it.
-      Progress (12 November 2026, [editors campaign, first pass](docs/audits/platform-parity/2026-11-12-editors/report.md), branch `claude/ergopti-todo-parity-b`): page and bridge behaviour of the personal information, prompt, paths and hotstrings editors. Fixed on macOS: a refused personal information save is told (EDM-001). EDD-1 decided by the maintainer on 2026-11-12 (a pause stops typing, not configuration): macOS and Linux editors save while paused, the LMH-003 gate reverted, Windows counterpart below. Done 2026-11-13 (worker H): the macOS prompt editor tells a refused save (`(prompt-editor-save-failure)`). Left: the layer editor page, tooltips, WPM.
-      Progress (12 November 2026, [pause, first and second pass](docs/audits/platform-parity/2026-11-12-pause/report.md), branch `claude/ergopti-todo-parity-b`): EDD-1 sharpened into a « real pause » (configuration and installs stay available, typing stays inert, a setting changed while paused applies on resume). Done on macOS and Linux: the physical shortcuts editor opens while paused; every menu's whole-scope restore and clear and the Configuration menu run while paused; the tray's feature rows stay live (`greyed_when_paused` is read by the AHK tray alone); Linux hotstring sections, keyboard groups, wrap choices and the pause layout switch work while paused (`edd1-paused-writes`). Left, see the report's last section: the macOS Shortcuts and both Gestures switches, Linux tap-hold edits, the programmable hotstrings switch, both AI menus, the personal editor and word expander rows (shared corpus), the macOS hotstrings submenus, the macOS magic key capture, and the audit that every typing feature (layout emulation first) is inert while paused.
-      Progress (13 November 2026, [pause, third pass](docs/audits/platform-parity/2026-11-12-pause/report.md#third-pass-2026-11-13-worker-h), worker H): the macOS Gestures switch and slot rows, the Linux gestures restore and clear, Linux tap-hold tap and delay edits and the programmable hotstrings controls (shared policy) commit while paused and apply on resume. Loading the programmable source at once while paused confirmed by the maintainer on 2026-11-14. Then the macOS Shortcuts switch (recorded under ScriptControl's claim, started on resume) and the macOS hotstrings submenus (sections, language and extension « all sections », order, preview, delays, settings window). Each macOS shortcut's row, the wrap rows, the ChatGPT URL editor and the tap-key rows too; layout emulation checked inert while paused on macOS and Linux. Left: the macOS script-chord and keyboard slot rows, both AI menus, the personal editor, legacy shortcut and word expander rows, the macOS magic key capture, the typing-inertness audit.
-      Progress (14 November 2026, [pause, fourth pass](docs/audits/platform-parity/2026-11-12-pause/report.md#fourth-pass-2026-11-14-worker-h-shared-rows-on-all-three-drivers), worker H): on Windows, macOS and Linux together, the personal hotstrings editor opens while paused, and the word expander, custom terminator and extension scope rows commit while paused, as do the AI privacy, trigger, display and generation rows. The shared policies, their AutoHotkey twins and corpora admit a paused snapshot and still refuse a malformed pause. Left: the AI enable switch, model, profile and API rows, the macOS legacy shortcut and slot rows, the magic key capture, the typing-inertness audit.
-      Progress (14 November 2026, [pause, fifth pass](docs/audits/platform-parity/2026-11-12-pause/report.md#fifth-pass-2026-11-14-worker-p-shortcut-slots-changed-while-paused), worker P): a shortcut slot changed while paused is saved at once and takes effect on resume, the resume chord staying the one of pause time (decided by the maintainer on 2026-11-14). macOS: the script chord slots, switch and restore, the keyboard slots and the editor legacy shortcut; Linux: the script chords; Windows: a global restore while paused keeps the chords of pause time across its reload (the Shortcuts submenu is greyed while paused). Then (sixth pass, decided by the coordinator on 2026-11-14) « capture the next key » for the physical magic key runs while paused on the three OS, saved at once and inert until resume; the Windows Layout submenu stays live while paused, only the layout manager and editor greyed with why. Typing-inertness audit done (report): every typing feature is gated on the three OS; fixed on Linux, metrics recorded keys and chords while paused; fixed on macOS, a pause ends a running CapsWord and its CapsLock, as on Windows and Linux (field point `pause_ends_capsword`). Background behaviours census (report): Linux metrics (application time, pointer, network, topology, system rows) and its spotlight now stop at pause; macOS forgets the distance seed. Keep-awake is restored on resume on the three OS (decided by the maintainer on 2026-11-14). Fixed (eighth pass): the macOS pause closes the foreground interval, so the time before it is credited. Fixed (seventh pass): the number-row choice is admitted while paused on the three OS (the shared policy and its Windows twin), saved at once and applied on resume; a pause edge between the capture and the write retires the capture.
-      Progress (13 November 2026, [tooltips and WPM campaign](docs/audits/platform-parity/2026-11-13-tooltips-wpm/report.md), worker H): the editors campaign's tooltip and WPM rows. Fixed on Linux: the preview hides before its trigger window closes (TWL-001), the WPM widget and tray readout hide while paused (TWL-002), an AI suggestion left alone runs out after the shared lifetime (TWL-003). Open: the Linux `llm_prediction` delay row, decisions TWD-1 (a zero-delay preview's 3 s safety hide, Windows only) and TWD-2 (« 0 » shown on a non-typing key on macOS and Linux).
-      [CODE] Left (2026-11-15): census areas outside the campaigned modules, the macOS bindings.lua and Linux
-      key_combinations.lua deep pass, and the Windows rows of each report. [DECISION] THD-1 to THD-4, HCD-1/2/4/5,
-      TCL-004, and the agent's GSD-1 and HCD-3.
-      Windows rows rechecked 2026-11-16 against the source: ADD-1 (`SFD_IsSecureAppWindow`), UPD-1 (an HTML 200
-      reads the feed), UPD-2, ILD-2, SCD-2 and SCD-3 were already done. Fixed that day: the `+33` short trigger of a
-      number stored without its 0 (HCM-007's Windows row, `_DynHS_InternationalPrefix`, shared
-      `international_prefix_vectors`) and UPW-005 (the signing policy read case-sensitively). Also fixed that day,
-      from the tooltips and WPM report: Linux has the Delays submenu's AI row and its overlay reads the
-      `llm_prediction` override (`tooltips-wpm-llm-delay-row`), and a lifetime of 0 keeps the prediction until the
-      next activity on Windows too, which hid it after the 50 ms floor (`llm-zero-lifetime`). Still open on
-      Windows: the Notepad and terminal Backspace undo (item below); KMD-1 was already in (650a49bdb2, rechecked on
-      the PC 2026-11-16, see the metrics campaign line).
-      TWD-1 and TWD-2, decided by the maintainer and done on 2026-11-16. TWD-1: a hotstring preview with no delay
-      hides after the shared `[timing] safety_timeout_sec` on the three OS (Windows read a typed 3.0, macOS and
-      Linux kept the bubble until the next key), a no-delay row of a macOS timed stack too; the single-source gate
-      `test-tooltip-style-single-source.cjs` requires the three readers (tests `twd1-zero-delay-safety`,
-      `twd1-stacked-safety`). TWD-2: the typing-speed widget shows only while text is typed and hides as soon as
-      the burst ends: a shortcut (Ctrl, Alt but not AltGr, Win or Cmd, Fn), a function, navigation or media key, a
-      shortcut modifier tapped alone, a focus change, the idle delay, or any pointer input, a single pixel of
-      movement, a click, a wheel or touchpad scroll (never a move the driver posts itself). Shift, AltGr and
-      Shift+AltGr (macOS: both Option keys) are level modifiers and never end it, held or tapped; AltGr's LCtrl
-      on Windows is no lone Ctrl. One rule: `[typing_burst]` of `_shared/metrics/data/wpm_widget/constants.toml`
-      names the keys by `KeyboardEvent.code`, mapped through `physical_keys.json`
-      (`metrics/engine/wpm/typing_keys.lua` and `activity.lua` on macOS and Linux, `WPMWidget_TypingBurstIndex`,
-      `WPMWidget_Burst*` and `WPMWidget_PointerEndsBurst` on Windows). Tests `twd2-typing-burst`,
-      `twd2-level-modifiers`, `twd2-pointer-hides`. Left: a real-keyboard look on each OS (not yet in the
-      TODO-tests files), and a Linux fifth-level key placed on a Ctrl key, which the input hook reports as Ctrl.
+- [ ] **[CODE] Parity audit continuation.** Reconcile current source areas with the register (the 2026-11-12 census
+      listed 381 areas, many changed since their campaign), then take one bounded module at a time across Windows,
+      macOS, Linux and shared; do not restart a finished campaign without source drift or a new hypothesis. Left:
+  - the census areas outside the campaigned modules, and the never-campaigned changed areas the
+    [start-at-login report](docs/audits/platform-parity/2026-11-12-start-at-login/report.md) lists (menus, i18n,
+    editors, healthcheck, onboarding, Linux install);
+  - a deep pass of macOS `bindings.lua` and Linux `key_combinations.lua`
+    ([shortcuts campaign](docs/audits/platform-parity/2026-11-11-shortcuts/report.md));
+  - the configuration, lifecycle, notification and network adapters in depth
+    ([adapters campaign](docs/audits/platform-parity/2026-11-11-adapters/report.md));
+  - make the Linux runner's notify-send sentinel count fatal (`tests/run.lua`) once the ~370 notices that still reach
+    the real notifier have a `ShellRunner._set_async_runner` seam
+    ([notifications campaign](docs/audits/platform-parity/2026-11-12-notifications/report.md));
+  - TWD-2 (the typing-speed widget hides when the burst ends): a Linux fifth-level key placed on a Ctrl key is
+    reported as Ctrl by the input hook and ends the burst; its real-keyboard look on each OS is not yet in the
+    TODO-tests files;
+  - the macOS Carbon slots against the tap rewrite, to confirm on a Mac
+    ([input/layout follow-up](docs/audits/platform-parity/2026-11-12-input-layout-followup/report.md));
+  - a deleted Linux checkout's startup entry stays until a checkout run rewrites it
+    ([Linux install campaign](docs/audits/platform-parity/2026-11-12-linux-install/report.md)).
+- [ ] **[RELEASE] Windows/Linux feed-only update fallback.** The unavailable-features diagnostics section is
+      published on both. Left: a feed-only list may install the channel's newest release only through authenticated
+      metadata (decided 2026-11-06, as macOS): download the asset under its conventional name, compute size and
+      SHA-256, rebuild the `asset_signing.json` record and verify `<asset>.sig` against the pinned key. Blocked until
+      `public_key_spki_base64` is provisioned and enforcement leaves `off` ([update-signing](docs/tooling/update-signing.md)).
+- [ ] **[CI] Native keyboard-source fixture (macOS).** The selection-deadline / cleanup-unavailable refusals of the
+      Swift keyboard-source cohorts ([sequential audit](docs/audits/platform-parity/2026-11-05-sequential/report.md)).
+      Both steps are bracketed with a text-input snapshot and `tsm-refusal.json`; the refused case now names
+      `process_current_source_stale` (`tools/test/test-macos-tsm-refusal.cjs`): the system applies the restore to US,
+      but `TISCopyCurrentKeyboardInputSource` in the test process keeps returning French, and every later case
+      captures that stale source (TextInputMenuAgent did not restart). Left: why the process misses that one change
+      (the notification that refreshes its cache, or the run-loop mode the fixture pumps), and whether the launcher's
+      own long-lived process can be left on a stale source the same way. No retry is added while the cause is
+      unproven.
+- [ ] **Linux live runtime and editor receiving.** Write the Linux runtime, editor and diagnostics flows in the hosted
+      desktop-webview CI shard: refused writes, native timer admission, stale epochs and physical cleanup
+      ([native UI audit](docs/audits/platform-parity/2026-11-05-native-ui/report.md)).
+- [ ] **Linux flow receiving.** A native terminal for LCP-004, chmod (make-executable from a file manager) and eject of
+      a real device (maybe a loop device), the case/wrap transforms inside a native editor field
+      ([flow review](docs/audits/platform-parity/2026-11-04-flows/report.md),
+      [receipts](docs/audits/linux-container-proofs/2026-11-11-recovery/README.md)).
+- [ ] **Linux native acceptance.** Multi-field Tab settling and grapheme deletion in host editors (hotstrings), pointer
+      metrics, live layout apply on KDE (GNOME is proved by `run_input_sources_live.sh gnome`), desktop connectors and
+      real mail/calendar (llm) ([18-scope review](docs/audits/platform-parity/2026-11-04-deep/report.md)); touchpad
+      hotplug waits on its question under « Maintainer decisions pending ».
 
-## Dead-key composition parity follow-up
+## Carried over from the 1.0.9 requests
 
-[Focused audit](docs/audits/platform-parity/2026-11-05-dead-keys/report.md), pinned source `f2c3ea43542c985fb20e5f0887976f1c02525341`: five new roots, [generated comparison](docs/audits/platform-parity/2026-11-05-dead-keys/capabilities.md). Evidence boundaries remain explicit; these are follow-ups, not implemented fixes.
-
-- [x] **Pause and a pending dead key (macOS, Linux).** A pending composition is native state there and Ergopti's pause
-      does not cancel it (both Windows engines do); decide whether the pause must clear it, and how.
-      Done 2026-11-13 (worker F): the layout emulation, which owns its pending dead key in Lua on both drivers, drops
-      it when the script pauses (`layout_emulation.drop_pending_dead_key`, called by macOS `pause_processing` and the
-      Linux pause listener), so it never composes with the first key after the resume; held custom modifiers keep
-      their own release path. Tests `(pause-drops-dead-key)` on both drivers. A dead key pending in the system's own
-      layout (no emulation) stays the OS's state, as with Ergopti not running: decided by the agent on 2026-11-13,
-      to review by the maintainer.
-
-## Cross-platform feature inventory
-
-- [ ] **Windows/Linux diagnostics:** (claimed by worker F, 2026-11-13: the section is published on both; the feed-only fallback stays blocked on the empty `public_key_spki_base64` and `off` enforcement, a maintainer key-provisioning step, so no code step can run before it) add the manifest-derived unavailable-features explanation already collected and rendered on macOS. Evaluate authenticated fallback metadata for feed-only update installation; retain current refusal without authenticated assets (macOS uses signed Sparkle metadata for newest-channel updates). Progress: Linux and Windows now publish the section through one shared Lua collector and its AHK mirror (AHK test written, not run on Linux); the feed-only fallback evaluation remains. Decided 2026-11-06 (align on macOS): a feed-only list may install the channel's newest release only through authenticated metadata, otherwise the refusal stays. Windows/Linux design: download the asset under its conventional name, compute size and SHA-256 locally, rebuild the `asset_signing.json` record and verify `<asset>.sig` against the pinned key before installing. Blocked: `public_key_spki_base64` is empty and enforcement is `off`, so every such install would refuse today; build it once the key is provisioned (docs/tooling/update-signing.md).
-      PC run 2026-11-11: the AHK mirror of the unavailable-features section (`test_healthcheck_core.ahk`, ui group) passed natively.
-      [RELEASE] Left (2026-11-15): the feed-only fallback waits on the release signing key (`public_key_spki_base64`
-      empty, enforcement `off` in asset_signing.json).
-- Moved to TODO-tests-windows.md (2026-11-15): qualify physical shortcut delivery on Windows.
-- Moved to TODO-tests-linux.md and TODO-tests-windows.md (2026-11-15): incremental touchpad gesture modes and step
-  sizes (the Windows check is « Windows incremental swipes (raw touchpad reader) »).
-- Moved to TODO-tests-linux.md (2026-11-15): focused-application identity on GNOME, KDE and COSMIC (field point
-  `wayland_focus`).
-
-## Sequential WPM, wrap and personal-info parity follow-up
-
-[November 5 sequential audit](docs/audits/platform-parity/2026-11-05-sequential/report.md) at `7aecd9a25b35efdcff68898919506dc2f6fd02d0`: four reviewers stayed on one module at a time, with independent root replays before advancing. [Generated capability and intentional-difference comparison](docs/audits/platform-parity/2026-11-05-sequential/capabilities.md). These are bounded source/actual-owner findings; Windows native execution and desktop receiving remain qualified. Findings below remain open; this campaign changes evidence and tracking, not production behavior.
-
-### Policy, documentation and verification debt
-
-- [ ] **[CI] Native keyboard-source fixture:** Claimed by worker B (2026-11-14). Investigate selection-deadline/cleanup-unavailable refusals seen before and during this audit; the targeted retry passes, but that does not establish a repaired cause. Keep failed receipts and exact required cohorts.
-      2026-11-11: the refusal of run 42014901978 (Intel macOS 15) follows one line no passing log shows,
-      `CFMessagePortSendRequest FAILED(-1) to send to port com.apple.tsm.uiserver`: the service that applies the
-      selection did not answer for about 11 s. 6736a355 brackets the cohort with a read-only snapshot of the text-input
-      agents (launchd state, runs, last exit, crash reports, unified log) kept with its receipt, so the next refusal
-      names the cause. The cohort passed 41/41 (Intel) and 40/40 (Apple silicon) over 2026-11-07..10 and again in
-      [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137); the cause stays unproven until a
-      refusal carries that snapshot.
-      2026-11-12: scan of ci.yml runs 2026-11-07..12 (282 of 353 runs on dev, claude/_ and tmp/_): the cohort steps ran
-      61 times on Intel and 62 on Apple silicon; 2 Intel refusals, [43013053161](https://github.com/adrienm7/ergopti/actions/runs/43013053161)
-      (job 130500102196) and [43172671159](https://github.com/adrienm7/ergopti/actions/runs/43172671159) (tmp/ci-snapshot, job 131034291324),
-      both after `CFMessagePortSendRequest FAILED(-1)` lines, as in 42014901978; none on Apple silicon. One macOS 26
-      `KeyboardSourceProbeTests` refusal in the full launcher suite ([43108782369](https://github.com/adrienm7/ergopti/actions/runs/43108782369),
-      job 130833096151) has no such line. Probes on hosted runners (temporary `probe-macos-tsm.yml`, removed in 3363b94e):
-      `TextInputMenuAgent` owns `com.apple.tsm.uiserver`; stopping it prints the line (20 on macos-15, 31 on Intel), so
-      does stopping `TextInputSwitcher` on Intel (12), not stopping SystemUIServer. But every perturbed cohort still passed
-      12/12: agent stopped ([43189848716](https://github.com/adrienm7/ergopti/actions/runs/43189848716), job 131086084762), both stopped, either
-      stopped or killed while the cohort selected ([43194666371](https://github.com/adrienm7/ergopti/actions/runs/43194666371), job 131102413569),
-      and that fresh runner's unperturbed baseline printed four such lines and passed. So the unanswered server is a
-      state the refusals share, not their cause; the cause is still unproven and no retry was added. 71a16621 (wording
-      corrected in 4d2e7e55, 533e2762) writes `tsm-refusal.json` beside the number-row receipt and annotates the state
-      (`tsm_uiserver_unanswered`, `fixture_refusal_unclassified` or `no_fixture_refusal`) with the agent snapshot; the
-      verdict and the exact cohorts are unchanged (`tools/test/test-macos-tsm-refusal.cjs`). Next refusal: read its
-      receipt and snapshot (did the agent's pid or run count change?) before trying another perturbation.
-      2026-11-12 afternoon: the refusal now recurs on macOS 26 in the full launcher suite ("Run Swift launcher tests on
-      macOS 26"), with no `tsm.uiserver` line in any of them: [43222724578](https://github.com/adrienm7/ergopti/actions/runs/43222724578) (job 131204789756) on
-      `KeyboardCharacterMappingTests.testFreshKeyboardEventsFollowLayoutAndShiftFlags` at 13:26:12 UTC, then
-      `KeyboardSourceProbeTests` (3), `NativeInputSourceSelectionTests` (4) and `NumberRowSourceProbeTests` (7)
-      "unavailable"; [43228623723](https://github.com/adrienm7/ergopti/actions/runs/43228623723) (job 131226750544) on the number-row cohort's first selecting case
-      (`testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI`, French) at 14:12:29, five seconds after
-      `NativeInputSourceSelectionTests` passed, then six more "unavailable". With 43108782369 that is three macOS 26
-      refusals without the line. The full-suite step carries no text-input snapshot or `tsm-refusal.json`, so the
-      next step is to bracket it as the number-row step is.
-      2026-11-14, worker B: both steps are bracketed (the full-suite step since 2026-11-12 evening). Scan of the 377
-      completed ci.yml runs of 2026-11-11 to 2026-11-14 00:30 UTC: the number-row step ran in 163 macOS 15 jobs (4
-      failed), the macOS 26 full suite in 83 (17 failed). Two refusals carry a receipt, both
-      `fixture_refusal_unclassified` and without a `tsm.uiserver` line: [43276494558](https://github.com/adrienm7/ergopti/actions/runs/43276494558) (job 131404916213,
-      Apple silicon, number-row step, 19:23 UTC on 11-12, first case
-      `testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI`, 9 of 12 cases refused) and
-      [43277967473](https://github.com/adrienm7/ergopti/actions/runs/43277967473) (job 131406033005, macOS 26 full suite, 19:11 UTC, first case
-      `testFreshKeyboardEventsFollowLayoutAndShiftFlags`; the French selection succeeded at +219 ms, the restore
-      answered `sourceUnavailable` at +6356 ms and +11390 ms). No refusal since 2026-11-13 11:21 UTC; the four
-      later full-suite failures are `CatalogUpdateUserDriverTests` (NSCocoaErrorDomain Code=2) with
-      `no_fixture_refusal`. The agent snapshot is written to the receipt file, not the log, so the pid and run-count
-      question needs the artifacts `swift-launcher-failure-43277967473-1` and the `number-row-carbon-arm64-…` artifact of
-      43276494558 before they expire; this session's network could not reach the artifact store.
-      Cause still unproven, no code changed.
-      [CODE] Left (2026-11-15): read the artifacts `swift-launcher-failure-43277967473-1` and the number-row artifact of
-      43276494558 before they expire (agent pid and run count), then find the cause.
-      2026-11-15, worker X: both artifacts read (`swift-launcher-failure-43277967473-1`, kept until 2027-02-10;
-      `number-row-carbon-arm64-43276494558-1`, expiring 2026-11-19). The TextInputMenuAgent pid and run count are the
-      same before and after both cohorts (423/1 and 419/1): the agent did not restart. Their TIS records show one
-      mechanism, on Apple silicon macOS 26.7.2 and 15.8.2 alike: the French selection is seen at +219 ms and
-      +221 ms, then the first restore to US returns 0 and, 6 s later, US reads enabled and selected while
-      `TISCopyCurrentKeyboardInputSource` in the test process still returns French, now unselected. The system
-      applied the restore; this process's current-source cache never followed, and every later case captured the
-      stale French as its original (hence the cascade of "unavailable"). The receipt now names it
-      `process_current_source_stale`, from the refused case's own records, with the wanted and current sources in
-      the annotation (test-macos-tsm-refusal.cjs). Still unproven: why the process misses that one change (the
-      notification that refreshes its cache, or the run-loop mode the fixture pumps), and whether the launcher's own
-      long-lived process can be left on a stale source the same way.
-
-## Native runtime, editor and diagnostics parity follow-up
-
-[November 5 audit](docs/audits/platform-parity/2026-11-05-native-ui/report.md): nine bounded OS × module scopes at `3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a`; 15 qualified findings, including one shared frontend root affecting all three OSes. These are source/model/private native-port findings, not 15 native desktop reproductions. [Capability and intentional-difference comparison](docs/audits/platform-parity/2026-11-05-native-ui/capabilities.md). The canonical manifests exclude counterchecked LVB-002 and MRT-005.
-
-### Qualification and policy follow-up
-
-- [ ] **[NATIVE]** Exercise the retained runtime/editor/diagnostics receiving boundaries on Windows and macOS, and the Linux live GTK/session flows. Worker B 2026-11-14: the Windows and macOS boundaries need a real PC and a real Mac, so they stay for the maintainer; the Linux runtime, editor and diagnostics flows can run in the hosted desktop-webview CI shard and are still to be written there. Replay refused writes, native timer admission, stale epochs and physical cleanup; the private models do not certify these boundaries. Linux, partly (2026-11-11): a live installed session with an in-process WebView (the first-run onboarding window) now receives the reload request instead of crashing (44b2e10f, `tests/hardware/run_webkit_gc_signal.lua` in the desktop-webview CI shard); the runtime/editor/diagnostics flows themselves remain. Mac part routed by worker F (2026-11-13): the field point `native_ui_receiving` in TODO-tests-macos.md.
-      [CODE] Left (2026-11-15): the Linux live runtime and editor flows in the desktop-webview shard are still to
-      write. The Windows and macOS boundaries are in TODO-tests-windows.md and TODO-tests-macos.md (2026-11-15).
-
-## Migration and update parity follow-up
-
-Evidence: [six-scope recovery/lifecycle audit](docs/audits/platform-parity/2026-11-04-recovery/report.md). These 17 OS manifestations include shared causes; keep intentional platform policies and all current refusal guards.
-
-### Linux
-
-- Moved to TODO-tests-macos.md (2026-11-15): receive the recovery audit scenarios on isolated macOS.
-
-## End-to-end parity follow-up
-
-Evidence: [12-scope flow review](docs/audits/platform-parity/2026-11-04-flows/report.md). These are OS/flow work items, not a claim of 26 unique causes or native acceptance. Preserve intentional policies and all current refusal guards.
-
-### Linux
-
-- [ ] **[PHYS-W] / [PHYS-M] / [PHYS-L]:** execute only the receiving scenarios named by each flow report on isolated native hosts. Source/recording-port tests do not close native focus, selection, keyring, application or device qualification. Linux, partly (2026-11-11, [receipts](docs/audits/linux-container-proofs/2026-11-11-recovery/README.md)): linux-clipboard X11 target negotiation (`run_clipboard_owner.lua x11`) and the AI selection read and replacement on a real accessibility server (`run_llm_selection_focus.py`, 31 cases) now run in the desktop-webview CI shard. The locked/unlocked keyring and its password prompt (linux-crypto) are received too: a real gnome-keyring and its prompter, answered and dismissed (`run_keyring_receipts.sh`, in CI); it found and fixed a dismissed prompt read as an absent key and a clear on a locked keyring read as done (a6fa8892). The linux-desktop trash and pointer mutations run for real too (`run_desktop_actions_live.sh`: empty_trash cancelled and confirmed on a real gio trash, center_mouse, overlapping toggle_dark_mode; in CI), which found and fixed an empty-trash reported done without GVfs (3da58645). Remaining Linux: a native terminal for LCP-004, chmod (make-executable from a file manager) and eject of a real device (linux-desktop), the case/wrap transforms inside a native editor field. The Wayland clipboard protocol is received too: the clipboard owner over data-control in headless sway (`run_clipboard_owner_wayland.sh`, in CI).
-      PC run 2026-11-11: the Windows WCP/WCR/WCF/WDS regressions (`test_clipboard_paste_transaction_ownership.ahk`, `test_keystats_text_cipher.ahk`, `test_wpm_config_types.ahk`, `test_system_actions.ahk`) passed natively on the maintainer's PC, which is not an isolated host.
-      Windows, received 2026-11-12 (`tools/test/run-windows-receiving-scenarios.ps1`, temp profile, hosted step « Receive the recovery and flow scenarios »): WCP-001 with two real windows and the real clipboard, a foreground change during the snapshot refusing before any clear or copy chord (the chord is the one recorded port, so nothing is typed), and its control delivering and restoring; WCR on the real DPAPI (round trip read back by an independent Windows PowerShell process; tampered, other-entropy and marker-shaped envelopes refused and never re-persisted) and the metrics cipher sealing marker-shaped typing with the real MachineGuid key; WCF-001 with the widget pair in the real Registry under a private key, read back by the boot loader, and a refused write keeping the previous pair; WDS-002 with the real Clear-RecycleBin failing natively after launch (scoped to an absent drive letter, so the user's bin is never emptied) reaching one error line, and a zero exit reported as done. 8 of 8 passed on the maintainer's PC; every scenario failed once with its owner broken (startup foreground and focus checks, envelope validation, marker skip, pair publication, worker exit observer). Remaining Windows: WCP-002 (the paste into a new foreground window needs real key emission) and a DPAPI blob of another Windows account (a second account).
-      [CODE] Left (2026-11-15): Linux LCP-004 native terminal, chmod, eject (maybe a loop device) and case/wrap in a
-      native editor field. Windows WCP-002, the DPAPI second account and every macOS scenario are in
-      TODO-tests-windows.md and TODO-tests-macos.md (2026-11-15).
-
-## Deep OS × module follow-up
-
-Audited source and immutable evidence: [18-scope review](docs/audits/platform-parity/2026-11-04-deep/report.md). These entries are implementation/validation work, not permission to remove deliberate safety checks or silently change explicit product contracts. Intentional differences and unresolved rationale are in the [provenance register](docs/audits/platform-parity/2026-11-04-deep/intentional-differences.md).
-
-### Linux
-
-- [ ] **Native acceptance:** run the unexecuted AHK/account-context/PnP and actual Mac/Linux device/provider scenarios from each module coverage register. Lua/PowerShell recording-port probes are not native desktop certification. Linux, partly (2026-11-11): the metrics privacy owner on a real GTK/AT-SPI desktop (`run_secure_focus_watch.py`, linux-metrics register) now runs in the desktop-webview CI shard, and the installed daemon grabs and re-emits a real uinput keyboard under systemd ([PHYS-L] proof). Remaining Linux: touchpad hotplug and SYN_DROPPED re-query (gestures), multi-field Tab settling and grapheme deletion in host editors (hotstrings), pointer metrics, live Wayland layout apply, desktop connectors and real mail/calendar (llm). Live Wayland layout apply on GNOME, received 2026-11-13 (worker D): a headless GNOME Shell 46 loads two builds under alternating slots through the Ergopti extension (`run_input_sources_live.sh gnome tests/hardware/run_user_layout_wayland_live.lua`, W1 to W3, run as an unprivileged user; not in CI, which installs no GNOME Shell); KDE stays.
-      PC run 2026-11-11: Windows ran the whole AHK suite natively (14 module groups, 20,286 tests) and `e2e/run_e2e.ahk` 90/90; the account-context and PnP scenarios remain.
-      [CODE] Left (2026-11-15): Linux touchpad hotplug and SYN_DROPPED, multi-field Tab and grapheme deletion, pointer
-      metrics, KDE live layout apply. Windows account-context and PnP and the macOS device and provider scenarios are
-      in TODO-tests-windows.md and TODO-tests-macos.md (2026-11-15).
-      SYN_DROPPED re-query done 2026-11-16: the gesture decoder threw the kernel's slot registers away on a lost
-      queue and never had them at open, so a contact landing on a retained coordinate (which the kernel omits) never
-      fired; the reader now answers EVIOCGABS and EVIOCGMTSLOTS (`abs_info`, `mt_slot_values`) and the manager seeds
-      the decoder at open and once the dropped packet ends (a touch held across the loss still owns no gesture).
-      Regression `test_mt_register_resync.lua` (kernel filter and overflow model, real reader, manager and decoder;
-      fails on the old code); the uinput round trip (`run_gesture_roundtrip.lua`, CI native lane) reads the
-      registers back from a real kernel. Linux only: macOS and Windows receive gestures from the OS, not evdev.
-
-## Carried over from the 1.0.9 requests (1-2 November)
-
-Released as v1.0.9; these requests of 1-2 November are still open.
-
-- [ ] **Slowness, every driver.** (claimed by worker F, 2026-11-13: the macOS timings are the field points `rerun_2026_11_02` and `main_thread_holds` of TODO-tests-macos.md, Linux is done, the Windows measurements need the Windows PC) Windows boot 7 s, `menu.rebuild` 1.7 s: lazy submenus, single-toggle update, one
-      registry proof, full save after ready, disk caches; a toggle must not rebuild 1000 rows.
-      Resume here (branch `wip/windows-boot-time`): parse fixes, the smoke operation caps, keyboard before tray root
-      and the queued early tray click are committed (keyboard registered at 4.5 s instead of 5.1 s on the smoke
-      fixture). Done 11 November: the emoji and symbol sections (1,575 rows on the maintainer's config) register
-      after ready in 25 ms Critical slices (`HSE_DeferRegistration`, `[hotstrings] deferred_registration_*`), their
-      `Seq` block reserved at the boot position: the registry after the slices is the boot one, 4,242 specs in the
-      same order (dumped from both boots), and `(hotstring-deferred-rank)` pins the tie-break, the slicing and the
-      stop at a registry clear; the prefix catalogue reads the cache, complete before ready. The AI submenu is
-      built at its first open (`MenuDeferOrBuild`, `(llm-menu-built-at-first-open)`), so neither the boot nor a
-      toggle's full root rebuild draws its rows. Medians of 7 interleaved boots of the maintainer-config fixture
-      (metrics off in the copy: a quarantined smoke is paused and keystats refuses a new ledger while paused, so
-      that fixture aborts beside a resident driver), summed `process_cpu`: emoji deferral 9,828 → 9,047 ms
-      (hotstrings stage 2,344 → 1,734 ms CPU); then lazy AI 8,609 → 8,391 ms (`menu row llm` 156 → 63 ms, `tray menu`
-      719 → 563 ms). The deferred slices cost about 0.75 s of wall over 1.2 s after ready on a loaded machine.
-      Next: script parse (lighter boot includes; AHK has no
-      runtime include, so only a smaller graph or a worker helps) and layout (rejected disk cache: native hotkey
-      registration); the remote AI catalogue (212 ms) can now be measured again with the AI root lazy. Measure each with interleaved base/candidate smoke-fixture boots (summed `process_cpu`). CI of
-      the branch: run 41737399378 (first run 41732233161 found two branch regressions, fixed since; its PAC and
-      action-picker WebView reds pass locally).
-      Windows boot, 3 November. Real logs: 4.75 s at best, 7.8 s typical, 15 s and more
-      under load; parse 1-1.7 s, layout 1.2 s, hotstrings 1.0 s, tray 1.0 s (AI submenu 0.75 s), pre-logger 1.2 s.
-      Three boots waited 24 s, 26 s and 446 s on a tray opened during boot (`native_menu_wait`): input waits for the
-      open menu. Done, measured on a smoke fixture made from the maintainer's config (median of 3 interleaved runs,
-      process CPU 7.75 → 7.20 s, menu usable 6.6 → 5.5 s; realistic-hotstrings fixture: hotstrings stage 1.9 → 1.1 s):
-      quoted TOML text lexed in native runs (personal file parse 463 → 165 ms), snapshot comparison without map
-      copies, one boot snapshot read for the AI options (4 → 1), personal-file metadata decodes only `[_meta]`
-      (468 → 29 ms for three 35 KB files). Gate: the startup smoke bounds the boot's counted operations
-      (`BOOT_OPERATION_CEILINGS`). Left, deliberate or rejected: parse, layout and hotstring registration (about
-      4.4 s) are needed at the first key; the remote AI catalogue (212 ms, rejected while the AI root was eager); the
-      boot's 9-13 registry deep compares (every write compares).
-      macOS, 6 November: the four script-chord slot rows open the shared action picker, as on Windows, instead of
-      inlining the 840-action catalogue each: the Shortcuts submenu fell from 3,537 to 177 rows (unit harness:
-      35.5 → 2.6 ms, 5.1 → 0.4 MB allocated per build; field rebuilds grew the heap 13-16 MB and the GC landed in
-      this stage, 320-342 ms). The Windows AI submenu is lazy since 11 November; Linux done 10 November: the tray builds a submenu's GTK
-      rows when a dbusmenu client opens it and updates a toggled row in place (native publication of the 1007-row
-      tree 125 → 1.2 ms, a toggle 118 → 1.0 ms, RSS 137 → 122 MB, headless SNI host; the shared Lua tree build,
-      about 78 ms, is unchanged); macOS `menu_keyboard_layout.sources`
-      re-reads the bundle variants from disk per rebuild (57-415 ms spikes) and needs a proven cache contract;
-      hs.menubar has no per-row update, so a macOS toggle still re-pushes the root, but since 11 November its Lua
-      build is bounded: a refresh asked only by clicks in one branch (`menu/ui/transactions/refresh_scope.lua`, through the click
-      gate's `around_click`) rebuilds that branch's module and reuses the rows the other menu modules built last
-      (`menu/ui/builder/branch_rows.lua`, a decorator over the menu modules, `builder.lua` unchanged). A pause flip, a request
-      from outside a click, two branches, or a click in the layout, AI, agent, configuration, language, About,
-      Hotstrings or Debug rows still rebuilds everything; Metrics, Shortcuts, Tap-Holds, Gestures and Apps may
-      rebuild alone. Real-module tray harness (median of 15 builds, 1,531 rows): full tree 20.1 ms and 2.76 MB
-      allocated, one branch 6.2-12.5 ms and 0.43-1.67 MB (gestures the largest); tests `(menu-branch-refresh)` in
-      `test_tray_every_submenu_populated`, `test_menu_refresh_scope`, `(menu-click-scope)`. Not timed on a Mac (the
-      next field report's `menu.rebuild` lines); the branch lists were decided by the coordinator on 2026-11-11
-      overnight, to review by the maintainer.
-      macOS, 6 November (wave 3): no cache: the build was repeating work with one answer. Both Keyboard Layouts
-      scopes were listed up to four times per rebuild (input-source map, active version, bundles stage, version
-      row) and the bundle's Info.plist and variant stats twice; one per-build snapshot now feeds every reader
-      (2 listings, 1 plist read; `test_layout_bundle_external_refresh`, `test_input_sources_version_gt`). Not timed
-      on a Mac: the next field report's `menu_keyboard_layout.sources` phase says whether the spikes are gone.
-      Done 2026-11-15 (`claude/ergopti-todo-mac-layout-sources-cache`, de5c21d18d): the `menu_keyboard_layout.sources`
-      disk reads (both scopes' highest bundle and its Info.plist variants) are kept between rebuilds only while an
-      FSEvents watcher runs on both Keyboard Layouts folders and has reported nothing since; the driver's own installs
-      invalidate at once; no watcher, no cache (`modules/keymap/layout_sources_cache.lua`, test_layout_sources_cache.lua).
-      Decided by the agent, to review by the maintainer: FSEvents rather than a directory-time key. The next Mac field
-      report's `menu_keyboard_layout.sources` phase confirms the spikes are gone. The Windows PC
-      timings and the macOS field points `rerun_2026_11_02` and `main_thread_holds` are in TODO-tests-windows.md and
-      TODO-tests-macos.md (2026-11-15).
-- [ ] **Before publishing.** (checked by worker F, 2026-11-13: a release gate for the maintainer, no code step) Whole AHK suite on a quiet machine with no resident driver, `npm run test:ahk-tray-rows-read-as-text`,
-      all live checks including `quit-over-a-log-flush`, JS, macOS and Linux suites, Windows field report with a driver.
-      PC run 2026-11-11: the whole AHK suite ran natively on the maintainer's PC (20,286 tests, reds fixed or reported not executed except TakeNote different-folder) and `e2e/run_e2e.ahk` 90/90; the live checks were 21 pass / 7 fail.
-      [RELEASE] Left (2026-11-15): the whole gate, run on the quiet PC before a release.
+- [ ] **Slowness, Windows boot.** Done so far: deferred emoji and symbol registration, the AI submenu built at its
+      first open, lighter parsing (see `BOOT_OPERATION_CEILINGS` of the startup smoke). Next candidates: script parse
+      (lighter boot includes; AHK has no runtime include, so only a smaller graph or a worker helps) and the remote AI
+      catalogue (212 ms), to measure again now that the AI root is lazy. Measure each with interleaved base/candidate
+      smoke-fixture boots (summed `process_cpu`). Rejected: a disk cache for the layout stage (native hotkey
+      registration). The PC timings and the macOS field points `rerun_2026_11_02` and `main_thread_holds` are in the
+      TODO-tests files.
+- [ ] **[RELEASE] Before publishing.** On a quiet PC with no resident driver: the whole AHK suite,
+      `npm run test:ahk-tray-rows-read-as-text`, every live check including `quit-over-a-log-flush`, the JS, macOS and
+      Linux suites, and a Windows field report with a driver.
 
 ## Remaining code work
 
@@ -1135,4 +898,13 @@ Each question names the default kept meanwhile; an answer moves into the item or
     `layers.toml` its compiled form with a `# source:` and `# body-fnv1a32:` header (coordinator, 2026-11-15);
   - Linux: the GNOME extension's `org.ergopti.InputSource1` admits any client of the session bus; GTK 3 Compose
     sets `GTK_IM_MODULE` only, from the user installer only;
-  - pause: a dead key pending in the system's own layout (no emulation) stays the OS's state.
+  - pause: a dead key pending in the system's own layout (no emulation) stays the OS's state; the macOS pause and
+    resume notices are kept (Linux shows them too);
+  - parity: GSD-1, the macOS live x1 swipe fires twice for a touch going right then back left (Windows and Linux
+    once), kept as it is; HCD-3, macOS and Linux type one field for the named personal tags, as Windows.
+- [ ] **Parity decisions THD-1 to THD-4 and HCD-1, HCD-2, HCD-4, HCD-5.** Tap-holds
+      ([report](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): THD-1 the pair tap and the layer, THD-2
+      the lone window, THD-3 layer-hold pair activity, THD-4 the macOS thumb Backspace under modifiers. Hotstring
+      cascade ([report](docs/audits/platform-parity/2026-11-11-hotstring-cascade/report.md)): HCD-1 an expired best
+      candidate (macOS falls to a lower rule), HCD-2 a bare `:` or `;` ends a trigger on macOS only, HCD-4 the delay
+      on `@` tags, HCD-5 an uppercase one-letter tag (privacy). Each report names the default kept meanwhile.

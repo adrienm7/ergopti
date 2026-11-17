@@ -1521,3 +1521,16 @@ migration (byte identity confirmed on the PC on 2026-11-16).
   (2026-11-16): Windows registers the single-letter combos only and resolves
   longer ones at fire time, as macOS and Linux do; a config that still holds the
   key reports it once as unused.
+
+## Tooltip safety hide and typing-speed bursts (2026-11-16, TWD-1, TWD-2)
+
+TWD-1: a hotstring preview with no delay hides after the shared `[timing]
+safety_timeout_sec` on the three OS, a no-delay row of a macOS timed stack too
+(`test-tooltip-style-single-source.cjs` requires the three readers). TWD-2: the
+typing-speed widget shows only while text is typed and hides as soon as the
+burst ends (a shortcut, a function, navigation or media key, a shortcut
+modifier tapped alone, a focus change, the idle delay, or any pointer input the
+driver did not post itself); Shift, AltGr and Shift+AltGr (macOS: both Option
+keys) are level modifiers and never end it. One rule: `[typing_burst]` of
+`_shared/metrics/data/wpm_widget/constants.toml`, keys named by
+`KeyboardEvent.code` through `physical_keys.json`.
