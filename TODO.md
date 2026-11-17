@@ -299,195 +299,36 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 Each closes on a named green hosted or native run, recorded here.
 
-- [ ] **Dev site deployment gated on its site jobs (maintainer, 2026-11-14).** ergopti.fr/dev was last deployed
-      on 2026-11-10 at 21:03: `deploy-site.yml` published only from a ci.yml run that concluded success, and `dev`
-      never does while a baseline red remains. A `dev` push now publishes from a completed red run when Common / E2E
-      tests (Shared UI rendering), Common / Build and Common / Install and launch (Stable site and Development site)
-      all succeeded; `main` keeps the whole-run success and a cancelled run never publishes
-      (`tools/ci/site-deploy-admission.cjs`, which logs the jobs that gated it; same exact tested bytes, no rebuild).
-      Those site jobs still follow Common Integration, so a red Common lot (today Packaging and boot) skips them and
-      nothing deploys until it is green. GitHub runs a `workflow_run` workflow from the default branch, so the
-      gate takes effect once `main` carries this change (the maintainer's merge); until then a manual Deploy site
-      dispatch on `dev` with a run ID uses it. Worker G. Closes on the first `dev` push that deploys with ergopti.fr/dev/editeur
-      in gh-pages `dev/`.
-      [RELEASE] Left (2026-11-15): the gate is on dev (1d9c242070) and a manual dispatch deployed /dev; the automatic
-      deploy needs this change on main.
-- [ ] **16/38.** One complete non-release three-OS checkpoint on the final source (units, E2E, packaging,
-      installation, launch) with exact receipts; it also carries the first hosted run of: the Linux X11 window list
-      (962a25a973), AppImage Build and `install-linux` rows (dce846a0bd), the Linux per-step installs (17e80f2882),
-      "Qualify the installed managed Ollama route plan" (c0a50b5e41), the Linux private runtime in every package,
-      and the run-timing summary (`run-timing.cjs --step-summary`; Flatpak under 5 min).
-      Initial audit preflight [42099804561](https://github.com/adrienm7/ergopti/actions/runs/42099804561) failed Arch native server detection, shared UI browser installation and macOS stubbed replay. Follow-up [42108198520](https://github.com/adrienm7/ergopti/actions/runs/42108198520) at `4ca161c3e512eecc4c78499db0465139c9a71861` is green: 114 successful jobs, with only Release / Publish skipped; Arch integration, shared UI rendering and all OS verdicts passed. Later dead-key preflight [42121216727](https://github.com/adrienm7/ergopti/actions/runs/42121216727), at `04ebe1089bf387ccbfef43bbfd3b2f3e9b1cd6d9`, failed Common / Install and launch (Stable site) at Install production site browsers, followed by its mandatory verdicts. Requalify that browser installation and the final source checkpoint; no successful browser/render receipt follows from the failed step. Hosted results remain separate from physical dead-key receiving.
-      2026-11-11 Linux and macOS lanes at `85f3dfee20` (Linux [43012051378](https://github.com/adrienm7/ergopti/actions/runs/43012051378), macOS [43012056158](https://github.com/adrienm7/ergopti/actions/runs/43012056158)): every Linux job is green (Unit, five distribution rows, Integration, five E2E shards, Build, all 20 Install-and-launch rows), including the installed managed Ollama route plan and its Go twin (network-ai, job 130500747601), the X11 cursor-display window switching step (input-display, job 130500747586), the AppImage Build and `install-linux` AppImage row and the per-distribution installs. The run-timing summary ran in Release / Verify (job 130525465817). Flatpak was 378 s cold (over 5 min): 986a3d5629 caches the flatpak-builder module state: cold 568 s, cache saved ([43105583384](https://github.com/adrienm7/ergopti/actions/runs/43105583384) attempt 2, job 130839886024), then warm 58 s with the module cache restored ([43126416939](https://github.com/adrienm7/ergopti/actions/runs/43126416939) at `7188928a48`, Linux Build job 130890961113); Flatpak under 5 min done. That run's Linux lane is green end to end (Linux Verdict job 130894504733). Both runs' Common lot "Distribution and updates" fails only on `test-windows-updater-original-source` (f9aea2f6c1 changed `test_framework.ahk` without resealing: the maintainer's reseal), so Common and Release Verify are red. Still open: Windows, the final source.
-      [RELEASE] Left (2026-11-15): Windows, macOS and Common are green (run 43693237215); the Linux updater E2E stays
-      red until a post-move prerelease exists, then one all-green run on the final source.
-- [ ] **macOS lane.** Claimed by worker K (2026-11-13). L32 and L42 Swift in the Build stage; the Issue #101
-      Swift and Go cells; native qualification of the Hotstrings category boot publication and the obsolete-leaf
-      setters; item 31's lane once its runtime build is green. Already green (run 41257389239): Launcher XCTest,
-      Native XCTest (Intel), Build and all five Install-and-launch rows, guardian fixes included; macOS Unit,
-      Integration and every E2E cell on run 41261068581.
-      2026-11-11 run [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) at `6736a355`: macOS Unit, Integration, every E2E cell (Native XCTest Intel, Launcher
-      XCTest macOS 26 with `Test Suite 'All tests' passed`, both Managed Ollama and Managed Ollama build cells = the
-      Issue #101 Swift and Go cells, Lease silence, Tooltip canvas, Archive update controls) and Build are green. L42:
-      the credentialed-redirect refusals (`testRealPACSourceRedirectsHaveFreshCredentialFreeOwners`,
-      `testRedirectIsRefusedWithoutSecondConnection`) pass in the full suite; L32's `memory_footprint_mb` is a Lua
-      field probe covered by the green Unit lots, not Swift. Still open: native Hotstrings category boot publication
-      and obsolete-leaf setters need an installed driver on a real Mac (no hosted row types into them), and item 31's
-      lane waits on its runtime build, which the pinned runtime rules keep out of scope tonight.
-      Requalified 2026-11-11 at `85f3dfee20` in [43012056158](https://github.com/adrienm7/ergopti/actions/runs/43012056158): macOS Unit, Integration, all 12 E2E cells, Build (with the
-      layout extension payload receipt) and all five Install-and-launch rows green; macOS Verdict job 130559010960 green.
-      Worker K 2026-11-13: no hosted code work is left here. L32 and L42 are closed above; what remains needs an
-      installed driver on a real Mac (Hotstrings category boot publication, obsolete-leaf setters) or item 31's runtime
-      build, which the pinned runtime rules keep out of reach: hardware and maintainer only.
-      [RELEASE] Left (2026-11-15): nothing hosted is left; item 31 waits on the runtime build. The Hotstrings boot
-      publication and obsolete-leaf setters on an installed Mac are in TODO-tests-macos.md (2026-11-15).
-- [ ] **Ollama Go cell** Claimed by worker K (2026-11-13). (cda1e10c5e) on the final source before a release (passed on run 40021624397).
-      Green again on both architectures in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (Managed Ollama and Managed Ollama build, Intel and Apple silicon);
-      it closes only on the release candidate's own source, which tonight's no-release rule excludes.
-      Worker K 2026-11-13: release-only, nothing to change in code; the known macOS Intel flake
-      `TestCancellationAndConcurrentClosePhysicallyRetirePeer` stays with worker G (CI baseline reds).
-      [RELEASE] Left (2026-11-15): a pass on the release candidate's own source.
-- [ ] **40.** Signed native execution of the eight Karabiner default/recommended/switch variants.
-      A hosted runner runs the eight variants only against the ad hoc signed app of the "karabiner config"
-      Install-and-launch row (`hs_native_bootstrap_probe.py`); the Developer ID signature exists only on a release
-      build, which tonight's no-release rule forbids, so the signed run needs the next release candidate.
-      Ad hoc receipt 2026-11-11: `macOS launch gate [karabiner_config] passed on arm64` in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (job 130257482253),
-      which requires all eight variants to build, merge and publish on the installed app.
-      [RELEASE] Left (2026-11-15): the ad hoc signed receipt passed (run 42929436137); the eight variants on a Developer
-      ID signed build remain.
-- Moved to TODO-tests-windows.md and TODO-tests-macos.md (2026-11-15): 104, 105, the common autocorrection sections
-  and the macOS dynamic hotstrings.
-- [ ] **34, 37, 102, 129.** Native macOS delimiter transactions; macOS packaging with both extension TOML files;
-      Windows native cases and Fedora/Alpine ShellRunner fixtures (Linux done in the start-up E2E).
-      macOS packaging received 2026-11-11: 85f3dfee20 makes the macOS and Linux builds require every hotstring file the
-      shipped extension manifest binds (`tools/build/check_layout_extension_payload.py`); the macOS Build of
-      [43012056158](https://github.com/adrienm7/ergopti/actions/runs/43012056158) (job 130512589181) prints `magickeyreplace.toml ... sections=replace`, `suffixes_a.toml` and
-      `PASS bound=6`, and the Linux Build of [43012051378](https://github.com/adrienm7/ergopti/actions/runs/43012051378) passes the same check. Fedora/Alpine ShellRunner fixtures
-      received: the full Linux unit suite passes on Fedora's and Alpine's own LuaJIT in 43012051378 (jobs 130494409773, 130494409706) and their Integration rows too. Still open: native macOS delimiter transactions (typing into an
-      installed driver on a real Mac) and the Windows native cases (maintainer; Windows counterpart of the payload check:
-      run it from the Windows packaging against the registry `windows_bundle_manifest.json` ships).
-      Done 2026-11-15 (`claude/ergopti-todo-win-payload-check`): the Windows packaging runs the same payload check on
-      the static bundle ZIP the exe embeds (`static_bundle.zip::static/layouts/registry`, ci-windows.yml right after
-      « Build static asset bundle »); proof: test-layout-extension-payload.cjs (archive cases and the step order). The
-      native macOS delimiter transactions and the Windows native cases are in TODO-tests-macos.md and
-      TODO-tests-windows.md (2026-11-15).
-- Moved to TODO-tests-macos.md and TODO-tests-windows.md (2026-11-15): 121, 123, 137, the AI Agent submenu
-  composed-menu qualification.
 - [ ] **[RELEASE] First `main` push after 1.0.9.** `main` is still at 4d834c866a; dev.174 and dev.175 are published
       as v1.0.10 (ci.yml keeps the legacy core up to counter 169, the `v0.0.0-dev.169` bridge). Merge to `main` with
       `Release-As: 1.0.10`, then check that CodeQL, which scans `main` only, closes the 32 alerts fixed on dev on
-      4 November (a3d69950e5..89b0b774c8).
-- [ ] **CodeQL Go.** Claimed by worker K (2026-11-13). After the `native_http` Go module is published, re-enable Go and check a non-empty analysis.
-      Worker K 2026-11-13, code side: there is no CodeQL workflow in the repository (default setup, a repository
-      setting), so re-enabling Go is the maintainer's. Both shared modules carry their own `go.mod` at the package root
-      and physical `go:embed` inputs, as `docs/memory/workflow-and-verification.md` requires. The standalone
-      `native_http` module stays standard-library only by design (`test-managed-bootstrap-policy.cjs`), yet its root
-      package imports `golang.org/x/sys/unix` on Linux and macOS (`listener_event_{linux,darwin}.go`, spliced into
-      Ollama's module); a standalone extraction therefore covers `proxyrelay`, `cmd/ergopti-proxy-relay`, `route_plan`
-      and the other-OS files, and the root package only where the autobuilder may fetch x/sys. Decided by the agent on
-      2026-11-13, to review by the maintainer: no `require` is added, because it would let CI fetch a module
-      (`GOPROXY=off`, "never injected" in `tools/test/fixtures/native-http-receiving/go.mod`); check after enabling
-      that the analysis lists the root package, and pin x/sys v0.37.0 there only if it does not.
-      [RELEASE] Left (2026-11-15): CodeQL is GitHub's default setup, a repository setting: re-enable Go after
-      `native_http` is published.
-- Moved to TODO-tests-windows.md (2026-11-15): native Windows TLS fixture.
-- [ ] **Intermittent fixtures.** Claimed by worker K (2026-11-13). Close each after it stays green: Linux window switch, cffi-lua clone, desktop-webview
-      AI focus, Windows `config` group, macOS Go `TestIdleDeadlinePhysicallyRetiresPeer`, macOS Swift
-      `testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope`.
-      Scan of ci.yml runs 2026-11-07..10 (macOS and Linux): the cursor-display window switch step passed 40/40;
-      no cffi-lua clone retry or desktop-webview AI-focus failure appeared (the webview lane's 4 failures were a
-      managed Python download, a 504 and an on-screen pill check); `TestIdleDeadlinePhysicallyRetiresPeer` and
-      `testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope` never failed (Swift launcher step 37 passes,
-      4 other failures). A new intermittent, `NativeAppClonerBundleOwnershipTests.testActualNativeCliLogLimits...`
-      (runs 42438031643, 42480689370, `[Errno 1] Operation not permitted`), is fixed at its cause in bce01f27: XNU
-      answers `killpg(group, 0)` with EPERM while the last members are unreaped zombies.
-      Worker G, 2026-11-14 (Paris): Windows config-transition « guarded native adapter: genuine acquired-read timer
-      custody » (dev run 43611195865, control mode, 0 hits in 512 attempts) is a geometric draw, not a hang: 57 hosted
-      modes over 7 runs needed 71.5 attempts on average, up to 432, so 512 missed one mode in about 150 runs. The bound is
-      2048 (about 3e-12 per run; a run pays it only on a miss), and `test-windows-config-timer-custody-bound.cjs`
-      recomputes the chance from that sample and fails at 512. Keep it listed until the config-transition shard stays green.
-      Worker C, 2026-11-14 (Paris): `test-linux-nix-native.cjs` (« 0 !== null » at `inventoryPhaseControls`, Release ci,
-      run 43604680663, one local run in three) is fixed at its cause: the phase owner's capture watcher can send its
-      TERM after the worker (`run-linux-managed-http-phase.py`) published `closed.json` with status 0, and Python
-      resets its handlers to SIG*DFL while it finalizes, so the worker died by signal and the owner read status null.
-      The worker now ignores TERM and INT once its closure receipt is final; regression
-      `test-linux-managed-phase-late-term.cjs` floods the real worker with TERM after its receipt (fails on attempt 1
-      with the old worker, 3 runs of 3), and the original test passed 8 runs of 8.
-      Worker G, 2026-11-13 (Paris): the baseline flake `TestCancellationAndConcurrentClosePhysicallyRetirePeer` (macOS
-      Intel Managed Ollama) is fixed at its cause in 694ac4c90e: a 120 ms deadline and a 200 ms idle clock could end
-      the request before a slow runner had started the peer, so the retirement check found no receipt. Each case now
-      cancels once the peer has recorded itself; a slow-start case (peer delayed 300 ms) fails with the old timing and
-      passes now. `TestClientErrorPrivacyRetainsContextCause` had the same 100 ms race (4ae913e873). Keep it listed until
-      the Intel cell stays green. Landed on 2026-11-14; both Managed Ollama and Managed Ollama build cells, Intel and Apple
-      silicon, passed with the `slow-start` case in CI run
-      [43579693369](https://github.com/adrienm7/ergopti/actions/runs/43579693369).
-      New 2026-11-11: Install-and-launch `symlink_logs_dir` failed once in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (job 130257482167) with "Quit did
-      not end both processes within 10 s (the Quit AppleEvent was never answered)" while the same build quit in
-      0.3–0.4 s in every other row. Its re-run (attempt 2, job 130295289361) passed and the macOS Verdict of
-      42929436137 is green (job 130295941982); keep it listed until it stays green.
-      Scan 2026-11-12 of ci.yml runs 2026-11-07..12 on dev, claude/* and tmp/\_ (282 of 353 runs listed, 71 runs of
-      2026-11-07..10 and the second job pages of ten large runs not read; logs read for the A/B buckets and one sample
-      per other failure group): `symlink_logs_dir` Quit timeout only once (job 130257482167 above); its failed-launch
-      artifact (launch-gate-failed-ci-macos-15-symlink_logs_dir\_\_tilde_paths-attempt-1, with the launcher and
-      Hammerspoon samples) could not be read from this session (artifact storage host refused by its network policy),
-      so it stays unexplained. No failure of the window switch, cffi-lua clone, desktop-webview AI focus,
-      `TestIdleDeadlinePhysicallyRetiresPeer` or `testBridgeHardDeath...` in the logs read; the sampled Linux install
-      and webview failures were an APT mirror timeout (1200 s) and WIP tests. `NativeAppClonerBundleOwnershipTests`
-      EPERM appears twice more, in [42940650392](https://github.com/adrienm7/ergopti/actions/runs/42940650392) and [42927169227](https://github.com/adrienm7/ergopti/actions/runs/42927169227), (2026-11-11, macOS 26); whether
-      their sources hold its fix bce01f27 is not checked (that commit is not reachable from this clone). Nothing reproduced, so nothing was changed here; the keyboard-source refusals are under « [CI] Native
-      keyboard-source fixture ».
-      Worker K scan 2026-11-13 of the 11 completed ci.yml runs of that day (43347126427 to 43504755033, both attempts
-      of 43430776650, every failed job's full log grepped): no failure of the Linux window switch (8 input-display jobs,
-      `test:linux:window-switch` clean), the cffi-lua clone (absent from every log), desktop-webview AI focus
-      (`PASS native GTK AI text focus: 31 cases` in all 8 jobs), `TestIdleDeadlinePhysicallyRetiresPeer`,
-      `testBridgeHardDeath...`, the `symlink_logs_dir` Quit timeout or the App Cloner EPERM. One Windows config-group
-      lookalike: `config-scope-global` in 43347126427 (job 131629578949, a structure-proof WIP source) stopped at
-      `[WATCHDOG] run_llm_model_browser timed out` on test 23/29 (`model-browser-native-json`); single occurrence, not
-      reproduced, kept listed. The macOS Intel `TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-header`
-      failure (43430776650 job 131906822890) belongs to worker G's fix. Nothing reproduced, so no code changed.
-      Worker A 2026-11-14: Windows core « Plain native CAS: a newer native copy retires only the old restore right
-      (plain-native-cas-owner) » failed once in [43535291046](https://github.com/adrienm7/ergopti/actions/runs/43535291046)
-      (job 132263577729, 2207/2208) and passed in 43530845290 and 43518505775. Cause: `_CB_PlainAuthenticate` refuses to
-      read while any other window holds the clipboard, so a listener reading the foreign copy (the runner's clipboard
-      history) defers settlement to the retry service, while the fixture asserted it at once. The production path is
-      right; the fixture now waits for that real retry, and the new `foreign-wins-held` case holds the reader's lease
-      at authentication so the deferred path runs on every run (branch `claude/ergopti-todo-cas-flake`).
-      New 2026-11-14 (worker L), fixed at its cause: the Linux fedora Integration job of run 43514634523 failed
-      `system-event-capture-policy` and `system-capture-integer-origin` (`run_system_event_capture.lua`: sleep
-      86000 instead of 120000 ms). The fixture anchored its fake wall clock at the real now and advanced it by
-      minutes; the job ran at 23:59:26 UTC, a gap crossed midnight and the day read back held only its share. Any
-      branch, `dev` included, failed it in the last minutes before local midnight. The wall origin is held at
-      23:00 today at the latest; regression `system-capture-before-midnight` starts the fixture at 23:59:26.
-      New 2026-11-14 (worker L), not reproduced, kept listed: in [43538811340](https://github.com/adrienm7/ergopti/actions/runs/43538811340) (a branch touching no LLM code)
-      Linux E2E network-ai failed `OwnedOllamaContainer.test_umask_0002_private_group_parents_install_and_start`
-      (the owned Ollama start expired, `ollama_unreachable`), green on `dev` run 43506243390; macOS E2E Managed
-      Ollama (Intel) failed « The managed Ollama build handoff never arrived » because its build job waited for a
-      runner from 03:24 to 04:10 Paris and finished at 04:18:45, after the consumer's wait ended at 04:17:20 (CI
-      capacity, not code).
-      Worker C 2026-11-14 (Paris), not mine, left open: desktop-webview « The privacy owner follows real GTK fields
-      on the accessibility bus » failed in [43611736406](https://github.com/adrienm7/ergopti/actions/runs/43611736406)
-      (branch `claude/ergopti-todo-nix-late-term`, whose commits touch only the managed phase worker and the native
-      theme data), the same AT-SPI family as worker J's secure-field probe below; its own fixture may need the same
-      ready-file wait.
-      Worker J 2026-11-14, two Linux intermittents fixed at their cause (keep listed until they stay green):
-      (1) desktop-webview « The secure-field probe on a real accessibility bus » failed once in 16 runs
-      ([43549510667](https://github.com/adrienm7/ergopti/actions/runs/43549510667), job 132327549143):
-      `FAIL one application with a focused text field: expected role=61, got inconclusive`, the next two checks green; again in [43579693369](https://github.com/adrienm7/ergopti/actions/runs/43579693369) (job 132404013294). `run_atspi_focus.sh` probed each GTK fixture after a fixed
-      `sleep 3`; a first application slow to start on a freshly installed runner was not up yet (reproduced locally
-      by delaying the fixture's start 4 s: the old script fails that first check only, the new one passes). The
-      fixture now writes a ready file once its window is active and its field focused, the script waits for it and
-      for the accessibility bus address (`wait_a11y_bus.py`) instead of sleeping, and prints the probe's own errors.
-      Regression: `test_atspi_fixture_lifetime.py` FixtureReadinessTest. (2) network-ai
-      `run_owned_ollama_container.py` hit its 60 s ceiling in 2 of 14 runs, on a different case each time
-      (worker L's « not reproduced » entry above; `test_umask_0002...` in [43538811340](https://github.com/adrienm7/ergopti/actions/runs/43538811340), `test_unreachable_pac...` in [43504755033](https://github.com/adrienm7/ergopti/actions/runs/43504755033)), with
-      `Local Ollama repair failed (runtime_retry_refused)` and the owned daemon not running. `runtime_repair.lua` refused a delivered
-      readiness-retry timer when the budget's precise clock (`uv.hrtime`) showed less than the poll delay elapsed;
-      the timer runs on libuv's loop clock, read from the coarse monotonic clock on Linux, so it can end a few
-      milliseconds early on the budget's clock and a daemon still starting at the first probe was refused. The repair
-      now waits out that shortfall before probing (the master budget still bounds every wait). Regression:
-      `test_runtime_repair.lua` « a retry timer ending short on the budget clock waits out the shortfall, then probes ».
-      Linux only: macOS and Windows do not compose this repair.
-      [LATER] Left (2026-11-15): no known code left; keep watching each listed fixture over further runs.
+      4 November (a3d69950e5..89b0b774c8), and that the dev site deploys by itself: `deploy-site.yml` runs from the
+      default branch, so the gate that publishes a red `dev` run whose site jobs all passed
+      (`tools/ci/site-deploy-admission.cjs`, on dev since 1d9c242070) takes effect only then. Closes on the first
+      `dev` push that deploys with ergopti.fr/dev/editeur in gh-pages `dev/`.
+- [ ] **[RELEASE] 16/38, one all-green three-OS checkpoint on the final source** (units, E2E, packaging,
+      installation, launch). Windows, macOS and Common are green (run 43693237215); the Linux E2E updater stays red
+      until a post-move dev prerelease exists, since its live step updates this checkout to the newest published
+      prerelease.
+- [ ] **[RELEASE] macOS release cells.** The Ollama Go cell (cda1e10c5e) passes on the release candidate's own
+      source; item 31's lane runs once its runtime build is green; item 40, the eight Karabiner
+      default/recommended/switch variants, runs on a Developer ID signed build (the ad hoc signed receipt passed in
+      run 42929436137).
+- [ ] **[RELEASE] CodeQL Go.** CodeQL is GitHub's default setup, a repository setting: re-enable Go once the
+      `native_http` Go module is published, then check that the analysis lists the root package (it imports
+      `golang.org/x/sys/unix` on Linux and macOS); pin x/sys v0.37.0 there only if it does not (no `require` is added
+      meanwhile, since CI runs with `GOPROXY=off`).
+- [ ] **[CI] Intermittent fixtures.** Close each once it stays green over further runs; no known code is left:
+  - Linux: the window switch, the cffi-lua clone, desktop-webview AI focus, and desktop-webview « The privacy owner
+    follows real GTK fields on the accessibility bus » (failed once in 43611736406; its fixture may need the ready-file
+    wait the secure-field probe got);
+  - Windows: the `config` group, including the config-transition timer custody (bound 2048,
+    `test-windows-config-timer-custody-bound.cjs`) and one `run_llm_model_browser` watchdog on
+    `model-browser-native-json` (43347126427, not reproduced);
+  - macOS: Go `TestIdleDeadlinePhysicallyRetiresPeer` and `TestCancellationAndConcurrentClosePhysicallyRetirePeer`
+    (Intel Managed Ollama, fixed with its `slow-start` case), Swift
+    `testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope`, and the Install-and-launch
+    `symlink_logs_dir` Quit timeout (once in 42929436137, unexplained).
 
 ## Maintainer decisions pending
 
