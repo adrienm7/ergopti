@@ -46,7 +46,7 @@ end
 
 -- The bracket keeps pgrep from matching the shell that runs it.
 local function owner_running()
-	return sh("pgrep -f '[c]lipboard_owner_worker.lua own' >/dev/null")
+	return sh("pgrep -f '[c]lipboard/adapters/owner_worker.lua own' >/dev/null")
 end
 
 assert(not owner_running(), "another clipboard owner already runs: its exit would be counted as this one's")
