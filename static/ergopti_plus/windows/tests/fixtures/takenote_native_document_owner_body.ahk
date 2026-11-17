@@ -2,6 +2,8 @@
 ; Real Notepad documents behind the genuine filename lookup and deferred note job.
 #Requires AutoHotkey v2.0
 
+#Include %A_LineFile%\..\takenote_native_document_owner_lib.ahk
+
 class _TNDO_Ops extends _TakeNoteNative {
 	static Errors := []
 	static Warnings := []
@@ -65,37 +67,24 @@ _TNDO_HoldProcess(Pid, FromRun := false) {
 			DllCall("kernel32\CloseHandle", "Ptr", Handle)
 	}
 }
-_TNDO_ReadDocument(Hwnd) {
-	; Classic Edit and the packaged RichEdit backend expose their actual text.
-	for Control in WinGetControlsHwnd("ahk_id " . Hwnd) {
-		ControlClass := WinGetClass("ahk_id " . Control)
-		if !RegExMatch(ControlClass, "i)^(?:Edit|RichEdit.*)$")
-			continue
-		try return ControlGetText(Control)
-	}
-	return ""
+; Classic Edit and the packaged RichEdit backend expose their actual text.
+class _TNDO_ControlPorts {
+	static Controls(Hwnd) => WinGetControlsHwnd("ahk_id " . Hwnd)
+	static ClassOf(Control) => WinGetClass("ahk_id " . Control)
+	static Visible(Control) => DllCall("user32\IsWindowVisible", "Ptr", Control, "Int") != 0
+	static Text(Control) => ControlGetText(Control)
 }
+class _TNDO_WindowPorts {
+	static List() => WinGetList("ahk_exe notepad.exe")
+	static Pid(Hwnd) => WinGetPID("ahk_id " . Hwnd)
+	static Document(Hwnd) => _TNDO_ReadDocument(Hwnd)
+	static Hold(Pid) => _TNDO_HoldProcess(Pid)
+	static Alive(Receipt) => DllCall("kernel32\WaitForSingleObject", "Ptr", Receipt.Handle, "UInt", 0, "UInt") == 258
+}
+_TNDO_ReadDocument(Hwnd) => _TNDO_SelectedDocumentText(Hwnd, _TNDO_ControlPorts)
 _TNDO_ObserveWindows() {
 	global _TNDO
-	for Hwnd in WinGetList("ahk_exe notepad.exe") {
-		try {
-			Pid := WinGetPID("ahk_id " . Hwnd)
-			Text := _TNDO_ReadDocument(Hwnd)
-			Document := Text == _TNDO.CanaryA ? "A" : Text == _TNDO.CanaryB ? "B" : ""
-			; A Run receipt owns its exact process. A broker-created process is
-			; adopted only after its actual document proves the private canary.
-			if Document == "" && !_TNDO.Processes.Has(Pid)
-				continue
-			Process := _TNDO_HoldProcess(Pid)
-			if !IsObject(Process) || DllCall("kernel32\WaitForSingleObject", "Ptr", Process.Handle, "UInt", 0, "UInt") != 258
-				continue
-			if WinGetPID("ahk_id " . Hwnd) != Pid
-				continue
-			_TNDO.Windows[Hwnd] := {Hwnd: Hwnd, Process: Process, Document: Document}
-		} catch as ObserveError {
-			_TNDO.ObserveError := ObserveError.Message
-		}
-	}
+	_TNDO_ObserveWindowsWith(_TNDO_WindowPorts, _TNDO)
 }
 _TNDO_WaitJob(JobId) {
 	global _TakeNotePending
@@ -156,9 +145,13 @@ _TNDO_Cleanup() {
 			}
 		} finally DllCall("kernel32\CloseHandle", "Ptr", Process.Handle)
 	}
-	for Hwnd in WinGetList("ahk_exe notepad.exe")
-		if !_TNDO.Windows.Has(Hwnd)
-			Clean := false
+	; Restored tabs live in the windows of a proved process and retired with it;
+	; a window left now belongs to a Notepad the probe never proved.
+	Foreign := _TNDO_ForeignWindows(WinGetList("ahk_exe notepad.exe"), _TNDO.Windows)
+	if Foreign.Length {
+		FileAppend("DIAGNOSTIC takenote-document foreign_windows=" . Foreign.Length . "`n", "*")
+		Clean := false
+	}
 	return Clean
 }
 
@@ -239,48 +232,55 @@ _TNDO_InspectDocumentIdentity(Hwnd, Phase) {
 }
 
 _TNDO_Main() {
-	global _TNDO, _TakeNotePending
+	global _TNDO
 	_TNDO_Require(A_Args.Length == 2, "A mode and exclusively owned directory are required")
 	Mode := A_Args[1], Root := A_Args[2]
 	_TNDO_Require(Mode == "same-folder" || Mode == "different-folder", "Unknown document mode")
+	; Windows 11 Notepad opens a launched file in its running process, so with a
+	; Notepad already open the canary document would prove, and the cleanup
+	; would end, somebody else's process. The parent reports this case as not
+	; executed; this check closes the race with a Notepad opened since.
 	_TNDO_Require(!ProcessExist("notepad.exe") && WinGetList("ahk_exe notepad.exe").Length == 0,
 		"A private Notepad probe cannot borrow an existing process or window")
 	_TNDO := {Root: Root, Processes: Map(), Windows: Map(), CanaryA: "owned_note_A_" . A_ScriptHwnd,
 		CanaryB: "owned_note_B_" . A_ScriptHwnd, ObserveError: ""}
-	Clean := false
-	try {
-		DirCreate(Root . "\A"), DirCreate(Root . "\B")
-		FileA := Root . "\A\Notes.txt", FileB := Root . "\B\Notes.txt"
-		FileAppend(_TNDO.CanaryA, FileA, "UTF-8-RAW")
-		FileAppend(_TNDO.CanaryB, FileB, "UTF-8-RAW")
-		_TNDO_WaitJob(TakeNoteRequest(false, Root . "\A", false, _TNDO_Ops))
-		First := WinActive("ahk_exe notepad.exe")
-		_TNDO_Require(_TNDO_IdentityCurrent(First) && _TNDO_ReadDocument(First) == _TNDO.CanaryA,
-			"The first genuine request must expose actual document A in its owned Notepad")
-		_TNDO_InspectDocumentIdentity(First, "first-A")
-		BeforeLaunches := _TNDO_Ops.Launches.Length
-		Target := Mode == "same-folder" ? "A" : "B"
-		_TNDO_WaitJob(TakeNoteRequest(false, Root . "\" . Target, false, _TNDO_Ops))
-		Active := WinActive("ahk_exe notepad.exe")
-		Text := _TNDO_IdentityCurrent(Active) ? _TNDO_ReadDocument(Active) : ""
-		Actual := Text == _TNDO.CanaryA ? "A" : Text == _TNDO.CanaryB ? "B" : "unknown"
-		if _TNDO_IdentityCurrent(Active)
-			_TNDO_InspectDocumentIdentity(Active, "second-" . Target)
-		FileAppend("OBSERVATION takenote-document mode=" . Mode . " target=" . Target . " actual=" . Actual
-			. " first_hwnd=" . First . " active_hwnd=" . Active . " launches_before=" . BeforeLaunches
-			. " launches_after=" . _TNDO_Ops.Launches.Length . " pending=" . _TakeNotePending.Count
-			. " errors=" . _TNDO_Ops.Errors.Length . " warnings=" . _TNDO_Ops.Warnings.Length . "`n", "*")
-		_TNDO_Require(Actual == Target, "The real TakeNote request must focus the requested directory's document")
-		_TNDO_Require(FileRead(FileA, "UTF-8") == _TNDO.CanaryA && FileRead(FileB, "UTF-8") == _TNDO.CanaryB,
-			"Both actual files must retain their exact owned contents")
-		_TNDO_Require(Mode != "same-folder" || (Active == First && _TNDO_Ops.Launches.Length == BeforeLaunches),
-			"Same-folder reuse must preserve the original native window without another launch")
-	} finally {
-		Clean := _TNDO_Cleanup()
-		FileAppend("CLEANUP takenote-document retired=" . (Clean ? 1 : 0) . "`n", "*")
-		_TNDO_Require(Clean, "Exact native document/process retirement must finish before directory cleanup")
-	}
+	_TNDO_RunThenCleanup(_TNDO_Exercise.Bind(Mode, Root), _TNDO_Cleanup, _TNDO_EmitCleanup)
 	FileAppend("PASS takenote-document " . Mode . "`n", "*")
+}
+_TNDO_EmitCleanup(Line) {
+	global _TNDO
+	; The last observation failure is the probe's own message or AutoHotkey's,
+	; never document text, and tells why a window was not proved.
+	FileAppend(Line . (_TNDO.ObserveError != "" ? " last_observe_error=[" . _TNDO.ObserveError . "]" : "") . "`n", "*")
+}
+_TNDO_Exercise(Mode, Root) {
+	global _TNDO, _TakeNotePending
+	DirCreate(Root . "\A"), DirCreate(Root . "\B")
+	FileA := Root . "\A\Notes.txt", FileB := Root . "\B\Notes.txt"
+	FileAppend(_TNDO.CanaryA, FileA, "UTF-8-RAW")
+	FileAppend(_TNDO.CanaryB, FileB, "UTF-8-RAW")
+	_TNDO_WaitJob(TakeNoteRequest(false, Root . "\A", false, _TNDO_Ops))
+	First := WinActive("ahk_exe notepad.exe")
+	_TNDO_Require(_TNDO_IdentityCurrent(First) && _TNDO_ReadDocument(First) == _TNDO.CanaryA,
+		"The first genuine request must expose actual document A in its owned Notepad")
+	_TNDO_InspectDocumentIdentity(First, "first-A")
+	BeforeLaunches := _TNDO_Ops.Launches.Length
+	Target := Mode == "same-folder" ? "A" : "B"
+	_TNDO_WaitJob(TakeNoteRequest(false, Root . "\" . Target, false, _TNDO_Ops))
+	Active := WinActive("ahk_exe notepad.exe")
+	Text := _TNDO_IdentityCurrent(Active) ? _TNDO_ReadDocument(Active) : ""
+	Actual := Text == _TNDO.CanaryA ? "A" : Text == _TNDO.CanaryB ? "B" : "unknown"
+	if _TNDO_IdentityCurrent(Active)
+		_TNDO_InspectDocumentIdentity(Active, "second-" . Target)
+	FileAppend("OBSERVATION takenote-document mode=" . Mode . " target=" . Target . " actual=" . Actual
+		. " first_hwnd=" . First . " active_hwnd=" . Active . " launches_before=" . BeforeLaunches
+		. " launches_after=" . _TNDO_Ops.Launches.Length . " pending=" . _TakeNotePending.Count
+		. " errors=" . _TNDO_Ops.Errors.Length . " warnings=" . _TNDO_Ops.Warnings.Length . "`n", "*")
+	_TNDO_Require(Actual == Target, "The real TakeNote request must focus the requested directory's document")
+	_TNDO_Require(FileRead(FileA, "UTF-8") == _TNDO.CanaryA && FileRead(FileB, "UTF-8") == _TNDO.CanaryB,
+		"Both actual files must retain their exact owned contents")
+	_TNDO_Require(Mode != "same-folder" || (Active == First && _TNDO_Ops.Launches.Length == BeforeLaunches),
+		"Same-folder reuse must preserve the original native window without another launch")
 }
 try {
 	_TNDO_Main()

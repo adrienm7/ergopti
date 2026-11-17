@@ -242,12 +242,12 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       code-point count would be wrong for emoji in RichEdit and Chromium. Choose: a per-host-class count (EDIT,
       RichEdit, Chromium, other), or an Undo that selects the expansion by its known length (Shift+Left per caret step,
       itself host-dependent) and types the trigger over it.
-- [ ] **TakeNote probe and Notepad's restored session.** TakeNote binds each note to its UI Automation tab
-      (a1cd4d2891), but the probe `takenote-native-document-owner` still cannot qualify it on the PC: Notepad there
-      restores about 50 « Notes.txt » tabs of earlier probe runs when it starts, the probe most likely reads the first
-      RichEdit control (a restored tab's) instead of the selected tab's, and its cleanup counts that window as foreign
-      (same-folder and different-folder both end « retired=0 » on 2026-11-17, the first error masked by the cleanup's).
-      Read the selected tab's document, report the first error, and accept restored tabs it does not own.
+- [ ] **TakeNote probe on the PC.** TakeNote binds each note to its UI Automation tab (a1cd4d2891). The probe
+      `takenote-native-document-owner` now reads the only visible RichEdit control (the selected tab's, not a restored
+      one's), owns every window of the Notepad its canary proved, reports its first error before the cleanup's, and
+      is not executed while another Notepad runs. Still to qualify on the PC with every Notepad window closed: both
+      modes green, and no « ambiguous » or `last_observe_error` in the CLEANUP line; if Notepad keeps the hidden tabs'
+      controls visible, read the selected document through UI Automation instead.
 - [ ] **`asa` then a rolled Space beside another AutoHotkey hook.** The live check `asa-space-fast` (Space down
       before the last `a` is up, 15 ms apart) types 20 `ASA` when no other AutoHotkey script runs, but typed `aASAASA`
       instead of `ASA ASA` 2 times in 20, then 5 times in 14, on the PC on 2026-11-17 while other scripts held

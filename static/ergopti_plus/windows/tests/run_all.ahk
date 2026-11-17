@@ -458,6 +458,7 @@ InstallSendNoOps()
 #Include unit/gestures/engine/test_system_action_lifecycle_timer.ahk
 #Include unit/gestures/engine/test_system_action_inflight_lifecycle.ahk
 #Include unit/gestures/engine/test_takenote_native_document_owner.ahk
+#Include unit/gestures/engine/test_takenote_native_probe_decisions.ahk
 #Include unit/platform/input/test_text_sender_modifiers.ahk
 #Include unit/platform/input/dispatch/test_timer_scheduler.ahk
 #Include unit/platform/input/dispatch/test_timer_delay_ceiling.ahk
