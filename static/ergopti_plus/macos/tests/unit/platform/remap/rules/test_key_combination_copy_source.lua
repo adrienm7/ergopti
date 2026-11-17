@@ -97,6 +97,18 @@ h.describe("chord copy actual fresh source producer", function()
    end
   end)
  end)
+ -- macOS copied the one-shot Shift into a chord, which no chord runs on any OS
+ -- (maintainer decision of 2026-11-06); Windows and Linux keep that chord.
+ h.it("(kcl-copy-skips-chordless-tap) a one-shot Shift tap keeps its pair's chord", function()
+  scoped(function(Config, _, path)
+   local source = '[mod_combos.config.escape_then_tab]\ntap = "sticky_shift"\ncombo = "caps_word"\n'
+   seed(path, source)
+   local with_shift = { { id = "none" }, { id = "sticky_shift" }, { id = "caps_word" } }
+   local plan = Config.prepare_copy_taps_to_chords(entries, with_shift, path)
+   h.assert_eq(plan.changes, 0); h.assert_eq(plan.skipped, { { id = PAIR, action = "sticky_shift" } })
+   h.assert_eq(read(path), source)
+  end)
+ end)
  h.it("a native lock refusal cannot acknowledge a copied candidate", function()
   scoped(function(Config, _, path)
    local plan = Config.prepare_copy_taps_to_chords(entries, actions, path)

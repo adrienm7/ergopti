@@ -375,14 +375,15 @@ local NONE_ACTION_ID = "none"
 --- Whether one catalogue action may fill a slot.
 ---   "tap"   — excludes actions with tappable == false (modifiers, combos, layer-hold).
 ---   "hold"  — only actions with holdable == true (modifiers, combos, layer-hold).
----   "combo" — every action.
+---   "combo" — every action but those no chord runs on any OS (the one-shot
+---             Shift, maintainer decision of 2026-11-06), as Windows and Linux.
 --- @param action table Catalogue entry.
 --- @param slot string "tap", "hold" or "combo".
 --- @return boolean
 local function slot_accepts(action, slot)
 	if slot == "hold" then return action.holdable == true end
 	if slot == "tap" then return action.tappable ~= false end
-	return true
+	return require("tap_hold.engine.key_combinations").CHORD_REFUSED_EVERYWHERE[action.id] ~= true
 end
 
 --- Builds the shared picker's items for one slot: the remap catalogue in its

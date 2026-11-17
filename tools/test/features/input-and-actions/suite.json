@@ -810,6 +810,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-personal-info-tags-single-source.cjs"],
 			"repro": "npm run test:personal-info-tags-single-source"
+		},
+		{
+			"id": "chord-refused-actions-single-source",
+			"ordinal": 685,
+			"name": "key-combination chords refuse one list of actions: the shared one-shot Shift ids and the Windows and Linux copies",
+			"cmd": "node",
+			"args": ["tools/test/test-chord-refused-actions-single-source.cjs"],
+			"repro": "npm run test:chord-refused-actions-single-source"
 		}
 	]
 }

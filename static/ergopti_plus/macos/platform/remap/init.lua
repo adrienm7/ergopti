@@ -5058,6 +5058,11 @@ end
 --- @param action_id string Action id from actions.json.
 function M.set_combo_combo_action(combo_id, action_id)
 	if not require_state("set_combo_combo_action") then return false end
+	-- No chord runs the one-shot Shift on any OS (maintainer decision of 2026-11-06).
+	if require("tap_hold.engine.key_combinations").CHORD_REFUSED_EVERYWHERE[action_id] then
+		Logger.warn(LOG, "Combo '%s': the action '%s' cannot run as a chord — refused.", tostring(combo_id), tostring(action_id))
+		return false
+	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.mod_combos_config[combo_id] = update_combo_slot(
 			candidate.mod_combos_config, combo_id, "combo", action_id)

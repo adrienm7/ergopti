@@ -2279,6 +2279,13 @@ function M.build_karabiner_json(
 		if state.combo_symmetric and is_non_canonical then
 			combo_id = "none"
 		end
+		-- A configuration written by hand or by an older build can still name an
+		-- action no chord runs (the one-shot Shift): that chord does nothing, said once.
+		if require("tap_hold.engine.key_combinations").CHORD_REFUSED_EVERYWHERE[combo_id] then
+			Logger.warn(LOG, "Combo '%s': the action '%s' cannot run as a chord; that chord does nothing.",
+				combo_def.id, combo_id)
+			combo_id = "none"
+		end
 
 		local tap_action   = action_index[tap_id]   or none_action
 		local hold_action  = action_index[hold_id]  or none_action

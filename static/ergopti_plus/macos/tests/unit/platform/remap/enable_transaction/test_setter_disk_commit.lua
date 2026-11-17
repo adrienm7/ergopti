@@ -131,4 +131,16 @@ helpers.describe("karabiner synchronous setters commit disk before live state", 
 			helpers.assert_eq(remap.get_tap_hold_timeout(), 321)
 		end)
 	end)
+
+	-- The chord setter took the one-shot Shift, which no chord runs on any OS
+	-- (maintainer decision of 2026-11-06); Windows and Linux refuse it.
+	helpers.it("(kcl-chord-refuses-one-shot-shift) the chord setter refuses the one-shot Shift", function()
+		with_fixture(function(fixture)
+			local remap, calls = fixture.load_enabled_remap({ initially_enabled = false })
+			local saves = calls.save
+			helpers.assert_eq(remap.set_combo_combo_action("left_shift+right_shift", "sticky_shift"), false)
+			helpers.assert_eq(remap.get_combo_combo_action("left_shift+right_shift"), "none")
+			helpers.assert_eq(calls.save, saves, "a refused chord action saves nothing")
+		end)
+	end)
 end)

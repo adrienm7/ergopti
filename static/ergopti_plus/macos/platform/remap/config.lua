@@ -1397,8 +1397,15 @@ function M.prepare_copy_taps_to_chords(entries, actions, path)
 	for index, entry in ipairs(entries) do pairs_of[index] = { id = TapHoldFile.pair_of_combo(entry.id) } end
 	local plan = require("tap_hold.engine.key_combinations").plan_chord_copy(status == "absent" and "" or source, {
 		entries = pairs_of, is_action = function(action) return known[action] == true end,
+		-- A tap no chord runs keeps its pair's chord, as on Windows and Linux.
+		is_chord_action = function(action)
+			return known[action] == true and require("tap_hold.engine.key_combinations").CHORD_REFUSED_EVERYWHERE[action] ~= true
+		end,
 		settings = { simultaneous_threshold_ms = SIMULTANEOUS_THRESHOLD_MS_DEFAULT, combo_symmetric = COMBO_SYMMETRIC_DEFAULT },
 	})
+	for _, skip in ipairs(plan.skipped) do
+		Logger.warn(LOG, "Pair '%s' tap '%s' cannot run as a chord — its chord is left as it is.", skip.id, skip.action)
+	end
 	local by_combo = {}
 	for pair, slots in pairs(plan.mod_combos_config) do by_combo[TapHoldFile.combo_of_pair(pair)] = slots end
 	plan.mod_combos_config = by_combo
