@@ -835,7 +835,9 @@ relative to `corpus_files.js`, from any page folder. The « i » popovers
 
 The library (115 layouts when measured, 165 since the KLA import) on a 2.5 MB
 French corpus took about 0.3 s from prepared tables in Node, before the ways
-of typing (below); the gate holds the whole library under 1.5 s. A page computes the
+of typing (below); the gate holds it under 13 ms per layout (1.5 s for 115
+layouts) on the fastest of up to three runs, one run following the machine's
+load and the JIT warming up. A page computes the
 tables of a corpus once (`prepareNgrams`) and keeps them under `hashText` of
 the text; built-in corpora can ship their tables pre-computed.
 
@@ -855,6 +857,24 @@ contexts a changed token reaches, and walks only what changed
 ([layout-optimizer.md](layout-optimizer.md), « Speed »: Ergopti 22.7 → 35.1,
 Ergo-L 16.7 → 23.0, bépo 8.7 → 15.1 trials per second). compileWays skips a
 dead-key rule whose prefix and tail lists did not change since its last pass.
+
+The walks then got their speed back without moving any value
+(`library_golden.json` pins every metric of every library layout on both
+French corpora; the gate compares them). The Node tests run the engine in a vm
+context, where each read of a global costs about a thousand times a local one:
+the built-ins are locals of the module (of `analyser_scores.js` too). A
+prepared table carries its tokens as ids and its counts as typed arrays
+(`tableIds`); with whole counts, the pairs and triples of each step are summed
+per key n-gram and passed to the visitor once, in the order they first came,
+so its integer sums and map orders are those of the n-gram-by-n-gram walk (a
+chord table, with fractional counts, is walked entry by entry).
+`trigramPoints` (the context choice) and the trigram rule (`tripleKind`) are
+memoised per board, forms that take away the same keys share one reachability
+pass, and the dead-key compile builds a chained way in full only once `offer`
+keeps it. Measured warm, 165 layouts, on a heavily loaded PC: the library
+2.5 → 1.0 s of CPU (fastest wall time 3.2 → 1.2 s), QWERTY 12 → 6 ms, bépo
+86 → 48 ms, Ergo-L 62 → 30 ms, Ergopti 52 → 28 ms; optimizer trials per second
+QWERTY 106 → 142, bépo 19 → 23, Ergo-L 25 → 32, Ergopti 25 → 30.
 
 ## Decided by the agent, to review by the maintainer
 
