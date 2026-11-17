@@ -1,0 +1,140 @@
+<!-- docs/audits/accessibility/README.md -->
+
+# Accessibility audit
+
+Started on 2026-11-17 (Paris time) for the TODO section « Full accessibility »
+(maintainer request of 2026-11-16). Target: WCAG 2.2 level AA on the site
+(ergopti.fr), Ergopti Studio (editor, Comparer, Optimiser, benchmarks) and
+Ergopti+ itself. The public statement is the site page `/accessibilite`
+(`src/routes/accessibilite/+page.svelte`); its « known gaps » follow this file.
+
+## Method and limits
+
+- **Automated scan.** `tools/test/browser/site-accessibility.playwright.cjs`
+  serves a built site on loopback and runs axe-core 4.14.0 (tags `wcag2a`,
+  `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22a`, `wcag22aa`) on every page of
+  the site and inside every same-origin frame it embeds (the Studio pages and
+  the Ergopti+ app windows shown as demos), in the light and dark colour
+  schemes, with reduced motion emulated so that reveal animations do not hide
+  content from the scan. Headless Chromium only.
+- **Ratchet.** Each violation is counted in nodes per page, scheme, frame and
+  rule in `tools/test/browser/site-accessibility-baseline.json`. CI runs the
+  scan on the received production site (job « Install and launch ») and fails
+  on a new row or a higher count; a lower count asks for
+  `--update-baseline`. `tools/test/test-site-accessibility-ratchet.cjs`
+  proves, without a browser, that the comparison refuses regressions and that
+  every page under `src/routes` is audited.
+- **Behaviour checks** in the same gate, which a scan cannot see: the skip
+  link is the first keyboard stop and moves the focus to the content, the
+  settings dialog has no violation of its own, a setting applies to the page,
+  reaches the Studio frame, survives a reload and resets, and the narrow-screen
+  menu opens from the keyboard and hides its links when closed.
+- **Not covered yet.** Automated tools find roughly a third of WCAG failures.
+  No screen-reader run, no 400 % zoom or 320 px reflow walk and no native
+  window (UI Automation, NSAccessibility, AT-SPI) has been recorded; these are
+  the « Manual audit » item of TODO.md. Non-text contrast (WCAG 1.4.11) is not
+  checked by axe.
+
+Local run: `npx vite build`, then
+`node tools/test/browser/site-accessibility.playwright.cjs build ""`
+(`--only=/studio,/` to scan a few pages, `--report=file.json` for every finding
+with its first targets, `--update-baseline` after fixes). From Git Bash, set
+`MSYS_NO_PATHCONV=1` so the route arguments are not rewritten as paths.
+
+## Results per page
+
+Violation nodes found by the scan, before this pass (the gate's first
+baseline, commit « test(a11y): gate the site and Studio pages on an axe-core
+ratchet ») and after it (2026-11-17, on dev after « test(ui): read the dark
+theme block that yields to a chosen light theme »).
+
+| Page                            |       Light before |       Light after | Dark before | Dark after |
+| ------------------------------- | -----------------: | ----------------: | ----------: | ---------: |
+| `/`                             |                  1 |                 0 |           1 |          0 |
+| `/ergopti`                      |                  1 |                 0 |           1 |          0 |
+| `/ergopti/presentation`         |                 15 |                 0 |          15 |          0 |
+| `/ergopti/utilisation`          |                  3 |                 0 |           3 |          0 |
+| `/ergopti/installation`         |                 12 |                 0 |          12 |          0 |
+| `/ergopti/benchmarks`           |                136 |                 6 |         136 |          6 |
+| `/ergopti/informations`         |                 20 |                 0 |          20 |          0 |
+| `/ergopti-plus`                 |                  9 |                 0 |           9 |          0 |
+| `/ergopti-plus/presentation`    |                  2 |                 0 |           2 |          0 |
+| `/ergopti-plus/hotstrings`      |                 17 |                 0 |          17 |          0 |
+| `/ergopti-plus/ia`              |                 15 |                 0 |          15 |          0 |
+| `/ergopti-plus/fonctionnalites` |                  1 |                 0 |           1 |          0 |
+| `/ergopti-plus/configuration`   |                  2 |                 0 |           2 |          0 |
+| `/ergopti-plus/installation`    |                  1 |                 0 |           1 |          0 |
+| `/ergopti-plus/faq`             |                  1 |                 0 |           1 |          0 |
+| `/ergopti-plus-old`             |                 28 |                 6 |          28 |          6 |
+| `/studio`                       |                  7 |                 0 |           6 |          0 |
+| `/studio/comparer`              |                124 |                 7 |         124 |          7 |
+| `/studio/optimiser`             |                  2 |                 0 |           2 |          0 |
+| `/accessibilite`                |                new |                 0 |         new |          0 |
+| **Total**                       | 793 (both schemes) | 38 (both schemes) |             |            |
+
+## Findings
+
+Severity is axe's impact. « Where » is the page for findings in the site's own
+document, or the framed shared page. Owner is who should fix what is left:
+other agents are rebuilding the Comparer's charts and heatmaps and the
+Optimiser, so chart-internal findings stay with them.
+
+| Severity | Where                                                                                                                                                                                                                                                                                                                                                                                                                                | Rule                          | Nodes before | Nodes after | Owner                                     |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- | -----------: | ----------: | ----------------------------------------- |
+| Critical | `/ergopti/presentation`, `/ergopti/utilisation`, `/ergopti/benchmarks`, `/ergopti-plus/presentation`, `/ergopti-plus-old`                                                                                                                                                                                                                                                                                                            | `select-name`                 |           12 |           0 | Site                                      |
+| Critical | `hotstring_editor/index.html`                                                                                                                                                                                                                                                                                                                                                                                                        | `label`                       |           12 |           0 | Ergopti+ shared UI                        |
+| Critical | `personal_info_editor/index.html`                                                                                                                                                                                                                                                                                                                                                                                                    | `label`                       |           12 |           0 | Ergopti+ shared UI                        |
+| Critical | `layout_editor/index.html`                                                                                                                                                                                                                                                                                                                                                                                                           | `aria-required-children`      |            2 |           0 | Studio editor                             |
+| Critical | `layout_editor/index.html`                                                                                                                                                                                                                                                                                                                                                                                                           | `aria-required-parent`        |            2 |           0 | Studio editor                             |
+| Critical | `layout_editor/index.html`                                                                                                                                                                                                                                                                                                                                                                                                           | `button-name`                 |            2 |           0 | Studio editor                             |
+| Critical | `layout_editor/index.html`                                                                                                                                                                                                                                                                                                                                                                                                           | `select-name`                 |            2 |           0 | Studio editor                             |
+| Serious  | `layout_analysis/index.html`                                                                                                                                                                                                                                                                                                                                                                                                         | `target-size`                 |          462 |           0 | Comparer / evaluator agents               |
+| Serious  | `/ergopti/presentation`, `/ergopti/installation`, `/ergopti/benchmarks`, `/ergopti/informations`, `/ergopti-plus-old`                                                                                                                                                                                                                                                                                                                | `target-size`                 |          146 |           0 | Site                                      |
+| Serious  | `/`, `/ergopti`, `/ergopti/presentation`, `/ergopti/utilisation`, `/ergopti/installation`, `/ergopti/benchmarks`, `/ergopti/informations`, `/ergopti-plus`, `/ergopti-plus/presentation`, `/ergopti-plus/hotstrings`, `/ergopti-plus/ia`, `/ergopti-plus/fonctionnalites`, `/ergopti-plus/configuration`, `/ergopti-plus/installation`, `/ergopti-plus/faq`, `/ergopti-plus-old`, `/studio`, `/studio/comparer`, `/studio/optimiser` | `label-content-name-mismatch` |           54 |           0 | Site                                      |
+| Serious  | `layout_analysis/index.html`                                                                                                                                                                                                                                                                                                                                                                                                         | `label-content-name-mismatch` |           26 |          26 | Comparer / evaluator agents               |
+| Serious  | `model_browser/index.html`                                                                                                                                                                                                                                                                                                                                                                                                           | `color-contrast`              |           18 |           0 | Ergopti+ shared UI                        |
+| Serious  | `/ergopti/installation`, `/ergopti-plus-old`                                                                                                                                                                                                                                                                                                                                                                                         | `list`                        |           14 |          12 | Site (the 12 left are on the legacy page) |
+| Serious  | `/ergopti-plus/ia`                                                                                                                                                                                                                                                                                                                                                                                                                   | `color-contrast`              |           10 |           0 | Site                                      |
+| Serious  | `hotstring_editor/index.html`                                                                                                                                                                                                                                                                                                                                                                                                        | `color-contrast`              |            6 |           0 | Ergopti+ shared UI                        |
+| Serious  | `layout_editor/index.html`                                                                                                                                                                                                                                                                                                                                                                                                           | `color-contrast`              |            3 |           0 | Studio editor                             |
+| Serious  | `/ergopti/presentation`                                                                                                                                                                                                                                                                                                                                                                                                              | `link-name`                   |            2 |           0 | Site                                      |
+| Serious  | `/ergopti/utilisation`                                                                                                                                                                                                                                                                                                                                                                                                               | `scrollable-region-focusable` |            2 |           0 | Site                                      |
+| Serious  | `personal_info_editor/index.html`                                                                                                                                                                                                                                                                                                                                                                                                    | `color-contrast`              |            2 |           0 | Ergopti+ shared UI                        |
+| Serious  | `changelog/index.html`                                                                                                                                                                                                                                                                                                                                                                                                               | `color-contrast`              |            2 |           0 | Ergopti+ shared UI                        |
+| Serious  | `layout_optimizer/index.html`                                                                                                                                                                                                                                                                                                                                                                                                        | `color-contrast`              |            2 |           0 | Optimiser agent                           |
+
+## What the pass fixed
+
+- **Site.** Skip link and a two-ring focus style on every page; the
+  narrow-screen menu could not be opened from the keyboard (its checkbox was
+  `display: none`) and its closed links took the focus invisibly; home links
+  whose names did not contain their visible text; unnamed selects, scroll-down
+  link and demo pager; a picture directly in a list; a scrolling table
+  unreachable by keyboard whose sort headers answered only to the mouse;
+  15 px table-of-contents targets; 1.9:1 to 4.1:1 greys in the AI tooltip
+  demo; buttons nested in links on the installation page; the keyboard
+  drawings are tables (a text view of the layout) and dead keys are named.
+- **Reduced motion.** `prefers-reduced-motion` and the site's own setting stop
+  AOS reveals, tocbot's and the page's smooth scrolling, CSS animations, the
+  hero demo's cycling and the count-up figures, on the site and in the Studio
+  frames (`theme.css`).
+- **Shared pages.** Filled buttons were white on the Apple blue (4.0:1, 3.6:1
+  in dark): a new `--theme-accent-fill` and a darker light accent
+  (`#0062cc`) fix them everywhere; dim greys of the model browser and the
+  changelog reach 4.5:1; the root `lang` follows the active locale instead of
+  `fr` in every language; the editor's layout tabs are a named group (a
+  tablist may hold only tabs) and its shortcut view a pressed toggle; unnamed
+  hotstring checkboxes, personal-info fields, finger select and home button;
+  24 px targets in the Comparer's layout list; the Optimiser's progress bar is
+  named by its live status line (the Comparer and the Optimiser already had
+  polite status regions).
+- **Settings and statement.** A header dialog with reduced motion, Atkinson
+  Hyperlegible (self-hosted under `static/fonts/`, SIL OFL 1.1), text size to
+  200 %, WCAG 1.4.12 spacing and high contrast, stored per visitor through
+  `static/ergopti_plus/_shared/ui/a11y_prefs.js`, tolerant of blocked storage
+  and carried into the Studio frames; the statement page `/accessibilite`.
+
+## What remains
+
+The open items live in TODO.md, section « Full accessibility ». The rows of
+the findings table with nodes left are their automated part.

@@ -720,6 +720,20 @@ outputs.
 The HTML parser can terminate a Svelte `<script>` block on a closing-tag token
 inside a comment. Avoid spelling that token literally in script comments.
 
+### project-site-accessibility-scan-traps
+
+The axe ratchet (`tools/test/browser/site-accessibility.playwright.cjs`) serves
+the build on 127.0.0.1, where `src/lib/js/isDev.js` shows the dev banner and
+probes absent `version.json` files: the scan therefore ignores server misses
+(the smoke gates own them) and sees the same banner in both CI lots. It
+emulates reduced motion, or AOS leaves headings at opacity 0 and axe skips
+their contrast. From Git Bash, `--only=/studio` is rewritten into a Windows
+path unless `MSYS_NO_PATHCONV=1` is set. A keyboard drawing is a table: a row
+whose keys are all `data-key=''` must be `aria-hidden` or axe reports an empty
+row. Action: rebuild before rescanning (the scan reads `build/`, a 7-minute
+build on the maintainer's PC) and lower the baseline in the same change as a
+fix.
+
 ### project-pages-deploy-branch-vs-workflow
 
 GitHub Pages deployment source can be branch-based or workflow-based. Verify the

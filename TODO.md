@@ -47,38 +47,36 @@ benchmarks) on the site and inside the app, and Ergopti+ itself (menus, windows,
 Windows, macOS and Linux. Target WCAG 2.2 level AA everywhere, AAA where it costs little; every new page or window
 is held to it from now on.
 
-- [ ] **Audit first.** An automated pass (axe-core or equivalent in the browser tests, a CI gate that fails on new
-      violations with a ratchet baseline) plus a manual checklist per page and per native window; record the
-      findings in docs/audits/accessibility/ with severity and owner.
-- [ ] **Images and media.** Every image, icon, SVG, chart and keyboard drawing has a text alternative (meaningful
-      `alt`, `aria-label`, or `alt=""` when decorative); charts and heatmaps also offer their numbers as a table;
-      videos get captions and transcripts.
+The site and the Studio pages are scanned by axe-core in CI (tools/test/browser/site-accessibility.playwright.cjs,
+ratchet baseline beside it, findings in [docs/audits/accessibility/](docs/audits/accessibility/README.md)); lower the
+baseline as violations go.
+
+- [ ] **Manual audit.** A checklist per page and per native window (keyboard walk, NVDA, JAWS, Narrator, VoiceOver,
+      Orca, 400 % zoom and 320 px reflow), recorded in docs/audits/accessibility/; extend the axe scan to the app's
+      own WebView windows (onboarding, menus' pages, metrics), not only those the site embeds.
+- [ ] **Images and media.** Charts and heatmaps (Comparer, benchmarks) offer their numbers as a table and their bars
+      say the visible label (axe `label-content-name-mismatch` on the score bars); videos get captions and
+      transcripts.
 - [ ] **Colour vision.** No information by colour alone (shapes, labels, patterns as well); palettes checked for
-      deuteranopia, protanopia and tritanopia; text contrast ≥ 4.5:1 (3:1 for large text and UI parts) in light and
-      dark themes; a high-contrast option.
-- [ ] **Motion sickness and vestibular disorders.** Honour `prefers-reduced-motion` everywhere (no parallax, no
-      auto-playing or looping animation, no smooth-scroll jumps, instant transitions when reduced); a site setting
-      to turn motion off; nothing flashes more than 3 times per second.
-- [ ] **Dyslexia and reading.** A dyslexia-friendly font option (e.g. OpenDyslexic or Atkinson Hyperlegible),
-      adjustable text size and line/letter spacing without breaking layouts (WCAG 1.4.12), plain-language texts,
-      no justified text, comfortable line length; settings remembered per viewer.
-- [ ] **Blind and low-vision users.** Full screen-reader support (NVDA, JAWS, Narrator, VoiceOver, Orca): semantic
-      HTML and landmarks, headings in order, labelled forms and buttons, live regions for results and progress
-      (Optimiser, Comparer), accessible names for every key of the keyboard drawings, a text/table view of every
-      layout; zoom to 400 % and reflow at 320 px wide without horizontal scroll.
-- [ ] **Keyboard and motor.** Everything usable with the keyboard alone, visible focus, logical focus order, skip
-      links, no keyboard traps, generous target sizes (≥ 24×24 px), no time limits or a way to extend them, drag
-      operations with a click alternative (WCAG 2.5.7).
+      deuteranopia, protanopia and tritanopia; non-text contrast ≥ 3:1 for UI parts and chart marks (axe does not
+      check it).
+- [ ] **Motion.** A pause button for the auto-advancing Ergopti+ hero demo when motion is not reduced (WCAG 2.2.2).
+- [ ] **Dyslexia and reading.** Check every page at 200 % text with the wide spacing setting for clipped or
+      overlapping text; plain-language texts, no justified text, comfortable line length.
+- [ ] **Blind and low-vision users.** Screen-reader runs; heading order and landmarks per page; accessible names
+      for the keys of the Studio's keyboard drawings (editor, Comparer, Optimiser) and a table view of a layout
+      there (the site's drawings are tables since this pass).
+- [ ] **Keyboard and motor.** Keyboard walk of the Studio (no traps, logical order), a click alternative for every
+      drag (WCAG 2.5.7), no time limits; the download buttons nested in links on the installation pages (two
+      focus stops each) become links styled as buttons; the legacy /ergopti-plus-old lists hold paragraphs.
 - [ ] **Cognitive.** Consistent navigation, clear error messages with how to fix them, confirmations before
       destructive actions, help text for every metric and setting.
 - [ ] **Ergopti+ native UI.** The menus, windows (WebView2 and native), tooltips, notifications and onboarding on
       the three OS expose names and roles to the platform accessibility APIs (UI Automation, NSAccessibility,
       AT-SPI), follow the system's high-contrast, reduced-motion and text-size settings, and are usable with a
       screen reader and keyboard only; the hotstring and prediction tooltips are announced or can be.
-- [ ] **Languages.** Correct `lang` attributes per page and per passage; the 21 locales keep the same
-      accessibility texts (alt texts and labels are translated, not left in English).
-- [ ] **Accessibility statement.** A public page stating the conformance level, known gaps and a contact to
-      report a barrier.
+- [ ] **Languages.** `lang` on foreign passages across the site (English names, quotes); the site is French
+      only and the Ergopti+ page French and English: decide whether the accessibility texts get the 21 locales.
 
 ## Ergopti Studio
 

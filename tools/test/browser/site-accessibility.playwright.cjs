@@ -109,23 +109,26 @@ function frameName(frame, page, origin, basePath) {
 	return url.pathname.slice(basePath.length + 1);
 }
 
-/** Run axe in one frame and return its violations, reduced to counted rows. */
-async function scanFrame(frame, axeSource) {
+/** Run axe in one frame, or one element of it, and return its violations as counted rows. */
+async function scanFrame(frame, axeSource, selector = null) {
 	await frame.evaluate(axeSource);
-	return frame.evaluate(async (tags) => {
-		const result = await window.axe.run(document, {
-			runOnly: { type: 'tag', values: tags },
-			resultTypes: ['violations'],
-			iframes: false
-		});
-		return result.violations.map((violation) => ({
-			rule: violation.id,
-			impact: violation.impact,
-			help: violation.help,
-			nodes: violation.nodes.length,
-			targets: violation.nodes.slice(0, 5).map((node) => node.target.join(' '))
-		}));
-	}, WCAG_TAGS);
+	return frame.evaluate(
+		async ([tags, selector]) => {
+			const result = await window.axe.run(selector ? document.querySelector(selector) : document, {
+				runOnly: { type: 'tag', values: tags },
+				resultTypes: ['violations'],
+				iframes: false
+			});
+			return result.violations.map((violation) => ({
+				rule: violation.id,
+				impact: violation.impact,
+				help: violation.help,
+				nodes: violation.nodes.length,
+				targets: violation.nodes.slice(0, 5).map((node) => node.target.join(' '))
+			}));
+		},
+		[WCAG_TAGS, selector]
+	);
 }
 
 /** Load one route in one colour scheme and scan the page and its frames. */
@@ -147,6 +150,61 @@ async function scanRoute(context, origin, basePath, route, scheme, inflight, axe
 				findings.push({ route, scheme, frame: name, ...violation });
 		}
 		return findings;
+	} finally {
+		await page.close();
+	}
+}
+
+/**
+ * What a scan cannot see: the keyboard reaches the skip link first and opens
+ * the narrow-screen menu, the settings dialog has no violation of its own, and
+ * a setting reaches the Studio frame, survives a reload and resets.
+ */
+async function exerciseKeyboardAndSettings(context, origin, basePath, inflight, axeSource) {
+	const page = await context.newPage();
+	const root = (target) =>
+		target.evaluate(() => document.documentElement.getAttribute('data-a11y-contrast'));
+	try {
+		await page.goto(origin + basePath + '/studio', { waitUntil: 'networkidle' });
+		await page.locator('main').first().waitFor({ state: 'visible' });
+		await smoke.settleFrames(page);
+		await smoke.settleNetwork(inflight, { quietMs: FRAME_QUIET_MS });
+		await page.keyboard.press('Tab');
+		assert.equal(
+			await page.evaluate(() => document.activeElement.classList.contains('skip-link')),
+			true,
+			'The skip link is the first keyboard stop'
+		);
+		await page.keyboard.press('Enter');
+		assert.equal(await page.evaluate(() => document.activeElement.id), 'contenu');
+		await page.click('#a11y-settings-button');
+		await page.locator('#a11y-settings').waitFor({ state: 'visible' });
+		assert.deepEqual(
+			await scanFrame(page.mainFrame(), axeSource, '#a11y-settings'),
+			[],
+			'The settings dialog has no violation'
+		);
+		await page.check('#a11y-contrast');
+		assert.equal(await root(page), 'high', 'The setting applies to the page');
+		const editor = page.frames().find((frame) => frame.url().includes('/layout_editor/'));
+		assert.ok(editor, 'The Studio frames the editor');
+		await editor.waitForFunction(
+			() => document.documentElement.getAttribute('data-a11y-contrast') === 'high'
+		);
+		await page.reload({ waitUntil: 'networkidle' });
+		assert.equal(await root(page), 'high', 'The setting is remembered');
+		await page.click('#a11y-settings-button');
+		await page.getByRole('button', { name: 'Réinitialiser' }).click();
+		assert.equal(await root(page), null, 'Reset removes the setting');
+		await page.keyboard.press('Escape');
+		// A narrow screen: the menu opens from the keyboard and hides its links when closed.
+		await page.setViewportSize({ width: 390, height: 844 });
+		await page.goto(origin + basePath + '/', { waitUntil: 'networkidle' });
+		const firstLink = page.locator('#menu-pages > a').first();
+		assert.equal(await firstLink.isVisible(), false, 'A closed menu hides its links');
+		await page.focus('#menu-btn');
+		await page.keyboard.press('Space');
+		await firstLink.waitFor({ state: 'visible' });
 	} finally {
 		await page.close();
 	}
@@ -203,6 +261,7 @@ async function scanSite(site, basePath, chromium, routes = AUDITED_ROUTES) {
 						findings.push(
 							...(await scanRoute(context, origin, basePath, route, scheme, inflight, axeSource))
 						);
+				await exerciseKeyboardAndSettings(context, origin, basePath, inflight, axeSource);
 				return findings;
 			} finally {
 				await context.close();
