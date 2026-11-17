@@ -111,7 +111,9 @@ shortcut_key_ease}`; `shortcuts(table)` → `table` checked (the model's
     trigramClasses: {roll3_in, roll3_out, alternation, redirect, roll_mixed, same_finger},
     keys: {KeyE: {presses, sfb, sfs, lsb, scissors, redirect, cost: {metric: part},
                   worst: {event: [[[codes], %], ...]}}, ...},
-    coverage: {typed, unsupported, unsupportedChars: {char: count}, bigrams, trigrams},
+    coverage: {typed, unsupported, unsupportedChars: {char: count}, bigrams, trigrams,
+               missingKeys, missingRequired: [char, ...]},
+    incomplete: false,               // a required character missing (below)
     typing: {mode, cost, alternatives, changed, paths, chords},  // Ways of typing
     simplicity: {accents, pairs, digits},  // each {value, measured} or null
     score: {total, contributions: {metric: points}, weights}
@@ -185,7 +187,12 @@ count}`), `chords` the multi-character outputs used with their counts.
 - `defaultWeights()` → a copy of `score_weights.json` (the « restore defaults »
   action).
 - `compare(layouts, ngrams, options)` → the results ranked best first, each
-  with `rank`.
+  with `rank`: every complete layout before every incomplete one, each group
+  by score (`rankOrder`, below).
+- `rank(results)` → the same ranking of results analysed apart (the
+  Comparer's text modes analyse some layouts on another table); `rankOrder(a,
+b)` → its order, negative when `a` ranks first; a result without a boolean
+  `incomplete` is refused.
 - `rescore(results, weights)` → the same results re-scored and re-ranked with
   new weights, without re-analysis (live weight editing).
 - `diff(a, b)` → `{metrics: {id: {a, b, delta, verdict}}, score: {a, b, delta,
@@ -239,6 +246,21 @@ held modifier 0.5. A typographic character the layout lacks is typed as its
 plain form (« » “ ” „ → ", ’ ‘ → ', – — → -, … → ..., no-break spaces → space;
 the Kalamine rule), but does not count as covered. A character with no way is
 **unsupported**.
+
+**Incomplete layouts** (maintainer, 2026-11-17). A layout that cannot type one
+of the model's `required_characters` on the chosen keyboard (the space, each
+letter a–z and each letter A–Z, every case checked on its own: « a » without a
+way to type « A » is missing « A ») is **incomplete**: `result.incomplete`,
+with `coverage.missingRequired` in the model's order. It ranks after every
+complete layout, whatever its score, in the Comparer's chart and table and in
+the editor panel's rank, and says what it lacks. The proportional `unsupported`
+penalty alone let an unusable layout rank well (Ergopti without k, w and z lost
+2 points). Any way counts (a dead key, a chord, another level); a typographic
+substitute does not. Accented letters, digits, punctuation and symbols only
+take the `unsupported` penalty, so the English layouts stay ranked normally on
+a French corpus. The set is layout data, not corpus data: a letter the corpus
+never uses is still required. On a board that lacks keys, the characters on
+them are missing too (Ergopti has no « z » on a Corne).
 
 **What is cached.** A corpus, a pasted text or the keystats store is reduced
 once to layout-independent counts: characters, character bigrams and character
@@ -738,7 +760,10 @@ of the characters typed otherwise than their cheapest way alone, then the
 twelve most frequent characters concerned, each way with its share,
 `typingRows`); the simplicity rules, each with its value or « not measured ».
 The ranking has a column each for the distinct characters (a count), the
-coverage bonus and the simplicity bonus. The chart colours are tokens of
+coverage bonus and the simplicity bonus. An incomplete layout keeps its rank
+after the complete ones in the chart and the table, carries « incomplete:
+lacks … » beside its name (in words, not by colour alone; its bar is faded),
+and its details say why it ranks there. The chart colours are tokens of
 `style.css` checked with the dataviz palette validator in light and dark.
 
 Two folded figures follow the worst pairs (row jumps are among their events
@@ -910,7 +935,9 @@ does not load the panel's scripts gets no panel.
 - Each edit is analysed 150 ms after the last change. In Chromium the
   conversion takes about 0.3 ms and the analysis about 5 ms.
 - The library is ranked once per corpus, keyboard, weights and ideal finger
-  load. The rank is « N of library + 1 ». « Rank among » (`#la-panel-rank`,
+  load. The rank is « N of library + 1 », counted by the engine's
+  `rankOrder`: an incomplete edited layout ranks after every complete one,
+  and the panel says which required characters it lacks. « Rank among » (`#la-panel-rank`,
   saved with the corpus) ranks it instead among the library and imported
   layouts ticked in « Comparer » (its saved selection); with none ticked, a
   note says so and the rank is 1 of 1.

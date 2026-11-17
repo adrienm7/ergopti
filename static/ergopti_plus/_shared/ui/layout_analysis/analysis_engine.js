@@ -1408,7 +1408,10 @@ var LAYOUT_ANALYSIS = (function () {
 				unsupported: c.unsupported,
 				unsupportedChars,
 				bigrams: c.bigrams,
-				trigrams: c.trigrams
+				trigrams: c.trigrams,
+				// The model's required characters (the space, a–z, A–Z) the layout
+				// cannot type on this keyboard: any of them makes it incomplete.
+				missingRequired: missingRequired(compiled.best)
 			},
 			typing: {
 				mode: typingMode(opts),
@@ -1429,8 +1432,22 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 		// One layout analysed in detail: each event's heaviest groups over the board.
 		if (opts.keyGroups === true) result.topGroups = topGroups(board, groups, c);
+		result.incomplete = result.coverage.missingRequired.length > 0;
 		result.score = score(result, opts.weights);
 		return result;
+	}
+
+	/**
+	 * The required characters (model required_characters: the space and the 26
+	 * letters in each case, each checked on its own) a layout cannot type by
+	 * any way of its own; a typographic substitute does not count.
+	 * @param {Map<string, object>} best - compileWays().best.
+	 * @returns {string[]} The missing ones, in the model's order.
+	 */
+	function missingRequired(best) {
+		return codePoints(data().model.required_characters).filter(
+			(char) => !best.has(char) || best.get(char).substituted === true
+		);
 	}
 
 	/**
@@ -4654,9 +4671,31 @@ var LAYOUT_ANALYSIS = (function () {
 		return rank(results);
 	}
 
-	/** Sorts results by score, best first, and numbers them. */
+	/**
+	 * The ranking order of two results: a complete layout before an incomplete
+	 * one (it cannot type a required character, so no score makes it usable),
+	 * then the higher score first.
+	 * @param {{incomplete: boolean, score: {total: number}}} a
+	 * @param {{incomplete: boolean, score: {total: number}}} b
+	 * @returns {number} Negative when a ranks before b.
+	 * @throws {Error} When a result does not say whether it is complete.
+	 */
+	function rankOrder(a, b) {
+		if (typeof a.incomplete !== 'boolean' || typeof b.incomplete !== 'boolean')
+			throw new Error('layout_analysis: a ranked result says whether it is complete');
+		if (a.incomplete !== b.incomplete) return a.incomplete ? 1 : -1;
+		return b.score.total - a.score.total;
+	}
+
+	/**
+	 * Sorts results, complete layouts first and each group by score, best
+	 * first, and numbers them.
+	 * @param {object[]} results - analyse() outputs (may come from different
+	 *   n-gram tables: the Comparer's text modes).
+	 * @returns {object[]} The same results, sorted, each with its rank (1-based).
+	 */
 	function rank(results) {
-		const sorted = results.slice().sort((a, b) => b.score.total - a.score.total);
+		const sorted = results.slice().sort(rankOrder);
 		sorted.forEach((result, i) => {
 			result.rank = i + 1;
 		});
@@ -4750,6 +4789,8 @@ var LAYOUT_ANALYSIS = (function () {
 		defaultFormFactorWeights,
 		formFactorWeights,
 		compare,
+		rank,
+		rankOrder,
 		rescore,
 		diff
 	};

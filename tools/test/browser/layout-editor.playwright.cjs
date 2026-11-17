@@ -306,6 +306,51 @@ async function exerciseStudioLayout(browser, origin) {
 		'the bars shorten from the best to the weakest'
 	);
 	assert.equal(comparer.zero, 0, 'no zero line');
+	// (comparer-incomplete) A layout that cannot type a letter in either case is
+	// flagged with what it lacks and ranked after every complete layout, though
+	// it scores as Ergopti does (maintainer, 2026-11-17).
+	await page.evaluate(() => {
+		const ergopti = window.LAYOUT_ANALYSIS.libraryLayouts().find((l) => l.id === 'ergopti');
+		const rows = Object.fromEntries(
+			Object.entries(ergopti.rows).map(([code, row]) => [
+				code,
+				row.map((cell) => (cell === 'k' || cell === 'K' ? null : cell))
+			])
+		);
+		window.LAYOUT_ANALYSIS_COMPARER.addLayouts([
+			{ id: 'user_ergopti_no_k', name: 'Ergopti without k', rows, dead: ergopti.dead }
+		]);
+	});
+	await page.waitForFunction(() => document.querySelector('#la-chart .la-incomplete'));
+	const incomplete = await page.evaluate(() => {
+		const bars = [...document.querySelectorAll('#la-chart .la-chart-row')];
+		const row = [...document.querySelectorAll('#la-table tbody tr')].find((tr) =>
+			tr.textContent.includes('Ergopti without k')
+		);
+		const flags = bars.map((bar) => bar.classList.contains('la-incomplete'));
+		return {
+			labels: bars.map((bar) => bar.querySelector('.la-chart-label').textContent),
+			// The bars of the complete layouts, then those of the incomplete ones.
+			ordered: flags.indexOf(true) > flags.lastIndexOf(false),
+			ergopti: Number(
+				[...document.querySelectorAll('#la-table tbody tr')].find(
+					(tr) => tr.cells[1].textContent === 'Ergopti'
+				).cells[0].textContent
+			),
+			rank: Number(row.cells[0].textContent),
+			tableFlag: row.querySelector('.la-incomplete-flag').textContent
+		};
+	});
+	assert.ok(
+		incomplete.labels.includes('Ergopti without k incomplete: lacks k K'),
+		`flagged with what it lacks: ${incomplete.labels.join(' | ')}`
+	);
+	assert.ok(
+		incomplete.ordered,
+		`the incomplete layouts come last: ${incomplete.labels.join(' | ')}`
+	);
+	assert.ok(incomplete.rank > incomplete.ergopti, 'it ranks after Ergopti, which scores the same');
+	assert.equal(incomplete.tableFlag, 'incomplete: lacks k K', 'the ranking table says so too');
 	const heading = await page.evaluate(
 		() => getComputedStyle(document.querySelector('#studio-comparer')).color
 	);

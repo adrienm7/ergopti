@@ -44,6 +44,11 @@
  *    an optimisation of the walks must not move any metric. A deliberate
  *    change of a definition, layout or corpus records them again with
  *    `node tools/test/test-layout-analysis-engine.cjs --update-golden`.
+ * 10. Incomplete layouts: a layout that cannot type the space or one of the 26
+ *    letters in either case (each case on its own) is flagged with what it
+ *    lacks and ranked after every complete layout, whatever its score, also
+ *    after a re-score; QWERTY (US) and Colemak on a French corpus stay
+ *    complete, their accents only unsupported.
  * ==============================================================================
  */
 
@@ -1681,6 +1686,87 @@ if (UPDATE_GOLDEN) {
 			});
 		}
 	}
+}
+
+// ======================================
+// ======= 10/ Incomplete layouts =======
+// ======================================
+
+{
+	const french = goldenCorpora.fr_don_quichotte;
+	/** A copy of a library layout with some characters taken off every level. */
+	const without = (id, chars, newId) => {
+		const layout = byId.get(id);
+		const rows = Object.fromEntries(
+			Object.entries(layout.rows).map(([code, row]) => [
+				code,
+				row.map((cell) => (typeof cell === 'string' && chars.includes(cell) ? null : cell))
+			])
+		);
+		return Object.assign({}, layout, { id: newId, name: newId, rows });
+	};
+	const required = Array.from(
+		vm.runInContext('LAYOUT_ANALYSIS_DATA', sandbox).model.required_characters
+	);
+	check(required.length === 53, `incomplete: ${required.length} required characters, expected 53`);
+	// English layouts lack the French accents: unsupported, never incomplete.
+	for (const id of ['qwerty', 'colemak']) {
+		const result = E.analyse(byId.get(id), french, {});
+		check(
+			result.incomplete === false && result.coverage.missingRequired.length === 0,
+			`incomplete: ${id} on Don Quichotte is flagged incomplete (${result.coverage.missingRequired.join('')})`
+		);
+		check(result.metrics.unsupported > 0, `incomplete: ${id} types every French character`);
+	}
+	const noK = without('ergopti', ['k', 'K'], 'ergopti_no_k');
+	const noKResult = E.analyse(noK, french, {});
+	check(
+		noKResult.incomplete === true && noKResult.coverage.missingRequired.join('') === 'kK',
+		`incomplete: Ergopti without k lacks ${JSON.stringify(noKResult.coverage.missingRequired)}`
+	);
+	const noSpace = without('qwerty', [' '], 'qwerty_no_space');
+	const noSpaceResult = E.analyse(noSpace, french, {});
+	check(
+		noSpaceResult.incomplete === true && noSpaceResult.coverage.missingRequired.join('') === ' ',
+		`incomplete: QWERTY without Space lacks ${JSON.stringify(noSpaceResult.coverage.missingRequired)}`
+	);
+	// « a » on its key but no « A » on the Shift level: each case is checked.
+	const noCapital = without('qwerty', ['A'], 'qwerty_no_capital_a');
+	const noCapitalResult = E.analyse(noCapital, french, {});
+	check(
+		noCapitalResult.incomplete === true &&
+			noCapitalResult.coverage.missingRequired.join('') === 'A',
+		`incomplete: QWERTY without « A » lacks ${JSON.stringify(noCapitalResult.coverage.missingRequired)}`
+	);
+	// The unusable Ergopti outscores QWERTY, and still ranks after it.
+	const qwerty = E.analyse(byId.get('qwerty'), french, {});
+	check(
+		noKResult.score.total > qwerty.score.total,
+		'incomplete: the test needs an incomplete layout that outscores a complete one'
+	);
+	const ranked = E.compare([noK, byId.get('qwerty'), noSpace, byId.get('ergopti')], french, {});
+	check(
+		ranked.map((r) => r.layout.id).join(' ') === 'ergopti qwerty ergopti_no_k qwerty_no_space' &&
+			ranked.map((r) => r.rank).join(' ') === '1 2 3 4',
+		`incomplete: ranking ${ranked.map((r) => `${r.rank}:${r.layout.id}`).join(' ')}`
+	);
+	const rescored = E.rescore(ranked, { sfb: 0 });
+	check(
+		rescored.slice(0, 2).every((r) => !r.incomplete) &&
+			rescored.slice(2).every((r) => r.incomplete),
+		'incomplete: a re-score keeps the complete layouts first'
+	);
+	check(
+		E.rankOrder(qwerty, noKResult) < 0 && E.rankOrder(noKResult, qwerty) > 0,
+		'incomplete: rankOrder puts the complete layout first'
+	);
+	let refused = false;
+	try {
+		E.rankOrder({ score: { total: 1 } }, qwerty);
+	} catch {
+		refused = true;
+	}
+	check(refused, 'incomplete: rankOrder refuses a result that does not say whether it is complete');
 }
 
 if (errors.length > 0) {

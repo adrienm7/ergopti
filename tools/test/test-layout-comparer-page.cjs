@@ -27,6 +27,9 @@
  *    the panel's scripts in the same order, before editor_page.js; the app
  *    window loads built-in corpora through its host, not as static tags; an
  *    inlined corpus loader (no script URL) still loads.
+ * 7. Incomplete layouts: the chart and the table flag a layout that cannot
+ *    type the space or a letter in either case, in the engine's ranking
+ *    order, and the editor panel ranks the edited layout by E.rankOrder.
  * ==============================================================================
  */
 
@@ -574,6 +577,28 @@ check(
 			const source = fs.readFileSync(shared('ui', dir, file), 'utf8');
 			check(!/\.toLocaleString\(/.test(source), `${dir}/${file} formats numbers itself`);
 		}
+}
+
+// (comparer-incomplete) An incomplete layout (no space or no letter in a case)
+// ranks after every complete one everywhere a rank is shown: the chart draws
+// the engine's order, and the editor panel counts the layouts before the edited
+// one by the engine's own order (E.rankOrder), never by the score alone.
+{
+	const panel = fs.readFileSync(path.join(PAGE_DIR, 'analysis_panel.js'), 'utf8');
+	check(
+		/const rank = 1 \+ scores\.filter\(\(other\) => E\.rankOrder\(other, result\) < 0\)\.length;/.test(
+			panel
+		),
+		'panel: the edited layout is ranked by E.rankOrder'
+	);
+	const body = (name) =>
+		page.match(new RegExp(`function ${name}\\(\\) \\{[\\s\\S]*?\\n\\t\\t\\}`))[0];
+	const chart = body('renderChart');
+	check(!/\.sort\(/.test(chart), 'chart: the bars follow the ranking, not a sort of their own');
+	check(
+		/incompleteFlag\(result\)/.test(chart) && /incompleteFlag\(result\)/.test(body('renderTable')),
+		'chart and table: an incomplete layout carries its flag'
+	);
 }
 
 if (errors.length > 0) {

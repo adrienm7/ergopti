@@ -290,6 +290,9 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		headline.setAttribute('role', 'status');
 		const rankNote = el('p', 'la-panel-note');
 		rankNote.hidden = true;
+		// A layout that cannot type the space or a letter: what it lacks, and why it ranks last.
+		const incompleteNote = el('p', 'la-panel-note la-panel-incomplete');
+		incompleteNote.hidden = true;
 		const note = el('p', 'la-panel-note');
 		const metrics = el('table', 'la-panel-metrics');
 		// Where the layout offers a choice: how often and which characters.
@@ -307,7 +310,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		// panel spans the editor's width: the settings and score, the finger load
 		// and analysers, then the fingering board.
 		const scoreColumn = el('div', 'la-panel-column');
-		scoreColumn.append(controls, headline, rankNote, note, metrics, typing);
+		scoreColumn.append(controls, headline, incompleteNote, rankNote, note, metrics, typing);
 		const loadColumn = el('div', 'la-panel-column');
 		loadColumn.append(fingersTitle, fingers, analysersTitle, analysers, extra);
 		const fingeringColumn = el('div', 'la-panel-column');
@@ -430,7 +433,10 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			]);
 		}
 
-		/** The ranked layouts' scores on these settings, computed once for them. */
+		/**
+		 * The ranked layouts' standings on these settings (whether each is
+		 * complete, and its score: what E.rankOrder compares), computed once.
+		 */
 		function libraryScores(prepared, settings) {
 			const pool = rankPool();
 			const key = rankKey(settings, pool);
@@ -443,7 +449,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					shortcuts: settings.shortcuts,
 					formWeights: settings.formWeights,
 					profile: settings.profile
-				}).map((r) => r.score.total);
+				}).map((r) => ({ incomplete: r.incomplete, score: { total: r.score.total } }));
 				state.libraryKey = key;
 			}
 			return state.library;
@@ -453,6 +459,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			tellHeat(null);
 			headline.textContent = text;
 			headline.className = 'la-panel-score la-panel-error';
+			incompleteNote.hidden = true;
 			metrics.replaceChildren();
 			typing.textContent = '';
 			fingers.replaceChildren();
@@ -504,13 +511,22 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			await new Promise((resolve) => setTimeout(resolve, 0));
 			if (mine !== state.generation) return;
 			const scores = libraryScores(prepared, settings);
-			const rank = 1 + scores.filter((score) => score > result.score.total).length;
+			// A complete layout ranks before an incomplete one, then by score.
+			const rank = 1 + scores.filter((other) => E.rankOrder(other, result) < 0).length;
 			headline.className = 'la-panel-score';
 			headline.textContent = t('layout_analysis.panel.score', {
 				score: format(result.score.total, SCORE_DIGITS),
 				rank,
 				count: scores.length + 1
 			});
+			incompleteNote.hidden = !result.incomplete;
+			incompleteNote.textContent = result.incomplete
+				? t('layout_analysis.incomplete.details', {
+						chars: result.coverage.missingRequired
+							.map((char) => (char === ' ' ? t('layout_analysis.incomplete.space') : char))
+							.join(' ')
+					})
+				: '';
 			// Ranked among the Comparer's ticks while none is ticked: say so.
 			rankNote.hidden = !(state.rank === RANK_SELECTION && scores.length === 0);
 			const same =

@@ -990,6 +990,24 @@ function checkKeyboardFormats(model) {
 }
 
 /**
+ * Rejects a required character set the engine could not check: one string of
+ * distinct single code points, holding the space and the 26 letters a–z in
+ * each case (maintainer, 2026-11-17: a layout missing one is incomplete).
+ * @param {object} model - analysis_model.json.
+ * @throws {Error} On a broken set.
+ */
+function checkRequiredCharacters(model) {
+	const value = model.required_characters;
+	if (typeof value !== 'string' || value === '') throw new Error('required_characters: none');
+	const chars = Array.from(value);
+	if (new Set(chars).size !== chars.length)
+		throw new Error('required_characters: a repeated character');
+	const letters = 'abcdefghijklmnopqrstuvwxyz';
+	for (const char of [' '].concat(Array.from(letters), Array.from(letters.toUpperCase())))
+		if (!chars.includes(char)) throw new Error(`required_characters: no ${JSON.stringify(char)}`);
+}
+
+/**
  * Rejects an ideal finger load that breaks the maintainer's rule: each hand
  * sums to half, index ≥ middle ≥ ring ≥ pinky, pinkies under 8 %.
  * @param {object} load - finger → %.
@@ -1066,6 +1084,7 @@ function buildData() {
 	// The engine keeps an edited load in the same order (analysis_engine.js idealLoad).
 	model.ideal_finger_load_hands = HAND_FINGERS;
 	checkKeyboardFormats(model);
+	checkRequiredCharacters(model);
 	delete model._description;
 	return {
 		schema_version: 1,

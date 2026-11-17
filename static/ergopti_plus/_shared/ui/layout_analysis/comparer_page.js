@@ -961,6 +961,29 @@
 		// ======= 5/ Rendering =====
 		// ==========================
 
+		/**
+		 * The required characters a layout lacks, as the page writes them: the
+		 * space by its name, the letters as they are.
+		 * @param {string[]} chars - result.coverage.missingRequired.
+		 * @returns {string}
+		 */
+		function missingText(chars) {
+			return chars
+				.map((char) => (char === ' ' ? t('layout_analysis.incomplete.space') : char))
+				.join(' ');
+		}
+
+		/** The flag an incomplete layout carries in the chart and the table. */
+		function incompleteFlag(result) {
+			return el(
+				'span',
+				'la-incomplete-flag',
+				t('layout_analysis.incomplete.flag', {
+					chars: missingText(result.coverage.missingRequired)
+				})
+			);
+		}
+
 		function render() {
 			renderChart();
 			renderTable();
@@ -1003,20 +1026,25 @@
 				const row = el('div', 'la-chart-row');
 				const value = format(result.score.total, 1);
 				const gap = result.score.total - best;
+				// An incomplete layout ranks after the complete ones and says what it lacks.
+				const flag = result.incomplete ? incompleteFlag(result) : null;
 				openOnActivate(
 					row,
 					result.layout.id,
 					t('layout_analysis.chart.row', {
-						layout: result.layout.name,
+						layout: flag ? `${result.layout.name} (${flag.textContent})` : result.layout.name,
 						rank: result.rank,
 						score: value
 					})
 				);
 				if (state.details === result.layout.id) row.classList.add('la-selected');
+				if (flag) row.classList.add('la-incomplete');
 				// The name starts with the visible text, name then value (WCAG 2.5.3);
 				// the spaces between the cells, unrendered in the grid, keep the
 				// two words apart in that visible text.
-				row.append(el('span', 'la-chart-label', result.layout.name), ' ');
+				const label = el('span', 'la-chart-label', result.layout.name);
+				if (flag) label.append(' ', flag);
+				row.append(label, ' ');
 				const track = el('span', 'la-chart-track');
 				const layout = byId.get(result.layout.id);
 				const personal = !layout || !SHAREABLE_ORIGINS.includes(layout.origin);
@@ -1026,7 +1054,9 @@
 				bar.style.left = '0%';
 				bar.style.width = `${3 + share * 97}%`;
 				track.append(bar);
-				row.title = `${result.layout.name}: ${value} ${t('layout_analysis.unit.points')}`;
+				row.title = `${result.layout.name}: ${value} ${t('layout_analysis.unit.points')}${
+					flag ? ` (${flag.textContent})` : ''
+				}`;
 				const cell = el('span', 'la-chart-value', value);
 				if (gap < 0) cell.append(' ', el('span', 'la-chart-gap', `(${format(gap, 1)})`));
 				row.append(track, ' ', cell);
@@ -1162,9 +1192,13 @@
 				if (state.details === result.layout.id) tr.className = 'la-selected';
 				for (const column of columns) {
 					const value = column.value(result);
-					tr.append(
-						el('td', '', column.digits === undefined ? String(value) : format(value, column.digits))
+					const cell = el(
+						'td',
+						'',
+						column.digits === undefined ? String(value) : format(value, column.digits)
 					);
+					if (column.key === 'name' && result.incomplete) cell.append(' ', incompleteFlag(result));
+					tr.append(cell);
 				}
 				tr.tabIndex = 0;
 				tr.addEventListener('click', () => showDetails(result.layout.id));
@@ -2149,6 +2183,11 @@
 				)
 				.join(' ');
 			$('la-unsupported').textContent = [
+				result.incomplete
+					? t('layout_analysis.incomplete.details', {
+							chars: missingText(result.coverage.missingRequired)
+						})
+					: '',
 				missing ? t('layout_analysis.details.unsupported', { chars: missing }) : '',
 				result.coverage.missingKeys.length > 0
 					? t('layout_analysis.details.missing_keys', {

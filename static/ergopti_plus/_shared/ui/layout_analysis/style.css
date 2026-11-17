@@ -335,6 +335,18 @@ body:has(> main.layout-analysis) {
 	white-space: nowrap;
 }
 
+/* A layout that cannot type the space or a letter: ranked last, flagged in
+   words (never by colour alone), its bar faded. */
+.la-incomplete-flag {
+	color: var(--la-bad);
+	font-size: 0.9em;
+	font-weight: 600;
+}
+
+.la-incomplete .la-bar {
+	opacity: 0.45;
+}
+
 .la-chart-track {
 	background: var(--la-surface-2);
 	border-radius: 3px;

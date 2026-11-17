@@ -101,6 +101,12 @@
 	margin: 0 0 8px;
 }
 
+/* An incomplete layout says so in words, in the refusal colour. */
+.la-panel-incomplete {
+	color: var(--theme-bad-text);
+	font-weight: 600;
+}
+
 /* ============================== */
 /* ============================== */
 /* ======= 2/ Metrics & fingers = */
