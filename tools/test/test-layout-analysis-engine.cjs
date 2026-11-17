@@ -23,7 +23,9 @@
  * 4. Library: about a hundred layouts with unique ids, every registry layout
  *    with its dead keys, and the reference QWERTY as its source says.
  * 5. Incremental score: scoreSession gives the full analysis's score after
- *    random swaps of any cells and dead-key rules (a property test), keeps a
+ *    random swaps of any cells and dead-key rules (a property test) on
+ *    layouts with one way per character and with several (Ergo-L, Ergopti,
+ *    bépo: the incremental context plan and walk), keeps a
  *    trial only once committed, and refuses a layout on another board.
  * 6. Ways of typing: in context the cheaper copy of a character (« a. »,
  *    « b. »), direct, AltGr or dead key by their documented costs, a
@@ -974,6 +976,9 @@ for (const layout of library) {
 	];
 	let trials = 0;
 	let worst = 0;
+	// How the trials were walked: the layouts with choices must take the
+	// incremental context walk, not only the whole-stream fallback.
+	const walks = {};
 	for (const { layout: id, options } of cases) {
 		if (!byId.has(id)) {
 			check(false, `incremental: the library has no ${id}`);
@@ -989,6 +994,7 @@ for (const layout of library) {
 		for (let s = 0; s < SWAPS; s++) {
 			const candidate = mutate(current);
 			const trial = session.trial(candidate);
+			walks[`${id}:${trial.walk}`] = (walks[`${id}:${trial.walk}`] || 0) + 1;
 			const expected = full(candidate);
 			const gap = Math.abs(trial.total - expected);
 			worst = Math.max(worst, gap);
@@ -1010,6 +1016,17 @@ for (const layout of library) {
 		}
 	}
 	check(trials >= cases.length * SWAPS, `incremental: only ${trials} trials ran`);
+	for (const id of ['ergol', 'ergopti', 'bepo'])
+		check(
+			(walks[`${id}:context`] || 0) >= SWAPS / 2,
+			`incremental: ${id} (several ways per character) re-walks its changed contexts: ${JSON.stringify(walks)}`
+		);
+	// Every walk is held to the full score: each must have run.
+	for (const walk of ['stream', 'context', 'whole'])
+		check(
+			Object.keys(walks).some((key) => key.endsWith(':' + walk)),
+			`incremental: no trial took the ${walk} walk: ${JSON.stringify(walks)}`
+		);
 	// A trial leaves the session where it was until it is committed.
 	const azerty = byId.get('azerty');
 	const session = E.scoreSession(azerty, sessionTable, {});

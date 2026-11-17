@@ -110,7 +110,22 @@ it gains its speed from:
   the refactor on the whole library). Measured (Node, « Swann », AZERTY,
   99 % of the n-grams, 2 000 swaps, a loaded Ryzen 5 3500U): 94 → 288
   layouts per second per worker (×3). A swap of a frequent letter still
-  walks about 15 % of the trigrams, which bounds the gain;
+  walks about 15 % of the trigrams, which bounds the gain.
+  A layout that offers a choice of ways (several ways for a character,
+  [layout-analysis.md](layout-analysis.md#ways-of-typing)) is planned from
+  the current plan (`planTyping`'s previous): only the choices whose
+  context — the trigram around an occurrence, and the tokens before and
+  after it, through the skipgram tallies — holds a token whose ways changed
+  are made again, by the same code in the same order as from nothing (the
+  plan is the same to the last bit), and the trial walks only the tokens,
+  pairs and triples whose ways, choice or shares of ways actually changed.
+  A trial that changes the chords or the set of multi-way tokens walks the
+  whole stream. Measured in the optimizer's own annealing (Swann, 99 % of
+  the n-grams, 120 swaps, interleaved on one loaded laptop, against the
+  whole-stream walk of 6a3858f2a6): Ergo-L 16.7 → 23.0, Ergopti 22.7 →
+  35.1, bépo 8.7 → 15.1, AZERTY 110 → 116 trials per second, with the
+  same results. What is left is the compile of the trial's layout (dead
+  keys: 4 ms on Ergopti, 15 ms on bépo) and the plan's fixed part;
 - Web Workers, one share of the restarts each (up to 8, one thread left to the
   page), so the Studio stays responsive and a run uses every core;
 - the « 99 % of the n-grams » accuracy (`searchTables`), which keeps the most
@@ -176,13 +191,6 @@ only), keyboard ISO, format TKL, default weights, 1 restart of 3 000 swaps on
 - Faster incremental scoring: a trial still compiles the whole layout and
   re-measures the layout-level metrics (shortcuts, digits, coverage), about
   1 ms; caching each entry's last key pattern would halve the walk.
-- Incremental scoring with context choices: the engine now types each
-  character the way that costs least in its context
-  ([layout-analysis.md](layout-analysis.md#ways-of-typing)), and
-  `scoreSession` keeps its partial walk only while the current layout and the
-  trial type every corpus character one way, with no chord. From AZERTY (the
-  default start) nothing changes; from a layout with choices each trial walks
-  the whole stream, exact but slow (Swann: Ergopti 95 → 17, Ergo-L 130 → 18
-  trials per second). The exact partial walk re-walks the n-grams of the
-  characters whose ways changed and of the multi-way characters whose
-  shares of ways changed, and re-plans only their contexts.
+- Incremental compile: a trial compiles its whole layout, which dominates
+  on dead-key layouts (bépo 15 ms, Ergopti 4 ms of a trial); a swap only
+  changes the ways that pass through its two keys.

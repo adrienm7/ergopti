@@ -847,8 +847,11 @@ a full compile. Measured on Nemolivier, Node 22, on a loaded Windows laptop
 Ergo-L 38 → 60 ms, Ergopti 24 → 49 ms, the library 1.38 → 1.69 s.
 `scoreSession` keeps its partial walk for layouts without choices (AZERTY,
 the optimizer's default start: about 100 → 94 trials per second on Swann);
-from a layout with choices each trial walks the whole stream (Ergopti 95 →
-17, Ergo-L 130 → 18 trials per second).
+a layout with choices is planned from the current plan, re-deciding only the
+contexts a changed token reaches, and walks only what changed
+([layout-optimizer.md](layout-optimizer.md), « Speed »: Ergopti 22.7 → 35.1,
+Ergo-L 16.7 → 23.0, bépo 8.7 → 15.1 trials per second). compileWays skips a
+dead-key rule whose prefix and tail lists did not change since its last pass.
 
 ## Decided by the agent, to review by the maintainer
 
