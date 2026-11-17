@@ -40,7 +40,7 @@ _HNRT_Source() {
 	Owners := Map()
 	for Symbol in ["_HCWWeb_TryOpen", "HotstringsLanguagePacks", "ReadTomlFile", "Gui_Create",
 		"WMPresentWindow", "RebuildHotstringsLive", "_HSE_SourcePriority", "_PersonalTomlOverrideFields",
-		"NotifierSend"] {
+		"NotifierSend", "A11ySystem_SetAccessibleName"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "" && !Owners.Has(Owner), "Each real component owner is uniquely admitted: " . Symbol)
 		Owners[Owner] := true
