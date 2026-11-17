@@ -11,13 +11,9 @@ answers each of them in `docs/field-reports/mac-<stamp>/todo_summary.md` (guided
 terminal): coverage table, verdicts and what no run can test in
 [docs/tooling/macos-field-report-coverage.md](docs/tooling/macos-field-report-coverage.md).
 
-- [ ] <!-- field-point: raw_telemetry --> Raw telemetry (2026-11-11): Metrics on, move, resize and full-screen a window, drag it to a second screen and
+- [ ] <!-- field-point: raw_telemetry --> Raw telemetry: Metrics on, move, resize and full-screen a window, drag it to a second screen and open Zoom or OBS: `events_window_topo` and `events_av` hold the rows; turn Wi-Fi off then on and connect a VPN (WireGuard or the system IPsec client): `events_network` holds `internet_down`, `internet_up`, `vpn_connected` and `vpn_disconnected`, and an idle iCloud Private Relay utun records no VPN.
 
-      open Zoom or OBS: `events_window_topo` and `events_av` hold the rows; turn Wi-Fi off then on and connect a VPN
-      (WireGuard or the system IPsec client): `events_network` holds `internet_down`, `internet_up`,
-      `vpn_connected` and `vpn_disconnected`, and an idle iCloud Private Relay utun records no VPN.
-
-- [ ] <!-- field-point: pac_real --> PAC route lists with a real PAC (dead relay then DIRECT or a live relay): field report: `field_network` (`route_lookup`) and `field_pac_fallback` on a network with a PAC. Native XCTest milestone: `ManagedProxyRouteWorkerTests` compiled and passed all 23 cases on macOS 26 in [CI run 42374265115](https://github.com/adrienm7/ergopti/actions/runs/42374265115/job/128410747338), source `07dda15c1`, including the native TCP listener probe; the injected route-list cases do not close application receiving with a real PAC.
+- [ ] <!-- field-point: pac_real --> PAC route lists with a real PAC (dead relay then DIRECT or a live relay): field report: `field_network` (`route_lookup`) and `field_pac_fallback` on a network with a PAC; the injected route-list cases of `ManagedProxyRouteWorkerTests` do not close application receiving with a real PAC.
 
 - [ ] <!-- field-point: minimum_tap --> Minimum tap: with CapsLock set to Enter on tap and Ctrl on hold, a bounce of about 20 ms types nothing and leaves no Ctrl held, a 60 ms tap types Enter, and Space still types at once in fast typing (owned runtime `to_delayed_action` timing, generator `apply_tap_minimum`).
 - [ ] <!-- field-point: lalt_one_shot --> Left Command's one-shot Shift (2026-11-12): with Left Command tapping the one-shot Shift and holding nothing, a tap then a letter types it capitalised, holding it shifts each key typed under it, and under a held Right Option, Caps Lock, Left Shift or Fn it fires nothing, as Windows' `lalt.ahk` 4.1 (generator `HELD_SHIFT_ONE_SHOT_TAPS`, model test `lalt-one-shot-held-shift`).
@@ -51,7 +47,10 @@ Field run, no person needed (read the next report):
   low limit) and a launcher.log trail starting `fd-limit-256-to-10240`. With Karabiner-Elements running, check
   that the trail has no `vhid-bootstrap-<n>` and that `field_owned_start` passes.
 - [ ] <!-- field-point: managed_ollama_0406 --> Managed Ollama 0.40.6 (rebuild with `tools/build/build-macos-managed-ollama.py` first): field report: `field_ai_local` behind a PAC-only or explicit proxy with no direct route, and `field_network_hosts` (the registry).
-- [ ] <!-- field-point: physical_shortcut_delivery --> Physical shortcut delivery: `keyboard_shortcuts.physical_delivery_available` answers true since the maintainer's decision of 2026-11-11 (the « Pas encore disponible » row was closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778) before that; `test_physical_shortcuts_row_available` now pins that a false answer still greys it so). Field report: with a physical slot bound in « Raccourcis physiques », the source key is suppressed once, no other owner (tap-hold, layer, hotstring, magic key) acts on it, and the action's output reaches the focused app under Karabiner and the keymap tap; the editor captures and saves the slot.
+- [ ] <!-- field-point: physical_shortcut_delivery --> Physical shortcut delivery: field report: with a physical
+      slot bound in « Raccourcis physiques », the source key is suppressed once, no other owner (tap-hold, layer,
+      hotstring, magic key) acts on it, and the action's output reaches the focused app under Karabiner and the keymap
+      tap; the editor captures and saves the slot.
 - [ ] <!-- field-point: taphold_word_reset --> Tap-hold word reset: with « Un tap ou un hold sur une touche tap-hold commence un nouveau mot » on and « Un raccourci clavier commence un nouveau mot » off, a tap-hold copy (Cmd+C tap) between two words makes the next word-start hotstring fire, the user's own Cmd+C does not, and no F20 reaches TextEdit or a Finder rename; switching the option off keeps the word. Karabiner-Elements must deliver the tagged F20 before the chord. Then with Caps Lock (or another tap-hold key) held as Ctrl or Cmd: a shortcut struck under it follows the same option, the user's own Cmd+C afterwards follows « Un raccourci clavier commence un nouveau mot », Ctrl held by hand before the key still reaches the tap (Ctrl+Enter), and no context-menu key reaches TextEdit or a Finder rename (Karabiner-Elements must deliver the untagged `application` key before the hold's modifier).
 - [ ] <!-- field-point: ai_inline_autotype --> AI inline auto-type: the engine (typed without Tab, a correction with deletions stays in the bubble) is `test_prediction_inline_autotype`; the typing into a real editor with a model is field report: `prediction_tooltip` with « Inline auto-type » on.
 - [ ] <!-- field-point: api_entries_backup --> Backup of the API entries: the backup and the restore are unit-tested (`test_config_backup_api_entries`, `test_changelog_release_install`). Decided by the maintainer on 2026-11-11: deleting an entry keeps deleting its Keychain item (`modules/llm/init.lua` `delete_entry_ids` → `retry_pending_api_token_deletes`), so an entry restored from a backup taken before that deletion needs its key re-entered. Field report: restore such a backup; the model selector page greys the entry with « Clé manquante : cette entrée est revenue d’une sauvegarde sans sa clé… » and its « Clé API… » action takes a new key, after which the entry answers (unit-tested by `test_api_token_absent_read`: the launcher's `itemNotFound` exit 69, the resolver's mark, the page row). An entry whose key survived still works unchanged.
@@ -59,11 +58,10 @@ Field run, no person needed (read the next report):
 - [ ] <!-- field-point: owned_ollama_pulls --> Owned Ollama starts and pulls: field report: `field_ai_local` (ready daemon) and `ollama_model` (a done pull) (6170813ea9, 6335790e5a, 894585a213, b71b4a67db, 4545f672d1, 721074f21d).
 - [ ] <!-- field-point: test_models --> Test models: field report: `ollama_model` and `mlx_model` (one complete download each) on a connection that does not count (e8ff7479e1). If `mlx_model` fails `download_launcher_failed` again, read the `step=`, `cause=` and quoted lines of its « MLX download launcher failed » line and fix that step (a `gatekeeper` or `import_failed` cause goes to the MLX repair, `network_admission_refused` to the managed network receiver).
 - [ ] <!-- field-point: timed_reload --> Timed reload: field report: `driver_reload` passes with its `reload_ms` under 4000 ms (b12a654d79, 02c58f8a94, c366dd1c5b, c0ba1d98bb, 8121349ee7, e6426e2ec5).
-- [ ] <!-- field-point: remap_guardian --> Remap guardian: `field_login_items` `developer_adhoc_reregistered` on a Mac that holds an earlier build's
-      Background Items record, no `ErgoptiPlus` codesigning kill in `field_app_health`, `guardian_state` ready with
-      `guardian_wait` under 10 s, and the same on an Intel Mac (2be257c9f5). Hosted CI proves the ad hoc installed-app
-      path on Apple silicon: registration, repeat registration (62eb698420), readback (34888894dd) and retirement pass
-      in all five Install-and-launch rows (run 41257389239).
+- [ ] <!-- field-point: remap_guardian --> Remap guardian: `field_login_items` `developer_adhoc_reregistered` on a
+      Mac that holds an earlier build's Background Items record, no `ErgoptiPlus` codesigning kill in
+      `field_app_health`, `guardian_state` ready with `guardian_wait` under 10 s, and the same on an Intel Mac
+      (2be257c9f5).
 - [ ] <!-- field-point: main_thread_holds --> Main-thread holds (ledger L16, L17, L18, L23; 0b679b0b0d, b5c0c0de37, c17aa3e5d7, 71a8b87f65, 236ea82e52,
       933707a1ae, 016ef6adc5, 58f82e9fdc, 6c30779ec3): menu rebuild (`field_menu_build` `menu_layout_slowest`,
       `slow_hold_phase`), preferences save (`slow_preferences_save_stage`, `_forks`), keystats append and ledger read
@@ -129,86 +127,84 @@ Hands needed:
       prompt reports `cancelled` and changes nothing.
 - [ ] <!-- field-point: scpt_recompile --> Run the field report once: field report: `scpt_recompile` rebuilds `Encryptor.app/.../main.scpt` from its updated `.applescript` (keystats rename) and commits it on the field branch (710f0a379d); cherry-pick that commit.
 - [ ] <!-- field-point: predictions_stop --> Predictions stop on activity: the cancellations (pointer, scroll, gestures, a key the tooltip did not consume) and Tab, Shift+Tab, arrows and digits acting on it are `test_mouse_tap_pointer_activity`, `test_prediction_cancelled_by_user_activity` and `test_llm_tooltip_chords_consumed`; on the Mac: field report: `field_log_signals` `log_prediction_activity_cancels` (one `User activity (mouseMoved)` per cancellation, at DEBUG). A person still checks Cmd+Tab, a click in another app, F5 and that mouseMoved in the keymap mouse tap adds no visible pointer lag.
-- [ ] <!-- field-point: config_nfd_paths --> Configuration paths in NFD and NFC (configuration campaign, open row, moved here
-      2026-11-13 by worker F): put `config.toml` and a personal hotstring file in a folder named `Données` once typed
-      composed (NFC) and once created by Finder (decomposed, NFD), point `paths.toml` at it: the driver reads, saves and
-      reloads both, the menu names the folder as typed, and no « file not found » or duplicate backup appears.
-- [ ] <!-- field-point: native_ui_receiving --> Runtime, editor and diagnostics receiving ([native UI audit](docs/audits/platform-parity/2026-11-05-native-ui/report.md),
-      moved here 2026-11-13 by worker F): in the layout editor, the navigation layer editor and the diagnostics page,
-      make a save fail (read-only `config.toml`), reload the driver while a window is open, and close a window during a
-      save: each refusal is told once, nothing is half written, no timer or window outlives its owner (log lines name
-      the cleanup).
-- [ ] <!-- field-point: input_policies --> Branch `wave3/input-policies` (2026-11-06): CapsWord closed on the macOS lane [run 42926643778](https://github.com/adrienm7/ergopti/actions/runs/42926643778) (`test_watchers_capsword_auto_off` « a second CapsWord action ends it at once and unlocks CapsLock », `test_karabiner_actions_reachable`, `test_menu_caps_word` « ★ » after the rename). Native one-shot Shift (modifier-map, dead-key and IME handling of the captured key) and CapsWord key/control payload receiving stay hands (moved from the one-shot and CapsWord parity follow-ups).
+- [ ] <!-- field-point: config_nfd_paths --> Configuration paths in NFD and NFC: put `config.toml` and a personal
+      hotstring file in a folder named `Données` once typed composed (NFC) and once created by Finder (decomposed,
+      NFD), point `paths.toml` at it: the driver reads, saves and reloads both, the menu names the folder as typed, and
+      no « file not found » or duplicate backup appears.
+- [ ] <!-- field-point: native_ui_receiving --> Runtime, editor and diagnostics receiving
+      ([native UI audit](docs/audits/platform-parity/2026-11-05-native-ui/report.md)): in Ergopti Studio and the
+      diagnostics page, make a save fail (read-only `config.toml`), reload the driver while a window is open, and close
+      a window during a save: each refusal is told once, nothing is half written, no timer or window outlives its owner
+      (log lines name the cleanup).
+- [ ] <!-- field-point: input_policies --> Input policies: native one-shot Shift (modifier-map, dead-key and IME
+      handling of the captured key) and CapsWord key/control payload receiving.
 - [ ] <!-- field-point: pause_ends_capsword --> A pause ends CapsWord (worker P, 2026-11-14): switch CapsWord on, then pause Ergopti: CapsLock goes off at once and stays off through the pause (`watchers.end_capsword_for_pause`, `test_pause_ends_capsword`); a CapsLock set by hand before the pause stays on.
-- [ ] <!-- field-point: layout_editor_window --> Layout editor window (2026-11-13): « Create or edit a layout… » and the layout manager's « Layout editor » open the editor in its own window; a second request brings it to the front with its unsaved work; « Close » closes it. Ergopti Studio (2026-11-14, `claude/ergopti-todo-studio-app`): the top-level « 🎨 Ergopti Studio… » row, right after « Keyboard layout », opens the same window, titled exactly « Ergopti Studio ». Studio tabs (2026-11-14, `claude/ergopti-todo-studio-app`): « Comparer » shows the layout ranking for a built-in corpus within a second, an imported layout is still listed after closing and reopening the window, and « Analyse my typing » then selects « My typing » in « Comparer ». XKB and KLC downloads (2026-11-15, `claude/ergopti-todo-native-export`): in the layout editor window's « Export » tab, « XKB » and « KLC » write `<id>_xkb.zip` and `<dll>.klc` to the Downloads folder, built by the host’s Lua (lua_export). « Open » shows the native open panel (`source_pick`) and opens the chosen source. Downloads (2026-11-14, `layout_editor_downloads`): the window's XKB, KLC, DLL and macOS bundle downloads land in the Downloads folder, a second download of the same file is named « name (2).ext », and the XKB archive installs with the user layout installer. Studio tabs and autosave (2026-11-15, `claude/ergopti-todo-studio-w-2`): in « Éditer », « + » opens a second layout in its own tab; edit both, kill the driver (or close the window), reopen « Ergopti Studio »: both tabs and their unsaved edits are back, from `layout_sources/studio_workspace.json`; « Export all » writes `ergopti-studio-layouts.zip` to the Downloads folder and « Import » of that file reopens every layout. Other layout formats (2026-11-16): « Open » in the native open panel lists .json, .klc and .kbe files, opens a KLAnext JSON (static/layouts/kla_iso) and a UTF-16 .klc, and refuses a KbdEdit .kbe with the « KbdEdit encrypts » message; the « Format » drop-down's « KLA / KLAnext JSON » and « Kalamine TOML » downloads land in the Downloads folder.
-      Navigation layer in the Studio (2026-11-15, `claude/ergopti-todo-studio-nav-entry`): the Tap-Holds menu's « Edit the navigation layer… » row and a
-      gesture bound to « Navigation layer » open Ergopti Studio on its « nav » layer, holding the current layer
-      key, with the user's layers.toml bindings; « Apply the navigation layer » then changes the layer live, and
-      layers.toml starts with « # source: » and « # body-fnv1a32: ».
+- [ ] <!-- field-point: layout_editor_window --> Ergopti Studio window: « Create or edit a layout… », the layout
+      manager's « Layout editor » and the top-level « 🎨 Ergopti Studio… » row (right after « Keyboard layout ») open
+      one window titled exactly « Ergopti Studio »; a second request brings it to the front with its unsaved work;
+      « Close » closes it. Tabs: « Comparer » shows the layout ranking for a built-in corpus within a second, an
+      imported layout is still listed after closing and reopening the window, and « Analyse my typing » then selects
+      « My typing ». Autosave: in « Éditer », « + » opens a second layout in its own tab; edit both, kill the driver
+      (or close the window), reopen the Studio: both tabs and their unsaved edits are back, from
+      `layout_sources/studio_workspace.json`; « Export all » writes `ergopti-studio-layouts.zip` to the Downloads
+      folder and « Import » of that file reopens every layout. Formats: « Open » shows the native open panel
+      (`source_pick`), lists .json, .klc and .kbe files, opens a KLAnext JSON (static/layouts/kla_iso) and a UTF-16
+      .klc, and refuses a KbdEdit .kbe with the « KbdEdit encrypts » message. Downloads: the XKB and KLC (built by the
+      host's Lua), DLL, macOS bundle, « KLA / KLAnext JSON » and « Kalamine TOML » downloads land in the Downloads
+      folder, a second download of the same file is named « name (2).ext », and the XKB archive installs with the user
+      layout installer. Navigation layer: the Tap-Holds menu's « Edit the navigation layer… » row and a gesture bound
+      to « Navigation layer » open the Studio on its « nav » layer, holding the current layer key, with the user's
+      layers.toml bindings; « Apply the navigation layer » then changes the layer live, and layers.toml starts with
+      « # source: » and « # body-fnv1a32: ».
 - [ ] <!-- field-point: one_shot_modifiers --> One-shot modifiers (worker A, 2026-11-13): the sticky delay row accepts 0 and shows « no time limit », the
       one-shot Shift and a gesture-armed `sticky_*` then never auto-cancel; a Karabiner tap-hold key set to tap
       `sticky_altgr` and hold Option types one Option-level character after a tap.
-- [ ] <!-- field-point: shortcut_key_carriage --> Native carriage of `shortcut_key` (moved 2026-11-15 from TODO.md
-      « Native carriage of `shortcut_key` (2026-11-15) », its real-OS proof once the [CODE] part is written): the
-      exported .keylayout carries the shortcut key on its Command level, and with the layout installed, Command plus
-      that key sends the shortcut key.
-- [ ] <!-- field-point: issue_106_runtime_admission --> Issue #106, owned Karabiner runtime not admitted (moved
-      2026-11-15 from TODO.md « [MACOS] Issue #106 », Windows CI reliability; f71d6eb884, 84090226ab): rules stay
-      fail-closed on an affected Mac (Clem, dev.166, macOS 27.3; the maintainer's Mac too). The misleading « lease
-      auto-recovery exhausted » error is gone and the installer helper refusal names its cause
-      (`helper_signature_invalid`, `helper_signature`, `helper_code_hashes`); the helper of
-      `remap-runtime-v16.3.0-ergopti.3` and the dev.166 launcher carry the same leaf (759d8aae…), so the leaf is not
-      the cause. On v1.0.10-dev.175 or later (the latest runtime is now ergopti.6), collect the `remap.runtime_owner`
-      lines (« unavailable: <reason> ») and `launcher.log` « owned runtime install: refused (…) ».
-- [ ] <!-- field-point: recovery_scenarios --> Recovery audit scenarios on an isolated Mac (moved 2026-11-15 from
-      TODO.md « [PHYS-M] », Migration and update parity follow-up; [recovery
-      audit](docs/audits/platform-parity/2026-11-04-recovery/report.md)): receive the recovery audit scenarios on
-      isolated macOS: Darwin migration/permission/rename contracts, selected-profile restart adoption and Versions
-      ARMED/refused-exit reconciliation. Linux physical ports do not close Hammerspoon/APFS qualification. Not
-      started.
-- [ ] <!-- field-point: flow_scenarios --> Flow receiving scenarios on an isolated Mac (moved 2026-11-15 from TODO.md
-      « [PHYS-W] / [PHYS-M] / [PHYS-L] », End-to-end parity follow-up; [flow
-      review](docs/audits/platform-parity/2026-11-04-flows/report.md)): execute every macOS receiving scenario named
-      by the flow report on an isolated native host. Source/recording-port tests do not close native focus, selection,
-      keyring, application or device qualification.
-- [ ] <!-- field-point: deep_device_scenarios --> Native acceptance, device and provider scenarios (moved 2026-11-15
-      from TODO.md « Native acceptance », Deep OS × module follow-up; [18-scope
-      review](docs/audits/platform-parity/2026-11-04-deep/report.md)): run the unexecuted Mac device and provider
-      scenarios from each module coverage register. Lua/PowerShell recording-port probes are not native desktop
-      certification.
-- [ ] <!-- field-point: karabiner_layout_actions --> Karabiner layout actions, which half is slow (moved 2026-11-15
-      from TODO.md « Field report 2026-11-03 », macOS, branch `fix/macos-field-2026-11-03`;
-      `test_actions_not_rebuilt_per_layout`): in the next Mac field report, the phase lines
+- [ ] <!-- field-point: shortcut_key_carriage --> Native carriage of `shortcut_key`: the exported .keylayout
+      carries the shortcut key on its Command and Control levels, and with the layout installed, Command plus that key
+      sends the shortcut key.
+- [ ] <!-- field-point: issue_106_runtime_admission --> Issue #106, owned Karabiner runtime not admitted
+      (f71d6eb884, 84090226ab): rules stay fail-closed on an affected Mac (Clem, dev.166, macOS 27.3; the maintainer's
+      Mac too); the helper leaf is not the cause. On v1.0.10-dev.175 or later (latest runtime ergopti.6), collect the
+      `remap.runtime_owner` lines (« unavailable: <reason> ») and `launcher.log` « owned runtime install: refused (…) »;
+      the installer helper refusal names its cause (`helper_signature_invalid`, `helper_signature`,
+      `helper_code_hashes`).
+- [ ] <!-- field-point: recovery_scenarios --> Recovery audit scenarios on an isolated Mac
+      ([recovery audit](docs/audits/platform-parity/2026-11-04-recovery/report.md)): Darwin migration, permission and
+      rename contracts, selected-profile restart adoption and Versions ARMED/refused-exit reconciliation.
+- [ ] <!-- field-point: flow_scenarios --> Flow receiving scenarios on an isolated Mac
+      ([flow review](docs/audits/platform-parity/2026-11-04-flows/report.md)): every macOS receiving scenario the flow
+      report names (native focus, selection, keyring, application and device qualification).
+- [ ] <!-- field-point: deep_device_scenarios --> Native acceptance, device and provider scenarios
+      ([18-scope review](docs/audits/platform-parity/2026-11-04-deep/report.md)): the unexecuted Mac device and
+      provider scenarios of each module coverage register.
+- [ ] <!-- field-point: karabiner_layout_actions --> Karabiner layout actions, which half is slow
+      (`test_actions_not_rebuilt_per_layout`): in the next field report, the phase lines
       `karabiner.layout_actions.keyboard_form` (the registry snapshot) and `karabiner.layout_actions.key_codes` (the
       548 `hs.keycodes.map` lookups) and the slow-callback attributions name the half of the 230 ms cold phase to
-      move.
-- [ ] <!-- field-point: one_folder_name --> One folder name (moved 2026-11-15 from TODO.md « One folder name for
-      Ergopti on the three OS »;
-      [handoff](docs/tooling/one-folder-name-handoff.md#what-the-maintainer-checks-on-each-machine)): check the Mac
-      against the handoff's macOS list (after the first launch, `~/Library/Application Support/Ergopti/` holds
-      `paths.toml`, `config/` and `RemapRuntime/`, the old Logs, Caches and `ergopti_plus` support folders are gone,
-      the stale `ErgoptiPlus/` entries deleted after the next login and `ErgoptiPlus/karabiner` kept); the migration
-      is removed only once the maintainer's machines pass.
-- [ ] <!-- field-point: owned_runtime_wp9 --> Owned Karabiner runtime, the WP9 pass (moved 2026-11-15 from TODO.md
-      « 31. Owned Karabiner runtime »; [ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
-      [handoff](docs/tooling/next-release-handoff.md)): the maintainer's WP9 pass (handoff checklist) on a physical
-      Mac, field-tested on the CI-signed dev build (never the ad hoc developer app), once a signed dev build is
-      authorized; the shared-mode deletion follows it.
-- [ ] <!-- field-point: migrations_registry_parse --> Boot cost of `migrations.toml` (moved 2026-11-15 from TODO.md
-      « Linux performance », its macOS boot item; [report](docs/audits/performance/linux/2026_11_11/report.md)):
-      measure on a Mac the boot time spent parsing and validating `migrations.toml` (74 KB, about 30 ms of Lua 5.4),
-      the saving a Lua port of the Windows typed SHA-256 registry cache would bring.
-- [ ] <!-- field-point: hotstrings_boot_publication --> Hotstrings category boot publication and obsolete-leaf setters
-      (moved 2026-11-15 from TODO.md « macOS lane », CI acceptance; runs 42929436137, 43012056158): native
-      qualification on an installed driver on a real Mac (no hosted row types into them).
-- [ ] <!-- field-point: autocorrection_sections --> Common autocorrection sections and dynamic hotstrings, native
-      macOS cases (moved 2026-11-15 from TODO.md « 104, 105 », CI acceptance; the Linux per-section E2E is fd95ef2d87,
-      `run_e2e.lua`): with one common section chosen at a time (`[hotstrings.groups]`,
-      `[hotstrings.modules.autocorrection]`), typing `chatgpt adn adaboost` gives only ChatGPT with names, only ADN
-      with abbreviations and only AdaBoost with technical terms, as the Linux daemon E2E (`AUTOCORRECT_SCENARIOS`)
-      does; and the macOS dynamic hotstrings on a real machine.
-- [ ] <!-- field-point: delimiter_transactions --> Native macOS delimiter transactions (moved 2026-11-15 from TODO.md
-      « 34, 37, 102, 129 », CI acceptance): typing into an installed driver on a real Mac.
-- [ ] <!-- field-point: agent_composed_menu --> AI Agent submenu composed-menu qualification (moved 2026-11-15 from
-      TODO.md « 121, 123, 137 », CI acceptance; the macOS Unit lots are green in run 42929436137): an installed driver
-      on a real Mac shows the AI Agent submenu's composed menu, with the provider published before model loading.
+      reduce.
+- [ ] <!-- field-point: one_folder_name --> One folder name
+      ([handoff](docs/tooling/one-folder-name-handoff.md#what-the-maintainer-checks-on-each-machine)): after the first
+      launch, `~/Library/Application Support/Ergopti/` holds `paths.toml`, `config/` and `RemapRuntime/`, the old
+      Logs, Caches and `ergopti_plus` support folders are gone, the stale `ErgoptiPlus/` entries are deleted after the
+      next login and `ErgoptiPlus/karabiner` is kept; the migration is removed only once the maintainer's machines
+      pass.
+- [ ] <!-- field-point: owned_runtime_wp9 --> Owned Karabiner runtime, the WP9 pass
+      ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
+      [handoff](docs/tooling/next-release-handoff.md)): the handoff checklist on a physical Mac, on the CI-signed dev
+      build (never the ad hoc developer app), once a signed dev build is authorized; the shared-mode deletion follows
+      it.
+- [ ] <!-- field-point: migrations_registry_parse --> Boot cost of `migrations.toml`
+      ([report](docs/audits/performance/linux/2026_11_11/report.md)): the boot time spent parsing and validating it
+      (74 KB, about 30 ms of Lua 5.4), the saving a Lua port of the Windows typed registry cache would bring (TODO.md
+      « Maintainer decisions pending »).
+- [ ] <!-- field-point: hotstrings_boot_publication --> Hotstrings category boot publication and
+      obsolete-leaf setters on an installed driver (no hosted row types into them).
+- [ ] <!-- field-point: autocorrection_sections --> Common autocorrection sections and dynamic hotstrings: with
+      one common section chosen at a time (`[hotstrings.groups]`, `[hotstrings.modules.autocorrection]`), typing
+      `chatgpt adn adaboost` gives only ChatGPT with names, only ADN with abbreviations and only AdaBoost with
+      technical terms, as the Linux daemon E2E (`AUTOCORRECT_SCENARIOS`) does; and the dynamic hotstrings on a real
+      machine.
+- [ ] <!-- field-point: delimiter_transactions --> Native delimiter transactions: typing into an installed
+      driver.
+- [ ] <!-- field-point: agent_composed_menu --> AI Agent submenu: an installed driver shows its composed menu,
+      with the provider published before model loading.
