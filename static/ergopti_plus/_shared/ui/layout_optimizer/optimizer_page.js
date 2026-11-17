@@ -29,6 +29,9 @@
  * 7. Zones: a click on the zone board keeps a character on the keys chosen.
  * 8. Remembered: the choices and the last text are kept in this browser's
  *    storage; a browser that refuses storage gets the same page, unsaved.
+ * 9. Fails in words: a stage of a run that fails is logged and said in the
+ *    reader's language with « Try again », and a page that declares no
+ *    language writes its numbers in the documented fallback.
  * ==============================================================================
  */
 
@@ -98,6 +101,11 @@
 	const STORAGE_KEY = 'ergopti.layout_optimizer.v1';
 	const TEXT_KEY = 'ergopti.layout_optimizer.text.v1';
 	const STANDALONE_ROOT_ID = 'layout-optimizer';
+	// The stages of a run, each with its own failure message (error.stage.<id>).
+	const RUN_STAGES = ['start', 'corpus', 'analysis', 'search', 'result'];
+	// The language of the numbers when the page declares no usable one: the
+	// locale i18n.js loads when none is set (its load()), never the browser's.
+	const FALLBACK_NUMBER_LOCALE = 'fr';
 
 	// The site passes ?lang=<code>; i18n.js loads that locale, then English and French.
 	const lang = new URLSearchParams(location.search).get('lang');
@@ -185,6 +193,7 @@
 		</div>
 		<progress id="lo-progress" max="1" value="0" aria-labelledby="lo-status"></progress>
 		<p id="lo-status" class="lo-muted" role="status" aria-live="polite"></p>
+		<button type="button" id="lo-retry" data-i18n="layout_optimizer.retry" hidden></button>
 	</div>
 </section>
 <section id="lo-result" class="lo-panel" hidden>
@@ -205,6 +214,44 @@
 		<button type="button" id="lo-open-comparer" data-i18n="layout_optimizer.result.open_comparer" disabled></button>
 	</div>
 </section>`;
+
+	let warnedLocale = false;
+
+	/**
+	 * The language the page writes its numbers in: that of its strings
+	 * (i18n.js's _i18n_locale), else the page's declared language (<html
+	 * lang>). A missing, empty or malformed tag (a host page that declares no
+	 * language) makes toLocaleString throw a RangeError: such a page writes
+	 * its numbers in FALLBACK_NUMBER_LOCALE, said once in the console.
+	 * @returns {string} A BCP 47 language tag.
+	 */
+	function numberLocale() {
+		const tags = [window._i18n_locale, document.documentElement.lang];
+		for (const tag of tags) {
+			if (typeof tag !== 'string' || tag === '') continue;
+			try {
+				Intl.getCanonicalLocales(tag);
+				return tag;
+			} catch (error) {
+				if (!(error instanceof RangeError)) throw error;
+			}
+		}
+		if (!warnedLocale) {
+			warnedLocale = true;
+			console.warn(
+				`[layout_optimizer] no usable page language (${JSON.stringify(tags)}): numbers use ${FALLBACK_NUMBER_LOCALE}`
+			);
+		}
+		return FALLBACK_NUMBER_LOCALE;
+	}
+
+	/** A number written with `digits` decimals in the page's language (numberLocale). */
+	function formatNumber(value, digits) {
+		return Number(value).toLocaleString(numberLocale(), {
+			minimumFractionDigits: digits,
+			maximumFractionDigits: digits
+		});
+	}
 
 	let mounted = null;
 	// The app's last keystats tables, kept when they arrive before the mount
@@ -258,13 +305,7 @@
 			return node;
 		}
 
-		// The language of the page's strings (i18n.js loads _i18n_locale, else the
-		// page's declared language), never the browser's own.
-		const number = (value, digits) =>
-			Number(value).toLocaleString(window._i18n_locale || document.documentElement.lang, {
-				minimumFractionDigits: digits,
-				maximumFractionDigits: digits
-			});
+		const number = formatNumber;
 		const signed = (value, digits) => (value > 0 ? '+' : '') + number(value, digits);
 		const metricDigits = E.metricDigits;
 
@@ -303,6 +344,8 @@
 			tables: new Map(),
 			// The pasted or opened text's tables: {hash, chars, tables}.
 			custom: null,
+			// A run reading its choices, corpus and start, before its runners start.
+			loading: false,
 			// The saved start layout, until the reader picks another.
 			savedStart: null,
 			// The host's corpora: {id, title, tables}, listed first.
@@ -783,8 +826,30 @@
 			}
 		}
 
+		/**
+		 * Starts a search. Each stage that can fail (reading the choices,
+		 * loading the corpus, measuring the start, starting the runners) ends
+		 * in failRun on an unexpected error: logged, said in words, with
+		 * « Try again », never a page left on « Loading the corpus… ».
+		 */
 		async function run() {
-			if (state.running) return;
+			if (state.running || state.loading) return;
+			$('lo-retry').hidden = true;
+			let stage = 'start';
+			state.loading = true;
+			try {
+				await runStages((next) => {
+					stage = next;
+				});
+			} catch (error) {
+				failRun(stage, error);
+			} finally {
+				state.loading = false;
+			}
+		}
+
+		/** run()'s stages; `enter` names the stage under way for failRun. */
+		async function runStages(enter) {
 			const start = startLayout();
 			if (!start) return;
 			const opts = problemOptions();
@@ -798,9 +863,11 @@
 			try {
 				O.problem(E, start, opts);
 			} catch (error) {
+				if (!(error instanceof O.OptimizerError)) throw error;
 				setStatus(errorText(error.code, error.message, error.values), true);
 				return;
 			}
+			enter('corpus');
 			setStatus(t(`${PREFIX}status.loading`));
 			// A text typed just now is read before the run, not after its pause.
 			if ($('lo-corpus').value === CUSTOM_ID) useText($('lo-text').value);
@@ -808,9 +875,12 @@
 			try {
 				tables = await loadTables($('lo-corpus').value);
 			} catch (error) {
-				setStatus(errorText(error.code || 'corpus', error.message), true);
+				// A missing text is the reader's to give, not a failure to retry.
+				if (error.code !== 'text_missing') throw error;
+				setStatus(errorText(error.code, error.message), true);
 				return;
 			}
+			enter('analysis');
 			const identity = {
 				id: `${start.id}_optimized`,
 				name: t(`${PREFIX}result.name`, { name: start.name })
@@ -826,6 +896,7 @@
 			$('lo-open-comparer').disabled = true;
 			showBest(start, state.startResult.score.total, false);
 
+			enter('search');
 			// One share of the restarts per worker, in order, so the split never changes the winner.
 			const workers = Math.max(1, Math.min(restarts, MAX_WORKERS, threads()));
 			const began = Date.now();
@@ -860,9 +931,56 @@
 			});
 		}
 
+		/**
+		 * Ends a run that failed unexpectedly at `stage`: logs the error, stops
+		 * the runners, gives the buttons back and says what failed in words,
+		 * with « Try again ».
+		 * @param {string} stage - One of RUN_STAGES.
+		 * @param {*} error - What was thrown.
+		 */
+		function failRun(stage, error) {
+			if (!RUN_STAGES.includes(stage))
+				throw new Error(`layout_optimizer: unknown run stage ${stage}`);
+			console.error(`[layout_optimizer] the run failed at its ${stage} stage:`, error);
+			const running = state.running;
+			state.running = null;
+			if (running)
+				for (const runner of running.runners) {
+					try {
+						runner.end();
+					} catch (failure) {
+						console.error('[layout_optimizer] a runner could not be ended:', failure);
+					}
+				}
+			$('lo-run').disabled = false;
+			$('lo-stop').disabled = true;
+			const message = error && error.message ? error.message : String(error);
+			const strings = window._i18n_strings || {};
+			const own =
+				error && error.code && typeof strings[`${PREFIX}error.${error.code}`] === 'string';
+			setStatus(
+				own
+					? t(`${PREFIX}error.${error.code}`, error.values)
+					: t(`${PREFIX}error.stage.${stage}`, { message }),
+				true
+			);
+			$('lo-retry').hidden = false;
+		}
+
+		/** A runner's message; one the page cannot show ends the run (failRun). */
 		function receive(running, part, message, began, iterations) {
+			try {
+				handle(running, part, message, began, iterations);
+			} catch (error) {
+				if (state.running === running) failRun('result', error);
+				else console.error('[layout_optimizer] a message after the run ended failed:', error);
+			}
+		}
+
+		function handle(running, part, message, began, iterations) {
 			if (state.running !== running) return;
 			if (message.type === 'error') {
+				console.error('[layout_optimizer] a runner failed:', message.code, message.message);
 				stop();
 				finish(running, began, errorText(message.code, message.message, message.values));
 				return;
@@ -932,8 +1050,10 @@
 				evaluations: number(evaluations(running), 0),
 				seconds: number((Date.now() - began) / 1000, 1)
 			};
-			if (error) setStatus(error, true);
-			else setStatus(t(`${PREFIX}status.${running.stopped ? 'stopped' : 'done'}`, values));
+			if (error) {
+				setStatus(error, true);
+				$('lo-retry').hidden = false;
+			} else setStatus(t(`${PREFIX}status.${running.stopped ? 'stopped' : 'done'}`, values));
 		}
 
 		function stop() {
@@ -1176,6 +1296,7 @@
 				fillWeights();
 			});
 			$('lo-run').addEventListener('click', run);
+			$('lo-retry').addEventListener('click', run);
 			$('lo-stop').addEventListener('click', stop);
 			$('lo-open-editor').addEventListener('click', openEditor);
 			$('lo-open-comparer').addEventListener('click', openComparer);
@@ -1275,7 +1396,7 @@
 			: null;
 	const BASE = SCRIPT_BASE || location.href;
 
-	window.LAYOUT_OPTIMIZER_PAGE = { mount };
+	window.LAYOUT_OPTIMIZER_PAGE = { mount, numberLocale, formatNumber };
 
 	/** The site's page: mount into its <main>. */
 	function autostart() {

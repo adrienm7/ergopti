@@ -395,6 +395,104 @@ async function main() {
 			await context.close();
 		}
 
+		// ======= 4b/ A host page with no language, and runs that fail =======
+		// A page that declared no language made the number formatter throw in
+		// the middle of run(), and the page stayed on « Loading the corpus… »
+		// with no message (until 2026-11-17). Now its numbers use the fallback
+		// language, and a stage that fails says so in words with « Try again ».
+		{
+			const context = await browser.newContext({ viewport: { width: 1180, height: 820 } });
+			const page = await context.newPage();
+			const errors = [];
+			page.on('pageerror', (error) => errors.push(error.message));
+			const inline = (file) =>
+				fs
+					.readFileSync(shared('ui', ...file.split('/')), 'utf8')
+					.replace(/<\/script/gi, '<\\/script');
+			const strings = JSON.parse(
+				fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+			);
+			const html =
+				'<!doctype html><html><head><meta charset="utf-8" />' +
+				`<style>${inline('theme.css')}${inline('layout_optimizer/style.css')}</style>` +
+				`<script>window._i18n_strings = ${JSON.stringify(strings).replace(/</g, '\\u003c')};</script>` +
+				[
+					'_generated/key_legend.js',
+					'layout_analysis/_generated/analysis_data.js',
+					'layout_analysis/analysis_engine.js',
+					'layout_analysis/pdf_text.js',
+					'layout_analysis/corpus_files.js',
+					'layout_optimizer/optimizer_core.js',
+					'layout_optimizer/optimizer_runner.js',
+					'layout_optimizer/optimizer_page.js'
+				]
+					.map((file) => `<script>${inline(file)}</script>`)
+					.join('') +
+				'</head><body><section id="studio-optimizer"></section></body></html>';
+			await page.route(`${origin}/no-language.html`, (route) =>
+				route.fulfill({ body: html, contentType: 'text/html; charset=utf-8' })
+			);
+			await page.goto(`${origin}/no-language.html`);
+			assert.equal(await page.evaluate(() => document.documentElement.lang), '', 'no language');
+			await page.evaluate((text) => {
+				const ngrams = Object.assign(window.LAYOUT_ANALYSIS.ngramsFromText(text), { total: 1 });
+				window.LAYOUT_OPTIMIZER_PAGE.mount(document.getElementById('studio-optimizer'));
+				document.dispatchEvent(new CustomEvent('studio-ngrams', { detail: ngrams }));
+			}, TEXT.repeat(4));
+			await shortBudget(page);
+			let status = await runToEnd(page);
+			assert.match(status, /^Done: \d+ layouts scored in \d+,\d s$/, `fallback numbers: ${status}`);
+			assert.match(await page.locator('#lo-score').textContent(), /\d,\d\d/, 'the score shows');
+
+			// Measuring the start fails once: the reason shows, then « Try again » runs.
+			await page.evaluate(() => {
+				const engine = window.LAYOUT_ANALYSIS;
+				const analyse = engine.analyse;
+				engine.analyse = () => {
+					engine.analyse = analyse;
+					throw new Error('injected failure');
+				};
+			});
+			status = await runToEnd(page);
+			assert.match(
+				status,
+				/^The start layout could not be measured: injected failure$/,
+				`a failing stage says so: ${status}`
+			);
+			assert.equal(await page.locator('#lo-retry').isVisible(), true, '« Try again » shows');
+			assert.equal(await page.locator('#lo-run').isDisabled(), false, 'Optimize is back');
+			await page.evaluate(() => {
+				document.querySelector('#lo-status').textContent = '';
+			});
+			await page.click('#lo-retry');
+			await page.waitForFunction(
+				() =>
+					/^Done/.test(document.querySelector('#lo-status').textContent) &&
+					!document.querySelector('#lo-run').disabled,
+				null,
+				{ timeout: 180000 }
+			);
+			assert.equal(await page.locator('#lo-retry').isHidden(), true, '« Try again » hides');
+			assert.deepEqual(errors, [], 'a failing stage raises no page error');
+			await context.close();
+		}
+		// A built-in corpus that cannot load says so, with « Try again ».
+		{
+			const { page, errors, context } = await open(browser, origin);
+			const script = await page.evaluate(
+				(id) => window.LAYOUT_ANALYSIS_DATA.corpora.find((corpus) => corpus.id === id).script,
+				await page.inputValue('#lo-corpus')
+			);
+			const blocked = `**/${path.posix.basename(script)}`;
+			await page.route(blocked, (route) => route.abort());
+			await shortBudget(page);
+			const status = await runToEnd(page);
+			assert.match(status, /^The corpus could not be loaded: /, `a corpus failure: ${status}`);
+			assert.equal(await page.locator('#lo-retry').isVisible(), true, '« Try again » shows');
+			assert.deepEqual(errors, [], 'a corpus failure raises no page error');
+			await context.close();
+		}
+
 		// ======= 5/ Light and dark at phone width, every locale =======
 		for (const colorScheme of ['light', 'dark']) {
 			const { page, errors, context } = await open(browser, origin, {

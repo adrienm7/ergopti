@@ -22,6 +22,10 @@
  * 4. Runner: a page-thread run (no worker) posts progress and a final layout
  *    whose score is the engine's on the whole corpus, and a refused
  *    constraint comes back as an error message with its code.
+ * 5. Robustness: numbers are written in the page's language, and a page that
+ *    declares none (or a malformed one) writes them in the documented
+ *    fallback instead of throwing; every stage of a run has its failure
+ *    message, and a runner message the page cannot show ends the run.
  * ==============================================================================
  */
 
@@ -117,6 +121,11 @@ check(
 		),
 	'the page offers every switch of the optimizer'
 );
+// Each stage of a run says its own failure (failRun).
+const stages = (page.match(/const RUN_STAGES = \[([\s\S]*?)\]/) || ['', ''])[1];
+const stageIds = Array.from(stages.matchAll(/'([a-z]+)'/g), (m) => m[1]);
+check(stageIds.length >= 5, `run stages: ${stageIds.join(', ')}`);
+for (const id of stageIds) keys.add(`${PREFIX}error.stage.${id}`);
 for (const id of switchIds) {
 	keys.add(`${PREFIX}option.${id}.label`);
 	keys.add(`${PREFIX}option.${id}.help`);
@@ -316,6 +325,76 @@ RUNNER.start(
 check(
 	refused.length === 1 && refused[0].type === 'error' && refused[0].code === 'no_dead_key',
 	'a refusal comes back with its code'
+);
+
+// =============================
+// ======= 5/ Robustness =======
+// =============================
+
+// The page script in a bare context (no element to mount into): its number
+// formatter. A host page without a language once made toLocaleString('')
+// throw a RangeError in the middle of run(), which left the page on
+// « Loading the corpus… ».
+{
+	const warnings = [];
+	const doc = {
+		documentElement: { lang: '' },
+		readyState: 'complete',
+		currentScript: null,
+		addEventListener() {},
+		getElementById: () => null
+	};
+	const pageBox = {
+		document: doc,
+		location: { search: '', href: 'http://localhost/' },
+		URLSearchParams,
+		URL,
+
+		console: { warn: (...args) => warnings.push(args.join(' ')), error() {}, log() {} }
+	};
+	pageBox.window = pageBox;
+	vm.createContext(pageBox);
+	vm.runInContext(page, pageBox, { filename: 'optimizer_page.js' });
+	const PAGE = pageBox.LAYOUT_OPTIMIZER_PAGE;
+	const fallback = (page.match(/const FALLBACK_NUMBER_LOCALE = '([a-z]+)'/) || [])[1];
+	check(Boolean(fallback), 'the page names its fallback number language');
+	const expect = (locale, value) =>
+		Number(value).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+	for (const lang of ['', 'not a language tag!', undefined]) {
+		doc.documentElement.lang = lang;
+		delete pageBox._i18n_locale;
+		let written = null;
+		try {
+			written = PAGE.formatNumber(1234.5, 2);
+		} catch (error) {
+			check(false, `lang ${JSON.stringify(lang)}: the formatter throws ${error.message}`);
+		}
+		check(
+			PAGE.numberLocale() === fallback,
+			`lang ${JSON.stringify(lang)}: falls back to ${fallback}`
+		);
+		if (written !== null)
+			check(written === expect(fallback, 1234.5), `lang ${JSON.stringify(lang)}: wrote ${written}`);
+	}
+	check(warnings.length === 1, `the fallback is said once in the console: ${warnings.length}`);
+	doc.documentElement.lang = 'de';
+	check(PAGE.formatNumber(1234.5, 2) === expect('de', 1234.5), 'the declared language writes');
+	pageBox._i18n_locale = 'en';
+	check(PAGE.numberLocale() === 'en', 'the strings’ language comes first');
+	pageBox._i18n_locale = '';
+	check(PAGE.numberLocale() === 'de', 'an empty strings’ language gives way to the declared one');
+}
+// Every runner message goes through receive, which ends a run it cannot show.
+check(
+	/function receive\([^)]*\) \{\s*try \{\s*handle\(/.test(page) &&
+		/catch \(error\) \{\s*if \(state\.running === running\) failRun\('result', error\)/.test(page),
+	'a runner message the page cannot show ends the run (failRun)'
+);
+check(
+	/async function run\(\) \{[\s\S]{0,400}try \{\s*await runStages\([\s\S]{0,120}catch \(error\) \{\s*failRun\(stage, error\)/.test(
+		page
+	),
+	'run() ends every failing stage in failRun'
 );
 
 if (errors.length) {

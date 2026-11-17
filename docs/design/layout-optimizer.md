@@ -176,6 +176,17 @@ that refuses storage, or a text over the quota, gets the same page unsaved.
 Where a worker cannot start (a page a host inlines, without a script URL),
 the same runner runs on the page in 40 ms slices.
 
+Numbers are written in the language of the page's strings (`_i18n_locale`),
+else the page's declared language (`<html lang>`); a page that declares
+none, or a malformed tag, writes them in French, the locale `i18n.js` loads
+when none is set, never the browser's own, and says so once in the console
+(`toLocaleString('')` throws). A run that fails at any stage (reading the
+choices, loading the corpus, measuring the start, starting the runners,
+showing a result) logs the error, says which stage failed in the reader's
+language (`layout_optimizer.error.stage.<stage>`, or the error's own code)
+and offers « Try again »; a refused constraint or a missing text is said
+without it.
+
 **In Ergopti+.** The Studio window of the app
 (`_shared/ui/layout_editor_window`, on Windows, macOS and Linux) has a third
 tab, « Optimiser », that mounts the page the first time it opens, with the
