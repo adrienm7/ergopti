@@ -10,7 +10,7 @@ const {
 	requestActiveCancellation,
 	hasRetainedPhases
 } = require('./run-linux-managed-http-native.cjs');
-const { payloadInventory } = require('./run-linux-updater-archive-native.cjs');
+const { payloadInventory, refusalSite } = require('./run-linux-updater-archive-native.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const NATIVE_TEMP_PARENT = '/var/tmp/ergopti-cloud-validation';
 const ABIS = ['luajit', 'lua5.4'];
@@ -66,20 +66,6 @@ function refused() {
  * @param {unknown} reason The caught value.
  * @returns {string} One line such as "Pinned ... refused. at prepare-linux-lua54-native-provider.cjs:212".
  */
-function refusalSite(reason) {
-	if (!(reason instanceof Error)) return 'non-Error refusal';
-	const message = String(reason.message)
-		.replace(/[\r\n]+/g, ' ')
-		.slice(0, 200);
-	// The first frame of a refusal is the shared refused() thrower; the check
-	// that called it is the next tool frame.
-	const frame = String(reason.stack || '')
-		.split('\n')
-		.filter((line) => !/^\s*at refused \(/.test(line))
-		.map((line) => line.match(/[\\/]tools[\\/]test[\\/]([\w.-]+\.cjs):(\d+):\d+\)?$/))
-		.find(Boolean);
-	return frame ? message + ' at ' + frame[1] + ':' + frame[2] : message;
-}
 // An explicit work root is supplied and owned by the caller; never create it.
 function temporaryWorkRoot(environment) {
 	const configured = Object.hasOwn(environment, 'ERGOPTI_UPDATER_TEMP_NATIVE_WORK_ROOT');

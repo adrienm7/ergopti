@@ -23,8 +23,33 @@ const COMMON = [
 	'one actual archive receipt waits retained physical owners',
 	'actual loop and exact namespace descriptor owners physically drain'
 ];
-function refused() {
-	throw new Error('Native archive admission or physical closure refused.');
+/**
+ * Refuses the run. The cause reaches the console line, never a transcript.
+ * @param {string} [cause] What was refused; without one the check's source line names it.
+ */
+function refused(cause = 'Native archive admission or physical closure refused.') {
+	throw new Error(cause);
+}
+/**
+ * The console cause of a refusal: its message and the runner line that
+ * refused, so a bare refusal still names its check (a canonical-build refusal
+ * once reached CI with no cause). Shared with the temporary-file runner.
+ * @param {unknown} reason The thrown value.
+ * @returns {string}
+ */
+function refusalSite(reason) {
+	if (!(reason instanceof Error)) return 'non-Error refusal';
+	const message = String(reason.message)
+		.replace(/[\r\n]+/g, ' ')
+		.slice(0, 200);
+	// The first frame of a refusal is the shared refused() thrower; the check
+	// that called it is the next tool frame.
+	const frame = String(reason.stack || '')
+		.split('\n')
+		.filter((line) => !/^\s*at refused \(/.test(line))
+		.map((line) => line.match(/[\\/]tools[\\/]test[\\/]([\w.-]+\.cjs):(\d+):\d+\)?$/))
+		.find(Boolean);
+	return frame ? message + ' at ' + frame[1] + ':' + frame[2] : message;
 }
 function hash(bytes) {
 	return crypto.createHash('sha256').update(bytes).digest('hex');
@@ -229,13 +254,14 @@ async function run({
 			budgetMs = 120000
 		) {
 			current();
+			const label = String(++serial).padStart(2, '0');
 			const result = await ownPhase({
 				command,
 				args,
 				env: childEnv,
 				cwd,
 				work,
-				label: String(++serial).padStart(2, '0'),
+				label,
 				worker,
 				owner,
 				ownerSha: identities[inputs[0]],
@@ -245,7 +271,12 @@ async function run({
 				gateDeadline: deadline
 			});
 			current();
-			if (!complete(result)) refused();
+			// Its transcript stays in the private work folder; the status names it.
+			if (!complete(result))
+				refused(
+					`child ${label} (${path.basename(String(command))}) ended status=${result?.status} ` +
+						`signal=${result?.signal} error=${result?.error}; transcript kept in ${label}.stderr`
+				);
 			return result;
 		}
 		const observedHead = await child('git', ['-C', root, 'rev-parse', 'HEAD']);
@@ -531,11 +562,12 @@ async function run({
 			'[OK] Linux updater archive pipeline: 3 actual native cases; 15 checks; 0 skipped; closure complete.'
 		);
 		return 0;
-	} catch {
+	} catch (reason) {
 		error(
 			'[FAIL] Linux updater archive native ' +
 				phase +
-				': admission or physical closure refused; private evidence retained.'
+				': admission or physical closure refused; private evidence retained. Refusal: ' +
+				refusalSite(reason)
 		);
 		return 1;
 	} finally {
@@ -551,4 +583,4 @@ if (require.main === module)
 	run().then((status) => {
 		process.exitCode = status;
 	});
-module.exports = { run, pipelineReceipt, payloadInventory };
+module.exports = { run, pipelineReceipt, payloadInventory, refusalSite };
