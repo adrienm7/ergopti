@@ -952,6 +952,40 @@ for (const [name, result] of [
 	}
 	writerRoundTrips++;
 }
+// The library's genkey layouts (tools/build/import-genkey-layouts.cjs): all 30
+// files of genkey's layouts folder at the pinned commit are accounted for, each
+// imported one an alphabetic block of the three letter rows the codegen
+// completes, each duplicate naming a library layout.
+{
+	const library = JSON.parse(
+		fs.readFileSync(shared('layouts', 'data', 'analysis', 'layout_library.json'), 'utf8')
+	);
+	const imported = library.layouts.filter((e) => e.source === 'genkey');
+	const left = library.not_imported.filter((e) => e.source === 'genkey');
+	const GENKEY_FILES = 30;
+	check(
+		imported.length + left.length === GENKEY_FILES &&
+			new Set([...imported, ...left].map((e) => e.source_path)).size === GENKEY_FILES,
+		`genkey library: ${imported.length} imported and ${left.length} left out, not ${GENKEY_FILES} files`
+	);
+	const blockCodes = new Set(
+		LETTER_ROWS.flat().concat(['BracketLeft', 'BracketRight', 'Quote', 'Backslash'])
+	);
+	for (const entry of imported) {
+		const generated = DATA.layouts.find((l) => l.id === entry.id);
+		check(
+			Object.keys(entry.keys).every((code) => blockCodes.has(code)) &&
+				generated !== undefined &&
+				Object.entries(entry.keys).every(([code, char]) => generated.rows[code][0] === char),
+			`genkey library: ${entry.id} is not a generated alphabetic block`
+		);
+	}
+	for (const entry of left.filter((e) => e.same_as))
+		check(
+			DATA.layouts.some((l) => l.id === entry.same_as),
+			`genkey library: ${entry.source_path} repeats ${entry.same_as}, which the library lacks`
+		);
+}
 // A letter-block format names what it leaves out: Ergo-L's dead keys and its
 // AltGr layer, bépo's dead key on KeyY.
 const ergolGenkey = F.toGenkey(ergolToml.layout);

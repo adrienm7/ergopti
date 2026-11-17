@@ -1,5 +1,5 @@
 {
-	"_description": "Layout library of the layout analysis, by KeyboardEvent.code. An entry with « keys » is an alphabetic block (3 rows, base characters only), imported on 2026-11-14 from the Oxeylyzer layout set (Apache-2.0 repository) and, for the classics it lacks, from the cmini collection (GPL-3.0 repository); the codegen completes it with the US number row and the US Shift pairs (letters: upper case). An entry with « rows » is a whole layout (base, Shift, AltGr, Shift+AltGr of every key its file states), imported on 2026-11-17 from Keyboard Layout Analyzer's built-in layouts (MIT repository) by tools/build/import-kla-layouts.cjs; the codegen takes it as it is. Only the arrangements are re-encoded, never a file, on the basis given in docs/audits/layout-analysers/report.md, section « Layout library ». « source » and « source_path » name the file each layout comes from; « not_imported » lists the files of these collections left out, with the reason and, for a duplicate, the library layout with the same keys (« same_as »). The registry layouts (static/layouts/registry) and the reference QWERTY and AZERTY (layout_composer/reference_layouts.js) join the library at codegen with all their layers and dead keys, so they are not repeated here.",
+	"_description": "Layout library of the layout analysis, by KeyboardEvent.code. An entry with « keys » is an alphabetic block (3 rows, base characters only), imported on 2026-11-14 from the Oxeylyzer layout set (Apache-2.0 repository) and, for the classics it lacks, from the cmini collection (GPL-3.0 repository), and on 2026-11-17 from genkey's layouts (GPL-3.0 repository) by tools/build/import-genkey-layouts.cjs; the codegen completes it with the US number row and the US Shift pairs (letters: upper case). An entry with « rows » is a whole layout (base, Shift, AltGr, Shift+AltGr of every key its file states), imported on 2026-11-17 from Keyboard Layout Analyzer's built-in layouts (MIT repository) by tools/build/import-kla-layouts.cjs; the codegen takes it as it is. Only the arrangements are re-encoded, never a file, on the basis given in docs/audits/layout-analysers/report.md, section « Layout library ». « source » and « source_path » name the file each layout comes from; « not_imported » lists the files of these collections left out, with the reason and, for a duplicate, the library layout with the same keys (« same_as »). The registry layouts (static/layouts/registry) and the reference QWERTY and AZERTY (layout_composer/reference_layouts.js) join the library at codegen with all their layers and dead keys, so they are not repeated here.",
 	"schema_version": 1,
 	"sources": {
 		"oxeylyzer": {
@@ -16,6 +16,11 @@
 			"url": "https://github.com/patorjk/keyboard-layout-analyzer/tree/c4f2f9bb43ca8de98c8cb0cd28a78043602c7dcb/layouts",
 			"commit": "c4f2f9bb43",
 			"licence": "MIT (repository, « Copyright (C) 2015-present Patrick Gillespie and other contributors »); arrangements re-encoded"
+		},
+		"genkey": {
+			"url": "https://github.com/semilin/genkey/tree/f1f41733931c2339d4ed161a5ace5f03412b282e/layouts",
+			"commit": "f1f4173393",
+			"licence": "GPL-3.0 (repository); arrangements re-encoded"
 		}
 	},
 	"layouts": [
@@ -7272,6 +7277,249 @@
 				"Slash": ["/", "?", null, null],
 				"Space": [" ", null, null, null]
 			}
+		},
+		{
+			"id": "apt",
+			"name": "APT",
+			"language": "en",
+			"source": "genkey",
+			"source_path": "layouts/apt",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "q",
+				"KeyW": "c",
+				"KeyE": "d",
+				"KeyR": "l",
+				"KeyT": "x",
+				"KeyY": "z",
+				"KeyU": "y",
+				"KeyI": "o",
+				"KeyO": "u",
+				"KeyP": "/",
+				"KeyA": "r",
+				"KeyS": "s",
+				"KeyD": "t",
+				"KeyF": "h",
+				"KeyG": "k",
+				"KeyH": "p",
+				"KeyJ": "n",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "a",
+				"KeyZ": "w",
+				"KeyX": "g",
+				"KeyC": "b",
+				"KeyV": "m",
+				"KeyB": "v",
+				"KeyN": "j",
+				"KeyM": "f",
+				"Comma": "'",
+				"Period": ",",
+				"Slash": "."
+			}
+		},
+		{
+			"id": "colemak_dhv_genkey",
+			"name": "Colemak DHv (genkey)",
+			"language": "en",
+			"source": "genkey",
+			"source_path": "layouts/colemak_dhv",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "q",
+				"KeyW": "w",
+				"KeyE": "c",
+				"KeyR": "p",
+				"KeyT": "b",
+				"KeyY": "j",
+				"KeyU": "l",
+				"KeyI": "u",
+				"KeyO": "y",
+				"KeyP": ";",
+				"BracketLeft": "-",
+				"KeyA": "a",
+				"KeyS": "r",
+				"KeyD": "s",
+				"KeyF": "t",
+				"KeyG": "g",
+				"KeyH": "m",
+				"KeyJ": "n",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "o",
+				"Quote": "'",
+				"KeyZ": "x",
+				"KeyX": "v",
+				"KeyC": "f",
+				"KeyV": "d",
+				"KeyB": "z",
+				"KeyN": "k",
+				"KeyM": "h",
+				"Comma": "/",
+				"Period": ".",
+				"Slash": ","
+			}
+		},
+		{
+			"id": "colemak_qi_x",
+			"name": "Colemak Qi;x",
+			"language": "en",
+			"source": "genkey",
+			"source_path": "layouts/colemak_qi_x",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": ";",
+				"KeyW": "l",
+				"KeyE": "c",
+				"KeyR": "m",
+				"KeyT": "k",
+				"KeyY": "j",
+				"KeyU": "f",
+				"KeyI": "u",
+				"KeyO": "y",
+				"KeyP": "q",
+				"KeyA": "a",
+				"KeyS": "r",
+				"KeyD": "s",
+				"KeyF": "t",
+				"KeyG": "g",
+				"KeyH": "p",
+				"KeyJ": "n",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "o",
+				"Quote": "'",
+				"KeyZ": "z",
+				"KeyX": "x",
+				"KeyC": "w",
+				"KeyV": "d",
+				"KeyB": "v",
+				"KeyN": "b",
+				"KeyM": "h",
+				"Comma": "/",
+				"Period": ".",
+				"Slash": ","
+			}
+		},
+		{
+			"id": "flaw",
+			"name": "FLAW",
+			"language": "en",
+			"source": "genkey",
+			"source_path": "layouts/flaw",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "f",
+				"KeyW": "l",
+				"KeyE": "a",
+				"KeyR": "w",
+				"KeyT": "p",
+				"KeyY": "z",
+				"KeyU": "k",
+				"KeyI": "u",
+				"KeyO": "r",
+				"KeyP": "/",
+				"KeyA": "h",
+				"KeyS": "s",
+				"KeyD": "o",
+				"KeyF": "y",
+				"KeyG": "c",
+				"KeyH": "m",
+				"KeyJ": "t",
+				"KeyK": "e",
+				"KeyL": "n",
+				"Semicolon": "i",
+				"KeyZ": "b",
+				"KeyX": "j",
+				"KeyC": "'",
+				"KeyV": "g",
+				"KeyB": "v",
+				"KeyN": "q",
+				"KeyM": "d",
+				"Comma": ".",
+				"Period": "x",
+				"Slash": ","
+			}
+		},
+		{
+			"id": "rolll_genkey",
+			"name": "Rolll (genkey)",
+			"language": "en",
+			"source": "genkey",
+			"source_path": "layouts/rolll",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "y",
+				"KeyW": "a",
+				"KeyE": "u",
+				"KeyR": "w",
+				"KeyT": "b",
+				"KeyY": "x",
+				"KeyU": "k",
+				"KeyI": "c",
+				"KeyO": "l",
+				"KeyP": "v",
+				"KeyA": "i",
+				"KeyS": "o",
+				"KeyD": "e",
+				"KeyF": "n",
+				"KeyG": "p",
+				"KeyH": "d",
+				"KeyJ": "h",
+				"KeyK": "s",
+				"KeyL": "r",
+				"Semicolon": "t",
+				"KeyZ": "j",
+				"KeyX": "/",
+				"KeyC": ",",
+				"KeyV": ".",
+				"KeyB": "q",
+				"KeyN": "f",
+				"KeyM": "m",
+				"Comma": "g",
+				"Period": "'",
+				"Slash": "z"
+			}
+		},
+		{
+			"id": "rtna",
+			"name": "RTNA",
+			"language": "en",
+			"source": "genkey",
+			"source_path": "layouts/rtna",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "x",
+				"KeyW": "d",
+				"KeyE": "h",
+				"KeyR": ".",
+				"KeyT": "q",
+				"KeyY": "b",
+				"KeyU": "f",
+				"KeyI": "o",
+				"KeyO": "u",
+				"KeyP": "j",
+				"KeyA": "r",
+				"KeyS": "t",
+				"KeyD": "n",
+				"KeyF": "a",
+				"KeyG": ";",
+				"KeyH": "g",
+				"KeyJ": "w",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "s",
+				"KeyZ": "l",
+				"KeyX": "k",
+				"KeyC": "m",
+				"KeyV": ",",
+				"KeyB": "/",
+				"KeyN": "p",
+				"KeyM": "c",
+				"Comma": "z",
+				"Period": "y",
+				"Slash": "v"
+			}
 		}
 	],
 	"not_imported": [
@@ -7597,6 +7845,147 @@
 			"source": "kla",
 			"source_path": "layouts/ergodox.workman",
 			"reason": "characters on keys the library's keyboards have no code for: ~ ` = + - _"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/_generate",
+			"reason": "genkey's generation template, not a layout"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/boo",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "boo"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/colemak",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "colemak"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/colemak_dh",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "colemak_dh"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/colemak_qi",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "colemak_qi"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/colemaq",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "colemaq"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/colemaq-f",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "colemaq_f"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/dvorak",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "dvorak"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/engram",
+			"reason": "keys beyond the three letter rows: 0:12 (@)"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/halmak",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "halmak"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/hands_down",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "hands_down"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/hyperroll",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "hyperroll"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/isrt",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "isrt"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/mtgap30",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "mtgap30"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/norman",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "norman"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/qgmlwy",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "qgmlwy"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/qwerty",
+			"reason": "keys beyond the three letter rows: 0:12 (\\)"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/semimak",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "semimak"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/semimak_jq",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "semimak_jq"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/sind",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "sind"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/vitrimak",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "vitrimak"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/vitrimak_ortho",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "vitrimak_ortho"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/whorf",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "whorf"
+		},
+		{
+			"source": "genkey",
+			"source_path": "layouts/workman",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "workman"
 		}
 	]
 }

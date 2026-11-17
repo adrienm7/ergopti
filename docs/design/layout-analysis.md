@@ -26,10 +26,13 @@ registry layouts and the reference QWERTY and AZERTY join the library through
 the layout composer's reader (`tools/lib/layout-composer.cjs`), converted by
 the engine's own `layoutFromComposerSource`.
 
-The library imports three collections (`sources` in `layout_library.json`):
-Oxeylyzer's and cmini's layouts as alphabetic blocks (`keys`, base characters
-of the three letter rows), which the codegen completes with the US number row
-and Shift pairs, and Keyboard Layout Analyzer's built-in layouts as whole
+The library imports four collections (`sources` in `layout_library.json`):
+Oxeylyzer's, cmini's and genkey's layouts as alphabetic blocks (`keys`, base
+characters of the three letter rows), which the codegen completes with the US
+number row and Shift pairs (`tools/build/import-genkey-layouts.cjs <genkey
+checkout>` re-encodes genkey's files through the Studio's `fromGenkey`, and
+lists its generation template, a file with a key off the three rows and each
+duplicate in `not_imported`), and Keyboard Layout Analyzer's built-in layouts as whole
 layouts (`rows`, every key and level its file states), taken as they are.
 `tools/build/import-kla-layouts.cjs <KLA checkout>` re-encodes KLA's files
 through the Studio's own reader (`fromKla`). A file is left out, and listed in

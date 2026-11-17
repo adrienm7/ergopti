@@ -89,13 +89,10 @@ Design: [layout-editor.md](docs/design/layout-editor.md), [layout-analysis.md](d
 analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-analysers/report.md) (its section 15
 waits for the maintainer's review).
 
-- [ ] **Layout formats, what is left.** The library imports Oxeylyzer, cmini and KLA's built-in layouts
-      (`tools/build/import-kla-layouts.cjs`; KLA's 16 files with characters on keys the library's keyboards lack,
-      12 of them ErgoDox, are listed in `not_imported` of `layout_library.json`). Left: genkey (GPL-3.0 like cmini)
-      once its layout list can be read; the ErgoDox files once the KLA reader and the library can place ErgoDox
-      thumb and outer keys. No third-party XKB symbols, KLC or DOF file under a licence that allows shipping it has
-      been found for the reader tests. KLAnext's `matrix` board is refused (`format_unsupported_board`): no matrix
-      file was found to read its key indexes from.
+- [ ] **Layout formats, what is left.** KLA's 16 files with characters on keys the library's keyboards lack (12 of
+      them ErgoDox) stay in `not_imported` of `layout_library.json` until the keyboard model, the KLA reader and the
+      library can place ErgoDox thumb and outer keys. KLAnext's `janiso` board is refused
+      (`format_unsupported_board`) until the model has the JIS keys; its `ergolinear` has no layout to read.
 - [ ] **[LATER] Layout library credits, what is left.** The credits were read on their authors' pages on 2026-11-17
       (`checked` and `evidence` in `layout_credits.json`). Still « knowledge »: QWERTY (US patent 207,559 is Sholes's,
       but its text names no letter order: read its drawings or another primary source) and KOY (neo-layout.org names

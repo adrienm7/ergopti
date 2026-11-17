@@ -355,4 +355,4 @@ function main(klaDir) {
 
 if (require.main === module) main(process.argv[2]);
 
-module.exports = { classify, signature };
+module.exports = { classify, signature, loadReaders };
