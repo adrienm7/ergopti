@@ -36,10 +36,11 @@ const HOME_CARDS = Object.freeze([
 	['ergopti-plus', 'Ergopti+', '/ergopti-plus'],
 	['studio', 'Ergopti Studio', '/studio']
 ]);
-// Ergopti Studio tabs: the editor and the layout comparison.
+// Ergopti Studio tabs: the editor, the layout comparison and the layout optimizer.
 const STUDIO_TABS = Object.freeze([
 	['/studio', 'Éditer'],
-	['/studio/comparer', 'Comparer']
+	['/studio/comparer', 'Comparer'],
+	['/studio/optimiser', 'Optimiser']
 ]);
 // Where the layout version selector must and must not be.
 const VERSION_SELECTOR = Object.freeze({
@@ -56,7 +57,8 @@ const REFERENCE_KEYBOARD = Object.freeze({
 		'/ergopti-plus/installation',
 		'/ergopti-plus-old',
 		'/studio',
-		'/studio/comparer'
+		'/studio/comparer',
+		'/studio/optimiser'
 	]
 });
 // Each Ergopti+ page renders exactly these sections, so a page never pays
@@ -309,7 +311,7 @@ async function exerciseSections(page, origin, basePath) {
 			'Studio tabs on ' + route
 		);
 	}
-	for (const route of ['/studio', '/studio/comparer'])
+	for (const [route] of STUDIO_TABS)
 		await expectSingleFrameLoads(page, origin, basePath, route, 'main iframe');
 	for (const [route] of STUDIO_TABS) await expectStudioWorkspace(page, origin, basePath, route);
 }
