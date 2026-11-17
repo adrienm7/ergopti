@@ -111,8 +111,14 @@ _TIC_SectionHeaderDropsItsComment() {
 _TIC_AllHeaderParsersStripComments() {
 	Checked := 0
 	; ParseTomlGroupConfig and ReadTomlSectionsOrder are driven just below. These two
-	; need a live configuration and a live engine.
-	Names := ["ApplyConfigToml", "LoadHotstringsSection"]
+	; need a live configuration and a live engine. LoadHotstringsSection reads its
+	; section through the index HotstringsSectionEntries builds (7853f1ba3b), so the
+	; header parser checked is that index, and the loader must go through it.
+	Loader := _DriverFuncBody("LoadHotstringsSection")
+	Assert(Loader != "", "LoadHotstringsSection must exist for the header-parser class guard")
+	Assert(InStr(Loader, "HotstringsSectionEntries(") > 0,
+		"LoadHotstringsSection must read its section through HotstringsSectionEntries, the header parser checked below")
+	Names := ["ApplyConfigToml", "HotstringsSectionEntries"]
 	for Name in Names {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Name . " must exist for the header-parser class guard")
