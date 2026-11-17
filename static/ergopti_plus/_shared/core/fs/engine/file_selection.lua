@@ -102,6 +102,10 @@ end
 --- @return string|nil reason Why the list was refused.
 function M.parse_uri_list(text)
 	if type(text) ~= "string" then return nil, "not_text" end
+	-- PCManFM (libfm) publishes the list with its C string terminator: a final
+	-- NUL is the end of the data, not part of the last path. One inside a line
+	-- still refuses the report (is_absolute_path).
+	while text:sub(-1) == "\0" do text = text:sub(1, -2) end
 	local paths = {}
 	for line in (text .. "\n"):gmatch("([^\n]*)\n") do
 		line = line:gsub("\r$", "")
