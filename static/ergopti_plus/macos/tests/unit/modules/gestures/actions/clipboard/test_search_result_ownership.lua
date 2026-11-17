@@ -14,7 +14,7 @@ require("core.logger.engine")
 
 local function it(name, scenario)
 	helpers.it(name, function()
-		helpers.with_stub_scope({ "platform.focus.window_manager", "core.ui.engine.native_app_switcher_owner", "adapters.clipboard" }, function()
+		helpers.with_stub_scope({ "platform.focus.window_manager", "core.ui.engine.native_app_switcher_owner", "clipboard.adapters.clipboard" }, function()
 			Fixture.with_fixture(function(fresh)
 				local actions, calls = fresh()
 				local f = { restores = 0 }

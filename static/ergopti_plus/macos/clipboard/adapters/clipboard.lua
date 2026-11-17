@@ -1,4 +1,4 @@
---- adapters/clipboard.lua
+--- clipboard/adapters/clipboard.lua
 
 --- ==============================================================================
 --- MODULE: Clipboard Adapter (Hammerspoon)
@@ -25,7 +25,7 @@ local hs     = hs
 local Logger = require("core.logger.engine.logger")
 local TableUtil = require("core.text.engine.table_util")
 
-local LOG = "adapters.clipboard"
+local LOG = "clipboard.adapters.clipboard"
 
 
 

@@ -16,7 +16,7 @@ local CAPTURED_STACK = {
 	"modules.keymap.utils",
 	"modules.keymap.terminator_replay",
 	"platform.input.text_sender",
-	"adapters.clipboard",
+	"clipboard.adapters.clipboard",
 	"adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",

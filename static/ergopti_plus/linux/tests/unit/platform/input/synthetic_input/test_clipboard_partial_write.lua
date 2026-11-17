@@ -11,10 +11,10 @@
 local helpers = require("tests.helpers")
 local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 -- Resolve transitive constructors before publishing controlled desktop ports.
-require("adapters.clipboard")
+require("clipboard.adapters.clipboard")
 
 local function with_session(options, body)
-	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
+	local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
 		"adapters.keyboard_layout", "core.logger.engine.shim" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -50,9 +50,9 @@ local function with_session(options, body)
 	}
 	package.loaded["adapters.keyboard_layout"] = { shortcut_keycode = function() return 47 end }
 	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
-	package.loaded["adapters.clipboard"] = nil
+	package.loaded["clipboard.adapters.clipboard"] = nil
 	local ok, detail = xpcall(function()
-		local clipboard = require("adapters.clipboard")
+		local clipboard = require("clipboard.adapters.clipboard")
 		function state.call(kind)
 			local function wait(ms) state.waits[#state.waits + 1] = ms end
 			if kind == "paste" then

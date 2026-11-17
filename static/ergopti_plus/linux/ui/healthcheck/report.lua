@@ -61,7 +61,7 @@ end
 
 --- The production side effects; a test replaces any of them.
 local DEFAULT_EFFECTS = {
-	copy = function(text) return require("adapters.clipboard").write(text) == true end,
+	copy = function(text) return require("clipboard.adapters.clipboard").write(text) == true end,
 	make_dir = function(dir)
 		local Shell = require("core.process.adapters.shell_runner")
 		return Shell.run("mkdir -p " .. Shell.quote(dir))

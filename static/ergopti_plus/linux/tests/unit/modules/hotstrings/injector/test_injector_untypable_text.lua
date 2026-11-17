@@ -61,7 +61,7 @@ end
 --- @param succeeds boolean Whether paste_text reports success.
 --- @return table stub, function restore
 local function stub_clipboard(succeeds)
-	local previous = package.loaded["adapters.clipboard"]
+	local previous = package.loaded["clipboard.adapters.clipboard"]
 	local stub = require("tests.fakes").clipboard({ available = succeeds })
 	stub.calls = {}
 	stub.paste_text = function(text)
@@ -79,8 +79,8 @@ local function stub_clipboard(succeeds)
 		end
 		return stage
 	end
-	package.loaded["adapters.clipboard"] = stub
-	return stub, function() package.loaded["adapters.clipboard"] = previous end
+	package.loaded["clipboard.adapters.clipboard"] = stub
+	return stub, function() package.loaded["clipboard.adapters.clipboard"] = previous end
 end
 
 

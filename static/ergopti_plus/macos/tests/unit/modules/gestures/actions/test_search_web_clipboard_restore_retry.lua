@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 --- Adds only the transaction and clock boundaries used by queued Search.
 local function search_transaction_ports(hs_stub)
-	package.loaded["adapters.clipboard"] = nil
+	package.loaded["clipboard.adapters.clipboard"] = nil
 	local input = package.loaded["platform.input.synthetic_input"]
 	local function complete(tx, status)
 		if tx.status then return false end

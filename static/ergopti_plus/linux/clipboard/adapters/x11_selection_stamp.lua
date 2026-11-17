@@ -1,4 +1,4 @@
---- adapters/x11_selection_stamp.lua
+--- clipboard/adapters/x11_selection_stamp.lua
 
 --- ==============================================================================
 --- MODULE: X11 Clipboard Owner Timestamp (Linux)

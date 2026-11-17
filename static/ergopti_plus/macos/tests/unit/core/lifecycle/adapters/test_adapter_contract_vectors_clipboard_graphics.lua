@@ -44,7 +44,7 @@ local Fixture = require("tests.support.adapters.contracts.adapter_contract_vecto
 -- stub so the round-trip never touches the real macOS pasteboard.
 helpers.describe("Adapter contract vectors: Clipboard", function()
 	local pb = { text = nil, data = nil }
-	local adapter = helpers.load_with_stubs("adapters.clipboard", {
+	local adapter = helpers.load_with_stubs("clipboard.adapters.clipboard", {
 		pasteboard = {
 			getContents = function() return pb.text end,
 			setContents = function(t) pb.text = t ; pb.data = { text = t } ; return true end,

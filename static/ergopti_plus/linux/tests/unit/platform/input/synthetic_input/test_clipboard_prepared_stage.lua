@@ -13,7 +13,7 @@ local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboa
 
 local function with_stage(body, options)
 	options = options or {}
-	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "core.logger.engine.shim",
+	local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "core.logger.engine.shim",
 		"adapters.keyboard_layout" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -62,7 +62,7 @@ local function with_stage(body, options)
 		s.lookups = s.lookups + 1; error("prepared paste must use the captured key")
 	end }
 	local ok, detail = xpcall(function()
-		local clipboard = helpers.load_module("adapters.clipboard")
+		local clipboard = helpers.load_module("clipboard.adapters.clipboard")
 		s.channel = { emit = function(code, value)
 			boundary("emit")
 			s.rows[#s.rows + 1] = { code, value }

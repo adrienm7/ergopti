@@ -1,4 +1,4 @@
-﻿; adapters/editor_replace.ahk
+﻿; clipboard/adapters/editor_replace.ahk
 
 ; ==============================================================================
 ; MODULE: Verified native editor output

@@ -1,4 +1,4 @@
---- adapters/clipboard_owner_worker.lua
+--- clipboard/adapters/owner_worker.lua
 
 --- ==============================================================================
 --- MODULE: Multi-Format Clipboard Owner (Linux)
@@ -539,7 +539,7 @@ function M.run(argv)
 end
 
 if type(arg) == "table" and type(arg[0]) == "string"
-	and arg[0]:gsub("\\", "/"):match("([^/]+)$") == "clipboard_owner_worker.lua" then
+	and arg[0]:gsub("\\", "/"):match("([^/]+)$") == "owner_worker.lua" then
 	os.exit(M.run(arg))
 end
 

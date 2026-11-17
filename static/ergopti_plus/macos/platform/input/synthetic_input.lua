@@ -1453,7 +1453,7 @@ local function build_key_pair(batch, modifiers, key, unicode, loopback, selftest
 	local ordinal = tx.next_ordinal + 1
 	-- Unicode text rides a carrier key the user is not holding: a key-down of a
 	-- key still down is lost, and with it the replacement's first character.
-	local code = unicode and require("adapters.unicode_carrier").keycode() or key
+	local code = unicode and require("clipboard.adapters.unicode_carrier").keycode() or key
 	local down = assert(new_key_event(modifiers, code, true),
 		"platform.input.synthetic_input: newKeyEvent returned nil for keyDown")
 	local up = assert(new_key_event(modifiers, code, false),
@@ -2209,7 +2209,7 @@ function M.keyStrokes(batch, value)
 	local observable_start = batch.has_observable_action
 	local first_observable_start = batch.first_observable_ordinal
 	local ok, err = xpcall(function()
-		if select(2, require("adapters.unicode_carrier").keycode()) then
+		if select(2, require("clipboard.adapters.unicode_carrier").keycode()) then
 			defer_diagnostic("debug",
 				"Synthetic text moved off a held key (%d byte(s)); its first character would have been lost.",
 				#value)

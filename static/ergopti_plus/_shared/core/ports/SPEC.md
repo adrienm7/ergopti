@@ -90,7 +90,7 @@ Each `.spec.js` file exports:
 | TrayMenu            | `tray/adapters/menu.ahk`                   | `tray/adapters/menu.lua`                   |
 | FileSystem          | `core/fs/adapters/file_system.ahk`         | `core/fs/adapters/file_system.lua`         |
 | SecureFieldDetector | `platform/focus/secure_field_detector.ahk` | `platform/focus/secure_field_detector.lua` |
-| Clipboard           | `adapters/clipboard.ahk`                   | `adapters/clipboard.lua`                   |
+| Clipboard           | `clipboard/adapters/clipboard.ahk`         | `clipboard/adapters/clipboard.lua`         |
 | Storage             | `core/fs/adapters/storage.ahk`             | `core/fs/adapters/storage.lua`             |
 | ProcessLifecycle    | `core/process/adapters/lifecycle.ahk`      | `core/process/adapters/lifecycle.lua`      |
 | KeyState            | `platform/input/key_state.ahk`             | `platform/input/key_state.lua`             |

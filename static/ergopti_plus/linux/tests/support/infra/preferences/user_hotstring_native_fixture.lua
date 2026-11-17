@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 --- @param f table Runtime fixture with optional phase/output transition callbacks.
 --- @param body function Receives the independently recorded output transitions.
 function M.with(f, body)
-	local names = { "adapters.keyboard_layout", "modules.hotstrings.injector", "adapters.clipboard" }
+	local names = { "adapters.keyboard_layout", "modules.hotstrings.injector", "clipboard.adapters.clipboard" }
 	local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local Capture = require("adapters.xkb_capture")
 	local caps, inject = Capture.caps_locked, f.injector_port.inject

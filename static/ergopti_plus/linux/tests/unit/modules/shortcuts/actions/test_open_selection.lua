@@ -128,10 +128,10 @@ end)
 
 --- Runs body with the session PRIMARY reader answering `selection`.
 local function with_selection(selection, body)
-	local previous = package.loaded["adapters.clipboard"]
-	package.loaded["adapters.clipboard"] = { read_primary = function() return true, selection end }
+	local previous = package.loaded["clipboard.adapters.clipboard"]
+	package.loaded["clipboard.adapters.clipboard"] = { read_primary = function() return true, selection end }
 	local ok, err = pcall(body)
-	package.loaded["adapters.clipboard"] = previous
+	package.loaded["clipboard.adapters.clipboard"] = previous
 	if not ok then error(err, 0) end
 end
 
@@ -443,7 +443,7 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 
 	helpers.it("the real URI adapter guards the actual Ctrl+C emitter", function()
 		local Subject = require("modules.shortcuts.open_selection")
-		local names = { "adapters.clipboard", "modules.gestures.combo_emitter", "core.events.loop" }
+		local names = { "clipboard.adapters.clipboard", "modules.gestures.combo_emitter", "core.events.loop" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local app, emitted = "nautilus", 0

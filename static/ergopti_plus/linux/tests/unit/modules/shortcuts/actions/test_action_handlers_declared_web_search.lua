@@ -40,10 +40,10 @@ helpers.describe("linux actions: web search", function()
 
 	--- Supplies the platform PRIMARY reader during the action.
 	local function with_primary(ok, selection, body)
-		local saved = package.loaded["adapters.clipboard"]
-		package.loaded["adapters.clipboard"] = { read_primary = function() return ok, selection end }
+		local saved = package.loaded["clipboard.adapters.clipboard"]
+		package.loaded["clipboard.adapters.clipboard"] = { read_primary = function() return ok, selection end }
 		local ran, err = pcall(body)
-		package.loaded["adapters.clipboard"] = saved
+		package.loaded["clipboard.adapters.clipboard"] = saved
 		if not ran then error(err, 0) end
 	end
 
@@ -82,7 +82,7 @@ helpers.describe("linux actions: web search", function()
 	end)
 
 	helpers.it("search-web reads Wayland PRIMARY through the bounded native adapter", function()
-		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
+		local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local read_command

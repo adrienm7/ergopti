@@ -115,7 +115,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 			"platform.focus.window_manager",
 			"apps.adapters.launcher",
 			"core.events.timer_scheduler",
-			"adapters.clipboard",
+			"clipboard.adapters.clipboard",
 			"settings.engine.paths",
 			"core.ui.engine.dialog_util",
 			"modules.shortcuts.actions.apps",
@@ -136,7 +136,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 			package.loaded["core.events.timer_scheduler"] = {
 				after = function() return true end,
 			}
-			package.loaded["adapters.clipboard"] = {
+			package.loaded["clipboard.adapters.clipboard"] = {
 				get_text = function() return "" end,
 			}
 			package.loaded["settings.engine.paths"] = {

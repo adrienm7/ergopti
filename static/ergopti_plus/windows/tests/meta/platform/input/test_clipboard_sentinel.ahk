@@ -4,7 +4,7 @@
 ; MODULE: Clipboard Save Error Sentinel Guard
 ; DESCRIPTION:
 ; Static source guard for the CB_Save error-sentinel fix in
-; adapters/clipboard.ahk.
+; clipboard/adapters/clipboard.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; CB_Save() previously returned "" (empty string) on clipboard-lock failure,
@@ -39,10 +39,10 @@ _TCBS_StripLineComments(Src) {
 
 _TCBS_SaveReturnsSentinel() {
 	Src := _TCBS_StripLineComments(_TCBS_ReadSource("clipboard.ahk"))
-	Assert(Src != "", "adapters/clipboard.ahk must be readable")
+	Assert(Src != "", "clipboard/adapters/clipboard.ahk must be readable")
 
 	Body := _DriverFuncBody("CB_Save")
-	Assert(Body != "", "CB_Save() must be defined in adapters/clipboard.ahk")
+	Assert(Body != "", "CB_Save() must be defined in clipboard/adapters/clipboard.ahk")
 
 	Assert(InStr(Body, "__CB_SAVE_ERROR__") > 0,
 		'CB_Save must return "__CB_SAVE_ERROR__" on failure so callers can distinguish a lock error from an empty clipboard')
@@ -60,7 +60,7 @@ _TCBS_RestoreGuardsOnSentinel() {
 	Src := _TCBS_StripLineComments(_TCBS_ReadSource("clipboard.ahk"))
 
 	Body := _DriverFuncBody("CB_Restore")
-	Assert(Body != "", "CB_Restore(Saved) must be defined in adapters/clipboard.ahk")
+	Assert(Body != "", "CB_Restore(Saved) must be defined in clipboard/adapters/clipboard.ahk")
 
 	Assert(InStr(Body, "__CB_SAVE_ERROR__") > 0,
 		"CB_Restore must check for the __CB_SAVE_ERROR__ sentinel and skip the restore when it is the saved value")

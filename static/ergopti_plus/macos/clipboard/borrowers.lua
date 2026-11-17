@@ -1,4 +1,4 @@
---- infra/clipboard_borrowers.lua
+--- clipboard/borrowers.lua
 
 --- ==============================================================================
 --- MODULE: Clipboard Borrowing Admission

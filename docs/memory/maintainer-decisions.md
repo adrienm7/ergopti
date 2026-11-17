@@ -1247,7 +1247,7 @@ When another family borrows the clipboard (a selection read, a plain paste, an
 Apps or Search capture), macOS TextSender and keymap output do not snapshot it:
 they type the text as keystrokes, as Windows' `SendInstant` does when the
 shared clipboard owner is busy. Output is neither dropped nor delayed
-(`infra/clipboard_borrowers.lua`, MCP-002).
+(`clipboard/borrowers.lua`, MCP-002).
 
 ## The one-shot Shift timeout is a user setting on every OS (6 November 2026)
 

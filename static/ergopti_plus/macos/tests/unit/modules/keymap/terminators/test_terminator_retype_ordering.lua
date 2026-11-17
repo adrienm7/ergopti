@@ -21,7 +21,7 @@ local OWNED = {
 	"layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue", "layouts.engine.utils",
 	"core.logger.engine.shim", "modules.keystats", "modules.keymap.expander",
 	"modules.keymap.state", "modules.keymap.terminator_replay", "modules.keymap.terminators",
-	"modules.keymap.utils", "adapters.clipboard", "tests.stubs.hs", "core.text.engine.utils_core",
+	"modules.keymap.utils", "clipboard.adapters.clipboard", "tests.stubs.hs", "core.text.engine.utils_core",
 }
 
 -- Keep native consumers isolated even when a historical assertion aborts early.

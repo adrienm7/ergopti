@@ -44,7 +44,7 @@ function M.with_world(options, callback)
 				native.stop = function(self) stop(self); return self end
 				return native
 			end
-			package.loaded["adapters.clipboard"] = nil
+			package.loaded["clipboard.adapters.clipboard"] = nil
 			package.loaded["modules.gestures.actions"] = nil
 			local actions = require("modules.gestures.actions")
 			actions.init({ action_params = {} })

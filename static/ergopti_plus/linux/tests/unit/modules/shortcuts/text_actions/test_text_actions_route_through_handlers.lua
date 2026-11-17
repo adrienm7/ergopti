@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 --- @return table gestures, table log
 local function routed_gestures()
 	local names = {
-		clipboard = "adapters.clipboard",
+		clipboard = "clipboard.adapters.clipboard",
 		event_loop = "core.events.loop",
 		combo = "modules.gestures.combo_emitter",
 		injector = "modules.hotstrings.injector",

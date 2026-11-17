@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "adapters.accessibility_copies", "core.process.adapters.shell_runner" }
+local MODULES = { "clipboard.adapters.accessibility_copies", "core.process.adapters.shell_runner" }
 local OWN = "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app"
 
 --- Runs body against a fresh adapter whose shell runner records each spawn.
@@ -28,7 +28,7 @@ local function with_probe(body)
 				return { start = function() return spawn.started end }
 			end,
 		}
-		body(require("adapters.accessibility_copies"), spawns)
+		body(require("clipboard.adapters.accessibility_copies"), spawns)
 		package.loaded["core.process.adapters.shell_runner"] = nil
 	end)
 end

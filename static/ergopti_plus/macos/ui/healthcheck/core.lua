@@ -432,7 +432,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.accessibility_copies",
+		id       = "clipboard.adapters.accessibility_copies",
 		contract = { "parse", "find" },
 		-- The Accessibility wait asks it for the other copies before any reset.
 		wired    = true,
@@ -476,7 +476,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.clipboard",
+		id       = "clipboard.adapters.clipboard",
 		contract = { "read", "write" },
 		wired    = true,
 	},
@@ -721,7 +721,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.unicode_carrier",
+		id       = "clipboard.adapters.unicode_carrier",
 		contract = { "note_physical_key", "keycode" },
 		-- The keymap taps report held keys; every synthetic text event asks it.
 		wired    = true,

@@ -1,4 +1,4 @@
---- adapters/accessibility_copies.lua
+--- clipboard/adapters/accessibility_copies.lua
 
 --- ==============================================================================
 --- MODULE: Accessibility Copies Adapter

@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 
 local function load_fixture()
 	for _, name in ipairs({
-		"modules.keymap.utils", "adapters.clipboard", "core.events.timer_scheduler", "platform.input.synthetic_input",
+		"modules.keymap.utils", "clipboard.adapters.clipboard", "core.events.timer_scheduler", "platform.input.synthetic_input",
 		"core.logger.engine.logger", "core.timing.engine.timings", "core.text.engine.utils",
 	}) do
 		package.loaded[name] = nil

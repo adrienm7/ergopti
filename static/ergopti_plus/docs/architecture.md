@@ -36,31 +36,23 @@ graph TD
     end
 
     subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
-        LINUX_clipboard["Clipboard.lua"]
-        LINUX_clipboard_owner["ClipboardOwner.lua"]
-        LINUX_clipboard_owner_worker["ClipboardOwnerWorker.lua"]
         LINUX_input_source_group_worker["InputSourceGroupWorker.lua"]
         LINUX_input_source_switch["InputSourceSwitch.lua"]
         LINUX_keyboard_layout["KeyboardLayout.lua"]
-        LINUX_selection_transaction["SelectionTransaction.lua"]
         LINUX_user_hotstring_destination["UserHotstringDestination.lua"]
-        LINUX_wayland_selection_counter["WaylandSelectionCounter.lua"]
         LINUX_window_switch["WindowSwitch.lua"]
         LINUX_wpm_surface["WpmSurface.lua"]
         LINUX_x11_keymap_watch_worker["X11KeymapWatchWorker.lua"]
-        LINUX_x11_selection_stamp["X11SelectionStamp.lua"]
         LINUX_xkb_capture["XkbCapture.lua"]
         LINUX_xkb_source_probe["XkbSourceProbe.lua"]
     end
 
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
-        MACOS_accessibility_copies["AccessibilityCopies.lua"]
         MACOS_accessibility_permission["AccessibilityPermission.lua"]
         MACOS_apple_shortcuts["AppleShortcuts.lua"]
         MACOS_apple_shortcuts_cli["AppleShortcutsCli.lua"]
         MACOS_apple_shortcuts_native["AppleShortcutsNative.lua"]
         MACOS_boot_fatal["BootFatal.lua"]
-        MACOS_clipboard["Clipboard.lua"]
         MACOS_event_provenance["EventProvenance.lua"]
         MACOS_field_check_ports["FieldCheckPorts.lua"]
         MACOS_field_probe_ports["FieldProbePorts.lua"]
@@ -88,16 +80,13 @@ graph TD
         MACOS_system_switcher_runtime["SystemSwitcherRuntime.lua"]
         MACOS_system_switcher_sampler["SystemSwitcherSampler.lua"]
         MACOS_tcc_grant["TccGrant.lua"]
-        MACOS_unicode_carrier["UnicodeCarrier.lua"]
         MACOS_update_launcher["UpdateLauncher.lua"]
     end
 
     subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]
-        WINDOWS_clipboard["Clipboard.ahk"]
         WINDOWS_console_window["ConsoleWindow.ahk"]
         WINDOWS_crash_report_worker["CrashReportWorker.ahk"]
         WINDOWS_diagnostics_control["DiagnosticsControl.ahk"]
-        WINDOWS_editor_replace["EditorReplace.ahk"]
         WINDOWS_keyboard_layout_install["KeyboardLayoutInstall.ahk"]
         WINDOWS_keyboard_layout_switch["KeyboardLayoutSwitch.ahk"]
         WINDOWS_mouse_control["MouseControl.ahk"]
@@ -116,14 +105,11 @@ graph TD
     end
 
     %% Port implementations: Linux (Lua)
-    P_Clipboard -->|implements| LINUX_clipboard
 
     %% Port implementations: macOS (Hammerspoon)
-    P_Clipboard -->|implements| MACOS_clipboard
     P_MouseControl -->|implements| MACOS_mouse_control
 
     %% Port implementations: Windows (AutoHotkey)
-    P_Clipboard -->|implements| WINDOWS_clipboard
     P_MouseControl -->|implements| WINDOWS_mouse_control
 
     %% Key domain relationships

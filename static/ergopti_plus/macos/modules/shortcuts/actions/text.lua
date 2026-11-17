@@ -18,8 +18,8 @@ local M = {}
 
 local hs         = hs
 local pasteboard = hs.pasteboard
-local Clipboard  = require("adapters.clipboard")
-local ClipboardBorrowers = require("infra.clipboard_borrowers")
+local Clipboard  = require("clipboard.adapters.clipboard")
+local ClipboardBorrowers = require("clipboard.borrowers")
 local JsonCodec  = require("core.fs.adapters.json_codec")
 local Logger     = require("core.logger.engine.logger")
 local Paths      = require("core.fs.engine.paths")

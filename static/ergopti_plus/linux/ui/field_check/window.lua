@@ -50,7 +50,7 @@ local function native(spec)
 				.. " --cancel-label=" .. Shell.quote(close_label)
 			return (require("core.ui.ui.modal").run(function() return Shell.exec_checked(command) end)) == true
 		end,
-		copy = function(text) return require("adapters.clipboard").write(text) end,
+		copy = function(text) return require("clipboard.adapters.clipboard").write(text) end,
 		defer = function(fn) return require("core.events.loop").defer(fn, 0) end,
 	}
 end

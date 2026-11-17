@@ -1,4 +1,4 @@
-﻿; adapters/clipboard.ahk
+﻿; clipboard/adapters/clipboard.ahk
 
 ; ==============================================================================
 ; MODULE: Clipboard Adapter (AutoHotkey)

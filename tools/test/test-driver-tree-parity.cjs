@@ -196,7 +196,7 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    the path leaves the shared set with no counterpart. The one
 //                    lowering this ratchet allows is a feature removed from every
 //                    driver (decided by the agent, to review by the maintainer).
-const BASELINE_SHARED = 63;
+const BASELINE_SHARED = 65;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
@@ -278,7 +278,7 @@ const BASELINE_SHARED = 63;
 //   the focused window under Wayland, where no client may ask the compositor.
 //   Windows and macOS read focus through their own native APIs and install no
 //   desktop-shell code, so counterpart folders there would hold nothing.
-const BASELINE_UNION = 83;
+const BASELINE_UNION = 85;
 
 // ── The test trees, measured apart from the architecture ────────────────────
 //

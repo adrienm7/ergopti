@@ -189,7 +189,7 @@ local function make_vkb(trigger, replacement, opts, others)
 	-- Expander delegates deletion to TextSender. It captures `hs` at module load
 	-- time too, so it must be reloaded alongside the keymap modules.
 	package.loaded["platform.input.text_sender"]        = nil
-	package.loaded["adapters.clipboard"]          = nil
+	package.loaded["clipboard.adapters.clipboard"]          = nil
 	-- The terminator is no longer emitted inline by the expander: it is handed to
 	-- TerminatorReplay, which holds it until the replacement has provably landed.
 	-- That module is stateful (M.init refuses a second call, and it owns the

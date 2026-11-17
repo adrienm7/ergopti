@@ -631,7 +631,7 @@ class SystemControl {
 		MouseMove(X, Y, 0)
 	}
 
-	; Empties the clipboard through the clipboard owner (adapters/clipboard.ahk),
+	; Empties the clipboard through the clipboard owner (clipboard/adapters/clipboard.ahk),
 	; which records the change as the driver's own: the keystats then retires
 	; the last copy's provenance instead of logging a user copy.
 	; @returns {Boolean} False when the clipboard could not be written.

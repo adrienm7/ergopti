@@ -227,7 +227,7 @@ helpers.describe("Main selected write owner construction", function()
 		fixture.with(function(state)
 			local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
 			local source = file:read("*a"); assert(file:close())
-			local first = assert(source:find('\t\tprivacy_owners.selection = require("adapters.selection_transaction").new({', 1, true))
+			local first = assert(source:find('\t\tprivacy_owners.selection = require("clipboard.adapters.selection_transaction").new({', 1, true))
 			local last = assert(source:find("\n\t\t})", first, true))
 			local body = source:sub(first, last + #"\n\t\t})" - 1)
 			local compile = loadstring or load

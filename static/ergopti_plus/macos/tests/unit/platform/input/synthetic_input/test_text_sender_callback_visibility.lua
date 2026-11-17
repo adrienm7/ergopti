@@ -10,7 +10,7 @@ helpers.describe("text_sender completion callback visibility", function()
 	helpers.it("logs a throwing completion callback without changing injection success", function()
 		helpers.with_fresh_modules({
 			"platform.input.text_sender",
-			"adapters.clipboard",
+			"clipboard.adapters.clipboard",
 			"platform.input.synthetic_input",
 			"core.events.timer_scheduler",
 			"core.logger.engine.logger",
@@ -29,7 +29,7 @@ helpers.describe("text_sender completion callback visibility", function()
 				return ok, callback_error
 			end
 			package.loaded["core.logger.engine.logger"] = logger
-			package.loaded["adapters.clipboard"] = {}
+			package.loaded["clipboard.adapters.clipboard"] = {}
 			package.loaded["core.events.timer_scheduler"] = {}
 			package.loaded["platform.input.synthetic_input"] = {
 				emit_key_strokes = function(text) return text == "visible" end,

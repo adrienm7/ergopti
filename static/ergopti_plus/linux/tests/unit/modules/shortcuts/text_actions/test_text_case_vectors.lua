@@ -51,7 +51,7 @@ end
 local function transformed_by(action_name, selected)
 	local names = {
 		manager = "modules.shortcuts.manager",
-		clipboard = "adapters.clipboard",
+		clipboard = "clipboard.adapters.clipboard",
 		event_loop = "core.events.loop",
 		combo = "modules.gestures.combo_emitter",
 		injector = "modules.hotstrings.injector",
