@@ -29,6 +29,10 @@
 				"zh"
 			]
 		},
+		"layout_analysis.words.effort": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
 		"layout_analysis.typing.altgr": {
 			"reason": "keyboard-key-name",
 			"locales": [
