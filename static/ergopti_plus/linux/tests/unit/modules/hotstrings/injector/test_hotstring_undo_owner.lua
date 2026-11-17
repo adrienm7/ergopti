@@ -32,6 +32,20 @@ local function main_callbacks(environment)
 	return chunk()
 end
 
+--- The text without its last user-perceived character.
+--- @param text string
+--- @param injector table The real injector, whose caret_steps counts characters.
+--- @return string
+local function without_last_cluster(text, injector)
+	local steps = injector.caret_steps(text)
+	for cut = #text, 0, -1 do
+		local head = text:sub(1, cut)
+		local boundary = cut == 0 or not text:sub(cut + 1, cut + 1):match("[\128-\191]")
+		if boundary and injector.caret_steps(head) == steps - 1 then return head end
+	end
+	return ""
+end
+
 --- Runs a real Undo after the actual Main callback publishes its commit record.
 --- @param options table Trigger, private flag and controlled transition boundary.
 --- @param body function Receives observations after the control callback.
@@ -42,7 +56,7 @@ local function with_undo(options, body)
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local observations = { wire = {}, writes = {}, logs = {}, documents = {
-			["/field/original"] = "Z", ["/field/successor"] = "SAFE" }, calls = 0, moved = false }
+			["/field/original"] = options.document or "Z", ["/field/successor"] = "SAFE" }, calls = 0, moved = false }
 		local function transition(point)
 			if options.boundary == point and not observations.moved then
 				observations.moved = true; state.path = "/field/successor"
@@ -92,7 +106,9 @@ local function with_undo(options, body)
 				observations.wire[#observations.wire + 1] = code .. ":" .. value
 				if value == 1 then
 					local text = observations.documents[state.path]
-					if code == 14 then text = text:sub(1, -2)
+					-- Backspace deletes one user-perceived character, as GTK 3 does
+					-- (run_hotstring_fields_live.lua): a whole emoji or accent cluster.
+					if code == 14 then text = without_last_cluster(text, injector)
 					elseif code == 47 then text = text .. clipboard
 					elseif code == 24 then text = text .. "o"
 					elseif code == 37 then text = text .. "k" end
@@ -126,7 +142,7 @@ local function with_undo(options, body)
 					record_correction = function() observations.corrections = (observations.corrections or 0) + 1 end },
 				engine = { reset = function() end, apply_expansion = function() end, on_char = function()
 					return { trigger = options.stored_trigger or options.trigger,
-						typed_trigger = options.trigger, replacement = "ZZ", backspace_count = 1,
+						typed_trigger = options.trigger, replacement = options.replacement or "ZZ", backspace_count = 1,
 						is_private = options.private == true }
 				end }, Logger = logger, injector = wrapped,
 			}, { __index = _G })
@@ -172,6 +188,15 @@ helpers.describe("Main Undo retains its original expansion authority", function(
 			end)
 		end)
 	end
+	-- The user's Backspace took the whole emoji, as GTK deletes a cluster; the
+	-- Undo counted the replacement in code points and also erased the "A"
+	-- typed before the expansion (run_hotstring_fields_live.lua).
+	helpers.it("erases what is left of an emoji replacement by character (linux-undo-graphemes)", function()
+		with_undo({ trigger = "ok", replacement = "Z\u{1F44D}\u{1F3FD}", document = "AZ" }, function(state)
+			helpers.assert_true(state.result.ok and state.result.cleanup_ok)
+			helpers.assert_eq(state.documents["/field/original"], "Aok", "only the replacement's own character is erased")
+		end)
+	end)
 	-- A conform rule stores `adn` and fires on `Adn`: Windows (the buffer) and
 	-- macOS (the matched text) type back what the user typed. Main used the
 	-- stored trigger and restored `adn`.

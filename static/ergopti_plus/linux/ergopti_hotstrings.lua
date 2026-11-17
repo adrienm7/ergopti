@@ -2280,9 +2280,12 @@ local function main()
 		-- The arithmetic is off by one on purpose. Under a grab the Backspace was
 		-- re-emitted to the application BEFORE this callback ran, so it has already
 		-- removed one character of the replacement; the erase here has to cover
-		-- what is left. Counted in codepoints, not bytes: "N'T" is three
-		-- characters and four bytes, and erasing four would eat the character
-		-- before it.
+		-- what is left. Counted in user-perceived characters, the unit one
+		-- Backspace deletes: "N'T" is three characters and four bytes, and an
+		-- emoji with a skin tone, a ZWJ sequence, a flag or an accent typed as a
+		-- combining mark is one character of several code points, which GTK
+		-- deletes whole (run_hotstring_fields_live.lua). Counting bytes or code
+		-- points ate the characters before the expansion.
 		--
 		-- An end-char expansion replays its terminator after the replacement
 		-- ("adn " → "ADN "), so THAT is what the Backspace removed, and the whole
@@ -2294,10 +2297,7 @@ local function main()
 			-- operation is in progress, so read only this captured commit record.
 			local undo = _undoable
 			_undoable = nil
-			local remaining = 0
-			for _ in (undo.replacement .. (undo.replayed or "")):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-				remaining = remaining + 1
-			end
+			local remaining = injector.caret_steps(undo.replacement .. (undo.replayed or ""))
 			if remaining >= 1 then
 				-- The trigger is typed text: its length is the diagnostic, not its
 				-- content, and a private one gives not even that (Windows, macOS).
