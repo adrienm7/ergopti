@@ -115,8 +115,10 @@ helpers.describe("startup: configuration consumers follow path initialization", 
 		local src = read_code("✅ Hammerspoon boot SUCCESSFUL.")
 		local ready = src:find("local config_paths_ready = config_paths.init(base_dir)", 1, true)
 		helpers.assert_true(ready ~= nil, "the path initialization owner must exist")
-		for _, name in ipairs({ "gestures", "keymap", "shortcuts", "dynamic_hotstrings" }) do
-			local loaded = src:find('require("modules.' .. name .. '")', 1, true)
+		-- Whole module names, never a prefix joined to a stem: the structure steps
+		-- move a module out of modules/, and a joined name cannot follow it.
+		for _, name in ipairs({ "gestures.engine", "modules.keymap", "modules.shortcuts", "modules.dynamic_hotstrings" }) do
+			local loaded = src:find('require("' .. name .. '")', 1, true)
 			helpers.assert_true(loaded ~= nil and loaded > ready,
 				"configuration-dependent module must follow the path owner: " .. name)
 		end
