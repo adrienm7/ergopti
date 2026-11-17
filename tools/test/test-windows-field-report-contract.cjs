@@ -43,6 +43,8 @@ const REPORT_REDACT = 'tools/dev/field-report-redact.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
 // The analyser and the declarations it reads its budgets from.
 const ANALYSER = 'tools/dev/field-log-analyse.py';
+// The machine facts and timeline builder the analysis reads first.
+const FACTS = 'tools/dev/field-report-facts.py';
 // The field run protocol every driver shares, and the Windows steps.
 const FIELD_RUN_PROTOCOL = 'static/ergopti_plus/_shared/diagnostics/data/field_run_protocol.json';
 const FIELD_RUN_STEPS = 'static/ergopti_plus/windows/data/field_run_steps.json';
@@ -244,6 +246,39 @@ check('the field run speaks the shared protocol and never starts a driver', () =
 	);
 });
 
+check('every step is timed with progress and a heartbeat, and the instances are sampled', () => {
+	const step = code.match(/^function Invoke-Step\(.*\) \{\n([\s\S]*?)^\}$/m);
+	assert(step, 'no Invoke-Step');
+	assert.match(
+		step[1],
+		/Log "> step \$\(\$script:StepIndex\)\/\$\(\$script:StepTotal\) \$Name\$Eta"/
+	);
+	assert.match(
+		step[1],
+		/\[ErgoptiFieldHeartbeat\]::Start\(\$Name, \$HeartbeatSeconds, \$script:StepHint\)/
+	);
+	assert.match(step[1], /\[ErgoptiFieldHeartbeat\]::Stop\(\)/);
+	assert.match(step[1], /Add-StepTime \$Name 'collector' \$Started \(Get-Epoch\)/);
+	assert.match(step[1], /Log " {2}\[OK\] \$Name \(\$Seconds s\)"/);
+	assert.match(
+		code,
+		/function Get-Epoch \{[^\n]*ToString\('F3', \$Invariant\)/,
+		'a decimal point on every locale'
+	);
+	const fieldRun = code.match(/^function Invoke-FieldRun \{\n([\s\S]*?)^\}$/m)[1];
+	assert.match(fieldRun, /Get-FieldInstances 'sample'/, 'the field run samples the instances');
+	assert.match(fieldRun, /field run still running: /, 'the field run has a heartbeat');
+	for (const phase of ['start', 'before_run', 'end'])
+		assert.match(
+			code,
+			new RegExp(`Get-FieldInstances '${phase}'\\n\\t\\tShow-MultipleDrivers \\$Lines '${phase}'`)
+		);
+	// WMI took 2.4 s a query on the maintainer's PC: never a whole-machine scan.
+	const instances = code.match(/^function Get-FieldInstances\(.*\) \{\n([\s\S]*?)^\}$/m)[1];
+	assert.doesNotMatch(instances, /LIKE/, 'Get-Process finds the candidates');
+	assert.match(instances, /\$script:ProcessDetails/);
+});
+
 check('the proxy facts say set or unset, never an address', () => {
 	const winhttp = code.match(/Invoke-Step 'proxy_winhttp' \{\n([\s\S]*?)\n\t\}\n/)[1];
 	assert.match(winhttp, /'WinHTTP: direct' \} else \{ 'WinHTTP: set' \}/);
@@ -378,6 +413,7 @@ function fixture(name, start = 'dev') {
 		COLLISIONS,
 		BUNDLED_SAMPLE,
 		ANALYSER,
+		FACTS,
 		FIELD_RUN_PROTOCOL,
 		FIELD_RUN_STEPS,
 		...sources
@@ -427,11 +463,17 @@ function runCollector(paths, { push = false } = {}) {
 	return spawnSync(interpreter, args, {
 		cwd: paths.clone,
 		encoding: 'utf8',
-		timeout: 120000,
+		// The machine facts add about twenty seconds of WMI and event-log
+		// queries; a loaded PC ran one collection past two minutes.
+		timeout: 240000,
 		windowsHide: true,
 		env: {
 			...process.env,
 			...GIT_IDENTITY,
+			// A one-second heartbeat and a three-second idle window: the idle step
+			// then outlives one heartbeat, which the run must print.
+			FIELD_HEARTBEAT_SECONDS_OVERRIDE: '1',
+			FIELD_IDLE_SECONDS_OVERRIDE: '3',
 			LOCALAPPDATA: paths.local,
 			APPDATA: paths.roaming,
 			USERPROFILE: paths.profile
@@ -518,6 +560,60 @@ try {
 				'check=field_run verdict=skip codes=no_ready_driver\n'
 			);
 			assert.doesNotMatch(fs.readFileSync(reportFile(folders[0], 'steps.txt'), 'utf8'), /\r/);
+			// The machine facts, the timing and the live progress (2026-11-17).
+			// The console writes CRLF on Windows.
+			const terminal = result.stdout.replace(/\r\n/g, '\n');
+			for (const name of [
+				'instances_start',
+				'remappers',
+				'permissions',
+				'keyboards',
+				'environment',
+				'app_folders',
+				'instances_before_run',
+				'instances_end',
+				'idle_cpu',
+				'event_log'
+			])
+				assert.match(steps, new RegExp(`^${name}\\s+exit=\\d+$`, 'm'), `step ${name}`);
+			assert.match(steps, /^facts\s+exit=0$/m);
+			assert.match(terminal, /^\[field-report\] > step 1\/\d+ versions$/m, 'step k/N');
+			assert.match(terminal, /^\[field-report\] {3}\[OK\] versions \(\d+ s\)$/m);
+			assert.match(
+				terminal,
+				/^\[field-report\] {3}\.\.\. idle_cpu still running \(\d+ s\)$/m,
+				'heartbeat'
+			);
+			assert.match(terminal, /waiting for you: keep your hands off the keyboard/);
+			const env = JSON.parse(fs.readFileSync(reportFile(folders[0], 'env.json'), 'utf8'));
+			assert.equal(env.os, 'win');
+			assert(env.environment.os_name, 'the environment facts reach env.json');
+			assert(
+				env.permissions.some((row) => row.name === 'uac'),
+				'the UAC fact'
+			);
+			assert.match(
+				fs.readFileSync(reportFile(folders[0], 'instances_start.txt'), 'utf8'),
+				/^fact\tsample\tphase=start\tt=\d+\.\d{3}$/m
+			);
+			const timeline = fs.readFileSync(reportFile(folders[0], 'timeline.txt'), 'utf8');
+			assert.match(timeline, /^## Slowest steps$/m);
+			assert.match(timeline, /\[collector\] idle_cpu/);
+			const times = fs.readFileSync(reportFile(folders[0], 'step_times.tsv'), 'utf8');
+			assert.match(
+				times,
+				/^versions\tcollector\t\d+\.\d{3}\t\d+\.\d{3}\t0\t30$/m,
+				'invariant epoch seconds'
+			);
+			assert.match(times, /^field_run\tphase\t/m);
+			assert.match(
+				fs.readFileSync(reportFile(folders[0], 'analysis.md'), 'utf8'),
+				/^## Slowest steps$/m
+			);
+			assert.match(
+				fs.readFileSync(reportFile(folders[0], 'analysis.md'), 'utf8'),
+				/^## Machine and instances$/m
+			);
 			const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD').split('\n');
 			assert(
 				committed.every((file) => file.startsWith(`${names.folder}/`)),

@@ -140,7 +140,16 @@ and runtime checks).
 The three `tools/dev/collect-*-field-report` collectors take their branch prefix,
 report folder and base config key from `identifiers.json` `field_report`; the two
 shell ones share `tools/dev/field-report-git.sh`, which the PowerShell one
-mirrors by hand, so change a git step in both.
+mirrors by hand, so change a git step in both. The same holds for the step
+runner (`tools/dev/field-report-steps.sh`: "step k/N", heartbeat, bound,
+`step_times.tsv`) and the machine facts: a step output line
+`fact<TAB><type><TAB>key=value...` is what `tools/dev/field-report-facts.py`
+reads into `env.json` and the analysis ranks (two drivers at once first). A new
+fact needs no parser change, only its type in `FACT_TYPES`. On Windows a WMI
+query costs about 2.4 s on the maintainer's PC: find processes with
+`Get-Process` and ask `Win32_Process` once per new pid, never a `LIKE` scan per
+sample; write every epoch with the invariant culture (a French Windows writes a
+decimal comma the timeline cannot parse).
 
 ## Communication
 

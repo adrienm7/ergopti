@@ -39,7 +39,27 @@
 # ([logs.windows]: %LOCALAPPDATA%\Ergopti\logs, [config.windows]:
 # %LOCALAPPDATA%\Ergopti\paths.toml and %LOCALAPPDATA%\Ergopti\config).
 #
+# The machine facts: every Ergopti instance (the compiled driver, an
+# interpreter running an ErgoptiPlus.ahk, any other AutoHotkey script) at the
+# start, before the run, every few seconds during it and at the end (a second
+# driver is said at once and first in the analysis), the other remappers
+# (PowerToys Keyboard Manager, kanata, a Scancode Map, a keyboard filter
+# driver, text expanders), the keyboards and layouts, the machine, the idle CPU
+# per driver process, the Application and Defender events of Ergopti, and the
+# app folders. tools/dev/field-report-facts.py turns their fact lines into
+# 0_main/env.json and the step timings into 0_main/timeline.txt; the analysis
+# reads both. Every step prints "step k/N" with the previous report's
+# duration, a heartbeat every 15 s while it runs (a .NET timer: a PowerShell
+# step blocks its thread) and [OK] or [FAIL] with its duration.
+#
 # NOT COVERED, AND WHY:
+# - A PowerShell step cannot be cut short: the CIM and event-log queries of
+#   the new steps carry their own timeouts and event caps instead.
+# - The driver's log level is not raised: the field run protocol has no
+#   request for it and the collector never writes the user's configuration;
+#   the analysis says when the logs hold no DEBUG line.
+# - The driver's own elevation is not read (querying an elevated process's
+#   token needs elevation); the console's and the UAC state are.
 # - The field run needs a developer driver of this clone already running
 #   (tools/dev/run-windows-dev.ps1): the collector asks it, through the shared
 #   protocol (_shared/diagnostics/data/field_run_protocol.json, infra/field_run.ahk), to
@@ -156,14 +176,118 @@ function Hide-User([string]$Text) {
 	return $Text
 }
 
+# How often a running step says it is still alive, the budget of a step that
+# names none, and the quiet window of the idle CPU step; the contract test
+# shortens the period and the window.
+$HeartbeatSeconds = 15
+if ($env:FIELD_HEARTBEAT_SECONDS_OVERRIDE) { $HeartbeatSeconds = [int]$env:FIELD_HEARTBEAT_SECONDS_OVERRIDE }
+$StepDefaultBudgetSeconds = 30
+$IdleSeconds = 20
+if ($env:FIELD_IDLE_SECONDS_OVERRIDE) { $IdleSeconds = [int]$env:FIELD_IDLE_SECONDS_OVERRIDE }
+# How often the field run's wait samples the Ergopti instances.
+$SamplerSeconds = 10
+$script:StepIndex = 0
+$script:StepTotal = 0
+$script:StepTimes = ''
+$script:PreviousTimes = @{}
+# The person-facing hint a step repeats in its heartbeat (set around a step).
+$script:StepHint = ''
+$Invariant = [Globalization.CultureInfo]::InvariantCulture
+
+# The heartbeat runs on a timer thread: a PowerShell step blocks the pipeline
+# thread, so only a .NET timer can print while it runs. Without it (a host
+# that refuses Add-Type) the steps still run, and the start and end lines stay.
+$script:Heartbeat = $false
+try {
+	if (-not ('ErgoptiFieldHeartbeat' -as [type])) {
+		Add-Type -Language CSharp -TypeDefinition @'
+using System;
+using System.Threading;
+public static class ErgoptiFieldHeartbeat {
+	static Timer timer;
+	static DateTime started;
+	static string label;
+	static string hint;
+	public static void Start(string name, int seconds, string waitHint) {
+		Stop();
+		label = name;
+		hint = waitHint;
+		started = DateTime.UtcNow;
+		timer = new Timer(Tick, null, seconds * 1000, seconds * 1000);
+	}
+	static void Tick(object state) {
+		int elapsed = (int)(DateTime.UtcNow - started).TotalSeconds;
+		Console.Out.WriteLine("[field-report]   ... " + label + " still running (" + elapsed + " s)");
+		if (!String.IsNullOrEmpty(hint)) Console.Out.WriteLine("[field-report]   ... waiting for you: " + hint);
+	}
+	public static void Stop() {
+		if (timer != null) { timer.Dispose(); timer = null; }
+	}
+}
+'@
+	}
+	$script:Heartbeat = $true
+} catch {
+	Log "WARNING: no heartbeat in this host (Add-Type refused: $($_.Exception.Message)); each step still prints its start and end."
+}
+
+# The time now, epoch seconds with milliseconds, in the invariant culture: a
+# French Windows writes a decimal comma the timeline cannot read.
+function Get-Epoch { return ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0).ToString('F3', $Invariant) }
+
+# Appends one line to step_times.tsv: name, kind, start, end, status, budget.
+function Add-StepTime([string]$Name, [string]$Kind, [string]$Start, [string]$End, [string]$Status, [string]$Budget) {
+	if (-not $script:StepTimes) { return }
+	[IO.File]::AppendAllText($script:StepTimes, "$Name`t$Kind`t$Start`t$End`t$Status`t$Budget`n", $Utf8)
+}
+
+# Counts the steps for "step k/N" and reads what the previous report of this
+# OS measured for each, its ETA.
+function Initialize-StepTimes {
+	$script:StepTimes = Join-Path $script:Out 'step_times.tsv'
+	Write-Text $script:StepTimes "name`tkind`tstart`tend`tstatus`tbudget`n"
+	# The named steps, plus one per digest of the digest table (run in a loop).
+	$Source = Get-Content -Raw -Encoding UTF8 -LiteralPath $PSCommandPath
+	$script:StepTotal = ([regex]::Matches($Source, "(?m)^\s*Invoke-Step '")).Count +
+		([regex]::Matches($Source, "(?m)^\s*digest_\w+ = '")).Count
+	$Reports = Join-Path $RepoRoot $Names.folder
+	$Previous = @(Get-ChildItem -LiteralPath $Reports -Directory -Filter 'win-*' -ErrorAction SilentlyContinue |
+		Where-Object { $_.FullName -ne $script:Out } | Sort-Object Name)
+	if (-not $Previous.Count) { return }
+	$File = Get-ChildItem -LiteralPath $Previous[-1].FullName -Recurse -Filter 'step_times.tsv' -ErrorAction SilentlyContinue | Select-Object -First 1
+	if (-not $File) { return }
+	foreach ($Line in (Get-Content -Encoding UTF8 -LiteralPath $File.FullName)) {
+		$Parts = $Line -split "`t"
+		$Begin = 0.0
+		$Finish = 0.0
+		if ($Parts.Count -ge 4 -and [double]::TryParse($Parts[2], [Globalization.NumberStyles]::Float, $Invariant, [ref]$Begin) -and
+			[double]::TryParse($Parts[3], [Globalization.NumberStyles]::Float, $Invariant, [ref]$Finish)) {
+			$script:PreviousTimes[$Parts[0]] = [int]($Finish - $Begin)
+		}
+	}
+}
+
 # Runs one named step, captures its output into a file and records its status.
-# A native command fails by its exit code, a cmdlet by an error record.
-function Invoke-Step([string]$Name, [scriptblock]$Body) {
+# A native command fails by its exit code, a cmdlet by an error record. It
+# prints "step k/N" with the previous report's duration, a heartbeat while it
+# runs (with the hint when it waits for the person), then [OK] or [FAIL] with
+# its duration, and appends its timing to step_times.tsv. $Budget is the
+# duration it should stay under; a CIM or event-log query inside a step
+# carries its own timeout, since a PowerShell step cannot be cut short.
+function Invoke-Step([string]$Name, [scriptblock]$Body, [int]$Budget = 0) {
 	$File = Join-Path $script:Out "$Name.txt"
 	$Code = 0
 	$Text = ''
 	$ErrorActionPreference = 'Continue'
 	$global:LASTEXITCODE = 0
+	$script:StepIndex++
+	$Eta = ''
+	if ($script:PreviousTimes.ContainsKey($Name)) { $Eta = " (about $($script:PreviousTimes[$Name]) s last time)" }
+	Log "> step $($script:StepIndex)/$($script:StepTotal) $Name$Eta"
+	if ($script:StepHint) { Log "  waiting for you: $($script:StepHint)" }
+	$Started = Get-Epoch
+	$Clock = [Diagnostics.Stopwatch]::StartNew()
+	if ($script:Heartbeat) { [ErgoptiFieldHeartbeat]::Start($Name, $HeartbeatSeconds, $script:StepHint) }
 	try {
 		$Items = @(& $Body 2>&1)
 		if ($LASTEXITCODE) { $Code = $LASTEXITCODE }
@@ -175,10 +299,16 @@ function Invoke-Step([string]$Name, [scriptblock]$Body) {
 	} catch {
 		$Text = $_ | Out-String -Width 200
 		$Code = 1
+	} finally {
+		if ($script:Heartbeat) { [ErgoptiFieldHeartbeat]::Stop() }
 	}
+	$Seconds = [int]$Clock.Elapsed.TotalSeconds
 	Write-Text $File (Hide-User $Text)
 	Add-Step ('{0,-28} exit={1}' -f $Name, $Code)
-	if ($Code -ne 0) { Log "step '$Name' exited $Code (kept in $File)" }
+	if ($Budget -le 0) { $Budget = $StepDefaultBudgetSeconds }
+	Add-StepTime $Name 'collector' $Started (Get-Epoch) "$Code" "$Budget"
+	if ($Code -ne 0) { Log "  [FAIL] $Name exited $Code ($Seconds s, kept in $File)" }
+	else { Log "  [OK] $Name ($Seconds s)" }
 }
 
 # Reads the string and string-list keys of one [section] of app_dirs.toml.
@@ -317,6 +447,8 @@ Write-Text $script:StepsFile ''
 # The coordinator reads which code the report ran on before anything else.
 $Commit = Get-Git rev-parse '--short' HEAD
 Write-Text (Join-Path $script:Out 'base.txt') "field_branch: $Branch`nbase: $Base`ncommit: $Commit`n"
+Initialize-StepTimes
+$RunStarted = Get-Date
 
 # ===========================================
 # ======= 3/ Logs, commit and push ==========
@@ -410,7 +542,20 @@ function Invoke-FieldRun {
 		}
 	}
 	$Sent = Get-Date
+	$LastNote = $Sent
+	$LastSample = [datetime]::MinValue
+	$Timeline = Join-Path $script:Out 'instances_timeline.txt'
 	while ($true) {
+		# A second driver or a restart during the run is on record.
+		if (((Get-Date) - $LastSample).TotalSeconds -ge $SamplerSeconds) {
+			$LastSample = Get-Date
+			[IO.File]::AppendAllText($Timeline, ((Get-FieldInstances 'sample') -join "`n") + "`n", $Utf8)
+		}
+		# A step can stay silent for minutes: the heartbeat says how far the run is.
+		if (((Get-Date) - $LastNote).TotalSeconds -ge $HeartbeatSeconds) {
+			$LastNote = Get-Date
+			Log "  ... field run still running: $($Seen.Count) step result(s), $([int]((Get-Date) - $Sent).TotalSeconds) s since the request."
+		}
 		if (Test-Path -LiteralPath $Refused -PathType Leaf) {
 			$Refusal = Get-Content -Raw -Encoding UTF8 -LiteralPath $Refused | ConvertFrom-Json
 			Log "The developer driver refused the field run request: $($Refusal.reason)."
@@ -447,6 +592,102 @@ function Invoke-FieldRun {
 		Start-Sleep -Seconds $FieldRunPollSeconds
 	}
 	Write-Text $Checks (($Lines -join "`n") + "`n")
+}
+
+# Prints a tab-separated fact line: its type, then key=value pairs, for
+# tools/dev/field-report-facts.py (env.json).
+function Format-Fact([string]$Type, [string[]]$Pairs) {
+	$Clean = @($Pairs | ForEach-Object { ($_ -replace "[`t`r`n]", ' ') })
+	return ((@('fact', $Type) + $Clean) -join "`t")
+}
+
+# The Ergopti instances of one phase (start, before_run, sample, end): the
+# compiled driver, an interpreter running this clone's or another copy's
+# ErgoptiPlus.ahk, and every other AutoHotkey script (another remapper). A
+# second driver (an installed one beside a developer run) or a restart is on
+# record. The command lines are matched, never printed; a script is named by
+# its file name only. A sample skips the signature check, which costs a call.
+# Get-Process finds the candidates; WMI, slow on some PCs (2.4 s a query on the
+# maintainer's), is asked once per new process for its command line and
+# parent, which never change, and the answers are kept for the next phase.
+$script:ProcessDetails = @{}
+function Get-FieldInstances([string]$Phase) {
+	$Now = Get-Epoch
+	$Lines = @(Format-Fact 'sample' @("phase=$Phase", "t=$Now"))
+	$Ahk = [regex]::Escape($Identifiers.app.ahk)
+	$Candidates = @(Get-Process -Name $Identifiers.app.name, 'AutoHotkey*' -ErrorAction SilentlyContinue)
+	$Unknown = @($Candidates | Where-Object { -not $script:ProcessDetails.ContainsKey("$($_.Id)@$($_.StartTime)") })
+	if ($Unknown.Count) {
+		$Filter = (@($Unknown | ForEach-Object { "ProcessId = $($_.Id)" }) -join ' OR ')
+		foreach ($Row in @(Get-CimInstance Win32_Process -Filter $Filter -OperationTimeoutSec 20 -ErrorAction SilentlyContinue)) {
+			$Match = $Unknown | Where-Object { $_.Id -eq $Row.ProcessId } | Select-Object -First 1
+			if ($Match) { $script:ProcessDetails["$($Match.Id)@$($Match.StartTime)"] = @([string]$Row.CommandLine, $Row.ParentProcessId) }
+		}
+	}
+	foreach ($Process in $Candidates) {
+		$Key = "$($Process.Id)@$($Process.StartTime)"
+		$Command = ''
+		$ParentId = ''
+		if ($script:ProcessDetails.ContainsKey($Key)) { $Command = $script:ProcessDetails[$Key][0]; $ParentId = $script:ProcessDetails[$Key][1] }
+		if ($Process.ProcessName -eq $Identifiers.app.name) { $Role = 'driver'; $Name = $Identifiers.app.name; $Origin = 'release' }
+		elseif ($Command -match $Ahk) {
+			$Role = 'driver'; $Name = $Identifiers.app.ahk
+			if ($Command -match [regex]::Escape($RepoRoot)) { $Origin = 'dev' } else { $Origin = 'other_source' }
+		} else {
+			$Role = 'remapper'; $Origin = 'other'
+			$Script = [regex]::Match($Command, '([^\\/"]+\.ahk)').Groups[1].Value
+			if (-not $Script) { $Script = 'unnamed script' }
+			$Name = "AutoHotkey script $Script"
+		}
+		$Path = [string]$Process.Path
+		$Version = ''
+		$Signer = ''
+		if ($Path -and (Test-Path -LiteralPath $Path -PathType Leaf)) {
+			$Version = [string](Get-Item -LiteralPath $Path).VersionInfo.FileVersion
+			if ($Phase -ne 'sample') {
+				$Signature = Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction SilentlyContinue
+				if ($Signature) {
+					$Signer = "$($Signature.Status)"
+					if ($Signature.SignerCertificate) { $Signer += ' ' + ($Signature.SignerCertificate.Subject -replace '^CN=([^,]+).*$', '$1') }
+				}
+			}
+		}
+		$Parent = ''
+		if ($ParentId) { $Parent = (Get-Process -Id $ParentId -ErrorAction SilentlyContinue).Name }
+		$Started = ''
+		if ($Process.StartTime) { $Started = $Process.StartTime.ToString('s') }
+		$Cpu = ''
+		if ($null -ne $Process.TotalProcessorTime) { $Cpu = $Process.TotalProcessorTime.TotalSeconds.ToString('F2', $Invariant) }
+		$Lines += Format-Fact 'instance' @("phase=$Phase", "t=$Now", "role=$Role", "name=$Name", "pid=$($Process.Id)",
+			"ppid=$ParentId", "parent=$Parent", "started=$Started", "cpu_s=$Cpu",
+			"rss_kb=$([int64]($Process.WorkingSet64 / 1KB))", "origin=$Origin", "path=$Path", "version=$Version",
+			'bundle_id=', "team=$Signer")
+	}
+	return $Lines
+}
+
+# Says at once, in the console, when one phase saw two drivers: the second
+# hook sees every key too, and the run's key checks are spoiled.
+function Show-MultipleDrivers([string[]]$Lines, [string]$Phase) {
+	$Drivers = @($Lines | Where-Object { $_ -match "^fact`tinstance`t.*`trole=driver`t" })
+	if ($Drivers.Count -le 1) { return }
+	Log "WARNING: $($Drivers.Count) Ergopti drivers are running at once ($Phase): quit the one you are not testing."
+	foreach ($Line in $Drivers) {
+		$Fields = @{}
+		foreach ($Part in ($Line -split "`t")) { if ($Part -match '^(\w+)=(.*)$') { $Fields[$Matches[1]] = $Matches[2] } }
+		Log "   pid $($Fields['pid']) ($($Fields['origin'])): $(Hide-User $Fields['path'])"
+	}
+}
+
+# The CPU time of every process, by pid, for the idle window.
+function Get-CpuTimes {
+	$Times = @{}
+	foreach ($Process in (Get-Process -ErrorAction SilentlyContinue)) {
+		# A protected process (another session, a service) gives no CPU time.
+		if ($null -eq $Process.TotalProcessorTime) { continue }
+		$Times[$Process.Id] = @($Process.ProcessName, $Process.TotalProcessorTime.TotalMilliseconds)
+	}
+	return $Times
 }
 
 # The first Python that really runs: the python3 of a Windows without Python is
@@ -507,8 +748,11 @@ function Complete-Report {
 			$DayLog = Join-Path $script:Out "$MainPrefix$Day$Extension"
 			if (Test-Path -LiteralPath $DayLog -PathType Leaf) { $DayLogs += $DayLog }
 		}
-		# The LLM sub-log keeps the download and server lines of earlier days.
-		foreach ($Name in "$($MainPrefix)llm$Extension", $BootstrapLog) {
+		# The topical sub-logs keep the download, server, boot, menu, layout,
+		# dispatch, tray and gesture lines of earlier days; the hotstring and
+		# keystats ones can carry typed text and stay.
+		$Topical = @('llm', 'ollama', 'boot', 'menu', 'layout', 'dispatch', 'tray', 'gestures') | ForEach-Object { "$MainPrefix$_$Extension" }
+		foreach ($Name in @($Topical) + @($BootstrapLog)) {
 			$Source = Join-Path $Folder $Name
 			if (Test-Path -LiteralPath $Source -PathType Leaf) { $null = Copy-ScrubbedLog $Source }
 		}
@@ -553,6 +797,17 @@ function Complete-Report {
 		if (-not $script:Python) { throw 'No Python interpreter runs on this PC.' }
 		& $script:Python (Join-Path $DevTools 'hotstring-collisions.py') (
 			[IO.Path]::Combine((Resolve-ConfigDir), 'hotstrings', 'personal_hotstrings.toml')) $BundledHotstrings
+	}
+
+	# env.json and the timeline from the fact lines, the step timings, the
+	# field run's results and the scrubbed day logs; the analysis reads both.
+	if ($script:Python) {
+		$ErrorActionPreference = 'Continue'
+		& $script:Python (Join-Path $DevTools 'field-report-facts.py') 'build' $script:Out '--os' 'win'
+		Add-Step ('{0,-28} exit={1}' -f 'facts', $LASTEXITCODE)
+		if ($LASTEXITCODE -ne 0) { Log "step 'facts' exited $LASTEXITCODE" }
+	} else {
+		Add-Step ('{0,-28} skipped (no Python interpreter runs on this PC)' -f 'facts')
 	}
 
 	# Last: it also reads the check verdicts the steps above wrote. Its output
@@ -750,13 +1005,177 @@ try {
 		# The verdicts above are the result; a probe's exit code is not the step's.
 		$global:LASTEXITCODE = 0
 	}
+	# Every Ergopti instance now, before the run, during it (the field run's
+	# wait samples them) and after it.
+	Invoke-Step 'instances_start' {
+		$Lines = Get-FieldInstances 'start'
+		Show-MultipleDrivers $Lines 'start'
+		$Lines
+	} 30
+	# Other remappers and hooks: a second keyboard hook, a Scancode Map or a
+	# keyboard filter driver changes what the driver sees.
+	Invoke-Step 'remappers' {
+		$Known = [ordered]@{
+			'PowerToys.KeyboardManagerEngine' = 'PowerToys Keyboard Manager'
+			'kanata' = 'kanata'; 'kanata_gui' = 'kanata'; 'kmonad' = 'kmonad'
+			'espanso' = 'espanso'; 'TextExpander' = 'TextExpander'; 'PhraseExpress' = 'PhraseExpress'
+			'Beeftext' = 'Beeftext'; 'Breevy' = 'Breevy'; 'Clavier' = 'Clavier+'
+			'logioptionsplus_agent' = 'Logi Options+'; 'lghub_agent' = 'Logitech G HUB'
+			'itype' = 'Microsoft Mouse and Keyboard Center'; 'RazerCentralService' = 'Razer Synapse'
+			'AutoHotkeyU64' = 'AutoHotkey v1'; 'AutoHotkeyU32' = 'AutoHotkey v1'
+		}
+		$Running = @(Get-Process -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ProcessName -Unique)
+		foreach ($Key in $Known.Keys) {
+			if ($Running -contains $Key) {
+				"running: $($Known[$Key])"
+				Format-Fact 'remapper' @("name=$($Known[$Key])", 'running=yes', 'conflict=yes', "detail=process $Key")
+			}
+		}
+		Get-FieldInstances 'remappers' | Where-Object { $_ -match "`trole=remapper`t" } | ForEach-Object {
+			$Script = [regex]::Match($_, "`tname=([^`t]*)").Groups[1].Value
+			"running: $Script"
+			Format-Fact 'remapper' @("name=$Script", 'running=yes', 'conflict=yes', 'detail=another AutoHotkey script')
+		}
+		$Layout = Get-ItemProperty -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layout' -ErrorAction SilentlyContinue
+		if ($Layout -and $Layout.PSObject.Properties['Scancode Map']) {
+			'Scancode Map: set (keys remapped below every application)'
+			Format-Fact 'remapper' @('name=Scancode Map (registry)', 'running=yes', 'conflict=yes', 'detail=HKLM Keyboard Layout')
+		} else { 'Scancode Map: unset' }
+		$Class = Get-ItemProperty -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e96b-e325-11ce-bfc1-08002be10318}' -ErrorAction SilentlyContinue
+		$Filters = @()
+		if ($Class -and $Class.PSObject.Properties['UpperFilters']) { $Filters = @($Class.UpperFilters) }
+		"keyboard class upper filters: $($Filters -join ', ')"
+		foreach ($Filter in ($Filters | Where-Object { $_ -ne 'kbdclass' })) {
+			Format-Fact 'remapper' @("name=keyboard filter driver $Filter", 'running=yes', 'conflict=yes', 'detail=keyboard class UpperFilters')
+		}
+		$Substitutes = Get-ItemProperty -LiteralPath 'HKCU:\Keyboard Layout\Substitutes' -ErrorAction SilentlyContinue
+		if ($Substitutes) { 'layout substitutes:'; $Substitutes | Select-Object -Property * -ExcludeProperty PS* | Format-List }
+	} 60
+	# What the driver needs from the session: no elevated window it cannot
+	# reach (UIPI), and the UAC state the elevation check reads.
+	Invoke-Step 'permissions' {
+		$Principal = New-Object Security.Principal.WindowsPrincipal ([Security.Principal.WindowsIdentity]::GetCurrent())
+		$Elevated = $Principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+		Format-Fact 'permission' @('name=collector_elevated', "state=$(if ($Elevated) { 'yes' } else { 'no' })", 'subject=this console')
+		$Uac = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -ErrorAction SilentlyContinue
+		$Lua = 'unset'
+		if ($Uac -and $Uac.PSObject.Properties['EnableLUA']) { $Lua = "$($Uac.EnableLUA)" }
+		Format-Fact 'permission' @('name=uac', "state=$(if ($Lua -eq '0') { 'disabled' } else { 'enabled' })", "subject=EnableLUA=$Lua")
+	} 30
+	# The keyboards, with their vendor and product ids only (an instance id
+	# can carry a serial), and the input languages and layouts.
+	Invoke-Step 'keyboards' {
+		foreach ($Device in @(Get-PnpDevice -Class Keyboard -PresentOnly -ErrorAction SilentlyContinue)) {
+			$Ids = [regex]::Match([string]$Device.InstanceId, 'VID_([0-9A-F]{4})&PID_([0-9A-F]{4})')
+			Format-Fact 'device' @('source=pnp', "name=$($Device.FriendlyName)", "vendor_id=$($Ids.Groups[1].Value)",
+				"product_id=$($Ids.Groups[2].Value)", 'keyboard=yes', "status=$($Device.Status)", 'grabbed=unknown')
+		}
+		foreach ($Language in @(Get-WinUserLanguageList -ErrorAction SilentlyContinue)) {
+			foreach ($Tip in @($Language.InputMethodTips)) { Format-Fact 'layout' @("id=$Tip", "language=$($Language.LanguageTag)") }
+		}
+	} 30
+	# The machine env.json summarises: build, model, displays, locale, power,
+	# security software, virtualization.
+	Invoke-Step 'environment' {
+		$Os = Get-CimInstance Win32_OperatingSystem -OperationTimeoutSec 20 -ErrorAction Stop
+		$System = Get-CimInstance Win32_ComputerSystem -OperationTimeoutSec 20 -ErrorAction SilentlyContinue
+		$Version = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction SilentlyContinue
+		$Displays = @(Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorBasicDisplayParams -OperationTimeoutSec 20 -ErrorAction SilentlyContinue).Count
+		$Battery = @(Get-CimInstance Win32_Battery -OperationTimeoutSec 20 -ErrorAction SilentlyContinue)
+		$Power = 'ac (no battery)'
+		if ($Battery.Count) { if ($Battery[0].BatteryStatus -eq 2) { $Power = 'ac' } else { $Power = 'battery' } }
+		$Antivirus = @(Get-CimInstance -Namespace root\SecurityCenter2 -ClassName AntiVirusProduct -OperationTimeoutSec 20 -ErrorAction SilentlyContinue |
+			ForEach-Object { $_.displayName }) -join ', '
+		$Display = ''
+		$Ubr = ''
+		if ($Version) {
+			if ($Version.PSObject.Properties['DisplayVersion']) { $Display = $Version.DisplayVersion }
+			if ($Version.PSObject.Properties['UBR']) { $Ubr = ".$($Version.UBR)" }
+		}
+		$Virtual = 'no'
+		if ($System -and ($System.HypervisorPresent -or ($System.Model -match 'Virtual|VMware|VirtualBox|KVM|QEMU'))) { $Virtual = 'yes' }
+		Format-Fact 'env' @("os_name=$($Os.Caption)", "os_version=$Display", "os_build=$($Os.BuildNumber)$Ubr",
+			"arch=$($Os.OSArchitecture)", "model=$(if ($System) { "$($System.Manufacturer) $($System.Model)" })",
+			"memory_gb=$([int]($Os.TotalVisibleMemorySize / 1MB))", "displays=$Displays", "locale=$((Get-Culture).Name)",
+			"system_locale=$((Get-WinSystemLocale -ErrorAction SilentlyContinue).Name)", "power=$Power",
+			"security_software=$Antivirus", "virtual_machine=$Virtual",
+			"uptime=$([int]((Get-Date) - $Os.LastBootUpTime).TotalMinutes) min",
+			"powershell=$($PSVersionTable.PSVersion)")
+	} 60
+	# Ergopti's folders: mode, date and size, never their content.
+	Invoke-Step 'app_folders' {
+		foreach ($Folder in (Join-AppDir $LogsBase @($FolderName)), (Join-Path $env:ProgramFiles $Identifiers.app.name),
+			(Join-Path $env:LOCALAPPDATA "Programs\$($Identifiers.app.name)")) {
+			if ($Folder -and (Test-Path -LiteralPath $Folder)) {
+				$Size = (Get-ChildItem -LiteralPath $Folder -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Sum Length).Sum
+				"$Folder  $((Get-Item -LiteralPath $Folder).LastWriteTime.ToString('s'))  $([int]($Size / 1MB)) MB"
+			} else { "absent: $Folder" }
+		}
+	} 60
+	Invoke-Step 'instances_before_run' {
+		$Lines = Get-FieldInstances 'before_run'
+		Show-MultipleDrivers $Lines 'before_run'
+		$Lines
+	} 30
 	# Last of the steps: the field run takes minutes, the facts above are kept
 	# if it is interrupted.
+	$FieldRunStarted = Get-Epoch
+	Log '> field run: the developer driver runs its steps now; each verdict prints here.'
 	try { Invoke-FieldRun }
 	catch {
 		Log "The field run could not be run: $($_.Exception.Message)"
 		Add-Step ('{0,-28} failed ({1})' -f 'field_run', $_.Exception.Message)
 	}
+	Add-StepTime 'field_run' 'phase' $FieldRunStarted (Get-Epoch) 'done' '0'
+	Invoke-Step 'instances_end' {
+		$Lines = Get-FieldInstances 'end'
+		Show-MultipleDrivers $Lines 'end'
+		$Lines
+	} 30
+	# The CPU each driver process spends while nothing is typed, and the
+	# busiest processes of the PC meanwhile.
+	$script:StepHint = "keep your hands off the keyboard and mouse for $IdleSeconds s (idle CPU)"
+	Invoke-Step 'idle_cpu' {
+		$Before = Get-CpuTimes
+		Start-Sleep -Seconds $IdleSeconds
+		$After = Get-CpuTimes
+		$Drivers = @(Get-FieldInstances 'idle' | Where-Object { $_ -match "`trole=driver`t" } |
+			ForEach-Object { [int][regex]::Match($_, "`tpid=(\d+)").Groups[1].Value })
+		"quiet window of $IdleSeconds s"
+		$Deltas = foreach ($Id in $After.Keys) {
+			if (-not $Before.ContainsKey($Id)) { continue }
+			New-Object PSObject -Property @{ Id = $Id; Name = $After[$Id][0]; Ms = [int]($After[$Id][1] - $Before[$Id][1]) }
+		}
+		foreach ($Delta in @($Deltas | Where-Object { $Drivers -contains $_.Id })) {
+			$Percent = (100.0 * $Delta.Ms / ($IdleSeconds * 1000)).ToString('F2', $Invariant)
+			"$($Delta.Name) (pid $($Delta.Id)): $($Delta.Ms) ms, $Percent %"
+			Format-Fact 'cpu' @('window=idle', "name=$($Delta.Name)", "pid=$($Delta.Id)", "cpu_ms=$($Delta.Ms)",
+				"window_ms=$($IdleSeconds * 1000)", "percent=$Percent")
+		}
+		'== busiest processes over the window'
+		$Deltas | Sort-Object Ms -Descending | Select-Object -First 12 | Format-Table -AutoSize Name, Id, Ms
+	} ($IdleSeconds + 30)
+	$script:StepHint = ''
+	# The Application log's errors of the driver and its helpers since the
+	# collector started, and what Microsoft Defender did to an Ergopti file
+	# this week (a quarantined helper fails without a trace of its own).
+	Invoke-Step 'event_log' {
+		$Pattern = 'AutoHotkey|ErgoptiPlus|ergopti|ollama'
+		$Queries = [ordered]@{
+			'Application' = @{ LogName = 'Application'; Level = 1, 2, 3; StartTime = $RunStarted }
+			'Defender' = @{ LogName = 'Microsoft-Windows-Windows Defender/Operational'; Id = 1116, 1117, 1118, 1119; StartTime = (Get-Date).AddDays(-7) }
+		}
+		foreach ($Log in $Queries.Keys) {
+			# Get-WinEvent throws when nothing matches; that answer is a fact here.
+			try {
+				$Events = @(Get-WinEvent -FilterHashtable $Queries[$Log] -MaxEvents 500 -ErrorAction Stop | Where-Object { $_.Message -match $Pattern })
+				"${Log}: $($Events.Count) matching event(s)"
+				$Events | ForEach-Object { "$($_.TimeCreated.ToString('s')) $($_.ProviderName) $($_.Id): $(($_.Message -split "`r?`n")[0])" }
+			} catch {
+				"${Log}: no matching event ($($_.Exception.Message))"
+			}
+		}
+	} 60
 	$Completed = $true
 } finally {
 	# Ctrl-C ends the try block; the evidence collected so far is still committed.
