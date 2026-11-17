@@ -29,7 +29,10 @@
 # 5. Background helpers (the heartbeat ticker, a bounded step's watchdog, the
 #    instance sampler) never hold the collector's standard output after it
 #    stops them: they write through /dev/null children, and
-#    field_steps_stop_background ends them from the interrupt trap.
+#    field_steps_stop_background ends them from the interrupt trap. They are
+#    ended with KILL: the interrupt trap ignores TERM before finalize runs its
+#    steps, and a helper forked after that inherits the ignored TERM, so a
+#    TERM would leave the collector waiting on it forever.
 #
 # The caller sources it after field-report-git.sh and calls field_steps_begin
 # once the report folder exists (uses out, steps, log). Bash 3.2 compatible:
@@ -96,11 +99,18 @@ field_step_ticker_start() {
 	FIELD_STEP_TICKER=$!
 }
 
+# Ends one background helper and reaps it. KILL, never TERM: a helper forked
+# inside the interrupt trap ignores TERM (FEATURES 5). $1: its pid.
+field_steps_end_helper() {
+	[ -n "$1" ] || return 0
+	kill -KILL "$1" 2>/dev/null
+	wait "$1" 2>/dev/null
+	return 0
+}
+
 # Stops the heartbeat started last.
 field_step_ticker_stop() {
-	[ -n "${FIELD_STEP_TICKER}" ] || return 0
-	kill "${FIELD_STEP_TICKER}" 2>/dev/null
-	wait "${FIELD_STEP_TICKER}" 2>/dev/null
+	field_steps_end_helper "${FIELD_STEP_TICKER}"
 	FIELD_STEP_TICKER=""
 }
 
@@ -128,8 +138,7 @@ field_step_run() {
 		FIELD_STEP_WATCHDOG=$!
 		wait "${FIELD_STEP_BOUNDED}"
 		status=$?
-		kill "${FIELD_STEP_WATCHDOG}" 2>/dev/null
-		wait "${FIELD_STEP_WATCHDOG}" 2>/dev/null
+		field_steps_end_helper "${FIELD_STEP_WATCHDOG}"
 		FIELD_STEP_BOUNDED="" FIELD_STEP_WATCHDOG=""
 		budget="${bound}"
 	else
@@ -165,7 +174,7 @@ field_phase_done() {
 field_steps_stop_background() {
 	local pid
 	for pid in "${FIELD_STEP_TICKER}" "${FIELD_STEP_WATCHDOG}" "${FIELD_STEP_BOUNDED}" "${FIELD_SAMPLER_PID}"; do
-		[ -n "${pid}" ] && kill "${pid}" 2>/dev/null
+		field_steps_end_helper "${pid}"
 	done
 	FIELD_STEP_TICKER="" FIELD_STEP_WATCHDOG="" FIELD_STEP_BOUNDED="" FIELD_SAMPLER_PID=""
 }
@@ -188,9 +197,7 @@ field_sampler_start() {
 
 # Stops the sampler.
 field_sampler_stop() {
-	[ -n "${FIELD_SAMPLER_PID}" ] || return 0
-	kill "${FIELD_SAMPLER_PID}" 2>/dev/null
-	wait "${FIELD_SAMPLER_PID}" 2>/dev/null
+	field_steps_end_helper "${FIELD_SAMPLER_PID}"
 	FIELD_SAMPLER_PID=""
 }
 
