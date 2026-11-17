@@ -11,8 +11,8 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
 (`gh workflow run ci.yml --ref <branch> -f os_lanes=windows`). Rules and ported work:
 [PC handoff](docs/tooling/windows-pc-agent-handoff.md). Order:
 
-1. Run the full AHK suite (`run_all.ahk`, then `e2e/run_e2e.ahk`) and fix what fails; the owned daemon's proxy
-   (743181a933) has not run live yet.
+1. Run the full AHK suite (`run_all.ahk`) and fix what fails; the owned daemon's proxy (743181a933) has not run live
+   yet. `e2e/run_e2e.ahk` passed 91 of 91 and the receiving scenarios 15 of 15 on 2026-11-17.
 2. Field report: `powershell -ExecutionPolicy Bypass -File tools/dev/collect-windows-field-report.ps1` (5.1, then
    `pwsh`) with `tools/dev/run-windows-dev.ps1` started, plus the runtime layer of
    `test-windows-field-report-contract.cjs`; this is the first real run of the field run without a click
@@ -63,31 +63,16 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
 - [ ] Layout DLL package: install the CI-built `Ergopti_windows_layout.zip` on the PC (the MSVC builder stays strict
       and needs the ARM64 C++ tools the PC lacks, decided 2026-11-17), then a native 32-bit typing check of the wow64
       image.
-- [ ] Layout emulation row on Windows (2026-11-06): Tray > Layout > « Disposition à émuler » lists none, Ergopti,
-      Ergopti➕ and the registry layouts; choosing one restarts the driver on it (the tick follows), « none » types
-      the system layout, an uninstalled stored layout stays named.
 - [ ] Composed layout on a real keyboard (Debug > "Test the composed layout").
 
 ### Typing, hotstrings and shortcuts
 
-- [ ] Hotstring section order: move/reset sections through the real tray, restart, and verify persistence plus
-      refusal of a stale menu after external config changes.
-- [ ] Hotstring preview boundaries: type punctuation before a word, change custom delimiters and the magic key, and
-      confirm preview and expansion still agree.
-- [ ] `asa` then Space fast, 20 times: always `ASA`.
-- [ ] Personal `sru` -> `SRU` (priority 100) beats the bundled `sru` -> `sur` (4741950f04); a hotstring with `{left}`
-      moves the caret.
-- [ ] Item 50: `fb` + Space, Enter and ★ with the abbreviation and brand packs, at 1, 2 and 3 arrows, consumed and
-      not.
-- [ ] Common autocorrection sections: with one common section chosen at a time (`[hotstrings.groups]`,
-      `[hotstrings.modules.autocorrection]`), typing `chatgpt adn adaboost` gives only ChatGPT with names, only ADN
-      with abbreviations and only AdaBoost with technical terms, as the Linux daemon E2E (`AUTOCORRECT_SCENARIOS`)
-      does.
 - [ ] Items 34, 37, 102 and 129: the Windows native cases of native delimiter transactions and packaging with both
       extension TOML files.
-- [ ] Immediate-Backspace restoration after Notepad-paste and terminal expansions: once the Notepad and terminal
-      owners keep an undo record (TODO.md), a Backspace right after the expansion types the trigger back in Notepad
-      and in a terminal, through the same owned output as the expansion.
+- [ ] Immediate-Backspace restoration in Windows Terminal: `sru` + Space then Backspace types `sru` back through the
+      paced terminal capture, an OpenTUI prompt such as Claude Code included. The live check `backspace-undo-hosts`
+      passed on 2026-11-17 in an edit, Notepad and a conhost console; conhost names its client as the window's owner,
+      so the console took the atomic path, and the check does not drive the user's own Windows Terminal.
 - [ ] One-shot modifiers (2026-11-13): the sticky delay row accepts 0 and shows « no time limit », and the one-shot
       Shift and `sticky_*` captures then wait with no InputHook timeout; `sticky_altgr` types the AltGr level on the
       Ergopti layout, through Kana on a Kana-style layout; a tap-hold key set to tap `sticky_altgr` and hold AltGr
@@ -153,7 +138,10 @@ physical size`); X and Y match the pad's width and height (logical span over mil
       Unplug/replug an external Precision Touchpad: `forgotten` then a fresh descriptor log. 7. Note in the log
       whether the shortcut (`shortcut swallowed`/`deferred`) arrives before or after the lift, to confirm the handoff
       window (300 ms) is enough.
-- [ ] Tray > Gestures: one « Infos… » row that opens the dialog.
+- [ ] Live checks `taphold-pickers` and `keycombo-picker` (no answer within 180 s, four runs on 2026-11-17 with 400 to
+      1,500 MB of free memory, under the 1,536 MB `WEBVIEW_MIN_AVAIL_RAM_MB` the WebView picker needs) and
+      `versions-tabs` (not executed for the same reason): rerun them with more free memory before reading them as
+      driver bugs.
 - [ ] WG-003 two-account check: as a standard user, run the first-run wizard's gesture registration and answer UAC
       with a different administrator account; the standard user's PrecisionTouchPad values change (and its backup is
       theirs), the administrator's hive is untouched, and the touchpad restart still reports success.

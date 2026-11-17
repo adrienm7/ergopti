@@ -222,11 +222,23 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       tone, a ZWJ sequence, a flag or a combining accent loses a character typed before it on Undo. Linux now counts
       `injector.caret_steps()` (measured in GTK by `run_hotstring_fields_live.lua`); count clusters the same way and
       check Notepad, Word and a browser field on the PC.
-- [ ] **TakeNote and the Windows 11 tabbed Notepad.** The Store Notepad opens a second file as a tab of the open
-      window, so a same-named note of another folder shares one window with the first, and the module, which binds
-      one window to one path, waits for a window that never comes (`takenote-native-document-owner` mode
-      different-folder fails on the PC, passes on the Server runner's classic Notepad). Tell the two tabs apart (UI
-      Automation tab items) or select the right tab before typing.
+- [ ] **TakeNote probe and Notepad's restored session.** TakeNote binds each note to its UI Automation tab
+      (a1cd4d2891), but the probe `takenote-native-document-owner` still cannot qualify it on the PC: Notepad there
+      restores about 50 « Notes.txt » tabs of earlier probe runs when it starts, the probe most likely reads the first
+      RichEdit control (a restored tab's) instead of the selected tab's, and its cleanup counts that window as foreign
+      (same-folder and different-folder both end « retired=0 » on 2026-11-17, the first error masked by the cleanup's).
+      Read the selected tab's document, report the first error, and accept restored tabs it does not own.
+- [ ] **`asa` then a rolled Space beside another AutoHotkey hook.** The live check `asa-space-fast` (Space down
+      before the last `a` is up, 15 ms apart) types 20 `ASA` when no other AutoHotkey script runs, but typed `aASAASA`
+      instead of `ASA ASA` 2 times in 20, then 5 times in 14, on the PC on 2026-11-17 while other scripts held
+      keyboard hooks (AutoHotkey's SendInput then falls back to SendEvent): an expansion completed by the tap-hold
+      Space loses its Space and leaves an `a`. Find the order of the Space tap, the trigger's last key-up and the
+      burst under SendEvent, with a DEBUG `HSEFire` trace.
+- [ ] **Hotstring output finality with SendEvent.** The interactive test « a chain of three in the real engine is
+      final with SendEvent and with SendInput » (`hotstring-output-is-final`) fails on the PC, alone and on the code
+      before 2026-11-17: watcher + SendEvent types `foo bar final` instead of `foo qzy`, so a level-0 SendEvent burst
+      reaches the I1 watcher and fires the next link. SendInput falls back to SendEvent whenever another script
+      holds a keyboard hook.
 - **Parity literals.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`,
   `request_plan_*`, the keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left; the rest of the menu
   files need `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers
