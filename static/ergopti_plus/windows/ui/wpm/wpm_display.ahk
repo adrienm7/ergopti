@@ -779,7 +779,8 @@ WPMWidget_Tick() {
         last_ac := WPMWidget._last_ac_tick
         last_input := WPMWidget._last_input_ms
         ; A focus change ends the typing burst, as on macOS and Linux.
-        Foreground := DllCall("GetForegroundWindow", "Ptr")
+        ; WinExist("A") is AHK's own foreground lookup (0 when none): no DllCall in ui/.
+        Foreground := WinExist("A")
         if WPMWidget._last_foreground != 0 && Foreground != WPMWidget._last_foreground
             WPMWidget._last_break_ms := now
         WPMWidget._last_foreground := Foreground
