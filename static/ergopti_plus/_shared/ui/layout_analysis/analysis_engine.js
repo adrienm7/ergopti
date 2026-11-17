@@ -643,14 +643,33 @@ var LAYOUT_ANALYSIS = (function () {
 			state: state === null ? b.state : state
 		});
 		const rules = deadRules(layout.dead);
+		// A list's version rises with each change. A rule whose prefixes and
+		// tails are the lists, at the versions, of its last pass would only
+		// offer again what it offered then: lists only get better, so every
+		// such offer is refused, and the rule is skipped (the same ways, in a
+		// fraction of the joins).
+		const versions = new WeakMap();
+		const version = (list) => versions.get(list) || 0;
+		const lastPass = new Array(rules.length);
 		for (let depth = 0; depth < MAX_DEAD_DEPTH; depth++) {
 			let changed = false;
-			for (const rule of rules) {
+			for (let r = 0; r < rules.length; r++) {
+				const rule = rules[r];
 				const prefixes = deadWays.get(rule.state);
 				if (!prefixes) continue;
 				const tails =
 					rule.typedDead !== null ? deadWays.get(rule.typedDead) : ways.get(rule.typedChar);
 				if (!tails) continue;
+				const seen = lastPass[r];
+				if (
+					seen &&
+					seen[0] === prefixes &&
+					seen[1] === version(prefixes) &&
+					seen[2] === tails &&
+					seen[3] === version(tails)
+				)
+					continue;
+				lastPass[r] = [prefixes, version(prefixes), tails, version(tails)];
 				let map = ways;
 				let target = rule.outChar;
 				if (rule.outDead !== null) [map, target] = [deadWays, rule.outDead];
@@ -664,7 +683,11 @@ var LAYOUT_ANALYSIS = (function () {
 						const closing = board.finger[candidate.keys[candidate.keys.length - 1]];
 						if (closing === LEFT_THUMB || closing === RIGHT_THUMB) candidate.terminated = true;
 						if (map === texts) candidate.width = codeLength(target);
-						if (offer(map, target, candidate)) changed = true;
+						if (offer(map, target, candidate)) {
+							changed = true;
+							const list = map.get(target);
+							versions.set(list, version(list) + 1);
+						}
 					}
 			}
 			if (!changed) break;
