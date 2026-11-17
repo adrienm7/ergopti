@@ -91,5 +91,11 @@ missing or failing `notify-send`.
 
 ## Remaining work
 
-Not reviewed: configuration, lifecycle, notification and network adapter
-groups in depth. Native receiving unqualified.
+The configuration, lifecycle, notification and network adapter groups were
+taken in depth by their own campaigns
+([configuration](../2026-11-11-config/report.md) and its
+[follow-up](../2026-11-12-config-followup/report.md),
+[lifecycle](../2026-11-12-lifecycle/report.md),
+[notifications](../2026-11-12-notifications/report.md),
+[network](../2026-11-12-network/report.md)); what stays open is listed there.
+Native receiving unqualified.

@@ -173,17 +173,15 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 - [ ] **[CODE] Parity audit continuation.** Reconcile current source areas with the register (the 2026-11-12 census
       listed 381 areas, many changed since their campaign), then take one bounded module at a time across Windows,
       macOS, Linux and shared; do not restart a finished campaign without source drift or a new hypothesis. Left:
-  - the census areas outside the campaigned modules, and the never-campaigned changed areas the
-    [start-at-login report](docs/audits/platform-parity/2026-11-12-start-at-login/report.md) lists (menus, i18n,
-    editors, healthcheck, onboarding, Linux install);
+  - a fresh census against the last pinned one
+    ([tap-holds follow-up](docs/audits/platform-parity/2026-11-12-tap-holds-followup/source-areas.json)) now that the
+    structure phase moved most folders, then the areas outside every campaign (the never-campaigned list of the
+    [start-at-login report](docs/audits/platform-parity/2026-11-12-start-at-login/report.md) was taken by the
+    menus-tray, i18n-runtime, editors, healthcheck, onboarding, Linux install and tooltips-wpm campaigns);
   - a deep pass of macOS `bindings.lua` and Linux `key_combinations.lua`
     ([shortcuts campaign](docs/audits/platform-parity/2026-11-11-shortcuts/report.md));
-  - the configuration, lifecycle, notification and network adapters in depth
-    ([adapters campaign](docs/audits/platform-parity/2026-11-11-adapters/report.md));
-  - the macOS Carbon slots against the tap rewrite, to confirm on a Mac
-    ([input/layout follow-up](docs/audits/platform-parity/2026-11-12-input-layout-followup/report.md));
-  - a deleted Linux checkout's startup entry stays until a checkout run rewrites it
-    ([Linux install campaign](docs/audits/platform-parity/2026-11-12-linux-install/report.md)).
+  - the macOS preference hydration beyond `load` and `current_view`
+    ([configuration follow-up](docs/audits/platform-parity/2026-11-12-config-followup/report.md#open));
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** The unavailable-features diagnostics section is
       published on both. Left: a feed-only list may install the channel's newest release only through authenticated
       metadata (decided 2026-11-06, as macOS): download the asset under its conventional name, compute size and

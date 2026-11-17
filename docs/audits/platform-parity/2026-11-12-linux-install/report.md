@@ -36,5 +36,9 @@ release: the checkout now writes `ergopti-source.desktop`.
 
 - A checkout's startup entry stays after the checkout is deleted (a source
   run has no uninstaller); the next Ergopti run from a checkout reports it as
-  stale and rewrites it on enable.
+  stale and rewrites it on enable. Closed as aligned on 2026-11-17: Windows
+  keeps a deleted source script's Startup-folder shortcut the same way (no
+  process runs from a deleted checkout to remove it, and `StartupOwnedShortcuts`
+  never takes a link whose target is gone), and Linux already does more by
+  naming the entry stale.
 - The download and network steps of `install.sh` (the other track's).

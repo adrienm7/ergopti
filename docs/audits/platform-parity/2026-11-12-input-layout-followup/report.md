@@ -35,4 +35,5 @@ leaves keeps its system letter. The regression compiles Main's own
 The macOS emulation rewrites a chord's key code to the emulated letter's key
 before passing the event on, so its Carbon `hs.hotkey` slots should already
 see the emulated letter. This needs a Mac to confirm, as does native
-receiving.
+receiving: it is part of the `layout_emulation` point of
+`TODO-tests-macos.md` (2026-11-17).
