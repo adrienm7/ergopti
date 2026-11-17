@@ -475,6 +475,11 @@ _PromptEdWeb_OnWebMessage(Handler, Args) {
 _PromptEdWeb_HandlePayload(Payload, Action := "") {
 	if (Action == "")
 		Action := Payload.Has("action") ? Payload["action"] : ""
+	; The page's "ready" is lifecycle-only here: the init is pushed from the
+	; native navigation callback (_PromptEdWeb_OnNavigationCompleted), and
+	; "ready" exists for the Linux host, which has none.
+	if (Action == "ready")
+		return
 	if (Action != "cancel" && Action != "save")
 		return
 
