@@ -9,7 +9,7 @@
 # the maintainer could not tell which one was the summary. Shared by the
 # macOS, Linux and Windows collectors.
 #
-#   0_main/      the synthesis: analysis.md, todo_summary.md, steps.txt, the
+#   0_main/      the synthesis: analysis.md, timeline.txt, env.json, todo_summary.md, steps.txt, the
 #                field run's terminal output, and their JSON twins
 #   1_logs/      the scrubbed driver logs (*.log)
 #   2_digests/   the grep digests and crash summaries over those logs
@@ -35,14 +35,25 @@ SYSTEM = "3_system"
 # The synthesis, in reading order (README lists them so).
 MAIN_FILES = [
     ("analysis.md", "What to fix first, check verdicts, errors and warnings: start here."),
+    (
+        "timeline.txt",
+        "Every step with its start and duration, the slowest and over-budget ones first.",
+    ),
     ("todo_summary.md", "One verdict per TODO point to confirm on this OS."),
     ("steps.txt", "Every collector step with its exit status."),
+    (
+        "env.json",
+        "The machine: Ergopti instances per phase, other remappers, permissions, devices, idle CPU.",
+    ),
     ("field_run.txt", "The field run's terminal output, one verdict per step."),
     ("not_automated.txt", "What the run cannot automate, and why."),
     ("analysis_console.txt", "The analysis's console output."),
     ("analysis.json", "analysis.md as data (the next report compares against it)."),
     ("todo_summary.json", "todo_summary.md as data."),
     ("todo_summary.txt", "todo_summary.md as the terminal printed it."),
+    ("timeline.json", "timeline.txt as data."),
+    ("step_times.tsv", "The raw step timings (epoch seconds) the timeline is built from."),
+    ("facts_console.txt", "The facts builder's console output."),
 ]
 
 

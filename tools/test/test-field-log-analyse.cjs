@@ -384,4 +384,300 @@ check('the analyser is Python 3.8 syntax with the standard library only', () => 
 	assert.doesNotMatch(source, /removeprefix|removesuffix|tomllib|\bmatch \w+:\n/);
 });
 
+// The machine facts (tools/dev/field-report-facts.py): the 2026-11-15 macOS
+// report could not tell whether a release and a developer app ran at once,
+// nor which process spent the 785 ms of idle CPU no timer explained. A report
+// folder with the collectors' fact lines, step timings and field run results
+// must give env.json, the timeline and the analysis findings that say so.
+const FACTS = path.join(ROOT, 'tools/dev/field-report-facts.py');
+
+/** Writes a report folder holding fact lines, step timings and results. */
+function factsFolder() {
+	const reports = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-facts-'));
+	const folder = path.join(reports, 'mac-2026-11-15_235348');
+	fs.mkdirSync(path.join(folder, 'field_run'), { recursive: true });
+	const fact = (...fields) => ['fact', ...fields].join('\t');
+	const instance = (phase, t, role, name, pid, origin, cpu, version) =>
+		fact(
+			'instance',
+			`phase=${phase}`,
+			`t=${t}`,
+			`role=${role}`,
+			`name=${name}`,
+			`pid=${pid}`,
+			'ppid=1',
+			'parent=launchd',
+			`started=start-${pid}`,
+			`cpu_s=${cpu}`,
+			'rss_kb=180000',
+			`origin=${origin}`,
+			`path=/Applications/${name}`,
+			`version=${version}`
+		);
+	// The idle field check ran from 22:54:48Z to 22:55:18Z (epoch below).
+	const start = Date.UTC(2026, 10, 15, 22, 54, 48) / 1000;
+	fs.writeFileSync(
+		path.join(folder, 'instances_start.txt'),
+		[
+			'raw evidence a person reads',
+			fact('sample', 'phase=start', `t=${start - 100}`),
+			instance('start', start - 100, 'driver', 'ErgoptiPlus', 28064, 'release', 10, '1.0.4'),
+			instance('start', start - 100, 'engine', 'Hammerspoon', 28072, 'release', 50, '1.0.4'),
+			instance('start', start - 100, 'driver', 'ErgoptiPlus', 30001, 'dev', 3, '1.0.5-dev')
+		].join('\n') + '\n'
+	);
+	fs.writeFileSync(
+		path.join(folder, 'instances_timeline.txt'),
+		[
+			fact('sample', 'phase=sample', `t=${start - 2}`),
+			instance('sample', start - 2, 'engine', 'Hammerspoon', 28072, 'release', 60.0, ''),
+			fact('sample', 'phase=sample', `t=${start + 32}`),
+			instance('sample', start + 32, 'engine', 'Hammerspoon', 28072, 'release', 61.7, '')
+		].join('\n') + '\n'
+	);
+	fs.writeFileSync(
+		path.join(folder, 'remappers.txt'),
+		fact(
+			'remapper',
+			'name=Karabiner-Elements',
+			'running=yes',
+			'version=16.0.0',
+			'conflict=yes',
+			'detail=core_services=2 owned_runtime_processes=3'
+		) +
+			'\n' +
+			fact('remapper', 'name=ibus-daemon', 'running=yes', 'conflict=no', 'detail=input method') +
+			'\n'
+	);
+	fs.writeFileSync(
+		path.join(folder, 'permissions.txt'),
+		fact('permission', 'name=ListenEvent', 'state=denied', 'subject=com.ergoptiplus.app') + '\n'
+	);
+	fs.writeFileSync(
+		path.join(folder, 'environment.txt'),
+		fact('env', 'os_name=macOS', 'os_version=15.1', 'displays=2') + '\n'
+	);
+	fs.writeFileSync(
+		path.join(folder, 'idle_cpu.txt'),
+		fact(
+			'cpu',
+			'window=idle',
+			'name=Hammerspoon',
+			'pid=28072',
+			'cpu_ms=900',
+			'window_ms=20000',
+			'percent=4.5'
+		) + '\n'
+	);
+	fs.writeFileSync(
+		path.join(folder, 'step_times.tsv'),
+		'name\tkind\tstart\tend\tstatus\tbudget\n' +
+			`versions\tcollector\t${start - 200}\t${start - 199}\t0\t30\n` +
+			`unified_log\tcollector\t${start + 100}\t${start + 280}\t143\t180\n` +
+			`field_run\tphase\t${start - 50}\t${start + 600}\t0\t21430\n`
+	);
+	fs.writeFileSync(
+		path.join(folder, 'field_run', '11_field_idle_cost.json'),
+		JSON.stringify({
+			step: 'field_idle_cost',
+			verdict: 'fail',
+			started_at: '2026-11-15T22:54:48Z',
+			finished_at: '2026-11-15T22:55:18Z',
+			elapsed_ms: 30029,
+			deadline_ms: 45000
+		})
+	);
+	fs.writeFileSync(
+		path.join(folder, 'field_run', '27_ollama_runtime.json'),
+		JSON.stringify({
+			step: 'ollama_runtime',
+			verdict: 'timeout',
+			started_at: '2026-11-15T22:56:00Z',
+			finished_at: '2026-11-15T23:01:00Z',
+			elapsed_ms: 300000,
+			deadline_ms: 240000
+		})
+	);
+	return { reports, folder };
+}
+
+check(
+	'the facts give env.json: two drivers at once, the remappers, the idle window per process',
+	() => {
+		const { reports, folder } = factsFolder();
+		try {
+			const built = spawnSync(python, [FACTS, 'build', folder, '--os', 'mac'], {
+				encoding: 'utf8'
+			});
+			assert.equal(built.status, 0, built.stderr);
+			assert.match(built.stdout, /Facts: 2 driver instance\(s\) at most at once/);
+			const env = JSON.parse(fs.readFileSync(path.join(folder, 'env.json'), 'utf8'));
+			assert.equal(env.instances.max_drivers, 2, 'the release and the developer launcher');
+			assert.deepEqual(env.instances.overlapping_drivers.map((row) => row.origin).sort(), [
+				'dev',
+				'release'
+			]);
+			assert.equal(env.instances.driver_restarts, 0, 'an engine-only sample is no restart');
+			assert.equal(env.environment.displays, '2');
+			assert.equal(env.remappers.length, 2);
+			// 1.7 s of CPU between the samples around the 30 s idle window (34 s apart).
+			const engine = env.idle_window_cpu.processes.find((row) => row.pid === '28072');
+			assert.equal(engine.cpu_ms, 1700);
+			assert.equal(engine.percent, 5);
+			const timeline = fs.readFileSync(path.join(folder, 'timeline.txt'), 'utf8');
+			assert.match(timeline, /^## Slowest steps$/m);
+			assert.match(timeline, /^ 1\. +650\.0 s {2}\[phase\] field_run/m, 'the slowest first');
+			assert.match(timeline, /^- \[collector\] unified_log: 180\.0 s \(budget 180 s\)$/m);
+			assert.match(timeline, /^- \[field_run\] ollama_runtime: 300\.0 s \(budget 240 s\)$/m);
+			assert.match(timeline, /^## Chronological$/m);
+			const json = JSON.parse(fs.readFileSync(path.join(folder, 'timeline.json'), 'utf8'));
+			assert.equal(json.over_budget.length, 2);
+		} finally {
+			fs.rmSync(reports, { recursive: true, force: true });
+		}
+	}
+);
+
+check(
+	'the analysis ranks two drivers first, then the remapper, the permission and the idle CPU',
+	() => {
+		const { reports, folder } = factsFolder();
+		try {
+			assert.equal(
+				spawnSync(python, [FACTS, 'build', folder, '--os', 'mac'], { encoding: 'utf8' }).status,
+				0
+			);
+			const result = analyse(['--repo', ROOT, '--out', folder]);
+			assert.equal(result.status, 0, result.stderr);
+			const document = JSON.parse(fs.readFileSync(path.join(folder, 'analysis.json'), 'utf8'));
+			const kinds = document.top_fixes.map((item) => item.kind);
+			assert.equal(kinds[0], 'multiple_drivers');
+			assert.equal(kinds[1], 'foreign_remapper');
+			assert.equal(kinds[2], 'permission');
+			assert(kinds.includes('idle_cpu'), kinds.join(','));
+			assert(kinds.includes('slow_step'), kinds.join(','));
+			assert.equal(
+				document.top_fixes.filter((item) => item.kind === 'foreign_remapper').length,
+				1,
+				'an input method is not a conflicting remapper'
+			);
+			assert.match(
+				document.top_fixes[1].what,
+				/another remapper is active: Karabiner-Elements 16\.0\.0/
+			);
+			const idle = document.top_fixes.filter((item) => item.kind === 'idle_cpu');
+			assert(
+				idle.some((item) => /field_idle_cost window/.test(item.what)),
+				'the field run window'
+			);
+			assert(
+				idle.some((item) => /idle window/.test(item.what)),
+				"the collector's quiet window"
+			);
+			assert.match(idle[0].detail, /field_check_session\.lua/, 'the declared idle budget');
+			const markdown = fs.readFileSync(path.join(folder, 'analysis.md'), 'utf8');
+			assert.match(markdown, /^## Machine and instances$/m);
+			assert.match(markdown, /^## Slowest steps$/m);
+			assert.match(markdown, /Ergopti drivers at most at once: 2 \(start phase\)/);
+			assert.match(markdown, /No DEBUG record in the logs/);
+			assert.match(result.stdout, /!! multiple_drivers: 2 Ergopti drivers ran at once/);
+		} finally {
+			fs.rmSync(reports, { recursive: true, force: true });
+		}
+	}
+);
+
+check(
+	'the Karabiner and keyboard summaries publish counts and ids, never names, commands or serials',
+	() => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-karabiner-'));
+		try {
+			const config = path.join(dir, 'karabiner.json');
+			fs.writeFileSync(
+				config,
+				JSON.stringify({
+					profiles: [
+						{
+							name: 'SECRETPROFILE',
+							selected: true,
+							simple_modifications: [{ from: {}, to: [] }],
+							complex_modifications: {
+								rules: [
+									{
+										description: 'SECRETRULE',
+										manipulators: [{ to: [{ shell_command: 'echo SECRETCMD' }] }]
+									}
+								]
+							},
+							devices: [
+								{
+									identifiers: { vendor_id: 1452, product_id: 832, is_keyboard: true },
+									ignore: true
+								}
+							]
+						}
+					]
+				})
+			);
+			const devices = path.join(dir, 'devices.json');
+			fs.writeFileSync(
+				devices,
+				JSON.stringify([
+					{
+						product: 'Apple Internal Keyboard',
+						is_built_in_keyboard: true,
+						device_identifiers: {
+							vendor_id: 1452,
+							product_id: 832,
+							is_keyboard: true,
+							device_address: 'aa-bb-cc-dd-ee-ff'
+						}
+					},
+					{
+						product: 'Ergo Board',
+						device_identifiers: { vendor_id: 7, product_id: 9, is_keyboard: true }
+					}
+				])
+			);
+			const summary = spawnSync(python, [FACTS, 'karabiner', config, devices], {
+				encoding: 'utf8'
+			});
+			assert.equal(summary.status, 0, summary.stderr);
+			assert.doesNotMatch(summary.stdout, /SECRET|aa-bb-cc/);
+			assert.match(summary.stdout, /complex_rules=1 manipulators=1 shell_commands=1/);
+			assert.match(summary.stdout, /name=Apple Internal Keyboard\t.*\tgrabbed=no$/m);
+			assert.match(summary.stdout, /name=Ergo Board\t.*\tgrabbed=yes$/m);
+			const plist = path.join(dir, 'hid.plist');
+			fs.writeFileSync(
+				plist,
+				'<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><array><dict>' +
+					'<key>PrimaryUsagePage</key><integer>1</integer><key>PrimaryUsage</key><integer>6</integer>' +
+					'<key>Product</key><string>Ergo Board</string><key>SerialNumber</key><string>SERIALCANARY</string>' +
+					'<key>VendorID</key><integer>7</integer><key>Built-In</key><false/>' +
+					'</dict></array></plist>'
+			);
+			const hid = spawnSync(python, [FACTS, 'hid', plist], { encoding: 'utf8' });
+			assert.equal(hid.status, 0, hid.stderr);
+			assert.doesNotMatch(hid.stdout, /SERIALCANARY/);
+			assert.match(hid.stdout, /^fact\tdevice\tsource=ioreg\tname=Ergo Board\t/m);
+			assert.match(hid.stdout, /^fact\tenv\tkeyboards=1$/m);
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	}
+);
+
+check('the facts builder is Python 3.8 syntax with the standard library only', () => {
+	const probe = spawnSync(
+		python,
+		[
+			'-c',
+			'import ast, sys; ast.parse(open(sys.argv[1], encoding="utf-8").read(), feature_version=(3, 8))',
+			FACTS
+		],
+		{ encoding: 'utf8' }
+	);
+	assert.equal(probe.status, 0, probe.stderr);
+});
+
 console.log(`\n${checks} field log analyser check(s) passed.`);

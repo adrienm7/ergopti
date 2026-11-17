@@ -22,7 +22,14 @@ The analysis has four parts:
 - lifecycle: starts, stops, crashes, reloads, sleep and wake, permission
   refusals, Karabiner lease failures, network failures, update checks, event
   tap restarts, and the verdict lines of the field checks;
-- what to fix first: the ten items ranked by severity weight times frequency.
+- what to fix first: the ten items ranked by severity weight times frequency;
+- the machine, from env.json and timeline.json that
+  tools/dev/field-report-facts.py wrote beside the logs: two Ergopti drivers
+  at once or a restart during the run, another remapper or text expander, a
+  missing permission or a foreign Secure Event Input, the process that spent
+  the idle CPU against the idle budget the code declares, and the slowest
+  steps with the ones over their budget. The first four rank above every log
+  finding: they spoil every other verdict of the run.
 
 tools/test/test-field-log-analyse.cjs replays one vector per driver spelling
 (tools/test/fixtures/field-log-analyse/vectors.json) and fails when a driver
@@ -70,6 +77,22 @@ WEIGHT_CRASH = 10
 WEIGHT_ERROR = 5
 WEIGHT_OVER_BUDGET = 3
 WEIGHT_WARNING = 1
+# The machine findings of env.json: fixed scores, so two drivers at once, a
+# foreign remapper or a missing permission head the list whatever the logs say.
+SCORE_MULTIPLE_DRIVERS = 1000
+SCORE_FOREIGN_REMAPPER = 200
+SCORE_PERMISSION = 150
+SCORE_IDLE_CPU = 100
+SCORE_DRIVER_RESTART = 40
+ENV_JSON = "env.json"
+TIMELINE_JSON = "timeline.json"
+SLOWEST_SHOWN = 10
+# The idle CPU budget the macOS idle field check declares; the collectors'
+# quiet-window measure on every OS is read against it.
+IDLE_BUDGET = (
+    "static/ergopti_plus/macos/infra/field_check_session.lua",
+    r"(?m)^M\.IDLE_CPU_PERCENT_MAX = (\d+(?:\.\d+)?)",
+)
 
 # A message template: format directives and the variable parts of a concrete
 # line become <*>, so a line and its repeat summary land in one group.
@@ -723,6 +746,8 @@ class Analysis:
         self.last_group = None
         self.perf_groups = set()
         self.banners = 0
+        # Records per level: no DEBUG record means the log level hid them.
+        self.levels = {}
 
     def _group(self, record, template, count, first, last):
         level = record["level"]
@@ -772,6 +797,7 @@ class Analysis:
             return
         self.records += 1
         item["line"] = line
+        self.levels[item.get("level")] = self.levels.get(item.get("level"), 0) + 1
         time = item["time"]
         self.first = time if self.first is None else min(self.first, time)
         self.last = time if self.last is None else max(self.last, time)
@@ -1164,6 +1190,200 @@ def collector_checks(out):
     return found
 
 
+def load_idle_budget(repo):
+    """Reads the idle CPU budget from its declaration.
+
+    Args:
+        repo: The clone root.
+
+    Returns:
+        A (percent, source) pair.
+
+    Raises:
+        SystemExit: The declaration moved.
+    """
+    relative, pattern = IDLE_BUDGET
+    try:
+        text = (repo / relative).read_text(encoding="utf-8-sig")
+    except OSError as error:
+        sys.exit("field-log-analyse: cannot read the idle budget {}: {}".format(relative, error))
+    match = re.search(pattern, text)
+    if not match:
+        sys.exit("field-log-analyse: {} no longer declares the idle CPU budget.".format(relative))
+    return float(match.group(1)), relative
+
+
+def read_json(path):
+    """Returns a JSON document, or None when the file is absent or unreadable."""
+    if not path.is_file():
+        return None
+    try:
+        with path.open(encoding="utf-8") as handle:
+            return json.load(handle)
+    except ValueError:
+        return None
+
+
+def describe_instance(row):
+    """One line naming a driver instance: name, pid, origin, version, path."""
+    return "{} pid {} ({}{}) {}".format(
+        row.get("name", "?"),
+        row.get("pid", "?"),
+        row.get("origin", "?"),
+        ", " + row["version"] if row.get("version") else "",
+        row.get("path", ""),
+    ).strip()
+
+
+def machine_findings(env, timeline, idle_budget):
+    """Turns env.json and timeline.json into "what to fix first" items.
+
+    Args:
+        env: The env.json document, or None.
+        timeline: The timeline.json document, or None.
+        idle_budget: The (percent, source) idle CPU budget.
+
+    Returns:
+        A list of dicts {score, kind, what, count, detail}.
+    """
+    items = []
+    if env:
+        instances = env.get("instances", {})
+        overlapping = instances.get("overlapping_drivers", [])
+        if overlapping:
+            items.append(
+                {
+                    "score": SCORE_MULTIPLE_DRIVERS,
+                    "kind": "multiple_drivers",
+                    "what": "{} Ergopti drivers ran at once ({} phase): every key and expansion check of "
+                    "this run is suspect".format(
+                        len(overlapping), instances.get("max_drivers_at", {}).get("phase")
+                    ),
+                    "count": len(overlapping),
+                    "detail": "; ".join(describe_instance(row) for row in overlapping),
+                }
+            )
+        restarts = instances.get("driver_restarts", 0)
+        if restarts:
+            items.append(
+                {
+                    "score": SCORE_DRIVER_RESTART * restarts,
+                    "kind": "driver_restart",
+                    "what": "the driver process changed {} time(s) during the collection".format(
+                        restarts
+                    ),
+                    "count": restarts,
+                    "detail": "; ".join(
+                        describe_instance(row) for row in instances.get("drivers_seen", [])
+                    ),
+                }
+            )
+        for remapper in env.get("remappers", []):
+            if remapper.get("running") != "yes" or remapper.get("conflict") == "no":
+                continue
+            items.append(
+                {
+                    "score": SCORE_FOREIGN_REMAPPER,
+                    "kind": "foreign_remapper",
+                    "what": "another remapper is active: {}{}".format(
+                        remapper.get("name", "?"),
+                        " " + remapper["version"] if remapper.get("version") else "",
+                    ),
+                    "count": 1,
+                    "detail": remapper.get("detail", ""),
+                }
+            )
+        for permission in env.get("permissions", []):
+            state = permission.get("state")
+            if state not in ("denied", "held_by_other"):
+                continue
+            items.append(
+                {
+                    "score": SCORE_PERMISSION,
+                    "kind": "permission",
+                    "what": "{} is {} for {}".format(
+                        permission.get("name", "?"), state, permission.get("subject", "?")
+                    ),
+                    "count": 1,
+                    "detail": permission.get("detail", ""),
+                }
+            )
+        budget, source = idle_budget
+        idle_rows = [row for row in env.get("cpu", []) if row.get("window") == "idle"]
+        window = env.get("idle_window_cpu") or {}
+        for row in window.get("processes", []):
+            idle_rows.append(dict(row, window="field_idle_cost"))
+        for row in idle_rows:
+            try:
+                percent = float(row.get("percent"))
+            except (TypeError, ValueError):
+                continue
+            if percent <= budget:
+                continue
+            items.append(
+                {
+                    "score": SCORE_IDLE_CPU,
+                    "kind": "idle_cpu",
+                    "what": "{} spent {} % CPU while idle ({} window), over the {} % budget".format(
+                        row.get("name", "?"), percent, row.get("window"), fmt(budget)
+                    ),
+                    "count": 1,
+                    "detail": "{} ms of CPU over {} ms; budget from {}".format(
+                        row.get("cpu_ms", "?"),
+                        row.get("window_ms", row.get("span_ms", "?")),
+                        source,
+                    ),
+                }
+            )
+    if timeline:
+        for event in timeline.get("over_budget", []):
+            if event.get("source") == "driver":
+                continue
+            items.append(
+                {
+                    "score": WEIGHT_OVER_BUDGET,
+                    "kind": "slow_step",
+                    "what": "{} step {} over its budget".format(
+                        event.get("source"), event.get("name")
+                    ),
+                    "count": 1,
+                    "detail": "{} s (budget {} s), {}".format(
+                        event.get("duration_s"), event.get("budget_s"), event.get("status")
+                    ),
+                }
+            )
+    return items
+
+
+def machine_summary(env, timeline, idle_budget, debug_records):
+    """The machine part of the analysis document.
+
+    Args:
+        env: The env.json document, or None.
+        timeline: The timeline.json document, or None.
+        idle_budget: The (percent, source) idle CPU budget.
+        debug_records: How many DEBUG records the logs hold.
+
+    Returns:
+        A dict, empty parts when the report has no env.json or timeline.json.
+    """
+    summary = {
+        "present": env is not None,
+        "environment": (env or {}).get("environment", {}),
+        "instances": (env or {}).get("instances", {}),
+        "remappers": (env or {}).get("remappers", []),
+        "permissions": (env or {}).get("permissions", []),
+        "idle_cpu": [row for row in (env or {}).get("cpu", []) if row.get("window") == "idle"],
+        "idle_window_cpu": (env or {}).get("idle_window_cpu"),
+        "idle_budget": {"percent": idle_budget[0], "source": idle_budget[1]},
+        "debug_records": debug_records,
+        "slowest": (timeline or {}).get("slowest", [])[:SLOWEST_SHOWN],
+        "over_budget": (timeline or {}).get("over_budget", []),
+        "timeline_span": (timeline or {}).get("span"),
+    }
+    return summary
+
+
 def analyse(logs, out, repo):
     """Analyses the logs and returns the analysis document.
 
@@ -1197,6 +1417,13 @@ def analyse(logs, out, repo):
     counts = {}
     for check in checks:
         counts[check["verdict"]] = counts.get(check["verdict"], 0) + 1
+    env = read_json(out / ENV_JSON)
+    timeline = read_json(out / TIMELINE_JSON)
+    idle_budget = load_idle_budget(repo)
+    fixes = machine_findings(env, timeline, idle_budget) + top_fixes(
+        groups, performance, analysis.lifecycle
+    )
+    fixes.sort(key=lambda item: (-item["score"], item["what"]))
     return {
         "schema": SCHEMA,
         "logs": [path.name for path in logs],
@@ -1211,7 +1438,8 @@ def analyse(logs, out, repo):
         "counters": analysis.counters,
         "lifecycle": analysis.lifecycle,
         "field_checks": {"items": checks, "counts": counts},
-        "top_fixes": top_fixes(groups, performance, analysis.lifecycle),
+        "top_fixes": fixes[:TOP_FIXES],
+        "machine": machine_summary(env, timeline, idle_budget, analysis.levels.get("DEBUG", 0)),
     }
 
 
@@ -1223,6 +1451,109 @@ def analyse(logs, out, repo):
 def cell(text):
     """Escapes one Markdown table cell."""
     return str(text).replace("|", "\\|").replace("\n", " ")
+
+
+def render_machine(machine):
+    """Renders the machine and slowest-steps sections of analysis.md.
+
+    Args:
+        machine: The machine_summary() dict.
+
+    Returns:
+        A list of Markdown lines.
+    """
+    out = ["", "## Machine and instances", ""]
+    if not machine.get("present"):
+        out.append("No env.json in this report (a collector older than the machine facts).")
+    else:
+        environment = machine["environment"]
+        if environment:
+            out.append(
+                "; ".join("{}: {}".format(key, environment[key]) for key in sorted(environment))
+                + "."
+            )
+        instances = machine["instances"]
+        out += [
+            "",
+            "Ergopti drivers at most at once: {} ({} phase); driver processes seen: {}; restarts: {}; "
+            "sampler snapshots: {}.".format(
+                instances.get("max_drivers", 0),
+                (instances.get("max_drivers_at") or {}).get("phase") or "—",
+                len(instances.get("drivers_seen", [])),
+                instances.get("driver_restarts", 0),
+                instances.get("samples", 0),
+            ),
+        ]
+        for row in instances.get("drivers_seen", []):
+            out.append("- " + cell(describe_instance(row)))
+        running = [r for r in machine["remappers"] if r.get("running") == "yes"]
+        out += ["", "Other remappers, text expanders and input methods running:"]
+        out += [
+            "- {}{}{}".format(
+                r.get("name", "?"),
+                " " + r["version"] if r.get("version") else "",
+                " (conflicts)"
+                if r.get("conflict") != "no"
+                else " (no conflict: {})".format(r.get("detail", "")),
+            )
+            for r in running
+        ] or ["- none"]
+        out += ["", "Permissions:"]
+        out += [
+            "- {}: {} ({}){}".format(
+                p.get("name", "?"),
+                p.get("state", "?"),
+                p.get("subject", "?"),
+                " — " + p["detail"] if p.get("detail") else "",
+            )
+            for p in machine["permissions"]
+        ] or ["- none recorded"]
+        budget = machine["idle_budget"]
+        out += [
+            "",
+            "Idle CPU per process (budget {} %, {}):".format(
+                fmt(budget["percent"]), budget["source"]
+            ),
+        ]
+        rows = list(machine["idle_cpu"])
+        window = machine.get("idle_window_cpu") or {}
+        rows += [dict(r, window=window.get("step")) for r in window.get("processes", [])]
+        out += [
+            "- {} ({} window): {} ms, {} %".format(
+                r.get("name", "?"), r.get("window"), r.get("cpu_ms", "?"), r.get("percent", "?")
+            )
+            for r in rows
+        ] or ["- no measure"]
+        if not machine.get("debug_records"):
+            out += [
+                "",
+                "No DEBUG record in the logs: the log level hid them (Debug > Log level > DEBUG before "
+                "the next run).",
+            ]
+    out += ["", "## Slowest steps", ""]
+    slowest = machine.get("slowest") or []
+    if slowest:
+        out += ["| # | Seconds | Source | Step | Status | Budget |", "|---|---|---|---|---|---|"]
+        for index, event in enumerate(slowest, 1):
+            out.append(
+                "| {} | {} | {} | {} | {} | {}{} |".format(
+                    index,
+                    event.get("duration_s"),
+                    event.get("source"),
+                    cell(event.get("name")),
+                    event.get("status"),
+                    event.get("budget_s") or "—",
+                    " ❌ over" if event.get("over") else "",
+                )
+            )
+        over = machine.get("over_budget") or []
+        out += [
+            "",
+            "{} step(s) over their budget; every step is in timeline.txt.".format(len(over)),
+        ]
+    else:
+        out.append("No timeline.json in this report.")
+    return out
 
 
 def render(document):
@@ -1271,8 +1602,17 @@ def render(document):
         "",
         "Score: crash x{}, error x{}, measure over budget x{}, warning x{}, times the occurrences.".format(
             WEIGHT_CRASH, WEIGHT_ERROR, WEIGHT_OVER_BUDGET, WEIGHT_WARNING
+        )
+        + " Machine findings score fixed: two drivers at once {}, another remapper {}, a permission {}, "
+        "idle CPU over budget {}, a driver restart {}.".format(
+            SCORE_MULTIPLE_DRIVERS,
+            SCORE_FOREIGN_REMAPPER,
+            SCORE_PERMISSION,
+            SCORE_IDLE_CPU,
+            SCORE_DRIVER_RESTART,
         ),
     ]
+    out += render_machine(document.get("machine") or {})
 
     checks = document["field_checks"]
     out += ["", "## Check verdicts", ""]
@@ -1433,6 +1773,10 @@ def summary_line(counts):
 def console(document):
     """Prints the short summary the collector shows."""
     prefix = "[field-report] "
+    # The machine findings first and loud: they spoil every verdict below.
+    for item in document["top_fixes"]:
+        if item["kind"] in ("multiple_drivers", "foreign_remapper", "permission", "idle_cpu"):
+            print("{}!! {}: {}".format(prefix, item["kind"], clip(item["what"])[:160]))
     for check in document["field_checks"]["items"]:
         print(
             "{}  {} check {}: {}".format(
@@ -1489,7 +1833,7 @@ def main():
                     "segments": {label: value for label, (value, _source) in segments.items()},
                     "sources": sorted(
                         {source for _prefix, source, _pattern, _inclusive in BUDGETS}
-                        | {WINDOWS_SEGMENT_BUDGETS[0]}
+                        | {WINDOWS_SEGMENT_BUDGETS[0], IDLE_BUDGET[0]}
                     ),
                 },
                 sort_keys=True,
