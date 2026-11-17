@@ -1597,7 +1597,11 @@ function fromSource(source, options = {}) {
 		const e0 = e0Of(sc);
 		if (sc >= 0x100 && (e0 === undefined || own(fields, 'virtual_key')))
 			fail('source_extended_character_key', code);
-		const vk = e0 ? e0[1] & 0xff : own(fields, 'virtual_key') ? fields.virtual_key : characterVk(sc);
+		const vk = e0
+			? e0[1] & 0xff
+			: own(fields, 'virtual_key')
+				? fields.virtual_key
+				: characterVk(sc);
 		if (!vk) fail('source_key_without_vk', code);
 		ownVk.set(code, vk);
 	}
