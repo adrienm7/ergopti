@@ -212,439 +212,88 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ## Remaining code work
 
-- Moved to TODO-tests-windows.md (2026-11-15): requalify the Windows key-combination and updater cohorts.
-- [x] **Windows AV-surface ceilings (found 2026-11-12).** The first Windows / Build of the current tree, run
-      43291765266 (artifact `ergoptiplus-av-surface-43291765266-1`), exceeds four ceilings of
-      `tools/ci/windows-exe-av-surface.json`: elevated_run 4/3, elevation_wording 4/3, injection_wording 13/11,
-      key_state_polling 69/58. The excess is already on `dev` (Build was skipped on every earlier run), at most +2
-      key_state_polling from ILD-2 `_KLE_RealCtrlHeld`. The maintainer sets the new ceilings; they guard the antivirus
-      surface, so no agent raises them alone.
-      Done 2026-11-13 by worker I without raising a ceiling (d10ad40fbc): the new key-state reads of the
-      physical-shortcut capture and ILD-2 go through `platform/input/key_state.ahk`, the gesture menu and onboarding share
-      one elevated launch (`GestureRestartRunElevated`), and the touchpad reader loads `hid.dll` with `#DllLoad`.
-      Windows Build green on run 43536962831 (key_state_polling 58, elevated_run 3, elevation_wording 3,
-      injection_wording 11); the ceilings the shared launch dropped are lowered to that measure
-      (powershell_policy_bypass 16 -> 15, hidden_window_style 3 -> 2, powershell_mentions 52 -> 46).
-      Same landing: Windows Integration Driver startup, red on `dev` since run 43306862276 (realistic-hotstrings
-      `toml.flat_values` 1212/1201), follows its new owners: every boot reads the shared tap-hold `shared_file.toml`
-      (Mac thumb positions, macOS-only modifiers), the schema v22 migration step and `tap_hold.max_activation_ms`.
-      The Windows Unit tests meta red (`desktop-ci-evidence`, « a delay between attempts » 0/2, run 43275487956) was
-      already fixed by a8f7c69c2c (the SwiftPM resolve fakes run ahead of Git Bash's own `sleep`): meta is green on
-      `dev` runs 43306862276 and 43457158223, so it left the baseline list.
-- [x] **Linux hardware test still passes the removed pause argument (found 2026-11-12).** Done 2026-11-13 (worker D):
-      the three calls pass the edit source only, and the paused step now expects the copy to run (EDD-1: a pause stops
-      typing, not configuration) and an unchanged copy to keep both files byte for byte; the paused session still
-      forwards the pair. Needs `/dev/uinput`, so only the Linux E2E desktop-webview job runs it.
-      `linux/tests/hardware/run_simultaneous_configuration_real.lua` still passes `script.is_paused` to `Scope.edit`
-      and `Scope.copy_taps_to_chords`, which take `expected_source` there since the EDD-1 pause-argument removal,
-      so the pause function lands in `expected_source` and Linux E2E
-      desktop-webview fails (« original publisher clears only the known third slot », line 252). Drop the argument,
-      then confirm with that E2E job.
-      Claimed by worker A: both calls now pass only `edit_source()`, and the paused copy is expected to succeed
-      with identical bytes (EDD-1); `test_hardware_scope_calls_take_one_source.lua` guards the argument. Proof: run
-      43535291046 (2026-11-14), whose Linux E2E desktop-webview job no longer fails « original publisher clears only
-      the known third slot »; its remaining reds are the baseline ones.
-- [x] **Windows global restore and the preferences source (found 2026-11-12).** On macOS the remap save wrote
-      `config.toml` without handing the bytes to the preferences, so « Restore recommended values » refused at the
-      shortcuts participant (fixed in 3e209162 by `Preferences.replace_source`). Check whether the AHK global restore
-      cohort has the same handoff gap now that `[tap_holds]` and `[mod_combos]` live in `config.toml`.
-      Checked 2026-11-13 by worker I: no such gap on Windows, so no code change. The AHK scopes keep no loaded
-      source to compare with: `ConfigScopeCommitOperations` (`settings/engine/scope/scope.ahk`, `Build()`) reads `config.toml`
-      fresh at commit time, checks drift against that image and publishes under its expected-old hash, and
-      `ConfigGlobalScopeApply` puts the tap-hold owner in the same cohort, so no participant hands bytes to the next.
-      Covered by `test_config_scope_manifest.ahk` (`scope-hash-precondition`, « inventory source drift refuses
-      before any backup »). Decided by the agent on 2026-11-13, to review by the maintainer.
-      Checked 2026-11-13 by worker E: no gap on Windows. `ConfigScopeCommitOperations` admits a fresh source
-      generation of `config.toml` at each commit (`TOML_BuildConfigUpdatedContent`) and checks the bytes it read,
-      so no acknowledged source outlives a remap save the way macOS's preferences snapshot did.
-- [x] **ci-acceptance-3 commits not yet on `dev` (2026-11-12).** Closed by worker G on 2026-11-13 (Paris). Checked
-      against `dev` by subject: cf44fb4e, aef8ae05 and da7cf001 were already there; 84e97e47 (number-row selection
-      timeline) and 4ae1131a (launcher helper resolution logged at boot) are now landed. Not landed, on purpose: the
-      MLC-005 relocation rows (faa1ade6, 13af8690, b74741e8, 14d21718, 365dae29). Their gate,
-      [43292636135](https://github.com/adrienm7/ergopti/actions/runs/43292636135) job 131487813938, failed on two real
-      launcher defects, now the item « MLC-005 relocated launcher refused » under macOS; the rows land with that fix.
-      The `ci(probe)` commits were temporary and removed on that branch. The receipts of 8886f2ba and ec54b45e
-      (43243856260 passed with the snapshot bracket; 43276494558 refused on macOS 15 without a `tsm.uiserver` line,
-      which 84e97e47 now prints) belong to « [CI] Native keyboard-source fixture ».
-- [x] **Windows compiled upgrade exit 1 (closed 2026-11-12 on its credible cause).** ed11665a is the credible cause,
-      unproven: the upgrade step was never reached afterwards. Watch for a `startup-smoke: uncaught` line on the
-      next failure of Windows Install and launch.
-      Reached again on 2026-11-14 (run 43536962831), with another cause: the structure step 471744488c had respelled
-      the v1.0.9 prior release's extracted asset paths to the new layout, while the published package still ships
-      `_shared/core/config_schema/migrations.toml` and `_shared/data/locales/en.json`. Fixed by worker I in
-      46536e589d; Install and launch green on run 43549510667.
+### Windows
 
-### Windows (the PC agent's)
-
-State on 2026-11-01. Whole AHK suite at d85a24eb53: 17277/17288 in parallel, the other 11 (clipboard and focus contention
-between workers) green alone. All live checks pass, typed by the harness.
-
-- **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
-
-- [x] **UPD-2 on AHK (decided by the coordinator on 2026-11-12, after the maintainer's real pause).**
-      Done 2026-11-13 by worker E: `_Updater_RequestPolicy` allows a manual request whatever the pause and the
-      suspend boundary keeps in-flight manual checks; installs keep the AHK-14 pause contract through
-      `_Updater_InstallRequestPolicy` (download reservation, managed-failure retry, signature fetch,
-      `ForInstall` publication) and refuse visibly while paused; an install asked after a check that crossed a
-      pause owns a fresh request. The update-check window keeps its `BornSuspended` capture (F-25) and refuses
-      only `update` while paused. AHK-31's suspend cancellation now drives a background request, with a new case
-      for a manual check kept through a pause in preparation. Decided by the agent on 2026-11-13, to review by the
-      maintainer: the one-click « Update now » is an install and refuses while paused. Installs while paused stay
-      the follow-up below. A manual check,
-      the changelog and Versions windows, the release links, the channel and interval settings and the update prompt
-      should run while paused, as macOS `check_now` and Linux `check_for_updates`; background checks keep their pause
-      drop. Tried on 2026-11-12 (ea031503, reverted in 79d1914b): `_Updater_RequestPolicy` allowed a manual request
-      whatever the pause, the suspend boundary (`_Updater_SwapAsyncRequestsForBoundary`) kept in-flight manual records,
-      the `_Updater_RefuseManualWhileSuspended` guards left the manual entry points, and `UpdateCheck_Perform` lost its
-      `BornSuspended` parameter. Windows CI run 43285586086 then showed what else relies on the pause revoking manual
-      work, to handle in the same change: `test_updater_transport_ownership.ahk` AHK-31 (a cancellation during owned
-      preparation) and AHK-33 (a pause inside the download START must still reject the reservation: installs stay
-      pause-sensitive, so `_Updater_TryReserveDownloadTransaction` and `_Updater_ManagedFailureOwnerIsCurrent` need the
-      request's pause generation of their own), the native update-consent fixtures
-      (`tests/fixtures/update_check_native_consent_body.ahk`, cases 1718-1720), `test_managed_terminal_failure.ahk:159`,
-      and the F-25 class loop in `test_webview_bridge_suspend_guard.ahk` that requires every message handler to read
-      `A_IsSuspended` (`_UpdateCheck_OnWebMessage`). Installs while paused stay a separate follow-up: the self-update
-      transaction stops at a pause in four places, the `updater-self-update` suspend step
-      (`_Updater_QuiesceSelfUpdateForSuspend`, `core/lifecycle/engine/lifecycle.ahk`), the staging monitor
-      (`_Updater_CancelSelfUpdateForSuspend`), the staging completion (« Update staging completion discarded while
-      suspended ») and the swap handshake (« the driver was suspended before the swap handshake completed »).
-- [x] **ILD-2, SCD-2 and SCD-3 on AHK (decided by the maintainer on 2026-11-11).** Ctrl+AltGr+key sends Ctrl and the
-      logical key, AltGr suspended. `modules/keymap/keylayout/keylayout_emulation.ahk` `_KLE_OnAltGr`: with a Ctrl other
-      than AltGr's own physically held, `_KLE_OnShortcut(Sc, "^")` (`"^+"` with Shift) instead of `_KLE_Emit`;
-      `test_keylayout_emulation.ahk` `_KLT_OptionsDecide` routes `ctrl altgr` presses the same way, so the shared vector
-      `ctrl_altgr_sends_ctrl_and_the_logical_key` replays. `modules/keymap/layout/accented_shortcuts.ahk`
-      `AccentedShortcuts_Register`: add the `<^<!` and `<^<!+` prefixes (SCD-2, Ctrl+Alt+é sends Ctrl+Alt+C).
-      `modules/shortcuts/utils.ahk` `AddShortcut` for a `^` slot: also `<^>!^` + scan code to the same callback, guarded by
-      the physical Ctrl (SCD-3, a `ctrl_x` slot fires for Ctrl+AltGr+x). Tests beside each.
-      ILD-2 and SCD-2 done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 7163ba50 and ee18e2d9: `_KLE_AltGrShortcutMods` with `_KLE_RealCtrlHeld`, the `<^<!` and `<^<!+` chords). Left: SCD-3. `AddShortcut` in `modules/shortcuts/utils.ahk` has no production caller, so the `<^>!^` registration belongs where the `ctrl_x` slots are really registered; find that registrar first, then add the hotkey guarded by `_KLE_RealCtrlHeld()` and test Ctrl+AltGr+x running the `ctrl_x` action.
-      SCD-3 done 2026-11-13 by worker E: the Ctrl slots are bound by `KeyboardShortcutsBindAll`
-      (`settings/engine/io.ahk`), and Ctrl+AltGr already reaches `_KLE_OnAltGr` with a real Ctrl (ILD-2), so the slot is
-      run there: `_KLE_AltGrSlotFor` names the `primary_`/`primary_shift_` slot of the logical key, which runs
-      through `RunKeyboardShortcutAction` (Shortcuts gate kept); without one the chord goes on as Ctrl and the key.
-      Test `SCD-3` in `test_keylayout_emulation.ahk`; the press on a PC is in TODO-tests-windows.md.
-- [ ] **EDD-1 on AHK (decided by the maintainer on 2026-11-12: a pause stops typing, not configuration).** Remove the
-      `A_IsSuspended` page-message gates that drop or refuse a configuration write while suspended, in
-      `ui/prompt_editor/init.ahk` (`_PromptEdWeb_OnWebMessage` and `_PromptEdWeb_Save`), `ui/paths_editor`,
-      `ui/personal_info_editor`, `ui/personal_toml_editor_webview.ahk`, `ui/layer_editor`, `ui/layout_manager`
-      (`_LayMgrWeb_*`), `ui/hotstrings_config_window`, `ui/action_picker`, `ui/model_browser` and
-      `ui/physical_shortcuts`; keep `ready`'s handling. Test in each editor's suite: a save while suspended writes the
-      file. Extended the same day into a « real pause »: also remove the Suspend gates on every configuration or
-      install action, i.e. the tray rows the manifest marks `greyed_when_paused` (they stay live while suspended;
-      `menu_init.ahk` is now the only reader of that key, so delete it from `menu.toml` together with the gates),
-      each menu's whole-scope restore and clear and the Configuration menu's, opening the physical shortcuts
-      editor, adding or deleting hotstrings, and installs (layouts, Ollama or MLX models, apps). Then confirm that
-      nothing that acts on typing stays active under Suspend (hotstrings, layout emulation, tap-holds, layers and
-      chords, shortcuts, gestures, AI predictions and their warmups and local server), with a regression for any
-      that still acts, and that a setting changed while suspended applies on resume. Every executable
-      `A_IsSuspended` read is listed by file and line, classified, in
-      [the Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md): the writers
-      (`infra/hotstrings/personal_toml_io.ahk` among them) refuse too, and the tray root rebuild is refused while
-      suspended, which must change before the rows stop greying. See `docs/memory/maintainer-decisions.md`.
-      Owned by the parity-b pass (decided by the coordinator on 2026-11-12): its Windows slice for personal hotstrings and personal info is 392ae998, and the remaining gates are listed in [the pause Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md) on `claude/ergopti-todo-parity-b`.
-      [CODE] Left (2026-11-15): the personal info and TOML slice is done (392ae998); the suspend gates of prompt_editor,
-      paths_editor, layer_editor, layout_manager, hotstrings_config_window, action_picker, model_browser, menu_llm and
-      `greyed_when_paused` remain, each classified against windows-inventory.md; the PC run that confirms them is in
-      TODO-tests-windows.md (2026-11-15).
-      [CODE] Progress (2026-11-15, branch `claude/ergopti-pause-c2-drop-greyed`): the tray root rebuilds under a pause
-      (f092410e7e on dev); the tray greys no feature row any more and the watchdog rebuilds the root once a pause or
-      resume settled (c3f678a972, test_tray_pause_greys_features.ahk); every click-reached handler that still refuses
-      while paused shows `notify.paused_refused` (667663b685, 72fb9945e5, test_bridge_suspend_guard.ahk
-      paused-refusal-notice); the key is now `boot_deferred`, the Windows boot shell's alone (ca4af9d52d). Left: the A
-      and B gates themselves (a paused save writes), the AI menus' deferred work, then the PC run.
-- **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
-  keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left, the rest of the menu files need
-  `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
-  before the registry loads. PAR-83 done 2026-11-16: the Ollama archive URL's host comes from
-  `Identifiers.Hosts.GITHUB` through the download plan (`-ReleaseHost`), no Windows copy left in the baseline. Moving `tests/run_*.ahk` to
-  `tests/runners/` is not worth it (455 `A_ScriptDir` uses, 1,908 includes).
-- **Tests.** Source assertions left to convert to behaviour; `--reverse` on the `llm` group has 3 order-dependent reds.
-  PC run 2026-11-11: `--reverse` on the `llm` group passes 2295/2295 after the order fixes. Count of `_Driver*` source
-  reads in the Windows tests: 3,780 in 994 files (meta 3,000, unit 778), down from 3,796. The timer, LLM tray probe,
-  keep-awake, scroll capture and password detector pause guards now run under a real `Suspend`. 80 meta files
-  still read `A_IsSuspended` from source. Guards that would send keys, paste or move the cursor when broken (text
-  sender, tap-hold, dead keys, `SimulateActivity`) need a seam first. The ROI half-life tick and the click
+- [ ] **EDD-1 on AHK: a pause stops typing, not configuration** ([decision](docs/memory/maintainer-decisions.md),
+      [pause Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md)). The tray keeps
+      its feature rows live and rebuilds under a pause, and every click-reached handler that still refuses shows
+      `notify.paused_refused`. Left: remove the A and B suspend gates (a paused save writes the file) of
+      `prompt_editor`, `paths_editor`, `layout_manager`, `hotstrings_config_window`, `action_picker`, `model_browser`
+      and `menu_llm`, each classified in the inventory, with a test per editor; the AI menus' deferred work; then the
+      PC run in TODO-tests-windows.md.
+- [ ] **Immediate-Backspace restoration after Notepad-paste and terminal expansions.** Those owners emit after the
+      keystroke and keep no undo record, so `HSE_UndoExpansion` refuses both hosts. Keep the record in
+      `_HSE_CommitNotepadOwner` and `_HSE_CommitTerminalOwner` (as `_HSE_RememberUndo` does) and send the undo burst
+      through the same owned output as the expansion (the clipboard owner of `_HSE_BeginOwnedNotepadTransaction`, the
+      paced capture of `_HSE_BeginOwnedTerminalTransaction`); the PC qualification is in TODO-tests-windows.md.
+- [ ] **TakeNote and the Windows 11 tabbed Notepad.** The Store Notepad opens a second file as a tab of the open
+      window, so a same-named note of another folder shares one window with the first, and the module, which binds
+      one window to one path, waits for a window that never comes (`takenote-native-document-owner` mode
+      different-folder fails on the PC, passes on the Server runner's classic Notepad). Tell the two tabs apart (UI
+      Automation tab items) or select the right tab before typing.
+- **Parity literals.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`,
+  `request_plan_*`, the keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left; the rest of the menu
+  files need `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers
+  and sleeps before the registry loads.
+- **Tests.** Source assertions left to convert to behaviour (3,780 `_Driver*` source reads in 994 files; 80 meta
+  files still read `A_IsSuspended` from source). Guards that would send keys, paste or move the cursor when broken
+  (text sender, tap-hold, dead keys, `SimulateActivity`) need a seam first. The ROI half-life tick and the click
   handlers are guarded a second time downstream, so a behaviour test of their own guard could not fail.
-- Moved to TODO-tests-windows.md (2026-11-15): the field report with a driver (step 2 of its order).
 - **Signing follow-ups.** Delete `.github/ci/stable_windows_signing_exception.json` once SignPath is configured; flip
   update enforcement to `required` after the `off` release. The relay exe and the vendor binaries are unsigned.
-- **Older findings.** The seven "Remaining findings" of
-  [the 2026-10-28 Windows audit](docs/audits/windows-2026-10-28/README.md); item 36 updater production coupling (the
-  first trusted PowerShell host acquisition); a408a29790 (the four longest AHK unit shards split) was never landed
-  and is not on the remote; not redone: every Windows unit shard now ends within 9 minutes (run 43291765266), so the
-  split no longer shortens the critical path (decided by the agent on 2026-11-13, to review by the maintainer).
-- **TakeNote and the Windows 11 tabbed Notepad.** The Store Notepad titles a window « Notes.txt – Bloc-notes » with
-  an en dash; the matcher read only « - » and never found the window (fixed, `takenote-title-separator`). Left: by
-  default it opens a second file as a tab of the open window, so a same-named note of another folder shares one
-  window with the first, and the module, which binds one window to one path, waits for a window that never comes
-  (`takenote-native-document-owner` mode different-folder fails on the PC, passes on the Server runner's classic
-  Notepad). Tell the two tabs apart (UI Automation tab items) or select the right tab before typing.
-- **Whole AHK suite on the PC (2026-11-10, `fix/windows-pc-2026-11-10`).** 20,286 run, 16 red: 2 token-exchange
-  budgets and 1 shortcut path case (fixed), 2 TakeNote (above). The other 11 need what the CI runner installs
-  and this PC does not have: the Kana layout (`one-shot-native-kana-*`, 2), a top row that types letters, while
-  the PC's first layout is the custom `d001040c` (`layout-row-native-flags`, `layout-row-external-native-flags`,
-  `layout-row-pending-dead-key`, 7), and file symlinks, which need Developer Mode (`unblock-selected-file-reparse`,
-  2). Skip each with its reason when the prerequisite is absent instead of failing.
-  PC run 2026-11-11: the token-exchange and shortcut path cases are fixed, the Kana one-shot cases pass (da5daad768), the layout-row and symlink cases report not executed with their reason (bb49219540); TakeNote different-folder stays (above).
-
-- [ ] **Immediate-Backspace restoration after Notepad-paste and terminal expansions.** Those owners emit after the
-      keystroke and keep no undo record, so a Backspace right after their expansion does not type the trigger back.
-      Claimed by worker E, then left on 2026-11-13 (decided by the agent, to review by the maintainer): the record is
-      cheap (`_HSE_CommitNotepadOwner` and `_HSE_CommitTerminalOwner` could keep it as `_HSE_RememberUndo` does), but
-      the undo burst must go through the same owned output as the expansion (the clipboard owner of
-      `_HSE_BeginOwnedNotepadTransaction`, the paced capture of `_HSE_BeginOwnedTerminalTransaction`), which only a
-      PC run in Notepad and a terminal can qualify. Until then `HSE_UndoExpansion` keeps refusing both hosts.
-      [CODE] Left (2026-11-15): not started (bb083f60a4); the Notepad and terminal owners keep no undo record. The PC
-      run that qualifies the fix is in TODO-tests-windows.md (2026-11-15).
-
-- [x] **LogsDirPath under the old folder name.** `settings/engine/migration/legacy_folder_migration.ahk` renames a custom logs folder named
-      like the old app folder to `Ergopti`, as macOS and Linux do since 2026-11-11 (shared `renamed` rule).
-      Done 2026-11-13 by worker E: `LegacyFolderCustomLegacyLogs`, `LegacyFolderCustomLogsStep` and the `renamed`
-      rule of `LegacyFolderRebased`; the logger's entries move, the user's own files stay (tests
-      `legacy-folder-custom-logs`).
-
-- [x] **Hotstring header rows outlive their expiry** in the « both » stack of `llm.trigger.while_hotstring_tooltip`
-      until the next render.
-      Done 2026-11-13 by worker E: the panel arms a repaint at its first header deadline
-      (`_LLM_TooltipArmSharedHeaderExpiry`, through the repaint-only `_LLM_TooltipRenderOwnedNavigation`); test
-      `llm-hotstring-tooltip-both-expiry`. Seeing the row leave on screen is in TODO-tests-windows.md.
-
-- [x] **Restored API entry without a usable key.** DPAPI keeps the key inside the backup: check whether a restore under
-      another user or machine yields an unusable key, and give it the « API key… » re-enter row as macOS and Linux do.
-      Done 2026-11-13 by worker E: it does (`LLM_ApiToken_Decrypt` keeps the envelope, which was then sent as the
-      key). `LLM_ApiToken_Unusable` makes the menu row offer only the key edit, skips the model listing and refuses
-      the request (test `api-entry-restored-key`); a real restore under a second account is in TODO-tests-windows.md.
+- **Older findings.** The seven « Remaining findings » of
+  [the 2026-10-28 Windows audit](docs/audits/windows-2026-10-28/README.md); item 36, the updater production coupling
+  (the first trusted PowerShell host acquisition).
 
 ### macOS
 
-- [ ] **MLC-005 relocated launcher refused (found by worker G on 2026-11-13).** In
-      [43292636135](https://github.com/adrienm7/ergopti/actions/runs/43292636135) (macOS 26, job 131487813938) the
-      launch gate of the relocation rows passed `symlinked_applications` but failed two scenarios on
-      `platform/remap/lease_helper.lua`: `spaced_accented_path` (« bundle-owned ErgoptiPlus helper no longer matches the
-      running launcher »: the exact-path or identity proof refuses an install under « Applications de Léa », then Quit
-      did not end both processes in 10 s) and `translocated` (« ERGOPTI_LAUNCHER_EXECUTABLE differs from the
-      bundle-owned helper »: the launcher exports its translocated path while the Lua tree derives another). Fix both
-      in the launcher/helper proof, then land the rows of branch `claude/ergopti-todo-ci-acceptance-3` (faa1ade6,
-      13af8690, b74741e8, 14d21718, 365dae29) with a green macOS 26 Install-and-launch row. Needs a Mac or the hosted
-      macOS 26 lane; the failed-launch artifact (13983003738) holds the launcher logs.
-      [CODE] Left (2026-11-15): 5fcb564b04 proves the helper by device and inode (test_lease_helper_identity.lua).
-      The five relocation-row commits are on dev since 2026-11-16 (ported from `claude/ergopti-todo-mlc005-rows`,
-      branch deleted). Left: confirm the three relocation rows green in the next hosted macOS 26 Install-and-launch run.
-
-- **Field report 2026-11-03 (`mac-2026-11-03_102716`), branch `fix/macos-field-2026-11-03`.** Done: ai_local no
-  longer lists the owned endpoint without its binary (no ERROR); n-gram history merges paced (458 ms slice); the
-  dashboard no longer resends an unchanged history each live update (250 ms holds, +73 MB heap per minute). Already on
-  dev: blob Range redirect (e6942d05c2), diagnostics phase A (e76a5443f8), post-wake AX hold (1f2884f13c), owned
-  Ollama Go test enrolment (627bfad0af). Done since: the hardware UUID keystats start needs is read by an ioreg child
-  during the start delay (`modules/keystats/host_signature.lua`), no longer by `ioreg -d2` on the main thread (151 ms
-  at boot+1 s); a later Metrics toggle still reads it synchronously when no prefetch ran. Karabiner regeneration stays
-  synchronous (merge 170 ms, layout actions 230 ms cold: event_taps `runloop_late_ms` 294), no safe non-blocking
-  design: the work is in-process Lua plus native calls (`hs.keycodes.map`, `hs.json`, the file write), which no child
-  can do, and slicing it across run-loop turns would let layout, pause and lease events land between a build and the
-  layout serial, lease token and epoch it was validated against. Measured on Linux Lua 5.4 under the stub harness
-  (shipped recommended preset, 6 rounds): layout actions 1.1-1.8 ms, build 27-40 ms, merge 9-30 ms, encode 11-44 ms
-  (258617 bytes); so the field 230 ms in `karabiner.layout_actions` is native, not the Lua loop. Next: split that
-  phase on the Mac (`Layout.keyboard_form()` registry snapshot vs the 548 `hs.keycodes.map` lookups) before touching
-  it. The menu Apps folder reader already uses `FsDir.try_entries_quiet`; the obsolete `find` follow-up is closed. Done 2026-11-11: `Config.resolve_layout_actions` times that phase's two halves apart (`karabiner.layout_actions.keyboard_form`, the registry snapshot, and `karabiner.layout_actions.key_codes`, the 548 lookups; regression in `test_actions_not_rebuilt_per_layout`), so the next Mac field report's phase lines and slow-callback attributions name the half to move. Left: decide from that report; the read is in TODO-tests-macos.md (2026-11-15).
-- **One folder name for Ergopti on the three OS.** The shared roots and boot migrations are already on dev. The maintainer's machine checks against `docs/tooling/one-folder-name-handoff.md` are in the three TODO-tests files (2026-11-15); remove the migration only once those checks pass. Rename the owned Karabiner runtime folder (`ErgoptiPlus`) in its next rebuild (item 31). Checked 2026-11-11: no code step is left here. The runtime folder rename is the maintainer's release step: it changes the compiled runtime, so it needs a rebuilt and republished pinned remap runtime (`vendor/remap-runtime/manifest.json`), which agents do not touch; removing the migration waits for the maintainer's machine checks.
-- **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
-  [handoff](docs/tooling/next-release-handoff.md)). Status on 4 November, all on `dev`:
-  - Done: the owned runtime is the default (`RUNTIME_DEFAULT = "owned"`, the two Configuration rows and
-    `remap_switch.lua` gone). Runtime `16.3.0-ergopti.3` published (prerelease `remap-runtime-v16.3.0-ergopti.3`,
-    downloaded back: sha256 `eced1bfd…dc4567`, 12351916 bytes) and pinned; its hosted sudo install acceptance passed on
-    macos-15, macos-15-intel and macos-26 (Remap runtime build run 41895547018: files, Core and VirtualHIDDevice jobs
-    loaded, pqrs' package installed in the same shell, stage retired). The install is offered once by itself (one
-    confirmation, one administrator prompt), the driver approval pane opens and is watched, the Tap-Holds row retries;
-    the field run and the collector (`--installed`) report every install fact.
-  - Decided: field-tested on the CI-signed dev build, never the ad hoc developer app; no Developer ID for now (item
-    below).
-  - Next: the maintainer's WP9 pass (handoff checklist, in TODO-tests-macos.md since 2026-11-15) once a signed dev build
-    is authorized, then the shared-mode deletion. Checked 2026-11-11: both steps are the maintainer's (a signed dev build and a physical Mac); no code step precedes them. Done on 1 November: the per-OS feature requirements table (`docs/design/feature-requirements.md`) and
-    the driver-only VirtualHIDDevice update offer (3ebab93a17).
-- **Owned runtime with a Developer ID (maintainer: not now, 2026-11-04).** With the self-signed CI certificate the
-  install takes one administrator prompt (the root Core and pqrs' daemon are LaunchDaemons bootstrapped by the
-  helper), Login Items lists them as separate « unidentified developer » rows, and the driver approval names pqrs'
-  extension. A Developer ID would allow: `SMAppService.daemon` for both jobs from `Contents/Library/LaunchDaemons`
-  (no password, one « Ergopti » Login Items group; launchd kills SMAppService jobs of a bundle with no Team ID,
-  `RemapLeaseGuardian.swift`), and an Ergopti-signed DriverKit extension in `Contents/Library/SystemExtensions`
-  activated with `OSSystemExtensionRequest` (needs Apple's DriverKit HID entitlements for the team). The root Core
-  keeps its own Input Monitoring row either way: launchd starts it, not Ergopti.
-- **Owned runtimes.** The rows in state "to do" of `_shared/core/network/data/owned_runtimes.json` are all item 31 (shared
-  Karabiner app, owned runtime, VirtualHIDDevice). The Swift-owned managed daemon under the proxy relay needs a short
-  design note first (who launches the relay, how its refusal receipt reaches the Swift owner; Swift and Go). Done on 1
-  November: App Cloner on the managed Python with pinned PyObjC 12.1 (managed-pyobjc.json, ensure-managed-pyobjc.sh
-  under the native PTY guardian, consent offer from the Apps menu, stable link `native-bootstrap/app-cloner/python3`;
-  existing clones keep /usr/bin/python3 until re-cloned). Checked 2026-11-11: the managed-daemon relay row stays blocked on that design note (who launches the relay, how its refusal receipt reaches the Swift owner), a maintainer decision; no code step is open before it.
-- **Checks left to a program from the Mac session.** Done on 1 November: `field_tap_hold_thresholds` (9901da4d94;
-  PAR-15 is confirmed by the next field run's result);
-  the HTTPS downgrade refusal is already covered by `ManagedPACSourceTests` and `ManagedBootstrapDownloadTests`.
-
-- [ ] **Owned runtime rebuild (macOS release step).** The next runtime build ships the MRT-004 « Réparer le service »
-      helper role and the helper's one-hash report rule (`OwnedVirtualHIDDaemonReportStageOwner.admitImage`); rebuild it
-      and update its manifest pin.
-      [RELEASE] Left (2026-11-15): not started; the pinned runtime (16.3.0-ergopti.6, 110d8949fb) predates MRT-004
-      (ff861e3640).
-
-- [x] **`events_typing.rich_text` in clear (AHK-005 / WM-002 left).** With metrics encryption on, Windows and Linux
-      store it empty; macOS still writes the typed text to SQLite. Done 2026-11-13 (worker F): the macOS writer stores
-      nothing there while encryption is on, and the shared encrypt pass first empties the local device's stored copies
-      (`text_migration_core.clear_rich_text_sql`, macOS and Linux backends; the Windows AHK pass needs none, its
-      writer never fills the column). Tests: `test_rich_text_not_stored_encrypted.lua`, runner contract.
+- [ ] **[CI] MLC-005 relocation rows.** The helper is proved by device and inode (`test_lease_helper_identity.lua`)
+      and the five relocation-row commits are on dev since 2026-11-16: confirm the `symlinked_applications`,
+      `spaced_accented_path` and `translocated` rows green in the next hosted macOS 26 Install-and-launch run.
+- [ ] **Field report follow-ups (2026-11-03).** Decide from the next report which half of the 230 ms cold
+      `karabiner.layout_actions` phase to reduce (`karabiner_layout_actions` in TODO-tests-macos.md; the
+      regeneration itself stays synchronous, see the rejected proposals). A Metrics toggle still reads the hardware
+      UUID synchronously when no start-delay prefetch ran (`modules/keystats/host_signature.lua`).
+- [ ] **One folder name for Ergopti on the three OS.** Remove the boot migration only once the maintainer's
+      machines pass the checks of the TODO-tests files
+      ([handoff](docs/tooling/one-folder-name-handoff.md)).
+- [ ] **[RELEASE] Owned runtime rebuild.** The pinned runtime (16.3.0-ergopti.6) predates MRT-004: the next build
+      ships the « Réparer le service » helper role, the helper's one-hash report rule
+      (`OwnedVirtualHIDDaemonReportStageOwner.admitImage`) and the raised descriptor limit, renames the owned runtime
+      folder `ErgoptiPlus`, and updates the manifest pin (the maintainer's step: agents do not touch the pinned
+      runtime).
+- [ ] **Item 31, owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
+      [handoff](docs/tooling/next-release-handoff.md)). After the maintainer's WP9 pass (`owned_runtime_wp9` in
+      TODO-tests-macos.md), delete the shared mode. The managed-daemon row of
+      `_shared/core/network/data/owned_runtimes.json` under the proxy relay waits for a short design note (who
+      launches the relay, how its refusal receipt reaches the Swift owner; Swift and Go).
+- [ ] **[LATER] Owned runtime with a Developer ID (maintainer: not now, 2026-11-04).** It would allow
+      `SMAppService.daemon` for both jobs (no password, one « Ergopti » Login Items group) and an Ergopti-signed
+      DriverKit extension activated with `OSSystemExtensionRequest` (needs Apple's DriverKit HID entitlements); the
+      root Core keeps its own Input Monitoring row either way.
 
 ### All drivers
 
-- [ ] **Structure plan (maintainer request 2026-11-11):** [docs/design/structure-plan.md](docs/design/structure-plan.md).
-      In progress: see « Resume here » at the top (branch `claude/ergopti-todo-structure-phase2`).
-      Rule A: every common value, text and logic in `_shared`. Rule B, decided by the maintainer on 2026-11-11:
-      feature-first trees (`<feature>/{engine,adapters,ui,data,native}`, `core/`, `platform/`), the same on every
-      driver and in `_shared`; file prefixes the folder repeats are renamed away (`keystats_walker.ahk` →
-      `walker.ahk`); `remap` is named `keyboard`; tests stay in `tests/<kind>/` mirroring the feature tree.
-      Start trigger: the go comes from the maintainer, as soon as the maintainer's AHK session has pushed its last
-      feature commits; the coordinator then launches phase 2 at once, one step per commit with
-      `tools/audit/structure/apply-step.cjs` (`--check-all` must be clean first).
-      [DECISION] Left (2026-11-15): phase 2 steps S1 to S17 are on dev (471744488c … 1f3361a57c); S18 to S38 remain, to
-      launch only with the maintainer's go ([CODE] after that).
-- **Provider flags inferred, not read.** Checked against the docs on 1 November (90344262aa): Featherless and
-  Qianfan confirmed. Rechecked on 10 November (7ae1147b): the Perplexity, `dashscope-intl` and Moonshot K2 watches
-  are closed and guarded by `test-llm-provider-retirements.cjs`. Left, both only provable with a live key (the docs
-  hosts are unreachable from cloud sessions and show no off example): SambaNova's `enable_thinking: false` (off is
-  its default, docs show only `true`) and the Chutes Qwen `enable_thinking` field; a refusal is dropped and
+- [ ] **Structure plan, phase 2** ([plan](docs/design/structure-plan.md), resume point
+      [docs/plans/structure-migration-resume.md](docs/plans/structure-migration-resume.md)). S01 to S20 are on dev
+      (S18 to S20: settings, menu, tray); S21 (ai) is being proved on `claude/ergopti-structure-s21-proof-*`; S22 to
+      S38 remain, one step per commit with `tools/audit/structure/apply-step.cjs`, landed in blocks of a few steps.
+      Paths that describe a published artifact (a prior release's payload, a historical pin) keep their old spelling.
+- **Provider flags inferred, not read.** Only provable with a live key: SambaNova's `enable_thinking: false` (off is
+  its default, the docs show only `true`) and the Chutes Qwen `enable_thinking` field; a refusal is dropped and
   remembered either way.
-- **Tooling found on the way (4 November).** The source seal now reads Git blobs without creating a temporary checkout. On the Windows PC these fail on a clean `dev` for
-  environment reasons, so only CI proves them: `test-site-github-release` and the site deploy admission controls
-  ("file changed before capture"), `test-keylayout-row-options` (different Lua keyboard ids),
-  `test-linux-field-report-contract` (setup error), `test-menu-manifest` in a worktree (a `node_modules` junction
-  copy fails with `EPERM`). Make each one pass locally or skip with a stated reason.
-  PC run 2026-11-16 (worktree on dev 164d6536aa, its own `npm ci` node_modules, `PYTHONUTF8=1`): all pass or skip
-  with their reason, so nothing is left here: `test-site-github-release` (35 controls),
-  `tools/test/fixtures/site-deploy-admission-controls.cjs` (165 controls), `test-keylayout-row-options` (10 cases),
-  `test-menu-manifest`, and `test-linux-field-report-contract` skips (« a Linux shell tool; not run on Windows »).
-  A worktree whose `node_modules` is a junction to the main checkout was not retried.
-- **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
-  of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
-  `mods` (macOS capture is item 31's).
+- **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins of
+  a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
+  `mods`.
 
-- [x] **Modifier-chord action labels from the key name table.** The action pickers still show raw or French chords
-      (« Cmd + Option + Shift + Enter ») on every driver; the tests that pin this label family change with it.
-      Checked 2026-11-13 (worker F): already done on the three drivers, every picker row goes through the shared
-      `key_names.chord_label` (macOS `gestures/actions.lua` and `remap/config.lua`, Linux `gestures/manager.lua`,
-      Windows `KeyNameChordLabel` in `gestures/actions.ahk`), pinned per locale by `test_action_catalogue_parity.lua`
-      and Linux `test_key_names.lua`. No code step left.
-      Verified done by worker A on 2026-11-13: every driver names a chord through the key name table (shared
-      `key_names.lua` `chord_label` on macOS and Linux, its AHK port `KeyNameChordLabel` on Windows), and the web
-      picker shows the host's labels; pinned by `test_key_names.lua` (Linux), `test_action_catalogue_parity.lua`
-      and the script-action projection corpus (macOS) and `test_gestures.ahk` (Windows).
+### Linux
 
-### Linux (container proofs of 2026-11-10)
-
-- [ ] **Legacy Linux updater probes (remove later).** Installed Linux updaters before the structure move (v1.0.9 …
-      v1.0.10-dev.175) admit a staged tarball only with `_shared/data/locales/en.json` and a `_shared/lua/` folder;
-      `tools/build/add-linux-legacy-update-probes.sh` adds both to the release tarball (decided by the coordinator on
-      2026-11-13, confirmed by the maintainer on 2026-11-14: Linux has no users yet, so this protects any v1.0.9 …
-      v1.0.10-dev.175 installation that exists in the future, and stays minimal: one generated file, the empty
-      `_shared/lua/` v1.0.9 requires, one regression test; proved locally by the real v1.0.9 installer applying a
-      post-move tarball, and in CI by each release's own `ownership.sh`, frozen from the v1.0.9 and v1.0.10-dev.175
-      tags in `tools/test/fixtures/linux-pre-move-ownership`, recording the packed tarball). Remove that step, its
-      call, `test-linux-legacy-update-probes.cjs` and those frozen helpers once the first release whose
-      updater finds a staged shared root by `build_stamp.txt` (a9c6e90be8) has been out for one full release cycle.
-      The structure step that moves `linux/infra/version.lua` (also required by v1.0.9) fails this build until it
-      adds that probe too. macOS only loses the boot-health probation if `macos/infra/updater_boot_ready.lua` moves;
-      Windows replaces one exe and probes nothing (rechecked on the v1.0.10-dev.175 sources on 2026-11-14: its
-      workers and caches are the installed build's). The live updater E2E step installs this checkout and updates
-      it to the newest published prerelease, so it stays red until a post-move dev prerelease exists. Landed by worker G on 2026-11-14; its check passed in CI run
-      [43579693369](https://github.com/adrienm7/ergopti/actions/runs/43579693369) (Common Packaging and boot, 25/26).
-      [LATER] Left (2026-11-15): remove the probe step, its call, its test and the pre-move fixtures once a post-move
-      release has served a full cycle.
-- [x] **GNOME input source switch.** GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`: on a
-      `sources` change it keeps its in-memory MRU and activates its first entry, and a non-interactive activation
-      writes no `mru-sources`. Done 2026-11-11 in `adapters/input_source_switch.lua`, decided by the coordinator on
-      2026-11-11 overnight, to review by the maintainer: the switch writes `sources` as the target alone, waits
-      `gnome_input_source_settle_ms`, writes the list back with the target first (as the installer already places an
-      activated layout) and `mru-sources`; a failure after the first write puts the list back, coalesced writes end on
-      no switch, never another layout. Left: the installer's `apply_gnome` (desktop_activation.py, W1 to W3) still
-      writes the list with the layout first, which a running shell ignores; it needs the same sequence and a Python
-      reader of the shared settle constant. 2026-11-11: the installer's live selection (`_gnome_select`, apply-wayland)
-      now writes the slot alone first and waits the settle time the daemon passes (`--gnome-settle-ms` from the shared
-      registry), and its XWayland read-back finds the layout by content in mutter's « (unnamed) » keymap (before, it
-      looked only for the layout's name, which mutter never writes, so every GNOME apply ended `not_loaded`). Still
-      `not_loaded` on GNOME 46 headless with both in place: one more cause is not found yet. Found 2026-11-11: GNOME
-      Shell reads the user registry (`~/.config/xkb/rules/evdev.xml`) only when it starts, so an id registered after
-      login is unknown to it and the slot alone switches the session to its `us` fallback. apply-wayland now compares
-      the registry's date with the shell's start, registers both slots and answers `needs_relogin` without touching
-      the setting; after the next login every build alternates live. [Proof](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md).
-      2026-11-13: the daemon's runtime switch no longer writes `sources` (see « GNOME layout switch through the Ergopti
-      GNOME Shell extension » above). Done 2026-11-13 (worker D): the installer switches the running Shell the same
-      way. `apply-wayland` (`_gnome_select`) writes the lists with the slot first for the next login, then activates
-      the slot through the extension once the Shell lists it (a bounded poll, no settle time: `--gnome-settle-ms` and
-      `gnome_input_source_settle_ms` are removed), and answers `gnome_extension_missing` with the setting put back
-      when the extension does not run; `apply_gnome` (W1 to W3, install) asks the extension too and otherwise says the
-      layout is active at the next login (the extension activates listed sources only, so an id the Shell has not
-      read never falls back to `us`). Proved on a headless GNOME Shell 46 as an unprivileged user:
-      `run_input_sources_live.sh gnome tests/hardware/run_user_layout_wayland_live.lua` holds W1 to W3 (7 checks
-      over the new login), and `gnome-no-extension` names the extension; `test_wayland_live_replace.py` models the
-      Shell with a fake extension. Linux only.
-
-### Linux performance (2026-11-11, branch `claude/ergopti-todo-linux-perf`)
-
-Claimed by worker L on 2026-11-13 (branch `claude/ergopti-todo-linux-perf-2`), taken over from worker D.
-
-Measured with `tools/bench/linux-session-bench.py` (real daemon, Xvfb session over the kernel model; report in
-`docs/audits/performance/linux/2026_11_11/report.md`). Budgets and the reuse rules below were decided by the
-coordinator on 2026-11-11, to review by the maintainer.
-
-- [ ] macOS boot: `migrations.toml` (74 KB) is parsed and validated at every boot (about 30 ms of Lua 5.4); a
-      generated, hash-checked Lua mirror would remove it (maintainer decision, numbers in the report).
-      Other OS, measured or read 2026-11-14 (worker L): Windows already skips the parse with a typed cache keyed by
-      the registry's SHA-256 and the parser files' identity (`settings/engine/publication/registry_cache.ahk`, validation still runs
-      on a hit; its parse cost about 0.5 s); Linux parses the same file under LuaJIT in about 7 ms cold and under 1 ms
-      warm (`settings.engine.migration.migrate.load_registry`, 21 runs), not worth a cache. Decided by the agent on
-      2026-11-14, to review by the maintainer: not built tonight. The parity path is a port of the Windows cache to
-      Lua (native `hs.hash.SHA256` of the source, a typed codec that evaluates no cached code, validation kept on a
-      hit) rather than a generated mirror, whose staleness only a gate would catch; it needs a Mac to measure the
-      30 ms it would save, and config migration is the place a wrong cache would rewrite a user's settings.
-      [DECISION] Left (2026-11-15): port the Windows typed SHA-256 registry cache to Lua or not; the Mac measurement of the
-      saving is in TODO-tests-macos.md (2026-11-15).
-- [ ] Windows counterparts (the maintainer's PC): the same `[Span]` TRACE/DONE pair and names in
-      `infra/hotpath_profiler.ahk` for `hotstring.expand`, the tray submenu build and a layout switch; a
-      millisecond-stamped kernel-to-output latency (`A_TickCount` against the hook's event time) as
-      `input.latency`; a `load` phase before `BootProfiler` starts; the last interval summary at exit.
-      2026-11-14 (worker L), code done, the field read stays on the maintainer's PC: `HotPath_SpanTrace` /
-      `HotPath_SpanDone` (`infra/hotpath_profiler.ahk`) write the Linux and macOS pair, `[TRACE] [Span] <name>…` and
-      `[DONE] [Span] <name> done in N ms (<outcome>)`, at DEBUG only, for `hotstring.expand` (the InputHook typing
-      path, its held-back end key and the Space tap-hold; outcome fired, declined or pending), `tray.fill` (each
-      deferred submenu build) and `layout.switch` (an input source from the menu, and an emulated layout up to its
-      reload handoff). Test: `test_hotpath_span_lines.ahk`. Already present before, verified in the source: the `load`
-      phase is BootProfile's « Pre-logger initialization (including script parse + load) » line with its replayed
-      stamps, and the last interval summary is written at exit by the logger's `OnExit` (`_LoggerOnExitFlush` →
-      `HotPath_StopStatistics` → a final `HotPath_FlushStatistics` with the PerfCounters line). Decided by the agent
-      on 2026-11-14, to review by the maintainer: no `input.latency` on Windows, because the InputHook callbacks
-      receive no event time (only `vk`, `sc` or the character); only the opt-in input probe's low-level hook sees
-      `KBDLLHOOKSTRUCT.time`, and a second permanent low-level hook for a metric would add a hook timeout risk to
-      every key.
-      [DECISION] Left (2026-11-15): code done (9a3fa08e75; test_hotpath_span_lines.ahk); the maintainer's review of
-      shipping no `input.latency` on Windows. The field read on the PC is in TODO-tests-windows.md (2026-11-15).
-
-- [x] Keystats boot: `open_db`'s own spawns (mkdir, schema checks), device registration and the open-walk read still
-      cost about 30 ms of sqlite3 processes.
-      Done 2026-11-13 (worker L): `open_db` reads the registry DDL and the raw tables lacking `utc_offset_min` in one
-      sqlite3 process (the missing names first, so the multiline DDL is the exact remainder) and runs the shell
-      `mkdir` only when the folder is absent (in-process metadata probe, no luv: the no-luv contract holds). A warm
-      open is 2 processes instead of 4, the whole keystats store boot (open, registration, both migration checks,
-      open walk) 6 instead of 8: median 37.6 → 29.5 ms over three sets of 21 boots (p95 40.6 → 32.3 ms), measured
-      on the writer alone against the HEAD copy. Regression: `keystats-open-processes` in
-      `test_sqlite_first_open.lua` (fails on the old writer with 3 processes and a mkdir). Worker D measured an
-      in-process mkdir through luv before (keystats stage 49 and 44 → 45 and 43 ms) and reverted it for the no-luv
-      contract (branch `claude/ergopti-todo-linux-desktop`, 59ea694c). Other OS: macOS (`hs.sqlite3`) and Windows
-      (`sqlite3.dll`) open the store in process, so no per-query process cost exists there; this cost is the Linux
-      driver's sqlite3 CLI design.
-- [ ] Keystats boot, the rest: registration, the two migration checks and the open walk are one sqlite3 process
-      each (about 4 ms: a shell, then sqlite3). Merging the reads would hand the public migration functions a value
-      read before the registration, which their tests drive one query at a time, so the remaining cut is a
-      persistent sqlite3 child for the synchronous writer ([design](docs/design/linux-sqlite-persistent-child.md)).
-      A design for the maintainer (worker D and worker L agree, 2026-11-13). Bench note: the session bench's tray
-      panel needs the Python that has GObject (`/usr/bin/python3.12` on Ubuntu 24.04 when `python3` is a newer
-      build); run the Lua suite as an unprivileged user, root passes every EACCES probe.
-      [DECISION] Left (2026-11-15): approve the persistent sqlite3 child of
-      docs/design/linux-sqlite-persistent-child.md, then implement it ([CODE]).
+- [ ] **[LATER] Legacy Linux updater probes.** `tools/build/add-linux-legacy-update-probes.sh` adds
+      `_shared/data/locales/en.json` and an empty `_shared/lua/` to the release tarball so pre-move updaters (v1.0.9
+      … v1.0.10-dev.175) admit it. Remove that step, its call, `test-linux-legacy-update-probes.cjs` and the frozen
+      helpers of `tools/test/fixtures/linux-pre-move-ownership` once the first release whose updater finds a staged
+      shared root by `build_stamp.txt` has been out for one full release cycle. The structure step that moves
+      `linux/infra/version.lua` (also required by v1.0.9) must add that probe too.
 
 ## CI acceptance
 
@@ -901,7 +550,18 @@ Each question names the default kept meanwhile; an answer moves into the item or
   - pause: a dead key pending in the system's own layout (no emulation) stays the OS's state; the macOS pause and
     resume notices are kept (Linux shows them too);
   - parity: GSD-1, the macOS live x1 swipe fires twice for a touch going right then back left (Windows and Linux
-    once), kept as it is; HCD-3, macOS and Linux type one field for the named personal tags, as Windows.
+    once), kept as it is; HCD-3, macOS and Linux type one field for the named personal tags, as Windows;
+  - performance: no `input.latency` span on Windows (its InputHook callbacks receive no event time, and a second
+    permanent low-level hook for a metric would add a hook timeout risk to every key); the Linux `migrations.toml`
+    parse is not cached (about 7 ms cold under LuaJIT).
+- [ ] **macOS `migrations.toml` boot parse (about 30 ms of Lua 5.4).** Port the Windows typed SHA-256 registry cache
+      (`settings/engine/publication/registry_cache.ahk`: a typed codec that evaluates no cached code, validation kept
+      on a hit) to Lua, or not? Config migration is where a wrong cache would rewrite a user's settings; the Mac
+      measurement of the saving is `migrations_registry_parse` in TODO-tests-macos.md. Kept meanwhile: no cache.
+- [ ] **Linux keystats boot: a persistent sqlite3 child?** Registration, the two migration checks and the open walk
+      cost one sqlite3 process each (about 4 ms); the remaining cut is a persistent child for the synchronous writer
+      ([design](docs/design/linux-sqlite-persistent-child.md)). Approve it, then implement ([CODE]). Kept meanwhile:
+      one process per query.
 - [ ] **Parity decisions THD-1 to THD-4 and HCD-1, HCD-2, HCD-4, HCD-5.** Tap-holds
       ([report](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): THD-1 the pair tap and the layer, THD-2
       the lone window, THD-3 layer-hold pair activity, THD-4 the macOS thumb Backspace under modifiers. Hotstring

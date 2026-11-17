@@ -214,3 +214,29 @@ gesture taps, so at most 16 of the 36 declared slots and none of the taps
 would work; the driver also removed output scraping from the keyboard path
 for four defects. `modules/gestures/manager.lua` reads the touchpad evdev node
 without a grab and decodes multitouch itself.
+
+## Moving the Windows test runners to tests/runners/
+
+Do not move `windows/tests/run_*.ahk` into a `tests/runners/` folder: the
+runners and their suites hold 455 `A_ScriptDir` uses and 1,908 includes
+(counted 2026-11-12), and nothing reads the runners by folder. Reconsider only
+with a generated include graph that rewrites them in one step.
+
+## Splitting the four longest Windows unit shards
+
+The split of a408a29790 was never landed and is not on the remote. Do not redo
+it: every Windows unit shard ends within 9 minutes (run 43291765266, 2026-11-13),
+so it no longer shortens the critical path. Reconsider when a shard becomes the
+longest job of the Windows lane.
+
+## A non-blocking macOS Karabiner regeneration
+
+Do not slice or move off the main thread the Karabiner rule regeneration (merge
+about 170 ms, `karabiner.layout_actions` about 230 ms cold in the 2026-11-03
+field report). The work is in-process Lua plus native calls (`hs.keycodes.map`,
+`hs.json`, the file write) that no child process can do, and slicing it across
+run-loop turns lets layout, pause and lease events land between a build and the
+layout serial, lease token and epoch it was validated against. The Lua loop is
+not the cost (1-2 ms for the layout actions under the stub harness): the field
+phase lines `karabiner.layout_actions.keyboard_form` and `.key_codes` name the
+native half to reduce instead.
