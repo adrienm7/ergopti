@@ -230,8 +230,12 @@ user really types. The contract (schema, families, refusal codes) is `_shared/me
   them once when it opens, so « My typing » is the default corpus of the editor's panel and of « Comparer »
   (maintainer, 2026-11-14), and again on « Analyse my typing »; no store yet keeps the built-in corpus and says so
   calmly, an unreadable one is an error.
-- Physical keystrokes: hotstring expansions, AI completions and other synthetic sources are subtracted
-  (`_shared/metrics/engine/view/studio_ngrams.lua`, `KLR_BuildStudioNgramsJson`).
+- Two texts (schema 2, maintainer 2026-11-17): the top-level tables are the keys typed, with hotstring expansions,
+  AI completions and other synthetic sources subtracted; the contract's `final_field` (`final`) holds the same
+  families and a total with every source counted, the text the user wanted
+  (`_shared/metrics/engine/view/studio_ngrams.lua`, `KLR_BuildStudioNgramsJson`). The Comparer's text modes choose
+  which one each layout types ([layout-analysis.md](layout-analysis.md), « Text modes »). The abbreviation a
+  hotstring erased stays counted in the final text: the store keeps per-source counts, not the erasures.
 - Fail fast: an absent store answers `keystats_absent`, a refused or partial read `keystats_unreadable`; the page
   shows the translated reason and keeps no partial data.
 - Computed once per store version: macOS and Linux keep the projection with the store's `meta.rev` (bumped by every

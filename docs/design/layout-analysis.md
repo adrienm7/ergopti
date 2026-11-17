@@ -233,6 +233,10 @@ The app passes the sums of the keystats tables over the chosen dates and apps
 as plain counts (`ngram_chars`, `ngram_bigrams`, `ngram_trigrams`, column `c`
 summed per `token`): `{chars: {token: n}, bigrams: {...}, trigrams: {...}}`.
 No text leaves the machine and none is needed. Worker T owns that bridge.
+Since schema 2 of `_shared/metrics/data/studio_ngrams.json` the payload holds
+two texts: the top-level tables are the keys typed (each count minus its
+hotstring, AI and other synthetic sources), and `final` the same tables with
+every source counted, the text the user wanted (« Text modes », below).
 
 ## Model
 

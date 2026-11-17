@@ -296,10 +296,11 @@ _KLRNul_TokenKeysStayDistinct() {
 Test("Keystats reader: a NUL token stays a distinct JSON key (windows-reader-nul-json-keys)",
 	_KLRNul_TokenKeysStayDistinct)
 
-; Ergopti Studio counts only the keystrokes typed on the keyboard: the shared
-; fixture's shared-token (6 typed, 5 hotstring, 1 AI) and other-token (2 typed,
-; 2 synthetic) contribute nothing, a manual row counts in full, and a token of
-; another family never leaks in.
+; Ergopti Studio's keys typed count only the keystrokes typed on the keyboard:
+; the shared fixture's shared-token (6 typed, 5 hotstring, 1 AI) and
+; other-token (2 typed, 2 synthetic) contribute nothing, a manual row counts in
+; full, and a token of another family never leaks in. Its final text (schema 2)
+; counts every source.
 _KLRSource_StudioCountsPhysicalKeystrokes() {
 	db := _KLRSource_OpenFixture()
 	try {
@@ -323,11 +324,20 @@ _KLRSource_StudioCountsPhysicalKeystrokes() {
 		AssertEqual(2, Payload["bigrams"]["es"], "the AI share of a bigram is subtracted")
 		AssertEqual(0, Payload["trigrams"].Count, "a word is not a trigram")
 		AssertEqual(7, Payload["total"])
+		; The final text (schema 2): every source counted, the same families.
+		Final := Payload[Contract["final_field"]]
+		AssertEqual(3, Final["chars"].Count, "the final text keeps the synthetic tokens: " . Json)
+		AssertEqual(6, Final["chars"]["shared-token"], "a hotstring and AI token counts in full")
+		AssertEqual(2, Final["chars"]["other-token"])
+		AssertEqual(7, Final["chars"]["e"])
+		AssertEqual(3, Final["bigrams"]["es"], "the AI share of a bigram is kept")
+		AssertEqual(0, Final["trigrams"].Count, "a word is not a trigram in the final text either")
+		AssertEqual(15, Final["total"])
 	} finally {
 		try SQLite_Close(db)
 	}
 }
-Test("Keystats reader: Ergopti Studio reads the physical keystrokes of three families (studio-keystats-bridge)",
+Test("Keystats reader: Ergopti Studio reads the keys typed and the final text of three families (studio-keystats-bridge)",
 	_KLRSource_StudioCountsPhysicalKeystrokes)
 
 ; The Ergopti Studio window answers keystats_ngrams: an absent keystats folder

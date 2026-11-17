@@ -1,12 +1,13 @@
 {
-	"_comment": "The one contract of Ergopti Studio's « My typing » payload, read by _shared/metrics/engine/view/studio_ngrams.lua (macOS, Linux), windows/ui/layout_manager/editor_window.ahk and the worker of windows/modules/keystats/keystats_prefetch.ahk, and pinned by tools/test/test-layout-manager-page.cjs. families maps each keystats reader code to its table and payload field; codes are the refusals the page translates as layout_editor.studio.keystats.<code>.",
-	"schema": 1,
+	"_comment": "The one contract of Ergopti Studio's « My typing » payload, read by _shared/metrics/engine/view/studio_ngrams.lua (macOS, Linux), windows/ui/layout_manager/editor_window.ahk and the worker of windows/modules/keystats/keystats_prefetch.ahk, and pinned by tools/test/test-layout-manager-page.cjs. families maps each keystats reader code to its table and payload field; the top-level fields hold the keys the fingers typed (every count minus its synthetic sources: hotstring, llm, other), and final_field names the object that holds the same families and a total with every source counted (the final text, after hotstring expansions and AI completions; schema 2). codes are the refusals the page translates as layout_editor.studio.keystats.<code>.",
+	"schema": 2,
 	"source": "keystats",
 	"families": [
 		{ "code": "c", "table": "ngram_chars", "field": "chars" },
 		{ "code": "bg", "table": "ngram_bigrams", "field": "bigrams" },
 		{ "code": "tg", "table": "ngram_trigrams", "field": "trigrams" }
 	],
+	"final_field": "final",
 	"codes": {
 		"absent": "keystats_absent",
 		"unreadable": "keystats_unreadable"

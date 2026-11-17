@@ -221,6 +221,7 @@ KLR_StudioContract() {
 				throw Error("The Ergopti Studio n-gram contract is missing: " . Path)
 		Contract := JsonParse(Text)
 		if !(Contract is Map) || !Contract.Has("schema") || !Contract.Has("families") || !Contract.Has("codes")
+				|| !Contract.Has("final_field") || !(Contract["final_field"] is String) || Contract["final_field"] = ""
 				throw Error("The Ergopti Studio n-gram contract is malformed.")
 		return Contract
 }
@@ -329,25 +330,39 @@ KLR_StudioSnapshotRetire(MetricsDir) {
 
 /**
  * Projects Ergopti Studio's « My typing » payload in SQLite: for each family
- * of the contract, the all-time count of each token the user typed on the
- * keyboard, every device and app summed. Synthetic sources (hotstrings, AI,
- * other synthetic labels; KLR_NgramSourceProjection) are subtracted, as
- * _shared/metrics/engine/view/studio_ngrams.lua does on macOS and Linux. No LIMIT:
- * a truncated table would be shown as the user's data.
+ * of the contract, the all-time count of each token, every device and app
+ * summed, in two texts. The top-level tables hold what the user typed on the
+ * keyboard: synthetic sources (hotstrings, AI, other synthetic labels;
+ * KLR_NgramSourceProjection) are subtracted. The contract's final_field holds
+ * the same families with every source counted, the final text (schema 2).
+ * _shared/metrics/engine/view/studio_ngrams.lua does the same on macOS and
+ * Linux. No LIMIT: a truncated table would be shown as the user's data.
  * @param db Open SQLite handle.
  * @param Contract {Map} KLR_StudioContract().
- * @returns {String} {"schema", "source", <field>: {token: count}…, "total"}.
+ * @returns {String} {"schema", "source", <field>: {token: count}…, "total",
+ *     <final_field>: {<field>: {token: count}…, "total"}}.
  */
 KLR_BuildStudioNgramsJson(db, Contract) {
 		if !db
 				throw Error("Ergopti Studio needs an open keystats database.")
 		out := '{"schema":' . Contract["schema"] . ',"source":' . JsonStringLiteral(Contract["source"])
+		; The keys typed: each count without its synthetic sources.
+		out .= KLR__StudioTables(db, Contract, "c - hs - llm - o")
+		; The final text: each count with every source.
+		FinalTables := KLR__StudioTables(db, Contract, "c")
+		return out . "," . JsonStringLiteral(Contract["final_field"]) . ":{" . SubStr(FinalTables, 2) . "}}"
+}
+
+; One text of the Studio payload: ',"<field>":{…}…,"total":N', each family's
+; tokens counted by CountExpr over the grouped c, hs, llm and o of a token.
+KLR__StudioTables(db, Contract, CountExpr) {
+		out := ""
 		total := 0
 		for Family in Contract["families"] {
 				sql := "SELECT " . KLR_SqlJsonObjectAgg("token", "n") . " AS j, COALESCE(SUM(n), 0) AS total"
-						. " FROM (SELECT token, c - hs - llm - o AS n FROM (SELECT token, SUM(c) AS c,"
+						. " FROM (SELECT token, " . CountExpr . " AS n FROM (SELECT token, SUM(c) AS c,"
 						. KLR_NgramSourceProjection() . " FROM " . Family["table"] . " GROUP BY token)"
-						. " WHERE token <> '' AND c - hs - llm - o > 0)"
+						. " WHERE token <> '' AND " . CountExpr . " > 0)"
 				rows := SQLite_Query(db, sql)
 				if rows.Length != 1 || !rows[1].Has("j")
 						throw Error("The Ergopti Studio projection returned no aggregate for " . Family["table"])
@@ -355,7 +370,7 @@ KLR_BuildStudioNgramsJson(db, Contract) {
 				if Family["code"] = "c"
 						total := rows[1]["total"]
 		}
-		return out . ',"total":' . total . "}"
+		return out . ',"total":' . total
 }
 
 ; One historical type's aggregate. A missing aggregate row is a reader defect,

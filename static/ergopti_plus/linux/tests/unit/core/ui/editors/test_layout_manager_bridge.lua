@@ -445,7 +445,7 @@ helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
 
 	local StudioNgrams = require("metrics.engine.view.studio_ngrams")
 
-	helpers.it("projects physical keystrokes only and refuses an absent or partial store (studio-keystats-bridge)", function()
+	helpers.it("projects the physical keystrokes and the final text, and refuses an absent or partial store (studio-keystats-bridge)", function()
 		local payload = StudioNgrams.project({
 			c = { a = { c = 10, hs = 3, llm = 1, o = 1 }, b = { c = 2, hs = 2 }, [""] = { c = 4 } },
 			bg = { ab = { c = 5 } },
@@ -457,6 +457,10 @@ helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
 		helpers.assert_eq(payload.bigrams, { ab = 5 })
 		helpers.assert_eq(payload.trigrams, {})
 		helpers.assert_eq(payload.total, 5)
+		-- The final text (schema 2): every source counted, the empty token still dropped.
+		helpers.assert_eq(StudioNgrams.FINAL_FIELD, "final")
+		helpers.assert_eq(payload.final, { chars = { a = 10, b = 2 }, bigrams = { ab = 5 },
+			trigrams = { abc = 1 }, total = 12 }, "the final text counts the hotstrings and the AI")
 		local function read(exists, dict, complete)
 			return StudioNgrams.read({ path = "/db.sqlite", exists = function() return exists end,
 				read = function() return dict, complete end })
@@ -582,6 +586,7 @@ INSERT OR REPLACE INTO meta(key, value) VALUES ('rev', '42');
 			helpers.assert_nil(dict.w, "the other families are not read")
 			local payload = StudioNgrams.project(dict)
 			helpers.assert_eq(payload.chars, { e = 10 })
+			helpers.assert_eq(payload.final.chars, { e = 12 }, "the final text keeps the hotstring expansion")
 			local _, missing_complete = Reader.read_studio_ngrams(dir .. "-absent.sqlite")
 			helpers.assert_true(missing_complete == false, "a read-only open never creates the store")
 			local probe = io.open(dir .. "-absent.sqlite", "rb")

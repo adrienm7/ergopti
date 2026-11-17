@@ -891,13 +891,19 @@ check(
 			},
 			'an unknown code reads as unreadable'
 		);
+		// Schema 2 (maintainer, 2026-11-17): the keys typed at the top level, and
+		// the final text (every source counted) under the contract's final_field,
+		// which the Comparer's text modes read.
+		assert.equal(contract.schema, 2, 'the payload carries the final text since schema 2');
+		assert.equal(contract.final_field, 'final');
 		const ngrams = {
-			schema: 1,
+			schema: contract.schema,
 			source: 'keystats',
 			chars: { e: 7 },
 			bigrams: {},
 			trigrams: {},
-			total: 7
+			total: 7,
+			[contract.final_field]: { chars: { e: 9 }, bigrams: {}, trigrams: {}, total: 9 }
 		};
 		window.keystatsNgrams({ ok: true, ngrams });
 		assert.equal(published().length, 1);

@@ -396,6 +396,8 @@ helpers.describe("Ergopti Studio keystats bridge (macOS)", function()
 			helpers.assert_eq(payload.chars, { e = 7 }, "hotstring expansions are not keystrokes")
 			helpers.assert_eq(payload.bigrams, { es = 4 })
 			helpers.assert_eq(payload.trigrams, { est = 2 })
+			helpers.assert_eq(payload.final.chars, { e = 9 }, "the final text keeps the hotstring expansions")
+			helpers.assert_eq(payload.final.total, 9)
 		end)
 		package.loaded["hs.sqlite3"] = saved_sqlite
 		package.loaded["modules.keystats.sqlite_reader"] = saved_reader

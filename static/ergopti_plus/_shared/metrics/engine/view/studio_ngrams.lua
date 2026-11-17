@@ -5,7 +5,8 @@
 --- DESCRIPTION:
 --- Turns the keystats reader's character n-gram dictionaries into the one
 --- payload Ergopti Studio analyses: the counts of the characters, bigrams and
---- trigrams the user really typed on this machine. macOS and Linux call it
+--- trigrams the user really typed on this machine, and the same counts of the
+--- final text (schema 2). macOS and Linux call it
 --- from their layout editor window hosts; the Windows host builds the same
 --- payload in windows/ui/layout_manager/editor_window.ahk.
 ---
@@ -13,10 +14,12 @@
 --- 1. Read only and local: the payload is built from the reader's projection of
 ---    db.sqlite and handed to the Studio page in the same window. Nothing here
 ---    writes the store or sends anything anywhere.
---- 2. Physical keystrokes only: a token's synthetic sources (hotstring
----    expansions, AI completions, other synthetic labels; the reader's hs, llm
----    and o fields) did not come from the keyboard, so they are subtracted from
----    its count before a layout is judged on them.
+--- 2. Two texts: the top-level tables hold the physical keystrokes only (a
+---    token's synthetic sources, hotstring expansions, AI completions and
+---    other synthetic labels, the reader's hs, llm and o fields, did not come
+---    from the keyboard, so they are subtracted from its count); the
+---    final_field table holds every source counted, the text the user wanted.
+---    The Comparer's text modes choose which one each layout types.
 --- 3. Fail fast: an absent store and an incomplete read are refusals with a
 ---    stable code the page translates; a partial projection is never offered
 ---    as the user's data.
@@ -39,7 +42,8 @@ local function load_contract()
 	file:close()
 	local contract = require("core.text.engine.json").decode(raw)
 	assert(type(contract) == "table" and type(contract.schema) == "number" and type(contract.source) == "string"
-		and type(contract.families) == "table" and type(contract.codes) == "table",
+		and type(contract.families) == "table" and type(contract.codes) == "table"
+		and type(contract.final_field) == "string" and contract.final_field ~= "",
 		"the Ergopti Studio n-gram contract is malformed")
 	return contract
 end
@@ -51,6 +55,9 @@ M.SCHEMA = CONTRACT.schema
 
 --- The reader families the Studio reads, by reader code and payload field.
 M.FAMILIES = CONTRACT.families
+
+--- The payload field of the final-text tables (every source counted).
+M.FINAL_FIELD = CONTRACT.final_field
 
 --- Refusal codes; the page shows `layout_editor.studio.keystats.<code>`.
 M.CODES = CONTRACT.codes
@@ -65,6 +72,14 @@ M.CODES = CONTRACT.codes
 -- =============================
 -- =============================
 
+--- A count the store can hold: a NaN, an infinity or a count below one is none.
+--- @param count number
+--- @return number count Zero or more.
+local function whole(count)
+	if count ~= count or count == math.huge or count <= 0 then return 0 end
+	return count
+end
+
 --- The number of physical keystrokes of one reader item.
 --- @param item table Reader item { c, hs, llm, o }.
 --- @return number count Zero or more.
@@ -72,27 +87,44 @@ local function physical_count(item)
 	if type(item) ~= "table" then return 0 end
 	local total = tonumber(item.c) or 0
 	local synthetic = (tonumber(item.hs) or 0) + (tonumber(item.llm) or 0) + (tonumber(item.o) or 0)
-	local count = total - synthetic
-	-- A NaN or an infinity is no count: the store holds integers.
-	if count ~= count or count == math.huge or count <= 0 then return 0 end
-	return count
+	return whole(total - synthetic)
+end
+
+--- The final-text count of one reader item: every source counted.
+--- @param item table Reader item { c, … }.
+--- @return number count Zero or more.
+local function final_count(item)
+	if type(item) ~= "table" then return 0 end
+	return whole(tonumber(item.c) or 0)
+end
+
+--- One text's tables: each family's counts by one rule, and the characters' total.
+--- @param dict table Reader output.
+--- @param count_of function Reader item → count.
+--- @param into table The table to fill.
+--- @return table into
+local function project_text(dict, count_of, into)
+	into.total = 0
+	for _, family in ipairs(M.FAMILIES) do
+		local counts = {}
+		for token, item in pairs(type(dict[family.code]) == "table" and dict[family.code] or {}) do
+			local count = type(token) == "string" and token ~= "" and count_of(item) or 0
+			if count > 0 then counts[token] = count end
+		end
+		into[family.field] = counts
+	end
+	for _, count in pairs(into.chars) do into.total = into.total + count end
+	return into
 end
 
 --- Projects reader dictionaries into the Studio payload.
 --- @param dict table Reader output: { c = {token → item}, bg = …, tg = … }.
---- @return table payload { schema, source, chars, bigrams, trigrams, total }.
+--- @return table payload { schema, source, chars, bigrams, trigrams, total,
+---     [FINAL_FIELD] = { chars, bigrams, trigrams, total } }.
 function M.project(dict)
 	assert(type(dict) == "table", "studio_ngrams.project needs the reader's dictionaries")
-	local payload = { schema = M.SCHEMA, source = CONTRACT.source, total = 0 }
-	for _, family in ipairs(M.FAMILIES) do
-		local counts = {}
-		for token, item in pairs(type(dict[family.code]) == "table" and dict[family.code] or {}) do
-			local count = type(token) == "string" and token ~= "" and physical_count(item) or 0
-			if count > 0 then counts[token] = count end
-		end
-		payload[family.field] = counts
-	end
-	for _, count in pairs(payload.chars) do payload.total = payload.total + count end
+	local payload = project_text(dict, physical_count, { schema = M.SCHEMA, source = CONTRACT.source })
+	payload[M.FINAL_FIELD] = project_text(dict, final_count, {})
 	return payload
 end
 
