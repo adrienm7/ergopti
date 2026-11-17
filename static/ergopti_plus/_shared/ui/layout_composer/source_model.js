@@ -98,6 +98,8 @@ var LayoutSource = (function () {
 	// The ISO key left of Z, and where the ANSI derivation moves it by default.
 	const ISO_EXTRA_KEY = 'IntlBackslash';
 	const ANSI_EXTRA_KEY = 'Backquote';
+	// The keyboards physical.keyboard can name (keyboard_forms.json's forms).
+	const KEYBOARDS = ['jis', 'abnt'];
 	const MACOS_EXPORT_STRINGS = [
 		'internal_name',
 		'ansi_internal_name',
@@ -256,8 +258,20 @@ var LayoutSource = (function () {
 		for (const field of ['description', 'author'])
 			if (own(source.layout, field)) string(source.layout[field], `layout.${field}`, true);
 		if (own(source.layout, 'languages')) list(source.layout.languages, 'layout.languages', string);
-		record(source.physical, ['base', 'ansi_extra_key', 'ansi_swaps'], ['base'], 'physical');
+		record(
+			source.physical,
+			['base', 'keyboard', 'ansi_extra_key', 'ansi_swaps'],
+			['base'],
+			'physical'
+		);
 		requireValue(['iso', 'ansi'].includes(source.physical.base), 'physical.base');
+		// The hardware the layout is for beyond ISO and ANSI: a JIS or ABNT keyboard,
+		// whose extra keys (keyboard_forms.json) sit on an ISO-like board.
+		if (own(source.physical, 'keyboard'))
+			requireValue(
+				KEYBOARDS.includes(source.physical.keyboard) && source.physical.base === 'iso',
+				'physical.keyboard'
+			);
 		if (own(source.physical, 'ansi_extra_key'))
 			keyCode(source.physical.ansi_extra_key, 'physical.ansi_extra_key');
 		if (own(source.physical, 'ansi_swaps')) {
@@ -716,6 +730,7 @@ var LayoutSource = (function () {
 		shortcutKeyCombinations,
 		ISO_EXTRA_KEY,
 		ANSI_EXTRA_KEY,
+		KEYBOARDS,
 		BUILTIN_MODIFIERS,
 		SourceError,
 		validate,

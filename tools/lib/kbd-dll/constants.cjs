@@ -195,6 +195,33 @@ const KBD_VERSION = 1;
 const SC_FLAGS = Object.freeze({ EXT: 0x0100, MULTIVK: 0x0200, SPECIAL: 0x0400, NUMPAD: 0x0800 });
 // The keyboard type of a standard 101/102-key PC keyboard (dwType = 4).
 const KEYBOARD_TYPE = 4;
+// The KBDTABLES dwType and dwSubType of each keyboard a model can name
+// (`keyboard_type`): kbd.h's KEYBOARD_TYPE_GENERIC_101 (4) by default, and for
+// a JIS keyboard KEYBOARD_TYPE_JAPAN (7) with the sub-type MICROSOFT_KBD_106_TYPE
+// (2), the pair Windows' own Japanese 106/109-key tables state
+// (KBD106.DLL in System32, read on 2026-11-17). An ABNT keyboard is a 101/102-key
+// keyboard to Windows: its two extra keys are in the type-4 table (0x73
+// VK_ABNT_C1, 0x7E VK_ABNT_C2), as in Microsoft's KBDBR.DLL.
+const KEYBOARD_TYPES = Object.freeze({
+	generic: Object.freeze({ type: KEYBOARD_TYPE, subtype: 0 }),
+	jis: Object.freeze({ type: 7, subtype: 2 })
+});
+// The virtual keys of the JIS keys the type-4 table gives none (0x70, 0x79,
+// 0x7D) or an unrelated one (0x7B, VK_OEM_PA1): Katakana/Hiragana, Henkan and
+// Muhenkan as KBD106.DLL sends them (VK_DBE_HIRAGANA, which kbd.h also names
+// VK_OEM_COPY, VK_CONVERT, VK_NONCONVERT; without KBD106's KBDSPECIAL flag, a
+// flag only its NLS functions read), and Yen VK_OEM_AX: KBD106's VK_OEM_5 is
+// the type-4 table's Backslash key, and VK_OEM_AX, the Japanese AX keyboard's
+// key, is the one OEM virtual key no type-4 key holds.
+const JIS_VKS = Object.freeze({
+	0x70: VK.OEM_COPY,
+	0x79: VK.CONVERT,
+	0x7b: VK.NONCONVERT,
+	0x7d: VK.OEM_AX
+});
+// The JIS input-method keys: a JIS layout sends their virtual keys even when it
+// gives them no character, so the input method still reads them.
+const JIS_IME_SCANCODES = Object.freeze([0x70, 0x79, 0x7b]);
 // The string resource holding the layout's display name (Layout Display Name).
 const DISPLAY_NAME_RESOURCE = 1000;
 
@@ -418,6 +445,9 @@ module.exports = {
 	KBD_VERSION,
 	SC_FLAGS,
 	KEYBOARD_TYPE,
+	KEYBOARD_TYPES,
+	JIS_VKS,
+	JIS_IME_SCANCODES,
 	DISPLAY_NAME_RESOURCE,
 	DEFAULT_SCANCODES,
 	DEFAULT_E0,

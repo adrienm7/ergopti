@@ -7,7 +7,7 @@
  * Writes the four Windows keyboard layout DLL images of a kbd tables model
  * directly, with no compiler, linker or resource compiler, so a page or a PC
  * without the LLVM toolchain can build them. The tables are the C emitter's
- * (emit-c.cjs mainRows, modNumbers, scanTable), laid out as the C structures
+ * (emit-c.cjs mainRows, modNumbers; model.cjs scanTable), laid out as the C structures
  * that emitter declares: natural alignment, pointers of 4 bytes (x86) or 8
  * (x64, arm64, and wow64, whose kbd.h pointers are 64 bits wide in a 32-bit
  * image). The resources are the ones emitRc describes: string 1000 (the
@@ -137,7 +137,7 @@ function tableObjects(model) {
 				flags: rule.dead ? C.DKF_DEAD : 0
 			});
 	const named = model.dead_keys.filter((dead) => dead.name);
-	const scan = Emit.scanTable(model);
+	const scan = Model.scanTable(model);
 	const objects = [];
 	const add = (name, alignment, write) => objects.push({ name, align: alignment, write });
 	const wchars = (area, text) => {
@@ -260,8 +260,8 @@ function tableObjects(model) {
 		a.u8(lgMax ? 4 + 2 * lgMax : 0);
 		a.pad(P.align);
 		ptr(lgMax ? 'aLigature' : null);
-		a.u32(C.KEYBOARD_TYPE);
-		a.u32(0);
+		a.u32(Model.keyboardType(model).type);
+		a.u32(Model.keyboardType(model).subtype);
 		a.pad(P.align);
 	});
 	return objects;

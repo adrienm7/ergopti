@@ -90,14 +90,6 @@ function modNumbers(model) {
 	});
 }
 
-/** The scan-code to virtual-key table with the layout's moves applied. */
-function scanTable(model) {
-	const table = C.DEFAULT_SCANCODES.slice();
-	// A moved character key carries no scan-code flag.
-	for (const entry of model.scancodes || []) table[entry.sc] = entry.vk;
-	return table;
-}
-
 /**
  * The C source of one layout DLL; KBD_WOW64 selects the SysWOW64 layout.
  * @param {object} input - A kbd tables model.
@@ -246,7 +238,7 @@ function emitC(input) {
 		line('};');
 	}
 	line('');
-	const scan = scanTable(model);
+	const scan = Model.scanTable(model);
 	line(`static const WORD ausVSCtoVK[${scan.length}] = {`);
 	for (let i = 0; i < scan.length; i += 8)
 		line(
@@ -290,8 +282,8 @@ function emitC(input) {
 	line(`\t${lgMax},`);
 	line(`\t${lgMax ? 'sizeof(LIGATURE_N)' : '0'},`);
 	line(`\tKP(${lgMax ? 'aLigature' : '0'}),`);
-	line(`\t${C.KEYBOARD_TYPE},`);
-	line('\t0');
+	line(`\t${Model.keyboardType(model).type},`);
+	line(`\t${Model.keyboardType(model).subtype}`);
 	line('};');
 	line('');
 	line('/* The one export (ordinal 1): the system calls it to get the tables. */');
@@ -391,4 +383,4 @@ function emitDef(input) {
 	return `LIBRARY ${model.dll_name}\nEXPORTS\n\tKbdLayerDescriptor @1\n`;
 }
 
-module.exports = { ARCHES, emitC, emitRc, emitDef, mainRows, modNumbers, scanTable };
+module.exports = { ARCHES, emitC, emitRc, emitDef, mainRows, modNumbers };

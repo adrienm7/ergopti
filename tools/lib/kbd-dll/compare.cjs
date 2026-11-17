@@ -71,9 +71,8 @@ function compareLayout(model, layout) {
 		diffs.push({ path: `dead_keys[0x${unit.toString(16)}]`, model: 'absent', dll: 'dead key' });
 	same('key_names', model.key_names || [], layout.key_names);
 	same('key_names_ext', model.key_names_ext || [], layout.key_names_ext);
-	const scan = C.DEFAULT_SCANCODES.slice();
-	for (const entry of model.scancodes || []) scan[entry.sc] = entry.vk;
-	same('scancodes', scan, layout.scancodes);
+	same('scancodes', Model.scanTable(model), layout.scancodes);
+	same('keyboard_type', Model.keyboardType(model), layout.keyboard_type);
 	same(
 		'e0',
 		Model.e0Table(model).map(([sc, vk]) => [sc, vk & 0xff]),

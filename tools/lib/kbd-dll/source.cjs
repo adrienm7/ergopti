@@ -100,9 +100,19 @@ const NUM_LOCK_VK = new Map([
 ]);
 const keypad = (sc) => Boolean(C.DEFAULT_SCANCODES[sc] & C.SC_FLAGS.NUMPAD);
 
-/** The virtual key a scan code types characters with, without the layout's moves. */
-const defaultVk = (sc) =>
-	keypad(sc) && NUM_LOCK_VK.has(sc) ? NUM_LOCK_VK.get(sc) : C.DEFAULT_SCANCODES[sc] & 0xff;
+/** The virtual key of a scan code in the standard table (0: none), keypad keys under Num Lock. */
+function defaultVk(sc) {
+	if (keypad(sc) && NUM_LOCK_VK.has(sc)) return NUM_LOCK_VK.get(sc);
+	const vk = C.DEFAULT_SCANCODES[sc] & 0xff;
+	return vk === C.VK_FOLLOW_ROW ? 0 : vk;
+}
+
+/**
+ * The virtual key a character key on a scan code takes unless the source names
+ * one: the standard table's, or for a JIS key the one constants JIS_VKS gives
+ * (Yen has none in the standard table, Muhenkan an unrelated one).
+ */
+const characterVk = (sc) => (Object.hasOwn(C.JIS_VKS, sc) ? C.JIS_VKS[sc] : defaultVk(sc));
 
 /** The modifier ids of a column bit mask, or null when Windows types no character there. */
 function columnIds(mask, altgr) {
@@ -185,7 +195,7 @@ function toSource(model, options) {
 		const entry = {};
 		if (key.attributes & C.ATTRIBUTES.caplok) entry.caps_lock = 'shift';
 		if (key.attributes & C.ATTRIBUTES.caplokaltgr) entry.caps_altgr = true;
-		if (defaultVk(sc) !== key.vk) entry.virtual_key = key.vk;
+		if (characterVk(sc) !== key.vk) entry.virtual_key = key.vk;
 		if (Object.keys(entry).length) keys[code] = entry;
 	});
 	for (const [field, extended] of [
@@ -218,7 +228,7 @@ function toSource(model, options) {
 		format: 'ergopti-layout',
 		version: 1,
 		layout: { id: options.id, name: options.name || model.layout_text },
-		physical: { base: 'iso' },
+		physical: model.keyboard_type === 'jis' ? { base: 'iso', keyboard: 'jis' } : { base: 'iso' },
 		layers
 	};
 	if (Object.keys(keys).length) source.keys = keys;
@@ -361,7 +371,11 @@ function fromSource(source, options = {}) {
 		const e0 = e0Of(sc);
 		if (sc >= 0x100 && (e0 === undefined || own(fields, 'virtual_key')))
 			fail('source_extended_character_key', code);
-		const vk = e0 ? e0[1] & 0xff : own(fields, 'virtual_key') ? fields.virtual_key : defaultVk(sc);
+		const vk = e0
+			? e0[1] & 0xff
+			: own(fields, 'virtual_key')
+				? fields.virtual_key
+				: characterVk(sc);
 		if (!vk) fail('source_key_without_vk', code);
 		ownVk.set(code, vk);
 	}
@@ -528,6 +542,12 @@ function fromSource(source, options = {}) {
 		if (sc >= 0x100) extra.scancodes_e0 = [{ sc: sc & 0xff, vk: C.VK.OEM_8 }];
 		else scancodes.push({ sc, vk: C.VK.OEM_8 });
 	}
+	// A JIS layout sends the input-method keys' virtual keys even where it types
+	// nothing on them, so the input method still reads them.
+	const jis = source.physical.keyboard === 'jis';
+	if (jis)
+		for (const sc of C.JIS_IME_SCANCODES)
+			if (!scancodes.some((move) => move.sc === sc)) scancodes.push({ sc, vk: C.JIS_VKS[sc] });
 	const model = {
 		format: Model.FORMAT,
 		version: Model.VERSION,
@@ -539,6 +559,7 @@ function fromSource(source, options = {}) {
 		copyright: windows.copyright || '',
 		company: windows.company || '',
 		flags: altgr ? ['altgr'] : [],
+		...(jis ? { keyboard_type: 'jis' } : {}),
 		columns,
 		scancodes,
 		keys,

@@ -88,6 +88,14 @@ var LAYOUT_FORMATS = (function () {
 	// XKB and Kalamine key names of the keys a layout defines.
 	const XKB_KEYS = (() => {
 		const out = { TLDE: 'Backquote', BKSL: 'Backslash', LSGT: 'IntlBackslash', SPCE: 'Space' };
+		// The JIS and ABNT keys (xkeyboard-config keycodes/evdev): Yen, Ro or ABNT C1,
+		// and the keypad comma (KPPT, its Brazilian keypad point alias, and I129).
+		Object.assign(out, {
+			AE13: 'IntlYen',
+			AB11: 'IntlRo',
+			KPPT: 'NumpadComma',
+			I129: 'NumpadComma'
+		});
 		const rows = [
 			[
 				'AE',
@@ -854,7 +862,11 @@ var LAYOUT_FORMATS = (function () {
 			result.unmapped.push({ what: 'include', detail: include[1] });
 		for (const key of block[2].matchAll(/key\s+<([A-Z0-9]+)>\s*\{([^}]*)\}/g)) {
 			const code = XKB_KEYS[key[1]];
-			const levels = /\[([^\]]*)\]/.exec(key[2]);
+			// A key type declaration (type[group1] = "…", as this repository's own
+			// exports write) is not the key's levels.
+			const levels = /\[([^\]]*)\]/.exec(
+				key[2].replace(/\btype(\[[^\]]*\])?\s*=\s*"[^"]*"\s*,?/g, '')
+			);
 			if (!levels) continue;
 			if (!code) {
 				result.unmapped.push({ what: 'key', detail: key[1] });

@@ -215,7 +215,8 @@ var LayoutTargetExport = (function () {
 		const shortcutKeys = (imported.plan && imported.plan.shortcut_keys) || [];
 		const keycodes = tables.keycodes;
 		const physicalKeys = tables.physicalKeys;
-		const physical = keycodes.keys.map((key) => ({
+		// The JIS and ABNT keys (extra_keys) are placed too: the generator writes them when typed on.
+		const physical = keycodes.keys.concat(keycodes.extra_keys || []).map((key) => ({
 			code: key.code,
 			mac: typeof key.mac === 'object' ? key.mac[imported.convention] : key.mac
 		}));

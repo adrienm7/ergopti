@@ -219,6 +219,33 @@ const KBD_VERSION = 1;
 const SC_FLAGS = Object.freeze({ EXT: 0x0100, MULTIVK: 0x0200, SPECIAL: 0x0400, NUMPAD: 0x0800 });
 // The keyboard type of a standard 101/102-key PC keyboard (dwType = 4).
 const KEYBOARD_TYPE = 4;
+// The KBDTABLES dwType and dwSubType of each keyboard a model can name
+// (`keyboard_type`): kbd.h's KEYBOARD_TYPE_GENERIC_101 (4) by default, and for
+// a JIS keyboard KEYBOARD_TYPE_JAPAN (7) with the sub-type MICROSOFT_KBD_106_TYPE
+// (2), the pair Windows' own Japanese 106/109-key tables state
+// (KBD106.DLL in System32, read on 2026-11-17). An ABNT keyboard is a 101/102-key
+// keyboard to Windows: its two extra keys are in the type-4 table (0x73
+// VK_ABNT_C1, 0x7E VK_ABNT_C2), as in Microsoft's KBDBR.DLL.
+const KEYBOARD_TYPES = Object.freeze({
+	generic: Object.freeze({ type: KEYBOARD_TYPE, subtype: 0 }),
+	jis: Object.freeze({ type: 7, subtype: 2 })
+});
+// The virtual keys of the JIS keys the type-4 table gives none (0x70, 0x79,
+// 0x7D) or an unrelated one (0x7B, VK_OEM_PA1): Katakana/Hiragana, Henkan and
+// Muhenkan as KBD106.DLL sends them (VK_DBE_HIRAGANA, which kbd.h also names
+// VK_OEM_COPY, VK_CONVERT, VK_NONCONVERT; without KBD106's KBDSPECIAL flag, a
+// flag only its NLS functions read), and Yen VK_OEM_AX: KBD106's VK_OEM_5 is
+// the type-4 table's Backslash key, and VK_OEM_AX, the Japanese AX keyboard's
+// key, is the one OEM virtual key no type-4 key holds.
+const JIS_VKS = Object.freeze({
+	0x70: VK.OEM_COPY,
+	0x79: VK.CONVERT,
+	0x7b: VK.NONCONVERT,
+	0x7d: VK.OEM_AX
+});
+// The JIS input-method keys: a JIS layout sends their virtual keys even when it
+// gives them no character, so the input method still reads them.
+const JIS_IME_SCANCODES = Object.freeze([0x70, 0x79, 0x7b]);
 // The string resource holding the layout's display name (Layout Display Name).
 const DISPLAY_NAME_RESOURCE = 1000;
 
@@ -442,6 +469,9 @@ module.exports = {
 	KBD_VERSION,
 	SC_FLAGS,
 	KEYBOARD_TYPE,
+	KEYBOARD_TYPES,
+	JIS_VKS,
+	JIS_IME_SCANCODES,
 	DISPLAY_NAME_RESOURCE,
 	DEFAULT_SCANCODES,
 	DEFAULT_E0,
@@ -552,6 +582,9 @@ function check(model) {
 	const flags = model.flags || [];
 	if (!Array.isArray(flags) || flags.some((f) => !Object.hasOwn(C.LOCALE_FLAGS, f)))
 		fail('kbd_flag_unknown', 'flags');
+	// Absent for the 101/102-key keyboard every layout is for unless it says so.
+	if (model.keyboard_type !== undefined && model.keyboard_type !== 'jis')
+		fail('kbd_keyboard_type', 'keyboard_type');
 	const columns = model.columns;
 	if (!Array.isArray(columns) || columns.length === 0 || columns.length > MAX_COLUMNS)
 		fail('kbd_columns', 'columns');
@@ -684,6 +717,18 @@ function modifierNames(model) {
 	);
 }
 
+/** The KBDTABLES keyboard type and sub-type of a model (constants KEYBOARD_TYPES). */
+function keyboardType(model) {
+	return C.KEYBOARD_TYPES[model.keyboard_type || 'generic'];
+}
+
+/** The scan-code table: the standard type-4 one with the model's `scancodes` moves. */
+function scanTable(model) {
+	const scan = C.DEFAULT_SCANCODES.slice();
+	for (const entry of model.scancodes || []) scan[entry.sc] = entry.vk;
+	return scan;
+}
+
 /** The locale flags word: KLLF bits low, KBD_VERSION high. */
 function localeFlags(model) {
 	const bits = (model.flags || []).reduce((a, f) => a | C.LOCALE_FLAGS[f], 0);
@@ -700,6 +745,8 @@ module.exports = {
 	modifierNames,
 	modifierKeys,
 	e0Table,
+	scanTable,
+	keyboardType,
 	localeFlags
 };
 	};
@@ -794,14 +841,6 @@ function modNumbers(model) {
 		const index = model.columns.indexOf(bits);
 		return index >= 0 ? index : C.SHFT_INVALID;
 	});
-}
-
-/** The scan-code to virtual-key table with the layout's moves applied. */
-function scanTable(model) {
-	const table = C.DEFAULT_SCANCODES.slice();
-	// A moved character key carries no scan-code flag.
-	for (const entry of model.scancodes || []) table[entry.sc] = entry.vk;
-	return table;
 }
 
 /**
@@ -952,7 +991,7 @@ function emitC(input) {
 		line('};');
 	}
 	line('');
-	const scan = scanTable(model);
+	const scan = Model.scanTable(model);
 	line(`static const WORD ausVSCtoVK[${scan.length}] = {`);
 	for (let i = 0; i < scan.length; i += 8)
 		line(
@@ -996,8 +1035,8 @@ function emitC(input) {
 	line(`\t${lgMax},`);
 	line(`\t${lgMax ? 'sizeof(LIGATURE_N)' : '0'},`);
 	line(`\tKP(${lgMax ? 'aLigature' : '0'}),`);
-	line(`\t${C.KEYBOARD_TYPE},`);
-	line('\t0');
+	line(`\t${Model.keyboardType(model).type},`);
+	line(`\t${Model.keyboardType(model).subtype}`);
 	line('};');
 	line('');
 	line('/* The one export (ordinal 1): the system calls it to get the tables. */');
@@ -1097,7 +1136,7 @@ function emitDef(input) {
 	return `LIBRARY ${model.dll_name}\nEXPORTS\n\tKbdLayerDescriptor @1\n`;
 }
 
-module.exports = { ARCHES, emitC, emitRc, emitDef, mainRows, modNumbers, scanTable };
+module.exports = { ARCHES, emitC, emitRc, emitDef, mainRows, modNumbers };
 	};
 	factories['./shortcut-keys.cjs'] = function (module, exports, require) {
 // tools/lib/kbd-dll/shortcut-keys.cjs
@@ -1287,9 +1326,19 @@ const NUM_LOCK_VK = new Map([
 ]);
 const keypad = (sc) => Boolean(C.DEFAULT_SCANCODES[sc] & C.SC_FLAGS.NUMPAD);
 
-/** The virtual key a scan code types characters with, without the layout's moves. */
-const defaultVk = (sc) =>
-	keypad(sc) && NUM_LOCK_VK.has(sc) ? NUM_LOCK_VK.get(sc) : C.DEFAULT_SCANCODES[sc] & 0xff;
+/** The virtual key of a scan code in the standard table (0: none), keypad keys under Num Lock. */
+function defaultVk(sc) {
+	if (keypad(sc) && NUM_LOCK_VK.has(sc)) return NUM_LOCK_VK.get(sc);
+	const vk = C.DEFAULT_SCANCODES[sc] & 0xff;
+	return vk === C.VK_FOLLOW_ROW ? 0 : vk;
+}
+
+/**
+ * The virtual key a character key on a scan code takes unless the source names
+ * one: the standard table's, or for a JIS key the one constants JIS_VKS gives
+ * (Yen has none in the standard table, Muhenkan an unrelated one).
+ */
+const characterVk = (sc) => (Object.hasOwn(C.JIS_VKS, sc) ? C.JIS_VKS[sc] : defaultVk(sc));
 
 /** The modifier ids of a column bit mask, or null when Windows types no character there. */
 function columnIds(mask, altgr) {
@@ -1372,7 +1421,7 @@ function toSource(model, options) {
 		const entry = {};
 		if (key.attributes & C.ATTRIBUTES.caplok) entry.caps_lock = 'shift';
 		if (key.attributes & C.ATTRIBUTES.caplokaltgr) entry.caps_altgr = true;
-		if (defaultVk(sc) !== key.vk) entry.virtual_key = key.vk;
+		if (characterVk(sc) !== key.vk) entry.virtual_key = key.vk;
 		if (Object.keys(entry).length) keys[code] = entry;
 	});
 	for (const [field, extended] of [
@@ -1405,7 +1454,7 @@ function toSource(model, options) {
 		format: 'ergopti-layout',
 		version: 1,
 		layout: { id: options.id, name: options.name || model.layout_text },
-		physical: { base: 'iso' },
+		physical: model.keyboard_type === 'jis' ? { base: 'iso', keyboard: 'jis' } : { base: 'iso' },
 		layers
 	};
 	if (Object.keys(keys).length) source.keys = keys;
@@ -1548,7 +1597,7 @@ function fromSource(source, options = {}) {
 		const e0 = e0Of(sc);
 		if (sc >= 0x100 && (e0 === undefined || own(fields, 'virtual_key')))
 			fail('source_extended_character_key', code);
-		const vk = e0 ? e0[1] & 0xff : own(fields, 'virtual_key') ? fields.virtual_key : defaultVk(sc);
+		const vk = e0 ? e0[1] & 0xff : own(fields, 'virtual_key') ? fields.virtual_key : characterVk(sc);
 		if (!vk) fail('source_key_without_vk', code);
 		ownVk.set(code, vk);
 	}
@@ -1715,6 +1764,12 @@ function fromSource(source, options = {}) {
 		if (sc >= 0x100) extra.scancodes_e0 = [{ sc: sc & 0xff, vk: C.VK.OEM_8 }];
 		else scancodes.push({ sc, vk: C.VK.OEM_8 });
 	}
+	// A JIS layout sends the input-method keys' virtual keys even where it types
+	// nothing on them, so the input method still reads them.
+	const jis = source.physical.keyboard === 'jis';
+	if (jis)
+		for (const sc of C.JIS_IME_SCANCODES)
+			if (!scancodes.some((move) => move.sc === sc)) scancodes.push({ sc, vk: C.JIS_VKS[sc] });
 	const model = {
 		format: Model.FORMAT,
 		version: Model.VERSION,
@@ -1726,6 +1781,7 @@ function fromSource(source, options = {}) {
 		copyright: windows.copyright || '',
 		company: windows.company || '',
 		flags: altgr ? ['altgr'] : [],
+		...(jis ? { keyboard_type: 'jis' } : {}),
 		columns,
 		scancodes,
 		keys,
@@ -1761,7 +1817,7 @@ module.exports = { toSource, fromSource, SourceMappingError };
  * Writes the four Windows keyboard layout DLL images of a kbd tables model
  * directly, with no compiler, linker or resource compiler, so a page or a PC
  * without the LLVM toolchain can build them. The tables are the C emitter's
- * (emit-c.cjs mainRows, modNumbers, scanTable), laid out as the C structures
+ * (emit-c.cjs mainRows, modNumbers; model.cjs scanTable), laid out as the C structures
  * that emitter declares: natural alignment, pointers of 4 bytes (x86) or 8
  * (x64, arm64, and wow64, whose kbd.h pointers are 64 bits wide in a 32-bit
  * image). The resources are the ones emitRc describes: string 1000 (the
@@ -1891,7 +1947,7 @@ function tableObjects(model) {
 				flags: rule.dead ? C.DKF_DEAD : 0
 			});
 	const named = model.dead_keys.filter((dead) => dead.name);
-	const scan = Emit.scanTable(model);
+	const scan = Model.scanTable(model);
 	const objects = [];
 	const add = (name, alignment, write) => objects.push({ name, align: alignment, write });
 	const wchars = (area, text) => {
@@ -2014,8 +2070,8 @@ function tableObjects(model) {
 		a.u8(lgMax ? 4 + 2 * lgMax : 0);
 		a.pad(P.align);
 		ptr(lgMax ? 'aLigature' : null);
-		a.u32(C.KEYBOARD_TYPE);
-		a.u32(0);
+		a.u32(Model.keyboardType(model).type);
+		a.u32(Model.keyboardType(model).subtype);
 		a.pad(P.align);
 	});
 	return objects;

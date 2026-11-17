@@ -120,7 +120,13 @@ const QWERTY_VK = {
 	0x34: 'OEM_PERIOD',
 	0x35: 'OEM_2',
 	0x39: 'SPACE',
-	0x56: 'OEM_102'
+	0x56: 'OEM_102',
+	// The ABNT and JIS keys kbd.h's type-4 table gives a virtual key (T73, T7E).
+	0x73: 'ABNT_C1',
+	0x7e: 'ABNT_C2',
+	// Yen has none there: VK_OEM_AX, as the DLL writer's JIS_VKS gives it
+	// (tools/lib/kbd-dll/constants.cjs, which says why).
+	0x7d: 'OEM_AX'
 };
 
 // Characters that name a punctuation virtual key of their own.
@@ -280,15 +286,18 @@ function units(text) {
 function physicalKeys(table, convention) {
 	if (!list(table.conventions, 'conventions').includes(convention))
 		throw new Error(`unknown keycode convention '${convention}'`);
-	return list(table.keys, 'keys').map((key) => {
-		const match = /^SC([0-9A-F]{3})$/.exec(key.ahk);
-		if (!match) throw new Error(`key ${key.code} has no scan code (ahk '${key.ahk}')`);
-		return {
-			code: key.code,
-			scanCode: parseInt(match[1], 16),
-			mac: typeof key.mac === 'object' ? key.mac[convention] : key.mac
-		};
-	});
+	// The JIS and ABNT keys follow; a key no column types on writes no row.
+	return list(table.keys, 'keys')
+		.concat(table.extra_keys === undefined ? [] : list(table.extra_keys, 'extra_keys'))
+		.map((key) => {
+			const match = /^SC([0-9A-F]{3})$/.exec(key.ahk);
+			if (!match) throw new Error(`key ${key.code} has no scan code (ahk '${key.ahk}')`);
+			return {
+				code: key.code,
+				scanCode: parseInt(match[1], 16),
+				mac: typeof key.mac === 'object' ? key.mac[convention] : key.mac
+			};
+		});
 }
 
 /**
@@ -340,7 +349,7 @@ function assignVirtualKeys(keys) {
 	const pooled = [];
 	for (const key of pending) {
 		const qwerty = QWERTY_VK[key.scanCode];
-		if (!(qwerty && qwerty.startsWith('OEM_') && take(key, qwerty))) pooled.push(key);
+		if (!(qwerty && /^(OEM|ABNT)_/.test(qwerty) && take(key, qwerty))) pooled.push(key);
 	}
 	for (const key of pooled) {
 		const free = OEM_POOL.find((vk) => !used.has(vk));

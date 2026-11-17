@@ -181,7 +181,12 @@ checks++;
 	const read = readDll(shaped, { foreign: true });
 	assert.equal(read.keyboard_type, 0);
 	assert.equal(read.descriptor_bits, 64);
-	assert.deepEqual(read.layout, mine.layout);
+	// The same tables, the keyboard type aside (the layout repeats dwType and dwSubType).
+	assert.deepEqual(read.layout.keyboard_type, { type: 0, subtype: 0 });
+	assert.deepEqual(
+		Object.assign({}, read.layout, { keyboard_type: mine.layout.keyboard_type }),
+		mine.layout
+	);
 	assert.throws(() => readDll(shaped), /pointer into a code or writable section/);
 	checks++;
 }

@@ -99,6 +99,9 @@ function check(model) {
 	const flags = model.flags || [];
 	if (!Array.isArray(flags) || flags.some((f) => !Object.hasOwn(C.LOCALE_FLAGS, f)))
 		fail('kbd_flag_unknown', 'flags');
+	// Absent for the 101/102-key keyboard every layout is for unless it says so.
+	if (model.keyboard_type !== undefined && model.keyboard_type !== 'jis')
+		fail('kbd_keyboard_type', 'keyboard_type');
 	const columns = model.columns;
 	if (!Array.isArray(columns) || columns.length === 0 || columns.length > MAX_COLUMNS)
 		fail('kbd_columns', 'columns');
@@ -231,6 +234,18 @@ function modifierNames(model) {
 	);
 }
 
+/** The KBDTABLES keyboard type and sub-type of a model (constants KEYBOARD_TYPES). */
+function keyboardType(model) {
+	return C.KEYBOARD_TYPES[model.keyboard_type || 'generic'];
+}
+
+/** The scan-code table: the standard type-4 one with the model's `scancodes` moves. */
+function scanTable(model) {
+	const scan = C.DEFAULT_SCANCODES.slice();
+	for (const entry of model.scancodes || []) scan[entry.sc] = entry.vk;
+	return scan;
+}
+
 /** The locale flags word: KLLF bits low, KBD_VERSION high. */
 function localeFlags(model) {
 	const bits = (model.flags || []).reduce((a, f) => a | C.LOCALE_FLAGS[f], 0);
@@ -247,5 +262,7 @@ module.exports = {
 	modifierNames,
 	modifierKeys,
 	e0Table,
+	scanTable,
+	keyboardType,
 	localeFlags
 };

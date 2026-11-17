@@ -27,9 +27,13 @@
  * 4. Images another toolchain built (Microsoft's own layouts, the MSVC builder's)
  *    read with { foreign: true }: their tables may sit in a writable section (the
  *    MSVC builder merges them into .data) or share the code section (the older
- *    SysWOW64 layouts), and kbd.h's optional dwType may be any value (Microsoft
- *    leaves it 0). Every other check stays. This tool's own images take neither
- *    liberty: read-only tables and dwType 4 (KEYBOARD_TYPE_GENERIC_101).
+ *    SysWOW64 layouts), kbd.h's optional dwType may be any value (Microsoft
+ *    leaves it 0), and the image may carry code with an entry point and a zero
+ *    KBD_VERSION word, as KBDJPN.DLL and KBDKOR.DLL do (their NLS functions).
+ *    Every other check stays. This tool's own images take none of these
+ *    liberties: read-only tables, no entry point, KBD_VERSION 1, and dwType 4
+ *    (KEYBOARD_TYPE_GENERIC_101) or, for a JIS keyboard, 7 (KEYBOARD_TYPE_JAPAN)
+ *    with the 106-key sub-type 2.
  * ==============================================================================
  */
 
@@ -222,8 +226,8 @@ function descriptorTarget(img) {
  */
 function readDll(bytes, options = {}) {
 	const img = parsePe(bytes);
-	if (img.entry !== 0) refuse('a layout DLL has no entry point');
 	const foreign = options.foreign === true;
+	if (img.entry !== 0 && !foreign) refuse('a layout DLL has no entry point');
 	if (!foreign)
 		for (const s of img.sections)
 			if (s.flags & SCN_WRITE && s.rawSize > 0 && s.name !== '.reloc')
@@ -321,10 +325,11 @@ function readDll(bytes, options = {}) {
 		type: u32(tablesRva + ligOffset + width),
 		subType: u32(tablesRva + ligOffset + width + 4)
 	};
-	if (t.flags >>> 16 !== 1) refuse('KBD_VERSION is not 1');
+	if (t.flags >>> 16 !== 1 && !(foreign && t.flags >>> 16 === 0)) refuse('KBD_VERSION is not 1');
 	if (t.modifiers === null || t.wchTables === null || t.scan === null)
 		refuse('a mandatory table is missing');
-	if (!foreign && t.type !== 4) refuse('keyboard type is not 4');
+	if (!foreign && !((t.type === 4 && t.subType === 0) || (t.type === 7 && t.subType === 2)))
+		refuse('keyboard type is neither 4 nor 7 (106-key)');
 
 	// Modifiers: VK_TO_BIT list, then wMaxModBits and its ModNumber bytes.
 	const toBit = pointer(t.modifiers, 1, 'pVkToBit');
@@ -502,6 +507,7 @@ function readDll(bytes, options = {}) {
 		checks: [...checked].sort(),
 		...(trace ? { trace } : {}),
 		layout: {
+			keyboard_type: { type: t.type, subtype: t.subType },
 			columns,
 			modifiers: bits,
 			flags: t.flags & 0xffff,
