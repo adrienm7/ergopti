@@ -17,8 +17,9 @@ const scopes = new Map([
 	// the live desktop actions proof (run_desktop_actions_live.sh) and the
 	// Wayland clipboard owner receipt (run_clipboard_owner_wayland.sh); 50: the
 	// layout source installed into a real X server (run_layout_source_live.lua);
-	// 51: the file-manager actions proof (run_file_manager_actions_live.sh).
-	['ci-linux.yml', 51],
+	// 51: the file-manager actions proof (run_file_manager_actions_live.sh);
+	// 52: the model page's first Ollama install (run_model_browser_runtime_webkit.sh).
+	['ci-linux.yml', 52],
 	['ci-macos.yml', 3],
 	['ci-common.yml', 2],
 	['linux-layout.yml', 2]

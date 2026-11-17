@@ -4634,6 +4634,43 @@ jobs:
           fi
         timeout-minutes: 5
 
+      - name: Install prerequisites for The model page offers the Ollama install and reads it installed in real WebKit
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl zstd gcc libc6-dev luajit lua-luv dbus-x11 xvfb
+          else
+              exit 1
+          fi
+        timeout-minutes: 20
+
+      # LRT-001 on the real page: the model selector page in WebKit, bound as the
+      # menu binds it, greys Ollama as missing and offers its install; its button
+      # runs the AI enable, which downloads the pinned official archive over
+      # HTTPS (only the consent is scripted), and the same page, without a
+      # restart or a model, then shows Ollama installed and available.
+      - name: The model page offers the Ollama install and reads it installed in real WebKit
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          timeout 900s bash static/ergopti_plus/linux/tests/hardware/run_model_browser_runtime_webkit.sh
+          else
+              exit 1
+          fi
+        timeout-minutes: 17
+
       - name: Install prerequisites for The release list window lists GitHub's releases in real WebKit
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux

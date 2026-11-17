@@ -956,8 +956,9 @@ check(
 		// desktop-webview; 216: the real-WebKit editor and diagnostics flows; 218:
 		// the file-manager actions proof and its install step; 219: the case and
 		// wrap transforms in a real GTK field; 220: the multi-field expansions
-		// and character deletion in real GTK fields.
-		assert.equal(Scoped.contract.slots.length, 220);
+		// and character deletion in real GTK fields; 222: the model page's first
+		// Ollama install in real WebKit and its install step.
+		assert.equal(Scoped.contract.slots.length, 222);
 		const retained = Raw.step(job.body, 'Retain scoped native Brew qualification receipt');
 		assert.ok(
 			retained.includes(

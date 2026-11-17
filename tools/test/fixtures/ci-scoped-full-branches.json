@@ -1103,6 +1103,18 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for The model page offers the Ollama install and reads it installed in real WebKit",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "The model page offers the Ollama install and reads it installed in real WebKit",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Install prerequisites for API keys in a real locked and unlocked keyring",
 			"protocol": 9
 		},

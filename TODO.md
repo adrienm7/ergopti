@@ -206,17 +206,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       `process_current_source_stale` from the recorded system layout. Left: `NumberRowSourceProbeTests.swift` keeps
       its own in-process selection because its bytes are the reviewed image `number_row_current_test_causal.py` pins
       (`CURRENT_TEST_SHA`); moving it to the shared fixture needs that review renewed. No retry is added.
-- [ ] **Linux live runtime receiving: the page's first install hangs after GitHub's redirect.** A flow is written
-      (`tests/hardware/run_model_browser_runtime_webkit.{lua,sh}`, kept out of CI until it passes): the model page in
-      real WebKit greys Ollama as missing and offers its install (proved in hosted CI, with the inventory notification
-      fixed by 4dbb51564d), and its button runs the AI enable, which asks the consent and starts the pinned archive
-      download. Then nothing for 870 s: the trace shows `download-start github.com`, « HTTP request failed: HTTP 302 »
-      2 s later, and the enable pending until the step's limit (dispatched runs 44038031815 and 44045162053, job
-      133909564507), although the dispatch-only « Run manual official runtime and model acceptance », same transport
-      without a GTK loop, completes (runs 44000968901, 43978912112). Find why the archive's redirect hop never settles
-      under the page (GTK main loop beside libuv, the page's reprojection or its inventory probe during the install),
-      fix it at its cause, then register the flow in the desktop-webview shard (LRT-001,
-      [native UI audit](docs/audits/platform-parity/2026-11-05-native-ui/report.md)).
 - [ ] **Linux native acceptance: pointer metrics.** Write a hosted-CI flow for the pointer metrics
       (`pointer_metrics.lua`, keystats' mouse columns): a uinput mouse the runner creates (`run_daemon_live.sh` already
       gets /dev/uinput) moved, clicked and scrolled under the daemon, then the stored rows read back from the metrics
@@ -313,6 +302,14 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Linux
 
+- [ ] **Archive downloads run one chunk per idle turn.** Measured on the model page flow (2026-11-17): an owned
+      archive download reads 64 KiB, pauses, writes it and resumes only after the write's acknowledgement, a
+      libuv event. The daemon's idle wait (`keyboard_hook.idle_wait`, up to 8 ms) polls the input and tray
+      descriptors only, so each chunk waits up to two idle turns: about 4 MB/s at most, some 6 minutes for the
+      1.4 GB Ollama archive. Each chunk's admission also re-reads `config.toml` (`runtime_source.read_source`,
+      `install_resolver` stats of every ancestor): about 30 ms per chunk on a loaded 8-core WSL. Wake the idle
+      wait on libuv's backend descriptor (as the tray's GLib companion does for D-Bus) and keep the per-chunk
+      source check cheap without weakening the revocation it gives, then time a first install on the PC.
 - [ ] **[LATER] Legacy Linux updater probes.** `tools/build/add-linux-legacy-update-probes.sh` adds
       `_shared/data/locales/en.json` and an empty `_shared/lua/` to the release tarball so pre-move updaters (v1.0.9
       … v1.0.10-dev.175) admit it. Remove that step, its call, `test-linux-legacy-update-probes.cjs` and the frozen

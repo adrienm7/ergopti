@@ -179,10 +179,21 @@ local APP = "model_browser"
 -- ===================================
 -- ===================================
 
---- Pumps GTK and the libuv loop the install runs on.
+-- Bounds one libuv turn of the pump: GTK's events are not libuv's, so the turn
+-- must come back for them even when no libuv descriptor is ready.
+local PUMP_TURN_MS = 10
+local pump_clock = assert(uv.new_timer())
+assert(pump_clock:start(PUMP_TURN_MS, PUMP_TURN_MS, function() end))
+
+--- Pumps GTK and the libuv loop the install runs on. The libuv turn waits for
+--- a ready descriptor (at most PUMP_TURN_MS) and handles it at once, as the
+--- daemon's loop does. One non-blocking turn then a fixed sleep served one
+--- event per sleep: the archive, a 64 KiB read then its write acknowledgement
+--- per chunk, came in at under 1 MB/s, and the 1.4 GB install outlived the
+--- step's limit with curl blocked on its full pipe.
 local function pump()
 	while Gtk.events_pending() do Gtk.main_iteration_do(false) end
-	uv.run("nowait")
+	uv.run("once")
 	while Gtk.events_pending() do Gtk.main_iteration_do(false) end
 end
 
@@ -240,9 +251,10 @@ end
 local function wait_for(predicate, seconds)
 	local deadline = uv.hrtime() + seconds * 1e9
 	repeat
+		-- The pump's own libuv turn is the wait: a sleep here would hold every
+		-- ready descriptor behind it.
 		pump()
 		if predicate() then return true end
-		uv.sleep(20)
 	until uv.hrtime() > deadline
 	return predicate() and true or false
 end
