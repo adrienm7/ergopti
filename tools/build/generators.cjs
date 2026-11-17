@@ -288,7 +288,17 @@ const GENERATORS = [
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_tatoeba.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_tatoeba.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_wikipedia.js',
-			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_wikipedia.js'
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_wikipedia.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_de_fontane_effi_briest.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_de_kafka_verwandlung.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_es_cervantes_quijote.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_es_galdos_marianela.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_it_collodi_pinocchio.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_it_de_amicis_ricordi.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_wikipedia_1m.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_news_1m.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_lexique_words.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_wikipedia_1m.js'
 		]
 	},
 	{
