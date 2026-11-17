@@ -34,8 +34,14 @@
  *    fixed one (seeded random layouts).
  * 7. Bonuses: distinct characters and the capped coverage bonus, which never
  *    outweighs worse SFBs; each simplicity rule passing and failing.
- * 8. Speed: the whole library on a 2.5 MB corpus, from prepared tables, well
- *    under a second.
+ * 8. Speed: the whole library on a 2.5 MB corpus, from prepared tables, within
+ *    a budget per layout, on the fastest of a few runs.
+ * 9. Golden: every metric of every library layout on both French corpora (the
+ *    speed corpus and the built-in Don Quichotte table) equals the reference
+ *    values of library_golden.json, recorded before the engine's speed-ups:
+ *    an optimisation of the walks must not move any metric. A deliberate
+ *    change of a definition, layout or corpus records them again with
+ *    `node tools/test/test-layout-analysis-engine.cjs --update-golden`.
  * ==============================================================================
  */
 
@@ -44,11 +50,20 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { spawnSync } = require('child_process');
 const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 
 const DATA_PATH = shared('ui', 'layout_analysis', '_generated', 'analysis_data.js');
 const ENGINE_PATH = shared('ui', 'layout_analysis', 'analysis_engine.js');
 const VECTORS_PATH = shared('tests', 'corpus', 'layout_analysis', 'metric_vectors.json');
+const GOLDEN_PATH = shared('tests', 'corpus', 'layout_analysis', 'library_golden.json');
+const DON_QUICHOTTE_PATH = shared(
+	'ui',
+	'layout_analysis',
+	'_generated',
+	'corpus_fr_don_quichotte.js'
+);
+const UPDATE_GOLDEN = process.argv.includes('--update-golden');
 const REGISTRY_INDEX = path.join(REPO_ROOT, 'static', 'layouts', 'registry', 'index.json');
 const SPEED_CORPUS = path.join(
 	REPO_ROOT,
@@ -62,10 +77,19 @@ const SPEED_CORPUS = path.join(
 // Floors: an empty library or vector file must not read as a pass.
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
-// Budget for the whole library on the speed corpus, from prepared tables. The
-// measured time is about 0.3 s; the budget leaves room for a slow CI runner.
-const SPEED_BUDGET_MS = 1500;
+// Budget per library layout on the speed corpus, from prepared tables: the
+// 1.5 s the whole library had when it held 115 layouts, so a growing library
+// keeps the same budget per layout. The measured time is about 3 ms.
+const SPEED_BUDGET_MS_PER_LAYOUT = 13;
+// The library is ranked up to this many times and the fastest run counts: one
+// run's time follows the machine's load and the JIT warming up, the fastest
+// the engine's own work. A run within the budget ends the check.
+const SPEED_RUNS = 3;
 const TOLERANCE = 1e-6;
+// The golden metrics are compared to this relative gap: the values are
+// bit-identical on the machines measured; the margin only covers another
+// platform's last-bit rounding of Math.hypot (the key distances).
+const GOLDEN_TOLERANCE = 1e-12;
 
 const errors = [];
 const check = (condition, message) => {
@@ -1356,13 +1380,93 @@ const bigLayout = (() => {
 // ========================
 
 const prepared = E.prepareNgrams(E.ngramsFromText(fs.readFileSync(SPEED_CORPUS, 'utf8')));
-const start = process.hrtime.bigint();
-E.compare(library, prepared, {});
-const elapsedMs = Number(process.hrtime.bigint() - start) / 1e6;
+const speedBudgetMs = SPEED_BUDGET_MS_PER_LAYOUT * library.length;
+const runsMs = [];
+while (runsMs.length < SPEED_RUNS && !(Math.min(...runsMs) < speedBudgetMs)) {
+	const start = process.hrtime.bigint();
+	E.compare(library, prepared, {});
+	runsMs.push(Number(process.hrtime.bigint() - start) / 1e6);
+}
+const elapsedMs = Math.min(...runsMs);
 check(
-	elapsedMs < SPEED_BUDGET_MS,
-	`speed: ${library.length} layouts took ${elapsedMs.toFixed(0)} ms`
+	elapsedMs < speedBudgetMs,
+	`speed: ${library.length} layouts took ${runsMs.map((ms) => ms.toFixed(0)).join(', ')} ms ` +
+		`(fastest ${(elapsedMs / library.length).toFixed(1)} ms per layout, ` +
+		`budget ${SPEED_BUDGET_MS_PER_LAYOUT} ms)`
 );
+
+// =========================
+// ======= 9/ Golden =======
+// =========================
+
+vm.runInContext(fs.readFileSync(DON_QUICHOTTE_PATH, 'utf8'), sandbox, {
+	filename: DON_QUICHOTTE_PATH
+});
+const goldenCorpora = {
+	corpus_nemolivier: prepared,
+	fr_don_quichotte: E.prepareNgrams(
+		vm.runInContext('LAYOUT_ANALYSIS_CORPORA', sandbox).fr_don_quichotte
+	)
+};
+const metricIds = Object.keys(E.METRICS);
+const measured = {};
+for (const [corpus, table] of Object.entries(goldenCorpora)) {
+	measured[corpus] = {};
+	for (const layout of library) {
+		const metrics = E.analyse(layout, table, {}).metrics;
+		measured[corpus][layout.id] = metricIds.map((id) => metrics[id]);
+	}
+}
+let goldenValues = 0;
+let goldenGap = 0;
+if (UPDATE_GOLDEN) {
+	const golden = {
+		_description:
+			'Every metric of every library layout on both French corpora, on the default keyboard, as analyse() gives them (tools/test/test-layout-analysis-engine.cjs, section 9): a speed-up of the engine must leave them unchanged. Values follow the order of metrics. Recorded again with node tools/test/test-layout-analysis-engine.cjs --update-golden only when a definition, a layout or a corpus changes on purpose.',
+		metrics: metricIds,
+		corpora: measured
+	};
+	fs.writeFileSync(GOLDEN_PATH, `${JSON.stringify(golden, null, '\t')}\n`);
+	// The repository's formatter packs the number arrays: the file keeps its style.
+	const formatted = spawnSync(
+		process.execPath,
+		[require.resolve('prettier/bin/prettier.cjs'), '--write', GOLDEN_PATH],
+		{ stdio: 'inherit' }
+	);
+	check(formatted.status === 0, `golden: prettier could not format ${GOLDEN_PATH}`);
+	console.log(`test-layout-analysis-engine: golden recorded in ${GOLDEN_PATH}`);
+} else {
+	const golden = JSON.parse(fs.readFileSync(GOLDEN_PATH, 'utf8'));
+	const update = 'record them with --update-golden if the change is deliberate';
+	check(
+		JSON.stringify(golden.metrics) === JSON.stringify(metricIds),
+		`golden: metrics ${golden.metrics.join(' ')} differ from the engine's; ${update}`
+	);
+	for (const [corpus, layouts] of Object.entries(measured)) {
+		const expected = golden.corpora[corpus] || {};
+		check(
+			Object.keys(expected).length === Object.keys(layouts).length,
+			`golden: ${corpus} has ${Object.keys(expected).length} layouts, the library ` +
+				`${Object.keys(layouts).length}; ${update}`
+		);
+		for (const [id, values] of Object.entries(layouts)) {
+			const want = expected[id];
+			if (!want) {
+				check(false, `golden: ${corpus} lacks ${id}; ${update}`);
+				continue;
+			}
+			values.forEach((value, i) => {
+				const gap = Math.abs(value - want[i]) / Math.max(1, Math.abs(want[i]));
+				goldenGap = Math.max(goldenGap, gap);
+				goldenValues++;
+				check(
+					gap <= GOLDEN_TOLERANCE,
+					`golden: ${corpus} ${id} ${golden.metrics[i]} = ${value}, recorded ${want[i]}`
+				);
+			});
+		}
+	}
+}
 
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
@@ -1371,5 +1475,6 @@ if (errors.length > 0) {
 }
 console.log(
 	`test-layout-analysis-engine: OK (${vectors.length} vectors, ${compared} values, ` +
-		`${library.length} layouts in ${elapsedMs.toFixed(0)} ms)`
+		`${library.length} layouts in ${elapsedMs.toFixed(0)} ms, ${goldenValues} golden values, ` +
+		`largest gap ${goldenGap.toExponential(1)})`
 );
