@@ -36,7 +36,7 @@ local FileSystem = require("core.fs.adapters.file_system")
 local Json = require("core.text.engine.json")
 local MlxRepo = require("ai.ui.menu.models.manager_mlx_repo")
 local NativePath = require("core.fs.engine.native_path")
-local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
+local Diagnosis = require("ai.engine.local_servers.mlx_bootstrap_diagnosis")
 -- A backslash is a filename byte on macOS: only the host's separators split it.
 local _module_source = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
 local _source_sep = "[" .. NativePath.separators() .. "]"

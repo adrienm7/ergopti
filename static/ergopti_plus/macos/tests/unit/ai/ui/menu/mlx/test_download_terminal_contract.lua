@@ -177,7 +177,7 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 	-- CI 2026-11-17: an admission port without refusal_exit_code (the receiving
 	-- owner fixture's) made the module unloadable, a load-time nil table key.
 	helpers.it("loads and names the step with an admission port lacking the refusal code (mlx-launcher-cause-2026-11-15)", function()
-		local real = require("modules.llm.opaque_network_admission")
+		local real = require("ai.engine.api.opaque_network_admission")
 		local port = setmetatable({}, { __index = function(_, key)
 			if key ~= "refusal_exit_code" then return real[key] end
 		end })
