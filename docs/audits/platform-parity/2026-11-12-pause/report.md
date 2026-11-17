@@ -258,6 +258,23 @@ retires the capture (as the magic key capture). Regressions: the shared
 contract `(paused-number-row)` and the Windows `test_number_row_symbols`
 corpus.
 
+## Eighth pass (2026-11-17): the Windows editors and AI menus
+
+The Windows editors that refused a paused click, most with a log line only,
+now save while paused: the prompt editor, the paths editor and its native
+fallback, the hotstrings window, the layout manager (install, select, remove),
+the action picker and its program discovery, the model page (choice, download,
+removal, native list), the magic key character capture, the AI scope restore,
+the API entries and the hotstring order rows. The pause greying of the Layout
+rows and of the hotstring order rows is gone, and the AI submenu is rebuilt
+under a settled pause (`_LLM_Menu_BuildHeld` holds a build only during the
+pause transition). The API entry test and the test prediction wait for the
+resume and say so. Regressions: `test_paused_handlers_never_silent.ahk` (every
+pause reader of the configuration surfaces is told or classified),
+`test_bridge_suspend_guard.ahk`, and the paused cases of the paths editor,
+model browser, layout manager, magic key capture, hotstring order and
+physical editor suites.
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a
@@ -265,9 +282,7 @@ paused driver act at once instead of « on resume », or the change needs its
 source proofs reworked first:
 
 - AI menus: turning the AI on (it starts model warmups and may offer an
-  install), and on Windows the model and API entry rows, the whole-scope
-  restore and clear, and the tray's greying of the AI submenu.
-- Windows: every `A_IsSuspended` gate is listed in
-  [the Windows inventory](windows-inventory.md); the fourth pass removed the
-  personal editor, word expander, terminator, extension scope and AI settings
-  row gates above.
+  install), on the three OS, greyed with its reason; on Windows the local
+  server rows (TODO).
+- Windows: the onboarding page, the touchpad auto-configure, the programmable
+  hotstrings switch and the metrics page refuse while paused and say so.

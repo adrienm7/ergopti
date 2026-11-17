@@ -460,7 +460,10 @@ state.
 
 Native `Suspend` disables hotkeys but not InputHooks, timers, or `OnMessage`.
 Every such callback that can type, display UI, record activity, or start network
-work must explicitly honor `A_IsSuspended`.
+work must explicitly honor `A_IsSuspended`. A configuration handler (an editor
+page, a menu row, a settings writer) must not: a pause stops typing, not
+configuration (EDD-1), and one that must wait calls `NotifyPausedRefusal`;
+`test_paused_handlers_never_silent.ahk` fails on any other pause reader there.
 
 ### project-a-pause-guard-is-not-a-shutdown-debt
 

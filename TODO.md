@@ -218,13 +218,12 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Windows
 
-- [ ] **EDD-1 on AHK: a pause stops typing, not configuration** ([decision](docs/memory/maintainer-decisions.md),
-      [pause Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md)). The tray keeps
-      its feature rows live and rebuilds under a pause, and every click-reached handler that still refuses shows
-      `notify.paused_refused`. Left: remove the A and B suspend gates (a paused save writes the file) of
-      `prompt_editor`, `paths_editor`, `layout_manager`, `hotstrings_config_window`, `action_picker`, `model_browser`
-      and `menu_llm`, each classified in the inventory, with a test per editor; the AI menus' deferred work; then the
-      PC run in TODO-tests-windows.md.
+- [ ] **EDD-1 on AHK: the AI menu's local server rows while paused** ([decision](docs/memory/maintainer-decisions.md)).
+      The shared `LocalServerMenuRows` greys every local server row under a pause, and `LLM_LocalServerPanel`
+      (`_Current`, `_HeldCurrent`, `_ApplyNonCritical`, `_PrepareRows`) refuses a model choice, an address or a key
+      while paused. As on macOS, those three must commit while paused and only the rescan wait for the resume (told by
+      `NotifyPausedRefusal`); the panel's view must then stay current across a pause, which `Retire(false)` at the
+      pause ends today. Then the PC run in TODO-tests-windows.md.
 - [ ] **Immediate-Backspace restoration after Notepad-paste and terminal expansions.** Those owners emit after the
       keystroke and keep no undo record, so `HSE_UndoExpansion` refuses both hosts. Keep the record in
       `_HSE_CommitNotepadOwner` and `_HSE_CommitTerminalOwner` (as `_HSE_RememberUndo` does) and send the undo burst

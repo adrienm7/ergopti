@@ -2498,6 +2498,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/ui/tooltip/test_border_ring_region.ahk
 #Include meta/core/ui/tooltip/test_render_accounting.ahk
 #Include meta/menu/test_tray_suspend_checkmark_survives_rebuild.ahk
+#Include meta/menu/test_paused_handlers_never_silent.ahk
 #Include meta/platform/focus/uia/test_clamp_every_probe_site.ahk
 #Include meta/platform/focus/uia/test_poll_segment_bounded.ahk
 #Include meta/modules/hotstrings/catalogue/test_hcw_reset_all_republishes.ahk

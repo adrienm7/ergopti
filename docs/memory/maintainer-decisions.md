@@ -116,8 +116,10 @@ available and nothing that acts on typing is active.
 macOS and Linux follow it through `edd1-paused-writes` regressions (the
 LMH-003 layout manager gate reverted, the prompt editor's create and clone
 saves, the physical shortcuts editor and capture, every scope owner's restore
-and clear). The Windows `A_IsSuspended` configuration gates are to remove
-(TODO « Windows (the PC agent's) »). Pages that are not configuration
+and clear). Windows follows since 2026-11-17: its editors, model page, AI
+scope restore and hotstring order run while paused, and
+`test_paused_handlers_never_silent.ahk` fails on a new silent pause gate in
+the configuration surfaces; the AI menu's local server rows are left (TODO). Pages that are not configuration
 (changelog, update check) keep their own rules. Do not add a pause gate to a
 configuration action; gate the typing runtime instead.
 
