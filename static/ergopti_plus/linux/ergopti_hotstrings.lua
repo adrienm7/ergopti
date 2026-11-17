@@ -1363,9 +1363,13 @@ local function main()
 			local remapper_paused = TapHold.set_paused(paused)
 			-- A pause turns the AI's live mode off; resuming leaves it off.
 			if prediction_engine then prediction_engine.on_pause_change(paused) end
+			-- The local server discovery stops its network work and keeps its
+			-- verdicts: the AI menu still configures the servers (EDD-1).
 			local servers = package.loaded["ai.engine.local_servers.local_servers"]
-			if paused and servers and servers.cancel() ~= true then
+			if paused and servers and servers.pause() ~= true then
 				Logger.warn("pause", "Local API discovery still owns native cleanup debt.")
+			elseif not paused and servers then
+				servers.resume()
 			end
 			if rebuild_tray_menu then rebuild_tray_menu() end
 			require("modules.keymap.pause_layout_switch").on_pause_change(paused)

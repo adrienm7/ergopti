@@ -2,6 +2,9 @@
 
 --- Local API discovery's Linux native port. The shared controller owns logical
 --- sweeps; every catalogue server retains a separate HTTP physical cleanup owner.
+--- A pause stops the discovery, not the configuration (EDD-1): pause() cancels
+--- the scan and the probes in flight and keeps the verdicts, without aging,
+--- so the menu still commits a model, an address or a key while paused.
 local M = {}
 local Catalogue = require("ai.engine.local_servers.catalogue")
 local Ports = require("ai.engine.local_servers.ports")
@@ -390,6 +393,8 @@ end
 local function rescan_owned(admit, on_done)
 	local generation = cancel_generation
 	local function current() return not closed and generation == cancel_generation end
+	-- The scan and the probes are network work: a pause holds them (EDD-1)
+	if controller.is_paused() then return false end
 	if not current() or type(admit) ~= "function" or not admitted(admit) or not current() then return false end
 	for owner in pairs(scan_owners) do retire_scan(owner) end
 	if not current() or not admitted(admit) or not current() then return false end
@@ -496,7 +501,9 @@ function M.views()
 end
 
 --- Logical fencing precedes physical cancellation; unresolved owners stay retained.
-local function cancel_owned()
+--- @param keep_verdicts boolean|nil A pause: the controller already fenced its
+---        sweep and keeps its verdicts and their age.
+local function cancel_owned(keep_verdicts)
 	local settled, captured = true, {}
 	cancel_generation = cancel_generation + 1
 	if scan_waiters then scan_waiters.cancelled = true end
@@ -506,7 +513,7 @@ local function cancel_owned()
 	end
 	revoke_queued()
 	view_generation = view_generation + 1
-	controller.invalidate()
+	if not keep_verdicts then controller.invalidate() end
 	for _, owner in ipairs(captured) do
 		if scan_owners[owner] then
 			if owner.operation then pcall(owner.cancel, owner.operation) end
@@ -537,6 +544,32 @@ function M.cancel()
 	return ok and settled == true
 end
 function M.shutdown() closed = true; return M.cancel() end
+
+--- Stops the network work for a pause and keeps the verdicts (EDD-1). A scan
+--- or a sweep the pause cuts short leaves them held until the resume's sweep.
+--- @return boolean settled False while native cleanup debt is retained.
+function M.pause()
+	if cancelling then return false end
+	if controller.pause(scan_waiters ~= nil) then
+		Logger.info(LOG, "Local server discovery paused; the last verdicts are kept.")
+	end
+	cancelling = true
+	local ok, settled = pcall(cancel_owned, true)
+	if not ok then pcall(Logger.error, LOG, "Local server pause cancellation raised an error; ownership is retained.") end
+	cancelling = false
+	return ok and settled == true
+end
+
+--- Readmits the discovery after a pause; held verdicts are stale at once.
+--- @return boolean changed False when not paused.
+function M.resume()
+	local changed = controller.resume()
+	if changed then Logger.info(LOG, "Local server discovery resumed.") end
+	return changed
+end
+function M.is_paused() return controller.is_paused() end
+--- Whether the verdicts shown wait for the resume's sweep (no action on them).
+function M.is_held() refresh_views(); return controller.is_held() end
 function M.order() refresh_views(); local copy = {}; for index,id in ipairs(order) do copy[index] = id end; return copy end
 function M.servers() refresh_views(); return servers end
 function M.result(id) refresh_views(); return controller.result(id) end

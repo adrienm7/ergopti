@@ -7,8 +7,8 @@
 ; drivers supply translated strings, live state and acknowledged action owners.
 ; No credential, discovery or HTTP resource is acquired by this view policy.
 ; A pause greys no row (EDD-1): only an inert view, one without current
-; receipts, shows its verdicts without actions; the Lua twin's `paused` option
-; still greys them on macOS and Linux (TODO.md).
+; receipts, shows its verdicts without actions, as the Lua twin's `inert`
+; option does on macOS and Linux.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

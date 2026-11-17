@@ -811,6 +811,12 @@
 			"not_testable": "Needs a person on the Mac to provoke each boundary in the real windows (a refused write, a stale epoch, a window closed during a save); the private models are unit-tested, the native receivers are not."
 		},
 		{
+			"id": "local_server_rows_paused",
+			"title": "The AI menu's local server rows commit while paused; only the rescan waits",
+			"checks": [],
+			"not_testable": "Needs a local server (LM Studio or oMLX) running and a person choosing a model, an address and a key while paused, then asking for a rescan: the field report does not drive the model selector page."
+		},
+		{
 			"id": "layout_editor_window",
 			"title": "Layout editor in its own window",
 			"checks": [],

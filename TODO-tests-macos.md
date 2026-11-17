@@ -146,6 +146,13 @@ Hands needed:
 - [ ] <!-- field-point: input_policies --> Input policies: native one-shot Shift (modifier-map, dead-key and IME
       handling of the captured key) and CapsWord key/control payload receiving.
 - [ ] <!-- field-point: pause_ends_capsword --> A pause ends CapsWord (worker P, 2026-11-14): switch CapsWord on, then pause Ergopti: CapsLock goes off at once and stays off through the pause (`watchers.end_capsword_for_pause`, `test_pause_ends_capsword`); a CapsLock set by hand before the pause stays on.
+- [ ] <!-- field-point: local_server_rows_paused --> Local server rows while paused (EDD-1, `edd1-local-server-rows`):
+      with LM Studio or oMLX running and listed in the model selector page, pause Ergopti+: the server's models stay
+      listed; choose one, then set its address and its key in their dialogs: each is saved at once (the API backend is
+      selected), and nothing that predicts runs until the resume. « Search for local servers again » shows the paused
+      notification once and probes nothing: no « probed » log line while paused, « Local server discovery paused » at
+      the pause. Resume: the log says « Local server discovery resumed », the servers are searched again and the choice
+      is served.
 - [ ] <!-- field-point: layout_editor_window --> Ergopti Studio window: « Create or edit a layout… », the layout
       manager's « Layout editor » and the top-level « 🎨 Ergopti Studio… » row (right after « Keyboard layout ») open
       one window titled exactly « Ergopti Studio »; a second request brings it to the front with its unsaved work;

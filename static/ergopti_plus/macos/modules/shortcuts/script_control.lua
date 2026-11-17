@@ -657,6 +657,18 @@ local function pause_all()
 			"api_remote.resume_warmup"
 		)
 		if not ok_step then return false, step_reason end
+		-- The local server discovery talks to the servers: a pause holds it and
+		-- keeps its verdicts, so the AI menu still configures them (EDD-1).
+		if type(remote.pause_local_discovery) == "function" then
+			ok_step, step_reason = add_required_step(
+				"api_remote.pause_local_discovery",
+				remote.pause_local_discovery,
+				remote.resume_local_discovery,
+				nil,
+				"api_remote.resume_local_discovery"
+			)
+			if not ok_step then return false, step_reason end
+		end
 	end
 
 	for _, owner in ipairs({
@@ -1687,6 +1699,7 @@ M.PAUSE_OWNER_IDS = {
 	"warmup_controller",
 	"ollama_warmup",
 	"remote_warmup",
+	"local_discovery",
 	ConfigKeys.COMMAND.WPM_MENUBAR,
 	ConfigKeys.COMMAND.WPM_WIDGET,
 	"remap_onboarding",

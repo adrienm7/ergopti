@@ -3873,6 +3873,12 @@ M._probe_local_target = probe_local_target
 --- process does not run, at its default address, is not probed.
 --- @param waiters table The callbacks of every detection the scan served.
 local function sweep_after_scan(waiters)
+	-- A pause during the scan holds the sweep: its callers are dropped, as a
+	-- sweep the pause cut short, and the resume's menu sweeps again (EDD-1).
+	if LocalServers.is_paused() then
+		Logger.info(LOG, "Local server sweep dropped after its port scan: Ergopti+ is paused.")
+		return
+	end
 	M.refresh_local_server_views()
 	local targets = {}
 	for _, id in ipairs(LocalServers.view_order()) do
@@ -3951,6 +3957,11 @@ function M.detect_local_servers(on_done)
 	if on_done ~= nil and type(on_done) ~= "function" then
 		error("api_remote.detect_local_servers: on_done must be a function")
 	end
+	-- The scan and the probes are network work: a pause holds them (EDD-1)
+	if LocalServers.is_paused() then
+		Logger.info(LOG, "Local server detection refused: Ergopti+ is paused.")
+		return false
+	end
 	if _port_scan_waiters then
 		if on_done then _port_scan_waiters[#_port_scan_waiters + 1] = on_done end
 		return true
@@ -3982,6 +3993,30 @@ function M.detect_local_servers(on_done)
 		Logger.error(LOG, "The local server port scan could not start: %s", tostring(err))
 		return false
 	end
+	return true
+end
+
+--- Stops the local server discovery for a pause (EDD-1): the sweep and the
+--- probes in flight are fenced, then cancelled, and the verdicts are kept for
+--- the menu, which still configures the servers while paused. The logical
+--- fence alone keeps a late answer out, so a refused cancellation is logged
+--- without failing the pause.
+--- @return boolean committed
+function M.pause_local_discovery()
+	LocalServers.pause()
+	for id, client in pairs(_local_probe_clients) do
+		local ok, err = xpcall(client.cancel, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Local server '%s' probe cancellation raised at the pause: %s", id, tostring(err))
+		end
+	end
+	return true
+end
+
+--- Readmits the local server discovery after a pause.
+--- @return boolean committed
+function M.resume_local_discovery()
+	LocalServers.resume()
 	return true
 end
 

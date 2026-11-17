@@ -293,6 +293,26 @@ Regressions: `test_local_server_panel_view_preparation.ahk`
 `(paused-local-server-rows)` under a real Suspend, and the panel case of
 `test_paused_handlers_never_silent.ahk`.
 
+## Tenth pass (2026-11-17): the macOS and Linux local server rows
+
+The shared row builder (`ai/engine/local_servers/menu.lua`) greyed every local
+server row under `paused`, and the macOS panel (`admitted`) and the Linux rows
+(`admit`, `can_configure_local_servers`) refused a model choice, an address and
+a key while paused. As on Windows they now commit while paused; only the
+rescan, which talks to the servers, waits for the resume and says so with the
+paused notice (`notify.paused_refused`). The shared discovery controller owns
+the pause (`pause`, `resume`): a sweep in flight is fenced and its callers
+dropped, a new one is refused, and the verdicts stay with their age frozen. A
+write, a view change or a sweep the pause cut short holds them (`is_held`):
+shown, without actions, until the resume's sweep. The builder's option is now
+`inert` (the AI off, an unreadable pause, held verdicts), as on Windows. macOS
+wires it as the `api_remote.pause_local_discovery` pause step, which also
+cancels the probes in flight; Linux's `on_pause_change` calls
+`local_servers.pause` (scan and probes cancelled) and `resume`. Regressions:
+the shared `run_pause` contract replayed by both drivers, macOS
+`test_local_openai_backends_api_models.lua` and Linux
+`test_local_server_discovery.lua` (`edd1-local-server-rows`).
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a
@@ -300,7 +320,6 @@ paused driver act at once instead of « on resume », or the change needs its
 source proofs reworked first:
 
 - AI menus: turning the AI on (it starts model warmups and may offer an
-  install), on the three OS, greyed with its reason; on macOS and Linux the
-  local server rows (TODO).
+  install), on the three OS, greyed with its reason.
 - Windows: the onboarding page, the touchpad auto-configure, the programmable
   hotstrings switch and the metrics page refuse while paused and say so.

@@ -184,11 +184,10 @@ local function collect(ctx)
 	local ApiPanel = require("ai.ui.menu.panels.api_panel")
 	local LocalServerPanel = require("ai.ui.menu.panels.local_server_panel")
 	local backend_collect, api_collect = {}, {}
-	local paused = ctx.is_paused() ~= false
 	-- A pause stops typing, not configuration (EDD-1): the backend and API
 	-- panels only collect choices, so they read a pause that admits them.
-	-- An unreadable pause still refuses, and the local server rows, which
-	-- start servers, keep the real pause.
+	-- An unreadable pause still refuses. The local server rows keep the real
+	-- pause: they commit while paused and hold only their sweep.
 	local function configuration_blocked()
 		local ok, current = pcall(ctx.is_paused)
 		return not ok or type(current) ~= "boolean"
@@ -209,7 +208,7 @@ local function collect(ctx)
 		collect = backend_collect,
 		local_server_rows = function(activate_api)
 			backend_collect.local_ctx = {
-				state = ctx.state, paused = paused, keymap = ctx.keymap, update_menu = ctx.update_menu,
+				state = ctx.state, keymap = ctx.keymap, update_menu = ctx.update_menu,
 				is_paused = ctx.native_is_paused, WarmupCtrl = ctx.WarmupCtrl, activate_api = activate_api,
 			}
 			return LocalServerPanel.rows(backend_collect.local_ctx)
@@ -666,14 +665,15 @@ function M.handle_action(ctx, body, probes, collected)
 	local action = body.action
 	-- A pause stops typing, not configuration (EDD-1): choices, downloads and
 	-- installs run while paused. What starts or contacts a runtime (a key
-	-- test, a server rescan, an MLX port change that restarts MLX) waits.
+	-- test, an MLX port change that restarts MLX) waits; a server rescan
+	-- waits in the local server panel, which tells it with the paused notice.
 	local paused = ctx.is_paused()
 	if type(paused) ~= "boolean" then
 		Logger.warn(LOG, "Model selector action '%s' refused: the pause state is unreadable.", tostring(action))
 		return false
 	end
 	local runtime_action = (action == "row_action" and body.id == "test")
-		or (action == "group_action" and (body.id == "rescan" or body.id == "mlx_port" or body.id == "mlx_port_reset"))
+		or (action == "group_action" and (body.id == "mlx_port" or body.id == "mlx_port_reset"))
 	if paused and runtime_action then
 		Logger.warn(LOG, "Model selector action '%s' waits for resume.", tostring(action))
 		return false
@@ -858,7 +858,8 @@ function M.group_action(backend, id)
 	if not _ctx or _ctx.config_reason() ~= nil then return false end
 	local paused = _ctx.is_paused()
 	if type(paused) ~= "boolean" then return false end
-	if paused and (id == "rescan" or id == "mlx_port" or id == "mlx_port_reset") then return false end
+	-- A paused rescan reaches the local server panel, which says it waits.
+	if paused and (id == "mlx_port" or id == "mlx_port_reset") then return false end
 	return group_action(_ctx, collect(_ctx), backend, id, DEFAULT_PROBES)
 end
 

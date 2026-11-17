@@ -44,6 +44,12 @@ yet; the first run also proves the field run without a click (53c1766514), the r
 - [ ] <!-- field-point: predictions_stop --> Predictions stop on activity: with a slow model, during the spinner move
       the mouse, turn the wheel, touch the touchpad (absolute pad and relative pad), switch window (the 250 ms poll),
       press F5: each cancels and hides. The validation digits and the navigation chords keep a shown prediction.
+- [ ] <!-- field-point: local_server_rows_paused --> Local server rows while paused (EDD-1, `edd1-local-server-rows`):
+      with LM Studio or oMLX running and listed in the model selector page's API group, pause Ergopti+: the server's
+      models stay listed and live; choose one, then set an address (« Local server at another address ») and a key: each
+      is saved at once and the page shows the choice, its rows without actions until the resume. « Search for local
+      servers again » shows the paused notification once and probes nothing: no « probed » log line while paused, «
+      Local server discovery paused » at the pause. Resume: the servers are searched again and the rows act.
 - [ ] <!-- field-point: input_policies --> Input policies: with the Bépo registry layout installed, monnaie then
       cédille types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row
       changes the one-shot wait; a CapsWord menu change applies to the running session; native one-shot Shift

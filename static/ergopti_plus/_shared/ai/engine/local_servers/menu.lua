@@ -4,7 +4,9 @@
 
 --- Catalogue-ordered local API menu rows. Drivers provide their current source,
 --- translated strings and acknowledged native actions; no credential or native
---- transport is owned by this view policy.
+--- transport is owned by this view policy. A pause greys no row (EDD-1): only
+--- an inert view (the AI off, an unreadable pause, or verdicts a pause holds
+--- without current evidence) shows its verdicts without actions.
 local M = {}
 local Discovery = require("ai.engine.local_servers.discovery")
 local Labels = require("menu.engine.labels")
@@ -21,6 +23,17 @@ local function active_matches(options, id)
 		return type(entry_id) == "string" and entry_id ~= "" and active.id == entry_id
 	end
 	return active.provider == id
+end
+
+--- Reads a driver's live pause owner for these rows (EDD-1): paused, the rows
+--- still commit and only the sweep waits; an unreadable owner refuses both.
+--- @param is_paused any The driver's pause reader.
+--- @return boolean|nil paused Nil when the reader is missing, throws or is untyped.
+function M.pause_state(is_paused)
+	if type(is_paused) ~= "function" then return nil end
+	local ok, paused = pcall(is_paused)
+	if not ok or type(paused) ~= "boolean" then return nil end
+	return paused
 end
 
 --- The authority displayed beside a configured server address.
@@ -45,9 +58,9 @@ end
 
 --- Builds one catalogue server's model and configuration choices.
 local function server_items(options, id, verdict)
-	local items, disabled = {}, options.paused or nil
+	local items, disabled = {}, options.inert or nil
 	local function action(name, model)
-		return not options.paused and function() return options.actions[name](id, model) end or nil
+		return not options.inert and function() return options.actions[name](id, model) end or nil
 	end
 	if verdict.status == Discovery.STATUS_NEEDS_KEY then
 		items[#items + 1] = { label = options.tr("menu.llm.local_servers.api_key"), disabled = disabled,
@@ -72,7 +85,7 @@ local function server_items(options, id, verdict)
 end
 
 --- Returns rows from the current jointly published catalogue verdicts.
---- @param options table { order, servers, detected, result, sweeping, paused,
+--- @param options table { order, servers, detected, result, sweeping, inert,
 --- backend, active, tr, format, actions = { select, address, key, rescan } }.
 --- @return table
 function M.rows(options)
@@ -106,12 +119,12 @@ function M.rows(options)
 			rows[#rows + 1] = { label = options.tr("menu.llm.local_servers.none_detected"), disabled = true }
 		end
 	end
-	rows[#rows + 1] = { label = options.tr("menu.llm.local_servers.rescan"), disabled = options.paused or nil,
-		action = not options.paused and options.actions.rescan or nil }
+	rows[#rows + 1] = { label = options.tr("menu.llm.local_servers.rescan"), disabled = options.inert or nil,
+		action = not options.inert and options.actions.rescan or nil }
 	local others = {}
 	for _, id in ipairs(options.order) do
-		others[#others + 1] = { label = options.servers[id].label, disabled = options.paused or nil,
-			action = not options.paused and function() return options.actions.address(id) end or nil }
+		others[#others + 1] = { label = options.servers[id].label, disabled = options.inert or nil,
+			action = not options.inert and function() return options.actions.address(id) end or nil }
 	end
 	rows[#rows + 1] = { label = options.tr("menu.llm.local_servers.other_address"), items = others }
 	return rows
@@ -127,7 +140,7 @@ end
 --- @return table tools { { id, text, run } } for the API group.
 function M.page_rows(options)
 	local rows, tools = {}, {}
-	local live = not options.paused
+	local live = not options.inert
 	for _, id in ipairs(options.detected) do
 		local verdict = options.result(id)
 		local label = M.label_of(options.servers, id, verdict)

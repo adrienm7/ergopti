@@ -24,6 +24,7 @@ local OWNER_IDS = {
 	"warmup_controller",
 	"ollama_warmup",
 	"remote_warmup",
+	"local_discovery",
 	"wpm_menubar",
 	"wpm_widget",
 	"remap_onboarding",
@@ -46,6 +47,7 @@ local REVERSIBLE_OWNER_IDS = {
 	"warmup_controller",
 	"ollama_warmup",
 	"remote_warmup",
+	"local_discovery",
 	"wpm_menubar",
 	"wpm_widget",
 }
@@ -190,6 +192,8 @@ local function load_inventory_context(options)
 	package.loaded["ai.engine.api.remote"] = options.remote or {
 		pause_warmup = invoke("remote_warmup", "pause"),
 		resume_warmup = invoke("remote_warmup", "resume"),
+		pause_local_discovery = invoke("local_discovery", "pause"),
+		resume_local_discovery = invoke("local_discovery", "resume"),
 	}
 	package.loaded["ui.wpm.wpm_menubar"] = {
 		is_running = function() return ctx.active.wpm_menubar end,

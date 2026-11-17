@@ -345,6 +345,31 @@ end
 --- @return boolean
 function M.is_sweeping() return _scanning or controller.is_sweeping() end
 
+--- Stops the discovery a pause must not run (EDD-1): a sweep or a port scan
+--- in flight publishes nothing, and the verdicts stay with their age frozen.
+--- @return boolean changed False when already paused.
+function M.pause()
+	local changed = controller.pause(_scanning)
+	if changed then Logger.info(LOG, "Local server discovery paused; the last verdicts are kept.") end
+	return changed
+end
+
+--- Readmits discovery after a pause; held verdicts are swept again.
+--- @return boolean changed False when not paused.
+function M.resume()
+	local changed = controller.resume()
+	if changed then Logger.info(LOG, "Local server discovery resumed.") end
+	return changed
+end
+
+--- Returns whether a pause holds the discovery.
+--- @return boolean
+function M.is_paused() return controller.is_paused() end
+
+--- Returns whether the verdicts shown wait for the resume's sweep (no action).
+--- @return boolean
+function M.is_held() return controller.is_held() end
+
 
 
 

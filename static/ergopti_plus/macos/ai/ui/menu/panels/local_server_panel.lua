@@ -23,6 +23,10 @@
 --- 4. Every failure offers its fix: a server that stopped answering, a key it
 ---    wants and a model it no longer serves each post a notice whose click
 ---    searches again, asks for the key or asks for another model.
+--- 5. A pause stops typing, not configuration (EDD-1): a model choice, an
+---    address and a key commit while paused, from the verdicts the pause kept;
+---    only the sweep, which talks to the servers, waits for the resume, and a
+---    rescan asked while paused says so with the paused notice.
 --- ==============================================================================
 
 local M = {}
@@ -68,13 +72,36 @@ local function servers()
 	return require("ai.engine.local_servers.local_servers")
 end
 
---- Requires the actual pause owner, including after a retained menu or dialog.
+--- Reads the actual pause owner, including after a retained menu or dialog.
+--- @param ctx table
+--- @return boolean|nil paused Nil when the owner is missing or unreadable.
+local function pause_state(ctx)
+	if type(ctx) ~= "table" then return nil end
+	return ServerMenu.pause_state(ctx.is_paused)
+end
+
+--- Admits the views, receipts and writes: a readable pause owner, paused or
+--- not (EDD-1). An unreadable one refuses.
 --- @param ctx table
 --- @return boolean
 local function admitted(ctx)
-	if type(ctx) ~= "table" or ctx.paused == true or type(ctx.is_paused) ~= "function" then return false end
-	local ok, paused = pcall(ctx.is_paused)
-	return ok and type(paused) == "boolean" and paused == false
+	return pause_state(ctx) ~= nil
+end
+
+--- Admits the network work (sweeps and probes): only while not paused.
+--- @param ctx table
+--- @return boolean
+local function network_admitted(ctx)
+	return pause_state(ctx) == false
+end
+
+--- The menu context the API panel's local server transaction reads: its pause
+--- admits a configuration write while paused, never under an unreadable pause.
+--- @param ctx table
+--- @return table
+local function configuration_ctx(ctx)
+	return setmetatable({ paused = false, is_paused = function() return not admitted(ctx) end },
+		{ __index = ctx })
 end
 
 --- Whether the user switched the AI on. With the AI off the rows stay inert
@@ -183,12 +210,13 @@ local function ask(message, informative, default, secure)
 	return TextUtils.trim(typed)
 end
 
---- Sweeps the servers again and redraws the menu when a verdict changed.
+--- Sweeps the servers again and redraws the menu when a verdict changed. A
+--- pause refuses it silently: the resume's menu sweeps the held verdicts.
 --- @param ctx table|nil Engine menu context.
 --- @param on_done function|nil Called once the sweep settled.
 --- @return boolean started
-function M.rescan(ctx, on_done)
-	if not admitted(ctx) then return false end
+local function sweep(ctx, on_done)
+	if not network_admitted(ctx) then return false end
 	return remote().detect_local_servers(function(changed)
 		if changed and ctx and type(ctx.update_menu) == "function" then
 			local ok, err = pcall(ctx.update_menu)
@@ -196,6 +224,20 @@ function M.rescan(ctx, on_done)
 		end
 		if type(on_done) == "function" then on_done() end
 	end)
+end
+
+--- The rescan the user asks for: while paused it waits for the resume and
+--- says so with the paused notice, as on Windows.
+--- @param ctx table|nil Engine menu context.
+--- @param on_done function|nil Called once the sweep settled.
+--- @return boolean started
+function M.rescan(ctx, on_done)
+	if pause_state(ctx) == true then
+		Logger.warn(LOG, "The local server rescan was refused while paused.")
+		notify(i18n.get("menu.llm.local_servers.header"), i18n.get("notify.paused_refused"), "warning")
+		return false
+	end
+	return sweep(ctx, on_done)
 end
 
 
@@ -218,7 +260,7 @@ function M.select_model(ctx, id, model, on_selected, receipt)
 	local held = receipt or capture_view(id)
 	if not view_current(ctx, held, receipt and model or nil) then return false end
 	Logger.info(LOG, "Local server '%s' model '%s' chosen.", id, model)
-	return ApiPanel.apply_local_server(ctx, id, { model = model }, function(committed)
+	return ApiPanel.apply_local_server(configuration_ctx(ctx), id, { model = model }, function(committed)
 		local activated = ctx.state.llm_backend == "api"
 		if committed == true and admitted(ctx) and not activated and type(ctx.activate_api) == "function" then
 			local ok, accepted = Logger.callback(LOG, "Local server backend selection", ctx.activate_api)
@@ -275,8 +317,8 @@ function M.prompt_address(ctx, id, receipt)
 			notice_action(id, function(ctx, held) return M.prompt_address(ctx, id, held) end))
 		return false
 	end
-	return ApiPanel.apply_local_server(ctx, id, { base_url = base }, function(committed)
-		if committed then M.rescan(ctx, function() M.report_sweep(id) end) end
+	return ApiPanel.apply_local_server(configuration_ctx(ctx), id, { base_url = base }, function(committed)
+		if committed then sweep(ctx, function() M.report_sweep(id) end) end
 	end, function() return view_current(ctx, held) end)
 end
 
@@ -291,8 +333,8 @@ function M.prompt_key(ctx, id, receipt)
 	local typed = ask(i18n.get("menu.llm.local_servers.header"),
 		i18n.format("dialog.local_servers.key_prompt", server.label), "", true)
 	if typed == nil or not view_current(ctx, held) then return false end
-	return ApiPanel.apply_local_server(ctx, id, { token = typed }, function(committed)
-		if committed then M.rescan(ctx, function() M.report_sweep(id) end) end
+	return ApiPanel.apply_local_server(configuration_ctx(ctx), id, { token = typed }, function(committed)
+		if committed then sweep(ctx, function() M.report_sweep(id) end) end
 	end, function() return view_current(ctx, held) end)
 end
 
@@ -330,7 +372,7 @@ end
 local function replace_model(id, missing, model)
 	local entry = remote().local_server_entry(id)
 	if _ctx and entry and (missing == nil or entry.model == missing) then
-		ApiPanel.apply_local_server(_ctx, id, { model = model })
+		ApiPanel.apply_local_server(configuration_ctx(_ctx), id, { model = model })
 	end
 	if not (_agent_ctx and missing) then return end
 	for _, key in ipairs({ "llm_agent_system1", "llm_agent_system2" }) do
@@ -417,7 +459,7 @@ end
 
 --- The rows of the local servers in the AI engine submenu. Starts a sweep,
 --- without waiting for it, when the verdicts are stale.
---- @param ctx table { state, paused, keymap, update_menu, WarmupCtrl, activate_api }.
+--- @param ctx table { state, is_paused, keymap, update_menu, WarmupCtrl, activate_api }.
 --- @return table rows
 function M.rows(ctx)
 	local api_remote = remote()
@@ -430,12 +472,12 @@ function M.rows(ctx)
 	servers().set_failure_handler(on_failure)
 	-- Source provenance is refreshed before cache age can grant a model view.
 	api_remote.refresh_local_server_views()
-	if admitted(ctx) and ai_enabled(ctx) and servers().is_stale() and not _rescan_deferred then
+	if network_admitted(ctx) and ai_enabled(ctx) and servers().is_stale() and not _rescan_deferred then
 		_rescan_deferred = true
 		local scheduled = DeferredWork.after(0, function()
 			_rescan_deferred = false
-			-- A switch-off before the build returned drops the queued sweep.
-			if ai_enabled(_ctx) then M.rescan(_ctx) end
+			-- A switch-off or a pause before the build returned drops the queued sweep.
+			if ai_enabled(_ctx) then sweep(_ctx) end
 		end, "menu_llm.local_servers.rescan")
 		if not scheduled then _rescan_deferred = false end
 	end
@@ -444,7 +486,10 @@ function M.rows(ctx)
 	for _, id in ipairs(data.view_order()) do receipts[id] = capture_view(id) end
 	return ServerMenu.rows({
 		order = data.view_order(), servers = data.view_servers(), detected = data.detected(),
-		result = data.result, sweeping = data.is_sweeping(), paused = not admitted(ctx) or not ai_enabled(ctx),
+		-- A pause greys nothing (EDD-1): only the AI off, an unreadable pause or
+		-- verdicts a pause holds without current evidence leave the rows inert.
+		result = data.result, sweeping = data.is_sweeping(),
+		inert = not admitted(ctx) or not ai_enabled(ctx) or data.is_held(),
 		backend = ctx.state.llm_backend, active = remote().get_active_entry(),
 		entry_id = function(id) local entry = remote().local_server_entry(id); return entry and entry.id end,
 		tr = i18n.get, format = i18n.format,

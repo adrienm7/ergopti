@@ -119,6 +119,12 @@
 			"condition": "A slow local model; a mouse, a wheel and a touchpad."
 		},
 		{
+			"id": "local_server_rows_paused",
+			"title": "The AI menu's local server rows commit while paused; only the rescan waits",
+			"checks": [],
+			"not_testable": "Needs a local server (LM Studio or oMLX) running and a person choosing a model, an address and a key while paused, then asking for a rescan: the field report does not drive the model selector page."
+		},
+		{
 			"id": "input_policies",
 			"title": "Branch wave3/input-policies: sticky delay, CapsWord menu, one-shot Shift device",
 			"checks": [

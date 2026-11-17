@@ -1481,3 +1481,107 @@ helpers.describe("Scripted startup discovery transport custody (startup-local-ht
 		end)
 	end)
 end)
+
+-- A pause stops typing, not configuration (EDD-1): the shared row builder
+-- greyed every local server row under `paused`, and the rows refused a model
+-- choice, an address and a key while paused. They commit now, from the
+-- verdicts the pause kept; only the sweep waits, told by the paused notice.
+helpers.describe("Linux local server rows while paused (edd1-local-server-rows)", function()
+	local I18n = require("core.i18n.engine.i18n")
+	--- Runs a scenario with one driven server, a fake notifier and a pause switch.
+	local function paused_world(body)
+		isolated(function(servers, entries, calls, _, scan)
+			for _, id in ipairs({ "lmstudio", "llamacpp", "jan" }) do scan[id] = { running = false, pids = {} } end
+			local previous = package.loaded["platform.focus.application_notifier"]
+			local world = { backend = "ollama", notices = {}, paused = false, prompt = nil }
+			package.loaded["platform.focus.application_notifier"] = { send = function(text, options)
+				world.notices[#world.notices + 1] = { text = text, options = options }
+				return true
+			end }
+			local llm = { get_backend = function() return world.backend end,
+				can_configure_local_servers = function() return true end, is_enabled = function() return true end,
+				set_backend = function(value, admit)
+					if not admit() then return false end
+					world.backend = value
+					return true
+				end }
+			local dialogs = { prompt = function() return world.prompt end, error = function() end }
+			local context = { is_paused = function() return world.paused end }
+			function world.build()
+				return require("ai.ui.menu.local_server_rows").rows(llm, dialogs, function() end, context)
+			end
+			local ok, err = pcall(body, servers, entries, calls, world)
+			package.loaded["platform.focus.application_notifier"] = previous
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("a paused model choice commits from the kept verdicts and the rescan waits for the resume", function()
+		paused_world(function(servers, entries, calls, world)
+			world.build()
+			helpers.assert_eq(#calls, 1)
+			calls[1].finish(models("qwen3"))
+			world.paused = true
+			helpers.assert_true(servers.pause())
+			local rows = world.build()
+			helpers.assert_eq(#calls, 1, "a paused menu build sweeps nothing")
+			local item = find(rows, "qwen3")
+			helpers.assert_true(item ~= nil, "the pause keeps the verdict listed")
+			helpers.assert_eq(item.disabled, nil, "a pause greys no row")
+			local rescan = find(rows, I18n.get("menu.llm.local_servers.rescan"))
+			helpers.assert_true(rescan ~= nil and rescan.disabled == nil, "the rescan row stays live")
+			local outcome = item.action()
+			helpers.assert_true(outcome and outcome.saved, "the model choice commits while paused")
+			helpers.assert_true(outcome.selected)
+			helpers.assert_eq(world.backend, "api")
+			helpers.assert_eq(entries.active().model, "qwen3")
+			helpers.assert_eq(rescan.action(), false, "the rescan waits for the resume")
+			helpers.assert_eq(#world.notices, 1, "and says so")
+			helpers.assert_eq(world.notices[1].text, I18n.get("notify.paused_refused"))
+			helpers.assert_eq(#calls, 1, "nothing probes a server while paused")
+			local after = find(world.build(), "qwen3")
+			helpers.assert_true(after ~= nil, "the paused write keeps the verdict shown")
+			helpers.assert_eq(after.disabled, true, "without an action until the resume's sweep")
+			helpers.assert_eq(#calls, 1)
+			world.paused = false
+			helpers.assert_true(servers.resume())
+			world.build()
+			helpers.assert_eq(#calls, 2, "the resume's menu sweeps the held verdicts")
+		end)
+	end)
+
+	helpers.it("a paused address commits without a sweep or a notice", function()
+		paused_world(function(servers, _, calls, world)
+			world.build()
+			calls[1].finish(models("qwen3"))
+			world.paused = true
+			servers.pause()
+			world.prompt = "http://127.0.0.1:18123/v1"
+			local address = find(world.build(), I18n.get("menu.llm.local_servers.other_address"))
+			helpers.assert_true(address ~= nil and address.items[1].disabled == nil)
+			local outcome = address.items[1].action()
+			helpers.assert_true(outcome and outcome.pending, "the address commits while paused")
+			helpers.assert_eq(servers.target("omlx").base_url, "http://127.0.0.1:18123/v1")
+			helpers.assert_eq(#calls, 1, "its sweep waits for the resume")
+			helpers.assert_eq(#world.notices, 0, "a write is not a refused rescan")
+		end)
+	end)
+
+	helpers.it("the pause cuts a running sweep short and keeps the last verdicts", function()
+		paused_world(function(servers, _, calls, world)
+			world.build()
+			calls[1].finish(models("qwen3"))
+			helpers.assert_true(servers.rescan(function() return true end))
+			helpers.assert_eq(#calls, 2)
+			world.paused = true
+			servers.pause()
+			helpers.assert_true(calls[2].cancelled > 0, "the pause cancels the probe in flight")
+			calls[2].finish({ ok = false, status = 0, body = "" })
+			helpers.assert_eq(servers.detected(), { "omlx" }, "late answers publish nothing while paused")
+			helpers.assert_eq(servers.rescan(function() return true end), false, "a paused rescan is refused")
+			helpers.assert_eq(#calls, 2)
+			helpers.assert_eq(find(world.build(), "qwen3").disabled, true,
+				"a verdict the pause cut short is shown without an action")
+		end)
+	end)
+end)

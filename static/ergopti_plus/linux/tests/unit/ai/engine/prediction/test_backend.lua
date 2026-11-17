@@ -388,7 +388,9 @@ end)
 
 
 helpers.describe("local API configuration uses the ordinary prediction admission owner", function()
-	helpers.it("master OFF permits configuration but pause and retained scope debt refuse it", function()
+	-- A pause stops typing, not configuration (EDD-1): it admits a local
+	-- server write; the menu holds only the sweep (edd1-local-server-rows).
+	helpers.it("master OFF and a pause permit configuration but retained scope debt refuses it", function()
 		local engine, _, scheduler, restore = load("ollama", nil, { ["llm.enabled"] = false })
 		-- The engine reads the profiles owner, not the storage fixture directly.
 		package.loaded["ai.engine.settings.profiles"].is_enabled = function() return false end
@@ -399,7 +401,7 @@ helpers.describe("local API configuration uses the ordinary prediction admission
 			helpers.assert_eq(engine.is_enabled(), false)
 			helpers.assert_eq(engine.can_configure_local_servers(), true)
 			paused = true
-			helpers.assert_eq(engine.can_configure_local_servers(), false)
+			helpers.assert_eq(engine.can_configure_local_servers(), true)
 			paused = false
 			helpers.assert_eq(engine.acquire_configuration(owner), true)
 			helpers.assert_eq(engine.can_configure_local_servers(), false)
@@ -452,11 +454,14 @@ helpers.describe("backend publication rechecks actual admission after dismissal"
 					end
 					local committed = engine.set_backend("api", admission)
 					armed = false
+					-- A pause stops typing, not configuration (EDD-1): a pause during the
+					-- dismissal no longer withdraws the admission (edd1-local-server-rows).
+					local commits = condition == "unchanged" or condition == "pause"
 					-- Assertions follow the actual dismissal observer; none can be swallowed by production.
 					helpers.assert_eq(observations.dismissals, 1, "the real dismissal must invoke its native overlay port")
-					helpers.assert_eq(committed, condition == "unchanged")
+					helpers.assert_eq(committed, commits)
 					local bytes = Sandbox.read_bytes(path)
-					if condition == "unchanged" then
+					if commits then
 						local decoded = require("core.text.engine.toml_codec").decode(bytes)
 						helpers.assert_eq(decoded.llm.models.selected, "api", "the real preference writer must acknowledge a new canonical backend")
 						helpers.assert_eq(decoded.future.value, 42)

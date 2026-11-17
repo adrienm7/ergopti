@@ -299,13 +299,14 @@ helpers.describe("Configured local menu leases and native pause (local-configure
 			helpers.assert_eq(world.persists, 0); helpers.assert_eq(api.get_entries(), { newer })
 		end)
 	end)
-	for _, phase in ipairs({ "paused", "missing", "untyped", "throw" }) do
+	-- A paused owner commits (EDD-1, edd1-local-server-rows below); an
+	-- unreadable one still refuses every write and every sweep.
+	for _, phase in ipairs({ "missing", "untyped", "throw" }) do
 		helpers.it("retained local rows refuse live pause owner " .. phase .. " (local-configured-views)", function()
 			with_panel(function(Panel, api, _, world, ctx)
 				api.detect_local_servers(); answer_sweep(world, { omlx = models_answer({ "model" }) })
 				local row = row_starting(Panel.rows(ctx), "oMLX 🖥️").items[1]
 				if phase == "missing" then ctx.is_paused = nil
-				elseif phase == "paused" then ctx.is_paused = function() return true end
 				elseif phase == "untyped" then ctx.is_paused = function() return "false" end
 				else ctx.is_paused = function() error("native pause read refused") end end
 				helpers.assert_eq(row.action(), false)
@@ -369,6 +370,99 @@ helpers.describe("Local models cache source identity (local-configured-cache)", 
 			for _, row in ipairs(rows) do
 				for _, item in ipairs(row.items or {}) do helpers.assert_eq(item.label == "old-source-model", false) end
 			end
+		end)
+	end)
+end)
+
+-- A pause stops typing, not configuration (EDD-1): the shared row builder
+-- greyed every local server row under `paused`, and the panel refused a model
+-- choice, an address and a key while paused. They commit now, from the
+-- verdicts the pause kept; only the sweep waits, told by the paused notice.
+helpers.describe("Local server rows while paused (edd1-local-server-rows)", function()
+	local i18n = require("core.i18n.engine.i18n")
+	local function rescan_row(rows)
+		for _, row in ipairs(rows) do
+			if row.label == i18n.get("menu.llm.local_servers.rescan") then return row end
+		end
+		return nil
+	end
+	local function paused_notices(world)
+		local count = 0
+		for _, notice in ipairs(world.notices) do
+			if notice.body == i18n.get("notify.paused_refused") then count = count + 1 end
+		end
+		return count
+	end
+
+	helpers.it("a paused model choice commits from the kept verdicts and the rescan waits for the resume", function()
+		with_panel(function(Panel, api, LocalServers, world, ctx)
+			api.detect_local_servers(); answer_sweep(world, { omlx = models_answer({ "model" }) })
+			local paused = true
+			ctx.is_paused = function() return paused end
+			helpers.assert_true(api.pause_local_discovery())
+			local probes = #world.probes
+			local rows = Panel.rows(ctx)
+			local server = row_starting(rows, "oMLX 🖥️")
+			helpers.assert_true(server ~= nil, "the pause keeps the verdict listed")
+			helpers.assert_eq(server.items[1].disabled, nil, "a pause greys no row")
+			helpers.assert_true(type(server.items[1].action) == "function")
+			local rescan = rescan_row(rows)
+			helpers.assert_true(rescan ~= nil and rescan.disabled == nil, "the rescan row stays live")
+			helpers.assert_true(server.items[1].action(), "the model choice commits while paused")
+			helpers.assert_eq(world.persists, 1)
+			helpers.assert_eq(api.get_active_entry().model, "model")
+			helpers.assert_eq(world.activations, 1, "the API backend is selected")
+			helpers.assert_eq(rescan.action(), false, "the rescan waits for the resume")
+			helpers.assert_eq(paused_notices(world), 1, "and says so with the paused notice")
+			helpers.assert_eq(#world.probes, probes, "nothing probes a server while paused")
+			-- The write leaves the verdicts without current evidence: shown, inert
+			local after = row_starting(Panel.rows(ctx), "oMLX 🖥️")
+			helpers.assert_true(after ~= nil, "the paused write keeps the verdict shown")
+			helpers.assert_eq(after.items[1].disabled, true)
+			helpers.assert_eq(LocalServers.is_held(), true)
+			helpers.assert_eq(#world.probes, probes, "a paused menu build sweeps nothing")
+			paused = false
+			helpers.assert_true(api.resume_local_discovery())
+			Panel.rows(ctx)
+			helpers.assert_true(#world.probes > probes, "the resume's menu sweeps the held verdicts")
+		end)
+	end)
+
+	for _, field in ipairs({ "address", "key" }) do
+		helpers.it("a paused " .. field .. " commits without a sweep or a notice", function()
+			with_panel(function(Panel, api, LocalServers, world, ctx)
+				api.detect_local_servers(); answer_sweep(world, { omlx = models_answer({ "model" }) })
+				ctx.is_paused = function() return true end
+				api.pause_local_discovery()
+				local probes, notices = #world.probes, #world.notices
+				world.dialog_answer = { "OK", field == "address" and "http://127.0.0.1:18123/v1" or "secret" }
+				local started
+				if field == "address" then started = Panel.prompt_address(ctx, "omlx")
+				else started = Panel.prompt_key(ctx, "omlx") end
+				helpers.assert_true(started, "the " .. field .. " commits while paused")
+				local pending = LocalServers.pending("omlx")
+				if field == "address" then helpers.assert_eq(pending.base_url, "http://127.0.0.1:18123/v1")
+				else helpers.assert_eq(pending.token, "secret") end
+				helpers.assert_eq(#world.probes, probes, "its sweep waits for the resume")
+				helpers.assert_eq(#world.notices, notices, "a write is not a refused rescan")
+			end)
+		end)
+	end
+
+	helpers.it("the pause cuts a running sweep short and keeps the last verdicts", function()
+		with_panel(function(Panel, api, LocalServers, world, ctx)
+			api.detect_local_servers(); answer_sweep(world, { omlx = models_answer({ "model" }) })
+			api.detect_local_servers()
+			local probes = #world.probes
+			api.pause_local_discovery()
+			answer_sweep(world, {})
+			helpers.assert_eq(LocalServers.detected(), { "omlx" }, "late answers publish nothing while paused")
+			helpers.assert_eq(LocalServers.is_held(), true)
+			helpers.assert_eq(api.detect_local_servers(), false, "a paused detection is refused")
+			helpers.assert_eq(#world.probes, probes)
+			ctx.is_paused = function() return true end
+			helpers.assert_eq(row_starting(Panel.rows(ctx), "oMLX 🖥️").items[1].disabled, true,
+				"a verdict the pause cut short is shown without an action")
 		end)
 	end)
 end)

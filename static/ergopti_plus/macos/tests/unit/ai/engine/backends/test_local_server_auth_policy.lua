@@ -58,6 +58,7 @@ end)
 
 helpers.describe("Shared local discovery controller", function()
 	require("tests.lua.core.local_server_discovery_contract").run(read("tests/corpus/llm/local_server_discovery.json"), helpers)
+	require("tests.lua.core.local_server_discovery_contract").run_pause(helpers)
 end)
 
 

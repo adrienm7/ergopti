@@ -267,11 +267,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### All drivers
 
-- [ ] **EDD-1 on macOS and Linux: the AI menu's local server rows while paused**
-      ([decision](docs/memory/maintainer-decisions.md)). Windows commits a model choice, an address and a key while
-      paused since 2026-11-17 and only its rescan waits, told by the paused notice (`local_server_panel.ahk`
-      `Pause`). The shared `ai/engine/local_servers/menu.lua` still greys every row under `paused`, and macOS
-      `local_server_panel.lua` (`admitted`) and Linux `local_server_rows.lua` (`admit`) refuse the three while paused.
 - [ ] **Structure plan, phase 2** ([plan](docs/design/structure-plan.md), resume point
       [docs/plans/structure-migration-resume.md](docs/plans/structure-migration-resume.md)). Left: S26 (hotstrings) to
       S38, one step per commit with `tools/audit/structure/run-phase2.cjs`, two or three per push after a CI proof.

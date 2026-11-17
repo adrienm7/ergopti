@@ -4054,11 +4054,12 @@ function M.get_backend()
 end
 
 --- Current admission for local-server configuration, including master OFF.
+--- A pause stops typing, not configuration (EDD-1): it admits a write while
+--- paused; the menu holds the discovery's network work by its own pause read.
 --- The existing preference transaction owns the backend mutation separately.
 --- @return boolean
 function M.can_configure_local_servers()
-	local paused = _is_paused()
-	return not paused and _scope_owner == nil and not _runtime_closed
+	return _scope_owner == nil and not _runtime_closed
 end
 
 --- Selects the backend.

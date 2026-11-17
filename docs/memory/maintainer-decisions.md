@@ -120,8 +120,10 @@ and clear). Windows follows since 2026-11-17: its editors, model page, AI
 scope restore and hotstring order run while paused, and
 `test_paused_handlers_never_silent.ahk` fails on a new silent pause gate in
 the configuration surfaces, the AI menu's local server rows included (their
-rescan waits for the resume). macOS and Linux still grey those rows while
-paused (TODO). Pages that are not configuration
+rescan waits for the resume). macOS and Linux follow for those rows since the
+same day: the shared discovery controller keeps the verdicts across a pause
+(`pause`, `resume`, `is_held`) and the shared row builder greys only an
+`inert` view (`edd1-local-server-rows`). Pages that are not configuration
 (changelog, update check) keep their own rules. Do not add a pause gate to a
 configuration action; gate the typing runtime instead.
 
