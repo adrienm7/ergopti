@@ -9,117 +9,81 @@ The Linux checks only a real desktop can answer; code work stays in [TODO.md](TO
 Every open line carries a `field-point` id; one `bash tools/dev/collect-linux-field-report.sh` run answers each
 of them in `docs/field-reports/linux-<stamp>/todo_summary.md` (probe steps read the session, guided steps prompt the
 gestures in the terminal): coverage table, verdicts and what no run can test in
-[docs/tooling/linux-field-report-coverage.md](docs/tooling/linux-field-report-coverage.md).
+[docs/tooling/linux-field-report-coverage.md](docs/tooling/linux-field-report-coverage.md). No machine is available
+yet; the first run also proves the field run without a click (53c1766514), the report marks, and `driver_reload`
+(one daemon restart under a real user manager). Container and CI proofs are not physical evidence.
 
-- [ ] <!-- field-point: raw_telemetry --> Raw telemetry (2026-11-11): under X11, move, resize and maximise a window and change monitor:
-      `events_window_topo` holds the rows from the libxcb and RandR reads; unplug the network and bring a WireGuard
-      tunnel up then down: `events_network` holds the four Internet and VPN kinds.
-- [ ] <!-- field-point: wayland_focus --> Wayland focus on GNOME and KDE: after `install.sh` (and a new login on GNOME), the excluded-applications rules and the metrics' per-app attribution follow the focused window under GNOME Shell 45+ and Plasma 6 (and 5): the log says « Listening for GNOME Shell/KWin focus reports », a title change in a browser updates the title, and turning the GNOME extension off makes the identity unknown.
-      COSMIC (2026-11-13): the log says « Listening for cosmic-comp focus reports on zcosmic_toplevel_info_v1
-      version 2 » on a current cosmic-comp (1 on an older one) and the focused application follows the window; the
-      v1, v2 and v2-without-list paths are proved only against the LuaJIT protocol fake.
-      GNOME layout switch (2026-11-13): on a real GNOME session after `install.sh` and a new login, Layout > « Input
-      sources » switches the layout through the Ergopti extension and the `sources` setting keeps its order; with the
-      extension turned off the menu names it.
-
-No machine is available. First `bash tools/dev/collect-linux-field-report.sh` on a real desktop: the field run
-without a click (53c1766514), the report marks, and `driver_reload` (one daemon restart under a real user manager).
-
-- [ ] <!-- field-point: physical_acceptance --> Physical acceptance: evdev/uinput grabs, polkit, autostart, Wayland and X11; wizard (7) on Wayland; magic key
-      grab, injection and hotplug (30); real kernel capture (93: ordered pairs need Xorg or a compositor on real
-      evdev nodes). Container pass (2026-11-10): not closable in the cloud container, whose kernel has no uinput or
-      evdev (`mknod /dev/uinput` opens with `ENODEV`) and no systemd PID 1, so a real-node grab, the polkit agent,
-      the user-manager autostart and real kernel capture cannot run there; the grab and injection on a real kernel
-      already run on CI (`run_grab_race.lua`, `run_daemon_live.sh`). The X11 and Wayland halves of the grabbed input
-      path now run on the kernel model (`tests/hardware/run_container_proofs.sh`). Left for a runner with uinput:
-      sway or Xorg reading the daemon's real virtual keyboard (93); wizard (7) and the magic key (30) not attempted.
-- [ ] <!-- field-point: item50_cascade --> Item 50 cascade and the composed layout typed on a physical keyboard.
-      Not attempted in the 2026-11-10 container pass; the emulation proof above can type the composer's
-      `composed.keylayout` once it is the emulated layout. 2026-11-11, the cascade through the daemon's real main()
-      (`tests/e2e/run_e2e.lua`, scripted keyboard, uinput into a model field; the container kernel has no evdev or
-      uinput): `fb` + Space, Enter and ★ at 1, 2 and 3 arrows, Space and Enter consumed and not, give the
-      `cascade_vectors.json` `fb_*` texts (11 scenarios, neutral and recommended presets). The same Space and Enter
-      cases are typed on a uinput keyboard in `run_daemon_live.lua`: CI run 42952845748 (native lane, real
-      uinput and grab) received « Facebook » and Space, and « Facebook » then Enter. Left: the
-      physical keyboard and the composed layout.
-- [ ] <!-- field-point: layout_emulation_w1_w4 --> Layout emulation W1 to W4 of `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions
-      Container proof 2026-11-10 (`tests/hardware/run_user_layout_wayland_live.lua`, [receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): on GNOME Shell
-      46 `apply-wayland` ends `not_loaded` and rolls back (the shell lists no user-tree id, mutter still compiles it);
-      on KWin 6.6.4 inconclusive (headless XWayland read-back); W4 not attempted. 2026-11-11: GNOME W1 to W3 hold
-      after one login (`user_layout_wayland_gnome.txt`, Bépo: the slot loads with `ERGOPTI_SEVEN_LEVEL`, the
-      digits-first build under the other slot replaces it with no restart); a layout first registered during the
-      session answers `needs_relogin` and leaves the setting alone. KDE (not re-run with Bépo) still open. W4
-      answered (`run_x11_reapply_live.sh`, `x11_reapply_*.txt`): GNOME Shell 46 and Plasma 6.6.4 under X11 put their
-      own layouts back when a keyboard appears (GNOME also on an input-sources setting change), never on a switch.
-      (dbe176e52b, 9b0a205029, dfb197a1ea), including mutter and KWin reloading a `~/.config/xkb` layout (107).
-- [ ] <!-- field-point: owned_gtk_host --> Owned GTK host (split from the window-toggle line): tap delay row and every tray dialog (ca680655d7), group restore and clear, open target, Backspace word start.
-- [ ] <!-- field-point: physical_shortcut_delivery --> Physical shortcut delivery (LIN-004): with a physical slot bound, prove on a real keyboard that the source key is
-      suppressed exactly once, no other owner (tap-hold, layer, hotstring, magic key) also acts on it, and the action's
-      output reaches the focused window under the grab; only that evidence may turn
-      `keyboard_shortcuts.physical_delivery_available` true. Delivery proven on the kernel model (2026-11-11):
-      `tests/hardware/run_physical_shortcut_container.py` (11 assertions; only its daemon process answers the getter
-      true) shows a bound key suppressed exactly once, also held with autorepeat, its action reaching mousepad, and a
-      single owner against a hotstring (the slot runs, `xz` never expands), a tap-hold key (Tab keeps its tap), the
-      layer (Alt+K keeps ArrowLeft) and the magic key (the slot runs, no ★). Decided by the maintainer on 2026-11-11:
-      the getter answers true, every safety refusal kept (done: `test_physical_delivery_available.lua`, the scope
-      fixtures and the tray row test pin true and keep each refusal under an explicit false answer). Left on a real
-      keyboard: the editor's capture and save (the picker window) and the delivery above under the evdev grab.
-- [ ] <!-- field-point: predictions_stop --> Predictions stop on activity (feat/predictions-stop-on-activity): with a slow model, during the spinner move
+- [ ] <!-- field-point: raw_telemetry --> Raw telemetry: under X11, move, resize and maximise a window and change
+      monitor: `events_window_topo` holds the rows from the libxcb and RandR reads; unplug the network and bring a
+      WireGuard tunnel up then down: `events_network` holds the four Internet and VPN kinds.
+- [ ] <!-- field-point: wayland_focus --> Wayland focus on GNOME, KDE and COSMIC: after `install.sh` (and a new login
+      on GNOME), the excluded-applications rules and the metrics' per-app attribution follow the focused window under
+      GNOME Shell 45+ and Plasma 6 (and 5): the log says « Listening for GNOME Shell/KWin focus reports », a title
+      change in a browser updates the title, and turning the GNOME extension off makes the identity unknown. On
+      COSMIC the log says « Listening for cosmic-comp focus reports on zcosmic_toplevel_info_v1 version 2 » on a
+      current cosmic-comp (1 on an older one) and the focused application follows the window. GNOME layout switch:
+      Layout > « Input sources » switches the layout through the Ergopti extension and the `sources` setting keeps
+      its order; with the extension turned off the menu names it.
+- [ ] <!-- field-point: physical_acceptance --> Physical acceptance: evdev/uinput grabs, polkit, autostart, Wayland
+      and X11; the wizard (7) on Wayland; the magic key grab, injection and hotplug (30); sway or Xorg reading the
+      daemon's real virtual keyboard on real evdev nodes (93).
+- [ ] <!-- field-point: item50_cascade --> Item 50 cascade on a physical keyboard (`fb` + Space, Enter and ★ at 1, 2
+      and 3 arrows, consumed and not, as `cascade_vectors.json` `fb_*`), and the composed layout typed on it.
+- [ ] <!-- field-point: layout_emulation_w1_w4 --> Layout emulation W1 to W4 of
+      `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions, including mutter and KWin reloading a
+      `~/.config/xkb` layout (107); KDE is not proved even in a container
+      ([receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)).
+- [ ] <!-- field-point: owned_gtk_host --> Owned GTK host: tap delay row and every tray dialog (ca680655d7), group
+      restore and clear, open target, Backspace word start.
+- [ ] <!-- field-point: physical_shortcut_delivery --> Physical shortcut delivery (LIN-004): on a real keyboard under
+      the evdev grab, a bound key is suppressed exactly once, no other owner (tap-hold, layer, hotstring, magic key)
+      acts on it, and the action's output reaches the focused window; the editor's capture and save (the picker
+      window) work.
+- [ ] <!-- field-point: predictions_stop --> Predictions stop on activity: with a slow model, during the spinner move
       the mouse, turn the wheel, touch the touchpad (absolute pad and relative pad), switch window (the 250 ms poll),
       press F5: each cancels and hides. The validation digits and the navigation chords keep a shown prediction.
-      Not emulable in the cloud (2026-11-10): the container kernel has no uinput module and no /dev/input
-      (`mknod c 10 223` opens with ENODEV), so no pointer, wheel or touchpad device can reach the hook's evdev
-      reader, and no compositor runs the spinner or the focused-window poll; the event routing is covered by
-      `test_prediction_control_retirement.lua` (« Main cancels AI on pointer activity »).
-- [ ] <!-- field-point: input_policies --> Branch `wave3/input-policies` (2026-11-06): with the Bépo registry layout installed, monnaie then cédille
-      Container proof 2026-11-10 ([receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)): Qt (kwrite) types ₢ at once; GTK 3 (mousepad, no IBus) types the
-      borrowed trigger « ⅕ » (Linux remaining work); the installed X11 Bépo needed 03a47899. The other parts of this
-      line were not attempted. 2026-11-11: GTK 3 and Qt both type ₢ at once (`bepo_compose_gtk3.txt`); left: the
-      sticky delay row, the CapsWord menu change, the one-shot Shift and CapsWord device checks.
-      types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row changes
-      the one-shot wait; a CapsWord menu change applies to the running session. Native one-shot Shift real-device
-      output receiving; CapsWord absolute reader and desktop keyboard grouping (moved from the one-shot and
-      CapsWord parity follow-ups).
-      GTK 3 Compose through IBus (2026-11-13): on a KDE or Xfce session with IBus installed and no input method, after
-      installing a Compose layout from the layout manager and logging in again, a GTK 3 application (mousepad, gedit)
-      types a multi-character Compose output, Layout shows « every sequence, through IBus », and the layout stays the
-      system's; with fcitx5 running the row names the input method and `~/.config/environment.d/90-ergopti-ibus.conf`
-      is absent.
-- [ ] <!-- field-point: layout_editor_window --> Layout editor window (2026-11-13): « Create or edit a layout… » and the layout manager's « Layout editor » open Studio tabs and autosave (2026-11-15, `claude/ergopti-todo-studio-w-2`): in « Éditer », « + » opens a second layout in its own tab; edit both, kill the driver (or close the window), reopen « Ergopti Studio »: both tabs and their unsaved edits are back, from `layout_sources/studio_workspace.json`; « Export all » writes `ergopti-studio-layouts.zip` to the Downloads folder and « Import » of that file reopens every layout. Other layout formats (2026-11-16): « Open » in WebKitGTK's file chooser lists .json, .klc and .kbe files, opens a KLAnext JSON (static/layouts/kla_iso) and a UTF-16 .klc, and refuses a KbdEdit .kbe with the « KbdEdit encrypts » message; the « Format » drop-down's « KLA / KLAnext JSON » and « Kalamine TOML » downloads land in the Downloads folder.
-      the editor in its own WebKitGTK window; a second request brings it to the front with its unsaved work; « Close »
-      closes it.
-      Ergopti Studio (2026-11-14, `claude/ergopti-todo-studio-app`): the top-level « 🎨 Ergopti Studio… » row,
-      right after « Keyboard layout », opens the same window, titled exactly « Ergopti Studio ».
-      Studio tabs (2026-11-14, `claude/ergopti-todo-studio-app`): « Comparer » shows the layout ranking for a
-      built-in corpus within a second, an imported layout is still listed after closing and reopening the window,
-      and « Analyse my typing » then selects « My typing » in « Comparer ». XKB and KLC downloads (2026-11-15, `claude/ergopti-todo-native-export`): in the layout editor window's « Export » tab, « XKB » and « KLC » write `<id>_xkb.zip` and `<dll>.klc` to the Downloads folder, built by the host’s Lua (lua_export); proven under xvfb in the container.
-      Downloads (2026-11-14, `layout_editor_downloads`): the window's XKB, KLC, DLL and macOS bundle downloads land in the Downloads folder, a second download of the same file is named « name (2).ext », and the XKB archive installs with the user layout installer.
-      Navigation layer in the Studio (2026-11-15, `claude/ergopti-todo-studio-nav-entry`): the Tap-Holds menu's « Edit the navigation layer… » row and a
-      gesture bound to « Navigation layer » open Ergopti Studio on its « nav » layer, holding the current layer
-      key, with the user's layers.toml bindings; « Apply the navigation layer » then changes the layer live, and
-      layers.toml starts with « # source: » and « # body-fnv1a32: ».
-- [ ] <!-- field-point: direct_xkb_levels --> Direct XKB compiler (2026-11-13, `claude/ergopti-todo-compilers`): the XKB export of
-      `_shared/tests/corpus/layouts/source/direct_levels.toml` installed with the user layout installer types a,
-      α (Right Ctrl, XKB's fifth level), æ (AltGr) and β (Right Ctrl). Proven in a container with xkbcomp and
-      libxkbcommon on the same files; left: a real GNOME or KDE session.
-- [ ] <!-- field-point: one_shot_modifiers --> One-shot modifiers (worker A, 2026-11-13): Tap-holds > sticky delay row accepts 0 and shows « no time limit »,
-      and a one-shot Shift then waits indefinitely; a gesture or key bound to `sticky_ctrl_shift`, `sticky_cmd_ctrl`
-      (Super+Ctrl) and `sticky_altgr` wraps the next key in those modifiers once, in a GTK and a Qt application; a
-      tap-hold key set to tap `sticky_altgr` and hold AltGr types one AltGr character after a tap.
-- [ ] <!-- field-point: shortcut_key_carriage --> Native carriage of `shortcut_key` (moved 2026-11-15 from TODO.md
-      « Native carriage of `shortcut_key` (2026-11-15) », its real-OS proof once the [CODE] part is written): the XKB
-      export states that XKB cannot carry `shortcut_key`, and Ergopti+ emulation keeps it on a real desktop: the
-      shortcut sends the shortcut key.
-- [ ] <!-- field-point: incremental_swipes --> Incremental touchpad swipes (moved 2026-11-15 from TODO.md « Windows
-      and Linux: evaluate incremental touchpad gesture modes and step sizes », Cross-platform feature inventory;
-      fd628ef212, `test_gesture_incremental.lua`): on a real touchpad, an incremental slot's action fires while the
-      fingers move (`modules/gestures/incremental_tracker.lua`), with the step rule and reversal shared with macOS;
-      the travel is in millimetres from the touchpad's own resolution (EVIOCGABS), so the steps set in
-      `[gestures.sensitivities]` and in each swipe slot's submenu match the distance swiped; a pad that reports no
-      resolution fires once, as x1, said in the log.
-- [ ] <!-- field-point: one_folder_name --> One folder name (moved 2026-11-15 from TODO.md « One folder name for
-      Ergopti on the three OS »;
-      [handoff](docs/tooling/one-folder-name-handoff.md#what-the-maintainer-checks-on-each-machine)): check the Linux
+- [ ] <!-- field-point: input_policies --> Input policies: with the Bépo registry layout installed, monnaie then
+      cédille types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row
+      changes the one-shot wait; a CapsWord menu change applies to the running session; native one-shot Shift
+      real-device output; CapsWord absolute reader and desktop keyboard grouping. GTK 3 Compose through IBus: on a
+      KDE or Xfce session with IBus installed and no input method, after installing a Compose layout from the layout
+      manager and logging in again, a GTK 3 application (mousepad, gedit) types a multi-character Compose output,
+      Layout shows « every sequence, through IBus », and the layout stays the system's; with fcitx5 running the row
+      names the input method and `~/.config/environment.d/90-ergopti-ibus.conf` is absent.
+- [ ] <!-- field-point: layout_editor_window --> Ergopti Studio window: « Create or edit a layout… », the layout
+      manager's « Layout editor » and the top-level « 🎨 Ergopti Studio… » row (right after « Keyboard layout ») open
+      one WebKitGTK window titled exactly « Ergopti Studio »; a second request brings it to the front with its unsaved
+      work; « Close » closes it. Tabs: « Comparer » shows the layout ranking for a built-in corpus within a second, an
+      imported layout is still listed after closing and reopening the window, and « Analyse my typing » then selects
+      « My typing ». Autosave: in « Éditer », « + » opens a second layout in its own tab; edit both, kill the driver
+      (or close the window), reopen the Studio: both tabs and their unsaved edits are back, from
+      `layout_sources/studio_workspace.json`; « Export all » writes `ergopti-studio-layouts.zip` to the Downloads
+      folder and « Import » of that file reopens every layout. Formats: « Open » in WebKitGTK's file chooser lists
+      .json, .klc and .kbe files, opens a KLAnext JSON (static/layouts/kla_iso) and a UTF-16 .klc, and refuses a
+      KbdEdit .kbe with the « KbdEdit encrypts » message. Downloads: the XKB (`<id>_xkb.zip`, built by the host's Lua),
+      KLC, DLL, macOS bundle, « KLA / KLAnext JSON » and « Kalamine TOML » downloads land in the Downloads folder, a
+      second download of the same file is named « name (2).ext », and the XKB archive installs with the user layout
+      installer. Navigation layer: the Tap-Holds menu's « Edit the navigation layer… » row and a gesture bound to
+      « Navigation layer » open the Studio on its « nav » layer, holding the current layer key, with the user's
+      layers.toml bindings; « Apply the navigation layer » then changes the layer live, and layers.toml starts with
+      « # source: » and « # body-fnv1a32: ».
+- [ ] <!-- field-point: direct_xkb_levels --> Direct XKB compiler: the XKB export of
+      `_shared/tests/corpus/layouts/source/direct_levels.toml` installed with the user layout installer types a, α
+      (Right Ctrl, XKB's fifth level), æ (AltGr) and β (Right Ctrl) on a real GNOME or KDE session.
+- [ ] <!-- field-point: one_shot_modifiers --> One-shot modifiers: Tap-holds > sticky delay row accepts 0 and shows
+      « no time limit », and a one-shot Shift then waits indefinitely; a gesture or key bound to `sticky_ctrl_shift`,
+      `sticky_cmd_ctrl` (Super+Ctrl) and `sticky_altgr` wraps the next key in those modifiers once, in a GTK and a Qt
+      application; a tap-hold key set to tap `sticky_altgr` and hold AltGr types one AltGr character after a tap.
+- [ ] <!-- field-point: shortcut_key_carriage --> Native carriage of `shortcut_key`: the XKB export states what XKB
+      cannot carry of `shortcut_key`, and on a real desktop the shortcut sends the shortcut key, through the installed
+      layout's Control/Alt/Super level and through Ergopti+ emulation.
+- [ ] <!-- field-point: incremental_swipes --> Incremental touchpad swipes (`test_gesture_incremental.lua`): on a real
+      touchpad, an incremental slot's action fires while the fingers move (`modules/gestures/incremental_tracker.lua`),
+      with the step rule and reversal shared with macOS; the travel is in millimetres from the touchpad's own
+      resolution (EVIOCGABS), so the steps set in `[gestures.sensitivities]` and in each swipe slot's submenu match
+      the distance swiped; a pad that reports no resolution fires once, as x1, said in the log.
+- [ ] <!-- field-point: one_folder_name --> One folder name
+      ([handoff](docs/tooling/one-folder-name-handoff.md#what-the-maintainer-checks-on-each-machine)): check the Linux
       machine against the handoff's Linux list (`~/.config/ergopti_plus`, `~/.local/state/ergopti_plus` and
       `~/.local/share/ergopti_plus` gone, the daemon log listing each move, the old
       `~/.cache/ergopti_updater_etag_*.txt` files deleted); the migration is removed only once the maintainer's
