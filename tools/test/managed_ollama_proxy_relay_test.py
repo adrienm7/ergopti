@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 ROOT = Path(__file__).resolve().parents[2]
 STATIC = ROOT / "static/ergopti_plus"
@@ -103,6 +104,44 @@ class DecisionTests(unittest.TestCase):
             str(self.receipt), "registry.ollama.ai:443", 10000, 15000, 300000, 30000
         )
         self.calls = []
+        clean = {key: value for key, value in os.environ.items() if not key.startswith("KRB5")}
+        control = unittest.mock.patch.dict(os.environ, clean, clear=True)
+        control.start()
+        self.addCleanup(control.stop)
+
+    def test_the_kerberos_variables_reach_the_probe_and_the_listen_request_only(self):
+        settings = {
+            "KRB5CCNAME": "FILE:/tmp/ergopti-ticket",
+            "KRB5_CONFIG": "/tmp/ergopti-krb5.conf",
+            "KRB5_KTNAME": "/tmp/not-for-the-relay.keytab",
+            "ERGOPTI_UNRELATED": "kept out",
+        }
+        with unittest.mock.patch.dict(os.environ, settings):
+            decision = self.decide(
+                [["HTTPS_PROXY", "http://proxy:8080"]],
+                Completed(0, '{"schema":1,"status":"required","scheme":"negotiate"}\n'),
+            )
+        environment = self.calls[0][1]["env"]
+        self.assertEqual(
+            sorted(environment), ["HOME", "KRB5CCNAME", "KRB5_CONFIG", "PATH"], "no other variable"
+        )
+        self.assertEqual(environment["KRB5CCNAME"], "FILE:/tmp/ergopti-ticket")
+        self.assertEqual(
+            decision.request_fields(self.options)["relay_environment"],
+            {"KRB5CCNAME": "FILE:/tmp/ergopti-ticket", "KRB5_CONFIG": "/tmp/ergopti-krb5.conf"},
+        )
+        without = self.decide(
+            [["HTTPS_PROXY", "http://proxy:8080"]],
+            Completed(0, '{"schema":1,"status":"required","scheme":"negotiate"}\n'),
+        )
+        self.assertNotIn("relay_environment", without.request_fields(self.options))
+
+    def test_a_kerberos_value_with_a_line_break_is_refused_before_any_probe(self):
+        with unittest.mock.patch.dict(os.environ, {"KRB5CCNAME": "FILE:/tmp/a\nB=c"}):
+            decision = self.decide([["HTTPS_PROXY", "http://proxy:8080"]], None)
+        self.assertEqual((decision.outcome, decision.reason), ("refused", "invalid_arguments"))
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.receipt.read_text(), "invalid_arguments\n")
 
     def decide(self, environment, answer):
         def run(arguments, **keywords):

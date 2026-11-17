@@ -754,12 +754,12 @@ jobs:
           grep -Fq "Test Suite 'ManagedImageAliasTests' passed" "$transcript"
           grep -Fq 'Executed 4 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'OwnedSuspendedImageTests' passed" "$transcript"
-          grep -Fq 'Executed 19 tests, with 0 failures' "$transcript"
+          grep -Fq 'Executed 22 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'ManagedListenerPathIdentityTests' passed" "$transcript"
           grep -Fq 'Executed 2 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'ManagedNetworkBootstrapTests' passed" "$transcript"
           test "$(grep -Fc 'Executed 7 tests, with 0 failures' "$transcript")" -eq 1
-          grep -Fq 'Executed 61 tests, with 0 failures' "$transcript"
+          grep -Fq 'Executed 64 tests, with 0 failures' "$transcript"
           # Independent logging cohort; historical52 above supplies no seven-case credit.
           log_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-xctest.log"
           log_source="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-source.json"

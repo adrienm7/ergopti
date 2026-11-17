@@ -81,8 +81,11 @@ class RelayDecision:
     "refused" (no proxy; `reason` is in the receipt).
     """
 
-    def __init__(self, outcome, *, name=None, upstream=None, reason=None):
+    def __init__(self, outcome, *, name=None, upstream=None, reason=None, sign_in=None):
         self.outcome, self.name, self.upstream, self.reason = outcome, name, upstream, reason
+        # The Kerberos variables (KRB5CCNAME, KRB5_CONFIG) the guardian hands to
+        # listen: it starts the relay with no inherited environment.
+        self.sign_in = dict(sign_in or {})
 
     def request_fields(self, options):
         """The suspended image request's relay fields (ManagedProxyRelayRequest)."""
@@ -93,6 +96,7 @@ class RelayDecision:
             "relay_dial_ms": options.timings["dial_ms"],
             "relay_handshake_ms": options.timings["handshake_ms"],
             "relay_idle_ms": options.timings["idle_ms"],
+            **({"relay_environment": dict(self.sign_in)} if self.sign_in else {}),
         }
 
 
@@ -152,6 +156,10 @@ def decide(
         return RelayDecision("keep")
     arguments = policy.probe_args(upstream, options.authority, options.timings)
     try:
+        sign_in = policy.sign_in_values(os.environ)
+    except POLICY.RelayPolicyError:
+        return refuse(options, "invalid_arguments")
+    try:
         result = run(
             [str(relay), *arguments],
             stdin=subprocess.DEVNULL,
@@ -160,7 +168,11 @@ def decide(
             timeout=options.probe_seconds
             if remaining is None
             else min(options.probe_seconds, remaining),
-            env={"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "HOME": os.environ.get("HOME", "/")},
+            env={
+                "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+                "HOME": os.environ.get("HOME", "/"),
+                **sign_in,
+            },
         )
         stdout = result.stdout.decode("utf-8", "replace")
         status, detail = policy.read_probe(result.returncode, stdout)
@@ -171,7 +183,7 @@ def decide(
         return RelayDecision("keep")
     if status == "required":
         log("required", detail)
-        return RelayDecision("required", name=name, upstream=upstream)
+        return RelayDecision("required", name=name, upstream=upstream, sign_in=sign_in)
     return refuse(options, detail)
 
 

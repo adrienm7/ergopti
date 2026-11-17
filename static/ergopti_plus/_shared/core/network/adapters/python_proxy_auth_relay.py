@@ -57,6 +57,20 @@ class ProxyAuthRelay:
                 raise RelayPolicyError("contract")
             self.refusals = frozenset(refusals)
             self.relay_user = contract["relay_user"]
+            # The Kerberos variables a relay owner hands to a relay started
+            # without its environment (the macOS managed daemon's guardian).
+            self.sign_in_environment = tuple(contract["sign_in_environment"])
+            self.max_sign_in_value_bytes = contract["max_sign_in_value_bytes"]
+            if (
+                not self.sign_in_environment
+                or any(
+                    type(name) is not str or re.fullmatch(r"[A-Z][A-Z0-9_]*", name) is None
+                    for name in self.sign_in_environment
+                )
+                or type(self.max_sign_in_value_bytes) is not int
+                or self.max_sign_in_value_bytes <= 0
+            ):
+                raise RelayPolicyError("contract")
             if type(self.relay_user) is not str or re.fullmatch(r"[a-z]+", self.relay_user) is None:
                 raise RelayPolicyError("contract")
             self.schemes = frozenset(contract["schemes"])
@@ -104,6 +118,28 @@ class ProxyAuthRelay:
             "--handshake-timeout-ms",
             str(timings["handshake_ms"]),
         ]
+
+    def sign_in_values(self, environment):
+        """The sign-in variables set in an environment, validated.
+
+        Returns:
+            {name: value} for each non-empty variable of sign_in_environment.
+
+        Raises:
+            RelayPolicyError: A value with a NUL or a line break, or too long.
+        """
+        values = {}
+        for name in self.sign_in_environment:
+            value = environment.get(name)
+            if not value:
+                continue
+            if (
+                any(character in value for character in "\0\r\n")
+                or len(value.encode("utf-8")) > self.max_sign_in_value_bytes
+            ):
+                raise RelayPolicyError("sign_in_environment")
+            values[name] = value
+        return values
 
     def read_probe(self, exit_code, stdout):
         """Read a finished probe child as the Lua policy does.

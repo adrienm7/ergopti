@@ -34,7 +34,7 @@ private final class SuspendedImageNativeSession {
 	///   (signed ad hoc), "" for none on disk, nil for a request without relay
 	///   fields. A relay request carries the bootstrap binding it needs.
 	init(launcher: URL, inodeDelta: UInt64 = 0, prefillSession: Bool = false, listenerEvent: Bool = false, loggedFixture: Bool = false,
-		relayScript: String? = nil) throws {
+		relayScript: String? = nil, relayEnvironment: [String: String]? = nil) throws {
 		self.loggedFixture = loggedFixture
 		let temporary = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
 		directory = temporary.appendingPathComponent("ergopti-image-\(UUID().uuidString)")
@@ -106,6 +106,13 @@ private final class SuspendedImageNativeSession {
 			request["store_cwd"] = String(cString: resolved); free(resolved)
 			request["relay_upstream"] = "http://proxy.example:8080"
 			request["relay_dial_ms"] = 1000; request["relay_handshake_ms"] = 1000; request["relay_idle_ms"] = 1000
+			if let relayEnvironment {
+				request["relay_environment"] = relayEnvironment
+				// The guardian's own variables, a keytab name among them, must not reach the relay.
+				var inherited = ProcessInfo.processInfo.environment
+				inherited["ERGOPTI_RELAY_LEAK_SENTINEL"] = "leaked"; inherited["KRB5_KTNAME"] = "/tmp/ergopti-not-for-relay.keytab"
+				process.environment = inherited
+			}
 			process.currentDirectoryURL = directory
 			if !relayScript.isEmpty {
 				let relay = worker.deletingLastPathComponent().appendingPathComponent(SuspendedImageProxyRelay.executableName)
@@ -354,8 +361,43 @@ final class OwnedSuspendedImageTests: XCTestCase {
 			("relay_upstream", "http://proxy.example:65536"), ("relay_upstream", "http://proxy example:8080"),
 			("relay_dial_ms", 0), ("relay_dial_ms", true), ("relay_handshake_ms", NSNumber(value: 1.5)),
 			("relay_idle_ms", 600_001), ("relay_idle_ms", "1000"),
+			("relay_environment", ["KRB5_KTNAME": "/tmp/keytab"]), ("relay_environment", ["PATH": "/tmp"]),
+			("relay_environment", ["KRB5CCNAME": ""]), ("relay_environment", ["KRB5CCNAME": "FILE:/tmp/a\nB=c"]),
+			("relay_environment", ["KRB5CCNAME": 1]), ("relay_environment", [String: String]()),
+			("relay_environment", ["KRB5CCNAME": String(repeating: "a", count: 4097)]), ("relay_environment", "KRB5CCNAME=x"),
 		]
 		for (field, value) in rejected { var altered = request; altered[field] = value; XCTAssertNil(try parse(altered), "\(field) \(value)") }
+	}
+	func testRelayRequestCarriesOnlyTheKerberosVariables() throws {
+		let home = "/private/tmp/ergopti-image-request-test"
+		let sessions = home + "/Library/Application Support/Ergopti/ollama-native-sessions/"
+		let request: [String: Any] = [
+			"version": 1, "executable": home + "/Library/Application Support/Ergopti/ollama-native-http/.ergopti-image-0123456789abcdef0123456789abcdef",
+			"arguments": ["serve"], "device": "1", "inode": "2",
+			"session_path": sessions + "daemon-0123456789abcdef0123456789abcdef.json",
+			"remaining_ms": 1000, "home": home, "models_path": "", "network_policy": home + "/policy.json",
+			"host": "127.0.0.1:11434", "proxy_url": "",
+			"bootstrap_path": sessions + "network-0123456789abcdef0123456789abcdef.json", "bootstrap_device": "1",
+			"bootstrap_inode": "3", "store_mode": "default", "store_cwd": FileManager.default.currentDirectoryPath,
+			"relay_upstream": "http://proxy.example:8080", "relay_dial_ms": 10_000, "relay_handshake_ms": 15_000,
+			"relay_idle_ms": 300_000,
+			"relay_environment": ["KRB5CCNAME": "FILE:/tmp/ergopti-ticket", "KRB5_CONFIG": "/tmp/ergopti-krb5.conf"],
+		]
+		let parsed = try XCTUnwrap(OwnedSuspendedImageRequest.parse(
+			try JSONSerialization.data(withJSONObject: request), launcher: "/usr/bin/true"))
+		XCTAssertEqual(try XCTUnwrap(parsed.relay).environment,
+			["KRB5CCNAME": "FILE:/tmp/ergopti-ticket", "KRB5_CONFIG": "/tmp/ergopti-krb5.conf"])
+		var alone = request
+		for key in ManagedProxyRelayRequest.requiredKeys { alone[key] = nil }
+		XCTAssertNil(OwnedSuspendedImageRequest.parse(try JSONSerialization.data(withJSONObject: alone), launcher: "/usr/bin/true"),
+			"relay_environment alone is no relay request")
+	}
+	func testSignInEnvironmentMirrorsTheRelayContract() throws {
+		let contract = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+			.appendingPathComponent("../../../../_shared/core/network/data/proxy_auth_relay.json").standardizedFileURL
+		let fields = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: contract)) as? [String: Any])
+		XCTAssertEqual(Set(try XCTUnwrap(fields["sign_in_environment"] as? [String])), ManagedProxyRelayRequest.signInEnvironment)
+		XCTAssertEqual(fields["max_sign_in_value_bytes"] as? Int, ManagedProxyRelayRequest.maximumSignInValueBytes)
 	}
 	func testRelayLineIsTheExactListenShape() {
 		let token = Self.relayToken
@@ -394,6 +436,25 @@ final class OwnedSuspendedImageTests: XCTestCase {
 		XCTAssertTrue(fixture.markers.contains("V1 ACTIVE"))
 		XCTAssertTrue(fixture.markers.contains("V1 RELAY_CLOSED 0"))
 		XCTAssertEqual(fixture.markers.last, "V1 RETIRED 0 1 1 0 0 0 0")
+	}
+	func testListenReceivesTheKerberosVariablesAndNothingElseOfTheGuardian() throws {
+		let temporary = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+		let pidFile = temporary.appendingPathComponent("ergopti-relay-\(UUID().uuidString).pid")
+		let environmentFile = temporary.appendingPathComponent("ergopti-relay-\(UUID().uuidString).env")
+		defer { try? FileManager.default.removeItem(at: pidFile); try? FileManager.default.removeItem(at: environmentFile) }
+		let script = relayScript(pidFile: pidFile).replacingOccurrences(of: "echo $$ >",
+			with: "env > '\(environmentFile.path)'\necho $$ >")
+		let passed = ["KRB5CCNAME": "FILE:/tmp/ergopti-ticket", "KRB5_CONFIG": "/tmp/ergopti-krb5.conf"]
+		let fixture = try SuspendedImageNativeSession(launcher: launcher(), relayScript: script, relayEnvironment: passed)
+		defer { fixture.cleanup() }
+		try activate(fixture)
+		XCTAssertTrue(fixture.markers.contains("V1 RELAY 40123 " + Self.relayToken))
+		XCTAssertEqual(fixture.markers.last, "V1 RETIRED 0 1 1 0 0 0 0")
+		let lines = String(decoding: try Data(contentsOf: environmentFile), as: UTF8.self).split(separator: "\n").map(String.init)
+		XCTAssertTrue(lines.contains("KRB5CCNAME=FILE:/tmp/ergopti-ticket"))
+		XCTAssertTrue(lines.contains("KRB5_CONFIG=/tmp/ergopti-krb5.conf"))
+		XCTAssertFalse(lines.contains(where: { $0.hasPrefix("ERGOPTI_RELAY_LEAK_SENTINEL=") }), "a guardian variable leaked")
+		XCTAssertFalse(lines.contains(where: { $0.hasPrefix("KRB5_KTNAME=") }), "a variable outside the contract leaked")
 	}
 	func testMissingRelayIsRelayUnavailable() throws {
 		let fixture = try SuspendedImageNativeSession(launcher: launcher(), relayScript: ""); defer { fixture.cleanup() }

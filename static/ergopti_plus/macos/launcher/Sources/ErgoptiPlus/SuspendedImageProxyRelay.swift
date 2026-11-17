@@ -15,23 +15,49 @@ struct ManagedProxyRelayRequest {
 	let dialMilliseconds: UInt32
 	let handshakeMilliseconds: UInt32
 	let idleMilliseconds: UInt32
+	/// The Kerberos variables listen reads (KRB5CCNAME, KRB5_CONFIG): the
+	/// guardian runs with PATH alone, so a ticket cache named by the user's
+	/// environment reaches the relay only through the request.
+	let environment: [String: String]
 
-	static let keys: Set<String> = ["relay_upstream", "relay_dial_ms", "relay_handshake_ms", "relay_idle_ms"]
+	static let requiredKeys: Set<String> = ["relay_upstream", "relay_dial_ms", "relay_handshake_ms", "relay_idle_ms"]
+	/// Every relay field; relay_environment is present only when one variable is set.
+	static let keys: Set<String> = requiredKeys.union(["relay_environment"])
+	/// proxy_auth_relay.json "sign_in_environment" and "max_sign_in_value_bytes"
+	/// (testSignInEnvironmentMirrorsTheRelayContract pins both).
+	static let signInEnvironment: Set<String> = ["KRB5CCNAME", "KRB5_CONFIG"]
+	static let maximumSignInValueBytes = 4096
 	/// The relay's own deadlines stay below ten minutes; a larger value is a caller fault.
 	static let maximumMilliseconds: UInt64 = 600_000
 
-	/// Parses the four relay fields, all present or all absent.
+	/// Parses the relay fields: the four required ones all present or all absent.
 	/// - Parameter fields: The decoded request object.
 	/// - Returns: nil when no field is present, .some(nil) for a refused set.
 	static func parse(_ fields: [String: Any]) -> ManagedProxyRelayRequest?? {
 		let present = Set(fields.keys).intersection(keys)
 		if present.isEmpty { return .some(nil) }
-		guard present == keys, let upstream = fields["relay_upstream"] as? String, validUpstream(upstream),
+		guard present.intersection(requiredKeys) == requiredKeys, let upstream = fields["relay_upstream"] as? String, validUpstream(upstream),
 			let dial = milliseconds(fields["relay_dial_ms"]),
 			let handshake = milliseconds(fields["relay_handshake_ms"]),
-			let idle = milliseconds(fields["relay_idle_ms"]) else { return nil }
+			let idle = milliseconds(fields["relay_idle_ms"]),
+			let environment = signIn(fields["relay_environment"]) else { return nil }
 		return .some(ManagedProxyRelayRequest(upstream: upstream, dialMilliseconds: dial,
-			handshakeMilliseconds: handshake, idleMilliseconds: idle))
+			handshakeMilliseconds: handshake, idleMilliseconds: idle, environment: environment))
+	}
+
+	/// The sign-in variables: only the contract's names, each a non-empty bounded
+	/// line. An absent field is no variable; an empty object is a caller fault.
+	private static func signIn(_ value: Any?) -> [String: String]? {
+		guard let value else { return [:] }
+		guard let object = value as? [String: Any], !object.isEmpty else { return nil }
+		var result: [String: String] = [:]
+		for (name, raw) in object {
+			guard signInEnvironment.contains(name), let text = raw as? String, !text.isEmpty,
+				text.utf8.count <= maximumSignInValueBytes,
+				!text.utf8.contains(where: { $0 == 0 || $0 == 10 || $0 == 13 }) else { return nil }
+			result[name] = text
+		}
+		return result
 	}
 
 	private static func milliseconds(_ value: Any?) -> UInt32? {
@@ -172,7 +198,8 @@ final class SuspendedImageProxyRelay {
 			"--handshake-timeout-ms", String(request.handshakeMilliseconds),
 			"--idle-timeout-ms", String(request.idleMilliseconds)]
 		guard let argv = duplicateCStringVector(arguments),
-			let envp = duplicateCStringVector(["HOME=" + home, "LANG=en_US.UTF-8", "PATH=/usr/bin:/bin:/usr/sbin:/sbin"]) else {
+			let envp = duplicateCStringVector(["HOME=" + home, "LANG=en_US.UTF-8", "PATH=/usr/bin:/bin:/usr/sbin:/sbin"]
+				+ request.environment.keys.sorted().map { $0 + "=" + request.environment[$0]! }) else {
 			return .refused("relay_unavailable")
 		}
 		defer { for case let pointer? in argv { free(pointer) }; for case let pointer? in envp { free(pointer) } }

@@ -4,6 +4,8 @@
 	"token_bytes": 32,
 	"schemes": ["negotiate", "ntlm"],
 	"posix_schemes": ["negotiate"],
+	"sign_in_environment": ["KRB5CCNAME", "KRB5_CONFIG"],
+	"max_sign_in_value_bytes": 4096,
 	"limits": {
 		"max_header_bytes": 32768,
 		"max_body_bytes": 65536,

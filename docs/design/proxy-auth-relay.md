@@ -167,6 +167,15 @@ that one child. So the relay is the daemon's sibling, under the same owner.
   prepares the daemon image. It answers `V1 RELAY <port> <token>` or
   `V1 RELAY_REFUSED <reason>` before `IMAGE_READY`. Python stays out of the process
   tree.
+- **Kerberos environment.** The guardian runs with `PATH` alone, and on Linux and
+  Windows the relay simply inherits its caller's environment. So the serve owner hands
+  the probe, and the request's `relay_environment`, exactly the variables of
+  `proxy_auth_relay.json` `sign_in_environment` (`KRB5CCNAME`, `KRB5_CONFIG`) that
+  are set, each a non-empty line of at most `max_sign_in_value_bytes`. A value with a
+  NUL or a line break refuses the sign-in with `invalid_arguments` before any probe.
+  The guardian refuses any other name and starts `listen` with `HOME`, `LANG`, `PATH`
+  and those variables only. `KRB5_KTNAME` names an acceptor keytab, which a client
+  sign-in never reads, so it is not passed.
 - **Route.** When the guardian answers the image proof, the Python owner replaces the
   snapshot's selected proxy with `http://ergopti:TOKEN@127.0.0.1:PORT` before it seals
   the bootstrap file; the daemon's Go transport sends the token as Basic credentials.
