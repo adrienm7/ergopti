@@ -7,7 +7,7 @@
 local Transfer = require("modules.updater.archive_transfer")
 local tests = {}
 local function test(name, body) tests[#tests + 1] = { name, body } end
-local function fixture(signature, without_url)
+local function fixture(signature, without_url, required)
  local h = { now = 0.25, active = true, children = {}, archives = 0, adoptions = 0,
   callbacks = {}, reservations = 0, bound = 0 }
  local artifact, target = {}, {}
@@ -82,7 +82,8 @@ local function fixture(signature, without_url)
  local factory = assert(Transfer.new(ports))
  h.operation = assert(factory:start({ tag = "v1.2.3", download_url = "https://release.invalid/archive",
   checksum_url = "https://release.invalid/checksum",
-  signature_url = signature and not without_url and "https://release.invalid/signature" or nil }, function(...)
+  signature_url = signature and not without_url and "https://release.invalid/signature" or nil,
+  signature_required = required }, function(...)
   h.callbacks[#h.callbacks + 1] = { ... }
  end))
  assert(h.operation.started == true and h.reservations == 1)
@@ -99,15 +100,15 @@ end
 
 local function gate(verdict)
  local g = { max_body_bytes = 4096, calls = {} }
- function g.decide(asset, text, fetch_error)
-  g.calls[#g.calls + 1] = { asset = asset, text = text, fetch_error = fetch_error }
+ function g.decide(asset, text, fetch_error, required)
+  g.calls[#g.calls + 1] = { asset = asset, text = text, fetch_error = fetch_error, required = required }
   if verdict == true then return true end
   return false, "update signature refused: the signature does not match the downloaded bundle"
  end
  return g
 end
-local function run(g, signature_reply)
- local h = fixture(g)
+local function run(g, signature_reply, required)
+ local h = fixture(g, nil, required)
  h.children.checksum:reply({ ok = true, body = "literal-checksum-record" }); h.children.checksum:ack()
  assert(h.signature_fetches == 1 and h.archives == 0, "the archive waits for the signature fetch")
  h.children.signature:reply(signature_reply); h.children.signature:ack()
@@ -151,7 +152,24 @@ test("without a signature port the flow is unchanged", function()
  h:complete()
  assert(#h.callbacks == 1 and h.callbacks[1][1] == "display-information-only")
 end)
-assert(#tests == 5, "signature transfer case floor")
+test("a release read from the public feed asks the gate to require the signature", function()
+ local g = gate(true)
+ local h = run(g, { ok = true, body = "c2ln" }, true)
+ assert(#g.calls == 1 and g.calls[1].required == true and g.calls[1].text == "c2ln")
+ assert(#h.callbacks == 1 and h.callbacks[1][1] == "display-information-only")
+ local plain = gate(true)
+ run(plain, { ok = true, body = "c2ln" })
+ assert(plain.calls[1].required == false, "an API release keeps the policy's enforcement")
+end)
+test("a feed release without the gate or the signature URL does not start", function()
+ for _, case in ipairs({ { nil, false }, { gate(true), true } }) do
+  local ok, message = pcall(fixture, case[1], case[2], true)
+  assert(not ok and tostring(message):find("assertion failed", 1, true), tostring(message))
+ end
+ local ok = pcall(fixture, gate(true), false, "yes")
+ assert(not ok, "only a literal true marks a feed release")
+end)
+assert(#tests == 7, "signature transfer case floor")
 
 local helpers = require("tests.helpers")
 helpers.describe("Archive Transfer Signature", function()

@@ -21,7 +21,10 @@
 --- configuration up (modules/updater/config_backup.lua), finds the release in
 --- the list this bridge last fetched from the GitHub API, then downloads,
 --- verifies and installs it through the updater manager's update path and
---- restarts the daemon on it. Each phase is pushed as install_progress. The
+--- restarts the daemon on it. A feed-only list (API unavailable) installs only
+--- the channel's newest release, under its conventional asset names, once its
+--- detached signature verifies against the pinned key; with no key provisioned,
+--- or for an older row, it is refused. Each phase is pushed as install_progress. The
 --- restore banner posts restore_backup; the daemon restarts on the restored
 --- configuration. An installed release whose daemon restart is refused waits
 --- (restart_pending): the page and the About menu offer to restart on it.
@@ -407,22 +410,57 @@ function M._install_context()
 	}
 end
 
---- Finds a release in the list the page shows.
---- @param tag string
---- @return string|nil chunk Raw release object JSON.
---- @return string|nil reason Locale key when it is not there.
-local function find_release(tag)
-	local manager = updater()
-	if not _last_list then return nil, ReleaseInstall.REASON.unknown_release end
-	if _last_list.kind ~= "json" then
-		-- The Atom feed carries no asset list and no checksum. Unlike macOS
-		-- (Sparkle verifies the appcast's EdDSA signature), Linux has no path that
-		-- verifies a release without the API list: the bundle is a tarball with no
-		-- signed update metadata (no AppImage zsync), and its .sha256 is only an
-		-- asset that list names. So no feed release installs, and the page keeps
-		-- the no-details warning (no __feed_install_handoff seed).
+--- Finds the release of a feed-only list that may install: the newest release
+--- of the channel on screen, when the shared offer rule offers it, as macOS
+--- hands that one release to Sparkle (modules/updater/feed_handoff.lua).
+--- @param manager table|nil The updater manager.
+--- @param tag string Posted tag.
+--- @param channel string|nil Channel on screen, posted by the page.
+--- @return string|nil chunk The feed row's release object JSON.
+--- @return string|nil reason Locale key when it may not install.
+local function find_feed_release(manager, tag, channel)
+	-- The Atom feed carries no asset list and no checksum: only a detached
+	-- signature of the pinned key authenticates a release read from it, so
+	-- without a provisioned key every feed row keeps the no-details refusal.
+	if not manager or type(manager.feed_install_available) ~= "function"
+		or manager.feed_install_available() ~= true then
 		return nil, ReleaseInstall.REASON.no_details
 	end
+	local registry = manager.CHANNELS
+	if type(channel) ~= "string" or not registry.channel_for_tag(tag) then
+		return nil, ReleaseInstall.REASON.unknown_release
+	end
+	local repo = manager.repo_info()
+	local list = ReleaseSources.feed_release_list(_last_list.body, repo.owner, repo.repo)
+	if not list then return nil, ReleaseInstall.REASON.unknown_release end
+	local chunks, tags = Parser.split_releases_array(list), {}
+	for index, chunk in ipairs(chunks) do tags[index] = Parser.parse_tag(chunk) end
+	local best = registry.pick_latest(tags, channel)
+	local newest = best and tags[best] or nil
+	local wanted = VersionOrder.normalize_tag(tag)
+	if not newest or VersionOrder.normalize_tag(newest) ~= wanted
+		or not registry.should_offer(newest, manager.current_version(), channel, manager.installed_channel()) then
+		for _, listed in ipairs(tags) do
+			if VersionOrder.normalize_tag(listed) == wanted then
+				return nil, ReleaseInstall.REASON.feed_not_newest
+			end
+		end
+		return nil, ReleaseInstall.REASON.unknown_release
+	end
+	Logger.info(LOG, "Release %s is the newest of channel %s in the public feed: it installs only once "
+		.. "its detached signature verifies.", newest, channel)
+	return chunks[best], nil
+end
+
+--- Finds a release in the list the page shows.
+--- @param tag string
+--- @param channel string|nil Channel on screen, posted by the page.
+--- @return string|nil chunk Raw release object JSON.
+--- @return string|nil reason Locale key when it is not there.
+local function find_release(tag, channel)
+	local manager = updater()
+	if not _last_list then return nil, ReleaseInstall.REASON.unknown_release end
+	if _last_list.kind ~= "json" then return find_feed_release(manager, tag, channel) end
 	if not manager or not manager.CHANNELS.channel_for_tag(tag) then
 		return nil, ReleaseInstall.REASON.unknown_release
 	end
@@ -493,7 +531,7 @@ local function install_session()
 		if not accepted or not rawequal(accepted.release, release) then return false end
 		local manager = updater()
 		return rawequal(manager, accepted.manager) and accepted_owners[owner] == accepted
-			and rawget(manager, "release_record") == accepted.resolve
+			and rawget(manager, accepted.resolver) == accepted.resolve
 			and rawequal(_daemon_state, accepted.state) and rawget(accepted.state, "restart_after_update") == accepted.restart
 	end
 	local function selected_current(accepted, record, owner, release)
@@ -517,13 +555,17 @@ local function install_session()
 			local tag = Parser.parse_tag(release)
 			local manager, state = updater(), owner.state
 			local restart = rawget(state, "restart_after_update")
-			local resolve = manager and rawget(manager, "release_record")
+			-- A release of a feed-only list names no assets: its record is the
+			-- conventional one whose signature the transfer requires.
+			local feed = type(owner.list) == "table" and owner.list.kind == "feed"
+			local resolver = feed and "feed_release_record" or "release_record"
+			local resolve = manager and rawget(manager, resolver)
 			if tag == "" or type(resolve) ~= "function" or type(restart) ~= "function" then return false end
 			-- Capture execution lineage now; resolve its asset only after the
 			-- shared caller has completed the required configuration backup.
-			if updater() ~= manager or rawget(manager, "release_record") ~= resolve or not failure_current(owner) then return false end
-			accepted_owners[owner] = { release = release, tag = tag, resolve = resolve,
-				manager = manager, state = state, restart = restart }
+			if updater() ~= manager or rawget(manager, resolver) ~= resolve or not failure_current(owner) then return false end
+			accepted_owners[owner] = { release = release, tag = tag, resolve = resolve, resolver = resolver,
+				feed = feed, manager = manager, state = state, restart = restart }
 			if not accepted_current(owner, release) or not failure_current(owner) then
 				accepted_owners[owner] = nil
 				return false
@@ -533,7 +575,7 @@ local function install_session()
 		failure_owner = failure_owner,
 		failure_current = failure_current,
 		blocked = function() return install_blocked(updater()) end,
-		find_release = function(tag) return find_release(tag) end,
+		find_release = function(tag, channel) return find_release(tag, channel) end,
 		backup = function(chunk)
 			local owner, err = backup_owner()
 			if not owner then return nil, err end
@@ -543,12 +585,16 @@ local function install_session()
 			local accepted = accepted_owners[retained_owner]
 			if not accepted or accepted.asset_resolved or not accepted_current(retained_owner, chunk) then return nil end
 			accepted.asset_resolved = true -- Reserve the single post-backup resolver call.
-			local resolved, record = pcall(accepted.resolve, chunk)
+			local resolved, record = pcall(accepted.resolve, accepted.feed and accepted.tag or chunk)
 			if not resolved or not accepted_current(retained_owner, chunk) or type(record) ~= "table"
 				or rawget(record, "tag") ~= accepted.tag or type(rawget(record, "download_url")) ~= "string"
-				or type(rawget(record, "checksum_url")) ~= "string" then return nil end
+				or type(rawget(record, "checksum_url")) ~= "string"
+				or (accepted.feed and rawget(record, "signature_required") ~= true) then return nil end
 			local selected = {}
-			for _, key in ipairs({ "tag", "download_url", "checksum_url", "notes", "published_at", "prerelease" }) do
+			-- The signature fields travel too: without them the transfer neither
+			-- fetches the detached signature nor requires it for a feed release.
+			for _, key in ipairs({ "tag", "download_url", "checksum_url", "signature_url", "signature_required",
+				"notes", "published_at", "prerelease" }) do
 				selected[key] = rawget(record, key)
 			end
 			if not accepted_current(retained_owner, chunk) then return nil end
@@ -563,8 +609,11 @@ local function install_session()
 			local manager = accepted.manager
 			local download = rawget(manager, "download_release")
 			if type(download) ~= "function" or not selected_current(accepted, record, retained_owner, release) then return false end
+			-- A feed release that fails verification failed its signature, the only
+			-- authentication it has: the page says so instead of a bare integrity error.
+			local verify_reason = accepted.feed and ReleaseInstall.REASON.feed_signature or ReleaseInstall.REASON.verify
 			return download(record, function(path, err, stage, failure_receipt)
-				done(path, stage == "verify" and ReleaseInstall.REASON.verify or ReleaseInstall.REASON.download, err,
+				done(path, stage == "verify" and verify_reason or ReleaseInstall.REASON.download, err,
 					failure_receipt)
 			end, function()
 				return rawget(manager, "download_release") == download

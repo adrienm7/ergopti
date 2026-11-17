@@ -27,9 +27,10 @@ function M.new(ports)
  if type(get) ~= "function" or type(download) ~= "function" or type(reserve) ~= "function"
   or type(bind_checksum) ~= "function" or type(adopt) ~= "function" or type(retire) ~= "function"
   or type(artifact_settled) ~= "function" or type(artifact_observe) ~= "function" then return nil end
- -- Optional detached-signature check: { decide = function(asset, signature_text) -> ok, message,
- -- max_body_bytes }. Without it, or without a published .sig, the transfer is the
- -- checksum-only transfer it always was; the gate decides what a missing one means.
+ -- Optional detached-signature check: { decide = function(asset, signature_text, fetch_error,
+ -- required) -> ok, message, max_body_bytes }. Without it, or without a published .sig, the
+ -- transfer is the checksum-only transfer it always was; the gate decides what a missing one
+ -- means. A release marked signature_required (read from the public feed) needs both.
  local signature = type(ports.signature) == "table" and ports.signature or nil
  if signature and (type(signature.decide) ~= "function" or type(signature.max_body_bytes) ~= "number") then return nil end
  local sealed_size = method(ports.artifact, "sealed_size")
@@ -55,6 +56,12 @@ function M.new(ports)
    if type(signature_url) ~= "string" or signature_url == "" or signature_url:find("\0", 1, true) then return nil end
    selected.signature_url = signature_url
   end
+  -- A release read from the public feed is authenticated by its signature
+  -- alone: without the gate or the signature's URL it cannot start.
+  local signature_required = rawget(release, "signature_required")
+  if signature_required ~= nil and signature_required ~= true then return nil end
+  if signature_required and (not signature or not selected.signature_url) then return nil end
+  selected.signature_required = signature_required == true
   local txn = { token = {}, phase = nil, cancelled = false, requests = {}, constructing = 0, finished = false, listeners = {} }
   local operation = { started = false }
   active = txn -- Reserve before native clock, source or artifact construction.
@@ -295,7 +302,7 @@ function M.new(ports)
       if signature then
        local sized, size = pcall(sealed_size, artifact)
        local accepted, message = signature.decide({ size = sized and size or nil, sha256 = expected },
-        txn.signature_text, txn.signature_fetch_error)
+        txn.signature_text, txn.signature_fetch_error, selected.signature_required)
        if accepted ~= true then fail(message or "update signature refused", "verify"); return end
       end
       txn.finished = true; active = nil; Budget.retire(budget)

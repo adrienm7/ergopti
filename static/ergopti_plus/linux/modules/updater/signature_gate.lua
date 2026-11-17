@@ -19,6 +19,9 @@
 ---    admitted refuses the update instead of silently skipping the check.
 --- 3. Every dependency is injected, so the suite replays each mode without
 ---    OpenSSL, a network or a file system.
+--- 4. A release read from the public feed has no digest from the API: its
+---    signature is its only authentication, so decide() requires it whatever
+---    the enforcement, and refuses outright while the policy holds no key.
 --- ==============================================================================
 
 local M = {}
@@ -40,6 +43,7 @@ M.REASON_TEXT = {
 	bad_size = "the size of the downloaded bundle is unknown",
 	bad_digest = "the digest of the downloaded bundle is unusable",
 	fetch_failed = "the signature could not be downloaded",
+	feed_without_key = "the signing policy holds no key, so a release read from the public feed cannot be verified",
 }
 
 --- Builds the gate.
@@ -69,18 +73,40 @@ function M.new(deps)
 		return policy and (deps.asset_name .. policy.signature_suffix) or nil
 	end
 
+	--- Whether the policy names a verification key, so a release read from the
+	--- public feed can be authenticated by its detached signature.
+	--- @return boolean
+	function gate.has_key()
+		local policy = admitted_policy()
+		return policy ~= nil and policy.public_key_spki_base64 ~= ""
+	end
+
 	--- Decides one update.
 	--- @param asset table { size, sha256 } of the downloaded, checksum-verified bundle.
 	--- @param signature_text string|nil The downloaded signature, nil when none.
 	--- @param fetch_error string|nil Why the signature download failed.
+	--- @param required boolean|nil True for a release read from the public feed: only a
+	---   verified signature proceeds, whatever the policy's enforcement.
 	--- @return boolean proceed
 	--- @return string|nil message The refusal, in words.
-	function gate.decide(asset, signature_text, fetch_error)
+	function gate.decide(asset, signature_text, fetch_error, required)
 		local policy, why = admitted_policy()
 		if not policy then
 			local text = M.REASON_TEXT[why] or tostring(why)
 			Log.error(tag, "Update refused: %s.", text)
 			return false, "update signature policy invalid: " .. text
+		end
+		if required == true then
+			if policy.public_key_spki_base64 == "" then
+				Log.error(tag, "Update refused: %s.", M.REASON_TEXT.feed_without_key)
+				return false, "update signature refused: " .. M.REASON_TEXT.feed_without_key
+			end
+			-- The feed gives no digest of its own: a policy that is still "off" must
+			-- not let an unverified asset through on this path.
+			local strict = {}
+			for name, value in pairs(policy) do strict[name] = value end
+			strict.enforcement = "required"
+			policy = strict
 		end
 		local subject = { name = deps.asset_name, size = asset.size, sha256 = asset.sha256 }
 		-- The release signer writes one protocol LF after the Base64 signature.

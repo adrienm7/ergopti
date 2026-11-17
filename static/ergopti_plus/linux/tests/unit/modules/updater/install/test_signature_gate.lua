@@ -9,7 +9,9 @@
 --- 2. a bad or a missing signature is refused in words when enforcement is
 ---    "required", and only logged in words when it is "off" (the default);
 --- 3. a policy that cannot be read or admitted refuses instead of skipping;
---- 4. the shipped policy is off, so an unsigned release still installs.
+--- 4. the shipped policy is off, so an unsigned release still installs;
+--- 5. a release read from the public feed installs only on a verified
+---    signature, whatever the enforcement, and never without a key.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -105,6 +107,34 @@ helpers.describe("update signature gate (Linux)", function()
 		local gate, lines = build(policy("off"))
 		helpers.assert_true((gate.decide(MOVED, V.valid.signature_base64, nil)))
 		helpers.assert_true(lines[1]:find("does not match the downloaded bundle", 1, true) ~= nil, lines[1])
+	end)
+
+	-- A release read from the public feed has no digest from the API: its
+	-- signature is all that authenticates it, so "off" must not let it through.
+	helpers.it("(feed-signature-required) a feed release needs a verified signature in every mode", function()
+		for _, mode in ipairs({ "off", "required" }) do
+			local gate, lines = build(policy(mode))
+			helpers.assert_true(gate.has_key(), mode)
+			helpers.assert_true((gate.decide(ASSET, V.valid.signature_base64, nil, true)), mode)
+			helpers.assert_eq(lines[1], "info: Update signature verified.")
+			local accepted, message = gate.decide(ASSET, nil, "HTTP 404", true)
+			helpers.assert_eq(accepted, false, mode .. ": a missing signature")
+			helpers.assert_true(message:find("could not be downloaded", 1, true) ~= nil, message)
+			accepted, message = gate.decide(MOVED, V.valid.signature_base64, nil, true)
+			helpers.assert_eq(accepted, false, mode .. ": a moved size")
+			helpers.assert_true(message:find("does not match", 1, true) ~= nil, message)
+		end
+	end)
+
+	helpers.it("(feed-signature-required) without a key a feed release is refused in words", function()
+		local gate, lines = build(SHIPPED)
+		helpers.assert_eq(gate.has_key(), false, "the shipped policy holds no key yet")
+		local accepted, message = gate.decide(ASSET, V.valid.signature_base64, nil, true)
+		helpers.assert_eq(accepted, false)
+		helpers.assert_true(message:find("read from the public feed cannot be verified", 1, true) ~= nil, message)
+		helpers.assert_true(lines[1]:find("^error: Update refused") ~= nil, lines[1])
+		local broken = build(nil, "bad_policy")
+		helpers.assert_eq(broken.has_key(), false)
 	end)
 
 	helpers.it("(signature-gate) an unusable policy refuses instead of skipping the check", function()

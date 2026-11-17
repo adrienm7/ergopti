@@ -39,6 +39,29 @@ local function release(tag, with_bundle)
 		html_url = "https://github.com/adrienm7/ergopti/releases/tag/" .. tag, body = "notes", assets = assets }
 end
 
+--- The fake public feed of a window whose API is unavailable: dev.142 is the
+--- channel's newest release, dev.141 an older one.
+local function feed_xml(tags)
+	local entries = {}
+	for _, tag in ipairs(tags) do
+		entries[#entries + 1] = '<entry><id>tag:github.com,2008:Repository/1/' .. tag .. '</id>'
+			.. '<updated>2026-11-01T10:00:00Z</updated>'
+			.. '<link rel="alternate" type="text/html" href="https://github.com/adrienm7/ergopti/releases/tag/'
+			.. tag .. '"/><title>' .. tag .. '</title></entry>'
+	end
+	return '<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">'
+		.. table.concat(entries) .. '</feed>'
+end
+local FEED = feed_xml({ "v0.0.0-dev.142", "v0.0.0-dev.141", "v0.0.0-dev.139" })
+
+--- The throwaway key and the signed record of the "archive" bundle the stubs serve.
+local function feed_vectors()
+	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/updater/feed_install_vectors.json", "rb"))
+	local raw = handle:read("*a")
+	handle:close()
+	return Json.decode(raw)
+end
+
 local LIST = Json.encode({
 	release("v0.0.0-dev.141", false),
 	release("v0.0.0-dev.140", true),
@@ -224,7 +247,8 @@ local function native_fixture(ctx, options)
 end
 
 --- Builds the real bridge over the real manager with every effect recorded.
---- @param opts table|nil { version, source_run, kind, digest, feed, backup_fails }
+--- @param opts table|nil { version, source_run, kind, digest, feed, feed_xml, feed_key,
+---   signature, backup_fails }
 --- @return table ctx
 local function harness(opts)
 	opts = opts or {}
@@ -255,6 +279,15 @@ local function harness(opts)
 	end
 	manager._http_client = {
 		get = function(url, _, _, callback)
+			if url:sub(-4) == ".sig" then
+				event("signature:" .. url)
+				if opts.signature then
+					callback({ ok = true, status = 200, body = opts.signature .. "\n" })
+				else
+					callback({ ok = false, status = 404, error = "HTTP 404" })
+				end
+				return true
+			end
 			event("checksum:" .. url)
 			callback({ ok = true, status = 200, body = DIGEST .. "  " .. ASSET .. "\n" })
 			return true
@@ -278,6 +311,19 @@ local function harness(opts)
 		cancel = function() return true end,
 	}
 	ctx.manager = manager
+	if opts.feed_key then
+		-- The signing policy as it will ship once provisioned, with the
+		-- fixture's throwaway key and enforcement still off.
+		local policy = Json.decode(assert(io.open(helpers.driver_root()
+			.. "/../_shared/updater/data/asset_signing.json", "rb")):read("*a"))
+		policy.public_key_spki_base64 = opts.feed_key
+		manager._signature_gate = require("modules.updater.signature_gate").new({
+			verifier = require("infra.asset_signature"),
+			read_policy = function() return policy end,
+			asset_name = ASSET,
+			logger = require("core.logger.engine.shim"),
+		})
+	end
 	ctx.native_fixture = native_fixture(ctx, opts)
 	local bridge = helpers.load_module("ui.changelog.bridge")
 	bridge._push = function(payload) ctx.pushes[#ctx.pushes + 1] = payload; return true end
@@ -336,7 +382,7 @@ local function harness(opts)
 		bridge._http_get = function(url, _, _, callback)
 			if url:find("releases.atom", 1, true) and not fed then
 				fed = true
-				callback(200, "<feed></feed>", nil)
+				callback(200, opts.feed_xml or "<feed></feed>", nil)
 			else
 				callback(0, "", "blocked")
 			end
@@ -492,6 +538,54 @@ helpers.describe("changelog_bridge: one-click release install", function()
 		ctx.restore_modules()
 		helpers.assert_eq(#ctx.events, 0)
 		helpers.assert_eq(progress(ctx)[1].reason_key, "changelog_window.install_error_no_details")
+	end)
+
+	-- Decided 2026-11-06 (align on macOS): a feed-only list installs the
+	-- channel's newest release, under its conventional asset names, once the
+	-- downloaded bundle's size and SHA-256 match a signature of the pinned key.
+	helpers.it("(feed-only-install) installs the feed's newest release once its signature verifies", function()
+		local V = feed_vectors()
+		local ctx = harness({ feed = true, feed_xml = FEED, feed_key = V.public_key_spki_base64,
+			signature = V.linux.signature_base64 })
+		ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.142", channel = "dev" }, ctx.state)
+		ctx.restore_modules()
+		local base = "https://github.com/adrienm7/ergopti/releases/download/v0.0.0-dev.142/" .. ASSET
+		helpers.assert_eq(phases(ctx), "backing_up,downloading,installing,restarting")
+		helpers.assert_eq(ctx.events[index_of(ctx.events, "checksum:")], "checksum:" .. base .. ".sha256")
+		helpers.assert_eq(ctx.events[index_of(ctx.events, "signature:")], "signature:" .. base .. ".sig")
+		helpers.assert_eq(ctx.events[index_of(ctx.events, "download:")], "download:" .. base)
+		helpers.assert_eq(#ctx.installs, 1)
+		helpers.assert_eq(ctx.installs[1].expected_version, "v0.0.0-dev.142")
+	end)
+
+	helpers.it("(feed-only-install) refuses the feed's newest release whose signature does not verify", function()
+		local V = feed_vectors()
+		for _, signature in ipairs({ false, (V.linux.signature_base64:gsub("^.", "A")) }) do
+			local ctx = harness({ feed = true, feed_xml = FEED, feed_key = V.public_key_spki_base64,
+				signature = signature or nil })
+			ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.142", channel = "dev" }, ctx.state)
+			ctx.restore_modules()
+			helpers.assert_eq(#ctx.installs, 0, "nothing installs without a verified signature")
+			helpers.assert_nil(index_of(ctx.events, "restart"))
+			local last = progress(ctx)[#progress(ctx)]
+			helpers.assert_eq(last.reason_key, "changelog_window.install_error_feed_signature")
+			helpers.assert_eq(last.backup_path, "/cfg/backups/pre-install-x")
+		end
+	end)
+
+	helpers.it("(feed-only-install) refuses an older feed row, and every row without a key", function()
+		local V = feed_vectors()
+		local ctx = harness({ feed = true, feed_xml = FEED, feed_key = V.public_key_spki_base64,
+			signature = V.linux.signature_base64 })
+		ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.141", channel = "dev" }, ctx.state)
+		ctx.restore_modules()
+		helpers.assert_eq(#ctx.events, 0, "an older row backs nothing up and downloads nothing")
+		helpers.assert_eq(progress(ctx)[1].reason_key, "changelog_window.install_error_feed_not_newest")
+		local unkeyed = harness({ feed = true, feed_xml = FEED, signature = V.linux.signature_base64 })
+		unkeyed.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.142", channel = "dev" }, unkeyed.state)
+		unkeyed.restore_modules()
+		helpers.assert_eq(#unkeyed.events, 0, "the shipped policy holds no key: the refusal stays")
+		helpers.assert_eq(progress(unkeyed)[1].reason_key, "changelog_window.install_error_no_details")
 	end)
 
 	helpers.it("restores a backup and restarts the daemon on it", function()

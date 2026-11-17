@@ -42,7 +42,10 @@
 --- 7. A chosen release: the Versions window installs any release of the list it
 ---    shows through the same download, checksum and install path
 ---    (release_record, download_release, install_release_archive); only a
----    click there reaches them, never the schedule.
+---    click there reaches them, never the schedule. When the window could only
+---    read the public feed, feed_release_record names the channel's newest
+---    release under its conventional asset names and the transfer installs it
+---    only once its detached signature verifies (signature_required).
 --- ==============================================================================
 
 local M = {}
@@ -1007,6 +1010,39 @@ end
 
 M._select_signature_asset = _select_signature_asset
 
+--- Whether a release read from the public feed can be authenticated: the
+--- signing policy names a verification key (docs/tooling/update-signing.md).
+--- @return boolean
+function M.feed_install_available()
+	return get_signature_gate().has_key() == true
+end
+
+--- The installable record of a release the public feed names, which lists no
+--- assets and no digests: the canonical bundle, its checksum and its signature
+--- under their conventional names in this repository's release path, with the
+--- signature required whatever the policy's enforcement. The checksum binds the
+--- downloaded bytes to a digest and the signature binds that digest and the size
+--- to the pinned key, so nothing the feed or the checksum asset says is trusted
+--- on its own.
+--- @param tag string Release tag the feed names.
+--- @return table|nil record nil when the tag is unusable or no key is provisioned.
+function M.feed_release_record(tag)
+	if type(tag) ~= "string" or not tag:match("^[A-Za-z0-9._+-]+$") then return nil end
+	local signature_name = get_signature_gate().signature_name()
+	if not signature_name or not M.feed_install_available() then return nil end
+	local base = M.releases_page_url() .. "/download/" .. tag .. "/"
+	return {
+		tag                = tag,
+		notes              = "",
+		download_url       = base .. LINUX_ASSET_NAME,
+		checksum_url       = base .. LINUX_CHECKSUM_ASSET_NAME,
+		signature_url      = base .. signature_name,
+		signature_required = true,
+		published_at       = "",
+		prerelease         = false,
+	}
+end
+
 --- The installable record of one release object of the release list: its tag
 --- and the canonical Linux bundle with its checksum, or nil when the release
 --- lacks either (it cannot be installed on this system).
@@ -1536,6 +1572,7 @@ local function release_snapshot(release)
  if type(signature_url) == "string" and signature_url ~= "" and not signature_url:find("\0", 1, true) then
   copy.signature_url = signature_url
  end
+ if rawget(release, "signature_required") == true then copy.signature_required = true end
  return copy
 end
 local function retire_verified_artifact()
