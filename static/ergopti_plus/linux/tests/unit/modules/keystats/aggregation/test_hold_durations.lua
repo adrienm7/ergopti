@@ -339,6 +339,8 @@ local function run_hold(transition, expected, options)
 
 		if options.before then options.before(logger, state) end
 		local hook = helpers.load_module("platform.input.keyboard_hook")
+		-- The genuine physical callback asks the hook which modifiers are held (TWD-2).
+		environment.keyboard_hook = hook
 		local forwarded = {}
 		local changed = false
 		local code = options.code or 30

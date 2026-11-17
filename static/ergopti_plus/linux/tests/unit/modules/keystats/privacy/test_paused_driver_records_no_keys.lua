@@ -58,7 +58,10 @@ local function environment_for(state, recorded)
 			discard_roi = function() end,
 			record_roi_key = function() end,
 		},
-		keyboard_hook = { source_device_identity = function() return "device" end },
+		keyboard_hook = {
+			source_device_identity = function() return "device" end,
+			held_modifiers = function() return {} end,
+		},
 		Monotonic = { now_ms = function() return 0 end },
 		script_actions = {
 			is_paused = function() return state.paused end,
