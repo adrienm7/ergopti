@@ -69,6 +69,9 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
 
 ### Typing, hotstrings and shortcuts
 
+- [ ] AltGr rolls and script shortcuts (2026-11-17): on Ergopti+, AltGr held over J then I types `("`, over the
+      `)` key then I types `)#`, and the `chevron_equal` roll works again; AltGr then Enter alone pauses, but « (# »
+      then Enter or Backspace with AltGr still down types Enter or erases, and never pauses or reloads.
 - [ ] Items 34, 37, 102 and 129: the Windows native cases of native delimiter transactions and packaging with both
       extension TOML files.
 - [ ] Backspace undo by characters (2026-11-17): give a personal hotstring a replacement ending in an emoji

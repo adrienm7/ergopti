@@ -54,6 +54,9 @@ global CTRL_ALT_NUMPAD := ""
 
 ; The physical-state port is shared by captured criteria and direct gate calls.
 global _ALTGR_PHYSICAL_STATE_QUERY := KS_IsHeld
+; The key pressed before the current one, as AutoHotkey's key history tells it
+; (A_PriorKey); a test models a press through this port.
+global _ALTGR_PRIOR_KEY_QUERY := () => A_PriorKey
 
 ; ``{Plain, Shifted}`` callables of every key of two parallel spec tables.
 _AltGrTableFromSpec(Plain, Shifted, DeadTables) {
@@ -204,18 +207,39 @@ ScriptAltGrKanaChordIsLive(AltGrDown) {
 ; @param Slot {String} The SCRIPT_SHORTCUT_SLOTS id the hotkey runs.
 ; @return {Boolean}
 ScriptAltGrChordRunsSlot(Slot, *) {
-    return ScriptAltGrChordIsLive(IsRealAltGrPress()) and ScriptShortcutSlotRunsAction(Slot)
+    return ScriptAltGrChordIsLive(IsRealAltGrPress()) and ScriptAltGrPressedJustBefore()
+        and ScriptShortcutSlotRunsAction(Slot)
 }
 
 ; The Kana-style twin: the suffix alone while SC138 is physically down.
 ScriptAltGrKanaChordRunsSlot(Slot, *) {
-    return ScriptAltGrKanaChordIsLive(GetKeyState("SC138", "P")) and ScriptShortcutSlotRunsAction(Slot)
+    return ScriptAltGrKanaChordIsLive(GetKeyState("SC138", "P")) and ScriptAltGrPressedJustBefore()
+        and ScriptShortcutSlotRunsAction(Slot)
 }
 
 ; The paused twin: while paused the combinations cannot arm (the prefix anchor
 ; is suspended with every hotkey), so the chord runs from the suffix alone.
 ScriptAltGrPausedChordRunsSlot(Slot, *) {
-    return ScriptAltGrChordIsLive(A_IsSuspended and GetKeyState("SC138", "P")) and ScriptShortcutSlotRunsAction(Slot)
+    return ScriptAltGrChordIsLive(A_IsSuspended and GetKeyState("SC138", "P")) and ScriptAltGrPressedJustBefore()
+        and ScriptShortcutSlotRunsAction(Slot)
+}
+
+; A script shortcut is AltGr pressed, then its key: the physical key pressed
+; just before this one is the AltGr key itself. Typing AltGr symbols then Enter
+; or Backspace before AltGr is up is text, not a shortcut: on Ergopti+ a fast
+; « (# » then Enter paused the driver, and Backspace reloaded it (the
+; maintainer, 2026-11-17). AutoHotkey writes its key history before it asks a
+; #HotIf criterion, and A_PriorKey leaves out the script's own input.
+; @param PriorKey {String} The key pressed before the current one; the
+;        _ALTGR_PRIOR_KEY_QUERY port (A_PriorKey) when omitted.
+; @return {Boolean}
+ScriptAltGrPressedJustBefore(PriorKey := unset) {
+    global _ALTGR_PRIOR_KEY_QUERY
+    if !IsSet(PriorKey)
+        PriorKey := _ALTGR_PRIOR_KEY_QUERY.Call()
+    if (PriorKey == "")
+        return false
+    return GetKeySC(PriorKey) == 0x138 or PriorKey = GetKeyName("SC138")
 }
 
 ; The script chord hotkeys, three per slot, each with the criterion bound to
