@@ -95,7 +95,16 @@ JsonParse(text) {
  * @throws {Error} Invalid JSON, a missing key or a selected non-object value.
  */
 JsonObjectMemberSpans(text, pathParts := unset) {
-	JsonParse(text)
+	; Validated by the decoder's own grammar without building the tree: only the
+	; spans are returned, and the walks below skip values instead of decoding
+	; them (perf-json-member-spans-2026-11-17: three decodes of the AI catalogue
+	; per call made its boot load 440 ms).
+	wellFormed := NativeTextIsWellFormedUtf16(StrPtr(text), StrLen(text))
+	position := 1
+	_JsonSkipValue(&text, &position, 0, wellFormed)
+	_JsonSkipWs(&text, &position)
+	if (position <= StrLen(text))
+		throw Error("JSON: unexpected trailing data at position " . position . ".", -1)
 	parts := IsSet(pathParts) ? pathParts : []
 	if !(parts is Array)
 		throw TypeError("JSON member paths require an array of decoded string keys.")
@@ -107,17 +116,18 @@ JsonObjectMemberSpans(text, pathParts := unset) {
 		loop StrLen(part)
 			if NumGet(StrPtr(part), (A_Index - 1) * 2, "UShort") = 0
 				throw ValueError("JSON member paths cannot contain NUL code units.")
-		members := _JsonObjectMemberSpansAt(&text, position)
+		members := _JsonObjectMemberSpansAt(&text, position, wellFormed)
 		if !members.Has(part)
 			throw ValueError("JSON object has no selected member.", -1, part)
 		position := members[part]["start"]
 	}
-	return _JsonObjectMemberSpansAt(&text, position)
+	return _JsonObjectMemberSpansAt(&text, position, wellFormed)
 }
 
-; The public span owner validates the whole source before walking selected objects.
-; Reuse the codec's own token progress rather than a second JSON scanner.
-_JsonObjectMemberSpansAt(&text, position) {
+; The public span owner validates the whole source before walking selected objects,
+; so a value's end is found by the codec's skip walk and its kind by its first
+; code unit, as _JsonParseValue dispatches it.
+_JsonObjectMemberSpansAt(&text, position, wellFormed) {
 	_JsonSkipWs(&text, &position)
 	if (SubStr(text, position, 1) != "{")
 		throw TypeError("Selected JSON member is not an object.")
@@ -134,7 +144,8 @@ _JsonObjectMemberSpansAt(&text, position) {
 		position++
 		_JsonSkipWs(&text, &position)
 		valueStart := position
-		_JsonParseValue(&text, &position, 1, &kind)
+		kind := _JsonValueKind(SubStr(text, position, 1))
+		_JsonSkipValue(&text, &position, 1, wellFormed)
 		members[key] := Map("start", valueStart, "length", position - valueStart,
 			"text", SubStr(text, valueStart, position - valueStart), "kind", kind,
 			"member_start", memberStart, "member_length", position - memberStart,
@@ -144,6 +155,21 @@ _JsonObjectMemberSpansAt(&text, position) {
 			return members
 		position++
 	}
+}
+
+; The kind _JsonParseValue reports for a value starting with this code unit.
+_JsonValueKind(c) {
+	if (c == "{")
+		return "object"
+	if (c == "[")
+		return "array"
+	if (c == '"')
+		return "string"
+	if (c == "t" or c == "f")
+		return "boolean"
+	if (c == "n")
+		return "null"
+	return "number"
 }
 
 /**

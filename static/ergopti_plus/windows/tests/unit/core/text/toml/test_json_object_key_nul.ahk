@@ -92,6 +92,28 @@ _JOKN_MemberPathNulRefusals() {
 Test("JSON: public member paths refuse native NUL aliases before lookup (json-member-spans)",
 	_JOKN_MemberPathNulRefusals)
 
+; perf-json-member-spans-2026-11-17: the span owner decoded the whole document
+; to validate it, then decoded every member value of each walked object again
+; to find its end; three decodes of the AI catalogue made its boot load 440 ms.
+; Validation and the walks now build nothing: only the returned descriptors.
+_JOKN_MemberSpansBuildNoTree() {
+	Source := '{"providers":{"a":{"models":[{"id":"x","tags":["t"]}],"auth":{"k":{"v":1}}},'
+		. '"b":{"models":[[1,2],{"deep":{"deeper":{"deepest":[null]}}}]}},"order":["a","b"]}'
+	Before := JsonDecodeTally()["containers"]
+	Providers := JsonObjectMemberSpans(Source, ["providers"])
+	Root := JsonObjectMemberSpans(Source)
+	AssertEqual(Before, JsonDecodeTally()["containers"],
+		"member spans must validate and walk without building a decoded container")
+	AssertEqual(2, Providers.Count)
+	AssertEqual("object", Providers["b"]["kind"])
+	AssertEqual("array", Root["order"]["kind"])
+	AssertEqual('["a","b"]', Root["order"]["text"])
+	AssertEqual(JsonParse(Providers["b"]["text"])["models"][2]["deep"]["deeper"]["deepest"].Length, 1,
+		"a skipped value's span is still its exact decodable source")
+}
+Test("JSON: member spans validate and walk without decoding the document (json-member-spans)",
+	_JOKN_MemberSpansBuildNoTree)
+
 
 _JsonArraySpans_PreserveExactOrderedTokenKinds() {
 	Source := ' [ true , 1, false, 0, "true", null, {"size":true,"\u0073ize":1}, ["é", {"x":"nested"}] ] '
