@@ -211,14 +211,16 @@ dim_alpha = 1.0
 dim_hex = "#8C8C8C"
 
 # Hint line color (navigation instructions below the predictions).
-hint_white = 0.40
+# Text, so 4.5:1 on the background at least (WCAG 1.4.3): 0.40 was 2.7:1.
+hint_white = 0.60
 hint_alpha = 1.0
-hint_hex = "#666666"
+hint_hex = "#999999"
 
-# Info bar (model + TTFT/TTLT timing).
-info_white = 0.30
+# Info bar (model + TTFT/TTLT timing). The dimmest text, still 4.5:1 on the
+# background (0.30 was 1.8:1).
+info_white = 0.56
 info_alpha = 1.0
-info_hex = "#4D4D4D"
+info_hex = "#8F8F8F"
 
 # "Generation in progress" label on the violet loading panel.
 loading_text_white = 0.80

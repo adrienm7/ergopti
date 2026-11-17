@@ -166,6 +166,26 @@ for (const [section, ahkKey, hsKey] of PAIRED) {
 	}
 }
 
+// The tooltip's text lines are text (WCAG 1.4.3): each must reach 4.5:1 on the
+// plain background (the hint and the info bar were 2.7:1 and 1.8:1).
+const TEXT_CONTRAST = 4.5;
+const luminance = (channels) => {
+	const [r, g, b] = channels.map((v) => {
+		const c = v / 255;
+		return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+	});
+	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+for (const key of ['hint_hex', 'info_hex', 'dim_hex', 'loading_text_hex']) {
+	if (!declared('colors', key) || !declared('colors', 'bg_hex')) continue;
+	const [high, low] = [rgb(toml.colors[key]), rgb(toml.colors.bg_hex)]
+		.map(luminance)
+		.sort((x, y) => y - x);
+	const ratio = (high + 0.05) / (low + 0.05);
+	if (ratio < TEXT_CONTRAST)
+		errors.push(`[colors].${key} is ${ratio.toFixed(2)}:1 on bg_hex, below ${TEXT_CONTRAST}:1`);
+}
+
 // The shortcut column's joiner is each OS's own; its modifiers are named by the
 // shared key name table (key_names.json), so no OS keeps a label list of its
 // own here: one held the English « Shift » in every locale.
