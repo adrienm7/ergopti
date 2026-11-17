@@ -11,13 +11,12 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
 (`gh workflow run ci.yml --ref <branch> -f os_lanes=windows`). Rules and ported work:
 [PC handoff](docs/tooling/windows-pc-agent-handoff.md). Order:
 
-1. Run the full AHK suite (`run_all.ahk`) and fix what fails; the owned daemon's proxy (743181a933) has not run live
-   yet. `e2e/run_e2e.ahk` passed 91 of 91 and the receiving scenarios 15 of 15 on 2026-11-17.
-2. Field report: `powershell -ExecutionPolicy Bypass -File tools/dev/collect-windows-field-report.ps1` (5.1, then
-   `pwsh`) with `tools/dev/run-windows-dev.ps1` started, plus the runtime layer of
-   `test-windows-field-report-contract.cjs`; this is the first real run of the field run without a click
-   (e5315ec576, 29cb604df0, e4ffacc709), of the report marks, of its budgets and LLM latency line (e4ffacc709,
-   8d52300169), and of the menu without dynamic rows (eeee484c6c, 65f298c3f7).
+1. The full AHK suite passed 19,331 of 19,331 on 2026-11-17 (`npm run test:ahk-parallel -- --fresh`, after the fixes
+   of `fix/windows-pc-2026-11-17`); the owned daemon's proxy (743181a933) has still not run live.
+2. Field report: run with Windows PowerShell 5.1 on 2026-11-17 (field run network and composer pass, boot cost
+   3,814 ms over its 2,500 ms budget), after four collector fixes; the runtime layer of
+   `test-windows-field-report-contract.cjs` passes. Left: the `pwsh` run (PowerShell 7 is not installed on the PC),
+   and a boot cost measured on an idle PC before reading it as a regression.
 3. The Windows items of « Remaining code work » in TODO.md.
 4. The checks below and the [standing checks](docs/tooling/windows-maintainer-checks.md#standing-checks) 1 to 15
    (`node tools/maintainer/windows-live-checks.cjs` runs the automatable ones).
@@ -31,6 +30,9 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
       docs/design/layout-windows-dll.md « Windows check », step 6.
 - [ ] Layout editor host (2026-11-12): the real UAC install of a source's DLLs, typing, switching and the uninstall
       (Settings > Apps and « Remove »), in source and compiled mode.
+- [ ] Ergopti Studio opens maximized (2026-11-17), at 100 %, 150 % and 200 % display scale: the title bar and its
+      buttons are reachable, « Restore » gives a window inside the screen; the page is dark in the dark theme,
+      « Comparer » included, and « Analyse de la disposition » spans the editor's width in columns.
 - [ ] Ergopti Studio window: « Create or edit a layout… », the layout manager's « Layout editor » and the top-level
       « 🎨 Ergopti Studio… » row (right after « Keyboard layout ») open one window titled exactly « Ergopti Studio »; a
       second request brings it to the front with its unsaved work; « Close » closes it; an install from it refreshes
@@ -142,10 +144,6 @@ physical size`); X and Y match the pad's width and height (logical span over mil
       Unplug/replug an external Precision Touchpad: `forgotten` then a fresh descriptor log. 7. Note in the log
       whether the shortcut (`shortcut swallowed`/`deferred`) arrives before or after the lift, to confirm the handoff
       window (300 ms) is enough.
-- [ ] Live checks `taphold-pickers` and `keycombo-picker` (no answer within 180 s, four runs on 2026-11-17 with 400 to
-      1,500 MB of free memory, under the 1,536 MB `WEBVIEW_MIN_AVAIL_RAM_MB` the WebView picker needs) and
-      `versions-tabs` (not executed for the same reason): rerun them with more free memory before reading them as
-      driver bugs.
 - [ ] WG-003 two-account check: as a standard user, run the first-run wizard's gesture registration and answer UAC
       with a different administrator account; the standard user's PrecisionTouchPad values change (and its backup is
       theirs), the administrator's hive is untouched, and the touchpad restart still reports success.
@@ -214,7 +212,9 @@ physical size`); X and Y match the pad's width and height (logical span over mil
       `%LOCALAPPDATA%\Ergopti\vendor\`, the command line shows `-File`, no `-EncodedCommand`.
 - [ ] api.github.com blocked: the update check's Atom fallback reports the version.
 - [ ] "Create a GitHub issue" signed in opens the form with no "Whoops" page (4e63c54c8a).
-- [ ] Developer mode: `tools\dev\run-windows-dev.ps1` with the exe running closes the exe, the tray appears, saving
+- [ ] Developer mode: a source-mode driver ignores `taskkill /PID` without `/F` (2026-11-17; File > Exit closes it
+      cleanly), and `run-windows-dev.ps1` closes the exe with the same `taskkill /IM`: check that the exe does close.
+      `tools\dev\run-windows-dev.ps1` with the exe running closes the exe, the tray appears, saving
       an `.ahk` reloads once; `npm run dev:windows` from Git Bash and cmd; double-click `ErgoptiPlus.ahk` with and
       without the exe (expected lines in `docs/design/developer-mode.md`).
 - [ ] Corporate network (item 62; 1d15b51e66, 7c001b2456): Debug > diagnostics (`github_api`, `proxy_pac`), a model
