@@ -2213,10 +2213,10 @@ end)
 -- One chord action this driver lacks (another OS's, written by a shared
 -- configuration) used to drop every chord without a word (TCL-003).
 helpers.describe("chord slots read from config.toml", function()
-	helpers.it("(tcl-003-foreign-chord-action) a foreign chord action costs only its own pair", function()
+	local function chord_snapshot(chords, assignable)
 		local text = base_text .. '[mod_combos]\nenabled = true\n'
-			.. '[mod_combos.config.caps_lock_then_tab]\ncombo = "run_program"\n'
-			.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "mission_control"\n'
+			.. '[mod_combos.config.caps_lock_then_tab]\ncombo = "' .. chords[1] .. '"\n'
+			.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "' .. chords[2] .. '"\n'
 		local owner = Owner.new({ keys = catalog, hold_picker = { modifiers = { "ctrl", "shift", "alt" }, layers = { "nav" } },
 			files = { read_with_status = function(file)
 				if file == path then return text, "ok" end
@@ -2225,13 +2225,68 @@ helpers.describe("chord slots read from config.toml", function()
 			route = function() return path end,
 			is_paused = function() return false end,
 			changed = function() return true end,
-			actions = { is_assignable = function(action) return action == "run_program" end } })
+			actions = { is_assignable = function(action) return assignable[action] == true end } })
 		local token = {}
 		helpers.assert_true(owner.acquire_configuration(token))
 		local snapshot = owner.configuration_snapshot(token)
-		helpers.assert_true(snapshot ~= nil and snapshot.chords ~= nil, "the other chords survive")
-		helpers.assert_eq(snapshot.chords.caps_lock_then_tab, "run_program")
-		helpers.assert_eq(snapshot.chords.tab_then_caps_lock, "none", "the foreign action does nothing here")
 		helpers.assert_true(owner.release_configuration(token))
+		return snapshot
+	end
+	helpers.it("(tcl-003-foreign-chord-action) a foreign chord action costs only its own pair", function()
+		local snapshot = chord_snapshot({ "copy", "mission_control" }, { copy = true })
+		helpers.assert_true(snapshot ~= nil and snapshot.chords ~= nil, "the other chords survive")
+		helpers.assert_eq(snapshot.chords.caps_lock_then_tab, "copy")
+		helpers.assert_eq(snapshot.chords.tab_then_caps_lock, "none", "the foreign action does nothing here")
+	end)
+	-- Linux turned an unavailable tap or hold, and a pair on a key this keyboard
+	-- lacks, into nothing without a word; Windows warns for each.
+	helpers.it("(kcl-invalid-pair-slot-logged) an unread pair slot is logged", function()
+		local Logger = require("core.logger.engine.shim")
+		local warn, warned = Logger.warn, {}
+		Logger.warn = function(module, message, ...) warned[#warned + 1] = string.format(message, ...); return warn(module, message, ...) end
+		local text = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "foreign_action"\nfuture_then_tab = "copy"\n'
+			.. '[shortcuts.key_combination_holds]\ntab_then_caps_lock = "foreign_hold"\n'
+		local ok, err = pcall(function()
+			local owner = Owner.new({ keys = catalog, hold_picker = { modifiers = { "ctrl", "shift", "alt" }, layers = { "nav" } },
+				files = { read_with_status = function(file)
+					if file == path then return text, "ok" end
+					return nil, "absent"
+				end },
+				route = function() return path end,
+				is_paused = function() return false end,
+				changed = function() return true end,
+				actions = { is_assignable = function(action) return action == "copy" end } })
+			helpers.assert_eq(owner.get_action("caps_lock_then_tab"), "none")
+			helpers.assert_eq(owner.get_hold("tab_then_caps_lock"), "none")
+		end)
+		Logger.warn = warn
+		helpers.assert_true(ok, tostring(err))
+		local function said(...)
+			for _, line in ipairs(warned) do
+				local all = true
+				for _, part in ipairs({ ... }) do all = all and line:find(part, 1, true) ~= nil end
+				if all then return true end
+			end
+			return false
+		end
+		helpers.assert_true(said("caps_lock_then_tab", "foreign_action"), "the unavailable tap is logged")
+		helpers.assert_true(said("tab_then_caps_lock", "foreign_hold"), "the unavailable hold is logged")
+		helpers.assert_true(said("future_then_tab"), "the pair on a missing key is logged")
+	end)
+	-- The menu refused these three in a chord while the read admitted a program
+	-- launch or the monitor Alt-Tab, which then did nothing at the chord with no
+	-- word; Windows refuses and logs all three at its read.
+	helpers.it("(kcl-chord-read-refuses-chordless-action) the read refuses what the chord picker refuses", function()
+		for _, action in ipairs({ "one_shot_shift", "run_program", "alt_tab_monitor" }) do
+			local Logger = require("core.logger.engine.shim")
+			local warn, warned = Logger.warn, nil
+			Logger.warn = function(module, message, ...) warned = string.format(message, ...); return warn(module, message, ...) end
+			local ok, snapshot = pcall(chord_snapshot, { "copy", action }, { copy = true, [action] = true })
+			Logger.warn = warn
+			helpers.assert_true(ok, tostring(snapshot))
+			helpers.assert_eq(snapshot.chords.caps_lock_then_tab, "copy", "the other chord survives")
+			helpers.assert_eq(snapshot.chords.tab_then_caps_lock, "none", action .. " runs in no chord")
+			helpers.assert_true(type(warned) == "string" and warned:find(action, 1, true) ~= nil, action .. " is logged")
+		end
 	end)
 end)

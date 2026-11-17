@@ -48,6 +48,13 @@ local function declared_settings()
 	return settings
 end
 local M, instance = {}, nil
+-- Actions no chord runs: the shared list (the one-shot Shift, refused in a
+-- chord on every OS by the maintainer decision of 2026-11-06); a program launch and
+-- the monitor Alt-Tab have no third-slot native receiving here. Windows refuses
+-- the same three (KEY_COMBINATION_CHORD_REFUSED_ACTIONS). The read and the
+-- menu admit from this one list.
+local CHORD_REFUSED_ACTIONS = TableUtil.shallow_copy(Shared.CHORD_REFUSED_EVERYWHERE)
+CHORD_REFUSED_ACTIONS.run_program, CHORD_REFUSED_ACTIONS.alt_tab_monitor = true, true
 local original_pair, original_pair_separator = Shared.pair, Shared.PAIR_SEPARATOR
 local identity_receipts = setmetatable({}, { __mode = "k" })
 local buffered_settings = setmetatable({}, {__mode="k"})
@@ -102,8 +109,25 @@ function M.new(options)
 			local action_ok = action == "none" or type(action) == "string" and catalogue.is_assignable(action)
 			local hold_ok = type(hold) == "string" and holds[hold] == true
 			assert(not strict or action_ok and hold_ok, "invalid known pair slot")
+			-- A slot read as none is said, never dropped in silence, as Windows does.
+			if not action_ok then
+				Logger.warn("modules.shortcuts.key_combinations",
+					"The %s pair's tap action '%s' is not available here; that tap does nothing.", pair, tostring(action))
+			end
+			if not hold_ok then
+				Logger.warn("modules.shortcuts.key_combinations",
+					"The %s pair's hold '%s' is not available here; that hold does nothing.", pair, tostring(hold))
+			end
 			result.taps[pair] = action_ok and action or "none"
 			result.holds[pair] = hold_ok and hold or "none"
+		end
+		for _, slots in ipairs(strict and {} or { taps, held }) do
+			for pair in pairs(slots) do
+				if not known[pair] then
+					Logger.warn("modules.shortcuts.key_combinations",
+						"The pair '%s' names a key this keyboard lacks; it is kept in the file and does nothing here.", tostring(pair))
+				end
+			end
 		end
 
 		-- Declared Linux absence values are read from Features, never hs_timeouts.
@@ -137,7 +161,7 @@ function M.new(options)
 				local row=namespace(configured[pair])
 				local action=row.combo
 				if action==nil then action="none" end
-				local valid=action=="none" or type(action)=="string" and action~="one_shot_shift"
+				local valid=action=="none" or type(action)=="string" and not CHORD_REFUSED_ACTIONS[action]
 					and catalogue.is_assignable(action)==true
 				assert(not strict or valid,"invalid known chord slot")
 				-- One action this driver lacks (another OS's, in the shared
@@ -145,7 +169,7 @@ function M.new(options)
 				-- every other chord stays (TCL-003).
 				if not valid then
 					Logger.warn("modules.shortcuts.key_combinations",
-						"The %s chord's action '%s' is not available here; that chord does nothing.", pair, tostring(action))
+						"The %s chord's action '%s' is not available to a chord here; that chord does nothing.", pair, tostring(action))
 					action="none"
 				end
 				chords[pair]=action; explicit=explicit or row.combo~=nil
@@ -380,7 +404,7 @@ function M.new(options)
 		if kind == "tap" then return value == "none" or value ~= "one_shot_shift" and catalogue.is_assignable(value) == true end
 		if kind == "combo" then
 			local declared=pcall(declared_settings)
-			return declared and next(declarations)~=nil and (value=="none" or value~="one_shot_shift" and value~="run_program" and value~="alt_tab_monitor" and catalogue.is_assignable(value)==true)
+			return declared and next(declarations)~=nil and (value=="none" or not CHORD_REFUSED_ACTIONS[value] and catalogue.is_assignable(value)==true)
 		end
 		if kind == "hold" then return holds[value] == true end
 		return false

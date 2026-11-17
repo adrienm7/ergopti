@@ -9,6 +9,12 @@ local M = {
 	PAIR_SEPARATOR = "_then_",
 	NONE = "none",
 }
+-- Actions no chord runs on any OS: the one-shot Shift, under its AutoHotkey and
+-- Linux id and its Karabiner id (maintainer decision of 2026-11-06, « One-shot
+-- Shift is a generic action on every OS »). A driver may refuse more where its
+-- chord cannot receive an action natively; Windows mirrors this list in
+-- KEY_COMBINATION_CHORD_REFUSED_ACTIONS.
+M.CHORD_REFUSED_EVERYWHERE = { one_shot_shift = true, sticky_shift = true }
 local TableUtil = require("core.text.engine.table_util")
 local ConfigKeys = require("settings.engine.keys")
 local function id(value)
