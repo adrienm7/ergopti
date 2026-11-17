@@ -594,11 +594,23 @@ try {
 			assert.match(terminal, /waiting for you: keep your hands off the keyboard/);
 			const env = JSON.parse(fs.readFileSync(reportFile(folders[0], 'env.json'), 'utf8'));
 			assert.equal(env.os, 'win');
-			assert(env.environment.os_name, 'the environment facts reach env.json');
-			assert(
-				env.permissions.some((row) => row.name === 'uac'),
-				'the UAC fact'
-			);
+			if (process.platform === 'win32') {
+				assert(env.environment.os_name, 'the environment facts reach env.json');
+			} else {
+				// Off Windows the environment step stops on Get-CimInstance before
+				// its fact line: a recorded failure, and no invented machine.
+				assert.match(steps, /^environment\s+exit=1$/m, 'the environment step failed as recorded');
+				assert.equal(env.environment?.os_name, undefined, 'no environment fact off Windows');
+			}
+			if (process.platform === 'win32') {
+				assert(
+					env.permissions.some((row) => row.name === 'uac'),
+					'the UAC fact'
+				);
+			} else {
+				// WindowsIdentity is Windows-only: the permissions step stops first.
+				assert.match(steps, /^permissions\s+exit=1$/m, 'the permissions step failed as recorded');
+			}
 			assert.match(
 				fs.readFileSync(reportFile(folders[0], 'instances_start.txt'), 'utf8'),
 				/^fact\tsample\tphase=start\tt=\d+\.\d{3}$/m
@@ -607,9 +619,12 @@ try {
 			assert.match(timeline, /^## Slowest steps$/m);
 			assert.match(timeline, /\[collector\] idle_cpu/);
 			const times = fs.readFileSync(reportFile(folders[0], 'step_times.tsv'), 'utf8');
+			// The versions step fails off Windows (Get-CimInstance), as above.
 			assert.match(
 				times,
-				/^versions\tcollector\t\d+\.\d{3}\t\d+\.\d{3}\t0\t30$/m,
+				process.platform === 'win32'
+					? /^versions\tcollector\t\d+\.\d{3}\t\d+\.\d{3}\t0\t30$/m
+					: /^versions\tcollector\t\d+\.\d{3}\t\d+\.\d{3}\t1\t30$/m,
 				'invariant epoch seconds'
 			);
 			assert.match(times, /^field_run\tphase\t/m);
