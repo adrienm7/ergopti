@@ -24,6 +24,8 @@ import sys
 import tempfile
 import time
 
+import x11_window_manager as WindowManager
+
 
 DRIVER = Path(__file__).resolve().parents[2]
 TITLE = "Ergopti owned secure focus watcher"
@@ -150,24 +152,16 @@ def session(root):
             return process
 
         try:
-            wm = launch(["openbox"], "openbox")
-            # xdotool windowactivate needs the window manager to announce
-            # _NET_ACTIVE_WINDOW; activated before openbox managed the screen it
-            # refused (« claims not to support _NET_ACTIVE_WINDOW », verify run
-            # 44018004125).
-            deadline = time.monotonic() + 8
-            while True:
-                supported = subprocess.run(
-                    ["xprop", "-root", "_NET_SUPPORTED"],
-                    capture_output=True,
-                    text=True,
-                    timeout=2,
-                )
-                if "_NET_ACTIVE_WINDOW" in supported.stdout:
-                    break
-                assert wm.poll() is None, "openbox exited before managing the screen"
-                assert time.monotonic() < deadline, "openbox did not announce _NET_ACTIVE_WINDOW"
-                time.sleep(0.02)
+            # The window is mapped only once openbox announces it can activate
+            # windows, and activated only once openbox manages it: started
+            # together, the window could map first and openbox then refused
+            # _NET_ACTIVE_WINDOW (desktop-webview job 133797159970).
+            display = stack.enter_context(contextlib.closing(WindowManager.Display()))
+            assert not WindowManager.ready(display), (
+                "a window manager owned the private X server early"
+            )
+            launch(["openbox"], "openbox")
+            WindowManager.wait_until_ready(display)
             app = launch(
                 [os.environ["ERGOPTI_ATSPI_GTK_PYTHON"], __file__, "--gtk", str(root)], "gtk"
             )
@@ -184,8 +178,10 @@ def session(root):
                 assert app.poll() is None, "owned GTK fixture exited before mapping"
                 assert time.monotonic() < deadline, "owned GTK fixture did not map"
                 time.sleep(0.02)
+            window = mapped.stdout.splitlines()[0]
+            WindowManager.wait_until_managed(display, int(window))
             subprocess.run(
-                ["xdotool", "windowactivate", "--sync", mapped.stdout.splitlines()[0]],
+                ["xdotool", "windowactivate", "--sync", window],
                 check=True,
                 timeout=5,
             )
