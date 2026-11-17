@@ -20,7 +20,9 @@
  * 3. Same score as the Comparer: the weights and the ideal finger load set in
  *    « Comparer » (its saved settings) apply here.
  * 4. « Ma frappe »: the app's 'studio-ngrams' event adds the user's own
- *    typing as the default corpus, as in the Comparer.
+ *    typing as the default corpus, as in the Comparer: its first arrival
+ *    (even before the panel exists) selects it, a later one only replaces
+ *    its tables and keeps the user's corpus.
  * 5. The other analysers' scores (LAYOUT_ANALYSER_SCORES): each analyser's
  *    official score is drawn with the analysis, the score with the user's
  *    finger model on the next tick, so the panel paints first. Extra
@@ -82,6 +84,11 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	const SCORE_DIGITS = 1;
 	// A change smaller than this is shown as none.
 	const DELTA_EPSILON = 0.005;
+	// The app's last keystats tables, kept when they arrive before a panel exists.
+	let lastNgrams = null;
+	document.addEventListener(NGRAMS_EVENT, (event) => {
+		lastNgrams = event.detail;
+	});
 	// Digits of the headline statistics of an analyser without a score.
 	const PART_DIGITS = 1;
 	// Shown in a score's cell until it is computed.
@@ -782,19 +789,34 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			state.previous = null;
 			schedule();
 		});
-		document.addEventListener(NGRAMS_EVENT, (event) => {
-			E.prepareNgrams(event.detail);
-			const entry = { id: MY_TYPING_ID, title: '', host: event.detail };
+		/**
+		 * Lists « Ma frappe » with the app's tables. Its first arrival makes it the
+		 * corpus; a later one (the fresh read after the saved one) replaces its
+		 * tables but keeps the user's choice, and analyses again only while
+		 * « Ma frappe » is the chosen corpus.
+		 * @param {object} ngrams The 'studio-ngrams' tables.
+		 */
+		function useMyTyping(ngrams) {
+			E.prepareNgrams(ngrams);
+			const entry = { id: MY_TYPING_ID, title: '', host: ngrams };
 			const at = corpora.findIndex((c) => c.id === MY_TYPING_ID);
-			if (at >= 0) corpora.splice(at, 1, entry);
-			else corpora.unshift(entry);
-			state.corpus = MY_TYPING_ID;
+			if (at >= 0) {
+				corpora.splice(at, 1, entry);
+				if (state.corpus !== MY_TYPING_ID) return;
+			} else {
+				corpora.unshift(entry);
+				state.corpus = MY_TYPING_ID;
+				fillControls();
+			}
 			state.previous = null;
 			state.libraryKey = '';
-			fillControls();
 			schedule();
-		});
+		}
+		document.addEventListener(NGRAMS_EVENT, (event) => useMyTyping(event.detail));
 		fillControls();
+		// Tables that arrived before the panel (the app sends its saved read as
+		// soon as the window opens).
+		if (lastNgrams) useMyTyping(lastNgrams);
 
 		return {
 			node,

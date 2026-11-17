@@ -31,8 +31,9 @@
  *    ({type: 'ergopti-layout-analysis:height', height}) on load and resize.
  * 7. Late host data: the app's 'studio-ngrams' event (or
  *    LAYOUT_ANALYSIS_COMPARER.setCorpus) adds « My typing » and selects it;
- *    LAYOUT_ANALYSIS_COMPARER.addLayouts adds personal layouts; a host
- *    `store` ({list, save, remove}, promises) keeps imported layouts instead
+ *    a later one (the app's fresh read after its saved one) replaces its
+ *    tables without changing the user's corpus;
+ *    LAYOUT_ANALYSIS_COMPARER.addLayouts adds personal layouts; a host `store` ({list, save, remove}, promises) keeps imported layouts instead
  *    of localStorage. LAYOUT_ANALYSIS_COMPARER.onResults(listener) lets an
  *    extra view (other analysers' scores) follow every comparison.
  * 8. Every metric and sourced value has an « i » button (info_popover.js):
@@ -2774,8 +2775,11 @@
 		// ==========================
 
 		/**
-		 * Adds or replaces a corpus after load (the app's keystats tables arrive on
-		 * the user's request): listed first, and selected when it is the default.
+		 * Adds or replaces a corpus after load (the app's keystats tables arrive
+		 * when the Studio opens: the last saved read at once, then a fresh one).
+		 * A new corpus is listed first and selected when it is the default; a
+		 * replaced one keeps the user's current choice, and is analysed again only
+		 * while it is the chosen corpus.
 		 * @param {{id: string, title?: string, tables: object, default?: boolean}} corpus
 		 * @throws {Error} On tables the engine cannot read.
 		 */
@@ -2783,8 +2787,13 @@
 			E.prepareNgrams(corpus.tables);
 			const entry = { id: corpus.id, title: corpus.title || '', host: { tables: corpus.tables } };
 			const at = corpora.findIndex((c) => c.id === corpus.id);
-			if (at >= 0) corpora.splice(at, 1, entry);
-			else corpora.unshift(entry);
+			if (at >= 0) {
+				corpora.splice(at, 1, entry);
+				fillCorpora();
+				if (state.corpus === corpus.id) analyse();
+				return;
+			}
+			corpora.unshift(entry);
 			if (corpus.default) state.corpus = corpus.id;
 			fillCorpora();
 			save();

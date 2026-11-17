@@ -237,7 +237,10 @@ user really types. The contract (schema, families, refusal codes) is `_shared/me
 - Computed once per store version: macOS and Linux keep the projection with the store's `meta.rev` (bumped by every
   ingest), Windows with a hash of the keystats files' paths, sizes and modification times; an unchanged store answers
   at once, without a read.
-- The page publishes the loaded counts as a `studio-ngrams` DOM event for the analysis panel.
+- The page publishes each host answer as a `studio-ngrams` DOM event for the analysis panel and « Comparer »; a
+  host may answer twice (a saved projection at once, then the fresh one). The first arrival selects « My typing »,
+  even before the panel or the Comparer exists; a later one replaces its tables without changing the user's corpus
+  and analyses again only while « My typing » is the chosen corpus.
 - The analysis panels open their « i » links through `window.LAYOUT_ANALYSIS_HOST.openLink(url)`: the page posts
   `open_link`, and the host opens an https URL (and nothing else) in the system browser.
 

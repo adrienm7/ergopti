@@ -11,7 +11,8 @@
  * show and add the Base, Shift, AltGr and Shift+AltGr layers from the layer
  * selector, lay out at phone width in light and dark without a sideways page
  * scroll, fit every key label inside its key, override shortcuts per modifier
- * combination through save and reload, and check that no raw locale key is shown in any tool tab of the 21
+ * combination through save and reload, keep a corpus the user picked when the
+ * app's « Ma frappe » refreshes, and check that no raw locale key is shown in any tool tab of the 21
  * locales. Page errors and requests outside the loopback origin fail the gate.
  * ==============================================================================
  */
@@ -397,6 +398,138 @@ async function exerciseCompareEdited(browser, origin) {
 		),
 		0,
 		'the edited layout is not stored with the personal layouts'
+	);
+	assert.deepEqual(errors, []);
+	await page.close();
+}
+
+/**
+ * (studio-my-typing-refresh) The app answers « Ma frappe » twice: its saved
+ * projection as soon as the window opens, before the editor's analysis panel
+ * exists, then the fresh read. The first arrival selects « Ma frappe » in the
+ * panel and in « Comparer »; the refresh replaces its tables, keeps a corpus
+ * the user picked meanwhile and analyses again only while « Ma frappe » is
+ * chosen.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseMyTypingRefresh(browser, origin) {
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
+	const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.addInitScript((strings) => {
+		window._i18n_strings = strings;
+		window.__posted = [];
+		window.webkit = {
+			messageHandlers: {
+				layout_editor_window_bridge: { postMessage: (payload) => window.__posted.push(payload) }
+			}
+		};
+	}, strings);
+	// Each read differs by its character total, which the Comparer reports.
+	const typing = (scale) => ({
+		schema: 1,
+		source: 'keystats',
+		total: 60 * scale,
+		chars: { e: 20 * scale, s: 12 * scale, a: 10 * scale, n: 8 * scale, ' ': 10 * scale },
+		bigrams: { es: 6 * scale, en: 5 * scale, 'e ': 8 * scale, ' a': 4 * scale },
+		trigrams: { 'es ': 3 * scale }
+	});
+	const answer = (ngrams) =>
+		page.evaluate((ngrams) => window.keystatsNgrams({ ok: true, ngrams }), ngrams);
+	const settle = () =>
+		page.evaluate(
+			() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+		);
+	await page.goto(`${origin}/ui/layout_editor_window/index.html`);
+	await page.evaluate(() =>
+		window.initData({
+			strings: {},
+			state: { platform: 'linux' },
+			studio_store: true,
+			keystats: true
+		})
+	);
+	assert.equal(
+		await page.evaluate(() => window.__posted.filter((p) => p.action === 'keystats_ngrams').length),
+		1,
+		'the window reads « Ma frappe » when it opens'
+	);
+	// The saved projection arrives before the editor, hence before its panel.
+	await answer(typing(1));
+	await page.evaluate(
+		(text) => window.sourceData({ filename: 'source.toml', text, folder: 'layout_sources/' }),
+		fs.readFileSync(SOURCE_FIXTURE, 'utf8')
+	);
+	await page.waitForSelector('#la-panel-corpus');
+	assert.equal(
+		await page.inputValue('#la-panel-corpus'),
+		'my_typing',
+		'the panel selects « Ma frappe » that arrived before it'
+	);
+
+	await page.click('#studio-tab-compare');
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'studio_layouts'));
+	await page.evaluate(() => {
+		const list = window.__posted.find((p) => p.action === 'studio_layouts');
+		window.studioLayouts({ request: list.request, ok: true, layouts: [] });
+	});
+	await page.waitForFunction(() => document.querySelectorAll('#la-chart .la-bar').length > 1);
+	assert.equal(
+		await page.inputValue('#la-corpus'),
+		'my_typing',
+		'the Comparer selects « Ma frappe »'
+	);
+	await page.evaluate(() => {
+		window.__totals = [];
+		window.LAYOUT_ANALYSIS_COMPARER.onResults((results, tables) =>
+			window.__totals.push(tables.totalChars)
+		);
+	});
+	const totals = () => page.evaluate(() => window.__totals.slice());
+	assert.deepEqual(await totals(), [60], 'the saved projection is analysed');
+
+	// The fresh read while « Ma frappe » is chosen: analysed again, still chosen.
+	await answer(typing(2));
+	await page.waitForFunction(() => window.__totals.length === 2);
+	assert.deepEqual(await totals(), [60, 120], 'the fresh read replaces the saved one');
+	assert.equal(await page.inputValue('#la-corpus'), 'my_typing');
+
+	// The user picks a built-in text; a later read keeps it and analyses nothing.
+	const builtin = await page.evaluate(
+		() => document.querySelector('#la-corpus optgroup:nth-of-type(2) option').value
+	);
+	await page.selectOption('#la-corpus', builtin);
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'studio_corpus'));
+	await serveCorpora(page);
+	await page.waitForFunction(() => window.__totals.length === 3);
+	const builtinTotal = (await totals())[2];
+	await answer(typing(3));
+	await settle();
+	assert.equal(await page.inputValue('#la-corpus'), builtin, 'a refresh keeps the user’s corpus');
+	assert.deepEqual(await totals(), [60, 120, builtinTotal], 'and analyses nothing on it');
+	// « Ma frappe » chosen again is analysed on the newest read.
+	await page.selectOption('#la-corpus', 'my_typing');
+	await page.waitForFunction(() => window.__totals.length === 4);
+	assert.equal((await totals())[3], 180, 'the newest read is the one kept');
+
+	// The same rule in the editor's panel.
+	await page.click('#studio-tab-edit');
+	const panelBuiltin = await page.evaluate(
+		() =>
+			[...document.querySelectorAll('#la-panel-corpus option')].find((o) => o.value !== 'my_typing')
+				.value
+	);
+	await page.selectOption('#la-panel-corpus', panelBuiltin);
+	await answer(typing(4));
+	await settle();
+	assert.equal(
+		await page.inputValue('#la-panel-corpus'),
+		panelBuiltin,
+		'a refresh keeps the corpus picked in the panel'
 	);
 	assert.deepEqual(errors, []);
 	await page.close();
@@ -2806,6 +2939,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseStudioNav(browser, origin);
 		await exerciseStudioLayout(browser, origin);
 		await exerciseCompareEdited(browser, origin);
+		await exerciseMyTypingRefresh(browser, origin);
 		await exerciseSiteOpensOnErgopti(browser, origin);
 		await exerciseLayerSelector(browser, origin);
 		await exercisePhoneWidth(browser, origin);

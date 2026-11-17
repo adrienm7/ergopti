@@ -912,6 +912,49 @@ check(
 );
 
 check(
+	'Ergopti Studio hands the analyses the saved read, then the fresh one, from one request',
+	() => {
+		// (studio-my-typing-refresh) A host may answer the window's one
+		// keystats_ngrams twice: a saved projection at once, then a fresh read.
+		// Both reach the Comparer and the analysis panel, in order; a refused
+		// refresh publishes nothing over the saved tables.
+		const { window, messages, document } = loadEditorPage();
+		window.initData({ strings: {}, state: { platform: 'windows' }, keystats: true });
+		assert.equal(messages.filter((m) => m.action === 'keystats_ngrams').length, 1);
+		const saved = {
+			schema: 1,
+			source: 'keystats',
+			chars: { e: 7 },
+			bigrams: {},
+			trigrams: {},
+			total: 7
+		};
+		const fresh = {
+			schema: 1,
+			source: 'keystats',
+			chars: { e: 9 },
+			bigrams: {},
+			trigrams: {},
+			total: 9
+		};
+		window.keystatsNgrams({ ok: true, ngrams: saved });
+		window.keystatsNgrams({ ok: true, ngrams: fresh });
+		const published = () =>
+			document.events
+				.filter((event) => event.type === 'studio-ngrams')
+				.map((event) => plain(event.detail));
+		assert.deepEqual(published(), [saved, fresh], 'each answer is published, the fresh one last');
+		window.keystatsNgrams({ ok: false, code: 'keystats_unreadable' });
+		assert.equal(published().length, 2, 'a refused refresh publishes no data');
+		assert.equal(
+			messages.filter((m) => m.action === 'keystats_ngrams').length,
+			1,
+			'the second answer is not a second request'
+		);
+	}
+);
+
+check(
 	'Ergopti Studio keeps the Comparer layouts in the host and runs corpus tables on request',
 	async () => {
 		const { window, byId, messages } = loadEditorPage();

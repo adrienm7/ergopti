@@ -792,7 +792,9 @@ window.LAYOUT_ANALYSIS_HOST = {
 Data that arrives after load (the app's keystats tables, fetched on the user's
 request; the user's own layouts) goes through
 `window.LAYOUT_ANALYSIS_COMPARER`: `setCorpus({id, title?, tables, default?})`
-adds or replaces a corpus, listed first and selected when `default` is true, and
+adds a corpus, listed first and selected when `default` is true, or replaces
+the tables of a listed one without changing the chosen corpus (analysed again
+only when it is the chosen one), and
 `addLayouts([layout, ...])` adds or replaces layouts, ticked, and `setFormat(id)`
 chooses the keyboard format (the app's Studio passes the editor's « Format »). The
 editor and the Comparer store that format once for both (`corpus_files.js`
