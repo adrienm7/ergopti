@@ -6,9 +6,9 @@ same commit as each step or checkpoint. Times are Paris time.
 
 ## Where things stand (2026-11-17)
 
-- S01 to S24 are on dev (S23 clipboard and S24 diagnostics landed on
-  2026-11-17); S25 (gestures) is next. The sections below are the history of
-  S01–S20 and stay for their lessons.
+- S01 to S25 are on dev (S23 clipboard, S24 diagnostics and S25 gestures
+  landed on 2026-11-17); S26 (hotstrings) is next. The sections below are the
+  history of S01–S20 and stay for their lessons.
 - Run each step on the Windows PC with
   `ERGOPTI_STRUCTURE_PHASE=2 node tools/audit/structure/run-phase2.cjs --from <key> --to <key>`
   in an own worktree (one step takes 15 to 25 minutes); the runner now passes
@@ -24,7 +24,16 @@ same commit as each step or checkpoint. Times are Paris time.
 - Then push a proof branch (`ci/verify-structure-<shortsha>`, its own
   concurrency group), dispatch `ci.yml` with `os_lanes=all`, and fix what it
   finds in follow-up commits after the step before landing. A full dev
-  baseline is a `ci/verify-<sha>` run of dev (44000968901 on 3cbd759da7). Dev baseline reds at the S21/S22
+  baseline is a `ci/verify-<sha>` run of dev (44000968901 on 3cbd759da7,
+  44026055910 on bf3d258699); compare failing names per job
+  (scratchpad `compare.py`), not job conclusions. Dev reds at the S23–S25
+  landing: Data and source contracts (the behavior owner
+  `windows/modules/keymap/keylayout/keylayout_emulation.ahk` needs its
+  source review since dev 1bad3747cf; the steps keep dev's pin), Test
+  infrastructure (`static/layouts/visualisation/ergopti_v2.2.json` missing
+  from `.prettierignore` since dev c75c95f487), Distribution and updates
+  (field report collectors), Linux E2E network-ai; Windows runners
+  sometimes time out spawning PowerShell (ETIMEDOUT), a runner flake. Dev baseline reds at the S21/S22
   landing: Linux E2E platform-metrics; Common Data and source contracts
   (behavior owner `windows/infra/hotstrings/hotstring_engine_main.ahk` needs
   its source review, from dev 6436cc2d6c); a racy Windows llm case
@@ -50,7 +59,23 @@ same commit as each step or checkpoint. Times are Paris time.
   - a scan of the driver's top `adapters/` folder loses each adapter a step
     moves into a feature folder (S23: the Linux port adapter presence test
     now lists every `adapters/` folder; the macOS shell-quote scan still
-    names the old roots and keeps working only while they hold files).
+    names the old roots and keeps working only while they hold files);
+  - nested alternations are not rewritten: `modules/(keymap|gestures)` in
+    `TEST_MODULE_GROUPS` matched nothing after S25 and every Windows runner
+    refused the gesture suites;
+  - names the step never sees: dotted Linux test module names held by JS
+    checks (`tests.unit.modules.gestures.…`), `pgrep -f` patterns of a
+    renamed worker, `"\\..\\ui\\…"` doubled-backslash AHK reads, Swift
+    test fixtures that build the path from two pieces;
+  - a dev commit that lands during a proof can still name an old module
+    (two Linux hardware runners after S23/S24): after each rebase, scan the
+    lines dev added for old paths and module names of the moved files;
+  - a rebase that conflicts on `behaviors.json` must keep dev's pins of
+    owners the steps did not touch; re-pin only files the steps rewrote;
+  - the source-tree scan gate counts a feature folder named like a settings
+    section (gestures; later hotstrings, metrics, shortcuts) as a tree, so
+    those names are not triggers of its platform rule (decided by the agent
+    on 2026-11-17, to review by the maintainer).
 
 ## History (2026-11-14, 17:20)
 
