@@ -136,6 +136,13 @@ waits for the maintainer's review).
       `src/lib/keyboard/data/ergopti_display_patch.json`). Left from the maintainer's 2026-11-14 request: display and
       emulate any layout source the same way (a patch per layout, or a default patch for layouts without Ergopti+
       levels); the selector's older Ergopti versions (1.1 to 2.1) stay frozen snapshots without a source.
+- [ ] **[LATER] « Ma frappe » saved read on macOS and Linux (2026-11-17).** Windows pushes its last complete Studio
+      read at once (`metrics\cache\studio_ngrams.json`) because its worker replays new events and may re-save a
+      1.1 GB reader image first (30 s and more). macOS and Linux have no such worker: they read `db.sqlite` read only
+      and keep the projection per `meta.rev`, so only the first open after a restart pays the read. The same SQL took
+      0.75 s warm and 4.5 s with a cold page cache on the maintainer's 1.1 GB image (290 KB of JSON). Measure that
+      first open on a large macOS store (Hammerspoon reads on its main thread) and on Linux before deciding whether
+      they save the read too.
 - [ ] **[RELEASE] Windows export step in native Lua.** The restricted host `windows/native/ergopti_lua_export.c`
       (pinned Lua 5.4.6, built by `tools/build/build_windows_lua_export.ps1` in package-windows) is done. Left: once a
       dev run builds « Windows / Build », commit its artifact `windows-lua-export-*` (`ergopti_lua_export.exe` and

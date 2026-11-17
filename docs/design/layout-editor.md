@@ -235,8 +235,16 @@ user really types. The contract (schema, families, refusal codes) is `_shared/me
 - Fail fast: an absent store answers `keystats_absent`, a refused or partial read `keystats_unreadable`; the page
   shows the translated reason and keeps no partial data.
 - Computed once per store version: macOS and Linux keep the projection with the store's `meta.rev` (bumped by every
-  ingest), Windows with a hash of the keystats files' paths, sizes and modification times; an unchanged store answers
-  at once, without a read.
+  ingest), Windows with a hash of the keystats files' paths, sizes and modification times (the `cache` folder left
+  out: it holds only derived projections); an unchanged store answers at once, without a read.
+- Saved read (Windows): the worker validates and replays the new events and may re-save the reader image before
+  it answers (30 s and more on a 1.1 GB image), so the resident saves each complete read in
+  `metrics\cache\studio_ngrams.json` (a header line with the store stamp, then the JSON) and pushes it as soon as
+  a window asks, before the worker's fresh read; a saved read of the unchanged store is the answer. The file holds
+  the same n-gram counts as the reader image beside it, in clear like them (at-rest encryption covers typed text,
+  not these aggregates), and the cache folder's ignore rule keeps it out of any sync. A metrics purge and the
+  dashboard's cache reset remove it, and a read that overlapped a purge is read again rather than saved. macOS and
+  Linux read their store directly (no replay), so only their first read after a restart costs the query.
 - The page publishes each host answer as a `studio-ngrams` DOM event for the analysis panel and « Comparer »; a
   host may answer twice (a saved projection at once, then the fresh one). The first arrival selects « My typing »,
   even before the panel or the Comparer exists; a later one replaces its tables without changing the user's corpus

@@ -727,6 +727,11 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 								LoggerError("Keystats", "KLWV_OnWebMessage: the reader image could not be retired; caches were not fully purged.")
 								return
 						}
+						; Ergopti Studio's saved « My typing » read is derived from the same image.
+						if !KLR_StudioSnapshotRetire(entry["metrics_dir"]) {
+								LoggerError("Keystats", "KLWV_OnWebMessage: the saved Ergopti Studio read could not be retired; caches were not fully purged.")
+								return
+						}
 						if KLWV_IsCurrent(which, Epoch)
 								KLWV.windows[which]["full_build_done"] := false
 						try LoggerDebug("Keystats", "KLWV_OnWebMessage: dashboard caches purged.")

@@ -351,7 +351,10 @@ _KLRSource_StudioWindowAnswers() {
 			"request_studio", (MetricsDir, OnTerminal) => (Requests.Push(MetricsDir),
 				OnTerminal.Call(Outcome["status"], Outcome["stage"]), true),
 			"push_raw", (Name, Json) => (Pushed.Push(Name . " " . Json), true),
-			"read_stage", FSRead)
+			"read_stage", FSRead,
+			"read_snapshot", KLR_StudioSnapshotRead,
+			"write_snapshot", KLR_StudioSnapshotWrite,
+			"purge_generation", () => 0)
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
 		AssertEqual('keystatsNgrams {"ok":false,"code":"' . Contract["codes"]["absent"] . '"}', Pushed[1])
 		AssertEqual(0, Requests.Length, "an absent store starts no worker")
@@ -365,7 +368,8 @@ _KLRSource_StudioWindowAnswers() {
 		Stamp["value"] := "rev-2"
 		Outcome["status"] := "failed", Outcome["stage"] := ""
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
-		AssertEqual('keystatsNgrams {"ok":false,"code":"' . Contract["codes"]["unreadable"] . '"}', Pushed[4])
+		AssertEqual(Pushed[2], Pushed[4], "a changed store shows the saved read first")
+		AssertEqual('keystatsNgrams {"ok":false,"code":"' . Contract["codes"]["unreadable"] . '"}', Pushed[5])
 		AssertEqual(2, Requests.Length, "a changed store is read again")
 		AssertTrue(LAYOUT_EDITOR_WINDOW_ACTIONS.Has("keystats_ngrams"), "the page's action is allowlisted")
 	} finally {
@@ -375,6 +379,140 @@ _KLRSource_StudioWindowAnswers() {
 }
 Test("Layout editor window: Ergopti Studio answers keystats_ngrams with the worker's read (studio-keystats-bridge)",
 	_KLRSource_StudioWindowAnswers)
+
+; A Studio window ports around a real keystats folder; the worker's terminal is
+; held in Terminals until the test ends the read.
+_KLRSource_StudioSnapshotDeps(Dir, Stamp, Pushed, Terminals, Generation) {
+	return Map(
+		"metrics_dir", Dir,
+		"stamp", (MetricsDir) => Stamp["value"],
+		"request_studio", (MetricsDir, OnTerminal) => (Terminals.Push(OnTerminal), true),
+		"push_raw", (Name, Json) => (Pushed.Push(Name . " " . Json), true),
+		"read_stage", FSRead,
+		"read_snapshot", KLR_StudioSnapshotRead,
+		"write_snapshot", KLR_StudioSnapshotWrite,
+		"purge_generation", () => Generation["value"])
+}
+
+; (studio-saved-read-first) After a restart the resident has no projection in
+; memory: the read saved by the last window is pushed at once, before the
+; worker starts, then the worker's fresh read replaces it and is saved in turn.
+_KLRSource_StudioSavedReadFirst() {
+	global _LayEdWin_StudioCache
+	_LayEdWin_StudioCache := 0
+	Dir := A_Temp . "\ergopti_studio_saved_" . A_TickCount
+	DirCreate(Dir . "\by_device\pc")
+	try {
+		FileAppend("-- ledger", Dir . "\by_device\pc\data.sql", "UTF-8-RAW")
+		AssertTrue(KLR_StudioSnapshotWrite(Dir, "rev-old", '{"schema":1,"chars":{"a":1}}'))
+		Stamp := Map("value", "rev-new")
+		Pushed := [], Terminals := []
+		Deps := _KLRSource_StudioSnapshotDeps(Dir, Stamp, Pushed, Terminals, Map("value", 0))
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual(1, Pushed.Length, "the saved read is pushed before the worker ends")
+		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":1,"chars":{"a":1}}}', Pushed[1])
+		AssertEqual(1, Terminals.Length, "a changed store still starts the worker")
+		FileAppend('{"schema":1,"chars":{"a":2}}', Dir . "\stage.json", "UTF-8-RAW")
+		Terminals[1].Call("ok", Dir . "\stage.json")
+		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":1,"chars":{"a":2}}}', Pushed[2],
+			"the fresh read follows")
+		Saved := KLR_StudioSnapshotRead(Dir)
+		AssertEqual("rev-new", Saved["stamp"], "the fresh read is saved with its stamp")
+		AssertEqual('{"schema":1,"chars":{"a":2}}', Saved["json"])
+		; A restart on the unchanged store: the saved read is the answer, no worker.
+		_LayEdWin_StudioCache := 0
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual(Pushed[2], Pushed[3])
+		AssertEqual(3, Pushed.Length)
+		AssertEqual(1, Terminals.Length, "a saved read of the unchanged store starts no worker")
+	} finally {
+		_LayEdWin_StudioCache := 0
+		DirDelete(Dir, true)
+	}
+}
+Test("Layout editor window: Ergopti Studio shows its saved read at once, then the fresh one (studio-saved-read-first)",
+	_KLRSource_StudioSavedReadFirst)
+
+; A saved read that is not in its format is logged and ignored: the worker reads
+; the store, and its read replaces the file.
+_KLRSource_StudioBrokenSavedRead() {
+	global _LayEdWin_StudioCache
+	_LayEdWin_StudioCache := 0
+	Dir := A_Temp . "\ergopti_studio_broken_" . A_TickCount
+	DirCreate(Dir . "\cache")
+	try {
+		FileAppend('{"schema":1}', KLR_StudioSnapshotPath(Dir), "UTF-8-RAW")
+		AssertThrows(() => KLR_StudioSnapshotRead(Dir), "a file without its header is refused")
+		Pushed := [], Terminals := []
+		Deps := _KLRSource_StudioSnapshotDeps(Dir, Map("value", "rev-1"), Pushed, Terminals, Map("value", 0))
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual(0, Pushed.Length, "a broken saved read is not shown")
+		AssertEqual(1, Terminals.Length)
+		FileAppend('{"schema":1,"chars":{"b":3}}', Dir . "\stage.json", "UTF-8-RAW")
+		Terminals[1].Call("ok", Dir . "\stage.json")
+		AssertEqual('{"schema":1,"chars":{"b":3}}', KLR_StudioSnapshotRead(Dir)["json"])
+		AssertTrue(KLR_StudioSnapshotRetire(Dir), "the saved read can be retired")
+		AssertEqual(0, KLR_StudioSnapshotRead(Dir), "no saved read is left")
+		AssertTrue(KLR_StudioSnapshotRetire(Dir), "retiring an absent read succeeds")
+	} finally {
+		_LayEdWin_StudioCache := 0
+		DirDelete(Dir, true)
+	}
+}
+Test("Keystats reader: a saved Ergopti Studio read out of its format is ignored and replaced (studio-saved-read-first)",
+	_KLRSource_StudioBrokenSavedRead)
+
+; (studio-saved-read-purge) A metrics purge that overlapped the worker's read:
+; that read may hold what the purge deleted, so it is neither pushed nor saved,
+; and the store is read again.
+_KLRSource_StudioPurgeOverlap() {
+	global _LayEdWin_StudioCache
+	_LayEdWin_StudioCache := 0
+	Dir := A_Temp . "\ergopti_studio_purge_" . A_TickCount
+	DirCreate(Dir . "\by_device\pc")
+	try {
+		FileAppend("-- ledger", Dir . "\by_device\pc\data.sql", "UTF-8-RAW")
+		Generation := Map("value", 4)
+		Pushed := [], Terminals := []
+		Deps := _KLRSource_StudioSnapshotDeps(Dir, Map("value", "rev-1"), Pushed, Terminals, Generation)
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		FileAppend('{"schema":1,"chars":{"p":9}}', Dir . "\stage.json", "UTF-8-RAW")
+		Generation["value"] := 6
+		Terminals[1].Call("ok", Dir . "\stage.json")
+		AssertEqual(0, Pushed.Length, "the overlapped read is not shown")
+		AssertEqual(0, KLR_StudioSnapshotRead(Dir), "nor saved")
+		AssertEqual(2, Terminals.Length, "the store is read again")
+		Terminals[2].Call("ok", Dir . "\stage.json")
+		AssertEqual(1, Pushed.Length, "a read after the purge is shown")
+		AssertEqual("rev-1", KLR_StudioSnapshotRead(Dir)["stamp"], "and saved")
+	} finally {
+		_LayEdWin_StudioCache := 0
+		DirDelete(Dir, true)
+	}
+}
+Test("Layout editor window: a Studio read that overlapped a metrics purge is read again (studio-saved-read-purge)",
+	_KLRSource_StudioPurgeOverlap)
+
+; The purge and the dashboard's cache reset retire the saved Studio read, and
+; the purge bumps its generation on both ends (KL_RunMetricsMaintenance needs
+; the live writer, so its order is pinned on the source).
+_KLRSource_StudioPurgeRetiresSavedRead() {
+	Body := _DriverFuncBody("KL_RunMetricsMaintenance")
+	Assert(Body != "", "KL_RunMetricsMaintenance must be found")
+	Tombstone := InStr(Body, "the tombstone is not in the replayed ledger")
+	Retire := InStr(Body, "KLR_StudioSnapshotRetire(MetricsDir)")
+	Assert(Tombstone > 0 && Retire > Tombstone, "the purge retires the saved read once its tombstone is replayed")
+	First := InStr(Body, "KLMaintenance.purge_generation += 1")
+	Assert(First > 0 && First < Tombstone, "the purge bumps the generation before its tombstone")
+	Assert(InStr(Body, "KLMaintenance.purge_generation += 1", , First + 1) > Retire,
+		"and again when it ends")
+	Reset := _DriverFuncBody("KLWV_OnWebMessage")
+	Assert(Reset != "", "KLWV_OnWebMessage must be found")
+	Assert(InStr(Reset, 'KLR_StudioSnapshotRetire(entry["metrics_dir"])') > InStr(Reset, 'KLR_CacheRetire(entry["metrics_dir"])'),
+		"the dashboard's cache reset retires the saved read with the reader image")
+}
+Test("Keystats maintenance: a purge and a cache reset retire the saved Studio read (studio-saved-read-purge)",
+	_KLRSource_StudioPurgeRetiresSavedRead)
 
 ; The Studio stamp changes when a keystats file grows and stays put otherwise.
 _KLRSource_StudioStampFollowsTheStore() {
@@ -386,6 +524,12 @@ _KLRSource_StudioStampFollowsTheStore() {
 		First := KLR_StudioStoreStamp(Dir)
 		Assert(First != "", "a folder with a journal has a stamp")
 		AssertEqual(First, KLR_StudioStoreStamp(Dir), "an unchanged folder keeps its stamp")
+		; The cache folder holds derived projections only: the worker's reader
+		; image and the saved Studio read must not make the read look stale.
+		DirCreate(Dir . "\cache")
+		FileAppend("image", Dir . "\cache\reader.sqlite", "UTF-8-RAW")
+		AssertTrue(KLR_StudioSnapshotWrite(Dir, First, '{"schema":1}'))
+		AssertEqual(First, KLR_StudioStoreStamp(Dir), "the cache folder is not part of the stamp")
 		FileAppend("b", Dir . "\device\data.sql", "UTF-8-RAW")
 		Assert(KLR_StudioStoreStamp(Dir) != First, "a grown journal changes the stamp")
 	} finally {

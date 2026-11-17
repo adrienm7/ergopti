@@ -93,6 +93,22 @@ KLR_CachePath(md) {
 	return KLR_CacheDir(md) . "reader.sqlite"
 }
 
+; Creates the cache folder with its ignore rule: everything in it is derived
+; from data.sql and never synced.
+; @param md {String} Metrics directory, trailing separator included.
+; @returns {Boolean} Whether the folder exists.
+KLR_CacheEnsureDir(md) {
+	Dir := KLR_CacheDir(md)
+	try DirCreate(Dir)
+	catch
+		return false
+	Ignore := Dir . ".gitignore"
+	if !FSExists(Ignore)
+		try FSWriteCreateDurable(Ignore,
+			"# Rebuilt reader projection. Derived from data.sql, never synced.`n*`n")
+	return true
+}
+
 ; The cache's own bookkeeping lives inside the cached database, so an image and
 ; the offsets it was built from can never be separated by a partial copy.
 KLR_CacheEnsureTables(db) {
@@ -472,17 +488,11 @@ _KLR_CacheStageIsOwned(Path) {
 KLR_CacheSave(db, sizes, md, logPath, snapshots) {
 	if !db || !(sizes is Map) || !(snapshots is Map) || snapshots.Count != sizes.Count
 		return 0
-	Dir := KLR_CacheDir(md)
-	try DirCreate(Dir)
-	catch {
+	; The guard is derived state too; install the cache ignore rule before it.
+	if !KLR_CacheEnsureDir(md) {
 		KLR_PrefetchDebug(logPath, "KLR cache save failed: cache directory")
 		return 0
 	}
-	; The guard is derived state too; install the cache ignore rule before it.
-	Ignore := Dir . ".gitignore"
-	if !FSExists(Ignore)
-		try FSWriteCreateDurable(Ignore,
-			"# Rebuilt reader projection. Derived from data.sql, never synced.`n*`n")
 	Guard := FSOpenExclusiveGuard(KLR_CachePath(md) . ".publish.lock")
 	if !Guard {
 		KLR_PrefetchDebug(logPath, "KLR cache save skipped: publication guard unavailable")

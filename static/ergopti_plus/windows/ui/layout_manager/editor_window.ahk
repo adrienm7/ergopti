@@ -27,7 +27,9 @@
 ;    user asks: a keystats worker projects the local store read only
 ;    (KLPF_RequestStudio, mode "studio") and its JSON is pushed to this window
 ;    alone as keystatsNgrams; an absent store or a failed read answers with the
-;    refusal codes of _shared/metrics/data/studio_ngrams.json.
+;    refusal codes of _shared/metrics/data/studio_ngrams.json. The last complete
+;    read is saved in the keystats cache folder (KLR_StudioSnapshotWrite) and
+;    pushed at once when a window opens, before the worker's fresh read.
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\identifiers.ahk
@@ -142,10 +144,14 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
 
 /**
  * Reads Ergopti Studio's « My typing » counts for this window. The keystats
- * folder is never written: a worker projects it read only, and its staged JSON
- * goes to this window alone.
+ * journals are never written: a worker projects them read only, and its staged
+ * JSON goes to this window alone. The last complete read is also saved in the
+ * keystats cache folder, so a later window (after a restart too) shows it at
+ * once, then the fresh read when its worker ends: the page answers twice.
  * @param {Map} Deps - "metrics_dir", "stamp" (MetricsDir), "request_studio"
- *   (MetricsDir, OnTerminal), "push_raw" (FunctionName, Json) and "read_stage" (Path).
+ *   (MetricsDir, OnTerminal), "push_raw" (FunctionName, Json), "read_stage" (Path),
+ *   "read_snapshot" (MetricsDir) and "write_snapshot" (MetricsDir, Stamp, Json)
+ *   (KLR_StudioSnapshot*), "purge_generation" () (KL_MetricsPurgeGeneration).
  * @returns {Boolean} Whether the read was accepted.
  */
 LayoutEditorWindow_ReadKeystats(Deps) {
@@ -160,14 +166,30 @@ LayoutEditorWindow_ReadKeystats(Deps) {
 	; An unchanged keystats folder answers from the last projection, at once.
 	Stamp := Deps["stamp"].Call(MetricsDir)
 	if (Stamp != "") && (_LayEdWin_StudioCache is Map) && (_LayEdWin_StudioCache["stamp"] == Stamp) {
-		Deps["push_raw"].Call("keystatsNgrams", '{"ok":true,"ngrams":' . _LayEdWin_StudioCache["json"] . "}")
+		_LayEdWin_PushNgrams(Deps, _LayEdWin_StudioCache["json"])
 		return true
 	}
-	return Deps["request_studio"].Call(MetricsDir, _LayEdWin_OnStudioTerminal.Bind(Deps, Codes, Stamp))
+	; The saved read first: « My typing » is the default corpus and must not
+	; wait for the worker, which replays what was typed since (30 s and more
+	; measured on a 1.1 GB reader image).
+	Saved := 0
+	try Saved := Deps["read_snapshot"].Call(MetricsDir)
+	catch as Err
+		LoggerError("LayoutEditorWindow", "The saved Ergopti Studio read is ignored: {1}", Err.Message)
+	if (Saved is Map) {
+		_LayEdWin_PushNgrams(Deps, Saved["json"])
+		if (Stamp != "") && (Saved["stamp"] == Stamp) {
+			_LayEdWin_StudioCache := Saved
+			return true
+		}
+	}
+	Generation := Deps["purge_generation"].Call()
+	return Deps["request_studio"].Call(MetricsDir,
+		_LayEdWin_OnStudioTerminal.Bind(Deps, Codes, MetricsDir, Stamp, Generation))
 }
 
 ; The worker's one terminal: its staged JSON, read before the stage is deleted.
-_LayEdWin_OnStudioTerminal(Deps, Codes, Stamp, Status, Stage) {
+_LayEdWin_OnStudioTerminal(Deps, Codes, MetricsDir, Stamp, Generation, Status, Stage) {
 	global _LayEdWin_StudioCache
 	if (Status != "ok") || (Stage == "") {
 		LoggerWarn("LayoutEditorWindow", "Ergopti Studio could not read the typing statistics ({1}).", Status)
@@ -180,7 +202,30 @@ _LayEdWin_OnStudioTerminal(Deps, Codes, Stamp, Status, Stage) {
 		_LayEdWin_PushRefusal(Deps, Codes["unreadable"])
 		return
 	}
+	; A metrics purge that overlapped the read may have run after the worker read
+	; what it deletes: that read is neither shown, kept nor saved; read again.
+	if (Deps["purge_generation"].Call() != Generation) {
+		LoggerInfo("LayoutEditorWindow", "A metrics purge overlapped the Ergopti Studio read; reading the typing statistics again.")
+		_LayEdWin_StudioCache := 0
+		LayoutEditorWindow_ReadKeystats(Deps)
+		return
+	}
 	_LayEdWin_StudioCache := Stamp != "" ? Map("stamp", Stamp, "json", Json) : 0
+	_LayEdWin_PushNgrams(Deps, Json)
+	if (Stamp == "")
+		return
+	Saved := false
+	try Saved := Deps["write_snapshot"].Call(MetricsDir, Stamp, Json)
+	catch as Err {
+		LoggerError("LayoutEditorWindow", "The Ergopti Studio read could not be saved: {1}", Err.Message)
+		return
+	}
+	if !Saved
+		LoggerError("LayoutEditorWindow", "The Ergopti Studio read could not be saved in the keystats cache folder.")
+}
+
+; Hands one projection JSON (encoded by SQLite, never re-parsed) to the page.
+_LayEdWin_PushNgrams(Deps, Json) {
 	Deps["push_raw"].Call("keystatsNgrams", '{"ok":true,"ngrams":' . Json . "}")
 }
 
@@ -563,6 +608,9 @@ _LayEdWin_Deps(Host) {
 		"request_studio", KLPF_RequestStudio,
 		"push_raw", _LayEdWin_PushRaw.Bind(Host),
 		"read_stage", FSRead,
+		"read_snapshot", KLR_StudioSnapshotRead,
+		"write_snapshot", KLR_StudioSnapshotWrite,
+		"purge_generation", KL_MetricsPurgeGeneration,
 		"open_url", (Url) => ExternalUrl_OpenHttp(Url),
 		"config_dir", _ConfigDir,
 		"shared_dir", _SharedDir,

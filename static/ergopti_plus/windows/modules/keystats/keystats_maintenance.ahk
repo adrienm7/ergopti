@@ -22,6 +22,9 @@
 ;    export.vacuum_into) into the user's Downloads folder, taken after the
 ;    flush settles. Names and the tombstone match the macOS and Linux helper
 ;    (_shared/metrics/engine/maintenance.lua) and the shared vectors.
+; 4. A Purge also removes Ergopti Studio's saved « My typing » read and bumps a
+;    generation on both ends, so a Studio read that overlapped it is read again
+;    rather than saved (KL_MetricsPurgeGeneration).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -44,6 +47,9 @@ class KLMaintenance {
 	static EXPORT_EXTENSION := ".sqlite"
 	; True while one Export or Purge owns the writer.
 	static active := false
+	; Bumped when a Purge starts and when it ends, so a read that overlapped one
+	; is known to have read what the Purge deletes (KL_MetricsPurgeGeneration).
+	static purge_generation := 0
 }
 
 
@@ -100,6 +106,13 @@ KL_SettleMetricsWriter() {
 ; ===================================
 ; ===================================
 
+; The Purge generation: a reader that saves what it read (Ergopti Studio's
+; « My typing ») compares it before and after its read.
+; @returns {Integer} KLMaintenance.purge_generation.
+KL_MetricsPurgeGeneration() {
+	return KLMaintenance.purge_generation
+}
+
 ; Runs one dashboard Export or Purge through the single owning writer.
 ; @param Kind {String} "export" or "purge".
 ; @param MetricsDir {String} The metrics folder the reader replays.
@@ -115,6 +128,7 @@ KL_RunMetricsMaintenance(Kind, MetricsDir) {
 	try {
 		Tombstone := 0
 		if (Kind = "purge") {
+			KLMaintenance.purge_generation += 1
 			Tombstone := KL_MetricsTombstone(KL_NowTimestamp())
 			if !KL_AppendLog(Tombstone)
 				throw Error("the journal refused the tombstone")
@@ -130,6 +144,12 @@ KL_RunMetricsMaintenance(Kind, MetricsDir) {
 				. SQLite_Q(KLMaintenance.TOMBSTONE_ACTION) . " AND ts=" . SQLite_Q(Tombstone["utc"]) . ";")
 			if (Rows.Length != 1 || Rows[1]["n"] < 1)
 				throw Error("the tombstone is not in the replayed ledger")
+			; Ergopti Studio shows its saved read at once: it must not show what was purged.
+			if !KLR_StudioSnapshotRetire(MetricsDir) {
+				LoggerError("Keystats", "Metrics purge applied, but the saved Ergopti Studio read {1} could not be removed.",
+					KLR_StudioSnapshotPath(MetricsDir))
+				return Refused
+			}
 		} else {
 			Folder := EnvGet("USERPROFILE")
 			if (Folder = "" || !DirExist(Folder . "\Downloads"))
@@ -147,6 +167,8 @@ KL_RunMetricsMaintenance(Kind, MetricsDir) {
 		; The resident process keeps no image it did not already own.
 		if db && !HadImage
 			KLR_ResetCache()
+		if (Kind = "purge")
+			KLMaintenance.purge_generation += 1
 		KLMaintenance.active := false
 	}
 }

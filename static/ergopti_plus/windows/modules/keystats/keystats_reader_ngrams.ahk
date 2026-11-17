@@ -18,6 +18,9 @@
 ;    heavy tables (penta/hexa/hepta) and caps each table at KLR_FAST_LIMIT rows.
 ; 4. KLR_ReadRangeSplitToday: full first-paint path that splits the result into
 ;    { historical (before today), today (per-app bucket) }.
+; 5. Ergopti Studio's « My typing »: KLR_BuildStudioNgramsJson projects it,
+;    KLR_StudioStoreStamp versions the store, and KLR_StudioSnapshot* keep the
+;    last complete read in the cache folder so the Studio shows it at once.
 ; ==============================================================================
 
 
@@ -226,14 +229,20 @@ KLR_StudioContract() {
  * A version stamp of the keystats folder: every file's path, size and
  * modification time, hashed. An ingest appends to a journal, so the stamp
  * changes with every new keystroke written; Ergopti Studio keeps its
- * projection while it does not.
+ * projection while it does not. The cache folder is left out: it holds only
+ * projections derived from the journals (the reader image, the saved Studio
+ * read), and saving one must not make the read it came from look stale.
  * @param MetricsDir {String} The keystats folder.
  * @returns {String} The stamp, or "" for a folder without any file.
  */
 KLR_StudioStoreStamp(MetricsDir) {
+		Derived := _KLR_StudioCacheDir(MetricsDir)
 		Entries := []
-		Loop Files, MetricsDir . "\*", "FR"
+		Loop Files, MetricsDir . "\*", "FR" {
+				if (SubStr(A_LoopFileFullPath, 1, StrLen(Derived)) = Derived)
+						continue
 				Entries.Push(A_LoopFileFullPath . "|" . A_LoopFileSize . "|" . A_LoopFileTimeModified)
+		}
 		if !Entries.Length
 				return ""
 		Sorted := ""
@@ -241,6 +250,81 @@ KLR_StudioStoreStamp(MetricsDir) {
 				Sorted .= Entry . "`n"
 		Sorted := Sort(Sorted)
 		return CryptoSha256(Sorted)
+}
+
+; The saved Studio read: one header line (this format, then the store stamp it
+; was read at), then the projection JSON exactly as the worker staged it.
+class KLRStudioSnapshot {
+		static FILE := "studio_ngrams.json"
+		static HEADER := "ergopti-studio-ngrams 1 "
+}
+
+; The keystats cache folder, from a metrics folder given with or without its
+; trailing separator (KL_MetricsDirFor gives none, KLR_CacheDir expects one).
+_KLR_StudioCacheDir(MetricsDir) {
+		return KLR_CacheDir(RTrim(MetricsDir, "\/") . "\")
+}
+
+/**
+ * Where the resident keeps the last complete Studio read: beside the reader
+ * image, which already holds the same n-gram counts in clear (the at-rest
+ * encryption covers typed text, never these aggregates), in the folder its
+ * ignore rule keeps out of any sync.
+ * @param MetricsDir {String} The keystats folder.
+ * @returns {String} The file path.
+ */
+KLR_StudioSnapshotPath(MetricsDir) {
+		return _KLR_StudioCacheDir(MetricsDir) . KLRStudioSnapshot.FILE
+}
+
+/**
+ * Reads the last complete Studio read the resident saved.
+ * @param MetricsDir {String} The keystats folder.
+ * @returns {Map|Integer} Map("stamp", String, "json", String), or 0 when none is saved.
+ * @throws {Error} When a saved file cannot be read or is not that format.
+ */
+KLR_StudioSnapshotRead(MetricsDir) {
+		Path := KLR_StudioSnapshotPath(MetricsDir)
+		if !FSExists(Path)
+				return 0
+		Text := FSRead(Path)
+		if !(Text is String)
+				throw Error("The saved Ergopti Studio read cannot be read: " . Path)
+		LineEnd := InStr(Text, "`n")
+		Header := LineEnd ? SubStr(Text, 1, LineEnd - 1) : ""
+		Json := LineEnd ? SubStr(Text, LineEnd + 1) : ""
+		Prefix := KLRStudioSnapshot.HEADER
+		if (SubStr(Header, 1, StrLen(Prefix)) !== Prefix) || (StrLen(Header) = StrLen(Prefix))
+				|| (SubStr(Json, 1, 1) != "{") || (SubStr(Json, -1) != "}")
+				throw Error("The saved Ergopti Studio read is not in its format: " . Path)
+		return Map("stamp", SubStr(Header, StrLen(Prefix) + 1), "json", Json)
+}
+
+/**
+ * Saves one complete Studio read, atomically (KLPF_WriteAtomic): a failed save
+ * leaves the previous file whole.
+ * @param MetricsDir {String} The keystats folder.
+ * @param Stamp {String} KLR_StudioStoreStamp at the read's request, never "".
+ * @param Json {String} The projection JSON object.
+ * @returns {Boolean} Whether the file now holds this read.
+ */
+KLR_StudioSnapshotWrite(MetricsDir, Stamp, Json) {
+		if !(Stamp is String) || (Stamp == "") || InStr(Stamp, "`n")
+				throw ValueError("A saved Ergopti Studio read needs its store stamp.")
+		if !(Json is String) || (SubStr(Json, 1, 1) != "{") || (SubStr(Json, -1) != "}")
+				throw ValueError("A saved Ergopti Studio read is one JSON object.")
+		if !KLR_CacheEnsureDir(RTrim(MetricsDir, "\/") . "\")
+				return false
+		return KLPF_WriteAtomic(KLR_StudioSnapshotPath(MetricsDir), KLRStudioSnapshot.HEADER . Stamp . "`n" . Json)
+}
+
+/**
+ * Removes the saved Studio read (a metrics purge, a dashboard cache reset).
+ * @param MetricsDir {String} The keystats folder.
+ * @returns {Boolean} True when no saved read remains.
+ */
+KLR_StudioSnapshotRetire(MetricsDir) {
+		return FSDelete(KLR_StudioSnapshotPath(MetricsDir)) ? true : false
 }
 
 /**
