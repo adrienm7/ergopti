@@ -310,8 +310,12 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 			fraction: nil) { cancellations += 1 }
 		let panel = try newNativePanel(since: previous)
 		XCTAssertEqual(panel.title, try Self.nativeCaption("Update"))
+		let stack = try XCTUnwrap(panel.contentView as? NSStackView)
+		let bar = try XCTUnwrap(stack.arrangedSubviews.compactMap { $0 as? NSProgressIndicator }.first)
+		XCTAssertEqual(bar.accessibilityLabel(), "Checking", "the bar is named by its step (a11y-update-progress-label)")
 		presenter.showProgress(UpdateProgressText(title: "Mise à jour", message: "Downloading", cancelTitle: "Cancel"),
 			fraction: 0.5) { cancellations += 1 }
+		XCTAssertEqual(bar.accessibilityLabel(), "Downloading", "a reused bar follows its new step")
 		XCTAssertTrue(NSApplication.shared.windows.contains { $0 === panel && $0.isVisible },
 			"a progress refresh retains the same visible native panel")
 		XCTAssertEqual(panel.title, try Self.nativeCaption("Mise à jour"), "a reused panel follows its new localized caption")

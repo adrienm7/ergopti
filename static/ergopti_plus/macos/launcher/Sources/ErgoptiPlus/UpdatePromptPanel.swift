@@ -71,8 +71,18 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 	func showProgress(_ text: UpdateProgressText, fraction: Double?, onCancel: (() -> Void)?) {
 		if let indicator = progressIndicator, let message = progressMessage, let panel {
 			panel.title = WindowTitles.compose(text.title)
+			let changed = message.stringValue != text.message
 			message.stringValue = text.message
+			indicator.setAccessibilityLabel(text.message)
 			apply(fraction: fraction, to: indicator)
+			// A screen reader does not read a label that changes under it:
+			// the new step (checking, downloading, installing) is announced.
+			if changed {
+				NSAccessibility.post(element: message, notification: .announcementRequested, userInfo: [
+					.announcement: text.message,
+					.priority: NSAccessibilityPriorityLevel.medium.rawValue,
+				])
+			}
 			return
 		}
 		closeAll()
@@ -83,6 +93,9 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 		indicator.minValue = 0
 		indicator.maxValue = 1
 		indicator.widthAnchor.constraint(equalToConstant: Self.contentWidth).isActive = true
+		// VoiceOver reads a bare bar as « progress indicator, 50 % » with no
+		// word on what progresses: the step's message names it.
+		indicator.setAccessibilityLabel(text.message)
 		apply(fraction: fraction, to: indicator)
 
 		var rows: [NSView] = [message, indicator]
