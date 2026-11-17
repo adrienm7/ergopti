@@ -569,8 +569,9 @@ end
 --- @param id string Application id, used by panels to remember position.
 --- @param icon_name string Icon theme name or absolute path.
 --- @param title string Accessible title.
+--- @param description string|nil The icon's accessible description (see set_icon).
 --- @return boolean
-function M.create(id, icon_name, title)
+function M.create(id, icon_name, title, description)
 	local lib = bind()
 	if not lib then return false end
 	if _indicator then return true end
@@ -583,6 +584,9 @@ function M.create(id, icon_name, title)
 	end
 
 	lib.indicator.app_indicator_set_status(_indicator, STATUS_ACTIVE)
+	if description and description ~= "" then
+		lib.indicator.app_indicator_set_icon_full(_indicator, tostring(icon_name), tostring(description))
+	end
 	if title and title ~= "" then
 		lib.indicator.app_indicator_set_title(_indicator, tostring(title))
 	end
@@ -611,11 +615,13 @@ end
 
 --- Replaces the icon.
 --- @param icon_name string
+--- @param description string|nil The icon's accessible description, what a
+---   screen reader says for the item (« Ergopti+ (paused) »); "" when absent.
 --- @return boolean
-function M.set_icon(icon_name)
+function M.set_icon(icon_name, description)
 	local lib = bind()
 	if not lib or not _indicator then return false end
-	lib.indicator.app_indicator_set_icon_full(_indicator, tostring(icon_name), "")
+	lib.indicator.app_indicator_set_icon_full(_indicator, tostring(icon_name), tostring(description or ""))
 	return true
 end
 

@@ -41,6 +41,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
+local I18n = require("core.i18n.engine.i18n")
 local Indicator = require("tray.adapters.appindicator")
 local Protocol = require("tray.protocol")
 local Perf = require("core.logger.engine.perf_counters")
@@ -82,6 +83,10 @@ local _backend = nil
 -- change the state does not re-send the icon over D-Bus.
 local _paused = false
 
+-- The accessible description last sent with the icon, so a menu rebuild after
+-- a locale change relabels it without re-sending an unchanged one.
+local _description = nil
+
 
 
 
@@ -106,6 +111,25 @@ local function resolve_icon(paused)
 	return FALLBACK_ICON
 end
 
+--- The icon's accessible description: the only place the paused state is
+--- said in words, since a screen reader cannot see the greyed logo. "" while
+--- the locale catalogue is not loaded yet (get() would answer the key itself);
+--- the next menu build fills it.
+--- @param paused boolean
+--- @return string
+local function describe(paused)
+	local key = paused and "accessibility.tray_tip_paused" or "accessibility.tray_tip"
+	if I18n.has(key) ~= true then return "" end
+	return I18n.get(key)
+end
+
+--- Sends the icon with its description.
+--- @param icon string|nil An explicit icon, else the state's logo.
+local function send_icon(icon)
+	_description = describe(_paused)
+	Indicator.set_icon(icon or resolve_icon(_paused), _description)
+end
+
 --- Creates the tray icon if it does not exist yet.
 --- @return boolean True when an icon is live.
 local function ensure_started()
@@ -114,9 +138,11 @@ local function ensure_started()
 		_backend = nil
 		return false
 	end
-	if not Indicator.create(INDICATOR_ID, resolve_icon(_paused), "Ergopti+") then
+	local description = describe(_paused)
+	if not Indicator.create(INDICATOR_ID, resolve_icon(_paused), "Ergopti+", description) then
 		return false
 	end
+	_description = description
 	_started = true
 	_backend = "appindicator"
 	return true
@@ -128,7 +154,7 @@ function M.setIcon(opts)
 	if not ensure_started() then return end
 	local icon = type(opts) == "table" and opts.icon or nil
 	if type(icon) == "string" and icon ~= "" then
-		Indicator.set_icon(icon)
+		send_icon(icon)
 	end
 end
 
@@ -142,6 +168,7 @@ local function replace_menu(items)
 		return false
 	end
 	if Indicator.set_menu(_items) ~= true then return false end
+	if describe(_paused) ~= _description then send_icon(nil) end
 	Logger.debug(LOG, "Tray menu set (%d top-level row(s)).", #_items)
 	return true
 end
@@ -202,7 +229,7 @@ function M.setPaused(paused)
 	if paused == _paused then return end
 	_paused = paused
 	if not _started then return end
-	Indicator.set_icon(resolve_icon(paused))
+	send_icon(nil)
 	Logger.debug(LOG, "Tray icon shows the %s logo.", paused and "paused" or "active")
 end
 
@@ -231,6 +258,7 @@ function M.destroy()
 	_backend = nil
 	_items = {}
 	_paused = false
+	_description = nil
 end
 
 --- Drains pending tray events. Never blocks.

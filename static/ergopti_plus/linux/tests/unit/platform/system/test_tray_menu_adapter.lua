@@ -19,7 +19,8 @@
 local helpers = require("tests.helpers")
 -- Every case installs its own indicator double; the module end puts the real
 -- entries back so no later module meets the double.
-local restore_loaded = helpers.keep_loaded({ "tray.adapters.appindicator", "tray.adapters.menu" })
+local restore_loaded = helpers.keep_loaded({ "tray.adapters.appindicator", "tray.adapters.menu",
+	"core.i18n.engine.i18n" })
 
 --- Installs a stand-in indicator and loads the adapter over it.
 --- @param available boolean Whether the machine can host a tray.
@@ -28,13 +29,18 @@ local function with_indicator(available)
 	local log = { menus = {}, icons = {}, pumps = 0, created = nil, destroyed = 0 }
 	package.loaded["tray.adapters.appindicator"] = {
 		is_available = function() return available end,
-		create = function(id, icon, title)
+		create = function(id, icon, title, description)
 			if not available then return false end
-			log.created = { id = id, icon = icon, title = title }
+			log.created = { id = id, icon = icon, title = title, description = description }
 			return true
 		end,
 		set_menu = function(items) log.menus[#log.menus + 1] = items ; return true end,
-		set_icon = function(icon) log.icons[#log.icons + 1] = icon ; return true end,
+		set_icon = function(icon, description)
+			log.icons[#log.icons + 1] = icon
+			log.descriptions = log.descriptions or {}
+			log.descriptions[#log.icons] = description
+			return true
+		end,
 		pump = function() log.pumps = log.pumps + 1 ; return 0 end,
 		destroy = function() log.destroyed = log.destroyed + 1 end,
 		is_live = function() return log.created ~= nil end,
@@ -191,6 +197,55 @@ end)
 -- ======= The Ergopti logo, not a generic glyph ===================
 -- =================================================================
 -- =================================================================
+
+helpers.describe("tray_menu: the icon is named for screen readers (a11y-tray-description)", function()
+
+	--- Installs a locale catalogue double and loads the adapter over it.
+	--- @param strings table|nil Translations by key; nil while none is loaded.
+	--- @return table adapter, table log, table strings
+	local function with_catalogue(strings)
+		package.loaded["core.i18n.engine.i18n"] = {
+			has = function(key) return strings ~= nil and strings[key] ~= nil end,
+			get = function(key)
+				if strings == nil or strings[key] == nil then error("get() of a missing key answers the key itself") end
+				return strings[key]
+			end,
+		}
+		local tray, log = with_indicator(true)
+		return tray, log, strings
+	end
+
+	helpers.it("names the icon at creation and says the paused state in words", function()
+		local tray, log = with_catalogue({
+			["accessibility.tray_tip"] = "Ergopti+",
+			["accessibility.tray_tip_paused"] = "Ergopti+ (en pause)",
+		})
+		tray.setMenu({})
+		helpers.assert_eq(log.created.description, "Ergopti+",
+			"an empty description leaves Orca with a file name or nothing")
+		tray.setPaused(true)
+		helpers.assert_eq(log.descriptions[#log.icons], "Ergopti+ (en pause)",
+			"the greyed logo is the only other sign of a pause, and a screen reader cannot see it")
+		tray.setPaused(false)
+		helpers.assert_eq(log.descriptions[#log.icons], "Ergopti+")
+	end)
+
+	helpers.it("relabels after the catalogue loads or changes, once", function()
+		local strings = {}
+		local tray, log = with_catalogue(strings)
+		tray.setMenu({})
+		helpers.assert_eq(log.created.description, "", "never the key itself before the catalogue loads")
+		strings["accessibility.tray_tip"] = "Ergopti+"
+		strings["accessibility.tray_tip_paused"] = "Ergopti+ (paused)"
+		tray.setMenu({})
+		helpers.assert_eq(#log.icons, 1, "the menu build after the catalogue loads names the icon")
+		helpers.assert_eq(log.descriptions[1], "Ergopti+")
+		tray.setMenu({})
+		helpers.assert_eq(#log.icons, 1, "an unchanged description is not re-sent over D-Bus")
+	end)
+
+end)
+
 
 helpers.describe("tray_menu: the icon is the Ergopti logo", function()
 

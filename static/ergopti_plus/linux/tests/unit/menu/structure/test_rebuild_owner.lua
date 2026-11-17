@@ -420,6 +420,8 @@ helpers.describe("menu rebuild: actual Main and tray boundaries", function()
 			if name == "core.logger.engine.shim" then return { debug = function() end, warn = function() end } end
 			if name == "tray.protocol" then return { resolve_tray_icon = function() return "input-keyboard" end } end
 			if name == "core.fs.engine.paths" then return { shared_root = function() return "/synthetic" end } end
+			-- The icon's accessible description; no catalogue here, so none.
+			if name == "core.i18n.engine.i18n" then return { has = function() return false end } end
 			-- Counters only: the tray counts and times each menu replacement.
 			if name == "core.logger.engine.perf_counters" then return require(name) end
 			error("unexpected tray dependency: " .. name)
