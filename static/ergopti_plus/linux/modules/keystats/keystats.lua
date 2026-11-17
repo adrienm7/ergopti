@@ -2426,9 +2426,18 @@ end
 --- Consulted IN ADDITION to the app-name list, never instead of it.
 --- @param is_secure boolean
 function M.set_secure_field(is_secure)
+	local was = _secure_field
 	_secure_field = (is_secure == true)
 	settle_capture_policy()
-	Logger.debug(LOG, "Secure field focused: %s.", tostring(_secure_field))
+	-- Logged on a change, one sentence per state: the logger folds repeats of
+	-- one format, so a single « %s » line hid every admission behind the
+	-- withdrawals around it (run_pointer_metrics_live.lua waits on these).
+	if _secure_field == was then return end
+	if _secure_field then
+		Logger.debug(LOG, "Focused field unknown or secure: metrics paused.")
+	else
+		Logger.debug(LOG, "Focused field admitted: metrics recorded.")
+	end
 end
 
 --- Admits one privacy-filter change, or says why it was refused. A metrics
