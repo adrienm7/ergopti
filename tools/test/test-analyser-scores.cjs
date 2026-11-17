@@ -18,7 +18,8 @@
  *    fidelity and direction; an unknown analyser throws.
  * 3. Whole library: every library layout gets a finite value (or, for an
  *    analyser without a score, finite parts) from every analyser on a
- *    built-in corpus, within a time budget.
+ *    built-in corpus, within a time budget per layout (the fastest of a few
+ *    passes).
  * ==============================================================================
  */
 
@@ -46,6 +47,10 @@ const MIN_ANALYSERS = 11;
 // than a page: global lookups go through the context), both fingerings.
 // Measured about 160 ms.
 const BUDGET_MS_PER_LAYOUT = 600;
+// The sample is scored up to this many times and the fastest pass counts: one
+// pass follows the machine's load and the JIT warming up, the fastest the
+// scorers' own work. A pass within the budget ends the check.
+const SPEED_PASSES = 3;
 const LIBRARY_SAMPLE = 30;
 const LETTERS_TEXT = 'Thequickbrownfoxjumpsoverthelazydog';
 const DIGITS_TEXT = '2024 or 1999, 35 and 46';
@@ -218,7 +223,8 @@ const corpus = E.prepareNgrams(
 	vm.runInContext('LAYOUT_ANALYSIS_CORPORA', sandbox).fr_don_quichotte
 );
 const sample = Array.from(library.values()).slice(0, LIBRARY_SAMPLE);
-const started = Date.now();
+const passesMs = [];
+let started = Date.now();
 for (const layout of sample) {
 	const both = S.scoreAll(layout, corpus, { keyboard: 'iso' });
 	const all = Object.fromEntries(Object.entries(both).map(([id, r]) => [id, r.official]));
@@ -231,10 +237,21 @@ for (const layout of sample) {
 		} else check(Number.isFinite(r.value), `${layout.id} ${a.id}: ${r.value} is not finite`);
 	}
 }
-const perLayout = (Date.now() - started) / sample.length;
+passesMs.push(Date.now() - started);
+while (
+	passesMs.length < SPEED_PASSES &&
+	Math.min(...passesMs) / sample.length > BUDGET_MS_PER_LAYOUT
+) {
+	started = Date.now();
+	// A copy of each layout: the engine keeps its key n-grams per layout object.
+	for (const layout of sample) S.scoreAll({ ...layout }, corpus, { keyboard: 'iso' });
+	passesMs.push(Date.now() - started);
+}
+const perLayout = Math.min(...passesMs) / sample.length;
 check(
 	perLayout <= BUDGET_MS_PER_LAYOUT,
-	`every analyser takes ${perLayout.toFixed(0)} ms per layout, budget ${BUDGET_MS_PER_LAYOUT} ms`
+	`every analyser takes ${perLayout.toFixed(0)} ms per layout (fastest of ` +
+		`${passesMs.map((ms) => (ms / sample.length).toFixed(0)).join(', ')}), budget ${BUDGET_MS_PER_LAYOUT} ms`
 );
 
 if (errors.length > 0) {
