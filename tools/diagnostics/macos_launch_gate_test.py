@@ -1450,15 +1450,19 @@ class LauncherHelperTests(unittest.TestCase):
 class FakeMounts:
     """The mount(8), umount(8) and xattr(1) commands a translocated relocation runs."""
 
-    def __init__(self, listing="", umount_status=0):
+    def __init__(self, listing="", umount_status=0, umount_statuses=None):
         self.listing = listing
         self.umount_status = umount_status
+        # Per-attempt umount statuses, the last one repeated once exhausted.
+        self.umount_statuses = list(umount_statuses or [])
         self.commands = []
 
     def __call__(self, arguments, **_):
         self.commands.append(arguments)
         stdout = self.listing if arguments == ["mount"] else ""
-        status = self.umount_status if arguments[0] == "umount" else 0
+        status = 0
+        if arguments[0] == "umount":
+            status = self.umount_statuses.pop(0) if self.umount_statuses else self.umount_status
         return subprocess.CompletedProcess(arguments, status, stdout, "busy" if status else "")
 
 
@@ -1584,10 +1588,35 @@ class RelocationTests(unittest.TestCase):
                 f"{downloaded} on /private/var/folders/T/AppTranslocation/1 (nullfs, local)\n",
                 umount_status=1,
             )
-            moved = relocation.Relocation("translocated", app, home, runner=mounts)
+            moved = relocation.Relocation(
+                "translocated", app, home, runner=mounts, sleep=lambda _: None
+            )
             moved.enter()
-            with self.assertRaisesRegex(RuntimeError, "umount .* failed: busy"):
+            with self.assertRaisesRegex(RuntimeError, "umount .* failed after 10 attempts: busy"):
                 moved.leave()
+            self.assertEqual(
+                sum(1 for command in mounts.commands if command[0] == "umount"),
+                relocation.UMOUNT_ATTEMPTS,
+            )
+            self.assertTrue(app.is_dir())
+
+    def test_translocation_unmount_retried_until_macos_releases_it(self):
+        # CI run 44000968901: umount refused right after Quit, then macOS released it.
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve()
+            app, home = self.installed(root), root / "home"
+            downloaded = home / "gitcfg/Downloads/ErgoptiPlus.app"
+            mounts = FakeMounts(
+                f"{downloaded} on /private/var/folders/T/AppTranslocation/1 (nullfs, local)\n",
+                umount_statuses=[1, 1, 0],
+            )
+            waits = []
+            moved = relocation.Relocation(
+                "translocated", app, home, runner=mounts, sleep=waits.append
+            )
+            moved.enter()
+            moved.leave()
+            self.assertEqual(waits, [relocation.UMOUNT_RETRY_SECONDS] * 2)
             self.assertTrue(app.is_dir())
 
 

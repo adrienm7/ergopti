@@ -50,6 +50,11 @@ SCENARIOS = tuple(LOCATIONS)
 # prompt; the pending 0083 of the install step would open that prompt instead.
 APPROVED_QUARANTINE_FLAGS = "00c3"
 LAUNCHER_RELATIVE = "Contents/MacOS/ErgoptiPlus"
+# macOS releases a translocation mount some time after the app quit: umount
+# answered "Operation not permitted" right after a healthy Quit (CI run
+# 44000968901), so it is tried again for a bounded time before it is reported.
+UMOUNT_ATTEMPTS = 10
+UMOUNT_RETRY_SECONDS = 0.5
 TRANSLOCATION_MARKER = "/AppTranslocation/"
 NULLFS_MOUNT = re.compile(r"^(?P<source>.+) on (?P<target>.+) \(nullfs, ")
 
@@ -67,13 +72,14 @@ def quarantine_stamp(flags=APPROVED_QUARANTINE_FLAGS, now=time.time, identifier=
 class Relocation:
     """Moves the installed bundle to one scenario location and back."""
 
-    def __init__(self, scenario, installed, home, runner=subprocess.run):
+    def __init__(self, scenario, installed, home, runner=subprocess.run, sleep=time.sleep):
         if scenario not in LOCATIONS:
             raise ValueError(f"Unknown relocation scenario {scenario!r}")
         self.scenario = scenario
         self.installed = Path(installed)
         self.home = Path(home)
         self.runner = runner
+        self.sleep = sleep
         folder, link = LOCATIONS[scenario]
         self.folder = self.home / folder
         self.link = self.home / link if link else None
@@ -141,9 +147,17 @@ class Relocation:
         problems = []
         if self.scenario == "translocated":
             for target in self.translocation_mounts():
-                result = self.runner(["umount", target], capture_output=True, text=True)
-                if result.returncode != 0:
-                    problems.append(f"umount {target} failed: {result.stderr.strip()}")
+                for attempt in range(UMOUNT_ATTEMPTS):
+                    result = self.runner(["umount", target], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        break
+                    if attempt + 1 < UMOUNT_ATTEMPTS:
+                        self.sleep(UMOUNT_RETRY_SECONDS)
+                else:
+                    problems.append(
+                        f"umount {target} failed after {UMOUNT_ATTEMPTS} attempts: "
+                        f"{result.stderr.strip()}"
+                    )
             if self.moved.exists():
                 self.runner(["xattr", "-dr", "com.apple.quarantine", str(self.moved)], check=True)
         if self.moved.exists():
