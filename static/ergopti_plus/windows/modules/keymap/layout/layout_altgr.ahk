@@ -237,9 +237,11 @@ ScriptAltGrPressedJustBefore(PriorKey := unset) {
     global _ALTGR_PRIOR_KEY_QUERY
     if !IsSet(PriorKey)
         PriorKey := _ALTGR_PRIOR_KEY_QUERY.Call()
-    if (PriorKey == "")
-        return false
-    return GetKeySC(PriorKey) == 0x138 or PriorKey = GetKeyName("SC138")
+    JustBefore := (PriorKey != "") and (GetKeySC(PriorKey) == 0x138 or PriorKey = GetKeyName("SC138"))
+    if LoggerIsDebugEnabled()
+        LoggerDebug("ScriptAltGr", "Script shortcut key after '{1}': {2}.", PriorKey,
+            JustBefore ? "right after AltGr, a shortcut" : "not right after AltGr, typed as text")
+    return JustBefore
 }
 
 ; The script chord hotkeys, three per slot, each with the criterion bound to
