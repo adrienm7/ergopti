@@ -45,7 +45,7 @@ class PhysicalSlots {
 		global _SharedDir
 		if (Path == "")
 			Path := _SharedDir . "\layouts\data\keycodes\physical_keys.json"
-		return PhysicalSlots(JsonParse(FSReadStrict(Path)))
+		return PhysicalSlots(JsonParseShared(Path, FSReadStrict(Path)))
 	}
 
 	/**

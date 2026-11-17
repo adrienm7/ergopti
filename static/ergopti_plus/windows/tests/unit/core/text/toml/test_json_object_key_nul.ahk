@@ -114,6 +114,32 @@ _JOKN_MemberSpansBuildNoTree() {
 Test("JSON: member spans validate and walk without decoding the document (json-member-spans)",
 	_JOKN_MemberSpansBuildNoTree)
 
+; perf-shared-json-roots-2026-11-17: four boot owners each decoded the 130 KB
+; physical-key registry (about 170 ms apiece). One decode is shared while the
+; text read is unchanged, and an edited text is decoded again.
+_JOKN_SharedRootFollowsItsText() {
+	Key := "shared-root-test-" . A_TickCount
+	First := JsonParseShared(Key, '{"keys":{"KeyA":{"ahk":"SC01E"}}}')
+	Before := JsonDecodeTally()["containers"]
+	Again := JsonParseShared(Key, '{"keys":{"KeyA":{"ahk":"SC01E"}}}')
+	AssertTrue(ObjPtr(First) == ObjPtr(Again), "an unchanged text must reuse the decoded root")
+	AssertEqual(Before, JsonDecodeTally()["containers"], "a reused root decodes nothing")
+	Edited := JsonParseShared(Key, '{"keys":{"KeyA":{"ahk":"SC010"}}}')
+	AssertEqual("SC010", Edited["keys"]["KeyA"]["ahk"], "an edited text must be decoded again")
+	AssertEqual("SC01E", First["keys"]["KeyA"]["ahk"], "an earlier root is never rewritten")
+	Other := JsonParseShared(Key . "-other", '{"keys":{"KeyA":{"ahk":"SC010"}}}')
+	AssertFalse(ObjPtr(Other) == ObjPtr(Edited), "documents of different paths never share a root")
+	; The four boot owners of the registry decode it through the shared root.
+	; The composed layout's source emulation keeps a private decode: its session
+	; owns what it is handed, so it never takes the shared root.
+	for Owner in ["WPMWidget_TypingBurstIndex", "MagicEditorPhysicalCatalogue", "LayoutEmulationRows",
+			"KeymapLayers_LoadContext"]
+		AssertTrue(InStr(_DriverFuncBody(Owner), "JsonParseShared(RegistryPath, FSReadStrict(RegistryPath))"),
+			Owner . " must read the physical-key registry through its shared root")
+}
+Test("JSON: a shared root is reused for an unchanged text and decoded again for an edited one (json-shared-root)",
+	_JOKN_SharedRootFollowsItsText)
+
 
 _JsonArraySpans_PreserveExactOrderedTokenKinds() {
 	Source := ' [ true , 1, false, 0, "true", null, {"size":true,"\u0073ize":1}, ["é", {"x":"nested"}] ] '

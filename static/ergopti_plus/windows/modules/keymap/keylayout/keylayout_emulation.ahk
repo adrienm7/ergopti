@@ -134,7 +134,8 @@ LayoutEmulationRows(SharedRoot := unset) {
 	if Rows is Map
 		return Rows
 	Root := IsSet(SharedRoot) ? SharedRoot : _SharedDir
-	Registry := JsonParse(FSReadStrict(Root . "\layouts\data\keycodes\physical_keys.json"))
+	RegistryPath := Root . "\layouts\data\keycodes\physical_keys.json"
+	Registry := JsonParseShared(RegistryPath, FSReadStrict(RegistryPath))
 	Built := Map()
 	for Row, Codes in LayoutRowsPolicyKeys(Registry) {
 		Names := []

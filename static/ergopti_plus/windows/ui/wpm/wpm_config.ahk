@@ -59,7 +59,8 @@ WPMWidget_TypingBurstIndex(Canon, SharedRoot := unset) {
 				if !Burst.Has(Key) || !(Burst[Key] is Array) || !Burst[Key].Length
 						throw ValueError("[typing_burst]." . Key . " must be a non-empty list")
 		Root := IsSet(SharedRoot) ? SharedRoot : _SharedDir
-		Registry := JsonParse(FSReadStrict(Root . "\layouts\data\keycodes\physical_keys.json"))
+		RegistryPath := Root . "\layouts\data\keycodes\physical_keys.json"
+		Registry := JsonParseShared(RegistryPath, FSReadStrict(RegistryPath))
 		Ending := Map()
 		for _, Group in Burst["ending_groups"]
 				Ending[Group] := true

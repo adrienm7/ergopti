@@ -76,6 +76,25 @@ JsonKnownRoot(Text, Root := unset) {
 	return (KnownRoot is Map && KnownText == Text) ? KnownRoot : false
 }
 
+/**
+ * The decoded root of a shipped JSON document several owners read, shared while
+ * the text each caller just read is exactly the text it was decoded from. The
+ * physical-key registry (130 KB, about 170 ms per decode) had four boot owners
+ * decoding it one after another (perf-shared-json-roots-2026-11-17). An edited
+ * file is decoded again on its next read; the root is read-only for every caller.
+ * @param {String} Key Identity of the document, its path.
+ * @param {String} Text The document's text, as the caller read it.
+ * @returns The decoded root (as JsonParse returns it).
+ */
+JsonParseShared(Key, Text) {
+	static Known := Map()
+	if Known.Has(Key) && Known[Key].Text == Text
+		return Known[Key].Root
+	Root := JsonParse(Text)
+	Known[Key] := { Text: Text, Root: Root }
+	return Root
+}
+
 JsonParse(text) {
 	pos := 1
 	val := _JsonParseValue(&text, &pos, 0)
