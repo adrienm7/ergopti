@@ -20,10 +20,16 @@
 	margin: 8px 0;
 }
 
-.la-fingering-map {
+/* The board keeps its key size and scrolls inside this box, never the page
+   (WCAG 1.4.10 reflow at 320 px). */
+.la-fingering-scroll {
 	margin: 8px 0;
 	max-width: 100%;
 	overflow-x: auto;
+}
+
+.la-fingering-map {
+	flex: none;
 	position: relative;
 }
 

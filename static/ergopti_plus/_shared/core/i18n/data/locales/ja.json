@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "総合スコアの点数（良い順）：各指標が重み×値を加算または減算します。配列を選ぶと詳細を表示します。",
 	"layout_analysis.chart.gain": "加点",
 	"layout_analysis.chart.loss": "減点",
-	"layout_analysis.chart.row": "{layout}：{rank} 位、{score} 点。詳細を表示",
+	"layout_analysis.chart.row": "{layout} {score} 点、{rank} 位。詳細を表示",
 	"layout_analysis.unit.points": "点",
 	"layout_analysis.share.button": "リンクをコピー",
 	"layout_analysis.share.copied": "リンクをコピーしました：このコーパス、キーボード、形状、配列で開きます。",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "最も打ちにくい頻出語",
 	"layout_analysis.words.word": "単語",
 	"layout_analysis.words.effort": "負担",
-	"layout_analysis.words.part": "主な要因"
+	"layout_analysis.words.part": "主な要因",
+	"layout_analysis.heat.table": "値を表で表示",
+	"layout_analysis.heat.table_key": "キー",
+	"layout_analysis.heat.table_position": "位置",
+	"layout_analysis.heat.table_finger": "指",
+	"layout_analysis.heat.position": "{row} 段目、{column} 番目のキー",
+	"layout_editor.board.dead_key": "デッドキー {name}",
+	"layout_editor.board.disabled": "無効",
+	"layout_editor.board.position": "{row} 段目、{column} 番目のキー",
+	"layout_editor.board.table": "配列を表で表示",
+	"layout_editor.board.table_key": "キー",
+	"layout_editor.swap.label": "入れ替えるキー",
+	"layout_editor.swap.button": "入れ替え"
 }

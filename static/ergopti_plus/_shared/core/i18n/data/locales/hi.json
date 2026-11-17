@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "कुल स्कोर के अंक, सबसे अच्छे पहले: हर माप अपना भार गुणा अपना मान जोड़ता या घटाता है। विवरण के लिए कोई लेआउट चुनें।",
 	"layout_analysis.chart.gain": "प्राप्त अंक",
 	"layout_analysis.chart.loss": "खोए अंक",
-	"layout_analysis.chart.row": "{layout}: स्थान {rank}, {score} अंक। विवरण दिखाएँ",
+	"layout_analysis.chart.row": "{layout} {score} अंक, स्थान {rank}। विवरण दिखाएँ",
 	"layout_analysis.unit.points": "अंक",
 	"layout_analysis.share.button": "लिंक कॉपी करें",
 	"layout_analysis.share.copied": "लिंक कॉपी हो गया: यह यही कॉर्पस, कीबोर्ड, फ़ॉर्मैट और ये लेआउट खोलता है।",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "सबसे कठिन बार-बार आने वाले शब्द",
 	"layout_analysis.words.word": "शब्द",
 	"layout_analysis.words.effort": "प्रयास",
-	"layout_analysis.words.part": "मुख्यतः इससे"
+	"layout_analysis.words.part": "मुख्यतः इससे",
+	"layout_analysis.heat.table": "मान तालिका के रूप में",
+	"layout_analysis.heat.table_key": "कुंजी",
+	"layout_analysis.heat.table_position": "स्थिति",
+	"layout_analysis.heat.table_finger": "उँगली",
+	"layout_analysis.heat.position": "पंक्ति {row}, कुंजी {column}",
+	"layout_editor.board.dead_key": "डेड कुंजी {name}",
+	"layout_editor.board.disabled": "निष्क्रिय",
+	"layout_editor.board.position": "पंक्ति {row}, कुंजी {column}",
+	"layout_editor.board.table": "लेआउट तालिका के रूप में",
+	"layout_editor.board.table_key": "कुंजी",
+	"layout_editor.swap.label": "इस कुंजी से अदला-बदली",
+	"layout_editor.swap.button": "अदला-बदली करें"
 }

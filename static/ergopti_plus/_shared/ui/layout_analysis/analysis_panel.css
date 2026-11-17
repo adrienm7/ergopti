@@ -46,7 +46,7 @@
 }
 
 .la-panel-error {
-	color: var(--theme-danger);
+	color: var(--theme-bad-text);
 	font-size: 1em;
 	font-weight: normal;
 }
@@ -102,11 +102,27 @@
 }
 
 .la-panel-good {
-	color: var(--theme-green);
+	color: var(--theme-good-text);
 }
 
 .la-panel-bad {
-	color: var(--theme-danger);
+	color: var(--theme-bad-text);
+}
+
+/* The mark of a better or worse value (▲ ▼), beside its sign and its colour. */
+.la-panel-verdict {
+	font-size: 0.8em;
+}
+
+/* Text for screen readers only: the editor page does not load the Comparer's
+   stylesheet, so the panel carries its own copy of the rule. */
+.la-panel .la-sr-only {
+	clip-path: inset(50%);
+	height: 1px;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
 }
 
 .la-panel h3 {

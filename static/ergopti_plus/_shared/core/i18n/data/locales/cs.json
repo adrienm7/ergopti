@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "Body celkového skóre, od nejlepšího: každá metrika přičte nebo odečte svou váhu krát svou hodnotu. Vyberte rozložení pro podrobnosti.",
 	"layout_analysis.chart.gain": "Získané body",
 	"layout_analysis.chart.loss": "Ztracené body",
-	"layout_analysis.chart.row": "{layout}: pořadí {rank}, {score} bodů. Zobrazit podrobnosti",
+	"layout_analysis.chart.row": "{layout} {score} bodů, pořadí {rank}. Zobrazit podrobnosti",
 	"layout_analysis.unit.points": "bodů",
 	"layout_analysis.share.button": "Kopírovat odkaz",
 	"layout_analysis.share.copied": "Odkaz zkopírován: otevře tento korpus, tuto klávesnici, tento formát a tato rozložení.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "Nejtěžší častá slova",
 	"layout_analysis.words.word": "Slovo",
 	"layout_analysis.words.effort": "Námaha",
-	"layout_analysis.words.part": "Hlavně kvůli"
+	"layout_analysis.words.part": "Hlavně kvůli",
+	"layout_analysis.heat.table": "Hodnoty v tabulce",
+	"layout_analysis.heat.table_key": "Klávesa",
+	"layout_analysis.heat.table_position": "Poloha",
+	"layout_analysis.heat.table_finger": "Prst",
+	"layout_analysis.heat.position": "řada {row}, klávesa {column}",
+	"layout_editor.board.dead_key": "mrtvá klávesa {name}",
+	"layout_editor.board.disabled": "vypnuto",
+	"layout_editor.board.position": "řada {row}, klávesa {column}",
+	"layout_editor.board.table": "Rozložení v tabulce",
+	"layout_editor.board.table_key": "Klávesa",
+	"layout_editor.swap.label": "Prohodit s klávesou",
+	"layout_editor.swap.button": "Prohodit"
 }

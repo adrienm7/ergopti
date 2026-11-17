@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "Бали загальної оцінки, від найкращої: кожна метрика додає або віднімає свою вагу, помножену на її значення. Виберіть розкладку, щоб побачити подробиці.",
 	"layout_analysis.chart.gain": "Здобуті бали",
 	"layout_analysis.chart.loss": "Втрачені бали",
-	"layout_analysis.chart.row": "{layout}: місце {rank}, {score} балів. Показати подробиці",
+	"layout_analysis.chart.row": "{layout} {score} балів, місце {rank}. Показати подробиці",
 	"layout_analysis.unit.points": "балів",
 	"layout_analysis.share.button": "Скопіювати посилання",
 	"layout_analysis.share.copied": "Посилання скопійовано: воно відкриває цей корпус, цю клавіатуру, цей формат і ці розкладки.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "Найважчі часті слова",
 	"layout_analysis.words.word": "Слово",
 	"layout_analysis.words.effort": "Зусилля",
-	"layout_analysis.words.part": "Переважно через"
+	"layout_analysis.words.part": "Переважно через",
+	"layout_analysis.heat.table": "Значення в таблиці",
+	"layout_analysis.heat.table_key": "Клавіша",
+	"layout_analysis.heat.table_position": "Розташування",
+	"layout_analysis.heat.table_finger": "Палець",
+	"layout_analysis.heat.position": "ряд {row}, клавіша {column}",
+	"layout_editor.board.dead_key": "мертва клавіша {name}",
+	"layout_editor.board.disabled": "вимкнено",
+	"layout_editor.board.position": "ряд {row}, клавіша {column}",
+	"layout_editor.board.table": "Розкладка в таблиці",
+	"layout_editor.board.table_key": "Клавіша",
+	"layout_editor.swap.label": "Поміняти з клавішею",
+	"layout_editor.swap.button": "Поміняти"
 }

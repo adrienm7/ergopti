@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "总分的分数（从好到差）：每个指标加上或减去其权重乘以其数值。选择一个布局查看详情。",
 	"layout_analysis.chart.gain": "得分",
 	"layout_analysis.chart.loss": "失分",
-	"layout_analysis.chart.row": "{layout}：第 {rank} 名，{score} 分。查看详情",
+	"layout_analysis.chart.row": "{layout} {score} 分，第 {rank} 名。查看详情",
 	"layout_analysis.unit.points": "分",
 	"layout_analysis.share.button": "复制链接",
 	"layout_analysis.share.copied": "链接已复制：它会打开此语料、键盘、规格和这些布局。",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "最难打的常用词",
 	"layout_analysis.words.word": "单词",
 	"layout_analysis.words.effort": "负担",
-	"layout_analysis.words.part": "主要来自"
+	"layout_analysis.words.part": "主要来自",
+	"layout_analysis.heat.table": "以表格显示数值",
+	"layout_analysis.heat.table_key": "按键",
+	"layout_analysis.heat.table_position": "位置",
+	"layout_analysis.heat.table_finger": "手指",
+	"layout_analysis.heat.position": "第 {row} 排，第 {column} 个键",
+	"layout_editor.board.dead_key": "死键 {name}",
+	"layout_editor.board.disabled": "已停用",
+	"layout_editor.board.position": "第 {row} 排，第 {column} 个键",
+	"layout_editor.board.table": "以表格显示布局",
+	"layout_editor.board.table_key": "按键",
+	"layout_editor.swap.label": "与此键交换",
+	"layout_editor.swap.button": "交换"
 }

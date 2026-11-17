@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "Punkty wyniku ogólnego, od najlepszego: każda miara dodaje lub odejmuje swoją wagę razy swoją wartość. Wybierz układ, aby zobaczyć szczegóły.",
 	"layout_analysis.chart.gain": "Zdobyte punkty",
 	"layout_analysis.chart.loss": "Utracone punkty",
-	"layout_analysis.chart.row": "{layout}: miejsce {rank}, {score} pkt. Pokaż szczegóły",
+	"layout_analysis.chart.row": "{layout} {score} pkt, miejsce {rank}. Pokaż szczegóły",
 	"layout_analysis.unit.points": "pkt",
 	"layout_analysis.share.button": "Kopiuj link",
 	"layout_analysis.share.copied": "Link skopiowany: otwiera ten korpus, tę klawiaturę, ten format i te układy.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "Najtrudniejsze częste słowa",
 	"layout_analysis.words.word": "Słowo",
 	"layout_analysis.words.effort": "Wysiłek",
-	"layout_analysis.words.part": "Głównie z powodu"
+	"layout_analysis.words.part": "Głównie z powodu",
+	"layout_analysis.heat.table": "Wartości w tabeli",
+	"layout_analysis.heat.table_key": "Klawisz",
+	"layout_analysis.heat.table_position": "Położenie",
+	"layout_analysis.heat.table_finger": "Palec",
+	"layout_analysis.heat.position": "rząd {row}, klawisz {column}",
+	"layout_editor.board.dead_key": "klawisz martwy {name}",
+	"layout_editor.board.disabled": "wyłączony",
+	"layout_editor.board.position": "rząd {row}, klawisz {column}",
+	"layout_editor.board.table": "Układ w tabeli",
+	"layout_editor.board.table_key": "Klawisz",
+	"layout_editor.swap.label": "Zamień z klawiszem",
+	"layout_editor.swap.button": "Zamień"
 }

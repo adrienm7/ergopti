@@ -33,8 +33,8 @@ body:has(> main.layout-analysis) {
 	--la-sub: var(--theme-sub);
 	--la-accent: var(--theme-accent);
 	--la-accent-soft: var(--theme-accent-soft);
-	--la-good: var(--theme-green);
-	--la-bad: var(--theme-danger);
+	--la-good: var(--theme-good-text);
+	--la-bad: var(--theme-bad-text);
 	/* Chart colours (theme.css « Chart look », validated in light and dark):
 	   points gained blue, points lost orange; one-hue blue ramp for the
 	   heatmap and the loads. */

@@ -39,10 +39,16 @@ const WCAG_TAGS = Object.freeze([
 	'wcag22aa'
 ]);
 const VIEWPORT = Object.freeze({ width: 1440, height: 900 });
+// A phone, for the reflow checks (WCAG 1.4.10 asks for 320 CSS pixels).
+const PHONE_VIEWPORT = Object.freeze({ width: 320, height: 800 });
 const BASELINE_PATH = path.join(__dirname, 'site-accessibility-baseline.json');
 // A frame that settles its scripts after load (the Studio pages build their
 // keyboards from fetched data) needs a quiet period before the scan.
 const FRAME_QUIET_MS = 500;
+// Longest a frame may stay busy (aria-busy="true") before the scan fails.
+const BUSY_TIMEOUT_MS = 60000;
+// Longer than one demo of the Ergopti+ hero (typing, preview, result: about 3.5 s).
+const HERO_CYCLE_MS = 4500;
 
 /**
  * Key of one counted violation row.
@@ -146,6 +152,12 @@ async function scanRoute(context, origin, basePath, route, scheme, inflight, axe
 			if (frame !== page.mainFrame() && (frame.url() === '' || frame.url() === 'about:blank'))
 				continue;
 			const name = frameName(frame, page, origin, basePath);
+			// A page computing a result marks it aria-busy and dims it (the
+			// Comparer's ranking): scanning then would count the dimmed text as
+			// low contrast, so the scan waits for the result, or fails.
+			await frame.waitForFunction(() => !document.querySelector('[aria-busy="true"]'), null, {
+				timeout: BUSY_TIMEOUT_MS
+			});
 			for (const violation of await scanFrame(frame, axeSource))
 				findings.push({ route, scheme, frame: name, ...violation });
 		}
@@ -210,6 +222,134 @@ async function exerciseKeyboardAndSettings(context, origin, basePath, inflight, 
 	}
 }
 
+/** The frame of a page whose address holds a part, once it has loaded and is not busy. */
+async function studioFrame(page, part) {
+	await smoke.settleFrames(page);
+	const frame = page.frames().find((each) => each.url().includes(part));
+	assert.ok(frame, 'The page frames ' + part);
+	await frame.waitForFunction(() => !document.querySelector('[aria-busy="true"]'), null, {
+		timeout: BUSY_TIMEOUT_MS
+	});
+	return frame;
+}
+
+/** Whether a document scrolls sideways (WCAG 1.4.10 reflow). */
+function scrollsSideways(target) {
+	return target.evaluate(
+		() => document.documentElement.scrollWidth > document.documentElement.clientWidth
+	);
+}
+
+/**
+ * What the scan cannot open: the Comparer's details and settings at phone
+ * width (no sideways page scroll, every figure a named table, the heatmap's
+ * numbers as a table, no violation once unfolded), and the editor's board
+ * (every key named with its place and its layers, the layout as a table, a
+ * swap without dragging, WCAG 2.5.7).
+ */
+async function exerciseStudio(context, origin, basePath, inflight, axeSource) {
+	const page = await context.newPage();
+	try {
+		await page.setViewportSize(PHONE_VIEWPORT);
+		await page.goto(origin + basePath + '/studio/comparer', { waitUntil: 'networkidle' });
+		await smoke.settleNetwork(inflight, { quietMs: FRAME_QUIET_MS });
+		const comparer = await studioFrame(page, '/layout_analysis/');
+		assert.equal(await scrollsSideways(page), false, 'The Comparer page fits a phone');
+		assert.equal(await scrollsSideways(comparer), false, 'The Comparer fits a phone');
+		await comparer.locator('#la-chart .la-chart-row').first().click();
+		await comparer.evaluate(() =>
+			document.querySelectorAll('#la-details details, #la-settings').forEach((node) => {
+				node.open = true;
+			})
+		);
+		assert.equal(await scrollsSideways(comparer), false, 'The unfolded figures fit a phone');
+		const figures = await comparer.evaluate(() => ({
+			keys: document.querySelectorAll('#la-heatmap .la-key').length,
+			rows: document.querySelectorAll('#la-heat-table tbody tr').length,
+			bars: Array.from(document.querySelectorAll('#la-details .la-bars'), (box) => ({
+				id: box.id,
+				table: box.getAttribute('role') === 'table' && box.hasAttribute('aria-labelledby'),
+				rows: box.querySelectorAll(
+					'[role="row"] > [role="rowheader"] + [aria-hidden] + [role="cell"]'
+				).length,
+				drawn: box.querySelectorAll('.la-chart-row').length
+			}))
+		}));
+		assert.ok(figures.keys > 0 && figures.rows === figures.keys, 'The heatmap has its table');
+		for (const box of figures.bars)
+			assert.ok(box.table && box.rows === box.drawn, 'A figure reads as a table: ' + box.id);
+		for (const part of ['#la-details', '#la-settings'])
+			assert.deepEqual(await scanFrame(comparer, axeSource, part), [], 'No violation in ' + part);
+
+		await page.setViewportSize({ ...VIEWPORT });
+		await page.goto(origin + basePath + '/studio', { waitUntil: 'networkidle' });
+		await smoke.settleNetwork(inflight, { quietMs: FRAME_QUIET_MS });
+		const editor = await studioFrame(page, '/layout_editor/');
+		await editor.locator('#le-board [data-code="KeyA"]').waitFor();
+		const names = await editor.evaluate(() =>
+			Array.from(document.querySelectorAll('#le-board .le-key'), (key) => ({
+				label: key.getAttribute('aria-label') || '',
+				dead: key.classList.contains('dead')
+			}))
+		);
+		assert.ok(names.length > 40, 'The editor draws its board');
+		for (const name of names)
+			assert.match(name.label, /rangée \d+, touche \d+/, 'A key says where it is: ' + name.label);
+		assert.ok(
+			names.some((name) => name.dead && name.label.includes('touche morte')),
+			'A dead key is named as one'
+		);
+		await editor.locator('#le-board-table > summary').click();
+		await editor.locator('#le-board-table tbody tr').first().waitFor();
+		assert.equal(await editor.locator('#le-board-table tbody tr').count(), names.length);
+		assert.deepEqual(await scanFrame(editor, axeSource, '#le-board-table'), []);
+		const legend = (code) =>
+			editor.locator('#le-board [data-code="' + code + '"] .le-legend').textContent();
+		const before = [await legend('KeyA'), await legend('KeyS')];
+		assert.notEqual(before[0], before[1], 'Two different keys to swap');
+		await editor.locator('#le-board [data-code="KeyA"]').click();
+		await editor.selectOption('#le-swap-target', 'KeyS');
+		await editor.locator('#le-swap').click();
+		await editor.waitForFunction(
+			(was) =>
+				document.querySelector('#le-board [data-code="KeyA"] .le-legend').textContent === was,
+			before[1]
+		);
+		assert.equal(await legend('KeyS'), before[0], 'The swap moved both keys without a drag');
+	} finally {
+		await page.close();
+	}
+}
+
+/**
+ * The Ergopti+ hero demo, with motion allowed, cycles on its own; its pause
+ * button stops it on the shown result (WCAG 2.2.2) and starts it again.
+ */
+async function exerciseHeroPause(context, origin, basePath, inflight) {
+	const page = await context.newPage();
+	try {
+		await page.emulateMedia({ reducedMotion: 'no-preference' });
+		await page.goto(origin + basePath + '/ergopti-plus', { waitUntil: 'networkidle' });
+		await smoke.settleNetwork(inflight, { quietMs: FRAME_QUIET_MS });
+		const pause = page.locator('.demo-pause');
+		await pause.click();
+		await page.locator('.demo-pause', { hasText: 'Relancer la démo' }).waitFor();
+		const shown = await page.locator('.demo-typed').textContent();
+		await page.waitForTimeout(HERO_CYCLE_MS);
+		assert.equal(await page.locator('.demo-typed').textContent(), shown, 'A paused demo stays');
+		await pause.click();
+		await page.locator('.demo-pause', { hasText: 'Mettre la démo en pause' }).waitFor();
+		// Read in English, the document says so (WCAG 3.1.1), then French again.
+		const lang = () => page.evaluate(() => document.documentElement.lang);
+		await page.getByRole('button', { name: 'EN', exact: true }).click();
+		await page.waitForFunction(() => document.documentElement.lang === 'en');
+		await page.getByRole('button', { name: 'FR', exact: true }).click();
+		assert.equal(await lang(), 'fr', 'The French page is French again');
+	} finally {
+		await page.close();
+	}
+}
+
 /** Serve the built site on loopback and scan every audited page in Chromium. */
 async function scanSite(site, basePath, chromium, routes = AUDITED_ROUTES) {
 	const axeSource = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
@@ -262,6 +402,8 @@ async function scanSite(site, basePath, chromium, routes = AUDITED_ROUTES) {
 							...(await scanRoute(context, origin, basePath, route, scheme, inflight, axeSource))
 						);
 				await exerciseKeyboardAndSettings(context, origin, basePath, inflight, axeSource);
+				await exerciseStudio(context, origin, basePath, inflight, axeSource);
+				await exerciseHeroPause(context, origin, basePath, inflight);
 				return findings;
 			} finally {
 				await context.close();

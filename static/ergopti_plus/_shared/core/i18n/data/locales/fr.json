@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "Points du score global, du meilleur au moins bon : chaque mesure ajoute ou retire son poids multiplié par sa valeur. Choisissez une disposition pour son détail.",
 	"layout_analysis.chart.gain": "Points gagnés",
 	"layout_analysis.chart.loss": "Points perdus",
-	"layout_analysis.chart.row": "{layout} : rang {rank}, {score} points. Afficher le détail",
+	"layout_analysis.chart.row": "{layout} {score} points, rang {rank}. Afficher le détail",
 	"layout_analysis.unit.points": "points",
 	"layout_analysis.share.button": "Copier le lien",
 	"layout_analysis.share.copied": "Lien copié : il ouvre ce corpus, ce clavier, ce format et ces dispositions.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "Les mots fréquents les plus difficiles",
 	"layout_analysis.words.word": "Mot",
 	"layout_analysis.words.effort": "Effort",
-	"layout_analysis.words.part": "Surtout dû à"
+	"layout_analysis.words.part": "Surtout dû à",
+	"layout_analysis.heat.table": "Les valeurs en tableau",
+	"layout_analysis.heat.table_key": "Touche",
+	"layout_analysis.heat.table_position": "Emplacement",
+	"layout_analysis.heat.table_finger": "Doigt",
+	"layout_analysis.heat.position": "rangée {row}, touche {column}",
+	"layout_editor.board.dead_key": "touche morte {name}",
+	"layout_editor.board.disabled": "désactivée",
+	"layout_editor.board.position": "rangée {row}, touche {column}",
+	"layout_editor.board.table": "La disposition en tableau",
+	"layout_editor.board.table_key": "Touche",
+	"layout_editor.swap.label": "Échanger avec la touche",
+	"layout_editor.swap.button": "Échanger"
 }

@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "Points of the global score, best first: each metric adds or removes its weight times its value. Choose a layout for its details.",
 	"layout_analysis.chart.gain": "Points gained",
 	"layout_analysis.chart.loss": "Points lost",
-	"layout_analysis.chart.row": "{layout}: rank {rank}, {score} points. Show the details",
+	"layout_analysis.chart.row": "{layout} {score} points, rank {rank}. Show the details",
 	"layout_analysis.unit.points": "points",
 	"layout_analysis.share.button": "Copy the link",
 	"layout_analysis.share.copied": "Link copied: it opens this corpus, keyboard, format and these layouts.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "The hardest frequent words",
 	"layout_analysis.words.word": "Word",
 	"layout_analysis.words.effort": "Effort",
-	"layout_analysis.words.part": "Mostly from"
+	"layout_analysis.words.part": "Mostly from",
+	"layout_analysis.heat.table": "The values as a table",
+	"layout_analysis.heat.table_key": "Key",
+	"layout_analysis.heat.table_position": "Position",
+	"layout_analysis.heat.table_finger": "Finger",
+	"layout_analysis.heat.position": "row {row}, key {column}",
+	"layout_editor.board.dead_key": "dead key {name}",
+	"layout_editor.board.disabled": "disabled",
+	"layout_editor.board.position": "row {row}, key {column}",
+	"layout_editor.board.table": "The layout as a table",
+	"layout_editor.board.table_key": "Key",
+	"layout_editor.swap.label": "Swap with the key",
+	"layout_editor.swap.button": "Swap"
 }

@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "Баллы общей оценки, от лучшей: каждая метрика прибавляет или вычитает свой вес, умноженный на её значение. Выберите раскладку, чтобы увидеть подробности.",
 	"layout_analysis.chart.gain": "Набранные баллы",
 	"layout_analysis.chart.loss": "Потерянные баллы",
-	"layout_analysis.chart.row": "{layout}: место {rank}, {score} баллов. Показать подробности",
+	"layout_analysis.chart.row": "{layout} {score} баллов, место {rank}. Показать подробности",
 	"layout_analysis.unit.points": "баллов",
 	"layout_analysis.share.button": "Скопировать ссылку",
 	"layout_analysis.share.copied": "Ссылка скопирована: она открывает этот корпус, эту клавиатуру, этот формат и эти раскладки.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "Самые трудные частые слова",
 	"layout_analysis.words.word": "Слово",
 	"layout_analysis.words.effort": "Усилие",
-	"layout_analysis.words.part": "В основном из-за"
+	"layout_analysis.words.part": "В основном из-за",
+	"layout_analysis.heat.table": "Значения в таблице",
+	"layout_analysis.heat.table_key": "Клавиша",
+	"layout_analysis.heat.table_position": "Положение",
+	"layout_analysis.heat.table_finger": "Палец",
+	"layout_analysis.heat.position": "ряд {row}, клавиша {column}",
+	"layout_editor.board.dead_key": "мёртвая клавиша {name}",
+	"layout_editor.board.disabled": "отключена",
+	"layout_editor.board.position": "ряд {row}, клавиша {column}",
+	"layout_editor.board.table": "Раскладка в таблице",
+	"layout_editor.board.table_key": "Клавиша",
+	"layout_editor.swap.label": "Поменять с клавишей",
+	"layout_editor.swap.button": "Поменять"
 }

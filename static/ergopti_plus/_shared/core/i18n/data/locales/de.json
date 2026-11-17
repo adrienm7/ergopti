@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "Punkte der Gesamtwertung, die besten zuerst: Jede Kennzahl fügt ihr Gewicht mal ihren Wert hinzu oder zieht es ab. Wählen Sie ein Layout für die Details.",
 	"layout_analysis.chart.gain": "Gewonnene Punkte",
 	"layout_analysis.chart.loss": "Verlorene Punkte",
-	"layout_analysis.chart.row": "{layout}: Rang {rank}, {score} Punkte. Details anzeigen",
+	"layout_analysis.chart.row": "{layout} {score} Punkte, Rang {rank}. Details anzeigen",
 	"layout_analysis.unit.points": "Punkte",
 	"layout_analysis.share.button": "Link kopieren",
 	"layout_analysis.share.copied": "Link kopiert: Er öffnet dieses Korpus, diese Tastatur, dieses Format und diese Layouts.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "Die schwierigsten häufigen Wörter",
 	"layout_analysis.words.word": "Wort",
 	"layout_analysis.words.effort": "Aufwand",
-	"layout_analysis.words.part": "Vor allem durch"
+	"layout_analysis.words.part": "Vor allem durch",
+	"layout_analysis.heat.table": "Die Werte als Tabelle",
+	"layout_analysis.heat.table_key": "Taste",
+	"layout_analysis.heat.table_position": "Lage",
+	"layout_analysis.heat.table_finger": "Fingersatz",
+	"layout_analysis.heat.position": "Reihe {row}, Taste {column}",
+	"layout_editor.board.dead_key": "Tottaste {name}",
+	"layout_editor.board.disabled": "deaktiviert",
+	"layout_editor.board.position": "Reihe {row}, Taste {column}",
+	"layout_editor.board.table": "Die Belegung als Tabelle",
+	"layout_editor.board.table_key": "Taste",
+	"layout_editor.swap.label": "Tauschen mit Taste",
+	"layout_editor.swap.button": "Tauschen"
 }

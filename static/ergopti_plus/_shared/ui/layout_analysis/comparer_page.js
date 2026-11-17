@@ -282,7 +282,7 @@
 		<button id="la-table-reset" type="button" data-i18n="layout_analysis.table.reset"></button>
 	</details>
 	<p id="la-table-count" class="la-muted" role="status"></p>
-	<div class="la-table-wrap">
+	<div class="la-table-wrap" tabindex="0">
 		<table id="la-table" class="la-table"></table>
 	</div>
 </section>
@@ -310,12 +310,18 @@
 	</div>
 	<div id="la-heatmap" class="la-heatmap"></div>
 	<div id="la-heat-legend" class="la-heat-legend"></div>
+	<details id="la-heat-table-box" class="la-section">
+		<summary data-i18n="layout_analysis.heat.table"></summary>
+		<div class="la-table-wrap" tabindex="0">
+			<table id="la-heat-table" class="la-table"></table>
+		</div>
+	</details>
 	<details class="la-section">
 		<summary data-i18n="layout_analysis.worst.title"></summary>
 		<p class="la-muted" data-i18n="layout_analysis.worst.caption"></p>
 		<label for="la-worst-event" data-i18n="layout_analysis.worst.event"></label>
 		<select id="la-worst-event"></select>
-		<div class="la-table-wrap">
+		<div class="la-table-wrap" tabindex="0">
 			<table id="la-worst" class="la-table"></table>
 		</div>
 	</details>
@@ -350,51 +356,51 @@
 	</details>
 	<details class="la-section">
 		<summary data-i18n="layout_analysis.classes.title"></summary>
-		<h4 data-i18n="layout_analysis.classes.bigrams"></h4>
-		<div id="la-bigram-classes" class="la-bars"></div>
-		<h4 data-i18n="layout_analysis.classes.trigrams"></h4>
-		<div id="la-trigram-classes" class="la-bars"></div>
+		<h4 id="la-bigram-classes-label" data-i18n="layout_analysis.classes.bigrams"></h4>
+		<div id="la-bigram-classes" class="la-bars" aria-labelledby="la-bigram-classes-label"></div>
+		<h4 id="la-trigram-classes-label" data-i18n="layout_analysis.classes.trigrams"></h4>
+		<div id="la-trigram-classes" class="la-bars" aria-labelledby="la-trigram-classes-label"></div>
 	</details>
 	<details class="la-section">
-		<summary data-i18n="layout_analysis.travel.title"></summary>
+		<summary id="la-travel-label" data-i18n="layout_analysis.travel.title"></summary>
 		<p class="la-muted" data-i18n="layout_analysis.travel.caption"></p>
-		<div id="la-travel" class="la-bars"></div>
+		<div id="la-travel" class="la-bars" aria-labelledby="la-travel-label"></div>
 	</details>
 	<details class="la-section">
-		<summary data-i18n="layout_analysis.layers.title"></summary>
+		<summary id="la-layers-label" data-i18n="layout_analysis.layers.title"></summary>
 		<p class="la-muted" data-i18n="layout_analysis.layers.caption"></p>
-		<div id="la-layers" class="la-bars"></div>
+		<div id="la-layers" class="la-bars" aria-labelledby="la-layers-label"></div>
 	</details>
 	<details class="la-section">
-		<summary data-i18n="layout_analysis.standing.title"></summary>
+		<summary id="la-standing-label" data-i18n="layout_analysis.standing.title"></summary>
 		<p class="la-muted" data-i18n="layout_analysis.standing.caption"></p>
-		<div id="la-standing" class="la-bars"></div>
+		<div id="la-standing" class="la-bars" aria-labelledby="la-standing-label"></div>
 	</details>
 	<div class="la-detail-grid">
 		<div>
-			<h3 data-i18n="layout_analysis.details.contributions"></h3>
-			<div id="la-contributions" class="la-bars"></div>
+			<h3 id="la-contributions-label" data-i18n="layout_analysis.details.contributions"></h3>
+			<div id="la-contributions" class="la-bars" aria-labelledby="la-contributions-label"></div>
 		</div>
 		<div>
-			<h3 data-i18n="layout_analysis.details.fingers"></h3>
+			<h3 id="la-fingers-label" data-i18n="layout_analysis.details.fingers"></h3>
 			<p class="la-muted" data-i18n="layout_analysis.details.fingers_caption"></p>
 			<ul class="la-legend">
 				<li><span class="la-swatch la-swatch-load"></span><span data-i18n="layout_analysis.details.share_mark"></span></li>
 				<li><span class="la-swatch la-swatch-ideal"></span><span data-i18n="layout_analysis.details.ideal_mark"></span></li>
 			</ul>
-			<div id="la-fingers" class="la-bars"></div>
-			<h3 data-i18n="layout_analysis.details.hands_rows"></h3>
-			<div id="la-hands-rows" class="la-bars"></div>
+			<div id="la-fingers" class="la-bars" aria-labelledby="la-fingers-label"></div>
+			<h3 id="la-hands-rows-label" data-i18n="layout_analysis.details.hands_rows"></h3>
+			<div id="la-hands-rows" class="la-bars" aria-labelledby="la-hands-rows-label"></div>
 		</div>
 	</div>
 	<h3 data-i18n="layout_analysis.details.metrics"></h3>
-	<div class="la-table-wrap">
+	<div class="la-table-wrap" tabindex="0">
 		<table id="la-metrics" class="la-table"></table>
 	</div>
 	<p id="la-unsupported" class="la-muted"></p>
 	<h3 data-i18n="layout_analysis.details.typing"></h3>
 	<p id="la-typing-caption" class="la-muted"></p>
-	<div class="la-table-wrap">
+	<div class="la-table-wrap" tabindex="0">
 		<table id="la-typing" class="la-table"></table>
 	</div>
 	<h3 data-i18n="layout_analysis.details.simplicity"></h3>
@@ -972,7 +978,10 @@
 					})
 				);
 				if (state.details === result.layout.id) row.classList.add('la-selected');
-				row.append(el('span', 'la-chart-label', result.layout.name));
+				// The name starts with the visible text, name then value (WCAG 2.5.3);
+				// the spaces between the cells, unrendered in the grid, keep the
+				// two words apart in that visible text.
+				row.append(el('span', 'la-chart-label', result.layout.name), ' ');
 				const track = el('span', 'la-chart-track');
 				// The zero line, so a negative score reads as one.
 				if (min < 0) {
@@ -989,7 +998,7 @@
 				bar.style.width = `${Math.abs(end - zero)}%`;
 				track.append(bar);
 				row.title = `${result.layout.name}: ${value} ${t('layout_analysis.unit.points')}`;
-				row.append(track, el('span', 'la-chart-value', value));
+				row.append(track, ' ', el('span', 'la-chart-value', value));
 				box.append(row);
 			}
 		}
@@ -1151,10 +1160,9 @@
 		 */
 		function signedBars(box, entries, digits, unit) {
 			box.replaceChildren();
+			box.setAttribute('role', 'table');
 			const extent = Math.max(...entries.map(([, v]) => Math.abs(v)), 1e-9);
 			for (const [label, value] of entries) {
-				const row = el('div', 'la-chart-row');
-				row.append(el('span', 'la-chart-label', label));
 				const track = el('span', 'la-chart-track la-signed');
 				const bar = el('span', value >= 0 ? 'la-bar la-bar-gain' : 'la-bar la-bar-loss');
 				const width = (Math.abs(value) / extent) * 50;
@@ -1162,10 +1170,35 @@
 				bar.style.width = `${width}%`;
 				track.append(bar);
 				const text = `${value > 0 ? '+' : ''}${format(value, digits)}`;
+				const row = barRow(label, track, text, ` ${unit}`);
 				row.title = `${label}: ${text} ${unit}`;
-				row.append(track, el('span', 'la-chart-value', text));
 				box.append(row);
 			}
+		}
+
+		/**
+		 * One bar of a figure, read as a table row by assistive technology:
+		 * the label is its row header, the value its cell, the drawn bar
+		 * hidden (it repeats the value). The box holding the rows is the table,
+		 * named by its heading (aria-labelledby in the markup).
+		 * @param {string} label
+		 * @param {HTMLElement} track The drawn bar.
+		 * @param {string} text The value as written beside the bar.
+		 * @param {string} [spoken] What the cell adds for a screen reader only:
+		 *   the unit, the ideal load.
+		 * @returns {HTMLElement}
+		 */
+		function barRow(label, track, text, spoken) {
+			const row = el('div', 'la-chart-row');
+			row.setAttribute('role', 'row');
+			const header = el('span', 'la-chart-label', label);
+			header.setAttribute('role', 'rowheader');
+			track.setAttribute('aria-hidden', 'true');
+			const value = el('span', 'la-chart-value', text);
+			value.setAttribute('role', 'cell');
+			if (spoken) value.append(el('span', 'la-sr-only', spoken));
+			row.append(header, track, value);
+			return row;
 		}
 
 		/**
@@ -1183,24 +1216,24 @@
 			const digits = written && written.digits !== undefined ? written.digits : 1;
 			const value = (v) => `${format(v, digits)} ${unit}`;
 			box.replaceChildren();
+			box.setAttribute('role', 'table');
 			for (const entry of entries) {
-				const row = el('div', 'la-chart-row');
-				row.append(el('span', 'la-chart-label', entry.label));
 				const track = el('span', 'la-chart-track');
 				const bar = el('span', 'la-bar la-bar-load');
 				bar.style.left = '0';
 				bar.style.width = `${scale > 0 ? Math.min(100, (entry.value / scale) * 100) : 0}%`;
 				track.append(bar);
 				const text = entry.text === undefined ? value(entry.value) : entry.text;
-				let title = `${entry.label}: ${text}`;
+				// The ideal mark is drawn only: a screen reader hears it with the value.
+				let ideal = '';
 				if (entry.target !== undefined) {
 					const mark = el('span', 'la-target');
 					mark.style.left = `${Math.min(100, (entry.target / scale) * 100)}%`;
 					track.append(mark);
-					title += ` (${t('layout_analysis.details.ideal_mark')}: ${value(entry.target)})`;
+					ideal = ` (${t('layout_analysis.details.ideal_mark')}: ${value(entry.target)})`;
 				}
-				row.title = title;
-				row.append(track, el('span', 'la-chart-value', text));
+				const row = barRow(entry.label, track, text, ideal);
+				row.title = `${entry.label}: ${text}${ideal}`;
 				box.append(row);
 			}
 		}
@@ -1288,6 +1321,70 @@
 		}
 
 		/**
+		 * Where each drawn key is, in words a screen reader and the table can
+		 * say: its row from the top and its rank from the left in that row.
+		 * @param {{codes: string[], x: number[], y: number[]}} board
+		 * @param {string[]} shown The drawn codes.
+		 * @returns {Map<string, {row: number, column: number}>}
+		 */
+		function keyPositions(board, shown) {
+			const drawn = new Set(shown);
+			const keys = board.codes
+				.map((code, k) => ({ code, x: board.x[k], y: board.y[k] }))
+				.filter((key) => drawn.has(key.code));
+			const rows = Array.from(new Set(keys.map((key) => key.y))).sort((a, b) => a - b);
+			const out = new Map();
+			rows.forEach((y, r) => {
+				keys
+					.filter((key) => key.y === y)
+					.sort((a, b) => a.x - b.x)
+					.forEach((key, c) => out.set(key.code, { row: r + 1, column: c + 1 }));
+			});
+			return out;
+		}
+
+		/**
+		 * The heatmap's numbers as a table, its text alternative: every drawn
+		 * key with its place, its finger and its value, largest first (by size
+		 * for a difference, its sign written).
+		 * @param {object} layout
+		 * @param {Array<{code: string, where: string, finger: string, value: number}>} rows
+		 * @param {boolean} signed A difference with another layout.
+		 */
+		function renderHeatTable(layout, rows, signed) {
+			const table = $('la-heat-table');
+			const unit = heatUnit(state.heat);
+			const head = el('tr');
+			for (const label of [
+				t('layout_analysis.heat.table_key'),
+				t('layout_analysis.heat.table_position'),
+				t('layout_analysis.heat.table_finger'),
+				`${heatName(state.heat)} (${unit})`
+			]) {
+				const th = el('th', '', label);
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const tbody = el('tbody');
+			for (const row of rows.slice().sort((a, b) => Math.abs(b.value) - Math.abs(a.value))) {
+				const tr = el('tr');
+				const th = el('th', 'la-keys', keyText(layout, row.code));
+				th.scope = 'row';
+				const written = `${signed && row.value > 0 ? '+' : ''}${format(row.value, HEAT_DIGITS)}`;
+				tr.append(
+					th,
+					el('td', '', row.where),
+					el('td', '', row.finger ? t(`layout_analysis.finger.${row.finger}`) : ''),
+					el('td', '', written)
+				);
+				tbody.append(tr);
+			}
+			table.replaceChildren(thead, tbody);
+		}
+
+		/**
 		 * The board of the chosen keyboard, each key showing the layout's base
 		 * character. One layout: shaded light to dark (one hue) by its share of
 		 * the largest value of the chosen per-key metric. Against another layout
@@ -1325,6 +1422,8 @@
 			box.style.maxWidth = `${width * HEAT_UNIT_PX}px`;
 			box.style.aspectRatio = `${width} / ${maxY}`;
 			box.classList.toggle('la-heatmap-diff', Boolean(other));
+			const position = keyPositions(board, shown);
+			const tableRows = [];
 			board.codes.forEach((code, k) => {
 				if (modifiers.has(code)) return;
 				const key = el('span', 'la-key', keyText(layout, code));
@@ -1347,12 +1446,16 @@
 					if (share >= HEAT_STRONG_SHARE) key.classList.add('la-key-strong');
 				}
 				const title = heatTitle(detail, layout, code, value, Boolean(other));
+				const where = t('layout_analysis.heat.position', position.get(code));
 				key.title = title;
 				key.tabIndex = 0;
 				key.setAttribute('role', 'img');
-				key.setAttribute('aria-label', title);
+				// The name also says where the key is, which the drawing shows.
+				key.setAttribute('aria-label', `${title} (${where})`);
 				box.append(key);
+				tableRows.push({ code, where, finger: DATA.model.fingers[board.finger[k]], value });
 			});
+			renderHeatTable(layout, tableRows, Boolean(other));
 			const legend = $('la-heat-legend');
 			const unit = heatUnit(state.heat);
 			if (other) {

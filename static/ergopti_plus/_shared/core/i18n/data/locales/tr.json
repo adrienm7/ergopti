@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "Genel puanın puanları, en iyiden başlayarak: her ölçüt ağırlığı çarpı değerini ekler ya da çıkarır. Ayrıntılar için bir düzen seçin.",
 	"layout_analysis.chart.gain": "Kazanılan puanlar",
 	"layout_analysis.chart.loss": "Kaybedilen puanlar",
-	"layout_analysis.chart.row": "{layout}: sıra {rank}, {score} puan. Ayrıntıları göster",
+	"layout_analysis.chart.row": "{layout} {score} puan, sıra {rank}. Ayrıntıları göster",
 	"layout_analysis.unit.points": "puan",
 	"layout_analysis.share.button": "Bağlantıyı kopyala",
 	"layout_analysis.share.copied": "Bağlantı kopyalandı: bu derlemi, bu klavyeyi, bu biçimi ve bu düzenleri açar.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "En zor sık kelimeler",
 	"layout_analysis.words.word": "Kelime",
 	"layout_analysis.words.effort": "Çaba",
-	"layout_analysis.words.part": "Çoğunlukla"
+	"layout_analysis.words.part": "Çoğunlukla",
+	"layout_analysis.heat.table": "Değerler tablo olarak",
+	"layout_analysis.heat.table_key": "Tuş",
+	"layout_analysis.heat.table_position": "Konum",
+	"layout_analysis.heat.table_finger": "Parmak",
+	"layout_analysis.heat.position": "sıra {row}, tuş {column}",
+	"layout_editor.board.dead_key": "ölü tuş {name}",
+	"layout_editor.board.disabled": "devre dışı",
+	"layout_editor.board.position": "sıra {row}, tuş {column}",
+	"layout_editor.board.table": "Düzen tablo olarak",
+	"layout_editor.board.table_key": "Tuş",
+	"layout_editor.swap.label": "Şu tuşla değiştir",
+	"layout_editor.swap.button": "Değiştir"
 }

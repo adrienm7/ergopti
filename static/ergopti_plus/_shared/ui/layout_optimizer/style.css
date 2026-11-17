@@ -32,8 +32,8 @@ body:has(> main.layout-optimizer) {
 	--lo-sub: var(--theme-sub);
 	--lo-accent: var(--theme-accent);
 	--lo-accent-soft: var(--theme-accent-soft);
-	--lo-good: var(--theme-green);
-	--lo-bad: var(--theme-danger);
+	--lo-good: var(--theme-good-text);
+	--lo-bad: var(--theme-bad-text);
 	font:
 		14px/1.45 system-ui,
 		sans-serif;
@@ -252,9 +252,25 @@ body:has(> main.layout-optimizer) {
 	color: var(--theme-white);
 }
 
+/* A dashed border as well as its colour, so the mark is not colour alone. */
 .layout-optimizer .lo-key.lo-changed {
 	border-color: var(--lo-good);
+	border-style: dashed;
 	box-shadow: inset 0 0 0 1px var(--lo-good);
+}
+
+/* The mark of a better or worse change (▲ ▼), beside its sign and colour. */
+.lo-verdict {
+	font-size: 0.8em;
+}
+
+.lo-sr-only {
+	clip-path: inset(50%);
+	height: 1px;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
 }
 
 .lo-key.key-legend-dead::before {

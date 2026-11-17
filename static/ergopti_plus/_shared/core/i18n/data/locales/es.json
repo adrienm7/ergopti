@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "Puntos de la puntuación global, del mejor al peor: cada métrica suma o resta su peso por su valor. Elija una distribución para ver su detalle.",
 	"layout_analysis.chart.gain": "Puntos ganados",
 	"layout_analysis.chart.loss": "Puntos perdidos",
-	"layout_analysis.chart.row": "{layout}: puesto {rank}, {score} puntos. Ver el detalle",
+	"layout_analysis.chart.row": "{layout} {score} puntos, puesto {rank}. Ver el detalle",
 	"layout_analysis.unit.points": "puntos",
 	"layout_analysis.share.button": "Copiar el enlace",
 	"layout_analysis.share.copied": "Enlace copiado: abre este corpus, este teclado, este formato y estas distribuciones.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "Las palabras frecuentes más difíciles",
 	"layout_analysis.words.word": "Palabra",
 	"layout_analysis.words.effort": "Esfuerzo",
-	"layout_analysis.words.part": "Sobre todo por"
+	"layout_analysis.words.part": "Sobre todo por",
+	"layout_analysis.heat.table": "Los valores en una tabla",
+	"layout_analysis.heat.table_key": "Tecla",
+	"layout_analysis.heat.table_position": "Posición",
+	"layout_analysis.heat.table_finger": "Dedo",
+	"layout_analysis.heat.position": "fila {row}, tecla {column}",
+	"layout_editor.board.dead_key": "tecla muerta {name}",
+	"layout_editor.board.disabled": "desactivada",
+	"layout_editor.board.position": "fila {row}, tecla {column}",
+	"layout_editor.board.table": "La distribución en una tabla",
+	"layout_editor.board.table_key": "Tecla",
+	"layout_editor.swap.label": "Intercambiar con la tecla",
+	"layout_editor.swap.button": "Intercambiar"
 }

@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "종합 점수의 점수(좋은 순): 각 지표가 가중치 × 값을 더하거나 뺍니다. 배열을 선택하면 세부 정보를 볼 수 있습니다.",
 	"layout_analysis.chart.gain": "얻은 점수",
 	"layout_analysis.chart.loss": "잃은 점수",
-	"layout_analysis.chart.row": "{layout}: {rank}위, {score}점. 세부 정보 보기",
+	"layout_analysis.chart.row": "{layout} {score}점, {rank}위. 세부 정보 보기",
 	"layout_analysis.unit.points": "점",
 	"layout_analysis.share.button": "링크 복사",
 	"layout_analysis.share.copied": "링크를 복사했습니다: 이 코퍼스, 키보드, 형태, 배열로 열립니다.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "가장 치기 어려운 자주 쓰는 단어",
 	"layout_analysis.words.word": "단어",
 	"layout_analysis.words.effort": "노력",
-	"layout_analysis.words.part": "주된 원인"
+	"layout_analysis.words.part": "주된 원인",
+	"layout_analysis.heat.table": "값을 표로 보기",
+	"layout_analysis.heat.table_key": "키",
+	"layout_analysis.heat.table_position": "위치",
+	"layout_analysis.heat.table_finger": "손가락",
+	"layout_analysis.heat.position": "{row}행, {column}번째 키",
+	"layout_editor.board.dead_key": "데드 키 {name}",
+	"layout_editor.board.disabled": "사용 안 함",
+	"layout_editor.board.position": "{row}행, {column}번째 키",
+	"layout_editor.board.table": "자판 배열을 표로 보기",
+	"layout_editor.board.table_key": "키",
+	"layout_editor.swap.label": "바꿀 키",
+	"layout_editor.swap.button": "바꾸기"
 }

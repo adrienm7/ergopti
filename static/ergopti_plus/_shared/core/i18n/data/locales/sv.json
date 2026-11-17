@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "Poäng i totalbetyget, bäst först: varje mått lägger till eller drar av sin vikt gånger sitt värde. Välj en layout för detaljerna.",
 	"layout_analysis.chart.gain": "Vunna poäng",
 	"layout_analysis.chart.loss": "Förlorade poäng",
-	"layout_analysis.chart.row": "{layout}: plats {rank}, {score} poäng. Visa detaljerna",
+	"layout_analysis.chart.row": "{layout} {score} poäng, plats {rank}. Visa detaljerna",
 	"layout_analysis.unit.points": "poäng",
 	"layout_analysis.share.button": "Kopiera länken",
 	"layout_analysis.share.copied": "Länken kopierad: den öppnar denna korpus, detta tangentbord, detta format och dessa layouter.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "De svåraste vanliga orden",
 	"layout_analysis.words.word": "Ord",
 	"layout_analysis.words.effort": "Ansträngning",
-	"layout_analysis.words.part": "Främst från"
+	"layout_analysis.words.part": "Främst från",
+	"layout_analysis.heat.table": "Värdena som tabell",
+	"layout_analysis.heat.table_key": "Tangent",
+	"layout_analysis.heat.table_position": "Placering",
+	"layout_analysis.heat.table_finger": "Fingersättning",
+	"layout_analysis.heat.position": "rad {row}, tangent {column}",
+	"layout_editor.board.dead_key": "död tangent {name}",
+	"layout_editor.board.disabled": "inaktiverad",
+	"layout_editor.board.position": "rad {row}, tangent {column}",
+	"layout_editor.board.table": "Layouten som tabell",
+	"layout_editor.board.table_key": "Tangent",
+	"layout_editor.swap.label": "Byt med tangenten",
+	"layout_editor.swap.button": "Byt"
 }

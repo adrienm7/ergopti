@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "Poeng i den samlede poengsummen, beste først: hvert mål legger til eller trekker fra sin vekt ganger sin verdi. Velg et oppsett for detaljene.",
 	"layout_analysis.chart.gain": "Vunne poeng",
 	"layout_analysis.chart.loss": "Tapte poeng",
-	"layout_analysis.chart.row": "{layout}: plass {rank}, {score} poeng. Vis detaljene",
+	"layout_analysis.chart.row": "{layout} {score} poeng, plass {rank}. Vis detaljene",
 	"layout_analysis.unit.points": "poeng",
 	"layout_analysis.share.button": "Kopier lenken",
 	"layout_analysis.share.copied": "Lenke kopiert: den åpner dette korpuset, dette tastaturet, dette formatet og disse oppsettene.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "De vanskeligste vanlige ordene",
 	"layout_analysis.words.word": "Ord",
 	"layout_analysis.words.effort": "Innsats",
-	"layout_analysis.words.part": "Mest fra"
+	"layout_analysis.words.part": "Mest fra",
+	"layout_analysis.heat.table": "Verdiene som tabell",
+	"layout_analysis.heat.table_key": "Tast",
+	"layout_analysis.heat.table_position": "Plassering",
+	"layout_analysis.heat.table_finger": "Fingersetting",
+	"layout_analysis.heat.position": "rad {row}, tast {column}",
+	"layout_editor.board.dead_key": "død tast {name}",
+	"layout_editor.board.disabled": "deaktivert",
+	"layout_editor.board.position": "rad {row}, tast {column}",
+	"layout_editor.board.table": "Oppsettet som tabell",
+	"layout_editor.board.table_key": "Tast",
+	"layout_editor.swap.label": "Bytt med tasten",
+	"layout_editor.swap.button": "Bytt"
 }

@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "נקודות הציון הכולל, מהטוב ביותר: כל מדד מוסיף או מפחית את משקלו כפול ערכו. בחרו פריסה לפרטים.",
 	"layout_analysis.chart.gain": "נקודות שהושגו",
 	"layout_analysis.chart.loss": "נקודות שאבדו",
-	"layout_analysis.chart.row": "{layout}: מקום {rank}, {score} נקודות. הצגת הפרטים",
+	"layout_analysis.chart.row": "{layout} {score} נקודות, מקום {rank}. הצגת הפרטים",
 	"layout_analysis.unit.points": "נקודות",
 	"layout_analysis.share.button": "העתקת הקישור",
 	"layout_analysis.share.copied": "הקישור הועתק: הוא פותח את הקורפוס, המקלדת, התצורה והפריסות האלה.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "המילים השכיחות הקשות ביותר",
 	"layout_analysis.words.word": "מילה",
 	"layout_analysis.words.effort": "מאמץ",
-	"layout_analysis.words.part": "בעיקר בגלל"
+	"layout_analysis.words.part": "בעיקר בגלל",
+	"layout_analysis.heat.table": "הערכים בטבלה",
+	"layout_analysis.heat.table_key": "מקש",
+	"layout_analysis.heat.table_position": "מיקום",
+	"layout_analysis.heat.table_finger": "אצבע",
+	"layout_analysis.heat.position": "שורה {row}, מקש {column}",
+	"layout_editor.board.dead_key": "מקש מת {name}",
+	"layout_editor.board.disabled": "מושבת",
+	"layout_editor.board.position": "שורה {row}, מקש {column}",
+	"layout_editor.board.table": "הפריסה בטבלה",
+	"layout_editor.board.table_key": "מקש",
+	"layout_editor.swap.label": "החלפה עם המקש",
+	"layout_editor.swap.button": "החלפה"
 }

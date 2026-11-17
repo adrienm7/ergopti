@@ -288,6 +288,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		// Where the layout offers a choice: how often and which characters.
 		const typing = el('p', 'la-panel-note');
 		const fingersTitle = el('h3');
+		fingersTitle.id = 'la-panel-fingers-title';
 		const fingers = el('div', 'la-panel-fingers');
 		const analysersTitle = el('h3');
 		const analysers = el('table', 'la-panel-metrics la-panel-analysers');
@@ -536,7 +537,14 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					const better = E.METRICS[id].better;
 					const good = better === 'higher' ? change > 0 : better === 'lower' ? change < 0 : null;
 					delta.textContent = `${change > 0 ? '+' : '−'}${format(Math.abs(change), metricDigits(id))}`;
-					if (good !== null) delta.classList.add(good ? 'la-panel-good' : 'la-panel-bad');
+					if (good !== null) {
+						delta.classList.add(good ? 'la-panel-good' : 'la-panel-bad');
+						// Better or worse with a mark and in words, never by its colour alone.
+						const words = t(`layout_analysis.details.verdict_${good ? 'better' : 'worse'}`);
+						delta.title = words;
+						delta.append(' ', el('span', 'la-panel-verdict', good ? '▲' : '▼'));
+						delta.append(el('span', 'la-sr-only', ` ${words}`));
+					}
 				}
 				tr.append(th, td, delta);
 				metrics.append(tr);
@@ -573,6 +581,9 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		 */
 		function drawFingers(result) {
 			fingers.replaceChildren();
+			// Read as a table: each finger a row, its share the cell, the ideal said with it.
+			fingers.setAttribute('role', 'table');
+			fingers.setAttribute('aria-labelledby', fingersTitle.id);
 			const scale = Math.max(
 				FINGER_SCALE_PERCENT,
 				...Object.values(result.fingerShares),
@@ -585,13 +596,18 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				const target = result.idealLoad[id];
 				const mark = el('span', 'la-panel-target');
 				mark.style.left = `${(target / scale) * 100}%`;
-				row.title = `${format(share, 1)} % (${t('layout_analysis.details.ideal_mark')}: ${format(target, 1)} %)`;
-				row.append(
-					el('span', 'la-panel-finger-name', t(`layout_analysis.finger.${id}`)),
-					el('span', 'la-panel-track'),
-					el('span', 'la-panel-finger-value', `${format(share, 1)} %`)
-				);
-				row.children[1].append(bar, mark);
+				const ideal = ` (${t('layout_analysis.details.ideal_mark')}: ${format(target, 1)} %)`;
+				row.title = `${format(share, 1)} %${ideal}`;
+				row.setAttribute('role', 'row');
+				const name = el('span', 'la-panel-finger-name', t(`layout_analysis.finger.${id}`));
+				name.setAttribute('role', 'rowheader');
+				const track = el('span', 'la-panel-track');
+				track.setAttribute('aria-hidden', 'true');
+				track.append(bar, mark);
+				const value = el('span', 'la-panel-finger-value', `${format(share, 1)} %`);
+				value.setAttribute('role', 'cell');
+				value.append(el('span', 'la-sr-only', ideal));
+				row.append(name, track, value);
 				fingers.append(row);
 			}
 		}

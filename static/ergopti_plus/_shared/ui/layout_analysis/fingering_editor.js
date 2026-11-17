@@ -193,6 +193,12 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 		const baseSelect = el('select');
 		baseLabel.append(baseText, baseSelect);
 		const map = el('div', 'la-heatmap la-fingering-map');
+		// The board keeps its key size and scrolls inside this focusable box, so
+		// a narrow screen never scrolls the page sideways (WCAG 1.4.10).
+		const mapBox = el('div', 'la-fingering-scroll');
+		mapBox.tabIndex = 0;
+		mapBox.setAttribute('role', 'region');
+		mapBox.append(map);
 		const keyLine = el('div', 'la-fingering-row');
 		const keyName = el('strong');
 		const fingerSelect = el('select');
@@ -214,7 +220,7 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 		actions.append(reset, exportButton, importLabel);
 		const status = el('p', 'la-muted');
 		status.setAttribute('role', 'status');
-		root.append(head, help, baseLabel, map, keyLine, actions, status);
+		root.append(head, help, baseLabel, mapBox, keyLine, actions, status);
 		errorSinks.push((text) => {
 			status.textContent = text;
 			status.className = 'la-error';
@@ -242,7 +248,9 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 			// in the accessibility tree of some readers, and nameless there.
 			fingerSelect.setAttribute('aria-label', t('layout_analysis.fingering.finger'));
 			homeButton.textContent = t('layout_analysis.fingering.set_home');
+			mapBox.setAttribute('aria-label', t('layout_analysis.fingering.title'));
 			const board = E.keyboard(keyboardId(), profile() || undefined);
+			const rows = Array.from(new Set(board.y)).sort((a, b) => a - b);
 			map.replaceChildren();
 			let width = 0;
 			let height = 0;
@@ -253,6 +261,15 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 				key.dataset.finger = finger;
 				key.textContent = finger;
 				key.title = `${code} — ${t(`layout_analysis.finger.${finger}`)}`;
+				// The visible finger code first (WCAG 2.5.3), then its finger in words and
+				// where the key is, which the drawing shows by place.
+				const row = board.y[k];
+				const column =
+					board.codes.filter((_, j) => board.y[j] === row && board.x[j] < board.x[k]).length + 1;
+				key.setAttribute(
+					'aria-label',
+					`${finger} — ${t(`layout_analysis.finger.${finger}`)}, ${t('layout_analysis.heat.position', { row: rows.indexOf(row) + 1, column })}`
+				);
 				if (board.homeOf[board.finger[k]] === k) key.classList.add('la-fingering-home');
 				if (code === selected) key.classList.add('la-selected');
 				key.setAttribute('aria-pressed', String(code === selected));

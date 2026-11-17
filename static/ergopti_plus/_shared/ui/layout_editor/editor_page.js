@@ -337,6 +337,8 @@ var LayoutEditorPage = (function () {
 			paletteBlock: PALETTE_BLOCKS[0].id,
 			// Whether the palette is unfolded, so a render keeps it open.
 			paletteOpen: false,
+			// Whether the layout's table view (the board's text alternative) is unfolded.
+			boardTableOpen: false,
 			// The name search: query, result cap and the last answer (null before a search).
 			nameSearch: { query: '', limit: UnicodeNames.DEFAULT_LIMIT, answer: null, failed: false },
 			// The text the character magnifier shows ('' shows its hint).
@@ -1385,6 +1387,74 @@ var LayoutEditorPage = (function () {
 			return Array.from(name).length === 1 ? name.toUpperCase() : name;
 		}
 
+		/** A layer's name as its tab shows it: a usual level by its name, another by its modifiers. */
+		function layerName(layer) {
+			const level = LayoutSourceIO.LEVEL_LAYERS.find((each) => levelLayer(each) === layer);
+			return level ? tl(`fill.level.${level.id}`) : layerLabel(layer);
+		}
+
+		/**
+		 * What a mapping does, in words a screen reader can say: the text it
+		 * types, a dead key by its name (its bare accent alone is easy to miss),
+		 * an action, a chord, or « disabled ».
+		 */
+		function spokenMapping(mapping) {
+			const kind = LayoutEditorModel.kindOf(mapping);
+			if (kind === 'dead_key') {
+				const dead = (doc().dead_keys || []).find((entry) => entry.id === mapping.dead_key);
+				return tl('board.dead_key', { name: (dead && dead.name) || mapping.dead_key });
+			}
+			if (kind === 'text' || kind === 'action' || kind === 'key') return legend(mapping, doc());
+			return tl('board.disabled');
+		}
+
+		/**
+		 * Each layer's mapping of a key, in the order of the layers, as
+		 * « layer: what it does » (an unmapped layer is left out).
+		 * @returns {string[]}
+		 */
+		function keyLevels(code) {
+			if (LayoutSourceIO.isPreserved(doc())) return [];
+			return LayoutEditorModel.layers(doc())
+				.map((layer) => {
+					const found = LayoutEditorModel.mappingAt(doc(), layer.id, code, state.platform || null);
+					return found ? `${layerName(layer)} ${spokenMapping(found.mapping)}` : null;
+				})
+				.filter(Boolean);
+		}
+
+		/**
+		 * Rows and ranks of the drawn keys: a key's row from the top and its
+		 * rank from the left in that row, which the drawing shows by place.
+		 * @returns {Map<string, string>} code → « row 2, key 5 ».
+		 */
+		function boardPositions(keys, form) {
+			const rows = Array.from(new Set(keys.map((k) => k.geometry[form].row))).sort((a, b) => a - b);
+			const out = new Map();
+			rows.forEach((row, r) =>
+				keys
+					.filter((k) => k.geometry[form].row === row)
+					.sort((a, b) => a.geometry[form].col - b.geometry[form].col)
+					.forEach((k, c) => out.set(k.code, tl('board.position', { row: r + 1, column: c + 1 })))
+			);
+			return out;
+		}
+
+		/**
+		 * A drawn key's accessible name: its visible text first (WCAG 2.5.3),
+		 * then its printed name for a named key (Tab), its place, and what it
+		 * does on every layer, or its shortcut overrides in the shortcut view.
+		 */
+		function keyAccessibleName(key, shown, where, shortcutText) {
+			const named = key.character || keyName(key.code) === key.code ? '' : keyName(key.code);
+			const parts = [named && !shown.includes(named) ? named : '', where]
+				.filter(Boolean)
+				.join(', ');
+			const levels = shortcutText ? [shortcutText] : keyLevels(key.code);
+			const head = shown ? `${shown}: ${parts}` : parts;
+			return levels.length ? `${head}. ${levels.join(', ')}` : head;
+		}
+
 		/** A key's tooltip in the shortcut view: what it acts as, then each override. */
 		function shortcutTitle(code, actsAs, overrides) {
 			const lines = overrides.map(
@@ -1812,6 +1882,7 @@ var LayoutEditorPage = (function () {
 				style: `--le-cols:${width};--le-rows:${height}`
 			});
 			const remap = doc().remap || {};
+			const positions = boardPositions(keys, form);
 			for (const key of keys) {
 				const g = key.geometry[form];
 				const overrides = state.shortcutView ? keyShortcuts(key.code) : [];
@@ -1839,6 +1910,13 @@ var LayoutEditorPage = (function () {
 					classes.push('pickable');
 				if (key.code === state.selected) classes.push('selected');
 				if (Object.prototype.hasOwnProperty.call(remap, key.code)) classes.push('remapped');
+				const codeText = key.character || keyName(key.code) === key.code ? '' : keyName(key.code);
+				const accessibleName = keyAccessibleName(
+					key,
+					[label, codeText].filter(Boolean).join(' '),
+					positions.get(key.code),
+					state.shortcutView ? shortcutTitle(key.code, actsAs, overrides).replace(/\n/g, ', ') : ''
+				);
 				container.append(
 					el(
 						'button',
@@ -1852,6 +1930,8 @@ var LayoutEditorPage = (function () {
 								: label
 									? `${keyName(key.code)}: ${label}`
 									: keyName(key.code),
+							'aria-label': accessibleName,
+							'data-label': accessibleName,
 							style: `--x:${g.col};--y:${g.row - top};--w:${g.width};--h:${g.height || 1}`,
 							draggable: editableLayer() ? 'true' : null,
 							onclick: () => {
@@ -1912,13 +1992,13 @@ var LayoutEditorPage = (function () {
 										: 'le-legend',
 								text: label
 							}),
+							// Unrendered between flex items, the space keeps the two texts two
+							// words in the visible text the accessible name starts with.
+							' ',
 							// Only a key with a printed name (Tab, Shift, Esc) shows it: a character
 							// key shows the selected layer's value alone, never the base character
 							// or its raw code; the tooltip still names it.
-							el('span', {
-								class: 'le-code',
-								text: key.character || keyName(key.code) === key.code ? '' : keyName(key.code)
-							})
+							el('span', { class: 'le-code', text: codeText })
 						]
 					)
 				);
@@ -1942,8 +2022,67 @@ var LayoutEditorPage = (function () {
 			);
 			return el('section', { class: 'le-board-wrap' }, [
 				el('div', { class: 'le-board-scroll' }, container),
-				mediaRow
+				mediaRow,
+				boardTable(keys, form, positions)
 			]);
+		}
+
+		/**
+		 * The layout as a table, the drawing's text alternative: one row per
+		 * drawn key in reading order (its name and place), one column per
+		 * layer, each cell what the key does there in words. Built only while
+		 * unfolded, so a closed table costs no render time.
+		 */
+		function boardTable(keys, form, positions) {
+			const box = el('details', {
+				class: 'le-board-table',
+				id: 'le-board-table',
+				open: state.boardTableOpen,
+				ontoggle: (event) => {
+					if (state.boardTableOpen === event.target.open) return;
+					state.boardTableOpen = event.target.open;
+					render();
+				}
+			});
+			box.append(el('summary', { text: tl('board.table') }));
+			if (!state.boardTableOpen) return box;
+			const layers = LayoutSourceIO.isPreserved(doc()) ? [] : LayoutEditorModel.layers(doc());
+			const head = el('tr', {}, [
+				el('th', { scope: 'col', text: tl('board.table_key') }),
+				...layers.map((layer) => el('th', { scope: 'col', text: layerName(layer) }))
+			]);
+			const ordered = keys.slice().sort((a, b) => {
+				const ga = a.geometry[form];
+				const gb = b.geometry[form];
+				return ga.row - gb.row || ga.col - gb.col;
+			});
+			const body = ordered.map((key) =>
+				el('tr', {}, [
+					el('th', { scope: 'row', text: `${keyName(key.code)} (${positions.get(key.code)})` }),
+					...layers.map((layer) => {
+						const found = LayoutEditorModel.mappingAt(
+							doc(),
+							layer.id,
+							key.code,
+							state.platform || null
+						);
+						return el('td', { text: found ? spokenMapping(found.mapping) : '' });
+					})
+				])
+			);
+			box.append(
+				el(
+					'div',
+					{
+						class: 'le-board-table-wrap',
+						tabindex: '0',
+						role: 'region',
+						'aria-label': tl('board.table')
+					},
+					[el('table', {}, [el('thead', {}, head), el('tbody', {}, body)])]
+				)
+			);
+			return box;
 		}
 
 		// ============================
@@ -2074,7 +2213,42 @@ var LayoutEditorPage = (function () {
 					disabled: state.clipboard === null,
 					onclick: () => pasteMapping(code)
 				}),
+				swapControl(code, keyOptions),
 				el('p', { class: 'le-note', text: tl('drag_hint') })
+			]);
+		}
+
+		/**
+		 * The click and keyboard way to do what dropping a key on another does
+		 * (WCAG 2.5.7, dragging movements): choose the other key, then swap the
+		 * two on this layer. Copying is Copy then Paste.
+		 */
+		function swapControl(code, keyOptions) {
+			const target = select(
+				keyOptions.filter(([other]) => other !== code),
+				null,
+				() => {},
+				{ id: 'le-swap-target' }
+			);
+			return el('div', { class: 'le-inline le-swap' }, [
+				el('label', { for: 'le-swap-target', text: tl('swap.label') }),
+				target,
+				el('button', {
+					type: 'button',
+					id: 'le-swap',
+					text: tl('swap.button'),
+					onclick: () =>
+						apply((d) =>
+							LayoutEditorModel.transferMapping(
+								d,
+								state.layer,
+								code,
+								target.value,
+								state.platform || null,
+								false
+							)
+						)
+				})
 			]);
 		}
 
@@ -3958,10 +4132,13 @@ var LayoutEditorPage = (function () {
 				if (value === undefined) {
 					node.style.removeProperty('--le-heat');
 					node.title = node.dataset.title;
+					node.setAttribute('aria-label', node.dataset.label);
 					continue;
 				}
 				node.style.setProperty('--le-heat', String(heat.max > 0 ? value / heat.max : 0));
 				node.title = `${node.dataset.title}\n${heat.titles[node.dataset.code]}`;
+				// The colour's value in words too, never by colour alone.
+				node.setAttribute('aria-label', `${node.dataset.label}. ${heat.titles[node.dataset.code]}`);
 			}
 		}
 

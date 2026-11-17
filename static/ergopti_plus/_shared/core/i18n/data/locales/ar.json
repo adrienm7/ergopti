@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "نقاط النتيجة الإجمالية، من الأفضل: كل مقياس يضيف وزنه مضروبًا في قيمته أو يطرحه. اختر تخطيطًا لعرض تفاصيله.",
 	"layout_analysis.chart.gain": "نقاط مكتسبة",
 	"layout_analysis.chart.loss": "نقاط مفقودة",
-	"layout_analysis.chart.row": "{layout}: المرتبة {rank}، {score} نقطة. عرض التفاصيل",
+	"layout_analysis.chart.row": "{layout} {score} نقطة، المرتبة {rank}. عرض التفاصيل",
 	"layout_analysis.unit.points": "نقطة",
 	"layout_analysis.share.button": "نسخ الرابط",
 	"layout_analysis.share.copied": "تم نسخ الرابط: يفتح هذه المدوّنة وهذه اللوحة وهذا الحجم وهذه التخطيطات.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "أصعب الكلمات الشائعة",
 	"layout_analysis.words.word": "الكلمة",
 	"layout_analysis.words.effort": "الجهد",
-	"layout_analysis.words.part": "غالبًا بسبب"
+	"layout_analysis.words.part": "غالبًا بسبب",
+	"layout_analysis.heat.table": "القيم في جدول",
+	"layout_analysis.heat.table_key": "المفتاح",
+	"layout_analysis.heat.table_position": "الموضع",
+	"layout_analysis.heat.table_finger": "الإصبع",
+	"layout_analysis.heat.position": "الصف {row}، المفتاح {column}",
+	"layout_editor.board.dead_key": "مفتاح ميت {name}",
+	"layout_editor.board.disabled": "معطّل",
+	"layout_editor.board.position": "الصف {row}، المفتاح {column}",
+	"layout_editor.board.table": "التخطيط في جدول",
+	"layout_editor.board.table_key": "المفتاح",
+	"layout_editor.swap.label": "تبديل مع المفتاح",
+	"layout_editor.swap.button": "تبديل"
 }

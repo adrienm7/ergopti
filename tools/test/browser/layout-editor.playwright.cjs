@@ -836,12 +836,23 @@ async function exerciseStudioComparer(page) {
 	);
 	assert.ok(
 		await page.$$eval('#la-heatmap .la-key', (keys) =>
-			keys.every((key) => key.tabIndex === 0 && key.getAttribute('aria-label') === key.title)
+			keys.every(
+				(key) =>
+					key.tabIndex === 0 &&
+					key.getAttribute('aria-label').startsWith(key.title + ' (') &&
+					/\d.*\d\)$/.test(key.getAttribute('aria-label'))
+			)
 		),
-		'every heatmap key is named and focusable'
+		'every heatmap key is named with its value and its place, and focusable'
+	);
+	// (comparer-heat-table) The heatmap's numbers as a table, one row per drawn key.
+	assert.equal(
+		await page.locator('#la-heat-table tbody tr').count(),
+		await page.locator('#la-heatmap .la-key').count(),
+		'the heatmap has its table'
 	);
 	// (comparer-worst-groups) The board's worst pairs, with their counts and shares.
-	await page.click('#la-details .la-section > summary');
+	await page.click('#la-details details:has(#la-worst-event) > summary');
 	await page.selectOption('#la-worst-event', 'sfb');
 	assert.ok(
 		(await page.locator('#la-worst tbody tr').count()) > 1,

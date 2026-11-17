@@ -30,8 +30,8 @@
 	--le-sub: var(--theme-sub);
 	--le-accent: var(--theme-accent);
 	--le-accent-soft: var(--theme-accent-soft);
-	--le-danger: var(--theme-danger);
-	--le-ok: var(--theme-green);
+	--le-danger: var(--theme-bad-text);
+	--le-ok: var(--theme-good-text);
 	--le-radius: 8px;
 	--le-gap: 16px;
 	background: var(--le-bg);
@@ -617,6 +617,41 @@ body {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* The layout as a table, the board's text alternative: it scrolls inside its
+   own focusable box, never the page. */
+.le-board-table {
+	margin-top: 8px;
+}
+
+.le-board-table > summary {
+	cursor: pointer;
+	font-weight: 600;
+	padding: 4px 0;
+}
+
+.le-board-table-wrap {
+	max-height: 60vh;
+	overflow: auto;
+}
+
+.le-board-table table {
+	border-collapse: collapse;
+}
+
+.le-board-table th,
+.le-board-table td {
+	border-bottom: 1px solid var(--le-border);
+	padding: 3px 8px;
+	text-align: left;
+	white-space: nowrap;
+}
+
+.le-board-table thead th {
+	background: var(--le-surface);
+	position: sticky;
+	top: 0;
 }
 
 /* =============================== */

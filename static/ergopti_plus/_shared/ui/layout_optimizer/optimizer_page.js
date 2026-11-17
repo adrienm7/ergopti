@@ -612,6 +612,28 @@
 		}
 
 		/**
+		 * Where each drawn key is, in words: its row from the top and its rank
+		 * from the left in that row (the Comparer's heatmap says it the same way).
+		 * @returns {Map<string, string>} code → « row 2, key 5 ».
+		 */
+		function keyPlaces(board, modifiers) {
+			const keys = board.codes
+				.map((code, k) => ({ code, x: board.x[k], y: board.y[k] }))
+				.filter((key) => !modifiers.has(key.code));
+			const rows = Array.from(new Set(keys.map((key) => key.y))).sort((a, b) => a - b);
+			const out = new Map();
+			rows.forEach((y, r) =>
+				keys
+					.filter((key) => key.y === y)
+					.sort((a, b) => a.x - b.x)
+					.forEach((key, c) =>
+						out.set(key.code, t('layout_analysis.heat.position', { row: r + 1, column: c + 1 }))
+					)
+			);
+			return out;
+		}
+
+		/**
 		 * Draws a layout's base level on the chosen keyboard.
 		 * @param {HTMLElement} box - The board element.
 		 * @param {object} layout - Library shape.
@@ -634,6 +656,7 @@
 			box.style.width = `${(maxX - minX) * unit}px`;
 			box.style.height = `${maxY * unit}px`;
 			box.style.fontSize = `${Math.round(unit * 0.38)}px`;
+			const where = keyPlaces(board, modifiers);
 			board.codes.forEach((code, k) => {
 				if (modifiers.has(code)) return;
 				const text = opts.label ? opts.label(code) : legend(layout, code);
@@ -652,7 +675,8 @@
 				if (opts.onKey) {
 					key.type = 'button';
 					key.setAttribute('aria-pressed', opts.marked && opts.marked(code) ? 'true' : 'false');
-					key.setAttribute('aria-label', `${code} ${text}`);
+					// The visible character first (WCAG 2.5.3), then where the key is.
+					key.setAttribute('aria-label', text ? `${text}, ${where.get(code)}` : where.get(code));
 					key.addEventListener('click', () => opts.onKey(code));
 				}
 				box.append(key);
@@ -1103,9 +1127,13 @@
 					const better = E.METRICS[id].better;
 					const good = better === 'lower' ? change < 0 : better === 'higher' ? change > 0 : false;
 					const bad = better === 'lower' ? change > 0 : better === 'higher' ? change < 0 : false;
-					if (Math.abs(change) >= Math.pow(10, -digits)) {
-						if (good) cell.classList.add('lo-good');
-						if (bad) cell.classList.add('lo-bad');
+					if (Math.abs(change) >= Math.pow(10, -digits) && (good || bad)) {
+						cell.classList.add(good ? 'lo-good' : 'lo-bad');
+						// Better or worse with a mark and in words, never by its colour alone.
+						const words = t(`layout_analysis.details.verdict_${good ? 'better' : 'worse'}`);
+						cell.title = words;
+						cell.append(' ', el('span', 'lo-verdict', good ? '▲' : '▼'));
+						cell.append(el('span', 'lo-sr-only', ` ${words}`));
 					}
 					tr.append(
 						el('th', '', t(`layout_analysis.metric.${id}`)),

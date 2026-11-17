@@ -4780,7 +4780,7 @@
 	"layout_analysis.chart.caption": "Punten van de totaalscore, de beste eerst: elke maatstaf telt zijn gewicht maal zijn waarde op of trekt het af. Kies een indeling voor de details.",
 	"layout_analysis.chart.gain": "Gewonnen punten",
 	"layout_analysis.chart.loss": "Verloren punten",
-	"layout_analysis.chart.row": "{layout}: plaats {rank}, {score} punten. Details tonen",
+	"layout_analysis.chart.row": "{layout} {score} punten, plaats {rank}. Details tonen",
 	"layout_analysis.unit.points": "punten",
 	"layout_analysis.share.button": "Link kopiëren",
 	"layout_analysis.share.copied": "Link gekopieerd: hij opent dit corpus, dit toetsenbord, dit formaat en deze indelingen.",
@@ -4858,5 +4858,17 @@
 	"layout_analysis.words.hardest": "De moeilijkste veelvoorkomende woorden",
 	"layout_analysis.words.word": "Woord",
 	"layout_analysis.words.effort": "Moeite",
-	"layout_analysis.words.part": "Vooral door"
+	"layout_analysis.words.part": "Vooral door",
+	"layout_analysis.heat.table": "De waarden als tabel",
+	"layout_analysis.heat.table_key": "Toets",
+	"layout_analysis.heat.table_position": "Positie",
+	"layout_analysis.heat.table_finger": "Vinger",
+	"layout_analysis.heat.position": "rij {row}, toets {column}",
+	"layout_editor.board.dead_key": "dode toets {name}",
+	"layout_editor.board.disabled": "uitgeschakeld",
+	"layout_editor.board.position": "rij {row}, toets {column}",
+	"layout_editor.board.table": "De indeling als tabel",
+	"layout_editor.board.table_key": "Toets",
+	"layout_editor.swap.label": "Verwisselen met toets",
+	"layout_editor.swap.button": "Verwisselen"
 }

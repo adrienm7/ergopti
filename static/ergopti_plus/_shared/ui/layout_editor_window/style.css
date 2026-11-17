@@ -55,7 +55,7 @@ body {
 }
 
 .studio-keystats-status.error {
-	color: var(--theme-danger);
+	color: var(--theme-bad-text);
 }
 
 .studio-keystats-privacy {
