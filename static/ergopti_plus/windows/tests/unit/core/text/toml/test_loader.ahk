@@ -479,6 +479,61 @@ TestTL_LoadHotstringsMultipleEntries() {
 Test("LoadHotstringsSection: registers all three entries from a three-entry section",
 	TestTL_LoadHotstringsMultipleEntries)
 
+; perf-hotstring-section-index-2026-11-17: each section load scanned its whole
+; file again. The sections of one text are indexed once and the index follows
+; the text: an edited text is indexed again.
+TestTL_SectionIndexFollowsItsText() {
+	Path := "section-index-test-" . A_TickCount
+	Entry := '"{1}" = {{} output = "{2}", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false {}}'
+	Text := "[[first]]`r`n" . Format(Entry, "aa", "alpha") . "`r`n"
+		. "[[second]] # a trailing comment still opens the section`r`n"
+		. Format(Entry, "bb", "beta") . "`r`n# " . Format(Entry, "zz", "commented") . "`r`n"
+		. Format(Entry, "cc", "gamma") . "`r`n"
+	First := HotstringsSectionEntries(Path, Text, "first")
+	Second := HotstringsSectionEntries(Path, Text, "second")
+	AssertEqual(1, First.Length, "the first section keeps its own entry")
+	AssertEqual(2, Second.Length, "the second section keeps both live entries in file order")
+	AssertEqual("bb", Second[1].Match[1])
+	AssertEqual("cc", Second[2].Match[1])
+	AssertEqual(0, HotstringsSectionEntries(Path, Text, "absent").Length, "an absent section has no entry")
+	AssertTrue(ObjPtr(Second) == ObjPtr(HotstringsSectionEntries(Path, Text, "second")),
+		"an unchanged text must reuse its index instead of scanning the file again")
+	Edited := StrReplace(Text, '"cc"', '"dd"')
+	Again := HotstringsSectionEntries(Path, Edited, "second")
+	AssertEqual("dd", Again[2].Match[1], "an edited text must be indexed again")
+	AssertEqual("cc", Second[2].Match[1], "an earlier index is never rewritten")
+}
+Test("LoadHotstringsSection: a file's sections are indexed once per text (hotstring-section-index)",
+	TestTL_SectionIndexFollowsItsText)
+
+TestTL_LoadHotstringsSectionsShareOneFile() {
+	TmpPath := A_ScriptDir . "\test_hstr_two_sections.toml"
+	if FileExist(TmpPath)
+		FileDelete(TmpPath)
+	Entry := '"{1}" = {{} output = "{2}", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false {}}'
+	FileAppend("[[first]]`r`n" . Format(Entry, "aa", "alpha") . "`r`n" . Format(Entry, "ab", "alef") . "`r`n"
+		. "[[second]]`r`n" . Format(Entry, "bb", "beta") . "`r`n", TmpPath, "UTF-8")
+	global ScriptInformation
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	ScriptInformation["PersonalTomlPath"] := TmpPath
+	try {
+		ResetHotstringRecorders()
+		LoadHotstringsSection("personal", "second", { TimeActivationSeconds: 0 })
+		AssertEqual(1, _Stub_HotstringRegistrations.Length, "the second section alone registers")
+		AssertContains(_Stub_HotstringRegistrations[1].spec, "bb")
+		ResetHotstringRecorders()
+		LoadHotstringsSection("personal", "first", { TimeActivationSeconds: 0 })
+		AssertEqual(2, _Stub_HotstringRegistrations.Length, "the first section of the same file registers after it")
+		AssertContains(_Stub_HotstringRegistrations[1].spec, "aa")
+		AssertContains(_Stub_HotstringRegistrations[2].spec, "ab")
+	} finally {
+		FileDelete(TmpPath)
+		ScriptInformation["PersonalTomlPath"] := OldPath
+	}
+}
+Test("LoadHotstringsSection: two sections of one file each register their own entries",
+	TestTL_LoadHotstringsSectionsShareOneFile)
+
 TestTL_LoadExtTomlFileUsesCurrentSection() {
 	TmpPath := A_ScriptDir . "\test_ext_loader.toml"
 	if FileExist(TmpPath) {

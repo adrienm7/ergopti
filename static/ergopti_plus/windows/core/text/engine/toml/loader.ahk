@@ -573,28 +573,11 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 
 		TimeActivationSeconds := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
 		TargetSection := StrLower(SectionName)
-		CurrentSection := ""
 
 		FileContent := ReadTomlFile(FilePath)
-		loop parse, FileContent, "`n", "`r" {
-				Line := Trim(A_LoopField, " `t")
-				if (Line == "" or SubStr(Line, 1, 1) == "#") {
-						continue
-				}
-				; Comment cut first — this pattern is anchored, so a commented header
-				; would not match, would fall through as a non-key line, and would leave
-				; CurrentSection pointing at the PREVIOUS section.
-				if RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch) {
-						CurrentSection := StrLower(Trim(SectionMatch[1]))
-						continue
-				}
-				if (CurrentSection != TargetSection) {
-						continue
-				}
-				if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
-						continue
-				}
-
+		for Entry in HotstringsSectionEntries(FilePath, FileContent, TargetSection) {
+				Line := Entry.Line
+				Match := Entry.Match
 				Trigger := UnescapeTomlString(Match[1])
 				Output := UnescapeTomlString(Match[2])
 				Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
@@ -639,6 +622,46 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 		}
 		try LoggerDone("TomlLoader", "Section [{1}.{2}]: {3} entry(ies) loaded.",
 				HotstringCategoryLogName(CategoryName), SectionName, Loaded)
+}
+
+/**
+ * The entry lines of one section of a hotstring file, from an index of every
+ * section built in one pass while the text read is unchanged. A layout extension
+ * binds about sixteen sections to its files and the personal file has several,
+ * and each section load scanned the whole file again, about 120 ms of the
+ * hotstring stage on the maintainer's PC (perf-hotstring-section-index-2026-11-17).
+ * An edited text is indexed again on its next read.
+ * @param {String} FilePath The file's path, the identity of its index.
+ * @param {String} FileContent The file's text, as the caller just read it.
+ * @param {String} Section The lowercase section name.
+ * @returns {Array} { Line, Match } per entry, in file order; empty for an absent section.
+ */
+HotstringsSectionEntries(FilePath, FileContent, Section) {
+		global _HOTSTRING_ENTRY_PATTERN
+		static Known := Map()
+		if !Known.Has(FilePath) || !(Known[FilePath].Text == FileContent) {
+				Sections := Map()
+				CurrentSection := ""
+				loop parse, FileContent, "`n", "`r" {
+						Line := Trim(A_LoopField, " `t")
+						if (Line == "" or SubStr(Line, 1, 1) == "#")
+								continue
+						; Comment cut first — this pattern is anchored, so a commented header
+						; would not match, would fall through as a non-key line, and would leave
+						; CurrentSection pointing at the PREVIOUS section.
+						if RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch) {
+								CurrentSection := StrLower(Trim(SectionMatch[1]))
+								continue
+						}
+						if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match)
+								continue
+						if !Sections.Has(CurrentSection)
+								Sections[CurrentSection] := []
+						Sections[CurrentSection].Push({ Line: Line, Match: Match })
+				}
+				Known[FilePath] := { Text: FileContent, Sections: Sections }
+		}
+		return Known[FilePath].Sections.Get(Section, [])
 }
 
 ; Register admitted sections together so physical TOML order survives boundaries.
