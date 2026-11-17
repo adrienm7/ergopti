@@ -73,6 +73,7 @@
 	const DATA = window.LAYOUT_ANALYSIS_DATA;
 	const INFO = window.LAYOUT_ANALYSIS_INFO;
 	const FINGERING = window.LAYOUT_ANALYSIS_FINGERING;
+	const UNDO = window.LAYOUT_ANALYSIS_UNDO;
 	const infoButton = INFO.button;
 	const STORAGE_KEY = window.LAYOUT_ANALYSIS_FILES.SETTINGS_KEY;
 	const CUSTOM_ID = 'custom';
@@ -2622,28 +2623,66 @@
 				fillLayouts();
 				analyse();
 			});
-			$('la-shortcuts-restore').addEventListener('click', () => {
-				state.shortcuts = E.defaultShortcuts();
-				fillShortcuts();
-				$('la-shortcuts-status').textContent = '';
-				save();
-				analyse();
-			});
-			$('la-forms-restore').addEventListener('click', () => {
-				state.formWeights = E.defaultFormFactorWeights();
-				fillForms();
-				$('la-forms-status').textContent = '';
-				save();
-				analyse();
-			});
-			$('la-ideal-restore').addEventListener('click', () => {
-				state.idealLoad = E.defaultIdealLoad();
-				fillIdealLoad();
-				save();
-				analyse();
-			});
-			$('la-restore').addEventListener('click', () => {
-				state.weights = E.defaultWeights();
+			// Each restore acts at once and offers to put the user's values back
+			// (undo_offer.js); a section already at its defaults has nothing to undo.
+			const restorer = (buttonId, nameKey, part, defaults, refill) => {
+				const button = $(buttonId);
+				const undo = UNDO.create(button.closest('section'));
+				button.after(undo.node);
+				button.addEventListener('click', () => {
+					const before = JSON.stringify(state[part]);
+					state[part] = defaults();
+					refill();
+					if (before === JSON.stringify(state[part])) {
+						undo.clear();
+						return;
+					}
+					undo.offer({
+						name: t(nameKey),
+						focus: button,
+						undo: () => {
+							state[part] = JSON.parse(before);
+							refill();
+						}
+					});
+				});
+			};
+			restorer(
+				'la-shortcuts-restore',
+				'layout_analysis.shortcuts.title',
+				'shortcuts',
+				E.defaultShortcuts,
+				() => {
+					fillShortcuts();
+					$('la-shortcuts-status').textContent = '';
+					save();
+					analyse();
+				}
+			);
+			restorer(
+				'la-forms-restore',
+				'layout_analysis.forms.title',
+				'formWeights',
+				E.defaultFormFactorWeights,
+				() => {
+					fillForms();
+					$('la-forms-status').textContent = '';
+					save();
+					analyse();
+				}
+			);
+			restorer(
+				'la-ideal-restore',
+				'layout_analysis.ideal.title',
+				'idealLoad',
+				E.defaultIdealLoad,
+				() => {
+					fillIdealLoad();
+					save();
+					analyse();
+				}
+			);
+			restorer('la-restore', 'layout_analysis.weights.title', 'weights', E.defaultWeights, () => {
 				fillWeights();
 				rescore();
 			});

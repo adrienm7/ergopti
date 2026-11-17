@@ -241,9 +241,75 @@ function scrollsSideways(target) {
 }
 
 /**
+ * The Comparer's restores act at once and offer an « Undo » (WCAG 3.3.4):
+ * a changed weight and a changed finger come back from the keyboard alone,
+ * the offer is said in a status region one Tab after its button, and the
+ * focus returns to the button. Leaves both offers shown for the scan.
+ * @param {object} comparer - The Comparer's frame, its settings unfolded.
+ * @param {object} page - The page holding the frame (its keyboard).
+ * @returns {Promise<function(): Promise<void>>} Takes both offers back.
+ */
+async function exerciseUndo(comparer, page) {
+	const weight = comparer.locator('#la-weight-list input').first();
+	const initial = await weight.inputValue();
+	await weight.fill(String(Number(initial) + 7));
+	await comparer.locator('#la-restore').click();
+	assert.equal(await weight.inputValue(), initial, 'The restore acts at once');
+	const line = comparer.locator('#la-restore + .la-undo');
+	assert.equal(await line.getAttribute('role'), 'status', 'The undo line is announced');
+	assert.equal(await line.locator('button').count(), 1, 'A restore offers an undo');
+	const fingering = comparer.locator('#la-fingering');
+	const key = fingering.locator('.la-fingering-key').first();
+	await key.click();
+	const finger = await key.getAttribute('data-finger');
+	const other = finger === 'lp' ? 'lr' : 'lp';
+	await fingering.locator('.la-fingering-row select').last().selectOption(other);
+	assert.equal(
+		await fingering.locator('.la-fingering-key').first().getAttribute('data-finger'),
+		other
+	);
+	const reset = fingering.locator('.la-row button').first();
+	await reset.click();
+	assert.equal(
+		await fingering.locator('.la-fingering-key').first().getAttribute('data-finger'),
+		finger
+	);
+	assert.equal(await fingering.locator('.la-undo button').count(), 1, 'The reset offers an undo');
+	return async () => {
+		await comparer.locator('#la-restore').focus();
+		await page.keyboard.press('Tab');
+		assert.equal(
+			await comparer.evaluate(() => document.activeElement.closest('.la-undo') !== null),
+			true,
+			'The undo is the next keyboard stop'
+		);
+		await page.keyboard.press('Enter');
+		assert.equal(
+			await weight.inputValue(),
+			String(Number(initial) + 7),
+			'Undo puts the weight back'
+		);
+		assert.equal(
+			await comparer.evaluate(() => document.activeElement.id),
+			'la-restore',
+			'The focus returns to the restore button'
+		);
+		assert.equal(await line.locator('button').count(), 0, 'An undo is used once');
+		await fingering.locator('.la-undo button').click();
+		assert.equal(
+			await fingering.locator('.la-fingering-key').first().getAttribute('data-finger'),
+			other,
+			'Undo puts the fingering back'
+		);
+		await reset.click();
+		await comparer.locator('#la-restore').click();
+	};
+}
+
+/**
  * What the scan cannot open: the Comparer's details and settings at phone
  * width (no sideways page scroll, every figure a named table, the heatmap's
- * numbers as a table, no violation once unfolded), and the editor's board
+ * numbers as a table, no violation once unfolded), the restores' undo, and the editor's board
  * (every key named with its place and its layers, the layout as a table, a
  * swap without dragging, WCAG 2.5.7).
  */
@@ -278,8 +344,10 @@ async function exerciseStudio(context, origin, basePath, inflight, axeSource) {
 		assert.ok(figures.keys > 0 && figures.rows === figures.keys, 'The heatmap has its table');
 		for (const box of figures.bars)
 			assert.ok(box.table && box.rows === box.drawn, 'A figure reads as a table: ' + box.id);
+		const undoBoth = await exerciseUndo(comparer, page);
 		for (const part of ['#la-details', '#la-settings'])
 			assert.deepEqual(await scanFrame(comparer, axeSource, part), [], 'No violation in ' + part);
+		await undoBoth();
 
 		await page.setViewportSize({ ...VIEWPORT });
 		await page.goto(origin + basePath + '/studio', { waitUntil: 'networkidle' });

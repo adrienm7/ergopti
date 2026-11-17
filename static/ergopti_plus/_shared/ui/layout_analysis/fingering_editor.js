@@ -24,7 +24,8 @@
  *    'storage' event.
  * 3. Checked by the engine (fingeringProfile, keyboard) before it is kept: an
  *    invalid change is refused with its reason, never half applied.
- * 4. Reset, export and import as JSON, for the keyboard shown.
+ * 4. Reset (with an « Undo » line, undo_offer.js), export and import as
+ *    JSON, for the keyboard shown.
  * 5. Mounted where the user analyses: the Comparer and the editor's analysis
  *    panel (both in the app's Studio window); every mount shows the refusals.
  * ==============================================================================
@@ -38,6 +39,7 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 	const E = window.LAYOUT_ANALYSIS;
 	const DATA = window.LAYOUT_ANALYSIS_DATA;
 	const INFO = window.LAYOUT_ANALYSIS_INFO;
+	const UNDO = window.LAYOUT_ANALYSIS_UNDO;
 	const t = INFO.t;
 	const STORAGE_KEY = 'ergopti.layout_analysis.profiles.v2';
 	const STORED_VERSION = 2;
@@ -218,9 +220,11 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 		importInput.accept = '.json';
 		importLabel.append(importText, importInput);
 		actions.append(reset, exportButton, importLabel);
+		// The reset acts at once; its line offers the keyboard's profile back.
+		const undo = UNDO.create(root);
 		const status = el('p', 'la-muted');
 		status.setAttribute('role', 'status');
-		root.append(head, help, baseLabel, mapBox, keyLine, actions, status);
+		root.append(head, help, baseLabel, mapBox, keyLine, actions, undo.node, status);
 		errorSinks.push((text) => {
 			status.textContent = text;
 			status.className = 'la-error';
@@ -320,7 +324,20 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 				next.home[fingerSelect.value] = selected;
 			})
 		);
-		reset.addEventListener('click', () => use(keyboardId(), null, true));
+		reset.addEventListener('click', () => {
+			const board = keyboardId();
+			const before = profile();
+			use(board, null, true);
+			if (!before) {
+				undo.clear();
+				return;
+			}
+			undo.offer({
+				name: t('layout_analysis.fingering.title'),
+				focus: reset,
+				undo: () => use(board, before, true)
+			});
+		});
 		exportButton.addEventListener('click', () => {
 			const text = JSON.stringify(
 				profile() || { id: PROFILE_ID, fingers: {}, home: {} },

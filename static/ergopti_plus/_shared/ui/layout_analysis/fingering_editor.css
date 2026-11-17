@@ -4,7 +4,8 @@
  * ==============================================================================
  * MODULE: Fingering Editor Style
  * DESCRIPTION:
- * The look of the fingering editor (fingering_editor.js) wherever it is
+ * The look of the fingering editor (fingering_editor.js) and of the « Undo »
+ * line of the Studio's restore buttons (undo_offer.js) wherever they are
  * mounted: the Comparer and the layout editor's analysis panel, on the site
  * and in the app's Studio window. Theme tokens only (theme.css), so it needs
  * no page's own variables; the key rules sit under the map, so a page's own
@@ -77,4 +78,19 @@
 
 .la-fingering-map .la-fingering-key.la-selected {
 	outline: 2px solid var(--theme-accent);
+}
+
+/* The « Undo » line after a restore: no room taken while empty, but kept in
+   the page so a screen reader hears it when it is filled. */
+.la-undo {
+	color: var(--theme-text);
+	margin: 4px 0;
+}
+
+.la-undo:empty {
+	margin: 0;
+}
+
+.la-undo .la-undo-button {
+	margin-inline-start: 4px;
 }

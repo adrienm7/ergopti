@@ -54,6 +54,8 @@ const SCRIPTS = [
 	'analyser_scores.js',
 	'analyser_tab.js',
 	'info_popover.js',
+	// The « Undo » line of the restore buttons and the fingering reset.
+	'undo_offer.js',
 	'fingering_editor.js',
 	'../layout_composer/_generated/composer_data.js',
 	'../layout_composer/composer_model.js',
@@ -100,6 +102,7 @@ for (const file of [
 	'info_popover.js',
 	'analysis_panel.js',
 	'fingering_editor.js',
+	'undo_offer.js',
 	'analyser_tab.js'
 ])
 	for (const m of fs.readFileSync(path.join(PAGE_DIR, file), 'utf8').matchAll(/\bt\('([a-z_.]+)'/g))
@@ -390,6 +393,7 @@ const PANEL_SCRIPTS = [
 	// The panel shows every analyser's score beside Ergopti's.
 	'../layout_analysis/analyser_scores.js',
 	'../layout_analysis/info_popover.js',
+	'../layout_analysis/undo_offer.js',
 	'../layout_analysis/fingering_editor.js',
 	'../layout_analysis/corpus_files.js',
 	'../layout_analysis/analysis_panel.js',
