@@ -393,8 +393,14 @@ Each question names the default kept meanwhile; an answer moves into the item or
   3. Never cache: 30 ms at boot is accepted.
 - [ ] **Linux keystats boot: a persistent sqlite3 child?** Registration, the two migration checks and the open walk
       cost one sqlite3 process each (about 4 ms); the remaining cut is a persistent child for the synchronous writer
-      ([design](docs/design/linux-sqlite-persistent-child.md)). Approve it, then implement ([CODE]). Kept meanwhile:
-      one process per query.
+      ([design](docs/design/linux-sqlite-persistent-child.md)): about 29.5 ms of store boot would become 5 to 7 ms,
+      and each later synchronous read (dashboard `query_rows`, `get_meta`) would save its 4 ms. Kept meanwhile: one
+      process per query.
+  1. **(recommended) Build the persistent child** as the design writes it (one `sqlite3` spawned through LuaJIT FFI,
+     each success acknowledged by a per-call random token, a refused statement ending the child and the next call
+     starting a new one, a read deadline added), then implement ([CODE]).
+  2. Keep one process per query: 30 ms at boot is accepted.
+  3. Link `libsqlite3` through FFI, the largest saving, which breaks the driver's rule of never linking SQLite.
 - [ ] **Parity decisions THD-1 to THD-4 and HCD-1, HCD-2, HCD-4, HCD-5.** Tap-holds
       ([report](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): THD-1 the pair tap and the layer, THD-2
       the lone window, THD-3 layer-hold pair activity, THD-4 the macOS thumb Backspace under modifiers. Hotstring
