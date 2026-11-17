@@ -168,6 +168,12 @@
 			"not_testable": "Whether one action fires per step of real finger travel is a person's reading of the swipe against the result: the container kernel has no evdev touchpad and no log line measures the travel felt."
 		},
 		{
+			"id": "typing_burst_widget",
+			"title": "Typing-speed widget bursts (TWD-2)",
+			"checks": [],
+			"not_testable": "The widget is read on screen: when it shows and hides as each key, modifier tap and pointer move arrives; the rule itself is unit-tested on the three drivers (twd2-typing-burst, twd2-level-modifiers, twd2-pointer-hides, twd2-keymap-role)."
+		},
+		{
 			"id": "one_folder_name",
 			"title": "One folder name: the legacy folders migrated on the maintainer's Linux machine",
 			"checks": [],

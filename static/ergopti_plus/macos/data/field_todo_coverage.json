@@ -643,6 +643,12 @@
 			"not_testable": "The row labels, their order, the tap delay row and the pickers are read on screen; « Retirer les anciennes règles » needs an upgrade; Login Items' single Ergopti is field_login_items."
 		},
 		{
+			"id": "typing_burst_widget",
+			"title": "Typing-speed widget bursts (TWD-2)",
+			"checks": [],
+			"not_testable": "The widget is read on screen: when it shows and hides as each key, modifier tap and pointer move arrives; the rule itself is unit-tested on the three drivers (twd2-typing-burst, twd2-level-modifiers, twd2-pointer-hides)."
+		},
+		{
 			"id": "typing",
 			"title": "Typing",
 			"checks": [

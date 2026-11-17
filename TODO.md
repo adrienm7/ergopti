@@ -180,9 +180,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     ([shortcuts campaign](docs/audits/platform-parity/2026-11-11-shortcuts/report.md));
   - the configuration, lifecycle, notification and network adapters in depth
     ([adapters campaign](docs/audits/platform-parity/2026-11-11-adapters/report.md));
-  - TWD-2 (the typing-speed widget hides when the burst ends): a Linux fifth-level key placed on a Ctrl key is
-    reported as Ctrl by the input hook and ends the burst; its real-keyboard look on each OS is not yet in the
-    TODO-tests files;
   - the macOS Carbon slots against the tap rewrite, to confirm on a Mac
     ([input/layout follow-up](docs/audits/platform-parity/2026-11-12-input-layout-followup/report.md));
   - a deleted Linux checkout's startup entry stays until a checkout run rewrites it

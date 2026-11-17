@@ -90,7 +90,9 @@ Hands needed:
       circumflex dead key (`^` then `e` gives ê) follow Ergopti➕; Cmd+Z undoes where Ergopti has z; a row switched
       off types French; a hotstring fires on emulated text. Check that a key the French layout makes dead (`^`)
       types its emulated character, that the cleared Option flag does not break an Option chord in Terminal, and
-      note the password-field limit (Secure Event Input: the system layout types).
+      note the password-field limit (Secure Event Input: the system layout types). Then bind a Shortcuts-menu slot
+      to Ctrl+Z: under the emulation it runs from the key that types « z » in Ergopti➕, not from the French Z key
+      (the Carbon `hs.hotkey` slot sees the rewritten key code; Linux ILX-001, input/layout follow-up report).
 - [ ] <!-- field-point: hotstrings_asa --> Hotstrings (asa): the carrier types the whole `ASA` while the trigger's `a` is held (`test_text_carrier_avoids_held_key`); on the Mac: field report: `field_log_signals` `log_held_key_moves` after a person types `asa` + Space fast twenty times, also holding `a`, and `hotstring_roundtrip`; ordinary hotstrings in Edge, VS Code and a terminal stay hands.
 - [ ] <!-- field-point: omlx_8181 --> oMLX on port 8181: field report: `field_local_servers` names it in API mode (`server_<id>` `up:...`), with no `ps` deadlock.
 - [ ] <!-- field-point: l46_gestures --> L46 with no explicit `[gestures.sensitivities]` swipe_3 value (6d3aa65273): field report: `field_gesture_frames`, and `field_log_signals` `log_capture_stamp_errors` (no `has no capture timestamp` ERROR after a reload) and `log_three_finger_rejections` (`<n>:<gate>`). The swipes themselves (minutes of two-finger scrolls switch no tab; deliberate vertical three-finger swipes — slow, flick, staggered, after a scroll, finger resting, ten half a second apart — each switch exactly one tab, past 29 units two) stay hands.
@@ -102,6 +104,10 @@ Hands needed:
 - [ ] <!-- field-point: menus --> Menus: Clear and Restore per category and global; Shortcuts group restore and clear; tap delay row and « Use
       global delay (…) »; tap and hold pickers; « Combinaisons de touches »; row order unchanged (PAR-76 R18);
       « Retirer les anciennes règles » on an upgrade (43); Login Items show one Ergopti (24).
+- [ ] <!-- field-point: typing_burst_widget --> Typing-speed widget bursts (TWD-2, 2026-11-16): with the widget on,
+      type a sentence in TextEdit: it shows; an arrow, F5, Cmd+C, Ctrl alone, Cmd alone, a click, a one-pixel
+      pointer move or a trackpad scroll hides it at once; Shift and both Option keys (alone, held, together),
+      Backspace, Return and Tab keep it; an Option-level character counts as typed text.
 - [ ] <!-- field-point: typing --> Typing: chained expansions, magic key on ISO and ANSI, undo by Backspace, password field, ignored app, no
       wrong erase count (PAR-76 R26); tap-hold rolls; Right Option + Return/Delete/Backspace/Escape; Backspace word
       start (Terminal, TextEdit, Safari Cmd+L); CapsWord cancelled by the pointer (44).

@@ -53,6 +53,29 @@ function M.index(registry, burst, field)
 	return index
 end
 
+-- The burst role of each keymap modifier role: Shift and AltGr levels type text,
+-- Ctrl, Alt and Super start shortcuts.
+local ROLE_OF_KEYMAP_MODIFIER = {
+	shift = M.ROLE.LEVEL, altgr = M.ROLE.LEVEL,
+	ctrl = M.ROLE.MODIFIER, alt = M.ROLE.MODIFIER, meta = M.ROLE.MODIFIER,
+}
+
+--- Corrects a key's burst role with the role the live keymap gives it, where the
+--- driver knows it (Linux XKB): a fifth-level or AltGr key placed on a Ctrl key
+--- types text, and Right Alt is a shortcut Alt on a US layout.
+--- @param index_role string|nil The role from index() for the physical code.
+--- @param keymap_role string|false|nil "shift", "altgr", "ctrl", "alt" or "meta";
+---   false when the keymap makes the key no modifier; nil when unknown.
+--- @return string|nil role
+function M.keymap_role(index_role, keymap_role)
+	if keymap_role == nil then return index_role end
+	local role = ROLE_OF_KEYMAP_MODIFIER[keymap_role]
+	if role then return role end
+	-- No modifier in this keymap: a remapped modifier position types text.
+	if index_role == M.ROLE.MODIFIER or index_role == M.ROLE.LEVEL then return nil end
+	return index_role
+end
+
 -- Built indexes per native field, false after a failed build.
 local _cache = {}
 

@@ -164,6 +164,10 @@ physical size`); X and Y match the pad's width and height (logical span over mil
       back; quit: it leaves; at 125 % and 200 % the number stays legible.
 - [ ] WPM widget: drag it, restart, and check it comes back where it was (the old split position keys are no longer
       read, so it starts once at its default).
+- [ ] Typing-speed widget bursts (TWD-2, 2026-11-16): with the widget on, type a sentence in Notepad: it shows; an
+      arrow, F5, Ctrl+C, Ctrl alone, Alt alone, Win alone, a click, a one-pixel mouse move or a wheel turn hides it at
+      once; Shift and AltGr (alone, held, together; AltGr's own LCtrl is no lone Ctrl), Backspace, Enter and Tab keep
+      it; an AltGr character counts as typed text.
 - [ ] Brightness joined source; retired Metrics shortcuts across a three-OS full save and an installed upgrade (63,
       71).
 - [ ] Ten window-toggle actions, also without WebView2 (native fallbacks): no orphan WebView2 process.

@@ -784,3 +784,30 @@ helpers.describe("keyboard source loss with a shared physical modifier", functio
 		end)
 	end
 end)
+
+helpers.describe("the keymap role of a held key", function()
+	helpers.it("(twd2-keymap-role) gives the physical callback the role the live keymap gave the press", function()
+		local seen, source_of = {}, nil
+		Fixture.with_session({
+			before_hook = function()
+				-- RightCtrl (97) carries ISO_Level5_Shift, RightAlt (100) is Alt_R.
+				package.loaded["adapters.xkb_capture"].modifier_role = function(code)
+					if code == 97 then return "altgr" end
+					if code == 100 then return "alt" end
+					return require("platform.input.evdev_codes").MODIFIER_OF[code]
+				end
+			end,
+			on_physical = function(s, code, _, _, value, source)
+				if value == 1 then seen[code] = s.hook.held_modifier_role(source, code); source_of = source end
+			end,
+		}, function(s)
+			s.edge("a", 97, 1, 10); s.edge("a", 100, 1, 20); s.edge("a", 30, 1, 30)
+			helpers.assert_eq(seen[97], "altgr", "a fifth-level key on the Ctrl position is a level modifier")
+			helpers.assert_eq(seen[100], "alt", "Right Alt as Alt_R is a shortcut Alt")
+			helpers.assert_eq(seen[30], false, "a letter is held as no modifier")
+			helpers.assert_eq(s.hook.held_modifier_role(source_of, 97), "altgr", "the role lasts while the key is held")
+			s.edge("a", 30, 0, 40); s.edge("a", 100, 0, 50); s.edge("a", 97, 0, 60)
+			helpers.assert_eq(s.hook.held_modifier_role(source_of, 97), false, "a released key holds no role")
+		end)
+	end)
+end)

@@ -3193,6 +3193,18 @@ function M.held_text_modifiers()
 	return held
 end
 
+--- The modifier role the live keymap gave a held key at its press: XKB options
+--- and layouts move roles between keys (a Ctrl key can carry ISO_Level5_Shift,
+--- Right Alt is Alt_R on a US layout), so the physical code alone cannot tell.
+--- Valid from the key's own physical-key callback until its release.
+--- @param source string Source identity the physical callback received.
+--- @param code integer evdev keycode.
+--- @return string|false "shift", "altgr", "ctrl", "alt" or "meta"; false when
+---   the key is not held as a modifier.
+function M.held_modifier_role(source, code)
+	return _modifier_down[source_key(source, code)] or false
+end
+
 --- Exact physical keycodes of held text-level modifiers, in press order.
 ---
 --- Injection must release and restore what the application actually saw. A role

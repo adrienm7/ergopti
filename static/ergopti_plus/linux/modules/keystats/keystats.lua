@@ -1184,17 +1184,22 @@ end
 --- @param scancode number Linux evdev key code.
 --- @param timestamp_ms number Event time in ms.
 --- @param shortcut boolean|nil A Ctrl, Alt or Super chord: it ends the typing burst.
-function M.record_physical_key(app_id, scancode, timestamp_ms, shortcut)
+--- @param keymap_role string|false|nil The modifier role the live keymap gave the
+---   key (keyboard_hook.held_modifier_role), false for none, nil when unknown.
+function M.record_physical_key(app_id, scancode, timestamp_ms, shortcut, keymap_role)
 	if not may_record() then return end
 	if type(scancode) ~= "number" or scancode <= 0 then return end
 	-- The history stamp is rounded; pointer activity uses this same precise clock.
 	-- A physical key alone never starts a typing burst: text does (ingest_keydown).
 	-- The typing burst rule (TWD-2): evdev code → role from the shared files.
-	local index, index_err, first_failure = require("metrics.engine.wpm.typing_keys").native_index("evdev")
+	local TypingKeys = require("metrics.engine.wpm.typing_keys")
+	local index, index_err, first_failure = TypingKeys.native_index("evdev")
 	if first_failure then
 		Logger.error(LOG, "Typing burst keys unreadable (%s): no key ends a burst until a reload.", tostring(index_err))
 	end
-	LiveWpm.observe_key(_live, index and index[scancode] or nil, scancode, shortcut == true, Monotonic.now_ms())
+	-- The keymap, not the position, says whether a modifier types text.
+	local role = TypingKeys.keymap_role(index and index[scancode] or nil, keymap_role)
+	LiveWpm.observe_key(_live, role, scancode, shortcut == true, Monotonic.now_ms())
 	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
 	local live, dated = app_pair(resolved_app, timestamp_ms)
 	local code = math.floor(scancode)

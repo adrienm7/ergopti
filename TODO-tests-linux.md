@@ -84,6 +84,11 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       with the step rule and reversal shared with macOS; the travel is in millimetres from the touchpad's own
       resolution (EVIOCGABS), so the steps set in `[gestures.sensitivities]` and in each swipe slot's submenu match
       the distance swiped; a pad that reports no resolution fires once, as x1, said in the log.
+- [ ] <!-- field-point: typing_burst_widget --> Typing-speed widget bursts (TWD-2, 2026-11-16): with the widget on,
+      type a sentence: it shows; an arrow, F5, Ctrl+C, Ctrl alone, Alt alone, Super alone, a click, a one-pixel
+      pointer move or a touchpad scroll hides it at once; Shift and AltGr (alone, held, together), Backspace, Enter
+      and Tab keep it. Then add the XKB option `lv5:rctrl_switch`: Right Ctrl tapped alone keeps the widget (a level
+      key there, `twd2-keymap-role`); with `ctrl:nocaps`, CapsLock tapped alone hides it.
 - [ ] <!-- field-point: one_folder_name --> One folder name
       ([handoff](docs/tooling/one-folder-name-handoff.md#what-the-maintainer-checks-on-each-machine)): check the Linux
       machine against the handoff's Linux list (`~/.config/ergopti_plus`, `~/.local/state/ergopti_plus` and

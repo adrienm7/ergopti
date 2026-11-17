@@ -431,6 +431,76 @@ helpers.describe("wpm readouts: the live speed", function()
 		end)
 	end)
 
+	helpers.it("(twd2-keymap-role) the live keymap, not the key's position, says whether a modifier types text", function()
+		require("tests.support.keystats_native_fixture").with(function(keystats)
+			require("tests.support.metrics_consent_fixture").enable(keystats)
+			local clock = require("core.logger.engine.monotonic")
+			local previous = clock.now_ms
+			local now = 40000
+			clock.now_ms = function() return now end
+			local ok, err = pcall(function()
+				local function visible()
+					local live = keystats.get_live_stats(now)
+					return Model.widget_visible({ last_input_s = live.last_input_time,
+						last_break_s = live.last_break_time, now_s = now / 1000, idle_hide_s = 3 })
+				end
+				local function type_a()
+					now = now + 10
+					keystats.record_physical_key("app", 30, now, false, false)
+					keystats.on_keydown("a", now, "app", 30)
+				end
+				-- evdev 97 = RightCtrl carrying ISO_Level5_Shift, 100 = RightAlt as
+				-- Alt_R (US), 58 = CapsLock as Control (ctrl:nocaps), 29 = LeftCtrl
+				-- remapped to a letter.
+				type_a()
+				now = now + 10
+				keystats.record_physical_key("app", 97, now, false, "altgr")
+				now = now + 10
+				keystats.record_physical_release(97)
+				helpers.assert_true(visible(), "a fifth-level key on the Ctrl position tapped alone keeps the burst")
+				now = now + 10
+				keystats.record_physical_key("app", 100, now, false, "alt")
+				now = now + 10
+				keystats.record_physical_release(100)
+				helpers.assert_true(not visible(), "Right Alt as a plain Alt tapped alone ends the burst")
+				type_a()
+				now = now + 10
+				keystats.record_physical_key("app", 58, now, true, "ctrl")
+				now = now + 10
+				keystats.record_physical_release(58)
+				helpers.assert_true(not visible(), "CapsLock made a Ctrl tapped alone ends the burst")
+				type_a()
+				now = now + 10
+				keystats.record_physical_key("app", 29, now, false, false)
+				keystats.on_keydown("q", now, "app", 29)
+				keystats.record_physical_release(29)
+				helpers.assert_true(visible(), "a Ctrl position the keymap makes a letter types text")
+				now = now + 10
+				keystats.record_physical_key("app", 29, now)
+				now = now + 10
+				keystats.record_physical_release(29)
+				helpers.assert_true(not visible(), "with no keymap answer the position's role stands")
+			end)
+			clock.now_ms = previous
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("(twd2-keymap-role) typing_keys.keymap_role maps each keymap modifier role", function()
+		local TypingKeys = require("metrics.engine.wpm.typing_keys")
+		local R = TypingKeys.ROLE
+		helpers.assert_eq(TypingKeys.keymap_role(R.MODIFIER, "altgr"), R.LEVEL)
+		helpers.assert_eq(TypingKeys.keymap_role(R.MODIFIER, "shift"), R.LEVEL)
+		helpers.assert_eq(TypingKeys.keymap_role(R.LEVEL, "alt"), R.MODIFIER)
+		helpers.assert_eq(TypingKeys.keymap_role(R.NEUTRAL, "ctrl"), R.MODIFIER)
+		helpers.assert_eq(TypingKeys.keymap_role(nil, "meta"), R.MODIFIER)
+		helpers.assert_eq(TypingKeys.keymap_role(R.MODIFIER, false), nil)
+		helpers.assert_eq(TypingKeys.keymap_role(R.LEVEL, false), nil)
+		helpers.assert_eq(TypingKeys.keymap_role(R.ENDS, false), R.ENDS)
+		helpers.assert_eq(TypingKeys.keymap_role(R.NEUTRAL, false), R.NEUTRAL)
+		helpers.assert_eq(TypingKeys.keymap_role(R.MODIFIER, nil), R.MODIFIER)
+	end)
+
 	helpers.it("(wpm-source-parity) real keystats preserves independent holds and the physical clock", function()
 		require("tests.support.keystats_native_fixture").with(function(keystats)
 			require("tests.support.metrics_consent_fixture").enable(keystats)

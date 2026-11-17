@@ -32,7 +32,12 @@ through the real Linux modules; no desktop was rendered.
   Decided by the maintainer on 2026-11-16 and done: the widget shows only while
   text is typed and hides at a shortcut, an ending key, a modifier tapped alone,
   a click or a focus change, on the three OS (`[typing_burst]`,
-  `twd2-typing-burst`).
+  `twd2-typing-burst`). On Linux the live XKB keymap, not the key's position,
+  gives a modifier its role (2026-11-17): a fifth-level key on a Ctrl key
+  (`lv5:rctrl_switch`) is a level key and never ends a burst, Right Alt as
+  `Alt_R` and CapsLock as Ctrl (`ctrl:nocaps`) are shortcut modifiers
+  (`keyboard_hook.held_modifier_role`, `typing_keys.keymap_role`,
+  `twd2-keymap-role`). The real-keyboard look is in the three TODO-tests files.
 - The user's `llm_prediction` delay override (Windows and macOS Delays row)
   has no Linux row: Linux uses the shared default.
   Done on 2026-11-16: Linux shows the row after the separator, as Windows,

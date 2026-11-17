@@ -1981,9 +1981,12 @@ local function main()
 			return
 		end
 		-- A Ctrl, Alt or Super chord ends the typing burst; AltGr types text (TWD-2).
+		-- The key's own role comes from the live keymap: a fifth-level key on a
+		-- Ctrl position types text, tapped alone too.
 		local held = keyboard_hook.held_modifiers()
 		local shortcut = (held.ctrl or held.alt or held.meta) and true or false
-		keystats.record_physical_key(app_id, scancode, math.floor(Monotonic.now_ms()), shortcut)
+		keystats.record_physical_key(app_id, scancode, math.floor(Monotonic.now_ms()), shortcut,
+			keyboard_hook.held_modifier_role(source, scancode))
 	end
 	local on_physical = input_capture_gate.guard(handle_physical,
 		function(scancode, _key_name, _char, value)
