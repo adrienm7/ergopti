@@ -66,13 +66,12 @@ baseline as violations go.
 - [ ] **Keyboard and motor.** Keyboard walk of the Studio (no traps, logical order), no time limits.
 - [ ] **Cognitive.** Consistent navigation; check that every error message says how to fix it and every metric and
       setting has its help text.
-- [ ] **Ergopti+ native UI.** The clear fixes of the code audit
-      ([table](docs/audits/accessibility/README.md#native-ergopti-ui-code-audit-2026-11-17)) on macOS and Linux:
-      the menu-bar / indicator name with the paused state, the canvas badge, the Swift progress bar's label, the GTK
-      dialog captions bound to their fields, the tooltip announcements (`hs.speech`, AT-SPI) and the system
-      reduced-motion / contrast / text-size settings (Windows done: tray name, labels, named « ↺ » buttons,
-      `TrayTip` order, tooltips under high contrast and « Make text bigger », live-region announcements). Left on
-      Windows: fixed font sizes in the native windows other than the tooltips. The screen-reader checks are the
+- [ ] **Ergopti+ native UI, what is left.** The clear fixes of the code audit
+      ([table](docs/audits/accessibility/README.md#native-ergopti-ui-code-audit-2026-11-17)) are in on the three OS
+      (tray / menu-bar names with the pause, labels and named controls, tooltips under high contrast, previews told
+      to a running screen reader). Left: fixed font sizes in the Windows native windows other than the tooltips;
+      the GNOME text scale; the WPM widgets, the spotlight overlay and `hs.alert` banners, still invisible to
+      screen readers; the Swift update panel's XCTest, not yet run in CI. The spoken results are the
       « Accessibility » items of the three TODO-tests files.
 - [ ] **Languages.** `lang` on foreign passages across the rest of the site (English names, quotes); decide whether
       the accessibility texts get the 21 locales.
