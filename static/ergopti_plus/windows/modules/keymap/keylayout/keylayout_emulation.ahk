@@ -1945,8 +1945,9 @@ _KLE_SourceBoot(ConfigDir, Deps) {
 		Model := SourceEmulation_Compile(Table)
 		if !SourceEmulation_HasRecords(Model)
 			return 0
+		RegistryPath := _SharedDir . "\layouts\data\keycodes\physical_keys.json"
 		Registry := Deps.Has("physical_keys") ? Deps["physical_keys"]
-			: JsonParse(FSReadStrict(_SharedDir . "\layouts\data\keycodes\physical_keys.json"))
+			: JsonParseShared(RegistryPath, FSReadStrict(RegistryPath))
 		Count := KeylayoutEmulation_SourceLoad(Model, Registry, Deps.Get("source_hotkey", Hotkey),
 			Deps.Get("source_hotif", HotIf))
 	} catch as Err {

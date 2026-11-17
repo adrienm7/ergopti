@@ -129,11 +129,11 @@ _JOKN_SharedRootFollowsItsText() {
 	AssertEqual("SC01E", First["keys"]["KeyA"]["ahk"], "an earlier root is never rewritten")
 	Other := JsonParseShared(Key . "-other", '{"keys":{"KeyA":{"ahk":"SC010"}}}')
 	AssertFalse(ObjPtr(Other) == ObjPtr(Edited), "documents of different paths never share a root")
-	; The four boot owners of the registry decode it through the shared root.
-	; The composed layout's source emulation keeps a private decode: its session
-	; owns what it is handed, so it never takes the shared root.
+	; Every owner of the registry decodes it through the shared root, the composed
+	; layout's source emulation too: it only reads the registry to name its scan
+	; codes, and its session is built from the layout's own model.
 	for Owner in ["WPMWidget_TypingBurstIndex", "MagicEditorPhysicalCatalogue", "LayoutEmulationRows",
-			"KeymapLayers_LoadContext"]
+			"KeymapLayers_LoadContext", "_KLE_SourceBoot"]
 		AssertTrue(InStr(_DriverFuncBody(Owner), "JsonParseShared(RegistryPath, FSReadStrict(RegistryPath))"),
 			Owner . " must read the physical-key registry through its shared root")
 }
