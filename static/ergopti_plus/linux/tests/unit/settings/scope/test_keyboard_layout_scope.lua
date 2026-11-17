@@ -10,6 +10,8 @@
 --- owed) and the participant: it settles only when the session answers, a load
 --- the session refuses reverts the rows, an inert choice is acknowledged with its
 --- reason, and a reload refused during a rollback stays owed until retried.
+--- The scope also holds the layout emulation's rows, so a committed or reverted
+--- scope reloads a running emulation (layout-scope-emulation-reload).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -21,13 +23,18 @@ local SOURCE = '[layout]\ndirect_access_digits = "digits"\nnumber_row_reorder_ed
 
 local function with_scope(body)
 	Sandbox.with_config(SOURCE, function(path)
-		local names = { "settings.engine.paths", "infra.keyboard_layout_scope", "infra.number_row_preferences" }
+		local names = { "settings.engine.paths", "infra.keyboard_layout_scope", "infra.number_row_preferences",
+			"modules.keymap.layout_emulation" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
-		local controls = {}
+		local controls = { reloads = 0 }
 		local backup = path .. ".scope-backup"
 		local ok, err = pcall(function()
 			package.loaded["settings.engine.paths"] = { config = function() return path end }
+			-- The real emulation owner would reach the session: every case counts its reloads.
+			package.loaded["modules.keymap.layout_emulation"] = {
+				reload_if_started = function() controls.reloads = controls.reloads + 1; return true end,
+			}
 			local files = {
 				read_with_status = function(target) return Writer.read_classified(target) end,
 				write = function() error("unconditional publication") end,
@@ -72,6 +79,60 @@ local function fake_live(options)
 	}
 	return live, state
 end
+
+helpers.describe("Linux keyboard layout scope: reloads the layout emulation (layout-scope-emulation-reload)", function()
+	helpers.it("reloads a running emulation when only its rows changed", function()
+		with_scope(function(owner, controls, _, _, Scope)
+			helpers.assert_eq(owner.apply("recommended"), true)
+			owner.release()
+			local live = fake_live()
+			local settled
+			Scope.participant({ live = live }).apply("recommended", function(ok, detail) settled = { ok, detail } end)
+			helpers.assert_eq(settled, { true, "rows_unchanged" })
+			helpers.assert_eq(controls.reloads, 1, "a global restore left the emulation typing its old session")
+		end)
+	end)
+
+	helpers.it("reloads after committing and again after the session refused and the rows were reverted", function()
+		with_scope(function(_, controls, _, _, Scope)
+			local live, state = fake_live()
+			Scope.participant({ live = live }).apply("recommended", function() end)
+			helpers.assert_eq(controls.reloads, 1)
+			state.answer(false, "stale_keymap")
+			helpers.assert_eq(controls.reloads, 2, "the emulation must follow the reverted rows")
+		end)
+	end)
+
+	helpers.it("reloads after a composition revert and not for a refused request", function()
+		with_scope(function(_, controls, _, _, Scope)
+			local live, state = fake_live()
+			local participant = Scope.participant({ live = live })
+			participant.apply("recommended", function() end)
+			state.answer(true)
+			participant.revert(function() end)
+			helpers.assert_eq(controls.reloads, 2)
+		end)
+		with_scope(function(_, controls, _, _, Scope)
+			local settled
+			Scope.participant({ live = fake_live() }).apply("bogus", function(ok) settled = ok end)
+			helpers.assert_eq(settled, false)
+			helpers.assert_eq(controls.reloads, 0, "nothing was committed")
+		end)
+	end)
+
+	helpers.it("settles the scope when the emulation refuses or raises", function()
+		for _, reload in ipairs({ function() return false end, function() error("boom") end }) do
+			with_scope(function(owner, _, _, _, Scope)
+				helpers.assert_eq(owner.apply("recommended"), true)
+				owner.release()
+				local settled
+				Scope.participant({ live = fake_live(), emulation = { reload_if_started = reload } })
+					.apply("recommended", function(ok, detail) settled = { ok, detail } end)
+				helpers.assert_eq(settled, { true, "rows_unchanged" })
+			end)
+		end
+	end)
+end)
 
 helpers.describe("Linux keyboard layout scope", function()
 	helpers.it("restores the recommended layout rows and keeps foreign content", function()

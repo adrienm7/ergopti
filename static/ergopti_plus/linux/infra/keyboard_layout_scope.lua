@@ -102,10 +102,28 @@ local function load_stored(live, settle)
 	if dispatched == false then return settle(false, "the layout manager refused the request") end
 end
 
+--- Has a started layout emulation type the rows config.toml now holds: the
+--- scope holds its rows too (the emulated layout, its base, variant, AltGr and
+--- row switches). A stopped one reads them when it starts; a refusal is logged,
+--- the rows stay stored and the emulation reports its own error in the menu.
+--- @param emulation table|nil The layout emulation owner (tests replace it).
+local function reload_emulation(emulation)
+	local called, reloaded = pcall(function()
+		return (emulation or require("modules.keymap.layout_emulation")).reload_if_started()
+	end)
+	if not called then
+		Logger.error(LOG, "The layout emulation reload raised after the layout scope: %s.", tostring(reloaded))
+	elseif reloaded == false then
+		Logger.warn(LOG, "The layout emulation did not reload the rows of the layout scope.")
+	end
+end
+
 --- The layout participant of a composed scope, bound to the retained owner. It
 --- settles each request only once the session holds the layout the stored rows
---- describe.
---- @param ports table|nil { live } The number-row live owner (tests replace it).
+--- describe, and has the layout emulation reload whatever the scope committed or
+--- reverted: a global restore or clear used to leave it typing its old session.
+--- @param ports table|nil { live, emulation } The number-row live owner and the
+---   layout emulation owner (tests replace them).
 --- @return table participant See config_scope_composition.
 function M.participant(ports)
 	ports = ports or {}
@@ -131,6 +149,7 @@ function M.participant(ports)
 			applying = false
 			return done(false, called and detail or tostring(committed))
 		end
+		reload_emulation(ports.emulation)
 		changed = not same_rows(before, live.stored())
 		if not changed then
 			applying = false
@@ -144,6 +163,7 @@ function M.participant(ports)
 			-- The session kept its layout: the file must not claim the new rows.
 			local reverted, revert_detail = cohort.revert()
 			applying = false
+			if reverted == true then reload_emulation(ports.emulation) end
 			Logger.error(LOG, "The layout rows were not loaded (%s); config.toml reverted: %s.", tostring(code),
 				tostring(reverted == true or revert_detail))
 			return done(false, "the session did not load the layout: " .. tostring(code))
@@ -154,6 +174,7 @@ function M.participant(ports)
 		if applying then return done(false, "the layout scope request is still settling") end
 		if cohort == nil then return done(false, "no committed scope to revert") end
 		local reverted, detail = cohort.revert()
+		if reverted == true then reload_emulation(ports.emulation) end
 		if reverted ~= true then
 			-- The session reload follows the rows once their rollback settles.
 			owed, changed = changed, false

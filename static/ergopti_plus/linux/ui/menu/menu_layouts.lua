@@ -236,8 +236,7 @@ local function _build_layouts(ctx)
 				Logger.error(LOG, "Keyboard layout scope '%s' was not applied: %s.", mode, tostring(detail))
 				show_error(i18n_safe("layouts.linux_rows_not_applied"))
 			end
-			-- The scope holds the emulation's rows too: it types what was restored.
-			require("modules.keymap.layout_emulation").reload_if_started()
+			-- The participant has already had the emulation type what was restored.
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end)
 		-- The session may answer later: a dispatched request is accepted now and

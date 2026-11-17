@@ -102,14 +102,35 @@ end
 --- choice with no layout of ours to apply it to is stored and acknowledged with
 --- its reason. A layout the system did not take reverts the rows, so the file
 --- never claims options the keyboard does not type.
+---
+--- The scope also holds the layout emulation's rows (the emulated layout, its
+--- base, variant, AltGr and row switches): once config.toml moved, the running
+--- emulation reloads them, as the submenu's own restore does. A global restore
+--- or clear used to leave the emulation typing its old session until a reload.
 --- @param synchronous table Participant over the scoped preferences owner.
---- @param layout table { rows() -> { order, edges }, live } The stored rows and the live owner.
+--- @param layout table { rows() -> { order, edges }, live, emulation? } The stored
+---   rows, the live owner and the layout emulation owner (modules/keymap/
+---   layout_emulation by default).
 --- @param defer function fn -> true once fn is scheduled off this stack.
 --- @return table participant See config_scope_composition.
 function M.layout_participant(synchronous, layout, defer)
 	local applying, changed = false, false
 	local participant = {}
 	local function same(a, b) return a.order == b.order and a.edges == b.edges end
+	--- Has a started emulation type the rows config.toml now holds; a stopped
+	--- one reads them when it starts. A refusal is logged: the rows are stored
+	--- and the emulation reports its own error in the menu.
+	local function reload_emulation()
+		local called, reloaded = pcall(function()
+			local emulation = layout.emulation or require("modules.keymap.layout_emulation")
+			return emulation.reload_if_started()
+		end)
+		if not called then
+			Logger.error(LOG, "The layout emulation reload raised after the layout scope: %s.", tostring(reloaded))
+		elseif reloaded == false then
+			Logger.warn(LOG, "The layout emulation did not reload the rows of the layout scope.")
+		end
+	end
 	--- Brings the typing layout to the stored rows; settle(ok, code).
 	local function load(settle)
 		local dispatched = layout.live.apply(layout.rows(), function(applied, code)
@@ -132,6 +153,7 @@ function M.layout_participant(synchronous, layout, defer)
 				applying = false
 				return done(false, detail)
 			end
+			reload_emulation()
 			changed = not same(before, layout.rows())
 			if not changed then
 				applying = false
@@ -145,6 +167,7 @@ function M.layout_participant(synchronous, layout, defer)
 				end
 				synchronous.revert(function(reverted, revert_detail)
 					applying = false
+					if reverted == true then reload_emulation() end
 					Logger.error(LOG, "The layout rows were not loaded (%s); config.toml reverted: %s.", tostring(code),
 						tostring(reverted == true or revert_detail))
 					done(false, "the system did not take the layout: " .. tostring(code))
@@ -155,6 +178,7 @@ function M.layout_participant(synchronous, layout, defer)
 	function participant.revert(done)
 		if applying then return done(false, "the layout scope request is still settling") end
 		synchronous.revert(function(reverted, detail)
+			if reverted == true then reload_emulation() end
 			if not reverted or not changed then return done(reverted == true, detail) end
 			changed = false
 			applying = true

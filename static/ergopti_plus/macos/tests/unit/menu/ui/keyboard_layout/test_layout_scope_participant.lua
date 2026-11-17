@@ -7,7 +7,10 @@
 --- the layout typing them was built and selected (docs/design/
 --- layout-option-emulation.md, section 5); a layout the system did not take
 --- reverts the rows; a choice with no layout of ours is acknowledged with its
---- reason (layout-scope-participant).
+--- reason (layout-scope-participant). The scope also holds the layout
+--- emulation's rows, so a committed or reverted scope reloads a running
+--- emulation, even when the number-row rows did not move
+--- (layout-scope-emulation-reload).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -15,7 +18,8 @@ local GlobalScope = require("menu.ui.transactions.global_scope")
 
 --- A synchronous participant whose apply changes the stored rows.
 local function world(live_answer)
-	local w = { rows = { order = "native", edges = false }, reverted = 0, live_calls = {} }
+	local w = { rows = { order = "native", edges = false }, reverted = 0, live_calls = {}, reloads = 0 }
+	w.emulation = { reload_if_started = function() w.reloads = w.reloads + 1; return true end }
 	w.synchronous = {
 		pending = function() return false end,
 		apply = function(_, done)
@@ -40,7 +44,8 @@ local function world(live_answer)
 		end,
 	}
 	w.participant = GlobalScope.layout_participant(w.synchronous,
-		{ rows = function() return w.rows end, live = w.live }, function(fn) fn(); return true end)
+		{ rows = function() return w.rows end, live = w.live, emulation = w.emulation },
+		function(fn) fn(); return true end)
 	return w
 end
 
@@ -87,5 +92,54 @@ helpers.describe("keyboard layout scope participant: settles on the typing layou
 		helpers.assert_eq(settled[1], true)
 		helpers.assert_eq(settled[2], "rows_unchanged")
 		helpers.assert_eq(#w.live_calls, 0)
+	end)
+end)
+
+helpers.describe("keyboard layout scope participant: reloads the layout emulation (layout-scope-emulation-reload)", function()
+	helpers.it("reloads a running emulation when only its rows changed", function()
+		local w = world({ true, nil })
+		w.synchronous.apply = function(_, done) done(true) end
+		local settled
+		w.participant.apply("clear", function(ok, detail) settled = { ok, detail } end)
+		helpers.assert_eq(settled[1], true)
+		helpers.assert_eq(w.reloads, 1, "a global clear left the emulation typing its old session")
+	end)
+
+	helpers.it("reloads once more after the rows were reverted", function()
+		local w = world({ false, "readback_mismatch" })
+		w.participant.apply("recommended", function() end)
+		w.answer()
+		helpers.assert_eq(w.reverted, 1)
+		helpers.assert_eq(w.reloads, 2, "the emulation must follow the reverted rows")
+	end)
+
+	helpers.it("does not reload when the rows were not committed", function()
+		local w = world({ true, nil })
+		w.synchronous.apply = function(_, done) done(false, "refused") end
+		local settled
+		w.participant.apply("recommended", function(ok, detail) settled = { ok, detail } end)
+		helpers.assert_eq(settled[1], false)
+		helpers.assert_eq(w.reloads, 0)
+	end)
+
+	helpers.it("settles the scope when the emulation refuses or raises", function()
+		for _, reload in ipairs({ function() return false end, function() error("boom") end }) do
+			local w = world({ true, nil })
+			w.synchronous.apply = function(_, done) done(true) end
+			w.emulation.reload_if_started = reload
+			local settled
+			w.participant.apply("recommended", function(ok, detail) settled = { ok, detail } end)
+			helpers.assert_eq(settled[1], true, "the stored rows stay committed")
+		end
+	end)
+
+	helpers.it("reloads after a composition revert of committed rows", function()
+		local w = world({ true, nil })
+		w.synchronous.apply = function(_, done) done(true) end
+		w.participant.apply("recommended", function() end)
+		local reverted
+		w.participant.revert(function(ok) reverted = ok end)
+		helpers.assert_eq(reverted, true)
+		helpers.assert_eq(w.reloads, 2)
 	end)
 end)
