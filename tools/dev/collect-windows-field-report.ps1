@@ -914,9 +914,20 @@ try {
 			if ([Environment]::GetEnvironmentVariable($Name)) { "${Name}: set" } else { "${Name}: unset" }
 		}
 	}
+	# Defender's class is absent (WBEM_E_INVALID_CLASS, 0x80041010) when another
+	# antivirus replaced it or a debloat removed it: a fact, not a failure. The
+	# products registered with Windows Security Center are listed either way.
 	Invoke-Step 'antivirus' {
-		Get-MpComputerStatus -ErrorAction Stop |
-			Format-List AMRunningMode, AntivirusEnabled, RealTimeProtectionEnabled, AntivirusSignatureVersion
+		try {
+			Get-MpComputerStatus -ErrorAction Stop |
+				Format-List AMRunningMode, AntivirusEnabled, RealTimeProtectionEnabled, AntivirusSignatureVersion
+		} catch [Microsoft.Management.Infrastructure.CimException] {
+			if ($_.FullyQualifiedErrorId -notmatch '0x80041010') { throw }
+			'Defender: not available (MSFT_MpComputerStatus is not registered)'
+		}
+		$Products = @(Get-CimInstance -Namespace 'root/SecurityCenter2' -ClassName AntiVirusProduct -ErrorAction SilentlyContinue)
+		if ($Products.Count -eq 0) { 'Security Center: no antivirus registered' }
+		foreach ($Product in $Products) { "Security Center antivirus: $($Product.displayName)" }
 	}
 	# WinHTTP (the system services' proxy): direct or set, never its address. Read
 	# from the registry: netsh words its answer in the display language, and a French

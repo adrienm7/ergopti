@@ -279,6 +279,22 @@ check('every step is timed with progress and a heartbeat, and the instances are 
 	assert.match(instances, /\$script:ProcessDetails/);
 });
 
+// The maintainer's PC (2026-11-17) has no MSFT_MpComputerStatus class: the
+// step failed instead of saying so, and named no antivirus at all.
+check(
+	'the antivirus step reports a missing Defender class and the Security Center products',
+	() => {
+		const step = code.match(/Invoke-Step 'antivirus' \{\n([\s\S]*?)\n\t\}\n/)[1];
+		assert.match(step, /catch \[Microsoft\.Management\.Infrastructure\.CimException\]/);
+		assert.match(
+			step,
+			/-notmatch '0x80041010'\) \{ throw \}/,
+			'any other failure still fails the step'
+		);
+		assert.match(step, /root\/SecurityCenter2' -ClassName AntiVirusProduct/);
+	}
+);
+
 check('the proxy facts say set or unset, never an address', () => {
 	const winhttp = code.match(/Invoke-Step 'proxy_winhttp' \{\n([\s\S]*?)\n\t\}\n/)[1];
 	assert.match(winhttp, /'WinHTTP: direct' \} else \{ 'WinHTTP: set' \}/);
