@@ -276,6 +276,8 @@
 		}
 	},
 	"reference_characters": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~àâäæçéèêëîïôöœùûüÿÀÂÄÆÇÉÈÊËÎÏÔÖŒÙÛÜŸ«»’‘“”…–—€£°§µ×÷±¿¡ñÑß",
+	"coverage_cap": 1000,
+	"simplicity_pairs": ["()", "[]", "{}", "<>", "«»", "“”", "‘’"],
 	"shortcut_letters": {
 		"a": 8,
 		"b": 5,

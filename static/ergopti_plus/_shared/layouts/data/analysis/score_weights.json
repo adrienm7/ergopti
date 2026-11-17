@@ -25,6 +25,8 @@
 		"unsupported": 5,
 		"compact_fit": 0.1,
 		"char_coverage": 0.1,
+		"coverage_bonus": 0.05,
+		"simplicity": 0.03,
 		"direct_digits": 0.03,
 		"shortcut_left": 0.15
 	}

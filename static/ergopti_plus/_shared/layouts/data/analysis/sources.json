@@ -8,6 +8,11 @@
 			"path": "docs/design/layout-analysis.md",
 			"anchor": "metrics"
 		},
+		"engine_doc_bonuses": {
+			"title": "Ergopti — layout analysis engine: coverage and simplicity bonuses",
+			"path": "docs/design/layout-analysis.md",
+			"anchor": "coverage-and-simplicity-bonuses"
+		},
 		"study": {
 			"title": "Ergopti — study of the layout analysers",
 			"path": "docs/audits/layout-analysers/report.md"
@@ -229,6 +234,9 @@
 		"char_coverage": ["engine_doc", "study"],
 		"direct_digits": ["engine_doc", "study"],
 		"shortcut_left": ["engine_doc", "study_shortcuts"],
+		"distinct_chars": ["engine_doc_bonuses"],
+		"coverage_bonus": ["engine_doc_bonuses"],
+		"simplicity": ["engine_doc_bonuses"],
 		"ideal_finger_load": ["study_finger_load", "dariogoetz", "genkey", "oxeylyzer", "ergol_stats"],
 		"shortcut_letters": [
 			"study_shortcuts",

@@ -30,7 +30,9 @@
  *    two-character output only when cheaper than its two taps, one way per
  *    character exactly as the fixed path, and the best path never above the
  *    fixed one (seeded random layouts).
- * 7. Speed: the whole library on a 2.5 MB corpus, from prepared tables, well
+ * 7. Bonuses: distinct characters and the capped coverage bonus, which never
+ *    outweighs worse SFBs; each simplicity rule passing and failing.
+ * 8. Speed: the whole library on a 2.5 MB corpus, from prepared tables, well
  *    under a second.
  * ==============================================================================
  */
@@ -1167,8 +1169,137 @@ check(refused, 'ways: an unknown typing mode is refused');
 	}
 }
 
+// ==================================================
+// ======= 7/ Coverage and simplicity bonuses =======
+// ==================================================
+
+// Distinct characters: a A s S ß, à À through the dead key, c h from the
+// output « ch », and " (typed for « by substitution, which does not count): 10.
+{
+	const layout = toy(
+		'toy_coverage',
+		{
+			KeyA: ['a', 'A', null, null],
+			KeyS: ['s', 'S', 'ß', null],
+			KeyQ: { dead: 'grave' },
+			KeyW: 'ch',
+			KeyZ: '"'
+		},
+		{ grave: { a: 'à', A: 'À' } }
+	);
+	const result = E.analyse(layout, E.ngramsFromText('a«'), { keyboard: 'iso' });
+	check(
+		result.metrics.distinct_chars === 10,
+		`coverage: ${result.metrics.distinct_chars} characters, not 10`
+	);
+	check(
+		near(result.metrics.coverage_bonus, 1),
+		`coverage: bonus ${result.metrics.coverage_bonus}, not 1 %`
+	);
+}
+// Past the cap (1,000): 39 keys × 4 levels and 6 dead keys over those 156
+// characters, with e and d, type 1,094 characters, a bonus of 100 %.
+const bigLayout = (() => {
+	const iso = E.keyboard('iso');
+	const codes = E.typingCodes().filter(
+		(code) => iso.index.has(code) && !['KeyE', 'KeyD', 'KeyJ', 'Space'].includes(code)
+	);
+	const rows = {};
+	const typed = [];
+	for (let i = 0; i < 39; i++) {
+		rows[codes[i]] = [0, 1, 2, 3].map((level) => String.fromCodePoint(0x400 + i * 4 + level));
+		typed.push(...rows[codes[i]]);
+	}
+	const dead = {};
+	for (let j = 0; j < 6; j++) {
+		rows[codes[39 + j]] = [{ dead: `s${j}` }, null, null, null];
+		dead[`s${j}`] = Object.fromEntries(
+			typed.map((char, i) => [char, String.fromCodePoint(0x1000 + j * 156 + i)])
+		);
+	}
+	rows.KeyE = ['e', null, null, null];
+	rows.KeyD = ['d', null, null, null];
+	return E.layoutFromRows({ id: 'toy_big', rows, dead });
+})();
+{
+	const result = E.analyse(bigLayout, E.ngramsFromText('ed'), { keyboard: 'iso' });
+	check(
+		result.metrics.distinct_chars === 1094,
+		`coverage: big layout has ${result.metrics.distinct_chars}`
+	);
+	check(result.metrics.coverage_bonus === 100, 'coverage: the bonus stops at the cap');
+	// e on KeyE and d on KeyD (one finger) against e and d on two hands: many
+	// more characters never outweigh the SFBs.
+	const small = toy('toy_small', { KeyE: 'e', KeyJ: 'd' });
+	const ranked = E.compare([bigLayout, small], E.ngramsFromText('ed ed ed'), { keyboard: 'iso' });
+	check(ranked[0].layout.id === 'toy_small', 'coverage: more characters do not outrank worse SFBs');
+	const w = E.defaultWeights();
+	check(
+		w.coverage_bonus * 100 < w.sfb,
+		'coverage: the whole bonus is worth less than one point of SFB'
+	);
+	check(
+		w.simplicity * 100 < w.sfb,
+		'simplicity: the whole bonus is worth less than one point of SFB'
+	);
+}
+
+// Simplicity rules, each with a case that passes and one that fails.
+{
+	const rule = (cells, dead, id) =>
+		E.analyse(toy(`toy_simple_${id}`, cells, dead), E.ngramsFromText('e'), { keyboard: 'iso' })
+			.simplicity;
+	const circ = { circ: { e: 'ê' } };
+	check(
+		rule({ KeyE: 'e', KeyQ: { dead: 'circ' } }, circ, 'dead').accents.value === 100,
+		'simplicity: dead key then e for ê'
+	);
+	check(
+		rule({ KeyE: 'e', KeyK: [null, null, 'ê', null] }, {}, 'far').accents.value === 0,
+		'simplicity: ê on AltGr of another key'
+	);
+	check(
+		rule({ KeyE: 'e', KeyK: 'ê' }, {}, 'own').accents === null,
+		'simplicity: a key of its own is not measured'
+	);
+	check(
+		rule({ KeyU: '(', KeyI: ')' }, {}, 'pair').pairs.value === 100,
+		'simplicity: ( then ) on the next key'
+	);
+	check(
+		rule({ KeyU: ')', KeyI: '(' }, {}, 'reversed').pairs.value === 50,
+		'simplicity: ) before ( is half'
+	);
+	check(
+		rule({ KeyU: ['(', ')', null, null] }, {}, 'shift').pairs.value === 50,
+		'simplicity: ( and ) on one key is half'
+	);
+	check(rule({ KeyU: '(', KeyP: ')' }, {}, 'apart').pairs.value === 0, 'simplicity: ( and ) apart');
+	const digits = (order) =>
+		Object.fromEntries(order.split('').map((d, i) => [`Digit${(i + 1) % 10}`, d]));
+	check(
+		rule(digits('1234567890'), {}, 'digits').digits.value === 100,
+		'simplicity: digits in order'
+	);
+	check(
+		rule(digits('0987654321'), {}, 'reversed_digits').digits.value === 0,
+		'simplicity: digits reversed'
+	);
+	const mixed = E.analyse(
+		toy('toy_simple_mixed', { KeyU: '(', KeyI: ')', ...digits('0987654321') }),
+		E.ngramsFromText('e'),
+		{
+			keyboard: 'iso'
+		}
+	);
+	check(
+		mixed.metrics.simplicity === 50,
+		`simplicity: the mean of the measured rules, ${mixed.metrics.simplicity}`
+	);
+}
+
 // ========================
-// ======= 7/ Speed =======
+// ======= 8/ Speed =======
 // ========================
 
 const prepared = E.prepareNgrams(E.ngramsFromText(fs.readFileSync(SPEED_CORPUS, 'utf8')));

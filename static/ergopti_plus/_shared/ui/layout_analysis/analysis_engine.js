@@ -31,6 +31,8 @@
  *    n-grams of the characters whose key sequence changed, through the same
  *    visitor and metric code as analyse(), for the layout optimizer (the
  *    whole stream again when a layout offers a choice of ways).
+ * 6. Bonuses apart from effort: the distinct characters a layout types
+ *    (coverage_bonus, over a fixed cap) and objective simplicity rules.
  * ==============================================================================
  */
 
@@ -122,7 +124,10 @@ var LAYOUT_ANALYSIS = (function () {
 		compact_fit: { unit: '%', better: 'higher', of: 'characters' },
 		char_coverage: { unit: '%', better: 'higher', of: 'layout' },
 		direct_digits: { unit: '%', better: 'higher', of: 'layout' },
-		shortcut_left: { unit: '%', better: 'higher', of: 'layout' }
+		shortcut_left: { unit: '%', better: 'higher', of: 'layout' },
+		distinct_chars: { unit: 'chars', better: 'none', of: 'layout' },
+		coverage_bonus: { unit: '%', better: 'higher', of: 'layout' },
+		simplicity: { unit: '%', better: 'higher', of: 'layout' }
 	};
 
 	// =======================
@@ -825,7 +830,7 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   (planTyping); 'fixed' types each its cheapest way out of context.
 	 * @returns {object} {layout, keyboard, metrics, fingers, fingerShares,
 	 *   idealLoad, hands, rows, coverage, trigramClasses, keys, typing,
-	 *   score}.
+	 *   simplicity, score}.
 	 */
 	function analyse(layoutInput, ngrams, options) {
 		const opts = options || {};
@@ -959,7 +964,8 @@ var LAYOUT_ANALYSIS = (function () {
 				changed: pct(report.changed, c.chars),
 				paths: report.paths,
 				chords: report.chords
-			}
+			},
+			simplicity: m.simplicity
 		};
 		// One layout analysed in detail: each event's heaviest groups over the board.
 		if (opts.keyGroups === true) result.topGroups = topGroups(board, groups, c);
@@ -1134,7 +1140,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {number} compact - compact_fit, measured by the caller.
 	 * @returns {object} {metrics, fingers, fingerLoad, fingerDistance (each finger's
 	 *   part of the travel, mm per character), ideal, pressed, allPresses, left,
-	 *   right, outer, home (presses on the outer column, on the home row)}.
+	 *   right, outer, home (presses on the outer column, on the home row),
+	 *   simplicity (the rules)}.
 	 */
 	function streamMetrics(layout, board, compiled, c, keyCount, opts, compact) {
 		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
@@ -1210,8 +1217,12 @@ var LAYOUT_ANALYSIS = (function () {
 			compact_fit: compact,
 			char_coverage: charCoverage(compiled.best),
 			direct_digits: directDigits(layout, board),
-			shortcut_left: shortcutLeft(layout, board, shortcuts(opts.shortcuts))
+			shortcut_left: shortcutLeft(layout, board, shortcuts(opts.shortcuts)),
+			distinct_chars: compiled.distinct,
+			coverage_bonus: coverageBonus(compiled.distinct)
 		};
+		const rules = simplicity(board, compiled);
+		metrics.simplicity = rules.value;
 		return {
 			metrics,
 			fingers,
@@ -1223,7 +1234,8 @@ var LAYOUT_ANALYSIS = (function () {
 			left,
 			right,
 			outer,
-			home: rowLoad[0] || 0
+			home: rowLoad[0] || 0,
+			simplicity: rules.rules
 		};
 	}
 
@@ -2112,6 +2124,154 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
+	 * The coverage bonus: the distinct characters a layout types (any way),
+	 * over the model's fixed cap (coverage_cap), at most 100 %. A fixed cap,
+	 * not the best of the layouts compared, so one layout's value never
+	 * depends on the others and the optimizer's objective stays stable.
+	 * @param {number} distinct - compileWays().distinct.
+	 * @returns {number} 0 to 100.
+	 */
+	function coverageBonus(distinct) {
+		const cap = data().model.coverage_cap;
+		return (100 * Math.min(distinct, cap)) / cap;
+	}
+
+	/**
+	 * The simplicity rules, each an objective share from 0 to 100 % (null when
+	 * the layout gives the rule nothing to measure); simplicity is their mean.
+	 * - accents: of the accented letters typed through AltGr or a dead key (not
+	 *   on a key of their own), the share whose last key is their base letter's
+	 *   key (dead key then e for ê, AltGr+e for é);
+	 * - pairs: each pair of simplicity_pairs typed, 1 when the closing
+	 *   character is the key right of the opening one on the same level, ½
+	 *   when it is left of it or both share one key (opening on the lower
+	 *   level), 0 otherwise;
+	 * - digits: of the nine steps 1→2 … 8→9, 9→0, the share where the next
+	 *   digit is the key right of the previous one on the same level.
+	 * « The key right of » is the next key of the same row (a split board's
+	 * other half included). Every way of each character is tried.
+	 * @param {object} board - From keyboard().
+	 * @param {object} compiled - From compileWays().
+	 * @returns {{value: number, rules: {accents, pairs, digits}}} Each rule
+	 *   {value, measured} or null.
+	 */
+	function simplicity(board, compiled) {
+		const { ways } = compiled;
+		const right = rightNeighbours(board);
+		const real = (char) => (ways.get(char) || []).filter((way) => !way.substituted);
+		const placed = (char) => real(char).map((way) => [way.keys[way.keys.length - 1], way.level]);
+		const share = (got, measured) =>
+			measured > 0 ? { value: (100 * got) / measured, measured } : null;
+
+		const baseKeys = new Map();
+		for (const [char, list] of ways)
+			for (const way of list)
+				if (!way.substituted && way.keys.length === 1 && way.altgr === 0)
+					(baseKeys.get(char) || baseKeys.set(char, new Set()).get(char)).add(way.keys[0]);
+		let accented = 0;
+		let mnemonic = 0;
+		for (const [char, list] of ways) {
+			const letter = accentBase(char);
+			if (letter === null) continue;
+			const own = list.filter((way) => !way.substituted);
+			if (own.length === 0 || own.some((way) => way.altgr === 0 && !way.dead)) continue;
+			accented++;
+			const letterKeys = new Set([
+				...(baseKeys.get(letter.toLowerCase()) || []),
+				...(baseKeys.get(letter.toUpperCase()) || [])
+			]);
+			if (own.some((way) => letterKeys.has(way.keys[way.keys.length - 1]))) mnemonic++;
+		}
+
+		let pairScore = 0;
+		let pairs = 0;
+		for (const pair of data().model.simplicity_pairs) {
+			const [open, close] = codePoints(pair);
+			const o = placed(open);
+			const c = placed(close);
+			if (o.length === 0 || c.length === 0) continue;
+			pairs++;
+			let best = 0;
+			for (const [ko, lo] of o)
+				for (const [kc, lc] of c) {
+					if (lo === lc && right[ko] === kc) best = Math.max(best, 1);
+					else if (lo === lc && right[kc] === ko) best = Math.max(best, 0.5);
+					else if (
+						ko === kc &&
+						LAYER_IDS.indexOf(lo) >= 0 &&
+						LAYER_IDS.indexOf(lo) < LAYER_IDS.indexOf(lc)
+					)
+						best = Math.max(best, 0.5);
+				}
+			pairScore += best;
+		}
+
+		const DIGITS = '1234567890';
+		let steps = 0;
+		let ordered = 0;
+		for (let i = 0; i + 1 < DIGITS.length; i++) {
+			const a = placed(DIGITS[i]);
+			const b = placed(DIGITS[i + 1]);
+			if (a.length === 0 || b.length === 0) continue;
+			steps++;
+			if (a.some(([ka, la]) => b.some(([kb, lb]) => la === lb && right[ka] === kb))) ordered++;
+		}
+
+		const rules = {
+			accents: share(mnemonic, accented),
+			pairs: share(pairScore, pairs),
+			digits: share(ordered, steps)
+		};
+		const values = Object.values(rules).filter((rule) => rule !== null);
+		const value = values.length ? values.reduce((s, rule) => s + rule.value, 0) / values.length : 0;
+		return { value, rules };
+	}
+
+	const accentCache = new Map();
+
+	/**
+	 * The base letter of an accented Latin letter (a letter A–Z followed by
+	 * combining marks once decomposed: ê → e, Ǘ → U), null for anything else.
+	 * @param {string} char - One character.
+	 * @returns {string|null} The base letter.
+	 */
+	function accentBase(char) {
+		if (accentCache.has(char)) return accentCache.get(char);
+		const parts = codePoints(char.normalize('NFD'));
+		const base =
+			parts.length >= 2 &&
+			/^[A-Za-z]$/.test(parts[0]) &&
+			parts.slice(1).every((mark) => /^\p{M}$/u.test(mark))
+				? parts[0]
+				: null;
+		accentCache.set(char, base);
+		return base;
+	}
+
+	const neighbourCache = new WeakMap();
+
+	/**
+	 * The key right of each key: the next key of the same row by position.
+	 * @param {object} board - From keyboard().
+	 * @returns {Int32Array} key index → the next key's index, or -1.
+	 */
+	function rightNeighbours(board) {
+		if (neighbourCache.has(board)) return neighbourCache.get(board);
+		const out = new Int32Array(board.codes.length).fill(-1);
+		const rows = new Map();
+		board.codes.forEach((_, k) => {
+			const row = board.row[k];
+			(rows.get(row) || rows.set(row, []).get(row)).push(k);
+		});
+		for (const keys of rows.values()) {
+			keys.sort((a, b) => board.x[a] - board.x[b] || a - b);
+			for (let i = 0; i + 1 < keys.length; i++) out[keys[i]] = keys[i + 1];
+		}
+		neighbourCache.set(board, out);
+		return out;
+	}
+
+	/**
 	 * The points the keystroke metrics take from the score along the path an
 	 * analysis typed, by the default weights, each share over the corpus's
 	 * own totals (characters, bigrams, trigrams): the sum the choice of ways
@@ -2587,7 +2747,7 @@ var LAYOUT_ANALYSIS = (function () {
 	 * 1. Chords: a two-character output replaces the two taps of its bigram
 	 *    when it costs less than them (each way's own cost plus the pair
 	 *    between the taps); outputs that would overlap keep the one that saves
-	 *    the most. Longer outputs are not typed as one.
+	 *    the most. Longer outputs count in distinct_chars only.
 	 * 2. Context: a character with several ways is typed, at each occurrence,
 	 *    the way that costs least with its neighbours: its own presses, the key
 	 *    pairs and triples it forms with the characters before and after it
