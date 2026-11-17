@@ -809,7 +809,10 @@ local function perform(session, action, state, context)
 		local revision = (session.snapshot.export_revision or 1) + 1
 		session.snapshot = M.build_snapshot(state, action.detailed, action.extensive)
 		session.snapshot.export_revision = revision
-		session.snapshot.retired_probes = session.cleanup_history
+		-- An explicit array: with no retired cohort the empty history encoded as
+		-- {}, the page's retired_probes.forEach threw inside render(), and the
+		-- window kept showing the previous run's results after every Refresh.
+		session.snapshot.retired_probes = require("core.text.engine.json").array(session.cleanup_history)
 		start_probes(session, state)
 		return { type = "snapshot", snapshot = session.snapshot }
 	end

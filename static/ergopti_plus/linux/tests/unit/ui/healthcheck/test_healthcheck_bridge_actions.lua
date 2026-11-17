@@ -366,6 +366,18 @@ helpers.describe("diagnostics bridge (linux): cleanup history", function()
 			helpers.assert_eq(#context.copied, 0)
 		end)
 	end)
+
+	-- The page calls retired_probes.forEach: {} threw inside render() and froze the
+	-- window on the previous run (tests/hardware/run_diagnostics_receiving_webkit.lua).
+	helpers.it("sends an empty cleanup history to the page as a JSON array", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.on_message("ready", {}, page(context))
+			local refreshed = bridge.on_message({ action = "refresh" }, {}, page(context))
+			local encoded = require("core.text.engine.json").encode(refreshed)
+			helpers.assert_true(type(encoded) == "string" and encoded:find('"retired_probes":[]', 1, true) ~= nil,
+				"an empty cleanup history must reach the page as retired_probes: [] — got " .. tostring(encoded))
+		end)
+	end)
 end)
 
 helpers.describe("diagnostics bridge (linux): sharing preview admission", function()
