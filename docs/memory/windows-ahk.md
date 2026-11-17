@@ -682,6 +682,13 @@ three arrows the engine resolves a chain before sending, and the interactive
 session's `foo bar final` (2026-11-17) was that cascade, not a level-0 burst
 reaching the I1 watcher.
 
+The Space tap's output is not atomic under the SendEvent fallback either: a
+key struck while it is typed reached the application between the burst's
+Backspaces (`asa`, Space, `a` gave `aASA` with no space). The roll block
+(`TapHoldRollUndecided`) therefore stays eligible while a tap is typed, and
+the tap's thread sends such keys again after its output
+(`asa-space-tap-interleave`).
+
 ### project-ahk-hotif-variant-precedence
 
 When several `#HotIf` variants of one hotkey are eligible, AutoHotkey fires the

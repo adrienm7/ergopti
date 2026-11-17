@@ -63,7 +63,7 @@ global TAPHOLD_ROLL_REPLAY_SEND_LEVEL := 4
 _TapHoldRollState() {
 	static State := Map("key", "", "sc", 0, "name", "", "down_at", 0, "threshold_ms", 0,
 		"tap_fn", 0, "press_fn", 0, "queue", [], "waiting", false, "generation", 0,
-		"tapping", "", "tap_down_at", 0, "outcomes", Map(), "owner", 0)
+		"tapping", "", "tap_down_at", 0, "late", [], "outcomes", Map(), "owner", 0)
 	return State
 }
 
@@ -101,14 +101,21 @@ TapHoldKeyRolls(KeyId) {
 	return Tap == "" || Tap == KeyId
 }
 
-; Whether a typing key is down and not yet a tap or a hold: the criterion of
-; the block of hotkeys in tap_hold_roll_keys.ahk.
+; Whether a typing key is down and not yet a tap or a hold, or its tap is being
+; typed: the criterion of the block of hotkeys in tap_hold_roll_keys.ahk.
 ; @returns {Boolean}
 TapHoldRollUndecided() {
 	; A key waiting for its chord partner holds the next characters the same way.
 	State := _TapHoldRollState()
+	; While the tap is typed, its output (the space, then the burst of the
+	; hotstring it completes) is not all on screen yet. When another AutoHotkey
+	; keyboard hook runs, SendInput falls back to SendEvent, and a key struck
+	; meanwhile reached the application between the burst's Backspaces: « asa »,
+	; Space, « a » typed « aASA » with no space (asa-space-tap-interleave). Such a
+	; key waits too, and the tap's thread sends it again after the output.
 	return KeyCombinationChordIsBusy()
 		|| (State["key"] != "" && TapHoldOwnerCurrent(State["owner"]))
+		|| State["tapping"] != ""
 }
 
 ; Whether the tap of KeyId is being typed by the roll owner now: the keys
@@ -191,7 +198,8 @@ _TapHoldRollOwnLayer(KeyId, KeyName, TapThresholdSec, Owner, Pressed) {
 ; @param TapFn {Func} Types the key's tap.
 ; @param PressHoldFn {Func} Presses the hold; returns true when it is down.
 ; @param OwnHoldFn {Func} OwnHoldFn(Pressed) owns the hold until the release.
-; @param Ports {Map} Test seams: "wait_release"(KeyName, Seconds), "tick"().
+; @param Ports {Map} Test seams: "wait_release"(KeyName, Seconds), "tick"(),
+;        "replay"(ScanCodes).
 ; @returns {Map} "activated" (the hold was owned), "tap" (always false),
 ;          "decision" ("tap", "hold" or "" for a press a click made neither).
 TapHoldOwnRoll(KeyId, KeyName, TapThresholdSec, TapFn, PressHoldFn, OwnHoldFn, Ports := 0, Owner := 0) {
@@ -231,7 +239,7 @@ TapHoldOwnRoll(KeyId, KeyName, TapThresholdSec, TapFn, PressHoldFn, OwnHoldFn, P
 		Critical(PreviousCritical)
 		; A key struck during this wait decides in its own thread (TapHoldRollOtherKey).
 		Released := WaitRelease.Call(KeyName, TapThresholdSec)
-		_TapHoldRollResolve(Released ? "tap" : "hold", KeyId, 0, Owner)
+		_TapHoldRollResolve(Released ? "tap" : "hold", KeyId, Ports, Owner)
 		Outcome := State["outcomes"].Has(KeyId) && State["outcomes"][KeyId]["owner"] == Owner
 			? State["outcomes"][KeyId] : Map("decision", "", "pressed", false)
 		if !TapHoldOwnerCurrent(Owner)
@@ -306,12 +314,18 @@ _TapHoldRollResolve(Decision, OnlyKeyId := "", Ports := 0, ExpectedOwner := 0) {
 	} else {
 		Previous := State["tapping"]
 		PreviousDownAt := State["tap_down_at"]
+		PreviousLate := State["late"]
 		State["tapping"] := KeyId
 		State["tap_down_at"] := DownAt
+		State["late"] := []
 		try TapFn.Call()
 		finally {
+			; The keys struck while the tap was typed follow the keys struck before it.
+			for Sc in State["late"]
+				Queue.Push(Sc)
 			State["tapping"] := Previous
 			State["tap_down_at"] := PreviousDownAt
+			State["late"] := PreviousLate
 		}
 	}
 	if (!A_IsSuspended && TapHoldOwnerCurrent(Owner) && Queue.Length > 0)
@@ -368,9 +382,16 @@ TapHoldRollOtherKey(HotkeyName := unset, Ports := 0) {
 	try {
 		if !TapHoldOwnerCurrent(Observer)
 			return
+		Late := false
 		if (State["key"] == "") {
-			; Decided since the criterion was read: the key is itself.
+			; Decided since the criterion was read: the key is itself. While the tap
+			; is still being typed, the tap's own thread sends it again once its
+			; output is out (TapHoldRollUndecided).
 			Undecided := false
+			if (State["tapping"] != "") {
+				State["late"].Push(Sc)
+				Late := true
+			}
 		} else {
 			Undecided := true
 			Owner := State["owner"]
@@ -387,6 +408,8 @@ TapHoldRollOtherKey(HotkeyName := unset, Ports := 0) {
 		}
 	} finally Critical(PreviousCritical)
 	if !Undecided {
+		if Late
+			return
 		if TapHoldOwnerCurrent(Observer) && !A_IsSuspended
 			_TapHoldRollPort(Ports, "replay", (Keys) => _TapHoldRollReplay(Keys, SendEvent, Observer)).Call([Sc])
 		return
