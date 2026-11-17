@@ -185,6 +185,9 @@ brew install --cask ergoptiplus@dev   # versions de développement</code
 		Ce problème ne devrait cependant a priori jamais exister, car le fichier keylayout est toujours testé
 		avant d'être partagé. Ces tests sont à la fois manuels et automatisés par de nombreux tests unitaires
 		Python.
+		<enhanced:img
+			src="../../../lib/images/macos_open_bundle.jpg"
+			alt="Finder, dossier Keyboard Layouts : clic droit sur Ergopti_v2.2.0.bundle, menu « Afficher le contenu du paquet »"
+		/>
 	</li>
-	<enhanced:img src="../../../lib/images/macos_open_bundle.jpg" alt="Ouverture du bundle" />
 </ul>

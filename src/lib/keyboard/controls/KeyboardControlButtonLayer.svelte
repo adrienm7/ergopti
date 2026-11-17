@@ -49,7 +49,11 @@
 </script>
 
 <keyboard-control-layer>
-	<select bind:value={layerValue} onchange={() => changeLayer(layerValue)}>
+	<select
+		bind:value={layerValue}
+		onchange={() => changeLayer(layerValue)}
+		aria-label="Couche affichée sur le clavier"
+	>
 		{#each availableLayers as [label, value]}
 			<option {value}>{label}</option>
 		{/each}

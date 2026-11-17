@@ -74,12 +74,12 @@
 
 <header>
 	<div id="ergopti-header">
-		<a href={resolve('/')} aria-label="Accéder à la page d’accueil">
-			<img src={asset('img/logo/logo.svg')} class="logo" alt="Logo Ergopti" />
+		<a href={resolve('/')} aria-label="Ergopti, page d’accueil">
+			<img src={asset('img/logo/logo.svg')} class="logo" alt="" />
 		</a>
 		<div id="ergopti-title">
 			<strong class="no-gradient text-white">
-				<a href={resolve('/')} aria-label="Accéder à la page d’accueil">
+				<a href={resolve('/')} aria-label="Ergopti, page d’accueil">
 					<Ergopti></Ergopti>
 				</a>
 				<span class="min-width-400">
@@ -120,7 +120,14 @@
 			</p>
 		</div>
 	</div>
-	<input class="menu-btn" type="checkbox" id="menu-btn" onclick={toggleOverflowMenu} />
+	<input
+		class="menu-btn"
+		type="checkbox"
+		id="menu-btn"
+		aria-label="Menu"
+		aria-controls="menu"
+		onclick={toggleOverflowMenu}
+	/>
 	<label class="menu-icon" for="menu-btn"><span class="navicon"></span></label>
 	<nav id="menu">
 		<div id="menu-pages">
@@ -282,8 +289,20 @@
 ==========================
 */
 
+	/* Hidden from sight but not from the keyboard: on a narrow screen it is the
+	   only way to open the menu, and its focus ring is drawn on the hamburger. */
 	header .menu-btn {
-		display: none;
+		height: 1px;
+		margin: -1px;
+		opacity: 0;
+		overflow: hidden;
+		position: absolute;
+		width: 1px;
+	}
+
+	header .menu-btn:focus-visible + .menu-icon {
+		outline: 3px solid #ffd60a;
+		outline-offset: -3px;
 	}
 
 	#menu-pages {
@@ -404,14 +423,18 @@
 
 		/* menu btn */
 
+		/* A closed menu is hidden, not only flattened: its links must not
+		   take the keyboard focus while nobody can see them. */
 		header #menu,
 		header .menu-btn:not(:checked) ~ #menu {
 			height: 0;
+			visibility: hidden;
 		}
 
 		header .menu-btn:checked ~ #menu {
 			height: calc(100vh - var(--header-height));
 			overflow: scroll;
+			visibility: visible;
 		}
 
 		header .menu-btn:checked ~ .menu-icon .navicon {

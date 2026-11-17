@@ -1,0 +1,197 @@
+/* src/lib/css/accessibility.css */
+
+/* =========================================================================== */
+/* Site-wide accessibility rules (WCAG 2.2 AA, maintainer request 2026-11-16): */
+/* a visible keyboard focus, the skip link, honouring reduced motion, and the  */
+/* looks the visitor picks in the accessibility settings. Those settings are   */
+/* data attributes on <html>, written by                                       */
+/* static/ergopti_plus/_shared/ui/a11y_prefs.js before the first paint; the    */
+/* Studio frames style the same attributes in their shared theme.css.          */
+/* =========================================================================== */
+
+/* ========================= */
+/* ========================= */
+/* ======= 1/ Focus ======== */
+/* ========================= */
+/* ========================= */
+
+/* :focus-visible only fires for keyboard focus, so mouse clicks stay clean.
+   Two rings (light outline, dark halo) stay visible on every background of
+   the site, from the dark gradient to the white cards. */
+:focus-visible {
+	box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.85);
+	outline: 3px solid #ffd60a;
+	outline-offset: 2px;
+}
+
+/* Hidden until focused: the first stop of the keyboard on every page. */
+.skip-link {
+	background: #000;
+	border: 2px solid #ffd60a;
+	border-radius: 6px;
+	color: #fff;
+	font-weight: bold;
+	left: 1rem;
+	padding: 0.6rem 1rem;
+	position: fixed;
+	text-decoration: none;
+	top: -100px;
+	z-index: 1000;
+}
+
+.skip-link:focus {
+	top: 0.5rem;
+}
+
+/* The skip link's target receives the focus without drawing a ring. */
+#contenu:focus {
+	outline: none;
+}
+
+/* Visually hidden, still read by screen readers. */
+.visually-hidden {
+	border: 0;
+	clip: rect(0 0 0 0);
+	clip-path: inset(50%);
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	padding: 0;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+/* ================================= */
+/* ================================= */
+/* ======= 2/ Reduced motion ======= */
+/* ================================= */
+/* ================================= */
+
+/* The system setting and the site setting give the same result: no smooth
+   scrolling, no animation, instant transitions, and the AOS reveal content
+   shown at once instead of faded in. */
+@media (prefers-reduced-motion: reduce) {
+	html,
+	body {
+		scroll-behavior: auto !important;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		scroll-behavior: auto !important;
+		transition-duration: 0.01ms !important;
+	}
+
+	[data-aos] {
+		opacity: 1 !important;
+		transform: none !important;
+	}
+}
+
+:root[data-a11y-motion='reduce'],
+:root[data-a11y-motion='reduce'] body {
+	scroll-behavior: auto !important;
+}
+
+:root[data-a11y-motion='reduce'] *,
+:root[data-a11y-motion='reduce'] *::before,
+:root[data-a11y-motion='reduce'] *::after {
+	animation-duration: 0.01ms !important;
+	animation-iteration-count: 1 !important;
+	scroll-behavior: auto !important;
+	transition-duration: 0.01ms !important;
+}
+
+:root[data-a11y-motion='reduce'] [data-aos] {
+	opacity: 1 !important;
+	transform: none !important;
+}
+
+/* ================================== */
+/* ================================== */
+/* ======= 3/ Reading settings ====== */
+/* ================================== */
+/* ================================== */
+
+/* Atkinson Hyperlegible is served by the site (static/fonts/), and
+   a11y_prefs.js links its stylesheet only when the setting is on. */
+/* Every text takes the font, except the icon font glyphs. */
+:root[data-a11y-font='hyperlegible'] :is(body, body *):not([class^='icon-'], [class*=' icon-']) {
+	font-family: 'Atkinson Hyperlegible', 'Noto Sans', sans-serif !important;
+}
+
+/* Text size: the root size scales every rem and em of the site. */
+:root[data-a11y-text='125'],
+:root[data-a11y-text='125'] body {
+	font-size: calc(1.25 * clamp(14px, 0.3vw + 14px, 18px));
+}
+
+:root[data-a11y-text='150'],
+:root[data-a11y-text='150'] body {
+	font-size: calc(1.5 * clamp(14px, 0.3vw + 14px, 18px));
+}
+
+:root[data-a11y-text='200'],
+:root[data-a11y-text='200'] body {
+	font-size: calc(2 * clamp(14px, 0.3vw + 14px, 18px));
+}
+
+/* Text spacing: the WCAG 1.4.12 values (line height 1.5, paragraph spacing
+   2 em, letter spacing 0.12 em, word spacing 0.16 em). */
+:root[data-a11y-spacing='wide'] :is(body, body *):not([class^='icon-'], [class*=' icon-']) {
+	letter-spacing: 0.12em !important;
+	line-height: 1.5 !important;
+	word-spacing: 0.16em !important;
+}
+
+:root[data-a11y-spacing='wide'] p {
+	margin-bottom: 2em !important;
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 4/ High contrast ===== */
+/* ============================== */
+/* ============================== */
+
+/* Black background, white text, yellow links: no gradient, transparency or
+   gradient-filled text left between the text and its background. */
+:root[data-a11y-contrast='high'],
+:root[data-a11y-contrast='high'] body,
+:root[data-a11y-contrast='high'] .bg-blue,
+:root[data-a11y-contrast='high'] bloc-main,
+:root[data-a11y-contrast='high'] header,
+:root[data-a11y-contrast='high'] footer {
+	background: #000 !important;
+	color: #fff !important;
+}
+
+:root[data-a11y-contrast='high'] body * {
+	-webkit-text-fill-color: currentColor !important;
+	background-image: none !important;
+	box-shadow: none !important;
+	text-shadow: none !important;
+}
+
+:root[data-a11y-contrast='high'] :is(main, header, footer, nav, section, article, aside, div) {
+	border-color: #fff;
+}
+
+:root[data-a11y-contrast='high'] a,
+:root[data-a11y-contrast='high'] a * {
+	color: #ffd60a !important;
+}
+
+:root[data-a11y-contrast='high'] main a {
+	text-decoration: underline !important;
+}
+
+:root[data-a11y-contrast='high'] :is(button, select, input, textarea) {
+	background: #000 !important;
+	border: 2px solid #fff !important;
+	color: #fff !important;
+}

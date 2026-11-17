@@ -52,3 +52,11 @@
 #page-toc-mobile {
 	display: block;
 }
+
+/* Each entry is a target of at least 24 px high (WCAG 2.5.8): the nested
+   entries had no margin and stood 15 px apart. */
+.toc-list .toc-link {
+	display: inline-block;
+	min-height: 24px;
+	padding: 2px 0;
+}

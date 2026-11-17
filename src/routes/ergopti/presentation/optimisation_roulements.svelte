@@ -88,7 +88,11 @@
 	<keyboard-control-rolls
 		style="width: 100%; margin: 0 auto; display: inline-block; text-align: center"
 	>
-		<select bind:value={texte} onchange={() => keyboard.typeText(texte, 250, false)}>
+		<select
+			bind:value={texte}
+			onchange={() => keyboard.typeText(texte, 250, false)}
+			aria-label="Roulement à montrer sur le clavier"
+		>
 			<option selected disabled hidden>Sélectionner le roulement</option>
 			<option disabled>— Roulements voyelles —</option>
 			{#each roulements_voyelles as value}<option {value}>{value.toUpperCase()}</option>{/each}

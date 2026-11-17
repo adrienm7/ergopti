@@ -22,7 +22,9 @@
 	</div>
 
 	<div style="margin: 0 auto; text-align:center; padding-top: 5px;">
-		<a href="#debut" class="scroll-down"><i class="icon-chevron-down"></i></a>
+		<a href="#debut" class="scroll-down" aria-label="Aller au début de la présentation"
+			><i class="icon-chevron-down" aria-hidden="true"></i></a
+		>
 	</div>
 	<div id="debut">
 		<small-space />

@@ -297,32 +297,58 @@
 					bind:value={selectedSection}
 					onchange={() => selectSection(selectedSection)}
 					style="min-width:220px;"
+					aria-label="Section des remplacements de texte"
 				>
 					{#each orderedSections as s}
 						<option value={s.name}>{s.title}</option>
 					{/each}
 				</select>
 				<input
+					type="search"
+					aria-label="Rechercher un remplacement"
 					placeholder="Rechercher..."
 					bind:value={searchQuery}
 					style="flex:1; min-width:160px; padding:0.35rem; color:#000; background: rgba(255,255,255,0.8); border:1px solid #ccc; border-radius:3px;"
 				/>
 			</div>
 			{#if displayedEntries.length}
-				<div style="max-height:20rem; overflow:auto; margin-top:0.5rem;">
+				<div
+					style="max-height:20rem; overflow:auto; margin-top:0.5rem;"
+					tabindex="0"
+					role="region"
+					aria-label="Remplacements de texte"
+				>
 					<table style="width:100%; border-collapse:collapse; table-layout:fixed;">
 						<thead>
 							<tr>
 								<th
-									style="text-align:center; padding:8px; border-bottom:1px solid #ddd; cursor:pointer;"
-									onclick={() => sortBy('key')}
-									>Abréviation {sortKey === 'key' ? (sortDir === 1 ? '▲' : '▼') : ''}</th
+									style="text-align:center; padding:8px; border-bottom:1px solid #ddd;"
+									aria-sort={sortKey === 'key'
+										? sortDir === 1
+											? 'ascending'
+											: 'descending'
+										: 'none'}
 								>
+									<button type="button" class="sort-button" onclick={() => sortBy('key')}
+										>Abréviation <span aria-hidden="true"
+											>{sortKey === 'key' ? (sortDir === 1 ? '▲' : '▼') : ''}</span
+										></button
+									>
+								</th>
 								<th
-									style="text-align:center; padding:8px; border-bottom:1px solid #ddd; cursor:pointer;"
-									onclick={() => sortBy('output')}
-									>Remplacement {sortKey === 'output' ? (sortDir === 1 ? '▲' : '▼') : ''}</th
+									style="text-align:center; padding:8px; border-bottom:1px solid #ddd;"
+									aria-sort={sortKey === 'output'
+										? sortDir === 1
+											? 'ascending'
+											: 'descending'
+										: 'none'}
 								>
+									<button type="button" class="sort-button" onclick={() => sortBy('output')}
+										>Remplacement <span aria-hidden="true"
+											>{sortKey === 'output' ? (sortDir === 1 ? '▲' : '▼') : ''}</span
+										></button
+									>
+								</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -383,6 +409,16 @@
 </div>
 
 <style>
+	/* The sort control looks like the header it replaces. */
+	.sort-button {
+		background: none;
+		border: none;
+		color: inherit;
+		cursor: pointer;
+		font: inherit;
+		min-height: 24px;
+	}
+
 	table {
 		border-collapse: collapse;
 		width: 100%;

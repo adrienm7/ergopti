@@ -432,8 +432,9 @@ FEATURES & RATIONALE:
 		margin-right: 6px;
 	}
 
+	/* Greys and dimming keep a 4.5:1 contrast on the #101010 tooltip (WCAG 1.4.3). */
 	.tt-eq {
-		color: #7f7f7f;
+		color: #a3a3a3;
 	}
 
 	.tt-corr {
@@ -457,12 +458,12 @@ FEATURES & RATIONALE:
 	}
 
 	.tt-dim {
-		opacity: 0.45;
+		opacity: 0.75;
 	}
 
 	.tt-hint {
 		border-top: 1px solid rgba(255, 255, 255, 0.08);
-		color: rgba(255, 255, 255, 0.45);
+		color: rgba(255, 255, 255, 0.7);
 		font-size: 0.72rem;
 		margin-top: 8px;
 		padding: 7px 14px;
@@ -471,7 +472,7 @@ FEATURES & RATIONALE:
 
 	.tt-info {
 		background: rgba(255, 255, 255, 0.04);
-		color: rgba(255, 255, 255, 0.38);
+		color: rgba(255, 255, 255, 0.7);
 		font-size: 0.7rem;
 		padding: 6px 14px;
 		text-align: right;

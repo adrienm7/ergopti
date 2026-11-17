@@ -132,6 +132,7 @@ export class Keyboard {
 			}
 		});
 		newKey.dataset['key'] = '';
+		newKey.removeAttribute('aria-label');
 
 		// Key content and style cleaning
 		newKey.replaceChildren(document.createElement('div'));
@@ -220,6 +221,8 @@ export class Keyboard {
 		if (key.dataset['style'] === 'deadkey') {
 			const legend = key.querySelector('div');
 			applyLegend(legend, deadKeyText(legend.textContent), true);
+			// The marked accent alone reads as a lone symbol; say what it is.
+			key.setAttribute('aria-label', 'Touche morte ' + legend.textContent.trim());
 		}
 
 		key.style.setProperty('--size', keyIdentifier['size']);

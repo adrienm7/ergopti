@@ -218,7 +218,7 @@ FEATURES & RATIONALE:
 				</div>
 			</div>
 
-			<ul class="demo-pager" aria-label="Sélectionner une démo">
+			<ul class="demo-pager" aria-label={t('Sélectionner une démo')}>
 				{#each demos as d, i}
 					<li>
 						<button
@@ -226,7 +226,13 @@ FEATURES & RATIONALE:
 							class:active={i === demoIndex}
 							onclick={() => goToDemo(i)}
 							title="{d.input} → {d.output} ({d.group})"
-							aria-label="Démo {i + 1} sur {demos.length} : {d.input} devient {d.output}"
+							aria-current={i === demoIndex ? 'true' : undefined}
+							aria-label={t('{input} → {output}, démo {n} sur {total}', {
+								input: d.input,
+								output: d.output,
+								n: i + 1,
+								total: demos.length
+							})}
 						>
 							<span class="pager-input">{d.input}</span>
 							<span class="pager-arrow">→</span>

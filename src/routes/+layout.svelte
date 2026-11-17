@@ -33,8 +33,19 @@
 	import '#lib/css/images.css';
 	import '#lib/css/buttons.css';
 	import '#lib/css/banner.css';
+	import '#lib/css/accessibility.css';
 
 	import '#lib/icons/icomoon/style.css';
+
+	/**
+	 * Whether the visitor asked for less motion, in the system or in the site's
+	 * accessibility settings (static/ergopti_plus/_shared/ui/a11y_prefs.js,
+	 * loaded by app.html before the page).
+	 * @returns {boolean}
+	 */
+	function reducedMotion() {
+		return window.ErgoptiA11yPrefs.reducedMotion();
+	}
 
 	onMount(() => {
 		tocbot.init({
@@ -48,6 +59,7 @@
 			hasInnerContainers: true,
 			// Prend en compte la hauteur du header pour le scroll
 			headingsOffset: 120,
+			scrollSmooth: !reducedMotion(),
 			scrollSmoothOffset: -120,
 			scrollSmoothDuration: 300,
 			orderedList: false
@@ -67,7 +79,7 @@
 			h3.setAttribute('data-aos', 'fade-right');
 		});
 
-		AOS.init({ mirror: true, offset: 0, anchorPlacement: 'top-bottom' });
+		AOS.init({ mirror: true, offset: 0, anchorPlacement: 'top-bottom', disable: reducedMotion });
 		tocbot.refresh();
 	});
 
@@ -123,9 +135,12 @@
 	{/if}
 </svelte:head>
 
+<a class="skip-link" href="#contenu">Aller au contenu</a>
+
 <bloc-page id="page" class="bg-blue">
 	<div style="flex-grow:1">
 		<Header />
+		<div id="contenu" tabindex="-1"></div>
 		<slot />
 	</div>
 	{#if !isStudioPage(page.url.pathname)}

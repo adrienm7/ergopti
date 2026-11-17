@@ -84,7 +84,11 @@
 	<h3>Ergo‑L</h3>
 	<div>
 		<div>
-			<select bind:value={variante_kalamine} style="height: 2rem">
+			<select
+				bind:value={variante_kalamine}
+				style="height: 2rem"
+				aria-label="Variante Ergo‑L à télécharger"
+			>
 				<option value="1dk" selected>1DFH</option>
 				<option value="standard">Standard — Analyse</option>
 			</select>
