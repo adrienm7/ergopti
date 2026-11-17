@@ -189,13 +189,14 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       (the notification that refreshes its cache, or the run-loop mode the fixture pumps), and whether the launcher's
       own long-lived process can be left on a stale source the same way. No retry is added while the cause is
       unproven.
-- [ ] **Linux live runtime and editor receiving.** Write the Linux runtime, editor and diagnostics flows in the hosted
-      desktop-webview CI shard: refused writes, native timer admission, stale epochs and physical cleanup
+- [ ] **Linux live runtime receiving.** Write the runtime flow in the hosted desktop-webview CI shard: the model
+      browser page in real WebKit reading the managed Ollama runtime absent, then installed after a real first install
+      without a restart (LRT-001), as the editor and diagnostics flows do
       ([native UI audit](docs/audits/platform-parity/2026-11-05-native-ui/report.md)).
-- [ ] **Linux flow receiving.** A native terminal for LCP-004, chmod (make-executable from a file manager) and eject of
-      a real device (maybe a loop device), the case/wrap transforms inside a native editor field
-      ([flow review](docs/audits/platform-parity/2026-11-04-flows/report.md),
-      [receipts](docs/audits/linux-container-proofs/2026-11-11-recovery/README.md)).
+- [ ] **Linux flow receiving.** The case/wrap transforms inside a native editor field: a focused GTK field on the
+      accessibility bus, the shortcuts manager's transform with the real text owner (`focus_guard.capture_text_owner`)
+      and XTest output, as `tests/hardware/llm_selection_focus.lua` drives it
+      ([flow review](docs/audits/platform-parity/2026-11-04-flows/report.md)).
 - [ ] **Linux native acceptance.** Multi-field Tab settling and grapheme deletion in host editors (hotstrings), pointer
       metrics, live layout apply on KDE (GNOME is proved by `run_input_sources_live.sh gnome`), desktop connectors and
       real mail/calendar (llm) ([18-scope review](docs/audits/platform-parity/2026-11-04-deep/report.md)).

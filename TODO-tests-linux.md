@@ -93,6 +93,11 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       pointer move or a touchpad scroll hides it at once; Shift and AltGr (alone, held, together), Backspace, Enter
       and Tab keep it. Then add the XKB option `lv5:rctrl_switch`: Right Ctrl tapped alone keeps the widget (a level
       key there, `twd2-keymap-role`); with `ctrl:nocaps`, CapsLock tapped alone hides it.
+- [ ] <!-- field-point: eject_removable_disk --> Eject a real removable disk: with a USB stick the session mounted
+      (from the file manager), a gesture bound to `eject_all_disks` unmounts each of its mounted partitions and powers
+      the drive off through udisks and polkit, with no root prompt: the stick leaves `lsblk` and the file manager,
+      and the system's own disks stay mounted. The hosted CI runner has no removable or hot-plugged disk, and a loop
+      device is neither, so the action rightly skips it there.
 - [ ] <!-- field-point: one_folder_name --> One folder name
       ([handoff](docs/tooling/one-folder-name-handoff.md#what-the-maintainer-checks-on-each-machine)): check the Linux
       machine against the handoff's Linux list (`~/.config/ergopti_plus`, `~/.local/state/ergopti_plus` and
