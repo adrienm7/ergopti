@@ -2,6 +2,8 @@
 	"_meta.flag": "🇨🇳",
 	"_meta.locale": "zh",
 	"_meta.name": "中文",
+	"accessibility.tray_tip": "Ergopti+",
+	"accessibility.tray_tip_paused": "Ergopti+（已暂停）",
 	"app_category.business": "商务",
 	"app_category.development": "开发工具",
 	"app_category.education": "教育",

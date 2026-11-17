@@ -2,6 +2,8 @@
 	"_meta.flag": "🇷🇺",
 	"_meta.locale": "ru",
 	"_meta.name": "Русский",
+	"accessibility.tray_tip": "Ergopti+",
+	"accessibility.tray_tip_paused": "Ergopti+ (приостановлен)",
 	"app_category.business": "Бизнес",
 	"app_category.development": "Инструменты разработчика",
 	"app_category.education": "Образование",

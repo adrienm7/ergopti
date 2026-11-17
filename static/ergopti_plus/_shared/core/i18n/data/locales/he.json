@@ -2,6 +2,8 @@
 	"_meta.flag": "🇮🇱",
 	"_meta.locale": "he",
 	"_meta.name": "עברית",
+	"accessibility.tray_tip": "Ergopti+",
+	"accessibility.tray_tip_paused": "Ergopti+ (מושהה)",
 	"app_category.business": "עסקים",
 	"app_category.development": "פיתוח",
 	"app_category.education": "חינוך",

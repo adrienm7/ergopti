@@ -2,6 +2,8 @@
 	"_meta.flag": "🇮🇳",
 	"_meta.locale": "hi",
 	"_meta.name": "हिन्दी",
+	"accessibility.tray_tip": "Ergopti+",
+	"accessibility.tray_tip_paused": "Ergopti+ (रोका गया)",
 	"app_category.business": "व्यवसाय",
 	"app_category.development": "विकास",
 	"app_category.education": "शिक्षा",

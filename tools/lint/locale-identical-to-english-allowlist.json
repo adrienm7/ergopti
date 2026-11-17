@@ -10,6 +10,31 @@
 		"pending-translation": "Studio, layout editor or analyser label written in English and French first (maintainer rule, 2026-11-14): the other locales carry the English value until the labels settle, then the entry is translated and deleted. Never for French."
 	},
 	"entries": {
+		"accessibility.tray_tip": {
+			"reason": "brand-or-feature-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
 		"layout_analysis.typing.shift": {
 			"reason": "keyboard-key-name",
 			"locales": [

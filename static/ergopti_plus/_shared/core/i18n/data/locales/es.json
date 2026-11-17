@@ -2,6 +2,8 @@
 	"_meta.flag": "🇪🇸",
 	"_meta.locale": "es",
 	"_meta.name": "Español",
+	"accessibility.tray_tip": "Ergopti+",
+	"accessibility.tray_tip_paused": "Ergopti+ (en pausa)",
 	"app_category.business": "Negocios",
 	"app_category.development": "Herramientas de desarrollo",
 	"app_category.education": "Educación",

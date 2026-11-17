@@ -2,6 +2,8 @@
 	"_meta.flag": "🇸🇪",
 	"_meta.locale": "sv",
 	"_meta.name": "Svenska",
+	"accessibility.tray_tip": "Ergopti+",
+	"accessibility.tray_tip_paused": "Ergopti+ (pausad)",
 	"app_category.business": "Företag",
 	"app_category.development": "Utveckling",
 	"app_category.education": "Utbildning",
