@@ -357,3 +357,25 @@ _BAT_TrayLaunch() {
 	AssertEqual(0, Rows[1]["action"].MinParams, "a menu action takes the menu's own arguments")
 }
 Test("(bundled-apps-tray) starts each app in its own process and writes the Encryptor drop target", _BAT_TrayLaunch)
+
+; Each production entry point the driver starts as its own process loads under
+; the real interpreter. The structure migration moved crypto.ahk and left the
+; App Cloner and Encryptor entry including the old path: the driver logged
+; « opened » while the app died on its missing #Include (the maintainer,
+; 2026-11-17). /validate loads a script without running it.
+_BAT_EntryPointsLoad() {
+	Windows := A_ScriptDir . "\.."
+	for Entry in ["apps\bundled_app_entry.ahk", "modules\keymap\uia_selection_worker_entry.ahk"] {
+		Path := Windows . "\" . Entry
+		AssertTrue(FileExist(Path) != "", "the entry point " . Entry . " exists")
+		Output := A_Temp . "\ergopti_entry_validate_" . A_TickCount . ".txt"
+		try {
+			Code := RunWait(A_ComSpec . ' /c ""' . A_AhkPath . '" /ErrorStdOut /validate "' . Path . '" > "' . Output . '" 2>&1"', , "Hide")
+			Said := FileExist(Output) ? FileRead(Output) : ""
+		} finally {
+			try FileDelete(Output)
+		}
+		AssertEqual(0, Code, Entry . " loads: " . Said)
+	}
+}
+Test("(bundled-apps-entry) every separate-process entry point loads under the interpreter", _BAT_EntryPointsLoad)

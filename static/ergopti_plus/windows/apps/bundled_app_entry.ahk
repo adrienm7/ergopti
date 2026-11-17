@@ -21,7 +21,7 @@ LoggerError(Args*) => ""
 #Include %A_ScriptDir%\..\_generated\window_titles.ahk
 #Include %A_ScriptDir%\..\core\ui\engine\native_dialogs.ahk
 #Include %A_ScriptDir%\..\core\text\engine\json.ahk
-#Include %A_ScriptDir%\..\adapters\crypto.ahk
+#Include %A_ScriptDir%\..\core\crypto\crypto.ahk
 #Include %A_ScriptDir%\adapters\bundled_apps_native.ahk
 #Include %A_ScriptDir%\strings.ahk
 #Include %A_ScriptDir%\encryptor_core.ahk
