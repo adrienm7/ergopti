@@ -724,9 +724,19 @@ local function copy_selection(b, emit_combo, sleep_ms, publication)
 	if not current() then return false, "destination_changed", sentinel end
 	local copy_ok, copied = pcall(emit_combo, "ctrl+c", publication)
 	if not copy_ok or copied ~= true then return false, "copy_chord_failed", sentinel end
-	if not current() then return false, "destination_changed", sentinel end
+	-- Once the chord is out, the original field may already have copied its
+	-- selection: the clipboard then holds neither the sentinel nor the saved
+	-- text, and a caller that recognised only those left the selection there
+	-- (run_shortcut_transforms_live.lua). What the copy's own settle leaves is
+	-- this chord's, as the successful path assumes, so it is named as owned.
+	local function stopped_after_chord(settled)
+		if not settled and not wait_checked(sleep_ms, COPY_SETTLE_MS) then return false, "copy_settle_failed", sentinel end
+		local read_ok, content = read_backend_checked(b)
+		return false, "destination_changed", read_ok and content or sentinel
+	end
+	if not current() then return stopped_after_chord(false) end
 	if not wait_checked(sleep_ms, COPY_SETTLE_MS) then return false, "copy_settle_failed", sentinel end
-	if not current() then return false, "destination_changed", sentinel end
+	if not current() then return stopped_after_chord(true) end
 	local selection_ok, selected, selection_error = read_backend_checked(b)
 	if not current() then return false, "destination_changed", selection_ok and selected or sentinel end
 	if not selection_ok then return false, selection_error or "selection_read_failed", sentinel end

@@ -199,6 +199,34 @@ helpers.describe("clipboard selection transaction", function()
 		end)
 	end)
 
+	-- run_shortcut_transforms_live.lua: the focus moved to another GTK field
+	-- while the copy settled; the original field had already copied its
+	-- selection, which matched neither the probe nor the saved text, so the
+	-- refusal left the user's clipboard holding the copied selection.
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		for _, moment in ipairs({ "after the chord", "after the settle" }) do
+			helpers.it("(linux-transform-own-copy) restores the clipboard when the destination changes "
+				.. moment .. " (" .. kind .. ")", function()
+				with_session(kind, "selected", function(clipboard, shell, combos, _, emit, sleep_ms)
+					local live = true
+					local publication = { current = function() return live end }
+					local ok, reason = clipboard.transform_selection(string.upper, function(combo)
+						local emitted = emit(combo)
+						if moment == "after the chord" then live = false end
+						return emitted
+					end, function(ms)
+						if moment == "after the settle" then live = false end
+						return sleep_ms(ms)
+					end, publication)
+					helpers.assert_eq(ok, false)
+					helpers.assert_eq(reason, "destination_changed")
+					helpers.assert_eq(combos, { "ctrl+c" }, "nothing is pasted into another field")
+					helpers.assert_eq(shell.current, "saved", "the selection the chord copied gives way to the saved text")
+				end)
+			end)
+		end
+	end
+
 	helpers.it("uses wl-clipboard under Wayland", function()
 		with_session("wayland", "selected", function(clipboard, shell, _, _, emit, sleep_ms)
 			local ok = clipboard.transform_selection(string.upper, emit, sleep_ms)
