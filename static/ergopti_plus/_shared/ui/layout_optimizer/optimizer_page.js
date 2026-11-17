@@ -393,7 +393,8 @@
 			// The host's corpora (« My typing ») first, whatever the language.
 			select.replaceChildren(
 				...state.hostCorpora.concat(shown).map((corpus) => {
-					const option = el('option', '', corpus.title);
+					// A count table's descriptive name is localized (title_key).
+					const option = el('option', '', corpus.title_key ? t(corpus.title_key) : corpus.title);
 					option.value = corpus.id;
 					return option;
 				}),

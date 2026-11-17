@@ -32,6 +32,55 @@
 			"word_column": "1_Mot",
 			"frequency_column": "10_FreqMot",
 			"scale": 1000
+		},
+		{
+			"output": "frequency/leipzig/de_wikipedia_2021_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/deu_wikipedia_2021_1M.tar.gz",
+			"sha256": "d5eb95fe71010a88d69ba408a4016f67a3a219e1a63cade652593abf33010aba",
+			"member": "deu_wikipedia_2021_1M/deu_wikipedia_2021_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/es_wikipedia_2021_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/spa_wikipedia_2021_1M.tar.gz",
+			"sha256": "d4fc33f8cb079a3a2dc9edaec8cdd062b9fba5a36f7fa5af9488a945a8f629c8",
+			"member": "spa_wikipedia_2021_1M/spa_wikipedia_2021_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/it_wikipedia_2021_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/ita_wikipedia_2021_1M.tar.gz",
+			"sha256": "e934b9ad62a4d79a9d48e3d903b5c32d8d279ac8f67938acc17aadb0782c2104",
+			"member": "ita_wikipedia_2021_1M/ita_wikipedia_2021_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/de_news_2024_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/deu_news_2024_1M.tar.gz",
+			"sha256": "203d98de187f6d87e7f97c1f516a64a9d19016d0dc81c935a72e769ef184fa64",
+			"member": "deu_news_2024_1M/deu_news_2024_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/es_news_2024_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/spa_news_2024_1M.tar.gz",
+			"sha256": "4666b54caad54cd46cdfea80e7cb727663b220c2ead871b4ccf6285df0599090",
+			"member": "spa_news_2024_1M/spa_news_2024_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/it_news_2024_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/ita_news_2024_1M.tar.gz",
+			"sha256": "90ed9f839c50de9a58a7f1772516891d6721c92f4b863560bd26a480d7717e30",
+			"member": "ita_news_2024_1M/ita_news_2024_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/en_news_2024_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/eng_news_2024_1M.tar.gz",
+			"sha256": "8f1d4d07b9771f8a7fc219ad587d5382eabf5009ef563f1bc4c12a467a8e3a97",
+			"member": "eng_news_2024_1M/eng_news_2024_1M-sentences.txt"
 		}
 	]
 }

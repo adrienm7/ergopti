@@ -132,6 +132,9 @@ for (const id of switchIds) {
 }
 for (const id of Object.keys(O.QWERTY_PIN_PRESETS)) keys.add(`${PREFIX}qwerty.preset.${id}`);
 for (const corpus of DATA.corpora) keys.add(`${PREFIX}language.${corpus.language}`);
+// A count table's localized name, shown in the corpus picker.
+for (const corpus of DATA.corpora) if (corpus.title_key) keys.add(corpus.title_key);
+check(page.includes('corpus.title_key'), 'the corpus picker no longer shows localized names');
 const codes = new Set(
 	Array.from(
 		read(path.join(PAGE_DIR, 'optimizer_core.js')).matchAll(/new OptimizerError\(\s*'([a-z_]+)'/g),

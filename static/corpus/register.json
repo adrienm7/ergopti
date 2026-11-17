@@ -3,45 +3,115 @@
 	"schema_version": 1,
 	"audited": "2026-11-14",
 	"files": {
+		"frequency/leipzig/de_news_2024_1M.json": {
+			"title": "Character, bigram and trigram counts and word table of 1,000,000 sentences of German news, 2024",
+			"source": "Leipzig Corpora Collection (deu_news_2024_1M), counted by tools/build/import-count-tables.cjs",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/deu_news_2024_1M.tar.gz",
+			"licence": "CC BY 4.0",
+			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012)",
+			"status": "ship",
+			"prune_ratio": 5e-8,
+			"note": "Shipped under CC BY 4.0 by the maintainer’s choice (2026-11-15: Ergopti is non-commercial; docs/memory/maintainer-decisions.md, « Corpora »), like the other Leipzig tables; the Leipzig licence page answers automated clients with an anti-bot challenge (Anubis) and the archive carries no licence file. The sentences are from German news sites crawled in 2024, a journalistic register next to the encyclopaedic Wikipedia one. Only the counts and the 1,000 most frequent words ship, never a sentence: each line’s « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than prune_ratio of their table are dropped (pruned_below)."
+		},
+		"frequency/leipzig/de_wikipedia_2021_1M.json": {
+			"title": "Character, bigram and trigram counts and word table of 1,000,000 sentences of German Wikipedia, 2021",
+			"source": "Leipzig Corpora Collection (deu_wikipedia_2021_1M), counted by tools/build/import-count-tables.cjs",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/deu_wikipedia_2021_1M.tar.gz",
+			"licence": "CC BY 4.0",
+			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012); Wikipedia contributors (CC BY-SA)",
+			"status": "ship",
+			"prune_ratio": 5e-8,
+			"note": "Shipped under CC BY 4.0 by the maintainer’s choice (2026-11-15: Ergopti is non-commercial; docs/memory/maintainer-decisions.md, « Corpora »), like the other Leipzig tables; the Leipzig licence page answers automated clients with an anti-bot challenge (Anubis) and the archive carries no licence file. The sentences are 2021 German Wikipedia text (CC BY-SA 3.0): its contributors are credited. Only the counts and the 1,000 most frequent words ship, never a sentence: each line’s « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than prune_ratio of their table are dropped (pruned_below)."
+		},
+		"frequency/leipzig/en_news_2024_1M.json": {
+			"title": "Character, bigram and trigram counts and word table of 1,000,000 sentences of English news, 2024",
+			"source": "Leipzig Corpora Collection (eng_news_2024_1M), counted by tools/build/import-count-tables.cjs",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/eng_news_2024_1M.tar.gz",
+			"licence": "CC BY 4.0",
+			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012)",
+			"status": "ship",
+			"prune_ratio": 5e-8,
+			"note": "Shipped under CC BY 4.0 by the maintainer’s choice (2026-11-15: Ergopti is non-commercial; docs/memory/maintainer-decisions.md, « Corpora »), like the other Leipzig tables; the Leipzig licence page answers automated clients with an anti-bot challenge (Anubis) and the archive carries no licence file. The sentences are from English news sites crawled in 2024, a journalistic register next to the encyclopaedic Wikipedia one. Only the counts and the 1,000 most frequent words ship, never a sentence: each line’s « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than prune_ratio of their table are dropped (pruned_below)."
+		},
 		"frequency/leipzig/en_wikipedia_2016_1M.json": {
-			"title": "Character, bigram and trigram counts of 1,000,000 sentences of English Wikipedia, 2016",
+			"title": "Character, bigram and trigram counts and word table of 1,000,000 sentences of English Wikipedia, 2016",
 			"source": "Leipzig Corpora Collection (eng_wikipedia_2016_1M), counted by tools/build/import-count-tables.cjs",
 			"url": "https://downloads.wortschatz-leipzig.de/corpora/eng_wikipedia_2016_1M.tar.gz",
 			"licence": "CC BY 4.0",
 			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012); Wikipedia contributors (CC BY-SA)",
 			"status": "ship",
 			"prune_ratio": 5e-8,
-			"note": "Shipped under CC BY 4.0 by the maintainer's choice (2026-11-15: Ergopti is non-commercial), like the French Leipzig tables; the Leipzig licence page answers automated clients with an anti-bot challenge (Anubis) and the archive carries no licence file. The sentences are 2016 English Wikipedia text (CC BY-SA 3.0): its contributors are credited. Only the counts ship (no sentence): each line's « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than prune_ratio of their table are dropped (pruned_below)."
+			"note": "Shipped under CC BY 4.0 by the maintainer's choice (2026-11-15: Ergopti is non-commercial), like the French Leipzig tables; the Leipzig licence page answers automated clients with an anti-bot challenge (Anubis) and the archive carries no licence file. The sentences are 2016 English Wikipedia text (CC BY-SA 3.0): its contributors are credited. Only the counts and the 1,000 most frequent words ship (no sentence): each line's « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than prune_ratio of their table are dropped (pruned_below)."
+		},
+		"frequency/leipzig/es_news_2024_1M.json": {
+			"title": "Character, bigram and trigram counts and word table of 1,000,000 sentences of Spanish news, 2024",
+			"source": "Leipzig Corpora Collection (spa_news_2024_1M), counted by tools/build/import-count-tables.cjs",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/spa_news_2024_1M.tar.gz",
+			"licence": "CC BY 4.0",
+			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012)",
+			"status": "ship",
+			"prune_ratio": 5e-8,
+			"note": "Shipped under CC BY 4.0 by the maintainer’s choice (2026-11-15: Ergopti is non-commercial; docs/memory/maintainer-decisions.md, « Corpora »), like the other Leipzig tables; the Leipzig licence page answers automated clients with an anti-bot challenge (Anubis) and the archive carries no licence file. The sentences are from Spanish news sites crawled in 2024, a journalistic register next to the encyclopaedic Wikipedia one. Only the counts and the 1,000 most frequent words ship, never a sentence: each line’s « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than prune_ratio of their table are dropped (pruned_below)."
+		},
+		"frequency/leipzig/es_wikipedia_2021_1M.json": {
+			"title": "Character, bigram and trigram counts and word table of 1,000,000 sentences of Spanish Wikipedia, 2021",
+			"source": "Leipzig Corpora Collection (spa_wikipedia_2021_1M), counted by tools/build/import-count-tables.cjs",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/spa_wikipedia_2021_1M.tar.gz",
+			"licence": "CC BY 4.0",
+			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012); Wikipedia contributors (CC BY-SA)",
+			"status": "ship",
+			"prune_ratio": 5e-8,
+			"note": "Shipped under CC BY 4.0 by the maintainer’s choice (2026-11-15: Ergopti is non-commercial; docs/memory/maintainer-decisions.md, « Corpora »), like the other Leipzig tables; the Leipzig licence page answers automated clients with an anti-bot challenge (Anubis) and the archive carries no licence file. The sentences are 2021 Spanish Wikipedia text (CC BY-SA 3.0): its contributors are credited. Only the counts and the 1,000 most frequent words ship, never a sentence: each line’s « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than prune_ratio of their table are dropped (pruned_below)."
 		},
 		"frequency/leipzig/fr_news_2024_1M.json": {
-			"title": "Character, bigram and trigram counts of 1,000,000 sentences of French news, 2024",
+			"title": "Character, bigram and trigram counts and word table of 1,000,000 sentences of French news, 2024",
 			"source": "Leipzig Corpora Collection (fra_news_2024_1M), counted by tools/build/import-count-tables.cjs",
 			"url": "https://downloads.wortschatz-leipzig.de/corpora/fra_news_2024_1M.tar.gz",
 			"licence": "CC BY 4.0",
 			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012)",
 			"status": "ship",
 			"prune_ratio": 5e-8,
-			"note": "Shipped under CC BY 4.0 by the maintainer's choice (2026-11-15: Ergopti is non-commercial), like the other Leipzig tables; the Leipzig licence page answers automated clients with an anti-bot challenge (Anubis) and the archive carries no licence file. The sentences are from French news sites crawled in 2024, a journalistic register next to the encyclopaedic Wikipédia one; only their counts ship, never a sentence: each line's « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than prune_ratio of their table are dropped (pruned_below)."
+			"note": "Shipped under CC BY 4.0 by the maintainer's choice (2026-11-15: Ergopti is non-commercial), like the other Leipzig tables; the Leipzig licence page answers automated clients with an anti-bot challenge (Anubis) and the archive carries no licence file. The sentences are from French news sites crawled in 2024, a journalistic register next to the encyclopaedic Wikipédia one; only their counts and their 1,000 most frequent words ship, never a sentence: each line's « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than prune_ratio of their table are dropped (pruned_below)."
 		},
 		"frequency/leipzig/fr_wikipedia_2021_1M.json": {
-			"title": "Character, bigram and trigram counts of 1,000,000 sentences of French Wikipedia, 2021",
+			"title": "Character, bigram and trigram counts and word table of 1,000,000 sentences of French Wikipedia, 2021",
 			"source": "Leipzig Corpora Collection (fra_wikipedia_2021_1M), counted by tools/build/import-count-tables.cjs",
 			"url": "https://downloads.wortschatz-leipzig.de/corpora/fra_wikipedia_2021_1M.tar.gz",
 			"licence": "CC BY 4.0",
 			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012); Wikipédia contributors (CC BY-SA)",
 			"status": "ship",
 			"prune_ratio": 5e-8,
-			"note": "The same Leipzig release family as original/fr/leipzig_fra_wikipedia_2021_10K-sentences.txt, shipped under CC BY 4.0 by the maintainer's choice (2026-11-14); its licence page cannot be read by automated clients (Anubis challenge) and the archive carries no licence file. The sentences are Wikipédia text (CC BY-SA 3.0 in 2021): its contributors are credited. Only the counts ship (no sentence): each line's « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than prune_ratio of their table are dropped (pruned_below)."
+			"note": "The same Leipzig release family as original/fr/leipzig_fra_wikipedia_2021_10K-sentences.txt, shipped under CC BY 4.0 by the maintainer's choice (2026-11-14); its licence page cannot be read by automated clients (Anubis challenge) and the archive carries no licence file. The sentences are Wikipédia text (CC BY-SA 3.0 in 2021): its contributors are credited. Only the counts and the 1,000 most frequent words ship (no sentence): each line's « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than prune_ratio of their table are dropped (pruned_below)."
+		},
+		"frequency/leipzig/it_news_2024_1M.json": {
+			"title": "Character, bigram and trigram counts and word table of 1,000,000 sentences of Italian news, 2024",
+			"source": "Leipzig Corpora Collection (ita_news_2024_1M), counted by tools/build/import-count-tables.cjs",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/ita_news_2024_1M.tar.gz",
+			"licence": "CC BY 4.0",
+			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012)",
+			"status": "ship",
+			"prune_ratio": 5e-8,
+			"note": "Shipped under CC BY 4.0 by the maintainer’s choice (2026-11-15: Ergopti is non-commercial; docs/memory/maintainer-decisions.md, « Corpora »), like the other Leipzig tables; the Leipzig licence page answers automated clients with an anti-bot challenge (Anubis) and the archive carries no licence file. The sentences are from Italian news sites crawled in 2024, a journalistic register next to the encyclopaedic Wikipedia one. Only the counts and the 1,000 most frequent words ship, never a sentence: each line’s « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than prune_ratio of their table are dropped (pruned_below)."
+		},
+		"frequency/leipzig/it_wikipedia_2021_1M.json": {
+			"title": "Character, bigram and trigram counts and word table of 1,000,000 sentences of Italian Wikipedia, 2021",
+			"source": "Leipzig Corpora Collection (ita_wikipedia_2021_1M), counted by tools/build/import-count-tables.cjs",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/ita_wikipedia_2021_1M.tar.gz",
+			"licence": "CC BY 4.0",
+			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012); Wikipedia contributors (CC BY-SA)",
+			"status": "ship",
+			"prune_ratio": 5e-8,
+			"note": "Shipped under CC BY 4.0 by the maintainer’s choice (2026-11-15: Ergopti is non-commercial; docs/memory/maintainer-decisions.md, « Corpora »), like the other Leipzig tables; the Leipzig licence page answers automated clients with an anti-bot challenge (Anubis) and the archive carries no licence file. The sentences are 2021 Italian Wikipedia text (CC BY-SA 3.0): its contributors are credited. Only the counts and the 1,000 most frequent words ship, never a sentence: each line’s « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than prune_ratio of their table are dropped (pruned_below)."
 		},
 		"frequency/lexique/fr_lexique_4_10.json": {
-			"title": "Character, bigram and trigram counts of the French word forms of Lexique 4.10",
+			"title": "Character, bigram and trigram counts and word table of the French word forms of Lexique 4.10",
 			"source": "Lexique 4.10 (Lexique4.1.tsv, column 10_FreqMot), counted by tools/build/import-count-tables.cjs",
 			"url": "https://www.lexique.org/databases/Lexique410/Lexique4.1.zip",
 			"licence": "CC BY-SA 4.0",
 			"attribution": "Lexique 4 by B. New, C. Pallier, G. Schalchli, J. Bourgin and M. Gimenes (Behavior Research Methods, 2026), www.lexique.org (CC BY-SA 4.0)",
 			"status": "ship",
 			"prune_ratio": 5e-8,
-			"note": "Licence read on www.lexique.org (« Lexique est distribuée sous une licence Creative Commons Attribution – Partage dans les mêmes conditions 4.0 ») and in the archive's README-Lexique.txt (« CC BY SA40.0 »), fetched 2026-11-15. Frequencies come from a 316-million-word subtitle corpus: spoken French. Each distinct form (1_Mot) counts once, weighted by the sum of its rows' frequencies per million (10_FreqMot, one row per lemma and part of speech) times 1,000, rounded; forms of weight 0 and the 290 multi-word rows (« citizen band ») are left out. The form total 11_FreqOrtho is not used: one form (« ben ») carries two different values of it. A word list: its n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. N-grams rarer than prune_ratio of their table are dropped (pruned_below)."
+			"note": "Licence read on www.lexique.org (« Lexique est distribuée sous une licence Creative Commons Attribution – Partage dans les mêmes conditions 4.0 ») and in the archive's README-Lexique.txt (« CC BY SA40.0 »), fetched 2026-11-15. Frequencies come from a 316-million-word subtitle corpus: spoken French. Each distinct form (1_Mot) counts once, weighted by the sum of its rows' frequencies per million (10_FreqMot, one row per lemma and part of speech) times 1,000, rounded; forms of weight 0 and the 290 multi-word rows (« citizen band ») are left out. The form total 11_FreqOrtho is not used: one form (« ben ») carries two different values of it. A word list: its n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. Its word table keeps the 1,000 most frequent words of that list by the engine’s word rule (« aujourd’hui » counts as « aujourd » and « hui »). N-grams rarer than prune_ratio of their table are dropped (pruned_below)."
 		},
 		"frequency/opensubtitles_2018/de_50k.txt": {
 			"title": "German word frequencies from subtitles (50,000 words)",

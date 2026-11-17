@@ -6,8 +6,9 @@
  * DESCRIPTION:
  * Builds the count tables of static/corpus/frequency (format ergopti-count-table)
  * from the pinned sources of static/corpus/count_table_sources.json: a large
- * corpus ships its character, bigram and trigram counts, never its text. The
- * layout analysis codegen reads the tables (corpora.json format count_table).
+ * corpus ships its character, bigram and trigram counts and its most frequent
+ * words, never its text. The layout analysis codegen reads the tables
+ * (corpora.json format count_table).
  * USAGE: node tools/build/import-count-tables.cjs [--only <output>] [--archive-dir <dir>]
  *
  * FEATURES & RATIONALE:
@@ -27,6 +28,9 @@
  * 4. Deterministic output: entries sorted by count, then by n-gram.
  * 5. The register (static/corpus/register.json) owns licences: a table is
  *    written only for a source the register already lists by its URL.
+ * 6. One word rule: the words of the same sentences or list, counted by the
+ *    engine's countWords and bounded by its wordTable (WORD_TABLE_SIZE, the
+ *    most frequent first), as a built-in corpus's word table is.
  * ==============================================================================
  */
 
@@ -110,25 +114,52 @@ function zipMember(zip, name) {
 }
 
 /**
- * The text of one member of a pinned archive.
+ * One member of an uncompressed tar archive (ustar or GNU, long names included).
+ * Read in Node, not by a tar program: Git for Windows' GNU tar reads « C:\… »
+ * as a remote host, and Windows' own bsdtar takes other options.
+ * @param {Buffer} tar - The archive.
+ * @param {string} name - The member's path.
+ * @returns {Buffer} Its bytes.
+ * @throws {Error} When the archive has no such member.
+ */
+function tarMember(tar, name) {
+	const text = (from, length) => {
+		const field = tar.subarray(from, from + length);
+		const end = field.indexOf(0);
+		return field.toString('utf8', 0, end < 0 ? length : end);
+	};
+	let longName = '';
+	for (let at = 0; at + 512 <= tar.length; ) {
+		if (tar[at] === 0) break;
+		const size = parseInt(text(at + 124, 12).trim() || '0', 8);
+		const type = String.fromCharCode(tar[at + 156]);
+		const dataAt = at + 512;
+		const next = dataAt + Math.ceil(size / 512) * 512;
+		if (type === 'L') {
+			longName = tar.toString('utf8', dataAt, dataAt + size).replace(/\0+$/, '');
+			at = next;
+			continue;
+		}
+		const prefix = text(at + 257, 6).startsWith('ustar') ? text(at + 345, 155) : '';
+		const entry = longName || (prefix ? `${prefix}/${text(at, 100)}` : text(at, 100));
+		longName = '';
+		if (entry === name && (type === '0' || type === '\0'))
+			return Buffer.from(tar.subarray(dataAt, dataAt + size));
+		at = next;
+	}
+	throw new Error(`the archive has no ${name}`);
+}
+
+/**
+ * The text of one member of a pinned archive (zip or tar.gz).
  * @param {object} source - A count_table_sources.json entry.
  * @param {string} archivePath - The archive, already checked.
  * @returns {string}
  */
 function memberText(source, archivePath) {
-	if (archivePath.endsWith('.zip'))
-		return zipMember(fs.readFileSync(archivePath), source.member).toString('utf8');
-	const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-count-table-'));
-	try {
-		const run = spawnSync('tar', ['-xzf', archivePath, '-C', folder, source.member], {
-			encoding: 'utf8'
-		});
-		if (run.error || run.status !== 0)
-			throw new Error(`tar could not extract ${source.member}: ${run.stderr || run.error}`);
-		return fs.readFileSync(path.join(folder, source.member), 'utf8');
-	} finally {
-		fs.rmSync(folder, { recursive: true, force: true });
-	}
+	const bytes = fs.readFileSync(archivePath);
+	if (archivePath.endsWith('.zip')) return zipMember(bytes, source.member).toString('utf8');
+	return tarMember(zlib.gunzipSync(bytes), source.member).toString('utf8');
 }
 
 /** Adds the counts of `from` into `into`. */
@@ -203,33 +234,39 @@ function repairMojibake(line) {
 /**
  * The counts of a Leipzig sentence file: its « number<TAB> » prefixes removed,
  * its CP1252-decoded UTF-8 repaired (repairMojibake), each line counted as text
- * by the engine.
+ * by the engine, and its words by the engine's word rule (countWords).
  * @param {string} text - The sentence file.
  * @param {object} engine - LAYOUT_ANALYSIS.
- * @returns {{chars: object, bigrams: object, trigrams: object}}
+ * @returns {{chars: object, bigrams: object, trigrams: object, words: object}}
+ *   The n-gram counts and every word's count, unbounded.
  */
 function leipzigCounts(text, engine) {
 	const lines = text.replace(/﻿/g, '').split('\n');
 	const counts = { chars: {}, bigrams: {}, trigrams: {} };
+	const words = {};
 	for (let i = 0; i < lines.length; i += LINES_PER_CHUNK) {
 		const chunk = lines
 			.slice(i, i + LINES_PER_CHUNK)
 			.map((line) => repairMojibake(line.replace(/^\d+\t/, '')))
 			.join('\n');
 		merge(counts, engine.ngramsFromText(chunk));
+		engine.countWords(chunk, 1, words);
 	}
+	counts.words = words;
 	return counts;
 }
 
 /**
  * The counts of a Lexique table: each distinct word once, weighted by the sum
  * of its rows' frequencies per million times scale (rounded), counted by the
- * word-list rule.
+ * word-list rule, and its words by the engine's word rule on that list.
  * @param {string} text - The TSV.
  * @param {object} source - With word_column, frequency_column and scale.
- * @returns {{chars: object, bigrams: object, trigrams: object}}
+ * @param {object} engine - LAYOUT_ANALYSIS.
+ * @returns {{chars: object, bigrams: object, trigrams: object, words: object}}
+ *   The n-gram counts and every word's count, unbounded.
  */
-function lexiqueCounts(text, source) {
+function lexiqueCounts(text, source, engine) {
 	const lines = text.replace(/﻿/g, '').split('\n');
 	const header = lines[0].replace(/\r$/, '').split('\t');
 	const word = header.indexOf(source.word_column);
@@ -266,7 +303,10 @@ function lexiqueCounts(text, source) {
 	console.log(
 		`import-count-tables: ${source.output}: ${weights.size} forms, ${multiWord} multi-word rows left out`
 	);
-	return Analysis.wordListCounts(list, source.output);
+	return {
+		...Analysis.wordListCounts(list, source.output),
+		words: Analysis.wordListWords(engine, list)
+	};
 }
 
 /**
@@ -334,8 +374,16 @@ function pruneDeviation(engine, counts, tables) {
 	return { max_metric_change: Number(worst.max_metric_change.toPrecision(3)), at: worst.at };
 }
 
-/** The count-table file of a source's tables, one entry per line. */
-function tableText(countedAs, tables, prunedBelow, pruneCheck) {
+/**
+ * The count-table file of a source's tables, one entry per line.
+ * @param {string} countedAs - text or word_list.
+ * @param {object} tables - The kept [n-gram, count] pairs (prune).
+ * @param {object} prunedBelow - Per table, the smallest count kept.
+ * @param {object} pruneCheck - From pruneDeviation.
+ * @param {object} words - The word table (the engine's wordTable), in order.
+ * @returns {string}
+ */
+function tableText(countedAs, tables, prunedBelow, pruneCheck, words) {
 	const block = (entries) =>
 		`{\n${entries.map(([gram, n]) => `\t\t${JSON.stringify(gram)}: ${n}`).join(',\n')}\n\t}`;
 	return [
@@ -351,7 +399,8 @@ function tableText(countedAs, tables, prunedBelow, pruneCheck) {
 		'\t},',
 		`\t"chars": ${block(tables.chars)},`,
 		`\t"bigrams": ${block(tables.bigrams)},`,
-		`\t"trigrams": ${block(tables.trigrams)}`,
+		`\t"trigrams": ${block(tables.trigrams)},`,
+		`\t"words": ${block(Object.entries(words))}`,
 		'}',
 		''
 	].join('\n');
@@ -384,7 +433,9 @@ function buildTable(source, ratio, archivePath, engine) {
 	if (!KINDS.includes(source.kind)) throw new Error(`${source.output}: kind ${source.kind}`);
 	const text = memberText(source, archivePath);
 	const counts =
-		source.kind === 'leipzig_sentences' ? leipzigCounts(text, engine) : lexiqueCounts(text, source);
+		source.kind === 'leipzig_sentences'
+			? leipzigCounts(text, engine)
+			: lexiqueCounts(text, source, engine);
 	const { tables, prunedBelow } = prune(counts, ratio);
 	const check = pruneDeviation(engine, counts, tables);
 	console.log(
@@ -398,7 +449,8 @@ function buildTable(source, ratio, archivePath, engine) {
 		source.kind === 'lexique_words' ? 'word_list' : 'text',
 		tables,
 		prunedBelow,
-		check
+		check,
+		engine.wordTable(counts.words)
 	);
 }
 
@@ -438,6 +490,7 @@ if (require.main === module) main();
 
 module.exports = {
 	memberText,
+	tarMember,
 	PRUNE_CHECK_LAYOUTS,
 	PRUNE_TOLERANCE,
 	zipMember,

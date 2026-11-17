@@ -2197,7 +2197,9 @@
 						? t('layout_analysis.corpus.custom')
 						: corpus.id === MY_TYPING_ID && !corpus.title
 							? t('layout_analysis.corpus.my_typing')
-							: corpus.title;
+							: corpus.builtin && corpus.builtin.title_key
+								? t(corpus.builtin.title_key)
+								: corpus.title;
 				const option = el('option', '', label);
 				option.value = corpus.id;
 				select.append(option);

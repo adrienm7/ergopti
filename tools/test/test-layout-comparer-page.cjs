@@ -132,6 +132,12 @@ for (const id of Object.keys(DATA.sources.items)) keys.add(`${PREFIX}info.${id}`
 // The other analysers' view shows each score-less analyser's headline parts.
 for (const entry of Object.values(DATA.analysers))
 	for (const part of entry.headline || []) keys.add(`${PREFIX}analysers.part.${part}`);
+// A corpus with a localized name (the count tables) is named in every locale.
+for (const corpus of DATA.corpora) if (corpus.title_key) keys.add(corpus.title_key);
+check(
+	page.includes('corpus.builtin.title_key'),
+	'the corpus picker no longer shows the localized corpus names'
+);
 check(keys.size >= MIN_KEYS, `only ${keys.size} keys found`);
 const locales = fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'));
 check(locales.length === 21, `${locales.length} locales`);

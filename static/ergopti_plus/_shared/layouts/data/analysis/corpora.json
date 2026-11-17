@@ -242,27 +242,87 @@
 			"title": "Wikipedia — 1,000,000 sentences (counts)",
 			"language": "fr",
 			"file": "static/corpus/frequency/leipzig/fr_wikipedia_2021_1M.json",
-			"format": "count_table"
+			"format": "count_table",
+			"title_key": "layout_analysis.corpus.name.fr_wikipedia_1m"
 		},
 		{
 			"id": "fr_news_1m",
 			"title": "News — 1,000,000 sentences (counts)",
 			"language": "fr",
 			"file": "static/corpus/frequency/leipzig/fr_news_2024_1M.json",
-			"format": "count_table"
+			"format": "count_table",
+			"title_key": "layout_analysis.corpus.name.fr_news_1m"
 		},
 		{
 			"id": "fr_lexique_words",
 			"title": "Lexique 4.10 — word forms (counts)",
 			"language": "fr",
 			"file": "static/corpus/frequency/lexique/fr_lexique_4_10.json",
-			"format": "count_table"
+			"format": "count_table",
+			"title_key": "layout_analysis.corpus.name.fr_lexique_words"
 		},
 		{
 			"id": "en_wikipedia_1m",
 			"title": "Wikipedia — 1,000,000 sentences (counts)",
 			"language": "en",
 			"file": "static/corpus/frequency/leipzig/en_wikipedia_2016_1M.json",
+			"format": "count_table",
+			"title_key": "layout_analysis.corpus.name.en_wikipedia_1m"
+		},
+		{
+			"id": "de_wikipedia_1m",
+			"title": "Wikipedia — 1,000,000 sentences (counts)",
+			"title_key": "layout_analysis.corpus.name.de_wikipedia_1m",
+			"language": "de",
+			"file": "static/corpus/frequency/leipzig/de_wikipedia_2021_1M.json",
+			"format": "count_table"
+		},
+		{
+			"id": "es_wikipedia_1m",
+			"title": "Wikipedia — 1,000,000 sentences (counts)",
+			"title_key": "layout_analysis.corpus.name.es_wikipedia_1m",
+			"language": "es",
+			"file": "static/corpus/frequency/leipzig/es_wikipedia_2021_1M.json",
+			"format": "count_table"
+		},
+		{
+			"id": "it_wikipedia_1m",
+			"title": "Wikipedia — 1,000,000 sentences (counts)",
+			"title_key": "layout_analysis.corpus.name.it_wikipedia_1m",
+			"language": "it",
+			"file": "static/corpus/frequency/leipzig/it_wikipedia_2021_1M.json",
+			"format": "count_table"
+		},
+		{
+			"id": "de_news_1m",
+			"title": "News — 1,000,000 sentences (counts)",
+			"title_key": "layout_analysis.corpus.name.de_news_1m",
+			"language": "de",
+			"file": "static/corpus/frequency/leipzig/de_news_2024_1M.json",
+			"format": "count_table"
+		},
+		{
+			"id": "es_news_1m",
+			"title": "News — 1,000,000 sentences (counts)",
+			"title_key": "layout_analysis.corpus.name.es_news_1m",
+			"language": "es",
+			"file": "static/corpus/frequency/leipzig/es_news_2024_1M.json",
+			"format": "count_table"
+		},
+		{
+			"id": "it_news_1m",
+			"title": "News — 1,000,000 sentences (counts)",
+			"title_key": "layout_analysis.corpus.name.it_news_1m",
+			"language": "it",
+			"file": "static/corpus/frequency/leipzig/it_news_2024_1M.json",
+			"format": "count_table"
+		},
+		{
+			"id": "en_news_1m",
+			"title": "News — 1,000,000 sentences (counts)",
+			"title_key": "layout_analysis.corpus.name.en_news_1m",
+			"language": "en",
+			"file": "static/corpus/frequency/leipzig/en_news_2024_1M.json",
 			"format": "count_table"
 		}
 	]

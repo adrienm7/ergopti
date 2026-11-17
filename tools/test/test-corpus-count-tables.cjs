@@ -14,7 +14,9 @@
  * metric of the check layouts within the importer's tolerance (each table
  * records its largest change, and a harsher pruning of a real text is caught
  * by the same check); a word-list table shows the word-list caveat; and the
- * reader refuses a malformed table.
+ * reader refuses a malformed table. Each table also ships its word table: the
+ * engine's WORD_TABLE_SIZE most frequent words of the same sentences or list,
+ * counted by the engine's word rule; a tar.gz member is read in Node.
  * ==============================================================================
  */
 
@@ -34,6 +36,7 @@ let checks = 0;
 
 // Every committed table is read by the codegen and traces to its pin and register entry.
 {
+	const engine = Analysis.loadEngine();
 	const sources = JSON.parse(
 		fs.readFileSync(path.join(CORPUS, 'count_table_sources.json'), 'utf8')
 	);
@@ -53,7 +56,8 @@ let checks = 0;
 	for (const file of committed) {
 		assert(outputs.has(file), `${file} has a pinned source`);
 		const source = sources.tables.find((entry) => entry.output === file);
-		assert(/^[0-9a-f]{64}$/.test(source.sha256), `${file}: its archive is pinned by SHA-256`);
+		for (const pinned of source.shards || [source])
+			assert(/^[0-9a-f]{64}$/.test(pinned.sha256), `${file}: its archive is pinned by SHA-256`);
 		assert.equal(
 			register[file] && register[file].url,
 			source.url,
@@ -78,10 +82,21 @@ let checks = 0;
 		);
 		assert.equal(
 			counts.countedAs,
-			source.kind === 'lexique_words' ? 'word_list' : 'text',
+			source.kind === 'leipzig_sentences' ? 'text' : 'word_list',
 			`${file}: counted as its kind counts`
 		);
+		// The word table is cut at the engine's size: every source has more words.
+		assert.equal(
+			Object.keys(counts.words).length,
+			engine.WORD_TABLE_SIZE,
+			`${file}: its word table keeps the ${engine.WORD_TABLE_SIZE} most frequent words`
+		);
 	}
+	assert.equal(
+		Analysis.COUNT_TABLE_MAX_WORDS,
+		engine.WORD_TABLE_SIZE,
+		'the reader bounds a word table where the engine cuts it'
+	);
 	checks++;
 }
 
@@ -89,15 +104,18 @@ let checks = 0;
 {
 	const engine = Analysis.loadEngine();
 	const counts = plain(Import.leipzigCounts('1\tab c\n2\tc\n', engine));
+	// A one-letter word has no key pair: the word rule leaves « c » out.
+	assert.deepEqual(counts.words, { ab: 1 });
 	assert.deepEqual(counts.chars, { a: 1, b: 1, ' ': 1, c: 2 });
 	assert.deepEqual(counts.bigrams, { ab: 1, 'b ': 1, ' c': 1 });
 	assert.deepEqual(counts.trigrams, { 'ab ': 1, 'b c': 1 });
 	// Counting in chunks gives the counts of the whole text (lines end segments).
 	const lines = Array.from({ length: 45000 }, (_, i) => `${i}\tmot ${i % 7}`).join('\n');
-	assert.deepEqual(
-		plain(Import.leipzigCounts(lines, engine)),
-		plain(engine.ngramsFromText(lines.replace(/^\d+\t/gm, '')))
-	);
+	const chunked = plain(Import.leipzigCounts(lines, engine));
+	const whole = lines.replace(/^\d+\t/gm, '');
+	assert.deepEqual(chunked.words, plain(engine.countWords(whole)));
+	delete chunked.words;
+	assert.deepEqual(chunked, plain(engine.ngramsFromText(whole)));
 	checks++;
 }
 
@@ -119,10 +137,9 @@ let checks = 0;
 	// Only CP1252-only bytes mark a run: an all-Latin-1 run is left as written.
 	assert.equal(repair('1\u00ca\u00b3'), '1\u00ca\u00b3');
 	const engine = Analysis.loadEngine();
-	assert.deepEqual(
-		plain(Import.leipzigCounts('1\tl\u00e2\u20ac\u2122a\n', engine)),
-		plain(engine.ngramsFromText('l\u2019a'))
-	);
+	const repaired = plain(Import.leipzigCounts('1\tl\u00e2\u20ac\u2122a\n', engine));
+	delete repaired.words;
+	assert.deepEqual(repaired, plain(engine.ngramsFromText('l\u2019a')));
 	checks++;
 }
 
@@ -135,25 +152,36 @@ let checks = 0;
 		'ça va\t9\tC',
 		'rare\t0.0001\tD'
 	].join('\n');
+	const engine = Analysis.loadEngine();
 	const counts = plain(
-		Import.lexiqueCounts(tsv, {
-			output: 'test',
-			word_column: '1_Mot',
-			frequency_column: '10_FreqMot',
-			scale: 1000
-		})
+		Import.lexiqueCounts(
+			tsv,
+			{
+				output: 'test',
+				word_column: '1_Mot',
+				frequency_column: '10_FreqMot',
+				scale: 1000
+			},
+			engine
+		)
 	);
+	// The word table weighs each form as its n-grams do.
+	assert.deepEqual(counts.words, { le: 2000 });
 	// « le » weighs (1.5 + 0.5) × 1000 = 2000; « rare » rounds to 0 and is dropped.
 	assert.deepEqual(counts.chars, { l: 2000, e: 2000, ' ': 2000 });
 	assert.deepEqual(counts.bigrams, { ' l': 2000, le: 2000, 'e ': 2000 });
 	assert.throws(
 		() =>
-			Import.lexiqueCounts('1_Mot\n', {
-				output: 'test',
-				word_column: '1_Mot',
-				frequency_column: '10_FreqMot',
-				scale: 1000
-			}),
+			Import.lexiqueCounts(
+				'1_Mot\n',
+				{
+					output: 'test',
+					word_column: '1_Mot',
+					frequency_column: '10_FreqMot',
+					scale: 1000
+				},
+				engine
+			),
 		/no 1_Mot or 10_FreqMot column/
 	);
 	checks++;
@@ -178,8 +206,16 @@ let checks = 0;
 		[['ab', 9]],
 		'an integer-like n-gram below the floor is dropped'
 	);
-	const text = Import.tableText('text', tables, prunedBelow, { max_metric_change: 0, at: '' });
-	assert.deepEqual(plain(Analysis.countTableCounts(text, 'test').chars), { a: 50, b: 30 });
+	const text = Import.tableText(
+		'text',
+		tables,
+		prunedBelow,
+		{ max_metric_change: 0, at: '' },
+		{ abc: 4, ab: 2 }
+	);
+	const read = plain(Analysis.countTableCounts(text, 'test'));
+	assert.deepEqual(read.chars, { a: 50, b: 30 });
+	assert.deepEqual(read.words, { abc: 4, ab: 2 }, 'the word table is written in its order');
 	const kept = Import.prune({ chars: { 10: 5, a: 7 }, bigrams: {}, trigrams: {} }, 0).tables.chars;
 	assert.deepEqual(
 		kept,
@@ -202,9 +238,18 @@ let checks = 0;
 		prune_check: { layouts: ['qwerty'], max_metric_change: 0, at: '' },
 		chars: { a: 3 },
 		bigrams: { ab: 1 },
-		trigrams: { abc: 1 }
+		trigrams: { abc: 1 },
+		words: { abc: 2, ab: 1 }
 	};
 	Analysis.countTableCounts(JSON.stringify(good), 'good');
+	// Distinct three-letter words: 26³ is more than the bound.
+	const word = (i) =>
+		Array.from({ length: 3 }, (_, k) =>
+			String.fromCharCode(97 + (Math.floor(i / 26 ** k) % 26))
+		).join('');
+	const tooMany = Object.fromEntries(
+		Array.from({ length: Analysis.COUNT_TABLE_MAX_WORDS + 1 }, (_, i) => [word(i), 1])
+	);
 	for (const [label, change] of [
 		['format', { format: 'other' }],
 		['field', { extra: 1 }],
@@ -213,7 +258,15 @@ let checks = 0;
 		['pruned_below', { pruned_below: { chars: 1 } }],
 		['counted_as', { counted_as: 'words' }],
 		['prune_check', { prune_check: { layouts: [], max_metric_change: 0, at: '' } }],
-		['prune_check change', { prune_check: { layouts: ['qwerty'], max_metric_change: -1, at: '' } }]
+		['prune_check change', { prune_check: { layouts: ['qwerty'], max_metric_change: -1, at: '' } }],
+		['version', { version: 1 }],
+		['no words', { words: undefined }],
+		['empty words', { words: {} }],
+		['too many words', { words: tooMany }],
+		['unsorted words', { words: { ab: 1, abc: 2 } }],
+		['one-letter word', { words: { a: 2 } }],
+		['capital word', { words: { Abc: 2 } }],
+		['word with a digit', { words: { ab1: 2 } }]
 	])
 		assert.throws(
 			() => Analysis.countTableCounts(JSON.stringify({ ...good, ...change }), label),
@@ -268,6 +321,15 @@ let checks = 0;
 	const byId = new Map(corpora.map((corpus) => [corpus.id, corpus]));
 	assert.equal(byId.get('fr_lexique_words').word_list, true, 'the Lexique table is a word list');
 	assert.equal(byId.get('fr_wikipedia_1m').word_list, false, 'the Wikipedia table is text');
+	// Every count table ships its word table (the effort per word reads it) and
+	// a localized name: its English title says neither its language nor its kind.
+	for (const corpus of corpora.filter((entry) => entry.format === 'count_table')) {
+		assert(corpus.words > 0, `${corpus.id}: no word table`);
+		assert(
+			corpus.title_key && corpus.title_key.startsWith(Analysis.CORPUS_TITLE_KEY_PREFIX),
+			`${corpus.id}: no localized name`
+		);
+	}
 	assert(
 		corpora.filter((corpus) => corpus.format === 'word_frequencies').every((c) => c.word_list),
 		'every word frequency list is a word list'
@@ -330,6 +392,38 @@ let checks = 0;
 	checks++;
 }
 
+// The tar reader takes a ustar member, a long-named one and names a missing one.
+{
+	const header = (name, size, type, prefix = '') => {
+		const block = Buffer.alloc(512);
+		block.write(name, 0, 100, 'utf8');
+		block.write(`${size.toString(8).padStart(11, '0')}\0`, 124, 12, 'utf8');
+		block.write(type, 156, 1, 'utf8');
+		block.write('ustar\0', 257, 6, 'utf8');
+		block.write(prefix, 345, 155, 'utf8');
+		return block;
+	};
+	const body = (text) => {
+		const data = Buffer.from(text);
+		return Buffer.concat([data, Buffer.alloc((512 - (data.length % 512)) % 512)]);
+	};
+	const longName = `d/${'x'.repeat(120)}.txt`;
+	const tar = Buffer.concat([
+		header('dir/', 0, '5'),
+		header('a-sentences.txt', 5, '0', 'dir'),
+		body('1\tab\n'),
+		header('././@LongLink', longName.length + 1, 'L'),
+		body(`${longName}\0`),
+		header(longName.slice(0, 100), 4, '0'),
+		body('long'),
+		Buffer.alloc(1024)
+	]);
+	assert.equal(Import.tarMember(tar, 'dir/a-sentences.txt').toString(), '1\tab\n');
+	assert.equal(Import.tarMember(tar, longName).toString(), 'long');
+	assert.throws(() => Import.tarMember(tar, 'dir/missing.txt'), /has no dir\/missing\.txt/);
+	checks++;
+}
+
 console.log(
-	`[OK] corpus count tables: ${checks} checks (committed tables, Leipzig and Lexique rules, pruning, reader, zip)`
+	`[OK] corpus count tables: ${checks} checks (committed tables, Leipzig and Lexique rules, word tables, pruning, reader, zip, tar)`
 );

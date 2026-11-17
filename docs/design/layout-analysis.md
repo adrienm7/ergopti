@@ -244,10 +244,10 @@ same-finger skipgram metric needs are the first and last characters of those
 trigrams, so they need no table of their own. Whether a pair is an SFB, a
 skipgram, a roll, an alternation or a redirect depends on the layout: that
 classification happens when a layout is scored, by mapping the cached n-grams
-onto its keys. A built-in corpus with a text (not a count table) also ships
-its word table (`wordsFromText`, the 1,000 most frequent words, a few
-kilobytes) for the effort per word; a pasted text gets one the same way, and
-the keystats send none.
+onto its keys. Every built-in corpus also ships its word table (`wordsFromText`,
+the 1,000 most frequent words, a few kilobytes) for the effort per word; a
+count table brings the one its importer counted from the same sentences or
+list; a pasted text gets one the same way, and the keystats send none.
 
 **Key n-grams.** The key bigrams and trigrams are those of the stream of
 expanded keystrokes. They are rebuilt exactly from the character tables: the
@@ -561,29 +561,45 @@ Shipped as of 2026-11-14:
   licence asks. Their `format` is `tsv`, and `tsv_text_column` picks the
   sentence.
 
-- Count tables (`format` `count_table`, « ergopti-count-table » version 1),
+- Count tables (`format` `count_table`, « ergopti-count-table » version 2),
   from the Leipzig Corpora Collection (shipped under CC BY 4.0 by the
   maintainer's choice, Ergopti being non-commercial): a million sentences each
-  of French Wikipedia 2021, French news 2024 and English Wikipedia 2016,
+  of Wikipedia (French 2021, English 2016, German, Spanish and Italian 2021)
+  and of news (French, English, German, Spanish and Italian 2024),
   counted as text, so bigrams and trigrams cross words; and Lexique 4.10's
   word forms weighted by their frequency per million (CC BY-SA 4.0), counted
   by the word-list rule, so their n-grams stay inside words and the page
   shows the word-list caveat. A table holds `chars`, `bigrams` and `trigrams`
   with their counts, how it was counted (`counted_as`: `text` or
   `word_list`), the count each table kept from (`pruned_below`) and what that
-  pruning changed (`prune_check`); the reader refuses another format, an
-  n-gram of the wrong length or a count under its floor.
+  pruning changed (`prune_check`), and its word table (`words`: the engine's
+  `WORD_TABLE_SIZE`, 1,000, most frequent words of the same sentences or
+  list, by its word rule `countWords`, most frequent first); the reader
+  refuses another format or version, an n-gram of the wrong length, a count
+  under its floor, or a word table that is empty, longer than 1,000, unsorted
+  or holds anything but lower-case words of two letters or more. Their
+  titles describe rather than name a work, so each has a localized name
+  (`title_key`, `layout_analysis.corpus.name.<id>`, in the 21 locales) that
+  the Comparer, the analysis panel and the Optimiser show. Each table is
+  0.5 to 0.8 MB of JSON, and its generated `corpus_<id>.js` is loaded only
+  when its corpus is chosen.
   `tools/build/import-count-tables.cjs` rebuilds them from the archives pinned
-  by SHA-256 in `static/corpus/count_table_sources.json`, with the engine's
-  own counting rules. It first repairs the UTF-8 a crawled page decoded as
+  by SHA-256 in `static/corpus/count_table_sources.json` (a tar.gz is read
+  in Node: Git for Windows' tar takes « C:\ » for a remote host), with the
+  engine's own counting rules. It first repairs the UTF-8 a crawled page decoded as
   CP1252 (the French news sentences hold some 2,600 such apostrophes), so one
   apostrophe is not counted as three rare characters. It drops the n-grams rarer than the register's
   `prune_ratio` of their table (5e-8) and refuses a table when any metric of
   QWERTY, AZERTY, BÉPO, Ergopti, Dvorak, Colemak or Ergo-L measured on the
   pruned counts differs from the full counts by more than 0.05 (percentage
   points for shares); the largest change, recorded in `prune_check`, is
-  0.037. Norvig's counts are not imported: their host is not reachable from
-  the build environment.
+  0.037. Leipzig offers no larger download than a million sentences for
+  these corpora, and the tables are bounded by their pruning, not by the
+  corpus size. Not imported, waiting for the maintainer (TODO.md, « Maintainer
+  decisions pending »): Norvig's counts (derived from the LDC-licensed Google
+  Web 1T, no licence for the data) and Tatoeba's full exports as counts
+  (CC BY 2.0 FR asks each sentence's author to be credited). Google Books
+  Ngram (CC BY 3.0) waits for a streaming importer (TODO.md).
 
 `static/corpus/frequency/` holds the downloaded frequency lists and count
 tables, which the register covers like the texts.
@@ -591,9 +607,9 @@ tables, which the register covers like the texts.
 Each word table is counted from the same shipped text as its n-grams (the
 sentence column of a Tatoeba export, the « word count » lines of a frequency
 list, each word as often as the list says), so it carries the same licence and
-attribution, written in the generated file's header; a count table ships
-n-grams only and has none. `LAYOUT_ANALYSIS_DATA.corpora[].words` gives how
-many words each corpus keeps.
+attribution, written in the generated file's header; a count table's word
+table comes from the same archive as its n-grams. `LAYOUT_ANALYSIS_DATA.corpora[].words`
+gives how many words each corpus keeps.
 
 The study (`docs/audits/layout-analysers/report.md`, section 18) lists what
 is refused, and why.
@@ -696,7 +712,7 @@ and the heatmap's choices):
 - « Effort per word » (from `wordEfforts` on the corpus's word table): the
   mean per word typed, the share of the occurrences in ten ranges of effort,
   and the 15 hardest words with the metric that costs each most. A corpus
-  without a word table (count tables, « My typing ») says so.
+  without a word table (« My typing ») says so.
 
 « Copy the link » (`#la-share`) writes the comparison's address: the framing
 page's (the site's `/studio/comparer` or `/ergopti/benchmarks`, which hand

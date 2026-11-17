@@ -55,9 +55,18 @@ const CORPUS_FORMATS = ['text', 'word_frequencies', 'tsv', 'count_table'];
 // How a count table was counted: as running text, or by the word-list rule.
 const COUNTED_AS = ['text', 'word_list'];
 // The count-table file (static/corpus/frequency/<source>/<id>.json) a large corpus
-// ships instead of its text: tools/corpus/import-count-tables.cjs writes it.
+// ships instead of its text: tools/build/import-count-tables.cjs writes it.
 const COUNT_TABLE_FORMAT = 'ergopti-count-table';
-const COUNT_TABLE_VERSION = 1;
+// Version 2 adds the word table (words): its most frequent words.
+const COUNT_TABLE_VERSION = 2;
+// The most words a count table's word table keeps: the engine's WORD_TABLE_SIZE
+// (tools/test/test-corpus-count-tables.cjs checks they agree).
+const COUNT_TABLE_MAX_WORDS = 1000;
+// A word of a word table, as the engine's countWords keeps it: two or more
+// letters or combining marks, folded to lower case.
+const COUNT_TABLE_WORD = /^[\p{L}\p{M}]{2,}$/u;
+// The i18n key family of a corpus's localized name (corpora.json title_key).
+const CORPUS_TITLE_KEY_PREFIX = 'layout_analysis.corpus.name.';
 const CREDITS_PATH = shared('layouts', 'data', 'analysis', 'layout_credits.json');
 const INFO_SOURCES_PATH = shared('layouts', 'data', 'analysis', 'sources.json');
 // The repository and the host a repository document is linked on (one source each).
@@ -523,10 +532,11 @@ function wordListCounts(text, id) {
  * rule (countWords).
  * @param {object} engine - LAYOUT_ANALYSIS.
  * @param {string} text - The list.
+ * @param {object} [into] - The count to add to; a new one when absent.
  * @returns {object} word → count, unbounded.
  */
-function wordListWords(engine, text) {
-	const counts = {};
+function wordListWords(engine, text, into) {
+	const counts = into || {};
 	for (const line of text.split('\n')) {
 		const match = /^(\S+) ([1-9][0-9]*)$/.exec(line);
 		if (match) engine.countWords(match[1], Number(match[2]), counts);
@@ -537,10 +547,12 @@ function wordListWords(engine, text) {
 /**
  * The tables of a count-table file, checked: each of chars, bigrams and trigrams
  * maps a string of exactly 1, 2 or 3 characters to a positive integer count,
- * and pruned_below gives, per table, the smallest count it kept.
+ * pruned_below gives, per table, the smallest count it kept, and words maps at
+ * most COUNT_TABLE_MAX_WORDS words to their counts, the most frequent first.
  * @param {string} text - The file.
  * @param {string} id - The corpus id, for errors.
- * @returns {{chars: object, bigrams: object, trigrams: object}} Counts.
+ * @returns {{chars: object, bigrams: object, trigrams: object, words: object,
+ *   countedAs: string}} Counts.
  * @throws {Error} On another format or version, an unknown key, or a bad entry.
  */
 function countTableCounts(text, id) {
@@ -556,7 +568,8 @@ function countTableCounts(text, id) {
 				'counted_as',
 				'pruned_below',
 				'prune_check',
-				...Object.keys(lengths)
+				...Object.keys(lengths),
+				'words'
 			].includes(key)
 		)
 			throw new Error(`corpora.json: ${id} count table has an unknown field ${key}`);
@@ -591,10 +604,28 @@ function countTableCounts(text, id) {
 			if (Array.from(gram).length !== length || !Number.isSafeInteger(n) || n < pruned[name])
 				throw new Error(`corpora.json: ${id} ${name} entry ${JSON.stringify(gram)} is invalid`);
 	}
+	// The word table: the engine's word rule, its most frequent words first.
+	const words = table.words;
+	if (!words || typeof words !== 'object' || Array.isArray(words))
+		throw new Error(`corpora.json: ${id} count table has no words`);
+	const wordEntries = Object.entries(words);
+	if (wordEntries.length === 0 || wordEntries.length > COUNT_TABLE_MAX_WORDS)
+		throw new Error(`corpora.json: ${id} count table has ${wordEntries.length} words`);
+	wordEntries.forEach(([word, n], index) => {
+		if (
+			!COUNT_TABLE_WORD.test(word) ||
+			word !== word.toLowerCase() ||
+			!Number.isSafeInteger(n) ||
+			n < 1 ||
+			(index > 0 && n > wordEntries[index - 1][1])
+		)
+			throw new Error(`corpora.json: ${id} words entry ${JSON.stringify(word)} is invalid`);
+	});
 	return {
 		chars: table.chars,
 		bigrams: table.bigrams,
 		trigrams: table.trigrams,
+		words,
 		countedAs: table.counted_as
 	};
 }
@@ -644,12 +675,12 @@ function buildCorpora(engine) {
 					? countTableCounts(text, corpus.id)
 					: engine.ngramsFromText(text);
 		// Its most frequent words, counted from the same text by the engine's rule;
-		// a count table holds n-grams only, so it has none.
+		// a count table brings its own, counted by the importer from its source.
 		const words =
 			format === 'word_frequencies'
 				? engine.wordTable(wordListWords(engine, text))
 				: format === 'count_table'
-					? null
+					? counts.words
 					: engine.wordsFromText(text);
 		const sorted = (table) =>
 			Object.fromEntries(
@@ -662,9 +693,22 @@ function buildCorpora(engine) {
 		};
 		if (words) tables[corpus.id].words = words;
 		const characters = Object.values(counts.chars).reduce((sum, n) => sum + n, 0);
+		// A localized name, for a title that describes rather than names a work.
+		if (
+			corpus.title_key !== undefined &&
+			!(
+				typeof corpus.title_key === 'string' &&
+				corpus.title_key.startsWith(CORPUS_TITLE_KEY_PREFIX) &&
+				corpus.title_key.length > CORPUS_TITLE_KEY_PREFIX.length
+			)
+		)
+			throw new Error(
+				`corpora.json: ${corpus.id} title_key must start with ${CORPUS_TITLE_KEY_PREFIX}`
+			);
 		catalogue.push({
 			id: corpus.id,
 			title: corpus.title,
+			...(corpus.title_key ? { title_key: corpus.title_key } : {}),
 			language: corpus.language,
 			format,
 			// Its n-grams stay inside words (layout_analysis.corpus.word_list).
@@ -676,7 +720,7 @@ function buildCorpora(engine) {
 			source: entry.source,
 			url: entry.url || '',
 			characters,
-			// How many words its word table keeps (0: none, a count table).
+			// How many words its word table keeps (0: none).
 			words: words ? Object.keys(words).length : 0,
 			script: `_generated/corpus_${corpus.id}.js`
 		});
@@ -1085,6 +1129,9 @@ module.exports = {
 	loadEngine,
 	COUNT_TABLE_FORMAT,
 	COUNT_TABLE_VERSION,
+	COUNT_TABLE_MAX_WORDS,
+	CORPUS_TITLE_KEY_PREFIX,
+	wordListWords,
 	buildData,
 	buildSource,
 	corpusSource,

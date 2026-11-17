@@ -345,7 +345,11 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					const option = el(
 						'option',
 						'',
-						c.id === MY_TYPING_ID ? t('layout_analysis.corpus.my_typing') : c.title
+						c.id === MY_TYPING_ID
+							? t('layout_analysis.corpus.my_typing')
+							: c.builtin && c.builtin.title_key
+								? t(c.builtin.title_key)
+								: c.title
 					);
 					option.value = c.id;
 					return option;

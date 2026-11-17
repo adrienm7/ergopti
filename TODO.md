@@ -89,11 +89,6 @@ Design: [layout-editor.md](docs/design/layout-editor.md), [layout-analysis.md](d
 analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-analysers/report.md) (its section 15
 waits for the maintainer's review).
 
-- [ ] **More figures per layout in the Comparer (maintainer, 2026-11-17), what remains.** Every figure from the
-      engine's numbers with a hand-checked tiny-corpus test, legend and units, light and dark, phone width, 21 locales.
-  - [ ] Word tables for the count-table corpora (Leipzig 1M, Lexique): their importer
-        (`tools/build/import-count-tables.cjs`) keeps n-grams only, so « Effort per word » says they have none; add
-        a bounded word table there (same archives, same licences) if wanted.
 - [ ] **Layout formats, what is left.** The library imports Oxeylyzer, cmini and KLA's built-in layouts
       (`tools/build/import-kla-layouts.cjs`; KLA's 16 files with characters on keys the library's keyboards lack,
       12 of them ErgoDox, are listed in `not_imported` of `layout_library.json`). Left: genkey (GPL-3.0 like cmini)
@@ -107,11 +102,12 @@ waits for the maintainer's review).
       no author, adnw.de has no page for it). The 53 « collection » credits come from KLA's « author » field, which
       can name the person who submitted the layout: check each against its author's page, first the doubtful ones
       (Klausler « Kaimakides », Neo 2.0 « Julian Asamer », CarpalxQ and QWERTY Wide Mod « Dave Ferree »).
-- [ ] **[LATER] Large published frequency tables.** The `ergopti-count-table` format and its importer
-      (`tools/build/import-count-tables.cjs`) ship Leipzig and Lexique tables. Not imported: Norvig's counts
-      (www.norvig.com refused by the build environment's proxy), Google Books Ngram (several GB per language: a
-      one-off offline streaming import that ships only letter and bigram tables, with licence and attribution),
-      Tatoeba counts, other languages.
+- [ ] **[LATER] Google Books Ngram tables and more Leipzig languages.** The `ergopti-count-table` importer
+      (`tools/build/import-count-tables.cjs`) ships Leipzig and Lexique tables with their word tables. Left: Google
+      Books Ngram 2020 1-grams (CC BY 3.0, several GB per language: stream the shards, never store them, pin each
+      shard's SHA-256), and languages with no Optimiser label yet (Portuguese, Dutch: Leipzig has
+      `por_wikipedia_2021_1M` and `nld_wikipedia_2021_1M`), which also need their `layout_optimizer.language.<code>`
+      string and a library layout.
 - [ ] **[LATER] Site keyboard for other layouts.** The site's Ergopti drawing is generated from
       `static/layouts/sources/ergopti.toml` (`tools/codegen/codegen-site-keyboard.cjs`, display patch
       `src/lib/keyboard/data/ergopti_display_patch.json`). Left from the maintainer's 2026-11-14 request: display and
@@ -442,6 +438,20 @@ more`, macOS and WebKit) does not switch the Studio frames to the black-and-yell
   2. Check the Ubuntu IRC logs' licence and, if it allows shipping, import a bounded sample with nicknames replaced
      ([CODE]).
   3. Wikipedia talk pages under CC BY-SA 4.0 with the signatures stripped ([CODE]).
+- [ ] **Norvig's n-gram counts? (decided by the agent on 2026-11-17, to review by the maintainer)** norvig.com/ngrams
+      gives its code under MIT but no licence for its data files, which it says are « derived from the Google Web
+      Trillion Word Corpus », distributed by the Linguistic Data Consortium under its own licence. Kept meanwhile:
+      not imported; the Leipzig and Google Books tables cover the same need.
+  1. **(recommended) Leave them out:** nothing read allows shipping counts derived from an LDC corpus.
+  2. Ask Peter Norvig under which licence the counts may ship, then import them ([CODE]).
+- [ ] **Tatoeba's full exports as count tables? (decided by the agent on 2026-11-17, to review by the maintainer)**
+      Tatoeba's sentences are CC BY 2.0 FR, whose one condition is to credit each sentence's author; a count table
+      holds no sentence, so its authors could only be credited together. Kept meanwhile: the 30,000-sentence
+      samples, which name each author on its line.
+  1. **(recommended) Import counts of every French and English sentence,** crediting « Tatoeba contributors » with
+     a link to the export that names each author ([CODE]).
+  2. The same, with the export's author list shipped beside each table ([CODE]).
+  3. Keep the samples only.
 - [ ] **Parity decisions THD-1 to THD-4 and HCD-1, HCD-2, HCD-4, HCD-5.** Tap-holds
       ([report](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): THD-1 the pair tap and the layer, THD-2
       the lone window, THD-3 layer-hold pair activity, THD-4 the macOS thumb Backspace under modifiers. Hotstring
