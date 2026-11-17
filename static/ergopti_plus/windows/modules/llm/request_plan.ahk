@@ -23,10 +23,6 @@
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
-; The debounce that turns the automatic trigger off: the stored value of
-; llm.trigger.debounce_ms. Any negative number given to the plan means the same.
-global LLM_REQUEST_PLAN_NEVER_MS := -1
-
 /** Throws unless Value is a non-negative number. AHK numbers are always finite. */
 _LLM_RequestPlanRequireDelay(Value, Name) {
 	if !(Value is Number) || Value < 0
