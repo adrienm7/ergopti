@@ -19,6 +19,7 @@ local AXResponsiveness = require("adapters.accessibility_permission")
 -- The two pieces of tooltip maths that must not differ between drivers, and
 -- are pinned to the same JSON vectors on both.
 local SharedTint   = require("core.ui.engine.tooltip.tint")
+local SystemA11y   = require("core.ui.adapters.system_accessibility")
 local SharedLayout = require("core.ui.engine.tooltip.layout")
 
 -- Corner arc radius for ALL tooltip rounding (single + stacked canvases). Read
@@ -247,14 +248,18 @@ end
 --- @param requested_tint table|nil Requested RGBA color tint.
 --- @return table The resolved background color object.
 function M.apply_tint(requested_tint)
+	-- Reduce transparency and Increase contrast ask for an opaque panel: the
+	-- text then stands on its own colour, not on whatever lies behind.
+	local opaque = SystemA11y.wants_opaque()
 	if not Config.settings.colorization_enabled then
-		return Config.colors.bg
+		if not opaque then return Config.colors.bg end
+		return { white = Config.colors.bg.white, alpha = 1 }
 	end
 
 	return SharedTint.mix(requested_tint, {
 		lightness  = Config.tint_config.lightness,
 		saturation = Config.tint_config.saturation,
-		alpha      = Config.colors.bg_alpha,
+		alpha      = opaque and 1 or Config.colors.bg_alpha,
 		-- An achromatic accent has no hue to keep, and inventing one produces a
 		-- red panel for a grey category.
 		neutral    = Config.colors.bg,
@@ -437,6 +442,34 @@ local function visible_stack_frame()
 end
 
 --- Compiles the component blocks, applies layout logic, and draws the canvas.
+--- The plain text of a prediction tooltip, for VoiceOver.
+--- @param blocks table|userdata The payloads render() receives.
+--- @return string|nil
+function M.announcement_for_blocks(blocks)
+	local preds = type(blocks) == "userdata" and blocks or (type(blocks) == "table" and blocks.preds or nil)
+	if type(preds) == "string" then return preds end
+	if preds == nil then return nil end
+	local ok, text = pcall(function() return preds:getString() end)
+	if ok and type(text) == "string" then return text end
+	return nil
+end
+
+--- The plain text of a hotstring stack, for VoiceOver: the rows that will be
+--- sent, each with its trigger, never the struck-through alternatives.
+--- @param rows table The rows render_stacked() receives.
+--- @return string|nil
+function M.announcement_for_stacked(rows)
+	local parts = {}
+	for _, row in ipairs(type(rows) == "table" and rows or {}) do
+		if type(row) == "table" and type(row.text) == "string" and row.text ~= "" and not row.dimmed then
+			local label = type(row.trigger_label) == "string" and row.trigger_label ~= "" and (" " .. row.trigger_label) or ""
+			parts[#parts + 1] = row.text .. label
+		end
+	end
+	if #parts == 0 then return nil end
+	return table.concat(parts, "; ")
+end
+
 --- @param blocks table|userdata The text payloads to draw.
 --- @param state table The orchestrator state object.
 --- @param start_watchers_callback function Function to execute event watchers post-render.
@@ -549,6 +582,8 @@ function M.render(blocks, state, start_watchers_callback)
 		M.canvas:frame({ x = pos_x, y = pos_y, w = canvas_width, h = canvas_height })
 		M.canvas[2].frame = { x = 0, y = 0, w = canvas_width, h = canvas_height }
 		if not show_canvas_verified(M.canvas, "tooltip canvas") then return false end
+		-- A canvas is invisible to VoiceOver: the prediction is spoken when it runs.
+		SystemA11y.announce(M.announcement_for_blocks(blocks))
 
 		if type(start_watchers_callback) == "function" then start_watchers_callback() end
 		return true
@@ -570,6 +605,7 @@ end
 --- next session starts with no stale header from a previous chain.
 --- @return boolean hidden Whether the canvas and stable zone reached hidden state.
 function M.hide()
+	SystemA11y.forget_announcement()
 	if M.canvas == nil then return true end
 	local hidden = hide_canvas_verified(M.canvas, "tooltip canvas")
 	local model_info_cleared = M.set_element_text(M.ELEM_MODEL_INFO, nil)
@@ -905,6 +941,8 @@ function M.render_stacked(rows, state, start_watchers_callback)
 		M.stacked_canvas[border_idx].frame = { x = 0, y = 0, w = canvas_width, h = total_height }
 
 		if not show_canvas_verified(M.stacked_canvas, "stacked tooltip canvas") then return false end
+		-- A canvas is invisible to VoiceOver: the preview is spoken when it runs.
+		SystemA11y.announce(M.announcement_for_stacked(rows))
 		if type(start_watchers_callback) == "function" then start_watchers_callback() end
 		return true
 	end, debug.traceback)
@@ -923,6 +961,7 @@ end
 --- Hides the stacked canvas.
 --- @return boolean hidden Whether the native stacked surface reached hidden state.
 function M.hide_stacked()
+	SystemA11y.forget_announcement()
 	return hide_canvas_verified(M.stacked_canvas, "stacked tooltip canvas")
 end
 

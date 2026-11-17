@@ -27,6 +27,8 @@ local OWNERS = {
 	-- The renderer asks it which applications answer Accessibility; it
 	-- captures hs at require time, so each scenario loads it afresh.
 	"adapters.accessibility_permission",
+	-- The renderer reads the display settings and announces through VoiceOver.
+	"core.ui.adapters.system_accessibility",
 	"core.network.engine.vscode_bridge", "core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.llm_line", "core.ui.engine.tooltip.tint", "core.ui.ui.tooltip.config", "core.ui.ui.tooltip.renderer",
 	-- The configuration names the shortcut column's modifiers through the key
 	-- name table, which it loads with its data and sorting helper.
@@ -52,6 +54,14 @@ function M.load()
 	package.loaded["core.text.engine.toml_codec.reader"] = nil
 	package.loaded["core.text.engine.toml.reader"] = nil
 	package.loaded["adapters.accessibility_permission"] = nil
+	-- The system settings and VoiceOver are tested on their own
+	-- (test_system_accessibility.lua); a renderer scenario draws as if all
+	-- were off and never loads the process runner they speak through.
+	package.loaded["core.ui.adapters.system_accessibility"] = {
+		wants_opaque = function() return false end,
+		announce = function() return false end,
+		forget_announcement = function() end,
+	}
 	return helpers.load_with_stubs("core.ui.ui.tooltip.renderer"), errors
 end
 
