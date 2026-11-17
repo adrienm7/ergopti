@@ -281,6 +281,7 @@
 		"test:hex-colours": "node ./tools/test/test-hex-colours.cjs",
 		"test:shared-ui-theme": "node ./tools/test/test-shared-ui-theme.cjs",
 		"test:app-colour-contrast": "node ./tools/test/test-app-colour-contrast.cjs",
+		"test:ergopti-plus-languages": "node ./tools/test/test-ergopti-plus-languages.cjs",
 		"test:prompt-editor-bridge": "node ./tools/test/test-prompt-editor-bridge.cjs",
 		"test:action-picker-bridge": "node ./tools/test/test-action-picker-bridge.cjs",
 		"test:action-picker-disabled-rows": "node ./tools/test/test-action-picker-disabled-rows.cjs",

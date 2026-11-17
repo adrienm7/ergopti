@@ -180,7 +180,7 @@ FEATURES & RATIONALE:
 	];
 </script>
 
-<section class="keyboard" id="ep-tapholds" style="--section-accent: #fb8c00;">
+<section class="keyboard" id="ep-tapholds" lang="fr" style="--section-accent: #fb8c00;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Tap-Holds</p>
@@ -249,7 +249,7 @@ FEATURES & RATIONALE:
 	</div>
 </section>
 
-<section class="keyboard" id="ep-raccourcis" style="--section-accent: #fb8c00;">
+<section class="keyboard" id="ep-raccourcis" lang="fr" style="--section-accent: #fb8c00;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Raccourcis</p>

@@ -143,7 +143,7 @@ FEATURES & RATIONALE:
 	let barMax = $derived(Math.max(60, ...bars));
 </script>
 
-<div class="live">
+<div class="live" lang="fr">
 	<div class="live-editor ep-window os-macos">
 		<div class="le-chrome">
 			<span class="dot"></span><span class="dot"></span><span class="dot"></span>

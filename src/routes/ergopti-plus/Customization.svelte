@@ -91,7 +91,12 @@ FEATURES & RATIONALE:
 	];
 </script>
 
-<section class="custo" id="ep-personnalisation" style="--section-accent: var(--accent-blue);">
+<section
+	class="custo"
+	id="ep-personnalisation"
+	lang="fr"
+	style="--section-accent: var(--accent-blue);"
+>
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Vous gardez la main</p>
@@ -121,7 +126,7 @@ FEATURES & RATIONALE:
 				</p>
 				<ul class="lang-chips">
 					{#each locales as l}
-						<li class="lang-chip" title={l.code}>
+						<li class="lang-chip" title={l.code} lang={l.code}>
 							<span class="lang-flag" aria-hidden="true">{l.flag}</span>{l.name}
 						</li>
 					{/each}

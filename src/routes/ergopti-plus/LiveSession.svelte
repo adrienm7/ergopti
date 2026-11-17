@@ -106,7 +106,7 @@ FEATURES & RATIONALE:
 	});
 </script>
 
-<div class="session-block">
+<div class="session-block" lang="fr">
 	<div class="session-window ep-window os-{ui.osStyle}">
 		<WindowChrome title="message.txt" />
 		<div class="session-body">

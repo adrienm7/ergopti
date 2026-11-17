@@ -40,7 +40,7 @@ under another configuration path.
 <section class="platforms" id="ep-telecharger" style="--section-accent: var(--accent-blue);">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">Trois systèmes</p>
+			<p class="kicker" lang="fr">Trois systèmes</p>
 			<h2>{t('Trois systèmes, un projet.')}</h2>
 			<p class="lead">
 				{t(
@@ -274,8 +274,9 @@ under another configuration path.
 			<span class="lg off">{t('— entrée non déclarée pour ce système')}</span>
 		</p>
 
-		<!-- Per-OS bonuses (exclusive features that are not bundled apps) -->
-		<div class="bonus-grid">
+		<!-- Per-OS bonuses (exclusive features that are not bundled apps); like the
+		     apps and the Linux call below, not translated yet: said French (WCAG 3.1.2). -->
+		<div class="bonus-grid" lang="fr">
 			<article class="ep-card bonus-card" use:reveal>
 				<h3><i class="icon-windows bonus-icon"></i> En bonus sur Windows</h3>
 				<ul class="bonus-list">
@@ -309,7 +310,7 @@ under another configuration path.
 		</div>
 
 		<!-- macOS bundled apps — showcased with their real bundle icons -->
-		<div class="apps-showcase" use:reveal>
+		<div class="apps-showcase" lang="fr" use:reveal>
 			<h3 class="apps-title"><i class="icon-appleinc"></i> Applications macOS incluses</h3>
 			<p class="apps-lead">
 				Des utilitaires signés Ergopti, livrés directement dans le driver macOS — rien de plus à
@@ -335,7 +336,7 @@ under another configuration path.
 			</p>
 		</div>
 
-		<aside class="linux-callout ep-card" use:reveal>
+		<aside class="linux-callout ep-card" lang="fr" use:reveal>
 			<h3>🐧 Vous utilisez Linux ? On vous cherche.</h3>
 			<p>
 				Le driver Linux existe : 16 000 lignes de Lua, tap-holds gérés par le daemon lui-même,
@@ -353,7 +354,7 @@ under another configuration path.
 		<div class="cta-card" use:reveal>
 			<div class="cta-glow" aria-hidden="true"></div>
 			<h2 class="cta-title">{t('Vos doigts vous diront merci.')}</h2>
-			<p class="cta-sub">
+			<p class="cta-sub" lang="fr">
 				Installez <ErgoptiPlus></ErgoptiPlus>, lancez-le, tapez <code>ct★</code> — et regardez
 				<span class="cta-demo">c’était</span> s’écrire tout seul. Le reste suivra.
 			</p>

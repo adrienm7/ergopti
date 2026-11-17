@@ -12,6 +12,9 @@ stacked four bordered boxes here.
 FEATURES & RATIONALE:
 1. Clear Boundary: a visitor on AZERTY must instantly see that everything
    ABOVE works for them, and this section is the Ergopti-only bonus.
+2. Language: the section has no English translation yet, so it says it is
+   French (lang="fr", WCAG 3.1.2) even inside the English page; its English
+   example words say they are English.
 ==============================================================================
 -->
 
@@ -27,10 +30,10 @@ FEATURES & RATIONALE:
 			color: '#1e88e5',
 			lead: 'Des séquences inconfortables remplacées par des roulements fluides sur doigts adjacents. Vous tapez ce qui est confortable, le mot correct sort.',
 			rows: [
-				{ trig: 'sx', out: 'sk', words: 'ask, task, desk' },
-				{ trig: 'cx', out: 'ck', words: 'back, check' },
-				{ trig: 'hc', out: 'wh', words: 'what, when, while' },
-				{ trig: 'nt’', out: 'n’t', words: 'don’t, can’t' }
+				{ trig: 'sx', out: 'sk', words: 'ask, task, desk', lang: 'en' },
+				{ trig: 'cx', out: 'ck', words: 'back, check', lang: 'en' },
+				{ trig: 'hc', out: 'wh', words: 'what, when, while', lang: 'en' },
+				{ trig: 'nt’', out: 'n’t', words: 'don’t, can’t', lang: 'en' }
 			]
 		},
 		{
@@ -49,8 +52,8 @@ FEATURES & RATIONALE:
 			color: '#8e44ad',
 			lead: 'Les combinaisons pénibles du code deviennent des roulements vers l’intérieur sur la home-row d’Ergopti.',
 			rows: [
-				{ trig: '$=', out: '=>', words: 'fat arrow' },
-				{ trig: '+?', out: '->', words: 'Rust, types' },
+				{ trig: '$=', out: '=>', words: 'fat arrow', lang: 'en' },
+				{ trig: '+?', out: '->', words: 'Rust, types', lang: 'en' },
 				{ trig: '!#', out: '!=', words: 'différent' },
 				{ trig: '<@', out: '</', words: 'fermeture HTML' }
 			]
@@ -85,7 +88,7 @@ FEATURES & RATIONALE:
 	];
 </script>
 
-<section class="exclusives" id="ep-ergopti" style="--section-accent: #ffc107;">
+<section class="exclusives" id="ep-ergopti" lang="fr" style="--section-accent: #ffc107;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">⚡ Bonus disposition Ergopti</p>
@@ -127,7 +130,7 @@ FEATURES & RATIONALE:
 								<span class="hs-key">{r.trig}</span>
 								<span class="hs-arrow">→</span>
 								<span class="hs-out">{r.out}</span>
-								<span class="hs-desc">{r.words}</span>
+								<span class="hs-desc" lang={r.lang}>{r.words}</span>
 							</li>
 						{/each}
 					</ul>
