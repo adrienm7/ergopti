@@ -62,6 +62,7 @@
 			"The secure-field probe on a real accessibility bus",
 			"The privacy owner follows real GTK fields on the accessibility bus",
 			"AI text reaches only its own real GTK field",
+			"Case and wrap transforms change only the selection of a real GTK field",
 			"Install prerequisites for API keys in a real locked and unlocked keyring",
 			"API keys in a real locked and unlocked keyring",
 			"Install prerequisites for Desktop actions change the real trash, pointer and color scheme",
@@ -402,6 +403,9 @@
 			"Install prerequisites for The secure-field probe on a real accessibility bus"
 		],
 		"AI text reaches only its own real GTK field": [
+			"Install prerequisites for The secure-field probe on a real accessibility bus"
+		],
+		"Case and wrap transforms change only the selection of a real GTK field": [
 			"Install prerequisites for The secure-field probe on a real accessibility bus"
 		],
 		"API keys in a real locked and unlocked keyring": [

@@ -3439,6 +3439,27 @@ jobs:
           fi
         timeout-minutes: 20
 
+      # The shortcuts manager's case and wrap transforms with the daemon's real
+      # text owner (focus guard over the resident AT-SPI watch) in a real GTK
+      # field, copy and paste through xclip and XTest: only the selection
+      # changes and the clipboard is put back; a password field gets no key;
+      # the focus moving to another field between copy and paste stops it.
+      - name: Case and wrap transforms change only the selection of a real GTK field
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          timeout 180s bash static/ergopti_plus/linux/tests/hardware/run_gtk_fields_live.sh tests/hardware/run_shortcut_transforms_live.lua
+          else
+              exit 1
+          fi
+        timeout-minutes: 5
+
       - name: Install prerequisites for API keys in a real locked and unlocked keyring
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         run: |

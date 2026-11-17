@@ -1091,6 +1091,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Case and wrap transforms change only the selection of a real GTK field",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Install prerequisites for API keys in a real locked and unlocked keyring",
 			"protocol": 9
 		},
