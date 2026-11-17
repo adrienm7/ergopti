@@ -162,8 +162,11 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     structure phase moved most folders, then the areas outside every campaign (the never-campaigned list of the
     [start-at-login report](docs/audits/platform-parity/2026-11-12-start-at-login/report.md) was taken by the
     menus-tray, i18n-runtime, editors, healthcheck, onboarding, Linux install and tooltips-wpm campaigns);
-  - a deep pass of macOS `bindings.lua` and Linux `key_combinations.lua`
-    ([shortcuts campaign](docs/audits/platform-parity/2026-11-11-shortcuts/report.md));
+  - the navigation layer's wheel on macOS (BNM-1 of the 2026-11-17 key-combinations and bindings pass): it stops
+    when the Shortcuts switch is off, because it is a child of the bindings layer (`bindings.lua:288`) that switch
+    pauses whole (`menu/ui/builder/state.lua:710-713`, `modules/shortcuts/init.lua:337-341`); on Windows and Linux
+    only the layer gates it, and the macOS menu says it is no shortcut. Give it its own owner outside the
+    Shortcuts-gated layer, still held back by a script pause, with a unit test that `pause_bindings` leaves it bound.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** The unavailable-features diagnostics section is
       published on both. Left: a feed-only list may install the channel's newest release only through authenticated
       metadata (decided 2026-11-06, as macOS): download the asset under its conventional name, compute size and
@@ -450,6 +453,36 @@ more`, macOS and WebKit) does not switch the Studio frames to the black-and-yell
      a link to the export that names each author ([CODE]).
   2. The same, with the export's author list shipped beside each table ([CODE]).
   3. Keep the samples only.
+- [ ] **Key-combination parity decisions KCD-1 to KCD-8 (2026-11-17 pass).** Kept meanwhile: each OS as it is.
+  - KCD-1, « Copy tap → combo » under symmetry: Windows writes only the earlier order's chord
+    (`KeyCombinationChordCopyRows`), macOS and Linux (shared `plan_chord_copy`) every order's own chord, which
+    shows once symmetry is turned off. 1. **(recommended)** Windows follows the shared planner. 2. The shared
+    planner writes only the owner order under symmetry.
+  - KCD-2, a program launch or the monitor Alt-Tab in a chord: refused on Windows and Linux, admitted on macOS
+    (Karabiner runs them). 1. **(recommended)** Keep macOS admitting them, with a platform reason on the chord
+    picker of Windows and Linux. 2. Refuse them on macOS too.
+  - KCD-3, a refused `[mod_combos]` delay or a non-boolean `enabled`: Linux turns every chord off, Windows and
+    macOS warn and use the declared value. 1. **(recommended)** Linux warns and uses the declared value. 2. Keep Linux failing closed.
+  - KCD-4, the one-shot Shift as a pair's tap: the Linux menu refuses it, its read admits it, Windows and macOS run
+    it. 1. **(recommended)** Linux offers it. 2. Refuse it as a pair tap everywhere.
+  - KCD-5, under symmetry the macOS menu hides the reverse-order pairs, tap and hold included, though the
+    generator still applies them. 1. **(recommended)** List every pair, as Windows and Linux; only the chord row is
+    shared. 2. Keep them hidden and stop applying their tap and hold.
+  - KCD-6, `[mod_combos] enabled` switches every key combination on macOS, only the chords on Windows and Linux.
+    1. **(recommended)** macOS reads `category_enabled.key_combinations` as its master and `[mod_combos] enabled`
+       as the chords only, with a migration. 2. Windows and Linux read `[mod_combos] enabled` as the master.
+  - KCD-7, a pair or chord across two keyboards: Linux refuses it, Windows and macOS admit it.
+    1. **(recommended)** Keep it, with a platform reason. 2. Linux admits it.
+  - KCD-8, the pair rows: summary, empty word, slot order and grouping differ on each OS.
+    1. **(recommended)** All follow Windows (tap, hold, chord; a submenu per first key; the chord in the summary).
+    2. Leave each OS's menu as it is.
+- [ ] **Ctrl+★ → Ctrl+S on Linux (BND-1, BND-2, 2026-11-17 pass).** macOS has `cmd_star` (Cmd+★ to Cmd+S, extra
+      modifiers kept), Windows `layout.ctrl_magic_save` (Ctrl + magic key to a bare Ctrl+S), Linux neither; its
+      reason `platform_reason.layout_emulation_is_windows_only` says Linux installs the layout as XKB with nothing to
+      switch off, stale since Linux emulates the layout (`modules/keymap/layout_emulation.lua`). Kept meanwhile: no
+      Linux option. 1. **(recommended)** Port `ctrl_magic_save` to the Linux emulation, keep extra modifiers on
+      Windows and Linux as macOS does, and correct the reason in the 21 locales ([CODE]). 2. Keep it off Linux and
+      only correct the reason's text.
 - [ ] **Parity decisions THD-1 to THD-4 and HCD-1, HCD-2, HCD-4, HCD-5.** Tap-holds
       ([report](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): THD-1 the pair tap and the layer, THD-2
       the lone window, THD-3 layer-hold pair activity, THD-4 the macOS thumb Backspace under modifiers. Hotstring
