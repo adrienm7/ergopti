@@ -826,6 +826,32 @@ check(
 	library.every((layout) => layout.authors.length > 0 || layout.source !== ''),
 	'library: a layout has neither an author nor a source'
 );
+// A credit read on its author's page records the page, the date and what it
+// says; Hands Down's site names « R. Alan Reiser ».
+{
+	const credits = JSON.parse(
+		fs.readFileSync(shared('layouts', 'data', 'analysis', 'layout_credits.json'), 'utf8')
+	).credits;
+	for (const [id, credit] of Object.entries(credits)) {
+		check(
+			['source', 'collection', 'knowledge'].includes(credit.basis),
+			`credits: ${id} has the unknown basis ${credit.basis}`
+		);
+		if (credit.checked !== undefined)
+			check(
+				/^\d{4}-\d{2}-\d{2}$/.test(credit.checked) &&
+					typeof credit.evidence === 'string' &&
+					credit.evidence !== '' &&
+					typeof credit.url === 'string',
+				`credits: ${id} was checked but records no date, evidence or page`
+			);
+	}
+	check(
+		byId.get('hands_down').authors[0] === 'R. Alan Reiser' &&
+			byId.get('hands_down').url === 'https://sites.google.com/alanreiser.com/handsdown',
+		'library: Hands Down is not credited from its author’s site'
+	);
+}
 check(byId.get('azerty').rows.KeyQ[0] === 'a', 'library: AZERTY types a on KeyQ');
 for (const layout of library) {
 	const r = E.analyse(layout, ngrams, {});

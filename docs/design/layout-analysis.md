@@ -427,7 +427,8 @@ Every library layout names its authors (`authors`, with `year`, `url` and
 `licence` when known) or, failing that, the collection it was taken from
 (`source`). A registry layout takes them from its `meta.toml`; the others from
 `_shared/layouts/data/analysis/layout_credits.json`, whose `basis` says whether
-the layout's own file or site states the credit (`source`) or it is the
+the author's own page, file or repository states the credit (`source`, with
+`checked`, the date it was read, and `evidence`, what it says) or it is the
 generally known author still to be checked (`knowledge`). The « Comparer »
 shows the credit and the link in each layout's details.
 

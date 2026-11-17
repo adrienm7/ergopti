@@ -1,11 +1,14 @@
 {
-	"_description": "Authors of the layouts of the analysis library, shown with each layout. The registry layouts take theirs from static/layouts/registry/<id>/meta.toml. « basis » says where a credit comes from: « source » when the layout's own file or site states it, « knowledge » when it is the generally known author not yet checked against the author's own page (to verify by the maintainer). A layout without an entry is credited to the collection it was taken from.",
+	"_description": "Authors of the layouts of the analysis library, shown with each layout. The registry layouts take theirs from static/layouts/registry/<id>/meta.toml. « basis » says where a credit comes from: « source » when the author's own page, file or repository states it (« checked » is the date it was read, « evidence » what it says), « knowledge » when it is the generally known author no page has confirmed yet (to verify by the maintainer). A layout without an entry is credited to the collection it was taken from.",
 	"schema_version": 1,
 	"credits": {
 		"qwerty": {
 			"authors": ["Christopher Latham Sholes"],
 			"year": 1873,
-			"basis": "knowledge"
+			"basis": "knowledge",
+			"evidence": "US patent 207,559 (C. L. Sholes, 1878) is Sholes's; its text names no letter order, and the drawings were not read.",
+			"checked": "2026-11-17",
+			"url": "https://patents.google.com/patent/US207559A/en"
 		},
 		"dvorak": {
 			"authors": ["August Dvorak", "William Dealey"],
@@ -16,8 +19,10 @@
 		"colemak": {
 			"authors": ["Shai Coleman"],
 			"year": 2006,
-			"url": "https://colemak.com",
-			"basis": "knowledge"
+			"url": "https://colemak.com/FAQ",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Colemak FAQ: « It's after the name of its creator, Shai Coleman. », released on 1 January 2006."
 		},
 		"colemak_dh": {
 			"authors": ["SteveP (Colemak Mod-DH)"],
@@ -32,32 +37,47 @@
 		"workman": {
 			"authors": ["OJ Bucao"],
 			"year": 2010,
-			"url": "https://workmanlayout.org",
-			"basis": "knowledge"
+			"url": "https://workmanlayout.org/",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Workman site: « By OJ Bucao, September 6, 2010 »."
 		},
 		"norman": {
 			"authors": ["David Norman"],
-			"year": 2012,
-			"basis": "knowledge"
+			"url": "https://normanlayout.info/",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Norman site: « David Norman has waived all copyright and related or neighboring rights to Norman keyboard layout »; it states no year of creation (only its addition to xkeyboard-config in 2013)."
 		},
 		"halmak": {
 			"authors": ["Nikolay Nemshilov"],
 			"year": 2016,
-			"basis": "knowledge"
+			"url": "https://github.com/kaievns/halmak",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Halmak repository (github.com/MadRabbit/halmak serves it): « Copyright (C) 2016 Nikolay Nemshilov »."
 		},
 		"mtgap30": {
 			"authors": ["Michael Dickens"],
-			"basis": "knowledge"
+			"url": "https://mathematicalmulticore.wordpress.com/the-keyboard-layout-project/",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Michael Dickens's blog, The Keyboard Layout Project: « I'm calling it MTGAP. »; the page names no version 3.0."
 		},
 		"qgmlwy": {
 			"authors": ["Martin Krzywinski (carpalx)"],
-			"url": "http://mkweb.bcgsc.ca/carpalx/",
-			"basis": "knowledge"
+			"url": "http://mkweb.bcgsc.ca/carpalx/?full_optimization",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Carpalx, « full optimization » (read through the Internet Archive, 2015; the live host refuses automated reads): « © 2005-2014 Martin Krzywinski », « the resulting layout is QGMLWY »."
 		},
 		"engram": {
 			"authors": ["Arno Klein"],
 			"year": 2021,
-			"basis": "knowledge"
+			"url": "https://github.com/binarybottle/engram",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Engram repository: « created by Arno Klein »; Engram v1.2 dated 2021-02-08."
 		},
 		"semimak": {
 			"authors": ["semi (semilin)"],
@@ -66,35 +86,59 @@
 		},
 		"semimak_jq": {
 			"authors": ["semi (semilin)"],
-			"basis": "knowledge"
+			"url": "https://github.com/semilin/genkey/blob/main/layouts/semimak_jq",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "semi's genkey repository holds « Semimak JQ » with these keys; semilin.dev: « you might know me as the 'semi' in 'semimak.' »."
 		},
 		"hands_down": {
-			"authors": ["Alan Reiser"],
-			"basis": "knowledge"
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Hands Down site: « … are trademarks of R. Alan Reiser »; its menu names Hands Down Neu and Hands Down Reference."
 		},
 		"hands_down_neu": {
-			"authors": ["Alan Reiser"],
-			"basis": "knowledge"
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Hands Down site: « … are trademarks of R. Alan Reiser »; its menu names Hands Down Neu and Hands Down Reference."
 		},
 		"hands_down_reference": {
-			"authors": ["Alan Reiser"],
-			"basis": "knowledge"
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Hands Down site: « … are trademarks of R. Alan Reiser »; its menu names Hands Down Neu and Hands Down Reference."
 		},
 		"capewell": {
 			"authors": ["Michael Capewell"],
-			"basis": "knowledge"
+			"url": "http://www.michaelcapewell.com/projects/keyboard/",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Michael Capewell's site, « Projects / Alternative Keyboard Layouts »: « The Capewell-Dvorak Layout », « The Capewell Layout »."
 		},
 		"capewell_dvorak": {
 			"authors": ["Michael Capewell"],
-			"basis": "knowledge"
+			"url": "http://www.michaelcapewell.com/projects/keyboard/",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Michael Capewell's site, « Projects / Alternative Keyboard Layouts »: « The Capewell-Dvorak Layout », « The Capewell Layout »."
 		},
 		"arensito": {
 			"authors": ["Håkon Hallingstad"],
-			"basis": "knowledge"
+			"url": "http://www.pvv.org/~hakonhal/main.cgi/keyboard",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Håkon Hallingstad's home page, « The Arensito Keyboard Layout » (read through the Internet Archive, 2010; the live page answers 502): « I have been using the arensito letter layout since 1. of January 2001 »."
 		},
 		"sturdy": {
-			"authors": ["Oxey (O_X_E_Y)"],
-			"basis": "knowledge"
+			"authors": ["Oxey (O-X-E-Y)"],
+			"url": "https://github.com/O-X-E-Y/layouts/tree/main/sturdy",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "Oxey's layouts repository, sturdy/index.html: « Sturdy is my attempt at making a layout that has very high rolls … »."
 		},
 		"gallium_v2": {
 			"authors": ["GalileoBlues"],
@@ -108,16 +152,25 @@
 			"basis": "source"
 		},
 		"adnw": {
-			"authors": ["Neo community (Aus der Neo-Welt)"],
-			"basis": "knowledge"
+			"authors": ["Andreas Wettstein"],
+			"url": "http://www.adnw.de/",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "adnw.de, « Bewertungsverfahren »: AdNW was made with the keyboard optimizer whose « Entwickler Andreas Wettstein » it quotes; KLA's AdNW file names him as its author."
 		},
 		"bone": {
-			"authors": ["Neo community"],
-			"basis": "knowledge"
+			"authors": ["effchen", "danros"],
+			"url": "https://neo-layout.org/Layouts/bone/",
+			"basis": "source",
+			"checked": "2026-11-17",
+			"evidence": "neo-layout.org, Bone: « Bone wurde von „effchen“ und „danros“ im IRC mit Hilfe von Arnes Optimierer … » (made with Arne's optimizer)."
 		},
 		"koy": {
 			"authors": ["Neo community"],
-			"basis": "knowledge"
+			"basis": "knowledge",
+			"evidence": "neo-layout.org/Layouts names KOY « Weiterentwicklung von AdNW » without an author; adnw.de has no page that names one.",
+			"checked": "2026-11-17",
+			"url": "https://neo-layout.org/Layouts/"
 		}
 	}
 }

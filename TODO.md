@@ -101,8 +101,10 @@ waits for the maintainer's review).
       KLC or DOF file under a licence that allows shipping it has been found for the reader tests.
       KLAnext's `matrix` board is refused (`format_unsupported_board`): no matrix file was found to read its key
       indexes from.
-- [ ] **[LATER] Layout library credits.** The 35 cmini layouts and 25 credits are shown; check each credit known
-      « from knowledge » against its author's own page.
+- [ ] **[LATER] Layout library credits, what is left.** The credits were read on their authors' pages on 2026-11-17
+      (`checked` and `evidence` in `layout_credits.json`). Still « knowledge »: QWERTY (US patent 207,559 is Sholes's,
+      but its text names no letter order: read its drawings or another primary source) and KOY (neo-layout.org names
+      no author, adnw.de has no page for it).
 - [ ] **More corpora.** French, English, German, Spanish and Italian books, Tatoeba, Wikipedia and MIT code are in.
       [CODE] Nothing from Wikisource yet. [DECISION] An e-mail or chat register: no candidate is cleared (Enron mails
       hold personal data, the Ubuntu IRC logs' licence is unchecked, Wikipedia talk pages sign each message with a
