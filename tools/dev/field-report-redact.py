@@ -22,7 +22,10 @@ Two modes:
   host name of this machine, whatever file it is in.
 
 The identity is read from this machine when the script runs: the repository
-never holds the values it looks for.
+never holds the values it looks for. It includes the machine's serial number,
+hardware UUID and machine id; any MAC address and any value a tool labels as a
+serial number or hardware UUID is replaced too, whoever's it is (the
+collectors' device and environment facts sit next to such output).
 """
 
 import argparse
@@ -57,6 +60,21 @@ HOME_PATHS = (
     ),
 )
 PLACEHOLDER_EMAIL = "<email>"
+# A network hardware address (Wi-Fi, Ethernet, a Bluetooth keyboard): it names
+# the device for life, so no report keeps one, whoever's it is.
+MAC_ADDRESS = re.compile(
+    r"(?<![0-9A-Fa-f:-])[0-9A-Fa-f]{2}(?:([:-])[0-9A-Fa-f]{2})(?:\1[0-9A-Fa-f]{2}){4}(?![0-9A-Fa-f:-])"
+)
+PLACEHOLDER_MAC = "<mac>"
+# A value a tool labels as a serial number or a hardware UUID (system_profiler,
+# ioreg, a device listing): the label stays, the value goes.
+LABELLED_SERIAL = re.compile(
+    r"(?P<label>(?:Serial Number(?: \(system\))?|SerialNumber|serial_number|serial-number|IOPlatformSerialNumber"
+    r"|Hardware UUID|Provisioning UDID|IOPlatformUUID|product_uuid|board_serial|product_serial)\"?\s*[:=]\s*\"?)"
+    r"(?P<value>(?!<)[A-Za-z0-9][A-Za-z0-9-]{3,})",
+    re.IGNORECASE,
+)
+PLACEHOLDER_SERIAL = "<serial>"
 # A placeholder still followed by a domain: a redaction that ran out of order.
 LEFTOVER_DOMAIN = re.compile(r"<(?:user|email)>@[A-Za-z0-9.-]+")
 
@@ -140,6 +158,7 @@ def identity():
         for key in ("ComputerName", "LocalHostName", "HostName"):
             hosts.add(_run(["scutil", "--get", key]))
     hosts |= {host.split(".")[0] for host in hosts}
+    serials = _machine_serials()
     homes = {
         str(pathlib.Path.home()),
         os.environ.get("HOME", ""),
@@ -181,7 +200,65 @@ def identity():
         "domains": keep(domains),
         "hosts": keep(hosts),
         "names": keep(names),
+        "serials": {v for v in serials if v and len(v) >= SERIAL_MIN_LENGTH},
     }
+
+
+# A serial or machine id shorter than this is a placeholder value ("0", "None").
+SERIAL_MIN_LENGTH = 6
+# The values firmware uses when it has no serial: they name no machine.
+SERIAL_PLACEHOLDERS = {
+    "none",
+    "default string",
+    "to be filled by o.e.m.",
+    "system serial number",
+    "0",
+}
+
+
+def _machine_serials():
+    """Returns this machine's serial numbers, hardware UUIDs and machine id.
+
+    The facts the collectors add (hardware model, devices) sit next to places
+    a tool may print them; reading them here lets the redaction prove none is
+    left, whatever command printed it.
+
+    Returns:
+        A set of strings, empty when none is readable.
+    """
+    values = set()
+    system = platform.system()
+    if system == "Darwin":
+        text = _run(["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"])
+        for key in ("IOPlatformSerialNumber", "IOPlatformUUID"):
+            match = re.search(r'"{}" = "([^"]+)"'.format(key), text)
+            if match:
+                values.add(match.group(1))
+    elif system == "Linux":
+        for path in (
+            "/sys/class/dmi/id/product_serial",
+            "/sys/class/dmi/id/product_uuid",
+            "/sys/class/dmi/id/board_serial",
+            "/sys/class/dmi/id/chassis_serial",
+            "/etc/machine-id",
+        ):
+            try:
+                values.add(pathlib.Path(path).read_text(encoding="utf-8").strip())
+            except OSError:
+                pass
+    elif system == "Windows":
+        text = _run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "(Get-CimInstance Win32_BIOS).SerialNumber; (Get-CimInstance Win32_ComputerSystemProduct).UUID; "
+                "(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Cryptography').MachineGuid",
+            ]
+        )
+        values |= {line.strip() for line in text.splitlines()}
+    return {v for v in values if v.lower() not in SERIAL_PLACEHOLDERS}
 
 
 def _spellings(value):
@@ -216,6 +293,7 @@ def replacements(ident):
     tokens += [(v, "<domain>") for v in ident["domains"]]
     tokens += [(v, "<host>") for v in ident["hosts"]]
     tokens += [(v, "<name>") for v in ident["names"]]
+    tokens += [(v, PLACEHOLDER_SERIAL) for v in ident.get("serials", ())]
     for value, placeholder in sorted(tokens, key=lambda pair: len(pair[0]), reverse=True):
         # Bounded by non-word characters: the login `ana` leaves `banana`.
         pattern = r"(?<![A-Za-z0-9])" + re.escape(value) + r"(?![A-Za-z0-9])"
@@ -236,6 +314,8 @@ def redact_text(text, pairs):
     # The generic forms first: replacing the login alone would leave its
     # domain behind (`<user>@corp.domain`), which no later pattern matches.
     text = EMAIL.sub(PLACEHOLDER_EMAIL, text)
+    text = LABELLED_SERIAL.sub(lambda m: m.group("label") + PLACEHOLDER_SERIAL, text)
+    text = MAC_ADDRESS.sub(PLACEHOLDER_MAC, text)
     for pattern, placeholder in pairs:
         text = pattern.sub(placeholder, text)
     for pattern, placeholder in HOME_PATHS:
@@ -256,6 +336,8 @@ def leaks(text, pairs):
     found = [m.group(0) for pattern, _ in pairs for m in pattern.finditer(text)]
     found += [m.group(0) for m in EMAIL.finditer(text)]
     found += [m.group(0) for m in LEFTOVER_DOMAIN.finditer(text)]
+    found += [m.group(0) for m in MAC_ADDRESS.finditer(text)]
+    found += [m.group("value") for m in LABELLED_SERIAL.finditer(text)]
     found += [m.group(0) for pattern, _ in HOME_PATHS for m in pattern.finditer(text)]
     return found
 

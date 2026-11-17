@@ -121,6 +121,25 @@ check('the organisation named by the directory domain leaves on its own too', ()
 	);
 });
 
+// The collectors' device and environment facts (hidutil, ioreg, karabiner_cli,
+// system_profiler) sit next to output that can carry a serial number, a
+// hardware UUID or a Bluetooth address: none may reach the public branch.
+check('serial numbers, hardware UUIDs and MAC addresses leave, versions and times stay', () => {
+	const run = runRedact({
+		'environment.txt':
+			'Serial Number (system): C02CANARY123\n"IOPlatformUUID" = "ABCD1234-CANARY"\n' +
+			'keyboard address a4:83:e7:12:34:56, wifi 00-1B-63-84-45-E6\n' +
+			'at 23:54:48, AutoHotkey 2.0.18.0, Karabiner-Elements 16.0.0\n'
+	});
+	assert.equal(run.status, 0, run.stderr);
+	assert.equal(
+		run.files['environment.txt'],
+		'Serial Number (system): <serial>\n"IOPlatformUUID" = "<serial>"\n' +
+			'keyboard address <mac>, wifi <mac>\n' +
+			'at 23:54:48, AutoHotkey 2.0.18.0, Karabiner-Elements 16.0.0\n'
+	);
+});
+
 check('a company login is removed even when the machine does not report it', () => {
 	const run = runRedact({ 'a.txt': 'owner other.person@unknown-corp.example\n' });
 	assert.equal(run.status, 0, run.stderr);
