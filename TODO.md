@@ -199,13 +199,19 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ## Carried over from the 1.0.9 requests
 
-- [ ] **Slowness, Windows boot.** Done so far: deferred emoji and symbol registration, the AI submenu built at its
-      first open, lighter parsing (see `BOOT_OPERATION_CEILINGS` of the startup smoke). Next candidates: script parse
-      (lighter boot includes; AHK has no runtime include, so only a smaller graph or a worker helps) and the remote AI
-      catalogue (212 ms), to measure again now that the AI root is lazy. Measure each with interleaved base/candidate
-      smoke-fixture boots (summed `process_cpu`). Rejected: a disk cache for the layout stage (native hotkey
-      registration). The PC timings and the macOS field points `rerun_2026_11_02` and `main_thread_holds` are in the
-      TODO-tests files.
+- [ ] **Slowness, Windows boot.** Left, largest first, measured 17 November on the maintainer's configuration
+      (`tools/dev/bench-ahk-startup.cjs` smoke boots, loaded PC, boot about 10.4 s): script parse before the first
+      line, 2.2-2.6 s of CPU (`AutoHotkey64.exe /validate ErgoptiPlus.ahk` alone takes as much; AHK has no runtime
+      include, so only a smaller include graph or a worker helps); hotstring registration 1.5 s and layout 1.0 s,
+      needed at the first key (a disk cache for the layout stage is rejected: native hotkey registration); the first
+      decode of `menu_manifest.json` (about 300 ms, in `HotstringsSeedLanguageCategoryGates`) and of the personal
+      hotstrings file (about 490 ms, the `ReadPersonalToml` seed of the configuration stage), both reused by later
+      owners, so only a cheaper decode or a selective read helps; the AI catalogue, 230 ms before the first key
+      (deferring it means a lazy accessor for its 184 readers); the magic editor's source probe (190 ms) and cohort
+      acquisition (135 ms); the tray menu, 0.6-0.7 s after the keyboard and before ready. Compare each with
+      interleaved base/candidate boots (summed `process_cpu`). A smoke boot beside a resident driver is suspended,
+      so it does not measure the keyboard arbiter of the prefix-watcher stage. The PC timings and the macOS field
+      points `rerun_2026_11_02` and `main_thread_holds` are in the TODO-tests files.
 - [ ] **[RELEASE] Before publishing.** On a quiet PC with no resident driver: the whole AHK suite,
       `npm run test:ahk-tray-rows-read-as-text`, every live check including `quit-over-a-log-flush`, the JS, macOS and
       Linux suites, and a Windows field report with a driver.
