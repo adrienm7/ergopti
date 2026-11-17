@@ -149,7 +149,24 @@ def session(root):
             return process
 
         try:
-            launch(["openbox"], "openbox")
+            wm = launch(["openbox"], "openbox")
+            # xdotool windowactivate needs the window manager to announce
+            # _NET_ACTIVE_WINDOW; activated before openbox managed the screen it
+            # refused (« claims not to support _NET_ACTIVE_WINDOW », verify run
+            # 44018004125).
+            deadline = time.monotonic() + 8
+            while True:
+                supported = subprocess.run(
+                    ["xprop", "-root", "_NET_SUPPORTED"],
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
+                )
+                if "_NET_ACTIVE_WINDOW" in supported.stdout:
+                    break
+                assert wm.poll() is None, "openbox exited before managing the screen"
+                assert time.monotonic() < deadline, "openbox did not announce _NET_ACTIVE_WINDOW"
+                time.sleep(0.02)
             app = launch(
                 [os.environ["ERGOPTI_ATSPI_GTK_PYTHON"], __file__, "--gtk", str(root)], "gtk"
             )
