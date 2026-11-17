@@ -368,7 +368,7 @@ Each question names the default kept meanwhile; an answer moves into the item or
 - [ ] **Accessibility choices of the second pass (decided by the agent on 2026-11-17, to review by the
       maintainer).** The legacy `/ergopti-plus-old` page is kept and fixed, not retired, since the new Ergopti+ page
       links to it (« Ancienne version de cette page »); the system's « increase contrast » (`prefers-contrast:
-  more`, macOS and WebKit) does not switch the Studio frames to the black-and-yellow high-contrast theme, which
+more`, macOS and WebKit) does not switch the Studio frames to the black-and-yellow high-contrast theme, which
       stays the site setting's (the site itself has no such rule); the heatmap table lists keys by value, largest
       first, not in board order. Approve or change.
 - [ ] **Agent decisions to review.** Each is implemented as written; confirm or change:
