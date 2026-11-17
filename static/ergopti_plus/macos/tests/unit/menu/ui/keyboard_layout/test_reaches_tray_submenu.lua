@@ -48,7 +48,7 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 		local deferred = 0
 		local window = {
 			menu_command = function() return function() end end,
-			editor_menu_command = function() return function() deferred = deferred + 1 end end,
+			edit_menu_command = function() return function() deferred = deferred + 1 end end,
 		}
 		package.loaded["ui.layout_manager"] = window
 		local ok, err = pcall(function()

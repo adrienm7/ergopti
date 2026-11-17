@@ -565,21 +565,23 @@ function M.menu_command()
 	end
 end
 
---- Builds the « Create or edit a layout… » menu command.
+--- Builds the top-level « Ergopti Studio… » command: the Studio on the tab it
+--- was left on (menu/ui/builder/builder.lua).
 --- @return function
 function M.editor_menu_command()
 	return function()
-		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), M.open_editor,
-			"layout_manager.open_editor")
+		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), M.open_studio,
+			"layout_manager.open_studio")
 	end
 end
 
---- Builds the top-level « Ergopti Studio… » command: the Studio on its last tab.
+--- Builds the « Create or edit a layout… » menu command: the Studio on its
+--- editor tab, which an open Studio may have left (studio-edit-tab).
 --- @return function
-function M.studio_menu_command()
+function M.edit_menu_command()
 	return function()
-		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), M.open_studio,
-			"layout_manager.open_studio")
+		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), M.open_editor,
+			"layout_manager.open_editor")
 	end
 end
 
