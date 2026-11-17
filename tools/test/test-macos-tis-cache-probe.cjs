@@ -7,7 +7,7 @@
  * .github/workflows/probe-macos-tis-cache.yml runs
  * tools/diagnostics/macos_tis_cache_probe.swift, which changes the input source
  * of the runner it runs on, so it must stay a manual probe: dispatched by hand
- * only, read-only token, on the hosted macOS images the refusals were seen on.
+ * or pushed on a temporary ci/verify-macos-* branch only, read-only token, on the hosted macOS images the refusals were seen on.
  * This test holds the workflow to that, and to the probe itself: every run-loop
  * mode the probe accepts is run, each in its own process, with and without the
  * body the refused cases ran; the evidence is uploaded even when a step fails;
@@ -32,8 +32,11 @@ const text = fs.readFileSync(WORKFLOW, 'utf8');
 const workflow = YAML.parse(text);
 const probe = fs.readFileSync(path.join(REPO_ROOT, PROBE), 'utf8');
 
-// A manual probe: no push, pull request or schedule, and a read-only token.
-assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);
+// A manual probe: dispatched, or pushed on a temporary verification branch,
+// never on dev, main, a pull request or a schedule; a read-only token.
+assert.deepEqual(Object.keys(workflow.on).sort(), ['push', 'workflow_dispatch']);
+assert.deepEqual(workflow.on.push.branches, ['ci/verify-macos-*']);
+assert.deepEqual(workflow.on.push.paths, [PROBE, '.github/workflows/probe-macos-tis-cache.yml']);
 assert.deepEqual(workflow.permissions, { contents: 'read' });
 assert.equal(workflow.on.workflow_dispatch.inputs.cycles.default, '30');
 checks++;
@@ -64,12 +67,14 @@ assert.deepEqual(
 	'every mode the probe accepts runs'
 );
 assert(variants.includes('default --body'), 'the refused cases ran a body between the selections');
+assert(variants.includes('nsapp --child-select'), 'an application observes a plain selector');
 assert.deepEqual(
 	variants.slice(0, 2),
 	['default --toggle', 'default --toggle --body'],
 	'the fixture-shaped variants run first, while the target is still disabled'
 );
 assert.match(run.run, /--cycles "\$CYCLES"/);
+assert.equal(run.env.CYCLES, "${{ inputs.cycles || '30' }}", 'a push runs the default cycles');
 assert.match(run.run, /macos_text_input_agents\.sh "\$evidence\/text-input-agents\.txt" before/);
 assert.match(run.run, /macos_text_input_agents\.sh "\$evidence\/text-input-agents\.txt" after/);
 assert.match(run.run, /grep -h '\^SUMMARY ' "\$evidence"\/\*\.jsonl/);
@@ -91,6 +96,7 @@ for (const needle of [
 	'if !targetWasEnabled && targetEnabledNow && originalCurrent',
 	'"AppleCurrentKeyboardLayoutInputSourceID"',
 	'case "--toggle": options.toggle = true',
+	'case "--child-select": options.childSelect = true',
 	'print("SUMMARY "'
 ])
 	assert(probe.includes(needle), `the probe holds ${needle}`);

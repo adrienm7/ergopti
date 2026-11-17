@@ -22,6 +22,10 @@
  * --body adds, between the two selections, what the refused cases did before the
  * restore: a keyboard event built from the HID system state and read back
  * (key code 12, the Q key), nothing posted.
+ * --child-select makes each selection in a fresh plain process (this binary run
+ * with --select <id>) while this process only observes and pumps: whether the
+ * lost selections follow the process that pumps text-input events or the one
+ * that selects.
  * --toggle runs each cycle as one fixture case does: enable the target (it must
  * start disabled), select it, restore the original, disable the target once the
  * original is current again.
@@ -70,6 +74,7 @@ struct Options {
 	var cycles = 0
 	var body = false
 	var toggle = false
+	var childSelect = false
 	var target = "com.apple.keylayout.French"
 }
 
@@ -92,6 +97,7 @@ func parseOptions(_ arguments: [String]) -> Options {
 		case "--target": options.target = value("--target")
 		case "--body": options.body = true
 		case "--toggle": options.toggle = true
+		case "--child-select": options.childSelect = true
 		default: fail("unknown argument \(arguments[index])")
 		}
 		index += 1
@@ -145,6 +151,20 @@ func preferences() -> [String: Any] {
 		result["selected"] = NSNull()
 	}
 	return result
+}
+
+/// Selects `id` from a fresh plain process; its status, or nil when the child did not answer one.
+func childSelect(_ id: String) -> OSStatus? {
+	guard let executable = Bundle.main.executablePath else { return nil }
+	let child = Process()
+	child.executableURL = URL(fileURLWithPath: executable)
+	child.arguments = ["--select", id]
+	let pipe = Pipe()
+	child.standardOutput = pipe
+	do { try child.run() } catch { return nil }
+	child.waitUntilExit()
+	let data = pipe.fileHandleForReading.readDataToEndOfFile()
+	return Int32(String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))
 }
 
 /// What a new process reads as current: the system's state without this process's cache.
@@ -220,10 +240,16 @@ struct Tally {
 }
 
 /// Selects `id`, waits for this process to see it and records what each side reads.
-func step(_ name: String, id: String, cycle: Int, mode: String, tally: inout Tally) {
+func step(_ name: String, id: String, cycle: Int, mode: String, viaChild: Bool, tally: inout Tally) {
 	guard let source = lookup(id) else { fail("\(id) is not an input source here") }
 	let before = notifications.count
-	let status = TISSelectInputSource(source)
+	let status: OSStatus
+	if viaChild {
+		guard let answered = childSelect(id) else { fail("the selecting child gave no status for \(id)") }
+		status = answered
+	} else {
+		status = TISSelectInputSource(source)
+	}
 	let wait = waitForCurrent(id, mode: mode, seconds: WAIT_SECONDS)
 	var record: [String: Any?] = [
 		"mode": mode, "cycle": cycle, "step": name, "wanted": id, "status": Int(status),
@@ -281,6 +307,11 @@ if arguments == ["--read-current"] {
 	print(currentIdentifier())
 	exit(0)
 }
+if arguments.count == 2 && arguments[0] == "--select" {
+	guard let source = lookup(arguments[1]) else { fail("\(arguments[1]) is not an input source here") }
+	print(TISSelectInputSource(source))
+	exit(0)
+}
 let options = parseOptions(arguments)
 if options.mode == "nsapp" {
 	let application = NSApplication.shared
@@ -303,7 +334,8 @@ if !targetWasEnabled && !options.toggle {
 }
 emit([
 	"mode": options.mode, "step": "start", "original": originalID, "target": options.target,
-	"body": options.body, "toggle": options.toggle, "fresh_process_current": freshProcessCurrent(),
+	"body": options.body, "toggle": options.toggle, "child_select": options.childSelect,
+	"fresh_process_current": freshProcessCurrent(),
 	"preferences": preferences(),
 ])
 
@@ -320,9 +352,9 @@ func toggleTarget(_ enable: Bool, cycle: Int, mode: String) -> Bool {
 
 for cycle in 1...options.cycles {
 	if options.toggle && !toggleTarget(true, cycle: cycle, mode: options.mode) { break }
-	step("select", id: options.target, cycle: cycle, mode: options.mode, tally: &tally)
+	step("select", id: options.target, cycle: cycle, mode: options.mode, viaChild: options.childSelect, tally: &tally)
 	if options.body { body(cycle: cycle, mode: options.mode) }
-	step("restore", id: originalID, cycle: cycle, mode: options.mode, tally: &tally)
+	step("restore", id: originalID, cycle: cycle, mode: options.mode, viaChild: options.childSelect, tally: &tally)
 	cyclesRun = cycle
 	// Like the fixture, retire the target only once the original is this process's current source.
 	if options.toggle {
@@ -343,7 +375,8 @@ if !targetWasEnabled && targetEnabledNow && originalCurrent, let source = lookup
 }
 
 let summary: [String: Any] = [
-	"mode": options.mode, "body": options.body, "toggle": options.toggle, "cycles": options.cycles, "cycles_run": cyclesRun, "steps": cyclesRun * 2,
+	"mode": options.mode, "body": options.body, "toggle": options.toggle,
+	"child_select": options.childSelect, "cycles": options.cycles, "cycles_run": cyclesRun, "steps": cyclesRun * 2,
 	"seen": tally.seen, "missed": tally.missed, "stale": tally.stale, "recovered": tally.recovered,
 	"original_current_at_end": originalCurrent,
 ]

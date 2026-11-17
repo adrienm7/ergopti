@@ -1,19 +1,30 @@
 # .github/workflows/probe-macos-tis-cache.yml
 
-# Manual probe for the « [CI] Native keyboard-source fixture » refusals (TODO.md):
-# in runs 43277967473 and 43276494558 the system applied a restore from French to
-# US while the test process's TISCopyCurrentKeyboardInputSource stayed French.
-# tools/diagnostics/macos_tis_cache_probe.swift runs each run-loop mode in its own
-# long-lived process on each hosted macOS image and says, step by step, whether
-# that process saw the change, what a fresh process read, what the HIToolbox
-# preferences held, and whether a stale cache caught up. The --toggle variants
-# run first, while the target is still disabled: they enable and disable it
-# around each cycle as one fixture case does. It never runs on push: dispatch it by hand, then read the
-# SUMMARY lines in the job summary and the JSON lines in the artifact.
+# Probe for the native keyboard-source fixture refusals: in runs 43277967473
+# and 43276494558 a restore from French to US moved the selected list while the
+# current source stayed French. tools/diagnostics/macos_tis_cache_probe.swift
+# runs each run-loop mode in its own long-lived process on each hosted macOS
+# image and says, step by step, whether that process saw the change, what a
+# fresh process read, what the HIToolbox preferences held, and whether a stale
+# source caught up. The --toggle variants run first, while the target is still
+# disabled: they enable and disable it around each cycle as one fixture case
+# does. "nsapp --child-select" pumps an application's events while a fresh
+# plain process makes each selection.
+#
+# It changes the runner's input source, so it never runs on dev, main or a pull
+# request. A workflow_dispatch needs this file on the default branch; until
+# then, push the candidate to a temporary ci/verify-macos-<sha> branch that
+# changes the probe or this file, read the SUMMARY lines in the job summary and
+# the JSON lines in the artifact, then delete the branch.
 
 name: Probe macOS TIS current-source cache
 
 on:
+  push:
+    branches: ['ci/verify-macos-*']
+    paths:
+      - tools/diagnostics/macos_tis_cache_probe.swift
+      - .github/workflows/probe-macos-tis-cache.yml
   workflow_dispatch:
     inputs:
       cycles:
@@ -42,7 +53,7 @@ jobs:
 
       - name: Run each run-loop mode in its own long-lived process
         env:
-          CYCLES: ${{ inputs.cycles }}
+          CYCLES: ${{ inputs.cycles || '30' }}
         run: |
           set -euo pipefail
           evidence="$RUNNER_TEMP/tis-cache-evidence"
@@ -50,7 +61,7 @@ jobs:
           sw_vers > "$evidence/sw_vers.txt"
           uname -m >> "$evidence/sw_vers.txt"
           bash tools/diagnostics/macos_text_input_agents.sh "$evidence/text-input-agents.txt" before
-          for variant in "default --toggle" "default --toggle --body" "default" "default --body" "tracking" "nsapp" "none"; do
+          for variant in "default --toggle" "default --toggle --body" "default" "default --body" "tracking" "nsapp" "nsapp --child-select" "none"; do
               read -r -a extra <<< "$variant"
               name="${variant// --/-}"
               "$RUNNER_TEMP/tis-cache-probe" --mode "${extra[@]}" --cycles "$CYCLES" | tee "$evidence/$name.jsonl"
