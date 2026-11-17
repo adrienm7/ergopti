@@ -1088,37 +1088,115 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @returns {Set<string>} The characters typed, substitutes included.
 	 */
 	function reachableChars(layout, board, missing) {
+		const graph = reachGraph(deadRules(layout.dead));
 		const chars = new Set();
-		const states = new Set();
-		for (const [code, row] of Object.entries(layout.rows)) {
+		// The rules' characters and states reached, by id.
+		const hasChar = new Uint8Array(graph.chars.length);
+		const hasState = new Uint8Array(graph.states.length);
+		for (const code in layout.rows) {
 			if (!board.index.has(code) || missing.has(code)) continue;
-			for (const cell of row) {
+			for (const cell of layout.rows[code]) {
 				if (cell === null) continue;
-				if (typeof cell !== 'string') states.add(cell.dead);
-				else if (codeLength(cell) === 1) chars.add(cell);
+				if (typeof cell !== 'string') {
+					const s = graph.stateId.get(cell.dead);
+					if (s !== undefined) hasState[s] = 1;
+				} else if (codeLength(cell) === 1) {
+					chars.add(cell);
+					const c = graph.charId.get(cell);
+					if (c !== undefined) hasChar[c] = 1;
+				}
 			}
 		}
-		const rules = deadRules(layout.dead);
+		const { state, typed, typedDead, out, outKind } = graph;
 		for (let depth = 0; depth < MAX_DEAD_DEPTH; depth++) {
 			let changed = false;
-			for (const rule of rules) {
-				if (!states.has(rule.state)) continue;
-				const typed =
-					rule.typedDead !== null ? states.has(rule.typedDead) : chars.has(rule.typedChar);
-				if (!typed) continue;
-				if (rule.outChar !== null && !chars.has(rule.outChar)) {
-					chars.add(rule.outChar);
+			for (let r = 0; r < state.length; r++) {
+				if (!hasState[state[r]]) continue;
+				if (!(typedDead[r] ? hasState[typed[r]] : hasChar[typed[r]])) continue;
+				if (outKind[r] === REACH_CHAR) {
+					if (hasChar[out[r]]) continue;
+					hasChar[out[r]] = 1;
+					chars.add(graph.chars[out[r]]);
 					changed = true;
-				} else if (rule.outDead !== null && !states.has(rule.outDead)) {
-					states.add(rule.outDead);
+				} else if (outKind[r] === REACH_STATE && !hasState[out[r]]) {
+					hasState[out[r]] = 1;
 					changed = true;
 				}
 			}
 			if (!changed) break;
 		}
-		for (const [fancy, plain] of Object.entries(data().model.substitutions))
-			if (!chars.has(fancy) && textPoints(plain).every((c) => chars.has(c))) chars.add(fancy);
+		for (const [fancy, plain] of substitutionParts())
+			if (!chars.has(fancy) && plain.every((c) => chars.has(c))) chars.add(fancy);
 		return chars;
+	}
+
+	// What a rule gives in reachGraph: a character, a dead state, or a text (nothing reached).
+	const REACH_TEXT = 0;
+	const REACH_CHAR = 1;
+	const REACH_STATE = 2;
+	const reachGraphCache = new WeakMap();
+
+	/**
+	 * The dead-key rules on ids, for reachableChars: the characters and
+	 * states they name, and per rule its state, what it reads (a state when
+	 * typedDead) and what it gives (outKind). Cached per rule list.
+	 */
+	function reachGraph(rules) {
+		let graph = reachGraphCache.get(rules);
+		if (graph) return graph;
+		const chars = [];
+		const states = [];
+		const charId = new Map();
+		const stateId = new Map();
+		const id = (map, list, name) => {
+			let i = map.get(name);
+			if (i === undefined) {
+				i = list.length;
+				map.set(name, i);
+				list.push(name);
+			}
+			return i;
+		};
+		const n = rules.length;
+		graph = {
+			chars,
+			states,
+			charId,
+			stateId,
+			state: new Int32Array(n),
+			typed: new Int32Array(n),
+			typedDead: new Uint8Array(n),
+			out: new Int32Array(n),
+			outKind: new Uint8Array(n)
+		};
+		rules.forEach((rule, r) => {
+			graph.state[r] = id(stateId, states, rule.state);
+			if (rule.typedDead !== null) {
+				graph.typedDead[r] = 1;
+				graph.typed[r] = id(stateId, states, rule.typedDead);
+			} else graph.typed[r] = id(charId, chars, rule.typedChar);
+			if (rule.outChar !== null) {
+				graph.outKind[r] = REACH_CHAR;
+				graph.out[r] = id(charId, chars, rule.outChar);
+			} else if (rule.outDead !== null) {
+				graph.outKind[r] = REACH_STATE;
+				graph.out[r] = id(stateId, states, rule.outDead);
+			} else graph.outKind[r] = REACH_TEXT;
+		});
+		reachGraphCache.set(rules, graph);
+		return graph;
+	}
+
+	let substitutionList = null;
+
+	/** The model's substitutions, each as [fancy, the characters of its plain form]. */
+	function substitutionParts() {
+		if (substitutionList === null)
+			substitutionList = Object.entries(data().model.substitutions).map(([fancy, plain]) => [
+				fancy,
+				textPoints(plain)
+			]);
+		return substitutionList;
 	}
 
 	// ========================
