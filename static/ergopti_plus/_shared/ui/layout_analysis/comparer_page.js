@@ -141,7 +141,6 @@
 	const LINK_PARAMS = ['corpus', 'keyboard', 'format', 'layouts', 'details', 'versus'];
 	// The layout origins a link can name: the user's own layouts stay on their device.
 	const SHAREABLE_ORIGINS = ['registry', 'reference', 'library'];
-	const TEXT_DEBOUNCE_MS = 400;
 	// The message the framing page listens for to size its frame.
 	const HEIGHT_MESSAGE = 'ergopti-layout-analysis:height';
 	// The app's keystats n-grams: the event its Studio window dispatches and the
@@ -2054,7 +2053,10 @@
 			let timer = null;
 			$('la-text').addEventListener('input', (event) => {
 				clearTimeout(timer);
-				timer = setTimeout(() => useText(event.target.value), TEXT_DEBOUNCE_MS);
+				timer = setTimeout(
+					() => useText(event.target.value),
+					window.LAYOUT_ANALYSIS_FILES.TEXT_DEBOUNCE_MS
+				);
 			});
 			$('la-file').addEventListener('change', async (event) => {
 				const file = event.target.files && event.target.files[0];

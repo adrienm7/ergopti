@@ -94,7 +94,6 @@
 	const MAX_TEXT_CHARS = 5000000;
 	// Files larger than this are refused before they are read (MB).
 	const MAX_FILE_MB = 50;
-	const TEXT_DEBOUNCE_MS = 400;
 	// The reader's choices and last text, kept in this browser for the next visit.
 	const STORAGE_KEY = 'ergopti.layout_optimizer.v1';
 	const TEXT_KEY = 'ergopti.layout_optimizer.text.v1';
@@ -1146,7 +1145,10 @@
 			let textTimer = null;
 			$('lo-text').addEventListener('input', (event) => {
 				clearTimeout(textTimer);
-				textTimer = setTimeout(() => useText(event.target.value), TEXT_DEBOUNCE_MS);
+				textTimer = setTimeout(
+					() => useText(event.target.value),
+					window.LAYOUT_ANALYSIS_FILES.TEXT_DEBOUNCE_MS
+				);
 			});
 			$('lo-file').addEventListener('change', (event) => {
 				const file = event.target.files && event.target.files[0];

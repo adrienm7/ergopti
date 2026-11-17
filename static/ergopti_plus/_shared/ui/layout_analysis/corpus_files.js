@@ -58,6 +58,9 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	// The Comparer's saved settings (weights, ideal finger load…), which the
 	// editor's analysis panel reads so both score alike.
 	const SETTINGS_KEY = 'ergopti.layout_analysis.v1';
+	// How long a pasted or typed corpus text rests before the Comparer and the
+	// Optimiser read it, so each keystroke does not restart the analysis.
+	const TEXT_DEBOUNCE_MS = 400;
 
 	/** A rejection the page localizes. */
 	const failure = (code) => Object.assign(new Error(code), { code });
@@ -323,6 +326,7 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 
 	return {
 		SETTINGS_KEY,
+		TEXT_DEBOUNCE_MS,
 		publishEditorLayouts,
 		onEditorLayouts,
 		OPEN_COMPARER_MESSAGE,
