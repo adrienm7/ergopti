@@ -677,6 +677,10 @@ ellipsis, the ê dead key, TextSender, predictions and paste already use
 `SendInput`.
 `tests/unit/modules/hotstrings/engine/test_hotstring_output_is_final.ahk` and
 `test_hotstring_chaining.ahk` (`--interactive` adds the real engine and keyboard).
+A test of this contract pins `HSE_CascadeMaxArrows := 1`: with the default
+three arrows the engine resolves a chain before sending, and the interactive
+session's `foo bar final` (2026-11-17) was that cascade, not a level-0 burst
+reaching the I1 watcher.
 
 ### project-ahk-hotif-variant-precedence
 

@@ -389,16 +389,65 @@ _HOF_RealSettle(Edit, Timeout := 4000) {
 	return A_TickCount - Since
 }
 
+; Arms the engine of one interactive session: a clean engine, one cascade
+; arrow and the chain of three. This contract is that no output re-enters the
+; watcher. With the default three arrows the engine itself resolves qzx > qzy >
+; qzz before it sends anything, so the watcher session typed « foo bar final »
+; with either primitive, which read as a level-0 SendEvent burst reaching the I1
+; watcher (2026-11-17); the in-engine cascade has its own test.
+; @param Origin {String} "watcher" (a star first trigger) or "tap" (an
+;        end-character first trigger, completed by Space).
+_HOF_RealArm(Origin) {
+	global HSE_CascadeMaxArrows
+	HSE_RegistryClear()
+	HSE_HardReset()
+	HSE_FeedReset(true)
+	HSE_CascadeMaxArrows := 1
+	Opts := Map("OnlyText", true, "Priority", HSE_PRIORITY_COMMON)
+	if (Origin == "watcher") {
+		CreateHotstring("*?", "qzx", "foo qzy", Opts)
+	} else {
+		; An end-character trigger: only the Space completes it.
+		CreateHotstring("?", "qzs", "foo qzy", Opts)
+	}
+	CreateHotstring("*?", "qzy", "bar qzz", Opts)
+	CreateHotstring("*?", "qzz", "final", Opts)
+}
+
+; The interactive session's engine, driven headless from the default cascade
+; setting: each origin sends the first link alone, as the interactive test
+; expects of the real keyboard.
+_HOF_RealArmImpl(Origin) {
+	global _HOF_Sends, HSE_CascadeMaxArrows
+	HSE_CascadeMaxArrows := ""
+	_HOF_RealArm(Origin)
+	Verdict := _HOF_TypeAndFire(Origin == "watcher" ? "qzx" : "qzs ")
+	AssertTrue(Verdict, Origin . ": the first link must dispatch")
+	AssertEqual(1, _HOF_Sends.Length, Origin . ": one trigger must produce one burst")
+	Expected := Origin == "watcher" ? "{BackSpace 3}{Text}foo qzy" : "{BackSpace 4}{Text}foo qzy "
+	AssertEqual(Expected, _HOF_Sends[1].Keys,
+		Origin . ": the session must send the first link alone, not the in-engine cascade")
+}
+
+_HOF_RealArmSendsOneLink() {
+	_HOF_Run(_HOF_RealArmImpl.Bind("watcher"))
+	_HOF_Run(_HOF_RealArmImpl.Bind("tap"))
+}
+
+Test("hotstring output: the interactive session arms one cascade arrow (hotstring-output-is-final)",
+	_HOF_RealArmSendsOneLink)
+
 ; One session in a window the test owns, on the real watcher InputHook.
 ; @param Primitive {String} "SendInput" or "SendEvent", the burst primitive.
 ; @param Origin {String} "watcher": the whole text is typed at level 2. "tap":
 ;        the trigger is typed, a level-2 hotkey thread completes it.
 ; @return {Map} document, buffer, document and buffer after one Backspace.
 _HOF_RealSession(Primitive, Origin) {
-	global _PrefixInputHook, _SendHook, _HotstringRegistrar, _AHK_SendInput
+	global _PrefixInputHook, _SendHook, _HotstringRegistrar, _AHK_SendInput, HSE_CascadeMaxArrows
 	SavedInput := _AHK_SendInput
 	SavedHook := _SendHook
 	SavedRegistrar := _HotstringRegistrar
+	SavedArrows := HSE_CascadeMaxArrows
 	Window := Gui("+AlwaysOnTop", "Ergopti hotstring output test")
 	Edit := Window.AddEdit("w420 h90 Multi", "")
 	Result := Map()
@@ -417,18 +466,7 @@ _HOF_RealSession(Primitive, Origin) {
 			_AHK_SendInput := (Keys) => SendInput(Keys)
 		else
 			_AHK_SendInput := (Keys) => SendEvent(Keys)
-		HSE_RegistryClear()
-		HSE_HardReset()
-		HSE_FeedReset(true)
-		Opts := Map("OnlyText", true, "Priority", HSE_PRIORITY_COMMON)
-		if (Origin == "watcher") {
-			CreateHotstring("*?", "qzx", "foo qzy", Opts)
-		} else {
-			; An end-character trigger: only the Space completes it.
-			CreateHotstring("?", "qzs", "foo qzy", Opts)
-		}
-		CreateHotstring("*?", "qzy", "bar qzz", Opts)
-		CreateHotstring("*?", "qzz", "final", Opts)
+		_HOF_RealArm(Origin)
 		_StartInputHook()
 		try {
 			if (Origin == "watcher") {
@@ -453,6 +491,7 @@ _HOF_RealSession(Primitive, Origin) {
 		_AHK_SendInput := SavedInput
 		_SendHook := SavedHook
 		_HotstringRegistrar := SavedRegistrar
+		HSE_CascadeMaxArrows := SavedArrows
 		HSE_RegistryClear()
 		HSE_HardReset()
 		try Window.Destroy()

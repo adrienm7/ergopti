@@ -244,11 +244,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       keyboard hooks (AutoHotkey's SendInput then falls back to SendEvent): an expansion completed by the tap-hold
       Space loses its Space and leaves an `a`. Find the order of the Space tap, the trigger's last key-up and the
       burst under SendEvent, with a DEBUG `HSEFire` trace.
-- [ ] **Hotstring output finality with SendEvent.** The interactive test « a chain of three in the real engine is
-      final with SendEvent and with SendInput » (`hotstring-output-is-final`) fails on the PC, alone and on the code
-      before 2026-11-17: watcher + SendEvent types `foo bar final` instead of `foo qzy`, so a level-0 SendEvent burst
-      reaches the I1 watcher and fires the next link. SendInput falls back to SendEvent whenever another script
-      holds a keyboard hook.
 - **Parity literals.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`,
   `request_plan_*`, the keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left; the rest of the menu
   files need `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers
