@@ -60,6 +60,9 @@
  *    layout's standing among the compared ones; every number is the engine's.
  * 14. The ranking table's columns (any metric) and row filters (name, family,
  *    score range) are the viewer's, kept with the other conveniences.
+ * 15. The key pair matrix (how often, or score points, each key pair) scrolls
+ *    inside its own box at phone width and is also a sortable table; the
+ *    effort per word reads the corpus's word table (built-in or pasted).
  * ==============================================================================
  */
 
@@ -95,7 +98,21 @@
 	// score, or any per-key metric of the engine (its costs and its gains).
 	const HEAT_PRESSES = 'presses';
 	const HEAT_SCORE = 'score';
-	const HEAT_CHOICES = [HEAT_PRESSES, HEAT_SCORE].concat(E.KEY_COST_METRICS, E.KEY_GAINS);
+	const HEAT_CHOICES = [HEAT_PRESSES, HEAT_SCORE].concat(
+		E.KEY_COST_METRICS,
+		E.KEY_GAINS,
+		E.KEY_INFO_METRICS
+	);
+	// The key pair matrix: its busiest keys on each axis (every letter of a
+	// layout fits), how its cells are coloured, and the rows of its table.
+	const MATRIX_MAX_KEYS = 32;
+	const MATRIX_COUNT = 'count';
+	const MATRIX_POINTS = 'points';
+	const MATRIX_CHOICES = [MATRIX_COUNT, MATRIX_POINTS];
+	const MATRIX_TABLE_ROWS = 100;
+	// The word effort figure: its ranges of effort and its hardest words.
+	const WORD_BINS = 10;
+	const HARDEST_WORDS = 15;
 	// Digits of a key's value in the heatmap.
 	const HEAT_DIGITS = 2;
 	// How many metrics a key's score tooltip names, worst first.
@@ -110,6 +127,7 @@
 		'lsb',
 		'scissors',
 		'half_scissors',
+		'row_jump',
 		'roll_in',
 		'roll_out',
 		'hand_change'
@@ -299,6 +317,35 @@
 		<select id="la-worst-event"></select>
 		<div class="la-table-wrap">
 			<table id="la-worst" class="la-table"></table>
+		</div>
+	</details>
+	<details class="la-section">
+		<summary data-i18n="layout_analysis.matrix.title"></summary>
+		<p id="la-matrix-caption" class="la-muted"></p>
+		<label for="la-matrix-by" data-i18n="layout_analysis.matrix.by"></label>
+		<select id="la-matrix-by"></select>
+		<div id="la-matrix-legend" class="la-heat-legend"></div>
+		<div class="la-matrix-wrap" tabindex="0" role="region" aria-labelledby="la-matrix-caption">
+			<table id="la-matrix" class="la-matrix"></table>
+		</div>
+		<h4 data-i18n="layout_analysis.matrix.table"></h4>
+		<p id="la-matrix-count" class="la-muted"></p>
+		<div class="la-table-wrap">
+			<table id="la-matrix-pairs" class="la-table"></table>
+		</div>
+	</details>
+	<details class="la-section">
+		<summary data-i18n="layout_analysis.words.title"></summary>
+		<p class="la-muted" data-i18n="layout_analysis.words.caption"></p>
+		<p id="la-words-none" class="la-muted" data-i18n="layout_analysis.words.none" hidden></p>
+		<div id="la-words-body">
+			<p id="la-words-mean" class="la-muted"></p>
+			<h4 data-i18n="layout_analysis.words.distribution"></h4>
+			<div id="la-words-bins" class="la-bars"></div>
+			<h4 data-i18n="layout_analysis.words.hardest"></h4>
+			<div class="la-table-wrap">
+				<table id="la-words" class="la-table"></table>
+			</div>
 		</div>
 	</details>
 	<details class="la-section">
@@ -521,7 +568,8 @@
 						// The ranking table's columns and filters, and the heatmap's choice.
 						table: state.table,
 						heat: state.heat,
-						heatDiff: state.heatDiff
+						heatDiff: state.heatDiff,
+						matrixBy: state.matrixBy
 					})
 				);
 			} catch {
@@ -599,6 +647,11 @@
 			heat: HEAT_CHOICES.includes(saved.heat) ? saved.heat : HEAT_PRESSES,
 			// With a layout to compare with, the heatmap shows the key-by-key difference.
 			heatDiff: saved.heatDiff === true,
+			// The key pair matrix's colour (how often, or score points) and its table's sort.
+			matrixBy: MATRIX_CHOICES.includes(saved.matrixBy) ? saved.matrixBy : MATRIX_COUNT,
+			matrixSort: { key: 'count', descending: true },
+			// The chosen corpus's word table (word → count), null when it has none.
+			words: null,
 			details: linked.details || null,
 			// The layout the details compare with (diff), null for none.
 			versus: linked.versus || null
@@ -733,15 +786,35 @@
 			return state.custom ? E.prepareNgrams(state.custom.tables) : null;
 		}
 
-		/** Reduces the user's text to tables, once per distinct text. */
+		/**
+		 * The chosen corpus's word table, once its tables are loaded: a built-in
+		 * corpus's (shipped with its n-grams), a host's when it sends one, the
+		 * user's text's; null for a corpus of letter counts only (count tables,
+		 * the keystats).
+		 */
+		function corpusWords() {
+			const corpus = corpora.find((c) => c.id === state.corpus);
+			if (corpus.host) return corpus.host.tables.words || null;
+			if (corpus.builtin) {
+				const raw = (window.LAYOUT_ANALYSIS_CORPORA || {})[corpus.id];
+				return (raw && raw.words) || null;
+			}
+			return (state.custom && state.custom.words) || null;
+		}
+
+		/** Reduces the user's text to tables and its word table, once per distinct text. */
 		function useText(text) {
 			const trimmed = text.trim();
 			if (trimmed === '') {
 				state.custom = null;
 			} else {
 				const hash = E.hashText(trimmed);
-				if (!state.custom || state.custom.hash !== hash)
-					state.custom = { hash, tables: E.ngramsFromText(trimmed) };
+				if (!state.custom || state.custom.hash !== hash || !state.custom.words)
+					state.custom = {
+						hash,
+						tables: E.ngramsFromText(trimmed),
+						words: E.wordsFromText(trimmed)
+					};
 			}
 			save();
 			analyse();
@@ -802,6 +875,7 @@
 			if (mine !== generation) return;
 			setBusy(false);
 			state.tables = tables;
+			state.words = tables ? corpusWords() : null;
 			const chosen = layouts.filter((layout) => state.selected.has(layout.id));
 			if (!tables || chosen.length === 0) {
 				state.results = [];
@@ -1325,6 +1399,15 @@
 				})
 			);
 			events.value = chosen;
+			const by = $('la-matrix-by');
+			by.replaceChildren(
+				...MATRIX_CHOICES.map((id) => {
+					const option = el('option', '', t(`layout_analysis.matrix.by_${id}`));
+					option.value = id;
+					return option;
+				})
+			);
+			by.value = state.matrixBy;
 		}
 
 		/**
@@ -1368,6 +1451,290 @@
 				tbody.append(tr);
 			}
 			table.replaceChildren(thead, tbody);
+		}
+
+		// The pair matrix and word efforts of a result, kept per result and weights
+		// (a weight change re-scores the same results without a new analysis).
+		const figureCache = new WeakMap();
+		function cachedFigure(result, name, compute) {
+			if (!figureCache.has(result)) figureCache.set(result, {});
+			const entry = figureCache.get(result);
+			const key = `${JSON.stringify(state.weights)}|${name === 'words' ? state.corpus : ''}`;
+			if (!entry[name] || entry[name].key !== key || entry[name].words !== state.words)
+				entry[name] = { key, words: state.words, value: compute() };
+			return entry[name].value;
+		}
+
+		/** A table header row of sort buttons; the sort is the viewer's (state[sortName]). */
+		function sortableHead(columns, sortName, redraw) {
+			const head = el('tr');
+			for (const column of columns) {
+				const th = el('th', 'la-sortable');
+				th.scope = 'col';
+				const sort = el('button', 'la-sort', column.label);
+				sort.type = 'button';
+				sort.addEventListener('click', () => {
+					const current = state[sortName];
+					state[sortName] =
+						current.key === column.key
+							? { key: column.key, descending: !current.descending }
+							: { key: column.key, descending: column.numeric };
+					redraw();
+				});
+				th.append(sort);
+				if (state[sortName].key === column.key)
+					th.setAttribute('aria-sort', state[sortName].descending ? 'descending' : 'ascending');
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			return thead;
+		}
+
+		/**
+		 * The key pair matrix (the engine's bigramMatrix): the busiest keys on
+		 * both axes, first key by row, second by column, each cell coloured by
+		 * how often the pair occurs (one hue, light to dark) or by the score
+		 * points it gains (blue, « + ») or costs (orange, « − ») into the
+		 * neutral surface. The figure scrolls inside its own box on a narrow
+		 * screen; every pair is also in a sortable table, and each cell names
+		 * its pair, share, count, kind and points to assistive technology.
+		 */
+		function renderMatrix(result) {
+			const layout = byId.get(result.layout.id);
+			const matrix = cachedFigure(result, 'matrix', () =>
+				E.bigramMatrix(layout, state.tables, analysisOptions())
+			);
+			const byPoints = state.matrixBy === MATRIX_POINTS;
+			const keys = matrix.keys.slice(0, MATRIX_MAX_KEYS);
+			$('la-matrix-caption').textContent = t('layout_analysis.matrix.caption', {
+				keys: keys.length,
+				all: matrix.keys.length
+			});
+			const value = (pair) => (byPoints ? pair.points : pair.share);
+			const at = new Map(matrix.pairs.map((pair) => [pair.keys.join(' '), pair]));
+			const shown = matrix.pairs.filter(
+				(pair) => keys.includes(pair.keys[0]) && keys.includes(pair.keys[1])
+			);
+			const extent = Math.max(...shown.map((pair) => Math.abs(value(pair))), 0);
+			const eventsText = (pair) =>
+				pair.events.map((id) => t(`layout_analysis.metric.${id}`)).join(', ');
+			const signed = (v, digits) => `${v > 0 ? '+' : ''}${format(v, digits)}`;
+			const describe = (pair) =>
+				t('layout_analysis.matrix.cell', {
+					first: keyText(layout, pair.keys[0]),
+					second: keyText(layout, pair.keys[1]),
+					share: format(pair.share, HEAT_DIGITS),
+					count: format(pair.count, 0),
+					events: eventsText(pair),
+					points: signed(pair.points, HEAT_DIGITS)
+				});
+			const table = $('la-matrix');
+			const head = el('tr');
+			head.append(el('td'));
+			for (const code of keys) {
+				const th = el('th', 'la-keys', keyText(layout, code));
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const tbody = el('tbody');
+			for (const first of keys) {
+				const tr = el('tr');
+				const th = el('th', 'la-keys', keyText(layout, first));
+				th.scope = 'row';
+				tr.append(th);
+				for (const second of keys) {
+					const td = el('td', 'la-cell');
+					const pair = at.get(`${first} ${second}`);
+					if (pair) {
+						const v = value(pair);
+						const share = extent > 0 ? Math.abs(v) / extent : 0;
+						if (byPoints) {
+							// The sign in the cell, never the colour alone.
+							td.classList.add(v > 0 ? 'la-cell-gain' : v < 0 ? 'la-cell-loss' : 'la-cell-zero');
+							td.style.setProperty(
+								'--la-share',
+								`${Math.round(share * HEAT_DIFF_MAX_SHARE * 100)}%`
+							);
+							td.append(el('span', '', v > 0 ? '+' : v < 0 ? '−' : ''));
+						} else {
+							td.classList.add('la-cell-count');
+							td.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
+						}
+						const text = describe(pair);
+						td.title = text;
+						td.append(el('span', 'la-sr-only', text));
+					}
+					tr.append(td);
+				}
+				tbody.append(tr);
+			}
+			table.replaceChildren(thead, tbody);
+			const legend = $('la-matrix-legend');
+			const unit = byPoints ? t('layout_analysis.unit.points') : '%';
+			if (byPoints) {
+				const swatch = (kind, mark, words) => {
+					const item = el('span', 'la-heat-key');
+					item.append(el('span', `la-swatch la-swatch-${kind}`), `${mark} ${words}`);
+					return item;
+				};
+				legend.replaceChildren(
+					swatch('less', '+', t('layout_analysis.chart.gain')),
+					swatch('more', '−', t('layout_analysis.chart.loss')),
+					el('span', 'la-muted', `± ${format(extent, HEAT_DIGITS)} ${unit}`)
+				);
+			} else {
+				legend.replaceChildren(
+					el('span', '', `${format(0, HEAT_DIGITS)} ${unit}`),
+					el('span', 'la-heat-ramp'),
+					el('span', '', `${format(extent, HEAT_DIGITS)} ${unit}`),
+					el(
+						'span',
+						'la-muted',
+						t('layout_analysis.heat.scale', { metric: t('layout_analysis.matrix.by_count') })
+					)
+				);
+			}
+			renderMatrixPairs(layout, matrix, eventsText, signed);
+		}
+
+		/** Every pair of the matrix as a sortable table, the most frequent ones. */
+		function renderMatrixPairs(layout, matrix, eventsText, signed) {
+			const rows = matrix.pairs.slice(0, MATRIX_TABLE_ROWS);
+			$('la-matrix-count').textContent = t('layout_analysis.matrix.table_count', {
+				shown: rows.length,
+				total: matrix.pairs.length
+			});
+			const columns = [
+				{
+					key: 'first',
+					label: t('layout_analysis.matrix.first'),
+					numeric: false,
+					value: (p) => keyText(layout, p.keys[0])
+				},
+				{
+					key: 'second',
+					label: t('layout_analysis.matrix.second'),
+					numeric: false,
+					value: (p) => keyText(layout, p.keys[1])
+				},
+				{
+					key: 'count',
+					label: t('layout_analysis.worst.count'),
+					numeric: true,
+					value: (p) => p.count
+				},
+				{
+					key: 'share',
+					label: `${t('layout_analysis.worst.share')} (%)`,
+					numeric: true,
+					value: (p) => p.share
+				},
+				{
+					key: 'events',
+					label: t('layout_analysis.matrix.events'),
+					numeric: false,
+					value: eventsText
+				},
+				{
+					key: 'points',
+					label: `${t('layout_analysis.matrix.points')} (${t('layout_analysis.unit.points')})`,
+					numeric: true,
+					value: (p) => p.points
+				}
+			];
+			const redraw = () => renderMatrixPairs(layout, matrix, eventsText, signed);
+			const thead = sortableHead(columns, 'matrixSort', redraw);
+			const column = columns.find((c) => c.key === state.matrixSort.key) || columns[2];
+			const sorted = rows.slice().sort((a, b) => {
+				const x = column.value(a);
+				const y = column.value(b);
+				const order = typeof x === 'string' ? x.localeCompare(y) : x - y;
+				return state.matrixSort.descending ? -order : order;
+			});
+			const tbody = el('tbody');
+			for (const pair of sorted) {
+				const tr = el('tr');
+				tr.append(
+					el('td', 'la-keys', keyText(layout, pair.keys[0])),
+					el('td', 'la-keys', keyText(layout, pair.keys[1])),
+					el('td', '', format(pair.count, 0)),
+					el('td', '', format(pair.share, HEAT_DIGITS)),
+					el('td', '', eventsText(pair)),
+					el('td', '', signed(pair.points, HEAT_DIGITS))
+				);
+				tbody.append(tr);
+			}
+			$('la-matrix-pairs').replaceChildren(thead, tbody);
+		}
+
+		/**
+		 * Effort per word (the engine's wordEfforts on the corpus's word table):
+		 * the mean, how the occurrences spread over ranges of effort, and the
+		 * hardest words with what costs them most. A corpus of letter counts
+		 * only says it has no word table.
+		 */
+		function renderWords(result) {
+			const words = state.words && Object.keys(state.words).length > 0 ? state.words : null;
+			$('la-words-none').hidden = Boolean(words);
+			$('la-words-body').hidden = !words;
+			if (!words) return;
+			const layout = byId.get(result.layout.id);
+			const efforts = cachedFigure(result, 'words', () =>
+				E.wordEfforts(layout, words, analysisOptions())
+			);
+			const points = t('layout_analysis.unit.points');
+			$('la-words-mean').textContent = t('layout_analysis.words.mean', {
+				mean: format(efforts.mean, 1),
+				words: format(efforts.words.length, 0),
+				unsupported: format(efforts.unsupported.length, 0)
+			});
+			const bins = E.effortDistribution(efforts.words, WORD_BINS);
+			loadBars(
+				$('la-words-bins'),
+				bins.map((bin) => ({
+					label: t('layout_analysis.words.bin', {
+						from: format(bin.from, 0),
+						to: format(bin.to, 0)
+					}),
+					value: bin.share
+				})),
+				Math.max(...bins.map((bin) => bin.share), 0)
+			);
+			const head = el('tr');
+			for (const label of [
+				t('layout_analysis.words.word'),
+				t('layout_analysis.worst.count'),
+				`${t('layout_analysis.words.effort')} (${points})`,
+				t('layout_analysis.words.part')
+			]) {
+				const th = el('th', '', label);
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const tbody = el('tbody');
+			for (const entry of efforts.words.slice(0, HARDEST_WORDS)) {
+				const [worst] = Object.entries(entry.parts).sort((a, b) => b[1] - a[1]);
+				const tr = el('tr');
+				tr.append(
+					el('td', 'la-keys', entry.word),
+					el('td', '', format(entry.count, 0)),
+					el('td', '', format(entry.effort, 1)),
+					el(
+						'td',
+						'',
+						worst && worst[1] > 0
+							? `${t(`layout_analysis.metric.${worst[0]}`)} ${format(worst[1], 1)}`
+							: ''
+					)
+				);
+				tbody.append(tr);
+			}
+			$('la-words').replaceChildren(thead, tbody);
 		}
 
 		/**
@@ -1600,6 +1967,8 @@
 			fillVersus(result);
 			renderHeatmap(result);
 			renderWorst(result);
+			renderMatrix(result);
+			renderWords(result);
 			renderFigures(result);
 			const contributions = Object.entries(result.score.contributions)
 				.filter(([, v]) => v !== 0)
@@ -2100,6 +2469,11 @@
 				renderDetails();
 			});
 			$('la-worst-event').addEventListener('change', renderDetails);
+			$('la-matrix-by').addEventListener('change', (event) => {
+				state.matrixBy = event.target.value;
+				save();
+				renderDetails();
+			});
 			// The table's row filters: an empty or unreadable bound filters nothing.
 			const bound = (input) => {
 				const value = Number(input.value);

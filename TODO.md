@@ -87,13 +87,9 @@ waits for the maintainer's review).
 
 - [ ] **More figures per layout in the Comparer (maintainer, 2026-11-17), what remains.** Every figure from the
       engine's numbers with a hand-checked tiny-corpus test, legend and units, light and dark, phone width, 21 locales.
-  - [ ] A key × key bigram matrix (which pairs a layout makes, coloured by count or by event).
-  - [ ] Effort per word and the hardest words to type: the corpus tables hold n-grams only, so the built-in corpora
-        and a user's text first need a word table (prepared once and cached like the n-grams).
-  - [ ] Row jumps per key (a key pair two or more rows apart on one hand): no such metric exists yet; define it in
-        docs/design/layout-analysis.md first, coordinated with the agent changing the engine's typing paths.
-  - [ ] Check the figures again once the engine types through best paths (alternative copies, AltGr, dead keys):
-        they read the engine's per-key output (keyValues, topGroups, fingerDistance), so they should follow.
+  - [ ] Word tables for the count-table corpora (Leipzig 1M, Lexique): their importer
+        (`tools/build/import-count-tables.cjs`) keeps n-grams only, so « Effort per word » says they have none; add
+        a bounded word table there (same archives, same licences) if wanted.
 - [ ] **Layout formats, what is left.** The library imports Oxeylyzer, cmini and KLA's built-in layouts
       (`tools/build/import-kla-layouts.cjs`; KLA's 16 files with characters on keys the library's keyboards lack,
       12 of them ErgoDox, are listed in `not_imported` of `layout_library.json`). Left: genkey (GPL-3.0 like cmini)
@@ -340,6 +336,14 @@ Each question names the default kept meanwhile; an answer moves into the item or
       télécharger), faq; no « versions » page, its changelog stays in the app. The floating reference keyboard only
       shows on the `/ergopti` pages. The Studio icon (`static/img/logo/studio.svg`: a keycap and a pencil on the dark
       disc of the logos) is new. Approve or change.
+- [ ] **Row jumps in the global score? (decided by the agent on 2026-11-17, to review by the maintainer)** The new
+      `row_jump` metric (two keys of one hand two rows or more apart, any fingers) is shown in the Comparer, the
+      heatmap and the worst pairs, but has no weight: the study gives it none, and it overlaps SFBs and scissors.
+      The effort per word uses the score's weights on the word typed alone, folded to lower case. Kept meanwhile:
+      informative only.
+  1. **(recommended) Keep it informative** until the study weighs it.
+  2. Give it a small default weight (e.g. 0.5 point per %) in `score_weights.json` and the study.
+  3. Count only jumps on different fingers, so it no longer overlaps the SFBs.
 - [ ] **Open questions of the 2026-11-15 hand-off.** The identity gate's false positive on every PDF's root trailer
       key in containers whose home is the root account's (left unchanged); the casing of BEO, INTS, UCIEA, AHEI,
       MTGAP-T and CTGAP 3 (the agent's spelling kept); the dead-key marker style (`key-legend-dead`: accent colour

@@ -583,6 +583,54 @@ body:has(> main.layout-analysis) {
 	white-space: pre;
 }
 
+/* The key pair matrix scrolls inside its own box, never the page. */
+.la-matrix-wrap {
+	margin-top: 8px;
+	max-width: 100%;
+	overflow: auto;
+}
+
+.la-matrix-wrap:focus-visible {
+	outline: 2px solid var(--la-accent);
+	outline-offset: 2px;
+}
+
+.la-matrix {
+	border-collapse: separate;
+	border-spacing: 2px;
+	font-size: 12px;
+}
+
+.la-matrix th {
+	font-weight: 600;
+	min-width: 22px;
+	padding: 0 2px;
+	text-align: center;
+}
+
+.la-matrix .la-cell {
+	background: var(--la-surface-2);
+	border-radius: 3px;
+	color: var(--la-heat-ink);
+	height: 22px;
+	min-width: 22px;
+	padding: 0;
+	text-align: center;
+}
+
+.la-matrix .la-cell-count {
+	background: color-mix(in oklab, var(--la-heat-high) var(--la-share), var(--la-heat-low));
+}
+
+/* Points: blue gained, orange lost, mixed into the neutral surface. */
+.la-matrix .la-cell-gain {
+	background: color-mix(in oklab, var(--la-gain) var(--la-share), var(--la-surface-2));
+}
+
+.la-matrix .la-cell-loss {
+	background: color-mix(in oklab, var(--la-loss) var(--la-share), var(--la-surface-2));
+}
+
 /* The ranking table's column choices and row filters. */
 .la-table-options {
 	margin: 8px 0;

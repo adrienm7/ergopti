@@ -853,6 +853,77 @@ async function exerciseStudioComparer(page) {
 		(await page.locator('#la-standing .la-chart-row').count()) > 10,
 		'a standing per metric'
 	);
+	// (row-jump) Row jumps: a heatmap choice and a worst-pairs event, not scored.
+	assert.ok(heatChoices.includes('row_jump'), 'the heatmap offers row jumps');
+	await page.selectOption('#la-worst-event', 'row_jump');
+	assert.ok(
+		(await page.locator('#la-worst tbody tr').count()) > 0,
+		'the worst row jumps are listed'
+	);
+	// (bigram-matrix) The key pair matrix: a named cell per pair, the busiest keys
+	// on both axes, both colourings with a legend, and every pair in a sortable table.
+	await page.evaluate(() => {
+		for (const section of document.querySelectorAll('#la-details .la-section')) section.open = true;
+	});
+	const cells = await page.$$eval('#la-matrix td.la-cell-count', (tds) =>
+		tds.map((td) => td.title)
+	);
+	assert.ok(cells.length > 100, `the matrix has ${cells.length} pairs`);
+	assert.match(cells[0], /: [\d.,]+ % .+\(\d[\d,]* .+\), .+, [+−-]?[\d.,]+ /);
+	assert.ok(
+		await page.$$eval('#la-matrix td.la-cell-count', (tds) =>
+			tds.every((td) => td.querySelector('.la-sr-only').textContent === td.title)
+		),
+		'every matrix cell is named to assistive technology'
+	);
+	assert.ok((await page.locator('#la-matrix thead th').count()) >= 26, 'a column per busy key');
+	await page.selectOption('#la-matrix-by', 'points');
+	assert.ok(
+		(await page.locator('#la-matrix td.la-cell-loss').count()) > 0 &&
+			(await page.locator('#la-matrix td.la-cell-gain').count()) > 0,
+		'pairs gain and lose points'
+	);
+	assert.equal(
+		await page.textContent('#la-matrix td.la-cell-loss span'),
+		'−',
+		'a lost pair is marked'
+	);
+	assert.equal(
+		await page.locator('#la-matrix-legend .la-swatch').count(),
+		2,
+		'gain and loss legend'
+	);
+	assert.equal(
+		await page.locator('#la-matrix-pairs tbody tr').count(),
+		100,
+		'100 pairs in the table'
+	);
+	await page.click('#la-matrix-pairs thead th:nth-child(6) button');
+	const sortedPoints = await page.$$eval('#la-matrix-pairs tbody tr td:nth-child(6)', (tds) =>
+		tds.map((td) => Number(td.textContent.replace(/[^\d.\-−+]/g, '').replace('−', '-')))
+	);
+	assert.ok(
+		sortedPoints.every((v, i) => i === 0 || sortedPoints[i - 1] >= v),
+		'the pair table sorts by points'
+	);
+	await page.selectOption('#la-matrix-by', 'count');
+	// (word-effort) A built-in text corpus ships its word table: the mean, the
+	// distribution over ten ranges and the hardest words.
+	assert.equal(await page.isHidden('#la-words-none'), true, 'this corpus has a word table');
+	assert.equal(await page.locator('#la-words-bins .la-chart-row').count(), 10, 'ten effort ranges');
+	assert.equal(await page.locator('#la-words tbody tr').count(), 15, 'the 15 hardest words');
+	assert.match(await page.textContent('#la-words-mean'), /[\d.,]+ points over [\d,]+ words/);
+	// (matrix-phone-width) At phone width the matrix scrolls inside its own box.
+	const viewport = page.viewportSize();
+	await page.setViewportSize({ width: 360, height: 740 });
+	const fit = await page.$eval('.la-matrix-wrap', (box) => ({
+		inside: box.scrollWidth > box.clientWidth,
+		right: box.getBoundingClientRect().right,
+		width: window.innerWidth
+	}));
+	assert.ok(fit.inside, 'the matrix scrolls inside its box');
+	assert.ok(fit.right <= fit.width, `the matrix box ends at ${fit.right} of ${fit.width}`);
+	await page.setViewportSize(viewport);
 	// (comparer-diff) « Compare with » puts a second layout's value and the
 	// difference beside each metric, its verdict in words; the finger chart
 	// marks each finger's ideal load.
