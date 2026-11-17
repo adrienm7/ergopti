@@ -575,6 +575,7 @@ return {
 	"tests.unit.core.ui.editors.test_bridge_handlers_paths_editor",
 	"tests.unit.core.ui.editors.test_bridge_handlers_personal_editor_fixture",
 	"tests.unit.core.ui.editors.test_hotstring_editor_autoclose",
+	"tests.unit.core.ui.editors.test_hotstring_editor_empty_arrays",
 	"tests.unit.ui.personal_info_editor.test_personal_info_editor_close",
 	"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload",
 	"tests.unit.infra.test_personal_info_fields",

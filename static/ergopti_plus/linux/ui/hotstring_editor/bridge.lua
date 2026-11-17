@@ -47,6 +47,7 @@ M.bridge_name = "hsEditor"
 local Logger = require("core.logger.engine.shim")
 local Storage = require("core.fs.adapters.storage")
 local MagicKey = require("modules.hotstrings.magic_key")
+local Json = require("core.text.engine.json")
 
 local LOG = "bridge.hsEditor"
 local APP_NAME = "hotstring_editor"
@@ -297,7 +298,10 @@ local function build_payload(state, open_mode, parsed, opening)
 				sections[#sections + 1] = {
 					name        = name,
 					description = type(sec.description) == "string" and sec.description or name,
-					entries     = entries,
+					-- An explicit array: an empty Lua table encodes as {}, and the
+					-- page's entries.forEach then threw inside render(), which left
+					-- every later section undrawn and the shortcut form unopened.
+					entries     = Json.array(entries),
 				}
 			end
 		end
@@ -316,7 +320,9 @@ local function build_payload(state, open_mode, parsed, opening)
 
 	local star = MagicKey.default()
 	return {
-		sections         = sections,
+		-- An explicit array for the same reason: a personal file that is absent
+		-- or has no section gave D.sections = {}, with no forEach or findIndex.
+		sections         = Json.array(sections),
 		row_identity     = true,
 		-- The key in effect, which is the user's if they chose one. `star` stays
 		-- the shipped character: the UI uses it for the literal it inserts from its
