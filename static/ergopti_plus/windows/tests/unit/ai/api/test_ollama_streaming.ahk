@@ -851,7 +851,8 @@ _OllamaStream_HttpStatus(Status, ExpectedSuccess, BodyKind) {
 			(*) => State["partials"] += 1, (Text) => (State["successes"] += 1, State["text"] := Text),
 			(*) => State["failures"] += 1, "", "", false, "", Map("run", NativeRun))
 		Started := A_TickCount
-		while State["successes"] + State["failures"] == 0 && TickElapsed(Started) < 10000
+		; Longer than the observer's wait below, so a slow first curl settles before this gives up.
+		while State["successes"] + State["failures"] == 0 && TickElapsed(Started) < 20000
 			Sleep(10)
 		AssertEqual(1, State["runs"], "the public driver must launch the real curl transport exactly once")
 		AssertEqual(1, State["successes"] + State["failures"], "the real transport settles exactly once")
@@ -935,8 +936,11 @@ _OllamaStream_HttpStatus(Status, ExpectedSuccess, BodyKind) {
 		}
 		; Receive a complete native response before testing its semantic admission.
 		; This observes the real exit and leaves the actual curl command unchanged.
+		; Bounded by the peer's own 15 s deadline, after which it closes: the first curl
+		; of a cold runner took over 5 s to exit (run 43978912112), and a failed wait
+		; here is swallowed by the launch as a transport failure.
 		AssertTrue(State["query_handle"] != 0, "the completed-response control requires its exact native handle")
-		AssertEqual(0, DllCall("Kernel32\WaitForSingleObject", "Ptr", State["query_handle"], "UInt", 5000, "UInt"),
+		AssertEqual(0, DllCall("Kernel32\WaitForSingleObject", "Ptr", State["query_handle"], "UInt", 15000, "UInt"),
 			"the genuine curl transport completes before its response is admitted")
 	}
 }
