@@ -323,7 +323,7 @@ class OwnedOllamaContainer(unittest.TestCase):
         result, logs, owned = self.start(pull=MODEL)
         self.assert_owned_started(result, owned)
         warnings = [
-            line for line in logs if line.startswith("WARN modules.llm.managed_ollama_proxy")
+            line for line in logs if line.startswith("WARN ai.engine.ollama.managed_ollama_proxy")
         ]
         self.assertTrue(
             any("lookup unusable at native_pac_download" in line for line in warnings), logs
@@ -398,7 +398,8 @@ class OwnedOllamaContainer(unittest.TestCase):
         return [
             line
             for line in logs
-            if line.startswith("WARN modules.llm.managed_ollama_proxy") and "unreachable" in line
+            if line.startswith("WARN ai.engine.ollama.managed_ollama_proxy")
+            and "unreachable" in line
         ]
 
     def test_pac_dead_relay_then_direct_walks_to_direct(self):
