@@ -103,7 +103,7 @@ Test("healthcheck: Keystats and LLM expose provenance-checked atomic snapshots (
 ; ======================================
 
 _HCOS_NoUnwrittenLegacyGlobals() {
-	Source := FileRead(A_ScriptDir . "\\..\\ui\\healthcheck\\helpers.ahk", "UTF-8")
+	Source := FileRead(A_ScriptDir . "\..\diagnostics\ui\healthcheck\helpers.ahk", "UTF-8")
 	AssertTrue(Source != "", "healthcheck helpers source must be readable")
 	for DeadName in ["_Keystats_EventsToday", "_Keystats_WPM",
 		"_Keystats_PrivacyCount", "llm_enabled", "llm_backend",
