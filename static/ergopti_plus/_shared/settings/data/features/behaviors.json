@@ -57,7 +57,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "3accc397169553866ab28cf3d796516af914b8c0870f74831a448565de728b50"
+			"sha256": "9ce160cd955a144e0e996b92f6cb72127f49c02b21feccedb3427b3b0bc3ba94"
 		},
 		{
 			"id": "windows-dead-legacy",
@@ -71,7 +71,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 			"symbol": "KeylayoutEmulation_PressNative",
-			"sha256": "74e7e5dead3f9c7bc59d880248431be94af9349f64910bc5074697ac3a630662"
+			"sha256": "c446174c014c3e129354dde16c420333993f65ab878390a51a228ca5e7673886"
 		},
 		{
 			"id": "macos-dead-native",
@@ -99,7 +99,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 			"symbol": "KeylayoutEmulation_Press(Sc, Shift, Caps, Option)",
-			"sha256": "74e7e5dead3f9c7bc59d880248431be94af9349f64910bc5074697ac3a630662"
+			"sha256": "c446174c014c3e129354dde16c420333993f65ab878390a51a228ca5e7673886"
 		},
 		{
 			"id": "macos-layout-emulation",
