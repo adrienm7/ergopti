@@ -18,6 +18,8 @@
 ---                       ~/.config/ergopti/hotstrings/ if that directory exists.
 ---   --device  <path>   Evdev device to listen on (e.g. /dev/input/event3).
 ---                       When omitted, device_finder auto-selects the keyboard.
+---   --pointer <path>   Evdev pointer to watch even when it is virtual (a
+---                       remapper's uinput mouse), beside the detected ones.
 ---   --layout  <name>   INPUT layout for keycode-to-character mapping: "qwerty"
 ---                       or "azerty". Default: auto-detect from $XKBLAYOUT.
 ---   --keymap  <path>   OUTPUT layout override: a keymap dump to type against,
@@ -153,6 +155,7 @@ local function print_usage()
 	print("                      Default: ~/.config/ergopti/hotstrings/")
 	print("  --device <path>     evdev device (e.g. /dev/input/event3).")
 	print("                      Default: auto-detected.")
+	print("  --pointer <path>    Also watch this evdev pointer, even a virtual one.")
 	print("  --layout <name>     Keyboard layout: qwerty | azerty.")
 	print("                      Default: $XKBLAYOUT, else qwerty.")
 	print("  --tray              Enable the system tray icon.")
@@ -717,7 +720,7 @@ local function parse_args()
 	local i = 1
 	while i <= #arg do
 		local a = arg[i]
-		if a == "--config" or a == "--device" or a == "--layout" or a == "--keymap" then
+		if a == "--config" or a == "--device" or a == "--pointer" or a == "--layout" or a == "--keymap" then
 			if type(arg[i + 1]) ~= "string" or arg[i + 1] == "" or arg[i + 1]:match("^%-%-") then
 				error("Missing value for " .. a, 0)
 			end
@@ -728,6 +731,7 @@ local function parse_args()
 		elseif a == "--no-grab"               then opts.grab    = false
 		elseif a == "--config"  and arg[i+1]  then i = i + 1; opts.config = arg[i]
 		elseif a == "--device"  and arg[i+1]  then i = i + 1; opts.device = arg[i]
+		elseif a == "--pointer" and arg[i+1]  then i = i + 1; opts.pointer = arg[i]
 		elseif a == "--layout"  and arg[i+1]  then i = i + 1; opts.layout = arg[i]
 		elseif a == "--keymap"  and arg[i+1]  then i = i + 1; opts.keymap = arg[i]
 		else
@@ -1145,6 +1149,8 @@ local function main()
 	if not device then
 		device = dev_finder.find_keyboard()
 	end
+	-- Before the hook takes its first pointer snapshot.
+	if opts.pointer then dev_finder.pin_pointer(opts.pointer) end
 	local InputAccess = require("platform.input.access")
 	-- The launcher could not set up the input groups because a program is
 	-- missing: say which one before the device error that follows from it.

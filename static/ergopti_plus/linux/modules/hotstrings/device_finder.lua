@@ -56,6 +56,9 @@ local LOG = "modules.hotstrings.device_finder"
 -- Path to the kernel virtual file listing all input devices.
 local PROC_INPUT_DEVICES = "/proc/bus/input/devices"
 
+-- The pointer named by --pointer, watched even when it is virtual (M.pin_pointer).
+local _pinned_pointer = nil
+
 -- Base directory for evdev character devices.
 local DEV_INPUT_DIR = "/dev/input/"
 
@@ -452,12 +455,13 @@ function M.select_pointers(devices)
 
 	for _, dev in ipairs(devices) do
 		-- Buttons AND an axis. A keyboard has EV_KEY and neither axis; a volume
-		-- rocker has EV_KEY alone; only a pointer has both.
+		-- rocker has EV_KEY alone; only a pointer has both. A virtual pointer is
+		-- watched only when the user named its node (--pointer).
+		local path = event_path(dev)
 		if has_bit(dev.ev_mask, EV_KEY_BIT)
 			and (has_bit(dev.ev_mask, EV_REL_BIT) or has_bit(dev.ev_mask, EV_ABS_BIT))
-			and not is_synthetic(dev)
+			and (not is_synthetic(dev) or (path ~= nil and path == _pinned_pointer))
 		then
-			local path = event_path(dev)
 			if path then
 				local lower = dev.name:lower()
 				if lower:find("mouse") or lower:find("touchpad") or lower:find("trackpoint") then
@@ -472,6 +476,19 @@ function M.select_pointers(devices)
 	for _, path in ipairs(fallback) do named[#named + 1] = path end
 	table.sort(named)
 	return named
+end
+
+--- Names one pointer node to watch even when it is virtual: a remapper's
+--- uinput mouse (input-remapper, a hosted acceptance run's mouse) is skipped
+--- as synthetic otherwise, and its clicks and travel would go unseen. The node
+--- must still be a pointer (buttons and an axis) in each kernel snapshot.
+--- @param path string|nil An /dev/input/eventN path, or nil to clear.
+function M.pin_pointer(path)
+	if path ~= nil and (type(path) ~= "string" or not path:match("^/dev/input/event%d+$")) then
+		error("a pinned pointer is an /dev/input/eventN path, got " .. tostring(path), 2)
+	end
+	_pinned_pointer = path
+	if path then Logger.info(LOG, "Pinned pointer device: %s.", path) end
 end
 
 --- Chooses the first pointer for legacy callers.

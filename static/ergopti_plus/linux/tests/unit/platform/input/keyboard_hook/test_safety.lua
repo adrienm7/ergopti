@@ -323,6 +323,21 @@ helpers.describe("device_finder: choosing a pointer", function()
 				.. "reacting to our own injections")
 	end)
 
+	-- A remapper's uinput mouse is virtual too: only the node the user names
+	-- with --pointer is watched, and only while it still is a pointer.
+	helpers.it("watches a virtual pointer only when its node is pinned (pointer-pin)", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local devices = finder.parse_devices(KEYBOARD .. OUR_INJECTOR)
+		helpers.assert_eq(finder.select_pointers(devices), {}, "unpinned, a virtual pointer stays unwatched")
+		finder.pin_pointer("/dev/input/event21")
+		helpers.assert_eq(finder.select_pointers(devices), { "/dev/input/event21" }, "the pinned node is watched")
+		helpers.assert_eq(finder.select_pointers(finder.parse_devices(KEYBOARD)), {},
+			"a pinned path that names no pointer is not watched")
+		finder.pin_pointer(nil)
+		helpers.assert_eq(finder.select_pointers(devices), {}, "clearing the pin restores the exclusion")
+		helpers.assert_true(not pcall(finder.pin_pointer, "/tmp/event21"), "a pin names an input event node")
+	end)
+
 	helpers.it("answers nothing when the machine has no pointer", function()
 		helpers.assert_eq(select_from(KEYBOARD), nil,
 			"a headless machine has none, and that is not an error — it only means "
