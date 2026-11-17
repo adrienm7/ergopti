@@ -20,8 +20,11 @@
  * timeline, because the job log stays readable where the evidence upload is not.
  * The two refusals whose records were read (runs 43277967473 and 43276494558)
  * show the restore to US applied by the system (US enabled and selected) while
- * the test process's current source stayed French: that record shape is named
- * process_current_source_stale, and a restore the system did not apply is not.
+ * the test process's current source stayed French. The record's systemLayout
+ * (com.apple.HIToolbox's current layout) says where that stale source lives:
+ * French there too is system_current_layout_stale, US there is
+ * process_current_source_stale, no system layout (those two older records) is
+ * current_source_stale_unlocated; a restore the system did not apply is none.
  * ==============================================================================
  */
 
@@ -310,7 +313,7 @@ try {
 	// then the restore to US is applied by the system (US enabled and selected)
 	// while the process's current source stays French, unselected, for 6 s.
 	const us = (selected) => state('com.apple.keylayout.US', true, selected);
-	const restoreEvents = (restored) => [
+	const restoreEvents = (restored, systemLayout) => [
 		{ phase: 'original.capture', uptime: 628.4463, original: us(true), current: us(true) },
 		{
 			phase: 'select.after',
@@ -326,7 +329,8 @@ try {
 			status: 0,
 			original: us(restored),
 			target: french(true, !restored),
-			current: french(true, false)
+			current: french(true, false),
+			...(systemLayout ? { systemLayout: { state: 'present', value: systemLayout } } : {})
 		}
 	];
 	const mappingRecord = (events) => ({
@@ -340,18 +344,22 @@ try {
 		events,
 		omittedEvents: 0
 	});
+	// Those records predate the system layout: the state stays unlocated.
 	const stale = classify('stale-current', fullLines, [mappingRecord(restoreEvents(true))]);
-	assert.equal(stale.receipt.state, 'process_current_source_stale');
+	assert.equal(stale.receipt.state, 'current_source_stale_unlocated');
 	assert.deepEqual(stale.receipt.stale_current, {
 		phase: 'restore.inner.after',
 		offset_ms: 6356,
 		wanted: 'com.apple.keylayout.US enabled=true selected=true',
-		current: 'com.apple.keylayout.French enabled=true selected=false'
+		current: 'com.apple.keylayout.French enabled=true selected=false',
+		system_layout: null,
+		located: null
 	});
 	assert.match(
 		stale.stdout,
-		/^::error::Native keyboard-source refusal: process_current_source_stale\. In testFreshKeyboardEventsFollowLayoutAndShiftFlags, restore\.inner\.after \(\+6356ms\) left com\.apple\.keylayout\.US enabled=true selected=true/m
+		/^::error::Native keyboard-source refusal: current_source_stale_unlocated\. In testFreshKeyboardEventsFollowLayoutAndShiftFlags, restore\.inner\.after \(\+6356ms\) left com\.apple\.keylayout\.US enabled=true selected=true/m
 	);
+	assert.match(stale.stdout, /do not hold the system's current layout/);
 	assert.match(
 		stale.stdout,
 		/restore\.inner\.after \+6356ms status=0 target=com\.apple\.keylayout\.French enabled=true selected=false; original=com\.apple\.keylayout\.US enabled=true selected=true; current=/
@@ -368,8 +376,32 @@ try {
 		[UNANSWERED, ...fullLines],
 		[mappingRecord(restoreEvents(true))]
 	);
-	assert.equal(both.receipt.state, 'process_current_source_stale');
+	assert.equal(both.receipt.state, 'current_source_stale_unlocated');
 	assert.equal(both.receipt.unanswered_count, 1);
+	checks++;
+
+	// The probe's miss in run 44025301586: HIToolbox kept French as the current
+	// layout while US was selected, so every process reads French.
+	const system = classify('system-layout-stale', fullLines, [
+		mappingRecord(restoreEvents(true, 'com.apple.keylayout.French'))
+	]);
+	assert.equal(system.receipt.state, 'system_current_layout_stale');
+	assert.equal(system.receipt.stale_current.system_layout, 'com.apple.keylayout.French');
+	assert.match(
+		system.stdout,
+		/^::error::Native keyboard-source refusal: system_current_layout_stale\. .*the system's current layout \(com\.apple\.HIToolbox\) stayed com\.apple\.keylayout\.French too/m
+	);
+	// The system layout already on US leaves only the test process stale.
+	const own = classify('process-stale', fullLines, [
+		mappingRecord(restoreEvents(true, 'com.apple.keylayout.US'))
+	]);
+	assert.equal(own.receipt.state, 'process_current_source_stale');
+	assert.match(own.stdout, /only the test process's view is stale\./);
+	// A system layout naming a third source locates nothing.
+	const third = classify('third-layout', fullLines, [
+		mappingRecord(restoreEvents(true, 'com.apple.keylayout.ABC'))
+	]);
+	assert.equal(third.receipt.state, 'current_source_stale_unlocated');
 	checks++;
 
 	// Both steps that select native input sources bracket their cohort with the

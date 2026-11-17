@@ -20,15 +20,26 @@ unanswered server is therefore the state the refusals share, not their cause.
 This owner reads the cohort transcript and the agent snapshot taken around it
 (macos_text_input_agents.sh) and writes a receipt whose state is one of:
 
-- process_current_source_stale: the refused case's own records show a select
+- system_current_layout_stale: the refused case's own records show a select
   or restore call after which the source it selected reads enabled and
-  selected, yet TISCopyCurrentKeyboardInputSource in the test process still
-  names another source: the system applied the selection and this process's
-  current-source cache never followed. Both refusals whose records were read
-  (runs 43277967473 and 43276494558, 2026-11-12) are this, on the first
-  restore from French to US, with the TextInputMenuAgent pid and run count
-  unchanged; every later case then captured the stale French as its original.
-  It names the mechanism, not why the cache missed the change;
+  selected, yet TISCopyCurrentKeyboardInputSource names another source, and
+  so does the current layout com.apple.HIToolbox publishes to every process
+  (AppleCurrentKeyboardLayoutInputSourceID, recorded as systemLayout): the
+  selected list moved and the system's current layout did not. A fresh
+  process reads the same stale layout, and selecting the already-selected
+  source again does not move it. The TIS cache probe saw it twice in run
+  44025301586 (macOS 26 and Intel, each in its application mode), then not
+  once in some 20,000 more steps of every mode, so what triggers it is open;
+- process_current_source_stale: the same call, but the system's current
+  layout is the selected source: only this process's view is stale;
+- current_source_stale_unlocated: the same call in records without the
+  system layout, so where the stale source lives is not known. Both
+  refusals whose records were read (runs 43277967473 and 43276494558,
+  2026-11-12) are this, on the first restore from French to US, with the
+  TextInputMenuAgent pid and run count unchanged; every later case then
+  captured the stale French as its original, and in run 43276494558 a new
+  XCTest process (the next step) read a current source that was not
+  selected, so that state outlived the process;
 - tsm_uiserver_unanswered: a fixture refusal follows an unanswered message;
 - fixture_refusal_unclassified: a fixture refusal without either;
 - no_fixture_refusal: the cohort holds no selection refusal.
@@ -75,6 +86,12 @@ SELECTING_CALLS = {
     "select.after": "target",
     "restore.inner.after": "original",
     "restore.outer.after": "original",
+}
+# Where the stale current source lives, from the system layout the record holds.
+STALE_STATES = {
+    "system": "system_current_layout_stale",
+    "process": "process_current_source_stale",
+    None: "current_source_stale_unlocated",
 }
 AGENT_FIELDS = re.compile(r"^\s*(state|pid|runs|last exit code|last terminating signal) = (.+)$")
 
@@ -179,11 +196,21 @@ def stale_current(events):
             and present(current, "id") is not None
             and present(current, "id") != present(wanted, "id")
         ):
+            system = event.get("systemLayout")
+            system_id = system["value"] if system and system.get("state") == "present" else None
+            if system_id is not None and system_id == present(current, "id"):
+                located = "system"
+            elif system_id is not None and system_id == present(wanted, "id"):
+                located = "process"
+            else:
+                located = None
             return {
                 "phase": event["phase"],
                 "offset_ms": round((event["uptime"] - start) * 1000),
                 "wanted": source_state(wanted),
                 "current": source_state(current),
+                "system_layout": system_id,
+                "located": located,
             }
     return None
 
@@ -246,7 +273,7 @@ def evaluate(transcript, snapshot="", receipts=None):
     if not refusals:
         state = "no_fixture_refusal"
     elif stale is not None:
-        state = "process_current_source_stale"
+        state = STALE_STATES[stale["located"]]
     elif unanswered and transcript.find(unanswered[0]["line"]) < transcript.find(
         refusals[0]["line"]
     ):
@@ -288,13 +315,26 @@ def annotation(receipt):
 def state_annotation(receipt):
     """The state sentence of a refused cohort's annotation."""
     refusal = receipt["first_refusal"]
-    if receipt["state"] == "process_current_source_stale":
+    if receipt["state"] in STALE_STATES.values():
         stale = receipt["stale_current"]
+        where = {
+            "system_current_layout_stale": (
+                "and the system's current layout (com.apple.HIToolbox) stayed "
+                f"{stale['system_layout']} too: the selected list moved, the current layout did not."
+            ),
+            "process_current_source_stale": (
+                f"while the system's current layout is {stale['system_layout']}: "
+                "only the test process's view is stale."
+            ),
+            "current_source_stale_unlocated": (
+                "and these records do not hold the system's current layout, "
+                "so whether only this process is stale is not known."
+            ),
+        }[receipt["state"]]
         return (
-            "::error::Native keyboard-source refusal: process_current_source_stale. "
+            f"::error::Native keyboard-source refusal: {receipt['state']}. "
             f"In {refusal['case']}, {stale['phase']} (+{stale['offset_ms']}ms) left "
-            f"{stale['wanted']} while this process's current source stayed {stale['current']}: "
-            "the system applied the selection and the test process never saw it."
+            f"{stale['wanted']} while the current source stayed {stale['current']}, {where}"
         )
     if receipt["state"] == "tsm_uiserver_unanswered":
         first = receipt["first_unanswered"]

@@ -95,6 +95,7 @@ function record(data, pid) {
 			refuse();
 		if (event.status !== undefined && !integer(event.status, -2147483648, 2147483647)) refuse();
 		if (event.snapshotID !== undefined) boundedIdentity(event.snapshotID);
+		if (event.systemLayout !== undefined) boundedIdentity(event.systemLayout);
 		for (const source of ['original', 'target', 'current']) {
 			if (event[source] === undefined) continue;
 			boundedIdentity(event[source].id);

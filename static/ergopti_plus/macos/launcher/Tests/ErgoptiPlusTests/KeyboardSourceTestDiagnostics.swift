@@ -75,6 +75,9 @@ final class KeyboardSourceTestDiagnostics {
 		let snapshotID: KeyboardSourceTestIdentity?
 		let keyboardType: UInt32?
 		let unicodeDataBytes: Int?
+		/// The current layout com.apple.HIToolbox publishes to every process; a source the
+		/// test process names current but the system does not is this process's alone.
+		var systemLayout: KeyboardSourceTestIdentity? = nil
 	}
 	struct Receipt: Codable {
 		let version: Int
@@ -102,6 +105,16 @@ final class KeyboardSourceTestDiagnostics {
 		events.append(event)
 	}
 
+	/// Reads AppleCurrentKeyboardLayoutInputSourceID, the layout a fresh process starts from.
+	static func systemLayout() -> KeyboardSourceTestIdentity {
+		let domain = "com.apple.HIToolbox" as CFString
+		_ = CFPreferencesAppSynchronize(domain)
+		guard let value = CFPreferencesCopyAppValue("AppleCurrentKeyboardLayoutInputSourceID" as CFString, domain)
+		else { return .bounded(nil) }
+		guard CFGetTypeID(value) == CFStringGetTypeID() else { return .init(state: "invalidType", value: nil) }
+		return .bounded(value as? String)
+	}
+
 	func record(_ phase: String, original: TISInputSource? = nil, target: TISInputSource? = nil,
 		status: OSStatus? = nil, snapshot: KeyboardSourceSnapshot? = nil) {
 		let uptime = ProcessInfo.processInfo.systemUptime
@@ -109,7 +122,7 @@ final class KeyboardSourceTestDiagnostics {
 		append(Event(phase: phase, uptime: uptime, status: status,
 			original: .read(original), target: .read(target), current: .read(current),
 			snapshotID: snapshot.map { .bounded($0.sourceID) }, keyboardType: snapshot?.keyboardType,
-			unicodeDataBytes: snapshot?.data.map { CFDataGetLength($0) }))
+			unicodeDataBytes: snapshot?.data.map { CFDataGetLength($0) }, systemLayout: Self.systemLayout()))
 	}
 
 	func nativeCall(_ phase: String, original: TISInputSource, target: TISInputSource? = nil,
