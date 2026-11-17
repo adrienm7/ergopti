@@ -13,7 +13,7 @@ local fixture = require("tests.support.text_owner_fixture")
 --- Runs the complete injection with controlled clipboard I/O and focus changes.
 --- @param boundary string Controlled external transition point, or stable.
 --- @param body function Receives result, wire, writes, state and stopped count.
-local function injection(boundary, body)
+local function injection(boundary, body, fields)
 	fixture.with(function(guard, state)
 		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
 			"adapters.keyboard_layout", "modules.hotstrings.injector", "platform.input.keyboard_hook", "core.logger.engine.shim" }
@@ -97,6 +97,10 @@ local function injection(boundary, body)
 				rows[#rows + 1] = code .. ":" .. value
 				held[code] = value == 1 or nil
 				if code == 29 and value == 1 then transition("ctrl-down") end
+				if code == 14 and value == 0 then
+					local _, erased = table.concat(rows, " "):gsub("14:0", "")
+					if erased == 3 then transition("after-erase") end
+				end
 				return true
 			end })
 			injector._set_nanosleep_for_test(function(seconds)
@@ -105,7 +109,9 @@ local function injection(boundary, body)
 			end)
 			local owner = assert(guard.capture_text_owner())
 			transition("before-erase")
-			local result = injector.inject(3, "☃", false, nil, owner)
+			local result
+			if fields then result = injector.inject_fields(3, { "ok", "☃" }, false, owner)
+			else result = injector.inject(3, "☃", false, nil, owner) end
 			if boundary ~= "cleanup-refusal" then helpers.assert_eq(held, {}, "original owned UP cleanup always balances the wire") end
 			body(result, rows, writes, state, stopped, transitioned, held)
 			local real_failure = boundary:find("native-", 1, true) == 1
@@ -195,6 +201,25 @@ helpers.describe("ordinary clipboard destination admission", function()
 				helpers.assert_eq(writes, (point == "before-erase" or point == "read" or point == "lookup") and {} or { "☃", "SAVED" })
 				helpers.assert_eq(stopped, 0, "destination refusal never emergency-stops a healthy keyboard")
 			end)
+		end)
+	end
+end)
+
+-- run_hotstring_fields_live.lua: the trigger's field changed while a
+-- multi-field expansion erased it, and the refusal stopped the whole keyboard
+-- hook, because inject_fields holds its destination in its body rather than
+-- passing it to the transaction that judges a stale destination healthy.
+helpers.describe("multi-field destination refusal (linux-fields-stale-no-stop)", function()
+	for _, point in ipairs({ "before-erase", "after-erase" }) do
+		helpers.it("(linux-fields-stale-no-stop) refuses a successor at " .. point .. " without stopping the keyboard", function()
+			injection(point, function(result, rows, _, _, stopped, transitioned)
+				helpers.assert_true(transitioned, "the actual requested blocking boundary must run")
+				helpers.assert_eq(result.ok, false)
+				helpers.assert_eq(result.error, "programmable_publication_stale")
+				helpers.assert_eq(result.cleanup_ok, true)
+				helpers.assert_true(not table.concat(rows, " "):find("24:1", 1, true), "no value is typed into the successor")
+				helpers.assert_eq(stopped, 0, "a changed destination never emergency-stops a healthy keyboard")
+			end, true)
 		end)
 	end
 end)

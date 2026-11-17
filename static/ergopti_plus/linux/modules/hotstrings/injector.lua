@@ -722,7 +722,11 @@ local function run_transaction(label, body, publication, prepared, data_attempt,
 	Perf.done("hotstring.expand", transaction_started,
 		string.format("%s, %d event(s)%s", label, transaction_events, result.ok and "" or ", failed"))
 	if not result.ok then result.error = private_failure(result.error, is_private) end
-	if not result.ok and not (publication ~= nil and result.cleanup_ok == true
+	-- A retained destination that went stale is a healthy refusal. inject_fields
+	-- holds its first field's destination in its body (its later fields are
+	-- reached through the Tabs) and passes only the prepared replacement, so the
+	-- prepared batch counts as a retained destination too.
+	if not result.ok and not ((publication ~= nil or prepared ~= nil) and result.cleanup_ok == true
 		and result.error == Errors.PROGRAMMABLE_PUBLICATION_STALE) then stop_after_failure(result, label) end
 	return result
 end
