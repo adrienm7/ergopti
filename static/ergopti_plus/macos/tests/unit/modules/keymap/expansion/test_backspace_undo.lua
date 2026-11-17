@@ -179,6 +179,22 @@ helpers.describe("keymap: the Backspace undo", function()
 		helpers.assert_eq(STAR, transaction.typed, "the magic key is typed back")
 	end)
 
+	-- One Backspace deletes a whole emoji, flag or accent cluster: counting the
+	-- replacement in code points also erased characters typed before it.
+	helpers.it("erases an emoji or accent replacement by character (macos-undo-graphemes)", function()
+		for _, case in ipairs({
+			{ "Z👍🏽", 3 }, { "Z👨‍👩‍👧", 3 }, { "Z🇫🇷", 3 }, { "Ze\u{0301}", 3 }, { "Z❤️", 3 },
+		}) do
+			local state, expander, log = fresh_engine({ { "ab", case[1], { auto_expand = false } } }, 1)
+			state.buffer = "ab"
+			helpers.assert_true(type_terminator(state, expander, " "), "ab+space must fire")
+			local restored, transaction = press_backspace(state, expander, log)
+			helpers.assert_true(restored, "the Backspace restores the trigger")
+			helpers.assert_eq(case[2], transaction.deletes, "Z, the cluster and the space only: " .. case[1])
+			helpers.assert_eq("ab", transaction.typed)
+		end
+	end)
+
 	helpers.it("a key output keeps no record (undo-literal)", function()
 		local state, expander = fresh_engine({ { "ab", "cd{Left}", { auto_expand = false } } }, 1)
 		state.buffer = "ab"

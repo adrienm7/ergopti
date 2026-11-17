@@ -25,6 +25,8 @@ local text_utils = require("core.text.engine.utils")
 -- the buffer traversal is not — macOS slices a byte string, the core an array of
 -- codepoints, and neither has to convert for the other.
 local HotstringCore = require("infra.hotstring_engine")
+-- Characters as one Backspace deletes them: a whole emoji or accent cluster.
+local ComposedText = require("infra.composed_text")
 local Cascade = require("hotstrings.engine.matcher.cascade")
 local InjectionPlan = require("hotstrings.engine.matcher.injection_plan")
 local km_utils   = require("modules.keymap.utils")
@@ -412,13 +414,17 @@ end
 --- Puts the trigger back for a Backspace pressed right after an expansion: the
 --- Backspace is consumed, what the expansion typed is erased and the trigger is
 --- typed again, outside the buffer so it cannot fire at once (Linux's undo).
+--- The erase counts user-perceived characters, the unit one Backspace deletes:
+--- an emoji with a skin tone, a ZWJ sequence, a flag or an accent typed as a
+--- combining mark is one character of several code points, and counting code
+--- points erased the characters typed before the expansion.
 --- @param undo table The record remember_undo kept, already taken off the state.
 --- @return boolean restored True when the edit went out; the Backspace is consumed.
 function M.undo_on_backspace(undo)
 	if not require_state("undo_on_backspace") then return false end
 	if type(undo) ~= "table" or _state.buffer ~= undo.buffer_after then return false end
 	local restored = M.perform_text_replacement(
-		text_utils.utf8_len(undo.typed),
+		ComposedText.count(undo.typed),
 		function() return km_utils.emit_text(undo.trigger) end,
 		function()
 			-- The restored trigger ends the word and is not in the buffer: a
