@@ -1,0 +1,119 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/hotstrings.v1.json",
+	"description": "What one Backspace erases in each Windows text host family, measured on Windows 11 on 2026-11-17 (one Backspace after each text, UTF-16 units removed). The Windows Backspace undo (HSE_BackspaceSegments) counts its steps from this table: edit is a Win32 EDIT, richedit RICHEDIT50W or the Store Notepad's RichEditD2DPT and WordPad, chromium Edge, Chrome and Electron; other keeps one step per code point. Linux counts GTK steps with injector.caret_steps(), which this table does not cover.",
+	"families": ["edit", "richedit", "chromium", "other"],
+	"texts": [
+		{
+			"id": "combining_acute",
+			"codepoints": ["0065", "0301"],
+			"first_backspace_units": { "edit": 1, "richedit": 1, "chromium": 1, "other": 1 },
+			"steps": { "edit": 2, "richedit": 2, "chromium": 2, "other": 2 },
+			"inferred": ["other"]
+		},
+		{
+			"id": "skin_tone",
+			"codepoints": ["1F44D", "1F3FD"],
+			"first_backspace_units": { "edit": 2, "richedit": 4, "chromium": 4, "other": 2 },
+			"steps": { "edit": 2, "richedit": 1, "chromium": 1, "other": 2 },
+			"inferred": ["other"]
+		},
+		{
+			"id": "flag",
+			"codepoints": ["1F1EB", "1F1F7"],
+			"first_backspace_units": { "edit": 2, "richedit": 2, "chromium": 4, "other": 2 },
+			"steps": { "edit": 2, "richedit": 2, "chromium": 1, "other": 2 },
+			"inferred": ["other"]
+		},
+		{
+			"id": "zwj_family",
+			"codepoints": ["1F468", "200D", "1F469", "200D", "1F467"],
+			"first_backspace_units": { "edit": 2, "richedit": 8, "chromium": 8, "other": 2 },
+			"steps": { "edit": 5, "richedit": 1, "chromium": 1, "other": 5 },
+			"inferred": ["other"]
+		},
+		{
+			"id": "heart_vs16",
+			"codepoints": ["2764", "FE0F"],
+			"first_backspace_units": { "edit": 1, "richedit": 2, "chromium": 2, "other": 1 },
+			"steps": { "edit": 2, "richedit": 1, "chromium": 1, "other": 2 },
+			"inferred": ["other"]
+		},
+		{
+			"id": "single_emoji",
+			"codepoints": ["1F600"],
+			"first_backspace_units": { "edit": 2, "richedit": 2, "chromium": 2, "other": 2 },
+			"steps": { "edit": 1, "richedit": 1, "chromium": 1, "other": 1 },
+			"inferred": ["richedit", "chromium", "other"]
+		},
+		{
+			"id": "plain_text_then_emoji",
+			"codepoints": ["0061", "00E9", "0020", "1F44D", "1F3FD", "0020"],
+			"first_backspace_units": { "edit": 1, "richedit": 1, "chromium": 1, "other": 1 },
+			"steps": { "edit": 6, "richedit": 5, "chromium": 5, "other": 6 },
+			"inferred": ["edit", "richedit", "chromium", "other"]
+		}
+	],
+	"hosts": [
+		{
+			"id": "classic_notepad",
+			"control_class": "Edit",
+			"window_class": "Notepad",
+			"family": "edit"
+		},
+		{
+			"id": "winforms_textbox",
+			"control_class": "WindowsForms10.EDIT.app.0.141b42a_r6_ad1",
+			"window_class": "WindowsForms10.Window.8.app.0.141b42a_r6_ad1",
+			"family": "edit"
+		},
+		{
+			"id": "store_notepad",
+			"control_class": "RichEditD2DPT",
+			"window_class": "Notepad",
+			"family": "richedit"
+		},
+		{
+			"id": "wordpad",
+			"control_class": "RICHEDIT50W",
+			"window_class": "WordPadClass",
+			"family": "richedit"
+		},
+		{
+			"id": "winforms_richtextbox",
+			"control_class": "WindowsForms10.RichEdit20W.app.0.141b42a_r6_ad1",
+			"window_class": "WindowsForms10.Window.8.app.0.141b42a_r6_ad1",
+			"family": "richedit"
+		},
+		{
+			"id": "chromium_page",
+			"control_class": "Chrome_RenderWidgetHostHWND",
+			"window_class": "Chrome_WidgetWin_1",
+			"family": "chromium"
+		},
+		{
+			"id": "chromium_omnibox",
+			"control_class": "Chrome_WidgetWin_1",
+			"window_class": "Chrome_WidgetWin_1",
+			"family": "chromium"
+		},
+		{
+			"id": "chromium_unreadable_control",
+			"control_class": "",
+			"window_class": "Chrome_WidgetWin_1",
+			"family": "chromium"
+		},
+		{ "id": "word", "control_class": "_WwG", "window_class": "OpusApp", "family": "other" },
+		{
+			"id": "windows_terminal",
+			"control_class": "",
+			"window_class": "CASCADIA_HOSTING_WINDOW_CLASS",
+			"family": "other"
+		},
+		{
+			"id": "console",
+			"control_class": "ConsoleWindowClass",
+			"window_class": "ConsoleWindowClass",
+			"family": "other"
+		}
+	]
+}

@@ -74,14 +74,15 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
       then Enter or Backspace with AltGr still down types Enter or erases, and never pauses or reloads.
 - [ ] Items 34, 37, 102 and 129: the Windows native cases of native delimiter transactions and packaging with both
       extension TOML files.
-- [ ] Backspace undo by characters (2026-11-17): give a personal hotstring a replacement ending in an emoji
-      with a skin tone (`👍🏽`), a flag (`🇫🇷`) and an accent typed as a combining mark; type a letter, the trigger
-      and Space, then Backspace, in Notepad, Word and a browser field: the trigger comes back and the letter typed
-      before it stays (the Undo erases by character, `_TextCaretSteps`, as one Backspace deletes in those hosts).
 - [ ] Immediate-Backspace restoration in Windows Terminal: `sru` + Space then Backspace types `sru` back through the
       paced terminal capture, an OpenTUI prompt such as Claude Code included. The live check `backspace-undo-hosts`
       passed on 2026-11-17 in an edit, Notepad and a conhost console; conhost names its client as the window's owner,
       so the console took the atomic path, and the check does not drive the user's own Windows Terminal.
+- [ ] Immediate-Backspace restoration of an emoji per host (2026-11-17): an expansion ending in « 👍🏽 », then
+      Backspace, gives the trigger back with nothing left of the expansion in a classic Edit (Win+R), the Store
+      Notepad, WordPad and Edge or an Electron app, and so does one ending in « 🇫🇷 »; the DEBUG log names the
+      host family (« Undo: N Backspace step(s) in a richedit host »); a letter typed before the trigger stays, in Word
+      too.
 - [ ] One-shot modifiers (2026-11-13): the sticky delay row accepts 0 and shows « no time limit », and the one-shot
       Shift and `sticky_*` captures then wait with no InputHook timeout; `sticky_altgr` types the AltGr level on the
       Ergopti layout, through Kana on a Kana-style layout; a tap-hold key set to tap `sticky_altgr` and hold AltGr

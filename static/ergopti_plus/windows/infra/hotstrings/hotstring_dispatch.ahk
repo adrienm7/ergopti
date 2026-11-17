@@ -1789,12 +1789,10 @@ _HSE_RememberUndoRecord(TriggerUnits, BufferBefore, Effect, Hwnd, Route) {
 
 ; Puts the trigger back for a Backspace pressed right after an expansion. The
 ; physical Backspace has already reached the application and removed the last
-; character the expansion typed, so the burst erases what is left of it and types
-; the trigger, outside the buffers so it cannot fire again at once (Linux's undo).
-; What is left is counted in user-perceived characters, the unit one Backspace
-; deletes: an emoji with a skin tone, a ZWJ sequence, a flag or an accent typed as
-; a combining mark is one character of several code points, and counting code
-; points erased characters typed before the expansion.
+; step of what the expansion typed, so the burst erases what is left of it and
+; types the trigger, outside the buffers so it cannot fire again at once (Linux's
+; undo). A step is what the focused host erases per Backspace: a code point in an
+; EDIT, a whole emoji in a RichEdit or Chromium (HSE_BackspaceSegments).
 ; Any edit, click, focus change or other window in between voids the record, and
 ; the burst takes the expansion's own output: Notepad's verified editor, the
 ; terminal's paced capture or the atomic SendInput.
@@ -1817,11 +1815,16 @@ HSE_UndoExpansion(Undo, FocusToken := unset, NativeSendFn := unset, SchedulerFn 
 		Host := OutputHostResolve(_HSE_OutputHostNeedsTitle)
 		if !Host["Valid"] or Host["Hwnd"] != Undo.Hwnd or _HSE_UndoRoute(Host) != Undo.Route
 				return false
-		Remaining := _TextCaretSteps(Undo.Typed)
+		Family := HSE_BackspaceFamilyOfFocus(Undo.FocusToken, Host["Class"])
+		Segments := HSE_BackspaceSegments(Undo.Typed, Family)
+		Remaining := Segments.Length
 		if (Remaining < 1)
 				return false
+		; What the physical Backspace left on screen.
+		Left := SubStr(Undo.Typed, 1, StrLen(Undo.Typed) - StrLen(Segments[Remaining]))
+		LoggerDebug("HSE", "Undo: {1} Backspace step(s) in a {2} host.", Remaining - 1, Family)
 		if Undo.Route != "atomic"
-				return _HSE_UndoThroughOwner(Undo, Remaining - 1, Host, NativeSendFn?, SchedulerFn)
+				return _HSE_UndoThroughOwner(Undo, Remaining - 1, Left, Host, NativeSendFn?, SchedulerFn)
 		Burst := (Remaining > 1 ? "{BackSpace " . (Remaining - 1) . "}" : "") . "{Text}" . Undo.Trigger
 		PrefixWatcherSuppress(true)
 		SyntheticOwner := 0
@@ -1913,19 +1916,21 @@ _HSE_LogUndoRestored(Undo) {
 ; against that reset context: a key typed meanwhile revokes it, and a refusal
 ; leaves the line unknown as a failed atomic undo does.
 ; @param Undo {Object} The record, already taken.
-; @param Erased {Integer} Codepoints of the expansion still on screen to erase.
+; @param Erased {Integer} Backspace steps of the expansion still on screen.
+; @param Left {String} The expansion's text still on screen.
 ; @param Host {Map} The output host the undo was admitted on.
 ; @param NativeSendFn {Func} The Notepad editor sender, TextSend when unset.
 ; @param SchedulerFn {Func|0} The terminal owner's scheduler, a timer when 0.
 ; @returns {Boolean} Always true: the Backspace's buffer effect is the reset.
-_HSE_UndoThroughOwner(Undo, Erased, Host, NativeSendFn := unset, SchedulerFn := 0) {
+_HSE_UndoThroughOwner(Undo, Erased, Left, Host, NativeSendFn := unset, SchedulerFn := 0) {
 		global _HSE_TerminalOwnerSerial, HSE_Buffer, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
 		global _PrefixInputContextGeneration, _PrefixDeferredGeneration, _PrefixContentGeneration
 		global _SendHook
-		Typed := Undo.Typed
+		; The Notepad editor replaces the exact text, counted in code points; the
+		; terminal types one Backspace per step.
 		Owner := Map("Id", ++_HSE_TerminalOwnerSerial, "Pending", true, "UndoRestore", true,
-			"Backspaces", Erased, "EraseUnits", 0,
-			"DeletedText", SubStr(Typed, 1, StrLen(Typed) - _TextTailCodeUnits(Typed, 1)),
+			"Backspaces", Undo.Route == "notepad" ? _TextCodepointLength(Left) : Erased,
+			"EraseUnits", 0, "DeletedText", Left,
 			"PlainInsertedText", Undo.Trigger, "SendPayload", "{Text}" . Undo.Trigger,
 			"EndCharPart", "", "OnlyText", true, "TrailingText", "", "TrailingChars", [],
 			"Hwnd", Host["Hwnd"], "Pid", Host["Pid"], "IsPrivate", Undo.IsPrivate, "Port", 0)

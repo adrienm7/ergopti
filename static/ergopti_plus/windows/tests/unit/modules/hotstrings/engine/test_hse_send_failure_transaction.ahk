@@ -1829,6 +1829,40 @@ _HNPU_BackspaceRestoresThroughTheEditor(Mode) {
 		AssertEqual("", HSE_Undoable, "and keeps no undo of its own")
 	}
 }
+/** The Store Notepad's RichEdit erases a toned emoji whole: the editor is asked for what is left. */
+_HNPU_EmojiTailFollowsTheRichEdit() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, HSE_Undoable, _PrefixFocusedControlToken, _LLM_Bridge_Buffer, _PrefixBuffer
+		_PrefixFocusedControlToken := 1
+		State := Map("Requests", [])
+		HSE_BackspaceStepsConfigure((Hwnd) => "RichEditD2DPT")
+		try {
+			HSE_Buffer := "xxab"
+			_PrefixBuffer := "xxab"
+			_LLM_Bridge_Buffer := "xxab"
+			OutputHostResolverPrimeForTest("notepad.exe")
+			Spec := _AHK04_NormalSpec()
+			Spec.Replacement := "Z" . Chr(0x1F44D) . Chr(0x1F3FD)
+			Effect := 0
+			Owner := HSE_DispatchMatch(Spec, "", &Effect, false, _HNP_Record.Bind(State))
+			AssertTrue(Owner is Map, "control: the Notepad expansion is pending on its editor owner")
+			_HNPU_Settle(State["Requests"][1])
+			Undo := HSE_Undoable
+			AssertTrue(IsObject(Undo), "control: the committed expansion keeps its undo record")
+			HSE_Undoable := ""
+			AssertTrue(HSE_UndoExpansion(Undo, 1, _HNP_Record.Bind(State)),
+				"the immediate Backspace owns its effect")
+			Request := State["Requests"][2]
+			AssertEqual("Z", Request.Opts["deleted_text"], "the physical Backspace took the whole toned emoji")
+			AssertEqual(1, Request.Opts["erase_before"], "and the editor erases the one code point left")
+			_HNPU_Settle(Request, true)
+		} finally HSE_BackspaceStepsConfigure(0)
+	}
+}
+Test("Notepad undo: the editor erases what the RichEdit Backspace left of an emoji (backspace-steps)",
+	_HNPU_EmojiTailFollowsTheRichEdit)
+
 Test("Notepad undo: an immediate Backspace restores the trigger through the editor (backspace-undo)",
 	_HNPU_BackspaceRestoresThroughTheEditor.Bind("ok"))
 Test("Notepad undo: a request refused before the Backspace lands is asked again (backspace-undo)",

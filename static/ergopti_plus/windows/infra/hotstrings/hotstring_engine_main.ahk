@@ -1742,5 +1742,6 @@ HSE_PreviewNextMatch(Buffer, NextChar) {
 
 #Include hotstring_match.ahk
 #Include hotstring_injection_plan.ahk
+#Include hotstring_backspace_steps.ahk
 #Include hotstring_dispatch.ahk
 #Include hotstring_cascade.ahk

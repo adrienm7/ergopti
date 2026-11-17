@@ -75,38 +75,69 @@ _BSU_BackspaceRestoresTheTrigger() {
 }
 Test("hotstrings: an immediate Backspace restores the trigger (backspace-undo)", _BSU_BackspaceRestoresTheTrigger)
 
-; One Backspace deletes a whole emoji, flag or accent cluster: the Undo counted
-; the replacement in code points and also erased characters typed before it.
-_BSU_EmojiReplacementErasedByCharacter() {
+; Fires « pce » + Space into a host whose focused control has ControlClass,
+; then restores it, and returns the burst.
+_BSU_UndoBurstIn(Replacement, ControlClass) {
 	global HSE_Undoable, _PrefixFocusedControlToken
-	Cases := [
-		["Z" . Chr(0x1F44D) . Chr(0x1F3FD), "skin tone"],
-		["Z" . Chr(0x1F468) . Chr(0x200D) . Chr(0x1F469) . Chr(0x200D) . Chr(0x1F467), "ZWJ family"],
-		["Z" . Chr(0x1F1EB) . Chr(0x1F1F7), "flag"],
-		["Ze" . Chr(0x301), "combining accent"]
-	]
+	HSE_BackspaceStepsConfigure((Hwnd) => ControlClass)
 	try {
-		for Row in Cases {
-			ResetHotstringRecorders()
-			SimulateRegularApp()
-			HSE_TestReset()
-			_PrefixFocusedControlToken := 1
-			CreateHotstring("C", "adn", Row[1])
-			HSE_FeedReset(true)
-			HSE_FeedChar("a")
-			HSE_FeedChar("d")
-			HSE_FeedChar("n")
-			Match := HSE_FeedChar(" ")
-			Assert(IsObject(Match), "control: adn + Space matches (" . Row[2] . ")")
-			AssertTrue(HSE_DispatchMatch(Match, " "), "control: the expansion fires (" . Row[2] . ")")
-			Undo := HSE_Undoable
-			Assert(IsObject(Undo), "a literal expansion keeps its undo record (" . Row[2] . ")")
-			HSE_Undoable := ""
-			AssertTrue(HSE_UndoExpansion(Undo, 1), "the immediate Backspace restores the trigger (" . Row[2] . ")")
-			AssertEqual("{BackSpace 2}{Text}adn", _BSU_LastBurst(),
-				"the Space is gone: Z and the " . Row[2] . " are two characters to erase")
-		}
-	} finally HSE_TestReset()
+		ResetHotstringRecorders()
+		SimulateRegularApp()
+		HSE_TestReset()
+		_PrefixFocusedControlToken := 1
+		CreateHotstring("C", "pce", Replacement)
+		HSE_FeedReset(true)
+		HSE_FeedChar("p")
+		HSE_FeedChar("c")
+		HSE_FeedChar("e")
+		Match := HSE_FeedChar(" ")
+		Assert(IsObject(Match), "control: pce + Space matches")
+		AssertTrue(HSE_DispatchMatch(Match, " "), "control: the expansion fires")
+		Undo := HSE_Undoable
+		Assert(IsObject(Undo), "control: the expansion keeps its undo")
+		HSE_Undoable := ""
+		AssertTrue(HSE_UndoExpansion(Undo, 1), "the immediate Backspace restores the trigger")
+		return _BSU_LastBurst()
+	} finally {
+		HSE_BackspaceStepsConfigure(0)
+		HSE_TestReset()
+	}
+}
+
+; One Backspace erases a whole emoji in a RichEdit or Chromium but one code
+; point in an EDIT: counting code points everywhere left « ok » plus a lone
+; base emoji's worth of Backspaces too many (backspace-steps).
+_BSU_EmojiStepsFollowTheHost() {
+	Thumb := Chr(0x1F44D) . Chr(0x1F3FD)
+	Flag := Chr(0x1F1EB) . Chr(0x1F1F7)
+	AssertEqual("{BackSpace 5}{Text}pce", _BSU_UndoBurstIn("ok " . Thumb, "Edit"),
+		"an EDIT erases the skin tone and its base one by one")
+	AssertEqual("{BackSpace 4}{Text}pce", _BSU_UndoBurstIn("ok " . Thumb, "RICHEDIT50W"),
+		"a RichEdit erases the toned emoji with one Backspace")
+	AssertEqual("{BackSpace 4}{Text}pce", _BSU_UndoBurstIn("ok " . Thumb, "Chrome_RenderWidgetHostHWND"),
+		"Chromium erases the toned emoji with one Backspace")
+	AssertEqual("{BackSpace 2}{Text}pce", _BSU_UndoBurstIn(Flag, "RichEditD2DPT"),
+		"the Store Notepad's RichEdit erases a flag one indicator at a time")
+	AssertEqual("{BackSpace 1}{Text}pce", _BSU_UndoBurstIn(Flag, "Chrome_RenderWidgetHostHWND"),
+		"Chromium erases a flag with one Backspace")
+	AssertEqual("{BackSpace 3}{Text}pce", _BSU_UndoBurstIn("ok" . Chr(0x2764) . Chr(0xFE0F), "Chrome_WidgetWin_1"),
+		"a VS16 heart is one step in the omnibox too")
+}
+Test("hotstrings: the Backspace undo counts emoji as the focused host erases them (backspace-steps)",
+	_BSU_EmojiStepsFollowTheHost)
+
+; A ZWJ family is one step in Chromium, a combining accent two: the Undo
+; erases exactly what the expansion left, never a character typed before it.
+_BSU_EmojiReplacementErasedByCharacter() {
+	Cases := [
+		["Z" . Chr(0x1F44D) . Chr(0x1F3FD), "skin tone", 2],
+		["Z" . Chr(0x1F468) . Chr(0x200D) . Chr(0x1F469) . Chr(0x200D) . Chr(0x1F467), "ZWJ family", 2],
+		["Z" . Chr(0x1F1EB) . Chr(0x1F1F7), "flag", 2],
+		["Ze" . Chr(0x301), "combining accent", 3]
+	]
+	for Row in Cases
+		AssertEqual("{BackSpace " . Row[3] . "}{Text}pce", _BSU_UndoBurstIn(Row[1], "Chrome_RenderWidgetHostHWND"),
+			"Chromium: the Space is gone and only the " . Row[2] . " replacement is left to erase")
 }
 Test("hotstrings: the Backspace undo erases an emoji or accent replacement by character (windows-undo-graphemes)",
 	_BSU_EmojiReplacementErasedByCharacter)

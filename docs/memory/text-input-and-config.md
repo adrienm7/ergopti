@@ -114,6 +114,21 @@ a typed letter, so the buffer runs one character ahead (no driver reads the
 field's text); Linux sees no modifiers on a typed newline, so Shift+Enter in a
 terminal TUI also reads as submitting the line.
 
+### project-backspace-steps-per-host
+
+One Backspace does not erase the same span in every Windows host (measured
+2026-11-17, `_shared/tests/corpus/hotstrings/backspace_step_vectors.json`): a
+Win32 EDIT erases one code point, a RichEdit (the Store Notepad's
+RichEditD2DPT, WordPad) erases a combining accent or one regional indicator
+alone but a skin tone, ZWJ sequence or VS16 with its base, and Chromium erases
+the accent alone but a whole emoji, flag or ZWJ cluster. The Backspace undo
+counts its steps with `HSE_BackspaceSegments` and the family of the focused
+control (`HSE_BackspaceFamilyOfFocus`); any other Backspace count over text the
+driver typed, which may hold emoji, must do the same rather than count code
+points with `_TextCodepointLength`. The GTK count of Linux `injector.caret_steps()` is a
+different table and is wrong in an EDIT. Add a host by measuring it into the
+vector file first.
+
 ### project-hotstring-cascade
 
 `hotstrings.cascade_max_arrows` (1 to 10, default 3) lets the text a hotstring
