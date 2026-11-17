@@ -135,7 +135,10 @@ async function runToEnd(page) {
 		);
 	} catch (error) {
 		const status = await page.locator('#lo-status').textContent();
-		throw new Error(`the run did not start and end (status: ${status}): ${error.message}`);
+		const corpus = await page.inputValue('#lo-corpus');
+		throw new Error(
+			`the run on ${corpus} at ${page.url()} did not start and end (status: ${status}): ${error.message}`
+		);
 	}
 	return page.locator('#lo-status').textContent();
 }
@@ -334,7 +337,8 @@ async function main() {
 				fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
 			);
 			const html =
-				'<!doctype html><html><head><meta charset="utf-8" />' +
+				// The app's window declares its language, as layout_editor_window/index.html does.
+				'<!doctype html><html lang="en"><head><meta charset="utf-8" />' +
 				`<style>${inline('theme.css')}${inline('layout_optimizer/style.css')}</style>` +
 				`<script>window._i18n_strings = ${JSON.stringify(strings).replace(/</g, '\\u003c')};` +
 				'window.__workers = 0; const NativeWorker = window.Worker;' +
