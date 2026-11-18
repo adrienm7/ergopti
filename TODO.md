@@ -52,7 +52,6 @@ every maintainer request here.
     `needs` the Intel build job and update `macos-stage-contract.json` with its review.
   - Shared-literal ratchet: `windows.path_name` 49/48 (`NOTIFIER_PRODUCT_NAME`, 11de860899) and
     `macos+linux.lua_function` 105/104 (`reload_emulation`, e13e110319): move them to a shared home.
-  - Linux desktop-webview: `programmable_publication_stale` in the real-GTK field test (5b4110f703), maybe flaky.
   - Re-read the first complete run after these; keylayout owner pin and Menus « cold command section » to confirm.
 - [ ] **Exact-count ceilings in tests (maintainer: « ces tests avec seuil magic value c'est vraiment mauvais »).**
       `toml.flat_values` was raised to 1500/2600 on 2026-11-17 to unblock CI. Replace exact operation counts and

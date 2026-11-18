@@ -345,6 +345,30 @@ helpers.describe("AT-SPI focus watcher: causal input barrier", function()
 		helpers.assert_nil(state.watch.snapshot())
 	end)
 
+	helpers.it("(linux-output-barrier-budget) admits a slower answer only within the budget its caller passes", function()
+		local lease = require("core.timing.engine.timings").ms("privacy", "atspi_probe_timeout_ms")
+		for _, budget in ipairs({ "input", lease }) do
+			local state = fixture()
+			state.ready()
+			-- The application answers 100 ms late, as GTK does while it still draws
+			-- the Backspaces an expansion just sent it.
+			state.on_pause = function()
+				if state.now == 1100 then state.message("snapshot") end
+			end
+			local answer = state.watch.barrier(budget ~= "input" and budget or nil)
+			if budget == "input" then
+				helpers.assert_nil(answer, "an input callback still waits no longer than its short budget")
+			else
+				helpers.assert_eq(answer and answer.role, 61, "an output boundary admits the late fresh answer")
+			end
+		end
+		local state = fixture()
+		state.ready()
+		for _, refused in ipairs({ 0, 1.5, lease + 1, "20" }) do
+			assert_false((pcall(state.watch.barrier, refused)), "a budget beyond the receipt lease is refused")
+		end
+	end)
+
 	helpers.it("admits an on-time native answer when the parent resumes after its deadline", function()
 		local state = fixture()
 		state.ready()

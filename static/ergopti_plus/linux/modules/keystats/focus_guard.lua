@@ -17,6 +17,14 @@
 
 local M = {}
 
+-- How long an output boundary of a retained destination waits for the focus
+-- worker's fresh answer: the worker's own native query deadline. The input
+-- budget (focus_barrier_timeout_ms) holds a physical key; an output boundary
+-- holds none, and right after an erase the application is still busy with
+-- the Backspaces just sent to it. With the input budget an expansion failed
+-- at random there as programmable_publication_stale (real-GTK field test).
+local OUTPUT_BARRIER_MS = require("core.timing.engine.timings").ms("privacy", "atspi_probe_timeout_ms")
+
 
 
 
@@ -349,16 +357,17 @@ function M.new(opts)
 	end
 
 	--- Checks live privacy and retains the exact receipt from its single barrier.
+	--- @param budget_ms number|nil Barrier answer deadline; nil for the input budget.
 	--- @return boolean blocked
 	--- @return table|nil snapshot Fresh resident native receipt.
-	local function text_admission()
+	local function text_admission(budget_ms)
 		if stopped then return true end
 		if joining_context then return true end
 		local snapshot
 		if watch then
 			watch.pump()
 			if pending_epoch ~= nil and options.now_ms() < probe_not_before_ms then return true end
-			snapshot = watch.barrier()
+			snapshot = watch.barrier(budget_ms)
 			if contextual then
 				if not snapshot or identity(snapshot) ~= observed then
 					if not context_pending then revoke_context() end
@@ -389,8 +398,9 @@ function M.new(opts)
 
 	--- Captures a fresh exact AI text target without launching a native helper.
 	--- A receipt cannot outlive its joined context, generation or detector epoch.
+	--- @param budget_ms number|nil Barrier answer deadline; nil for the input budget.
 	--- @return string|nil identity Exact active non-password bus/object identity.
-	function guard.focused_text_identity()
+	function guard.focused_text_identity(budget_ms)
 		if reading_text_identity or stopped or not contextual or not watch or context_pending or joining_context
 			or not joined_field or not joined_context then return nil end
 		local field, context = joined_field, joined_context
@@ -398,7 +408,7 @@ function M.new(opts)
 		local called, result = pcall(function()
 			if field.generation ~= context_generation or field.epoch == nil
 				or detector.currentEpoch() ~= field.epoch then return nil end
-			local blocked, snapshot = text_admission()
+			local blocked, snapshot = text_admission(budget_ms)
 			if blocked or not snapshot or snapshot.role == 40
 				or snapshot.bus ~= field.bus or snapshot.path ~= field.path or snapshot.role ~= field.role
 				or detector.currentEpoch() ~= field.epoch or joined_field ~= field or joined_context ~= context
@@ -459,7 +469,7 @@ function M.new(opts)
 			return checked and current == true
 		end
 		function owner.current()
-			local checked, current = pcall(function() return retained() and focus() == target and owner.cached() end)
+			local checked, current = pcall(function() return retained() and focus(OUTPUT_BARRIER_MS) == target and owner.cached() end)
 			return checked and current == true
 		end
 		return owner.cached() and owner or nil

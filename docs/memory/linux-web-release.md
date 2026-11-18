@@ -234,6 +234,17 @@ closed on ambiguity: every expansion blocked. Measured cost is ~1 ms per node
 against a 1 s probe deadline. Action: keep the search scoped to the active
 window and prove changes with `tests/hardware/run_atspi_focus.sh`.
 
+### project-linux-focus-barrier-budget-is-per-caller
+
+`atspi_focus_watch.barrier()` waits 20 ms (`focus_barrier_timeout_ms`) for the
+worker's fresh answer, because an input callback holds a physical key while it
+waits; a timeout publishes no receipt and revokes the joined field for good.
+Right after the injector's erase, GTK is still drawing the Backspaces it was
+sent, so that budget failed expansions at random as
+`programmable_publication_stale`. Action: an output boundary of a retained
+destination (`capture_text_owner`'s `current()`) passes the native query
+deadline (`atspi_probe_timeout_ms`); input callbacks keep the default.
+
 ### project-linux-first-install-needs-luajit-module-builds
 
 Generic `lua-*` packages are Lua 5.4 builds on Fedora, Arch, openSUSE and

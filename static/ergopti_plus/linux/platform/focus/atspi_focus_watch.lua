@@ -291,13 +291,20 @@ function M.new(options)
 
 	--- Obtains a causally fresh resident answer before logical input collection.
 	--- Timeout withholds logical collection and never starts a second process.
+	--- An input callback keeps the short default budget, since a physical key
+	--- waits on it. An output boundary may pass a longer one, up to the lease of
+	--- a receipt: the application is then still busy with the keys just sent to
+	--- it, and a refusal there aborts the whole injection.
+	--- @param budget_ms number|nil Answer deadline; nil for the input budget.
 	--- @return table|nil receipt
-	function watcher.barrier()
+	function watcher.barrier(budget_ms)
+		assert(budget_ms == nil or (type(budget_ms) == "number" and budget_ms > 0
+			and budget_ms % 1 == 0 and budget_ms <= lease_ms), "focus barrier budget refused")
 		watcher.pump()
 		if not ready or failed or not transport then return nil end
 		request = request + 1
 		if not transport.request(request) then fail("admission request refused"); return nil end
-		local deadline = now_ms() + barrier_ms
+		local deadline = now_ms() + (budget_ms or barrier_ms)
 		while true do
 			-- The scheduler may resume a one-millisecond pause after the budget.
 			-- Drain once without waiting, accepting only a response the worker
