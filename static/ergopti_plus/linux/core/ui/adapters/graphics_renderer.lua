@@ -113,7 +113,7 @@ local function bind()
 	Logger.debug(LOG, "Tooltip renderer bound (lgi + GTK 3).")
 	-- A preview can be drawn: from now on it follows the desktop's high
 	-- contrast and screen reader, read in the background.
-	SystemA11y.start()
+	SystemA11y.ensure_started()
 	return _gtk
 end
 
@@ -473,17 +473,7 @@ end
 --- @param screen_reader boolean
 --- @return boolean described
 function M.describe_window(window, atk, rows, screen_reader)
-	if type(atk) ~= "table" and type(atk) ~= "userdata" then return false end
-	local ok, err = pcall(function()
-		local accessible = window:get_accessible()
-		accessible:set_role(screen_reader and atk.Role.NOTIFICATION or atk.Role.TOOL_TIP)
-		accessible:set_name(M.accessible_text(rows))
-	end)
-	if not ok then
-		Logger.debug(LOG, "The preview window could not be named for AT-SPI: %s.", tostring(err))
-		return false
-	end
-	return true
+	return SystemA11y.name_window(window, atk, screen_reader and "NOTIFICATION" or "TOOL_TIP", M.accessible_text(rows))
 end
 
 --- The panel colour under the desktop's high-contrast setting: opaque, so

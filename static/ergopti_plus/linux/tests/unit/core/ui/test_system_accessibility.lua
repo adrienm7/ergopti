@@ -73,6 +73,15 @@ h.describe("desktop accessibility settings (a11y-linux-settings)", function()
 		done()
 	end)
 
+	h.it("(a11y-linux-drawn) the first drawn surface starts the reading, the others reuse it", function()
+		local module, log, done = load_settings({})
+		h.assert_true(module.ensure_started(100), "the first surface to bind GTK starts it")
+		local spawned = #log.spawned
+		h.assert_eq(module.ensure_started(100), false, "a second surface starts nothing")
+		h.assert_eq(#log.spawned, spawned)
+		done()
+	end)
+
 	h.it("(a11y-linux-settings) refreshes a stale cache, never a fresh one", function()
 		local module, log, done = load_settings({})
 		module.start(100)

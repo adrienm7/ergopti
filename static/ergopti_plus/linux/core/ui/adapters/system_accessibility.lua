@@ -17,6 +17,8 @@
 --- 3. The screen-reader setting gates the previews' announcement (decided
 ---    2026-11-17, no setting of its own): with it on, the preview window is an
 ---    AT-SPI notification Orca speaks when it appears; off, it stays a tooltip.
+---    The other drawn windows (the WPM widget, the spotlight overlay) are
+---    named for AT-SPI through name_window under the same setting.
 --- ==============================================================================
 
 local M = {}
@@ -99,9 +101,9 @@ local function refresh()
 	end
 end
 
---- Starts reading the desktop's settings: the preview renderer calls it once
---- it has bound GTK. Before it, and in a process that never calls it (a
---- test), every setting reads as off and no child is started.
+--- Starts reading the desktop's settings. Before it, and in a process that
+--- never calls it (a test), every setting reads as off and no child is
+--- started. The drawn surfaces go through ensure_started.
 --- @param now number|nil Test seam, see settings.
 --- @return boolean started False when already started.
 function M.start(now)
@@ -122,6 +124,16 @@ function M.start(now)
 	return true
 end
 
+--- Starts the reading unless it already runs: the preview, the WPM widget and
+--- the spotlight overlay each call it once they have bound GTK, and the first
+--- of them starts it.
+--- @param now number|nil Test seam, see settings.
+--- @return boolean started True when this call started it.
+function M.ensure_started(now)
+	if _started then return false end
+	return M.start(now)
+end
+
 --- The desktop's accessibility settings, from the cache; a stale cache starts
 --- a background refresh and is answered meanwhile.
 --- @param now number|nil Current time in seconds (test seam), os.time() by default.
@@ -134,6 +146,37 @@ function M.settings(now)
 		refresh()
 	end
 	return _settings
+end
+
+
+
+
+-- ==================================
+-- ==================================
+-- ======= 2/ Naming ================
+-- ==================================
+-- ==================================
+
+--- Gives a drawn window an AT-SPI role and name: a cairo surface has no text
+--- a screen reader can read. Orca speaks a NOTIFICATION when it is mapped and
+--- reads a named window when the user reaches it.
+--- @param window userdata|table The GTK window.
+--- @param atk table|nil The Atk namespace; nil leaves the window unnamed.
+--- @param role string|nil An Atk.Role member, such as "NOTIFICATION"; nil keeps the window's.
+--- @param name string
+--- @return boolean named
+function M.name_window(window, atk, role, name)
+	if type(atk) ~= "table" and type(atk) ~= "userdata" then return false end
+	local ok, err = pcall(function()
+		local accessible = window:get_accessible()
+		if role then accessible:set_role(atk.Role[role]) end
+		accessible:set_name(name)
+	end)
+	if not ok then
+		Logger.debug(LOG, "A drawn window could not be named for AT-SPI: %s.", tostring(err))
+		return false
+	end
+	return true
 end
 
 return M

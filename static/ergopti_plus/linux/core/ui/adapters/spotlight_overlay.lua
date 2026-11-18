@@ -16,11 +16,15 @@
 ---    Without a compositor the window is shaped to the painted pixels.
 --- 3. The pointer is read in-process (GDK seat pointer), so the dismissal poll
 ---    starts no command per tick.
+--- 4. Heard by Orca. The shapes are pixels: while the desktop's screen reader
+---    is on, the ring's window is an AT-SPI notification named « Mouse pointer
+---    highlighted », which Orca speaks when it is mapped, as Windows says it.
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
+local SystemA11y = require("core.ui.adapters.system_accessibility")
 
 local LOG = "core.ui.adapters.spotlight_overlay"
 
@@ -40,20 +44,37 @@ local _windows = {}
 -- ===============================================
 
 --- Binds lgi and GTK 3 once.
---- @return table|nil { Gtk, Gdk, cairo }
+--- @return table|nil { Gtk, Gdk, cairo, Atk|nil }
 local function bind()
 	if _gtk ~= nil then return _gtk or nil end
 	_gtk = false
 	local ok, bound = pcall(function()
 		local lgi = require("lgi")
-		return { Gtk = lgi.require("Gtk", "3.0"), Gdk = lgi.require("Gdk", "3.0"), cairo = lgi.cairo }
+		-- Atk names the ring for AT-SPI; without its introspection data the
+		-- overlay still draws.
+		local found, atk = pcall(lgi.require, "Atk")
+		return { Gtk = lgi.require("Gtk", "3.0"), Gdk = lgi.require("Gdk", "3.0"), cairo = lgi.cairo,
+			Atk = found and atk or nil }
 	end)
 	if not ok or type(bound) ~= "table" then
 		Logger.warn(LOG, "GTK 3 could not be bound through lgi: no pointer spotlight.")
 		return nil
 	end
 	_gtk = bound
+	SystemA11y.ensure_started()
 	return _gtk
+end
+
+--- Test seam: forces the binding without touching a library.
+--- @param value table|false|nil
+function M._set_binding_for_test(value)
+	_gtk = value
+end
+
+--- The notice Orca speaks for a shown spotlight, in the active language.
+--- @return string
+local function shown_notice()
+	return require("core.i18n.engine.i18n").get("accessibility.spotlight_shown")
 end
 
 --- Whether the overlay can be drawn.
@@ -119,6 +140,10 @@ local function open_window(g, shape)
 	end
 	window:resize(shape.size, shape.size)
 	window:move(math.floor(shape.x - shape.size / 2), math.floor(shape.y - shape.size / 2))
+	-- Named before it is mapped: Orca speaks a notification when it appears.
+	if shape.kind == "ring" and SystemA11y.settings().screen_reader then
+		SystemA11y.name_window(window, g.Atk, "NOTIFICATION", shown_notice())
+	end
 	window:show_all()
 	window:get_window():input_shape_combine_region(g.cairo.Region.create(), 0, 0)
 	-- Without a compositor the transparent corners would paint opaque: the
