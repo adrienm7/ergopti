@@ -13,6 +13,10 @@
 _SPCO_ChildSource() {
 	global _DriverDir, _SharedDir
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
+	; A published overlay is announced while a screen reader runs. Some programs
+	; set the system's screen-reader flag on a desktop without one: these vectors
+	; prove the timer, so the flag reads as off here, whatever the host says.
+	Source .= "A11ySystem_ScreenReaderOn() => false`n"
 	Seen := Map()
 	for Symbol in ["GR_CreateWindow", "MCGetPosStrict", "TickExpired", "ParseTomlFile", "IniCacheGet", "TimingsLoadShared"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)

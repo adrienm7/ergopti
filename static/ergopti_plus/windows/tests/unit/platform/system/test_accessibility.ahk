@@ -262,3 +262,65 @@ _A11yT_SetFontReachesTheControl() {
 }
 Test("a11y fonts: Gui_SetFont gives the control the scaled font (a11y-text-scale-2026-11-18)",
 	_A11yT_SetFontReachesTheControl)
+
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 5/ WPM widget and Spotlight overlay =======
+; ===================================================
+; ===================================================
+
+; The WPM pill and graph were nameless painted windows to a screen reader
+; (a11y-readers-2026-11-18): while one runs, the shown window is named by the
+; value it draws, once per change and never otherwise.
+_A11yT_WpmSurfaceIsNamedForReaders() {
+	Calls := []
+	NameFn(Hwnd, Text) {
+		Calls.Push(Text)
+		return true
+	}
+	G := Gui()
+	try {
+		AssertFalse(_WPMWidget_NameForReaders(G, "72", () => false, NameFn), "no reader, no name")
+		AssertEqual(0, Calls.Length)
+		AssertTrue(_WPMWidget_NameForReaders(G, "72", () => true, NameFn), "a running reader gets the value")
+		AssertFalse(_WPMWidget_NameForReaders(G, "72", () => true, NameFn), "the same value is not set again")
+		AssertTrue(_WPMWidget_NameForReaders(G, "75", () => true, NameFn), "a new value is")
+		AssertEqual(2, Calls.Length)
+		AssertEqual("75 " . t("menu.metrics.wpm_unit"), Calls[2], "the value and its unit in the active language")
+		AssertFalse(_WPMWidget_NameForReaders(G, "75", () => false, NameFn), "the reader stopping clears it")
+		AssertTrue(_WPMWidget_NameForReaders(G, "75", () => true,
+			(Hwnd, Text) => A11ySystem_SetAccessibleName(Hwnd, Text)), "the real annotation is accepted")
+	} finally {
+		G.Destroy()
+		_WPMWidget_NameForReaders(0, "", () => false)
+	}
+}
+Test("a11y readers: the WPM surface is named by its value while a screen reader runs (a11y-readers-2026-11-18)",
+	_A11yT_WpmSurfaceIsNamedForReaders)
+
+; The Spotlight overlay told a screen reader nothing: while one runs, its
+; circle window announces that the pointer is highlighted.
+_A11yT_SpotlightIsAnnounced() {
+	Heard := []
+	AnnounceFn(Hwnd, Text) {
+		Heard.Push(Hwnd . "|" . Text)
+		return true
+	}
+	Receipt := Map("module", 0, "token", 0, "windows", [4242])
+	AssertEqual("", _SpotlightAnnounce(Receipt, () => false, AnnounceFn), "no reader, nothing said")
+	AssertEqual("", _SpotlightAnnounce(Map("windows", []), () => true, AnnounceFn), "no window, nothing said")
+	Text := _SpotlightAnnounce(Receipt, () => true, AnnounceFn)
+	AssertEqual(t("accessibility.spotlight_shown"), Text)
+	AssertTrue(Text != "accessibility.spotlight_shown" && Text != "", "the notice is translated")
+	Deadline := A_TickCount + 2000
+	while (Heard.Length == 0 && A_TickCount < Deadline)
+		Sleep(10)
+	AssertEqual(1, Heard.Length, "the notice goes out on a timer turn")
+	AssertEqual("4242|" . Text, Heard[1], "the circle's window says it")
+}
+Test("a11y readers: the Spotlight overlay is announced while a screen reader runs (a11y-readers-2026-11-18)",
+	_A11yT_SpotlightIsAnnounced)

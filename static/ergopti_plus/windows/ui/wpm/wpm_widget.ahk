@@ -128,6 +128,37 @@ _WPMWidget_ApplyRoundedRegion(Hwnd, W, H, Diameter, RegionFn := 0) {
 }
 
 
+; The pill and the graph are painted surfaces a screen reader found nameless
+; (the graph has no text control at all). While one runs, the shown window
+; is named by the value it draws (« 72 WPM »), so a reader reaching it says
+; the speed; nothing is announced, the speed changing every tick. A
+; SystemParametersInfo read per tick, and a name set only when it changes.
+; @param GuiRef {Gui} The surface just shown.
+; @param Value {String} The speed it draws; the unit is added in the active language.
+; @param ScreenReaderFn {Func|Integer} Replaces A11ySystem_ScreenReaderOn (tests).
+; @param NameFn {Func|Integer} Replaces A11ySystem_SetAccessibleName (tests).
+; @returns {Boolean} Whether a new name was set.
+_WPMWidget_NameForReaders(GuiRef, Value, ScreenReaderFn := 0, NameFn := 0) {
+		; The name last set ("" for none): one widget per driver.
+		static LastName := ""
+		ReaderOn := IsObject(ScreenReaderFn) ? ScreenReaderFn.Call() : A11ySystem_ScreenReaderOn()
+		if !ReaderOn {
+				LastName := ""
+				return false
+		}
+		if !IsObject(GuiRef)
+				return false
+		Text := Value . " " . t("menu.metrics.wpm_unit")
+		if (Text == LastName)
+				return false
+		SetName := IsObject(NameFn) ? NameFn : A11ySystem_SetAccessibleName
+		if !SetName.Call(GuiRef.Hwnd, Text)
+				return false
+		LastName := Text
+		return true
+}
+
+
 WPMWidget_BuildGraph() {
 		Existing := WPMWidget._graph_gui
 		g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000 -DPIScale", "ErgoptiPlus WPM Graph")

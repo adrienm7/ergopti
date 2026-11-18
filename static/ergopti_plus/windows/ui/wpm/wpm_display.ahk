@@ -836,6 +836,8 @@ WPMWidget_Tick() {
             if !WPMWidget_RenderGraph(label, accent)
                 return
             GR_Show(WPMWidget._graph_gui.Hwnd)
+            ; Named only once shown: a surface the catch below discards has no window.
+            _WPMWidget_NameForReaders(WPMWidget._graph_gui, wpm_str)
         } catch as _e {
             ; Mirrors the compact-mode sibling below: LOG the failure and rebuild.
             ; A bare catch that only dropped the handle left the widget dead until
@@ -863,6 +865,7 @@ WPMWidget_Tick() {
                 WPMWidget._lbl_wpm.SetFont("c" . txt_col)
             if WPMWidget._lbl_unit
                 WPMWidget._lbl_unit.SetFont("c" . txt_col)
+            _WPMWidget_NameForReaders(WPMWidget._gui, wpm_str)
         } catch as _e {
             try LoggerError("WPMWidget", "Compact mode tick threw — rebuilding widget: {1}.", _e.Message)
             _WPMWidget_DiscardSurface(gui_ref, false)

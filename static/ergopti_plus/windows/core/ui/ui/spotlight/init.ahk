@@ -123,6 +123,7 @@ SpotlightMouseAt(X, Y, DurationMs) {
 		if !_SpotlightPublishStart(_Spotlight_State, Claim["generation"],
 				Receipt, Data)
 			throw Error("Spotlight start ownership was cancelled before publication")
+		_SpotlightAnnounce(Receipt)
 		return true
 	} catch as Err {
 		_SpotlightSessionSettle(Receipt)
