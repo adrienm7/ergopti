@@ -126,6 +126,7 @@ _TestResultsBeginRun()
 #Include ../core/lifecycle/engine/app_state.ahk
 #Include support/native_cli_diagnostics.ahk
 #Include support/receiving_profile.ahk
+#Include support/native_keyboard_walk.ahk
 
 ; Stubs second — they define ScriptInformation, Features, SendNewResult,
 ; WrapTextIfSelected, DeadKey, ToggleCapsLock, etc., which infra/ files
@@ -1395,6 +1396,7 @@ global _AhkSubDir := ""
 #Include unit/core/lifecycle/test_single_instance_gate.ahk
 #Include unit/platform/system/test_worker_tray_icon_hidden.ahk
 #Include unit/platform/system/test_accessibility.ahk
+#Include unit/platform/system/test_native_keyboard_walk.ahk
 #Include unit/tray/test_notify_icon.ahk
 #Include unit/modules/keystats/test_keystats_network_transitions.ahk
 #Include ../menu/engine/command_origin.ahk
