@@ -213,6 +213,41 @@ for (const file of locales) {
 	check(rethrown, 'refusal: an error the engine did not raise stays an error');
 }
 
+// Numbers: the page's way, one formatter per language and decimals. A ranking
+// of every layout writes tens of thousands of numbers, and toLocaleString with
+// options builds a new Intl.NumberFormat each time (a tenth of a load).
+{
+	const reader = { window: { _i18n_strings: { '_meta.locale': 'fr' } } };
+	reader.window.window = reader.window;
+	vm.createContext(reader.window);
+	vm.runInContext(fs.readFileSync(path.join(PAGE_DIR, 'info_popover.js'), 'utf8'), reader.window);
+	const made = vm.runInContext(
+		`(() => {
+			const Native = Intl.NumberFormat;
+			const made = { count: 0 };
+			Intl.NumberFormat = function (...args) { made.count++; return new Native(...args); };
+			Number.prototype.toLocaleString = () => { throw new Error('toLocaleString per number'); };
+			return made;
+		})()`,
+		reader.window
+	);
+	const { format } = vm.runInContext('LAYOUT_ANALYSIS_INFO', reader.window);
+	const expected = (lang, value, digits) =>
+		new Intl.NumberFormat(lang, {
+			minimumFractionDigits: digits,
+			maximumFractionDigits: digits
+		}).format(value);
+	let same = true;
+	for (let i = 0; i < 2000; i++) same = same && format(i / 7, 2) === expected('fr', i / 7, 2);
+	check(
+		same && format('1234.5', 0) === expected('fr', 1234.5, 0),
+		'format: the page’s French numbers'
+	);
+	check(made.count === 2, `format: ${made.count} formatters for 2 decimal counts`);
+	reader.window._i18n_strings = { '_meta.locale': 'en' };
+	check(format(1234.5, 1) === '1,234.5', 'format: a later language of the strings is followed');
+}
+
 // The site sizes its frame from this message (contract with src/routes/studio).
 check(
 	page.includes("'ergopti-layout-analysis:height'") && page.includes('postMessage'),

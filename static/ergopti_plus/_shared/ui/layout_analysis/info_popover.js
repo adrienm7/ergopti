@@ -99,12 +99,25 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		return window._i18n_locale || document.documentElement.lang;
 	}
 
+	// One formatter per language and decimals: toLocaleString with options
+	// builds a new Intl.NumberFormat on every call, and a ranking of every
+	// layout writes tens of thousands of numbers.
+	const formatters = new Map();
+
 	/** A number with exactly this many decimals, written the page's way. */
-	const format = (value, digits) =>
-		Number(value).toLocaleString(locale(), {
-			minimumFractionDigits: digits,
-			maximumFractionDigits: digits
-		});
+	function format(value, digits) {
+		const lang = locale();
+		const key = `${lang}|${digits}`;
+		let formatter = formatters.get(key);
+		if (formatter === undefined) {
+			formatter = new Intl.NumberFormat(lang, {
+				minimumFractionDigits: digits,
+				maximumFractionDigits: digits
+			});
+			formatters.set(key, formatter);
+		}
+		return formatter.format(Number(value));
+	}
 
 	/** Gives a button its translated accessible name and state. */
 	function label(button) {
