@@ -56,6 +56,9 @@ function loadPage() {
 					'theme_choice.js',
 					// The visitor's display preferences: also a page concern.
 					'a11y_prefs.js',
+					// The live analysis panel: page UI that listens on the document
+					// from its load (the app's keystats tables); no export reads it.
+					'layout_analysis/analysis_panel.js',
 					'layout_editor/editor_page.js',
 					'layout_editor/standalone.js'
 				].includes(file)
