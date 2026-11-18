@@ -2,6 +2,7 @@
 <html lang="fr">
 	<head>
 		<meta charset="UTF-8" />
+		<title data-i18n="prompt_editor.title_new"></title>
 		<link rel="stylesheet" href="../theme.css" />
 		<link rel="stylesheet" href="style.css" />
 		<script src="../i18n.js"></script>
@@ -10,11 +11,11 @@
 	<body>
 		<h1 id="title" data-i18n="prompt_editor.title_new"></h1>
 		<div class="fg">
-			<div class="fg-header"><label data-i18n="prompt_editor.label_name"></label></div>
+			<div class="fg-header"><label for="p-name" data-i18n="prompt_editor.label_name"></label></div>
 			<input type="text" id="p-name" autocomplete="off" spellcheck="false" />
 		</div>
 		<div class="fg">
-			<div class="fg-header"><label data-i18n="prompt_editor.label_mode"></label></div>
+			<div class="fg-header"><label for="p-mode" data-i18n="prompt_editor.label_mode"></label></div>
 			<select id="p-mode" data-i18n-option-prefix="prompt_editor.mode">
 				<option value="parallel" selected></option>
 				<option value="batch"></option>
@@ -22,7 +23,7 @@
 		</div>
 		<div class="fg" style="flex-grow: 1; display: flex">
 			<div class="fg-header">
-				<label data-i18n="prompt_editor.label_prompt"></label>
+				<label id="p-prompt-label" data-i18n="prompt_editor.label_prompt"></label>
 				<div>
 					<button
 						class="btn btn-sm btn-s"
@@ -63,9 +64,20 @@
 			</div>
 			<div class="editor-wrap">
 				<div id="e-out-ph" class="ph-overlay" data-i18n="prompt_editor.placeholder_prompt"></div>
-				<div id="e-out" class="output-editor" contenteditable="true" spellcheck="false"></div>
+				<!-- A contenteditable is not a form field: its role and the label
+				     above name it for assistive technology (WCAG 1.3.1, 4.1.2). -->
+				<div
+					id="e-out"
+					class="output-editor"
+					contenteditable="true"
+					spellcheck="false"
+					role="textbox"
+					aria-multiline="true"
+					aria-labelledby="p-prompt-label"
+					aria-describedby="p-prompt-help"
+				></div>
 			</div>
-			<div class="help" data-i18n="prompt_editor.help_text"></div>
+			<div id="p-prompt-help" class="help" data-i18n="prompt_editor.help_text"></div>
 		</div>
 		<div class="btn-row">
 			<button class="btn btn-s" onclick="doCancel()" data-i18n="common.cancel"></button>

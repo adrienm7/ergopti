@@ -572,6 +572,8 @@ function init(data) {
 	activePromptContext = nextContext;
 
 	document.getElementById('title').textContent = data.title;
+	// The document title says what the window edits, as its heading does (WCAG 2.4.2).
+	document.title = data.title;
 	document.getElementById('p-name').value = data.name;
 	document.getElementById('p-mode').value = data.mode;
 

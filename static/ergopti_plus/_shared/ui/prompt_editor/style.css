@@ -27,7 +27,8 @@
 	--border: var(--theme-separator);
 	--text: var(--theme-text);
 	--sub: var(--theme-sub);
-	--hint: var(--theme-gray);
+	/* Hints are small text: 4.5:1 on the window in both appearances (WCAG 1.4.3). */
+	--hint: var(--theme-secondary-label);
 	--accent: var(--theme-accent);
 	--danger: var(--theme-danger);
 	--chip-bg: var(--theme-hue-ddeeff);
@@ -37,7 +38,7 @@
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--hint: var(--theme-hue-636366);
+		--hint: var(--theme-hue-a0a0a6);
 		--chip-bg: var(--theme-hue-183060);
 		--chip-c: var(--theme-hue-93b8f8);
 		--chip-bd: rgba(147, 184, 248, 0.28);
@@ -246,8 +247,10 @@ select:focus {
 	filter: brightness(0.9);
 }
 
+/* The dark appearance's accent is too light under white text (3.6:1): the
+   save button keeps the deep blue in both (5.8:1, WCAG 1.4.3). */
 .btn-p {
-	background: var(--accent);
+	background: var(--theme-hue-0062cc);
 	color: var(--theme-white);
 }
 
