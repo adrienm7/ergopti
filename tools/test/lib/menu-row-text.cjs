@@ -41,7 +41,9 @@ const PROSE_SPELLINGS = new Set([
 	'meta',
 	'insert',
 	'home',
-	'end'
+	'end',
+	// The JIS Henkan alias; « convert » is also an English verb of the texts.
+	'convert'
 ]);
 
 /**

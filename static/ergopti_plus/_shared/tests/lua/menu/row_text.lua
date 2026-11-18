@@ -68,6 +68,8 @@ local PROSE_SPELLINGS = {
 	alt = true, tab = true, space = true, enter = true, delete = true, option = true, ["return"] = true,
 	command = true, control = true, super = true, caps = true, escape = true, shift = true, meta = true,
 	insert = true, home = true, ["end"] = true,
+	-- The JIS Henkan alias; « convert » is also an English verb of the texts.
+	convert = true,
 }
 
 --- Every key spelling a row must never show: the ids and aliases of
