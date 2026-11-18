@@ -165,20 +165,57 @@ function toLua(action, data) {
 // ====================================
 // ====================================
 
+// The open dialogs, innermost last, each with the element that had the focus
+// when it opened. A confirmation can open over the entry form.
+const openModals = [];
+// What the keyboard can reach first in a dialog that has just opened.
+const MODAL_FOCUSABLE =
+	'button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
+	'[contenteditable="true"], summary';
+
 /**
- * Safely adds the 'on' class to display a modal.
- * @param {string} id - The modal container ID.
+ * Makes everything but the innermost open dialog inert, so Tab and a screen
+ * reader stay in the dialog (WCAG 2.4.3) and leave it only to the window's
+ * frame. The autocomplete popup serves the entry form and stays live.
  */
-function openModal(id) {
-	document.getElementById(id).classList.add('on');
+function syncModalInertness() {
+	const top = openModals.length ? document.getElementById(openModals.at(-1).id) : null;
+	for (const child of document.body.children) {
+		if (child.tagName === 'SCRIPT' || child.id === 'ac-popup') continue;
+		child.inert = top !== null && child !== top;
+	}
 }
 
 /**
- * Safely removes the 'on' class to hide a modal and resets related form states.
+ * Shows a dialog, keeps the keyboard inside it, and moves the focus into it
+ * unless the caller already did: a dialog opened from the keyboard was
+ * unreachable behind its overlay, and its Enter and Escape keys never fired.
+ * @param {string} id - The modal container ID.
+ */
+function openModal(id) {
+	const modal = document.getElementById(id);
+	if (!openModals.some((entry) => entry.id === id))
+		openModals.push({ id, opener: document.activeElement });
+	modal.classList.add('on');
+	syncModalInertness();
+	if (!modal.contains(document.activeElement)) {
+		const first = modal.querySelector(MODAL_FOCUSABLE);
+		if (first) first.focus();
+	}
+}
+
+/**
+ * Hides a dialog, resets its form state, and gives the focus back to the
+ * element that opened it when that element is still on the page.
  * @param {string} id - The modal container ID.
  */
 function closeModal(id) {
 	document.getElementById(id).classList.remove('on');
+	const index = openModals.findIndex((entry) => entry.id === id);
+	const closed = index >= 0 ? openModals.splice(index, 1)[0] : null;
+	syncModalInertness();
+	if (closed && closed.opener && closed.opener.isConnected && !closed.opener.closest('[inert]'))
+		closed.opener.focus();
 	if (id === 'entry-modal') clearEntryErrors();
 	if (id === 'sec-modal') clearSecErrors();
 }
@@ -216,7 +253,9 @@ function showConfirm(msg, fn, opts = {}) {
 
 	const okBtn = document.getElementById('confirm-ok');
 	okBtn.textContent = opts.okLabel || _t('common.delete');
-	okBtn.style.background = opts.okColor || 'var(--danger)';
+	// Deep tones under the white label (4.5:1, WCAG 1.4.3): the system red and
+	// orange are too light for it.
+	okBtn.style.background = opts.okColor || 'var(--theme-hue-b3261e)';
 
 	_confirmCb = fn;
 	openModal('confirm-modal');
@@ -839,21 +878,29 @@ function onRowMouseDown(e) {
 	_rowMouseDownY = e.clientY;
 }
 
-function handleSecTitleClick(e, si) {
+/**
+ * Whether a click ends a drag or a text selection rather than a plain click.
+ * A click the keyboard made (detail 0, Enter or Space on a button) has no
+ * pointer travel and always counts.
+ * @param {MouseEvent} e
+ * @returns {boolean}
+ */
+function isDragOrSelection(e) {
+	if (e.detail === 0) return false;
 	const dx = e.clientX - _rowMouseDownX,
 		dy = e.clientY - _rowMouseDownY;
-	if (Math.sqrt(dx * dx + dy * dy) > 4) return;
+	if (Math.sqrt(dx * dx + dy * dy) > 4) return true;
 	const sel = window.getSelection();
-	if (sel && sel.toString().length > 0) return;
+	return !!sel && sel.toString().length > 0;
+}
+
+function handleSecTitleClick(e, si) {
+	if (isDragOrSelection(e)) return;
 	showEditSec(si);
 }
 
 function handleRowClick(e, si, ei) {
-	const dx = e.clientX - _rowMouseDownX,
-		dy = e.clientY - _rowMouseDownY;
-	if (Math.sqrt(dx * dx + dy * dy) > 4) return;
-	const sel = window.getSelection();
-	if (sel && sel.toString().length > 0) return;
+	if (isDragOrSelection(e)) return;
 
 	let target = e.target;
 	let field = null;
@@ -954,17 +1001,36 @@ function render() {
 				'" title="' +
 				(_t('editor.hotstrings.drag_handle_title') || 'Drag') +
 				'">☰</span>';
+		// Buttons, not clickable spans: the keyboard folds, edits and deletes a
+		// section as the mouse does (WCAG 2.1.1), and the fold says its state.
+		const secName = escapeHtml(s.description || s.name);
 		html +=
-			'<span class="caret' + (exp ? ' open' : '') + '" onclick="togSec(' + si + ')">▶</span>';
+			'<button type="button" class="caret' +
+			(exp ? ' open' : '') +
+			'" aria-expanded="' +
+			exp +
+			'" aria-label="' +
+			secName +
+			'" onclick="togSec(' +
+			si +
+			')">▶</button>';
 		html +=
-			'<span class="sec-title" onmousedown="onRowMouseDown(event)" onclick="handleSecTitleClick(event,' +
+			'<button type="button" class="sec-title" title="' +
+			escapeHtml(_t('editor.hotstrings.click_to_edit')) +
+			'" onmousedown="onRowMouseDown(event)" onclick="handleSecTitleClick(event,' +
 			si +
 			')">' +
-			escapeHtml(s.description || s.name) +
-			'</span>';
+			secName +
+			'</button>';
 		html += '<span class="sec-cnt">(' + (searching ? idx.length : cnt) + ')</span>';
 		html +=
-			'<button class="sec-del" onclick="delSec(' +
+			'<button type="button" class="sec-del" aria-label="' +
+			escapeHtml(_t('common.delete')) +
+			' ' +
+			secName +
+			'" title="' +
+			escapeHtml(_t('common.delete')) +
+			'" onclick="delSec(' +
 			si +
 			')" onmousedown="event.stopPropagation()">✕</button>';
 		html += '</div>';
@@ -988,11 +1054,11 @@ function render() {
 					escapeHtml(_t('editor.hotstrings.select_entry') + ' ' + e.trigger) +
 					'" onclick="event.stopPropagation(); updateBulk()" onmousedown="event.stopPropagation()"></div>';
 				html +=
-					'<div class="e-trig"><span class="trig-lbl" data-f="trig" title="' +
+					'<div class="e-trig"><button type="button" class="trig-lbl" data-f="trig" title="' +
 					escapeHtml(_t('editor.hotstrings.click_to_edit')) +
 					'">' +
 					dispTrig(e.trigger) +
-					'</span></div>';
+					'</button></div>';
 				html += '<span class="e-arrow">→</span>';
 				html +=
 					'<div class="e-out-cell"><div class="e-out" data-f="out" title="' +
@@ -1008,7 +1074,16 @@ function render() {
 				if (typeof e.priority === 'number')
 					html += '<span class="tag on tag-prio" data-f="prio">P' + e.priority + '</span>';
 				html += '</div>';
-				html += '<span class="e-del" onclick="delEntryStop(event,' + si + ',' + ei + ')">✕</span>';
+				html +=
+					'<button type="button" class="e-del" aria-label="' +
+					escapeHtml(_t('common.delete') + ' ' + e.trigger) +
+					'" title="' +
+					escapeHtml(_t('common.delete')) +
+					'" onclick="delEntryStop(event,' +
+					si +
+					',' +
+					ei +
+					')">✕</button>';
 				html += '</div>';
 			});
 			// The add button is hidden on a filtered view to avoid appending into
@@ -1343,7 +1418,7 @@ function saveEntry(andNew) {
 			executeSave,
 			{
 				okLabel: _t('editor.hotstrings.btn_redefine') || 'Redefine',
-				okColor: ThemeTokens.color('orange'),
+				okColor: ThemeTokens.color('hue-9a6700'),
 				isWarning: true
 			}
 		);
@@ -1386,6 +1461,8 @@ window.updateBulk = function () {
 				? _t('editor.hotstrings.bulk_selected_other')
 				: _t('editor.hotstrings.bulk_selected_one'));
 		const sel = document.getElementById('bulk-sec-sel');
+		// The list's first option names it, and is replaced on every refresh.
+		sel.setAttribute('aria-label', _t('editor.hotstrings.bulk_move_placeholder'));
 		sel.innerHTML =
 			'<option value="">' +
 			(_t('editor.hotstrings.bulk_move_placeholder') || 'Move to…') +
@@ -1679,7 +1756,10 @@ document.addEventListener('selectionchange', function () {
 
 	te.addEventListener('keydown', function (e) {
 		if (imeComposing || e.isComposing || e.keyCode === 229) return;
-		if (e.key === 'Enter' || e.key === 'Tab') {
+		// Enter moves on to the expansion. Tab keeps the page order (the magic
+		// key button, then the expansion): taking Tab here, Shift+Tab included,
+		// held the focus between the two editors for good (WCAG 2.1.2).
+		if (e.key === 'Enter') {
 			e.preventDefault();
 			document.getElementById('e-out').focus();
 			return;
@@ -1830,16 +1910,11 @@ document.addEventListener('selectionchange', function () {
 				hideAc();
 				return;
 			}
-		} else if (e.key === 'Tab') {
-			// Focus on the main validate button in the entry modal
-			e.preventDefault();
-			var entryModal = document.getElementById('entry-modal');
-			if (entryModal) {
-				var btns = entryModal.querySelectorAll('.btn.btn-p');
-				if (btns.length > 0) btns[0].focus();
-			}
-			return;
 		}
+		// Tab keeps the page order (the special commands, the options, the
+		// priority, then the buttons; Ctrl or Cmd + Enter saves): jumping to
+		// Save on Tab and Shift+Tab alike skipped the options and held the
+		// focus coming back (WCAG 2.1.2, 2.4.3).
 
 		if (e.key === 'Enter' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
 			e.preventDefault();
