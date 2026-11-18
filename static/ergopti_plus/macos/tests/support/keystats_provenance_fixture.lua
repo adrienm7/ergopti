@@ -54,6 +54,8 @@ function M.load_keystats()
 	package.loaded["modules.keystats.log_manager"] = {
 		init = function(core_state) state = core_state; return true end,
 		ensure_ingest_running = function() return true end,
+		-- The session rows (session_start, idle_start…) the engine queues.
+		append_log = function() return true end,
 		defer_flush_buffer = function() return true end,
 		defer_typing_builder = function(builder)
 			deferred_typing_builders[#deferred_typing_builders + 1] = builder

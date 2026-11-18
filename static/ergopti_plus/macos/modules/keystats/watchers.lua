@@ -49,6 +49,8 @@ local AUTO_FLUSH_IDLE_MS         = Timings.ms("keystats", "auto_flush_idle_ms")
 local SESSION_TIMEOUT_MS         = Timings.ms("keystats", "session_timeout_ms")
 -- Minimum gap between system-load polls to avoid spawning top too often (5 min)
 local SYSTEM_LOAD_POLL_INTERVAL_MS = Timings.ms("keystats", "system_load_poll_ms")
+-- The two session limits, as the session machine takes them.
+local SESSION_LIMITS = { micro_idle_ms = MICRO_IDLE_TIMEOUT_MS, session_timeout_ms = SESSION_TIMEOUT_MS }
 -- macOS needs one runloop turn after wake/unlock before AX reports foreground truth
 local CONTEXT_REFRESH_DELAY_SEC = 0.05
 
@@ -59,6 +61,12 @@ local _is_paused = nil
 
 -- Log manager reference; the engine drains all sensor events through it.
 local LogManager = require("modules.keystats.log_manager")
+local SessionMachine = require("modules.keystats.session_machine")
+
+--- Hands a session row to the log manager bound at call time.
+--- @param entry table One events_session entry.
+--- @return boolean accepted
+local function append_session_log(entry) return LogManager.append_log(entry) end
 
 -- Window topology and capture presence ride the hardware lifecycle and the
 -- maintenance tick: it starts and stops with the hardware watchers.
@@ -241,31 +249,15 @@ function M.check_idle()
 
 	if _state.session_last_active > 0 then
 		local idle_ms = now - _state.session_last_active
-
-		if not _state.is_micro_idle
-		and idle_ms > MICRO_IDLE_TIMEOUT_MS
-		and idle_ms <= SESSION_TIMEOUT_MS
-		then
-			_state.is_micro_idle = true
-			LogManager.append_log({ type = "idle_start" })
-			Logger.debug(LOG, "Micro-idle started (%.0f ms since last keystroke).", idle_ms)
-		end
-
-		if idle_ms > AUTO_FLUSH_IDLE_MS and #_state.buffer_events > 0 then
+		-- The typing run is stored before its session can end.
+		if (idle_ms > AUTO_FLUSH_IDLE_MS or idle_ms > SESSION_TIMEOUT_MS) and #_state.buffer_events > 0 then
 			LogManager.flush_buffer()
 		end
-
-		if idle_ms > SESSION_TIMEOUT_MS then
-			if #_state.buffer_events > 0 then LogManager.flush_buffer() end
-			LogManager.append_log({
-				type        = "session_end",
-				duration_ms = _state.session_last_active - _state.session_start_time,
-			})
+		local transition = SessionMachine.tick(_state, append_session_log, SESSION_LIMITS, now)
+		if transition == "idle_start" then
+			Logger.debug(LOG, "Micro-idle started (%.0f ms since the last input).", idle_ms)
+		elseif transition == "session_end" then
 			Logger.debug(LOG, "Typing session ended after %.0f ms of inactivity.", idle_ms)
-			_state.session_generation = (_state.session_generation or 0) + 1
-			_state.session_last_active = 0
-			_state.session_start_time  = 0
-			_state.is_micro_idle       = false
 		end
 	end
 
