@@ -2306,7 +2306,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ui/onboarding/test_onbweb_singleton_guard.ahk
 #Include meta/settings/persistence/test_reset_config_writes_meta_placeholder.ahk
 #Include meta/core/ui/webview/test_shared_env_reentrancy_guard.ahk
-#Include meta/core/ui/webview/test_host_callback_epoch.ahk
+#Include unit/core/ui/webview/test_host_pause.ahk
 ; AltTabMonitor bare-try-no-catch fix (F37) — sibling of the
 ; GestureGetCyclableWindows TOCTOU guard (commit 7b701020d).
 #Include meta/gestures/test_alt_tab_monitor_catch.ahk
