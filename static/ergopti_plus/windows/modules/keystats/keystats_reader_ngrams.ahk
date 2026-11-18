@@ -354,38 +354,49 @@ KLR_StudioSnapshotRetire(MetricsDir) {
  * Linux. No LIMIT: a truncated table would be shown as the user's data.
  * @param db Open SQLite handle.
  * @param Contract {Map} KLR_StudioContract().
+ * @param Query {Func} (db, Sql) => rows, SQLite_Query by default (the tests count the queries).
  * @returns {String} {"schema", "source", <field>: {token: count}…, "total",
  *     <final_field>: {<field>: {token: count}…, "total"}}.
  */
-KLR_BuildStudioNgramsJson(db, Contract) {
+KLR_BuildStudioNgramsJson(db, Contract, Query := SQLite_Query) {
 		if !db
 				throw Error("Ergopti Studio needs an open keystats database.")
-		out := '{"schema":' . Contract["schema"] . ',"source":' . JsonStringLiteral(Contract["source"])
-		; The keys typed: each count without its synthetic sources.
-		out .= KLR__StudioTables(db, Contract, "c - hs - llm - o")
-		; The final text: each count with every source.
-		FinalTables := KLR__StudioTables(db, Contract, "c")
-		return out . "," . JsonStringLiteral(Contract["final_field"]) . ":{" . SubStr(FinalTables, 2) . "}}"
+		Typed := ""
+		Final := ""
+		Totals := Map("typed", 0, "final", 0)
+		; One grouping per family gives both texts: the keys typed (each count
+		; without its synthetic sources) and the final text (every source). Two
+		; passes grouped the whole table twice: 3.0 s against 1.55 s on the
+		; maintainer's 1.1 GB reader image (2026-11-18).
+		for Family in Contract["families"] {
+				Agg := KLR__StudioFamily(db, Family["table"], Query)
+				Typed .= "," . JsonStringLiteral(Family["field"]) . ":" . Agg["typed"]
+				Final .= "," . JsonStringLiteral(Family["field"]) . ":" . Agg["final"]
+				if Family["code"] = "c"
+						Totals["typed"] := Agg["typed_total"], Totals["final"] := Agg["final_total"]
+		}
+		return '{"schema":' . Contract["schema"] . ',"source":' . JsonStringLiteral(Contract["source"])
+				. Typed . ',"total":' . Totals["typed"]
+				. "," . JsonStringLiteral(Contract["final_field"]) . ":{" . SubStr(Final, 2)
+				. ',"total":' . Totals["final"] . "}}"
 }
 
-; One text of the Studio payload: ',"<field>":{…}…,"total":N', each family's
-; tokens counted by CountExpr over the grouped c, hs, llm and o of a token.
-KLR__StudioTables(db, Contract, CountExpr) {
-		out := ""
-		total := 0
-		for Family in Contract["families"] {
-				sql := "SELECT " . KLR_SqlJsonObjectAgg("token", "n") . " AS j, COALESCE(SUM(n), 0) AS total"
-						. " FROM (SELECT token, " . CountExpr . " AS n FROM (SELECT token, SUM(c) AS c,"
-						. KLR_NgramSourceProjection() . " FROM " . Family["table"] . " GROUP BY token)"
-						. " WHERE token <> '' AND " . CountExpr . " > 0)"
-				rows := SQLite_Query(db, sql)
-				if rows.Length != 1 || !rows[1].Has("j")
-						throw Error("The Ergopti Studio projection returned no aggregate for " . Family["table"])
-				out .= "," . JsonStringLiteral(Family["field"]) . ":" . rows[1]["j"]
-				if Family["code"] = "c"
-						total := rows[1]["total"]
-		}
-		return out . ',"total":' . total
+; Both texts of one family from one grouping of its table: each token's count
+; without its synthetic sources (typed) and with them (final), a text keeping
+; only its positive counts.
+KLR__StudioFamily(db, Table, Query) {
+		TypedN := "CASE WHEN typed > 0 THEN typed END"
+		FinalN := "CASE WHEN final > 0 THEN final END"
+		sql := "SELECT " . KLR_SqlJsonObjectAgg("token", TypedN) . " AS typed,"
+				. " COALESCE(SUM(" . TypedN . "), 0) AS typed_total,"
+				. " " . KLR_SqlJsonObjectAgg("token", FinalN) . " AS final,"
+				. " COALESCE(SUM(" . FinalN . "), 0) AS final_total"
+				. " FROM (SELECT token, c - hs - llm - o AS typed, c AS final FROM (SELECT token, SUM(c) AS c,"
+				. KLR_NgramSourceProjection() . " FROM " . Table . " GROUP BY token) WHERE token <> '')"
+		rows := Query.Call(db, sql)
+		if rows.Length != 1 || !rows[1].Has("typed") || !rows[1].Has("final")
+				throw Error("The Ergopti Studio projection returned no aggregate for " . Table)
+		return rows[1]
 }
 
 ; One historical type's aggregate. A missing aggregate row is a reader defect,

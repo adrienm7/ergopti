@@ -315,7 +315,18 @@ _KLRSource_StudioCountsPhysicalKeystrokes() {
 			. SQLite_Q("device-a") . "," . SQLite_Q(today) . "," . SQLite_Q("other.exe") . ","
 			. SQLite_Q("est") . ",4," . SQLite_Q("{}") . ");"))
 		Contract := KLR_StudioContract()
-		Json := KLR_BuildStudioNgramsJson(db, Contract)
+		; (studio-read-one-pass) One grouping per family gives both texts: the
+		; read grouped every table twice, 3.8 s against 1.7 s on a 1.1 GB image.
+		Queries := []
+		Counted(Handle, Sql) {
+			Queries.Push(Sql)
+			return SQLite_Query(Handle, Sql)
+		}
+		Json := KLR_BuildStudioNgramsJson(db, Contract, Counted)
+		AssertEqual(Contract["families"].Length, Queries.Length, "one query per family")
+		for Sql in Queries
+			AssertEqual(1, StrLen(Sql) - StrLen(StrReplace(Sql, "GROUP BY", "GROUP B")), "one grouping per query: " . Sql)
+		AssertEqual(Json, KLR_BuildStudioNgramsJson(db, Contract), "SQLite_Query is the default port")
 		Payload := JsonParse(Json)
 		AssertEqual(Contract["schema"], Payload["schema"])
 		AssertEqual("keystats", Payload["source"])
