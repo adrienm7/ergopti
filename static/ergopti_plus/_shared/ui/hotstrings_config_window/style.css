@@ -97,8 +97,25 @@ body {
 .btn:hover {
 	border-color: var(--accent);
 }
+/* The system reds are too light for text on the window (WCAG 1.4.3). */
 .btn-danger {
-	color: var(--danger);
+	color: var(--theme-hue-b3261e);
+}
+
+@media (prefers-color-scheme: dark) {
+	.btn-danger {
+		color: var(--theme-hue-ff8e85);
+	}
+}
+
+/* Read by a screen reader, not shown: which card a repeated field label is in. */
+.visually-hidden {
+	clip-path: inset(50%);
+	height: 1px;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
 }
 
 .group-bar {
@@ -219,11 +236,6 @@ main {
 .field-priority .ctrl input {
 	width: 48px;
 }
-.ctrl input:focus,
-.ctrl select:focus {
-	outline: 0;
-}
-
 .field.overridden .ctrl {
 	background: var(--override);
 	border-color: var(--accent);

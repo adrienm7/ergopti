@@ -70,6 +70,33 @@ function applyTemplateI18n(node) {
 	});
 }
 
+// Numbers the controls of the rendered fields; a template cannot hold ids.
+let fieldCount = 0;
+
+/**
+ * Ties each field's label to its control, and names the control after the
+ * category or section it sets: every card repeats the same four labels, so a
+ * screen reader hears which one it is in (WCAG 1.3.1, 2.4.6, 4.1.2).
+ * @param {ParentNode} node - A rendered category head or section.
+ * @param {string} owner - The category or section title.
+ */
+function labelFields(node, owner) {
+	node.querySelectorAll('.field').forEach(function (field) {
+		const label = field.querySelector('label');
+		const control = field.querySelector('.ctrl input, .ctrl select');
+		if (!label || !control) return;
+		control.id = 'hs-field-' + ++fieldCount;
+		label.htmlFor = control.id;
+		label.id = control.id + '-label';
+		const ownerName = document.createElement('span');
+		ownerName.className = 'visually-hidden';
+		ownerName.id = control.id + '-owner';
+		ownerName.textContent = owner;
+		field.appendChild(ownerName);
+		control.setAttribute('aria-labelledby', label.id + ' ' + ownerName.id);
+	});
+}
+
 // ============================================================
 // 1/ Bridge primitives
 // ============================================================
@@ -151,9 +178,12 @@ function render() {
 		const card = node.querySelector('.cat');
 
 		card.querySelector('.cat-title').textContent = cat.title;
+		labelFields(card.querySelector('.cat-head'), cat.title);
 
 		// The caret and the title both fold the category's sections.
 		const toggle = card.querySelector('[data-role=toggle]');
+		// The caret's glyph says nothing; the category names the fold.
+		toggle.setAttribute('aria-label', cat.title);
 		const title = card.querySelector('.cat-title');
 		const sectionsBox = card.querySelector('.sections');
 		const key = categoryKey(cat);
@@ -178,6 +208,7 @@ function render() {
 			const secNode = document.importNode(tplSec, true);
 			applyTemplateI18n(secNode);
 			secNode.querySelector('.sec-title').textContent = sec.title || sec.name;
+			labelFields(secNode, sec.title || sec.name);
 			bindDelay(secNode.querySelector('.field-delay'), cat, sec);
 			bindColor(secNode.querySelector('.field-color'), cat, sec);
 			bindPriority(secNode.querySelector('.field-priority'), cat, sec);
