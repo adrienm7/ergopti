@@ -2446,9 +2446,13 @@ _advance_maintenance = function(db, settled)
 	local request = _maintenance_request
 	if not request then return end
 	if request.kind == "purge" then
+		-- The writer stores a row's ts in UTC (KMD-1) while the tombstone's ts is
+		-- local time; its UTC instant, kept in the row's metadata, names it.
 		local found = false
 		for _ in db:nrows("SELECT 1 FROM events_system WHERE action=" .. _sq(Maintenance.TOMBSTONE_ACTION)
-			.. " AND ts=" .. _sq(request.tombstone.ts) .. " LIMIT 1") do found = true end
+			.. " AND json_extract(metadata_json, '$.utc')=" .. _sq(request.tombstone.metadata.utc) .. " LIMIT 1") do
+			found = true
+		end
 		if found or settled then _finish_maintenance(request, found) end
 		return
 	end

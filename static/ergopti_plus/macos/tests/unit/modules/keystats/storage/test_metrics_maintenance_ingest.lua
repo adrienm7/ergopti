@@ -58,7 +58,7 @@ local function child()
  end
  local replies = {}
  local function count(sql) local n; for row in db:nrows(sql) do n = row.n end; return n end
- own({ kind = 'purge', tombstone = { ts = tombstone.timestamp }, complete = function(ok, p) replies[#replies + 1] = { ok, p } end })
+ own({ kind = 'purge', tombstone = { ts = tombstone.timestamp, metadata = { utc = tombstone.utc } }, complete = function(ok, p) replies[#replies + 1] = { ok, p } end })
  manager.ingest_once()
  local typing_before = count('SELECT COUNT(*) AS n FROM events_typing')
  local replies_after_typing = #replies
