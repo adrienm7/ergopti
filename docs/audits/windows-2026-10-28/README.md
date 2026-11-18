@@ -57,95 +57,67 @@ duplicate checkouts. Its omissions receipt identifies any excluded large file.
 
 ## Remaining findings
 
-1. **Crash-torn SQL ingest can acknowledge an unreadable ledger.** The actual
-   public ingestion path was run against complete, torn-literal, torn-commit,
-   fake-commit, and torn-UTF-8 predecessors. The healthy control passed and four
-   interrupted cases failed on the original implementation. A resident full
-   history scan was rejected after measured UI-blocking cost. The unfinished
-   admission prototype uses detached validation, native identity and change-time
-   certificates, and a short-lived exclusive append handle. Focused cases pass,
-   but lifecycle transfer, cold-reload validation, and withdrawal of a lazy task
-   remain unsafe or incompletely qualified. The latest four-case lifecycle run
-   contains one healthy case, one real task-retirement failure, and two missing
-   child receipts; those missing receipts do not prove their intended product
-   failures. Preserve the canonical reader's `r-w` protection. Do not replace it
-   with a permanent writable handle or a synchronous whole-history scan.
-   Evidence: `evidence/scratch/windows-ledger-admission-r19/`, including
-   `review.json`, `native-old-final/`, `native-group-qualification-r26/`, and
-   `native-genuine-lifecycle-baseline-r26/`. Source: `wip/ergopti-windows-r19-ledger/`.
+Status on 18 November 2026: seven of the eight findings are fixed, each with a
+regression test that fails on the code the audit read. Finding 5 still needs
+its native binaries rebuilt by the maintainer. The original descriptions and
+evidence paths stay in `evidence.tar.gz` and in Git history.
 
-2. **Configuration restore can publish a substituted staging file.** The actual
-   public restore path verified one file and later published different bytes
-   after a pathname substitution. The separate integrated restore-authority fix
-   prevents pending RAM saves from overwriting a backup restored through the
-   Versions-page action. The low-level restore remains a disk-only operation;
-   this does not close the staging identity race. A raw-copy prototype was rejected
-   because it loses native metadata, streams, or encryption semantics. A pinned
-   `CopyFileW` prototype still allowed a replacement ancestor to be written before
-   identity refusal. Any successor must own destination creation and cleanup
-   through ancestor/reparse changes without overwriting foreign files, and must
-   preserve the native copy contract. Wine did not qualify EFS or alternate
-   streams, and a read-only claim refused write-attributes access. Real Windows
-   tests are required before accepting a replacement design.
-   Evidence: `evidence/scratch/windows-restore-r22/` and
-   `evidence/scratch/windows-audit-round6/delivery-review/restore-publication-identity/`.
-   Rejected source snapshots remain under the restore proof directory.
+1. **Crash-torn SQL ingest could acknowledge an unreadable ledger.** Fixed by
+   `aa1650f51b`: `state.json` now records the ledger's identity and its
+   acknowledged length, so boot cuts an interrupted append in O(1) and the
+   journal writes those events again. The admission prototype with a writable
+   handle or a full history scan was not adopted. Regression:
+   `windows/tests/unit/modules/keystats/test_keystats_torn_ledger_tail.ahk`
+   (torn literal, torn commit, fake commit, torn UTF-8 and complete control).
 
-3. **Uninstall can recycle a foreign replacement.** In the genuine public
-   PowerShell removal function, the unregister callback moved the confirmed
-   executable and installed a foreign replacement. The function returned success
-   and selected that replacement for recycling. A healthy control passed. This
-   is a host PowerShell 7 logic proof; native Windows PowerShell 5.1 and the
-   physical Recycle Bin were not qualified locally. Another pathname hash leaves
-   the same race; replacing recycle with permanent deletion breaks the contract.
-   A future fix needs an identity-preserving removal/quarantine capability.
-   Evidence: `evidence/scratch/windows-packaging-r30/uninstall-unregister-race-proof.json`
-   and `uninstall-custody-design-review.json`. The exact macOS ordering differs;
-   analogous Linux/macOS source leads are not native reproductions.
+2. **Configuration restore could publish a substituted staging file.** Fixed
+   by `cd47844355`: the stage and its folders are held by handle from the
+   first open to the last close. The stage is copied by handle with
+   `BackupRead`, so it keeps the attributes, write time and encryption that
+   `CopyFileW` copies, and renamed with `FileRenameInformation`. Regression:
+   `windows/tests/unit/modules/updater/test_config_restore_custody.ahk`, with
+   a separate same-user attacker process (`fixtures/restore_stage_attacker.ahk`).
 
-4. **Stored n-grams cannot distinguish literal bracket text from control
-   markers.** Two real histories can produce identical encoded bytes, and valid
-   literal n-grams disappear from the UI. A new versioned token representation
-   and an explicit historical-data policy are required; the old intent cannot
-   be reconstructed reliably from the ambiguous bytes.
-   Evidence: `evidence/scratch/windows-audit-round6/ui-metrics/typing-bracket-ngram-review.json`.
+3. **Uninstall could recycle a foreign replacement.** Fixed by `4c9448cf7a`
+   (maintainer decision of 2026-11-11 in `docs/memory/maintainer-decisions.md`):
+   the confirmed executable is renamed to a private quarantine name under an
+   identity anchor and recycled only when the Recycle Bin holds that identity.
+   Regression: `tools/test/test-windows-uninstall.cjs`.
 
-5. **Native Windows builder validation has literal-path and schema defects.**
-   Real PowerShell AST controls reproduced wildcard interpretation of bracketed
-   directories and coercive manifest acceptance. Review-only source patches are
-   retained. The tracked native binaries and fingerprints were not forged or
-   manually refreshed. The official MSVC regeneration and native validation are
-   still required before delivery.
-   Evidence: `evidence/scratch/windows-audit-round6/delivery-review/builder-boundaries/`.
+4. **Stored n-grams could not tell literal bracket text from markers.**
+   Resolved by token encoding 2 (`211e7ec7ed`, maintainer decision of
+   2026-11-01): a typed `[` is escaped as `[[`, and Windows and macOS rebuild
+   every key from the raw events, keeping the old image as a backup.
 
-6. **Diagnostic archive acknowledgement remains intermittent.** Native Windows
-   CI run `40709098135` failed one acknowledgement case. Run `40724503912` passed
-   the full Windows lane with unchanged collector production and stronger
-   refusal diagnostics. The cause is not established. The exclusive diagnostic
-   namespace fix is separate and does not claim to resolve this failure.
-   Evidence is indexed in the historical report and CI annotation packets.
+5. **Native Windows builder validation had literal-path and schema defects.**
+   Fixed in source by `7313d78d00` (literal `Push-Location`, strict nav owner
+   schema), `ff8610fb53` (the `[long]` PowerShell 7 parses) and `850bf7c1ca`
+   (the same integer check on the five version guards of the PAC and Lua
+   export builders). Regression: `tools/test/test-windows-builder-boundaries.cjs`.
+   Left to the maintainer: rebuild the tracked native binaries and their
+   manifests in the official MSVC environment. The PAC source fingerprint
+   covers the builder scripts, so `vendor/ergopti_network_pac.json` predates
+   these edits until that rebuild.
 
-7. **macOS optional callback regression can falsely accept `error(nil)`.** The
-   complete original regression falsely accepts a genuine `error(nil)` thrown
-   after the genuine `api_common` callback, because its no-throw sentinel checks
-   only the nil error payload rather than the `pcall` status. The inspected test
-   and producer match the recorded `origin/dev` checkpoint. This proves a test
-   defect, not that `api_common` itself swallows the error. This is distinct from
-   Windows empty-message errors; macOS source was left unchanged in this audit.
-   Evidence: `evidence/scratch/windows-adapter-contract-followup/macos-nil-error-report-r29/`.
+6. **Diagnostic archive acknowledgement was intermittent.** Fixed by
+   `698b2cf2aa`: the worker's exclusive rewrite of `progress.json` met the
+   host's progress read and failed with a sharing violation before the ZIP.
+   The rewrite now retries a sharing or lock violation for 2 s. Regression:
+   `tools/test/test-windows-diagnostic-progress-reader.cjs`.
 
-8. **Developer interpreter native qualification and an unproven harness lead.**
-   The developer-interpreter selection correction is implemented and has genuine
-   host PowerShell controls. Actual PowerShell 5.1 execution remains a
-   Windows-runner requirement. The local native-entry test correctly rejected
-   Wine's empty PowerShell stub and retained that failure. The final cancellation
-   and editor-cohort caught-state guards have healthy/mutation proofs and are
-   indexed as separate commits. Their broader 156-case Wine run retained three
-   unchanged Ollama DELETE acceptance failures, whose cause remains unclassified.
-   A personal-info void callback guard remains only an unproven lead; do not
-   apply its proposal without a real original-path reproduction.
-   Evidence: `evidence/scratch/windows-dev-interpreter-r34/` and
-   `evidence/scratch/windows-final-r29/`.
+7. **The macOS optional-callback regression accepted `error(nil)`.** Fixed by
+   `df467c0da1`: the test now reads the `pcall` status, not only the payload.
+
+8. **Developer interpreter native qualification and a harness lead.** The
+   selection fix is in `tools/dev/run-windows-dev.ps1` (an explicit
+   interpreter is authoritative). On 18 November 2026,
+   `node tools/test/test-windows-dev-script.cjs` ran on native Windows
+   PowerShell 5.1.26100 with 21 checks passed and `native_entry_cases=8`, the
+   qualification Wine could not provide. The personal-info void-callback lead
+   is closed by `b92cceef52`, which proved it on native Windows. The three
+   Ollama DELETE failures only appeared under Wine: the native run of the
+   whole suite on 11 November (20,286 tests,
+   `docs/audits/windows-2026-11-11-todo-triage.md`) had no Ollama red.
 
 ## Scope and qualification limits
 
@@ -209,9 +181,7 @@ were not changed by this assertion fix.
 
 ## Maintainer decisions
 
-- Choose a versioned n-gram encoding and a historical-data migration policy.
 - Identify the official MSVC environment to regenerate the builder outputs and
-  verify their tracked fingerprints.
-- Assign the remaining crash-torn ledger, restore-publication identity, and
-  uninstall identity work with native Windows qualification. The archived
-  rejected designs explain why small pathname-only patches are insufficient.
+  verify their tracked fingerprints (finding 5).
+- The n-gram encoding and the restore custody (2026-11-01) and the uninstall
+  identity (2026-11-11) are decided; see `docs/memory/maintainer-decisions.md`.

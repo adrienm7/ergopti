@@ -263,9 +263,13 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
   handlers are guarded a second time downstream, so a behaviour test of their own guard could not fail.
 - **Signing follow-ups.** Delete `.github/ci/stable_windows_signing_exception.json` once SignPath is configured; flip
   update enforcement to `required` after the `off` release. The relay exe and the vendor binaries are unsigned.
-- **Older findings.** The seven « Remaining findings » of
-  [the 2026-10-28 Windows audit](docs/audits/windows-2026-10-28/README.md); item 36, the updater production coupling
-  (the first trusted PowerShell host acquisition).
+- **Older findings** ([the 2026-10-28 Windows audit](docs/audits/windows-2026-10-28/README.md)). Findings 1 to 4
+  and 6 to 8 are fixed. Left: finding 5's native binaries and manifests, rebuilt in the official MSVC environment
+  (the maintainer's step: the PAC source fingerprint covers the builder scripts). Item 36, the updater production
+  coupling: the inactive « original23 » collector (`tools/ci/run-windows-updater-original-diagnostic-cohort.cjs`)
+  needs a first trusted PowerShell host, which a PowerShell script cannot acquire for itself before it runs. It
+  needs a native pre-host launcher with an approved image contract, which is a maintainer decision (which signed
+  `powershell.exe` image, checked how) and a new tracked binary from the same MSVC build.
 
 ### macOS
 
