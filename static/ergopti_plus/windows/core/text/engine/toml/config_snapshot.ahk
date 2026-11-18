@@ -74,6 +74,28 @@ ConfigTomlBootSnapshot(Cache) {
 }
 
 /**
+ * The snapshot of Path, served by the open boot read stretch when it already
+ * admitted the published generation, read afresh otherwise. A boot consumer that
+ * reads config.toml by path (the logger, the feature loader, the metrics
+ * settings) re-proved the unchanged image with two whole-snapshot comparisons;
+ * ConfigTomlBootReadsRelease still proves the served image when the stretch
+ * closes. Outside the stretch, or for any other path, nothing changes.
+ * @param {String} Path - Configuration source path.
+ * @returns {Object} The typed snapshot ConfigTomlReadSnapshot describes.
+ */
+ConfigTomlReadBootServedSnapshot(Path) {
+	global ConfigurationFile, _ParseTomlCache, _ConfigTomlSnapshots
+	global ConfigMigrateBootReadProof, _ConfigTomlBootReadMemo
+	Served := _ConfigTomlBootReadMemo
+	if IsObject(Served) && IsSet(ConfigMigrateBootReadProof) && ConfigMigrateBootReadProof.open
+			&& IsSet(ConfigurationFile) && Path == ConfigurationFile
+			&& _ConfigTomlSnapshots.Has(Path) && _ConfigTomlSnapshots[Path] == Served
+			&& _ParseTomlCache.Has(Path) && _ParseTomlCache[Path] == Served.Cache
+		return Served
+	return ConfigTomlReadSnapshot(Path)
+}
+
+/**
  * Ends the boot stretch's snapshot reuse with one admitted read: the snapshot
  * it served must still be the native generation, never a mutated or replaced one.
  * @param {String} Path - The boot configuration path.

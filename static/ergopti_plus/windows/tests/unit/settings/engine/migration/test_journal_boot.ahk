@@ -730,6 +730,40 @@ _CMJ_BootSnapshotStretch() {
 }
 Test("config journal: the boot read stretch serves one admitted snapshot and proves it at release", _CMJ_BootSnapshotStretch)
 
+; boot-snapshot-by-path-2026-11-18: the logger, the feature loader and the
+; metrics settings read config.toml by path, so each re-proved the image the
+; stretch had already admitted. A read by path inside the stretch is served that
+; snapshot without a read; after the stretch, it reads again.
+_CMJ_BootSnapshotByPath() {
+	global ConfigurationFile, ConfigMigrateBootReadProof, _ConfigTomlSnapshotReads
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Source := _CMJ_CurrentSource(), Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	try {
+		ConfigurationFile := Path
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		ConfigMigrateBootReadsOpen()
+		Cache := ParseConfigTomlFile(Path)
+		Served := ConfigTomlBootSnapshot(Cache)
+		Before := _ConfigTomlSnapshotReads
+		AssertTrue(ConfigTomlReadBootServedSnapshot(Path) == Served,
+			"a read by path inside the stretch is served the admitted snapshot")
+		AssertEqual(Before, _ConfigTomlSnapshotReads, "the served read re-proves nothing")
+		AssertTrue(ConfigMigrateBootReadsClose(Path))
+		Before := _ConfigTomlSnapshotReads
+		AssertTrue(ConfigTomlReadBootServedSnapshot(Path) == Served, "the closed stretch reads the same generation")
+		Assert(_ConfigTomlSnapshotReads > Before, "after the stretch a read by path proves its image again")
+		AssertTrue(ConfigTomlBootReadsRelease(Path))
+	} finally {
+		ConfigMigrateBootReadProof.open := false
+		ConfigMigrateBootReadProof.registry := 0, ConfigMigrateBootReadProof.shadow := 0
+		try ConfigTomlBootReadsRelease(Path)
+		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: a read by path inside the boot read stretch is served its admitted snapshot", _CMJ_BootSnapshotByPath)
+
 _CMJ_BootRegistryWithdrawal(When := "prepared") {
 	global ConfigurationFile, _LOGGER_TEST_SINK, LOGGER_MIN_LEVEL
 	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset

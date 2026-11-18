@@ -548,8 +548,9 @@ LoggerInit() {
 		if IsSet(ConfigurationFile) {
 				if ConfigMigrateBoot(ConfigurationFile, "known") {
 						; Normal boot and menu updates retain the canonical source
-						; generation, including its original native presence.
-						Cache := ConfigTomlReadSnapshot(ConfigurationFile).Cache
+						; generation, including its original native presence. The boot
+						; read stretch serves the generation it already admitted.
+						Cache := ConfigTomlReadBootServedSnapshot(ConfigurationFile).Cache
 						Value := IniCacheGet(Cache, ConfigKey.SCRIPT, ConfigLeaf.LOG_LEVEL, LOGGER_DEFAULT_LEVEL)
 				} else if FileExist(ConfigurationFile) {
 						; Fatal startup recovery can initialize logging before the
