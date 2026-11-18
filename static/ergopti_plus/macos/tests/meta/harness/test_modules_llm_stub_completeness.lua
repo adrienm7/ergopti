@@ -26,22 +26,21 @@
 
 local helpers = require("tests.helpers")
 
+-- Named by module, not by path: a structure step respells a module name where
+-- a tests/-relative path held in a table stays stale.
 local FILES_WITH_STUB = {
-	"unit/ai/ui/menu/backend/test_startup_controller_generation_guard.lua",
-	"unit/modules/keymap/expansion/test_utf8_offset_pcall.lua",
-	"unit/modules/keymap/llm_bridge/test_llm_bridge_no_duplicate_init.lua",
-	"unit/ai/ui/menu/profiles/test_label.lua",
+	"tests.unit.ai.ui.menu.backend.test_startup_controller_generation_guard",
+	"tests.unit.hotstrings.engine.expander.expansion.test_utf8_offset_pcall",
+	"tests.unit.hotstrings.engine.expander.llm_bridge.test_no_duplicate_init",
+	"tests.unit.ai.ui.menu.profiles.test_label",
 }
 
---- Reads a tests/-relative source file.
---- @param rel string Path relative to the tests/ directory.
+--- Reads a test module's source, found as require would find it.
+--- @param module_name string Dotted test module name.
 --- @return string The file's raw source text.
-local function read_test_source(rel)
-	local path = helpers.driver_root() .. "tests/" .. rel
-	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "cannot open " .. path)
-	local content = fh:read("*a")
-	fh:close()
+local function read_test_source(module_name)
+	local content, missing = helpers.read_module_source(module_name)
+	helpers.assert_true(content ~= nil, "cannot find " .. module_name .. ": " .. tostring(missing))
 	return content
 end
 

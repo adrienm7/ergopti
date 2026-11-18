@@ -523,7 +523,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- unanswered and captures hs: each test starts with no cooldown.
 	loaded["adapters.accessibility_permission"] = nil
 
-	-- Drop every cached modules.keymap.registry* sub-module (registry.lua was split
+	-- Drop every cached hotstrings.engine.expander.registry* sub-module (registry.lua was split
 	-- into registry_groups.lua + registry_index.lua). All three capture `local hs = hs`
 	-- at require-time; when a test file requires only "hotstrings.engine.expander.registry" (which
 	-- itself requires the two split files), load_with_stubs's first line only clears
@@ -532,7 +532,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- disconnected hs stub instance. Registry.is_section_enabled then silently
 	-- reads/writes hs.settings against a stale store for the rest of the run
 	-- (F-HIGH-23 fix). Pattern-based like the ui.menu sweep above so any future split
-	-- under modules.keymap.registry* is covered automatically.
+	-- under hotstrings.engine.expander.registry* is covered automatically.
 	for name in pairs(loaded) do
 		if type(name) == "string" and name:match("^hotstrings%.engine%.expander%.registry") then
 			loaded[name] = nil

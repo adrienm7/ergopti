@@ -8,8 +8,11 @@
 
 local helpers = require("tests.helpers")
 
+-- The last two are made-up names under the two sweeps of load_with_stubs (the
+-- menu modules and the hotstring registry split): each must follow the sweep
+-- pattern when a structure step respells it.
 local KEYS = { "hs", "hs.timer", "tests.stubs.hs", "core.i18n.engine.i18n",
-	"ui.menu.scope_fixture", "modules.keymap.registry_scope_fixture" }
+	"ui.menu.scope_fixture", "hotstrings.engine.expander.registry_scope_fixture" }
 
 helpers.describe("native stub scope", function()
 	for _, throws in ipairs({ false, true }) do
