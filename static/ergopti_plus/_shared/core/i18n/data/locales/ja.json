@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "シザー",
 	"layout_analysis.info.analyser.kla": "Patrick Gillespie の Keyboard Layout Analyzer：100 点満点で高いほど良く、距離、指の使用、同指、同じ手から算出。完全に再現：独自のシミュレーション、キー位置、運指を使用。",
 	"layout_analysis.info.analyser.kla_stevep": "SteveP による KLA のフォーク：100 点満点で高いほど良く、距離の代わりに労力モデル（Fitts）を使用。完全に再現。",
-	"layout_analysis.info.analyser.klanext": "KLAnext（Ian Douglas）：距離、同指、同じ手から算出し、低いほど良い。コードは非公開のため、公開された表から式を再構築しており、数値は近似です。",
+	"layout_analysis.info.analyser.klanext": "KLAnext（Ian Douglas）：距離、同指、同じ手から算出し、低いほど良い。コードは非公開のため、その結果から式を再構築しており、同じ配列ならそのサンプル文で本家と同じ数値になります。",
 	"layout_analysis.info.analyser.a200": "ClemenPine の a200：トライグラムの統計（交互打鍵、ロール、方向転換、同指）で、スコアなし。完全に再現。",
 	"layout_analysis.info.analyser.carpalx": "Martin Krzywinski の carpalx：文字の 3 連の平均打鍵労力で、低いほど良い（そのコーパスで QWERTY = 3）。文字のみのテキストでは正確、それ以外では近い値。",
 	"layout_analysis.info.analyser.keygen": "xsznix の keygen：1 文字あたりのペナルティで、低いほど良い。近い値：4 キーの連続はトライグラムから推定。",

@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "מספריים",
 	"layout_analysis.info.analyser.kla": "Keyboard Layout Analyzer של Patrick Gillespie: מתוך 100, גבוה יותר עדיף, לפי מרחק, שימוש באצבעות, אותה אצבע ואותה יד. משוחזר במדויק: הסימולציה שלו, מיקומי המקשים והאצבוע.",
 	"layout_analysis.info.analyser.kla_stevep": "הפיצול של SteveP ל-KLA: מתוך 100, גבוה יותר עדיף, עם מודל מאמץ (Fitts) במקום מרחק. משוחזר במדויק.",
-	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): מרחק, אותה אצבע ואותה יד, נמוך יותר עדיף. הקוד שלו אינו פומבי: הנוסחה נבנתה מחדש מהטבלאות שפורסמו, ולכן המספר משוער.",
+	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): מרחק, אותה אצבע ואותה יד, נמוך יותר עדיף. הקוד שלו אינו פומבי: הנוסחה נבנתה מחדש מהתוצאות שלו, והיא נותנת את המספרים שלו עצמו על טקסטי הדוגמה שלו, לאותה פריסה.",
 	"layout_analysis.info.analyser.a200": "a200 של ClemenPine: סטטיסטיקות טריגרמים (החלפה בין ידיים, גלגולים, שינויי כיוון, אותה אצבע), ללא ציון. משוחזר במדויק.",
 	"layout_analysis.info.analyser.carpalx": "carpalx של Martin Krzywinski: מאמץ ההקלדה הממוצע של שלשות אותיות, נמוך יותר עדיף (QWERTY = 3 בקורפוס שלו). מדויק בטקסט של אותיות בלבד, קרוב בשאר המקרים.",
 	"layout_analysis.info.analyser.keygen": "keygen של xsznix: קנס לכל תו, נמוך יותר עדיף. קרוב: רצפי ארבעת המקשים שלו מוערכים מטריגרמים.",

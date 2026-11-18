@@ -731,6 +731,16 @@ function buildCorpora(engine) {
 			bigrams: sorted(counts.bigrams),
 			trigrams: sorted(counts.trigrams)
 		};
+		// The n-grams with a line break or a tab, for the analysers that type
+		// Enter and Tab (a text's only: word lists and count tables have none).
+		if (counts.breaks) {
+			const b = counts.breaks;
+			tables[corpus.id].breaks = {
+				chars: sorted(b.chars),
+				bigrams: sorted(b.bigrams),
+				trigrams: sorted(b.trigrams)
+			};
+		}
 		if (words) tables[corpus.id].words = words;
 		const characters = Object.values(counts.chars).reduce((sum, n) => sum + n, 0);
 		// A localized name, for a title that describes rather than names a work.
@@ -866,6 +876,11 @@ function corpusSource(id, table, licence) {
 		'var LAYOUT_ANALYSIS_CORPORA = typeof LAYOUT_ANALYSIS_CORPORA === "object" ? LAYOUT_ANALYSIS_CORPORA : {};',
 		`LAYOUT_ANALYSIS_CORPORA[${JSON.stringify(id)}] = {"chars":${tableText(table.chars, patterns)},` +
 			`"bigrams":${tableText(table.bigrams, patterns)},"trigrams":${tableText(table.trigrams, patterns)}` +
+			(table.breaks
+				? `,"breaks":{"chars":${tableText(table.breaks.chars, patterns)},` +
+					`"bigrams":${tableText(table.breaks.bigrams, patterns)},` +
+					`"trigrams":${tableText(table.breaks.trigrams, patterns)}}`
+				: '') +
 			(table.words ? `,"words":${tableText(table.words, patterns)}` : '') +
 			'};',
 		''

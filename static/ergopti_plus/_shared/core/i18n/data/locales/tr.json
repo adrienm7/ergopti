@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "Makaslar",
 	"layout_analysis.info.analyser.kla": "Patrick Gillespie'nin Keyboard Layout Analyzer'ı: 100 üzerinden, yüksek olan daha iyi; mesafe, parmak kullanımı, aynı parmak ve aynı elden. Birebir yeniden üretildi: kendi simülasyonu, tuş konumları ve parmak düzeni.",
 	"layout_analysis.info.analyser.kla_stevep": "SteveP'nin KLA çatalı: 100 üzerinden, yüksek olan daha iyi; mesafe yerine bir efor modeli (Fitts) ile. Birebir yeniden üretildi.",
-	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): mesafe, aynı parmak ve aynı el, düşük olan daha iyi. Kodu açık değil: formül yayımlanmış tablolarından yeniden kuruldu, bu yüzden sayı yaklaşıktır.",
+	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): mesafe, aynı parmak ve aynı el, düşük olan daha iyi. Kodu açık değil: formül sonuçlarından yeniden kuruldu ve aynı düzen için örnek metinlerinde onun kendi sayılarını verir.",
 	"layout_analysis.info.analyser.a200": "ClemenPine'ın a200'ü: trigram istatistikleri (dönüşümlülük, yuvarlamalar, yön değiştirmeler, aynı parmak), puan yok. Birebir yeniden üretildi.",
 	"layout_analysis.info.analyser.carpalx": "Martin Krzywinski'nin carpalx'i: harf üçlülerinin ortalama yazma eforu, düşük olan daha iyi (kendi derleminde QWERTY = 3). Yalnızca harflerden oluşan metinde birebir, diğer durumlarda yakın.",
 	"layout_analysis.info.analyser.keygen": "xsznix'in keygen'i: karakter başına ceza, düşük olan daha iyi. Yakın: dört tuşluk dizileri trigramlardan tahmin edilir.",

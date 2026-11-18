@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "Ciseaux",
 	"layout_analysis.info.analyser.kla": "Le Keyboard Layout Analyzer de Patrick Gillespie : score sur 100, mieux si plus haut, d’après la distance, la charge des doigts, le même doigt et la même main. Reproduit exactement : sa simulation, ses positions de touches et son doigté.",
 	"layout_analysis.info.analyser.kla_stevep": "La version de KLA de SteveP : score sur 100, mieux si plus haut, avec un modèle d’effort (Fitts) au lieu de la distance. Reproduit exactement.",
-	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas) : distance, même doigt et même main, mieux si plus bas. Son code n’est pas public : la formule est reconstruite à partir de ses tableaux publiés, le nombre est donc approché.",
+	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas) : distance, même doigt et même main, mieux si plus bas. Son code n’est pas public : la formule est reconstruite à partir de ses résultats et redonne ses propres nombres sur ses textes d’exemple, pour la même disposition.",
 	"layout_analysis.info.analyser.a200": "a200 de ClemenPine : statistiques de trigrammes (alternance, roulements, redirections, même doigt), sans score. Reproduit exactement.",
 	"layout_analysis.info.analyser.carpalx": "carpalx de Martin Krzywinski : effort moyen de frappe des triplets de lettres, mieux si plus bas (QWERTY = 3 sur son corpus). Exact sur un texte de lettres seules, proche sinon.",
 	"layout_analysis.info.analyser.keygen": "keygen de xsznix : pénalité par caractère, mieux si plus bas. Proche : ses suites de quatre touches sont estimées à partir des trigrammes.",

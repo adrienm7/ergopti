@@ -210,11 +210,14 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const geometry = model.geometry[form];
 		const codes = Object.keys(geometry);
 		const index = new Map(codes.map((code, k) => [code, k]));
+		// KLAnext's own layout files finger a few keys their way (the Space thumb,
+		// Dvorak's number row), by library layout id.
+		const own = (model.layout_fingering && model.layout_fingering[layout.id]) || {};
 		const finger = codes.map((code) =>
 			fingerFor(
 				ctx,
 				code,
-				fingerIndex((angle && model.angle_fingering[code]) || model.fingering[code])
+				fingerIndex(own[code] || (angle && model.angle_fingering[code]) || model.fingering[code])
 			)
 		);
 		const custom = customModel(ctx);
@@ -268,6 +271,11 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 * trigrams), and how often each character starts or ends a run.
 	 */
 	function klaBigrams(table, strokes) {
+		// A table from ngramsFromText brings its line breaks and tabs apart.
+		const breaks = table.breaks;
+		const uni = breaks ? table.uni.concat(breaks.uni) : table.uni;
+		const bi = breaks ? table.bi.concat(breaks.bi) : table.bi;
+		const tri = breaks ? table.tri.concat(breaks.tri) : table.tri;
 		const pairs = [];
 		const into = new Map();
 		const outOf = new Map();
@@ -276,31 +284,36 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			into.set(b, (into.get(b) || 0) + n);
 			outOf.set(a, (outOf.get(a) || 0) + n);
 		};
-		for (const [a, b, n] of table.bi) if (strokes.has(a) && strokes.has(b)) add(a, b, n);
-		for (const [a, x, b, n] of table.tri)
-			if (!strokes.has(x) && strokes.has(a) && strokes.has(b)) add(a, b, n);
+		for (const [x, y, n] of bi) if (strokes.has(x) && strokes.has(y)) add(x, y, n);
+		for (const [x, skipped, y, n] of tri)
+			if (!strokes.has(skipped) && strokes.has(x) && strokes.has(y)) add(x, y, n);
 		let starts = [];
 		let ends = [];
-		for (const [char, n] of table.uni) {
+		for (const [char, n] of uni) {
 			if (!strokes.has(char)) continue;
 			const s = n - (into.get(char) || 0);
 			const e = n - (outOf.get(char) || 0);
 			if (s > 0) starts.push([char, s]);
 			if (e > 0) ends.push([char, e]);
 		}
-		// Tables cut at line breaks (ngramsFromText) hold no "\n": the S runs of
-		// such a text were joined by S − 1 line breaks, which KLA types as Enter.
-		// Each run's end and the next run's start are paired through Enter in
-		// proportion; one run in S keeps its true start and end.
+		// Tables cut at line breaks without their break tables (a count table, a
+		// word list) hold no "\n": the S runs of such a text were joined by S − 1
+		// line breaks, which KLA types as Enter. Each run's end and the next run's
+		// start are paired through Enter in proportion; one run in S keeps its
+		// true start and end.
 		const runs = starts.reduce((sum, [, n]) => sum + n, 0);
-		if (runs > 1 && !table.uni.some(([char]) => char === '\n') && strokes.has('\n')) {
+		let enters = 0;
+		if (runs > 1 && !uni.some(([char]) => char === '\n') && strokes.has('\n')) {
+			enters = runs - 1;
 			const joined = (runs - 1) / runs;
 			for (const [char, n] of ends) add(char, '\n', n * joined);
 			for (const [char, n] of starts) add('\n', char, n * joined);
 			starts = starts.map(([char, n]) => [char, n / runs]);
 			ends = ends.map(([char, n]) => [char, n / runs]);
 		}
-		return { pairs, starts, ends };
+		// Every character of the text, typed or not, Enter and Tab included.
+		const characters = uni.reduce((sum, [, n]) => sum + n, 0) + enters;
+		return { pairs, starts, ends, characters };
 	}
 
 	/**
@@ -315,8 +328,9 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 * @param {object} bigrams - klaBigrams().
 	 * @param {Function} move - (finger, fromKey, toKey, pressing) → distance.
 	 * @returns {object} {presses, distance[f], usage[f], sameFinger[f],
-	 *   sameFingerNoRepeat[f], sameHand[g], sameHandNoRepeat[g]} with g
-	 *   0 left, 1 right, 2 thumbs.
+	 *   sameFingerNoRepeat[f], sameHand[g], sameHandNoRepeat[g], sameSide[h]}
+	 *   with g 0 left, 1 right, 2 thumbs, and h the hand, its thumb included
+	 *   (repeats counted).
 	 */
 	function klaSimulate(board, strokes, bigrams, move) {
 		const c = {
@@ -326,7 +340,8 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			sameFinger: new Float64Array(10),
 			sameFingerNoRepeat: new Float64Array(10),
 			sameHand: new Float64Array(3),
-			sameHandNoRepeat: new Float64Array(3)
+			sameHandNoRepeat: new Float64Array(3),
+			sameSide: new Float64Array(2)
 		};
 		const group = (f) => (isThumb(f) ? 2 : handOf(f));
 		const pos = new Int32Array(10);
@@ -363,6 +378,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 						c.sameFinger[f] += n;
 						if (prevKey !== key) c.sameFingerNoRepeat[f] += n;
 					}
+					if (handOf(prevFinger) === handOf(f)) c.sameSide[handOf(f)] += n;
 					const g = group(f);
 					if (group(prevFinger) === g) {
 						c.sameHand[g] += n;
@@ -529,21 +545,16 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	}
 
 	/**
-	 * KLAnext, reconstructed from its published tables: weighted distance (with
-	 * a fixed cost per press), weighted same-finger presses (repeats included)
-	 * and weighted same-hand bigrams, each per character bigram; lower is better.
+	 * KLAnext, reconstructed from its output on texts written to isolate each
+	 * term (docs/design/analyser-scores.md): over the characters of the text
+	 * (Enter, Tab and the characters it cannot type included), the weighted
+	 * distance with a fixed cost per press, the weighted same-finger presses
+	 * (repeats included) and the square of the weighted share of presses on the
+	 * hand of the previous one (thumbs with their hand); lower is better.
 	 */
 	function scoreKlanext(ctx) {
-		const { model, strokes, bigrams, counters: c } = klaRun(ctx, 'klanext', euclid);
+		const { model, bigrams, counters: c } = klaRun(ctx, 'klanext', euclid);
 		const handWeight = [model.hand_weight.left, model.hand_weight.right];
-		let total = 0;
-		let sameHand = 0;
-		for (const [a, b, n] of bigrams.pairs) {
-			total += n;
-			const fa = strokes.get(a).finger;
-			const fb = strokes.get(b).finger;
-			if (handOf(fa) === handOf(fb) && fa !== fb) sameHand += n * handWeight[handOf(fa)];
-		}
 		let distance = 0;
 		let sameFinger = 0;
 		FINGERS.forEach((id, f) => {
@@ -551,11 +562,12 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			distance += w * (c.distance[f] + model.press_overhead_px * c.usage[f]);
 			sameFinger += w * c.sameFinger[f];
 		});
-		const per = (v) => (total > 0 ? v / total : 0);
+		const sameHand = handWeight[0] * c.sameSide[0] + handWeight[1] * c.sameSide[1];
+		const per = (v) => (bigrams.characters > 0 ? v / bigrams.characters : 0);
 		const parts = {
 			distance: model.c_distance * per(distance),
 			same_finger: model.c_same_finger * per(sameFinger),
-			same_hand: model.c_same_hand * per(sameHand)
+			same_hand: model.c_same_hand * per(sameHand) ** 2
 		};
 		return {
 			value: parts.distance + parts.same_finger + parts.same_hand,

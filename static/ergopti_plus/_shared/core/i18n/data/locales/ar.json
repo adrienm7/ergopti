@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "مقصات",
 	"layout_analysis.info.analyser.kla": "Keyboard Layout Analyzer لـ Patrick Gillespie: من 100، الأعلى أفضل، بناءً على المسافة واستخدام الأصابع والإصبع نفسه واليد نفسها. معاد إنتاجه بدقة: محاكاته الخاصة ومواضع المفاتيح وتوزيع الأصابع.",
 	"layout_analysis.info.analyser.kla_stevep": "نسخة SteveP المشتقة من KLA: من 100، الأعلى أفضل، مع نموذج جهد (Fitts) بدلًا من المسافة. معاد إنتاجه بدقة.",
-	"layout_analysis.info.analyser.klanext": "KLAnext ‏(Ian Douglas): المسافة والإصبع نفسه واليد نفسها، الأدنى أفضل. شيفرته غير منشورة: أعيد بناء الصيغة من جداوله المنشورة، لذا فالرقم تقريبي.",
+	"layout_analysis.info.analyser.klanext": "KLAnext ‏(Ian Douglas): المسافة والإصبع نفسه واليد نفسها، الأدنى أفضل. شيفرته غير منشورة: أعيد بناء الصيغة من نتائجه، وهي تعطي أرقامه نفسها على نصوصه النموذجية، للتخطيط نفسه.",
 	"layout_analysis.info.analyser.a200": "a200 لـ ClemenPine: إحصاءات الثلاثيات (التناوب والتدحرجات وتغييرات الاتجاه والإصبع نفسه)، بلا نتيجة. معاد إنتاجه بدقة.",
 	"layout_analysis.info.analyser.carpalx": "carpalx لـ Martin Krzywinski: متوسط جهد الكتابة لثلاثيات الحروف، الأدنى أفضل (QWERTY = 3 على مدوَّنته). دقيق على نص من الحروف فقط، وقريب في غير ذلك.",
 	"layout_analysis.info.analyser.keygen": "keygen لـ xsznix: عقوبة لكل حرف، الأدنى أفضل. قريب: تسلسلاته من أربعة مفاتيح مقدّرة من الثلاثيات.",

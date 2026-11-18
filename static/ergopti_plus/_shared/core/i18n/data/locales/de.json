@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "Scheren",
 	"layout_analysis.info.analyser.kla": "Keyboard Layout Analyzer von Patrick Gillespie: von 100, höher ist besser, aus Distanz, Fingernutzung, gleichem Finger und gleicher Hand. Exakt nachgebildet: eigene Simulation, Tastenpositionen und eigener Fingersatz.",
 	"layout_analysis.info.analyser.kla_stevep": "Fork von KLA durch SteveP: von 100, höher ist besser, mit einem Aufwandsmodell (Fitts) statt der Distanz. Exakt nachgebildet.",
-	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): Distanz, gleicher Finger und gleiche Hand, niedriger ist besser. Sein Code ist nicht öffentlich: Die Formel ist aus seinen veröffentlichten Tabellen rekonstruiert, daher ist der Wert ungefähr.",
+	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): Distanz, gleicher Finger und gleiche Hand, niedriger ist besser. Sein Code ist nicht öffentlich: Die Formel ist aus seinen Ergebnissen rekonstruiert und liefert auf seinen Beispieltexten seine eigenen Werte, für dasselbe Layout.",
 	"layout_analysis.info.analyser.a200": "a200 von ClemenPine: Trigramm-Statistiken (Wechsel, Rollen, Richtungswechsel, gleicher Finger), keine Punktzahl. Exakt nachgebildet.",
 	"layout_analysis.info.analyser.carpalx": "carpalx von Martin Krzywinski: mittlerer Tippaufwand von Buchstabentriaden, niedriger ist besser (QWERTY = 3 auf seinem Korpus). Exakt bei reinem Buchstabentext, sonst nah dran.",
 	"layout_analysis.info.analyser.keygen": "keygen von xsznix: Strafe pro Zeichen, niedriger ist besser. Nah dran: Seine Folgen von vier Tasten werden aus Trigrammen geschätzt.",

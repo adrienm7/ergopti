@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "Tesouras",
 	"layout_analysis.info.analyser.kla": "O Keyboard Layout Analyzer de Patrick Gillespie: em 100, mais alto é melhor, a partir da distância, do uso dos dedos, do mesmo dedo e da mesma mão. Reproduzido exatamente: a sua própria simulação, posições de teclas e dedilhado.",
 	"layout_analysis.info.analyser.kla_stevep": "O fork de KLA de SteveP: em 100, mais alto é melhor, com um modelo de esforço (Fitts) em vez da distância. Reproduzido exatamente.",
-	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): distância, mesmo dedo e mesma mão, mais baixo é melhor. O seu código não é público: a fórmula é reconstruída a partir das suas tabelas publicadas, por isso o número é aproximado.",
+	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): distância, mesmo dedo e mesma mão, mais baixo é melhor. O seu código não é público: a fórmula é reconstruída a partir dos seus resultados e dá os seus próprios números nos seus textos de exemplo, para o mesmo layout.",
 	"layout_analysis.info.analyser.a200": "a200 de ClemenPine: estatísticas de trigramas (alternância, rolamentos, redirecionamentos, mesmo dedo), sem pontuação. Reproduzido exatamente.",
 	"layout_analysis.info.analyser.carpalx": "carpalx de Martin Krzywinski: esforço médio de escrita de tríades de letras, mais baixo é melhor (QWERTY = 3 no seu corpus). Exato em texto só com letras, próximo nos outros casos.",
 	"layout_analysis.info.analyser.keygen": "keygen de xsznix: penalização por carácter, mais baixo é melhor. Próximo: as suas sequências de quatro teclas são estimadas a partir de trigramas.",

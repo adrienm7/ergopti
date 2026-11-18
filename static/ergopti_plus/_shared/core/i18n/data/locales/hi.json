@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "कैंचियाँ",
 	"layout_analysis.info.analyser.kla": "Patrick Gillespie का Keyboard Layout Analyzer: 100 में से, अधिक बेहतर, दूरी, उँगली उपयोग, एक ही उँगली और एक ही हाथ से। हूबहू पुनरुत्पादित: उसका अपना सिमुलेशन, कुंजी स्थितियाँ और अँगुली-क्रम।",
 	"layout_analysis.info.analyser.kla_stevep": "SteveP का KLA फ़ोर्क: 100 में से, अधिक बेहतर, दूरी की जगह प्रयास मॉडल (Fitts) के साथ। हूबहू पुनरुत्पादित।",
-	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): दूरी, एक ही उँगली और एक ही हाथ, कम बेहतर। इसका कोड सार्वजनिक नहीं है: सूत्र इसकी प्रकाशित तालिकाओं से दोबारा बनाया गया है, इसलिए संख्या अनुमानित है।",
+	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): दूरी, एक ही उँगली और एक ही हाथ, कम बेहतर। इसका कोड सार्वजनिक नहीं है: सूत्र इसके परिणामों से फिर से बनाया गया है और उसी लेआउट के लिए इसके नमूना पाठों पर इसकी अपनी संख्याएँ देता है।",
 	"layout_analysis.info.analyser.a200": "ClemenPine का a200: ट्राइग्राम आँकड़े (बारी-बारी, रोल, दिशा परिवर्तन, एक ही उँगली), कोई स्कोर नहीं। हूबहू पुनरुत्पादित।",
 	"layout_analysis.info.analyser.carpalx": "Martin Krzywinski का carpalx: अक्षर-त्रिकों का औसत टाइपिंग प्रयास, कम बेहतर (उसके कॉर्पस पर QWERTY = 3)। केवल अक्षरों वाले पाठ पर सटीक, अन्यथा निकट।",
 	"layout_analysis.info.analyser.keygen": "xsznix का keygen: प्रति अक्षर दंड, कम बेहतर। निकट: इसकी चार कुंजियों की शृंखलाएँ ट्राइग्राम से अनुमानित हैं।",

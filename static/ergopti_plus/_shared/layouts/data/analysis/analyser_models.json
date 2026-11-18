@@ -538,9 +538,9 @@
 			"author": "Ian Douglas",
 			"url": "https://klanext.keyboard-design.com",
 			"repository": "",
-			"revision": "closed source; published result tables in the Ergo-L repository (03c6c7c)",
-			"licence": "none published (closed source); only published numbers used",
-			"fidelity": "approximate",
+			"revision": "closed source, version 0.06; its output on probe texts and 14 presets, read on its site (2026-11-18)",
+			"licence": "none published (closed source); only its output numbers used",
+			"fidelity": "exact",
 			"better": "lower",
 			"unit": "points",
 			"digits": 2,
@@ -634,11 +634,12 @@
 				"altgr_key": "AltRight",
 				"enter_key": "Enter",
 				"tab_key": "Tab",
-				"fallbacks": {
-					"’": "'",
-					"“": "\"",
-					"”": "\"",
-					"–": "-"
+				"fallbacks": {},
+				"layout_fingering": {
+					"colemak": { "Space": "rt" },
+					"dvorak": { "Digit6": "li", "Digit8": "ri", "Digit9": "rm", "Digit0": "rr" },
+					"qwerty": { "Space": "rt" },
+					"workman": { "Space": "rt" }
 				},
 				"geometry": {
 					"standard": {
@@ -769,7 +770,7 @@
 						"ControlRight": [714.5, 225.5, 76]
 					}
 				},
-				"press_overhead_px": 21.0526312,
+				"press_overhead_px": 21.052631579,
 				"finger_weight": {
 					"lp": 3.67,
 					"lr": 2.9,
@@ -786,9 +787,9 @@
 					"left": 1.1,
 					"right": 1.0
 				},
-				"c_distance": 0.4392,
-				"c_same_finger": 491.25,
-				"c_same_hand": 29.43
+				"c_distance": 0.44,
+				"c_same_finger": 492,
+				"c_same_hand": 68.2
 			}
 		},
 		"a200": {

@@ -54,9 +54,13 @@ A page loads, from the `_shared/ui/<page>/` folder:
 
 All functions are on `LAYOUT_ANALYSIS`. Every invalid input throws.
 
-- `ngramsFromText(text)` → `{chars, bigrams, trigrams}`: counts of 1-, 2- and
-  3-character tokens (Unicode code points, case and spaces kept). Line breaks
-  and tabs cut the text: no n-gram spans them and they are not counted.
+- `ngramsFromText(text)` → `{chars, bigrams, trigrams, breaks}`: counts of 1-,
+  2- and 3-character tokens (Unicode code points, case and spaces kept). Line
+  breaks and tabs cut the text: no n-gram of the main tables spans them and
+  they are not counted there. `breaks` holds, apart, the n-grams of the whole
+  text that contain a line break (CR LF and CR read as LF) or a tab, for the
+  analysers that type Enter and Tab (KLA, KLAnext); our own metrics never read
+  it. Main tables and `breaks` together count every n-gram of the text.
 - `prepareNgrams(ngrams)` → the tables as arrays, cached per object. Call it
   once per corpus and pass the result to every analysis: this is what makes a
   comparison instant.
@@ -551,7 +555,8 @@ register is the one source for them. The codegen enforces three rules:
 - it refuses a built-in corpus whose status is not `ship`.
 
 The codegen counts the n-grams of each built-in corpus with the engine's own
-`ngramsFromText` and writes only the tables. Each corpus gets its own file,
+`ngramsFromText` and writes only the tables (with their `breaks` for a text;
+a word list or a count table has none). Each corpus gets its own file,
 `_generated/corpus_<id>.js`, loaded when the corpus is chosen, with the
 licence and attribution in its header. `LAYOUT_ANALYSIS_DATA.corpora` lists
 the corpora with their licence, attribution, source and size, and the page

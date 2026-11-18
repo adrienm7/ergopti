@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "Nůžky",
 	"layout_analysis.info.analyser.kla": "Keyboard Layout Analyzer Patricka Gillespieho: ze 100, vyšší je lepší, ze vzdálenosti, využití prstů, stejného prstu a stejné ruky. Reprodukováno přesně: vlastní simulace, pozice kláves a prstoklad.",
 	"layout_analysis.info.analyser.kla_stevep": "Fork KLA od SteveP: ze 100, vyšší je lepší, s modelem námahy (Fitts) místo vzdálenosti. Reprodukováno přesně.",
-	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): vzdálenost, stejný prst a stejná ruka, nižší je lepší. Jeho kód není veřejný: vzorec je rekonstruován z publikovaných tabulek, takže číslo je přibližné.",
+	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): vzdálenost, stejný prst a stejná ruka, nižší je lepší. Jeho kód není veřejný: vzorec je rekonstruován z jeho výsledků a na jeho ukázkových textech dává stejná čísla, pro stejné rozložení.",
 	"layout_analysis.info.analyser.a200": "a200 od ClemenPine: statistiky trigramů (střídání, převalení, změny směru, stejný prst), bez skóre. Reprodukováno přesně.",
 	"layout_analysis.info.analyser.carpalx": "carpalx Martina Krzywinského: průměrná námaha psaní trojic písmen, nižší je lepší (QWERTY = 3 na jeho korpusu). Přesné u textu jen z písmen, jinak blízké.",
 	"layout_analysis.info.analyser.keygen": "keygen od xsznix: penalizace na znak, nižší je lepší. Blízké: jeho sekvence čtyř kláves se odhadují z trigramů.",

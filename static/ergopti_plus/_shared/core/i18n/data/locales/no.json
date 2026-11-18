@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "Sakser",
 	"layout_analysis.info.analyser.kla": "Patrick Gillespies Keyboard Layout Analyzer: av 100, høyere er bedre, ut fra avstand, fingerbruk, samme finger og samme hånd. Gjengitt nøyaktig: egen simulering, tasteposisjoner og fingersetting.",
 	"layout_analysis.info.analyser.kla_stevep": "StevePs fork av KLA: av 100, høyere er bedre, med en anstrengelsesmodell (Fitts) i stedet for avstand. Gjengitt nøyaktig.",
-	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): avstand, samme finger og samme hånd, lavere er bedre. Koden er ikke offentlig: formelen er gjenoppbygd fra de publiserte tabellene, så tallet er omtrentlig.",
+	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): avstand, samme finger og samme hånd, lavere er bedre. Koden er ikke offentlig: formelen er gjenoppbygd fra resultatene og gir de samme tallene på eksempeltekstene, for det samme oppsettet.",
 	"layout_analysis.info.analyser.a200": "ClemenPines a200: trigramstatistikk (veksling, rulling, retningsskift, samme finger), ingen poengsum. Gjengitt nøyaktig.",
 	"layout_analysis.info.analyser.carpalx": "Martin Krzywinskis carpalx: gjennomsnittlig skriveanstrengelse for bokstavtripler, lavere er bedre (QWERTY = 3 på korpuset sitt). Nøyaktig på tekst med bare bokstaver, nær ellers.",
 	"layout_analysis.info.analyser.keygen": "xsznix' keygen: straff per tegn, lavere er bedre. Nær: sekvensene av fire taster anslås ut fra trigrammer.",

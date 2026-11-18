@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "가위",
 	"layout_analysis.info.analyser.kla": "Patrick Gillespie의 Keyboard Layout Analyzer: 100점 만점, 높을수록 좋음, 거리, 손가락 사용, 같은 손가락, 같은 손으로 계산. 정확히 재현: 자체 시뮬레이션, 키 위치, 운지법 사용.",
 	"layout_analysis.info.analyser.kla_stevep": "SteveP의 KLA 포크: 100점 만점, 높을수록 좋음, 거리 대신 노력 모델(Fitts) 사용. 정확히 재현.",
-	"layout_analysis.info.analyser.klanext": "KLAnext(Ian Douglas): 거리, 같은 손가락, 같은 손, 낮을수록 좋음. 코드가 공개되지 않아 공개된 표에서 공식을 재구성했으므로 수치는 근사값입니다.",
+	"layout_analysis.info.analyser.klanext": "KLAnext(Ian Douglas): 거리, 같은 손가락, 같은 손, 낮을수록 좋음. 코드가 공개되지 않아 그 결과에서 공식을 재구성했으며, 같은 배열이면 그 예시 텍스트에서 원래와 같은 수치를 냅니다.",
 	"layout_analysis.info.analyser.a200": "ClemenPine의 a200: 트라이그램 통계(교대, 롤, 방향 전환, 같은 손가락), 점수 없음. 정확히 재현.",
 	"layout_analysis.info.analyser.carpalx": "Martin Krzywinski의 carpalx: 글자 3개 묶음의 평균 타건 노력, 낮을수록 좋음(자체 말뭉치에서 QWERTY = 3). 글자만 있는 텍스트에서는 정확, 그 밖에는 근접.",
 	"layout_analysis.info.analyser.keygen": "xsznix의 keygen: 글자당 벌점, 낮을수록 좋음. 근접: 4키 연속은 트라이그램에서 추정합니다.",

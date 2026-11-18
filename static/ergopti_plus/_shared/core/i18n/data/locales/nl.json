@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "Scharen",
 	"layout_analysis.info.analyser.kla": "Keyboard Layout Analyzer van Patrick Gillespie: op 100, hoger is beter, op basis van afstand, vingergebruik, dezelfde vinger en dezelfde hand. Exact nagebootst: eigen simulatie, toetsposities en vingerzetting.",
 	"layout_analysis.info.analyser.kla_stevep": "De fork van KLA door SteveP: op 100, hoger is beter, met een inspanningsmodel (Fitts) in plaats van afstand. Exact nagebootst.",
-	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): afstand, dezelfde vinger en dezelfde hand, lager is beter. De code is niet openbaar: de formule is herbouwd uit de gepubliceerde tabellen, dus het getal is bij benadering.",
+	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): afstand, dezelfde vinger en dezelfde hand, lager is beter. De code is niet openbaar: de formule is herbouwd uit de resultaten en geeft op de voorbeeldteksten dezelfde getallen, voor dezelfde indeling.",
 	"layout_analysis.info.analyser.a200": "a200 van ClemenPine: trigramstatistieken (afwisseling, rollen, richtingswissels, dezelfde vinger), geen score. Exact nagebootst.",
 	"layout_analysis.info.analyser.carpalx": "carpalx van Martin Krzywinski: gemiddelde typinspanning van lettertriaden, lager is beter (QWERTY = 3 op zijn corpus). Exact bij tekst met alleen letters, anders dichtbij.",
 	"layout_analysis.info.analyser.keygen": "keygen van xsznix: straf per teken, lager is beter. Dichtbij: de reeksen van vier toetsen worden geschat uit trigrammen.",

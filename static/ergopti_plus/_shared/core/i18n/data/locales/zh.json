@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "剪刀",
 	"layout_analysis.info.analyser.kla": "Patrick Gillespie 的 Keyboard Layout Analyzer：满分 100，越高越好，基于距离、手指使用、同指和同手。精确复现：采用其自身的模拟、键位和指法。",
 	"layout_analysis.info.analyser.kla_stevep": "SteveP 的 KLA 分支：满分 100，越高越好，以用力模型（Fitts）代替距离。精确复现。",
-	"layout_analysis.info.analyser.klanext": "KLAnext（Ian Douglas）：距离、同指和同手，越低越好。其代码未公开：公式根据其公布的表格重建，因此数值为近似值。",
+	"layout_analysis.info.analyser.klanext": "KLAnext（Ian Douglas）：距离、同指和同手，越低越好。其代码未公开：公式根据其结果重建，对同一布局，在其示例文本上给出与它相同的数值。",
 	"layout_analysis.info.analyser.a200": "ClemenPine 的 a200：三元组统计（交替、滚动、方向变换、同指），无得分。精确复现。",
 	"layout_analysis.info.analyser.carpalx": "Martin Krzywinski 的 carpalx：字母三元组的平均打字用力，越低越好（在其语料上 QWERTY = 3）。仅含字母的文本上精确，其他情况接近。",
 	"layout_analysis.info.analyser.keygen": "xsznix 的 keygen：每个字符的惩罚值，越低越好。接近：其四键序列由三元组估算。",

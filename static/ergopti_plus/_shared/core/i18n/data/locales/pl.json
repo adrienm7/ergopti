@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "Nożyce",
 	"layout_analysis.info.analyser.kla": "Keyboard Layout Analyzer Patricka Gillespiego: na 100, więcej znaczy lepiej, na podstawie odległości, użycia palców, tego samego palca i tej samej ręki. Odtworzony dokładnie: jego własna symulacja, pozycje klawiszy i palcowanie.",
 	"layout_analysis.info.analyser.kla_stevep": "Fork KLA autorstwa SteveP: na 100, więcej znaczy lepiej, z modelem wysiłku (Fitts) zamiast odległości. Odtworzony dokładnie.",
-	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): odległość, ten sam palec i ta sama ręka, mniej znaczy lepiej. Jego kod nie jest publiczny: wzór odtworzono z opublikowanych tabel, więc liczba jest przybliżona.",
+	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): odległość, ten sam palec i ta sama ręka, mniej znaczy lepiej. Jego kod nie jest publiczny: wzór odtworzono z jego wyników i na jego tekstach przykładowych daje te same liczby, dla tego samego układu.",
 	"layout_analysis.info.analyser.a200": "a200 autorstwa ClemenPine: statystyki trigramów (naprzemienność, przetoczenia, zmiany kierunku, ten sam palec), bez wyniku. Odtworzony dokładnie.",
 	"layout_analysis.info.analyser.carpalx": "carpalx Martina Krzywinskiego: średni wysiłek pisania trójek liter, mniej znaczy lepiej (QWERTY = 3 na jego korpusie). Dokładny dla tekstu z samych liter, w innym przypadku zbliżony.",
 	"layout_analysis.info.analyser.keygen": "keygen autorstwa xsznix: kara na znak, mniej znaczy lepiej. Zbliżony: jego ciągi czterech klawiszy są szacowane z trigramów.",

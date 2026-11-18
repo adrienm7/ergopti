@@ -1125,9 +1125,14 @@ var LAYOUT_ANALYSIS = (function () {
 
 	/**
 	 * Counts the characters, bigrams and trigrams of a text. Line breaks and
-	 * tabs cut the text: no n-gram spans them and they are not counted.
+	 * tabs cut the text: no n-gram of the main tables spans them and they are
+	 * not counted there. The analysers that type them (KLA's and KLAnext's
+	 * Enter and Tab) read them from `breaks`: the n-grams of the whole text that
+	 * hold a line break or a tab (CR LF and a lone CR read as one line break), so
+	 * that the main tables and `breaks` together count every n-gram of the text.
 	 * @param {string} text - The corpus.
-	 * @returns {{chars: object, bigrams: object, trigrams: object}} Counts.
+	 * @returns {{chars: object, bigrams: object, trigrams: object, breaks: {chars:
+	 *   object, bigrams: object, trigrams: object}}} Counts.
 	 */
 	function ngramsFromText(text) {
 		const chars = {};
@@ -1146,6 +1151,39 @@ var LAYOUT_ANALYSIS = (function () {
 					trigrams[t] = (trigrams[t] || 0) + 1;
 				}
 			}
+		}
+		return { chars, bigrams, trigrams, breaks: breakNgrams(text) };
+	}
+
+	/** A line break or a tab: what cuts ngramsFromText's main tables. */
+	const isBreak = (char) => char === '\n' || char === '\t';
+
+	/**
+	 * The n-grams of a text that hold a line break or a tab, line breaks read as
+	 * one \n (CR LF, CR, LF).
+	 * @param {string} text - The corpus.
+	 * @returns {{chars: object, bigrams: object, trigrams: object}} Counts.
+	 */
+	function breakNgrams(text) {
+		const chars = {};
+		const bigrams = {};
+		const trigrams = {};
+		const c = codePoints(text.replace(/\r\n?/g, '\n'));
+		const add = (table, key) => {
+			table[key] = (table[key] || 0) + 1;
+		};
+		for (let i = 0; i < c.length; i++) {
+			if (!isBreak(c[i])) continue;
+			add(chars, c[i]);
+			// Each n-gram once: where its first break is.
+			const earlier = (from) => {
+				for (let j = from; j < i; j++) if (isBreak(c[j])) return true;
+				return false;
+			};
+			for (let start = Math.max(0, i - 1); start <= i && start + 1 < c.length; start++)
+				if (!earlier(start)) add(bigrams, c[start] + c[start + 1]);
+			for (let start = Math.max(0, i - 2); start <= i && start + 2 < c.length; start++)
+				if (!earlier(start)) add(trigrams, c[start] + c[start + 1] + c[start + 2]);
 		}
 		return { chars, bigrams, trigrams };
 	}
@@ -1178,9 +1216,25 @@ var LAYOUT_ANALYSIS = (function () {
 			prepared: true,
 			uni: split(ngrams.chars, 1),
 			bi: split(ngrams.bigrams, 2),
-			tri: split(ngrams.trigrams, 3)
+			tri: split(ngrams.trigrams, 3),
+			breaks: null
 		};
 		prepared.totalChars = prepared.uni.reduce((sum, entry) => sum + entry[1], 0);
+		// The n-grams with a line break or a tab (ngramsFromText), when the
+		// table has them; only the analysers that type Enter and Tab read them.
+		if (ngrams.breaks !== undefined) {
+			const b = ngrams.breaks;
+			if (!b || typeof b.chars !== 'object' || typeof b.bigrams !== 'object')
+				throw new Error('layout_analysis: breaks need chars and bigrams');
+			prepared.breaks = {
+				uni: split(b.chars, 1),
+				bi: split(b.bigrams, 2),
+				tri: split(b.trigrams, 3)
+			};
+			for (const [char] of prepared.breaks.uni)
+				if (char !== '\n' && char !== '\t')
+					throw new Error(`layout_analysis: breaks count ${JSON.stringify(char)}`);
+		}
 		preparedCache.set(ngrams, prepared);
 		return prepared;
 	}

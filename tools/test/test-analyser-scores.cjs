@@ -182,6 +182,33 @@ for (const self of ['dead:1dk', '**']) {
 		`ergol: ë not typed through « ${self} » (${parts.unsupported} % unsupported)`
 	);
 }
+// The break tables of ngramsFromText (the Enter and Tab presses KLA and
+// KLAnext type): hand-counted on a short text, and with the main tables
+// they count every n-gram of the text, as read with its line breaks kept.
+{
+	const counted = E.ngramsFromText('ab\r\n\nc\td');
+	const same = (got, expected, what) =>
+		check(
+			JSON.stringify(Object.entries(got).sort()) ===
+				JSON.stringify(Object.entries(expected).sort()),
+			`ngramsFromText breaks ${what}: ${JSON.stringify(got)}, expected ${JSON.stringify(expected)}`
+		);
+	same(counted.breaks.chars, { '\n': 2, '\t': 1 }, 'chars');
+	same(counted.breaks.bigrams, { 'b\n': 1, '\n\n': 1, '\nc': 1, 'c\t': 1, '\td': 1 }, 'bigrams');
+	same(
+		counted.breaks.trigrams,
+		{ 'ab\n': 1, 'b\n\n': 1, '\n\nc': 1, '\nc\t': 1, 'c\td': 1 },
+		'trigrams'
+	);
+	const text = fs.readFileSync(path.join(VECTORS_DIR, 'analysers', 'kla_alice_ch1.txt'), 'utf8');
+	const cut = E.ngramsFromText(text + '\t\tx\n');
+	const whole = countsWithLineBreaks(text + '\t\tx\n');
+	for (const key of ['chars', 'bigrams', 'trigrams']) {
+		const merged = Object.assign({}, cut[key]);
+		for (const [gram, n] of Object.entries(cut.breaks[key])) merged[gram] = (merged[gram] || 0) + n;
+		same(merged, whole[key], `with the main ${key}`);
+	}
+}
 // Two fingerings side by side: on a text without spaces or digits, where
 // carpalx, keygen, genkey and Oxeylyzer finger QWERTY as the default model
 // does, the two numbers are equal; Keyboard Layout Optimizer fingers the

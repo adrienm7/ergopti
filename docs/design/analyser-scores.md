@@ -113,14 +113,14 @@ its own preference rule.
   character (fingers start home, and go home at the end). KLA's own key centres
   (`standard` for `ansi`, `european` otherwise), its fingering (Space on the
   left thumb, the layout's angle mod kept), a character's first key in KLA's
-  matrix order. A line break is Enter: tables cut at line breaks
-  (`ngramsFromText`) get them back as each run's end and the next run's start
-  joined through Enter in proportion; a character KLA skips joins its
-  neighbours (from the trigrams).
+  matrix order. A line break is Enter and a tab is Tab, read from the break
+  tables of `ngramsFromText`; a table without them (a count table, a word
+  list) gets each run's end and the next run's start joined through Enter in
+  proportion. A character KLA skips joins its neighbours (from the trigrams).
 - **Fidelity: exact.** Vectors (KLA's own code run on the same text): `the` on
   QWERTY 54.3077; KLA's _Alice_ chapter 1 preset, line breaks kept: QWERTY
-  53.0568, AZERTY 49.5354 (4 decimals). On the same text cut at its line breaks,
-  0.04 to 0.05 points lower.
+  53.0568, AZERTY 49.5354 (4 decimals), the same from the engine's tables
+  with their break tables (before them, 0.04 to 0.05 points lower).
 
 ### KLA, SteveP's fork
 
@@ -136,31 +136,57 @@ key size)` per axis, lateral ×2.0, vertical pinky 1.6 / ring 1.3 / middle 1.1
 10·max(0, 10 − % same finger)`; `score = 0.5·distS + 0.2·fingerS +
 0.3·sfS`.
 - **Fidelity: exact.** Vectors (the fork's own code): `the` on QWERTY 41.3333;
-  _Alice_: QWERTY 46.5481, AZERTY 38.9089.
+  _Alice_: QWERTY 46.5481, AZERTY 38.9089 (line breaks kept or from the break
+  tables).
 
 ### KLAnext (reconstructed)
 
-- **Source.** https://klanext.keyboard-design.com (Ian Douglas), closed source,
-  no licence published; nothing of it is used but its published numbers: the
-  result tables in the screenshots of the Ergo-L repository
-  (`www/content/articles/analyse_et_optimisation/klanext_*.png`, revision
-  03c6c7c). The structure follows Keyboard Layout Optimizer's re-implementation
-  of the KLAnext metrics (`config/evaluation/klanext.yml`, GPL-3.0, read only).
-- **Formula.** Stated by KLAnext: distance 40 %, same-finger bigrams 40 %, hand
-  alternation 20 %, lower is better; observed: Overall = Distance + Same Finger
-  - Same Hand. Reconstructed: Distance = 0.4392·Σ fw·hw·(px moved + 21.05 px per
-    press) / bigrams; Same Finger = 491.25·Σ fw·hw·same-finger presses (repeats
-    included) / bigrams; Same Hand = 29.43·Σ hw·same-hand, different-finger
-    bigrams / bigrams; finger weights pinky 3.67, ring 2.9, middle 2.0, index
-    1.85, thumb 1.0, left hand ×1.1. The three constants are fitted (the first
-    two match Keyboard Layout Optimizer's 0.44 and 490.2; Same Hand is one
-    constant fitted on two published rows).
-- **Fidelity: approximate.** Checked once, not in the gate: QWERTY ANSI on
-  « Chained English Bigrams 7 », published 207.32, ours 207.26 with line breaks
-  kept (the text is not kept in the repository: its licence is unknown). On
-  tables cut at line breaks the blank lines (Enter repeats) are lost: about 4 %
-  lower on that corpus of short lines. Gate: hand-computed (`the` on QWERTY
-  ANSI, 174.2699: distance only). Re-fit when the live site is reachable.
+- **Source.** https://klanext.keyboard-design.com (Ian Douglas), version 0.06,
+  closed source, no licence published; nothing of it is used but its own
+  numbers: its « Summary » table (Overall, Distance, Same Finger, Same Hand)
+  and its per-finger tables, read on its site for texts written to isolate
+  each term (`the`, `ee`, `th⏎⏎e`, `e␣`, one character at a time…) and for 14
+  of its preset texts (2026-11-18). Its layout names map to our library in
+  `tools/dev/analyser-reference/klanext.json`.
+- **Formula.** Lower is better, Overall = Distance + Same Finger + Same Hand,
+  each over N, the characters of the text: Enter, Tab and the characters it
+  cannot type included (they type nothing but count; one it cannot type joins
+  its neighbours), CR dropped. KLA's typing simulation (fingers go home, the
+  Shift of the other hand, a released Shift is the previous press), with
+  finger weights pinky 3.67, ring 2.9, middle 2.0, index 1.85, thumb 1.0 and
+  the left hand (thumb included) ×1.1:
+  - Distance = 0.44 · Σ weight · (px moved + 21.05 px per press) / N (50 px =
+    1.9 cm: 11.58 per weighted cm, 0.8 cm per press);
+  - Same Finger = 492 · Σ weight · presses on the finger of the previous press
+    (repeats included) / N;
+  - Same Hand = 68.2 · (Σ hand weight · presses on the hand of the previous
+    press / N)², thumbs counted with their hand, repeats included: the square
+    is what the published code rows (Same Hand 18 to 24) needed.
+  - KLAnext's layout files type Space with the right thumb on QWERTY, Colemak
+    and Workman (the left on the others), and its Dvorak fingers the number row
+    6, 8, 9, 0 with left index, right index, middle and ring (model
+    `layout_fingering`, by library id). It maps no typographic character to a
+    plain one (’ is not ').
+- **Line breaks.** Enter and Tab come from the break tables of
+  `ngramsFromText`, so blank lines (Enter repeats) and indentation tabs are
+  typed as KLAnext types them. A table without them (a count table, a word
+  list) gets its runs joined through Enter in proportion, as for KLA.
+- **Fidelity: exact.** The three constants and every rule were read from
+  KLAnext's output on hand-made texts; on 14 presets × 9 layouts (126 points:
+  prose, chained English, « Proglish » and code bigrams, pangrams, Spanish
+  UDHR), every column is within 0.005 of the site's 2-decimal number once the
+  keys KLAnext's own layout files place differently are applied (its Dvorak
+  is the ANSI one, its Capewell, UCIEA and MTGAP put brackets and a few signs
+  on other keys, its Workman swaps `;` and `'`; listed in the reference file).
+  With our library's layouts as they are, the Overall gap is 0.19 % on
+  average, 2.5 % at most (code presets on those five layouts). Before this
+  reconstruction (bigram denominators, a linear Same Hand fitted on two
+  rows, no Enter repeats): 4.96 % on average, 10.9 % at most. Gate: 11 of
+  KLAnext's own values on short texts (Enter repeats, Tab, Shift, Space
+  thumb, a character it cannot type, CR LF, Dvorak's number row), within the
+  0.005 of its rounding. `tools/dev/verify-analyser-scores.cjs` re-measures
+  the presets (it downloads them; their licence is unknown, so they are never
+  stored here).
 
 ### a200 (200-analyzer)
 

@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "Forbici",
 	"layout_analysis.info.analyser.kla": "Il Keyboard Layout Analyzer di Patrick Gillespie: su 100, più alto è meglio, in base a distanza, uso delle dita, stesso dito e stessa mano. Riprodotto esattamente: la sua simulazione, le posizioni dei tasti e la diteggiatura.",
 	"layout_analysis.info.analyser.kla_stevep": "Il fork di KLA di SteveP: su 100, più alto è meglio, con un modello di sforzo (Fitts) al posto della distanza. Riprodotto esattamente.",
-	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): distanza, stesso dito e stessa mano, più basso è meglio. Il suo codice non è pubblico: la formula è ricostruita dalle sue tabelle pubblicate, quindi il numero è approssimato.",
+	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): distanza, stesso dito e stessa mano, più basso è meglio. Il suo codice non è pubblico: la formula è ricostruita dai suoi risultati e restituisce i suoi stessi numeri sui suoi testi di esempio, per lo stesso layout.",
 	"layout_analysis.info.analyser.a200": "a200 di ClemenPine: statistiche sui trigrammi (alternanza, rotolamenti, reindirizzamenti, stesso dito), nessun punteggio. Riprodotto esattamente.",
 	"layout_analysis.info.analyser.carpalx": "carpalx di Martin Krzywinski: sforzo medio di digitazione delle triadi di lettere, più basso è meglio (QWERTY = 3 sul suo corpus). Esatto su testo di sole lettere, vicino altrimenti.",
 	"layout_analysis.info.analyser.keygen": "keygen di xsznix: penalità per carattere, più basso è meglio. Vicino: le sue sequenze di quattro tasti sono stimate dai trigrammi.",

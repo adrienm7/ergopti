@@ -1,5 +1,5 @@
 {
-	"_description": "Reference vectors of the analyser scorers (_shared/ui/layout_analysis/analyser_scores.js, gate tools/test/test-analyser-scores.cjs): a layout, a text or corpus, a keyboard and the value the analyser gives. « basis » says where the value comes from: « tool » = printed by the analyser's own code, run on the same input; « published » = a table the analyser's author published; « hand » = computed by hand from the formula of docs/design/analyser-scores.md. A text with « keep_line_breaks » is counted with its line breaks, as KLA reads them (KLA types each as Enter). Fixtures: analysers/kla_alice_ch1.txt is KLA's preset (Lewis Carroll, public domain; KLA is MIT), analysers/ergol_*.json are the Ergo-L repository's corpus tables (Project Gutenberg texts) and Kalamine keymaps (WTFPL v2).",
+	"_description": "Reference vectors of the analyser scorers (_shared/ui/layout_analysis/analyser_scores.js, gate tools/test/test-analyser-scores.cjs): a layout, a text or corpus, a keyboard and the value the analyser gives. « basis » says where the value comes from: « tool » = printed by the analyser's own code, run on the same input; « published » = a table the analyser's author published; « hand » = computed by hand from the formula of docs/design/analyser-scores.md. A text with « keep_line_breaks » is counted with its line breaks in the main tables; any other text is counted by the engine (ngramsFromText), whose break tables give KLA and KLAnext their Enter and Tab presses. KLAnext's values are its site's, printed to 2 decimals. Fixtures: analysers/kla_alice_ch1.txt is KLA's preset (Lewis Carroll, public domain; KLA is MIT), analysers/ergol_*.json are the Ergo-L repository's corpus tables (Project Gutenberg texts) and Kalamine keymaps (WTFPL v2).",
 	"schema_version": 1,
 	"vectors": [
 		{
@@ -61,19 +61,205 @@
 			"tolerance": 0.0001
 		},
 		{
+			"analyser": "kla",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"file": "analysers/kla_alice_ch1.txt",
+			"value": 53.0568,
+			"tolerance": 0.0001
+		},
+		{
+			"analyser": "kla",
+			"basis": "tool",
+			"layout": "azerty",
+			"keyboard": "iso",
+			"file": "analysers/kla_alice_ch1.txt",
+			"value": 49.5354,
+			"tolerance": 0.0001
+		},
+		{
+			"analyser": "kla_stevep",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"file": "analysers/kla_alice_ch1.txt",
+			"value": 46.5481,
+			"tolerance": 0.0001
+		},
+		{
+			"analyser": "kla_stevep",
+			"basis": "tool",
+			"layout": "azerty",
+			"keyboard": "iso",
+			"file": "analysers/kla_alice_ch1.txt",
+			"value": 38.9089,
+			"tolerance": 0.0001
+		},
+		{
 			"analyser": "klanext",
-			"basis": "hand",
+			"basis": "tool",
 			"layout": "qwerty",
 			"keyboard": "ansi",
 			"text": "the",
-			"value": 174.26992717323174,
-			"tolerance": 1e-9,
+			"value": 116.39,
+			"tolerance": 0.0051,
 			"parts": {
-				"distance": 174.26992717323174,
+				"distance": 116.39,
 				"same_finger": 0,
 				"same_hand": 0
 			},
-			"parts_tolerance": 1e-9
+			"parts_tolerance": 0.0051
+		},
+		{
+			"analyser": "klanext",
+			"basis": "tool",
+			"layout": "dvorak",
+			"keyboard": "ansi",
+			"text": "the",
+			"value": 26.26,
+			"tolerance": 0.0051,
+			"parts": {
+				"distance": 18.68,
+				"same_finger": 0,
+				"same_hand": 7.58
+			},
+			"parts_tolerance": 0.0051
+		},
+		{
+			"analyser": "klanext",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "The",
+			"value": 275.25,
+			"tolerance": 0.0051,
+			"parts": {
+				"distance": 267.67,
+				"same_finger": 0,
+				"same_hand": 7.58
+			},
+			"parts_tolerance": 0.0051
+		},
+		{
+			"analyser": "klanext",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "th\n\ne",
+			"value": 540.41,
+			"tolerance": 0.0051,
+			"parts": {
+				"distance": 168.37,
+				"same_finger": 361.13,
+				"same_hand": 10.91
+			},
+			"parts_tolerance": 0.0051
+		},
+		{
+			"analyser": "klanext",
+			"basis": "tool",
+			"layout": "dvorak",
+			"keyboard": "ansi",
+			"text": "th\te",
+			"value": 122.95,
+			"tolerance": 0.0051,
+			"parts": {
+				"distance": 104.16,
+				"same_finger": 0,
+				"same_hand": 18.8
+			},
+			"parts_tolerance": 0.0051
+		},
+		{
+			"analyser": "klanext",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "eée",
+			"value": 416.89,
+			"tolerance": 0.0051,
+			"parts": {
+				"distance": 46.93,
+				"same_finger": 360.8,
+				"same_hand": 9.17
+			},
+			"parts_tolerance": 0.0051
+		},
+		{
+			"analyser": "klanext",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "e’e",
+			"value": 416.89,
+			"tolerance": 0.0051,
+			"parts": {
+				"distance": 46.93,
+				"same_finger": 360.8,
+				"same_hand": 9.17
+			},
+			"parts_tolerance": 0.0051
+		},
+		{
+			"analyser": "klanext",
+			"basis": "tool",
+			"layout": "workman",
+			"keyboard": "ansi",
+			"text": "e ",
+			"value": 30.94,
+			"tolerance": 0.0051,
+			"parts": {
+				"distance": 13.89,
+				"same_finger": 0,
+				"same_hand": 17.05
+			},
+			"parts_tolerance": 0.0051
+		},
+		{
+			"analyser": "klanext",
+			"basis": "tool",
+			"layout": "dvorak",
+			"keyboard": "ansi",
+			"text": "6",
+			"value": 228.62,
+			"tolerance": 0.0051,
+			"parts": {
+				"distance": 228.62,
+				"same_finger": 0,
+				"same_hand": 0
+			},
+			"parts_tolerance": 0.0051
+		},
+		{
+			"analyser": "klanext",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "deded",
+			"value": 979.12,
+			"tolerance": 0.0051,
+			"parts": {
+				"distance": 60.39,
+				"same_finger": 865.92,
+				"same_hand": 52.81
+			},
+			"parts_tolerance": 0.0051
+		},
+		{
+			"analyser": "klanext",
+			"basis": "tool",
+			"layout": "colemak",
+			"keyboard": "ansi",
+			"text": "e\r\ne",
+			"value": 195.56,
+			"tolerance": 0.0051,
+			"parts": {
+				"distance": 165.25,
+				"same_finger": 0,
+				"same_hand": 30.31
+			},
+			"parts_tolerance": 0.0051
 		},
 		{
 			"analyser": "a200",
@@ -104,13 +290,13 @@
 			"keyboard": "ansi",
 			"text": "the",
 			"value": 3.463054595,
-			"tolerance": 1e-6,
+			"tolerance": 0.000001,
 			"parts": {
 				"base": 1.847693475,
 				"penalty": 0.42032112,
 				"path": 1.19504
 			},
-			"parts_tolerance": 1e-6
+			"parts_tolerance": 0.000001
 		},
 		{
 			"analyser": "carpalx",
@@ -119,7 +305,7 @@
 			"keyboard": "ansi",
 			"text": "and",
 			"value": 3.534177,
-			"tolerance": 1e-6
+			"tolerance": 0.000001
 		},
 		{
 			"analyser": "carpalx",
@@ -128,7 +314,7 @@
 			"keyboard": "ansi",
 			"text": "tbt",
 			"value": 5.744381,
-			"tolerance": 1e-6
+			"tolerance": 0.000001
 		},
 		{
 			"analyser": "keygen",
@@ -155,7 +341,7 @@
 			"keyboard": "ansi",
 			"text": "ded",
 			"value": 342.581,
-			"tolerance": 1e-6
+			"tolerance": 0.000001
 		},
 		{
 			"analyser": "oxeylyzer",
@@ -262,7 +448,7 @@
 				"redirect_bad": 0.421049,
 				"unsupported": 0
 			},
-			"parts_tolerance": 1e-6
+			"parts_tolerance": 0.000001
 		},
 		{
 			"analyser": "ergol",

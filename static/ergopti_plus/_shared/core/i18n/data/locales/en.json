@@ -4719,7 +4719,7 @@
 	"layout_analysis.analysers.part.scissor": "Scissors",
 	"layout_analysis.info.analyser.kla": "Patrick Gillespie’s Keyboard Layout Analyzer: out of 100, higher is better, from distance, finger usage, same finger and same hand. Reproduced exactly: its own simulation, key positions and fingering.",
 	"layout_analysis.info.analyser.kla_stevep": "SteveP’s fork of KLA: out of 100, higher is better, with an effort model (Fitts) instead of distance. Reproduced exactly.",
-	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): distance, same finger and same hand, lower is better. Its code is not public: the formula is rebuilt from its published tables, so the number is approximate.",
+	"layout_analysis.info.analyser.klanext": "KLAnext (Ian Douglas): distance, same finger and same hand, lower is better. Its code is not public: the formula is rebuilt from its results and gives its own numbers on its sample texts, for the same layout.",
 	"layout_analysis.info.analyser.a200": "ClemenPine’s a200: trigram statistics (alternation, rolls, redirects, same finger), no score. Reproduced exactly.",
 	"layout_analysis.info.analyser.carpalx": "Martin Krzywinski’s carpalx: mean typing effort of letter triads, lower is better (QWERTY = 3 on its corpus). Exact on letters-only text, close otherwise.",
 	"layout_analysis.info.analyser.keygen": "xsznix’s keygen: penalty per character, lower is better. Close: its runs of four keys are estimated from trigrams.",
