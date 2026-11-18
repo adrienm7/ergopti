@@ -738,6 +738,30 @@ check(
 		check(source.name, `library collection ${id}: no name for the origin filter`);
 }
 
+// The score settings file: export, import and reset controls in « Réglages du
+// score »; the import applies only what the engine's strict reading returns,
+// and the app's Studio window saves the export through its host's download
+// path (source_export), a WebView keeping no browser download.
+{
+	for (const id of ['la-config-export', 'la-config-import', 'la-config-reset', 'la-config-status'])
+		check(page.includes(`id="${id}"`), `score settings: no #${id}`);
+	const importer = page.slice(page.indexOf("$('la-config-import')"));
+	check(
+		importer.indexOf('E.readScoreConfig(') > 0 &&
+			importer.indexOf('E.readScoreConfig(') < importer.indexOf('Object.assign(state, settings)'),
+		'score settings: the import applies the file before the engine has read it whole'
+	);
+	check(
+		page.includes('E.scoreConfig(') && page.includes('HOST.saveFile'),
+		'score settings: the export does not go through E.scoreConfig and the host'
+	);
+	const appWindow = fs.readFileSync(shared('ui', 'layout_editor_window', 'script.js'), 'utf8');
+	check(
+		/saveFile: function \(filename, text\) \{[\s\S]*?hostSaveBinary\(/.test(appWindow),
+		'score settings: the app window host has no saveFile through source_export'
+	);
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
 	console.error(`test-layout-comparer-page: ${errors.length} problem(s)`);

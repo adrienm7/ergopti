@@ -844,6 +844,14 @@ body:has(> main.layout-analysis) {
 	margin-top: 12px;
 }
 
+/* Export, import and reset of every score setting, wrapped on a narrow screen. */
+.la-config-actions {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+}
+
 /* A dead key shows its bare accent with a corner mark, as on the editor's board. */
 .la-heatmap .la-key.key-legend-dead::before {
 	border-color: currentColor currentColor transparent transparent;

@@ -205,6 +205,22 @@ b)` → its order, negative when `a` ranks first; a result without a boolean
 - `ACCESS_WEIGHTS` → `['modifier_usage', 'altgr_usage', 'dead_key_usage']`;
   `accessWeights(weights?)` → those three, each default replaced by the given
   weight.
+- `scoreConfig({weights, idealLoad, shortcuts, formWeights})` → the score
+  settings file the Comparer exports (« Import, export and reset » in « Réglages
+  du score »): `{format: "ergopti-score-settings", schema_version: 1, analyser:
+"ergopti", weights, ideal_load, shortcuts, form_weights}`, every weight of the
+  score (a metric is in the score when its weight is above 0; the access
+  weights among them). `readScoreConfig(json)` reads such a file whole or not
+  at all: an entry missing (`config_missing`, a weight included) or unknown
+  (`config_unknown_key`), another format, version or analyser
+  (`config_format`, `config_version`, `config_analyser`), a value of the wrong
+  type (`config_weight_type`) or a negative weight (`config_weight_range`) is
+  refused, as is an ideal load, shortcut table or form factor weights the
+  engine refuses. The app saves the export through its download path
+  (`LAYOUT_ANALYSIS_HOST.saveFile`, `source_export`: the Downloads folder on
+  Windows, macOS and Linux), the site as a browser download; an import is
+  applied and analysed again (the access weights may change), and « Reset all
+  to defaults » restores every score setting with an « Undo ».
 - `diff(a, b)` → `{metrics: {id: {a, b, delta, verdict}}, score: {a, b, delta,
 verdict}}`: two results side by side, `delta = a − b`, `verdict` `better` or
   `worse` for `a` by the metric's `better`, `same` when equal, `none` for a

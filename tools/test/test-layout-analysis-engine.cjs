@@ -846,6 +846,135 @@ for (const id of E.ACCESS_WEIGHTS) {
 	}
 	check(refused, `rescore: a changed ${id} is refused, it chooses the ways of typing`);
 }
+// The score settings file: an export read back gives the same settings, the
+// defaults (the « reset ») included, and every malformed file is refused whole
+// with its code.
+{
+	const custom = {
+		weights: Object.assign(E.defaultWeights(), { sfb: 7.25, altgr_usage: 0, dead_key_usage: 4 }),
+		idealLoad: Object.assign({}, E.defaultIdealLoad()),
+		shortcuts: E.defaultShortcuts(),
+		formWeights: E.defaultFormFactorWeights()
+	};
+	custom.shortcuts.letters.c = 3;
+	const defaultsSettings = {
+		weights: E.defaultWeights(),
+		idealLoad: Object.assign({}, E.defaultIdealLoad()),
+		shortcuts: E.defaultShortcuts(),
+		formWeights: E.defaultFormFactorWeights()
+	};
+	for (const [name, settings] of [
+		['custom', custom],
+		['defaults', defaultsSettings]
+	]) {
+		const file = JSON.parse(JSON.stringify(E.scoreConfig(settings)));
+		check(
+			file.format === 'ergopti-score-settings' &&
+				file.schema_version === 1 &&
+				file.analyser === 'ergopti',
+			`score config: ${name} names its format, version and analyser`
+		);
+		const back = E.readScoreConfig(file);
+		check(
+			JSON.stringify(back) === JSON.stringify(settings),
+			`score config: ${name} round trip gives ${JSON.stringify(back)}`
+		);
+	}
+	const good = () => JSON.parse(JSON.stringify(E.scoreConfig(custom)));
+	const refusals = [
+		['config_not_object', () => []],
+		['config_unknown_key', () => Object.assign(good(), { extra: 1 })],
+		[
+			'config_unknown_key',
+			() => {
+				const file = good();
+				file.weights.typo_sfb = 1;
+				return file;
+			}
+		],
+		[
+			'config_missing',
+			() => {
+				const file = good();
+				delete file.ideal_load;
+				return file;
+			}
+		],
+		[
+			'config_missing',
+			() => {
+				const file = good();
+				delete file.weights.altgr_usage;
+				return file;
+			}
+		],
+		['config_format', () => Object.assign(good(), { format: 'kla' })],
+		['config_version', () => Object.assign(good(), { schema_version: 2 })],
+		['config_analyser', () => Object.assign(good(), { analyser: 'oxeylyzer' })],
+		[
+			'config_weight_type',
+			() => {
+				const file = good();
+				file.weights.sfb = '10';
+				return file;
+			}
+		],
+		['config_weight_type', () => Object.assign(good(), { shortcuts: null })],
+		[
+			'config_weight_range',
+			() => {
+				const file = good();
+				file.weights.sfb = -1;
+				return file;
+			}
+		],
+		[
+			'ideal_load_sum',
+			() => {
+				const file = good();
+				file.ideal_load.lp += 10;
+				return file;
+			}
+		],
+		[
+			'shortcut_letter_value',
+			() => {
+				const file = good();
+				file.shortcuts.letters.c = 11;
+				return file;
+			}
+		],
+		[
+			'form_weights_zero',
+			() => {
+				const file = good();
+				for (const id of Object.keys(file.form_weights)) file.form_weights[id] = 0;
+				return file;
+			}
+		]
+	];
+	for (const [code, make] of refusals) {
+		let caught = null;
+		try {
+			E.readScoreConfig(make());
+		} catch (error) {
+			caught = error;
+		}
+		check(
+			caught && caught.name === 'AnalysisError' && caught.code === code,
+			`score config: expected the refusal ${code}, got ${caught ? caught.code || caught.message : 'none'}`
+		);
+	}
+	let exportRefused = false;
+	try {
+		E.scoreConfig(
+			Object.assign({}, custom, { weights: Object.assign({}, custom.weights, { sfb: -2 }) })
+		);
+	} catch (error) {
+		exportRefused = error.code === 'config_weight_range';
+	}
+	check(exportRefused, 'score config: an export of settings the import would refuse is refused');
+}
 const zeroAll = Object.fromEntries(Object.keys(defaults).map((m) => [m, 0]));
 check(
 	E.compare([byId.get('qwerty'), byId.get('ergopti')], ngrams, { weights: zeroAll }).every(

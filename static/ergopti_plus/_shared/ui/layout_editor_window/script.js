@@ -617,6 +617,13 @@ window.keystatsNgrams = function (result) {
 window.LAYOUT_ANALYSIS_HOST = Object.assign(window.LAYOUT_ANALYSIS_HOST || {}, {
 	openLink: function (url) {
 		send('open_link', { url: String(url) });
+	},
+	// The Comparer's score settings export: the editor's download path
+	// (source_export, the Downloads folder on Windows, macOS and Linux), since
+	// a WebView keeps no browser download. Settles on the file's path.
+	saveFile: function (filename, text) {
+		if (!_hostExports) return Promise.reject({ code: 'host_save_failed', path: filename });
+		return hostSaveBinary(filename, new TextEncoder().encode(text));
 	}
 });
 

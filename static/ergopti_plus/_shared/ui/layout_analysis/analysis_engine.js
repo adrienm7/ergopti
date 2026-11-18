@@ -5854,6 +5854,129 @@ var LAYOUT_ANALYSIS = (function () {
 		return rank(results);
 	}
 
+	// The score settings file (« Réglages du score », export and import): its
+	// format name, the one version this engine reads, and the analyser it is for.
+	const SCORE_CONFIG_FORMAT = 'ergopti-score-settings';
+	const SCORE_CONFIG_VERSION = 1;
+	const SCORE_CONFIG_ANALYSER = 'ergopti';
+	// Its entries, each read by the engine's own check of that setting.
+	const SCORE_CONFIG_KEYS = Object.freeze([
+		'format',
+		'schema_version',
+		'analyser',
+		'weights',
+		'ideal_load',
+		'shortcuts',
+		'form_weights'
+	]);
+
+	/**
+	 * The score settings as the file the Comparer exports: every weight of the
+	 * global score (a metric is in the score when its weight is above 0, the
+	 * access weights among them), the ideal finger load, the shortcut table and
+	 * the compact form factors' weights, each checked as an analysis checks it.
+	 * @param {{weights: object, idealLoad: object, shortcuts: object,
+	 *   formWeights: object}} settings - The settings in use.
+	 * @returns {object} The file's JSON value.
+	 * @throws {AnalysisError} When a setting is one the import would refuse.
+	 */
+	function scoreConfig(settings) {
+		const out = {
+			format: SCORE_CONFIG_FORMAT,
+			schema_version: SCORE_CONFIG_VERSION,
+			analyser: SCORE_CONFIG_ANALYSER,
+			weights: Object.assign({}, settings.weights),
+			ideal_load: Object.assign({}, settings.idealLoad),
+			shortcuts: {
+				letters: Object.assign({}, settings.shortcuts.letters),
+				ease: Object.assign({}, settings.shortcuts.ease)
+			},
+			form_weights: Object.assign({}, settings.formWeights)
+		};
+		readScoreConfig(out);
+		return out;
+	}
+
+	/**
+	 * Reads a score settings file, whole or not at all: every entry present,
+	 * none unknown, each value checked, so a partial file is never applied.
+	 * @param {*} value - The file's parsed JSON.
+	 * @returns {{weights: object, idealLoad: object, shortcuts: object,
+	 *   formWeights: object}} The settings, ready for analyse().
+	 * @throws {AnalysisError} config_not_object, config_unknown_key,
+	 *   config_missing, config_format, config_version, config_analyser,
+	 *   config_weight_type, config_weight_range, or the refusal of the ideal
+	 *   load, shortcut table or form factor weights.
+	 */
+	function readScoreConfig(value) {
+		const isObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+		if (!isObject(value))
+			throw new AnalysisError('config_not_object', {}, 'a score settings file is a JSON object');
+		for (const key of Object.keys(value))
+			if (!SCORE_CONFIG_KEYS.includes(key))
+				throw new AnalysisError(
+					'config_unknown_key',
+					{ key },
+					`unknown score settings entry ${key}`
+				);
+		for (const key of SCORE_CONFIG_KEYS)
+			if (!(key in value))
+				throw new AnalysisError('config_missing', { key }, `the score settings lack ${key}`);
+		if (value.format !== SCORE_CONFIG_FORMAT)
+			throw new AnalysisError(
+				'config_format',
+				{ found: String(value.format) },
+				`format ${value.format} is not ${SCORE_CONFIG_FORMAT}`
+			);
+		if (value.schema_version !== SCORE_CONFIG_VERSION)
+			throw new AnalysisError(
+				'config_version',
+				{ found: String(value.schema_version), expected: String(SCORE_CONFIG_VERSION) },
+				`score settings version ${value.schema_version} is not ${SCORE_CONFIG_VERSION}`
+			);
+		if (value.analyser !== SCORE_CONFIG_ANALYSER)
+			throw new AnalysisError(
+				'config_analyser',
+				{ found: String(value.analyser), expected: SCORE_CONFIG_ANALYSER },
+				`score settings for ${value.analyser}, not ${SCORE_CONFIG_ANALYSER}`
+			);
+		if (!isObject(value.weights))
+			throw new AnalysisError('config_weight_type', { key: 'weights' }, 'weights is not an object');
+		const defaults = data().weights;
+		for (const id of Object.keys(value.weights))
+			if (!(id in defaults))
+				throw new AnalysisError(
+					'config_unknown_key',
+					{ key: `weights.${id}` },
+					`unknown weight ${id}`
+				);
+		const weights = {};
+		for (const id of Object.keys(defaults)) {
+			const key = `weights.${id}`;
+			if (!(id in value.weights))
+				throw new AnalysisError('config_missing', { key }, `the score settings lack ${key}`);
+			const weight = value.weights[id];
+			if (typeof weight !== 'number')
+				throw new AnalysisError('config_weight_type', { key }, `${key} is not a number`);
+			if (!Number.isFinite(weight) || weight < 0)
+				throw new AnalysisError(
+					'config_weight_range',
+					{ key, value: weight },
+					`${key} must be a finite number >= 0`
+				);
+			weights[id] = weight;
+		}
+		for (const key of ['ideal_load', 'shortcuts', 'form_weights'])
+			if (!isObject(value[key]))
+				throw new AnalysisError('config_weight_type', { key }, `${key} is not an object`);
+		return {
+			weights,
+			idealLoad: Object.assign({}, idealLoad(value.ideal_load)),
+			shortcuts: shortcuts(value.shortcuts),
+			formWeights: formFactorWeights(value.form_weights)
+		};
+	}
+
 	return {
 		METRICS,
 		ACCESS_WEIGHTS,
@@ -5900,6 +6023,8 @@ var LAYOUT_ANALYSIS = (function () {
 		effortDistribution,
 		defaultWeights,
 		accessWeights,
+		scoreConfig,
+		readScoreConfig,
 		defaultIdealLoad,
 		idealLoad,
 		defaultShortcuts,

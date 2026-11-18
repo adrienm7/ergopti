@@ -683,6 +683,22 @@
 
 <details id="la-settings" class="la-settings">
 <summary data-i18n="layout_analysis.settings.title"></summary>
+<section class="la-weights la-config" aria-labelledby="la-config-label">
+	<div class="la-heading">
+		<h2 id="la-config-label" data-i18n="layout_analysis.config.title"></h2>
+	</div>
+	<p class="la-muted" data-i18n="layout_analysis.config.help"></p>
+	<div class="la-config-actions">
+		<button id="la-config-export" type="button" data-i18n="layout_analysis.config.export"></button>
+		<label class="la-file">
+			<span class="la-file-button" data-i18n="layout_analysis.config.import"></span>
+			<input id="la-config-import" type="file" accept=".json,application/json" />
+		</label>
+		<button id="la-config-reset" type="button" data-i18n="layout_analysis.config.reset"></button>
+	</div>
+	<p id="la-config-status" class="la-muted" role="status"></p>
+</section>
+
 <section class="la-weights" aria-labelledby="la-weights-label">
 	<div class="la-heading">
 		<h2 id="la-weights-label" data-i18n="layout_analysis.weights.title"></h2>
@@ -3738,6 +3754,117 @@
 			}
 		}
 
+		// The file name a score settings export is saved under.
+		const SCORE_CONFIG_FILE = 'ergopti-score-settings.json';
+
+		/** Shows one line of the score settings status; error marks a refusal. */
+		function configStatus(text, error) {
+			const status = $('la-config-status');
+			status.className = error ? 'la-error' : 'la-muted';
+			status.textContent = text;
+		}
+
+		/** Fills every score settings control again, then analyses with them. */
+		function applyScoreSettings() {
+			fillWeights();
+			fillIdealLoad();
+			fillShortcuts();
+			fillForms();
+			save();
+			// The access weights may have changed: the layouts are typed again.
+			analyse();
+		}
+
+		/**
+		 * The score settings file: export (the host's download path in the app,
+		 * a browser download on the site), a strict import that applies a file
+		 * whole or not at all, and a reset of every setting with an « Undo ».
+		 */
+		function wireScoreConfig() {
+			const parts = ['weights', 'idealLoad', 'shortcuts', 'formWeights'];
+			$('la-config-export').addEventListener('click', async () => {
+				const text = `${JSON.stringify(
+					E.scoreConfig({
+						weights: state.weights,
+						idealLoad: state.idealLoad,
+						shortcuts: state.shortcuts,
+						formWeights: state.formWeights
+					}),
+					null,
+					'\t'
+				)}\n`;
+				if (typeof HOST.saveFile === 'function') {
+					try {
+						const where = await HOST.saveFile(SCORE_CONFIG_FILE, text);
+						configStatus(t('layout_analysis.config.exported', { path: where }), false);
+					} catch (error) {
+						configStatus(
+							t('layout_analysis.config.save_failed', {
+								code: (error && error.code) || String(error)
+							}),
+							true
+						);
+					}
+					return;
+				}
+				const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+				const link = el('a');
+				link.href = url;
+				link.download = SCORE_CONFIG_FILE;
+				document.body.append(link);
+				link.click();
+				link.remove();
+				setTimeout(() => URL.revokeObjectURL(url), 0);
+				configStatus(t('layout_analysis.config.downloaded', { name: SCORE_CONFIG_FILE }), false);
+			});
+			const input = $('la-config-import');
+			input.addEventListener('change', async () => {
+				const file = input.files && input.files[0];
+				input.value = '';
+				if (!file) return;
+				let settings;
+				try {
+					settings = E.readScoreConfig(JSON.parse(await file.text()));
+				} catch (error) {
+					// Nothing is applied: the reason says what to change in the file.
+					configStatus(
+						t('layout_analysis.config.refused', { name: file.name, reason: INFO.refusal(error) }),
+						true
+					);
+					return;
+				}
+				Object.assign(state, settings);
+				applyScoreSettings();
+				configStatus(t('layout_analysis.config.imported', { name: file.name }), false);
+			});
+			const reset = $('la-config-reset');
+			const undo = UNDO.create(reset.closest('section'));
+			$('la-config-status').before(undo.node);
+			reset.addEventListener('click', () => {
+				const before = JSON.stringify(parts.map((part) => state[part]));
+				state.weights = E.defaultWeights();
+				state.idealLoad = Object.assign({}, E.defaultIdealLoad());
+				state.shortcuts = E.defaultShortcuts();
+				state.formWeights = E.defaultFormFactorWeights();
+				applyScoreSettings();
+				configStatus('', false);
+				if (before === JSON.stringify(parts.map((part) => state[part]))) {
+					undo.clear();
+					return;
+				}
+				undo.offer({
+					name: t('layout_analysis.config.title'),
+					focus: reset,
+					undo: () => {
+						JSON.parse(before).forEach((value, i) => {
+							state[parts[i]] = value;
+						});
+						applyScoreSettings();
+					}
+				});
+			});
+		}
+
 		function fillWeights() {
 			const list = $('la-weight-list');
 			list.replaceChildren();
@@ -4214,6 +4341,7 @@
 					analyse();
 				}
 			);
+			wireScoreConfig();
 			restorer('la-restore', 'layout_analysis.weights.title', 'weights', E.defaultWeights, () => {
 				fillWeights();
 				// The access weights may change with the others: the layouts are typed again.
