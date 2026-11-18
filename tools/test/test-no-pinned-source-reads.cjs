@@ -96,7 +96,9 @@ const BASELINE = 22;
 //              takes a base name and survives a move; the count had drifted to 382.)
 //      174 → 171 (2026-11-11: the keep-awake and health-probe pause guards became
 //              behaviour tests; the count had drifted one above the baseline.)
-const READ_BASELINE = 171;
+//      173 → 170 (2026-11-18: the bundled-app entry points and the layout registry
+//              watch module are found by name; the count had drifted two above.)
+const READ_BASELINE = 170;
 
 const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirs?Concat/;
 // A quoted relative path into a driver SOURCE tree ending in .ahk, e.g.

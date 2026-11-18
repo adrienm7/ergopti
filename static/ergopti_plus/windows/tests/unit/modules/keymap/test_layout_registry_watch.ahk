@@ -182,9 +182,7 @@ _LRWT_StopBeforeBootAssignment() {
 	Dir := A_Temp . "\ergopti_lrwt_" . A_TickCount
 	DirCreate(Dir)
 	try {
-		Module := A_LineFile . "\..\..\..\..\..\modules\keymap\layout_registry_watch.ahk"
-		Loop Files Module
-			Module := A_LoopFileFullPath
+		Module := _DriverProductionFileForSymbol("LayoutRegistryWatch_Stop")
 		Out := Dir . "\out.txt"
 		Script := Dir . "\child.ahk"
 		FileAppend('#Requires AutoHotkey v2.0`n#NoTrayIcon`n#Warn All, Off`n'

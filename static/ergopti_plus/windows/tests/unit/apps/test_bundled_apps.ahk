@@ -363,10 +363,21 @@ Test("(bundled-apps-tray) starts each app in its own process and writes the Encr
 ; App Cloner and Encryptor entry including the old path: the driver logged
 ; « opened » while the app died on its missing #Include (the maintainer,
 ; 2026-11-17). /validate loads a script without running it.
+; Entries are found by base name, so a structure move cannot strand the test.
+_BAT_EntryPath(Name) {
+	Found := []
+	for Path in _DriverProductionSourceCensus().Paths {
+		SplitPath(Path, &Base)
+		if Base = Name
+			Found.Push(Path)
+	}
+	AssertEqual(1, Found.Length, "exactly one production entry point is named " . Name)
+	return Found[1]
+}
+
 _BAT_EntryPointsLoad() {
-	Windows := A_ScriptDir . "\.."
-	for Entry in ["apps\bundled_app_entry.ahk", "modules\keymap\uia_selection_worker_entry.ahk"] {
-		Path := Windows . "\" . Entry
+	for Entry in ["bundled_app_entry.ahk", "uia_selection_worker_entry.ahk"] {
+		Path := _BAT_EntryPath(Entry)
 		AssertTrue(FileExist(Path) != "", "the entry point " . Entry . " exists")
 		Output := A_Temp . "\ergopti_entry_validate_" . A_TickCount . ".txt"
 		try {
