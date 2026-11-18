@@ -240,12 +240,26 @@ k3·p3)) + ks·(ph + 0.3·pr + 0.3·pf)` with base effort per position, penalty
   (same finger 5 + 5 per centre-column key, long jumps 1 / 10 / 5, pinky-ring
   twist 10, roll reversal 20, twist 10, long-jump sandwich 3, rolls out +0.125
   and in −0.125, same hand and alternating hand over four keys 0.5). Runs reset
-  on a character outside keygen's own set; Space is the right thumb.
+  on a character outside keygen's own set; Space is the right thumb. A
+  character on two keys takes the last one keygen writes in its map: the base
+  layer, then the Shift layer, each in key order (Xpert's two `e`, the `w`
+  keygen's own Capewell repeats). The length is the file's: every character,
+  line break and tab (the break tables of `ngramsFromText`; a table without
+  them counts one break per cut).
 - **Fidelity: close.** The four-key runs are estimated from the trigrams
-  (Markov), and a text cut into runs counts one line break per cut in the
-  length. On carpalx's `books.short.txt` with keygen's own five layouts, within
-  0.3 % of an independent transcription of `penalty.rs`. Gate: hand-computed
-  (`the` 1.8333).
+  (Markov, each end independent given the middle bigram), the only
+  approximation left. Measured against keygen itself (built from 37ae949,
+  `run-ref` for its own layouts, `refine` with a layout file for ours, its
+  first printed score), on _Alice_, _Sherlock Holmes_, English Wikipedia,
+  Python code and _Germinal_ with non-ASCII characters turned into `#` (keygen
+  slices its text by character index as bytes, so it reads ASCII only; `#` is
+  outside its set and cuts the run there): its 7 layouts 0.11 % on average,
+  0.34 % at most (35 points); 10 library layouts 0.09 %, 0.32 % at most (50
+  points). Before (one break per cut, so blank lines were missing from the
+  length; the first key of a repeated character): 0.43 %, 0.93 % at most.
+  Gate: hand-computed (`the` 1.8333) and keygen's own output on short texts:
+  `The quick brown fox.` on QWERTY 2.64375, blank lines on Colemak, a run cut
+  by `[ ]` on QWERTY, `see the eel` on Xpert (its two `e`).
 
 ### genkey
 
@@ -385,18 +399,20 @@ and layout, the gap to KLAnext's numbers recorded in
 `tools/dev/analyser-reference/klanext.json`, with our library's layouts and
 with KLAnext's own layout definitions. With `--oxeylyzer=<exe>
 --oxeylyzer-data=<its data folder>` it also runs a local Oxeylyzer build on our
-corpus texts; with `--genkey=<exe> --genkey-data=<its source folder>`, a local
-genkey build. Measured on 2026-11-18:
+corpus texts; with `--genkey=<exe> --genkey-data=<its source folder>` and
+`--keygen=<exe> --keygen-data=<its source folder>`, local builds of genkey and
+keygen. Measured on 2026-11-18:
 
 | Analyser  | Points | Mean gap                                | Largest      |
 | --------- | ------ | --------------------------------------- | ------------ |
 | KLAnext   | 126    | 0.0024 (its definitions), 0.19 % (ours) | 0.005, 2.5 % |
 | Oxeylyzer | 72     | 0.0044                                  | 0.012        |
 | genkey    | 140    | 1.4 % (5.5 % before)                    | 9.9 %        |
+| keygen    | 85     | 0.11 % (its), 0.09 % (ours)             | 0.34 %       |
 
 Not re-measured against a run of the tool in this pass: cmini, a200
-(Python), carpalx (Perl), keygen (Rust) and Keyboard Layout Optimizer
-(Rust): their fidelity above rests on the earlier checks it names.
+(Python), carpalx (Perl) and Keyboard Layout Optimizer (Rust): their
+fidelity above rests on the earlier checks it names.
 
 ## Not covered
 

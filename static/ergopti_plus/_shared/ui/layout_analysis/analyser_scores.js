@@ -1015,7 +1015,14 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const model = entry('keygen').model;
 		const init = new Set(Array.from(model.init_chars));
 		const posOf = new Map(model.pos_to_code.map((code, p) => [code, p]).filter(([c]) => c));
-		const keyOf = keyOfChar(ctx.layout, model.pos_to_code.filter(Boolean), [0, 1]);
+		// keygen fills its character map with the base layer, then the Shift
+		// layer, each in key order: a character on two keys takes the last.
+		const keyOf = new Map();
+		for (const layer of [0, 1])
+			for (const code of model.pos_to_code) {
+				const cell = code && ctx.layout.rows[code] ? ctx.layout.rows[code][layer] : null;
+				if (single(cell)) keyOf.set(cell, { code, layer });
+			}
 		const keys = new Map();
 		const centre = new Set(model.center);
 		for (const [char, { code }] of keyOf) {
@@ -1149,10 +1156,15 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			if (hb === hc) p.same_hand += (0.5 * left[hb] * right[hb]) / n;
 			else p.alternating_hand += (0.5 * left[hc] * right[hb]) / n;
 		}
-		// keygen divides by the file's length, line breaks included: a text cut
-		// into R runs (characters − bigrams) had R − 1 of them.
+		// keygen divides by the file's length, line breaks and tabs included:
+		// counted in the break tables of ngramsFromText (blank lines and
+		// indentation too); a table without them, cut into R runs (characters −
+		// bigrams), had at least R − 1 of them.
+		const breaks = ctx.table.breaks;
 		const runs = ctx.table.totalChars - ctx.table.bi.reduce((sum, entry) => sum + entry[2], 0);
-		const length = ctx.table.totalChars + Math.max(0, runs - 1);
+		const length =
+			ctx.table.totalChars +
+			(breaks ? breaks.uni.reduce((sum, entry) => sum + entry[1], 0) : Math.max(0, runs - 1));
 		const parts = {};
 		let total = 0;
 		for (const [k, v] of Object.entries(p)) {

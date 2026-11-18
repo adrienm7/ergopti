@@ -326,6 +326,42 @@
 			"tolerance": 1e-9
 		},
 		{
+			"analyser": "keygen",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "The quick brown fox.",
+			"value": 2.64375,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "keygen",
+			"basis": "tool",
+			"layout": "colemak",
+			"keyboard": "ansi",
+			"text": "Wait\n\nwhat?\n",
+			"value": 0.5833333333333334,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "keygen",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "a+b=c; [x] rest",
+			"value": 0.9,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "keygen",
+			"basis": "tool",
+			"layout": "xpert",
+			"keyboard": "ansi",
+			"text": "see the eel",
+			"value": 0.6363636363636364,
+			"tolerance": 1e-9
+		},
+		{
 			"analyser": "genkey",
 			"basis": "hand",
 			"layout": "qwerty",

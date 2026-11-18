@@ -27,14 +27,19 @@
  *    on each of our texts, then `genkey rank`, in a temporary copy of its
  *    layouts, against our scorer on the same layout files (those whose finger
  *    matrix is genkey's column fingering).
- * 4. Exit status: 0 when every comparison ran, 1 when a download, a run or a
+ * 4. keygen (--keygen=<exe> --keygen-data=<its source folder>): `keygen
+ *    run-ref` for its built-in layouts (read from its src/layout.rs), and
+ *    `keygen refine` on a layout file written from each of a few library
+ *    layouts, its first printed score read and the process then stopped. The
+ *    texts go in ASCII (keygen reads nothing else), any other character as #.
+ * 5. Exit status: 0 when every comparison ran, 1 when a download, a run or a
  *    parse failed. The gaps are reported, not judged: the fidelity of each
  *    analyser is recorded in docs/design/analyser-scores.md.
  *
  * Usage:
  *   node tools/dev/verify-analyser-scores.cjs [--analyser=<id>] [--verbose]
  *        [--oxeylyzer=<exe> --oxeylyzer-data=<dir> [--oxeylyzer-config=<file>]]
- *        [--genkey=<exe> --genkey-data=<dir>]
+ *        [--genkey=<exe> --genkey-data=<dir>] [--keygen=<exe> --keygen-data=<dir>]
  * ==============================================================================
  */
 
@@ -45,7 +50,7 @@ const os = require('os');
 const path = require('path');
 const vm = require('vm');
 const https = require('https');
-const { spawnSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 
 const UI = shared('ui', 'layout_analysis');
@@ -86,6 +91,20 @@ const OXEYLYZER_TIMEOUT_MS = 600000;
 const GENKEY_TEXTS = Object.assign({}, OXEYLYZER_TEXTS, {
 	germinal: 'static/corpus/original/fr/zola_germinal.txt'
 });
+// keygen: library layouts fed to it as layout files (refine prints their score first).
+const KEYGEN_LIBRARY = [
+	'qwerty',
+	'azerty',
+	'dvorak',
+	'colemak',
+	'workman',
+	'bepo',
+	'ergopti',
+	'xpert',
+	'engram',
+	'canary'
+];
+const KEYGEN_TIMEOUT_MS = 120000;
 
 const args = process.argv.slice(2);
 const option = (name) => {
@@ -370,8 +389,132 @@ function verifyGenkey(exe, data) {
 	}
 }
 
+// ========================
+// ======= 5/ keygen ======
+// ========================
+
+/**
+ * keygen's built-in layouts (its `layout.rs`, read at run time) as library
+ * layouts on the keys of our keygen model: {NAME: layout}, without those that
+ * put a character on the left thumb, a key our model does not have.
+ */
+function keygenBuiltins(source) {
+	const codes = MODELS.keygen.model.pos_to_code;
+	const text = fs.readFileSync(source, 'utf8');
+	const layouts = {};
+	const pattern =
+		/pub static (\w+)_LAYOUT: Layout = Layout\(\s*Layer\(KeyMap\(\[([^\]]*)\]\)\),\s*Layer\(KeyMap\(\[([^\]]*)\]\)\)\);/g;
+	const escapes = { "\\'": "'", '\\0': '\0', '\\\\': '\\' };
+	const chars = (list) =>
+		Array.from(list.matchAll(/'(\\.|[^'\\])'/g), (m) => escapes[m[1]] || m[1]);
+	for (const m of text.matchAll(pattern)) {
+		const [base, shift] = [chars(m[2]), chars(m[3])];
+		if (base.length !== codes.length || shift.length !== codes.length)
+			throw new Error(`keygen ${m[1]}: ${base.length} keys, expected ${codes.length}`);
+		if (base[32] !== '\0') continue;
+		const rows = {};
+		codes.forEach((code, p) => {
+			if (code) rows[code] = [base[p], shift[p], null, null].map((c) => (c === '\0' ? null : c));
+		});
+		layouts[m[1]] = { id: m[1], name: m[1], rows, fingering: 'standard' };
+	}
+	if (Object.keys(layouts).length === 0) throw new Error(`no keygen layout in ${source}`);
+	return layouts;
+}
+
+/**
+ * A library layout as a keygen layout file (Layout::from_string: per layer,
+ * three rows of 5 + 6, 5 + 6 and 5 + 5 keys and the two thumb keys, the
+ * Shift layer 40 characters after the base one); NUL stands for no key.
+ */
+function keygenLayoutFile(layout) {
+	const codes = MODELS.keygen.model.pos_to_code;
+	const layer = (l) => {
+		const c = codes.map((code) => {
+			const cell = code && layout.rows[code] ? layout.rows[code][l] : null;
+			return typeof cell === 'string' && Array.from(cell).length === 1 ? cell : '\0';
+		});
+		const row = (from, left, right) =>
+			`${c.slice(from, from + left).join('')} ${c.slice(from + left, from + left + right).join('')}`;
+		return `${row(0, 5, 6)}\n${row(11, 5, 6)}\n${row(22, 5, 5)}${c[32]}${c[33]}\n`;
+	};
+	return layer(0) + layer(1);
+}
+
+/** keygen's first « total: …; scaled: … » line, the process killed once read. */
+function keygenFirstScore(exe, argv) {
+	return new Promise((resolve, reject) => {
+		const child = spawn(exe, argv);
+		let out = '';
+		const timer = setTimeout(() => {
+			child.kill();
+			reject(new Error(`keygen ${argv.join(' ')}: no score in ${KEYGEN_TIMEOUT_MS} ms`));
+		}, KEYGEN_TIMEOUT_MS);
+		child.stdout.on('data', (chunk) => {
+			out += chunk;
+			const m = /total: [0-9.e+-]+; scaled: (-?[0-9.e+-]+)/.exec(out);
+			if (!m) return;
+			clearTimeout(timer);
+			child.kill();
+			resolve(Number(m[1]));
+		});
+		child.on('error', reject);
+		child.on('exit', (code) => {
+			if (!/scaled:/.test(out)) {
+				clearTimeout(timer);
+				reject(new Error(`keygen ${argv.join(' ')}: exit ${code} without a score`));
+			}
+		});
+	});
+}
+
+async function verifyKeygen(exe, data) {
+	if (!fs.existsSync(exe)) throw new Error(`no keygen executable at ${exe}`);
+	const builtins = keygenBuiltins(path.join(data, 'src', 'layout.rs'));
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'keygen-'));
+	try {
+		const gaps = { builtin: [], library: [] };
+		for (const [id, file] of Object.entries(GENKEY_TEXTS)) {
+			// keygen slices its text by character index as if it were bytes: it
+			// reads ASCII only. A non-ASCII character becomes « # », outside its
+			// character set, so its run is cut there as keygen means to.
+			const text = fs.readFileSync(path.join(REPO_ROOT, file), 'utf8').replace(/\P{ASCII}/gu, '#');
+			const corpus = path.join(root, `${id}.txt`);
+			fs.writeFileSync(corpus, text);
+			const tables = E.prepareNgrams(E.ngramsFromText(text));
+			const line = [];
+			const run = spawnSync(exe, ['run-ref', corpus], { encoding: 'utf8', maxBuffer: 1 << 26 });
+			if (run.status !== 0) throw new Error(`keygen run-ref on ${id}: exit ${run.status}`);
+			for (const m of run.stdout.matchAll(/Reference: (\w+)[\s\S]*?scaled: (-?[0-9.e+-]+)/g)) {
+				if (!builtins[m[1]]) continue;
+				const ours = S.score('keygen', builtins[m[1]], tables, { keyboard: 'ansi' }).value;
+				gaps.builtin.push((100 * (ours - Number(m[2]))) / Number(m[2]));
+				line.push(`${m[1]} ${Number(m[2]).toFixed(4)}/${ours.toFixed(4)}`);
+			}
+			for (const layoutId of KEYGEN_LIBRARY) {
+				const layout = libraryLayout(layoutId);
+				const file = path.join(root, `${layoutId}.layout`);
+				fs.writeFileSync(file, keygenLayoutFile(layout));
+				const theirs = await keygenFirstScore(exe, ['refine', corpus, file]);
+				const ours = S.score('keygen', layout, tables, { keyboard: 'ansi' }).value;
+				gaps.library.push((100 * (ours - theirs)) / theirs);
+				line.push(`${layoutId} ${theirs.toFixed(4)}/${ours.toFixed(4)}`);
+			}
+			if (verbose) console.log(`  ${id.padEnd(9)} ${line.join('  ')}`);
+		}
+		console.log(
+			`keygen: its ${Object.keys(builtins).length} layouts, ${gaps.builtin.length} points, ${summary(gaps.builtin, 3, ' %')}`
+		);
+		console.log(
+			`keygen: ${KEYGEN_LIBRARY.length} library layouts, ${gaps.library.length} points, ${summary(gaps.library, 3, ' %')}`
+		);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+}
+
 // ======================
-// ======= 5/ Main ======
+// ======= 6/ Main ======
 // ======================
 
 async function main() {
@@ -390,6 +533,12 @@ async function main() {
 		const data = option('genkey-data');
 		if (exe && data) verifyGenkey(exe, data);
 		else console.log('genkey: skipped (needs --genkey=<exe> --genkey-data=<its source folder>)');
+	}
+	if (!only || only === 'keygen') {
+		const exe = option('keygen');
+		const data = option('keygen-data');
+		if (exe && data) await verifyKeygen(exe, data);
+		else console.log('keygen: skipped (needs --keygen=<exe> --keygen-data=<its source folder>)');
 	}
 }
 
