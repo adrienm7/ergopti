@@ -291,9 +291,19 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       from 195 to 141 ms with every shortcut in a later, quieter series (wall 197 to 140 ms); the whole boot stayed
       inside its noise (4.85 s elapsed both ways). Measured and left:
       the hotstring stage has no single hotspot (« Trimming per-row work in the Windows hotstring registrars » in
-      `docs/memory/rejected_proposals.md`); the `.tsv` admission is 40-65 ms warm; the AI catalogue include is 85-95
-      ms, where `api_providers.json` is decoded once (21 ms) and walked twice more for spans (20 ms over the whole
-      text, then 24-32 ms re-validating each provider's text).
+      `docs/memory/rejected_proposals.md`); the `.tsv` admission is 40-65 ms warm. Done 18 November, third pass:
+      the AI catalogue include decoded `api_providers.json` (21 ms), walked the whole text again for the providers'
+      spans (20 ms) and each provider's slice once more (24-32 ms), and each thinking_dialect was walked again on
+      top. One decode now also returns the providers' member span tree (`JsonParseWithMemberSpans`), so the text
+      is walked as one complete document per load instead of 170 times, with every refusal and its message kept
+      (`test_remote_catalog_refusals.ahk`). Same bench, 4 interleaved rounds of one warm-up and 3 boots per
+      variant, PC loaded by a WSL suite, medians of 12: the AI stage ('LLM defaults loaded') 255 to 170 ms wall
+      and 250 to 172 ms CPU, every new boot below every old one but one; a standalone QPC harness on the same
+      text, 119 to 61 ms. The whole boot stayed inside its noise (6.53 to 6.43 s). Linux decoded the same text
+      three times for two owners (the remote catalogue and both local-server catalogue loads); it now decodes
+      it once (`Json.decode_shared`), about 9 ms less (4.4 ms per LuaJIT decode under WSL). macOS decodes it once natively and once lossless, which the shape proof
+      needs, and walks no slice again. Left: `local_servers.json` is still decoded, then walked twice for spans
+      in the same include.
 - [ ] **[RELEASE] Before publishing.** On a quiet PC with no resident driver: the whole AHK suite,
       `npm run test:ahk-tray-rows-read-as-text`, every live check including `quit-over-a-log-flush`, the JS, macOS and
       Linux suites, and a Windows field report with a driver.
