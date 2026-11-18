@@ -56,7 +56,7 @@ module drifted after its campaign (the shared tap-hold file of the 2026-11-11
 decision, its migrations, writers and the Karabiner generator): its follow-up
 reviews that drift.
 
-## Shared corpus replays on macOS (PAR-58) — November 18, 2026
+## Shared corpus replays on macOS and Linux (PAR-58) — November 18, 2026
 
 **Typing sessions.** `_shared/tests/corpus/keystats/session_events_vectors.json`
 now runs on macOS through the real event tap, idle timer
@@ -78,12 +78,31 @@ already close a session on shutdown. macOS keeps its
 session state in CoreState rather than in the closure-owned
 `_shared/metrics/engine/system/session_events.lua` Linux runs, because the live
 WPM readout and the deferred synthetic snapshot read and extend those fields;
-the corpus replay is what pins the two machines together. One macOS gap the
-corpus does not cover remains: the deferred synthetic snapshot opens a session
-without writing its `session_start`.
+the corpus replay is what pins the two machines together.
+
+The deferred snapshot of synthetic text (an expansion, an AI answer) also set
+the session fields: with no session open it opened one without its
+`session_start`, so the next timeout or stop wrote a `session_end` nothing had
+opened. Windows (its hook skips injected input) and Linux (sessions come from
+evdev keys only) never show synthetic text to their session machine, and
+neither had the defect. The macOS snapshot now feeds only the live WPM; the same
+consumer replays synthetic text alone and inside a session.
+
+**Dashboard Export and Purge.**
+`_shared/tests/corpus/keystats/metrics_maintenance_vectors.json` now runs on
+macOS through the real dashboard request, ingest and writer, in a zone east of
+UTC, and its three ledgers replay in every order into stores the real writer
+opens (`tests/meta/corpus/test_corpus_keystats_metrics_maintenance.lua`). The
+replay found one defect: the writer stores a row's ts in UTC (KMD-1) but the
+Purge looked its tombstone up by the tombstone's local ts, so outside UTC a
+Purge deleted the metrics and then answered "refused". The lookup now uses the
+UTC instant the tombstone's metadata carries. The hosted runners run in UTC,
+where the two stamps coincide; the existing ingest test was red only in other
+zones.
 
 **Menu corpora.** Review of the 96 corpora of `_shared/tests/corpus/menus/` for
-the rows macOS draws. macOS now replays every corpus whose rows it draws:
+the rows macOS draws. macOS now replays every corpus whose rows it draws, and
+Linux replays the same four corpora that carry Linux rows:
 
 | Corpus                                                                    | macOS consumer                                                                                                                |
 | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -107,8 +126,17 @@ does not replay are not macOS rows:
 - `llm_complete_presentation_owners` describes manifest ownership and is read by
   the JS menu gate, not by a driver.
 
-Linux still replays neither `hotstring_extension_frames`,
-`hotstrings_parameter_frames` nor the two profile command corpora.
+Linux consumers, under `linux/tests/unit/`:
+
+- `hotstring_extension_frames`: `menu/hotstrings/test_extension_hotstrings.lua`
+  (`native_order.linux`, drawn in English as the corpus writes it, and
+  `linux_without_extensions_returns_nil`);
+- `hotstrings_parameter_frames`:
+  `modules/hotstrings/preview/test_parameter_frames.lua` (`delays.linux`,
+  `linux_delays_ms`, `preview.linux`, `parents`);
+- `profile_create_command`, `profile_clone_command`:
+  `ai/engine/settings/test_profile_settings.lua`, through the real Create and
+  Clone rows and their declarations in the manifest.
 
 ## Review status at pause — November 5, 2026
 
