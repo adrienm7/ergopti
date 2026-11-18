@@ -849,6 +849,24 @@ for (const [id, chars] of [
 	['dvorak', ['/', '?', ';', ':']]
 ])
 	for (const char of chars) check(types(id, char), `library: ${id} cannot type ${char}`);
+// Dvorak is the standard ANSI one (dvorak-ansi-2026-11-18): [ ] on the number
+// row's right, / = after L, - after S; its alphabetic block alone left them
+// where QWERTY has them.
+for (const [code, base, shift] of [
+	['Minus', '[', '{'],
+	['Equal', ']', '}'],
+	['BracketLeft', '/', '?'],
+	['BracketRight', '=', '+'],
+	['Quote', '-', '_'],
+	['KeyQ', "'", '"'],
+	['KeyZ', ';', ':']
+]) {
+	const row = byId.get('dvorak').rows[code];
+	check(
+		row[0] === base && row[1] === shift,
+		`library: Dvorak's ${code} is ${row[0]} ${row[1]}, the ANSI Dvorak's ${base} ${shift}`
+	);
+}
 // Credits: a registry layout from its meta.toml, another from layout_credits.json.
 check(
 	byId.get('bepo').authors[0] === 'bépo community (bepo.fr)',

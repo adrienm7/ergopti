@@ -175,11 +175,12 @@ key size)` per axis, lateral ×2.0, vertical pinky 1.6 / ring 1.3 / middle 1.1
   KLAnext's output on hand-made texts; on 14 presets × 9 layouts (126 points:
   prose, chained English, « Proglish » and code bigrams, pangrams, Spanish
   UDHR), every column is within 0.005 of the site's 2-decimal number once the
-  keys KLAnext's own layout files place differently are applied (its Dvorak
-  is the ANSI one, its Capewell, UCIEA and MTGAP put brackets and a few signs
-  on other keys, its Workman swaps `;` and `'`; listed in the reference file).
-  With our library's layouts as they are, the Overall gap is 0.19 % on
-  average, 2.5 % at most (code presets on those five layouts). Before this
+  keys KLAnext's own layout files place differently are applied (its
+  Capewell, UCIEA and MTGAP put brackets and a few signs on other keys, its
+  Workman swaps `;` and `'`; listed in the reference file). With our
+  library's layouts as they are, the Overall gap is 0.18 % on average, 2.5 %
+  at most (code presets on those four layouts; our Dvorak is the ANSI one
+  since 2026-11-18, 0.19 % on average before). Before this
   reconstruction (bigram denominators, a linear Same Hand fitted on two
   rows, no Enter repeats): 4.96 % on average, 10.9 % at most. Gate: 11 of
   KLAnext's own values on short texts (Enter repeats, Tab, Shift, Space
@@ -460,7 +461,7 @@ Optimizer (KLO in the table). Measured on 2026-11-18:
 
 | Analyser  | Points | Mean gap                                | Largest      |
 | --------- | ------ | --------------------------------------- | ------------ |
-| KLAnext   | 126    | 0.0024 (its definitions), 0.19 % (ours) | 0.005, 2.5 % |
+| KLAnext   | 126    | 0.0024 (its definitions), 0.18 % (ours) | 0.005, 2.5 % |
 | Oxeylyzer | 72     | 0.0044                                  | 0.012        |
 | genkey    | 140    | 1.4 % (5.5 % before)                    | 9.9 %        |
 | keygen    | 85     | 0.11 % (its), 0.09 % (ours)             | 0.34 %       |

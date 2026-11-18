@@ -705,7 +705,12 @@
 				"KeyM": "m",
 				"Comma": "w",
 				"Period": "v",
-				"Slash": "z"
+				"Slash": "z",
+				"Minus": "[",
+				"Equal": "]",
+				"BracketLeft": "/",
+				"BracketRight": "=",
+				"Quote": "-"
 			}
 		},
 		{

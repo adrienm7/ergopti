@@ -26,18 +26,6 @@
 			["IntlBackslash", 0, null],
 			["IntlBackslash", 1, null]
 		],
-		"dvorak": [
-			["Minus", 0, "["],
-			["Minus", 1, "{"],
-			["Equal", 0, "]"],
-			["Equal", 1, "}"],
-			["Quote", 0, "-"],
-			["Quote", 1, "_"],
-			["BracketLeft", 0, "/"],
-			["BracketLeft", 1, "?"],
-			["BracketRight", 0, "="],
-			["BracketRight", 1, "+"]
-		],
 		"mtgap30": [
 			["KeyG", 1, ";"],
 			["KeyC", 1, "<"],
