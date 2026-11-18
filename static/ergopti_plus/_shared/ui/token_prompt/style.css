@@ -45,8 +45,9 @@ h2 {
 	padding: 10px 12px;
 }
 
+/* Small text: grey-aaa keeps 4.5:1 on the window (WCAG 1.4.3). */
 #link-section {
-	color: var(--theme-grey-888);
+	color: var(--theme-grey-aaa);
 	font-size: 12px;
 	margin-bottom: 18px;
 	text-align: center;
