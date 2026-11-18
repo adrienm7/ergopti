@@ -1625,8 +1625,10 @@ _TooltipMixTintHex(AccentHex) {
 		MinC := Min(R, G, B)
 		Delta := MaxC - MinC
 
-		; Achromatic accent (gray/white/black) — no hue to carry, mirror JS fallback
-		if (Delta <= 0.0001) {
+		; Achromatic accent (gray/white/black) — no hue to carry, mirror JS fallback:
+		; under ACHROMATIC_CHROMA of tint.js the imposed saturation would turn a
+		; faint tint (the palette's grey #6e6e73) into a saturated navy.
+		if (Delta < 0.05) {
 				return _TOOLTIP_DEFAULT_BG_HEX
 		}
 

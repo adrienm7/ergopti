@@ -17,15 +17,17 @@
 --- WHY AN ACHROMATIC ACCENT FALLS BACK:
 --- Grey has no hue. Running it through the conversion produces a hue of zero,
 --- which is red — so a category with a neutral accent would get a red panel.
+--- A near grey is no better: the imposed saturation turned the palette's grey
+--- (#6e6e73, a faint blue) into a navy panel the indigo one hid.
 --- The reference implementation (mixTint in tint.js) checks the same delta.
 --- ==============================================================================
 
 local M = {}
 
--- Below this chroma the colour has no meaningful hue and the conversion would
--- invent one. Matches the JS reference exactly, because the two are pinned to
--- the same vectors.
-local ACHROMATIC_DELTA = 0.0001
+-- Below this chroma (13 of 255) the colour has no meaningful hue and the
+-- conversion would invent one. Matches ACHROMATIC_CHROMA of the JS reference
+-- exactly, because the two are pinned to the same vectors.
+local ACHROMATIC_DELTA = 0.05
 
 
 

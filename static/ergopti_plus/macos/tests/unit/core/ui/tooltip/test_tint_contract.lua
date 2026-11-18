@@ -144,6 +144,12 @@ local TINT_VECTORS = {
 		expected_hex = "#242424",
 	},
 	{
+		id           = "near_gray",
+		description  = "The palette grey (#6E6E73, a faint blue) → default dark background, not navy.",
+		accent_hex   = "#6E6E73",
+		expected_hex = "#242424",
+	},
+	{
 		id           = "no_accent",
 		description  = "Nil accent → falls back to default dark background.",
 		accent_hex   = nil,

@@ -47,6 +47,8 @@ _GetTintVectors() {
 	Vectors.Push({ Id: "purple_accent", AccentHex: "#AE61FF", ExpectedHex: "20053D" })
 	Vectors.Push({ Id: "yellow_accent", AccentHex: "#FFCC00", ExpectedHex: "3D3205" })
 	Vectors.Push({ Id: "achromatic",    AccentHex: "#808080", ExpectedHex: "242424" })
+	; The palette grey is a faint blue: it read as navy, like the indigo (a11y-cvd-2026-11-18).
+	Vectors.Push({ Id: "near_gray",     AccentHex: "#6E6E73", ExpectedHex: "242424" })
 	; no_accent: empty string triggers the fallback to _TOOLTIP_DEFAULT_BG_HEX
 	Vectors.Push({ Id: "no_accent",     AccentHex: "",        ExpectedHex: "242424" })
 	return Vectors
