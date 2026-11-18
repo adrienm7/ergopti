@@ -129,7 +129,14 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       on open, Tab walks every control. 4. With the screen reader on (Super+Alt+S, so
       `org.gnome.desktop.a11y.applications screen-reader-enabled` is true): a hotstring preview and an AI
       prediction are spoken when they appear (the window is an AT-SPI notification named by its rows; check
-      Accerciser if Orca stays silent), within five seconds of turning it on; off, nothing is spoken. The WPM
-      widget and the spotlight overlay are still read as nothing. 5. GNOME high contrast
+      Accerciser if Orca stays silent), within five seconds of turning it on; off, nothing is spoken. With the
+      screen reader on, the spotlight shortcut makes Orca say « Pointeur de la souris mis en évidence » once per
+      press (the ring window is a notification; the crosses on other monitors say nothing), and Accerciser shows
+      the WPM widget's window named by its speed (« 72 MPM »), renamed when the speed changes, with nothing
+      spoken; off, both stay unnamed. 5. GNOME high contrast
       (`org.gnome.desktop.a11y.interface high-contrast`): the previews turn opaque within five seconds; note what
-      should follow « Reduce animation » and « Large text » (read, not applied yet).
+      should follow « Reduce animation ». 6. « Large text » (`gsettings set org.gnome.desktop.interface
+      text-scaling-factor 1.5`, X11 and Wayland): within five seconds the hotstring and AI previews draw their
+      text 1.5 times larger and the panel grows with it; the GTK dialogs (text entry, list) follow at once
+      through GTK itself; check whether the Studio and the other WebKit windows follow too (not handled by the
+      driver); the WPM pill keeps its size, as on Windows.

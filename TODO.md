@@ -123,10 +123,10 @@ baseline as violations go.
       ([table](docs/audits/accessibility/README.md#native-ergopti-ui-code-audit-2026-11-17)) are in on the three OS
       (tray / menu-bar names with the pause, labels and named controls, tooltips under high contrast, previews told
       to a running screen reader); on Windows the native windows' fonts follow the text size, and the WPM widget
-      and the Spotlight overlay reach a running screen reader (fourth pass). Left: the GNOME text scale; the WPM
-      widgets and the spotlight overlay on macOS and Linux, and `hs.alert` banners, still invisible to screen
-      readers; the Swift update panel's XCTest, not yet run in CI. The spoken results are the « Accessibility »
-      items of the three TODO-tests files.
+      and the Spotlight overlay reach a running screen reader (fourth pass); on macOS and Linux the WPM widgets,
+      the spotlight overlay and the `hs.alert` banners reach a running screen reader, and the Linux previews
+      follow the GNOME text scale (fifth pass). Left: the Swift update panel's XCTest, not yet run in CI. The
+      spoken results are the « Accessibility » items of the three TODO-tests files.
 - [ ] **Languages.** `lang` on foreign passages across the rest of the site (English names, quotes); decide whether
       the accessibility texts get the 21 locales.
 

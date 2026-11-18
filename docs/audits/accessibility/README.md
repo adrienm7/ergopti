@@ -260,10 +260,10 @@ app's WebViews do not keep across restarts.
 | macOS   | `menu/ui/init.lua`                                                                                      | the menu-bar item is an image with no title or tooltip                         | done: tooltip « Ergopti+ » / « Ergopti+ (paused) », 21 locales      |
 | macOS   | `menu/ui/builder/canvas_badge.lua`                                                                      | the first menu row is an untitled canvas image                                 | done: the pill's text is its tooltip                                |
 | macOS   | `launcher/Sources/ErgoptiPlus/UpdatePromptPanel.swift`                                                  | unlabelled progress bar                                                        | done: named by its step, each new step announced                    |
-| macOS   | `core/ui/ui/tooltip/renderer.lua`, `ui/wpm/wpm_widget.lua`                                              | `hs.canvas` is invisible to VoiceOver                                          | previews spoken while VoiceOver runs; WPM widget open               |
+| macOS   | `core/ui/ui/tooltip/renderer.lua`, `ui/wpm/wpm_widget.lua`                                              | `hs.canvas` is invisible to VoiceOver                                          | done: previews, spotlight, WPM bursts, banners spoken by VoiceOver  |
 | Linux   | `tray/adapters/appindicator.lua`                                                                        | empty accessible description; paused told by the icon only                     | done: the icon's description, paused or not, 21 locales             |
 | Linux   | `core/ui/ui/dialog_host.lua`                                                                            | caption not bound to its entry or list; empty window title fallback            | done: caption bound to its field; « Ergopti+ » as fallback          |
-| Linux   | `core/ui/adapters/graphics_renderer.lua`, `wpm_surface.lua`, `spotlight_overlay.lua`                    | cairo-drawn, no text for AT-SPI                                                | previews named (notification with Orca); WPM, spotlight open        |
+| Linux   | `core/ui/adapters/graphics_renderer.lua`, `wpm_surface.lua`, `spotlight_overlay.lua`                    | cairo-drawn, no text for AT-SPI                                                | done: previews, spotlight (Orca notification), WPM window named     |
 
 Third pass on macOS and Linux (2026-11-17): the rows marked « done » above,
 and the system settings the previews follow. macOS reads Reduce transparency
@@ -276,9 +276,9 @@ background `gsettings` children every five seconds (never on the keystroke
 path): high contrast makes the previews opaque and, with the screen reader on,
 the preview window is an AT-SPI notification Orca speaks, a tooltip otherwise.
 Announcements follow the screen reader's state, with no setting of their own
-(decided on 2026-11-17, to review by the maintainer). Still open: the WPM
-widgets and the spotlight overlay, the GNOME text scale (not read yet),
-`hs.alert` banners; Reduce motion is read, but no native preview animates.
+(decided on 2026-11-17, to review by the maintainer). The WPM widgets, the
+spotlight overlay, the `hs.alert` banners and the GNOME text scale followed in
+the fifth pass below; Reduce motion is read, but no native preview animates.
 
 The screen-reader checks only a real machine can answer are in
 TODO-tests-windows.md, TODO-tests-macos.md and TODO-tests-linux.md
@@ -461,6 +461,45 @@ in a WebView2 that Tab does not enter (« Open on GitHub » shows them); WebView
 when Tab leaves its last element. Not walked: the magic key captures (their
 input hook takes the next key by design and says Escape cancels), the
 system MsgBox and InputBox, and the WebView2-only windows.
+
+## Fifth pass, macOS and Linux drawn surfaces (2026-11-18, Paris time)
+
+A code pass with unit tests only; the spoken results are the « Accessibility »
+items of TODO-tests-macos.md and TODO-tests-linux.md.
+
+- **macOS mechanism.** Hammerspoon has no NSAccessibilityPostNotification:
+  `hs.axuielement` reads and observes other applications' elements and posts
+  nothing, and an `hs.canvas` or `hs.alert` window has no accessibility
+  element to name. Every drawn surface therefore speaks through VoiceOver's
+  AppleScript `output`, the route the previews already took
+  (`core/ui/adapters/system_accessibility.lua`). `announce_event` says one
+  user-caused event while VoiceOver runs, and leaves the previews' repeat
+  suppression as it was.
+- **macOS surfaces.** The spotlight (and a screen teleport) says « Mouse
+  pointer highlighted » once it is fully up; the keep-awake on and off banners
+  are said when they are really shown; the WPM widget, which a canvas cannot
+  name as Windows names its window, says the burst's last speed once when it
+  hides, never per refresh, not for a burst at zero, not on a stop or a pause.
+- **Linux surfaces.** While `screen-reader-enabled` is on, the spotlight ring
+  window is an AT-SPI notification named « Mouse pointer highlighted », which
+  Orca speaks when it is mapped (the crosses say nothing), and the WPM window
+  is named by the speed it draws, renamed only when it changes, with nothing
+  spoken, as on Windows. Off, neither window is touched. The settings reading
+  starts with the first drawn surface that binds GTK, not only the preview.
+- **GNOME text scale.** `org.gnome.desktop.interface text-scaling-factor` is
+  read with the other settings (background `gsettings`, 0.5 to 3): GTK
+  applies it to its own widgets and the dialogs, and the cairo previews, which
+  set their Pango sizes themselves, now multiply every font size by it, as the
+  Windows tooltips follow « Make text bigger ». The WPM pill keeps the canon's
+  fixed geometry on every OS.
+
+Tests (slugs `a11y-macos-event`, `a11y-macos-spotlight`, `a11y-macos-alert`,
+`a11y-macos-wpm`, `a11y-linux-drawn`, `a11y-linux-text-scale`): macOS
+`tests/unit/core/ui/test_system_accessibility.lua`,
+`tests/unit/modules/shortcuts/system_actions/test_system_mouse_pause_ownership.lua`,
+`test_keep_awake.lua`, `tests/unit/ui/wpm/test_wpm_widget_voiceover.lua`;
+Linux `tests/unit/core/ui/test_system_accessibility.lua` and
+`test_drawn_surfaces_for_atspi.lua`.
 
 ## What remains
 

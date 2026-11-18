@@ -215,8 +215,10 @@ Hands needed:
       new step. 3. With VoiceOver on and VoiceOver Utility > General > « Allow VoiceOver to be controlled with
       AppleScript » checked: a hotstring preview and an AI prediction are spoken once each in VO's voice (the
       struck-through alternatives are not), nothing is spoken with VoiceOver off, and with the box unchecked a
-      single warning reaches the log; the WPM widget stays silent. 4. The keep-awake banner (`hs.alert`): read or
-      not. 5. System Settings > Accessibility > Display: with Increase contrast or Reduce transparency on, the
+      single warning reaches the log. 4. Same VoiceOver set-up: the mouse spotlight shortcut (and a screen
+      teleport) says « Pointeur de la souris mis en évidence » once per press; toggling keep-awake says its on
+      and off banners once each; with the WPM widget on, a typing burst says its last speed (« 72 MPM ») once
+      when the widget hides, nothing while typing; with VoiceOver off none of them speaks. 5. System Settings > Accessibility > Display: with Increase contrast or Reduce transparency on, the
       hotstring and AI previews are opaque within a second; note what else should follow Reduce motion.
 - [ ] <!-- field-point: owned_runtime_wp9 --> Owned Karabiner runtime, the WP9 pass
       ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
