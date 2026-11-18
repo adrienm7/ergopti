@@ -77,6 +77,7 @@ const REGISTRY = path.join(
 	'keycodes',
 	'physical_keys.json'
 );
+const KEYBOARD_FORMS = path.join(path.dirname(REGISTRY), 'keyboard_forms.json');
 
 // AutoHotkey spellings of the registry's `ahk_send` names (Keys.htm of the
 // shipped help), lowercased: alias -> registry name.
@@ -568,7 +569,29 @@ if (altGrRegistrations < 3)
 const characters = characterKeys();
 if (characters.size < 40)
 	errors.push(`the registry names only ${characters.size} character key(s)`);
+// The JIS and ABNT keys (IntlYen, IntlRo, the input-method keys, the keypad
+// comma) have no place on the ISO board: no static hotkey or AltGr row names
+// them, the emulated layer takes the character ones by a computed scan code
+// and leaves the input-method ones to the IME. The character rule below stays
+// conservative for them (it flags a hook hotkey naming a character whatever
+// key types it), so only a key a keyboard form adds is spared, and only while
+// the registry gives it no ISO place.
+const formOnly = new Set();
+{
+	const registry = JSON.parse(fs.readFileSync(REGISTRY, 'utf8'));
+	const forms = JSON.parse(fs.readFileSync(KEYBOARD_FORMS, 'utf8')).forms;
+	for (const form of Object.values(forms))
+		for (const code of Object.keys(form.keys)) {
+			const geometry = registry.keys[code]?.geometry;
+			if (geometry && Object.keys(geometry).length === 0) formOnly.add(code);
+		}
+	if (formOnly.size !== 6)
+		errors.push(
+			`the keyboard forms add ${formOnly.size} key(s) without an ISO place, expected the six JIS and ABNT keys`
+		);
+}
 for (const [sc, code] of characters) {
+	if (formOnly.has(code)) continue;
 	if (!altGr.has(sc) && !scanCodes.has(sc))
 		errors.push(
 			`the character key ${code} (${sc}) is no longer declared by scan code: the character rule ` +
