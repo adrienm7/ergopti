@@ -1078,6 +1078,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/platform/remap/key_combinations/test_key_combination_chord_policy.ahk
 #Include unit/platform/remap/key_combinations/test_key_combination_chord_engine.ahk
 #Include unit/gestures/engine/test_cycle_candidates.ahk
+#Include unit/gestures/engine/test_foreground_order_pause.ahk
 #Include unit/gestures/engine/test_recommended_actions.ahk
 #Include unit/settings/engine/persistence/test_transactions.ahk
 #Include unit/settings/engine/persistence/test_suspend_marker_handoff.ahk
@@ -1921,7 +1922,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/ui/webview/test_temp_dir_and_com_leak_on_reload.ahk
 #Include meta/modules/hotstrings/engine/test_win_l_lock_resets_context.ahk
 #Include meta/core/network/test_winhttp_no_abort_on_poll_timeout.ahk
-#Include meta/gestures/test_winorder_unbounded_and_cross_thread.ahk
 #Include meta/ui/wpm/test_wpm_push_unguarded_debug_arg_build.ahk
 #Include meta/ui/wpm/test_wpm_config_position_pair_validation.ahk
 #Include meta/ui/wpm/test_wpm_tray_readout_wiring.ahk
