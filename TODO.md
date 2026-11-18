@@ -55,6 +55,13 @@ every maintainer request here.
       `toml.flat_values` was raised to 1500/2600 on 2026-11-17 to unblock CI. Replace exact operation counts and
       similar magic thresholds (boot operation ceilings, literal ratchets where they only count) with budgets that
       mean something (time, order of magnitude, or a named single source), one ratchet at a time.
+      Done 2026-11-18: `toml.flat_values`, `toml.document_parse` and `toml.document_slow_steps` left the startup
+      smoke. It now names the owners allowed to re-parse a text the boot already parsed
+      (`BOOT_PARSE_REPEAT_OWNERS`), and a lexer test proves slow steps do not grow with run length. Left:
+      `config.snapshot_read` and `config_migrate.registry_deep_compares` (read counts, not data-sized; give them
+      the same repeat treatment), and the three « debt » owners of that list (personal-file activation,
+      terminator records, LLM privacy snapshot), which could read the admitted boot snapshot instead of
+      re-parsing config.toml. Then the other count ratchets in the unit tests.
 - [ ] **Intermittent tests to redo on a quiet PC** (the agent was stopped because the PC was overloaded): the
       « [CI] Intermittent fixtures » item below plus healthcheck collection, SendInstant, Ollama native,
       `groups247-*` order dependence, native clipboard/picker, WebView picker cleanup, `idle-caret-context`,

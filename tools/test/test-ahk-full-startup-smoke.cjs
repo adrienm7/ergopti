@@ -197,77 +197,60 @@ function hotstringsRenderTimes(configRoot) {
 
 // boot-operation-budget-2026-11-03: the boot's counted operations, read from the
 // driver's own first counter record. Wall time on a shared runner is too noisy
-// to gate, but each of these counts is deterministic for a fixture and named a
-// measured cost of the maintainer's 8-10 s boot: every snapshot read compared
-// the whole config.toml snapshot twice, the document lexer classified quoted
-// text one character at a time, and personal-file metadata decoded every
-// hotstring row. Lowering a ceiling is welcome; raising one needs the measured
-// reason in the commit.
-// Raised on 2026-11-07, measured per owner (the boot log's "Document parses by
-// owner" record): ad8268b7da reads personal_info.toml through the typed
-// document parser, which keeps its exact values, where the flat reader that
-// the parse counter does not see used to read it (+1 parse); 424b4a26d8's
-// boot-tail proof of the served config snapshot costs one registry compare
-// (+1). An absent hotstring override file, parsed as an empty document on
-// every boot since 3e25e5d71c, no longer is. Against the 2026-11-04 counts
-// (be1d107b6a), every fixture moved by the same amounts, so no hotstring owner
-// is involved: the typed personal_info.toml parse adds 118 slow lexer steps
-// (suspend-marker 391 -> 509, realistic 13420 -> 13538), and the settings
-// added to the generated config template since then add 4 flat values
-// (realistic 1197 -> 1201). neutral-defaults seeds the whole generated
-// template, which 8f859044ea grew by the two WPM notification-area settings,
-// and its boot parses that config.toml eight times: 11943 -> 12109 slow
-// steps (118 personal_info + 48) and 2179 -> 2191 flat values.
-// Raised on 2026-11-12, measured on a local run and CI run 43159682408:
-// 7aff0236dd put the eight [gestures.modes] strings and eight
-// [gestures.sensitivities] numbers into the generated template. One parse of
-// the template went from 975 to 1029 slow lexer steps; the realistic boot,
-// whose CI parse count varies by one, counted 13567 locally and 13582 on CI
-// (13538 -> 13582). neutral-defaults seeds that template: its flat reads grew
-// 2191 -> 2248, and CI run 43172671159 parsed it once more than the local
-// run (15 document parses, not 14), one more 1029-step template parse:
-// 11807 locally, 12841 on CI (12109 -> 12841).
-// Raised on 2026-11-12 (evening), measured on two CI runs of different branches:
-// neutral-defaults counted 2250 flat values (2248 -> 2250) with the same 15
-// parses and 12841 slow steps both on claude/ergopti-todo-windows-ahk (run
-// 43274338951) and on claude/ergopti-todo-ci-acceptance-3 (run 43275759107),
-// which shares only the dev base and carries no TOML or config change. The two
-// values come from the dev base the boot seeds (its generated config template),
-// not from either branch; every other fixture and counter is unchanged.
-// Raised on 2026-11-13, measured on dev runs 43306862276 and 43457158223:
-// every boot reads 17 more flat values (fresh-config 1162 -> 1179, realistic
-// 1195 -> 1212) and 27 fewer slow lexer steps, the same for each fixture. The
-// tap-hold loader now reads _shared/tap_hold/data/shared_file.toml at its
-// include position for the Mac thumb positions (f94137f677) and the macOS-only
-// modifiers (11 values, parsed once and cached), the config migrations gained
-// the schema v22 import_companion step (5 values, 2187982b36), and the timing
-// registry gained tap_hold.max_activation_ms (1 value, 86e59b8dfd). The
-// neutral-defaults boot reads the same documents and seeds the generated
-// template, which gained [tap_holds] sticky_timeout_ms (c81728c4fa): measured
-// 2250 -> 2271 on run 43514634523, its slow steps 12841 -> 12838.
-// Raised on 2026-11-16, measured on dev runs 43923292049 and 43932070178:
-// every boot reads one more flat value (fresh-config 1179 -> 1180, realistic
-// 1212 -> 1213). TimingsLoadShared parses the whole timing registry, which
-// gained [ui] paused_refusal_repeat_ms (353f777c1f) and [adapters]
-// wayland_keymap_dump_timeout_ms (b69e9542de) and lost [ui]
-// gnome_input_source_settle_ms (097abc914d): net +1, the same for each fixture.
-// Raised on 2026-11-17, measured on verify run 44012261707 against dev run
-// 43959165676: every boot reads seven more flat values (fresh-config 1180 ->
-// 1187, realistic 1213 -> 1220), the same for each of the 15 fixtures that ran.
-// The whole-file reads gained [typing_burst] in the WPM canon (5 lists,
-// e4343af912 and 3181451c68), [gestures] touchpad_rescan_ms in the timing
-// registry (d6375159c8) and [llm_ui] delay_category in the tooltip constants
-// (bb95e3dc72). neutral-defaults reads the same files once: 2268 -> 2275.
-// Raised on 2026-11-17 by the maintainer to leave headroom (realistic 1220 ->
-// 1500, all 2275 -> 2600): every new shared constant moved this count by one
-// and blocked CI. It still catches an order-of-magnitude regression; replacing
-// these exact-count ceilings with a meaningful budget is a TODO.md item.
+// to gate, but each count is deterministic for a fixture. Two ceilings remain
+// counts: every snapshot read compared the whole config.toml snapshot twice, and
+// registry comparisons multiplied with the boot's readers. Both count reads, not
+// data, so a new setting does not move them; tests/unit/settings/engine/migration
+// test_journal_boot.ahk proves the sharing structurally. The data-sized counts
+// (toml.flat_values, toml.document_parse, toml.document_slow_steps) are judged by
+// BOOT_PARSE_REPEAT_OWNERS and the lexer's run-length test instead.
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },
-	'toml.document_parse': { all: 15, [REALISTIC_HOTSTRINGS_FIXTURE]: 18 },
-	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
-	'toml.document_slow_steps': { all: 12841, [REALISTIC_HOTSTRINGS_FIXTURE]: 13582 },
-	'toml.flat_values': { all: 2600, [REALISTIC_HOTSTRINGS_FIXTURE]: 1500 }
+	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 }
+};
+
+// boot-parse-repeats-2026-11-18: the owners allowed to parse a text the boot had
+// already parsed, by reader, as "caller<parent" (the driver's Error().What
+// frames). This replaces the toml.flat_values, toml.document_parse and
+// toml.document_slow_steps ceilings: their counts moved with every shared
+// constant and template setting, while the cost they bounded is a reader that
+// parses again what the boot already parsed (each personal hotstrings file four
+// times, perf-personal-metadata-2026-10-17). A new repeat fails whatever the size
+// of the data, and so does an owner below that no boot repeats any more: remove
+// it. "Proof" owners must parse their own genuine read; "debt" owners could reuse
+// an earlier parse and are listed in TODO.md to be retired.
+const SEEN_REPEAT_OWNERS = new Set();
+const BOOT_PARSE_REPEAT_OWNERS = {
+	Document: {
+		'ConfigMigrateRun<Func.Prototype.Call':
+			'proof: the migration owner classifies the version of its own physical read',
+		'ConfigMigratePlan<ConfigMigrateRun':
+			'proof: the planner parses the exact bytes it backs up and migrates',
+		'_ConfigMigrateVariantSourceWitness<ConfigMigratePlan':
+			'proof: the variant move witnesses the semantic owner of the planned source',
+		'_ConfigMigrateVariantBootRefusal<Func.Prototype.Call':
+			'proof: a refused or finished migration rereads the file it left',
+		'Func.Prototype.Call<ClassifyImage':
+			'proof: the migration journal classifies each genuine image it admits',
+		'Func.Prototype.Call<ConfigMigrateBoot':
+			'proof: the boot journal classifies the too-old image it refuses',
+		'ConfigTomlDecodeSnapshot<ConfigTomlReadSnapshot':
+			'proof: the served snapshot is decoded apart from its private shadow',
+		'ConfigTomlDecodeSnapshot<Func.Prototype.Call':
+			'proof: the private shadow the served snapshot is compared against',
+		'ConfigTomlDecodeSnapshot<PersonalFileControls.Refresh':
+			'debt: the personal-file activation could read the admitted boot snapshot',
+		'HotstringsTerminatorRecordsInit<HotstringsTerminatorRecordsInitBoot':
+			'debt: the terminator records could read the admitted snapshot document',
+		'TOML_ParseDocumentShared<_LLM_Menu_PrivacySnapshot':
+			'debt: the shared document cache misses because no earlier boot reader fills it'
+	},
+	Flat: {
+		'_ConfigMigrateParse<ConfigMigrateRun':
+			'proof: the version check compares a second read against the first',
+		'_ConfigMigrateParse<ConfigMigratePlan':
+			'proof: the planner parses the exact bytes it backs up and migrates'
+	}
 };
 
 /**
@@ -311,6 +294,66 @@ function bootOperationProblem(fixture, configRoot) {
 		}
 	}
 	return '';
+}
+
+/**
+ * Every boot's repeated parses, read from the driver's first re-parse records:
+ * one entry per reader and owner that parsed a text its reader had already
+ * parsed in that boot.
+ * @param {string} configRoot
+ * @returns {Array<{reader: string, owner: string, count: number}>}
+ */
+function bootParseRepeats(configRoot) {
+	const repeats = [];
+	for (const match of logText(configRoot).matchAll(
+		/\[Perf\] (Document|Flat) re-parses by owner \(0 ms\): ([^\n]*)/g
+	))
+		for (const pair of match[2].replace(/\.\s*$/, '').split(' ')) {
+			const [owner, count] = pair.split('=');
+			repeats.push({ reader: match[1], owner, count: Number(count) });
+		}
+	return repeats;
+}
+
+/**
+ * Whether every repeated boot parse belongs to an owner named in
+ * BOOT_PARSE_REPEAT_OWNERS.
+ * @param {string} fixture
+ * @param {string} configRoot
+ * @returns {string} The first unnamed repeat, or '' when there is none.
+ */
+function bootParseRepeatProblem(fixture, configRoot) {
+	const repeats = bootParseRepeats(configRoot);
+	console.log(
+		`${fixture} boot re-parses: ${repeats.map(({ reader, owner, count }) => `${reader}:${owner}=${count}`).join(' ') || 'none'}`
+	);
+	for (const { reader, owner } of repeats) SEEN_REPEAT_OWNERS.add(`${reader}:${owner}`);
+	const unnamed = repeats.find(({ reader, owner }) => !BOOT_PARSE_REPEAT_OWNERS[reader][owner]);
+	if (unnamed)
+		return (
+			`the boot's ${unnamed.reader.toLowerCase()} reader parsed ${unnamed.count} text(s) it had already ` +
+			`parsed, again for ${unnamed.owner}: reuse the first parse (a cached read, a shared snapshot), ` +
+			'or name this owner and its reason in BOOT_PARSE_REPEAT_OWNERS'
+		);
+	// A named owner repeats one parse of the boot's image, the one its reason
+	// names; a second one is the owner parsing its own text again.
+	const doubled = repeats.find(({ count }) => count > 1);
+	if (doubled)
+		return `${doubled.owner} parsed the same ${doubled.reader.toLowerCase()} text ${doubled.count + 1} times in one boot: ${BOOT_PARSE_REPEAT_OWNERS[doubled.reader][doubled.owner]}, once`;
+	return '';
+}
+
+/**
+ * The named repeat owners no boot of this run used: a retired repeat whose name
+ * must leave BOOT_PARSE_REPEAT_OWNERS, so the list only ever shrinks.
+ * @returns {string[]}
+ */
+function staleRepeatOwners() {
+	return Object.entries(BOOT_PARSE_REPEAT_OWNERS).flatMap(([reader, owners]) =>
+		Object.keys(owners)
+			.filter((owner) => !SEEN_REPEAT_OWNERS.has(`${reader}:${owner}`))
+			.map((owner) => `${reader}:${owner}`)
+	);
 }
 
 // These fields are foreign data after the dedicated Metrics bindings retired.
@@ -922,6 +965,8 @@ async function main() {
 				return fail(`${fixture}: no real Hotstrings submenu render was logged`);
 			const operations = bootOperationProblem(fixture, configRoot);
 			if (operations) return fail(`${fixture}: ${operations}`);
+			const repeats = bootParseRepeatProblem(fixture, configRoot);
+			if (repeats) return fail(`${fixture}: ${repeats}`);
 			const slowest = Math.max(0, ...renders);
 			if (slowest > HOTSTRINGS_RENDER_BUDGET_MS)
 				return fail(
@@ -971,8 +1016,15 @@ async function main() {
 				if (reloaded !== null) return reloaded;
 				const warmOperations = bootOperationProblem(`${fixture}/warm`, configRoot);
 				if (warmOperations) return fail(`${fixture}/warm: ${warmOperations}`);
+				const warmRepeats = bootParseRepeatProblem(`${fixture}/warm`, configRoot);
+				if (warmRepeats) return fail(`${fixture}/warm: ${warmRepeats}`);
 			}
 		}
+		const stale = staleRepeatOwners();
+		if (stale.length > 0)
+			return fail(
+				`no boot repeats a parse for ${stale.join(', ')} any more: remove it from BOOT_PARSE_REPEAT_OWNERS`
+			);
 		console.log(
 			'\x1b[32m[OK] full AHK startup smoke: fresh, reloaded, independent, suspend-marker, extension opt-in, ' +
 				'script-chord, literal-config-types, retired-Metrics, realistic-hotstrings, neutral-defaults and older-release boots reached ' +
