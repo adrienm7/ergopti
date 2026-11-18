@@ -50,7 +50,7 @@
 		"static/ergopti_plus/windows/settings/engine/migration/migrate.ahk": "4ed0167d44027cc2843be709d4ad86003f6602b662e19cbdffe4c8354b7cff58",
 		"static/ergopti_plus/windows/settings/engine/migration/transition_runtime.ahk": "69f1d7e0dd6f9dc4876ca62361f5c788165e1af54ba2777b28e34f446ff13921",
 		"static/ergopti_plus/windows/settings/engine/publication/write_lease.ahk": "7d278afefdf2225df01d07100f3359f86ae2675335ea2b8368a71c2f1fa6f7ff",
-		"static/ergopti_plus/windows/core/text/engine/toml/document.ahk": "05c5700946d0274d67c8896d47d47154f062f892ae69d8cab4daa04fb8e1fc73",
+		"static/ergopti_plus/windows/core/text/engine/toml/document.ahk": "43ecad1fd25ca940a7a5b5e98a50ad53c226fbef27affa3f3475777e5c3a2b2c",
 		"static/ergopti_plus/windows/modules/updater.ahk": "5b3bfe553d1168768fc5d21184293ed664472bedad6b7cb2ba1a6bdd3e93aead",
 		"static/ergopti_plus/windows/modules/updater/changelog.ahk": "ccef36e54167796bf3f7af81cde6a454cb311f4ed8f5b04de8cfdf954e3b6271",
 		"static/ergopti_plus/windows/modules/updater/channels.ahk": "6764ad4d8b4610b9159f5862be2d13e12dc770c86645caba6680ee1fbbbe18b2",
@@ -70,7 +70,7 @@
 	"diagnostic_only": true,
 	"private_cost_fixture_admitted": false,
 	"role": "candidate",
-	"source_pin_base": "875b1e32d169fc8926c34d67c1efbd0ff8a7ce78",
+	"source_pin_base": "88837b46216aa2d0e5da8d3f7fdb9929b8868f14",
 	"runtime_qualification": "UNRUN",
 	"source_authority": "Pins are data; actual HEAD/Git object/API/artifact receiving remains independently required."
 }
