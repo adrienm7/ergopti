@@ -652,7 +652,7 @@ the corpora with their licence, attribution, source and size, and the page
 shows them under the corpus picker. Each entry of `corpora.json` also says
 what sort of text it is (`kind`: `literature`, `encyclopedia`, `news`,
 `sentences`, `words` for a word list or word frequencies, `code`), which the
-Comparer's picker groups and filters by with the `language`; the codegen
+Comparer's picker names on each entry under its `language` group; the codegen
 refuses another kind, and a `code` corpus is the only one whose language is
 `code`. The library's collections (`layout_library.json` `sources`) each carry
 the `name` the Comparer's origin filter shows, which the codegen requires.
@@ -848,20 +848,38 @@ report.
 ## Comparer page
 
 Layout of the page, top to bottom (maintainer, 2026-11-18): the title and
-« Copy the link »; two cards side by side (stacked on a phone), the corpus and
-« Text and keyboard » (text mode, keyboard, format); the folded layout list;
+« Copy the link »; two cards side by side (stacked on a phone), the corpus
+(with the text mode under it on « Ma frappe ») and « Text and keyboard »
+(keyboard, format); the folded layout list;
 the status; the results; then the score settings folded in one « Réglages du
 score » section. While a corpus loads, the status says so and the results carry
 `aria-busy`.
 
-**Corpus picker.** The user's own texts come first under their heading (« My
-typing » while the app reads it, then the pasted text or file), then one
-`optgroup` per language and kind of the built-in texts (« French · Books »,
-« English · Encyclopedia »…, code last under « Source code »; `corpora.json`
-`kind`, language names from `Intl.DisplayNames` in the page's language). Two
-filters, « Language » (`#la-corpus-language`; code is listed whatever the
-language) and « Kind of text » (`#la-corpus-kind`), narrow the list; the chosen
-corpus always stays listed. Both are saved (`corpusFilter`).
+**Corpus picker.** One native `<select>` (`#la-corpus`), shared by the
+Comparer, the editor's panel (`#la-panel-corpus`) and the Optimiser
+(`#lo-corpus`) through `LAYOUT_ANALYSIS_FILES.fillCorpusPicker`: the user's own
+texts first under « On this PC » (« My typing », listed at once while the app
+reads it, then the pasted text or file), then one `optgroup` per language of
+the built-in texts, the language with the most texts first and its name from
+`Intl.DisplayNames` in the page's language, code last under « Source code ».
+Inside a language the texts follow the `corpora.json` kinds' order, and each
+entry says its kind (« Germinal · Books »; `layout_analysis.corpus.entry`).
+
+Why one control (maintainer, 2026-11-18): the « Language » and « Kind of text »
+filters that stood beside it only narrowed a list whose groups already say the
+language and whose entries now say the kind; with 44 texts in six groups a
+grouped list reads at a glance, and two extra selects cost a phone two rows
+and the keyboard two stops. A native select keeps the platform's own keyboard
+path (arrows, Home and End, type-ahead on the title, which therefore comes
+before the kind) and announces each group to a screen reader, the same in
+WebView2, WKWebView, WebKitGTK and every browser, which a custom WAI-ARIA
+combobox would have to rebuild and test on each. A searchable combobox is
+worth it past some hundred entries, not here. « My typing » stays first in
+« On this PC » and is not a language: the keystats store mixes every language
+and code the user types. The filters' saved `corpusFilter` is no longer read
+or written; the chosen corpus stays `corpus`, so saved choices load as they
+were. The Optimiser's own « Language » select went the same way (its saved
+`language` is ignored).
 
 **Layout list.** Besides its text search, « Origin » (`#la-pick-origin`: the
 Ergopti layouts, the references, the user's own, or a library collection by
@@ -1042,7 +1060,11 @@ for the layouts imported from files.
 ### Text modes
 
 « Text typed » (`#la-text-mode`, saved as `textMode`; maintainer, 2026-11-17)
-chooses which text each layout types:
+chooses which text each layout types. It sits under the corpus picker and is
+shown on « My typing » only (maintainer, 2026-11-18): on any other corpus it
+means nothing, so it is hidden and not applied (the layouts type that corpus's
+one text and no « + » box is listed), while the saved choice is kept for « My
+typing »:
 
 - **Keys typed** (`typed`, the default, « Ma frappe » as it was): every layout
   types the raw text, the keys the fingers pressed, hotstring abbreviations
@@ -1061,9 +1083,11 @@ chooses which text each layout types:
 
 Only a corpus of two texts tells them apart: « My typing » since schema 2 of
 the keystats payload (keys typed at the top level, the final text under
-`final`; [Keystats input](#keystats-input)). A built-in corpus, a pasted text
-or a file is one text: the choice and the « + » boxes are greyed with the
-reason, and every layout types that text. The raw text of a built-in corpus is
+`final`; [Keystats input](#keystats-input)), which every host sends (the
+Windows reader and the shared Lua projection of macOS and Linux,
+`studio_ngrams.json`). A read of one text (schema 1) greys the choice and the
+« + » boxes with the reason; a built-in corpus, a pasted text or a file hides
+them, and every layout types that text. The raw text of a built-in corpus is
 not derived from the Ergopti+ hotstring catalogue, because that is not sound
 at n-gram level: an abbreviation replaces whole words and their spaces, and a
 character trigram table does not say where a word starts or ends, so the

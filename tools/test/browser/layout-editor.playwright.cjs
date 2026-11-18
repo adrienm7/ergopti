@@ -580,6 +580,10 @@ async function exerciseMyTypingRefresh(browser, origin) {
 			}
 		};
 	}, strings);
+	// A saved « mixed » text mode, which a built-in text must neither show nor apply.
+	await page.addInitScript(() =>
+		window.localStorage.setItem('ergopti.layout_analysis.v1', JSON.stringify({ textMode: 'mixed' }))
+	);
 	// Each read differs by its character total, which the Comparer reports.
 	const typing = (scale) => ({
 		schema: 1,
@@ -649,11 +653,36 @@ async function exerciseMyTypingRefresh(browser, origin) {
 	assert.deepEqual(await totals(), [60, 120], 'the fresh read replaces the saved one');
 	assert.equal(await page.inputValue('#la-corpus'), 'my_typing');
 
+	// (comparer-text-mode-place) The text typed sits under the corpus picker, on
+	// « Ma frappe » only (maintainer, 2026-11-18).
+	const textMode = () =>
+		page.evaluate(() => {
+			const field = document.getElementById('la-text-mode-field');
+			const picker = document.getElementById('la-corpus');
+			return {
+				shown: !field.hidden,
+				underPicker:
+					field.closest('.la-corpus-card') === picker.closest('.la-corpus-card') &&
+					Boolean(picker.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING),
+				plus: document.querySelectorAll('#la-layout-list .la-plus').length,
+				saved: JSON.parse(localStorage.getItem('ergopti.layout_analysis.v1')).textMode
+			};
+		});
+	const onMine = await textMode();
+	assert.equal(onMine.shown, true, '« Ma frappe » offers the text typed');
+	assert.equal(onMine.underPicker, true, 'under the corpus picker, in its card');
+	assert.ok(onMine.plus > 0, 'and its « + » layouts in the mixed mode');
+
 	// The user picks a built-in text; a later read keeps it and analyses nothing.
 	const builtin = await page.evaluate(
 		() => document.querySelector('#la-corpus optgroup:nth-of-type(2) option').value
 	);
 	await page.selectOption('#la-corpus', builtin);
+	assert.deepEqual(
+		await textMode(),
+		{ shown: false, underPicker: true, plus: 0, saved: 'mixed' },
+		'a built-in text hides the text typed and applies none of it, the choice kept'
+	);
 	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'studio_corpus'));
 	await serveCorpora(page);
 	await page.waitForFunction(() => window.__totals.length === 3);
@@ -1292,9 +1321,9 @@ async function exerciseComparerTabs(page) {
 }
 
 /**
- * (comparer-corpus-picker) The corpus picker groups the built-in texts by
- * language and kind, after the user's own; its filters narrow the list and
- * keep the chosen corpus. (comparer-phone-width) Every sub-tab fits a phone in
+ * (comparer-corpus-picker) One corpus picker: the user's own texts, then one
+ * group per language with each entry's kind, code last; it is driven by the
+ * keyboard, and the text typed is not offered on a built-in text. (comparer-phone-width) Every sub-tab fits a phone in
  * light and dark without a sideways page scroll.
  * @param {import('playwright').Browser} browser
  * @param {string} origin
@@ -1311,36 +1340,62 @@ async function exerciseComparerPicker(browser, origin) {
 		await page.goto(`${origin}/ui/layout_analysis/index.html?lang=en&corpus=fr_nemolivier`);
 		await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
 		if (colorScheme === 'light') {
-			const groups = () =>
-				page.$$eval('#la-corpus optgroup', (list) =>
-					list.map((g) => ({ label: g.label, ids: [...g.children].map((o) => o.value) }))
-				);
-			const all = await groups();
-			assert.equal(all[0].ids[0], 'custom', 'the user’s own text first');
-			assert.ok(
-				all.some((g) => g.label === 'French · Books') && all.some((g) => g.label === 'Source code'),
-				`grouped by language and kind: ${all.map((g) => g.label).join(' | ')}`
+			// One picker (maintainer, 2026-11-18): no language or kind filter beside it.
+			assert.equal(
+				await page.locator('#la-corpus-language, #la-corpus-kind').count(),
+				0,
+				'no filter repeats the picker'
 			);
-			await page.selectOption('#la-corpus-language', 'en');
-			const english = (await groups()).slice(1);
-			assert.ok(
-				english.every(
-					(g) =>
-						g.label.startsWith('English') ||
-						g.label === 'Source code' ||
-						g.ids.every((id) => id === 'fr_nemolivier')
-				),
-				`English texts and code, and the chosen corpus: ${english.map((g) => g.label).join(' | ')}`
+			const groups = await page.$$eval('#la-corpus optgroup', (list) =>
+				list.map((g) => ({
+					label: g.label,
+					options: [...g.children].map((o) => ({ id: o.value, text: o.textContent }))
+				}))
 			);
-			assert.equal(await page.inputValue('#la-corpus'), 'fr_nemolivier', 'the chosen corpus stays');
-			await page.selectOption('#la-corpus-kind', 'code');
+			const labels = groups.map((g) => g.label);
 			assert.deepEqual(
-				(await groups()).slice(1).map((g) => g.label),
-				['French · Books', 'Source code'],
-				'the kind narrows the list, the chosen corpus kept'
+				labels,
+				['On this PC', 'French', 'English', 'German', 'Italian', 'Spanish', 'Source code'],
+				'the user’s texts, then one group per language, most texts first, code last'
 			);
-			await page.selectOption('#la-corpus-language', '');
-			await page.selectOption('#la-corpus-kind', '');
+			assert.deepEqual(
+				groups[0].options.map((o) => o.id),
+				['custom'],
+				'the user’s own text first'
+			);
+			const builtins = await page.evaluate(() => window.LAYOUT_ANALYSIS_DATA.corpora.length);
+			const listed = groups.slice(1).flatMap((g) => g.options);
+			assert.equal(listed.length, builtins, `every built-in text is listed (${builtins})`);
+			assert.equal(
+				await page.locator('#la-corpus > option').count(),
+				0,
+				'every entry sits in a group'
+			);
+			for (const group of groups.slice(1, -1))
+				for (const option of group.options)
+					assert.match(
+						option.text,
+						/ · (Books|Encyclopedia|News|Everyday sentences|Word lists)$/,
+						`${group.label}: ${option.text} says its kind`
+					);
+			// The keyboard path: the picker takes the focus and an arrow moves the choice.
+			await page.focus('#la-corpus');
+			const before = await page.inputValue('#la-corpus');
+			await page.keyboard.press('ArrowDown');
+			const after = await page.inputValue('#la-corpus');
+			assert.notEqual(after, before, 'an arrow key chooses the next corpus');
+			await page.waitForFunction(
+				(id) => JSON.parse(localStorage.getItem('ergopti.layout_analysis.v1')).corpus === id,
+				after
+			);
+			await page.keyboard.press('ArrowUp');
+			assert.equal(await page.inputValue('#la-corpus'), before, 'and back');
+			// The text typed means something on « Ma frappe » only: hidden on a book.
+			assert.equal(
+				await page.isHidden('#la-text-mode-field'),
+				true,
+				'no « text typed » choice on a built-in text'
+			);
 			assert.equal(
 				await page.evaluate(() => document.getElementById('la-filters-box').open),
 				false,

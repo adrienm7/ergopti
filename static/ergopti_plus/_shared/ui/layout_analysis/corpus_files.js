@@ -85,6 +85,95 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 		return tables.final && mode !== TEXT_MODES.typed ? tables.final : tables;
 	}
 
+	// The kinds of built-in corpora in the picker's order (corpora.json kind),
+	// and the language of a code corpus, which has no natural language.
+	const CORPUS_KINDS = ['literature', 'encyclopedia', 'news', 'sentences', 'words', 'code'];
+	const CODE_LANGUAGE = 'code';
+
+	/**
+	 * Fills a corpus picker, the one control the Comparer, the editor's panel
+	 * and the Optimiser choose a corpus with (maintainer, 2026-11-18): a
+	 * native select, whose keyboard and screen-reader behaviour every webview
+	 * of the three drivers and every browser give, with the user's own texts
+	 * first under their heading, then one group per language (the language
+	 * with the most texts first, code last), each entry saying its kind. A
+	 * separate language or kind filter would only repeat these groups.
+	 * @param {HTMLSelectElement} select - The picker.
+	 * @param {{mine: Array<{id: string, label: string, disabled?: boolean, title?: string}>,
+	 *   builtins: object[], value: string, t: function(string, object=): string,
+	 *   locale: string}} options - mine: the user's own entries in order;
+	 *   builtins: corpora.json entries; value: the corpus to select; t: the
+	 *   page's translator; locale: the page's language, which names the groups.
+	 * @returns {void}
+	 * @throws {Error} On a corpus of an unknown kind.
+	 */
+	function fillCorpusPicker(select, options) {
+		const { mine, builtins, value, t, locale } = options;
+		const names = new Intl.DisplayNames([locale], { type: 'language' });
+		const languageName = (code) => {
+			const name = names.of(code);
+			return name.charAt(0).toUpperCase() + name.slice(1);
+		};
+		const counts = new Map();
+		for (const corpus of builtins) {
+			if (!CORPUS_KINDS.includes(corpus.kind))
+				throw new Error(`layout_analysis: corpus ${corpus.id} has the unknown kind ${corpus.kind}`);
+			if (corpus.language !== CODE_LANGUAGE)
+				counts.set(corpus.language, (counts.get(corpus.language) || 0) + 1);
+		}
+		const languages = Array.from(counts.keys())
+			.sort(
+				(a, b) => counts.get(b) - counts.get(a) || languageName(a).localeCompare(languageName(b))
+			)
+			.concat([CODE_LANGUAGE]);
+		const option = (id, label) => {
+			const node = document.createElement('option');
+			node.value = id;
+			node.textContent = label;
+			return node;
+		};
+		const groups = [];
+		if (mine.length > 0) {
+			const group = document.createElement('optgroup');
+			group.label = t('layout_analysis.corpus.group_mine');
+			for (const entry of mine) {
+				const node = option(entry.id, entry.label);
+				node.disabled = entry.disabled === true;
+				if (entry.title) node.title = entry.title;
+				group.append(node);
+			}
+			groups.push(group);
+		}
+		for (const language of languages) {
+			const members = builtins
+				.filter((corpus) => corpus.language === language)
+				.sort((a, b) => CORPUS_KINDS.indexOf(a.kind) - CORPUS_KINDS.indexOf(b.kind));
+			if (members.length === 0) continue;
+			const group = document.createElement('optgroup');
+			group.label =
+				language === CODE_LANGUAGE ? t('layout_analysis.corpus.kind.code') : languageName(language);
+			for (const corpus of members) {
+				// A count table's descriptive name is localized (title_key).
+				const title = corpus.title_key ? t(corpus.title_key) : corpus.title;
+				const node = option(
+					corpus.id,
+					language === CODE_LANGUAGE
+						? title
+						: t('layout_analysis.corpus.entry', {
+								title,
+								kind: t(`layout_analysis.corpus.kind.${corpus.kind}`)
+							})
+				);
+				node.dataset.language = corpus.language;
+				node.dataset.kind = corpus.kind;
+				group.append(node);
+			}
+			groups.push(group);
+		}
+		select.replaceChildren(...groups);
+		select.value = value;
+	}
+
 	/** A rejection the page localizes. */
 	const failure = (code) => Object.assign(new Error(code), { code });
 
@@ -352,6 +441,7 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 		TEXT_DEBOUNCE_MS,
 		TEXT_MODES,
 		plainTables,
+		fillCorpusPicker,
 		publishEditorLayouts,
 		onEditorLayouts,
 		OPEN_COMPARER_MESSAGE,

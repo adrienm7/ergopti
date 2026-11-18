@@ -246,13 +246,6 @@ body:has(> main.layout-analysis) {
 	grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
 }
 
-.la-corpus-filters {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px 12px;
-	margin-bottom: 6px;
-}
-
 .la-layouts {
 	margin-top: 16px;
 }

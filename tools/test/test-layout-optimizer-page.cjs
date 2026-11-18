@@ -12,7 +12,7 @@
  *    loader, the optimizer, its runner and the page script in that order, and
  *    the worker imports the same engine and optimizer; every file exists.
  * 2. Strings: every layout_optimizer.* key the page shows (data-i18n, option
- *    prefixes, t() calls, the switches, presets and corpus languages it
+ *    prefixes, t() calls, the switches and presets it
  *    builds keys from, and every refusal code of the optimizer) exists in all
  *    21 locales with the placeholders of English; the metric and keyboard
  *    names it borrows from layout_analysis.* exist too.
@@ -222,10 +222,13 @@ for (const where of ['comparer', 'editor']) {
 	keys.add(`${PREFIX}library.open_${where}`);
 	keys.add(`${PREFIX}library.open_${where}_label`);
 }
-for (const corpus of DATA.corpora) keys.add(`${PREFIX}language.${corpus.language}`);
 // A count table's localized name, shown in the corpus picker.
 for (const corpus of DATA.corpora) if (corpus.title_key) keys.add(corpus.title_key);
-check(page.includes('corpus.title_key'), 'the corpus picker no longer shows localized names');
+check(
+	page.includes('FILES.fillCorpusPicker(') &&
+		read(shared('ui', 'layout_analysis', 'corpus_files.js')).includes('corpus.title_key'),
+	'the corpus picker is the shared one, which shows the localized names'
+);
 const codes = new Set(
 	Array.from(
 		read(path.join(PAGE_DIR, 'optimizer_core.js')).matchAll(/new OptimizerError\(\s*'([a-z_]+)'/g),

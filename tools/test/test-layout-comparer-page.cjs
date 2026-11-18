@@ -115,11 +115,15 @@ for (const file of [
 	'analyser_tab.js',
 	'worst_groups.js',
 	'best_swaps.js',
-	'board_image.js'
+	'board_image.js',
+	// The corpus picker the Comparer, the panel and the Optimiser share.
+	'corpus_files.js'
 ])
 	for (const m of fs.readFileSync(path.join(PAGE_DIR, file), 'utf8').matchAll(/\bt\('([a-z_.]+)'/g))
 		keys.add(m[1]);
 for (const id of Object.keys(E.METRICS)) keys.add(`${PREFIX}metric.${id}`);
+// The picker names each built-in text's kind (corpus_files.js fillCorpusPicker).
+for (const corpus of DATA.corpora) keys.add(`${PREFIX}corpus.kind.${corpus.kind}`);
 for (const id of DATA.model.fingers) keys.add(`${PREFIX}finger.${id}`);
 for (const id of Object.keys(DATA.model.keyboards)) keys.add(`${PREFIX}keyboard.${id}`);
 for (const format of E.keyboardFormats()) keys.add(`${PREFIX}format.${format.id}`);
@@ -164,7 +168,8 @@ for (const entry of Object.values(DATA.analysers))
 // A corpus with a localized name (the count tables) is named in every locale.
 for (const corpus of DATA.corpora) if (corpus.title_key) keys.add(corpus.title_key);
 check(
-	page.includes('corpus.builtin.title_key'),
+	page.includes('LAYOUT_ANALYSIS_FILES.fillCorpusPicker(') &&
+		fs.readFileSync(path.join(PAGE_DIR, 'corpus_files.js'), 'utf8').includes('corpus.title_key'),
 	'the corpus picker no longer shows the localized corpus names'
 );
 check(keys.size >= MIN_KEYS, `only ${keys.size} keys found`);
@@ -745,7 +750,11 @@ check(
 		);
 		check(style.includes(`.la-seg-${slot},`), `style.css: no colour for part ${slot}`);
 	}
-	const kinds = literal('CORPUS_KINDS');
+	// The kinds live with the shared corpus picker (corpus_files.js).
+	const files = fs.readFileSync(path.join(PAGE_DIR, 'corpus_files.js'), 'utf8');
+	const kindsSource = files.match(/const CORPUS_KINDS = (\[[^\]]*\]);/);
+	check(kindsSource, 'corpus_files.js lost CORPUS_KINDS');
+	const kinds = kindsSource ? vm.runInNewContext(`(${kindsSource[1]})`) : [];
 	for (const corpus of DATA.corpora) {
 		check(kinds.includes(corpus.kind), `corpus ${corpus.id}: kind ${corpus.kind}`);
 		check(
@@ -753,11 +762,10 @@ check(
 			`corpus ${corpus.id}: only code has the language « code »`
 		);
 	}
-	for (const kind of kinds)
-		check(
-			page.includes(`t('layout_analysis.corpus.kind.${kind}')`),
-			`corpus kind ${kind}: no label`
-		);
+	check(
+		files.includes('t(`layout_analysis.corpus.kind.${corpus.kind}`)'),
+		'the corpus picker names no kind'
+	);
 	for (const [id, source] of Object.entries(DATA.library_sources))
 		check(source.name, `library collection ${id}: no name for the origin filter`);
 }

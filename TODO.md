@@ -481,19 +481,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       converter only; `keylayout_to_xkb.py` still reads `keys` alone and reports macOS 93 and 94 as unplaced
       (`test_registry_conversion.py`). Kept meanwhile: the Lua contract probes Eisu and Kana (102, 104) instead, and
       the Python twin is unchanged. Choose whether the Python twin reads `extra_keys` too.
-- [ ] **« Ma frappe » beside the corpus filters? (asked by the maintainer on 2026-11-18)** The Comparer's corpus
-      card has « Langue » and « Type de texte », which narrow the built-in texts, and the corpus list, whose first
-      group « Mes textes » holds « Ma frappe » and the pasted text whatever the filters
-      ([layout-analysis.md](docs/design/layout-analysis.md), « Corpus picker »). The question: offer « Texte tapé
-      sur ce PC » at the filters' level, like a language. Kept meanwhile: the list as it is.
-  1. **(recommended) Keep it in « Mes textes », first and never filtered out.** It is neither a language nor a kind:
-     the keystats store mixes every language and code the user types, so a language filter would have to keep it
-     under every language (as code is) or hide it under all of them; it is already the app's default and listed
-     first. Its absence was the unreadable read (fixed on 2026-11-18), not its place.
-  2. Add a third filter, « Source » (my texts / built-in texts), above the two others: one more control for a group
-     of two entries.
-  3. List « Ma frappe » under the language filter as its own entry, the other filters greyed while it is chosen.
-
 - [ ] **Screen-reader announcements of tooltips, decided by the agent on 2026-11-17.** Hotstring previews and
       finished AI predictions are announced only while the system says a screen reader runs (Windows
       `SPI_GETSCREENREADER`, VoiceOver, Orca), with no Ergopti+ setting; add a menu switch if users find them noisy.

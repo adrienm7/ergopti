@@ -68,7 +68,8 @@
  *    bigrams, trigrams, rows and distance, side-by-side heat maps, coverage
  *    and more, other analysers, one layout. Every figure follows the filters
  *    (name, family, origin, language, completeness, score) and has a table;
- *    the corpus picker groups the built-in texts by language and kind.
+ *    the corpus picker groups the built-in texts by language, each entry
+ *    naming its kind.
  * ==============================================================================
  */
 
@@ -308,10 +309,6 @@
 	// How many boards the side-by-side heat maps draw, the first of the ranking.
 	const HEATS_COUNTS = [2, 4, 6, 9, 12];
 	const DEFAULT_HEATS_COUNT = 6;
-	// The kinds of built-in corpora in the picker's order (corpora.json kind),
-	// and the language of a code corpus, which has no natural language.
-	const CORPUS_KINDS = ['literature', 'encyclopedia', 'news', 'sentences', 'words', 'code'];
-	const CODE_LANGUAGE = 'code';
 	// A filter set to this value keeps everything.
 	const ALL = '';
 	const COMPLETE_CHOICES = ['all', 'yes', 'no'];
@@ -341,18 +338,17 @@
 			for="la-corpus"
 			data-i18n="layout_analysis.corpus.label"
 		></label>
-		<div class="la-corpus-filters">
-			<label class="la-filter-field">
-				<span data-i18n="layout_analysis.filter.language"></span>
-				<select id="la-corpus-language"></select>
-			</label>
-			<label class="la-filter-field">
-				<span data-i18n="layout_analysis.corpus.filter_kind"></span>
-				<select id="la-corpus-kind"></select>
-			</label>
-		</div>
 		<select id="la-corpus"></select>
 		<p id="la-corpus-info" class="la-muted"></p>
+	</div>
+	<div id="la-text-mode-field" class="la-field" hidden>
+		<label for="la-text-mode" data-i18n="layout_analysis.text_mode.label"></label>
+		<select id="la-text-mode" data-i18n-option-prefix="layout_analysis.text_mode">
+			<option value="typed"></option>
+			<option value="final"></option>
+			<option value="mixed"></option>
+		</select>
+		<p id="la-text-mode-info" class="la-muted"></p>
 	</div>
 	<div id="la-custom" class="la-field la-custom" hidden>
 		<textarea
@@ -375,15 +371,6 @@
 
 <section class="la-card la-options" aria-labelledby="la-options-label">
 	<h2 id="la-options-label" class="la-card-title" data-i18n="layout_analysis.options.title"></h2>
-	<div class="la-field">
-		<label for="la-text-mode" data-i18n="layout_analysis.text_mode.label"></label>
-		<select id="la-text-mode" data-i18n-option-prefix="layout_analysis.text_mode">
-			<option value="typed"></option>
-			<option value="final"></option>
-			<option value="mixed"></option>
-		</select>
-		<p id="la-text-mode-info" class="la-muted"></p>
-	</div>
 	<div class="la-option-pair">
 		<div class="la-field">
 			<div class="la-heading">
@@ -948,10 +935,9 @@
 						heatDiff: state.heatDiff,
 						matrixBy: state.matrixBy,
 						// The sub-tab the visitor last chose, the side-by-side heat maps'
-						// choices, the corpus picker's and the layout list's filters.
+						// choices and the layout list's filters.
 						tab: state.tabSaved,
 						heats: state.heats,
-						corpusFilter: state.corpusFilter,
 						pick: state.pick
 					})
 				);
@@ -1051,7 +1037,6 @@
 			// Each themed table's sort, by table name.
 			tabSorts: {},
 			heats: validHeats(saved.heats),
-			corpusFilter: validFilters(saved.corpusFilter, ['language', 'kind']),
 			pick: validFilters(saved.pick, ['origin', 'language'])
 		};
 		// A link's layouts are shown, not saved: the visitor's own choice stays.
@@ -1191,11 +1176,14 @@
 		async function corpusTables() {
 			const corpus = corpora.find((c) => c.id === state.corpus);
 			if (corpus.host) {
-				const plain = window.LAYOUT_ANALYSIS_FILES.plainTables(corpus.host.tables, state.textMode);
+				const plain = window.LAYOUT_ANALYSIS_FILES.plainTables(
+					corpus.host.tables,
+					appliedTextMode()
+				);
 				return {
 					plain: E.prepareNgrams(plain),
 					raw:
-						finalTables(corpus) && state.textMode === TEXT_MIXED
+						finalTables(corpus) && appliedTextMode() === TEXT_MIXED
 							? E.prepareNgrams(corpus.host.tables)
 							: null
 				};
@@ -1440,14 +1428,6 @@
 			misc: () => t('layout_analysis.tab.misc'),
 			analysers: () => t('layout_analysis.tab.analysers'),
 			details: () => t('layout_analysis.tab.details')
-		};
-		const KIND_LABEL = {
-			literature: () => t('layout_analysis.corpus.kind.literature'),
-			encyclopedia: () => t('layout_analysis.corpus.kind.encyclopedia'),
-			news: () => t('layout_analysis.corpus.kind.news'),
-			sentences: () => t('layout_analysis.corpus.kind.sentences'),
-			words: () => t('layout_analysis.corpus.kind.words'),
-			code: () => t('layout_analysis.corpus.kind.code')
 		};
 		const DIRECTION_LABEL = {
 			lower: () => t('layout_analysis.analysers.better.lower'),
@@ -3711,102 +3691,60 @@
 		// ===========================
 
 		function fillCorpora() {
-			const select = $('la-corpus');
-			select.replaceChildren();
-			// The filters: the languages of the built-in texts (most texts first),
-			// and their kinds in corpora.json's order. Code has no language: it is
-			// listed whatever language is chosen.
-			const builtins = corpora.filter((c) => c.builtin).map((c) => c.builtin);
-			const languages = byFrequency(
-				builtins.map((c) => c.language).filter((l) => l !== CODE_LANGUAGE),
-				languageName
-			);
-			const kinds = CORPUS_KINDS.filter((kind) => builtins.some((c) => c.kind === kind));
-			state.corpusFilter.language = fillSelect(
-				$('la-corpus-language'),
-				[[ALL, t('layout_analysis.filter.language_all')]].concat(
-					languages.map((id) => [id, languageName(id)])
-				),
-				state.corpusFilter.language
-			);
-			state.corpusFilter.kind = fillSelect(
-				$('la-corpus-kind'),
-				[[ALL, t('layout_analysis.corpus.kind_all')]].concat(
-					kinds.map((id) => [id, KIND_LABEL[id]()])
-				),
-				state.corpusFilter.kind
-			);
-			// The user's own text first, under its own heading (maintainer,
-			// 2026-11-17): « My typing » while the app reads it, then the pasted
-			// text; the built-in texts below, one group per language and kind.
-			const mine = el('optgroup');
-			mine.label = t('layout_analysis.corpus.group_mine');
-			const hasMyTyping = corpora.some((c) => c.id === MY_TYPING_ID);
-			if (!hasMyTyping && myTypingState) {
-				const waiting = el(
-					'option',
-					'',
-					t(
+			// The user's own texts first (maintainer, 2026-11-17): « My typing »,
+			// listed at once while the app reads it, then the pasted text.
+			const mine = [];
+			if (!corpora.some((c) => c.id === MY_TYPING_ID) && myTypingState)
+				mine.push({
+					id: MY_TYPING_ID,
+					label: t(
 						myTypingState.state === 'loading'
 							? 'layout_analysis.corpus.my_typing_loading'
 							: 'layout_analysis.corpus.my_typing_unavailable'
-					)
-				);
-				waiting.value = MY_TYPING_ID;
-				waiting.disabled = true;
-				if (myTypingState.reason) waiting.title = myTypingState.reason;
-				mine.append(waiting);
-			}
-			const labelOf = (corpus) =>
-				corpus.id === CUSTOM_ID
-					? t('layout_analysis.corpus.custom')
-					: corpus.id === MY_TYPING_ID && !corpus.title
-						? t('layout_analysis.corpus.my_typing')
-						: corpus.builtin && corpus.builtin.title_key
-							? t(corpus.builtin.title_key)
-							: corpus.title;
-			const option = (corpus) => {
-				const node = el('option', '', labelOf(corpus));
-				node.value = corpus.id;
-				return node;
-			};
-			for (const corpus of corpora.filter((c) => !c.builtin)) mine.append(option(corpus));
-			const { language, kind } = state.corpusFilter;
-			// The chosen corpus stays listed whatever the filters, so the picker shows it.
-			const kept = (c) =>
-				c.id === state.corpus ||
-				((!language || c.builtin.language === language || c.builtin.language === CODE_LANGUAGE) &&
-					(!kind || c.builtin.kind === kind));
-			const groups = [];
-			for (const lang of languages.concat([CODE_LANGUAGE]))
-				for (const sort of CORPUS_KINDS) {
-					const members = corpora.filter(
-						(c) => c.builtin && c.builtin.language === lang && c.builtin.kind === sort && kept(c)
-					);
-					if (members.length === 0) continue;
-					const group = el('optgroup');
-					group.label =
-						lang === CODE_LANGUAGE
-							? KIND_LABEL[sort]()
-							: t('layout_analysis.corpus.group', {
-									language: languageName(lang),
-									kind: KIND_LABEL[sort]()
-								});
-					group.append(...members.map(option));
-					groups.push(group);
-				}
-			select.append(...[mine].concat(groups).filter((group) => group.children.length > 0));
-			select.value = state.corpus;
-			select.classList.toggle('la-corpus-mine', state.corpus === MY_TYPING_ID);
+					),
+					disabled: true,
+					title: myTypingState.reason
+				});
+			for (const corpus of corpora.filter((c) => !c.builtin))
+				mine.push({
+					id: corpus.id,
+					label:
+						corpus.id === CUSTOM_ID
+							? t('layout_analysis.corpus.custom')
+							: corpus.id === MY_TYPING_ID && !corpus.title
+								? t('layout_analysis.corpus.my_typing')
+								: corpus.title
+				});
+			window.LAYOUT_ANALYSIS_FILES.fillCorpusPicker($('la-corpus'), {
+				mine,
+				builtins: corpora.filter((c) => c.builtin).map((c) => c.builtin),
+				value: state.corpus,
+				t,
+				locale: INFO.locale()
+			});
+			$('la-corpus').classList.toggle('la-corpus-mine', state.corpus === MY_TYPING_ID);
 			showCorpusInfo();
 		}
 
 		/**
-		 * The text mode control: its value, and why it is greyed on a corpus of
-		 * one text (a book has no keys typed; the hotstrings cannot be undone at
-		 * n-gram level), or what the chosen mode does.
+		 * The text the layouts type: the chosen mode on « My typing », the one
+		 * corpus that can bring the keys typed and the final text apart; the
+		 * keys typed on every other corpus, whose single text both are, so the
+		 * saved mode is kept but not applied there.
+		 * @returns {string} A TEXT_MODES value.
+		 */
+		function appliedTextMode() {
+			return state.corpus === MY_TYPING_ID ? state.textMode : TEXT_TYPED;
+		}
+
+		/**
+		 * The text mode control, under the corpus picker and shown on « My
+		 * typing » only (maintainer, 2026-11-18): elsewhere the choice means
+		 * nothing (appliedTextMode). Its value, and why it is greyed on a read
+		 * of one text, or what the chosen mode does.
 		 */
 		function showTextMode() {
+			$('la-text-mode-field').hidden = state.corpus !== MY_TYPING_ID;
 			const select = $('la-text-mode');
 			const two = hasTwoTexts();
 			select.value = state.textMode;
@@ -3870,7 +3808,7 @@
 				list.append(label);
 				// « + »: this layout also ranks as « <name>+ », typing the keys typed with
 				// the Ergopti+ hotstrings, while the others type the final text.
-				if (state.textMode !== TEXT_MIXED) continue;
+				if (appliedTextMode() !== TEXT_MIXED) continue;
 				const plusLabel = el('label', 'la-plus');
 				const plus = el('input');
 				plus.type = 'checkbox';
@@ -4493,16 +4431,6 @@
 				save();
 				render();
 			});
-			// The corpus picker's filters narrow its list, never the chosen corpus.
-			for (const [id, name] of [
-				['la-corpus-language', 'language'],
-				['la-corpus-kind', 'kind']
-			])
-				$(id).addEventListener('change', (event) => {
-					state.corpusFilter[name] = event.target.value;
-					save();
-					fillCorpora();
-				});
 			// The layout list's filters, which « Select all shown » follows.
 			for (const [id, name] of [
 				['la-pick-origin', 'origin'],

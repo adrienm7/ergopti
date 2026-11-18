@@ -364,22 +364,16 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			analysersTitle.textContent = t('layout_analysis.analysers.title');
 			note.textContent = t('layout_analysis.panel.weights_note');
 			if (compareButton) compareButton.textContent = t('layout_analysis.panel.compare');
-			corpusSelect.replaceChildren(
-				...corpora.map((c) => {
-					const option = el(
-						'option',
-						'',
-						c.id === MY_TYPING_ID
-							? t('layout_analysis.corpus.my_typing')
-							: c.builtin && c.builtin.title_key
-								? t(c.builtin.title_key)
-								: c.title
-					);
-					option.value = c.id;
-					return option;
-				})
-			);
-			corpusSelect.value = state.corpus;
+			// The Comparer's picker: « My typing » first, the texts by language.
+			FILES.fillCorpusPicker(corpusSelect, {
+				mine: corpora
+					.filter((c) => !c.builtin)
+					.map((c) => ({ id: c.id, label: t('layout_analysis.corpus.my_typing') })),
+				builtins: corpora.filter((c) => c.builtin).map((c) => c.builtin),
+				value: state.corpus,
+				t,
+				locale: INFO.locale()
+			});
 			keyboardSelect.replaceChildren(
 				...KEYBOARDS.map((id) => {
 					const option = el('option', '', t(`layout_analysis.keyboard.${id}`));

@@ -3643,10 +3643,6 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["es", "fr", "it", "nl", "pt"]
 		},
-		"layout_optimizer.language.code": {
-			"reason": "loanword-or-cognate",
-			"locales": ["de", "fr", "nl"]
-		},
 		"layout_optimizer.result.start": {
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "de", "nl", "no", "pl", "sv"]
@@ -3663,7 +3659,7 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["fr", "nl"]
 		},
-		"layout_analysis.corpus.group": {
+		"layout_analysis.corpus.entry": {
 			"reason": "symbol-or-placeholder-only",
 			"locales": [
 				"ar",

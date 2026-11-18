@@ -144,8 +144,6 @@
 <section class="lo-card lo-step lo-step-setup" aria-labelledby="lo-setup-title">
 	<h2 id="lo-setup-title" data-i18n="layout_optimizer.setup.title"></h2>
 	<div class="lo-fields">
-		<label class="lo-field"><span data-i18n="layout_optimizer.corpus.language"></span>
-			<select id="lo-language"></select></label>
 		<label class="lo-field"><span data-i18n="layout_optimizer.corpus.label"></span>
 			<select id="lo-corpus"></select></label>
 		<label class="lo-field"><span data-i18n="layout_optimizer.start.label"></span>
@@ -620,39 +618,26 @@
 		// ======= 3/ Controls ========
 		// ============================
 
-		function fillLanguages() {
-			const languages = [...new Set(DATA.corpora.map((corpus) => corpus.language))];
-			const select = $('lo-language');
-			const kept = select.value;
-			select.replaceChildren(
-				...languages.map((code) => {
-					const option = el('option', '', t(`${PREFIX}language.${code}`));
-					option.value = code;
-					return option;
-				})
-			);
-			select.value = kept || DATA.corpora.find((c) => c.id === DEFAULT_CORPUS).language;
-		}
-
+		/**
+		 * The corpus picker the Comparer and the editor's panel share
+		 * (LAYOUT_ANALYSIS_FILES.fillCorpusPicker): the host's corpora (« My
+		 * typing ») and the user's own text first, then the texts by language.
+		 */
 		function fillCorpora() {
 			const select = $('lo-corpus');
 			const kept = select.value;
-			const shown = DATA.corpora.filter((corpus) => corpus.language === $('lo-language').value);
-			const custom = el('option', '', t(`${PREFIX}corpus.custom`));
-			custom.value = CUSTOM_ID;
-			// The host's corpora (« My typing ») first, whatever the language.
-			select.replaceChildren(
-				...state.hostCorpora.concat(shown).map((corpus) => {
-					// A count table's descriptive name is localized (title_key).
-					const option = el('option', '', corpus.title_key ? t(corpus.title_key) : corpus.title);
-					option.value = corpus.id;
-					return option;
-				}),
-				custom
-			);
+			const mine = state.hostCorpora
+				.map((corpus) => ({ id: corpus.id, label: corpus.title }))
+				.concat([{ id: CUSTOM_ID, label: t(`${PREFIX}corpus.custom`) }]);
+			FILES.fillCorpusPicker(select, {
+				mine,
+				builtins: DATA.corpora,
+				value: kept,
+				t,
+				locale: numberLocale()
+			});
 			const values = Array.from(select.options, (option) => option.value);
-			if (values.includes(kept)) select.value = kept;
-			else if (values.includes(DEFAULT_CORPUS)) select.value = DEFAULT_CORPUS;
+			if (!values.includes(kept)) select.value = DEFAULT_CORPUS;
 			syncCorpus();
 		}
 
@@ -1649,7 +1634,6 @@
 			const switches = {};
 			for (const id of SWITCHES) switches[id] = $(`lo-switch-${id}`).checked;
 			writeStored(STORAGE_KEY, {
-				language: $('lo-language').value,
 				corpus: $('lo-corpus').value,
 				start: $('lo-start').value,
 				startMode: root.querySelector('input[name="lo-start-mode"]:checked').value,
@@ -1679,8 +1663,6 @@
 			};
 			const strings = (list) =>
 				Array.isArray(list) ? list.filter((item) => typeof item === 'string') : [];
-			choose('lo-language', saved.language);
-			fillCorpora();
 			choose('lo-corpus', saved.corpus);
 			syncCorpus();
 			// A layout open in « Éditer » may arrive after the mount: it is chosen then.
@@ -1722,7 +1704,6 @@
 		const defaultRestarts = () => Math.min(MAX_WORKERS, threads());
 
 		function bind() {
-			$('lo-language').addEventListener('change', fillCorpora);
 			$('lo-corpus').addEventListener('change', syncCorpus);
 			let textTimer = null;
 			$('lo-text').addEventListener('input', (event) => {
@@ -1791,7 +1772,6 @@
 		/** Every string again, once the locale has arrived. */
 		function refreshStrings() {
 			applyStrings();
-			fillLanguages();
 			fillCorpora();
 			fillStarts();
 			fillKeyboards();
