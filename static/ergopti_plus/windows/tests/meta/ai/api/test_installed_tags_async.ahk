@@ -159,21 +159,17 @@ _MetaCheckInstalledTagsNonBlocking() {
 		. "aborts the build and empties the IA menu")
 	Assert(_InstalledTagsAsyncDispatchIsExecutable(FireBody),
 		"_LLM_Menu_FireInstalledTagsProbe must dispatch the async probe")
-	Assert(InStr(FireBody, "A_IsSuspended"),
-		"_LLM_Menu_FireInstalledTagsProbe must early-return on A_IsSuspended — its rebuild "
-		. "path bypasses native Suspend like the health probe")
-
+	; The probe's pause refusal and the shared owner guard's (which the health
+	; completion uses too) are called under a real Suspend in
+	; tests/unit/ai/api/test_aux_request_ownership.ahk.
 	DoneBody := _DriverFuncBody("_LLM_Menu_OnInstalledTagsProbeDone")
-	OwnerGuard := _DriverFuncBody("_LLM_Menu_AuxOwnerIsCurrent")
 	Assert(DoneBody != "", "actions.ahk must define _LLM_Menu_OnInstalledTagsProbeDone()")
-	Assert(OwnerGuard != "", "the shared auxiliary menu-owner guard must exist")
 	Assert(InStr(DoneBody, "LLM_SetInstalledTagsCache("),
 		"_LLM_Menu_OnInstalledTagsProbeDone must stash the result via LLM_SetInstalledTagsCache")
 	Assert(InStr(DoneBody, "_LLM_InstalledTagsListChanged(")
-			and InStr(DoneBody, "_LLM_Menu_AuxOwnerIsCurrent(Owner)")
-			and InStr(OwnerGuard, "A_IsSuspended"),
-		"_LLM_Menu_OnInstalledTagsProbeDone must repaint only on a real change and never "
-		. "while suspended (flip-guard, mirrors the health dot)")
+			and InStr(DoneBody, "_LLM_Menu_AuxOwnerIsCurrent(Owner)"),
+		"_LLM_Menu_OnInstalledTagsProbeDone must repaint only on a real change and only for "
+		. "its current owner (flip-guard, mirrors the health dot)")
 
 	; (7) EnsureModelReady waits for the async cache after the deps-ready guard.
 	EnsureBody := _DriverFuncBody("LLM_Menu_EnsureModelReady")
