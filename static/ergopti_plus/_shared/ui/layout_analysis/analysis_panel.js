@@ -160,39 +160,12 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	}
 
 	/**
-	 * The Comparer's weights and ideal finger load, each checked by the engine,
-	 * and the user's fingering profile of one keyboard.
+	 * The Comparer's score settings and the user's fingering profile of one
+	 * keyboard, read once for every Studio score (score_settings.js).
 	 * @param {string} keyboardId The keyboard analysed.
 	 */
 	function comparerSettings(keyboardId) {
-		const saved = readStorage(FILES.SETTINGS_KEY);
-		const settings = {};
-		try {
-			// score() refuses an unknown metric or an invalid weight.
-			if (saved.weights) E.score({ metrics: {} }, saved.weights);
-			settings.weights = saved.weights;
-		} catch {
-			settings.weights = undefined;
-		}
-		try {
-			settings.idealLoad = saved.idealLoad ? E.idealLoad(saved.idealLoad) : undefined;
-		} catch {
-			settings.idealLoad = undefined;
-		}
-		// The Comparer's shortcut table and form factor weights, so both score alike.
-		try {
-			settings.shortcuts = saved.shortcuts ? E.shortcuts(saved.shortcuts) : undefined;
-		} catch {
-			settings.shortcuts = undefined;
-		}
-		try {
-			settings.formWeights = saved.formWeights ? E.formFactorWeights(saved.formWeights) : undefined;
-		} catch {
-			settings.formWeights = undefined;
-		}
-		// The user's fingering profile of this keyboard, shared with the Comparer.
-		settings.profile = window.LAYOUT_ANALYSIS_FINGERING.current(keyboardId) || undefined;
-		return settings;
+		return window.LAYOUT_ANALYSIS_SCORE_SETTINGS.analysisOptions(keyboardId);
 	}
 
 	/**

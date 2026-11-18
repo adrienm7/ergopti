@@ -74,6 +74,8 @@
 	const DATA = window.LAYOUT_ANALYSIS_DATA;
 	const INFO = window.LAYOUT_ANALYSIS_INFO;
 	const FINGERING = window.LAYOUT_ANALYSIS_FINGERING;
+	// The score settings every Studio score reads (score_settings.js).
+	const SCORE_SETTINGS = window.LAYOUT_ANALYSIS_SCORE_SETTINGS;
 	const UNDO = window.LAYOUT_ANALYSIS_UNDO;
 	const infoButton = INFO.button;
 	const STORAGE_KEY = window.LAYOUT_ANALYSIS_FILES.SETTINGS_KEY;
@@ -617,6 +619,8 @@
 						matrixBy: state.matrixBy
 					})
 				);
+				// The editor's panel and the optimizer of this page score with them too.
+				SCORE_SETTINGS.notify();
 			} catch {
 				// A private window or a full quota: the page keeps working unsaved.
 			}
@@ -680,12 +684,9 @@
 			// Whether the user chose the ticked layouts; until then they follow the keyboard.
 			selectionChosen: saved.selectionChosen === true && Array.isArray(saved.selected),
 			selected: null,
-			weights: Object.assign(E.defaultWeights(), validWeights(saved.weights)),
-			idealLoad: validIdealLoad(saved.idealLoad),
-			// The shortcut table of shortcut_left and the form factor weights of
-			// compact_fit, the model's until the user edits them.
-			shortcuts: validOr(E.shortcuts, saved.shortcuts, E.defaultShortcuts),
-			formWeights: validOr(E.formFactorWeights, saved.formWeights, E.defaultFormFactorWeights),
+			// The weights, ideal load, shortcut table (shortcut_left) and form factor
+			// weights (compact_fit), read as every Studio score reads them.
+			...SCORE_SETTINGS.parse(saved),
 			custom: saved.custom && saved.custom.tables ? saved.custom : null,
 			// Which text each layout types, and the layouts ticked « + » (TEXT_MIXED).
 			textMode: TEXT_MODES.includes(saved.textMode) ? saved.textMode : TEXT_TYPED,
@@ -773,28 +774,6 @@
 			}
 		}
 
-		/** A saved table the engine still accepts (check), else its default. */
-		function validOr(check, value, fallback) {
-			if (value === undefined) return fallback();
-			try {
-				return check(value);
-			} catch (error) {
-				console.warn(
-					`layout comparer: a saved table is refused (${error.code}); the default applies`
-				);
-				return fallback();
-			}
-		}
-
-		/** Keeps only the saved weights the engine still scores. */
-		function validWeights(weights) {
-			const out = {};
-			const defaults = E.defaultWeights();
-			for (const [id, value] of Object.entries(weights || {}))
-				if (id in defaults && Number.isFinite(value) && value >= 0) out[id] = value;
-			return out;
-		}
-
 		/**
 		 * The ranking table's saved columns (metric ids the engine still has, the
 		 * default set when none) and row filters (a name, a family, a score range).
@@ -812,16 +791,6 @@
 				min: bound(value.min),
 				max: bound(value.max)
 			};
-		}
-
-		/** The saved ideal finger load when the engine still accepts it, else the default. */
-		function validIdealLoad(load) {
-			if (!load) return E.defaultIdealLoad();
-			try {
-				return Object.assign({}, E.idealLoad(load));
-			} catch {
-				return E.defaultIdealLoad();
-			}
 		}
 
 		// ==========================

@@ -959,6 +959,16 @@ why, and each has « restore the defaults ».
 Weights, ideal finger load, shortcut table, form factor weights, selection, corpus and keyboard are remembered in `localStorage` when
 the browser allows it; nothing is sent anywhere.
 
+`score_settings.js` (global `LAYOUT_ANALYSIS_SCORE_SETTINGS`) is the one
+reading of those score settings: `parse(saved)` checks each the way the
+Comparer loads them, `analysisOptions(keyboard)` adds the keyboard's
+fingering profile, `customised(keyboard)` says which differ from the
+defaults, and `onChange(listener)` follows the Comparer's save (`notify()`
+on the same page, the `storage` event from another frame) and the fingering
+editor. The Comparer, the editor's analysis panel and the optimizer score
+with it, so a weight changed in the Comparer changes the optimizer's
+objective; no other page keeps weights of its own.
+
 ## Editor analysis panel
 
 `_shared/ui/layout_analysis/analysis_panel.js` (global `LAYOUT_ANALYSIS_PANEL`)

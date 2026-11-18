@@ -68,6 +68,8 @@ const SCRIPTS = [
 	// The PDF text reader corpus_files.js calls.
 	'pdf_text.js',
 	'corpus_files.js',
+	// The score settings every Studio score reads (the Comparer's own, shared).
+	'score_settings.js',
 	'comparer_page.js'
 ];
 // Floor: a page that lost its strings must not read as complete.
@@ -397,7 +399,13 @@ for (const src of SCRIPTS)
 		.matchAll(/^(?:const|let|class)\s+([A-Za-z_$][\w$]*)/gm))
 		lexical.add(m[1]);
 check(lexical.has('LAYOUT_COMPOSER_DATA'), 'globals: composer_data.js no longer seen');
-for (const file of ['comparer_page.js', 'analysis_panel.js', 'info_popover.js', 'corpus_files.js'])
+for (const file of [
+	'comparer_page.js',
+	'analysis_panel.js',
+	'info_popover.js',
+	'corpus_files.js',
+	'score_settings.js'
+])
 	for (const m of fs
 		.readFileSync(path.join(PAGE_DIR, file), 'utf8')
 		.matchAll(/window\.([A-Za-z_$][\w$]*)/g))
@@ -413,6 +421,7 @@ const PANEL_SCRIPTS = [
 	'../layout_analysis/undo_offer.js',
 	'../layout_analysis/fingering_editor.js',
 	'../layout_analysis/corpus_files.js',
+	'../layout_analysis/score_settings.js',
 	'../layout_analysis/analysis_panel.js',
 	'../layout_editor/editor_page.js'
 ];
