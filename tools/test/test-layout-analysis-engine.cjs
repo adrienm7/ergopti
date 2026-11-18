@@ -30,7 +30,9 @@
  *    tables shared or copied), plans it from the current plan to exactly
  *    the counts per way a plan from nothing gives, keeps a trial only once
  *    committed (an earlier trial too, after a later one replaced its plan),
- *    and refuses a layout on another board.
+ *    writes its compile into spare maps rather than copies (the committed
+ *    layout's maps left as a whole compile gives them), and refuses a
+ *    layout on another board.
  * 6. Ways of typing: in context the cheaper copy of a character (« a. »,
  *    « b. »), direct, AltGr or dead key by their documented costs, a
  *    two-character output only when cheaper than its two taps, one way per
@@ -1316,6 +1318,50 @@ for (const layout of library) {
 		check(
 			Math.abs(again.total - later.total) <= SESSION_TOLERANCE,
 			'incremental: a later trial scores the same from the earlier commit'
+		);
+	}
+	// A trial writes its compile into the session's spare maps, not into
+	// copies of the current ones: two trials in a row hand out the same maps,
+	// and a trial after a commit writes the other ones, leaving the committed
+	// layout's maps as they were.
+	if (byId.has('bepo')) {
+		const bepo = clone(byId.get('bepo'), true);
+		const spares = E.scoreSession(bepo, sessionTable, {});
+		const swapped = (a, b) => {
+			const out = clone(bepo, true);
+			[out.rows[a], out.rows[b]] = [out.rows[b], out.rows[a]];
+			return out;
+		};
+		const wholeText = (layout) => {
+			const parsed = E.layoutFromRows(layout);
+			const board = E.keyboard(parsed.fingering === 'angle' ? 'iso_angle' : 'iso');
+			return waysText(E.compileWays(parsed, board, null));
+		};
+		const first = spares.trial(swapped('KeyA', 'KeyS'));
+		const firstMaps = [first.compiled.ways, first.compiled.best, first.compiled.texts];
+		const keptLayout = swapped('KeyF', 'KeyD');
+		const second = spares.trial(keptLayout);
+		check(
+			first.compile === 'incremental' && second.compile === 'incremental',
+			`incremental: bépo's letter swaps compile in part (${first.compile}, ${second.compile})`
+		);
+		check(
+			second.compiled.ways === firstMaps[0] &&
+				second.compiled.best === firstMaps[1] &&
+				second.compiled.texts === firstMaps[2],
+			'incremental: a trial reuses the spare maps of the trial before, instead of copying the current ones'
+		);
+		second.commit();
+		const kept = second.compiled;
+		const third = spares.trial(swapped('KeyE', 'KeyR'));
+		check(
+			third.compiled.ways !== kept.ways && third.compiled.best !== kept.best,
+			'incremental: a trial after a commit writes the other spare maps'
+		);
+		check(
+			waysText(third.compiled) === wholeText(swapped('KeyE', 'KeyR')) &&
+				waysText(kept) === wholeText(keptLayout),
+			"incremental: a later trial leaves the committed layout's maps as a whole compile gives them"
 		);
 	}
 	// The partial compile must carry the trials, not the whole-compile fallback.

@@ -695,6 +695,8 @@ var LAYOUT_ANALYSIS = (function () {
 	const wayTimes = new WeakMap();
 	// Passes a partial compile may take before it gives up and compiles whole.
 	const PARTIAL_PASS_LIMIT = 4 * MAX_DEAD_DEPTH;
+	// No key changed (planTyping's from.changed when the compile is the same).
+	const NO_KEYS = new Set();
 
 	/**
 	 * Which of two offers of a way on the same keys a whole compile makes
@@ -951,11 +953,14 @@ var LAYOUT_ANALYSIS = (function () {
 	 * whose base letter was, are counted again.
 	 * @param {object} previous - The finishWays() result of the core before.
 	 * @param {object} core - From compileCoreFrom(), with changedChars.
-	 * @returns {object} As finishWays.
+	 * @param {{ways, best}} [spares] - spareMaps() a score session writes the
+	 *   finished maps into, instead of copies of the previous ones.
+	 * @returns {object} As finishWays, plus changed: the characters whose
+	 *   lists may differ from previous.ways.
 	 */
-	function finishWaysFrom(previous, core) {
-		const ways = new Map(previous.ways);
-		const best = new Map(previous.best);
+	function finishWaysFrom(previous, core, spares) {
+		const ways = spares ? spares.ways.copyOf(previous.ways) : new Map(previous.ways);
+		const best = spares ? spares.best.copyOf(previous.best) : new Map(previous.best);
 		const changed = new Set(core.changedChars);
 		const substitutions = substitutionParts();
 		// The previous substitutes leave (a cell's own list is never a substitute).
@@ -991,7 +996,11 @@ var LAYOUT_ANALYSIS = (function () {
 			best.set(fancy, list[0]);
 			changed.add(fancy);
 		}
-		const out = { ways, texts: core.texts, best, distinct };
+		if (spares) {
+			spares.ways.mark(changed);
+			spares.best.mark(changed);
+		}
+		const out = { ways, texts: core.texts, best, distinct, changed };
 		if (!previous.accents) previous.accents = accentCounts(previous.ways);
 		let { accented, mnemonic } = previous.accents;
 		const recount = new Set(changed);
@@ -1072,6 +1081,66 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
+	 * The maps a score session writes one role of its trials into (a core's
+	 * ways, a compile's best ways, a plan's ways…), so that a trial starts
+	 * from a copy of the current map without copying it whole. The map handed
+	 * out last differs from the one it was made equal to only on the keys
+	 * the trial wrote (mark: each collection of keys, once its writes are
+	 * done; it must not change after), so asking again for that map writes
+	 * those keys back, and asking for the map handed out (the trial was
+	 * committed) writes them into the map before it, when that one is a
+	 * spare too. The map asked for is never written; any other map (a whole
+	 * compile's, which nothing writes after) is copied whole, and copyWhole
+	 * copies a map that may be written later (another role's spare). A map
+	 * handed out stays valid until the next copy.
+	 * @returns {{copyOf: function(Map): Map, copyWhole: function(Map): Map,
+	 *   mark: function(Iterable): void, owns: function(Map): boolean}}
+	 */
+	function spareMaps() {
+		// The map handed out last, the map it was made equal to, and whether that one is a spare.
+		let last = null;
+		let from = null;
+		let fromOwn = false;
+		// Collections of the keys where last and from may differ (a key may be in several).
+		let dirty = [];
+		const sync = (target, source) => {
+			for (const keys of dirty)
+				for (const key of keys) {
+					const value = source.get(key);
+					if (value === undefined) target.delete(key);
+					else target.set(key, value);
+				}
+			dirty = [];
+			return target;
+		};
+		return {
+			copyOf(map) {
+				if (map === from && last !== null) return sync(last, from);
+				if (map === last && fromOwn) {
+					[last, from] = [from, last];
+					return sync(last, from);
+				}
+				dirty = [];
+				fromOwn = map === last;
+				from = map;
+				return (last = new Map(map));
+			},
+			copyWhole(map) {
+				dirty = [];
+				fromOwn = false;
+				from = null;
+				return (last = new Map(map));
+			},
+			mark(keys) {
+				dirty.push(keys);
+			},
+			owns(map) {
+				return map === last || (fromOwn && map === from);
+			}
+		};
+	}
+
+	/**
 	 * compileCore of a layout a few cells or dead-key rules away from one
 	 * already compiled (scoreSession's swaps), equal to compiling it from
 	 * nothing: only the characters, dead states and texts whose ways can
@@ -1084,10 +1153,12 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {object} previous - From compileCore() or compileCoreFrom(), on the same board.
 	 * @param {object} layout - Library shape.
 	 * @param {object} board - From keyboard().
+	 * @param {{coreWays, deadWays, texts}} [spares] - spareMaps() a score session
+	 *   writes the new lists into, instead of copies of the previous maps.
 	 * @returns {object} As compileCore, plus whole: true when compiled from
 	 *   nothing, or changedChars: the characters compiled again.
 	 */
-	function compileCoreFrom(previous, layout, board) {
+	function compileCoreFrom(previous, layout, board, spares) {
 		const before = previous.layout;
 		const touched = new Set();
 		const touch = (cell) => {
@@ -1157,17 +1228,21 @@ var LAYOUT_ANALYSIS = (function () {
 			else if (symbol[0] === 'd') only.dead.add(name);
 			else only.texts.add(name);
 		}
+		// The previous maps, less the lists compiled again: only those keys are written.
+		const without = (map, keys, spare) => {
+			const out = spare ? spare.copyOf(map) : new Map(map);
+			for (const key of keys) out.delete(key);
+			if (spare) spare.mark(keys);
+			return out;
+		};
 		const core = {
 			layout,
 			// The characters whose lists were compiled again (finishWaysFrom).
 			changedChars: only.chars,
-			ways: new Map(previous.ways),
-			deadWays: new Map(previous.deadWays),
-			texts: new Map(previous.texts)
+			ways: without(previous.ways, only.chars, spares && spares.coreWays),
+			deadWays: without(previous.deadWays, only.dead, spares && spares.deadWays),
+			texts: without(previous.texts, only.texts, spares && spares.texts)
 		};
-		for (const char of only.chars) core.ways.delete(char);
-		for (const state of only.dead) core.deadWays.delete(state);
-		for (const text of only.texts) core.texts.delete(text);
 		offerCells(core, layout, board, null, only);
 		const order = [];
 		for (let r = 0; r < rules.length; r++) if (touched.has(outputs[r])) order.push(r);
@@ -2672,6 +2747,16 @@ var LAYOUT_ANALYSIS = (function () {
 			return out;
 		}
 
+		// The maps the trials write their compile and plan into (spareMaps): a
+		// trial's maps are its own until the next trial.
+		const spares = {
+			coreWays: spareMaps(),
+			ways: spareMaps(),
+			deadWays: spareMaps(),
+			texts: spareMaps(),
+			best: spareMaps(),
+			plan: spareMaps()
+		};
 		// Trials made so far: only the last one's plan is whole until the next trial.
 		let trials = 0;
 
@@ -2682,15 +2767,19 @@ var LAYOUT_ANALYSIS = (function () {
 			trials += 1;
 			const serial = trials;
 			// Compiled from the current layout: only the ways the changed cells and rules reach.
-			const nextCore = compileCoreFrom(state.core, layout, board);
+			const nextCore = compileCoreFrom(state.core, layout, board, spares);
 			const nextCompiled =
 				nextCore === state.core
 					? state.compiled
 					: nextCore.whole
 						? finishWays(new Map(nextCore.ways), nextCore.texts)
-						: finishWaysFrom(state.compiled, nextCore);
+						: finishWaysFrom(state.compiled, nextCore, spares);
 			// Planned from the current plan: only the choices a changed token can reach are made again.
-			const nextPlan = planTyping(nextCompiled, board, table, fixed, state.plan);
+			const nextPlan = planTyping(nextCompiled, board, table, fixed, state.plan, {
+				spare: spares.plan,
+				changed:
+					nextCompiled === state.compiled ? NO_KEYS : nextCore.whole ? null : nextCompiled.changed
+			});
 			const seqs = sequences(nextCompiled.best);
 			let next;
 			// How the trial was walked: the changed characters' n-grams ('stream'),
@@ -4275,10 +4364,14 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   ways changed are made again, and the plan records what changed
 	 *   (plan.changed) for an incremental walk. The result is the plan made
 	 *   from nothing, to the last bit.
+	 * @param {{spare: object, changed: Set<string>|null}} [from] - With
+	 *   previous (scoreSession): the spareMaps() the plan's own ways are written
+	 *   into, and the characters whose lists may differ from those of the
+	 *   compile previous was planned from (null: unknown).
 	 * @returns {object} {table, ways, best, multi, chords, choose, uniDist,
 	 *   leftDist, rightDist, pickAt, parts, before, after, changed?}.
 	 */
-	function planTyping(compiled, board, charTable, fixed, previous) {
+	function planTyping(compiled, board, charTable, fixed, previous, from) {
 		const plan = {
 			table: charTable,
 			ways: compiled.ways,
@@ -4347,14 +4440,22 @@ var LAYOUT_ANALYSIS = (function () {
 		// behind an extra press no typist makes; it stays the way of a
 		// character that has no other, and the fixed path keeps its choice.
 		const { table } = plan;
+		const filtered = [];
+		const keptLists = [];
 		for (const [token] of table.uni) {
 			const list = plan.ways.get(token);
 			if (!list || list.length < 2) continue;
 			const kept = list.filter((way, i) => i === 0 || !way.terminated);
 			if (kept.length === list.length) continue;
-			if (plan.ways === compiled.ways) plan.ways = new Map(compiled.ways);
-			plan.ways.set(token, kept);
+			filtered.push(token);
+			keptLists.push(kept);
 		}
+		if (filtered.length && plan.ways === compiled.ways) {
+			plan.ways = waysToFilter(compiled, previous, from);
+			if (from) plan.filtered = filtered;
+		}
+		for (let i = 0; i < filtered.length; i++) plan.ways.set(filtered[i], keptLists[i]);
+		if (plan.filtered) from.spare.mark(filtered);
 		const { ways, multi } = plan;
 
 		// 2. Context (planContext, on token ids).
@@ -4401,6 +4502,29 @@ var LAYOUT_ANALYSIS = (function () {
 			return chooseWay(st, ai, bi, ci, pair(ai, bi), ci < 0 ? -1 : pair(bi, ci));
 		};
 		return plan;
+	}
+
+	/**
+	 * A copy of a compile's ways for planTyping to filter: with a score
+	 * session's spare maps, the previous plan's own ways with only the
+	 * characters that may differ written again (those the compile changed and
+	 * those the previous plan filtered), else a whole copy.
+	 */
+	function waysToFilter(compiled, previous, from) {
+		if (!from) return new Map(compiled.ways);
+		const { spare, changed } = from;
+		if (changed === null || !previous || !previous.filtered || !spare.owns(previous.ways))
+			return spare.copyWhole(compiled.ways);
+		const ways = spare.copyOf(previous.ways);
+		for (const keys of [changed, previous.filtered]) {
+			for (const key of keys) {
+				const list = compiled.ways.get(key);
+				if (list === undefined) ways.delete(key);
+				else ways.set(key, list);
+			}
+			spare.mark(keys);
+		}
+		return ways;
 	}
 
 	/**
