@@ -62,8 +62,9 @@ h2 {
 	outline: none;
 }
 
+/* Bright enough for small text on the window (WCAG 1.4.3: 4.5:1). */
 #range-hint {
-	color: var(--theme-hue-7a7a80);
+	color: var(--theme-hue-a0a0a6);
 	font-size: 11px;
 }
 
@@ -97,11 +98,13 @@ button:hover {
 	background: var(--theme-hue-3d3d41);
 }
 
+/* A deep blue under the light label (6:1, WCAG 1.4.3); hover darkens it
+   rather than lightening it below that ratio. */
 #save-button {
-	background: var(--theme-hue-3a6bd0);
-	border-color: var(--theme-hue-3a6bd0);
+	background: var(--theme-hue-1a4bbf);
+	border-color: var(--theme-hue-1a4bbf);
 }
 
 #save-button:hover {
-	background: var(--theme-hue-4478e0);
+	background: var(--theme-hue-0b4ea2);
 }

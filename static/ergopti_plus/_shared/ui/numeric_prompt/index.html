@@ -15,11 +15,19 @@
 			<div id="prompt-hint"></div>
 
 			<div id="input-wrapper">
-				<input type="number" id="value-input" step="any" />
+				<!-- The field has no label of its own: the question above names it and
+				     the hint, the range and a refusal describe it (WCAG 1.3.1, 3.3.2). -->
+				<input
+					type="number"
+					id="value-input"
+					step="any"
+					aria-labelledby="prompt-title"
+					aria-describedby="prompt-hint range-hint error"
+				/>
 				<div id="range-hint"></div>
 			</div>
 
-			<div id="error" hidden></div>
+			<div id="error" role="alert" hidden></div>
 
 			<div id="buttons">
 				<button
