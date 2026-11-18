@@ -1,4 +1,4 @@
-﻿; tests/unit/gestures/engine/test_takenote_native_probe_decisions.ahk
+﻿; tests/unit/modules/take_note/test_takenote_native_probe_decisions.ahk
 
 ; ==============================================================================
 ; MODULE: TakeNote Native Probe Decision Tests

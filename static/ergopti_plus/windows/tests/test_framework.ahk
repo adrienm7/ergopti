@@ -801,8 +801,8 @@ global TEST_MODULE_GROUPS := [
 	["config-updater", "^unit/settings/engine/|^unit/core/text/toml/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
 	; Hotstrings, dynamic hotstrings and shortcuts.
 	["hotstrings-shortcuts", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
-	; Keyboard remapping, layouts and gestures.
-	["keymap-gestures", "^unit/(platform/remap|modules/keymap|gestures)/"],
+	; Keyboard remapping, layouts, gestures and the Take note action a gesture runs.
+	["keymap-gestures", "^unit/(platform/remap|modules/keymap|modules/take_note|gestures)/"],
 	; Keystats capture, storage and metrics.
 	["keystats", "^unit/modules/keystats/"],
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.

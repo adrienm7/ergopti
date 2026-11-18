@@ -1,4 +1,4 @@
-﻿; tests/unit/gestures/engine/test_takenote_pause_lifecycle_owner.ahk
+﻿; tests/unit/modules/take_note/test_takenote_pause_lifecycle_owner.ahk
 
 ; ==============================================================================
 ; MODULE: TakeNote Pause Lifecycle Ownership Tests

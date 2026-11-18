@@ -1,4 +1,4 @@
-﻿; tests/unit/gestures/engine/test_take_note_async_job.ahk
+﻿; tests/unit/modules/take_note/test_take_note_async_job.ahk
 
 ; ==============================================================================
 ; MODULE: Shared Take-Note Async Job Tests

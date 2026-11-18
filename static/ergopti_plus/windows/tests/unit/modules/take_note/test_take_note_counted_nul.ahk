@@ -1,4 +1,4 @@
-﻿; tests/unit/gestures/engine/test_take_note_counted_nul.ahk
+﻿; tests/unit/modules/take_note/test_take_note_counted_nul.ahk
 
 ; Counted JSON strings cross a real native file-existence witness, while the
 ; public action uses explicit passive OS/timer ports: no Notepad or input.
