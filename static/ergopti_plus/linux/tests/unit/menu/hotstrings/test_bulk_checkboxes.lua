@@ -690,6 +690,17 @@ helpers.describe("dynamic families consume the genuine shared boundaries", funct
 end)
 
 
+--- True when a chunk source is the file require loads for a module name, so
+--- the check follows the module wherever the structure steps move it.
+--- @param source string debug.getinfo(...).source of a function.
+--- @param module_name string Dotted module name.
+--- @return boolean
+local function is_module_file(source, module_name)
+	local file = assert(helpers.driver_module_path(module_name), "driver module required: " .. module_name)
+	local tail = file:sub(#helpers.driver_root() + 1)
+	return source:sub(-#tail) == tail
+end
+
 --- Retains the real dynamic engine, manifest binding and genuine Hotstrings constructor/category subtree.
 local function with_personal_info_leaf(body)
 	with_dynamic_family_owners(function(owner)
@@ -701,7 +712,7 @@ local function with_personal_info_leaf(body)
 		-- dispatch unrelated full-tray producers before the leaf assertions.
 		local get_upvalue = assert(debug.getupvalue)
 		local source = debug.getinfo(builder.build, "S").source
-		assert(source:match("/menu/ui/builder/builder%.lua$"), "actual native builder file required")
+		assert(is_module_file(source, "menu.ui.builder.builder"), "actual native builder file required")
 		local build_hotstrings, matches = nil, 0
 		for index = 1, math.huge do
 			local name, value = get_upvalue(builder.build, index)
@@ -709,10 +720,10 @@ local function with_personal_info_leaf(body)
 			if name == "_build_hotstrings" then build_hotstrings, matches = value, matches + 1 end
 		end
 		assert(matches == 1 and type(build_hotstrings) == "function", "unique original native Hotstrings constructor required")
-		-- The root binds the constructor from its own module (hotstrings/ui/menu/hotstrings.lua).
+		-- The root binds the constructor from its own module.
 		assert(rawequal(build_hotstrings, require("hotstrings.ui.menu.hotstrings").build),
 			"constructor must be the one the actual builder binds")
-		assert(debug.getinfo(build_hotstrings, "S").source:match("/ui/menu/menu_hotstrings%.lua$"),
+		assert(is_module_file(debug.getinfo(build_hotstrings, "S").source, "hotstrings.ui.menu.hotstrings"),
 			"constructor must belong to the actual Hotstrings module")
 		local opened = {}
 		local config, changes = fake_config(false, false)
