@@ -1,0 +1,221 @@
+{
+	"_description": "KLAnext's own numbers (its « Summary » table: Overall, Distance, Same Finger, Same Hand, ANSI board, version 0.06), read on https://klanext.keyboard-design.com on 2026-11-18 for its preset texts (https://klanext.keyboard-design.com/corpus/<id>.txt, licence unknown: never stored here). tools/dev/verify-analyser-scores.cjs downloads the texts and compares our scorer. « layouts » maps KLAnext's layout names to our library's ids; « definitions » lists the keys where KLAnext's layout files put a character elsewhere than our library (read from its output on one-character texts): code, layer (0 base, 1 Shift), character.",
+	"site": "https://klanext.keyboard-design.com",
+	"version": "0.06",
+	"read": "2026-11-18",
+	"columns": ["overall", "distance", "same_finger", "same_hand"],
+	"layouts": {
+		"qwerty.en.ansi": "qwerty",
+		"dvorak.en.ansi": "dvorak",
+		"colemak.en.ansi": "colemak",
+		"workman.en.ansi": "workman",
+		"mtgap.en.ansi": "mtgap30",
+		"capewell.en.ansi": "capewell",
+		"burroughs-bower.en.ansi": "burroughs_bower",
+		"hieamtsrn.en.ansi": "hieamtsrn",
+		"uciea-vanilla.en.ansi": "uciea"
+	},
+	"definitions": {
+		"capewell": [
+			["Minus", 0, "["],
+			["Minus", 1, "{"],
+			["Equal", 0, "]"],
+			["Equal", 1, "}"],
+			["BracketRight", 0, "="],
+			["BracketRight", 1, "+"],
+			["IntlBackslash", 0, null],
+			["IntlBackslash", 1, null]
+		],
+		"dvorak": [
+			["Minus", 0, "["],
+			["Minus", 1, "{"],
+			["Equal", 0, "]"],
+			["Equal", 1, "}"],
+			["Quote", 0, "-"],
+			["Quote", 1, "_"],
+			["BracketLeft", 0, "/"],
+			["BracketLeft", 1, "?"],
+			["BracketRight", 0, "="],
+			["BracketRight", 1, "+"]
+		],
+		"mtgap30": [
+			["KeyG", 1, ";"],
+			["KeyC", 1, "<"],
+			["KeyB", 0, ":"],
+			["KeyB", 1, "?"]
+		],
+		"uciea": [
+			["Minus", 0, "["],
+			["Minus", 1, "{"],
+			["Equal", 0, "]"],
+			["Equal", 1, "}"],
+			["KeyX", 0, "/"],
+			["BracketRight", 0, "="],
+			["BracketRight", 1, "+"],
+			["IntlBackslash", 0, null],
+			["IntlBackslash", 1, null]
+		],
+		"workman": [
+			["KeyP", 0, ";"],
+			["KeyP", 1, ":"],
+			["Quote", 0, "'"],
+			["Quote", 1, "\""]
+		]
+	},
+	"presets": {
+		"alice-ch1": {
+			"burroughs_bower": [142.93, 69.29, 55.24, 18.4],
+			"capewell": [141.68, 67.83, 52.55, 21.3],
+			"colemak": [130.03, 66.16, 50.26, 13.62],
+			"dvorak": [145.4, 71.55, 64.54, 9.31],
+			"hieamtsrn": [123.94, 68.3, 45.51, 10.13],
+			"mtgap30": [128.7, 69.44, 48.35, 10.91],
+			"qwerty": [185.49, 94.55, 77.73, 13.2],
+			"uciea": [119.12, 70.39, 39.09, 9.63],
+			"workman": [138.86, 65.6, 58.06, 15.2]
+		},
+		"coder0": {
+			"burroughs_bower": [344.75, 137.25, 184.84, 22.66],
+			"capewell": [356.24, 137.03, 195.24, 23.97],
+			"colemak": [341.48, 135.31, 185.17, 21.01],
+			"dvorak": [359.78, 141.52, 199.92, 18.33],
+			"hieamtsrn": [369.97, 132.42, 218.44, 19.11],
+			"mtgap30": [356.82, 137.62, 199.3, 19.9],
+			"qwerty": [380.86, 153.47, 204.41, 22.98],
+			"uciea": [333.53, 139.15, 175.82, 18.56],
+			"workman": [350.54, 137.99, 190.42, 22.13]
+		},
+		"coder3": {
+			"burroughs_bower": [354.35, 137.66, 193.61, 23.07],
+			"capewell": [360.33, 137.89, 198.14, 24.3],
+			"colemak": [344.12, 135.79, 187.24, 21.09],
+			"dvorak": [366.7, 142.07, 206.31, 18.33],
+			"hieamtsrn": [370.08, 133.83, 217.32, 18.93],
+			"mtgap30": [362.25, 138.09, 203.67, 20.49],
+			"qwerty": [385.66, 153.61, 209.03, 23.02],
+			"uciea": [339.28, 139.7, 180.86, 18.72],
+			"workman": [354.66, 139.02, 193.62, 22.02]
+		},
+		"coder5": {
+			"burroughs_bower": [354.47, 138.78, 192.63, 23.07],
+			"capewell": [360.29, 138.96, 196.98, 24.36],
+			"colemak": [343.9, 136.95, 185.84, 21.12],
+			"dvorak": [366.33, 143.38, 204.54, 18.4],
+			"hieamtsrn": [369.94, 134.87, 216.05, 19.01],
+			"mtgap30": [360.89, 139.11, 201.29, 20.49],
+			"qwerty": [385.64, 154.66, 207.93, 23.05],
+			"uciea": [339.58, 141.02, 179.76, 18.8],
+			"workman": [355.03, 140.12, 192.81, 22.11]
+		},
+		"common-words-prose": {
+			"burroughs_bower": [114.52, 62.25, 35.59, 16.69],
+			"capewell": [110.12, 60.44, 30.64, 19.04],
+			"colemak": [102.03, 58.23, 27.78, 16.03],
+			"dvorak": [106.75, 59.73, 37.91, 9.11],
+			"hieamtsrn": [99.97, 59.66, 28.57, 11.74],
+			"mtgap30": [97.42, 60.63, 24.29, 12.5],
+			"qwerty": [147.84, 88.89, 44.02, 14.94],
+			"uciea": [97.94, 62.31, 26.32, 9.31],
+			"workman": [107.36, 55.54, 36.44, 15.38]
+		},
+		"intro": {
+			"burroughs_bower": [186.65, 68.84, 100.54, 17.27],
+			"capewell": [183.53, 67.95, 94.53, 21.05],
+			"colemak": [168.8, 66.61, 88.27, 13.93],
+			"dvorak": [189.64, 75.37, 103.95, 10.33],
+			"hieamtsrn": [175.65, 71.33, 93.36, 10.96],
+			"mtgap30": [176.67, 71.1, 91.76, 13.82],
+			"qwerty": [245.49, 98.77, 131.97, 14.76],
+			"uciea": [173.81, 71.19, 91.33, 11.28],
+			"workman": [182.22, 69.41, 96.92, 15.89]
+		},
+		"monkey0": {
+			"burroughs_bower": [154.92, 71.7, 64.97, 18.24],
+			"capewell": [149.94, 69.91, 59.19, 20.83],
+			"colemak": [140.69, 68.69, 58.27, 13.73],
+			"dvorak": [154.57, 75.37, 69.83, 9.37],
+			"hieamtsrn": [139.46, 71.19, 58.15, 10.12],
+			"mtgap30": [138.37, 72.15, 54.31, 11.91],
+			"qwerty": [207.28, 100.36, 92.06, 14.87],
+			"uciea": [133.79, 72.2, 51.48, 10.11],
+			"workman": [152.85, 70.93, 67.1, 14.82]
+		},
+		"monkey3": {
+			"burroughs_bower": [154.36, 71.91, 64.44, 18.02],
+			"capewell": [151.29, 70.54, 59.93, 20.81],
+			"colemak": [139.18, 68.91, 56.63, 13.65],
+			"dvorak": [153.24, 76.01, 67.95, 9.28],
+			"hieamtsrn": [137.49, 71.9, 55.5, 10.09],
+			"mtgap30": [138.27, 72.79, 53.65, 11.83],
+			"qwerty": [207.78, 100.68, 92.49, 14.61],
+			"uciea": [130.61, 72.79, 47.82, 10],
+			"workman": [152.76, 71.3, 66.78, 14.68]
+		},
+		"pangrams": {
+			"burroughs_bower": [185.61, 85.7, 81.42, 18.49],
+			"capewell": [189.42, 86, 81.36, 22.06],
+			"colemak": [162.99, 84.18, 65.59, 13.23],
+			"dvorak": [169.52, 87.03, 71.58, 10.91],
+			"hieamtsrn": [141.26, 89.74, 41.61, 9.92],
+			"mtgap30": [155.11, 88.77, 53.34, 13],
+			"qwerty": [221.95, 105.58, 101.35, 15.02],
+			"uciea": [132.79, 90.01, 33.89, 8.88],
+			"workman": [173.59, 85.32, 74.11, 14.16]
+		},
+		"savant0": {
+			"burroughs_bower": [183.32, 79.78, 84.39, 19.15],
+			"capewell": [181.86, 78.6, 81.77, 21.5],
+			"colemak": [168.84, 77.11, 76.75, 14.98],
+			"dvorak": [184.47, 84.22, 89.75, 10.51],
+			"hieamtsrn": [172.15, 79.02, 81.86, 11.27],
+			"mtgap30": [170.09, 80.56, 76.44, 13.1],
+			"qwerty": [234.57, 106.43, 111.98, 16.15],
+			"uciea": [160.34, 80.69, 68.44, 11.2],
+			"workman": [181.24, 79.51, 85.68, 16.05]
+		},
+		"savant3": {
+			"burroughs_bower": [191.87, 83.09, 89.76, 19.02],
+			"capewell": [190.61, 81.96, 87.06, 21.6],
+			"colemak": [176.69, 80.41, 81.38, 14.9],
+			"dvorak": [192.16, 87.22, 94.17, 10.77],
+			"hieamtsrn": [180.65, 82.49, 86.61, 11.55],
+			"mtgap30": [180.11, 83.93, 82.85, 13.32],
+			"qwerty": [241.26, 109.72, 115.47, 16.07],
+			"uciea": [169.26, 84.35, 73.47, 11.43],
+			"workman": [189.12, 82.79, 90.41, 15.92]
+		},
+		"test-corpus-40-10-10": {
+			"burroughs_bower": [190.77, 84.06, 87.77, 18.93],
+			"capewell": [190.47, 82.92, 86.12, 21.43],
+			"colemak": [177.66, 81.26, 81.41, 14.99],
+			"dvorak": [192.54, 88.25, 93.5, 10.79],
+			"hieamtsrn": [181.59, 83.12, 86.87, 11.6],
+			"mtgap30": [179.7, 84.85, 81.61, 13.24],
+			"qwerty": [240.82, 110.38, 114.31, 16.13],
+			"uciea": [169.16, 85.12, 72.6, 11.45],
+			"workman": [190.21, 83.71, 90.46, 16.04]
+		},
+		"typing-champ-1": {
+			"burroughs_bower": [113.85, 61.22, 37.83, 14.8],
+			"capewell": [114.48, 59.41, 36.64, 18.43],
+			"colemak": [106.46, 56.92, 36.97, 12.57],
+			"dvorak": [125.26, 65.47, 48.91, 10.88],
+			"hieamtsrn": [101.68, 61.63, 29.13, 10.93],
+			"mtgap30": [96.76, 63.38, 21, 12.38],
+			"qwerty": [170.67, 94.25, 62.56, 13.86],
+			"uciea": [104.67, 63.09, 30.77, 10.81],
+			"workman": [118.68, 58.75, 45.82, 14.12]
+		},
+		"udhr_spa": {
+			"burroughs_bower": [156.97, 59.02, 79.29, 18.66],
+			"capewell": [156.51, 58.73, 73.85, 23.93],
+			"colemak": [149.59, 56.74, 73.93, 18.91],
+			"dvorak": [159.26, 67.39, 80.36, 11.51],
+			"hieamtsrn": [143.75, 64.18, 69.21, 10.37],
+			"mtgap30": [155.28, 63.56, 76.01, 15.71],
+			"qwerty": [233.13, 84.26, 127.88, 20.99],
+			"uciea": [147.58, 60.53, 73.38, 13.68],
+			"workman": [161.15, 64.14, 77.73, 19.29]
+		}
+	}
+}

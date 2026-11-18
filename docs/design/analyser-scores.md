@@ -361,6 +361,25 @@ r·skip1 + r²·skip2 + r³·skip3)` (r = 1/7) times the distance and 5.5 / fing
   library's Ergo-L lacks the one-dead-key-on-itself chain (ë), 0.002 %
   unsupported.
 
+## Checking against the real tools
+
+`node tools/dev/verify-analyser-scores.cjs [--verbose]` (maintainer tool, needs
+the network; never in CI) downloads KLAnext's presets and prints, per preset
+and layout, the gap to KLAnext's numbers recorded in
+`tools/dev/analyser-reference/klanext.json`, with our library's layouts and
+with KLAnext's own layout definitions. With `--oxeylyzer=<exe>
+--oxeylyzer-data=<its data folder>` it also runs a local Oxeylyzer build on our
+corpus texts. Measured on 2026-11-18:
+
+| Analyser  | Points | Mean gap                                | Largest      |
+| --------- | ------ | --------------------------------------- | ------------ |
+| KLAnext   | 126    | 0.0024 (its definitions), 0.19 % (ours) | 0.005, 2.5 % |
+| Oxeylyzer | 72     | 0.0044                                  | 0.012        |
+
+Not re-measured against a run of the tool in this pass: genkey (Go), cmini,
+a200 (Python), carpalx (Perl), keygen (Rust) and Keyboard Layout Optimizer
+(Rust): their fidelity above rests on the earlier checks it names.
+
 ## Not covered
 
 Listed by the search for this work, not reproduced (no score, or a score made
