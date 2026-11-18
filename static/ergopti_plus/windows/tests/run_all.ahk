@@ -647,6 +647,7 @@ InstallSendNoOps()
 #Include unit/modules/keymap/test_nav_layer_save.ahk
 #Include unit/modules/hotstrings/engine/test_synthetic_buffer_effects.ahk
 #Include unit/modules/hotstrings/prefix/test_prefix_finalizer_generation.ahk
+#Include unit/modules/hotstrings/prefix/test_prefix_deferred_pause.ahk
 #Include unit/modules/hotstrings/engine/test_synthetic_sends_declare_buffer_effect.ahk
 #Include unit/platform/remap/keys/test_capsword_taphold_unlatch.ahk
 #Include unit/modules/shortcuts/test_caps_word_auto_off_policy.ahk
@@ -1879,7 +1880,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/gestures/test_paste_plain_nontext_clip_guard.ahk
 #Include meta/core/text/test_pathstoml_read_missing_utf8_encoding.ahk
 #Include meta/modules/hotstrings/personal/test_personal_ext_scan_unbounded_recursion.ahk
-#Include meta/modules/hotstrings/prefix/test_prefix_index_rebuild_no_suspend_guard.ahk
+#Include meta/modules/hotstrings/prefix/test_prefix_index_rebuild_atomic_swap.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_onkeydown_tab_llm_feed_gap.ahk
 #Include meta/platform/system/test_reg_keyexists_value_only.ahk
 #Include meta/adapters/test_registry_oserror_number_not_extra.ahk
@@ -2223,7 +2224,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/hotstrings/catalogue/test_deferred_ext_scan_critical_file_io.ahk
 #Include meta/ui/wpm/test_wpm_compact_color_validation.ahk
 #Include meta/platform/remap/keys/test_backspace_repeat_suspend_guard.ahk
-#Include meta/modules/hotstrings/prefix/test_prefix_render_flush_suspend_guard.ahk
 #Include meta/gestures/test_dispatch_logs_failure.ahk
 #Include meta/ai/servers/test_ollama_installer_sync_winhttp_blocks.ahk
 #Include meta/ai/servers/test_ollama_delete_model_async.ahk
@@ -2347,7 +2347,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/settings/persistence/test_master_gate_drifted_subgate_skip.ahk
 #Include meta/platform/remap/keys/test_rctrl_lalt_hotif_gated.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_keydown_ctrl_backspace_reset.ahk
-#Include meta/modules/hotstrings/prefix/test_prefix_index_rebuild_suspend_replay.ahk
+#Include meta/modules/hotstrings/prefix/test_prefix_index_rebuild_resume_replay.ahk
 #Include meta/core/lifecycle/engine/reload/test_suspend_transition_serialized.ahk
 #Include meta/modules/shortcuts/test_wrap_selection_clip_fallback.ahk
 #Include meta/modules/shortcuts/test_uia_selection_poll_boot_gated.ahk
