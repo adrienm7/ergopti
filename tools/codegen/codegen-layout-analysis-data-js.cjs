@@ -54,6 +54,11 @@ const REGISTER_STATUSES = ['ship', 'hold', 'refused'];
 // The folders of static/corpus the register covers: texts, and word frequency lists.
 const CORPUS_FOLDERS = ['original', 'frequency'];
 const CORPUS_FORMATS = ['text', 'word_frequencies', 'tsv', 'count_table'];
+// What sort of text a corpus is (corpora.json kind): the Comparer's corpus
+// picker groups by it, prose apart from word lists and code.
+const CORPUS_KINDS = ['literature', 'encyclopedia', 'news', 'sentences', 'words', 'code'];
+// The language of a code corpus: no natural language.
+const CODE_LANGUAGE = 'code';
 // How a count table was counted: as running text, or by the word-list rule.
 const COUNTED_AS = ['text', 'word_list'];
 // The count-table file (static/corpus/frequency/<source>/<id>.json) a large corpus
@@ -363,6 +368,10 @@ function fromWholeRows(entry, codes) {
  * @throws {Error} On a malformed entry or an unknown layout.
  */
 function checkNotImported(library, ids) {
+	// Each collection is named as people write it (the Comparer's origin filter).
+	for (const [id, source] of Object.entries(library.sources))
+		if (typeof source.name !== 'string' || source.name.trim() === '')
+			throw new Error(`layout_library.json: source ${id} needs a display name`);
 	for (const entry of library.not_imported || []) {
 		if (!library.sources[entry.source] || !entry.source_path || !entry.reason)
 			throw new Error(
@@ -675,6 +684,13 @@ function buildCorpora(engine) {
 		if (corpus.restore_dead_key_pairs) text = restoreDeadKeyPairs(text);
 		// A Leipzig sentence file numbers its lines: « 12<TAB>sentence ».
 		if (corpus.strip_sentence_numbers) text = text.replace(/^\d+\t/gm, '');
+		if (!CORPUS_KINDS.includes(corpus.kind))
+			throw new Error(`corpora.json: ${corpus.id} has kind ${corpus.kind}`);
+		// Code, and only code, has no natural language.
+		if ((corpus.kind === 'code') !== (corpus.language === CODE_LANGUAGE))
+			throw new Error(
+				`corpora.json: ${corpus.id} is kind ${corpus.kind} in language ${corpus.language}`
+			);
 		const format = corpus.format || 'text';
 		if (!CORPUS_FORMATS.includes(format))
 			throw new Error(`corpora.json: ${corpus.id} has format ${format}`);
@@ -734,6 +750,7 @@ function buildCorpora(engine) {
 			title: corpus.title,
 			...(corpus.title_key ? { title_key: corpus.title_key } : {}),
 			language: corpus.language,
+			kind: corpus.kind,
 			format,
 			// Its n-grams stay inside words (layout_analysis.corpus.word_list).
 			word_list:

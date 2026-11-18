@@ -555,7 +555,13 @@ The codegen counts the n-grams of each built-in corpus with the engine's own
 `_generated/corpus_<id>.js`, loaded when the corpus is chosen, with the
 licence and attribution in its header. `LAYOUT_ANALYSIS_DATA.corpora` lists
 the corpora with their licence, attribution, source and size, and the page
-shows them under the corpus picker.
+shows them under the corpus picker. Each entry of `corpora.json` also says
+what sort of text it is (`kind`: `literature`, `encyclopedia`, `news`,
+`sentences`, `words` for a word list or word frequencies, `code`), which the
+Comparer's picker groups and filters by with the `language`; the codegen
+refuses another kind, and a `code` corpus is the only one whose language is
+`code`. The library's collections (`layout_library.json` `sources`) each carry
+the `name` the Comparer's origin filter shows, which the codegen requires.
 
 Shipped as of 2026-11-14:
 

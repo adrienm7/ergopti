@@ -3,21 +3,25 @@
 	"schema_version": 1,
 	"sources": {
 		"oxeylyzer": {
+			"name": "Oxeylyzer",
 			"url": "https://github.com/O-X-E-Y/oxeylyzer/tree/data-files",
 			"commit": "9cd336c",
 			"licence": "Apache-2.0 (repository); arrangements re-encoded"
 		},
 		"cmini": {
+			"name": "cmini",
 			"url": "https://github.com/Apsu/cmini",
 			"commit": "0db088e",
 			"licence": "GPL-3.0 (repository); user-submitted arrangements, re-encoded"
 		},
 		"kla": {
+			"name": "Keyboard Layout Analyzer",
 			"url": "https://github.com/patorjk/keyboard-layout-analyzer/tree/c4f2f9bb43ca8de98c8cb0cd28a78043602c7dcb/layouts",
 			"commit": "c4f2f9bb43",
 			"licence": "MIT (repository, « Copyright (C) 2015-present Patrick Gillespie and other contributors »); arrangements re-encoded"
 		},
 		"genkey": {
+			"name": "genkey",
 			"url": "https://github.com/semilin/genkey/tree/f1f41733931c2339d4ed161a5ace5f03412b282e/layouts",
 			"commit": "f1f4173393",
 			"licence": "GPL-3.0 (repository); arrangements re-encoded"

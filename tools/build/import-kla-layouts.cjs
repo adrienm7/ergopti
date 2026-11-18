@@ -50,6 +50,7 @@ const CREDITS_PATH = shared('layouts', 'data', 'analysis', 'layout_credits.json'
 const UI_DIR = shared('ui');
 const SOURCE_ID = 'kla';
 const SOURCE = {
+	name: 'Keyboard Layout Analyzer',
 	url: `https://${identifiers.hosts.github}/patorjk/keyboard-layout-analyzer/tree/c4f2f9bb43ca8de98c8cb0cd28a78043602c7dcb/layouts`,
 	commit: 'c4f2f9bb43',
 	licence:

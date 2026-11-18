@@ -45,6 +45,7 @@ const { signature, loadReaders } = require('./import-kla-layouts.cjs');
 const LIBRARY_PATH = shared('layouts', 'data', 'analysis', 'layout_library.json');
 const SOURCE_ID = 'genkey';
 const SOURCE = {
+	name: 'genkey',
 	url: `https://${identifiers.hosts.github}/semilin/genkey/tree/f1f41733931c2339d4ed161a5ace5f03412b282e/layouts`,
 	commit: 'f1f4173393',
 	licence: 'GPL-3.0 (repository); arrangements re-encoded'

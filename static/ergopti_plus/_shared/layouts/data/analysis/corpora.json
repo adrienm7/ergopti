@@ -1,11 +1,12 @@
 {
-	"_description": "Built-in corpora of the layout analysis: each names a text of static/corpus whose entry in static/corpus/register.json has status « ship »; its licence, attribution and source are read from that register (one source). The codegen (tools/codegen/codegen-layout-analysis-data-js.cjs) ships their n-gram tables, never the text, in _shared/ui/layout_analysis/_generated/corpus_<id>.js, with the licence in each file's header. « restore_dead_key_pairs » turns the two-character spellings the old KLA conversion wrote (^e, ¨i) back into the accented letter; it stays off for code, where ^ is an operator. « strip_sentence_numbers » removes the « number<TAB> » prefix of each line of a Leipzig sentence file. « format »: « text » (the default) counts the text; « word_frequencies » reads « word count » lines and counts each word with a space on either side, so its n-grams stay inside words and at word boundaries; « tsv » counts the column « tsv_text_column » (0-based) of each tab-separated line, one sentence per line. « count_table » reads a static/corpus/frequency count table (format ergopti-count-table, written by tools/build/import-count-tables.cjs from static/corpus/count_table_sources.json): a large corpus's character, bigram and trigram counts, without its text.",
+	"_description": "Built-in corpora of the layout analysis: each names a text of static/corpus whose entry in static/corpus/register.json has status « ship »; its licence, attribution and source are read from that register (one source). The codegen (tools/codegen/codegen-layout-analysis-data-js.cjs) ships their n-gram tables, never the text, in _shared/ui/layout_analysis/_generated/corpus_<id>.js, with the licence in each file's header. « restore_dead_key_pairs » turns the two-character spellings the old KLA conversion wrote (^e, ¨i) back into the accented letter; it stays off for code, where ^ is an operator. « strip_sentence_numbers » removes the « number<TAB> » prefix of each line of a Leipzig sentence file. « format »: « text » (the default) counts the text; « word_frequencies » reads « word count » lines and counts each word with a space on either side, so its n-grams stay inside words and at word boundaries; « tsv » counts the column « tsv_text_column » (0-based) of each tab-separated line, one sentence per line. « count_table » reads a static/corpus/frequency count table (format ergopti-count-table, written by tools/build/import-count-tables.cjs from static/corpus/count_table_sources.json): a large corpus's character, bigram and trigram counts, without its text. « kind » says what sort of text it is; the Comparer's corpus picker groups by it: « literature » (books and essays), « encyclopedia », « news », « sentences » (everyday sentences), « words » (a word list or word frequencies) or « code » (source code, whose « language » is « code »).",
 	"schema_version": 1,
 	"corpora": [
 		{
 			"id": "fr_don_quichotte",
 			"title": "L'ingénieux chevalier Don Quichotte de la Manche (Cervantes, trad. Charles Furne)",
 			"language": "fr",
+			"kind": "literature",
 			"file": "static/corpus/original/fr/don_quichotte.txt",
 			"restore_dead_key_pairs": true
 		},
@@ -13,6 +14,7 @@
 			"id": "fr_swann",
 			"title": "Du côté de chez Swann (Marcel Proust, 1913)",
 			"language": "fr",
+			"kind": "literature",
 			"file": "static/corpus/original/fr/corpus_johnix_swann10.txt",
 			"restore_dead_key_pairs": true
 		},
@@ -20,6 +22,7 @@
 			"id": "en_don_quixote",
 			"title": "Don Quixote (Cervantes, translated by John Ormsby, 1885)",
 			"language": "en",
+			"kind": "literature",
 			"file": "static/corpus/original/en/don_quixote_ormsby.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -27,6 +30,7 @@
 			"id": "fr_nemolivier",
 			"title": "Balzac, Baudelaire, Lautréamont, Maupassant, Nerval, Roussel",
 			"language": "fr",
+			"kind": "literature",
 			"file": "static/corpus/original/fr/corpus_nemolivier.txt",
 			"restore_dead_key_pairs": true
 		},
@@ -34,6 +38,7 @@
 			"id": "fr_autonomy",
 			"title": "Autonomie, la liberté de pensée (J.-M. Smith, trad. collective)",
 			"language": "fr",
+			"kind": "literature",
 			"file": "static/corpus/original/fr/corpus_johnix_autonomy.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -41,6 +46,7 @@
 			"id": "fr_leipzig_news",
 			"title": "Leipzig — French news 2023 (10,000 sentences)",
 			"language": "fr",
+			"kind": "news",
 			"file": "static/corpus/original/fr/leipzig_fra_news_2023_10K-sentences.txt",
 			"restore_dead_key_pairs": false,
 			"strip_sentence_numbers": true
@@ -49,6 +55,7 @@
 			"id": "fr_leipzig_wikipedia",
 			"title": "Leipzig — French Wikipedia 2021 (10,000 sentences)",
 			"language": "fr",
+			"kind": "encyclopedia",
 			"file": "static/corpus/original/fr/leipzig_fra_wikipedia_2021_10K-sentences.txt",
 			"restore_dead_key_pairs": false,
 			"strip_sentence_numbers": true
@@ -57,6 +64,7 @@
 			"id": "fr_subtitles_words",
 			"title": "Français — sous-titres (fréquences de mots)",
 			"language": "fr",
+			"kind": "words",
 			"file": "static/corpus/frequency/opensubtitles_2018/fr_50k.txt",
 			"format": "word_frequencies",
 			"restore_dead_key_pairs": false
@@ -65,6 +73,7 @@
 			"id": "en_subtitles_words",
 			"title": "English — subtitles (word frequencies)",
 			"language": "en",
+			"kind": "words",
 			"file": "static/corpus/frequency/opensubtitles_2018/en_50k.txt",
 			"format": "word_frequencies",
 			"restore_dead_key_pairs": false
@@ -73,6 +82,7 @@
 			"id": "de_subtitles_words",
 			"title": "Deutsch — Untertitel (Worthäufigkeiten)",
 			"language": "de",
+			"kind": "words",
 			"file": "static/corpus/frequency/opensubtitles_2018/de_50k.txt",
 			"format": "word_frequencies",
 			"restore_dead_key_pairs": false
@@ -81,6 +91,7 @@
 			"id": "es_subtitles_words",
 			"title": "Español — subtítulos (frecuencias de palabras)",
 			"language": "es",
+			"kind": "words",
 			"file": "static/corpus/frequency/opensubtitles_2018/es_50k.txt",
 			"format": "word_frequencies",
 			"restore_dead_key_pairs": false
@@ -89,6 +100,7 @@
 			"id": "it_subtitles_words",
 			"title": "Italiano — sottotitoli (frequenze di parole)",
 			"language": "it",
+			"kind": "words",
 			"file": "static/corpus/frequency/opensubtitles_2018/it_50k.txt",
 			"format": "word_frequencies",
 			"restore_dead_key_pairs": false
@@ -97,6 +109,7 @@
 			"id": "code_javascript",
 			"title": "JavaScript (lodash)",
 			"language": "code",
+			"kind": "code",
 			"file": "static/corpus/original/code/lodash_4.17.21.js.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -104,6 +117,7 @@
 			"id": "code_python",
 			"title": "Python (rich)",
 			"language": "code",
+			"kind": "code",
 			"file": "static/corpus/original/code/rich_13.7.1.py.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -111,6 +125,7 @@
 			"id": "code_rust",
 			"title": "Rust (ripgrep)",
 			"language": "code",
+			"kind": "code",
 			"file": "static/corpus/original/code/ripgrep_14.1.0.rs.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -118,6 +133,7 @@
 			"id": "fr_hugo_miserables",
 			"title": "Les Misérables, tome I (Victor Hugo)",
 			"language": "fr",
+			"kind": "literature",
 			"file": "static/corpus/original/fr/hugo_les_miserables_1.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -125,6 +141,7 @@
 			"id": "fr_zola_germinal",
 			"title": "Germinal (Émile Zola)",
 			"language": "fr",
+			"kind": "literature",
 			"file": "static/corpus/original/fr/zola_germinal.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -132,6 +149,7 @@
 			"id": "de_fontane_effi_briest",
 			"title": "Effi Briest (Theodor Fontane)",
 			"language": "de",
+			"kind": "literature",
 			"file": "static/corpus/original/de/fontane_effi_briest.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -139,6 +157,7 @@
 			"id": "de_kafka_verwandlung",
 			"title": "Die Verwandlung (Franz Kafka)",
 			"language": "de",
+			"kind": "literature",
 			"file": "static/corpus/original/de/kafka_die_verwandlung.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -146,6 +165,7 @@
 			"id": "es_cervantes_quijote",
 			"title": "Don Quijote de la Mancha (Miguel de Cervantes)",
 			"language": "es",
+			"kind": "literature",
 			"file": "static/corpus/original/es/cervantes_don_quijote.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -153,6 +173,7 @@
 			"id": "es_galdos_marianela",
 			"title": "Marianela (Benito Pérez Galdós)",
 			"language": "es",
+			"kind": "literature",
 			"file": "static/corpus/original/es/galdos_marianela.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -160,6 +181,7 @@
 			"id": "it_collodi_pinocchio",
 			"title": "Le avventure di Pinocchio (Carlo Collodi)",
 			"language": "it",
+			"kind": "literature",
 			"file": "static/corpus/original/it/collodi_pinocchio.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -167,6 +189,7 @@
 			"id": "it_de_amicis_ricordi",
 			"title": "Ricordi d'infanzia e di scuola (Edmondo De Amicis)",
 			"language": "it",
+			"kind": "literature",
 			"file": "static/corpus/original/it/de_amicis_ricordi_d_infanzia.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -174,6 +197,7 @@
 			"id": "fr_verne_tour_du_monde",
 			"title": "Le Tour du monde en quatre-vingts jours (Jules Verne)",
 			"language": "fr",
+			"kind": "literature",
 			"file": "static/corpus/original/fr/verne_tour_du_monde.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -181,6 +205,7 @@
 			"id": "fr_flaubert_bovary",
 			"title": "Madame Bovary (Gustave Flaubert)",
 			"language": "fr",
+			"kind": "literature",
 			"file": "static/corpus/original/fr/flaubert_madame_bovary.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -188,6 +213,7 @@
 			"id": "en_austen_pride",
 			"title": "Pride and Prejudice (Jane Austen)",
 			"language": "en",
+			"kind": "literature",
 			"file": "static/corpus/original/en/austen_pride_and_prejudice.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -195,6 +221,7 @@
 			"id": "en_carroll_alice",
 			"title": "Alice's Adventures in Wonderland (Lewis Carroll)",
 			"language": "en",
+			"kind": "literature",
 			"file": "static/corpus/original/en/carroll_alice_in_wonderland.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -202,6 +229,7 @@
 			"id": "en_doyle_sherlock",
 			"title": "The Adventures of Sherlock Holmes (Arthur Conan Doyle)",
 			"language": "en",
+			"kind": "literature",
 			"file": "static/corpus/original/en/doyle_adventures_of_sherlock_holmes.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -209,6 +237,7 @@
 			"id": "fr_tatoeba",
 			"title": "Tatoeba — phrases du quotidien en français",
 			"language": "fr",
+			"kind": "sentences",
 			"file": "static/corpus/original/fr/tatoeba_fra_30k.tsv",
 			"restore_dead_key_pairs": false,
 			"format": "tsv",
@@ -218,6 +247,7 @@
 			"id": "en_tatoeba",
 			"title": "Tatoeba — everyday English sentences",
 			"language": "en",
+			"kind": "sentences",
 			"file": "static/corpus/original/en/tatoeba_eng_30k.tsv",
 			"restore_dead_key_pairs": false,
 			"format": "tsv",
@@ -227,6 +257,7 @@
 			"id": "fr_wikipedia",
 			"title": "Wikipédia — 20 articles",
 			"language": "fr",
+			"kind": "encyclopedia",
 			"file": "static/corpus/original/fr/wikipedia_fr_20_articles.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -234,6 +265,7 @@
 			"id": "en_wikipedia",
 			"title": "Wikipedia — 20 articles",
 			"language": "en",
+			"kind": "encyclopedia",
 			"file": "static/corpus/original/en/wikipedia_en_20_articles.txt",
 			"restore_dead_key_pairs": false
 		},
@@ -241,6 +273,7 @@
 			"id": "fr_wikipedia_1m",
 			"title": "Wikipedia — 1,000,000 sentences (counts)",
 			"language": "fr",
+			"kind": "encyclopedia",
 			"file": "static/corpus/frequency/leipzig/fr_wikipedia_2021_1M.json",
 			"format": "count_table",
 			"title_key": "layout_analysis.corpus.name.fr_wikipedia_1m"
@@ -249,6 +282,7 @@
 			"id": "fr_news_1m",
 			"title": "News — 1,000,000 sentences (counts)",
 			"language": "fr",
+			"kind": "news",
 			"file": "static/corpus/frequency/leipzig/fr_news_2024_1M.json",
 			"format": "count_table",
 			"title_key": "layout_analysis.corpus.name.fr_news_1m"
@@ -257,6 +291,7 @@
 			"id": "fr_lexique_words",
 			"title": "Lexique 4.10 — word forms (counts)",
 			"language": "fr",
+			"kind": "words",
 			"file": "static/corpus/frequency/lexique/fr_lexique_4_10.json",
 			"format": "count_table",
 			"title_key": "layout_analysis.corpus.name.fr_lexique_words"
@@ -265,6 +300,7 @@
 			"id": "en_wikipedia_1m",
 			"title": "Wikipedia — 1,000,000 sentences (counts)",
 			"language": "en",
+			"kind": "encyclopedia",
 			"file": "static/corpus/frequency/leipzig/en_wikipedia_2016_1M.json",
 			"format": "count_table",
 			"title_key": "layout_analysis.corpus.name.en_wikipedia_1m"
@@ -274,6 +310,7 @@
 			"title": "Wikipedia — 1,000,000 sentences (counts)",
 			"title_key": "layout_analysis.corpus.name.de_wikipedia_1m",
 			"language": "de",
+			"kind": "encyclopedia",
 			"file": "static/corpus/frequency/leipzig/de_wikipedia_2021_1M.json",
 			"format": "count_table"
 		},
@@ -282,6 +319,7 @@
 			"title": "Wikipedia — 1,000,000 sentences (counts)",
 			"title_key": "layout_analysis.corpus.name.es_wikipedia_1m",
 			"language": "es",
+			"kind": "encyclopedia",
 			"file": "static/corpus/frequency/leipzig/es_wikipedia_2021_1M.json",
 			"format": "count_table"
 		},
@@ -290,6 +328,7 @@
 			"title": "Wikipedia — 1,000,000 sentences (counts)",
 			"title_key": "layout_analysis.corpus.name.it_wikipedia_1m",
 			"language": "it",
+			"kind": "encyclopedia",
 			"file": "static/corpus/frequency/leipzig/it_wikipedia_2021_1M.json",
 			"format": "count_table"
 		},
@@ -298,6 +337,7 @@
 			"title": "News — 1,000,000 sentences (counts)",
 			"title_key": "layout_analysis.corpus.name.de_news_1m",
 			"language": "de",
+			"kind": "news",
 			"file": "static/corpus/frequency/leipzig/de_news_2024_1M.json",
 			"format": "count_table"
 		},
@@ -306,6 +346,7 @@
 			"title": "News — 1,000,000 sentences (counts)",
 			"title_key": "layout_analysis.corpus.name.es_news_1m",
 			"language": "es",
+			"kind": "news",
 			"file": "static/corpus/frequency/leipzig/es_news_2024_1M.json",
 			"format": "count_table"
 		},
@@ -314,6 +355,7 @@
 			"title": "News — 1,000,000 sentences (counts)",
 			"title_key": "layout_analysis.corpus.name.it_news_1m",
 			"language": "it",
+			"kind": "news",
 			"file": "static/corpus/frequency/leipzig/it_news_2024_1M.json",
 			"format": "count_table"
 		},
@@ -322,6 +364,7 @@
 			"title": "News — 1,000,000 sentences (counts)",
 			"title_key": "layout_analysis.corpus.name.en_news_1m",
 			"language": "en",
+			"kind": "news",
 			"file": "static/corpus/frequency/leipzig/en_news_2024_1M.json",
 			"format": "count_table"
 		},
@@ -329,6 +372,7 @@
 			"id": "fr_books_words",
 			"title": "Google Books 1950-2019 — French words (counts)",
 			"language": "fr",
+			"kind": "words",
 			"file": "static/corpus/frequency/google_books/fr_1grams_2020.json",
 			"format": "count_table",
 			"title_key": "layout_analysis.corpus.name.fr_books_words"
