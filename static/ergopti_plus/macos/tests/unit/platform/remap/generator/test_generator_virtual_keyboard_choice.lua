@@ -23,6 +23,7 @@ local helpers = require("tests.helpers")
 package.loaded["tests.support.platform.remap.generator.generator_fixture"] = nil
 local Fixture = require("tests.support.platform.remap.generator.generator_fixture")
 local Generator = Fixture.Generator
+local Sequence = require("tests.support.script_chord_sequence")
 local NONE_ACTION = Fixture.NONE_ACTION
 local make_state = Fixture.make_state
 local Layout = require("modules.keymap.layout")
@@ -164,9 +165,10 @@ helpers.describe("the choice reaches the outputs and the arrival convention", fu
 		local config, err = Generator.build_karabiner_json(state, { NONE_ACTION }, {}, {}, nil, "/fake/data_dir/")
 		helpers.assert_nil(err)
 		for _, rule in ipairs(config.profiles[1].complex_modifications.rules) do
-			for _, manipulator in ipairs(rule.manipulators or {}) do
+			-- The rule ending the script chord sequence types every key as is.
+			for _, manipulator in ipairs(Sequence.is_sequence_rule(rule) and {} or rule.manipulators or {}) do
 				if manipulator.from and manipulator.from.key_code == "h" and manipulator.to then
-					return manipulator.to[1].key_code
+					return Sequence.without_sequence(manipulator.to)[1].key_code
 				end
 			end
 		end

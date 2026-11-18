@@ -16,7 +16,8 @@
 --- 4. A layer the rule builder rejects fails the build instead of dropping it.
 --- ==============================================================================
 
-local helpers = require("tests.helpers")
+local helpers  = require("tests.helpers")
+local Sequence = require("tests.support.script_chord_sequence")
 
 package.loaded["core.logger.engine.logger"] = nil
 local _ = helpers.load_with_stubs("core.logger.engine.logger")
@@ -80,11 +81,12 @@ local function make_state(nav_layer)
 	}
 end
 
---- The deployed manipulators firing on a key code.
+--- The deployed manipulators firing on a key code, outside the rule ending
+--- the script chord sequence, which takes every key.
 local function manipulators_on(config, key_code)
 	local found = {}
 	for _, rule in ipairs(config.profiles[1].complex_modifications.rules) do
-		for _, manipulator in ipairs(rule.manipulators or {}) do
+		for _, manipulator in ipairs(Sequence.is_sequence_rule(rule) and {} or rule.manipulators or {}) do
 			if manipulator.from and manipulator.from.key_code == key_code then found[#found + 1] = manipulator end
 		end
 	end
@@ -106,7 +108,8 @@ helpers.describe("Navigation layer in the generated Karabiner config", function(
 		helpers.assert_nil(err)
 		local on_h = manipulators_on(config, "h")
 		helpers.assert_eq(#on_h, 1, "KeyH is bound once")
-		helpers.assert_eq(on_h[1].to[1].key_code, "left_arrow")
+		helpers.assert_true(Sequence.is_sequence_event(on_h[1].to[1]), "the layer key ends a script chord sequence")
+		helpers.assert_eq(Sequence.without_sequence(on_h[1].to)[1].key_code, "left_arrow")
 		helpers.assert_true(has_condition(on_h[1], "ergopti_layer_active_" .. TOKEN, 1),
 			"the layer reads this generation's layer variable")
 		helpers.assert_true(has_condition(on_h[1], "ergopti_mode_" .. TOKEN, 1),

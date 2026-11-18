@@ -186,9 +186,14 @@ helpers.describe("Karabiner rules of the shared script chords (script-chords-thr
 					taken[key] = nil
 				end
 			end
-			return posted[#posted]
+			return posted[#posted], taken
 		end
 		local RCMD, RETURN = "right_command", "return_or_enter"
+		-- Karabiner holds only the last event of to: the sequence variable
+		-- appended after right Option's key released it at once.
+		local _, taken = play({ { RCMD, true } })
+		local held_to = taken[RCMD].to
+		helpers.assert_true(held_to[#held_to].key_code ~= nil, "right Option stays held while it starts the sequence")
 		local chord = play({ { RCMD, true }, { RETURN, true } })
 		helpers.assert_true(chord ~= RETURN, "right Option then Return is the pause chord")
 		helpers.assert_eq(play({ { RCMD, true }, { "5", true }, { "5", false }, { RETURN, true } }), RETURN,

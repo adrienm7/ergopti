@@ -23,6 +23,7 @@
 local helpers        = require("tests.helpers")
 local KarabinerModel = require("tests.support.karabiner_model")
 local SourceFile     = require("tests.support.source_file")
+local Sequence       = require("tests.support.script_chord_sequence")
 
 local TOKEN    = "0123456789abcdef0123456789abcdef"
 local DATA_DIR = helpers.driver_root() .. "platform/remap/data/"
@@ -41,8 +42,11 @@ local DATA_DIR = helpers.driver_root() .. "platform/remap/data/"
 -- The CapsWord rule leaves its delimiter and click exits to the
 -- [shortcuts.caps_word] settings; every other rule digests as before
 -- (capsword-auto-off-settings).
+-- A running script chord is a sequence (2026-11-17): every key-down lowers
+-- the sequence variable right Command raises, and a last rule lowers it for
+-- the registry keys no earlier rule takes (script-chord-sequence).
 local TAP_HOLDS_ON_PINS = {
-	default     = { rules = 24, digest = "cff39a3f5e11da3e" },
+	default     = { rules = 25, digest = "4795ffc1ce7d4f84" },
 	-- Re-pinned for PAR-17: the recommended pairs became the three tap slots
 	-- Windows and Linux ship, with no chord and no hold slot.
 	-- Re-pinned for PAR-15: the global delay is the registry's 200 ms (it was 250 ms)
@@ -63,8 +67,9 @@ local TAP_HOLDS_ON_PINS = {
 	-- variable a delayed action raises once the minimum has elapsed. Then for
 	-- the pairs' press order (2026-11-12): a key-down of a first key shared by
 	-- several pairs records the rivals already held, and each such pair waits
-	-- for no rival held before its own first key.
-	recommended = { rules = 27, digest = "124d7525760bcbf7" },
+	-- for no rival held before its own first key. Then for the script chord
+	-- sequence (script-chord-sequence).
+	recommended = { rules = 28, digest = "e82aeb532d6b1931" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the
@@ -475,7 +480,9 @@ helpers.with_fresh_modules({
 				end
 				local seen = {}
 				for _, rule in ipairs(rules_of(state)) do
-					for _, manipulator in ipairs(rule.manipulators or {}) do
+					-- The rule ending the script chord sequence types the physical
+					-- context-menu key as is, which is no marker.
+					for _, manipulator in ipairs(Sequence.is_sequence_rule(rule) and {} or rule.manipulators or {}) do
 						local list, index = marked_list(manipulator)
 						local key_code = manipulator.from and manipulator.from.key_code
 						if list then

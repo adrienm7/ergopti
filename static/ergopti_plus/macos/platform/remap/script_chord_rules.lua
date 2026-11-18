@@ -62,6 +62,10 @@ local HOLDER_KEY = "right_command"
 -- it to the lease generation like the holder's.
 local SEQUENCE_SUFFIX = "_sequence"
 
+-- The description of the last rule, which ends the sequence on a key no
+-- earlier rule takes.
+local SEQUENCE_RULE_DESCRIPTION = "Script control: another key after physical rcmd ends the chord sequence"
+
 -- The Karabiner key codes that end the sequence, sorted; nil until read.
 local _sequence_keys = nil
 
@@ -262,6 +266,18 @@ local function sets_variable(events, name, value)
 	return false
 end
 
+--- The position of the event raising the holder variable.
+--- @param events table Karabiner events that raise it.
+--- @param holder_var string
+--- @return integer index
+local function holder_index(events, holder_var)
+	for index, event in ipairs(events) do
+		local set = event.set_variable
+		if type(set) == "table" and set.name == holder_var and set.value == 1 then return index end
+	end
+	error("script chord rules: no event raises " .. holder_var)
+end
+
 --- Makes the running chords a sequence over the deployed rules (see 5.
 --- above). The manipulator tracking the holder's press raises the sequence
 --- variable, and its release lowers it; every other key manipulator lowers it
@@ -279,7 +295,10 @@ function M.apply_sequence(rules, holder_var)
 			-- A running chord lowers the sequence itself (M.running).
 			if manipulator.type == "basic" and not sets_variable(manipulator.to, sequence_var, 0) then
 				if sets_variable(manipulator.to, holder_var, 1) then
-					manipulator.to[#manipulator.to + 1] = { set_variable = { name = sequence_var, value = 1 } }
+					-- Karabiner holds only the last event of to: appended, the
+					-- variable would release right Command at once.
+					table.insert(manipulator.to, holder_index(manipulator.to, holder_var) + 1,
+						{ set_variable = { name = sequence_var, value = 1 } })
 					manipulator.to_after_key_up = manipulator.to_after_key_up or {}
 					manipulator.to_after_key_up[#manipulator.to_after_key_up + 1] =
 						{ set_variable = { name = sequence_var, value = 0 } }
@@ -301,7 +320,7 @@ function M.apply_sequence(rules, holder_var)
 		}
 	end
 	rules[#rules + 1] = {
-		description = "Script control: another key after physical rcmd ends the chord sequence",
+		description = SEQUENCE_RULE_DESCRIPTION,
 		manipulators = manipulators,
 	}
 	return rules
@@ -309,5 +328,8 @@ end
 
 --- The holder key of the running chords.
 M.HOLDER_KEY = HOLDER_KEY
+
+--- The description of the rule that ends the sequence (M.apply_sequence).
+M.SEQUENCE_RULE_DESCRIPTION = SEQUENCE_RULE_DESCRIPTION
 
 return M

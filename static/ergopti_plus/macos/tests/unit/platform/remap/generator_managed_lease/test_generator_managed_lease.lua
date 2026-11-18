@@ -8,6 +8,7 @@
 
 local helpers = require("tests.helpers")
 local support = require("tests.support.generator_managed_lease_fixture")
+local Sequence = require("tests.support.script_chord_sequence")
 local TOKEN = support.TOKEN
 local OLD_TOKEN_A = support.OLD_TOKEN_A
 local MODE_NAME = support.MODE_NAME
@@ -245,7 +246,8 @@ helpers.describe("Karabiner generator managed lease gates", function()
 			-- condition must read this generation's variable, never the bare one.
 			local consumers = 0
 			for _, rule in ipairs(generated_a.profiles[1].complex_modifications.rules) do
-				for _, manipulator in ipairs(rule.manipulators or {}) do
+				-- The rule ending the script chord sequence takes every key.
+				for _, manipulator in ipairs(Sequence.is_sequence_rule(rule) and {} or rule.manipulators or {}) do
 					if manipulator.from and manipulator.from.key_code == "h" then
 						helpers.assert_eq(condition_count(manipulator, scoped("layer_active", TOKEN), 1), 1,
 							"the navigation layer must read the generation's own layer variable")
