@@ -21,8 +21,10 @@ _OGRA_NativeRegistrationIsAsync() {
 	StartPidPos := InStr(Start, "ProcessExist(_OnboardingGestureJob")
 	Assert(StartReceiptPos > 0 && StartPidPos > StartReceiptPos,
 		"a second launch must consume the old receipt before consulting its recyclable PID")
-	Assert(InStr(Poll, "ProcessExist") > 0 && InStr(Poll, "A_IsSuspended") > 0 && InStr(Poll, "_Onboarding_ReadGestureAutoResult") > 0,
-		"completion must wait across Suspend and trust only the worker-authored result, never a racy PID exit-code lookup")
+	; Waiting across a pause is called under a real Suspend in
+	; tests/unit/gestures/engine/test_worker_result_poll_pause.ahk.
+	Assert(InStr(Poll, "ProcessExist") > 0 && InStr(Poll, "_Onboarding_ReadGestureAutoResult") > 0,
+		"completion must trust only the worker-authored result, never a racy PID exit-code lookup")
 	ReceiptPos := InStr(Poll, "FileExist(_OnboardingGestureJob")
 	PidPos := InStr(Poll, "ProcessExist(_OnboardingGestureJob")
 	Assert(ReceiptPos > 0 && PidPos > ReceiptPos,

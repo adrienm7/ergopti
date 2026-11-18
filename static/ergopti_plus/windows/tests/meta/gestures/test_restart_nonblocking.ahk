@@ -38,8 +38,10 @@ _GRN_GestureRestartDoesNotBlockDriverThread() {
 	for _, Launcher in ["GestureRestartTouchpadDevice", "_Onboarding_StartGestureAuto"]
 		Assert(InStr(_DriverFuncBody(Launcher), "RunAs") = 0,
 			Launcher . " must elevate through GestureRestartRunElevated, not a *RunAs of its own")
-	Assert(InStr(Poll, "A_IsSuspended") > 0 && InStr(Poll, "_GestureRestartReadResult") > 0,
-		"completion must wait across Suspend and consume only the worker-authored result")
+	; Waiting across a pause is called under a real Suspend in
+	; tests/unit/gestures/engine/test_worker_result_poll_pause.ahk.
+	Assert(InStr(Poll, "_GestureRestartReadResult") > 0,
+		"completion must consume only the worker-authored result")
 	ReceiptPos := InStr(Poll, "FileExist(_GestureRestartJob")
 	PidPos := InStr(Poll, "ProcessExist(_GestureRestartJob")
 	Assert(ReceiptPos > 0 && PidPos > ReceiptPos,

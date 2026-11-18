@@ -1163,6 +1163,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/core/lifecycle/engine/test_runtime_decision_generation.ahk
 #Include meta/ui/wpm/test_wpm_global_barrier_behavior.ahk
 #Include unit/gestures/engine/test_restart_result_zero_is_success.ahk
+#Include unit/gestures/engine/test_worker_result_poll_pause.ahk
 #Include unit/gestures/adapters/test_touchpad_registry.ahk
 _LogBootProgress("gestures + test included")
 
