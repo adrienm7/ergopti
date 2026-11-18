@@ -528,6 +528,8 @@ function _renderChannelTabs() {
 		var tab = document.createElement('button');
 		tab.className = 'channel-btn' + (id === _currentChannel ? ' active' : '');
 		tab.setAttribute('data-channel', id);
+		// The active tab is said, not only coloured (WCAG 1.3.1, 4.1.2).
+		tab.setAttribute('aria-pressed', id === _currentChannel ? 'true' : 'false');
 		tab.textContent = _t(_channels.channel(id).labelKey) || '';
 		tab.onclick = function () {
 			setChannel(id);
@@ -769,7 +771,16 @@ function renderReleaseList() {
 		var item = document.createElement('div');
 		item.className = 'release-item' + (release.prerelease ? ' prerelease' : '');
 		item.setAttribute('data-idx', idx);
+		// A keyboard stop that Enter and Space pick, as a click does (WCAG 2.1.1);
+		// aria-current names the release on screen (_markSelectedRelease).
+		item.setAttribute('role', 'button');
+		item.tabIndex = 0;
 		item.onclick = function () {
+			selectRelease(idx);
+		};
+		item.onkeydown = function (event) {
+			if (event.key !== 'Enter' && event.key !== ' ') return;
+			event.preventDefault();
 			selectRelease(idx);
 		};
 
@@ -827,6 +838,16 @@ function clearContent() {
 	_renderInstallControls();
 }
 
+/** Marks the selected release row, for the eye and for assistive technology. */
+function _markSelectedRelease() {
+	document.querySelectorAll('.release-item').forEach(function (el) {
+		var selected = parseInt(el.getAttribute('data-idx'), 10) === _selectedIndex;
+		el.classList.toggle('selected', selected);
+		if (selected) el.setAttribute('aria-current', 'true');
+		else el.removeAttribute('aria-current');
+	});
+}
+
 /**
  * Selects and displays a release by index.
  * @param {number} idx
@@ -836,9 +857,7 @@ function selectRelease(idx) {
 	_selectedIndex = idx;
 
 	// Update sidebar selection state.
-	document.querySelectorAll('.release-item').forEach(function (el) {
-		el.classList.toggle('selected', parseInt(el.getAttribute('data-idx'), 10) === idx);
-	});
+	_markSelectedRelease();
 
 	var release = _releases[idx];
 	_currentReleaseUrl = _isAllowedRepositoryUrl(release.html_url) ? release.html_url : null;
@@ -1332,9 +1351,7 @@ function setInstallContext(context) {
 	_adoptPendingInstall(_hostPendingInstall(context.pending));
 	renderReleaseList();
 	if (_selectedIndex >= 0) {
-		document.querySelectorAll('.release-item').forEach(function (el) {
-			el.classList.toggle('selected', parseInt(el.getAttribute('data-idx'), 10) === _selectedIndex);
-		});
+		_markSelectedRelease();
 	}
 	_renderInstallControls();
 	_renderRestoreBanner();
