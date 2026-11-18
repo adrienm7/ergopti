@@ -55,7 +55,12 @@ _CTC_LabelAt(TargetMenu, Position) {
 ; retain the children and parent until AHK exit teardown, which can end in
 ; STATUS_HEAP_CORRUPTION after every assertion has passed. Preserve unrelated
 ; detached menus; dispatcher ownership must not be reduced to tray reachability.
+; The emptied menu's own owner entry is retired as production retirement does
+; (_HS_PersonalReleaseMenus): left behind, it turns stale once the Menu is freed
+; and a later test's prune sweeps it, which that test's snapshot of the shared
+; registry reads as a foreign registration it destroyed (dispatch-owner-leak).
 _CTC_ReleaseMenu(TargetMenu, Seen := unset) {
+	global _MenuDispatchOwnerHandles
 	if !IsSet(Seen)
 		Seen := Map()
 	Handle := TargetMenu.Handle
@@ -71,6 +76,10 @@ _CTC_ReleaseMenu(TargetMenu, Seen := unset) {
 	for Child in Children
 		_CTC_ReleaseMenu(Child, Seen)
 	TargetMenu.Delete()
+	Receipt := _MenuDispatchOwnerReceipt(TargetMenu)
+	if Receipt && TrayMenuItemCount(TargetMenu) == 0 && _MenuDispatchOwnerHandles.Has(Handle)
+		&& _MenuDispatchOwnerHandles[Handle] == Receipt
+		_MenuDispatchOwnerHandles.Delete(Handle)
 	MenuDispatcher_PruneMenu(TargetMenu)
 }
 
@@ -393,6 +402,35 @@ _CTC_DispatchOwnerLifetime() {
 }
 Test("menu-terminal-shutdown: native ownership identifies the exact Menu lifetime",
 	_CTC_DispatchOwnerLifetime)
+
+; The shared release helper must leave the global owner ledger as it found it:
+; an entry it leaves turns stale once the Menu is freed, and the next test that
+; prunes deletes it from under that test's registry snapshot (dispatch-owner-leak).
+_CTC_ReleaseRetiresOwnerEntry() {
+	global _MenuDispatchOwnerHandles
+	Root := Menu(), Child := Menu(), Foreign := Menu()
+	try {
+		AssertEqual(1, RegisterMenuItem(Foreign, "foreign command", (*) => 0))
+		AssertEqual(1, RegisterMenuItem(Child, "child command", (*) => 0))
+		AssertEqual(1, RegisterMenuItem(Root, "root command", (*) => 0))
+		Root.Add("child", Child)
+		Handles := [Root.Handle, Child.Handle], ForeignHandle := Foreign.Handle
+		ForeignReceipt := _MenuDispatchOwnerHandles[ForeignHandle]
+		for Handle in Handles
+			AssertTrue(_MenuDispatchOwnerHandles.Has(Handle), "the precondition registers each owned menu")
+		_CTC_ReleaseMenu(Root)
+		for Handle in Handles
+			AssertFalse(_MenuDispatchOwnerHandles.Has(Handle),
+				"a released menu leaves no owner entry to go stale (dispatch-owner-leak)")
+		AssertTrue(_MenuDispatchOwnerHandles.Has(ForeignHandle)
+			&& _MenuDispatchOwnerHandles[ForeignHandle] == ForeignReceipt, "a foreign live owner entry is kept")
+	} finally {
+		_CTC_ReleaseMenu(Root)
+		_CTC_ReleaseMenu(Foreign)
+	}
+}
+Test("menu-dispatch-owner: the test release helper retires its own owner entries (dispatch-owner-leak)",
+	_CTC_ReleaseRetiresOwnerEntry)
 
 _CTC_WithTerminalRegistry(Callback) {
 	global _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles

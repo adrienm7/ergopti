@@ -126,6 +126,11 @@ _PDPO_Case(Mode, Logs) {
 	SavedCounts := IsSet(_FmtCountCache) ? _FmtCountCache : unset
 	SavedDefault := IsSet(_PrevDefaultLabel) ? _PrevDefaultLabel : unset
 	State := MasterGateState(), SavedState := State.Clone()
+	; Any prune, this case's release included, may collect bookkeeping that an
+	; earlier test left for menus already freed. Settle it before the snapshot so
+	; the exact-identity check below judges only live foreign registrations
+	; (dispatch-owner-leak).
+	MenuDispatcher_PruneMenu(Menu())
 	Tables := [_MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens,
 		_MenuDispatchClickSequences, _MenuDispatchOwnerHandles], Before := []
 	for Table in Tables

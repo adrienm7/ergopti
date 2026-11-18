@@ -552,6 +552,15 @@ rows, and prune their registrations before clearing the parent; see
 dispatcher deliberately uses ownership beyond tray reachability, so clearing
 its global maps would hide a different bug.
 
+A release must also retire each emptied menu's own `_MenuDispatchOwnerHandles`
+entry, as `_HS_PersonalReleaseMenus` does. A left entry turns stale once the
+Menu is freed, and the next prune anywhere (any release, any test) sweeps it,
+so a later test that snapshots the dispatcher maps sees foreign entries vanish
+only when run after the leaker. Many tests still `Rendered.Delete()` without
+pruning; a test that asserts exact foreign preservation therefore settles dead
+bookkeeping first (`MenuDispatcher_PruneMenu(Menu())`) before its snapshot.
+Replay a suspected order with `run_all.ahk --list=<file>`.
+
 ### project-clipboard-delayed-rendering-and-image-custody
 
 A clipboard sequence may change while a valid delayed image is materialized:
