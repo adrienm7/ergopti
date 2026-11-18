@@ -200,6 +200,36 @@ _A11yT_AnnounceSkipsADestroyedSurface() {
 Test("a11y tooltip: a surface destroyed before its notice is skipped quietly (a11y-gone-surface-2026-11-18)",
 	_A11yT_AnnounceSkipsADestroyedSurface)
 
+; A live surface is announced with its own window and logs nothing: the
+; liveness probe once read Hwnd as a method call and failed on every tooltip.
+_A11yT_AnnounceReadsALiveSurface() {
+	global _TooltipLastAnnouncement, _TooltipLastAnnouncementTick
+	SavedText := _TooltipLastAnnouncement, SavedTick := _TooltipLastAnnouncementTick
+	Calls := []
+	Record(Hwnd, Text) {
+		Calls.Push({Hwnd: Hwnd, Text: Text})
+		return true
+	}
+	Live := Gui()
+	Text := "a11y-live-" . A_TickCount
+	Before := LoggerVolume()
+	try {
+		AssertTrue(_TooltipAnnouncePresented([{Text: Text}], {Gui: Live}, () => true, Record) != "",
+			"a live surface is announced")
+		Sleep(50)
+		After := LoggerVolume()
+		for Field in ["error", "dropped", "suppressed", "collapsed"]
+			AssertEqual(Before[Field], After[Field], "no error is logged for a live surface (" . Field . ")")
+		AssertEqual(1, Calls.Length, "the notice is sent once")
+		AssertEqual(Live.Hwnd, Calls[1].Hwnd, "the notice names the surface's own window")
+	} finally {
+		_TooltipLastAnnouncement := SavedText, _TooltipLastAnnouncementTick := SavedTick
+		Live.Destroy()
+	}
+}
+Test("a11y tooltip: a live surface is announced with its window (a11y-live-surface-2026-11-18)",
+	_A11yT_AnnounceReadsALiveSurface)
+
 
 
 

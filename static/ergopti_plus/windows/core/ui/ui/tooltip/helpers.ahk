@@ -482,13 +482,14 @@ _TooltipAnnouncePresented(Items, Surface, ScreenReaderFn := 0, AnnounceFn := 0) 
 }
 
 ; Whether a Gui still owns its window: AutoHotkey throws on any property of a
-; destroyed Gui, and Hwnd is the one read that has no side effect.
+; destroyed Gui, and Hwnd is the one read that has no side effect. The read is
+; an assignment because a bare « G.Hwnd » statement is a method call in v2.
 ; @param G {Gui} The surface's Gui.
 ; @returns {Boolean}
 _TooltipGuiHasWindow(G) {
 		try {
-			G.Hwnd
-			return true
+			Hwnd := G.Hwnd
+			return Hwnd != 0
 		} catch Error as Err {
 			if InStr(Err.Message, "has no window")
 				return false
