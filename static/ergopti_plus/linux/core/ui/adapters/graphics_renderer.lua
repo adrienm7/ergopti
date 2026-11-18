@@ -486,6 +486,28 @@ function M.contrast_background(background, high_contrast)
 	return { red = background.red, green = background.green, blue = background.blue, alpha = 1 }
 end
 
+-- The last scaled style, kept so a preview per keystroke builds no table.
+local _scaled = { base = nil, factor = nil, style = nil }
+
+--- The style at the desktop's text scale (GNOME « Large text »,
+--- text-scaling-factor): GTK scales its own widgets by it, but the preview
+--- sets its Pango sizes itself, so every font size is multiplied here, as the
+--- Windows tooltips follow « Make text bigger ». The panel is measured from
+--- its text, so it grows with it; the paddings stay.
+--- @param style table From core/ui/ui/tooltip/config.lua; never mutated.
+--- @param factor number|nil The text-scaling-factor; nil or 1 keeps the style.
+--- @return table
+function M.scaled_style(style, factor)
+	if type(factor) ~= "number" or factor == 1 then return style end
+	if _scaled.base == style and _scaled.factor == factor then return _scaled.style end
+	local scaled = {}
+	for key, value in pairs(style) do scaled[key] = value end
+	scaled.sizes = {}
+	for key, size in pairs(style.sizes) do scaled.sizes[key] = size * factor end
+	_scaled.base, _scaled.factor, _scaled.style = style, factor, scaled
+	return scaled
+end
+
 
 
 
@@ -570,7 +592,8 @@ local function show_owned(rows, opts)
 	local window = ensure_window()
 	if not window then return false end
 
-	_style = opts.style
+	local desktop = SystemA11y.settings()
+	_style = M.scaled_style(opts.style, desktop.text_scale)
 	local pango_layout = g.PangoCairo.create_layout(
 		g.cairo.Context.create(g.cairo.ImageSurface.create("ARGB32", 1, 1)))
 
@@ -587,7 +610,6 @@ local function show_owned(rows, opts)
 		},
 	})
 
-	local desktop = SystemA11y.settings()
 	background = M.contrast_background(background, desktop.high_contrast)
 
 	_surface_rows = { rows = rows, metrics = metrics, background = background }

@@ -4,8 +4,8 @@
 --- MODULE: System Accessibility Settings (Linux)
 --- DESCRIPTION:
 --- Reads the desktop's accessibility settings the GNOME schemas expose, which
---- most GTK desktops honour: whether a screen reader is enabled, high contrast
---- and animations.
+--- most GTK desktops honour: whether a screen reader is enabled, high contrast,
+--- animations and the text scale.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Never on the keystroke path: a preview is drawn on a keystroke, and a
@@ -19,6 +19,11 @@
 ---    AT-SPI notification Orca speaks when it appears; off, it stays a tooltip.
 ---    The other drawn windows (the WPM widget, the spotlight overlay) are
 ---    named for AT-SPI through name_window under the same setting.
+--- 4. The text scale (« Large text », org.gnome.desktop.interface
+---    text-scaling-factor) is what GTK applies to its own widgets, the dialogs
+---    included; a cairo-drawn preview sets its font sizes itself, so it reads
+---    the factor here and multiplies them, as Windows does with « Make text
+---    bigger ».
 --- ==============================================================================
 
 local M = {}
@@ -34,14 +39,19 @@ local LOG = "core.ui.adapters.system_accessibility"
 local REFRESH_SECONDS = Timings.sec("tooltip", "accessibility_settings_refresh_ms")
 local READ_TIMEOUT_MS = Timings.ms("tooltip", "accessibility_settings_read_timeout_ms")
 
---- The settings read, each { schema, key, field, on = the value meaning true }.
+--- The settings read, each { schema, key, field, on = the value meaning true },
+--- or { schema, key, field, scale = true } for the text scale.
 M.KEYS = {
 	{ schema = "org.gnome.desktop.a11y.applications", key = "screen-reader-enabled", field = "screen_reader", on = "true" },
 	{ schema = "org.gnome.desktop.a11y.interface", key = "high-contrast", field = "high_contrast", on = "true" },
 	{ schema = "org.gnome.desktop.interface", key = "enable-animations", field = "reduce_motion", on = "false" },
+	{ schema = "org.gnome.desktop.interface", key = "text-scaling-factor", field = "text_scale", scale = true },
 }
 
-local _settings = { screen_reader = false, high_contrast = false, reduce_motion = false }
+-- The range the text-scaling-factor schema accepts (an OS fact).
+local TEXT_SCALE_MIN, TEXT_SCALE_MAX = 0.5, 3.0
+
+local _settings = { screen_reader = false, high_contrast = false, reduce_motion = false, text_scale = 1 }
 local _refreshed_at = nil
 local _pending = 0
 local _refusal_reported = false
@@ -67,6 +77,17 @@ function M.parse_boolean(stdout)
 	return nil
 end
 
+--- Reads a gsettings text-scaling-factor answer: a number GNOME accepts, or
+--- nil when it says anything else.
+--- @param stdout string|nil
+--- @return number|nil
+function M.parse_scale(stdout)
+	if type(stdout) ~= "string" then return nil end
+	local value = tonumber(stdout:match("^%s*([%d%.]+)%s*$"))
+	if not value or value < TEXT_SCALE_MIN or value > TEXT_SCALE_MAX then return nil end
+	return value
+end
+
 --- Reports a refused read once.
 --- @param why string
 local function report_refusal(why)
@@ -82,15 +103,16 @@ local function refresh()
 		local handle, refusal = ShellRunner.run_async("gsettings", { "get", entry.schema, entry.key },
 			{ timeout_ms = READ_TIMEOUT_MS }, function(result)
 				_pending = _pending - 1
-				local value = result and result.ok and M.parse_boolean(result.stdout) or nil
+				local parse = entry.scale and M.parse_scale or M.parse_boolean
+				local value = result and result.ok and parse(result.stdout) or nil
 				if value == nil then
 					report_refusal("gsettings get " .. entry.schema .. " " .. entry.key)
 					return
 				end
-				local on = value == entry.on
-				if _settings[entry.field] ~= on then
-					_settings[entry.field] = on
-					Logger.debug(LOG, "Desktop setting %s is now %s.", entry.field, tostring(on))
+				if not entry.scale then value = value == entry.on end
+				if _settings[entry.field] ~= value then
+					_settings[entry.field] = value
+					Logger.debug(LOG, "Desktop setting %s is now %s.", entry.field, tostring(value))
 				end
 			end)
 		if handle then
@@ -137,7 +159,8 @@ end
 --- The desktop's accessibility settings, from the cache; a stale cache starts
 --- a background refresh and is answered meanwhile.
 --- @param now number|nil Current time in seconds (test seam), os.time() by default.
---- @return table { screen_reader, high_contrast, reduce_motion } booleans.
+--- @return table { screen_reader, high_contrast, reduce_motion } booleans and
+---   text_scale, the text-scaling-factor (1 until read).
 function M.settings(now)
 	now = now or os.time()
 	if not _started or not _available then return _settings end

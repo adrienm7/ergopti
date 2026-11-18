@@ -53,7 +53,7 @@ h.describe("desktop accessibility settings (a11y-linux-settings)", function()
 		local module, log, done = load_settings({})
 		local settings = module.settings(100)
 		h.assert_eq(#log.spawned, 0, "a test or an import must never start gsettings")
-		h.assert_eq(settings, { screen_reader = false, high_contrast = false, reduce_motion = false })
+		h.assert_eq(settings, { screen_reader = false, high_contrast = false, reduce_motion = false, text_scale = 1 })
 		done()
 	end)
 
@@ -62,13 +62,14 @@ h.describe("desktop accessibility settings (a11y-linux-settings)", function()
 			["org.gnome.desktop.a11y.applications screen-reader-enabled"] = "true\n",
 			["org.gnome.desktop.a11y.interface high-contrast"] = "true\n",
 			["org.gnome.desktop.interface enable-animations"] = "false\n",
+			["org.gnome.desktop.interface text-scaling-factor"] = "1.25\n",
 		})
 		h.assert_true(module.start(100))
-		h.assert_eq(#log.spawned, 3)
+		h.assert_eq(#log.spawned, 4)
 		h.assert_eq(log.spawned[1], "gsettings get org.gnome.desktop.a11y.applications screen-reader-enabled")
 		h.assert_eq(module.settings(100).screen_reader, false, "answered from the cache until the read lands")
 		settle(log)
-		h.assert_eq(module.settings(100), { screen_reader = true, high_contrast = true, reduce_motion = true })
+		h.assert_eq(module.settings(100), { screen_reader = true, high_contrast = true, reduce_motion = true, text_scale = 1.25 })
 		h.assert_eq(module.start(), false, "a second start is refused")
 		done()
 	end)
@@ -87,9 +88,9 @@ h.describe("desktop accessibility settings (a11y-linux-settings)", function()
 		module.start(100)
 		settle(log)
 		module.settings(101)
-		h.assert_eq(#log.spawned, 3, "a preview per keystroke must not start a child each time")
+		h.assert_eq(#log.spawned, 4, "a preview per keystroke must not start a child each time")
 		module.settings(200)
-		h.assert_eq(#log.spawned, 6)
+		h.assert_eq(#log.spawned, 8)
 		done()
 	end)
 
@@ -101,7 +102,7 @@ h.describe("desktop accessibility settings (a11y-linux-settings)", function()
 		})
 		module.start(100)
 		settle(log)
-		h.assert_eq(module.settings(100), { screen_reader = true, high_contrast = false, reduce_motion = false })
+		h.assert_eq(module.settings(100), { screen_reader = true, high_contrast = false, reduce_motion = false, text_scale = 1 })
 		done()
 	end)
 
@@ -110,7 +111,7 @@ h.describe("desktop accessibility settings (a11y-linux-settings)", function()
 		h.assert_true(module.start(100))
 		module.settings(200)
 		h.assert_eq(#log.spawned, 0)
-		h.assert_eq(module.settings(300), { screen_reader = false, high_contrast = false, reduce_motion = false })
+		h.assert_eq(module.settings(300), { screen_reader = false, high_contrast = false, reduce_motion = false, text_scale = 1 })
 		done()
 	end)
 
@@ -121,6 +122,79 @@ h.describe("desktop accessibility settings (a11y-linux-settings)", function()
 		h.assert_nil(module.parse_boolean("'true'"))
 		h.assert_nil(module.parse_boolean(nil))
 		done()
+	end)
+
+	h.it("(a11y-linux-text-scale) parses only a text scale GNOME accepts", function()
+		local module, _, done = load_settings({})
+		h.assert_eq(module.parse_scale("1.5\n"), 1.5)
+		h.assert_eq(module.parse_scale(" 1 "), 1)
+		h.assert_nil(module.parse_scale("4.0"), "above the schema's range")
+		h.assert_nil(module.parse_scale("0.1"), "below the schema's range")
+		h.assert_nil(module.parse_scale("No such key"))
+		h.assert_nil(module.parse_scale(nil))
+		done()
+	end)
+
+	h.it("(a11y-linux-text-scale) an unreadable text scale stays at 1", function()
+		local module, log, done = load_settings({ ["org.gnome.desktop.interface text-scaling-factor"] = "nan\n" })
+		module.start(100)
+		settle(log)
+		h.assert_eq(module.settings(100).text_scale, 1)
+		done()
+	end)
+end)
+
+h.describe("the preview at the desktop's text scale (a11y-linux-text-scale)", function()
+	local Renderer = h.load_module("core.ui.adapters.graphics_renderer")
+	local style = { fonts = { main = "Sans" }, sizes = { main = 12, hint = 9, info = 10 }, layout = { pad_x = 8 } }
+
+	h.it("(a11y-linux-text-scale) multiplies every font size, never the paddings", function()
+		local scaled = Renderer.scaled_style(style, 1.5)
+		h.assert_eq(scaled.sizes, { main = 18, hint = 13.5, info = 15 })
+		h.assert_eq(scaled.layout.pad_x, 8)
+		h.assert_eq(style.sizes.main, 12, "the shared style is never mutated")
+		h.assert_true(rawequal(Renderer.scaled_style(style, 1.5), scaled), "one table per scale, not per keystroke")
+		h.assert_true(rawequal(Renderer.scaled_style(style, 1), style))
+		h.assert_true(rawequal(Renderer.scaled_style(style, nil), style))
+	end)
+
+	h.it("(a11y-linux-text-scale) the shown preview sets its text at the desktop's scale", function()
+		local names = { "core.ui.adapters.graphics_renderer", "core.ui.adapters.system_accessibility",
+			"core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.tint" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+		local ok, err = pcall(function()
+			package.loaded["core.ui.adapters.system_accessibility"] = {
+				ensure_started = function() return false end, name_window = function() return true end,
+				settings = function() return { screen_reader = false, high_contrast = false, text_scale = 2 } end,
+			}
+			package.loaded["core.ui.engine.tooltip.layout"] = { compute_position = function() return { x = 0, y = 0 } end }
+			package.loaded["core.ui.engine.tooltip.tint"] = { mix = function() return {} end }
+			local noop = function() end
+			local sizes, visible = {}, false
+			local window = setmetatable({
+				get_screen = function() return { get_rgba_visual = function() return nil end } end,
+				get_visible = function() return visible end,
+				show_all = function() visible = true end,
+			}, { __index = function() return noop end })
+			local renderer = require("core.ui.adapters.graphics_renderer")
+			renderer._set_binding_for_test({ Gtk = { Window = function() return window end },
+				Pango = { FontDescription = { from_string = function()
+					return { set_size = function(_, size) sizes[#sizes + 1] = size end }
+				end } },
+				PangoCairo = { create_layout = function() return { set_font_description = noop,
+					set_text = noop, get_pixel_size = function() return 10, 10 end } end },
+				cairo = { Context = { create = noop }, ImageSurface = { create = noop }, Region = { create = noop } },
+			})
+			h.assert_true(renderer.show({ { text = "bonjour" } }, { style = {
+				fonts = { main = "Sans" }, sizes = { main = 12, hint = 9 },
+				layout = { pad_x = 1, pad_y = 1, line_spacing = 1, label_gap = 1, llm_max_content_width = 100 },
+				positioning = {}, tint = {}, colors = { bg = {} },
+			} }))
+			h.assert_eq(sizes[1], 24 * 1024, "measured at twice the size under a text scale of 2")
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
 	end)
 end)
 
