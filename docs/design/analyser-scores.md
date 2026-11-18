@@ -365,12 +365,31 @@ r·skip1 + r²·skip2 + r³·skip3)` (r = 1/7) times the distance and 5.5 / fing
   characters, bigrams or trigrams found, on key n-grams where held modifiers
   are presses of their own. Its ISO board with costs, unbalancing and matrix
   positions; a character takes its cheapest key, Shift of the other hand.
-- **Fidelity: exact** for base and Shift layers: its own evaluator run on `the`
-  (270.797), `The` (576.958) and `Hello, World.` (2 656.977) on its QWERTY;
-  our scorer gives the same to 1e-9. On its default German-English corpus, our
-  QWERTY UK gives 539.4 for its 542.6 (every part within 0.5 % but
-  irregularity, a square root of products, 12 % lower). AltGr is our
-  adaptation (held AltRight): the tool models Neo layers, not AltGr.
+- **Whole text.** The tool reads the text as it is: Enter is typed (its key
+  cost, its finger), and an n-gram from a line break to another character is
+  left out but counted as found, before any key lookup. The break tables of
+  `ngramsFromText` give those n-grams; a table without them has none. A
+  character of a higher layer is pressed as its base-layer key (the key the
+  tool resolves it to, with that key's base symbol), and the key trigrams of
+  a character trigram and its modifier expansions are summed before they are
+  costed: irregularity, (1 + w·c₁)(1 + w·c₂) − 1 per key trigram, is not
+  linear in the weight w.
+- **Fidelity: exact** for base and Shift layers. Measured against its own
+  `evaluate` (built from 8c8ec9f, its default evaluation) with each library
+  layout written into its `standard_qwerty_iso.yml` (QWERTY, AZERTY, QWERTZ,
+  Dvorak, Colemak, Workman, Canary, Ergopti), on _Alice_, _Sherlock Holmes_,
+  English Wikipedia, Python code and _Germinal_ (40 points): within 1e-6 %
+  on every point. Before (no line breaks typed, the n-grams after a line
+  break counted as not found when they held a character it cannot type, the
+  modifier expansions costed one by one, a higher-layer key named by its own
+  symbol): 5.5 % on average, 16 % at most; on its default German-English
+  corpus our QWERTY UK gave 539.4 for its 542.6. Gate: its own output on
+  `the` (270.797), `The` (576.958), `Hello, World.` (2 656.977) on its
+  QWERTY and on four short texts (blank lines, a curly quote after a line
+  break, mixed case, a tab), to 1e-9. AltGr is our adaptation (held
+  AltRight): the tool models Neo layers, not AltGr; Ergo-L and Bépo, with a
+  dead key among the keys its layout string permutes, could not be written
+  into its file.
 
 ### cmini
 
@@ -420,8 +439,9 @@ with KLAnext's own layout definitions. With `--oxeylyzer=<exe>
 corpus texts; with `--genkey=<exe> --genkey-data=<its source folder>` and
 `--keygen=<exe> --keygen-data=<its source folder>`, local builds of genkey and
 keygen; with `--perl=<exe> --carpalx-data=<its source folder>` (and
-`--carpalx-perl5lib` for the Perl modules it needs), carpalx itself. Measured
-on 2026-11-18:
+`--carpalx-perl5lib` for the Perl modules it needs), carpalx itself; with
+`--klo=<evaluate exe> --klo-data=<its source folder>`, Keyboard Layout
+Optimizer (KLO in the table). Measured on 2026-11-18:
 
 | Analyser  | Points | Mean gap                                | Largest      |
 | --------- | ------ | --------------------------------------- | ------------ |
@@ -430,10 +450,10 @@ on 2026-11-18:
 | genkey    | 140    | 1.4 % (5.5 % before)                    | 9.9 %        |
 | keygen    | 85     | 0.11 % (its), 0.09 % (ours)             | 0.34 %       |
 | carpalx   | 50     | 0.31 % (1.2 % before)                   | 1.2 %        |
+| KLO       | 40     | < 1e-6 % (5.5 % before)                 | < 1e-6 %     |
 
-Not re-measured against a run of the tool in this pass: cmini, a200
-(Python) and Keyboard Layout Optimizer (Rust): their fidelity above rests on
-the earlier checks it names.
+Not re-measured against a run of the tool in this pass: cmini and a200
+(Python): their fidelity above rests on the earlier checks it names.
 
 ## Not covered
 

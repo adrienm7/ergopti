@@ -129,6 +129,23 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	}
 
 	/**
+	 * A prepared table with its line breaks and tabs back in its n-grams, for
+	 * the analysers that read the whole text: ngramsFromText keeps them in its
+	 * break tables. A table without them (a count table) is returned as is.
+	 * @param {object} table - prepareNgrams() output.
+	 * @returns {{uni: Array, bi: Array, tri: Array}} The n-grams.
+	 */
+	function withBreaks(table) {
+		const breaks = table.breaks;
+		if (!breaks) return table;
+		return perCorpus(table, 'with-breaks', () => ({
+			uni: table.uni.concat(breaks.uni),
+			bi: table.bi.concat(breaks.bi),
+			tri: table.tri.concat(breaks.tri)
+		}));
+	}
+
+	/**
 	 * Which key types each character, the way an analyser that knows one key per
 	 * character looks it up: keys in the given order, layers in the given order,
 	 * the first hit wins. Dead keys and multi-character outputs are not seen.
@@ -1888,11 +1905,13 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		}
 		if (!best.has('\n')) best.set('\n', { code: model.enter_key, layer: 0, mods: [] });
 		for (const [char, b] of best) {
+			// A character of a higher layer is pressed as its base-layer key, the
+			// one the tool resolves it to (same index, same base symbol).
 			const key = keyOf(b.code, false);
-			if (layout.rows[b.code] && layout.rows[b.code][b.layer] === char) key.symbol = char;
+			if (b.layer === 0 && layout.rows[b.code] && layout.rows[b.code][0] === char)
+				key.symbol = char;
 			strokes.set(char, {
-				// Same physical key, same pair costs: the cost cache is indexed by key.
-				key: Object.assign({}, key, { symbol: char, id: `${b.code}:${b.layer}` }),
+				key: b.layer === 0 ? Object.assign({}, key, { symbol: char }) : key,
 				mods: b.mods.map((m) => keyOf(m, true))
 			});
 		}
@@ -1973,6 +1992,10 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			oxey_outward_rolls: 0
 		};
 		const found = { uni: 0, bi: 0, tri: 0 };
+		// The tool reads the whole text: Enter is typed, and an n-gram from a line
+		// break to another character is left out (below); the break tables of
+		// ngramsFromText hold those n-grams, a table without them has none.
+		const tables = withBreaks(ctx.table);
 		const all = { uni: 0, bi: 0, tri: 0 };
 		// Each character's expansion with unit weight, built once: One (the key
 		// and its modifiers), Two (the pairs among them) and Three (triples).
@@ -1992,7 +2015,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const three = (st, w) => st.three.map(([triple, factor]) => [triple, w * factor]);
 		// Unigrams: finger and hand load, modifier usage, key costs.
 		const load = new Float64Array(10);
-		for (const [c, n] of ctx.table.uni) {
+		for (const [c, n] of tables.uni) {
 			all.uni += n;
 			const s = strokes.get(c);
 			if (!s) continue;
@@ -2011,13 +2034,17 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			raw.movement_pattern += w * pairs[at + 2];
 			raw.no_handswitch_after_unbalancing_key += w * pairs[at + 3];
 		};
-		for (const [c1, c2, n] of ctx.table.bi) {
+		for (const [c1, c2, n] of tables.bi) {
 			all.bi += n;
+			// Left out after a line break before any lookup: found, at no cost.
+			if (c1 === '\n' && c2 !== '\n') {
+				found.bi += n;
+				continue;
+			}
 			const s1 = strokes.get(c1);
 			const s2 = strokes.get(c2);
 			if (!s1 || !s2) continue;
 			found.bi += n;
-			if (c1 === '\n' && c2 !== '\n') continue;
 			bigram(s1.key, s2.key, n);
 			for (const m of s1.mods) bigram(m, s2.key, n);
 			for (const m of s1.mods) for (const o of s2.mods) bigram(m, o, n);
@@ -2082,27 +2109,41 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 				}
 			}
 		};
-		for (const [c1, c2, c3, n] of ctx.table.tri) {
+		// The tool sums the weights of the key trigrams first (the ones a
+		// character trigram and its modifier expansions share), then costs each
+		// once: irregularity is not linear in the weight.
+		const gathered = new Map();
+		const gather = (a, b, c, w) => {
+			const id = (a.index * size + b.index) * size + c.index;
+			const old = gathered.get(id);
+			if (old) old[3] += w;
+			else gathered.set(id, [a, b, c, w]);
+		};
+		for (const [c1, c2, c3, n] of tables.tri) {
 			all.tri += n;
+			if ((c1 === '\n' && c2 !== '\n') || (c2 === '\n' && c3 !== '\n')) {
+				found.tri += n;
+				continue;
+			}
 			const s1 = strokes.get(c1);
 			const s2 = strokes.get(c2);
 			const s3 = strokes.get(c3);
 			if (!s1 || !s2 || !s3) continue;
 			found.tri += n;
-			if ((c1 === '\n' && c2 !== '\n') || (c2 === '\n' && c3 !== '\n')) continue;
 			if (s1.mods.length + s2.mods.length + s3.mods.length === 0) {
-				trigram(s1.key, s2.key, s3.key, n);
+				gather(s1.key, s2.key, s3.key, n);
 				continue;
 			}
 			const s = [s1, s2, s3];
 			const [o1, o2, o3] = s.map(one);
-			for (const a of o1) for (const b of o2) for (const c of o3) trigram(a, b, c, n);
-			for (const [[a, b], w] of two(s[0], n)) for (const c of o2) trigram(a, b, c, w);
-			for (const a of o1) for (const [[b, c], w] of two(s[1], n)) trigram(a, b, c, w);
-			for (const [[a, b], w] of two(s[1], n)) for (const c of o3) trigram(a, b, c, w);
-			for (const a of o2) for (const [[b, c], w] of two(s[2], n)) trigram(a, b, c, w);
-			for (const st of s) for (const [[a, b, c], w] of three(st, n)) trigram(a, b, c, w);
+			for (const a of o1) for (const b of o2) for (const c of o3) gather(a, b, c, n);
+			for (const [[a, b], w] of two(s[0], n)) for (const c of o2) gather(a, b, c, w);
+			for (const a of o1) for (const [[b, c], w] of two(s[1], n)) gather(a, b, c, w);
+			for (const [[a, b], w] of two(s[1], n)) for (const c of o3) gather(a, b, c, w);
+			for (const a of o2) for (const [[b, c], w] of two(s[2], n)) gather(a, b, c, w);
+			for (const st of s) for (const [[a, b, c], w] of three(st, n)) gather(a, b, c, w);
 		}
+		for (const [a, b, c, w] of gathered.values()) trigram(a, b, c, w);
 		raw.irregularity = Math.sqrt(raw.irregularity);
 		// Finger balance: sample standard deviation of load over intended load.
 		const fingers = FINGERS.map((id, i) => i).filter((i) => !isThumb(i));

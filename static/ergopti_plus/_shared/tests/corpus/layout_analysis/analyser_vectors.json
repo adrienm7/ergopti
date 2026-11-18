@@ -515,6 +515,42 @@
 			"tolerance": 1e-9
 		},
 		{
+			"analyser": "dariogoetz",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "the quick\nbrown fox\n\njumps over",
+			"value": 840.5794621022449,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "dariogoetz",
+			"basis": "tool",
+			"layout": "colemak",
+			"keyboard": "iso",
+			"text": "“Hi,” she said.\n“Yes.”\n",
+			"value": 781.26012992246,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "dariogoetz",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "aaA aAa\nAaa AAa.\n",
+			"value": 1401.9803616174931,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "dariogoetz",
+			"basis": "tool",
+			"layout": "colemak",
+			"keyboard": "iso",
+			"text": "Tab\there,\n\n\nThen: end",
+			"value": 2033.6119267993677,
+			"tolerance": 1e-9
+		},
+		{
 			"analyser": "cmini",
 			"basis": "hand",
 			"layout": "qwerty",

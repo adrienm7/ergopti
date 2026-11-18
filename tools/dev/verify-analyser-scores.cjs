@@ -38,7 +38,12 @@
  *    text and each of a few of its keyboard files fingered as our model. It
  *    needs Config::General, Math::VecStat and Set::IntSpan, and loads GD,
  *    which only its drawing uses (an empty GD.pm on the library path does).
- * 6. Exit status: 0 when every comparison ran, 1 when a download, a run or a
+ * 6. Keyboard Layout Optimizer (--klo=<its evaluate exe> --klo-data=<its source
+ *    folder>): each of a few library layouts written into the base layout of
+ *    its config/keyboard/standard_qwerty_iso.yml (base and Shift: the file
+ *    has no AltGr), `evaluate --corpus <text> --json` with the layout string
+ *    that keeps it, against our scorer on the same two layers.
+ * 7. Exit status: 0 when every comparison ran, 1 when a download, a run or a
  *    parse failed. The gaps are reported, not judged: the fidelity of each
  *    analyser is recorded in docs/design/analyser-scores.md.
  *
@@ -47,6 +52,7 @@
  *        [--oxeylyzer=<exe> --oxeylyzer-data=<dir> [--oxeylyzer-config=<file>]]
  *        [--genkey=<exe> --genkey-data=<dir>] [--keygen=<exe> --keygen-data=<dir>]
  *        [--perl=<exe> --carpalx-data=<dir> [--carpalx-perl5lib=<dirs>]]
+ *        [--klo=<exe> --klo-data=<dir>]
  * ==============================================================================
  */
 
@@ -124,6 +130,19 @@ const CARPALX_KEYBOARDS = [
 	'arensito',
 	'tnwmlc',
 	'qwkrfy'
+];
+// Keyboard Layout Optimizer: library layouts written into its QWERTY ISO file.
+const KLO_LIBRARY = [
+	'qwerty',
+	'azerty',
+	'qwertz',
+	'dvorak',
+	'colemak',
+	'workman',
+	'canary',
+	'ergopti',
+	'ergol',
+	'bepo'
 ];
 
 const args = process.argv.slice(2);
@@ -632,8 +651,185 @@ function verifyCarpalx(perl, data) {
 	}
 }
 
+// ===========================================
+// ======= 7/ Keyboard Layout Optimizer ======
+// ===========================================
+
+// Our keys on the rows of its standard_qwerty_iso.yml base_layout, in its
+// order (null: a key of its own, kept: Backspace, Tab, Caps Lock, Enter, the
+// Shifts and the bottom row's modifiers), and the columns its layout string
+// permutes (fixed_keys false) per row.
+const KLO_ROWS = [
+	[
+		'Backquote',
+		'Digit1',
+		'Digit2',
+		'Digit3',
+		'Digit4',
+		'Digit5',
+		'Digit6',
+		'Digit7',
+		'Digit8',
+		'Digit9',
+		'Digit0',
+		'Minus',
+		'Equal',
+		null
+	],
+	[
+		null,
+		'KeyQ',
+		'KeyW',
+		'KeyE',
+		'KeyR',
+		'KeyT',
+		'KeyY',
+		'KeyU',
+		'KeyI',
+		'KeyO',
+		'KeyP',
+		'BracketLeft',
+		'BracketRight'
+	],
+	[
+		null,
+		'KeyA',
+		'KeyS',
+		'KeyD',
+		'KeyF',
+		'KeyG',
+		'KeyH',
+		'KeyJ',
+		'KeyK',
+		'KeyL',
+		'Semicolon',
+		'Quote',
+		'Backslash',
+		null
+	],
+	[
+		null,
+		'IntlBackslash',
+		'KeyZ',
+		'KeyX',
+		'KeyC',
+		'KeyV',
+		'KeyB',
+		'KeyN',
+		'KeyM',
+		'Comma',
+		'Period',
+		'Slash',
+		null
+	],
+	[null, null, null, 'Space', null, null, null, null]
+];
+const KLO_FREE = [null, [1, 10], [1, 9], [2, 10], null];
+
+/** A key's base and Shift characters, as its keyboard file can hold them. */
+function kloCells(layout, code) {
+	const row = layout.rows[code] || [];
+	const cell = (c) => (typeof c === 'string' && Array.from(c).length === 1 ? c : null);
+	// A Shift character on a key without a base one is left out: the tool
+	// names a key by its base symbol.
+	return cell(row[0]) === null ? [] : [cell(row[0]), cell(row[1])].filter((c) => c !== null);
+}
+
+/**
+ * A library layout written into the tool's QWERTY ISO keyboard file (base and
+ * Shift layers), and the layout string that keeps it as it is: the base
+ * symbols of the keys it permutes. Null when a permuted key has no base
+ * symbol (a dead key there).
+ */
+function kloKeyboard(template, layout) {
+	const lines = template.split('\n');
+	const start = lines.findIndex((l) => /^base_layout:/.test(l));
+	if (start < 0) throw new Error('the keyboard file has no base_layout');
+	const free = [];
+	let row = -1;
+	let col = 0;
+	for (let i = start + 1; i < lines.length && !/^\S/.test(lines[i]); i++) {
+		const m = /^(\s*)- (- )?(\[.*\])\s*$/.exec(lines[i]);
+		if (!m) continue;
+		if (m[2]) {
+			row++;
+			col = 0;
+		} else col++;
+		const code = KLO_ROWS[row] ? KLO_ROWS[row][col] : undefined;
+		if (code === undefined && row !== 4) throw new Error(`base_layout row ${row} has a key ${col}`);
+		if (!code) continue;
+		const cells = kloCells(layout, code);
+		lines[i] =
+			`${m[1]}- ${m[2] || ''}[${(cells.length ? cells : ['']).map((c) => JSON.stringify(c)).join(', ')}]`;
+		if (KLO_FREE[row] && col >= KLO_FREE[row][0] && col <= KLO_FREE[row][1]) {
+			if (cells.length === 0 || cells[0] === ' ') return null;
+			free.push(cells[0]);
+		}
+	}
+	return { file: lines.join('\n'), layoutString: free.join('') };
+}
+
+/** The library layout as the keyboard file holds it: base and Shift only. */
+function kloAsWritten(layout) {
+	const rows = {};
+	for (const code of Object.keys(layout.rows)) {
+		const cells = kloCells(layout, code);
+		rows[code] = [cells[0] || null, cells[1] || null, null, null];
+	}
+	return Object.assign({}, layout, { rows, dead: {}, command: {} });
+}
+
+function verifyKlo(exe, data) {
+	if (!fs.existsSync(exe)) throw new Error(`no evaluate executable at ${exe}`);
+	const templatePath = path.join(data, 'config', 'keyboard', 'standard_qwerty_iso.yml');
+	if (!fs.existsSync(templatePath)) throw new Error(`${data} has no ${templatePath}`);
+	const template = fs.readFileSync(templatePath, 'utf8').split('\r').join('');
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'klo-'));
+	try {
+		const gaps = [];
+		const skipped = new Set();
+		for (const [id, file] of Object.entries(GENKEY_TEXTS)) {
+			const text = fs.readFileSync(path.join(REPO_ROOT, file), 'utf8');
+			const tables = E.prepareNgrams(E.ngramsFromText(text));
+			const line = [];
+			for (const layoutId of KLO_LIBRARY) {
+				const layout = libraryLayout(layoutId);
+				const keyboard = kloKeyboard(template, layout);
+				if (!keyboard) {
+					skipped.add(layoutId);
+					continue;
+				}
+				const conf = path.join(root, `${layoutId}.yml`);
+				fs.writeFileSync(conf, keyboard.file);
+				const run = spawnSync(
+					exe,
+					['-l', conf, '--corpus', path.join(REPO_ROOT, file), '--json', keyboard.layoutString],
+					{ cwd: data, encoding: 'utf8', maxBuffer: 1 << 28 }
+				);
+				if (run.status !== 0)
+					throw new Error(
+						`evaluate ${layoutId} on ${id}: exit ${run.status}\n${run.stderr.slice(-400)}`
+					);
+				const theirs = JSON.parse(run.stdout)[0].total_cost;
+				const ours = S.score('dariogoetz', kloAsWritten(layout), tables, { keyboard: 'iso' }).value;
+				gaps.push((100 * (ours - theirs)) / theirs);
+				line.push(`${layoutId} ${theirs.toFixed(3)}/${ours.toFixed(3)}`);
+			}
+			if (verbose) console.log(`  ${id.padEnd(9)} ${line.join('  ')}`);
+		}
+		const note = skipped.size
+			? ` (skipped, a dead key on a permuted key: ${[...skipped].join(', ')})`
+			: '';
+		console.log(
+			`Keyboard Layout Optimizer: ${gaps.length} points, ${summary(gaps, 6, ' %')}${note}`
+		);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+}
+
 // ======================
-// ======= 7/ Main ======
+// ======= 8/ Main ======
 // ======================
 
 async function main() {
@@ -664,6 +860,15 @@ async function main() {
 		const data = option('carpalx-data');
 		if (perl && data) verifyCarpalx(perl, data);
 		else console.log('carpalx: skipped (needs --perl=<exe> --carpalx-data=<its source folder>)');
+	}
+	if (!only || only === 'dariogoetz') {
+		const exe = option('klo');
+		const data = option('klo-data');
+		if (exe && data) verifyKlo(exe, data);
+		else
+			console.log(
+				'Keyboard Layout Optimizer: skipped (needs --klo=<evaluate exe> --klo-data=<its source folder>)'
+			);
 	}
 }
 
