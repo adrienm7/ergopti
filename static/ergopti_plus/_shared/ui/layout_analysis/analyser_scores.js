@@ -1167,6 +1167,73 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	// ========================
 
 	/**
+	 * genkey's corpus, built from a prepared table: its letters, its bigrams
+	 * and its skipgrams. genkey counts a pair of characters g apart (g from 1
+	 * to 9, every character between them kept by its filter) with the weight
+	 * 1/2^(g−1). The tables hold the gap of 1 (the trigrams); the longer gaps
+	 * are carried forward by the trigrams' second-order chain, P(c | a b) =
+	 * trigram(abc) / bigram(ab), whose bigram also counts the runs that end
+	 * after b, so a run's end stops the chain as genkey's reset does.
+	 * @param {object} table - prepareNgrams() output.
+	 * @returns {{uni: Map, bi: Map, skip: Map}} Letter → n, pair → n, pair → weight.
+	 */
+	function genkeyTables(table) {
+		const model = entry('genkey').model;
+		const norm = genkeyNorm(model);
+		const add = (map, key, n) => map.set(key, (map.get(key) || 0) + n);
+		const uni = new Map();
+		const bi = new Map();
+		const tri = new Map();
+		for (const [c, n] of table.uni) {
+			const x = norm(c);
+			if (x) add(uni, x, n);
+		}
+		for (const [a, b, n] of table.bi) {
+			const x = norm(a);
+			const y = norm(b);
+			if (x && y) add(bi, x + y, n);
+		}
+		for (const [a, m, b, n] of table.tri) {
+			const x = norm(a);
+			const y = norm(m);
+			const z = norm(b);
+			if (x && y && z) add(tri, x + y + z, n);
+		}
+		const skip = new Map();
+		const next = new Map();
+		for (const [abc, n] of tri) {
+			add(skip, abc[0] + abc[2], n);
+			const ab = abc.slice(0, 2);
+			if (!next.has(ab)) next.set(ab, []);
+			next.get(ab).push([abc[2], n / bi.get(ab)]);
+		}
+		// chain: (first character, last two) → count, for the current gap.
+		let chain = tri;
+		for (let gap = 2; gap <= model.skipgram_max_gap; gap++) {
+			const weight = model.skipgram_decay ** (gap - 1);
+			const longer = new Map();
+			for (const [key, n] of chain) {
+				const follow = next.get(key.slice(1));
+				if (!follow) continue;
+				for (const [c, p] of follow) add(longer, key[0] + key[2] + c, n * p);
+			}
+			for (const [key, n] of longer) add(skip, key[0] + key[2], weight * n);
+			chain = longer;
+		}
+		return { uni, bi, skip };
+	}
+
+	/** genkey's character filter: lower case, its substitutions, its valid set. */
+	function genkeyNorm(model) {
+		const valid = new Set(Array.from(model.valid_chars));
+		return (char) => {
+			const lower = char.toLowerCase();
+			const sub = model.substitutions[lower] || lower;
+			return valid.has(sub) ? sub : null;
+		};
+	}
+
+	/**
 	 * genkey's score: weighted finger speed (same-finger bigrams and
 	 * skipgrams times squared distance, over each finger's speed), lateral
 	 * stretch bigrams and index imbalance; lower is better. Corpus filter:
@@ -1174,12 +1241,8 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 */
 	function scoreGenkey(ctx) {
 		const model = entry('genkey').model;
-		const valid = new Set(Array.from(model.valid_chars));
-		const norm = (char) => {
-			const lower = char.toLowerCase();
-			const sub = model.substitutions[lower] || lower;
-			return valid.has(sub) ? sub : null;
-		};
+		const norm = genkeyNorm(model);
+		const t = perCorpus(ctx.table, 'genkey:tables', genkeyTables);
 		const angle = ctx.layout.fingering === 'angle' || ctx.keyboard === 'iso_angle';
 		const rows = ctx.keyboard === 'ansi' ? model.rows_ansi : model.rows_iso;
 		const keys = new Map();
@@ -1202,14 +1265,9 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 				keys.set(char, { r, col, finger });
 			})
 		);
-		const letters = new Map();
-		for (const [c, n] of ctx.table.uni) {
-			const x = norm(c);
-			if (x) letters.set(x, (letters.get(x) || 0) + n);
-		}
 		let T = 0;
 		const index = [0, 0];
-		for (const [c, n] of letters) {
+		for (const [c, n] of t.uni) {
 			const k = keys.get(c);
 			if (!k) continue;
 			T += n;
@@ -1225,29 +1283,24 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		let lsb = 0;
 		const lsbPairs = new Set(model.lsb_finger_pairs.map(([a, b]) => `${a}/${b}`));
 		let sfbDistinct = 0;
-		for (const [a, b, n] of ctx.table.bi) {
-			const x = norm(a);
-			const y = norm(b);
-			const ka = x && keys.get(x);
-			const kb = y && keys.get(y);
+		for (const [xy, n] of t.bi) {
+			const ka = keys.get(xy[0]);
+			const kb = keys.get(xy[1]);
 			if (!ka || !kb) continue;
 			if (ka.finger === kb.finger) {
 				speed[ka.finger] += model.sfb * n * dist(ka, kb);
-				if (x !== y) sfbDistinct += n;
+				if (xy[0] !== xy[1]) sfbDistinct += n;
 			} else if (
 				(lsbPairs.has(`${ka.finger}/${kb.finger}`) || lsbPairs.has(`${kb.finger}/${ka.finger}`)) &&
 				Math.abs(ka.col - kb.col) >= model.lsb_min_dx
 			)
 				lsb += n;
 		}
-		for (const [a, m, b, n] of ctx.table.tri) {
-			const x = norm(a);
-			const y = norm(b);
-			if (!x || !y || !norm(m)) continue;
-			const ka = keys.get(x);
-			const kb = keys.get(y);
+		for (const [xy, n] of t.skip) {
+			const ka = keys.get(xy[0]);
+			const kb = keys.get(xy[1]);
 			if (!ka || !kb || ka.finger !== kb.finger) continue;
-			speed[ka.finger] += model.dsfb * model.skipgram_scale * n * dist(ka, kb);
+			speed[ka.finger] += model.dsfb * n * dist(ka, kb);
 		}
 		let fspeed = 0;
 		const parts = {};

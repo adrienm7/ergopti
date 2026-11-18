@@ -23,14 +23,18 @@
  *    its « Score » line with ours on its ortho board. Its weights are those of
  *    the config it wrote on its first run (--oxeylyzer-config, by default
  *    beside the data folder).
- * 3. Exit status: 0 when every comparison ran, 1 when a download, a run or a
+ * 3. genkey (--genkey=<exe> --genkey-data=<its source folder>): `genkey load`
+ *    on each of our texts, then `genkey rank`, in a temporary copy of its
+ *    layouts, against our scorer on the same layout files (those whose finger
+ *    matrix is genkey's column fingering).
+ * 4. Exit status: 0 when every comparison ran, 1 when a download, a run or a
  *    parse failed. The gaps are reported, not judged: the fidelity of each
  *    analyser is recorded in docs/design/analyser-scores.md.
  *
  * Usage:
- *   node tools/dev/verify-analyser-scores.cjs [--analyser=klanext|oxeylyzer]
- *        [--verbose] [--oxeylyzer=<exe> --oxeylyzer-data=<dir>
- *        [--oxeylyzer-config=<file>]]
+ *   node tools/dev/verify-analyser-scores.cjs [--analyser=<id>] [--verbose]
+ *        [--oxeylyzer=<exe> --oxeylyzer-data=<dir> [--oxeylyzer-config=<file>]]
+ *        [--genkey=<exe> --genkey-data=<dir>]
  * ==============================================================================
  */
 
@@ -78,6 +82,10 @@ const OXEYLYZER_TEXTS = {
 	pyrich: 'static/corpus/original/code/rich_13.7.1.py.txt'
 };
 const OXEYLYZER_TIMEOUT_MS = 600000;
+// genkey: the same texts and a French one (its filter keeps a-z and a few signs).
+const GENKEY_TEXTS = Object.assign({}, OXEYLYZER_TEXTS, {
+	germinal: 'static/corpus/original/fr/zola_germinal.txt'
+});
 
 const args = process.argv.slice(2);
 const option = (name) => {
@@ -97,6 +105,7 @@ for (const file of SCRIPTS)
 	vm.runInContext(fs.readFileSync(path.join(UI, file), 'utf8'), sandbox, { filename: file });
 const E = vm.runInContext('LAYOUT_ANALYSIS', sandbox);
 const S = vm.runInContext('LAYOUT_ANALYSER_SCORES', sandbox);
+const MODELS = vm.runInContext('LAYOUT_ANALYSIS_DATA', sandbox).analysers;
 const library = new Map(E.libraryLayouts().map((layout) => [layout.id, layout]));
 
 /** One library layout, or an error naming it. */
@@ -263,8 +272,106 @@ ${out.slice(-600)}`
 	}
 }
 
+// ========================
+// ======= 4/ genkey ======
+// ========================
+
+/**
+ * One of genkey's layout files as a library layout: its three rows on the
+ * keys of our genkey model (ANSI rows), base layer only. Its finger matrix
+ * must be genkey's column fingering, the one our scorer applies.
+ */
+function genkeyLayout(file) {
+	const rowsOf = MODELS.genkey.model.rows_ansi;
+	const columns = MODELS.genkey.model.column_fingers;
+	const lines = fs.readFileSync(file, 'utf8').split('\n');
+	const rows = {};
+	lines.slice(1, 4).forEach((line, r) => {
+		line
+			.trim()
+			.split(/\s+/)
+			.filter(Boolean)
+			.forEach((char, col) => {
+				if (rowsOf[r][col]) rows[rowsOf[r][col]] = [char.toLowerCase(), null, null, null];
+			});
+	});
+	const standard = lines.slice(4, 7).every((line, r) =>
+		line
+			.trim()
+			.split(/\s+/)
+			.filter(Boolean)
+			.every((finger, col) => Number(finger) === columns[Math.min(col, columns.length - 1)])
+	);
+	const keys = lines.slice(1, 4).map((l) => l.trim().split(/\s+/).filter(Boolean).length);
+	const fingers = lines.slice(4, 7).map((l) => l.trim().split(/\s+/).filter(Boolean).length);
+	const name = lines[0].trim();
+	return {
+		layout: { id: name, name, rows, fingering: 'standard' },
+		usable: standard && keys.every((n, r) => n === fingers[r])
+	};
+}
+
+function verifyGenkey(exe, data) {
+	if (!fs.existsSync(exe)) throw new Error(`no genkey executable at ${exe}`);
+	for (const needed of ['config.toml', 'layouts', path.join('corpora', 'shai-iweb.json')])
+		if (!fs.existsSync(path.join(data, needed)))
+			throw new Error(`${data} is not genkey's folder (no ${needed})`);
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'genkey-'));
+	try {
+		fs.cpSync(path.join(data, 'layouts'), path.join(root, 'layouts'), { recursive: true });
+		fs.mkdirSync(path.join(root, 'corpora'));
+		fs.copyFileSync(
+			path.join(data, 'corpora', 'shai-iweb.json'),
+			path.join(root, 'corpora', 'shai-iweb.json')
+		);
+		const config = fs.readFileSync(path.join(data, 'config.toml'), 'utf8');
+		if (!/^Corpus = .*$/m.test(config)) throw new Error('genkey config.toml has no Corpus line');
+		const withCorpus = (name) => config.replace(/^Corpus = .*$/m, `Corpus = "${name}"`);
+		const run = (argv) => {
+			const result = spawnSync(exe, argv, { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 });
+			if (result.status !== 0)
+				throw new Error(`genkey ${argv.join(' ')}: exit ${result.status}\n${result.stderr}`);
+			return result.stdout;
+		};
+		const files = fs
+			.readdirSync(path.join(data, 'layouts'))
+			.filter((f) => !f.startsWith('_'))
+			.map((f) => Object.assign({ file: f }, genkeyLayout(path.join(data, 'layouts', f))))
+			.filter((l) => l.usable);
+		const gaps = [];
+		for (const [id, file] of Object.entries(GENKEY_TEXTS)) {
+			// `load` needs a valid config (an existing corpus) before it writes the new one.
+			fs.writeFileSync(path.join(root, 'config.toml'), withCorpus('shai-iweb'));
+			fs.copyFileSync(path.join(REPO_ROOT, file), path.join(root, `${id}.txt`));
+			run(['load', `${id}.txt`]);
+			fs.writeFileSync(path.join(root, 'config.toml'), withCorpus(id));
+			const theirs = new Map();
+			for (const m of run(['rank']).matchAll(/^(.*?)\s+(-?[0-9.]+)\s*$/gm))
+				theirs.set(m[1].trim(), Number(m[2]));
+			const tables = E.prepareNgrams(
+				E.ngramsFromText(fs.readFileSync(path.join(REPO_ROOT, file), 'utf8'))
+			);
+			const line = [];
+			for (const { layout } of files) {
+				const published = theirs.get(layout.name);
+				if (published === undefined)
+					throw new Error(`genkey on ${id}: no score for ${layout.name}`);
+				const ours = S.score('genkey', layout, tables, { keyboard: 'ansi' }).value;
+				gaps.push((100 * (ours - published)) / published);
+				line.push(`${layout.name} ${published}/${ours.toFixed(3)}`);
+			}
+			if (verbose) console.log(`  ${id.padEnd(9)} ${line.join('  ')}`);
+		}
+		console.log(
+			`genkey: ${gaps.length} points (${files.length} of its layouts), Score ${summary(gaps, 3, ' %')}`
+		);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+}
+
 // ======================
-// ======= 4/ Main ======
+// ======= 5/ Main ======
 // ======================
 
 async function main() {
@@ -277,6 +384,12 @@ async function main() {
 			option('oxeylyzer-config') || (data && path.join(data, '..', 'config', 'config.toml'));
 		if (exe && data) verifyOxeylyzer(exe, data, config);
 		else console.log('Oxeylyzer: skipped (needs --oxeylyzer=<exe> --oxeylyzer-data=<dir>)');
+	}
+	if (!only || only === 'genkey') {
+		const exe = option('genkey');
+		const data = option('genkey-data');
+		if (exe && data) verifyGenkey(exe, data);
+		else console.log('genkey: skipped (needs --genkey=<exe> --genkey-data=<its source folder>)');
 	}
 }
 

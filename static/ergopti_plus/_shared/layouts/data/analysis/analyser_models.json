@@ -1056,7 +1056,7 @@
 			"repository": "https://github.com/semilin/genkey",
 			"revision": "1.2, f1f4173 (2024-07-03)",
 			"licence": "GPL-3.0-or-later (LICENSE)",
-			"fidelity": "approximate",
+			"fidelity": "close",
 			"better": "lower",
 			"unit": "points",
 			"digits": 2,
@@ -1142,7 +1142,8 @@
 				"key_travel": 0.01,
 				"sfb": 1.0,
 				"dsfb": 0.5,
-				"skipgram_scale": 1.5486,
+				"skipgram_max_gap": 9,
+				"skipgram_decay": 0.5,
 				"fspeed_scale": 800,
 				"lsb_finger_pairs": [
 					[3, 2],

@@ -336,11 +336,38 @@
 		},
 		{
 			"analyser": "genkey",
-			"basis": "hand",
+			"basis": "tool",
 			"layout": "qwerty",
 			"keyboard": "ansi",
 			"text": "ded",
-			"value": 342.581,
+			"value": 341.666666667,
+			"tolerance": 0.000001
+		},
+		{
+			"analyser": "genkey",
+			"basis": "tool",
+			"layout": "colemak",
+			"keyboard": "ansi",
+			"text": "The Lazy Dog",
+			"value": 198.454545455,
+			"tolerance": 0.000001
+		},
+		{
+			"analyser": "genkey",
+			"basis": "tool",
+			"layout": "workman",
+			"keyboard": "ansi",
+			"text": "minimum: \"on-off\" aloud",
+			"value": 35.351609848,
+			"tolerance": 0.000001
+		},
+		{
+			"analyser": "genkey",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "ki\njk\nlo",
+			"value": 203.333333333,
 			"tolerance": 0.000001
 		},
 		{

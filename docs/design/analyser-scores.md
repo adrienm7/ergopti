@@ -259,10 +259,26 @@ k3·p3)) + ks·(ph + 0.3·pr + 0.3·pf)` with base effort per position, penalty
   lower case, `? : _ "` folded, only `a-z , . / ; - '` kept, anything else
   resets. Its ortho grid and column fingering (the layout's angle mod kept);
   base layer only.
-- **Fidelity: approximate.** genkey weights skipgrams up to a gap of 9; the
-  tables hold the gap of 1 only, scaled by 1.5486 (the ratio of all skipgrams
-  to skip-1 on genkey's default corpus): from +0.8 % to −9 % on three layouts.
-  Gate: hand-computed (`ge` 65, `ded` 342.581).
+- **Skipgrams.** genkey counts a pair of characters g apart (g = 1 to 9,
+  every character between them kept, the count reset at a line end) with the
+  weight 1/2^(g−1). The tables hold the gap of 1 (the trigrams); the longer
+  gaps are carried forward by the trigrams' second-order chain, P(c | ab) =
+  trigram(abc) / bigram(ab), computed once per corpus. The bigram also counts
+  the runs that end after b, so a run's end stops the chain as genkey's reset
+  does; the chain is exact when each pair of characters has one continuation.
+- **Fidelity: close.** Measured against genkey itself (built from f1f4173, its
+  default config, `load` then `rank`), on its 28 layout files whose finger
+  matrix is its column fingering, over _Alice_, _Sherlock Holmes_, English
+  Wikipedia, Python code and _Germinal_ (140 points): 1.4 % on average, 9.9 %
+  at most (code). An own transcription of the formula fed with genkey's exact
+  skipgrams gives its output to 9 decimals, so the skipgram chain is the whole
+  gap. Before (skip-1 scaled by 1.5486, the ratio of all skipgrams to skip-1
+  on genkey's default corpus): 5.5 % on average, 20.5 % at most. Gate:
+  hand-computed (`ge` 65) and genkey's own output (`rank`, printed to 9
+  decimals by a local build) on short texts where the chain is exact: `ded`
+  on QWERTY 341.666666667 (342.581 with the old scale), `The Lazy Dog` on
+  Colemak, `minimum: "on-off" aloud` on Workman (case, substitutions), three
+  lines on QWERTY (the reset at each line end).
 
 ### Oxeylyzer
 
@@ -369,15 +385,17 @@ and layout, the gap to KLAnext's numbers recorded in
 `tools/dev/analyser-reference/klanext.json`, with our library's layouts and
 with KLAnext's own layout definitions. With `--oxeylyzer=<exe>
 --oxeylyzer-data=<its data folder>` it also runs a local Oxeylyzer build on our
-corpus texts. Measured on 2026-11-18:
+corpus texts; with `--genkey=<exe> --genkey-data=<its source folder>`, a local
+genkey build. Measured on 2026-11-18:
 
 | Analyser  | Points | Mean gap                                | Largest      |
 | --------- | ------ | --------------------------------------- | ------------ |
 | KLAnext   | 126    | 0.0024 (its definitions), 0.19 % (ours) | 0.005, 2.5 % |
 | Oxeylyzer | 72     | 0.0044                                  | 0.012        |
+| genkey    | 140    | 1.4 % (5.5 % before)                    | 9.9 %        |
 
-Not re-measured against a run of the tool in this pass: genkey (Go), cmini,
-a200 (Python), carpalx (Perl), keygen (Rust) and Keyboard Layout Optimizer
+Not re-measured against a run of the tool in this pass: cmini, a200
+(Python), carpalx (Perl), keygen (Rust) and Keyboard Layout Optimizer
 (Rust): their fidelity above rests on the earlier checks it names.
 
 ## Not covered
