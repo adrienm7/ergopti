@@ -511,10 +511,9 @@ function M.toggle_awake()
 		-- the close cannot swallow the toast we just displayed (it still would on
 		-- the no-handle path, which falls back to closeAll).
 		close_awake_alert()
-		local off_text = i18n.get("shortcuts.keep_awake_off")
-		local ok_off_alert = pcall(hs.alert.show, off_text, 2.0)
+		local ok_off_alert = pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_off"), 2.0)
 		-- An alert banner has no accessibility element: VoiceOver hears it here.
-		if ok_off_alert then SystemA11y.announce_event(off_text) end
+		if ok_off_alert then SystemA11y.announce_event(i18n.get("shortcuts.keep_awake_off")) end
 		return watcher_settled and return_timer_settled and tick_timer_settled
 	else
 		-- A prior activate-then-throw may have left an inert exact timer awaiting
@@ -618,14 +617,13 @@ function M.toggle_awake()
 		math.randomseed(os.time())
 
 		close_awake_alert()
-		local on_text = i18n.get("shortcuts.keep_awake_on")
-		local _ok_alert, _alert_id = pcall(hs.alert.show, on_text, math.huge)
+		local _ok_alert, _alert_id = pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_on"), math.huge)
 		if _ok_alert then
 			awake_alert_id    = _alert_id
 			-- Record that a banner is up even when the build gave us no id, so the
 			-- teardown can still reach it via the no-handle fallback.
 			awake_alert_shown = true
-			SystemA11y.announce_event(on_text)
+			SystemA11y.announce_event(i18n.get("shortcuts.keep_awake_on"))
 		end
 
 		-- Record the current mouse position as the jitter origin

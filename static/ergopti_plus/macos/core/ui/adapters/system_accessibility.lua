@@ -42,8 +42,10 @@ local LOG = "system_accessibility"
 -- VoiceOver's bundle identifier: it runs as its own application.
 local VOICEOVER_BUNDLE_ID = "com.apple.VoiceOver"
 
--- How long a settings read stays valid, in seconds.
-local SETTINGS_TTL_SECONDS = Timings.sec("tooltip", "accessibility_settings_ttl_ms")
+-- How long a settings read stays valid, in seconds; read on the first
+-- settings read, so the action modules that only announce (keep-awake, the
+-- spotlight, the WPM widget) load this adapter without the tooltip timings.
+local _settings_ttl_seconds = nil
 
 local _settings, _settings_at = nil, nil
 local _settings_refusal_reported = false
@@ -65,7 +67,8 @@ local _announce_refusal_reported = false
 --- @return table { reduce_motion, reduce_transparency, increase_contrast } booleans.
 function M.display_settings(now)
 	now = now or os.time()
-	if _settings and _settings_at and now - _settings_at < SETTINGS_TTL_SECONDS then return _settings end
+	_settings_ttl_seconds = _settings_ttl_seconds or Timings.sec("tooltip", "accessibility_settings_ttl_ms")
+	if _settings and _settings_at and now - _settings_at < _settings_ttl_seconds then return _settings end
 	local ok, raw = pcall(function() return hs.screen.accessibilitySettings() end)
 	if not ok or type(raw) ~= "table" then
 		if not _settings_refusal_reported then
