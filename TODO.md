@@ -448,6 +448,16 @@ Each closes on a named green hosted or native run, recorded here.
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
+- [ ] **Access weights of the score (decided by the agent on 2026-11-18, to review by the maintainer).** New
+      metric `altgr_usage` (characters typed with AltGr held) with weight 2, on top of `modifier_usage` 0.5;
+      `dead_key_usage` raised from 0.5 to 2. Per character, an AltGr chord costs 2.5 plus the thumb's reach, a dead
+      key 2 plus its own press, an off-centre direct key about 1 to 1.7, an SFB 10. These three weights are the
+      user's in the choice of ways (an edit analyses again; `rescore` refuses it), the others stay the defaults'.
+      Nemolivier: Ergo-L 24.38 → 17.65 (rank 5 → 6), bépo 5.39 → −0.42, Ergopti 26.89 → 23.11, Optimot 18.18 →
+      15.17. Ergo-L still reaches é, è and `'` by Shift+AltGr or AltGr detours where they avoid an SFB (SFB 0.97 %
+      best, 1.79 % fixed); `altgr_usage` 10 gives 1.52 %, 20 gives 1.78 %. Choose the defaults, and whether such
+      detours should count at all (docs/design/layout-analysis.md, « Access weights »).
+
 - [ ] **Python XKB converter and the JIS and ABNT keys (decided by the agent on 2026-11-18, to review by the
       maintainer).** 2f96fa2f4f places Yen, Ro and the keypad comma (`mac_keycodes.json` `extra_keys`) in the Lua
       converter only; `keylayout_to_xkb.py` still reads `keys` alone and reports macOS 93 and 94 as unplaced

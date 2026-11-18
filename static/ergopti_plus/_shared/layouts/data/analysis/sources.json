@@ -13,6 +13,11 @@
 			"path": "docs/design/layout-analysis.md",
 			"anchor": "coverage-and-simplicity-bonuses"
 		},
+		"engine_doc_ways": {
+			"title": "Ergopti — layout analysis engine: ways of typing",
+			"path": "docs/design/layout-analysis.md",
+			"anchor": "ways-of-typing"
+		},
 		"study": {
 			"title": "Ergopti — study of the layout analysers",
 			"path": "docs/audits/layout-analysers/report.md"
@@ -227,8 +232,9 @@
 		"finger_imbalance": ["engine_doc", "study_finger_load", "dariogoetz", "genkey"],
 		"hand_imbalance": ["engine_doc", "dariogoetz"],
 		"pinky_load": ["engine_doc", "ergol_stats", "genkey", "oxeylyzer"],
-		"modifier_usage": ["engine_doc", "dariogoetz", "kla"],
-		"dead_key_usage": ["engine_doc", "ergol_stats", "kalamine"],
+		"modifier_usage": ["engine_doc", "engine_doc_ways", "dariogoetz", "kla"],
+		"altgr_usage": ["engine_doc", "engine_doc_ways", "dariogoetz"],
+		"dead_key_usage": ["engine_doc", "engine_doc_ways", "ergol_stats", "kalamine"],
 		"outer_column": ["engine_doc", "study"],
 		"unsupported": ["engine_doc", "ergol_stats"],
 		"compact_fit": ["engine_doc", "study"],

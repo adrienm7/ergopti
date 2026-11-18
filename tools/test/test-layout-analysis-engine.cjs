@@ -824,10 +824,34 @@ check(dox.relRow[dox.index.get('KeyE')] === -1, 'board ergodox: E one row above 
 
 const ranked = E.compare([byId.get('qwerty'), byId.get('ergopti')], ngrams, {});
 check(ranked[0].layout.id === 'ergopti' && ranked[0].rank === 1, 'compare: Ergopti beats QWERTY');
-const flipped = E.rescore(ranked, Object.fromEntries(Object.keys(defaults).map((m) => [m, 0])));
+// The access weights choose the ways of typing: rescore keeps them, and a
+// change of one needs a new analysis.
+const zeroOthers = Object.fromEntries(
+	Object.keys(defaults).map((m) => [m, E.ACCESS_WEIGHTS.includes(m) ? defaults[m] : 0])
+);
+const flipped = E.rescore(ranked, zeroOthers);
 check(
-	flipped.every((r) => r.score.total === 0),
-	'rescore: all-zero weights give every layout zero'
+	flipped.every((r) => {
+		const access = E.ACCESS_WEIGHTS.reduce((sum, m) => sum - defaults[m] * r.metrics[m], 0);
+		return Math.abs(r.score.total - access) < 1e-9;
+	}),
+	'rescore: zero weights but the access ones leave only the access contributions'
+);
+for (const id of E.ACCESS_WEIGHTS) {
+	let refused = false;
+	try {
+		E.rescore(ranked, { [id]: defaults[id] + 1 });
+	} catch (error) {
+		refused = /analyse again/.test(error.message);
+	}
+	check(refused, `rescore: a changed ${id} is refused, it chooses the ways of typing`);
+}
+const zeroAll = Object.fromEntries(Object.keys(defaults).map((m) => [m, 0]));
+check(
+	E.compare([byId.get('qwerty'), byId.get('ergopti')], ngrams, { weights: zeroAll }).every(
+		(r) => r.score.total === 0
+	),
+	'analyse: all-zero weights give every layout zero'
 );
 
 // ==========================
@@ -1459,15 +1483,17 @@ const onlyKind = (result, char) =>
 }
 
 // Direct, AltGr or dead key, by the documented costs (default weights:
-// distance 1/mm, home_row 0.3, pinky_load 0.3, modifier and dead-key use 0.5,
-// sfb 10; ISO reaches KeyR, KeyP, KeyE 19.636 mm, AltRight 69.056 mm). In
-// « fé » there are 2 characters and 1 bigram, so a pair counts 100 × 2 per
-// point of weight:
+// distance 1/mm, home_row 0.3, pinky_load 0.3, sfb 10, and the access weights
+// modifier_usage 0.5, altgr_usage 2, dead_key_usage 2; ISO reaches KeyR, KeyP,
+// KeyE 19.636 mm, AltRight 69.056 mm). In « fé » there are 2 characters and 1
+// bigram, so a pair counts 100 × 2 per point of weight:
 // - é on KeyR (left index, like f): 19.636 + 10 × 200 (SFB) = 2019.636;
-// - AltGr+KeyL (home): −30 (home) + 69.056 (AltRight) + 50 (modifier) = 89.056;
-// - dead key KeyP then e on KeyE: 19.636 + 30 (pinky) + 19.636 + 50 (dead key)
-//   = 119.272, both pairs changing hands.
-// Alone, é is typed directly (19.636 is the least).
+// - AltGr+KeyL (home): −30 (home) + 69.056 (AltRight) + 50 (modifier) + 200
+//   (AltGr layer) = 289.056;
+// - dead key KeyP then e on KeyE: 19.636 + 30 (pinky) + 19.636 + 200 (dead key)
+//   = 269.272, both pairs changing hands.
+// Alone, é is typed directly (19.636 is the least). The user's access weights
+// choose too: with altgr_usage 0, AltGr costs 89.056 and wins.
 {
 	const cells = {
 		KeyF: 'f',
@@ -1481,11 +1507,41 @@ const onlyKind = (result, char) =>
 	const alone = E.analyse(full, E.ngramsFromText('é'), { keyboard: 'iso' });
 	check(onlyKind(alone, 'é') === 'direct', `ways: é alone is typed ${onlyKind(alone, 'é')}`);
 	const afterF = E.analyse(full, E.ngramsFromText('fé'), { keyboard: 'iso' });
-	check(onlyKind(afterF, 'é') === 'altgr', `ways: « fé » types é by ${onlyKind(afterF, 'é')}`);
-	// f on the home row (−30), é through AltGr (89.056), over 2 characters.
+	check(onlyKind(afterF, 'é') === 'dead', `ways: « fé » types é by ${onlyKind(afterF, 'é')}`);
+	// f on the home row (−30), é through the dead key (269.272), over 2 characters.
 	check(
-		Math.abs(afterF.typing.cost - (-30 + 89.056) / 2) < 1e-3,
+		Math.abs(afterF.typing.cost - (-30 + 269.272) / 2) < 1e-3,
 		`ways: « fé » costs ${afterF.typing.cost}`
+	);
+	check(afterF.metrics.altgr_usage === 0, 'ways: « fé » through the dead key holds no AltGr');
+	const cheapAltGr = E.analyse(full, E.ngramsFromText('fé'), {
+		keyboard: 'iso',
+		weights: { altgr_usage: 0 }
+	});
+	check(
+		onlyKind(cheapAltGr, 'é') === 'altgr',
+		`ways: with altgr_usage 0, « fé » types é by ${onlyKind(cheapAltGr, 'é')}`
+	);
+	check(
+		Math.abs(cheapAltGr.typing.cost - (-30 + 89.056) / 2) < 1e-3,
+		`ways: « fé » with altgr_usage 0 costs ${cheapAltGr.typing.cost}`
+	);
+	check(
+		cheapAltGr.metrics.altgr_usage === 50 && cheapAltGr.metrics.modifier_usage === 50,
+		'ways: AltGr types one character of two, counted in altgr_usage and modifier_usage'
+	);
+	check(
+		cheapAltGr.typing.access.altgr_usage === 0 && afterF.typing.access.altgr_usage === 2,
+		'ways: a result names the access weights its ways were chosen by'
+	);
+	// A dearer dead key sends é back to AltGr: 89.056 + 200 < 19.636 + 30 + 19.636 + 1000.
+	const dearDead = E.analyse(full, E.ngramsFromText('fé'), {
+		keyboard: 'iso',
+		weights: { dead_key_usage: 10 }
+	});
+	check(
+		onlyKind(dearDead, 'é') === 'altgr',
+		`ways: with dead_key_usage 10, « fé » types é by ${onlyKind(dearDead, 'é')}`
 	);
 	const noAltGr = toy('toy_access_dead', Object.assign({}, cells, { KeyL: null }), dead);
 	const deadKey = E.analyse(noAltGr, E.ngramsFromText('fé'), { keyboard: 'iso' });
@@ -1494,6 +1550,47 @@ const onlyKind = (result, char) =>
 		`ways: without AltGr, « fé » types é by ${onlyKind(deadKey, 'é')}`
 	);
 	check(deadKey.metrics.dead_key_usage === 50, 'ways: the dead key types one character of two');
+}
+
+// Ergo-L types é as its one dead key (KeyO, right ring finger, top row) then
+// s (KeyS). « ié »: i on KeyL (right ring, home row), so the stream is KeyL
+// KeyO KeyS: KeyL → KeyO is an SFB (one finger, two keys), KeyO → KeyS changes
+// hands: SFB 1 of 2 key bigrams, 50 %. « éi »: KeyO KeyS KeyL, no SFB, and the
+// skipgram KeyO … KeyL is the one key trigram, SFS 100 %. The dead key's press
+// is a keystroke of the stream on its own finger, both before and after.
+{
+	const ergol = byId.get('ergol');
+	const ie = E.analyse(ergol, E.ngramsFromText('ié'), {});
+	const steps = ie.typing.paths['é'];
+	check(
+		steps.length === 1 && steps[0].steps.map(([code]) => code).join(' ') === 'KeyO KeyS',
+		`Ergo-L: « ié » types é by ${JSON.stringify(steps)}`
+	);
+	check(
+		ie.metrics.sfb === 50,
+		`Ergo-L: « ié » has SFB ${ie.metrics.sfb} %, i → dead key is one of 2`
+	);
+	const pairs = E.bigramMatrix(ergol, E.ngramsFromText('ié'), {}).pairs;
+	const sfbPairs = pairs.filter((p) => p.events.includes('sfb')).map((p) => p.keys.join('>'));
+	check(
+		sfbPairs.join(' ') === 'KeyL>KeyO',
+		`Ergo-L: the SFB of « ié » is i → dead key, found ${sfbPairs.join(' ')}`
+	);
+	const ei = E.analyse(ergol, E.ngramsFromText('éi'), {});
+	check(
+		ei.metrics.sfb === 0 && ei.metrics.sfs === 100,
+		`Ergo-L: « éi » has SFB ${ei.metrics.sfb} % and SFS ${ei.metrics.sfs} %`
+	);
+	// The optimizer's session types by the same access weights as analyse().
+	const text = E.ngramsFromText('ié ça, l’été où « il » a dû voir ê à è (là) !');
+	for (const weights of [{}, { altgr_usage: 0, dead_key_usage: 10 }]) {
+		const total = E.analyse(ergol, text, { weights }).score.total;
+		const session = E.scoreSession(ergol, text, { weights }).total;
+		check(
+			Math.abs(total - session) < 1e-9,
+			`Ergo-L: scoreSession ${session} differs from analyse ${total} with ${JSON.stringify(weights)}`
+		);
+	}
 }
 
 // A two-character output: AltGr+KeyR types « ab ». With a on KeyQ and b on

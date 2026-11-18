@@ -231,6 +231,7 @@
 			'direct_digits',
 			'shortcut_left',
 			'modifier_usage',
+			'altgr_usage',
 			'dead_key_usage'
 		]
 	};
@@ -3237,7 +3238,7 @@
 			);
 			loadBars(
 				$('la-layers'),
-				['modifier_usage', 'dead_key_usage'].map((id) => ({
+				['modifier_usage', 'altgr_usage', 'dead_key_usage'].map((id) => ({
 					label: metricLabel(id),
 					value: result.metrics[id]
 				})),
@@ -3758,7 +3759,11 @@
 					}
 					input.removeAttribute('aria-invalid');
 					state.weights[id] = value;
-					rescore();
+					// An access weight chooses the ways of typing: the layouts are typed again.
+					if (E.ACCESS_WEIGHTS.includes(id)) {
+						save();
+						analyse();
+					} else rescore();
 				});
 				label.append(input);
 				list.append(label);
@@ -4211,7 +4216,9 @@
 			);
 			restorer('la-restore', 'layout_analysis.weights.title', 'weights', E.defaultWeights, () => {
 				fillWeights();
-				rescore();
+				// The access weights may change with the others: the layouts are typed again.
+				save();
+				analyse();
 			});
 			// Dynamic labels follow the strings, whenever they land.
 			document.addEventListener('i18n:applied', () => {

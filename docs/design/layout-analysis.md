@@ -198,7 +198,13 @@ count}`), `chords` the multi-character outputs used with their counts.
 b)` → its order, negative when `a` ranks first; a result without a boolean
   `incomplete` is refused.
 - `rescore(results, weights)` → the same results re-scored and re-ranked with
-  new weights, without re-analysis (live weight editing).
+  new weights, without re-analysis (live weight editing). It refuses an access
+  weight (`ACCESS_WEIGHTS`) other than the one the results' ways were chosen by
+  (`result.typing.access`): those weights change the typing, so the layouts are
+  analysed again ([Ways of typing](#ways-of-typing)).
+- `ACCESS_WEIGHTS` → `['modifier_usage', 'altgr_usage', 'dead_key_usage']`;
+  `accessWeights(weights?)` → those three, each default replaced by the given
+  weight.
 - `diff(a, b)` → `{metrics: {id: {a, b, delta, verdict}}, score: {a, b, delta,
 verdict}}`: two results side by side, `delta = a − b`, `verdict` `better` or
   `worse` for `a` by the metric's `better`, `same` when equal, `none` for a
@@ -288,7 +294,9 @@ pairs inside a character's sequence come from its unigram count, the pair
 across two characters from their bigram, and the trigrams across three
 characters from their trigram. An unsupported character drops the n-grams it is
 in. Modifiers are held, not pressed in the stream: they count in finger load,
-distance and `modifier_usage`, not in bigrams or trigrams.
+distance, `modifier_usage` and `altgr_usage`, not in bigrams or trigrams. A
+dead key is pressed: it is a key of the stream on its own finger, in the pairs
+and trigrams with the keys before and after it.
 
 **Keyboards.** `iso`, `ansi` and `ortho` (ISO geometry with the row stagger
 removed), `iso_angle` (the angle-mod fingering: Z by the ring finger, X by the
@@ -373,6 +381,7 @@ metric a share of the typed characters.
 | `hand_imbalance`   | %     | lower  | Gap between the left and right hands' shares of the non-thumb presses.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `pinky_load`       | %     | lower  | Both pinkies' share of the non-thumb presses.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `modifier_usage`   | %     | lower  | Characters typed with Shift or AltGr held.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `altgr_usage`      | %     | lower  | Characters typed with AltGr held (its layer; counted in `modifier_usage` too).                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `dead_key_usage`   | %     | lower  | Characters typed through a dead key.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `outer_column`     | %     | lower  | Non-thumb presses on the 7th right-hand column (Equal, BracketRight, Backslash).                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `unsupported`      | %     | lower  | Characters of the corpus the layout cannot type.                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -413,17 +422,18 @@ typist makes.
 
 **Cost.** The choice minimises the score points the keystroke metrics take,
 by the default weights `w` (`score_weights.json`; not the user's, so a way of
-typing does not follow the ranking weights and `rescore` stays exact). For a
-corpus of `N` characters, `B` bigrams and `T` trigrams, typing one occurrence
-costs `cost / N` points with:
+typing does not follow the ranking weights and `rescore` stays exact), except
+the three **access weights** `a` (`ACCESS_WEIGHTS`), which are the user's
+(below). For a corpus of `N` characters, `B` bigrams and `T` trigrams,
+typing one occurrence costs `cost / N` points with:
 
 - each press of key `k`, held modifiers included:
   `w.distance × reach(k) + 100 × (w.pinky_load [pinky] + w.outer_column [outer
 column] − w.home_row [home row, not a modifier])`, thumbs carrying only their
   distance;
-- per character: `100 × w.modifier_usage` if a modifier is held,
-  `100 × w.dead_key_usage` behind a dead key (times the characters of a
-  multi-character output);
+- per character: `100 × a.modifier_usage` if a modifier is held,
+  `100 × a.altgr_usage` more if AltGr is held, `100 × a.dead_key_usage`
+  behind a dead key (times the characters of a multi-character output);
 - each key pair, times `N / B`: `100 × (w.sfb [SFB] + w.scissors [full] +
 w.half_scissors [half] + w.lsb [lateral] − w.roll_in [inward] − w.roll_out
 [outward])`, the classification of the `sfb` … `roll_out` metrics;
@@ -432,6 +442,46 @@ w.roll3_in − w.roll3_out − w.alternation)` by the same classification.
 
 `finger_imbalance` and `hand_imbalance` are not sums over keystrokes and take
 no part. `result.typing.cost` is that sum over the path typed, in points.
+
+**Access weights** (decided by the agent on 2026-11-18, to review by the
+maintainer). How a character is reached is costed by three weights of the
+score, which the user edits with the others in the Comparer's « Réglages du
+score »:
+
+| Weight           | Default | Per character typed this way                                                    |
+| ---------------- | ------: | ------------------------------------------------------------------------------- |
+| `modifier_usage` |     0.5 | Shift or AltGr held.                                                            |
+| `altgr_usage`    |       2 | AltGr held: the cost of the AltGr layer, added to `modifier_usage`.             |
+| `dead_key_usage` |       2 | Typed through a dead key: the cost of the sequence's extra press, per sequence. |
+
+The positions are costed by the per-press weights above (`distance`,
+`pinky_load`, `outer_column`, `home_row`), the dead key's own press
+included, and its pairs by the pair weights (an SFB from the letter before to
+the dead key, Ergo-L's « ié »). By default, per character and in points per
+percentage point: an AltGr chord costs 2.5 plus the AltGr thumb's reach; a
+dead key 2 plus its press (its reach, a pinky or outer-column key, its pairs),
+so about as much; a direct key off the centre about 1 to 1.7 (outer column 1,
+pinky 0.3, its reach); an SFB 10. So a direct key, even off the centre, beats a
+dead key or AltGr, and both beat an SFB. The user decides otherwise by these
+weights: `altgr_usage` below `dead_key_usage` prefers AltGr, a larger
+`dead_key_usage` prefers an off-centre key. A chained dead key pays
+`dead_key_usage` once and its further presses through their positions and
+pairs.
+
+They are the user's in the choice, unlike the other weights, because they
+state how the user types rather than how a layout is ranked. An edit of one
+therefore types the layouts again: the Comparer analyses again instead of
+re-scoring, `rescore` refuses results chosen by other access weights, and
+`scoreSession` (the optimizer) plans by the same weights as `analyse()`, so
+its objective stays exact. The other analysers' scorers (`keyNgrams`) type by
+the default access weights.
+
+Measured on the Nemolivier anthology (ISO): Ergo-L's SFB is 1.79 % typed the
+fixed way and 0.97 % typed the best way, which reaches 26 characters by a
+second way (é through Shift+AltGr and its acute dead key, è through its grave
+one, `'` through AltGr): at `altgr_usage` 0 it is 0.97 %, at 2 (default)
+0.97 % with fewer detours (1.02 → 0.78 % of the characters typed another way),
+at 10 1.52 % and at 20 1.78 %.
 
 **Choice.** For a character `b` with several ways between `a` and `c`, the
 engine picks the way `v` of least

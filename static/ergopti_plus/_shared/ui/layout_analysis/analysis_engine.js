@@ -151,6 +151,7 @@ var LAYOUT_ANALYSIS = (function () {
 		hand_imbalance: { unit: '%', better: 'lower', of: 'keystrokes' },
 		pinky_load: { unit: '%', better: 'lower', of: 'keystrokes' },
 		modifier_usage: { unit: '%', better: 'lower', of: 'characters' },
+		altgr_usage: { unit: '%', better: 'lower', of: 'characters' },
 		dead_key_usage: { unit: '%', better: 'lower', of: 'characters' },
 		outer_column: { unit: '%', better: 'lower', of: 'keystrokes' },
 		unsupported: { unit: '%', better: 'lower', of: 'characters' },
@@ -162,6 +163,15 @@ var LAYOUT_ANALYSIS = (function () {
 		coverage_bonus: { unit: '%', better: 'higher', of: 'layout' },
 		simplicity: { unit: '%', better: 'higher', of: 'layout' }
 	};
+
+	/**
+	 * The access weights: the costs of the way a character is reached (a held
+	 * Shift or AltGr, the AltGr layer, a dead key's extra press). The choice
+	 * of ways reads the user's own (the other keystroke metrics choose by the
+	 * defaults), so an edit of one of them analyses again, and rescore()
+	 * refuses it (docs/design/layout-analysis.md, « Ways of typing »).
+	 */
+	const ACCESS_WEIGHTS = Object.freeze(['modifier_usage', 'altgr_usage', 'dead_key_usage']);
 
 	/**
 	 * How many decimals the pages show a metric with: a count none, a distance
@@ -1708,7 +1718,7 @@ var LAYOUT_ANALYSIS = (function () {
 		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
 		const table = prepareNgrams(ngrams);
 		const compiled = compileWays(layout, board, null);
-		const plan = planTyping(compiled, board, table, typingMode(opts) === 'fixed');
+		const plan = planTyping(compiled, board, table, planMode(opts));
 		const keyCount = new Float64Array(board.codes.length);
 		const c = streamCounts();
 		const unsupportedChars = {};
@@ -1826,13 +1836,21 @@ var LAYOUT_ANALYSIS = (function () {
 			typing: {
 				mode: typingMode(opts),
 				// The points the keystroke metrics take from the score along this
-				// path, by the default weights and the corpus's own totals: what
-				// the choice of ways minimises (typingCosts).
-				cost: typingCost(table, c, {
-					pinky: m.fingerLoad[0] + m.fingerLoad[9],
-					outer: m.outer,
-					home: m.home
-				}),
+				// path, by the default weights, the access weights of the choice and
+				// the corpus's own totals: what the choice of ways minimises
+				// (typingCosts, unitCost).
+				cost: typingCost(
+					table,
+					c,
+					{
+						pinky: m.fingerLoad[0] + m.fingerLoad[9],
+						outer: m.outer,
+						home: m.home
+					},
+					plan.access
+				),
+				// The access weights the ways were chosen by: rescore() refuses others.
+				access: Object.assign({}, plan.access),
 				alternatives: plan.multi.size,
 				changed: pct(report.changed, c.chars),
 				paths: report.paths,
@@ -1858,6 +1876,34 @@ var LAYOUT_ANALYSIS = (function () {
 		return codePoints(data().model.required_characters).filter(
 			(char) => !best.has(char) || best.get(char).substituted === true
 		);
+	}
+
+	/**
+	 * The access weights an analysis types with: each default, replaced by
+	 * the given weight of the same metric.
+	 * @param {object} [weights] - As score().
+	 * @returns {{modifier_usage: number, altgr_usage: number, dead_key_usage: number}}
+	 * @throws {Error} On a negative or non-finite access weight.
+	 */
+	function accessWeights(weights) {
+		const defaults = data().weights;
+		const out = {};
+		for (const id of ACCESS_WEIGHTS) {
+			const value = weights && weights[id] !== undefined ? weights[id] : defaults[id];
+			if (!(value >= 0) || !Number.isFinite(value))
+				throw new Error(`layout_analysis: weight of ${id} must be a finite number >= 0`);
+			out[id] = value;
+		}
+		return out;
+	}
+
+	/**
+	 * How analyse() options plan the typing (planTyping): the mode and the
+	 * access weights of the choice.
+	 * @returns {{fixed: boolean, access: object}}
+	 */
+	function planMode(opts) {
+		return { fixed: typingMode(opts) === 'fixed', access: accessWeights(opts.weights) };
 	}
 
 	/**
@@ -1945,6 +1991,7 @@ var LAYOUT_ANALYSIS = (function () {
 			chars: 0,
 			unsupported: 0,
 			modifiers: 0,
+			altgr: 0,
 			dead: 0,
 			distance: 0,
 			bigrams: 0,
@@ -1994,6 +2041,7 @@ var LAYOUT_ANALYSIS = (function () {
 				c.chars += typed;
 				if (seq.dead) c.dead += typed;
 				if (seq.shift + seq.altgr > 0) c.modifiers += typed;
+				if (seq.altgr > 0) c.altgr += typed;
 			},
 			unsupported(char, n) {
 				c.unsupported += n;
@@ -2178,6 +2226,7 @@ var LAYOUT_ANALYSIS = (function () {
 			hand_imbalance: pct(Math.abs(left - right), left + right),
 			pinky_load: pct(fingerLoad[0] + fingerLoad[9], pressed),
 			modifier_usage: pct(c.modifiers, c.chars),
+			altgr_usage: pct(c.altgr, c.chars),
 			dead_key_usage: pct(c.dead, c.chars),
 			outer_column: pct(outer, pressed),
 			unsupported: pct(c.unsupported, allChars),
@@ -2523,7 +2572,8 @@ var LAYOUT_ANALYSIS = (function () {
 		const perBoard = perLayout.get(layoutInput);
 		if (perBoard.has(board.id)) return perBoard.get(board.id);
 		const compiled = compileWays(layout, board, null);
-		const plan = planTyping(compiled, board, table, false);
+		// The other analysers' scorers type by the default access weights.
+		const plan = planTyping(compiled, board, table, { fixed: false, access: accessWeights() });
 		const out = {
 			board,
 			layout,
@@ -2766,7 +2816,7 @@ var LAYOUT_ANALYSIS = (function () {
 			keyCount: new Float64Array(K)
 		};
 		const deltaVisitor = sessionVisitor(delta.c, delta.keyCount, delta.counts);
-		const fixed = typingMode(opts) === 'fixed';
+		const mode = planMode(opts);
 		// Every character typed one way whatever its context: the incremental walk holds.
 		const simple = (plan) => plan.multi.size === 0 && plan.chords.length === 0;
 		// What decides a plan's stream: each character's ways and the chords.
@@ -2788,7 +2838,7 @@ var LAYOUT_ANALYSIS = (function () {
 		// The ways before the substitutes, which a trial compiles again only in part.
 		const core = compileCore(firstLayout, board, null, 'record');
 		const compiled = finishWays(new Map(core.ways), core.texts);
-		const plan = planTyping(compiled, board, table, fixed);
+		const plan = planTyping(compiled, board, table, mode);
 		const walked = walkAll(plan);
 		const formValues = forms.map((form) => formFit(firstLayout, board, table, form));
 		let state = {
@@ -2867,7 +2917,7 @@ var LAYOUT_ANALYSIS = (function () {
 						? finishWays(new Map(nextCore.ways), nextCore.texts)
 						: finishWaysFrom(state.compiled, nextCore, spares);
 			// Planned from the current plan: only the choices a changed token can reach are made again.
-			const nextPlan = planTyping(nextCompiled, board, table, fixed, state.plan, {
+			const nextPlan = planTyping(nextCompiled, board, table, mode, state.plan, {
 				spare: spares.plan,
 				changed:
 					nextCompiled === state.compiled ? NO_KEYS : nextCore.whole ? null : nextCompiled.changed
@@ -3136,7 +3186,7 @@ var LAYOUT_ANALYSIS = (function () {
 			compileWays(layout, board, null),
 			board,
 			prepareNgrams(ngrams),
-			opts.typing === 'fixed'
+			planMode(opts)
 		);
 		return {
 			board,
@@ -3407,7 +3457,7 @@ var LAYOUT_ANALYSIS = (function () {
 		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
 		const table = prepareNgrams(ngrams);
 		const compiled = compileWays(layout, board, null);
-		const plan = planTyping(compiled, board, table, typingMode(opts) === 'fixed');
+		const plan = planTyping(compiled, board, table, planMode(opts));
 		const K = board.codes.length;
 		const names = Object.keys(streamCounts()).filter((name) => name !== 'bigrams');
 		// A pair's class, probed once from the visitor: the counters it raises.
@@ -3531,7 +3581,7 @@ var LAYOUT_ANALYSIS = (function () {
 		const layout = layoutFromRows(layoutInput);
 		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
 		const compiled = compileWays(layout, board, null);
-		const fixed = typingMode(opts) === 'fixed';
+		const mode = planMode(opts);
 		const signed = signedWeights(opts.weights);
 		const entries = Array.isArray(words) ? words : Object.entries(words || {});
 		const out = [];
@@ -3544,7 +3594,7 @@ var LAYOUT_ANALYSIS = (function () {
 			if (!(count > 0) || !Number.isFinite(count))
 				throw new Error(`layout_analysis: the word ${word} needs a positive count`);
 			const c = streamCounts();
-			const plan = planTyping(compiled, board, prepareNgrams(ngramsFromText(word)), fixed);
+			const plan = planTyping(compiled, board, prepareNgrams(ngramsFromText(word)), mode);
 			walkTyped(
 				board,
 				plan,
@@ -3943,7 +3993,8 @@ var LAYOUT_ANALYSIS = (function () {
 
 	/**
 	 * The points the keystroke metrics take from the score along the path an
-	 * analysis typed, by the default weights, each share over the corpus's
+	 * analysis typed, by the default weights and the access weights of its
+	 * choice (ACCESS_WEIGHTS), each share over the corpus's
 	 * own totals (characters, bigrams, trigrams): the sum the choice of ways
 	 * minimises (typingCosts), so a best path never costs more than the fixed
 	 * one where the choices do not interact.
@@ -3951,9 +4002,10 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {object} c - analyse()'s counts.
 	 * @param {{pinky: number, outer: number, home: number}} presses - Presses
 	 *   on the pinkies, on the outer column and on the home row.
+	 * @param {object} access - From accessWeights().
 	 * @returns {number} Points (positive: lost).
 	 */
-	function typingCost(table, c, presses) {
+	function typingCost(table, c, presses, access) {
 		const w = data().weights;
 		const maps = ngramMaps(table);
 		const nc = table.totalChars;
@@ -3976,8 +4028,9 @@ var LAYOUT_ANALYSIS = (function () {
 			w.pinky_load * presses.pinky +
 			w.outer_column * presses.outer -
 			w.home_row * presses.home +
-			w.modifier_usage * c.modifiers +
-			w.dead_key_usage * c.dead;
+			access.modifier_usage * c.modifiers +
+			access.altgr_usage * c.altgr +
+			access.dead_key_usage * c.dead;
 		return (
 			per(bigrams, maps.bigrams) +
 			per(trigrams, maps.trigrams) +
@@ -4264,7 +4317,9 @@ var LAYOUT_ANALYSIS = (function () {
 	 * in score points times the number of characters (bigrams for a pair),
 	 * so a sum divided by that number is the points it takes. The default
 	 * weights, not the user's: the way a typist types does not follow the
-	 * ranking weights, and rescore() stays exact without a new analysis.
+	 * ranking weights, and rescore() stays exact without a new analysis. The
+	 * access weights (ACCESS_WEIGHTS) are the exception: unitCost reads the
+	 * user's from the plan (planCosts).
 	 * finger_imbalance and hand_imbalance are not sums over keystrokes and
 	 * do not take part.
 	 * @param {object} board - From keyboard().
@@ -4448,8 +4503,10 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {object} compiled - From compileWays().
 	 * @param {object} board - From keyboard().
 	 * @param {object} charTable - From prepareNgrams().
-	 * @param {boolean} fixed - Type every character its cheapest way out of
-	 *   context, with no chord (the fixed path the best one is compared with).
+	 * @param {{fixed: boolean, access: object}} mode - From planMode(): fixed
+	 *   types every character its cheapest way out of context, with no chord
+	 *   (the fixed path the best one is compared with); access holds the
+	 *   access weights the choice costs a way's modifiers and dead keys by.
 	 * @param {object} [previous] - The plan of a layout a few keys away on the
 	 *   same table (scoreSession): when both have the same chords and
 	 *   multi-way tokens, only the choices whose context holds a token whose
@@ -4463,16 +4520,17 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @returns {object} {table, ways, best, multi, chords, choose, uniDist,
 	 *   leftDist, rightDist, pickAt, parts, before, after, changed?}.
 	 */
-	function planTyping(compiled, board, charTable, fixed, previous, from) {
+	function planTyping(compiled, board, charTable, mode, previous, from) {
 		const plan = {
 			table: charTable,
 			ways: compiled.ways,
 			best: compiled.best,
 			multi: new Set(),
-			chords: []
+			chords: [],
+			access: mode.access
 		};
-		if (fixed) return plan;
-		const pc = planCosts(board, charTable);
+		if (mode.fixed) return plan;
+		const pc = planCosts(board, charTable, mode.access);
 		const unitMemo = new Map();
 		const unit = (way) => {
 			let cost = unitMemo.get(way);
@@ -4621,10 +4679,10 @@ var LAYOUT_ANALYSIS = (function () {
 
 	/**
 	 * What the context choice reads of a board and a character table: the
-	 * typingCosts of the board, the pair and triple factors (N / B, N / T) of
-	 * the table, and its n-gram maps.
+	 * typingCosts of the board, the access weights of the choice, the pair
+	 * and triple factors (N / B, N / T) of the table, and its n-gram maps.
 	 */
-	function planCosts(board, charTable) {
+	function planCosts(board, charTable, access) {
 		const base = typingCosts(board);
 		const maps = ngramMaps(charTable);
 		const nc = charTable.totalChars;
@@ -4633,6 +4691,7 @@ var LAYOUT_ANALYSIS = (function () {
 		return {
 			board,
 			w: base.w,
+			access,
 			n: base.n,
 			press: base.press,
 			pair: base.pair,
@@ -4659,7 +4718,8 @@ var LAYOUT_ANALYSIS = (function () {
 
 	/**
 	 * A way's own cost: its presses (held modifiers included), the pairs and
-	 * triples inside it, and the per-character metrics it adds to.
+	 * triples inside it, and the per-character access metrics it adds to, by
+	 * the plan's access weights.
 	 */
 	function unitCost(pc, way) {
 		const keys = way.keys;
@@ -4671,8 +4731,9 @@ var LAYOUT_ANALYSIS = (function () {
 		for (let i = 0; i + 1 < keys.length; i++) cost += wayPair(pc, keys[i], keys[i + 1]);
 		for (let i = 0; i + 2 < keys.length; i++)
 			cost += wayTriple(pc, keys[i], keys[i + 1], keys[i + 2]);
-		if (way.shift + way.altgr > 0) cost += 100 * pc.w.modifier_usage * width;
-		if (way.dead) cost += 100 * pc.w.dead_key_usage * width;
+		if (way.shift + way.altgr > 0) cost += 100 * pc.access.modifier_usage * width;
+		if (way.altgr > 0) cost += 100 * pc.access.altgr_usage * width;
+		if (way.dead) cost += 100 * pc.access.dead_key_usage * width;
 		return cost;
 	}
 
@@ -5769,14 +5830,33 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 	}
 
-	/** Re-scores and re-ranks results with new weights (no re-analysis). */
+	/**
+	 * Re-scores and re-ranks results with new weights (no re-analysis).
+	 * @param {object[]} results - analyse() outputs.
+	 * @param {object} [weights] - As score().
+	 * @returns {object[]} The same results, re-scored and ranked.
+	 * @throws {Error} When an access weight differs from the one a result's
+	 *   ways were chosen by: those weights change the typing, so the layouts
+	 *   must be analysed again.
+	 */
 	function rescore(results, weights) {
+		const access = accessWeights(weights);
+		for (const result of results) {
+			const used = result.typing && result.typing.access;
+			if (!used) throw new Error('layout_analysis: rescore needs analyse() results');
+			for (const id of ACCESS_WEIGHTS)
+				if (used[id] !== access[id])
+					throw new Error(
+						`layout_analysis: ${id} chooses the ways of typing; analyse again instead of rescore`
+					);
+		}
 		for (const result of results) result.score = score(result, weights);
 		return rank(results);
 	}
 
 	return {
 		METRICS,
+		ACCESS_WEIGHTS,
 		LAYER_IDS,
 		AnalysisError,
 		KEY_EVENTS,
@@ -5819,6 +5899,7 @@ var LAYOUT_ANALYSIS = (function () {
 		wordEfforts,
 		effortDistribution,
 		defaultWeights,
+		accessWeights,
 		defaultIdealLoad,
 		idealLoad,
 		defaultShortcuts,

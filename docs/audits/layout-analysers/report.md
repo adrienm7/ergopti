@@ -401,7 +401,8 @@ bad layouts on the reference corpora weighs as the tools above weigh it.
 | hand_imbalance   |    0.2 | dariogoetz hand_disbalance 40.                                                                                                                        |
 | pinky_load       |    0.3 | Ergo-L criterion 2 (spare the pinkies); genkey/Oxeylyzer finger weights make the pinky the weakest finger.                                            |
 | modifier_usage   |    0.5 | dariogoetz modifier_usage 100; KLA counts Shift presses.                                                                                              |
-| dead_key_usage   |    0.5 | A dead key is already an extra keystroke in every n-gram metric (Ergo-L); this small extra keeps two equal layouts apart.                             |
+| altgr_usage      |      2 | The AltGr layer on top of modifier_usage (2.5 in all): a thumb chord, as dear as a dead key (agent, 2026-11-18).                                      |
+| dead_key_usage   |      2 | The extra press of a dead-key sequence, above an off-centre direct key, below an SFB (agent, 2026-11-18; was 0.5).                                    |
 | outer_column     |      1 | Maintainer: the 7th right-hand column is penalised twice (distance and compact fitness), and shown on its own.                                        |
 | unsupported      |      5 | A character the layout cannot type removes its n-grams from every other metric, which would flatter the layout; Ergo-L warns at 0.5 %.                |
 | compact_fit      |    0.1 | Maintainer requirement; 1 point per 10 % of characters lost on a compact board.                                                                       |

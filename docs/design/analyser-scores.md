@@ -91,6 +91,14 @@ unknown (a200, cmini, Oxeylyzer), as the analyser itself would do with a
 layout file of its format. Ergo-L follows dead keys and chained dead keys with
 its own preference rule.
 
+**Access weights.** Ergopti's own score costs the way a character is reached
+by three weights the user edits (`modifier_usage` 0.5, `altgr_usage` 2,
+`dead_key_usage` 2; [layout-analysis.md](layout-analysis.md#ways-of-typing),
+« Access weights »), which also choose the way of typing of a character that
+has several. The scorers of this page model other tools, so they type
+(`keyNgrams`) by the default access weights whatever the user's: an edit of
+them changes no number on this page.
+
 ## The analysers
 
 ### KLA (Keyboard Layout Analyzer)
