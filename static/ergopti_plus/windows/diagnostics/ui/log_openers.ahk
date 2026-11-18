@@ -44,7 +44,7 @@ LogOpeners_OpenFolder(RunFn := 0) {
 			return false
 		}
 	}
-	(HasMethod(RunFn, "Call") ? RunFn : Run).Call('explorer.exe "' . LogDir . '"')
+	(HasMethod(RunFn, "Call") ? RunFn : Run).Call(ShellRunner_SystemProgramCommand("explorer.exe", '"' . LogDir . '"'))
 	return true
 }
 
@@ -54,7 +54,7 @@ LogOpeners_OpenFolder(RunFn := 0) {
 LogOpeners_OpenTodayLog(RunFn := 0) {
 	if !LoggerFlushForRead()
 		return false
-	(HasMethod(RunFn, "Call") ? RunFn : Run).Call('notepad.exe "' . LoggerTodayLogPath() . '"')
+	(HasMethod(RunFn, "Call") ? RunFn : Run).Call(ShellRunner_SystemProgramCommand("notepad.exe", '"' . LoggerTodayLogPath() . '"'))
 	return true
 }
 
@@ -69,7 +69,7 @@ LogOpeners_OpenTodayErrors(RunFn := 0, NotifyFn := 0) {
 		return false
 	Path := LoggerTodayErrorsPath()
 	if FileExist(Path) {
-		(HasMethod(RunFn, "Call") ? RunFn : Run).Call('notepad.exe "' . Path . '"')
+		(HasMethod(RunFn, "Call") ? RunFn : Run).Call(ShellRunner_SystemProgramCommand("notepad.exe", '"' . Path . '"'))
 		return true
 	}
 	try LoggerInfo("LogOpeners", "No errors file for today at '{1}'; the user is told instead.", Path)

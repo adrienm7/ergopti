@@ -33,7 +33,7 @@ OpenPersonalShortcuts(*) {
 		return false
 	}
 	try {
-		Run('notepad.exe "' . Path . '"')
+		Run(ShellRunner_SystemProgramCommand("notepad.exe", '"' . Path . '"'))
 		return true
 	} catch as Err {
 		try LoggerError("Menu", "Could not open personal shortcuts at '{1}': {2}.", Path, Err.Message)

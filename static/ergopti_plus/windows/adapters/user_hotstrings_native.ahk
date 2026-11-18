@@ -9,7 +9,7 @@
 
 /** Open the editor using the existing explicit Notepad command line. */
 UHN_OpenSource(Path) {
-	Run('notepad.exe "' . Path . '"')
+	Run(ShellRunner_SystemProgramCommand("notepad.exe", '"' . Path . '"'))
 }
 
 /** Preserve the native thread result and separately return its process id. */

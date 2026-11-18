@@ -698,7 +698,7 @@ OllamaWV_OnWebMessage(sender, args) {
 			if IsSet(OnRetry)
 				OnRetry()
 		case "terminal":
-			Run("cmd.exe")
+			Run(ShellRunner_SystemProgramCommand("cmd.exe"))
 	}
 }
 

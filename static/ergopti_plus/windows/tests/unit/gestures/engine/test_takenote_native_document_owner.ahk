@@ -20,7 +20,9 @@ _TNDO_Source() {
 		AssertTrue(OwnerPath != "", "The probe must use the actual production owner of " . Symbol)
 		Source .= "#Include " . OwnerPath . "`n"
 	}
-	for Symbol in ["_WMResolveSpec", "WMActivate"] {
+	; Notepad starts by its absolute path, spelled by the process adapter.
+	for Symbol in ["_WMResolveSpec", "WMActivate", "ShellRunner_SystemProgramCommand",
+			"ShellRunner_SystemProgramPath", "ShellRunner_WinPsPath"] {
 		Body := _DriverFuncBody(Symbol)
 		AssertTrue(Body != "", "The native activation graph must include " . Symbol)
 		Source .= Body . "`n"

@@ -520,7 +520,7 @@ _SRCT_RecordLaunch(State, Target) {
 	State["events"].Push("run")
 	State["launches"] += 1
 	State["suspended_at_launch"] := A_IsSuspended
-	AssertEqual("Regedit.exe", Target)
+	AssertEqual('"' . A_WinDir . '\regedit.exe"', Target, "the Registry Editor starts by its absolute path")
 	if State["throw_launch"]
 		throw Error("owned launch failure")
 	return true
@@ -649,7 +649,7 @@ Test("Shortcuts/win: refuse a failed Downloads lookup (downloads-known-folder)",
 TestShortcuts_OpenDownloadsKeepsResolvedTarget() {
 	Targets := []
 	AssertTrue(_OpenDownloadsWith(() => "Z:\Company\Alice Downloads", (Command) => Targets.Push(Command)))
-	AssertEqual('explorer.exe "Z:\Company\Alice Downloads"', Targets[1], "the resolved directory remains one quoted Explorer argument")
+	AssertEqual('"' . A_WinDir . '\explorer.exe" "Z:\Company\Alice Downloads"', Targets[1], "the resolved directory remains one quoted Explorer argument")
 	FailedResolve() {
 		throw Error("Downloads lookup denied")
 	}

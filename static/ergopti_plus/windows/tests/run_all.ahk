@@ -1942,6 +1942,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/hotstrings/personal/test_per_entry_priority_divergence_cache_vs_toml.ahk
 #Include unit/core/process/shell_runner/test_plc_closure_callable.ahk
 #Include unit/core/process/shell_runner/test_win_ps_version_check.ahk
+#Include unit/core/process/shell_runner/test_system_program_path.ahk
 #Include unit/ai/servers/test_remote_parse_first_content_match.ahk
 #Include unit/modules/hotstrings/engine/test_stale_cache_survives_reset_and_pause.ahk
 #Include unit/modules/hotstrings/engine/test_time_activation_fails_open_on_missing_prev_char.ahk
@@ -2103,6 +2104,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ai/prediction/test_output_physical_generation.ahk
 #Include meta/platform/input/test_text_sender_callback_on_bailout.ahk
 #Include meta/core/process/shell_runner/test_poll_suspend_guard.ahk
+#Include meta/core/process/shell_runner/test_system_program_launch.ahk
 #Include meta/core/process/shell_runner/test_legacy_claims.ahk
 #Include meta/gestures/test_screenshot_tree_owned_default.ahk
 #Include meta/core/process/shell_runner/test_isolated_logger.ahk

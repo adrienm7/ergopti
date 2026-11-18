@@ -279,6 +279,16 @@ unzip or other dropper-like stage in the compiled exe; do the work in process
 gates the built exe; lower a ceiling when a launcher goes, and never raise one
 without a reason in the commit. Reputation comes only from signing (SignPath).
 
+### project-system-programs-start-by-absolute-path
+
+`Run`, `RunWait`, ShellExecute and `CreateProcess` resolve a bare `notepad.exe`
+or `powershell.exe` through the search path, which looks in the portable exe's
+folder and the current folder before System32, so a planted copy runs instead
+(elevated behind `*RunAs`). Action: start a program Windows ships through
+`ShellRunner_SystemProgramCommand`/`ShellRunner_SystemProgramPath`, or
+`ShellRunner_WinPsPath` for PowerShell; the meta test
+`system-program-absolute-path` scans every launch position.
+
 ### project-ahk-loop-capture-copy-freezes-nothing
 
 Copying a loop variable into another outer local does not freeze it for a

@@ -158,7 +158,7 @@ global GESTURE_ACTIONS := Map(
 		},
 		; --- User files ---
 		"open_script_source", {
-				Fn: (*) => Run('notepad.exe "' . A_ScriptFullPath . '"'),
+				Fn: (*) => Run(ShellRunner_SystemProgramCommand("notepad.exe", '"' . A_ScriptFullPath . '"')),
 		},
 		"open_personal_shortcuts", {
 				Fn: (*) => GestureEditPersonalShortcuts(),
@@ -249,7 +249,7 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => Search(),
 		},
 		"open_file_manager", {
-				Fn: (*) => GestureRunShellTarget("explorer.exe", "open_file_manager"),
+				Fn: (*) => GestureRunShellTarget(ShellRunner_SystemProgramCommand("explorer.exe"), "open_file_manager"),
 		},
 		"open_system_settings", {
 				Fn: (*) => GestureRunShellTarget("ms-settings:", "open_system_settings"),
@@ -1024,7 +1024,7 @@ GestureOpenIfExists(Path) {
 		if (Path = "" or !FileExist(Path)) {
 				return
 		}
-		Run('notepad.exe "' . Path . '"')
+		Run(ShellRunner_SystemProgramCommand("notepad.exe", '"' . Path . '"'))
 }
 
 ; Toggle / focus / open helper shared by every UI window action above.
@@ -1196,7 +1196,7 @@ GestureEditPersonalShortcuts() {
 				return false
 		}
 		try {
-				Run('notepad.exe "' . Path . '"')
+				Run(ShellRunner_SystemProgramCommand("notepad.exe", '"' . Path . '"'))
 				return true
 		} catch as Err {
 				try LoggerError("Gestures", "Could not open personal shortcuts at '{1}': {2}.", Path, Err.Message)

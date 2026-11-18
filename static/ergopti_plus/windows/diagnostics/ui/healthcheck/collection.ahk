@@ -365,7 +365,7 @@ class DiagnosticCollectionWindows {
 		if !this.Result.Get("archive_created", false) {
 			if !this.Result.Get("folder_available", false) || !DirExist(this.Directory)
 				return false
-			Run('explorer.exe "' . this.Directory . '"')
+			Run(ShellRunner_SystemProgramCommand("explorer.exe", '"' . this.Directory . '"'))
 			return true
 		}
 		if !FileExist(this.Archive)
@@ -375,7 +375,7 @@ class DiagnosticCollectionWindows {
 			LoggerError("DiagnosticsCollection", "Diagnostic archive changed after committed collection.")
 			return false
 		}
-		Run('explorer.exe /select,"' . this.Archive . '"')
+		Run(ShellRunner_SystemProgramCommand("explorer.exe", '/select,"' . this.Archive . '"'))
 		return true
 	}
 

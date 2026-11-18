@@ -59,7 +59,7 @@ ScreenBrightnessRequest(Action, Done := 0) {
 	Args := ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File",
 		_VendorDir . "\ergopti_brightness_worker.ps1", "-PolicyPath",
 		_SharedDir . "\shortcuts\data\actions\brightness.json", "-Action", Action]
-	try Handle := Spawn.Call("powershell.exe", Args,
+	try Handle := Spawn.Call(ShellRunner_WinPsPath(), Args,
 		ScreenBrightnessCompleted.Bind(Id), , , Data["max_receipt_bytes"])
 	catch as Err {
 		if ScreenBrightnessOwner.job == Job

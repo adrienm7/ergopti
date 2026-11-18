@@ -82,6 +82,10 @@ _EDOT_Source(Root, LogOpeners := false) {
 		Owner := _DriverProductionFileForSymbol("LogOpeners_OpenTodayErrors", _DriverDir)
 		AssertTrue(Owner != "", "The log reader child must use the real UI action owner")
 		Source .= "#Include " . Owner . "`n"
+		; The actions name Notepad and Explorer by their absolute path; the
+		; process adapter that owns that spelling is too wide for this child.
+		for Name in ["ShellRunner_SystemProgramCommand", "ShellRunner_SystemProgramPath", "ShellRunner_WinPsPath"]
+			Source .= _DriverFuncBody(Name) . "`n"
 	}
 	return Chr(0xFEFF) . Source . "#Include " . _DriverDir . "\tests\fixtures\"
 		. (LogOpeners ? "log_openers_buffered_owner_body.ahk" : "error_dialog_startup_owner_body.ahk") . "`n"

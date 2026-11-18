@@ -454,13 +454,13 @@ _HCReport_Start(CommandLine) {
 ; Selects the saved report in Explorer.
 ; @returns {Boolean} False when Explorer could not be started.
 _HCReport_Reveal(Path) {
-	return _HCReport_Start('explorer.exe /select,"' . Path . '"')
+	return _HCReport_Start(ShellRunner_SystemProgramCommand("explorer.exe", '/select,"' . Path . '"'))
 }
 
 ; Opens a folder in Explorer, or a file with its default program.
 ; @returns {Boolean}
 _HCReport_Open(Path) {
-	return _HCReport_Start(InStr(FileExist(Path), "D") ? 'explorer.exe "' . Path . '"' : '"' . Path . '"')
+	return _HCReport_Start(InStr(FileExist(Path), "D") ? ShellRunner_SystemProgramCommand("explorer.exe", '"' . Path . '"') : '"' . Path . '"')
 }
 
 ; Shows a system notification through the notifier adapter.

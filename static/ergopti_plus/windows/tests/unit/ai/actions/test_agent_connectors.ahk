@@ -170,7 +170,7 @@ _LAG_ToolConnectors() {
 		Result := LLM_AgentConnector_Execute(_LAG_Action('{"type":"shortcut","name":"Envoyer la facture",'
 			. '"input":"Facture 12 & \"urgent\""}'), Config)
 		AssertTrue(Result["ok"], "the PowerShell tool runs")
-		AssertEqual("", _LVS_DeepEqual(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+		AssertEqual("", _LVS_DeepEqual([A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
 			"C:\t\Envoyer la facture.ps1", 'Facture 12 & "urgent"'], Fx.Launched[1]),
 			"with the input as its only argument")
 		LLM_AgentConnector_Execute(_LAG_Action('{"type":"shortcut","name":"Ouvrir le CRM"}'), Config)

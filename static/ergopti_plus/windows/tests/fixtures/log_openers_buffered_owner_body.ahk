@@ -22,7 +22,7 @@ _LOB_Require(Condition, Message) {
 _LOB_Launch(Command) {
 	global _LOB
 	_LOB.Launches += 1
-	_LOB_Require(Command == 'notepad.exe "' . _LOB.Path . '"', "The actual action must launch the exact dated log resolver path.")
+	_LOB_Require(Command == '"' . A_WinDir . '\System32\notepad.exe" "' . _LOB.Path . '"', "The actual action must launch the exact dated log resolver path.")
 	Text := FileRead(_LOB.Path, "UTF-8")
 	_LOB_Require(InStr(Text, _LOB.Message) > 0, "The real warning must already be on disk at the launch boundary.")
 	_LOB_Require(InStr(Text, _LOB.Message, , InStr(Text, _LOB.Message) + StrLen(_LOB.Message)) == 0,

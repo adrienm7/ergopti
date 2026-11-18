@@ -202,7 +202,7 @@ _LLM_Menu_PullModel(name, IsTag := false, BaseUrl := "", RunFn := 0, ScheduleFn 
 	; Open a persistent cmd window so the download progress (layer-by-layer
 	; progress bars) is fully visible. /k keeps it open after completion so
 	; the user can confirm the download succeeded before closing.
-	Command := 'cmd.exe /k set "OLLAMA_HOST=' . BaseUrl . '"&& ollama pull "' . tag . '"'
+	Command := ShellRunner_SystemProgramCommand("cmd.exe", '/k set "OLLAMA_HOST=' . BaseUrl . '"&& ollama pull "' . tag . '"')
 	try {
 		if HasMethod(RunFn, "Call") {
 			if RunFn.Call(Command) != true

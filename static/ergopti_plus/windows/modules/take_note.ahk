@@ -82,7 +82,7 @@ class _TakeNoteNative {
 	static Launch(Path) {
 		if _TakeNoteNative._HasNativeNul(Path)
 			throw ValueError("note path cannot contain a NUL code unit")
-		Run('notepad.exe "' . Path . '"')
+		Run(ShellRunner_SystemProgramCommand("notepad.exe", '"' . Path . '"'))
 		return true
 	}
 

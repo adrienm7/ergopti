@@ -23,7 +23,7 @@ _ODNB_KeyboardPathHasNoExplorerWait() {
 	Assert(!InStr(Combined, "WinWait("),
 		"OpenDownloads must not synchronously wait for Explorer from the keyboard hotkey thread")
 	Assert(InStr(LaunchBody, "DownloadsPath := ResolveFn.Call()") > 0
-		and InStr(LaunchBody, "LaunchFn.Call('explorer.exe") > 0,
+		and InStr(LaunchBody, 'LaunchFn.Call(ShellRunner_SystemProgramCommand("explorer.exe"') > 0,
 		"the hotkey's launcher must resolve Downloads and open that exact folder through Explorer")
 	CatchPos := InStr(Body, "} catch as Err")
 	Assert(CatchPos > 0 and InStr(SubStr(Body, CatchPos, 300), "LoggerError") > 0,

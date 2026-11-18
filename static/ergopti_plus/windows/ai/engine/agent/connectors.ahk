@@ -178,7 +178,7 @@ _LLM_AgentConnector_Shortcut(Action, Config) {
 	Extension := StrLower(Extension)
 	switch Extension {
 		case "ps1":
-			Argv := ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", Path]
+			Argv := [ShellRunner_WinPsPath(), "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", Path]
 		case "ahk":
 			Argv := [A_AhkPath, Path]
 		default:

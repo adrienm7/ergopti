@@ -55,7 +55,7 @@ _ODC_CheckExplorerLaunchContained() {
 	Body := _DriverFuncBody("OpenDownloads")
 	LaunchBody := _DriverFuncBody("_OpenDownloadsWith")
 	Assert(Body != "" && LaunchBody != "", "the hotkey and resolved-folder launcher must exist")
-	Assert(InStr(LaunchBody, "LaunchFn.Call('explorer.exe ") > 0
+	Assert(InStr(LaunchBody, 'LaunchFn.Call(ShellRunner_SystemProgramCommand("explorer.exe", ') > 0
 		&& RegExMatch(LaunchBody, "LaunchFn\.Call\([^\r\n]*DownloadsPath"),
 		"the native launcher must pass the resolved Downloads path to Explorer")
 	TryPos := InStr(Body, "try {")

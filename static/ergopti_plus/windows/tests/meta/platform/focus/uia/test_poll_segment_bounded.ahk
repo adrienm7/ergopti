@@ -94,7 +94,7 @@ _UPB_WorkerDeadlineCanInterruptCurrentHop() {
 	TreeKill := _DriverFuncBody("_SR_LegacyRequestTreeKill")
 	Assert(InStr(AsyncTerminate, "_SR_LegacyClaimAsyncTerminate(state)") > 0
 		&& InStr(AsyncTerminate, '_SR_LegacyRequestTreeKill(outcome["Pid"])') > 0
-		&& InStr(TreeKill, 'Run("taskkill.exe') > 0
+		&& InStr(TreeKill, 'Run(ShellRunner_SystemProgramCommand("taskkill.exe"') > 0
 		&& InStr(AsyncTerminate . AsyncClaim . TreeKill, "ProcessClose(") = 0
 		&& InStr(AsyncTerminate . AsyncClaim . TreeKill, "FileDelete(") = 0,
 		"ShellRunner's async termination must only launch the tree kill and detach completion; it must never wait in ProcessClose or filesystem cleanup")

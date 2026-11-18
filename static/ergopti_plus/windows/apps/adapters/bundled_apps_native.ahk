@@ -140,7 +140,7 @@ BundledAppsNative_Start(Executable, Args) {
  * @param {String} Path
  */
 BundledAppsNative_Reveal(Path) {
-	Run('explorer.exe /select,' . BundledAppsNative_QuoteArg(Path))
+	Run(ShellRunner_SystemProgramCommand("explorer.exe", "/select," . BundledAppsNative_QuoteArg(Path)))
 }
 
 /**

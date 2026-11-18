@@ -436,7 +436,7 @@ _RegJumpCommit(RegPath, WriteFn, ExistsFn, KillFn, RunFn) {
 						A_IsSuspended ? "driver paused" : "selection command superseded")
 				return false
 		}
-		RunFn.Call("Regedit.exe")
+		RunFn.Call(ShellRunner_SystemProgramCommand("regedit.exe"))
 		return true
 }
 
@@ -540,7 +540,7 @@ OpenDownloads(*) {
 ; folder redirected by the user or by company policy.
 _OpenDownloadsWith(ResolveFn, LaunchFn) {
 		DownloadsPath := ResolveFn.Call()
-		LaunchFn.Call('explorer.exe "' DownloadsPath '"')
+		LaunchFn.Call(ShellRunner_SystemProgramCommand("explorer.exe", '"' . DownloadsPath . '"'))
 		return true
 }
 

@@ -31,7 +31,7 @@ _GRN_GestureRestartDoesNotBlockDriverThread() {
 	Assert(StartReceiptPos > 0 && StartPidPos > StartReceiptPos,
 		"a second restart must consume the prior receipt before consulting its recyclable PID")
 	Launch := _DriverFuncBody("GestureRestartRunElevated")
-	Assert(InStr(Launch, "*RunAs powershell.exe") > 0,
+	Assert(InStr(Launch, "Run('*RunAs " . Chr(34) . "' . ShellRunner_WinPsPath() . '") > 0,
 		"GestureRestartTouchpadDevice must preserve elevation for the PnP operation")
 	; One elevation site for both launchers: each *RunAs counts against the
 	; antivirus surface ceilings of the compiled exe.

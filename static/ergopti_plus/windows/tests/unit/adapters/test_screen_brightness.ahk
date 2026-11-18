@@ -81,7 +81,8 @@ _SBT_Owned(Action, Body, Configure := 0, ExpectedStart := true) {
 }
 
 _SBT_Terminal(Fake, Observed, Notices) {
-	AssertEqual("powershell.exe", Fake.executable)
+	AssertEqual(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe", Fake.executable,
+		"the worker starts by its absolute path (system-program-absolute-path)")
 	AssertEqual("brightness_up", Fake.args[Fake.args.Length])
 	AssertEqual("-ExecutionPolicy", Fake.args[5])
 	AssertEqual("Bypass", Fake.args[6], "only the owned process receives the native worker policy")
