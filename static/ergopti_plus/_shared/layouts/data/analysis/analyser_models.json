@@ -911,7 +911,6 @@
 				},
 				"path_cost": "ph + 0.3*pr + 0.3*pf",
 				"min_triad_count": 10,
-				"reference_triads": 9151165,
 				"extension": {
 					"IntlBackslash": {
 						"row": 3,

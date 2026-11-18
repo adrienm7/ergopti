@@ -285,10 +285,10 @@
 		},
 		{
 			"analyser": "carpalx",
-			"basis": "hand",
+			"basis": "tool",
 			"layout": "qwerty",
 			"keyboard": "ansi",
-			"text": "the",
+			"text": "the\nthe\nthe\nthe\nthe\nthe\nthe\nthe\nthe\nthe\n",
 			"value": 3.463054595,
 			"tolerance": 0.000001,
 			"parts": {
@@ -303,7 +303,7 @@
 			"basis": "hand",
 			"layout": "qwerty",
 			"keyboard": "ansi",
-			"text": "and",
+			"text": "and\nand\nand\nand\nand\nand\nand\nand\nand\nand\n",
 			"value": 3.534177,
 			"tolerance": 0.000001
 		},
@@ -312,9 +312,36 @@
 			"basis": "hand",
 			"layout": "qwerty",
 			"keyboard": "ansi",
-			"text": "tbt",
+			"text": "tbt\ntbt\ntbt\ntbt\ntbt\ntbt\ntbt\ntbt\ntbt\ntbt\n",
 			"value": 5.744381,
 			"tolerance": 0.000001
+		},
+		{
+			"analyser": "carpalx",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "The cat, the hat.\nThe cat, the hat.\nThe cat, the hat.\nThe cat, the hat.\nThe cat, the hat.\nThe cat, the hat.\nThe cat, the hat.\nThe cat, the hat.\nThe cat, the hat.\nThe cat, the hat.\n",
+			"value": 3.189385984,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "carpalx",
+			"basis": "tool",
+			"layout": "colemak",
+			"keyboard": "ansi",
+			"text": "Zebras quiz, jumping!\nZebras quiz, jumping!\nZebras quiz, jumping!\nZebras quiz, jumping!\nZebras quiz, jumping!\nZebras quiz, jumping!\nZebras quiz, jumping!\nZebras quiz, jumping!\nZebras quiz, jumping!\nZebras quiz, jumping!\nZebras quiz, jumping!\nZebras quiz, jumping!\n",
+			"value": 2.970174579,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "carpalx",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "the\nthe\nthe\nthe\nthe\nthe\nthe\nthe\nthe\nthe\ndog\ndog\ndog\n",
+			"value": 3.463054595,
+			"tolerance": 1e-9
 		},
 		{
 			"analyser": "keygen",

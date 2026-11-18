@@ -220,15 +220,33 @@ k3·p3)) + ks·(ph + 0.3·pr + 0.3·pf)` with base effort per position, penalty
   triad, `kb, kp, ks = 0.3555, 0.6423, 0.4268`, `k1, k2, k3 = 1, 0.367, 0.235`.
   Its English mode keeps a-z only (lower case) and deletes everything else, so
   triads join across spaces within a line; identical triplets and triads seen
-  fewer than 10 times in 9 151 165 are dropped (the threshold scales with the
-  corpus). Its own finger map and 4-row ANSI grid, whatever the board;
-  IntlBackslash, which carpalx lacks, is our extension at KeyZ's effort.
+  fewer than 10 times in the corpus are dropped (`triads_min_freq = 10` of its
+  `carpalx.conf`, a count, whatever the corpus's size: a text where no triad
+  reaches it scores 0). Its own finger map and 4-row ANSI grid, whatever the
+  board; IntlBackslash, which carpalx lacks, is our extension at KeyZ's
+  effort.
+- **Triads from the tables.** Each trigram (a y b) around a letter y gives the
+  triads (x y z) of x, the letter before y in its line, and z, the letter
+  after: a or b itself when it is a letter, else the letters reached by the
+  trigrams' second-order chain through the deleted characters (backward from
+  a y, forward from y b, 12 characters at most), x and z independent given a
+  y b. The chain's bigram counts the runs that end there, so a line's end
+  stops it. Exact for letters-only text and when each context has one
+  continuation.
 - **Fidelity: close.** Exact for letters-only text: on its `books.txt` with the
   non-letters removed, our scorer gives the published table (QWERTY 3.000,
   Dvorak 2.098, Colemak 1.842, Workman 1.993, QGMLWY 1.670, and their base,
-  penalty and path parts). From the raw text, a triad across a deleted run is
-  estimated from the trigrams (Markov): within 0.006. Gate: hand-computed
-  triads (`the` 3.463055, `and` 3.534177, `tbt` 5.744381).
+  penalty and path parts). Measured against carpalx itself (Perl, 95f46d0,
+  its default `carpalx.conf`, `reporteffort`) on _Alice_, _Sherlock Holmes_,
+  English Wikipedia, Python code and _Germinal_ with 10 of its keyboard files
+  (50 points): 0.31 % on average, 1.2 % at most (code). Before (the threshold
+  scaled to the corpus's size, so _Alice_ kept the triads carpalx drops, and
+  the triads across a deleted run estimated without the isolated letters, a
+  or I): 1.2 % on average, 4.2 % at most. Gate: hand-computed triads (`the`,
+  `and`, `tbt`, ten lines each) and carpalx's own output (`reporteffort`,
+  printed to 9 decimals by a local copy): `The cat, the hat.` and `Zebras
+quiz, jumping!` on ten and twelve lines (across spaces and punctuation), ten
+  `the` and three `dog` on QWERTY 3.463054595 (`dog` under the threshold).
 
 ### keygen
 
@@ -401,7 +419,9 @@ with KLAnext's own layout definitions. With `--oxeylyzer=<exe>
 --oxeylyzer-data=<its data folder>` it also runs a local Oxeylyzer build on our
 corpus texts; with `--genkey=<exe> --genkey-data=<its source folder>` and
 `--keygen=<exe> --keygen-data=<its source folder>`, local builds of genkey and
-keygen. Measured on 2026-11-18:
+keygen; with `--perl=<exe> --carpalx-data=<its source folder>` (and
+`--carpalx-perl5lib` for the Perl modules it needs), carpalx itself. Measured
+on 2026-11-18:
 
 | Analyser  | Points | Mean gap                                | Largest      |
 | --------- | ------ | --------------------------------------- | ------------ |
@@ -409,10 +429,11 @@ keygen. Measured on 2026-11-18:
 | Oxeylyzer | 72     | 0.0044                                  | 0.012        |
 | genkey    | 140    | 1.4 % (5.5 % before)                    | 9.9 %        |
 | keygen    | 85     | 0.11 % (its), 0.09 % (ours)             | 0.34 %       |
+| carpalx   | 50     | 0.31 % (1.2 % before)                   | 1.2 %        |
 
 Not re-measured against a run of the tool in this pass: cmini, a200
-(Python), carpalx (Perl) and Keyboard Layout Optimizer (Rust): their
-fidelity above rests on the earlier checks it names.
+(Python) and Keyboard Layout Optimizer (Rust): their fidelity above rests on
+the earlier checks it names.
 
 ## Not covered
 

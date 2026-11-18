@@ -32,7 +32,13 @@
  *    `keygen refine` on a layout file written from each of a few library
  *    layouts, its first printed score read and the process then stopped. The
  *    texts go in ASCII (keygen reads nothing else), any other character as #.
- * 5. Exit status: 0 when every comparison ran, 1 when a download, a run or a
+ * 5. carpalx (--perl=<exe> --carpalx-data=<its source folder>
+ *    [--carpalx-perl5lib=<dirs>]): `carpalx -action
+ *    loadkeyboard,loadtriads,reporteffort` with its own carpalx.conf, on each
+ *    text and each of a few of its keyboard files fingered as our model. It
+ *    needs Config::General, Math::VecStat and Set::IntSpan, and loads GD,
+ *    which only its drawing uses (an empty GD.pm on the library path does).
+ * 6. Exit status: 0 when every comparison ran, 1 when a download, a run or a
  *    parse failed. The gaps are reported, not judged: the fidelity of each
  *    analyser is recorded in docs/design/analyser-scores.md.
  *
@@ -40,6 +46,7 @@
  *   node tools/dev/verify-analyser-scores.cjs [--analyser=<id>] [--verbose]
  *        [--oxeylyzer=<exe> --oxeylyzer-data=<dir> [--oxeylyzer-config=<file>]]
  *        [--genkey=<exe> --genkey-data=<dir>] [--keygen=<exe> --keygen-data=<dir>]
+ *        [--perl=<exe> --carpalx-data=<dir> [--carpalx-perl5lib=<dirs>]]
  * ==============================================================================
  */
 
@@ -105,6 +112,19 @@ const KEYGEN_LIBRARY = [
 	'canary'
 ];
 const KEYGEN_TIMEOUT_MS = 120000;
+// carpalx: its keyboard files fingered as our model (etc/keyboards/<id>.conf).
+const CARPALX_KEYBOARDS = [
+	'qwerty',
+	'dvorak',
+	'colemak',
+	'workman',
+	'qgmlwy',
+	'norman',
+	'klausler',
+	'arensito',
+	'tnwmlc',
+	'qwkrfy'
+];
 
 const args = process.argv.slice(2);
 const option = (name) => {
@@ -513,8 +533,107 @@ async function verifyKeygen(exe, data) {
 	}
 }
 
+// =========================
+// ======= 6/ carpalx ======
+// =========================
+
+/**
+ * carpalx's keyboard files (etc/keyboards/*.conf) as library layouts on the
+ * rows of our carpalx model, keeping those whose fingers are the model's.
+ */
+function carpalxKeyboards(dir) {
+	const model = MODELS.carpalx.model;
+	const keyboards = {};
+	for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.conf'))) {
+		const text = fs.readFileSync(path.join(dir, file), 'utf8').split('\r').join('');
+		const rows = {};
+		let same = true;
+		const blocks = Array.from(
+			text.matchAll(/<row (\d)>\s*keys\s*=\s*(.*)\n\s*fingers\s*=\s*(.*)\n/g)
+		);
+		for (const [, index, keyList, fingerList] of blocks) {
+			const r = Number(index) - 1;
+			const keys = keyList.trim().split(/\s+/);
+			const fingers = fingerList.trim().split(/\s+/).map(Number);
+			if (!model.rows_to_code[r] || keys.length !== model.rows_to_code[r].length) same = false;
+			if (!same) break;
+			keys.forEach((key, col) => {
+				if (fingers[col] !== model.finger[r][col]) same = false;
+				const chars = Array.from(key.replace(/\\(.)/g, '$1'));
+				const letter = /^[a-z]$/i.test(chars[0]);
+				rows[model.rows_to_code[r][col]] = letter
+					? [chars[0].toLowerCase(), chars[0].toUpperCase(), null, null]
+					: [chars[0], chars[1] || null, null, null];
+			});
+		}
+		if (same && blocks.length === model.rows_to_code.length)
+			keyboards[file.replace(/\.conf$/, '')] = {
+				id: file,
+				name: file,
+				rows,
+				fingering: 'standard'
+			};
+	}
+	return keyboards;
+}
+
+function verifyCarpalx(perl, data) {
+	if (!fs.existsSync(perl)) throw new Error(`no Perl at ${perl}`);
+	if (!fs.existsSync(path.join(data, 'bin', 'carpalx')))
+		throw new Error(`${data} is not carpalx's folder (no bin/carpalx)`);
+	const keyboards = carpalxKeyboards(path.join(data, 'etc', 'keyboards'));
+	const chosen = CARPALX_KEYBOARDS.filter((id) => keyboards[id]);
+	if (chosen.length === 0) throw new Error('none of the carpalx keyboards has our fingering');
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'carpalx-'));
+	try {
+		const env = Object.assign({}, process.env);
+		const lib = option('carpalx-perl5lib');
+		if (lib) env.PERL5LIB = env.PERL5LIB ? `${lib}${path.delimiter}${env.PERL5LIB}` : lib;
+		const gaps = [];
+		for (const [id, file] of Object.entries(GENKEY_TEXTS)) {
+			// carpalx caches a corpus's triads beside it: a fresh file per text.
+			const corpus = path.join(root, `${id}.txt`);
+			fs.copyFileSync(path.join(REPO_ROOT, file), corpus);
+			const tables = E.prepareNgrams(E.ngramsFromText(fs.readFileSync(corpus, 'utf8')));
+			const line = [];
+			for (const keyboard of chosen) {
+				const run = spawnSync(
+					perl,
+					[
+						path.join(data, 'bin', 'carpalx'),
+						'-configfile',
+						path.join(data, 'etc', 'carpalx.conf'),
+						'-action',
+						'loadkeyboard,loadtriads,reporteffort,quit',
+						'-corpus',
+						corpus,
+						'-keyboard_input',
+						path.join(data, 'etc', 'keyboards', `${keyboard}.conf`)
+					],
+					{ env, encoding: 'utf8', maxBuffer: 1 << 26 }
+				);
+				const m = /#data effort_all=>\[([0-9.]+)/.exec(run.stdout);
+				if (run.status !== 0 || !m)
+					throw new Error(
+						`carpalx on ${id} with ${keyboard}: exit ${run.status}\n${run.stderr.slice(-400)}`
+					);
+				const theirs = Number(m[1]);
+				const ours = S.score('carpalx', keyboards[keyboard], tables, { keyboard: 'ansi' }).value;
+				gaps.push((100 * (ours - theirs)) / theirs);
+				line.push(`${keyboard} ${theirs}/${ours.toFixed(3)}`);
+			}
+			if (verbose) console.log(`  ${id.padEnd(9)} ${line.join('  ')}`);
+		}
+		console.log(
+			`carpalx: ${gaps.length} points (${chosen.length} of its keyboards), ${summary(gaps, 3, ' %')}`
+		);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+}
+
 // ======================
-// ======= 6/ Main ======
+// ======= 7/ Main ======
 // ======================
 
 async function main() {
@@ -539,6 +658,12 @@ async function main() {
 		const data = option('keygen-data');
 		if (exe && data) await verifyKeygen(exe, data);
 		else console.log('keygen: skipped (needs --keygen=<exe> --keygen-data=<its source folder>)');
+	}
+	if (!only || only === 'carpalx') {
+		const perl = option('perl');
+		const data = option('carpalx-data');
+		if (perl && data) verifyCarpalx(perl, data);
+		else console.log('carpalx: skipped (needs --perl=<exe> --carpalx-data=<its source folder>)');
 	}
 }
 

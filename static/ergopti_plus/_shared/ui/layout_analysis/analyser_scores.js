@@ -795,56 +795,107 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	// ======= 5/ carpalx ======
 	// =========================
 
+	// Rounds of carpalx's chain through deleted characters: runs of deleted
+	// characters longer than this between two letters are rare (a line of
+	// punctuation), and each round adds one character.
+	const CARPALX_CHAIN_ROUNDS = 12;
+
 	/**
 	 * carpalx's letter triads of a corpus: lower case, a-z only, every other
 	 * character deleted (so triads join across spaces and punctuation, within a
-	 * line), identical triplets dropped. A triad across one deleted run is
-	 * estimated from the trigrams and bigrams (Markov), the rest is exact.
-	 * @returns {Map<string, number>} Triad → count.
+	 * line), identical triplets dropped. Each trigram (a y b) around a letter y
+	 * gives the triads (x y z) of x, the letter before y in its line, and z,
+	 * the letter after: a itself when it is a letter, else the letters reached
+	 * by the trigrams' second-order chain through the deleted characters
+	 * (backward from a y, forward from y b), x and z independent given a y b.
+	 * The chain's bigram counts the runs that end there, so a line's end stops
+	 * it as carpalx's line does. Exact for letters-only text.
+	 * @returns {object} Triads as typed arrays of letter indexes and counts.
 	 */
 	function carpalxTriads(table) {
-		const GAP = '#';
-		const letter = (char) => {
-			const lower = char.toLowerCase();
-			return lower.length === 1 && lower >= 'a' && lower <= 'z' ? lower : GAP;
+		const SEP = '\u0000';
+		const letters = new Map();
+		const letterOf = (char) => {
+			if (!letters.has(char)) {
+				const lower = char.toLowerCase();
+				letters.set(
+					char,
+					lower.length === 1 && lower >= 'a' && lower <= 'z' ? lower.charCodeAt(0) - 97 : -1
+				);
+			}
+			return letters.get(char);
 		};
-		const tri = new Map();
-		const add = (map, key, n) => map.set(key, (map.get(key) || 0) + n);
-		for (const [a, b, c, n] of table.tri) add(tri, letter(a) + letter(b) + letter(c), n);
-		// Over one gap: the letters that follow "y #" and those that precede "# y".
-		const gapNext = new Map();
-		const gapPrev = new Map();
-		const list = (map, key) => {
-			if (!map.has(key)) map.set(key, { total: 0, items: [] });
-			return map.get(key);
+		const bi = new Map();
+		for (const [a, b, n] of table.bi) bi.set(a + SEP + b, n);
+		// States of the chain, keyed by two characters: forward (p, c) with c
+		// deleted, backward (c, y) with c deleted; each with its next characters.
+		const forward = new Map();
+		const backward = new Map();
+		const step = (map, key, char, n, total) => {
+			if (!map.has(key)) map.set(key, []);
+			map.get(key).push([char, n / total]);
 		};
-		for (const [t, n] of tri) {
-			if (t[0] === GAP || t[1] !== GAP || t[2] === GAP) continue;
-			const next = list(gapNext, t[0]);
-			next.total += n;
-			next.items.push([t[2], n]);
-			const prev = list(gapPrev, t[2]);
-			prev.total += n;
-			prev.items.push([t[0], n]);
+		for (const [a, b, c, n] of table.tri) {
+			if (letterOf(b) < 0) step(forward, a + SEP + b, c, n, bi.get(a + SEP + b));
+			if (letterOf(b) < 0) step(backward, b + SEP + c, a, n, bi.get(b + SEP + c));
 		}
-		const triads = new Map();
-		const offer = (key, n) => {
-			if (key[0] === key[1] && key[1] === key[2]) return;
-			add(triads, key, n);
+		// Letter distribution reached from each state, by fixed-point iteration
+		// (each round reaches one more deleted character).
+		const solve = (map, nextKey) => {
+			let reach = new Map();
+			for (let round = 0; round < CARPALX_CHAIN_ROUNDS; round++) {
+				const next = new Map();
+				for (const [key, steps] of map) {
+					const v = new Float64Array(26);
+					for (const [char, p] of steps) {
+						const l = letterOf(char);
+						if (l >= 0) v[l] += p;
+						else {
+							const further = reach.get(nextKey(key, char));
+							if (further) for (let i = 0; i < 26; i++) v[i] += p * further[i];
+						}
+					}
+					next.set(key, v);
+				}
+				reach = next;
+			}
+			return reach;
 		};
-		for (const [t, n] of tri) {
-			if (t[1] === GAP) continue;
-			if (t[0] !== GAP && t[2] !== GAP) offer(t, n);
-			else if (t[0] !== GAP) {
-				// x y #, then z over the gap: n(x y #) · n(y # z) / n(y # ·).
-				const next = gapNext.get(t[1]);
-				if (next) for (const [z, m] of next.items) offer(t[0] + t[1] + z, (n * m) / next.total);
-			} else if (t[2] !== GAP) {
-				// x over the gap, then # y z: n(x # y) / n(· # y) · n(# y z).
-				const prev = gapPrev.get(t[1]);
-				if (prev) for (const [x, m] of prev.items) offer(x + t[1] + t[2], (n * m) / prev.total);
+		const ahead = solve(forward, (key, char) => key.slice(key.indexOf(SEP) + 1) + SEP + char);
+		const behind = solve(backward, (key, char) => char + SEP + key.slice(0, key.indexOf(SEP)));
+		const counts = new Float64Array(26 * 26 * 26);
+		const unit = (l) => {
+			const v = new Float64Array(26);
+			v[l] = 1;
+			return v;
+		};
+		for (const [a, y, b, n] of table.tri) {
+			const ly = letterOf(y);
+			if (ly < 0) continue;
+			const la = letterOf(a);
+			const lb = letterOf(b);
+			const left = la >= 0 ? unit(la) : behind.get(a + SEP + y);
+			const right = lb >= 0 ? unit(lb) : ahead.get(y + SEP + b);
+			if (!left || !right) continue;
+			for (let x = 0; x < 26; x++) {
+				if (left[x] === 0) continue;
+				for (let z = 0; z < 26; z++)
+					if (right[z] !== 0 && !(x === ly && ly === z))
+						counts[(x * 26 + ly) * 26 + z] += n * left[x] * right[z];
 			}
 		}
+		const triads = new Map();
+		counts.forEach((n, k) => {
+			if (n > 0)
+				triads.set(
+					String.fromCharCode(
+						97 + Math.floor(k / 676),
+						97 + (Math.floor(k / 26) % 26),
+						97 + (k % 26)
+					),
+					n
+				);
+		});
 		// As typed arrays of letter indexes, so a layout is scored in one pass.
 		const size = triads.size;
 		const out = {
@@ -953,7 +1004,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 				w.finger * model.finger_penalty[key.finger];
 			keys[i] = key;
 		}
-		const threshold = (model.min_triad_count * triads.total) / model.reference_triads;
+		const threshold = model.min_triad_count;
 		const { kb, kp, ks, k1, k2, k3 } = model.k;
 		let kept = 0;
 		let dropped = 0;
