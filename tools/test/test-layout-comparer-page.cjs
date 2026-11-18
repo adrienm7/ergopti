@@ -762,6 +762,95 @@ check(
 	);
 }
 
+// The score settings read as titled sections (maintainer, 2026-11-18): each
+// static section has its icon and accent, every weight is in exactly one
+// titled group with its help in all 21 locales, each weight input is the
+// target of its own label and described by its unit and definition, and the
+// ideal finger load has its hands' picture, drawn from its inputs.
+{
+	const groupsMatch = page.match(/const WEIGHT_GROUPS = (\{[\s\S]*?\n\t\});/);
+	check(groupsMatch, 'score settings: the page lost WEIGHT_GROUPS');
+	const groups = groupsMatch ? vm.runInNewContext(`(${groupsMatch[1]})`) : {};
+	const grouped = Object.values(groups).flat();
+	const weightIds = Object.keys(E.defaultWeights());
+	check(
+		grouped.length === weightIds.length && weightIds.every((id) => grouped.includes(id)),
+		`score settings: WEIGHT_GROUPS holds ${grouped.join(' ')}, the weights are ${weightIds.join(' ')}`
+	);
+	check(
+		JSON.stringify(Object.keys(groups)) ===
+			JSON.stringify(['pairs', 'rolls', 'load', 'position', 'access', 'bonuses']),
+		`score settings: groups ${Object.keys(groups).join(' ')}`
+	);
+	const english = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, 'en.json'), 'utf8'));
+	for (const file of locales) {
+		const strings = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, file), 'utf8'));
+		for (const group of Object.keys(groups))
+			for (const key of [`weights.group.${group}`, `weights.group_help.${group}`])
+				check(
+					typeof strings[`${PREFIX}${key}`] === 'string' && strings[`${PREFIX}${key}`] !== '',
+					`${file}: ${PREFIX}${key}`
+				);
+		for (const better of ['lower', 'higher']) {
+			const key = `${PREFIX}weights.per_${better}`;
+			check(
+				typeof strings[key] === 'string' && strings[key].includes('{unit}'),
+				`${file}: ${key} with {unit}`
+			);
+		}
+	}
+	check(
+		weightIds.every((id) => ['lower', 'higher'].includes(E.METRICS[id].better)),
+		'score settings: a weight of a metric neither lower nor higher has no unit phrase'
+	);
+	check(english[`${PREFIX}weights.per_lower`], 'score settings: no English unit phrase');
+	for (const section of ['config', 'weights', 'ideal', 'shortcuts', 'forms'])
+		check(
+			new RegExp(`class="la-weights[^"]* la-accent-[1-6]" data-section-icon="${section}"`).test(
+				page
+			),
+			`score settings: the ${section} section has no accent or icon`
+		);
+	const iconsMatch = page.match(/const SECTION_ICONS = (\{[\s\S]*?\n\t\});/);
+	const icons = iconsMatch ? vm.runInNewContext(`(${iconsMatch[1]})`) : {};
+	for (const id of [...Object.keys(groups), 'config', 'weights', 'ideal', 'shortcuts', 'forms'])
+		check(typeof icons[id] === 'string' && icons[id] !== '', `score settings: no icon for ${id}`);
+	check(
+		/svg\.setAttribute\('aria-hidden', 'true'\)/.test(page),
+		'score settings: the section icons are not hidden from assistive technology'
+	);
+	const control = page.slice(page.indexOf('function weightControl('));
+	const body = control.slice(0, control.indexOf('\n\t\t}\n'));
+	check(
+		/label\.htmlFor = inputId/.test(body) && /input\.id = inputId/.test(body),
+		'score settings: a weight input is not the target of its label'
+	);
+	check(
+		/aria-describedby', `\$\{inputId\}-unit \$\{inputId\}-help`/.test(body) &&
+			body.includes('t(`layout_analysis.info.${id}`)'),
+		'score settings: a weight input is not described by its unit and definition'
+	);
+	check(
+		/<svg\s+id="la-ideal-hands"[^>]*aria-hidden="true"/.test(page),
+		'score settings: the ideal finger load has no hands picture'
+	);
+	const ideal = page.slice(page.indexOf('function fillIdealLoad('));
+	check(
+		(ideal.slice(0, ideal.indexOf('\n\t\t}\n')).match(/drawIdealHands\(/g) || []).length === 2,
+		'score settings: the hands picture does not follow the ideal load and its edits'
+	);
+	const css = fs.readFileSync(path.join(PAGE_DIR, 'style.css'), 'utf8');
+	check(
+		css.includes('minmax(min(100%, 240px), 1fr)'),
+		'score settings: the weight grid does not reflow to one column at 320 px'
+	);
+	for (let slot = 1; slot <= 6; slot++)
+		check(
+			css.includes(`.la-accent-${slot} {\n\t--la-section-accent: var(--la-cat-${slot});`),
+			`score settings: no accent for slot ${slot}`
+		);
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
 	console.error(`test-layout-comparer-page: ${errors.length} problem(s)`);

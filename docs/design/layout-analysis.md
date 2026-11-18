@@ -955,7 +955,18 @@ the visitor's saved selection until they tick or untick one.
 (built-in, pasted text, or a .txt, .md, .csv, .html, .docx, .odt or .pdf file (`pdf_text.js`: its text, no library; a locked or scanned PDF refused) read in
 the page), keyboard, layout selection, the global score chart, the sortable
 ranking, each layout's contributions, finger load and metrics, and the weights
-editor with « restore the defaults ». The site embeds it like the editor
+editor with « restore the defaults ». « Réglages du score » is split into
+sections, each with its heading, a decorative icon and an accent slot of
+theme.css « Chart look » on its edge (never on text, so the text keeps its
+contrast): import, export and reset; the weights, in six titled groups
+(`WEIGHT_GROUPS` of `comparer_page.js`: same finger and stretches, rolls and
+redirects, finger and hand load, rows and position, access method, coverage
+and simplicity bonuses; every weight in one); the ideal finger load, its
+inputs beside a picture of the hands whose bars follow them; the shortcuts;
+the compact boards; the fingering. Each weight is a card: its name labels its
+input, the points a unit is worth and the metric's « i » definition (one
+source with the popover) describe it. The grids fall to one column under
+240 px, so the panel reflows at 320 px. The site embeds it like the editor
 (`?lang=<code>`); the app's Studio window loads the same page. A link may add
 `corpus=<built-in id>`, `keyboard=<id>`, `format=<id>`, `layouts=<id,id>`,
 `details=<id>` and `versus=<id>`: the page opens on them over the

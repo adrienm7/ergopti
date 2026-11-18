@@ -852,6 +852,155 @@ body:has(> main.layout-analysis) {
 	gap: 8px 12px;
 }
 
+/* Each settings section and weight group: an accent slot (« Chart look »)
+   on its edge and its icon only, never on text, so the text keeps the page's
+   contrast in both themes; the heading and the icon tell the sections apart
+   without the colour. */
+.la-accent-1 {
+	--la-section-accent: var(--la-cat-1);
+}
+
+.la-accent-2 {
+	--la-section-accent: var(--la-cat-2);
+}
+
+.la-accent-3 {
+	--la-section-accent: var(--la-cat-3);
+}
+
+.la-accent-4 {
+	--la-section-accent: var(--la-cat-4);
+}
+
+.la-accent-5 {
+	--la-section-accent: var(--la-cat-5);
+}
+
+.la-accent-6 {
+	--la-section-accent: var(--la-cat-6);
+}
+
+.la-settings > .la-weights {
+	border-left: 4px solid var(--la-section-accent, var(--la-border));
+	margin: 28px 0;
+	padding-left: 14px;
+}
+
+.la-settings .la-heading h2,
+.la-group-heading {
+	align-items: center;
+	display: flex;
+	gap: 10px;
+}
+
+.la-section-icon {
+	fill: none;
+	flex: none;
+	height: 1.4em;
+	stroke: var(--la-section-accent, currentColor);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 2;
+	width: 1.4em;
+}
+
+.la-weight-groups {
+	display: grid;
+	gap: 32px;
+	margin-top: 20px;
+}
+
+.la-weight-group {
+	border-left: 3px solid var(--la-section-accent);
+	padding: 2px 0 2px 14px;
+}
+
+.la-group-heading {
+	font-size: 1.05em;
+	margin: 0 0 4px;
+}
+
+/* One weight: its name and « i », the input with what a unit is worth, and
+   the metric's definition under them. */
+.la-weight-card {
+	background: var(--la-surface-2);
+	border: 1px solid var(--la-border);
+	border-radius: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 10px 12px;
+}
+
+.la-weight-top {
+	align-items: center;
+	display: flex;
+	font-weight: 600;
+	gap: 8px;
+	justify-content: space-between;
+}
+
+.la-weight-field {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 10px;
+}
+
+.la-weight-field input {
+	width: 6em;
+}
+
+.la-weight-card input[aria-invalid='true'] {
+	border-color: var(--la-bad);
+}
+
+.la-weight-unit {
+	color: var(--la-sub);
+}
+
+.la-weight-help {
+	color: var(--la-sub);
+	font-size: 0.9em;
+	margin: 0;
+}
+
+/* The ideal finger load: the hands' picture beside its inputs, above them on
+   a narrow screen. */
+.la-ideal-layout {
+	align-items: center;
+	display: grid;
+	gap: 16px 24px;
+	grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+	margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+	.la-ideal-layout {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.la-ideal-hands {
+	height: auto;
+	max-width: 260px;
+	width: 100%;
+}
+
+.la-ideal-finger {
+	fill: var(--la-section-accent);
+}
+
+.la-ideal-palm {
+	fill: var(--la-border);
+}
+
+.la-ideal-value {
+	fill: currentColor;
+	font-size: 11px;
+	text-anchor: middle;
+}
+
 /* A dead key shows its bare accent with a corner mark, as on the editor's board. */
 .la-heatmap .la-key.key-legend-dead::before {
 	border-color: currentColor currentColor transparent transparent;
@@ -865,8 +1014,9 @@ body:has(> main.layout-analysis) {
 
 .la-weight-list {
 	display: grid;
-	gap: 6px 16px;
-	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	gap: 12px 16px;
+	/* One column under 240 px: the page reflows at 320 px wide. */
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
 	margin-top: 10px;
 }
 

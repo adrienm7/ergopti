@@ -203,6 +203,53 @@
 	];
 	const DEFAULT_TAB = 'overview';
 	const DETAILS_TAB = 'details';
+	// The score settings' weight groups, each a titled sub-section; every
+	// weight of the score is in exactly one (test-layout-comparer-page.cjs).
+	const WEIGHT_GROUPS = {
+		pairs: ['sfb', 'sfs', 'lsb', 'scissors', 'half_scissors'],
+		rolls: [
+			'roll_in',
+			'roll_out',
+			'roll3_in',
+			'roll3_out',
+			'alternation',
+			'redirect',
+			'redirect_bad'
+		],
+		load: ['finger_imbalance', 'hand_imbalance', 'pinky_load'],
+		position: ['home_row', 'distance', 'outer_column'],
+		access: ['modifier_usage', 'altgr_usage', 'dead_key_usage'],
+		bonuses: [
+			'unsupported',
+			'compact_fit',
+			'char_coverage',
+			'coverage_bonus',
+			'simplicity',
+			'direct_digits',
+			'shortcut_left'
+		]
+	};
+	// Each weight group's accent: its slot of theme.css « Chart look », drawn
+	// on the section's edge and icon only, so the text keeps its contrast (the
+	// static sections name theirs in the markup, la-accent-<slot>).
+	const SECTION_SLOT = { pairs: 1, rolls: 2, load: 3, position: 4, access: 5, bonuses: 6 };
+	// The settings sections' icons (24 × 24 strokes), decorative: each section
+	// is named by its heading.
+	const SECTION_ICONS = {
+		pairs: 'M6 3h12v7H6zM6 14h12v7H6zM12 10v4',
+		rolls: 'M4 17c2-7 9-10 15-6M16 8l3 3-3 3',
+		load: 'M5 21V12M9 21V7M13 21V5M17 21V9M21 21V14',
+		position: 'M12 3v5M12 16v5M3 12h5M16 12h5M12 9a3 3 0 1 0 0.01 0',
+		access: 'M4 10h9v10H4zM10 4h10v10h-4M7 15h3',
+		bonuses: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z',
+		config: 'M8 3v12M4 11l4 4 4-4M16 21V9M12 13l4-4 4 4',
+		weights: 'M12 4v16M5 8h14M5 8l-3 6h6zM19 8l-3 6h6zM8 20h8',
+		ideal: 'M6 21v-9M10 21V5M14 21V4M18 21V8M3 21h18',
+		shortcuts: 'M3 7h18v10H3zM7 11h1M11 11h1M15 11h1M7 14h10',
+		forms: 'M3 8h18v8H3zM3 12h18M9 8v8M15 8v8'
+	};
+	const SVG_NS = 'http://www.w3.org/2000/svg';
+
 	// The metrics each themed tab charts, one bar chart each and one table;
 	// every metric of the engine is in exactly one tab (test-layout-comparer-page.cjs).
 	const TAB_METRICS = {
@@ -683,7 +730,7 @@
 
 <details id="la-settings" class="la-settings">
 <summary data-i18n="layout_analysis.settings.title"></summary>
-<section class="la-weights la-config" aria-labelledby="la-config-label">
+<section class="la-weights la-config la-accent-1" data-section-icon="config" aria-labelledby="la-config-label">
 	<div class="la-heading">
 		<h2 id="la-config-label" data-i18n="layout_analysis.config.title"></h2>
 	</div>
@@ -699,7 +746,7 @@
 	<p id="la-config-status" class="la-muted" role="status"></p>
 </section>
 
-<section class="la-weights" aria-labelledby="la-weights-label">
+<section class="la-weights la-accent-2" data-section-icon="weights" aria-labelledby="la-weights-label">
 	<div class="la-heading">
 		<h2 id="la-weights-label" data-i18n="layout_analysis.weights.title"></h2>
 		<button
@@ -713,10 +760,10 @@
 	</div>
 	<p class="la-muted" data-i18n="layout_analysis.weights.help"></p>
 	<button id="la-restore" type="button" data-i18n="layout_analysis.weights.restore"></button>
-	<div id="la-weight-list" class="la-weight-list"></div>
+	<div id="la-weight-list" class="la-weight-groups"></div>
 </section>
 
-<section class="la-weights" aria-labelledby="la-ideal-label">
+<section class="la-weights la-accent-3" data-section-icon="ideal" aria-labelledby="la-ideal-label">
 	<div class="la-heading">
 		<h2 id="la-ideal-label" data-i18n="layout_analysis.ideal.title"></h2>
 		<button
@@ -734,11 +781,20 @@
 		type="button"
 		data-i18n="layout_analysis.ideal.restore"
 	></button>
-	<div id="la-ideal-list" class="la-weight-list"></div>
+	<div class="la-ideal-layout">
+		<svg
+			id="la-ideal-hands"
+			class="la-ideal-hands"
+			viewBox="0 0 220 120"
+			aria-hidden="true"
+			focusable="false"
+		></svg>
+		<div id="la-ideal-list" class="la-weight-list"></div>
+	</div>
 	<p id="la-ideal-sum" class="la-muted" role="status"></p>
 </section>
 
-<section class="la-weights" aria-labelledby="la-shortcuts-label">
+<section class="la-weights la-accent-4" data-section-icon="shortcuts" aria-labelledby="la-shortcuts-label">
 	<div class="la-heading">
 		<h2 id="la-shortcuts-label" data-i18n="layout_analysis.shortcuts.title"></h2>
 		<button
@@ -763,7 +819,7 @@
 	<p id="la-shortcuts-status" class="la-muted" role="status"></p>
 </section>
 
-<section class="la-weights" aria-labelledby="la-forms-label">
+<section class="la-weights la-accent-6" data-section-icon="forms" aria-labelledby="la-forms-label">
 	<div class="la-heading">
 		<h2 id="la-forms-label" data-i18n="layout_analysis.forms.title"></h2>
 		<button
@@ -3865,36 +3921,159 @@
 			});
 		}
 
+		/** A section's decorative icon (SECTION_ICONS): its heading names it. */
+		function sectionIcon(id) {
+			const svg = document.createElementNS(SVG_NS, 'svg');
+			svg.setAttribute('viewBox', '0 0 24 24');
+			svg.setAttribute('class', 'la-section-icon');
+			svg.setAttribute('aria-hidden', 'true');
+			svg.setAttribute('focusable', 'false');
+			const path = document.createElementNS(SVG_NS, 'path');
+			path.setAttribute('d', SECTION_ICONS[id]);
+			svg.append(path);
+			return svg;
+		}
+
+		/** Puts each static settings section's icon before its heading text, once. */
+		function placeSectionIcons() {
+			for (const section of document.querySelectorAll('#la-settings [data-section-icon]')) {
+				const heading = section.querySelector('.la-heading h2');
+				if (heading.querySelector('.la-section-icon')) continue;
+				heading.prepend(sectionIcon(section.dataset.sectionIcon));
+			}
+		}
+
+		/**
+		 * The bars of the ideal finger load, one per finger, left hand then right,
+		 * each as tall as its share: a picture of the inputs beside it, which stay
+		 * the controls (the figure is hidden from assistive technology).
+		 * @param {object} values - finger id → share (%), possibly not a number.
+		 */
+		function drawIdealHands(values) {
+			const svg = $('la-ideal-hands');
+			svg.replaceChildren();
+			const fingers = Object.keys(E.defaultIdealLoad());
+			const shares = fingers.map((id) => (Number.isFinite(values[id]) ? values[id] : 0));
+			const top = Math.max(20, ...shares);
+			const width = 20;
+			const base = 100;
+			fingers.forEach((id, i) => {
+				// A gap between the hands: the four left fingers, then the four right.
+				const x = 10 + i * 24 + (i >= fingers.length / 2 ? 12 : 0);
+				const height = Math.max(4, (shares[i] / top) * 80);
+				const bar = document.createElementNS(SVG_NS, 'rect');
+				bar.setAttribute('x', String(x));
+				bar.setAttribute('y', String(base - height));
+				bar.setAttribute('width', String(width));
+				bar.setAttribute('height', String(height));
+				bar.setAttribute('rx', '9');
+				bar.setAttribute('class', 'la-ideal-finger');
+				const value = document.createElementNS(SVG_NS, 'text');
+				value.setAttribute('x', String(x + width / 2));
+				value.setAttribute('y', String(base - height - 4));
+				value.setAttribute('class', 'la-ideal-value');
+				value.textContent = format(shares[i], 0);
+				bar.dataset.finger = id;
+				svg.append(bar, value);
+			});
+			// Each hand's palm under its four fingers.
+			for (const x of [8, 116]) {
+				const palm = document.createElementNS(SVG_NS, 'rect');
+				palm.setAttribute('x', String(x));
+				palm.setAttribute('y', String(base + 2));
+				palm.setAttribute('width', '96');
+				palm.setAttribute('height', '16');
+				palm.setAttribute('rx', '8');
+				palm.setAttribute('class', 'la-ideal-palm');
+				svg.append(palm);
+			}
+		}
+
+		/**
+		 * One weight's control: its name (the label of its input), its « i », the
+		 * input with the points it is worth per unit, and the metric's definition
+		 * (the « i » text, one source with the popover) as the input's description.
+		 */
+		function weightControl(id) {
+			const metric = E.METRICS[id];
+			const control = el('div', 'la-weight-card');
+			const inputId = `la-weight-${id}`;
+			const top = el('div', 'la-weight-top');
+			const label = el('label', 'la-weight-name', t(`layout_analysis.metric.${id}`));
+			label.htmlFor = inputId;
+			top.append(label, infoButton(id));
+			const field = el('div', 'la-weight-field');
+			const input = el('input');
+			input.id = inputId;
+			input.type = 'number';
+			input.min = '0';
+			input.step = 'any';
+			input.value = String(state.weights[id]);
+			input.setAttribute('aria-describedby', `${inputId}-unit ${inputId}-help`);
+			const unit = el(
+				'span',
+				'la-weight-unit',
+				t(`layout_analysis.weights.per_${metric.better}`, {
+					unit: metric.unit === 'mm' ? t('layout_analysis.unit.mm') : '%'
+				})
+			);
+			unit.id = `${inputId}-unit`;
+			field.append(input, unit);
+			const help = el('p', 'la-weight-help', t(`layout_analysis.info.${id}`));
+			help.id = `${inputId}-help`;
+			control.append(top, field, help);
+			return { control, input };
+		}
+
 		function fillWeights() {
 			const list = $('la-weight-list');
 			list.replaceChildren();
-			for (const id of Object.keys(E.defaultWeights())) {
-				const label = el('label', 'la-weight');
-				const name = el('span', '', t(`layout_analysis.metric.${id}`));
-				name.append(' ', infoButton(id));
-				label.append(name);
-				const input = el('input');
-				input.type = 'number';
-				input.min = '0';
-				input.step = 'any';
-				input.value = String(state.weights[id]);
-				input.addEventListener('input', () => {
-					const value = Number(input.value);
-					if (input.value === '' || !Number.isFinite(value) || value < 0) {
-						input.setAttribute('aria-invalid', 'true');
-						return;
-					}
-					input.removeAttribute('aria-invalid');
-					state.weights[id] = value;
-					// An access weight chooses the ways of typing: the layouts are typed again.
-					if (E.ACCESS_WEIGHTS.includes(id)) {
-						save();
-						analyse();
-					} else rescore();
-				});
-				label.append(input);
-				list.append(label);
+			const grouped = Object.values(WEIGHT_GROUPS).flat();
+			for (const id of Object.keys(E.defaultWeights()))
+				if (!grouped.includes(id))
+					throw new Error(`layout_analysis: the weight ${id} is in no WEIGHT_GROUPS group`);
+			for (const [group, ids] of Object.entries(WEIGHT_GROUPS)) {
+				const section = el('section', `la-weight-group la-accent-${SECTION_SLOT[group]}`);
+				const headingId = `la-weight-group-${group}`;
+				section.setAttribute('aria-labelledby', headingId);
+				const heading = el('h3', 'la-group-heading');
+				heading.id = headingId;
+				heading.append(
+					sectionIcon(group),
+					el('span', '', t(`layout_analysis.weights.group.${group}`))
+				);
+				const grid = el('div', 'la-weight-list');
+				section.append(
+					heading,
+					el('p', 'la-muted', t(`layout_analysis.weights.group_help.${group}`)),
+					grid
+				);
+				list.append(section);
+				for (const id of ids) {
+					const { control, input } = weightControl(id);
+					grid.append(control);
+					wireWeight(id, input);
+				}
 			}
+			placeSectionIcons();
+		}
+
+		/** Re-scores (or, for an access weight, analyses again) as a weight is edited. */
+		function wireWeight(id, input) {
+			input.addEventListener('input', () => {
+				const value = Number(input.value);
+				if (input.value === '' || !Number.isFinite(value) || value < 0) {
+					input.setAttribute('aria-invalid', 'true');
+					return;
+				}
+				input.removeAttribute('aria-invalid');
+				state.weights[id] = value;
+				// An access weight chooses the ways of typing: the layouts are typed again.
+				if (E.ACCESS_WEIGHTS.includes(id)) {
+					save();
+					analyse();
+				} else rescore();
+			});
 		}
 
 		function fillIdealLoad() {
@@ -3902,6 +4081,14 @@
 			list.replaceChildren();
 			const inputs = {};
 			const showSum = () => {
+				drawIdealHands(
+					Object.fromEntries(
+						Object.keys(inputs).map((id) => [
+							id,
+							inputs[id].value === '' ? NaN : Number(inputs[id].value)
+						])
+					)
+				);
 				const sum = Object.keys(inputs).reduce((total, id) => total + Number(inputs[id].value), 0);
 				const box = $('la-ideal-sum');
 				box.textContent = t('layout_analysis.ideal.sum', { sum: format(sum, 1) });
@@ -3942,6 +4129,7 @@
 				label.append(input);
 				list.append(label);
 			}
+			drawIdealHands(state.idealLoad);
 			$('la-ideal-sum').textContent = t('layout_analysis.ideal.sum', {
 				sum: format(
 					Object.values(state.idealLoad).reduce((a, b) => a + b, 0),
