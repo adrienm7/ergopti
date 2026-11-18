@@ -263,6 +263,20 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       notes were cold caches of a fresh private code copy, which the benchmark now warms first. A smoke boot beside a
       resident driver is suspended, so it does not measure the keyboard arbiter of the prefix-watcher stage. The PC
       timings and the macOS field points `rerun_2026_11_02` and `main_thread_holds` are in the TODO-tests files.
+      Done 18 November, second pass (quiet PC beside the resident driver, 4 interleaved rounds of one warm-up and 3
+      boots per variant, medians of 12): the configuration stage was 250 ms CPU, and 160-190 ms of it was the typed
+      read of the 33 KB personal hotstrings file for its `_meta` tables. The TOML document reader now reads a one-line
+      assignment of simple tokens, splits a member list of bare keys and one-line scalars, decodes a one-line basic
+      string or a Boolean and takes a quoted key without escapes by native matches instead of its lexer, with the same
+      documents, records and spans on 518 TOML files (the shared tree and a real configuration): the personal file
+      parses in 33-45 ms instead of 94-115 ms and config.toml, read about five times per boot, in 10-12 ms instead of
+      16-20 ms (same process). The configuration stage went from 250 to 172 ms CPU with the member split alone, and
+      from 195 to 141 ms with every shortcut in a later, quieter series (wall 197 to 140 ms); the whole boot stayed
+      inside its noise (4.85 s elapsed both ways). Measured and left:
+      the hotstring stage has no single hotspot (« Trimming per-row work in the Windows hotstring registrars » in
+      `docs/memory/rejected_proposals.md`); the `.tsv` admission is 40-65 ms warm; the AI catalogue include is 85-95
+      ms, where `api_providers.json` is decoded once (21 ms) and walked twice more for spans (20 ms over the whole
+      text, then 24-32 ms re-validating each provider's text).
 - [ ] **[RELEASE] Before publishing.** On a quiet PC with no resident driver: the whole AHK suite,
       `npm run test:ahk-tray-rows-read-as-text`, every live check including `quit-over-a-log-flush`, the JS, macOS and
       Linux suites, and a Windows field report with a driver.

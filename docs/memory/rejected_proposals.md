@@ -77,6 +77,19 @@ Remove duplicate work first. Layout tables are no better a target: of a 547 ms
 reaches. Reconsider only for one document whose decode costs several times the
 codec's, with the invalidation proved.
 
+## Trimming per-row work in the Windows hotstring registrars
+
+Do not micro-optimise `CreateCaseSensitiveHotstrings`, `_HsCacheRegisterRows`
+or `_HSE_IndexStarPrefixes` for boot time. Reading each option with one `Get`,
+testing the two shift symbols with `InStr` instead of splitting the trigger, a
+per-section option template cloned per row and reusing the prefix buckets were
+replayed against the old code in one process on the 1,211 cached rows of a real
+boot (about 170 ms a replay, identical registry fingerprints): the difference
+stayed inside the replay's noise. The cost is spread over the objects every spec
+needs (`HSE_Register` about 70 µs a spec: the Spec literal and the Meta copy
+about 55 ms, the star-prefix index about 45 ms per 2,741 specs). Reconsider only
+with a change to what a spec holds or how many specs a row registers.
+
 ## Building the remote AI catalogue on first use
 
 Do not defer `_LLMRemote_LoadCatalog` past boot while the AI root is eager: it
