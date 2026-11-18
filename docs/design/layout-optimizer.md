@@ -157,11 +157,27 @@ it gains its speed from:
   of wall time (of CPU time): Ergopti 56.8 → 110.4 (81.8 → 138.0), Ergo-L
   39.4 → 92.5 (61.1 → 128.2), bépo 35.3 → 57.0 (49.6 → 94.9), AZERTY
   145 → 207 (163 → 228), QWERTY 160 → 193 (186 → 256), every run ending on
-  the same best score. What is left on bépo is its compile (a quarter of a
-  trial: 2,181 dead-key rules, a few thousand joins per swap of a letter
-  the rules read) and its finish (15 %); on Ergo-L, the plan (20 %) and the
+  the same best score. A trial then stopped copying the session's maps
+  (the core's ways, dead states and texts, the finished ways and best
+  ways, the plan's filtered ways: about 1,769 entries each on bépo): each
+  role has two spare maps (`spareMaps`), and the one a trial gets is made
+  equal to the current map by writing back only the keys the trial before
+  changed (about 120 characters per letter swap on bépo); the partial
+  compile lists the rules of the touched outputs from the rule graph
+  instead of testing all 2,181. Measured (Swann, 99 %, 1,500 swaps from
+  the start layout, the old and new engines in one Node process stepped
+  in turn 20 iterations at a time, so that the load falls on both alike,
+  on one heavily loaded PC, against f32cb8f6b2), speed-up of the median
+  run: bépo ×1.28 (5 runs, ×1.19–×1.37), Ergopti ×1.12 (3 runs,
+  ×1.07–×1.19), Ergo-L ×1.18 (3 runs, ×1.15–×1.23), every trial's score
+  bit-identical to the old engine's (`Object.is`, seeds 7 and 3); at the
+  rates above, about bépo 73, Ergopti 124, Ergo-L 110 trials per second.
+  The compile and finish fell from about 40 % to 31 % of a bépo trial;
+  the joins themselves are few (about 150 per swap, nearly all kept), so
+  what is left of them is a per-character cost: about 120 lists compiled,
+  finished and planned again per swap. On Ergo-L, the plan (20 %) and the
   context walk (20 %, two thirds of it the corpus trigrams of the swapped
-  characters that hold no multi-way token);
+  characters that hold no multi-way token) are left;
 - Web Workers, one share of the restarts each (up to 8, one thread left to the
   page), so the Studio stays responsive and a run uses every core;
 - the « 99 % of the n-grams » accuracy (`searchTables`), which keeps the most
@@ -246,9 +262,15 @@ only), keyboard ISO, format TKL, default weights, 1 restart of 3 000 swaps on
 
 ## Follow-ups
 
-- Faster bépo trials: the partial compile (a quarter of a trial) joins
-  every way of each dead key with every way of a swapped letter, through
-  all 92 dead states, and its finish still copies the maps of 1,769
-  characters; bépo is at about 57 trials per second of the 95–130 aimed
-  at. Tried without gain: keeping each pair's side costs across trials,
-  and summing the walk's rest n-grams per key n-gram before the visitor.
+- Faster bépo trials: about 73 trials per second of the 95–130 aimed at.
+  A letter swap compiles, finishes and plans again the lists of about 120
+  characters (each output of a rule that reads the letter, through the 92
+  dead states), almost all of them accented letters no corpus n-gram
+  holds: their cost is per character (map writes, the accent rule, the
+  plan's filtered ways), not the joins. The plan and context walk (about
+  a third of a trial, as on Ergo-L) and the compact forms' reachability
+  (`reachableChars` reads all 2,181 rules per pass) come next. Tried
+  without gain: keeping each pair's side costs across trials, summing the
+  walk's rest n-grams per key n-gram before the visitor, and refusing a
+  chain on its cost before building it (a full list refuses about one
+  chain in a hundred trials).
