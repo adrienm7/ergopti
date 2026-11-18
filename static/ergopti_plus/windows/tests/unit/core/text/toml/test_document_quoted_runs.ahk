@@ -170,3 +170,29 @@ _TDQ_RandomRecordsMatch() {
 }
 Test("TOML document: quoted runs match the plain lexer on generated records (toml-quoted-runs-2026-11-03)",
 	_TDQ_RandomRecordsMatch)
+
+; boot-parse-repeats-2026-11-18: the lexer's slow steps are the characters it
+; classifies one at a time. They replace the boot's toml.document_slow_steps
+; ceiling, which every setting added to the template moved: the cost it bounded
+; is a run that stops being taken in one native search, and that shows here as
+; slow steps growing with the length of a run instead of its structure.
+_TDQ_SlowSteps(Text) {
+	global _TOML_DocumentSlowSteps
+	Before := _TOML_DocumentSlowSteps
+	TOML_ParseDocument(Text)
+	return _TOML_DocumentSlowSteps - Before
+}
+
+_TDQ_SlowStepsFollowStructureNotLength() {
+	Q := Chr(34)
+	Shape(Run) {
+		return "# " . Run . "`n[s]`nk" . Run . " = " . Q . Run . "\t" . Q . " # " . Run . "`n"
+			. "l = '" . Run . "'`nb = [" . Q . Run . Q . ", '" . Run . "']`n"
+	}
+	Short := "a"
+	Long := StrReplace(Format("{:400}", ""), " ", "a")
+	AssertEqual(_TDQ_SlowSteps(Shape(Short)), _TDQ_SlowSteps(Shape(Long)),
+		"comments, bare keys and one-line strings cost their delimiters, not their length")
+}
+Test("TOML document: slow lexer steps do not grow with the length of a run (boot-parse-repeats-2026-11-18)",
+	_TDQ_SlowStepsFollowStructureNotLength)
