@@ -124,9 +124,14 @@ const tracked = trackedPaths
 // is carved out of modules/ and infra/, so a list naming either of those and
 // not platform/ has a hole created by that migration, whatever it meant to
 // cover. That is the exact shape that silently dropped 19 tests.
-// A feature folder that shares its name with a settings section (gestures
-// now; hotstrings, metrics, shortcuts later) is not listed: the section lists
-// of the settings and menus name it beside ui, and they are no tree scans.
+// A feature folder that shares its name with a settings section is not listed:
+// the section lists of the settings and menus name it beside ui, and they are
+// no tree scans. The structure step's folder gain adds it here because this
+// list names modules; take it out again in the step's follow-up.
+// It does not count toward the two names that make a list a tree list either:
+// a config path ({ "hotstrings", "modules" }) or a diagnostics scope list
+// (["hotstrings", "ai", ...]) holds one real tree name beside it.
+const SECTION_FOLDERS = new Set(['gestures', 'hotstrings']);
 const REQUIRES_PLATFORM = [
 	'modules',
 	'infra',
@@ -138,8 +143,7 @@ const REQUIRES_PLATFORM = [
 	'ai',
 	'apps',
 	'clipboard',
-	'diagnostics',
-	'hotstrings'
+	'diagnostics'
 ];
 
 const incomplete = [];
@@ -152,7 +156,7 @@ for (const rel of tracked) {
 		let m;
 		while ((m = LIST_RE.exec(line))) {
 			const named = treesIn(m[0]);
-			if (named.length < 2) continue;
+			if (named.filter((t) => !SECTION_FOLDERS.has(t)).length < 2) continue;
 			if (!named.some((t) => REQUIRES_PLATFORM.includes(t))) continue;
 			if (named.includes('platform')) continue;
 			incomplete.push({ rel, line: line.trim().slice(0, 110), absent: ['platform'] });
