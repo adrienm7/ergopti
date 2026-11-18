@@ -690,7 +690,10 @@ ellipsis, the ê dead key, TextSender, predictions and paste already use
 A test of this contract pins `HSE_CascadeMaxArrows := 1`: with the default
 three arrows the engine resolves a chain before sending, and the interactive
 session's `foo bar final` (2026-11-17) was that cascade, not a level-0 burst
-reaching the I1 watcher.
+reaching the I1 watcher. A Backspace right after an expansion is the undo
+(backspace-undo): it restores the trigger without its end character and leaves
+`HSE_Buffer` empty, so a test that wants one character removed must type
+something else first.
 
 The SendEvent fallback is not atomic, and the driver made it slow: AutoHotkey
 reverts with a key delay of -1 but a press duration of 0 whenever the script's
