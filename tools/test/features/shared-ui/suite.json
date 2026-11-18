@@ -589,6 +589,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-heat-scale.cjs"],
 			"repro": "npm run test:heat-scale"
+		},
+		{
+			"id": "app-windows-accessibility-ratchet",
+			"ordinal": 697,
+			"name": "the app windows accessibility ratchet refuses new violations and walk problems, its baseline is well formed, every window page is audited and each fixture posts to its page's bridge",
+			"cmd": "node",
+			"args": ["tools/test/test-app-windows-accessibility-ratchet.cjs"],
+			"repro": "npm run test:app-windows-accessibility-ratchet"
 		}
 	]
 }

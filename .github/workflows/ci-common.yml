@@ -351,6 +351,9 @@ jobs:
       - name: Test the Studio keyboard walk
         run: npm run test:browser:studio-keyboard
 
+      - name: Test the app windows accessibility
+        run: npm run test:browser:app-accessibility
+
       - name: Test shared prompt editor initialization
         run: npm run test:browser:prompt-editor-initialization
 

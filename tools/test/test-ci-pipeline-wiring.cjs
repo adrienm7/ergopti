@@ -3266,7 +3266,8 @@ function commonProblems(files) {
 		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install'],
 		['Test shared layout editor page', 'npm run test:browser:layout-editor'],
 		['Test shared layout optimizer page', 'npm run test:browser:layout-optimizer'],
-		['Test the Studio keyboard walk', 'npm run test:browser:studio-keyboard']
+		['Test the Studio keyboard walk', 'npm run test:browser:studio-keyboard'],
+		['Test the app windows accessibility', 'npm run test:browser:app-accessibility']
 	])
 		exactStep(browser, name, command);
 	if (browser) {

@@ -110,6 +110,9 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Real Chromium walks the Studio pages with Tab and Shift+Tab in its own step
 	// of Core / js; test-ci-pipeline-wiring.cjs pins that step.
 	'tools/test/browser/studio-keyboard.playwright.cjs',
+	// Real Chromium scans and walks the app's own WebView windows with a fake host
+	// in its own step of Core / js; test-ci-pipeline-wiring.cjs pins that step.
+	'tools/test/browser/app-windows-accessibility.playwright.cjs',
 	// Actual Chromium/WebKit rendering runs separately in mandatory Core / js;
 	// test-ci-pipeline-wiring.cjs rejects missing or redirected browser execution.
 	'tools/test/browser/physical-shortcuts.playwright.cjs',
