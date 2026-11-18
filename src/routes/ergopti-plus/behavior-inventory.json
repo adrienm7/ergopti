@@ -25,7 +25,7 @@
 				{
 					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
 					"symbol": "HSE_TryRepeatKey(MagicKey)",
-					"sha256": "62b7fd8ba4b086763c9e0af570fc863f9c98fb15a86c6ed26f171100a6335fbb"
+					"sha256": "31ae8e4e1d45766cfeeac25d0e1b9174e66cb84d6cbc6240b50b5314278a1da4"
 				}
 			],
 			"macos": [
@@ -80,7 +80,7 @@
 				{
 					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
 					"symbol": "HSE_UndoExpansion(Undo",
-					"sha256": "412214f21cc2bbcfa0ec98fc468e3a9a7f5bd1151ab784e67f77b9e7c216eebe"
+					"sha256": "2903dd9aa1369217f50069d3d3fe8cc5a91c0cd14bdcdd8d97e444f01fd6391f"
 				}
 			],
 			"macos": [
@@ -130,7 +130,7 @@
 				{
 					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
 					"symbol": "HSE_TryRepeatKey(MagicKey)",
-					"sha256": "62b7fd8ba4b086763c9e0af570fc863f9c98fb15a86c6ed26f171100a6335fbb"
+					"sha256": "31ae8e4e1d45766cfeeac25d0e1b9174e66cb84d6cbc6240b50b5314278a1da4"
 				}
 			],
 			"macos": [
@@ -182,12 +182,12 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "a17138aaf6f33716723ac32d702e099db9c70aa6f07f4166aa837a75473e13af"
+					"sha256": "8bab67f3e58a0e5a530ea444fe2e229d3091aea275d906afc1935da8b0c1ec56"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "c446174c014c3e129354dde16c420333993f65ab878390a51a228ca5e7673886"
+					"sha256": "d1b40305db94364b31a35075589ab824c0a08dd2c218b403fcd74b35d2afbac1"
 				}
 			],
 			"macos": [
@@ -206,7 +206,7 @@
 				{
 					"file": "static/ergopti_plus/linux/platform/input/keyboard_hook.lua",
 					"symbol": "local function _dispatch_post_remap(ev, source)",
-					"sha256": "a1292bfe3e9067e2dc2d2fb9818bb3573f8d2d3c48e3256452b80b161cf94f5d"
+					"sha256": "f164d946153abffcf6005b4606fef370b4b0e3df4328bc79d70f83f2251d4cab"
 				}
 			]
 		}
@@ -237,12 +237,12 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "a17138aaf6f33716723ac32d702e099db9c70aa6f07f4166aa837a75473e13af"
+					"sha256": "8bab67f3e58a0e5a530ea444fe2e229d3091aea275d906afc1935da8b0c1ec56"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "c446174c014c3e129354dde16c420333993f65ab878390a51a228ca5e7673886"
+					"sha256": "d1b40305db94364b31a35075589ab824c0a08dd2c218b403fcd74b35d2afbac1"
 				}
 			],
 			"macos": [
@@ -284,12 +284,12 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "a17138aaf6f33716723ac32d702e099db9c70aa6f07f4166aa837a75473e13af"
+					"sha256": "8bab67f3e58a0e5a530ea444fe2e229d3091aea275d906afc1935da8b0c1ec56"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "c446174c014c3e129354dde16c420333993f65ab878390a51a228ca5e7673886"
+					"sha256": "d1b40305db94364b31a35075589ab824c0a08dd2c218b403fcd74b35d2afbac1"
 				}
 			],
 			"macos": [
@@ -308,7 +308,7 @@
 				{
 					"file": "static/ergopti_plus/linux/platform/input/keyboard_hook.lua",
 					"symbol": "local function _dispatch_post_remap(ev, source)",
-					"sha256": "a1292bfe3e9067e2dc2d2fb9818bb3573f8d2d3c48e3256452b80b161cf94f5d"
+					"sha256": "f164d946153abffcf6005b4606fef370b4b0e3df4328bc79d70f83f2251d4cab"
 				}
 			]
 		}
@@ -336,7 +336,7 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_Press(Sc, Shift, Caps, Option)",
-					"sha256": "c446174c014c3e129354dde16c420333993f65ab878390a51a228ca5e7673886"
+					"sha256": "d1b40305db94364b31a35075589ab824c0a08dd2c218b403fcd74b35d2afbac1"
 				}
 			],
 			"macos": [
