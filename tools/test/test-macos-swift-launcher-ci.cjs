@@ -181,9 +181,11 @@ check(
 );
 // Fail fast: a red Hammerspoon Unit, Integration or E2E suite spends no macOS
 // packaging minutes. The stages are strictly sequential, so Build needs E2E,
-// which needs Integration, which needs every Unit cell.
+// which needs Integration, which needs every Unit cell. E2E is two jobs: the
+// managed Ollama builds, then the cells that receive them.
 check(
-	JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) === JSON.stringify(['e2e-hs']),
+	JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) ===
+		JSON.stringify(['e2e-ollama-build', 'e2e-hs']),
 	`package-macos must need exactly the E2E suite it admits, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`
 );
 

@@ -100,11 +100,20 @@ function receiveSdkCensus(step, census) {
 
 function macRoleBody(body, role, expectedCount) {
 	const parent = role === 'cold-bootstrap-native' ? 'package-macos' : 'integration-hs';
-	const matrix = role === 'cold-bootstrap-native' ? 'testbuild_matrix' : 'e2e_matrix';
+	const build = role === 'managed-ollama-build';
+	const matrix =
+		role === 'cold-bootstrap-native'
+			? 'testbuild_matrix'
+			: build
+				? 'e2e_ollama_build_matrix'
+				: 'e2e_matrix';
 	const metadata = role === 'cold-bootstrap-native' ? 'testbuild_metadata' : 'e2e_metadata';
 	const selected = `fromJSON(needs.${parent}.outputs.${metadata})[matrix.lot]`;
-	// Each stage waits for the one before it, which supplies its lot plan.
-	const predecessors = [parent];
+	// Each stage waits for the one before it, which supplies its lot plan. A
+	// matrix cell cannot need another cell, so the E2E cells that receive a
+	// managed Ollama build also need the job of the builds.
+	const predecessors =
+		role === 'cold-bootstrap-native' || build ? [parent] : [parent, 'e2e-ollama-build'];
 	assert.equal(pipeline.field(body, 'needs'), predecessors.map((need) => '- ' + need).join(' '));
 	assert.deepEqual(pipeline.needsOf(body), predecessors);
 	assert.equal(pipeline.field(body, 'runs-on'), '${{ ' + selected + '.runner }}');
@@ -1046,13 +1055,15 @@ for (const [job, platform] of [
 	);
 }
 /** Requires actual native Ollama inputs and receiving before Brew can fail. */
-function checkManagedOllamaNative(body) {
+function checkManagedOllamaNative(body, buildBody) {
 	const role = macRoleBody(body, 'managed-ollama-native', 39);
-	// The clean source build runs in its own parallel cell of the same stage.
-	const producer = macRoleBody(body, 'managed-ollama-build', 9);
+	// The clean source build runs in a cell of its own job, which the
+	// receiving job needs: a matrix cell cannot need another cell.
+	const producer = macRoleBody(buildBody, 'managed-ollama-build', 9);
+	assert.throws(() => Mac.selected(body, 'managed-ollama-build'), /Missing Mac role/);
 	for (const step of [
 		...Mac.selected(body, 'managed-ollama-native'),
-		...Mac.selected(body, 'managed-ollama-build')
+		...Mac.selected(buildBody, 'managed-ollama-build')
 	]) {
 		assert.match(step.body, /^          GOTOOLCHAIN: 'local'$/m);
 		assert.match(step.body, /^          ERGOPTI_RELEASE_TAG: '\$\{\{ inputs\.tag \}\}'$/m);
@@ -1173,7 +1184,8 @@ function checkManagedOllamaNative(body) {
 	assert.doesNotMatch(role, /gh release|softprops\/action-gh-release|createRelease|--cross/);
 }
 const managedOllamaNative = pipeline.job(Mac.stage['managed-ollama-native']);
-checkManagedOllamaNative(managedOllamaNative);
+const managedOllamaBuild = pipeline.job(Mac.stage['managed-ollama-build']);
+checkManagedOllamaNative(managedOllamaNative, managedOllamaBuild);
 assert.deepEqual(pipeline.needsOf(pipeline.job('macos-ok')), ['launch']);
 assert.match(
 	pipeline.step(pipeline.job('macos-ok'), 'Require the complete source-bound stage chain'),
@@ -1227,9 +1239,17 @@ for (const [from, to] of [
 	['    name: E2E tests', '    if: inputs.release\n    name: E2E tests'],
 	['    name: E2E tests', '    continue-on-error: true\n    name: E2E tests']
 ]) {
-	const changed = managedOllamaNative.replace(from, to);
-	assert.notEqual(changed, managedOllamaNative, from);
-	assert.throws(() => checkManagedOllamaNative(changed), from);
+	// Each mutation is refused in every job that holds its text.
+	let mutated = 0;
+	for (const [native, build] of [
+		[managedOllamaNative.replace(from, to), managedOllamaBuild],
+		[managedOllamaNative, managedOllamaBuild.replace(from, to)]
+	]) {
+		if (native === managedOllamaNative && build === managedOllamaBuild) continue;
+		mutated++;
+		assert.throws(() => checkManagedOllamaNative(native, build), from);
+	}
+	assert.ok(mutated > 0, from);
 }
 
 for (const [job, name] of [

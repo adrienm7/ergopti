@@ -6,10 +6,13 @@
  * MODULE: Managed Ollama Native Build Handoff
  * DESCRIPTION:
  * The clean managed Ollama source build runs in its own macOS E2E cell,
- * "Managed Ollama build (<architecture>)", in parallel with the Swift and
- * XCTest qualification of the "Managed Ollama (<architecture>)" cell that
- * receives it. The build cell seals its exact outputs into one artifact; the
- * receiving cell waits for that artifact, then admits it only when every file
+ * "Managed Ollama build (<architecture>)", of the e2e-ollama-build job; the
+ * E2E job, whose "Managed Ollama (<architecture>)" cell receives it, needs that
+ * job, so the receiver starts only after every build ended (a matrix cell
+ * cannot need another cell, and a receiver that ran beside a queued build
+ * could time out waiting). The build cell seals its exact outputs into one
+ * artifact; the receiving cell finds that artifact, normally on its first
+ * poll, then admits it only when every file
  * is the sealed byte stream and the provenance binds this commit, this run,
  * this architecture and the bridge sources of the receiving checkout. Nothing
  * is cached: the producer still builds from a fresh Go cache on every run.

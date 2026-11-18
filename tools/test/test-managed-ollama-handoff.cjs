@@ -551,13 +551,18 @@ const workflow = YAML.parse(
 	fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8')
 );
 const e2e = workflow.jobs['e2e-hs'];
+const producerJob = workflow.jobs['e2e-ollama-build'];
 assert.equal(e2e.name, 'E2E tests');
+// The receivers' job needs the builds' job, so a receiver never races a
+// queued build; both keep the name the cell lookup reads.
+assert.equal(producerJob.name, e2e.name);
+assert.deepEqual(e2e.needs, ['integration-hs', 'e2e-ollama-build']);
 for (const architecture of ['arm64', 'amd64'])
 	assert.equal(
 		Handoff.producerJobSuffix(architecture),
 		'E2E tests (' + roleLot('e2e', 'managed-ollama-build', architecture, '') + ')'
 	);
-const hand = e2e.steps.find(
+const hand = producerJob.steps.find(
 	(step) => step.name === 'Hand the clean native source build to its receiving cell'
 );
 assert.equal(
@@ -570,7 +575,17 @@ assert.equal(
 );
 assert.equal(hand.with.path, '${{ runner.temp }}/managed-ollama-handoff');
 assert.deepEqual(e2e.permissions, { contents: 'read', actions: 'read' });
-const producerSteps = e2e.steps.filter((step) => /'managed-ollama-build'/.test(step.if ?? ''));
+// The builds read no run listing: only the receivers' job widens its token.
+assert.equal(producerJob.permissions, undefined);
+assert.deepEqual(
+	e2e.steps.filter((step) => /'managed-ollama-build'/.test(step.if ?? '')),
+	[],
+	'no build step stays beside its receivers'
+);
+const producerSteps = producerJob.steps.filter((step) =>
+	/'managed-ollama-build'/.test(step.if ?? '')
+);
+assert.ok(producerSteps.length > 5, 'the build job runs the clean build');
 assert.ok(
 	!producerSteps.some(
 		(step) => /actions\/cache/.test(step.uses ?? '') || /GOCACHE|GOMODCACHE/.test(step.run ?? '')
@@ -596,7 +611,7 @@ assert.equal(
 	['managed-ollama-inputs', 'amd64', SHA, '42'].join('-')
 );
 const build = workflow.jobs['package-macos'];
-assert.deepEqual(build.needs, ['e2e-hs'], 'the build runs after E2E');
+assert.deepEqual(build.needs, ['e2e-ollama-build', 'e2e-hs'], 'the build runs after E2E');
 assert.deepEqual(build.permissions, { contents: 'read', actions: 'read' });
 const names = build.steps.map((step) => step.name);
 const awaiting = names.indexOf('Await both source-qualified native producer inputs');

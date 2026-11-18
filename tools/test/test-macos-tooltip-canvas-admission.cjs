@@ -102,7 +102,7 @@ for (const job of ['managed-ollama-native', 'cold-bootstrap-native']) {
 
 const canvasStage = pipeline.job('e2e-hs');
 const canvas = macRole.body(pipeline.file('.github/workflows/ci-macos.yml'), 'tooltip-canvas');
-assert.deepEqual(pipeline.needsOf(canvasStage), ['integration-hs']);
+assert.deepEqual(pipeline.needsOf(canvasStage), ['integration-hs', 'e2e-ollama-build']);
 assert.equal(
 	pipeline.field(canvasStage, 'runs-on'),
 	'${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].runner }}'

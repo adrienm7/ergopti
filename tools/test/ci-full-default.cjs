@@ -37,6 +37,7 @@ const JOBS = [
 	],
 	['.github/workflows/ci-macos.yml', 'test-hs', null],
 	['.github/workflows/ci-macos.yml', 'integration-hs', null],
+	['.github/workflows/ci-macos.yml', 'e2e-ollama-build', null],
 	['.github/workflows/ci-macos.yml', 'e2e-hs', null],
 	['.github/workflows/ci-macos.yml', 'package-macos', null],
 	['.github/workflows/ci-macos.yml', 'launch', null],
@@ -123,31 +124,31 @@ const FULL_STEPS = [
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'e2e-hs',
+		'e2e-ollama-build',
 		'Prepare genuine pinned Go toolchain',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'e2e-hs',
+		'e2e-ollama-build',
 		'Acquire and verify genuine pinned upstream inputs',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'e2e-hs',
+		'e2e-ollama-build',
 		'Build and admit the actual native source asset',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'e2e-hs',
+		'e2e-ollama-build',
 		'Seal the clean native source build for its receiving cell',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled() && steps.ollama-native-producer.outcome == 'success') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'e2e-hs',
+		'e2e-ollama-build',
 		'Hand the clean native source build to its receiving cell',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled() && steps.ollama-native-seal.outcome == 'success') }}"
 	],

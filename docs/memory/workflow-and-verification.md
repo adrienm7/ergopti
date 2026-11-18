@@ -386,15 +386,23 @@ graph and no macOS minutes spent packaging a commit whose E2E is red. The
 macOS 26 launcher XCTest and the native probes of the build host left Build for
 the E2E cell `launcher-native` (measured in run 40176334355: about ten minutes
 of the 16 Build spent outside its input wait), so Build only builds, packages
-and signs, in about six minutes on a non-release run. The E2E plan starts the
-stage's longest chain first: the Intel build, the Intel XCTest cell and the
-Intel runtime receiving that waits for the build, then the Apple silicon build
-and native cell, then the launcher cell, with the short tooltip cell and the
-dispatch-only cells last (run 40498535042: the Intel XCTest cell queued 8.7
-minutes behind short cells and ended the stage). The launcher cell's move out
+and signs, in about six minutes on a non-release run. The two clean managed
+Ollama builds run in their own job, `e2e-ollama-build`, which `e2e-hs` and
+Build need: a matrix cell cannot `needs` another cell, and in run 44072500520
+the Intel receiving cell, polling beside a build still queued for a runner, hit
+its 45-minute bound ("handoff never arrived"). Every E2E cell now starts after
+both builds (the Intel build took about 12 minutes there), a few minutes more
+on the stage in exchange for a receiver that cannot race its producer;
+`macos-stage-roles.cjs` STAGE_JOBS owns the split and both jobs keep the name
+"E2E tests", which the handoff's cell lookup reads. Inside each job the plan
+starts the longest cells first: the Intel build, then the Intel XCTest and
+runtime cells, the Apple silicon native cell, the launcher cell, with the short
+tooltip cell and the dispatch-only cells last (run 40498535042: the Intel
+XCTest cell queued 8.7 minutes behind short cells and ended the stage). The launcher cell's move out
 of Build traded about one more macOS runner-minute per run (a second job's
 setup) for a critical path about 7 to 10 minutes shorter.
-On a push E2E now holds seven macOS cells for five runners. The Intel
+On a push E2E holds seven macOS cells for five runners, two builds then five
+cells, so neither of its jobs queues a macOS cell. The Intel
 managed native role still runs its XCTest cohorts in a second cell, and the
 test build runs four launch lots (scenarios in turn, a proved fresh runner
 between them via `macos_launch_reset.py`) beside the cold cell: five macOS

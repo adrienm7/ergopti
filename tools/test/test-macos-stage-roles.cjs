@@ -25,13 +25,18 @@ const host = (cell) => ({
 	os: cell.runner === 'ubuntu-latest' ? 'linux' : 'darwin',
 	architecture: cell.architecture === 'amd64' ? 'x64' : 'arm64'
 });
-/** The successful direct predecessor aggregates a receiving stage is given. */
+/**
+ * The successful direct aggregates the job of a receiving stage's first cell
+ * is given: every job of the predecessor stages, then the jobs of its own
+ * stage it needs (the E2E job needs the managed Ollama build job).
+ */
 function needsOf(receiver, result = 'success') {
+	const job = roles.jobOf(receiver, roles.plan(receiver, context)[0]);
 	return Object.fromEntries(
-		roles.PREDECESSORS[receiver].map((stage) => [
-			roles.JOBS[roles.STAGES.indexOf(stage)],
-			{ result }
-		])
+		[
+			...roles.PREDECESSORS[receiver].flatMap((stage) => roles.STAGE_JOBS[stage]),
+			...(roles.JOB_NEEDS[job] ?? [])
+		].map((name) => [name, { result }])
 	);
 }
 /** Admits one receiving stage from its predecessors' receipts, as the workflow does. */
@@ -67,28 +72,48 @@ check('exact six visible jobs with only their declared predecessor edges', () =>
 	const workflow = YAML.parse(
 		fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'), 'utf8')
 	);
-	const jobs = ['test-hs', 'integration-hs', 'e2e-hs', 'package-macos', 'launch', 'macos-ok'];
+	const jobs = [
+		'test-hs',
+		'integration-hs',
+		'e2e-ollama-build',
+		'e2e-hs',
+		'package-macos',
+		'launch',
+		'macos-ok'
+	];
 	assert.deepEqual(Object.keys(workflow.jobs), jobs);
+	assert.deepEqual(
+		roles.STAGES.flatMap((stage) => roles.STAGE_JOBS[stage]),
+		jobs.slice(0, -1),
+		'Every stage job, in workflow order'
+	);
 	const needs = {
 		'test-hs': [],
 		'integration-hs': ['test-hs'],
-		'e2e-hs': ['integration-hs'],
-		'package-macos': ['e2e-hs'],
+		// A matrix cell cannot need another cell: the cells that receive a
+		// managed Ollama build need the job that builds it.
+		'e2e-ollama-build': ['integration-hs'],
+		'e2e-hs': ['integration-hs', 'e2e-ollama-build'],
+		'package-macos': ['e2e-ollama-build', 'e2e-hs'],
 		launch: ['package-macos'],
 		'macos-ok': ['launch']
 	};
-	for (const [index, stage] of roles.STAGES.entries())
-		assert.deepEqual(
-			needs[roles.JOBS[index]],
-			roles.PREDECESSORS[stage].map((name) => roles.JOBS[roles.STAGES.indexOf(name)]),
-			'The workflow edges are the stage predecessors'
-		);
+	for (const stage of roles.STAGES)
+		for (const job of roles.STAGE_JOBS[stage])
+			assert.deepEqual(
+				needs[job],
+				[
+					...roles.PREDECESSORS[stage].flatMap((name) => roles.STAGE_JOBS[name]),
+					...(roles.JOB_NEEDS[job] ?? [])
+				],
+				'The workflow edges are the stage predecessors and the same-stage needs'
+			);
 	for (const id of jobs) {
 		assert.deepEqual(workflow.jobs[id].needs || [], needs[id]);
 		const ids = workflow.jobs[id].steps.filter((step) => step.id).map((step) => step.id);
 		assert.equal(ids.length, new Set(ids).size, 'Merged roles must retain unique step IDs');
 	}
-	for (const id of ['e2e-hs', 'launch'])
+	for (const id of ['e2e-ollama-build', 'e2e-hs', 'launch'])
 		assert.equal(workflow.jobs[id].strategy['fail-fast'], false);
 	// The Unit matrix is exactly the Lua runner's module groups, in order.
 	assert.deepEqual(workflow.jobs['test-hs'].strategy, {
@@ -105,7 +130,7 @@ check('exact six visible jobs with only their declared predecessor edges', () =>
 		(step) => step.name === 'Verify mandatory jobs and launch scenarios'
 	);
 	assert.equal(verifier.env.NEEDS, '${{ steps.stage-verdict.outputs.needs }}');
-	for (const id of ['integration-hs', 'e2e-hs', 'package-macos', 'launch']) {
+	for (const id of ['integration-hs', 'e2e-ollama-build', 'e2e-hs', 'package-macos', 'launch']) {
 		const steps = workflow.jobs[id].steps;
 		assert.ok(
 			steps
@@ -145,6 +170,82 @@ check('push E2E includes every mandatory role and both managed architectures', (
 		['amd64', 'other']
 	])
 		assert.throws(() => roles.roleLot('e2e', 'managed-ollama-native', architecture, scenario));
+});
+check('managed Ollama receivers need the job of the clean builds they receive', () => {
+	// Run 44072500520: the Intel receiver, a cell of the same matrix as its
+	// build, polled for a handoff that never arrived within its bound.
+	const push = roles.displayPlan('e2e', context).matrix.lot;
+	const builds = [
+		'Managed Ollama build (macOS 15, Intel)',
+		'Managed Ollama build (macOS 15, Apple silicon)'
+	];
+	assert.deepEqual(roles.jobMatrices('e2e', context), {
+		'e2e-ollama-build': { lot: builds },
+		'e2e-hs': { lot: push.filter((lot) => !builds.includes(lot)) }
+	});
+	assert.equal(roles.matrixOutput('e2e', 'e2e-hs'), 'e2e_matrix');
+	assert.equal(roles.matrixOutput('e2e', 'e2e-ollama-build'), 'e2e_ollama_build_matrix');
+	assert.equal(roles.matrixOutput('testbuild', 'launch'), 'testbuild_matrix');
+	assert.throws(() => roles.matrixOutput('e2e', 'launch'), /Unknown stage job/);
+	for (const cell of roles
+		.plan('e2e', context)
+		.filter((row) => row.role === 'managed-ollama-native')) {
+		const build = roles
+			.plan('e2e', context)
+			.find((row) => row.role === 'managed-ollama-build' && row.architecture === cell.architecture);
+		assert.ok(roles.JOB_NEEDS[roles.jobOf('e2e', cell)].includes(roles.jobOf('e2e', build)));
+	}
+	const displayed = roles.displayPlan('e2e', context);
+	const receiver = 'Managed Ollama (macOS 15, Intel)';
+	const builder = 'Managed Ollama build (macOS 15, Intel)';
+	assert.equal(roles.lotJob('e2e', receiver, displayed.metadata, context), 'e2e-hs');
+	assert.equal(roles.lotJob('e2e', builder, displayed.metadata, context), 'e2e-ollama-build');
+	assert.equal(roles.lotJob('build', undefined, undefined, context), 'package-macos');
+	assert.throws(
+		() => roles.lotJob('e2e', 'foreign', displayed.metadata, context),
+		/Missing or foreign human lot/
+	);
+	const admit = (lot, needs) =>
+		roles.admit('e2e', lot, displayed.metadata, needs, context, 1, () => completed.all.integration);
+	const integration = { 'integration-hs': { result: 'success' } };
+	assert.doesNotThrow(() => admit(builder, integration));
+	assert.throws(
+		() => admit(builder, { ...integration, 'e2e-ollama-build': { result: 'success' } }),
+		/Closed stage/
+	);
+	assert.throws(() => admit(receiver, integration), /Closed stage/);
+	for (const result of ['failure', 'cancelled', 'skipped'])
+		assert.throws(
+			() => admit(receiver, { ...integration, 'e2e-ollama-build': { result } }),
+			/Direct predecessor aggregate/
+		);
+	assert.doesNotThrow(() =>
+		admit(receiver, { ...integration, 'e2e-ollama-build': { result: 'success' } })
+	);
+	// Build admits every E2E job, the build job included.
+	assert.throws(
+		() => roles.aggregate({ 'e2e-hs': { result: 'success' } }, ['e2e']),
+		/Closed stage/
+	);
+	const workflow = YAML.parse(
+		fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'), 'utf8')
+	);
+	const built = (id) =>
+		workflow.jobs[id].steps.filter((step) =>
+			(step.if ?? '').includes("env.MACOS_STAGE_ROLE == 'managed-ollama-build'")
+		);
+	assert.ok(built('e2e-ollama-build').length > 5, 'The build job runs the build role');
+	assert.deepEqual(built('e2e-hs'), [], 'The receiving job keeps no build step');
+	assert.equal(
+		workflow.jobs['e2e-ollama-build'].strategy.matrix,
+		'${{ fromJSON(needs.integration-hs.outputs.e2e_ollama_build_matrix) }}'
+	);
+	assert.equal(
+		workflow.jobs['integration-hs'].outputs.e2e_ollama_build_matrix,
+		'${{ steps.stage-plan.outputs.e2e_ollama_build_matrix }}'
+	);
+	// Both jobs keep the static E2E name, so the handoff finds its cells by lot.
+	assert.equal(workflow.jobs['e2e-ollama-build'].name, workflow.jobs['e2e-hs'].name);
 });
 /** The managed native steps one cell of each scenario actually runs. */
 function managedNativeSteps(workflow) {
@@ -506,7 +607,11 @@ check('existing scope owner admits every retained Mac command after address relo
 // One more than the single-cell Unit: a duplicate Unit row now replaces a mandatory group;
 // one more for the Intel managed native split; eighteen for the Integration stage's own
 // aggregate and receipt refusals.
-assert.equal(controls, 104, 'all original stage and receipt controls remain present');
+assert.equal(
+	controls,
+	105,
+	'all original stage and receipt controls and the managed Ollama build job control remain present'
+);
 check('Unit lots are the module groups, each one complete stubbed cell', () => {
 	const groups = roles.unitGroups();
 	// Deliberately narrow: these are the macOS shard GROUP names, not source trees
@@ -776,7 +881,7 @@ for (const receiver of ['integration', 'e2e', 'build', 'testbuild']) {
 					let reads = 0;
 					const needs = {
 						...needsOf(receiver),
-						[roles.JOBS[roles.STAGES.indexOf(stage)]]: { result }
+						...Object.fromEntries(roles.STAGE_JOBS[stage].map((job) => [job, { result }]))
 					};
 					assert.throws(
 						() =>
@@ -857,7 +962,7 @@ check('recording refuses another valid cell under the selected human lot', () =>
 		/Selected human lot and receipt cell differ/
 	);
 });
-assert.equal(controls, 163, 'original controls and human lot transport controls all execute');
+assert.equal(controls, 164, 'original controls and human lot transport controls all execute');
 check('role labels retain the independent authored human names without runtime metadata', () => {
 	for (const [stage, role, architecture, scenario, expected] of [
 		['unit', 'lua-unit-meta', 'stubbed', 'meta', 'meta'],
@@ -939,7 +1044,7 @@ check('full-cell human labels still reject incomplete cells and foreign fields',
 		/Closed stage receipt fields required/
 	);
 });
-assert.equal(controls, 166, 'all original, human lot transport and role-label controls execute');
+assert.equal(controls, 167, 'all original, human lot transport and role-label controls execute');
 /** Admit the Unit group matrix while preserving its complete receipt-producing source chain. */
 function assertLiteralUnit(source) {
 	const job = YAML.parse(source, { uniqueKeys: true }).jobs['test-hs'];
@@ -1043,6 +1148,7 @@ function assertLiteralIntegration(source) {
 			needs: ['test-hs'],
 			outputs: {
 				e2e_matrix: '${{ steps.stage-plan.outputs.e2e_matrix }}',
+				e2e_ollama_build_matrix: '${{ steps.stage-plan.outputs.e2e_ollama_build_matrix }}',
 				e2e_metadata: '${{ steps.stage-plan.outputs.e2e_metadata }}'
 			}
 		},
@@ -1405,8 +1511,8 @@ for (const [name, mutate] of [
 	});
 assert.equal(
 	controls,
-	200,
-	'all prior 166 controls, 25 Unit matrix controls and 9 Integration cell controls execute'
+	201,
+	'all prior 167 controls, 25 Unit matrix controls and 9 Integration cell controls execute'
 );
 
 /** The native composition validator needs the approved commit's complete HEAD ancestry. */
@@ -1457,8 +1563,8 @@ for (const [name, mutate] of [
 	});
 assert.equal(
 	controls,
-	207,
-	'all prior 200 controls and seven managed native history controls execute'
+	208,
+	'all prior 201 controls and seven managed native history controls execute'
 );
 
 // The stage graph is a chain: Build admits E2E and the test build admits Build.
@@ -1667,7 +1773,7 @@ check('an E2E older than its Integration predecessor is a backward lineage', () 
 		/Backward predecessor attempt lineage/
 	);
 });
-assert.equal(controls, 222, 'all prior 207 controls and fifteen stage graph controls execute');
+assert.equal(controls, 223, 'all prior 208 controls and fifteen stage graph controls execute');
 
 // Launch lots: four launch jobs beside the cold bootstrap, each scenario once.
 function checkLaunchLotLoop(workflow) {
@@ -1825,7 +1931,7 @@ check(
 		}
 	}
 );
-assert.equal(controls, 223, 'all prior 222 controls and the launch lot control execute');
+assert.equal(controls, 224, 'all prior 223 controls and the launch lot control execute');
 
 // Every macOS cell, job and repeated step states its macOS version from HOSTS.
 check('macOS cells name their version from one host table and refuse another', () => {
@@ -1883,7 +1989,7 @@ check('macOS cells name their version from one host table and refuse another', (
 	])
 		assert.throws(() => roles.confirmMacosVersion(selected, version));
 });
-assert.equal(controls, 224, 'all prior 223 controls and the macOS version control execute');
+assert.equal(controls, 225, 'all prior 224 controls and the macOS version control execute');
 
 // Build builds, packages and signs; its one test is the crash-on-launch smoke
 // test of the release archive, which gates the signature. Every test of the
@@ -2023,6 +2129,6 @@ check('Build only builds, packages and signs; the launcher cell owns the build-h
 		assert.ok(buildTestProblems(moved).length > 0, label + ' must refuse');
 	}
 });
-assert.equal(controls, 225, 'all prior 224 controls and the Build purity control execute');
+assert.equal(controls, 226, 'all prior 225 controls and the Build purity control execute');
 
 console.log('macos-stage-roles: ' + controls + ' controls passed');

@@ -341,7 +341,9 @@ function admitItem36Selector(mac) {
 	)
 		return null;
 	if (
-		JSON.stringify(pipeline.needsOf(job)) !== JSON.stringify(['integration-hs']) ||
+		// The E2E job also needs the managed Ollama build job its receivers read.
+		JSON.stringify(pipeline.needsOf(job)) !==
+			JSON.stringify(['integration-hs', 'e2e-ollama-build']) ||
 		pipeline.field(job, 'runs-on') !==
 			'${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].runner }}' ||
 		pipeline.field(job, 'timeout-minutes') !==

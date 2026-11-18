@@ -8,7 +8,25 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { parseClosedJson, LAUNCH_QUALIFICATION_MATRIX } = require('./dev-release-qualification.cjs');
 const STAGES = ['unit', 'integration', 'e2e', 'build', 'testbuild'];
-const JOBS = ['test-hs', 'integration-hs', 'e2e-hs', 'package-macos', 'launch'];
+/**
+ * The jobs of each stage, in workflow order. A matrix cell cannot need another
+ * cell, so the clean managed Ollama builds run in a job of their own that the
+ * E2E job needs: the cells that receive a build start only once it is sealed,
+ * instead of polling for an artifact whose producer may still be queued behind
+ * the account's five macOS runners (the Intel handoff of run 44072500520
+ * never arrived within the receiver's bound).
+ */
+const STAGE_JOBS = Object.freeze({
+	unit: Object.freeze(['test-hs']),
+	integration: Object.freeze(['integration-hs']),
+	e2e: Object.freeze(['e2e-ollama-build', 'e2e-hs']),
+	build: Object.freeze(['package-macos']),
+	testbuild: Object.freeze(['launch'])
+});
+/** The roles a job runs when its stage has several jobs; the stage's other job runs every other role. */
+const JOB_ROLES = Object.freeze({ 'e2e-ollama-build': Object.freeze(['managed-ollama-build']) });
+/** The jobs of its own stage a job needs, beside the jobs of the predecessor stages. */
+const JOB_NEEDS = Object.freeze({ 'e2e-hs': Object.freeze(['e2e-ollama-build']) });
 /**
  * The stages each stage admits directly. The lane is strictly sequential:
  * Integration follows Unit, E2E follows Integration, Build packages only after
@@ -162,20 +180,19 @@ function plan(stage, context) {
 	// for real: one cell, on the stubbed host like the unit cells.
 	if (stage === 'integration') return [cell('lua-integration', 'stubbed', 20, INTEGRATION_GROUP)];
 	// Each managed-ollama-build cell runs the clean native source build of the
-	// managed-ollama-native cell of its architecture, beside it; the sealed bytes
-	// travel through tools/ci/managed-ollama-handoff.cjs.
+	// managed-ollama-native cell of its architecture in the e2e-ollama-build job,
+	// which the E2E job needs (STAGE_JOBS); the sealed bytes travel through
+	// tools/ci/managed-ollama-handoff.cjs.
 	// The Intel managed-ollama-native role runs as two cells: its XCTest cohorts
-	// ("xctest") beside the runtime receiving ("runtime"), which waits for the
-	// clean build anyway. Apple silicon keeps one cell that runs both.
+	// ("xctest") beside the runtime receiving ("runtime"). Apple silicon keeps
+	// one cell that runs both.
 	// launcher-native runs the full launcher XCTest and the native probes on the
 	// build host, so Build only builds, packages and signs.
-	// The account runs five macOS jobs at a time and starts them in this order.
-	// The longest chain is Intel: its build, then the runtime receiving that
-	// waits for it, beside the Intel XCTest cell (about 13 min on run
-	// 40498535042, where it queued 8.7 min behind short cells). The Intel cells
-	// and the two builds therefore take the first five runners; the launcher
-	// cell follows, and the short tooltip cell and the dispatch-only cells come
-	// last.
+	// The account runs five macOS jobs at a time and starts each job's cells in
+	// this order: the Intel build first, the longest of the two builds (about
+	// 12 min on run 44072500520); then the Intel cells, the launcher cell (the
+	// longest E2E cell, about 16 min), and the short tooltip cell and the
+	// dispatch-only cells last.
 	if (stage === 'e2e') {
 		const rows = [
 			cell('e2e-hs', 'stubbed', 360),
@@ -377,6 +394,45 @@ function displayPlan(stage, context) {
 	};
 }
 
+/** The job of its stage that runs one cell: the job owning its role, else the stage's general job. */
+function jobOf(stage, selected) {
+	assert.ok(STAGES.includes(stage), 'Unknown stage');
+	const owners = STAGE_JOBS[stage].filter((job) => JOB_ROLES[job]?.includes(selected.role));
+	if (owners.length === 1) return owners[0];
+	const general = STAGE_JOBS[stage].filter((job) => !Object.hasOwn(JOB_ROLES, job));
+	assert.equal(general.length, 1, 'One general job per stage');
+	return general[0];
+}
+
+/** The job output carrying one job's lot matrix: the general job keeps the stage's name. */
+function matrixOutput(stage, job) {
+	assert.ok(STAGES.includes(stage) && STAGE_JOBS[stage].includes(job), 'Unknown stage job');
+	return (Object.hasOwn(JOB_ROLES, job) ? job.replace(/-/g, '_') : stage) + '_matrix';
+}
+
+/** Splits one stage's lots by the job that runs them, every job keeping the plan order. */
+function jobMatrices(stage, context) {
+	const displayed = displayPlan(stage, context);
+	const matrices = Object.fromEntries(
+		STAGE_JOBS[stage].map((job) => [
+			job,
+			{
+				lot: displayed.matrix.lot.filter((lot) => jobOf(stage, displayed.metadata[lot]) === job)
+			}
+		])
+	);
+	// GitHub refuses a matrix job without a row instead of skipping it.
+	for (const [job, matrix] of Object.entries(matrices))
+		assert.ok(matrix.lot.length > 0, 'Job ' + job + ' has no lot');
+	return matrices;
+}
+
+/** The job one admitted lot must run in, so a cell cannot run under a job that skipped its needs. */
+function lotJob(stage, lot, metadata, context) {
+	if (SINGLE_CELL_STAGES.includes(stage)) return STAGE_JOBS[stage][0];
+	return jobOf(stage, selectLot(stage, lot, metadata, context));
+}
+
 /** Refuses a partial or altered map before returning the unchanged canonical cell. */
 function selectLot(stage, lot, metadata, context) {
 	const expected = displayPlan(stage, context);
@@ -404,9 +460,11 @@ function admit(receiver, lot, metadata, needs, context, currentAttempt, receive)
 		['integration', 'e2e', 'build', 'testbuild'].includes(receiver),
 		'Unknown receiving stage'
 	);
-	if (!SINGLE_CELL_STAGES.includes(receiver)) selectLot(receiver, lot, metadata, context);
+	const job = SINGLE_CELL_STAGES.includes(receiver)
+		? STAGE_JOBS[receiver][0]
+		: jobOf(receiver, selectLot(receiver, lot, metadata, context));
 	const predecessors = PREDECESSORS[receiver];
-	const result = aggregate(needs, predecessors);
+	const result = aggregate(needs, predecessors, JOB_NEEDS[job] ?? []);
 	assert.equal(typeof receive, 'function', 'Missing prior receipt reader');
 	const receipts = receive();
 	assert.ok(Array.isArray(receipts), 'Prior stage receipts must be a list');
@@ -524,14 +582,19 @@ function validateChain(chain, beforeStage, context) {
 	return chain;
 }
 
-/** The direct GitHub matrix aggregates are admitted before any receipt is consumed. */
-function aggregate(needs, stages) {
+/**
+ * The direct GitHub matrix aggregates are admitted before any receipt is
+ * consumed: every job of the predecessor stages, plus the jobs of its own
+ * stage the receiving job needs (sameStage).
+ */
+function aggregate(needs, stages, sameStage = []) {
 	const names = typeof stages === 'string' ? [stages] : stages;
 	assert.ok(
 		Array.isArray(names) && names.length > 0 && names.every((stage) => STAGES.includes(stage)),
 		'Unknown predecessor stage'
 	);
-	const jobs = names.map((stage) => JOBS[STAGES.indexOf(stage)]);
+	assert.ok(Array.isArray(sameStage), 'Same-stage needs must be a list');
+	const jobs = [...names.flatMap((stage) => STAGE_JOBS[stage]), ...sameStage];
 	fields(needs, jobs);
 	for (const job of jobs)
 		assert.equal(needs[job].result, 'success', 'Direct predecessor aggregate did not succeed');
@@ -724,12 +787,12 @@ function main(args) {
 				'Build scenario output differs from canonical owner'
 			);
 		const displayed = displayPlan(stage, context);
+		const matrices = jobMatrices(stage, context);
 		fs.appendFileSync(
 			process.env.GITHUB_OUTPUT,
-			stage +
-				'_matrix=' +
-				JSON.stringify(displayed.matrix) +
-				'\n' +
+			STAGE_JOBS[stage]
+				.map((job) => matrixOutput(stage, job) + '=' + JSON.stringify(matrices[job]) + '\n')
+				.join('') +
 				stage +
 				'_metadata=' +
 				JSON.stringify(displayed.metadata) +
@@ -742,6 +805,18 @@ function main(args) {
 		fs.appendFileSync(process.env.GITHUB_OUTPUT, 'cell=' + JSON.stringify(selected) + '\n');
 	} else if (command === 'admit') {
 		assert.equal(args.length, 4);
+		assert.equal(
+			process.env.GITHUB_JOB,
+			lotJob(
+				stage,
+				process.env.MACOS_STAGE_LOT,
+				SINGLE_CELL_STAGES.includes(stage)
+					? undefined
+					: parseClosedJson(process.env.MACOS_STAGE_METADATA),
+				context
+			),
+			'The lot runs in another job of its stage'
+		);
 		// A macOS cell runs on the macOS version its job and lot names state.
 		if (process.platform === 'darwin')
 			confirmMacosVersion(
@@ -809,7 +884,9 @@ function main(args) {
 module.exports = {
 	unitGroups,
 	STAGES,
-	JOBS,
+	STAGE_JOBS,
+	JOB_ROLES,
+	JOB_NEEDS,
 	PREDECESSORS,
 	HOSTS,
 	macosName,
@@ -824,6 +901,10 @@ module.exports = {
 	humanLot,
 	roleLot,
 	displayPlan,
+	jobOf,
+	matrixOutput,
+	jobMatrices,
+	lotJob,
 	selectLot,
 	selectUnitLot,
 	admit,

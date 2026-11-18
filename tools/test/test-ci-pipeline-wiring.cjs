@@ -224,6 +224,7 @@ const LANE_JOB_NAMES = Object.freeze({
 	'test-hs': ['unit', null],
 	// One stubbed cell, so no matrix: the job names its subject.
 	'integration-hs': ['integration', 'Lua module wiring, stubbed hs'],
+	'e2e-ollama-build': ['e2e', null],
 	'e2e-hs': ['e2e', null],
 	// The macOS Build states the macOS version HOSTS assigns its runner.
 	'package-macos': [
@@ -1631,6 +1632,8 @@ const LUA_TIMING_RETENTION = [
 	}
 ];
 
+/** The jobs of its own stage a lot consumer also needs, authored independently of the roles owner. */
+const SAME_STAGE_NEEDS = Object.freeze({ 'e2e-hs': Object.freeze(['e2e-ollama-build']) });
 /** Admits only each matrix include and its exact authored stage-plan producer. */
 /** Bind every human-lot output read to its exact adjacent producer and closed field. */
 function lotTransport(source, rel) {
@@ -1642,6 +1645,15 @@ function lotTransport(source, rel) {
 		const routes =
 			rel === MACOS_BOX
 				? [
+						[
+							'integration-hs',
+							'e2e-ollama-build',
+							'stage-plan',
+							'e2e_ollama_build_matrix',
+							'e2e_metadata',
+							'Resolve exact E2E stage roles',
+							'node tools/ci/macos-stage-roles.cjs plan e2e'
+						],
 						[
 							'integration-hs',
 							'e2e-hs',
@@ -1699,8 +1711,10 @@ function lotTransport(source, rel) {
 		for (const [producer, consumer, id, matrix, metadata, name, run] of routes) {
 			const preceding = document.jobs[producer],
 				receiving = document.jobs[consumer];
-			// Every stage waits for the one stage before it, on every lane.
-			const predecessors = [producer];
+			// Every stage waits for the one stage before it, on every lane. A
+			// matrix cell cannot need another cell, so the Mac E2E job also needs
+			// the job of the managed Ollama builds its cells receive.
+			const predecessors = [producer, ...(SAME_STAGE_NEEDS[consumer] ?? [])];
 			assert.deepEqual(receiving.needs, predecessors, 'Exact immediate lot predecessor required');
 			const outputs =
 				id === 'site-plan' || id === 'install-plan' ? ['matrix', 'metadata'] : [matrix, metadata];
@@ -3677,8 +3691,11 @@ const LANE_GRAPHS = {
 	[MACOS_BOX]: [
 		['test-hs', [], 'unit'],
 		['integration-hs', ['test-hs'], 'integration'],
-		['e2e-hs', ['integration-hs'], 'e2e'],
-		['package-macos', ['e2e-hs'], 'build'],
+		// A matrix cell cannot need another cell: the managed Ollama builds run
+		// in their own E2E job, which the receiving E2E job and Build need.
+		['e2e-ollama-build', ['integration-hs'], 'e2e'],
+		['e2e-hs', ['integration-hs', 'e2e-ollama-build'], 'e2e'],
+		['package-macos', ['e2e-ollama-build', 'e2e-hs'], 'build'],
 		['launch', ['package-macos'], 'testbuild'],
 		['macos-ok', ['launch'], 'verdict']
 	],
@@ -3959,7 +3976,7 @@ for (const [rel, id, unit] of [
 		rel === MACOS_BOX
 			? id === 'integration-hs'
 				? `    needs:\n      - ${unit}\n    outputs:`
-				: `      actions: read\n    needs:\n      - ${unit}\n    runs-on: \${{ fromJSON(needs.${unit}`
+				: `      actions: read\n    needs:\n      - ${unit}\n      - e2e-ollama-build\n    runs-on: \${{ fromJSON(needs.${unit}`
 			: `    needs: [${unit}]\n`;
 	for (const suffix of ['    if: false\n', '    continue-on-error: true\n']) {
 		mustCatch(
@@ -3978,10 +3995,15 @@ for (const [rel, id, unit] of [
 
 errors.push(...graphProblems(pipeline.files()));
 // E2E needs Integration and Build needs E2E; both read Actions evidence, and each anchor names its own runner.
+// The receiving E2E job and Build also need the managed Ollama build job.
+const MACOS_E2E_NEEDS_BLOCK = '    needs:\n      - integration-hs\n      - e2e-ollama-build\n';
 const MACOS_E2E_NEEDS =
-	'      actions: read\n    needs:\n      - integration-hs\n    runs-on: ${{ fromJSON(needs.integration-hs';
+	'      actions: read\n' +
+	MACOS_E2E_NEEDS_BLOCK +
+	'    runs-on: ${{ fromJSON(needs.integration-hs';
+const MACOS_BUILD_NEEDS_BLOCK = '    needs:\n      - e2e-ollama-build\n      - e2e-hs\n';
 const MACOS_BUILD_NEEDS =
-	'      actions: read\n    needs:\n      - e2e-hs\n    runs-on: macos-latest\n';
+	'      actions: read\n' + MACOS_BUILD_NEEDS_BLOCK + '    runs-on: macos-latest\n';
 const MACOS_LAUNCH_NEEDS =
 	'    needs:\n      - package-macos\n    runs-on: ${{ fromJSON(needs.package-macos';
 const MACOS_INTEGRATION_NEEDS = '    needs:\n      - test-hs\n    outputs:\n';
@@ -4020,13 +4042,25 @@ for (const [what, rel, from, to] of [
 		'a sixth entry in the macOS lane',
 		MACOS_BOX,
 		MACOS_E2E_NEEDS,
-		MACOS_E2E_NEEDS.replace('    needs:\n      - integration-hs\n', '')
+		MACOS_E2E_NEEDS.replace(MACOS_E2E_NEEDS_BLOCK, '')
+	],
+	[
+		'macOS E2E stops waiting for the managed Ollama builds it receives',
+		MACOS_BOX,
+		MACOS_E2E_NEEDS,
+		MACOS_E2E_NEEDS.replace('      - e2e-ollama-build\n', '')
 	],
 	[
 		'macOS packaging stops waiting for E2E',
 		MACOS_BOX,
 		MACOS_BUILD_NEEDS,
-		MACOS_BUILD_NEEDS.replace('    needs:\n      - e2e-hs\n', '    needs: []\n')
+		MACOS_BUILD_NEEDS.replace(MACOS_BUILD_NEEDS_BLOCK, '    needs: []\n')
+	],
+	[
+		'macOS packaging stops admitting the managed Ollama build job',
+		MACOS_BOX,
+		MACOS_BUILD_NEEDS,
+		MACOS_BUILD_NEEDS.replace('      - e2e-ollama-build\n', '')
 	],
 	[
 		'macOS packaging waits for units only',
@@ -4050,7 +4084,7 @@ for (const [what, rel, from, to] of [
 		'native canvas stops waiting for integration tests',
 		MACOS_BOX,
 		MACOS_E2E_NEEDS,
-		MACOS_E2E_NEEDS.replace('    needs:\n      - integration-hs\n', '    needs: []\n')
+		MACOS_E2E_NEEDS.replace(MACOS_E2E_NEEDS_BLOCK, '    needs: []\n')
 	],
 	[
 		'native canvas stops waiting for E2E',
@@ -5034,7 +5068,7 @@ for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
 	}
 	const scopedAcquisition =
 		rel === MACOS_BOX &&
-		job === 'e2e-hs' &&
+		job === 'e2e-ollama-build' &&
 		name === 'Acquire and verify genuine pinned upstream inputs';
 	mustCatch(
 		`${job} ${name}: missing native evidence step`,
@@ -6135,7 +6169,8 @@ function reporterLifecycleProblems(files) {
 			const admissionAt = steps.indexOf(admission),
 				downloadAt = steps.indexOf(download);
 			if (
-				JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(['integration-hs']) ||
+				JSON.stringify(pipeline.needsOf(job.body)) !==
+					JSON.stringify(['integration-hs', 'e2e-ollama-build']) ||
 				pipeline.field(job.body, 'if') !== null ||
 				pipeline.field(job.body, 'continue-on-error') !== null ||
 				admissions.length !== 1 ||
@@ -9057,12 +9092,12 @@ for (const name of [
 		mustCatch(
 			`native producer diagnostic ${name}: invalid condition ${changed}`,
 			MACOS_BOX,
-			macConditionalPrefix(head, 'e2e-hs'),
+			macConditionalPrefix(head, 'e2e-ollama-build'),
 			head + `        if: ${changed}\n`,
 			stepProblems
 		);
 	}
-	const from = macConditionalPrefix(head, 'e2e-hs');
+	const from = macConditionalPrefix(head, 'e2e-ollama-build');
 	const source = rawSourceFiles.find((file) => file.rel === MACOS_BOX).text;
 	assert.equal(source.split(from).length - 1, 1, 'one exact native producer diagnostic step');
 	const swallowed = rawSourceFiles.map((file) =>
@@ -9077,7 +9112,7 @@ for (const name of [
 	);
 }
 
-// Model receiving owns one successful admission of the parallel clean build,
+// Model receiving owns one successful admission of the clean build it needs,
 // independently of earlier refusals.
 {
 	const files = pipeline.rawFiles();
