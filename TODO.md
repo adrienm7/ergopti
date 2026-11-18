@@ -49,7 +49,11 @@ every maintainer request here.
   copies and the npm cache regularly; compact the WSL disk image when no agent uses WSL (C: reached 2.8 GB free).
 - [ ] **CI reds left after verify run 44072500520** (decisions taken 2026-11-17):
   - macOS Intel « managed Ollama build handoff never arrived »: maintainer decision: make the consuming cell
-    `needs` the Intel build job and update `macos-stage-contract.json` with its review.
+    `needs` the Intel build job and update `macos-stage-contract.json` with its review. Done locally on
+    2026-11-18: both managed Ollama builds run in their own job `e2e-ollama-build`, which `e2e-hs` and Build
+    need (stage roles, admission, contract and tests updated); confirm on the next run that « macOS / E2E tests
+    (Managed Ollama build (macOS 15, Intel)) » ends before « macOS / E2E tests (Managed Ollama (macOS 15,
+    Intel)) » starts and that the receiver admits the handoff on its first poll.
   - Re-read the first complete run after these; keylayout owner pin and Menus « cold command section » to confirm.
 - [ ] **Exact-count ceilings in tests (maintainer: « ces tests avec seuil magic value c'est vraiment mauvais »).**
       `toml.flat_values` was raised to 1500/2600 on 2026-11-17 to unblock CI. Replace exact operation counts and
