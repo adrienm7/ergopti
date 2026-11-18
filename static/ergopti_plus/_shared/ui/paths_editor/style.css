@@ -47,8 +47,10 @@ h1 {
 	margin: 0 0 2px;
 }
 
+/* Every small text keeps 4.5:1 on its background (WCAG 1.4.3): grey-666
+   for the notes, the deep blue and brown for the tags and the save button. */
 .subtitle {
-	color: var(--theme-grey-888);
+	color: var(--theme-grey-666);
 	flex-shrink: 0;
 	font-size: 11px;
 	margin: 0 0 12px;
@@ -126,13 +128,13 @@ input[type='text']:focus {
 }
 
 input[type='text'].is-default {
-	color: var(--theme-grey-999);
+	color: var(--theme-grey-666);
 }
 
 /* The default folder shown under each field, and the logs field's note. */
 .row-default,
 .row-hint {
-	color: var(--theme-grey-888);
+	color: var(--theme-grey-666);
 	font-size: 10.5px;
 	margin: 5px 0 0;
 }
@@ -169,7 +171,7 @@ input[type='text'].is-default {
 .tag-default {
 	background: var(--theme-hue-e8f4ff);
 	border-radius: 4px;
-	color: var(--theme-blue);
+	color: var(--theme-hue-0062cc);
 	font-size: 10px;
 	font-weight: 500;
 	margin-left: 4px;
@@ -180,7 +182,7 @@ input[type='text'].is-default {
 .tag-modified {
 	background: var(--theme-hue-fff3e0);
 	border-radius: 4px;
-	color: var(--theme-hue-e65100);
+	color: var(--theme-hue-7a4b00);
 	font-size: 10px;
 	font-weight: 500;
 	margin-left: 4px;
@@ -227,7 +229,7 @@ button:hover {
 }
 
 .save {
-	background: var(--theme-blue);
+	background: var(--theme-hue-0062cc);
 	color: var(--theme-white);
 }
 
