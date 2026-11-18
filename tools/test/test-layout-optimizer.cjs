@@ -20,7 +20,10 @@
  *    inspected): pinned keys, QWERTY pins from a base or a random start,
  *    case pairs, digits (fixed, number row, anywhere), letters off the number
  *    row, punctuation, symbols, the AltGr levels, the dead key's layer,
- *    zones; unknown options and impossible pins are refused with their code.
+ *    zones; a Ctrl shortcut kept on its QWERTY key while its letter moves
+ *    (the command map shortcut_left reads, a score that differs from the
+ *    letters' own place); unknown options and impossible pins are refused
+ *    with their code.
  * 5. Incremental scoring: the incremental objective gives every layout the
  *    search scores the engine's full score, and the same search result; the
  *    result's dead-key tables are its own, not the ones the scored layouts
@@ -248,6 +251,47 @@ check(
 	'a QWERTY pin onto a pinned key is refused'
 );
 
+// QWERTY shortcuts: Ctrl+Z X C V stay on QWERTY's keys while the letters move.
+// Before 2026-11-18 the optimizer could only pin the letters themselves.
+{
+	const run = search(azerty, { qwertyShortcuts: ['z', 'x', 'c', 'v'] }, { start: 'random' });
+	const ZXCV = { z: 'KeyZ', x: 'KeyX', c: 'KeyC', v: 'KeyV' };
+	check(
+		everyLayout(run, (layout) =>
+			Object.entries(ZXCV).every(
+				([letter, code]) =>
+					layout.rows[code][0] === letter || (layout.command || {})[code] === letter
+			)
+		),
+		'every scored layout keeps Ctrl+Z X C V on the QWERTY keys'
+	);
+	check(
+		run.seen.some((layout) => Object.entries(ZXCV).some(([l, code]) => layout.rows[code][0] !== l)),
+		'the letters of the kept shortcuts still move'
+	);
+	// The engine scores the shortcut where it is kept, not where its letter is.
+	const moved = run.seen.find((layout) => layout.rows.KeyZ[0] !== 'z');
+	const free = Object.assign({}, moved, { command: {} });
+	const shortcutOf = (layout) => E.analyse(layout, tables, ANALYSIS).metrics.shortcut_left;
+	check(
+		shortcutOf(moved) !== shortcutOf(free),
+		`a kept shortcut changes shortcut_left (${shortcutOf(moved)} vs ${shortcutOf(free)})`
+	);
+	check(
+		Math.abs(run.result.score - E.analyse(run.result.layout, tables, ANALYSIS).score.total) <=
+			TOLERANCE,
+		'with kept shortcuts, the reported score is the engine score'
+	);
+	check(
+		refusal(() => O.problem(E, azerty, { qwertyShortcuts: ['ß'] })) === 'shortcut_missing',
+		'a shortcut of a letter the layout lacks is refused'
+	);
+	check(
+		refusal(() => O.problem(E, azerty, { qwertyShortcuts: 'z' })) === 'option_value',
+		'kept shortcuts are a list'
+	);
+}
+
 // Case pairs: a letter keeps its capital on Shift wherever it goes.
 check(
 	everyLayout(base, (layout) =>
@@ -453,7 +497,8 @@ check(
 for (const [start, options] of [
 	[azerty, {}],
 	[ergol, { altgr: true, movePunctuation: true, moveSymbols: true }],
-	[ergol, { deadKeyLayer: true }]
+	[ergol, { deadKeyLayer: true }],
+	[azerty, { qwertyShortcuts: ['z', 'x', 'c', 'v'] }]
 ]) {
 	const p = O.problem(E, start, options);
 	const fullObjective = O.engineObjective(E, tables, ANALYSIS);
@@ -487,6 +532,21 @@ for (const [start, options] of [
 	check(
 		JSON.stringify(again.layout) === JSON.stringify(viaFull.layout),
 		`incremental (${start.id}): editing a result's dead keys changes the next search`
+	);
+}
+
+// The objective follows the analysis options it is given: a weight raised in
+// the Comparer's settings (score_settings.js hands them to the page, which
+// hands them here) changes the score of the same layout.
+{
+	const heavier = Object.assign({}, ANALYSIS, {
+		weights: Object.assign(E.defaultWeights(), { sfb: E.defaultWeights().sfb * 3 })
+	});
+	const layout = O.layoutOf(O.problem(E, azerty), O.problem(E, azerty).start);
+	check(
+		O.engineObjective(E, tables, ANALYSIS)(layout) !==
+			O.engineObjective(E, tables, heavier)(layout),
+		'the objective follows the weights it is given'
 	);
 }
 

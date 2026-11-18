@@ -10,9 +10,12 @@
  * too large or of an unknown type; a run in Web Workers finishes with the
  * engine's score of its layout; a zone drawn on the board keeps a letter on
  * its keys; the choices survive a reload, and the page still works when the
- * browser refuses storage; it lays out at phone width in light and dark
- * without a sideways page scroll; no raw locale key shows in any of the 21
- * locales. Page errors and requests outside the loopback origin fail the gate.
+ * browser refuses storage; the score is the Comparer's, with the Comparer's
+ * saved settings (a weight raised there changes the optimizer's score and
+ * its summary); Ctrl Z X C V kept on their QWERTY keys while the letters
+ * move; it lays out at phone width in light and dark without a sideways
+ * page scroll; no raw locale key shows in any of the 21 locales. Page
+ * errors and requests outside the loopback origin fail the gate.
  * ==============================================================================
  */
 
@@ -108,6 +111,10 @@ const textStatus = (page) => page.locator('#lo-text-status').textContent();
 
 /** Sets a short budget: one restart of a few swaps, so a run ends in seconds. */
 async function shortBudget(page) {
+	// The budget is folded under « Search budget and seed ».
+	await page.evaluate(() => {
+		document.querySelector('.lo-advanced').open = true;
+	});
 	await page.fill('#lo-seconds', '20');
 	await page.fill('#lo-iterations', '30');
 	await page.fill('#lo-restarts', '1');
@@ -240,6 +247,10 @@ async function main() {
 		// ======= 2/ Zones: a letter kept on the keys clicked on the board =======
 		{
 			const { page, errors, context } = await open(browser, origin);
+			// The zones are one sub-tab of « What may move »: one board at a time.
+			assert.equal(await page.locator('#lo-zone-board').isHidden(), true, 'zones wait');
+			await page.click('#lo-tab-zones');
+			assert.equal(await page.locator('#lo-pin-board').isHidden(), true, 'one board shows');
 			await page.selectOption('#lo-zone-char', 'e');
 			// AZERTY's e is on KeyE: a zone that leaves it out moves it first.
 			await page.click('#lo-zone-board [data-code="KeyJ"]');
@@ -280,9 +291,11 @@ async function main() {
 				/characters, counted/.test(document.querySelector('#lo-text-status').textContent)
 			);
 			await page.check('#lo-switch-altgr');
+			await page.click('.lo-advanced summary');
 			await page.fill('#lo-seed', '7');
 			await page.locator('#lo-seed').dispatchEvent('change');
 			await page.click('#lo-pin-board [data-code="KeyA"]');
+			await page.click('#lo-tab-zones');
 			await page.selectOption('#lo-zone-char', 'e');
 			await page.click('#lo-zone-board [data-code="KeyD"]');
 			await page.reload();
@@ -298,6 +311,11 @@ async function main() {
 				'a pinned key is kept'
 			);
 			assert.match(await page.locator('#lo-zones-summary').textContent(), /e: 1 keys/);
+			assert.equal(
+				await page.locator('#lo-tab-zones').getAttribute('aria-selected'),
+				'true',
+				'the sub-tab is kept'
+			);
 			assert.deepEqual(errors, []);
 			await context.close();
 		}
@@ -348,7 +366,11 @@ async function main() {
 					'layout_analysis/_generated/analysis_data.js',
 					'layout_analysis/analysis_engine.js',
 					'layout_analysis/pdf_text.js',
+					'layout_analysis/info_popover.js',
+					'layout_analysis/undo_offer.js',
+					'layout_analysis/fingering_editor.js',
 					'layout_analysis/corpus_files.js',
+					'layout_analysis/score_settings.js',
 					'layout_optimizer/optimizer_core.js',
 					'layout_optimizer/optimizer_runner.js',
 					'layout_optimizer/optimizer_page.js'
@@ -421,7 +443,11 @@ async function main() {
 					'layout_analysis/_generated/analysis_data.js',
 					'layout_analysis/analysis_engine.js',
 					'layout_analysis/pdf_text.js',
+					'layout_analysis/info_popover.js',
+					'layout_analysis/undo_offer.js',
+					'layout_analysis/fingering_editor.js',
 					'layout_analysis/corpus_files.js',
+					'layout_analysis/score_settings.js',
 					'layout_optimizer/optimizer_core.js',
 					'layout_optimizer/optimizer_runner.js',
 					'layout_optimizer/optimizer_page.js'
@@ -490,6 +516,96 @@ async function main() {
 			assert.match(status, /^The corpus could not be loaded: /, `a corpus failure: ${status}`);
 			assert.equal(await page.locator('#lo-retry').isVisible(), true, '« Try again » shows');
 			assert.deepEqual(errors, [], 'a corpus failure raises no page error');
+			await context.close();
+		}
+
+		// ======= 4c/ The Comparer's score settings are the optimizer's =======
+		// Until 2026-11-18 the optimizer kept weights of its own and scored
+		// without the Comparer's ideal load, shortcut table, compact keyboards
+		// and fingering: the same layout had two scores in the Studio.
+		{
+			const { page, errors, context } = await open(browser, origin);
+			assert.equal(
+				await page.locator('#lo-settings-list .lo-custom-setting').count(),
+				0,
+				'every setting is the default'
+			);
+			await shortBudget(page);
+			let status = await runToEnd(page);
+			assert.match(status, /^Done/, `the default run ends: ${status}`);
+			const startTile = () => page.locator('#lo-score .lo-tile-value').first().textContent();
+			const before = await startTile();
+			// The Comparer saves a raised SFB weight and tells the page, as its save() does.
+			await page.evaluate(() => {
+				const weights = window.LAYOUT_ANALYSIS.defaultWeights();
+				weights.sfb *= 3;
+				window.localStorage.setItem(
+					window.LAYOUT_ANALYSIS_FILES.SETTINGS_KEY,
+					JSON.stringify({ weights })
+				);
+				window.LAYOUT_ANALYSIS_SCORE_SETTINGS.notify();
+			});
+			assert.match(
+				await page.locator('#lo-settings-list .lo-custom-setting').textContent(),
+				/Weights.*your own/,
+				'the summary follows the Comparer'
+			);
+			status = await runToEnd(page);
+			assert.match(status, /^Done/, `the weighted run ends: ${status}`);
+			const after = await startTile();
+			assert.notEqual(after, before, 'a Comparer weight changes the optimizer score');
+			// The score is the engine's with the Comparer's weights, as the Comparer shows it.
+			const expected = await page.evaluate(async () => {
+				const E = window.LAYOUT_ANALYSIS;
+				const corpus = window.LAYOUT_ANALYSIS_DATA.corpora.find(
+					(c) => c.id === document.querySelector('#lo-corpus').value
+				);
+				const tables = await window.LAYOUT_ANALYSIS_FILES.builtinTables(corpus);
+				const weights = E.defaultWeights();
+				weights.sfb *= 3;
+				const azerty = E.libraryLayouts().find((layout) => layout.id === 'azerty');
+				return E.analyse(azerty, tables, {
+					keyboard: 'iso',
+					weights,
+					format: E.defaultKeyboardFormat()
+				}).score.total;
+			});
+			assert.equal(after, expected.toFixed(2), 'the start score is the Comparer score');
+			assert.deepEqual(errors, []);
+			await context.close();
+		}
+
+		// ======= 4d/ Ctrl Z X C V stay on QWERTY's keys while the letters move =======
+		{
+			const { page, errors, context } = await open(browser, origin);
+			await page.click('#lo-tab-shortcuts');
+			await page.check('input[name="lo-shortcut-mode"][value="shortcut"]');
+			await page.click('#lo-qwerty-presets button >> nth=0');
+			assert.equal(
+				await page.locator('#lo-qwerty-board [data-code="KeyZ"]').getAttribute('aria-pressed'),
+				'true',
+				'the preset marks Z'
+			);
+			await shortBudget(page);
+			const status = await runToEnd(page);
+			assert.match(status, /^Done/, `the shortcut run ends: ${status}`);
+			// The layout handed to « Compare » is the result: catch it before the page leaves.
+			await page.evaluate(() => {
+				window.LAYOUT_ANALYSIS_FILES.handOff = (layout) => {
+					window.__handed = layout;
+					throw Object.assign(new Error('kept'), { code: 'studio_handoff_failed' });
+				};
+			});
+			await page.click('#lo-open-comparer');
+			const layout = await page.evaluate(() => window.__handed);
+			const kept = { z: 'KeyZ', x: 'KeyX', c: 'KeyC', v: 'KeyV' };
+			for (const [letter, code] of Object.entries(kept))
+				assert.ok(
+					layout.rows[code][0] === letter || layout.command[code] === letter,
+					`Ctrl+${letter} stays on ${code}: ${JSON.stringify(layout.command)}`
+				);
+			assert.ok(Object.keys(layout.command).length > 0, 'some kept shortcut left its letter');
+			assert.deepEqual(errors, []);
 			await context.close();
 		}
 

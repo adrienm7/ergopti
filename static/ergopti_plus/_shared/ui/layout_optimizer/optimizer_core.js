@@ -22,7 +22,8 @@
  * 3. Every constraint is a switch of the problem (DEFAULT_OPTIONS): which
  *    kinds of units move, whether digits leave the number row, whether the
  *    AltGr levels and a dead key's layer take part, keys pinned where they
- *    are, letters pinned at their QWERTY place (the Ctrl shortcuts), zones.
+ *    are, letters pinned at their QWERTY place (the Ctrl shortcuts), or only
+ *    their Ctrl/Cmd shortcut kept on that key while the letter moves, zones.
  * 4. Restarts are independent and numbered: restart k draws from its own seed,
  *    so a page may run them in parallel workers and keep the same result.
  * 5. Fail fast: an impossible constraint throws an OptimizerError with a
@@ -64,6 +65,9 @@ var LAYOUT_OPTIMIZER = (function () {
 		pinnedCodes: [],
 		// Letters held at their QWERTY key (the Ctrl/Cmd shortcuts Z X C V…).
 		qwertyPins: [],
+		// Letters whose Ctrl/Cmd shortcut stays on their QWERTY key (the layout's
+		// command map) while the letter itself may move.
+		qwertyShortcuts: [],
 		// Character → the only codes its unit may sit on.
 		zones: {}
 	});
@@ -183,7 +187,11 @@ var LAYOUT_OPTIMIZER = (function () {
 		])
 			if (typeof opts[key] !== 'boolean')
 				throw new OptimizerError('option_value', { option: key }, `${key} is not a boolean`);
-		if (!Array.isArray(opts.pinnedCodes) || !Array.isArray(opts.qwertyPins))
+		if (
+			!Array.isArray(opts.pinnedCodes) ||
+			!Array.isArray(opts.qwertyPins) ||
+			!Array.isArray(opts.qwertyShortcuts)
+		)
 			throw new OptimizerError('option_value', { option: 'pins' }, 'pins are lists');
 		if (!opts.zones || typeof opts.zones !== 'object')
 			throw new OptimizerError('option_value', { option: 'zones' }, 'zones is an object');
@@ -225,7 +233,11 @@ var LAYOUT_OPTIMIZER = (function () {
 	 */
 	function problem(engine, startLayout, options) {
 		const opts = checkedOptions(options);
-		const layout = engine.layoutFromRows(startLayout);
+		const layout = withQwertyShortcuts(
+			engine,
+			engine.layoutFromRows(startLayout),
+			opts.qwertyShortcuts
+		);
 		const codes = new Set(engine.typingCodes());
 		const slots = [];
 		const units = [];
@@ -287,11 +299,7 @@ var LAYOUT_OPTIMIZER = (function () {
 		const typedLetters = new Set(deadKeys);
 
 		// QWERTY pins: each letter is moved onto its QWERTY key first, then fixed.
-		const qwerty = engine.libraryLayouts().find((entry) => entry.id === 'qwerty');
-		if (!qwerty) throw new Error('layout_optimizer: the engine library has no qwerty');
-		const qwertyCode = {};
-		for (const [code, row] of Object.entries(qwerty.rows))
-			if (typeof row[0] === 'string') qwertyCode[row[0]] = code;
+		const qwertyCode = qwertyCodes(engine);
 		const assignment = units.map((unit) => unit.index);
 		const slotOfUnit = units.map((unit) => unit.index);
 		const fixed = movable.map((m) => !m);
@@ -369,6 +377,47 @@ var LAYOUT_OPTIMIZER = (function () {
 				);
 		});
 		return result;
+	}
+
+	/** Each letter of QWERTY's base level → its key. */
+	function qwertyCodes(engine) {
+		const qwerty = engine.libraryLayouts().find((entry) => entry.id === 'qwerty');
+		if (!qwerty) throw new Error('layout_optimizer: the engine library has no qwerty');
+		const out = {};
+		for (const [code, row] of Object.entries(qwerty.rows))
+			if (typeof row[0] === 'string') out[row[0]] = code;
+		return out;
+	}
+
+	/**
+	 * The start layout with each chosen letter's Ctrl/Cmd shortcut on its QWERTY
+	 * key (its command map, which the engine's shortcut_left reads and the
+	 * search never moves): Ctrl+the key Z of QWERTY stays « undo » wherever z
+	 * goes. Another key's shortcut to the same letter is dropped.
+	 * @param {object} engine - LAYOUT_ANALYSIS.
+	 * @param {object} layout - The checked start layout (not changed).
+	 * @param {string[]} letters - Lowercase letters.
+	 * @returns {object} The layout, with its own command map when letters are given.
+	 * @throws {OptimizerError} shortcut_missing when the layout lacks the letter
+	 *   on a base level, or the letter's QWERTY key.
+	 */
+	function withQwertyShortcuts(engine, layout, letters) {
+		if (!letters.length) return layout;
+		const qwertyCode = qwertyCodes(engine);
+		const command = Object.assign({}, layout.command);
+		for (const letter of letters) {
+			const target = qwertyCode[letter];
+			const typed = Object.values(layout.rows).some((row) => row[0] === letter);
+			if (typeof letter !== 'string' || !target || !layout.rows[target] || !typed)
+				throw new OptimizerError(
+					'shortcut_missing',
+					{ letter: String(letter) },
+					`the shortcut of ${letter} cannot stay on its QWERTY key`
+				);
+			for (const [code, made] of Object.entries(command)) if (made === letter) delete command[code];
+			command[target] = letter;
+		}
+		return Object.assign({}, layout, { command });
 	}
 
 	/**

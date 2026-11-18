@@ -779,7 +779,11 @@ function showTab(tab) {
 		if (!_optimizerMounted) {
 			_optimizerMounted = true;
 			window.LAYOUT_OPTIMIZER_PAGE.mount(optimizer, {
-				host: { openEditor: editOptimized, openComparer: compareEdited }
+				host: {
+					openEditor: editOptimized,
+					openComparer: compareEdited,
+					openScoreSettings: showScoreSettings
+				}
 			});
 		}
 		return;
@@ -804,6 +808,18 @@ function showTab(tab) {
 function compareEdited(layout) {
 	showTab('compare');
 	window.LAYOUT_ANALYSIS_COMPARER.addLayouts([layout]);
+}
+
+/**
+ * Shows the Comparer's « Réglages du score » unfolded: the optimizer's
+ * « Edit in Compare » (one set of score settings for every Studio score).
+ */
+function showScoreSettings() {
+	showTab('compare');
+	const settings = document.getElementById('la-settings');
+	if (!settings) throw new Error('layout_editor_window: the Comparer has no score settings');
+	settings.open = true;
+	settings.scrollIntoView({ block: 'start' });
 }
 
 document.getElementById('studio-tab-edit').addEventListener('click', function () {

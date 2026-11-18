@@ -7,9 +7,12 @@ corpus: it searches key arrangements and keeps the one the layout analysis
 engine ([layout-analysis.md](layout-analysis.md)) scores best. The optimizer
 measures nothing itself: the score of an arrangement is always
 `LAYOUT_ANALYSIS.analyse(layout, tables, options).score.total`, with the
-user's weights, keyboard and keyboard format. A metric added to the engine
-or a weight changed in `score_weights.json` reaches the optimizer with no
-change here.
+Comparer's score settings (weights, ideal finger load, shortcut table,
+compact keyboards' weights and the keyboard's fingering profile, read by
+`_shared/ui/layout_analysis/score_settings.js`), the keyboard and the
+keyboard format. A metric added to the engine, a weight changed in
+`score_weights.json` or a setting changed in the Comparer reaches the
+optimizer with no change here.
 
 ## Files
 
@@ -51,6 +54,7 @@ the move set and each unit-tested:
 | `deadKeyLayer`           | off     | The layer of a dead key becomes places (`deadState`, by default the one with most rules). |
 | `pinnedCodes`            | `[]`    | Keys whose units never move.                                                              |
 | `qwertyPins`             | `[]`    | Letters placed on their QWERTY key first, then fixed (presets `z x c v` and `a s`).       |
+| `qwertyShortcuts`        | `[]`    | Letters whose Ctrl/Cmd shortcut stays on their QWERTY key (`command`); the letter moves.  |
 | `zones`                  | `{}`    | Character → the only codes its unit may sit on.                                           |
 
 A unit may always stay where the start had it, unless a zone leaves that key
@@ -63,7 +67,14 @@ place follows its letter, so every rule stays reachable whatever moves, and
 those letters stay on base places. A dead key never goes behind a dead key.
 A QWERTY pin that would move a fixed key, or a letter the start lacks, is
 refused (`pin_conflict`, `pin_missing`); a random start places the pinned
-letters before it shuffles the rest.
+letters before it shuffles the rest. A kept QWERTY shortcut writes the
+start layout's `command` map (QWERTY's key → the letter, another key's
+entry for that letter dropped), which no swap changes: the engine's
+`shortcut_left` scores the shortcut where it is kept, and « Open in the
+editor » carries it as the source's `command` layer (`required = ["meta"]`,
+`LAYOUT_FORMATS.toSource`), which the macOS `.keylayout` and Linux XKB
+exports compile; Windows' KLC compiles no Ctrl level. A letter or a QWERTY
+key the start lacks is refused (`shortcut_missing`).
 
 ## Search
 
@@ -148,27 +159,38 @@ shows for it.
 
 ## Page
 
-Pick the language and corpus (the built-in corpora of the Comparer, or « your
-own text »: pasted, or a file the Comparer's reader opens — text, HTML,
-.docx, .odt, PDF — counted on the device; a text needs 200 to 5 000 000
-characters and a file at most 50 MB, each refusal said under the box), the
-start layout (the library, and the layouts open in « Éditer »), « this
-layout » or « a random arrangement of its keys », the keyboard; the
-switches, each explained; keys kept in place (click them on the start
-layout's board); letters kept at their QWERTY place (click them on the QWERTY
-board, or the presets « Ctrl Z X C V » and « Ctrl A S »); zones (choose a
-character, then click the keys it may sit on, on the start layout's board; its
-start key outlined, every zone summed up under the board); the weights (the
-engine's defaults, editable); the budget (seconds, swaps per restart,
-restarts, seed, accuracy). « Optimize » shows the best layout so far (changed
-keys outlined), its score against the start, and the main metrics against the
-start; « Stop » keeps the best found. « Open in the editor » hands the layout
-to « Éditer », which opens it in a new tab (`LAYOUT_ANALYSIS_FILES
-.handOffToEditor`, editor `openLayout`); « Compare with other layouts » hands
-it to « Comparer » the way the editor does.
+Four numbered step cards; on a wide screen the run card stays beside the
+first two (sticky), on a phone everything is one column:
+
+1. **Corpus and start**: language, corpus (the built-in corpora of the
+   Comparer, or « your own text »: pasted, or a file the Comparer's reader
+   opens — text, HTML, .docx, .odt, PDF — counted on the device; a text needs
+   200 to 5 000 000 characters and a file at most 50 MB, each refusal said
+   under the box), start layout (the library, and the layouts open in
+   « Éditer »), keyboard, « this layout » or « a random arrangement of its
+   keys ».
+2. **What may move**: the switches, each explained, in a grid; then one
+   segmented sub-tab at a time: keys kept in place (click them on the start
+   layout's board), Ctrl shortcuts (letters on the QWERTY board or the presets
+   « Ctrl Z X C V » and « Ctrl A S », and whether the letter itself stays on
+   its QWERTY key or only its Ctrl/Cmd shortcut does), zones (choose a
+   character, then click the keys it may sit on; its start key outlined,
+   every zone summed up under the board).
+3. **Run**: the score settings the run uses, each « default » or « your
+   own » (the Comparer's, never a copy: « Change them in Compare » opens its
+   « Réglages du score », the app's window unfolds it), the budget folded
+   (seconds, swaps per restart, restarts, seed, accuracy), « Optimize » and
+   « Stop », the progress and the status.
+4. **Result**: the start, best and gain as three tiles; the start and the
+   best layout side by side, each changed key outlined in dashes on both,
+   and how many changed; the main metrics against the start in two tables
+   side by side. « Stop » keeps the best found. « Open in the editor » hands
+   the layout to « Éditer », which opens it in a new tab
+   (`LAYOUT_ANALYSIS_FILES.handOffToEditor`, editor `openLayout`); « Compare
+   with other layouts » hands it to « Comparer » the way the editor does.
 
 The page keeps the reader's choices (corpus, start, keyboard, switches, pins,
-zones, weights, budget) and their last text in this browser's storage
+QWERTY letters and what of them stays, zones, the open sub-tab, budget) and their last text in this browser's storage
 (`ergopti.layout_optimizer.v1`, `ergopti.layout_optimizer.text.v1`), and puts
 them back on the next visit, skipping a value it no longer knows; a browser
 that refuses storage, or a text over the quota, gets the same page unsaved.

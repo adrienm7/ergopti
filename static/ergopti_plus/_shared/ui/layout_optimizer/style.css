@@ -1,8 +1,9 @@
 /* _shared/ui/layout_optimizer/style.css */
 
 /* =========================================================================== */
-/* Layout Optimizer — setup panels, pin boards, budget, live best layout and   */
-/* its metrics against the start. Light and dark through theme.css tokens.     */
+/* Layout Optimizer — four numbered step cards (corpus and start, what may     */
+/* move, run, result), sub-tabs for the position constraints, the result's     */
+/* score tiles and boards side by side. Light and dark through theme.css.      */
 /* =========================================================================== */
 
 /* =============================== */
@@ -26,44 +27,68 @@ body:has(> main.layout-optimizer) {
 }
 
 .layout-optimizer {
-	--lo-surface: var(--theme-surface);
-	--lo-surface-2: var(--theme-surface-2);
+	--lo-page: var(--theme-bg);
+	--lo-card: var(--theme-surface);
+	--lo-inset: var(--theme-surface-2);
 	--lo-border: var(--theme-separator);
 	--lo-sub: var(--theme-sub);
 	--lo-accent: var(--theme-accent);
 	--lo-accent-soft: var(--theme-accent-soft);
 	--lo-good: var(--theme-good-text);
 	--lo-bad: var(--theme-bad-text);
+	/* One spacing scale for the whole page. */
+	--lo-space-1: 4px;
+	--lo-space-2: 8px;
+	--lo-space-3: 12px;
+	--lo-space-4: 16px;
+	--lo-space-5: 24px;
+	--lo-space-6: 32px;
+	--lo-radius: 12px;
+	counter-reset: lo-step;
 	font:
-		14px/1.45 system-ui,
+		14px/1.5 system-ui,
 		sans-serif;
 	margin: 0 auto;
-	max-width: 1200px;
-	padding: 16px;
+	max-width: 1240px;
+	padding: var(--lo-space-5) var(--lo-space-4) var(--lo-space-6);
 }
 
 .layout-optimizer h1 {
-	font-size: 1.4em;
-	margin: 0 0 6px;
+	font-size: 1.6em;
+	line-height: 1.25;
+	margin: 0 0 var(--lo-space-2);
 }
 
 .layout-optimizer h2 {
-	font-size: 1.1em;
-	margin: 0 0 8px;
+	align-items: center;
+	display: flex;
+	font-size: 1.15em;
+	gap: var(--lo-space-3);
+	line-height: 1.3;
+	margin: 0 0 var(--lo-space-4);
 }
 
 .layout-optimizer h3 {
 	font-size: 1em;
-	margin: 14px 0 4px;
+	margin: var(--lo-space-5) 0 var(--lo-space-2);
 }
 
 .layout-optimizer [hidden] {
 	display: none;
 }
 
+.lo-header {
+	margin-bottom: var(--lo-space-5);
+	max-width: 72ch;
+}
+
+.lo-lead {
+	font-size: 1.02em;
+}
+
 .lo-muted {
 	color: var(--lo-sub);
-	margin: 4px 0;
+	margin: var(--lo-space-1) 0 var(--lo-space-3);
 }
 
 .lo-error {
@@ -74,13 +99,14 @@ body:has(> main.layout-optimizer) {
 .layout-optimizer select,
 .layout-optimizer textarea,
 .layout-optimizer input[type='number'] {
-	background: var(--lo-surface);
+	background: var(--lo-card);
 	border: 1px solid var(--lo-border);
-	border-radius: 6px;
+	border-radius: 8px;
 	color: inherit;
 	font: inherit;
 	max-width: 100%;
-	padding: 5px 8px;
+	min-height: 34px;
+	padding: 6px 10px;
 }
 
 .layout-optimizer button {
@@ -89,6 +115,12 @@ body:has(> main.layout-optimizer) {
 
 .layout-optimizer button:hover:not(:disabled) {
 	background: var(--lo-accent-soft);
+}
+
+.layout-optimizer button:focus-visible,
+.layout-optimizer summary:focus-visible {
+	outline: 2px solid var(--lo-accent);
+	outline-offset: 2px;
 }
 
 .layout-optimizer button:disabled {
@@ -101,43 +133,115 @@ body:has(> main.layout-optimizer) {
 	border-color: var(--theme-accent-fill);
 	color: var(--theme-white);
 	font-weight: 600;
+	padding-inline: var(--lo-space-4);
+}
+
+.layout-optimizer .lo-primary:hover:not(:disabled) {
+	background: var(--theme-accent-fill);
+	filter: brightness(1.08);
 }
 
 /* ============================== */
 /* ============================== */
-/* ======= 2/ Panels ============ */
+/* ======= 2/ Steps & Cards ===== */
 /* ============================== */
 /* ============================== */
 
-.lo-grid {
+/* One column on a phone; on a wide screen the run card stays beside the setup. */
+.lo-steps {
 	display: grid;
-	gap: 12px;
-	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-	margin-top: 12px;
+	gap: var(--lo-space-4);
+	grid-template-columns: minmax(0, 1fr);
 }
 
-.lo-panel {
-	background: var(--lo-surface-2);
+@media (min-width: 1000px) {
+	.lo-steps {
+		align-items: start;
+		gap: var(--lo-space-5);
+		grid-template-columns: minmax(0, 1fr) 340px;
+	}
+
+	.lo-step-setup {
+		grid-column: 1;
+		grid-row: 1;
+	}
+
+	.lo-step-move {
+		grid-column: 1;
+		grid-row: 2;
+	}
+
+	.lo-step-run {
+		grid-column: 2;
+		grid-row: 1 / span 2;
+		position: sticky;
+		top: var(--lo-space-4);
+	}
+
+	.lo-step-result {
+		grid-column: 1 / -1;
+		grid-row: 3;
+	}
+}
+
+.lo-card {
+	background: var(--lo-card);
 	border: 1px solid var(--lo-border);
-	border-radius: 10px;
+	border-radius: var(--lo-radius);
 	min-width: 0;
-	padding: 12px;
+	padding: var(--lo-space-5);
 }
 
-.lo-wide {
-	grid-column: 1 / -1;
+/* Each step's heading carries its number, in the order of the page. */
+.lo-step > h2::before {
+	align-items: center;
+	background: var(--lo-accent-soft);
+	border-radius: 50%;
+	color: var(--lo-accent);
+	content: counter(lo-step);
+	counter-increment: lo-step;
+	display: inline-flex;
+	flex: none;
+	font-size: 0.85em;
+	font-weight: 700;
+	height: 28px;
+	justify-content: center;
+	width: 28px;
 }
 
-/* « Your own text »: the box takes the panel's width; the file picker wraps under it. */
+.lo-field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--lo-space-1);
+	min-width: 0;
+}
+
+.lo-field > span {
+	font-weight: 600;
+}
+
+/* The setup's selects side by side while they fit, one per line on a phone. */
+.lo-fields {
+	display: grid;
+	gap: var(--lo-space-3) var(--lo-space-4);
+	grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+/* « Your own text »: the box takes the card's width; the file picker wraps under it. */
+.lo-custom {
+	margin-top: var(--lo-space-4);
+}
+
 .lo-custom textarea {
 	resize: vertical;
 	width: 100%;
 }
 
 .lo-file {
+	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: var(--lo-space-2);
 	max-width: 100%;
 }
 
@@ -145,79 +249,197 @@ body:has(> main.layout-optimizer) {
 	max-width: 100%;
 }
 
-#lo-result {
-	margin-top: 12px;
-}
-
-.lo-panel summary {
-	cursor: pointer;
-	font-weight: 600;
-}
-
-.lo-field {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-	margin-bottom: 8px;
-	min-width: 0;
-}
-
 /* A field beside buttons: its label on the same line (the zone's character). */
 .lo-field.lo-inline {
 	align-items: center;
 	flex-direction: row;
-	margin-bottom: 0;
+	gap: var(--lo-space-2);
 }
 
 .lo-radios {
 	border: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--lo-space-1);
+	margin: var(--lo-space-4) 0 0;
+	min-width: 0;
+	padding: 0;
+}
+
+.lo-radios legend {
+	font-weight: 600;
+	margin-bottom: var(--lo-space-1);
 	padding: 0;
 }
 
 .lo-radios label {
+	align-items: flex-start;
 	display: flex;
-	gap: 6px;
+	gap: var(--lo-space-2);
+}
+
+.lo-radios input {
+	margin-top: 4px;
 }
 
 .lo-row {
 	display: grid;
-	gap: 8px 12px;
-	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	gap: var(--lo-space-3);
+	grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+	margin: var(--lo-space-3) 0;
+}
+
+/* The switches: a grid of items, each a bold label and its explanation. */
+.lo-switches {
+	display: grid;
+	gap: var(--lo-space-3) var(--lo-space-5);
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	margin-top: var(--lo-space-4);
+}
+
+.lo-switch-item {
+	min-width: 0;
 }
 
 .lo-switch {
 	align-items: flex-start;
 	display: flex;
 	font-weight: 600;
-	gap: 6px;
+	gap: var(--lo-space-2);
+}
+
+.lo-switch input {
+	margin-top: 4px;
 }
 
 .lo-help {
 	font-size: 0.92em;
-	margin: 0 0 8px 22px;
-}
-
-.lo-weights {
-	display: grid;
-	gap: 6px 16px;
-	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-	margin: 10px 0;
+	margin: 2px 0 0 22px;
 }
 
 .lo-buttons {
+	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
-	gap: 8px;
-	margin: 8px 0;
+	gap: var(--lo-space-2);
+	margin: var(--lo-space-3) 0;
+}
+
+.lo-note {
+	font-size: 0.92em;
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 3/ Sub-tabs ========== */
+/* ============================== */
+/* ============================== */
+
+/* A segmented control: one constraint and its board at a time. */
+.lo-tabs {
+	background: var(--lo-inset);
+	border: 1px solid var(--lo-border);
+	border-radius: 10px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--lo-space-1);
+	padding: var(--lo-space-1);
+}
+
+.layout-optimizer .lo-tabs [role='tab'] {
+	background: transparent;
+	border: 0;
+	border-radius: 7px;
+	flex: 1 1 auto;
+	font-weight: 600;
+	min-height: 32px;
+}
+
+.layout-optimizer .lo-tabs [role='tab'][aria-selected='true'] {
+	background: var(--lo-card);
+	box-shadow: 0 0 0 1px var(--lo-border);
+	color: var(--lo-accent);
+}
+
+.lo-tab-panel {
+	padding-top: var(--lo-space-3);
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 4/ Run card ========== */
+/* ============================== */
+/* ============================== */
+
+.lo-settings {
+	background: var(--lo-inset);
+	border-radius: 10px;
+	padding: var(--lo-space-3) var(--lo-space-4);
+}
+
+.lo-settings h3 {
+	margin-top: 0;
+}
+
+.lo-settings-list {
+	list-style: none;
+	margin: 0 0 var(--lo-space-3);
+	padding: 0;
+}
+
+/* A dot before each setting: hollow for the default, filled for the user's own. */
+.lo-settings-list li {
+	align-items: baseline;
+	display: flex;
+	gap: var(--lo-space-2);
+	padding: 2px 0;
+}
+
+.lo-settings-list li::before {
+	border: 2px solid var(--lo-sub);
+	border-radius: 50%;
+	content: '';
+	flex: none;
+	height: 8px;
+	transform: translateY(-1px);
+	width: 8px;
+}
+
+.lo-settings-list li.lo-custom-setting {
+	font-weight: 600;
+}
+
+.lo-settings-list li.lo-custom-setting::before {
+	background: var(--lo-accent);
+	border-color: var(--lo-accent);
+}
+
+.lo-advanced {
+	border-bottom: 1px solid var(--lo-border);
+	border-top: 1px solid var(--lo-border);
+	margin: var(--lo-space-4) 0;
+	padding: var(--lo-space-3) 0;
+}
+
+.lo-advanced summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.lo-run-buttons .lo-primary {
+	flex: 1 1 auto;
+	min-height: 40px;
 }
 
 #lo-progress {
+	accent-color: var(--lo-accent);
+	height: 8px;
 	width: 100%;
 }
 
 /* ============================== */
 /* ============================== */
-/* ======= 3/ Boards ============ */
+/* ======= 5/ Boards ============ */
 /* ============================== */
 /* ============================== */
 
@@ -228,13 +450,13 @@ body:has(> main.layout-optimizer) {
 }
 
 .lo-board {
-	margin: 6px 0;
+	margin: var(--lo-space-2) 0;
 	position: relative;
 }
 
 .layout-optimizer .lo-key {
 	align-items: center;
-	background: var(--lo-surface);
+	background: var(--lo-inset);
 	border: 1px solid var(--lo-border);
 	border-radius: 6px;
 	color: var(--theme-text);
@@ -242,6 +464,7 @@ body:has(> main.layout-optimizer) {
 	font-size: inherit;
 	font-weight: 600;
 	justify-content: center;
+	min-height: 0;
 	padding: 0;
 	position: absolute;
 }
@@ -254,9 +477,10 @@ body:has(> main.layout-optimizer) {
 
 /* A dashed border as well as its colour, so the mark is not colour alone. */
 .layout-optimizer .lo-key.lo-changed {
-	border-color: var(--lo-good);
+	background: var(--lo-accent-soft);
+	border-color: var(--lo-accent);
 	border-style: dashed;
-	box-shadow: inset 0 0 0 1px var(--lo-good);
+	box-shadow: inset 0 0 0 1px var(--lo-accent);
 }
 
 /* The mark of a better or worse change (▲ ▼), beside its sign and colour. */
@@ -285,12 +509,66 @@ body:has(> main.layout-optimizer) {
 
 /* ============================== */
 /* ============================== */
-/* ======= 4/ Result ============ */
+/* ======= 6/ Result ============ */
 /* ============================== */
 /* ============================== */
 
-.lo-score {
-	font-size: 1.1em;
+/* The start, the best and the gain, as three tiles. */
+.lo-tiles {
+	display: grid;
+	gap: var(--lo-space-3);
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	margin-bottom: var(--lo-space-4);
+}
+
+.lo-tile {
+	background: var(--lo-inset);
+	border: 1px solid var(--lo-border);
+	border-radius: 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	padding: var(--lo-space-3) var(--lo-space-4);
+}
+
+.lo-tile-label {
+	color: var(--lo-sub);
+	font-size: 0.9em;
+}
+
+.lo-tile-value {
+	font-size: 1.5em;
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	overflow-wrap: anywhere;
+}
+
+.lo-tile-best {
+	border-color: var(--lo-accent);
+}
+
+.lo-tile-good .lo-tile-value {
+	color: var(--lo-good);
+}
+
+.lo-tile-bad .lo-tile-value {
+	color: var(--lo-bad);
+}
+
+/* The start and the best layout side by side when both fit. */
+.lo-boards {
+	display: grid;
+	gap: var(--lo-space-4) var(--lo-space-5);
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+}
+
+.lo-figure {
+	margin: 0;
+	min-width: 0;
+}
+
+.lo-figure figcaption {
 	font-weight: 600;
 }
 
@@ -302,6 +580,14 @@ body:has(> main.layout-optimizer) {
 	color: var(--lo-bad);
 }
 
+/* The metrics in two tables side by side while both fit. */
+.lo-metric-tables {
+	align-items: start;
+	display: grid;
+	gap: 0 var(--lo-space-5);
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+}
+
 .lo-table-box {
 	max-width: 100%;
 	overflow-x: auto;
@@ -309,17 +595,58 @@ body:has(> main.layout-optimizer) {
 
 .lo-table {
 	border-collapse: collapse;
-	margin: 8px 0;
+	margin: var(--lo-space-2) 0;
+	width: 100%;
 }
 
 .lo-table th,
 .lo-table td {
 	border-bottom: 1px solid var(--lo-border);
-	padding: 4px 10px;
+	padding: 6px 12px;
 	text-align: left;
+}
+
+.lo-table thead th {
+	color: var(--lo-sub);
+	font-size: 0.9em;
+	font-weight: 600;
+}
+
+.lo-table tbody th {
+	font-weight: 500;
 }
 
 .lo-table .lo-num {
 	font-variant-numeric: tabular-nums;
 	text-align: right;
+	white-space: nowrap;
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 7/ Phone ============= */
+/* ============================== */
+/* ============================== */
+
+@media (max-width: 560px) {
+	.layout-optimizer {
+		padding: var(--lo-space-4) var(--lo-space-3) var(--lo-space-5);
+	}
+
+	.lo-card {
+		padding: var(--lo-space-4) var(--lo-space-3);
+	}
+
+	.lo-tile {
+		padding: var(--lo-space-2) var(--lo-space-3);
+	}
+
+	.lo-tile-value {
+		font-size: 1.15em;
+	}
+
+	.lo-table th,
+	.lo-table td {
+		padding: 6px;
+	}
 }

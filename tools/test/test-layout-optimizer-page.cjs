@@ -51,7 +51,13 @@ const SCRIPTS = [
 	'../layout_analysis/_generated/analysis_data.js',
 	'../layout_analysis/analysis_engine.js',
 	'../layout_analysis/pdf_text.js',
+	// The fingering profiles the score reads, and what they need.
+	'../layout_analysis/info_popover.js',
+	'../layout_analysis/undo_offer.js',
+	'../layout_analysis/fingering_editor.js',
 	'../layout_analysis/corpus_files.js',
+	// The Comparer's score settings, the one source of the score (no weights of its own).
+	'../layout_analysis/score_settings.js',
 	'optimizer_core.js',
 	'optimizer_runner.js',
 	'optimizer_page.js'
@@ -131,6 +137,13 @@ for (const id of switchIds) {
 	keys.add(`${PREFIX}option.${id}.help`);
 }
 for (const id of Object.keys(O.QWERTY_PIN_PRESETS)) keys.add(`${PREFIX}qwerty.preset.${id}`);
+// The score settings' summary: each one default or the user's own.
+for (const id of ['default', 'custom']) keys.add(`${PREFIX}settings.${id}`);
+// The page keeps no weight of its own: the run scores with the Comparer's settings.
+check(
+	page.includes('SCORE_SETTINGS.analysisOptions(') && !/defaultWeights\(\)/.test(page),
+	'the optimizer scores with the shared score settings, not weights of its own'
+);
 for (const corpus of DATA.corpora) keys.add(`${PREFIX}language.${corpus.language}`);
 // A count table's localized name, shown in the corpus picker.
 for (const corpus of DATA.corpora) if (corpus.title_key) keys.add(corpus.title_key);
@@ -255,7 +268,7 @@ check(
 		);
 	const windowScript = read(path.join(windowDir, 'script.js'));
 	check(
-		/LAYOUT_OPTIMIZER_PAGE\.mount\(optimizer, \{\s*host: \{ openEditor: editOptimized, openComparer: compareEdited \}/.test(
+		/LAYOUT_OPTIMIZER_PAGE\.mount\(optimizer, \{\s*host: \{\s*openEditor: editOptimized,\s*openComparer: compareEdited,\s*openScoreSettings: showScoreSettings\s*\}/.test(
 			windowScript
 		),
 		'layout_editor_window: the tab mounts the optimizer with the window as host'

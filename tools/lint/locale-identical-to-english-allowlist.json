@@ -3651,10 +3651,6 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "de", "nl", "no", "pl", "sv"]
 		},
-		"layout_optimizer.result.score": {
-			"reason": "loanword-or-cognate",
-			"locales": ["da", "nl"]
-		},
 		"layout_optimizer.result.best": {
 			"reason": "loanword-or-cognate",
 			"locales": ["no"]

@@ -4,11 +4,12 @@
  * ==============================================================================
  * MODULE: Layout Optimizer Page
  * DESCRIPTION:
- * The « Optimiser » tab of Ergopti Studio: pick a corpus, a start layout
- * (or a random arrangement of its keys), the constraints, the weights of the
- * Comparer's score and a budget; watch the best layout found so far, its
- * score and its metrics against the start; stop at any time; open the result
- * in « Éditer » or compare it in « Comparer ». Everything runs in the page.
+ * The « Optimiser » tab of Ergopti Studio, in four steps: pick a corpus and
+ * a start layout (or a random arrangement of its keys); say what may move;
+ * run with the Comparer's score settings and a budget; watch the best layout
+ * found so far beside the start, its score and its metrics against the
+ * start; stop at any time; open the result in « Éditer » or compare it in
+ * « Comparer ». Everything runs in the page.
  *
  * FEATURES & RATIONALE:
  * 1. Responsive: the search runs in Web Workers (optimizer_worker.js), one
@@ -21,8 +22,10 @@
  * 4. Mountable: LAYOUT_OPTIMIZER_PAGE.mount(root, {host?}) fills any element;
  *    the site's page mounts its <main>. Every visible string is a locale key.
  * 5. Pins: a click on a key of the start layout keeps it in place; the QWERTY
- *    board keeps chosen letters at their QWERTY place (presets for the Ctrl
- *    shortcuts Z X C V and A S), whatever the start.
+ *    board keeps chosen letters at their QWERTY place, or only their Ctrl/Cmd
+ *    shortcut while the letter moves (presets for Z X C V and A S), whatever
+ *    the start. Fixed keys, shortcuts and zones are sub-tabs of one step, so
+ *    one board shows at a time.
  * 6. Corpora: the built-in ones, or the reader's own text, pasted or opened
  *    from a file (the Comparer's reader), counted on the device, with its
  *    size limits said in words.
@@ -32,6 +35,11 @@
  * 9. Fails in words: a stage of a run that fails is logged and said in the
  *    reader's language with « Try again », and a page that declares no
  *    language writes its numbers in the documented fallback.
+ * 10. One score: the search maximises the Comparer's global score with the
+ *    Comparer's own settings (weights, ideal finger load, shortcut table,
+ *    compact keyboards, fingering), read through score_settings.js at each
+ *    run; the page sums them up and opens the Comparer to change them, so
+ *    no second copy of a weight exists.
  * ==============================================================================
  */
 
@@ -42,6 +50,8 @@
 	const O = window.LAYOUT_OPTIMIZER;
 	const FILES = window.LAYOUT_ANALYSIS_FILES;
 	const DATA = window.LAYOUT_ANALYSIS_DATA;
+	// The Comparer's score settings, the one source of every Studio score.
+	const SCORE_SETTINGS = window.LAYOUT_ANALYSIS_SCORE_SETTINGS;
 	const PREFIX = 'layout_optimizer.';
 	// The constraint switches the page offers, in the core's order (DEFAULT_OPTIONS).
 	const SWITCHES = [
@@ -68,8 +78,13 @@
 		'finger_imbalance',
 		'hand_imbalance',
 		'pinky_load',
+		'shortcut_left',
 		'simplicity'
 	];
+	// The sub-tabs of the position constraints, in order.
+	const PLACE_TABS = ['pins', 'shortcuts', 'zones'];
+	// What the QWERTY board keeps: the letter itself, or only its Ctrl/Cmd shortcut.
+	const SHORTCUT_MODES = ['letter', 'shortcut'];
 	const DEFAULT_START = 'azerty';
 	const DEFAULT_CORPUS = 'fr_swann';
 	const DEFAULT_SECONDS = 30;
@@ -111,48 +126,68 @@
 	const lang = new URLSearchParams(location.search).get('lang');
 	if (lang && /^[a-z]{2}$/.test(lang)) window._i18n_locale = lang;
 
-	// The page's markup; data-i18n attributes are filled by applyStrings().
-	const MARKUP = `<h1 data-i18n="layout_optimizer.title"></h1>
-<p class="lo-muted" data-i18n="layout_optimizer.intro"></p>
-<section class="lo-grid">
-	<div class="lo-panel">
-		<h2 data-i18n="layout_optimizer.setup.title"></h2>
+	// The page's markup; data-i18n attributes are filled by applyStrings(). Four
+	// numbered steps (corpus and start, what may move, run, result); the
+	// position constraints are sub-tabs, the search budget is folded.
+	const MARKUP = `<header class="lo-header">
+	<h1 data-i18n="layout_optimizer.title"></h1>
+	<p class="lo-muted lo-lead" data-i18n="layout_optimizer.intro"></p>
+</header>
+<div class="lo-steps">
+<section class="lo-card lo-step lo-step-setup" aria-labelledby="lo-setup-title">
+	<h2 id="lo-setup-title" data-i18n="layout_optimizer.setup.title"></h2>
+	<div class="lo-fields">
 		<label class="lo-field"><span data-i18n="layout_optimizer.corpus.language"></span>
 			<select id="lo-language"></select></label>
 		<label class="lo-field"><span data-i18n="layout_optimizer.corpus.label"></span>
 			<select id="lo-corpus"></select></label>
-		<div id="lo-custom" class="lo-field lo-custom" hidden>
-			<textarea id="lo-text" rows="4" data-i18n-placeholder="layout_optimizer.corpus.paste_placeholder"></textarea>
-			<label class="lo-file"><span data-i18n="layout_optimizer.corpus.file"></span>
-				<input id="lo-file" type="file" accept=".txt,.md,.csv,.tsv,.html,.htm,.json,.tex,.docx,.odt,.pdf" /></label>
-			<p id="lo-text-status" class="lo-muted" role="status" aria-live="polite"></p>
-		</div>
 		<label class="lo-field"><span data-i18n="layout_optimizer.start.label"></span>
 			<select id="lo-start"></select></label>
-		<fieldset class="lo-field lo-radios">
-			<legend data-i18n="layout_optimizer.start.mode"></legend>
-			<label><input type="radio" name="lo-start-mode" value="layout" checked />
-				<span data-i18n="layout_optimizer.start.mode_layout"></span></label>
-			<label><input type="radio" name="lo-start-mode" value="random" />
-				<span data-i18n="layout_optimizer.start.mode_random"></span></label>
-		</fieldset>
 		<label class="lo-field"><span data-i18n="layout_optimizer.keyboard"></span>
 			<select id="lo-keyboard"></select></label>
 	</div>
-	<div class="lo-panel">
-		<h2 data-i18n="layout_optimizer.constraints.title"></h2>
-		<p class="lo-muted" data-i18n="layout_optimizer.constraints.fixed"></p>
-		<div id="lo-switches"></div>
+	<div id="lo-custom" class="lo-field lo-custom" hidden>
+		<textarea id="lo-text" rows="4" data-i18n-placeholder="layout_optimizer.corpus.paste_placeholder"></textarea>
+		<label class="lo-file"><span data-i18n="layout_optimizer.corpus.file"></span>
+			<input id="lo-file" type="file" accept=".txt,.md,.csv,.tsv,.html,.htm,.json,.tex,.docx,.odt,.pdf" /></label>
+		<p id="lo-text-status" class="lo-muted" role="status" aria-live="polite"></p>
 	</div>
-	<div class="lo-panel lo-wide">
-		<h2 data-i18n="layout_optimizer.pins.title"></h2>
+	<fieldset class="lo-radios">
+		<legend data-i18n="layout_optimizer.start.mode"></legend>
+		<label><input type="radio" name="lo-start-mode" value="layout" checked />
+			<span data-i18n="layout_optimizer.start.mode_layout"></span></label>
+		<label><input type="radio" name="lo-start-mode" value="random" />
+			<span data-i18n="layout_optimizer.start.mode_random"></span></label>
+	</fieldset>
+</section>
+<section class="lo-card lo-step lo-step-move" aria-labelledby="lo-move-title">
+	<h2 id="lo-move-title" data-i18n="layout_optimizer.constraints.title"></h2>
+	<p class="lo-muted" data-i18n="layout_optimizer.constraints.fixed"></p>
+	<div id="lo-switches" class="lo-switches"></div>
+	<h3 id="lo-place-title" data-i18n="layout_optimizer.place.title"></h3>
+	<div class="lo-tabs" role="tablist" aria-labelledby="lo-place-title">
+		<button type="button" role="tab" id="lo-tab-pins" aria-controls="lo-panel-pins" data-i18n="layout_optimizer.pins.title"></button>
+		<button type="button" role="tab" id="lo-tab-shortcuts" aria-controls="lo-panel-shortcuts" data-i18n="layout_optimizer.shortcuts.tab"></button>
+		<button type="button" role="tab" id="lo-tab-zones" aria-controls="lo-panel-zones" data-i18n="layout_optimizer.zones.title"></button>
+	</div>
+	<div id="lo-panel-pins" class="lo-tab-panel" role="tabpanel" aria-labelledby="lo-tab-pins">
 		<p class="lo-muted" data-i18n="layout_optimizer.pins.help"></p>
 		<div class="lo-board-box"><div id="lo-pin-board" class="lo-board"></div></div>
-		<h3 data-i18n="layout_optimizer.qwerty.title"></h3>
+	</div>
+	<div id="lo-panel-shortcuts" class="lo-tab-panel" role="tabpanel" aria-labelledby="lo-tab-shortcuts" hidden>
 		<p class="lo-muted" data-i18n="layout_optimizer.qwerty.help"></p>
+		<fieldset class="lo-radios">
+			<legend data-i18n="layout_optimizer.qwerty.mode"></legend>
+			<label><input type="radio" name="lo-shortcut-mode" value="letter" checked />
+				<span data-i18n="layout_optimizer.qwerty.mode_letter"></span></label>
+			<label><input type="radio" name="lo-shortcut-mode" value="shortcut" />
+				<span data-i18n="layout_optimizer.qwerty.mode_shortcut"></span></label>
+		</fieldset>
 		<div class="lo-buttons" id="lo-qwerty-presets"></div>
 		<div class="lo-board-box"><div id="lo-qwerty-board" class="lo-board"></div></div>
-		<h3 data-i18n="layout_optimizer.zones.title"></h3>
+		<p class="lo-muted lo-note" data-i18n="layout_optimizer.qwerty.scored"></p>
+	</div>
+	<div id="lo-panel-zones" class="lo-tab-panel" role="tabpanel" aria-labelledby="lo-tab-zones" hidden>
 		<p class="lo-muted" data-i18n="layout_optimizer.zones.help"></p>
 		<div class="lo-buttons">
 			<label class="lo-field lo-inline"><span data-i18n="layout_optimizer.zones.char"></span>
@@ -163,14 +198,17 @@
 		<div class="lo-board-box"><div id="lo-zone-board" class="lo-board"></div></div>
 		<p id="lo-zones-summary" class="lo-muted" role="status"></p>
 	</div>
-	<details class="lo-panel lo-wide">
-		<summary data-i18n="layout_optimizer.weights.title"></summary>
-		<p class="lo-muted" data-i18n="layout_optimizer.weights.help"></p>
-		<div id="lo-weights" class="lo-weights"></div>
-		<button type="button" id="lo-weights-restore" data-i18n="layout_optimizer.weights.restore"></button>
-	</details>
-	<div class="lo-panel lo-wide">
-		<h2 data-i18n="layout_optimizer.budget.title"></h2>
+</section>
+<section class="lo-card lo-step lo-step-run" aria-labelledby="lo-run-title">
+	<h2 id="lo-run-title" data-i18n="layout_optimizer.run_title"></h2>
+	<div class="lo-settings">
+		<h3 data-i18n="layout_optimizer.settings.title"></h3>
+		<p class="lo-muted" data-i18n="layout_optimizer.settings.help"></p>
+		<ul id="lo-settings-list" class="lo-settings-list"></ul>
+		<button type="button" id="lo-settings-edit" data-i18n="layout_optimizer.settings.edit"></button>
+	</div>
+	<details class="lo-advanced">
+		<summary data-i18n="layout_optimizer.budget.advanced"></summary>
 		<div class="lo-row">
 			<label class="lo-field"><span data-i18n="layout_optimizer.budget.seconds"></span>
 				<input id="lo-seconds" type="number" min="1" max="3600" step="1" /></label>
@@ -187,19 +225,31 @@
 				</select></label>
 		</div>
 		<p class="lo-muted" data-i18n="layout_optimizer.budget.help"></p>
-		<div class="lo-buttons">
-			<button type="button" id="lo-run" class="lo-primary" data-i18n="layout_optimizer.run"></button>
-			<button type="button" id="lo-stop" data-i18n="layout_optimizer.stop" disabled></button>
-		</div>
-		<progress id="lo-progress" max="1" value="0" aria-labelledby="lo-status"></progress>
-		<p id="lo-status" class="lo-muted" role="status" aria-live="polite"></p>
-		<button type="button" id="lo-retry" data-i18n="layout_optimizer.retry" hidden></button>
+	</details>
+	<div class="lo-buttons lo-run-buttons">
+		<button type="button" id="lo-run" class="lo-primary" data-i18n="layout_optimizer.run"></button>
+		<button type="button" id="lo-stop" data-i18n="layout_optimizer.stop" disabled></button>
 	</div>
+	<progress id="lo-progress" max="1" value="0" aria-labelledby="lo-status"></progress>
+	<p id="lo-status" class="lo-muted" role="status" aria-live="polite"></p>
+	<button type="button" id="lo-retry" data-i18n="layout_optimizer.retry" hidden></button>
 </section>
-<section id="lo-result" class="lo-panel" hidden>
-	<h2 data-i18n="layout_optimizer.result.title"></h2>
-	<p id="lo-score" class="lo-score"></p>
-	<div class="lo-board-box"><div id="lo-result-board" class="lo-board"></div></div>
+<section id="lo-result" class="lo-card lo-step lo-step-result" aria-labelledby="lo-result-title" hidden>
+	<h2 id="lo-result-title" data-i18n="layout_optimizer.result.title"></h2>
+	<div id="lo-score" class="lo-tiles"></div>
+	<div class="lo-boards">
+		<figure class="lo-figure">
+			<figcaption data-i18n="layout_optimizer.start.label"></figcaption>
+			<div class="lo-board-box"><div id="lo-start-board" class="lo-board"></div></div>
+		</figure>
+		<figure class="lo-figure">
+			<figcaption data-i18n="layout_optimizer.result.best_board"></figcaption>
+			<div class="lo-board-box"><div id="lo-result-board" class="lo-board"></div></div>
+		</figure>
+	</div>
+	<p id="lo-changed" class="lo-muted"></p>
+	<h3 data-i18n="layout_optimizer.result.metrics"></h3>
+	<div class="lo-metric-tables">
 	<div class="lo-table-box"><table class="lo-table">
 		<thead><tr>
 			<th data-i18n="layout_optimizer.result.metric"></th>
@@ -209,11 +259,22 @@
 		</tr></thead>
 		<tbody id="lo-metrics"></tbody>
 	</table></div>
+	<div class="lo-table-box"><table class="lo-table">
+		<thead><tr>
+			<th data-i18n="layout_optimizer.result.metric"></th>
+			<th data-i18n="layout_optimizer.result.start"></th>
+			<th data-i18n="layout_optimizer.result.best"></th>
+			<th data-i18n="layout_optimizer.result.change"></th>
+		</tr></thead>
+		<tbody id="lo-metrics-more"></tbody>
+	</table></div>
+	</div>
 	<div class="lo-buttons">
-		<button type="button" id="lo-open-editor" data-i18n="layout_optimizer.result.open_editor" disabled></button>
+		<button type="button" id="lo-open-editor" class="lo-primary" data-i18n="layout_optimizer.result.open_editor" disabled></button>
 		<button type="button" id="lo-open-comparer" data-i18n="layout_optimizer.result.open_comparer" disabled></button>
 	</div>
-</section>`;
+</section>
+</div>`;
 
 	let warnedLocale = false;
 
@@ -267,10 +328,11 @@
 	 * Fills an element with the optimizer.
 	 * @param {HTMLElement} root - The element the page fills.
 	 * @param {{reportHeight?: boolean, host?: {openEditor?: function(object): void,
-	 *   openComparer?: function(object): void}}} [options] - reportHeight: post
-	 *   the page height to a framing parent (the site); host: the app's Studio
-	 *   window, which opens the result in its own « Éditer » and « Comparer »
-	 *   tabs instead of the site's.
+	 *   openComparer?: function(object): void, openScoreSettings?: function(): void}}}
+	 *   [options] - reportHeight: post the page height to a framing parent (the
+	 *   site); host: the app's Studio window, which opens the result, and the
+	 *   score settings, in its own « Éditer » and « Comparer » tabs instead of
+	 *   the site's.
 	 * @returns {{setCorpus: function(object): void}} The mounted page.
 	 * @throws {Error} On a missing root or a second mount.
 	 */
@@ -337,10 +399,12 @@
 		const state = {
 			editorLayouts: [],
 			pinnedCodes: new Set(),
+			// Letters of the QWERTY board, and what of them stays (SHORTCUT_MODES).
 			qwertyPins: new Set(),
+			shortcutMode: 'letter',
+			placeTab: PLACE_TABS[0],
 			// Character → the keys it may sit on (LAYOUT_OPTIMIZER zones).
 			zones: new Map(),
-			weights: E.defaultWeights(),
 			tables: new Map(),
 			// The pasted or opened text's tables: {hash, chars, tables}.
 			custom: null,
@@ -555,28 +619,6 @@
 			if (!digits.checked) outside.checked = false;
 		}
 
-		function fillWeights() {
-			const box = $('lo-weights');
-			box.replaceChildren(
-				...Object.keys(E.defaultWeights()).map((id) => {
-					const input = el('input');
-					input.type = 'number';
-					input.min = '0';
-					input.step = '0.05';
-					input.value = String(state.weights[id]);
-					input.dataset.metric = id;
-					input.addEventListener('change', () => {
-						const value = Number(input.value);
-						if (Number.isFinite(value) && value >= 0) state.weights[id] = value;
-						else input.value = String(state.weights[id]);
-					});
-					const label = el('label', 'lo-field lo-weight');
-					label.append(el('span', '', t(`layout_analysis.metric.${id}`)), input);
-					return label;
-				})
-			);
-		}
-
 		function fillPresets() {
 			const box = $('lo-qwerty-presets');
 			const buttons = Object.entries(O.QWERTY_PIN_PRESETS).map(([id, letters]) => {
@@ -595,6 +637,51 @@
 				drawPinBoards();
 			});
 			box.replaceChildren(...buttons, clear);
+		}
+
+		/**
+		 * Shows one sub-tab of the position constraints (fixed keys, Ctrl
+		 * shortcuts, zones); its board is drawn again at the panel's width.
+		 * @param {string} id - One of PLACE_TABS.
+		 * @param {boolean} [focus] - Moves the focus to the tab (arrow keys).
+		 */
+		function showPlaceTab(id, focus) {
+			if (!PLACE_TABS.includes(id)) throw new Error(`layout_optimizer: unknown tab ${id}`);
+			state.placeTab = id;
+			for (const tab of PLACE_TABS) {
+				const button = $(`lo-tab-${tab}`);
+				const selected = tab === id;
+				button.setAttribute('aria-selected', String(selected));
+				// One tab stop for the list; the arrow keys move between tabs.
+				button.tabIndex = selected ? 0 : -1;
+				$(`lo-panel-${tab}`).hidden = !selected;
+			}
+			if (focus) $(`lo-tab-${id}`).focus();
+			drawPinBoards();
+		}
+
+		/** The score settings the next run uses, summed up beside « Optimize ». */
+		function drawSettings() {
+			const keyboard = $('lo-keyboard').value;
+			if (!keyboard) return;
+			const custom = SCORE_SETTINGS.customised(keyboard);
+			const rows = [
+				['layout_analysis.weights.title', custom.weights > 0],
+				['layout_analysis.ideal.title', custom.idealLoad],
+				['layout_analysis.shortcuts.title', custom.shortcuts],
+				['layout_analysis.forms.title', custom.formWeights],
+				['layout_analysis.fingering.title', custom.fingering]
+			];
+			$('lo-settings-list').replaceChildren(
+				...rows.map(([key, changed]) => {
+					const item = el(
+						'li',
+						changed ? 'lo-custom-setting' : '',
+						t(`${PREFIX}settings.${changed ? 'custom' : 'default'}`, { label: t(key) })
+					);
+					return item;
+				})
+			);
 		}
 
 		// ============================
@@ -771,9 +858,12 @@
 
 		/** The constraints of the run (LAYOUT_OPTIMIZER.problem options). */
 		function problemOptions() {
+			const letters = [...state.qwertyPins].sort();
 			const out = {
 				pinnedCodes: [...state.pinnedCodes].sort(),
-				qwertyPins: [...state.qwertyPins].sort(),
+				// The letter itself on its QWERTY key, or only its Ctrl/Cmd shortcut.
+				qwertyPins: state.shortcutMode === 'letter' ? letters : [],
+				qwertyShortcuts: state.shortcutMode === 'shortcut' ? letters : [],
 				zones: Object.fromEntries(
 					[...state.zones.entries()]
 						.sort(([a], [b]) => (a < b ? -1 : 1))
@@ -784,15 +874,20 @@
 			return out;
 		}
 
+		/**
+		 * The analyse() options of the run: the Comparer's score settings and the
+		 * keyboard's fingering (score_settings.js), on the chosen keyboard and the
+		 * Studio's keyboard format, so the score is the one the Comparer shows.
+		 */
 		function analysisOptions() {
 			const format = FILES.savedFormat();
-			return {
-				keyboard: $('lo-keyboard').value,
-				weights: Object.assign({}, state.weights),
+			const keyboard = $('lo-keyboard').value;
+			return Object.assign(SCORE_SETTINGS.analysisOptions(keyboard), {
+				keyboard,
 				format: E.keyboardFormats().some((f) => f.id === format)
 					? format
 					: E.defaultKeyboardFormat()
-			};
+			});
 		}
 
 		function readInteger(id, min, max, fallback) {
@@ -1094,17 +1189,23 @@
 		 */
 		function showBest(layout, score, better, final) {
 			state.bestLayout = layout;
-			const start = state.startInUse;
-			drawBoard($('lo-result-board'), layout, {
-				changed: (code) => legend(layout, code) !== legend(start, code)
-			});
+			drawResultBoards();
 			const startScore = state.startResult.score.total;
-			$('lo-score').textContent = t(`${PREFIX}result.score`, {
-				best: number(score, 2),
-				start: number(startScore, 2),
-				change: signed(score - startScore, 2)
-			});
-			$('lo-score').classList.toggle('lo-good', score > startScore);
+			const change = score - startScore;
+			const tile = (key, value, className) => {
+				const node = el('div', `lo-tile ${className || ''}`.trim());
+				node.append(el('span', 'lo-tile-label', t(key)), el('span', 'lo-tile-value', value));
+				return node;
+			};
+			$('lo-score').replaceChildren(
+				tile(`${PREFIX}result.start`, number(startScore, 2)),
+				tile(`${PREFIX}result.best`, number(score, 2), 'lo-tile-best'),
+				tile(
+					`${PREFIX}result.change`,
+					signed(change, 2),
+					change > 0 ? 'lo-tile-good' : change < 0 ? 'lo-tile-bad' : ''
+				)
+			);
 			if (!final && Date.now() - state.lastMetrics < METRICS_MS) return;
 			state.lastMetrics = Date.now();
 			const result = E.analyse(layout, state.tablesInUse, state.analysisInUse);
@@ -1115,36 +1216,55 @@
 			}
 		}
 
+		/**
+		 * The start and the best layout side by side, each key that changed
+		 * outlined on both, and how many changed.
+		 */
+		function drawResultBoards() {
+			const start = state.startInUse;
+			const best = state.bestLayout;
+			if (!start || !best) return;
+			const changed = (code) => code !== 'Space' && legend(best, code) !== legend(start, code);
+			drawBoard($('lo-start-board'), start, { changed });
+			drawBoard($('lo-result-board'), best, { changed });
+			const count = Object.keys(best.rows).filter(changed).length;
+			$('lo-changed').textContent = t(`${PREFIX}result.changed`, { count: number(count, 0) });
+		}
+
+		/**
+		 * The metrics against the start, in two tables side by side on a wide
+		 * screen (one under the other on a phone), so the result uses the width.
+		 */
 		function drawMetrics(result) {
-			const body = $('lo-metrics');
-			body.replaceChildren(
-				...DELTA_METRICS.map((id) => {
-					const before = state.startResult.metrics[id];
-					const after = result.metrics[id];
-					const change = after - before;
-					const tr = el('tr');
-					const digits = metricDigits(id);
-					const cell = el('td', 'lo-num', signed(change, digits));
-					const better = E.METRICS[id].better;
-					const good = better === 'lower' ? change < 0 : better === 'higher' ? change > 0 : false;
-					const bad = better === 'lower' ? change > 0 : better === 'higher' ? change < 0 : false;
-					if (Math.abs(change) >= Math.pow(10, -digits) && (good || bad)) {
-						cell.classList.add(good ? 'lo-good' : 'lo-bad');
-						// Better or worse with a mark and in words, never by its colour alone.
-						const words = t(`layout_analysis.details.verdict_${good ? 'better' : 'worse'}`);
-						cell.title = words;
-						cell.append(' ', el('span', 'lo-verdict', good ? '▲' : '▼'));
-						cell.append(el('span', 'lo-sr-only', ` ${words}`));
-					}
-					tr.append(
-						el('th', '', t(`layout_analysis.metric.${id}`)),
-						el('td', 'lo-num', number(before, digits)),
-						el('td', 'lo-num', number(after, digits)),
-						cell
-					);
-					return tr;
-				})
-			);
+			const rows = DELTA_METRICS.map((id) => {
+				const before = state.startResult.metrics[id];
+				const after = result.metrics[id];
+				const change = after - before;
+				const tr = el('tr');
+				const digits = metricDigits(id);
+				const cell = el('td', 'lo-num', signed(change, digits));
+				const better = E.METRICS[id].better;
+				const good = better === 'lower' ? change < 0 : better === 'higher' ? change > 0 : false;
+				const bad = better === 'lower' ? change > 0 : better === 'higher' ? change < 0 : false;
+				if (Math.abs(change) >= Math.pow(10, -digits) && (good || bad)) {
+					cell.classList.add(good ? 'lo-good' : 'lo-bad');
+					// Better or worse with a mark and in words, never by its colour alone.
+					const words = t(`layout_analysis.details.verdict_${good ? 'better' : 'worse'}`);
+					cell.title = words;
+					cell.append(' ', el('span', 'lo-verdict', good ? '▲' : '▼'));
+					cell.append(el('span', 'lo-sr-only', ` ${words}`));
+				}
+				tr.append(
+					el('th', '', t(`layout_analysis.metric.${id}`)),
+					el('td', 'lo-num', number(before, digits)),
+					el('td', 'lo-num', number(after, digits)),
+					cell
+				);
+				return tr;
+			});
+			const half = Math.ceil(rows.length / 2);
+			$('lo-metrics').replaceChildren(...rows.slice(0, half));
+			$('lo-metrics-more').replaceChildren(...rows.slice(half));
 		}
 
 		// ============================
@@ -1182,6 +1302,19 @@
 				FILES.handOff(state.bestLayout);
 			} catch (error) {
 				setStatus(errorText(error.code, error.message), true);
+				return;
+			}
+			openTab(FILES.OPEN_COMPARER_MESSAGE, '../layout_analysis/index.html');
+		}
+
+		/**
+		 * Opens the Comparer's « Réglages du score », where the settings of
+		 * every Studio score are changed: the app's window shows its own tab,
+		 * the site opens the Comparer's page.
+		 */
+		function openScoreSettings() {
+			if (typeof HOST.openScoreSettings === 'function') {
+				HOST.openScoreSettings();
 				return;
 			}
 			openTab(FILES.OPEN_COMPARER_MESSAGE, '../layout_analysis/index.html');
@@ -1225,8 +1358,9 @@
 				switches,
 				pinnedCodes: [...state.pinnedCodes],
 				qwertyPins: [...state.qwertyPins],
+				shortcutMode: state.shortcutMode,
+				placeTab: state.placeTab,
 				zones: problemOptions().zones,
-				weights: state.weights,
 				seconds: $('lo-seconds').value,
 				iterations: $('lo-iterations').value,
 				restarts: $('lo-restarts').value,
@@ -1263,13 +1397,13 @@
 			syncSwitches();
 			state.pinnedCodes = new Set(strings(saved.pinnedCodes));
 			state.qwertyPins = new Set(strings(saved.qwertyPins));
+			if (SHORTCUT_MODES.includes(saved.shortcutMode)) state.shortcutMode = saved.shortcutMode;
+			root.querySelector(`input[name="lo-shortcut-mode"][value="${state.shortcutMode}"]`).checked =
+				true;
+			if (PLACE_TABS.includes(saved.placeTab)) state.placeTab = saved.placeTab;
 			state.zones = new Map();
 			for (const [char, codes] of Object.entries(saved.zones || {}))
 				if (strings(codes).length) state.zones.set(char, new Set(strings(codes)));
-			const defaults = E.defaultWeights();
-			for (const [id, value] of Object.entries(saved.weights || {}))
-				if (id in defaults && Number.isFinite(value) && value >= 0) state.weights[id] = value;
-			fillWeights();
 			for (const id of ['seconds', 'iterations', 'restarts', 'seed'])
 				if (typeof saved[id] === 'string' && /^\d+$/.test(saved[id]))
 					$(`lo-${id}`).value = saved[id];
@@ -1309,7 +1443,26 @@
 				state.pinnedCodes.clear();
 				drawPinBoards();
 			});
-			$('lo-keyboard').addEventListener('change', drawPinBoards);
+			$('lo-keyboard').addEventListener('change', () => {
+				drawPinBoards();
+				// Each keyboard has its own fingering profile.
+				drawSettings();
+			});
+			for (const id of PLACE_TABS)
+				$(`lo-tab-${id}`).addEventListener('click', () => showPlaceTab(id));
+			root.querySelector('.lo-tabs').addEventListener('keydown', (event) => {
+				const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+				if (!step) return;
+				event.preventDefault();
+				const at = PLACE_TABS.indexOf(state.placeTab);
+				showPlaceTab(PLACE_TABS[(at + step + PLACE_TABS.length) % PLACE_TABS.length], true);
+			});
+			for (const input of root.querySelectorAll('input[name="lo-shortcut-mode"]'))
+				input.addEventListener('change', () => {
+					if (input.checked) state.shortcutMode = input.value;
+				});
+			$('lo-settings-edit').addEventListener('click', openScoreSettings);
+			SCORE_SETTINGS.onChange(drawSettings);
 			$('lo-zone-char').addEventListener('change', drawPinBoards);
 			$('lo-zone-clear').addEventListener('click', () => {
 				state.zones.delete($('lo-zone-char').value);
@@ -1320,10 +1473,6 @@
 				drawPinBoards();
 			});
 			$('lo-switches').addEventListener('change', syncSwitches);
-			$('lo-weights-restore').addEventListener('click', () => {
-				state.weights = E.defaultWeights();
-				fillWeights();
-			});
 			$('lo-run').addEventListener('click', run);
 			$('lo-retry').addEventListener('click', run);
 			$('lo-stop').addEventListener('click', stop);
@@ -1335,10 +1484,7 @@
 					if (root.clientWidth === width) return;
 					width = root.clientWidth;
 					drawPinBoards();
-					if (state.bestLayout && state.startInUse)
-						drawBoard($('lo-result-board'), state.bestLayout, {
-							changed: (code) => legend(state.bestLayout, code) !== legend(state.startInUse, code)
-						});
+					drawResultBoards();
 				}).observe(root);
 			}
 		}
@@ -1351,8 +1497,8 @@
 			fillStarts();
 			fillKeyboards();
 			fillSwitches();
-			fillWeights();
 			fillPresets();
+			drawSettings();
 		}
 
 		// Saving waits until the saved choices are back, or the defaults would replace them.
@@ -1364,6 +1510,7 @@
 		$('lo-seed').value = String(DEFAULT_SEED);
 		bind();
 		restore();
+		showPlaceTab(state.placeTab);
 		restored = true;
 		// Every field and switch saves on change; the boards save as they redraw.
 		root.addEventListener('change', save);
