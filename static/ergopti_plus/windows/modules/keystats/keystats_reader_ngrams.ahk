@@ -239,8 +239,11 @@ KLR_StudioContract() {
 KLR_StudioStoreStamp(MetricsDir) {
 		Derived := _KLR_StudioCacheDir(MetricsDir)
 		Entries := []
-		Loop Files, MetricsDir . "\*", "FR" {
-				if (SubStr(A_LoopFileFullPath, 1, StrLen(Derived)) = Derived)
+		Loop Files, RTrim(MetricsDir, "\/") . "\*", "FR" {
+				; A_LoopFilePath keeps the folder as Derived spells it (trimmed, then
+				; one separator); A_LoopFileFullPath expands 8.3 names (a CI runner's
+				; RUNNER~1 temp folder) and separators, and then no cache file matched.
+				if (SubStr(A_LoopFilePath, 1, StrLen(Derived)) = Derived)
 						continue
 				Entries.Push(A_LoopFileFullPath . "|" . A_LoopFileSize . "|" . A_LoopFileTimeModified)
 		}

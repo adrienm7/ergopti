@@ -560,6 +560,15 @@ _KLRSource_StudioStampFollowsTheStore() {
 		FileAppend("image", Dir . "\cache\reader.sqlite", "UTF-8-RAW")
 		AssertTrue(KLR_StudioSnapshotWrite(Dir, First, '{"schema":1}'))
 		AssertEqual(First, KLR_StudioStoreStamp(Dir), "the cache folder is not part of the stamp")
+		; Loop Files normalizes a full path (8.3 names such as a CI runner's
+		; RUNNER~1, separators): the cache stays out however the folder is spelled.
+		Spelled := StrReplace(Dir, "\", "/")
+		AssertEqual(KLR_StudioStoreStamp(Spelled), KLR_StudioStoreStamp(Spelled . "/"),
+			"the stamp does not depend on a trailing separator")
+		Bare := KLR_StudioStoreStamp(Spelled)
+		FileAppend("more", Dir . "\cache\reader.sqlite", "UTF-8-RAW")
+		AssertEqual(Bare, KLR_StudioStoreStamp(Spelled),
+			"the cache folder is not part of the stamp of a folder spelled otherwise")
 		FileAppend("b", Dir . "\device\data.sql", "UTF-8-RAW")
 		Assert(KLR_StudioStoreStamp(Dir) != First, "a grown journal changes the stamp")
 	} finally {
