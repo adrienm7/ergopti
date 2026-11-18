@@ -240,6 +240,30 @@ ConfigTomlDecodeSnapshotShared(Source) {
 	return Snapshot
 }
 
+/**
+ * The typed document of an exact configuration text, for READ-ONLY consumers.
+ * When the text is the one the published config.toml snapshot admitted, that
+ * snapshot's own document is served: the boot already parsed it, and a consumer
+ * that rereads the unchanged file paid a whole parse again. Any other text has
+ * the shared document parse. The result is shared and must not be mutated.
+ * @param {String} Source - Exact configuration text the caller read.
+ * @returns {Map} The semantic document of Source; malformed input throws.
+ */
+ConfigTomlSourceDocument(Source) {
+	global ConfigurationFile, _ConfigTomlSnapshots, _ParseTomlCache
+	if !(Source is String)
+		throw TypeError("Configuration source must be a String")
+	; Only the published generation: a snapshot whose cache was retired no longer
+	; owns the file, whatever text it holds.
+	if IsSet(ConfigurationFile) && _ConfigTomlSnapshots.Has(ConfigurationFile)
+			&& _ParseTomlCache.Has(ConfigurationFile) {
+		Admitted := _ConfigTomlSnapshots[ConfigurationFile]
+		if _ParseTomlCache[ConfigurationFile] == Admitted.Cache && Admitted.Source == Source
+			return Admitted.Document
+	}
+	return TOML_ParseDocumentShared(Source)
+}
+
 ; Reuses the actual inline-table owner to preserve each child literal spelling.
 ; Typed rendering alone would manufacture legacy Boolean intent from signed zero.
 _ConfigTomlRawTree(Value, Raw) {
@@ -538,3 +562,4 @@ _ConfigTomlSnapshotEqual(Left, Right) {
 	}
 	return Left is String ? StrCompare(Left, Right, true) == 0 : Left == Right
 }
+

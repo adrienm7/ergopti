@@ -1311,3 +1311,34 @@ _SHP_DecodeSnapshotSharesOnlyEqualText() {
 }
 Test("toml shared parse: the shared snapshot decode is keyed by text and leaves the private decode alone (shared-source-parse)",
 	_SHP_DecodeSnapshotSharesOnlyEqualText)
+
+; boot-parse-repeats-2026-11-18: a reader of the unchanged config.toml is served
+; the document the boot admitted instead of parsing that text again; any other
+; text, or a retired generation, is parsed as before.
+_SHP_AdmittedConfigDocumentIsReused() {
+	global ConfigurationFile, _ConfigTomlSnapshots, _ParseTomlCache
+	FileWasSet := IsSet(ConfigurationFile), SavedFile := FileWasSet ? ConfigurationFile : ""
+	Path := A_Temp . "\ergopti_shared_probe_admitted_" . A_ScriptHwnd . ".toml"
+	Source := "[shared_probe_f]`nvalue = " . A_TickCount . "`n"
+	Admitted := ConfigTomlDecodeSnapshot(Source)
+	try {
+		ConfigurationFile := Path
+		_ConfigTomlSnapshots[Path] := Admitted
+		_ParseTomlCache[Path] := Admitted.Cache
+		Assert(ConfigTomlSourceDocument(Source . "") == Admitted.Document,
+			"the unchanged text reads the admitted document")
+		Other := ConfigTomlSourceDocument("[shared_probe_f]`nvalue = -1`n")
+		Assert(Other != Admitted.Document, "a changed text is parsed afresh")
+		AssertEqual(-1, Other["shared_probe_f"]["value"])
+		_ParseTomlCache[Path] := Map()
+		Assert(ConfigTomlSourceDocument(Source) != Admitted.Document,
+			"a retired generation no longer serves its document")
+	} finally {
+		for Store in [_ConfigTomlSnapshots, _ParseTomlCache]
+			if Store.Has(Path)
+				Store.Delete(Path)
+		ConfigurationFile := FileWasSet ? SavedFile : unset
+	}
+}
+Test("toml shared parse: the admitted config.toml document serves its unchanged text (shared-source-parse)",
+	_SHP_AdmittedConfigDocumentIsReused)

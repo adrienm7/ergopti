@@ -237,11 +237,7 @@ const BOOT_PARSE_REPEAT_OWNERS = {
 		'ConfigTomlDecodeSnapshot<ConfigTomlReadSnapshot':
 			'proof: the served snapshot is decoded apart from its private shadow',
 		'ConfigTomlDecodeSnapshot<Func.Prototype.Call':
-			'proof: the private shadow the served snapshot is compared against',
-		'ConfigTomlDecodeSnapshot<PersonalFileControls.Refresh':
-			'debt: the personal-file activation could read the admitted boot snapshot',
-		'TOML_ParseDocumentShared<_LLM_Menu_PrivacySnapshot':
-			'debt: the shared document cache misses because no earlier boot reader fills it'
+			'proof: the private shadow the served snapshot is compared against'
 	},
 	Flat: {
 		'_ConfigMigrateParse<ConfigMigrateRun':

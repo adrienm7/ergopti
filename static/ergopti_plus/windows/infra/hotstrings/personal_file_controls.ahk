@@ -142,8 +142,9 @@ class PersonalFileControls {
 		if !(Content is String)
 			throw Error("The personal-file activation configuration is unreadable.")
 		; Dynamic choices may be dotted assignments or inline containers. Read
-		; their typed semantic tree without publishing another boot snapshot.
-		Stored := ConfigTomlDecodeSnapshot(Content).Document
+		; their typed semantic tree without publishing another boot snapshot;
+		; the unchanged boot file reuses the document the boot admitted.
+		Stored := ConfigTomlSourceDocument(Content)
 		for Record in Inventory {
 			if Record["admitted"] && Record["exclusive"] {
 				Owner := PersonalFileAdoptedOwner(Record, Stored)

@@ -755,6 +755,7 @@ _PFC_SemanticActivation(Shape, Mode) {
 	Source := Fixture.source
 	try {
 		AssertEqual(Id, Fixture.descriptor["id"], "the authored choices target the actually discovered file")
+		TOML_ParseRepeatOwnersTake("document")
 		Cache := ParseConfigTomlFile(Fixture.path)
 		AssertTrue(Cache["future"]["text"] is String)
 		AssertEqual("001", Cache["future"]["text"])
@@ -762,6 +763,11 @@ _PFC_SemanticActivation(Shape, Mode) {
 
 		HSE_RegistryClear()
 		PersonalFileControls.Register()
+		; boot-parse-repeats-2026-11-18: the activation reads the document the
+		; boot admitted for this unchanged file, never a second parse of it.
+		for RepeatOwner in TOML_ParseRepeatOwnersTake("document")
+			AssertFalse(InStr(RepeatOwner, "PersonalFileControls") || InStr(RepeatOwner, "ConfigTomlSourceDocument"),
+				"the personal-file activation parsed the admitted source again: " . RepeatOwner)
 		Owner := PersonalFileControls.owners[Id]
 		AssertTrue(Owner.groups[Id] is TOML_Bool, "the actual adopted gate retains TOML Boolean intent")
 		AssertEqual(FileEnabled, Owner.groups[Id].Value)

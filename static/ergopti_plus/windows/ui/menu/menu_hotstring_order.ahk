@@ -100,7 +100,7 @@ _HS_OrderSnapshot(Category, Path := unset) {
 		Content := Presence ? FSReadUtf8Exact(Path) : ""
 		if !(Content is String)
 			throw TypeError("Section-order source is not readable.")
-		Document := TOML_ParseDocumentShared(Content)
+		Document := ConfigTomlSourceDocument(Content)
 		Read := _TOML_DocumentLookup(Document, ["hotstrings", ConfigLeaf.ORDER_OVERRIDES, Category])
 		if Read["blocked"] || Read["found"] && !_HS_OrderValid(Read["value"])
 			throw TypeError("Section order is not a text list.")

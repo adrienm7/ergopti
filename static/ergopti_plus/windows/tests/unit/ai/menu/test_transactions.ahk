@@ -684,3 +684,45 @@ _LMT_NarrowSemanticDefault(Kind) {
 Test("LLM narrow semantic default: Info Bar preserves dotted schema and foreign bytes", _LMT_NarrowSemanticDefault.Bind("info"))
 Test("LLM narrow semantic default: indentation preserves dotted schema and foreign bytes", _LMT_NarrowSemanticDefault.Bind("indent"))
 Test("LLM narrow semantic default: privacy preserves dotted schema and foreign bytes", _LMT_NarrowSemanticDefault.Bind("privacy"))
+
+; boot-parse-repeats-2026-11-18: the trigger menu's privacy rows, the Info Bar and
+; the indentation rows read the document the boot admitted for the unchanged
+; config.toml. The text is unique to this run, so no earlier shared parse can
+; hide a second parse of it.
+_LMT_SnapshotsReuseAdmittedDocument() {
+	global _LLM_Menu, _LLM_Engine, _ConfigTomlSnapshots, _ParseTomlCache
+	Path := _LMT_InfoBarPrivatePath()
+	Previous := _LMT_InstallFixture(Path), PreviousEngine := _LLM_Engine
+	try {
+		_LLM_Menu["enabled"] := true
+		_LLM_Menu["n_predictions"] := 3
+		_LLM_Menu["pred_indent"] := 1
+		_LLM_Menu["show_all_at_once"] := false
+		_LLM_Menu["show_info_bar"] := true
+		_LLM_Menu["disable_url_bars"] := false
+		_LLM_Menu["disable_password_fields"] := false
+		_LLM_Engine := LLM_Menu_DeepClone(_LLM_Menu)
+		Initial := _CMJFixtureCurrentSource('[llm]`nenabled = true`n[llm.models]`nselected = "ollama"`n'
+			. '[llm.profiles]`nnum_predictions = 3`n[llm.display]`npred_indent = 1`nstreaming_multi = true`nshow_info_bar = true`n'
+			. '[llm.trigger]`nurl_bar_filter_enabled = false`nsecure_filter_enabled = false`n[private]`nprobe = ' . A_TickCount . '`n')
+		Assert(FSWriteDurable(Path, Initial))
+		TOML_ParseRepeatOwnersTake("document")
+		Admitted := ConfigTomlDecodeSnapshot(Initial)
+		_ConfigTomlSnapshots[Path] := Admitted
+		_ParseTomlCache[Path] := Admitted.Cache
+		for Snapshot in [_LLM_Menu_PrivacySnapshot("disable_url_bars"),
+				_LLM_Menu_PrivacySnapshot("disable_password_fields"),
+				_LLM_Menu_InfoBarSnapshot(), _LLM_Menu_IndentSnapshot()]
+			AssertFalse(Snapshot["blocked"], "the admitted document admits each row")
+		for RepeatOwner in TOML_ParseRepeatOwnersTake("document")
+			AssertFalse(InStr(RepeatOwner, "_LLM_Menu_") || InStr(RepeatOwner, "ConfigTomlSourceDocument"),
+				"an LLM menu snapshot parsed the admitted source again: " . RepeatOwner)
+	} finally {
+		for Store in [_ConfigTomlSnapshots, _ParseTomlCache]
+			if Store.Has(Path)
+				Store.Delete(Path)
+		_LLM_Engine := PreviousEngine
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM menu snapshots: the unchanged config.toml reuses its admitted document", _LMT_SnapshotsReuseAdmittedDocument)
