@@ -43,7 +43,26 @@ async function observe(source, root, scenario) {
 	let forwarderReads = 0;
 	const ending = 'main().then(';
 	assert.equal(source.split(ending).length, 2, 'the actual startup main must have one invocation');
-	const executable = source.slice(0, source.indexOf(ending)) + '\nglobalThis.bootMain = main;\n';
+	const executable =
+		source.slice(0, source.indexOf(ending)) +
+		'\nglobalThis.bootMain = main;\nglobalThis.smokeWorkOwners = BOOT_WORK_OWNERS;\n';
+	// The boot's owner records name every owner the smoke admits, once; each
+	// work scenario plants one regression the smoke must name.
+	let smokeContext;
+	const workRecords = () =>
+		Object.entries(smokeContext.smokeWorkOwners)
+			.map(([kind, owners]) => {
+				const names = Object.keys(owners);
+				if (scenario === 'work-stale' && kind === 'Snapshot reads') names.shift();
+				const pairs = names.map(
+					(owner, index) =>
+						`${owner}=${scenario === 'work-doubled' && kind === 'Snapshot reads' && index === 0 ? 2 : 1}`
+				);
+				if (scenario === 'work-unnamed' && kind === 'Document re-parses')
+					pairs.push('ConfigTomlDecodeSnapshot<PersonalFileControls.Refresh=1');
+				return `[INFO] [Perf] ${kind} by owner (0 ms): ${pairs.join(' ')}.\n`;
+			})
+			.join('');
 	try {
 		const context = vm.createContext({
 			__dirname: path.join(root, 'tools/test'),
@@ -229,8 +248,9 @@ async function observe(source, root, scenario) {
 									: render(15) +
 											deferredRender(scenario === 'slow-render' ? 3200 : 40) +
 											resume +
-											// The boot's first counter record; the smoke caps its counts.
-											`[INFO] [Perf] Interval counters (0 ms): config.snapshot_read=${scenario === 'operation-over-budget' ? 99 : 1} toml.document_parse=1.\n` +
+											// The boot's first counter record and the owner records the smoke judges.
+											'[INFO] [Perf] Interval counters (0 ms): config.snapshot_read=1 toml.document_parse=1.\n' +
+											workRecords() +
 											'[INFO] inert ready\n'
 							);
 							const receipt = {
@@ -311,6 +331,7 @@ async function observe(source, root, scenario) {
 				return require(name);
 			}
 		});
+		smokeContext = context;
 		vm.runInContext(executable, context, { filename: OWNER });
 		let status, failure;
 		try {
@@ -708,7 +729,9 @@ async function check(source, root = ROOT) {
 		'ai-deferral-missing',
 		'ai-resume-missing',
 		'slow-render',
-		'operation-over-budget',
+		'work-unnamed',
+		'work-doubled',
+		'work-stale',
 		'types-cold-pid',
 		'types-cold-level',
 		'types-cold-numeric',
@@ -750,9 +773,13 @@ async function check(source, root = ROOT) {
 		);
 		assert.equal(
 			result.warmCalls,
-			['first-early-exit', 'first-save-missing', 'slow-render', 'operation-over-budget'].includes(
-				scenario
-			)
+			[
+				'first-early-exit',
+				'first-save-missing',
+				'slow-render',
+				'work-unnamed',
+				'work-doubled'
+			].includes(scenario)
 				? 0
 				: 1,
 			scenario + ': the intended real runner branch must execute'
@@ -764,10 +791,20 @@ async function check(source, root = ROOT) {
 				result.diagnostics.join('\n'),
 				/fresh-config: a Hotstrings menu render took 3200 ms \(budget 2000 ms/
 			);
-		if (scenario === 'operation-over-budget')
+		if (scenario === 'work-unnamed')
 			assert.match(
 				result.diagnostics.join('\n'),
-				/fresh-config: boot 1 counted config\.snapshot_read=99, over its ceiling of 9/
+				/fresh-config: the boot's document re-parses by owner include ConfigTomlDecodeSnapshot<PersonalFileControls\.Refresh \(1\), which BOOT_WORK_OWNERS does not name/
+			);
+		if (scenario === 'work-doubled')
+			assert.match(
+				result.diagnostics.join('\n'),
+				/fresh-config: ParseConfigTomlFile<Auto-execute did its snapshot reads work 2 times in one boot/
+			);
+		if (scenario === 'work-stale')
+			assert.match(
+				result.diagnostics.join('\n'),
+				/no boot does the work of Snapshot reads:ParseConfigTomlFile<Auto-execute any more/
 			);
 		if (scenario === 'first-save-missing')
 			assert.match(result.diagnostics.join('\n'), /fresh-config:.*no fresh full-save receipt/);

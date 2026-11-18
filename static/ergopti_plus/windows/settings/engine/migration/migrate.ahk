@@ -1138,6 +1138,11 @@ global ConfigMigrateRegistryChecks := 0
 
 ; Number of those checks that really compared the registry (diagnostics only).
 global ConfigMigrateRegistryDeepCompares := 0
+; Those comparisons per owner since the last interval publication, so the startup
+; smoke names the owners a boot compares for instead of capping their count. An
+; owner is the request ("!" for a fresh check) and the caller<parent frames of
+; the liveness check; a closure's frame has an empty name.
+global _ConfigMigrateDeepCompareOwners := Map()
 
 ; Memo of one synchronous proof scope: the shipped registry and the private
 ; shadow whose deep comparison already succeeded inside the open scope.
@@ -1345,6 +1350,8 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 					&& ReadProof.shadow == Row.registry_shadow
 				return true
 			ConfigMigrateRegistryDeepCompares += 1
+			_ConfigMigrateDeepCompareOwnerCount(Request . (Fresh ? "!" : "") . ":"
+				. Error("", -2).What . "<" . Error("", -3).What)
 			CompareStarted := PerfStage_Begin()
 			Same := ConfigMigrateSameRegistry(CurrentRegistry, Row.registry_shadow)
 			PerfStage_End("ConfigMigrate.registry_deep_compare", CompareStarted)
@@ -2124,4 +2131,28 @@ ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, Side, Bounds := 0) {
 		return ConfigMigrateBoot(Path, "settle_owned", Candidate, Bundle)
 	} catch
 		return false
+}
+
+/**
+ * Counts one deep registry comparison for its owner, within the document parse
+ * owner bound.
+ * @param {String} Owner - "request:caller<parent" for the liveness check that compared.
+ */
+_ConfigMigrateDeepCompareOwnerCount(Owner) {
+	global _ConfigMigrateDeepCompareOwners, TOML_DOCUMENT_PARSE_OWNER_LIMIT
+	if _ConfigMigrateDeepCompareOwners.Has(Owner)
+		_ConfigMigrateDeepCompareOwners[Owner] += 1
+	else if _ConfigMigrateDeepCompareOwners.Count < TOML_DOCUMENT_PARSE_OWNER_LIMIT
+		_ConfigMigrateDeepCompareOwners[Owner] := 1
+}
+
+/**
+ * Returns and clears the deep comparison owners counted since the last call.
+ * @returns {Map} Owner to comparison count.
+ */
+ConfigMigrateDeepCompareOwnersTake() {
+	global _ConfigMigrateDeepCompareOwners
+	Owners := _ConfigMigrateDeepCompareOwners
+	_ConfigMigrateDeepCompareOwners := Map()
+	return Owners
 }

@@ -17,6 +17,11 @@ global _ConfigTomlSnapshots := Map()
 ; Monotonic count of snapshot reads. Each one compares the whole snapshot with
 ; its shadow, so tests pin how many a step spends.
 global _ConfigTomlSnapshotReads := 0
+; Snapshot reads per caller<parent since the last interval publication. Each one
+; compares the whole snapshot with its shadow, so the startup smoke names the
+; owners a boot reads through instead of capping their count. Bounded like the
+; document parse owners.
+global _ConfigTomlSnapshotReadOwners := Map()
 ; The snapshot the open boot read stretch serves (ConfigTomlBootSnapshot), or 0.
 global _ConfigTomlBootReadMemo := 0
 
@@ -325,6 +330,7 @@ ConfigTomlReadSnapshot(Path) {
 	global _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshotReads
 	_ConfigTomlSnapshotReads += 1
 	PerfCount("config.snapshot_read")
+	_ConfigTomlSnapshotReadOwnerCount(Error("", -2).What . "<" . Error("", -3).What)
 	global _TomlReadFailures, _TomlUnreadableFiles
 	static Generations := Map()
 	static DecodeOwner := ConfigTomlDecodeSnapshot, JournalOwner := ConfigMigrateBoot
@@ -563,3 +569,25 @@ _ConfigTomlSnapshotEqual(Left, Right) {
 	return Left is String ? StrCompare(Left, Right, true) == 0 : Left == Right
 }
 
+/**
+ * Counts one snapshot read for its owner, within the document parse owner bound.
+ * @param {String} Owner - "caller<parent" as Error().What reports them.
+ */
+_ConfigTomlSnapshotReadOwnerCount(Owner) {
+	global _ConfigTomlSnapshotReadOwners, TOML_DOCUMENT_PARSE_OWNER_LIMIT
+	if _ConfigTomlSnapshotReadOwners.Has(Owner)
+		_ConfigTomlSnapshotReadOwners[Owner] += 1
+	else if _ConfigTomlSnapshotReadOwners.Count < TOML_DOCUMENT_PARSE_OWNER_LIMIT
+		_ConfigTomlSnapshotReadOwners[Owner] := 1
+}
+
+/**
+ * Returns and clears the snapshot read owners counted since the last call.
+ * @returns {Map} Owner to read count.
+ */
+ConfigTomlSnapshotReadOwnersTake() {
+	global _ConfigTomlSnapshotReadOwners
+	Owners := _ConfigTomlSnapshotReadOwners
+	_ConfigTomlSnapshotReadOwners := Map()
+	return Owners
+}

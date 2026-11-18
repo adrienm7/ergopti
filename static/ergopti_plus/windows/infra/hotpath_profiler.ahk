@@ -775,6 +775,17 @@ PerfCounters_Flush() {
 				try LoggerEvidence("Perf", "{1} re-parses by owner ({2} ms): {3}.", Label, IntervalMs, PerfCountersText(Repeats))
 		}
 	}
+	; Whole-image proofs by the owner that asked for each.
+	if IsSet(ConfigTomlSnapshotReadOwnersTake) {
+		Owners := ConfigTomlSnapshotReadOwnersTake()
+		if Owners.Count > 0
+			try LoggerEvidence("Perf", "Snapshot reads by owner ({1} ms): {2}.", IntervalMs, PerfCountersText(Owners))
+	}
+	if IsSet(ConfigMigrateDeepCompareOwnersTake) {
+		Owners := ConfigMigrateDeepCompareOwnersTake()
+		if Owners.Count > 0
+			try LoggerEvidence("Perf", "Registry deep compares by owner ({1} ms): {2}.", IntervalMs, PerfCountersText(Owners))
+	}
 	State := PerfProcessState()
 	; The log-volume figures ride on this record as they ride on the macOS memory
 	; record: both are process-wide and one record per interval is what is read back.

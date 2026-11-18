@@ -195,33 +195,25 @@ function hotstringsRenderTimes(configRoot) {
 	].map((match) => Number(match[1] ?? match[2]));
 }
 
-// boot-operation-budget-2026-11-03: the boot's counted operations, read from the
-// driver's own first counter record. Wall time on a shared runner is too noisy
-// to gate, but each count is deterministic for a fixture. Two ceilings remain
-// counts: every snapshot read compared the whole config.toml snapshot twice, and
-// registry comparisons multiplied with the boot's readers. Both count reads, not
-// data, so a new setting does not move them; tests/unit/settings/engine/migration
-// test_journal_boot.ahk proves the sharing structurally. The data-sized counts
-// (toml.flat_values, toml.document_parse, toml.document_slow_steps) are judged by
-// BOOT_PARSE_REPEAT_OWNERS and the lexer's run-length test instead.
-const BOOT_OPERATION_CEILINGS = {
-	'config.snapshot_read': { all: 9 },
-	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 }
-};
-
-// boot-parse-repeats-2026-11-18: the owners allowed to parse a text the boot had
-// already parsed, by reader, as "caller<parent" (the driver's Error().What
-// frames). This replaces the toml.flat_values, toml.document_parse and
-// toml.document_slow_steps ceilings: their counts moved with every shared
-// constant and template setting, while the cost they bounded is a reader that
-// parses again what the boot already parsed (each personal hotstrings file four
-// times, perf-personal-metadata-2026-10-17). A new repeat fails whatever the size
-// of the data, and so does an owner below that no boot repeats any more: remove
-// it. "Proof" owners must parse their own genuine read; "debt" owners could reuse
-// an earlier parse and are listed in TODO.md to be retired.
-const SEEN_REPEAT_OWNERS = new Set();
-const BOOT_PARSE_REPEAT_OWNERS = {
-	Document: {
+// boot-work-owners-2026-11-18: the boot's repeated work, judged by owner instead
+// of by count. The driver publishes, for its first counter interval, who parsed
+// again a text its reader had already parsed ("Document re-parses", "Flat
+// re-parses"), who read the config.toml snapshot (each read compares the whole
+// snapshot with its private shadow twice) and who deep-compared the migration
+// registry with its shadow. Owners are "caller<parent" (the driver's Error().What
+// frames; a closure has an empty name), a registry compare prefixed by its
+// request ("!" marks a fresh check). This replaces the toml.flat_values,
+// toml.document_parse, toml.document_slow_steps, config.snapshot_read and
+// config_migrate.registry_deep_compares ceilings: the data-sized counts moved with
+// every shared constant, and the read counts only said how many, never which
+// reader was new. A boot fails on an owner this table does not name, whatever the
+// size of the data; on a named owner doing its work twice, unless its reason
+// starts with "each", naming the unit it repeats per; and, over the whole run, on
+// a named owner no boot uses any more, so the table only shrinks. "Proof" owners
+// need their own genuine read; "debt" owners could reuse an earlier one and are
+// listed in TODO.md to be retired.
+const BOOT_WORK_OWNERS = {
+	'Document re-parses': {
 		'ConfigMigrateRun<Func.Prototype.Call':
 			'proof: the migration owner classifies the version of its own physical read',
 		'ConfigMigratePlan<ConfigMigrateRun':
@@ -239,114 +231,138 @@ const BOOT_PARSE_REPEAT_OWNERS = {
 		'ConfigTomlDecodeSnapshot<Func.Prototype.Call':
 			'proof: the private shadow the served snapshot is compared against'
 	},
-	Flat: {
+	'Flat re-parses': {
 		'_ConfigMigrateParse<ConfigMigrateRun':
 			'proof: the version check compares a second read against the first',
 		'_ConfigMigrateParse<ConfigMigratePlan':
 			'proof: the planner parses the exact bytes it backs up and migrates'
+	},
+	'Snapshot reads': {
+		'ParseConfigTomlFile<Auto-execute': 'proof: the boot decodes and publishes the bootstrap cache',
+		'ConfigTomlBootSnapshot<_FeatureStateAdmitBootCache':
+			'proof: the boot read stretch serves every bootstrap consumer from this one read',
+		'ConfigTomlBootReadsRelease<Auto-execute':
+			'proof: the closing stretch proves the served snapshot is still the native generation',
+		'_ConfigFullSaveCaptureOptionalBootSource<_ConfigFullSaveRequest':
+			'proof: the boot full save captures the generation it is about to rewrite',
+		'LoggerInit<Auto-execute':
+			'debt: the log level could read through the boot read stretch (ConfigTomlBootSnapshot)',
+		'ApplyConfigToml<ApplyBootConfigToml':
+			'debt: the feature loader could read through the boot read stretch (ConfigTomlBootSnapshot)',
+		'CS_Read<CS_Load':
+			'debt: the metrics settings could read through the boot read stretch (ConfigTomlBootSnapshot)'
+	},
+	'Registry deep compares': {
+		'prepare:ConfigMigrateBoot<ConfigSchemaPrepareSource':
+			'proof: the boot prepares its source against the live registry',
+		'prepare:ClassifyImage<ConfigMigrateBoot':
+			'proof: the prepared image is classified with the live registry',
+		'boot:ConfigMigrateBoot<Auto-execute':
+			'each side of the migration: the boot request proves the registry before the migration runs and again before it admits the result',
+		'boot:<Func.Prototype.Call':
+			'each durable effect: every native write of the boot migration compares the registry afresh (MigrationRegistryAdmission)',
+		'boot:ClassifyImage<ConfigMigrateBoot':
+			'proof: the migrated image is classified with the live registry',
+		'capture_read:ConfigMigrateBoot<Func.Prototype.Call':
+			'proof: the first snapshot read of the boot read stretch proves the registry once',
+		'capture_read:<Func.Prototype.Call':
+			'proof: the admission of that first read, before the stretch memo holds the proof',
+		'close_boot_reads!:ConfigMigrateBoot<ConfigMigrateBootReadsClose':
+			'proof: the closing stretch compares once afresh, so a registry changed while it was open is reported'
 	}
+};
+const SEEN_WORK_OWNERS = new Set();
+
+// What a new owner of each kind of work should do instead of being named.
+const BOOT_WORK_ADVICE = {
+	'Document re-parses': 'reuse the first parse (a cached read, the admitted snapshot document)',
+	'Flat re-parses': 'reuse the first parse (a cached read, the admitted snapshot document)',
+	'Snapshot reads': 'read through the boot read stretch (ConfigTomlBootSnapshot)',
+	'Registry deep compares':
+		'share the open proof (ConfigMigrateWithRegistryProof or the boot read stretch)'
 };
 
 /**
- * The counted operations of every boot a fixture logged: the first counter
- * record of a process, whose window starts at the process.
+ * Whether the boot published its first counter record: the interval flush that
+ * publishes the owner records ran.
  * @param {string} configRoot
- * @returns {Array<Map<string, number>>}
+ * @returns {string} The problem, or '' when every boot flushed its counters.
  */
-function bootOperationCounts(configRoot) {
-	return [...logText(configRoot).matchAll(/\[Perf\] Interval counters \(0 ms\): ([^\n]*)/g)].map(
-		(match) =>
-			new Map(
-				match[1]
-					.replace(/\.\s*$/, '')
-					.split(' ')
-					.map((pair) => pair.split('='))
-					.filter((pair) => pair.length === 2)
-					.map(([name, value]) => [name, Number(value)])
-			)
-	);
+function bootCounterProblem(configRoot) {
+	return /\[Perf\] Interval counters \(0 ms\): /.test(logText(configRoot))
+		? ''
+		: 'no boot counter record was logged';
 }
 
 /**
- * Whether a fixture's boots stayed within their operation ceilings.
- * @param {string} fixture
+ * Every boot's work by owner, read from the driver's first owner records: one
+ * entry per kind of work, record and owner.
  * @param {string} configRoot
- * @returns {string} The first excess, or '' when every boot is within budget.
+ * @returns {Array<{kind: string, owner: string, count: number}>}
  */
-function bootOperationProblem(fixture, configRoot) {
-	const boots = bootOperationCounts(configRoot);
-	if (boots.length === 0) return 'no boot counter record was logged';
-	for (const [index, counts] of boots.entries()) {
-		console.log(
-			`${fixture} boot ${index + 1} operations: ${[...Object.keys(BOOT_OPERATION_CEILINGS)].map((name) => `${name}=${counts.get(name) ?? 0}`).join(' ')}`
-		);
-		for (const [name, ceilings] of Object.entries(BOOT_OPERATION_CEILINGS)) {
-			const ceiling = ceilings[fixture] ?? ceilings.all;
-			const count = counts.get(name) ?? 0;
-			if (count > ceiling)
-				return `boot ${index + 1} counted ${name}=${count}, over its ceiling of ${ceiling}`;
-		}
-	}
-	return '';
-}
-
-/**
- * Every boot's repeated parses, read from the driver's first re-parse records:
- * one entry per reader and owner that parsed a text its reader had already
- * parsed in that boot.
- * @param {string} configRoot
- * @returns {Array<{reader: string, owner: string, count: number}>}
- */
-function bootParseRepeats(configRoot) {
-	const repeats = [];
-	for (const match of logText(configRoot).matchAll(
-		/\[Perf\] (Document|Flat) re-parses by owner \(0 ms\): ([^\n]*)/g
-	))
+function bootWorkOwners(configRoot) {
+	const kinds = Object.keys(BOOT_WORK_OWNERS).join('|');
+	const records = new RegExp(`\\[Perf\\] (${kinds}) by owner \\(0 ms\\): ([^\\n]*)`, 'g');
+	const owners = [];
+	for (const match of logText(configRoot).matchAll(records))
 		for (const pair of match[2].replace(/\.\s*$/, '').split(' ')) {
-			const [owner, count] = pair.split('=');
-			repeats.push({ reader: match[1], owner, count: Number(count) });
+			const split = pair.lastIndexOf('=');
+			owners.push({
+				kind: match[1],
+				owner: pair.slice(0, split),
+				count: Number(pair.slice(split + 1))
+			});
 		}
-	return repeats;
+	return owners;
 }
 
 /**
- * Whether every repeated boot parse belongs to an owner named in
- * BOOT_PARSE_REPEAT_OWNERS.
+ * Whether every boot's repeated work belongs to an owner named in
+ * BOOT_WORK_OWNERS, each doing it once unless its reason says what it repeats per.
  * @param {string} fixture
  * @param {string} configRoot
- * @returns {string} The first unnamed repeat, or '' when there is none.
+ * @returns {string} The first unnamed or doubled owner, or '' when there is none.
  */
-function bootParseRepeatProblem(fixture, configRoot) {
-	const repeats = bootParseRepeats(configRoot);
-	console.log(
-		`${fixture} boot re-parses: ${repeats.map(({ reader, owner, count }) => `${reader}:${owner}=${count}`).join(' ') || 'none'}`
-	);
-	for (const { reader, owner } of repeats) SEEN_REPEAT_OWNERS.add(`${reader}:${owner}`);
-	const unnamed = repeats.find(({ reader, owner }) => !BOOT_PARSE_REPEAT_OWNERS[reader][owner]);
+function bootWorkProblem(fixture, configRoot) {
+	const owners = bootWorkOwners(configRoot);
+	for (const kind of Object.keys(BOOT_WORK_OWNERS))
+		console.log(
+			`${fixture} boot ${kind.toLowerCase()}: ${
+				owners
+					.filter((entry) => entry.kind === kind)
+					.map(({ owner, count }) => `${owner}=${count}`)
+					.join(' ') || 'none'
+			}`
+		);
+	for (const { kind, owner } of owners) SEEN_WORK_OWNERS.add(`${kind}:${owner}`);
+	const unnamed = owners.find(({ kind, owner }) => !Object.hasOwn(BOOT_WORK_OWNERS[kind], owner));
 	if (unnamed)
 		return (
-			`the boot's ${unnamed.reader.toLowerCase()} reader parsed ${unnamed.count} text(s) it had already ` +
-			`parsed, again for ${unnamed.owner}: reuse the first parse (a cached read, a shared snapshot), ` +
-			'or name this owner and its reason in BOOT_PARSE_REPEAT_OWNERS'
+			`the boot's ${unnamed.kind.toLowerCase()} by owner include ${unnamed.owner} (${unnamed.count}), ` +
+			`which BOOT_WORK_OWNERS does not name: ${BOOT_WORK_ADVICE[unnamed.kind]}, ` +
+			'or name this owner and its reason there'
 		);
-	// A named owner repeats one parse of the boot's image, the one its reason
-	// names; a second one is the owner parsing its own text again.
-	const doubled = repeats.find(({ count }) => count > 1);
+	const doubled = owners.find(
+		({ kind, owner, count }) => count > 1 && !BOOT_WORK_OWNERS[kind][owner].startsWith('each ')
+	);
 	if (doubled)
-		return `${doubled.owner} parsed the same ${doubled.reader.toLowerCase()} text ${doubled.count + 1} times in one boot: ${BOOT_PARSE_REPEAT_OWNERS[doubled.reader][doubled.owner]}, once`;
+		return (
+			`${doubled.owner} did its ${doubled.kind.toLowerCase()} work ${doubled.count} times in one boot, ` +
+			`but its reason names one: ${BOOT_WORK_OWNERS[doubled.kind][doubled.owner]}`
+		);
 	return '';
 }
 
 /**
- * The named repeat owners no boot of this run used: a retired repeat whose name
- * must leave BOOT_PARSE_REPEAT_OWNERS, so the list only ever shrinks.
+ * The named owners no boot of this run used: retired work whose name must leave
+ * BOOT_WORK_OWNERS, so the table only ever shrinks.
  * @returns {string[]}
  */
-function staleRepeatOwners() {
-	return Object.entries(BOOT_PARSE_REPEAT_OWNERS).flatMap(([reader, owners]) =>
+function staleWorkOwners() {
+	return Object.entries(BOOT_WORK_OWNERS).flatMap(([kind, owners]) =>
 		Object.keys(owners)
-			.filter((owner) => !SEEN_REPEAT_OWNERS.has(`${reader}:${owner}`))
-			.map((owner) => `${reader}:${owner}`)
+			.filter((owner) => !SEEN_WORK_OWNERS.has(`${kind}:${owner}`))
+			.map((owner) => `${kind}:${owner}`)
 	);
 }
 
@@ -957,10 +973,10 @@ async function main() {
 				!logText(configRoot).includes("Deferred submenu 'hotstrings_menu' built in")
 			)
 				return fail(`${fixture}: no real Hotstrings submenu render was logged`);
-			const operations = bootOperationProblem(fixture, configRoot);
-			if (operations) return fail(`${fixture}: ${operations}`);
-			const repeats = bootParseRepeatProblem(fixture, configRoot);
-			if (repeats) return fail(`${fixture}: ${repeats}`);
+			const counters = bootCounterProblem(configRoot);
+			if (counters) return fail(`${fixture}: ${counters}`);
+			const work = bootWorkProblem(fixture, configRoot);
+			if (work) return fail(`${fixture}: ${work}`);
 			const slowest = Math.max(0, ...renders);
 			if (slowest > HOTSTRINGS_RENDER_BUDGET_MS)
 				return fail(
@@ -1008,16 +1024,16 @@ async function main() {
 
 				const reloaded = failOnLoggedErrors('reloaded-config', configRoot);
 				if (reloaded !== null) return reloaded;
-				const warmOperations = bootOperationProblem(`${fixture}/warm`, configRoot);
-				if (warmOperations) return fail(`${fixture}/warm: ${warmOperations}`);
-				const warmRepeats = bootParseRepeatProblem(`${fixture}/warm`, configRoot);
-				if (warmRepeats) return fail(`${fixture}/warm: ${warmRepeats}`);
+				const warmCounters = bootCounterProblem(configRoot);
+				if (warmCounters) return fail(`${fixture}/warm: ${warmCounters}`);
+				const warmWork = bootWorkProblem(`${fixture}/warm`, configRoot);
+				if (warmWork) return fail(`${fixture}/warm: ${warmWork}`);
 			}
 		}
-		const stale = staleRepeatOwners();
+		const stale = staleWorkOwners();
 		if (stale.length > 0)
 			return fail(
-				`no boot repeats a parse for ${stale.join(', ')} any more: remove it from BOOT_PARSE_REPEAT_OWNERS`
+				`no boot does the work of ${stale.join(', ')} any more: remove it from BOOT_WORK_OWNERS`
 			);
 		console.log(
 			'\x1b[32m[OK] full AHK startup smoke: fresh, reloaded, independent, suspend-marker, extension opt-in, ' +
