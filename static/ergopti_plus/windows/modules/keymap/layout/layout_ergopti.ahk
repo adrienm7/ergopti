@@ -612,6 +612,7 @@ _ErgoptiScanCodeNumber(Sc) => Integer("0x" . SubStr(Sc, 3))
  * @returns {Map}
  */
 ErgoptiBaseMapping() {
+	PerfCount("ergopti_layout.base_mapping_build")
 	Out := Map()
 	for Sc, Descriptor in ErgoptiLayout_Spec()["levels"]["base"] {
 		if !Descriptor.Has("text")
@@ -630,6 +631,7 @@ ErgoptiBaseMapping() {
  *   sequence, "table", its published dead-key table).
  */
 ErgoptiBaseDeadKeys() {
+	PerfCount("ergopti_layout.base_dead_keys_build")
 	Spec := ErgoptiLayout_Spec()
 	Out := Map()
 	for Sc, Descriptor in Spec["levels"]["base"] {

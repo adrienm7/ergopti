@@ -288,6 +288,52 @@ _MET_ActualSourceOwner() {
 }
 Test("magic editor: effective physical owner priority and native retargeting", _MET_ActualSourceOwner)
 
+; Both Ergopti base tables are built from the whole layer, so they are built once
+; per probe; rebuilding them for every catalogue key made the boot probe quadratic.
+_MET_BaseTableBuilds() {
+	Counts := _PerfCountersOwner().Counts
+	return Counts.Get("ergopti_layout.base_mapping_build", 0) + Counts.Get("ergopti_layout.base_dead_keys_build", 0)
+}
+
+_MET_BaseTablesOncePerProbe() {
+	global Features, ScriptInformation, KLE_Model, TapHold
+	_TestEnsureErgoptiLayout()
+	Saved := [Features, ScriptInformation, KLE_Model, TapHold]
+	try {
+		Features := Map("layout", Map("ergopti_base", true, "direct_access_digits", "native", "emulated_layout", ""),
+			"hotstrings", Map("magic_key", Map("replace", Map("enabled", false))))
+		ScriptInformation := Map("MagicKey", ";", "MagicKeySourceScan", "SC024", "MagicKeySourceChosen", false,
+			"MagicKeySourceOverridesEmulation", false)
+		KLE_Model := 0, TapHold := Map("keys", Map())
+		Hkl := DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
+		Full := MagicEditorPhysicalCatalogue(_SharedDir)
+		One := 0
+		for Key in Full["keys"]
+			if Key["code"] == "KeyA"
+				One := Map("keys", [Key])
+		AssertTrue(One is Map, "the physical registry names KeyA")
+		Before := _MET_BaseTableBuilds()
+		_MagicEditorCurrentSource(1, One, Hkl)
+		OneBuilds := _MET_BaseTableBuilds() - Before
+		AssertTrue(OneBuilds > 0, "control: a key of the built-in base layer reads the Ergopti base tables")
+		Before := _MET_BaseTableBuilds()
+		Receipt := _MagicEditorCurrentSource(2, Full, Hkl)
+		AssertEqual(OneBuilds, _MET_BaseTableBuilds() - Before,
+			"a probe of every physical key builds the base tables as often as a probe of one key")
+		Entry := ErgoptiBaseMapping()[0x1E]
+		Expected := (Entry is String) ? Entry : Entry.alt
+		Typed := ""
+		for Candidate in Receipt["candidates"]
+			if Candidate["code"] == "KeyA"
+				Typed := Candidate["text"]
+		AssertEqual(Expected, Typed, "the shared tables still answer what the built-in base layer types on KeyA")
+	} finally {
+		Features := Saved[1], ScriptInformation := Saved[2], KLE_Model := Saved[3], TapHold := Saved[4]
+	}
+}
+Test("magic editor: one probe builds the Ergopti base tables once (magic-probe-base-tables-once)",
+	_MET_BaseTablesOncePerProbe)
+
 _MET_CohortRefusals() {
 	for Refuse in ["", "reserve", "disable", "activate", "retire"]
 		_MET_CohortRefusal(Refuse)

@@ -234,8 +234,13 @@ _MagicEditorAdmission() {
 		"inhibited", (SIHO_HasActive() || (IsSet(LayerEnabled) && LayerEnabled) || !_EmitReachedScreen()) ? true : false)
 }
 
-/** Reads plain effective output without advancing the registry dead-key machine. */
-_MagicEditorEffectivePlain(Code, Scan, Native) {
+/**
+ * Reads plain effective output without advancing the registry dead-key machine.
+ * @param {Map} Probe - One probe's memo: the number-row mode and the Ergopti base
+ *   tables do not change between the keys of a probe, so each is read once, when
+ *   a key first needs it, instead of once per catalogue key.
+ */
+_MagicEditorEffectivePlain(Probe, Code, Scan, Native) {
 	global Features, ScriptInformation, KLE_Model, KLE_KeyCodes, KLE_LevelIndex, KEYLAYOUT_NEUTRAL_STATE, TapHold
 	Numeric := Integer("0x" . SubStr(Scan, 3))
 	TapId := TapHoldResolveKeyIdFromVkSc(0, Numeric)
@@ -248,7 +253,9 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 	Edge := NumberRowEdgeText(Numeric, false, NumberRowForegroundLayout(), false)
 	if Edge != ""
 		return { Count: StrLen(Edge), Text: Edge }
-	if NumberRowEffectiveMode() == "digits" {
+	if !Probe.Has("number_row_mode")
+		Probe["number_row_mode"] := NumberRowEffectiveMode()
+	if Probe["number_row_mode"] == "digits" {
 		if Numeric >= 0x02 && Numeric <= 0x0B
 			return { Count: 1, Text: Numeric == 0x0B ? "0" : String(Numeric - 1) }
 	} else if !KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) {
@@ -259,7 +266,7 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 	}
 	if _KLE_BaseCriterion(Scan, false) && KLE_KeyCodes.Has(Scan) {
 		Shift := false
-		if NumberRowEffectiveMode() == "symbols" && NumberRowSymbolsCapable(false) {
+		if Probe["number_row_mode"] == "symbols" && NumberRowSymbolsCapable(false) {
 			Level := NumberRowSymbolsLevel(Numeric, false)
 			if Level["supported"]
 				Shift := Level["shift"]
@@ -274,9 +281,13 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 		Row := NumberRowEmulatedBase(StrUpper(Scan))
 		if Row != ""
 			return { Count: StrLen(Row), Text: Row }
-		if ErgoptiBaseDeadKeys().Has(Scan)
-			return { Count: -1, Text: ErgoptiBaseDeadKeys()[Scan]["chain"] }
-		Base := ErgoptiBaseMapping()
+		if !Probe.Has("base_dead_keys")
+			Probe["base_dead_keys"] := ErgoptiBaseDeadKeys()
+		if Probe["base_dead_keys"].Has(Scan)
+			return { Count: -1, Text: Probe["base_dead_keys"][Scan]["chain"] }
+		if !Probe.Has("base_mapping")
+			Probe["base_mapping"] := ErgoptiBaseMapping()
+		Base := Probe["base_mapping"]
 		if Base.Has(Numeric) {
 			Entry := Base[Numeric]
 			Text := (Entry is String) ? Entry : (Entry.HasOwnProp("alt") && Entry.alt != "" ? Entry.alt : Entry.c)
@@ -290,7 +301,7 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 _MagicEditorCurrentSource(Generation, Keycodes, Hkl) {
 	global Features, ScriptInformation
 	Source := MagicEditorProbeSource(Hkl, ScriptInformation["MagicKey"], Generation, Keycodes,
-		0, _MagicEditorEffectivePlain)
+		0, _MagicEditorEffectivePlain.Bind(Map()))
 	if ScriptInformation["MagicKeySourceChosen"] && Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"] {
 		Chosen := StrUpper(ScriptInformation["MagicKeySourceScan"])
 		Owned := []
