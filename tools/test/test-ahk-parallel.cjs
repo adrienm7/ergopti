@@ -128,6 +128,18 @@ assert.deepEqual(sessionUses('Assert(InStr(Src, "SendInput("))'), []);
 assert.deepEqual(sessionUses('; SendInput("x")\n/* WinActivate(x) */'), []);
 assert.deepEqual(sessionUses('Request.Send(Body)'), []);
 assert.deepEqual(sessionUses('class Fake {\n\tSend(Body) {\n\t}\n}\nSend(1)'), []);
+// BM_CLICK needs the active window, through DllCall or the built-in message call.
+assert.deepEqual(
+	sessionUses(
+		'DllCall("User32\\SendMessageW", "Ptr", Hwnd, "UInt", 0xF5,\n\t"Ptr", 0, "Ptr", 0, "Ptr")'
+	),
+	['BM_CLICK']
+);
+assert.deepEqual(sessionUses('PostMessage(0xF5, 0, 0, "Button1", "ahk_id " . Hwnd)'), ['BM_CLICK']);
+assert.deepEqual(
+	sessionUses('DllCall("User32\\SendMessageW", "Ptr", Hwnd, "UInt", 0xF0, "Ptr", 0)'),
+	[]
+);
 
 // A fixture counts for the test naming it, through a wrapper too, and a marker adds a file.
 function withTests(files, check) {
@@ -180,7 +192,9 @@ for (const file of [
 	'unit/diagnostics/engine/input_probe/test_entry_owner.ahk',
 	'unit/core/ui/tooltip/test_hostile_native64.ahk',
 	'unit/modules/hotstrings/engine/test_sendinstant_clipboard_owner.ahk',
-	'unit/gestures/engine/test_plain_clipboard_owner.ahk'
+	'unit/gestures/engine/test_plain_clipboard_owner.ahk',
+	// Its second BM_CLICK went unanswered among neighbours on 2026-11-18.
+	'unit/core/ui/windows/test_app_picker_generation.ahk'
 ]) {
 	const source = fs.readFileSync(path.join(TESTS_DIR, file), 'utf8');
 	assert.notDeepEqual(exclusiveReasons(source, fixtures), [], file);

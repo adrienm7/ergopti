@@ -27,6 +27,13 @@ const OPERATOR_MARKER = /^[ \t]*;[ \t]*ahk-parallel:[ \t]*operator-only[ \t]+\S/
 const NATIVE_CALL =
 	/\bDllCall\(\s*["'](?:[\w.]+\\)?(OpenClipboard|EmptyClipboard|SetClipboardData|GetClipboardData|CloseClipboard|AddClipboardFormatListener|SetForegroundWindow|SwitchToThisWindow|AttachThreadInput|SetFocus|GetFocus|GetForegroundWindow|GetActiveWindow|SendInput|keybd_event|mouse_event|BlockInput)["']/g;
 
+// BM_CLICK (0xF5) is a mouse press and release on the button: it takes the mouse
+// capture, and Windows documents that it can fail while its window is not active.
+// A neighbour's window that takes the foreground then drops the click (the app
+// picker's second OK, 2026-11-18).
+const BUTTON_CLICK =
+	/\bDllCall\(\s*["'](?:[\w.]+\\)?(?:SendMessage|SendMessageTimeout|PostMessage)W?["'][^\n]*?["']UInt["']\s*,\s*(?:0xF5|245)\b|(?<![\w.])(?:SendMessage|PostMessage)\(\s*(?:0xF5|245)\b/i;
+
 // `.Send(` is an HTTP request, hence the lookbehind. Calls need their parenthesis:
 // `Send` alone is a parameter or a seam's name in many tests.
 const LANGUAGE_USE =
@@ -83,7 +90,9 @@ function maskSource(source, maskStrings) {
  */
 function sessionUses(source) {
 	const found = new Set();
-	for (const match of maskSource(source, false).matchAll(NATIVE_CALL)) found.add(match[1]);
+	const withStrings = maskSource(source, false);
+	for (const match of withStrings.matchAll(NATIVE_CALL)) found.add(match[1]);
+	if (BUTTON_CLICK.test(withStrings)) found.add('BM_CLICK');
 	const code = maskSource(source, true);
 	for (const match of code.matchAll(LANGUAGE_USE)) found.add(match[1] || '.Focus');
 	for (const match of code.matchAll(CLIPBOARD_ADAPTER)) found.add(match[0]);
