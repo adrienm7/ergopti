@@ -3662,6 +3662,38 @@
 		"layout_optimizer.zones.title": {
 			"reason": "loanword-or-cognate",
 			"locales": ["fr", "nl"]
+		},
+		"layout_analysis.corpus.group": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_analysis.analysers.view_scores": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr", "nl"]
+		},
+		"layout_analysis.ranking.title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["pl"]
 		}
 	}
 }

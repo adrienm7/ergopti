@@ -386,10 +386,13 @@
    surface, so a key worth zero would vanish: every key wears a 1 px edge of
    the same hue, 3.7:1 and 4.2:1 against the surface and 3.2:1 and 3.8:1
    against the light end (WCAG 1.4.11 non-text contrast). The four
-   categorical hues (the fingers) are the validator's first four slots, in
+   categorical hues are the validator's first six slots (the fingers take
+   four; the Comparer's stacked figures, its trigram classes, all six), in
    their fixed order: every adjacent pair passes the colour-blind and
-   normal-vision floors in both modes; aqua and yellow are 2.8:1 and 2.2:1
-   on white, so each mark also prints its name (the relief rule). */
+   normal-vision floors in both modes (worst adjacent CVD ΔE 9.1 light, 8.4
+   dark on #2c2c2e); aqua, yellow and magenta are 2.8:1, 2.2:1 and 2.7:1 on
+   white, so each mark also prints its name or has its table (the relief
+   rule). */
 :root {
 	--theme-chart-gain: #2a78d6;
 	--theme-chart-loss: #eb6834;
@@ -401,6 +404,8 @@
 	--theme-chart-cat-2: #eb6834;
 	--theme-chart-cat-3: #1baf7a;
 	--theme-chart-cat-4: #eda100;
+	--theme-chart-cat-5: #e87ba4;
+	--theme-chart-cat-6: #008300;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -415,6 +420,8 @@
 		--theme-chart-cat-2: #d95926;
 		--theme-chart-cat-3: #199e70;
 		--theme-chart-cat-4: #c98500;
+		--theme-chart-cat-5: #d55181;
+		--theme-chart-cat-6: #0ca30c;
 	}
 }
 
@@ -429,6 +436,8 @@
 	--theme-chart-cat-2: #d95926;
 	--theme-chart-cat-3: #199e70;
 	--theme-chart-cat-4: #c98500;
+	--theme-chart-cat-5: #d55181;
+	--theme-chart-cat-6: #0ca30c;
 }
 
 /* Status text (a better value, an error message): the system green and red

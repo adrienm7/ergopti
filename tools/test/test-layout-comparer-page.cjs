@@ -618,10 +618,89 @@ check(
 		page.match(new RegExp(`function ${name}\\(\\) \\{[\\s\\S]*?\\n\\t\\t\\}`))[0];
 	const chart = body('renderChart');
 	check(!/\.sort\(/.test(chart), 'chart: the bars follow the ranking, not a sort of their own');
+	const ranking = page.match(/function rankingTable\([^)]*\) \{[\s\S]*?\n\t\t\}/)[0];
 	check(
-		/incompleteFlag\(result\)/.test(chart) && /incompleteFlag\(result\)/.test(body('renderTable')),
+		/incompleteFlag\(result\)/.test(chart) && /incompleteFlag\(result\)/.test(ranking),
 		'chart and table: an incomplete layout carries its flag'
 	);
+	check(
+		/rankingTable\(\s*\$\('la-table'\)/.test(body('renderTable')),
+		'the ranking is a ranking table'
+	);
+	// Every other figure orders its layouts with the incomplete ones last.
+	check(
+		/Number\(a\.incomplete\) - Number\(b\.incomplete\)/.test(
+			page.match(/function figureOrder\([^)]*\) \{[\s\S]*?\n\t\t\}/)[0]
+		),
+		'figures: the incomplete layouts come last'
+	);
+}
+
+// (comparer-sub-tabs) The results are sub-tabs (maintainer, 2026-11-18): each
+// has its panel and its label, every metric of the engine is charted in exactly
+// one themed tab, the stacked figures' parts each have a categorical colour
+// token in both themes, and every built-in corpus has a kind the picker groups.
+{
+	const literal = (name) => {
+		const m = page.match(new RegExp(`const ${name} = (\\[[^\\]]*\\]|\\{[\\s\\S]*?\\n\\t\\});`));
+		check(m, `the page lost ${name}`);
+		return m ? vm.runInNewContext(`(${m[1]})`) : null;
+	};
+	const tabs = literal('TABS');
+	check(
+		JSON.stringify(tabs) ===
+			JSON.stringify([
+				'overview',
+				'fingers',
+				'bigrams',
+				'trigrams',
+				'rows',
+				'heatmaps',
+				'misc',
+				'analysers',
+				'details'
+			]),
+		`tabs: ${tabs}`
+	);
+	for (const id of tabs) {
+		check(markup.includes(`id="la-panel-${id}"`), `tab ${id}: no panel`);
+		check(page.includes(`t('layout_analysis.tab.${id}')`), `tab ${id}: no label`);
+	}
+	const tabMetrics = literal('TAB_METRICS');
+	const charted = Object.values(tabMetrics).flat();
+	for (const id of Object.keys(E.METRICS))
+		check(
+			charted.filter((m) => m === id).length === 1,
+			`metric ${id} is charted ${charted.filter((m) => m === id).length} times`
+		);
+	for (const id of charted) check(id in E.METRICS, `tab metric ${id} is not an engine metric`);
+	for (const tab of Object.keys(tabMetrics))
+		check(markup.includes(`id="la-charts-${tab}"`), `tab ${tab}: no chart grid`);
+	const parts = Math.max(literal('TRIGRAM_MIX').length, literal('ROW_MIX').length);
+	const theme = fs.readFileSync(shared('ui', 'theme.css'), 'utf8');
+	const style = fs.readFileSync(path.join(PAGE_DIR, 'style.css'), 'utf8');
+	for (let slot = 1; slot <= parts; slot++) {
+		check(
+			(theme.match(new RegExp(`--theme-chart-cat-${slot}:`, 'g')) || []).length === 3,
+			`theme.css: --theme-chart-cat-${slot} in light, system dark and chosen dark`
+		);
+		check(style.includes(`.la-seg-${slot},`), `style.css: no colour for part ${slot}`);
+	}
+	const kinds = literal('CORPUS_KINDS');
+	for (const corpus of DATA.corpora) {
+		check(kinds.includes(corpus.kind), `corpus ${corpus.id}: kind ${corpus.kind}`);
+		check(
+			(corpus.kind === 'code') === (corpus.language === 'code'),
+			`corpus ${corpus.id}: only code has the language « code »`
+		);
+	}
+	for (const kind of kinds)
+		check(
+			page.includes(`t('layout_analysis.corpus.kind.${kind}')`),
+			`corpus kind ${kind}: no label`
+		);
+	for (const [id, source] of Object.entries(DATA.library_sources))
+		check(source.name, `library collection ${id}: no name for the origin filter`);
 }
 
 if (errors.length > 0) {

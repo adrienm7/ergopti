@@ -753,19 +753,85 @@ report.
 
 ## Comparer page
 
-Layout of the page, top to bottom: corpus, keyboard and format; layouts; the
-global score chart (points, a zero line, gained in blue and lost in orange,
-with a legend; each bar opens the details with a click or Enter) and the
-sortable ranking (header buttons, units in the headers); the other analysers;
-the details; then the score settings folded in one « Réglages du score »
-section. While a corpus loads, the status says so and the results carry
-`aria-busy`. The details show: « Compare with » (`#la-versus`, another
+Layout of the page, top to bottom (maintainer, 2026-11-18): the title and
+« Copy the link »; two cards side by side (stacked on a phone), the corpus and
+« Text and keyboard » (text mode, keyboard, format); the folded layout list;
+the status; the results; then the score settings folded in one « Réglages du
+score » section. While a corpus loads, the status says so and the results carry
+`aria-busy`.
+
+**Corpus picker.** The user's own texts come first under their heading (« My
+typing » while the app reads it, then the pasted text or file), then one
+`optgroup` per language and kind of the built-in texts (« French · Books »,
+« English · Encyclopedia »…, code last under « Source code »; `corpora.json`
+`kind`, language names from `Intl.DisplayNames` in the page's language). Two
+filters, « Language » (`#la-corpus-language`; code is listed whatever the
+language) and « Kind of text » (`#la-corpus-kind`), narrow the list; the chosen
+corpus always stays listed. Both are saved (`corpusFilter`).
+
+**Layout list.** Besides its text search, « Origin » (`#la-pick-origin`: the
+Ergopti layouts, the references, the user's own, or a library collection by
+its `layout_library.json` `name`) and « Language » (`#la-pick-language`)
+narrow the list, which « Select all shown » follows; saved as `pick`.
+
+**Filters.** « Layouts shown » (`#la-filters-box`, open from 720 px and
+whenever a filter is set, folded on a phone, its summary counting the layouts
+kept) holds the filters every sub-tab draws from: name, family, origin,
+language, completeness (complete, incomplete or both) and a score range, with
+« Show every row and the default columns »; saved in `table`.
+
+**Sub-tabs** (`#la-tabs`, the ARIA tabs pattern: arrows, Home and End move;
+one panel at a time; the last one the visitor chose is saved as `tab`, a link
+naming `details` opens « One layout »). The overview is drawn after every
+analysis, another tab when it is shown.
+
+- **Overview**: the global score chart (bars from the weakest shown to the best,
+  the gap to the first in brackets; each bar opens the details with a click or
+  Enter), the best complete layout shown by the score and by nine metrics as
+  tiles, and the sortable ranking (header buttons, units in the headers, its
+  columns the viewer's: `#la-table-options`).
+- **Fingers and hands**: the finger load against the ideal as a heat table
+  (each finger's share, its signed gap to the ideal under it, the cell orange
+  above and blue below the ideal, into the neutral surface; the ideal load is
+  the first row), the hand balance (both hands in one bar, the middle marked,
+  the most balanced first), and a chart per metric.
+- **Bigrams**, **Trigrams**, **Rows and distance**, **Coverage and more**: one
+  bar chart per metric of `TAB_METRICS` (every engine metric is in exactly one
+  tab), its direction in words (« lower is better », « higher is better » or
+  « not scored »), the better first and the incomplete layouts last; then the
+  tab's sortable table. Trigrams adds the six trigram classes as a stacked bar
+  per layout; rows adds the row usage stacked bar (the home row's value
+  written) and each finger's travel as a heat table on the blue ramp.
+- **Heat maps**: the first 2 to 12 layouts shown side by side
+  (`#la-heats-count`, 6 by default), each key coloured by the presses, the
+  score or any per-key metric (`#la-heats-metric`), on one scale for all
+  (`#la-heats-shared`, the default) or each its own. The space bar's share of
+  the presses dwarfs every letter, so the scale is the other keys' and the
+  legend's dark end reads « ≥ »; the space bar is drawn at its darkest. Each
+  board has its values as a folded table and opens the layout's details.
+- **Other analysers**: `analyser_tab.js`, below.
+- **One layout**: the details, a list of the compared layouts on top
+  (`#la-details-layout`).
+
+Every chart is read as a table by assistive technology (rows of row header and
+cell, named by its heading), and every figure has a table: the themed tabs'
+sortable tables, the stacked figures' and boards' folded tables. The user's
+own layouts take the accent colour in the bars and an accent edge in the tables
+and tiles. A stacked figure's parts take the categorical slots of theme.css
+« Chart look » in a fixed order (six slots, validated adjacent-pair in light
+and dark with the dataviz palette validator); the ramps and the diverging pair
+are the heatmap's. At phone width a bar takes the whole width under its label
+and the page never scrolls sideways (`layout-editor.playwright.cjs`
+`exerciseComparerPicker`, every tab in light and dark).
+
+The details show: « Compare with » (`#la-versus`, another
 compared layout: its value and the difference beside every metric and the
 score, from `diff`, each with ▲ better, ▼ worse, = equal or « not scored » in
 words); the key heatmap in one blue hue from light to dark with its scale
 (0 to the largest key's value), board positions in % so it shrinks with the
-page; the contributions; each finger's share of the non-thumb presses with
-its ideal load marked; hands and rows; every metric; « Typed via » (the share
+page, with each finger's share of the non-thumb presses (its ideal load
+marked), hands and rows under it and the contributions beside it; every
+metric; « Typed via » (the share
 of the characters typed otherwise than their cheapest way alone, then the
 twelve most frequent characters concerned, each way with its share,
 `typingRows`); the simplicity rules, each with its value or « not measured ».
@@ -775,6 +841,11 @@ after the complete ones in the chart and the table, carries « incomplete:
 lacks … » beside its name (in words, not by colour alone; its bar is faded),
 and its details say why it ranks there. The chart colours are tokens of
 `style.css` checked with the dataviz palette validator in light and dark.
+
+The other analysers' view (`analyser_tab.js`) shows each analyser's score, or
+its rank of the layouts scored so far (`#la-analysers-view`: 1 for its best,
+ties shared, the cell on the blue ramp with the rank written); every column
+sorts from a header button that says its order in `aria-sort`.
 
 Two folded figures follow the worst pairs (row jumps are among their events
 and the heatmap's choices):
@@ -1119,3 +1190,12 @@ Decided by the agent on 2026-11-17, to review by the maintainer: `row_jump`
 the study gives it no weight; a word's effort is measured on its lower-case
 form with the score's own weights, typed alone (no space around it); a word
 table keeps 1,000 words.
+
+Decided by the agent on 2026-11-18, to review by the maintainer, for the
+Comparer's sub-tabs: the tab order and names; the overview's nine leader
+metrics; the filters folded under 720 px; the heat maps' scale leaving the
+space bar out (drawn at its darkest, the legend reading « ≥ »); the stacked
+figures writing the home row's share beside the row usage and nothing beside
+the trigram classes; the corpus kinds (`literature`, `encyclopedia`, `news`,
+`sentences`, `words`, `code`) and the Leipzig sentence samples filed as
+encyclopedia or news by their source.

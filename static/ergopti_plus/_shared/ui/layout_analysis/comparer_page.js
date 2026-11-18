@@ -64,6 +64,11 @@
  * 15. The key pair matrix (how often, or score points, each key pair) scrolls
  *    inside its own box at phone width and is also a sortable table; the
  *    effort per word reads the corpus's word table (built-in or pasted).
+ * 16. Sub-tabs (maintainer, 2026-11-18): overview, fingers and hands,
+ *    bigrams, trigrams, rows and distance, side-by-side heat maps, coverage
+ *    and more, other analysers, one layout. Every figure follows the filters
+ *    (name, family, origin, language, completeness, score) and has a table;
+ *    the corpus picker groups the built-in texts by language and kind.
  * ==============================================================================
  */
 
@@ -154,6 +159,7 @@
 	const HEAT_UNIT_PX = 44;
 	// Width of the space bar in key units.
 	const SPACE_UNITS = 6;
+	const SPACE_CODE = 'Space';
 	// A key at least this share of the heatmap's maximum is dark enough for light ink.
 	const HEAT_STRONG_SHARE = 0.55;
 	// Where a shared link opens when the page has no web address of its own
@@ -183,6 +189,89 @@
 	// library id never holds a « + », so the two never collide.
 	const PLUS_SUFFIX = '+';
 
+	// The results' sub-tabs, in order (maintainer, 2026-11-18): the ranking, the
+	// figures by theme (after KLAnext's result tabs), the other analysers and
+	// one layout in detail. A link naming a layout to detail opens the last.
+	const TABS = [
+		'overview',
+		'fingers',
+		'bigrams',
+		'trigrams',
+		'rows',
+		'heatmaps',
+		'misc',
+		'analysers',
+		'details'
+	];
+	const DEFAULT_TAB = 'overview';
+	const DETAILS_TAB = 'details';
+	// The metrics each themed tab charts, one bar chart each and one table;
+	// every metric of the engine is in exactly one tab (test-layout-comparer-page.cjs).
+	const TAB_METRICS = {
+		fingers: ['finger_imbalance', 'hand_imbalance', 'pinky_load'],
+		bigrams: [
+			'sfb',
+			'sfs',
+			'lsb',
+			'scissors',
+			'half_scissors',
+			'row_jump',
+			'repeat',
+			'roll_in',
+			'roll_out',
+			'hand_change'
+		],
+		trigrams: ['roll3_in', 'roll3_out', 'alternation', 'redirect', 'redirect_bad'],
+		rows: ['home_row', 'top_row', 'bottom_row', 'number_row', 'distance', 'outer_column'],
+		misc: [
+			'unsupported',
+			'char_coverage',
+			'distinct_chars',
+			'coverage_bonus',
+			'simplicity',
+			'compact_fit',
+			'direct_digits',
+			'shortcut_left',
+			'modifier_usage',
+			'dead_key_usage'
+		]
+	};
+	// The parts of the stacked figures, each drawn in its categorical slot of
+	// theme.css « Chart look », in this fixed order (colour follows the part).
+	const TRIGRAM_MIX = [
+		'roll3_in',
+		'roll3_out',
+		'alternation',
+		'redirect',
+		'roll_mixed',
+		'same_finger'
+	];
+	const ROW_MIX = ['number_row', 'top_row', 'home_row', 'bottom_row'];
+	// The metrics whose best layout the overview names, beside the score.
+	const LEADER_METRICS = [
+		'sfb',
+		'sfs',
+		'lsb',
+		'scissors',
+		'redirect',
+		'distance',
+		'home_row',
+		'roll_in',
+		'finger_imbalance'
+	];
+	// How many boards the side-by-side heat maps draw, the first of the ranking.
+	const HEATS_COUNTS = [2, 4, 6, 9, 12];
+	const DEFAULT_HEATS_COUNT = 6;
+	// The kinds of built-in corpora in the picker's order (corpora.json kind),
+	// and the language of a code corpus, which has no natural language.
+	const CORPUS_KINDS = ['literature', 'encyclopedia', 'news', 'sentences', 'words', 'code'];
+	const CODE_LANGUAGE = 'code';
+	// A filter set to this value keeps everything.
+	const ALL = '';
+	const COMPLETE_CHOICES = ['all', 'yes', 'no'];
+	// The narrowest page that opens the filters at first (a phone folds them).
+	const FILTERS_OPEN_MIN_PX = 720;
+
 	// The site's standalone page mounts the Comparer into this element.
 	const STANDALONE_ROOT_ID = 'layout-analysis';
 
@@ -191,14 +280,31 @@
 	if (lang && /^[a-z]{2}$/.test(lang)) window._i18n_locale = lang;
 
 	// The Comparer's markup; data-i18n* attributes are filled by applyStrings().
-	const MARKUP = `<h1 data-i18n="layout_analysis.title"></h1>
-<section class="la-controls" aria-labelledby="la-corpus-label">
+	const MARKUP = `<div class="la-top">
+	<h1 data-i18n="layout_analysis.title"></h1>
+	<button id="la-share" type="button" data-i18n="layout_analysis.share.button"></button>
+</div>
+<p id="la-share-status" class="la-muted" role="status" hidden></p>
+
+<div class="la-setup">
+<section class="la-card la-corpus-card" aria-labelledby="la-corpus-label">
 	<div class="la-field">
 		<label
 			id="la-corpus-label"
+			class="la-card-title"
 			for="la-corpus"
 			data-i18n="layout_analysis.corpus.label"
 		></label>
+		<div class="la-corpus-filters">
+			<label class="la-filter-field">
+				<span data-i18n="layout_analysis.filter.language"></span>
+				<select id="la-corpus-language"></select>
+			</label>
+			<label class="la-filter-field">
+				<span data-i18n="layout_analysis.corpus.filter_kind"></span>
+				<select id="la-corpus-kind"></select>
+			</label>
+		</div>
 		<select id="la-corpus"></select>
 		<p id="la-corpus-info" class="la-muted"></p>
 	</div>
@@ -219,6 +325,10 @@
 		</label>
 		<p id="la-file-error" class="la-error" hidden></p>
 	</div>
+</section>
+
+<section class="la-card la-options" aria-labelledby="la-options-label">
+	<h2 id="la-options-label" class="la-card-title" data-i18n="layout_analysis.options.title"></h2>
 	<div class="la-field">
 		<label for="la-text-mode" data-i18n="layout_analysis.text_mode.label"></label>
 		<select id="la-text-mode" data-i18n-option-prefix="layout_analysis.text_mode">
@@ -228,28 +338,31 @@
 		</select>
 		<p id="la-text-mode-info" class="la-muted"></p>
 	</div>
-	<div class="la-field">
-		<div class="la-heading">
-			<label for="la-keyboard" data-i18n="layout_analysis.keyboard.label"></label>
-			<button
-				class="la-info"
-				type="button"
-				data-info="fingering"
-				data-i18n-title="layout_analysis.info.button"
-			>
-				i
-			</button>
+	<div class="la-option-pair">
+		<div class="la-field">
+			<div class="la-heading">
+				<label for="la-keyboard" data-i18n="layout_analysis.keyboard.label"></label>
+				<button
+					class="la-info"
+					type="button"
+					data-info="fingering"
+					data-i18n-title="layout_analysis.info.button"
+				>
+					i
+				</button>
+			</div>
+			<select id="la-keyboard" data-i18n-option-prefix="layout_analysis.keyboard"></select>
 		</div>
-		<select id="la-keyboard" data-i18n-option-prefix="layout_analysis.keyboard"></select>
-	</div>
-	<div class="la-field">
-		<label for="la-format" data-i18n="layout_analysis.format.label"></label>
-		<select id="la-format" data-i18n-option-prefix="layout_analysis.format"></select>
+		<div class="la-field">
+			<label for="la-format" data-i18n="layout_analysis.format.label"></label>
+			<select id="la-format" data-i18n-option-prefix="layout_analysis.format"></select>
+		</div>
 	</div>
 </section>
+</div>
 
-<section class="la-layouts" aria-labelledby="la-layouts-label">
-	<h2 id="la-layouts-label" data-i18n="layout_analysis.layouts.label"></h2>
+<section class="la-card la-layouts" aria-labelledby="la-layouts-label">
+	<h2 id="la-layouts-label" class="la-card-title" data-i18n="layout_analysis.layouts.label"></h2>
 	<details id="la-layouts-box" class="la-layouts-box">
 	<summary id="la-layouts-summary"></summary>
 	<div class="la-row">
@@ -257,7 +370,18 @@
 			id="la-filter"
 			type="search"
 			data-i18n-placeholder="layout_analysis.layouts.filter_placeholder"
+			data-i18n-title="layout_analysis.layouts.filter_placeholder"
 		/>
+		<label class="la-filter-field">
+			<span data-i18n="layout_analysis.filter.origin"></span>
+			<select id="la-pick-origin"></select>
+		</label>
+		<label class="la-filter-field">
+			<span data-i18n="layout_analysis.filter.language"></span>
+			<select id="la-pick-language"></select>
+		</label>
+	</div>
+	<div class="la-row">
 		<button id="la-all" type="button" data-i18n="layout_analysis.layouts.all"></button>
 		<button id="la-none" type="button" data-i18n="layout_analysis.layouts.none"></button>
 		<label class="la-file">
@@ -272,164 +396,290 @@
 
 <p id="la-status" class="la-status" role="status" aria-live="polite"></p>
 
-<section id="la-results" class="la-results" aria-labelledby="la-chart-label">
-	<div class="la-heading la-heading-wide">
-		<h2 id="la-chart-label" data-i18n="layout_analysis.chart.title"></h2>
-		<button id="la-share" type="button" data-i18n="layout_analysis.share.button"></button>
-	</div>
-	<p id="la-share-status" class="la-muted" role="status" hidden></p>
-	<p class="la-muted" data-i18n="layout_analysis.chart.caption"></p>
-	<div id="la-chart" class="la-chart"></div>
-	<details id="la-table-options" class="la-table-options">
-		<summary data-i18n="layout_analysis.table.options"></summary>
-		<fieldset class="la-columns">
-			<legend data-i18n="layout_analysis.table.columns"></legend>
-			<div id="la-column-list" class="la-column-list"></div>
-		</fieldset>
-		<div class="la-table-filters">
-			<label class="la-filter-field">
-				<span data-i18n="layout_analysis.table.filter_name"></span>
-				<input id="la-row-name" type="search" />
-			</label>
-			<label class="la-filter-field">
-				<span data-i18n="layout_analysis.table.filter_family"></span>
-				<select id="la-row-family"></select>
-			</label>
-			<label class="la-filter-field">
-				<span data-i18n="layout_analysis.table.score_min"></span>
-				<input id="la-row-min" type="number" step="any" />
-			</label>
-			<label class="la-filter-field">
-				<span data-i18n="layout_analysis.table.score_max"></span>
-				<input id="la-row-max" type="number" step="any" />
-			</label>
-		</div>
-		<button id="la-table-reset" type="button" data-i18n="layout_analysis.table.reset"></button>
-	</details>
-	<p id="la-table-count" class="la-muted" role="status"></p>
-	<div class="la-table-wrap" tabindex="0">
-		<table id="la-table" class="la-table"></table>
-	</div>
-</section>
-
-<section id="la-analysers" class="la-card" hidden></section>
-
-<section id="la-details" class="la-details" hidden>
-	<h2 id="la-details-title"></h2>
-	<p class="la-muted">
-		<span id="la-details-credit"></span>
-		<a id="la-details-link" target="_blank" rel="noopener" hidden></a>
-	</p>
-	<div class="la-field la-versus">
-		<label for="la-versus" data-i18n="layout_analysis.details.versus"></label>
-		<select id="la-versus"></select>
-	</div>
-	<h3 data-i18n="layout_analysis.details.heatmap"></h3>
-	<div class="la-heat-controls">
-		<label class="la-sr-only" for="la-heat-metric" data-i18n="layout_analysis.details.heatmap"></label>
-		<select id="la-heat-metric"></select>
-		<label id="la-heat-diff-field" class="la-check" hidden>
-			<input id="la-heat-diff" type="checkbox" />
-			<span id="la-heat-diff-label"></span>
+<section id="la-results" class="la-results" aria-labelledby="la-results-label">
+	<h2 id="la-results-label" class="la-sr-only" data-i18n="layout_analysis.results.title"></h2>
+	<details id="la-filters-box" class="la-filters-box">
+	<summary>
+		<span id="la-filters-label" class="la-filters-title" data-i18n="layout_analysis.filter.title"></span>
+		<span id="la-table-count" class="la-muted" role="status"></span>
+	</summary>
+	<div class="la-filters" role="group" aria-labelledby="la-filters-label">
+		<label class="la-filter-field la-filter-name">
+			<span data-i18n="layout_analysis.table.filter_name"></span>
+			<input id="la-row-name" type="search" />
 		</label>
+		<label class="la-filter-field">
+			<span data-i18n="layout_analysis.table.filter_family"></span>
+			<select id="la-row-family"></select>
+		</label>
+		<label class="la-filter-field">
+			<span data-i18n="layout_analysis.filter.origin"></span>
+			<select id="la-row-origin"></select>
+		</label>
+		<label class="la-filter-field">
+			<span data-i18n="layout_analysis.filter.language"></span>
+			<select id="la-row-language"></select>
+		</label>
+		<label class="la-filter-field">
+			<span data-i18n="layout_analysis.filter.complete"></span>
+			<select id="la-row-complete" data-i18n-option-prefix="layout_analysis.filter.complete_choice">
+				<option value="all"></option>
+				<option value="yes"></option>
+				<option value="no"></option>
+			</select>
+		</label>
+		<label class="la-filter-field la-filter-score">
+			<span data-i18n="layout_analysis.table.score_min"></span>
+			<input id="la-row-min" type="number" step="any" />
+		</label>
+		<label class="la-filter-field la-filter-score">
+			<span data-i18n="layout_analysis.table.score_max"></span>
+			<input id="la-row-max" type="number" step="any" />
+		</label>
+		<button id="la-table-reset" type="button" data-i18n="layout_analysis.table.reset"></button>
 	</div>
-	<div id="la-heatmap" class="la-heatmap"></div>
-	<div id="la-heat-legend" class="la-heat-legend"></div>
-	<details id="la-heat-table-box" class="la-section">
-		<summary data-i18n="layout_analysis.heat.table"></summary>
-		<div class="la-table-wrap" tabindex="0">
-			<table id="la-heat-table" class="la-table"></table>
-		</div>
 	</details>
-	<details class="la-section">
-		<summary data-i18n="layout_analysis.worst.title"></summary>
-		<p class="la-muted" data-i18n="layout_analysis.worst.caption"></p>
-		<label for="la-worst-event" data-i18n="layout_analysis.worst.event"></label>
-		<select id="la-worst-event"></select>
-		<div class="la-table-wrap" tabindex="0">
-			<table id="la-worst" class="la-table"></table>
+	<div id="la-tabs" class="la-tabs" role="tablist" aria-labelledby="la-results-label"></div>
+
+	<div id="la-panel-overview" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-overview">
+		<div class="la-overview">
+			<section class="la-figure" aria-labelledby="la-chart-label">
+				<h3 id="la-chart-label" data-i18n="layout_analysis.chart.title"></h3>
+				<p class="la-muted" data-i18n="layout_analysis.chart.caption"></p>
+				<div id="la-chart" class="la-chart"></div>
+			</section>
+			<section class="la-leaders-box" aria-labelledby="la-leaders-label">
+				<h3 id="la-leaders-label" data-i18n="layout_analysis.leaders.title"></h3>
+				<dl id="la-leaders" class="la-leaders"></dl>
+			</section>
+			<section class="la-figure la-figure-wide" aria-labelledby="la-ranking-label">
+				<h3 id="la-ranking-label" data-i18n="layout_analysis.ranking.title"></h3>
+				<details id="la-table-options" class="la-table-options">
+					<summary data-i18n="layout_analysis.table.columns"></summary>
+					<div id="la-column-list" class="la-column-list"></div>
+				</details>
+				<div class="la-table-wrap" tabindex="0" role="region" aria-labelledby="la-ranking-label">
+					<table id="la-table" class="la-table"></table>
+				</div>
+			</section>
 		</div>
-	</details>
-	<details class="la-section">
-		<summary data-i18n="layout_analysis.matrix.title"></summary>
-		<p id="la-matrix-caption" class="la-muted"></p>
-		<label for="la-matrix-by" data-i18n="layout_analysis.matrix.by"></label>
-		<select id="la-matrix-by"></select>
-		<div id="la-matrix-legend" class="la-heat-legend"></div>
-		<div class="la-matrix-wrap" tabindex="0" role="region" aria-labelledby="la-matrix-caption">
-			<table id="la-matrix" class="la-matrix"></table>
+	</div>
+
+	<div id="la-panel-fingers" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-fingers" hidden>
+		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.tab.intro_fingers"></p>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-finger-table-label">
+			<h3 id="la-finger-table-label" data-i18n="layout_analysis.fingers.title"></h3>
+			<p class="la-muted" data-i18n="layout_analysis.fingers.caption"></p>
+			<ul class="la-legend">
+				<li><span class="la-swatch la-swatch-more"></span><span data-i18n="layout_analysis.fingers.over"></span></li>
+				<li><span class="la-swatch la-swatch-less"></span><span data-i18n="layout_analysis.fingers.under"></span></li>
+			</ul>
+			<div class="la-table-wrap" tabindex="0" role="region" aria-labelledby="la-finger-table-label">
+				<table id="la-finger-table" class="la-table la-heat-table"></table>
+			</div>
+		</section>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-hands-label">
+			<h3 id="la-hands-label" data-i18n="layout_analysis.hands.title"></h3>
+			<p class="la-muted" data-i18n="layout_analysis.hands.caption"></p>
+			<ul id="la-hands-legend" class="la-legend"></ul>
+			<div id="la-hands" class="la-bars" aria-labelledby="la-hands-label"></div>
+		</section>
+		<div id="la-charts-fingers" class="la-chart-grid"></div>
+	</div>
+
+	<div id="la-panel-bigrams" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-bigrams" hidden>
+		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.tab.intro_bigrams"></p>
+		<div id="la-charts-bigrams" class="la-chart-grid"></div>
+	</div>
+
+	<div id="la-panel-trigrams" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-trigrams" hidden>
+		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.tab.intro_trigrams"></p>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-trigram-mix-label">
+			<h3 id="la-trigram-mix-label" data-i18n="layout_analysis.trigram_mix.title"></h3>
+			<p class="la-muted" data-i18n="layout_analysis.trigram_mix.caption"></p>
+			<div id="la-trigram-mix"></div>
+		</section>
+		<div id="la-charts-trigrams" class="la-chart-grid"></div>
+	</div>
+
+	<div id="la-panel-rows" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-rows" hidden>
+		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.tab.intro_rows"></p>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-row-mix-label">
+			<h3 id="la-row-mix-label" data-i18n="layout_analysis.row_mix.title"></h3>
+			<p class="la-muted" data-i18n="layout_analysis.row_mix.caption"></p>
+			<div id="la-row-mix"></div>
+		</section>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-travel-table-label">
+			<h3 id="la-travel-table-label" data-i18n="layout_analysis.travel.title"></h3>
+			<p class="la-muted" data-i18n="layout_analysis.travel.caption"></p>
+			<div id="la-travel-legend" class="la-heat-legend"></div>
+			<div class="la-table-wrap" tabindex="0" role="region" aria-labelledby="la-travel-table-label">
+				<table id="la-travel-table" class="la-table la-heat-table"></table>
+			</div>
+		</section>
+		<div id="la-charts-rows" class="la-chart-grid"></div>
+	</div>
+
+	<div id="la-panel-heatmaps" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-heatmaps" hidden>
+		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.tab.intro_heatmaps"></p>
+		<div class="la-heat-controls">
+			<label class="la-filter-field">
+				<span data-i18n="layout_analysis.heats.metric"></span>
+				<select id="la-heats-metric"></select>
+			</label>
+			<label class="la-filter-field">
+				<span data-i18n="layout_analysis.heats.count"></span>
+				<select id="la-heats-count"></select>
+			</label>
+			<label class="la-check">
+				<input id="la-heats-shared" type="checkbox" />
+				<span data-i18n="layout_analysis.heats.shared"></span>
+			</label>
 		</div>
-		<h4 data-i18n="layout_analysis.matrix.table"></h4>
-		<p id="la-matrix-count" class="la-muted"></p>
-		<div class="la-table-wrap" tabindex="0">
-			<table id="la-matrix-pairs" class="la-table"></table>
+		<div id="la-heats-legend" class="la-heat-legend"></div>
+		<div id="la-heats" class="la-heat-grid"></div>
+	</div>
+
+	<div id="la-panel-misc" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-misc" hidden>
+		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.tab.intro_misc"></p>
+		<div id="la-charts-misc" class="la-chart-grid"></div>
+	</div>
+
+	<div id="la-panel-analysers" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-analysers" hidden>
+		<section id="la-analysers" class="la-card" hidden></section>
+	</div>
+
+	<div id="la-panel-details" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-details" hidden>
+	<div class="la-field la-details-pick">
+		<label for="la-details-layout" data-i18n="layout_analysis.details.layout"></label>
+		<select id="la-details-layout"></select>
+	</div>
+	<section id="la-details" class="la-details" hidden>
+		<h2 id="la-details-title"></h2>
+		<p class="la-muted">
+			<span id="la-details-credit"></span>
+			<a id="la-details-link" target="_blank" rel="noopener" hidden></a>
+		</p>
+		<div class="la-field la-versus">
+			<label for="la-versus" data-i18n="layout_analysis.details.versus"></label>
+			<select id="la-versus"></select>
 		</div>
-	</details>
-	<details class="la-section">
-		<summary data-i18n="layout_analysis.words.title"></summary>
-		<p class="la-muted" data-i18n="layout_analysis.words.caption"></p>
-		<p id="la-words-none" class="la-muted" data-i18n="layout_analysis.words.none" hidden></p>
-		<div id="la-words-body">
-			<p id="la-words-mean" class="la-muted"></p>
-			<h4 id="la-words-bins-label" data-i18n="layout_analysis.words.distribution"></h4>
-			<div id="la-words-bins" class="la-bars" aria-labelledby="la-words-bins-label"></div>
-			<h4 data-i18n="layout_analysis.words.hardest"></h4>
-			<div class="la-table-wrap" tabindex="0">
-				<table id="la-words" class="la-table"></table>
+		<div class="la-detail-grid">
+			<div class="la-detail-main">
+				<h3 data-i18n="layout_analysis.details.heatmap"></h3>
+				<div class="la-heat-controls">
+					<label class="la-sr-only" for="la-heat-metric" data-i18n="layout_analysis.details.heatmap"></label>
+					<select id="la-heat-metric"></select>
+					<label id="la-heat-diff-field" class="la-check" hidden>
+						<input id="la-heat-diff" type="checkbox" />
+						<span id="la-heat-diff-label"></span>
+					</label>
+				</div>
+				<div id="la-heatmap" class="la-heatmap"></div>
+				<div id="la-heat-legend" class="la-heat-legend"></div>
+				<details id="la-heat-table-box" class="la-section">
+					<summary data-i18n="layout_analysis.heat.table"></summary>
+					<div class="la-table-wrap" tabindex="0">
+						<table id="la-heat-table" class="la-table"></table>
+					</div>
+				</details>
+				<div class="la-detail-loads">
+				<h3 id="la-fingers-label" data-i18n="layout_analysis.details.fingers"></h3>
+				<p class="la-muted" data-i18n="layout_analysis.details.fingers_caption"></p>
+				<ul class="la-legend">
+					<li><span class="la-swatch la-swatch-load"></span><span data-i18n="layout_analysis.details.share_mark"></span></li>
+					<li><span class="la-swatch la-swatch-ideal"></span><span data-i18n="layout_analysis.details.ideal_mark"></span></li>
+				</ul>
+				<div id="la-fingers" class="la-bars" aria-labelledby="la-fingers-label"></div>
+				<h3 id="la-hands-rows-label" data-i18n="layout_analysis.details.hands_rows"></h3>
+				<div id="la-hands-rows" class="la-bars" aria-labelledby="la-hands-rows-label"></div>
+				</div>
+			</div>
+			<div>
+				<h3 id="la-contributions-label" data-i18n="layout_analysis.details.contributions"></h3>
+				<div id="la-contributions" class="la-bars" aria-labelledby="la-contributions-label"></div>
 			</div>
 		</div>
-	</details>
-	<details class="la-section">
-		<summary data-i18n="layout_analysis.classes.title"></summary>
-		<h4 id="la-bigram-classes-label" data-i18n="layout_analysis.classes.bigrams"></h4>
-		<div id="la-bigram-classes" class="la-bars" aria-labelledby="la-bigram-classes-label"></div>
-		<h4 id="la-trigram-classes-label" data-i18n="layout_analysis.classes.trigrams"></h4>
-		<div id="la-trigram-classes" class="la-bars" aria-labelledby="la-trigram-classes-label"></div>
-	</details>
-	<details class="la-section">
-		<summary id="la-travel-label" data-i18n="layout_analysis.travel.title"></summary>
-		<p class="la-muted" data-i18n="layout_analysis.travel.caption"></p>
-		<div id="la-travel" class="la-bars" aria-labelledby="la-travel-label"></div>
-	</details>
-	<details class="la-section">
-		<summary id="la-layers-label" data-i18n="layout_analysis.layers.title"></summary>
-		<p class="la-muted" data-i18n="layout_analysis.layers.caption"></p>
-		<div id="la-layers" class="la-bars" aria-labelledby="la-layers-label"></div>
-	</details>
-	<details class="la-section">
-		<summary id="la-standing-label" data-i18n="layout_analysis.standing.title"></summary>
-		<p class="la-muted" data-i18n="layout_analysis.standing.caption"></p>
-		<div id="la-standing" class="la-bars" aria-labelledby="la-standing-label"></div>
-	</details>
-	<div class="la-detail-grid">
-		<div>
-			<h3 id="la-contributions-label" data-i18n="layout_analysis.details.contributions"></h3>
-			<div id="la-contributions" class="la-bars" aria-labelledby="la-contributions-label"></div>
+		<details class="la-section">
+			<summary data-i18n="layout_analysis.worst.title"></summary>
+			<p class="la-muted" data-i18n="layout_analysis.worst.caption"></p>
+			<label for="la-worst-event" data-i18n="layout_analysis.worst.event"></label>
+			<select id="la-worst-event"></select>
+			<div class="la-table-wrap" tabindex="0">
+				<table id="la-worst" class="la-table"></table>
+			</div>
+		</details>
+		<details class="la-section">
+			<summary data-i18n="layout_analysis.matrix.title"></summary>
+			<p id="la-matrix-caption" class="la-muted"></p>
+			<label for="la-matrix-by" data-i18n="layout_analysis.matrix.by"></label>
+			<select id="la-matrix-by"></select>
+			<div id="la-matrix-legend" class="la-heat-legend"></div>
+			<div class="la-matrix-wrap" tabindex="0" role="region" aria-labelledby="la-matrix-caption">
+				<table id="la-matrix" class="la-matrix"></table>
+			</div>
+			<h4 data-i18n="layout_analysis.matrix.table"></h4>
+			<p id="la-matrix-count" class="la-muted"></p>
+			<div class="la-table-wrap" tabindex="0">
+				<table id="la-matrix-pairs" class="la-table"></table>
+			</div>
+		</details>
+		<details class="la-section">
+			<summary data-i18n="layout_analysis.words.title"></summary>
+			<p class="la-muted" data-i18n="layout_analysis.words.caption"></p>
+			<p id="la-words-none" class="la-muted" data-i18n="layout_analysis.words.none" hidden></p>
+			<div id="la-words-body">
+				<p id="la-words-mean" class="la-muted"></p>
+				<h4 id="la-words-bins-label" data-i18n="layout_analysis.words.distribution"></h4>
+				<div id="la-words-bins" class="la-bars" aria-labelledby="la-words-bins-label"></div>
+				<h4 data-i18n="layout_analysis.words.hardest"></h4>
+				<div class="la-table-wrap" tabindex="0">
+					<table id="la-words" class="la-table"></table>
+				</div>
+			</div>
+		</details>
+		<details class="la-section">
+			<summary data-i18n="layout_analysis.classes.title"></summary>
+			<h4 id="la-bigram-classes-label" data-i18n="layout_analysis.classes.bigrams"></h4>
+			<div id="la-bigram-classes" class="la-bars" aria-labelledby="la-bigram-classes-label"></div>
+			<h4 id="la-trigram-classes-label" data-i18n="layout_analysis.classes.trigrams"></h4>
+			<div id="la-trigram-classes" class="la-bars" aria-labelledby="la-trigram-classes-label"></div>
+		</details>
+		<details class="la-section">
+			<summary id="la-travel-label" data-i18n="layout_analysis.travel.title"></summary>
+			<p class="la-muted" data-i18n="layout_analysis.travel.caption"></p>
+			<div id="la-travel" class="la-bars" aria-labelledby="la-travel-label"></div>
+		</details>
+		<details class="la-section">
+			<summary id="la-layers-label" data-i18n="layout_analysis.layers.title"></summary>
+			<p class="la-muted" data-i18n="layout_analysis.layers.caption"></p>
+			<div id="la-layers" class="la-bars" aria-labelledby="la-layers-label"></div>
+		</details>
+		<details class="la-section">
+			<summary id="la-standing-label" data-i18n="layout_analysis.standing.title"></summary>
+			<p class="la-muted" data-i18n="layout_analysis.standing.caption"></p>
+			<div id="la-standing" class="la-bars" aria-labelledby="la-standing-label"></div>
+		</details>
+		<h3 data-i18n="layout_analysis.details.metrics"></h3>
+		<div class="la-table-wrap" tabindex="0">
+			<table id="la-metrics" class="la-table"></table>
 		</div>
-		<div>
-			<h3 id="la-fingers-label" data-i18n="layout_analysis.details.fingers"></h3>
-			<p class="la-muted" data-i18n="layout_analysis.details.fingers_caption"></p>
-			<ul class="la-legend">
-				<li><span class="la-swatch la-swatch-load"></span><span data-i18n="layout_analysis.details.share_mark"></span></li>
-				<li><span class="la-swatch la-swatch-ideal"></span><span data-i18n="layout_analysis.details.ideal_mark"></span></li>
-			</ul>
-			<div id="la-fingers" class="la-bars" aria-labelledby="la-fingers-label"></div>
-			<h3 id="la-hands-rows-label" data-i18n="layout_analysis.details.hands_rows"></h3>
-			<div id="la-hands-rows" class="la-bars" aria-labelledby="la-hands-rows-label"></div>
+		<p id="la-unsupported" class="la-muted"></p>
+		<div class="la-detail-grid">
+			<div>
+				<h3 data-i18n="layout_analysis.details.typing"></h3>
+				<p id="la-typing-caption" class="la-muted"></p>
+				<div class="la-table-wrap" tabindex="0">
+					<table id="la-typing" class="la-table"></table>
+				</div>
+			</div>
+			<div>
+				<h3 data-i18n="layout_analysis.details.simplicity"></h3>
+				<table id="la-simplicity" class="la-table"></table>
+			</div>
 		</div>
+	</section>
 	</div>
-	<h3 data-i18n="layout_analysis.details.metrics"></h3>
-	<div class="la-table-wrap" tabindex="0">
-		<table id="la-metrics" class="la-table"></table>
-	</div>
-	<p id="la-unsupported" class="la-muted"></p>
-	<h3 data-i18n="layout_analysis.details.typing"></h3>
-	<p id="la-typing-caption" class="la-muted"></p>
-	<div class="la-table-wrap" tabindex="0">
-		<table id="la-typing" class="la-table"></table>
-	</div>
-	<h3 data-i18n="layout_analysis.details.simplicity"></h3>
-	<table id="la-simplicity" class="la-table"></table>
 </section>
 
 <details id="la-settings" class="la-settings">
@@ -616,7 +866,13 @@
 						table: state.table,
 						heat: state.heat,
 						heatDiff: state.heatDiff,
-						matrixBy: state.matrixBy
+						matrixBy: state.matrixBy,
+						// The sub-tab the visitor last chose, the side-by-side heat maps'
+						// choices, the corpus picker's and the layout list's filters.
+						tab: state.tabSaved,
+						heats: state.heats,
+						corpusFilter: state.corpusFilter,
+						pick: state.pick
 					})
 				);
 				// The editor's panel and the optimizer of this page score with them too.
@@ -707,7 +963,16 @@
 			words: null,
 			details: linked.details || null,
 			// The layout the details compare with (diff), null for none.
-			versus: linked.versus || null
+			versus: linked.versus || null,
+			// The sub-tab shown: a link's layout in detail opens « One layout »,
+			// else the visitor's last choice (tabSaved, kept only when they click).
+			tab: linked.details ? DETAILS_TAB : TABS.includes(saved.tab) ? saved.tab : DEFAULT_TAB,
+			tabSaved: TABS.includes(saved.tab) ? saved.tab : DEFAULT_TAB,
+			// Each themed table's sort, by table name.
+			tabSorts: {},
+			heats: validHeats(saved.heats),
+			corpusFilter: validFilters(saved.corpusFilter, ['language', 'kind']),
+			pick: validFilters(saved.pick, ['origin', 'language'])
 		};
 		// A link's layouts are shown, not saved: the visitor's own choice stays.
 		state.linkedSelection = Boolean(linked.layouts);
@@ -784,13 +1049,35 @@
 				? value.columns.filter((id) => id in E.METRICS)
 				: TABLE_METRICS.slice();
 			const bound = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+			const text = (v) => (typeof v === 'string' ? v : ALL);
 			return {
 				columns,
-				name: typeof value.name === 'string' ? value.name : '',
-				family: typeof value.family === 'string' ? value.family : '',
+				name: text(value.name),
+				family: text(value.family),
+				origin: text(value.origin),
+				language: text(value.language),
+				complete: COMPLETE_CHOICES.includes(value.complete) ? value.complete : COMPLETE_CHOICES[0],
 				min: bound(value.min),
 				max: bound(value.max)
 			};
+		}
+
+		/** The saved choices of the side-by-side heat maps, the defaults otherwise. */
+		function validHeats(heats) {
+			const value = heats && typeof heats === 'object' ? heats : {};
+			return {
+				metric: HEAT_CHOICES.includes(value.metric) ? value.metric : HEAT_PRESSES,
+				count: HEATS_COUNTS.includes(value.count) ? value.count : DEFAULT_HEATS_COUNT,
+				shared: value.shared !== false
+			};
+		}
+
+		/** Saved filter values (strings) by name; a missing one keeps everything. */
+		function validFilters(filters, names) {
+			const value = filters && typeof filters === 'object' ? filters : {};
+			return Object.fromEntries(
+				names.map((name) => [name, typeof value[name] === 'string' ? value[name] : ALL])
+			);
 		}
 
 		// ==========================
@@ -1062,10 +1349,203 @@
 			);
 		}
 
+		// Literal keys, so the locale gate finds every string these labels show.
+		const TAB_LABEL = {
+			overview: () => t('layout_analysis.tab.overview'),
+			fingers: () => t('layout_analysis.tab.fingers'),
+			bigrams: () => t('layout_analysis.tab.bigrams'),
+			trigrams: () => t('layout_analysis.tab.trigrams'),
+			rows: () => t('layout_analysis.tab.rows'),
+			heatmaps: () => t('layout_analysis.tab.heatmaps'),
+			misc: () => t('layout_analysis.tab.misc'),
+			analysers: () => t('layout_analysis.tab.analysers'),
+			details: () => t('layout_analysis.tab.details')
+		};
+		const KIND_LABEL = {
+			literature: () => t('layout_analysis.corpus.kind.literature'),
+			encyclopedia: () => t('layout_analysis.corpus.kind.encyclopedia'),
+			news: () => t('layout_analysis.corpus.kind.news'),
+			sentences: () => t('layout_analysis.corpus.kind.sentences'),
+			words: () => t('layout_analysis.corpus.kind.words'),
+			code: () => t('layout_analysis.corpus.kind.code')
+		};
+		const DIRECTION_LABEL = {
+			lower: () => t('layout_analysis.analysers.better.lower'),
+			higher: () => t('layout_analysis.analysers.better.higher'),
+			none: () => t('layout_analysis.details.verdict_none')
+		};
+
+		/** A metric's name as the page writes it. */
+		function metricName(id) {
+			return t(`layout_analysis.metric.${id}`);
+		}
+
+		/** A trigram class's name: a metric's, or one of the two classes that are not metrics. */
+		function trigramClassName(id) {
+			if (id === 'roll_mixed') return t('layout_analysis.classes.roll_mixed');
+			if (id === 'same_finger') return t('layout_analysis.classes.same_finger');
+			return metricName(id);
+		}
+
+		/**
+		 * Where a layout comes from, as the filters group it: the registry, the
+		 * references, the user's own, or the library collection it was imported from.
+		 */
+		function originOf(layout) {
+			return layout.origin === 'library' ? layout.source : layout.origin;
+		}
+
+		/** An origin's name in the filters. */
+		function originName(origin) {
+			if (origin === 'registry') return t('layout_analysis.filter.origin_registry');
+			if (origin === 'reference') return t('layout_analysis.filter.origin_reference');
+			if (origin === 'user') return t('layout_analysis.filter.origin_user');
+			const source = DATA.library_sources[origin];
+			if (!source) throw new Error(`layout comparer: no library collection ${origin}`);
+			return t('layout_analysis.filter.origin_collection', { name: source.name });
+		}
+
+		/** A language's own name in the page's language (« Français », « Deutsch » in English: « French »…). */
+		function languageName(code) {
+			const name = new Intl.DisplayNames([INFO.locale()], { type: 'language' }).of(code);
+			return name.charAt(0).toUpperCase() + name.slice(1);
+		}
+
+		/**
+		 * Fills a select with [value, label] entries and keeps its value when it
+		 * is still offered, else the first entry's.
+		 * @returns {string} The value chosen.
+		 */
+		function fillSelect(select, entries, value) {
+			select.replaceChildren(
+				...entries.map(([id, label]) => {
+					const option = el('option', '', label);
+					option.value = id;
+					return option;
+				})
+			);
+			select.value = entries.some(([id]) => id === value) ? value : entries[0][0];
+			return select.value;
+		}
+
+		/** The distinct values of a list, the most frequent first, then by name. */
+		function byFrequency(values, name) {
+			const counts = new Map();
+			for (const value of values) counts.set(value, (counts.get(value) || 0) + 1);
+			return Array.from(counts.keys()).sort(
+				(a, b) => counts.get(b) - counts.get(a) || name(a).localeCompare(name(b))
+			);
+		}
+
+		/** Whether a result is one of the user's own layouts (accent colour). */
+		function isPersonal(result) {
+			const layout = layoutOf(result.layout.id);
+			return !layout || !SHAREABLE_ORIGINS.includes(layout.origin);
+		}
+
 		function render() {
-			renderChart();
-			renderTable();
-			renderDetails();
+			const count = $('la-table-count');
+			count.textContent =
+				state.results.length > 0
+					? t('layout_analysis.table.count', {
+							shown: shownRows().length,
+							total: state.results.length
+						})
+					: '';
+			renderActive();
+		}
+
+		/**
+		 * Draws the overview and the sub-tab shown; the others are drawn when
+		 * they are chosen.
+		 */
+		function renderActive() {
+			const draw = {
+				overview: () => {
+					renderLeaders();
+					renderChart();
+					renderTable();
+				},
+				fingers: () => {
+					renderFingerTable();
+					renderHands();
+					renderMetricTab('fingers');
+				},
+				bigrams: () => renderMetricTab('bigrams'),
+				trigrams: () => {
+					renderTrigramMix();
+					renderMetricTab('trigrams');
+				},
+				rows: () => {
+					renderRowMix();
+					renderTravelTable();
+					renderMetricTab('rows');
+				},
+				heatmaps: renderHeatGrid,
+				misc: () => renderMetricTab('misc'),
+				// The other analysers' view follows the Comparer by itself (analyser_tab.js).
+				analysers: () => {},
+				details: () => {
+					fillDetailsPick();
+					renderDetails();
+				}
+			};
+			// The ranking is cheap and always current, whichever tab is shown.
+			draw.overview();
+			if (state.tab !== DEFAULT_TAB) draw[state.tab]();
+		}
+
+		/** The tab strip: one button per sub-tab, its panel shown when it is chosen. */
+		function fillTabs() {
+			const list = $('la-tabs');
+			list.replaceChildren(
+				...TABS.map((id) => {
+					const button = el('button', 'la-tab', TAB_LABEL[id]());
+					button.type = 'button';
+					button.id = `la-tab-${id}`;
+					button.setAttribute('role', 'tab');
+					button.setAttribute('aria-controls', `la-panel-${id}`);
+					button.addEventListener('click', () => chooseTab(id, true));
+					// Arrows, Home and End move between the tabs (the ARIA tabs pattern).
+					button.addEventListener('keydown', (event) => {
+						const at = TABS.indexOf(id);
+						const next = {
+							ArrowRight: TABS[(at + 1) % TABS.length],
+							ArrowLeft: TABS[(at - 1 + TABS.length) % TABS.length],
+							Home: TABS[0],
+							End: TABS[TABS.length - 1]
+						}[event.key];
+						if (!next) return;
+						event.preventDefault();
+						chooseTab(next, true);
+						$(`la-tab-${next}`).focus();
+					});
+					return button;
+				})
+			);
+			showTab();
+		}
+
+		/** Marks the chosen tab and shows its panel only. */
+		function showTab() {
+			for (const id of TABS) {
+				const button = $(`la-tab-${id}`);
+				const chosen = id === state.tab;
+				button.setAttribute('aria-selected', String(chosen));
+				button.tabIndex = chosen ? 0 : -1;
+				$(`la-panel-${id}`).hidden = !chosen;
+			}
+		}
+
+		/** Shows a sub-tab; the visitor's own choice is kept for the next visit. */
+		function chooseTab(id, byUser) {
+			state.tab = id;
+			if (byUser) {
+				state.tabSaved = id;
+				save();
+			}
+			showTab();
+			renderActive();
 		}
 
 		/**
@@ -1089,12 +1569,13 @@
 		 * natural zero (each metric adds or removes its weighted value), so the
 		 * bars run from the weakest layout shown to the best one: the longest is
 		 * the best, and each value names its gap to the first. The user's own
-		 * layouts take the accent colour.
+		 * layouts take the accent colour. The filters choose the layouts drawn.
 		 */
 		function renderChart() {
 			const box = $('la-chart');
 			box.replaceChildren();
-			const shown = state.results.slice(0, CHART_MAX_BARS);
+			const rows = shownRows();
+			const shown = rows.slice(0, CHART_MAX_BARS);
 			if (shown.length === 0) return;
 			const totals = shown.map((r) => r.score.total);
 			const best = Math.max(...totals);
@@ -1124,9 +1605,7 @@
 				if (flag) label.append(' ', flag);
 				row.append(label, ' ');
 				const track = el('span', 'la-chart-track');
-				const layout = layoutOf(result.layout.id);
-				const personal = !layout || !SHAREABLE_ORIGINS.includes(layout.origin);
-				const bar = el('span', personal ? 'la-bar la-bar-mine' : 'la-bar la-bar-score');
+				const bar = el('span', isPersonal(result) ? 'la-bar la-bar-mine' : 'la-bar la-bar-score');
 				// The weakest keeps a sliver, so every row shows a bar; one layout alone is full.
 				const share = span > 0 ? (result.score.total - worst) / span : 1;
 				bar.style.left = '0%';
@@ -1140,6 +1619,47 @@
 				row.append(track, ' ', cell);
 				box.append(row);
 			}
+			if (rows.length > shown.length) box.append(moreNote(shown.length, rows.length));
+		}
+
+		/** The line under a chart that shows the first of the layouts only. */
+		function moreNote(shown, total) {
+			return el('p', 'la-muted', t('layout_analysis.chart.more', { shown, total }));
+		}
+
+		/**
+		 * The overview's tiles: the best complete layout shown by the score and by
+		 * a few telling metrics, each opening that layout's details.
+		 */
+		function renderLeaders() {
+			const box = $('la-leaders');
+			box.replaceChildren();
+			const complete = shownRows().filter((r) => !r.incomplete);
+			box.closest('section').hidden = complete.length === 0;
+			if (complete.length === 0) return;
+			const tile = (label, result, text) => {
+				const item = el('div', isPersonal(result) ? 'la-leader la-leader-mine' : 'la-leader');
+				const value = el('dd', 'la-leader-value', text);
+				const name = el('button', 'la-leader-name', result.layout.name);
+				name.type = 'button';
+				name.addEventListener('click', () => showDetails(result.layout.id));
+				const who = el('dd', 'la-leader-who');
+				who.append(name);
+				item.append(el('dt', '', label), value, who);
+				box.append(item);
+			};
+			tile(
+				t('layout_analysis.chart.title'),
+				complete[0],
+				`${format(complete[0].score.total, 1)} ${t('layout_analysis.unit.points')}`
+			);
+			for (const id of LEADER_METRICS) {
+				const higher = E.METRICS[id].better === 'higher';
+				const best = complete.reduce((a, b) =>
+					(higher ? b.metrics[id] > a.metrics[id] : b.metrics[id] < a.metrics[id]) ? b : a
+				);
+				tile(metricName(id), best, `${format(best.metrics[id], metricDigits(id))} ${unitText(id)}`);
+			}
 		}
 
 		/** A compared layout's family ('' for none). */
@@ -1148,17 +1668,34 @@
 			return (layout && layout.family) || '';
 		}
 
-		/** The results the table's row filters keep: name, family and score range. */
+		/**
+		 * The results the filters keep, in the ranking's order: name, family,
+		 * origin, language, completeness and score range. Every figure and table
+		 * of the sub-tabs draws these.
+		 */
 		function shownRows() {
-			const { name, family, min, max } = state.table;
+			const { name, family, origin, language, complete, min, max } = state.table;
 			const needle = name.trim().toLowerCase();
-			return state.results.filter(
-				(r) =>
+			return state.results.filter((r) => {
+				const layout = layoutOf(r.layout.id);
+				return (
 					(!needle || r.layout.name.toLowerCase().includes(needle)) &&
 					(!family || familyOf(r) === family) &&
+					(!origin || originOf(layout) === origin) &&
+					(!language || layout.language === language) &&
+					(complete === 'all' || (complete === 'yes') === !r.incomplete) &&
 					(min === null || r.score.total >= min) &&
 					(max === null || r.score.total <= max)
-			);
+				);
+			});
+		}
+
+		/** The origins and languages of the listed layouts, the most frequent first. */
+		function layoutFacets() {
+			return {
+				origins: byFrequency(layouts.map(originOf), originName),
+				languages: byFrequency(layouts.map((l) => l.language).filter(Boolean), languageName)
+			};
 		}
 
 		/** The column choices (every metric, in the engine's order) and the filters' values. */
@@ -1180,41 +1717,57 @@
 						save();
 						renderTable();
 					});
-					label.append(box, el('span', '', t(`layout_analysis.metric.${id}`)));
+					label.append(box, el('span', '', metricName(id)));
 					return label;
 				})
 			);
 			const families = Array.from(new Set(layouts.map((l) => l.family).filter(Boolean))).sort();
-			const all = el('option', '', t('layout_analysis.table.family_all'));
-			all.value = '';
-			$('la-row-family').replaceChildren(
-				all,
-				...families.map((family) => {
+			state.table.family = fillSelect(
+				$('la-row-family'),
+				[[ALL, t('layout_analysis.table.family_all')]].concat(
 					// A family is named by its first layout's name (Ergopti, Bépo…).
-					const option = el('option', '', layouts.find((l) => l.family === family).name);
-					option.value = family;
-					return option;
-				})
+					families.map((family) => [family, layouts.find((l) => l.family === family).name])
+				),
+				state.table.family
 			);
-			if (!families.includes(state.table.family)) state.table.family = '';
-			$('la-row-family').value = state.table.family;
+			const { origins, languages } = layoutFacets();
+			const originEntries = [[ALL, t('layout_analysis.filter.origin_all')]].concat(
+				origins.map((id) => [id, originName(id)])
+			);
+			const languageEntries = [[ALL, t('layout_analysis.filter.language_all')]].concat(
+				languages.map((id) => [id, languageName(id)])
+			);
+			state.table.origin = fillSelect($('la-row-origin'), originEntries, state.table.origin);
+			state.table.language = fillSelect(
+				$('la-row-language'),
+				languageEntries,
+				state.table.language
+			);
+			state.pick.origin = fillSelect($('la-pick-origin'), originEntries, state.pick.origin);
+			state.pick.language = fillSelect($('la-pick-language'), languageEntries, state.pick.language);
+			$('la-row-complete').value = state.table.complete;
 			$('la-row-name').value = state.table.name;
 			$('la-row-min').value = state.table.min === null ? '' : String(state.table.min);
 			$('la-row-max').value = state.table.max === null ? '' : String(state.table.max);
 		}
 
-		/** The ranking table, sortable by any column, with its chosen columns and rows. */
-		function renderTable() {
-			const table = $('la-table');
+		/**
+		 * A ranking table of results, sortable by any column (a header button,
+		 * its order in aria-sort): rank, layout, score and the given metrics. A
+		 * row opens the layout's details by a click or Enter; an incomplete
+		 * layout carries its flag.
+		 * @param {HTMLTableElement} table
+		 * @param {object[]} rows The results, in the ranking's order.
+		 * @param {string[]} metricIds The metric columns.
+		 * @param {{key: string, descending: boolean}} sort
+		 * @param {function({key: string, descending: boolean}): void} resort
+		 *   Called with the new sort when a header is chosen.
+		 * @returns {{key: string, descending: boolean}} The sort applied (rank
+		 *   when the sorted column is gone).
+		 */
+		function rankingTable(table, rows, metricIds, sort, resort) {
 			table.replaceChildren();
-			const count = $('la-table-count');
-			count.textContent = '';
-			if (state.results.length === 0) return;
-			const shown = shownRows();
-			count.textContent = t('layout_analysis.table.count', {
-				shown: shown.length,
-				total: state.results.length
-			});
+			if (rows.length === 0) return sort;
 			const columns = [
 				{ key: 'rank', label: t('layout_analysis.table.rank'), value: (r) => r.rank },
 				{ key: 'name', label: t('layout_analysis.table.layout'), value: (r) => r.layout.name },
@@ -1225,49 +1778,58 @@
 					digits: 1
 				}
 			].concat(
-				state.table.columns.map((id) => ({
+				metricIds.map((id) => ({
 					key: id,
-					label: `${t(`layout_analysis.metric.${id}`)} (${unitText(id)})`,
+					label: `${metricName(id)} (${unitText(id)})`,
 					value: (r) => r.metrics[id],
-					digits: metricDigits(id)
+					digits: metricDigits(id),
+					// The order a first click asks for: the metric's better value first.
+					higher: E.METRICS[id].better !== 'lower'
 				}))
 			);
+			// A sorted column the user hid sorts by rank again.
+			const applied = columns.some((c) => c.key === sort.key)
+				? sort
+				: { key: 'rank', descending: false };
 			const head = el('tr');
 			for (const column of columns) {
 				const th = el('th', 'la-sortable');
 				th.scope = 'col';
 				// The sort is a button, so the keyboard reaches it.
-				const sort = el('button', 'la-sort', column.label);
-				sort.type = 'button';
-				sort.addEventListener('click', () => {
-					state.sort =
-						state.sort.key === column.key
-							? { key: column.key, descending: !state.sort.descending }
-							: { key: column.key, descending: column.key === 'score' };
-					renderTable();
+				const button = el('button', 'la-sort', column.label);
+				button.type = 'button';
+				button.dataset.sort = column.key;
+				button.addEventListener('click', () => {
+					resort(
+						applied.key === column.key
+							? { key: column.key, descending: !applied.descending }
+							: { key: column.key, descending: column.key === 'score' || Boolean(column.higher) }
+					);
+					// The table is drawn again: the focus stays on the same header.
+					const again = table.isConnected ? table : document.getElementById(table.id) || table;
+					const focus = again.querySelector(`button[data-sort="${column.key}"]`);
+					if (focus) focus.focus();
 				});
-				th.append(sort);
+				th.append(button);
 				if (DATA.sources.items[column.key]) th.append(' ', infoButton(column.key));
-				if (state.sort.key === column.key)
-					th.setAttribute('aria-sort', state.sort.descending ? 'descending' : 'ascending');
+				if (applied.key === column.key)
+					th.setAttribute('aria-sort', applied.descending ? 'descending' : 'ascending');
 				head.append(th);
 			}
 			const thead = el('thead');
 			thead.append(head);
-			// A sorted column the user hid sorts by rank again.
-			if (!columns.some((c) => c.key === state.sort.key))
-				state.sort = { key: 'rank', descending: false };
-			const sortColumn = columns.find((c) => c.key === state.sort.key);
-			const rows = shown.slice().sort((a, b) => {
+			const sortColumn = columns.find((c) => c.key === applied.key);
+			const sorted = rows.slice().sort((a, b) => {
 				const x = sortColumn.value(a);
 				const y = sortColumn.value(b);
 				const order = typeof x === 'string' ? x.localeCompare(y) : x - y;
-				return state.sort.descending ? -order : order;
+				return applied.descending ? -order : order;
 			});
 			const tbody = el('tbody');
-			for (const result of rows) {
+			for (const result of sorted) {
 				const tr = el('tr');
 				if (state.details === result.layout.id) tr.className = 'la-selected';
+				if (isPersonal(result)) tr.classList.add('la-row-mine');
 				for (const column of columns) {
 					const value = column.value(result);
 					const cell = el(
@@ -1288,13 +1850,607 @@
 				tbody.append(tr);
 			}
 			table.append(thead, tbody);
+			return applied;
 		}
 
+		/** The overview's ranking table, with the viewer's columns and the filters' rows. */
+		function renderTable() {
+			state.sort = rankingTable(
+				$('la-table'),
+				shownRows(),
+				state.table.columns,
+				state.sort,
+				(sort) => {
+					state.sort = sort;
+					renderTable();
+				}
+			);
+		}
+
+		/**
+		 * A bar of one result in a figure from zero: the user's own layouts in the
+		 * accent colour, an incomplete one faded with its flag in words. Read as a
+		 * table row (barRow); a click opens the layout's details, whose keyboard
+		 * way is the table under the figure.
+		 */
+		function resultBar(result, value, scale, text) {
+			const track = el('span', 'la-chart-track');
+			const bar = el('span', isPersonal(result) ? 'la-bar la-bar-mine' : 'la-bar la-bar-score');
+			bar.style.left = '0';
+			bar.style.width = `${scale > 0 ? Math.max(0, Math.min(100, (value / scale) * 100)) : 0}%`;
+			track.append(bar);
+			const flag = result.incomplete ? incompleteFlag(result) : null;
+			const row = barRow(result.layout.name, track, text);
+			if (flag) {
+				row.classList.add('la-incomplete');
+				row.firstChild.append(' ', flag);
+			}
+			if (state.details === result.layout.id) row.classList.add('la-selected');
+			row.classList.add('la-clickable');
+			row.title = `${result.layout.name}: ${text}${flag ? ` (${flag.textContent})` : ''}`;
+			row.addEventListener('click', () => showDetails(result.layout.id));
+			return row;
+		}
+
+		/**
+		 * The results ordered for a figure of one value: complete layouts first
+		 * (incomplete ones rank last everywhere), each group by the value, the
+		 * better first (the larger first for a value not scored), then by rank.
+		 */
+		function figureOrder(rows, value, better) {
+			const sign = better === 'lower' ? 1 : -1;
+			return rows
+				.slice()
+				.sort(
+					(a, b) =>
+						Number(a.incomplete) - Number(b.incomplete) ||
+						sign * (value(a) - value(b)) ||
+						a.rank - b.rank
+				);
+		}
+
+		/** One metric's bar chart over the results shown: named, its direction in words. */
+		function metricChart(id, rows) {
+			const section = el('section', 'la-figure');
+			const titleId = `la-chart-${id}`;
+			const title = el('h3', '', `${metricName(id)} (${unitText(id)})`);
+			title.id = titleId;
+			if (DATA.sources.items[id]) title.append(' ', infoButton(id));
+			section.setAttribute('aria-labelledby', titleId);
+			const better = E.METRICS[id].better;
+			section.append(title, el('p', 'la-muted la-direction', DIRECTION_LABEL[better]()));
+			const box = el('div', 'la-bars');
+			box.setAttribute('role', 'table');
+			box.setAttribute('aria-labelledby', titleId);
+			const sorted = figureOrder(rows, (r) => r.metrics[id], better);
+			const shown = sorted.slice(0, CHART_MAX_BARS);
+			const scale = Math.max(...shown.map((r) => r.metrics[id]), 0);
+			const digits = metricDigits(id);
+			const unit = unitText(id);
+			for (const result of shown)
+				box.append(
+					resultBar(
+						result,
+						result.metrics[id],
+						scale,
+						`${format(result.metrics[id], digits)} ${unit}`
+					)
+				);
+			section.append(box);
+			if (sorted.length > shown.length) section.append(moreNote(shown.length, sorted.length));
+			return section;
+		}
+
+		/** A themed tab's sortable table: rank, layout, score and the tab's metrics. */
+		function metricTable(name, metricIds, rows) {
+			const section = el('section', 'la-figure la-figure-wide');
+			const titleId = `la-table-${name}-label`;
+			const title = el('h3', '', t('layout_analysis.heat.table'));
+			title.id = titleId;
+			section.setAttribute('aria-labelledby', titleId);
+			const wrap = el('div', 'la-table-wrap');
+			wrap.tabIndex = 0;
+			wrap.setAttribute('role', 'region');
+			wrap.setAttribute('aria-labelledby', titleId);
+			const table = el('table', 'la-table');
+			table.id = `la-table-${name}`;
+			wrap.append(table);
+			section.append(title, wrap);
+			const sortOf = () => state.tabSorts[name] || { key: 'rank', descending: false };
+			const draw = (target) =>
+				rankingTable(target, rows, metricIds, sortOf(), (sort) => {
+					state.tabSorts[name] = sort;
+					draw($(`la-table-${name}`));
+				});
+			draw(table);
+			return section;
+		}
+
+		/** A themed tab: one chart per metric, then the table of them all. */
+		function renderMetricTab(tab) {
+			const rows = shownRows();
+			const grid = $(`la-charts-${tab}`);
+			grid.replaceChildren();
+			if (rows.length === 0) return;
+			grid.append(
+				...TAB_METRICS[tab].map((id) => metricChart(id, rows)),
+				metricTable(tab, TAB_METRICS[tab], rows)
+			);
+		}
+
+		/**
+		 * A table header row of sort buttons over a table of its own (a heat
+		 * table): the sort is the viewer's, kept in state.tabSorts[name].
+		 */
+		function tabSortHead(columns, name, redraw) {
+			tabSort(name);
+			return sortableHead(columns, null, redraw, {
+				get: () => state.tabSorts[name],
+				set: (sort) => {
+					state.tabSorts[name] = sort;
+				}
+			});
+		}
+
+		/** A tab table's sort, by rank until the viewer chooses a column. */
+		function tabSort(name) {
+			if (!state.tabSorts[name]) state.tabSorts[name] = { key: 'rank', descending: false };
+			return state.tabSorts[name];
+		}
+
+		/** Sorts rows by the column a tab table's sort names. */
+		function sortedBy(rows, columns, sort) {
+			const column = columns.find((c) => c.key === sort.key) || columns[0];
+			return rows.slice().sort((a, b) => {
+				const x = column.value(a);
+				const y = column.value(b);
+				const order = typeof x === 'string' ? x.localeCompare(y) : x - y;
+				return sort.descending ? -order : order;
+			});
+		}
+
+		/** A row of a heat table: the layout as its header, opening its details. */
+		function heatTableRow(result) {
+			const tr = el('tr');
+			if (state.details === result.layout.id) tr.className = 'la-selected';
+			const th = el('th', '', result.layout.name);
+			th.scope = 'row';
+			if (result.incomplete) th.append(' ', incompleteFlag(result));
+			tr.append(th);
+			tr.tabIndex = 0;
+			tr.addEventListener('click', () => showDetails(result.layout.id));
+			tr.addEventListener('keydown', (event) => {
+				if (event.key !== 'Enter') return;
+				event.preventDefault();
+				showDetails(result.layout.id);
+			});
+			return tr;
+		}
+
+		/**
+		 * Finger load against the ideal, every layout shown: each finger's share
+		 * of the non-thumb presses, its gap to the ideal written under it (signed),
+		 * the cell orange above the ideal and blue below, stronger with the gap,
+		 * mixed into the neutral surface. The ideal load is the first row.
+		 */
+		function renderFingerTable() {
+			const table = $('la-finger-table');
+			const rows = shownRows();
+			table.replaceChildren();
+			if (rows.length === 0) return;
+			const ideal = rows[0].idealLoad;
+			const fingers = Object.keys(ideal);
+			const columns = [
+				{ key: 'name', label: t('layout_analysis.table.layout'), value: (r) => r.layout.name }
+			]
+				.concat(
+					fingers.map((id) => ({
+						key: id,
+						label: t(`layout_analysis.finger.${id}`),
+						numeric: true,
+						value: (r) => r.fingerShares[id]
+					}))
+				)
+				.concat([
+					{
+						key: 'finger_imbalance',
+						label: `${metricName('finger_imbalance')} (%)`,
+						numeric: true,
+						value: (r) => r.metrics.finger_imbalance
+					},
+					{
+						key: 'rank',
+						label: t('layout_analysis.table.rank'),
+						numeric: true,
+						value: (r) => r.rank
+					}
+				]);
+			const thead = tabSortHead(columns, 'fingers_load', renderFingerTable);
+			const extent = Math.max(
+				...rows.flatMap((r) => fingers.map((id) => Math.abs(r.fingerShares[id] - ideal[id]))),
+				1e-9
+			);
+			const tbody = el('tbody');
+			const idealRow = el('tr', 'la-ideal-row');
+			const idealHead = el('th', '', t('layout_analysis.details.ideal_mark'));
+			idealHead.scope = 'row';
+			idealRow.append(idealHead, ...fingers.map((id) => el('td', '', format(ideal[id], 1))));
+			idealRow.append(el('td'), el('td'));
+			tbody.append(idealRow);
+			for (const result of sortedBy(rows, columns, tabSort('fingers_load'))) {
+				const tr = heatTableRow(result);
+				for (const id of fingers) {
+					const value = result.fingerShares[id];
+					// A gap that rounds to zero is written without a sign (never « -0.0 »).
+					const gap = Math.abs(value - ideal[id]) < 0.05 ? 0 : value - ideal[id];
+					const td = el(
+						'td',
+						`la-cell ${gap > 0 ? 'la-cell-over' : gap < 0 ? 'la-cell-under' : ''}`
+					);
+					td.style.setProperty(
+						'--la-share',
+						`${Math.round((Math.abs(gap) / extent) * HEAT_DIFF_MAX_SHARE * 100)}%`
+					);
+					const signed = `${gap > 0 ? '+' : ''}${format(gap, 1)}`;
+					td.append(el('span', '', format(value, 1)), el('small', 'la-gap', signed));
+					td.title = `${t(`layout_analysis.finger.${id}`)}: ${format(value, 1)} % (${t(
+						'layout_analysis.details.ideal_mark'
+					)} ${format(ideal[id], 1)} %, ${signed})`;
+					tr.append(td);
+				}
+				tr.append(
+					el('td', '', format(result.metrics.finger_imbalance, metricDigits('finger_imbalance'))),
+					el('td', '', String(result.rank))
+				);
+				tbody.append(tr);
+			}
+			table.append(thead, tbody);
+		}
+
+		/**
+		 * Hand balance, the most balanced first: each layout's left and right
+		 * shares of the non-thumb presses in one bar (two categorical slots, a
+		 * surface gap between them), the middle marked, both values written.
+		 */
+		function renderHands() {
+			const box = $('la-hands');
+			box.replaceChildren();
+			box.setAttribute('role', 'table');
+			const left = t('layout_analysis.details.hand_left');
+			const right = t('layout_analysis.details.hand_right');
+			$('la-hands-legend').replaceChildren(
+				legendItem('la-swatch-cat-1', left),
+				legendItem('la-swatch-cat-2', right)
+			);
+			const sorted = figureOrder(shownRows(), (r) => r.metrics.hand_imbalance, 'lower');
+			const shown = sorted.slice(0, CHART_MAX_BARS);
+			for (const result of shown) {
+				const track = el('span', 'la-chart-track la-stack');
+				const share = result.hands.left;
+				const leftBar = el('span', 'la-bar la-seg la-seg-1');
+				leftBar.style.left = '0';
+				leftBar.style.width = `${share}%`;
+				const rightBar = el('span', 'la-bar la-seg la-seg-2');
+				rightBar.style.left = `${share}%`;
+				rightBar.style.width = `${result.hands.right}%`;
+				const middle = el('span', 'la-target');
+				middle.style.left = '50%';
+				track.append(leftBar, rightBar, middle);
+				const text = `${format(result.hands.left, 1)} % · ${format(result.hands.right, 1)} %`;
+				const row = barRow(
+					result.layout.name,
+					track,
+					text,
+					` (${left} ${format(result.hands.left, 1)} %, ${right} ${format(result.hands.right, 1)} %)`
+				);
+				if (result.incomplete) {
+					row.classList.add('la-incomplete');
+					row.firstChild.append(' ', incompleteFlag(result));
+				}
+				if (state.details === result.layout.id) row.classList.add('la-selected');
+				row.classList.add('la-clickable');
+				row.title = `${result.layout.name}: ${left} ${format(result.hands.left, 1)} %, ${right} ${format(result.hands.right, 1)} %`;
+				row.addEventListener('click', () => showDetails(result.layout.id));
+				box.append(row);
+			}
+			if (sorted.length > shown.length) box.append(moreNote(shown.length, sorted.length));
+		}
+
+		/** A legend entry: a swatch of a class and its name. */
+		function legendItem(swatch, label) {
+			const item = el('li');
+			item.append(el('span', `la-swatch ${swatch}`), el('span', '', label));
+			return item;
+		}
+
+		/**
+		 * A stacked figure: each layout shown (ranking order) in one bar split
+		 * into its parts (categorical slots in a fixed order, a surface gap
+		 * between them), with a legend, and its values as a folded table.
+		 * @param {HTMLElement} box
+		 * @param {Array<{id: string, label: string}>} parts
+		 * @param {function(object, string): number} value A result's share of a part (%).
+		 * @param {string} name Its tables' name (the sort's).
+		 * @param {string|null} written The part whose value is written beside
+		 *   each bar (the home row), or null when no part speaks for the bar.
+		 */
+		function stackedFigure(box, parts, value, name, written) {
+			box.replaceChildren();
+			const rows = shownRows();
+			if (rows.length === 0) return;
+			const legend = el('ul', 'la-legend');
+			parts.forEach((part, i) => legend.append(legendItem(`la-swatch-cat-${i + 1}`, part.label)));
+			const bars = el('div', 'la-bars');
+			bars.setAttribute('role', 'table');
+			bars.setAttribute('aria-labelledby', box.closest('section').getAttribute('aria-labelledby'));
+			const shown = rows.slice(0, CHART_MAX_BARS);
+			for (const result of shown) {
+				const track = el('span', 'la-chart-track la-stack');
+				let at = 0;
+				parts.forEach((part, i) => {
+					const share = value(result, part.id);
+					const segment = el('span', `la-bar la-seg la-seg-${i + 1}`);
+					segment.style.left = `${at}%`;
+					segment.style.width = `${Math.max(0, share)}%`;
+					at += Math.max(0, share);
+					track.append(segment);
+				});
+				const said = parts
+					.map((part) => `${part.label} ${format(value(result, part.id), 1)} %`)
+					.join(', ');
+				// One part's value beside the bar at most; all of them are in the title and the table.
+				const row = barRow(
+					result.layout.name,
+					track,
+					written ? `${format(value(result, written), 1)} %` : '',
+					` (${said})`
+				);
+				if (result.incomplete) {
+					row.classList.add('la-incomplete');
+					row.firstChild.append(' ', incompleteFlag(result));
+				}
+				if (state.details === result.layout.id) row.classList.add('la-selected');
+				row.classList.add('la-clickable');
+				row.title = `${result.layout.name}: ${said}`;
+				row.addEventListener('click', () => showDetails(result.layout.id));
+				bars.append(row);
+			}
+			const tableBox = el('details', 'la-section');
+			tableBox.append(el('summary', '', t('layout_analysis.heat.table')));
+			const wrap = el('div', 'la-table-wrap');
+			wrap.tabIndex = 0;
+			const table = el('table', 'la-table');
+			table.id = `la-table-${name}`;
+			wrap.append(table);
+			tableBox.append(wrap);
+			const columns = [
+				{ key: 'name', label: t('layout_analysis.table.layout'), value: (r) => r.layout.name }
+			]
+				.concat(
+					parts.map((part) => ({
+						key: part.id,
+						label: `${part.label} (%)`,
+						numeric: true,
+						value: (r) => value(r, part.id)
+					}))
+				)
+				.concat([
+					{
+						key: 'rank',
+						label: t('layout_analysis.table.rank'),
+						numeric: true,
+						value: (r) => r.rank
+					}
+				]);
+			const drawTable = () => {
+				const target = $(`la-table-${name}`) || table;
+				const tbody = el('tbody');
+				for (const result of sortedBy(rows, columns, tabSort(name))) {
+					const tr = heatTableRow(result);
+					for (const part of parts) tr.append(el('td', '', format(value(result, part.id), 1)));
+					tr.append(el('td', '', String(result.rank)));
+					tbody.append(tr);
+				}
+				target.replaceChildren(tabSortHead(columns, name, drawTable), tbody);
+			};
+			box.append(legend, bars);
+			if (rows.length > shown.length) box.append(moreNote(shown.length, rows.length));
+			box.append(tableBox);
+			drawTable();
+		}
+
+		/** How the trigrams split into their six classes, layout by layout. */
+		function renderTrigramMix() {
+			stackedFigure(
+				$('la-trigram-mix'),
+				TRIGRAM_MIX.map((id) => ({ id, label: trigramClassName(id) })),
+				(result, id) => result.trigramClasses[id],
+				'trigram_mix',
+				null
+			);
+		}
+
+		/** Each layout's presses on the number, top, home and bottom rows. */
+		function renderRowMix() {
+			stackedFigure(
+				$('la-row-mix'),
+				ROW_MIX.map((id) => ({ id, label: metricName(id) })),
+				(result, id) => result.metrics[id],
+				'row_mix',
+				'home_row'
+			);
+		}
+
+		/**
+		 * Each finger's travel (mm per typed character), every layout shown, on
+		 * one blue ramp from zero to the longest; the total is the distance.
+		 */
+		function renderTravelTable() {
+			const table = $('la-travel-table');
+			const rows = shownRows();
+			table.replaceChildren();
+			$('la-travel-legend').replaceChildren();
+			if (rows.length === 0) return;
+			const fingers = Object.keys(rows[0].fingerDistance);
+			const mm = t('layout_analysis.unit.mm');
+			const columns = [
+				{ key: 'name', label: t('layout_analysis.table.layout'), value: (r) => r.layout.name }
+			]
+				.concat(
+					fingers.map((id) => ({
+						key: id,
+						label: t(`layout_analysis.finger.${id}`),
+						numeric: true,
+						value: (r) => r.fingerDistance[id]
+					}))
+				)
+				.concat([
+					{
+						key: 'distance',
+						label: `${metricName('distance')} (${mm})`,
+						numeric: true,
+						value: (r) => r.metrics.distance
+					},
+					{
+						key: 'rank',
+						label: t('layout_analysis.table.rank'),
+						numeric: true,
+						value: (r) => r.rank
+					}
+				]);
+			const extent = Math.max(...rows.flatMap((r) => fingers.map((id) => r.fingerDistance[id])), 0);
+			const tbody = el('tbody');
+			for (const result of sortedBy(rows, columns, tabSort('travel'))) {
+				const tr = heatTableRow(result);
+				for (const id of fingers) {
+					const value = result.fingerDistance[id];
+					const share = extent > 0 ? value / extent : 0;
+					const td = el('td', 'la-cell la-cell-count', format(value, 2));
+					td.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
+					if (share >= HEAT_STRONG_SHARE) td.classList.add('la-cell-strong');
+					td.title = `${t(`layout_analysis.finger.${id}`)}: ${format(value, 2)} ${mm}`;
+					tr.append(td);
+				}
+				tr.append(
+					el('td', '', format(result.metrics.distance, metricDigits('distance'))),
+					el('td', '', String(result.rank))
+				);
+				tbody.append(tr);
+			}
+			table.append(tabSortHead(columns, 'travel', renderTravelTable), tbody);
+			$('la-travel-legend').replaceChildren(
+				el('span', '', `${format(0, 2)} ${mm}`),
+				el('span', 'la-heat-ramp'),
+				el('span', '', `${format(extent, 2)} ${mm}`)
+			);
+		}
+
+		/**
+		 * The side-by-side heat maps: the first boards of the results shown (the
+		 * ranking's order), each layout on its own board coloured by the chosen
+		 * per-key value, on one scale for all or each on its own; each board has
+		 * its values as a folded table and opens the layout's details.
+		 */
+		function renderHeatGrid() {
+			const grid = $('la-heats');
+			grid.replaceChildren();
+			$('la-heats-legend').replaceChildren();
+			const { metric, count, shared } = state.heats;
+			const boards = shownRows()
+				.slice(0, count)
+				.map((result) => ({ result, values: heatValuesOf(result, metric, null) }));
+			if (boards.length === 0) return;
+			const unit = heatUnit(metric);
+			const modifiers = new Set(Object.values(DATA.model.modifier_keys));
+			// The space bar takes a share of the presses no other key comes near: the
+			// scale is the other keys', and the space bar is drawn at its darkest.
+			const extentOf = (values) =>
+				Math.max(
+					...Object.entries(values)
+						.filter(([code]) => !modifiers.has(code) && code !== SPACE_CODE)
+						.map(([, v]) => Math.abs(v)),
+					0
+				);
+			const common = Math.max(...boards.map((b) => extentOf(b.values)), 0);
+			const ramp = (extent) => [
+				el('span', '', `${format(0, HEAT_DIGITS)} ${unit}`),
+				el('span', 'la-heat-ramp'),
+				el('span', '', `≥ ${format(extent, HEAT_DIGITS)} ${unit}`)
+			];
+			if (shared)
+				$('la-heats-legend').replaceChildren(
+					...ramp(common),
+					el('span', 'la-muted', t('layout_analysis.heat.scale', { metric: heatName(metric) }))
+				);
+			for (const { result, values } of boards) {
+				const layout = layoutOf(result.layout.id);
+				const card = el(
+					'section',
+					isPersonal(result) ? 'la-figure la-heat-card la-heat-mine' : 'la-figure la-heat-card'
+				);
+				const titleId = `la-heats-${grid.children.length}`;
+				const title = el('h3');
+				title.id = titleId;
+				const open = el(
+					'button',
+					'la-link-button',
+					t('layout_analysis.details.title', { layout: result.layout.name, rank: result.rank })
+				);
+				open.type = 'button';
+				open.addEventListener('click', () => showDetails(result.layout.id));
+				title.append(open);
+				if (result.incomplete) title.append(' ', incompleteFlag(result));
+				card.setAttribute('aria-labelledby', titleId);
+				const box = el('div', 'la-heatmap la-heatmap-small');
+				const extent = shared ? common : extentOf(values);
+				const tableRows = drawBoard(box, result, layout, values, {
+					extent,
+					other: false,
+					focusable: false,
+					title: (code, value) =>
+						`${keyText(layout, code)} · ${heatName(metric)}: ${format(value, HEAT_DIGITS)} ${unit}`
+				});
+				card.append(title, box);
+				if (!shared) {
+					const legend = el('div', 'la-heat-legend');
+					legend.append(...ramp(extent));
+					card.append(legend);
+				}
+				const tableBox = el('details', 'la-section');
+				tableBox.append(el('summary', '', t('layout_analysis.heat.table')));
+				const wrap = el('div', 'la-table-wrap');
+				wrap.tabIndex = 0;
+				const table = el('table', 'la-table');
+				heatTableInto(table, layout, tableRows, metric, false);
+				wrap.append(table);
+				tableBox.append(wrap);
+				card.append(tableBox);
+				grid.append(card);
+			}
+		}
+
+		/** The layout list of « One layout »: every compared layout, in the ranking's order. */
+		function fillDetailsPick() {
+			// Before the first results (a link's layout waits for them) nothing is replaced.
+			if (state.results.length > 0 && !state.results.some((r) => r.layout.id === state.details))
+				state.details = state.results[0].layout.id;
+			fillSelect(
+				$('la-details-layout'),
+				state.results.length > 0
+					? state.results.map((r) => [r.layout.id, `${r.rank}. ${r.layout.name}`])
+					: [['', t('layout_analysis.status.empty')]],
+				state.details || ''
+			);
+		}
+
+		/** Opens a layout's details in « One layout ». */
 		function showDetails(id) {
 			state.details = id;
 			if (state.versus === id) state.versus = null;
+			state.tab = DETAILS_TAB;
+			showTab();
 			render();
-			$('la-details').scrollIntoView({ block: 'nearest' });
+			$('la-tabs').scrollIntoView({ block: 'nearest' });
 		}
 
 		/**
@@ -1421,13 +2577,18 @@
 		 * @returns {object} code → value.
 		 */
 		function heatValues(detail, other) {
-			if (state.heat === HEAT_SCORE) {
-				const own = E.keyScoreCost(detail, state.weights);
+			return heatValuesOf(detail, state.heat, other);
+		}
+
+		/** Each key's value of a heatmap choice for one result (heatValues), any choice. */
+		function heatValuesOf(result, metric, other) {
+			if (metric === HEAT_SCORE) {
+				const own = E.keyScoreCost(result, state.weights);
 				if (!other) return own;
 				const theirs = E.keyScoreCost(other, state.weights);
 				return Object.fromEntries(Object.keys(own).map((code) => [code, own[code] - theirs[code]]));
 			}
-			return other ? E.keyDiff(detail, other, state.heat) : E.keyValues(detail, state.heat);
+			return other ? E.keyDiff(result, other, metric) : E.keyValues(result, metric);
 		}
 
 		/**
@@ -1495,14 +2656,18 @@
 		 * @param {boolean} signed A difference with another layout.
 		 */
 		function renderHeatTable(layout, rows, signed) {
-			const table = $('la-heat-table');
-			const unit = heatUnit(state.heat);
+			heatTableInto($('la-heat-table'), layout, rows, state.heat, signed);
+		}
+
+		/** The heatmap's numbers of one choice as a table (renderHeatTable), into any table. */
+		function heatTableInto(table, layout, rows, metric, signed) {
+			const unit = heatUnit(metric);
 			const head = el('tr');
 			for (const label of [
 				t('layout_analysis.heat.table_key'),
 				t('layout_analysis.heat.table_position'),
 				t('layout_analysis.heat.table_finger'),
-				`${heatName(state.heat)} (${unit})`
+				`${heatName(metric)} (${unit})`
 			]) {
 				const th = el('th', '', label);
 				th.scope = 'col';
@@ -1528,17 +2693,89 @@
 		}
 
 		/**
-		 * The board of the chosen keyboard, each key showing the layout's base
-		 * character. One layout: shaded light to dark (one hue) by its share of
-		 * the largest value of the chosen per-key metric. Against another layout
-		 * (the difference): orange where this layout puts more, blue where less,
-		 * stronger with the size of the gap, each tooltip signed. The legend
-		 * gives the scale; every key is reachable from the keyboard with its
-		 * value as its name. The board shrinks with the page instead of scrolling.
+		 * Draws a board of a result's keyboard into a box, each key showing the
+		 * layout's base character, positioned in % so the board scales with its
+		 * box. One layout: one hue, light to dark, by the key's share of the
+		 * extent. A difference (other): orange where this layout puts more,
+		 * blue where less, mixed into the neutral surface.
+		 * @param {HTMLElement} box
+		 * @param {object} result
+		 * @param {object} layout
+		 * @param {object} byCode code → value.
+		 * @param {{extent?: number, other: boolean, focusable: boolean,
+		 *   title: function(string, number): string}} options extent: the value
+		 *   of the darkest key (the box's own largest when absent); focusable:
+		 *   every key takes the focus with its value as its name.
+		 * @returns {Array<{code: string, where: string, finger: string, value: number}>}
+		 *   The drawn keys, the rows of the board's table.
+		 */
+		function drawBoard(box, result, layout, byCode, options) {
+			box.replaceChildren();
+			const board = E.keyboard(result.keyboard, result.profile || undefined);
+			const modifiers = new Set(Object.values(DATA.model.modifier_keys));
+			const shown = board.codes.filter((code) => !modifiers.has(code));
+			const extent =
+				options.extent !== undefined
+					? options.extent
+					: Math.max(...shown.map((code) => Math.abs(byCode[code])), 0);
+			const minX = Math.min(...board.x) - 0.5;
+			const maxX = Math.max(...board.x) + 0.5;
+			const maxY = Math.max(...board.y);
+			const width = maxX - minX;
+			// Positions in % of the board, so the whole board scales with its box.
+			const across = (units) => `${(units / width) * 100}%`;
+			const down = (units) => `${(units / maxY) * 100}%`;
+			box.style.maxWidth = `${width * HEAT_UNIT_PX}px`;
+			box.style.aspectRatio = `${width} / ${maxY}`;
+			box.classList.toggle('la-heatmap-diff', options.other);
+			const position = keyPositions(board, shown);
+			const tableRows = [];
+			board.codes.forEach((code, k) => {
+				if (modifiers.has(code)) return;
+				const key = el('span', 'la-key', keyText(layout, code));
+				const row = layout.rows[code];
+				if (row && row[0] && typeof row[0] === 'object')
+					key.classList.add(KEY_LEGEND.DEAD_KEY_CLASS);
+				const value = byCode[code];
+				const share = extent > 0 ? Math.min(1, Math.abs(value) / extent) : 0;
+				const span = code === 'Space' ? SPACE_UNITS : 1;
+				const left = code === 'Space' ? board.x[k] - SPACE_UNITS / 2 : board.x[k] - 0.5;
+				key.style.left = across(left - minX);
+				key.style.top = down(board.y[k] - 1);
+				key.style.width = across(span);
+				key.style.height = down(1);
+				if (options.other) {
+					key.classList.add(value > 0 ? 'la-key-more' : value < 0 ? 'la-key-less' : 'la-key-same');
+					key.style.setProperty('--la-share', `${Math.round(share * HEAT_DIFF_MAX_SHARE * 100)}%`);
+				} else {
+					key.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
+					if (share >= HEAT_STRONG_SHARE) key.classList.add('la-key-strong');
+				}
+				const title = options.title(code, value);
+				const where = t('layout_analysis.heat.position', position.get(code));
+				key.title = title;
+				key.setAttribute('role', 'img');
+				// The name also says where the key is, which the drawing shows.
+				key.setAttribute('aria-label', `${title} (${where})`);
+				if (options.focusable) key.tabIndex = 0;
+				box.append(key);
+				tableRows.push({ code, where, finger: DATA.model.fingers[board.finger[k]], value });
+			});
+			return tableRows;
+		}
+
+		/**
+		 * The board of the chosen keyboard in the details, each key showing the
+		 * layout's base character. One layout: shaded light to dark (one hue) by
+		 * its share of the largest value of the chosen per-key metric. Against
+		 * another layout (the difference): orange where this layout puts more,
+		 * blue where less, stronger with the size of the gap, each tooltip
+		 * signed. The legend gives the scale; every key is reachable from the
+		 * keyboard with its value as its name. The board shrinks with the page
+		 * instead of scrolling.
 		 */
 		function renderHeatmap(result) {
 			const box = $('la-heatmap');
-			box.replaceChildren();
 			const detail = detailOf(result);
 			const versus = state.results.find((r) => r.layout.id === state.versus) || null;
 			const field = $('la-heat-diff-field');
@@ -1549,55 +2786,14 @@
 				});
 			$('la-heat-diff').checked = state.heatDiff;
 			const other = versus && state.heatDiff ? versus : null;
-			const board = E.keyboard(result.keyboard, result.profile || undefined);
 			const layout = layoutOf(result.layout.id);
-			const modifiers = new Set(Object.values(DATA.model.modifier_keys));
 			const byCode = heatValues(detail, other);
-			const shown = board.codes.filter((code) => !modifiers.has(code));
-			const extent = Math.max(...shown.map((code) => Math.abs(byCode[code])), 0);
-			const minX = Math.min(...board.x) - 0.5;
-			const maxX = Math.max(...board.x) + 0.5;
-			const maxY = Math.max(...board.y);
-			const width = maxX - minX;
-			// Positions in % of the board, so the whole board scales with its box.
-			const across = (units) => `${(units / width) * 100}%`;
-			const down = (units) => `${(units / maxY) * 100}%`;
-			box.style.maxWidth = `${width * HEAT_UNIT_PX}px`;
-			box.style.aspectRatio = `${width} / ${maxY}`;
-			box.classList.toggle('la-heatmap-diff', Boolean(other));
-			const position = keyPositions(board, shown);
-			const tableRows = [];
-			board.codes.forEach((code, k) => {
-				if (modifiers.has(code)) return;
-				const key = el('span', 'la-key', keyText(layout, code));
-				const row = layout.rows[code];
-				if (row && row[0] && typeof row[0] === 'object')
-					key.classList.add(KEY_LEGEND.DEAD_KEY_CLASS);
-				const value = byCode[code];
-				const share = extent > 0 ? Math.abs(value) / extent : 0;
-				const span = code === 'Space' ? SPACE_UNITS : 1;
-				const left = code === 'Space' ? board.x[k] - SPACE_UNITS / 2 : board.x[k] - 0.5;
-				key.style.left = across(left - minX);
-				key.style.top = down(board.y[k] - 1);
-				key.style.width = across(span);
-				key.style.height = down(1);
-				if (other) {
-					key.classList.add(value > 0 ? 'la-key-more' : value < 0 ? 'la-key-less' : 'la-key-same');
-					key.style.setProperty('--la-share', `${Math.round(share * HEAT_DIFF_MAX_SHARE * 100)}%`);
-				} else {
-					key.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
-					if (share >= HEAT_STRONG_SHARE) key.classList.add('la-key-strong');
-				}
-				const title = heatTitle(detail, layout, code, value, Boolean(other));
-				const where = t('layout_analysis.heat.position', position.get(code));
-				key.title = title;
-				key.tabIndex = 0;
-				key.setAttribute('role', 'img');
-				// The name also says where the key is, which the drawing shows.
-				key.setAttribute('aria-label', `${title} (${where})`);
-				box.append(key);
-				tableRows.push({ code, where, finger: DATA.model.fingers[board.finger[k]], value });
+			const tableRows = drawBoard(box, result, layout, byCode, {
+				other: Boolean(other),
+				focusable: true,
+				title: (code, value) => heatTitle(detail, layout, code, value, Boolean(other))
 			});
+			const extent = Math.max(...tableRows.map((row) => Math.abs(row.value)), 0);
 			renderHeatTable(layout, tableRows, Boolean(other));
 			const legend = $('la-heat-legend');
 			const unit = heatUnit(state.heat);
@@ -1635,6 +2831,18 @@
 				})
 			);
 			select.value = state.heat;
+			// The side-by-side heat maps offer the same choices, and how many boards.
+			fillSelect(
+				$('la-heats-metric'),
+				HEAT_CHOICES.map((id) => [id, heatName(id)]),
+				state.heats.metric
+			);
+			fillSelect(
+				$('la-heats-count'),
+				HEATS_COUNTS.map((n) => [String(n), format(n, 0)]),
+				String(state.heats.count)
+			);
+			$('la-heats-shared').checked = state.heats.shared;
 			const events = $('la-worst-event');
 			const chosen = events.value || E.KEY_EVENTS[0];
 			events.replaceChildren(
@@ -1711,32 +2919,49 @@
 			return entry[name].value;
 		}
 
-		/** A table header row of sort buttons; the sort is the viewer's (state[sortName]). */
-		function sortableHead(columns, sortName, redraw) {
+		/**
+		 * A table header row of sort buttons; the sort is the viewer's
+		 * (state[sortName], or the holder's get and set). After a redraw the focus
+		 * returns to the same header, found by its data-sort in the document.
+		 */
+		function sortableHead(columns, sortName, redraw, holder) {
+			const get = holder ? holder.get : () => state[sortName];
+			const set = holder
+				? holder.set
+				: (sort) => {
+						state[sortName] = sort;
+					};
 			const head = el('tr');
+			const scope = `${sortName || 'tab'}-${columns.map((c) => c.key).join('.')}`;
 			for (const column of columns) {
 				const th = el('th', 'la-sortable');
 				th.scope = 'col';
 				const sort = el('button', 'la-sort', column.label);
 				sort.type = 'button';
+				sort.dataset.sortScope = scope;
+				sort.dataset.sort = column.key;
 				sort.addEventListener('click', () => {
-					const current = state[sortName];
-					state[sortName] =
+					const current = get();
+					set(
 						current.key === column.key
 							? { key: column.key, descending: !current.descending }
-							: { key: column.key, descending: column.numeric };
+							: { key: column.key, descending: Boolean(column.numeric) }
+					);
 					redraw();
+					const again = root.querySelector(
+						`button[data-sort-scope="${scope}"][data-sort="${column.key}"]`
+					);
+					if (again) again.focus();
 				});
 				th.append(sort);
-				if (state[sortName].key === column.key)
-					th.setAttribute('aria-sort', state[sortName].descending ? 'descending' : 'ascending');
+				if (get().key === column.key)
+					th.setAttribute('aria-sort', get().descending ? 'descending' : 'ascending');
 				head.append(th);
 			}
 			const thead = el('thead');
 			thead.append(head);
 			return thead;
 		}
-
 		/**
 		 * The key pair matrix (the engine's bigramMatrix): the busiest keys on
 		 * both axes, first key by row, second by column, each cell coloured by
@@ -2339,13 +3564,34 @@
 		function fillCorpora() {
 			const select = $('la-corpus');
 			select.replaceChildren();
+			// The filters: the languages of the built-in texts (most texts first),
+			// and their kinds in corpora.json's order. Code has no language: it is
+			// listed whatever language is chosen.
+			const builtins = corpora.filter((c) => c.builtin).map((c) => c.builtin);
+			const languages = byFrequency(
+				builtins.map((c) => c.language).filter((l) => l !== CODE_LANGUAGE),
+				languageName
+			);
+			const kinds = CORPUS_KINDS.filter((kind) => builtins.some((c) => c.kind === kind));
+			state.corpusFilter.language = fillSelect(
+				$('la-corpus-language'),
+				[[ALL, t('layout_analysis.filter.language_all')]].concat(
+					languages.map((id) => [id, languageName(id)])
+				),
+				state.corpusFilter.language
+			);
+			state.corpusFilter.kind = fillSelect(
+				$('la-corpus-kind'),
+				[[ALL, t('layout_analysis.corpus.kind_all')]].concat(
+					kinds.map((id) => [id, KIND_LABEL[id]()])
+				),
+				state.corpusFilter.kind
+			);
 			// The user's own text first, under its own heading (maintainer,
 			// 2026-11-17): « My typing » while the app reads it, then the pasted
-			// text; the built-in texts below.
+			// text; the built-in texts below, one group per language and kind.
 			const mine = el('optgroup');
 			mine.label = t('layout_analysis.corpus.group_mine');
-			const texts = el('optgroup');
-			texts.label = t('layout_analysis.corpus.group_texts');
 			const hasMyTyping = corpora.some((c) => c.id === MY_TYPING_ID);
 			if (!hasMyTyping && myTypingState) {
 				const waiting = el(
@@ -2362,20 +3608,45 @@
 				if (myTypingState.reason) waiting.title = myTypingState.reason;
 				mine.append(waiting);
 			}
-			for (const corpus of corpora) {
-				const label =
-					corpus.id === CUSTOM_ID
-						? t('layout_analysis.corpus.custom')
-						: corpus.id === MY_TYPING_ID && !corpus.title
-							? t('layout_analysis.corpus.my_typing')
-							: corpus.builtin && corpus.builtin.title_key
-								? t(corpus.builtin.title_key)
-								: corpus.title;
-				const option = el('option', '', label);
-				option.value = corpus.id;
-				(corpus.builtin ? texts : mine).append(option);
-			}
-			select.append(...[mine, texts].filter((group) => group.children.length > 0));
+			const labelOf = (corpus) =>
+				corpus.id === CUSTOM_ID
+					? t('layout_analysis.corpus.custom')
+					: corpus.id === MY_TYPING_ID && !corpus.title
+						? t('layout_analysis.corpus.my_typing')
+						: corpus.builtin && corpus.builtin.title_key
+							? t(corpus.builtin.title_key)
+							: corpus.title;
+			const option = (corpus) => {
+				const node = el('option', '', labelOf(corpus));
+				node.value = corpus.id;
+				return node;
+			};
+			for (const corpus of corpora.filter((c) => !c.builtin)) mine.append(option(corpus));
+			const { language, kind } = state.corpusFilter;
+			// The chosen corpus stays listed whatever the filters, so the picker shows it.
+			const kept = (c) =>
+				c.id === state.corpus ||
+				((!language || c.builtin.language === language || c.builtin.language === CODE_LANGUAGE) &&
+					(!kind || c.builtin.kind === kind));
+			const groups = [];
+			for (const lang of languages.concat([CODE_LANGUAGE]))
+				for (const sort of CORPUS_KINDS) {
+					const members = corpora.filter(
+						(c) => c.builtin && c.builtin.language === lang && c.builtin.kind === sort && kept(c)
+					);
+					if (members.length === 0) continue;
+					const group = el('optgroup');
+					group.label =
+						lang === CODE_LANGUAGE
+							? KIND_LABEL[sort]()
+							: t('layout_analysis.corpus.group', {
+									language: languageName(lang),
+									kind: KIND_LABEL[sort]()
+								});
+					group.append(...members.map(option));
+					groups.push(group);
+				}
+			select.append(...[mine].concat(groups).filter((group) => group.children.length > 0));
 			select.value = state.corpus;
 			select.classList.toggle('la-corpus-mine', state.corpus === MY_TYPING_ID);
 			showCorpusInfo();
@@ -2420,13 +3691,21 @@
 			state.linkedSelection = false;
 		}
 
+		/** Whether the layout list's filters (text, origin, language) show a layout. */
+		function pickShows(layout) {
+			const filter = $('la-filter').value.trim().toLowerCase();
+			return (
+				(!filter || layout.name.toLowerCase().includes(filter) || layout.id.includes(filter)) &&
+				(!state.pick.origin || originOf(layout) === state.pick.origin) &&
+				(!state.pick.language || layout.language === state.pick.language)
+			);
+		}
+
 		function fillLayouts() {
 			const list = $('la-layout-list');
 			list.replaceChildren();
-			const filter = $('la-filter').value.trim().toLowerCase();
 			for (const layout of layouts) {
-				if (filter && !layout.name.toLowerCase().includes(filter) && !layout.id.includes(filter))
-					continue;
+				if (!pickShows(layout)) continue;
 				const label = el('label', 'la-layout');
 				const box = el('input');
 				box.type = 'checkbox';
@@ -2689,10 +3968,7 @@
 		}
 
 		function visibleLayoutIds() {
-			const filter = $('la-filter').value.trim().toLowerCase();
-			return layouts
-				.filter((l) => !filter || l.name.toLowerCase().includes(filter) || l.id.includes(filter))
-				.map((l) => l.id);
+			return layouts.filter(pickShows).map((l) => l.id);
 		}
 
 		function bind() {
@@ -2799,22 +4075,65 @@
 				const value = Number(input.value);
 				return input.value === '' || !Number.isFinite(value) ? null : value;
 			};
+			// The filters choose the layouts every sub-tab draws.
 			const filtered = () => {
 				state.table.name = $('la-row-name').value;
 				state.table.family = $('la-row-family').value;
+				state.table.origin = $('la-row-origin').value;
+				state.table.language = $('la-row-language').value;
+				state.table.complete = $('la-row-complete').value;
 				state.table.min = bound($('la-row-min'));
 				state.table.max = bound($('la-row-max'));
 				save();
-				renderTable();
+				render();
 			};
 			for (const id of ['la-row-name', 'la-row-min', 'la-row-max'])
 				$(id).addEventListener('input', filtered);
-			$('la-row-family').addEventListener('change', filtered);
+			for (const id of ['la-row-family', 'la-row-origin', 'la-row-language', 'la-row-complete'])
+				$(id).addEventListener('change', filtered);
 			$('la-table-reset').addEventListener('click', () => {
 				state.table = validTable(null);
 				fillTableOptions();
 				save();
-				renderTable();
+				render();
+			});
+			// The corpus picker's filters narrow its list, never the chosen corpus.
+			for (const [id, name] of [
+				['la-corpus-language', 'language'],
+				['la-corpus-kind', 'kind']
+			])
+				$(id).addEventListener('change', (event) => {
+					state.corpusFilter[name] = event.target.value;
+					save();
+					fillCorpora();
+				});
+			// The layout list's filters, which « Select all shown » follows.
+			for (const [id, name] of [
+				['la-pick-origin', 'origin'],
+				['la-pick-language', 'language']
+			])
+				$(id).addEventListener('change', (event) => {
+					state.pick[name] = event.target.value;
+					save();
+					fillLayouts();
+				});
+			$('la-heats-metric').addEventListener('change', (event) => {
+				state.heats.metric = event.target.value;
+				save();
+				renderHeatGrid();
+			});
+			$('la-heats-count').addEventListener('change', (event) => {
+				state.heats.count = Number(event.target.value);
+				save();
+				renderHeatGrid();
+			});
+			$('la-heats-shared').addEventListener('change', (event) => {
+				state.heats.shared = event.target.checked;
+				save();
+				renderHeatGrid();
+			});
+			$('la-details-layout').addEventListener('change', (event) => {
+				if (event.target.value) showDetails(event.target.value);
 			});
 			$('la-versus').addEventListener('change', (event) => {
 				state.versus = event.target.value || null;
@@ -2908,6 +4227,7 @@
 				fillForms();
 				fillTableOptions();
 				fillHeatChoices();
+				fillTabs();
 				render();
 				analyse();
 			});
@@ -3020,6 +4340,8 @@
 				byId.set(layout.id, layout);
 				state.selected.add(layout.id);
 			}
+			// A new origin or language joins the filters.
+			fillTableOptions();
 			fillLayouts();
 			analyse();
 		}
@@ -3079,6 +4401,16 @@
 			fillForms();
 			fillTableOptions();
 			fillHeatChoices();
+			fillTabs();
+			// The filters stay open where the width holds them in a row, and
+			// wherever one is set, so a narrowed list never hides its reason.
+			const { name, family, origin, language, complete, min, max } = state.table;
+			$('la-filters-box').open =
+				window.matchMedia(`(min-width: ${FILTERS_OPEN_MIN_PX}px)`).matches ||
+				Boolean(name || family || origin || language) ||
+				complete !== COMPLETE_CHOICES[0] ||
+				min !== null ||
+				max !== null;
 			fingeringView = FINGERING.mount($('la-fingering'), { keyboard: () => state.keyboard });
 			window.LAYOUT_ANALYSIS_FILES.onEditorLayouts(useEditorLayouts);
 			FINGERING.onChange(() => analyse());

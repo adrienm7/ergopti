@@ -47,12 +47,27 @@ body:has(> main.layout-analysis) {
 	--la-heat-ink: var(--theme-text);
 	--la-heat-ink-strong: var(--theme-chart-ramp-ink-strong);
 	--la-target: var(--theme-text);
+	/* The stacked figures' parts (and the two hands), categorical slots in
+	   their fixed order: the colour follows the part, never its rank. */
+	--la-cat-1: var(--theme-chart-cat-1);
+	--la-cat-2: var(--theme-chart-cat-2);
+	--la-cat-3: var(--theme-chart-cat-3);
+	--la-cat-4: var(--theme-chart-cat-4);
+	--la-cat-5: var(--theme-chart-cat-5);
+	--la-cat-6: var(--theme-chart-cat-6);
 	font:
 		14px/1.45 system-ui,
 		sans-serif;
 	margin: 0 auto;
-	max-width: 1200px;
-	padding: 16px;
+	/* Wide screens show figures side by side rather than one long column. */
+	max-width: 1680px;
+	padding: 16px 20px 24px;
+}
+
+@media (max-width: 480px) {
+	.layout-analysis {
+		padding: 12px 12px 20px;
+	}
 }
 
 .layout-analysis h1 {
@@ -177,10 +192,69 @@ body:has(> main.layout-analysis) {
 /* ============================== */
 /* ============================== */
 
-.la-controls {
+/* The page's head: its title and « Copy the link » on one line. */
+.la-top {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	justify-content: space-between;
+	margin-bottom: 12px;
+}
+
+.layout-analysis .la-top h1 {
+	margin: 0;
+}
+
+/* A card: one group of controls or one figure on the surface colour. */
+.la-card,
+.la-figure {
+	background: var(--la-surface);
+	border: 1px solid var(--la-border);
+	border-radius: 10px;
+	min-width: 0;
+	padding: 12px 14px;
+}
+
+.layout-analysis .la-card-title {
+	display: block;
+	font-size: 1.05em;
+	font-weight: 600;
+	margin: 0 0 8px;
+}
+
+/* The corpus beside the text and keyboard choices; stacked on a phone. */
+.la-setup {
+	display: grid;
+	gap: 16px;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+}
+
+.la-options {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.la-option-pair {
 	display: grid;
 	gap: 12px;
-	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+}
+
+.la-corpus-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 12px;
+	margin-bottom: 6px;
+}
+
+.la-layouts {
+	margin-top: 16px;
+}
+
+.la-layouts .la-row + .la-row {
+	margin-top: 8px;
 }
 
 .la-field {
@@ -528,7 +602,7 @@ body:has(> main.layout-analysis) {
 .la-detail-grid {
 	display: grid;
 	gap: 0 24px;
-	grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
 }
 
 /* The board scales with the page (positions in %, width from the script);
@@ -795,4 +869,359 @@ body:has(> main.layout-analysis) {
 
 .la-weight input[aria-invalid='true'] {
 	border-color: var(--la-bad);
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 5/ Sub-tabs & figures  */
+/* ============================== */
+/* ============================== */
+
+/* The filters every sub-tab follows, one row above the tabs (wrapped, and
+   folded at first, on a phone); the summary says how many layouts they keep. */
+.la-filters-box {
+	background: var(--la-surface);
+	border: 1px solid var(--la-border);
+	border-radius: 10px;
+	margin-top: 12px;
+	padding: 6px 14px;
+}
+
+.la-filters-box > summary {
+	cursor: pointer;
+	padding: 4px 0;
+}
+
+.la-filters-box > summary > span + span {
+	margin-left: 8px;
+}
+
+.la-filters {
+	align-items: flex-end;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+	padding: 4px 0 8px;
+}
+
+.la-filters-title {
+	align-self: center;
+	font-weight: 600;
+	margin-right: 4px;
+}
+
+.la-filter-name input {
+	width: min(100%, 220px);
+}
+
+.la-filter-score input {
+	width: 7em;
+}
+
+/* The tab strip wraps instead of scrolling the page at phone width. */
+.la-tabs {
+	border-bottom: 1px solid var(--la-border);
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px 4px;
+	margin: 8px 0 16px;
+}
+
+.layout-analysis .la-tab {
+	background: none;
+	border: 0;
+	border-bottom: 3px solid transparent;
+	border-radius: 6px 6px 0 0;
+	color: var(--la-sub);
+	font-weight: 600;
+	margin-bottom: -1px;
+	padding: 8px 12px;
+}
+
+.layout-analysis .la-tab:hover {
+	background: var(--la-accent-soft);
+	color: inherit;
+}
+
+.layout-analysis .la-tab[aria-selected='true'] {
+	border-bottom-color: var(--la-accent);
+	color: inherit;
+}
+
+.la-tab-panel {
+	min-width: 0;
+}
+
+.layout-analysis .la-tab-intro {
+	margin: 0 0 12px;
+	max-width: 90ch;
+}
+
+/* The figures of a tab, as many columns as the width holds. */
+.la-chart-grid,
+.la-heat-grid {
+	display: grid;
+	gap: 16px;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+}
+
+.la-heat-grid {
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+}
+
+.la-figure-wide {
+	grid-column: 1 / -1;
+}
+
+.la-tab-panel > .la-figure {
+	margin-bottom: 16px;
+}
+
+.layout-analysis .la-figure h3 {
+	margin: 0 0 4px;
+}
+
+.la-direction {
+	font-size: 0.9em;
+}
+
+/* The overview: the score chart beside the ranking when the width holds both. */
+.la-overview {
+	align-items: start;
+	display: grid;
+	gap: 16px;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+}
+
+/* The tiles fill the column beside the score chart. */
+.layout-analysis .la-leaders-box h3 {
+	margin: 0 0 8px;
+}
+
+.la-overview .la-table-wrap {
+	max-height: 70vh;
+	overflow: auto;
+}
+
+/* The best layout by the score and a few metrics, one tile each. */
+.layout-analysis .la-leaders {
+	display: grid;
+	gap: 8px;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+	margin: 0;
+}
+
+.la-leader {
+	background: var(--la-surface);
+	border: 1px solid var(--la-border);
+	border-radius: 8px;
+	min-width: 0;
+	padding: 8px 10px;
+}
+
+.la-leader-mine {
+	border-color: var(--la-accent);
+}
+
+.la-leader dt {
+	color: var(--la-sub);
+	font-size: 0.9em;
+}
+
+.la-leader dd {
+	margin: 0;
+}
+
+.la-leader-value {
+	font-size: 1.25em;
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+.layout-analysis .la-leader-name,
+.layout-analysis .la-link-button {
+	background: none;
+	border: 0;
+	color: var(--la-accent);
+	padding: 0;
+	text-align: left;
+}
+
+.layout-analysis .la-leader-name {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.layout-analysis .la-leader-name:hover,
+.layout-analysis .la-link-button:hover {
+	background: none;
+	text-decoration: underline;
+}
+
+.la-link-button {
+	font-weight: 600;
+}
+
+.la-clickable {
+	cursor: pointer;
+}
+
+.la-clickable:hover {
+	background: var(--la-accent-soft);
+}
+
+/* The user's own layout in a table: an accent edge, its name in bold. */
+.la-table .la-row-mine td:nth-child(2) {
+	box-shadow: inset 3px 0 0 var(--la-accent);
+	font-weight: 600;
+}
+
+/* A heat table: the layout's name in a header column that stays in view. */
+.la-heat-table th[scope='row'] {
+	background: var(--la-surface);
+	left: 0;
+	position: sticky;
+	text-align: left;
+	z-index: 1;
+}
+
+.la-heat-table td:nth-child(2) {
+	text-align: right;
+}
+
+.la-heat-table td.la-cell {
+	color: var(--la-heat-ink);
+	min-width: 3.6em;
+}
+
+.la-heat-table .la-cell-count {
+	background: color-mix(in oklab, var(--la-heat-high) var(--la-share), var(--la-heat-low));
+}
+
+.la-heat-table .la-cell-strong {
+	color: var(--la-heat-ink-strong);
+}
+
+.la-heat-table .la-cell-over {
+	background: color-mix(in oklab, var(--la-loss) var(--la-share), var(--la-surface-2));
+}
+
+.la-heat-table .la-cell-under {
+	background: color-mix(in oklab, var(--la-gain) var(--la-share), var(--la-surface-2));
+}
+
+/* Each finger's gap to the ideal, written under its share. */
+.la-gap {
+	display: block;
+	font-size: 0.8em;
+}
+
+.la-heat-table .la-ideal-row th,
+.la-heat-table .la-ideal-row td {
+	color: var(--la-sub);
+	cursor: default;
+	font-style: italic;
+}
+
+/* A stacked bar: its parts side by side, a surface gap between them. */
+.la-stack {
+	height: 14px;
+	overflow: hidden;
+}
+
+.la-seg {
+	border-radius: 0;
+	box-shadow: inset -2px 0 0 var(--la-surface);
+}
+
+.la-seg-1,
+.la-swatch-cat-1 {
+	background: var(--la-cat-1);
+}
+
+.la-seg-2,
+.la-swatch-cat-2 {
+	background: var(--la-cat-2);
+}
+
+.la-seg-3,
+.la-swatch-cat-3 {
+	background: var(--la-cat-3);
+}
+
+.la-seg-4,
+.la-swatch-cat-4 {
+	background: var(--la-cat-4);
+}
+
+.la-seg-5,
+.la-swatch-cat-5 {
+	background: var(--la-cat-5);
+}
+
+.la-seg-6,
+.la-swatch-cat-6 {
+	background: var(--la-cat-6);
+}
+
+/* The side-by-side heat maps: smaller legends, the user's own board edged. */
+.la-heat-card .la-heatmap {
+	margin: 6px auto 4px;
+}
+
+.la-heatmap-small .la-key {
+	border-width: 1px;
+	font-size: clamp(8px, 2.4cqw, 13px);
+}
+
+.la-heat-mine {
+	border-color: var(--la-accent);
+}
+
+.la-details-pick {
+	margin-bottom: 12px;
+	max-width: 360px;
+}
+
+.layout-analysis .la-details {
+	margin-top: 0;
+}
+
+/* The details' heatmap takes a row of its own, two columns where three fit. */
+.la-detail-main {
+	grid-column: 1 / -1;
+}
+
+@media (min-width: 1300px) {
+	.la-detail-main {
+		grid-column: span 2;
+	}
+}
+
+.la-heat-table thead th:first-child {
+	text-align: left;
+}
+
+/* At phone width a bar takes the whole width under its label. */
+@media (max-width: 520px) {
+	.la-chart-row {
+		grid-template-columns: minmax(0, 1fr) auto;
+		row-gap: 2px;
+	}
+
+	.la-chart-row > .la-chart-label {
+		grid-column: 1 / -1;
+	}
+}
+
+/* The other analysers' view choice keeps its own width. */
+.la-analysers .la-filter-field {
+	align-items: flex-start;
+}
+
+/* The finger load and the rows under the details' heatmap, at a readable width. */
+.la-detail-loads {
+	max-width: 720px;
 }

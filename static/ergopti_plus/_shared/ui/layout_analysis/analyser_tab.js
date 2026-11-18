@@ -17,6 +17,9 @@
  *    idle slice, so the Comparer stays responsive (every analyser, both
  *    fingerings, costs about 70 ms per layout).
  * 3. Every string is a locale key; numbers use the page's locale.
+ * 4. Scores or ranks: each analyser's rank of the layouts beside the
+ *    Comparer's, the cell shaded on one blue ramp (rank 1 darkest), the rank
+ *    always written; every column sorts from a header button (aria-sort).
  * ==============================================================================
  */
 
@@ -31,6 +34,14 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		official: () => t('layout_analysis.analysers.official'),
 		custom: () => t('layout_analysis.analysers.custom')
 	};
+	// What the cells show: each analyser's score, or the rank it gives.
+	const VIEWS = ['scores', 'ranks'];
+	const VIEW_LABEL = {
+		scores: () => t('layout_analysis.analysers.view_scores'),
+		ranks: () => t('layout_analysis.analysers.view_ranks')
+	};
+	// A rank cell at least this share of the darkest is dark enough for light ink.
+	const STRONG_SHARE = 0.55;
 	const DIRECTION_LABEL = {
 		higher: () => t('layout_analysis.analysers.better.higher'),
 		lower: () => t('layout_analysis.analysers.better.lower'),
@@ -81,10 +92,17 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		const title = el('h2');
 		const intro = el('p', 'la-muted');
 		const status = el('p', 'la-muted');
+		const viewField = el('label', 'la-filter-field');
+		const viewName = el('span');
+		const view = el('select');
+		view.id = 'la-analysers-view';
+		viewField.append(viewName, view);
+		const viewCaption = el('p', 'la-muted');
 		const wrap = el('div', 'la-table-wrap');
-		const table = el('table', 'la-table la-analysers-table');
+		wrap.tabIndex = 0;
+		const table = el('table', 'la-table la-heat-table la-analysers-table');
 		wrap.append(table);
-		section.append(title, intro, status, wrap);
+		section.append(title, intro, viewField, viewCaption, status, wrap);
 		container.append(section);
 		container.hidden = false;
 
@@ -95,8 +113,13 @@ var LAYOUT_ANALYSER_TAB = (function () {
 			keyboard: 'iso',
 			scores: new Map(),
 			sort: null,
+			view: VIEWS[0],
 			job: 0
 		};
+		view.addEventListener('change', () => {
+			state.view = view.value;
+			render();
+		});
 		const FINGERING = window.LAYOUT_ANALYSIS_FINGERING;
 
 		/** The text of one score: its value, or the headline statistics of a score-less analyser. */
@@ -114,22 +137,70 @@ var LAYOUT_ANALYSER_TAB = (function () {
 			const thead = el('thead');
 			const top = el('tr');
 			const sub = el('tr');
-			top.append(el('th', '', t('layout_analysis.analysers.layout')));
-			sub.append(el('th'));
+			const name = el('th', '', t('layout_analysis.analysers.layout'));
+			name.scope = 'col';
+			top.append(name);
+			sub.append(el('td'));
 			for (const a of analysers) {
 				const th = el('th', 'la-analyser');
+				th.scope = 'colgroup';
 				th.colSpan = FINGERINGS.length;
 				th.append(el('span', '', a.name), INFO.button(`analyser.${a.id}`));
 				th.append(el('small', 'la-muted', DIRECTION_LABEL[a.better]()));
 				top.append(th);
 				for (const fingering of FINGERINGS) {
-					const cell = el('th', 'la-sortable', FINGERING_LABEL[fingering]());
-					if (a.better !== 'none') cell.addEventListener('click', () => sortBy(a, fingering));
+					const cell = el('th', 'la-sortable');
+					cell.scope = 'col';
+					// A score-less analyser has nothing to sort by.
+					if (a.better === 'none') cell.textContent = FINGERING_LABEL[fingering]();
+					else {
+						// The sort is a button, so the keyboard reaches it.
+						const button = el('button', 'la-sort', FINGERING_LABEL[fingering]());
+						button.type = 'button';
+						button.dataset.sort = `${a.id}.${fingering}`;
+						button.addEventListener('click', () => {
+							sortBy(a, fingering);
+							const again = table.querySelector(`button[data-sort="${a.id}.${fingering}"]`);
+							if (again) again.focus();
+						});
+						cell.append(button);
+						if (state.sort && state.sort.id === a.id && state.sort.fingering === fingering)
+							cell.setAttribute(
+								'aria-sort',
+								// The values' order: the best first, lowest or highest by the analyser.
+								(a.better === 'lower') !== state.sort.flip ? 'ascending' : 'descending'
+							);
+					}
 					sub.append(cell);
 				}
 			}
 			thead.append(top, sub);
 			return thead;
+		}
+
+		/**
+		 * Each layout's rank by each analyser and fingering (1: the analyser's
+		 * best), among the layouts scored so far; ties share a rank.
+		 * @returns {Map<string, number>} `${layout}|${analyser}|${fingering}` → rank.
+		 */
+		function ranks() {
+			const out = new Map();
+			const scored = state.results.filter((r) => state.scores.has(r.layout.id));
+			for (const a of analysers) {
+				if (a.better === 'none') continue;
+				for (const fingering of FINGERINGS) {
+					const value = (r) => state.scores.get(r.layout.id)[a.id][fingering].value;
+					const sorted = scored
+						.filter((r) => Number.isFinite(value(r)))
+						.sort((x, y) => (a.better === 'lower' ? value(x) - value(y) : value(y) - value(x)));
+					sorted.forEach((r, i) => {
+						const tied = i > 0 && value(sorted[i - 1]) === value(r);
+						const rank = tied ? out.get(`${sorted[i - 1].layout.id}|${a.id}|${fingering}`) : i + 1;
+						out.set(`${r.layout.id}|${a.id}|${fingering}`, rank);
+					});
+				}
+			}
+			return out;
 		}
 
 		function sortBy(a, fingering) {
@@ -156,14 +227,41 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		function render() {
 			title.textContent = t('layout_analysis.analysers.title');
 			intro.textContent = t('layout_analysis.analysers.intro');
+			viewName.textContent = t('layout_analysis.analysers.view');
+			view.replaceChildren(
+				...VIEWS.map((id) => {
+					const option = el('option', '', VIEW_LABEL[id]());
+					option.value = id;
+					return option;
+				})
+			);
+			view.value = state.view;
+			viewCaption.textContent =
+				state.view === 'ranks' ? t('layout_analysis.analysers.ranks_caption') : '';
+			const byRank = state.view === 'ranks' ? ranks() : null;
+			const last = byRank ? Math.max(...byRank.values(), 1) : 1;
 			const tbody = el('tbody');
 			for (const result of ordered()) {
 				const tr = el('tr');
-				tr.append(el('th', 'la-name', result.layout.name));
+				const name = el('th', 'la-name', result.layout.name);
+				name.scope = 'row';
+				tr.append(name);
 				const s = state.scores.get(result.layout.id);
 				for (const a of analysers)
-					for (const fingering of FINGERINGS)
-						tr.append(el('td', 'la-num', cellText(a, s && s[a.id][fingering])));
+					for (const fingering of FINGERINGS) {
+						const rank = byRank && byRank.get(`${result.layout.id}|${a.id}|${fingering}`);
+						if (!rank) {
+							tr.append(el('td', 'la-num', cellText(a, s && s[a.id][fingering])));
+							continue;
+						}
+						// One blue ramp, the first rank darkest; the rank is written in the cell.
+						const share = last > 1 ? (last - rank) / (last - 1) : 1;
+						const cell = el('td', 'la-num la-cell la-cell-count', format(rank, 0));
+						cell.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
+						if (share >= STRONG_SHARE) cell.classList.add('la-cell-strong');
+						cell.title = `${a.name} (${FINGERING_LABEL[fingering]()}): ${cellText(a, s[a.id][fingering])}`;
+						tr.append(cell);
+					}
 				tbody.append(tr);
 			}
 			table.replaceChildren(header(), tbody);

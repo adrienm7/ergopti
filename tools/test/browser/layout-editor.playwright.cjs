@@ -1150,6 +1150,214 @@ async function exerciseDownloadWithoutLuaVm(browser, origin) {
  * and ranks the layouts on it.
  * @param {import('playwright').Page} page The editor window, after initData.
  */
+/**
+ * (comparer-sub-tabs) The results are sub-tabs (maintainer, 2026-11-18): the
+ * arrows move between the tabs, one panel shows at a time, each themed tab
+ * charts its metrics (one named chart each, read as a table) with a sortable
+ * table, fingers and hands hold the finger load against the ideal and the
+ * hand balance, trigrams and rows their stacked figures with a legend and a
+ * table, the heat maps one board per layout shown, the other analysers their
+ * ranks, and the filters (origin, completeness) narrow every figure.
+ * @param {import('playwright').Page} page The Comparer on its overview.
+ */
+async function exerciseComparerTabs(page) {
+	const results = await page.locator('#la-table tbody tr').count();
+	const visiblePanels = () =>
+		page.$$eval('.la-tab-panel', (panels) => panels.filter((p) => !p.hidden).map((p) => p.id));
+	await page.focus('#la-tab-overview');
+	await page.keyboard.press('ArrowRight');
+	assert.deepEqual(await visiblePanels(), ['la-panel-fingers'], 'the arrow shows the next tab');
+	assert.equal(
+		await page.evaluate(() => document.activeElement.id),
+		'la-tab-fingers',
+		'and moves the focus to it'
+	);
+	assert.equal(await page.getAttribute('#la-tab-fingers', 'aria-selected'), 'true');
+	// Fingers and hands: the ideal row, then one row per layout; a gap never reads « -0.0 ».
+	assert.equal(await page.locator('#la-finger-table tbody tr').count(), results + 1);
+	assert.ok(
+		await page.$$eval('#la-finger-table .la-gap', (gaps) =>
+			gaps.every((gap) => /^(\+|−|-)?\d/.test(gap.textContent) && gap.textContent !== '-0.0')
+		),
+		'every finger writes its gap to the ideal'
+	);
+	assert.equal(await page.locator('#la-hands .la-chart-row').count(), results, 'a hand bar each');
+	assert.equal(await page.locator('#la-hands-legend li').count(), 2, 'left and right named');
+	// Each themed tab: one named chart per metric, read as a table, and the sortable table.
+	for (const [tab, charts] of [
+		['fingers', 3],
+		['bigrams', 10],
+		['trigrams', 5],
+		['rows', 6],
+		['misc', 10]
+	]) {
+		await page.click(`#la-tab-${tab}`);
+		const figures = await page.$$eval(`#la-charts-${tab} .la-figure`, (sections) =>
+			sections.map((section) => ({
+				id: section.getAttribute('aria-labelledby'),
+				named: Boolean(
+					document.getElementById(section.getAttribute('aria-labelledby'))?.textContent
+				),
+				table: section.querySelector('[role="table"], table') !== null
+			}))
+		);
+		assert.equal(figures.length, charts + 1, `${tab}: ${charts} charts and a table`);
+		assert.ok(
+			figures.every((f) => f.named && f.table),
+			`${tab}: every chart named, a table to AT: ${JSON.stringify(figures)}`
+		);
+		assert.equal(
+			await page.locator(`#la-table-${tab} tbody tr`).count(),
+			results,
+			`${tab}: a table row per layout`
+		);
+	}
+	// A metric column sorts its better value first, and says so in aria-sort.
+	await page.click('#la-tab-bigrams');
+	await page.click('#la-table-bigrams thead button[data-sort="sfb"]');
+	const sfb = await page.$$eval('#la-table-bigrams tbody tr td:nth-child(4)', (cells) =>
+		cells.map((cell) => Number(cell.textContent.replace(/[^\d.]/g, '')))
+	);
+	assert.ok(
+		sfb.every((v, i) => i === 0 || sfb[i - 1] <= v),
+		`SFB sorted lowest first: ${sfb}`
+	);
+	assert.equal(
+		await page.evaluate(() => document.activeElement.dataset.sort),
+		'sfb',
+		'the focus stays on the sorted header'
+	);
+	// Stacked figures: a legend entry per part and the values as a table.
+	await page.click('#la-tab-trigrams');
+	assert.equal(await page.locator('#la-trigram-mix .la-legend li').count(), 6, 'six classes');
+	assert.equal(await page.locator('#la-table-trigram_mix tbody tr').count(), results);
+	await page.click('#la-tab-rows');
+	assert.equal(await page.locator('#la-row-mix .la-legend li').count(), 4, 'four rows');
+	assert.equal(await page.locator('#la-travel-table tbody tr').count(), results);
+	// Heat maps: a board per layout shown, up to the count chosen, each with its table.
+	await page.click('#la-tab-heatmaps');
+	await page.selectOption('#la-heats-count', '2');
+	assert.equal(await page.locator('#la-heats .la-heat-card').count(), Math.min(2, results));
+	assert.equal(
+		await page.locator('#la-heats .la-heat-card').first().locator('table tbody tr').count(),
+		await page.locator('#la-heats .la-heat-card').first().locator('.la-key').count(),
+		'a board has its table'
+	);
+	await page.selectOption('#la-heats-metric', 'sfb');
+	await page.uncheck('#la-heats-shared');
+	assert.equal(
+		await page.locator('#la-heats .la-heat-card .la-heat-legend').count(),
+		Math.min(2, results),
+		'each board its own scale'
+	);
+	await page.check('#la-heats-shared');
+	await page.selectOption('#la-heats-count', '6');
+	// The other analysers: their ranks, one blue ramp, the rank written.
+	await page.click('#la-tab-analysers');
+	await page.waitForFunction(
+		() => !/…/.test(document.querySelector('.la-analysers-table tbody')?.textContent || '…'),
+		null,
+		{ timeout: 60000 }
+	);
+	await page.selectOption('#la-analysers-view', 'ranks');
+	assert.ok(
+		await page.$$eval(
+			'.la-analysers-table td.la-cell-count',
+			(cells) => cells.length > 0 && cells.every((cell) => /^\d+$/.test(cell.textContent))
+		),
+		'each analyser ranks the layouts'
+	);
+	await page.selectOption('#la-analysers-view', 'scores');
+	// The filters narrow every figure: an origin, then the complete layouts only.
+	await page.click('#la-tab-bigrams');
+	await page.selectOption('#la-row-origin', 'registry');
+	const registry = await page.locator('#la-table tbody tr').count();
+	assert.ok(registry > 0 && registry < results, `the origin filter keeps ${registry}`);
+	assert.equal(await page.locator('#la-table-bigrams tbody tr').count(), registry);
+	await page.selectOption('#la-row-origin', '');
+	await page.selectOption('#la-row-complete', 'no');
+	assert.equal(
+		await page.locator('#la-table tbody tr').count(),
+		0,
+		'no incomplete layout is compared here'
+	);
+	await page.selectOption('#la-row-complete', 'all');
+	await page.click('#la-tab-overview');
+	assert.ok(
+		(await page.locator('#la-leaders .la-leader').count()) >= 2,
+		'the overview names the best layouts'
+	);
+}
+
+/**
+ * (comparer-corpus-picker) The corpus picker groups the built-in texts by
+ * language and kind, after the user's own; its filters narrow the list and
+ * keep the chosen corpus. (comparer-phone-width) Every sub-tab fits a phone in
+ * light and dark without a sideways page scroll.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseComparerPicker(browser, origin) {
+	for (const colorScheme of ['light', 'dark']) {
+		const context = await browser.newContext({
+			viewport: { width: 375, height: 812 },
+			colorScheme
+		});
+		const page = await context.newPage();
+		const errors = [];
+		page.on('pageerror', (error) => errors.push(error.message));
+		await page.goto(`${origin}/ui/layout_analysis/index.html?lang=en&corpus=fr_nemolivier`);
+		await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+		if (colorScheme === 'light') {
+			const groups = () =>
+				page.$$eval('#la-corpus optgroup', (list) =>
+					list.map((g) => ({ label: g.label, ids: [...g.children].map((o) => o.value) }))
+				);
+			const all = await groups();
+			assert.equal(all[0].ids[0], 'custom', 'the user’s own text first');
+			assert.ok(
+				all.some((g) => g.label === 'French · Books') && all.some((g) => g.label === 'Source code'),
+				`grouped by language and kind: ${all.map((g) => g.label).join(' | ')}`
+			);
+			await page.selectOption('#la-corpus-language', 'en');
+			const english = (await groups()).slice(1);
+			assert.ok(
+				english.every(
+					(g) =>
+						g.label.startsWith('English') ||
+						g.label === 'Source code' ||
+						g.ids.every((id) => id === 'fr_nemolivier')
+				),
+				`English texts and code, and the chosen corpus: ${english.map((g) => g.label).join(' | ')}`
+			);
+			assert.equal(await page.inputValue('#la-corpus'), 'fr_nemolivier', 'the chosen corpus stays');
+			await page.selectOption('#la-corpus-kind', 'code');
+			assert.deepEqual(
+				(await groups()).slice(1).map((g) => g.label),
+				['French · Books', 'Source code'],
+				'the kind narrows the list, the chosen corpus kept'
+			);
+			await page.selectOption('#la-corpus-language', '');
+			await page.selectOption('#la-corpus-kind', '');
+			assert.equal(
+				await page.evaluate(() => document.getElementById('la-filters-box').open),
+				false,
+				'a phone folds the filters'
+			);
+		}
+		for (const tab of await page.$$eval('#la-tabs [role="tab"]', (tabs) => tabs.map((t) => t.id))) {
+			await page.click(`#${tab}`);
+			assert.equal(
+				await page.evaluate(() => document.documentElement.scrollWidth),
+				375,
+				`${colorScheme}: ${tab} fits the phone`
+			);
+		}
+		assert.deepEqual(errors, [], `comparer at phone width (${colorScheme})`);
+		await context.close();
+	}
+}
+
 async function exerciseStudioComparer(page) {
 	assert.equal(
 		await page.locator('#studio-comparer #la-table').count(),
@@ -1230,8 +1438,14 @@ async function exerciseStudioComparer(page) {
 		"Ergopti's base dead keys as bare accents"
 	);
 	// (studio-key-heatmap) A layout's details heatmap names each key's worst SFB
-	// partners from the engine's worst groups.
-	await page.click('#la-table tbody tr');
+	// partners from the engine's worst groups. A row opened « One layout »,
+	// whose own list picks the first of the ranking.
+	assert.equal(await page.isVisible('#la-panel-details'), true, 'a row opens « One layout »');
+	assert.equal(await page.isVisible('#la-panel-overview'), false, 'one panel at a time');
+	await page.selectOption(
+		'#la-details-layout',
+		await page.$eval('#la-details-layout option', (option) => option.value)
+	);
 	await page.selectOption('#la-heat-metric', 'sfb');
 	assert.ok(
 		await page.$$eval('#la-heatmap .la-key', (keys) =>
@@ -1390,6 +1604,8 @@ async function exerciseStudioComparer(page) {
 	await page.uncheck('#la-heat-diff');
 	// (comparer-table-options) The ranking table's columns and rows are the
 	// viewer's: a metric added, a name filter, both kept for the next visit.
+	await page.click('#la-tab-overview');
+	await exerciseComparerTabs(page);
 	await page.click('#la-table-options > summary');
 	const columnsBefore = await page.locator('#la-table thead th').count();
 	await page.check('#la-column-list input[value="pinky_load"]');
@@ -3095,6 +3311,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseLongLabels(browser, origin);
 		await exerciseShortcuts(browser, origin);
 		await exerciseComparerLink(browser, origin);
+		await exerciseComparerPicker(browser, origin);
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);
