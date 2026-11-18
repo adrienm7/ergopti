@@ -8,7 +8,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk",
 			"symbol": "HSE_TryRepeatKey(MagicKey)",
-			"sha256": "31ae8e4e1d45766cfeeac25d0e1b9174e66cb84d6cbc6240b50b5314278a1da4"
+			"sha256": "aa05e42a74907c25cf60901fb94bbfbd0a50b9b3fc36eec971c8ed6dcc8c3c33"
 		},
 		{
 			"id": "windows-control",
@@ -22,7 +22,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/dispatch.ahk",
 			"symbol": "HSE_UndoExpansion(Undo",
-			"sha256": "5eaf1ba98e812aeb37f88934ce4e764c0d0728655fbb5cfe393161691d8b39b6"
+			"sha256": "8bf0f2e0026bdcf27a51735d7fe419f502370492a86682027dc1a4f64f4174a6"
 		},
 		{
 			"id": "macos-repeat",
@@ -64,7 +64,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 			"symbol": "DeadKey(Mapping)",
-			"sha256": "a9fb6443077818b247fca8464c1ace6d624bc15aaca422ea321436059b9e2709"
+			"sha256": "1aa33ce9802ad4945e6eca7d45688389eccef53310c3aba4a92d499d897339a0"
 		},
 		{
 			"id": "windows-dead-registry",
@@ -92,7 +92,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/platform/input/keyboard_hook.lua",
 			"symbol": "local function _dispatch_post_remap(ev, source)",
-			"sha256": "f164d946153abffcf6005b4606fef370b4b0e3df4328bc79d70f83f2251d4cab"
+			"sha256": "d5a9f3f79ccad99ac9f07cfef8b1cc7979a96355e8f3635b1e837ec36daf532c"
 		},
 		{
 			"id": "windows-layout-emulation",
