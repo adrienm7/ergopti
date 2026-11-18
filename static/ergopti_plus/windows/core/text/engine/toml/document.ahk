@@ -207,18 +207,27 @@ _TOML_DocumentMultilineBody(Raw) {
 }
 
 /**
- * The patterns of a member list the lexer copies verbatim: bare keys, each
- * holding a one-line basic string or a token free of every character the lexer
- * classifies (quotes, comments, containers, separators), with blanks and tabs
- * between them. Built once.
- * @returns {Object} List (the whole body) and Member (one member) patterns.
+ * The patterns of text the lexer copies verbatim: a one-line basic string or a
+ * token free of every character the lexer classifies (quotes, comments,
+ * containers, separators), bare keys holding one, and one-line assignments of
+ * such a scalar, of an inline table of such members or of an array of such
+ * scalars, with blanks and tabs between the tokens. Built once.
+ * @returns {Object} List (a whole member list), Member (one member) and Record
+ *   (a whole line, capturing its key and value) patterns.
  */
 _TOML_DocumentSimpleMemberPatterns() {
 	; Possessive throughout: each class is disjoint from what follows it, so
 	; nothing ever needs to be given back.
-	Value := '(?:"(?:[^"\\\r\n]++|\\[^\r\n])*+"|[A-Za-z0-9_.+-]++)'
-	Member := "[A-Za-z0-9_-]++[ \t]*+=[ \t]*+" . Value
-	return { List: "^[ \t]*+" . Member . "(?:[ \t]*+,[ \t]*+" . Member . ")*+[ \t]*+\z", Member: Member }
+	Basic := '"(?:[^"\\\r\n]++|\\[^\r\n])*+"'
+	Scalar := "(?:" . Basic . "|[A-Za-z0-9_.+-]++)"
+	Member := "[A-Za-z0-9_-]++[ \t]*+=[ \t]*+" . Scalar
+	Members := Member . "(?:[ \t]*+,[ \t]*+" . Member . ")*+"
+	Inline := "\{[ \t]*+(?:" . Members . "[ \t]*+)?\}"
+	Items := "\[[ \t]*+(?:" . Scalar . "(?:[ \t]*+,[ \t]*+" . Scalar . ")*+[ \t]*+)?\]"
+	Key := "(?:" . Basic . "|[A-Za-z0-9_-]++(?:\.[A-Za-z0-9_-]++)*+)"
+	return { List: "^[ \t]*+" . Members . "[ \t]*+\z", Member: Member,
+		Record: "^[ \t]*+(?<key>" . Key . ")[ \t]*+=[ \t]*+(?<value>" . Scalar . "|" . Inline . "|" . Items
+			. ")[ \t\r]*+\z" }
 }
 
 ; Only the semantic inline-table reader uses this canonical strict delegation.
@@ -367,6 +376,7 @@ TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
 }
 
 _TOML_ParseDocumentRecords(Source, &Records, &Physical) {
+	static Patterns := _TOML_DocumentSimpleMemberPatterns()
 	if SubStr(Source, 1, 1) == Chr(0xFEFF)
 		Source := SubStr(Source, 2)
 	Root := _TOML_DocumentTable(), Current := Root, CurrentPath := [], NativeSection := ""
@@ -379,6 +389,25 @@ _TOML_ParseDocumentRecords(Source, &Records, &Physical) {
 		if SubStr(Source, Position, 1) == Chr(10) {
 			Position += 1
 			Physical.Push({ Kind: "trivia", Section: NativeSection, Text: Chr(10) })
+			continue
+		}
+		; A one-line assignment of simple tokens, nearly every line of a
+		; configuration or a hotstrings file, is the record the lexer would copy
+		; verbatim up to its line feed; its key and value are read from the match.
+		LineEnd := InStr(Source, Chr(10), true, Position)
+		LineStop := LineEnd ? LineEnd : StrLen(Source) + 1
+		try {
+			Simple := RegExMatch(SubStr(Source, Position, LineStop - Position), Patterns.Record, &Assignment)
+		} catch {
+			; The engine's match limit on a very long line: the lexer decides.
+			Simple := 0
+		}
+		if Simple {
+			Position := LineEnd ? LineEnd + 1 : LineStop
+			RawRecord := SubStr(Source, Start, Position - Start)
+			KeyText := Assignment["key"], Raw := Assignment["value"]
+			_TOML_DocumentAssign(Current, CurrentPath, NativeSection, KeyText, Raw, RawRecord,
+				Declared, Dotted, Arrays, Sealed, Records, Physical)
 			continue
 		}
 		Record := _TOML_DocumentToken(Source, &Position, Chr(10))
@@ -423,38 +452,47 @@ _TOML_ParseDocumentRecords(Source, &Records, &Physical) {
 			Physical.Push({ Kind: "opaque", Section: NativeSection, Text: RawRecord })
 			continue
 		}
-		Parts := TOML_ParseKeyPath(KeyText, true)
 		Raw := Trim(SubStr(Record, SplitPosition), " " . Chr(9) . Chr(13) . Chr(10))
-		Node := Current
-		loop Parts.Length - 1 {
-			Key := Parts[A_Index]
-			if !Node.Has(Key)
-				Node[Key] := _TOML_DocumentTable()
-			Child := Node[Key]
-			if !(Child is Map) || Sealed.Has(Child) || Arrays.Has(Child)
-					|| (Declared.Has(Child) && !Dotted.Has(Child))
-				throw ValueError("TOML assignment extends a closed namespace")
-			Declared[Child] := true
-			Dotted[Child] := true
-			Node := Child
-		}
-		Key := Parts[Parts.Length]
-		if Node.Has(Key)
-			throw ValueError("Duplicate TOML semantic assignment")
-		Value := _TOML_DocumentValue(Raw)
-		Node[Key] := Value
-		_TOML_DocumentSealed(Value, Sealed)
-		Path := CurrentPath.Clone()
-		for Part in Parts
-			Path.Push(Part)
-		NativeKey := KeyText
-		if StrLen(NativeKey) >= 2 && SubStr(NativeKey, 1, 1) == Chr(34) && SubStr(NativeKey, -1) == Chr(34)
-			NativeKey := SubStr(NativeKey, 2, StrLen(NativeKey) - 2)
-		Records.Push({ Path: Path, Raw: Raw, Value: Value, Owner: Node, Key: Key,
-			NativeSection: NativeSection, NativeKey: NativeKey })
-		Physical.Push({ Kind: "assignment", Section: NativeSection, Key: NativeKey, Text: RawRecord })
+		_TOML_DocumentAssign(Current, CurrentPath, NativeSection, KeyText, Raw, RawRecord,
+			Declared, Dotted, Arrays, Sealed, Records, Physical)
 	}
 	return Root
+}
+
+; Stores one assignment record in its table, whichever path cut it from the
+; source: its dotted parents, its decoded value and its typed and physical
+; records. Raw is the value text and RawRecord the exact source span.
+_TOML_DocumentAssign(Current, CurrentPath, NativeSection, KeyText, Raw, RawRecord,
+		Declared, Dotted, Arrays, Sealed, Records, Physical) {
+	Parts := TOML_ParseKeyPath(KeyText, true)
+	Node := Current
+	loop Parts.Length - 1 {
+		Key := Parts[A_Index]
+		if !Node.Has(Key)
+			Node[Key] := _TOML_DocumentTable()
+		Child := Node[Key]
+		if !(Child is Map) || Sealed.Has(Child) || Arrays.Has(Child)
+				|| (Declared.Has(Child) && !Dotted.Has(Child))
+			throw ValueError("TOML assignment extends a closed namespace")
+		Declared[Child] := true
+		Dotted[Child] := true
+		Node := Child
+	}
+	Key := Parts[Parts.Length]
+	if Node.Has(Key)
+		throw ValueError("Duplicate TOML semantic assignment")
+	Value := _TOML_DocumentValue(Raw)
+	Node[Key] := Value
+	_TOML_DocumentSealed(Value, Sealed)
+	Path := CurrentPath.Clone()
+	for Part in Parts
+		Path.Push(Part)
+	NativeKey := KeyText
+	if StrLen(NativeKey) >= 2 && SubStr(NativeKey, 1, 1) == Chr(34) && SubStr(NativeKey, -1) == Chr(34)
+		NativeKey := SubStr(NativeKey, 2, StrLen(NativeKey) - 2)
+	Records.Push({ Path: Path, Raw: Raw, Value: Value, Owner: Node, Key: Key,
+		NativeSection: NativeSection, NativeKey: NativeKey })
+	Physical.Push({ Kind: "assignment", Section: NativeSection, Key: NativeKey, Text: RawRecord })
 }
 
 /**

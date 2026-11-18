@@ -242,3 +242,93 @@ _TDS_ShortcutsPrecedeGeneralPaths() {
 }
 Test("TOML document: the scalar and quoted-key shortcuts run before the general paths (toml-simple-members-2026-11-18)",
 	_TDS_ShortcutsPrecedeGeneralPaths)
+
+; A parse as comparable text: the typed document and every typed record. The
+; physical spans are compared apart, since a comment changes their text.
+_TDS_ParseOutcome(Source, &Physical := 0) {
+	try {
+		Document := TOML_ParseDocument(Source, &Records, &Physical)
+		Text := _TDS_DumpTree(Document)
+		for Record in Records {
+			Path := ""
+			for Part in Record.Path
+				Path .= Part . "/"
+			Text .= "`n" . Path . "=" . Record.Raw . "|" . Record.Key . "|" . Record.NativeKey . "|"
+				. Record.NativeSection . "|" . _TDS_DumpTree(Record.Value)
+		}
+		return Text
+	} catch as Err
+		return "refused: " . Type(Err) . " " . Err.Message
+}
+
+_TDS_DumpTree(Value) {
+	if Value is Map {
+		Text := "{"
+		for Key, Item in Value
+			Text .= Key . ":" . _TDS_DumpTree(Item) . ","
+		return Text . "}"
+	}
+	return _TDS_Dump(Value)
+}
+
+; Lines near the simple assignment shape, each placed in a small document. A
+; line the record shortcut takes must parse as the lexer parses it once a
+; trailing comment sends it there; every physical span must still rebuild the
+; source exactly.
+_TDS_RecordLines() {
+	Q := Chr(34)
+	Lines := [
+		"key = 1", "  key=" . Q . "x" . Q . "  ", "a.b-c = true", Q . "@a★" . Q . " = { output = " . Q . "y" . Q . ", is_word = true }",
+		"k = { }", "k = []", "k = [1, " . Q . "two" . Q . ", 3.5]", "k = [1,]", "k = { a = 1, }", "k = " . Q . "a\" . Q . "b" . Q,
+		"k = " . Q . Q, "k = 1`r", "k = 1 2", "k = 'lit'", "k = [[1]]", "k = { a = { b = 1 } }", Q . "q\" . Q . "k" . Q . " = 1",
+		"a . b = 1", "k = -", "k = 2026-11-18", "k =", "= 1", "[table]", "[[array]]", "k = " . Q . "x" . Q . " # c"
+	]
+	Keys := ["k", "a.b", "x-1", Q . "q" . Q, Q . "a.b" . Q, "é", Q . "\" . Q]
+	Values := [Q . "plain" . Q, Q . "#{[,='" . Q, "true", "12", "{ a = 1 }", "{a=" . Q . "x" . Q . ",b=false}", "[1, 2]",
+		"[" . Q . "a" . Q . ", " . Q . "b" . Q . "]", Q . "x\" . Q, "{ a = [1] }"]
+	Seed := 20261118
+	loop 300
+		Lines.Push(_TDS_Pick(&Seed, ["", " ", "`t"]) . _TDS_Pick(&Seed, Keys) . _TDS_Pick(&Seed, [" = ", "=", " =`t"])
+			. _TDS_Pick(&Seed, Values) . _TDS_Pick(&Seed, ["", " ", "`r", " `t"]))
+	return Lines
+}
+
+_TDS_RecordsMatchLexer() {
+	Record := _TOML_DocumentSimpleMemberPatterns().Record
+	Taken := 0
+	for Line in _TDS_RecordLines() {
+		Source := "[s]`n" . Line . "`nafter = 1`n"
+		Physical := 0
+		Simple := _TDS_ParseOutcome(Source, &Physical)
+		if SubStr(Simple, 1, 9) != "refused: " {
+			Rebuilt := ""
+			for Span in Physical
+				Rebuilt .= Span.Text
+			AssertEqual(Source, Rebuilt, "the physical spans rebuild line " . A_Index . ": " . Line)
+		}
+		if !RegExMatch(Line, Record)
+			continue
+		Taken += 1
+		AssertEqual(_TDS_ParseOutcome("[s]`n" . Line . " # sent to the lexer`nafter = 1`n"), Simple,
+			"line " . A_Index . ": " . Line)
+	}
+	Assert(Taken > 100, "the shortcut takes most generated lines (" . Taken . ")")
+}
+Test("TOML document: a simple assignment line parses as the lexer parses it (toml-simple-records-2026-11-18)",
+	_TDS_RecordsMatchLexer)
+
+; The regression this guards: configuration and hotstring lines going back
+; through the lexer, which classifies each quote, brace and line feed alone.
+_TDS_SimpleLinesTakeNoLexerStep() {
+	global _TOML_DocumentSlowSteps
+	Q := Chr(34)
+	; An array's elements are still cut by the lexer, so none is listed here.
+	Source := "version = 3`nenabled = true`nname = " . Q . "Ergopti" . Q . "`n"
+		. Q . "@b★" . Q . " = { output = " . Q . "x" . Q . ", is_word = false, priority = 30 }`n"
+	Before := _TOML_DocumentSlowSteps
+	Document := TOML_ParseDocument(Source)
+	AssertEqual(0, _TOML_DocumentSlowSteps - Before, "simple assignment lines take no lexer step")
+	AssertEqual(4, Document.Count, "every line is read")
+}
+Test("TOML document: simple assignment lines take no lexer step (toml-simple-records-2026-11-18)",
+	_TDS_SimpleLinesTakeNoLexerStep)
