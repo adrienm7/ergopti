@@ -67,6 +67,10 @@ on:
         description: Linux tarball asset name from the updater release contract
         required: true
         type: string
+    secrets:
+      UPDATE_SIGNING_KEY:
+        description: Update asset signing key, PEM; passed on release runs only
+        required: false
 
 permissions:
   contents: read

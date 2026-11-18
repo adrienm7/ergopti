@@ -545,6 +545,7 @@ jobs:
       WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ needs.validate.outputs.release == 'true' && secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD || '' }}
       WINDOWS_SIGNER_SUBJECT: ${{ needs.validate.outputs.release == 'true' && secrets.WINDOWS_SIGNER_SUBJECT || '' }}
       SIGNPATH_API_TOKEN: ${{ needs.validate.outputs.release == 'true' && secrets.SIGNPATH_API_TOKEN || '' }}
+      UPDATE_SIGNING_KEY: ${{ needs.validate.outputs.release == 'true' && secrets.UPDATE_SIGNING_KEY || '' }}
 
   # ─────────────────────────────────────────────────
   # 2.3) Linux — unit tests, E2E, package, installations and verdict
@@ -561,6 +562,8 @@ jobs:
       prerelease: ${{ needs.validate.outputs.prerelease }}
       channel: ${{ needs.validate.outputs.channel }}
       linux_bundle: ${{ needs.validate.outputs.linux_bundle }}
+    secrets:
+      UPDATE_SIGNING_KEY: ${{ needs.validate.outputs.release == 'true' && secrets.UPDATE_SIGNING_KEY || '' }}
 
   # ─────────────────────────────────────────────────
   # 2.4) Common — shared JavaScript, property, mutation and site suites

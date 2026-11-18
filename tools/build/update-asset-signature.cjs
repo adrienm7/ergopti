@@ -52,13 +52,44 @@ const POLICY_PATH = path.resolve(
 	'asset_signing.json'
 );
 
-/** The shared signing policy. */
-function loadPolicy() {
-	const policy = JSON.parse(fs.readFileSync(POLICY_PATH, 'utf8'));
+/**
+ * Admits a signing policy as both updaters do: "required" without a
+ * verification key would refuse every update, so the flip to "required" is
+ * refused here, in CI, before any release carries it.
+ * @param {object} policy
+ * @returns {object} The same policy.
+ */
+function validatePolicy(policy) {
 	if (policy.schema_version !== 1 || policy.algorithm !== 'ecdsa-p256-sha256') {
 		throw new Error('The update signing policy is not the version this tool implements.');
 	}
+	if (policy.enforcement !== 'off' && policy.enforcement !== 'required') {
+		throw new Error('The update signing enforcement is neither "off" nor "required".');
+	}
+	if (typeof policy.public_key_spki_base64 !== 'string') {
+		throw new Error('The update signing public key is not a string.');
+	}
+	if (policy.public_key_spki_base64 !== '') {
+		const key = crypto.createPublicKey({
+			key: Buffer.from(policy.public_key_spki_base64, 'base64'),
+			format: 'der',
+			type: 'spki'
+		});
+		if (key.asymmetricKeyType !== 'ec' || key.asymmetricKeyDetails.namedCurve !== 'prime256v1') {
+			throw new Error('The update signing public key is not an ECDSA P-256 key.');
+		}
+	} else if (policy.enforcement === 'required') {
+		throw new Error(
+			'The update signing policy requires signatures but names no public key: ' +
+				'provision the key first (docs/tooling/update-signing.md).'
+		);
+	}
 	return policy;
+}
+
+/** The shared signing policy. */
+function loadPolicy() {
+	return validatePolicy(JSON.parse(fs.readFileSync(POLICY_PATH, 'utf8')));
 }
 
 /**
@@ -267,6 +298,7 @@ module.exports = {
 	verifyRecord,
 	generateKeyPair,
 	loadPolicy,
+	validatePolicy,
 	releaseSign,
 	signaturesExpected,
 	main

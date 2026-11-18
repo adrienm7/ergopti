@@ -178,6 +178,40 @@ check('the policy cannot require signatures without a verification key', () => {
 	assert.equal(policy.signature_bytes, 64);
 });
 
+check('flipping enforcement to required is admitted only once the key is provisioned', () => {
+	const pair = Tool.generateKeyPair();
+	const flipped = {
+		...policy,
+		enforcement: 'required',
+		public_key_spki_base64: pair.publicKeySpkiBase64
+	};
+	assert.equal(
+		Tool.validatePolicy(flipped),
+		flipped,
+		'the flip with a provisioned key is admitted'
+	);
+	assert.equal(
+		Tool.signaturesExpected(flipped),
+		true,
+		'a required policy fails a lane without the secret'
+	);
+	assert.throws(
+		() => Tool.validatePolicy({ ...flipped, public_key_spki_base64: '' }),
+		/names no public key/,
+		'the flip before provisioning would refuse every update and is refused in CI'
+	);
+	assert.throws(() => Tool.validatePolicy({ ...flipped, enforcement: 'warn' }), /neither/);
+	const p384 = crypto
+		.generateKeyPairSync('ec', { namedCurve: 'secp384r1' })
+		.publicKey.export({ type: 'spki', format: 'der' })
+		.toString('base64');
+	assert.throws(
+		() => Tool.validatePolicy({ ...flipped, public_key_spki_base64: p384 }),
+		/not an ECDSA P-256 key/
+	);
+	assert.equal(Tool.validatePolicy(policy), policy, 'the shipped policy is admitted as it stands');
+});
+
 check('release-sign fails fast without the secret once the policy expects signatures', () => {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-sign-'));
 	try {
@@ -284,6 +318,34 @@ check(
 				name + ' does not read the secret'
 			);
 			assert.ok(workflow.includes(uploaded), name + ' does not upload the signature');
+			// A called workflow sees only the secrets it declares and its caller passes:
+			// undeclared, the key reads as empty and a provisioned policy fails the lane.
+			const declared = workflow.slice(
+				workflow.indexOf('workflow_call:'),
+				workflow.indexOf('\njobs:')
+			);
+			assert.match(
+				declared,
+				/\n {6}UPDATE_SIGNING_KEY:\n {8}description: [^\n]+\n {8}required: false\n/,
+				name + ' does not declare the UPDATE_SIGNING_KEY secret'
+			);
+		}
+		const caller = read('ci.yml');
+		for (const [job, file] of [
+			['windows', 'ci-windows.yml'],
+			['linux', 'ci-linux.yml']
+		]) {
+			const start = caller.indexOf(`\n  ${job}:\n`);
+			assert.ok(start >= 0, 'ci.yml has no ' + job + ' job');
+			const end = caller.indexOf('\n\n', start + 1);
+			const block = caller.slice(start, end);
+			assert.ok(block.includes('uses: ./.github/workflows/' + file), job + ' calls ' + file);
+			assert.ok(
+				block.includes(
+					"UPDATE_SIGNING_KEY: ${{ needs.validate.outputs.release == 'true' && secrets.UPDATE_SIGNING_KEY || '' }}"
+				),
+				'ci.yml does not pass UPDATE_SIGNING_KEY to the ' + job + ' release lane'
+			);
 		}
 		const release = read('ci-release.yml');
 		assert.ok(

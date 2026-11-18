@@ -682,6 +682,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-guided.cjs"],
 			"repro": "npm run test:field-guided"
+		},
+		{
+			"id": "update-asset-signature",
+			"ordinal": 691,
+			"name": "update asset signatures sign and verify the canonical record, refuse enforcement without a key and reach both release lanes with the signing secret",
+			"cmd": "node",
+			"args": ["tools/test/test-update-asset-signature.cjs"],
+			"repro": "node tools/test/test-update-asset-signature.cjs"
 		}
 	]
 }

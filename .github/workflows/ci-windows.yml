@@ -49,6 +49,9 @@ on:
       SIGNPATH_API_TOKEN:
         description: SignPath CI user API token; passed on release runs only
         required: false
+      UPDATE_SIGNING_KEY:
+        description: Update asset signing key, PEM; passed on release runs only
+        required: false
 
 permissions:
   contents: read

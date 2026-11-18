@@ -96,7 +96,8 @@ code-signature requirement of the staged app.
    `node tools/build/update-asset-signature.cjs keygen`.
 2. Store the printed private PEM as the repository secret `UPDATE_SIGNING_KEY`
    (GitHub, Settings, Secrets and variables, Actions). Keep an offline copy; a
-   lost key means every installed copy needs a manual update.
+   lost key means every installed copy needs a manual update. `ci.yml` passes it
+   to the Windows and Linux lanes on release runs only, and both declare it.
 3. Put the printed public key (base64 SubjectPublicKeyInfo) into
    `public_key_spki_base64` of `asset_signing.json`.
 4. Cut one release with `enforcement` still `"off"`. The release lanes sign and
@@ -107,9 +108,12 @@ code-signature requirement of the staged app.
    the Versions window's feed list on Windows and on Linux: the log must say
    `Feed release ... authenticated` (Windows) or `Update signature verified.`
    after the feed row was chosen (Linux), and an older feed row must be refused.
-5. Set `enforcement` to `"required"` in a following commit. From then on a release
-   without the signatures fails in CI, and an updater refuses an asset whose
-   signature is missing or wrong.
+5. Set `enforcement` to `"required"` in a following commit that changes only that
+   field. From then on a release without the signatures fails in CI, and an
+   updater refuses an asset whose signature is missing or wrong. The flip is
+   refused while `public_key_spki_base64` is empty, by the release tool, the
+   Windows verifier and the Linux gate alike, since it would refuse every
+   update (`tools/test/test-update-asset-signature.cjs`).
 
 ## What the release lanes do
 
