@@ -25,6 +25,7 @@ local Manifest = require("menu.engine.manifest_reader")
 local Composition = require("settings.engine.scope.composition")
 local Participant = require("settings.engine.scope.participant")
 local Logger = require("core.logger.engine.logger")
+local EmulationReload = require("settings.engine.scope.layout_emulation_reload")
 local ConfigKeys = require("settings.engine.keys")
 local LOG = "menu.global_scope"
 
@@ -117,20 +118,9 @@ function M.layout_participant(synchronous, layout, defer)
 	local applying, changed = false, false
 	local participant = {}
 	local function same(a, b) return a.order == b.order and a.edges == b.edges end
-	--- Has a started emulation type the rows config.toml now holds; a stopped
-	--- one reads them when it starts. A refusal is logged: the rows are stored
-	--- and the emulation reports its own error in the menu.
-	local function reload_emulation()
-		local called, reloaded = pcall(function()
-			local emulation = layout.emulation or require("modules.keymap.layout_emulation")
-			return emulation.reload_if_started()
-		end)
-		if not called then
-			Logger.error(LOG, "The layout emulation reload raised after the layout scope: %s.", tostring(reloaded))
-		elseif reloaded == false then
-			Logger.warn(LOG, "The layout emulation did not reload the rows of the layout scope.")
-		end
-	end
+	--- Has a started emulation type the rows config.toml now holds
+	--- (settings/engine/scope/layout_emulation_reload, shared with Linux).
+	local function reload_emulation() EmulationReload.reload(layout.emulation, Logger, LOG) end
 	--- Brings the typing layout to the stored rows; settle(ok, code).
 	local function load(settle)
 		local dispatched = layout.live.apply(layout.rows(), function(applied, code)
