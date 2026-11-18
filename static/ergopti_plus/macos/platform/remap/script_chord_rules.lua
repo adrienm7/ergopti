@@ -62,13 +62,6 @@ local HOLDER_KEY = "right_command"
 -- it to the lease generation like the holder's.
 local SEQUENCE_SUFFIX = "_sequence"
 
--- The key that joins a chord without ending the sequence (see 5. above).
-local SEQUENCE_KEPT_KEY = "fn"
-
--- The physical-key registry, whose Karabiner key codes are every key that
--- ends the sequence.
-local REGISTRY_REL_PATH = "layouts/data/keycodes/physical_keys.json"
-
 -- The Karabiner key codes that end the sequence, sorted; nil until read.
 local _sequence_keys = nil
 
@@ -225,7 +218,9 @@ end
 --- @return table key_codes
 local function sequence_keys()
 	if _sequence_keys then return _sequence_keys end
-	local path = Paths.shared(REGISTRY_REL_PATH)
+	-- The physical-key registry: its Karabiner key codes are every key that
+	-- ends the sequence.
+	local path = Paths.shared("layouts/data/keycodes/physical_keys.json")
 	local handle = path and io.open(path, "rb")
 	if not handle then error("script chord rules: cannot read " .. tostring(path)) end
 	local read_ok, raw = pcall(handle.read, handle, "*a")
@@ -243,7 +238,7 @@ local function sequence_keys()
 		local code = type(karabiner) == "table" and karabiner.key_code
 		-- Mouse buttons name no key ("undefined"); the wheel has no key code.
 		if type(code) == "string" and code ~= "undefined" and code:match("^[a-z0-9_]+$")
-			and code ~= HOLDER_KEY and code ~= SEQUENCE_KEPT_KEY and not seen[code] then
+			and code ~= HOLDER_KEY and code ~= "fn" and not seen[code] then
 			seen[code] = true
 			keys[#keys + 1] = code
 		end
@@ -288,7 +283,7 @@ function M.apply_sequence(rules, holder_var)
 					manipulator.to_after_key_up = manipulator.to_after_key_up or {}
 					manipulator.to_after_key_up[#manipulator.to_after_key_up + 1] =
 						{ set_variable = { name = sequence_var, value = 0 } }
-				elseif from.key_code ~= SEQUENCE_KEPT_KEY then
+				elseif from.key_code ~= "fn" then
 					local to = { { set_variable = { name = sequence_var, value = 0 } } }
 					for _, event in ipairs(manipulator.to or {}) do to[#to + 1] = event end
 					manipulator.to = to
