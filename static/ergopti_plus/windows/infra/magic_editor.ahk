@@ -253,9 +253,9 @@ _MagicEditorEffectivePlain(Probe, Code, Scan, Native) {
 	Edge := NumberRowEdgeText(Numeric, false, NumberRowForegroundLayout(), false)
 	if Edge != ""
 		return { Count: StrLen(Edge), Text: Edge }
-	if !Probe.Has("number_row_mode")
-		Probe["number_row_mode"] := NumberRowEffectiveMode()
-	if Probe["number_row_mode"] == "digits" {
+	if !Probe.Has("effective_number_row")
+		Probe["effective_number_row"] := NumberRowEffectiveMode()
+	if Probe["effective_number_row"] == "digits" {
 		if Numeric >= 0x02 && Numeric <= 0x0B
 			return { Count: 1, Text: Numeric == 0x0B ? "0" : String(Numeric - 1) }
 	} else if !KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) {
@@ -266,7 +266,7 @@ _MagicEditorEffectivePlain(Probe, Code, Scan, Native) {
 	}
 	if _KLE_BaseCriterion(Scan, false) && KLE_KeyCodes.Has(Scan) {
 		Shift := false
-		if Probe["number_row_mode"] == "symbols" && NumberRowSymbolsCapable(false) {
+		if Probe["effective_number_row"] == "symbols" && NumberRowSymbolsCapable(false) {
 			Level := NumberRowSymbolsLevel(Numeric, false)
 			if Level["supported"]
 				Shift := Level["shift"]
