@@ -55,7 +55,9 @@ function M.register(helpers, driver)
 					else count = count + 1 end
 				end
 				helpers.assert_eq(count, driver == "macos" and 211 or 241)
-				helpers.assert_eq(physical_count, 1536, "96 registry key positions times all 16 exact modifier subsets")
+				-- The slot space is the registry's, whatever a driver can read: the
+				-- six JIS and ABNT keys count on macOS too, where three have no keycode.
+				helpers.assert_eq(physical_count, 1632, "102 registry key positions times all 16 exact modifier subsets")
 				helpers.assert_eq(published.slots.physical_none_KeyJ, true)
 				helpers.assert_eq(published.slots.physical_ctrl_alt_shift_super_KeyJ, true)
 				helpers.assert_nil(published.slots.physical_none_KeyFuture)

@@ -425,6 +425,11 @@ Each closes on a named green hosted or native run, recorded here.
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
+- [ ] **Python XKB converter and the JIS and ABNT keys (decided by the agent on 2026-11-18, to review by the
+      maintainer).** 2f96fa2f4f places Yen, Ro and the keypad comma (`mac_keycodes.json` `extra_keys`) in the Lua
+      converter only; `keylayout_to_xkb.py` still reads `keys` alone and reports macOS 93 and 94 as unplaced
+      (`test_registry_conversion.py`). Kept meanwhile: the Lua contract probes Eisu and Kana (102, 104) instead, and
+      the Python twin is unchanged. Choose whether the Python twin reads `extra_keys` too.
 - [ ] **Screen-reader announcements of tooltips, decided by the agent on 2026-11-17.** Hotstring previews and
       finished AI predictions are announced only while the system says a screen reader runs (Windows
       `SPI_GETSCREENREADER`, VoiceOver, Orca), with no Ergopti+ setting; add a menu switch if users find them noisy.
