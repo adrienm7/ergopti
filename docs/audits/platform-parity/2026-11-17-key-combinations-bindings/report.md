@@ -24,10 +24,16 @@ Karabiner or AutoHotkey hook driven.
 One list: `CHORD_REFUSED_EVERYWHERE` (shared); the Windows map and the Linux additions are pinned to it by
 `chord-refused-actions-single-source`. Commits 2286dc55bb, c156bd5337, 918d8d9308, 1282d7620d, e9c641d0d3.
 
+BNM-1, macOS, Medium, resolved November 18, 2026: the navigation layer's wheel stopped with the Shortcuts switch,
+because it was a child of the bindings layer (`bindings.lua:288`) that `pause_bindings` pauses whole. Windows (only
+`LayerEnabled` gates the wheel hotkeys, the script pause suspends them) and Linux (the tap-hold engine owns the wheel,
+`TapHold.set_paused` holds it back) never tied it to Shortcuts. Its owner is now `modules/shortcuts/layer_wheel.lua`:
+started and stopped with the Shortcuts subsystem, left bound by `pause_bindings`, paused and resumed by ScriptControl
+as its own `shortcuts.pause_layer_wheel` step. Regression: `test_layer_wheel_owner.lua`.
+
 ## Open
 
-KCD-1 to KCD-8, BNM-1, BND-1, BND-2 and KCH-1 as listed in TODO.md « Maintainer decisions pending » and « Parity
-audit ».
+KCD-1 to KCD-8, BND-1, BND-2 and KCH-1 as listed in TODO.md « Maintainer decisions pending » and « Parity audit ».
 
 ## Refuted
 

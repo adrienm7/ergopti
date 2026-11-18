@@ -627,7 +627,7 @@ end)
 
 helpers.describe("shortcut bindings: raw owner release identity", function()
 	for _, id in ipairs({
-		"tap_keys", "layer_wheel", "cmd_star", "wrap_text_if_selected",
+		"tap_keys", "cmd_star", "wrap_text_if_selected",
 	}) do
 		helpers.it("fences a raw " .. id .. " callback when its factory reenters pause", function()
 			local options = { reenter_raw_factory = id }
@@ -647,7 +647,7 @@ helpers.describe("shortcut bindings: raw owner release identity", function()
 	end
 
 	for _, id in ipairs({
-		"tap_keys", "layer_wheel", "cmd_star", "wrap_text_if_selected",
+		"tap_keys", "cmd_star", "wrap_text_if_selected",
 	}) do
 		helpers.it("fences a raw " .. id .. " enable factory that reenters pause", function()
 			local options = {}
@@ -669,7 +669,7 @@ helpers.describe("shortcut bindings: raw owner release identity", function()
 	end
 
 	for _, id in ipairs({
-		"tap_keys", "layer_wheel", "cmd_star", "wrap_text_if_selected",
+		"tap_keys", "cmd_star", "wrap_text_if_selected",
 	}) do
 		for _, mode in ipairs({ "false", "nil", "throw" }) do
 			helpers.it("retains " .. id .. " on pause delete " .. mode, function()

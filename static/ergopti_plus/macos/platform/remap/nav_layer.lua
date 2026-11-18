@@ -783,11 +783,11 @@ end
 --- @param label string For the logs.
 function M.reconcile_wheel(label)
 	local reconciled, committed = pcall(function()
-		return require("modules.shortcuts.bindings").reconcile_layer_wheel()
+		return require("modules.shortcuts.layer_wheel").reconcile()
 	end)
 	if not reconciled or committed ~= true then
-		Logger.warn(LOG, "%s: the layer's wheel bindings apply with the next Shortcuts start (%s).",
-			tostring(label), tostring(reconciled and "a start is in progress" or committed))
+		Logger.warn(LOG, "%s: the scroll wheel takes the layer's wheel bindings at the next save or resume (%s).",
+			tostring(label), tostring(reconciled and "its owner refused them" or committed))
 	end
 end
 

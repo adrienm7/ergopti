@@ -417,6 +417,11 @@ function M.load_with_stubs(module_name, hs_overrides)
 		loaded["modules.shortcuts.actions.system_mouse"] = nil
 		loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	end
+	-- The Shortcuts facade starts and stops the navigation layer's wheel owner:
+	-- a fresh facade must not inherit the previous fixture's bound scroll tap.
+	if module_name == "modules.shortcuts" or module_name == "modules.shortcuts.init" then
+		loaded["modules.shortcuts.layer_wheel"] = nil
+	end
 	if module_name == "modules.shortcuts.actions.text" or module_name == "modules.keymap.utils" then
 		loaded["clipboard.adapters.clipboard"] = nil
 	end

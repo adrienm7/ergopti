@@ -233,12 +233,7 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     ([tap-holds follow-up](docs/audits/platform-parity/2026-11-12-tap-holds-followup/source-areas.json)) now that the
     structure phase moved most folders, then the areas outside every campaign (the never-campaigned list of the
     [start-at-login report](docs/audits/platform-parity/2026-11-12-start-at-login/report.md) was taken by the
-    menus-tray, i18n-runtime, editors, healthcheck, onboarding, Linux install and tooltips-wpm campaigns);
-  - the navigation layer's wheel on macOS (BNM-1 of the 2026-11-17 key-combinations and bindings pass): it stops
-    when the Shortcuts switch is off, because it is a child of the bindings layer (`bindings.lua:288`) that switch
-    pauses whole (`menu/ui/builder/state.lua:710-713`, `modules/shortcuts/init.lua:337-341`); on Windows and Linux
-    only the layer gates it, and the macOS menu says it is no shortcut. Give it its own owner outside the
-    Shortcuts-gated layer, still held back by a script pause, with a unit test that `pause_bindings` leaves it bound.
+    menus-tray, i18n-runtime, editors, healthcheck, onboarding, Linux install and tooltips-wpm campaigns).
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
       channel's newest release through its required detached signature on both (`feed-only-install` tests, throwaway
       key in `feed_install_vectors.json`); without a key every feed row keeps the no-details refusal. Left, at release

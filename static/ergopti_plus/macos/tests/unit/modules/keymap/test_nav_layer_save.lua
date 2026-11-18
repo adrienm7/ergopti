@@ -79,7 +79,7 @@ end
 local function with_save(scenario)
 	local names = { "core.logger.engine.logger", "core.i18n.engine.i18n", "core.fs.engine.paths",
 		"settings.engine.paths", "core.fs.adapters.file_system", "modules.keymap.nav_layer_save",
-		"modules.shortcuts.bindings", "core.ui.engine.notifications" }
+		"modules.shortcuts.layer_wheel", "core.ui.engine.notifications" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local world = { dir = make_config_dir(), writes = {}, regenerations = 0, regenerate_accepts = true,
@@ -96,7 +96,7 @@ local function with_save(scenario)
 			shared = function(rel) return helpers.shared(rel) end,
 		}
 		package.loaded["settings.engine.paths"] = { get_config_dir = function() return world.dir end }
-		package.loaded["modules.shortcuts.bindings"] = { reconcile_layer_wheel = function()
+		package.loaded["modules.shortcuts.layer_wheel"] = { reconcile = function()
 			world.wheel_reconciles = world.wheel_reconciles + 1
 			return true
 		end }

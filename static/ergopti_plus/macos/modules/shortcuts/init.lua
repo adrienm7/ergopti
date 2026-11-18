@@ -14,6 +14,7 @@
 local hs = hs
 
 local Bindings          = require("modules.shortcuts.bindings")
+local LayerWheel        = require("modules.shortcuts.layer_wheel")
 local ScriptControl     = require("modules.shortcuts.script_control")
 local KeyboardShortcuts = require("modules.shortcuts.keyboard_shortcuts")
 local GestureActions    = require("gestures.engine.actions")
@@ -138,6 +139,12 @@ M.is_bound               = Bindings.is_bound
 M.set_wrap_pairs_getter  = Bindings.set_wrap_pairs_getter
 M.set_chatgpt_url        = Bindings.set_chatgpt_url
 M.get_chatgpt_url        = Bindings.get_chatgpt_url
+
+-- The navigation layer's wheel is no shortcut: the Shortcuts switch
+-- (pause_bindings) leaves it bound, ScriptControl pauses it as its own step.
+M.pause_layer_wheel      = LayerWheel.pause
+M.resume_layer_wheel     = LayerWheel.resume
+M.is_layer_wheel_bound   = LayerWheel.is_bound
 
 -- Proxy Script Control Methods
 M.ACTIONS               = ScriptControl.ACTIONS
@@ -295,8 +302,9 @@ end
 --- — both manage KeyboardShortcuts, so the initial start must too (otherwise the
 --- configurable Cmd/Ctrl/Option shortcuts stay dead until the first pause/resume).
 --- ScriptControl has its own dedicated start/stop (start_script_control) so its
---- pause/quit/reload tap survives a bindings toggle.
---- @return boolean committed True only when both child starts committed.
+--- pause/quit/reload tap survives a bindings toggle. The navigation layer's
+--- wheel starts here too, but no Shortcuts switch pauses it afterwards.
+--- @return boolean committed True only when every child start committed.
 function M.start()
 	if binding_external_pause_claimed() then return false end
 	local recovering_rebind = release_rebind_recovery_claim()
@@ -309,6 +317,8 @@ function M.start()
 		{name = "keyboard_shortcuts", start = function(attempt_is_current)
 			return start_after_aggregate_shutdown(KeyboardShortcuts, attempt_is_current)
 		end, stop = KeyboardShortcuts.stop},
+		{name = "layer_wheel", start = function() return LayerWheel.start() end,
+			stop = LayerWheel.stop},
 	})
 	if committed ~= true and recovering_rebind then
 		add_binding_pause_claim(REBIND_RECOVERY_CLAIM)
@@ -325,6 +335,7 @@ function M.stop()
 		{name = "bindings", stop = Bindings.stop},
 		{name = "script_control", stop = ScriptControl.stop},
 		{name = "keyboard_shortcuts", stop = KeyboardShortcuts.stop},
+		{name = "layer_wheel", stop = LayerWheel.stop},
 	})
 	return settled
 end
@@ -332,7 +343,9 @@ end
 --- Stops only the user-facing bindings and keyboard shortcuts, leaving the
 --- script-control eventtap alive so AltGr+Enter/Escape/Backspace can still
 --- un-pause the script. Called by pause_all() in script_control.lua instead
---- of stop() which would also kill the script-control tap itself.
+--- of stop() which would also kill the script-control tap itself. The
+--- navigation layer's wheel is no shortcut and stays bound: ScriptControl pauses
+--- it through pause_layer_wheel().
 --- @return boolean settled True only when both user-facing children stopped.
 function M.pause_bindings(parent)
 	add_binding_pause_claim(binding_pause_claim(parent))

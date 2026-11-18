@@ -559,6 +559,19 @@ local function pause_all()
 		if not ok_step then return false, step_reason end
 	end
 
+	-- The navigation layer's wheel is no shortcut: pause_bindings() leaves it
+	-- bound, as the Shortcuts switch does, so the pause holds it back here.
+	if _shortcuts and type(_shortcuts.pause_layer_wheel) == "function" then
+		ok_step, step_reason = add_required_step(
+			"shortcuts.pause_layer_wheel",
+			_shortcuts.pause_layer_wheel,
+			_shortcuts.resume_layer_wheel,
+			nil,
+			"shortcuts.resume_layer_wheel"
+		)
+		if not ok_step then return false, step_reason end
+	end
+
 	-- suspend() preserves CoreState.enabled while gating every gesture. The
 	-- fallback is only reversible when gestures were enabled before pause.
 	if _gestures and type(_gestures.suspend) == "function" then

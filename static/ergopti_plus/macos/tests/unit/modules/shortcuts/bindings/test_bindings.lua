@@ -245,12 +245,12 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		end
 	end)
 
-	helpers.it("includes the standalone tap_keys and layer_wheel entries", function()
+	helpers.it("includes the standalone tap_keys entry and not the layer's wheel", function()
 		local seen = {}
 		for _, entry in ipairs(list) do seen[entry.id] = true end
 		helpers.assert_true(seen.tap_keys)
 		helpers.assert_nil(seen.at_hash, "the key left of 1 is a tap key now, not a fixed screenshot")
-		helpers.assert_true(seen.layer_wheel)
+		helpers.assert_nil(seen.layer_wheel, "the layer's wheel is no shortcut: modules/shortcuts/layer_wheel.lua")
 		helpers.assert_nil(seen.layer_scroll, "Layer + Scroll is retired: the layer's wheel replaces it")
 	end)
 
@@ -265,7 +265,6 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		local idx = {}
 		for i, entry in ipairs(list) do idx[entry.id] = i end
 		helpers.assert_true(idx.cmd_star < idx.tap_keys)
-		helpers.assert_true(idx.cmd_star < idx.layer_wheel)
 	end)
 end)
 

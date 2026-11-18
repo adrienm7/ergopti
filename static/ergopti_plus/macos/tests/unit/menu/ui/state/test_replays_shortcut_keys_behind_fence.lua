@@ -28,7 +28,7 @@ local DISABLED_ID = "wrap_text_if_selected"
 local REFUSED_ID = "cmd_star"
 -- Owners derived from other files (tap-key assignments, the layer's wheel in
 -- layers.toml) rather than from a saved key.
-local DERIVED_IDS = { tap_keys = true, layer_wheel = true }
+local DERIVED_IDS = { tap_keys = true }
 
 -- A config.toml written by an older build: at_hash was removed from the
 -- binding registry and the manifest, and retired_off never existed.

@@ -67,7 +67,7 @@ end
 
 -- Owners derived from other files (tap-key assignments, the layer's wheel in
 -- layers.toml): no [shortcuts.keys] preference is ever written for them.
-local DERIVED_IDS = { tap_keys = true, layer_wheel = true }
+local DERIVED_IDS = { tap_keys = true }
 
 --- Asserts declared preferences survive and the derived dispatchers stay absent.
 --- @param bindings table Real Bindings module.

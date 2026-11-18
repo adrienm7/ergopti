@@ -61,15 +61,15 @@ function M.load_context()
 end
 
 --- Hands the saved layer's wheel bindings, which Hammerspoon runs rather than
---- Karabiner, to their owner (modules/shortcuts/bindings.lua).
+--- Karabiner, to their owner (modules/shortcuts/layer_wheel.lua).
 local function reconcile_wheel()
 	local ok, committed = pcall(function()
-		return require("modules.shortcuts.bindings").reconcile_layer_wheel()
+		return require("modules.shortcuts.layer_wheel").reconcile()
 	end)
 	if not ok then
 		Logger.error(LOG, "The layer's wheel bindings could not be applied: %s.", tostring(committed))
 	elseif committed ~= true then
-		Logger.warn(LOG, "The layer's wheel bindings apply with the next Shortcuts start: a start is in progress.")
+		Logger.warn(LOG, "The layer's wheel bindings are saved; the scroll wheel takes them at the next save or resume.")
 	end
 end
 
