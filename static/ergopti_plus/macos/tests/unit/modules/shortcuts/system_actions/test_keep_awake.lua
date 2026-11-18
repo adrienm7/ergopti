@@ -47,6 +47,24 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		end)
 	end)
 
+	-- An hs.alert banner has no accessibility element: VoiceOver heard nothing
+	-- when keep-awake turned on or off (a11y-macos-alert).
+	helpers.it("(a11y-macos-alert) says each banner it shows to VoiceOver", function()
+		with_fixture(function()
+			local spoken = {}
+			package.loaded["core.ui.adapters.system_accessibility"] = {
+				announce_event = function(text) spoken[#spoken + 1] = text; return true end,
+			}
+			local sys, show_calls = make_sys_with_alert_spy()
+			sys.toggle_awake()
+			helpers.assert_eq(spoken, { show_calls[#show_calls].msg }, "the on-banner is said")
+			sys.toggle_awake()
+			helpers.assert_eq(#spoken, 2)
+			helpers.assert_eq(spoken[2], show_calls[#show_calls].msg, "the off-banner is said")
+			helpers.assert_true(spoken[1] ~= spoken[2])
+		end)
+	end)
+
 	helpers.it("closes the banner on manual toggle OFF", function()
 		with_fixture(function()
 			package.loaded["platform.input.keycodes"] = nil
