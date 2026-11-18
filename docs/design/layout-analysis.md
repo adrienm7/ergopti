@@ -806,13 +806,13 @@ analysis, another tab when it is shown.
   « not scored »), the better first and the incomplete layouts last; then the
   tab's sortable table. Trigrams adds the six trigram classes as a stacked bar
   per layout; rows adds the row usage stacked bar (the home row's value
-  written) and each finger's travel as a heat table on the blue ramp.
+  written) and each finger's travel as a heat table on the heat scale.
 - **Heat maps**: the first 2 to 12 layouts shown side by side
   (`#la-heats-count`, 6 by default), each key coloured by the presses, the
   score or any per-key metric (`#la-heats-metric`), on one scale for all
   (`#la-heats-shared`, the default) or each its own. The space bar's share of
   the presses dwarfs every letter, so the scale is the other keys' and the
-  legend's dark end reads « ≥ »; the space bar is drawn at its darkest. Each
+  legend's red end reads « ≥ »; the space bar is drawn at the red end. Each
   board has its values as a folded table and opens the layout's details.
 - **Other analysers**: `analyser_tab.js`, below.
 - **One layout**: the details, a list of the compared layouts on top
@@ -825,15 +825,22 @@ own layouts take the accent colour in the bars and an accent edge in the tables
 and tiles. A stacked figure's parts take the categorical slots of theme.css
 « Chart look » in a fixed order (six slots, validated adjacent-pair in light
 and dark with the dataviz palette validator); the ramps and the diverging pair
-are the heatmap's. At phone width a bar takes the whole width under its label
+are the heatmap's. The heat scale (theme.css `--theme-chart-heat-*`, the
+maintainer's request of 2026-11-18) runs from blue for the least through
+green, yellow and orange to red for the most; every count figure (the heat
+maps, the heat tables, the key pair matrix by count, the editor's key colours)
+reads that one gradient at its share, prints in the dark heat ink (4.5:1 on
+every point of the scale in both themes), and keeps its legend, tooltips and
+table (`tools/test/test-heat-scale.cjs`); the analysers' ranks keep the
+one-hue blue ramp, the first rank darkest. At phone width a bar takes the whole width under its label
 and the page never scrolls sideways (`layout-editor.playwright.cjs`
 `exerciseComparerPicker`, every tab in light and dark).
 
 The details show: « Compare with » (`#la-versus`, another
 compared layout: its value and the difference beside every metric and the
 score, from `diff`, each with ▲ better, ▼ worse, = equal or « not scored » in
-words); the key heatmap in one blue hue from light to dark with its scale
-(0 to the largest key's value), board positions in % so it shrinks with the
+words); the key heatmap on the heat scale with its legend (0 to the largest
+key's value), board positions in % so it shrinks with the
 page, with each finger's share of the non-thumb presses (its ideal load
 marked), hands and rows under it and the contributions beside it; every
 metric; « Typed via » (the share
@@ -857,7 +864,7 @@ and the heatmap's choices):
 
 - « Key pair matrix » (`#la-matrix`, from `bigramMatrix`): the 32 busiest keys
   on both axes, first key by row and second by column, each cell coloured by
-  its share of the pairs (the heatmap's blue ramp) or by its score points
+  its share of the pairs (the heat scale) or by its score points
   (gained blue with « + », lost orange with « − », into the neutral surface),
   with a legend and units. It scrolls inside its own focusable box, never the
   page, at phone width; each cell names its pair, share, count, kind and

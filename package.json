@@ -788,6 +788,7 @@
 		"test:kbd-dll-wow64": "node ./tools/test/test-kbd-dll-wow64.cjs",
 		"test:layout-jis-abnt": "node ./tools/test/test-layout-jis-abnt.cjs",
 		"test:key-shape": "node ./tools/test/test-key-shape.cjs",
+		"test:heat-scale": "node ./tools/test/test-heat-scale.cjs",
 		"test:layout-source": "node ./tools/test/test-layout-source.cjs",
 		"test:layout-source-compiler": "node ./tools/test/test-layout-source-compiler.cjs",
 		"test:layout-editor-model": "node ./tools/test/test-layout-editor-model.cjs",

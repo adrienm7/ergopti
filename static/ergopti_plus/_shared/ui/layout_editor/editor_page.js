@@ -198,9 +198,8 @@ var LayoutEditorPage = (function () {
 	const SVG_NS = 'http://www.w3.org/2000/svg';
 
 	/**
-	 * The outline of an L-shaped key (the ISO Enter): the same SVG path twice
-	 * over the whole button, the key's body and the analysis colours laid over
-	 * it, which style.css fills and strokes as the key's state says.
+	 * The outline of an L-shaped key (the ISO Enter): one SVG path over the
+	 * whole button, which style.css fills and strokes as the key's state says.
 	 * @param {{d: string, width: number, height: number}} shape - From KEY_SHAPE.lPath.
 	 * @returns {SVGSVGElement}
 	 */
@@ -211,13 +210,10 @@ var LayoutEditorPage = (function () {
 		svg.setAttribute('preserveAspectRatio', 'none');
 		svg.setAttribute('aria-hidden', 'true');
 		svg.setAttribute('focusable', 'false');
-		// The key's own fill and border, then the analysis colours laid over it.
-		for (const layer of ['le-key-body', 'le-key-overlay']) {
-			const path = document.createElementNS(SVG_NS, 'path');
-			path.setAttribute('class', layer);
-			path.setAttribute('d', shape.d);
-			svg.append(path);
-		}
+		const path = document.createElementNS(SVG_NS, 'path');
+		path.setAttribute('class', 'le-key-body');
+		path.setAttribute('d', shape.d);
+		svg.append(path);
 		return svg;
 	}
 

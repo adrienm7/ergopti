@@ -160,8 +160,6 @@
 	// Width of the space bar in key units.
 	const SPACE_UNITS = 6;
 	const SPACE_CODE = 'Space';
-	// A key at least this share of the heatmap's maximum is dark enough for light ink.
-	const HEAT_STRONG_SHARE = 0.55;
 	// Where a shared link opens when the page has no web address of its own
 	// (the app's Studio window): the site's Comparer.
 	const SITE_COMPARER_URL = 'https://ergopti.fr/studio/comparer';
@@ -2327,7 +2325,6 @@
 					const share = extent > 0 ? value / extent : 0;
 					const td = el('td', 'la-cell la-cell-count', format(value, 2));
 					td.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
-					if (share >= HEAT_STRONG_SHARE) td.classList.add('la-cell-strong');
 					td.title = `${t(`layout_analysis.finger.${id}`)}: ${format(value, 2)} ${mm}`;
 					tr.append(td);
 				}
@@ -2695,8 +2692,8 @@
 		/**
 		 * Draws a board of a result's keyboard into a box, each key showing the
 		 * layout's base character, positioned in % so the board scales with its
-		 * box. One layout: one hue, light to dark, by the key's share of the
-		 * extent. A difference (other): orange where this layout puts more,
+		 * box. One layout: the heat scale (theme.css), blue for the least to red
+		 * for the most, by the key's share of the extent. A difference (other): orange where this layout puts more,
 		 * blue where less, mixed into the neutral surface.
 		 * @param {HTMLElement} box
 		 * @param {object} result
@@ -2749,7 +2746,6 @@
 					key.style.setProperty('--la-share', `${Math.round(share * HEAT_DIFF_MAX_SHARE * 100)}%`);
 				} else {
 					key.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
-					if (share >= HEAT_STRONG_SHARE) key.classList.add('la-key-strong');
 				}
 				const title = options.title(code, value);
 				const where = t('layout_analysis.heat.position', position.get(code));
@@ -2766,7 +2762,7 @@
 
 		/**
 		 * The board of the chosen keyboard in the details, each key showing the
-		 * layout's base character. One layout: shaded light to dark (one hue) by
+		 * layout's base character. One layout: coloured on the heat scale (blue to red) by
 		 * its share of the largest value of the chosen per-key metric. Against
 		 * another layout (the difference): orange where this layout puts more,
 		 * blue where less, stronger with the size of the gap, each tooltip
@@ -2965,7 +2961,7 @@
 		/**
 		 * The key pair matrix (the engine's bigramMatrix): the busiest keys on
 		 * both axes, first key by row, second by column, each cell coloured by
-		 * how often the pair occurs (one hue, light to dark) or by the score
+		 * how often the pair occurs (the heat scale, blue to red) or by the score
 		 * points it gains (blue, « + ») or costs (orange, « − ») into the
 		 * neutral surface. The figure scrolls inside its own box on a narrow
 		 * screen; every pair is also in a sortable table, and each cell names

@@ -531,24 +531,31 @@ body {
 	cursor: crosshair;
 }
 
-/* The analysis panel's key colours: --le-heat runs from 0 (green, costs nothing)
-   to 1 (red, the key that costs the most), laid over the key's own background. */
+/* The analysis panel's key colours: --le-heat runs from 0 (blue, costs
+   nothing) to 1 (red, the key that costs the most) on the Studio's one heat
+   scale (theme.css), the gradient's colour at that point under the key. */
 .le-key.le-heat {
-	background-image: linear-gradient(
-		hsl(calc(120 - 120 * var(--le-heat)) 75% 50% / 0.45),
-		hsl(calc(120 - 120 * var(--le-heat)) 75% 50% / 0.45)
-	);
+	background: var(--theme-chart-heat-scale) calc(var(--le-heat) * 100%) 0 / 10000% 100% no-repeat;
+	color: var(--theme-chart-heat-ink);
+}
+
+.le-key.le-heat .le-code {
+	color: inherit;
 }
 
 /*
  * The ISO Enter, an L (editor_page.js keyOutline, key_shape.js): the button is
  * clipped to the L, so a click in its notch reaches the key there, and its SVG
- * path draws the fill and the border the other keys take from the button.
+ * path draws the fill and the border the other keys take from the button; the
+ * heat colour stays the button's background, clipped to the L.
  */
+.le-key.le-key-l {
+	background: none;
+}
+
 .le-key.le-key-l,
 .layout-editor .le-key.le-key-l:hover,
 .le-key.le-key-l.selected {
-	background: none;
 	border-color: transparent;
 	clip-path: polygon(
 		0 0,
@@ -584,11 +591,6 @@ body {
 	stroke: var(--le-border);
 }
 
-.le-key-shape .le-key-overlay {
-	fill: none;
-	stroke: none;
-}
-
 .le-key-l.mapped .le-key-body,
 .le-key-l.overridden .le-key-body {
 	fill: var(--le-accent-soft);
@@ -609,12 +611,12 @@ body {
 	stroke-width: 2px;
 }
 
-.le-key-l.le-heat {
-	background-image: none;
+.le-key.le-key-l.le-heat {
+	background: var(--theme-chart-heat-scale) calc(var(--le-heat) * 100%) 0 / 10000% 100% no-repeat;
 }
 
-.le-key-l.le-heat .le-key-overlay {
-	fill: hsl(calc(120 - 120 * var(--le-heat)) 75% 50% / 0.45);
+.le-key-l.le-heat .le-key-body {
+	fill: none;
 }
 
 .le-act-as {

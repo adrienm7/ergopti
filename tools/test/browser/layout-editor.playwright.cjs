@@ -1262,7 +1262,7 @@ async function exerciseComparerTabs(page) {
 	await page.selectOption('#la-analysers-view', 'ranks');
 	assert.ok(
 		await page.$$eval(
-			'.la-analysers-table td.la-cell-count',
+			'.la-analysers-table td.la-cell-rank',
 			(cells) => cells.length > 0 && cells.every((cell) => /^\d+$/.test(cell.textContent))
 		),
 		'each analyser ranks the layouts'

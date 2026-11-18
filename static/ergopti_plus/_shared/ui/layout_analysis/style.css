@@ -36,16 +36,20 @@ body:has(> main.layout-analysis) {
 	--la-good: var(--theme-good-text);
 	--la-bad: var(--theme-bad-text);
 	/* Chart colours (theme.css « Chart look », validated in light and dark):
-	   points gained blue, points lost orange; one-hue blue ramp for the
-	   heatmap and the loads. */
+	   points gained blue, points lost orange; the heat scale (blue for the
+	   least to red for the most) for the heat maps and the counts, read
+	   through --la-share by the gradient's own colour at that point. */
 	--la-gain: var(--theme-chart-gain);
 	--la-loss: var(--theme-chart-loss);
 	--la-load: var(--theme-chart-gain);
-	--la-heat-low: var(--theme-chart-ramp-low);
-	--la-heat-high: var(--theme-chart-ramp-high);
+	--la-heat-scale: var(--theme-chart-heat-scale);
 	--la-heat-edge: var(--theme-chart-ramp-edge);
 	--la-heat-ink: var(--theme-text);
-	--la-heat-ink-strong: var(--theme-chart-ramp-ink-strong);
+	--la-heat-fill-ink: var(--theme-chart-heat-ink);
+	/* The analysers' ranks: one blue hue, the first rank darkest. */
+	--la-rank-low: var(--theme-chart-ramp-low);
+	--la-rank-high: var(--theme-chart-ramp-high);
+	--la-rank-ink-strong: var(--theme-chart-ramp-ink-strong);
 	--la-target: var(--theme-text);
 	/* The stacked figures' parts (and the two hands), categorical slots in
 	   their fixed order: the colour follows the part, never its rank. */
@@ -616,23 +620,21 @@ body:has(> main.layout-analysis) {
 
 .la-heatmap .la-key {
 	align-items: center;
-	background: color-mix(in oklab, var(--la-heat-high) var(--la-share), var(--la-heat-low));
+	/* The scale's colour at --la-share: the gradient drawn 100 times the
+	   cell's width, its point at that share under the cell. */
+	background: var(--la-heat-scale) var(--la-share) 0 / 10000% 100% no-repeat;
 	border: 2px solid var(--la-surface);
 	border-radius: 6px;
 	/* The edge inside the surface gap: a key worth zero, as light as the
 	   surface, still shows its shape (theme.css « Chart look »). */
 	box-shadow: inset 0 0 0 1px var(--la-heat-edge);
-	color: var(--la-heat-ink);
+	color: var(--la-heat-fill-ink);
 	cursor: default;
 	display: flex;
 	font-size: clamp(9px, 2.6cqw, 15px);
 	font-weight: 600;
 	justify-content: center;
 	position: absolute;
-}
-
-.la-heatmap .la-key-strong {
-	color: var(--la-heat-ink-strong);
 }
 
 .la-heat-legend {
@@ -648,14 +650,17 @@ body:has(> main.layout-analysis) {
    mixed into the neutral surface so the midpoint is grey, never a hue. */
 .la-heatmap .la-key-more {
 	background: color-mix(in oklab, var(--la-loss) var(--la-share), var(--la-surface-2));
+	color: var(--la-heat-ink);
 }
 
 .la-heatmap .la-key-less {
 	background: color-mix(in oklab, var(--la-gain) var(--la-share), var(--la-surface-2));
+	color: var(--la-heat-ink);
 }
 
 .la-heatmap .la-key-same {
 	background: var(--la-surface-2);
+	color: var(--la-heat-ink);
 }
 
 .la-heatmap .la-key:focus-visible {
@@ -754,7 +759,8 @@ body:has(> main.layout-analysis) {
 }
 
 .la-matrix .la-cell-count {
-	background: color-mix(in oklab, var(--la-heat-high) var(--la-share), var(--la-heat-low));
+	background: var(--la-heat-scale) var(--la-share) 0 / 10000% 100% no-repeat;
+	color: var(--la-heat-fill-ink);
 }
 
 /* Points: blue gained, orange lost, mixed into the neutral surface. */
@@ -810,7 +816,7 @@ body:has(> main.layout-analysis) {
 }
 
 .la-heat-ramp {
-	background: linear-gradient(to right, var(--la-heat-low), var(--la-heat-high));
+	background: var(--la-heat-scale);
 	border: 1px solid var(--la-border);
 	border-radius: 3px;
 	display: inline-block;
@@ -1097,11 +1103,16 @@ body:has(> main.layout-analysis) {
 }
 
 .la-heat-table .la-cell-count {
-	background: color-mix(in oklab, var(--la-heat-high) var(--la-share), var(--la-heat-low));
+	background: var(--la-heat-scale) var(--la-share) 0 / 10000% 100% no-repeat;
+	color: var(--la-heat-fill-ink);
+}
+
+.la-heat-table .la-cell-rank {
+	background: color-mix(in oklab, var(--la-rank-high) var(--la-share), var(--la-rank-low));
 }
 
 .la-heat-table .la-cell-strong {
-	color: var(--la-heat-ink-strong);
+	color: var(--la-rank-ink-strong);
 }
 
 .la-heat-table .la-cell-over {

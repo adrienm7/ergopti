@@ -256,7 +256,7 @@ var LAYOUT_ANALYSER_TAB = (function () {
 						}
 						// One blue ramp, the first rank darkest; the rank is written in the cell.
 						const share = last > 1 ? (last - rank) / (last - 1) : 1;
-						const cell = el('td', 'la-num la-cell la-cell-count', format(rank, 0));
+						const cell = el('td', 'la-num la-cell la-cell-rank', format(rank, 0));
 						cell.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
 						if (share >= STRONG_SHARE) cell.classList.add('la-cell-strong');
 						cell.title = `${a.name} (${FINGERING_LABEL[fingering]()}): ${cellText(a, s[a.id][fingering])}`;

@@ -438,6 +438,31 @@
 	--theme-chart-cat-6: #0ca30c;
 }
 
+/* The heat scale of every count figure (the Studio's heat maps, their tables,
+   the bigram matrix, the editor's key colours): blue for the least, through
+   green, yellow and orange, to red for the most (maintainer, 2026-11-18). Each
+   stop is light enough for the dark heat ink at 4.5:1 or more wherever the
+   scale is read, in both themes, so the stops are the same in both; the keys
+   keep their 1 px edge against the surface, and every figure keeps its legend
+   (0 to its largest value), its tooltips and its table, so no value is told
+   by colour alone (tools/test/test-heat-scale.cjs). */
+:root {
+	--theme-chart-heat-1: #7fb2e5;
+	--theme-chart-heat-2: #6cc77a;
+	--theme-chart-heat-3: #f7dc5c;
+	--theme-chart-heat-4: #f5953a;
+	--theme-chart-heat-5: #f0605e;
+	--theme-chart-heat-ink: #1d1d1f;
+	--theme-chart-heat-scale: linear-gradient(
+		to right,
+		var(--theme-chart-heat-1),
+		var(--theme-chart-heat-2),
+		var(--theme-chart-heat-3),
+		var(--theme-chart-heat-4),
+		var(--theme-chart-heat-5)
+	);
+}
+
 /* Status text (a better value, an error message): the system green and red
    are 2.2:1 and 3.6:1 on white, below the 4.5:1 of text (WCAG 1.4.3); these
    reach it on the light and dark surfaces. A status also says itself in words

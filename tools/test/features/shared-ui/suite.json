@@ -581,6 +581,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-key-shape.cjs"],
 			"repro": "npm run test:key-shape"
+		},
+		{
+			"id": "heat-scale",
+			"ordinal": 696,
+			"name": "the Studio's heat figures read one blue-to-red scale, readable with its ink on every point in both themes, with key edges and legends",
+			"cmd": "node",
+			"args": ["tools/test/test-heat-scale.cjs"],
+			"repro": "npm run test:heat-scale"
 		}
 	]
 }
