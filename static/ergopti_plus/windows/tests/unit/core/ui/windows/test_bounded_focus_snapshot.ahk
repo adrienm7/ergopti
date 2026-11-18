@@ -226,6 +226,67 @@ _BFS_NewerRefreshOwnsPublication() {
 Test("metrics focus: newer B owns publication after A yields (focus-refresh-bounded-resident)",
 	_BFS_NewerRefreshOwnsPublication)
 
+; The repeating focus timer keeps firing under native Suspend, so a paused
+; refresh must not even acquire the foreground (F-06); an acquisition the pause
+; overtakes must not publish what it read. Each refusal is its own guard.
+global _BFS_PausedProbeCount := 0
+
+_BFS_CountingProbe(TimeoutMs) {
+	global _BFS_PausedProbeCount
+	_BFS_PausedProbeCount += 1
+	return _BFS_AcceptedProbe("paused.exe", "Paused title", "PausedClass", 404)
+}
+
+_BFS_SuspendingProbe(TimeoutMs) {
+	global _BFS_PausedProbeCount
+	_BFS_PausedProbeCount += 1
+	Suspend(true)
+	return _BFS_AcceptedProbe("overtaken.exe", "Overtaken title", "OvertakenClass", 505)
+}
+
+_BFS_PausedRefreshAcquiresAndPublishesNothing() {
+	global _BFS_NowValue, _BFS_PausedProbeCount
+	SavedState := MetricsFocusCache.state
+	SavedGeneration := MetricsFocusCache.generation
+	SavedRefreshGeneration := MetricsFocusCache.refresh_generation
+	WasSuspended := A_IsSuspended
+	try {
+		MetricsFocusCache.state := _BFS_State(true, "before.exe", "Before",
+			"BeforeClass", 3, "", false, 900)
+		MetricsFocusCache.generation := 60
+		MetricsFocusCache.refresh_generation := 20
+		_BFS_NowValue := 1000
+		_BFS_PausedProbeCount := 0
+
+		Suspend(true)
+		AssertFalse(MF_RefreshFocus(true, _BFS_CountingProbe, _BFS_Now),
+			"a paused refresh must report no publication")
+		AssertEqual(0, _BFS_PausedProbeCount, "a paused refresh must not acquire the foreground window")
+
+		Suspend(false)
+		AssertFalse(MF_RefreshFocus(true, _BFS_SuspendingProbe, _BFS_Now),
+			"an acquisition overtaken by a pause must report no publication")
+		AssertEqual(1, _BFS_PausedProbeCount, "the overtaken refresh ran its one acquisition")
+		AssertEqual("before.exe", MetricsFocusCache.state.process_name,
+			"an acquisition overtaken by a pause must not publish what it read")
+		AssertEqual(60, MetricsFocusCache.generation, "an overtaken acquisition must not advance the privacy epoch")
+
+		Suspend(false)
+		AssertTrue(MF_RefreshFocus(true, _BFS_CountingProbe, _BFS_Now),
+			"positive control: a running refresh publishes its acquisition")
+		AssertEqual("paused.exe", MetricsFocusCache.state.process_name)
+	} finally {
+		if A_IsSuspended != WasSuspended
+			Suspend(WasSuspended)
+		MetricsFocusCache.state := SavedState
+		MetricsFocusCache.generation := SavedGeneration
+		MetricsFocusCache.refresh_generation := SavedRefreshGeneration
+	}
+}
+
+Test("metrics focus: a paused refresh acquires and publishes nothing (F-06)",
+	_BFS_PausedRefreshAcquiresAndPublishesNothing)
+
 
 
 

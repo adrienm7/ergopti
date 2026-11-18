@@ -39,29 +39,22 @@
 
 
 
-; ================================================================
-; ================================================================
-; ======= 1/ The tick must refuse to probe while suspended =======
-; ================================================================
-; ================================================================
+; ========================================================
+; ========================================================
+; ======= 1/ The tick owns the bounded acquisition =======
+; ========================================================
+; ========================================================
 
-_MFS_TickIsSuspendGuarded() {
-	Body := _DriverFuncBody("MF_RefreshFocus")
-	Assert(Body != "", "MF_RefreshFocus must exist in infra/metrics/metrics_filters.ahk")
-
-	Guard := InStr(Body, "A_IsSuspended")
-	Assert(Guard > 0,
-		"MF_RefreshFocus must bail out on A_IsSuspended — SetTimer callbacks bypass native Suspend and would otherwise observe focus 20x/second for the entire pause")
-
-	Delegate := InStr(Body, "_MF_RefreshFocusNonCritical")
-	Assert(Delegate > Guard,
-		"the A_IsSuspended guard must precede the non-Critical acquisition delegate")
+; The pause refusals before and after the acquisition are called under a real
+; Suspend in tests/unit/core/ui/windows/test_bounded_focus_snapshot.ahk; that
+; test injects the acquisition, so the production default stays a source read.
+_MFS_TickOwnsBoundedAcquisition() {
 	NativeBody := _DriverFuncBody("_MF_RefreshFocusNonCritical")
 	Assert(NativeBody != "" && InStr(NativeBody,
 		"WICaptureBoundedFocusSnapshot") > 0,
 		"the delegated refresh must still own the bounded foreground acquisition")
 }
-Test("metrics: MF_RefreshFocus refuses to probe while suspended (F-06)", _MFS_TickIsSuspendGuarded)
+Test("metrics: the focus refresh owns the bounded foreground acquisition (F-06)", _MFS_TickOwnsBoundedAcquisition)
 
 
 
@@ -173,23 +166,17 @@ Test("metrics: the focus poll is gated on MetricsShortcuts.enabled (F-06)", _MFS
 ; The other recurring ticks still own their direct native pause checks.
 _ATG_MetricsTicksGatedOnSuspend() {
 	; Move-resilient: locate each tick function across the whole driver source
-	; via the framework helper rather than a pinned per-module path. Maps the
-	; bare function name to the original declaration used in assertion messages.
+	; via the framework helper rather than a pinned per-module path.
 	; KL_CaptureHeld() is the shared capture gate: driver suspension OR the
-	; user's collection pause. A tick that gates on it also gates on
-	; A_IsSuspended, provided the gate itself still reads A_IsSuspended.
-	HeldBody := _DriverFuncBody("KL_CaptureHeld")
-	Assert(HeldBody != "" && InStr(HeldBody, "A_IsSuspended") > 0,
-		"KL_CaptureHeld() must exist and hold capture on A_IsSuspended (metrics-timers-bypass-pause)")
-	Checks := Map(
-		"KL_IngestOnce",   "KL_IngestOnce(",
-		"KL_Hook_Tick",    "KL_Hook_Tick()")
-	for Name, Decl in Checks {
-		Body := _DriverFuncBody(Name)
-		Assert(Body != "", Decl . " must exist")
-		Assert(InStr(Body, "A_IsSuspended") > 0 || InStr(Body, "KL_CaptureHeld()") > 0,
-			Decl . " must early-return on A_IsSuspended or KL_CaptureHeld() so metrics timers go quiet while paused (metrics-timers-bypass-pause)")
-	}
+	; user's collection pause; _MFS_CaptureGateKeepsBothPauseCauses below calls
+	; it under a real Suspend. KL_Hook_Tick is called under a real Suspend in
+	; tests/unit/modules/keystats/test_keystats_hook_tick_pause.ahk. The ingest
+	; tick re-checks the pause inside its journal scope, so its admission guard
+	; cannot be observed apart from the second one and stays a source read.
+	Body := _DriverFuncBody("KL_IngestOnce")
+	Assert(Body != "", "KL_IngestOnce( must exist")
+	Assert(InStr(Body, "A_IsSuspended") > 0 || InStr(Body, "KL_CaptureHeld()") > 0,
+		"KL_IngestOnce( must early-return on A_IsSuspended or KL_CaptureHeld() so metrics timers go quiet while paused (metrics-timers-bypass-pause)")
 	Sensor := _StripFullLineComments(_DriverFuncBody("KL_Sensors_Tick"))
 	Assert(Sensor != "", "KL_Sensors_Tick() must exist")
 	Gate := InStr(Sensor, "KL_CaptureHeld()")
@@ -198,10 +185,6 @@ _ATG_MetricsTicksGatedOnSuspend() {
 	Publish := InStr(Sensor, "KL_LogSystemEvent(")
 	Assert(Gate > 0 && Filter > Gate && Native > Gate && Publish > Gate,
 		"the real collection pause gate must precede sensor filtering, native acquisition and publication")
-	Capture := _StripFullLineComments(_DriverFuncBody("KL_CaptureHeld"))
-	Assert(Capture != "", "the delegated collection pause gate must have a real production owner")
-	Assert(InStr(Capture, "A_IsSuspended") > 0 && InStr(Capture, "KLCollection.suspended") > 0,
-		"the shared sensor gate must retain both the driver pause and the independent collection pause")
 	; KL_Hook_LivePush is the live-push companion tick.
 	Body := _DriverFuncBody("KL_Hook_LivePush")
 	Assert(Body != "", "KL_Hook_LivePush() must exist")

@@ -253,4 +253,66 @@ _KLSW_PausedShutdownDrain() {
 Test("system watchers: paused shutdown drains only completed records (system-paused-delivery-debt)",
 	_KLSW_PausedShutdownDrain)
 
+; Native Suspend leaves the OnMessage handlers and the idle timer armed, so each
+; watcher callback must refuse its delivery while paused, or the keystats writes
+; lock, sleep and idle records the user paused (keystats-watchers-bypass-pause).
+; The fixture's admission port always allows, so only the callbacks' own guard
+; can keep the paused edges and the pending debt out of the ledger. Each call is
+; checked on its own; the resumed idle tick is the positive control.
+_KLSW_PausedCallbacksDeliverNothing() {
+	SavedOwner := KLWatch.system_events
+	SavedFailure := KLWatch.system_failure_reported
+	SavedInitialized := Keystats.initialized
+	SavedTick := KLHook.last_tick
+	SavedPrivacy := KLWatch.privacy_interrupted
+	SavedPrivacyAt := KLWatch.privacy_started_at
+	WasSuspended := A_IsSuspended
+	F := _KLSO_Fixture()
+	try {
+		KLWatch.system_events := F.Owner
+		KLWatch.system_failure_reported := false
+		Keystats.initialized := true
+		KLHook.last_tick := 0
+		F.Tick := 10
+		KL_Watchers_OnPowerBroadcast(KLWatchConst.PBT_APMSUSPEND, 0, 0, 0)
+		F.Mode := "throw-before"
+		F.Tick := 40
+		KL_Watchers_OnPowerBroadcast(KLWatchConst.PBT_APMRESUMEAUTOMATIC, 0, 0, 0)
+		F.Mode := "ok"
+		Events := F.Events.Length
+		Debt := F.Owner.Pending.Length
+		AssertTrue(Debt > 0, "precondition: a completed interval awaits technical delivery")
+
+		Suspend(true)
+		F.Tick := 100
+		KL_Watchers_OnSessionChange(KLWatchConst.WTS_SESSION_LOCK, 0, 0, 0)
+		AssertEqual(Events, F.Events.Length, "a lock delivered while paused must append nothing")
+		AssertEqual(Debt, F.Owner.Pending.Length, "a lock delivered while paused must not drain the debt")
+		F.Tick := 110
+		KL_Watchers_OnPowerBroadcast(KLWatchConst.PBT_APMSUSPEND, 0, 0, 0)
+		AssertEqual(Events, F.Events.Length, "a sleep delivered while paused must append nothing")
+		AssertEqual(Debt, F.Owner.Pending.Length, "a sleep delivered while paused must not drain the debt")
+		F.Tick := 900
+		KL_Watchers_IdleTick()
+		AssertEqual(Events, F.Events.Length, "an idle tick while paused must append nothing")
+		AssertEqual(Debt, F.Owner.Pending.Length, "an idle tick while paused must keep the debt for the resume")
+
+		Suspend(false)
+		KL_Watchers_IdleTick()
+		AssertEqual(0, F.Owner.Pending.Length, "positive control: the resumed idle tick delivers the debt")
+		AssertEqual(30, F.Measures()[1]["duration_ms"], "positive control: the delivered interval is the pre-pause one")
+	} finally {
+		if A_IsSuspended != WasSuspended
+			Suspend(WasSuspended)
+		KLWatch.system_events := SavedOwner
+		KLWatch.system_failure_reported := SavedFailure
+		Keystats.initialized := SavedInitialized
+		KLHook.last_tick := SavedTick
+		KLWatch.privacy_interrupted := SavedPrivacy
+		KLWatch.privacy_started_at := SavedPrivacyAt
+	}
+}
+Test("system watchers: paused callbacks deliver nothing until the resume (keystats-watchers-bypass-pause)",
+	_KLSW_PausedCallbacksDeliverNothing)
+
 #Include test_system_delivery_owner.ahk

@@ -1221,6 +1221,7 @@ global _AhkSubDir := ""
 #Include ../modules/keystats/keystats_journal.ahk
 #Include ../modules/keystats/keystats_shutdown.ahk
 #Include unit/modules/keystats/test_keystats_shutdown_timers.ahk
+#Include unit/modules/keystats/test_keystats_hook_tick_pause.ahk
 ; Event-ID recovery is a pure module extracted from keystats.ahk so its real
 ; tail parser can be exercised without loading the OS-hooking entry module.
 #Include ../modules/keystats/keystats_event_id.ahk
@@ -1289,6 +1290,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/metrics/test_metrics_and_locale_honesty.ahk
 #Include unit/modules/keystats/test_corpus_app_category_store.ahk
 #Include unit/modules/keystats/test_keystats_app_categories.ahk
+#Include unit/modules/keystats/test_keystats_app_category_deferred_pause.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader_manifest_contract.ahk
 #Include unit/modules/keystats/test_context_nonempty_prepare_owner.ahk
@@ -1563,7 +1565,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/gestures/test_mouse_hotkey_clobber.ahk
 #Include meta/gestures/test_mouse_suspend_guard.ahk
 #Include meta/modules/keystats/test_scroll_flush_fn_cleared_on_stop.ahk
-#Include meta/modules/keystats/test_keystats_watchers_pause_guard.ahk
 #Include unit/modules/keystats/test_keystats_session_privacy_transaction.ahk
 #Include unit/modules/keystats/test_keystats_session_close_retry.ahk
 #Include unit/modules/keystats/test_keystats_native64_clock.ahk
