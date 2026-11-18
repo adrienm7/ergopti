@@ -28,12 +28,14 @@
 ; ============================================================
 ; ============================================================
 
-_CWB_ReadSource(FileName) {
-	return _DriverFileSource(FileName)
+; Reads the whole production file that defines Symbol, wherever it lives: a
+; base name stops naming one file once the structure plan renames its owner.
+_CWB_ReadSource(Symbol) {
+	return _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol(Symbol), "UTF-8"))
 }
 
 _CWB_AsyncPollAcceptsBinaryWithoutWaiting() {
-	Src := _CWB_ReadSource("hotstring_engine.ahk")
+	Src := _CWB_ReadSource("_SelectionCapturePoll")
 	Body := _DriverFuncBody("_SelectionCapturePoll")
 
 	Assert(Body != "", "_SelectionCapturePoll() must exist in hotstring_engine.ahk")

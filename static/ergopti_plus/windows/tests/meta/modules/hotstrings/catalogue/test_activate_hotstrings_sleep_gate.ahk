@@ -63,7 +63,7 @@ Test("hotstring_engine: HSE_Buffer stays a module super-global for ActivateHotst
 	_AHSG_EngineBufferIsSuperGlobal)
 
 _AHSG_GateBeforePoke() {
-	Src := _AHSG_ReadSource("hotstring_engine.ahk")
+	Src := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("ActivateHotstrings"), "UTF-8"))
 	Seg := _DriverFuncBody("ActivateHotstrings")
 	Assert(Seg != "", "ActivateHotstrings() declaration must exist in hotstring_engine.ahk")
 
@@ -82,7 +82,7 @@ _AHSG_GateBeforePoke() {
 Test("hotstring_engine: ActivateHotstrings gates the Sleep poke on a pending HSE_Buffer (activate-hotstrings-sleep-on-keyboard-thread)", _AHSG_GateBeforePoke)
 
 _AHSG_GuardReturnsEarly() {
-	Src := _AHSG_ReadSource("hotstring_engine.ahk")
+	Src := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("ActivateHotstrings"), "UTF-8"))
 	Seg := _DriverFuncBody("ActivateHotstrings")
 	; Slice from the function head to the first space poke: the early-return that
 	; skips the dance on an empty buffer must live in that prologue.

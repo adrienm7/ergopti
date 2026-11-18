@@ -31,8 +31,10 @@
 ; ==================================================
 ; ==================================================
 
-_GSBlk_ReadSource(FileName) {
-	return _DriverFileSource(FileName)
+; Reads the whole production file that defines Symbol, wherever it lives: a
+; base name stops naming one file once the structure plan renames its owner.
+_GSBlk_ReadSource(Symbol) {
+	return _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol(Symbol), "UTF-8"))
 }
 
 
@@ -46,7 +48,7 @@ _GSBlk_ReadSource(FileName) {
 
 ; The public capture API must arm a timer rather than call blocking ClipWait.
 _GSBlk_GetSelectionIsTimerDriven() {
-	Src := _GSBlk_ReadSource("hotstring_engine.ahk")
+	Src := _GSBlk_ReadSource("GetSelectionAsync")
 	Seg := _DriverFuncBody("GetSelectionAsync")
 	Assert(Seg != "", "GetSelectionAsync() declaration must exist in hotstring_engine.ahk")
 	Assert(InStr(Seg, "SetTimer(Job[") > 0,

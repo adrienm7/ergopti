@@ -16,8 +16,10 @@
 
 #Requires AutoHotkey v2.0
 
-_TRNTA_ReadSource(FileName) {
-	return _DriverFileSource(FileName)
+; Reads the whole production file that defines Symbol, wherever it lives: a
+; base name stops naming one file once the structure plan renames its owner.
+_TRNTA_ReadSource(Symbol) {
+	return _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol(Symbol), "UTF-8"))
 }
 
 _TRNTA_StripLineComments(Src) {
@@ -40,7 +42,7 @@ _TRNTA_StripLineComments(Src) {
 ; ================================================================
 
 _TRNTA_NoThirdArg() {
-	Src := _TRNTA_StripLineComments(_TRNTA_ReadSource("registry.ahk"))
+	Src := _TRNTA_StripLineComments(_TRNTA_ReadSource("Reg_ReadBinary"))
 	Assert(Src != "", "settings/engine/registry.ahk must be readable")
 
 	Body := _DriverFuncBody("Reg_ReadBinary")

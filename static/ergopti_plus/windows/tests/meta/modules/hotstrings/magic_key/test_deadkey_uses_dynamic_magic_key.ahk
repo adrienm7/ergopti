@@ -21,8 +21,10 @@
 
 #Requires AutoHotkey v2.0
 
-_TDUDMK_ReadSource(FileName) {
-	return _DriverFileSource(FileName)
+; Reads the whole production file that defines Symbol, wherever it lives: a
+; base name stops naming one file once the structure plan renames its owner.
+_TDUDMK_ReadSource(Symbol) {
+	return _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol(Symbol), "UTF-8"))
 }
 
 _TDUDMK_StripLineComments(Src) {
@@ -45,7 +47,7 @@ _TDUDMK_StripLineComments(Src) {
 ; ==============================================================================
 
 _TDUDMK_DynamicMagicKeyUsed() {
-	Src := _TDUDMK_StripLineComments(_TDUDMK_ReadSource("hotstrings.ahk"))
+	Src := _TDUDMK_StripLineComments(_TDUDMK_ReadSource("ShouldActivateDeadkey"))
 	Assert(Src != "", "modules/hotstrings.ahk must be readable")
 
 	Body := _DriverFuncBody("ShouldActivateDeadkey")

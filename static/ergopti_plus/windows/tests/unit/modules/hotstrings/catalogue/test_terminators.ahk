@@ -454,6 +454,19 @@ _MKTB_IncludePath(Target) {
 	return { Target: Normalized, Filename: Filename }
 }
 
+; The absolute form of a path with its ".." segments folded, so an include
+; target and a census path name one file alike.
+_MKTB_FullPath(Path) {
+	Size := DllCall("Kernel32\GetFullPathNameW", "Str", Path, "UInt", 0, "Ptr", 0, "Ptr", 0, "UInt")
+	if !Size
+		throw OSError()
+	Full := Buffer(Size * 2)
+	Written := DllCall("Kernel32\GetFullPathNameW", "Str", Path, "UInt", Size, "Ptr", Full, "Ptr", 0, "UInt")
+	if !Written || Written >= Size
+		throw Error("The path did not resolve completely: " . Path)
+	return StrGet(Full)
+}
+
 _MKTB_IncludePathSeparators() {
 	for Target in ["../generated/catalogue.ahk", "..\generated\catalogue.ahk", "../generated\catalogue.ahk"] {
 		Owner := _MKTB_IncludePath(Target)
@@ -487,18 +500,24 @@ _MKTB_ChildSource() {
 	; Reuse the suite's actual generated-class/data-owner include paths. These
 	; owners contain initialization, so a function-only extraction is insufficient.
 	Suite := FileRead(A_ScriptDir . "\run_all.ahk", "UTF-8")
-	for Basename in ["terminators.ahk", "hotstrings_config.ahk"] {
+	; The generated owner is named by its file; the authored config owner by a
+	; symbol it defines, since a base name stops being unique once it moves.
+	ConfigOwner := _MKTB_FullPath(_DriverProductionFileForSymbol("HotstringsConfigApplyMagicKey"))
+	for Wanted in [{ Name: "terminators.ahk", Path: "" }, { Name: ConfigOwner, Path: ConfigOwner }] {
 		Found := 0
 		for Line in StrSplit(Suite, "`n") {
 			if !RegExMatch(Line, "^#Include\s+(.+)$", &Match)
 				continue
 			Owner := _MKTB_IncludePath(Match[1])
-			if Owner.Filename != Basename
+			IsOwner := Wanted.Path == ""
+				? Owner.Filename = Wanted.Name
+				: _MKTB_FullPath(A_ScriptDir . "\" . Owner.Target) = Wanted.Path
+			if !IsOwner
 				continue
 			Code .= "#Include " . A_ScriptDir . "\" . Owner.Target . "`n"
 			Found += 1
 		}
-		AssertEqual(1, Found, "the actual suite must name one complete data owner: " . Basename)
+		AssertEqual(1, Found, "the actual suite must name one complete data owner: " . Wanted.Name)
 	}
 	for Symbol in ["HotPath_Now", "UnescapeTomlString", "_FeatureBuildSinglePlan", "MasterGateState", "_TextCodepointLength", "HSE_Register", "ModifyMagicKey", "SIHO_StartOwned"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)

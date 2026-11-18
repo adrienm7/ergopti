@@ -36,10 +36,10 @@
 ; ======================================
 ; ======================================
 
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_RKVO_ReadSource(FileName) {
-	return _DriverFileSource(FileName)
+; Reads the whole production file that defines Symbol, wherever it lives: a
+; base name stops naming one file once the structure plan renames its owner.
+_RKVO_ReadSource(Symbol) {
+	return _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol(Symbol), "UTF-8"))
 }
 
 
@@ -53,7 +53,7 @@ _RKVO_ReadSource(FileName) {
 ; ====================================================
 
 _RKVO_KeyExistsEnumeratesValues() {
-	Src := _RKVO_ReadSource("registry.ahk")
+	Src := _RKVO_ReadSource("Reg_KeyExists")
 	Seg := _DriverFuncBody("Reg_KeyExists")
 	Assert(Seg != "", "Reg_KeyExists(keyPath) declaration must exist in settings/engine/registry.ahk")
 	; Opening the key itself is stronger than enumerating its values: it also
