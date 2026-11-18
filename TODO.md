@@ -244,12 +244,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Windows
 
-- [ ] **TakeNote probe on the PC.** TakeNote binds each note to its UI Automation tab (a1cd4d2891). The probe
-      `takenote-native-document-owner` now reads the only visible RichEdit control (the selected tab's, not a restored
-      one's), owns every window of the Notepad its canary proved, reports its first error before the cleanup's, and
-      is not executed while another Notepad runs. Still to qualify on the PC with every Notepad window closed: both
-      modes green, and no « ambiguous » or `last_observe_error` in the CLEANUP line; if Notepad keeps the hidden tabs'
-      controls visible, read the selected document through UI Automation instead.
 - [ ] **An expansion burst beside another AutoHotkey hook is not atomic.** SendInput then falls back to
       SendEvent. Since 2026-11-18 the burst goes out unpaced (`asa-space-burst-unpaced`): 10 to 15 ms instead of
       80 to 90, and `asa-space-fast` passes 20/20 beside a second hook. A key struck within those milliseconds
