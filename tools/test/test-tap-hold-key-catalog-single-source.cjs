@@ -589,9 +589,17 @@ function simultaneousLinuxAdmission(
 		owner.includes('Features.default_for==original_default') &&
 		owner.includes('buffered_settings[configured]') &&
 		owner.includes('options.files == nil and options.route == nil') &&
-		owner.includes('action~=\"one_shot_shift\"') &&
+		// The chord read refuses the one-shot Shift through the shared list
+		// every driver reads (CHORD_REFUSED_EVERYWHERE), not a local literal.
+		owner.includes(
+			'CHORD_REFUSED_ACTIONS = TableUtil.shallow_copy(Shared.CHORD_REFUSED_EVERYWHERE)'
+		) &&
+		owner.includes('and not CHORD_REFUSED_ACTIONS[action]') &&
+		/M\.CHORD_REFUSED_EVERYWHERE = \{[^}]*\bone_shot_shift = true\b/.test(policy) &&
 		// Chord slots run CapsWord through the executor, as pair taps do.
 		!owner.includes('action~=\"caps_word\"') &&
+		!owner.includes('CHORD_REFUSED_ACTIONS.caps_word') &&
+		!/M\.CHORD_REFUSED_EVERYWHERE = \{[^}]*\bcaps_word\b/.test(policy) &&
 		wrapper.includes('buffered_settings_current') &&
 		wrapper.includes('buffer_request') &&
 		hook.includes('capture_buffered_input') &&
@@ -659,7 +667,8 @@ for (const [index, token] of [
 	[0, 'require("platform.remap.key_combination_engine")'],
 	[1, 'receipt.physical == true'],
 	[1, 'current.source == receipt.source'],
-	[2, 'action~=\"one_shot_shift\"'],
+	[2, 'and not CHORD_REFUSED_ACTIONS[action]'],
+	[2, 'Shared.CHORD_REFUSED_EVERYWHERE'],
 	[3, 'Scope.edit(rows,source)']
 ]) {
 	const changed = linuxSources.slice();
@@ -817,6 +826,22 @@ if (
 			)
 		)
 			errors.push(`Simultaneous mode accepted omitted publisher: ${token}`);
+	}
+	// The shared refusal list is the only place the one-shot Shift leaves the
+	// chord slots: dropping it there, or adding CapsWord, must be refused.
+	for (const [token, replacement] of [
+		['one_shot_shift = true, ', ''],
+		['{ one_shot_shift = true', '{ caps_word = true, one_shot_shift = true']
+	]) {
+		if (
+			simultaneousLinuxAdmission(
+				manifest,
+				linuxSources,
+				linuxCombinationScope,
+				linuxCombinationPolicy.split(token).join(replacement)
+			)
+		)
+			errors.push(`Simultaneous mode accepted an altered shared chord refusal list: ${token}`);
 	}
 	const altered = structuredClone(manifest);
 	altered.feature_records.find(
