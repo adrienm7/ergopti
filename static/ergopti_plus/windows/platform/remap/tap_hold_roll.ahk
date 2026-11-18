@@ -75,7 +75,8 @@ _TapHoldReadRollKeys() {
 	Keys := Map()
 	Path := (IsSet(_SharedDir) ? _SharedDir : "") . "\tap_hold\data\defaults.toml"
 	try {
-		Sections := TOML_ParseFreshFile(Path)
+		; The cached read: the tap-hold loader decoded this shipped file already.
+		Sections := ParseTomlFile(Path)
 		List := Sections.Has("tap_hold.rollover") ? Sections["tap_hold.rollover"].Get("keys", "") : ""
 		if !(List is Array) || List.Length == 0
 			throw Error("[tap_hold.rollover] declares no keys")
