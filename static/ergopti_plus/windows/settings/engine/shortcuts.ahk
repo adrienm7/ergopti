@@ -76,7 +76,8 @@ CS_Read(&Snapshot := 0, &SourcePath := "") {
 		try {
 				; Bootstrap, feature application and metrics must retain one native
 				; source generation. A physical edit alone grants no new admission.
-				Snapshot := ConfigTomlReadSnapshot(path)
+				; The boot read stretch serves the generation it already admitted.
+				Snapshot := ConfigTomlReadBootServedSnapshot(path)
 		} catch as Err {
 				global _ConfigBootReadFailed
 				_ConfigBootReadFailed := true
