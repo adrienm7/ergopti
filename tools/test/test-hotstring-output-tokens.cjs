@@ -167,7 +167,7 @@ for (const file of CONSUMERS) {
 }
 const linuxManifest = fs.readFileSync(path.join(SP, 'linux', 'tests', 'test_manifest.lua'), 'utf8');
 check(
-	linuxManifest.includes('"tests.unit.modules.hotstrings.engine.test_output_token_vectors"'),
+	linuxManifest.includes('"tests.unit.hotstrings.engine.engine.test_output_token_vectors"'),
 	'the Linux test manifest must list test_output_token_vectors'
 );
 const ahkRunner = fs.readFileSync(path.join(SP, 'windows', 'tests', 'run_all.ahk'), 'utf8');

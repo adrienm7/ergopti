@@ -30,7 +30,7 @@ LoggerSubFilesData() {
 		; LLM menu, model switching, warmup, toggle events.
 		Map("name", "ErgoptiPlus_llm.log", "tags", ["[llm.", "[menu_llm", "[keymap.llm", "WARMUP", "[TOGGLE]", "[LLM", "[modules.llm.", "[ai.", "[infra.llm_", "[ui.llm_", "[ui.menu.llm_", "[ui.tooltip.llm]"]),
 		; Keymap processing, dynamic hotstrings, personal info, TOML reader.
-		Map("name", "ErgoptiPlus_hotstrings.log", "tags", ["[keymap.", "[dynamic_hotstring", "[personal_info]", "[toml_reader]", "hotstring", "[Hotstring", "[HSE", "[UserHotstrings", "[PersonalToml", "[PersonalInfo", "[modules.dynamic_hotstrings.", "[infra.personal_info_fields]"]),
+		Map("name", "ErgoptiPlus_hotstrings.log", "tags", ["[keymap.", "[dynamic_hotstring", "[personal_info]", "[toml_reader]", "hotstring", "[Hotstring", "[HSE", "[UserHotstrings", "[PersonalToml", "[PersonalInfo", "[hotstrings.engine.dynamic.", "[hotstrings.engine.catalogue.personal_info_fields]"]),
 		; Keystroke logging, SQLite writes, rotation, export.
 		Map("name", "ErgoptiPlus_keystats.log", "tags", ["[keystats", "[Keystats", "[KL", "[modules.keystats.", "[infra.metrics_"]),
 		; Menu builder, UI components, app picker, download window.

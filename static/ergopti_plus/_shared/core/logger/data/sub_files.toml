@@ -103,8 +103,8 @@ patterns    = [
     "[UserHotstrings",
     "[PersonalToml",
     "[PersonalInfo",
-    "[modules.dynamic_hotstrings.",
-    "[infra.personal_info_fields]",
+    "[hotstrings.engine.dynamic.",
+    "[hotstrings.engine.catalogue.personal_info_fields]",
 ]
 
 [[sub_files]]

@@ -24,7 +24,7 @@ return {
 	-- LLM menu, model switching, warmup, toggle events.
 	{ name = "ErgoptiPlus_llm.log", patterns = { "[llm.", "[menu_llm", "[keymap.llm", "WARMUP", "[TOGGLE]", "[LLM", "[modules.llm.", "[ai.", "[infra.llm_", "[ui.llm_", "[ui.menu.llm_", "[ui.tooltip.llm]" } },
 	-- Keymap processing, dynamic hotstrings, personal info, TOML reader.
-	{ name = "ErgoptiPlus_hotstrings.log", patterns = { "[keymap.", "[dynamic_hotstring", "[personal_info]", "[toml_reader]", "hotstring", "[Hotstring", "[HSE", "[UserHotstrings", "[PersonalToml", "[PersonalInfo", "[modules.dynamic_hotstrings.", "[infra.personal_info_fields]" } },
+	{ name = "ErgoptiPlus_hotstrings.log", patterns = { "[keymap.", "[dynamic_hotstring", "[personal_info]", "[toml_reader]", "hotstring", "[Hotstring", "[HSE", "[UserHotstrings", "[PersonalToml", "[PersonalInfo", "[hotstrings.engine.dynamic.", "[hotstrings.engine.catalogue.personal_info_fields]" } },
 	-- Keystroke logging, SQLite writes, rotation, export.
 	{ name = "ErgoptiPlus_keystats.log", patterns = { "[keystats", "[Keystats", "[KL", "[modules.keystats.", "[infra.metrics_" } },
 	-- Menu builder, UI components, app picker, download window.
