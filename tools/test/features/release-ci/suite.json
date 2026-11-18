@@ -322,6 +322,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-macos-tis-cache-probe.cjs"],
 			"repro": "npm run test:macos-tis-cache-probe"
+		},
+		{
+			"id": "windows-stable-signing-retirement",
+			"ordinal": 692,
+			"name": "deleting the unsigned stable Windows exception is one step that refuses unsigned stable receipts and still publishes signed releases",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-stable-signing-retirement.cjs"],
+			"repro": "node tools/test/test-windows-stable-signing-retirement.cjs"
 		}
 	]
 }

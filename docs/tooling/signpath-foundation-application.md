@@ -4,7 +4,7 @@
 
 Decision (maintainer, October 22): apply now. This file holds what the application needs, the
 answers to give, and the switch-on steps once SignPath accepts the project. The workflow side is
-done; nothing signs until the variables below exist.
+done; nothing signs until the secrets and variables of step 5 exist.
 
 ## Why signing, and not another exe change
 
@@ -74,10 +74,13 @@ asked. Answer in English.
    the SignPath action needs to read the job and download the unsigned artifact, and
    `ci-release.yml` counts SignPath as configured once the three variables and both secrets are
    set.
-7. Then retire `.github/ci/stable_windows_signing_exception.json` and its exception code in
-   `tools/ci/windows-stable-signing.cjs`, and change the README policy from "being prepared" to
-   SignPath's wording "Free code signing provided by SignPath.io, certificate by SignPath
-   Foundation".
+7. Once that release is published signed, delete `.github/ci/stable_windows_signing_exception.json`
+   in a commit of its own, with nothing else. `tools/ci/windows-stable-signing.cjs` reads its
+   absence as the retired exception: an unsigned stable build then fails its Build job, and a
+   stable release publishes only when signing is configured
+   (`tools/test/test-windows-stable-signing-retirement.cjs`). Then change the README policy from
+   "being prepared" to SignPath's wording "Free code signing provided by SignPath.io, certificate
+   by SignPath Foundation".
 
 Dev prereleases stay unsigned on purpose: each request needs a human approval.
 

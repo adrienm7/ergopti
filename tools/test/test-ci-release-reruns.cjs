@@ -258,14 +258,14 @@ function repository(name, branch) {
 		'tools/build/release-channel.cjs',
 		'tools/ci/dev-release-qualification.cjs',
 		'tools/ci/windows-stable-signing.cjs',
-		'.github/ci/stable_windows_signing_exception.json',
 		'.github/ci/dev_release_qualification_exceptions.json',
 		'.github/ci/stable_release_qualification_exception.json',
 		'.github/ci/stable_v102_macos_native_qualification_exception.json',
-		// Absent once v1.0.3 defers no scope; its loader then requires that absence.
-		...['.github/ci/stable_v103_macos_native_qualification_exception.json'].filter((file) =>
-			fs.existsSync(path.join(ROOT, file))
-		),
+		// Each is absent once retired; its loader then requires that absence.
+		...[
+			'.github/ci/stable_v103_macos_native_qualification_exception.json',
+			'.github/ci/stable_windows_signing_exception.json'
+		].filter((file) => fs.existsSync(path.join(ROOT, file))),
 		'tools/build/publish-verified-release.cjs',
 		'tools/build/macos-release-publication.cjs',
 		'tools/build/macos-release-archives.cjs',
@@ -1275,14 +1275,14 @@ function preflight(
 		'tools/build/release-channel.cjs',
 		'tools/ci/dev-release-qualification.cjs',
 		'tools/ci/windows-stable-signing.cjs',
-		'.github/ci/stable_windows_signing_exception.json',
 		'.github/ci/dev_release_qualification_exceptions.json',
 		'.github/ci/stable_release_qualification_exception.json',
 		'.github/ci/stable_v102_macos_native_qualification_exception.json',
-		// Absent once v1.0.3 defers no scope; its loader then requires that absence.
-		...['.github/ci/stable_v103_macos_native_qualification_exception.json'].filter((file) =>
-			fs.existsSync(path.join(ROOT, file))
-		),
+		// Each is absent once retired; its loader then requires that absence.
+		...[
+			'.github/ci/stable_v103_macos_native_qualification_exception.json',
+			'.github/ci/stable_windows_signing_exception.json'
+		].filter((file) => fs.existsSync(path.join(ROOT, file))),
 		// The preflight asks the signing owner whether the assets must carry a .sig.
 		'tools/build/update-asset-signature.cjs',
 		'static/ergopti_plus/_shared/updater/data/asset_signing.json',
@@ -2429,7 +2429,8 @@ check(
 		const bytes = Buffer.from('owned unsigned publication fixture');
 		fs.writeFileSync(path.join(assets, 'ErgoptiPlus.exe'), bytes);
 		const hash = require('node:crypto').createHash('sha256').update(bytes).digest('hex');
-		const evidence = signing.receipt(context, sha, sha, hash);
+		// Built from the admissible record: the shipped exception may be retired.
+		const evidence = signing.receipt(context, sha, sha, hash, new Date(), signing.EXCEPTION_RECORD);
 		fs.writeFileSync(
 			path.join(assets, 'windows-signing-qualification.json'),
 			JSON.stringify(evidence)
@@ -2437,6 +2438,12 @@ check(
 		const unsignedEnv = { ...env, ERGOPTI_WINDOWS_CREATE_RELEASE: 'true' };
 		fs.unlinkSync(marker);
 		const admitted = runScript(script, work, unsignedEnv);
+		if (signing.POLICY === null) {
+			assert.notEqual(admitted.status, 0, 'a retired exception admits no unsigned receipt');
+			assert.match(admitted.stderr, /retired/);
+			assert.equal(fs.existsSync(marker), false, 'a retired exception cannot reach publication');
+			return;
+		}
 		assert.equal(admitted.status, 0, admitted.stdout + admitted.stderr);
 		assert.equal(
 			fs.readFileSync(marker, 'utf8'),

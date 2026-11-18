@@ -235,10 +235,11 @@ function buildCiBody(
 					env.GITHUB_SHA,
 					signingFixture.checkout,
 					crypto.createHash('sha256').update(signingFixture.image).digest('hex'),
-					qualificationNow
+					qualificationNow,
+					signing.EXCEPTION_RECORD
 				);
 				notice = signing.notice(env.GITHUB_SHA, env.ERGOPTI_DEV_RELEASE_TAG);
-			} else if (env.ERGOPTI_DEV_RELEASE_CHANNEL === signing.POLICY.channel) {
+			} else if (env.ERGOPTI_DEV_RELEASE_CHANNEL === signing.STABLE_CHANNEL) {
 				assert.equal(
 					env.ERGOPTI_WINDOWS_SIGNING_CONFIGURED,
 					'true',
@@ -1017,7 +1018,8 @@ function checkUnsignedQualificationBody(modules) {
 			env.GITHUB_SHA,
 			env.GITHUB_SHA,
 			hash,
-			now
+			now,
+			signing.EXCEPTION_RECORD
 		)
 	};
 	env.ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE = signing.notice(

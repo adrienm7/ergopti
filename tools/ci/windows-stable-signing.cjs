@@ -7,6 +7,13 @@
  * Admits human-authorized unsigned stable artifacts until signing is
  * implemented. This is signature metadata, not a test deferral or execution
  * authority. Every test remains full.
+ *
+ * Retiring the exception is one step: delete
+ * .github/ci/stable_windows_signing_exception.json. Its absence is the retired
+ * state, not a missing input: --receipt then refuses every unsigned stable
+ * artifact, and --publication-admit refuses an unsigned receipt and admits a
+ * stable release only when signing is configured. Any other read failure of
+ * the file still refuses.
  * ==============================================================================
  */
 
@@ -22,10 +29,10 @@ const {
 } = require('./dev-release-qualification.cjs');
 const { app } = require('../lib/identifiers.cjs');
 const ROOT = path.resolve(__dirname, '../..');
-const POLICY = parseClosedJson(
-	fs.readFileSync(path.join(ROOT, '.github/ci/stable_windows_signing_exception.json'), 'utf8')
-);
+const POLICY_PATH = path.join(ROOT, '.github/ci/stable_windows_signing_exception.json');
 const RECEIPT = 'windows-signing-qualification.json';
+// The only channel whose releases are stable, signed or under the exception.
+const STABLE_CHANNEL = 'main';
 const QUOTE =
 	"le exe non signé est autorisé tant qu'on n’a pas implémenté la signature, qui est un élément de la todo";
 function refuse() {
@@ -40,44 +47,57 @@ function keys(value, expected) {
 	)
 		refuse();
 }
+// The one admissible content of the exception file; only authorized may be
+// false, which keeps the file but admits nothing. Tests build their policy
+// fixture from it, so they keep running once the file is deleted.
+const EXCEPTION_RECORD = Object.freeze({
+	schema: 2,
+	id: 'stable-windows-unsigned-until-signing',
+	authorized: true,
+	authorization_date: '2026-10-11',
+	authorization_quote: QUOTE,
+	repository: 'adrienm7/ergopti',
+	event_name: 'push',
+	ref: 'refs/heads/main',
+	release: true,
+	prerelease: 'false',
+	channel: STABLE_CHANNEL,
+	purpose: 'windows-authenticode-only',
+	qualified: false,
+	until: 'windows-signing-implemented'
+});
 function validatePolicy(value) {
-	keys(value, [
-		'schema',
-		'id',
-		'authorized',
-		'authorization_date',
-		'authorization_quote',
-		'repository',
-		'event_name',
-		'ref',
-		'release',
-		'prerelease',
-		'channel',
-		'purpose',
-		'qualified',
-		'until'
-	]);
+	keys(value, Object.keys(EXCEPTION_RECORD));
 	if (
-		value.schema !== 2 ||
-		value.id !== 'stable-windows-unsigned-until-signing' ||
 		typeof value.authorized !== 'boolean' ||
-		value.authorization_date !== '2026-10-11' ||
-		value.authorization_quote !== QUOTE ||
-		value.until !== 'windows-signing-implemented' ||
-		value.repository !== 'adrienm7/ergopti' ||
-		value.event_name !== 'push' ||
-		value.ref !== 'refs/heads/main' ||
-		value.release !== true ||
-		value.prerelease !== 'false' ||
-		value.channel !== 'main' ||
-		value.purpose !== 'windows-authenticode-only' ||
-		value.qualified !== false
+		Object.keys(EXCEPTION_RECORD).some(
+			(key) => key !== 'authorized' && value[key] !== EXCEPTION_RECORD[key]
+		)
 	)
 		refuse();
 	return value;
 }
-validatePolicy(POLICY);
+/**
+ * The admitted exception, or null once its file is deleted.
+ * @param {string} file Path of the exception file.
+ * @returns {object|null}
+ */
+function loadPolicy(file = POLICY_PATH) {
+	let text;
+	try {
+		text = fs.readFileSync(file, 'utf8');
+	} catch (error) {
+		if (error && error.code === 'ENOENT') return null;
+		throw error;
+	}
+	return validatePolicy(parseClosedJson(text));
+}
+const POLICY = loadPolicy();
 function admit(context, source, checkout, now = new Date(), policy = POLICY) {
+	if (policy === null)
+		throw new Error(
+			'The unsigned stable Windows exception is retired: a stable release must be signed.'
+		);
 	validatePolicy(policy);
 	keys(context, [
 		'github_actions',
@@ -174,7 +194,7 @@ function notice(source, tag) {
 function requireFreshUnsigned(createRelease) {
 	if (createRelease !== 'true') refuse();
 }
-function main(args, env = process.env) {
+function main(args, env = process.env, policy = POLICY) {
 	const context = environmentContext(env);
 	const source = env.GITHUB_SHA || '';
 	const checkout = execFileSync('git', ['rev-parse', 'HEAD'], {
@@ -184,14 +204,23 @@ function main(args, env = process.env) {
 	if (args.length === 1 && args[0] === '--receipt') {
 		if (env.ERGOPTI_WINDOWS_AUTHENTICODE_STATUS !== 'NotSigned') refuse();
 		console.log(
-			JSON.stringify(receipt(context, source, checkout, env.ERGOPTI_UNSIGNED_ARTIFACT_SHA256 || ''))
+			JSON.stringify(
+				receipt(
+					context,
+					source,
+					checkout,
+					env.ERGOPTI_UNSIGNED_ARTIFACT_SHA256 || '',
+					new Date(),
+					policy
+				)
+			)
 		);
 		return;
 	}
 	if (args.length === 1 && args[0] === '--publication-admit') {
 		const directory = path.join(ROOT, 'release-assets');
 		const filename = path.join(directory, RECEIPT);
-		if (context.channel !== POLICY.channel) {
+		if (context.channel !== STABLE_CHANNEL) {
 			if (fs.existsSync(filename)) refuse();
 			console.log('ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE=');
 			return;
@@ -210,7 +239,9 @@ function main(args, env = process.env) {
 			context,
 			source,
 			checkout,
-			crypto.createHash('sha256').update(image).digest('hex')
+			crypto.createHash('sha256').update(image).digest('hex'),
+			new Date(),
+			policy
 		);
 		console.log('ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE=' + notice(source, context.tag));
 		return;
@@ -219,6 +250,10 @@ function main(args, env = process.env) {
 }
 module.exports = {
 	validatePolicy,
+	loadPolicy,
+	main,
+	EXCEPTION_RECORD,
+	STABLE_CHANNEL,
 	admit,
 	receipt,
 	validateReceipt,

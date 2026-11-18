@@ -882,9 +882,9 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	const source = 'a'.repeat(40),
 		hash = 'b'.repeat(64),
 		clock = new Date('2026-10-11T09:00:00Z');
-	const proposed = { ...Signing.POLICY, authorized: true };
-	assert.equal(typeof Signing.POLICY.authorized, 'boolean');
-	if (!Signing.POLICY.authorized)
+	// The shipped exception may be deleted: the fixture is its one admissible record.
+	const proposed = { ...Signing.EXCEPTION_RECORD };
+	if (Signing.POLICY === null || !Signing.POLICY.authorized)
 		assert.throws(() => Signing.admit(context, source, source, clock));
 	else Signing.admit(context, source, source, clock);
 	Signing.admit(context, source, source, clock, proposed);
@@ -914,7 +914,10 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	Signing.admit(context, source, source, new Date('2026-10-11T07:00:00Z'), proposed);
 	assert.throws(() => Signing.admit(context, source, source, new Date('invalid'), proposed));
 	assert.throws(() =>
-		Signing.admit(context, source, source, clock, { ...Signing.POLICY, authorized: false })
+		Signing.admit(context, source, source, clock, {
+			...Signing.EXCEPTION_RECORD,
+			authorized: false
+		})
 	);
 	const value = Signing.receipt(context, source, source, hash, clock, proposed);
 	Signing.validateReceipt(value, context, source, source, hash, clock, proposed);
