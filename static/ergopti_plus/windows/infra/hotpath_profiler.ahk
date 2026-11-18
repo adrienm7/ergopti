@@ -767,6 +767,14 @@ PerfCounters_Flush() {
 		if ParseOwners.Count > 0
 			try LoggerEvidence("Perf", "Document parses by owner ({1} ms): {2}.", IntervalMs, PerfCountersText(ParseOwners))
 	}
+	; A text a reader parsed twice in one interval, by the owner of the second parse.
+	if IsSet(TOML_ParseRepeatOwnersTake) {
+		for Reader, Label in Map("document", "Document", "flat", "Flat") {
+			Repeats := TOML_ParseRepeatOwnersTake(Reader)
+			if Repeats.Count > 0
+				try LoggerEvidence("Perf", "{1} re-parses by owner ({2} ms): {3}.", Label, IntervalMs, PerfCountersText(Repeats))
+		}
+	}
 	State := PerfProcessState()
 	; The log-volume figures ride on this record as they ride on the macOS memory
 	; record: both are process-wide and one record per interval is what is read back.

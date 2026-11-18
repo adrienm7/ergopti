@@ -16,8 +16,9 @@
 global _TOML_DocumentParses := 0
 
 ; Monotonic count of characters the lexer classified one at a time. That is the
-; slow path, so the boot record publishes it per parse and the startup smoke
-; bounds it: a native run that stops matching shows up here, not in a wall clock.
+; slow path, so the boot record publishes it per parse and the lexer test proves
+; it does not grow with the length of a run: a native run that stops matching
+; shows up here, not in a wall clock.
 global _TOML_DocumentSlowSteps := 0
 ; Document parses per caller<parent since the last interval publication. The
 ; boot's ceiling counts parses, and only the owners tell a new boot reader from an
@@ -25,6 +26,13 @@ global _TOML_DocumentSlowSteps := 0
 ; name per caller pair filled it and refused unrelated counters.
 global _TOML_DocumentParseOwners := Map()
 global TOML_DOCUMENT_PARSE_OWNER_LIMIT := 32
+; boot-parse-repeats-2026-11-18: the texts each reader ("document", "flat") parsed
+; since the last interval publication, and the owners that parsed one of them
+; again. A repeat is work the boot already did, whatever the size of the data, so
+; the startup smoke names the owners allowed to repeat instead of capping a count
+; that every new shared setting moved. Both maps keep the owner bound above.
+global _TOML_ParseRepeatSources := Map("document", Map(), "flat", Map())
+global _TOML_ParseRepeatOwners := Map("document", Map(), "flat", Map())
 
 /** Returns a case-sensitive semantic table without native configuration effects. */
 _TOML_DocumentTable() {
@@ -307,6 +315,7 @@ TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
 	_TOML_DocumentParses += 1
 	PerfCount("toml.document_parse")
 	_TOML_DocumentParseOwnerCount(Error("", -2).What . "<" . Error("", -3).What)
+	_TOML_ParseRepeatNote("document", Source)
 	PerfCount("toml.document_chars", StrLen(Source))
 	SlowStepsBefore := _TOML_DocumentSlowSteps
 	try return _TOML_ParseDocumentRecords(Source, &Records, &Physical)
@@ -1710,5 +1719,43 @@ TOML_DocumentParseOwnersTake() {
 	global _TOML_DocumentParseOwners
 	Owners := _TOML_DocumentParseOwners
 	_TOML_DocumentParseOwners := Map()
+	return Owners
+}
+
+/**
+ * Notes one parse of Source by a reader. A text this reader already parsed in
+ * the current interval counts the reader's caller as a repeat owner. Called by
+ * the reader function itself, so its caller and parent are frames -3 and -4.
+ * @param {String} Reader - "document" or "flat".
+ * @param {String} Source - The parsed text; an empty one costs nothing and is not kept.
+ */
+_TOML_ParseRepeatNote(Reader, Source) {
+	global _TOML_ParseRepeatSources, _TOML_ParseRepeatOwners, TOML_DOCUMENT_PARSE_OWNER_LIMIT
+	if Source == ""
+		return
+	Sources := _TOML_ParseRepeatSources[Reader]
+	if !Sources.Has(Source) {
+		if Sources.Count < TOML_DOCUMENT_PARSE_OWNER_LIMIT
+			Sources[Source] := true
+		return
+	}
+	Owners := _TOML_ParseRepeatOwners[Reader]
+	Owner := Error("", -3).What . "<" . Error("", -4).What
+	if Owners.Has(Owner)
+		Owners[Owner] += 1
+	else if Owners.Count < TOML_DOCUMENT_PARSE_OWNER_LIMIT
+		Owners[Owner] := 1
+}
+
+/**
+ * Returns and clears one reader's repeat owners, and forgets the texts it parsed.
+ * @param {String} Reader - "document" or "flat".
+ * @returns {Map} Owner to repeated parse count.
+ */
+TOML_ParseRepeatOwnersTake(Reader) {
+	global _TOML_ParseRepeatSources, _TOML_ParseRepeatOwners
+	Owners := _TOML_ParseRepeatOwners[Reader]
+	_TOML_ParseRepeatOwners[Reader] := Map()
+	_TOML_ParseRepeatSources[Reader] := Map()
 	return Owners
 }
