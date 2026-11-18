@@ -10,8 +10,10 @@ local helpers = require("tests.helpers")
 local function with_widget(callback, position)
 	helpers.with_stub_scope({ "ui.wpm.wpm_widget", "ui.wpm.shared", "core.ui.ui.tooltip",
 		"modules.keystats", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings", "core.events.timer_scheduler",
-		"core.ui.adapters.graphics_renderer", "core.fs.adapters.storage" }, function()
-		local state = { timers = {}, taps = {}, canvases = {}, logs = {}, now = 1, last_input = 1, preview = false }
+		"core.ui.adapters.graphics_renderer", "core.fs.adapters.storage",
+		"core.ui.adapters.system_accessibility" }, function()
+		local state = { timers = {}, taps = {}, canvases = {}, logs = {}, now = 1, last_input = 1, preview = false,
+			wpm = 42, spoken = {} }
 		local function phase(name)
 			if state.on_phase then state.on_phase(name) end
 		end
@@ -29,7 +31,11 @@ local function with_widget(callback, position)
 		package.loaded["modules.keystats"] = { get_live_stats = function()
 			phase("stats")
 			if state.stats_failure then error("PRIVATE_DETAIL") end
-			return { wpm = 42, last_input_time = state.last_input }
+			return { wpm = state.wpm, last_input_time = state.last_input }
+		end }
+		package.loaded["core.ui.adapters.system_accessibility"] = { announce_event = function(text)
+			state.spoken[#state.spoken + 1] = text
+			return true
 		end }
 		package.loaded["ui.wpm.shared"] = { get_active_source = function() return "manual" end,
 			resolve_group_hex = function() return nil end, unit_label = function() return "WPM" end }

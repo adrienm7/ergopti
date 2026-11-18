@@ -12,6 +12,9 @@
 --- 2. Autonomous Polling: Manages its own lifecycle and history array.
 --- 3. Dynamic Styling: Visual feedback changes color based on the typing source.
 --- 4. Effective WPM: Displays the net typing speed, visualizing productivity spikes.
+--- 5. VoiceOver: a canvas cannot carry the accessible name the Windows widget
+---    gets, so a running VoiceOver hears the burst's last speed once, when the
+---    widget hides; never per refresh, and nothing without VoiceOver.
 --- ==============================================================================
 
 local M = {}
@@ -23,6 +26,7 @@ local Logger     = require("core.logger.engine.logger")
 local Paths      = require("core.fs.engine.paths")
 local GraphicsRenderer = require("core.ui.adapters.graphics_renderer")
 local Storage = require("core.fs.adapters.storage")
+local SystemA11y = require("core.ui.adapters.system_accessibility")
 local TimerScheduler = require("core.events.timer_scheduler")
 local Timings = require("core.timing.engine.timings")
 local TomlCodec = require("core.text.engine.toml_codec")
@@ -148,6 +152,10 @@ local _wpm_history       = {}
 local _show_graph        = false
 local _use_source_colors = true
 local _last_mouse_sec    = 0    -- wall clock of the last mouse/touchpad event
+-- The speed the visible canvas last drew ("72 WPM"), nil while it is hidden.
+-- A canvas has no accessibility element VoiceOver could read, and the speed
+-- changes every refresh: the burst's last speed is said once, when it hides.
+local _shown_readout     = nil
 
 -- Current-cycle canvas geometry, shared with the mouseCallback closure below.
 -- The closure is created ONCE, the first time update_widget_body() creates
@@ -416,8 +424,14 @@ update_widget_body = function(generation)
 		canvas:replaceElements(elements)
 		if not is_current(generation) or _canvas ~= canvas then return false end
 		canvas:show()
+		_shown_readout = math.floor(display_wpm) > 0 and WPMModel.readout_label(display_wpm, frame_opts.unit) or nil
 	else
 		if _canvas then _canvas:hide() end
+		-- The burst ended: its speed is said once, never on a refresh that
+		-- keeps the widget hidden.
+		local readout = _shown_readout
+		_shown_readout = nil
+		if readout then SystemA11y.announce_event(readout) end
 	end
 end
 
@@ -617,6 +631,8 @@ function M.stop()
 		return true
 	end
 	_running = false
+	-- A stop or a pause is no burst ending: nothing is said.
+	_shown_readout = nil
 	_generation = _generation + 1
 	local generation = _generation
 	local runtime_stopped = release_runtime()
