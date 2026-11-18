@@ -251,9 +251,14 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       still lands inside the burst. Holding such keys through the roll block was tried and lost a key
       (`#MaxThreadsPerHotkey`; see `project-hotstring-output-is-final` in `docs/memory/windows-ahk.md`); a fix
       needs an owner that buffers physical keys without one hotkey thread per key, such as the native capture.
-- **Parity literals.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`,
-  `request_plan_*`, the keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left; the rest of the menu
-  files need `test-menu-manifest` to stop pinning their spelling. PAR-79: 4 Windows timer literals left (13 in
+- **Parity literals.** PAR-58: `terminator_restoration`, `context_buffer`, `request_plan_*` and `row_options` are
+  replayed on all three drivers (row options on macOS and Linux through `test-keylayout-row-options` and
+  `test-xkb-row-options`). Keystats gaps left: `session_events` on macOS, whose session machine lives in
+  `modules/keystats/init.lua` and `watchers.lua` rather than the shared `session_events.lua` Linux runs, and
+  `metrics_maintenance` on macOS (the shared helper Linux already replays). `composite_key` is Windows-only by its
+  own scope. `menus/*` (96 corpora, many named for one platform) still needs a per-corpus review of which driver
+  owns each row. PAR-74: 2 literals left, in `_shared/settings/data/features/caps_word_auto_off_policy.ahk`, which
+  cannot include the generated constants. PAR-79: 4 Windows timer literals left (13 in
   `timer-literal-baseline.json`, 9 of them in the archived `old/kalamine` scripts), and none can move: the 3 startup
   smoke sleeps of `ErgoptiPlus.ahk` and the UIA worker's idle `Sleep(250)` run before or without the registry.
 - **Tests.** Source assertions left to convert to behaviour (3,799 `_Driver*` source reads in 991 files; 68 meta
