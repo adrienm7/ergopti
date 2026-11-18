@@ -171,6 +171,20 @@ waits for the maintainer's review).
       0.75 s warm and 4.5 s with a cold page cache on the maintainer's 1.1 GB image (290 KB of JSON). Measure that
       first open on a large macOS store (Hammerspoon reads on its main thread) and on Linux before deciding whether
       they save the read too.
+- [ ] **« Ma frappe » fresh read on Windows (2026-11-18).** The Studio now shows the saved read at once (its marker
+      keys made every tab refuse it before) and its SQL projection takes 1.7 s instead of 3.8 s on the maintainer's
+      1.1 GB reader image. The worker still took about 45 s on that store (window at 19:59:55, read saved at
+      20:00:41): the rest is the reader image's catch-up on `data.sql` and the image save before the worker exits
+      (`KLPF_SettleReaderCache`), which hold the terminal back. Profile those two phases on the maintainer's store
+      (a copy at another path rebuilds the image from scratch, so it does not measure them) before deciding whether
+      the worker hands its stage over before saving the image.
+- [ ] **Library layouts that lose their own characters (2026-11-18).** Optimot, BvoFRak 1.0 FR and the Spanish
+      QWERTY now type their accents (whole rows and `dead_keys` in `layout_library.json`). The same import loss is
+      left, each needing a complete source of the layout: the letter blocks completed with the US rows of
+      non-English layouts (BEO 0.99 % of Swann unsupported: è ê ç ; ? ; Engram ES 2.6 % of Marianela: í ó á é ñ ¿ ¡;
+      QWERTZ 1.6 % of Kafka: ü ä ß; AdNW, Bone and Mine 0.6 %: ß; KOY and Noted 0.2–0.3 %: ; ? :; Morgenstern 2 %:
+      its block has no b), and the KLA files without their AltGr or dead keys (Neo 2: ; ? !; Spanish Dvorak: no
+      acute at all). Russian JCUKEN's 80 % on a French text is genuine.
 - [ ] **[RELEASE] Windows export step in native Lua.** The restricted host `windows/native/ergopti_lua_export.c`
       (pinned Lua 5.4.6, built by `tools/build/build_windows_lua_export.ps1` in package-windows) is done. Left: once a
       dev run builds « Windows / Build », commit its artifact `windows-lua-export-*` (`ergopti_lua_export.exe` and
