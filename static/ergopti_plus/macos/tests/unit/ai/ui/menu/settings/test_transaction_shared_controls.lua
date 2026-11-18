@@ -16,6 +16,15 @@ local indentation_item = Fixture.indentation_item
 local token_streaming_corpus = Fixture.token_streaming_corpus
 local with_fixture = Fixture.with_fixture
 
+--- Reads the shared indentation choices and admission vectors.
+--- @return table corpus
+local function indentation_corpus()
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/indentation_control.json"), "rb"))
+	local text = assert(file:read("*a"))
+	assert(file:close())
+	return assert(require("core.text.engine.json").decode(text))
+end
+
 
 
 
@@ -556,16 +565,40 @@ helpers.describe("macOS shared indentation choice", function()
 		with_fixture({}, function(fixture)
 			local rows = fixture.streaming_menu()
 			local parent = indentation_item(rows)
-			helpers.assert_eq(#parent.menu, 15)
-			for index, value in ipairs({-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7}) do
-				local unit = value == 0 and "menu.llm.indent_none" or math.abs(value) == 1 and "menu.llm.indent_space" or "menu.llm.indent_spaces"
-				local prefix = value == 0 and "" or (value > 0 and "+" or "") .. value .. " "
-				helpers.assert_eq(parent.menu[index].title, prefix .. unit)
-				helpers.assert_eq(parent.menu[index].checked or false, value == fixture.state.llm_pred_indent)
+			local corpus = indentation_corpus()
+			helpers.assert_eq(#parent.menu, #corpus.choices)
+			for index, choice in ipairs(corpus.choices) do
+				-- The fixture translator returns the key itself.
+				helpers.assert_eq(parent.menu[index].title, choice.prefix .. choice.i18n)
+				helpers.assert_eq(parent.menu[index].checked or false, choice.value == fixture.state.llm_pred_indent)
 			end
 			helpers.assert_eq(parent.title, "menu.llm.indent_label: +1 menu.llm.indent_space")
 			helpers.assert_eq(rows[#rows], parent, "the canonical all-OS declaration owns the trailing position")
 		end)
+	end)
+
+	helpers.it("replays the shared admission vectors against the macOS indentation values (shared-indentation)", function()
+		local corpus = indentation_corpus()
+		local Policy = require("ai.engine.settings.display_policy")
+		local Manifest = require("menu.engine.manifest_reader")
+		-- The values the streaming panel offers, read where it reads them.
+		local values = Policy.indentation_values(Manifest.find_entry_by_path(
+			require("settings.engine.keys").KEY.LLM_DISPLAY_PRED_INDENT))
+		local offered = {}
+		for index, choice in ipairs(corpus.choices) do offered[index] = choice.value end
+		helpers.assert_eq(values, offered)
+		local owner, other = {}, {}
+		for _, vector in ipairs(corpus.cases) do
+			local expected, current = {}, {}
+			for key, value in pairs(corpus.base) do expected[key], current[key] = value, value end
+			for key, value in pairs(vector.expected or {}) do expected[key] = value end
+			for key, value in pairs(vector.current) do current[key] = value end
+			expected.owner = expected.owner == "owned" and owner or other
+			current.owner = current.owner == "owned" and owner or other
+			local decision = Policy.indentation_intent(expected, current, vector.value, values)
+			helpers.assert_eq(decision.admitted, vector.admitted, vector.id)
+			if vector.admitted then helpers.assert_eq(decision.value, vector.value, vector.id) end
+		end
 	end)
 
 	helpers.it("commits a retained native choice while paused, read on resume (shared-indentation)", function()

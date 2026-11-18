@@ -39,6 +39,39 @@ helpers.describe("LLM scope deferred editor admission", function()
 	end)
 end)
 
+--- Reads one profile command corpus of _shared/tests/corpus/menus/.
+--- @param name string The corpus file stem.
+--- @return table corpus
+local function command_corpus(name)
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/" .. name .. ".json"), "rb"))
+	local text = assert(file:read("*a"))
+	assert(file:close())
+	return assert(require("core.text.engine.json").decode(text))
+end
+
+helpers.describe("profile command corpora on macOS", function()
+	-- llm_profile_lua_frame places Clone in its own section above Create, unlike
+	-- the Windows frame; only the declarations themselves are shared.
+	helpers.it("draws Create and Clone from their shared declarations, each with its native action", function()
+		local create, clone_command = command_corpus("profile_create_command"), command_corpus("profile_clone_command")
+		helpers.assert_eq(create.section, clone_command.section)
+		with_fixture({}, function(fixture)
+			local rows = fixture.manager.get_menu_item().menu
+			local positions = {}
+			for index, row in ipairs(rows) do
+				if row.label == create.i18n then positions.create = index end
+				if row.label == clone_command.i18n then positions.clone = index end
+			end
+			helpers.assert_type(positions.create, "number", create.id)
+			helpers.assert_type(positions.clone, "number", clone_command.id)
+			helpers.assert_type(rows[positions.create].action, "function")
+			helpers.assert_type(rows[positions.clone].action, "function")
+			helpers.assert_true(rows[positions.create].disabled ~= true, create.ready)
+			helpers.assert_true(rows[positions.clone].disabled ~= true, clone_command.ready)
+		end)
+	end)
+end)
+
 helpers.describe("shared Create Profile command", function()
 	helpers.it("shared Create Profile follows the changed declaration without a native label", function()
 		with_fixture({ create_label_key = "button.cancel" }, function(fixture)

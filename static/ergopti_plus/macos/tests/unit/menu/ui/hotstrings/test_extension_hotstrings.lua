@@ -26,6 +26,14 @@ local ERGOPTI = {
 }
 local DEMO = { id = "demo", name = "Demo", toml_files = { { stem = "phrases" } }, bound_files = {} }
 
+--- Reads one menus corpus of _shared/tests/corpus/menus/.
+--- @param name string The corpus file stem.
+--- @return table corpus
+local function read_corpus(name)
+	return require("core.fs.adapters.json_codec").decode(require("tests.support.source_file").read(
+		helpers.shared("tests/corpus/menus/" .. name .. ".json")))
+end
+
 --- A menu context with the given loaded groups and discovery catalogue.
 --- @param hotfiles table Loaded group names.
 --- @param packs table Discovery catalogue.
@@ -180,16 +188,20 @@ end
 helpers.describe("complete installed extension shared frames (macOS)", function()
 	helpers.it("(shared-extension-frame) retains complete checkbox, category and bound-section order", function()
 		with_extension_frame(function(f)
+			-- The macOS order of _shared/tests/corpus/menus/hotstring_extension_frames.json.
+			local corpus = read_corpus("hotstring_extension_frames")
 			local rows = assert(f.build()).menu
-			helpers.assert_eq(#rows, 6)
-			helpers.assert_eq(rows[1].title, f.translator.get("menu.hotstrings.enable_all_sections"))
-			helpers.assert_eq(rows[1].checked, true)
-			helpers.assert_eq(rows[2].title, "-")
-			helpers.assert_eq(rows[3].title, "sfbsreduction (5)")
-			helpers.assert_eq(rows[4].title, "rolls (7)")
-			helpers.assert_eq(rows[5].title, "-")
-			helpers.assert_eq(rows[6].title, "Repeat corrections (14)")
-			helpers.assert_eq(rows[6].checked, true)
+			local titles = {}
+			for index, row in ipairs(rows) do titles[index] = row.title end
+			local expected = {}
+			for index, entry in ipairs(corpus.native_order.hs) do
+				if entry == "bulk" then expected[index] = f.translator.get(corpus.captions.extension_all_sections)
+				elseif entry == "separator" then expected[index] = "-"
+				else expected[index] = entry end
+			end
+			helpers.assert_eq(titles, expected)
+			helpers.assert_eq(rows[1].checked, corpus.bulk_checked)
+			helpers.assert_eq(rows[#rows].checked, true)
 			f.context.paused = true
 			helpers.assert_eq(rows[1].fn(), false, "a retained canonical checkbox refuses the live native pause")
 		end)

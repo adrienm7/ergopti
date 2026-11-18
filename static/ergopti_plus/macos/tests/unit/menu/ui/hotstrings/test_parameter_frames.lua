@@ -74,26 +74,41 @@ end
 helpers.describe("hotstrings parameter complete shared frames", function()
 	helpers.it("retains Mac delay, preview and catalogue order with real category values", function()
 		with_frame(function(f)
+			-- The macOS rows of _shared/tests/corpus/menus/hotstrings_parameter_frames.json.
+			local corpus = require("core.fs.adapters.json_codec").decode(require("tests.support.source_file").read(
+				helpers.shared("tests/corpus/menus/hotstrings_parameter_frames.json")))
 			local menu = assert(f.build())
-			local delays = children(menu, f.captions("menu.hotstrings.delays_colors"))
-			helpers.assert_eq(#delays, 8)
-			local keys = { [1] = "menu.hotstrings.config_item", [3] = "menu.hotstrings.tooltip_ai_acceptance",
-				[4] = "menu.hotstrings.tooltip_autocompletion", [5] = "menu.hotstrings.tooltip_default",
-				[7] = "menu.hotstrings.delay_magic_key", [8] = "menu.hotstrings.delay_autocorrection" }
-			for index, key in pairs(keys) do
-				helpers.assert_eq(delays[index].title:sub(1, #f.captions(key)), f.captions(key))
+			local delays = children(menu, f.captions(corpus.parents.delays))
+			helpers.assert_eq(#delays, #corpus.delays.hs)
+			local delay_index = 0
+			for index, id in ipairs(corpus.delays.hs) do
+				local name = id:match("^parameter_delay_(.+)$")
+				if id == "separator" or name == "category_boundary" then
+					helpers.assert_eq(delays[index].title, "-", id)
+				elseif corpus.captions[name] then
+					local caption = f.captions(corpus.captions[name])
+					helpers.assert_eq(delays[index].title:sub(1, #caption), caption, id)
+					delay_index = delay_index + 1
+					helpers.assert_true(delays[index].title:find(
+						tostring(corpus.mac_delays_ms[delay_index]) .. " ms", 1, true) ~= nil, id)
+				end
 			end
-			helpers.assert_eq(delays[2].title, "-"); helpers.assert_eq(delays[6].title, "-")
-			helpers.assert_true(delays[7].title:find("250 ms", 1, true) ~= nil)
-			local preview = children(menu, f.captions("menu.hotstrings.preview_bubbles"))
-			helpers.assert_eq(#preview, 5)
+			helpers.assert_eq(delay_index, #corpus.mac_delays_ms, "every delay row carries its value")
+			helpers.assert_eq(delays[1].title:sub(1, #f.captions("menu.hotstrings.config_item")),
+				f.captions("menu.hotstrings.config_item"))
+			local preview = children(menu, f.captions(corpus.parents.preview))
+			helpers.assert_eq(#preview, #corpus.preview.hs + 1, "the presence provider draws its two native rows")
+			local states = {}
+			for _, row in ipairs(preview) do
+				if row.title ~= "-" then states[#states + 1] = row.checked == true end
+			end
+			helpers.assert_eq(states, corpus.preview_states)
 			for index, key in ipairs({ "tooltip_magic", "tooltip_autocorrect", "tooltip_ai" }) do
 				helpers.assert_eq(preview[index].title, f.captions("menu.hotstrings." .. key))
 			end
 			helpers.assert_eq(preview[4].title, "-")
 			helpers.assert_eq(preview[5].title, f.captions("menu.hotstrings.tooltip_colored"))
-			helpers.assert_eq(preview[1].checked, true); helpers.assert_eq(preview[2].checked == true, false)
-			local word = children(menu, f.captions("menu.hotstrings.word_expanders"))
+			local word = children(menu, f.captions(corpus.parents.word_expander))
 			helpers.assert_eq(#word, 11)
 			-- Built-in rows resolve their locale key; a literal catalogue label
 			-- showed French to every user.
