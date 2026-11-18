@@ -3694,6 +3694,92 @@
 		"layout_analysis.ranking.title": {
 			"reason": "loanword-or-cognate",
 			"locales": ["pl"]
+		},
+		"layout_editor.physical.jis": {
+			"reason": "unit-or-abbreviation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.physical.abnt": {
+			"reason": "unit-or-abbreviation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"key_name.muhenkan": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"key_name.henkan": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"key_name.kana_mode": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"key_name.ro": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"layer_editor.key.non_convert": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"layer_editor.key.convert": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"layer_editor.key.kana_mode": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"layout_editor.export.option.dof": {
+			"reason": "brand-or-feature-name",
+			"locales": ["hi", "tr"]
+		},
+		"layout_editor.export.option.cmini": {
+			"reason": "brand-or-feature-name",
+			"locales": ["hi", "ko", "tr"]
 		}
 	}
 }
