@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "Bu cihaza kaydedilmedi: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(tarayıcı yer kalmadığında bunları silebilir: bir yedek dışa aktarın)",
 	"layout_editor.start.loading": "Katalog düzenleri yükleniyor…",
-	"layout_editor.start.copy_name": "Benim {name}",
+	"layout_editor.start.copy_name": "Düzenim ({name} tabanlı)",
 	"layout_editor.start.library": "Kitaplıktaki tüm düzenler",
 	"layout_editor.start.search": "Düzen ara",
 	"layout_editor.start.from_library": "Bu düzenden başla",

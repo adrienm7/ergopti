@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "इस डिवाइस पर सहेजा नहीं गया: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(जगह कम पड़ने पर ब्राउज़र इन्हें मिटा सकता है: एक बैकअप निर्यात करें)",
 	"layout_editor.start.loading": "कैटलॉग के लेआउट लोड हो रहे हैं…",
-	"layout_editor.start.copy_name": "मेरा {name}",
+	"layout_editor.start.copy_name": "मेरा लेआउट ({name} पर आधारित)",
 	"layout_editor.start.library": "लाइब्रेरी के सभी लेआउट",
 	"layout_editor.start.search": "लेआउट खोजें",
 	"layout_editor.start.from_library": "इस लेआउट से शुरू करें",

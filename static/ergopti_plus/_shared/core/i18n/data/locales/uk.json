@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "Не збережено на цьому пристрої: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(браузер може видалити їх, коли закінчиться місце: експортуйте резервну копію)",
 	"layout_editor.start.loading": "Завантаження розкладок каталогу…",
-	"layout_editor.start.copy_name": "Мій {name}",
+	"layout_editor.start.copy_name": "Моя розкладка (на основі {name})",
 	"layout_editor.start.library": "Усі розкладки бібліотеки",
 	"layout_editor.start.search": "Пошук розкладки",
 	"layout_editor.start.from_library": "Почати з цієї розкладки",

@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "לא נשמר במכשיר זה: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(הדפדפן עלול למחוק אותן כשייגמר לו המקום: ייצאו גיבוי)",
 	"layout_editor.start.loading": "טוען את פריסות הקטלוג…",
-	"layout_editor.start.copy_name": "ה-{name} שלי",
+	"layout_editor.start.copy_name": "הפריסה שלי (מבוססת על {name})",
 	"layout_editor.start.library": "כל הפריסות בספרייה",
 	"layout_editor.start.search": "חיפוש פריסה",
 	"layout_editor.start.from_library": "להתחיל מפריסה זו",

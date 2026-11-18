@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "未保存到本设备：{reason}",
 	"layout_editor.tabs.autosave.not_persistent": "（浏览器空间不足时可能会清除它们：请导出备份）",
 	"layout_editor.start.loading": "正在加载目录中的布局…",
-	"layout_editor.start.copy_name": "我的 {name}",
+	"layout_editor.start.copy_name": "我的布局（基于 {name}）",
 	"layout_editor.start.library": "布局库中的所有布局",
 	"layout_editor.start.search": "搜索布局",
 	"layout_editor.start.from_library": "从此布局开始",

@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "Inte sparat på den här enheten: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(webbläsaren kan rensa dem när utrymmet tar slut: exportera en säkerhetskopia)",
 	"layout_editor.start.loading": "Läser in katalogens layouter…",
-	"layout_editor.start.copy_name": "Min {name}",
+	"layout_editor.start.copy_name": "Min layout (baserad på {name})",
 	"layout_editor.start.library": "Alla layouter i biblioteket",
 	"layout_editor.start.search": "Sök efter en layout",
 	"layout_editor.start.from_library": "Utgå från den här layouten",

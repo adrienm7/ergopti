@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "No guardado en este dispositivo: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(el navegador puede borrarlas cuando se quede sin espacio: exporta una copia de seguridad)",
 	"layout_editor.start.loading": "Cargando las distribuciones del catálogo…",
-	"layout_editor.start.copy_name": "Mi {name}",
+	"layout_editor.start.copy_name": "Mi distribución (basada en {name})",
 	"layout_editor.start.library": "Todas las distribuciones de la biblioteca",
 	"layout_editor.start.search": "Buscar una distribución",
 	"layout_editor.start.from_library": "Empezar desde esta distribución",

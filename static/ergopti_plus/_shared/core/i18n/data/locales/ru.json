@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "Не сохранено на этом устройстве: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(браузер может удалить их, когда закончится место: экспортируйте резервную копию)",
 	"layout_editor.start.loading": "Загрузка раскладок каталога…",
-	"layout_editor.start.copy_name": "Мой {name}",
+	"layout_editor.start.copy_name": "Моя раскладка (на основе {name})",
 	"layout_editor.start.library": "Все раскладки библиотеки",
 	"layout_editor.start.search": "Поиск раскладки",
 	"layout_editor.start.from_library": "Начать с этой раскладки",

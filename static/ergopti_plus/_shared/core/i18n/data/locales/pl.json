@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "Nie zapisano na tym urządzeniu: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(przeglądarka może je usunąć, gdy zabraknie miejsca: wyeksportuj kopię zapasową)",
 	"layout_editor.start.loading": "Wczytywanie układów z katalogu…",
-	"layout_editor.start.copy_name": "Mój {name}",
+	"layout_editor.start.copy_name": "Mój układ (na bazie {name})",
 	"layout_editor.start.library": "Wszystkie układy biblioteki",
 	"layout_editor.start.search": "Wyszukaj układ",
 	"layout_editor.start.from_library": "Zacznij od tego układu",

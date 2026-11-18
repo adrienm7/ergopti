@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "この端末に保存されていません：{reason}",
 	"layout_editor.tabs.autosave.not_persistent": "（容量が不足するとブラウザーが削除することがあります。バックアップをエクスポートしてください）",
 	"layout_editor.start.loading": "カタログのレイアウトを読み込み中…",
-	"layout_editor.start.copy_name": "マイ {name}",
+	"layout_editor.start.copy_name": "マイ配列（{name} ベース）",
 	"layout_editor.start.library": "ライブラリのすべての配列",
 	"layout_editor.start.search": "配列を検索",
 	"layout_editor.start.from_library": "この配列から始める",

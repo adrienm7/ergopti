@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "Ikke gemt på denne enhed: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(browseren kan rydde dem, når den løber tør for plads: eksportér en sikkerhedskopi)",
 	"layout_editor.start.loading": "Indlæser katalogets layouts…",
-	"layout_editor.start.copy_name": "Min {name}",
+	"layout_editor.start.copy_name": "Mit layout (baseret på {name})",
 	"layout_editor.start.library": "Alle layouts i biblioteket",
 	"layout_editor.start.search": "Søg efter et layout",
 	"layout_editor.start.from_library": "Start fra dette layout",

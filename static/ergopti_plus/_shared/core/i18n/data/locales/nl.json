@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "Niet opgeslagen op dit apparaat: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(de browser kan ze wissen als de ruimte opraakt: exporteer een back-up)",
 	"layout_editor.start.loading": "Indelingen uit de catalogus laden…",
-	"layout_editor.start.copy_name": "Mijn {name}",
+	"layout_editor.start.copy_name": "Mijn lay-out (op basis van {name})",
 	"layout_editor.start.library": "Alle indelingen van de bibliotheek",
 	"layout_editor.start.search": "Een indeling zoeken",
 	"layout_editor.start.from_library": "Beginnen vanaf deze indeling",

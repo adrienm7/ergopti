@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "Ikke lagret på denne enheten: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(nettleseren kan slette dem når den går tom for plass: eksporter en sikkerhetskopi)",
 	"layout_editor.start.loading": "Laster inn katalogens oppsett…",
-	"layout_editor.start.copy_name": "Min {name}",
+	"layout_editor.start.copy_name": "Mitt oppsett (basert på {name})",
 	"layout_editor.start.library": "Alle oppsett i biblioteket",
 	"layout_editor.start.search": "Søk etter et oppsett",
 	"layout_editor.start.from_library": "Start fra dette oppsettet",

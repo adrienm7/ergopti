@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "Not saved on this device: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(the browser may clear them when it runs out of space: export a backup)",
 	"layout_editor.start.loading": "Loading the catalogue layouts…",
-	"layout_editor.start.copy_name": "My {name}",
+	"layout_editor.start.copy_name": "My layout (based on {name})",
 	"layout_editor.start.library": "Every layout of the library",
 	"layout_editor.start.search": "Search a layout",
 	"layout_editor.start.from_library": "Start from this layout",

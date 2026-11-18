@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "Neuloženo v tomto zařízení: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(prohlížeč je může smazat, když mu dojde místo: exportujte zálohu)",
 	"layout_editor.start.loading": "Načítání rozložení z katalogu…",
-	"layout_editor.start.copy_name": "Můj {name}",
+	"layout_editor.start.copy_name": "Moje rozložení (podle {name})",
 	"layout_editor.start.library": "Všechna rozložení knihovny",
 	"layout_editor.start.search": "Hledat rozložení",
 	"layout_editor.start.from_library": "Začít z tohoto rozložení",

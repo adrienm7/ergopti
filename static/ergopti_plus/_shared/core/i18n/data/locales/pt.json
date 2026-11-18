@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "Não guardado neste dispositivo: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(o navegador pode apagá-los quando ficar sem espaço: exporte uma cópia de segurança)",
 	"layout_editor.start.loading": "A carregar os layouts do catálogo…",
-	"layout_editor.start.copy_name": "O meu {name}",
+	"layout_editor.start.copy_name": "Meu layout (baseado em {name})",
 	"layout_editor.start.library": "Todos os layouts da biblioteca",
 	"layout_editor.start.search": "Procurar um layout",
 	"layout_editor.start.from_library": "Começar a partir deste layout",

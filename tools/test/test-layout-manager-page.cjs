@@ -851,6 +851,29 @@ check('the editor window declares its strings for the hosts, present in every lo
 	}
 });
 
+check('a copied layout is named as the user’s own layout, not « My Ergopti »', () => {
+	// « Mon Ergopti » read as the Ergopti layout itself (maintainer, 2026-11-18):
+	// the copy is « My layout (based on Ergopti) », its name only a label (the
+	// stored ids and workspace keys are unchanged).
+	for (const code of LOCALES) {
+		const table = locale(code);
+		const name = table['layout_editor.start.copy_name'];
+		const own = table['layout_editor.default_name'];
+		assert.ok(
+			typeof name === 'string' && name.includes('{name}'),
+			`${code}.json: the copy's name lacks {name}`
+		);
+		assert.ok(
+			typeof own === 'string' && own !== '' && name.includes(own),
+			`${code}.json: « ${name.replace('{name}', 'Ergopti')} » does not say « ${own} »`
+		);
+		assert.ok(
+			!/^(Mon|My) Ergopti$/.test(name.replace('{name}', 'Ergopti')),
+			`${code}.json still says « ${name.replace('{name}', 'Ergopti')} »`
+		);
+	}
+});
+
 check(
 	'Ergopti Studio reads « My typing » when the window opens, from a host that offers it',
 	() => {

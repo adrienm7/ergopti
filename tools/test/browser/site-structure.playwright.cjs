@@ -499,13 +499,15 @@ async function exerciseStudioHandoff(page, origin, basePath) {
 		"the Comparer keeps the editor's format"
 	);
 	await comparer
-		.locator('#la-table tbody tr', { hasText: 'Mon Ergopti' })
+		.locator('#la-table tbody tr', { hasText: 'Ma disposition (d’après Ergopti)' })
 		.first()
 		.waitFor({ timeout: 20000 });
 	// (compare-reuses-editor-entry) The handed layout is the editor_… entry the
 	// Comparer lists from the editor frame: one row, not a copy beside it.
 	assert.equal(
-		await comparer.locator('#la-layout-list .la-layout', { hasText: 'Mon Ergopti' }).count(),
+		await comparer
+			.locator('#la-layout-list .la-layout', { hasText: 'Ma disposition (d’après Ergopti)' })
+			.count(),
 		1,
 		'the edited layout is listed once'
 	);
@@ -523,7 +525,7 @@ async function exerciseStudioHandoff(page, origin, basePath) {
 	await visit(page, origin, basePath, '/studio/comparer');
 	await page
 		.frameLocator('iframe.studio-frame')
-		.locator('#la-layout-list .la-layout', { hasText: 'Mon Ergopti' })
+		.locator('#la-layout-list .la-layout', { hasText: 'Ma disposition (d’après Ergopti)' })
 		.first()
 		.waitFor();
 }

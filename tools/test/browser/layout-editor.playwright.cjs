@@ -996,7 +996,7 @@ async function exerciseStartAnyLayout(page) {
 		"Colemak-DH's letters on the board"
 	);
 	await tool(page, 'details');
-	assert.equal(await page.inputValue('#le-name'), 'My Colemak-DH');
+	assert.equal(await page.inputValue('#le-name'), 'My layout (based on Colemak-DH)');
 }
 
 /**
@@ -1980,7 +1980,7 @@ async function exerciseManager(browser, origin) {
 	if (await page.locator('#le-confirm-yes').count()) await page.click('#le-confirm-yes');
 	await page.waitForSelector('#le-start', { state: 'detached' });
 	await tool(page, 'details');
-	assert.equal(await page.inputValue('#le-name'), 'My Ergopti');
+	assert.equal(await page.inputValue('#le-name'), 'My layout (based on Ergopti)');
 	await page.click('#le-new');
 	await page.click('#le-start [data-start="blank"]');
 	await page.waitForSelector('#le-start', { state: 'detached' });

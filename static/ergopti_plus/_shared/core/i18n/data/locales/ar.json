@@ -599,7 +599,7 @@
 	"layout_editor.tabs.autosave.failed": "لم يُحفظ على هذا الجهاز: {reason}",
 	"layout_editor.tabs.autosave.not_persistent": "(قد يمسحها المتصفح عند نفاد المساحة: صدّر نسخة احتياطية)",
 	"layout_editor.start.loading": "جارٍ تحميل تخطيطات الفهرس…",
-	"layout_editor.start.copy_name": "{name} الخاص بي",
+	"layout_editor.start.copy_name": "تخطيطي (مبني على {name})",
 	"layout_editor.start.library": "كل تخطيطات المكتبة",
 	"layout_editor.start.search": "البحث عن تخطيط",
 	"layout_editor.start.from_library": "البدء من هذا التخطيط",
