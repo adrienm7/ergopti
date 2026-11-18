@@ -69,6 +69,13 @@ its Edit stayed empty. Action: before calling such a red a regression, look for
 `ErgoptiPlus.ahk` in `Get-CimInstance Win32_Process`. A probe that records
 `GetOpenClipboardWindow`'s PID at the refusal names the culprit.
 
+The driver is not the only such reader. With Windows clipboard history on,
+explorer.exe and the `cbdhsvc` service open the clipboard after every write,
+so with no driver running the gesture render-focus child still failed 13 of
+40 runs on 2026-11-18 (busy probe, silent CAS refusal, or a Ctrl+V the Edit
+never pasted). A rerun that stays red with no driver is therefore not proof of
+a regression either: name the opener first.
+
 ### project-ahk-listview-modify-suppresses-selection-events
 
 On AutoHotkey v2.0.26, `Gui.ListView.Modify` deliberately suppresses the

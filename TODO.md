@@ -68,10 +68,20 @@ every maintainer request here.
       read stretch (`ConfigTomlBootSnapshot`); the remaining exact counts in unit tests (shared-parse memo bound
       in test_loader, stretch reads in test_journal_boot, saved-options read in ai/menu test_persistence) state
       one-read-per-step invariants and stay unless one proves arbitrary.
-- [ ] **Intermittent tests to redo on a quiet PC** (the agent was stopped because the PC was overloaded): the
-      « [CI] Intermittent fixtures » item below plus healthcheck collection, SendInstant, Ollama native,
-      `groups247-*` order dependence, native clipboard/picker, WebView picker cleanup, `idle-caret-context`,
-      `key-state-dllcall-uncaught`.
+- [ ] **SendInstant paste races Windows' own clipboard readers.** Rerun on a quiet PC on 2026-11-18 (no resident
+      driver, 3 runs per group): healthcheck, Ollama native, `groups247-*`, pickers, `idle-caret-context`,
+      `key-state-dllcall-uncaught`, `tap-keys-kana-native`, the `config-*` groups and the model browser stayed
+      green; the app picker refusal failed once among neighbours (BM_CLICK, now exclusive). Two clipboard fixtures
+      still failed once each, alone in the exclusive phase: `gesture-transform-native-render-focus` current
+      (sends=0) and `sendinstant-native-snapshot-copy` current. On this PC (clipboard history on) explorer.exe and
+      `cbdhsvc` open the clipboard after every write (probe: 40 writes, 492 foreign lock samples from the two).
+      The gesture child alone failed 13 of 40 runs: twice `CB_IsBusy` saw explorer.exe and SendInstant took the
+      clipboard-free path; three times SendInstant returned with no paste and no log, which an instrumented loop
+      put at `CB_WritePlainSnapshot` (its single-shot CAS and `_CB_PlainAuthenticate` both refuse any open
+      lease); seven times Ctrl+V was sent but the Edit never pasted (explorer.exe held the lock just after the
+      paste in 4 of the 6 instrumented cases); once the capture timed out. The production paste can lose an expansion the same way. Decide whether publication
+      waits for readers (bounded, like `CB_OpenClipboardWithin`) before authenticating and pasting, then make the
+      fixtures hold a known reader instead of depending on the desktop's.
 
 ## Full accessibility (maintainer request, 2026-11-16, very important)
 
@@ -386,7 +396,8 @@ Each closes on a named green hosted or native run, recorded here.
     wait the secure-field probe got);
   - Windows: the `config` group, including the config-transition timer custody (bound 2048,
     `test-windows-config-timer-custody-bound.cjs`) and one `run_llm_model_browser` watchdog on
-    `model-browser-native-json` (43347126427, not reproduced);
+    `model-browser-native-json` (43347126427, not reproduced; all four `config-*` groups, the bound check and
+    `run_llm_model_browser.ahk` passed three times in a row locally on 2026-11-18, so only hosted runs are left);
   - macOS: Go `TestIdleDeadlinePhysicallyRetiresPeer` and `TestCancellationAndConcurrentClosePhysicallyRetirePeer`
     (Intel Managed Ollama, fixed with its `slow-start` case), Swift
     `testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope`, and the Install-and-launch
