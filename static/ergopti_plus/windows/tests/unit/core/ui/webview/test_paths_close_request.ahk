@@ -27,8 +27,11 @@ _PCRT_ChildSource(NativePause := false) {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 	Owners := Map()
-	for Symbol in ["JsonStringLiteral", "FilePathsEditor", "_PathsEdWeb_TryOpen", "WMPresentWindow", "TickElapsed"] {
-		if NativePause && Symbol == "FilePathsEditor"
+	; The native case extracts FilePathsEditor alone, so its file's own includes
+	; are lost: the font scaler it calls must come from its genuine owner.
+	for Symbol in ["JsonStringLiteral", "FilePathsEditor", "_PathsEdWeb_TryOpen", "WMPresentWindow", "TickElapsed",
+			"Gui_SetFont"] {
+		if (NativePause && Symbol == "FilePathsEditor") || (!NativePause && Symbol == "Gui_SetFont")
 			continue
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The paths retirement child requires its whole genuine owner: " . Symbol)
@@ -37,7 +40,7 @@ _PCRT_ChildSource(NativePause := false) {
 			Code .= "#Include " . Owner . "`n"
 		}
 	}
-	AssertEqual(NativePause ? 4 : 5, Owners.Count, "The codec/public/host/native presentation/clock owners must be present")
+	AssertEqual(5, Owners.Count, "The codec/public or font/host/native presentation/clock owners must be present")
 	if NativePause {
 		Body := _DriverFuncBody("FilePathsEditor")
 		AssertTrue(Body != "", "The native admission test requires the actual public editor")
