@@ -830,6 +830,37 @@ HotstringsCacheEnsure() {
 	}
 }
 
+/**
+ * Entries per section of a bundled file, read from the rows the loaded cache
+ * admitted for it instead of from the file: the hotstrings these rows register
+ * are the ones the menu counts.
+ * @param {string} FilePath - TOML file whose sections are counted.
+ * @returns {Map|Integer} Lowercase section -> entries, or 0 when no cache is
+ *   loaded or the loaded one did not compile this file.
+ */
+HotstringsCacheSectionCounts(FilePath) {
+	global _HS_CACHE_LOADED, _HS_CACHE_ROWS
+	if !_HS_CACHE_LOADED || !(_HS_CACHE_ROWS is Map) || !_HS_CACHE_ROWS.HasOwnProp("SourceInventory")
+		return 0
+	Wanted := _HotstringsCachePathKey(FilePath)
+	Category := ""
+	for Receipt in _HS_CACHE_ROWS.SourceInventory {
+		if Receipt.present == 1 && _HotstringsCachePathKey(Receipt.path) == Wanted {
+			Category := Receipt.category
+			break
+		}
+	}
+	if Category == ""
+		return 0
+	Prefix := Category . "."
+	Counts := Map()
+	for Key, RowList in _HS_CACHE_ROWS {
+		if SubStr(Key, 1, StrLen(Prefix)) == Prefix
+			Counts[SubStr(Key, StrLen(Prefix) + 1)] := RowList.Length
+	}
+	return Counts
+}
+
 ; Register every cached hotstring of one section. Reproduces the runtime TOML
 ; fallback (LoadHotstringsSection) 1:1: per-row opts (TimeActivationSeconds from
 ; FeatureConfig, FinalResult, IsRepeat, Category, Section, Priority, optional

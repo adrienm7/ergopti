@@ -1161,3 +1161,51 @@ _HsCacheSortBySeq(Specs) {
 	}
 	return Sorted
 }
+
+Test("hotstrings cache: menu counts of bundled files come from the admitted rows (menu-count-from-admitted-rows)",
+	_HsCache_AdmittedCountsCase)
+
+; The tray counts a bundled file from the rows the cache registered: a scan of
+; the same file must agree section by section, and a loaded cache leaves no
+; bundled file to scan again, while a file the cache never compiled still is.
+_HsCache_AdmittedCountsCase() {
+	global _HS_CACHE_ROWS, _HS_CACHE_LOADED, _TomlFileSectionCounts
+	Saved := [_HS_CACHE_ROWS, _HS_CACHE_LOADED, _TomlFileSectionCounts]
+	Other := A_Temp . "\hs_cache_admitted_counts_" . A_TickCount . "_" . Random(1000, 9999) . ".toml"
+	try {
+		Rows := _HotstringsCacheBuildRows()
+		_HS_CACHE_ROWS := Rows, _HS_CACHE_LOADED := true, _TomlFileSectionCounts := Map()
+		Compared := 0
+		for Receipt in Rows.SourceInventory {
+			if Receipt.present != 1
+				continue
+			Admitted := HotstringsCacheSectionCounts(Receipt.path)
+			AssertTrue(Admitted is Map, "the loaded cache answers for its own file: " . Receipt.category)
+			Scanned := TomlCountSectionEntries(FileRead(Receipt.path, "UTF-8"))
+			for Section, Count in Scanned
+				AssertEqual(Count, Admitted.Get(Section, 0),
+					Receipt.category . "." . Section . ": the admitted rows count what the file scan counts")
+			for Section, Count in Admitted
+				AssertEqual(Count, Scanned.Get(Section, 0),
+					Receipt.category . "." . Section . ": the file scan counts what the admitted rows count")
+			Compared += 1
+		}
+		AssertTrue(Compared > 0, "control: the cache compiled bundled files")
+		Before := _PerfCountersOwner().Counts.Get("toml.section_count_scan", 0)
+		for Receipt in Rows.SourceInventory
+			if Receipt.present == 1
+				_TomlWarmFileCounts(Receipt.path)
+		AssertEqual(Before, _PerfCountersOwner().Counts.Get("toml.section_count_scan", 0),
+			"counting the bundled files of a loaded cache scans none of them again")
+		FileAppend("[[snippets]]`nbrb = " . '"' . "be right back" . '"' . "`n", Other, "UTF-8-RAW")
+		AssertFalse(HotstringsCacheSectionCounts(Other) is Map, "the cache answers only for files it compiled")
+		Counts := _TomlWarmFileCounts(Other)
+		AssertEqual(Before + 1, _PerfCountersOwner().Counts.Get("toml.section_count_scan", 0),
+			"control: a file the cache did not compile is scanned")
+		AssertEqual(1, Counts.Get("snippets", 0), "control: the scan counts the file's entry")
+	} finally {
+		_HS_CACHE_ROWS := Saved[1], _HS_CACHE_LOADED := Saved[2], _TomlFileSectionCounts := Saved[3]
+		if FileExist(Other)
+			FileDelete(Other)
+	}
+}

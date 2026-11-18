@@ -240,7 +240,7 @@ ReadTomlFile(FilePath, ReadOwner := 0) {
 
 ; Helper to warm the section counts cache for a specific file.
 _TomlWarmFileCounts(FilePath) {
-		global _TomlFileSectionCounts, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
+		global _TomlFileSectionCounts
 		PreviousCritical := Critical("On")
 		try {
 				if _TomlFileSectionCounts.Has(FilePath)
@@ -249,50 +249,21 @@ _TomlWarmFileCounts(FilePath) {
 		} finally Critical(PreviousCritical)
 		Owner := _TomlLoaderBeginCacheRead(FilePath)
 		try {
+			; A bundled file the hotstring cache compiled is counted from the rows
+			; it admitted at registration: scanning it again cost every bundled
+			; catalogue line before the boot could publish the tray menu.
+			Admitted := HotstringsCacheSectionCounts(FilePath)
+			if Admitted is Map {
+					_TomlLoaderPublishCounts(Owner, FilePath, Admitted, Cache)
+					return Admitted
+			}
 			Counts := Map()
 			if !FileExist(FilePath) {
 					_TomlLoaderPublishCounts(Owner, FilePath, Counts, Cache)
 					return Counts
 			}
 
-			CurrentSec := ""
-			loop parse, ReadTomlFile(FilePath, Owner), "`n", "`r" {
-					Line := Trim(A_LoopField, " `t")
-					if (Line == "" or SubStr(Line, 1, 1) == "#")
-							continue
-						
-					; [[section]] or [section] header.
-					; Stripped like LoadHotstringsSection does. This pattern is ANCHORED, so
-					; a header carrying a trailing comment simply fails to match: the line
-					; then falls through to the entry parser, fails that too, and continues —
-					; leaving CurrentSec on the PREVIOUS section, so every entry below is
-					; counted against the wrong one. That is why the menu's hotstring count
-					; could disagree with the number of entries actually registered.
-					if (SubStr(Line, 1, 1) == "["
-					and RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch)) {
-							CurrentSec := StrLower(Trim(SectionMatch[1]))
-							if !Counts.Has(CurrentSec)
-									Counts[CurrentSec] := 0
-							continue
-					}
-				
-					; Match hotstring entry: key = value or key = { ... }
-					; Skip every metadata block, not just the two flat forms: equality checks
-					; let the dotted per-section form ([_meta.sections.<x>], [_meta.section_delays])
-					; written by the config window slip through, so its delay/color/priority lines
-					; were miscounted as hotstrings. Mirror _HotstringsCacheBuildRows' convention.
-					; Count a line only when it matches one of the two shapes the loaders
-					; actually register: the full inline-table entry (LoadHotstringsSection /
-					; LoadExtTomlFile) or the simple key="value" entry (LoadExtTomlFile
-					; fallback). A looser `key =` test over-counted non-entry lines, so the
-					; displayed count could exceed the registered/cached row count.
-					if (CurrentSec != "" and CurrentSec != "_meta" and !InStr(CurrentSec, "_meta.")) {
-							if (RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN)
-							or RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN)) {
-									Counts[CurrentSec] := Counts[CurrentSec] + 1
-							}
-					}
-			}
+			Counts := TomlCountSectionEntries(ReadTomlFile(FilePath, Owner))
 
 			; Never memoise a count derived from a read that failed. ReadTomlFile
 			; deliberately leaves an unreadable path uncached so the next caller retries;
@@ -304,6 +275,57 @@ _TomlWarmFileCounts(FilePath) {
 			_TomlLoaderPublishCounts(Owner, FilePath, Counts, Cache)
 			return Counts
 		} finally _TomlLoaderEndCacheRead(Owner)
+}
+
+/**
+ * Counts the hotstring entries of every section of a TOML text, the way the
+ * menu counts a file no cache admitted.
+ * @param {string} Content - Whole TOML file.
+ * @returns {Map} Lowercase section -> number of entries.
+ */
+TomlCountSectionEntries(Content) {
+		global _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
+		PerfCount("toml.section_count_scan")
+		Counts := Map()
+		CurrentSec := ""
+		loop parse, Content, "`n", "`r" {
+			Line := Trim(A_LoopField, " `t")
+			if (Line == "" or SubStr(Line, 1, 1) == "#")
+					continue
+
+			; [[section]] or [section] header.
+			; Stripped like LoadHotstringsSection does. This pattern is ANCHORED, so
+			; a header carrying a trailing comment simply fails to match: the line
+			; then falls through to the entry parser, fails that too, and continues —
+			; leaving CurrentSec on the PREVIOUS section, so every entry below is
+			; counted against the wrong one. That is why the menu's hotstring count
+			; could disagree with the number of entries actually registered.
+			if (SubStr(Line, 1, 1) == "["
+			and RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch)) {
+					CurrentSec := StrLower(Trim(SectionMatch[1]))
+					if !Counts.Has(CurrentSec)
+							Counts[CurrentSec] := 0
+					continue
+			}
+
+			; Match hotstring entry: key = value or key = { ... }
+			; Skip every metadata block, not just the two flat forms: equality checks
+			; let the dotted per-section form ([_meta.sections.<x>], [_meta.section_delays])
+			; written by the config window slip through, so its delay/color/priority lines
+			; were miscounted as hotstrings. Mirror _HotstringsCacheBuildRows' convention.
+			; Count a line only when it matches one of the two shapes the loaders
+			; actually register: the full inline-table entry (LoadHotstringsSection /
+			; LoadExtTomlFile) or the simple key="value" entry (LoadExtTomlFile
+			; fallback). A looser `key =` test over-counted non-entry lines, so the
+			; displayed count could exceed the registered/cached row count.
+			if (CurrentSec != "" and CurrentSec != "_meta" and !InStr(CurrentSec, "_meta.")) {
+					if (RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN)
+					or RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN)) {
+							Counts[CurrentSec] := Counts[CurrentSec] + 1
+					}
+			}
+		}
+		return Counts
 }
 
 ; Count hotstring entries inside a specific [[section]] of a TOML category file.
