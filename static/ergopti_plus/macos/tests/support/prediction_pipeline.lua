@@ -117,7 +117,7 @@ local function load_fixture(options)
 	-- The pipeline test controls the focused-window classification boundary. A
 	-- newly loaded real keymap cache is deliberately unknown until its async AX
 	-- prewarm commits, which would make this fixture stop before backend dispatch.
-	package.loaded["modules.keymap.utils"] = {
+	package.loaded["hotstrings.engine.expander.utils"] = {
 		is_ignored_window = function() return false end,
 	}
 

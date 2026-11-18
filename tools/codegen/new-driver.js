@@ -73,7 +73,8 @@ const DRIVER_SUBDIRS = [
 	'apps',
 	'clipboard',
 	'diagnostics',
-	'gestures'
+	'gestures',
+	'hotstrings'
 ];
 
 /** Supported target languages. */

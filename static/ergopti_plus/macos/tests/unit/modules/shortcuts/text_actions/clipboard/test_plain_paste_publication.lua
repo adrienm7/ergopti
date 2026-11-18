@@ -43,7 +43,7 @@ end
 
 local function with_plain(callback)
 	helpers.with_stub_scope({
-		"modules.keymap.utils",
+		"hotstrings.engine.expander.utils",
 		"modules.shortcuts.actions.text", "modules.shortcuts.actions.text_continuation",
 		"modules.shortcuts.actions.text_dispatch", "modules.shortcuts.actions.text_transform_grace",
 	}, function()

@@ -15,8 +15,8 @@ local OWNERS = {
 	"diagnostics.adapters.event_provenance", "core.fs.adapters.file_system", "platform.input.key_state",
 	"core.process.adapters.shell_runner", "platform.input.synthetic_input", "core.events.timer_scheduler",
 	"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
-	"core.timing.engine.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
-	"modules.keymap.terminator_replay", "platform.input.text_sender", "clipboard.adapters.clipboard",
+	"core.timing.engine.deferred_work", "core.fs.engine.dir", "hotstrings.engine.expander.utils",
+	"hotstrings.engine.expander.terminator_replay", "platform.input.text_sender", "clipboard.adapters.clipboard",
 }
 
 local function with_observer(callback)

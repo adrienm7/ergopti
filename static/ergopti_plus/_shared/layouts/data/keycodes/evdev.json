@@ -1,6 +1,6 @@
 {
 	"_description": "Linux evdev kernel keycode → character maps for QWERTY and AZERTY layouts. Single source of truth — consumed by the Linux input_reader via _shared/platform/input/keycodes/evdev.lua. Keycodes follow input-event-codes.h KEY_* values. Characters use UTF-8 where needed (e.g. é = \\u00e9).",
-	"_used_by": ["linux/modules/hotstrings/input_reader.lua"],
+	"_used_by": ["linux/hotstrings/engine/input_reader.lua"],
 	"layouts": {
 		"qwerty": {
 			"unshifted": {

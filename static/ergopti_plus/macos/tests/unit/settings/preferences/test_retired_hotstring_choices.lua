@@ -38,7 +38,7 @@ local SOURCE = table.concat({
 --- @param body function Receives (preferences, path, warnings, catalogue).
 local function with_source(body)
 	helpers.with_stub_scope({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim",
-		"settings.engine.migration.outdated", "infra.hotstring_choice_catalogue" }, function()
+		"settings.engine.migration.outdated", "hotstrings.engine.matcher.choice_catalogue" }, function()
 		local warnings = {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...)
@@ -47,11 +47,11 @@ local function with_source(body)
 		logger.error = logger.warn
 		package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 		package.loaded["core.fs.adapters.file_system"] = nil
-		package.loaded["infra.hotstring_choice_catalogue"] = nil
+		package.loaded["hotstrings.engine.matcher.choice_catalogue"] = nil
 		local config_outdated = require("settings.engine.migration.outdated")
 		if type(config_outdated.reset_for_tests) == "function" then config_outdated.reset_for_tests() end
 		local preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
-		local catalogue = require("infra.hotstring_choice_catalogue")
+		local catalogue = require("hotstrings.engine.matcher.choice_catalogue")
 		OutputFixture.with_output(function(path)
 			local file = assert(io.open(path, "wb")); assert(file:write(SOURCE)); assert(file:close())
 			body(preferences, path, warnings, catalogue)
@@ -82,9 +82,9 @@ end
 
 helpers.describe("retired hotstring choices (hotstring-choice-retired-2026-10-23)", function()
 	helpers.it("accepts one catalogue owner and refuses a second or a non-function", function()
-		helpers.with_stub_scope({ "infra.hotstring_choice_catalogue" }, function()
-			package.loaded["infra.hotstring_choice_catalogue"] = nil
-			local catalogue = require("infra.hotstring_choice_catalogue")
+		helpers.with_stub_scope({ "hotstrings.engine.matcher.choice_catalogue" }, function()
+			package.loaded["hotstrings.engine.matcher.choice_catalogue"] = nil
+			local catalogue = require("hotstrings.engine.matcher.choice_catalogue")
 			helpers.assert_eq(catalogue.retired("anything"), false, "an unpublished catalogue retires nothing")
 			helpers.assert_eq(catalogue.publish("not a lookup"), false)
 			helpers.assert_eq(catalogue.publish(function() return nil end), true)
@@ -133,14 +133,14 @@ helpers.describe("retired hotstring choices (hotstring-choice-retired-2026-10-23
 	end)
 
 	helpers.it("keeps a retired choice in the file across a save", function()
-		helpers.with_stub_scope({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "infra.hotstring_choice_catalogue",
+		helpers.with_stub_scope({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "hotstrings.engine.matcher.choice_catalogue",
 			"settings.engine.migration.outdated" }, function()
-			package.loaded["infra.hotstring_choice_catalogue"] = nil
+			package.loaded["hotstrings.engine.matcher.choice_catalogue"] = nil
 			require("settings.engine.migration.outdated").reset_for_tests()
 			local path = "/virtual/retired_choices/config.toml"
 			local disk = { [path] = SOURCE }
 			local preferences = load_fixture_preferences(disk)
-			publish_build(require("infra.hotstring_choice_catalogue"))
+			publish_build(require("hotstrings.engine.matcher.choice_catalogue"))
 			local state = preferences.load(path)
 			state.hotstrings.autocorrection = true
 			helpers.assert_eq(preferences.save(path, state, {}, {}), true)
@@ -155,14 +155,14 @@ helpers.describe("retired hotstring choices (hotstring-choice-retired-2026-10-23
 	end)
 
 	helpers.it("keeps every retired choice when the state holds no category at all", function()
-		helpers.with_stub_scope({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "infra.hotstring_choice_catalogue",
+		helpers.with_stub_scope({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "hotstrings.engine.matcher.choice_catalogue",
 			"settings.engine.migration.outdated" }, function()
-			package.loaded["infra.hotstring_choice_catalogue"] = nil
+			package.loaded["hotstrings.engine.matcher.choice_catalogue"] = nil
 			require("settings.engine.migration.outdated").reset_for_tests()
 			local path = "/virtual/retired_choices/empty.toml"
 			local disk = { [path] = "[hotstrings.groups]\nremoved = true\n" }
 			local preferences = load_fixture_preferences(disk)
-			require("infra.hotstring_choice_catalogue").publish(function() return nil end)
+			require("hotstrings.engine.matcher.choice_catalogue").publish(function() return nil end)
 			local state = preferences.load(path)
 			helpers.assert_nil(state.hotstrings.removed)
 			helpers.assert_eq(preferences.save(path, state, {}, {}), true)

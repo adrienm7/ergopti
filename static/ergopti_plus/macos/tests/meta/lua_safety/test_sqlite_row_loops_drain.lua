@@ -31,6 +31,7 @@ local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "clipboard",
 	DRIVER_ROOT .. "diagnostics",
 	DRIVER_ROOT .. "gestures",
+	DRIVER_ROOT .. "hotstrings",
 	helpers.shared(""),
 }
 local ROW_ITERATOR = "^%s*for%s.-%sin%s+[%w_%.]*db:[nu]?rows%("

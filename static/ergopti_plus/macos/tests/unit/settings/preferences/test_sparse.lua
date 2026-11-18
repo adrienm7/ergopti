@@ -9,7 +9,7 @@ helpers.describe("sparse preference transactions", function()
 			local source = '[future]\nkeep = 99\n'
 			package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
 			local modules = {}
-			for key, name in pairs({ keymap = "modules.keymap", dyn_hot_mod = "modules.dynamic_hotstrings",
+			for key, name in pairs({ keymap = "hotstrings.engine.expander", dyn_hot_mod = "hotstrings.engine.dynamic",
 				shortcuts_mod = "modules.shortcuts", gestures = "gestures.engine", keystats = "modules.keystats" }) do
 				modules[key] = helpers.load_with_stubs(name)
 			end

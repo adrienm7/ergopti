@@ -47,10 +47,13 @@ const src = JSON.parse(
 const expected = { common: src.common, package: src.package, personal: src.personal };
 
 const AHK = fs.readFileSync(
-	path.join(ROOT, 'windows/infra/hotstrings/hotstring_engine_main.ahk'),
+	path.join(ROOT, 'windows/hotstrings/engine/matcher/engine_main.ahk'),
 	'utf8'
 );
-const LUA = fs.readFileSync(path.join(ROOT, 'macos/modules/keymap/registry.lua'), 'utf8');
+const LUA = fs.readFileSync(
+	path.join(ROOT, 'macos/hotstrings/engine/expander/registry.lua'),
+	'utf8'
+);
 
 // AHK: `global HSE_PRIORITY_COMMON := 10`. Lua: `local PRIORITY_COMMON = 10`.
 function ahkConst(key) {
@@ -138,7 +141,7 @@ const PRIORITY_LITERAL_RE = /priority\w*["'\s)\]]*\s*(?::=|==|=|:|\bor\b|\?\?)\s
 // value must still equal the shared source default.
 const PINNED = [
 	{
-		file: 'windows/infra/hotstrings/hotstring_builder.ahk',
+		file: 'windows/hotstrings/engine/matcher/builder.ahk',
 		symbol: '_MakeHotstringMeta',
 		want: () => expected.common,
 		why: 'AHK v2 default-parameter expressions cannot reference a global'
@@ -237,7 +240,9 @@ function cascadePositions(text) {
 
 const luaResolver = LUA.match(/local function resolve_priority[\s\S]*?\nend/);
 if (!luaResolver) {
-	console.log(`  ${FAIL}  macos/modules/keymap/registry.lua: resolve_priority() not found`);
+	console.log(
+		`  ${FAIL}  macos/hotstrings/engine/expander/registry.lua: resolve_priority() not found`
+	);
 	fail++;
 } else {
 	const pos = cascadePositions(luaResolver[0]);
@@ -259,7 +264,7 @@ if (!luaResolver) {
 // function, so the contract is asserted where it is written down: the comment
 // naming the order must still match the shared JSON's description.
 const CACHE = fs.readFileSync(
-	path.join(ROOT, 'windows/infra/hotstrings/hotstrings_cache.ahk'),
+	path.join(ROOT, 'windows/hotstrings/engine/catalogue/cache.ahk'),
 	'utf8'
 );
 if (/individual\s*>\s*section\s*>\s*file\s*>\s*source/.test(CACHE)) {
@@ -267,7 +272,7 @@ if (/individual\s*>\s*section\s*>\s*file\s*>\s*source/.test(CACHE)) {
 	pass++;
 } else {
 	console.log(
-		`  ${FAIL}  windows/infra/hotstrings/hotstrings_cache.ahk no longer states the cascade individual > section > file > source`
+		`  ${FAIL}  windows/hotstrings/engine/catalogue/cache.ahk no longer states the cascade individual > section > file > source`
 	);
 	fail++;
 }

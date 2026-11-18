@@ -20,9 +20,9 @@ local it = Fixture.it
 helpers.describe("llm_generate_prediction action", function()
 	it("runs the bridge's manual request from a gesture and from a keyboard slot", function(fresh_actions)
 		local actions = fresh_actions()
-		local saved = package.loaded["modules.keymap"]
+		local saved = package.loaded["hotstrings.engine.expander"]
 		local requests = 0
-		package.loaded["modules.keymap"] = {
+		package.loaded["hotstrings.engine.expander"] = {
 			request_manual_prediction = function()
 				requests = requests + 1
 				return true
@@ -35,7 +35,7 @@ helpers.describe("llm_generate_prediction action", function()
 				"a keyboard slot runs the same action")
 			helpers.assert_eq(requests, 2, "each dispatch must ask the bridge for one prediction")
 		end)
-		package.loaded["modules.keymap"] = saved
+		package.loaded["hotstrings.engine.expander"] = saved
 		if not ok then error(err, 0) end
 	end)
 end)

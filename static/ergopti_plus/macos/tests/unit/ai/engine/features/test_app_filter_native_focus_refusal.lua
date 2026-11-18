@@ -6,7 +6,7 @@ local helpers = require("tests.helpers")
 --- Owns the real filter and classifier plus declared native and cache boundaries.
 ---@param callback function Receives the real filter and native controls.
 local function with_filter(callback)
-	return helpers.with_stub_scope({ "core.logger.engine.logger", "modules.keymap.utils",
+	return helpers.with_stub_scope({ "core.logger.engine.logger", "hotstrings.engine.expander.utils",
 		"platform.focus.secure_field_detector", "ai.engine.prediction.app_filter" }, function()
 		local c = { mode = "healthy", role = "AXTextField", subrole = nil,
 			bundle = "com.apple.Safari", ignored = false, focus_reads = 0, calls = {} }
@@ -60,7 +60,7 @@ local function with_filter(callback)
 				return app_element
 			end } }
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["modules.keymap.utils"] = { is_ignored_window = function() return c.ignored end }
+		package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return c.ignored end }
 		return callback(require("ai.engine.prediction.app_filter"), c)
 	end)
 end

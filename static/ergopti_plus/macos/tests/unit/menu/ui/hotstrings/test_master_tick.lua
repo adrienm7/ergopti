@@ -26,7 +26,7 @@ local Answers = require("onboarding.engine.answers")
 
 -- The menu modules menu/ui/init.lua loads, under the keys Builder.generate reads.
 local MENU_MODULES = {
-	hotstrings = "ui.menu.menu_hotstrings",
+	hotstrings = "hotstrings.ui.menu.hotstrings",
 }
 
 
@@ -221,7 +221,7 @@ end
 local function with_wizard(answer, scenario)
 	helpers.with_stub_scope({
 		"settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.fs.engine.dir",
-		"menu.ui.builder.state", "menu.ui.builder.builder", "ui.menu.menu_hotstrings", "menu.ui.keyboard.keymap_lifecycle",
+		"menu.ui.builder.state", "menu.ui.builder.builder", "hotstrings.ui.menu.hotstrings", "menu.ui.keyboard.keymap_lifecycle",
 		"core.ui.engine.notifications", "core.i18n.engine.i18n", "menu.engine.manifest_menu",
 	}, function()
 		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }

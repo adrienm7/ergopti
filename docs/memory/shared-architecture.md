@@ -326,7 +326,7 @@ Selection case conversion follows one rule, pinned by
 `_shared/tests/corpus/text_case/vectors.json`, which the three suites replay.
 macOS and Linux call `_shared/core/text/engine/unicode_case` over a generated Unicode table
 (`npm run codegen:unicode-case` refuses any Node but the `.node-version` pin);
-Windows calls `infra/text_case.ahk` over StrUpper/StrLower, so ß, the final
+Windows calls `hotstrings/engine/text_case.ahk` over StrUpper/StrLower, so ß, the final
 sigma and title digraphs are Lua-only vectors. Never case user text with Lua
 `string.upper`/`string.lower` (bytes only) or AHK `Format("{:T}")` (a capital
 after a digit, none after a hyphen).

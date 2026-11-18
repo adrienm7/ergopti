@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Programmable Hotstrings Driver Lifecycle (Shared)
 --- DESCRIPTION:
---- The lifecycle both Lua drivers' modules/dynamic_hotstrings/user_code.lua used
+--- The lifecycle both Lua drivers' hotstrings/engine/dynamic/user_code.lua used
 --- to repeat around the shared programmable-hotstring owner
 --- (hotstrings/engine/dynamic/user_code_core.lua): the single started generation, the
 --- desired / active / dirty posture, loading the personal source, the

@@ -89,7 +89,7 @@ local function with_action(route, mode, action, body)
 			local layout = require("adapters.keyboard_layout")
 			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} },
 				O = { keycode = 24, mods = { "shift" } }, K = { keycode = 37, mods = { "shift" } } })
-			injector = require("modules.hotstrings.injector")
+			injector = require("hotstrings.engine.injector")
 			injector._set_nanosleep_for_test(function() end)
 			injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
 				world.keys[#world.keys + 1] = { code, value }; world.held[code] = value == 1 or nil; return true
@@ -100,9 +100,9 @@ local function with_action(route, mode, action, body)
 				gestures = "gestures.engine.manager", ActionHandlers = "modules.shortcuts.action_handlers",
 				prediction_engine = "ai.engine.prediction.engine", keyboard_shortcuts = "modules.shortcuts.keyboard_shortcuts",
 				keyboard_hook = "platform.input.keyboard_hook", keystats = "modules.keystats.keystats", Monotonic = "core.logger.engine.monotonic",
-				MagicKeySource = "modules.hotstrings.magic_key_source", script_chords = "modules.shortcuts.script_chords",
-				tap_keys = "modules.shortcuts.tap_keys", hotstrings_config = "modules.hotstrings.hotstrings_config",
-				MagicKey = "modules.hotstrings.magic_key", TapHold = "platform.remap.tap_hold_manager" }) do environment[field] = require(name) end
+				MagicKeySource = "hotstrings.engine.magic_key_source", script_chords = "modules.shortcuts.script_chords",
+				tap_keys = "modules.shortcuts.tap_keys", hotstrings_config = "hotstrings.engine.catalogue.config",
+				MagicKey = "hotstrings.engine.magic_key", TapHold = "platform.remap.tap_hold_manager" }) do environment[field] = require(name) end
 			environment.secure_focus_guard, environment.injector = guard, injector
 			environment.input_capture_gate = require("platform.input.capture_gate").new()
 			environment.on_char = function() error("The bound chord must not become a text callback") end

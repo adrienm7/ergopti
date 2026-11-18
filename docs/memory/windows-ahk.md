@@ -723,7 +723,7 @@ the primitive); modifier releases
 (`config_io`, `error_net`, `lifecycle`) need the hook path. Expansions, the
 ellipsis, the ê dead key, TextSender, predictions and paste already use
 `SendInput`.
-`tests/unit/modules/hotstrings/engine/test_hotstring_output_is_final.ahk` and
+`tests/unit/hotstrings/engine/engine/test_output_is_final.ahk` and
 `test_hotstring_chaining.ahk` (`--interactive` adds the real engine and keyboard).
 A test of this contract pins `HSE_CascadeMaxArrows := 1`: with the default
 three arrows the engine resolves a chain before sending, and the interactive

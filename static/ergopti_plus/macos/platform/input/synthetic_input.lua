@@ -2802,7 +2802,7 @@ do
 	--- Emits one field-run selftest key pair, posted globally like a loopback so
 	--- the keymap tap sees it. The record's selftest field lets the keymap decode
 	--- it as typing, but only while the field run's scratch window has the focus
-	--- (modules/keymap/selftest_gate.lua); everywhere else it is consumed. The
+	--- (hotstrings/engine/expander/selftest_gate.lua); everywhere else it is consumed. The
 	--- class is a record field, not a tag bit: once its record is evicted the key
 	--- is ordinary synthetic output, which no tap counts or expands. It is a
 	--- replacement effect, so it publishes no action epoch that would reset the

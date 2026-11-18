@@ -103,7 +103,7 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 			end
 		end
 		helpers.assert_true(physical_picker, "the actual Layout renderer still exposes physical-key selection")
-		local Hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local Hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 		local ManifestMenu = require("menu.engine.manifest_menu")
 		local rows = Hotstrings.build_bound_section_rows(ctx, { { group = "magickey", section = "replace" } })
 		local rendered = ManifestMenu.render_rows(rows, "extension_hotstrings")

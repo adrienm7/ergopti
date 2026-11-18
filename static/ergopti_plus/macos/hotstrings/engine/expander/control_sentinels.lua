@@ -1,0 +1,143 @@
+--- hotstrings/engine/expander/control_sentinels.lua
+
+--- ==============================================================================
+--- MODULE: Karabiner Control Sentinel Owner
+--- DESCRIPTION:
+--- Single owner of the reserved key events that Karabiner emits only to signal
+--- Hammerspoon. Such an event is a control message, never application input: the
+--- frontmost application must not receive it. A text field with a selection
+--- treats an unknown function key as typing and replaces the selection (QSpace
+--- rename lost the whole file name whenever the navigation layer was held).
+---
+--- FEATURES & RATIONALE:
+--- 1. One claim point: the keymap keyDown and keyUp eventtaps call claim_key()
+---    with the keycode they already read. They are installed for the whole
+---    process lifetime, including PAUSE, so the sentinel is deleted there. Every
+---    other Ergopti tap passes the reserved code through without acting on it,
+---    which makes the outcome independent of Quartz tap insertion order.
+--- 2. In-process fan-out: consumers that need the signal (the LLM tooltip idle
+---    deadline, the navigation layer's wheel bindings) register a named
+---    listener instead of decoding the key in their own tap, which may run after
+---    the owner deleted the event.
+--- 3. Bounded hot path: claim_key() is one table lookup on an already-read
+---    keycode; no additional native event field is read for ordinary keys.
+--- ==============================================================================
+
+local M = {}
+
+local Keycodes       = require("platform.input.keycodes.core")
+local Logger         = require("core.logger.engine.logger")
+local SyntheticInput = require("platform.input.synthetic_input")
+local ControlSignals = require("layouts.engine.layers.control_signals")
+
+local LOG = "keymap.control_sentinels"
+
+--- Signal published when Karabiner enters the navigation layer (F20 sentinel).
+M.NAV_LAYER_ENTERED = "nav_layer_entered"
+--- Signal published when Karabiner leaves the navigation layer (F19 sentinel).
+M.NAV_LAYER_EXITED = "nav_layer_exited"
+M.ONE_SHOT_SHIFT = "one_shot_shift"
+M.CAPSWORD_ACTIVATED = "capsword_activated"
+M.CAPSWORD_DEACTIVATED = "capsword_deactivated"
+--- A tap-hold key's own command follows (hotstrings.tap_hold_resets_word).
+M.TAP_HOLD_COMMAND = "tap_hold_command"
+--- A tap-hold key's Ctrl, Cmd or Option hold follows (context-menu sentinel).
+M.TAP_HOLD_MODIFIER = "tap_hold_modifier"
+
+-- Reserved keycode → published signal. Karabiner prepends F20 to every action
+-- that activates the navigation layer, appends F19 to every one that turns it
+-- off, and leads every tap-hold hold pressing Ctrl, Cmd or Option with the
+-- untagged context-menu key (platform/remap/generator.lua).
+local SIGNAL_BY_KEYCODE = {
+	[Keycodes.F20_LAYER_NAV_ENTERED]          = M.NAV_LAYER_ENTERED,
+	[Keycodes.F19_LAYER_NAV_EXITED]           = M.NAV_LAYER_EXITED,
+	[Keycodes.CONTEXT_MENU_TAP_HOLD_MODIFIER] = M.TAP_HOLD_MODIFIER,
+}
+
+-- name → callback(signal). Keyed slots, so a module reload replaces its own
+-- listener instead of stacking a stale closure beside the new one.
+local _listeners = {}
+local _listener_failure_logged = {}
+
+
+--- Registers, replaces, or removes one named listener.
+--- Listeners run inside the eventtap callback that claimed the sentinel. They
+--- must do bounded in-memory work and defer anything else off the callback.
+--- @param name string Stable listener identity.
+--- @param callback function|nil Receives the signal name and the sentinel's
+---   modifier flags (nil for a published layer move); nil unregisters.
+function M.set_listener(name, callback)
+	assert(type(name) == "string" and name ~= "",
+		"keymap.control_sentinels.set_listener: name must be a non-empty string")
+	assert(callback == nil or type(callback) == "function",
+		"keymap.control_sentinels.set_listener: callback must be a function or nil")
+	_listeners[name] = callback
+	_listener_failure_logged[name] = nil
+end
+
+
+--- Reports one listener failure off the eventtap, once per listener.
+--- @param name string Listener identity.
+--- @param detail any Failure detail.
+local function report_listener_failure(name, detail)
+	if _listener_failure_logged[name] then return end
+	_listener_failure_logged[name] = true
+	-- Logger writes files synchronously; never do that on the HID callback.
+	local scheduled = SyntheticInput.defer_after_callback("control sentinel listener failure",
+		function()
+			Logger.error(LOG, "Sentinel listener '%s' failed: %s.", name, tostring(detail))
+		end)
+	if not scheduled then _listener_failure_logged[name] = nil end
+end
+
+
+--- Delivers one signal to every registered listener.
+--- @param signal string Published signal name.
+--- @param flags table|nil The sentinel key-down's modifier flags, when a key carried it.
+local function publish(signal, flags)
+	for name, callback in pairs(_listeners) do
+		local ok, err = pcall(callback, signal, flags)
+		if not ok then report_listener_failure(name, err) end
+	end
+end
+
+
+--- Publishes a navigation-layer transition that no sentinel key carried.
+--- A Lua catalogue action (layer_on/layer_off on a gesture or an action slot)
+--- writes the Karabiner layer variable directly, so no F20/F19 reaches the
+--- keymap tap; its settled write must still move the wheel bindings with it.
+--- @param active boolean True when the layer was entered, false when left.
+function M.publish_nav_layer(active)
+	assert(type(active) == "boolean",
+		"keymap.control_sentinels.publish_nav_layer: active must be a boolean")
+	publish(active and M.NAV_LAYER_ENTERED or M.NAV_LAYER_EXITED)
+end
+
+
+--- Returns whether a keycode is a reserved Karabiner control sentinel.
+--- @param keycode number Quartz keycode.
+--- @return boolean
+function M.is_sentinel(keycode)
+	return SIGNAL_BY_KEYCODE[keycode] ~= nil
+end
+
+
+--- Claims one reserved Karabiner control key so the calling tap deletes it.
+--- Key-down publishes the signal; key-up is swallowed silently so no orphan
+--- release reaches the application either.
+--- @param keycode number Keycode already read by the calling tap.
+--- @param is_down boolean True for key-down, false for key-up.
+--- @param flags table|nil Modifier flags, read only for a reserved key-down.
+--- @return boolean consumed True when the caller must delete the event.
+function M.claim_key(keycode, is_down, flags)
+	local signal = SIGNAL_BY_KEYCODE[keycode]
+	if signal == nil then return false end
+	-- F20 carries the exact control tags; F19 remains the navigation exit even
+	-- while the user's hand still holds tagged modifiers.
+	if signal == M.NAV_LAYER_ENTERED then signal = ControlSignals.decode(flags) or signal end
+	if is_down then publish(signal, flags) end
+	return true
+end
+
+
+return M

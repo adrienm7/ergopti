@@ -194,13 +194,13 @@ function M.run(options)
 		set_runtime_guard = noop,
 	}
 	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = noop }
-	package.loaded["modules.keymap.registry"] = {
+	package.loaded["hotstrings.engine.expander.registry"] = {
 		init = function() return true end,
 		mappings_for_tail = function() return nil end,
 		mappings_for_star_tail = function() return nil end,
 	}
-	package.loaded["modules.hotstrings.hotstrings_config"] = {}
-	package.loaded["modules.keymap.terminator_replay"] = {
+	package.loaded["hotstrings.engine.catalogue.config"] = {}
+	package.loaded["hotstrings.engine.expander.terminator_replay"] = {
 		init = function() return true end,
 		flush_now = noop,
 	}
@@ -218,7 +218,7 @@ function M.run(options)
 	}
 
 	local synthetic = require("platform.input.synthetic_input")
-	local km_utils = require("modules.keymap.utils")
+	local km_utils = require("hotstrings.engine.expander.utils")
 	local terminal_target = options.terminal and { id = "terminal-app" } or nil
 	if terminal_target then
 		local text_sender = require("platform.input.text_sender")
@@ -236,15 +236,15 @@ function M.run(options)
 	local expander
 	if options.expander then
 		expander = options.expander
-		package.loaded["modules.keymap.expander"] = expander
+		package.loaded["hotstrings.engine.expander.expander"] = expander
 	elseif options.expander_failure then
 		expander = {
 			init = function() return true end,
 			perform_text_replacement = function() return false end,
 		}
-		package.loaded["modules.keymap.expander"] = expander
+		package.loaded["hotstrings.engine.expander.expander"] = expander
 	else
-		expander = require("modules.keymap.expander")
+		expander = require("hotstrings.engine.expander.expander")
 	end
 
 	local bridge = require("ai.engine.bridge")
@@ -273,7 +273,7 @@ function M.run(options)
 		preview_autocorrect_enabled = true,
 	})
 	if not options.expander_failure and not options.expander then
-		expander.init(state, package.loaded["modules.keymap.registry"], bridge)
+		expander.init(state, package.loaded["hotstrings.engine.expander.registry"], bridge)
 	end
 
 	local buffer_before = state.buffer

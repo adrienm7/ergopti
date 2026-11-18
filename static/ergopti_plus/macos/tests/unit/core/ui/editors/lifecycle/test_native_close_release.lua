@@ -12,16 +12,16 @@ local helpers = require("tests.helpers")
 require("core.logger.engine")
 
 local EDITORS = {
-	"ui.hotstring_editor", "ui.hotstrings_config_window", "ui.personal_info_editor", "ai.ui.prompt_editor",
+	"hotstrings.ui.hotstring_editor", "hotstrings.ui.hotstrings_config_window", "hotstrings.ui.personal_info_editor", "ai.ui.prompt_editor",
 }
 
 local function with_native_editor(name, scenario)
 	return helpers.with_stub_scope({
-		"ui.hotstring_editor", "ui.hotstring_editor.save_validation", "ui.hotstrings_config_window",
-		"ui.personal_info_editor", "ai.ui.prompt_editor", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.events.timer_scheduler",
+		"hotstrings.ui.hotstring_editor", "hotstrings.ui.hotstring_editor.save_validation", "hotstrings.ui.hotstrings_config_window",
+		"hotstrings.ui.personal_info_editor", "ai.ui.prompt_editor", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.events.timer_scheduler",
 		"core.ui.adapters.webview_result", "core.timing.engine.deferred_work", "core.fs.engine.paths", "core.fs.engine.dir", "core.ui.engine.notifications",
-		"core.text.engine.toml.reader", "core.text.engine.toml.writer", "modules.hotstrings.hotstrings_config",
-		"modules.hotstrings.hotstrings_config_schema", "platform.input.hotkey_registrar", "keyboard.engine.chord",
+		"core.text.engine.toml.reader", "core.text.engine.toml.writer", "hotstrings.engine.catalogue.config",
+		"hotstrings.engine.catalogue.config_schema", "platform.input.hotkey_registrar", "keyboard.engine.chord",
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
 		"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
@@ -52,7 +52,7 @@ local function with_native_editor(name, scenario)
 				return { frame = function() return { x = 0, y = 0, w = 1400, h = 900 } end }
 			end },
 		})
-		if name == "ui.hotstring_editor" then editor.init(helpers.shared("hotstrings/data/catalogue/defaults.toml"), {}) end
+		if name == "hotstrings.ui.hotstring_editor" then editor.init(helpers.shared("hotstrings/data/catalogue/defaults.toml"), {}) end
 		function h.open() return editor.open({}, function() return true end) end
 		function h.drain() h.drain_native_close() end
 		scenario(editor, h)

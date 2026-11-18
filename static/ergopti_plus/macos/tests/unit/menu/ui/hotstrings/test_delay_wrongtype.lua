@@ -12,7 +12,7 @@
 --- make_delay_item is a deep local; the coercion is pinned at source + as an
 --- arithmetic-safety unit on the exact expression.
 ---
---- PF-4: ui/menu/menu_hotstrings.lua was later split into
+--- PF-4: hotstrings/ui/menu/hotstrings.lua was later split into
 --- menu_hotstrings_management.lua + menu_hotstrings_custom.lua, relocating the
 --- fix to menu_hotstrings_management.lua — this test's hardcoded path is
 --- updated to follow it. The runtime fix itself was never lost.
@@ -22,11 +22,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("hotstrings delay item coerces a wrong-typed delay", function()
 	helpers.it("source: cur_val is tonumber-coerced before the *1000 arithmetic", function()
-		-- Selected by a declaration unique to ui/menu/menu_hotstrings_management.lua rather than by
+		-- Selected by a declaration unique to hotstrings/ui/menu/management.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_unit("function M.build_management(ctx)")
-		helpers.assert_true(src ~= nil, "ui/menu/menu_hotstrings_management.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "hotstrings/ui/menu/management.lua source must be locatable")
 		helpers.assert_true(src:find("tonumber(is_base and state.expansion_delay", 1, true) ~= nil,
 			"cur_val must be tonumber-coerced (fail closed to default_val) before * 1000")
 		helpers.assert_true(src:find("local cur_val = is_base and state.expansion_delay or", 1, true) == nil,

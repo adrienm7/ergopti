@@ -50,7 +50,7 @@ global _ActPickWeb_NavSub     := unset
 ; unsubscribe line calls remove_WebMessageReceived via ComCall against a
 ; CoreWebView2 pointer already invalidated by the first pass's
 ; Controller.Close() — a genuine SEH access violation no AHK try/catch can
-; intercept (see personal_toml_editor_webview.ahk _HsEdWeb_ResetDone for the
+; intercept (see ../hotstrings/ui/personal_toml_editor_webview.ahk _HsEdWeb_ResetDone for the
 ; crash this mirrors). The flag makes the second call a true no-op instead.
 global _ActPickWeb_ResetDone  := false
 global _ActPickWeb_SubscriptionOwner := 0

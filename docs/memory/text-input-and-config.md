@@ -425,7 +425,7 @@ dispatch alike. Only the layout emulation stamped that map, so with the
 emulation off (the W1 neutral layout setting) nothing delayed fired or
 previewed. The ungated repeat doubling was the only bubble left, then none
 once it was withheld. The prefix watcher now stamps each observed character
-through `AppState_TouchLastSentKey` (`infra/hotstrings/hotstring_send.ahk`)
+through `AppState_TouchLastSentKey` (`hotstrings/engine/matcher/send.ahk`)
 before feeding the engine. Action: a new path that feeds the engine a
 character already on screen stamps it through that owner. Never write the map
 elsewhere, and never push the ring (`_LSCPush`) from the watcher: the emulation

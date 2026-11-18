@@ -104,7 +104,7 @@ function M.run(receipt_path, destination, nonce)
 		local _, source_status = FileSystem.read_with_status(destination)
 		assert(source_status == "absent", "Private Script source must initially be absent")
 		-- Only the standalone bootstrap initializes these native locale owners.
-		assert(package.loaded["modules.keymap"] == nil and package.loaded["menu.ui"] == nil,
+		assert(package.loaded["hotstrings.engine.expander"] == nil and package.loaded["menu.ui"] == nil,
 			"The managed driver must not own this standalone native probe")
 		I18n.set_locale_injector(function(code) Locale.set_locale(code) end)
 		I18n.init()

@@ -87,7 +87,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 		for _, enabled in ipairs({ true, false }) do
 			helpers.it("a category offers the explicit scope command " .. tostring(enabled)
 				.. " behind group gate " .. tostring(posture), function()
-				local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+				local hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 				local ctx, batches = context(not posture, posture)
 				ctx.state.keymap = false
 				local starts, saves, updates = 0, 0, 0
@@ -111,7 +111,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 		end
 
 		helpers.it("a language submenu opens with one checkbox, ticked " .. tostring(posture), function()
-			local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+			local hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 			local ctx, batches = context(posture, posture)
 			local rows = hotstrings.build_language_bulk_actions(ctx, { "alpha" })
 			helpers.assert_eq(#rows, 1, "the pair is one row")
@@ -124,7 +124,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 	end
 
 	helpers.it("one group with a section off leaves every « all » checkbox unticked", function()
-		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 		local ctx = context(true, true, { "alpha.toml", "beta.toml" })
 		ctx.keymap.is_section_enabled = function(group, section)
 			return not (group == "beta" and section == "two")
@@ -137,7 +137,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 	end)
 
 	helpers.it("a paused script can choose its next category without starting capture", function()
-		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 		local ctx, batches = context(true, true)
 		ctx.paused = true
 		ctx.state.keymap = false
@@ -155,7 +155,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 	for _, enabled in ipairs({ true, false }) do
 		for _, refusal in ipairs({ "false", "nil", "throw" }) do
 			helpers.it("a refused category save " .. refusal .. " restores posture " .. tostring(enabled), function()
-				local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+				local hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 				local ctx, batches = context(not enabled, not enabled)
 				ctx.state.hotstrings.alpha = not enabled
 				ctx.state.hotstrings.beta = true
@@ -180,7 +180,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 	end
 
 	helpers.it("a refused tray refresh cannot undo an acknowledged category save", function()
-		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 		local ctx, batches = context(false, false)
 		ctx.state.hotstrings.alpha = false
 		local saved_choice, refreshes
@@ -198,7 +198,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 	for _, enabled in ipairs({ true, false }) do
 		for _, posture in ipairs({ true, false }) do
 			helpers.it("personal scope command " .. tostring(enabled) .. " behind gate " .. tostring(posture), function()
-				local custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+				local custom = helpers.load_with_stubs("hotstrings.ui.menu.custom")
 				local ctx, batches = context(not posture, posture, { "personal.toml" })
 				ctx.state.trigger_char = "★"
 				ctx.state.keymap = false
@@ -225,7 +225,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 		end
 		for _, refusal in ipairs({ "false", "nil", "throw" }) do
 			helpers.it("personal scope restores every prior gate after " .. refusal .. " save for " .. tostring(enabled), function()
-				local custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+				local custom = helpers.load_with_stubs("hotstrings.ui.menu.custom")
 				local ctx, batches = context(not enabled, not enabled, { "personal.toml", "personal_ext_work.toml" })
 				ctx.state.trigger_char = "★"
 				ctx.state.hotstrings = { personal = not enabled, custom = not enabled, unrelated = true }
@@ -249,7 +249,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 		end
 	end
 	helpers.it("a personal file submenu owns only its group and keeps shared command order", function()
-		helpers.with_stub_scope({ "settings.engine.scope.personal_file_scope", "ui.menu.menu_hotstrings_custom" }, function()
+		helpers.with_stub_scope({ "settings.engine.scope.personal_file_scope", "hotstrings.ui.menu.custom" }, function()
 			-- This projection fixture owns a synthetic acknowledged group. Actual
 			-- provenance, native route and refusal behavior have their own owner test.
 			local bindings = 0
@@ -257,7 +257,7 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 				bindings = bindings + 1
 				return function() return true end
 			end }
-			local custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+			local custom = helpers.load_with_stubs("hotstrings.ui.menu.custom")
 			local ctx, batches = context(false, false, { "personal.toml", "personal_ext_work.toml" })
 			ctx.state.trigger_char = "★"
 			ctx.hotfile_paths = { personal_ext_work = "/user/work.toml" }
@@ -304,18 +304,18 @@ end)
 --- @param body function Real category callback observations.
 local function with_category_file(committed, body, change_label)
 	helpers.with_stub_scope({ "menu.engine.manifest_menu", "core.timing.engine.deferred_work",
-		"core.events.timer_scheduler", "core.process.adapters.shell_runner", "modules.keymap", "modules.dynamic_hotstrings",
-		"ui.menu.menu_hotstrings", "ui.menu.menu_hotstrings_custom" }, function()
+		"core.events.timer_scheduler", "core.process.adapters.shell_runner", "hotstrings.engine.expander", "hotstrings.engine.dynamic",
+		"hotstrings.ui.menu.hotstrings", "hotstrings.ui.menu.custom" }, function()
 		-- Category file opening neither starts nor inspects these unrelated engines.
-		package.loaded["modules.keymap"] = { DEFAULT_STATE = {} }
-		package.loaded["modules.dynamic_hotstrings"] = { DEFAULT_STATE = {} }
+		package.loaded["hotstrings.engine.expander"] = { DEFAULT_STATE = {} }
+		package.loaded["hotstrings.engine.dynamic"] = { DEFAULT_STATE = {} }
 		local callbacks, launches = {}, {}
 		package.loaded["core.process.adapters.shell_runner"] = { open = function(path) launches[#launches + 1] = path; return true end }
 		package.loaded["core.events.timer_scheduler"] = { after = function(_, callback)
 			callbacks[#callbacks + 1] = callback
 			return {}, committed
 		end }
-		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 		package.loaded["menu.engine.manifest_menu"] = assert(require("menu.engine.renderer").new({
 			platform = "hs", manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 			json_decode = function(bytes)
@@ -326,8 +326,8 @@ local function with_category_file(committed, body, change_label)
 			i18n = { get = function(key) return key end, section = function(key) return key end },
 			logger = require("core.logger.engine.logger"),
 		}))
-		package.loaded["ui.menu.menu_hotstrings"] = nil
-		hotstrings = require("ui.menu.menu_hotstrings")
+		package.loaded["hotstrings.ui.menu.hotstrings"] = nil
+		hotstrings = require("hotstrings.ui.menu.hotstrings")
 		body(hotstrings, callbacks, launches)
 	end)
 end
@@ -382,15 +382,15 @@ end)
 
 --- The actual common-category owner consumes a fresh genuine manifest renderer.
 local function with_common_section_frame(body)
-	return helpers.with_stub_scope({ "core.logger.engine.logger", "menu.engine.manifest_menu", "ui.menu.menu_hotstrings",
-		"ui.menu.menu_hotstrings_custom", "ui.menu.menu_hotstrings_management" }, function()
+	return helpers.with_stub_scope({ "core.logger.engine.logger", "menu.engine.manifest_menu", "hotstrings.ui.menu.hotstrings",
+		"hotstrings.ui.menu.custom", "hotstrings.ui.menu.management" }, function()
 		local translator = require("core.i18n.engine.i18n")
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
 			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.fs.adapters.json_codec").decode, i18n = translator, logger = require("core.logger.engine.logger"),
 		}))
 		package.loaded["menu.engine.manifest_menu"] = renderer
-		local hotstrings = require("ui.menu.menu_hotstrings")
+		local hotstrings = require("hotstrings.ui.menu.hotstrings")
 		local ctx = context(true, true)
 		ctx.keymap.get_sections = function() return {
 			{ name = "-" }, { name = "one", count = 1, description = "Independent One" },
@@ -459,12 +459,12 @@ local function with_personal_info_leaf(body)
 		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["core.timing.engine.deferred_work"] = nil
 		package.loaded["menu.engine.manifest_menu"] = nil
-		package.loaded["ui.menu.menu_hotstrings"] = nil
+		package.loaded["hotstrings.ui.menu.hotstrings"] = nil
 		local timer
 		local called, detail = xpcall(function()
 			timer = require("core.events.timer_scheduler")
 			local renderer = assert(require("menu.engine.manifest_menu"))
-			local hotstrings = require("ui.menu.menu_hotstrings")
+			local hotstrings = require("hotstrings.ui.menu.hotstrings")
 			local ctx = context(true, true)
 			local opened, saves, updates, notifications = 0, 0, 0, 0
 			ctx.applyTriggerChar = function(value) return "@ " .. value end
@@ -609,7 +609,7 @@ end)
 
 helpers.describe("hotstring section order native menu", function()
 	helpers.it("hotstring-section-order: original menu moves, rolls back and rejects a stale click", function()
-		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 		local ctx = context(true, true)
 		ctx.keymap.get_sections = function() return { { name = "one" }, { name = "two" } } end
 		ctx.is_paused = function() return false end

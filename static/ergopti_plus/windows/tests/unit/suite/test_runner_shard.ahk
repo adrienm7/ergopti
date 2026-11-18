@@ -56,7 +56,7 @@ _RSH_GroupRules() {
 	AssertEqual("config-updater", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\core\text\toml\test_writer_admission.ahk"))
 	AssertEqual("config-updater", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_updater.ahk"))
 	AssertEqual("config-updater", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\updater\test_updater_curl_capture.ahk"))
-	AssertEqual("hotstrings-shortcuts", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\hotstrings\personal\test_user_hotstrings.ahk"))
+	AssertEqual("hotstrings-shortcuts", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\hotstrings\engine\personal\test_user_hotstrings.ahk"))
 	AssertEqual("hotstrings-shortcuts", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\shortcuts\test_capsword_auto_off.ahk"))
 	AssertEqual("keymap-gestures", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\platform\remap\tap_hold\test_tap_hold_loader.ahk"))
 	AssertEqual("keymap-gestures", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\gestures\engine\test_gestures.ahk"))

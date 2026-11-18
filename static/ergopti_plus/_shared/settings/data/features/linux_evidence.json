@@ -79,11 +79,11 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/hotstrings/word_reset.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/word_reset.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/menu/ui/builder/builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_word_reset.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_word_reset_events.lua"
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/engine/test_word_reset.lua",
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/engine/test_word_reset_events.lua"
 			]
 		},
 		"magic_key_source": {
@@ -96,11 +96,11 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/hotstrings/magic_key_source.lua",
-				"static/ergopti_plus/linux/infra/hotstring_preferences.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/magic_key_source.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/matcher/preferences.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/menu/ui/builder/builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/magic_key/test_magic_key_source_config_toml_leaf.lua"
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/magic_key/test_source_config_toml_leaf.lua"
 			]
 		},
 		"script_chords": {
@@ -137,9 +137,9 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/dynamic/manager.lua",
 				"static/ergopti_plus/linux/tests/unit/settings/test_empty_config_neutral.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/dynamic_hotstrings/test_dynamic_rule_families.lua"
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/dynamic/test_rule_families.lua"
 			]
 		},
 		"tap_hold_master": {
@@ -393,19 +393,19 @@
 			"proof_tier": "integration",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
-				"static/ergopti_plus/linux/modules/hotstrings/loader.lua",
-				"static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua",
-				"static/ergopti_plus/linux/modules/hotstrings/magic_key.lua",
-				"static/ergopti_plus/linux/modules/hotstrings/preview_settings.lua",
-				"static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/catalogue/test_hotstrings_config.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/catalogue/test_loader_catalogue.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/dynamic_hotstrings/test_dynamic_rule_families.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_prefix_expansions.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/magic_key/test_magic_key.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/preview/test_preview_rows.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_repeat_key.lua"
+				"static/ergopti_plus/linux/hotstrings/engine/catalogue/config.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/loader.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/dynamic/manager.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/magic_key.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/preview_settings.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/repeat_key.lua",
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/catalogue/test_config.lua",
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/catalogue/test_loader_catalogue.lua",
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/dynamic/test_rule_families.lua",
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/engine/test_prefix_expansions.lua",
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/magic_key/test_magic_key.lua",
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/preview/test_rows.lua",
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/engine/test_repeat_key.lua"
 			]
 		},
 		"llm": {
@@ -572,14 +572,14 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua",
-				"static/ergopti_plus/linux/modules/dynamic_hotstrings/user_code.lua",
-				"static/ergopti_plus/linux/infra/user_hotstring_runtime.lua",
-				"static/ergopti_plus/linux/infra/hotstring_preferences.lua",
-				"static/ergopti_plus/linux/adapters/user_hotstring_destination.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/dynamic/manager.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/dynamic/user_code.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/user_hotstring_runtime.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/matcher/preferences.lua",
+				"static/ergopti_plus/linux/hotstrings/adapters/user_hotstring_destination.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/menu/ui/builder/builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/dynamic_hotstrings/test_user_code_contract.lua",
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/dynamic/test_user_code_contract.lua",
 				"static/ergopti_plus/linux/tests/unit/settings/preferences/test_user_hotstring_runtime.lua",
 				"static/ergopti_plus/linux/tests/unit/platform/input/synthetic_input/test_user_hotstring_destination.lua",
 				"static/ergopti_plus/linux/tests/unit/menu/hotstrings/test_user_hotstring_menu.lua"
@@ -1137,10 +1137,10 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
-				"static/ergopti_plus/linux/modules/hotstrings/expansion_delay.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/catalogue/config.lua",
+				"static/ergopti_plus/linux/hotstrings/engine/expansion_delay.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_expansion_delay.lua"
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/engine/test_expansion_delay.lua"
 			]
 		},
 		"layout.on_pause": {

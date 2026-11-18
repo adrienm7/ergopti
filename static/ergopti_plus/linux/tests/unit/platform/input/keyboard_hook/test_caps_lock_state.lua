@@ -26,14 +26,14 @@ local LED_CAPSL = 1
 local function load_hook()
 	local saved = {
 		xkb = package.loaded["adapters.xkb_capture"],
-		finder = package.loaded["modules.hotstrings.device_finder"],
+		finder = package.loaded["hotstrings.engine.device_finder"],
 	}
 	package.loaded["adapters.xkb_capture"] = {
 		is_ready = function() return true end,
 		reset_state = function() return true end,
 		process = function() return nil, nil, nil end,
 	}
-	package.loaded["modules.hotstrings.device_finder"] = {
+	package.loaded["hotstrings.engine.device_finder"] = {
 		find_keyboard = function() return nil end,
 		is_key_device = function() return true, nil end,
 		-- Controlled keyboard sources have no REL/ABS axes.
@@ -42,7 +42,7 @@ local function load_hook()
 	}
 	return helpers.load_module("platform.input.keyboard_hook"), function()
 		package.loaded["adapters.xkb_capture"] = saved.xkb
-		package.loaded["modules.hotstrings.device_finder"] = saved.finder
+		package.loaded["hotstrings.engine.device_finder"] = saved.finder
 	end
 end
 

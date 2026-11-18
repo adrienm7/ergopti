@@ -4,7 +4,7 @@
 --- MODULE: Hotstring Section Order Tray Host
 --- DESCRIPTION:
 --- The daemon's tray without its keyboard: the real hotstring catalogue
---- (modules/hotstrings/hotstrings_config.lua over the bundled packs), the real
+--- (hotstrings/engine/catalogue/config.lua over the bundled packs), the real
 --- menu builder (menu/ui/builder/builder.lua) and the real tray (tray/adapters/menu.lua
 --- over libayatana-appindicator), rebuilt through the daemon's own rebuild owner
 --- after every committed click. tray_panel.py clicks it over D-Bus.
@@ -33,10 +33,10 @@ if not Indicator.is_available() then
 end
 
 local LOG = "tests.desktop.hotstring_order"
-local Config = require("modules.hotstrings.hotstrings_config")
+local Config = require("hotstrings.engine.catalogue.config")
 local Builder = require("menu.ui.builder.builder")
 local rebuild = nil
-assert(Config.init(require("modules.hotstrings.engine").new(), nil, function() if rebuild then rebuild() end end))
+assert(Config.init(require("hotstrings.engine.engine").new(), nil, function() if rebuild then rebuild() end end))
 assert(select(2, Config.load_all(nil, true)) == true, "the bundled catalogue must load")
 
 local function context()

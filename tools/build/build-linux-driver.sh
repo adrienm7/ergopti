@@ -228,11 +228,11 @@ REQUIRED_FILES=(
 	"linux/apps/cloner.lua"
 	"_shared/apps/data/encryptor/format.json"
 	"_shared/apps/data/app_cloner/families.json"
-	"linux/modules/hotstrings/engine.lua"
-	"linux/modules/hotstrings/loader.lua"
-	"linux/modules/hotstrings/injector.lua"
-	"linux/modules/hotstrings/input_reader.lua"
-	"linux/modules/hotstrings/device_finder.lua"
+	"linux/hotstrings/engine/engine.lua"
+	"linux/hotstrings/engine/loader.lua"
+	"linux/hotstrings/engine/injector.lua"
+	"linux/hotstrings/engine/input_reader.lua"
+	"linux/hotstrings/engine/device_finder.lua"
 	"linux/modules/keystats/metrics_collector.lua"
 	"linux/core/network/adapters/http_client.lua"
 	"linux/tray/adapters/menu.lua"
@@ -484,9 +484,9 @@ else
 	# Lua's package.path which expects Windows-style (d:\...).
 	if [[ "$(uname -s 2>/dev/null || echo '')" == Linux ]]; then
 		# Test 2: require the engine module (validates package.path)
-		echo "  Test: require('modules.hotstrings.engine')..."
+		echo "  Test: require('hotstrings.engine.engine')..."
 		if _lua_with_path "
-			local engine = require('modules.hotstrings.engine')
+			local engine = require('hotstrings.engine.engine')
 			local e = engine.new()
 			assert(e ~= nil, 'engine.new() returned nil')
 			assert(type(e.on_char) == 'function', 'on_char is not a function')

@@ -46,7 +46,7 @@ local function with_output(body)
 	layout._set_table_for_test({ z = { keycode = KEY_W, level = 1, mods = {} },
 		x = { keycode = KEY_X, level = 1, mods = {} } })
 	helpers.load_module("gestures.engine.combo_emitter")
-	local injector = helpers.load_module("modules.hotstrings.injector")
+	local injector = helpers.load_module("hotstrings.engine.injector")
 	injector._set_nanosleep_for_test(function() end)
 	local emulation = helpers.load_module("modules.keymap.layout_emulation")
 	local ok, err = pcall(function()

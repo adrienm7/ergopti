@@ -194,8 +194,8 @@ for (const rel of WRAP_RESET_CONSUMERS) {
 // Every migrated native consumer must still delegate its actual restore callback
 // to the declaration checked above; removing a native label must not remove coverage.
 for (const rel of [
-	'macos/ui/menu/menu_hotstrings_management.lua',
-	'windows/ui/menu/menu_hotstrings.ahk',
+	'macos/hotstrings/ui/menu/management.lua',
+	'windows/hotstrings/ui/menu/hotstrings.ahk',
 	'linux/menu/ui/builder/builder.lua'
 ]) {
 	const text = readSourceFile(path.join(SP, rel));

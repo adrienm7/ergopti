@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local SCOPE_MODULES = {
 	script_scope = "settings.engine.scope.script_scope", tap_hold_scope = "infra.tap_hold_scope",
 	shortcuts_scope = "infra.shortcuts_scope", llm_scope = "ai.engine.scope", metrics_scope = "infra.metrics_scope",
-	hotstrings_scope = "infra.hotstrings_scope", dynamic_hotstrings_scope = "infra.dynamic_hotstrings_scope",
+	hotstrings_scope = "hotstrings.engine.catalogue.scope", dynamic_hotstrings_scope = "hotstrings.engine.dynamic.scope",
 	key_combinations_scope = "infra.key_combinations_scope", global_scope = "settings.engine.scope.global_scope",
 	gesture_scope = "gestures.engine.manager",
 }

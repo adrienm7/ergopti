@@ -52,8 +52,8 @@ end
 --- @param body function body(Import, path, Preferences)
 local function with_config(content, body)
 	local previous = {}
-	for _, name in ipairs({ "infra.hotstring_preferences", "modules.hotstrings.terminator_settings",
-		"infra.legacy_hotstring_storage" }) do
+	for _, name in ipairs({ "hotstrings.engine.matcher.preferences", "hotstrings.engine.matcher.terminator_settings",
+		"hotstrings.engine.legacy_hotstring_storage" }) do
 		previous[name] = package.loaded[name]
 		package.loaded[name] = nil
 	end
@@ -67,9 +67,9 @@ local function with_config(content, body)
 		handle:close()
 	end
 	local ok, err = pcall(function()
-		local Preferences = require("infra.hotstring_preferences")
+		local Preferences = require("hotstrings.engine.matcher.preferences")
 		assert(Preferences._set_file_for_test(path))
-		body(require("infra.legacy_hotstring_storage"), path, Preferences)
+		body(require("hotstrings.engine.legacy_hotstring_storage"), path, Preferences)
 	end)
 	for name, value in pairs(previous) do package.loaded[name] = value end
 	os.remove(path)
@@ -184,7 +184,7 @@ helpers.describe("legacy hotstring storage import: word delimiters", function()
 			helpers.assert_nil(adapter.values[CUSTOM_KEY])
 
 			-- The owner reads exactly what was imported.
-			local Settings = require("modules.hotstrings.terminator_settings")
+			local Settings = require("hotstrings.engine.matcher.terminator_settings")
 			local Terminators = require("layouts.engine.layers.terminators")
 			local before = Settings.snapshot()
 			local paths = require("settings.engine.paths")

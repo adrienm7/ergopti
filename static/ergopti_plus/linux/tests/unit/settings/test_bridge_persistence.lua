@@ -73,7 +73,7 @@ local function with_writer_spy(module_name, invoke)
 	}
 	local saved = package.loaded["core.text.engine.toml_codec.writer"]
 	local previous_manager = package.loaded["core.ui.ui.webview_manager"]
-	if module_name == "ui.hotstring_editor.bridge" then
+	if module_name == "hotstrings.ui.hotstring_editor.bridge" then
 		package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return 73 end, eval_js = function() return true end }
 	end
 	package.loaded["core.text.engine.toml_codec.writer"] = fake
@@ -168,7 +168,7 @@ helpers.describe("bridge handler TOML persistence", function()
 	helpers.it("hotstring_editor_bridge.save writes the personal file, named by its stem", function()
 		local state = { config = { get_config_dir = function() return "/home/user/.config/ergopti/hotstrings" end } }
 		local captured = with_writer_spy(
-			"ui.hotstring_editor.bridge",
+			"hotstrings.ui.hotstring_editor.bridge",
 			function(handler)
 				local context = open_personal_view(handler, state)
 				handler.on_message({
@@ -221,7 +221,7 @@ helpers.describe("bridge handler TOML persistence", function()
     seed:close()
     local state = { config = { get_config_dir = function() return dir end } }
     local captured = with_writer_spy(
-      "ui.hotstring_editor.bridge",
+      "hotstrings.ui.hotstring_editor.bridge",
       function(handler)
         local context = open_personal_view(handler, state)
         handler.on_message({
@@ -278,7 +278,7 @@ helpers.describe("bridge handler TOML persistence", function()
 		local previous_manager = package.loaded["core.ui.ui.webview_manager"]
 		package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return 73 end, eval_js = function() return true end }
 		local ok, err = pcall(function()
-			local handler = helpers.load_module("ui.hotstring_editor.bridge")
+			local handler = helpers.load_module("hotstrings.ui.hotstring_editor.bridge")
 			local context = open_personal_view(handler, state)
 			handler.on_message({ action = "save", data = {
 				sections_order = { "english", "metiers" },
@@ -296,7 +296,7 @@ helpers.describe("bridge handler TOML persistence", function()
 			} }, state, context)
 		end)
 		package.loaded["core.ui.ui.webview_manager"] = previous_manager
-		package.loaded["ui.hotstring_editor.bridge"] = nil
+		package.loaded["hotstrings.ui.hotstring_editor.bridge"] = nil
 		-- The writer may leave its backup beside the file.
 		local listing = io.popen('ls -A "' .. dir .. '"')
 		for name in listing:lines() do os.remove(dir .. "/" .. name) end
@@ -408,7 +408,7 @@ helpers.describe("hotstring editor classified source admission", function()
 		local native_open, native_rename = io.open, os.rename
 		local NativeWriter = require("core.fs.engine.regular_file_writer")
 		local native_stage = NativeWriter.open
-		local old_bridge = package.loaded["ui.hotstring_editor.bridge"]
+		local old_bridge = package.loaded["hotstrings.ui.hotstring_editor.bridge"]
 		local old_manager = package.loaded["core.ui.ui.webview_manager"]
 		local writer = require("core.text.engine.toml_codec.writer")
 		local reader = require("core.text.engine.toml_codec.reader")
@@ -481,7 +481,7 @@ helpers.describe("hotstring editor classified source admission", function()
 				if mode == "missing_classified" then port.read_classified = nil else port.write = function() obs.faults = obs.faults + 1; return 2 end end
 				package.loaded["core.text.engine.toml_codec.writer"] = port
 			end
-			local bridge = helpers.load_module("ui.hotstring_editor.bridge")
+			local bridge = helpers.load_module("hotstrings.ui.hotstring_editor.bridge")
 			obs.opened = bridge.push_init(state, context)
 			obs.result = bridge.on_message({ action = "save", data = {
 				sections_order = { "english" }, sections = { english = { description = "English", entries = { editor_entry("new", "next") } } },
@@ -489,7 +489,7 @@ helpers.describe("hotstring editor classified source admission", function()
 		end)
 		release_source()
 		io.open, os.rename, NativeWriter.open = native_open, native_rename, native_stage
-		package.loaded["ui.hotstring_editor.bridge"] = old_bridge
+		package.loaded["hotstrings.ui.hotstring_editor.bridge"] = old_bridge
 		package.loaded["core.ui.ui.webview_manager"] = old_manager
 		package.loaded["core.text.engine.toml_codec.writer"], package.loaded["core.text.engine.toml_codec.reader"] = old_writer, old_reader
 		local fh = native_open(path, "r"); obs.bytes = fh and fh:read("*a") or nil; if fh then fh:close() end
@@ -497,7 +497,7 @@ helpers.describe("hotstring editor classified source admission", function()
 		os.remove(path); os.remove(path .. ".tmp"); os.remove(root)
 		obs.ok, obs.problem = ok, problem
 		obs.restored = io.open == native_open and os.rename == native_rename and NativeWriter.open == native_stage
-			and package.loaded["ui.hotstring_editor.bridge"] == old_bridge
+			and package.loaded["hotstrings.ui.hotstring_editor.bridge"] == old_bridge
 			and package.loaded["core.text.engine.toml_codec.writer"] == old_writer and package.loaded["core.text.engine.toml_codec.reader"] == old_reader
 			and package.loaded["core.ui.ui.webview_manager"] == old_manager
 		return obs

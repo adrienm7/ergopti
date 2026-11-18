@@ -142,7 +142,7 @@ end
 --- the frontmost application. The frontmost check comes from NSWorkspace, so
 --- no other application is ever asked anything; Accessibility is asked only
 --- for this process's own focused window. Called from the keymap's eventtap
---- for field-run selftest keys only (modules/keymap/selftest_gate.lua).
+--- for field-run selftest keys only (hotstrings/engine/expander/selftest_gate.lua).
 --- @return number|nil window_id Nil when another application is in front or
 ---         this process has no focused window.
 function M.focused_window_id()

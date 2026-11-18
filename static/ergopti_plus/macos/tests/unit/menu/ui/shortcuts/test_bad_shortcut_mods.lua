@@ -11,7 +11,7 @@
 --- Fix: coerce_mods() wraps both callsites in menu_hotstrings.lua and
 --- menu_metrics.lua — { mods="ctrl" } is treated as { mods={"ctrl"} }.
 ---
---- PF-7: ui/menu/menu_hotstrings.lua was split into menu_hotstrings_custom.lua
+--- PF-7: hotstrings/ui/menu/hotstrings.lua was split into menu_hotstrings_custom.lua
 --- + menu_hotstrings_management.lua; coerce_mods and its two original call
 --- sites (sc_is_default, sc_label) moved intact into menu_hotstrings_custom.lua
 --- — this test's hardcoded path is updated to follow it. Separately, sc_fn()
@@ -52,7 +52,7 @@ end
 helpers.describe("M-13: coerce_mods helper present (source)", function()
 
 	helpers.it("menu_hotstrings.lua defines coerce_mods", function()
-		local src = read_src("local function split_personal_ext_stem") -- ui/menu/menu_hotstrings_custom.lua
+		local src = read_src("local function split_personal_ext_stem") -- hotstrings/ui/menu/custom.lua
 		helpers.assert_true(src:find("coerce_mods", 1, true) ~= nil,
 			"menu_hotstrings_custom.lua must define coerce_mods to handle string-typed .mods")
 	end)
@@ -80,7 +80,7 @@ end)
 helpers.describe("M-13: no unguarded sc.mods usage remaining (source)", function()
 
 	helpers.it("menu_hotstrings.lua: ipairs(sc.mods) replaced by coerce_mods", function()
-		local src = read_src("local function split_personal_ext_stem") -- ui/menu/menu_hotstrings_custom.lua
+		local src = read_src("local function split_personal_ext_stem") -- hotstrings/ui/menu/custom.lua
 		-- ipairs(sc.mods ...) without coerce_mods wrapping is the crash pattern
 		local bare = src:find("ipairs(sc%.mods")
 		helpers.assert_true(bare == nil,
@@ -88,7 +88,7 @@ helpers.describe("M-13: no unguarded sc.mods usage remaining (source)", function
 	end)
 
 	helpers.it("menu_hotstrings.lua: table.concat(sc.mods ...) replaced by coerce_mods", function()
-		local src = read_src("local function split_personal_ext_stem") -- ui/menu/menu_hotstrings_custom.lua
+		local src = read_src("local function split_personal_ext_stem") -- hotstrings/ui/menu/custom.lua
 		local bare = src:find("table%.concat%(sc%.mods")
 		helpers.assert_true(bare == nil,
 			"menu_hotstrings_custom.lua must not call table.concat(sc.mods,...) directly — use coerce_mods(sc.mods)")
@@ -125,7 +125,7 @@ end)
 helpers.describe("PF-7: sc_fn() no longer crashes on string-typed .mods", function()
 
 	helpers.it("source: sc_fn's current_str build goes through coerce_mods, not a bare .mods read", function()
-		local src = read_src("local function split_personal_ext_stem") -- ui/menu/menu_hotstrings_custom.lua
+		local src = read_src("local function split_personal_ext_stem") -- hotstrings/ui/menu/custom.lua
 		local fn_start = src:find("local function sc_fn()", 1, true)
 		helpers.assert_true(fn_start ~= nil, "sc_fn must still exist in menu_hotstrings_custom.lua")
 		local fn_end = src:find("\tend\n", fn_start)

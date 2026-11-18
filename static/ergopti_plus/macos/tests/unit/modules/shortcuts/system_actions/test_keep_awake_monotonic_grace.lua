@@ -26,7 +26,7 @@ local OWNED_MODULES = {
 	"core.timing.engine.timings",
 	"core.i18n.engine.i18n",
 	"platform.input.keycodes",
-	"modules.keymap.control_sentinels",
+	"hotstrings.engine.expander.control_sentinels",
 	"platform.input.key_state",
 	"platform.input.keyboard_geometry",
 	"platform.input.synthetic_input",
@@ -128,7 +128,7 @@ local function with_awake(callback)
 				"modules.shortcuts.actions.system_pixel", "modules.shortcuts.actions.system_mouse",
 				"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
 				"gestures.engine", "core.ui.engine.notifications", "core.logger.engine.key_event_health",
-				"core.text.engine.utils", "modules.keymap.control_sentinels", "platform.input.key_state",
+				"core.text.engine.utils", "hotstrings.engine.expander.control_sentinels", "platform.input.key_state",
 				"platform.input.keyboard_geometry", "modules.keystats.log_manager",
 			}) do package.loaded[name] = {} end
 			local System = require("modules.shortcuts.actions.system")

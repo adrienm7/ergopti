@@ -24,7 +24,7 @@ local SOURCE = '[hotstrings]\npreview_star_enabled = ' .. tostring(STAR_CHOICE) 
 --- @param content string|nil Initial bytes; nil is an absent file.
 --- @param body function body(Preferences, path)
 local function with_preferences(content, body)
-	local previous = package.loaded["infra.hotstring_preferences"]
+	local previous = package.loaded["hotstrings.engine.matcher.preferences"]
 	local path = string.format("%s/ergopti_hotstring_preferences_%d_%d.toml",
 		(os.getenv("TMPDIR") or "/tmp"):gsub("/+$", ""), os.time(), math.random(100000, 999999))
 	if content then
@@ -33,11 +33,11 @@ local function with_preferences(content, body)
 		handle:close()
 	end
 	local ok, err = pcall(function()
-		local Preferences = helpers.load_module("infra.hotstring_preferences")
+		local Preferences = helpers.load_module("hotstrings.engine.matcher.preferences")
 		assert(Preferences._set_file_for_test(path))
 		body(Preferences, path)
 	end)
-	package.loaded["infra.hotstring_preferences"] = previous
+	package.loaded["hotstrings.engine.matcher.preferences"] = previous
 	os.remove(path)
 	os.remove(path .. ".tmp")
 	if not ok then error(err, 0) end
@@ -73,8 +73,8 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 			helpers.assert_eq(decoded.hotstrings.dynamic.date_fr.enabled, true)
 			helpers.assert_eq(decoded.hotstrings.unknown, "kept")
 			helpers.assert_eq(decoded.other.value, 1)
-			package.loaded["infra.hotstring_preferences"] = nil
-			local restarted = require("infra.hotstring_preferences")
+			package.loaded["hotstrings.engine.matcher.preferences"] = nil
+			local restarted = require("hotstrings.engine.matcher.preferences")
 			assert(restarted._set_file_for_test(path))
 			helpers.assert_eq(restarted.get("hotstrings.trigger_char"), "§")
 			helpers.assert_eq(restarted.get("hotstrings.dynamic.date_fr.enabled"), true)

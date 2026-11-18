@@ -41,8 +41,8 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 	local section = presence and "preview_presence_controls" or (selected_key and "preview_magic_control" or "preview_colored_control")
 	return helpers.with_stub_scope({
 		"settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.ui.engine.dialog_util",
-		"core.i18n.engine.i18n", "menu.engine.manifest_menu", "core.ui.engine.notifications", "ui.menu.menu_hotstrings_management",
-		"modules.hotstrings.hotstrings_config",
+		"core.i18n.engine.i18n", "menu.engine.manifest_menu", "core.ui.engine.notifications", "hotstrings.ui.menu.management",
+		"hotstrings.engine.catalogue.config",
 		"menu.ui.transactions.preview_transaction", "settings.ui.menu.preferences_transaction", "menu.ui.transactions.global_actions_transaction",
 	}, function()
 		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
@@ -68,7 +68,7 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 			end, i18n = { get = translate, section = function(key) return key end },
 			logger = require("core.logger.engine.logger"),
 		}))
-		package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return { delay = 0.1, has_override = false } end }
+		package.loaded["hotstrings.engine.catalogue.config"] = { resolve = function() return { delay = 0.1, has_override = false } end }
 		package.loaded["menu.engine.manifest_menu"] = { command_row = renderer.command_row, check_row = renderer.check_row, native_child_rows = renderer.native_child_rows, get_root = renderer.get_root, template_rows = renderer.template_rows, get_array = renderer.get_array, build = function(_, _, _, _, _, providers)
 			if type(providers.preview_bubbles) == "function" then return providers.preview_bubbles() end
 			return {}
@@ -134,7 +134,7 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 				notify_feature = function() calls.notices = calls.notices + 1 end,
 				updateMenu = function() calls.updates = calls.updates + 1 end,
 			}
-			local menus = require("ui.menu.menu_hotstrings_management").build_management(context).menu
+			local menus = require("hotstrings.ui.menu.management").build_management(context).menu
 			local row = assert(find_row(menus, translate(declaration_label or label_key)))
 			callback({ action = row.action, row = row, menus = menus, state = state, calls = calls, owner = owner, global = global,
 				path = path, runtime = function() return runtime end,

@@ -510,9 +510,9 @@ helpers.describe("hotstrings scope menu composition", function()
 				return selected
 			end }
 			local overrides = { get_override_path = function() return "/virtual/hotstrings_config.toml" end }
-			package.loaded["modules.hotstrings.hotstrings_config"] = overrides
+			package.loaded["hotstrings.engine.catalogue.config"] = overrides
 			local constructions = 0
-			package.loaded["ui.menu.hotstrings_scope"] = { new = function(options)
+			package.loaded["hotstrings.ui.menu.scope"] = { new = function(options)
 				received, constructions = options, constructions + 1
 				return { apply = function(mode)
 					return options.admission("hotstrings scope fixture", function()
@@ -535,7 +535,7 @@ helpers.describe("hotstrings scope menu composition", function()
 			helpers.assert_type(received.checkpoint.capture, "function")
 			helpers.assert_type(received.checkpoint.replace, "function")
 			helpers.assert_type(received.demotions.release_feature, "function")
-			helpers.assert_eq(received.editor, package.loaded["ui.hotstring_editor"],
+			helpers.assert_eq(received.editor, package.loaded["hotstrings.ui.hotstring_editor"],
 				"the editor follows the magic key, as from its own menu row")
 			for _, name in ipairs({ "start_engine", "stop_engine", "is_personal", "remove", "capture_preferences" }) do
 				helpers.assert_type(received[name], "function", name)
@@ -553,12 +553,12 @@ helpers.describe("hotstrings scope menu composition", function()
 
 	helpers.it("skips the hotstrings category of the global restore when its owner cannot serve it", function()
 		with_menu_fixture({}, function(observations)
-			package.loaded["modules.hotstrings.hotstrings_config"] = {
+			package.loaded["hotstrings.engine.catalogue.config"] = {
 				get_override_path = function() return "/virtual/hotstrings_config.toml" end,
 			}
 			local reason = "the hotstring override file was not read cleanly"
 			local owner = { apply = function() return true end, unavailable = function() return reason end }
-			package.loaded["ui.menu.hotstrings_scope"] = { new = function() return owner end }
+			package.loaded["hotstrings.ui.menu.scope"] = { new = function() return owner end }
 			local composed
 			package.loaded["menu.ui.transactions.global_scope"] = { new = function(options)
 				composed = options

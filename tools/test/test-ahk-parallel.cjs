@@ -191,7 +191,7 @@ for (const file of [
 	'unit/diagnostics/engine/input_probe/test_rival_owner.ahk',
 	'unit/diagnostics/engine/input_probe/test_entry_owner.ahk',
 	'unit/core/ui/tooltip/test_hostile_native64.ahk',
-	'unit/modules/hotstrings/engine/test_sendinstant_clipboard_owner.ahk',
+	'unit/hotstrings/engine/engine/test_sendinstant_clipboard_owner.ahk',
 	'unit/gestures/engine/test_plain_clipboard_owner.ahk',
 	// Its second BM_CLICK went unanswered among neighbours on 2026-11-18.
 	'unit/core/ui/windows/test_app_picker_generation.ahk'

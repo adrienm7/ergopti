@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local OWNED_MODULES = {
 	"gestures.engine.sticky_modifiers",
 	"platform.input.modifier_injector",
-	"modules.keymap.control_sentinels",
+	"hotstrings.engine.expander.control_sentinels",
 	"layouts.engine.layers.control_signals",
 	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
@@ -88,7 +88,7 @@ local function with_fixture(callback)
 			end,
 		}
 
-		local Sentinels = require("modules.keymap.control_sentinels")
+		local Sentinels = require("hotstrings.engine.expander.control_sentinels")
 		local Keycodes = require("platform.input.keycodes.core")
 		local Timer = require("core.events.timer_scheduler")
 		local Injector = require("platform.input.modifier_injector")

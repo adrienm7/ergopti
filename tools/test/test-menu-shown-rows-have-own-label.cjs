@@ -84,8 +84,8 @@ const LISTED_WITHOUT_A_LABEL = new Map([
 // new one fails until someone says what it lists.
 const VARIABLE_LISTING_SITES = new Map([
 	['windows/menu/ui/builder/submenus.ahk', 'V2Section: the hotstring categories listed above'],
-	['windows/ui/menu/menu_hotstrings.ahk', 'the hotstring categories listed above'],
-	['windows/ui/menu/menu_hotstring_switches.ahk', 'paths only: the « all sections » writers'],
+	['windows/hotstrings/ui/menu/hotstrings.ahk', 'the hotstring categories listed above'],
+	['windows/hotstrings/ui/menu/switches.ahk', 'paths only: the « all sections » writers'],
 	['windows/menu/engine/manifest_menu.ahk', 'a `group_label` row, of which the manifest has none']
 ]);
 

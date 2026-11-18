@@ -510,7 +510,7 @@ helpers.describe("conditional Magic Editor yields during collision preflight", f
 			local source = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\n'
 				.. (case.stored and 'magic_editor = "copy"\n' or '')
 			with_collision_scope(source, NO_TAP_HOLDS, function(scope, owners, controls, path)
-				local names = { "modules.hotstrings.magic_key_source", "modules.hotstrings.magic_key" }
+				local names = { "hotstrings.engine.magic_key_source", "hotstrings.engine.magic_key" }
 				local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 				local ok, why = pcall(function()
 					local facts = { generation = 7, status = "ready", candidates = {

@@ -46,7 +46,7 @@
 ; ==================================================
 
 _CWDW_Source() {
-	return _DriverDirConcat("ui/hotstrings_config_window")
+	return _DriverDirConcat("hotstrings/ui/hotstrings_config_window")
 }
 
 ; The Change handler must NOT persist directly -- it arms the debounce instead.

@@ -153,13 +153,13 @@ content = [
 	'EVIOCGRAB',
 	'"platform\.input\.evdev_reader"',
 	'"platform\.input\.keyboard_hook"',
-	'"modules\.hotstrings\.device_finder"',
+	'"hotstrings\.engine\.device_finder"',
 	'"gestures\.adapters\.touchpad_finder"',
 ]
 
 [detection.linux.evdev.owners]
 # The keyboard grab: every feature that reacts to a typed key runs behind it.
-"modules/hotstrings/device_finder.lua" = [
+"hotstrings/engine/device_finder.lua" = [
 	"hotstrings.**",
 	"shortcuts.**",
 	"tap_holds.*",
@@ -177,7 +177,7 @@ content = [
 	"layout.emulate_home_row",
 	"layout.emulate_bottom_row",
 ]
-"modules/hotstrings/injector.lua" = ["hotstrings.**", "llm.**"]
+"hotstrings/engine/injector.lua" = ["hotstrings.**", "llm.**"]
 "modules/shortcuts/manager.lua" = ["shortcuts.**"]
 # Ctrl+é as Ctrl+C: decided in the keyboard hook's consumption callback.
 "modules/shortcuts/accented_shortcuts.lua" = ["shortcuts.a_grave.*", "shortcuts.e_acute.*", "shortcuts.e_circ.*", "shortcuts.e_grave.*"]
@@ -195,12 +195,12 @@ content = [
 "ui/physical_shortcuts/" = "the shortcut editor captures one key combination to store it"
 
 [detection.linux.uinput]
-content = ['/dev/uinput', 'UI_DEV_CREATE', '"platform\.input\.uinput_writer"', '"modules\.hotstrings\.injector"']
+content = ['/dev/uinput', 'UI_DEV_CREATE', '"platform\.input\.uinput_writer"', '"hotstrings\.engine\.injector"']
 
 [detection.linux.uinput.owners]
 # The layout emulation types its characters through the injector.
-"modules/hotstrings/injector.lua" = ["hotstrings.**", "llm.**", "layout.emulated_layout", "layout.ergopti_base", "layout.ergopti_alt_gr", "layout.ergopti_variant", "layout.emulate_number_row", "layout.emulate_top_row", "layout.emulate_home_row", "layout.emulate_bottom_row"]
-"modules/dynamic_hotstrings/" = ["hotstrings.dynamic.*"]
+"hotstrings/engine/injector.lua" = ["hotstrings.**", "llm.**", "layout.emulated_layout", "layout.ergopti_base", "layout.ergopti_alt_gr", "layout.ergopti_variant", "layout.emulate_number_row", "layout.emulate_top_row", "layout.emulate_home_row", "layout.emulate_bottom_row"]
+"hotstrings/engine/dynamic/" = ["hotstrings.dynamic.*"]
 "modules/shortcuts/manager.lua" = ["shortcuts.**"]
 "platform/remap/tap_hold_manager.lua" = ["tap_holds.*", "mod_combos.*", "shortcuts.key_combination_taps.*", "category_enabled.key_combinations"]
 "gestures/engine/combo_emitter.lua" = ["gestures.**"]
@@ -282,7 +282,7 @@ content = ['WebView2Loader', 'CreateCoreWebView2']
 "ui/onboarding/" = "the onboarding wizard is not a manifest feature"
 "settings/ui/paths_editor/" = "the folders editor is not a manifest feature"
 "ui/personal_info_editor/" = "the personal information editor edits the settings"
-"ui/personal_toml_editor_webview.ahk" = "the personal hotstrings editor edits the settings"
+"hotstrings/ui/personal_toml_editor_webview.ahk" = "the personal hotstrings editor edits the settings"
 "ui/physical_shortcuts/" = "the physical shortcut editor edits the shortcut settings"
 "ai/ui/prompt_editor/" = "the prompt profile editor edits the settings"
 "ui/update_check/" = "the update window is not a manifest feature"

@@ -156,7 +156,7 @@ for (const platform of ['linux', 'macos']) {
 const windowsCorpusReader = fs.readFileSync(
 	path.join(
 		REPO_ROOT,
-		'static/ergopti_plus/windows/tests/unit/modules/hotstrings/magic_key/test_magic_key_source_menu.ahk'
+		'static/ergopti_plus/windows/tests/unit/hotstrings/engine/magic_key/test_source_menu.ahk'
 	),
 	'utf8'
 );

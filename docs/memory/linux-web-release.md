@@ -304,7 +304,7 @@ three drivers understand (Linux `requirement_holds`).
 ### project-linux-the-ai-completes-its-own-typing-context
 
 The prediction engine does not read the hotstring word buffer on Linux. The
-Linux `modules/hotstrings/engine.lua` wrapper reports each edit the shared
+Linux `hotstrings/engine/engine.lua` wrapper reports each edit the shared
 engine applies (typed text, Backspace, `apply_expansion`, `reset`, a
 navigation) to the AI context of `ai/engine/api/context.lua`, a rolling window
 from `_shared/ai/engine/policy/context_buffer.lua`, which macOS shares for its

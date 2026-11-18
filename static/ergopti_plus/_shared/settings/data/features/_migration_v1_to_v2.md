@@ -42,7 +42,7 @@ Every file below references the `Features` global or uses `IniCacheGet`. The cut
 13. `lib/metrics/wpm_widget.ahk` — `IniCacheGet("Script", "WpmWidget…")` → DELETED (WpmWidget dropped from AHK in v2)
 14. `lib/toml/toml_helpers.ahk` — utility, may need v2 awareness
 15. `modules/gestures.ahk` — reads `Features["Gestures"]…` + `IniCacheGet("Gestures", …)` + `IniCacheGet("Shortcuts.Actions", …)`
-16. `modules/hotstrings.ahk` — reads `Features["DistancesReduction"|"SFBsReduction"|"Rolls"|"Autocorrection"|"MagicKey"]…` (~99 occurrences)
+16. `hotstrings/hotstrings.ahk` — reads `Features["DistancesReduction"|"SFBsReduction"|"Rolls"|"Autocorrection"|"MagicKey"]…` (~99 occurrences)
 17. `modules/layout.ahk` — reads `Features["Layout"]…`
 18. `modules/shortcuts.ahk` — reads `Features["Shortcuts"]…` (~42 occurrences)
 19. `platform/remap.ahk` — reads `Features["TapHolds"]…` (~70 occurrences) — see Section 7 for the structural change
@@ -533,7 +533,7 @@ When you start the cut-over, do these in order:
    5. `modules/gestures.ahk` (~7 sites + `IniCacheGet`)
    6. `lib/dispatchers.ahk` (~1 site)
    7. `modules/shortcuts.ahk` (~42 sites — the biggest single-file impact after `hotstrings.ahk`)
-   8. `modules/hotstrings.ahk` (~99 sites — by far the biggest)
+   8. `hotstrings/hotstrings.ahk` (~99 sites — by far the biggest)
    9. `lib/hotstrings/personal_toml_editor.ahk` (~2 sites)
    10. `modules/keystats/keystats_prefetch.ahk` (~3 sites)
    11. `menu/ui/tray_menu.ahk` (~20 sites + 7 `IniCacheGet`)

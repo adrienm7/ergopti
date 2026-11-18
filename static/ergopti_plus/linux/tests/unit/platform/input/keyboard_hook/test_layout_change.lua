@@ -27,13 +27,13 @@ local helpers = require("tests.helpers")
 
 -- Restored afterwards: load_module wipes the named module, not its dependencies,
 -- so a recording stub left in place would follow every later test file.
-local _saved_reader = package.loaded["modules.hotstrings.input_reader"]
+local _saved_reader = package.loaded["hotstrings.engine.input_reader"]
 
 --- Installs an input_reader that records which layout name it is asked for.
 --- @return table The layout names seen, in order.
 local function install_recording_reader()
 	local seen = {}
-	package.loaded["modules.hotstrings.input_reader"] = {
+	package.loaded["hotstrings.engine.input_reader"] = {
 		get_layouts = function() return { qwerty = {}, azerty = {} } end,
 		resolve_char = function(_code, layout)
 			seen[#seen + 1] = layout
@@ -57,7 +57,7 @@ helpers.describe("keyboard hook: a physical layout-family change", function()
 
 		helpers.assert_true(hook.set_layout("azerty"),
 			"a layout the driver knows must be accepted")
-		package.loaded["modules.hotstrings.input_reader"] = _saved_reader
+		package.loaded["hotstrings.engine.input_reader"] = _saved_reader
 		helpers.assert_eq(hook.get_layout(), "azerty",
 			"aggregate and heatmap readers must see the new physical family")
 	end)
@@ -68,7 +68,7 @@ helpers.describe("keyboard hook: a physical layout-family change", function()
 
 		helpers.assert_true(hook.set_layout("qwerty"), "the known name must be accepted first")
 		local accepted = hook.set_layout("dvorak-imaginary")
-		package.loaded["modules.hotstrings.input_reader"] = _saved_reader
+		package.loaded["hotstrings.engine.input_reader"] = _saved_reader
 
 		helpers.assert_true(not accepted,
 			"the resolver falls back to qwerty for an unknown name, so storing one "
@@ -82,7 +82,7 @@ helpers.describe("keyboard hook: a physical layout-family change", function()
 		local hook = helpers.load_module("platform.input.keyboard_hook")
 		helpers.assert_true(hook.set_layout("qwerty"))
 		local started = hook.start({ layout = "dvorak-imaginary", device = "/dev/null" })
-		package.loaded["modules.hotstrings.input_reader"] = _saved_reader
+		package.loaded["hotstrings.engine.input_reader"] = _saved_reader
 		helpers.assert_eq(started, false)
 		helpers.assert_eq(hook.isRunning(), false)
 		helpers.assert_eq(hook.get_layout(), "qwerty")
@@ -93,7 +93,7 @@ helpers.describe("keyboard hook: a physical layout-family change", function()
 		local hook = helpers.load_module("platform.input.keyboard_hook")
 		helpers.assert_true(hook.set_layout("qwerty"))
 		local started = hook.start({ layout = "azerty", onHoldAdmission = true })
-		package.loaded["modules.hotstrings.input_reader"] = _saved_reader
+		package.loaded["hotstrings.engine.input_reader"] = _saved_reader
 		helpers.assert_eq(started, false)
 		helpers.assert_eq(hook.get_layout(), "qwerty")
 	end)
@@ -102,7 +102,7 @@ helpers.describe("keyboard hook: a physical layout-family change", function()
 		install_recording_reader()
 		local hook = helpers.load_module("platform.input.keyboard_hook")
 		local accepted = hook.set_layout(nil)
-		package.loaded["modules.hotstrings.input_reader"] = _saved_reader
+		package.loaded["hotstrings.engine.input_reader"] = _saved_reader
 		helpers.assert_true(not accepted,
 			"a menu row wired to the wrong argument must not silently blank the "
 				.. "layout — that is how the forty-one bridge calls failed")

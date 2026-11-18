@@ -59,10 +59,10 @@ Put it in the suite covering the affected layer:
 
 **Encode the root cause, and exploit the harness so a regression actually
 fails.** Canonical example: the `DYN_HOTSTRINGS_DEFAULT_DELAY` startup crash came
-from a menu-build global living in the late-loaded `modules/hotstrings.ahk`
+from a menu-build global living in the late-loaded `hotstrings/hotstrings.ahk`
 instead of the early `hotstrings_config.ahk`. The guard test asserts the constant
 is defined — and works precisely because the AHK suite loads
-`hotstrings_config.ahk` but NOT `modules/hotstrings.ahk`, so moving it back makes
+`hotstrings_config.ahk` but NOT `hotstrings/hotstrings.ahk`, so moving it back makes
 the constant undefined and fails the test.
 
 Guard tests should enumerate the **whole class** of call sites, not the single

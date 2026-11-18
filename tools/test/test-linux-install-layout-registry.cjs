@@ -551,8 +551,8 @@ try {
 					'package.path = root .. "/linux/?.lua;" .. root .. "/linux/?/init.lua;"',
 					'	.. root .. "/_shared/?.lua;" .. root .. "/_shared/?/init.lua;" .. package.path',
 					'local Paths = require("core.fs.engine.paths")',
-					'local Config = require("modules.hotstrings.hotstrings_config")',
-					'local Loader = require("modules.hotstrings.loader")',
+					'local Config = require("hotstrings.engine.catalogue.config")',
+					'local Loader = require("hotstrings.engine.loader")',
 					...(process.platform === 'win32'
 						? [
 								'local Shell = require("core.process.adapters.shell_runner")',

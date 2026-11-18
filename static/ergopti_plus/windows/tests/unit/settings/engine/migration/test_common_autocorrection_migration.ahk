@@ -9,7 +9,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../../../../../modules/hotstrings.ahk
+#Include ../../../../../hotstrings/hotstrings.ahk
 _CAO_Policy() {
 	global _SharedDir
 	return _ConfigMigrateParse(FSReadStrict(_SharedDir

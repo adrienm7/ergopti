@@ -251,12 +251,12 @@ for (const [name, source] of [
 const MACOS_MODULES = {
 	config_cleanup: 'settings/ui/cleanup.lua',
 	action_picker: 'ui/action_picker/init.lua',
-	hotstrings_config_window: 'ui/hotstrings_config_window/init.lua',
+	hotstrings_config_window: 'hotstrings/ui/hotstrings_config_window/init.lua',
 	prompt_editor: 'ai/ui/prompt_editor/init.lua',
 	changelog: 'ui/changelog/init.lua',
 	model_browser: 'ai/ui/model_browser/init.lua',
-	hotstring_editor: 'ui/hotstring_editor/init.lua',
-	personal_info_editor: 'ui/personal_info_editor/init.lua',
+	hotstring_editor: 'hotstrings/ui/hotstring_editor/init.lua',
+	personal_info_editor: 'hotstrings/ui/personal_info_editor/init.lua',
 	physical_shortcuts: 'ui/physical_shortcuts/init.lua',
 	onboarding: 'ui/onboarding/init.lua',
 	paths_editor: 'settings/ui/menu/paths.lua',
@@ -333,7 +333,7 @@ const WINDOWS_APPS = {
 		]
 	},
 	hotstring_editor: {
-		file: 'ui/personal_toml_editor_webview.ahk',
+		file: 'hotstrings/ui/personal_toml_editor_webview.ahk',
 		checks: (m) => [new RegExp(`\\bw${m.width}\\s+h${m.height}\\b`)]
 	},
 	healthcheck: {
@@ -359,7 +359,7 @@ const WINDOWS_APPS = {
 		checks: (m) => [new RegExp(`\\bw${m.width}\\s+h${m.height}\\b`)]
 	},
 	hotstrings_config_window: {
-		file: 'ui/hotstrings_config_window/webview.ahk',
+		file: 'hotstrings/ui/hotstrings_config_window/webview.ahk',
 		checks: (m) => [
 			new RegExp(`HCWWEB_WIDTH\\s*:=\\s*${m.width}\\b`),
 			new RegExp(`HCWWEB_HEIGHT\\s*:=\\s*${m.height}\\b`)
@@ -392,7 +392,7 @@ const WINDOWS_APPS = {
 		checks: (m) => [new RegExp(`\\bw${m.width}\\s+h${m.height}\\b`)]
 	},
 	personal_info_editor: {
-		file: 'ui/personal_info_editor/init.ahk',
+		file: 'hotstrings/ui/personal_info_editor/init.ahk',
 		checks: (m) => [new RegExp(`\\bw${m.width}\\s+h${m.height}\\b`)]
 	},
 	action_picker: {

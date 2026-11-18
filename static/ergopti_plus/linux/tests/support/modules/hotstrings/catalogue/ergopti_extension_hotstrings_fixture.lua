@@ -53,8 +53,8 @@ end
 --- @return table catalogue
 --- @return table found
 local function load(with_ergopti)
-	local Loader = helpers.load_module("modules.hotstrings.loader")
-	local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+	local Loader = helpers.load_module("hotstrings.engine.loader")
+	local Config = helpers.load_module("hotstrings.engine.catalogue.config")
 	local found = Extensions.scan(roots(with_ergopti), {
 		list_dirs = Loader.list_subdirs, list_files = Loader.find_toml_files, read_file = Loader.read_file,
 	})
@@ -89,7 +89,7 @@ end
 --- The independent pre-move reference shared by all three native suites.
 --- @return table
 local function distance_reference()
-	local text = assert(require("modules.hotstrings.loader").read_file(
+	local text = assert(require("hotstrings.engine.loader").read_file(
 		Paths.shared("tests/corpus/hotstrings/distance_reduction_entries.json")))
 	return Json.decode(text)
 end
@@ -127,7 +127,7 @@ end
 --- @param dir string
 --- @return table categories
 local function load_with_user_folder(dir)
-	local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+	local Config = helpers.load_module("hotstrings.engine.catalogue.config")
 	-- The engine accepts the catalogue: the owner publishes a catalogue only
 	-- once its engine has, so a silent stub would leave every category out.
 	Config.init({ load_mappings = function() return true end }, dir)
@@ -172,7 +172,7 @@ end
 --- @param configure function Receives the recording native ports and actual owner list.
 --- @param body function Receives the fresh actual Loader.
 local function with_exact_loader_ports(configure, body)
-	local names = { "lfs", "luv", "modules.hotstrings.loader", "core.network.engine.curl_identity" }
+	local names = { "lfs", "luv", "hotstrings.engine.loader", "core.network.engine.curl_identity" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local Exact = require("core.network.engine.curl_identity")
@@ -187,9 +187,9 @@ local function with_exact_loader_ports(configure, body)
 	end
 	package.loaded.luv = native
 	package.loaded.lfs = { attributes = function() return { mode = "file", dev = 11, ino = 100 } end }
-	package.loaded["modules.hotstrings.loader"] = nil
+	package.loaded["hotstrings.engine.loader"] = nil
 	local ok, err = pcall(function()
-		local Loader = require("modules.hotstrings.loader")
+		local Loader = require("hotstrings.engine.loader")
 		configure(Loader, native, state, owners, Exact)
 		body(Loader, native, state, owners)
 	end)

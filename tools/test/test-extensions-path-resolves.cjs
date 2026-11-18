@@ -121,7 +121,7 @@ if (!entry) {
 
 const AHK_READ_SITES = [
 	'static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk',
-	'static/ergopti_plus/windows/ui/hotstrings_config_window/hcw_helpers.ahk'
+	'static/ergopti_plus/windows/hotstrings/ui/hotstrings_config_window/hcw_helpers.ahk'
 ];
 
 for (const rel of AHK_READ_SITES) {
@@ -242,8 +242,8 @@ function catalogueRouteErrors(input) {
 
 const catalogue = {
 	entry: entry || '',
-	owner: read('static/ergopti_plus/windows/infra/hotstrings/extension_packs.ahk') || '',
-	menu: read('static/ergopti_plus/windows/ui/menu/menu_hotstrings.ahk') || ''
+	owner: read('static/ergopti_plus/windows/hotstrings/engine/catalogue/extension_packs.ahk') || '',
+	menu: read('static/ergopti_plus/windows/hotstrings/ui/menu/hotstrings.ahk') || ''
 };
 for (const failure of catalogueRouteErrors(catalogue))
 	errors.push(`Windows catalogue: ${failure}.`);
@@ -328,7 +328,7 @@ if (macSitesSeen === 0) {
 // Both Lua drivers discover packs from the shared root's sibling, the one anchor
 // their path owners already probe. Resolved from the real _shared directory.
 const LUA_DISCOVERY_OWNERS = [
-	'static/ergopti_plus/macos/infra/extension_packs.lua',
+	'static/ergopti_plus/macos/hotstrings/engine/catalogue/extension_packs.lua',
 	'static/ergopti_plus/linux/core/fs/engine/paths.lua'
 ];
 for (const rel of LUA_DISCOVERY_OWNERS) {

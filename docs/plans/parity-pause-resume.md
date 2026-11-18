@@ -110,7 +110,7 @@ a paused snapshot on the three OS; see the report's seventh pass.
   `tools/lib/menu-native-llm-parent-binding.cjs` (the Linux `toggle_ready`
   body), `tools/test/test-menu-parity.cjs` (its seams),
   `tools/test/fixtures/personal-section-owner-counterexamples.cjs` (a hash of
-  `macos/ui/menu/menu_hotstrings_custom.lua`, recomputed on every rebase that
+  `macos/hotstrings/ui/menu/custom.lua`, recomputed on every rebase that
   touches the file).
 - `tools/test/test-shared-literal-inventory.cjs` is a ratchet: a removed
   duplicate needs `--update-baseline` in the same change.

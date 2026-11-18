@@ -112,7 +112,7 @@ local wire = Backend.new()
 Writer._set_backend(wire)
 write_file(work .. "/uinput", "")
 Writer._set_path_for_test(work .. "/uinput")
-assert(require("modules.hotstrings.injector").open_fast_channel(), "the output channel must open on the XTest wire")
+assert(require("hotstrings.engine.injector").open_fast_channel(), "the output channel must open on the XTest wire")
 
 local Manager = require("gestures.engine.manager")
 local BackgroundCommands = require("gestures.engine.background_commands")

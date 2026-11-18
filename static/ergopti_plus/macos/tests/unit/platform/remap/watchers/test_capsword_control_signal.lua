@@ -66,9 +66,9 @@ helpers.describe("CapsWord native graph and shared control tags", function()
 	end)
 
 	helpers.it("keeps CapsWord tags separate from navigation, one-shot Shift and unrelated chords", function()
-		helpers.with_stub_scope({ "modules.keymap.control_sentinels", "core.logger.engine.logger" }, function()
+		helpers.with_stub_scope({ "hotstrings.engine.expander.control_sentinels", "core.logger.engine.logger" }, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-			local owner = require("modules.keymap.control_sentinels")
+			local owner = require("hotstrings.engine.expander.control_sentinels")
 			local signals = {}
 			owner.set_listener("capsword.test", function(signal) signals[#signals + 1] = signal end)
 			helpers.assert_true(owner.claim_key(90, true, { ctrl = true, alt = true, shift = true }))

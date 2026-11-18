@@ -70,7 +70,7 @@ const EXEMPT = new Set([
 	// The two bootstraps, whose depth is asserted separately below rather than
 	// trusted: they run before package.path includes the shared tree.
 	'ergopti_hotstrings.lua',
-	'modules/hotstrings/engine.lua',
+	'hotstrings/engine/engine.lua',
 	// The installer's bytecode compiler is a bootstrap too: it puts an
 	// installation root's linux/ and _shared/ on package.path, and infra.paths
 	// itself needs the shared tree (logger.shim) before it can resolve anything.
@@ -93,7 +93,7 @@ if (files.length < 40) {
 //
 // Both encode the checkout's depth as a fact. The second is the one that
 // mattered: core/timing/engine/timings.lua, infra/wpm_constants.lua,
-// infra/personal_info_fields.lua and gestures/engine/manager.lua all used it,
+// hotstrings/engine/catalogue/personal_info_fields.lua and gestures/engine/manager.lua all used it,
 // none was exempt, and none was ever reported — this guard printed "All 99
 // Linux module(s) reach _shared through core/fs/engine/paths.lua" while four did not.
 // On an installed package the driver sits flat in /usr/lib/ergopti, so three
@@ -127,7 +127,7 @@ for (const abs of files) {
 // pattern had already reached.
 const BOOTSTRAPS = [
 	{ file: 'ergopti_hotstrings.lua', note: 'SCRIPT_DIR is the driver root' },
-	{ file: 'modules/hotstrings/engine.lua', note: '_linux_root is the driver root' }
+	{ file: 'hotstrings/engine/engine.lua', note: '_linux_root is the driver root' }
 ];
 for (const b of BOOTSTRAPS) {
 	const abs = path.join(DRIVER, b.file);

@@ -127,7 +127,7 @@ echo "Package: $PACKAGE_NAME $VERSION ($ARCH)"
 # possible outcome: it installs, it launches, and it fails on the target.
 REQUIRED_PAYLOAD=(
   "ergopti_hotstrings.lua"
-  "modules/hotstrings/engine.lua"
+  "hotstrings/engine/engine.lua"
   "core/fs/engine/paths.lua"
   "tray/adapters/menu.lua"
   "core/ui/ui/webkit_host.lua"

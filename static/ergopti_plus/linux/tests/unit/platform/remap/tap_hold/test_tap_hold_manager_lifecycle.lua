@@ -305,12 +305,12 @@ os.remove(user_path)
 	helpers.it("gives the one-shot Shift the shared results and the magic key's (one-shot-results-shared)", function()
 		local Manager, hook, _, user_path, resets = manager()
 		require("adapters.keyboard_layout")._set_table_for_test(nil)
-		local magic = require("modules.hotstrings.magic_key").get()
+		local magic = require("hotstrings.engine.magic_key").get()
 		helpers.assert_true(magic ~= "", "the shipped magic key")
 		hook.key_text = function(code) return ({ [41] = magic, [57] = " ", [52] = "." })[code] end
-		local saved = package.loaded["modules.hotstrings.injector"]
+		local saved = package.loaded["hotstrings.engine.injector"]
 		local injected = {}
-		package.loaded["modules.hotstrings.injector"] = {
+		package.loaded["hotstrings.engine.injector"] = {
 			inject = function(_, text) injected[#injected + 1] = text; return { ok = true } end,
 		}
 		local ok, err = pcall(function()
@@ -323,7 +323,7 @@ os.remove(user_path)
 				hook.on_tap(tap)
 			end
 		end)
-		package.loaded["modules.hotstrings.injector"] = saved
+		package.loaded["hotstrings.engine.injector"] = saved
 		Manager._reset_for_test()
 		os.remove(user_path)
 		if not ok then error(err, 0) end
@@ -342,14 +342,14 @@ os.remove(user_path)
 	helpers.it("gives the magic key its result before the character's own (one-shot-magic-first)", function()
 		local Manager, hook, _, user_path = manager()
 		hook.key_text = function(code) return code == 51 and "," or nil end
-		local names = { "modules.hotstrings.magic_key", "modules.hotstrings.injector" }
+		local names = { "hotstrings.engine.magic_key", "hotstrings.engine.injector" }
 		local saved = {}
 		for _, name in ipairs(names) do
 			saved[name] = package.loaded[name]
 		end
 		local injected = {}
-		package.loaded["modules.hotstrings.magic_key"] = { get = function() return "," end }
-		package.loaded["modules.hotstrings.injector"] = {
+		package.loaded["hotstrings.engine.magic_key"] = { get = function() return "," end }
+		package.loaded["hotstrings.engine.injector"] = {
 			inject = function(_, text) injected[#injected + 1] = text; return { ok = true } end,
 		}
 		require("adapters.keyboard_layout")._set_table_for_test(nil)
@@ -1539,7 +1539,7 @@ helpers.describe("native OneShot Manager route", function()
 			options.eof_path = s.paths.b; s.hook.pump(); options.eof_path = nil
 			helpers.assert_eq(s.reader.source_owner_current(original), false)
 			s.held[s.paths.b] = {}
-			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { s.paths.a, s.paths.b }, {} end
+			package.loaded["hotstrings.engine.device_finder"].find_devices = function() return { s.paths.a, s.paths.b }, {} end
 			for _ = 1, s.hook.DEVICE_CHECK_TICKS do s.hook.check_device() end
 			s.pump_at(1400)
 			helpers.assert_eq(#s.actions, 0, "a reconnected source cannot revive the old DOWN")

@@ -121,7 +121,7 @@ end)
 local function load_reader_over(load)
 	local saved = package.loaded["platform.input.keycodes.evdev"]
 	package.loaded["platform.input.keycodes.evdev"] = { load = load }
-	local ok, result = pcall(helpers.fresh_module, "modules.hotstrings.input_reader")
+	local ok, result = pcall(helpers.fresh_module, "hotstrings.engine.input_reader")
 	package.loaded["platform.input.keycodes.evdev"] = saved
 	return ok, result
 end

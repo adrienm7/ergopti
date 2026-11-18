@@ -70,7 +70,7 @@ end
 --- The keymap's tap states, or nil before the keymap is loaded.
 --- @return table|nil states
 local function tap_states()
-	local keymap = package.loaded["modules.keymap"]
+	local keymap = package.loaded["hotstrings.engine.expander"]
 	if type(keymap) ~= "table" or type(keymap.tap_states) ~= "function" then return nil end
 	return keymap.tap_states()
 end
@@ -598,7 +598,7 @@ end
 --- ends one, or nil before the keymap registry is loaded.
 --- @return table|nil facts { candidates = { { trigger, expansion } }, space_terminates, space_consumed }
 local function hotstring_candidates()
-	local registry = package.loaded["modules.keymap.registry"]
+	local registry = package.loaded["hotstrings.engine.expander.registry"]
 	if type(registry) ~= "table" or type(registry.field_run_candidates) ~= "function" then return nil end
 	return {
 		candidates = registry.field_run_candidates(),
@@ -663,7 +663,7 @@ end
 
 --- Types selftest keys into a scratch text field this process opens, and only
 --- there. The keymap decodes them as typing only while that window is the
---- focused one and consumes them anywhere else (modules/keymap/selftest_gate.lua);
+--- focused one and consumes them anywhere else (hotstrings/engine/expander/selftest_gate.lua);
 --- this side also checks the focus and the keymap taps before each key, and
 --- closes the window and brings the previous application back whatever happens.
 --- A key is a single character or a key name such as "space".
@@ -836,7 +836,7 @@ local function scratch_typing(keys, callback, options)
 			end
 			publication = generation
 		end
-		local utils = package.loaded["modules.keymap.utils"]
+		local utils = package.loaded["hotstrings.engine.expander.utils"]
 		if type(utils) ~= "table" or type(utils.selftest_window_context) ~= "function" then return type_key(1) end
 		local ignored, generation = utils.selftest_window_context()
 		if ignored == true then return settle("scratch_ignored") end
@@ -1039,7 +1039,7 @@ function M.new()
 		end_callback_accounting = function() return require("core.logger.engine.logger").end_callback_accounting() end,
 		-- Read only when the keymap loaded it: the idle check must not load it.
 		window_activity = function()
-			local utils = package.loaded["modules.keymap.utils"]
+			local utils = package.loaded["hotstrings.engine.expander.utils"]
 			return type(utils) == "table" and type(utils.ignored_window_activity) == "function"
 				and utils.ignored_window_activity() or nil
 		end,

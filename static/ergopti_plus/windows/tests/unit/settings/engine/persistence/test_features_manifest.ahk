@@ -517,7 +517,7 @@ Test("#HotIf Features[]: all occurrences have IsSet(Features) guard",
 ; Win+magic-key owner intercepted input outside that assignment model and could
 ; not be removed or rebound from the Shortcuts menu.
 TestFMv2_PersonalEditorHasNoDedicatedMagicBinding() {
-	Code := _StripFullLineComments(_DriverDirsConcat("modules/keymap", "ai/engine"))
+	Code := _StripFullLineComments(_DriverDirsConcat("modules/keymap", "hotstrings/engine/expander", "ai/engine"))
 	Assert(Trim(Code) != "", "the complete actual keymap module must be readable and nonempty")
 	Assert(!InStr(Code, "OpenPersonalEditor()"),
 		"layout.ahk must never register an editor binding outside ordinary keyboard slots")

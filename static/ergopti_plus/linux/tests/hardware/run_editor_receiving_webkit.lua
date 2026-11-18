@@ -120,14 +120,14 @@ local function chmod(folder_mode, file_mode)
 	assert(sh("chmod " .. folder_mode .. " " .. quote(PERSONAL_DIR)), "the personal folder mode must change")
 end
 
-local HotstringsConfig = require("modules.hotstrings.hotstrings_config")
+local HotstringsConfig = require("hotstrings.engine.catalogue.config")
 assert(HotstringsConfig.init(nil, PERSONAL_DIR, nil) == true, "the real hotstrings configuration must initialize")
 assert(HotstringsConfig.get_config_dir() == PERSONAL_DIR, "the editor must edit the owned personal folder")
 HotstringsConfig.load_all()
 local Gate = require("platform.input.capture_gate").new({})
 local Manager = require("core.ui.ui.webview_manager")
 Manager.set_daemon_state({ config = HotstringsConfig, input_capture_gate = Gate })
-local Bridge = require("ui.hotstring_editor.bridge")
+local Bridge = require("hotstrings.ui.hotstring_editor.bridge")
 local APP, BRIDGE = "hotstring_editor", "hsEditor"
 local save_error = require("core.i18n.engine.i18n").get("editor.hotstrings.save_error")
 assert(type(save_error) == "string" and save_error ~= "" and save_error ~= "editor.hotstrings.save_error",

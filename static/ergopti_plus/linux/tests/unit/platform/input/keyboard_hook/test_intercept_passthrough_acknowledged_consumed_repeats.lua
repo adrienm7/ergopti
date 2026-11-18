@@ -35,9 +35,9 @@ local helpers, EV_KEY, ev =
 
 helpers.describe("keyboard hook: acknowledged consumed repeats", function()
 	local function observe(mode)
-		local previous = package.loaded["modules.hotstrings.device_finder"]
+		local previous = package.loaded["hotstrings.engine.device_finder"]
 		local state = { origins = 0, consumed = 0, repeated = 0, raw = {}, values = {}, released = {} }
-		package.loaded["modules.hotstrings.device_finder"] = {
+		package.loaded["hotstrings.engine.device_finder"] = {
 			physical_sources = function(paths)
 				state.origins = state.origins + 1
 				return { { path = paths[1], sysfs = "/sys/probe/keyboard", name = "fixture keyboard", physical = true } }
@@ -91,7 +91,7 @@ helpers.describe("keyboard hook: acknowledged consumed repeats", function()
 				end,
 			}, true)
 		end)
-		package.loaded["modules.hotstrings.device_finder"] = previous
+		package.loaded["hotstrings.engine.device_finder"] = previous
 		if not ok then error(err, 0) end
 		return state
 	end
@@ -123,7 +123,7 @@ helpers.describe("keyboard hook: acknowledged consumed repeats", function()
 	end)
 
 	helpers.it("(magic-source-repeat) publishes a qualified origin before the first newly started physical press", function()
-		local names = { "adapters.xkb_capture", "platform.input.evdev_reader", "modules.hotstrings.device_finder" }
+		local names = { "adapters.xkb_capture", "platform.input.evdev_reader", "hotstrings.engine.device_finder" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local path = os.tmpname()
@@ -237,7 +237,7 @@ helpers.describe("keyboard hook: recovery repeat ownership", function()
 	--- @return table observed Callback epochs, cookies and raw emitted events.
 	local function observe_recovery(mode)
 		local names = { "adapters.xkb_capture", "platform.input.evdev_reader",
-			"modules.hotstrings.device_finder", "platform.input.keyboard_hook" }
+			"hotstrings.engine.device_finder", "platform.input.keyboard_hook" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local paths = { os.tmpname(), os.tmpname() }

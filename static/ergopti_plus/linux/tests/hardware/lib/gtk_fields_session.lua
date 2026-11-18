@@ -213,7 +213,7 @@ function M.xtest_wire()
 	local file = assert(io.open(node, "wb"))
 	assert(file:close())
 	Writer._set_path_for_test(node)
-	assert(require("modules.hotstrings.injector").open_fast_channel(), "the output channel must open on the XTest wire")
+	assert(require("hotstrings.engine.injector").open_fast_channel(), "the output channel must open on the XTest wire")
 	return wire
 end
 

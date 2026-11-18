@@ -18,7 +18,7 @@ global SubMenus := Map()
 #Include ../../gestures/ui/menu/gestures.ahk
 #Include ../../ui/menu/menu_metrics.ahk
 #Include ../../ui/menu/menu_layout.ahk
-#Include ../../ui/menu/menu_hotstrings.ahk
+#Include ../../hotstrings/ui/menu/hotstrings.ahk
 #Include ../../ui/menu/menu_metrics_actions.ahk
 
 ; Runs the auto-configure — success is already indicated by the green status label in the UI,
@@ -104,7 +104,7 @@ global _LegacyDynamicHotstringsKeyMap := _MR_DynamicHotstringsKeyMap()
 global _DYNAMIC_HOTSTRINGS_ORDER := _MR_DynamicHotstringsOrder()
 
 
-#Include ../../ui/menu/menu_hotstring_switches.ahk
+#Include ../../hotstrings/ui/menu/switches.ahk
 #Include builder/submenus.ahk
 #Include ../../ui/menu/menu_shortcuts.ahk
 #Include ../../ui/menu/menu_taphold.ahk

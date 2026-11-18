@@ -53,8 +53,8 @@ M.GROUPS = {
 	{ name = "core", prefixes = { "tests/unit/adapters/", "tests/unit/platform/" } },
 	{ name = "infra", prefixes = { "tests/unit/infra/", "tests/unit/diagnostics/engine/control/" } },
 	{ name = "input", prefixes = {
-		"tests/unit/modules/hotstrings/",
-		"tests/unit/modules/dynamic_hotstrings/",
+		"tests/unit/hotstrings/engine/",
+		"tests/unit/hotstrings/engine/dynamic/",
 		"tests/unit/modules/shortcuts/",
 		"tests/unit/modules/keymap/",
 		"tests/unit/gestures/",

@@ -44,7 +44,7 @@ local OWNED = {
 	"core.logger.engine.shim",
 	"menu.engine.labels",
 	"modules.keystats",
-	"modules.keymap.utils",
+	"hotstrings.engine.expander.utils",
 	"ai.engine",
 	"ai.engine.api.common",
 	"ai.engine.prediction.app_filter",

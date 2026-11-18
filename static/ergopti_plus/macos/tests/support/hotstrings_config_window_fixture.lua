@@ -25,12 +25,12 @@ local function with_window(test)
 		package.loaded["core.fs.engine.paths"] = { shared = function(path) return "/virtual/" .. path end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
-		package.loaded["modules.keymap"] = {}
-		package.loaded["infra.personal_hotstrings"] = { adoptions = function() return {} end }
+		package.loaded["hotstrings.engine.expander"] = {}
+		package.loaded["hotstrings.engine.catalogue.personal_hotstrings"] = { adoptions = function() return {} end }
 		package.loaded["settings.engine.preferences.personal_file_controls"] = {
 			capture = function() return nil end, apply = function() return false end,
 		}
-		package.loaded["modules.hotstrings.hotstrings_config"] = {
+		package.loaded["hotstrings.engine.catalogue.config"] = {
 			set_override = function() state.writes = state.writes + 1 return true end,
 			resolve = function() return {} end, get_toml_defaults = function() return {} end,
 			get_user_override = function() return {} end, get_sections = function() return {} end,
@@ -79,8 +79,8 @@ local function with_window(test)
 				return view
 			end,
 		}
-		package.loaded["ui.hotstrings_config_window"] = nil
-		test(require("ui.hotstrings_config_window"), state)
+		package.loaded["hotstrings.ui.hotstrings_config_window"] = nil
+		test(require("hotstrings.ui.hotstrings_config_window"), state)
 	end, debug.traceback)
 	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(loaded) do package.loaded[name] = value end
@@ -113,7 +113,7 @@ local function install_personal_binding(path, content)
 	package.loaded["core.fs.engine.dir"] = { entries = function(candidate)
 		return candidate == root and { name } or {}
 	end }
-	package.loaded["infra.personal_hotstrings"] = {
+	package.loaded["hotstrings.engine.catalogue.personal_hotstrings"] = {
 		adoptions = function() return { record } end,
 	}
 	package.loaded["settings.engine.preferences.personal_file_controls"] = {

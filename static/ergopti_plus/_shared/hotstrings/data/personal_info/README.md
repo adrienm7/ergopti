@@ -14,9 +14,9 @@ between them:
 
 | Driver  | Site                                                           |
 | ------- | -------------------------------------------------------------- |
-| macOS   | `modules/dynamic_hotstrings/rules_engine.lua`                  |
-| Linux   | `modules/dynamic_hotstrings/prefix_rules.lua`                  |
-| Windows | `modules/dynamic_hotstrings/dynamic_hotstrings.ahk`            |
+| macOS   | `hotstrings/engine/dynamic/rules_engine.lua`                   |
+| Linux   | `hotstrings/engine/dynamic/prefix_rules.lua`                   |
+| Windows | `hotstrings/engine/dynamic/hotstrings.ahk`                     |
 | shared  | `hotstrings/engine/dynamic/core.lua` (`compute_prefix_counts`) |
 
 Four hand-written lists is four chances for one to drift, and the failure is
@@ -93,11 +93,11 @@ every driver's suite.
 
 ## Windows applies the mask through its AutoHotkey twin
 
-Windows is wired to this declaration. `windows/infra/personal_info_mask.ahk`
+Windows is wired to this declaration. `windows/hotstrings/engine/catalogue/personal_info_mask.ahk`
 reads the policy (which fields are secrets, how much of one stays visible) from
 `fields.toml` at runtime and masks the frozen field/value snapshot of an
 engine decision for the preview bubble (`PersonalInfoMaskForPreview`,
-`windows/infra/personal_info_preview.ahk`) and for persisted metrics. The
+`windows/hotstrings/engine/catalogue/personal_info_preview.ahk`) and for persisted metrics. The
 direct-registered tags (`@iban★`, `@cb★`, `@ss★`) carry their field names in
 `PreviewFields`, so the same mask reaches them. The algorithm is pinned by
 `preview_vectors.toml`, replayed by every driver's suite.
@@ -116,11 +116,11 @@ from the working, translated tray caption; it does not affect the mask.
 The `[letters]` table maps one alias key to an `[info]` field. What a key may
 be, and so what a combo such as `@np` can name, is not yet the same everywhere:
 
-| Driver  | Accepted alias key                                                                                                     | Owner                                                          |
-| ------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| macOS   | one cased Unicode scalar, with exact spelling and no normalisation; other keys are refused at load                     | `parse_toml_section` in `dynamic_hotstrings/personal_info.lua` |
-| Linux   | exactly one valid UTF-8 code point (a precomposed `é` is accepted, a decomposed spelling is refused, no normalisation) | `strict_codepoint_length` in `dynamic_hotstrings/manager.lua`  |
-| Windows | one cased letter, ASCII or accented (`@tél` ships), tested by distinct upper and lower forms                           | `_PIPreviewIsTagChar` in `infra/personal_info_preview.ahk`     |
+| Driver  | Accepted alias key                                                                                                     | Owner                                                                            |
+| ------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| macOS   | one cased Unicode scalar, with exact spelling and no normalisation; other keys are refused at load                     | `parse_toml_section` in `dynamic_hotstrings/personal_info.lua`                   |
+| Linux   | exactly one valid UTF-8 code point (a precomposed `é` is accepted, a decomposed spelling is refused, no normalisation) | `strict_codepoint_length` in `dynamic_hotstrings/manager.lua`                    |
+| Windows | one cased letter, ASCII or accented (`@tél` ships), tested by distinct upper and lower forms                           | `_PIPreviewIsTagChar` in `hotstrings/engine/catalogue/personal_info_preview.ahk` |
 
 The three agree on the shipped thirteen aliases and accept accented and non-Latin
 cased aliases. The Lua combo resolvers reject conflicting case twins rather than

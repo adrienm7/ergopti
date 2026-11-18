@@ -74,7 +74,7 @@ local function load_filter(bundle, subrole_throws)
 		path     = function() return "/Applications/Safari.app" end,
 	}
 
-	package.loaded["modules.keymap.utils"] = {
+	package.loaded["hotstrings.engine.expander.utils"] = {
 		is_ignored_window = function() return false end,
 	}
 	package.loaded["ai.engine.prediction.app_filter"] = nil

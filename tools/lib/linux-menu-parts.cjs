@@ -44,7 +44,7 @@ const PART_MODULES = new Set([
 	'menu.ui.builder.dialogs',
 	'menu.ui.ergopti_studio',
 	'gestures.ui.menu.gestures',
-	'ui.menu.menu_hotstrings',
+	'hotstrings.ui.menu.hotstrings',
 	'settings.ui.menu.language',
 	'ui.menu.menu_layouts',
 	'ai.ui.menu.llm',

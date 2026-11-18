@@ -126,7 +126,7 @@ DeadKey(Mapping) {
 
 UpdateLastSentCharacter(Character) {
 	; Ring-buffer push is O(1) and does not reallocate past boot — see
-	; ``_LSCPush`` in infra/hotstrings/hotstring_send.ahk, which also owns the
+	; ``_LSCPush`` in hotstrings/engine/matcher/send.ahk, which also owns the
 	; timestamp write (AppState_TouchLastSentKey).
 	_LSCPush(Character)
 	AppState_TouchLastSentKey(Character)

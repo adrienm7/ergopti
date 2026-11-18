@@ -65,7 +65,7 @@ local VALUE_REPEAT = 2
 local XKB_KEY_UP = 0
 local XKB_KEY_DOWN = 1
 
--- The two modifier keys the injector presses (modules/hotstrings/injector.lua
+-- The two modifier keys the injector presses (hotstrings/engine/injector.lua
 -- MODIFIER_CODES), in XKB numbering, so the inverse table is probed with the
 -- very chords that will be emitted.
 local XKB_LEFTSHIFT = EvdevCodes.KEY_LEFTSHIFT + EVDEV_TO_XKB_OFFSET

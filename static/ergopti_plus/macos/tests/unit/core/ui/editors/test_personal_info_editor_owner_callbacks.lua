@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 --- Runs an isolated editor scenario with independently retained native callbacks.
 --- @param scenario function Receives the real editor and native records.
 local function with_editor(scenario)
-	local keys = { "ui.personal_info_editor", "core.logger.engine.logger", "core.i18n.engine.i18n",
+	local keys = { "hotstrings.ui.personal_info_editor", "core.logger.engine.logger", "core.i18n.engine.i18n",
 		"core.fs.engine.paths", "core.timing.engine.timings", "core.timing.engine.deferred_work", "core.ui.ui.builder" }
 	local saved, prior_hs = {}, _G.hs
 	for _, key in ipairs(keys) do saved[key] = package.loaded[key] end
@@ -64,8 +64,8 @@ local function with_editor(scenario)
 				return native
 			end,
 		}
-		package.loaded["ui.personal_info_editor"] = nil
-		scenario(require("ui.personal_info_editor"), records)
+		package.loaded["hotstrings.ui.personal_info_editor"] = nil
+		scenario(require("hotstrings.ui.personal_info_editor"), records)
 	end, debug.traceback)
 	for _, key in ipairs(keys) do package.loaded[key] = saved[key] end
 	_G.hs = prior_hs

@@ -44,21 +44,21 @@ const STAMP = '2026-10-30 10:00:00:000';
 const CASES = [
 	[
 		WINDOWS,
-		'infra/hotstrings/hotstring_inputhook.ahk',
+		'hotstrings/engine/matcher/inputhook.ahk',
 		"OnChar error for char '{1}': {2}.",
 		[CANARY, 'boom'],
 		': boom.'
 	],
 	[
 		WINDOWS,
-		'infra/hotstrings/hotstring_inputhook.ahk',
+		'hotstrings/engine/matcher/inputhook.ahk',
 		"UIA wrap error for char '{1}': {2}.",
 		[CANARY, 'boom'],
 		': boom.'
 	],
 	[
 		WINDOWS,
-		'infra/hotstrings/hotstring_inputhook.ahk',
+		'hotstrings/engine/matcher/inputhook.ahk',
 		"DBG calling TooltipShow: {1} item(s), first='{2}'.",
 		['1', CANARY],
 		'1 item(s)'
@@ -121,28 +121,28 @@ const CASES = [
 	],
 	[
 		WINDOWS,
-		'infra/hotstrings/hotstring_inputhook.ahk',
+		'hotstrings/engine/matcher/inputhook.ahk',
 		"Fire-log drain failed for trigger '{1}': {2}.",
 		[CANARY, 'boom'],
 		': boom.'
 	],
 	[
 		LINUX,
-		'modules/hotstrings/injector.lua',
+		'hotstrings/engine/injector.lua',
 		"Cannot deliver '%s' — not typable on this layout and no clipboard route.",
 		[CANARY],
 		'not typable'
 	],
 	[
 		LINUX,
-		'modules/hotstrings/injector.lua',
+		'hotstrings/engine/injector.lua',
 		"Cannot deliver '%s' before erasing its trigger: %s.",
 		[CANARY, 'boom'],
 		'before erasing'
 	],
 	[
 		LINUX,
-		'modules/hotstrings/injector.lua',
+		'hotstrings/engine/injector.lua',
 		"inject(): bc=%d text='%s'…",
 		['3', `${CANARY}'…\n${CANARY} second line`],
 		'inject(): bc=3 '

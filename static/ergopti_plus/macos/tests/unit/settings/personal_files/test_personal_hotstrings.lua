@@ -25,7 +25,7 @@ end
 local function restore_all()
 	for name, prev in pairs(SAVED) do package.loaded[name] = prev.value end
 	SAVED = {}
-	package.loaded["infra.personal_hotstrings"] = nil
+	package.loaded["hotstrings.engine.catalogue.personal_hotstrings"] = nil
 end
 
 --- Supplies explicit physical/source observations for these discovery-only doubles.
@@ -49,7 +49,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		-- Record every keymap.load_toml call so we can assert order independently of
 		-- the returned list (the two must agree).
 		local registered = {}
-		mock("modules.keymap", {
+		mock("hotstrings.engine.expander", {
 			-- The real module exports this constant and infra/personal_hotstrings reads
 			-- it, so a stub without it hands nil to load_toml and the group silently
 			-- registers under no name. A stub must model the real API it stands in for.
@@ -60,7 +60,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 			end,
 			source_priority = function(_) return nil end,
 		})
-		mock("ui.hotstring_editor", { init = function() end })
+		mock("hotstrings.ui.hotstring_editor", { init = function() end })
 		mock("settings.engine.paths", {
 			get = function(key)
 				if key == "PersonalTomlPath" then return "/fake/hot/personal_hotstrings.toml" end
@@ -88,8 +88,8 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		end
 		hs.json = { decode = function(_) return nil end }
 
-		package.loaded["infra.personal_hotstrings"] = nil
-		local PH = require("infra.personal_hotstrings")
+		package.loaded["hotstrings.engine.catalogue.personal_hotstrings"] = nil
+		local PH = require("hotstrings.engine.catalogue.personal_hotstrings")
 		local ok, loaded = pcall(PH.load, { bundled_hotstrings_dir = "/fake/bundle/" })
 
 		hs.fs.attributes, hs.json = prev_attr, prev_json
@@ -127,12 +127,12 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		-- again — the exact shape hs.fs.attributes/fs_dir.entries cannot tell
 		-- apart from a real filesystem symlink loop. Before the depth guard,
 		-- M.load would recurse until Lua's C-stack limit aborted the process.
-		mock("modules.keymap", {
+		mock("hotstrings.engine.expander", {
 			PERSONAL_GROUP_NAME = "personal",
 			load_toml = function(_, _) return true end,
 			source_priority = function(_) return nil end,
 		})
-		mock("ui.hotstring_editor", { init = function() end })
+		mock("hotstrings.ui.hotstring_editor", { init = function() end })
 		mock("settings.engine.paths", {
 			get = function(key)
 				if key == "PersonalTomlPath" then return "/fake/hot/personal_hotstrings.toml" end
@@ -154,8 +154,8 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		end
 		hs.json = { decode = function(_) return nil end }
 
-		package.loaded["infra.personal_hotstrings"] = nil
-		local PH = require("infra.personal_hotstrings")
+		package.loaded["hotstrings.engine.catalogue.personal_hotstrings"] = nil
+		local PH = require("hotstrings.engine.catalogue.personal_hotstrings")
 		local ok, err = pcall(PH.load, { bundled_hotstrings_dir = "/fake/bundle/" })
 
 		hs.fs.attributes, hs.json = prev_attr, prev_json
@@ -180,12 +180,12 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		-- before the subdirectory "a", so the SECOND (colliding) load is the
 		-- nested one — the warn must fire and the loaded list must still record
 		-- something sane rather than throwing.
-		mock("modules.keymap", {
+		mock("hotstrings.engine.expander", {
 			PERSONAL_GROUP_NAME = "personal",
 			load_toml = function(_, _) return true end,
 			source_priority = function(_) return nil end,
 		})
-		mock("ui.hotstring_editor", { init = function() end })
+		mock("hotstrings.ui.hotstring_editor", { init = function() end })
 		mock("settings.engine.paths", {
 			get = function(key)
 				if key == "PersonalTomlPath" then return "/fake/hot/personal_hotstrings.toml" end
@@ -211,7 +211,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 
 		-- Capture Logger.warn calls without silencing them (same pattern as
 		-- tests/meta/architecture/test_healthcheck_api_contract.lua).
-		package.loaded["infra.personal_hotstrings"] = nil
+		package.loaded["hotstrings.engine.catalogue.personal_hotstrings"] = nil
 		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local warnings = {}
@@ -221,7 +221,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 			return orig_warn(log_obj, fmt, ...)
 		end
 
-		local PH = require("infra.personal_hotstrings")
+		local PH = require("hotstrings.engine.catalogue.personal_hotstrings")
 		local ok, loaded = pcall(PH.load, { bundled_hotstrings_dir = "/fake/bundle/",
 			saved_preferences = { hotstrings = { personal_ext_a__b = true } } })
 

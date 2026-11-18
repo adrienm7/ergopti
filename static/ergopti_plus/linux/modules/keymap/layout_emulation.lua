@@ -16,7 +16,7 @@
 ---    magic key: the grabbed press never reaches the application, its text is
 ---    typed in its place and then handed to the character path, so the buffer,
 ---    the metrics and the hotstrings see exactly what the application shows,
----    as for the magic key (modules/hotstrings/magic_key_source.lua).
+---    as for the magic key (hotstrings/engine/magic_key_source.lua).
 --- 2. Key presses first: a text the session's XKB layout types with keys goes
 ---    out as key presses; a character it cannot type goes through the
 ---    injector's clipboard route, the one the expansions use for such

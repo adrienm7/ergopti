@@ -141,8 +141,8 @@ local function driver_state(path)
 
 	local paths = require("settings.engine.paths")
 	local previous_config, previous_chatgpt = paths.config, package.loaded["modules.shortcuts.chatgpt"]
-	local previous_preferences = package.loaded["infra.hotstring_preferences"]
-	local previous_magic_key = package.loaded["modules.hotstrings.magic_key"]
+	local previous_preferences = package.loaded["hotstrings.engine.matcher.preferences"]
+	local previous_magic_key = package.loaded["hotstrings.engine.magic_key"]
 	paths.config = function(name)
 		helpers.assert_eq(name, "config.toml")
 		return path
@@ -152,13 +152,13 @@ local function driver_state(path)
 	end)
 	-- The runtime reads the canonical trigger through hotstring preferences;
 	-- the setup wizard reads the same leaf when it shows the stored choice.
-	package.loaded["infra.hotstring_preferences"] = nil
+	package.loaded["hotstrings.engine.matcher.preferences"] = nil
 	local ok_key, magic_key = pcall(function()
-		return helpers.load_module("modules.hotstrings.magic_key").get()
+		return helpers.load_module("hotstrings.engine.magic_key").get()
 	end)
 	paths.config, package.loaded["modules.shortcuts.chatgpt"] = previous_config, previous_chatgpt
-	package.loaded["infra.hotstring_preferences"] = previous_preferences
-	package.loaded["modules.hotstrings.magic_key"] = previous_magic_key
+	package.loaded["hotstrings.engine.matcher.preferences"] = previous_preferences
+	package.loaded["hotstrings.engine.magic_key"] = previous_magic_key
 	if not ok_url then error(chatgpt_url, 0) end
 	if not ok_key then error(magic_key, 0) end
 

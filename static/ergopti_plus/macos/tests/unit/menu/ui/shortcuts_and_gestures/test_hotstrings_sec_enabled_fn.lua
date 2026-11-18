@@ -11,11 +11,11 @@
 
 local helpers = require("tests.helpers")
 
--- Selected by a declaration unique to ui/menu/menu_hotstrings.lua rather than by
+-- Selected by a declaration unique to hotstrings/ui/menu/hotstrings.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
 local src = helpers.read_driver_source("local function buildPersonalInfoItems")
-helpers.assert_true(src ~= nil, "ui/menu/menu_hotstrings.lua source must be locatable")
+helpers.assert_true(src ~= nil, "hotstrings/ui/menu/hotstrings.lua source must be locatable")
 
 -- Test 1: The two exact code expressions that used the undefined variable must not appear.
 -- (Comments referencing it by name are OK; the actual variable-reference patterns are not.)

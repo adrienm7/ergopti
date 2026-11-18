@@ -82,7 +82,7 @@ assert.equal(
 assert.equal(GATE_COMMANDS['linux-xkb-source'].npm, 'test:linux:xkb-source');
 for (const file of [
 	'static/ergopti_plus/linux/adapters/xkb_source_probe.lua',
-	'static/ergopti_plus/linux/modules/hotstrings/magic_key_source.lua',
+	'static/ergopti_plus/linux/hotstrings/engine/magic_key_source.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua',
 	'static/ergopti_plus/_shared/shortcuts/engine/magic_editor_core.lua'
 ])

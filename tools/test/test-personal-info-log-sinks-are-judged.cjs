@@ -79,10 +79,10 @@ const REDACTORS = [
 // skimmed. These directories are where a resolved @-tag can actually appear.
 const LUA_TREES = [
 	'_shared/hotstrings/engine/dynamic',
-	'linux/modules/dynamic_hotstrings',
-	'macos/modules/dynamic_hotstrings',
-	'linux/infra/personal_info_fields.lua',
-	'macos/infra/personal_info_fields.lua'
+	'linux/hotstrings/engine/dynamic',
+	'macos/hotstrings/engine/dynamic',
+	'linux/hotstrings/engine/catalogue/personal_info_fields.lua',
+	'macos/hotstrings/engine/catalogue/personal_info_fields.lua'
 ];
 
 const LUA_SINKS = [
@@ -136,49 +136,49 @@ const JUDGED = [
 		why: 'the interpolation is the exit status and the output of a fixed script that only empties the Recycle Bin, never hotstring content.'
 	},
 	{
-		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		file: 'hotstrings/engine/matcher/dispatch.ahk',
 		match: 'Resolving a dynamic replacement failed; exception detail withheld.',
 		verdict: 'not-personal',
 		why: 'the call deliberately withholds the resolver exception and interpolates no trigger or replacement content.'
 	},
 	{
-		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		file: 'hotstrings/engine/matcher/dispatch.ahk',
 		match: 'Undo: restored a private trigger (content withheld).',
 		verdict: 'not-personal',
 		why: 'the private branch itself: a constant sentence that interpolates nothing.'
 	},
 	{
-		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		file: 'hotstrings/engine/matcher/dispatch.ahk',
 		match: 'Undo: restored the trigger ({1} char(s)).',
 		verdict: 'not-personal',
 		why: 'prints _TextCodepointLength(Undo.Trigger), the length of the restored trigger, never its text.'
 	},
 	{
-		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		file: 'hotstrings/engine/matcher/dispatch.ahk',
 		match: 'Undo: restoring the trigger failed ({1}); the context is reset.',
 		verdict: 'not-personal',
 		why: 'the interpolation is Type(Err) of the failed send or the fixed "send refused", never the restored trigger.'
 	},
 	{
-		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		file: 'hotstrings/engine/matcher/dispatch.ahk',
 		match: 'Undo: restoring the trigger in the terminal failed; the context is reset.',
 		verdict: 'not-personal',
 		why: 'a constant sentence: "trigger" names what failed to come back, and the call interpolates nothing.'
 	},
 	{
-		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		file: 'hotstrings/engine/matcher/dispatch.ahk',
 		match: 'Undo: restoring the trigger in Notepad failed ({1}); the context is reset.',
 		verdict: 'not-personal',
 		why: 'the interpolation is the Notepad sender\'s failure reason (a fixed refusal or the send error\'s Message) or the fixed "not committed", the same value the sibling "did not complete its canonical commit" sink prints; never the restored trigger.'
 	},
 	{
-		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		file: 'hotstrings/engine/matcher/dispatch.ahk',
 		match: "A hotstring replacement resolved to '{1}', not String",
 		verdict: 'not-personal',
 		why: 'the only interpolation is Type(ResolvedBase), a runtime type name rather than the resolved value.'
 	},
 	{
-		file: 'infra/hotstrings/personal_toml_io.ahk',
+		file: 'hotstrings/engine/catalogue/personal_toml_io.ahk',
 		match: "Atomic replacement of '{1}' succeeded, but live publication",
 		verdict: 'not-personal',
 		why: 'both calls interpolate the bounded personal-TOML config path and, on failure, publication error metadata; no file contents or mapping values.'
@@ -214,37 +214,37 @@ const JUDGED = [
 		why: 'replacement is the fallback LLM model name; all interpolations are model identifiers and fixed backend tags.'
 	},
 	{
-		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		file: 'hotstrings/engine/matcher/dispatch.ahk',
 		match: 'FIRE trigger={1} char(s)',
 		verdict: 'not-personal',
 		why: 'prints lengths only: the trigger, the end character and the burst each reach the log through StrLen(), for public and private mappings alike.'
 	},
 	{
-		file: 'infra/hotstrings/hotstring_inputhook.ahk',
+		file: 'hotstrings/engine/matcher/inputhook.ahk',
 		match: 'Fire-log drain failed',
 		verdict: 'withheld-by-caller',
 		why: '`Named` is assigned on the preceding line as Rec.IsPrivate ? PersonalInfoRedactForLog(Rec.Trigger) : Rec.Trigger.'
 	},
 	{
-		file: 'infra/hotstrings/hotstring_inputhook.ahk',
+		file: 'hotstrings/engine/matcher/inputhook.ahk',
 		match: 'Index rebuilt:',
 		verdict: 'not-personal',
 		why: 'prints NewSet.Count — how many triggers were indexed, never one of them.'
 	},
 	{
-		file: 'infra/hotstrings/hotstring_inputhook.ahk',
+		file: 'hotstrings/engine/matcher/inputhook.ahk',
 		match: '"type", kind,',
 		verdict: 'withheld-by-caller',
 		why: 'KL_LogHotstringNearMiss; both call sites return early via _NearMissIsWithheld before reaching it.'
 	},
 	{
-		file: 'infra/hotstrings/hotstrings_io.ahk',
+		file: 'hotstrings/engine/catalogue/io.ahk',
 		match: "Atomic replacement of override file '{1}' raised: {2}.",
 		verdict: 'not-personal',
 		why: 'the interpolated value is the fixed config-directory overrides filename plus OS error metadata, never a trigger or replacement.'
 	},
 	{
-		file: 'infra/hotstrings/hotstrings_io.ahk',
+		file: 'hotstrings/engine/catalogue/io.ahk',
 		match: "Atomic replacement of override file '{1}' failed (Windows error {2}).",
 		verdict: 'not-personal',
 		why: 'the interpolated value is the fixed config-directory overrides filename plus an OS error code, never a trigger or replacement.'
@@ -411,22 +411,22 @@ if (luaSites.length === 0) {
 // real one, and cheaper than tuning the net until it misses something.
 const LUA_JUDGED = [
 	{
-		file: 'linux/modules/dynamic_hotstrings/manager.lua',
+		file: 'linux/hotstrings/engine/dynamic/manager.lua',
 		match: '(LOG, "Dynamic single-field expansion refused: no retained text destination.")',
 		why: 'The constant diagnostic interpolates no personal-info value; "expansion" appears only in prose.'
 	},
 	{
-		file: 'linux/modules/dynamic_hotstrings/manager.lua',
+		file: 'linux/hotstrings/engine/dynamic/manager.lua',
 		match: 'prefix_rules module unavailable',
 		why: 'no interpolation at all; "expansion" is in the prose.'
 	},
 	{
-		file: 'macos/modules/dynamic_hotstrings/personal_info.lua',
+		file: 'macos/hotstrings/engine/dynamic/personal_info.lua',
 		match: 'personal_info.toml not found',
 		why: 'no interpolation at all; "values" is in the prose.'
 	},
 	{
-		file: 'macos/modules/dynamic_hotstrings/rules_engine.lua',
+		file: 'macos/hotstrings/engine/dynamic/rules_engine.lua',
 		match: 'set_trigger_char: received an invalid value',
 		why: 'the "value" is the magic-key CHARACTER the caller passed, not a personal_info field.'
 	}
@@ -474,7 +474,7 @@ function judgmentIndex(site) {
 // A retired message prefix must not approve a later call carrying private data.
 // The old delimiter judgment accepted this sink even though its Trigger is raw.
 const retiredPrivateSink = {
-	file: 'infra/hotstrings/hotstrings_io.ahk',
+	file: 'hotstrings/engine/catalogue/io.ahk',
 	callNorm:
 		'("privacy_probe", "Global delimiter sets published after durable override replacement. Trigger: {1}", Trigger)'
 };

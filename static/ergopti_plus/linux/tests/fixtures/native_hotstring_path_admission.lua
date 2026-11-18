@@ -14,7 +14,7 @@ if mode == "index" then
 		return shared(path)
 	end
 end
-local Config = require("modules.hotstrings.hotstrings_config")
+local Config = require("hotstrings.engine.catalogue.config")
 Config._set_override_config_dir_for_test(root)
 Config._set_config_file_for_test(root .. "/choices.toml")
 if mode == "index" then
@@ -32,7 +32,7 @@ elseif mode == "override" or mode == "denied" then
 elseif mode == "retained" then
 	local loads = 0
 	assert(Config.init({ load_mappings = function() loads = loads + 1; return true end }, root))
-	local Loader = require("modules.hotstrings.loader")
+	local Loader = require("hotstrings.engine.loader")
 	Loader.load_catalogue = function() return { committed = true, errors = 0, mappings = {}, categories = {} } end
 	local _, committed = Config.load_all()
 	assert(committed and loads == 1, "healthy catalogue must be published first")
@@ -43,7 +43,7 @@ elseif mode == "retained" then
 		"refused override must preserve the active catalogue")
 elseif mode == "missing" then
 	assert(Config.init({}, root))
-	local Loader = require("modules.hotstrings.loader")
+	local Loader = require("hotstrings.engine.loader")
 	local observed = false
 	Loader.load_catalogue = function(paths)
 		for _, source in ipairs(paths) do

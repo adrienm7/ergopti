@@ -35,13 +35,13 @@ end
 --- Publishes the sentinel Karabiner taps on entering the navigation layer, as
 --- the keymap tap that claims it does.
 local function enter_layer()
-	require("modules.keymap.control_sentinels").claim_key(
+	require("hotstrings.engine.expander.control_sentinels").claim_key(
 		require("platform.input.keycodes").F20_LAYER_NAV_ENTERED, true, {})
 end
 
 --- Publishes the sentinel Karabiner taps on leaving the navigation layer.
 local function exit_layer()
-	require("modules.keymap.control_sentinels").claim_key(
+	require("hotstrings.engine.expander.control_sentinels").claim_key(
 		require("platform.input.keycodes").F19_LAYER_NAV_EXITED, true, {})
 end
 

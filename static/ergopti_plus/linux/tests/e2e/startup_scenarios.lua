@@ -76,7 +76,7 @@ local CORPUS = "/../_shared/tests/corpus/config_migrations"
 local REFUSAL_ERRORS = {
 	{ "toml_writer", "batch_write: publication to '<config>/config.toml' failed" },
 	{ "hotstrings.terminator_settings", "Word-delimiter settings were not persisted: " },
-	{ "ui.menu.menu_hotstrings", "Word-delimiter change was rolled back because persistence failed." },
+	{ "hotstrings.ui.menu.hotstrings", "Word-delimiter change was rolled back because persistence failed." },
 }
 
 --- The REFUSAL_ERRORS entry an error line is, if any.

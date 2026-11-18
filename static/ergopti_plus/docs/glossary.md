@@ -24,7 +24,7 @@ within each group. Cross-references appear as **→ Term**.
 A **→ Hotstring** expansion mode where the expansion fires the instant the
 full trigger is typed, without waiting for a **→ Terminator** keystroke. Enabled
 by the `auto` flag on a hotstring entry. Implemented in
-`static/ergopti_plus/macos/modules/keymap/expander.lua` and
+`static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua` and
 `static/ergopti_plus/windows/lib/hotstrings/hotstring_engine.ahk`.
 
 **Buffer (Typing Buffer)**
@@ -157,7 +157,7 @@ key, or combining vowel + modifier into a single typed sequence. Stored in
 **Dynamic Hotstrings**
 Hotstrings whose replacement is computed at expansion time rather than being
 a static string. Implemented in
-`static/ergopti_plus/macos/modules/dynamic_hotstrings/`. Examples include
+`static/ergopti_plus/macos/hotstrings/engine/dynamic/`. Examples include
 the `{date}` and `{time}` template tokens.
 
 **`final` Flag**

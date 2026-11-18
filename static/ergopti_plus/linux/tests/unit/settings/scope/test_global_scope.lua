@@ -15,7 +15,7 @@ local Codec = require("core.text.engine.toml_codec")
 
 local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 local OWNER_MODULES = { "infra.tap_hold_scope", "infra.shortcuts_scope", "ai.engine.scope", "infra.metrics_scope",
-	"infra.hotstrings_scope", "settings.engine.scope.script_scope" }
+	"hotstrings.engine.catalogue.scope", "settings.engine.scope.script_scope" }
 
 --- A stub participant journaling into a shared trace.
 local function stub(trace, name, refuse)
@@ -160,7 +160,7 @@ helpers.describe("Linux global scope: hotstrings", function()
 	helpers.it("registers the hotstrings scope owner with the daemon's runtimes", function()
 		with_modules(function()
 			local seen, participant = nil, stub({}, "hotstrings")
-			package.loaded["infra.hotstrings_scope"] = {
+			package.loaded["hotstrings.engine.catalogue.scope"] = {
 				participant = function(ports, ...)
 					seen = { extra = select("#", ...), ports = ports }
 					return participant
@@ -179,7 +179,7 @@ helpers.describe("Linux global scope: hotstrings", function()
 
 	helpers.it("leaves hotstrings out when the daemon runs none", function()
 		with_modules(function()
-			package.loaded["infra.hotstrings_scope"] = {
+			package.loaded["hotstrings.engine.catalogue.scope"] = {
 				participant = function() error("no hotstrings owner without a hotstrings configuration") end,
 			}
 			local registry = require("settings.engine.scope.global_scope").participants({ is_paused = function() return false end })

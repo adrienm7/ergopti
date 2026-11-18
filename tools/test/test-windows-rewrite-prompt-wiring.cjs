@@ -460,7 +460,7 @@ check(
 );
 check(
 	bodyOf(
-		read('infra/hotstrings/hotstring_dispatch.ahk'),
+		read('hotstrings/engine/matcher/dispatch.ahk'),
 		'_HSE_MirrorCanonicalEffectToLlm'
 	).includes('LLM_Bridge_ReissueLiveAfterExpansion()'),
 	'a hotstring expansion must re-issue the live request on the expanded text'

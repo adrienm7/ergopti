@@ -74,7 +74,7 @@ _USBP_SelectionIsPolledInBackground() {
 	StartBody := _DriverFuncBody("UIASW_Start")
 	Assert(InStr(StartBody, "UIASW_WorkerEntryPath()") > 0,
 		"source mode must launch the minimal UIA worker entry instead of reparsing the full driver on first use")
-	Entry := _USBP_ReadSource("modules/keymap/uia_selection_worker_entry.ahk")
+	Entry := _USBP_ReadSource("hotstrings/engine/expander/uia_selection_worker_entry.ahk")
 	Assert(InStr(Entry, "vendor\UIA.ahk") > 0
 		&& InStr(Entry, "core\process\adapters\uia_worker.ahk") > 0
 		&& InStr(Entry, "#Include %A_ScriptDir%\uia_selection_worker.ahk") = 0

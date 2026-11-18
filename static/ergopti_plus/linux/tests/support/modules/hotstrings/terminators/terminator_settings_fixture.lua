@@ -42,10 +42,10 @@ local function with_settings(source, body)
 			for key, value in pairs(require("settings.engine.paths")) do paths[key] = value end
 			paths.config = function() return path end
 			package.loaded["settings.engine.paths"] = paths
-			for _, name in ipairs({ "infra.hotstring_preferences", "modules.hotstrings.terminator_settings" }) do
+			for _, name in ipairs({ "hotstrings.engine.matcher.preferences", "hotstrings.engine.matcher.terminator_settings" }) do
 				package.loaded[name] = nil
 			end
-			local Settings = require("modules.hotstrings.terminator_settings")
+			local Settings = require("hotstrings.engine.matcher.terminator_settings")
 			baseline = Settings.snapshot()
 			local passed, failure = pcall(body, Settings, path, Sandbox, Terminators)
 			assert(Settings.restore_configuration(baseline), "the shared catalogue must be put back")

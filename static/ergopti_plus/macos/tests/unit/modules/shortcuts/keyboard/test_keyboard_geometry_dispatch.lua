@@ -12,7 +12,7 @@ local Json = require("core.text.engine.json")
 
 local function with_geometry(callback)
 	helpers.with_stub_scope({ "platform.input.keyboard_geometry", "modules.shortcuts.tap_keys",
-		"modules.keymap.magic_key_source" }, function()
+		"hotstrings.engine.expander.magic_key_source" }, function()
 		local getenv = os.getenv
 		os.getenv = function(key)
 			if key ~= "ERGOPTI_KEYBOARD_GEOMETRY_V1" then return getenv(key) end
@@ -79,7 +79,7 @@ helpers.describe("per-event physical keyboard geometry (ansi-iso-position)", fun
 
 	helpers.it("Backquote and IntlBackslash remap only their own physical key", function()
 		with_geometry(function()
-			local Source = require("modules.keymap.magic_key_source")
+			local Source = require("hotstrings.engine.expander.magic_key_source")
 			local on = function() return true end
 			for _, case in ipairs({
 				{ "Backquote", 41, 50, false }, { "Backquote", 41, 10, true },

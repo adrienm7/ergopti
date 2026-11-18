@@ -12,7 +12,7 @@
 ---    social security number twice: more personal data than the user asked for
 ---    (HCD-3, decided by the agent on 2026-11-13, to review by the maintainer).
 --- 2. One table for the three drivers. macOS and Linux read this module; the
----    Windows map (`PERSONAL_INFO_TAGS`, infra/personal_info_preview.ahk) is
+---    Windows map (`PERSONAL_INFO_TAGS`, hotstrings/engine/catalogue/personal_info_preview.ahk) is
 ---    pinned to it by tools/test/test-personal-info-tags-single-source.cjs.
 --- 3. Case-insensitive, as the Windows hotstrings (no C flag) are.
 --- ==============================================================================

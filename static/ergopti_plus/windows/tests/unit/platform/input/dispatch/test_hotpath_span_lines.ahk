@@ -110,7 +110,7 @@ _HSL_EveryPathCarriesItsSpan() {
 	}
 	; The InputHook's typing path and its held-back end key both dispatch inside
 	; the hook file (the first inside a long callback); each dispatch is paired.
-	Src := _StripFullLineComments(_DriverFileSource("hotstring_inputhook.ahk"))
+	Src := _StripFullLineComments(_DriverFileSource("inputhook.ahk"))
 	Opens := 0, Closes := 0, Position := 1
 	while (Position := InStr(Src, 'HotPath_SpanTrace("hotstring.expand")', , Position)) {
 		Opens += 1

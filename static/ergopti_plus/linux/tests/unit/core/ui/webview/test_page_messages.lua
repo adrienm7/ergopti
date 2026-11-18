@@ -35,9 +35,9 @@ helpers.describe("webview pages: messages and replies cross the bridge", functio
 		local logger, lines = require("core.logger.engine.shim"), {}
 		-- A plain page: document apps refuse a payload without its envelope
 		-- before the handler runs, so they cannot reach the exception path.
-		local original_error, original_handler = logger.error, package.loaded["ui.hotstring_editor.bridge"]
+		local original_error, original_handler = logger.error, package.loaded["hotstrings.ui.hotstring_editor.bridge"]
 		logger.error = function(_, fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
-		package.loaded["ui.hotstring_editor.bridge"] = { bridge_name = "hsEditor",
+		package.loaded["hotstrings.ui.hotstring_editor.bridge"] = { bridge_name = "hsEditor",
 			on_message = function(payload) error("failure: " .. payload.secret) end }
 		local ok, err = pcall(function()
 			local wm = require("core.ui.ui.webview_manager")
@@ -45,7 +45,7 @@ helpers.describe("webview pages: messages and replies cross the bridge", functio
 			helpers.assert_true(#lines > 0, "the bridge failure is diagnosed")
 			helpers.assert_true(not table.concat(lines, "\n"):find("secret-canary", 1, true))
 		end)
-		logger.error, package.loaded["ui.hotstring_editor.bridge"] = original_error, original_handler
+		logger.error, package.loaded["hotstrings.ui.hotstring_editor.bridge"] = original_error, original_handler
 		if not ok then error(err, 0) end
 	end)
 

@@ -214,7 +214,7 @@ local PE = require("ai.engine.prediction.engine")
 local function load_real_setting_bridge()
 	local noop = function() end
 	local replacements = {
-		["modules.keymap.utils"] = {},
+		["hotstrings.engine.expander.utils"] = {},
 		["diagnostics.adapters.event_provenance"] = {STATUS_UNREADABLE = "unreadable"},
 		["platform.input.synthetic_input"] = {current_action_epoch = function() return 0 end},
 		["core.text.engine.utils"] = {},
@@ -226,9 +226,9 @@ local function load_real_setting_bridge()
 		},
 		["modules.keystats"] = {},
 		["core.ui.ui.tooltip"] = {},
-		["modules.keymap.registry"] = {},
-		["modules.hotstrings.hotstrings_config"] = {},
-		["modules.keymap.expander"] = {},
+		["hotstrings.engine.expander.registry"] = {},
+		["hotstrings.engine.catalogue.config"] = {},
+		["hotstrings.engine.expander.expander"] = {},
 		["core.events.timer_scheduler"] = {after = noop},
 		["menu.engine.manifest_reader"] = {},
 		["diagnostics.engine.hid_diagnostic_mailbox"] = {},

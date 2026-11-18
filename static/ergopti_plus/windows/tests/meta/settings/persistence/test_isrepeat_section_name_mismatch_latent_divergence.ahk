@@ -64,7 +64,7 @@ _ISRMM_ReadSharedSource(RelPath) {
 ; ==================================================
 
 _ISRMM_CacheDropsBrokenPredicate() {
-	Src := _ISRMM_ReadWindowsSource("hotstrings_cache.ahk")
+	Src := _ISRMM_ReadWindowsSource("cache.ahk")
 	Body := _DriverFuncBody("_HotstringsCacheBuildRows")
 	Assert(Body != "", "_HotstringsCacheBuildRows must exist in hotstrings_cache.ahk")
 	; The broken no-underscore section literal predicate must be gone (not dead).

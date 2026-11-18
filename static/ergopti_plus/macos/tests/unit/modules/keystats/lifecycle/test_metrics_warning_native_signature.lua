@@ -33,7 +33,7 @@ local OWNERS = {
 	"platform.input.keyboard_hook", "adapters.input_source_broker", "core.fs.adapters.storage",
 	"core.events.timer_scheduler", "modules.keystats.aggregator.events",
 	"modules.keystats.aggregator.state", "modules.keystats.aggregator.core",
-	"modules.keystats.aggregator.physical", "ui.metrics_typing.init", "ui.metrics_typing", "modules.keymap",
+	"modules.keystats.aggregator.physical", "ui.metrics_typing.init", "ui.metrics_typing", "hotstrings.engine.expander",
 }
 
 

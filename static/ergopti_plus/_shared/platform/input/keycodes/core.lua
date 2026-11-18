@@ -77,7 +77,7 @@ M.F18_KARABINER_DELETE = 79
 --- release, an explicit layer off). Between F20 and F19 the macOS driver runs
 --- the layer's wheel bindings, which Karabiner cannot take
 --- (modules/shortcuts/actions/system.lua bind_layer_wheel). Deleted like F20
---- by modules/keymap/control_sentinels.lua.
+--- by hotstrings/engine/expander/control_sentinels.lua.
 M.F19_LAYER_NAV_EXITED = 80
 
 --- F20 (keycode 90) — Karabiner-emitted "nav layer entered" sentinel. Fired
@@ -86,7 +86,7 @@ M.F19_LAYER_NAV_EXITED = 80
 --- caps_lock, etc.) so Hammerspoon can distinguish "user is entering the nav
 --- layer" from "user pressed a real key that should dismiss the tooltip".
 --- On macOS the keymap eventtaps delete both phases through
---- modules/keymap/control_sentinels.lua so no application ever receives it,
+--- hotstrings/engine/expander/control_sentinels.lua so no application ever receives it,
 --- then publish the signal in-process (the LLM tooltip renews its deadline).
 M.F20_LAYER_NAV_ENTERED = 90
 
@@ -99,7 +99,7 @@ M.F20_LAYER_NAV_ENTERED = 90
 --- keep; F13 to F20 are all taken, and F21 to F24 reach no application (the
 --- macOS HID table maps them to no keycode). An Apple keyboard has no such
 --- key and macOS gives it no action; the keymap eventtaps delete both phases
---- through modules/keymap/control_sentinels.lua.
+--- through hotstrings/engine/expander/control_sentinels.lua.
 M.CONTEXT_MENU_TAP_HOLD_MODIFIER = 110
 
 --- Karabiner key_code name of CONTEXT_MENU_TAP_HOLD_MODIFIER. hs.keycodes.map
@@ -141,7 +141,7 @@ M.FORWARD_DELETE = 117
 M.RETURN = 36
 
 --- Escape (keycode 53) — KE-paused fallback path counterpart, and also
---- consumed by modules/keymap/init.lua to dismiss predictions.
+--- consumed by hotstrings/engine/expander/init.lua to dismiss predictions.
 M.ESCAPE = 53
 
 --- Tab (keycode 48) — used by the LLM tooltip eventtap to accept the currently

@@ -26,7 +26,7 @@ local function save_once(source, mutate)
 		-- One load per process: the keymap refuses a second LLM-bridge init.
 		if not modules then
 			modules = {}
-			for key, name in pairs({ keymap = "modules.keymap", dyn_hot_mod = "modules.dynamic_hotstrings",
+			for key, name in pairs({ keymap = "hotstrings.engine.expander", dyn_hot_mod = "hotstrings.engine.dynamic",
 				shortcuts_mod = "modules.shortcuts", gestures = "gestures.engine", keystats = "modules.keystats" }) do
 				modules[key] = helpers.load_with_stubs(name)
 			end

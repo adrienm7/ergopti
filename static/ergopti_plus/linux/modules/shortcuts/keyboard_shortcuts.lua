@@ -297,7 +297,7 @@ end
 --- @return string
 function M.get_slot_label(slot_id, reason)
 	if slot_id == MagicEditor.SLOT_ID then
-		local label = key_name("meta") .. " + " .. require("modules.hotstrings.magic_key").get()
+		local label = key_name("meta") .. " + " .. require("hotstrings.engine.magic_key").get()
 		if reason then label = label .. " (" .. require("core.i18n.engine.i18n").get("menu.shortcuts.keyboard.magic_editor_reason." .. reason) .. ")" end
 		return label
 	end
@@ -623,7 +623,7 @@ end
 --- @return table decision Shared policy receipt.
 function M.magic_editor_decision(admission)
 	load_assignments()
-	local Source = require("modules.hotstrings.magic_key_source")
+	local Source = require("hotstrings.engine.magic_key_source")
 	local source, claims = Source.editor_source(), {}
 	for _, candidate in ipairs(source.candidates) do
 		if candidate.direct and not candidate.dead then
@@ -641,7 +641,7 @@ function M.magic_editor_decision(admission)
 	local catalogue = assert(action_catalogue(), "magic editor action catalogue is unavailable")
 	return MagicEditor.resolve({ default_action = Manifest.default_for(MagicEditor.PATH),
 		stored_action = _explicit_assignments[MagicEditor.SLOT_ID], is_action = catalogue.is_assignable,
-		trigger = require("modules.hotstrings.magic_key").get(), source = source, known_codes = Source.known_codes(),
+		trigger = require("hotstrings.engine.magic_key").get(), source = source, known_codes = Source.known_codes(),
 		explicit_claims = claims, configuration_generation = _dispatch_generation, admission = admission })
 end
 

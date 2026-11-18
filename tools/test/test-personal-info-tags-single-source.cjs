@@ -41,7 +41,7 @@ function sharedTags() {
 
 /** The Windows map and its registration order. */
 function windowsTags() {
-	const source = read('windows', 'infra', 'personal_info_preview.ahk');
+	const source = read('windows', 'hotstrings', 'engine', 'catalogue', 'personal_info_preview.ahk');
 	const body = /global PERSONAL_INFO_TAGS := Map\(([\s\S]*?)\n\)/.exec(source);
 	assert.ok(body, 'personal_info_preview.ahk declares PERSONAL_INFO_TAGS');
 	const tags = {};

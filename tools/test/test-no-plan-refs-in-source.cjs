@@ -35,7 +35,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 // Files where a bare "Phase N" is a legitimate algorithm-step label (CAT-B),
 // not a refactor-plan reference. Verified by reading each site.
 const PHASE_ALLOWLIST = new Set([
-	'static/ergopti_plus/linux/modules/hotstrings/injector.lua',
+	'static/ergopti_plus/linux/hotstrings/engine/injector.lua',
 	'static/ergopti_plus/macos/platform/remap/ke_lifecycle.lua',
 	'static/ergopti_plus/macos/ai/engine/api/mlx_discovery.lua',
 	'static/ergopti_plus/macos/tests/unit/modules/keystats/lifecycle/test_keystats_privacy.lua',

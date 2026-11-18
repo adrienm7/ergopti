@@ -51,7 +51,7 @@ local function reload_already_terminating()
 end
 
 -- Hard cap on how deep the recursive personal-hotstrings watcher scan descends.
--- Same rationale as infra/personal_hotstrings.lua's SCAN_MAX_DEPTH: the scanned
+-- Same rationale as hotstrings/engine/catalogue/personal_hotstrings.lua's SCAN_MAX_DEPTH: the scanned
 -- tree is a user-writable folder, so a self-referential symlink would make a
 -- naive recursion loop forever and abort boot with a stack overflow (F-LOW-4).
 local SCAN_MAX_DEPTH = 16

@@ -35,7 +35,7 @@ local TYPES = {
 local function fresh_harness(overrides)
 	package.loaded["platform.remap.watchers"] = nil
 	package.loaded["infra.capsword_auto_off"] = nil
-	package.loaded["modules.keymap.control_sentinels"] = nil
+	package.loaded["hotstrings.engine.expander.control_sentinels"] = nil
 	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
@@ -114,7 +114,7 @@ local function fresh_harness(overrides)
 	end
 	helpers.assert_true(h.settings.apply_state(state), "the test settings must compile")
 
-	h.sentinels = require("modules.keymap.control_sentinels")
+	h.sentinels = require("hotstrings.engine.expander.control_sentinels")
 	h.watchers = helpers.load_with_stubs("platform.remap.watchers", {
 		eventtap = {
 			new = function(types, callback)

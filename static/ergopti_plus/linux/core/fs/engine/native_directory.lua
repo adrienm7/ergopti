@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Lists directories and walks trees in this process through libuv, for the
 --- callers that used to fork `find` for it: the hotstring pack discovery
---- (modules/hotstrings/loader.lua) and the log retention purge
+--- (hotstrings/engine/loader.lua) and the log retention purge
 --- (core/logger/engine/sink.lua).
 ---
 --- FEATURES & RATIONALE:

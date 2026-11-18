@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The one scratch window the developer field run types its selftest keys
 --- into. The typing step publishes the window while it types and retracts it
---- when it ends; the keymap's selftest gate (modules/keymap/selftest_gate.lua)
+--- when it ends; the keymap's selftest gate (hotstrings/engine/expander/selftest_gate.lua)
 --- reads it for every selftest key.
 ---
 --- FEATURES & RATIONALE:

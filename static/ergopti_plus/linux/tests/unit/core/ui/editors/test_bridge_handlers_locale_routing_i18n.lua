@@ -57,7 +57,7 @@ end)
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("hotstrings_config_bridge", function()
-    local handler = helpers.load_module("ui.hotstrings_config_window.bridge")
+    local handler = helpers.load_module("hotstrings.ui.hotstrings_config_window.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -568,7 +568,7 @@ end)
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("hotstring_editor_bridge", function()
-    local handler = helpers.load_module("ui.hotstring_editor.bridge")
+    local handler = helpers.load_module("hotstrings.ui.hotstring_editor.bridge")
     local state = build_mock_state()
 
 		helpers.it("(hotstring-save-alert-owner) does not send a stale save error to the replacement page", function()
@@ -755,25 +755,25 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("(hotstring-pref-invalid) falls back for mistyped stored preferences", function()
       local previous_storage = package.loaded["core.fs.adapters.storage"]
-      local previous_handler = package.loaded["ui.hotstring_editor.bridge"]
+      local previous_handler = package.loaded["hotstrings.ui.hotstring_editor.bridge"]
       local values = { ["hotstring_editor.compact_view"] = "false",
         ["hotstring_editor.auto_close"] = 1, ["hotstring_editor.default_section"] = { "foreign" } }
       package.loaded["core.fs.adapters.storage"] = { get = function(key) return values[key] end }
-      package.loaded["ui.hotstring_editor.bridge"] = nil
-      local bridge = require("ui.hotstring_editor.bridge")
+      package.loaded["hotstrings.ui.hotstring_editor.bridge"] = nil
+      local bridge = require("hotstrings.ui.hotstring_editor.bridge")
       local observed = { bridge.get_pref("compact_view"), bridge.get_pref("auto_close"), bridge.get_pref("default_section") }
-      package.loaded["core.fs.adapters.storage"], package.loaded["ui.hotstring_editor.bridge"] = previous_storage, previous_handler
+      package.loaded["core.fs.adapters.storage"], package.loaded["hotstrings.ui.hotstring_editor.bridge"] = previous_storage, previous_handler
       helpers.assert_eq(observed, { false, false, "" })
     end)
     helpers.it("'save_pref' reports a storage failure and rejects the wrong value type", function()
       local previous_storage = package.loaded["core.fs.adapters.storage"]
-      local previous_handler = package.loaded["ui.hotstring_editor.bridge"]
+      local previous_handler = package.loaded["hotstrings.ui.hotstring_editor.bridge"]
       package.loaded["core.fs.adapters.storage"] = {
         get = function(_key, default_value) return default_value end,
         set = function() return false end,
       }
-      package.loaded["ui.hotstring_editor.bridge"] = nil
-      local failing = require("ui.hotstring_editor.bridge")
+      package.loaded["hotstrings.ui.hotstring_editor.bridge"] = nil
+      local failing = require("hotstrings.ui.hotstring_editor.bridge")
 
       local failed = failing.on_message(
         { action = "save_pref", data = { key = "compact_view", value = true } }, state)
@@ -781,7 +781,7 @@ helpers.describe("ui.bridge_handlers", function()
         { action = "save_pref", data = { key = "compact_view", value = "true" } }, state)
 
       package.loaded["core.fs.adapters.storage"] = previous_storage
-      package.loaded["ui.hotstring_editor.bridge"] = previous_handler
+      package.loaded["hotstrings.ui.hotstring_editor.bridge"] = previous_handler
       helpers.assert_eq(failed.saved, false,
         "the page must not receive saved=true when the durable write failed")
       helpers.assert_eq(mistyped.saved, false,

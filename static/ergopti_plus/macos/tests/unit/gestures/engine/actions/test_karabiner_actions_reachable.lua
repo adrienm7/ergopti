@@ -214,7 +214,7 @@ helpers.describe("Karabiner catalogue actions: engine variables", function()
 	--- @return table signals Ordered published signal names.
 	--- @return table Sentinels Real control-sentinel owner.
 	local function record_layer_signals()
-		local Sentinels = require("modules.keymap.control_sentinels")
+		local Sentinels = require("hotstrings.engine.expander.control_sentinels")
 		local signals = {}
 		Sentinels.set_listener("test.layer_wheel", function(signal) signals[#signals + 1] = signal end)
 		return signals, Sentinels
@@ -352,9 +352,9 @@ helpers.describe("Karabiner catalogue actions: sticky modifiers", function()
 
 	helpers.it("sticky_shift arms the shared one-shot owner", function()
 		local Actions, seen = fresh_registry()
-		helpers.with_stub_scope({ "modules.keymap" }, function()
+		helpers.with_stub_scope({ "hotstrings.engine.expander" }, function()
 			local calls = 0
-			package.loaded["modules.keymap"] = {
+			package.loaded["hotstrings.engine.expander"] = {
 				arm_one_shot_shift = function() calls = calls + 1; return true end,
 			}
 			helpers.assert_true(Actions.execute_single("sticky_shift"))

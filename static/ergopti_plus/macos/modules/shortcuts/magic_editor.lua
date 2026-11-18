@@ -20,7 +20,7 @@ local FileSystem = require("core.fs.adapters.file_system")
 local JsonCodec = require("core.fs.adapters.json_codec")
 local Paths = require("core.fs.engine.paths")
 local Manifest = require("menu.engine.manifest_reader")
-local MagicKeySource = require("modules.keymap.magic_key_source")
+local MagicKeySource = require("hotstrings.engine.expander.magic_key_source")
 local Geometry = require("platform.input.keyboard_geometry")
 local Logger = require("core.logger.engine.logger")
 

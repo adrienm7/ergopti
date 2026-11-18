@@ -20,7 +20,7 @@ local function fixture()
 	f.hs.caffeinate = { watcher = { new = function()
 		return { start = function(self) return self end, stop = function(self) return self end }
 	end } }
-	package.loaded["modules.keymap"] = { is_known_trigger = function(word) return word == "known" end }
+	package.loaded["hotstrings.engine.expander"] = { is_known_trigger = function(word) return word == "known" end }
 	local control = { now = 1000, calls = 0, builders = {}, rows = {}, errors = {} }
 	f.hs.timer.absoluteTime = function() return control.now * 1000000 end
 	local log = package.loaded["modules.keystats.log_manager"]

@@ -309,7 +309,7 @@ terminal_hotstring_key_delay_ms = 20
 # any change while the physical Backspace has not reached the document yet. The
 # request is asked again every retry interval, within the settle window, while
 # the keyboard capture holds the keys typed after the Backspace.
-# AHK: infra/hotstrings/hotstring_dispatch.ahk.
+# AHK: hotstrings/engine/matcher/dispatch.ahk.
 notepad_undo_settle_ms = 600
 notepad_undo_retry_ms = 25
 
@@ -774,7 +774,7 @@ one_shot_shift_timeout_ms = 2000
 # application publishes its selection within the 200 ms the clipboard settle
 # delay already allows; this leaves it a little more before the copy is sent
 # again, and the wait is a timer, never a sleep on the input thread.
-# AHK: platform/remap/constants.ahk TAP_COPY_VERIFY_MS. HS: modules/keymap/init.lua
+# AHK: platform/remap/constants.ahk TAP_COPY_VERIFY_MS. HS: hotstrings/engine/expander/init.lua
 # build_tap_copy. LX: platform/remap/tap_hold_manager.lua.
 copy_verify_ms = 300
 
@@ -807,13 +807,13 @@ complex_key_carry_ms = 300
 # Windows: the emoji and symbol sections register after ready, at their boot
 # rank, in slices of this length; the keyboard waits at most one slice. A gap
 # between two slices lets the input queued meanwhile run.
-# AHK: infra/hotstrings/hotstring_engine_main.ahk HSE_DeferredRegistrationSlice.
+# AHK: hotstrings/engine/matcher/engine_main.ahk HSE_DeferredRegistrationSlice.
 deferred_registration_slice_ms = 25
 deferred_registration_gap_ms = 15
 
 # Windows: how often the programmable (user code) hotstring loader polls its
 # worker processes until each one ends.
-# AHK: modules/dynamic_hotstrings/user_code.ahk UserHotstringWorker.
+# AHK: hotstrings/engine/dynamic/user_code.ahk UserHotstringWorker.
 user_code_worker_poll_ms = 25
 
 
@@ -924,7 +924,7 @@ script_control_tap_watchdog_interval_ms = 2000
 # native dialog or WebView callback that triggered it has returned and released its
 # window first (the layout manager, the personal information editor, the shortcut
 # and gesture parameter prompts, the model selector).
-# HS: ui/menu/*.lua, ui/layout_manager/init.lua, ui/personal_info_editor/init.lua.
+# HS: ui/menu/*.lua, ui/layout_manager/init.lua, hotstrings/ui/personal_info_editor/init.lua.
 ui_handoff_ms = 50
 
 # Linux: the delay before a health-check probe starts its work off the click that
@@ -1008,8 +1008,8 @@ wpm_menubar_update_ms = 500
 
 # How long capturing the physical magic key by pressing it waits for a key
 # before it ends with nothing changed.
-# AHK: core/ui/ui/editors.ahk MagicKeySourceCapture. HS: ui/menu/magic_key_source_menu.lua.
-# Linux: modules/hotstrings/magic_key_source.lua capture.
+# AHK: core/ui/ui/editors.ahk MagicKeySourceCapture. HS: hotstrings/ui/menu/magic_key_source_menu.lua.
+# Linux: hotstrings/engine/magic_key_source.lua capture.
 magic_key_capture_timeout_ms = 10000
 
 # How often that capture reads the physical key state on Windows, for a key
@@ -1076,7 +1076,7 @@ reload_deadline_ms = 12000
 
 # macOS: delay before the editor of a personal information file opens after its
 # menu row is clicked, so the menu has closed.
-# HS: ui/menu/menu_hotstrings.lua.
+# HS: hotstrings/ui/menu/hotstrings.lua.
 editor_open_after_click_ms = 100
 
 # macOS: delay before Hammerspoon reloads after the paths editor changed a path.
@@ -1139,7 +1139,7 @@ healthcheck_probe_yield_ms = 1
 
 # macOS: the run-loop yield between two hotstring categories whose metadata is
 # read after the boot, so the first preview of a category reads memory rather
-# than its TOML on the keystroke. HS: modules/hotstrings/hotstrings_config.lua.
+# than its TOML on the keystroke. HS: hotstrings/engine/catalogue/config.lua.
 hotstring_meta_prewarm_step_ms = 1
 
 # Page scripts cannot read the registry; their copies are pinned to these keys by

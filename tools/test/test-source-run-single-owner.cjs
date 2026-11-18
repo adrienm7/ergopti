@@ -103,11 +103,11 @@ const WINDOWS_MECHANICS = {
 	'diagnostics/engine/reports/snapshot.ahk': 'the snapshot reports the flag itself',
 	'diagnostics/engine/field_run/startup_smoke.ahk':
 		'the startup receipt identity owner reports its executable and compiled flag',
-	'modules/keymap/uia_selection_worker.ahk': 'how a worker process is spawned',
+	'hotstrings/engine/expander/uia_selection_worker.ahk': 'how a worker process is spawned',
 	'modules/keystats/keystats_prefetch.ahk': 'how a worker process is spawned',
 	'apps/ui/menu/apps.ahk': 'how a bundled app process is spawned',
 	'ui/layout_manager/kbd_register_core.ahk': 'how the elevated layout installer relaunches itself',
-	'modules/dynamic_hotstrings/user_code.ahk':
+	'hotstrings/engine/dynamic/user_code.ahk':
 		'launch an owned personal-code worker with the bundled interpreter /script mode',
 	'core/process/adapters/program_providers.ahk':
 		'admit A_AhkPath as an interpreter only when the current runtime is interpreted',

@@ -111,11 +111,11 @@ helpers.describe("selection translation retains its original focus", function()
 	helpers.it("does not load a missing destination tracker on the input callback", function()
 		Fixture.with_world("Mixed", "fr", function(world)
 			local text = require("modules.shortcuts.actions.text")
-			local tracked = package.loaded["modules.keymap.utils"]
-			package.loaded["modules.keymap.utils"] = nil
+			local tracked = package.loaded["hotstrings.engine.expander.utils"]
+			package.loaded["hotstrings.engine.expander.utils"] = nil
 			local ok, result = pcall(text.selection_uppercase, "gestures")
-			local loaded_during_call = package.loaded["modules.keymap.utils"]
-			package.loaded["modules.keymap.utils"] = tracked
+			local loaded_during_call = package.loaded["hotstrings.engine.expander.utils"]
+			package.loaded["hotstrings.engine.expander.utils"] = tracked
 			helpers.assert_true(ok)
 			helpers.assert_eq(result, false)
 			helpers.assert_nil(loaded_during_call)

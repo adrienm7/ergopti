@@ -16,7 +16,7 @@ local Input = require("platform.input.event")
 --- @return table session
 function M.new(options)
 	options = options or {}
-	local doubled = { "platform.input.evdev_reader", "platform.input.uinput_writer", "platform.input.keyboard_hook", "adapters.keyboard_layout", "modules.hotstrings.injector", "gestures.engine.combo_emitter" }
+	local doubled = { "platform.input.evdev_reader", "platform.input.uinput_writer", "platform.input.keyboard_hook", "adapters.keyboard_layout", "hotstrings.engine.injector", "gestures.engine.combo_emitter" }
 	local saved_modules = {}
 	for _, name in ipairs(doubled) do saved_modules[name] = package.loaded[name] end
 	local queues, sources, handles, paths, next_fd = {}, {}, {}, {}, 10
@@ -25,8 +25,8 @@ function M.new(options)
 		local file = assert(io.open(path, "w")); file:write("controlled source\n"); file:close()
 		paths[id], sources[#sources + 1], queues[path] = path, path, {}
 	end
-	local saved_finder = package.loaded["modules.hotstrings.device_finder"]
-	package.loaded["modules.hotstrings.device_finder"] = {
+	local saved_finder = package.loaded["hotstrings.engine.device_finder"]
+	package.loaded["hotstrings.engine.device_finder"] = {
 		find_devices = function() return sources, {} end,
 		is_key_device = function() return true end,
 		-- Controlled keyboard sources have no REL/ABS axes.
@@ -101,7 +101,7 @@ function M.new(options)
 		package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }
 		local Layout = helpers.load_module("adapters.keyboard_layout")
 		Layout._set_table_for_test({ x = { keycode = 45, level = 1, mods = {} } })
-		local Injector = helpers.load_module("modules.hotstrings.injector")
+		local Injector = helpers.load_module("hotstrings.engine.injector")
 		package.loaded["adapters.xkb_capture"] = saved_xkb
 		Injector._set_uinput(Writer); Injector._set_nanosleep_for_test(function() end)
 		local result = Injector.type_directly("x")
@@ -113,7 +113,7 @@ function M.new(options)
 		pcall(Hook.stop); pcall(Hook.set_remapper, nil)
 		Reader._reset_backend(); Writer.close_owned(session.cap)
 		for _, path in pairs(paths) do os.remove(path) end
-		package.loaded["modules.hotstrings.device_finder"] = saved_finder
+		package.loaded["hotstrings.engine.device_finder"] = saved_finder
 		for _, name in ipairs(doubled) do package.loaded[name] = saved_modules[name] end
 	end
 	return session

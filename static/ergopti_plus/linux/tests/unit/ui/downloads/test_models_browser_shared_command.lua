@@ -17,8 +17,8 @@ local helpers = require("tests.helpers")
 local function with_browser(callback)
 	local names = { "menu.ui.builder.builder", "ai.ui.menu.backend_rows", "menu.engine.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
 		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
-		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key",
-		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "core.ui.ui.modal",
+		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "hotstrings.engine.magic_key",
+		"hotstrings.engine.preview_settings", "hotstrings.engine.repeat_key", "core.ui.ui.modal",
 		"core.ui.ui.text_prompt", "ai.engine.policy.trigger_policy", "infra.version", "core.lifecycle.engine.installation",
 		"updater.engine.version_label", "updater.engine.schedule", "ai.ui.model_browser.bridge" }
 	local saved = {}

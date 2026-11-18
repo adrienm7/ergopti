@@ -400,13 +400,13 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- consumes the replay module's exact commitment, and replay correctly refuses
 	-- rebinding to a different CoreState. Reloading only the parent would therefore
 	-- create an impossible hybrid fixture (fresh parent, stale child).
-	if module_name == "modules.keymap.expander" then
-		loaded["modules.keymap.terminator_replay"] = nil
+	if module_name == "hotstrings.engine.expander.expander" then
+		loaded["hotstrings.engine.expander.terminator_replay"] = nil
 	end
 	-- The keymap applies the physical magic key its child owns: a fresh keymap
 	-- must not inherit a key the previous fixture chose.
-	if module_name == "modules.keymap" or module_name == "modules.keymap.init" then
-		loaded["modules.keymap.magic_key_source"] = nil
+	if module_name == "hotstrings.engine.expander" or module_name == "hotstrings.engine.expander.init" then
+		loaded["hotstrings.engine.expander.magic_key_source"] = nil
 	end
 	-- The system-action facade now exposes three stateful child owners. Reloading
 	-- only the facade would retain their pause claims, exact native debt, and the
@@ -422,7 +422,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	if module_name == "modules.shortcuts" or module_name == "modules.shortcuts.init" then
 		loaded["modules.shortcuts.layer_wheel"] = nil
 	end
-	if module_name == "modules.shortcuts.actions.text" or module_name == "modules.keymap.utils" then
+	if module_name == "modules.shortcuts.actions.text" or module_name == "hotstrings.engine.expander.utils" then
 		loaded["clipboard.adapters.clipboard"] = nil
 	end
 	-- Every screen-capture owner shares the flow's once-per-process permission
@@ -525,7 +525,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 
 	-- Drop every cached modules.keymap.registry* sub-module (registry.lua was split
 	-- into registry_groups.lua + registry_index.lua). All three capture `local hs = hs`
-	-- at require-time; when a test file requires only "modules.keymap.registry" (which
+	-- at require-time; when a test file requires only "hotstrings.engine.expander.registry" (which
 	-- itself requires the two split files), load_with_stubs's first line only clears
 	-- the exact module_name key, leaving registry_index/registry_groups cached from
 	-- whatever earlier test file first required them — bound to THAT test's now
@@ -534,7 +534,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- (F-HIGH-23 fix). Pattern-based like the ui.menu sweep above so any future split
 	-- under modules.keymap.registry* is covered automatically.
 	for name in pairs(loaded) do
-		if type(name) == "string" and name:match("^modules%.keymap%.registry") then
+		if type(name) == "string" and name:match("^hotstrings%.engine%.expander%.registry") then
 			loaded[name] = nil
 		end
 	end
@@ -1077,11 +1077,11 @@ function M.timing_failed() return _timing ~= nil and _timing.has_errors() end
 --- which every step respells. A name under the family's original prefix (a
 --- module not moved yet, or a stub's made-up name) belongs to it too.
 local MODULE_FAMILIES = {
-	["modules.keymap"] = {
-		"modules.keymap",
+	["hotstrings.engine.expander"] = {
+		"hotstrings.engine.expander",
 		"modules.keymap.composer_check",
-		"modules.keymap.control_sentinels",
-		"modules.keymap.expander",
+		"hotstrings.engine.expander.control_sentinels",
+		"hotstrings.engine.expander.expander",
 		"modules.keymap.input_sources",
 		"modules.keymap.layout",
 		"modules.keymap.layout_emulation",
@@ -1091,20 +1091,20 @@ local MODULE_FAMILIES = {
 		"modules.keymap.layout_sources_cache",
 		"ai.engine.bridge",
 		"ai.engine.api.context",
-		"modules.keymap.magic_key_source",
+		"hotstrings.engine.expander.magic_key_source",
 		"modules.keymap.number_row_live",
 		"modules.keymap.one_shot_shift",
 		"modules.keymap.pending_layout_activation",
-		"modules.keymap.registry",
-		"modules.keymap.registry_groups",
-		"modules.keymap.registry_index",
-		"modules.keymap.section_keys",
-		"modules.keymap.selftest_gate",
-		"modules.keymap.state",
-		"modules.keymap.tap_copy",
-		"modules.keymap.terminator_replay",
-		"modules.keymap.terminators",
-		"modules.keymap.utils",
+		"hotstrings.engine.expander.registry",
+		"hotstrings.engine.expander.registry_groups",
+		"hotstrings.engine.expander.registry_index",
+		"hotstrings.engine.expander.section_keys",
+		"hotstrings.engine.expander.selftest_gate",
+		"hotstrings.engine.expander.state",
+		"hotstrings.engine.expander.tap_copy",
+		"hotstrings.engine.expander.terminator_replay",
+		"hotstrings.engine.expander.terminators",
+		"hotstrings.engine.expander.utils",
 	},
 	["ai.engine"] = {
 		"ai.engine",

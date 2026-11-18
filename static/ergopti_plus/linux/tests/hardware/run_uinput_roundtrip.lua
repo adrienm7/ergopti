@@ -34,7 +34,7 @@ local InputEvent  = require("platform.input.event")
 local DeviceNames = require("platform.input.device_names")
 local UinputWriter = require("platform.input.uinput_writer")
 local EvdevReader  = require("platform.input.evdev_reader")
-local DeviceFinder = require("modules.hotstrings.device_finder")
+local DeviceFinder = require("hotstrings.engine.device_finder")
 
 
 

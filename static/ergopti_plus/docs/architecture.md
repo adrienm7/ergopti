@@ -39,7 +39,6 @@ graph TD
         LINUX_input_source_group_worker["InputSourceGroupWorker.lua"]
         LINUX_input_source_switch["InputSourceSwitch.lua"]
         LINUX_keyboard_layout["KeyboardLayout.lua"]
-        LINUX_user_hotstring_destination["UserHotstringDestination.lua"]
         LINUX_window_switch["WindowSwitch.lua"]
         LINUX_wpm_surface["WpmSurface.lua"]
         LINUX_x11_keymap_watch_worker["X11KeymapWatchWorker.lua"]
@@ -77,10 +76,8 @@ graph TD
         WINDOWS_keyboard_layout_install["KeyboardLayoutInstall.ahk"]
         WINDOWS_keyboard_layout_switch["KeyboardLayoutSwitch.ahk"]
         WINDOWS_mouse_control["MouseControl.ahk"]
-        WINDOWS_registry_notify["RegistryNotify.ahk"]
         WINDOWS_screen_brightness["ScreenBrightness.ahk"]
         WINDOWS_updater_curl_capture["UpdaterCurlCapture.ahk"]
-        WINDOWS_user_hotstrings_native["UserHotstringsNative.ahk"]
     end
 
     subgraph Domain["Domain — shared business logic"]

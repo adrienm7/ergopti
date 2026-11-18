@@ -16,11 +16,11 @@
 
 local helpers = require("tests.helpers")
 
--- Selected by a declaration unique to ui/personal_info_editor/init.lua rather than by
+-- Selected by a declaration unique to hotstrings/ui/personal_info_editor/init.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
 local src = helpers.read_driver_source("local function build_fields")
-helpers.assert_true(src ~= nil, "ui/personal_info_editor/init.lua source must be locatable")
+helpers.assert_true(src ~= nil, "hotstrings/ui/personal_info_editor/init.lua source must be locatable")
 
 -- Test 1: No local HTTP server — that was the source of the leak.
 helpers.assert_true(

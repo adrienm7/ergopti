@@ -37,22 +37,22 @@ local COMMON_STUBS = {
 	["platform.input.hotkey_registrar"] = {},
 	["core.fs.adapters.file_system"] = {},
 	["core.timing.engine.deferred_work"] = {},
-	["modules.hotstrings.hotstrings_config"] = {},
-	["modules.hotstrings.hotstrings_config_schema"] = {},
+	["hotstrings.engine.catalogue.config"] = {},
+	["hotstrings.engine.catalogue.config_schema"] = {},
 	["core.text.engine.toml.record_editor"] = {},
 }
 
 local SUBJECTS = {
 	{
 		label = "hotstring editor",
-		module_name = "ui.hotstring_editor",
+		module_name = "hotstrings.ui.hotstring_editor",
 		geometry_name = "hotstring_editor",
 		bridge_name = "hsEditor",
 		open = function(subject) subject.open("menu") end,
 	},
 	{
 		label = "hotstrings config window",
-		module_name = "ui.hotstrings_config_window",
+		module_name = "hotstrings.ui.hotstrings_config_window",
 		geometry_name = "hotstrings_config_window",
 		bridge_name = "hotstrings_config_bridge",
 		open = function(subject) subject.open() end,

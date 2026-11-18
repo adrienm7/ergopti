@@ -971,10 +971,7 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 			nativeTemplateBinding(changed, '.ahk', 'actual_frame', 'actual_command', 1),
 			false
 		);
-	const mac = fs.readFileSync(
-		path.join(SP, 'macos/ui/menu/menu_hotstrings_management.lua'),
-		'utf8'
-	);
+	const mac = fs.readFileSync(path.join(SP, 'macos/hotstrings/ui/menu/management.lua'), 'utf8');
 	assert.equal(
 		nativeTemplateBinding(mac, '.lua', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1),
 		true
@@ -1039,7 +1036,7 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 		]
 	])
 		assert.equal(nativeTemplateBinding(linux.replace(from, to), '.lua', section, key, port), false);
-	const win = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'), 'utf8'),
+	const win = fs.readFileSync(path.join(SP, 'windows/hotstrings/ui/menu/hotstrings.ahk'), 'utf8'),
 		editor = fs.readFileSync(path.join(SP, 'windows/core/ui/ui/editors.ahk'), 'utf8');
 	assert.equal(
 		nativeTemplateBinding(win, '.ahk', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1, [

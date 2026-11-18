@@ -55,7 +55,7 @@ end
 
 --- Validates the physical family against its actual provider registry.
 local function physical_family(family)
-	local known = require("modules.hotstrings.input_reader").get_layouts()
+	local known = require("hotstrings.engine.input_reader").get_layouts()
 	assert(type(family) == "string" and type(known) == "table" and known[family],
 		"Metrics require a captured supported physical keyboard family")
 	return family
@@ -84,7 +84,7 @@ local function finger_lookup(family)
 	-- labels describe an Apple keyboard, whose punctuation differs from Linux.
 	-- Resolve each Linux evdev level back to that same physical QWERTY key.
 	local reference = FingerMap.load("qwerty", read_file, Json.decode, path)
-	local layouts = require("modules.hotstrings.input_reader").get_layouts()
+	local layouts = require("hotstrings.engine.input_reader").get_layouts()
 	local qwerty = type(layouts) == "table" and layouts.qwerty or nil
 	local target = type(layouts) == "table" and layouts[family] or nil
 	if type(reference) ~= "table" or type(qwerty) ~= "table" or type(qwerty.unshifted) ~= "table"
@@ -184,7 +184,7 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 	assert(clock.layout == nil or type(clock.layout) == "string", "Invalid captured metrics layout label")
 	local typing_walk
 	if clock.foreign == true then
-		local known = require("modules.hotstrings.input_reader").get_layouts()
+		local known = require("hotstrings.engine.input_reader").get_layouts()
 		local family = clock.physical_layout
 		typing_walk = (type(family) == "string" and type(known) == "table" and known[family])
 			and captured_walk(family) or Walk

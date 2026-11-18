@@ -31,8 +31,8 @@ function M.daemon()
 			.. "\n[shortcuts.keyboard]\nmeta_space = \"llm_predict_rewrite\"\n"
 	end
 	assert(Files.write(Paths.config("config.toml"), config), "live configuration must be created")
-	local Hotstrings = require("modules.hotstrings.hotstrings_config")
-	Hotstrings.init(require("modules.hotstrings.engine").new(), "tests/e2e/fixtures/daemon_keys.toml")
+	local Hotstrings = require("hotstrings.engine.catalogue.config")
+	Hotstrings.init(require("hotstrings.engine.engine").new(), "tests/e2e/fixtures/daemon_keys.toml")
 	Hotstrings.load_all()
 	assert(Hotstrings.set_all_sections("daemon_keys", true), "the live catalogue must be explicitly selected")
 	assert(Files.write(Paths.config("tap_hold.toml"), require("tests.support.tap_hold_fixture").with_preset()),

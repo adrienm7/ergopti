@@ -22,7 +22,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
 const INSTALLER = path.join(DRIVER, 'install.sh');
 const MIGRATOR = path.join(DRIVER, 'install', 'canonical_packs.sh');
-const CONFIG_MANAGER = path.join(DRIVER, 'modules', 'hotstrings', 'hotstrings_config.lua');
+const CONFIG_MANAGER = path.join(DRIVER, 'hotstrings', 'engine', 'catalogue', 'config.lua');
 
 function fail(message) {
 	throw new Error(message);

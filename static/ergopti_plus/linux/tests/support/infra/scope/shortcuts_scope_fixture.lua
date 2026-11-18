@@ -157,7 +157,7 @@ local CHORD_PARAMETER = "script__script_altgr_enter__open_url"
 local function with_collision_scope(source, tap_config, body, navigation_text)
 	with_scope(function(scope, owners, controls, path)
 		local names = { "platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
-			"modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }
+			"hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local Manager, tap_path, hook, navigation_dir, navigation_made
 		local ok, why = pcall(function()
@@ -260,15 +260,15 @@ local magic_collision_file_read = require("core.fs.adapters.file_system").read
 
 --- Uses the real replacement owner and its actual cached preference document.
 local function with_magic_source(scope, owners, controls, path, state, body)
-	local names = { "modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }
+	local names = { "hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local Source, choices, typed = nil, {}, {}
 	local prior_read = controls.files.read
 	controls.files.read = magic_collision_file_read
 	local ok, why = pcall(function()
-		local Preferences = require("infra.hotstring_preferences")
+		local Preferences = require("hotstrings.engine.matcher.preferences")
 		helpers.assert_true(Preferences._set_file_for_test(path))
-		Source = require("modules.hotstrings.magic_key_source")
+		Source = require("hotstrings.engine.magic_key_source")
 		Source.init({
 			is_active = function() return state.active ~= false end,
 			replace_on = function() return state.replace ~= false end,

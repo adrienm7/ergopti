@@ -343,18 +343,18 @@ helpers.describe("aggregate menu preserves actual private choices and native pub
 	for _, kind in ipairs({ "language" }) do
 		for _, refusal in ipairs({ "false", "nil", "throw", "truthy" }) do
 			helpers.it("aggregate " .. kind .. " retains the actual owner after writer " .. refusal, function()
-				local old_loader = package.loaded["modules.hotstrings.loader"]
-				local old_config = package.loaded["modules.hotstrings.hotstrings_config"]
+				local old_loader = package.loaded["hotstrings.engine.loader"]
+				local old_config = package.loaded["hotstrings.engine.catalogue.config"]
 				local view = fake_config(false, false)
 				local categories = view.get_categories()
-				package.loaded["modules.hotstrings.loader"] = { load_catalogue = function()
+				package.loaded["hotstrings.engine.loader"] = { load_catalogue = function()
 					return { committed = true, errors = 0, categories = categories, mappings = {
 						{ trigger = "a", replacement = "A", group = "autocorrection", section = "first" },
 						{ trigger = "e", replacement = "E", group = LANGUAGE_CATEGORY, section = "first" },
 					} }
 				end }
 				local ok, err = pcall(function()
-					local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+					local Config = helpers.load_module("hotstrings.engine.catalogue.config")
 					local Choices = require("tests.support.hotstring_choices")
 					local source = '[category_enabled]\nhotstrings = false\n[hotstrings]\n'
 						.. 'groups = { autocorrection = false, rolls = false, en_typos = false }\n'
@@ -399,8 +399,8 @@ helpers.describe("aggregate menu preserves actual private choices and native pub
 						end)
 					end)
 				end)
-				package.loaded["modules.hotstrings.loader"] = old_loader
-				package.loaded["modules.hotstrings.hotstrings_config"] = old_config
+				package.loaded["hotstrings.engine.loader"] = old_loader
+				package.loaded["hotstrings.engine.catalogue.config"] = old_config
 				if not ok then error(err, 0) end
 			end)
 		end
@@ -428,11 +428,11 @@ local function with_dynamic_family_owners(body)
 	local batch_write = Writer.batch_write
 	local Preferences
 	local called, failure = pcall(function()
-		Preferences = helpers.load_module("infra.hotstring_preferences")
+		Preferences = helpers.load_module("hotstrings.engine.matcher.preferences")
 		assert(Preferences._set_file_for_test(path))
 		package.loaded["hotstrings.engine.dynamic.core"] = nil
-		package.loaded["modules.dynamic_hotstrings.prefix_rules"] = nil
-		local dynamic = helpers.load_module("modules.dynamic_hotstrings.manager")
+		package.loaded["hotstrings.engine.dynamic.prefix_rules"] = nil
+		local dynamic = helpers.load_module("hotstrings.engine.dynamic.manager")
 		assert(dynamic.init({ personal_info_path = personal, trigger_char = "★" }))
 		assert(dynamic.is_enabled() == true)
 		body({ dynamic = dynamic, preferences = Preferences, writer = Writer,
@@ -709,8 +709,8 @@ local function with_personal_info_leaf(body)
 			if name == "_build_hotstrings" then build_hotstrings, matches = value, matches + 1 end
 		end
 		assert(matches == 1 and type(build_hotstrings) == "function", "unique original native Hotstrings constructor required")
-		-- The root binds the constructor from its own module (ui/menu/menu_hotstrings.lua).
-		assert(rawequal(build_hotstrings, require("ui.menu.menu_hotstrings").build),
+		-- The root binds the constructor from its own module (hotstrings/ui/menu/hotstrings.lua).
+		assert(rawequal(build_hotstrings, require("hotstrings.ui.menu.hotstrings").build),
 			"constructor must be the one the actual builder binds")
 		assert(debug.getinfo(build_hotstrings, "S").source:match("/ui/menu/menu_hotstrings%.lua$"),
 			"constructor must belong to the actual Hotstrings module")
@@ -814,7 +814,7 @@ end)
 
 helpers.describe("hotstring section order native menu", function()
 	helpers.it("hotstring-section-order: original Linux menu persists and reloads the chosen order", function()
-		local preferences = require("infra.hotstring_preferences")
+		local preferences = require("hotstrings.engine.matcher.preferences")
 		local path = os.tmpname()
 		local file = assert(io.open(path, "wb")); file:write(""); file:close()
 		local ok, detail = xpcall(function()

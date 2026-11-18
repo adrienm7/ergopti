@@ -33,8 +33,8 @@ end
 local function with_fixture(outcome, callback)
 	return helpers.with_stub_scope({
 		"settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.ui.engine.dialog_util",
-		"core.i18n.engine.i18n", "menu.engine.manifest_menu", "core.ui.engine.notifications", "ui.menu.menu_hotstrings_management",
-		"modules.hotstrings.hotstrings_config", "menu.ui.keyboard.base_delay_transaction",
+		"core.i18n.engine.i18n", "menu.engine.manifest_menu", "core.ui.engine.notifications", "hotstrings.ui.menu.management",
+		"hotstrings.engine.catalogue.config", "menu.ui.keyboard.base_delay_transaction",
 		"settings.ui.menu.preferences_transaction", "menu.ui.transactions.global_actions_transaction", "menu.ui.builder.state",
 	}, function()
 		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
@@ -54,7 +54,7 @@ local function with_fixture(outcome, callback)
 			native_child_rows = renderer.native_child_rows, get_root = renderer.get_root, template_rows = renderer.template_rows, get_array = renderer.get_array, check_row = renderer.check_row,
 			command_row = renderer.command_row, build = renderer.build,
 		}
-		package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return { delay = 0.1 } end }
+		package.loaded["hotstrings.engine.catalogue.config"] = { resolve = function() return { delay = 0.1 } end }
 		return OutputFixture.with_output(function(path)
 			local file = assert(io.open(path, "wb")); assert(file:write(SOURCE)); file:close()
 			local loaded, status = Preferences.load(path)
@@ -155,7 +155,7 @@ local function with_fixture(outcome, callback)
 				commit_base_delay = owner.set,
 				save_prefs = function() return global.run_exclusive("Legacy save", raw_save) end,
 				updateMenu = function() calls.updates = calls.updates + 1 end }
-			local menus = require("ui.menu.menu_hotstrings_management").build_management(context).menu
+			local menus = require("hotstrings.ui.menu.management").build_management(context).menu
 			local row = assert(find_baseline(menus))
 			callback({ action = row.fn, row = row, state = state, state_delays = state_delays, calls = calls,
 				owner = owner, global = global, runtime = function() return runtime end,

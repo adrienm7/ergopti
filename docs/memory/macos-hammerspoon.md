@@ -782,7 +782,7 @@ QSpace file name whenever the navigation layer was held. Quartz tap order
 follows start order and taps restart, so "a swallow tap that runs last" cannot
 be guaranteed. The keymap keyDown/keyUp taps (installed for the whole process,
 PAUSE included) delete such keycodes through
-`modules/keymap/control_sentinels.lua`, before ignored-window pass-through;
+`hotstrings/engine/expander/control_sentinels.lua`, before ignored-window pass-through;
 every other tap passes them through untouched, and consumers subscribe with
 `set_listener`. Do not claim in `EventProvenance.classify_with_fence`: an extra
 keycode read there breaks the per-tap read budgets pinned by the tooltip and
@@ -1345,7 +1345,7 @@ a key whose hold is its own modifier reaches the flagsChanged tap as its press
 and release, and a tap's output follows the release within milliseconds; the
 window-server stamps give the press duration a held main thread cannot skew.
 Action: diagnose or verify a tap output from that stream
-(`modules/keymap/tap_copy.lua` does it for the copy tap, one log line per
+(`hotstrings/engine/expander/tap_copy.lua` does it for the copy tap, one log line per
 watched tap with the press time against the threshold), and read the
 clipboard counter in the keyDown tap, before the application has the
 keystroke.
@@ -2265,7 +2265,7 @@ baseline` line (item 38).
   `field_test_shortcut` is skipped as `absent` (`no_listing` when the list
   failed): create it once in Shortcuts as a shortcut that does nothing.
 - `field_tap_copy` reads what the user's own copy taps did since the driver
-  started (`modules/keymap/tap_copy.lua` statistics) and never types or writes
+  started (`hotstrings/engine/expander/tap_copy.lua` statistics) and never types or writes
   the clipboard. `copy_watch` fails as `keymap_not_started`; `copy_window` is
   `w<window>:<key>:<deployed ms>+...` and fails as `short:` when Karabiner got
   a key a timeout below the lone tap window (`no_copy_tap` skips it);

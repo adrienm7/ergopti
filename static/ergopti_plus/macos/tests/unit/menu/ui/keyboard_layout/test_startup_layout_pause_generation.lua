@@ -81,7 +81,7 @@ local state = {
 
 package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 package.loaded["core.ui.engine.notifications"] = { notify = function() end }
-package.loaded["ui.hotstring_editor"] = { set_update_menu = function() end }
+package.loaded["hotstrings.ui.hotstring_editor"] = { set_update_menu = function() end }
 package.loaded["core.text.engine.utils"] = {
 	escape_gsub_replacement = function(value) return value end,
 	shell_quote = function(value) return value end,
@@ -99,7 +99,7 @@ package.loaded["menu.ui.builder.builder"] = {
 	generate = function() return {} end,
 	invalidate_cache = function() end,
 }
-package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = function() end }
+package.loaded["hotstrings.ui.menu.counter"] = { invalidate_cache = function() end }
 package.loaded["settings.ui.menu.paths"] = {
 	is_initialized = function() return true end,
 	get = function() return "/tmp/ergopti-test" end,
@@ -147,7 +147,7 @@ package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = { req
 for _, module_name in ipairs({
 	"gestures.ui.menu.gestures",
 	"ui.menu.menu_shortcuts",
-	"ui.menu.menu_hotstrings",
+	"hotstrings.ui.menu.hotstrings",
 	"ui.menu.menu_metrics",
 	"ui.menu.menu_tap_holds",
 	"ui.menu.menu_about",
@@ -170,7 +170,7 @@ package.loaded["ui.menu.menu_tap_holds"] = {
 package.loaded["ai.engine"] = { set_backend = function() end }
 package.loaded["modules.keystats"] = {}
 package.loaded["modules.shortcuts"] = shortcuts
-package.loaded["modules.dynamic_hotstrings"] = {}
+package.loaded["hotstrings.engine.dynamic"] = {}
 package.loaded["gestures.engine"] = {}
 package.loaded["infra.personal_shortcuts"] = { load = function() end }
 

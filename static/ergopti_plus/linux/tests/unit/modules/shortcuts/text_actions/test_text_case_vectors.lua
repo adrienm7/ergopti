@@ -54,7 +54,7 @@ local function transformed_by(action_name, selected)
 		clipboard = "clipboard.adapters.clipboard",
 		event_loop = "core.events.loop",
 		combo = "gestures.engine.combo_emitter",
-		injector = "modules.hotstrings.injector",
+		injector = "hotstrings.engine.injector",
 		keystats = "modules.keystats.keystats",
 	}
 	local previous = {}

@@ -6,7 +6,7 @@
 ; Loads the shared cross-driver corpus from
 ; _shared/tests/corpus/hotstrings/config_resolve_vectors.json and validates
 ; the AHK resolution cascade (HotstringsResolve,
-; infra/hotstrings/hotstrings_catalogue.ahk) against it — proving
+; hotstrings/engine/catalogue/catalogue.ahk) against it — proving
 ; delay/color/show_tooltip/priority precedence (user_section > user_category >
 ; toml_section > toml_category) matches the macOS driver bit for bit.
 ; The base expansion delay and the offsets of it are covered by the second

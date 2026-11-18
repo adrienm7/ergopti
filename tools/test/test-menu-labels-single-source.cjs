@@ -16,7 +16,7 @@
  * IT CHECKED CONSUMPTION, WHICH IS NOT THE SAME AS ABSENCE:
  * The old gate named three macOS files and asserted each required the shared
  * module. Anything it did not name was free to re-implement the formatter — and
- * two files did: macos/ui/menu/menu_hotstrings.lua and menu_hotstrings_custom.lua
+ * two files did: macos/hotstrings/ui/menu/hotstrings.lua and menu_hotstrings_custom.lua
  * each carried their own byte-identical fmt_count. A "single-source" gate that
  * only inspects the files already known to comply cannot find a duplicate; it can
  * only confirm the compliance it already knew about.

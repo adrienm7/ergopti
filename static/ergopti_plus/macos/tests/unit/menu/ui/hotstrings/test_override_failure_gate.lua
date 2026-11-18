@@ -15,7 +15,7 @@ helpers.describe("hotstring category delay is fail-closed", function()
 		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function() return "OK", "250" end,
 		}
-		package.loaded["modules.hotstrings.hotstrings_config"] = {
+		package.loaded["hotstrings.engine.catalogue.config"] = {
 			resolve = function() return { delay = 0.1, has_override = false } end,
 			set_override = function() return false end,
 		}
@@ -43,8 +43,8 @@ helpers.describe("hotstring category delay is fail-closed", function()
 				return providers.delays_colors()
 			end,
 		}
-		package.loaded["ui.menu.menu_hotstrings_management"] = nil
-		local Management = require("ui.menu.menu_hotstrings_management")
+		package.loaded["hotstrings.ui.menu.management"] = nil
+		local Management = require("hotstrings.ui.menu.management")
 		local applied, saves, updates = 0, 0, 0
 		local built = Management.build_management({
 			state = { delays = {}, trigger_char = "★" },

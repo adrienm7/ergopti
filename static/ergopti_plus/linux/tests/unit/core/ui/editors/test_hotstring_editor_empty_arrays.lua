@@ -37,14 +37,14 @@ local function pushed_payload(content)
 		eval_js = function(_, code) pushed = code; return true end,
 	}
 	local ok, err = pcall(function()
-		local handler = helpers.load_module("ui.hotstring_editor.bridge")
+		local handler = helpers.load_module("hotstrings.ui.hotstring_editor.bridge")
 		local state = { config = { get_config_dir = function() return "/virtual/ergopti/hotstrings" end } }
 		helpers.assert_true(handler.push_init(state, { app_name = "hotstring_editor", epoch = 41 }),
 			"the opening must be pushed")
 	end)
 	package.loaded["core.text.engine.toml_codec.writer"] = saved_writer
 	package.loaded["core.ui.ui.webview_manager"] = saved_manager
-	package.loaded["ui.hotstring_editor.bridge"] = nil
+	package.loaded["hotstrings.ui.hotstring_editor.bridge"] = nil
 	if not ok then error(err, 0) end
 	local encoded = type(pushed) == "string" and pushed:match("window%.initData%((.*)%)$") or nil
 	helpers.assert_true(type(encoded) == "string", "the push must call window.initData with a JSON argument")

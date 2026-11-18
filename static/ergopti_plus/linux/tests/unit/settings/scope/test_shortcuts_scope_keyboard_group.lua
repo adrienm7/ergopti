@@ -82,13 +82,13 @@ helpers.describe("Linux keyboard group scope", function()
 			local questions, changed = 0, 0
 			-- The contextual slot reads the physical magic-key source: this test
 			-- owns it rather than inheriting another test's initialized owner.
-			local saved_source = package.loaded["modules.hotstrings.magic_key_source"]
-			local saved_magic = package.loaded["modules.hotstrings.magic_key"]
-			package.loaded["modules.hotstrings.magic_key_source"] = {
+			local saved_source = package.loaded["hotstrings.engine.magic_key_source"]
+			local saved_magic = package.loaded["hotstrings.engine.magic_key"]
+			package.loaded["hotstrings.engine.magic_key_source"] = {
 				editor_source = function() return { generation = 1, status = "unavailable", candidates = {} } end,
 				known_codes = function() return {} end,
 			}
-			package.loaded["modules.hotstrings.magic_key"] = { get = function() return "★" end, is_customised = function() return false end }
+			package.loaded["hotstrings.engine.magic_key"] = { get = function() return "★" end, is_customised = function() return false end }
 			local passed, err = pcall(function()
 				root.top_level = declared_parent(top, "shortcuts")
 				os.execute = function(command)
@@ -144,8 +144,8 @@ helpers.describe("Linux keyboard group scope", function()
 				helpers.assert_eq(changed, 2)
 			end)
 			root.top_level, os.execute = top, execute
-			package.loaded["modules.hotstrings.magic_key_source"] = saved_source
-			package.loaded["modules.hotstrings.magic_key"] = saved_magic
+			package.loaded["hotstrings.engine.magic_key_source"] = saved_source
+			package.loaded["hotstrings.engine.magic_key"] = saved_magic
 			if not passed then error(err, 0) end
 		end, SOURCE)
 	end)

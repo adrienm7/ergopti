@@ -35,7 +35,7 @@ same commit as each step or checkpoint. Times are Paris time.
   (field report collectors), Linux E2E network-ai; Windows runners
   sometimes time out spawning PowerShell (ETIMEDOUT), a runner flake. Dev baseline reds at the S21/S22
   landing: Linux E2E platform-metrics; Common Data and source contracts
-  (behavior owner `windows/infra/hotstrings/hotstring_engine_main.ahk` needs
+  (behavior owner `windows/hotstrings/engine/matcher/engine_main.ahk` needs
   its source review, from dev 6436cc2d6c); a racy Windows llm case
   (`test_ollama_streaming.ahk:861`, WaitForSingleObject 0 returns 258).
 - What S21/S22 taught, to check after every later step:

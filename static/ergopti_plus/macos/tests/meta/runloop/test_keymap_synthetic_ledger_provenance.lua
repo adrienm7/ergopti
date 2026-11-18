@@ -198,7 +198,7 @@ local function selftest_sites_fail_closed(production, keymap)
 	return consumed == reads
 end
 
-helpers.describe("modules/keymap/init.lua: synthetic ledger is provenance-gated (audit-v5)", function()
+helpers.describe("hotstrings/engine/expander/init.lua: synthetic ledger is provenance-gated (audit-v5)", function()
 
 	-- The selftest class (SyntheticInput.emit_selftest_key_stroke) is the one
 	-- owned event the keymap may decode as typing. Each of its three tap sites

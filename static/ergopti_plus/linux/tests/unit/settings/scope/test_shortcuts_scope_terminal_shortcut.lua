@@ -16,10 +16,10 @@ helpers.describe("Linux terminal shortcut scope", function()
 			local source = { generation = 1, status = "ready", candidates = {
 				{ code = "KeyJ", native_code = 36, identity = "evdev:36", text = "★", native_text = "j", direct = true, dead = false },
 			} }
-			package.loaded["modules.hotstrings.magic_key_source"] = {
+			package.loaded["hotstrings.engine.magic_key_source"] = {
 				editor_source = function() return source end, known_codes = function() return { KeyJ = true } end,
 			}
-			package.loaded["modules.hotstrings.magic_key"] = { get = function() return "★" end }
+			package.loaded["hotstrings.engine.magic_key"] = { get = function() return "★" end }
 			local function decision()
 				return owners.keyboard.magic_editor_decision({ master = owners.manager.is_enabled(), paused = false, inhibited = false })
 			end

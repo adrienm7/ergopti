@@ -64,29 +64,29 @@ const DRIVERS = [
 	{
 		driver: 'windows',
 		helper: {
-			file: 'windows/ui/menu/menu_hotstring_switches.ahk',
+			file: 'windows/hotstrings/ui/menu/switches.ahk',
 			from: '_HS_AllSectionsRow(AllOn, Apply) {',
 			to: '\n}'
 		},
 		call: '_HS_AllSectionsRow(',
 		files: [
-			'windows/ui/menu/menu_hotstring_switches.ahk',
+			'windows/hotstrings/ui/menu/switches.ahk',
 			'windows/menu/ui/builder/submenus.ahk',
-			'windows/ui/menu/menu_hotstrings.ahk',
+			'windows/hotstrings/ui/menu/hotstrings.ahk',
 			'windows/menu/ui/builder/menu_init.ahk'
 		]
 	},
 	{
 		driver: 'macos',
 		helper: {
-			file: 'macos/ui/menu/menu_hotstrings_custom.lua',
+			file: 'macos/hotstrings/ui/menu/custom.lua',
 			from: 'function M.all_sections_row(',
 			to: '\nend'
 		},
 		call: 'all_sections_row(',
 		files: [
-			'macos/ui/menu/menu_hotstrings.lua',
-			'macos/ui/menu/menu_hotstrings_custom.lua',
+			'macos/hotstrings/ui/menu/hotstrings.lua',
+			'macos/hotstrings/ui/menu/custom.lua',
 			'macos/menu/ui/builder/builder.lua'
 		]
 	},
@@ -107,13 +107,13 @@ const DRIVERS = [
 const CATEGORY_REGIONS = [
 	{
 		driver: 'windows',
-		file: 'windows/ui/menu/menu_hotstring_switches.ahk',
+		file: 'windows/hotstrings/ui/menu/switches.ahk',
 		from: '_HS_CategoryMenu(V1Cat, TomlPath, Sections,',
 		to: '\n}'
 	},
 	{
 		driver: 'macos',
-		file: 'macos/ui/menu/menu_hotstrings.lua',
+		file: 'macos/hotstrings/ui/menu/hotstrings.lua',
 		from: 'local render_ctx = { commands = {',
 		to: '\n\t\tend'
 	},
@@ -131,14 +131,14 @@ const CATEGORY_REGIONS = [
 const PERSONAL_REGIONS = [
 	{
 		driver: 'windows',
-		file: 'windows/ui/menu/menu_hotstrings.ahk',
+		file: 'windows/hotstrings/ui/menu/hotstrings.ahk',
 		from: '_HS_PersonalRows(Options := unset) {',
 		to: '\n\t\tPersonalActiveCount :=',
 		tokens: ['_HS_CategoryMenu(', 'HS_TogglePersonalAllSections(Enabled, Options)']
 	},
 	{
 		driver: 'macos',
-		file: 'macos/ui/menu/menu_hotstrings_custom.lua',
+		file: 'macos/hotstrings/ui/menu/custom.lua',
 		from: 'function M.build_custom(',
 		to: '\nreturn M',
 		tokens: [
@@ -176,7 +176,7 @@ const LANGUAGE_REGIONS = [
 	},
 	{
 		driver: 'macos',
-		file: 'macos/ui/menu/menu_hotstrings.lua',
+		file: 'macos/hotstrings/ui/menu/hotstrings.lua',
 		from: 'function M.build_language_bulk_actions(',
 		to: 'local _mgmt = require'
 	},

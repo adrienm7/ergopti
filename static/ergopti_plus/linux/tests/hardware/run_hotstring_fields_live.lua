@@ -4,7 +4,7 @@
 --- MODULE: Multi-Field Expansions And Character Deletion In Real GTK Fields
 --- DESCRIPTION:
 --- Run by run_gtk_fields_live.sh on Xvfb with openbox and a private session
---- bus. The hotstring injector (modules/hotstrings/injector.lua) types into
+--- bus. The hotstring injector (hotstrings/engine/injector.lua) types into
 --- real GTK fields with the daemon's text owner (focus_guard.capture_text_owner
 --- over the resident AT-SPI watch) and the production writer, whose last hop is
 --- XTest. Every verdict is read back from the fields themselves.
@@ -48,7 +48,7 @@ end
 local Session = require("tests.hardware.lib.gtk_fields_session")
 local Clipboard = require("clipboard.adapters.clipboard")
 local ComboEmitter = require("gestures.engine.combo_emitter")
-local Injector = require("modules.hotstrings.injector")
+local Injector = require("hotstrings.engine.injector")
 local Json = require("core.text.engine.json")
 
 print("=== multi-field expansions and character deletion in real GTK fields ===")

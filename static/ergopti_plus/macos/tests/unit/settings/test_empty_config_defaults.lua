@@ -77,7 +77,7 @@ helpers.describe("empty configuration boot projection", function()
 		package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
 		local modules = {}
 		-- Literal module names, in load order, so each follows its file when it moves.
-		for _, entry in ipairs({ { "keymap", "modules.keymap" }, { "dynamic_hotstrings", "modules.dynamic_hotstrings" },
+		for _, entry in ipairs({ { "keymap", "hotstrings.engine.expander" }, { "dynamic_hotstrings", "hotstrings.engine.dynamic" },
 			{ "shortcuts", "modules.shortcuts" }, { "gestures", "gestures.engine" }, { "keystats", "modules.keystats" } }) do
 			modules[entry[1]] = helpers.load_with_stubs(entry[2])
 		end

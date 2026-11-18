@@ -62,7 +62,7 @@ local function _extension_shortcut_rows()
 	local rows = {}
 
 	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
-	local ok_loader, Loader = pcall(require, "modules.hotstrings.loader")
+	local ok_loader, Loader = pcall(require, "hotstrings.engine.loader")
 	if not ok_paths or not ok_loader or type(Paths.extension_roots) ~= "function" then return rows end
 
 	-- The same io functions hotstrings_config.extension_packs() injects. The

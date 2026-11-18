@@ -42,21 +42,21 @@ end
 
 helpers.describe("Shipped Ergopti native menu (Linux)", function()
 	helpers.it("(ergopti-extension-selection) controls real shipped metadata and physical replacement without an installed layout", function()
-		local names = { "modules.hotstrings.hotstrings_config", "modules.hotstrings.loader",
-			"modules.hotstrings.magic_key_source", "infra.hotstring_preferences", "menu.ui.builder.builder" }
+		local names = { "hotstrings.engine.catalogue.config", "hotstrings.engine.loader",
+			"hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences", "menu.ui.builder.builder" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, err = pcall(function()
-			local Config = require("modules.hotstrings.hotstrings_config")
+			local Config = require("hotstrings.engine.catalogue.config")
 			local Choices = require("tests.support.hotstring_choices")
 			local source = '[hotstrings]\nmagic_key_source = "KeyJ"\n'
 				.. 'groups = { magickey = true, french_distancesreduction = true }\n'
 				.. '[hotstrings.modules.magickey]\nreplace = false\ntext_expansion_symbols = true\n'
 				.. '[hotstrings.modules.french_distancesreduction]\nsuffixes_a = true\n'
 			with_private_choices(Config, source, function(path)
-				local Preferences = require("infra.hotstring_preferences")
+				local Preferences = require("hotstrings.engine.matcher.preferences")
 				helpers.assert_true(Preferences._set_file_for_test(path))
-				local Source = require("modules.hotstrings.magic_key_source")
+				local Source = require("hotstrings.engine.magic_key_source")
 				local typed, queued, dispatched, gates = {}, {}, {}, {}
 				Source.init({
 					is_active = function() return true end,

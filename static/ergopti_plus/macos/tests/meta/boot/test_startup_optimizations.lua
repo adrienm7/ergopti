@@ -117,7 +117,7 @@ helpers.describe("startup: configuration consumers follow path initialization", 
 		helpers.assert_true(ready ~= nil, "the path initialization owner must exist")
 		-- Whole module names, never a prefix joined to a stem: the structure steps
 		-- move a module out of modules/, and a joined name cannot follow it.
-		for _, name in ipairs({ "gestures.engine", "modules.keymap", "modules.shortcuts", "modules.dynamic_hotstrings" }) do
+		for _, name in ipairs({ "gestures.engine", "hotstrings.engine.expander", "modules.shortcuts", "hotstrings.engine.dynamic" }) do
 			local loaded = src:find('require("' .. name .. '")', 1, true)
 			helpers.assert_true(loaded ~= nil and loaded > ready,
 				"configuration-dependent module must follow the path owner: " .. name)

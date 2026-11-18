@@ -41,12 +41,12 @@ const GENERATED = {
 };
 const RENDERERS = [
 	{
-		file: path.join(SP, 'windows', 'ui', 'menu', 'menu_hotstrings.ahk'),
+		file: path.join(SP, 'windows', 'hotstrings', 'ui', 'menu', 'hotstrings.ahk'),
 		resolves: 't(D["label_key"])',
 		forbidden: ['D["label"]']
 	},
 	{
-		file: path.join(SP, 'macos', 'ui', 'menu', 'menu_hotstrings_management.lua'),
+		file: path.join(SP, 'macos', 'hotstrings', 'ui', 'menu', 'management.lua'),
 		resolves: 'i18n.get(def.label_key)',
 		forbidden: ['def.label or ""', 'Guillemets fermants', 'Tiret bas']
 	},

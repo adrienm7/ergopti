@@ -56,7 +56,7 @@ helpers.describe("meta: nominal startup diagnostics stay warning-free", function
 	end)
 
 	helpers.it("the normal dynamic-hotstring boot order is debug-only", function()
-		local source = read_source("local function register_prefix_entries") -- modules/dynamic_hotstrings/rules_engine.lua
+		local source = read_source("local function register_prefix_entries") -- hotstrings/engine/dynamic/rules_engine.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"Personal data received before keymap wiring", 1, true) ~= nil)
 		helpers.assert_true(source:find("personal data present but keymap not wired yet", 1, true) == nil)
 	end)
@@ -79,7 +79,7 @@ helpers.describe("meta: nominal startup diagnostics stay warning-free", function
 	end)
 
 	helpers.it("passive mouse-tap recovery does not pollute warnings", function()
-		local source = read_source("local function invalidate_observed_context") -- modules/keymap/init.lua
+		local source = read_source("local function invalidate_observed_context") -- hotstrings/engine/expander/init.lua
 		helpers.assert_true(source:find("name == \"mouse\" and Logger.debug or Logger.warn", 1, true) ~= nil)
 	end)
 end)

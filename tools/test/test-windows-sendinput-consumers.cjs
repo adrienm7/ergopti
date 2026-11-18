@@ -32,7 +32,7 @@ const SITE = /(^|[^_A-Za-z"\\])SendInput\(/;
 const DECIDED = {
 	'platform/input/text_sender.ahk': 1,
 	'settings/engine/io.ahk': 1,
-	'infra/hotstrings/hotstring_send.ahk': 5,
+	'hotstrings/engine/matcher/send.ahk': 5,
 	'diagnostics/engine/field_run/input_probe.ahk': 3
 };
 

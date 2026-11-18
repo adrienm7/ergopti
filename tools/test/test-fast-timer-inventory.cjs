@@ -108,7 +108,7 @@ const INVENTORY = {
 		'READY service custody. 150 ms bounds cancellation, stale configuration and pause ' +
 		'observation; READY retains the ownership watch after the progress window closes. ' +
 		'Cancel stops the exact callback, and no unowned or external server arms this timer.',
-	'modules/dynamic_hotstrings/user_code.ahk:_UserHotstringsPoll':
+	'hotstrings/engine/dynamic/user_code.ahk:_UserHotstringsPoll':
 		'Armed only while a programmable worker or exact Job/stage retirement debt is owned. ' +
 		'25 ms bounds cooperative cancellation and stale source/focus/input publication; ' +
 		'the final acknowledged cleanup disarms it. ShellRunner owns process completion, ' +

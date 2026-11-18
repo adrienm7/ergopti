@@ -222,7 +222,7 @@ pins this list, so a new site needs a decision here first.
 | Site                                           | Keeps SendInput because                                                                                                                                                                                                                                                |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `platform/input/text_sender.ahk`               | Predictions and paste: measured 56 against 191 ms, and the burst is atomic, so a physical key cannot land inside an accepted text. SendEvent would trade that for nothing, since the order no longer decides anything.                                                 |
-| `infra/hotstrings/hotstring_send.ahk`          | The HSE dispatch: measured 51 against 137 ms, one atomic erase and replacement. The terminal burst stays SendEvent, for its pacing only.                                                                                                                               |
+| `hotstrings/engine/matcher/send.ahk`           | The HSE dispatch: measured 51 against 137 ms, one atomic erase and replacement. The terminal burst stays SendEvent, for its pacing only.                                                                                                                               |
 | `settings/engine/io.ahk`                       | One key given back when a script chord lost its action. It must stay: its hotkey is at a higher `#InputLevel` than a level-0 SendEvent, which could fire the chord again, while SendInput hides the key from this script's own hook. It is rare and outside any burst. |
 | `diagnostics/engine/field_run/input_probe.ahk` | The measurements of items 49 and 50 themselves, in a window the check owns.                                                                                                                                                                                            |
 
@@ -348,7 +348,7 @@ Do not re-apply them.
 The decision recorded for item 50 ("hotstring output must be able to trigger
 another hotstring, `SendMode("Event")` exists for that") describes the retired
 native `Hotstring()` engine. Read from the code and reproduced on the real
-engine with `tests/unit/modules/hotstrings/engine/test_hotstring_output_is_final.ahk`
+engine with `tests/unit/hotstrings/engine/engine/test_output_is_final.ahk`
 (`--interactive`: real `InputHook`, real keyboard, an owned window):
 
 | Path                                             | Primitive and level                                                                          | Seen by the prefix watcher | Chain                                    |

@@ -84,14 +84,14 @@ Domain modules:
 
 ## 5. Driver Compliance
 
-| Module            | AHK adapter                                       | HS adapter                                |
-| ----------------- | ------------------------------------------------- | ----------------------------------------- |
-| Registry          | `lib/hotstrings/hotstring_engine.ahk`             | `modules/keymap/registry.lua`             |
-| Expander          | `modules/hotstrings.ahk` + `hotstring_engine.ahk` | `modules/keymap/expander.lua`             |
-| Terminators       | `lib/hotstrings/hotstring_prefix_watcher.ahk`     | `modules/keymap/terminators.lua`          |
-| PromptBuilder     | `ai/engine/api/common.ahk`                        | `ai/engine/prediction/prompt_builder.lua` |
-| ProfileSelector   | `ai/engine/settings/profiles.ahk`                 | `ai/engine/settings/profiles.lua`         |
-| GestureRecognizer | `modules/gestures.ahk` (registry-only)            | `gestures/engine/engine.lua`              |
+| Module            | AHK adapter                                          | HS adapter                                   |
+| ----------------- | ---------------------------------------------------- | -------------------------------------------- |
+| Registry          | `lib/hotstrings/hotstring_engine.ahk`                | `hotstrings/engine/expander/registry.lua`    |
+| Expander          | `hotstrings/hotstrings.ahk` + `hotstring_engine.ahk` | `hotstrings/engine/expander/expander.lua`    |
+| Terminators       | `lib/hotstrings/hotstring_prefix_watcher.ahk`        | `hotstrings/engine/expander/terminators.lua` |
+| PromptBuilder     | `ai/engine/api/common.ahk`                           | `ai/engine/prediction/prompt_builder.lua`    |
+| ProfileSelector   | `ai/engine/settings/profiles.ahk`                    | `ai/engine/settings/profiles.lua`            |
+| GestureRecognizer | `modules/gestures.ahk` (registry-only)               | `gestures/engine/engine.lua`                 |
 
 ---
 

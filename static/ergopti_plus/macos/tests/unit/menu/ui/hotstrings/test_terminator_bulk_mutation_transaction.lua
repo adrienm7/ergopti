@@ -46,17 +46,17 @@ local function run_action(label, outcome, options)
 	local saved = {}
 	local module_names = {
 		"menu.engine.manifest_menu", "menu.engine.manifest_reader", "core.ui.engine.notifications",
-		"modules.hotstrings.hotstrings_config", "menu.ui.keyboard.keymap_lifecycle",
-		"ui.menu.menu_hotstrings_management",
+		"hotstrings.engine.catalogue.config", "menu.ui.keyboard.keymap_lifecycle",
+		"hotstrings.ui.menu.management",
 	}
 
 	for _, name in ipairs({
 		"menu.engine.manifest_menu",
 		"menu.engine.manifest_reader",
 		"core.ui.engine.notifications",
-		"modules.hotstrings.hotstrings_config",
+		"hotstrings.engine.catalogue.config",
 		"menu.ui.keyboard.keymap_lifecycle",
-		"ui.menu.menu_hotstrings_management",
+		"hotstrings.ui.menu.management",
 	}) do
 		saved[name] = package.loaded[name]
 	end
@@ -120,11 +120,11 @@ local function run_action(label, outcome, options)
 			calls.notices = calls.notices + 1
 		end,
 	}
-	package.loaded["modules.hotstrings.hotstrings_config"] = {
+	package.loaded["hotstrings.engine.catalogue.config"] = {
 		resolve = function() return { delay = 0.1, has_override = false } end,
 	}
 	package.loaded["menu.ui.keyboard.keymap_lifecycle"] = nil
-	package.loaded["ui.menu.menu_hotstrings_management"] = nil
+	package.loaded["hotstrings.ui.menu.management"] = nil
 
 	local ok, fixture_or_err = xpcall(function()
 		local keymap = {
@@ -160,7 +160,7 @@ local function run_action(label, outcome, options)
 			end,
 			is_repeat_feature_enabled = function() return false end,
 		}
-		local Management = require("ui.menu.menu_hotstrings_management")
+		local Management = require("hotstrings.ui.menu.management")
 		local ctx = {
 			state = state,
 			paused = false,

@@ -8,7 +8,7 @@
 --- whether a copy reaches a real application: the lone tap window Karabiner
 --- was given, whether the pasteboard counter the copy check relies on can be
 --- read, and what happened to every watched copy tap since the driver started
---- (modules/keymap/tap_copy.lua statistics).
+--- (hotstrings/engine/expander/tap_copy.lua statistics).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Nothing is typed and the clipboard is never written: the run reads what

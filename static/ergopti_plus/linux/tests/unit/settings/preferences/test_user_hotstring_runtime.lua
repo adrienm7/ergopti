@@ -13,11 +13,11 @@ local Atspi = require("platform.focus.atspi_focus")
 local Detector = require("platform.focus.secure_field_detector")
 local FocusGuard = require("modules.keystats.focus_guard")
 local CaptureGate = require("platform.input.capture_gate")
-local Engine = require("modules.hotstrings.engine")
-local Runtime = require("infra.user_hotstring_runtime")
+local Engine = require("hotstrings.engine.engine")
+local Runtime = require("hotstrings.engine.user_hotstring_runtime")
 local FileSystem = require("core.fs.adapters.file_system")
 local Timer = require("core.events.timer_scheduler")
-local Injector = require("modules.hotstrings.injector")
+local Injector = require("hotstrings.engine.injector")
 local uv = require("luv")
 local NativeConfigPaths = require("settings.engine.paths")
 
@@ -35,7 +35,7 @@ local function drain()
 end
 
 local function with_runtime(body)
-	local owned = { "modules.dynamic_hotstrings.user_code", "settings.engine.paths", "platform.focus.application_notifier" }
+	local owned = { "hotstrings.engine.dynamic.user_code", "settings.engine.paths", "platform.focus.application_notifier" }
 	for _, name in ipairs(DISCOVERY_OWNERS) do owned[#owned + 1] = name end
 	local previous = {}
 	for _, path in ipairs(owned) do previous[path] = package.loaded[path]; package.loaded[path] = nil end
@@ -113,7 +113,7 @@ local function with_runtime(body)
 			return true
 		end })
 	f.native = native
-	local User = require("modules.dynamic_hotstrings.user_code")
+	local User = require("hotstrings.engine.dynamic.user_code")
 	f.User = User
 	helpers.assert_true(User.start(native))
 	helpers.assert_eq(f.factories, 0, "closed boot never evaluates a user factory")
@@ -143,10 +143,10 @@ local with_native_injector = require("tests.support.infra.preferences.user_hotst
 
 --- Runs actual global and dynamic scope owners around the native callback fixture.
 local function with_configuration_scope(f, body)
-	local modules = { "infra.hotstrings_scope", "infra.dynamic_hotstrings_scope", "modules.dynamic_hotstrings.manager",
-		"modules.dynamic_hotstrings.prefix_rules", "hotstrings.engine.dynamic.core", "modules.hotstrings.hotstrings_config",
-		"modules.hotstrings.loader", "infra.hotstring_preferences", "modules.hotstrings.repeat_key",
-		"modules.hotstrings.magic_key", "modules.hotstrings.terminator_settings", "modules.hotstrings.preview_settings" }
+	local modules = { "hotstrings.engine.catalogue.scope", "hotstrings.engine.dynamic.scope", "hotstrings.engine.dynamic.manager",
+		"hotstrings.engine.dynamic.prefix_rules", "hotstrings.engine.dynamic.core", "hotstrings.engine.catalogue.config",
+		"hotstrings.engine.loader", "hotstrings.engine.matcher.preferences", "hotstrings.engine.repeat_key",
+		"hotstrings.engine.magic_key", "hotstrings.engine.matcher.terminator_settings", "hotstrings.engine.preview_settings" }
 	for _, name in ipairs(DISCOVERY_OWNERS) do modules[#modules + 1] = name end
 	local previous = {}
 	for _, name in ipairs(modules) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -165,12 +165,12 @@ local function with_configuration_scope(f, body)
 			-- The storage adapter keeps storage.json in the default configuration folder.
 			default_config_dir = function() return directory .. "/" .. require("core.fs.engine.app_dirs").linux.folder_name end,
 			data_home = function() return directory end }, { __index = NativeConfigPaths })
-		package.loaded["modules.hotstrings.loader"] = { find_toml_files = function() return {} end,
+		package.loaded["hotstrings.engine.loader"] = { find_toml_files = function() return {} end,
 			list_subdirs = function() return {} end, read_file = function() return nil end,
 			load_catalogue = function() return { committed = true, errors = 0, categories = {}, mappings = {} } end }
-		local Preferences = require("infra.hotstring_preferences")
+		local Preferences = require("hotstrings.engine.matcher.preferences")
 		helpers.assert_true(Preferences.refresh())
-		local Dynamic = require("modules.dynamic_hotstrings.manager")
+		local Dynamic = require("hotstrings.engine.dynamic.manager")
 		if f.zero_builtin then
 			-- A refusing builtin registrar is the availability fault under test;
 			-- the manager still derives its actual count from the real rule store.
@@ -179,17 +179,17 @@ local function with_configuration_scope(f, body)
 		end
 		helpers.assert_true(Dynamic.init({ trigger_char = "★", personal_info_path = directory .. "/personal_info.toml" }))
 		f.dynamic = Dynamic
-		local Config = require("modules.hotstrings.hotstrings_config")
+		local Config = require("hotstrings.engine.catalogue.config")
 		helpers.assert_true(Config.init(f.engine, directory))
 		local _, committed = Config.load_all(); helpers.assert_true(committed)
-		local Repeat = require("modules.hotstrings.repeat_key")
-		local Terminators = require("modules.hotstrings.terminator_settings")
+		local Repeat = require("hotstrings.engine.repeat_key")
+		local Terminators = require("hotstrings.engine.matcher.terminator_settings")
 		helpers.assert_true(Terminators.load())
-		local scope = require("infra.hotstrings_scope").new({ path = config_path, backup_suffix = ".scope-test.bak",
+		local scope = require("hotstrings.engine.catalogue.scope").new({ path = config_path, backup_suffix = ".scope-test.bak",
 			config = Config, preferences = Preferences, dynamic = Dynamic,
-			repeat_key = Repeat, word_reset = require("modules.hotstrings.word_reset"), magic_key = require("modules.hotstrings.magic_key"), terminators = Terminators,
-			preview_settings = require("modules.hotstrings.preview_settings") })
-		local dynamic_scope = require("infra.dynamic_hotstrings_scope").new({ path = config_path,
+			repeat_key = Repeat, word_reset = require("hotstrings.engine.word_reset"), magic_key = require("hotstrings.engine.magic_key"), terminators = Terminators,
+			preview_settings = require("hotstrings.engine.preview_settings") })
+		local dynamic_scope = require("hotstrings.engine.dynamic.scope").new({ path = config_path,
 			backup_path = config_path .. ".dynamic-test.bak", config = Config, preferences = Preferences, dynamic = Dynamic })
 		body({ scope = scope, dynamic_scope = dynamic_scope, Dynamic = Dynamic, path = config_path,
 			original = source, Preferences = Preferences, Config = Config })
@@ -720,14 +720,14 @@ helpers.describe("programmable native Linux runtime", function()
 	helpers.it("(user-hotstrings-native) saves source controls then reloads disk preferences into the real runtime", function()
 		with_runtime(function(f)
 			local path = os.tmpname()
-			local previous_preferences = package.loaded["infra.hotstring_preferences"]
-			local previous_menu = package.loaded["ui.menu.programmatic_hotstrings"]
+			local previous_preferences = package.loaded["hotstrings.engine.matcher.preferences"]
+			local previous_menu = package.loaded["hotstrings.ui.menu.programmatic_hotstrings"]
 			local output = assert(io.open(path, "w"))
 			output:write('[other]\nuntouched="foreign"\n[hotstrings.dynamic.user_code]\nneighbor="kept"\n')
 			output:close()
 			local ok, problem = xpcall(function()
-				package.loaded["infra.hotstring_preferences"] = nil
-				local Preferences = require("infra.hotstring_preferences")
+				package.loaded["hotstrings.engine.matcher.preferences"] = nil
+				local Preferences = require("hotstrings.engine.matcher.preferences")
 				helpers.assert_true(Preferences._set_file_for_test(path))
 				local facade = { is_enabled = function() return f.enabled end,
 					set_user_code_time_activation = f.User.set_time_activation,
@@ -736,8 +736,8 @@ helpers.describe("programmable native Linux runtime", function()
 					user_code_problem = f.User.problem,
 					user_code_scope_snapshot = f.User.scope_snapshot, user_code_scope_adopt = f.User.scope_adopt,
 					user_code_scope_restore = f.User.scope_restore }
-				package.loaded["ui.menu.programmatic_hotstrings"] = nil
-				local rows = require("ui.menu.programmatic_hotstrings").build({ dyn_hotstrings = facade,
+				package.loaded["hotstrings.ui.menu.programmatic_hotstrings"] = nil
+				local rows = require("hotstrings.ui.menu.programmatic_hotstrings").build({ dyn_hotstrings = facade,
 					is_paused = function() return false end, on_menu_changed = function() end })
 				helpers.assert_true(rows[1].menu[1].fn())
 				helpers.assert_true(f.User.is_enabled())
@@ -746,8 +746,8 @@ helpers.describe("programmable native Linux runtime", function()
 				local decoded = require("core.text.engine.toml_codec").decode(bytes)
 				helpers.assert_eq(decoded.other.untouched, "foreign")
 				helpers.assert_eq(decoded.hotstrings.dynamic.user_code.neighbor, "kept")
-				package.loaded["infra.hotstring_preferences"] = nil
-				local restarted = require("infra.hotstring_preferences")
+				package.loaded["hotstrings.engine.matcher.preferences"] = nil
+				local restarted = require("hotstrings.engine.matcher.preferences")
 				helpers.assert_true(restarted._set_file_for_test(path))
 				helpers.assert_true(f.User.set_enabled(false))
 				helpers.assert_true(f.User.set_time_activation(restarted.get("hotstrings.dynamic.user_code.time_activation_seconds")))
@@ -756,8 +756,8 @@ helpers.describe("programmable native Linux runtime", function()
 				f.type_suffix(); helpers.assert_true(f.User.request("@é")); drain()
 				helpers.assert_eq(f.outputs, { { deletes = 3, text = "0", private = true } })
 			end, debug.traceback)
-			package.loaded["infra.hotstring_preferences"] = previous_preferences
-			package.loaded["ui.menu.programmatic_hotstrings"] = previous_menu
+			package.loaded["hotstrings.engine.matcher.preferences"] = previous_preferences
+			package.loaded["hotstrings.ui.menu.programmatic_hotstrings"] = previous_menu
 			os.remove(path)
 			if not ok then error(problem, 0) end
 		end)
@@ -765,12 +765,12 @@ helpers.describe("programmable native Linux runtime", function()
 	for _, failure in ipairs({ "false", "throw" }) do
 		helpers.it("(user-menu-publication-inverse) restores actual Linux source timing after " .. failure .. " publication", function()
 			with_runtime(function(f)
-				local names = { "infra.hotstring_preferences", "ui.menu.programmatic_hotstrings", "core.ui.ui.text_prompt", "core.ui.ui.modal" }
+				local names = { "hotstrings.engine.matcher.preferences", "hotstrings.ui.menu.programmatic_hotstrings", "core.ui.ui.text_prompt", "core.ui.ui.modal" }
 				local previous = {}
 				for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 				local writes, updates = 0, 0
 				local ok, problem = xpcall(function()
-					package.loaded["infra.hotstring_preferences"] = {
+					package.loaded["hotstrings.engine.matcher.preferences"] = {
 						get = function(key) return key:match("enabled$") and true or 0.5 end,
 						set_many = function()
 							writes = writes + 1
@@ -788,7 +788,7 @@ helpers.describe("programmable native Linux runtime", function()
 						user_code_scope_snapshot = f.User.scope_snapshot, user_code_scope_adopt = f.User.scope_adopt,
 						user_code_scope_restore = f.User.scope_restore,
 					}
-					local rows = require("ui.menu.programmatic_hotstrings").build({ dyn_hotstrings = facade,
+					local rows = require("hotstrings.ui.menu.programmatic_hotstrings").build({ dyn_hotstrings = facade,
 						is_paused = function() return false end,
 						on_menu_changed = function() updates = updates + 1 end })
 					helpers.assert_eq(rows[1].menu[2].fn(), false)

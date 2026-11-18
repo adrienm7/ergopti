@@ -411,7 +411,7 @@ function nativeFunctionReferenceKeys(source) {
 		) + ' end'
 	])
 		assert.equal(nativeFunctionReferenceKeys(changed).has('actual_row'), false);
-	const actual = fs.readFileSync(path.join(SP, 'macos/ui/menu/menu_hotstrings_custom.lua'), 'utf8');
+	const actual = fs.readFileSync(path.join(SP, 'macos/hotstrings/ui/menu/custom.lua'), 'utf8');
 	assert.equal(nativeFunctionReferenceKeys(actual).has('personal_legacy_shortcut'), true);
 	for (const changed of [
 		actual.replace('local legacy_rows = {}', 'local sc_fn\n\tlocal legacy_rows = {}'),
@@ -535,10 +535,7 @@ function nativeFunctionReferenceKeys(source) {
 			nativeTemplateBinding(changed, '.ahk', 'actual_frame', 'actual_command', 1),
 			false
 		);
-	const mac = fs.readFileSync(
-		path.join(SP, 'macos/ui/menu/menu_hotstrings_management.lua'),
-		'utf8'
-	);
+	const mac = fs.readFileSync(path.join(SP, 'macos/hotstrings/ui/menu/management.lua'), 'utf8');
 	assert.equal(
 		nativeTemplateBinding(mac, '.lua', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1),
 		true
@@ -603,7 +600,7 @@ function nativeFunctionReferenceKeys(source) {
 		]
 	])
 		assert.equal(nativeTemplateBinding(linux.replace(from, to), '.lua', section, key, port), false);
-	const win = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'), 'utf8'),
+	const win = fs.readFileSync(path.join(SP, 'windows/hotstrings/ui/menu/hotstrings.ahk'), 'utf8'),
 		editor = fs.readFileSync(path.join(SP, 'windows/core/ui/ui/editors.ahk'), 'utf8');
 	assert.equal(
 		nativeTemplateBinding(win, '.ahk', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1, [

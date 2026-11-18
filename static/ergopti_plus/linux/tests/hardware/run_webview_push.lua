@@ -125,7 +125,7 @@ local function run()
 	-- push change the page" assertion would fail for a reason that says nothing about
 	-- the push. The REAL config module is used, loading the bundled packs, so what
 	-- the page renders is what a user would see.
-	local HotstringsConfig = require("modules.hotstrings.hotstrings_config")
+	local HotstringsConfig = require("hotstrings.engine.catalogue.config")
 	local config_dir = nil
 	if arg and arg[1] == "hotstring_editor" then config_dir = prepare_personal_source() end
 	assert(HotstringsConfig.init(nil, config_dir, nil) == true,

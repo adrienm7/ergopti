@@ -15,7 +15,7 @@
 package.loaded["tests.support.adapters.synthetic_input.uinput_writer_fixture"] = nil
 local Fixture = require("tests.support.adapters.synthetic_input.uinput_writer_fixture")
 local helpers, recorder = Fixture.helpers, Fixture.recorder
-local Finder = require("modules.hotstrings.device_finder")
+local Finder = require("hotstrings.engine.device_finder")
 local KeyboardSource = require("tests.hardware.keyboard_source_writer")
 
 -- Resolved as require resolves it, so the writer can move without this test pinning its path.

@@ -612,7 +612,7 @@ end
 --- @return string|nil Unique native accessibility bus/object identity.
 function M.focused_text_identity()
 	local captured, destination = pcall(function()
-		return require("adapters.user_hotstring_destination").capture_current()
+		return require("hotstrings.adapters.user_hotstring_destination").capture_current()
 	end)
 	if not captured or not destination then return nil end
 	return "atspi:" .. destination.bus .. ":" .. destination.path
@@ -633,7 +633,7 @@ function M.focused_identity()
 		-- Ergopti integration reports). The accessible control
 		-- still has an exact native destination; labels never substitute for it.
 		local captured, destination = pcall(function()
-			return require("adapters.user_hotstring_destination").capture_current()
+			return require("hotstrings.adapters.user_hotstring_destination").capture_current()
 		end)
 		if captured and destination then identity = "atspi:" .. destination.bus .. ":" .. destination.path end
 	end

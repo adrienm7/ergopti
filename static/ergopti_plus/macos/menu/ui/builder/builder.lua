@@ -93,7 +93,7 @@ local function configuration_parent_unchanged(parent, fields)
 end
 
 
-local HotCounter  = require("ui.menu.hotstring_counter")
+local HotCounter  = require("hotstrings.ui.menu.counter")
 local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
 local CanvasBadge = require("menu.ui.builder.canvas_badge")
 local Labels      = require("menu.engine.labels")

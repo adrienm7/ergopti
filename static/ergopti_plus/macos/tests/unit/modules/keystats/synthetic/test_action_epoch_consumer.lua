@@ -24,7 +24,7 @@ local RESET_MODULES = {
 	"platform.input.synthetic_input", "adapters.input_source_broker",
 	"core.logger.engine.logger", "core.timing.engine.timings",
 	"menu.engine.manifest_reader", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
-	"metrics.engine.metrics", "modules.keymap",
+	"metrics.engine.metrics", "hotstrings.engine.expander",
 }
 
 
@@ -252,7 +252,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 		subscribe = function() return true end,
 		unsubscribe = function() return true end,
 	}
-	package.loaded["modules.keymap"] = { get_shift_side = function() return "none" end }
+	package.loaded["hotstrings.engine.expander"] = { get_shift_side = function() return "none" end }
 	package.loaded["core.timing.engine.timings"] = {
 		ms = function(_section, key)
 			local values = {
@@ -420,7 +420,7 @@ local function load_fixture()
 		subscribe = function() return true end,
 		unsubscribe = function() return true end,
 	}
-	package.loaded["modules.keymap"] = { get_shift_side = function() return "none" end }
+	package.loaded["hotstrings.engine.expander"] = { get_shift_side = function() return "none" end }
 	package.loaded["core.logger.engine.logger"] = api({
 		pcall = function(_module_name, fn, ...)
 			return pcall(fn, ...)

@@ -72,7 +72,7 @@ end
 --- @param action_kind string top|bulk|section.
 --- @return table fixture
 local function custom_fixture(outcome, action_kind)
-	local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+	local Custom = helpers.load_with_stubs("hotstrings.ui.menu.custom")
 	local group_enabled = action_kind ~= "top"
 	local calls = {
 		starts = 0,
@@ -158,7 +158,7 @@ end
 --- @param outcome string false|nil|throw.
 --- @return table fixture
 local function extension_fixture(outcome)
-	local Hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+	local Hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 	local calls = {
 		starts = 0, keymap_mutations = 0, saves = 0,
 		notifications = 0, updates = 0, reloads = 0,

@@ -25,7 +25,7 @@ local function emitted(f)
 end
 
 local function with_focus(callback)
-	helpers.with_stub_scope({ "modules.keymap.utils", "platform.focus.secure_field_detector",
+	helpers.with_stub_scope({ "hotstrings.engine.expander.utils", "platform.focus.secure_field_detector",
 		"modules.shortcuts.actions.text", "modules.shortcuts.actions.text_continuation",
 		"modules.shortcuts.actions.text_dispatch", "modules.shortcuts.actions.text_transform_grace" }, function()
 		with_sender(function(f)
@@ -55,7 +55,7 @@ local function with_focus(callback)
 			local board = f.hs_overrides.pasteboard
 			board.getContents = function() return f.clipboard()["public.utf8-plain-text"] end
 			hs.pasteboard.getContents = board.getContents
-			local utils = require("modules.keymap.utils")
+			local utils = require("hotstrings.engine.expander.utils")
 			utils.start_ignored_win_tracking({}, {})
 			helpers.assert_true(utils.prewarm_ignored_win_watchers({}, {}))
 			package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }

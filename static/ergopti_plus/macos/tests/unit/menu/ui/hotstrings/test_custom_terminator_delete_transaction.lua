@@ -55,8 +55,8 @@ local function with_fixture(outcome, callback)
 	return helpers.with_stub_scope({
 		"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger", "settings.engine.preferences.preferences",
 		"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "menu.engine.manifest_menu", "menu.engine.manifest_reader",
-		"core.ui.engine.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
-		"menu.ui.keyboard.keymap_lifecycle", "ui.menu.menu_hotstrings_management", "settings.ui.menu.preferences_transaction",
+		"core.ui.engine.notifications", "hotstrings.engine.catalogue.config", "layouts.engine.layers.terminators",
+		"menu.ui.keyboard.keymap_lifecycle", "hotstrings.ui.menu.management", "settings.ui.menu.preferences_transaction",
 	}, function()
 		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		local FileSystem = require("core.fs.adapters.file_system")
@@ -88,10 +88,10 @@ local function with_fixture(outcome, callback)
 		}
 		package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "★" end }
 		package.loaded["core.ui.engine.notifications"] = { notify = function() calls.notices = calls.notices + 1 end }
-		package.loaded["modules.hotstrings.hotstrings_config"] = {
+		package.loaded["hotstrings.engine.catalogue.config"] = {
 			resolve = function() return { delay = 0.1, has_override = false } end,
 		}
-		local Management = require("ui.menu.menu_hotstrings_management")
+		local Management = require("hotstrings.ui.menu.management")
 		return OutputFixture.with_output(function(path)
 			local handle = assert(io.open(path, "wb"))
 			assert(handle:write(SOURCE))

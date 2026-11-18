@@ -1,0 +1,6 @@
+--- tests/unit/hotstrings/engine/expander/test_pause_switch_policy.lua
+--- Shared pause/resume/quit layout policy, through the actual Linux assertion owner.
+local helpers = require("tests.helpers")
+require("tests.lua.settings.pause_switch_policy_contract").run(helpers,
+	helpers.driver_root() .. "/../_shared/tests/corpus/layouts/pause_switch_vectors.json")
+return true

@@ -94,10 +94,10 @@ const driverSources = (dir) => {
 
 // 1. Every character the engine is fed carries a timestamp for the time gate.
 const OWNER = 'AppState_TouchLastSentKey';
-const OWNER_FILE = path.join(WIN, 'infra', 'hotstrings', 'hotstring_send.ahk');
+const OWNER_FILE = path.join(WIN, 'hotstrings', 'engine', 'matcher', 'send.ahk');
 
 const dispatch = stripComments(
-	read(path.join(WIN, 'infra', 'hotstrings', 'hotstring_dispatch.ahk'))
+	read(path.join(WIN, 'hotstrings', 'engine', 'matcher', 'dispatch.ahk'))
 );
 const prepare = bodyOf(dispatch, '_HSE_PrepareDispatchDecision').text;
 const gate = bodyOf(dispatch, '_HSE_EvaluateTimeGate').text;
@@ -114,7 +114,7 @@ const ownerSource = stripComments(read(OWNER_FILE));
 const owner = bodyOf(ownerSource, OWNER);
 check(
 	owner.text !== '',
-	`${OWNER} must be defined in infra/hotstrings/hotstring_send.ahk, which loads with the engine: in modules/keymap/ it belongs to the layout emulation, the only writer the neutral layout setting leaves out`
+	`${OWNER} must be defined in hotstrings/engine/matcher/send.ahk, which loads with the engine: in modules/keymap/ it belongs to the layout emulation, the only writer the neutral layout setting leaves out`
 );
 
 const writes = [];
@@ -135,7 +135,7 @@ check(
 );
 
 const watcher = stripComments(
-	read(path.join(WIN, 'infra', 'hotstrings', 'hotstring_inputhook.ahk'))
+	read(path.join(WIN, 'hotstrings', 'engine', 'matcher', 'inputhook.ahk'))
 );
 const onChar = bodyOf(watcher, '_OnPrefixChar').text;
 const STAMP = '_PrefixStampCompletedInput';
@@ -199,8 +199,8 @@ for (const entry of previews) {
 // 3. The AHK regression test runs.
 const runAll = read(path.join(WIN, 'tests', 'run_all.ahk'));
 check(
-	/^#Include unit\/modules\/hotstrings\/preview\/test_hotstring_preview_shows\.ahk$/m.test(runAll),
-	'run_all.ahk must include unit/modules/hotstrings/preview/test_hotstring_preview_shows.ahk'
+	/^#Include unit\/hotstrings\/engine\/preview\/test_shows\.ahk$/m.test(runAll),
+	'run_all.ahk must include unit/hotstrings/engine/preview/test_shows.ahk'
 );
 
 if (errors.length) {

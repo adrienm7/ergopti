@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Atspi = require("platform.focus.atspi_focus")
-local Destination = require("adapters.user_hotstring_destination")
+local Destination = require("hotstrings.adapters.user_hotstring_destination")
 
 local function response(bus, path, active, role)
 	return 'FOCUS:' .. require("core.text.engine.json").encode({ role = role or 61, name = "Identical document",

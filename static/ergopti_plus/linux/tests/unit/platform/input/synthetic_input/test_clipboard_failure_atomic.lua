@@ -147,7 +147,7 @@ helpers.describe("clipboard paste snapshot", function()
 						return true
 					end,
 				}
-				local Transaction = helpers.load_module("modules.hotstrings.output_transaction")
+				local Transaction = helpers.load_module("hotstrings.engine.output_transaction")
 				local tx = Transaction.new(raw)
 				local pasted = clipboard.paste_text("replacement", tx.channel(), function() end)
 				if not pasted then tx.fail("paste chord failed", "clipboard") end
@@ -169,7 +169,7 @@ helpers.describe("clipboard paste snapshot", function()
 
 	helpers.it("treats an emitter exception like a failed chord and still restores", function()
 		with_clipboard(true, "saved", function(clipboard, shell)
-			local Transaction = helpers.load_module("modules.hotstrings.output_transaction")
+			local Transaction = helpers.load_module("hotstrings.engine.output_transaction")
 			local tx = Transaction.new({
 				is_open = function() return true end,
 				emit = function() error("wire exploded") end,

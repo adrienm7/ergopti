@@ -59,13 +59,13 @@ const declarations = {
 const files = {
 	ahk: [
 		'windows/menu/ui/builder/submenus.ahk',
-		'windows/ui/menu/menu_hotstring_switches.ahk',
+		'windows/hotstrings/ui/menu/switches.ahk',
 		'windows/menu/ui/builder/menu_init.ahk'
 	],
 	hs: [
 		'macos/menu/ui/builder/builder.lua',
-		'macos/ui/menu/menu_hotstrings_custom.lua',
-		'macos/ui/menu/menu_hotstrings.lua'
+		'macos/hotstrings/ui/menu/custom.lua',
+		'macos/hotstrings/ui/menu/hotstrings.lua'
 	],
 	linux: ['linux/menu/ui/builder/builder.lua']
 };
@@ -1218,7 +1218,7 @@ function luaHotstringGraph(sources, platform) {
 		custom.writes.length ||
 		!luaCall(custom.value, 'require') ||
 		!custom.value.callee.binding.global ||
-		custom.value.args[0]?.value !== 'ui.menu.menu_hotstrings_custom'
+		custom.value.args[0]?.value !== 'hotstrings.ui.menu.custom'
 	)
 		return false;
 	const call = bulk.nodes.filter((n) => luaCall(n, 'Custom', 'all_sections_row'));
@@ -1590,11 +1590,8 @@ function hotstringLanguagePublication(sources, manifest, platform, target) {
 			if (
 				ranges(source, 'local ManifestMenu = require("menu.engine.manifest_menu")', '.lua')
 					.length !== 1 ||
-				ranges(
-					sources[consumerFile],
-					'local Custom = require("ui.menu.menu_hotstrings_custom")',
-					'.lua'
-				).length !== 1
+				ranges(sources[consumerFile], 'local Custom = require("hotstrings.ui.menu.custom")', '.lua')
+					.length !== 1
 			)
 				return false;
 			const native = owner(source, 'local function build_hotstrings_rows(ctx, menu_mods)', '.lua');

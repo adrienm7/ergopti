@@ -120,7 +120,7 @@ local function with_keyboard_slot_picker(prompt, body)
 	local ok, failure = pcall(function()
 		Sandbox.with_config(source, function(path)
 			for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.keyboard_shortcuts",
-				"modules.shortcuts.manager", "modules.hotstrings.magic_key", "settings.engine.preferences.program_binding_transaction",
+				"modules.shortcuts.manager", "hotstrings.engine.magic_key", "settings.engine.preferences.program_binding_transaction",
 				"menu.engine.manifest_menu" }) do package.loaded[name] = nil end
 			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 			package.loaded["settings.engine.paths"] = { config = function() return path end }

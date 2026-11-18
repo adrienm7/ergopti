@@ -1009,7 +1009,7 @@ helpers.describe("linux-logger-topical-fan-out", function()
 		with_sink("route", function(_, Logger, dir)
 			Logger.info("modules.keystats.keystats", "marker-keystats")
 			Logger.info("ai.engine.local_servers.inference", "marker-llm")
-			Logger.info("modules.hotstrings.injector", "marker-hotstrings")
+			Logger.info("hotstrings.engine.injector", "marker-hotstrings")
 			Logger.info("sink_test", "marker-unrouted")
 			-- The keystats file name comes from the routing table, not a spelling here.
 			local keystats_file
