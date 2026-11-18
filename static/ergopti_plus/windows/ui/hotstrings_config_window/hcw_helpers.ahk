@@ -482,7 +482,7 @@ OpenHotstringsConfigWindow() {
 	SecDD := G.Add("DropDownList", "x+6 yp-3 w450 r14", [])
 
 	; ----- Current path hint (below selectors) ----------------------------
-	Status := G.Add("Text", "xm y+6 w526 h18 cGray", "")
+	Status := G.Add("Text", "xm y+6 w526 h18", "")
 
 	G.Add("Text", "xm y+14 w526 h1 0x10")   ; horizontal rule (SS_SUNKEN)
 

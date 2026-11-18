@@ -681,7 +681,7 @@ _UpdateCheck_BuildNative() {
 	if (Texts["line2"] != "")
 		G.Add("Text", "xm y+6 w" . Width . " Center", Texts["line2"])
 	if (Texts["logged"] != "")
-		G.Add("Text", "xm y+8 w" . Width . " Center cGray", Texts["logged"])
+		G.Add("Text", "xm y+8 w" . Width . " Center", Texts["logged"])
 	for Other in Texts["others"] {
 		G.Add("Text", "xm y+10 w" . Width . " Center", Other.text)
 		SwitchButton := G.Add("Button", "xm y+4", t("update_check.switch_channel"))

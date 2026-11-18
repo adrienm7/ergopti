@@ -1379,7 +1379,7 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 	G.Add("Text", "xm w700", HeaderText)
 	Gui_SetFont(G, "s9 norm")
 	if (Release.HasProp("PublishedAt") and Release.PublishedAt != "") {
-		G.Add("Text", "xm y+2 cGray w700", SubStr(Release.PublishedAt, 1, 10))
+		G.Add("Text", "xm y+2 w700", SubStr(Release.PublishedAt, 1, 10))
 	}
 	Gui_SetFont(G, "s10 norm")
 	G.Add("Text", "xm y+10 w700", t("updater.update_dialog_changelog"))

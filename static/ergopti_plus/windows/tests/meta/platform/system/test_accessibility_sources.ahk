@@ -93,3 +93,31 @@ _A11yS_FontSizesFollowTheTextScale() {
 }
 Test("a11y sources: native font sizes go through Gui_SetFont (a11y-text-scale-2026-11-18)",
 	_A11yS_FontSizesFollowTheTextScale)
+
+; A fixed text colour in a native window ignores a contrast theme, and the
+; « Gray » of three status lines was 3.4:1 on the dialog face
+; (a11y-cvd-2026-11-18). The tooltips and the WPM pill paint their own
+; surfaces and follow high contrast through the style globals.
+_A11yS_NativeTextKeepsTheSystemColour() {
+	static Exempt := ["/core/ui/ui/tooltip/", "/ui/wpm/"]
+	Offenders := [], Scanned := 0
+	for Path in _DriverProductionSourceCensus().Paths {
+		Unix := StrReplace(Path, "\", "/")
+		Skip := false
+		for Part in Exempt
+			Skip := Skip || InStr(Unix, Part)
+		if Skip
+			continue
+		Scanned += 1
+		Src := _StripFullLineComments(FileRead(Path, "UTF-8"))
+		Pos := 1
+		while Pos := RegExMatch(Src, 'i)\.(?:Add(?:Text)?|SetFont)\((?:"Text",\s*)?"(?:[^"]*\s)?c(?:Gray|Grey|Silver|Red|Green|Blue|Navy|Maroon|Teal|[0-9A-F]{6})(?=[\s"])', &M, Pos) {
+			Offenders.Push(Path . ": " . M[0])
+			Pos += M.Len
+		}
+	}
+	Assert(Scanned > 100, "the census must reach the driver's sources, scanned " . Scanned)
+	AssertEqual(0, Offenders.Length, "native text keeps the system colour: " . (Offenders.Length ? Offenders[1] : ""))
+}
+Test("a11y sources: native window text keeps the system colour (a11y-cvd-2026-11-18)",
+	_A11yS_NativeTextKeepsTheSystemColour)
