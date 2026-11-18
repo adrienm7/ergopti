@@ -67,7 +67,10 @@ Test("a11y sources: the hotstring window's symbol buttons are named (a11y-native
 ; scale their sizes through the style globals, the WPM pill keeps the canon's
 ; fixed geometry, and the helper itself is the one direct call.
 _A11yS_FontSizesFollowTheTextScale() {
-	static Exempt := ["/core/ui/engine/font_scale.ahk", "/core/ui/ui/tooltip/", "/ui/wpm/wpm_widget.ahk"]
+	; The helper and the WPM pill are found by the functions they define, so a
+	; move cannot silently drop their exemption.
+	ExemptFiles := [_DriverProductionFileForSymbol("Gui_SetFont"), _DriverProductionFileForSymbol("WPMWidget_BuildCompact")]
+	static ExemptDirs := ["/core/ui/ui/tooltip/"]
 	Offenders := [], Scanned := 0, Routed := 0
 	for Path in _DriverProductionSourceCensus().Paths {
 		Unix := StrReplace(Path, "\", "/")
@@ -76,7 +79,9 @@ _A11yS_FontSizesFollowTheTextScale() {
 		while Pos := RegExMatch(Src, "Gui_SetFont\(", &M, Pos)
 			Routed += 1, Pos += M.Len
 		Skip := false
-		for Part in Exempt
+		for File in ExemptFiles
+			Skip := Skip || (Path = File)
+		for Part in ExemptDirs
 			Skip := Skip || InStr(Unix, Part)
 		if Skip
 			continue
