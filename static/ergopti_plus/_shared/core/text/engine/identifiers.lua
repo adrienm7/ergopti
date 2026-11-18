@@ -16,6 +16,7 @@ return {
 		ahk = "ErgoptiPlus.ahk",
 		exe = "ErgoptiPlus.exe",
 		bundle = "ErgoptiPlus.app",
+		display_name = "Ergopti+",
 	},
 	bundle_ids = {
 		launcher = "com.ergoptiplus.app",

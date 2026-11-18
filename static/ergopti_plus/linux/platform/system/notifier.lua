@@ -36,13 +36,14 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local Shell = require("core.process.adapters.shell_runner")
+local Identifiers = require("core.text.engine.identifiers")
 
 local LOG = "platform.system.notifier"
 
 -- The title shown when a caller supplies none. From the port contract, so the
 -- three drivers name the application identically in the user's notification
 -- centre.
-local DEFAULT_TITLE = "Ergopti+"
+local DEFAULT_TITLE = Identifiers.app.display_name
 
 -- The freedesktop urgency for each contract level.
 --

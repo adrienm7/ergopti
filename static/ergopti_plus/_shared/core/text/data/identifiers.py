@@ -11,6 +11,7 @@ APP = {
     "ahk": "ErgoptiPlus.ahk",
     "exe": "ErgoptiPlus.exe",
     "bundle": "ErgoptiPlus.app",
+    "display_name": "Ergopti+",
 }
 
 BUNDLE_IDS = {

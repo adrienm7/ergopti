@@ -89,7 +89,10 @@ const PATH_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9._-]+)*\/?$/;
 // path (linux/core/lifecycle/engine/bytecode_package.lua, modules/updater/installer.lua).
 // The Linux desktop names add a D-Bus object path and a dot file name.
 const LINUX_DESKTOP_SHAPE = /^(?:(?:\/[A-Za-z0-9_]+)+|\.?[A-Za-z0-9][A-Za-z0-9._-]*)$/;
+// The product name the user reads (app.display_name) carries a plus sign.
+const APP_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/;
 const GROUP_SHAPE = {
+	app: APP_SHAPE,
 	field_report: PATH_SHAPE,
 	bytecode_package: PATH_SHAPE,
 	linux_desktop: LINUX_DESKTOP_SHAPE

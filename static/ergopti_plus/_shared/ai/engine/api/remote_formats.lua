@@ -43,6 +43,8 @@
 
 local M = {}
 
+local Identifiers = require("core.text.engine.identifiers")
+
 
 
 
@@ -56,8 +58,8 @@ local M = {}
 -- Header carrying a Backboard key
 M.BACKBOARD_KEY_HEADER = "X-API-Key"
 
--- Name of the one assistant the driver creates per key
-M.BACKBOARD_ASSISTANT_NAME = "Ergopti+"
+-- Name of the one assistant the driver creates per key: the product name
+M.BACKBOARD_ASSISTANT_NAME = Identifiers.app.display_name
 
 --- Splits a Backboard model id into the provider and the model it names.
 --- @param model string "<llm_provider>/<model_name>".

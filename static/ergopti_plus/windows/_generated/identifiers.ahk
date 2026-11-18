@@ -18,6 +18,7 @@ class Identifiers {
 		static AHK := "ErgoptiPlus.ahk"
 		static EXE := "ErgoptiPlus.exe"
 		static BUNDLE := "ErgoptiPlus.app"
+		static DISPLAY_NAME := "Ergopti+"
 	}
 	class BundleIds {
 		static LAUNCHER := "com.ergoptiplus.app"

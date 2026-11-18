@@ -22,6 +22,8 @@
 ;   hs.notify (no soundName) and Linux notify-send (no sound hint) show it.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\identifiers.ahk
+
 
 
 
@@ -34,11 +36,6 @@
 ; Replaces the desktop for the test suite: a toggle exercised by a unit test must
 ; not show a real notification on the developer's machine.
 global _NotifierDisplaySink := 0
-
-; The title of a notice whose caller names none: the product name of the port
-; contract (DEFAULT_TITLE), which docs/design/studio-glossary.md keeps the same
-; in every locale. "ErgoptiPlus" is the program file's name, never a label.
-global NOTIFIER_PRODUCT_NAME := "Ergopti+"
 
 ; TrayTip's option bit that silences the system sound.
 global NOTIFIER_MUTE_FLAG := 0x10
@@ -73,8 +70,11 @@ _NotifierKindToFlag(Kind) {
 ; @param DisplayFn {Func|Integer} Replaces the desktop (tests only).
 ; @returns {Boolean} Whether the notification was handed to the shell.
 NotifierSend(Message, Opts, DisplayFn := 0) {
-	global _NotifierDisplaySink, NOTIFIER_PRODUCT_NAME, NOTIFIER_MUTE_FLAG
-	Title := NOTIFIER_PRODUCT_NAME
+	global _NotifierDisplaySink, NOTIFIER_MUTE_FLAG
+	; A notice whose caller names no title shows the product name of the port
+	; contract, which docs/design/studio-glossary.md keeps the same in every
+	; locale. "ErgoptiPlus" is the program file's name, never a label.
+	Title := Identifiers.App.DISPLAY_NAME
 	Level := "info"
 	Sound := false
 	if (Opts is Map) {

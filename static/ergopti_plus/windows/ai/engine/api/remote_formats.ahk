@@ -34,6 +34,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include %A_LineFile%\..\..\..\..\_generated\identifiers.ahk
+
 
 
 
@@ -46,9 +48,6 @@
 
 ; Header carrying a Backboard key
 global LLM_BACKBOARD_KEY_HEADER := "X-API-Key"
-
-; Name of the one assistant the driver creates per key
-global LLM_BACKBOARD_ASSISTANT_NAME := "Ergopti+"
 
 ; Header carrying a decisions key
 global LLM_DECISIONS_KEY_HEADER := "Authorization"
@@ -98,10 +97,10 @@ LLM_RemoteFormats_BackboardSplitModel(Model) {
  * @returns {Map} Map("url", "body").
  */
 LLM_RemoteFormats_BackboardAssistantRequest(BaseUrl) {
-	global LLM_BACKBOARD_ASSISTANT_NAME
+	; The one assistant the driver creates per key carries the product name.
 	return Map(
 		"url", BaseUrl . "/assistants",
-		"body", Map("name", LLM_BACKBOARD_ASSISTANT_NAME, "system_prompt", ""))
+		"body", Map("name", Identifiers.App.DISPLAY_NAME, "system_prompt", ""))
 }
 
 /**

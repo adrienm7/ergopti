@@ -220,7 +220,7 @@ KLR_StudioContract() {
 		if !(Text is String)
 				throw Error("The Ergopti Studio n-gram contract is missing: " . Path)
 		Contract := JsonParse(Text)
-		if !(Contract is Map) || !Contract.Has("schema") || !Contract.Has("families") || !Contract.Has("codes")
+		if !(Contract is Map) || !Contract.Has("schema") || !Contract.Has("families") || !Contract.Has("codes") || !Contract.Has("snapshot")
 				|| !Contract.Has("final_field") || !(Contract["final_field"] is String) || Contract["final_field"] = ""
 				throw Error("The Ergopti Studio n-gram contract is malformed.")
 		return Contract
@@ -253,11 +253,23 @@ KLR_StudioStoreStamp(MetricsDir) {
 		return CryptoSha256(Sorted)
 }
 
-; The saved Studio read: one header line (this format, then the store stamp it
-; was read at), then the projection JSON exactly as the worker staged it.
-class KLRStudioSnapshot {
-		static FILE := "studio_ngrams.json"
-		static HEADER := "ergopti-studio-ngrams 1 "
+/**
+ * The saved Studio read's file name and header prefix, from the contract
+ * (snapshot): one header line (the format, a space, then the store stamp it
+ * was read at), then the projection JSON exactly as the worker staged it.
+ * @returns {Map} Map("file", String, "header", String).
+ * @throws {Error} When the contract does not name the saved read.
+ */
+_KLR_StudioSnapshotFormat() {
+		static Format := 0
+		if IsObject(Format)
+				return Format
+		Snapshot := KLR_StudioContract()["snapshot"]
+		if !(Snapshot is Map) || !Snapshot.Has("file") || !Snapshot.Has("format")
+				|| (Snapshot["file"] == "") || (Snapshot["format"] == "")
+				throw Error("The Ergopti Studio n-gram contract does not name its saved read.")
+		Format := Map("file", Snapshot["file"], "header", Snapshot["format"] . " ")
+		return Format
 }
 
 ; The keystats cache folder, from a metrics folder given with or without its
@@ -275,7 +287,7 @@ _KLR_StudioCacheDir(MetricsDir) {
  * @returns {String} The file path.
  */
 KLR_StudioSnapshotPath(MetricsDir) {
-		return _KLR_StudioCacheDir(MetricsDir) . KLRStudioSnapshot.FILE
+		return _KLR_StudioCacheDir(MetricsDir) . _KLR_StudioSnapshotFormat()["file"]
 }
 
 /**
@@ -294,7 +306,7 @@ KLR_StudioSnapshotRead(MetricsDir) {
 		LineEnd := InStr(Text, "`n")
 		Header := LineEnd ? SubStr(Text, 1, LineEnd - 1) : ""
 		Json := LineEnd ? SubStr(Text, LineEnd + 1) : ""
-		Prefix := KLRStudioSnapshot.HEADER
+		Prefix := _KLR_StudioSnapshotFormat()["header"]
 		if (SubStr(Header, 1, StrLen(Prefix)) !== Prefix) || (StrLen(Header) = StrLen(Prefix))
 				|| (SubStr(Json, 1, 1) != "{") || (SubStr(Json, -1) != "}")
 				throw Error("The saved Ergopti Studio read is not in its format: " . Path)
@@ -316,7 +328,7 @@ KLR_StudioSnapshotWrite(MetricsDir, Stamp, Json) {
 				throw ValueError("A saved Ergopti Studio read is one JSON object.")
 		if !KLR_CacheEnsureDir(RTrim(MetricsDir, "\/") . "\")
 				return false
-		return KLPF_WriteAtomic(KLR_StudioSnapshotPath(MetricsDir), KLRStudioSnapshot.HEADER . Stamp . "`n" . Json)
+		return KLPF_WriteAtomic(KLR_StudioSnapshotPath(MetricsDir), _KLR_StudioSnapshotFormat()["header"] . Stamp . "`n" . Json)
 }
 
 /**

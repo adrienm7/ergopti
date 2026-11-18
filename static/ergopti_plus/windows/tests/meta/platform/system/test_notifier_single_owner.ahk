@@ -64,6 +64,6 @@ _TNSO_NoFileNameTitle() {
 	Assert(!RegExMatch(Src, 'NotifierSend\([^\n]*"ErgoptiPlus"'),
 		"a notification title must be the product name, never the program file name ErgoptiPlus")
 	Body := _DriverFuncBody("NotifierSend")
-	Assert(InStr(Body, "NOTIFIER_PRODUCT_NAME") > 0, "NotifierSend must default its title to the product name")
+	Assert(InStr(Body, "Identifiers.App.DISPLAY_NAME") > 0, "NotifierSend must default its title to the product name")
 }
 Test("notifier: no notification is titled with the program file name", _TNSO_NoFileNameTitle)

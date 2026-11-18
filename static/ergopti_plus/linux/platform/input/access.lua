@@ -115,7 +115,7 @@ end
 
 --- The window title of the degraded state: the product name, which is what
 --- the AppImage catalogue and a user's task switcher show.
-M.WINDOW_TITLE = "Ergopti+"
+M.WINDOW_TITLE = require("core.text.engine.identifiers").app.display_name
 
 --- A translated label, or its key when the catalogue cannot supply one.
 --- @param i18n table|nil

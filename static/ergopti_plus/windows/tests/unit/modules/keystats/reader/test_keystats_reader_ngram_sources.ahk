@@ -443,6 +443,26 @@ _KLRSource_StudioSavedReadFirst() {
 Test("Layout editor window: Ergopti Studio shows its saved read at once, then the fresh one (studio-saved-read-first)",
 	_KLRSource_StudioSavedReadFirst)
 
+; The saved read's file and header come from the shared contract (snapshot),
+; not from a name this driver types.
+_KLRSource_StudioSavedReadFollowsContract() {
+	Snapshot := KLR_StudioContract()["snapshot"]
+	Dir := A_Temp . "\ergopti_studio_contract_" . A_TickCount
+	DirCreate(Dir . "\cache")
+	try {
+		Path := KLR_StudioSnapshotPath(Dir)
+		AssertEqual(Snapshot["file"], SubStr(Path, StrLen(Path) - StrLen(Snapshot["file"]) + 1),
+			"the saved read is the file the contract names")
+		AssertTrue(KLR_StudioSnapshotWrite(Dir, "rev-9", '{"schema":1}'))
+		Text := FileRead(Path, "UTF-8")
+		AssertEqual(Snapshot["format"] . " rev-9`n", SubStr(Text, 1, InStr(Text, "`n")),
+			"its header line is the contract's format, then the store stamp")
+	} finally {
+		DirDelete(Dir, true)
+	}
+}
+Test("keystats ngrams: the saved Studio read follows the shared contract", _KLRSource_StudioSavedReadFollowsContract)
+
 ; A saved read that is not in its format is logged and ignored: the worker reads
 ; the store, and its read replaces the file.
 _KLRSource_StudioBrokenSavedRead() {
