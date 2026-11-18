@@ -4196,7 +4196,9 @@ function topJobProblems(files) {
  * Rejects permissions outside each exact role: three Common custody jobs, and
  * the macOS caller with its E2E stage (whose managed Ollama cells receive the
  * parallel clean build artifact) and its Build (which waits beside E2E for the
- * qualified native inputs), may read Actions evidence; release and its caller
+ * qualified native inputs), and the Windows caller with its Build (whose
+ * token SignPath uses to fetch the unsigned exe), may read Actions evidence;
+ * release and its caller
  * in ci.yml alone may write repository contents.
  * @param {Array<{rel: string, text: string}>} files The pipeline.
  * @returns {string[]}
@@ -4210,6 +4212,10 @@ function permissionProblems(files) {
 		`${ENTRY}:macos`,
 		`${MACOS_BOX}:e2e-hs`,
 		`${MACOS_BOX}:package-macos`,
+		// SignPath reads the Windows Build job and downloads its unsigned exe
+		// with that job's token; its caller grants the same ceiling.
+		`${ENTRY}:windows`,
+		`${WINDOWS_BOX}:package-windows`,
 		// The release preflight reads the run's own jobs for the timing summary.
 		`${RELEASE_BOX}:publication-plan`
 	]);

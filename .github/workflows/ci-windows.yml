@@ -974,6 +974,11 @@ jobs:
     name: 'Build (ErgoptiPlus.exe and layout installer)'
     needs: [e2e-ahk]
     runs-on: windows-latest
+    # The SignPath action hands this job's token to SignPath, which reads the
+    # job details and downloads the unsigned artifact with it.
+    permissions:
+      contents: read
+      actions: read
 
     outputs:
       ci_predecessors: ${{ toJSON(needs) }}

@@ -70,6 +70,10 @@ asked. Answer in English.
    - Leave `WINDOWS_SIGNING_CERTIFICATE_BASE64` and `_PASSWORD` unset: two signers fail the build.
 6. Push the next stable release. The `Build (ErgoptiPlus.exe ...)` job waits (up to 2 h) on the
    SignPath approval: approve it in SignPath, the job verifies the signature and the publisher.
+   Nothing in the repository changes for this: the job already grants `actions: read`, which
+   the SignPath action needs to read the job and download the unsigned artifact, and
+   `ci-release.yml` counts SignPath as configured once the three variables and both secrets are
+   set.
 7. Then retire `.github/ci/stable_windows_signing_exception.json` and its exception code in
    `tools/ci/windows-stable-signing.cjs`, and change the README policy from "being prepared" to
    SignPath's wording "Free code signing provided by SignPath.io, certificate by SignPath

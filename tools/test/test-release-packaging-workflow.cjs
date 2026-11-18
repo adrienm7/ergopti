@@ -1052,6 +1052,22 @@ if (windowsSigningStep !== null) {
 			'output-artifact-directory: ${{ runner.temp }}/signpath-signed'
 		])
 			if (!submit.includes(token)) errors.push(`the SignPath request is missing ${token}`);
+		// SignPath downloads the artifact with this job's token; ci.yml grants the
+		// same ceiling to the called workflow.
+		const windowsYml = fs.readFileSync(path.join(root, WINDOWS_BOX), 'utf8');
+		const packageJob = windowsYml.slice(windowsYml.indexOf('\n  package-windows:\n'));
+		const packageHead = packageJob.slice(0, packageJob.indexOf('\n    steps:\n') + 1);
+		const callerYml = fs.readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8');
+		const callerJob = callerYml.slice(callerYml.indexOf('\n  windows:\n'));
+		const callerHead = callerJob.slice(0, callerJob.indexOf('\n    with:\n') + 1);
+		for (const [label, head] of [
+			['package-windows', packageHead],
+			['ci.yml windows', callerHead]
+		])
+			if (!/\n {4}permissions:\n {6}contents: read\n {6}actions: read\n/.test(head))
+				errors.push(
+					`${label} must grant actions: read so SignPath can fetch the unsigned artifact`
+				);
 	}
 	if (!body.includes('ERGOPTI_RELEASE_PRERELEASE -ceq "true"')) {
 		errors.push('only an explicit dev prerelease may omit every Windows signing secret');

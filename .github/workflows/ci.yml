@@ -534,6 +534,11 @@ jobs:
     needs: [validate, prepare-common]
     if: needs.validate.outputs.lane_windows == 'true'
     uses: ./.github/workflows/ci-windows.yml
+    # A called job's token cannot exceed this one: SignPath reads the build
+    # job and its unsigned artifact (ci-windows.yml, package-windows).
+    permissions:
+      contents: read
+      actions: read
     with:
       release: ${{ needs.validate.outputs.release == 'true' }}
       version: ${{ needs.validate.outputs.version }}
