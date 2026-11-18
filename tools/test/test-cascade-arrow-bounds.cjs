@@ -27,6 +27,7 @@ const assert = require('assert');
 const fs = require('fs');
 const TOML = require('smol-toml');
 const { shared, REPO_ROOT } = require('../lib/paths.cjs');
+const { driverFileDefining } = require('../lib/driver-source-owner.cjs');
 const path = require('path');
 
 const read = (file) => fs.readFileSync(file, 'utf8');
@@ -75,8 +76,13 @@ assert.ok(
 	luaEngine.includes(`M.CASCADE_MAX_ARROWS = ${high}`),
 	'the shared Lua engine upper bound'
 );
-const windows = path.join(REPO_ROOT, 'static/ergopti_plus/windows/infra');
-const ahkEngine = read(path.join(windows, 'hotstrings/hotstring_engine_main.ahk'));
+// The Windows engine is the file that declares the upper bound, wherever the
+// structure steps keep it; the lower bound must sit beside it.
+const ahkEngine = driverFileDefining(
+	'windows',
+	'.ahk',
+	/^global HSE_CASCADE_MAX_ARROWS\s*:=/m
+).text;
 assert.ok(ahkEngine.includes(`global HSE_CASCADE_MIN_ARROWS := ${low}`), 'the Windows lower bound');
 assert.ok(
 	ahkEngine.includes(`global HSE_CASCADE_MAX_ARROWS := ${high}`),

@@ -32,6 +32,7 @@ const fs = require('fs');
 const TOML = require('smol-toml');
 const tomlOwnData = require('./fixtures/toml-own-data.cjs');
 const { shared, REPO_ROOT } = require('../lib/paths.cjs');
+const { driverFileNamed } = require('../lib/driver-source-owner.cjs');
 const path = require('path');
 
 const PATH = 'hotstrings.magic_key_source';
@@ -140,13 +141,8 @@ assert.ok(
 	'Windows uses the same existing translated reason'
 );
 for (const platform of ['linux', 'macos']) {
-	const source = fs.readFileSync(
-		path.join(
-			REPO_ROOT,
-			`static/ergopti_plus/${platform}/modules/${platform === 'linux' ? 'hotstrings' : 'keymap'}/magic_key_source.lua`
-		),
-		'utf8'
-	);
+	// Found by name: the structure steps move the module between feature folders.
+	const source = driverFileNamed(platform, 'magic_key_source.lua').text;
 	assert.ok(
 		source.includes('Shared.tap_conflict('),
 		`${platform} consumes the shared configured ownership policy`
