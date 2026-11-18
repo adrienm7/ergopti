@@ -261,8 +261,8 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
   collection arms, `AwakeCheckMouseMoved` and `_UserHotstringsPoll` move once those children call
   `TimingsLoadShared`. The suspended requeue `-500` of `core/events/timer_scheduler.ahk` waits for its harnesses
   (`run_llm_*`) to load the registry.
-- **Tests.** Source assertions left to convert to behaviour (3,799 `_Driver*` source reads in 989 files; 71 meta
-  files still name `A_IsSuspended`, 60 of them outside comments). Counted over `windows/tests/**/*.ahk` as calls to
+- **Tests.** Source assertions left to convert to behaviour (3,799 `_Driver*` source reads in 991 files; 68 meta
+  files still name `A_IsSuspended`, 57 of them outside comments). Counted over `windows/tests/**/*.ahk` as calls to
   `_DriverFuncBody`, `_DriverFuncBodyOrEmpty`, `_DriverSourceConcat`, `_DriverSourceNoComments`, `_DriverDirConcat`,
   `_DriverDirsConcat` and `_DriverFileSource`, and as `tests/meta` files containing `A_IsSuspended`. Guards that
   would send keys, paste or move the cursor when broken (text sender, inline auto-type, tap-hold, dead keys,
