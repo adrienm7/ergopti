@@ -53,6 +53,12 @@
  *    lacks and ranked after every complete layout, whatever its score, also
  *    after a re-score; QWERTY (US) and Colemak on a French corpus stay
  *    complete, their accents only unsupported.
+ * 11. Whole French layouts type French: Optimot, BvoFRak and the Spanish
+ *    QWERTY with their dead keys.
+ * 12. Official layouts: the keys, levels and dead-key results of the layouts
+ *    re-encoded from their official files (Ergo-L's 1DK, Optimot 1.8.0, the
+ *    Neo family, QWERTZ, the Spanish layouts, Engram-es), and their language's
+ *    text typed in full.
  * ==============================================================================
  */
 
@@ -1905,8 +1911,10 @@ if (UPDATE_GOLDEN) {
 		.filter((cell) => cell && typeof cell === 'object')
 		.map((cell) => cell.dead)
 		.sort();
+	// (official-layouts-2026-11-18) Optimot 1.8.0's thirteen dead keys.
 	check(
-		deadCells.join(' ') === 'circumflex diaeresis',
+		deadCells.join(' ') ===
+			'abovedot abovering acute breve caron cedilla circumflex currency diaeresis grave horn macron tilde',
 		`dead keys: Optimot's dead keys are ${deadCells.join(' ')}`
 	);
 	check(
@@ -1917,6 +1925,136 @@ if (UPDATE_GOLDEN) {
 		E.analyse(optimot, E.ngramsFromText('être où ça ? Noël'), {}).metrics.unsupported === 0,
 		'dead keys: Optimot types « être où ça ? Noël »'
 	);
+}
+
+// ==================================================
+// ======= 12/ Layouts as their official files ======
+// ==================================================
+
+{
+	// (official-layouts-2026-11-18) Each fact below is read in the layout's
+	// official file: Ergo-L's Kalamine TOML (ergol-v1.0.2), Optimot 1.8.0's
+	// Linux XKB and XCompose (optimot.fr), xkeyboard-config's symbols/de and
+	// symbols/es, dl.neo-layout.org/mine_2.39 and Engram-es's README. The
+	// library held letter blocks completed with the US rows, KLA files without
+	// their dead keys or AltGr level, and Mine as it was before April 2022.
+	const cell = (id, code, level) => {
+		const layout = byId.get(id);
+		const row = layout && layout.rows[code];
+		const value = row ? row[level] : undefined;
+		return value && typeof value === 'object' ? `dead:${value.dead}` : value;
+	};
+	const rule = (id, state, typed) => ((byId.get(id) || { dead: {} }).dead[state] || {})[typed];
+	const official = [
+		// Ergo-L: the 1DK is the base of the key right of D, and 1DK + s is é.
+		['ergol', 'KeyO', 0, 'dead:1dk'],
+		['ergol', 'KeyO', 1, '!'],
+		// Optimot 1.8.0: ^ ! ¨ ¡ on the key right of N, the AltGr arrows of 1.8.
+		['optimot', 'Quote', 0, 'dead:circumflex'],
+		['optimot', 'Quote', 2, 'dead:diaeresis'],
+		['optimot', 'KeyR', 2, 'dead:acute'],
+		['optimot', 'KeyS', 2, '↓'],
+		['optimot', 'KeyD', 2, '↑'],
+		['optimot', 'KeyX', 2, 'dead:grave'],
+		['optimot', 'Backquote', 2, 'dead:currency'],
+		// Neo 2: ; ? ! on level 3, the dead ^ ` ´ on level 1.
+		['neo2_new', 'Slash', 2, ';'],
+		['neo2_new', 'KeyH', 2, '?'],
+		['neo2_new', 'KeyY', 2, '!'],
+		['neo2_new', 'Backquote', 0, 'dead:circumflex'],
+		['neo2_new', 'Equal', 0, 'dead:grave'],
+		['neo2_new', 'BracketRight', 0, 'dead:acute'],
+		// Bone, KOY, AdNW, Noted, Mine: their own 31st and 32nd keys.
+		['bone', 'Quote', 0, 'q'],
+		['bone', 'BracketLeft', 0, 'ß'],
+		['koy', 'Quote', 0, 'f'],
+		['koy', 'Slash', 0, 'j'],
+		['koy', 'BracketLeft', 0, 'z'],
+		['adnw', 'KeyP', 0, 'j'],
+		['adnw', 'BracketLeft', 0, 'f'],
+		['adnw', 'Quote', 0, 'ß'],
+		['noted', 'Backslash', 0, 'dead:acute'],
+		['mine', 'KeyQ', 0, 'j'],
+		['mine', 'KeyT', 0, 'q'],
+		['mine', 'BracketLeft', 0, 'z'],
+		['mine', 'KeyL', 0, 's'],
+		['mine', 'Semicolon', 0, 'h'],
+		['mine', 'Backslash', 0, 'dead:acute'],
+		// German QWERTZ: ü ö ä ß, the dead ^ and ´, Shift+7 is /.
+		['qwertz', 'BracketLeft', 0, 'ü'],
+		['qwertz', 'Semicolon', 0, 'ö'],
+		['qwertz', 'Quote', 0, 'ä'],
+		['qwertz', 'Minus', 0, 'ß'],
+		['qwertz', 'Digit7', 1, '/'],
+		['qwertz', 'Backquote', 0, 'dead:circumflex'],
+		['qwertz', 'Equal', 0, 'dead:acute'],
+		// Spanish QWERTY: Shift+7 is /, Shift+8 is (, the dead ´ right of ñ.
+		['qwerty_spanish', 'Digit7', 1, '/'],
+		['qwerty_spanish', 'Digit8', 1, '('],
+		['qwerty_spanish', 'Semicolon', 0, 'ñ'],
+		['qwerty_spanish', 'Quote', 0, 'dead:acute'],
+		// Spanish Dvorak (xkeyboard-config): the dead ´ and ` and its R-H exchange.
+		['spanish_dvorak', 'Quote', 0, 'dead:acute'],
+		['spanish_dvorak', 'BracketLeft', 0, 'dead:grave'],
+		['spanish_dvorak', 'KeyO', 0, 'h'],
+		['spanish_dvorak', 'KeyJ', 0, 'r'],
+		// Engram-es: ☆ in the middle of the home row, ¿¡ and ?! below it.
+		['engram_es', 'KeyH', 0, 'dead:engram_star'],
+		['engram_es', 'KeyB', 0, '¿'],
+		['engram_es', 'KeyN', 1, '!'],
+		['engram_es', 'BracketLeft', 0, 'w']
+	];
+	for (const [id, code, level, expected] of official)
+		check(
+			cell(id, code, level) === expected,
+			`official layouts: ${id} ${code} level ${level} is ${cell(id, code, level)}, its official file has ${expected}`
+		);
+	for (const [id, state, typed, expected] of [
+		['ergol', '1dk', 's', 'é'],
+		['ergol', '1dk', 'e', 'è'],
+		['ergol', '1dk', 'a', 'à'],
+		['ergol', '1dk', 'n', 'ê'],
+		['ergol', '1dk', 'c', 'ç'],
+		// Optimot's own ^ and ¨ tables (its XCompose), not the plain accents.
+		['optimot', 'circumflex', 'p', '|'],
+		['optimot', 'circumflex', 'k', '='],
+		['optimot', 'circumflex', 'n', 'ñ'],
+		['optimot', 'circumflex', 'm', 'ç'],
+		['optimot', 'circumflex', "'", '['],
+		['optimot', 'diaeresis', 't', 'þ'],
+		['optimot', 'currency', '$', '£'],
+		['neo2_new', 'circumflex', 'e', 'ê'],
+		['neo2_new', 'caron', 's', 'š'],
+		['qwerty_spanish', 'acute', 'e', 'é'],
+		['spanish_dvorak', 'acute', 'o', 'ó'],
+		['engram_es', 'engram_star', 'a', 'á'],
+		['engram_es', 'engram_star', 'n', 'ñ']
+	])
+		check(
+			rule(id, state, typed) === expected,
+			`official layouts: ${id} ${state} + ${typed} is ${rule(id, state, typed)}, its official file gives ${expected}`
+		);
+	// AdNW is one layout: KLA's copy of it is left out as a duplicate.
+	check(!byId.has('adnw_kla'), 'official layouts: AdNW is in the library twice');
+	// Each types its language's text in full.
+	for (const [ids, text] of [
+		[
+			['neo2_new', 'bone', 'koy', 'adnw', 'noted', 'mine', 'qwertz'],
+			'Größe, Übung; ändern? Ja! Öl: „Straße“ – (Fuß) @ 3 € mögen.'
+		],
+		[
+			['qwerty_spanish', 'spanish_dvorak', 'engram_es'],
+			'¿Qué pasó, niño? ¡Ánimo, pingüino! Él lo dijo: «sí».'
+		],
+		[['optimot'], 'Ça ! Où ? « Noël » : être, naïf, cœur — [x] {y} | 1 = 2, ñ.']
+	])
+		for (const id of ids) {
+			const result = E.analyse(byId.get(id), E.ngramsFromText(text), {});
+			check(
+				result.metrics.unsupported === 0,
+				`official layouts: ${id} cannot type ${Object.keys(result.coverage.unsupportedChars).join('')}`
+			);
+		}
 }
 
 if (errors.length > 0) {

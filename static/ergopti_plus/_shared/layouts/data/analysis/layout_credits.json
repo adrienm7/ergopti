@@ -201,11 +201,6 @@
 			"authors": ["Ulrich Atz"],
 			"basis": "collection"
 		},
-		"adnw_kla": {
-			"authors": ["Andreas Wettstein"],
-			"url": "http://www.adnw.de",
-			"basis": "collection"
-		},
 		"anglian": {
 			"authors": ["Ashley Crane"],
 			"basis": "collection"
@@ -408,6 +403,21 @@
 			"authors": ["Artem Vyalkov"],
 			"url": "http://www.workmanlayout.com/",
 			"basis": "collection"
+		},
+		"optimot": {
+			"authors": ["Patrick Jamet"],
+			"url": "https://optimot.fr/",
+			"basis": "source",
+			"checked": "2026-11-18",
+			"evidence": "optimot.fr, « Licence »: « Vous devez créditer la disposition « Optimot » et son auteur « Patrick Jamet » »; every page: « Copyright © 2022-2026 Patrick Jamet ». Confirmed by the maintainer on 2026-11-18."
+		},
+		"engram_es": {
+			"authors": ["Arno Klein"],
+			"year": 2021,
+			"url": "https://github.com/binarybottle/engram/tree/main/engram-es",
+			"basis": "source",
+			"checked": "2026-11-18",
+			"evidence": "Engram repository, engram-es/README.md: « Engram-es is a keyboard layout optimized for comfortable and efficient touch typing in Spanish created by Arno Klein »; engram-es-2021: Engram-es v1.0 dated 2021-09-30."
 		}
 	}
 }

@@ -472,6 +472,22 @@ adds the six registry layouts and the reference QWERTY and AZERTY with all
 their layers and dead keys: 165 layouts. Each entry names its `source` and
 `source_path`.
 
+On 2026-11-18 eleven entries were re-encoded from their official files, every
+key, level and two-key dead-key composition compared by a script: Optimot from
+optimot.fr's 1.8.0 Linux driver (XKB and XCompose; CC BY-NC-SA, so only the
+arrangement is re-encoded); Neo 2, Bone, KOY, AdNW, Noted, German QWERTZ, the
+Spanish QWERTY and the Spanish Dvorak from xkeyboard-config's `symbols/de` and
+`symbols/es` (f4d3ed8b) with the libX11 en_US.UTF-8 Compose table (and
+dl.neo-layout.org's XCompose for the Neo family); Mine from
+dl.neo-layout.org/mine_2.39 (the library held its block from before April
+2022); Engram-es from its README in the Engram repository. These entries state
+their dead keys as cells and their compositions as `dead_rules`; sequences of
+three keys or more are left out, and the Neo family keeps its levels 1, 2, 3 and
+5 (Mod3 as AltGr) without level 4. KLA's AdNW became a duplicate of the official
+one. Ergo-L and bépo already matched their official files (the Kalamine TOML of
+ergol-v1.0.2; bépo 1.1rc2's KLC and XKB). BEO and Morgenstern have no official
+source that could be found and stay letter blocks.
+
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not
 protected by copyright, only its implementation, and points to _SAS Institute

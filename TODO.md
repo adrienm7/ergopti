@@ -178,13 +178,15 @@ waits for the maintainer's review).
       (`KLPF_SettleReaderCache`), which hold the terminal back. Profile those two phases on the maintainer's store
       (a copy at another path rebuilds the image from scratch, so it does not measure them) before deciding whether
       the worker hands its stage over before saving the image.
-- [ ] **Library layouts that lose their own characters (2026-11-18).** Optimot, BvoFRak 1.0 FR and the Spanish
-      QWERTY now type their accents (whole rows and `dead_keys` in `layout_library.json`). The same import loss is
-      left, each needing a complete source of the layout: the letter blocks completed with the US rows of
-      non-English layouts (BEO 0.99 % of Swann unsupported: è ê ç ; ? ; Engram ES 2.6 % of Marianela: í ó á é ñ ¿ ¡;
-      QWERTZ 1.6 % of Kafka: ü ä ß; AdNW, Bone and Mine 0.6 %: ß; KOY and Noted 0.2–0.3 %: ; ? :; Morgenstern 2 %:
-      its block has no b), and the KLA files without their AltGr or dead keys (Neo 2: ; ? !; Spanish Dvorak: no
-      acute at all). Russian JCUKEN's 80 % on a French text is genuine.
+- [ ] **Library layouts that lose their own characters, what is left (2026-11-18).** Optimot 1.8.0, Neo 2, Bone,
+      KOY, AdNW, Noted, Mine, QWERTZ, the Spanish QWERTY and Dvorak and Engram-es are now re-encoded from their
+      official files (`docs/audits/layout-analysers/report.md`, « Layout library »). Left: BEO (0.99 % of Swann
+      unsupported: è ê ç ; ?) and Morgenstern (2 %: its block has no b) have no official source that could be found,
+      so they stay Oxeylyzer letter blocks; the Neo family has no level 4 (Mod4) in the four-level model, so its
+      ¿ ¡ (0.27 % of Marianela) and its level-4 dead ¨ stay unsupported; dead-key sequences of three keys or more
+      (Optimot's chained accents) are left out; the xkeyboard-config Spanish Dvorak exchanges R and H against KLA's
+      « Spanish Dvorak (Jorge Sanz) », whose author page could not be read (web.archive.org was offline). Russian
+      JCUKEN's 80 % on a French text is genuine.
 - [ ] **[RELEASE] Windows export step in native Lua.** The restricted host `windows/native/ergopti_lua_export.c`
       (pinned Lua 5.4.6, built by `tools/build/build_windows_lua_export.ps1` in package-windows) is done. Left: once a
       dev run builds « Windows / Build », commit its artifact `windows-lua-export-*` (`ergopti_lua_export.exe` and
