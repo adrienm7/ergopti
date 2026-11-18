@@ -50,8 +50,6 @@ every maintainer request here.
 - [ ] **CI reds left after verify run 44072500520** (decisions taken 2026-11-17):
   - macOS Intel « managed Ollama build handoff never arrived »: maintainer decision: make the consuming cell
     `needs` the Intel build job and update `macos-stage-contract.json` with its review.
-  - Shared-literal ratchet: `windows.path_name` 49/48 (`NOTIFIER_PRODUCT_NAME`, 11de860899) and
-    `macos+linux.lua_function` 105/104 (`reload_emulation`, e13e110319): move them to a shared home.
   - Re-read the first complete run after these; keylayout owner pin and Menus « cold command section » to confirm.
 - [ ] **Exact-count ceilings in tests (maintainer: « ces tests avec seuil magic value c'est vraiment mauvais »).**
       `toml.flat_values` was raised to 1500/2600 on 2026-11-17 to unblock CI. Replace exact operation counts and
