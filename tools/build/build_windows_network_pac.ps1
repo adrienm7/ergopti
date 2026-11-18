@@ -80,7 +80,7 @@ if ((Get-FileHash -LiteralPath $SourceArchive -Algorithm SHA256).Hash.ToLowerInv
 Invoke-PacBuildCommand 'python' @((Join-Path $PSScriptRoot 'prepare_network_pac_sources.py'), '--repo', $RepoRoot,
 	'--archive', $SourceArchive, '--output', $Prepared, '--msvc-function', $FunctionPath)
 $Receipt = Get-Content -LiteralPath (Join-Path $Prepared 'source_receipt.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($Receipt.schema_version -ne 1 -or $Receipt.source_fingerprint -cnotmatch '^[0-9a-f]{64}$') {
+if (($Receipt.schema_version -isnot [int] -and $Receipt.schema_version -isnot [long]) -or $Receipt.schema_version -ne 1 -or $Receipt.source_fingerprint -cnotmatch '^[0-9a-f]{64}$') {
 	throw 'Generated PAC source receipt refused.'
 }
 $Common = @('/nologo', '/Brepro', '/std:c11', '/O2', '/MT', '/guard:cf', '/D_CRT_SECURE_NO_WARNINGS', '/D_WIN32_WINNT=0x0602', ('/I' + $Prepared), ('/I' + $SharedSource), ('/I' + $NativeSource))
@@ -103,7 +103,8 @@ $Receipt = Get-Content -LiteralPath (Join-Path $Prepared 'source_receipt.json') 
 if ($Receipt.source_fingerprint -cne $Before) { throw 'PAC source identity changed during native compilation.' }
 $Executable = Join-Path $BuildRoot 'ergopti_network_pac.exe'
 $Identity = (& $Executable --identity) | ConvertFrom-Json
-if ($LASTEXITCODE -ne 0 -or $Identity.schema_version -ne 1 -or $Identity.duktape_version -ne 20700 -or
+if ($LASTEXITCODE -ne 0 -or ($Identity.schema_version -isnot [int] -and $Identity.schema_version -isnot [long]) -or $Identity.schema_version -ne 1 -or
+	($Identity.duktape_version -isnot [int] -and $Identity.duktape_version -isnot [long]) -or $Identity.duktape_version -ne 20700 -or
 	$Identity.source_fingerprint -cne $Receipt.source_fingerprint) { throw 'Actual compiled PAC identity refused.' }
 # Inspect the actual built PE and its static-runtime dependency closure before publishing.
 $Bytes = [IO.File]::ReadAllBytes($Executable)

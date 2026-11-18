@@ -42,7 +42,7 @@ function Get-TextSha256 {
 }
 
 $Pin = Get-Content -LiteralPath (Join-Path $NativeSource 'ergopti_lua_export.pin.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($Pin.schema_version -ne 1 -or $Pin.sha256 -cnotmatch '^[0-9a-f]{64}$' -or
+if (($Pin.schema_version -isnot [int] -and $Pin.schema_version -isnot [long]) -or $Pin.schema_version -ne 1 -or $Pin.sha256 -cnotmatch '^[0-9a-f]{64}$' -or
 	$Pin.url -cnotmatch '^https://www\.lua\.org/ftp/lua-5\.4\.[0-9]+\.tar\.gz$' -or $Pin.archive_root -cnotmatch '^lua-5\.4\.[0-9]+$') {
 	throw 'Canonical pinned Lua source refused.'
 }
@@ -123,7 +123,8 @@ try {
 
 $Executable = Join-Path $BuildRoot 'ergopti_lua_export.exe'
 $Identity = (& $Executable --identity) | ConvertFrom-Json
-if ($LASTEXITCODE -ne 0 -or $Identity.schema_version -ne 1 -or $Identity.host -cne 'ergopti_lua_export' -or
+if ($LASTEXITCODE -ne 0 -or ($Identity.schema_version -isnot [int] -and $Identity.schema_version -isnot [long]) -or $Identity.schema_version -ne 1 -or
+	$Identity.host -cne 'ergopti_lua_export' -or
 	$Identity.lua_release -cne $Pin.lua_release -or $Identity.source_fingerprint -cne $Fingerprint) {
 	throw 'Actual compiled Lua export host identity refused.'
 }

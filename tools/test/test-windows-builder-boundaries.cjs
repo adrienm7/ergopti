@@ -34,6 +34,26 @@ for (const name of builders) {
 }
 assert.ok(pushes >= 3, 'the census must see the builders changing directory');
 
+// Every version a builder reads from JSON (a pin, a receipt, the identity a
+// built exe prints) is refused unless it is an integer, the nav owner's guard
+// below being the one whose behaviour is measured. The PAC and Lua export
+// builders compared theirs with a bare -ne, so the strings "1" and "20700"
+// passed for the integers (builder-version-kind).
+let versionComparisons = 0;
+for (const name of builders) {
+	const source = fs.readFileSync(path.join(BUILD_DIR, name), 'utf8');
+	for (const match of source.matchAll(/(\$\w+\.\w*version) -ne (\d+)\b/g)) {
+		versionComparisons += 1;
+		const [, field, value] = match;
+		const strict = `(${field} -isnot [int] -and ${field} -isnot [long]) -or ${field} -ne ${value}`;
+		assert.ok(
+			source.includes(strict),
+			`${name}: ${field} must be refused unless it is an integer, as in: ${strict}`
+		);
+	}
+}
+assert.ok(versionComparisons >= 5, 'the census must see the builders checking their versions');
+
 const navOwner = fs.readFileSync(path.join(BUILD_DIR, 'build_windows_nav_owner.ps1'), 'utf8');
 const schemaGuard = navOwner.match(/^\s*if \((.*schema_version.*)\) \{$/m);
 assert.ok(schemaGuard, 'the provenance schema guard must exist');
