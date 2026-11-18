@@ -2475,6 +2475,7 @@ function M.build_karabiner_json(
 		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
 		return nil, err
 	end
+	local running_chords = #chord_rules > 0
 	local with_chords = {}
 	for _, rule in ipairs(all_rules) do
 		if not historical_script_rules[rule] then
@@ -2522,6 +2523,11 @@ function M.build_karabiner_json(
 			tap_holds_on and "on" or "off", combinations_on and "on" or "off", #all_rules - #kept)
 		all_rules = kept
 	end
+
+	-- A running chord is right Option pressed, then its key, with no key
+	-- between (the maintainer, 2026-11-17): every final key-down rule takes
+	-- part, so the sequence is applied to the rules as deployed.
+	if running_chords then ScriptChordRules.apply_sequence(all_rules, held_var_name(SCRIPT_CONTROL_HOLDER_KEY)) end
 
 	-- Native control expansion detaches manipulators, so reject aliased source
 	-- graphs first instead of accidentally hiding the decoder's identity error.

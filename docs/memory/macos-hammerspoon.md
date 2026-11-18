@@ -873,6 +873,20 @@ Ergopti's provenance and never passes a sentinel check; its rule also reads
 fn + Backspace and comes first. Action: never emit a sentinel rule for a slot
 that runs nothing, and re-pin the generator graph tests for an intended change.
 
+### project-macos-script-chord-sequence-variable
+
+Karabiner has no condition for "the key pressed just before", and a delayed
+action cannot carry it: the right Command manipulator's one delayed action
+already times the tap minimum, and its cancel ordering against a later
+manipulator is not specified. The running chords therefore also require
+`ke_held_right_command_sequence`, which the manipulator setting the holder
+variable raises at its press and lowers at its release, every other deployed
+key manipulator lowers at its key-down (fn excepted, for fn + Backspace), and a
+last rule lowers for any registry key no earlier rule takes before typing it
+unchanged; that rule matches only while the variable is up, so only the first
+key after right Option goes through it. Action: a new rule pass that adds
+manipulators runs before `apply_sequence`, which must see the final graph.
+
 ### project-hs-shortcut-preference-is-not-the-binding
 
 Named shortcuts in `modules/shortcuts/bindings.lua` have two axes:

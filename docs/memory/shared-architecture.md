@@ -420,6 +420,20 @@ became `chords_enabled` and the slots in config schema v7. Action: change a
 slot, a preset or the paused actions on the three drivers and in the JSON at
 once, never on one driver.
 
+### project-script-chords-are-a-sequence
+
+Maintainer decision (2026-11-17): a script chord is AltGr (right Option on a
+Mac) pressed, then the slot's key, with no other key pressed between. On
+Ergopti+ AltGr types symbols, so a fast « (# » then Enter while AltGr was still
+held paused the driver. Windows reads AutoHotkey's key history
+(`ScriptAltGrPressedJustBefore`, A_PriorKey), Linux the hook's `prior_role` (the
+modifier role of the key pressed before, modifiers included), macOS a Karabiner
+sequence variable (`script_chord_rules.lua` `apply_sequence`). Paused on macOS
+the chords keep the real Option key without a sequence rule: once Karabiner is
+bundled with Ergopti, pausing pauses Karabiner and the chord key moves to the
+physical Alt (Option) position. Action: a new chord or chord path checks the
+key pressed just before, and `test-script-chords-three-os.cjs` pins all three.
+
 ### project-restore-and-clear-read-two-shared-keys
 
 Every row that puts a section back to Ergopti's preset reads

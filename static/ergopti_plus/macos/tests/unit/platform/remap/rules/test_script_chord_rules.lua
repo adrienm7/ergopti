@@ -113,6 +113,100 @@ helpers.describe("Karabiner rules of the shared script chords (script-chords-thr
 		helpers.assert_eq(keys_of(historical), "delete_or_backspace,return_or_enter,escape")
 	end)
 
+	-- On Ergopti+ right Option types symbols: a fast « (# » then Return while
+	-- it was still held paused the driver (the maintainer, 2026-11-17). A
+	-- chord is right Option pressed, then its key, as on Windows and Linux.
+	-- The keys run through the deployed rules as Karabiner takes them: the
+	-- first manipulator whose key and conditions match takes the key-down.
+	helpers.it("script-chord-sequence: only the key right after right Option is a chord", function()
+		local actions = {
+			NONE_ACTION,
+			{ id = "altgr", label = "AltGr", karabiner_to = { { key_code = "right_option" } } },
+			{ id = "tab", label = "Tab", karabiner_to = { { key_code = "tab" } } },
+			{ id = "cmd", label = "Cmd", karabiner_to = { { key_code = "left_command" } } },
+		}
+		local keys = {
+			{ id = "right_command", label = "Right Command", from = { key_code = "right_command" } },
+			{ id = "spacebar", label = "Space", from = { key_code = "spacebar" } },
+		}
+		local config, err = Generator.build_karabiner_json({
+			tap_hold_config = { right_command = { tap = "tab", hold = "altgr" },
+				spacebar = { tap = "none", hold = "cmd" } },
+			mod_combos_config = {}, tap_hold_timeout_ms = 200,
+			simultaneous_threshold_ms = 100, combo_symmetric = false,
+		}, actions, keys, {}, {}, "/fake/data_dir/", TEST_LEASE_TOKEN)
+		helpers.assert_nil(err)
+		local rules = config.profiles[1].complex_modifications.rules
+
+		--- The keys Karabiner posts for a stream of { key, down } presses.
+		local function play(stream)
+			local vars, taken, posted, held = {}, {}, {}, {}
+			local function holds(condition)
+				local logical = LeaseContract.parse_runtime_variable_name(condition.name)
+				-- The lease's own mode and revocation gates are open in this deploy.
+				if not logical then return LeaseContract.is_managed_variable_name(condition.name) end
+				local equal = (vars[condition.name] or 0) == condition.value
+				if condition.type == "variable_if" then return equal end
+				if condition.type == "variable_unless" then return not equal end
+				return false
+			end
+			local function matches(manipulator, key)
+				local from = manipulator.from or {}
+				if manipulator.type ~= "basic" or from.key_code ~= key then return false end
+				for _, name in ipairs((from.modifiers or {}).mandatory or {}) do
+					if not held[name] then return false end
+				end
+				for _, condition in ipairs(manipulator.conditions or {}) do
+					if not holds(condition) then return false end
+				end
+				return true
+			end
+			local function run(events)
+				for _, event in ipairs(events or {}) do
+					local gate = true
+					for _, condition in ipairs(event.conditions or {}) do gate = gate and holds(condition) end
+					if gate and event.set_variable then vars[event.set_variable.name] = event.set_variable.value end
+					if gate and event.key_code then posted[#posted + 1] = event.key_code end
+				end
+			end
+			for _, step in ipairs(stream) do
+				local key, down = step[1], step[2]
+				held[key] = down or nil
+				if down then
+					local found
+					for _, rule in ipairs(rules) do
+						for _, manipulator in ipairs(rule.manipulators) do
+							if not found and matches(manipulator, key) then found = manipulator end
+						end
+					end
+					taken[key] = found
+					if found then run(found.to) else posted[#posted + 1] = key end
+				elseif taken[key] then
+					run(taken[key].to_after_key_up)
+					taken[key] = nil
+				end
+			end
+			return posted[#posted]
+		end
+		local RCMD, RETURN = "right_command", "return_or_enter"
+		local chord = play({ { RCMD, true }, { RETURN, true } })
+		helpers.assert_true(chord ~= RETURN, "right Option then Return is the pause chord")
+		helpers.assert_eq(play({ { RCMD, true }, { "5", true }, { "5", false }, { RETURN, true } }), RETURN,
+			"a symbol typed under right Option, then Return, is text")
+		helpers.assert_eq(play({ { RCMD, true }, { "spacebar", true }, { "spacebar", false }, { RETURN, true } }),
+			RETURN, "a key with its own rule ends the sequence too")
+		helpers.assert_eq(play({ { RCMD, true }, { "left_shift", true }, { RETURN, true } }), RETURN,
+			"a modifier pressed after right Option ends the sequence")
+		helpers.assert_eq(play({ { RCMD, true }, { RETURN, true }, { RETURN, false }, { RETURN, true } }), RETURN,
+			"a second Return under the same right Option is text")
+		helpers.assert_eq(play({ { RCMD, true }, { "5", true }, { RCMD, false }, { RCMD, true }, { RETURN, true } }),
+			chord, "pressed again, right Option starts a new sequence")
+		helpers.assert_true(play({ { RCMD, true }, { "fn", true }, { "delete_or_backspace", true } })
+			~= "delete_or_backspace", "fn joins the Delete chord of a Mac keyboard without the key")
+		helpers.assert_eq(play({ { "5", true } }), "5", "the key ending the sequence still types")
+		helpers.assert_eq(play({ { RCMD, true }, { "5", true } }), "5", "the key ending the sequence still types")
+	end)
+
 	helpers.it("script-chord: a plan naming an unknown slot is refused", function()
 		local config, err = Generator.build_karabiner_json({
 			tap_hold_config = {}, mod_combos_config = {}, tap_hold_timeout_ms = 200,

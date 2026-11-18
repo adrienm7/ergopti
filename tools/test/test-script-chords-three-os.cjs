@@ -25,7 +25,8 @@
  * 4. The first-run wizard lists none of them: their preset is their default.
  * 5. A chord is a sequence on the three drivers (the maintainer, 2026-11-17):
  *    AltGr pressed, then the slot's key, with no other key between. Windows
- *    reads A_PriorKey, Linux the hook's prior_role.
+ *    reads A_PriorKey, Linux the hook's prior_role, macOS a Karabiner sequence
+ *    variable that any other key-down lowers.
  *
  * ROOT CAUSE ENCODED:
  * Each driver had its own chords: four AltGr slots on Windows, three
@@ -310,6 +311,17 @@ check(
 	/_prior_down_role, _last_down_role = _last_down_role, role or false/.test(linuxHook) &&
 		/prior_role = _prior_down_role,/.test(linuxHook),
 	'the Linux keyboard hook must record every key press, modifiers included, and offer the one before'
+);
+check(
+	/\{ type = "variable_if", name = sequence_var, value = 1 \}/.test(macRules) &&
+		/function M\.apply_sequence\(rules, holder_var\)/.test(macRules),
+	'the macOS running chords must require the sequence variable that any other key-down lowers'
+);
+check(
+	/ScriptChordRules\.apply_sequence\(all_rules, held_var_name\(SCRIPT_CONTROL_HOLDER_KEY\)\)/.test(
+		read('macos', 'platform', 'remap', 'generator.lua')
+	),
+	'the macOS generator must apply the chord sequence to the rules it deploys'
 );
 
 // ==================================================

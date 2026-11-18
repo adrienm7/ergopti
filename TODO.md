@@ -308,12 +308,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### All drivers
 
-- [ ] **Script shortcuts as a sequence on macOS and Linux (maintainer, 2026-11-17).** A script shortcut is the AltGr
-      key (right Option on a Mac) pressed, then Enter, Backspace, Delete or Escape, with no key between: typing AltGr
-      symbols then Enter before AltGr is up is text. Windows requires the key pressed just before to be AltGr
-      (`ScriptAltGrPressedJustBefore`, A_PriorKey); port the same rule to `linux/modules/shortcuts/script_chords.lua`
-      (`on_key` sees only the suffix: record the previous key down) and to the macOS Karabiner sentinel rules of
-      `script_chord_catalogue.lua`, with the three-OS contract test `test-script-chords-three-os.cjs`.
 - [ ] **Structure plan, phase 2** ([plan](docs/design/structure-plan.md), resume point
       [docs/plans/structure-migration-resume.md](docs/plans/structure-migration-resume.md)). Left: S26 (hotstrings) to
       S38, one step per commit with `tools/audit/structure/run-phase2.cjs`, two or three per push after a CI proof.
