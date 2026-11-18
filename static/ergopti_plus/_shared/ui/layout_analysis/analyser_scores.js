@@ -1291,11 +1291,14 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	}
 
 	/**
-	 * Oxeylyzer's token n-grams of a corpus, from the character tables: a
-	 * capital that follows an unshifted character is preceded by a Shift token,
-	 * which no layout of Oxeylyzer's types, so the n-grams across it score
-	 * nothing but still count; skip-2 and skip-3 grams are not in the tables
-	 * and are taken equal to skip-1.
+	 * Oxeylyzer's token n-grams of a corpus, from the character tables. Its
+	 * cleaner writes a Shift token before a capital unless the last character
+	 * it kept was shifted too (a dropped character between them does not
+	 * release Shift); a dropped character is a gap no n-gram spans. No layout
+	 * types the Shift token, so the n-grams through it score nothing but count
+	 * in the totals, and a skipgram can span it (x, Shift, y). The Shift state
+	 * is read two characters back at most; skip-2 and skip-3 grams are not in
+	 * the tables and are taken equal to skip-1.
 	 */
 	function oxeyTables(table) {
 		const model = entry('oxeylyzer').model;
@@ -1318,37 +1321,52 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			chars += n;
 			if (t.shift) shiftTokens += n;
 		}
-		// A shift token is written when a capital follows an unshifted character.
+		// Whether t writes a Shift token after the last kept token, prev.
 		const shiftAfter = (prev, t) => t.shift && !(prev && prev.shift);
+		// Bigrams starting with a capital, to split into run starts and the rest.
+		const shiftedFirst = new Map();
 		for (const [a, b, n] of table.bi) {
 			const x = of(a);
 			const y = of(b);
 			if (!x || !y) continue;
+			bigramTotal += n;
 			if (x.shift && y.shift) shiftTokens -= n;
-			if (shiftAfter(x, y)) bigramTotal += 2 * n;
-			else {
-				bigramTotal += n;
-				add(bigrams, x.token + y.token, n);
-			}
+			if (x.shift) add(shiftedFirst, a + b, n);
+			if (shiftAfter(x, y)) {
+				// x, Shift, y: a token trigram and a skipgram through the Shift token.
+				trigramTotal += n;
+				add(skip, x.token + y.token, n);
+			} else add(bigrams, x.token + y.token, n);
 		}
 		for (const [a, m, c, n] of table.tri) {
 			const x = of(a);
 			const y = of(m);
 			const z = of(c);
+			// Shift held across one dropped character: no new Shift token.
+			if (x && !y && z && x.shift && z.shift) shiftTokens -= n;
+			// Shift, y, z where y writes the Shift token.
+			if (y && z && y.shift) {
+				if (shiftAfter(x, y)) trigramTotal += n;
+				shiftedFirst.set(m + c, shiftedFirst.get(m + c) - n);
+			}
 			if (!x || !z) continue;
 			const breakAtM = y && shiftAfter(x, y);
 			const breakAtZ = shiftAfter(y || x, z);
 			if (!breakAtM && !breakAtZ) add(skip, x.token + z.token, n);
-			if (!y) continue;
+			if (!y || breakAtM) continue;
 			trigramTotal += n;
-			if (!breakAtM && !breakAtZ) add(trigrams, x.token + y.token + z.token, n);
+			if (!breakAtZ) add(trigrams, x.token + y.token + z.token, n);
 		}
+		// A capital starting a run writes its Shift token: Shift, y, z.
+		for (const n of shiftedFirst.values()) trigramTotal += Math.max(0, n);
+		shiftTokens = Math.max(0, shiftTokens);
 		return {
 			bigrams,
 			skip,
 			trigrams,
-			chars: chars + Math.max(0, shiftTokens),
-			bigramTotal,
+			chars: chars + shiftTokens,
+			// Every Shift token starts a bigram with its capital.
+			bigramTotal: bigramTotal + shiftTokens,
 			trigramTotal
 		};
 	}

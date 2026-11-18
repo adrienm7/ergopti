@@ -277,14 +277,31 @@ k3·p3)) + ks·(ph + 0.3·pr + 0.3·pf)` with base effort per position, penalty
 r·skip1 + r²·skip2 + r³·skip3)` (r = 1/7) times the distance and 5.5 / finger
   weight + stretches `−0.3·…` times the stretch distance + pinky-ring bigrams
   −0.2, with Oxeylyzer's integer truncations. Corpus: a-z and unshifted
-  punctuation kept, capitals and Shift forms preceded by a Shift token,
-  everything else (space, accents) dropped. Its 3 × 10 letter block,
+  punctuation kept; a capital or a Shift form writes a Shift token unless the
+  last kept character was shifted too (a dropped character does not release
+  Shift); everything else (space, accents, line breaks) is a gap no n-gram
+  spans, though a skipgram spans one character, and one spans the Shift
+  token (x, Shift, y). No layout types the Shift token: the n-grams through
+  it count in the totals and score nothing. Its 3 × 10 letter block,
   traditional fingering; on the row-staggered board, or its own ortho grid when
   the keyboard is `ortho` (its default layouts).
-- **Fidelity: close.** The tables hold no skip-2 or skip-3 grams; skip-1 stands
-  for them (+0.75 % on QWERTY with Oxeylyzer's default corpus, against −3.9 %
-  without them). Gate: hand-computed from the source (`the` 0.1333, `decided`
-  −6.3314 on the staggered board, −6.0214 on ortho).
+- **Fidelity: close.** Measured against the real REPL (built from 5a85ca0, its
+  default weights, `analyze` on its ortho layouts) on four of our texts
+  (_Alice_, _Sherlock Holmes_, English Wikipedia, Python code) and _Swann_
+  (French), 18 layouts whose letter block our library shares: Score within
+  0.0044 on average, 0.012 at most (72 points of the four English texts and
+  code; _Swann_ within 0.010). Two approximations remain, both measured by
+  feeding the scorer exact token tables built from the text: the tables hold
+  no skip-2 or skip-3 grams, so skip-1 stands for them (about 0.002), and
+  Oxeylyzer stores each count as a share of its table and reads it back
+  truncated, often one lower (about 0.001; reproduced exactly on short texts).
+  The Shift token after a dropped character (a capital starting a word) was
+  missing from the totals and the skipgrams through Shift were missing; with
+  them the gap went from 0.0057 on average (0.028 at most, Canary) to 0.0044.
+  Gate: hand-computed from the source (`the` 0.1333, `decided` −6.3314 on
+  the staggered board, −6.0214 on ortho) and the REPL's own output on short
+  texts with capitals (`dEd` −2.28, `A Dog ran` 0.174, `sat. A Dog` −0.2).
+  Our library's Halmak is not Oxeylyzer's (an ANSI board, 11 columns).
 
 ### Keyboard Layout Optimizer (dariogoetz)
 
