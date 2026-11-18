@@ -90,6 +90,15 @@ _HCPT_Source(Root) {
 			Added .= "#Include " . IncludeOwner . "`n"
 		}
 	}
+	; The collection poll reads its period from the private copy of the real
+	; shared timing registry that _HCPT_Assets stages under the child's root.
+	TimingsOwner := _DriverProductionFileForSymbol("TimingsLoadShared", _DriverDir)
+	AssertTrue(TimingsOwner != "", "The collection child needs the genuine timing registry owner.")
+	if !Owners.Has(TimingsOwner) {
+		Owners[TimingsOwner] := true
+		Added .= "#Include " . TimingsOwner . "`n"
+	}
+	Added .= "TimingsLoadShared()`n"
 	Added .= "#Include " . _HCPT_ClassOwner() . "`n"
 	Added .= "#Include " . _DriverDir . "\tests\fixtures\healthcheck_collection_publish_owner_body.ahk`n"
 	Old := "#Include " . _DriverDir . "\tests\fixtures\error_dialog_startup_owner_body.ahk`n"
@@ -102,8 +111,12 @@ _HCPT_Assets(Root) {
 	global _DriverDir, _SharedDir, _VendorDir
 	_EDOT_Assets(Root)
 	FSCreateDirectoryExclusiveStrict(Root . "\localappdata")
+	; The donor already created shared\core for its locale inputs.
+	for Folder in ["core\timing", "core\timing\data"]
+		FSCreateDirectoryExclusiveStrict(Root . "\shared\" . Folder)
 	for Pair in [
 		[_SharedDir . "\diagnostics\data\collection.json", Root . "\shared\diagnostics\data\collection.json"],
+		[_SharedDir . "\core\timing\data\constants.toml", Root . "\shared\core\timing\data\constants.toml"],
 		[_VendorDir . "\ergopti_diagnostics.ps1", Root . "\vendor\ergopti_diagnostics.ps1"]] {
 		FileCopy(Pair[1], Pair[2], false)
 		AssertEqual(CryptoSha256Bytes(FSReadBytesStrict(Pair[1])), CryptoSha256Bytes(FSReadBytesStrict(Pair[2])),

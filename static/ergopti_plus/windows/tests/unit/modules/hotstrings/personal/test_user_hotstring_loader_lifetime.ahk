@@ -49,7 +49,8 @@ _UHLT_Source(Root) {
 	for Symbol in ["JsonStringLiteral", "CryptoSha256Bytes", "FSReadStrict", "WallClockTimestamp", "ManifestBuildFeaturesMap",
 		"IsCategoryGated", "_CategoryEnabledKey", "ConfigMigrateBoot", "TOML_BatchWrite",
 		"ConfigTransitionInspect", "ConfigTransitionProductionPort", "LoggerInit", "Redact_Apply", "PLC_CreateProcessWithInheritedHandles", "ShellRunner_SpawnTreeOwned",
-		"_HSE_RunOwnedTerminalTransaction", "UserHotstringsReload", "PerfCount", "KS_ScancodeToVk"] {
+		"_HSE_RunOwnedTerminalTransaction", "UserHotstringsReload", "PerfCount", "KS_ScancodeToVk",
+		"ParseTomlFile", "IniCacheGet", "TimingsLoadShared"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "The child must load its genuine source owner: " . Symbol)
 		if !Owners.Has(Owner) {
@@ -62,6 +63,8 @@ _UHLT_Source(Root) {
 	Source .= "#Include " . KeyOwner . "`n"
 	for Symbol in ["AppDirsFolderName", "LoggerSubFilesData"]
 		Source .= "#Include " . _UHLT_Generated(Symbol) . "`n"
+	; The worker poll reads its period from the staged copy of the real registry.
+	Source .= "TimingsLoadShared()`n"
 	return Chr(0xFEFF) . Source . "#Include " . _DriverDir . "\tests\fixtures\user_hotstring_loader_lifetime_body.ahk`n"
 }
 
@@ -71,7 +74,8 @@ _UHLT_Assets(Root) {
 		FSCreateDirectoryExclusiveStrict(Root . "\" . Subdir)
 	; The shared inputs' folders come from their own paths, wherever the shared
 	; tree keeps them.
-	Shared := ["hotstrings\data\catalogue\user_code.ahk", "diagnostics\data\redaction.json"]
+	Shared := ["hotstrings\data\catalogue\user_code.ahk", "diagnostics\data\redaction.json",
+		"core\timing\data\constants.toml"]
 	_EDOT_CreateParents(Root . "\shared", Shared)
 	Pairs := [[_VendorDir . "\ergopti_user_hotstrings.ahk", Root . "\vendor\ergopti_user_hotstrings.ahk"]]
 	for Relative in Shared

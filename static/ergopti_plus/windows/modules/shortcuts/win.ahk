@@ -74,7 +74,7 @@ StartActivitySimulation(*) {
 				return false
 		}
 		; Start a fast timer to instantly detect if the user moves the mouse
-		SetTimer(AwakeCheckMouseMoved, 150)
+		SetTimer(AwakeCheckMouseMoved, TimingsGet("keep_awake", "mouse_check_poll_ms"))
 		; Use InputHook to detect any keypress -- does not conflict with other hotkeys
 		try {
 				AwakeInputHook := AwakeCreateCancellationHook()

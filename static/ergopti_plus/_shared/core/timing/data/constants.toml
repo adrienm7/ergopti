@@ -517,6 +517,10 @@ tick_max_ms = 5000
 # AHK: win.ahk AWAKE_RETURN_MS. HS: system.lua AWAKE_RETURN_DELAY_SEC.
 return_delay_ms = 200
 
+# Windows: how often keep-awake reads the cursor to stop when the user moves the
+# mouse. AHK: modules/shortcuts/win.ahk AwakeCheckMouseMoved.
+mouse_check_poll_ms = 150
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Keystats
@@ -807,6 +811,11 @@ complex_key_carry_ms = 300
 deferred_registration_slice_ms = 25
 deferred_registration_gap_ms = 15
 
+# Windows: how often the programmable (user code) hotstring loader polls its
+# worker processes until each one ends.
+# AHK: modules/dynamic_hotstrings/user_code.ahk UserHotstringWorker.
+user_code_worker_poll_ms = 25
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Ergonomics warnings
@@ -842,6 +851,19 @@ hesitation_cooldown_ms = 10000
 [ui]
 # Windows: the poll that awaits a pending suspend. AHK: core/lifecycle/engine/lifecycle.ahk.
 suspend_pending_poll_ms = 25
+
+# Windows: how often a diagnostics collection polls its worker process until it ends.
+# AHK: diagnostics/ui/healthcheck/collection.ahk.
+diagnostic_collection_poll_ms = 100
+
+# Windows: a one-shot scheduled timer that comes due while the driver is
+# suspended waits this long, then checks again, instead of running paused.
+# AHK: core/events/timer_scheduler.ahk _TimerAdapterMakeOneShot.
+suspended_timer_requeue_ms = 500
+
+# Windows: how often the mouse spotlight checks for a pointer move or its timeout.
+# AHK: core/ui/ui/spotlight/ownership.ahk _SpotlightSessionTimerNative.
+spotlight_poll_ms = 100
 
 # Windows: how long TakeNote waits on a Notepad tab it has not bound before it
 # accepts it as the note it launched (Windows 11 tabbed Notepad, where a file

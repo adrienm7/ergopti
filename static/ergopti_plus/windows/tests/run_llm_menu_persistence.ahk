@@ -31,6 +31,8 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../platform/input/hotkey_registrar.ahk
 #Include ../infra/hotpath_profiler.ahk
 #Include ../core/text/engine/toml/helpers.ahk
+; The scheduler's suspended re-queue reads the shared timing registry.
+#Include ../core/timing/engine/config.ahk
 #Include ../core/text/engine/toml/loader.ahk
 #Include ../core/text/engine/toml/config_loader.ahk
 #Include ../menu/engine/manifest_reader.ahk
@@ -84,6 +86,7 @@ _LlmPersistWatchdog(*) {
 }
 SetTimer(_LlmPersistWatchdog, -LLM_PERSISTENCE_RUNNER_TIMEOUT_MS)
 
+TimingsLoadShared(_SharedDir)
 LLM_Defaults_Load()
 
 RunTests()

@@ -488,7 +488,7 @@ class UserHotstringWorker {
 	start() {
 		global _UserHotstringsJobs
 		_UserHotstringsJobs[this] := this
-		SetTimer(_UserHotstringsPoll, 25)
+		SetTimer(_UserHotstringsPoll, TimingsGet("hotstrings", "user_code_worker_poll_ms"))
 		SetTimer(this.timer, -1)
 		return true
 	}

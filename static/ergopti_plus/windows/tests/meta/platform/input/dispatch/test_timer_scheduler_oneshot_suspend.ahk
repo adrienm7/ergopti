@@ -40,7 +40,7 @@ _TSO_SuspendedRequeueOwnershipIsAtomic() {
 	Assert(Body != "", "_TimerAdapterMakeOneShot must exist for the atomic suspended-requeue guard")
 	CriticalPos := InStr(Body, 'PreviousCritical := Critical("On")')
 	FiredPos := InStr(Body, 'BoundHandle["Fired"]')
-	RequeuePos := InStr(Body, "SetTimer(requeued, -500)")
+	RequeuePos := InStr(Body, 'SetTimer(requeued, -TimingsGet("ui", "suspended_timer_requeue_ms"))')
 	RestorePos := InStr(Body, "Critical(PreviousCritical)", false, RequeuePos)
 	Assert(CriticalPos > 0 && FiredPos > CriticalPos && RequeuePos > CriticalPos,
 		"the one-shot must enter Critical before any handle state can race a suspended re-queue (AHK-160)")

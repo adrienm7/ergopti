@@ -425,7 +425,7 @@ _TimerAdapterMakeOneShot(Handle, Fn, ChildSerial := 0) {
 				Serial := ++BoundHandle["RequeueSerial"]
 				requeued := _TimerAdapterMakeOneShot(BoundHandle, UserCallback, Serial)
 				BoundHandle["RequeuedFn"] := requeued
-				try SetTimer(requeued, -500)
+				try SetTimer(requeued, -TimingsGet("ui", "suspended_timer_requeue_ms"))
 				catch as Err {
 					Failure := Err
 					try _TimerAdapterCancelNative(requeued)

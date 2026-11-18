@@ -102,7 +102,7 @@ class DiagnosticCollectionWindows {
 			PreviousCritical := Critical("On")
 			try {
 				if !this.Terminal
-					SetTimer(this.CollectionTimer, 100)
+					SetTimer(this.CollectionTimer, TimingsGet("ui", "diagnostic_collection_poll_ms"))
 			} finally Critical(PreviousCritical)
 			this.Publish()
 			return true
@@ -114,7 +114,7 @@ class DiagnosticCollectionWindows {
 				PreviousCritical := Critical("On")
 				try {
 					if !this.Terminal
-						SetTimer(this.CollectionTimer, 100)
+						SetTimer(this.CollectionTimer, TimingsGet("ui", "diagnostic_collection_poll_ms"))
 				} finally Critical(PreviousCritical)
 			} else if !this.Terminal {
 				this.Terminal := true

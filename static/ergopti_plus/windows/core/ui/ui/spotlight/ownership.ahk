@@ -42,7 +42,7 @@ class _SpotlightSessionNative {
 
 class _SpotlightSessionTimerNative {
 	static Arm() {
-		SetTimer(_SpotlightTick, 100)
+		SetTimer(_SpotlightTick, TimingsGet("ui", "spotlight_poll_ms"))
 	}
 
 	static Stop() {

@@ -57,7 +57,7 @@ _KATO_Bind(&Source, Name, Needle, Replacement, Expected) {
 }
 
 _KATO_Source(Receipt) {
-	global _DriverDir
+	global _DriverDir, _SharedDir
 	Owner := _KATO_Owner(), Original := FSReadStrict(Owner)
 	for Name in ["StartActivitySimulation", "StopActivitySimulation", "AwakeStopCancellationHook",
 		"AwakeCreateCancellationHook", "AwakeCheckMouseMoved", "SimulateActivity"]
@@ -112,7 +112,7 @@ _KATO_Source(Receipt) {
 		Source .= 'Features["shortcuts"]["' . Nested . '"] := Map("enabled", false)' . "`n"
 	Seen := Map()
 	for Symbol in ["LoggerInfo", "WallClockTimestamp", "TickElapsed", "KS_AltGrKeyName", "CryptoSha256Bytes",
-		"KL_JsonEncode", "JsonStringLiteral", "t", "NotifierSend"] {
+		"KL_JsonEncode", "JsonStringLiteral", "t", "NotifierSend", "ParseTomlFile", "IniCacheGet", "TimingsLoadShared"] {
 		Path := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Path != "" && _DriverFuncBody(Symbol) != "", "the real child dependency must resolve: " . Symbol)
 		if !Seen.Has(Path) {
@@ -123,6 +123,8 @@ _KATO_Source(Receipt) {
 	; After the notifier's include, whose top level resets the seam: the
 	; keep-awake notices reach a recorder, never the desktop.
 	Source .= "NotifierSetDisplaySink((*) => 1)`n"
+	; The movement poll reads its period from the real shared timing registry.
+	Source .= "TimingsLoadShared(" . _KATO_Quote(_SharedDir) . ")`n"
 	BodyPath := _DriverDir . "\tests\fixtures\keepawake_timer_owner_body.ahk"
 	Body := FSReadStrict(BodyPath)
 	AssertTrue(Body != "")

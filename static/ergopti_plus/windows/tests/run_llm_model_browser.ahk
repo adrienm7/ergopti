@@ -112,6 +112,12 @@ _LlmMbWatchdog(*) {
 }
 SetTimer(_LlmMbWatchdog, -60000)
 
+; The scheduler's suspended re-queue and the browser's own delays read the real
+; shared timing registry; _SharedDir above is a stub folder for the catalogue.
+#Include ../core/text/engine/toml/helpers.ahk
+#Include ../core/timing/engine/config.ahk
+TimingsLoadShared(A_ScriptDir . "\..\..\_shared")
+
 
 
 
