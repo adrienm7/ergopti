@@ -840,12 +840,33 @@ _GSWO_AllEntryPointsShareOwnership() {
 	Assert(InStr(ShortcutSource, 'SC029:: TapKeyFire("number_row_left")') > 0
 		&& InStr(TapFireBody, "GestureInvokeAction(") > 0
 		&& InStr(ShortcutSource, "GestureCaptureRegion(") = 0
-		&& InStr(ShortcutSource, "ShellRun") = 0,
+		&& !_GSWO_SpawnsShellWorker(ShortcutSource),
 		"the physical SC029 entry point must delegate instead of spawning a sibling worker")
 }
 
 Test("screenshot-worker-ownership: every entry point and lifecycle boundary shares one owner",
 	_GSWO_AllEntryPointsShareOwnership)
+
+; Only the ShellRunner calls that start a process can spawn a worker. The path
+; and command builders (ShellRunner_SystemProgramCommand) start nothing, and
+; the shortcuts use them to name Windows programs by absolute path.
+; @param {String} Source Driver source with full-line comments stripped.
+; @returns {Boolean} Whether Source calls a process-starting ShellRunner entry.
+_GSWO_SpawnsShellWorker(Source) {
+	return RegExMatch(Source, "\bShellRunner_(?:Exec|Spawn\w*)\s*\(") > 0
+}
+
+_GSWO_SpawnPredicateNamesOnlyLaunchers() {
+	for Launcher in ['ShellRunner_Exec("cmd")', "ShellRunner_Spawn(Exe, Args)",
+			"ShellRunner_SpawnTreeOwned(Exe, Args)", "ShellRunner_SpawnTreeOwnedCommand(App, Line, Env)"]
+		AssertTrue(_GSWO_SpawnsShellWorker("x := " . Launcher), "a process launcher must count as a spawn: " . Launcher)
+	for Builder in ['RunFn.Call(ShellRunner_SystemProgramCommand("regedit.exe"))',
+			'ShellRunner_SystemProgramPath("explorer.exe")', "ShellRunner_FindOnPath(Name)"]
+		AssertFalse(_GSWO_SpawnsShellWorker("x := " . Builder), "a command builder starts no worker: " . Builder)
+}
+
+Test("screenshot-worker-ownership: a system program command builder is not a spawned worker (screenshot-spawn-predicate)",
+	_GSWO_SpawnPredicateNamesOnlyLaunchers)
 
 #Include test_screenshot_region_startup.ahk
 
