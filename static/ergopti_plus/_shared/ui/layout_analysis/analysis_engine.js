@@ -635,11 +635,18 @@ var LAYOUT_ANALYSIS = (function () {
 		return true;
 	}
 
+	/** Array a then array b, in a new array: Array#concat without its generic, slower path. */
+	function joined(a, b) {
+		const out = a.slice();
+		for (let i = 0; i < b.length; i++) out.push(b[i]);
+		return out;
+	}
+
 	/** Way a then way b; state: the dead state a enters, or null for two characters in a row. */
 	function joinWays(a, b, state) {
 		return {
-			keys: a.keys.concat(b.keys),
-			layers: a.layers.concat(b.layers),
+			keys: joined(a.keys, b.keys),
+			layers: joined(a.layers, b.layers),
 			shift: a.shift + b.shift,
 			altgr: a.altgr + b.altgr,
 			dead: state !== null || a.dead || b.dead,
@@ -773,7 +780,7 @@ var LAYOUT_ANALYSIS = (function () {
 	 */
 	function completeJoin(way, time, board) {
 		if (way.layers !== null) return;
-		way.layers = time.p.layers.concat(time.t.layers);
+		way.layers = joined(time.p.layers, time.t.layers);
 		way.level = `${way.state}/${time.t.level}`;
 		const closing = board.finger[way.keys[way.keys.length - 1]];
 		if (closing === LEFT_THUMB || closing === RIGHT_THUMB) way.terminated = true;
@@ -813,8 +820,9 @@ var LAYOUT_ANALYSIS = (function () {
 		// fraction of the joins).
 		const versions = new WeakMap();
 		const version = (list) => versions.get(list) || 0;
-		const lastPass = new Array(rules.length);
 		const count = order === null ? rules.length : order.length;
+		// By position in the order: each rule is in it once.
+		const lastPass = new Array(count);
 		const passes = partial ? PARTIAL_PASS_LIMIT : MAX_DEAD_DEPTH;
 		for (let depth = 0; depth < passes; depth++) {
 			let changed = false;
@@ -826,7 +834,7 @@ var LAYOUT_ANALYSIS = (function () {
 				const tails =
 					rule.typedDead !== null ? deadWays.get(rule.typedDead) : ways.get(rule.typedChar);
 				if (!tails) continue;
-				const seen = lastPass[r];
+				const seen = lastPass[i];
 				if (
 					seen &&
 					seen[0] === prefixes &&
@@ -835,7 +843,7 @@ var LAYOUT_ANALYSIS = (function () {
 					seen[3] === version(tails)
 				)
 					continue;
-				lastPass[r] = [prefixes, version(prefixes), tails, version(tails)];
+				lastPass[i] = [prefixes, version(prefixes), tails, version(tails)];
 				let map = ways;
 				let target = rule.outChar;
 				if (rule.outDead !== null) [map, target] = [deadWays, rule.outDead];
@@ -848,7 +856,7 @@ var LAYOUT_ANALYSIS = (function () {
 							if (d >= MAX_DEAD_DEPTH) continue;
 							// Built in full only when offerTimed keeps it or compares labels.
 							const candidate = {
-								keys: prefix.keys.concat(tail.keys),
+								keys: joined(prefix.keys, tail.keys),
 								layers: null,
 								shift: prefix.shift + tail.shift,
 								altgr: prefix.altgr + tail.altgr,
@@ -873,7 +881,7 @@ var LAYOUT_ANALYSIS = (function () {
 						// join(prefix, tail, rule.state), with only what offer compares
 						// until it keeps the candidate: most chains are refused.
 						const candidate = {
-							keys: prefix.keys.concat(tail.keys),
+							keys: joined(prefix.keys, tail.keys),
 							layers: null,
 							shift: prefix.shift + tail.shift,
 							altgr: prefix.altgr + tail.altgr,
@@ -887,7 +895,7 @@ var LAYOUT_ANALYSIS = (function () {
 						const list = map.get(target);
 						versions.set(list, version(list) + 1);
 						if (record) wayTimes.set(candidate, { d: depth, r, p: prefix, t: tail });
-						candidate.layers = prefix.layers.concat(tail.layers);
+						candidate.layers = joined(prefix.layers, tail.layers);
 						candidate.level = `${rule.state}/${tail.level}`;
 						// A dead key closed by a thumb key (the space bar, on any level)
 						// types its own sign: the fallback, never an alternative to
@@ -1048,20 +1056,29 @@ var LAYOUT_ANALYSIS = (function () {
 	 * The dead-key rules as a graph of symbols (« c » a character, « d » a dead
 	 * state, « t » a text): what each rule gives, and the rules that read each.
 	 * @param {Array<object>} rules - From deadRules().
-	 * @returns {{outputs: string[], users: Map<string, number[]>}} Rule index →
-	 *   its output's symbol; symbol → the indexes of the rules it is an input of.
+	 * @returns {{outputs: string[], users: Map<string, number[]>, producers:
+	 *   Map<string, number[]>}} Rule index → its output's symbol; symbol → the
+	 *   indexes of the rules it is an input of, and of the rules that give it
+	 *   (ascending).
 	 */
 	function ruleGraph(rules) {
 		if (ruleGraphCache.has(rules)) return ruleGraphCache.get(rules);
 		const users = new Map();
-		const use = (symbol, r) => (users.get(symbol) || users.set(symbol, []).get(symbol)).push(r);
+		const producers = new Map();
+		const add = (map, symbol, r) => (map.get(symbol) || map.set(symbol, []).get(symbol)).push(r);
 		const outputs = rules.map((rule, r) => {
-			use(`d${rule.state}`, r);
-			use(rule.typedDead !== null ? `d${rule.typedDead}` : `c${rule.typedChar}`, r);
-			if (rule.outDead !== null) return `d${rule.outDead}`;
-			return rule.outText !== null ? `t${rule.outText}` : `c${rule.outChar}`;
+			add(users, `d${rule.state}`, r);
+			add(users, rule.typedDead !== null ? `d${rule.typedDead}` : `c${rule.typedChar}`, r);
+			const out =
+				rule.outDead !== null
+					? `d${rule.outDead}`
+					: rule.outText !== null
+						? `t${rule.outText}`
+						: `c${rule.outChar}`;
+			add(producers, out, r);
+			return out;
 		});
-		const graph = { outputs, users };
+		const graph = { outputs, users, producers };
 		ruleGraphCache.set(rules, graph);
 		return graph;
 	}
@@ -1183,7 +1200,7 @@ var LAYOUT_ANALYSIS = (function () {
 			if (board.index.has(code) && !(code in layout.rows))
 				compareRows(before.rows[code], undefined);
 		const rules = deadRules(layout.dead);
-		const { outputs, users } = ruleGraph(rules);
+		const { outputs, users, producers } = ruleGraph(rules);
 		if (before.dead !== layout.dead) {
 			const changedStates = new Set();
 			const compareStates = (ra, rb, state) => {
@@ -1244,8 +1261,13 @@ var LAYOUT_ANALYSIS = (function () {
 			texts: without(previous.texts, only.texts, spares && spares.texts)
 		};
 		offerCells(core, layout, board, null, only);
+		// The rules that give a touched symbol, ascending: those a whole compile follows first.
 		const order = [];
-		for (let r = 0; r < rules.length; r++) if (touched.has(outputs[r])) order.push(r);
+		for (const symbol of touched) {
+			const given = producers.get(symbol);
+			if (given) for (const r of given) order.push(r);
+		}
+		order.sort((x, y) => x - y);
 		if (!followRules(core, rules, order, board, 'partial'))
 			return Object.assign(compileCore(layout, board, null, 'record'), { whole: true });
 		return core;
