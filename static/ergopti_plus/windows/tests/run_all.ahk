@@ -1118,6 +1118,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/core/text/toml/test_array_element_types.ahk
 #Include unit/core/text/toml/test_inline_tables.ahk
 #Include unit/core/text/toml/test_document_quoted_runs.ahk
+#Include unit/core/text/toml/test_document_simple_members.ahk
 #Include unit/core/text/toml/test_section_filter.ahk
 #Include unit/core/text/toml/test_nested_arrays.ahk
 #Include unit/core/text/toml/test_float_roundtrip.ahk

@@ -206,9 +206,46 @@ _TOML_DocumentMultilineBody(Raw) {
 	return TOML_UnescapeBasicStringContents(Result)
 }
 
+/**
+ * The patterns of a member list the lexer copies verbatim: bare keys, each
+ * holding a one-line basic string or a token free of every character the lexer
+ * classifies (quotes, comments, containers, separators), with blanks and tabs
+ * between them. Built once.
+ * @returns {Object} List (the whole body) and Member (one member) patterns.
+ */
+_TOML_DocumentSimpleMemberPatterns() {
+	; Possessive throughout: each class is disjoint from what follows it, so
+	; nothing ever needs to be given back.
+	Value := '(?:"(?:[^"\\\r\n]++|\\[^\r\n])*+"|[A-Za-z0-9_.+-]++)'
+	Member := "[A-Za-z0-9_-]++[ \t]*+=[ \t]*+" . Value
+	return { List: "^[ \t]*+" . Member . "(?:[ \t]*+,[ \t]*+" . Member . ")*+[ \t]*+\z", Member: Member }
+}
+
 ; Only the semantic inline-table reader uses this canonical strict delegation.
 ; Keep the generic inline-table splitter unchanged for all existing callers.
 _TOML_DocumentSplit(Body, Separator := ",", Strict := true) {
+	; A member list made only of bare keys holding a one-line basic string or a
+	; bare token, the shape of every hotstring entry, is split by native matches
+	; instead of the lexer: in it the lexer copies each member verbatim between
+	; two commas, so the parts are the same. Anything else, an empty or trailing
+	; member included, is left to the lexer and its errors.
+	if Separator == "," {
+		static Patterns := _TOML_DocumentSimpleMemberPatterns()
+		try {
+			Simple := RegExMatch(Body, Patterns.List)
+		} catch {
+			; The engine's match limit on a very long member: the lexer decides.
+			Simple := 0
+		}
+		if Simple {
+			Parts := [], Position := 1
+			while RegExMatch(Body, Patterns.Member, &Member, Position) {
+				Parts.Push(Member[0])
+				Position := Member.Pos + Member.Len
+			}
+			return Parts
+		}
+	}
 	Parts := [], Position := 1
 	while Position <= StrLen(Body) {
 		Token := _TOML_DocumentToken(Body, &Position, Separator, &Separated)
@@ -250,6 +287,13 @@ _TOML_DocumentValue(Raw) {
 		}
 		return Result
 	}
+	; A one-line basic string and a lowercase Boolean, nearly every member of a
+	; hotstring entry, decode here as TOML_CoerceValue decodes them, without the
+	; integer spellings and the scalar checks neither can match.
+	if StrLen(Raw) >= 2 && SubStr(Raw, 1, 1) == Chr(34) && SubStr(Raw, -1) == Chr(34)
+		return TOML_UnescapeBasicStringContents(SubStr(Raw, 2, StrLen(Raw) - 2))
+	if Raw == "true" || Raw == "false"
+		return TOML_Bool(Raw == "true")
 	Spelled := _TOML_DocumentSpelledInteger(Raw)
 	return Spelled != "" ? Spelled : TOML_CoerceValue(Raw, true)
 }
