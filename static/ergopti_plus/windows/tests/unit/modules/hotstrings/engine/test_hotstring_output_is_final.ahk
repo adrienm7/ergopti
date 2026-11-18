@@ -45,7 +45,7 @@ global _HOF_Sends := []
 ; Stands in for the OS keyboard: records what was sent and at which level.
 _HOF_SendInput(Keys) {
 	global _HOF_Sends
-	_HOF_Sends.Push({ Keys: Keys, Level: A_SendLevel })
+	_HOF_Sends.Push({ Keys: Keys, Level: A_SendLevel, KeyDelay: A_KeyDelay, KeyDuration: A_KeyDuration })
 	return 1
 }
 
@@ -257,6 +257,34 @@ _HOF_RawCallbacksAreAtomicAtLevelZero() {
 
 Test("hotstring output: the burst goes out at level 0 from a level-2 hotkey thread (hotstring-output-is-final)",
 	_HOF_DispatchPinsSendLevel)
+
+; Beside another AutoHotkey hook SendInput falls back to SendEvent, which keeps
+; a press duration of 0 unless the key delay is -1: under the driver's global
+; SetKeyDelay(0) each key yielded, the burst took 80 to 90 ms, and the next
+; word's letters landed inside it (« AaSAASA » for « ASA ASA », 2026-11-18).
+_HOF_BurstUnpacedImpl() {
+	global _HOF_Sends
+	_HOF_RegisterChain()
+	PreviousDelay := A_KeyDelay
+	PreviousDuration := A_KeyDuration
+	SetKeyDelay(0, -1)
+	try {
+		AssertTrue(_HOF_TypeAndFire("qzx"), "the first link must dispatch")
+		AssertEqual(1, _HOF_Sends.Length, "one trigger must produce exactly one injected burst")
+		AssertEqual(-1, _HOF_Sends[1].KeyDelay, "the burst must be sent with no key delay")
+		AssertEqual(-1, _HOF_Sends[1].KeyDuration,
+			"the burst must be sent with no press duration, so a SendEvent fallback never yields inside it")
+		AssertEqual(0, A_KeyDelay, "the dispatch must give the caller its key delay back")
+		AssertEqual(-1, A_KeyDuration, "the dispatch must give the caller its press duration back")
+	} finally SetKeyDelay(PreviousDelay, PreviousDuration)
+}
+
+_HOF_BurstIsUnpaced() {
+	_HOF_Run(_HOF_BurstUnpacedImpl)
+}
+
+Test("hotstring output: the burst is sent unpaced, so a SendEvent fallback stays short (asa-space-burst-unpaced)",
+	_HOF_BurstIsUnpaced)
 Test("hotstring output: text ending with another trigger is not fed back (hotstring-output-is-final)",
 	_HOF_OutputIsFinal)
 Test("hotstring output: text ending mid-trigger is completed by the typed character (hotstring-output-is-final)",

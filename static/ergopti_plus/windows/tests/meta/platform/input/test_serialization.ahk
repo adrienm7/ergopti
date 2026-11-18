@@ -109,7 +109,7 @@ _MetaCheckInputSerialization() {
 	AtomicBlock := SubStr(DispatchBody, AtomicStart)
 	AtomicCritical := InStr(AtomicBlock, 'Critical("On")')
 	HookSend := InStr(AtomicBlock, 'Hook("SendFinalResult", Burst, false)')
-	DirectSend := InStr(AtomicBlock, "_AHK_SendInput.Bind(Burst)")
+	DirectSend := InStr(AtomicBlock, "_HSE_SendBurstUnpaced(Burst)")
 	Assert(AtomicCritical > 0 and HookSend > AtomicCritical
 		and DirectSend > AtomicCritical,
 		"both atomic sender implementations must run after their branch enters Critical")

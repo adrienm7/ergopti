@@ -682,12 +682,24 @@ three arrows the engine resolves a chain before sending, and the interactive
 session's `foo bar final` (2026-11-17) was that cascade, not a level-0 burst
 reaching the I1 watcher.
 
-The Space tap's output is not atomic under the SendEvent fallback either: a
-key struck while it is typed reached the application between the burst's
-Backspaces (`asa`, Space, `a` gave `aASA` with no space). The roll block
-(`TapHoldRollUndecided`) therefore stays eligible while a tap is typed, and
-the tap's thread sends such keys again after its output
-(`asa-space-tap-interleave`).
+The SendEvent fallback is not atomic, and the driver made it slow: AutoHotkey
+reverts with a key delay of -1 but a press duration of 0 whenever the script's
+key delay is not -1 (keyboard_mouse.cpp SendKeys), and the global
+`SetKeyDelay(0)` is not. Each key then yielded between its press and its
+release, an eight-character burst took 80 to 90 ms beside a second hook
+(measured 2026-11-18), and the next word's letters landed inside it (`asa`,
+Space, `a` typed `AaSAASA`). `_HSE_SendBurstUnpaced` sends every expansion
+burst under `SetKeyDelay(-1, -1)`: 10 to 15 ms. A key struck in those
+milliseconds still lands inside the burst. Two rejected ways to hold such keys:
+the roll block can capture them, but a `-1` timer that ends the hold runs
+before their hotkey threads, and a capture whose thread finds the same hotkey
+still running is discarded by `#MaxThreadsPerHotkey` (application.cpp
+`PerformIsAllowed`), so a key was lost. AutoHotkey does not re-check a
+`#HotIf` the hook already evaluated: it passes the variant in the message.
+The roll block also stays eligible while a roll tap is typed, and that tap's
+thread sends the keys struck meanwhile again after its output
+(`asa-space-tap-interleave`). By default Space is not a tap-hold:
+`asa-space-fast` completes through the prefix watcher.
 
 ### project-ahk-hotif-variant-precedence
 

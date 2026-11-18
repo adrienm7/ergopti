@@ -102,6 +102,27 @@ _HSE_SendWithAltGrUp(SendFn) {
 		return TapHoldSendWithKeyUp(KS_AltGrKeyName(), SendFn)
 }
 
+; Sends one expansion burst at TEXT_SENDER_SEND_LEVEL with no key delay and no
+; press duration. SendInput is atomic only while no other AutoHotkey keyboard
+; hook runs; beside one it falls back to SendEvent, which keeps no delay between
+; keys but a press duration of 0 whenever the script's key delay is not -1
+; (keyboard_mouse.cpp SendKeys), and the driver's global SetKeyDelay(0) is not.
+; Each key then yielded between its press and its release: an eight-character
+; burst took 80 to 90 ms on the PC, and the next word's letters landed between
+; its keys (« asa », Space, « a » typed « AaSAASA », 2026-11-18). Unpaced, it
+; took 10 to 15 ms (asa-space-burst-unpaced).
+; @param Burst {String} The Send string of the whole edit.
+_HSE_SendBurstUnpaced(Burst) {
+		global _AHK_SendInput
+		PreviousKeyDelay := A_KeyDelay
+		PreviousKeyDuration := A_KeyDuration
+		SetKeyDelay(-1, -1)
+		try
+				return _TextSenderAtSendLevel(_AHK_SendInput.Bind(Burst))
+		finally
+				SetKeyDelay(PreviousKeyDelay, PreviousKeyDuration)
+}
+
 ; One SendEvent call retains real SetKeyDelay pacing inside the terminal. The
 ; native keyboard arbiter owns physical edges for the whole call; BlockInput's
 ; Send mode is deliberately absent because it discards rather than buffers them.
@@ -1627,7 +1648,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 										; AutoHotkey keyboard hook runs, so a burst typed at level 2 came
 										; back through the prefix watcher as typed input and cascaded
 										; (hotstring-output-is-final).
-										_TextSenderAtSendLevel(_AHK_SendInput.Bind(Burst))
+										_HSE_SendBurstUnpaced(Burst)
 										return true
 								}
 								Fired := _HSE_SendWithAltGrUp(SendAtomicBurst)
@@ -1838,7 +1859,7 @@ HSE_UndoExpansion(Undo, FocusToken := unset, NativeSendFn := unset, SchedulerFn 
 								Hook := _SendHook
 								Sent := _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))
 						} else {
-								_TextSenderAtSendLevel(_AHK_SendInput.Bind(Burst))
+								_HSE_SendBurstUnpaced(Burst)
 								Sent := true
 						}
 				} finally Critical(AtCritical)

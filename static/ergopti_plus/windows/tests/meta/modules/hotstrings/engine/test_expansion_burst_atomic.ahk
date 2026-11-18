@@ -62,11 +62,12 @@ _EBA_AssertBurstIsAssembledWhole() {
 	; the dispatch body pins atomicity and the AHK-04 failure boundary together.
 	Dispatch := _StripFullLineComments(_DriverFuncBody("HSE_DispatchMatch"))
 	Assert(Dispatch != "", "HSE_DispatchMatch must exist in the driver source")
-	SendPos := InStr(Dispatch, "_AHK_SendInput.Bind(Burst)")
-	Assert(SendPos > 0 and InStr(Dispatch, "_AHK_SendInput.Bind(Burst)", , SendPos + 1) = 0,
+	SendPos := InStr(Dispatch, "_HSE_SendBurstUnpaced(Burst)")
+	Assert(SendPos > 0 and InStr(Dispatch, "_HSE_SendBurstUnpaced(Burst)", , SendPos + 1) = 0,
 		"the assembled burst must reach exactly one SendInput — splitting the erase, replacement "
 		. "and terminator is what lets a physical key splice into an expansion")
-	Assert(InStr(Dispatch, "_TextSenderAtSendLevel(_AHK_SendInput.Bind(Burst))") > 0,
+	Sender := _StripFullLineComments(_DriverFuncBody("_HSE_SendBurstUnpaced"))
+	Assert(InStr(Sender, "_TextSenderAtSendLevel(_AHK_SendInput.Bind(Burst))") > 0,
 		"the burst must go out at TEXT_SENDER_SEND_LEVEL, never the caller's level: a level-2 burst "
 		. "re-enters the prefix watcher whenever SendInput falls back to SendEvent (hotstring-output-is-final)")
 	Assert(InStr(Dispatch,

@@ -245,14 +245,12 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       is not executed while another Notepad runs. Still to qualify on the PC with every Notepad window closed: both
       modes green, and no « ambiguous » or `last_observe_error` in the CLEANUP line; if Notepad keeps the hidden tabs'
       controls visible, read the selected document through UI Automation instead.
-- [ ] **`asa` then a rolled Space beside another AutoHotkey hook.** The live check `asa-space-fast` (Space down
-      before the last `a` is up, 15 ms apart) types 20 `ASA` when no other AutoHotkey script runs, but typed `aASAASA`
-      instead of `ASA ASA` 2 times in 20, then 5 times in 14, on the PC on 2026-11-17 while other scripts held
-      keyboard hooks (AutoHotkey's SendInput then falls back to SendEvent): an expansion completed by the tap-hold
-      Space loses its Space and leaves an `a`. The string is what the next word's `a` gives when it lands between
-      the Backspaces of the SendEvent burst; the roll block now holds a key struck while a tap is typed and sends
-      it again after the output (`asa-space-tap-interleave`). Run `asa-space-fast` again beside another
-      AutoHotkey hook to confirm.
+- [ ] **An expansion burst beside another AutoHotkey hook is not atomic.** SendInput then falls back to
+      SendEvent. Since 2026-11-18 the burst goes out unpaced (`asa-space-burst-unpaced`): 10 to 15 ms instead of
+      80 to 90, and `asa-space-fast` passes 20/20 beside a second hook. A key struck within those milliseconds
+      still lands inside the burst. Holding such keys through the roll block was tried and lost a key
+      (`#MaxThreadsPerHotkey`; see `project-hotstring-output-is-final` in `docs/memory/windows-ahk.md`); a fix
+      needs an owner that buffers physical keys without one hotkey thread per key, such as the native capture.
 - **Parity literals.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`,
   `request_plan_*`, the keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left; the rest of the menu
   files need `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers
