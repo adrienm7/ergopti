@@ -53,6 +53,22 @@ the TAP file lands under the prefix's `drive_c/users/<user>/Temp`. Loading all
 only: hooks, SendInput, WebView2, PowerShell workers and real desktop timing
 still need a Windows runner or the maintainer's PC.
 
+### project-ahk-session-tests-need-no-resident-driver
+
+The session-exclusive phase of `ahk-parallel.cjs` shares the desktop with any
+resident `ErgoptiPlus.ahk`. On 2026-11-18 the maintainer's driver turned six of
+those tests red, at today's head and at the previous evening's commit alike.
+Its keystats `OnClipboardChange` observer opens the clipboard right after each
+write, and `_CB_PlainAuthenticate` refuses a lease another window holds, so
+the SendInstant clipboard fixtures (`sendinstant-clipboard-owner`,
+`-post-receipt-owner`, `-native-snapshot-copy`) refuse the paste. Which modes
+fail varies from run to run. Its hook also takes an injected `vkDF`, the Kana
+AltGr (`SC138`) on his layout, so the `tap-keys-kana-native` held modes never
+see OEM8 down. The `current` post-receipt mode also once sent its Ctrl+V and
+its Edit stayed empty. Action: before calling such a red a regression, look for
+`ErgoptiPlus.ahk` in `Get-CimInstance Win32_Process`. A probe that records
+`GetOpenClipboardWindow`'s PID at the refusal names the culprit.
+
 ### project-ahk-listview-modify-suppresses-selection-events
 
 On AutoHotkey v2.0.26, `Gui.ListView.Modify` deliberately suppresses the
