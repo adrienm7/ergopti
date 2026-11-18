@@ -420,8 +420,9 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 ### All drivers
 
 - [ ] **Structure plan, phase 2** ([plan](docs/design/structure-plan.md), resume point
-      [docs/plans/structure-migration-resume.md](docs/plans/structure-migration-resume.md)). Left: S26 (hotstrings) to
-      S38, one step per commit with `tools/audit/structure/run-phase2.cjs`, two or three per push after a CI proof.
+      [docs/plans/structure-migration-resume.md](docs/plans/structure-migration-resume.md)). S26 (hotstrings) is
+      built on `fix/windows-pc-2026-11-17` and waits for its CI proof. Left: S27 (install) to S38, one step per commit
+      with `tools/audit/structure/run-phase2.cjs`, two or three per push after a CI proof.
       Paths that describe a published artifact (a prior release's payload, a historical pin) keep their old spelling.
 - **Provider flags inferred, not read.** Only provable with a live key: SambaNova's `enable_thinking: false` (off is
   its default, the docs show only `true`) and the Chutes Qwen `enable_thinking` field; a refusal is dropped and

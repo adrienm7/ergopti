@@ -4,11 +4,31 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-17)
+## Where things stand (2026-11-18)
 
 - S01 to S25 are on dev (S23 clipboard, S24 diagnostics and S25 gestures
-  landed on 2026-11-17); S26 (hotstrings) is next. The sections below are the
-  history of S01–S20 and stay for their lessons.
+  landed on 2026-11-17). S26 (hotstrings) is built on
+  `fix/windows-pc-2026-11-17` (2026-11-18, 16:40), with its preparation and
+  follow-up commits, and waits for its CI proof; S27 (install) is next. The
+  sections below are the history of S01–S20 and stay for their lessons.
+- What S26 taught, on top of the S21/S22 list below:
+  - the apply step refuses a base-name read (`_DriverFileSource("x.ahk")`)
+    of a file the step renames into a name another file holds
+    (hotstring_engine.ahk → engine.ahk, hotstrings_config.ahk → config.ahk,
+    hotstring_registry.ahk → registry.ahk): read the owner of a symbol it
+    defines instead, before the step;
+  - a `^modules%.<feature>%.` sweep becomes a `MODULE_FAMILIES` entry in the
+    driver's test helpers, read through `helpers.in_module_family`;
+  - the folder gain adds the new top folder to the Windows `core` group, and
+    the old nested alternation `unit/modules/(hotstrings|…)` matches nothing:
+    rewrite the owning group by hand and drop the gain; the macOS lots
+    (`modules`, `ui`) and the Linux dotted group assertions need the same;
+  - JS checks that hold a Lua module or a dotted test name inside a larger
+    string (`menu-native-personal-info-binding.cjs`,
+    `test-hotstring-output-tokens.cjs`) and log-tag patterns in
+    `sub_files.toml` are not rewritten;
+  - `test_user_hotstrings.ahk:359` (DirDelete after the worker cancel) can
+    fail under a parallel load and passes alone.
 - Run each step on the Windows PC with
   `ERGOPTI_STRUCTURE_PHASE=2 node tools/audit/structure/run-phase2.cjs --from <key> --to <key>`
   in an own worktree (one step takes 15 to 25 minutes); the runner now passes
