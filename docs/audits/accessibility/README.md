@@ -320,7 +320,110 @@ native calls.
   running flag is the opt-in (decision pending in TODO.md).
 - **Left.** Whether Narrator, NVDA and JAWS speak the live region is a
   TODO-tests-windows.md check; native windows other than the tooltips keep
-  fixed font sizes at a larger text size.
+  fixed font sizes at a larger text size (fixed in the fourth pass below).
+
+## Fourth pass, Windows and shared UI (2026-11-18, Paris time)
+
+A code pass on the Windows maintainer's PC with no live check: no key
+injection, no native window opened on purpose, headless Chromium only. The
+axe gate was already at 0 nodes (`site-accessibility-baseline.json` is
+empty), so it had nothing left to lower.
+
+### Native window text size and screen readers (Windows)
+
+- **Text size.** « Make text bigger » (Settings > Accessibility > Text size,
+  the `TextScaleFactor` the tooltips already read) reaches the system fonts
+  only: a window that asks for a size by number keeps it. Every native window
+  of the driver now sets its sizes through `Gui_SetFont`
+  (`core/ui/engine/font_scale.ahk`), which multiplies each « sN » by the scale
+  read when the window is built: 19 calls in 12 files (update prompt and
+  check, Versions window, hotstring settings, action and app pickers, path
+  dialogs, model browser fallback, prompt dialog, gestures help, apps editor
+  dialog, delimiter prompt, the bundled App Cloner and Encryptor). The display
+  scale needs nothing: AutoHotkey turns points into pixels with the screen's
+  DPI. Each window file includes the helper itself, so a test child that loads
+  one window file gets it. A source guard refuses a size given straight to
+  `SetFont` outside the tooltips (scaled through their style globals) and the
+  WPM pill (the canon's fixed geometry, shared with macOS and Linux). A window
+  already open keeps its size until reopened; fixed widths may wrap or clip at
+  225 % (a TODO-tests-windows.md check).
+- **Fixed greys.** Three status lines (update prompt date, update check log
+  line, hotstring settings status) were painted « Gray », 3.4:1 on the dialog
+  face and blind to a contrast theme: they take the system text colour, and a
+  guard refuses a fixed text colour in a native window outside the tooltips
+  and the WPM pill.
+- **WPM widget.** The pill and the graph were nameless painted windows. While
+  `SPI_GETSCREENREADER` says a screen reader runs, the shown surface is named
+  by the value it draws (« 72 WPM », unit in the active language), set only
+  when the value changes; nothing is announced, the value changing every
+  second.
+- **Spotlight.** While a screen reader runs, the shortcut's circle window
+  says « Mouse pointer highlighted » (`accessibility.spotlight_shown`, 21
+  locales) through the same polite live region as the tooltips.
+- **Note.** `SPI_GETSCREENREADER` was on on the maintainer's PC: some
+  programs set it without a screen reader. These names and notices, and the
+  tooltip previews of the third pass, then reach Windows' accessibility tree
+  without anyone hearing them; the test children that prove timers and
+  surfaces read the flag as off instead of trusting the host.
+
+Tests (slugs `a11y-text-scale-2026-11-18`, `a11y-readers-2026-11-18`,
+`a11y-cvd-2026-11-18`): `tests/unit/platform/system/test_accessibility.ahk`
+(the scaling arithmetic, a real control's font at the system scale, the WPM
+names and the Spotlight notice through injected seams) and
+`tests/meta/platform/system/test_accessibility_sources.ahk` (the two source
+guards).
+
+### Colour vision review
+
+Checked with the dataviz validator (OKLab, Machado 2009 CVD simulation) and
+WCAG contrast ratios computed from the resolved `theme.css` tokens.
+
+| Surface                        | Finding                                                                                                                                                                                                                                                                                             | Fix                                                                                                                                                                                                                                                                                                    |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Hotstring palette (14 colours) | As swatches it fails the categorical checks (yellow off the lightness band, cyan, brown and grey below the chroma floor, grey and brown ΔE 3.2 under protanopia, 5.3 in normal vision; yellow 1.4:1, orange 2.4:1, lime 2.9:1 on white). Every swatch has its name beside it in the picker.         | None needed for the picker: the name is the identity, the swatch a hint.                                                                                                                                                                                                                               |
+| Tooltip tint of the palette    | The tint keeps the hue at a fixed lightness and saturation: the grey `#6e6e73` (a faint blue, chroma 0.02) became a navy `#05053d` panel, beside the indigo's `#050e3d`, so the default « personal » category looked like the indigo one. Text on every tint is 11:1 or more, labels 4.8:1 or more. | Below a chroma of 0.05 an accent is grey and keeps the neutral panel, in the three drivers (`tint.js`, `tint.lua`, `_TooltipMixTintHex`), with a `near_gray` contract vector. Every other palette hue keeps its tint.                                                                                  |
+| Onboarding                     | Step dots told done, current and to come by hue alone (pale grey 1.4:1, green 2.0:1 on the page); hints `#888` 3.3:1; white on the system blue 4.0:1 (primary button); blue selected language, chosen answer and separators 3.5:1 to 4.0:1; a refused trigger character was only a red edge.        | Dots by shape (ring, filled dot, wider bar, edges 5.3:1 and more) and a progress bar « Step 3 of 8 » for screen readers; hints `#636366` 5.5:1; `--theme-accent-fill` and `--theme-accent` (5.1:1 to 5.8:1); a written refusal « Enter 1 to {1} visible characters. » with `aria-invalid`, 21 locales. |
+| Download window                | Statistics and detail line `#888` 4.4:1; the Cancel button's red 4.1:1 on its own wash. Progress and kinds are said in words beside their colours; the bars hold 3.3:1 and more against their track.                                                                                                | `#999` 5.4:1; Cancel `#ff8e85` 6.2:1.                                                                                                                                                                                                                                                                  |
+
+Open: the tooltip tints of the other palette hues sit at one lightness by
+design (13 %), so a colour-blind reader tells categories apart by the
+preview's text, not by its wash; a category shown in words in the tooltip
+would be a design change for the maintainer.
+
+### Error messages (WCAG 3.3.3)
+
+A survey of the English locale found 479 error-like keys, about 155 of them
+already saying what to do. Of the about 60 shown on Windows or in the shared
+pages without a next step, 30 now end with one, in the 21 locales, chosen
+from what the calling code allows: try again and read today's log (updater
+tag, update check, download window, screenshot, agent action), close the
+program holding the file (update settings, proxy setting, personal
+hotstrings, unused keys, emulated layout), free space or a writable folder
+(onboarding, editor saves, Studio data folder, metrics export), the
+clipboard (colour copy, editor copy), browser storage (editor tabs, Compare
+hand-off), reload or reopen (Comparer store and corpus, metrics, apps
+dashboard, Versions window), reinstall (missing or broken
+`constants.toml`), the connection (healthcheck network), the AI model and
+key (translation, agent). Left without a remedy on purpose: the Optimiser's
+corpus and worker refusals (it already offers « Try again »), labels, titles
+and the other codes of `layout_editor.error.*`, which this pass did not
+trace to a caller. The rest of the survey (bundled apps, gestures, layout manager, model
+browser) is the next batch.
+
+### Keyboard walk of the Studio (WCAG 2.1.2, 2.4.3, 2.4.7)
+
+`tools/test/browser/studio-keyboard.playwright.cjs` serves `static/` as the
+site does and walks the editor, the Comparer (folded, then with its details
+and settings open) and the Optimiser with Tab alone, then back with
+Shift+Tab: the focus must leave the page at both ends, never meet a stop
+twice, go down the page, land on visible elements, and retrace its way;
+`tools/test/test-keyboard-walk.cjs` proves the analysis refuses each of these
+failures. The first run found a trap: the editor's « Try » field simulated
+every key, Tab included, so the keyboard could enter it but not leave
+(WCAG 2.1.2). Tab and Shift+Tab now move the focus on from it. The walks:
+editor 216 stops, Comparer 76 (256 unfolded), Optimiser 64, each out at both
+ends. No Studio page has a time limit (WCAG 2.2.1): the third pass's undo
+offers stay until replaced.
 
 ## What remains
 

@@ -84,23 +84,29 @@ baseline as violations go.
       own WebView windows (onboarding, menus' pages, metrics), not only those the site embeds.
 - [ ] **Images and media.** Videos get captions and transcripts (the charts, heatmaps and keyboard drawings have
       their tables since the second pass).
-- [ ] **Colour vision.** Left after the third pass (heatmap key edges, finger hues, metrics muted text, AI tooltip
-      hint and info lines): a colour-only review with the dataviz validator of the other app windows (onboarding,
-      download window, the hotstrings window's 14-colour palette in `native_theme.toml`).
+- [ ] **Colour vision.** The onboarding, download window and hotstring palette review is done (fourth pass,
+      [audit](docs/audits/accessibility/README.md#colour-vision-review)). Left: the tooltip tints sit at one
+      lightness, so a colour-blind reader tells hotstring categories apart by the preview's text only; naming the
+      category in the tooltip is a design change for the maintainer.
 - [ ] **Dyslexia and reading.** Check every page at 200 % text with the wide spacing setting for clipped or
       overlapping text; plain-language texts, no justified text, comfortable line length.
 - [ ] **Blind and low-vision users.** Screen-reader runs; heading order and landmarks per page; the Optimiser's
       result board (plain characters) has no table view of its own (« Open in the editor » gives one).
-- [ ] **Keyboard and motor.** Keyboard walk of the Studio (no traps, logical order), no time limits.
-- [ ] **Cognitive.** Consistent navigation; check that every error message says how to fix it and every metric and
-      setting has its help text.
+- [ ] **Keyboard and motor.** The Studio keyboard walk is a CI gate (`npm run test:browser:studio-keyboard`, the
+      editor's « Try » field trap fixed) and the Studio has no time limit. Left: the same walk in the app's own
+      WebView windows (metrics, hotstring settings, onboarding), which need a host to render.
+- [ ] **Cognitive.** Consistent navigation; every metric and setting has its help text. Error messages: 30 of the
+      about 60 shown on Windows or in the shared pages without a next step now say one
+      ([audit](docs/audits/accessibility/README.md#error-messages-wcag-333)); left: the bundled apps, gestures,
+      layout manager and model browser messages, and the `layout_editor.error.*` codes not traced to a caller.
 - [ ] **Ergopti+ native UI, what is left.** The clear fixes of the code audit
       ([table](docs/audits/accessibility/README.md#native-ergopti-ui-code-audit-2026-11-17)) are in on the three OS
       (tray / menu-bar names with the pause, labels and named controls, tooltips under high contrast, previews told
-      to a running screen reader). Left: fixed font sizes in the Windows native windows other than the tooltips;
-      the GNOME text scale; the WPM widgets, the spotlight overlay and `hs.alert` banners, still invisible to
-      screen readers; the Swift update panel's XCTest, not yet run in CI. The spoken results are the
-      « Accessibility » items of the three TODO-tests files.
+      to a running screen reader); on Windows the native windows' fonts follow the text size, and the WPM widget
+      and the Spotlight overlay reach a running screen reader (fourth pass). Left: the GNOME text scale; the WPM
+      widgets and the spotlight overlay on macOS and Linux, and `hs.alert` banners, still invisible to screen
+      readers; the Swift update panel's XCTest, not yet run in CI. The spoken results are the « Accessibility »
+      items of the three TODO-tests files.
 - [ ] **Languages.** `lang` on foreign passages across the rest of the site (English names, quotes); decide whether
       the accessibility texts get the 21 locales.
 

@@ -189,8 +189,12 @@ physical size`); X and Y match the pad's width and height (logical span over mil
       running nothing changes; say whether the speech interrupts typing or lags. 4. The error dialog, the download
       window and the config cleanup open without focus: is anything read? 5. Windows high contrast (Settings >
       Accessibility > Contrast themes), switched while Ergopti+ runs: the next hotstring and AI tooltips take the
-      theme's tooltip colours with no tint; which native windows keep fixed colours, and do the Studio's bars and heatmap stay visible (`forced-colors`). 6. Text size at 150 % (Settings > Accessibility > Text size): the tooltips' text grows without clipping;
-      display scale 200 %: clipped text in native windows. 7. The hotstring settings window: the four « ↺ »
+      theme's tooltip colours with no tint; which native windows keep fixed colours, and do the Studio's bars and heatmap stay visible (`forced-colors`). 6. Text size at 150 % then 225 % (Settings > Accessibility > Text size): the tooltips' text grows without clipping;
+      then reopen the update check, the Releases window, the hotstring settings, the action picker and the
+      Encryptor: their text is larger too (fourth pass), say which ones clip or wrap a label;
+      display scale 200 %: clipped text in native windows. 9. With Narrator on, type until the WPM widget shows,
+      reach it with the Narrator key + arrows: it says « 72 WPM » (the speed); press the Spotlight shortcut: « Mouse
+      pointer highlighted » is said once. 7. The hotstring settings window: the four « ↺ »
       buttons read « Restore default: Delay (ms) » and so on, the colour swatch is not read as a progress bar. 8. Fields named by their label: the Win + G link editor (« Link: »), the Releases window's channel picker
       (« Update channel ») and notes (« Changelog »), the input check's field.
 
