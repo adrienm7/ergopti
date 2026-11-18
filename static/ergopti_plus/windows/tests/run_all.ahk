@@ -1914,7 +1914,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/menu/test_dispatch_error_propagation.ahk
 #Include meta/core/ui/windows/test_launch_error_msgbox_on_timer_thread.ahk
 #Include meta/platform/focus/uia/test_error_logged.ahk
-#Include meta/modules/updater/test_updater_focus_poll_suspend_guard.ahk
+#Include meta/modules/updater/test_updater_background_tick_suspend_guard.ahk
 #Include meta/modules/updater/test_updater_setchannel_cancels_async.ahk
 #Include meta/modules/updater/test_updater_setchannel_blocks_during_download.ahk
 #Include meta/modules/updater/test_updater_setcheckinterval_coerces.ahk
