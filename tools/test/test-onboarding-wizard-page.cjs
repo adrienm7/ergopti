@@ -249,7 +249,19 @@ function loadPage() {
 				return el.querySelectorAll(selector)[0] || null;
 			},
 			scrollIntoView() {},
-			focus() {}
+			focus() {},
+			attributes: {},
+			setAttribute(name, value) {
+				el.attributes[name] = String(value);
+			},
+			getAttribute(name) {
+				return Object.prototype.hasOwnProperty.call(el.attributes, name)
+					? el.attributes[name]
+					: null;
+			},
+			removeAttribute(name) {
+				delete el.attributes[name];
+			}
 		};
 		return el;
 	}
@@ -502,6 +514,20 @@ function cataloguePaths(driver) {
 			page.el('step-bar').children.length,
 			2 + APPROVED_ORDER.length,
 			`${driver}: language, folder, then one dot per page`
+		);
+		// The dots told the step by hue alone: the bar says it in words (a11y-cvd-2026-11-18).
+		const bar = page.el('step-bar');
+		assert.equal(bar.getAttribute('role'), 'progressbar', `${driver}: the bar is a progress bar`);
+		assert.equal(
+			bar.getAttribute('aria-valuetext'),
+			locale('en')
+				['onboarding.step_progress'].replace('{1}', '1')
+				.replace('{2}', String(2 + APPROVED_ORDER.length)),
+			`${driver}: the bar names the step and the count`
+		);
+		assert.ok(
+			bar.children.every((dot) => dot.getAttribute('aria-hidden') === 'true'),
+			`${driver}: the dots themselves are not read`
 		);
 	}
 })();
@@ -1500,8 +1526,22 @@ function assertSeparated(row, where) {
 		'an empty custom key blocks Next'
 	);
 	assert.ok(input.classList.contains('invalid'));
+	// The red edge alone told the refusal: it is said in words (a11y-cvd-2026-11-18).
+	const refusal = page.el('page-magic-error');
+	assert.equal(
+		refusal.textContent,
+		locale('en')['onboarding.magic_key.invalid'].replace(
+			'{1}',
+			String(hotstrings.magic_key.max_characters)
+		)
+	);
+	assert.ok(!refusal.classList.contains('hidden'), 'the refusal shows');
+	assert.equal(input.getAttribute('aria-invalid'), 'true');
+	assert.equal(input.getAttribute('aria-describedby'), 'page-magic-error');
 	input.value = '§';
 	input.dispatch('input');
+	assert.ok(refusal.classList.contains('hidden'), 'typing clears the refusal');
+	assert.equal(input.getAttribute('aria-invalid'), null);
 	const done = finish(page);
 	assert.deepEqual(
 		done.answers.operations.find((op) => op.path === 'hotstrings.trigger_char'),

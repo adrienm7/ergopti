@@ -83,23 +83,30 @@ body {
 	margin-bottom: 18px;
 }
 
+/* The three states differ by shape, not only by hue (WCAG 1.4.1): a step to
+   come is a ring, a done one a filled dot, the current one a wider bar. Each
+   edge holds 3:1 on the page (WCAG 1.4.11); the pale grey dot and the green
+   one were 1.4:1 and 2.0:1. */
 .step-dot {
-	background: var(--theme-hue-d0d0d5);
-	border-radius: 50%;
-	height: 7px;
+	background: transparent;
+	border: 1.5px solid var(--theme-hue-636366);
+	border-radius: 4px;
+	height: 8px;
 	transition:
 		background 0.2s,
-		transform 0.2s;
-	width: 7px;
+		width 0.2s;
+	width: 8px;
 }
 
 .step-dot.active {
-	background: var(--theme-blue);
-	transform: scale(1.25);
+	background: var(--theme-accent);
+	border-color: var(--theme-accent);
+	width: 20px;
 }
 
 .step-dot.done {
-	background: var(--theme-green);
+	background: var(--theme-accent);
+	border-color: var(--theme-accent);
 }
 
 /* =============================== */
@@ -124,7 +131,8 @@ h1 {
 }
 
 .hint {
-	color: var(--theme-grey-888);
+	/* #888 was 3.3:1 on the page. */
+	color: var(--theme-hue-636366);
 	font-size: 11px;
 	font-style: italic;
 	line-height: 1.5;
@@ -196,7 +204,7 @@ h1 {
 }
 
 .lang-item.selected .lang-name {
-	color: var(--theme-blue);
+	color: var(--theme-accent);
 	font-weight: 600;
 }
 
@@ -325,7 +333,7 @@ h1 {
 }
 
 .radio-card input[type='radio']:checked + .radio-label {
-	color: var(--theme-blue);
+	color: var(--theme-accent);
 	font-weight: 500;
 }
 
@@ -370,6 +378,14 @@ h1 {
 .magic-input.invalid {
 	border-color: var(--theme-hue-dd1111);
 	box-shadow: 0 0 0 3px rgba(221, 17, 17, 0.15);
+}
+
+/* The refused trigger is said in words, not only by the red edge. */
+.field-error {
+	color: var(--theme-bad-text);
+	font-size: 12px;
+	font-weight: 600;
+	margin: 6px 0 0;
 }
 
 /* ====================================== */
@@ -435,7 +451,7 @@ h1 {
 /* The separator between a trigger and its action: the arrows inside gesture
    and action labels must never read as it. */
 .value-separator {
-	color: var(--theme-blue);
+	color: var(--theme-accent);
 	font-weight: 700;
 }
 
@@ -473,7 +489,8 @@ button:hover {
 }
 
 .primary {
-	background: var(--theme-blue);
+	/* White on the system blue was 4.0:1. */
+	background: var(--theme-accent-fill);
 	color: var(--theme-white);
 }
 
@@ -523,9 +540,9 @@ button:hover {
 }
 
 .register-status.register-ok {
-	color: var(--theme-hue-1a8c3a);
+	color: var(--theme-good-text);
 }
 
 .register-status.register-err {
-	color: var(--theme-hue-dd1111);
+	color: var(--theme-bad-text);
 }

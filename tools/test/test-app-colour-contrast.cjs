@@ -202,6 +202,80 @@ for (const dark of [false, true]) {
 		);
 }
 
+// 4/ The onboarding and the download window (a11y-cvd-2026-11-18)
+const ONBOARDING_CSS = fs.readFileSync(shared('ui', 'onboarding', 'style.css'), 'utf8');
+const DOWNLOAD_CSS = fs.readFileSync(shared('ui', 'download_window', 'style.css'), 'utf8');
+/** A plain property's value in a block of declarations. */
+function prop(declarations, name) {
+	const match = declarations.match(new RegExp('(?:^|[\\s;{])' + name + ':\\s*([^;]+);'));
+	assert.ok(match, 'No ' + name);
+	return match[1].trim();
+}
+/** A colour of a stylesheet, its var() resolved through the theme; rgba() composed on a ground. */
+function paint(value, ground) {
+	const rgba = value.match(/^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/);
+	if (rgba) {
+		const alpha = Number(rgba[4]);
+		return [1, 2, 3].map((i, j) => (Number(rgba[i]) / 255) * alpha + ground[j] * (1 - alpha));
+	}
+	return channels(resolve(value));
+}
+const readable = (fg, bg, what) =>
+	assert.ok(contrast(fg, bg) >= TEXT_CONTRAST, what + ': ' + contrast(fg, bg).toFixed(2) + ':1');
+/** The page ground: the body block that sets one (an earlier « html, body » sets sizes only). */
+function ground(css) {
+	for (const match of css.matchAll(/(?:^|\n)body \{([^}]*)\}/g))
+		if (/background:/.test(match[1])) return paint(prop(match[1], 'background'));
+	assert.fail('No body background');
+}
+const page = ground(ONBOARDING_CSS);
+const white = channels('#ffffff');
+// The hints were #888 (3.3:1), the filled button white on the system blue (4.0:1), the
+// chosen language, answer and separators that blue (3.5:1 to 4.0:1).
+readable(paint(prop(block(ONBOARDING_CSS, '.hint'), 'color')), page, 'onboarding hint');
+readable(white, paint(prop(block(ONBOARDING_CSS, '.primary'), 'background')), 'onboarding button');
+readable(
+	paint(prop(block(ONBOARDING_CSS, '.lang-item.selected .lang-name'), 'color')),
+	paint(prop(block(ONBOARDING_CSS, '.lang-item.selected'), 'background')),
+	'chosen language'
+);
+readable(
+	paint(
+		prop(block(ONBOARDING_CSS, ".radio-card input[type='radio']:checked + .radio-label"), 'color')
+	),
+	white,
+	'chosen answer'
+);
+readable(paint(prop(block(ONBOARDING_CSS, '.value-separator'), 'color')), white, 'separator');
+for (const state of ['register-ok', 'register-err'])
+	readable(paint(prop(block(ONBOARDING_CSS, '.register-status.' + state), 'color')), page, state);
+// The step dots told done, current and to come by hue alone (1.4:1 and 2.0:1): each
+// state has its own shape, and every mark holds 3:1 on the page.
+const dot = block(ONBOARDING_CSS, '.step-dot');
+const active = block(ONBOARDING_CSS, '.step-dot.active');
+const done = block(ONBOARDING_CSS, '.step-dot.done');
+assert.equal(prop(dot, 'background'), 'transparent', 'a step to come is a ring');
+assert.notEqual(prop(active, 'width'), prop(dot, 'width'), 'the current step is wider');
+for (const [what, colour] of [
+	['ring', prop(dot, 'border').split(/\s+/).pop()],
+	['current', prop(active, 'background')],
+	['done', prop(done, 'background')]
+])
+	assert.ok(
+		contrast(paint(colour), page) >= NON_TEXT_CONTRAST,
+		'step dot ' + what + ' must stand out of the page'
+	);
+// The download window's statistics were #888 (4.4:1), its Cancel red 4.1:1 on its wash.
+const windowGround = ground(DOWNLOAD_CSS);
+for (const selector of ['#model', '#subtitle', '#stats', '#detail-line'])
+	readable(paint(prop(block(DOWNLOAD_CSS, selector), 'color')), windowGround, selector);
+const cancel = block(DOWNLOAD_CSS, '#btn-cancel');
+readable(
+	paint(prop(cancel, 'color')),
+	paint(prop(cancel, 'background'), windowGround),
+	'download Cancel'
+);
+
 console.log(
-	'test-app-colour-contrast: OK (heatmap edge, finger hues, metrics text, light and dark)'
+	'test-app-colour-contrast: OK (heatmap edge, finger hues, metrics text, onboarding, download window)'
 );

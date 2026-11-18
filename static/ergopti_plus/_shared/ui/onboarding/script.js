@@ -487,17 +487,54 @@ function _pageAt(index) {
 	return null;
 }
 
-/** Draws one dot per step, marking the done and active ones. */
+/**
+ * Draws one dot per step, marking the done and active ones. The bar is a
+ * progress bar for assistive technology: « Step 3 of 8 », where the dots
+ * alone told it nothing.
+ */
 function _renderStepBar() {
 	var bar = document.getElementById('step-bar');
 	bar.innerHTML = '';
+	bar.setAttribute('role', 'progressbar');
+	bar.setAttribute('aria-valuemin', '1');
+	bar.setAttribute('aria-valuemax', String(_steps.length));
+	bar.setAttribute('aria-valuenow', String(_stepIndex + 1));
+	bar.setAttribute(
+		'aria-valuetext',
+		_t('onboarding.step_progress')
+			.replace('{1}', String(_stepIndex + 1))
+			.replace('{2}', String(_steps.length))
+	);
 	_steps.forEach(function (_id, index) {
 		var dot = document.createElement('div');
 		dot.className = 'step-dot';
+		dot.setAttribute('aria-hidden', 'true');
 		if (index < _stepIndex) dot.classList.add('done');
 		else if (index === _stepIndex) dot.classList.add('active');
 		bar.appendChild(dot);
 	});
+}
+
+/**
+ * Shows or clears the refusal of a custom trigger character, in words beside
+ * the red edge (WCAG 1.4.1, 3.3.1).
+ * @param {HTMLInputElement} input
+ * @param {number} maxCharacters
+ * @param {boolean} invalid
+ */
+function _setMagicInvalid(input, maxCharacters, invalid) {
+	var message = document.getElementById('page-magic-error');
+	input.classList.toggle('invalid', invalid);
+	if (invalid) {
+		message.textContent = _t('onboarding.magic_key.invalid').replace('{1}', String(maxCharacters));
+		input.setAttribute('aria-invalid', 'true');
+		input.setAttribute('aria-describedby', 'page-magic-error');
+	} else {
+		message.textContent = '';
+		input.removeAttribute('aria-invalid');
+		input.removeAttribute('aria-describedby');
+	}
+	message.classList.toggle('hidden', !invalid);
 }
 
 /** Shows the current step and its footer buttons. */
@@ -793,7 +830,7 @@ function _renderMagicKey(page, state) {
 		state.magicChanged = true;
 		state.magic = CUSTOM_MAGIC_VALUE;
 		state.custom = input.value;
-		input.classList.remove('invalid');
+		_setMagicInvalid(input, choice.max_characters, false);
 	});
 	custom.appendChild(input);
 	container.appendChild(custom);
@@ -1145,7 +1182,7 @@ function _pageComplete(page) {
 		return true;
 	var input = document.getElementById('page-magic-options').querySelector('.magic-input');
 	if (input) {
-		input.classList.add('invalid');
+		_setMagicInvalid(input, page.magic_key.max_characters, true);
 		input.focus();
 	}
 	return false;
