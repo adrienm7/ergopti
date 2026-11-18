@@ -407,8 +407,23 @@ dashboard, Versions window), reinstall (missing or broken
 key (translation, agent). Left without a remedy on purpose: the Optimiser's
 corpus and worker refusals (it already offers « Try again »), labels, titles
 and the other codes of `layout_editor.error.*`, which this pass did not
-trace to a caller. The rest of the survey (bundled apps, gestures, layout manager, model
-browser) is the next batch.
+trace to a caller.
+
+The second batch (2026-11-18) traced 33 more to their callers and gave each
+the step it allows: the bundled apps (choose the program or the file again,
+the password used to encrypt, a writable folder), the Windows gesture rows
+(« Auto-configure » in the same menu, reopen the menu), the layout manager
+(« Refresh », wait for the running operation, move the foreign file, the
+connection, today's log), the model browser (« Install Ollama », « Install
+MLX ») and the editor codes shown after an action (the use named in
+parentheses, wait for the save, reload the page, a supported browser, the
+log). `tools/test/test-error-messages-say-how-to-recover.cjs` pins the
+English step of these 63 messages and refuses a locale that keeps the
+English text, changes a placeholder or does not quote its own label. Left
+without a remedy on purpose: the other `layout_editor.error.*` codes, which
+state a validation rule (the fix is the rule itself), and the layout
+manager's « No catalogue available », always followed by the cause that
+names the remedy.
 
 ### Keyboard walk of the Studio (WCAG 2.1.2, 2.4.3, 2.4.7)
 
@@ -424,6 +439,28 @@ every key, Tab included, so the keyboard could enter it but not leave
 editor 216 stops, Comparer 76 (256 unfolded), Optimiser 64, each out at both
 ends. No Studio page has a time limit (WCAG 2.2.1): the third pass's undo
 offers stay until replaced.
+
+### Keyboard walk of the native windows (Windows, WCAG 2.1.1, 2.1.2, 2.4.3)
+
+`tests/unit/platform/system/test_native_keyboard_walk.ahk` opens 14 native
+windows of the driver through their real openers (the AI profile prompt,
+the gesture backend picker and manual setup window, the composer check
+report, the ChatGPT link editor, the application picker, the native
+fallbacks of the hotstring settings, paths editor, action picker and update
+prompt, the keyboard slot picker, the new delimiter prompt, the bundled
+apps' question and the Encryptor drop window), off screen and without
+activation, and walks each with Tab and back with Shift+Tab
+(`tests/support/native_keyboard_walk.ahk`). The keys are posted to the
+focused control of the driver's own thread, so AutoHotkey's message loop
+handles them as a real key and nothing reaches another program. Every
+focusable control (one stop per radio group) must be reached, no control may
+keep the focus, no stop is met twice and Shift+Tab retraces Tab; the first
+three tests prove it refuses a WantTab trap and a control without a tab
+stop. No window trapped the keyboard. The update prompt's release notes sit
+in a WebView2 that Tab does not enter (« Open on GitHub » shows them); WebView2 hands the focus back to the next native control on its own
+when Tab leaves its last element. Not walked: the magic key captures (their
+input hook takes the next key by design and says Escape cancels), the
+system MsgBox and InputBox, and the WebView2-only windows.
 
 ## What remains
 

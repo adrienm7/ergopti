@@ -85,12 +85,16 @@ baseline as violations go.
 - [ ] **Blind and low-vision users.** Screen-reader runs; heading order and landmarks per page; the Optimiser's
       result board (plain characters) has no table view of its own (« Open in the editor » gives one).
 - [ ] **Keyboard and motor.** The Studio keyboard walk is a CI gate (`npm run test:browser:studio-keyboard`, the
-      editor's « Try » field trap fixed) and the Studio has no time limit. Left: the same walk in the app's own
-      WebView windows (metrics, hotstring settings, onboarding), which need a host to render.
-- [ ] **Cognitive.** Consistent navigation; every metric and setting has its help text. Error messages: 30 of the
-      about 60 shown on Windows or in the shared pages without a next step now say one
-      ([audit](docs/audits/accessibility/README.md#error-messages-wcag-333)); left: the bundled apps, gestures,
-      layout manager and model browser messages, and the `layout_editor.error.*` codes not traced to a caller.
+      editor's « Try » field trap fixed) and the Studio has no time limit. The Windows driver's native windows
+      (14 of them: settings prompts, pickers, editors, the hotstring settings, paths and update fallbacks) are walked
+      with Tab and Shift+Tab in the AHK suite (`test_native_keyboard_walk.ahk`); none traps the keyboard. Left: the
+      same walk in the app's own WebView windows (metrics, hotstring settings, onboarding), which need a host to
+      render, and in the macOS and Linux native windows.
+- [ ] **Cognitive.** Consistent navigation; every metric and setting has its help text. Error messages: the
+      about 60 shown on Windows or in the shared pages without a next step now say one, 63 of them pinned by
+      `tools/test/test-error-messages-say-how-to-recover.cjs`
+      ([audit](docs/audits/accessibility/README.md#error-messages-wcag-333)); left: the `layout_editor.error.*`
+      codes that are labels or validation rules rather than failures.
 - [ ] **Ergopti+ native UI, what is left.** The clear fixes of the code audit
       ([table](docs/audits/accessibility/README.md#native-ergopti-ui-code-audit-2026-11-17)) are in on the three OS
       (tray / menu-bar names with the pause, labels and named controls, tooltips under high contrast, previews told
