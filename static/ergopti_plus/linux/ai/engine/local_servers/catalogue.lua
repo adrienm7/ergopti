@@ -52,7 +52,8 @@ function M.load(occupied)
 	-- A local descriptor cannot shadow a registered cloud provider.
 	local cloud_path = Paths.shared("ai/data/api_providers.json")
 	local cloud_raw = read_source(cloud_path)
-	local cloud = type(cloud_raw) == "string" and Json.decode(cloud_raw) or nil
+	-- The remote catalogue owner decodes the same text: one decode serves both
+	local cloud = type(cloud_raw) == "string" and Json.decode_shared(cloud_path, cloud_raw) or nil
 	if type(cloud) ~= "table" or type(cloud.providers) ~= "table" then
 		Logger.error("llm.local_server_catalogue", "The cloud API catalogue is unavailable; local server identities cannot be admitted.")
 		return {}, {}, false, {}, {}, {}, {}

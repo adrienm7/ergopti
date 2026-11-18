@@ -286,6 +286,25 @@ function M.decode(raw) return decode(raw, false) end
 --- @return any|nil Tagged arrays/null and ordinary objects, or nil on failure.
 function M.decode_lossless(raw) return decode(raw, true) end
 
+-- Document key -> { raw = text, root = its M.decode root }
+local shared_roots = {}
+
+--- Decodes a document several owners read once while its text is unchanged: the
+--- root is shared while the text a caller just read is exactly the text it was
+--- decoded from, and an edited text is decoded again (AutoHotkey's
+--- JsonParseShared). The Linux driver decoded the 29 KB API catalogue three
+--- times at boot for two owners. The root is read-only for every caller.
+--- @param key string Identity of the document, its path.
+--- @param raw string The document's text, as the caller read it.
+--- @return any|nil Decoded value, as M.decode returns it.
+function M.decode_shared(key, raw)
+	local known = shared_roots[key]
+	if known and known.raw == raw then return known.root end
+	local root = M.decode(raw)
+	shared_roots[key] = { raw = raw, root = root }
+	return root
+end
+
 -- ============================================================================
 -- 2. JSON encoder
 -- ============================================================================

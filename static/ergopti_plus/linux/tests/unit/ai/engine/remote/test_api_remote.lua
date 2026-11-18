@@ -73,6 +73,33 @@ helpers.describe("api_remote: the shared provider catalogue", function()
 		helpers.assert_eq(table.concat(catalogue.order, ","), "valid,openai_compat")
 	end)
 
+	-- The local servers' catalogue (read at boot by local_servers.lua, and again by
+	-- this module's load) reads the cloud ids from the same file this module reads
+	-- its providers from: three decodes of the same 29 KB text for two owners.
+	helpers.it("decodes the catalogue text once for both of its boot owners", function()
+		local path = require("core.fs.engine.paths").shared("ai/data/api_providers.json")
+		local fh = assert(io.open(path, "rb"))
+		local text = fh:read("*a")
+		fh:close()
+		local decode = Json.decode
+		local decodes = 0
+		Json.decode = function(raw)
+			if raw == text then decodes = decodes + 1 end
+			return decode(raw)
+		end
+		local ok, err = pcall(function()
+			-- An edited text is decoded again: no root decoded before this test is reused
+			Json.decode_shared(path, "{}")
+			helpers.load_module("ai.engine.local_servers.catalogue").load({})
+			local remote = load_remote()
+			helpers.assert_true(remote.provider("cerebras") ~= nil, "the catalogue loads")
+		end)
+		Json.decode = decode
+		unload()
+		assert(ok, err)
+		helpers.assert_eq(decodes, 1, "one decode of the catalogue text per boot")
+	end)
+
 	helpers.it("exposes the shared connectivity probe", function()
 		local remote = load_remote()
 		local spec = remote.test_request_spec()

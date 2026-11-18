@@ -169,13 +169,12 @@ local function parse_decisions_test(node)
 	return { state = state, questions = questions }
 end
 
---- Parses a catalogue document. Exposed for tests over the shared corpus.
---- @param text string|nil
+--- Projects a decoded catalogue document, without changing it.
+--- @param root any The decoded api_providers.json, nil when unreadable.
 --- @return table { providers, order, prices, test_request, decisions_test }
 --- @return boolean admitted Nonempty projected catalogue, before native read acknowledgement.
-function M.parse_catalogue(text)
+local function parse_catalogue_root(root)
 	local catalogue = { providers = {}, order = {}, prices = {}, test_request = nil, decisions_test = nil }
-	local root = type(text) == "string" and Json.decode(text) or nil
 	if type(root) ~= "table" or type(root.providers) ~= "table" or type(root.provider_order) ~= "table" then
 		Logger.error(LOG, "api_providers.json is missing or malformed — no remote provider is available.")
 		return catalogue, false
@@ -224,6 +223,14 @@ function M.parse_catalogue(text)
 	return catalogue, #catalogue.order > 0
 end
 
+--- Parses a catalogue document. Exposed for tests over the shared corpus.
+--- @param text string|nil
+--- @return table catalogue As parse_catalogue_root.
+--- @return boolean admitted As parse_catalogue_root.
+function M.parse_catalogue(text)
+	return parse_catalogue_root(type(text) == "string" and Json.decode(text) or nil)
+end
+
 --- The catalogue, loaded once from the shared tree.
 --- @return table
 local function catalogue()
@@ -234,7 +241,8 @@ local function catalogue()
 	if status ~= "ok" then text = nil end
 	local closed = status == "ok"
 	local cloud_published
-	_catalogue, cloud_published = M.parse_catalogue(text)
+	-- The local catalogue below reads the same text for its cloud ids: one decode serves both
+	_catalogue, cloud_published = parse_catalogue_root(type(text) == "string" and Json.decode_shared(path, text) or nil)
 	local order, servers, local_published, _, request_fields, local_dialect = LocalCatalogue.load(_catalogue.providers)
 	_catalogue.config_cloud_published = cloud_published == true and type(text) == "string" and closed == true
 	_catalogue.config_local_published = local_published == true
