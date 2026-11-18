@@ -355,6 +355,16 @@ const locales = fs
 if (locales.length < 21) fail(`only ${locales.length} locales read`);
 let worded = 0;
 const MARK = (key) => `<${key}>`;
+// The only character keys the model names (layer_model.js NAMED_KEYS), by
+// their locale key; any other character key reads its host legend or code.
+const JIS_INPUT_METHOD_KEYS = {
+	NonConvert: 'non_convert',
+	Convert: 'convert',
+	KanaMode: 'kana_mode'
+};
+for (const code of Object.keys(JIS_INPUT_METHOD_KEYS))
+	if (!DATA.keys.some((key) => key.code === code && key.character === true))
+		fail(`${code} is no longer a character key of the layer editor data`);
 for (const os of OSES) {
 	const bare = { os, data: DATA, t: MARK, legends: {} };
 	const given = { os, data: DATA, t: MARK, legends: { KeyQ: 'a', Digit1: '&', Space: '!' } };
@@ -363,6 +373,23 @@ for (const os of OSES) {
 		worded += 1;
 		const legend = Model.keyLegend(key.code, bare);
 		if (key.character === true) {
+			// The JIS input-method keys are character keys sent by scan code, but
+			// a layout usually types nothing on them: with no host legend they
+			// read their translated name (Muhenkan, Henkan, Kana), and a host
+			// legend still wins, as on every other character key.
+			const imeName = JIS_INPUT_METHOD_KEYS[key.code];
+			if (imeName) {
+				if (legend !== MARK(`layer_editor.key.${imeName}`))
+					fail(`input-method key ${key.code} reads "${legend}" on ${os}, not its name`);
+				if (Model.keyLegend(key.code, { ...bare, legends: { [key.code]: 'x' } }) !== 'x')
+					fail(`input-method key ${key.code} ignores its host legend on ${os}`);
+				for (const locale of locales) {
+					const name = locale.strings[`layer_editor.key.${imeName}`];
+					if (typeof name !== 'string' || name.trim() === '')
+						fail(`${locale.name} has no "layer_editor.key.${imeName}" for ${key.code}`);
+				}
+				continue;
+			}
 			if (legend !== key.code)
 				fail(`${key.code} reads "${legend}" on ${os} with no legend from its host, not its code`);
 			continue;
