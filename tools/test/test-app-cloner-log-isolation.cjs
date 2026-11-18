@@ -597,10 +597,11 @@ function startupDialog(name) {
 		? { source: argv[2], body: argv[4], title: argv[5], button: argv[6], log: entry.log_path }
 		: null;
 }
-for (const [name, locale, diagnostic] of [
+for (const [name, locale, shownDiagnostic] of [
 	['english', 'en', 'Native panel operation failed.'],
 	['french', 'fr', 'Native panel operation failed.'],
-	['unknown', 'en', 'Unknown error.'],
+	// An empty failure reads the catalogue's own unknown-error sentence.
+	['unknown', 'en', null],
 	['whitespace', 'en', 'stdout diagnostic'],
 	['hostile', 'en', startup.hostile],
 	['catalogue-changed-after-ui', 'en', 'Native panel operation failed.']
@@ -609,6 +610,7 @@ for (const [name, locale, diagnostic] of [
 	const expected = JSON.parse(
 		fs.readFileSync(path.join(localesDirectory, `${locale}.json`), 'utf8')
 	);
+	const diagnostic = shownDiagnostic ?? expected['apps.cloner.error_unknown'];
 	test(
 		`the actual startup ${name} failure dispatches selected text and untrusted data as arguments`,
 		actual !== null &&
