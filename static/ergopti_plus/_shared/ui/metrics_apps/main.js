@@ -79,8 +79,11 @@ function activateTab(name) {
 	document.querySelectorAll('[data-tab]').forEach((el) => {
 		el.classList.toggle('tab-active', el.getAttribute('data-tab') === name);
 	});
+	// The shown tab reads as pressed, not by its colour alone (WCAG 1.4.1, 4.1.2).
 	document.querySelectorAll('.tab-btn').forEach((btn) => {
-		btn.classList.toggle('active', btn.getAttribute('data-tab-target') === name);
+		const shown = btn.getAttribute('data-tab-target') === name;
+		btn.classList.toggle('active', shown);
+		btn.setAttribute('aria-pressed', shown ? 'true' : 'false');
 	});
 	// Re-render so newly-visible canvases get a non-zero size before Chart.js
 	// computes their dimensions. setTimeout(0) waits for the layout pass.
@@ -129,7 +132,7 @@ function rebuildFilterButtons() {
 		catBox.innerHTML = catList
 			.map((c) => {
 				const active = !currentCategoryFilter || currentCategoryFilter.has(c);
-				return `<button class="filter-btn${active ? ' active' : ''}" data-cat="${escapeHtml(c)}" style="padding:3px 9px;font-size:11px;">${escapeHtml(c)}</button>`;
+				return `<button type="button" class="filter-btn${active ? ' active' : ''}" aria-pressed="${active}" data-cat="${escapeHtml(c)}" style="padding:3px 9px;font-size:11px;">${escapeHtml(c)}</button>`;
 			})
 			.join('');
 		[...catBox.querySelectorAll('button[data-cat]')].forEach((btn) => {
@@ -156,7 +159,7 @@ function rebuildFilterButtons() {
 		wkBox.innerHTML = wkLabels
 			.map((label, idx) => {
 				const active = !currentWeekdayFilter || currentWeekdayFilter.has(idx);
-				return `<button class="filter-btn${active ? ' active' : ''}" data-dow="${idx}" style="padding:3px 9px;font-size:11px;">${escapeHtml(label)}</button>`;
+				return `<button type="button" class="filter-btn${active ? ' active' : ''}" aria-pressed="${active}" data-dow="${idx}" style="padding:3px 9px;font-size:11px;">${escapeHtml(label)}</button>`;
 			})
 			.join('');
 		[...wkBox.querySelectorAll('button[data-dow]')].forEach((btn) => {
@@ -1103,12 +1106,14 @@ function renderDashboard() {
 
 			const tdName = document.createElement('td');
 			tdName.className = 'app-name-cell';
-			tdName.innerHTML = `<strong>${escapeHtml(app.name)}</strong>`;
+			// The keyboard reaches the drill-down and the category editor through
+			// buttons (WCAG 2.1.1); their clicks reach the row's and the cell's handlers.
+			tdName.innerHTML = `<button type="button" class="app-cell-btn app-name-btn">${escapeHtml(app.name)}</button>`;
 			tr.appendChild(tdName);
 
 			const tdCat = document.createElement('td');
 			tdCat.className = 'app-cat-cell';
-			tdCat.innerHTML = `<span style="font-size: 0.85em; color: var(--text-muted); cursor: pointer;" title="${escapeHtml(_t('ui_apps.cat_edit_tooltip'))}">${escapeHtml(app.category)} ✎</span>`;
+			tdCat.innerHTML = `<button type="button" class="app-cell-btn app-cat-btn" title="${escapeHtml(_t('ui_apps.cat_edit_tooltip'))}">${escapeHtml(app.category)} ✎</button>`;
 			tdCat.addEventListener('click', (ev) => {
 				ev.stopPropagation();
 				postBridge({ action: 'edit', app: app.name, cat: app.category, score: app.score });

@@ -423,7 +423,7 @@ function renderComparator(currentAgg) {
 				: d < 0
 					? ThemeTokens.color('red-dark')
 					: ThemeTokens.color('grey-888');
-		return `<div style="font-size:18px;color:${ThemeTokens.color('white')};font-weight:600;">${fmt(curV)}</div>
+		return `<div style="font-size:18px;color:var(--strong-color);font-weight:600;">${fmt(curV)}</div>
 			<div style="font-size:11px;color:${colour};">${sign}${fmt(Math.abs(d))} (${sign}${Math.abs(pct).toFixed(0)}%)</div>
 			<div style="font-size:10px;color:var(--text-muted);">avant : ${fmt(prevV)}</div>`;
 	};

@@ -36,6 +36,7 @@ function loadMetricsPage(app, host, afterScript) {
 			style: {},
 			classList: { toggle() {} },
 			addEventListener() {},
+			focus() {},
 			appendChild(child) {
 				child.parentNode = this;
 				this.children.push(child);

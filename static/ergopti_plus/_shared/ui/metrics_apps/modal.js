@@ -5,6 +5,20 @@
 
 let _appModalChart = null;
 
+// The control that opened the drill-down, which gets the focus back on close.
+let _appModalOpener = null;
+
+/**
+ * Makes everything but the drill-down inert, or live again: while the modal
+ * is open the keyboard and assistive technology stay in it (WCAG 2.4.3).
+ * @param {boolean} inert
+ */
+function setAppModalBackgroundInert(inert) {
+	Array.from(document.body.children).forEach((node) => {
+		if (node.id !== 'app_drilldown_modal' && node.tagName !== 'SCRIPT') node.inert = inert;
+	});
+}
+
 /**
  * Aggregates the manifest for a single app within the active period and
  * renders the drill-down modal: 6 stat tiles, an hourly chart, top
@@ -200,14 +214,28 @@ function openAppDrilldown(appName) {
 			.replace('{pct}', llm_pct.toFixed(1))}</div>` +
 		`<div style="font-size:12px;padding:3px 0;color:${ThemeTokens.color('grey-888')};">${_t('ui_apps.modal_total_chars').replace('{n}', format_int(a.chars || 0))}</div>`;
 
+	// A redraw of an open drill-down keeps the control that first opened it.
+	if (modal.style.display !== 'flex') _appModalOpener = document.activeElement;
+	setAppModalBackgroundInert(true);
 	modal.style.display = 'flex';
+	document.getElementById('app_modal_close').focus();
 }
 
 window.openAppDrilldown = openAppDrilldown;
 window.closeAppDrilldown = function () {
 	const modal = document.getElementById('app_drilldown_modal');
-	if (modal) modal.style.display = 'none';
+	if (!modal || modal.style.display === 'none') return;
+	modal.style.display = 'none';
+	setAppModalBackgroundInert(false);
+	const opener = _appModalOpener;
+	_appModalOpener = null;
+	if (opener && opener.isConnected && typeof opener.focus === 'function') opener.focus();
 };
+
+// Escape closes the drill-down, as every dialog does.
+document.addEventListener('keydown', (event) => {
+	if (event.key === 'Escape') window.closeAppDrilldown();
+});
 
 function format_int(n) {
 	return new Intl.NumberFormat('fr-FR').format(Math.round(n || 0));
