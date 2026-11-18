@@ -347,7 +347,10 @@ function fromAlphaBlock(entry, qwerty) {
  * taken as it is: nothing is completed. Its « dead_keys » name the cells that
  * are dead keys of a standard accent (a KLA file cannot say so): each such
  * cell becomes that dead key, which composes every character the layout types
- * by Unicode normalisation, as an imported file's standard accent does.
+ * by Unicode normalisation, as an imported file's standard accent does. A
+ * layout encoded from its official files states its dead keys as cells
+ * ({dead: state}) and their compositions as « dead_rules »; a standard
+ * accent's state composes the characters its rules leave out the same way.
  * @param {object} entry - One layout_library.json entry with rows.
  * @param {string[]} codes - The measured codes.
  * @param {object} formats - LAYOUT_FORMATS (loadFormats).
@@ -358,15 +361,21 @@ function fromAlphaBlock(entry, qwerty) {
 function fromWholeRows(entry, codes, formats) {
 	const measured = new Set(codes);
 	const rows = {};
+	const deadCell = (cell) =>
+		cell !== null && typeof cell === 'object' && typeof cell.dead === 'string' && cell.dead !== '';
 	for (const [code, row] of Object.entries(entry.rows)) {
 		if (!measured.has(code)) throw new Error(`${entry.id}: ${code} is not a measured key`);
 		if (
 			!Array.isArray(row) ||
 			row.length !== LIBRARY_LEVELS ||
-			!row.every((cell) => cell === null || (typeof cell === 'string' && cell !== ''))
+			!row.every(
+				(cell) => cell === null || (typeof cell === 'string' && cell !== '') || deadCell(cell)
+			)
 		)
-			throw new Error(`${entry.id}: ${code} is not ${LIBRARY_LEVELS} characters or null`);
-		rows[code] = row.slice();
+			throw new Error(
+				`${entry.id}: ${code} is not ${LIBRARY_LEVELS} characters, dead keys or null`
+			);
+		rows[code] = row.map((cell) => (deadCell(cell) ? { dead: cell.dead } : cell));
 	}
 	const layout = {
 		id: entry.id,
@@ -392,8 +401,34 @@ function fromWholeRows(entry, codes, formats) {
 			});
 		if (!found) throw new Error(`${entry.id}: dead key ${char} is on no key`);
 	}
+	// A dead cell of the rows ({dead: state}) types the rules its source states
+	// (« dead_rules »: the second key's character, or « dead:<state> » for a
+	// dead key, → the output); a standard accent's state also composes the rest
+	// by normalisation. Another state needs its rules: nothing is guessed.
+	const states = new Set();
+	for (const row of Object.values(entry.rows))
+		for (const cell of row) if (deadCell(cell)) states.add(cell.dead);
+	const deadRules = entry.dead_rules || {};
+	for (const [state, rules] of Object.entries(deadRules)) {
+		if (!states.has(state)) throw new Error(`${entry.id}: dead_rules ${state} is on no key`);
+		for (const [typed, output] of Object.entries(rules)) {
+			const target = typed.startsWith('dead:') ? typed.slice('dead:'.length) : null;
+			if (target !== null ? !states.has(target) : Array.from(typed).length !== 1)
+				throw new Error(`${entry.id}: dead_rules ${state} has the invalid key ${typed}`);
+			if (typeof output !== 'string' || output === '')
+				throw new Error(`${entry.id}: dead_rules ${state}.${typed} types no text`);
+		}
+		layout.dead[state] = Object.assign({}, rules);
+	}
+	for (const state of states) {
+		if (!formats.ACCENTS[state] && !deadRules[state])
+			throw new Error(`${entry.id}: dead key ${state} is no standard accent and has no rules`);
+		if (deadKeys.some(([, accent]) => accent === state))
+			throw new Error(`${entry.id}: dead key ${state} is both a cell and a dead_keys character`);
+	}
 	// Composed once every dead cell is known, so no accent composes another's key.
 	for (const [, accent] of deadKeys) formats.composeAccent(layout, accent, accent);
+	for (const state of states) formats.composeAccent(layout, state, state);
 	return layout;
 }
 
