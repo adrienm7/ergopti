@@ -2,7 +2,7 @@
 	"_comment": "Counts of tools/test/test-structure-folder-bounds.cjs (Rule B of docs/design/structure-plan.md), measured 2026-11-11 (rebaselined on dev a85f2f75). They can only go down: lower them with --update-baseline in the change that fixes a folder; never raise one.",
 	"windows.code_oversized": 3,
 	"windows.code_singleton": 1,
-	"windows.tests_oversized": 12,
+	"windows.tests_oversized": 11,
 	"windows.tests_singleton": 8,
 	"macos.code_oversized": 4,
 	"macos.code_singleton": 0,
