@@ -1525,6 +1525,76 @@ var LAYOUT_ANALYSIS = (function () {
 		return prepared;
 	}
 
+	/**
+	 * Whether a token typed by a key is text a layout produces: one code point
+	 * that is not a control character, a line break and a tab excepted (Escape
+	 * and Backspace also reach the store as U+001B and U+0008).
+	 * @param {string} token - One token of a stored key.
+	 * @returns {boolean}
+	 */
+	function isTypedText(token) {
+		const c = codePoints(token);
+		if (c.length !== 1) return false;
+		if (isBreak(c[0])) return true;
+		return !/^[\u0000-\u001f\u007f-\u009f]$/.test(c[0]);
+	}
+
+	/**
+	 * The n-gram tables of the keystats store's « My typing » payload
+	 * (_shared/metrics/data/studio_ngrams.json), in the shape ngramsFromText
+	 * returns. A stored key is a run of tokens (_shared/metrics/data/keystats_tokens.json):
+	 * a marker such as [BS] or [LEFT] for a key that types no text, the escape
+	 * [[ for a typed bracket, or one character. An n-gram with a marker or a
+	 * control character is no text a layout types, and a key whose tokens do not
+	 * make one n-gram of its family is not one either: both are left out and
+	 * counted in `skipped`. The n-grams with a line break or a tab go to `breaks`,
+	 * as ngramsFromText puts them, so the analysers read both corpora alike.
+	 * @param {{chars: object, bigrams: object, trigrams?: object, final?: object}} payload
+	 *   The host's tables; final, when present, is converted the same way.
+	 * @param {function(string): string[]} tokenize - The store's key reader (key_tokens).
+	 * @returns {{chars: object, bigrams: object, trigrams: object, breaks: object,
+	 *   total: number, skipped: number, final?: object}} Counts.
+	 * @throws {Error} On a payload without its tables or a count that is not a number.
+	 */
+	function ngramsFromKeystats(payload, tokenize) {
+		if (typeof tokenize !== 'function')
+			throw new Error('layout_analysis: keystats n-grams need the key reader');
+		const text = (tables, what) => {
+			if (!tables || typeof tables.chars !== 'object' || typeof tables.bigrams !== 'object')
+				throw new Error(`layout_analysis: the keystats ${what} need chars and bigrams`);
+			const main = { chars: {}, bigrams: {}, trigrams: {} };
+			const breaks = { chars: {}, bigrams: {}, trigrams: {} };
+			let skipped = 0;
+			let total = 0;
+			for (const [field, size] of [
+				['chars', 1],
+				['bigrams', 2],
+				['trigrams', 3]
+			]) {
+				for (const [key, n] of Object.entries(tables[field] || {})) {
+					if (typeof n !== 'number' || !Number.isFinite(n))
+						throw new Error(
+							`layout_analysis: the keystats count of ${JSON.stringify(key)} is no number`
+						);
+					if (!(n > 0)) continue;
+					const tokens = tokenize(key);
+					if (tokens.length !== size || !tokens.every(isTypedText)) {
+						if (size === 1) skipped += n;
+						continue;
+					}
+					const gram = tokens.join('');
+					const table = tokens.some(isBreak) ? breaks[field] : main[field];
+					table[gram] = (table[gram] || 0) + n;
+					if (size === 1) total += n;
+				}
+			}
+			return Object.assign(main, { breaks, total, skipped });
+		};
+		const out = text(payload, 'tables');
+		if (payload.final !== undefined) out.final = text(payload.final, 'final text');
+		return out;
+	}
+
 	const tableIdsCache = new WeakMap();
 
 	/**
@@ -5733,6 +5803,7 @@ var LAYOUT_ANALYSIS = (function () {
 		metricDigits,
 		keyNgrams,
 		ngramsFromText,
+		ngramsFromKeystats,
 		prepareNgrams,
 		analyse,
 		scoreSession,

@@ -590,8 +590,25 @@ window.keystatsNgrams = function (result) {
 		);
 		return;
 	}
-	_keystatsNgrams = ngrams;
-	document.dispatchEvent(new CustomEvent('studio-ngrams', { detail: ngrams }));
+	// The store keeps keys, not text: [BS], the arrows and Escape are left out
+	// here, once, and the tables are checked before any tab reads them, so a
+	// table the engine refuses never reaches a panel that mounts on it (the
+	// editor's panel did, and « Éditer » stayed empty).
+	let tables;
+	try {
+		tables = LAYOUT_ANALYSIS.ngramsFromKeystats(ngrams, key_tokens);
+		LAYOUT_ANALYSIS.prepareNgrams(tables);
+		if (tables.final !== undefined) LAYOUT_ANALYSIS.prepareNgrams(tables.final);
+	} catch (error) {
+		// Refused like an unreadable store: the tables already shown stay.
+		announceKeystats(
+			'failed',
+			tr(KEYSTATS_REFUSALS.keystats_unreadable) + ' (' + error.message + ')'
+		);
+		return;
+	}
+	_keystatsNgrams = tables;
+	document.dispatchEvent(new CustomEvent('studio-ngrams', { detail: tables }));
 };
 
 // The analysis panels (_shared/ui/layout_analysis) open their « i » links

@@ -36,6 +36,13 @@ const infoPopoverSource = fs.readFileSync(
 	path.join(SHARED, 'ui/layout_analysis/info_popover.js'),
 	'utf8'
 );
+// The scripts the Studio window reads « Ma frappe » with (index.html loads them
+// before script.js): the analysis engine and the keystats key reader.
+const studioReaderPreludes = [
+	'ui/layout_analysis/analysis_engine.js',
+	'ui/metrics_typing/_generated/keystats_tokens.js',
+	'ui/metrics_typing/key_tokens.js'
+].map((file) => ({ source: fs.readFileSync(path.join(SHARED, file), 'utf8'), filename: file }));
 const LOCALE_DIR = path.join(SHARED, 'core/i18n/data/locales');
 const LOCALES = [
 	'ar',
@@ -223,7 +230,8 @@ function loadEditorPage() {
 			{
 				source: 'window.LAYOUT_ANALYSIS_INFO = LAYOUT_ANALYSIS_INFO;',
 				filename: 'window-binding.js'
-			}
+			},
+			...studioReaderPreludes
 		]
 	});
 }
@@ -907,7 +915,16 @@ check(
 		};
 		window.keystatsNgrams({ ok: true, ngrams });
 		assert.equal(published().length, 1);
-		assert.deepEqual(plain(published()[0].detail), ngrams);
+		const empty = { chars: {}, bigrams: {}, trigrams: {} };
+		assert.deepEqual(plain(published()[0].detail), {
+			chars: { e: 7 },
+			bigrams: {},
+			trigrams: {},
+			breaks: empty,
+			total: 7,
+			skipped: 0,
+			final: { chars: { e: 9 }, bigrams: {}, trigrams: {}, breaks: empty, total: 9, skipped: 0 }
+		});
 		// The analysis panels open their « i » links through the host.
 		window.LAYOUT_ANALYSIS_HOST.openLink('https://ergopti.fr/studio');
 		assert.deepEqual(plain(messages[messages.length - 1]), {
@@ -949,7 +966,11 @@ check(
 			document.events
 				.filter((event) => event.type === 'studio-ngrams')
 				.map((event) => plain(event.detail));
-		assert.deepEqual(published(), [saved, fresh], 'each answer is published, the fresh one last');
+		assert.deepEqual(
+			published().map((tables) => tables.chars),
+			[{ e: 7 }, { e: 9 }],
+			'each answer is published, the fresh one last'
+		);
 		window.keystatsNgrams({ ok: false, code: 'keystats_unreadable' });
 		assert.equal(published().length, 2, 'a refused refresh publishes no data');
 		assert.equal(
@@ -957,6 +978,49 @@ check(
 			1,
 			'the second answer is not a second request'
 		);
+	}
+);
+
+check(
+	'(studio-my-typing-markers) « Ma frappe » reaches the tabs as text, not as stored keys',
+	() => {
+		// The keystats store keeps keys: [BS], [ENTER], the arrows, [[ for a typed
+		// bracket, and Escape as U+001B. The saved read with them reached the
+		// editor's analysis panel before the editor mounted (the AHK host answers
+		// keystats_ngrams while it still builds sourceData); its first table refused
+		// "[BS]" as a 1-gram and « Éditer » stayed empty, and the Comparer never
+		// listed « Ma frappe ».
+		const { window, document, context } = loadEditorPage();
+		window.initData({ strings: {}, state: { platform: 'windows' }, keystats: true });
+		const stored = {
+			chars: { e: 5, '[BS]': 4, '[ENTER]': 2, '\n': 2, '[[': 1, '\u001b': 3, ' ?': 1 },
+			bigrams: { 'e[BS]': 3, '[BS][BS]': 2, ee: 1, 'e\n': 2, '[[e': 1 },
+			trigrams: { 'e[BS]e': 1, eee: 1, '[ENTER]\ne': 1 },
+			total: 18
+		};
+		window.keystatsNgrams({ ok: true, ngrams: { ...stored, final: stored } });
+		const published = document.events.filter((event) => event.type === 'studio-ngrams');
+		assert.equal(published.length, 1, 'the read is published');
+		const tables = plain(published[0].detail);
+		assert.deepEqual(tables.chars, { e: 5, '[': 1 }, 'markers and control keys are not text');
+		assert.deepEqual(tables.bigrams, { ee: 1, '[e': 1 });
+		assert.deepEqual(tables.trigrams, { eee: 1 });
+		assert.deepEqual(tables.breaks, { chars: { '\n': 2 }, bigrams: { 'e\n': 2 }, trigrams: {} });
+		assert.equal(tables.skipped, 4 + 2 + 3 + 1, 'every key left out is counted');
+		// Every tab prepares the tables it receives: none may refuse them.
+		const engine = vm.runInContext('LAYOUT_ANALYSIS', context);
+		engine.prepareNgrams(published[0].detail);
+		engine.prepareNgrams(published[0].detail.final);
+		assert.equal(
+			document.events.filter((event) => event.type === 'studio-ngrams-state').length,
+			1,
+			'only the loading state was announced'
+		);
+		// Tables the engine still refuses are announced as unreadable, never published.
+		window.keystatsNgrams({ ok: true, ngrams: { chars: { e: 'many' }, bigrams: {} } });
+		assert.equal(document.events.filter((event) => event.type === 'studio-ngrams').length, 1);
+		const states = document.events.filter((event) => event.type === 'studio-ngrams-state');
+		assert.equal(states[states.length - 1].detail.state, 'failed');
 	}
 );
 
