@@ -240,8 +240,6 @@ const BOOT_PARSE_REPEAT_OWNERS = {
 			'proof: the private shadow the served snapshot is compared against',
 		'ConfigTomlDecodeSnapshot<PersonalFileControls.Refresh':
 			'debt: the personal-file activation could read the admitted boot snapshot',
-		'HotstringsTerminatorRecordsInit<HotstringsTerminatorRecordsInitBoot':
-			'debt: the terminator records could read the admitted snapshot document',
 		'TOML_ParseDocumentShared<_LLM_Menu_PrivacySnapshot':
 			'debt: the shared document cache misses because no earlier boot reader fills it'
 	},

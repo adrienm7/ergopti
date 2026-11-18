@@ -48,6 +48,29 @@ _HTRB_AdmittedGeneration() {
 Test("terminator-boot: real loader receipt retains the admitted generation after the source changes",
 	_HTRB_WithBoot.Bind(_HTRB_AdmittedGeneration))
 
+; boot-parse-repeats-2026-11-18: the boot owner resolves its records from the
+; document the loader admitted. Parsing that exact source again is the repeat the
+; startup smoke refuses; the document reader's repeat owners show it here too.
+_HTRB_ReusesAdmittedDocument() {
+	OriginalBootBody := _HTR_Source()
+	Fixture := _ScopeOwnerFixture(OriginalBootBody)
+	try {
+		Assert(FSWriteDurable(Fixture.path, Fixture.source))
+		TOML_ParseRepeatOwnersTake("document")
+		BootSnapshot := 0
+		ApplyBootConfigToml(Map(), Fixture.path, &BootSnapshot)
+		Assert(BootSnapshot is Object, "the actual loader must publish its admitted image")
+		AssertTrue(HotstringsTerminatorRecordsInitBoot(BootSnapshot))
+		AssertEqual(_HTR_DEFAULT_WORD . "¤😀", HotstringsGetWordDelimiters(),
+			"the records resolved from the admitted document")
+		for Owner in TOML_ParseRepeatOwnersTake("document")
+			AssertFalse(InStr(Owner, "HotstringsTerminatorRecords"),
+				"the terminator boot owner parsed the admitted source again: " . Owner)
+	} finally _ScopeOwnerCleanup(Fixture)
+}
+Test("terminator-boot: the records reuse the admitted document instead of parsing it again",
+	_HTRB_WithBoot.Bind(_HTRB_ReusesAdmittedDocument))
+
 _HTRB_RefusedGeneration(ReadRefusal) {
 	global _HotstringsTerminatorRecords, _ConfigBootRejectedOverrides, _ConfigBootReadFailed
 	Fixture := _ScopeOwnerFixture(), ReadLock := false, PrimaryFailure := false

@@ -139,21 +139,36 @@ _HotstringsTerminatorBuiltinResolve(States, Consumption, Rejected) {
 	return { State: State, Stored: Stored }
 }
 
-/** Consumes only the boot loader's admitted image; refusal publishes no record owner. */
+/**
+ * Consumes only the boot loader's admitted image; refusal publishes no record owner.
+ * The records resolve from the snapshot's own typed document: the loader already
+ * parsed that exact source, and parsing it again cost a whole config.toml parse.
+ */
 HotstringsTerminatorRecordsInitBoot(Snapshot) {
 	if Snapshot is Integer && Snapshot == 0
 		return false
 	if !(Snapshot is Object) || !HasProp(Snapshot, "Source") || !(Snapshot.Source is String)
+			|| !HasProp(Snapshot, "Document") || !(Snapshot.Document is Map)
 		throw TypeError("The terminator boot owner requires an admitted configuration snapshot.")
-	return HotstringsTerminatorRecordsInit(Snapshot.Source)
+	return _HotstringsTerminatorRecordsPublish(Snapshot.Source, Snapshot.Document)
 }
 
 /** Initializes one boot owner without borrowing a later unrelated source read. */
 HotstringsTerminatorRecordsInit(Source) {
+	return _HotstringsTerminatorRecordsPublish(Source, TOML_ParseDocument(Source))
+}
+
+/**
+ * Publishes the record owner of Source from its typed document, read only.
+ * @param {String} Source - The exact configuration text the owner retains.
+ * @param {Map} Document - The typed document of that exact text.
+ * @returns {Boolean} True once the owner is published.
+ */
+_HotstringsTerminatorRecordsPublish(Source, Document) {
 	global _HotstringsTerminatorRecords, HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
 	if _HotstringsTerminatorRecords is Object
 		throw Error("The custom terminator record owner is already initialized.")
-	Candidate := HotstringsTerminatorRecordsResolve(TOML_ParseDocument(Source))
+	Candidate := HotstringsTerminatorRecordsResolve(Document)
 	Candidate.Source := Source
 	_HotstringsTerminatorRecords := Candidate
 	HSE_WORD_TERMINATORS := HotstringsGetWordDelimiters()
