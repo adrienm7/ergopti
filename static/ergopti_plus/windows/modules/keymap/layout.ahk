@@ -214,7 +214,12 @@ _RemapEmit(SendStr, KeyChar, *) {
 ; makes its text VISIBLE, so it observes the keystream instead of eating it, and
 ; a character it sees still reaches the application. Adding it to the set above
 ; would suppress every ring push for the entire life of the driver.
-global _EMIT_NONSUPPRESSING_HOOKS := ["_PrefixInputHook"]
+; The expansion burst capture (_HSE_BurstInputHook) holds the physical text keys
+; struck during a burst and types them again after it, but its input level lets
+; every emit through (they are sent below it), and a key a remap hotkey consumes
+; is never collected: no emitted character is eaten. Its global keeps the one
+; reused capture object, so in the set above it would also gate every push.
+global _EMIT_NONSUPPRESSING_HOOKS := ["_PrefixInputHook", "_HSE_BurstInputHook"]
 
 _EmitReachedScreen() {
 	global _EMIT_SUPPRESSING_HOOKS

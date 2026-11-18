@@ -37,7 +37,7 @@ global HSE_BURST_CAPTURE_OPTIONS := "L1023 B0"
 ; One capture serves every burst (_HSE_BurstCapture): constructing an InputHook
 ; per burst stalled 75 to 220 ms about three times in 2,000 on the PC, against
 ; at most 9 ms for restarting this one (a restart clears its Input).
-global _HSE_BurstCaptureHook := 0
+global _HSE_BurstInputHook := 0
 
 ; Terminal/TUI inputs commonly update their edit state once per render turn.
 ; A zero-delay run of Backspaces can therefore collapse onto one stale snapshot,
@@ -173,12 +173,12 @@ _HSE_ReleaseBurstCapture(Capture) {
 ; The burst capture, built at its first use from the injectable InputHook.
 ; @return {InputHook} The capture, stopped unless a burst is on its way.
 _HSE_BurstCapture() {
-		global _HSE_BurstCaptureHook, _AHK_InputHook, HSE_BURST_CAPTURE_OPTIONS
+		global _HSE_BurstInputHook, _AHK_InputHookFactory, HSE_BURST_CAPTURE_OPTIONS
 		global TAPHOLD_ROLL_REPLAY_SEND_LEVEL
-		if !IsObject(_HSE_BurstCaptureHook)
-				_HSE_BurstCaptureHook := _AHK_InputHook.Call(
+		if !IsObject(_HSE_BurstInputHook)
+				_HSE_BurstInputHook := _AHK_InputHookFactory.Call(
 						"I" . (TAPHOLD_ROLL_REPLAY_SEND_LEVEL + 1) . " " . HSE_BURST_CAPTURE_OPTIONS)
-		return _HSE_BurstCaptureHook
+		return _HSE_BurstInputHook
 }
 
 ; Types the text a burst capture held, the way the layout emulation types a

@@ -351,24 +351,24 @@ _HOF_RaceSendEvent(Keys) {
 }
 
 _HOF_RaceRun(Struck, Refuse, Callback) {
-	global _HOF_Race, _AHK_SendInput, _AHK_SendEvent, _AHK_InputHook, _HSE_BurstCaptureHook
+	global _HOF_Race, _AHK_SendInput, _AHK_SendEvent, _AHK_InputHookFactory, _HSE_BurstInputHook
 	SavedInput := _AHK_SendInput
 	SavedEvent := _AHK_SendEvent
-	SavedHook := _AHK_InputHook
-	SavedCapture := _HSE_BurstCaptureHook
+	SavedHook := _AHK_InputHookFactory
+	SavedCapture := _HSE_BurstInputHook
 	_HOF_Race := { Struck: Struck, Refuse: Refuse, Screen: [], Captures: [], Replays: [], Built: 0,
 		StruckDuringReplay: "", StruckAtStop: "" }
 	_AHK_SendInput := _HOF_RaceSendInput
 	_AHK_SendEvent := _HOF_RaceSendEvent
-	_AHK_InputHook := (Options) => _HOF_RaceCapture(Options)
-	_HSE_BurstCaptureHook := 0
+	_AHK_InputHookFactory := (Options) => _HOF_RaceCapture(Options)
+	_HSE_BurstInputHook := 0
 	try
 		Callback.Call()
 	finally {
 		_AHK_SendInput := SavedInput
 		_AHK_SendEvent := SavedEvent
-		_AHK_InputHook := SavedHook
-		_HSE_BurstCaptureHook := SavedCapture
+		_AHK_InputHookFactory := SavedHook
+		_HSE_BurstInputHook := SavedCapture
 	}
 }
 

@@ -80,7 +80,7 @@
 				{
 					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
 					"symbol": "HSE_UndoExpansion(Undo",
-					"sha256": "2903dd9aa1369217f50069d3d3fe8cc5a91c0cd14bdcdd8d97e444f01fd6391f"
+					"sha256": "5eaf1ba98e812aeb37f88934ce4e764c0d0728655fbb5cfe393161691d8b39b6"
 				}
 			],
 			"macos": [
@@ -182,7 +182,7 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "8bab67f3e58a0e5a530ea444fe2e229d3091aea275d906afc1935da8b0c1ec56"
+					"sha256": "a9fb6443077818b247fca8464c1ace6d624bc15aaca422ea321436059b9e2709"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
@@ -237,7 +237,7 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "8bab67f3e58a0e5a530ea444fe2e229d3091aea275d906afc1935da8b0c1ec56"
+					"sha256": "a9fb6443077818b247fca8464c1ace6d624bc15aaca422ea321436059b9e2709"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
@@ -284,7 +284,7 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "8bab67f3e58a0e5a530ea444fe2e229d3091aea275d906afc1935da8b0c1ec56"
+					"sha256": "a9fb6443077818b247fca8464c1ace6d624bc15aaca422ea321436059b9e2709"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
