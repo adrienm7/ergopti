@@ -162,11 +162,16 @@ helpers.describe("complete installed extension shared frames (Linux)", function(
 		-- translated name, so the whole frame is drawn in that locale.
 		local corpus = read_corpus("hotstring_extension_frames")
 		local bulk = { enable = corpus.captions.extension_enable_all, disable = corpus.captions.extension_disable_all }
-		-- i18n settles its own locale on first use; settle it first, so the
-		-- build cannot switch the frame back to the session language.
+		-- An earlier module can leave the cached i18n and locale modules out of
+		-- step (run after tests.unit.core.i18n.test_persistence, the frame drew
+		-- in French while the expectation read English). The frame gets one fresh i18n, locale and
+		-- core, restored afterwards. i18n settles its own locale on first
+		-- use; settle it first, so the build cannot switch the frame back.
+		local owners = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core" }
+		local cached = {}
+		for _, name in ipairs(owners) do cached[name] = package.loaded[name]; package.loaded[name] = nil end
 		require("core.i18n.engine.i18n").init()
 		local Locale = require("core.i18n.engine.locale")
-		local previous = Locale.current_locale()
 		Locale.set_locale("en")
 		local ok, err = pcall(with_extension_frame, function(f)
 			local rows = assert(f.build()).menu
@@ -186,7 +191,7 @@ helpers.describe("complete installed extension shared frames (Linux)", function(
 			helpers.assert_true(rows[1].fn()); helpers.assert_true(rows[2].fn())
 			helpers.assert_eq(writes, 2)
 		end)
-		Locale.set_locale(previous)
+		for _, name in ipairs(owners) do package.loaded[name] = cached[name] end
 		if not ok then error(err, 0) end
 	end)
 	helpers.it("keeps the extension children in a paused tray (edd1-paused-writes)", function()
