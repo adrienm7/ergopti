@@ -255,10 +255,16 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
   `request_plan_*`, the keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left; the rest of the menu
   files need `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers
   and sleeps before the registry loads.
-- **Tests.** Source assertions left to convert to behaviour (3,780 `_Driver*` source reads in 994 files; 80 meta
-  files still read `A_IsSuspended` from source). Guards that would send keys, paste or move the cursor when broken
-  (text sender, tap-hold, dead keys, `SimulateActivity`) need a seam first. The ROI half-life tick and the click
-  handlers are guarded a second time downstream, so a behaviour test of their own guard could not fail.
+- **Tests.** Source assertions left to convert to behaviour (3,799 `_Driver*` source reads in 989 files; 71 meta
+  files still name `A_IsSuspended`, 60 of them outside comments). Counted over `windows/tests/**/*.ahk` as calls to
+  `_DriverFuncBody`, `_DriverFuncBodyOrEmpty`, `_DriverSourceConcat`, `_DriverSourceNoComments`, `_DriverDirConcat`,
+  `_DriverDirsConcat` and `_DriverFileSource`, and as `tests/meta` files containing `A_IsSuspended`. Guards that
+  would send keys, paste or move the cursor when broken (text sender, inline auto-type, tap-hold, dead keys,
+  `SimulateActivity`, the keep-awake start, the bridge start) need a seam first. Guarded a second time downstream,
+  so a behaviour test of their own guard could not fail: the ROI half-life tick, the click handlers, the updater
+  background tick, the ShellRunner pollers, the ingest tick and the click-hold key watcher (its paused branch does
+  what the running one does). Owners outside the headless runner (`Ergopti_OnSuspendEnter`/`Resume`, the layout
+  poll, the model browser bridge) stay source reads until they get a harness.
 - **Signing follow-ups (maintainer).** The workflows and scripts are ready; only these steps are left. SignPath:
   after acceptance, set the secrets `SIGNPATH_API_TOKEN` and `WINDOWS_SIGNER_SUBJECT` and the variables
   `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG` and `SIGNPATH_SIGNING_POLICY_SLUG`, approve the first stable
