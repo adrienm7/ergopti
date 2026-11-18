@@ -28,7 +28,20 @@ same commit as each step or checkpoint. Times are Paris time.
     `test-hotstring-output-tokens.cjs`) and log-tag patterns in
     `sub_files.toml` are not rewritten;
   - `test_user_hotstrings.ahk:359` (DirDelete after the worker cancel) can
-    fail under a parallel load and passes alone.
+    fail under a parallel load and passes alone;
+  - on a Windows PC shared with another clipboard user, the native
+    `SendInstant native post-receipt copy` and `copy after snapshot` cases
+    fail before the step as after it; under WSL without a display, Linux
+    `test_colored_menu` and `test_prompt_cancel` wait on a real dialog
+    host, and the FIFO and permission cases fail on /mnt as root.
+- Local proof of S26 (2026-11-18): strict lint, format, AHK parse and
+  encoding, literal inventory, pinned reads, corpus fields, folder bounds,
+  tree parity, module matrix; AHK filters over the moved files (about 2,600
+  cases); every moved macOS module (lua5.4) and every moved Linux module
+  (LuaJIT) under WSL. Not proven here: the full JS suite (the host Node is
+  22.16, `.node-version` pins 22.22.2), the macOS launcher and E2E lanes,
+  and the cohort requalifications named in the commits. Next: a proof
+  branch `ci/verify-structure-<shortsha>` with `os_lanes=all`.
 - Run each step on the Windows PC with
   `ERGOPTI_STRUCTURE_PHASE=2 node tools/audit/structure/run-phase2.cjs --from <key> --to <key>`
   in an own worktree (one step takes 15 to 25 minutes); the runner now passes
