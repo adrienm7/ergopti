@@ -38,6 +38,7 @@ _RCR_Descriptor(Extra := "") {
 ; global the load publishes.
 ; @param {String} Text The api_providers.json source.
 ; @returns {Map} "thrown" (the load's error message, "" when it returned),
+;     "threw" (whether the load threw, so an Error("") still counts),
 ;     "logged" (every log line of the load), "providers" (the published
 ;     provider registry) and "tally" (JsonDecodeTally deltas of the load).
 _RCR_Load(Text) {
@@ -48,7 +49,7 @@ _RCR_Load(Text) {
 	OldSharedDir := _SharedDir
 	Root := A_Temp . "\ergopti-catalog-refusal-" . DllCall("GetCurrentProcessId") . "-" . Serial
 	Lines := []
-	Result := Map("thrown", "", "logged", Lines)
+	Result := Map("thrown", "", "threw", false, "logged", Lines)
 	try {
 		DirCreate(Root . "\ai\data")
 		FileAppend(Text, Root . "\ai\data\api_providers.json", "UTF-8-RAW")
@@ -56,8 +57,10 @@ _RCR_Load(Text) {
 		LoggerSetTestSink((Line) => Lines.Push(Line))
 		Before := JsonDecodeTally()
 		try _LLMRemote_LoadCatalog()
-		catch as Err
+		catch as Err {
+			Result["threw"] := true
 			Result["thrown"] := Err.Message
+		}
 		After := JsonDecodeTally()
 		Delta := Map()
 		for Name, Value in After
@@ -124,9 +127,10 @@ _RCR_WholeCatalogueRefusals() {
 		. (JSON_MAX_NESTING_DEPTH + 6) . "."])
 	for Row in Cases {
 		Result := _RCR_Load(Row[1])
+		AssertTrue(Result["threw"], "the load refuses " . SubStr(Row[1], 1, 60))
 		AssertEqual(Row[2], Result["thrown"], "the refusal of " . SubStr(Row[1], 1, 60))
 	}
-	AssertEqual("", _RCR_Load('{' . Valid . '}')["thrown"], "the minimal valid catalogue loads")
+	AssertFalse(_RCR_Load('{' . Valid . '}')["threw"], "the minimal valid catalogue loads")
 }
 Test("api_providers.json: a malformed catalogue is refused whole with its message", _RCR_WholeCatalogueRefusals)
 
@@ -182,7 +186,7 @@ _RCR_DialectRefusals() {
 		. ', "d_inner_last_wins": ' . _RCR_Descriptor('"thinking_dialect": 1, "thinking_dialect": {"toggle": {"t": true}}')
 		. ', "d_inner_last_refused": ' . _RCR_Descriptor('"thinking_dialect": {"toggle": {"t": true}}, "thinking_dialect": 1')
 	Result := _RCR_Load('{"provider_order": [' . Order . '], "providers": {' . Providers . '}, "model_prices": {}}')
-	AssertEqual("", Result["thrown"], "a refused dialect refuses its provider only")
+	AssertFalse(Result["threw"], "a refused dialect refuses its provider only")
 	Published := Result["providers"]
 	for Row in Refused {
 		AssertFalse(Published.Has(Row[1]), Row[1] . " is refused")
@@ -231,8 +235,8 @@ _RCR_ShippedCatalogueWalkedOnce() {
 	Shipped := FileRead(_SharedDir . "\ai\data\api_providers.json", "UTF-8")
 	Small := _RCR_Load(Minimal)
 	Large := _RCR_Load(Shipped)
-	AssertEqual("", Small["thrown"], "the one-provider catalogue loads")
-	AssertEqual("", Large["thrown"], "the shipped catalogue loads")
+	AssertFalse(Small["threw"], "the one-provider catalogue loads")
+	AssertFalse(Large["threw"], "the shipped catalogue loads")
 	Dialects := 0
 	for ProviderId, Provider in Large["providers"]
 		Dialects += Provider.Has("ThinkingDialect") && Provider["ThinkingDialect"].Count > 0
