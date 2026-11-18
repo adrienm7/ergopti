@@ -1595,6 +1595,14 @@ var LAYOUT_FORMATS = (function () {
 			}
 			return { id: spec.id, required: spec.required, optional: [], keys };
 		});
+		// The Ctrl/Cmd letters of keys whose shortcut differs from their base
+		// character (the optimizer's kept QWERTY shortcuts): the editor's
+		// « command » layer, which the macOS and Linux exports compile.
+		const commandKeys = {};
+		for (const [code, letter] of Object.entries(layout.command || {}))
+			commandKeys[code] = { text: letter };
+		if (Object.keys(commandKeys).length > 0)
+			layers.push({ id: 'command', required: ['meta'], optional: [], keys: commandKeys });
 		const deadKeys = Object.keys(layout.dead).map((state) => {
 			const rules = [];
 			for (const [typed, made] of Object.entries(layout.dead[state])) {

@@ -688,6 +688,27 @@ check(
 		singleCharacterLayers(klaIso.layout, klaCodes),
 	'a KLAnext layout written as a .keylayout types other keys'
 );
+// A Ctrl/Cmd shortcut kept on another key than its letter (the optimizer's
+// kept QWERTY shortcuts) survives the source and the .keylayout: toSource
+// dropped the command map until 2026-11-18, so « Open in the editor » lost it.
+{
+	const azerty = E.libraryLayouts().find((layout) => layout.id === 'azerty');
+	const moved = JSON.parse(JSON.stringify(azerty));
+	moved.id = 'kept_shortcuts';
+	[moved.rows.KeyW, moved.rows.KeyZ] = [moved.rows.KeyZ, moved.rows.KeyW];
+	moved.command = { KeyZ: 'w', KeyW: 'z' };
+	const source = F.toSource(moved);
+	try {
+		Source.validate(source);
+	} catch (error) {
+		check(false, `kept shortcuts: toSource is invalid (${error.code} ${error.path})`);
+	}
+	const back = F.fromKeylayout(exportKeylayout(moved), moved.id, 'iso', keylayoutTools);
+	check(
+		back.layout.command.KeyZ === 'w' && back.layout.command.KeyW === 'z',
+		`kept shortcuts: the command map comes back as ${JSON.stringify(back.layout.command)}`
+	);
+}
 
 // ====================================================================
 // ======= 9/ KLAnext matrix, XKB, KLC, DOF, genkey, cmini: real files ===
