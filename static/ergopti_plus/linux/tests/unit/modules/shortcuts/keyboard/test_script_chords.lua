@@ -134,7 +134,7 @@ helpers.describe("Linux script-management chords (script-chords-three-os-2026-09
 		with_chords(nil, function(Chords, log)
 			helpers.assert_eq(Chords.chords_enabled(), true)
 			for _, code in ipairs({ KEY_ENTER, KEY_BACKSPACE, KEY_DELETE, KEY_ESC }) do
-				helpers.assert_eq(Chords.on_key({ code = code, mods = ALTGR }), true, "AltGr + " .. code)
+				helpers.assert_eq(Chords.on_key({ code = code, mods = ALTGR, prior_role = "altgr" }), true, "AltGr + " .. code)
 			end
 			helpers.assert_eq(#log.executed, 0, "nothing runs inside the consumption callback")
 			log.run()
@@ -158,11 +158,11 @@ helpers.describe("Linux script-management chords (script-chords-three-os-2026-09
 		with_chords("[shortcuts.script_control]\nchords_enabled = false\n", function(Chords, log)
 			helpers.assert_eq(Chords.chords_enabled(), false)
 			for _, code in ipairs({ KEY_ENTER, KEY_BACKSPACE, KEY_DELETE, KEY_ESC }) do
-				helpers.assert_eq(Chords.on_key({ code = code, mods = ALTGR }), false)
+				helpers.assert_eq(Chords.on_key({ code = code, mods = ALTGR, prior_role = "altgr" }), false)
 			end
 			helpers.assert_eq(Chords.get_action("script_altgr_escape"), "script_quit")
 			helpers.assert_true(Chords.set_chords_enabled(true))
-			helpers.assert_eq(Chords.on_key({ code = KEY_ESC, mods = ALTGR }), true)
+			helpers.assert_eq(Chords.on_key({ code = KEY_ESC, mods = ALTGR, prior_role = "altgr" }), true)
 			local saved = TomlCodec.decode(Sandbox.read_bytes(log.path))
 			helpers.assert_eq(((saved.shortcuts or {}).script_control or {}).chords_enabled, nil,
 				"the switch back on its default is a deletion")
@@ -172,8 +172,8 @@ helpers.describe("Linux script-management chords (script-chords-three-os-2026-09
 	helpers.it("script-chord: an explicit none is kept and leaves that chord to the application", function()
 		with_chords('[shortcuts.script_control]\nscript_altgr_enter = "none"\n', function(Chords, log)
 			helpers.assert_eq(Chords.get_action("script_altgr_enter"), "none")
-			helpers.assert_eq(Chords.on_key({ code = KEY_ENTER, mods = ALTGR }), false)
-			helpers.assert_eq(Chords.on_key({ code = KEY_ESC, mods = ALTGR }), true)
+			helpers.assert_eq(Chords.on_key({ code = KEY_ENTER, mods = ALTGR, prior_role = "altgr" }), false)
+			helpers.assert_eq(Chords.on_key({ code = KEY_ESC, mods = ALTGR, prior_role = "altgr" }), true)
 			helpers.assert_true(Chords.set_action("script_altgr_backspace", "none"))
 			local saved = TomlCodec.decode(Sandbox.read_bytes(log.path)).shortcuts.script_control
 			helpers.assert_eq(saved.script_altgr_backspace, "none", "none is written, since absence is the preset")
@@ -187,13 +187,13 @@ helpers.describe("Linux script-management chords (script-chords-three-os-2026-09
 	helpers.it("script-chord: paused, only a script-management action runs", function()
 		with_chords('[shortcuts.script_control]\nscript_altgr_delete = "screen_capture"\n', function(Chords, log)
 			log.paused = true
-			helpers.assert_eq(Chords.on_key({ code = KEY_DELETE, mods = ALTGR }), false,
+			helpers.assert_eq(Chords.on_key({ code = KEY_DELETE, mods = ALTGR, prior_role = "altgr" }), false,
 				"a paused daemon leaves any other action's chord to the application")
-			helpers.assert_eq(Chords.on_key({ code = KEY_ENTER, mods = ALTGR }), true, "the way back from a pause")
+			helpers.assert_eq(Chords.on_key({ code = KEY_ENTER, mods = ALTGR, prior_role = "altgr" }), true, "the way back from a pause")
 			log.run()
 			helpers.assert_eq(table.concat(log.executed, " / "), "script_pause_toggle@script__script_altgr_enter")
 			log.paused = false
-			helpers.assert_eq(Chords.on_key({ code = KEY_DELETE, mods = ALTGR }), true)
+			helpers.assert_eq(Chords.on_key({ code = KEY_DELETE, mods = ALTGR, prior_role = "altgr" }), true)
 			log.paused = true
 			log.run()
 			helpers.assert_eq(#log.executed, 1, "a pause between the press and its tick runs nothing else")
@@ -202,14 +202,35 @@ helpers.describe("Linux script-management chords (script-chords-three-os-2026-09
 
 	helpers.it("script-chord: without AltGr, with another modifier or on another key the press is the application's", function()
 		with_chords(nil, function(Chords, log)
-			helpers.assert_eq(Chords.on_key({ code = KEY_ENTER, mods = {} }), false)
+			helpers.assert_eq(Chords.on_key({ code = KEY_ENTER, mods = {}, prior_role = "altgr" }), false)
 			for _, name in ipairs({ "ctrl", "alt", "meta" }) do
-				helpers.assert_eq(Chords.on_key({ code = KEY_ENTER, mods = { altgr = true, [name] = true } }), false, name)
+				helpers.assert_eq(Chords.on_key({ code = KEY_ENTER, mods = { altgr = true, [name] = true }, prior_role = "altgr" }), false, name)
 			end
-			helpers.assert_eq(Chords.on_key({ code = KEY_ENTER, mods = { altgr = true, shift = true } }), true,
+			helpers.assert_eq(Chords.on_key({ code = KEY_ENTER, mods = { altgr = true, shift = true }, prior_role = "altgr" }), true,
 				"Shift rides along, as on Windows")
-			helpers.assert_eq(Chords.on_key({ code = 30, mods = ALTGR }), false, "AltGr + A types its character")
+			helpers.assert_eq(Chords.on_key({ code = 30, mods = ALTGR, prior_role = "altgr" }), false, "AltGr + A types its character")
 			helpers.assert_eq(#log.deferred, 1)
+		end)
+	end)
+
+	-- Ergopti+ AltGr types symbols: a fast « (# » then Enter or Backspace while
+	-- AltGr is still held paused or reloaded the driver (the maintainer,
+	-- 2026-11-17). A chord is AltGr pressed, then its key, as on Windows.
+	helpers.it("script-chord: a slot key typed after another key while AltGr is held is text", function()
+		with_chords(nil, function(Chords, log)
+			for _, code in ipairs({ KEY_ENTER, KEY_BACKSPACE, KEY_DELETE, KEY_ESC }) do
+				helpers.assert_eq(Chords.on_key({ code = code, mods = ALTGR, prior_role = false }), false,
+					"AltGr symbol then " .. code)
+				helpers.assert_eq(Chords.on_key({ code = code, mods = ALTGR, prior_role = "shift" }), false,
+					"Shift pressed after AltGr then " .. code)
+				helpers.assert_eq(Chords.on_key({ code = code, mods = ALTGR }), false, "no key before " .. code)
+			end
+			log.paused = true
+			helpers.assert_eq(Chords.on_key({ code = KEY_ENTER, mods = ALTGR, prior_role = false }), false,
+				"paused, the resume chord is a sequence too")
+			helpers.assert_eq(#log.deferred, 0)
+			helpers.assert_eq(Chords.on_key({ code = KEY_ENTER, mods = ALTGR, prior_role = "altgr" }), true,
+				"right after AltGr the resume chord runs")
 		end)
 	end)
 
@@ -235,11 +256,11 @@ helpers.describe('script chord after a pause cycle', function()
     with_chords('[shortcuts.script_control]\nscript_altgr_delete = "screen_capture"\n', function(chords, log)
       local script = require('modules.shortcuts.script_actions').new({reset=function() end,reload=function() end,quit=function() end})
       chords.init({is_paused=script.is_paused,pause_epoch=script.pause_epoch,defer=function(fn) log.deferred[#log.deferred+1]=fn; return true end})
-      assert(chords.on_key({code=KEY_DELETE,mods=ALTGR}))
+      assert(chords.on_key({code=KEY_DELETE,mods=ALTGR,prior_role="altgr"}))
       assert(script.toggle_pause()); assert(script.toggle_pause())
       log.run()
       helpers.assert_eq(log.executed, {})
-      assert(chords.on_key({code=KEY_DELETE,mods=ALTGR})); log.run()
+      assert(chords.on_key({code=KEY_DELETE,mods=ALTGR,prior_role="altgr"})); log.run()
       helpers.assert_eq(log.executed, {'screen_capture@script__script_altgr_delete'})
     end)
   end)
@@ -247,7 +268,7 @@ helpers.describe('script chord after a pause cycle', function()
     with_chords(nil, function(chords, log)
       local script = require('modules.shortcuts.script_actions').new({reset=function() end,reload=function() end,quit=function() end})
       chords.init({is_paused=script.is_paused,pause_epoch=script.pause_epoch,defer=function(fn) log.deferred[#log.deferred+1]=fn; return true end})
-      assert(chords.on_key({code=KEY_BACKSPACE,mods=ALTGR}))
+      assert(chords.on_key({code=KEY_BACKSPACE,mods=ALTGR,prior_role="altgr"}))
       assert(script.toggle_pause()); assert(script.toggle_pause())
       log.run()
       helpers.assert_eq(log.executed, {'script_reload@script__script_altgr_backspace'})
@@ -269,14 +290,14 @@ helpers.describe('script chord after a pause cycle', function()
       file:close()
       helpers.assert_eq(saved.shortcuts.script_control.script_altgr_enter, 'none', 'the change is written at once')
       helpers.assert_eq(chords.set_chords_enabled(false), true, 'a paused switch is saved')
-      helpers.assert_eq(chords.on_key({code=KEY_ENTER,mods=ALTGR}), true, 'the chord active at pause time still resumes')
-      helpers.assert_eq(chords.on_key({code=KEY_BACKSPACE,mods=ALTGR}), false, 'the new chord waits for the resume')
+      helpers.assert_eq(chords.on_key({code=KEY_ENTER,mods=ALTGR,prior_role="altgr"}), true, 'the chord active at pause time still resumes')
+      helpers.assert_eq(chords.on_key({code=KEY_BACKSPACE,mods=ALTGR,prior_role="altgr"}), false, 'the new chord waits for the resume')
       log.run()
       helpers.assert_eq(log.executed, {'script_pause_toggle@script__script_altgr_enter'})
       assert(chords.set_chords_enabled(true))
       assert(script.toggle_pause())
-      helpers.assert_eq(chords.on_key({code=KEY_ENTER,mods=ALTGR}), false, 'the paused change applies on resume')
-      helpers.assert_eq(chords.on_key({code=KEY_BACKSPACE,mods=ALTGR}), true, 'the paused change applies on resume')
+      helpers.assert_eq(chords.on_key({code=KEY_ENTER,mods=ALTGR,prior_role="altgr"}), false, 'the paused change applies on resume')
+      helpers.assert_eq(chords.on_key({code=KEY_BACKSPACE,mods=ALTGR,prior_role="altgr"}), true, 'the paused change applies on resume')
     end)
   end)
 end)

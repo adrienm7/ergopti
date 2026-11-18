@@ -45,7 +45,7 @@ local function with_owner(domain, body)
 			ctx.owner = owner
 			ctx.id = domain == "tap" and "number_row_left" or "script_altgr_enter"
 			ctx.binding = owner.binding_id(ctx.id)
-			ctx.detail = domain == "tap" and { code = 41, mods = {} } or { code = 28, mods = { altgr = true } }
+			ctx.detail = domain == "tap" and { code = 41, mods = {} } or { code = 28, mods = { altgr = true }, prior_role = "altgr" }
 			local function observe()
 				if ctx.on_admission then ctx.on_admission() end
 				return ctx.paused

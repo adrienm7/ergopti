@@ -27,6 +27,10 @@
 --- 5. A change made while paused is saved at once and runs from the resume:
 ---    the chords live at pause time keep answering until then, so the chord
 ---    that resumes cannot move away under a paused daemon.
+--- 6. A chord is a sequence: AltGr pressed, then the slot's key, with no other
+---    key pressed between (the hook's prior_role). Typing AltGr symbols then
+---    Enter or Backspace before AltGr is up is text: on Ergopti+ a fast « (# »
+---    then Enter paused the driver (the maintainer, 2026-11-17), as on Windows.
 --- ==============================================================================
 
 local M = {}
@@ -425,7 +429,7 @@ function M.init(opts)
 end
 
 --- Decides one key press from the keyboard hook's consumption callback.
---- @param detail table { code, mods } as the hook reports it.
+--- @param detail table { code, mods, prior_role } as the hook reports it.
 --- @return boolean consumed True when the press is a chord whose slot runs an
 ---   action; it then never reaches the application.
 function M.on_key(detail)
@@ -433,6 +437,8 @@ function M.on_key(detail)
 	if type(detail) ~= "table" or type(detail.code) ~= "number" then return false end
 	local mods = type(detail.mods) == "table" and detail.mods or {}
 	if not mods.altgr then return false end
+	-- Only right after AltGr itself: « (# » then Enter while AltGr is held is text.
+	if detail.prior_role ~= "altgr" then return false end
 	for _, name in ipairs(BLOCKING_MODIFIERS) do
 		if mods[name] then return false end
 	end

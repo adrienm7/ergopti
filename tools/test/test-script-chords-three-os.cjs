@@ -23,6 +23,9 @@
  *    clear, separator, slots), its title ticked from the switch getter, and each
  *    driver registers its group, its three commands and the getter.
  * 4. The first-run wizard lists none of them: their preset is their default.
+ * 5. A chord is a sequence on the three drivers (the maintainer, 2026-11-17):
+ *    AltGr pressed, then the slot's key, with no other key between. Windows
+ *    reads A_PriorKey, Linux the hook's prior_role.
  *
  * ROOT CAUSE ENCODED:
  * Each driver had its own chords: four AltGr slots on Windows, three
@@ -273,6 +276,40 @@ check(
 		read('linux', 'ergopti_hotstrings.lua')
 	),
 	'the Linux keyboard hook must ask the script chords about every key press'
+);
+
+// A chord is a sequence on the three drivers (the maintainer, 2026-11-17):
+// AltGr pressed, then the slot's key, with no other key between. Typing AltGr
+// symbols then Enter before AltGr is up is text.
+const altgrAhk = read('windows', 'modules', 'keymap', 'layout', 'layout_altgr.ahk');
+const ahkCriteria = [
+	'ScriptAltGrChordRunsSlot',
+	'ScriptAltGrKanaChordRunsSlot',
+	'ScriptAltGrPausedChordRunsSlot'
+];
+for (const name of ahkCriteria) {
+	const body = (altgrAhk.match(new RegExp(`^${name}\\(Slot, \\*\\) \\{([\\s\\S]*?)^\\}`, 'm')) || [
+		'',
+		''
+	])[1];
+	check(
+		/ScriptAltGrPressedJustBefore\(\)/.test(body),
+		`Windows ${name} must require AltGr to be the key pressed just before`
+	);
+}
+check(
+	/A_PriorKey/.test(altgrAhk),
+	"Windows must read the key pressed just before from AutoHotkey's key history"
+);
+check(
+	/if detail\.prior_role ~= "altgr" then return false end/.test(linuxChords),
+	'Linux script chords must require AltGr to be the key pressed just before (prior_role)'
+);
+const linuxHook = read('linux', 'platform', 'input', 'keyboard_hook.lua');
+check(
+	/_prior_down_role, _last_down_role = _last_down_role, role or false/.test(linuxHook) &&
+		/prior_role = _prior_down_role,/.test(linuxHook),
+	'the Linux keyboard hook must record every key press, modifiers included, and offer the one before'
 );
 
 // ==================================================

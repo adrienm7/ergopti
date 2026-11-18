@@ -464,6 +464,7 @@ return {
 	"tests.unit.platform.input.keyboard_hook.test_adapter",
 	"tests.unit.platform.input.keyboard_hook.test_intercept_passthrough_mode_re_emits",
 	"tests.unit.platform.input.keyboard_hook.test_intercept_passthrough_acknowledged_consumed_repeats",
+	"tests.unit.platform.input.keyboard_hook.test_consumption_prior_role",
 	"tests.unit.platform.input.keyboard_hook.test_modal_release",
 	"tests.unit.platform.input.keyboard_hook.test_tap_hold",
 	"tests.unit.platform.input.keyboard_hook.test_action_one_shot",

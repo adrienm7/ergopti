@@ -250,6 +250,13 @@ local _modifier_down = {}
 local _modifier_count = { shift = 0, ctrl = 0, alt = 0, altgr = 0, meta = 0 }
 local _modifier_order = {}
 
+-- The modifier role of the latest key press ("altgr", "shift"... or false for
+-- a key that is no modifier) and of the press before it, the one a consumer
+-- reads: a script chord is AltGr pressed, then its key, with no other key
+-- between (the maintainer, 2026-11-17). nil before any press.
+local _last_down_role = nil
+local _prior_down_role = nil
+
 -- When each key went down, by evdev code. Cleared on release, so a key still
 -- held when a flush lands is simply not reported until it comes up.
 local _pressed_at = {}
@@ -598,6 +605,7 @@ local function _reset_modifier_state()
 	_modifier_down = {}
 	_modifier_count = { shift = 0, ctrl = 0, alt = 0, altgr = 0, meta = 0 }
 	_modifier_order = {}
+	_last_down_role, _prior_down_role = nil, nil
 	_shift_held, _ctrl_held, _alt_held = false, false, false
 	_altgr_held, _meta_held = false, false
 	_consumed_down = {}
@@ -1342,6 +1350,7 @@ local function consumption_detail(ev, source, identity, char)
 		physical = ev.remapped ~= true and _physical_sources[source] == true,
 		origin_generation = _origin_ready and _origin_generation or nil,
 		value = ev.value, mods = M.held_modifiers(), shift_side = M.held_shift_side(),
+		prior_role = _prior_down_role,
 	}
 end
 
@@ -1785,6 +1794,11 @@ local function _dispatch_post_remap(ev, source)
 		if capture_err then M.emergency_stop("XKB handoff capture refused: " .. tostring(capture_err)); return end
 		_forward_raw(ev, source)
 		return
+	end
+	-- Every press, a modifier's included, moves the key history one step; a
+	-- repeat or a release does not, as in AutoHotkey's A_PriorKey.
+	if ev.value == InputEvent.VALUE_DOWN then
+		_prior_down_role, _last_down_role = _last_down_role, role or false
 	end
 	local modifier_key = source_key(source, ev.code)
 	local held_role = _modifier_down[modifier_key]
@@ -4336,7 +4350,9 @@ end
 ---                                  and with ("shortcut", { key, mods }) for a chord.
 ---              onPhysical function  Called with (evdev_scancode, key_name, char_or_nil,
 ---                                  evdev_value, source_path) for every physical down/up transition.
----              onConsume function Called before pass-through with a key detail;
+---              onConsume function Called before pass-through with a key detail
+---                                  (prior_role: the modifier role of the key pressed
+---                                  just before, false for no modifier, nil for none);
 ---                                  true suppresses its down/repeat/up in intercept mode.
 ---              onDesync function Called synchronously when evdev reports queue loss.
 ---              onEmitRaw function  Called with (evdev_scancode, evdev_value) to put a

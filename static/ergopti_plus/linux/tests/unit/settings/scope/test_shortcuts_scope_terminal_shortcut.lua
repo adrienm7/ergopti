@@ -464,7 +464,7 @@ helpers.describe("Linux script chords in the Shortcuts scope", function()
 				helpers.assert_eq(saved[slot], "none", slot .. " is written off, since absence is the preset")
 				helpers.assert_eq(owners.chords.get_action(slot), "none")
 			end
-			helpers.assert_eq(owners.chords.on_key({ code = 28, mods = { altgr = true } }), false,
+			helpers.assert_eq(owners.chords.on_key({ code = 28, mods = { altgr = true }, prior_role = "altgr" }), false,
 				"AltGr + Enter reaches the application after a clear")
 		end)
 	end)

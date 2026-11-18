@@ -120,7 +120,7 @@ local function with_action(route, mode, action, body)
 			local consume = evaluate(source:sub(first, last - 1) .. "\nreturn on_consume", environment)
 			local event = { code = 36, key = "j", char = "j", mods = { ctrl = true } }
 			if route == "tap" then event = { code = 41, mods = {} }
-			elseif route == "chord" then event = { code = 28, mods = { altgr = true } } end
+			elseif route == "chord" then event = { code = 28, mods = { altgr = true }, prior_role = "altgr" } end
 			if route == "gesture" then
 				world.consumed = environment.gestures.dispatch_gesture({ fingers = 3, tap = true })
 			elseif route == "observe" then

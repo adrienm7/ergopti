@@ -264,7 +264,9 @@ tick and judge the slot again there, so a pause in between runs only a
 script-management action. The Shortcuts scope owns them; its `only =
 "script_chords"` narrowing leaves the other owners' rows and parameters alone.
 Action: keep any new chord in that callback, never in `on_key`, where the
-application already has the key.
+application already has the key. A chord also needs the hook's `prior_role` to
+be `"altgr"`: the hook moves its key history on every non-handoff press,
+modifiers included, and repeats and releases do not move it.
 
 ### project-linux-ai-off-disarms-the-ai-actions
 
