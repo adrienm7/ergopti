@@ -1,6 +1,9 @@
 {
 	"$schema": "https://ergopti.com/schema/corpus/hotstrings.v1.json",
 	"description": "What one Backspace erases in each Windows text host family, measured on Windows 11 on 2026-11-17 (one Backspace after each text, UTF-16 units removed). The Windows Backspace undo (HSE_BackspaceSegments) counts its steps from this table: edit is a Win32 EDIT, richedit RICHEDIT50W or the Store Notepad's RichEditD2DPT and WordPad, chromium Edge, Chrome and Electron; other keeps one step per code point. Linux counts GTK steps with injector.caret_steps(), which this table does not cover.",
+	"field_semantics": {
+		"inferred": "Descriptive: the families whose values for this text were not measured on Windows 11 but follow that family's rule (other: one step per code point). No replay reads it; it tells the next editor which values a measurement may still correct."
+	},
 	"families": ["edit", "richedit", "chromium", "other"],
 	"texts": [
 		{
