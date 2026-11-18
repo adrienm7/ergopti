@@ -164,6 +164,10 @@ const TARGETS = [
 	{
 		name: 'Windows',
 		root: path.join(DRIVERS, 'windows'),
+		// AHK tests also name shared-tree files relative to _SharedDir
+		// (hotstrings/data/catalogue/user_code.ahk), and both trees hold the
+		// feature folders the pin pattern names: a file pin resolves in either.
+		fileRoots: [path.join(DRIVERS, 'windows'), path.join(DRIVERS, '_shared')],
 		testRe: /^(?:test|bench|run)_.*\.ahk$/,
 		skipRe: null,
 		pins: (src) => [
@@ -196,8 +200,11 @@ for (const target of TARGETS) {
 
 		for (const { pin, kind } of pins) {
 			if (INTENTIONALLY_ABSENT.has(pin)) continue;
-			const abs = path.join(target.root, pin.replace(/\//g, path.sep));
-			const ok = kind === 'ahk-dir' ? holdsAhk(abs) : fs.existsSync(abs);
+			const rel = pin.replace(/\//g, path.sep);
+			const ok =
+				kind === 'ahk-dir'
+					? holdsAhk(path.join(target.root, rel))
+					: (target.fileRoots || [target.root]).some((root) => fs.existsSync(path.join(root, rel)));
 			if (!ok) stale.push({ driver: target.name, test: relTest, pin, kind });
 		}
 	}
