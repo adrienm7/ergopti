@@ -28,6 +28,7 @@ local ShellRunner    = require("core.process.adapters.shell_runner")
 local SyntheticInput = require("platform.input.synthetic_input")
 local TimerScheduler = require("core.events.timer_scheduler")
 local PythonInterpreter = require("ai.adapters.python_interpreter")
+local SystemA11y     = require("core.ui.adapters.system_accessibility")
 
 local LOG = "shortcuts.actions.system"
 
@@ -1097,6 +1098,9 @@ function M.spotlight_mouse(duration_s, parent)
 		cleanup_spotlight_operation(operation, "spotlight timeout rollback")
 		return false
 	end
+	-- The overlay is drawn pixels VoiceOver cannot see: a user who pressed the
+	-- shortcut heard nothing. Said once the overlay is fully up, as on Windows.
+	SystemA11y.announce_event(i18n.get("accessibility.spotlight_shown"))
 	return true
 end
 

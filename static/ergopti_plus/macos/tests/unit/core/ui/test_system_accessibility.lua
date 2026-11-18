@@ -99,6 +99,20 @@ helpers.describe("VoiceOver announcements (a11y-macos-announce)", function()
 			'tell application "VoiceOver" to output "a \\"b\\" \\\\ c d"')
 	end)
 
+	helpers.it("(a11y-macos-event) says each event again, without touching the preview's last text", function()
+		local module, log = load_adapter({ voiceover = true })
+		helpers.assert_eq(module.announce("bonjour"), true)
+		helpers.assert_eq(module.announce_event("Mouse pointer highlighted"), true)
+		helpers.assert_eq(module.announce_event("Mouse pointer highlighted"), true,
+			"a second spotlight is a second event")
+		helpers.assert_eq(module.announce("bonjour"), false, "the preview is still not repeated")
+		helpers.assert_eq(#log.scripts, 3)
+		helpers.assert_eq(module.announce_event(""), false)
+		module = load_adapter({ voiceover = false })
+		helpers.assert_eq(module.announce_event("Mouse pointer highlighted"), false,
+			"nothing is said while VoiceOver does not run")
+	end)
+
 	helpers.it("ignores an empty text", function()
 		local module, log = load_adapter({ voiceover = true })
 		helpers.assert_eq(module.announce(""), false)

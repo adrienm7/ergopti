@@ -19,7 +19,14 @@
 ---    in a loop.
 --- 2. The same text is spoken once: a preview redrawn for every keystroke
 ---    that leaves it unchanged would otherwise repeat it.
---- 3. The settings are read at most once a second: a preview is drawn on a
+--- 3. Why AppleScript and not an accessibility notification: Hammerspoon
+---    exposes no NSAccessibilityPostNotification (hs.axuielement reads and
+---    observes other applications' elements, it posts nothing), and an
+---    hs.canvas or hs.alert window has no accessibility element to name. The
+---    other drawn surfaces (the spotlight overlay, the WPM widget, the hs.alert
+---    banners) therefore speak through announce_event, the same VoiceOver
+---    voice, once per event rather than once per text.
+--- 4. The settings are read at most once a second: a preview is drawn on a
 ---    keystroke, and each read is a round of NSWorkspace calls.
 --- ==============================================================================
 
@@ -111,6 +118,19 @@ function M.voiceover_script(text)
 	return 'tell application "VoiceOver" to output "' .. escaped .. '"'
 end
 
+--- Hands a text to VoiceOver; the caller has checked that it runs.
+--- @param text string
+--- @return boolean started
+local function speak(text)
+	local started = ShellRunner.applescript(M.voiceover_script(text), function(ok)
+		if ok or _announce_refusal_reported then return end
+		_announce_refusal_reported = true
+		Logger.warn(LOG, "VoiceOver refused the announcement: allow it to be controlled with AppleScript "
+			.. "in VoiceOver Utility to hear the previews.")
+	end)
+	return started == true
+end
+
 --- Speaks a text through VoiceOver when it runs; does nothing otherwise.
 --- @param text string|nil The plain text; nil or "" forgets the last one.
 --- @return boolean announced True when the text was handed to VoiceOver.
@@ -122,13 +142,19 @@ function M.announce(text)
 	if text == _last_announced then return false end
 	if not M.screen_reader_running() then return false end
 	_last_announced = text
-	local started = ShellRunner.applescript(M.voiceover_script(text), function(ok)
-		if ok or _announce_refusal_reported then return end
-		_announce_refusal_reported = true
-		Logger.warn(LOG, "VoiceOver refused the announcement: allow it to be controlled with AppleScript "
-			.. "in VoiceOver Utility to hear the previews.")
-	end)
-	return started == true
+	return speak(text)
+end
+
+--- Speaks one event through VoiceOver when it runs: a spotlight shown, a
+--- banner, a typing burst's speed. Each call is one event the user caused,
+--- so the same text is spoken again on the next one, and the preview's
+--- last announcement is left as it was.
+--- @param text string|nil The plain text; nil or "" says nothing.
+--- @return boolean announced True when the text was handed to VoiceOver.
+function M.announce_event(text)
+	if type(text) ~= "string" or text:match("^%s*$") then return false end
+	if not M.screen_reader_running() then return false end
+	return speak(text)
 end
 
 --- Forgets the last announcement, so the same text is spoken again when it

@@ -44,6 +44,7 @@ local function fresh_mouse_owner()
 		"core.logger.engine.logger",
 		"core.ui.engine.notifications",
 		"core.i18n.engine.i18n",
+		"core.ui.adapters.system_accessibility",
 	}) do package.loaded[name] = nil end
 
 	local fixture = {
@@ -64,6 +65,7 @@ local function fresh_mouse_owner()
 		start_hook = nil,
 		boundary_hook = nil,
 		nested_pause_result = nil,
+		spoken = {},
 	}
 
 	--- Queues one native timer behavior for the next TimerScheduler acquisition.
@@ -355,6 +357,12 @@ local function fresh_mouse_owner()
 		end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.ui.adapters.system_accessibility"] = {
+		announce_event = function(text)
+			fixture.spoken[#fixture.spoken + 1] = text
+			return true
+		end,
+	}
 	package.loaded["adapters.mouse_control"] = {
 		setPos = function()
 			if type(fixture.boundary_hook) == "function" then
@@ -893,6 +901,21 @@ helpers.describe("SystemMouse synchronous native boundary ownership", function()
 		helpers.assert_eq(fixture.lock_calls, 1)
 		helpers.assert_eq(
 			fixture.subject.is_mouse_actions_paused("gestures"), false)
+	end)
+end)
+
+-- The overlay is pixels VoiceOver cannot reach: each spotlight the user calls
+-- is said once it is fully up, as Windows says it (a11y-macos-spotlight).
+helpers.describe("SystemMouse spotlight for VoiceOver (a11y-macos-spotlight)", function()
+	helpers.it("(a11y-macos-spotlight) says each shown spotlight, never a refused one", function()
+		local fixture = fresh_mouse_owner()
+		helpers.assert_eq(fixture.subject.spotlight_mouse(4), true)
+		helpers.assert_eq(fixture.spoken, { "accessibility.spotlight_shown" })
+		helpers.assert_eq(fixture.subject.spotlight_mouse(4), true)
+		helpers.assert_eq(#fixture.spoken, 2, "a second press is a second event, said again")
+		helpers.assert_eq(fixture.subject.pause_mouse_actions(), true)
+		helpers.assert_eq(fixture.subject.spotlight_mouse(4), false)
+		helpers.assert_eq(#fixture.spoken, 2, "a spotlight that never showed is not said")
 	end)
 end)
 
