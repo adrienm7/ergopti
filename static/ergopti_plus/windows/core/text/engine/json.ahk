@@ -96,6 +96,7 @@ JsonParseShared(Key, Text) {
 }
 
 JsonParse(text) {
+	_JsonCountDocumentPass(&text)
 	pos := 1
 	val := _JsonParseValue(&text, &pos, 0)
 	_JsonSkipWs(&text, &pos)
@@ -118,23 +119,10 @@ JsonObjectMemberSpans(text, pathParts := unset) {
 	; spans are returned, and the walks below skip values instead of decoding
 	; them (perf-json-member-spans-2026-11-17: three decodes of the AI catalogue
 	; per call made its boot load 440 ms).
-	wellFormed := NativeTextIsWellFormedUtf16(StrPtr(text), StrLen(text))
-	position := 1
-	_JsonSkipValue(&text, &position, 0, wellFormed)
-	_JsonSkipWs(&text, &position)
-	if (position <= StrLen(text))
-		throw Error("JSON: unexpected trailing data at position " . position . ".", -1)
-	parts := IsSet(pathParts) ? pathParts : []
-	if !(parts is Array)
-		throw TypeError("JSON member paths require an array of decoded string keys.")
+	wellFormed := _JsonValidateDocument(&text)
+	parts := _JsonMemberPathParts(IsSet(pathParts) ? pathParts : [])
 	position := 1
 	for part in parts {
-		if !(part is String)
-			throw TypeError("JSON member paths require decoded string keys.")
-		; Native Map keys stop at NUL; reject the complete decoded part before lookup.
-		loop StrLen(part)
-			if NumGet(StrPtr(part), (A_Index - 1) * 2, "UShort") = 0
-				throw ValueError("JSON member paths cannot contain NUL code units.")
 		members := _JsonObjectMemberSpansAt(&text, position, wellFormed)
 		if !members.Has(part)
 			throw ValueError("JSON object has no selected member.", -1, part)
@@ -143,13 +131,181 @@ JsonObjectMemberSpans(text, pathParts := unset) {
 	return _JsonObjectMemberSpansAt(&text, position, wellFormed)
 }
 
+/**
+ * Returns the member span tree of a complete JSON object: each member's value
+ * span, as JsonObjectMemberSpans returns it without the member_* fields, where
+ * each object value also holds its own member spans under "members", at every
+ * depth. The text is validated once and each value visited once, so a caller
+ * reading nested members never walks a slice of a text it already walked.
+ * Offsets are one-based UTF-16 positions in text, at every level of the tree.
+ * @param {string} text Complete JSON object source.
+ * @returns {Map} Decoded key -> "start", "length", "text" and "kind", plus
+ *   "members" for an object value.
+ * @throws {Error} Invalid JSON; TypeError when the root is not an object.
+ */
+JsonObjectMemberSpanTree(text) {
+	wellFormed := _JsonValidateDocument(&text)
+	position := 1
+	_JsonSkipWs(&text, &position)
+	if (SubStr(text, position, 1) != "{")
+		throw _JsonNotAnObjectError()
+	return _JsonMemberSpanTreeAt(&text, &position, wellFormed, [], 1)
+}
+
+/**
+ * Decodes a complete JSON document and returns, with its root, the member span
+ * tree (JsonObjectMemberSpanTree) of the object selected by decoded key parts.
+ * The decode is the only validation pass: the span walk that follows visits each
+ * value of the text once, descending into the selected object instead of
+ * skipping it and coming back (perf-ai-catalogue-walks-2026-11-18: the AI
+ * catalogue was decoded, validated whole again for its provider spans, and each
+ * provider's slice validated once more, about 50 ms of its boot load).
+ * @param {string} text Complete JSON source.
+ * @param {Array} pathParts Decoded object keys; [] selects the root object.
+ * @returns {Map} "root" (as JsonParse returns it) and "members" (the span tree,
+ *   or false when the path does not select an object, which the caller's check
+ *   of the decoded root then names).
+ * @throws {Error} Invalid JSON; TypeError or ValueError for invalid path parts.
+ */
+JsonParseWithMemberSpans(text, pathParts) {
+	parts := _JsonMemberPathParts(pathParts)
+	root := JsonParse(text)
+	members := false
+	if (root is Map) {
+		position := 1
+		_JsonSkipWs(&text, &position)
+		members := _JsonMemberSpanTreeAt(&text, &position,
+			NativeTextIsWellFormedUtf16(StrPtr(text), StrLen(text)), parts, 1)
+	}
+	return Map("root", root, "members", members)
+}
+
+/**
+ * Returns the member spans of a span tree node (JsonObjectMemberSpanTree).
+ * @param {Map} Span One span of a member span tree.
+ * @returns {Map} Its own member spans.
+ * @throws {TypeError} The span's value is not an object, as JsonObjectMemberSpans
+ *   refuses that span's text.
+ */
+JsonSpanObjectMembers(Span) {
+	if (Span["kind"] != "object")
+		throw _JsonNotAnObjectError()
+	return Span["members"]
+}
+
+; Validates one complete document by the decoder's grammar, building nothing.
+; @returns {Boolean} Whether the text holds no lone surrogate (_JsonSkipValue).
+_JsonValidateDocument(&text) {
+	_JsonCountDocumentPass(&text)
+	wellFormed := NativeTextIsWellFormedUtf16(StrPtr(text), StrLen(text))
+	position := 1
+	_JsonSkipValue(&text, &position, 0, wellFormed)
+	_JsonSkipWs(&text, &position)
+	if (position <= StrLen(text))
+		throw Error("JSON: unexpected trailing data at position " . position . ".", -1)
+	return wellFormed
+}
+
+; Checks the decoded keys of a member path.
+; @returns {Array} The parts, unchanged.
+_JsonMemberPathParts(parts) {
+	if !(parts is Array)
+		throw TypeError("JSON member paths require an array of decoded string keys.")
+	for part in parts {
+		if !(part is String)
+			throw TypeError("JSON member paths require decoded string keys.")
+		; Native Map keys stop at NUL; reject the complete decoded part before lookup.
+		loop StrLen(part)
+			if NumGet(StrPtr(part), (A_Index - 1) * 2, "UShort") = 0
+				throw ValueError("JSON member paths cannot contain NUL code units.")
+	}
+	return parts
+}
+
+; The refusal of a span selection whose value is not an object.
+_JsonNotAnObjectError() {
+	return TypeError("Selected JSON member is not an object.")
+}
+
+; Walks the object whose "{" is at position, in a text already validated, and
+; leaves position after its "}". While path parts remain, only a member named by
+; the next part is descended into, and the last one wins as in the decoder: its
+; tree is returned, or false when that member is not an object; every other value
+; is skipped. Past the path, every member is recorded with its value's "start",
+; "length", "text" and "kind", an object value with its own tree under "members".
+; A key without escapes and a scalar value are each consumed by one anchored
+; match (_JsonSkipPatterns): a call of the exact walk per member cost as much as
+; decoding the whole AI catalogue.
+_JsonMemberSpanTreeAt(&text, &position, wellFormed, parts, partIndex) {
+	static Tally := _JsonDecodeCounters()
+	Patterns := _JsonSkipPatterns(wellFormed)
+	selecting := partIndex <= parts.Length
+	wanted := selecting ? parts[partIndex] : ""
+	members := selecting ? false : Map()
+	position++  ; consume {
+	_JsonSkipWs(&text, &position)
+	if (SubStr(text, position, 1) == "}") {
+		position++
+		return members
+	}
+	loop {
+		if RegExMatch(text, Patterns["member_key"], &match, position) {
+			key := match[1]
+			Tally.StringUnits += match.Len[1]
+			position += match.Len
+		} else {
+			_JsonSkipWs(&text, &position)
+			key := _JsonParseString(&text, &position, true)
+			_JsonSkipWs(&text, &position)
+			position++  ; consume :
+			_JsonSkipWs(&text, &position)
+		}
+		valueStart := position
+		kind := _JsonValueKind(SubStr(text, position, 1))
+		if (kind == "object") {
+			if !selecting
+				nested := _JsonMemberSpanTreeAt(&text, &position, wellFormed, parts, partIndex)
+			else if (key == wanted)
+				members := _JsonMemberSpanTreeAt(&text, &position, wellFormed, parts, partIndex + 1)
+			else
+				_JsonSkipValue(&text, &position, 1, wellFormed)
+		} else {
+			if (selecting && key == wanted)
+				members := false
+			try {
+				found := kind != "array" && RegExMatch(text, Patterns["scalar"], &match, position)
+			} catch {
+				; The engine's match limit: the exact walk decides instead.
+				found := 0
+			}
+			if found
+				position += match.Len
+			else
+				_JsonSkipValue(&text, &position, 1, wellFormed)
+		}
+		if !selecting {
+			span := Map("start", valueStart, "length", position - valueStart,
+				"text", SubStr(text, valueStart, position - valueStart), "kind", kind)
+			if (kind == "object")
+				span["members"] := nested
+			members[key] := span
+		}
+		_JsonSkipWs(&text, &position)
+		if (SubStr(text, position, 1) == "}") {
+			position++
+			return members
+		}
+		position++  ; consume ,
+	}
+}
+
 ; The public span owner validates the whole source before walking selected objects,
 ; so a value's end is found by the codec's skip walk and its kind by its first
 ; code unit, as _JsonParseValue dispatches it.
 _JsonObjectMemberSpansAt(&text, position, wellFormed) {
 	_JsonSkipWs(&text, &position)
 	if (SubStr(text, position, 1) != "{")
-		throw TypeError("Selected JSON member is not an object.")
+		throw _JsonNotAnObjectError()
 	position++
 	members := Map()
 	_JsonSkipWs(&text, &position)
@@ -203,6 +359,7 @@ _JsonValueKind(c) {
  * @throws {Error} Invalid JSON or a root that is not an array.
  */
 JsonArrayElementSpans(text) {
+	_JsonCountDocumentPass(&text)
 	position := 1
 	_JsonSkipWs(&text, &position)
 	if SubStr(text, position, 1) != "[" {
@@ -258,6 +415,7 @@ JsonArrayElementSpans(text) {
  */
 JsonArrayObjectMembers(text, memberKeys) {
 	wanted := _JsonMemberSelection(memberKeys)
+	_JsonCountDocumentPass(&text)
 	position := 1
 	_JsonSkipWs(&text, &position)
 	if SubStr(text, position, 1) != "[" {
@@ -316,6 +474,7 @@ JsonArrayObjectMembers(text, memberKeys) {
  */
 JsonObjectMembers(text, memberKeys) {
 	wanted := _JsonMemberSelection(memberKeys)
+	_JsonCountDocumentPass(&text)
 	position := 1
 	_JsonSkipWs(&text, &position)
 	if SubStr(text, position, 1) != "{" {
@@ -347,24 +506,35 @@ _JsonMemberSelection(memberKeys) {
 
 /**
  * Returns the cumulative decode accounting of this process.
- * @returns {Map} "containers" (objects and arrays built) and "string_units"
- *   (decoded string code units, keys included).
+ * @returns {Map} "containers" (objects and arrays built), "string_units"
+ *   (decoded string code units, keys included), "document_passes" (complete
+ *   JSON texts each public entry point validated) and "document_units" (the
+ *   code units of those texts).
  */
 JsonDecodeTally() {
 	Tally := _JsonDecodeCounters()
-	return Map("containers", Tally.Containers, "string_units", Tally.StringUnits)
+	return Map("containers", Tally.Containers, "string_units", Tally.StringUnits,
+		"document_passes", Tally.Documents, "document_units", Tally.DocumentUnits)
 }
 
 ; Cumulative decode accounting of this process: containers (objects and arrays)
-; built and string code units decoded. Validated values that a caller did not
-; ask for are never built, so a decode budget is a deterministic count rather
-; than a wall-clock measure. A function static rather than a module global, so
+; built, string code units decoded, and complete documents walked. Validated
+; values that a caller did not ask for are never built, so a decode budget is a
+; deterministic count rather than a wall-clock measure, and a text walked twice
+; shows as two passes. A function static rather than a module global, so
 ; a decode reached before this file's auto-execute section has run still
 ; counts instead of reading an unset variable; each decoder captures the same
 ; object once in its own static.
 _JsonDecodeCounters() {
-	static Counters := { Containers: 0, StringUnits: 0 }
+	static Counters := { Containers: 0, StringUnits: 0, Documents: 0, DocumentUnits: 0 }
 	return Counters
+}
+
+; Counts one complete-document pass over text, made by a public entry point.
+_JsonCountDocumentPass(&text) {
+	static Tally := _JsonDecodeCounters()
+	Tally.Documents += 1
+	Tally.DocumentUnits += StrLen(text)
 }
 
 /**
@@ -625,7 +795,9 @@ _JsonParseArray(&text, &pos, depth) {
 ;   uploader object), with no recursion in the pattern.
 ; "members" consumes the "key":value, members of an object and, when the last
 ; one is followed by its closer, that member and the "}" (capture 1); "elements"
-; does the same for the elements of an array; "value" is one value.
+; does the same for the elements of an array; "value" is one value; "member_key"
+; is one key without escapes and its ":" (the key's text in capture 1); "scalar"
+; is one string, integer or literal.
 _JsonSkipPatterns(WellFormed) {
 	static Sets := Map()
 	if !Sets.Has(WellFormed) {
@@ -647,7 +819,9 @@ _JsonSkipPatterns(WellFormed) {
 			"members", _JsonSkipRunPattern(Member, "\}"),
 			"elements", _JsonSkipRunPattern(Element, "\]"),
 			"value", "\G" . Level2,
-			"plain", Plain, "ws", Ws, "member_tail", MemberTail)
+			"plain", Plain, "ws", Ws, "member_tail", MemberTail,
+			"member_key", "\G" . Ws . '"(' . Plain . '*+)"' . Ws . ":" . Ws,
+			"scalar", "\G" . Level0)
 	}
 	return Sets[WellFormed]
 }

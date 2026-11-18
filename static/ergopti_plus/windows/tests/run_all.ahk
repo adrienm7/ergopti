@@ -773,6 +773,7 @@ _LLM_Deps_State := "ready"
 #Include unit/ai/api/test_remote.ahk
 #Include unit/ai/api/test_remote_async_registry.ahk
 #Include unit/ai/api/test_remote_requests.ahk
+#Include unit/ai/api/test_remote_catalog_refusals.ahk
 #Include unit/ai/api/test_thinking_off.ahk
 #Include unit/ai/api/test_shared_vectors.ahk
 #Include unit/ai/api/test_model_capabilities.ahk

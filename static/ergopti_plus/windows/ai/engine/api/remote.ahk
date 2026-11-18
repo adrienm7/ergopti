@@ -2729,12 +2729,16 @@ _LLMRemote_LoadCatalog() {
     path := _SharedDir . "\ai\data\api_providers.json"
     if !FileExist(path)
         throw Error("api_providers.json not found at " . path)
+    ; One decode validates the text and finds each provider's source: thinking_off
+    ; travels as JSON source (JsonParse decodes booleans as 0/1), and walking the
+    ; text again for it cost about 50 ms of the boot (perf-ai-catalogue-walks-2026-11-18).
     try {
         text := FileRead(path, "UTF-8")
-        root := JsonParse(text)
+        Document := JsonParseWithMemberSpans(text, ["providers"])
     } catch as err {
         throw Error("api_providers.json parse failed: " . err.Message)
     }
+    root := Document["root"]
     if !(root is Map)
         throw Error("api_providers.json root must be an object")
     order := root.Has("provider_order") ? root["provider_order"] : ""
@@ -2750,8 +2754,8 @@ _LLMRemote_LoadCatalog() {
     candidateProviders := Map()
     candidateOrder := []
     seenProviders := Map()
-    ; thinking_off travels as JSON source (JsonParse decodes booleans as 0/1)
-    ProviderSpans := JsonObjectMemberSpans(text, ["providers"])
+    ; The checks above make providers an object, so the walk found its members
+    ProviderSpans := Document["members"]
     for _, pid in order {
         if (Type(pid) != "String" or Trim(pid) = "")
             continue
@@ -2770,8 +2774,7 @@ _LLMRemote_LoadCatalog() {
             continue
         }
         try {
-            Members := JsonObjectMemberSpans(ProviderSpans[pid]["text"])
-            Dialect := LLM_ThinkingOffParseDialect(Members.Has("thinking_dialect") ? Members["thinking_dialect"]["text"] : "")
+            Dialect := LLM_ThinkingOffParseDialectSpan(ProviderSpans[pid]["members"].Get("thinking_dialect", ""))
         } catch as ThinkingErr {
             ; A half-read dialect would let some models think: refuse the provider whole
             try LoggerError("LLM.remote", "api_providers.json: providers.{1}.thinking_dialect is invalid ({2}) — skipped.",

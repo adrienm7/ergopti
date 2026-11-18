@@ -150,16 +150,38 @@ LLM_ThinkingOffParseFamilies(Text) {
  * @throws {Error} A malformed dialect, refused whole.
  */
 LLM_ThinkingOffParseDialect(Text) {
+	if (Text == "")
+		return Map()
+	return _LLM_ThinkingOffDialectFromMembers(JsonObjectMemberSpanTree(Text))
+}
+
+/**
+ * Validates a provider's thinking_dialect from the member span tree of the
+ * document that holds it (JsonParseWithMemberSpans), without walking its text
+ * again: the same refusals as LLM_ThinkingOffParseDialect on that span's text.
+ * @param {Map|String} Span The thinking_dialect member's span, "" when the
+ *     provider has none.
+ * @returns {Map} Kind -> exact JSON source of its fields template.
+ * @throws {Error} A malformed dialect, refused whole.
+ */
+LLM_ThinkingOffParseDialectSpan(Span) {
+	if !IsObject(Span) && Span == ""
+		return Map()
+	return _LLM_ThinkingOffDialectFromMembers(JsonSpanObjectMembers(Span))
+}
+
+; The dialect a member span tree (JsonObjectMemberSpanTree) describes.
+; @param {Map} Members The dialect object's member span tree.
+; @returns {Map} Kind -> exact JSON source of its fields template.
+_LLM_ThinkingOffDialectFromMembers(Members) {
 	global LLM_THINKING_OFF_KINDS
 	Dialect := Map()
-	if (Text == "")
-		return Dialect
-	for Kind, Span in JsonObjectMemberSpans(Text) {
+	for Kind, Span in Members {
 		if (SubStr(Kind, 1, 1) == "_")
 			continue
 		if !LLM_THINKING_OFF_KINDS.Has(Kind)
 			throw ValueError("thinking_dialect has an unknown kind " . Kind . ".")
-		if (Span["kind"] != "object") || !_LLM_ThinkingOffFieldsValid(Span["text"])
+		if (Span["kind"] != "object") || !_LLM_ThinkingOffFieldsValid(Span["members"])
 			throw ValueError("thinking_dialect." . Kind . " has invalid fields.")
 		if ((Kind == "toggle") == (InStr(Span["text"], '"$level"', true) > 0))
 			throw ValueError("thinking_dialect." . Kind . (Kind == "toggle" ? " cannot hold a level." : " needs a level."))
@@ -170,11 +192,10 @@ LLM_ThinkingOffParseDialect(Text) {
 
 ; Checks body fields: identifier names holding strings, numbers, booleans or
 ; non-empty objects of the same.
-; @param {String} Text The object's JSON source.
+; @param {Map} Members The object's member span tree.
 ; @returns {Boolean}
-_LLM_ThinkingOffFieldsValid(Text) {
+_LLM_ThinkingOffFieldsValid(Members) {
 	global LLM_THINKING_OFF_FIELD_PATTERN
-	Members := JsonObjectMemberSpans(Text)
 	if (Members.Count == 0)
 		return false
 	for Name, Span in Members {
@@ -182,7 +203,7 @@ _LLM_ThinkingOffFieldsValid(Text) {
 			return false
 		Kind := Span["kind"]
 		if (Kind == "object") {
-			if !_LLM_ThinkingOffFieldsValid(Span["text"])
+			if !_LLM_ThinkingOffFieldsValid(Span["members"])
 				return false
 		} else if (Kind != "string" && Kind != "number" && Kind != "boolean") {
 			return false
