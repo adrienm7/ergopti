@@ -531,8 +531,10 @@ ErgoptiLayout_Init(RegistryDir) {
 	LoggerStart("ErgoptiLayout", "Reading the Ergopti layout tables from {1}…", RegistryDir)
 	Started := A_TickCount
 	try {
-		Ergopti := LayoutRegistry_ReadBundled(ERGOPTI_LAYOUT_ID, RegistryDir)
-		Plus := LayoutRegistry_ReadBundled(ERGOPTI_PLUS_LAYOUT_ID, RegistryDir)
+		; One decode of the index serves both layouts.
+		Index := LayoutRegistry_ReadBundledIndex(RegistryDir)
+		Ergopti := LayoutRegistry_ReadBundled(ERGOPTI_LAYOUT_ID, RegistryDir, Index)
+		Plus := LayoutRegistry_ReadBundled(ERGOPTI_PLUS_LAYOUT_ID, RegistryDir, Index)
 		Convention := Ergopti["Entry"]["keycode_convention"]
 		if (Plus["Entry"]["keycode_convention"] !== Convention)
 			throw Error("Ergopti and Ergopti+ number their keys differently in the registry.")

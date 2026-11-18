@@ -312,6 +312,36 @@ _EKT_PublishedCase() {
 		"a second initialisation is refused")
 }
 
+Test("ergopti tables: boot loading decodes the shipped index once for both layouts (boot-index-decoded-once)",
+	_EKT_IndexDecodedOnceCase)
+
+; The two Ergopti layouts share one index: reading both must decode it no more
+; often than reading one does, so a second decode coming back fails here.
+_EKT_IndexDecodedOnceCase() {
+	global ERGOPTI_SPEC, DeadkeyMappingCircumflex, DeadkeyMappingDiaresis, DeadkeyMappingSuperscript
+	global DeadkeyMappingSubscript, DeadkeyMappingGreek, DeadkeyMappingR, DeadkeyMappingCurrency
+	Name := "layout_registry.bundled_index_decode"
+	Dir := LayoutRegistry_BundledDir()
+	_TestEnsureErgoptiLayout()
+	Before := _PerfCountersOwner().Counts.Get(Name, 0)
+	LayoutRegistry_ReadBundled(ERGOPTI_LAYOUT_ID, Dir)
+	One := _PerfCountersOwner().Counts.Get(Name, 0) - Before
+	AssertTrue(One > 0, "control: reading one shipped layout decodes the index through the counted reader")
+	Saved := [ERGOPTI_SPEC, DeadkeyMappingCircumflex, DeadkeyMappingDiaresis, DeadkeyMappingSuperscript,
+		DeadkeyMappingSubscript, DeadkeyMappingGreek, DeadkeyMappingR, DeadkeyMappingCurrency]
+	ERGOPTI_SPEC := 0
+	try {
+		Before := _PerfCountersOwner().Counts.Get(Name, 0)
+		ErgoptiLayout_Init(Dir)
+		AssertEqual(One, _PerfCountersOwner().Counts.Get(Name, 0) - Before,
+			"reading Ergopti and Ergopti+ decodes the shipped index as often as reading one layout")
+	} finally {
+		ERGOPTI_SPEC := Saved[1], DeadkeyMappingCircumflex := Saved[2], DeadkeyMappingDiaresis := Saved[3]
+		DeadkeyMappingSuperscript := Saved[4], DeadkeyMappingSubscript := Saved[5], DeadkeyMappingGreek := Saved[6]
+		DeadkeyMappingR := Saved[7], DeadkeyMappingCurrency := Saved[8]
+	}
+}
+
 Test("ergopti tables: a shipped layout that fails its checksum is refused (ergopti-keylayout-tables)",
 	_EKT_ChecksumCase)
 

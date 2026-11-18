@@ -278,18 +278,33 @@ LayoutRegistry_ReadLocal(Id, LocalDir) {
 }
 
 /**
+ * Decodes the index shipped with the driver. A caller reading several shipped
+ * layouts decodes it once and hands it to each LayoutRegistry_ReadBundled:
+ * the decode is most of the cost of reading one layout.
+ * @param {string} RegistryDir - Folder from LayoutRegistry_BundledDir.
+ * @returns {Map} Parsed index.json.
+ */
+LayoutRegistry_ReadBundledIndex(RegistryDir) {
+	PerfCount("layout_registry.bundled_index_decode")
+	return JsonParse(_LayoutRegistryReadText(RegistryDir . LayoutRegistry_Settings()["index_file"]))
+}
+
+/**
  * Reads a layout shipped with the driver and verifies it against the shipped
  * index, like a downloaded one: a damaged installation fails here instead of
  * emulating something else.
  * @param {string} Id - Registry id.
  * @param {string} RegistryDir - Folder from LayoutRegistry_BundledDir.
+ * @param {Map} Index - LayoutRegistry_ReadBundledIndex(RegistryDir), decoded
+ *   here when omitted.
  * @returns {Map} Text (the .keylayout) and Entry (its index entry).
  * @throws {Error} When the layout is missing, misplaced or fails verification.
  */
-LayoutRegistry_ReadBundled(Id, RegistryDir) {
+LayoutRegistry_ReadBundled(Id, RegistryDir, Index := unset) {
 	if !LayoutRegistry_IsValidId(Id)
 		throw ValueError("Invalid registry layout id.", -1, Id)
-	Index := JsonParse(_LayoutRegistryReadText(RegistryDir . LayoutRegistry_Settings()["index_file"]))
+	if !IsSet(Index)
+		Index := LayoutRegistry_ReadBundledIndex(RegistryDir)
 	Entry := LayoutRegistry_FindEntry(Index, Id)
 	; The index builder always files a layout as <id>/<id>.keylayout; anything
 	; else would read outside the layout's own folder.
