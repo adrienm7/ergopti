@@ -256,11 +256,12 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       needs an owner that buffers physical keys without one hotkey thread per key, such as the native capture.
 - **Parity literals.** PAR-58: `terminator_restoration`, `context_buffer`, `request_plan_*` and `row_options` are
   replayed on all three drivers (row options on macOS and Linux through `test-keylayout-row-options` and
-  `test-xkb-row-options`). Keystats gaps left: `session_events` on macOS, whose session machine lives in
-  `modules/keystats/init.lua` and `watchers.lua` rather than the shared `session_events.lua` Linux runs, and
-  `metrics_maintenance` on macOS (the shared helper Linux already replays). `composite_key` is Windows-only by its
-  own scope. `menus/*` (96 corpora, many named for one platform) still needs a per-corpus review of which driver
-  owns each row. PAR-74: 2 literals left, in `_shared/settings/data/features/caps_word_auto_off_policy.ahk`, which
+  `test-xkb-row-options`). `session_events` is replayed on macOS since 2026-11-18 (three fixes in
+  `modules/keystats/session_machine.lua`; the deferred synthetic snapshot still opens a session without its
+  `session_start`). Keystats gap left: `metrics_maintenance` on macOS (the shared helper Linux already replays).
+  `composite_key` is Windows-only by its own scope. `menus/*`: macOS replays every corpus whose rows it draws (per-corpus
+  table in [the parity audit](docs/platform-parity-audit.md)); Linux still replays neither
+  `hotstring_extension_frames`, `hotstrings_parameter_frames` nor the two profile command corpora. PAR-74: 2 literals left, in `_shared/settings/data/features/caps_word_auto_off_policy.ahk`, which
   cannot include the generated constants. PAR-79: 4 Windows timer literals left (13 in
   `timer-literal-baseline.json`, 9 of them in the archived `old/kalamine` scripts), and none can move: the 3 startup
   smoke sleeps of `ErgoptiPlus.ahk` and the UIA worker's idle `Sleep(250)` run before or without the registry.

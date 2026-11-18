@@ -56,6 +56,60 @@ module drifted after its campaign (the shared tap-hold file of the 2026-11-11
 decision, its migrations, writers and the Karabiner generator): its follow-up
 reviews that drift.
 
+## Shared corpus replays on macOS (PAR-58) — November 18, 2026
+
+**Typing sessions.** `_shared/tests/corpus/keystats/session_events_vectors.json`
+now runs on macOS through the real event tap, idle timer
+(`watchers.check_idle`) and engine stop
+(`tests/meta/corpus/test_corpus_keystats_session_events.lua`). The first replay
+found three disagreements, fixed in the new `modules/keystats/session_machine.lua`
+that the event tap, the idle timer, the session reset and the stop now share:
+
+- a click or a scroll ended an idle span but did not keep the session alive, so
+  a session ended five minutes after the last key even while the pointer moved;
+- an input after a missed timeout (no idle tick ran, as across a sleep)
+  extended the old session, whose `session_end` then counted the silence as
+  typing time; it now ends the old session first;
+- a stop (feature off, reload, quit) left the open session without its
+  `session_end`.
+
+The Windows replay had found the click and scroll gap too, and its watchers
+already close a session on shutdown. macOS keeps its
+session state in CoreState rather than in the closure-owned
+`_shared/metrics/engine/system/session_events.lua` Linux runs, because the live
+WPM readout and the deferred synthetic snapshot read and extend those fields;
+the corpus replay is what pins the two machines together. One macOS gap the
+corpus does not cover remains: the deferred synthetic snapshot opens a session
+without writing its `session_start`.
+
+**Menu corpora.** Review of the 96 corpora of `_shared/tests/corpus/menus/` for
+the rows macOS draws. macOS now replays every corpus whose rows it draws:
+
+| Corpus                                                                    | macOS consumer                                                                                                                |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `hotstring_extension_frames`                                              | `tests/unit/menu/ui/hotstrings/test_extension_hotstrings.lua` (`native_order.hs`)                                             |
+| `hotstrings_parameter_frames`                                             | `tests/unit/menu/ui/hotstrings/test_parameter_frames.lua` (`delays.hs`, `mac_delays_ms`)                                      |
+| `indentation_control`                                                     | `tests/unit/ai/ui/menu/settings/test_transaction_shared_controls.lua` (choices and cases)                                     |
+| `profile_create_command`, `profile_clone_command`                         | `tests/unit/ai/ui/menu/profiles/test_candidate_transaction_deferred_editor.lua`                                               |
+| caption, affix, prefix, fixed-parent, separator, magic-key-source corpora | the shared contracts of `_shared/tests/lua/menu/` and `layouts/magic_key_source_contract.lua`, registered by the macOS suites |
+
+The macOS Lua frame places Clone in its own section above Create, unlike the
+Windows frame; only the two command declarations are shared. The corpora macOS
+does not replay are not macOS rows:
+
+- `windows_*` (four) pin Windows-native captions, and `startup_bootstrap_captions`
+  the Windows tray drawn before the full menu loads (the generated
+  `startup_tray_projection.ahk`); the macOS menu bar has no such pre-load tray;
+- `linux_*` and `agent_linux_disabled_apps` are Linux rows;
+- `personal_shortcuts_frame` declares its rows for Windows only
+  (`platform_rows.hs` is empty): macOS lists the same shortcuts under rows of its
+  own, a menu-structure difference recorded in the feature inventory;
+- `llm_complete_presentation_owners` describes manifest ownership and is read by
+  the JS menu gate, not by a driver.
+
+Linux still replays neither `hotstring_extension_frames`,
+`hotstrings_parameter_frames` nor the two profile command corpora.
+
 ## Review status at pause — November 5, 2026
 
 The maintainer requested a pause after the dead-key campaign delivered in
