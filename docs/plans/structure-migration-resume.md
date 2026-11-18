@@ -34,6 +34,24 @@ same commit as each step or checkpoint. Times are Paris time.
     fail before the step as after it; under WSL without a display, Linux
     `test_colored_menu` and `test_prompt_cancel` wait on a real dialog
     host, and the FIFO and permission cases fail on /mnt as root.
+- What the S26 CI proof (run 44387793851) added:
+  - the folder gain puts a settings-section folder (hotstrings) into
+    `REQUIRES_PLATFORM` of `test-source-trees-are-scanned.cjs`; take it out
+    and add it to `SECTION_FOLDERS` (metrics and shortcuts next);
+  - a gained folder the shared tree also holds makes AHK tests' shared
+    relative paths read as Windows pins (`test-git-mv-resilience.cjs` now
+    resolves file pins in both trees);
+  - JS checks that join a path from pieces or a template literal are never
+    rewritten: read the owner with `tools/lib/driver-source-owner.cjs`;
+  - Lua patterns on a chunk's file name and made-up `package.loaded` keys
+    under a sweep prefix are not rewritten either; compare with
+    `helpers.driver_module_path(name)` and keep fixture keys under the
+    current sweep prefix;
+  - a step that splits an oversized test folder needs the Rule B baseline
+    lowered (`--update-baseline`);
+  - `test_plain_native_cas_owner.ahk` failed once on a hosted runner: S26
+    touches neither the test, its fixture nor the clipboard owner, so it is
+    the known clipboard race, not step fallout.
 - Local proof of S26 (2026-11-18): strict lint, format, AHK parse and
   encoding, literal inventory, pinned reads, corpus fields, folder bounds,
   tree parity, module matrix; AHK filters over the moved files (about 2,600
