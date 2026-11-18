@@ -1683,20 +1683,17 @@ local function build_deferred_synthetic_snapshot(operation)
 		end
 	end
 
-	-- A queued historical snapshot must not reopen a session reset meanwhile.
+	-- A queued historical snapshot must not feed the live WPM of a session reset
+	-- meanwhile. The typing session itself is left to the keys and the pointer
+	-- (session_machine.lua): synthetic text opens and extends none, as on
+	-- Windows and Linux, so no session can open without its session_start.
 	if operation.session_generation == CoreState.session_generation then
 		for _ = 1, operation.deletes do
 			remove_effective_timestamp_at_or_before(operation.timestamp_ms)
 		end
 		insert_effective_timestamps(operation.timestamp_ms, char_count)
 		if char_count > 0 then
-			CoreState.session_last_active = math.max(
-				CoreState.session_last_active or 0, operation.timestamp_ms)
 			CoreState.typing_last_active = math.max(CoreState.typing_last_active, operation.timestamp_ms)
-			if CoreState.session_start_time == 0
-				or CoreState.session_start_time > operation.timestamp_ms then
-				CoreState.session_start_time = operation.timestamp_ms
-			end
 		end
 	end
 

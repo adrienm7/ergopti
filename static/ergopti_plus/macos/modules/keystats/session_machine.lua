@@ -11,12 +11,13 @@
 --- FEATURES & RATIONALE:
 --- 1. The rules are those of _shared/tests/corpus/keystats/session_events_vectors.json,
 ---    which this driver replays through its real event tap, idle timer and stop
----    (tests/unit/modules/keystats/core/test_corpus_keystats_session_events.lua).
+---    (tests/meta/corpus/test_corpus_keystats_session_events.lua).
 ---    Linux runs the closure-owned _shared/metrics/engine/system/session_events.lua;
----    macOS keeps its state in CoreState because the live WPM readout and the
----    deferred synthetic snapshot read and extend the same session fields.
+---    macOS keeps its state in CoreState, which the idle timer and the stop read.
 --- 2. Any input, a key or the pointer, ends an idle span and keeps an open
----    session alive; only a keystroke opens one. An input that arrives after a
+---    session alive; only a keystroke opens one. Synthetic text (an expansion,
+---    an AI answer) is no input here, as on Windows and Linux: it once opened a
+---    session without its session_start. An input that arrives after a
 ---    missed timeout (no idle tick ran, as across a sleep) ends the old session
 ---    first, so the silence is never counted as typing time.
 --- 3. Each caller passes the limits it read from the timing registry
@@ -24,7 +25,7 @@
 ---    so this module holds no copy a test stub could leave stale.
 --- 4. close() is the single way to end a session: it writes session_end with the
 ---    time from the first to the last input and starts a new session generation
----    so a queued synthetic snapshot cannot reopen it.
+---    so a queued synthetic snapshot cannot feed the live WPM of a new session.
 --- ==============================================================================
 
 local M = {}

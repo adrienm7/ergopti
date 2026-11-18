@@ -16,6 +16,10 @@
 ---    session without its session_end.
 --- 2. Only the four events_session kinds are compared; the other rows the
 ---    engine writes (typing runs, system events) belong to other corpora.
+--- 3. Synthetic text is not an input of the corpus: Windows and Linux never
+---    show it to their session machine. The macOS deferred snapshot used to open
+---    a session without writing its session_start, so a later stop or timeout
+---    wrote a session_end nothing had opened.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -75,6 +79,13 @@ local function start_replay()
 		watchers.check_idle()
 	end
 	function replay.stop() fixture.keystats.stop() end
+	--- Expands synthetic text (a hotstring or an AI answer) and runs its
+	--- deferred snapshot, as the log manager does after the event tap returns.
+	function replay.synthetic(at, text)
+		now_ms = at
+		helpers.assert_true(fixture.keystats.notify_synthetic(text, "hotstring", 0), "the synthetic text is accepted")
+		fixture.drain()
+	end
 	function replay.rows()
 		local taken = rows
 		rows = {}
@@ -110,4 +121,30 @@ helpers.describe("corpus: keystats/session_events_vectors.json on macOS", functi
 			helpers.assert_eq(replay.errors, {}, "every callback must complete without a hidden failure")
 		end)
 	end
+
+	helpers.it("session-events: synthetic text alone opens no session", function()
+		local replay = start_replay()
+		local timeout_ms = corpus.timings.session_timeout_ms
+		replay.synthetic(timeout_ms, "abc")
+		helpers.assert_eq(replay.rows(), {}, "synthetic text writes no session row")
+		replay.tick(timeout_ms * 2 + 1)
+		replay.stop()
+		helpers.assert_eq(replay.rows(), {}, "no session_end may close a session nothing opened")
+		helpers.assert_eq(replay.errors, {}, "every callback must complete without a hidden failure")
+	end)
+
+	helpers.it("session-events: synthetic text inside a session leaves its span to the inputs", function()
+		local replay = start_replay()
+		local first, last = corpus.timings.micro_idle_ms, corpus.timings.micro_idle_ms * 2
+		replay.input(first, true)
+		replay.input(last, true)
+		replay.synthetic(last + corpus.timings.micro_idle_ms - 1, "abc")
+		replay.stop()
+		local rows = replay.rows()
+		helpers.assert_eq(#rows, 2, "one session, opened and closed")
+		helpers.assert_eq(rows[1].type, "session_start")
+		helpers.assert_eq(rows[2].type, "session_end")
+		helpers.assert_eq(rows[2].duration_ms, last - first, "the session spans its inputs, as on Windows and Linux")
+		helpers.assert_eq(replay.errors, {}, "every callback must complete without a hidden failure")
+	end)
 end)
