@@ -50,7 +50,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/hotstrings/engine/repeat_key.lua",
 			"symbol": "function M.resolve",
-			"sha256": "7360716033ca3373c82ee36d173ad967441ee5a36bab61b0b08196a800f426c3"
+			"sha256": "fdb04b78a2858b8745045e5331bb96d7a08cbea67cd41ebd9a812bd3da2d4516"
 		},
 		{
 			"id": "linux-control",
