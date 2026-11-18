@@ -62,8 +62,6 @@ every maintainer request here.
       « [CI] Intermittent fixtures » item below plus healthcheck collection, SendInstant, Ollama native,
       `groups247-*` order dependence, native clipboard/picker, WebView picker cleanup, `idle-caret-context`,
       `key-state-dllcall-uncaught`.
-- [ ] **Register row** in `docs/platform-parity-audit.md` (module « Key combinations and macOS bindings ») for
-      `docs/audits/platform-parity/2026-11-17-key-combinations-bindings/report.md`.
 
 ## Full accessibility (maintainer request, 2026-11-16, very important)
 
