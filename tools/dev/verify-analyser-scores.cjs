@@ -43,7 +43,12 @@
  *    its config/keyboard/standard_qwerty_iso.yml (base and Shift: the file
  *    has no AltGr), `evaluate --corpus <text> --json` with the layout string
  *    that keeps it, against our scorer on the same two layers.
- * 7. Exit status: 0 when every comparison ran, 1 when a download, a run or a
+ * 7. cmini and a200 (--python=<exe> with --cmini-data=<its folder> or
+ *    --a200-data=<its python/apps/a200 folder>): our small Python runners call
+ *    their analyzers on the corpus each builds from a text (cmini's
+ *    scripts/data.py rule; a200's gendata word-list model), on their own
+ *    layout files fingered as our model, statistic by statistic.
+ * 8. Exit status: 0 when every comparison ran, 1 when a download, a run or a
  *    parse failed. The gaps are reported, not judged: the fidelity of each
  *    analyser is recorded in docs/design/analyser-scores.md.
  *
@@ -53,6 +58,7 @@
  *        [--genkey=<exe> --genkey-data=<dir>] [--keygen=<exe> --keygen-data=<dir>]
  *        [--perl=<exe> --carpalx-data=<dir> [--carpalx-perl5lib=<dirs>]]
  *        [--klo=<exe> --klo-data=<dir>]
+ *        [--python=<exe> [--cmini-data=<dir>] [--a200-data=<dir>]]
  * ==============================================================================
  */
 
@@ -143,6 +149,34 @@ const KLO_LIBRARY = [
 	'ergopti',
 	'ergol',
 	'bepo'
+];
+// cmini's and a200's layout files fingered as our model.
+const AKL_CMINI = [
+	'qwerty',
+	'dvorak',
+	'colemak',
+	'colemak-dh',
+	'workman',
+	'sturdy',
+	'graphite',
+	'semimak',
+	'isrt',
+	'mtgap',
+	'halmak',
+	'norman',
+	'qgmlwy'
+];
+const AKL_A200 = [
+	'Qwerty',
+	'Arensito',
+	'Capewell',
+	'Mtgap',
+	'Engram',
+	'Beakl-15',
+	'Rolll',
+	'Pine',
+	'Heart',
+	'Ctgap'
 ];
 
 const args = process.argv.slice(2);
@@ -828,8 +862,250 @@ function verifyKlo(exe, data) {
 	}
 }
 
+// ================================
+// ======= 8/ cmini and a200 ======
+// ================================
+
+// Our runner of cmini's analyzer (argv: cmini folder, text, layouts): the
+// corpus as its scripts/data.py builds one, the statistics of `view`.
+const CMINI_RUNNER = `
+import json, os, sys
+from collections import Counter
+root, text, names = sys.argv[1], sys.argv[2], sys.argv[3].split(',')
+os.chdir(root)
+sys.path.insert(0, root)
+from core.keyboard import Layout, Position
+from util import analyzer
+with open(text, encoding='utf-8') as f:
+    flat = ' '.join(f.read().split())
+def grams(n):
+    windows = zip(*(flat[i:] for i in range(n)))
+    return dict(Counter(''.join(w) for w in windows if ' ' not in w))
+mono, bi, tri = grams(1), grams(2), grams(3)
+out = {}
+for name in names:
+    with open(f'layouts/{name}.json', encoding='utf-8') as f:
+        data = json.load(f)
+    ll = Layout(data['name'], data['user'], data['board'], {k: Position(**v) for k, v in data['keys'].items()})
+    stats = analyzer.trigrams(ll, tri)
+    stats['sfb'] = analyzer.sfb_bigram(ll, bi)
+    out[name] = {'stats': stats, 'use': analyzer.use(ll, mono), 'keys': data['keys']}
+print(json.dumps(out))
+`;
+// Our runner of a200 (argv: its app folder, text, layouts): its data built by
+// src/gendata.py from the text's words, its results in the AVG thumb mode.
+const A200_RUNNER = `
+import json, os, sys, tempfile
+root, text, names = sys.argv[1], sys.argv[2], sys.argv[3].split(',')
+os.chdir(root)
+sys.path.insert(0, os.path.join(root, 'src'))
+import analyzer, gendata, layout
+with open(text, encoding='utf-8') as f:
+    words = f.read().split()
+with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
+    json.dump({'texts': words}, f)
+try:
+    data = {'1-grams': gendata.get_monograms(f.name), '3-grams': gendata.get_trigrams(f.name)}
+finally:
+    os.remove(f.name)
+out = {'data': data, 'results': {}, 'layouts': {}}
+for name in names:
+    keys = layout.load_file(f'layouts/{name}')
+    results = analyzer.get_results(keys, data, {'thumb-space': 'AVG'})
+    # Its ratios are infinite without an outward roll: not JSON.
+    out['results'][name] = {k: (None if v == float('inf') else v) for k, v in results.items()}
+    out['layouts'][name] = {k: v for k, v in keys['keys'].items() if not v.get('template')}
+print(json.dumps(out))
+`;
+// Their rows on our keys (row, column).
+const AKL_ROWS = [
+	MODELS.genkey.model.rows_ansi[0],
+	MODELS.genkey.model.rows_ansi[1],
+	MODELS.genkey.model.rows_ansi[2]
+];
+const AKL_FINGERS = { LP: 0, LR: 1, LM: 2, LI: 3, LT: 4, RT: 5, RI: 6, RM: 7, RR: 8, RP: 9 };
+
+/** One of our Python runners' JSON output. */
+function runPython(python, code, argv) {
+	const run = spawnSync(python, ['-c', code, ...argv], { encoding: 'utf8', maxBuffer: 1 << 30 });
+	if (run.status !== 0) throw new Error(`python: exit ${run.status}\n${run.stderr.slice(-600)}`);
+	return JSON.parse(run.stdout);
+}
+
+/** The largest |gap| per statistic, as « name gap, … ». */
+function largest(gaps) {
+	return Object.entries(gaps)
+		.map(([k, v]) => `${k} ${Math.max(...v.map(Math.abs)).toExponential(1)}`)
+		.join(', ');
+}
+
+function verifyCmini(python, data) {
+	const board = E.keyboard('ansi');
+	const fingerOf = new Map(board.codes.map((c, k) => [c, board.finger[k]]));
+	const names = {
+		alternate: 'alternate',
+		roll_in: 'roll-in',
+		roll_out: 'roll-out',
+		onehand_in: 'oneh-in',
+		onehand_out: 'oneh-out',
+		redirect: 'redirect',
+		redirect_bad: 'bad-redirect',
+		sfs_red: 'dsfb-red',
+		sfs_alt: 'dsfb-alt',
+		sft: 'sfT',
+		sfr: 'sfR',
+		unknown: 'unknown',
+		sfb: 'sfb'
+	};
+	const gaps = {};
+	let points = 0;
+	const skipped = new Set();
+	for (const file of Object.values(GENKEY_TEXTS)) {
+		const text = path.join(REPO_ROOT, file);
+		const results = runPython(python, CMINI_RUNNER, [data, text, AKL_CMINI.join(',')]);
+		const tables = E.prepareNgrams(E.ngramsFromText(fs.readFileSync(text, 'utf8')));
+		for (const [name, r] of Object.entries(results)) {
+			// Its layout's keys on ours, kept when its fingers are our model's.
+			const rows = {};
+			const same = Object.entries(r.keys).every(([char, k]) => {
+				const code = AKL_ROWS[k.row] && AKL_ROWS[k.row][k.col];
+				if (!code || fingerOf.get(code) !== AKL_FINGERS[k.finger]) return false;
+				rows[code] = [char, char.toUpperCase() !== char ? char.toUpperCase() : null, null, null];
+				return true;
+			});
+			if (!same) {
+				skipped.add(name);
+				continue;
+			}
+			const layout = { id: name, name, rows, fingering: 'standard' };
+			const parts = S.score('cmini', layout, tables, { keyboard: 'ansi' }).parts;
+			for (const [ours, theirs] of Object.entries(names))
+				(gaps[ours] = gaps[ours] || []).push(parts[ours] - 100 * r.stats[theirs]);
+			(gaps.left_hand = gaps.left_hand || []).push(parts.left_hand - 100 * r.use.LH);
+			points++;
+		}
+	}
+	const note = skipped.size ? ` (not our fingering: ${[...skipped].join(', ')})` : '';
+	console.log(`cmini: ${points} points, largest gap in points: ${largest(gaps)}${note}`);
+}
+
+/**
+ * a200's layout keys on ours. a200 completes each layout with its template,
+ * QWERTY's characters on QWERTY's fingers: those the file does not place go
+ * on their QWERTY key when it is free, else on a free key of the same
+ * finger. Returns the layout and the characters a library layout cannot
+ * give a200's statistics for (the template's characters on the three rows,
+ * which a200 leaves out of its row use, and those with no free key).
+ */
+function a200Layout(keys) {
+	const board = E.keyboard('ansi');
+	const fingerOf = new Map(board.codes.map((c, k) => [c, board.finger[k]]));
+	const qwerty = libraryLayout('qwerty');
+	const rowCodes = new Set(AKL_ROWS.flat());
+	const rows = {};
+	const fromFile = new Set();
+	for (const [char, k] of Object.entries(keys)) {
+		const code = AKL_ROWS[k.row] && AKL_ROWS[k.row][k.col];
+		if (!code || fingerOf.get(code) !== AKL_FINGERS[k.finger]) return null;
+		rows[code] = rows[code] || [null, null, null, null];
+		rows[code][k.shift ? 1 : 0] = char;
+		fromFile.add(code);
+	}
+	const left = new Set();
+	const placed = new Set(Object.keys(keys));
+	const pending = [];
+	for (const code of board.codes)
+		for (const layer of [0, 1]) {
+			const char = qwerty.rows[code] && qwerty.rows[code][layer];
+			if (typeof char !== 'string' || char === ' ' || placed.has(char)) continue;
+			placed.add(char);
+			if (fromFile.has(code)) pending.push([char, fingerOf.get(code)]);
+			else {
+				rows[code] = rows[code] || [null, null, null, null];
+				rows[code][layer] = char;
+				if (rowCodes.has(code)) left.add(char);
+			}
+		}
+	const modifiers = new Set(['Space', 'ShiftLeft', 'ShiftRight', 'AltRight']);
+	for (const [char, f] of pending) {
+		const code = board.codes.find(
+			(c) =>
+				!modifiers.has(c) &&
+				fingerOf.get(c) === f &&
+				!fromFile.has(c) &&
+				(!rows[c] || rows[c].slice(0, 2).includes(null))
+		);
+		left.add(char);
+		if (!code) continue;
+		rows[code] = rows[code] || [null, null, null, null];
+		rows[code][rows[code][0] === null ? 0 : 1] = char;
+	}
+	rows.Space = [' ', null, null, null];
+	return { rows, left };
+}
+
+function verifyA200(python, data) {
+	const names = {
+		alternate: 'alternate',
+		roll_in: 'roll-in',
+		roll_out: 'roll-out',
+		oneh_in: 'oneh-in',
+		oneh_out: 'oneh-out',
+		redirect: 'redirect',
+		sfb: 'sfb',
+		dsfb_red: 'dsfb-red',
+		dsfb_alt: 'dsfb-alt',
+		sft: 'sfT',
+		sfr: 'sfR',
+		unknown: 'unknown',
+		finger_lp: 'LP',
+		finger_ri: 'RI',
+		row_top: 'top',
+		row_home: 'home'
+	};
+	// The characters no library layout can give a200's statistics for, from
+	// its layout files alone, leave the texts first.
+	const probe = runPython(python, A200_RUNNER, [data, __filename, AKL_A200.join(',')]);
+	const left = new Set();
+	const layouts = {};
+	for (const name of AKL_A200) {
+		const converted = a200Layout(probe.layouts[name]);
+		if (!converted) throw new Error(`a200 ${name}: not our fingering`);
+		converted.left.forEach((c) => left.add(c));
+		layouts[name] = converted.rows;
+	}
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'a200-'));
+	try {
+		const gaps = {};
+		let points = 0;
+		for (const [id, file] of Object.entries(GENKEY_TEXTS)) {
+			const text = path.join(root, `${id}.txt`);
+			const chars = Array.from(fs.readFileSync(path.join(REPO_ROOT, file), 'utf8'));
+			fs.writeFileSync(text, chars.filter((c) => !left.has(c)).join(''));
+			const out = runPython(python, A200_RUNNER, [data, text, AKL_A200.join(',')]);
+			const tables = E.prepareNgrams({
+				chars: out.data['1-grams'],
+				bigrams: {},
+				trigrams: out.data['3-grams']
+			});
+			for (const name of AKL_A200) {
+				const layout = { id: name, name, rows: layouts[name], fingering: 'standard' };
+				const parts = S.score('a200', layout, tables, { keyboard: 'ansi' }).parts;
+				for (const [ours, theirs] of Object.entries(names))
+					(gaps[ours] = gaps[ours] || []).push(parts[ours] - 100 * out.results[name][theirs]);
+				points++;
+			}
+		}
+		console.log(
+			`a200: ${points} points on its own data (without ${[...left].join(' ')}), largest gap in points: ${largest(gaps)}`
+		);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+}
+
 // ======================
-// ======= 8/ Main ======
+// ======= 9/ Main ======
 // ======================
 
 async function main() {
@@ -869,6 +1145,17 @@ async function main() {
 			console.log(
 				'Keyboard Layout Optimizer: skipped (needs --klo=<evaluate exe> --klo-data=<its source folder>)'
 			);
+	}
+	const python = option('python');
+	if (!only || only === 'cmini') {
+		const data = option('cmini-data');
+		if (python && data) verifyCmini(python, data);
+		else console.log('cmini: skipped (needs --python=<exe> --cmini-data=<its source folder>)');
+	}
+	if (!only || only === 'a200') {
+		const data = option('a200-data');
+		if (python && data) verifyA200(python, data);
+		else console.log('a200: skipped (needs --python=<exe> --a200-data=<its app folder>)');
 	}
 }
 

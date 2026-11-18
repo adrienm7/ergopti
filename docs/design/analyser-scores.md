@@ -205,7 +205,17 @@ key size)` per axis, lateral ×2.0, vertical pinky 1.6 / ring 1.3 / middle 1.1
   its `monkeytype-quotes` corpus reproduces the Graphite README's « A200 » block
   to 2 decimals (alternates 30.47 %, rolls 47.56 %, ratio 0.89, redirects
   6.23 %, …) but SFB 1.03 % for 1.04 % and RR 12.34 % for 12.33 %, from our
-  library's Graphite.
+  library's Graphite. Measured against a200 itself (its `src/analyzer.py`,
+  AVG mode, on the data its `src/gendata.py` builds from each text's words,
+  its word-list model) on _Alice_, _Sherlock Holmes_, English Wikipedia,
+  Python code and _Germinal_ with 10 of its layout files (50 points): every
+  statistic within 1e-13 point. a200 completes a layout with its template
+  (QWERTY's characters on QWERTY's fingers, out of its row use), which a
+  library layout cannot hold beside the file's own keys: the template's
+  punctuation the files do not place (`[ ] \ / ; ' < >` and their Shift
+  forms) leaves the texts of this check. In the Studio our scorer reads the
+  corpus's own trigrams instead of that word-list model. Gate: a200's own
+  output on its data for a two-sentence text, on QWERTY, to 1e-9.
 
 ### carpalx
 
@@ -405,7 +415,12 @@ r·skip1 + r²·skip2 + r³·skip3)` (r = 1/7) times the distance and 5.5 / fing
 - **Fidelity: exact.** On cmini's `shai` corpus with cmini's own QWERTY (the
   letter block), our scorer gives cmini's cached output to 6 decimals on every
   trigram class (checked once; the corpus is GPL data of the cmini
-  repository). Gate: hand-computed tables.
+  repository). Measured against cmini's own `util/analyzer.py` on the corpus
+  its `scripts/data.py` builds from each text, on _Alice_, _Sherlock Holmes_,
+  English Wikipedia, Python code and _Germinal_ with 13 of its layout files
+  (65 points; its Canary has another fingering): every statistic within
+  1e-14 point. Gate: hand-computed tables and cmini's own output on a
+  two-sentence text on QWERTY, to 1e-9.
 
 ### Ergo-L analyser and Kalamine statistics
 
@@ -452,8 +467,9 @@ Optimizer (KLO in the table). Measured on 2026-11-18:
 | carpalx   | 50     | 0.31 % (1.2 % before)                   | 1.2 %        |
 | KLO       | 40     | < 1e-6 % (5.5 % before)                 | < 1e-6 %     |
 
-Not re-measured against a run of the tool in this pass: cmini and a200
-(Python): their fidelity above rests on the earlier checks it names.
+cmini and a200 (Python, `--python=<exe>` with `--cmini-data=<its folder>` or
+`--a200-data=<its app folder>`) needed no change: every statistic within
+1e-13 point of their own code on 65 and 50 points.
 
 ## Not covered
 
