@@ -26,7 +26,10 @@
  * 2. One library for the site and the app: registry layouts keep all their
  *    layers and dead keys; an alphabetic block of the library JSON gets the US
  *    number row and the US Shift pairs, the convention of its source; a whole
- *    layout of the library JSON (KLA's) is taken as it is.
+ *    layout of the library JSON (KLA's) is taken as it is, and its
+ *    « dead_keys » (a character of its rows → a standard accent) become dead
+ *    keys that compose as the Studio's importers compose them
+ *    (layout_formats.js composeAccent).
  * 3. Deterministic: no timestamp, keys in a fixed order.
  * ==============================================================================
  */
@@ -110,6 +113,7 @@ const PURITY_TEST_PATH = path.join(
 );
 const CORPUS_OUT_DIR = shared('ui', 'layout_analysis', '_generated');
 const ENGINE_PATH = shared('ui', 'layout_analysis', 'analysis_engine.js');
+const FORMATS_PATH = shared('ui', 'layout_analysis', 'layout_formats.js');
 const PHYSICAL_KEYS_PATH = shared('layouts', 'data', 'keycodes', 'physical_keys.json');
 const SOURCES = [
 	'layouts/data/analysis/analysis_model.json',
@@ -247,6 +251,18 @@ function loadEngine() {
 }
 
 /**
+ * The Studio's layout file reader (layout_formats.js), loaded as the classic
+ * script a page loads: its standard accents compose the library's dead keys.
+ * @returns {object} LAYOUT_FORMATS.
+ */
+function loadFormats() {
+	const sandbox = {};
+	vm.createContext(sandbox);
+	vm.runInContext(fs.readFileSync(FORMATS_PATH, 'utf8'), sandbox, { filename: FORMATS_PATH });
+	return vm.runInContext('LAYOUT_FORMATS', sandbox);
+}
+
+/**
  * A registry or reference layout, with all its layers and dead keys, through
  * the engine's own converter.
  * @param {object} engine - LAYOUT_ANALYSIS.
@@ -328,13 +344,18 @@ function fromAlphaBlock(entry, qwerty) {
 
 /**
  * A whole layout of the library JSON (every key and level its source states),
- * taken as it is: nothing is completed.
+ * taken as it is: nothing is completed. Its « dead_keys » name the cells that
+ * are dead keys of a standard accent (a KLA file cannot say so): each such
+ * cell becomes that dead key, which composes every character the layout types
+ * by Unicode normalisation, as an imported file's standard accent does.
  * @param {object} entry - One layout_library.json entry with rows.
  * @param {string[]} codes - The measured codes.
+ * @param {object} formats - LAYOUT_FORMATS (loadFormats).
  * @returns {object} The library entry.
- * @throws {Error} On a key the engine does not measure or a malformed row.
+ * @throws {Error} On a key the engine does not measure, a malformed row, or a
+ *   dead key that is no standard accent or no cell of the rows.
  */
-function fromWholeRows(entry, codes) {
+function fromWholeRows(entry, codes, formats) {
 	const measured = new Set(codes);
 	const rows = {};
 	for (const [code, row] of Object.entries(entry.rows)) {
@@ -347,7 +368,7 @@ function fromWholeRows(entry, codes) {
 			throw new Error(`${entry.id}: ${code} is not ${LIBRARY_LEVELS} characters or null`);
 		rows[code] = row.slice();
 	}
-	return {
+	const layout = {
 		id: entry.id,
 		name: entry.name,
 		language: entry.language,
@@ -358,6 +379,22 @@ function fromWholeRows(entry, codes) {
 		command: {},
 		dead: {}
 	};
+	const deadKeys = Object.entries(entry.dead_keys || {});
+	for (const [char, accent] of deadKeys) {
+		if (!formats.ACCENTS[accent])
+			throw new Error(`${entry.id}: dead key ${char} names no standard accent (${accent})`);
+		let found = false;
+		for (const row of Object.values(rows))
+			row.forEach((cell, level) => {
+				if (cell !== char) return;
+				row[level] = { dead: accent };
+				found = true;
+			});
+		if (!found) throw new Error(`${entry.id}: dead key ${char} is on no key`);
+	}
+	// Composed once every dead cell is known, so no accent composes another's key.
+	for (const [, accent] of deadKeys) formats.composeAccent(layout, accent, accent);
+	return layout;
 }
 
 /**
@@ -392,6 +429,7 @@ function checkNotImported(library, ids) {
  */
 function buildLibrary(model) {
 	const engine = loadEngine();
+	const formats = loadFormats();
 	const codes = engine.typingCodes(model);
 	const composer = loadComposer();
 	const out = [];
@@ -426,7 +464,7 @@ function buildLibrary(model) {
 			throw new Error(`${entry.id}: a library entry has either keys or rows`);
 		out.push(
 			entry.rows
-				? fromWholeRows(entry, codes)
+				? fromWholeRows(entry, codes, formats)
 				: fromAlphaBlock(entry, composer.REFERENCE.qwerty.rows)
 		);
 	}

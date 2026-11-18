@@ -1,5 +1,5 @@
 {
-	"_description": "Layout library of the layout analysis, by KeyboardEvent.code. An entry with « keys » is an alphabetic block (3 rows, base characters only), imported on 2026-11-14 from the Oxeylyzer layout set (Apache-2.0 repository) and, for the classics it lacks, from the cmini collection (GPL-3.0 repository), and on 2026-11-17 from genkey's layouts (GPL-3.0 repository) by tools/build/import-genkey-layouts.cjs; the codegen completes it with the US number row and the US Shift pairs (letters: upper case). An entry with « rows » is a whole layout (base, Shift, AltGr, Shift+AltGr of every key its file states), imported on 2026-11-17 from Keyboard Layout Analyzer's built-in layouts (MIT repository) by tools/build/import-kla-layouts.cjs; the codegen takes it as it is. Only the arrangements are re-encoded, never a file, on the basis given in docs/audits/layout-analysers/report.md, section « Layout library ». « source » and « source_path » name the file each layout comes from; « not_imported » lists the files of these collections left out, with the reason and, for a duplicate, the library layout with the same keys (« same_as »). The registry layouts (static/layouts/registry) and the reference QWERTY and AZERTY (layout_composer/reference_layouts.js) join the library at codegen with all their layers and dead keys, so they are not repeated here.",
+	"_description": "Layout library of the layout analysis, by KeyboardEvent.code. An entry with « keys » is an alphabetic block (3 rows, base characters only), imported on 2026-11-14 from the Oxeylyzer layout set (Apache-2.0 repository) and, for the classics it lacks, from the cmini collection (GPL-3.0 repository), and on 2026-11-17 from genkey's layouts (GPL-3.0 repository) by tools/build/import-genkey-layouts.cjs; the codegen completes it with the US number row and the US Shift pairs (letters: upper case). An entry with « rows » may state « dead_keys » (a character of its rows → a standard accent of layout_formats.js): a KLA file cannot say that a key is dead, so each is stated where the layout types that accent's letters nowhere else (Optimot, BvoFRak and the Spanish QWERTY: ê, á or ü only through ^, ´ or ¨), and the codegen composes it by Unicode normalisation as the Studio's importers do. An entry with « rows » is a whole layout (base, Shift, AltGr, Shift+AltGr of every key its file states), imported on 2026-11-17 from Keyboard Layout Analyzer's built-in layouts (MIT repository) by tools/build/import-kla-layouts.cjs; the codegen takes it as it is. Only the arrangements are re-encoded, never a file, on the basis given in docs/audits/layout-analysers/report.md, section « Layout library ». « source » and « source_path » name the file each layout comes from; « not_imported » lists the files of these collections left out, with the reason and, for a duplicate, the library layout with the same keys (« same_as »). The registry layouts (static/layouts/registry) and the reference QWERTY and AZERTY (layout_composer/reference_layouts.js) join the library at codegen with all their layers and dead keys, so they are not repeated here.",
 	"schema_version": 1,
 	"sources": {
 		"oxeylyzer": {
@@ -25,6 +25,10 @@
 			"url": "https://github.com/semilin/genkey/tree/f1f41733931c2339d4ed161a5ace5f03412b282e/layouts",
 			"commit": "f1f4173393",
 			"licence": "GPL-3.0 (repository); arrangements re-encoded"
+		},
+		"ergopti": {
+			"name": "Ergopti",
+			"licence": "the repository's own layout files; arrangements re-encoded"
 		}
 	},
 	"layouts": [
@@ -2678,39 +2682,62 @@
 			"id": "optimot",
 			"name": "Optimot",
 			"language": "fr",
-			"source": "oxeylyzer",
-			"source_path": "static/layouts/french/optimot.dof",
+			"source": "ergopti",
+			"source_path": "static/layouts/kla_iso/others/optimot.fr.iso.json",
 			"fingering": "standard",
-			"keys": {
-				"KeyQ": ",",
-				"KeyW": "j",
-				"KeyE": "o",
-				"KeyR": "é",
-				"KeyT": "b",
-				"KeyY": "f",
-				"KeyU": "d",
-				"KeyI": "l",
-				"KeyO": "'",
-				"KeyP": "q",
-				"KeyA": "a",
-				"KeyS": "i",
-				"KeyD": "e",
-				"KeyF": "u",
-				"KeyG": ".",
-				"KeyH": "p",
-				"KeyJ": "t",
-				"KeyK": "s",
-				"KeyL": "r",
-				"Semicolon": "n",
-				"KeyZ": "z",
-				"KeyX": "y",
-				"KeyC": "k",
-				"KeyB": "w",
-				"KeyN": "g",
-				"KeyM": "c",
-				"Comma": "m",
-				"Period": "h",
-				"Slash": "v"
+			"rows": {
+				"Backquote": ["$", "€", "£", "©"],
+				"Digit1": ["«", "1", "“", "¼"],
+				"Digit2": ["»", "2", "”", "½"],
+				"Digit3": ["\"", "3", "„", "¾"],
+				"Digit4": ["-", "4", "‑", "⅓"],
+				"Digit5": ["+", "5", "±", "⅔"],
+				"Digit6": ["*", "6", "×", "✻"],
+				"Digit7": ["/", "7", "\\", "÷"],
+				"Digit8": ["=", "8", "≠", "≈"],
+				"Digit9": ["(", "9", "[", "′"],
+				"Digit0": [")", "0", "]", "″"],
+				"Minus": ["@", "_", "−", "‒"],
+				"Equal": ["#", "%", "°", "º"],
+				"KeyQ": ["à", "À", "<", "⩽"],
+				"KeyW": ["j", "J", ">", "⩾"],
+				"KeyE": ["o", "O", "œ", "Œ"],
+				"KeyR": ["é", "É", "´", null],
+				"KeyT": ["b", "B", "—", null],
+				"KeyY": ["f", "F", "‘", null],
+				"KeyU": ["d", "D", "{", "†"],
+				"KeyI": ["l", "L", "}", "‡"],
+				"KeyO": ["'", "?", "’", "¿"],
+				"KeyP": ["q", "Q", null, null],
+				"BracketLeft": ["x", "X", "|", "®"],
+				"BracketRight": ["z", "Z", "→", "™"],
+				"KeyA": ["a", "A", "æ", "Æ"],
+				"KeyS": ["i", "I", "ᵢ", "§"],
+				"KeyD": ["e", "E", "ᵉ", "¶"],
+				"KeyF": ["u", "U", "ù", "Ù"],
+				"KeyG": [",", ";", "–", null],
+				"KeyH": ["p", "P", null, null],
+				"KeyJ": ["t", "T", "&", null],
+				"KeyK": ["s", "S", null, null],
+				"KeyL": ["r", "R", null, null],
+				"Semicolon": ["n", "N", "~", null],
+				"Quote": ["^", "!", "¨", "¡"],
+				"Backslash": ["ç", "Ç", null, null],
+				"IntlBackslash": ["k", "K", null, null],
+				"KeyZ": ["y", "Y", null, null],
+				"KeyX": ["è", "È", "`", null],
+				"KeyC": [".", ":", "…", "·"],
+				"KeyV": ["w", "W", "•", null],
+				"KeyN": ["g", "G", "µ", null],
+				"KeyM": ["c", "C", null, null],
+				"Comma": ["m", "M", null, null],
+				"Period": ["h", "H", null, null],
+				"Slash": ["v", "V", null, null],
+				"Space": [" ", " ", " ", "­"]
+			},
+			"dead_keys": {
+				"^": "circumflex",
+				"¨": "diaeresis"
 			}
 		},
 		{
@@ -4275,6 +4302,10 @@
 				"Period": ["y", "Y", null, null],
 				"Slash": ["à", "À", null, null],
 				"Space": [" ", null, null, null]
+			},
+			"dead_keys": {
+				"^": "circumflex",
+				"¨": "diaeresis"
 			}
 		},
 		{
@@ -4629,6 +4660,12 @@
 				"Period": [".", ":", null, null],
 				"Slash": ["-", "_", null, null],
 				"Space": [" ", null, null, null]
+			},
+			"dead_keys": {
+				"´": "acute",
+				"¨": "diaeresis",
+				"`": "grave",
+				"^": "circumflex"
 			}
 		},
 		{
@@ -7995,6 +8032,12 @@
 			"source_path": "layouts/workman",
 			"reason": "the same letters and digits as a library layout",
 			"same_as": "workman"
+		},
+		{
+			"source": "oxeylyzer",
+			"source_path": "static/layouts/french/optimot.dof",
+			"reason": "Optimot's letter block only, without its accents, digits and dead keys; the whole layout comes from the repository's KLA file",
+			"same_as": "optimot"
 		}
 	]
 }

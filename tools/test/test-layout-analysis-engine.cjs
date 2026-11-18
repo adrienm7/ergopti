@@ -1881,6 +1881,44 @@ if (UPDATE_GOLDEN) {
 	check(refused, 'incomplete: rankOrder refuses a result that does not say whether it is complete');
 }
 
+// =============================================
+// ======= 11/ Whole French layouts type French =======
+// =============================================
+
+{
+	// (optimot-unsupported) The library held Optimot as Oxeylyzer's letter block,
+	// completed with the US number row: no à, è, ç, ê, ?, and 1.28 % of Don
+	// Quichotte « unsupported ». It is now the whole layout with its dead ^ and
+	// ¨, as are the other whole layouts whose accents only a dead key types.
+	const french = goldenCorpora.fr_don_quichotte;
+	for (const id of ['optimot', 'bvofrak1', 'qwerty_spanish']) {
+		const layout = byId.get(id);
+		const result = E.analyse(layout, french, {});
+		check(
+			result.metrics.unsupported < 0.05,
+			`dead keys: ${id} leaves ${result.metrics.unsupported.toFixed(3)} % of Don Quichotte unsupported (${Object.keys(result.coverage.unsupportedChars).join('')})`
+		);
+	}
+	const optimot = byId.get('optimot');
+	const deadCells = Object.values(optimot.rows)
+		.flat()
+		.filter((cell) => cell && typeof cell === 'object')
+		.map((cell) => cell.dead)
+		.sort();
+	check(
+		deadCells.join(' ') === 'circumflex diaeresis',
+		`dead keys: Optimot's dead keys are ${deadCells.join(' ')}`
+	);
+	check(
+		(optimot.dead.circumflex || {}).e === 'ê' && (optimot.dead.diaeresis || {}).i === 'ï',
+		'dead keys: Optimot composes ê and ï'
+	);
+	check(
+		E.analyse(optimot, E.ngramsFromText('être où ça ? Noël'), {}).metrics.unsupported === 0,
+		'dead keys: Optimot types « être où ça ? Noël »'
+	);
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
 	console.error(`test-layout-analysis-engine: ${errors.length} problem(s)`);

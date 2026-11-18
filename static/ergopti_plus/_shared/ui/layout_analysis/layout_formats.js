@@ -1898,6 +1898,7 @@ var LAYOUT_FORMATS = (function () {
 		XKB_KEYS,
 		KLA_KEYS,
 		ACCENTS,
+		composeAccent,
 		fromKla,
 		fromKalamineJson,
 		fromKalamineToml,
