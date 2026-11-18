@@ -63,6 +63,7 @@ M.GROUPS = {
 		"tests/unit/diagnostics/engine/reports/",
 		"tests/unit/diagnostics/engine/test_hid_diagnostic_mailbox.lua",
 		"tests/unit/gestures/",
+		"tests/unit/hotstrings/engine/",
 	} },
 	{ name = "menu_llm", prefixes = { "tests/unit/ai/ui/menu/" } },
 	{ name = "menu_input", prefixes = {
@@ -71,7 +72,7 @@ M.GROUPS = {
 		"tests/unit/menu/ui/shortcuts_and_gestures/",
 		"tests/unit/menu/ui/keyboard_layout/",
 	} },
-	{ name = "ui", prefixes = { "tests/unit/ui/", "tests/unit/menu/", "tests/unit/diagnostics/ui/" } },
+	{ name = "ui", prefixes = { "tests/unit/ui/", "tests/unit/menu/", "tests/unit/diagnostics/ui/", "tests/unit/hotstrings/ui/" } },
 	{ name = "other", prefixes = {} },
 }
 

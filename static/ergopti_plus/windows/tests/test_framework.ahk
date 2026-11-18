@@ -799,16 +799,18 @@ global TEST_MODULE_GROUPS := [
 	["config-scope-features", "^unit/settings/engine/scope/"],
 	; Configuration storage, TOML and the updater.
 	["config-updater", "^unit/settings/engine/|^unit/core/text/toml/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
+	; Keyboard remapping, layouts, gestures and the Take note action a gesture
+	; runs; the keyboard layout expander tests keep this runner after S26 put
+	; them under hotstrings/.
+	["keymap-gestures", "^unit/(platform/remap|modules/keymap|modules/take_note|gestures|hotstrings/engine/expander)/"],
 	; Hotstrings, dynamic hotstrings and shortcuts.
-	["hotstrings-shortcuts", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
-	; Keyboard remapping, layouts, gestures and the Take note action a gesture runs.
-	["keymap-gestures", "^unit/(platform/remap|modules/keymap|modules/take_note|gestures)/"],
+	["hotstrings-shortcuts", "^unit/(hotstrings|modules/shortcuts)/"],
 	; Keystats capture, storage and metrics.
 	["keystats", "^unit/modules/keystats/"],
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.
 	["ui", "^unit/(ui|menu|ai|apps|diagnostics/ui)/"],
 	; Adapters, platform services, shared infrastructure and the test runner.
-	["core", "^unit/(adapters|platform|infra|suite|core|settings|tray|ai|apps|clipboard|diagnostics|hotstrings)/"]
+	["core", "^unit/(adapters|platform|infra|suite|core|settings|tray|ai|apps|clipboard|diagnostics)/"]
 ]
 
 ; The test category of a registering test file; a file no category declares is refused.
