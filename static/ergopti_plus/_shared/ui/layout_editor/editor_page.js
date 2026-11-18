@@ -191,6 +191,36 @@ var LayoutEditorPage = (function () {
 		return node;
 	}
 
+	// The board's gap between keys and corner radius in key units: style.css
+	// draws a key 4px short of its units and rounds it by 6px, on a unit of
+	// about 50px (40 to 58px, .le-board).
+	const BOARD_DRAWING = Object.freeze({ gap: 0.08, radius: 0.12 });
+	const SVG_NS = 'http://www.w3.org/2000/svg';
+
+	/**
+	 * The outline of an L-shaped key (the ISO Enter): the same SVG path twice
+	 * over the whole button, the key's body and the analysis colours laid over
+	 * it, which style.css fills and strokes as the key's state says.
+	 * @param {{d: string, width: number, height: number}} shape - From KEY_SHAPE.lPath.
+	 * @returns {SVGSVGElement}
+	 */
+	function keyOutline(shape) {
+		const svg = document.createElementNS(SVG_NS, 'svg');
+		svg.setAttribute('class', 'le-key-shape');
+		svg.setAttribute('viewBox', `0 0 ${shape.width} ${shape.height}`);
+		svg.setAttribute('preserveAspectRatio', 'none');
+		svg.setAttribute('aria-hidden', 'true');
+		svg.setAttribute('focusable', 'false');
+		// The key's own fill and border, then the analysis colours laid over it.
+		for (const layer of ['le-key-body', 'le-key-overlay']) {
+			const path = document.createElementNS(SVG_NS, 'path');
+			path.setAttribute('class', layer);
+			path.setAttribute('d', shape.d);
+			svg.append(path);
+		}
+		return svg;
+	}
+
 	/**
 	 * The export format this viewer chose last (a per-viewer convenience: a
 	 * private window or blocked storage just starts on the default).
@@ -1931,6 +1961,9 @@ var LayoutEditorPage = (function () {
 					classes.push('pickable');
 				if (key.code === state.selected) classes.push('selected');
 				if (Object.prototype.hasOwnProperty.call(remap, key.code)) classes.push('remapped');
+				// The ISO Enter is drawn as its L (key_shape.js), not as a tall rectangle.
+				const shape = KEY_SHAPE.isTwoRowL(g) ? KEY_SHAPE.lPath(g, BOARD_DRAWING) : null;
+				if (shape) classes.push('le-key-l');
 				const codeText = key.character || keyName(key.code) === key.code ? '' : keyName(key.code);
 				const accessibleName = keyAccessibleName(
 					key,
@@ -1953,7 +1986,11 @@ var LayoutEditorPage = (function () {
 									: keyName(key.code),
 							'aria-label': accessibleName,
 							'data-label': accessibleName,
-							style: `--x:${g.col};--y:${g.row - top};--w:${g.width};--h:${g.height || 1}`,
+							style:
+								`--x:${g.col};--y:${g.row - top};--w:${g.width};--h:${g.height || 1}` +
+								(shape
+									? `;--notch-x:${shape.notchX / shape.width};--notch-y:${shape.notchY / shape.height}`
+									: ''),
 							draggable: editableLayer() ? 'true' : null,
 							onclick: () => {
 								// « Pick on the board »: this click chooses the key to act as.
@@ -2006,6 +2043,7 @@ var LayoutEditorPage = (function () {
 							}
 						},
 						[
+							shape ? keyOutline(shape) : null,
 							el('span', {
 								class:
 									!state.shortcutView && isDeadKey(found && found.mapping)

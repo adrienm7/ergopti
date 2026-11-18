@@ -540,6 +540,83 @@ body {
 	);
 }
 
+/*
+ * The ISO Enter, an L (editor_page.js keyOutline, key_shape.js): the button is
+ * clipped to the L, so a click in its notch reaches the key there, and its SVG
+ * path draws the fill and the border the other keys take from the button.
+ */
+.le-key.le-key-l,
+.layout-editor .le-key.le-key-l:hover,
+.le-key.le-key-l.selected {
+	background: none;
+	border-color: transparent;
+	clip-path: polygon(
+		0 0,
+		100% 0,
+		100% 100%,
+		calc(var(--notch-x) * 100%) 100%,
+		calc(var(--notch-x) * 100%) calc(var(--notch-y) * 100%),
+		0 calc(var(--notch-y) * 100%)
+	);
+}
+
+.le-key-shape {
+	height: 100%;
+	inset: 0;
+	overflow: visible;
+	pointer-events: none;
+	position: absolute;
+	width: 100%;
+	z-index: -1;
+}
+
+.le-key-l {
+	isolation: isolate;
+}
+
+.le-key-shape path {
+	stroke-width: 1px;
+	vector-effect: non-scaling-stroke;
+}
+
+.le-key-shape .le-key-body {
+	fill: var(--le-surface);
+	stroke: var(--le-border);
+}
+
+.le-key-shape .le-key-overlay {
+	fill: none;
+	stroke: none;
+}
+
+.le-key-l.mapped .le-key-body,
+.le-key-l.overridden .le-key-body {
+	fill: var(--le-accent-soft);
+}
+
+.le-key-l.platform .le-key-body {
+	stroke: var(--le-accent);
+	stroke-dasharray: 4 3;
+}
+
+.le-key-l.overridden .le-key-body,
+.le-key-l:hover:not(:disabled) .le-key-body {
+	stroke: var(--le-accent);
+}
+
+.le-key-l.selected .le-key-body {
+	stroke: var(--le-accent);
+	stroke-width: 2px;
+}
+
+.le-key-l.le-heat {
+	background-image: none;
+}
+
+.le-key-l.le-heat .le-key-overlay {
+	fill: hsl(calc(120 - 120 * var(--le-heat)) 75% 50% / 0.45);
+}
+
 .le-act-as {
 	border-bottom: 1px solid var(--le-border);
 	margin-bottom: 8px;

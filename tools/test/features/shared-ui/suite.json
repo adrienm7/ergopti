@@ -573,6 +573,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-keyboard-walk.cjs"],
 			"repro": "npm run test:keyboard-walk"
+		},
+		{
+			"id": "key-shape",
+			"ordinal": 695,
+			"name": "the Studio board draws the ISO Enter as one L-shaped path, its lower row from bottom_col, and no other key as an L",
+			"cmd": "node",
+			"args": ["tools/test/test-key-shape.cjs"],
+			"repro": "npm run test:key-shape"
 		}
 	]
 }
