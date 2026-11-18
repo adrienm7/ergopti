@@ -496,6 +496,8 @@ function _renderStepBar() {
 	var bar = document.getElementById('step-bar');
 	bar.innerHTML = '';
 	bar.setAttribute('role', 'progressbar');
+	// A progress bar needs a name of its own (WCAG 4.1.2): the wizard's.
+	bar.setAttribute('aria-label', _t('onboarding.window_title'));
 	bar.setAttribute('aria-valuemin', '1');
 	bar.setAttribute('aria-valuemax', String(_steps.length));
 	bar.setAttribute('aria-valuenow', String(_stepIndex + 1));
@@ -582,8 +584,12 @@ function _renderLanguage() {
 	var list = document.getElementById('lang-list');
 	list.innerHTML = '';
 	LOCALES.forEach(function (loc) {
-		var row = document.createElement('div');
+		// A button the keyboard reaches and a screen reader names as pressed or
+		// not: the rows were plain blocks only a pointer could choose (WCAG 2.1.1).
+		var row = document.createElement('button');
+		row.type = 'button';
 		row.className = 'lang-item' + (loc.code === _selectedLocale ? ' selected' : '');
+		row.setAttribute('aria-pressed', loc.code === _selectedLocale ? 'true' : 'false');
 		row.dataset.code = loc.code;
 
 		var flag = document.createElement('span');

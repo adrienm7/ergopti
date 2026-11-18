@@ -24,6 +24,15 @@ body {
 	margin: 0;
 }
 
+:root {
+	/* The wizard has one appearance, light, whatever the system's: its surfaces
+	   are palette whites. The semantic accent turns to the dark appearance's
+	   blue under a dark system and fell to 3.4:1 on them (WCAG 1.4.3), so the
+	   page keeps the light accent, 5.6:1 or more on them. */
+	--onboarding-accent: var(--theme-hue-0062cc);
+	color-scheme: light;
+}
+
 body {
 	background: var(--theme-page-background);
 	color: var(--theme-grey-333);
@@ -99,14 +108,14 @@ body {
 }
 
 .step-dot.active {
-	background: var(--theme-accent);
-	border-color: var(--theme-accent);
+	background: var(--onboarding-accent);
+	border-color: var(--onboarding-accent);
 	width: 20px;
 }
 
 .step-dot.done {
-	background: var(--theme-accent);
-	border-color: var(--theme-accent);
+	background: var(--onboarding-accent);
+	border-color: var(--onboarding-accent);
 }
 
 /* =============================== */
@@ -177,13 +186,19 @@ h1 {
 .lang-item {
 	align-items: center;
 	background: var(--theme-white);
+	border: none;
 	border-bottom: 1px solid var(--theme-grey-f0f0f0);
+	border-radius: 0;
+	color: inherit;
 	cursor: pointer;
 	display: flex;
+	font: inherit;
 	gap: 10px;
 	padding: 9px 12px;
+	text-align: left;
 	transition: background 0.1s;
 	user-select: none;
+	width: 100%;
 }
 
 .lang-item:first-child {
@@ -204,7 +219,7 @@ h1 {
 }
 
 .lang-item.selected .lang-name {
-	color: var(--theme-accent);
+	color: var(--onboarding-accent);
 	font-weight: 600;
 }
 
@@ -333,7 +348,7 @@ h1 {
 }
 
 .radio-card input[type='radio']:checked + .radio-label {
-	color: var(--theme-accent);
+	color: var(--onboarding-accent);
 	font-weight: 500;
 }
 
@@ -424,18 +439,23 @@ h1 {
 	font-weight: 600;
 }
 
+/* Each box is 16 px and the rows 26 px apart at least: the boxes were 13 px,
+   23.5 px apart, under the 24 px a pointer target needs (WCAG 2.5.8). */
 .check-row {
 	align-items: flex-start;
 	cursor: pointer;
 	display: flex;
 	gap: 8px;
-	padding: 3px 0;
+	min-height: 26px;
+	padding: 4px 0;
 }
 
 .check-row input[type='checkbox'] {
 	accent-color: var(--theme-blue);
 	flex-shrink: 0;
-	margin: 2px 0 0;
+	height: 16px;
+	margin: 1px 0 0;
+	width: 16px;
 }
 
 .check-row input[type='checkbox']:disabled + .check-label {
@@ -451,7 +471,7 @@ h1 {
 /* The separator between a trigger and its action: the arrows inside gesture
    and action labels must never read as it. */
 .value-separator {
-	color: var(--theme-accent);
+	color: var(--onboarding-accent);
 	font-weight: 700;
 }
 

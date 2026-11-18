@@ -1915,7 +1915,27 @@ function assertSeparated(row, where) {
 
 	const frRow = page.el('lang-list').children.find((row) => row.dataset.code === 'fr');
 	assert.ok(frRow, 'the injected locale list renders a French row');
+	// Each language is a button the keyboard reaches, pressed when chosen
+	// (WCAG 2.1.1, 4.1.2); the rows were blocks only a pointer could choose.
+	for (const row of page.el('lang-list').children) {
+		assert.equal(row.tagName, 'BUTTON', 'a language row is a button');
+		assert.equal(row.type, 'button', 'a language row submits nothing');
+		assert.equal(row.getAttribute('aria-pressed'), row.dataset.code === 'en' ? 'true' : 'false');
+	}
+	assert.equal(
+		page.el('step-bar').getAttribute('aria-label'),
+		locale('en')['onboarding.window_title'],
+		'the progress bar has a name (WCAG 4.1.2)'
+	);
 	frRow.click();
+	assert.equal(
+		page
+			.el('lang-list')
+			.children.find((row) => row.dataset.code === 'fr')
+			.getAttribute('aria-pressed'),
+		'true',
+		'the chosen language reads as pressed'
+	);
 	assert.deepEqual(page.messages.splice(0), [{ action: 'previewLocale', locale: 'fr' }]);
 	page.window.applyStrings({ locale: 'fr', strings: locale('fr') });
 	assert.equal(
