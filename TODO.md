@@ -253,8 +253,14 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       needs an owner that buffers physical keys without one hotkey thread per key, such as the native capture.
 - **Parity literals.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`,
   `request_plan_*`, the keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left; the rest of the menu
-  files need `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers
-  and sleeps before the registry loads.
+  files need `test-menu-manifest` to stop pinning their spelling. PAR-79: 10 Windows timer literals left (19 in
+  `timer-literal-baseline.json`, 9 of them in the archived `old/kalamine` scripts). The 3 startup smoke sleeps of
+  `ErgoptiPlus.ahk` and the UIA worker's idle `Sleep(250)` run before or without the registry. Five pollers are run
+  by child-script tests that do not load it (`test_spotlight_coordinate_owner`, the diagnostics collection
+  children, `test_keepawake_timer_owner`, `test_user_hotstring_loader_lifetime`): the spotlight tick, the 2
+  collection arms, `AwakeCheckMouseMoved` and `_UserHotstringsPoll` move once those children call
+  `TimingsLoadShared`. The suspended requeue `-500` of `core/events/timer_scheduler.ahk` waits for its harnesses
+  (`run_llm_*`) to load the registry.
 - **Tests.** Source assertions left to convert to behaviour (3,799 `_Driver*` source reads in 989 files; 71 meta
   files still name `A_IsSuspended`, 60 of them outside comments). Counted over `windows/tests/**/*.ahk` as calls to
   `_DriverFuncBody`, `_DriverFuncBodyOrEmpty`, `_DriverSourceConcat`, `_DriverSourceNoComments`, `_DriverDirConcat`,
