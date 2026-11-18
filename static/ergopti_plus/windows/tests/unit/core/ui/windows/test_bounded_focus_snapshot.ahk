@@ -457,6 +457,61 @@ _BFS_KeystatsRejectsInvalidCanonicalSnapshot() {
 Test("keystats focus: invalid canonical snapshot cannot mutate context (focus-refresh-bounded-resident)",
 	_BFS_KeystatsRejectsInvalidCanonicalSnapshot)
 
+; F-08: the context timer keeps firing under native Suspend. A paused tick must
+; read no foreground and must move both open watermarks forward by the paused
+; span, or the first switch after the resume bills the whole pause to the app
+; that was focused. The advance is clamped to the present, so two
+; compensations for one span cannot push a watermark into the future.
+_BFS_PausedContextTickAdvancesWatermarks() {
+	SavedInitialized := Keystats.initialized
+	SavedAppEnteredAt := KLHook.app_entered_at
+	SavedTitleEnteredAt := KLHook.title_entered_at
+	SavedSuspendTick := KLHook.suspend_tick
+	SavedTransition := KLHook.context_transition, SavedStop := KLHook.context_stop
+	SavedObservations := KLHook.context_observations, SavedObservationHead := KLHook.context_observation_head
+	WasSuspended := A_IsSuspended
+	Reads := 0
+	Snapshot(*) {
+		Reads += 1
+		return _BFS_State(true, "paused.exe", "Paused", "PausedClass", 9, "", false, 1)
+	}
+	try {
+		Keystats.initialized := true
+		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
+		Start := A_TickCount
+		KLHook.app_entered_at := Start - 60000
+		KLHook.title_entered_at := Start - 60000
+		KLHook.suspend_tick := Start - 5000
+		Suspend(true)
+		KL_Hook_RefreshContext(true, Snapshot)
+		AssertEqual(0, Reads, "a paused context tick must not read the foreground")
+		AssertTrue(KLHook.app_entered_at >= Start - 55000,
+			"a paused context tick must move the app watermark by the paused span (F-08)")
+		AssertTrue(KLHook.title_entered_at >= Start - 55000,
+			"a paused context tick must move the title watermark by the paused span (F-08)")
+
+		KLHook.app_entered_at := A_TickCount - 1000
+		KLHook.title_entered_at := A_TickCount - 1000
+		KLHook.suspend_tick := A_TickCount - 100000
+		KL_Hook_RefreshContext(true, Snapshot)
+		AssertTrue(KLHook.app_entered_at <= A_TickCount && KLHook.title_entered_at <= A_TickCount,
+			"the paused advance must stop at the present")
+	} finally {
+		if A_IsSuspended != WasSuspended
+			Suspend(WasSuspended)
+		Keystats.initialized := SavedInitialized
+		KLHook.app_entered_at := SavedAppEnteredAt
+		KLHook.title_entered_at := SavedTitleEnteredAt
+		KLHook.suspend_tick := SavedSuspendTick
+		KLHook.context_transition := SavedTransition, KLHook.context_stop := SavedStop
+		KLHook.context_observations := SavedObservations, KLHook.context_observation_head := SavedObservationHead
+	}
+}
+
+Test("keystats focus: a paused context tick advances its watermarks instead of reading (F-08)",
+	_BFS_PausedContextTickAdvancesWatermarks)
+
 
 
 
