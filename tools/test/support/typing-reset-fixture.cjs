@@ -41,7 +41,12 @@ function frontend(host = 'macos') {
 	);
 	const context = vm.createContext({
 		console,
-		document: { getElementById: (id) => elements[id] || null, addEventListener() {} },
+		// The modals make the rest of the body inert while they are open.
+		document: {
+			body: { children: [] },
+			getElementById: (id) => elements[id] || null,
+			addEventListener() {}
+		},
 		addEventListener() {},
 		setTimeout(fn, delay) {
 			const id = ++nextTimer;

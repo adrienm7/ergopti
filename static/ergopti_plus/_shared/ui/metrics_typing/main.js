@@ -380,6 +380,32 @@ document.addEventListener('DOMContentLoaded', () => {
 		});
 	}
 
+	// A table box that scrolls takes the keyboard focus, named by its card's
+	// heading, so its rows scroll without a pointer (WCAG 2.1.1); a box that fits
+	// is no stop. Its rows and its visibility change after every render.
+	document.querySelectorAll('.ekpi-table-wrap').forEach((box) => {
+		const sync = () => {
+			if (box.scrollHeight > box.clientHeight || box.scrollWidth > box.clientWidth) {
+				const heading = box.parentElement && box.parentElement.querySelector('h2, h3');
+				box.tabIndex = 0;
+				box.setAttribute('role', 'region');
+				if (heading) {
+					// The heading's own words, without its info tooltip.
+					const name = heading.cloneNode(true);
+					name.querySelectorAll('.tooltip').forEach((tip) => tip.remove());
+					box.setAttribute('aria-label', name.textContent.replace(/\s+/g, ' ').trim());
+				}
+			} else {
+				box.removeAttribute('tabindex');
+				box.removeAttribute('role');
+				box.removeAttribute('aria-label');
+			}
+		};
+		new MutationObserver(sync).observe(box, { childList: true, subtree: true });
+		new ResizeObserver(sync).observe(box);
+		sync();
+	});
+
 	// Close the app filter modal when clicking outside the modal-content box
 	const modal = document.getElementById('app_modal');
 	if (modal) {

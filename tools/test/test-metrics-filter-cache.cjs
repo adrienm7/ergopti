@@ -795,6 +795,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 			const page = loadMetricsAppsPage(host);
 			for (const id of [
 				'app_drilldown_modal',
+				'app_modal_close',
 				'app_modal_title',
 				'app_modal_tiles',
 				'app_modal_hourly',
@@ -4207,6 +4208,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 		const page = loadMetricsAppsPage(host);
 		for (const id of [
 			'app_drilldown_modal',
+			'app_modal_close',
 			'app_modal_title',
 			'app_modal_tiles',
 			'app_modal_hourly',
@@ -4349,6 +4351,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 		const page = loadMetricsAppsPage(host);
 		for (const id of [
 			'app_drilldown_modal',
+			'app_modal_close',
 			'app_modal_title',
 			'app_modal_tiles',
 			'app_modal_hourly',
@@ -5264,9 +5267,12 @@ test('apps focus latency displays measured zero and distinguishes absence', () =
 		app_modal_dests: {},
 		app_modal_layouts: {},
 		app_modal_records: {},
-		app_modal_assist: {}
+		app_modal_assist: {},
+		app_modal_close: { focus() {} }
 	};
 	context.document.getElementById = (id) => elements[id] || null;
+	// An open drill-down makes the rest of the body inert.
+	context.document.body = { children: [] };
 	context.document.createElement = () => ({
 		style: {},
 		children: [],

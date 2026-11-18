@@ -50,9 +50,12 @@
 function switch_tab(tab_name) {
 	app_state.current_tab = tab_name;
 
-	document.querySelectorAll('.tabs .tab-btn').forEach((btn) => btn.classList.remove('active'));
-	const active_btn = document.querySelector(`.tab-btn[data-tab="${tab_name}"]`);
-	if (active_btn) active_btn.classList.add('active');
+	// The shown table reads as pressed, not by its colour alone (WCAG 1.4.1, 4.1.2).
+	document.querySelectorAll('.tabs .tab-btn').forEach((btn) => {
+		const shown = btn.getAttribute('data-tab') === tab_name;
+		btn.classList.toggle('active', shown);
+		btn.setAttribute('aria-pressed', shown ? 'true' : 'false');
+	});
 
 	// Reset table state to "most frequent first" when switching sections
 	app_state.sort_col = 'count';
@@ -310,6 +313,17 @@ function gradient_color(value, stops) {
 	}
 	const last = stops[stops.length - 1];
 	return `rgb(${last[1]},${last[2]},${last[3]})`;
+}
+
+/**
+ * The gradient colour as table text: shaded by --gradient-ink-shade (style.css),
+ * which darkens it on the light appearance, where the bright stops were 1.5:1
+ * to 2.0:1 on the page (WCAG 1.4.3), and leaves it as is on the dark one.
+ * @param {string} color - A CSS colour from gradient_color.
+ * @returns {string} A CSS colour.
+ */
+function gradient_ink(color) {
+	return `color-mix(in srgb, ${color}, black var(--gradient-ink-shade))`;
 }
 
 // ===================================
@@ -1974,11 +1988,12 @@ function render_table() {
 
 				const avg_str = item.avg > 0 ? `${format_number(item.avg.toFixed(1))} ms` : '-';
 
-				const wpm_color = item.wpm > 0 ? gradient_color(item.wpm, WPM_GRADIENT) : 'inherit';
+				const wpm_color =
+					item.wpm > 0 ? gradient_ink(gradient_color(item.wpm, WPM_GRADIENT)) : 'inherit';
 				const wpm_str =
 					item.wpm > 0 ? `${format_number(item.wpm.toFixed(1))} ${_t('ui_typing.unit_mpm')}` : '-';
 
-				const acc_color = gradient_color(item.acc, PRECISION_GRADIENT);
+				const acc_color = gradient_ink(gradient_color(item.acc, PRECISION_GRADIENT));
 
 				// Repetition cell: show count · rate% on one line, breakdown below when ★ involved.
 				// null = tab type doesn't support rep (no next-level data); show "—".

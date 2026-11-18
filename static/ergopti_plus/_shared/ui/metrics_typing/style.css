@@ -37,11 +37,13 @@
 	--filter-hover: var(--th-hover);
 
 	/* KPI Colors (Strong contrast for Light Mode) */
-	--kpi-hs-color: rgb(217, 48, 37);
-	--kpi-llm-color: rgb(138, 62, 184);
+	/* Text colours too: each holds 4.5:1 on its card and its split box, where
+	   the system red, purple and orange were 3.1:1, 3.9:1 and 2.3:1 (WCAG 1.4.3). */
+	--kpi-hs-color: rgb(176, 32, 24);
+	--kpi-llm-color: rgb(112, 44, 155);
 	/* WPM KPI card is orange; the chart uses --chart-wpm-color (yellow) */
-	--kpi-wpm-color: rgb(230, 140, 0);
-	--kpi-wpm-rgb: 230, 140, 0;
+	--kpi-wpm-color: rgb(160, 82, 0);
+	--kpi-wpm-rgb: 160, 82, 0;
 	--chart-wpm-color: rgb(204, 163, 0);
 	--chart-wpm-rgb: 204, 163, 0;
 	--kpi-precision-color: var(--theme-hue-008000);
@@ -78,6 +80,23 @@
 
 	/* Text colors */
 	--strong-color: var(--theme-metrics-strong);
+	/* Black mixed into the table's speed and accuracy gradient (table.js). */
+	--gradient-ink-shade: 50%;
+
+	/* Headings and values of the detail cards: each holds 4.5:1 on its tinted
+	   card. The light appearance used the dark one's pastels, 1.3:1 to 2.5:1
+	   (WCAG 1.4.3). */
+	--ekpi-ergo-bigram-ink: rgb(67, 56, 202);
+	--ekpi-ergo-trigram-ink: rgb(126, 34, 206);
+	--ekpi-errors-ink: rgb(185, 28, 28);
+	--ekpi-roi-ink: rgb(22, 101, 52);
+	--ekpi-lexical-ink: rgb(146, 64, 14);
+	--ekpi-rhythm-ink: rgb(3, 105, 161);
+	--ekpi-sessions-ink: rgb(17, 94, 89);
+	--ekpi-records-ink: rgb(190, 24, 93);
+	--ekpi-charmix-ink: rgb(87, 83, 78);
+	--ekpi-apps-ink: rgb(162, 28, 175);
+	--ekpi-wellness-ink: rgb(63, 98, 18);
 }
 
 /* Variables mode SOMBRE */
@@ -134,7 +153,20 @@
 		--chart-bg: rgba(255, 255, 255, 0.05);
 		--chart-border: rgba(255, 255, 255, 0.4);
 
-		/* Text colors */
+		--gradient-ink-shade: 0%;
+
+		/* Detail card headings and values */
+		--ekpi-ergo-bigram-ink: rgb(129, 140, 248);
+		--ekpi-ergo-trigram-ink: rgb(192, 132, 252);
+		--ekpi-errors-ink: rgb(248, 113, 113);
+		--ekpi-roi-ink: rgb(74, 222, 128);
+		--ekpi-lexical-ink: rgb(251, 191, 36);
+		--ekpi-rhythm-ink: rgb(56, 189, 248);
+		--ekpi-sessions-ink: rgb(45, 212, 191);
+		--ekpi-records-ink: rgb(244, 114, 182);
+		--ekpi-charmix-ink: rgb(168, 162, 158);
+		--ekpi-apps-ink: rgb(232, 121, 249);
+		--ekpi-wellness-ink: rgb(163, 230, 53);
 	}
 }
 
@@ -266,20 +298,23 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	background: var(--filter-hover);
 }
 
+/* White on the dark appearance's accent was 3.6:1 (WCAG 1.4.3): the fill
+   accent holds 4.5:1 behind white in both appearances. */
 .filter-btn.active {
-	background: var(--accent);
-	border-color: var(--accent);
+	background: var(--theme-accent-fill);
+	border-color: var(--theme-accent-fill);
 	color: var(--theme-white);
 }
 
+/* The status red: the system red was 3.3:1 on light and 3.7:1 on dark (WCAG 1.4.3). */
 .filter-reset {
 	background: rgba(255, 59, 48, 0.05);
-	border-color: var(--theme-red);
-	color: var(--theme-red);
+	border-color: var(--theme-bad-text);
+	color: var(--theme-bad-text);
 }
 .filter-reset:hover {
 	background: rgba(255, 59, 48, 0.15);
-	color: var(--theme-red);
+	color: var(--theme-bad-text);
 }
 
 /* The Export / Purge confirmation and outcome line. */
@@ -421,8 +456,8 @@ input[type='date']::-webkit-datetime-edit-year-field {
 .trend-svg.up,
 .trend-svg.down,
 .trend-svg.stable {
-	color: var(--theme-white);
-	opacity: 0.9;
+	/* The card's own colour: white vanished on the light cards (WCAG 1.4.11). */
+	color: inherit;
 }
 
 .sparkline-container {
@@ -486,7 +521,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 .expanded-kpi-block.card-ergo-bigram h2,
 .expanded-kpi-block.card-ergo-bigram .stat-value {
-	color: rgb(129, 140, 248);
+	color: var(--ekpi-ergo-bigram-ink);
 }
 
 .expanded-kpi-block.card-ergo-trigram {
@@ -496,7 +531,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 .expanded-kpi-block.card-ergo-trigram h2,
 .expanded-kpi-block.card-ergo-trigram .stat-value {
-	color: rgb(192, 132, 252);
+	color: var(--ekpi-ergo-trigram-ink);
 }
 
 .expanded-kpi-block.card-errors {
@@ -506,7 +541,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 .expanded-kpi-block.card-errors h2,
 .expanded-kpi-block.card-errors .stat-value {
-	color: rgb(248, 113, 113);
+	color: var(--ekpi-errors-ink);
 }
 
 .expanded-kpi-block.card-roi {
@@ -516,7 +551,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 .expanded-kpi-block.card-roi h2,
 .expanded-kpi-block.card-roi .stat-value {
-	color: rgb(74, 222, 128);
+	color: var(--ekpi-roi-ink);
 }
 
 .expanded-kpi-block.card-lexical {
@@ -526,7 +561,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 .expanded-kpi-block.card-lexical h2,
 .expanded-kpi-block.card-lexical .stat-value {
-	color: rgb(251, 191, 36);
+	color: var(--ekpi-lexical-ink);
 }
 
 .expanded-kpi-block.card-rhythm {
@@ -536,7 +571,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 .expanded-kpi-block.card-rhythm h2,
 .expanded-kpi-block.card-rhythm .stat-value {
-	color: rgb(56, 189, 248);
+	color: var(--ekpi-rhythm-ink);
 }
 
 .expanded-kpi-block.card-sessions {
@@ -546,7 +581,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 .expanded-kpi-block.card-sessions h2,
 .expanded-kpi-block.card-sessions .stat-value {
-	color: rgb(45, 212, 191);
+	color: var(--ekpi-sessions-ink);
 }
 
 .expanded-kpi-block.card-records {
@@ -556,7 +591,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 .expanded-kpi-block.card-records h2,
 .expanded-kpi-block.card-records .stat-value {
-	color: rgb(244, 114, 182);
+	color: var(--ekpi-records-ink);
 }
 
 .expanded-kpi-block.card-charmix {
@@ -566,7 +601,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 .expanded-kpi-block.card-charmix h2,
 .expanded-kpi-block.card-charmix .stat-value {
-	color: rgb(168, 162, 158);
+	color: var(--ekpi-charmix-ink);
 }
 
 .expanded-kpi-block.card-apps {
@@ -576,7 +611,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 .expanded-kpi-block.card-apps h2,
 .expanded-kpi-block.card-apps .stat-value {
-	color: rgb(232, 121, 249);
+	color: var(--ekpi-apps-ink);
 }
 
 .expanded-kpi-block.card-wellness {
@@ -586,7 +621,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 .expanded-kpi-block.card-wellness h2,
 .expanded-kpi-block.card-wellness .stat-value {
-	color: rgb(163, 230, 53);
+	color: var(--ekpi-wellness-ink);
 }
 
 /* Header section: title + KPI value + split details */
@@ -816,8 +851,8 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	background: var(--td-hover);
 }
 .tab-btn.active {
-	background: var(--accent);
-	border-color: var(--accent);
+	background: var(--theme-accent-fill);
+	border-color: var(--theme-accent-fill);
 	color: var(--theme-white);
 }
 
@@ -1365,18 +1400,19 @@ th .tooltip .tooltiptext {
 	width: 100%;
 }
 
-/* Background tinted to box color but slightly darker */
+/* Background tinted to box color but slightly darker; light enough that the
+   muted text keeps 4.5:1 on it (WCAG 1.4.3). */
 .stat-card.card-hs .stat-details-split {
-	background: color-mix(in srgb, var(--kpi-hs-color), transparent 80%);
+	background: color-mix(in srgb, var(--kpi-hs-color), transparent 95%);
 }
 .stat-card.card-llm .stat-details-split {
-	background: color-mix(in srgb, var(--kpi-llm-color), transparent 80%);
+	background: color-mix(in srgb, var(--kpi-llm-color), transparent 95%);
 }
 .stat-card.card-rep .stat-details-split {
-	background: color-mix(in srgb, var(--kpi-rep-color), transparent 80%);
+	background: color-mix(in srgb, var(--kpi-rep-color), transparent 95%);
 }
 .stat-card.card-dist .stat-details-split {
-	background: color-mix(in srgb, var(--kpi-dist-color), transparent 80%);
+	background: color-mix(in srgb, var(--kpi-dist-color), transparent 95%);
 }
 
 @media (prefers-color-scheme: dark) {

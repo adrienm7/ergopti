@@ -21,7 +21,7 @@
 			<div class="filters-bar">
 				<div class="filter-group-dates">
 					<div>
-						<label data-i18n="ui_typing.label_from"></label
+						<label for="date_start" data-i18n="ui_typing.label_from"></label
 						><input
 							type="date"
 							id="date_start"
@@ -29,7 +29,7 @@
 						/>
 					</div>
 					<div>
-						<label data-i18n="ui_typing.label_to"></label
+						<label for="date_end" data-i18n="ui_typing.label_to"></label
 						><input
 							type="date"
 							id="date_end"
@@ -842,7 +842,7 @@
 							<div class="split-col" title="Espace, tabulation, retour à la ligne, NBSP, NNBSP.">
 								<div
 									class="split-label"
-									style="color: rgb(74, 222, 128)"
+									style="color: var(--ekpi-roi-ink)"
 									data-i18n="ui_typing.lbl_spaces"
 								></div>
 								<div class="split-val"><strong id="charmix_space">—</strong></div>
@@ -991,48 +991,56 @@
 			<div class="tabs tabs-row">
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="kc"
 					onclick="switch_tab('kc')"
 					data-i18n="ui_typing.tab_keycodes"
 				></button>
 				<button
 					class="tab-btn active"
+					aria-pressed="true"
 					data-tab="c"
 					onclick="switch_tab('c')"
 					data-i18n="ui_typing.tab_chars"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="bg"
 					onclick="switch_tab('bg')"
 					data-i18n="ui_typing.tab_bigrams"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="tg"
 					onclick="switch_tab('tg')"
 					data-i18n="ui_typing.tab_trigrams"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="qg"
 					onclick="switch_tab('qg')"
 					data-i18n="ui_typing.tab_quadgrams"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="pg"
 					onclick="switch_tab('pg')"
 					data-i18n="ui_typing.tab_pentagrams"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="hx"
 					onclick="switch_tab('hx')"
 					data-i18n="ui_typing.tab_hexagrams"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="hp"
 					onclick="switch_tab('hp')"
 					data-i18n="ui_typing.tab_heptagrams"
@@ -1041,30 +1049,35 @@
 			<div class="tabs tabs-row">
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="w"
 					onclick="switch_tab('w')"
 					data-i18n="ui_typing.tab_words"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="w_bg"
 					onclick="switch_tab('w_bg')"
 					data-i18n="ui_typing.tab_word_bigrams"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="w_tg"
 					onclick="switch_tab('w_tg')"
 					data-i18n="ui_typing.tab_word_trigrams"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="w_qg"
 					onclick="switch_tab('w_qg')"
 					data-i18n="ui_typing.tab_word_quadgrams"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="w_pg"
 					onclick="switch_tab('w_pg')"
 					data-i18n="ui_typing.tab_word_pentagrams"
@@ -1073,36 +1086,42 @@
 			<div class="tabs tabs-row">
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="mods"
 					onclick="switch_tab('mods')"
 					data-i18n="ui_typing.tab_modifiers"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="sc"
 					onclick="switch_tab('sc')"
 					data-i18n="ui_typing.tab_shortcuts"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="sc_bg"
 					onclick="switch_tab('sc_bg')"
 					data-i18n="ui_typing.tab_shortcut_bigrams"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="sc_tg"
 					onclick="switch_tab('sc_tg')"
 					data-i18n="ui_typing.tab_shortcut_trigrams"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="sc_qg"
 					onclick="switch_tab('sc_qg')"
 					data-i18n="ui_typing.tab_shortcut_quadgrams"
 				></button>
 				<button
 					class="tab-btn"
+					aria-pressed="false"
 					data-tab="sc_pg"
 					onclick="switch_tab('sc_pg')"
 					data-i18n="ui_typing.tab_shortcut_pentagrams"
@@ -1206,8 +1225,8 @@
 		</div>
 
 		<div id="app_modal" class="modal" style="display: none">
-			<div class="modal-content">
-				<h2 data-i18n="ui_typing.modal_select_apps"></h2>
+			<div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="app_modal_title">
+				<h2 id="app_modal_title" data-i18n="ui_typing.modal_select_apps"></h2>
 				<div class="app-modal-controls">
 					<button
 						class="tab-btn"

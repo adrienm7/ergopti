@@ -93,14 +93,31 @@ document.addEventListener('i18n:applied', update_app_btn_text);
 // ======================================
 // ======================================
 
+// The control that opened the app filter, which gets the focus back on close.
+let app_modal_opener = null;
+
+/**
+ * Makes everything but the app filter inert, or live again: while it is open
+ * the keyboard and assistive technology stay in it (WCAG 2.4.3).
+ * @param {boolean} inert
+ */
+function set_app_modal_background_inert(inert) {
+	Array.from(document.body.children).forEach((node) => {
+		if (node.id !== 'app_modal' && node.tagName !== 'SCRIPT') node.inert = inert;
+	});
+}
+
 /**
  * Opens the app filter modal and renders the current app list.
  */
 function open_app_modal() {
+	const modal = document.getElementById('app_modal');
 	const search_input = document.getElementById('app_search');
 	if (search_input) search_input.value = '';
 	render_app_list();
-	document.getElementById('app_modal').style.display = 'flex';
+	if (modal.style.display !== 'flex') app_modal_opener = document.activeElement;
+	set_app_modal_background_inert(true);
+	modal.style.display = 'flex';
 	if (search_input) search_input.focus();
 }
 
@@ -108,10 +125,23 @@ function open_app_modal() {
  * Closes the app filter modal and applies the updated selection.
  */
 function close_app_modal() {
-	document.getElementById('app_modal').style.display = 'none';
+	const modal = document.getElementById('app_modal');
+	const was_open = modal.style.display === 'flex';
+	modal.style.display = 'none';
+	set_app_modal_background_inert(false);
 	update_app_btn_text();
 	apply_date_app_filters();
+	const opener = app_modal_opener;
+	app_modal_opener = null;
+	if (was_open && opener && opener.isConnected && typeof opener.focus === 'function')
+		opener.focus();
 }
+
+// Escape closes the app filter, as every dialog does.
+document.addEventListener('keydown', (event) => {
+	if (event.key === 'Escape' && document.getElementById('app_modal')?.style.display === 'flex')
+		close_app_modal();
+});
 
 /**
  * Selects all available apps and re-renders the list.
@@ -188,7 +218,7 @@ function render_app_list() {
 		const icon_src =
 			window.app_icons && Object.hasOwn(window.app_icons, app) ? window.app_icons[app] : null;
 		const icon_html = icon_src
-			? `<img src="${icon_src}" class="app-icon-img" alt="${escape_html(app)}" />`
+			? `<img src="${icon_src}" class="app-icon-img" alt="" />`
 			: `<div class="app-icon-div" style="background-color:${get_app_color(app)}">${escape_html(appInitial(app))}</div>`;
 
 		html +=
