@@ -3530,6 +3530,10 @@ var LayoutEditorPage = (function () {
 				'aria-label': tl('preview.placeholder'),
 				autocomplete: 'off',
 				onkeydown: (event) => {
+					// Tab and Shift+Tab move the focus on, as from any field: the
+					// field simulated them too, so the keyboard could enter it but
+					// never leave (WCAG 2.1.2, found by the Studio keyboard walk).
+					if (event.key === 'Tab' && !event.ctrlKey && !event.altKey && !event.metaKey) return;
 					event.preventDefault();
 					const engine = typist();
 					if (engine && engine.owns(event.code)) {

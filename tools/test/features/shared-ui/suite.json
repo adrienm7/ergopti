@@ -565,6 +565,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-ergopti-plus-languages.cjs"],
 			"repro": "npm run test:ergopti-plus-languages"
+		},
+		{
+			"id": "keyboard-walk",
+			"ordinal": 693,
+			"name": "the Studio keyboard walk refuses a trap, a repeated or hidden stop, a positive tabindex, a jump back up the page and a Shift+Tab order that differs",
+			"cmd": "node",
+			"args": ["tools/test/test-keyboard-walk.cjs"],
+			"repro": "npm run test:keyboard-walk"
 		}
 	]
 }

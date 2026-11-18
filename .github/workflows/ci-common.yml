@@ -348,6 +348,9 @@ jobs:
       - name: Test shared layout optimizer page
         run: npm run test:browser:layout-optimizer
 
+      - name: Test the Studio keyboard walk
+        run: npm run test:browser:studio-keyboard
+
       - name: Test shared prompt editor initialization
         run: npm run test:browser:prompt-editor-initialization
 
