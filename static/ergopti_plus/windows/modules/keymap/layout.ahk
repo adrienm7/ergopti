@@ -575,7 +575,7 @@ _UIA_StartSelectionPoll() {
     if IsSet(_UIA_SelectionPollTimer)
         return
     _UIA_SelectionPollTimer := _UIA_SelectionPollTick.Bind()
-    SetTimer(_UIA_SelectionPollTimer, 500)
+    SetTimer(_UIA_SelectionPollTimer, TimingsGet("adapters", "uia_selection_poll_ms"))
 }
 _UIA_StartSelectionPoll()
 

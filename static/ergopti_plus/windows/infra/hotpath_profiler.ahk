@@ -585,11 +585,14 @@ HotPath_StartStatistics() {
 	Owner := _HotPathStatisticsOwner()
 	if Owner.Started
 		throw Error("Latency statistics already started")
+	IntervalMs := TimingsGet("logger", "hotpath_statistics_interval_ms")
+	if (IntervalMs <= 0)
+		throw ValueError(Format("[logger] hotpath_statistics_interval_ms must be positive, got {1}.", IntervalMs))
 	Owner.Started := true
 	Owner.Timer := HotPath_FlushStatistics
-	; One minute retains distributions without turning normal typing into log I/O.
-	SetTimer(Owner.Timer, 60000, -1)
-	try LoggerInfo("HotPath", "Latency statistics started (interval=60000 ms, labels={1}).", Owner.Stats.Limit)
+	; The period is read at the call so the fast-timer inventory resolves it.
+	SetTimer(Owner.Timer, TimingsGet("logger", "hotpath_statistics_interval_ms"), -1)
+	try LoggerInfo("HotPath", "Latency statistics started (interval={1} ms, labels={2}).", IntervalMs, Owner.Stats.Limit)
 }
 
 /** Detaches the numeric snapshot before logging can pump callbacks into the next window. */

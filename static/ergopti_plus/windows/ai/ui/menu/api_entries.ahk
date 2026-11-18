@@ -751,7 +751,7 @@ _LLM_Menu_ApiTestProgressShow(EntryId, Name, Owner := "") {
 		}
 		; Named callback (not a closure) so the fast-timer inventory can pin
 		; this 150 ms pulse by name; the tick itself reads the global state.
-		SetTimer(_LLM_Menu_ApiTestProgressTick, 150)
+		SetTimer(_LLM_Menu_ApiTestProgressTick, TimingsGet("llm", "api_test_progress_tick_ms"))
 	} catch as Err {
 		try LoggerWarn("LLM", "API test progress unavailable: {1}.",
 			Err.Message)

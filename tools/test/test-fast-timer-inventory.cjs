@@ -49,9 +49,47 @@
 
 const fs = require('fs');
 const path = require('path');
+const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
+
+// A period read from the shared timing registry is still a period: a poller
+// moved from a typed literal to TimingsGet("<section>", "<key>") stays in the
+// inventory under the registry value, so moving it cannot hide it.
+const TIMINGS = toml.parse(
+	fs.readFileSync(
+		path.join(
+			ROOT,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'core',
+			'timing',
+			'data',
+			'constants.toml'
+		),
+		'utf8'
+	)
+);
+const REGISTRY_PERIOD = /^TimingsGet\(\s*"(\w+)"\s*,\s*"(\w+)"\s*\)$/;
+
+/**
+ * Resolves a SetTimer period written as a literal or as a registry read.
+ * @param {string} expr The period argument as written.
+ * @returns {number|null} Milliseconds, or null when it is neither.
+ */
+function periodOf(expr) {
+	if (/^\d+$/.test(expr)) return Number(expr);
+	const read = expr.match(REGISTRY_PERIOD);
+	if (!read) return null;
+	const value = TIMINGS[read[1]]?.[read[2]];
+	if (!Number.isInteger(value))
+		throw new Error(
+			`TimingsGet("${read[1]}", "${read[2]}") names no integer key of constants.toml`
+		);
+	return value;
+}
 
 // Anything at or above this is a background chore, not a poller.
 const FAST_MS = 1000;
@@ -101,6 +139,14 @@ const INVENTORY = {
 		'_LLM_Menu_ApiTestProgressHide when the probe answers, times out or is cancelled. ' +
 		'150 ms keeps the elapsed-time label and bar moving smoothly; a slower pulse makes ' +
 		'the probe look frozen while it waits on the provider.',
+	'core/ui/ui/editors.ahk:MagicKeyCapturePoll':
+		'Armed only while the « Press the key… » capture of the magic key is open, and stopped ' +
+		'when it closes. 10 ms reads the physical key state so a short tap is not missed; the ' +
+		'period is timings [ui] magic_key_capture_poll_ms.',
+	'modules/shortcuts/capsword_auto_off.ahk:Callbacks':
+		'Armed only while CapsWord is on and set to end on pointer motion; one cursor read per ' +
+		'tick. 100 ms (timings [ui] capsword_check_interval_ms) ends the word before the next ' +
+		'click lands on a moved pointer.',
 	'modules/keymap/layout.ahk:_UIA_SelectionPollTimer':
 		'Polls the UIA selection so a layout remap knows whether text is selected. 500 ms, and ' +
 		'armed only in the apps that need it — the AX call is the expensive part, which is why ' +
@@ -159,9 +205,8 @@ for (const abs of walk(DRIVER)) {
 				const parts = splitArgs(m[1]);
 				if (parts.length < 2) continue;
 				// A positive literal repeats; a negative one fires once and stops.
-				const num = parts[1].trim().match(/^(\d+)$/);
-				if (!num) continue;
-				const ms = Number(num[1]);
+				const ms = periodOf(parts[1].trim());
+				if (ms === null) continue;
 				if (ms <= 0 || ms >= FAST_MS) continue;
 				// The callback name, for a stable key that survives a line move.
 				const cb = (parts[0].trim().match(/^[A-Za-z_]\w*/) || ['<expr>'])[0];

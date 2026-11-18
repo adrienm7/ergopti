@@ -83,7 +83,7 @@ _FTI_Inventory() {
 		"this.Timer",                    "150",   ; exact managed Ollama session/debt/READY custody; canceled on retirement
 		"this.PollTimer",                "?",     ; field run request watch, only while a field report folder is declared; timings [ui] field_run_poll_ms
 		"AwakeCheckMouseMoved",         "150",   ; only armed in awake mode
-		'Callbacks["motion"]',          "?",     ; only armed while CapsWord is on and set to end on pointer motion; timings [ui] capsword_check_interval_ms (100), one cursor read
+		'Callbacks["motion"]',          "100",     ; only armed while CapsWord is on and set to end on pointer motion; timings [ui] capsword_check_interval_ms (100), one cursor read
 		"_LLM_Menu_ApiTestProgressTick", "150",  ; only armed while the API test progress is showing
 		"KLHook.flush_timer",           "200",   ; keystats buffer flush
 		"PLC_Poll",                     "250",   ; process lifecycle watch
@@ -97,8 +97,8 @@ _FTI_Inventory() {
 		"BoundFn",                      "?",     ; generic scheduler adapter, period is the caller's
 		"_SuspendStateWatchdog",        "500",   ; lifecycle transitions and one-shot boot restore
 		"SimulateActivity",             "?",     ; randomised interval, awake mode only
-		"MagicKeyCapturePoll",          "?",     ; only armed while "Press the key…" is open; timings [ui] magic_key_capture_poll_ms (10), reads the physical key state
-		"_RawTouchpadWatchdog",         "?",     ; only armed while a swipe shortcut waits for its touch to end; timings [gestures] incremental_handoff_ms (300), no OS call
+		"MagicKeyCapturePoll",          "10",      ; only armed while "Press the key…" is open; timings [ui] magic_key_capture_poll_ms (10), reads the physical key state
+		"_RawTouchpadWatchdog",         "300",     ; only armed while a swipe shortcut waits for its touch to end; timings [gestures] incremental_handoff_ms (300), no OS call
 		"Tick",                         "?")     ; keyboard layout registry watch; timings [adapters] layout_registry_watch_poll_ms (100), one zero-timeout event wait per watched key
 }
 
@@ -193,6 +193,10 @@ _FTI_ResolvePeriod(Src, Expr) {
 	}
 	if RegExMatch(Expr, "^\d+$")
 		return Expr
+	; A period read from the shared timings registry at the call resolves to the
+	; registry's value, so moving a poller's literal there keeps it inventoried.
+	if RegExMatch(Expr, '^TimingsGet\(\s*"(\w+)"\s*,\s*"(\w+)"\s*\)$', &Read)
+		return String(TimingsGet(Read[1], Read[2]))
 	if !RegExMatch(Expr, "^(?:[_A-Za-z][_A-Za-z0-9]*\.)?([_A-Za-z][_A-Za-z0-9]*)$", &Name)
 		return ""
 	; A constant loaded from the shared timings registry resolves to the

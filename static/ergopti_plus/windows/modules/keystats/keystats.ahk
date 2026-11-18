@@ -359,7 +359,7 @@ KL_WriteAtomic(path, content) {
         ; Retry once after a brief pause to ride out a transient AV / indexer
         ; lock on ``path``. Sleep on the timer thread is acceptable here —
         ; SaveState already runs off the hot keyboard path.
-        Sleep 50
+        Sleep(TimingsGet("keystats", "state_rename_retry_ms"))
         if !DllCall("Kernel32\MoveFileExW", "Str", tmp, "Str", path,
                 "UInt", FLAGS, "Int") {
             err := A_LastError

@@ -27,6 +27,13 @@
 # ──────────────────────────────────────────────────────────────────────
 
 [llm]
+# Windows: the managed Ollama session watch (cancellation, stale
+# configuration, pause, READY custody). AHK: ai/engine/ollama/managed_bootstrap.ahk.
+managed_session_poll_ms = 150
+
+# Windows: the API test progress pulse; slower and the probe looks frozen.
+# AHK: ai/ui/menu/api_entries.ahk.
+api_test_progress_tick_ms = 150
 
 # The keystroke debounce before an LLM prediction request is the user's
 # llm.trigger.debounce_ms, shipped as llm_debounce_ms in
@@ -218,6 +225,8 @@ val_chord_release_timeout_ms = 5000
 # ──────────────────────────────────────────────────────────────────────
 
 [tooltip]
+# Windows: the tooltip dequeue poll during a dequeue cycle. AHK: core/ui/ui/tooltip/core.ahk.
+dequeue_poll_ms = 100
 
 # The hotstring and LLM tooltip durations, their decrement and their floor are
 # declared once, in _shared/core/ui/data/tooltip/constants.toml [timing], which every
@@ -496,7 +505,6 @@ emergency_recycle_delay_ms = 20
 # ──────────────────────────────────────────────────────────────────────
 
 [keep_awake]
-
 # Minimum interval between mouse-jitter ticks.
 # AHK: win.ahk AWAKE_TICK_MIN_MS. HS: system.lua AWAKE_TICK_MIN_SEC.
 tick_min_ms = 1000
@@ -518,6 +526,11 @@ return_delay_ms = 200
 # Windows: the poll while keystats stops, and the wait before the page's first data.
 stop_poll_ms = 50
 first_push_delay_ms = 1500
+
+# Windows: the pause before the one retry of a state file rename that a
+# transient antivirus or indexer lock refused. AHK: keystats.ahk
+# (the atomic state write).
+state_rename_retry_ms = 50
 
 # Background ingest tick — how often buffered events are flushed to disk.
 # AHK: keystats.ahk INGEST_TICK_MS. HS: log_manager.lua INGEST_TICK_SEC.
@@ -827,6 +840,9 @@ hesitation_cooldown_ms = 10000
 # ──────────────────────────────────────────────────────────────────────
 
 [ui]
+# Windows: the poll that awaits a pending suspend. AHK: core/lifecycle/engine/lifecycle.ahk.
+suspend_pending_poll_ms = 25
+
 # Windows: how long TakeNote waits on a Notepad tab it has not bound before it
 # accepts it as the note it launched (Windows 11 tabbed Notepad, where a file
 # already open there stays selected instead of opening a new tab).
@@ -1214,6 +1230,11 @@ native_slow_batch_ms = 500
 # AHK: infra/hotpath_profiler.ahk HotPath_LoadTimings.
 hotpath_slow_ms = 5
 
+# How often the latency statistics of the hot-path segments are summarised in
+# the log: one minute retains the distributions without turning normal typing
+# into log I/O. AHK: infra/hotpath_profiler.ahk HotPath_StartStatistics.
+hotpath_statistics_interval_ms = 60000
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Performance budgets
@@ -1270,6 +1291,14 @@ prediction_display_ms = 2000
 # ──────────────────────────────────────────────────────────────────────
 
 [adapters]
+# Windows: how often the native navigation owner's receipts are drained when
+# its wake message is delayed or lost. AHK: ai/adapters/nav_event_owner.ahk.
+nav_event_owner_service_poll_ms = 100
+
+# Windows: the UIA selection poll a layout remap reads, armed only in the
+# apps that need it (a cross-process COM round trip). AHK: modules/keymap/layout.ahk.
+uia_selection_poll_ms = 500
+
 # Windows: the poll of a managed HTTP request an owner waits for.
 http_managed_wait_poll_ms = 10
 # Windows: the delay before a closed WebView profile folder is removed.

@@ -394,7 +394,7 @@ _TooltipDequeuePollFn(ExpectedGeneration := unset, ExpectedSurface := 0) {
 ; to arm the poll timer. Code at file scope in #Include'd files does not execute
 ; in AHK v2 when the include appears after the auto-execute section has ended.
 TooltipDequeueInit() {
-    SetTimer(_TooltipDequeuePollFn, 100)
+    SetTimer(_TooltipDequeuePollFn, TimingsGet("tooltip", "dequeue_poll_ms"))
 }
 
 ; Style constants — sourced from core/ui/engine/style.ahk (included before this file

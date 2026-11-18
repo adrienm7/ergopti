@@ -63,7 +63,7 @@ _USBP_SelectionIsPolledInBackground() {
 		"GetUIASelection must NOT call UIA directly on the keyboard path (uia-selection-blocks-keyboard-thread)")
 
 	; 3. Verify timer is armed.
-	Assert(InStr(Src, "SetTimer(_UIA_SelectionPollTimer, 500)") > 0,
+	Assert(InStr(Src, 'SetTimer(_UIA_SelectionPollTimer, TimingsGet("adapters", "uia_selection_poll_ms"))') > 0,
 		"UIA selection poll timer must be armed with a periodic interval")
 
 	Root := _USBP_ReadSource("ErgoptiPlus.ahk")

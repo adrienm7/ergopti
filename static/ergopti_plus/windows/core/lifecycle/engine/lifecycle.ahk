@@ -483,7 +483,7 @@ ToggleSuspend(*) {
 		; Acquire the completion owner before publishing pending state. A rejected
 		; timer must leave the pause action immediately retryable instead of
 		; stranding a request that has neither completion nor timeout callbacks.
-		SetTimer(_SuspendPendingPoll, 25)
+		SetTimer(_SuspendPendingPoll, TimingsGet("ui", "suspend_pending_poll_ms"))
 		_SuspendPendingSince := PendingSince
 		_SuspendPending := true
 		LoggerWarn("Lifecycle", "Suspend deferred until custom-combination prefix keys are released (held: {1}).",

@@ -1147,7 +1147,7 @@ class OllamaManagedBootstrap {
 		try {
 			if this.Cancelled || this.Failed || !IsObject(this.Timer)
 				return false
-			SetTimer(this.Timer, 150)
+			SetTimer(this.Timer, TimingsGet("llm", "managed_session_poll_ms"))
 			return true
 		} finally Critical(PreviousCritical)
 	}

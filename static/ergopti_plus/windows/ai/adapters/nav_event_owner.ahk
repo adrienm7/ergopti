@@ -147,7 +147,7 @@ _LLM_NavEventOwnerSetServiceTimer(Armed) {
 		return !Armed
 	}
 	if Armed
-		SetTimer(_LLM_NavEventOwnerServiceFn, 100)
+		SetTimer(_LLM_NavEventOwnerServiceFn, TimingsGet("adapters", "nav_event_owner_service_poll_ms"))
 	else
 		SetTimer(_LLM_NavEventOwnerServiceFn, 0)
 	_LLM_NavEventOwnerServiceArmed := Armed

@@ -294,7 +294,7 @@ TestShortcuts_ToggleSuspendDrainsAltGrPrefixFirst() {
 	Assert(Body != "", "ToggleSuspend must exist in core/lifecycle/engine/lifecycle.ahk")
 
 	ClearPos := InStr(Body, "_SuspendPrefixesAreClear()")
-	Assert(ClearPos > 0 and InStr(Body, "SetTimer(_SuspendPendingPoll, 25)") > ClearPos,
+	Assert(ClearPos > 0 and InStr(Body, 'SetTimer(_SuspendPendingPoll, TimingsGet("ui", "suspend_pending_poll_ms"))') > ClearPos,
 		"ToggleSuspend must defer Suspend until the physical AltGr/Kana prefix has released")
 }
 Test("Shortcuts/AltGr: ToggleSuspend drains the AltGr prefix latch before toggling Suspend (historical AltGr latch gotcha)",

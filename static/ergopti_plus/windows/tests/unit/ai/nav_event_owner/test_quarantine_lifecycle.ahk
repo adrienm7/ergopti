@@ -818,7 +818,7 @@ _LNEO_SuspendDisarmsAndResumeRearmsServiceTimer() {
 	Helper := _DriverFuncBodyOrEmpty("_LLM_NavEventOwnerSetServiceTimer")
 	Assert(Helper != ""
 		and InStr(Helper,
-			"SetTimer(_LLM_NavEventOwnerServiceFn, 100)") > 0
+			'SetTimer(_LLM_NavEventOwnerServiceFn, TimingsGet("adapters", "nav_event_owner_service_poll_ms"))') > 0
 		and InStr(Helper,
 			"SetTimer(_LLM_NavEventOwnerServiceFn, 0)") > 0,
 		"the service timer helper must control the real repeating timer")
