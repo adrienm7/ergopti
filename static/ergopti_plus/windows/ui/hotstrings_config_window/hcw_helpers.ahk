@@ -16,6 +16,8 @@
 ; file; the thin shim (init.ahk) includes both.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
+
 global _HCWGui      := 0
 global _HCWWidgets  := 0
 global _HCW_LastSelection := 0
@@ -451,7 +453,7 @@ OpenHotstringsConfigWindow() {
 	_HCW_BuildGroupList()
 
 	G := Gui_Create("+Resize +MinSize580x320", t("hs_config.window_title"))
-	G.SetFont("s10", "Segoe UI")
+	Gui_SetFont(G, "s10", "Segoe UI")
 	G.MarginX := 14
 	G.MarginY := 12
 

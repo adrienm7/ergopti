@@ -17,6 +17,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
 
 ; The exact binding is unavailable to new held-click acquisitions during its write.
 global GestureBindingWriteOwners := Map()
@@ -1197,7 +1198,7 @@ GestureShortcutText(Ids) {
 ; settings`` menu items — the user only needs one path now.
 GestureShowManualTutorialDialog() {
 		tg := Gui_Create("", t("onboarding.gestures.register_manual"))
-		tg.SetFont("s9", "Segoe UI")
+		Gui_SetFont(tg, "s9", "Segoe UI")
 		tg.MarginX := 18
 		tg.MarginY := 14
 		

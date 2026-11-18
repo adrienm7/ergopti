@@ -218,3 +218,47 @@ _A11yT_LayerRestoresTheRebasedText() {
 }
 Test("a11y tray: the navigation layer restores the pause text set meanwhile (a11y-native-2026-11-17)",
 	_A11yT_LayerRestoresTheRebasedText)
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 4/ Native window fonts =======
+; ======================================
+; ======================================
+
+; « Make text bigger » left every native window's explicit size unchanged:
+; « s10 » stayed 10 pt at 200 % (a11y-text-scale-2026-11-18).
+_A11yT_FontOptionsFollowTheTextScale() {
+	AssertEqual("s10 bold cFFFFFF", Gui_FontOptions("s10 bold cFFFFFF", 100), "100 % keeps the size")
+	AssertEqual("s15 bold cFFFFFF", Gui_FontOptions("s10 bold cFFFFFF", 150))
+	AssertEqual("s20 norm", Gui_FontOptions("s9 norm", 225), "9 pt at 225 % rounds to 20 pt")
+	AssertEqual("w700 s25 c3A3A3A", Gui_FontOptions("w700 s11 c3A3A3A", 225), "a size after other options")
+	AssertEqual("S14", Gui_FontOptions("S11", 125), "the option letter is case-insensitive")
+	AssertEqual("cGray strike", Gui_FontOptions("cGray strike", 200), "no size, nothing to scale")
+	AssertEqual("s2", Gui_FontOptions("s1", 200), "a 1 pt spacer stays at least 1 pt")
+	AssertThrows(() => Gui_FontOptions("s10", 0), "a scale under 100 % is refused, not used")
+	AssertThrows(() => Gui_FontOptions("s10", "150"), "a scale that is not an integer is refused")
+}
+Test("a11y fonts: native window sizes follow the system text scale (a11y-text-scale-2026-11-18)",
+	_A11yT_FontOptionsFollowTheTextScale)
+
+; The real setting reaches a real control: the font Windows returns for a
+; control set through Gui_SetFont is the scaled size.
+_A11yT_SetFontReachesTheControl() {
+	G := Gui()
+	try {
+		Label := G.AddText("", "Aa")
+		Gui_SetFont(Label, "s20", "Segoe UI")
+		Font := SendMessage(0x0031, 0, 0, Label)   ; WM_GETFONT
+		Info := Buffer(92, 0)                        ; LOGFONTW
+		AssertTrue(DllCall("GetObjectW", "Ptr", Font, "Int", Info.Size, "Ptr", Info, "Int") > 0, "the control has a font")
+		Px := Abs(NumGet(Info, 0, "Int"))
+		Expected := Round(Round(20 * A11ySystem_TextScalePercent() / 100) * A_ScreenDPI / 72)
+		AssertTrue(Abs(Px - Expected) <= 1, "the font must be the scaled size: " . Px . " px, expected " . Expected)
+	} finally G.Destroy()
+}
+Test("a11y fonts: Gui_SetFont gives the control the scaled font (a11y-text-scale-2026-11-18)",
+	_A11yT_SetFontReachesTheControl)

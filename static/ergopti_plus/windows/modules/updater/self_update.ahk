@@ -10,6 +10,8 @@
 ; updater/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
+
 
 
 
@@ -1368,18 +1370,18 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 	}
 	G := Gui_Create("+Resize +MinSize720x420", t("updater.update_window_title"))
 	_Updater_PromptGui := G
-	G.SetFont("s11 bold", "Segoe UI")
+	Gui_SetFont(G, "s11 bold", "Segoe UI")
 	G.MarginX := 14
 	G.MarginY := 12
 	; Header: "Update available — vX.Y.Z" so the user immediately sees the
 	; tag they're about to install. Date below if we have one.
 	HeaderText := Format(t("updater.update_dialog_header"), Release.Tag)
 	G.Add("Text", "xm w700", HeaderText)
-	G.SetFont("s9 norm")
+	Gui_SetFont(G, "s9 norm")
 	if (Release.HasProp("PublishedAt") and Release.PublishedAt != "") {
 		G.Add("Text", "xm y+2 cGray w700", SubStr(Release.PublishedAt, 1, 10))
 	}
-	G.SetFont("s10 norm")
+	Gui_SetFont(G, "s10 norm")
 	G.Add("Text", "xm y+10 w700", t("updater.update_dialog_changelog"))
 
 	; Placeholder that WebView2 overlays — same height as the former Edit control.

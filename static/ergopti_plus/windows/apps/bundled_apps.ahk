@@ -15,6 +15,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0+
+#Include %A_LineFile%\..\..\core\ui\engine\font_scale.ahk
 
 ; The bundled app ids the tray and the command line name.
 global BUNDLED_APP_ENCRYPTOR := "encryptor"
@@ -45,7 +46,7 @@ BundledAppUi_Entry(Title, Prompt, Initial := "", Hidden := false) {
 BundledAppUi_Choice(Title, Text, OkLabel, CancelLabel) {
 	State := { answer: false }
 	Window := Gui("-MinimizeBox", WindowTitle(Title))
-	Window.SetFont("s10")
+	Gui_SetFont(Window, "s10")
 	Window.AddText("w440", Text)
 	Ok := Window.AddButton("Default w200", OkLabel)
 	Cancel := Window.AddButton("x+20 w200", CancelLabel)
@@ -160,7 +161,7 @@ Encryptor_ProcessFiles(Files, Ports) {
  */
 Encryptor_ShowDropWindow(Ports) {
 	Window := Gui(, WindowTitle(AppText("menu.apps.encrypt_desc")))
-	Window.SetFont("s11")
+	Gui_SetFont(Window, "s11")
 	Window.AddText("w420 h140 Center Border 0x200", AppText("apps.encryptor.drop_hint"))
 	Browse := Window.AddButton("w200", AppText("apps.cloner.btn_browse"))
 	Browse.OnEvent("Click", (*) => _Encryptor_Browse(Ports))

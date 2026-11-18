@@ -27,6 +27,7 @@
 #Include %A_LineFile%\..\..\..\..\core\lifecycle\engine\transition.ahk
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\core\ui\engine\font_scale.ahk
 
 
 ; Module-level Gui handle so a second call brings the existing window to
@@ -153,7 +154,7 @@ _LLM_ModelBrowser_Build() {
 		g.MarginX := 10
 		g.MarginY := 10
 
-		g.SetFont("s10")
+		Gui_SetFont(g, "s10")
 
 		; Filter row — search the table by typing a substring. Live filter on
 		; every keystroke so the list narrows as the user thinks, no Apply

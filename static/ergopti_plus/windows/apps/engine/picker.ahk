@@ -44,6 +44,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
 
 global _AppPickerOwnerEpochs := Map()
 global _AppPickerActiveReceipts := Map()
@@ -307,7 +308,7 @@ AppPicker_Show(opts) {
 		rows := AppPicker_BuildRows(initial)
 
 		g := Gui_Create("+Resize +MinSize400x500", title)
-		g.SetFont("s10")
+		Gui_SetFont(g, "s10")
 		g.MarginX := 14
 		g.MarginY := 14
 		g.AddText("w400", prompt)

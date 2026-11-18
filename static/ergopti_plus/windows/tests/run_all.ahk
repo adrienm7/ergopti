@@ -367,6 +367,7 @@ InstallHotstringHooks()
 ; ── Adapter contract: include all port adapters so contract vector tests can call them ──
 #Include ../platform/system/notifier.ahk
 #Include ../platform/system/accessibility.ahk
+#Include ../core/ui/engine/font_scale.ahk
 #Include ../core/lifecycle/engine/shutdown/quit_admission.ahk
 #Include ../core/events/timer_scheduler.ahk
 #Include ../core/fs/adapters/file_system.ahk

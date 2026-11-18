@@ -10,6 +10,8 @@
 ; their menu call sites are unaffected.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
+
 ; Each native picker is constructed anew; default Close would only hide its
 ; controls and their captured callbacks instead of retiring the owned window.
 _ActionPickerNativeClose(Window, *) {
@@ -33,7 +35,7 @@ ShowKeyboardSlotPicker(Prefix) {
 		W := Gui_Create("", t("dialog.keyboard_shortcut.title_prefix") . _KeyboardSlotFamilyLabel(Prefix) . " + …")
 		W.OnEvent("Close", _ActionPickerNativeClose)
 		W.OnEvent("Escape", _ActionPickerNativeClose)
-		W.SetFont("s10", "Segoe UI")
+		Gui_SetFont(W, "s10", "Segoe UI")
 		W.MarginX := 12
 		W.MarginY := 12
 		W.Add("Text", "xm", t("dialog.keyboard_shortcut.prompt"))
@@ -122,7 +124,7 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := ""
 		W := Gui_Create("", Title)
 		W.OnEvent("Close", _ActionPickerNativeClose)
 		W.OnEvent("Escape", _ActionPickerNativeClose)
-		W.SetFont("s10", "Segoe UI")
+		Gui_SetFont(W, "s10", "Segoe UI")
 		W.MarginX := 12
 		W.MarginY := 12
 		W.Add("Text", "xm", t("dialog.action_picker.label"))
@@ -210,7 +212,7 @@ FilePathsEditor(*) {
 				return
 		W := Gui_Create(, t("dialog.config_folder.window_title"))
 		_PathsEdNative_BindCancellation(W)
-		W.SetFont("s10", "Segoe UI")
+		Gui_SetFont(W, "s10", "Segoe UI")
 		W.MarginX := 12
 		W.MarginY := 12
 		W.Add("Text", "xm w400", t("dialog.config_folder.label"))

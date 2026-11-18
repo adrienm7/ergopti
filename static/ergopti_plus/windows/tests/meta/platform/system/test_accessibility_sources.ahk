@@ -61,3 +61,35 @@ _A11yS_HotstringWindowControlsAreNamed() {
 }
 Test("a11y sources: the hotstring window's symbol buttons are named (a11y-native-2026-11-17)",
 	_A11yS_HotstringWindowControlsAreNamed)
+
+; A size given straight to SetFont ignores « Make text bigger »; every native
+; window goes through Gui_SetFont (a11y-text-scale-2026-11-18). The tooltips
+; scale their sizes through the style globals, the WPM pill keeps the canon's
+; fixed geometry, and the helper itself is the one direct call.
+_A11yS_FontSizesFollowTheTextScale() {
+	static Exempt := ["/core/ui/engine/font_scale.ahk", "/core/ui/ui/tooltip/", "/ui/wpm/wpm_widget.ahk"]
+	Offenders := [], Scanned := 0, Routed := 0
+	for Path in _DriverProductionSourceCensus().Paths {
+		Unix := StrReplace(Path, "\", "/")
+		Src := _StripFullLineComments(FileRead(Path, "UTF-8"))
+		Pos := 1
+		while Pos := RegExMatch(Src, "Gui_SetFont\(", &M, Pos)
+			Routed += 1, Pos += M.Len
+		Skip := false
+		for Part in Exempt
+			Skip := Skip || InStr(Unix, Part)
+		if Skip
+			continue
+		Scanned += 1
+		Pos := 1
+		while Pos := RegExMatch(Src, 'i)\.SetFont\(\s*"(?:[^"]*\s)?s(?:\d|"\s*\.)', &M, Pos) {
+			Offenders.Push(Path . ": " . M[0])
+			Pos += M.Len
+		}
+	}
+	Assert(Scanned > 100, "the census must reach the driver's sources, scanned " . Scanned)
+	Assert(Routed >= 19, "the native windows must still set their fonts through Gui_SetFont, found " . Routed)
+	AssertEqual(0, Offenders.Length, "a font size must go through Gui_SetFont: " . (Offenders.Length ? Offenders[1] : ""))
+}
+Test("a11y sources: native font sizes go through Gui_SetFont (a11y-text-scale-2026-11-18)",
+	_A11yS_FontSizesFollowTheTextScale)

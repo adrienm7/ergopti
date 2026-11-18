@@ -26,6 +26,7 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\..\core\ui\engine\font_scale.ahk
 
 
 
@@ -937,7 +938,7 @@ _LLM_Menu_ProfilePromptInput(Prompt, Title, Options := "", Default := "") {
 	Finished := false
 	TimeoutFn := Finish.Bind("Timeout")
 	try {
-		Dialog.SetFont("s10", "Segoe UI")
+		Gui_SetFont(Dialog, "s10", "Segoe UI")
 		Dialog.AddText("x12 y12 w" . (Width - 24) . " h36", Prompt)
 		Editor := Dialog.AddEdit("x12 y54 w" . (Width - 24) . " h" . (Height - 106)
 			. " Multi WantReturn VScroll Limit0", Default)

@@ -29,6 +29,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
 
 ; Geometry is resolved at open time by the existing WebViewHost manifest owner.
 
@@ -674,9 +675,9 @@ _UpdateCheck_BuildNative() {
 	G := _UpdateCheck_NewWindow()
 	G.MarginX := 20
 	G.MarginY := 16
-	G.SetFont("s12 bold", "Segoe UI")
+	Gui_SetFont(G, "s12 bold", "Segoe UI")
 	G.Add("Text", "xm w" . Width . " Center", Texts["line1"])
-	G.SetFont("s10 norm", "Segoe UI")
+	Gui_SetFont(G, "s10 norm", "Segoe UI")
 	if (Texts["line2"] != "")
 		G.Add("Text", "xm y+6 w" . Width . " Center", Texts["line2"])
 	if (Texts["logged"] != "")

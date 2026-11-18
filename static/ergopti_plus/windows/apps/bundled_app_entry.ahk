@@ -17,6 +17,7 @@
 ; The app process has no logger: the crypto adapter's diagnostics are no-ops
 ; here, and every failure the user can act on reaches them as a dialog.
 LoggerError(Args*) => ""
+LoggerWarn(Args*) => ""
 
 #Include %A_ScriptDir%\..\_generated\window_titles.ahk
 #Include %A_ScriptDir%\..\core\ui\engine\native_dialogs.ahk

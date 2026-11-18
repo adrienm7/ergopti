@@ -10,6 +10,8 @@
 ; updater/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
+
 
 
 ; ====================================
@@ -483,7 +485,7 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 	WinTitle := t("changelog_window.window_title")
 
 	G := Gui_Create("+Resize +MinSize930x400", WinTitle)
-	G.SetFont("s10", "Segoe UI")
+	Gui_SetFont(G, "s10", "Segoe UI")
 	G.MarginX := 10
 	G.MarginY := 8
 
@@ -591,7 +593,7 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 	RightPane.GetPos(&rpx, &rpy, &rpw, &rph)
 	RightPaneEdit := G.Add("Edit", "x" . rpx . " y" . rpy . " w" . rpw . " h" . rph
 		. " ReadOnly +Multi -Wrap +VScroll", "")
-	RightPaneEdit.SetFont("s9", "Consolas")
+	Gui_SetFont(RightPaneEdit, "s9", "Consolas")
 	; No label sits before the notes (the empty placeholder does), so a screen
 	; reader gets their name from the section they show.
 	A11ySystem_SetAccessibleName(RightPaneEdit.Hwnd, t("changelog_window.section_changelog"))

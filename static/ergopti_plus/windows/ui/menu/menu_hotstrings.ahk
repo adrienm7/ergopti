@@ -14,6 +14,7 @@
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include %A_LineFile%\..\..\..\core\text\engine\number.ahk
 #Include %A_LineFile%\..\..\..\core\lifecycle\engine\value_check.ahk
+#Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
 
 
 
@@ -621,7 +622,7 @@ _HS_DelimAddCustom() {
 		return
 	}
 	G := Gui_Create("", t("dialog.hotstrings.new_delimiter_title"))
-	G.SetFont("s10", "Segoe UI")
+	Gui_SetFont(G, "s10", "Segoe UI")
 	G.Add("Text", "xm y10 w300", t("dialog.hotstrings.new_delimiter_prompt"))
 	EditCtrl := G.Add("Edit", "xm y+6 w60 Limit2")
 	ChkCtrl  := G.Add("Checkbox", "xm y+10 w300", t("dialog.hotstrings.consume_checkbox"))
