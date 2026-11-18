@@ -11,6 +11,16 @@ local helpers = require("tests.helpers")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 local RegistryCodec = require("ai.engine.settings.profile_registry_codec")
 
+--- Reads one profile command corpus of _shared/tests/corpus/menus/.
+--- @param name string The corpus file stem.
+--- @return table corpus
+local function command_corpus(name)
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/" .. name .. ".json"), "rb"))
+	local text = assert(file:read("*a"))
+	assert(file:close())
+	return assert(require("core.text.engine.json").decode(text))
+end
+
 
 --- Binds the actual idle live owner without replacing the profile/save collaborators.
 --- Every native owner is fresh; all module identities/absence are journalled.
@@ -302,10 +312,13 @@ helpers.describe("LLM user profiles: tray reachability", function()
 			"the registered model-browser bridge needs a production menu caller")
 		helpers.assert_eq(browse.fn(), true)
 		helpers.assert_eq(opened_window, "model_browser")
-		local create = find(menu, require("core.i18n.engine.i18n").get("menu.profiles.create_profile"))
+		-- The shared declaration of _shared/tests/corpus/menus/profile_create_command.json.
+		local create_command = command_corpus("profile_create_command")
+		local create = find(menu, require("core.i18n.engine.i18n").get(create_command.i18n))
 		helpers.assert_not_nil(create,
 			"the shared editor needs a production caller, not only a registered bridge")
 		helpers.assert_eq(type(create.fn), "function")
+		helpers.assert_true(create.disabled ~= true, create_command.ready)
 		helpers.assert_eq(create.fn(), true)
 		helpers.assert_eq(opened.existing, nil)
 		helpers.assert_true(opened.opts.profile_id:match("^user_") ~= nil)
@@ -353,7 +366,11 @@ helpers.describe("LLM user profiles: tray reachability", function()
 		local file = assert(io.open(Paths.shared("menu/data/menu_manifest.json"), "r"))
 		local document = Json.decode(file:read("*a"))
 		file:close()
-		document.llm_profile_commands[1].i18n = "button.cancel"
+		local declared = 0
+		for _, declaration in ipairs(document[create_command.section]) do
+			if declaration.id == create_command.id then declaration.i18n = "button.cancel"; declared = declared + 1 end
+		end
+		helpers.assert_eq(declared, 1, create_command.id)
 		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "linux",
 			manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
@@ -500,9 +517,12 @@ helpers.describe("shared Clone Profile command", function()
 				return nil
 			end
 			local i18n = require("core.i18n.engine.i18n")
+			-- The shared declaration of _shared/tests/corpus/menus/profile_clone_command.json.
+			local clone_command = command_corpus("profile_clone_command")
 			local builder = helpers.load_module("menu.ui.builder.builder")
-			local row = find(builder.build(context), i18n.get("menu.profiles.clone_builtin"))
+			local row = find(builder.build(context), i18n.get(clone_command.i18n))
 			helpers.assert_not_nil(row)
+			helpers.assert_true(row.disabled ~= true, clone_command.ready)
 			helpers.assert_eq(row.fn(), true)
 			helpers.assert_eq(calls, 1)
 			helpers.assert_not_nil(opened.existing)
@@ -531,16 +551,18 @@ helpers.describe("shared Clone Profile command", function()
 			helpers.assert_eq(refreshes, 1)
 			helpers.assert_eq(settings.set("active", "basic"), true,
 				"the conditional Clone row requires a real active built-in before rebuilding")
-			local fresh_clone = assert(find(builder.build(context), i18n.get("menu.profiles.clone_builtin")))
+			local fresh_clone = assert(find(builder.build(context), i18n.get(clone_command.i18n)))
 			helpers.assert_eq(fresh_clone.fn(), false, "a fresh row still preserves native editor refusal")
 			helpers.assert_eq(calls, 3)
 			local Paths = require("core.fs.engine.paths")
 			local file = assert(io.open(Paths.shared("menu/data/menu_manifest.json"), "r"))
 			local manifest = require("core.text.engine.json").decode(file:read("*a"))
 			file:close()
-			for _, declaration in ipairs(manifest.llm_profile_commands) do
-				if declaration.id == "llm_profile_clone" then declaration.i18n = "button.cancel" end
+			local declared = 0
+			for _, declaration in ipairs(manifest[clone_command.section]) do
+				if declaration.id == clone_command.id then declaration.i18n = "button.cancel"; declared = declared + 1 end
 			end
+			helpers.assert_eq(declared, 1, clone_command.id)
 			replace("menu.engine.manifest_menu", assert(require("menu.engine.renderer").new({
 				platform = "linux", manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 				json_decode = function() return manifest end, i18n = i18n, logger = require("core.logger.engine.shim"),

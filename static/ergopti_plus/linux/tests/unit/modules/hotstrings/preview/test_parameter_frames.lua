@@ -33,6 +33,16 @@ local function with_frames(body, paused, mutate)
 	if not ok then error(err, 0) end
 end
 
+--- Reads _shared/tests/corpus/menus/hotstrings_parameter_frames.json.
+--- @return table corpus
+local function read_corpus()
+	local file = assert(io.open(require("core.fs.engine.paths").shared(
+		"tests/corpus/menus/hotstrings_parameter_frames.json"), "rb"))
+	local text = assert(file:read("*a"))
+	assert(file:close())
+	return assert(require("core.text.engine.json").decode(text))
+end
+
 local function find(rows, title)
 	for _, row in ipairs(rows or {}) do
 		if row.title == title then return row end
@@ -43,30 +53,42 @@ end
 helpers.describe("complete shared Hotstrings parameter frames", function()
 	helpers.it("preserves Linux delay and preview orders without Mac-only quick actions", function()
 		with_frames(function(rows, i18n)
-			local delays = assert(find(rows, i18n.get("menu.hotstrings.delays_colors"))).menu
-			helpers.assert_eq(#delays, 7)
-			helpers.assert_eq(delays[1].title, i18n.get("menu.hotstrings.config_item"))
-			helpers.assert_eq(delays[2].title, "-")
-			for index, key in ipairs({ "tooltip_default", "delay_magic_key", "delay_autocorrection" }) do
-				local caption = i18n.get("menu.hotstrings." .. key)
-				helpers.assert_eq(delays[index + 2].title:sub(1, #caption), caption)
-				helpers.assert_true(delays[index + 2].title:find("750 ms", 1, true) ~= nil)
+			-- The Linux rows of _shared/tests/corpus/menus/hotstrings_parameter_frames.json.
+			local corpus = read_corpus()
+			local delays = assert(find(rows, i18n.get(corpus.parents.delays))).menu
+			helpers.assert_eq(#delays, #corpus.delays.linux)
+			local delay_index = 0
+			for index, id in ipairs(corpus.delays.linux) do
+				local name = id:match("^parameter_delay_(.+)$")
+				if id == "separator" then
+					helpers.assert_eq(delays[index].title, "-", id)
+				elseif name == "config" then
+					helpers.assert_eq(delays[index].title, i18n.get("menu.hotstrings.config_item"), id)
+				elseif name == "ai_acceptance" then
+					-- The AI suggestion's lifetime, after a separator as on Windows
+					-- (tooltips-wpm-llm-delay-row): its own default, never the expansion delay.
+					local caption = i18n.get(corpus.captions[name])
+					helpers.assert_eq(delays[index].title:sub(1, #caption), caption, id)
+					local default_ms = math.floor(require("core.ui.ui.tooltip.config").llm_timeout_default() * 1000 + 0.5)
+					helpers.assert_true(delays[index].title:find(default_ms .. " ms", 1, true) ~= nil, delays[index].title)
+					helpers.assert_true(delays[index].title:find(i18n.get("menu.settings.default_indicator"), 1, true) ~= nil)
+				else
+					local caption = i18n.get(assert(corpus.captions[name], id))
+					helpers.assert_eq(delays[index].title:sub(1, #caption), caption, id)
+					delay_index = delay_index + 1
+					helpers.assert_true(delays[index].title:find(
+						tostring(corpus.linux_delays_ms[delay_index]) .. " ms", 1, true) ~= nil, id)
+				end
 			end
-			-- The AI suggestion's lifetime, after a separator as on Windows
-			-- (tooltips-wpm-llm-delay-row): its own default, never the expansion delay.
-			helpers.assert_eq(delays[6].title, "-")
-			local ai_caption = i18n.get(require("menu.engine.manifest_menu").get_root().hotstrings_delay_captions.ai_acceptance)
-			helpers.assert_eq(delays[7].title:sub(1, #ai_caption), ai_caption)
-			local default_ms = math.floor(require("core.ui.ui.tooltip.config").llm_timeout_default() * 1000 + 0.5)
-			helpers.assert_true(delays[7].title:find(default_ms .. " ms", 1, true) ~= nil, delays[7].title)
-			helpers.assert_true(delays[7].title:find(i18n.get("menu.settings.default_indicator"), 1, true) ~= nil)
-			local preview = assert(find(rows, i18n.get("menu.hotstrings.preview_bubbles"))).menu
-			helpers.assert_eq(#preview, 5); helpers.assert_eq(preview[4].title, "-")
+			helpers.assert_eq(delay_index, #corpus.linux_delays_ms, "every expansion delay row carries its value")
+			local preview = assert(find(rows, i18n.get(corpus.parents.preview))).menu
+			helpers.assert_eq(#preview, #corpus.preview.linux + 1, "the presence provider draws its two native rows")
 			for index, key in ipairs({ "tooltip_magic", "tooltip_autocorrect", "tooltip_ai" }) do
 				helpers.assert_eq(preview[index].title, i18n.get("menu.hotstrings." .. key))
 			end
-			helpers.assert_eq(preview[5].title, i18n.get("menu.hotstrings.tooltip_colored"))
-			local word = assert(find(rows, i18n.get("menu.hotstrings.word_expanders"))).menu
+			helpers.assert_eq(preview[#preview - 1].title, "-")
+			helpers.assert_eq(preview[#preview].title, i18n.get("menu.hotstrings.tooltip_colored"))
+			local word = assert(find(rows, i18n.get(corpus.parents.word_expander))).menu
 			helpers.assert_eq(word[4].title, "-")
 			helpers.assert_eq(word[#word - 1].title, "-")
 			helpers.assert_eq(word[#word].title, i18n.get("menu.hotstrings.add_delimiter"))

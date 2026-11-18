@@ -15,6 +15,16 @@ local manifest_file = assert(io.open(helpers.driver_root() .. "/../../layouts/re
 local shipped = require("core.text.engine.toml_codec.codec").decode(assert(manifest_file:read("*a"))).extension
 assert(manifest_file:close())
 
+--- Reads one menus corpus of _shared/tests/corpus/menus/.
+--- @param name string The corpus file stem.
+--- @return table corpus
+local function read_corpus(name)
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/" .. name .. ".json"), "rb"))
+	local text = assert(file:read("*a"))
+	assert(file:close())
+	return assert(require("core.text.engine.json").decode(text))
+end
+
 --- A hotstrings config double whose loaded categories name their extension.
 --- @param with_ergopti boolean Whether the Ergopti extension supplied its categories.
 --- @return table
@@ -117,7 +127,8 @@ helpers.describe("Hotstrings menu (linux): extension submenus", function()
 		local mb = helpers.load_module("menu.ui.builder.builder")
 		local i18n = require("core.i18n.engine.i18n")
 		local label = string.format(i18n.get("menu.extensions.hotstrings_of"), "Ergopti+")
-		helpers.assert_nil(row_starting(mb.build({ config = fake_config(false), _version = "9.9.9" }), label))
+		local row = row_starting(mb.build({ config = fake_config(false), _version = "9.9.9" }), label)
+		helpers.assert_eq(row == nil, read_corpus("hotstring_extension_frames").linux_without_extensions_returns_nil)
 	end)
 end)
 
@@ -146,17 +157,28 @@ end
 
 helpers.describe("complete installed extension shared frames (Linux)", function()
 	helpers.it("retains the full command, category and bound-section order", function()
-		with_extension_frame(function(f)
+		-- The Linux order of _shared/tests/corpus/menus/hotstring_extension_frames.json.
+		-- The corpus writes the native rows in English: a category row is its
+		-- translated name, so the whole frame is drawn in that locale.
+		local corpus = read_corpus("hotstring_extension_frames")
+		local bulk = { enable = corpus.captions.extension_enable_all, disable = corpus.captions.extension_disable_all }
+		-- i18n settles its own locale on first use; settle it first, so the
+		-- build cannot switch the frame back to the session language.
+		require("core.i18n.engine.i18n").init()
+		local Locale = require("core.i18n.engine.locale")
+		local previous = Locale.current_locale()
+		Locale.set_locale("en")
+		local ok, err = pcall(with_extension_frame, function(f)
 			local rows = assert(f.build()).menu
-			helpers.assert_eq(#rows, 7)
-			helpers.assert_eq(rows[1].title, f.translator.get("menu.hotstrings.check_all"))
-			helpers.assert_eq(rows[2].title, f.translator.get("menu.hotstrings.uncheck_all"))
-			helpers.assert_eq(rows[3].title, "-")
-			helpers.assert_eq(rows[4].title, "sfbsreduction (5)")
-			helpers.assert_eq(rows[5].title, f.translator.get("category.rolls") .. " (7)")
-			helpers.assert_eq(rows[6].title, "-")
-			helpers.assert_eq(rows[7].title, "repeat_corrections (14)")
-			helpers.assert_eq(rows[7].checked, true)
+			local titles, expected = {}, {}
+			for index, row in ipairs(rows) do titles[index] = row.title end
+			for index, entry in ipairs(corpus.native_order.linux) do
+				if bulk[entry] then expected[index] = Locale.get(bulk[entry])
+				elseif entry == "separator" then expected[index] = "-"
+				else expected[index] = entry end
+			end
+			helpers.assert_eq(titles, expected)
+			helpers.assert_eq(rows[#rows].checked, true)
 			local writes = 0
 			f.context.config.set_extension_sections_enabled = function() writes = writes + 1; return true end
 			-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
@@ -164,6 +186,8 @@ helpers.describe("complete installed extension shared frames (Linux)", function(
 			helpers.assert_true(rows[1].fn()); helpers.assert_true(rows[2].fn())
 			helpers.assert_eq(writes, 2)
 		end)
+		Locale.set_locale(previous)
+		if not ok then error(err, 0) end
 	end)
 	helpers.it("keeps the extension children in a paused tray (edd1-paused-writes)", function()
 		with_extension_frame(function(f)
