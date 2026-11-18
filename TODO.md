@@ -59,13 +59,15 @@ every maintainer request here.
       `toml.flat_values` was raised to 1500/2600 on 2026-11-17 to unblock CI. Replace exact operation counts and
       similar magic thresholds (boot operation ceilings, literal ratchets where they only count) with budgets that
       mean something (time, order of magnitude, or a named single source), one ratchet at a time.
-      Done 2026-11-18: `toml.flat_values`, `toml.document_parse` and `toml.document_slow_steps` left the startup
-      smoke. It now names the owners allowed to re-parse a text the boot already parsed
-      (`BOOT_PARSE_REPEAT_OWNERS`), and a lexer test proves slow steps do not grow with run length. Left:
-      `config.snapshot_read` and `config_migrate.registry_deep_compares` (read counts, not data-sized; give them
-      the same repeat treatment), and the three « debt » owners of that list (personal-file activation,
-      terminator records, LLM privacy snapshot), which could read the admitted boot snapshot instead of
-      re-parsing config.toml. Then the other count ratchets in the unit tests.
+      Done 2026-11-18: the startup smoke has no count ceiling left. It names the owners of the boot's repeated
+      work (`BOOT_WORK_OWNERS`: re-parses, config.toml snapshot reads, registry deep compares), a lexer test
+      proves slow steps do not grow with run length, and the re-parse debts (personal-file activation,
+      terminator records, LLM privacy rows) read the admitted snapshot document. The unit ratchets of the flat
+      write and the typed transaction parses now name the owner that must not parse twice. Left: the three
+      snapshot-read debts of that table (`LoggerInit`, `ApplyConfigToml`, `CS_Read`) could read through the boot
+      read stretch (`ConfigTomlBootSnapshot`); the remaining exact counts in unit tests (shared-parse memo bound
+      in test_loader, stretch reads in test_journal_boot, saved-options read in ai/menu test_persistence) state
+      one-read-per-step invariants and stay unless one proves arbitrary.
 - [ ] **Intermittent tests to redo on a quiet PC** (the agent was stopped because the PC was overloaded): the
       « [CI] Intermittent fixtures » item below plus healthcheck collection, SendInstant, Ollama native,
       `groups247-*` order dependence, native clipboard/picker, WebView picker cleanup, `idle-caret-context`,

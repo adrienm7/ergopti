@@ -602,7 +602,7 @@ _CMJ_RegistryProofScope() {
 			"five file guards in one scope share a single deep comparison")
 		Before := ConfigMigrateRegistryDeepCompares
 		AssertTrue(AllHold())
-		AssertEqual(5, ConfigMigrateRegistryDeepCompares - Before,
+		AssertEqual(Guards.Length, ConfigMigrateRegistryDeepCompares - Before,
 			"the memo ends with its scope: guards outside it compare every time")
 		Registry["current"] := OriginalCurrent + 1
 		AssertFalse(ConfigMigrateWithRegistryProof(AllHold), "a registry mutated before the scope is refused inside it")
@@ -625,7 +625,8 @@ _CMJ_RegistryProofScope() {
 		AssertTrue(ConfigMigrateWithRegistryProof(AllHold, Standing))
 		AssertEqual(1, ConfigMigrateRegistryDeepCompares - Before, "a standing proof serves the next scope")
 		AssertTrue(AllHold(), "a standing proof leaves no memo outside its own scopes")
-		AssertEqual(6, ConfigMigrateRegistryDeepCompares - Before, "guards outside a scope still compare")
+		AssertEqual(1 + Guards.Length, ConfigMigrateRegistryDeepCompares - Before,
+			"guards outside a scope still compare, one each")
 		Registry["current"] := OriginalCurrent + 1
 		Standing.registry := 0, Standing.shadow := 0
 		AssertFalse(ConfigMigrateWithRegistryProof(AllHold, Standing),
@@ -686,9 +687,10 @@ _CMJ_BootReadStretch() {
 Test("config journal: the boot read stretch shares one comparison and never admits a write on it", _CMJ_BootReadStretch)
 
 ; boot-operation-budget-2026-11-03: the boot's consumers read config.toml through
-; ConfigTomlBootSnapshot fourteen times, over the startup smoke's ceiling of
-; nine. The open stretch serves them the one snapshot it admitted, and its
-; release proves that snapshot once, refusing one mutated while it was served.
+; ConfigTomlBootSnapshot fourteen times. The open stretch serves them the one
+; snapshot it admitted, and its release proves that snapshot once, refusing one
+; mutated while it was served; the startup smoke names the boot's other readers
+; (BOOT_WORK_OWNERS).
 _CMJ_BootSnapshotStretch() {
 	global ConfigurationFile, ConfigMigrateBootReadProof, _ConfigTomlSnapshotReads
 	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
@@ -704,7 +706,7 @@ _CMJ_BootSnapshotStretch() {
 		AssertTrue(IsObject(Served), "the bootstrap cache has its actual snapshot owner")
 		loop 6
 			AssertTrue(ConfigTomlBootSnapshot(Cache) == Served, "every boot consumer shares the admitted snapshot")
-		AssertEqual(1, _ConfigTomlSnapshotReads - Before, "seven boot consumers pay one snapshot read")
+		AssertEqual(1, _ConfigTomlSnapshotReads - Before, "all the boot consumers pay one snapshot read")
 		AssertTrue(ConfigMigrateBootReadsClose(Path))
 		Before := _ConfigTomlSnapshotReads
 		AssertTrue(ConfigTomlBootReadsRelease(Path), "an unchanged served snapshot releases cleanly")

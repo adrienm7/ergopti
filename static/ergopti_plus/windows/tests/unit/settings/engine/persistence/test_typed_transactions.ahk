@@ -149,29 +149,43 @@ Test("config: detached LLM transaction types Boolean values before injected buil
 ; Every document-mode write parsed its source twice (once for the source model,
 ; once again for the expected model it then mutates) before parsing the final
 ; candidate. The expected model now starts from the one source parse
-; (config-parse-per-transaction).
+; (config-parse-per-transaction). The document reader's repeat owners name each
+; parse of a text it already parsed, so the builder must be none of them.
+_CTT_RepeatsOf(Owners, Name) {
+	Found := ""
+	for Owner in Owners
+		if Name == "" || InStr(Owner, Name)
+			Found .= (Found == "" ? "" : ", ") . Owner
+	return Found
+}
+
 _CTT_ParsesPerWrite() {
-	global _TOML_DocumentParses
 	Runtime := _CFGFS_CaptureRuntime()
 	Path := _CTU_NewPath()
 	try {
 		AssertTrue(FSWrite(Path, _CMJFixtureCurrentSource("[layout]`nergopti_base = true`n[metrics]`nenabled = true`n")))
 		_CFGFS_Prepare(Path)
 		Source := FSReadUtf8Exact(Path)
-		Before := _TOML_DocumentParses
+		TOML_ParseRepeatOwnersTake("document")
 		Built := TOML_BuildConfigDocumentCandidate(Source, [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(false) }], [])
-		AssertEqual(2, _TOML_DocumentParses - Before, "one source parse and one final candidate parse")
+		Repeats := TOML_ParseRepeatOwnersTake("document")
+		AssertEqual(0, Repeats.Count, "the builder parses the source and its candidate once each: "
+			. _CTT_RepeatsOf(Repeats, ""))
 		AssertFalse(Built["preserve_source"])
 		AssertEqual(false, TOML_ParseDocument(Built["content"])["layout"]["ergopti_base"].Value)
 		AssertEqual(true, TOML_ParseDocument(Source)["layout"]["ergopti_base"].Value, "the source model is never the mutated one")
-		Before := _TOML_DocumentParses
+		TOML_ParseRepeatOwnersTake("document")
 		TOML_BuildConfigDocumentCandidate(Source, [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(true) }], [])
-		AssertEqual(1, _TOML_DocumentParses - Before, "an unchanged source needs its one source parse only")
-		Before := _TOML_DocumentParses
+		Repeats := TOML_ParseRepeatOwnersTake("document")
+		AssertEqual(0, Repeats.Count, "an unchanged source is parsed once, never again as its own candidate: "
+			. _CTT_RepeatsOf(Repeats, ""))
+		TOML_ParseRepeatOwnersTake("document")
 		AssertTrue(TOML_ConfigBatchWrite(Path, [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(false) }]))
 		; The schema journal admits the final candidate with its own parse: it is
-		; an independent admission owner and never trusts the builder model.
-		AssertEqual(3, _TOML_DocumentParses - Before, "one real write: source, candidate, journal admission")
+		; an independent admission owner and never trusts the builder model. Only
+		; the builder must not parse a text twice.
+		AssertEqual("", _CTT_RepeatsOf(TOML_ParseRepeatOwnersTake("document"), "BuildConfigDocumentCandidate"),
+			"one real write parses its source and candidate once each in the builder")
 		AssertEqual(false, TOML_ParseDocument(FSReadUtf8Exact(Path))["layout"]["ergopti_base"].Value)
 	} finally {
 		_CFGFS_RestoreRuntime(Runtime)

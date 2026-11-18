@@ -401,17 +401,19 @@ Test("TOML: the bare key path fast path agrees with the general scan "
 
 ; The flat writer parsed the source and the candidate a second time inside the
 ; foreign-record retention it had already admitted with the first two parses.
+; The document reader's repeat owners name whoever parses a text it already
+; parsed, so the retention must not be one, whatever the other readers spend.
 _TIT_FlatWriteParsesOnce() {
-	global _TOML_DocumentParses
 	Path := _CTU_NewPath()
 	try {
 		AssertTrue(FSWrite(Path, "# user note`n[sample]`nafter = 1`nkeep = 3`n"))
-		Before := _TOML_DocumentParses
+		TOML_ParseRepeatOwnersTake("document")
 		AssertTrue(TOML_BatchWrite(Path, [{ Section: "sample", Key: "after", Value: 2 }]))
-		Spent := _TOML_DocumentParses - Before
+		for Owner in TOML_ParseRepeatOwnersTake("document")
+			AssertFalse(InStr(Owner, "_TOML_RetainForeignRecords"),
+				"the foreign-record retention tokenized a text the write already parsed: " . Owner)
 		AssertTrue(InStr(FSRead(Path), "# user note") > 0, "the foreign comment is retained")
 		AssertEqual(2, TOML_ParseFreshFile(Path)["sample"]["after"])
-		AssertEqual(6, Spent, "parses spent by one flat write")
 	} finally FSDelete(Path)
 }
 Test("TOML: one flat write does not tokenize its source or candidate twice "
