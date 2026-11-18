@@ -148,6 +148,8 @@ global TEXT_SENDER_SEND_LEVEL := 0
 ; ever reaches the OS during a dry run (mirrors the _SendHook pattern).
 global _AHK_SendText  := (Text) => SendText(Text)
 global _AHK_SendInput := (Keys) => SendInput(Keys)
+global _AHK_SendEvent := (Keys) => SendEvent(Keys)
+global _AHK_InputHook := (Options) => InputHook(Options)
 
 
 

@@ -626,13 +626,26 @@ SimulateMicrosoftOffice() {
 ; dedicated function called from run_all.ahk's body).
 global _AHK_SendText  := (Text) => 0   ; no-op — never reaches SendText()
 global _AHK_SendInput := (Keys) => 0   ; no-op — never reaches SendInput()
+global _AHK_SendEvent := (Keys) => 0   ; no-op — never reaches SendEvent()
+global _AHK_InputHook := (Options) => _NoOpInputHook()
+
+; Stands in for the InputHook an expansion burst holds the user's keys with: a
+; real one would take the keys typed on the desktop while a test dispatches.
+class _NoOpInputHook {
+    Input := ""
+    InProgress := false
+    Start() => 0
+    Stop() => 0
+}
 
 ; InstallSendNoOps must be called AFTER #Include text_sender.ahk in run_all.ahk
-; to win the last-assignment race and lock both globals to no-ops.
+; to win the last-assignment race and lock every primitive to a no-op.
 InstallSendNoOps() {
-    global _AHK_SendText, _AHK_SendInput
+    global _AHK_SendText, _AHK_SendInput, _AHK_SendEvent, _AHK_InputHook
     _AHK_SendText  := (Text) => 0
     _AHK_SendInput := (Keys) => 0
+    _AHK_SendEvent := (Keys) => 0
+    _AHK_InputHook := (Options) => _NoOpInputHook()
 }
 
 

@@ -259,12 +259,11 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Windows
 
-- [ ] **An expansion burst beside another AutoHotkey hook is not atomic.** SendInput then falls back to
-      SendEvent. Since 2026-11-18 the burst goes out unpaced (`asa-space-burst-unpaced`): 10 to 15 ms instead of
-      80 to 90, and `asa-space-fast` passes 20/20 beside a second hook. A key struck within those milliseconds
-      still lands inside the burst. Holding such keys through the roll block was tried and lost a key
-      (`#MaxThreadsPerHotkey`; see `project-hotstring-output-is-final` in `docs/memory/windows-ahk.md`); a fix
-      needs an owner that buffers physical keys without one hotkey thread per key, such as the native capture.
+- [ ] **A non-text key struck during an expansion burst beside another AutoHotkey hook.** SendInput then falls
+      back to SendEvent; the burst's InputHook holds the text typed meanwhile and types it after the burst
+      (`burst-holds-struck-keys`), but a Backspace or an arrow stays visible and can still land inside it. Holding
+      those needs to tell a key a hotkey takes from one it does not, or the replay types it twice (see
+      `project-hotstring-output-is-final` in `docs/memory/windows-ahk.md`).
 - **Parity literals.** PAR-58: `terminator_restoration`, `context_buffer`, `request_plan_*` and `row_options` are
   replayed on all three drivers (row options on macOS and Linux through `test-keylayout-row-options` and
   `test-xkb-row-options`). `session_events` is replayed on macOS since 2026-11-18 (three fixes in

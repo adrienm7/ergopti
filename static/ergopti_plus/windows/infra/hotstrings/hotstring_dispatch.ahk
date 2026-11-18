@@ -26,6 +26,19 @@
 ; replayed characters.
 global HSE_SUPPRESS_RELEASE_DELAY_MS := 60
 
+; The InputHook that holds what the user types while an expansion burst is on
+; its way (_HSE_SendBurstUnpaced). Not visible, so a text key it collects never
+; reaches the window; B0 keeps a Backspace from deleting held text, since it
+; passes (non-text keys are not held). Its input level, set at its first use,
+; lets through the burst (level 0) and the held text it types again (the roll
+; replay's level). A key a hotkey consumes is not collected: the hotkey runs
+; after the burst anyway, its thread waiting for the dispatch's Critical section.
+global HSE_BURST_CAPTURE_OPTIONS := "L1023 B0"
+; One capture serves every burst (_HSE_BurstCapture): constructing an InputHook
+; per burst stalled 75 to 220 ms about three times in 2,000 on the PC, against
+; at most 9 ms for restarting this one (a restart clears its Input).
+global _HSE_BurstCaptureHook := 0
+
 ; Terminal/TUI inputs commonly update their edit state once per render turn.
 ; A zero-delay run of Backspaces can therefore collapse onto one stale snapshot,
 ; after which the replacement is appended to the untouched trigger. Keep the
@@ -110,17 +123,79 @@ _HSE_SendWithAltGrUp(SendFn) {
 ; Each key then yielded between its press and its release: an eight-character
 ; burst took 80 to 90 ms on the PC, and the next word's letters landed between
 ; its keys (« asa », Space, « a » typed « AaSAASA », 2026-11-18). Unpaced, it
-; took 10 to 15 ms (asa-space-burst-unpaced).
+; took 10 to 15 ms (asa-space-burst-unpaced), and a key struck in those
+; milliseconds still landed inside it. So an InputHook holds what the user types
+; for the length of the burst, and the held text is typed after it
+; (burst-holds-struck-keys).
 ; @param Burst {String} The Send string of the whole edit.
 _HSE_SendBurstUnpaced(Burst) {
 		global _AHK_SendInput
 		PreviousKeyDelay := A_KeyDelay
 		PreviousKeyDuration := A_KeyDuration
 		SetKeyDelay(-1, -1)
-		try
+		Capture := 0
+		try {
+				Capture := _HSE_BurstCapture()
+				; A burst sent while another holds the keys leaves them to that one,
+				; which types them after both.
+				if Capture.InProgress
+						Capture := 0
+				else
+						Capture.Start()
 				return _TextSenderAtSendLevel(_AHK_SendInput.Bind(Burst))
+		} finally {
+				try {
+						if IsObject(Capture)
+								_HSE_ReleaseBurstCapture(Capture)
+				} finally SetKeyDelay(PreviousKeyDelay, PreviousKeyDuration)
+		}
+}
+
+; Types the held text while the capture still holds the keys struck meanwhile,
+; until it holds none, and only then stops it: a key struck between the stop
+; and the typing would otherwise reach the window before the held ones.
+; @param Capture {InputHook} The started burst capture.
+_HSE_ReleaseBurstCapture(Capture) {
+		Typed := 0
+		try {
+				loop {
+						Held := SubStr(Capture.Input, Typed + 1)
+						if (Held == "")
+								break
+						_HSE_TypeHeldText(Held)
+						Typed += StrLen(Held)
+				}
+		} finally Capture.Stop()
+		; A key struck in the instant before the stop.
+		_HSE_TypeHeldText(SubStr(Capture.Input, Typed + 1))
+}
+
+; The burst capture, built at its first use from the injectable InputHook.
+; @return {InputHook} The capture, stopped unless a burst is on its way.
+_HSE_BurstCapture() {
+		global _HSE_BurstCaptureHook, _AHK_InputHook, HSE_BURST_CAPTURE_OPTIONS
+		global TAPHOLD_ROLL_REPLAY_SEND_LEVEL
+		if !IsObject(_HSE_BurstCaptureHook)
+				_HSE_BurstCaptureHook := _AHK_InputHook.Call(
+						"I" . (TAPHOLD_ROLL_REPLAY_SEND_LEVEL + 1) . " " . HSE_BURST_CAPTURE_OPTIONS)
+		return _HSE_BurstCaptureHook
+}
+
+; Types the text a burst capture held, the way the layout emulation types a
+; struck key: a SendEvent the driver's InputHooks observe as typed input, at a
+; level above every hotkey's (the roll replay's), since the key that typed it
+; reached no hotkey.
+; @param Text {String} The held text, "" when nothing was struck.
+_HSE_TypeHeldText(Text) {
+		global _AHK_SendEvent, TAPHOLD_ROLL_REPLAY_SEND_LEVEL
+		if Text == ""
+				return
+		PreviousLevel := A_SendLevel
+		SendLevel(TAPHOLD_ROLL_REPLAY_SEND_LEVEL)
+		try
+				_AHK_SendEvent.Call("{Text}" . Text)
 		finally
-				SetKeyDelay(PreviousKeyDelay, PreviousKeyDuration)
+				SendLevel(PreviousLevel)
 }
 
 ; One SendEvent call retains real SetKeyDelay pacing inside the terminal. The

@@ -728,7 +728,26 @@ release, an eight-character burst took 80 to 90 ms beside a second hook
 (measured 2026-11-18), and the next word's letters landed inside it (`asa`,
 Space, `a` typed `AaSAASA`). `_HSE_SendBurstUnpaced` sends every expansion
 burst under `SetKeyDelay(-1, -1)`: 10 to 15 ms. A key struck in those
-milliseconds still lands inside the burst. Two rejected ways to hold such keys:
+milliseconds landed inside the burst, so the burst now restarts one InputHook
+for its length (`_HSE_BurstCapture`, `I5 L1023 B0`, not visible; building one
+per burst stalled 75 to 220 ms about three times in 2,000, a restart at most
+9 ms with a median of 0.2 ms, and a restart clears its Input): it holds
+the text the user types, and `_HSE_ReleaseBurstCapture` types it after the
+burst with SendEvent at `TAPHOLD_ROLL_REPLAY_SEND_LEVEL`, which the I1 watchers
+see, no hotkey takes and the capture's I5 lets through. It types while the
+capture still runs and stops it only once it holds nothing: stopping first let
+a key struck in between reach the window ahead of the held ones (the likely
+cause of one « saa » for « asa » seen live on a loaded PC). SendEvent returns only once the script's own hook
+has seen every key (a level-1 end key was always processed when it returned),
+so nothing struck during the burst is still in flight at the stop.
+Probed 2026-11-18 with keys from another process: a newer
+non-visible InputHook hides a text key it collects from the older watchers
+(neither OnChar nor OnKeyDown), so the replay is the only copy they see. A key
+a remap hotkey suppresses reaches no InputHook (only what the hotkey sends
+does, as the magic-key capture in `editors.ahk` records), and its thread runs
+after the Critical burst anyway. Non-text keys (Backspace, arrows) stay
+visible and can still land inside the burst.
+`(burst-holds-struck-keys)` models the race. Two rejected ways to hold such keys:
 the roll block can capture them, but a `-1` timer that ends the hold runs
 before their hotkey threads, and a capture whose thread finds the same hotkey
 still running is discarded by `#MaxThreadsPerHotkey` (application.cpp
