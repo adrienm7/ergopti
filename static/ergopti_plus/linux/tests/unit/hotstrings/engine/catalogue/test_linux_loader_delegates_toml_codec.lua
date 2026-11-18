@@ -40,7 +40,7 @@ local assert_true = helpers.assert_true
 -- =========================================
 -- =========================================
 
--- modules/hotstrings/loader, selected by a declaration unique to it.
+-- hotstrings/engine/loader, selected by a declaration unique to it.
 local loader_src = assert(helpers.read_driver_unit("local function tiers("))
 
 describe("Linux TOML loader delegation to core.text.engine.toml_codec.reader", function()

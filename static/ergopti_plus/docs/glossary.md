@@ -31,7 +31,7 @@ by the `auto` flag on a hotstring entry. Implemented in
 The rolling in-memory string that records the characters the user has typed
 since the last word boundary or reset event. The **→ HotstringMatcher** reads
 the buffer on every keypress to detect matching triggers. The buffer is
-maintained in `CoreState` and is managed by `modules/keymap/init.lua`.
+maintained in `CoreState` and is managed by `hotstrings/engine/expander/init.lua`.
 
 **Caret Positioning**
 After a hotstring expansion, the caret (text cursor) is placed at the correct
@@ -43,12 +43,12 @@ up where the user expects. See `expander.lua` → `perform_text_replacement`.
 The shared runtime state table that is passed by reference to every keymap
 sub-module (Registry, Expander, LLMBridge). It stores the typing buffer,
 active delays, the magic key character, and feature flags. Defined and
-instantiated in `modules/keymap/state.lua`. See also **→ Registry**, **→ Expander**.
+instantiated in `hotstrings/engine/expander/state.lua`. See also **→ Registry**, **→ Expander**.
 
 **Eventtap**
 The Hammerspoon mechanism (wrapping macOS `CGEventTap`) through which
 Ergopti+ intercepts every keydown and keyup event system-wide. The eventtap
-loop in `modules/keymap/init.lua` is the entry point for all keymap and
+loop in `hotstrings/engine/expander/init.lua` is the entry point for all keymap and
 hotstring processing.
 
 **Expander**
@@ -56,7 +56,7 @@ The module responsible for executing a hotstring expansion once the
 **→ HotstringMatcher** has identified a match. It calculates the number of
 backspaces to issue, emits the replacement text, and updates the
 **→ CoreState** buffer. Domain spec: `_shared/core/text/data/domain/Expander.spec.js`.
-Implementations: `modules/keymap/expander.lua` (Hammerspoon),
+Implementations: `hotstrings/engine/expander/expander.lua` (Hammerspoon),
 `modules/hotstrings.ahk` (AHK).
 
 **HotstringMatcher**
@@ -91,7 +91,7 @@ The in-memory data store for all hotstring mappings, groups, sections, and
 terminators. Provides O(1) lookup via **→ Tail-Char Bucket** indexing and
 manages the enable/disable lifecycle of hotstring groups. Domain spec:
 `_shared/core/text/data/domain/Registry.spec.js`. Implementations:
-`modules/keymap/registry.lua` (Hammerspoon),
+`hotstrings/engine/expander/registry.lua` (Hammerspoon),
 `lib/hotstrings/hotstring_engine.ahk` (AHK).
 
 **Repeat Feature**
@@ -117,7 +117,7 @@ A keypress (space, punctuation, Enter, etc.) that signals the end of a
 potential hotstring trigger and triggers expansion if the buffer matches.
 The full catalogue of enabled terminators is managed by the Terminators
 module. Domain spec: `_shared/core/text/data/domain/Terminators.spec.js`. Implementations:
-`modules/keymap/terminators.lua` (Hammerspoon),
+`hotstrings/engine/expander/terminators.lua` (Hammerspoon),
 `lib/hotstrings/hotstring_prefix_watcher.ahk` (AHK).
 
 **Word Boundary**
@@ -243,7 +243,7 @@ Windows layer key for key.
 **Nav-Layer Sentinel**
 A synthetic keycode (F20, keycode 90) injected by Karabiner-Elements when a
 navigation layer becomes active or inactive. The eventtap in
-`modules/keymap/init.lua` detects this sentinel to suppress hotstring
+`hotstrings/engine/expander/init.lua` detects this sentinel to suppress hotstring
 processing while a layer is engaged.
 
 **Tap Action**
@@ -293,7 +293,7 @@ before an LLM prediction request is fired. Prevents sending a request on every
 single keystroke. Implemented as a timer in `modules/llm/prediction_engine.lua`.
 
 **LLM Bridge**
-The thin orchestrator in `modules/keymap/llm_bridge.lua` that connects the
+The thin orchestrator in `ai/engine/bridge.lua` that connects the
 keymap core to the **→ Prediction Engine**. Handles keymap-specific concerns:
 hotstring preview, keystroke routing (arrow keys, Enter, modifier+digit) for
 navigating predictions, and buffer management on navigation or escape events.

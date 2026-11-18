@@ -230,7 +230,7 @@ describe("managers delegate TOML parsing to the shared codec", function()
 
 	local tap_hold_src = assert(helpers.read_module_source("platform.remap.tap_hold_loader"))
 	local writer_src   = assert(helpers.read_module_source("platform.remap.tap_hold_writer"))
-	-- modules/dynamic_hotstrings/manager, selected by a declaration unique to it.
+	-- hotstrings/engine/dynamic/manager, selected by a declaration unique to it.
 	local dynamic_src = helpers.read_driver_unit("local function strict_codepoint_length(")
 
 	it("the tap-hold loader and writer call .decode and keep no bespoke parser", function()

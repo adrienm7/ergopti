@@ -7,7 +7,7 @@
  * The @-tags that name one personal_info field (@iban, @tel, …) live in
  * _shared/hotstrings/engine/personal_info/tags.lua, read by macOS and Linux.
  * Windows registers its own AutoHotkey map (PERSONAL_INFO_TAGS and its
- * registration order, infra/personal_info_preview.ahk). This gate holds the
+ * registration order, hotstrings/engine/catalogue/personal_info_preview.ahk). This gate holds the
  * three to one set of tags and one field per tag: a tag missing on one OS
  * there read letter by letter and typed more personal data than asked
  * (HCD-3).

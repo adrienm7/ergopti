@@ -8,7 +8,7 @@
 ; Covers the override-file parser, the resolution cascade
 ; (user.section → user.file → toml.section → toml.file → GLOBAL_DEFAULT_DELAY)
 ; and the set / clear override mutators implemented in
-; ``infra/hotstrings_config.ahk``. The TOML metadata layer is mocked through
+; ``hotstrings/engine/catalogue/config.ahk``. The TOML metadata layer is mocked through
 ; the global ``HotstringGroupConfig`` map populated by
 ; ``ParseTomlGroupConfig`` so the tests do not depend on the bundled
 ; hotstring files being present at a specific location during CI.

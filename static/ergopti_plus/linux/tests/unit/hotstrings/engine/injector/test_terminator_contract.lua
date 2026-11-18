@@ -39,7 +39,7 @@ local helpers = require("tests.helpers")
 --- Reads the injector's source for the structural assertions below.
 --- @return string
 local function injector_source()
-	-- modules/hotstrings/injector, selected by a declaration unique to it.
+	-- hotstrings/engine/injector, selected by a declaration unique to it.
 	return assert(helpers.read_driver_unit("local function retire_clipboard("))
 end
 

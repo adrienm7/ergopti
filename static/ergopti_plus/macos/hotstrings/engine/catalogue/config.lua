@@ -905,7 +905,7 @@ function M.resolve(category, section)
 	end
 
 	-- Memoised, like the AutoHotkey sibling (_HSResolveCache / _HSResolveGen in
-	-- infra/hotstrings/hotstrings_config.ahk). The answer for a (category, section)
+	-- hotstrings/engine/catalogue/config.ahk). The answer for a (category, section)
 	-- pair is static between override and TOML changes, and the tooltip preview
 	-- resolves it once per CANDIDATE on every keystroke — so the cascade was being
 	-- re-walked several times per key on the HID thread. The two drivers were

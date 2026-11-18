@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Loads the shared cross-driver corpus from
 --- _shared/tests/corpus/hotstrings/config_resolve_vectors.json and validates
---- the macOS resolution cascade (modules.hotstrings.hotstrings_config's
+--- the macOS resolution cascade (hotstrings.engine.catalogue.config's
 --- M.resolve) against it — proving delay/color/show_tooltip/priority precedence
 --- (user_section > user_category > toml_section > toml_category) matches the
 --- AHK driver bit for bit. The base expansion delay the overrides are offsets of

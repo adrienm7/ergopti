@@ -6,9 +6,9 @@
 # Single source of truth for the hard fallback values used by the hotstring
 # config resolver when neither a user override, the section's manifest row nor a
 # category/section TOML `[_meta]` declares a delay or color. Both drivers read this file at boot:
-#   AHK         — lib/hotstrings/hotstrings_config.ahk
+#   AHK         — hotstrings/engine/catalogue/config.ahk
 #                 (HotstringsConfigLoadSharedDefaults, fail-fast).
-#   Hammerspoon — modules/hotstrings_config.lua (load_shared_defaults, fail-fast).
+#   Hammerspoon — hotstrings/engine/catalogue/config.lua (load_shared_defaults, fail-fast).
 # A missing file or key aborts startup loudly — there is no compile-time
 # fallback, so this file is the only place these values are written.
 #

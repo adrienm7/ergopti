@@ -6,7 +6,7 @@
 --- Supplies the shared extension scanner (_shared/hotstrings/engine/extensions.lua)
 --- with this driver's filesystem and roots, then registers the discovered packs
 --- through the existing keymap TOML loader. Linux (infra/paths.extension_roots)
---- and Windows (infra/hotstrings/extension_packs.ahk) discover the same roots in
+--- and Windows (hotstrings/engine/catalogue/extension_packs.ahk) discover the same roots in
 --- the same order.
 ---
 --- FEATURES & RATIONALE:

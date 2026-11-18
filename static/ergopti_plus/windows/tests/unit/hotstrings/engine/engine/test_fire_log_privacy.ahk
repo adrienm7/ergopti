@@ -12,7 +12,7 @@
 ; ROOT CAUSE ENCODED: the personal-info registrations carried no privacy marker
 ; at all, so nothing downstream could tell an IBAN from an abbreviation. Windows
 ; was the only one of the three drivers with no is_private concept on this path:
-; macOS (modules/keymap/expander.lua) skips both of its sinks for a private
+; macOS (hotstrings/engine/expander/expander.lua) skips both of its sinks for a private
 ; mapping "including the trigger, which is itself a fragment of the secret", and
 ; Linux (modules/keystats/keystats.lua) substitutes a placeholder per
 ; character. The marker now rides the Spec from CreateHotstring through the

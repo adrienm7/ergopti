@@ -16,7 +16,7 @@
 ---    _shared/hotstrings/engine/dynamic/core.lua module — zero duplication.
 --- 4. Trigger-agnostic: the caller supplies the trigger character (default
 ---    "★") so the engine matches regardless of which key the user configured.
---- 5. Injection: when a match fires, delegates to modules.hotstrings.injector
+--- 5. Injection: when a match fires, delegates to hotstrings.engine.injector
 ---    for ydotool-based text injection (same path as static hotstrings).
 --- ==============================================================================
 

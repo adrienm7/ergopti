@@ -20,7 +20,7 @@
 --- only the screen said they were, which is indistinguishable from a reset.
 ---
 --- Windows has an explicit, unit-tested policy for the first
---- (infra/hotstrings/hotstring_count_policy.ahk: "a disabled scope shows no
+--- (hotstrings/engine/matcher/count_policy.ahk: "a disabled scope shows no
 --- active hotstrings, not the count it would have if re-enabled"), and macOS
 --- keeps `checked` and `disabled` as two independent reads for the second.
 --- ==============================================================================

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Native completion records the actual committed scalar tail, never erase syntax,
 ; under the Critical section of its canonical commit. The atomic branch's ring is
-; driven in unit/modules/hotstrings/engine/test_hse_dispatch_behaviour.ahk.
+; driven in unit/hotstrings/engine/engine/test_hse_dispatch_behaviour.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

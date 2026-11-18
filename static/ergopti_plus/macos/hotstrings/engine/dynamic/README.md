@@ -28,7 +28,7 @@ Orchestrates dynamic text expansions that cannot be stored as static hotstring t
 ## Init pattern
 
 ```lua
-local DynHS = require("modules.dynamic_hotstrings")
+local DynHS = require("hotstrings.engine.dynamic")
 DynHS.init(shared_state)
 -- keymap/registry.lua calls DynHS.get_matchers() to register dynamic triggers
 ```

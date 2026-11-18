@@ -11,7 +11,7 @@
 --- WHY IT IS HERE AND NOT ONLY ON THE OTHER TWO DRIVERS:
 --- The manifest declared `hotstrings.repeat_key_enabled` and the `repeat_key`
 --- menu row as `platforms = ["ahk"]`, and that was already wrong when it was
---- written: macOS ships both the engine (`modules/keymap/expander.lua`
+--- written: macOS ships both the engine (`hotstrings/engine/expander/expander.lua`
 --- try_repeat_feature) and the toggle. The restriction recorded who implemented
 --- it first, not what the platforms can do — the same mistake already found and
 --- corrected for `hotstring_extensions` and `magic_key_config`.

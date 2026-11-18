@@ -513,7 +513,7 @@ helpers.describe("word reset: the daemon wiring", function()
 	end)
 
 	helpers.it("word reset, lets the Hotstrings scope adopt and restore both leaves", function()
-		-- infra/hotstrings_scope, selected by a declaration unique to it.
+		-- hotstrings/engine/catalogue/scope, selected by a declaration unique to it.
 		local text = helpers.expand_config_keys(assert(helpers.read_driver_unit('local LOG = "hotstrings.engine.catalogue.scope"')))
 		helpers.assert_contains(text, "WordReset.adopt_configuration(decoded)")
 		helpers.assert_contains(text, "WordReset.restore_configuration(snapshot.word_reset)")

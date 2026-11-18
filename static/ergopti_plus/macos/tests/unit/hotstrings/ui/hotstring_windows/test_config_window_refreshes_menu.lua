@@ -42,7 +42,7 @@ local TEST_DELAY_MS  = 420
 
 --- Installs a spying hotstrings_config double and loads the window against it.
 --- Installed BEFORE load_with_stubs so the window captures the double at
---- require-time (load_with_stubs does not evict modules.hotstrings.*).
+--- require-time (load_with_stubs does not evict hotstrings.engine.catalogue.*).
 --- @return table window_module, table store_spy
 local function load_window()
 	local store = { sets = 0, clears = 0 }

@@ -13,6 +13,6 @@ WKWebView-based interface for creating, editing, and managing custom hotstrings 
 ## Usage
 
 ```lua
-local HotstringEditor = require("ui.hotstring_editor")
+local HotstringEditor = require("hotstrings.ui.hotstring_editor")
 HotstringEditor.show()  -- called from the Personal Hotstrings menu item
 ```

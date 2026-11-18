@@ -13,7 +13,7 @@
 ; corpus, base_delay_vectors.json (section 4 below).
 ;
 ; Reuses the _HCfgTestReset / _HCfgTestSeedToml fixture helpers from
-; unit/modules/hotstrings/catalogue/test_hotstrings_config.ahk (must load before this file — see run_all.ahk).
+; unit/hotstrings/engine/catalogue/test_config.ahk (must load before this file — see run_all.ahk).
 ;
 ; The macOS half lives in
 ; macos/tests/unit/meta/test_corpus_hotstrings_config_resolve.lua.

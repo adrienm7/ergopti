@@ -4,7 +4,7 @@
 --- MODULE: hotstrings_config show_tooltip Round-Trip Tests
 --- DESCRIPTION:
 --- Regression tests for the "hotstrings-config-show-tooltip-pattern" audit
---- finding in modules/hotstrings_config.lua.
+--- finding in hotstrings/engine/catalogue/config.lua.
 ---
 --- ROOT CAUSE ENCODED:
 --- The TOML parser for hotstrings_config used a single pattern

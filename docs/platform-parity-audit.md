@@ -132,7 +132,7 @@ Linux consumers, under `linux/tests/unit/`:
   (`native_order.linux`, drawn in English as the corpus writes it, and
   `linux_without_extensions_returns_nil`);
 - `hotstrings_parameter_frames`:
-  `modules/hotstrings/preview/test_parameter_frames.lua` (`delays.linux`,
+  `hotstrings/engine/preview/test_parameter_frames.lua` (`delays.linux`,
   `linux_delays_ms`, `preview.linux`, `parents`);
 - `profile_create_command`, `profile_clone_command`:
   `ai/engine/settings/test_profile_settings.lua`, through the real Create and

@@ -14,7 +14,7 @@
 --- and a live RulesEngine.set_trigger_char(char) is wired into menu_state.lua's
 --- sync so a later magic-key change also reaches this engine without a reload.
 ---
---- This test drives the REAL boot order (modules.dynamic_hotstrings.M.start) with
+--- This test drives the REAL boot order (hotstrings.engine.dynamic.M.start) with
 --- a fake keymap module whose get_trigger_char() returns a custom character, and
 --- asserts the interceptor captured via register_interceptor fires on that custom
 --- character, not the "★" default that personal_info.toml would have supplied.

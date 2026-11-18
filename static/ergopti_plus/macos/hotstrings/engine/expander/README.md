@@ -32,7 +32,7 @@ Core engine for Ergopti+. Runs the OS-level `eventtap` loop that intercepts ever
 ## Init pattern
 
 ```lua
-local Keymap = require("modules.keymap")
+local Keymap = require("hotstrings.engine.expander")
 Keymap.init(shared_state)   -- shared_state is the CoreState table
 Keymap.start()
 ```

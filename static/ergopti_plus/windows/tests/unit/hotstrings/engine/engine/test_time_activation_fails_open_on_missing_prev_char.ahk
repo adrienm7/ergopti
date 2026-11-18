@@ -99,7 +99,7 @@ Test("hotstring_engine: activation duration must fit the elapsed-tick domain",
 ; reference is therefore the character typed immediately before the expander.
 ; Measured from the penultimate letter, `pr` + Space was gated on the p -> r gap
 ; as well and a normal-speed press missed a 0.5 s delay. macOS replays the same
-; vectors in tests/unit/modules/keymap/test_time_gate_corpus.lua and Linux in
+; vectors in tests/unit/hotstrings/engine/expander/test_time_gate_corpus.lua and Linux in
 ; test_shared_hotstring_engine.lua.
 
 _TGC_Vectors() {

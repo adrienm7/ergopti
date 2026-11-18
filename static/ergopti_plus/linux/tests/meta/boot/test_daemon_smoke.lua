@@ -377,7 +377,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local expiry_call = "ExpansionDelay.allows(result, delay_sec, Monotonic.resolution_ms(),"
       helpers.assert_true(src:find(expiry_call, 1, true) ~= nil,
         "expiry must evaluate the last-letter-to-expander interval against the stamping clock's resolution")
-      -- modules/hotstrings/expansion_delay, selected by a declaration unique to it.
+      -- hotstrings/engine/expansion_delay, selected by a declaration unique to it.
       local gate_src = helpers.read_driver_unit("function M.allows(")
       helpers.assert_true(gate_src ~= nil, "expansion delay gate is readable")
       helpers.assert_true(gate_src:find("Engine.within_expansion_delay(result, delay_sec, resolution_ms, factor)", 1, true) ~= nil,

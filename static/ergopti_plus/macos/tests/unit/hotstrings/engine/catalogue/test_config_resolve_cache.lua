@@ -12,7 +12,7 @@
 --- a tooltip is eligible — so the cascade was being re-walked several times per
 --- key on the HID thread. The AutoHotkey sibling reached that conclusion first
 --- and added `_HSResolveCache` / `_HSResolveGen`
---- (infra/hotstrings/hotstrings_config.ahk); macOS had no equivalent, so the two
+--- (hotstrings/engine/catalogue/config.ahk); macOS had no equivalent, so the two
 --- drivers paid different costs for the same cascade.
 ---
 --- WHY THE INVALIDATION IS THE INTERESTING HALF:

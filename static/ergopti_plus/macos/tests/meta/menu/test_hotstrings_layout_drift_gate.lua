@@ -40,7 +40,7 @@
 --- macOS already draws by hand.
 ---
 --- The AHK half reads both keys generically via MenuRenderer_Build in
---- infra/manifest_menu.ahk (see ui/menu/menu_hotstrings.ahk,
+--- infra/manifest_menu.ahk (see hotstrings/ui/menu/hotstrings.ahk,
 --- ui/menu/menu_layout.ahk) — no equivalent drift gate is needed there.
 --- ==============================================================================
 

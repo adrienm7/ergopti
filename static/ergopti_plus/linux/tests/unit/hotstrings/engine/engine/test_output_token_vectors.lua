@@ -4,7 +4,7 @@
 --- MODULE: Tokens of a hotstring output (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/hotstrings/output_token_vectors.json, which the
---- macOS and Windows suites replay too, through modules.hotstrings.output_tokens,
+--- macOS and Windows suites replay too, through hotstrings.engine.output_tokens,
 --- then runs an output through the shared engine and reads the evdev events the
 --- injector writes.
 ---

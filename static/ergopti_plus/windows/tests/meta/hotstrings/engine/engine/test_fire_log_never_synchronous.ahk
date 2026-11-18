@@ -118,7 +118,7 @@ _FLNS_NoUnexpectedSynchronousCaller() {
 }
 
 ; The queue's own deferral is driven through a real timer in
-; unit/modules/hotstrings/engine/test_hse_dispatch_behaviour.ahk.
+; unit/hotstrings/engine/engine/test_hse_dispatch_behaviour.ahk.
 
 
 Test("meta fire-log-never-synchronous: every fire path queues the record",
