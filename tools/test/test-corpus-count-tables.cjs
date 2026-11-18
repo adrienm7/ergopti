@@ -32,6 +32,13 @@ const Import = require('../build/import-count-tables.cjs');
 
 const CORPUS = path.join(REPO_ROOT, 'static', 'corpus');
 const plain = (value) => JSON.parse(JSON.stringify(value));
+// The engine's tables of a text without its break tables: a count table keeps
+// the main tables only (the analysers that type Enter fall back on its runs).
+const mainTables = (counts) => {
+	const { breaks, ...main } = plain(counts);
+	assert(breaks, 'ngramsFromText brings its break tables');
+	return main;
+};
 let checks = 0;
 
 // Every committed table is read by the codegen and traces to its pin and register entry.
@@ -115,7 +122,7 @@ let checks = 0;
 	const whole = lines.replace(/^\d+\t/gm, '');
 	assert.deepEqual(chunked.words, plain(engine.countWords(whole)));
 	delete chunked.words;
-	assert.deepEqual(chunked, plain(engine.ngramsFromText(whole)));
+	assert.deepEqual(chunked, mainTables(engine.ngramsFromText(whole)));
 	checks++;
 }
 
@@ -139,7 +146,7 @@ let checks = 0;
 	const engine = Analysis.loadEngine();
 	const repaired = plain(Import.leipzigCounts('1\tl\u00e2\u20ac\u2122a\n', engine));
 	delete repaired.words;
-	assert.deepEqual(repaired, plain(engine.ngramsFromText('l\u2019a')));
+	assert.deepEqual(repaired, mainTables(engine.ngramsFromText('l\u2019a')));
 	checks++;
 }
 
