@@ -20,6 +20,8 @@
 				title=""
 				onclick="toggleToc()"
 				aria-label="Table of contents"
+				aria-controls="toc"
+				aria-expanded="false"
 			>
 				☰
 			</button>
@@ -30,7 +32,9 @@
 			<input id="search" type="text" autocomplete="off" autocorrect="off" spellcheck="false" />
 		</div>
 
-		<main id="list" tabindex="-1"></main>
+		<!-- A keyboard stop of its own: the list scrolls, and the arrows and Enter
+		     work from it as from the search field (WCAG 2.1.1). -->
+		<main id="list" tabindex="0" aria-labelledby="title"></main>
 
 		<!-- The editor of a send_text / send_key / send_shortcut value, or of the
 		     prompt and count of an llm_prompt_prediction, the vision backend of a
@@ -40,7 +44,14 @@
 			<h2 id="param-title"></h2>
 			<p id="param-prompt"></p>
 			<p id="param-hint"></p>
-			<input id="param-input" type="text" autocomplete="off" autocorrect="off" spellcheck="false" />
+			<input
+				id="param-input"
+				aria-labelledby="param-prompt"
+				type="text"
+				autocomplete="off"
+				autocorrect="off"
+				spellcheck="false"
+			/>
 			<div id="param-choice" hidden>
 				<label id="param-profile-label" for="param-profile"></label>
 				<select id="param-profile"></select>

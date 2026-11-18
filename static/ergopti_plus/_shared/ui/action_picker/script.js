@@ -93,6 +93,9 @@ function init(data) {
 	strings.noResults = data.noResults || 'No matching action';
 
 	el('title').textContent = data.title || '';
+	// The window's title for assistive technology too: the native title bar is
+	// the host's, the document's own title is what a screen reader names.
+	document.title = data.title || '';
 	el('subtitle').textContent = data.label || '';
 	el('search').placeholder = data.searchPlaceholder || '';
 	if (typeof data.cancelLabel !== 'string' || data.cancelLabel === '')
@@ -323,13 +326,19 @@ function isConfirmable(id) {
 }
 
 function buildHeadingRow(i, e) {
-	const row = document.createElement('div');
+	// Folding is a fold of the live tree, so it is disabled while searching
+	// (search already expands only the relevant matches). A foldable heading is
+	// a button, so the keyboard folds it as the mouse does (WCAG 2.1.1).
+	const searching = el('search').value.trim() !== '';
+	const row = document.createElement(searching ? 'div' : 'button');
 	const lvl = Math.min(e.level, 4);
 	row.className = 'heading lvl' + lvl + (collapsed.has(i) ? ' collapsed' : '');
+	row.dataset.entry = String(i);
 	row.style.paddingLeft = 8 + (lvl - 1) * 16 + 'px';
 
 	const caret = document.createElement('span');
 	caret.className = 'caret';
+	caret.setAttribute('aria-hidden', 'true');
 	caret.textContent = '▾';
 	const txt = document.createElement('span');
 	txt.className = 'heading-text';
@@ -337,10 +346,9 @@ function buildHeadingRow(i, e) {
 	row.appendChild(caret);
 	row.appendChild(txt);
 
-	// Folding is a fold of the live tree, so it is disabled while searching
-	// (search already expands only the relevant matches).
-	const searching = el('search').value.trim() !== '';
 	if (!searching) {
+		row.type = 'button';
+		row.setAttribute('aria-expanded', collapsed.has(i) ? 'false' : 'true');
 		row.addEventListener('click', function () {
 			toggleFold(i);
 		});
@@ -404,7 +412,16 @@ function setActive(idx, instant) {
 function toggleFold(i) {
 	if (collapsed.has(i)) collapsed.delete(i);
 	else collapsed.add(i);
+	const refocus = document.activeElement && document.activeElement.dataset.entry === String(i);
 	render();
+	// render() rebuilds the rows: the keyboard stays on the heading it folded.
+	if (refocus) focusHeading(i);
+}
+
+// Focuses the rendered heading button of entry i, when it is shown.
+function focusHeading(i) {
+	const row = el('list').querySelector('button.heading[data-entry="' + i + '"]');
+	if (row) row.focus();
 }
 
 // ============================================================
@@ -412,13 +429,24 @@ function toggleFold(i) {
 // ============================================================
 
 function toggleToc() {
-	const toc = el('toc');
-	if (toc.hidden) {
-		buildToc();
-		toc.hidden = false;
-	} else {
-		toc.hidden = true;
-	}
+	if (el('toc').hidden) openToc();
+	else closeToc(true);
+}
+
+// Opens the drawer with the keyboard on its first heading.
+function openToc() {
+	buildToc();
+	el('toc').hidden = false;
+	el('toc-btn').setAttribute('aria-expanded', 'true');
+	const first = el('toc-inner').querySelector('.toc-item');
+	if (first) first.focus();
+}
+
+// Closes the drawer; returnFocus puts the keyboard back on its button.
+function closeToc(returnFocus) {
+	el('toc').hidden = true;
+	el('toc-btn').setAttribute('aria-expanded', 'false');
+	if (returnFocus) el('toc-btn').focus();
 }
 
 function buildToc() {
@@ -428,7 +456,8 @@ function buildToc() {
 		const e = entries[i];
 		if (e.kind !== 'heading') continue;
 		const lvl = Math.min(e.level, 4);
-		const a = document.createElement('div');
+		const a = document.createElement('button');
+		a.type = 'button';
 		a.className = 'toc-item lvl' + lvl;
 		a.style.paddingLeft = 10 + (lvl - 1) * 16 + 'px';
 		a.textContent = e.text;
@@ -443,8 +472,9 @@ function tocGoto(i) {
 	// Expand every ancestor so the heading is visible, then scroll to it.
 	for (const h of ancestorsOf(i)) collapsed.delete(h);
 	el('search').value = '';
-	el('toc').hidden = true;
+	closeToc(false);
 	render();
+	focusHeading(i);
 	// Find the heading row by re-walking; headings carry no id, so match by order.
 	const rows = el('list').children;
 	let seen = -1;
@@ -1187,7 +1217,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		} else if (e.key === 'Escape') {
 			e.preventDefault();
 			if (!el('toc').hidden) {
-				el('toc').hidden = true;
+				closeToc(true);
 				return;
 			}
 			doCancel();
