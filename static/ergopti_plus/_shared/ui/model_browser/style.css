@@ -172,6 +172,13 @@ tbody tr.selected {
 	box-shadow: inset 2px 0 0 var(--row-sel-border);
 }
 
+/* The dim text is 3.7:1 on the selection's blue; a lighter grey keeps 4.5:1
+   (WCAG 1.4.3). */
+tbody tr.selected td.num,
+tbody tr.selected .sub {
+	color: var(--theme-hue-d0d0d4);
+}
+
 tbody tr.active .name-cell::after {
 	color: var(--accent);
 	content: '●';
@@ -409,9 +416,10 @@ thead th:focus-visible,
 	font-weight: 700;
 }
 
+/* Near-black on the green: the light text read 1.4:1 (WCAG 1.4.3). */
 .chip.default {
 	background: var(--theme-green-dark);
-	color: var(--text);
+	color: var(--theme-grey-0b0b0b);
 }
 
 .status.remote {
