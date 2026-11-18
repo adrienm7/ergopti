@@ -70,6 +70,30 @@ helpers.describe("Linux media key metrics (linux-media-key-metrics)", function()
 		end)
 	end)
 
+	-- The shared vectors macOS and Windows replay name each media key by its
+	-- evdev code too; Linux reads that column.
+	Home.it("media-identity-vectors: every shared evdev code names its shared identity", function()
+		local path = require("core.fs.engine.paths").shared("tests/corpus/keystats/media_identity_vectors.json")
+		local handle = assert(io.open(path, "rb"), "cannot open " .. path)
+		local vectors = assert(require("core.text.engine.json").decode(handle:read("*a")), "the media vectors must decode")
+		handle:close()
+		helpers.assert_true(#vectors.positive >= 5, "the media vectors must not be empty")
+		with_keystats({}, function(keystats)
+			local named = {}
+			for _, vector in ipairs(vectors.positive) do
+				helpers.assert_eq(keystats.media_id(vector.evdev), vector.id, vector.id)
+				named[vector.evdev] = true
+			end
+			-- An evdev code next to a media key, and the media keys' HID usages read
+			-- as evdev codes, stay unnamed: only the shared column is a Linux code.
+			for _, vector in ipairs(vectors.positive) do
+				for _, code in ipairs({ vector.evdev + 1, vector.evdev - 1, vector.usage }) do
+					if not named[code] then helpers.assert_nil(keystats.media_id(code), vector.id .. " " .. code) end
+				end
+			end
+		end)
+	end)
+
 	Home.it("flushes a press and its release under the press's identity, off the heatmap", function()
 		with_keystats({}, function(keystats, calls)
 			helpers.assert_true(keystats.record_media_press("org.gnome.Rhythmbox", KEY_PLAYPAUSE, DEVICE))
