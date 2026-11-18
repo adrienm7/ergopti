@@ -161,6 +161,18 @@ const JUDGED = [
 	},
 	{
 		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		match: 'Undo: restoring the trigger in the terminal failed; the context is reset.',
+		verdict: 'not-personal',
+		why: 'a constant sentence: "trigger" names what failed to come back, and the call interpolates nothing.'
+	},
+	{
+		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		match: 'Undo: restoring the trigger in Notepad failed ({1}); the context is reset.',
+		verdict: 'not-personal',
+		why: 'the interpolation is the Notepad sender\'s failure reason (a fixed refusal or the send error\'s Message) or the fixed "not committed", the same value the sibling "did not complete its canonical commit" sink prints; never the restored trigger.'
+	},
+	{
+		file: 'infra/hotstrings/hotstring_dispatch.ahk',
 		match: "A hotstring replacement resolved to '{1}', not String",
 		verdict: 'not-personal',
 		why: 'the only interpolation is Type(ResolvedBase), a runtime type name rather than the resolved value.'
