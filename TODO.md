@@ -48,9 +48,6 @@ every maintainer request here.
   after reading). After each agent: remove its worktree and scratch files; purge stale scratch dirs, WSL `/root`
   copies and the npm cache regularly; compact the WSL disk image when no agent uses WSL (C: reached 2.8 GB free).
 - [ ] **CI reds left after verify run 44072500520** (decisions taken 2026-11-17):
-  - Windows SSPI curl flake: the TLS test server closes while the client's TLS close is still in flight (reset
-    10054). Maintainer decision: half-close then wait (bounded) for the client's close, and revise the pinned test
-    « queued peer TLS close is processed without a peer wait ».
   - macOS Intel « managed Ollama build handoff never arrived »: maintainer decision: make the consuming cell
     `needs` the Intel build job and update `macos-stage-contract.json` with its review.
   - Shared-literal ratchet: `windows.path_name` 49/48 (`NOTIFIER_PRODUCT_NAME`, 11de860899) and

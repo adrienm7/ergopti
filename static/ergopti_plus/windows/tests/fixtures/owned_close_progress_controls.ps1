@@ -47,7 +47,7 @@ public static class OwnedCloseProgressControls {
         Bind(owner,"bioRead","Bio");Bind(owner,"clearError","Clear");return owner;
     }
     static void Require(bool value,string label){if(!value)throw new InvalidDataException(label);}
-    static void Case(int shutdownResult,int shutdownError,bool authenticated,bool expectedFailure,bool partialDrain=false) {
+    static void Case(int shutdownResult,int shutdownError,bool authenticated,bool expectedFailure,string expectedPeerClose,bool partialDrain=false) {
         TcpListener listener=new TcpListener(IPAddress.Loopback,0);
         TcpClient peer=new TcpClient(),origin=null;
         try {
@@ -57,10 +57,13 @@ public static class OwnedCloseProgressControls {
             object owner=Owner();Type streamType=typeof(ErgoptiFixtureOpenSsl).GetNestedType("NativeStream",BindingFlags.NonPublic);
             Stream stream=(Stream)Empty(streamType);
             streamType.GetField("Owner").SetValue(stream,owner);
-            Set(stream,"network",origin.GetStream());Set(stream,"encrypted",new byte[16384]);Set(stream,"ssl",new IntPtr(1));
-            Set(stream,"authenticated",authenticated);Set(stream,"receivedEncrypted",9);Set(stream,"writtenEncrypted",11);
+            Set(stream,"network",new ErgoptiFixtureNetworkStream(origin.Client));Set(stream,"encrypted",new byte[16384]);Set(stream,"ssl",new IntPtr(1));
+            Set(stream,"authenticated",authenticated);Set(stream,"receivedEncrypted",9);Set(stream,"writtenEncrypted",11);Set(stream,"peerCloseWaitMs",2000);
+            // The peer has already closed its side: a wait for it ends at its FIN.
+            NetworkStream reader=peer.GetStream();peer.Client.Shutdown(SocketShutdown.Send);
             bool failed=false;try{stream.Dispose();}catch(InvalidOperationException){failed=true;}catch(IOException){if(!partialDrain)throw;failed=true;}
             Require(failed==expectedFailure,"original_shutdown_failure_preserved");
+            Require((string)streamType.GetField("peerClose",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(stream)==expectedPeerClose,"peer_close_outcome");
             ErgoptiFixtureOpenSsl value=(ErgoptiFixtureOpenSsl)owner;
             ErgoptiFixtureOpenSsl.ClosedStreamFact fact=value.ReadClosedStream();
             Require(fact!=null && fact.Sequence==1 && fact.NetworkClosed==1,"actual_stream_dispose_ack");
@@ -69,7 +72,6 @@ public static class OwnedCloseProgressControls {
             Require(fact.CloseWritten==(authenticated&&(!expectedFailure||partialDrain)?3:0) && fact.Pending==0,"actual_close_progress");
             Require(freed==1 && value.OwnedStreams==0,"original_native_port_and_stream_retired");
             stream.Dispose();Require(freed==1 && value.ReadClosedStream().Sequence==1,"no_duplicate_native_close");
-            NetworkStream reader=peer.GetStream();
             if(authenticated&&(!expectedFailure||partialDrain))Require(reader.ReadByte()==1&&reader.ReadByte()==0&&reader.ReadByte()==255,"actual_output_bytes");
             Require(reader.ReadByte()==-1,"actual_network_closed");
         } finally {if(origin!=null)origin.Close();peer.Close();listener.Stop();}
@@ -96,7 +98,8 @@ public static class OwnedCloseProgressControls {
         Require(read==2 && written==(failingWrite?0:2),"source_owned_response_progress");
     }
     public static int Run() {
-        Case(0,0,true,false);Case(1,0,true,false);Case(-1,2,true,false);Case(-1,1,true,true);Case(0,0,false,false);Case(0,0,true,true,true);
+        Case(0,0,true,false,"peer_closed");Case(1,0,true,false,"received");Case(-1,2,true,false,"peer_closed");
+        Case(-1,1,true,true,null);Case(0,0,false,false,null);Case(0,0,true,true,null,true);
         object owner=Owner();MethodInfo observe=typeof(ErgoptiFixtureOpenSsl).GetMethod("ObserveClosedStream",BindingFlags.Instance|BindingFlags.NonPublic);
         observe.Invoke(owner,new object[]{1,0,0,1,1,1,-1,false});
         Require(((ErgoptiFixtureOpenSsl)owner).ReadClosedStream()==null,"unacknowledged_close_unavailable");
@@ -121,7 +124,8 @@ public static class QueuedTlsShutdownControls {
     }
     static void Set(object owner,string field,object value){owner.GetType().GetField(field,Private).SetValue(owner,value);}
     static void Bind(object owner,string field,string method){FieldInfo member=owner.GetType().GetField(field,Private);member.SetValue(owner,Delegate.CreateDelegate(member.FieldType,typeof(QueuedTlsShutdownControls).GetMethod(method,BindingFlags.Static|BindingFlags.NonPublic)));}
-    static int Shutdown(IntPtr ssl){calls++;if(calls==1)return 0;if(mode==0 || (mode==1&&calls==3))return 1;return -1;}
+    // Mode 7: the client's close_notify, read during the peer wait, completes the shutdown.
+    static int Shutdown(IntPtr ssl){calls++;if(calls==1)return 0;if(mode==0 || (mode==1&&calls==3) || (mode==7&&calls>=3))return 1;return -1;}
     static int Error(IntPtr ssl,int value){errors++;return mode==2 || (mode==5&&calls==3)?1:mode==4?3:2;}
     static void Free(IntPtr ssl){freed++;}
     static void Clear(){ }
@@ -133,34 +137,77 @@ public static class QueuedTlsShutdownControls {
         public ObservedInput(Socket socket):base(socket){ }
         public override int Read(byte[] bytes,int offset,int count){Reads++;return base.Read(bytes,offset,Math.Min(count,3));}
     }
-    static void Case(int choice,bool queued,bool expectedFailure,int expectedCalls,int expectedErrors) {
+    // Peer behaviours: Silent never closes; Fin half-closes before the close starts;
+    // Notify answers the server's close as a TLS client does, with its own close
+    // record once it has read the server's output and FIN.
+    const int Silent=0,Fin=1,Notify=2;
+    static void Case(int choice,int caseMode,int queuedBytes,int peerMode,int waitMs,bool expectedFailure,int expectedCalls,int expectedErrors,
+        int expectedInput,string expectedPeerClose,int expectedPending,int expectedDiscarded) {
         TcpListener listener=new TcpListener(IPAddress.Loopback,0);TcpClient peer=new TcpClient(),origin=null;Stream stream=null;
+        System.Threading.Thread answer=null;int[] seen=new int[]{-2,-2,-2,-2};Exception answerFailure=null;
         try {
             listener.Start();peer.Connect((IPEndPoint)listener.LocalEndpoint);origin=listener.AcceptTcpClient();peer.ReceiveTimeout=3000;origin.ReceiveTimeout=3000;
-            var network=new ObservedInput(origin.Client);
-            if(queued){peer.GetStream().Write(choice==6?new byte[]{3,0,254,3,0,254}:new byte[]{3,0,254},0,choice==6?6:3);var elapsed=System.Diagnostics.Stopwatch.StartNew();while(!network.DataAvailable && elapsed.ElapsedMilliseconds<3000)System.Threading.Thread.Yield();Require(network.DataAvailable,"actual_input_queued");}
-            mode=choice;calls=errors=freed=drained=inputBytes=0;
+            var network=new ObservedInput(origin.Client);NetworkStream client=peer.GetStream();
+            if(queuedBytes>0){client.Write(queuedBytes==6?new byte[]{3,0,254,3,0,254}:new byte[]{3,0,254},0,queuedBytes);var elapsed=System.Diagnostics.Stopwatch.StartNew();while(origin.Available<queuedBytes && elapsed.ElapsedMilliseconds<3000)System.Threading.Thread.Yield();Require(origin.Available==queuedBytes,"actual_input_queued");}
+            if(peerMode==Fin)peer.Client.Shutdown(SocketShutdown.Send);
+            if(peerMode==Notify){
+                answer=new System.Threading.Thread(delegate() {
+                    try {for(int index=0;index<4;index++)seen[index]=client.ReadByte();client.Write(new byte[]{3,0,254},0,3);}
+                    catch(Exception failure){answerFailure=failure;}
+                });
+                answer.IsBackground=true;answer.Start();
+            }
+            mode=caseMode;calls=errors=freed=drained=inputBytes=0;
             var owner=(ErgoptiFixtureOpenSsl)Empty(typeof(ErgoptiFixtureOpenSsl));Set(owner,"gate",new object());Set(owner,"streams",1);
             Bind(owner,"shutdown","Shutdown");Bind(owner,"sslError","Error");Bind(owner,"sslFree","Free");Bind(owner,"bioRead","BioRead");Bind(owner,"bioWrite","BioWrite");Bind(owner,"clearError","Clear");
             Type type=typeof(ErgoptiFixtureOpenSsl).GetNestedType("NativeStream",BindingFlags.NonPublic);stream=(Stream)Empty(type);type.GetField("Owner").SetValue(stream,owner);
             Set(stream,"network",network);Set(stream,"encrypted",new byte[16384]);Set(stream,"ssl",new IntPtr(1));Set(stream,"authenticated",true);Set(stream,"receivedEncrypted",9);Set(stream,"writtenEncrypted",11);
+            Set(stream,"peerCloseWaitMs",waitMs);
+            var closing=System.Diagnostics.Stopwatch.StartNew();
             bool failed=false;try{stream.Dispose();}catch(InvalidOperationException){failed=true;}
+            closing.Stop();
+            if(answer!=null)Require(answer.Join(3000)&&answerFailure==null,"peer_answer_completed");
             var fact=owner.ReadClosedStream();
             Require(failed==expectedFailure,"original_tls_error_not_waived");
             Require(calls==expectedCalls && errors==expectedErrors,"exact_calls_zero_never_get_error");
-            Require(fact!=null&&fact.ShutdownResult==(choice==0||choice==1?1:-1)&&fact.NetworkClosed==1,"actual_final_shutdown_fact");
-            Require(inputBytes==(queued?3:0)&&network.Reads==(queued?1:0),"only_already_readable_input");
-            Require(fact.Received==9+(queued?3:0)&&fact.Written==14&&fact.CloseWritten==3&&fact.Pending==(choice==6?1:0),"retained_exact_byte_accounting");
-            Require(network.DiscardedInputBytes==(choice==6?3:0),"only_captured_raw_bytes_retired_outside_TLS");
+            Require((string)type.GetField("peerClose",Private).GetValue(stream)==expectedPeerClose,"peer_close_outcome");
+            // Only an expired wait spends its bound; every other close ends at the peer's own close.
+            Require(expectedPeerClose=="wait_expired"?closing.ElapsedMilliseconds>=waitMs-50:closing.ElapsedMilliseconds<waitMs,"peer_wait_bounded");
+            bool completed=expectedPeerClose=="received"||expectedPeerClose=="peer_close_notify";
+            Require(fact!=null&&fact.ShutdownResult==(completed?1:-1)&&fact.NetworkClosed==1,"actual_final_shutdown_fact");
+            Require(inputBytes==expectedInput&&network.Reads==expectedInput/3,"only_already_readable_input");
+            Require(fact.Received==9+expectedInput&&fact.Written==14&&fact.CloseWritten==3&&fact.Pending==expectedPending,"retained_exact_byte_accounting");
+            Require(network.DiscardedInputBytes==expectedDiscarded,"only_captured_raw_bytes_retired_outside_TLS");
             Require(freed==1&&owner.OwnedStreams==0,"actual_native_and_network_retirement");
             stream.Dispose();Require(freed==1&&owner.ReadClosedStream().Sequence==1,"no_duplicate_shutdown_owner");
-            NetworkStream received=peer.GetStream();Require(received.ReadByte()==9&&received.ReadByte()==0&&received.ReadByte()==255&&received.ReadByte()==-1,"actual_output_and_eof");
+            if(answer==null)for(int index=0;index<4;index++)seen[index]=client.ReadByte();
+            Require(seen[0]==9&&seen[1]==0&&seen[2]==255&&seen[3]==-1,"actual_output_and_eof");
         } catch(Exception failure) {
             QueuedTlsShutdownObservation.Report(choice,stream,failure,calls,errors,inputBytes);
             throw;
-        } finally {if(stream!=null)stream.Dispose();if(origin!=null)origin.Close();peer.Close();listener.Stop();}
+        } finally {if(stream!=null)stream.Dispose();if(origin!=null)origin.Close();peer.Close();listener.Stop();if(answer!=null)answer.Join(3000);}
     }
-    public static int Run(){Case(0,false,false,2,0);Case(1,true,false,3,1);Case(2,false,true,2,1);Case(3,false,false,2,1);Case(4,false,false,2,1);Case(5,true,true,3,2);Case(6,true,false,3,2);return 7;}
+    public static int Run(){
+        // The close the peer already sent ends it at once, even from a silent peer.
+        Case(0,0,0,Silent,2000,false,2,0,0,"received",0,0);
+        Case(1,1,3,Silent,2000,false,3,1,3,"received",0,0);
+        // A TLS fault is never waived, and no wait follows it.
+        Case(2,2,0,Silent,2000,true,2,1,0,null,0,0);
+        // The server half-closes and waits for the client's close: its FIN...
+        Case(3,3,0,Fin,2000,false,2,1,0,"peer_closed",0,0);
+        Case(4,4,0,Fin,2000,false,2,1,0,"peer_closed",0,0);
+        Case(5,5,3,Silent,2000,true,3,2,3,null,0,0);
+        Case(6,6,6,Fin,2000,false,4,3,6,"peer_closed",0,0);
+        // ...or its close_notify, sent only after it read the server's FIN.
+        Case(7,7,0,Notify,2000,false,3,1,3,"peer_close_notify",0,0);
+        // A client that never closes costs the bound, then the server closes.
+        Case(8,3,0,Silent,300,false,2,1,0,"wait_expired",0,0);
+        // A TLS fault in the client's close stays an error.
+        Case(9,5,0,Notify,2000,true,3,2,3,null,0,0);
+        // Input left by a failed close is retired outside TLS, never reset.
+        Case(10,5,6,Silent,2000,true,3,2,3,null,1,3);
+        return 11;
+    }
 }
 
 // Optional facts bind this exact controlled Case stream; they cannot replace its failure.
@@ -168,7 +215,7 @@ public static class QueuedTlsShutdownObservation {
     static string I(int value) { return value.ToString(System.Globalization.CultureInfo.InvariantCulture); }
     public static void Report(int choice,Stream stream,Exception failure,int calls,int errors,int input) {
         try {
-            if(choice<0 || choice>6 || failure==null)return;
+            if(choice<0 || choice>10 || failure==null)return;
             ErgoptiFixtureOpenSsl.ClosedStreamFact fact=null;
             if(stream!=null) {
                 FieldInfo field=stream.GetType().GetField("Owner",BindingFlags.Public|BindingFlags.Instance);
@@ -187,6 +234,8 @@ public static class QueuedTlsShutdownObservation {
                     case "actual_native_and_network_retirement":phase="assert_retired";break;
                     case "no_duplicate_shutdown_owner":phase="assert_duplicate";break;
                     case "actual_output_and_eof":phase="assert_output";break;
+                    case "peer_close_outcome":case "peer_answer_completed":phase="assert_peer";break;
+                    case "peer_wait_bounded":phase="assert_wait";break;
                 }
             }
             string family=failure is InvalidDataException?"invalid_data":failure is InvalidOperationException?"invalid_operation":failure is IOException?"io":"other";
