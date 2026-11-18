@@ -609,6 +609,58 @@ ExitApp(Failures ? 1 : 0)
 }
 
 
+; Timer and dependency callbacks keep firing under native Suspend, so every
+; lifecycle entry must defer its work and record it for the resume replay
+; (llm-menu-suspend-bootstrap). The fake port counts each lifecycle effect, and
+; none may run while paused. The bridge start is checked with the feature off,
+; where an unguarded call returns before any effect.
+_LBLD_AssertPausedDeferral(State, Result, What) {
+	global _LLM_Menu
+	AssertFalse(Result, What . " must refuse while paused")
+	AssertTrue(_LLM_Menu["bootstrap_pending"], What . " must record its work for the resume replay")
+	for Key in ["cancel", "validate", "start", "stop", "deps_checks", "build", "warmup", "failed"]
+		AssertEqual(0, State[Key], What . " must run no '" . Key . "' effect while paused")
+	_LLM_Menu["bootstrap_pending"] := false
+}
+
+; One case per entry, so each guard is the only one standing between its call
+; and the fake port.
+_LBLD_PausedLifecycleDefers(Entry) {
+	global _LLM_Menu
+	State := _LBLD_State()
+	Port := _LBLD_Port(State)
+	; The API branch of the lifecycle acts before any other guard; an Ollama
+	; lifecycle would reach the bootstrap's own guard and hide a missing one.
+	_LBLD_Reset(_LBLD_Menu(Entry = "run" ? "api" : "ollama", true))
+	Intent := _LLM_Menu_CaptureBackendLifecycleIntent(false)
+	if Entry = "bridge"
+		_LLM_Menu["enabled"] := false
+	WasSuspended := A_IsSuspended
+	try {
+		Suspend(true)
+		switch Entry {
+			case "run":
+				_LBLD_AssertPausedDeferral(State, LLM_Menu_RunBackendLifecycle(Intent, Port), "the backend lifecycle")
+			case "bootstrap":
+				_LBLD_AssertPausedDeferral(State, LLM_Menu_BootstrapOllama(false, Port, Intent), "the Ollama bootstrap")
+			case "ready":
+				_LBLD_AssertPausedDeferral(State, LLM_Menu_OnDepsReady(Intent, Port), "the dependency-ready callback")
+			case "failed":
+				_LBLD_AssertPausedDeferral(State, LLM_Menu_OnDepsFailed("fixture", Intent, Port),
+					"the dependency-failed callback")
+			case "bridge":
+				LLM_Menu_TryStartBridge()
+				AssertTrue(_LLM_Menu["bootstrap_pending"],
+					"a paused bridge start must record its work for the resume replay")
+			default:
+				throw ValueError("unknown lifecycle entry " . Entry)
+		}
+	} finally {
+		if A_IsSuspended != WasSuspended
+			Suspend(WasSuspended)
+	}
+}
+
 ; Every case replaces the shared menu, epoch and readiness continuation. Left in
 ; place, the partial fixture Map reached the next test of the same run: later
 ; LLM menu tests failed with "Item has no value" whenever a filter such as
@@ -671,7 +723,17 @@ _LBLD_Cases() {
 		["installed-tags-warmup: reentrant bridge publication keeps the successor owned",
 			_LBLD_TagsReentrantReady],
 		["installed-tags-warmup: both installed-model corrections enter lifecycle ownership",
-			_LBLD_ModelCorrectionsKeepLifecycle]]
+			_LBLD_ModelCorrectionsKeepLifecycle],
+		["LLM tray: a paused backend lifecycle defers its work (llm-menu-suspend-bootstrap)",
+			_LBLD_PausedLifecycleDefers.Bind("run")],
+		["LLM tray: a paused Ollama bootstrap defers its work (llm-menu-suspend-bootstrap)",
+			_LBLD_PausedLifecycleDefers.Bind("bootstrap")],
+		["LLM tray: a paused dependency-ready callback defers its work (llm-menu-suspend-bootstrap)",
+			_LBLD_PausedLifecycleDefers.Bind("ready")],
+		["LLM tray: a paused dependency-failed callback defers its work (llm-menu-suspend-bootstrap)",
+			_LBLD_PausedLifecycleDefers.Bind("failed")],
+		["LLM tray: a paused bridge start defers its work (llm-menu-suspend-bootstrap)",
+			_LBLD_PausedLifecycleDefers.Bind("bridge")]]
 }
 
 for _LBLD_Spec in _LBLD_Cases()

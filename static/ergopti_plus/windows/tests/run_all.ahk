@@ -765,6 +765,7 @@ _LLM_Deps_State := "ready"
 #Include unit/ai/api/test_provider_error_prefix.ahk
 #Include unit/ai/api/test_ollama_local_presence.ahk
 #Include unit/ai/api/test_ollama_warmup.ahk
+#Include unit/ai/api/test_ollama_warmup_pause.ahk
 #Include unit/ai/prediction/test_engine_read_guarded_in_timer.ahk
 #Include unit/ai/api/test_remote.ahk
 #Include unit/ai/api/test_remote_async_registry.ahk
@@ -834,6 +835,7 @@ _LLM_Deps_State := "ready"
 #Include unit/ai/prediction/test_engine.ahk
 #Include unit/ai/prediction/test_engine_state.ahk
 #Include unit/ai/prediction/test_engine_pointer_dismiss.ahk
+#Include unit/ai/prediction/test_pointer_watch_pause.ahk
 #Include unit/ai/api/test_semantic_config_identity.ahk
 #Include unit/ai/api/test_semantic_config_budget.ahk
 #Include unit/ai/api/test_defaults.ahk
@@ -1481,7 +1483,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/menu/test_dispatch_epoch.ahk
 #Include meta/ai/api/test_setbackend_propagates_to_engine.ahk
 #Include meta/ai/menu/test_persistence_transactions.ahk
-#Include meta/ai/api/test_warmup_retry_suspend_guard.ahk
+#Include meta/ai/api/test_suspend_enter_cancels_warmup.ahk
 #Include meta/modules/keystats/ergonomics/test_halflife_tick_suspend_guard.ahk
 #Include meta/modules/keymap/test_layout_poll_suspend_guard.ahk
 #Include meta/modules/keymap/test_layout_poll_native_arming.ahk
@@ -1877,7 +1879,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/gestures/test_paste_plain_nontext_clip_guard.ahk
 #Include meta/core/text/test_pathstoml_read_missing_utf8_encoding.ahk
 #Include meta/modules/hotstrings/personal/test_personal_ext_scan_unbounded_recursion.ahk
-#Include meta/platform/input/dispatch/test_pointer_watch_timer_bypasses_suspend.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_index_rebuild_no_suspend_guard.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_onkeydown_tab_llm_feed_gap.ahk
 #Include meta/platform/system/test_reg_keyexists_value_only.ahk
@@ -2249,7 +2250,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/remap/altgr/test_script_altgr_hotkeys.ahk
 #Include meta/platform/remap/keys/test_space_hold_exception_guard.ahk
 #Include meta/ai/api/test_stream_handle_type.ahk
-#Include meta/ai/api/test_warmup_backoff_preserved.ahk
 ; These three were orphaned with their own (duplicate or pure-scan) includes;
 ; the duplicate test_framework.ahk includes were stripped so they integrate.
 #Include meta/platform/system/test_dpapi_blob_size.ahk

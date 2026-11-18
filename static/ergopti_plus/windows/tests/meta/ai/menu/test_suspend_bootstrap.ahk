@@ -10,9 +10,10 @@
 #Requires AutoHotkey v2.0
 
 _LMSB_ActionsLifecycleEntriesAreSuspendFenced() {
-	for Name in ["LLM_Menu_RunBackendLifecycle", "LLM_Menu_BootstrapOllama",
-			"LLM_Menu_OnDepsReady", "LLM_Menu_OnDepsFailed",
-			"LLM_Menu_TryStartBridge", "LLM_Menu_StartBridge"] {
+	; The other lifecycle entries are called under a real Suspend through a fake
+	; port in tests/unit/ai/api/test_backend_lifecycle_dispatch.ahk. An unguarded
+	; bridge start would start the real bridge, so its guard stays a source read.
+	for Name in ["LLM_Menu_StartBridge"] {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Name " must exist in the LLM menu lifecycle")
 		Assert(InStr(Body, "if A_IsSuspended") > 0,
@@ -21,7 +22,7 @@ _LMSB_ActionsLifecycleEntriesAreSuspendFenced() {
 			Name " must record suspended lifecycle work for replay after resume")
 	}
 }
-Test("LLM tray: suspended bootstrap and dependency callbacks are fenced (llm-menu-suspend-bootstrap)", _LMSB_ActionsLifecycleEntriesAreSuspendFenced)
+Test("LLM tray: the suspended bridge start is fenced (llm-menu-suspend-bootstrap)", _LMSB_ActionsLifecycleEntriesAreSuspendFenced)
 
 _LMSB_ResumeReplaysPendingBootstrap() {
 	Body := _DriverFuncBody("LLM_Menu_OnResume")
