@@ -460,7 +460,84 @@ stop. No window trapped the keyboard. The update prompt's release notes sit
 in a WebView2 that Tab does not enter (« Open on GitHub » shows them); WebView2 hands the focus back to the next native control on its own
 when Tab leaves its last element. Not walked: the magic key captures (their
 input hook takes the next key by design and says Escape cancels), the
-system MsgBox and InputBox, and the WebView2-only windows.
+system MsgBox and InputBox, and the WebView2-only windows (walked in the
+browser, next section).
+
+## Fifth pass, the app's WebView windows (2026-11-18, Paris time)
+
+`tools/test/browser/app-windows-accessibility.playwright.cjs`
+(`npm run test:browser:app-accessibility`, its own step of Core / js) opens
+the 21 windows Ergopti+ shows in its own WebView, at their
+`apps.manifest.json` size, from a loopback server that serves `static/`. A
+fake host takes the page's bridge messages and answers them with fixture
+data (`app-windows-fixtures/`), so every list, chart and table is filled;
+each window also has the states a user opens (forms, dialogs, tabs, failure
+views, onboarding steps): 65 states in all. Each state is scanned by axe in
+both colour schemes and walked with Tab and Shift+Tab, as the Studio walk
+does, and each stop must show a focus indicator of its own (its look
+focused differs from its look blurred). Axe nodes and walk problems are
+counted against `app-windows-accessibility-baseline.json`;
+`tools/test/test-app-windows-accessibility-ratchet.cjs` proves, without a
+browser, that the ratchet refuses a new row, that every page under
+`_shared/ui/` is audited or exempt for a stated reason (the Studio pages and
+the Studio window, scanned by the site gates), and that each fixture posts to
+its page's bridge. The pages post over WebView2's `chrome.webview` by
+default; `--bridge=webkit` posts over `webkit.messageHandlers`, the macOS and
+Linux bridge, and gives the same counts.
+
+Before the fixes, scanned on the previous commit's pages with the same
+fixtures: at least 390 nodes. After: 35, all in the layout manager, whose
+files another change owned at the time. Per window: onboarding 87 → 0,
+changelog 56 → 0, metrics_apps 36 → 0, hotstring_editor 33 → 0,
+hotstrings_config_window 28 → 0, metrics_typing 27 or more → 0,
+action_picker 24 → 0, paths_editor 20 → 0, numeric_prompt 12 → 0,
+healthcheck 10 → 0, model_browser 10 → 0, prompt_editor 9 → 0,
+token_prompt 2 → 0, update_check 1 → 0; error_dialog, config_cleanup,
+download_window, release_notes, personal_info_editor and physical_shortcuts
+had none.
+
+- **Contrast (1.4.3).** Hints, notes, tags, dates and KPI colours; white text
+  on light metrics cards; the onboarding accent under a dark system; white
+  labels on light accents (now the accent fill token); the speed and accuracy
+  gradients of the typing tables.
+- **Links (1.4.1).** Release-note links are underlined at rest.
+- **Names (1.3.1, 4.1.2).** Labels bound to their fields, rich editors named
+  as text boxes, document titles, scrolling boxes focusable and named,
+  dialogs with their role and name.
+- **Keyboard (2.1.1).** The changelog's release rows, the action picker's
+  headings and contents, the hotstring editor's folds, titles and deletes,
+  the onboarding's language choice, the metrics' app names and categories are
+  buttons now.
+- **Focus (2.4.3, 2.4.7).** The dialogs of the hotstring editor and the
+  metrics windows keep the focus inside (the rest of the page is inert),
+  Escape closes them and the focus returns to the opener; the hotstring
+  editor's trigger and output fields no longer take Tab (Shift+Tab was
+  trapped there, Tab jumped to Save); the hotstring settings and the bulk
+  move list lost their `outline: none`.
+
+Proof by reverting: the gate run on the previous commit's `static/`
+(`--root=<copy>`) shows every row above again, or stops on the state
+assertion that covers a fix the scan cannot see (a release row selected from
+the keyboard, a heading folded with Enter, the focus entering a dialog, one
+tab read as pressed).
+
+Host paths checked: the fixes are HTML, CSS and page script, with no new
+`<link>` or `<script>` tag (the macOS builder inlines only its exact
+`<link rel="stylesheet" href>` and `<script src>` forms) and no new inline
+event handler (the Linux document policy refuses them on nonce pages); no
+host script queries a selector or calls a function the fixes renamed.
+`inert` and `Array.prototype.at` need WebView2 102, Safari 15.5 and
+WebKitGTK 2.36 or later. Not exercised: the Linux `document_bridge`
+admission handshake, which the fake host skips by calling the pages' entry
+points.
+
+Left: the layout manager's 35 contrast nodes; the hotstring editor's section
+reordering is drag only (2.5.7); the metrics tooltips open on hover only
+(1.4.13); the action picker's list is not a listbox, so the arrow-key
+highlight is not announced; the typing metrics' trend arrows have no text;
+the physical shortcuts page declares English whatever its strings; a few
+untranslated labels (the hotstring editor's search, the action picker's
+« Table of contents »).
 
 ## Fifth pass, macOS and Linux drawn surfaces (2026-11-18, Paris time)
 

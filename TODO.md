@@ -96,8 +96,9 @@ ratchet baseline beside it, findings in [docs/audits/accessibility/](docs/audits
 baseline as violations go.
 
 - [ ] **Manual audit.** A checklist per page and per native window (keyboard walk, NVDA, JAWS, Narrator, VoiceOver,
-      Orca, 400 % zoom and 320 px reflow), recorded in docs/audits/accessibility/; extend the axe scan to the app's
-      own WebView windows (onboarding, menus' pages, metrics), not only those the site embeds.
+      Orca, 400 % zoom and 320 px reflow), recorded in docs/audits/accessibility/. The axe scan covers the app's own
+      WebView windows since the fifth pass (21 windows, `npm run test:browser:app-accessibility`, fake host and
+      fixture data); left there: the layout manager's 35 contrast nodes (its files were being changed elsewhere).
 - [ ] **Images and media.** Videos get captions and transcripts (the charts, heatmaps and keyboard drawings have
       their tables since the second pass).
 - [ ] **Colour vision.** The onboarding, download window and hotstring palette review is done (fourth pass,
@@ -111,9 +112,10 @@ baseline as violations go.
 - [ ] **Keyboard and motor.** The Studio keyboard walk is a CI gate (`npm run test:browser:studio-keyboard`, the
       editor's « Try » field trap fixed) and the Studio has no time limit. The Windows driver's native windows
       (14 of them: settings prompts, pickers, editors, the hotstring settings, paths and update fallbacks) are walked
-      with Tab and Shift+Tab in the AHK suite (`test_native_keyboard_walk.ahk`); none traps the keyboard. Left: the
-      same walk in the app's own WebView windows (metrics, hotstring settings, onboarding), which need a host to
-      render, and in the macOS and Linux native windows.
+      with Tab and Shift+Tab in the AHK suite (`test_native_keyboard_walk.ahk`); none traps the keyboard. The app's
+      21 WebView windows are walked the same way, each stop with a visible focus indicator, in the same gate as
+      their scan (fifth pass). Left: the macOS and Linux native windows; the hotstring editor's section reordering
+      is drag only (WCAG 2.5.7); the metrics tooltips open on hover only (1.4.13).
 - [ ] **Cognitive.** Consistent navigation; every metric and setting has its help text. Error messages: the
       about 60 shown on Windows or in the shared pages without a next step now say one, 63 of them pinned by
       `tools/test/test-error-messages-say-how-to-recover.cjs`
