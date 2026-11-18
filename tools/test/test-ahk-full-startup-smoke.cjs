@@ -245,8 +245,6 @@ const BOOT_WORK_OWNERS = {
 			'proof: the closing stretch proves the served snapshot is still the native generation',
 		'_ConfigFullSaveCaptureOptionalBootSource<_ConfigFullSaveRequest':
 			'proof: the boot full save captures the generation it is about to rewrite',
-		'ApplyConfigToml<ApplyBootConfigToml':
-			'debt: the feature loader could read through the boot read stretch (ConfigTomlBootSnapshot)',
 		'CS_Read<CS_Load':
 			'debt: the metrics settings could read through the boot read stretch (ConfigTomlBootSnapshot)'
 	},

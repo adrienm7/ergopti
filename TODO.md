@@ -63,10 +63,10 @@ every maintainer request here.
       work (`BOOT_WORK_OWNERS`: re-parses, config.toml snapshot reads, registry deep compares), a lexer test
       proves slow steps do not grow with run length, and the re-parse debts (personal-file activation,
       terminator records, LLM privacy rows) read the admitted snapshot document. The unit ratchets of the flat
-      write and the typed transaction parses now name the owner that must not parse twice. The logger reads
-      config.toml through the boot read stretch (`ConfigTomlReadBootServedSnapshot`). Left: the two snapshot-read
-      debts of that table (`ApplyConfigToml`, `CS_Read`) could read through the boot read stretch; the remaining exact counts in unit tests (shared-parse memo bound
-      in test_loader, stretch reads in test_journal_boot, saved-options read in ai/menu test_persistence) state
+      write and the typed transaction parses now name the owner that must not parse twice. The logger and
+      the feature loader read config.toml through the boot read stretch (`ConfigTomlReadBootServedSnapshot`).
+      Left: the snapshot-read debt of that table `CS_Read` could read through the boot read stretch; the remaining
+      exact counts in unit tests (shared-parse memo bound in test_loader, stretch reads in test_journal_boot, saved-options read in ai/menu test_persistence) state
       one-read-per-step invariants and stay unless one proves arbitrary.
 - [ ] **SendInstant paste races Windows' own clipboard readers.** Rerun on a quiet PC on 2026-11-18 (no resident
       driver, 3 runs per group): healthcheck, Ollama native, `groups247-*`, pickers, `idle-caret-context`,

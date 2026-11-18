@@ -767,8 +767,9 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 	; Admit the complete semantic image before applying any feature. A native
 	; read refusal must never mean an empty configuration whose defaults may
 	; later overwrite the source; the existing session latch retains that debt.
+	; The boot read stretch serves the generation it already admitted.
 	global _ConfigBootReadFailed
-	try Snapshot := ConfigTomlReadSnapshot(FilePath)
+	try Snapshot := ConfigTomlReadBootServedSnapshot(FilePath)
 	catch as Err {
 		if !TOML_UnreadableFile(FilePath) {
 			RejectedOverrides += 1
