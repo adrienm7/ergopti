@@ -645,6 +645,24 @@ local MODULE_FAMILIES = {
 		"ai.engine.preferences",
 		"ai.engine.scope",
 	},
+	["modules.hotstrings"] = {
+		"modules.hotstrings.device_finder",
+		"modules.hotstrings.engine",
+		"modules.hotstrings.expansion_delay",
+		"modules.hotstrings.hotstrings_config",
+		"modules.hotstrings.injector",
+		"modules.hotstrings.input_reader",
+		"modules.hotstrings.loader",
+		"modules.hotstrings.magic_key",
+		"modules.hotstrings.magic_key_source",
+		"modules.hotstrings.output_tokens",
+		"modules.hotstrings.output_transaction",
+		"modules.hotstrings.preview_settings",
+		"modules.hotstrings.repeat_key",
+		"modules.hotstrings.selected_output",
+		"modules.hotstrings.terminator_settings",
+		"modules.hotstrings.word_reset",
+	},
 }
 local _family_members = {}
 for family, members in pairs(MODULE_FAMILIES) do

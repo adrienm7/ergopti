@@ -651,7 +651,7 @@ do
 		local ok, failure = xpcall(function()
 			for name in pairs(package.loaded) do
 				if helpers.in_module_family(name, "modules.llm", true) or name:match("^modules%.keystats%.")
-					or name:match("^modules%.hotstrings%.") or name:match("^modules%.shortcuts%.") then package.loaded[name] = nil end
+					or helpers.in_module_family(name, "modules.hotstrings", true) or name:match("^modules%.shortcuts%.") then package.loaded[name] = nil end
 			end
 			for _, name in ipairs({ "platform.input.keyboard_hook", "platform.input.evdev_reader", "platform.input.modifier_broker",
 				"adapters.keyboard_layout", "platform.focus.secure_field_detector", "clipboard.adapters.clipboard", "core.events.timer_scheduler",
