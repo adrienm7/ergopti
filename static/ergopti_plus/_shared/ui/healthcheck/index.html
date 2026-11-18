@@ -94,7 +94,7 @@
 			</label>
 			<label class="details">
 				<input type="checkbox" id="chk-extensive" disabled />
-				<span data-i18n="healthcheck.deep_tests_checkbox"></span>
+				<span id="deep-tests-label" data-i18n="healthcheck.deep_tests_checkbox"></span>
 			</label>
 			<section id="day-log" class="day-log">
 				<label class="details">
@@ -105,12 +105,16 @@
 				<p class="hint" data-i18n="healthcheck.day_log.upload_notice"></p>
 				<p id="day-log-status" role="status" aria-live="polite"></p>
 				<details id="day-log-preview" hidden>
-					<summary data-i18n="healthcheck.day_log.preview_title"></summary>
-					<pre id="day-log-preview-text"></pre>
+					<summary
+						id="day-log-preview-title"
+						data-i18n="healthcheck.day_log.preview_title"
+					></summary>
+					<!-- Scroll boxes are keyboard stops, so the keyboard scrolls them (WCAG 2.1.1). -->
+					<pre id="day-log-preview-text" tabindex="0" aria-labelledby="day-log-preview-title"></pre>
 				</details>
 			</section>
 			<p id="deep-progress" role="status" aria-live="polite"></p>
-			<pre id="deep-results"></pre>
+			<pre id="deep-results" tabindex="0" aria-labelledby="deep-tests-label"></pre>
 			<p id="status" class="status info" role="status" aria-live="polite"></p>
 		</header>
 		<main id="content"></main>
