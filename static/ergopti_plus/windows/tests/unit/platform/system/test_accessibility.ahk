@@ -172,6 +172,34 @@ _A11yT_AnnounceOnlyWithScreenReader() {
 }
 Test("a11y tooltip: previews reach a running screen reader once (a11y-native-2026-11-17)", _A11yT_AnnounceOnlyWithScreenReader)
 
+; A preview hidden before its announcement turn has nothing left on screen to
+; read: the notice is skipped, not reported as an error (the resident driver
+; opened the error window on « Gui has no window », 2026-11-18).
+_A11yT_AnnounceSkipsADestroyedSurface() {
+	global _TooltipLastAnnouncement, _TooltipLastAnnouncementTick
+	SavedText := _TooltipLastAnnouncement, SavedTick := _TooltipLastAnnouncementTick
+	Calls := []
+	Record(Hwnd, Text) {
+		Calls.Push(Text)
+		return true
+	}
+	Gone := Gui()
+	Gone.Destroy()
+	Before := LoggerVolume()
+	try {
+		AssertEqual("", _TooltipAnnouncePresented([{Text: "a11y-gone-" . A_TickCount}], {Gui: Gone}, () => true, Record))
+		Sleep(50)
+		After := LoggerVolume()
+		for Field in ["error", "dropped", "suppressed", "collapsed"]
+			AssertEqual(Before[Field], After[Field], "no error is logged for a surface already gone (" . Field . ")")
+		AssertEqual(0, Calls.Length, "nothing is announced for a surface already gone")
+	} finally {
+		_TooltipLastAnnouncement := SavedText, _TooltipLastAnnouncementTick := SavedTick
+	}
+}
+Test("a11y tooltip: a surface destroyed before its notice is skipped quietly (a11y-gone-surface-2026-11-18)",
+	_A11yT_AnnounceSkipsADestroyedSurface)
+
 
 
 

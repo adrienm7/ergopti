@@ -461,7 +461,15 @@ _TooltipAnnouncePresented(Items, Surface, ScreenReaderFn := 0, AnnounceFn := 0) 
 			if (Text == _TooltipLastAnnouncement
 					&& A_TickCount - _TooltipLastAnnouncementTick < TimingsGet("ui", "tooltip_announce_repeat_ms"))
 				return ""
-			Hwnd := (IsObject(Surface) && IsObject(Surface.Gui)) ? Surface.Gui.Hwnd : 0
+			Hwnd := 0
+			if (IsObject(Surface) && IsObject(Surface.Gui)) {
+				; A surface hidden and destroyed before this turn left nothing on
+				; screen to read; its Hwnd would throw « Gui has no window » and
+				; open the error window (screen reader on, 2026-11-18).
+				if !_TooltipGuiHasWindow(Surface.Gui)
+					return ""
+				Hwnd := Surface.Gui.Hwnd
+			}
 			_TooltipLastAnnouncement := Text
 			_TooltipLastAnnouncementTick := A_TickCount
 			Announce := IsObject(AnnounceFn) ? AnnounceFn : A11ySystem_Announce
@@ -470,6 +478,21 @@ _TooltipAnnouncePresented(Items, Surface, ScreenReaderFn := 0, AnnounceFn := 0) 
 		} catch Error as Err {
 			_UiOracleReportError("Tooltip screen-reader notice failed: " . Err.Message)
 			return ""
+		}
+}
+
+; Whether a Gui still owns its window: AutoHotkey throws on any property of a
+; destroyed Gui, and Hwnd is the one read that has no side effect.
+; @param G {Gui} The surface's Gui.
+; @returns {Boolean}
+_TooltipGuiHasWindow(G) {
+		try {
+			G.Hwnd
+			return true
+		} catch Error as Err {
+			if InStr(Err.Message, "has no window")
+				return false
+			throw Err
 		}
 }
 
