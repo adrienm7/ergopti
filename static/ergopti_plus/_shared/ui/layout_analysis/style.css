@@ -698,6 +698,12 @@ body:has(> main.layout-analysis) {
 	justify-content: flex-end;
 }
 
+/* A header that wraps must not squeeze its « i » below its size: the target
+   and the space around it stay 24 px wide (WCAG 2.5.8). */
+.la-th-head > .la-info {
+	flex-shrink: 0;
+}
+
 /* The header text is the sort button: plain text that the keyboard reaches. */
 .layout-analysis .la-sort {
 	background: none;
