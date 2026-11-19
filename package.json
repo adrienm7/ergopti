@@ -809,6 +809,8 @@
 		"test:heading-landmarks": "node ./tools/test/test-heading-landmarks.cjs",
 		"test:site-semantic-html": "node ./tools/test/test-site-semantic-html.cjs",
 		"test:site-image-alternatives": "node ./tools/test/test-site-image-alternatives.cjs",
+		"test:keyboard-operability": "node ./tools/test/test-keyboard-operability.cjs",
+		"test:browser:keyboard-operability": "node ./tools/test/browser/keyboard-operability.playwright.cjs build \"\"",
 		"test:layout-source-emulation": "node ./tools/test/test-layout-source-emulation.cjs",
 		"test:site-keyboard-data": "node ./tools/test/test-site-keyboard-data.cjs",
 		"test:layout-shortcut-keys": "node ./tools/test/test-layout-shortcut-keys.cjs",

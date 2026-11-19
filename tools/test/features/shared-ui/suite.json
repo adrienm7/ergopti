@@ -637,6 +637,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-site-image-alternatives.cjs"],
 			"repro": "npm run test:site-image-alternatives"
+		},
+		{
+			"id": "keyboard-operability",
+			"ordinal": 707,
+			"name": "the keyboard operability judgement refuses every control only a mouse can use and every disclosure, popup or composite widget the keys do not drive, and the site and app window gates call it",
+			"cmd": "node",
+			"args": ["tools/test/test-keyboard-operability.cjs"],
+			"repro": "npm run test:keyboard-operability"
 		}
 	]
 }

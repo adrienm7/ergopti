@@ -28,6 +28,7 @@ const path = require('node:path');
 const { chromium } = require('playwright');
 const { collectOutline, outlineProblems } = require('../lib/heading-landmarks.cjs');
 const { walkProblems } = require('../lib/keyboard-walk.cjs');
+const operability = require('../lib/keyboard-operability.cjs');
 
 const STATIC_ROOT = path.resolve(__dirname, '..', '..', '..', 'static');
 const TYPES = {
@@ -147,6 +148,12 @@ async function walk(page, key) {
 /** Opens one Studio page in French, as the site frames it, and waits for it to settle. */
 async function open(browser, origin, target) {
 	const context = await browser.newContext({ viewport: VIEWPORT });
+	// Records every pointer and key listener, so the operability check sees
+	// what only a mouse could use (lib/keyboard-operability.cjs).
+	await context.addInitScript(operability.instrumentListeners, {
+		pointer: operability.POINTER_EVENTS,
+		keys: operability.KEY_EVENTS
+	});
 	const page = await context.newPage();
 	const errors = [];
 	page.on('pageerror', (error) => errors.push(error.message));
@@ -174,6 +181,17 @@ async function check(page, label) {
 		backwardLeft: backward.left
 	});
 	assert.deepEqual(problems, [], label + ': the keyboard walk must pass');
+	// Everything a mouse can use, the keyboard must use too.
+	const rows = await page.evaluate(operability.collectOperability, {
+		pointer: operability.POINTER_EVENTS,
+		keys: operability.KEY_EVENTS,
+		roles: operability.INTERACTIVE_ROLES
+	});
+	assert.deepEqual(
+		operability.operabilityProblems(rows),
+		[],
+		label + ': no control only a mouse can use'
+	);
 	// The outline a screen reader moves through: one h1, no skipped level, named landmarks.
 	const outline = await page.evaluate(collectOutline);
 	assert.deepEqual(outlineProblems(outline), [], label + ': headings and landmarks');

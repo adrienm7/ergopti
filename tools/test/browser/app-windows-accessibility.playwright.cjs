@@ -40,6 +40,7 @@ const http = require('node:http');
 const path = require('node:path');
 const { collectOutline, outlineProblems } = require('../lib/heading-landmarks.cjs');
 const { walkProblems } = require('../lib/keyboard-walk.cjs');
+const operability = require('../lib/keyboard-operability.cjs');
 const { catalogueShape, pageRawKeys } = require('../lib/raw-locale-keys.cjs');
 const { WINDOWS } = require('./app-windows-fixtures.cjs');
 
@@ -70,6 +71,9 @@ const WCAG_TAGS = Object.freeze([
 const WALK_RULE = 'keyboard-walk';
 // The rule name under which a window's heading and landmark problems are counted.
 const OUTLINE_RULE = 'heading-landmarks';
+// The rule name under which a window's controls only a mouse can use are
+// counted (lib/keyboard-operability.cjs): the ratchet refuses a new one.
+const OPERABILITY_RULE = 'keyboard-operability';
 const TYPES = {
 	'.html': 'text/html',
 	'.js': 'text/javascript',
@@ -339,6 +343,12 @@ async function openWindow(browser, origin, target, scheme, family) {
 		(url) => !url.href.startsWith(origin + '/'),
 		(route) => route.abort()
 	);
+	// Records every pointer and key listener, so the operability check sees
+	// what only a mouse could use (lib/keyboard-operability.cjs).
+	await page.addInitScript(operability.instrumentListeners, {
+		pointer: operability.POINTER_EVENTS,
+		keys: operability.KEY_EVENTS
+	});
 	await page.addInitScript(installFakeHost, {
 		bridge: target.bridge,
 		family,
@@ -392,6 +402,24 @@ async function auditWindows(chromium, windows, family, port) {
 								[],
 								`${target.id} (${state.name}) shows raw locale keys`
 							);
+							// Anything a mouse can use, the keyboard must use too.
+							const rows = await page.evaluate(operability.collectOperability, {
+								pointer: operability.POINTER_EVENTS,
+								keys: operability.KEY_EVENTS,
+								roles: operability.INTERACTIVE_ROLES
+							});
+							const mouseOnly = operability.operabilityProblems(rows);
+							if (mouseOnly.length)
+								findings.push({
+									window: target.id,
+									scheme,
+									state: state.name,
+									rule: OPERABILITY_RULE,
+									impact: 'serious',
+									help: 'Controls only a mouse can use',
+									nodes: mouseOnly.length,
+									targets: mouseOnly
+								});
 							const { problems, stops } = await walkWindow(page);
 							if (problems.length)
 								findings.push({
@@ -565,6 +593,7 @@ module.exports = {
 	COLOR_SCHEMES,
 	WALK_RULE,
 	OUTLINE_RULE,
+	OPERABILITY_RULE,
 	rowKey,
 	countsOf,
 	compareWithBaseline,
