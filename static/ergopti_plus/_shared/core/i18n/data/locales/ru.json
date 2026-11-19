@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "Изменено клавиш: {count} (пунктирная рамка на обеих клавиатурах).",
 	"layout_optimizer.result.metrics": "Показатели относительно исходной",
 	"layout_optimizer.error.shortcut_missing": "Сочетание буквы {letter} не может остаться на её клавише QWERTY: в исходной раскладке нет этой буквы или этой клавиши.",
+	"layout_optimizer.error.thumb_keys_absent": "На этой клавиатуре нет клавиш для больших пальцев, поэтому на них нельзя поместить буквы: выберите раздельную или ортолинейную клавиатуру либо не ставьте буквы под большие пальцы",
 	"layout_optimizer.budget.title": "Бюджет и запуск",
 	"layout_optimizer.budget.seconds": "Время (секунды)",
 	"layout_optimizer.budget.iterations": "Обменов за перезапуск",

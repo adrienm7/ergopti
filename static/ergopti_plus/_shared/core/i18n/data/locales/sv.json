@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "{count} tangenter ändrade (streckad kant på båda tangentborden).",
 	"layout_optimizer.result.metrics": "Mätvärden jämfört med starten",
 	"layout_optimizer.error.shortcut_missing": "Genvägen för {letter} kan inte stanna på sin QWERTY-tangent: startlayouten saknar den bokstaven eller den tangenten.",
+	"layout_optimizer.error.thumb_keys_absent": "Det här tangentbordet har inga tumtangenter, så inga bokstäver kan placeras på dem: välj ett delat eller ortolinjärt tangentbord, eller håll bokstäverna borta från tummarna",
 	"layout_optimizer.budget.title": "Budget och körning",
 	"layout_optimizer.budget.seconds": "Tid (sekunder)",
 	"layout_optimizer.budget.iterations": "Byten per omstart",

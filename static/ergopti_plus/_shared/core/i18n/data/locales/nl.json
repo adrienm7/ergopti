@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "{count} toetsen veranderd (gestippelde rand op beide toetsenborden).",
 	"layout_optimizer.result.metrics": "Metingen ten opzichte van de start",
 	"layout_optimizer.error.shortcut_missing": "De sneltoets van {letter} kan niet op zijn QWERTY-toets blijven: de startindeling mist die letter of die toets.",
+	"layout_optimizer.error.thumb_keys_absent": "Dit toetsenbord heeft geen duimtoetsen, dus er kunnen geen letters op: kies een gesplitst of ortholineair bord, of houd de letters van de duimen af",
 	"layout_optimizer.budget.title": "Budget en uitvoeren",
 	"layout_optimizer.budget.seconds": "Tijd (seconden)",
 	"layout_optimizer.budget.iterations": "Wisselingen per herstart",

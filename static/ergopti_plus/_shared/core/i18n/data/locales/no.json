@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "{count} taster endret (stiplet kant på begge tastaturene).",
 	"layout_optimizer.result.metrics": "Målinger sammenlignet med starten",
 	"layout_optimizer.error.shortcut_missing": "Snarveien for {letter} kan ikke bli på QWERTY-tasten sin: startoppsettet mangler den bokstaven eller den tasten.",
+	"layout_optimizer.error.thumb_keys_absent": "Dette tastaturet har ingen tommeltaster, så det kan ikke plasseres bokstaver på dem: velg et delt eller ortolineært tastatur, eller hold bokstavene unna tomlene",
 	"layout_optimizer.budget.title": "Budsjett og kjøring",
 	"layout_optimizer.budget.seconds": "Tid (sekunder)",
 	"layout_optimizer.budget.iterations": "Bytter per omstart",

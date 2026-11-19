@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "{count} Tasten geändert (gestrichelter Rand auf beiden Tastaturen).",
 	"layout_optimizer.result.metrics": "Messwerte gegenüber dem Start",
 	"layout_optimizer.error.shortcut_missing": "Das Kürzel von {letter} kann nicht auf seiner QWERTY-Taste bleiben: dem Startlayout fehlt dieser Buchstabe oder diese Taste.",
+	"layout_optimizer.error.thumb_keys_absent": "Diese Tastatur hat keine Daumentasten, daher können dort keine Buchstaben liegen: Wählen Sie eine geteilte oder ortholineare Tastatur oder lassen Sie die Buchstaben weg von den Daumen",
 	"layout_optimizer.budget.title": "Budget und Start",
 	"layout_optimizer.budget.seconds": "Zeit (Sekunden)",
 	"layout_optimizer.budget.iterations": "Tausche pro Neustart",

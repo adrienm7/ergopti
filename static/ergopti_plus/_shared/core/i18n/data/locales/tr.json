@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "{count} tuş değişti (iki klavyede de kesikli kenar).",
 	"layout_optimizer.result.metrics": "Başlangıca göre ölçümler",
 	"layout_optimizer.error.shortcut_missing": "{letter} kısayolu QWERTY tuşunda kalamaz: başlangıç düzeninde bu harf ya da bu tuş yok.",
+	"layout_optimizer.error.thumb_keys_absent": "Bu klavyede başparmak tuşu yok, bu yüzden üzerlerine harf yerleştirilemez: bölünmüş veya ortolineer bir klavye seçin ya da harfleri başparmaklardan uzak tutun",
 	"layout_optimizer.budget.title": "Bütçe ve çalıştırma",
 	"layout_optimizer.budget.seconds": "Süre (saniye)",
 	"layout_optimizer.budget.iterations": "Yeniden başlatma başına takas",

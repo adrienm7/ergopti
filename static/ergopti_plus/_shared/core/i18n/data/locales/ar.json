@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "تغيّر {count} مفتاحًا (حدّ متقطع على اللوحتين).",
 	"layout_optimizer.result.metrics": "المقاييس مقارنة بالبداية",
 	"layout_optimizer.error.shortcut_missing": "لا يمكن لاختصار {letter} أن يبقى على مفتاحه في QWERTY: تخطيط البداية يفتقد هذا الحرف أو هذا المفتاح.",
+	"layout_optimizer.error.thumb_keys_absent": "لا تحتوي لوحة المفاتيح هذه على مفاتيح للإبهام، فلا يمكن وضع حروف عليها: اختر لوحة منقسمة أو متعامدة، أو أبقِ الحروف بعيدًا عن الإبهامين",
 	"layout_optimizer.budget.title": "الميزانية والتشغيل",
 	"layout_optimizer.budget.seconds": "الوقت (بالثواني)",
 	"layout_optimizer.budget.iterations": "عمليات التبديل لكل إعادة بدء",

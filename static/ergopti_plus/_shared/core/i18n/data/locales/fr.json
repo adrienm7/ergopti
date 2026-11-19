@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "{count} touches ont changé (bordure en pointillés sur les deux claviers).",
 	"layout_optimizer.result.metrics": "Mesures par rapport au départ",
 	"layout_optimizer.error.shortcut_missing": "Le raccourci de {letter} ne peut pas rester sur sa touche QWERTY : la disposition de départ n’a pas cette lettre ou cette touche.",
+	"layout_optimizer.error.thumb_keys_absent": "Ce clavier n’a pas de touches de pouce : impossible d’y placer des lettres. Choisissez un clavier séparé ou ortholinéaire, ou laissez les lettres hors des pouces",
 	"layout_optimizer.budget.title": "Budget et lancement",
 	"layout_optimizer.budget.seconds": "Durée (secondes)",
 	"layout_optimizer.budget.iterations": "Échanges par redémarrage",

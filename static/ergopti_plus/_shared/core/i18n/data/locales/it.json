@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "{count} tasti cambiati (bordo tratteggiato su entrambe le tastiere).",
 	"layout_optimizer.result.metrics": "Metriche rispetto alla partenza",
 	"layout_optimizer.error.shortcut_missing": "La scorciatoia di {letter} non può restare sul suo tasto QWERTY: al layout di partenza manca quella lettera o quel tasto.",
+	"layout_optimizer.error.thumb_keys_absent": "Questa tastiera non ha tasti per i pollici, quindi non vi si possono mettere lettere: scegli una tastiera divisa o ortolineare, oppure lascia le lettere fuori dai pollici",
 	"layout_optimizer.budget.title": "Budget e avvio",
 	"layout_optimizer.budget.seconds": "Tempo (secondi)",
 	"layout_optimizer.budget.iterations": "Scambi per riavvio",

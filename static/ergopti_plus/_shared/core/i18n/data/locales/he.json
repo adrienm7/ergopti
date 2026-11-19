@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "{count} מקשים השתנו (מסגרת מקווקוות בשתי המקלדות).",
 	"layout_optimizer.result.metrics": "מדדים ביחס להתחלה",
 	"layout_optimizer.error.shortcut_missing": "הקיצור של {letter} לא יכול להישאר על מקש ה-QWERTY שלו: בפריסת ההתחלה חסרים האות או המקש.",
+	"layout_optimizer.error.thumb_keys_absent": "למקלדת זו אין מקשי אגודל, ולכן אי אפשר להציב עליהם אותיות: בחרו מקלדת מפוצלת או אורתוליניארית, או השאירו את האותיות מחוץ לאגודלים",
 	"layout_optimizer.budget.title": "תקציב והרצה",
 	"layout_optimizer.budget.seconds": "זמן (שניות)",
 	"layout_optimizer.budget.iterations": "החלפות לכל הפעלה מחדש",

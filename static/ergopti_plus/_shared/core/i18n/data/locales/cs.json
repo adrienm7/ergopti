@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "Změněné klávesy: {count} (čárkovaný okraj na obou klávesnicích).",
 	"layout_optimizer.result.metrics": "Metriky oproti výchozímu stavu",
 	"layout_optimizer.error.shortcut_missing": "Zkratka písmena {letter} nemůže zůstat na své klávese QWERTY: výchozí rozložení nemá toto písmeno nebo tuto klávesu.",
+	"layout_optimizer.error.thumb_keys_absent": "Tato klávesnice nemá klávesy pro palce, nelze na ně tedy umístit písmena: zvolte dělenou nebo ortolineární klávesnici, nebo nechte písmena mimo palce",
 	"layout_optimizer.budget.title": "Rozpočet a spuštění",
 	"layout_optimizer.budget.seconds": "Čas (sekundy)",
 	"layout_optimizer.budget.iterations": "Výměn na restart",

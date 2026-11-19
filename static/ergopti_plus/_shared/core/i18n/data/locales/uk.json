@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "Змінено клавіш: {count} (пунктирна рамка на обох клавіатурах).",
 	"layout_optimizer.result.metrics": "Показники відносно початкової",
 	"layout_optimizer.error.shortcut_missing": "Сполучення літери {letter} не може лишитися на її клавіші QWERTY: у початковій розкладці немає цієї літери або цієї клавіші.",
+	"layout_optimizer.error.thumb_keys_absent": "На цій клавіатурі немає клавіш для великих пальців, тож на них не можна розмістити літери: виберіть розділену чи ортолінійну клавіатуру або не ставте літери під великі пальці",
 	"layout_optimizer.budget.title": "Бюджет і запуск",
 	"layout_optimizer.budget.seconds": "Час (секунди)",
 	"layout_optimizer.budget.iterations": "Обмінів за перезапуск",

@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "{count} teclas mudaram (borda tracejada nos dois teclados).",
 	"layout_optimizer.result.metrics": "Métricas em relação ao início",
 	"layout_optimizer.error.shortcut_missing": "O atalho de {letter} não pode ficar na sua tecla QWERTY: falta essa letra ou essa tecla ao layout de partida.",
+	"layout_optimizer.error.thumb_keys_absent": "Este teclado não tem teclas para os polegares, por isso não é possível colocar letras nelas: escolha um teclado dividido ou ortolinear, ou mantenha as letras fora dos polegares",
 	"layout_optimizer.budget.title": "Orçamento e execução",
 	"layout_optimizer.budget.seconds": "Tempo (segundos)",
 	"layout_optimizer.budget.iterations": "Trocas por reinício",

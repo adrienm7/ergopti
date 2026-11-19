@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "Zmienione klawisze: {count} (przerywana ramka na obu klawiaturach).",
 	"layout_optimizer.result.metrics": "Miary względem punktu wyjścia",
 	"layout_optimizer.error.shortcut_missing": "Skrót litery {letter} nie może zostać na jej klawiszu QWERTY: układ początkowy nie ma tej litery lub tego klawisza.",
+	"layout_optimizer.error.thumb_keys_absent": "Ta klawiatura nie ma klawiszy kciuków, więc nie można na nich umieścić liter: wybierz klawiaturę dzieloną lub ortolinearną albo nie umieszczaj liter pod kciukami",
 	"layout_optimizer.budget.title": "Budżet i uruchomienie",
 	"layout_optimizer.budget.seconds": "Czas (sekundy)",
 	"layout_optimizer.budget.iterations": "Zamian na restart",

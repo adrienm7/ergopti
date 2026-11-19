@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "{count} keys changed (dashed outline on both boards).",
 	"layout_optimizer.result.metrics": "Metrics against the start",
 	"layout_optimizer.error.shortcut_missing": "The shortcut of {letter} cannot stay on its QWERTY key: the start layout lacks that letter or that key.",
+	"layout_optimizer.error.thumb_keys_absent": "This keyboard has no thumb keys, so letters cannot be placed on them: choose a split or ortholinear board, or keep the letters off the thumbs",
 	"layout_optimizer.budget.title": "Budget and run",
 	"layout_optimizer.budget.seconds": "Time (seconds)",
 	"layout_optimizer.budget.iterations": "Swaps per restart",

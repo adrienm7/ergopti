@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "{count} teclas cambiaron (borde discontinuo en ambos teclados).",
 	"layout_optimizer.result.metrics": "Métricas frente al inicio",
 	"layout_optimizer.error.shortcut_missing": "El atajo de {letter} no puede quedarse en su tecla QWERTY: a la distribución de partida le falta esa letra o esa tecla.",
+	"layout_optimizer.error.thumb_keys_absent": "Este teclado no tiene teclas para los pulgares, así que no se pueden colocar letras en ellas: elija un teclado dividido u ortolineal, o deje las letras fuera de los pulgares",
 	"layout_optimizer.budget.title": "Presupuesto y ejecución",
 	"layout_optimizer.budget.seconds": "Tiempo (segundos)",
 	"layout_optimizer.budget.iterations": "Intercambios por reinicio",

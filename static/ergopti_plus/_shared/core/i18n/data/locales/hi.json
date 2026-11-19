@@ -4881,6 +4881,7 @@
 	"layout_optimizer.result.changed": "{count} कुंजियाँ बदलीं (दोनों कीबोर्ड पर बिंदीदार किनारा)।",
 	"layout_optimizer.result.metrics": "शुरुआत की तुलना में माप",
 	"layout_optimizer.error.shortcut_missing": "{letter} का शॉर्टकट अपनी QWERTY कुंजी पर नहीं रह सकता: शुरुआती लेआउट में वह अक्षर या वह कुंजी नहीं है।",
+	"layout_optimizer.error.thumb_keys_absent": "इस कीबोर्ड में अंगूठे की कुंजियाँ नहीं हैं, इसलिए उन पर अक्षर नहीं रखे जा सकते: स्प्लिट या ऑर्थोलिनियर बोर्ड चुनें, या अक्षरों को अंगूठों से दूर रखें",
 	"layout_optimizer.budget.title": "बजट और चलाना",
 	"layout_optimizer.budget.seconds": "समय (सेकंड)",
 	"layout_optimizer.budget.iterations": "प्रति पुनःआरंभ अदला-बदलियाँ",
