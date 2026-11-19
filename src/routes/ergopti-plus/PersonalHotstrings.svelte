@@ -98,7 +98,7 @@ FEATURES & RATIONALE:
 				<h3>Ajout en 5 secondes</h3>
 				<ol class="steps">
 					{#each steps as s, i}
-						<li><span class="step-num">{i + 1}</span><span>{s}</span></li>
+						<li><span class="step-num">{i + 1}</span>{s}</li>
 					{/each}
 				</ol>
 				<ul class="rows">
@@ -138,12 +138,14 @@ FEATURES & RATIONALE:
 		</div>
 
 		<!-- The REAL personal-info window, live-wired to the examples above -->
-		<div class="info-embed">
-			<p class="info-lead" use:reveal>
-				La fenêtre en question — la vraie. <strong>Modifiez un champ ci-dessous</strong> : les
-				exemples <code>np★</code>, <code>sig★</code>, <code>@np★</code>… au-dessus se réécrivent en
-				direct, exactement comme le feront vos expansions.
-			</p>
+		<figure class="info-embed">
+			<figcaption>
+				<p class="info-lead" use:reveal>
+					La fenêtre en question — la vraie. <strong>Modifiez un champ ci-dessous</strong> : les
+					exemples <code>np★</code>, <code>sig★</code>, <code>@np★</code>… au-dessus se réécrivent
+					en direct, exactement comme le feront vos expansions.
+				</p>
+			</figcaption>
 			<DriverFrame
 				id="personal_info_editor"
 				width={geo.personal_info_editor?.width ?? 560}
@@ -151,7 +153,7 @@ FEATURES & RATIONALE:
 				displayHeight={480}
 				oninfochange={onInfoChange}
 			/>
-		</div>
+		</figure>
 	</div>
 </section>
 
@@ -232,7 +234,7 @@ FEATURES & RATIONALE:
 	}
 
 	.info-embed {
-		margin-top: clamp(24px, 3.5vw, 36px);
+		margin: clamp(24px, 3.5vw, 36px) 0 0;
 	}
 
 	.info-lead {

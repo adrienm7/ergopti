@@ -203,33 +203,33 @@ FEATURES & RATIONALE:
 					use:reveal={{ delay: (i % 4) * 70 }}
 				>
 					<div class="tap-keycap"><kbd>{t.key}</kbd></div>
-					<div class="tap-rows">
+					<dl class="tap-rows">
 						<div class="tap-row">
-							<span class="tap-pill">Tap</span>
-							<span class="tap-glyph" aria-hidden="true">{t.tap.icon}</span>
-							<span class="tap-action">{t.tap.label}</span>
+							<dt class="tap-pill">Tap</dt>
+							<dd class="tap-glyph" aria-hidden="true">{t.tap.icon}</dd>
+							<dd class="tap-action">{t.tap.label}</dd>
 						</div>
 						<div class="tap-row tap-row--hold">
-							<span class="tap-pill tap-pill--hold">Hold</span>
-							<span class="tap-glyph" aria-hidden="true">{t.hold.icon}</span>
-							<span class="tap-action">{t.hold.label}</span>
+							<dt class="tap-pill tap-pill--hold">Hold</dt>
+							<dd class="tap-glyph" aria-hidden="true">{t.hold.icon}</dd>
+							<dd class="tap-action">{t.hold.label}</dd>
 						</div>
-					</div>
+					</dl>
 					<p class="tap-note">{t.note}</p>
 				</article>
 			{/each}
 
 			<article class="ep-card tap-card tap-card--nav" use:reveal={{ delay: 280 }}>
-				<h3>Layer navigation <span class="nav-hint">(maintenir <kbd>LAlt</kbd>)</span></h3>
-				<div class="nav-grid">
+				<h3>Layer navigation <small class="nav-hint">(maintenir <kbd>LAlt</kbd>)</small></h3>
+				<ul class="nav-grid">
 					{#each navLayer as n}
-						<div class="nav-cell">
+						<li class="nav-cell">
 							<kbd>{n.key}</kbd>
 							<span class="nav-glyph" aria-hidden="true">{n.label}</span>
 							<span class="nav-desc">{n.desc}</span>
-						</div>
+						</li>
 					{/each}
-				</div>
+				</ul>
 				<p class="tap-note">
 					Flèches sur HJKL, pages, début/fin de ligne, effacement par mot — la main ne quitte jamais
 					la position de repos.
@@ -274,7 +274,7 @@ FEATURES & RATIONALE:
 
 		<!-- Shared action catalog, structured like the driver's picker and
 		     filtered by the page's OS toggle -->
-		<div class="actions-block">
+		<section class="actions-block">
 			<h3 class="actions-title" use:reveal>
 				<span use:countup={visibleCount}>{visibleCount}</span> actions à assigner. À n’importe quelle
 				touche ou geste.
@@ -305,7 +305,7 @@ FEATURES & RATIONALE:
 					</article>
 				{/each}
 			</div>
-		</div>
+		</section>
 	</div>
 </section>
 
@@ -338,6 +338,7 @@ FEATURES & RATIONALE:
 		display: flex;
 		flex-direction: column;
 		gap: 7px;
+		margin: 0;
 	}
 
 	.tap-row {
@@ -372,12 +373,14 @@ FEATURES & RATIONALE:
 	.tap-glyph {
 		flex-shrink: 0;
 		font-size: 1rem;
+		margin: 0;
 		min-width: 1.6em;
 	}
 
 	.tap-action {
 		font-size: 0.9rem;
 		font-weight: 650;
+		margin: 0;
 		min-width: 0;
 		overflow-wrap: anywhere;
 	}
@@ -409,6 +412,9 @@ FEATURES & RATIONALE:
 		display: grid;
 		gap: 8px;
 		grid-template-columns: repeat(auto-fit, minmax(min(100%, 4.5rem), 1fr));
+		line-height: inherit;
+		list-style: none;
+		text-align: inherit;
 	}
 
 	.nav-cell {
@@ -419,7 +425,10 @@ FEATURES & RATIONALE:
 		display: flex;
 		flex-direction: column;
 		gap: 3px;
+		line-height: inherit;
+		margin: 0;
 		padding: 10px 6px;
+		text-align: inherit;
 	}
 
 	.nav-glyph {
@@ -501,8 +510,16 @@ FEATURES & RATIONALE:
 
 	/* ─── Action catalog ────────────────────────────────────── */
 
+	/* The catalog is a sub-section of its own: cancel the page's section
+	   padding, positioning and chapter divider (ergopti-plus.css). */
 	.actions-block {
 		margin-top: clamp(28px, 4vw, 44px);
+		padding-block: 0;
+		position: static;
+	}
+
+	section.actions-block:not(.hero)::before {
+		content: none;
 	}
 
 	.actions-title {

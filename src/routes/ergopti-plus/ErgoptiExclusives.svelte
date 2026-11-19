@@ -104,16 +104,18 @@ FEATURES & RATIONALE:
 			</p>
 		</header>
 
-		<div class="ergo-keyboard" use:reveal>
+		<figure class="ergo-keyboard" use:reveal>
 			<KeyboardBasis id="presentation_plus" />
 			<div class="ergo-keyboard-controls">
 				<KeyboardControls id="presentation_plus" />
 			</div>
-			<p class="ergo-keyboard-caption">
-				La disposition Ergopti et ses couches — explorez la couche AltGr, la touche magique et les
-				symboles de programmation.
-			</p>
-		</div>
+			<figcaption>
+				<p class="ergo-keyboard-caption">
+					La disposition Ergopti et ses couches — explorez la couche AltGr, la touche magique et les
+					symboles de programmation.
+				</p>
+			</figcaption>
+		</figure>
 
 		<div class="bigram-grid">
 			{#each bigramCards as cat, i}

@@ -85,15 +85,15 @@ sub-pages does not refetch them. Each sub-page renders only its own sections.
 
 	<main class="ep-main">
 		<div class="ep-root">
-			<div class="ep-topbar">
+			<header class="ep-topbar">
 				<LangToggle />
 				<p class="ep-version" aria-live="polite">
-					{#if ui.release}<span>Ergopti+ {ui.release.tag}</span>{/if}
+					{#if ui.release}Ergopti+ {ui.release.tag}{/if}
 				</p>
 				<p class="legacy-link">
 					<a href={resolve('/ergopti-plus-old')}>{t('Ancienne version de cette page →')}</a>
 				</p>
-			</div>
+			</header>
 			<SubNav label={t('Pages d’Ergopti+')} {items} />
 
 			{@render children()}

@@ -81,7 +81,7 @@ FEATURES & RATIONALE:
 						<span class="gesture-fingers">{g.fingers}</span>
 						<span class="gesture-type">{g.type}</span>
 					</div>
-					<div class="gesture-action">{g.action}</div>
+					<h3 class="gesture-action">{g.action}</h3>
 					<p class="gesture-note">{g.note}</p>
 				</article>
 			{/each}
@@ -128,10 +128,19 @@ FEATURES & RATIONALE:
 		padding: 3px 10px;
 	}
 
-	.gesture-action {
+	/* The card's title keeps its former plain-text look: cancel what the
+	   global and card h3 rules (titles.css, ergopti-plus.css) add. */
+	.gesture-card .gesture-action {
+		color: inherit;
 		font-size: 1.02rem;
 		font-weight: 700;
-		margin-bottom: 6px;
+		letter-spacing: normal;
+		line-height: inherit;
+		margin: 0 0 6px;
+		overflow-wrap: inherit;
+		text-align: inherit;
+		-webkit-text-fill-color: inherit;
+		text-wrap: inherit;
 	}
 
 	.gesture-note {
