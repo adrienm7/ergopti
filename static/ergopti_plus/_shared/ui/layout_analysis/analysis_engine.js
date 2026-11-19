@@ -4256,27 +4256,46 @@ var LAYOUT_ANALYSIS = (function () {
 	 */
 	function shortcutLeft(layout, board, table) {
 		const { letters, ease } = table;
-		const where = {};
+		const entries = shortcutEntries(letters);
+		// Letter → its key: a Map, as each layout names other letters.
+		const where = new Map();
 		for (const code in layout.rows) {
 			const letter =
 				layout.command[code] !== undefined ? layout.command[code] : layout.rows[code][0];
 			if (typeof letter !== 'string') continue;
 			const lower = lowerCase(letter);
-			if (letters[lower] !== undefined && where[lower] === undefined) where[lower] = code;
+			if (entries.weights.has(lower) && !where.has(lower)) where.set(lower, code);
 		}
 		for (const code in layout.command) {
 			const lower = lowerCase(layout.command[code]);
-			if (letters[lower] !== undefined) where[lower] = code;
+			if (entries.weights.has(lower)) where.set(lower, code);
 		}
 		let got = 0;
 		let all = 0;
-		for (const [letter, weight] of Object.entries(letters)) {
+		for (const [letter, weight] of entries.list) {
 			all += weight;
-			const code = where[letter];
+			const code = where.get(letter);
 			if (code === undefined || !board.index.has(code)) continue;
 			got += weight * (ease[code] || 0);
 		}
 		return all > 0 ? (100 * got) / all : 0;
+	}
+
+	// The model's shortcut letters as shortcutEntries gives them, built once.
+	let modelShortcutEntries = null;
+
+	/**
+	 * A shortcut table's letters as a Map and as entries in their order. The
+	 * model's own, which every analysis without custom shortcuts reads, are
+	 * built once; a custom table is a fresh copy (shortcuts()), built each time.
+	 */
+	function shortcutEntries(letters) {
+		const own = letters === data().model.shortcut_letters;
+		if (own && modelShortcutEntries !== null) return modelShortcutEntries;
+		const list = Object.entries(letters);
+		const out = { list, weights: new Map(list) };
+		if (own) modelShortcutEntries = out;
+		return out;
 	}
 
 	// ==================================
