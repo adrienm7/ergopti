@@ -5057,6 +5057,7 @@
 	"layout_analysis.corpus.kind.words": "Woordenlijsten",
 	"layout_analysis.corpus.kind.code": "Broncode",
 	"layout_analysis.corpus.entry": "{title} · {kind}",
+	"layout_analysis.tab.home": "Start",
 	"layout_analysis.tab.overview": "Overzicht",
 	"layout_analysis.tab.fingers": "Vingers en handen",
 	"layout_analysis.tab.bigrams": "Bigrammen",

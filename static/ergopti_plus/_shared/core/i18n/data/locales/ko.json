@@ -5057,6 +5057,7 @@
 	"layout_analysis.corpus.kind.words": "단어 목록",
 	"layout_analysis.corpus.kind.code": "소스 코드",
 	"layout_analysis.corpus.entry": "{title} · {kind}",
+	"layout_analysis.tab.home": "홈",
 	"layout_analysis.tab.overview": "개요",
 	"layout_analysis.tab.fingers": "손가락과 손",
 	"layout_analysis.tab.bigrams": "바이그램",

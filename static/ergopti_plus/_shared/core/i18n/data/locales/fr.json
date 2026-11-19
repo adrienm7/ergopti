@@ -5057,6 +5057,7 @@
 	"layout_analysis.corpus.kind.words": "Listes de mots",
 	"layout_analysis.corpus.kind.code": "Code source",
 	"layout_analysis.corpus.entry": "{title} · {kind}",
+	"layout_analysis.tab.home": "Accueil",
 	"layout_analysis.tab.overview": "Vue d’ensemble",
 	"layout_analysis.tab.fingers": "Doigts et mains",
 	"layout_analysis.tab.bigrams": "Bigrammes",

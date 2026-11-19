@@ -347,9 +347,20 @@ async function exerciseStudio(context, origin, basePath, inflight, axeSource) {
 		assert.ok(figures.keys > 0 && figures.rows === figures.keys, 'The heatmap has its table');
 		for (const box of figures.bars)
 			assert.ok(box.table && box.rows === box.drawn, 'A figure reads as a table: ' + box.id);
+		assert.deepEqual(
+			await scanFrame(comparer, axeSource, '#la-details'),
+			[],
+			'No violation in #la-details'
+		);
+		// The score settings sit in « Home », the Comparer's first tab.
+		await comparer.locator('#la-tab-home').click();
+		assert.equal(await scrollsSideways(comparer), false, 'The unfolded settings fit a phone');
 		const undoBoth = await exerciseUndo(comparer, page);
-		for (const part of ['#la-details', '#la-settings'])
-			assert.deepEqual(await scanFrame(comparer, axeSource, part), [], 'No violation in ' + part);
+		assert.deepEqual(
+			await scanFrame(comparer, axeSource, '#la-settings'),
+			[],
+			'No violation in #la-settings'
+		);
 		await undoBoth();
 
 		await page.setViewportSize({ ...VIEWPORT });

@@ -5057,6 +5057,7 @@
 	"layout_analysis.corpus.kind.words": "Списки слів",
 	"layout_analysis.corpus.kind.code": "Вихідний код",
 	"layout_analysis.corpus.entry": "{title} · {kind}",
+	"layout_analysis.tab.home": "Головна",
 	"layout_analysis.tab.overview": "Огляд",
 	"layout_analysis.tab.fingers": "Пальці й руки",
 	"layout_analysis.tab.bigrams": "Біграми",

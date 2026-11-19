@@ -164,6 +164,17 @@ async function downloaded(page, click) {
 }
 
 /**
+ * Shows a tab of the Comparer (its tabs lead the page, « Home » first)
+ * unless it is shown already.
+ * @param {import('playwright').Page} page
+ * @param {string} id A TABS id of comparer_page.js.
+ */
+async function comparerTab(page, id) {
+	if ((await page.getAttribute(`#la-tab-${id}`, 'aria-selected')) !== 'true')
+		await page.click(`#la-tab-${id}`);
+}
+
+/**
  * Answers every corpus request the window has posted (studio_corpus) as the app
  * hosts do: the generated file runs in the page, then the request settles.
  * @param {import('playwright').Page} page
@@ -332,6 +343,7 @@ async function exerciseStudioLayout(browser, origin) {
 	await page.evaluate(() => {
 		document.getElementById('la-filters-box').open = true;
 	});
+	await comparerTab(page, 'overview');
 	await page.fill('#la-row-name', 'Ergopti');
 	await page.waitForFunction(() => document.querySelector('#la-chart .la-incomplete'));
 	const incomplete = await page.evaluate(() => {
@@ -394,6 +406,7 @@ async function exerciseStudioLayout(browser, origin) {
 	);
 	assert.equal(await page.isDisabled('#la-text-mode'), false, 'two texts: the choice is open');
 	assert.equal(await page.inputValue('#la-text-mode'), 'typed', 'the keys typed until chosen');
+	await comparerTab(page, 'home');
 	await page.selectOption('#la-text-mode', 'final');
 	await page.waitForFunction(() =>
 		/ on 90 characters/.test(document.getElementById('la-status').textContent)
@@ -405,9 +418,11 @@ async function exerciseStudioLayout(browser, origin) {
 	);
 	await page.selectOption('#la-text-mode', 'mixed');
 	// One layout and its « + » twin in the chart, under its 40 bars.
+	await comparerTab(page, 'overview');
 	await page.fill('#la-row-name', 'QWERTY (US)');
 	const before = await page.locator('#la-chart .la-chart-row').count();
 	// The layout list is folded under its summary line.
+	await comparerTab(page, 'home');
 	await page.click('#la-layouts-summary');
 	await page
 		.locator('#la-layout-list .la-plus', { hasText: /^QWERTY \(US\)\+$/ })
@@ -473,6 +488,7 @@ async function exerciseStudioLayout(browser, origin) {
 		).includes('QWERTY (US)+'),
 		'one text: no « + » layout is ranked'
 	);
+	await comparerTab(page, 'overview');
 	await page.fill('#la-row-name', '');
 	const heading = await page.evaluate(
 		() => getComputedStyle(document.querySelector('#studio-comparer')).color
@@ -1425,6 +1441,7 @@ async function exerciseComparerWholeLibrary(browser, origin) {
 		'the results are no longer busy once every slice is scored'
 	);
 	// A saved selection stays the user's.
+	await comparerTab(page, 'home');
 	await page.click('#la-layouts-summary');
 	await page.click('#la-none');
 	await page
@@ -1462,6 +1479,7 @@ async function exerciseComparerLayoutList(browser, origin) {
 	await page.waitForFunction(
 		() => document.getElementById('la-results').getAttribute('aria-busy') === 'false'
 	);
+	await comparerTab(page, 'home');
 	await page.click('#la-layouts-summary');
 	const fold = (text) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 	const list = () =>
@@ -1570,6 +1588,97 @@ async function exerciseComparerLayoutList(browser, origin) {
 }
 
 /**
+ * (comparer-home-tab) The Comparer's tabs lead the page, « Home » first: it
+ * holds the corpus, the layout list and the score settings, and a fresh visit
+ * opens it, while a link to a comparison opens its ranking (maintainer,
+ * 2026-11-18). The ARIA tabs pattern holds, in light and dark and in every
+ * locale.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseComparerHome(browser, origin) {
+	for (const colorScheme of ['light', 'dark']) {
+		const context = await browser.newContext({
+			viewport: { width: 1280, height: 900 },
+			colorScheme
+		});
+		const page = await context.newPage();
+		const errors = [];
+		page.on('pageerror', (error) => errors.push(error.message));
+		await page.goto(`${origin}/ui/layout_analysis/index.html?lang=en`);
+		await page.waitForFunction(
+			() => document.getElementById('la-results').getAttribute('aria-busy') === 'false'
+		);
+		const layout = await page.evaluate(() => {
+			const tabs = document.getElementById('la-tabs');
+			const home = document.getElementById('la-panel-home');
+			const before = (a, b) =>
+				Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+			return {
+				role: tabs.getAttribute('role'),
+				first: tabs.querySelector('[role="tab"]').id,
+				selected: [...tabs.querySelectorAll('[role="tab"]')]
+					.filter((tab) => tab.getAttribute('aria-selected') === 'true')
+					.map((tab) => tab.id),
+				shown: [...document.querySelectorAll('.la-tab-panel')]
+					.filter((panel) => !panel.hidden)
+					.map((panel) => panel.id),
+				tabsFirst: before(tabs, document.getElementById('la-corpus')),
+				onTop: tabs.getBoundingClientRect().top < home.getBoundingClientRect().top,
+				holds: ['la-corpus', 'la-layouts-box', 'la-settings'].every((id) =>
+					home.contains(document.getElementById(id))
+				),
+				filters: document.getElementById('la-filters-box').hidden,
+				panelRole: home.getAttribute('role'),
+				labelled: home.getAttribute('aria-labelledby')
+			};
+		});
+		assert.deepEqual(
+			layout,
+			{
+				role: 'tablist',
+				first: 'la-tab-home',
+				selected: ['la-tab-home'],
+				shown: ['la-panel-home'],
+				tabsFirst: true,
+				onTop: true,
+				holds: true,
+				filters: true,
+				panelRole: 'tabpanel',
+				labelled: 'la-tab-home'
+			},
+			`${colorScheme}: « Home » first, open on a fresh visit, holding the setup`
+		);
+		// The arrows move to the results and back, the focus following.
+		await page.focus('#la-tab-home');
+		await page.keyboard.press('ArrowRight');
+		assert.equal(await page.evaluate(() => document.activeElement.id), 'la-tab-overview');
+		assert.equal(await page.isHidden('#la-panel-home'), true, 'the ranking replaces « Home »');
+		assert.equal(await page.isVisible('#la-filters-box'), true, 'with the results’ filters');
+		await page.keyboard.press('Home');
+		assert.equal(await page.evaluate(() => document.activeElement.id), 'la-tab-home');
+		assert.deepEqual(errors, [], `${colorScheme}: page errors`);
+		await context.close();
+	}
+	// A link to a comparison opens its ranking.
+	const page = await browser.newPage();
+	await page.goto(`${origin}/ui/layout_analysis/index.html?lang=en&corpus=fr_nemolivier`);
+	await page.waitForSelector('#la-tab-overview[aria-selected="true"]');
+	assert.equal(await page.isHidden('#la-panel-home'), true, 'a link opens the ranking');
+	// Every locale names « Home ».
+	for (const lang of LOCALES) {
+		await page.goto(`${origin}/ui/layout_analysis/index.html?lang=${lang}&corpus=fr_nemolivier`);
+		await page.waitForSelector('#la-tab-home');
+		const label = (await page.textContent('#la-tab-home')).trim();
+		assert.ok(
+			label !== '' && !label.startsWith('layout_analysis.'),
+			`${lang}: « Home » is ${label}`
+		);
+	}
+	await page.close();
+}
+
+/**
  * (comparer-corpus-picker) One corpus picker: the user's own texts, then one
  * group per language with each entry's kind, code last; it is driven by the
  * keyboard, and the text typed is not offered on a built-in text. (comparer-phone-width) Every sub-tab fits a phone in
@@ -1632,6 +1741,7 @@ async function exerciseComparerPicker(browser, origin) {
 						`${group.label}: ${option.text} says its kind`
 					);
 			// The keyboard path: the picker takes the focus and an arrow moves the choice.
+			await comparerTab(page, 'home');
 			await page.focus('#la-corpus');
 			const before = await page.inputValue('#la-corpus');
 			await page.keyboard.press('ArrowDown');
@@ -1724,12 +1834,14 @@ async function exerciseStudioComparer(page) {
 		{ Ergopti: true, 'Ergopti+': true, 'Ergopti ANSI': false, 'Ergopti+ ANSI': false },
 		'ISO ticks Ergopti and Ergopti+'
 	);
+	await comparerTab(page, 'home');
 	await page.selectOption('#la-keyboard', 'ansi');
 	assert.deepEqual(
 		await ticks(),
 		{ Ergopti: false, 'Ergopti+': false, 'Ergopti ANSI': true, 'Ergopti+ ANSI': true },
 		'ANSI ticks their ANSI versions'
 	);
+	await comparerTab(page, 'home');
 	await page.selectOption('#la-keyboard', 'iso');
 	await page.waitForFunction(
 		() =>
@@ -1933,6 +2045,7 @@ async function exerciseStudioComparer(page) {
 		'a column added'
 	);
 	const rowsBefore = await page.locator('#la-table tbody tr').count();
+	await comparerTab(page, 'overview');
 	await page.fill('#la-row-name', 'ergopti');
 	const rowsAfter = await page.locator('#la-table tbody tr').count();
 	assert.ok(
@@ -1970,6 +2083,7 @@ async function exerciseStudioComparer(page) {
 	// (editable-tables) The shortcut letters, their keys' ease and the compact
 	// form factors' weights are edited, refused when out of range, saved and reset.
 	// They sit in the folded score settings.
+	await comparerTab(page, 'home');
 	await page.click('#la-settings > summary');
 	assert.equal(await page.locator('#la-shortcut-letters input').count(), 26, 'every letter');
 	assert.equal(await page.locator('#la-form-list input').count(), 4, 'every form factor');
@@ -1997,6 +2111,7 @@ async function exerciseStudioComparer(page) {
 	// (« Choose File », « No file chosen »): each is hidden inside a label whose
 	// button carries the page's translated text.
 	// The corpus file sits in the panel « custom text » opens: open it first.
+	await comparerTab(page, 'home');
 	await page.selectOption('#la-corpus', 'custom');
 	// (comparer-reads-pdf) A PDF's text becomes the corpus, read in the page.
 	await page.setInputFiles(
@@ -3173,6 +3288,7 @@ async function exerciseComparerLink(browser, origin) {
 		'60'
 	]);
 	// The link wins over the choice the visitor saved last time.
+	await comparerTab(page, 'home');
 	await page.selectOption('#la-keyboard', 'ansi');
 	assert.deepEqual((await choices('corpus=en_wikipedia&keyboard=iso')).slice(0, 2), [
 		'en_wikipedia',
@@ -3640,6 +3756,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseComparerPicker(browser, origin);
 		await exerciseComparerWholeLibrary(browser, origin);
 		await exerciseComparerLayoutList(browser, origin);
+		await exerciseComparerHome(browser, origin);
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);

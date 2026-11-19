@@ -5057,6 +5057,7 @@
 	"layout_analysis.corpus.kind.words": "Elenchi di parole",
 	"layout_analysis.corpus.kind.code": "Codice sorgente",
 	"layout_analysis.corpus.entry": "{title} · {kind}",
+	"layout_analysis.tab.home": "Inizio",
 	"layout_analysis.tab.overview": "Panoramica",
 	"layout_analysis.tab.fingers": "Dita e mani",
 	"layout_analysis.tab.bigrams": "Bigrammi",

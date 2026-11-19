@@ -5057,6 +5057,7 @@
 	"layout_analysis.corpus.kind.words": "शब्द सूचियाँ",
 	"layout_analysis.corpus.kind.code": "स्रोत कोड",
 	"layout_analysis.corpus.entry": "{title} · {kind}",
+	"layout_analysis.tab.home": "मुखपृष्ठ",
 	"layout_analysis.tab.overview": "सारांश",
 	"layout_analysis.tab.fingers": "उँगलियाँ और हाथ",
 	"layout_analysis.tab.bigrams": "द्विग्राम",

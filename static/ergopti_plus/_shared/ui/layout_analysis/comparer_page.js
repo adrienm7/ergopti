@@ -197,10 +197,14 @@
 	// library id never holds a « + », so the two never collide.
 	const PLUS_SUFFIX = '+';
 
-	// The results' sub-tabs, in order (maintainer, 2026-11-18): the ranking, the
-	// figures by theme (after KLAnext's result tabs), the other analysers and
-	// one layout in detail. A link naming a layout to detail opens the last.
+	// The Comparer's tabs, in order, at the top of the page (maintainer,
+	// 2026-11-18): « Home » (the corpus, the layouts and the score settings),
+	// then the results: the ranking, the figures by theme (after KLAnext's
+	// result tabs), the other analysers and one layout in detail. A fresh visit
+	// opens « Home », a link to a comparison its ranking, a link naming a
+	// layout to detail the last.
 	const TABS = [
+		'home',
 		'overview',
 		'fingers',
 		'bigrams',
@@ -211,6 +215,7 @@
 		'analysers',
 		'details'
 	];
+	const HOME_TAB = 'home';
 	const DEFAULT_TAB = 'overview';
 	const DETAILS_TAB = 'details';
 	// The score settings' weight groups, each a titled sub-section; every
@@ -333,11 +338,15 @@
 
 	// The Comparer's markup; data-i18n* attributes are filled by applyStrings().
 	const MARKUP = `<div class="la-top">
-	<h1 data-i18n="layout_analysis.title"></h1>
+	<h1 id="la-title" data-i18n="layout_analysis.title"></h1>
 	<button id="la-share" type="button" data-i18n="layout_analysis.share.button"></button>
 </div>
 <p id="la-share-status" class="la-muted" role="status" hidden></p>
 
+<div id="la-tabs" class="la-tabs" role="tablist" aria-labelledby="la-title"></div>
+<p id="la-status" class="la-status" role="status" aria-live="polite"></p>
+
+<div id="la-panel-home" class="la-tab-panel la-home" role="tabpanel" aria-labelledby="la-tab-home" hidden>
 <div class="la-setup">
 <section class="la-card la-corpus-card" aria-labelledby="la-corpus-label">
 	<div class="la-field">
@@ -443,7 +452,118 @@
 	</details>
 </section>
 
-<p id="la-status" class="la-status" role="status" aria-live="polite"></p>
+<details id="la-settings" class="la-settings">
+<summary data-i18n="layout_analysis.settings.title"></summary>
+<section class="la-weights la-config la-accent-1" data-section-icon="config" aria-labelledby="la-config-label">
+	<div class="la-heading">
+		<h2 id="la-config-label" data-i18n="layout_analysis.config.title"></h2>
+	</div>
+	<p class="la-muted" data-i18n="layout_analysis.config.help"></p>
+	<div class="la-config-actions">
+		<button id="la-config-export" type="button" data-i18n="layout_analysis.config.export"></button>
+		<label class="la-file">
+			<span class="la-file-button" data-i18n="layout_analysis.config.import"></span>
+			<input id="la-config-import" type="file" accept=".json,application/json" />
+		</label>
+		<button id="la-config-reset" type="button" data-i18n="layout_analysis.config.reset"></button>
+	</div>
+	<p id="la-config-status" class="la-muted" role="status"></p>
+</section>
+
+<section class="la-weights la-accent-2" data-section-icon="weights" aria-labelledby="la-weights-label">
+	<div class="la-heading">
+		<h2 id="la-weights-label" data-i18n="layout_analysis.weights.title"></h2>
+		<button
+			class="la-info"
+			type="button"
+			data-info="weights"
+			data-i18n-title="layout_analysis.info.button"
+		>
+			i
+		</button>
+	</div>
+	<p class="la-muted" data-i18n="layout_analysis.weights.help"></p>
+	<button id="la-restore" type="button" data-i18n="layout_analysis.weights.restore"></button>
+	<div id="la-weight-list" class="la-weight-groups"></div>
+</section>
+
+<section class="la-weights la-accent-3" data-section-icon="ideal" aria-labelledby="la-ideal-label">
+	<div class="la-heading">
+		<h2 id="la-ideal-label" data-i18n="layout_analysis.ideal.title"></h2>
+		<button
+			class="la-info"
+			type="button"
+			data-info="ideal_finger_load"
+			data-i18n-title="layout_analysis.info.button"
+		>
+			i
+		</button>
+	</div>
+	<p class="la-muted" data-i18n="layout_analysis.ideal.help"></p>
+	<button
+		id="la-ideal-restore"
+		type="button"
+		data-i18n="layout_analysis.ideal.restore"
+	></button>
+	<div class="la-ideal-layout">
+		<svg
+			id="la-ideal-hands"
+			class="la-ideal-hands"
+			viewBox="0 0 220 120"
+			aria-hidden="true"
+			focusable="false"
+		></svg>
+		<div id="la-ideal-list" class="la-weight-list"></div>
+	</div>
+	<p id="la-ideal-sum" class="la-muted" role="status"></p>
+</section>
+
+<section class="la-weights la-accent-4" data-section-icon="shortcuts" aria-labelledby="la-shortcuts-label">
+	<div class="la-heading">
+		<h2 id="la-shortcuts-label" data-i18n="layout_analysis.shortcuts.title"></h2>
+		<button
+			class="la-info"
+			type="button"
+			data-info="shortcut_letters"
+			data-i18n-title="layout_analysis.info.button"
+		>
+			i
+		</button>
+	</div>
+	<p class="la-muted" data-i18n="layout_analysis.shortcuts.help"></p>
+	<button
+		id="la-shortcuts-restore"
+		type="button"
+		data-i18n="layout_analysis.shortcuts.restore"
+	></button>
+	<h3 data-i18n="layout_analysis.shortcuts.letters"></h3>
+	<div id="la-shortcut-letters" class="la-weight-list"></div>
+	<h3 data-i18n="layout_analysis.shortcuts.ease"></h3>
+	<div id="la-shortcut-ease" class="la-weight-list"></div>
+	<p id="la-shortcuts-status" class="la-muted" role="status"></p>
+</section>
+
+<section class="la-weights la-accent-6" data-section-icon="forms" aria-labelledby="la-forms-label">
+	<div class="la-heading">
+		<h2 id="la-forms-label" data-i18n="layout_analysis.forms.title"></h2>
+		<button
+			class="la-info"
+			type="button"
+			data-info="compact_fit"
+			data-i18n-title="layout_analysis.info.button"
+		>
+			i
+		</button>
+	</div>
+	<p class="la-muted" data-i18n="layout_analysis.forms.help"></p>
+	<button id="la-forms-restore" type="button" data-i18n="layout_analysis.forms.restore"></button>
+	<div id="la-form-list" class="la-weight-list"></div>
+	<p id="la-forms-status" class="la-muted" role="status"></p>
+</section>
+
+<section id="la-fingering" class="la-weights la-fingering"></section>
+</details>
+</div>
 
 <section id="la-results" class="la-results" aria-labelledby="la-results-label">
 	<h2 id="la-results-label" class="la-sr-only" data-i18n="layout_analysis.results.title"></h2>
@@ -488,7 +608,6 @@
 		<button id="la-table-reset" type="button" data-i18n="layout_analysis.table.reset"></button>
 	</div>
 	</details>
-	<div id="la-tabs" class="la-tabs" role="tablist" aria-labelledby="la-results-label"></div>
 
 	<div id="la-panel-overview" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-overview">
 		<div class="la-overview">
@@ -738,119 +857,7 @@
 		</div>
 	</section>
 	</div>
-</section>
-
-<details id="la-settings" class="la-settings">
-<summary data-i18n="layout_analysis.settings.title"></summary>
-<section class="la-weights la-config la-accent-1" data-section-icon="config" aria-labelledby="la-config-label">
-	<div class="la-heading">
-		<h2 id="la-config-label" data-i18n="layout_analysis.config.title"></h2>
-	</div>
-	<p class="la-muted" data-i18n="layout_analysis.config.help"></p>
-	<div class="la-config-actions">
-		<button id="la-config-export" type="button" data-i18n="layout_analysis.config.export"></button>
-		<label class="la-file">
-			<span class="la-file-button" data-i18n="layout_analysis.config.import"></span>
-			<input id="la-config-import" type="file" accept=".json,application/json" />
-		</label>
-		<button id="la-config-reset" type="button" data-i18n="layout_analysis.config.reset"></button>
-	</div>
-	<p id="la-config-status" class="la-muted" role="status"></p>
-</section>
-
-<section class="la-weights la-accent-2" data-section-icon="weights" aria-labelledby="la-weights-label">
-	<div class="la-heading">
-		<h2 id="la-weights-label" data-i18n="layout_analysis.weights.title"></h2>
-		<button
-			class="la-info"
-			type="button"
-			data-info="weights"
-			data-i18n-title="layout_analysis.info.button"
-		>
-			i
-		</button>
-	</div>
-	<p class="la-muted" data-i18n="layout_analysis.weights.help"></p>
-	<button id="la-restore" type="button" data-i18n="layout_analysis.weights.restore"></button>
-	<div id="la-weight-list" class="la-weight-groups"></div>
-</section>
-
-<section class="la-weights la-accent-3" data-section-icon="ideal" aria-labelledby="la-ideal-label">
-	<div class="la-heading">
-		<h2 id="la-ideal-label" data-i18n="layout_analysis.ideal.title"></h2>
-		<button
-			class="la-info"
-			type="button"
-			data-info="ideal_finger_load"
-			data-i18n-title="layout_analysis.info.button"
-		>
-			i
-		</button>
-	</div>
-	<p class="la-muted" data-i18n="layout_analysis.ideal.help"></p>
-	<button
-		id="la-ideal-restore"
-		type="button"
-		data-i18n="layout_analysis.ideal.restore"
-	></button>
-	<div class="la-ideal-layout">
-		<svg
-			id="la-ideal-hands"
-			class="la-ideal-hands"
-			viewBox="0 0 220 120"
-			aria-hidden="true"
-			focusable="false"
-		></svg>
-		<div id="la-ideal-list" class="la-weight-list"></div>
-	</div>
-	<p id="la-ideal-sum" class="la-muted" role="status"></p>
-</section>
-
-<section class="la-weights la-accent-4" data-section-icon="shortcuts" aria-labelledby="la-shortcuts-label">
-	<div class="la-heading">
-		<h2 id="la-shortcuts-label" data-i18n="layout_analysis.shortcuts.title"></h2>
-		<button
-			class="la-info"
-			type="button"
-			data-info="shortcut_letters"
-			data-i18n-title="layout_analysis.info.button"
-		>
-			i
-		</button>
-	</div>
-	<p class="la-muted" data-i18n="layout_analysis.shortcuts.help"></p>
-	<button
-		id="la-shortcuts-restore"
-		type="button"
-		data-i18n="layout_analysis.shortcuts.restore"
-	></button>
-	<h3 data-i18n="layout_analysis.shortcuts.letters"></h3>
-	<div id="la-shortcut-letters" class="la-weight-list"></div>
-	<h3 data-i18n="layout_analysis.shortcuts.ease"></h3>
-	<div id="la-shortcut-ease" class="la-weight-list"></div>
-	<p id="la-shortcuts-status" class="la-muted" role="status"></p>
-</section>
-
-<section class="la-weights la-accent-6" data-section-icon="forms" aria-labelledby="la-forms-label">
-	<div class="la-heading">
-		<h2 id="la-forms-label" data-i18n="layout_analysis.forms.title"></h2>
-		<button
-			class="la-info"
-			type="button"
-			data-info="compact_fit"
-			data-i18n-title="layout_analysis.info.button"
-		>
-			i
-		</button>
-	</div>
-	<p class="la-muted" data-i18n="layout_analysis.forms.help"></p>
-	<button id="la-forms-restore" type="button" data-i18n="layout_analysis.forms.restore"></button>
-	<div id="la-form-list" class="la-weight-list"></div>
-	<p id="la-forms-status" class="la-muted" role="status"></p>
-</section>
-
-<section id="la-fingering" class="la-weights la-fingering"></section>
-</details>`;
+</section>`;
 
 	/**
 	 * The « My typing » read as the Comparer lists it: none when the user has no
@@ -1045,8 +1052,14 @@
 			versus: linked.versus || null,
 			// The sub-tab shown: a link's layout in detail opens « One layout »,
 			// else the visitor's last choice (tabSaved, kept only when they click).
-			tab: linked.details ? DETAILS_TAB : TABS.includes(saved.tab) ? saved.tab : DEFAULT_TAB,
-			tabSaved: TABS.includes(saved.tab) ? saved.tab : DEFAULT_TAB,
+			tab: linked.details
+				? DETAILS_TAB
+				: linked.corpus || linked.layouts
+					? DEFAULT_TAB
+					: TABS.includes(saved.tab)
+						? saved.tab
+						: HOME_TAB,
+			tabSaved: TABS.includes(saved.tab) ? saved.tab : HOME_TAB,
 			// Each themed table's sort, by table name.
 			tabSorts: {},
 			heats: validHeats(saved.heats),
@@ -1462,6 +1475,7 @@
 
 		// Literal keys, so the locale gate finds every string these labels show.
 		const TAB_LABEL = {
+			home: () => t('layout_analysis.tab.home'),
 			overview: () => t('layout_analysis.tab.overview'),
 			fingers: () => t('layout_analysis.tab.fingers'),
 			bigrams: () => t('layout_analysis.tab.bigrams'),
@@ -1585,6 +1599,8 @@
 					renderTravelTable();
 					renderMetricTab('rows');
 				},
+				// « Home » holds controls only, filled as they change.
+				home: () => {},
 				heatmaps: renderHeatGrid,
 				misc: () => renderMetricTab('misc'),
 				// The other analysers' view follows the Comparer by itself (analyser_tab.js).
@@ -1639,6 +1655,8 @@
 				button.tabIndex = chosen ? 0 : -1;
 				$(`la-panel-${id}`).hidden = !chosen;
 			}
+			// The results' filters narrow the figures, not « Home »'s controls.
+			$('la-filters-box').hidden = state.tab === HOME_TAB;
 		}
 
 		/** Shows a sub-tab; the visitor's own choice is kept for the next visit. */

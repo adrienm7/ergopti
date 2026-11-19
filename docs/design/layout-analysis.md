@@ -848,12 +848,15 @@ report.
 ## Comparer page
 
 Layout of the page, top to bottom (maintainer, 2026-11-18): the title and
-« Copy the link »; two cards side by side (stacked on a phone), the corpus
-(with the text mode under it on « Ma frappe ») and « Text and keyboard »
-(keyboard, format); the folded layout list;
-the status; the results; then the score settings folded in one « Réglages du
-score » section. While a corpus loads, the status says so and the results carry
-`aria-busy`.
+« Copy the link »; the tab strip (`#la-tabs`), « Home » first; the status; then
+the chosen tab's panel. « Home » (`#la-panel-home`) holds what the comparison
+is made of: two cards side by side (stacked on a phone), the corpus (with the
+text mode under it on « Ma frappe ») and « Text and keyboard » (keyboard,
+format); the folded layout list; and the score settings folded in one
+« Réglages du score » section. The other tabs are the results, under their
+« Layouts shown » filters, which « Home » hides. A fresh visit opens « Home »,
+a link to a comparison (`corpus` or `layouts`) its ranking. While a corpus
+loads, the status says so and the results carry `aria-busy`.
 
 **Corpus picker.** One native `<select>` (`#la-corpus`), shared by the
 Comparer, the editor's panel (`#la-panel-corpus`) and the Optimiser
@@ -904,9 +907,9 @@ kept) holds the filters every sub-tab draws from: name, family, origin,
 language, completeness (complete, incomplete or both) and a score range, with
 « Show every row and the default columns »; saved in `table`.
 
-**Sub-tabs** (`#la-tabs`, the ARIA tabs pattern: arrows, Home and End move;
-one panel at a time; the last one the visitor chose is saved as `tab`, a link
-naming `details` opens « One layout »). The overview is drawn after every
+**Tabs** (`#la-tabs`, named by the page title, the ARIA tabs pattern: arrows,
+Home and End move; one panel at a time; the last one the visitor chose is saved
+as `tab`, a link naming `details` opens « One layout »). The overview is drawn after every
 analysis, another tab when it is shown.
 
 - **Overview**: the global score chart (bars from the weakest shown to the best,

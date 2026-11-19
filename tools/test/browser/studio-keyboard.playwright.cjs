@@ -44,7 +44,8 @@ const PAGES = Object.freeze([
 	{
 		name: 'Comparer',
 		path: UI + 'layout_analysis/index.html',
-		ready: '#la-results[aria-busy="false"] #la-chart .la-chart-row'
+		// A fresh visit opens « Home », the corpus, the layouts and the settings.
+		ready: '#la-panel-home #la-corpus'
 	},
 	{ name: 'Optimiser', path: UI + 'layout_optimizer/index.html', ready: '.layout-optimizer h1' }
 ]);

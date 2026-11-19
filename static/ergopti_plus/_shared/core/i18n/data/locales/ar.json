@@ -5057,6 +5057,7 @@
 	"layout_analysis.corpus.kind.words": "قوائم كلمات",
 	"layout_analysis.corpus.kind.code": "شيفرة مصدرية",
 	"layout_analysis.corpus.entry": "{title} · {kind}",
+	"layout_analysis.tab.home": "الرئيسية",
 	"layout_analysis.tab.overview": "نظرة عامة",
 	"layout_analysis.tab.fingers": "الأصابع واليدان",
 	"layout_analysis.tab.bigrams": "الثنائيات",

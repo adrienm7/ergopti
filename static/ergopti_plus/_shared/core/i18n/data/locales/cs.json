@@ -5057,6 +5057,7 @@
 	"layout_analysis.corpus.kind.words": "Seznamy slov",
 	"layout_analysis.corpus.kind.code": "Zdrojový kód",
 	"layout_analysis.corpus.entry": "{title} · {kind}",
+	"layout_analysis.tab.home": "Úvod",
 	"layout_analysis.tab.overview": "Přehled",
 	"layout_analysis.tab.fingers": "Prsty a ruce",
 	"layout_analysis.tab.bigrams": "Bigramy",

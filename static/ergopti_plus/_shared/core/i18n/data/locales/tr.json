@@ -5057,6 +5057,7 @@
 	"layout_analysis.corpus.kind.words": "Kelime listeleri",
 	"layout_analysis.corpus.kind.code": "Kaynak kod",
 	"layout_analysis.corpus.entry": "{title} · {kind}",
+	"layout_analysis.tab.home": "Ana sayfa",
 	"layout_analysis.tab.overview": "Genel bakış",
 	"layout_analysis.tab.fingers": "Parmaklar ve eller",
 	"layout_analysis.tab.bigrams": "İkili gruplar",

@@ -5057,6 +5057,7 @@
 	"layout_analysis.corpus.kind.words": "Ordlistor",
 	"layout_analysis.corpus.kind.code": "Källkod",
 	"layout_analysis.corpus.entry": "{title} · {kind}",
+	"layout_analysis.tab.home": "Start",
 	"layout_analysis.tab.overview": "Översikt",
 	"layout_analysis.tab.fingers": "Fingrar och händer",
 	"layout_analysis.tab.bigrams": "Bigram",

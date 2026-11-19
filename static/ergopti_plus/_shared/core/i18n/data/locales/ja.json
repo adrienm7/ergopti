@@ -5057,6 +5057,7 @@
 	"layout_analysis.corpus.kind.words": "単語リスト",
 	"layout_analysis.corpus.kind.code": "ソースコード",
 	"layout_analysis.corpus.entry": "{title}・{kind}",
+	"layout_analysis.tab.home": "ホーム",
 	"layout_analysis.tab.overview": "概要",
 	"layout_analysis.tab.fingers": "指と手",
 	"layout_analysis.tab.bigrams": "バイグラム",

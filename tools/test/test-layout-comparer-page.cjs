@@ -714,6 +714,8 @@ check(
 	check(
 		JSON.stringify(tabs) ===
 			JSON.stringify([
+				// « Home » first (maintainer, 2026-11-18): the corpus, the layouts, the settings.
+				'home',
 				'overview',
 				'fingers',
 				'bigrams',
@@ -725,6 +727,15 @@ check(
 				'details'
 			]),
 		`tabs: ${tabs}`
+	);
+	// The tab strip leads the page: before « Home »'s corpus picker and the results.
+	check(
+		markup.indexOf('id="la-tabs"') >= 0 &&
+			markup.indexOf('id="la-tabs"') < markup.indexOf('id="la-corpus"') &&
+			markup.indexOf('id="la-panel-home"') < markup.indexOf('id="la-corpus"') &&
+			markup.indexOf('id="la-corpus"') < markup.indexOf('id="la-settings"') &&
+			markup.indexOf('id="la-settings"') < markup.indexOf('id="la-results"'),
+		'the tabs lead the page, and « Home » holds the corpus, the layouts and the settings'
 	);
 	for (const id of tabs) {
 		check(markup.includes(`id="la-panel-${id}"`), `tab ${id}: no panel`);
