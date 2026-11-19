@@ -71,10 +71,10 @@
 	<li>
 		<strong>Méthode "Clean"</strong> (recommandée) : installe la disposition dans un répertoire
 		d'extensions dédié (<code>/usr/share/xkeyboard-config.d/ergopti/</code>) sans modifier aucun
-		fichier système. Cette méthode nécessite <code>libxkbcommon</code> ≥ 1.13.0 et
-		<code>xkeyboard-config</code> ≥ 2.45 (Arch et Fedora récentes la proposent) ainsi qu'une
-		<strong>session Wayland</strong> : seul <code>libxkbcommon</code> lit ce répertoire, le serveur
-		Xorg compile ses dispositions avec son propre <code>xkbcomp</code> et ne le voit pas.
+		fichier système. Elle nécessite <code>libxkbcommon</code> ≥ 1.13.0,
+		<code>xkeyboard-config</code> ≥ 2.45 (présents sur les Arch et Fedora récentes) et une
+		<strong>session Wayland</strong>. En effet, seul <code>libxkbcommon</code> lit ce répertoire :
+		le serveur Xorg compile ses dispositions avec son propre <code>xkbcomp</code> et ne le voit pas.
 	</li>
 	<li>
 		<strong>Méthode "Legacy"</strong> : modifie directement les fichiers système XKB (<code
@@ -88,26 +88,26 @@
 	Le script de détection choisit automatiquement la méthode optimale selon votre système et votre
 	session, puis chacune de ses étapes affiche son résultat (plus rien n'est silencieux). Les couches
 	Maj, Verr Maj et AltGr sont fournies par un fichier de <em>types</em> désormais
-	<strong>toujours inclus</strong> : la couche raccourcis (<kbd>Ctrl</kbd>/<kbd>Alt</kbd>/<kbd
+	<strong>toujours inclus</strong>. La couche raccourcis (<kbd>Ctrl</kbd>/<kbd>Alt</kbd>/<kbd
 		>Win</kbd
-	>) rend la lettre de base Ergopti de chaque touche — et sur les touches sans lettre simple comme
+	>) rend la lettre de base Ergopti de chaque touche. Sur les touches sans lettre simple, comme
 	<kbd>é</kbd>, <kbd>à</kbd>, <kbd>ê</kbd>, <kbd>è</kbd>, elle rend respectivement
 	<kbd-output>C</kbd-output>, <kbd-output>V</kbd-output>, <kbd-output>X</kbd-output>,
 	<kbd-output>Z</kbd-output> pour garder Copier/Coller/Couper/Annuler sous les doigts. Après la
-	copie des fichiers, l'installeur compile réellement la disposition (seule, puis à côté d'une autre
-	disposition comme <code>us</code>) et vérifie que ce type personnalisé est bien présent avant de
-	déclarer l'installation réussie. La réinstallation par-dessus une version précédente (y compris
-	l'ancienne méthode) nettoie automatiquement les restes de l'installation antérieure. Enfin, la
-	variante « Ergopti++ » n'est plus proposée à l'installation : elle sature la table XCompose ;
-	utilisez Ergopti ou Ergopti+.
+	copie des fichiers, l'installeur compile la disposition, seule puis à côté d'une autre (comme
+	<code>us</code>). Il ne déclare l'installation réussie que si ce type personnalisé est bien
+	présent. La réinstallation par-dessus une version précédente (y compris l'ancienne méthode)
+	nettoie automatiquement les restes de l'installation antérieure. Enfin, la variante « Ergopti++ »
+	n'est plus proposée à l'installation : elle sature la table XCompose ; utilisez Ergopti ou
+	Ergopti+.
 </p>
 <p>
-	L'activation dans la session s'exécute toujours <strong>sans</strong> <code>sudo</code> : sur
-	GNOME (et ses dérivés) la disposition est placée en tête de vos sources de saisie existantes sans
-	en retirer aucune, sur KDE Plasma elle est ajoutée en tête de la liste des dispositions, sur une
-	session X11 elle est appliquée immédiatement avec <code>setxkbmap</code>. Les compositeurs qui
-	gèrent eux-mêmes leur clavier (Hyprland, Sway, niri, river, Wayfire, labwc) n'ont pas de réglage
-	commun : l'installeur affiche alors le fragment de configuration exact à coller dans leur fichier.
+	L'activation dans la session se fait toujours <strong>sans</strong> <code>sudo</code>. Sur GNOME
+	(et ses dérivés), la disposition est placée en tête de vos sources de saisie, sans en retirer
+	aucune. Sur KDE Plasma, elle est ajoutée en tête de la liste des dispositions. Sur une session
+	X11, elle est appliquée immédiatement avec <code>setxkbmap</code>. Les compositeurs qui gèrent
+	eux-mêmes leur clavier (Hyprland, Sway, niri, river, Wayfire, labwc) n'ont pas de réglage commun :
+	l'installeur affiche alors le fragment de configuration exact à coller dans leur fichier.
 </p>
 <p>
 	Le script demande les droits <code>sudo</code>. Pour désinstaller :
@@ -120,9 +120,10 @@
 </p>
 <p>
 	Si la disposition ne fonctionne pas, relancez la commande ci-dessus en ajoutant
-	<code>-s -- --diagnose</code> après <code>bash</code> : le rapport obtenu (système, session, versions
-	XKB, fichiers installés, réglages du bureau, compilation réelle de la disposition) est ce qu'il faut
-	joindre à un rapport de bug. Il ne demande aucun droit administrateur et ne modifie rien.
+	<code>-s -- --diagnose</code> après <code>bash</code>. Joignez le rapport obtenu à votre rapport
+	de bug : il décrit le système, la session, les versions XKB, les fichiers installés, les réglages
+	du bureau et la compilation de la disposition. Il ne demande aucun droit administrateur et ne
+	modifie rien.
 </p>
 
 <h3>Détails techniques de l'installation</h3>
@@ -238,8 +239,7 @@
 		touche. Ce problème peut probablement être résolu en utilisant un autre logiciel de remappage de
 		clavier, comme cela a été corrigé sur macOS. <br /> Un autre problème plus embêtant est que la
 		répétition de deux lettres ne fonctionne pas, notamment pour la lettre
-		<kbd>P</kbd>
-		où pour tapper <kbd-output>PP</kbd-output>, il faut appuyer quatre fois sur la touche
+		<kbd>P</kbd> : pour taper <kbd-output>PP</kbd-output>, il faut appuyer quatre fois sur la touche
 		<kbd>P</kbd>. Par conséquent, il est plutôt recommandé d'utiliser la version standard d'<Ergopti
 		></Ergopti> ou « Ergopti+ » (un seul +) avec le driver
 		<a href={resolve('/ergopti-plus')} class="link"><ErgoptiPlus /></a>.
