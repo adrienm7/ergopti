@@ -41,8 +41,9 @@
  *    fixed one (seeded random layouts).
  * 7. Bonuses: distinct characters and the capped coverage bonus, which never
  *    outweighs worse SFBs; each simplicity rule passing and failing.
- * 8. Speed: the whole library on a 2.5 MB corpus, from prepared tables, within
- *    a budget per layout, on the fastest of a few runs.
+ * 8. Speed: analysing the whole library on a 2.5 MB corpus, from prepared
+ *    tables, costs at most SPEED_WALKS_BOUND reference walks of the same table
+ *    (tools/test/lib/table-walk-speed.cjs), timed in the same process.
  * 9. Golden: every metric of every library layout on both French corpora (the
  *    speed corpus and the built-in Don Quichotte table) equals the reference
  *    values of library_golden.json, recorded before the engine's speed-ups,
@@ -94,6 +95,7 @@ const path = require('path');
 const vm = require('vm');
 const { spawnSync } = require('child_process');
 const { REPO_ROOT, shared } = require('../lib/paths.cjs');
+const { relativeSpeed, tableWalk } = require('./lib/table-walk-speed.cjs');
 
 const DATA_PATH = shared('ui', 'layout_analysis', '_generated', 'analysis_data.js');
 const ENGINE_PATH = shared('ui', 'layout_analysis', 'analysis_engine.js');
@@ -126,14 +128,17 @@ const LIBRARY_COUNT = 710;
 // The collections imported from their authors' own files: each of their
 // layouts is credited from the author's page (layout_credits.json).
 const CREDITED_SOURCES = ['handsdown', 'ergol_repo'];
-// Budget per library layout on the speed corpus, from prepared tables: the
-// 1.5 s the whole library had when it held 115 layouts, so a growing library
-// keeps the same budget per layout. The measured time is about 3 ms.
-const SPEED_BUDGET_MS_PER_LAYOUT = 13;
-// The library is ranked up to this many times and the fastest run counts: one
-// run's time follows the machine's load and the JIT warming up, the fastest
-// the engine's own work. A run within the budget ends the check.
-const SPEED_RUNS = 3;
+// Analysing the library costs 23 to 39 reference walks of its table with every
+// core of a Windows PC busy (2026-11-19: alone and inside this test, eight
+// more busy processes moved it by a tenth): the engine plans each character's
+// way and adds every metric's counters where the walk reads one key per
+// character. Whole runs on a quieter PC gave a ratio 1.6 times higher, about
+// 60 here. The bound is twice that: an engine three times slower fails on a
+// loaded machine, one twice as slow on a quiet one.
+const SPEED_WALKS_BOUND = 120;
+// Layouts per timed chunk, and the rounds the chunks run at most.
+const SPEED_CHUNK = 10;
+const SPEED_ROUNDS = 3;
 const TOLERANCE = 1e-6;
 // The golden metrics are compared to this relative gap: the values are
 // bit-identical on the machines measured; the margin only covers another
@@ -2106,19 +2111,20 @@ const bigLayout = (() => {
 // ========================
 
 const prepared = E.prepareNgrams(E.ngramsFromText(fs.readFileSync(SPEED_CORPUS, 'utf8')));
-const speedBudgetMs = SPEED_BUDGET_MS_PER_LAYOUT * library.length;
-const runsMs = [];
-while (runsMs.length < SPEED_RUNS && !(Math.min(...runsMs) < speedBudgetMs)) {
-	const start = process.hrtime.bigint();
-	E.compare(library, prepared, {});
-	runsMs.push(Number(process.hrtime.bigint() - start) / 1e6);
-}
-const elapsedMs = Math.min(...runsMs);
+const speed = relativeSpeed({
+	items: library,
+	chunk: SPEED_CHUNK,
+	reference: tableWalk(prepared),
+	subject: (layouts) => E.compare(layouts, prepared, {}),
+	bound: SPEED_WALKS_BOUND,
+	maxRounds: SPEED_ROUNDS
+});
+const elapsedMs = speed.subjectMs;
 check(
-	elapsedMs < speedBudgetMs,
-	`speed: ${library.length} layouts took ${runsMs.map((ms) => ms.toFixed(0)).join(', ')} ms ` +
-		`(fastest ${(elapsedMs / library.length).toFixed(1)} ms per layout, ` +
-		`budget ${SPEED_BUDGET_MS_PER_LAYOUT} ms)`
+	speed.ratio <= SPEED_WALKS_BOUND,
+	`speed: analysing ${library.length} layouts costs ${speed.ratio.toFixed(1)} reference walks ` +
+		`of the table (bound ${SPEED_WALKS_BOUND}): ${speed.subjectMs.toFixed(0)} ms against ` +
+		`${speed.referenceMs.toFixed(0)} ms, fastest chunks of ${speed.rounds} rounds`
 );
 
 // =========================
@@ -3191,6 +3197,7 @@ if (errors.length > 0) {
 }
 console.log(
 	`test-layout-analysis-engine: OK (${vectors.length} vectors, ${compared} values, ` +
-		`${library.length} layouts in ${elapsedMs.toFixed(0)} ms, ${goldenValues} golden values, ` +
+		`${library.length} layouts in ${elapsedMs.toFixed(0)} ms (${speed.ratio.toFixed(1)} table walks), ` +
+		`${goldenValues} golden values, ` +
 		`largest gap ${goldenGap.toExponential(1)})`
 );

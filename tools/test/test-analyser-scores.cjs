@@ -18,8 +18,9 @@
  *    fidelity and direction; an unknown analyser throws.
  * 3. Whole library: every library layout gets a finite value (or, for an
  *    analyser without a score, finite parts) from every analyser on a
- *    built-in corpus, within a time budget per layout (the fastest of a few
- *    passes).
+ *    built-in corpus, at a cost of at most SCORES_WALKS_BOUND reference walks
+ *    of the corpus table per layout (tools/test/lib/table-walk-speed.cjs),
+ *    timed in the same process.
  * ==============================================================================
  */
 
@@ -29,6 +30,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { shared } = require('../lib/paths.cjs');
+const { relativeSpeed, tableWalk } = require('./lib/table-walk-speed.cjs');
 
 const DIR = shared('ui', 'layout_analysis');
 const VECTORS_DIR = shared('tests', 'corpus', 'layout_analysis');
@@ -43,14 +45,15 @@ const SCRIPTS = [
 // Floors: an empty vector file or analyser list must not read as a pass.
 const MIN_VECTORS = 20;
 const MIN_ANALYSERS = 11;
-// Budget per library layout for every analyser, inside a vm context (slower
-// than a page: global lookups go through the context), both fingerings.
-// Measured about 160 ms.
-const BUDGET_MS_PER_LAYOUT = 600;
-// The sample is scored up to this many times and the fastest pass counts: one
-// pass follows the machine's load and the JIT warming up, the fastest the
-// scorers' own work. A pass within the budget ends the check.
-const SPEED_PASSES = 3;
+// Scoring a layout with every analyser, both fingerings, inside a vm context
+// (global lookups go through the context), costs about 2100 reference walks
+// of the corpus table with every core of a Windows PC busy (2026-11-19).
+// The engine's library ratio was 1.6 times higher on a quieter PC, about 3400
+// here. The bound is twice that: scorers three times slower fail on a loaded
+// machine, twice as slow on a quiet one.
+const SCORES_WALKS_BOUND = 7000;
+// The sample is scored up to this many rounds, one layout per timed chunk.
+const SPEED_ROUNDS = 3;
 const LIBRARY_SAMPLE = 30;
 const LETTERS_TEXT = 'Thequickbrownfoxjumpsoverthelazydog';
 const DIGITS_TEXT = '2024 or 1999, 35 and 46';
@@ -250,8 +253,6 @@ const corpus = E.prepareNgrams(
 	vm.runInContext('LAYOUT_ANALYSIS_CORPORA', sandbox).fr_don_quichotte
 );
 const sample = Array.from(library.values()).slice(0, LIBRARY_SAMPLE);
-const passesMs = [];
-let started = Date.now();
 for (const layout of sample) {
 	const both = S.scoreAll(layout, corpus, { keyboard: 'iso' });
 	const all = Object.fromEntries(Object.entries(both).map(([id, r]) => [id, r.official]));
@@ -264,21 +265,21 @@ for (const layout of sample) {
 		} else check(Number.isFinite(r.value), `${layout.id} ${a.id}: ${r.value} is not finite`);
 	}
 }
-passesMs.push(Date.now() - started);
-while (
-	passesMs.length < SPEED_PASSES &&
-	Math.min(...passesMs) / sample.length > BUDGET_MS_PER_LAYOUT
-) {
-	started = Date.now();
-	// A copy of each layout: the engine keeps its key n-grams per layout object.
-	for (const layout of sample) S.scoreAll({ ...layout }, corpus, { keyboard: 'iso' });
-	passesMs.push(Date.now() - started);
-}
-const perLayout = Math.min(...passesMs) / sample.length;
+// A copy of each layout: the engine keeps its key n-grams per layout object,
+// so every round scores from the start.
+const speed = relativeSpeed({
+	items: sample,
+	chunk: 1,
+	reference: tableWalk(corpus),
+	subject: ([layout]) => S.scoreAll({ ...layout }, corpus, { keyboard: 'iso' }),
+	bound: SCORES_WALKS_BOUND,
+	maxRounds: SPEED_ROUNDS
+});
 check(
-	perLayout <= BUDGET_MS_PER_LAYOUT,
-	`every analyser takes ${perLayout.toFixed(0)} ms per layout (fastest of ` +
-		`${passesMs.map((ms) => (ms / sample.length).toFixed(0)).join(', ')}), budget ${BUDGET_MS_PER_LAYOUT} ms`
+	speed.ratio <= SCORES_WALKS_BOUND,
+	`every analyser costs ${speed.ratio.toFixed(0)} reference walks of the corpus per layout ` +
+		`(bound ${SCORES_WALKS_BOUND}): ${speed.subjectMs.toFixed(0)} ms against ` +
+		`${speed.referenceMs.toFixed(3)} ms on ${sample.length} layouts, fastest of ${speed.rounds} rounds`
 );
 
 if (errors.length > 0) {
@@ -288,5 +289,6 @@ if (errors.length > 0) {
 }
 console.log(
 	`test-analyser-scores: OK (${analysers.length} analysers, ${vectors.length} vectors, ${compared} values, ` +
-		`${sample.length} layouts at ${perLayout.toFixed(0)} ms each)`
+		`${sample.length} layouts at ${(speed.subjectMs / sample.length).toFixed(0)} ms each, ` +
+		`${speed.ratio.toFixed(0)} table walks)`
 );
