@@ -164,7 +164,10 @@ function collectOperability(lists) {
 		const native = element.matches(NATIVE);
 		const disabled =
 			element.matches(':disabled') || element.getAttribute('aria-disabled') === 'true';
-		const focusable = element.matches(FOCUSABLE) && element.tabIndex >= 0;
+		// An editing host takes the focus without a tabindex (Chromium still
+		// reports tabIndex -1 for it); an explicit tabindex="-1" takes it out.
+		const editing = element.isContentEditable && element.getAttribute('tabindex') === null;
+		const focusable = element.matches(FOCUSABLE) && (element.tabIndex >= 0 || editing);
 		let keyHandled = recorded.roots.size > 0 && lists.keys.some((type) => recorded.roots.has(type));
 		for (let node = element; node && !keyHandled; node = node.parentElement) {
 			const own = typesOf(node);
@@ -181,8 +184,22 @@ function collectOperability(lists) {
 				element.parentElement.closest(
 					'[role="tablist"], [role="listbox"], [role="menu"], [role="menubar"], [role="grid"], [role="treegrid"], [role="tree"], [role="radiogroup"], [role="toolbar"]'
 				);
+			// A combobox drives its list boxes from outside them: a focusable
+			// field naming the widget in aria-controls and its active item in
+			// aria-activedescendant.
+			// The field's key listener answers for the active item.
+			const driver =
+				widget &&
+				widget.id &&
+				[...document.querySelectorAll('[aria-activedescendant][aria-controls]')].find(
+					(field) =>
+						field.tabIndex >= 0 &&
+						field.getAttribute('aria-controls').split(/\s+/).includes(widget.id)
+				);
+			if (driver && lists.keys.some((type) => typesOf(driver).has(type))) keyHandled = true;
 			if (widget)
 				roving =
+					Boolean(driver) ||
 					(widget.hasAttribute('aria-activedescendant') && widget.tabIndex >= 0) ||
 					[...widget.querySelectorAll('[role="' + role + '"]')].some(
 						(item) => item.tabIndex >= 0 && shown(item)

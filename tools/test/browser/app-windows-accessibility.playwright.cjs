@@ -600,6 +600,38 @@ async function selfCheck(chromium) {
 			[],
 			'Escape pressed in the shown dialog, not in the first hidden one'
 		);
+		// The shared judgement (lib/keyboard-operability.cjs) reads a combobox's
+		// options and a rich editor as the keyboard reaches them, and still
+		// refuses a list box nothing drives and an editor taken out of Tab.
+		const shared = await browser.newPage();
+		await shared.addInitScript(operability.instrumentListeners, {
+			pointer: operability.POINTER_EVENTS,
+			keys: operability.KEY_EVENTS
+		});
+		await shared.goto('about:blank');
+		await shared.setContent(`<main><h1>Shared</h1>
+			<input id="field" role="combobox" aria-controls="driven" aria-activedescendant="o1" aria-expanded="true">
+			<ul role="listbox" id="driven" aria-label="Driven"><li role="option" id="o1">One</li></ul>
+			<ul role="listbox" id="loose" aria-label="Loose"><li role="option" id="o2">Two</li></ul>
+			<div id="editor" contenteditable="true" role="textbox" aria-label="Editor">x</div>
+			<div id="pulled" contenteditable="true" role="textbox" aria-label="Pulled" tabindex="-1">y</div></main>`);
+		await shared.evaluate(() => {
+			for (const id of ['o1', 'o2', 'editor', 'pulled'])
+				document.getElementById(id).addEventListener('click', () => {});
+			document.getElementById('field').addEventListener('keydown', () => {});
+		});
+		const judged = operability
+			.operabilityProblems(
+				await shared.evaluate(operability.collectOperability, {
+					pointer: operability.POINTER_EVENTS,
+					keys: operability.KEY_EVENTS,
+					roles: operability.INTERACTIVE_ROLES
+				})
+			)
+			.join('\n');
+		assert.doesNotMatch(judged, /#o1|#editor/, 'A driven option and a rich editor pass');
+		assert.match(judged, /li#o2/, 'An option no field drives fails');
+		assert.match(judged, /div#pulled/, 'An editor out of the Tab order fails');
 	} finally {
 		await browser.close();
 	}
