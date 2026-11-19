@@ -1308,8 +1308,9 @@ async function exerciseComparerTabs(page) {
 	// A metric column sorts its better value first, and says so in aria-sort.
 	await page.click('#la-tab-bigrams');
 	await page.click('#la-table-bigrams thead button[data-sort="sfb"]');
+	// The value is the cell's first text; its percentile chip (« P70 ») follows it.
 	const sfb = await page.$$eval('#la-table-bigrams tbody tr td:nth-child(4)', (cells) =>
-		cells.map((cell) => Number(cell.textContent.replace(/[^\d.]/g, '')))
+		cells.map((cell) => Number(cell.firstChild.textContent.replace(/[^\d.]/g, '')))
 	);
 	assert.ok(
 		sfb.every((v, i) => i === 0 || sfb[i - 1] <= v),
