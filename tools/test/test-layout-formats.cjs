@@ -58,6 +58,10 @@
  *    from another version, cut, damaged, too large or holding a layout the
  *    engine refuses (an unknown key, a bad cell, an unknown field) is refused
  *    whole with its stable code.
+ * 13. KLA thumb keys: an ErgoDox file with a letter on a thumb key reads its
+ *    thumbs to the model's thumb keys (a lone capital as its letter's Shift,
+ *    the big keys first, a key beyond the codes named), a space-only file
+ *    still reads the space bar, and the ErgoDox export reads back the same.
  * ==============================================================================
  */
 
@@ -1326,6 +1330,75 @@ async function checkLinks() {
 	check(
 		message.key === 'layout_analysis.formats.refused.link_invalid',
 		`share link: the refusal is not worded: ${message.key}`
+	);
+}
+
+// ===================================================
+// ======= 13/ KLA thumb keys (thumb-letter files) ===
+// ===================================================
+
+{
+	// A Hands Down « ts » ErgoDox file as moutis/HandsDown writes it: t on the
+	// left thumb's inner 2-unit key (67), its capital alone on another left
+	// thumb key (69), the space on the right inner one (74), KLA fingers 5/6.
+	const key = (id, primary, finger, shift = -1) => ({
+		id,
+		primary,
+		shift,
+		altGr: -1,
+		shiftAltGr: -1,
+		finger
+	});
+	const thumbFile = (thumbs) => ({
+		label: 'thumb test',
+		keyboardType: 'ergodox',
+		keys: [key(29, 'r'.codePointAt(0), 1, 'R'.codePointAt(0)), ...thumbs]
+	});
+	const gold = F.fromKla(
+		thumbFile([key(67, 116, 5), key(69, 84, 5), key(74, 32, 6, 95), key(75, 13, 6)])
+	);
+	check(
+		JSON.stringify(gold.layout.rows.NonConvert) === '["t","T",null,null]' &&
+			JSON.stringify(gold.layout.rows.Convert) === '[" ","_",null,null]' &&
+			!gold.layout.rows.Space &&
+			gold.unmapped.length === 0,
+		`thumb keys: the Gold file reads ${JSON.stringify(gold.layout.rows)} ${JSON.stringify(gold.unmapped)}`
+	);
+	// A third right thumb key has no code: it is named, not dropped; the big
+	// keys (74, 75) take Convert before the small one (72) takes KanaMode.
+	const many = F.fromKla(
+		thumbFile([key(66, 32, 5), key(72, 45, 6), key(75, 101, 6), key(73, 120, 6)])
+	);
+	check(
+		many.layout.rows.NonConvert[0] === ' ' &&
+			many.layout.rows.Convert[0] === 'e' &&
+			many.layout.rows.KanaMode[0] === '-' &&
+			many.unmapped.length === 1 &&
+			/^73 \(x\)$/.test(many.unmapped[0].detail),
+		`thumb keys: the big keys first, the extra named: ${JSON.stringify(many.layout.rows)} ${JSON.stringify(many.unmapped)}`
+	);
+	// The space alone on the thumbs reads as before: the shared space bar.
+	const plain = F.fromKla(thumbFile([key(66, 32, 5), key(74, 32, 6)]));
+	check(
+		plain.layout.rows.Space[0] === ' ' && !plain.layout.rows.NonConvert,
+		`thumb keys: a space-only file does not read Space: ${JSON.stringify(plain.layout.rows)}`
+	);
+	// Written back on KLA's ErgoDox board, it reads to the same keys.
+	const written = F.toKla(gold.layout, DATA.model.fingerings.standard);
+	const back = F.fromKla(JSON.parse(JSON.stringify(written)));
+	check(
+		written.keyboardType === 'ergodox' &&
+			written.keys[67].finger === 5 &&
+			written.keys[74].finger === 6 &&
+			canonical(back.layout) === canonical(gold.layout),
+		`thumb keys: the ErgoDox export does not read back: ${JSON.stringify(back.layout.rows)}`
+	);
+	// The reader's thumb codes are the model's.
+	const codes = ['NonConvert', 'Convert', 'KanaMode'];
+	check(
+		JSON.stringify(DATA.model.thumb_keys) === JSON.stringify(codes) &&
+			JSON.stringify(DATA.model.thumb_rest_keys) === JSON.stringify(codes.slice(0, 2)),
+		`thumb keys: the model's ${DATA.model.thumb_keys} are not the KLA reader's ${codes}`
 	);
 }
 

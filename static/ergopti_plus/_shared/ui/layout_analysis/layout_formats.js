@@ -14,7 +14,8 @@
  *
  * FEATURES & RATIONALE:
  * 1. Formats read: Keyboard Layout Analyzer JSON (KLA, KLAnext and their
- *    forks, on the standard, european, ErgoDox and KLAnext matrix boards),
+ *    forks, on the standard, european, ErgoDox and KLAnext matrix boards, the
+ *    thumb keys of the last two included),
  *    Kalamine TOML and JSON (Ergo-L and its family), XKB symbols, Windows
  *    KLC, Oxeylyzer DOF (libdof's boards, anchors and layers), genkey
  *    layouts, cmini JSON and plain rows of characters. A macOS .keylayout
@@ -446,6 +447,39 @@ var LAYOUT_FORMATS = (function () {
 	})();
 	// The KLA finger number of each engine finger (1 left pinky … 10 right pinky).
 	const KLA_FINGERS = { lp: 1, lr: 2, lm: 3, li: 4, lt: 5, rt: 6, ri: 7, rm: 8, rr: 9, rp: 10 };
+	// The thumb keys of the analysis model (analysis_model.json thumb_keys), by
+	// thumb, in the order a thumb-letter file's keys take them: the first of
+	// each thumb is the one it rests on (thumb_rest_keys).
+	const KLA_THUMB_CODES = { left: ['NonConvert'], right: ['Convert', 'KanaMode'] };
+	const KLA_THUMB_HANDS = { 5: 'left', 6: 'right' };
+	// The boards with thumb clusters, and their big thumb keys (ErgoDox's
+	// 2-unit keys, KLA's index; KLAnext's matrix draws none bigger).
+	const KLA_THUMB_BOARDS = { ergodox: { big: [66, 67, 74, 75] }, matrix: { big: [] } };
+	// KLA's ErgoDox board for the writer: its size, the keys without a
+	// character (their primary and finger, from KLAnext's layouts/qwerty.en.ergodox.json),
+	// the thumb key each thumb code is written on (the ErgoDox inner 2-unit
+	// keys, where Hands Down's files put their thumb letter and space; KanaMode
+	// on the right cluster's lower small key) and the start key of each finger.
+	const KLA_ERGODOX = {
+		size: 76,
+		specials: {
+			14: [-95, 1],
+			28: [8, 1],
+			39: [13, 10],
+			40: [16, 1],
+			53: [-16, 10],
+			54: [-18, 1],
+			64: [20, 5],
+			67: [8, 5],
+			70: [18, 6],
+			71: [27, 6],
+			74: [9, 6],
+			75: [13, 6]
+		},
+		thumbs: { NonConvert: 67, Convert: 74, KanaMode: 73 },
+		space: 66,
+		fingerStart: { 1: 29, 2: 30, 3: 31, 4: 32, 5: 66, 6: 74, 7: 35, 8: 36, 9: 37, 10: 38 }
+	};
 	// The non-character keys of KLA's european board, by index: their primary.
 	const KLA_EUROPEAN_SPECIALS = {
 		13: 8,
@@ -871,6 +905,66 @@ var LAYOUT_FORMATS = (function () {
 	// ==========================
 
 	/**
+	 * The thumb keys of a KLA file on a board with thumb clusters (ErgoDox,
+	 * KLAnext's matrix), when one of them types something else than the space:
+	 * each thumb's keys, by the file's own finger (5 left, 6 right), take that
+	 * thumb's codes (KLA_THUMB_CODES), the big keys first, then by index; the
+	 * shared space bar (Space) is not used, so the space goes to the thumb the
+	 * file gives it. A key holding only the capital of a letter on another key
+	 * of the same thumb (Hands Down's « T » beside « t ») becomes that key's
+	 * Shift. A thumb key beyond its thumb's codes stays unmapped (null code),
+	 * reported. Otherwise (the space alone on the thumbs) nothing changes.
+	 * @param {string} type - The file's keyboardType.
+	 * @param {Map<number, object>} placed - Index → key.
+	 * @param {function(object): Array} cellsOf - A key's four cells.
+	 * @returns {{codes: Map<number, string|null>, cells: Map<number, Array>}}
+	 */
+	function klaThumbCodes(type, placed, cellsOf) {
+		const none = { codes: new Map(), cells: new Map() };
+		const spec = KLA_THUMB_BOARDS[type];
+		if (!spec) return none;
+		const board = KLA_KEYS[type];
+		const thumbs = [];
+		placed.forEach((key, index) => {
+			const hand = KLA_THUMB_HANDS[key.finger];
+			if (hand === undefined || (board[index] && board[index] !== 'Space')) return;
+			const cells = cellsOf(key);
+			if (cells.some((cell) => cell !== NONE)) thumbs.push({ index, hand, cells });
+		});
+		if (!thumbs.some((thumb) => thumb.cells.some((cell) => cell !== NONE && cell !== ' ')))
+			return none;
+		const out = { codes: new Map(), cells: new Map() };
+		for (const hand of Object.keys(KLA_THUMB_CODES)) {
+			const own = thumbs
+				.filter((thumb) => thumb.hand === hand)
+				.sort(
+					(a, b) => spec.big.includes(b.index) - spec.big.includes(a.index) || a.index - b.index
+				);
+			const kept = own.filter((thumb) => {
+				const [capital, ...rest] = thumb.cells;
+				if (!capital || rest.some((cell) => cell !== NONE)) return true;
+				const lower = own.find(
+					(other) =>
+						other !== thumb &&
+						other.cells[1] === NONE &&
+						other.cells[0] !== capital &&
+						other.cells[0] === capital.toLowerCase()
+				);
+				if (!lower) return true;
+				lower.cells = [lower.cells[0], capital, lower.cells[2], lower.cells[3]];
+				out.codes.set(thumb.index, null);
+				out.cells.set(thumb.index, [NONE, NONE, NONE, NONE]);
+				return false;
+			});
+			kept.forEach((thumb, i) => {
+				out.codes.set(thumb.index, KLA_THUMB_CODES[hand][i] || null);
+				out.cells.set(thumb.index, thumb.cells);
+			});
+		}
+		return out;
+	}
+
+	/**
 	 * Reads a Keyboard Layout Analyzer JSON (KLA, KLAnext, their forks).
 	 * @param {object} json - The parsed file.
 	 * @returns {object} {format, layout, unmapped}.
@@ -896,10 +990,13 @@ var LAYOUT_FORMATS = (function () {
 			if (!key || typeof key !== 'object') fail('format_invalid', `keys[${index}]`);
 			placed.set(Number.isInteger(key.id) && key.id >= 0 ? key.id : index, key);
 		});
+		const cellsOf = (key) =>
+			['primary', 'shift', 'altGr', 'shiftAltGr'].map((field) => cellOf(key[field]));
+		const thumbCodes = klaThumbCodes(json.keyboardType, placed, cellsOf);
 		placed.forEach((key, index) => {
-			const cells = ['primary', 'shift', 'altGr', 'shiftAltGr'].map((field) => cellOf(key[field]));
+			const cells = thumbCodes.cells.get(index) || cellsOf(key);
 			if (cells.every((cell) => cell === NONE)) return;
-			const code = board[index];
+			const code = thumbCodes.codes.has(index) ? thumbCodes.codes.get(index) : board[index];
 			if (!code) {
 				// A key the ISO board has no place for (an ErgoDox thumb or outer
 				// column): its characters are named so the user sees what is left out.
@@ -1654,12 +1751,16 @@ var LAYOUT_FORMATS = (function () {
 
 	/**
 	 * Writes a layout as a Keyboard Layout Analyzer JSON on its european
-	 * (ISO) board, with the engine's standard fingering.
+	 * (ISO) board, with the engine's standard fingering; a layout with
+	 * characters on thumb keys goes on its ErgoDox board (toKlaErgodox), which
+	 * KLA and KLAnext both read.
 	 * @param {object} layout - The layout (library shape).
 	 * @param {object} fingering - code → finger id (LAYOUT_ANALYSIS_DATA.model.fingerings.standard).
 	 * @returns {object} The JSON object; dead keys cannot be written (KLA has none).
 	 */
 	function toKla(layout, fingering) {
+		const thumbCodes = [].concat(...Object.values(KLA_THUMB_CODES));
+		if (thumbCodes.some((code) => layout.rows[code])) return toKlaErgodox(layout, fingering);
 		const byCode = {};
 		for (const [index, code] of Object.entries(KLA_KEYS.european)) byCode[code] = Number(index);
 		const keys = [];
@@ -1683,6 +1784,57 @@ var LAYOUT_FORMATS = (function () {
 			author: '',
 			fingerStart: { 1: 29, 2: 30, 3: 31, 4: 32, 5: 57, 6: 57, 7: 35, 8: 36, 9: 37, 10: 38 },
 			keyboardType: 'european',
+			keys
+		};
+	}
+
+	/**
+	 * Writes a layout with characters on its thumb keys (NonConvert, Convert,
+	 * KanaMode) as a KLA JSON on its ErgoDox board, the one KLA and KLAnext
+	 * draw thumb clusters on: each thumb code on its ErgoDox thumb key
+	 * (KLA_ERGODOX.thumbs) with its thumb's finger, the space bar on the left
+	 * thumb's outer key, the other keys where fromKla reads them back.
+	 * @param {object} layout - The layout (library shape).
+	 * @param {object} fingering - code → finger id (the standard fingering).
+	 * @returns {object} The JSON object.
+	 */
+	function toKlaErgodox(layout, fingering) {
+		const byCode = { Space: KLA_ERGODOX.space };
+		for (const [index, code] of Object.entries(KLA_KEYS.ergodox))
+			if (byCode[code] === undefined) byCode[code] = Number(index);
+		const fingerOf = {};
+		for (const [code, index] of Object.entries(KLA_ERGODOX.thumbs)) {
+			byCode[code] = index;
+			fingerOf[code] = KLA_THUMB_CODES.left.includes(code) ? 5 : 6;
+		}
+		fingerOf.Space = 5;
+		const keys = [];
+		for (let id = 0; id < KLA_ERGODOX.size; id++) {
+			const special = KLA_ERGODOX.specials[id];
+			keys.push({
+				id,
+				primary: special ? special[0] : -1,
+				shift: -1,
+				altGr: -1,
+				shiftAltGr: -1,
+				finger: special ? special[1] : 1
+			});
+		}
+		for (const [code, row] of Object.entries(layout.rows)) {
+			const index = byCode[code];
+			if (index === undefined) continue;
+			['primary', 'shift', 'altGr', 'shiftAltGr'].forEach((field, layer) => {
+				const cell = row[layer];
+				keys[index][field] =
+					typeof cell === 'string' && Array.from(cell).length === 1 ? cell.codePointAt(0) : -1;
+			});
+			keys[index].finger = fingerOf[code] || KLA_FINGERS[fingering[code]] || 1;
+		}
+		return {
+			label: layout.name || layout.id,
+			author: '',
+			fingerStart: KLA_ERGODOX.fingerStart,
+			keyboardType: 'ergodox',
 			keys
 		};
 	}
