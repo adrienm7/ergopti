@@ -350,16 +350,20 @@ async function expectStudioWorkspace(page, origin, basePath, route) {
 	);
 	// The tab bar continues the top menu's dark band, in the menu's style: no
 	// page background between the header, the tabs and the tool (maintainer,
-	// 2026-11-15), and text tabs, not pills.
+	// 2026-11-15), and text tabs, not pills. The band is the whole bar (the
+	// Studio's name, its tabs and « Apparence », 2026-11-18), not the tabs
+	// alone, which share its width with the name.
 	const bar = await page.evaluate(() => {
-		const nav = document.querySelector('.studio-shell nav.subnav');
+		const band = document.querySelector('.studio-shell .studio-bar');
+		const nav = band.querySelector('nav.subnav');
 		const header = document.querySelector('header');
 		const tab = nav.querySelector('a');
 		return {
-			background: getComputedStyle(nav).backgroundColor,
+			background: getComputedStyle(band).backgroundColor,
+			tabsBackground: getComputedStyle(nav).backgroundColor,
 			headerBackground: getComputedStyle(header).backgroundColor,
-			top: nav.getBoundingClientRect().top,
-			bottom: nav.getBoundingClientRect().bottom,
+			top: band.getBoundingClientRect().top,
+			bottom: band.getBoundingClientRect().bottom,
 			// On a phone the dev banner is a band right under the header.
 			headerBottom: Math.max(
 				header.getBoundingClientRect().bottom,
@@ -367,8 +371,8 @@ async function expectStudioWorkspace(page, origin, basePath, route) {
 					.filter((banner) => getComputedStyle(banner).transform === 'none')
 					.map((banner) => banner.getBoundingClientRect().bottom)
 			),
-			left: nav.getBoundingClientRect().left,
-			width: nav.getBoundingClientRect().width,
+			left: band.getBoundingClientRect().left,
+			width: band.getBoundingClientRect().width,
 			tabRadius: getComputedStyle(tab).borderTopLeftRadius
 		};
 	});
@@ -376,6 +380,11 @@ async function expectStudioWorkspace(page, origin, basePath, route) {
 		bar.background,
 		bar.headerBackground,
 		'Studio tab bar in the header color on ' + route
+	);
+	assert.equal(
+		bar.tabsBackground,
+		bar.headerBackground,
+		'Studio tabs in the header color on ' + route
 	);
 	assert.ok(
 		Math.abs(bar.top - bar.headerBottom) <= 1,
