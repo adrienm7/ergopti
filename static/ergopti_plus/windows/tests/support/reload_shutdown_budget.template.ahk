@@ -55,6 +55,19 @@ LoggerError(*) {
 }
 LoggerInfo(*) {
 }
+LoggerStart(*) {
+}
+LoggerSuccess(*) {
+}
+LoggerWarn(*) {
+}
+; The hand-off reads its successor deadline from the timing registry; the model
+; drives time through TickExpired, so any value serves, but only that key.
+TimingsGet(Section, Key) {
+	if (Section != "ui" || Key != "reload_successor_deadline_ms")
+		return _RQSB_UnexpectedFacade("TimingsGet " . Section . "." . Key)
+	return 30000
+}
 UninstallCancel() {
 	return true
 }
