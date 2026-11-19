@@ -393,26 +393,25 @@ function buildHead() {
 	head.innerHTML = COLUMNS.map(function (c) {
 		var sorted =
 			c.sort && c.sort === _sortKey ? (_sortDir === 1 ? 'ascending' : 'descending') : 'none';
+		// A sortable header holds a button: the keyboard reaches and presses
+		// it like any control, and the cell keeps aria-sort for readers.
+		var label = _escHtml(_t(c.header));
 		return (
 			'<th scope="col" class="' +
 			c.cls +
 			'"' +
-			(c.sort ? ' data-sort="' + c.sort + '" tabindex="0" aria-sort="' + sorted + '"' : '') +
+			(c.sort ? ' aria-sort="' + sorted + '"' : '') +
 			'>' +
-			_escHtml(_t(c.header)) +
+			(c.sort
+				? '<button type="button" class="sort-btn" data-sort="' + c.sort + '">' + label + '</button>'
+				: label) +
 			'</th>'
 		);
 	}).join('');
 	if (typeof head.querySelectorAll !== 'function') return;
-	head.querySelectorAll('th[data-sort]').forEach(function (th) {
-		th.onclick = function () {
-			setSort(th.getAttribute('data-sort'));
-		};
-		th.onkeydown = function (ev) {
-			if (ev.key === 'Enter' || ev.key === ' ') {
-				ev.preventDefault();
-				setSort(th.getAttribute('data-sort'));
-			}
+	head.querySelectorAll('button[data-sort]').forEach(function (button) {
+		button.onclick = function () {
+			setSort(button.getAttribute('data-sort'));
 		};
 	});
 }

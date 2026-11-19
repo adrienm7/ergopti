@@ -428,7 +428,19 @@ tbody tr.unavailable td.col-actions {
 
 tbody tr:focus,
 button:focus-visible,
-thead th:focus-visible,
+/* The sort button reads as the header text it replaces. */
+thead .sort-btn {
+	background: none;
+	border: 0;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	padding: 0;
+	text-align: inherit;
+	width: 100%;
+}
+
+thead .sort-btn:focus-visible,
 #backend-filter:focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: -2px;

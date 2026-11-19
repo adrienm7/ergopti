@@ -105,12 +105,12 @@ class Element {
 	}
 }
 
-/** The selectors the page uses: tag, tr[data-key] and th[data-sort]. */
+/** The selectors the page uses: tag, tr[data-key] and button[data-sort]. */
 function matches(el, selector) {
 	if (selector === 'tbody') return el.tagName === 'TBODY';
 	if (selector === 'tr[data-key]')
 		return el.tagName === 'TR' && el.getAttribute('data-key') !== null;
-	if (selector === 'th[data-sort]') return false;
+	if (selector === 'button[data-sort]') return false;
 	if (selector === '[data-nav]') return el.getAttribute('data-nav') !== null;
 	return false;
 }
@@ -437,8 +437,16 @@ for (const id of ['mlx', 'ollama', 'api']) toggleOf(page, id).onclick();
 const rows = drawnRows(page.byId);
 
 // Columns: one header per declared column, translated, in the declared order.
-const headers = [...page.byId['head-row'].innerHTML.matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map(
-	(m) => m[1]
+// A sortable header's text sits in its sort button (WCAG 2.1.1: a cell is no control).
+const headers = [
+	...page.byId['head-row'].innerHTML.matchAll(
+		/<th[^>]*>(?:<button type="button" class="sort-btn" data-sort="[a-z_]+">)?([^<]*)(?:<\/button>)?<\/th>/g
+	)
+].map((m) => m[1]);
+assert.equal(
+	(page.byId['head-row'].innerHTML.match(/<th[^>]*tabindex/g) || []).length,
+	0,
+	'no header cell takes the focus itself'
 );
 assert.deepEqual(
 	headers,
