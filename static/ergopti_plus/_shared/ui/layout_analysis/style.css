@@ -1161,24 +1161,33 @@ body:has(> main.layout-analysis) {
 	width: 7em;
 }
 
-/* The tab strip wraps instead of scrolling the page at phone width. */
+/* The tab strip leads the page and wraps instead of scrolling it at phone
+   width, so no tab is ever hidden. Each tab carries its icon in its accent
+   slot; the chosen one stands on the surface with a bar in that colour and
+   heavier text (not colour alone). */
 .la-tabs {
-	border-bottom: 1px solid var(--la-border);
+	background: var(--la-surface-2);
+	border: 1px solid var(--la-border);
+	border-radius: 12px;
 	display: flex;
 	flex-wrap: wrap;
-	gap: 2px 4px;
-	margin: 8px 0 16px;
+	gap: 4px;
+	margin: 12px 0 16px;
+	padding: 6px;
 }
 
 .layout-analysis .la-tab {
+	align-items: center;
 	background: none;
 	border: 0;
 	border-bottom: 3px solid transparent;
-	border-radius: 6px 6px 0 0;
+	border-radius: 8px;
 	color: var(--la-sub);
+	display: inline-flex;
 	font-weight: 600;
-	margin-bottom: -1px;
-	padding: 8px 12px;
+	gap: 8px;
+	min-height: 40px;
+	padding: 6px 12px;
 }
 
 .layout-analysis .la-tab:hover {
@@ -1187,8 +1196,47 @@ body:has(> main.layout-analysis) {
 }
 
 .layout-analysis .la-tab[aria-selected='true'] {
-	border-bottom-color: var(--la-accent);
+	background: var(--la-surface);
+	border-bottom-color: var(--la-tab-accent);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 	color: inherit;
+	font-weight: 700;
+}
+
+/* Each tab's mark (theme.css « Marks », 3:1 on the surfaces). */
+.la-tab-accent-1 {
+	--la-tab-accent: var(--theme-mark-1);
+}
+
+.la-tab-accent-2 {
+	--la-tab-accent: var(--theme-mark-2);
+}
+
+.la-tab-accent-3 {
+	--la-tab-accent: var(--theme-mark-3);
+}
+
+.la-tab-accent-4 {
+	--la-tab-accent: var(--theme-mark-4);
+}
+
+.la-tab-accent-5 {
+	--la-tab-accent: var(--theme-mark-5);
+}
+
+.la-tab-accent-6 {
+	--la-tab-accent: var(--theme-mark-6);
+}
+
+.la-tab-icon {
+	fill: none;
+	flex: none;
+	height: 1.3em;
+	stroke: var(--la-tab-accent);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 2;
+	width: 1.3em;
 }
 
 .la-tab-panel {

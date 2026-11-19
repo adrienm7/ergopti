@@ -264,6 +264,34 @@
 		forms: 'M3 8h18v8H3zM3 12h18M9 8v8M15 8v8'
 	};
 	const SVG_NS = 'http://www.w3.org/2000/svg';
+	// Each tab's icon (24 × 24 strokes, the settings sections' set) and its
+	// accent slot of theme.css « Chart look » (maintainer, 2026-11-18: the tabs
+	// say at a glance what each holds). Both are decorative: the tab's text
+	// names it, and the chosen tab is marked by its bar and weight too.
+	const TAB_ICONS = {
+		home: 'M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6',
+		overview: 'M4 20V11M10 20V4M16 20v-7M2 20h20',
+		fingers: 'M7 21v-7l-2-3M10 14V5M13 14V3M16 14V5M19 14V8M7 14h12v2a5 5 0 0 1-5 5h-2',
+		bigrams: 'M3 7h7v10H3zM14 7h7v10h-7z',
+		trigrams: 'M2 8h5v8H2zM9.5 8h5v8h-5zM17 8h5v8h-5z',
+		rows: 'M3 6h18M5 12h16M7 18h14',
+		heatmaps: 'M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z',
+		misc: 'M12 3v18M3 12h18M6 6l12 12M18 6L6 18',
+		analysers: 'M10 4a6 6 0 1 0 0.01 0M15 15l6 6',
+		details: 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6'
+	};
+	const TAB_SLOT = {
+		home: 1,
+		overview: 2,
+		fingers: 3,
+		bigrams: 4,
+		trigrams: 5,
+		rows: 6,
+		heatmaps: 1,
+		misc: 2,
+		analysers: 3,
+		details: 4
+	};
 
 	// The metrics each themed tab charts, one bar chart each and one table;
 	// every metric of the engine is in exactly one tab (test-layout-comparer-page.cjs).
@@ -1620,7 +1648,8 @@
 			const list = $('la-tabs');
 			list.replaceChildren(
 				...TABS.map((id) => {
-					const button = el('button', 'la-tab', TAB_LABEL[id]());
+					const button = el('button', `la-tab la-tab-accent-${TAB_SLOT[id]}`);
+					button.append(tabIcon(id), el('span', 'la-tab-label', TAB_LABEL[id]()));
 					button.type = 'button';
 					button.id = `la-tab-${id}`;
 					button.setAttribute('role', 'tab');
@@ -1644,6 +1673,19 @@
 				})
 			);
 			showTab();
+		}
+
+		/** A tab's decorative icon (TAB_ICONS): its text names the tab. */
+		function tabIcon(id) {
+			const svg = document.createElementNS(SVG_NS, 'svg');
+			svg.setAttribute('class', 'la-tab-icon');
+			svg.setAttribute('viewBox', '0 0 24 24');
+			svg.setAttribute('aria-hidden', 'true');
+			svg.setAttribute('focusable', 'false');
+			const path = document.createElementNS(SVG_NS, 'path');
+			path.setAttribute('d', TAB_ICONS[id]);
+			svg.append(path);
+			return svg;
 		}
 
 		/** Marks the chosen tab and shows its panel only. */

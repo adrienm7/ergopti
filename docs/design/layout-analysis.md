@@ -909,7 +909,12 @@ language, completeness (complete, incomplete or both) and a score range, with
 
 **Tabs** (`#la-tabs`, named by the page title, the ARIA tabs pattern: arrows,
 Home and End move; one panel at a time; the last one the visitor chose is saved
-as `tab`, a link naming `details` opens « One layout »). The overview is drawn after every
+as `tab`, a link naming `details` opens « One layout »). Each tab carries a
+decorative icon (`TAB_ICONS`, the settings sections' 24 × 24 stroke set,
+`aria-hidden`) in its mark (`TAB_SLOT`, theme.css `--theme-mark-<n>`: the six
+chart hues darkened in light so an icon holds 3:1 on the surfaces, white in
+high contrast); the chosen tab stands on the surface with a bar in its mark
+and heavier text, so colour is never its only cue. The overview is drawn after every
 analysis, another tab when it is shown.
 
 - **Overview**: the global score chart (bars from the weakest shown to the best,

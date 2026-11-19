@@ -433,6 +433,47 @@
 	--theme-chart-cat-6: #0ca30c;
 }
 
+/* Marks: the six chart hues as a tab's or a section's icon and edge, darkened
+   in light so each holds 3:1 on the surfaces (3.9:1 at worst on
+   --theme-surface-2, 3.5:1 on the dark one); high contrast draws them white. */
+:root {
+	--theme-mark-1: #2a78d6;
+	--theme-mark-2: #c4501f;
+	--theme-mark-3: #0b8a5c;
+	--theme-mark-4: #9a6700;
+	--theme-mark-5: #c2457a;
+	--theme-mark-6: #008300;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--theme-mark-1: #3987e5;
+		--theme-mark-2: #d95926;
+		--theme-mark-3: #199e70;
+		--theme-mark-4: #c98500;
+		--theme-mark-5: #d55181;
+		--theme-mark-6: #0ca30c;
+	}
+}
+
+:root[data-theme='dark'] {
+	--theme-mark-1: #3987e5;
+	--theme-mark-2: #d95926;
+	--theme-mark-3: #199e70;
+	--theme-mark-4: #c98500;
+	--theme-mark-5: #d55181;
+	--theme-mark-6: #0ca30c;
+}
+
+:root[data-a11y-contrast='high'] {
+	--theme-mark-1: var(--theme-white);
+	--theme-mark-2: var(--theme-white);
+	--theme-mark-3: var(--theme-white);
+	--theme-mark-4: var(--theme-white);
+	--theme-mark-5: var(--theme-white);
+	--theme-mark-6: var(--theme-white);
+}
+
 /* The heat scale of every count figure (the Studio's heat maps, their tables,
    the bigram matrix, the editor's key colours): blue for the least, through
    green, yellow and orange, to red for the most (maintainer, 2026-11-18). Each

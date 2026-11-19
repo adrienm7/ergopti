@@ -1649,6 +1649,73 @@ async function exerciseComparerHome(browser, origin) {
 			},
 			`${colorScheme}: « Home » first, open on a fresh visit, holding the setup`
 		);
+		// (comparer-tab-icons) Each tab shows a decorative icon in its accent; its
+		// text stays its name; the chosen tab is marked by a bar and weight, not
+		// colour alone; icons hold 3:1 and labels 4.5:1 on their background.
+		const tabs = await page.$$eval('#la-tabs [role="tab"]', (list) => {
+			const rgb = (text) => (text.match(/[\d.]+/g) || []).slice(0, 4).map(Number);
+			const luminance = ([r, g, b]) => {
+				const lin = (c) => {
+					const v = c / 255;
+					return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+				};
+				return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+			};
+			const contrast = (a, b) => {
+				const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m);
+				return (x + 0.05) / (y + 0.05);
+			};
+			// The first opaque background behind a node.
+			const backdrop = (node) => {
+				for (let at = node; at; at = at.parentElement) {
+					const colour = rgb(getComputedStyle(at).backgroundColor);
+					if (colour.length >= 3 && (colour.length === 3 || colour[3] > 0.5)) return colour;
+				}
+				return [255, 255, 255];
+			};
+			return list.map((tab) => {
+				const icon = tab.querySelector('svg.la-tab-icon');
+				const style = getComputedStyle(tab);
+				const back = backdrop(tab);
+				return {
+					id: tab.id,
+					icon: Boolean(icon),
+					hidden: icon ? icon.getAttribute('aria-hidden') === 'true' : false,
+					focusable: icon ? icon.getAttribute('focusable') : null,
+					name: tab.textContent.trim(),
+					label: tab.querySelector('.la-tab-label')?.textContent.trim(),
+					selected: tab.getAttribute('aria-selected') === 'true',
+					bar: parseFloat(style.borderBottomWidth),
+					barColour: style.borderBottomColor,
+					weight: Number(style.fontWeight),
+					iconContrast: icon ? contrast(rgb(getComputedStyle(icon).stroke), back) : 0,
+					textContrast: contrast(rgb(style.color), back)
+				};
+			});
+		});
+		for (const tab of tabs) {
+			assert.ok(tab.icon && tab.hidden && tab.focusable === 'false', `${tab.id}: a hidden icon`);
+			assert.ok(tab.name && tab.name === tab.label, `${tab.id}: named by its text (${tab.name})`);
+			assert.ok(tab.iconContrast >= 3, `${colorScheme} ${tab.id}: icon ${tab.iconContrast}`);
+			assert.ok(tab.textContrast >= 4.5, `${colorScheme} ${tab.id}: text ${tab.textContrast}`);
+		}
+		const chosen = tabs.find((tab) => tab.selected);
+		const others = tabs.filter((tab) => !tab.selected);
+		assert.ok(
+			others.every(
+				(tab) => chosen.weight > tab.weight && !/rgba\(0, 0, 0, 0\)/.test(chosen.barColour)
+			),
+			`${colorScheme}: the chosen tab is heavier and barred, not only coloured`
+		);
+		assert.ok(chosen.bar >= 3, 'a bar of 3 px at least');
+		assert.ok(
+			(
+				await page.$$eval('#la-tabs .la-tab-icon', (icons) => [
+					...new Set(icons.map((icon) => getComputedStyle(icon).stroke))
+				])
+			).length >= 5,
+			'the tabs carry several accents'
+		);
 		// The arrows move to the results and back, the focus following.
 		await page.focus('#la-tab-home');
 		await page.keyboard.press('ArrowRight');
