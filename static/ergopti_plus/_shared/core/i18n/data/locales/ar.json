@@ -390,7 +390,7 @@
 	"layout_editor.error.workspace_store_unavailable": "لا يحتفظ هذا المتصفح بأي بيانات للصفحة (نافذة خاصة؟): صدّر نسخة احتياطية قبل المغادرة.",
 	"layout_editor.error.backup_invalid": "هذا الملف ليس أرشيف ZIP قابلًا للقراءة. اختر نسخة احتياطية صدّرها المحرر (ملف .zip).",
 	"layout_editor.error.backup_deflate_unsupported": "لا يستطيع هذا المتصفح فك ضغط أرشيف مضغوط. افتح المحرر في إصدار حديث من Chrome أو Edge أو Firefox أو Safari.",
-	"layout_editor.error.import_unsupported": "تُستورد ملفات .toml و.keylayout و.zip فقط.",
+	"layout_editor.error.import_unsupported": "يقبل الاستيراد الملفات نفسها التي يقبلها «{open}» ({extensions}) والنسخ الاحتياطية ‎.zip.",
 	"layout_editor.error.studio_invalid_layout": "رفض Ergopti+ التخطيط الذي أرسلته الصفحة.",
 	"layout_editor.error.studio_write_failed": "تعذّر على Ergopti+ الكتابة في مجلد بياناتك. تحقق من أن المجلد قابل للكتابة وفيه مساحة فارغة، ثم أعد المحاولة.",
 	"layout_editor.error.studio_unreadable": "الملف الذي يحفظ فيه Ergopti+ بيانات Studio الخاصة بك تالف؛ تُرك دون أي تغيير.",

@@ -390,7 +390,7 @@
 	"layout_editor.error.workspace_store_unavailable": "此浏览器不为该页面保留任何数据（无痕窗口？）：离开前请导出备份。",
 	"layout_editor.error.backup_invalid": "此文件不是可读取的 ZIP 压缩包。请选择由编辑器导出的备份（.zip 文件）。",
 	"layout_editor.error.backup_deflate_unsupported": "此浏览器无法解压压缩包。请在最新版的 Chrome、Edge、Firefox 或 Safari 中打开编辑器。",
-	"layout_editor.error.import_unsupported": "仅可导入 .toml、.keylayout 和 .zip 文件。",
+	"layout_editor.error.import_unsupported": "导入接受与“{open}”相同的文件（{extensions}）以及 .zip 备份。",
 	"layout_editor.error.studio_invalid_layout": "Ergopti+ 拒绝了页面发送的布局。",
 	"layout_editor.error.studio_write_failed": "Ergopti+ 无法写入你的数据文件夹。请确认该文件夹可写入且有剩余空间，然后重试。",
 	"layout_editor.error.studio_unreadable": "Ergopti+ 保存你的 Studio 数据的文件已损坏；该文件保持不动。",

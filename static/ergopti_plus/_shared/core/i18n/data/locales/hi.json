@@ -390,7 +390,7 @@
 	"layout_editor.error.workspace_store_unavailable": "यह ब्राउज़र इस पेज का कोई डेटा नहीं रखता (निजी विंडो?): जाने से पहले एक बैकअप निर्यात करें।",
 	"layout_editor.error.backup_invalid": "यह फ़ाइल पढ़ने योग्य ZIP आर्काइव नहीं है। संपादक द्वारा निर्यात किया गया बैकअप (एक .zip फ़ाइल) चुनें।",
 	"layout_editor.error.backup_deflate_unsupported": "यह ब्राउज़र संपीड़ित आर्काइव को खोल नहीं सकता। संपादक को Chrome, Edge, Firefox या Safari के अद्यतन संस्करण में खोलें।",
-	"layout_editor.error.import_unsupported": "केवल .toml, .keylayout और .zip फ़ाइलें आयात होती हैं।",
+	"layout_editor.error.import_unsupported": "आयात वही फ़ाइलें लेता है जो “{open}” खोलता है ({extensions}) और .zip बैकअप।",
 	"layout_editor.error.studio_invalid_layout": "Ergopti+ ने पेज द्वारा भेजा गया लेआउट अस्वीकार कर दिया।",
 	"layout_editor.error.studio_write_failed": "Ergopti+ आपके डेटा फ़ोल्डर में नहीं लिख सका। जाँचें कि फ़ोल्डर में लिखा जा सकता है और खाली जगह है, फिर से कोशिश करें।",
 	"layout_editor.error.studio_unreadable": "जिस फ़ाइल में Ergopti+ आपका Studio डेटा रखता है वह ख़राब है; उसे छुआ नहीं गया है।",

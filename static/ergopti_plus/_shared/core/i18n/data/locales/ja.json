@@ -390,7 +390,7 @@
 	"layout_editor.error.workspace_store_unavailable": "このブラウザーはこのページのデータを保持しません（プライベートウィンドウ？）。離れる前にバックアップをエクスポートしてください。",
 	"layout_editor.error.backup_invalid": "このファイルは読み取り可能な ZIP アーカイブではありません。エディターでエクスポートしたバックアップ（.zip ファイル）を選んでください。",
 	"layout_editor.error.backup_deflate_unsupported": "このブラウザーは圧縮されたアーカイブを展開できません。最新の Chrome、Edge、Firefox、Safari のいずれかでエディターを開いてください。",
-	"layout_editor.error.import_unsupported": "読み込めるのは .toml、.keylayout、.zip ファイルのみです。",
+	"layout_editor.error.import_unsupported": "読み込みでは「{open}」と同じファイル（{extensions}）と .zip バックアップを使えます。",
 	"layout_editor.error.studio_invalid_layout": "Ergopti+ はページから送られた配列を拒否しました。",
 	"layout_editor.error.studio_write_failed": "Ergopti+ はデータフォルダーに書き込めませんでした。フォルダーに書き込みができ、空き容量があることを確認してから、もう一度お試しください。",
 	"layout_editor.error.studio_unreadable": "Ergopti+ が Studio のデータを保存しているファイルが破損しています。ファイルには手を加えません。",

@@ -390,7 +390,7 @@
 	"layout_editor.error.workspace_store_unavailable": "Bu tarayıcı sayfa için veri saklamıyor (gizli pencere mi?): ayrılmadan önce bir yedek dışa aktarın.",
 	"layout_editor.error.backup_invalid": "Bu dosya okunabilir bir ZIP arşivi değil. Düzenleyicinin dışa aktardığı bir yedeği (.zip dosyası) seçin.",
 	"layout_editor.error.backup_deflate_unsupported": "Bu tarayıcı sıkıştırılmış bir arşivi açamıyor. Düzenleyiciyi güncel bir Chrome, Edge, Firefox veya Safari'de açın.",
-	"layout_editor.error.import_unsupported": "Yalnızca .toml, .keylayout ve .zip dosyaları içe aktarılır.",
+	"layout_editor.error.import_unsupported": "İçe aktarma, “{open}” ile aynı dosyaları ({extensions}) ve .zip yedeklerini alır.",
 	"layout_editor.error.studio_invalid_layout": "Ergopti+ sayfanın gönderdiği düzeni reddetti.",
 	"layout_editor.error.studio_write_failed": "Ergopti+ veri klasörünüze yazamadı. Klasörün yazılabilir olduğunu ve boş alan bulunduğunu kontrol edip yeniden deneyin.",
 	"layout_editor.error.studio_unreadable": "Ergopti+’nın Studio verilerinizi sakladığı dosya bozuk; hiç dokunulmadan bırakıldı.",

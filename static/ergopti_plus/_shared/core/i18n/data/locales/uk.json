@@ -390,7 +390,7 @@
 	"layout_editor.error.workspace_store_unavailable": "Цей браузер не зберігає дані сторінки (приватне вікно?): експортуйте резервну копію, перш ніж піти.",
 	"layout_editor.error.backup_invalid": "Цей файл не є читабельним архівом ZIP. Виберіть резервну копію, експортовану редактором (файл .zip).",
 	"layout_editor.error.backup_deflate_unsupported": "Цей браузер не може розпакувати стиснений архів. Відкрийте редактор в актуальній версії Chrome, Edge, Firefox або Safari.",
-	"layout_editor.error.import_unsupported": "Імпортуються лише файли .toml, .keylayout і .zip.",
+	"layout_editor.error.import_unsupported": "Імпорт приймає ті самі файли, що й «{open}» ({extensions}), і резервні копії .zip.",
 	"layout_editor.error.studio_invalid_layout": "Ergopti+ відхилив розкладку, надіслану сторінкою.",
 	"layout_editor.error.studio_write_failed": "Ergopti+ не вдалося записати у вашу теку даних. Перевірте, що до теки можна записувати і в ній є вільне місце, і спробуйте ще раз.",
 	"layout_editor.error.studio_unreadable": "Файл, у якому Ergopti+ зберігає ваші дані Studio, пошкоджено; його залишено недоторканим.",

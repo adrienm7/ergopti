@@ -390,7 +390,7 @@
 	"layout_editor.error.workspace_store_unavailable": "이 브라우저는 이 페이지의 데이터를 보관하지 않습니다(비공개 창인가요?). 나가기 전에 백업을 내보내세요.",
 	"layout_editor.error.backup_invalid": "이 파일은 읽을 수 있는 ZIP 압축 파일이 아닙니다. 편집기에서 내보낸 백업(.zip 파일)을 선택하세요.",
 	"layout_editor.error.backup_deflate_unsupported": "이 브라우저는 압축된 파일을 풀 수 없습니다. 최신 버전의 Chrome, Edge, Firefox 또는 Safari에서 편집기를 여세요.",
-	"layout_editor.error.import_unsupported": ".toml, .keylayout, .zip 파일만 가져올 수 있습니다.",
+	"layout_editor.error.import_unsupported": "가져오기는 ‘{open}’과 같은 파일({extensions})과 .zip 백업을 받습니다.",
 	"layout_editor.error.studio_invalid_layout": "Ergopti+가 페이지에서 보낸 배열을 거부했습니다.",
 	"layout_editor.error.studio_write_failed": "Ergopti+가 데이터 폴더에 쓰지 못했습니다. 폴더에 쓸 수 있고 여유 공간이 있는지 확인한 뒤 다시 시도하세요.",
 	"layout_editor.error.studio_unreadable": "Ergopti+가 Studio 데이터를 보관하는 파일이 손상되었습니다. 파일은 건드리지 않습니다.",

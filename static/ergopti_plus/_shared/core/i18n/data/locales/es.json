@@ -390,7 +390,7 @@
 	"layout_editor.error.workspace_store_unavailable": "Este navegador no guarda datos para la página (¿una ventana privada?): exporta una copia de seguridad antes de salir.",
 	"layout_editor.error.backup_invalid": "Este archivo no es un archivo ZIP legible. Elige una copia de seguridad exportada por el editor (un archivo .zip).",
 	"layout_editor.error.backup_deflate_unsupported": "Este navegador no puede descomprimir un archivo comprimido. Abre el editor en una versión actualizada de Chrome, Edge, Firefox o Safari.",
-	"layout_editor.error.import_unsupported": "Solo se importan archivos .toml, .keylayout y .zip.",
+	"layout_editor.error.import_unsupported": "Importar acepta los mismos archivos que «{open}» ({extensions}) y las copias de seguridad .zip.",
 	"layout_editor.error.studio_invalid_layout": "Ergopti+ rechazó la distribución que envió la página.",
 	"layout_editor.error.studio_write_failed": "Ergopti+ no pudo escribir en tu carpeta de datos. Comprueba que la carpeta admite escritura y tiene espacio libre, y vuelve a intentarlo.",
 	"layout_editor.error.studio_unreadable": "El archivo donde Ergopti+ guarda sus datos de Studio está dañado; se deja intacto.",

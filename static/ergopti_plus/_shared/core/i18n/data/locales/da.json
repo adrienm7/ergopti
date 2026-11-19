@@ -390,7 +390,7 @@
 	"layout_editor.error.workspace_store_unavailable": "Denne browser gemmer ingen data for siden (et privat vindue?): eksportér en sikkerhedskopi, før du går.",
 	"layout_editor.error.backup_invalid": "Denne fil er ikke et læsbart ZIP-arkiv. Vælg en sikkerhedskopi, som editoren har eksporteret (en .zip-fil).",
 	"layout_editor.error.backup_deflate_unsupported": "Denne browser kan ikke pakke et komprimeret arkiv ud. Åbn editoren i en opdateret Chrome, Edge, Firefox eller Safari.",
-	"layout_editor.error.import_unsupported": "Kun .toml-, .keylayout- og .zip-filer importeres.",
+	"layout_editor.error.import_unsupported": "Import tager de samme filer som »{open}« ({extensions}) og .zip-sikkerhedskopier.",
 	"layout_editor.error.studio_invalid_layout": "Ergopti+ afviste det layout, siden sendte.",
 	"layout_editor.error.studio_write_failed": "Ergopti+ kunne ikke skrive til din datamappe. Kontrollér, at der kan skrives i mappen, og at der er ledig plads, og prøv igen.",
 	"layout_editor.error.studio_unreadable": "Filen, hvor Ergopti+ gemmer dine Studio-data, er beskadiget; den lades urørt.",

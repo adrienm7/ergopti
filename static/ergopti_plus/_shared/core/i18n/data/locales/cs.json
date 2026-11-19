@@ -390,7 +390,7 @@
 	"layout_editor.error.workspace_store_unavailable": "Tento prohlížeč pro stránku neuchovává žádná data (anonymní okno?): před odchodem exportujte zálohu.",
 	"layout_editor.error.backup_invalid": "Tento soubor není čitelný archiv ZIP. Vyberte zálohu exportovanou editorem (soubor .zip).",
 	"layout_editor.error.backup_deflate_unsupported": "Tento prohlížeč neumí rozbalit komprimovaný archiv. Otevřete editor v aktuálním prohlížeči Chrome, Edge, Firefox nebo Safari.",
-	"layout_editor.error.import_unsupported": "Importují se jen soubory .toml, .keylayout a .zip.",
+	"layout_editor.error.import_unsupported": "Import přijímá stejné soubory jako „{open}“ ({extensions}) a zálohy .zip.",
 	"layout_editor.error.studio_invalid_layout": "Ergopti+ odmítl rozložení, které stránka odeslala.",
 	"layout_editor.error.studio_write_failed": "Ergopti+ nemohl zapisovat do vaší datové složky. Zkontrolujte, že do složky lze zapisovat a je v ní volné místo, a zkuste to znovu.",
 	"layout_editor.error.studio_unreadable": "Soubor, ve kterém Ergopti+ uchovává vaše data Studia, je poškozený; zůstává nedotčen.",

@@ -127,6 +127,15 @@ var LayoutEditorPage = (function () {
 	const DEFAULT_EXPORT_FORMAT = 'toml';
 	// The macOS downloads, in drop-down order: the ISO + ANSI bundle, then one .keylayout per board.
 	const MACOS_EXPORTS = ['bundle', 'iso', 'ansi'];
+	// The one list of files the editor reads: « Open… » takes these, « Import… »
+	// takes them and the .zip backups of « Export all » (LAYOUT_FORMATS.EXTENSIONS,
+	// which the app's native panel reads too).
+	const OPENED_EXTENSIONS = LAYOUT_FORMATS.EXTENSIONS.map((ext) => `.${ext}`);
+	const BACKUP_EXTENSION = '.zip';
+	const IMPORTED_EXTENSIONS = OPENED_EXTENSIONS.concat([BACKUP_EXTENSION]);
+	/** Whether a file name ends with one of these extensions. */
+	const hasExtension = (name, extensions) =>
+		extensions.some((ext) => name.toLowerCase().endsWith(ext));
 	// The history shortcuts (every editor's): the chords LayerModel.chordText writes in
 	// the buttons' names, and the keys each OS's users press for them. Ctrl and Cmd
 	// both work on every OS (a Mac keyboard on Windows, a PC keyboard on a Mac).
@@ -368,7 +377,7 @@ var LayoutEditorPage = (function () {
 	/** The translated refusal of an edit or a file. */
 	function problemText(error) {
 		const code = error && error.code ? error.code : 'unexpected';
-		const message = tl(`error.${code}`);
+		const message = tl(`error.${code}`, error && error.values);
 		const text = message === PREFIX + `error.${code}` ? tl('error.generic', { code }) : message;
 		return error && error.path ? `${text} (${error.path})` : text;
 	}
@@ -694,20 +703,10 @@ var LayoutEditorPage = (function () {
 			);
 		}
 
-		/** The document of one imported file: an Ergopti source or a .keylayout. */
-		function importedDoc(name, text) {
-			if (/\.keylayout$/i.test(name)) {
-				const id = LayoutSourceIO.identifierFrom(name.replace(/\.keylayout$/i, ''), 'layout');
-				return LayoutSourceIO.importKeylayout(text, id, state.importConvention);
-			}
-			const parsed = LayoutSourceIO.parse(text);
-			if (!parsed.ok) throw parsed.error;
-			return parsed.doc;
-		}
-
 		/**
-		 * « Import »: every layout of the chosen files (sources, .keylayout files and
-		 * backups) in new tabs; a file that does not read is named, the others open.
+		 * « Import »: every layout of the chosen files (any file « Open… » reads, and
+		 * backups) in new tabs, read as « Open… » reads them; a file that does not
+		 * read is named, the others open.
 		 */
 		async function importTabs(input) {
 			const files = [...(input.files || [])];
@@ -721,9 +720,16 @@ var LayoutEditorPage = (function () {
 						entries.push(
 							...(await LayoutEditorWorkspace.readArchive(new Uint8Array(await file.arrayBuffer())))
 						);
-					else if (LayoutEditorWorkspace.IMPORTED.test(file.name))
-						entries.push({ name: file.name, text: await file.text() });
-					else throw { code: 'import_unsupported', path: file.name };
+					else if (hasExtension(file.name, OPENED_EXTENSIONS)) {
+						// Bytes too, as « Open… » reads them: a UTF-16 KLC, a KbdEdit .kbe header.
+						const bytes = new Uint8Array(await file.arrayBuffer());
+						entries.push({ name: file.name, text: LAYOUT_FORMATS.decode(bytes), bytes });
+					} else
+						throw {
+							code: 'import_unsupported',
+							path: file.name,
+							values: { open: tl('btn.open'), extensions: OPENED_EXTENSIONS.join(', ') }
+						};
 				} catch (error) {
 					refused.push(`${file.name}: ${problemText(error)}`);
 				}
@@ -733,9 +739,9 @@ var LayoutEditorPage = (function () {
 			const first = state.tabs.length;
 			for (const entry of entries) {
 				try {
-					state.tabs.push(newTab(importedDoc(entry.name, entry.text), false));
+					state.tabs.push(newTab(readDocument(entry.name, entry.text, entry.bytes).doc, false));
 				} catch (error) {
-					refused.push(`${entry.name}: ${problemText(error)}`);
+					refused.push(`${entry.name}: ${refusalText(error)}`);
 				}
 			}
 			if (state.tabs.length > first) showTab(first);
@@ -944,7 +950,7 @@ var LayoutEditorPage = (function () {
 			const importInput = el('input', {
 				type: 'file',
 				id: 'le-tabs-import-file',
-				accept: '.toml,.keylayout,.zip',
+				accept: IMPORTED_EXTENSIONS.join(','),
 				multiple: true,
 				hidden: true,
 				onchange: (event) => importTabs(event.target)
@@ -998,35 +1004,61 @@ var LayoutEditorPage = (function () {
 		// ======= 4/ Files ===========
 		// ============================
 
-		function openText(name, text, bytes) {
+		/** A refusal already worded for the reader (a foreign file's reader). */
+		function worded(text) {
+			return { worded: text };
+		}
+
+		/** The words of a readDocument refusal, or of any other error. */
+		function refusalText(error) {
+			return error && typeof error.worded === 'string' ? error.worded : problemText(error);
+		}
+
+		/**
+		 * Reads one layout file into a document, as « Open… » and « Import… » both
+		 * do: a .keylayout through its importer, an Ergopti source as it is, any
+		 * other layout file (KLA or KLAnext JSON, Kalamine, XKB symbols, KLC, DOF,
+		 * cmini, rows, KbdEdit .kbe) through the Comparer's readers into a new
+		 * source. The file's bytes, when the page has them, let a .kbe header be
+		 * checked.
+		 * @param {string} name - The file name.
+		 * @param {string} text - Its text.
+		 * @param {Uint8Array} [bytes] - Its bytes.
+		 * @returns {{doc: object, notice: string}} The document and the status that says what was read.
+		 * @throws {object} A refusal (refusalText words it).
+		 */
+		function readDocument(name, text, bytes) {
 			if (/\.keylayout$/i.test(name)) {
-				const convention = state.importConvention;
-				try {
-					const id = LayoutSourceIO.identifierFrom(name.replace(/\.keylayout$/i, ''), 'layout');
-					replace(LayoutSourceIO.importKeylayout(text, id, convention));
-					notify('ok', tl('status.imported', { name }));
-				} catch (error) {
-					notify('error', problemText(error));
-				}
+				const id = LayoutSourceIO.identifierFrom(name.replace(/\.keylayout$/i, ''), 'layout');
+				return {
+					doc: LayoutSourceIO.importKeylayout(text, id, state.importConvention),
+					notice: tl('status.imported', { name })
+				};
+			}
+			if (!/^\s*format\s*=\s*"ergopti-layout"/m.test(text)) return readForeign(name, text, bytes);
+			const parsed = LayoutSourceIO.parse(text);
+			if (!parsed.ok) throw parsed.error;
+			return { doc: parsed.doc, notice: tl('status.opened', { name }) };
+		}
+
+		function openText(name, text, bytes) {
+			let read;
+			try {
+				read = readDocument(name, text, bytes);
+			} catch (error) {
+				notify('error', refusalText(error));
 				return;
 			}
-			// An Ergopti source opens as it is; any other layout file (KLA or KLAnext
-			// JSON, Kalamine, XKB symbols, KLC, DOF, cmini, rows, KbdEdit .kbe) goes
-			// through the Comparer's readers.
-			if (!/^\s*format\s*=\s*"ergopti-layout"/m.test(text)) return importForeign(name, text, bytes);
-			const parsed = LayoutSourceIO.parse(text);
-			if (!parsed.ok) return notify('error', problemText(parsed.error));
-			replace(parsed.doc);
-			notify('ok', tl('status.opened', { name }));
+			replace(read.doc);
+			notify('ok', read.notice);
 		}
 
 		/**
 		 * Reads another tool's layout file into a new Ergopti source: the
 		 * Comparer's readers (layout_formats.js) give each key's characters and
 		 * dead keys, toSource the source; what they could not read is listed.
-		 * The file's bytes, when the page has them, let a .kbe header be checked.
 		 */
-		function importForeign(name, text, bytes) {
+		function readForeign(name, text, bytes) {
 			let result;
 			let started;
 			const tools = {
@@ -1050,21 +1082,20 @@ var LayoutEditorPage = (function () {
 			} catch (error) {
 				// The Comparer's words for a file its readers refuse.
 				const refusal = LAYOUT_FORMATS.refusalMessage(error);
-				notify('error', t(refusal.key, refusal.values));
-				return;
+				throw worded(t(refusal.key, refusal.values));
 			}
-			replace(started.doc);
-			notify(
-				'ok',
-				result.unmapped.length === 0
-					? tl('status.imported_format', { name, format: result.format })
-					: tl('status.imported_partial', {
-							name,
-							format: result.format,
-							count: result.unmapped.length,
-							list: lossList(result.unmapped)
-						})
-			);
+			return {
+				doc: started.doc,
+				notice:
+					result.unmapped.length === 0
+						? tl('status.imported_format', { name, format: result.format })
+						: tl('status.imported_partial', {
+								name,
+								format: result.format,
+								count: result.unmapped.length,
+								list: lossList(result.unmapped)
+							})
+			};
 		}
 
 		/** What a reader or writer could not carry, in a few words of the page's language. */
@@ -1258,7 +1289,7 @@ var LayoutEditorPage = (function () {
 			const fileInput = el('input', {
 				type: 'file',
 				id: 'le-open-file',
-				accept: LAYOUT_FORMATS.EXTENSIONS.map((ext) => `.${ext}`).join(','),
+				accept: OPENED_EXTENSIONS.join(','),
 				hidden: true,
 				onchange: (event) => readFile(event.target, openText)
 			});

@@ -390,7 +390,7 @@
 	"layout_editor.error.workspace_store_unavailable": "דפדפן זה אינו שומר נתונים עבור הדף (חלון פרטי?): ייצאו גיבוי לפני היציאה.",
 	"layout_editor.error.backup_invalid": "קובץ זה אינו ארכיון ZIP קריא. בחרו גיבוי שהעורך ייצא (קובץ .zip).",
 	"layout_editor.error.backup_deflate_unsupported": "דפדפן זה אינו יכול לפרוס ארכיון דחוס. פתחו את העורך בגרסה עדכנית של Chrome, Edge, Firefox או Safari.",
-	"layout_editor.error.import_unsupported": "רק קובצי .toml, .keylayout ו-.zip מיובאים.",
+	"layout_editor.error.import_unsupported": "הייבוא מקבל את אותם קבצים כמו „{open}” ({extensions}) וגיבויי ‎.zip.",
 	"layout_editor.error.studio_invalid_layout": "Ergopti+ דחה את הפריסה שהדף שלח.",
 	"layout_editor.error.studio_write_failed": "Ergopti+ לא הצליח לכתוב לתיקיית הנתונים שלכם. ודאו שאפשר לכתוב לתיקייה ושיש בה מקום פנוי, ונסו שוב.",
 	"layout_editor.error.studio_unreadable": "הקובץ שבו Ergopti+ שומר את נתוני ה-Studio שלכם פגום; הוא נשאר ללא שינוי.",

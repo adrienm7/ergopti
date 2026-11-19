@@ -230,7 +230,53 @@ async function exerciseHistoryShortcuts(browser, origin) {
 	await context.close();
 }
 
+/**
+ * (import-formats) « Import… » accepts every file « Open… » accepts, and its
+ * .zip backups: a KLA JSON opens as a new tab through the same reader as
+ * « Open… »; a file of another type names what Import takes.
+ */
+async function exerciseImportFormats(browser, origin) {
+	const { page, errors, context } = await openOnErgopti(browser, origin);
+	const opened = (await page.getAttribute('#le-open-file', 'accept')).split(',');
+	const imported = (await page.getAttribute('#le-tabs-import-file', 'accept')).split(',');
+	assert.ok(opened.length >= 10, `Open… accepts ${opened.join(' ')}`);
+	assert.deepEqual(
+		imported,
+		opened.concat(['.zip']),
+		'Import… accepts what Open… accepts, and backups'
+	);
+	const dir = path.join(ROOT, 'tools', 'test', 'fixtures', 'layout-formats', 'third-party');
+	const tabs = () => page.locator('.le-layout-tab').count();
+	const before = await tabs();
+	await page.setInputFiles('#le-tabs-import-file', [path.join(dir, 'ergol.json')]);
+	await page.waitForFunction(
+		(count) => document.querySelectorAll('.le-layout-tab').length > count,
+		before
+	);
+	assert.equal(
+		await page.textContent('#le-board [data-code="KeyW"] .le-legend'),
+		'c',
+		"the KLA JSON's tab shows Ergo-L"
+	);
+	await page.setInputFiles('#le-tabs-import-file', {
+		name: 'notes.pdf',
+		mimeType: 'application/pdf',
+		buffer: Buffer.from('%PDF-1.4')
+	});
+	await page.waitForFunction(() =>
+		/notes\.pdf/.test(document.getElementById('le-message').textContent)
+	);
+	const message = await page.textContent('#le-message');
+	assert.ok(
+		message.includes('.kbe') && message.includes('.zip'),
+		`the refusal names the formats: ${message}`
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseImportFormats,
 	exerciseHistoryShortcuts,
 	exerciseOneInfoPerRow,
 	EN,

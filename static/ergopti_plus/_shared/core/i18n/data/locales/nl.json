@@ -390,7 +390,7 @@
 	"layout_editor.error.workspace_store_unavailable": "Deze browser bewaart geen gegevens voor de pagina (een privévenster?): exporteer een back-up voordat je vertrekt.",
 	"layout_editor.error.backup_invalid": "Dit bestand is geen leesbaar ZIP-archief. Kies een back-up die de editor heeft geëxporteerd (een .zip-bestand).",
 	"layout_editor.error.backup_deflate_unsupported": "Deze browser kan geen gecomprimeerd archief uitpakken. Open de editor in een actuele versie van Chrome, Edge, Firefox of Safari.",
-	"layout_editor.error.import_unsupported": "Alleen .toml-, .keylayout- en .zip-bestanden worden geïmporteerd.",
+	"layout_editor.error.import_unsupported": "Importeren neemt dezelfde bestanden als ‘{open}’ ({extensions}) en .zip-back-ups.",
 	"layout_editor.error.studio_invalid_layout": "Ergopti+ weigerde de indeling die de pagina stuurde.",
 	"layout_editor.error.studio_write_failed": "Ergopti+ kon niet naar je gegevensmap schrijven. Controleer of de map beschrijfbaar is en vrije ruimte heeft en probeer het opnieuw.",
 	"layout_editor.error.studio_unreadable": "Het bestand waarin Ergopti+ je Studio-gegevens bewaart, is beschadigd; het blijft onaangeroerd.",
