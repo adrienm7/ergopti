@@ -219,17 +219,17 @@ function render_app_list() {
 			window.app_icons && Object.hasOwn(window.app_icons, app) ? window.app_icons[app] : null;
 		const icon_html = icon_src
 			? `<img src="${icon_src}" class="app-icon-img" alt="" />`
-			: `<div class="app-icon-div" style="background-color:${get_app_color(app)}">${escape_html(appInitial(app))}</div>`;
+			: `<span class="app-icon-div" style="background-color:${get_app_color(app)}">${escape_html(appInitial(app))}</span>`;
 
 		html +=
-			`<label class="app-item">` +
+			`<li><label class="app-item">` +
 			`<input type="checkbox" value="${escape_html(app)}" ${checked} onchange="toggle_app_selection(this)">` +
-			`<div class="app-icon-wrapper">${icon_html}</div>` +
+			`<span class="app-icon-wrapper" aria-hidden="true">${icon_html}</span>` +
 			`<span class="app-name">${escape_html(app)}</span>` +
-			`</label>`;
+			`</label></li>`;
 	});
 
 	container.innerHTML =
 		html ||
-		`<div style="padding:15px; color:var(--text-muted); text-align:center;">${_t('ui_typing.no_app_found')}</div>`;
+		`<li style="padding:15px; color:var(--text-muted); text-align:center;">${_t('ui_typing.no_app_found')}</li>`;
 }

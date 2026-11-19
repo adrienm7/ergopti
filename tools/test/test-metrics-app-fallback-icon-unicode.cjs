@@ -35,14 +35,14 @@ vm.runInContext(
 );
 context.render_app_list();
 assert.ok(
-	list.innerHTML.includes('>😀</div>'),
+	list.innerHTML.includes('>😀</span>'),
 	'emoji fallback must not split the UTF-16 surrogate pair'
 );
 assert.ok(
-	list.innerHTML.includes('>É</div>'),
+	list.innerHTML.includes('>É</span>'),
 	'a decomposed accented initial must remain accented'
 );
-assert.ok(list.innerHTML.includes('>🇫🇷</div>'), 'a flag must remain one complete grapheme');
+assert.ok(list.innerHTML.includes('>🇫🇷</span>'), 'a flag must remain one complete grapheme');
 const fallbackList = { innerHTML: '' };
 const legacy = vm.createContext({
 	ThemeTokens: { color: () => '#000' },
@@ -65,11 +65,11 @@ vm.runInContext(
 );
 legacy.render_app_list();
 assert.ok(
-	fallbackList.innerHTML.includes('>😀</div>'),
+	fallbackList.innerHTML.includes('>😀</span>'),
 	'older WebKit must preserve full code points'
 );
 assert.ok(
-	fallbackList.innerHTML.includes('>É</div>'),
+	fallbackList.innerHTML.includes('>É</span>'),
 	'older WebKit must preserve composed accents'
 );
 console.log('application fallback badges preserve Unicode initials');

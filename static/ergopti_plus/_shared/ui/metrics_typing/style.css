@@ -183,6 +183,53 @@ body {
 	overflow-x: hidden;
 }
 
+/* The page's semantic elements keep the look their classes give: none of
+   the browser's own margins, indents or list markers. Zero specificity, so
+   every class rule of the page still wins over these. */
+:where(
+	p.stat-value,
+	p.stat-details,
+	p.chart-help,
+	p.maintenance-bar,
+	p.filter-field,
+	p.stat-sub,
+	dl.stat-details-split,
+	dd.split-val,
+	ul.stat-details,
+	ul.app-list
+) {
+	margin: 0;
+	padding-left: 0;
+}
+
+:where(ul.stat-details, ul.app-list) {
+	list-style: none;
+}
+
+:where(kbd) {
+	font-family: inherit;
+	font-size: inherit;
+}
+
+/* A control drawn as its text: the sort buttons of the table headers and the
+   information marks, which keep the look they had as plain text. */
+button.th-sort,
+button.tooltip {
+	background: none;
+	border: 0;
+	font: inherit;
+	margin: 0;
+	padding: 0;
+	text-align: inherit;
+	text-transform: inherit;
+}
+
+button.th-sort {
+	color: inherit;
+	cursor: pointer;
+	line-height: inherit;
+}
+
 /* ================================== */
 /* ================================== */
 /* ======= 2/ Layout & Header ======= */
@@ -420,6 +467,32 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	font-weight: bold;
 	gap: 8px;
 	margin: 10px 0;
+}
+
+/* A value with its information mark: one centred row (the row was a box
+   inside the value; the value is that row now). */
+.stat-value.stat-value-tip {
+	align-items: center;
+	gap: 6px;
+}
+
+/* The words typed under the speed value, spaced only when shown. */
+.stat-sub:not(:empty) {
+	margin-top: 5px;
+}
+
+/* The speed value: its words and characters per minute, one per line. */
+.stat-value.stat-value-stack {
+	align-items: flex-start;
+	flex-direction: column;
+	gap: 0;
+	justify-content: center;
+}
+
+.stat-value-line {
+	align-items: center;
+	display: flex;
+	gap: 6px;
 }
 
 .stat-unit {
@@ -832,10 +905,6 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	margin-bottom: 6px;
 }
 
-.tabs-row:last-of-type {
-	margin-bottom: 15px;
-}
-
 .tab-btn {
 	background: var(--panel-bg);
 	border: 1px solid var(--border);
@@ -1193,7 +1262,8 @@ td.col-rep {
 	text-align: left;
 	transform: none;
 	transition: opacity 0.2s;
-	visibility: hidden;
+	/* Hidden by its opacity, not its visibility: the text stays the name of
+	   the mark that holds it, which the keyboard reaches. */
 	white-space: normal;
 	width: max-content;
 	/* Above the sticky top bar (z-index 100) and any other overlay */
@@ -1211,9 +1281,15 @@ th .tooltip .tooltiptext {
 	right: 0;
 }
 
-.tooltip:hover .tooltiptext {
+/* Shown on hover and on keyboard focus alike, and dismissed by Escape until
+   the pointer or the focus leaves it (WCAG 1.4.13). */
+.tooltip:hover .tooltiptext,
+.tooltip:focus-visible .tooltiptext {
 	opacity: 1;
-	visibility: visible;
+}
+
+.tooltip.tooltip-dismissed .tooltiptext {
+	opacity: 0;
 }
 
 .stat-inline-tooltip .info-icon {
@@ -1337,7 +1413,8 @@ th .tooltip .tooltiptext {
 	transition: background 0.2s;
 }
 
-.app-item:last-child {
+/* Each app's label sits alone in its list item: the last item's label. */
+.app-list > li:last-child > .app-item {
 	border-bottom: none;
 }
 
@@ -1587,6 +1664,7 @@ th .tooltip .tooltiptext {
 .find-highlight {
 	background: rgba(255, 214, 10, 0.35);
 	border-radius: 2px;
+	color: inherit;
 }
 
 /* The active (current) occurrence: brighter fill + orange outline */

@@ -50,11 +50,15 @@
 function switch_tab(tab_name) {
 	app_state.current_tab = tab_name;
 
-	// The shown table reads as pressed, not by its colour alone (WCAG 1.4.1, 4.1.2).
+	// The shown table's tab reads as selected, not by its colour alone (WCAG
+	// 1.4.1, 4.1.2), and is the one stop of the tab list (roving tabindex).
 	document.querySelectorAll('.tabs .tab-btn').forEach((btn) => {
 		const shown = btn.getAttribute('data-tab') === tab_name;
 		btn.classList.toggle('active', shown);
-		btn.setAttribute('aria-pressed', shown ? 'true' : 'false');
+		btn.setAttribute('aria-selected', shown ? 'true' : 'false');
+		btn.tabIndex = shown ? 0 : -1;
+		if (shown)
+			document.getElementById('metrics_table_panel')?.setAttribute('aria-labelledby', btn.id);
 	});
 
 	// Reset table state to "most frequent first" when switching sections
@@ -67,6 +71,32 @@ function switch_tab(tab_name) {
 
 	render_current_tab();
 }
+
+/**
+ * Moves between the table tabs with the arrow keys, Home and End, as the tab
+ * pattern does (WCAG 2.1.1): the tab reached is shown at once.
+ * @param {KeyboardEvent} event - A keydown inside the tab list.
+ */
+function handle_tab_keydown(event) {
+	const tabs = Array.from(document.querySelectorAll('.tabs .tab-btn'));
+	const from = tabs.indexOf(event.target);
+	if (from === -1) return;
+	const steps = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+	let to;
+	if (Object.hasOwn(steps, event.key)) to = (from + steps[event.key] + tabs.length) % tabs.length;
+	else if (event.key === 'Home') to = 0;
+	else if (event.key === 'End') to = tabs.length - 1;
+	else return;
+	event.preventDefault();
+	switch_tab(tabs[to].getAttribute('data-tab'));
+	tabs[to].focus();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+	document
+		.querySelector('.tabs-group[role="tablist"]')
+		?.addEventListener('keydown', handle_tab_keydown);
+});
 
 /**
  * Updates the search query from the table header input and re-renders.
@@ -765,7 +795,7 @@ function render_current_tab() {
 					: show_hs || show_llm
 						? _t('ui_typing.table_mode_mixed')
 						: _t('ui_typing.table_mode_raw');
-			mode_badge = ` <span style="font-size:0.8em;opacity:0.7;">(${mode_label})</span>`;
+			mode_badge = ` <small style="font-size:0.8em;opacity:0.7;">(${mode_label})</small>`;
 		}
 		occ_elem.innerHTML = format_number(total_occ) + mode_badge;
 	}
@@ -1295,7 +1325,7 @@ function render_kc_heatmap(kc_data_arr) {
 
 		// Tooltip div — absolutely positioned, hidden by default
 		tooltips +=
-			`<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
+			`<div id="${tip_id}" class="hm-tooltip" aria-hidden="true" style="display:none;position:fixed;z-index:9999;` +
 			`background:${ThemeTokens.color('hue-1a1a2e')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
 			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:220px;white-space:nowrap;text-align:left;">` +
 			tip_html +
@@ -1303,17 +1333,17 @@ function render_kc_heatmap(kc_data_arr) {
 	});
 
 	container.innerHTML =
-		`<div style="display:inline-block;position:relative;">` +
-		`<div style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-1e96ff')};margin-bottom:6px;text-align:left;">` +
-		`Heatmap de l'utilisation physique des touches</div>` +
-		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
+		`<figure style="display:inline-block;position:relative;margin:0;">` +
+		`<figcaption id="kc_heatmap_caption" style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-1e96ff')};margin-bottom:6px;text-align:left;">` +
+		`${_t('ui_typing.heatmap_keys_title')}</figcaption>` +
+		`<svg width="${SVG_W}" height="${SVG_H}" role="img" aria-labelledby="kc_heatmap_caption" xmlns="http://www.w3.org/2000/svg" ` +
 		`style="background:${ThemeTokens.color('hue-12121e')};border-radius:10px;display:block;"` +
 		`onmousemove="hm_track_mouse(event)">` +
 		rects +
 		labels +
 		`</svg>` +
 		tooltips +
-		`</div>`;
+		`</figure>`;
 }
 
 /**
@@ -1588,7 +1618,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 			key_occurrences > 0 ? ((sfb_key_count / key_occurrences) * 100).toFixed(1) : '0.0';
 
 		const tip_lines = [
-			`<b>${escape_html(label_raw || kc_str)}</b> <span style="color:${ThemeTokens.color('grey-888')};font-size:10px;">(kc ${kc_str})</span><br>`,
+			`<b>${escape_html(label_raw || kc_str)}</b> <small style="color:${ThemeTokens.color('grey-888')};font-size:10px;">(kc ${kc_str})</small><br>`,
 			`Occurrences : <b>${format_number(key_occurrences)}</b>`
 		];
 
@@ -1736,7 +1766,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		}
 
 		tooltips +=
-			`<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
+			`<div id="${tip_id}" class="hm-tooltip" aria-hidden="true" style="display:none;position:fixed;z-index:9999;` +
 			`background:${ThemeTokens.color('hue-1a2e1a')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
 			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:280px;white-space:nowrap;text-align:left;">` +
 			`<style scoped>.hm-tooltip hr{margin:4px 0;border-color:${ThemeTokens.color('grey-555')};}</style>` +
@@ -1745,17 +1775,17 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 	});
 
 	container.innerHTML =
-		`<div style="display:inline-block;position:relative;">` +
-		`<div style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-22c55e')};margin-bottom:6px;text-align:left;">` +
-		`Heatmap des SFBs par touche</div>` +
-		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
+		`<figure style="display:inline-block;position:relative;margin:0;">` +
+		`<figcaption id="sfb_heatmap_caption" style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-22c55e')};margin-bottom:6px;text-align:left;">` +
+		`${_t('ui_typing.heatmap_sfb_title')}</figcaption>` +
+		`<svg width="${SVG_W}" height="${SVG_H}" role="img" aria-labelledby="sfb_heatmap_caption" xmlns="http://www.w3.org/2000/svg" ` +
 		`style="background:${ThemeTokens.color('hue-1e1608')};border-radius:10px;display:block;"` +
 		`onmousemove="hm_track_mouse(event)">` +
 		rects +
 		labels +
 		`</svg>` +
 		tooltips +
-		`</div>`;
+		`</figure>`;
 }
 
 // ===================================
@@ -1928,12 +1958,12 @@ function render_table() {
 					const kc_label = kc_name
 						? `kc ${item.key}&nbsp;<span class="kc-name">(${escape_html(kc_name)})</span>`
 						: `kc ${item.key}`;
-					key_html = `<span class="mono-space kc-chip">${kc_label}</span>`;
+					key_html = `<kbd class="mono-space kc-chip">${kc_label}</kbd>`;
 				} else if (['sc_bg', 'sc_tg', 'sc_qg', 'sc_pg'].includes(app_state.current_tab)) {
 					// Keys are shortcut sequences joined by →; split and render each part
 					const sc_parts = item.key.split('→');
 					key_html =
-						`<span class="shortcut-seq">` +
+						`<kbd class="shortcut-seq">` +
 						sc_parts
 							.map(
 								(p, i) =>
@@ -1941,22 +1971,22 @@ function render_table() {
 									format_shortcut_key(p)
 							)
 							.join('') +
-						`</span>`;
+						`</kbd>`;
 				} else if (['w_bg', 'w_tg', 'w_qg', 'w_pg'].includes(app_state.current_tab)) {
 					// Keys are words joined by space; render as plain-text chips with arrows
 					const w_parts = item.key.split(' ');
 					key_html =
-						`<span class="seq-chips">` +
+						`<kbd class="seq-chips">` +
 						w_parts
 							.map(
 								(p, i) =>
 									(i > 0 ? ` <span style="color:var(--text-muted);">→</span> ` : '') +
-									`<span class="mono-space">${escape_html(p)}</span>`
+									`<kbd class="mono-space">${escape_html(p)}</kbd>`
 							)
 							.join('') +
-						`</span>`;
+						`</kbd>`;
 				} else if (is_shortcut_tab) {
-					key_html = `<span class="shortcut-seq">${format_shortcut_key(item.key)}</span>`;
+					key_html = `<kbd class="shortcut-seq">${format_shortcut_key(item.key)}</kbd>`;
 				} else if (is_ctrl_display) {
 					// Resolve the best label: pretty symbol > ASCII abbreviation > uppercase name
 					const label =
@@ -1966,16 +1996,16 @@ function render_table() {
 								`\\x${single_code.toString(16).toUpperCase().padStart(2, '0')}`)
 							: null) ??
 						item.key.toUpperCase();
-					key_html = `<span class="shortcut-chip shortcut-key-control">${escape_html(label)}</span>`;
+					key_html = `<kbd class="shortcut-chip shortcut-key-control">${escape_html(label)}</kbd>`;
 				} else {
 					// N-gram tabs always render one chip per token for visual consistency.
 					// Characters/words/shortcuts stay as a single chip when there are no
 					// special markers, which avoids needless per-grapheme splitting for prose.
 					const is_ngram_tab = ['bg', 'tg', 'qg', 'pg', 'hx', 'hp'].includes(app_state.current_tab);
 					if (is_ngram_tab || /\[|\u00A0|\u202F/.test(item.key)) {
-						key_html = `<span class="seq-chips">${format_seq_chips(item.key)}</span>`;
+						key_html = `<kbd class="seq-chips">${format_seq_chips(item.key)}</kbd>`;
 					} else {
-						key_html = `<span class="mono-space">${format_display_key(item.key)}</span>`;
+						key_html = `<kbd class="mono-space">${format_display_key(item.key)}</kbd>`;
 					}
 				}
 
@@ -1983,7 +2013,7 @@ function render_table() {
 				if (item.synth_hs > 0) synth_parts.push(`${format_number(item.synth_hs)} HS`);
 				if (item.synth_llm > 0) synth_parts.push(`${format_number(item.synth_llm)} IA`);
 				const synth_str = synth_parts.length
-					? `<br><span style="font-size:10px;color:var(--text-muted);">(dont ${synth_parts.join(', ')})</span>`
+					? `<br><small style="font-size:10px;color:var(--text-muted);">(dont ${synth_parts.join(', ')})</small>`
 					: '';
 
 				const avg_str = item.avg > 0 ? `${format_number(item.avg.toFixed(1))} ms` : '-';

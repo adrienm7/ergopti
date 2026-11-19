@@ -99,7 +99,7 @@ function format_number_plain(num) {
 function wrap_exact_tooltip(display, exact) {
 	// Use toLocaleString with 'fr-FR' for native French number formatting in the tooltip
 	const exact_str = Number(exact).toLocaleString('fr-FR', { maximumFractionDigits: 20 });
-	return `<span class="num-tooltip" title="${exact_str}">${display}</span>`;
+	return `<data class="num-tooltip" value="${Number(exact)}" title="${exact_str}">${display}</data>`;
 }
 
 /**
@@ -183,13 +183,16 @@ function format_display_key(str) {
 	s = s.replace(/\n/g, '[[NEWLINE]]');
 	s = s.replace(/\[BS\]/gi, '[[BACKSPACE]]');
 
-	s = s.replace(/\[\[SPACE\]\]/g, '<span class="shortcut-chip shortcut-key-control">Space</span>');
-	s = s.replace(/\[\[NBSP\]\]/g, '<span class="key-control space-badge">NBSP</span>');
-	s = s.replace(/\[\[NNBSP\]\]/g, '<span class="key-control space-badge">NNBSP</span>');
-	s = s.replace(/\[\[NEWLINE\]\]/g, '<span style="color:var(--text-muted);">&#x21B5;</span>');
+	s = s.replace(/\[\[SPACE\]\]/g, '<kbd class="shortcut-chip shortcut-key-control">Space</kbd>');
+	s = s.replace(/\[\[NBSP\]\]/g, '<kbd class="key-control space-badge">NBSP</kbd>');
+	s = s.replace(/\[\[NNBSP\]\]/g, '<kbd class="key-control space-badge">NNBSP</kbd>');
+	s = s.replace(
+		/\[\[NEWLINE\]\]/g,
+		'<kbd class="key-newline" style="color:var(--text-muted);">&#x21B5;</kbd>'
+	);
 	s = s.replace(
 		/\[\[BACKSPACE\]\]/g,
-		'<span class="shortcut-chip shortcut-key-control">BackSpace</span>'
+		'<kbd class="shortcut-chip shortcut-key-control">BackSpace</kbd>'
 	);
 	return s;
 }
@@ -209,14 +212,13 @@ function format_seq_chips(str) {
 			if (is_key_marker(token)) {
 				const lower = token.toLowerCase();
 				const sym = CONTROL_KEY_SYMBOLS[lower] ?? lower.toUpperCase();
-				return `<span class="shortcut-chip shortcut-key-control">${escape_html(sym)}</span>`;
+				return `<kbd class="shortcut-chip shortcut-key-control">${escape_html(sym)}</kbd>`;
 			}
-			if (token === '\u00A0') return `<span class="shortcut-chip shortcut-key-control">NBSP</span>`;
-			if (token === '\u202F')
-				return `<span class="shortcut-chip shortcut-key-control">NNBSP</span>`;
-			if (token === ' ') return `<span class="shortcut-chip shortcut-key-control">Space</span>`;
-			if (token === '\n') return `<span class="mono-space seq-space">&#x21B5;</span>`;
-			return `<span class="mono-space">${escape_html(token)}</span>`;
+			if (token === '\u00A0') return `<kbd class="shortcut-chip shortcut-key-control">NBSP</kbd>`;
+			if (token === '\u202F') return `<kbd class="shortcut-chip shortcut-key-control">NNBSP</kbd>`;
+			if (token === ' ') return `<kbd class="shortcut-chip shortcut-key-control">Space</kbd>`;
+			if (token === '\n') return `<kbd class="mono-space seq-space">&#x21B5;</kbd>`;
+			return `<kbd class="mono-space">${escape_html(token)}</kbd>`;
 		})
 		.join('');
 }
@@ -300,7 +302,7 @@ function format_shortcut_key(str) {
 			}
 
 			const plus = idx < parts.length - 1 ? '<span class="shortcut-plus">+</span>' : '';
-			return `<span class="${cls}">${escape_html(label)}</span>${plus}`;
+			return `<kbd class="${cls}">${escape_html(label)}</kbd>${plus}`;
 		})
 		.join('');
 }
@@ -318,12 +320,24 @@ function format_shortcut_key(str) {
  * @returns {string} SVG HTML string.
  */
 function get_trend_svg(valid_points) {
-	const stable_svg =
-		'<svg class="trend-svg stable" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>';
-	const up_svg =
-		'<svg class="trend-svg up"     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>';
-	const down_svg =
-		'<svg class="trend-svg down"   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="7" x2="17" y2="17"></line><polyline points="17 7 17 17 7 17"></polyline></svg>';
+	// The arrow is an image named by its direction: its shape alone told it.
+	const arrow = (direction, name, shape) =>
+		`<svg class="trend-svg ${direction}" role="img" aria-label="${escape_html(name)}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${shape}</svg>`;
+	const stable_svg = arrow(
+		'stable',
+		_t('ui_typing.trend_stable'),
+		'<line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline>'
+	);
+	const up_svg = arrow(
+		'up',
+		_t('ui_typing.trend_up'),
+		'<line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline>'
+	);
+	const down_svg = arrow(
+		'down',
+		_t('ui_typing.trend_down'),
+		'<line x1="7" y1="7" x2="17" y2="17"></line><polyline points="17 7 17 17 7 17"></polyline>'
+	);
 
 	if (!valid_points || valid_points.length < 2) return stable_svg;
 

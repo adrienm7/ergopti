@@ -586,29 +586,27 @@ function compute_manifest_metrics() {
 	const wpm_val_elem = document.getElementById('wpm_val');
 	if (wpm_val_elem) {
 		wpm_val_elem.innerHTML =
-			`<div style="display:flex;flex-direction:column;justify-content:center;">` +
-			`<div style="display:flex;align-items:center;gap:6px;">` +
+			`<span class="stat-value-line">` +
 			`<span>${format_number(manifest_wpm.toFixed(1))} <span class="stat-unit">${_t('ui_typing.unit_mpm')}</span></span>` +
-			`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">${_t('ui_typing.tooltip_mpm')}</span></span>` +
-			`</div>` +
-			`<div style="display:flex;align-items:center;gap:6px;font-size:0.65em;margin-top:5px;">` +
+			`<button type="button" class="tooltip stat-inline-tooltip">${INFO_SVG}<small class="tooltiptext">${_t('ui_typing.tooltip_mpm')}</small></button>` +
+			`</span>` +
+			`<span class="stat-value-line" style="font-size:0.65em;margin-top:5px;">` +
 			`<span>${format_number(manifest_cpm.toFixed(0))} <span class="stat-unit">${_t('ui_typing.unit_cpm')}</span></span>` +
-			`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">${_t('ui_typing.tooltip_cpm_simple')}</span></span>` +
-			`</div>` +
-			`</div>`;
+			`<button type="button" class="tooltip stat-inline-tooltip">${INFO_SVG}<small class="tooltiptext">${_t('ui_typing.tooltip_cpm_simple')}</small></button>` +
+			`</span>`;
 	}
 
 	const global_details = document.getElementById('global_details');
 	if (global_details) {
 		global_details.innerHTML =
-			`<div style="margin-top:5px;">` +
+			`<li style="margin-top:5px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(global_raw_chars)}</strong>` +
 			` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.cpm_unit_raw_chars')}</span>` +
-			`</div>` +
-			`<div style="margin-top:3px;">` +
+			`</li>` +
+			`<li style="margin-top:3px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(global_output_chars)}</strong>` +
 			` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.cpm_unit_output_chars')}</span>` +
-			`</div>`;
+			`</li>`;
 	}
 
 	render_charts();
@@ -817,30 +815,28 @@ function recompute_speed_kpi() {
 				.replace('{chars_total}', format_number(chars_total));
 
 	wpm_val_elem.innerHTML =
-		`<div style="display:flex;flex-direction:column;justify-content:center;">` +
-		`<div style="display:flex;align-items:center;gap:6px;">` +
+		`<span class="stat-value-line">` +
 		`<span>${format_number(output_wpm.toFixed(1))} <span class="stat-unit">${_t('ui_typing.unit_mpm')}</span></span>` +
-		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${formula_tooltip}</span></span>` +
-		`</div>` +
-		`<div style="display:flex;align-items:center;gap:6px;font-size:0.65em;margin-top:5px;">` +
+		`<button type="button" class="tooltip stat-inline-tooltip">${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${formula_tooltip}</small></button>` +
+		`</span>` +
+		`<span class="stat-value-line" style="font-size:0.65em;margin-top:5px;">` +
 		`<span>${format_number(output_cpm.toFixed(0))} <span class="stat-unit">${_t('ui_typing.unit_cpm')}</span></span>` +
-		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${formula_tooltip}</span></span>` +
-		`</div>` +
-		`</div>`;
+		`<button type="button" class="tooltip stat-inline-tooltip">${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${formula_tooltip}</small></button>` +
+		`</span>`;
 
 	const global_details = document.getElementById('global_details');
 	if (global_details) {
 		const total_trig = totals.hs_input_chars + totals.llm_input_chars;
 		const output_chars = totals.manual_chars + totals.hs_chars + totals.llm_chars - total_trig;
 		global_details.innerHTML =
-			`<div style="margin-top:5px;">` +
+			`<li style="margin-top:5px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(totals.manual_chars)}</strong>` +
 			` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.cpm_unit_raw_chars')}</span>` +
-			`</div>` +
-			`<div style="margin-top:3px;">` +
+			`</li>` +
+			`<li style="margin-top:3px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(output_chars)}</strong>` +
 			` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.cpm_unit_output_chars')}</span>` +
-			`</div>`;
+			`</li>`;
 	}
 }
 
@@ -1090,11 +1086,10 @@ function render_repetitions_kpi() {
 	const val_el = document.getElementById('rep_val');
 	if (val_el) {
 		val_el.innerHTML =
-			`<div style="display:flex;align-items:center;gap:6px;">` +
 			`<span>${format_number(rep_pct.toFixed(1))}<span class="stat-unit">%</span></span>` +
-			`<span class="tooltip stat-inline-tooltip" style="color:var(--kpi-rep-color);">${INFO_SVG}` +
-			`<span class="tooltiptext">${_t('ui_typing.tooltip_rep_pct')}</span>` +
-			`</span></div>`;
+			`<button type="button" class="tooltip stat-inline-tooltip" style="color:var(--kpi-rep-color);">${INFO_SVG}` +
+			`<small class="tooltiptext">${_t('ui_typing.tooltip_rep_pct')}</small>` +
+			`</button>`;
 	}
 
 	// Raw count as secondary detail
@@ -1153,7 +1148,7 @@ function render_rep_table() {
 	} else {
 		rows_html = sorted
 			.map((d) => {
-				const key_html = `<span class="seq-chips">${format_seq_chips(d.key)}</span>`;
+				const key_html = `<kbd class="seq-chips">${format_seq_chips(d.key)}</kbd>`;
 				const star_html =
 					d.star > 0
 						? format_number(d.star)
@@ -1170,10 +1165,10 @@ function render_rep_table() {
 
 	container.innerHTML = `<table class="ekpi-table">
 			<thead><tr>
-				<th onclick="sort_rep_table('key')">${h_key}</th>
-				<th onclick="sort_rep_table('total')" style="text-align:right">${h_total}</th>
-				<th onclick="sort_rep_table('manual')" style="text-align:right">${h_manual}</th>
-				<th onclick="sort_rep_table('star')" style="text-align:right">${h_star}</th>
+				<th><button type="button" class="th-sort" onclick="sort_rep_table('key')">${h_key}</button></th>
+				<th style="text-align:right"><button type="button" class="th-sort" onclick="sort_rep_table('total')">${h_total}</button></th>
+				<th style="text-align:right"><button type="button" class="th-sort" onclick="sort_rep_table('manual')">${h_manual}</button></th>
+				<th style="text-align:right"><button type="button" class="th-sort" onclick="sort_rep_table('star')">${h_star}</button></th>
 			</tr></thead>
 			<tbody>${rows_html}</tbody>
 		</table>`;
@@ -1409,11 +1404,10 @@ function render_sfb_kpi() {
 	// Primary KPI: raw SFB rate with raw count below
 	if (val_el) {
 		val_el.innerHTML =
-			`<div style="display:flex;align-items:center;gap:6px;">` +
 			`<span>${format_number(sfb_pct.toFixed(1))}<span class="stat-unit">%</span></span>` +
-			`<span class="tooltip stat-inline-tooltip" style="color:var(--kpi-sfb-color);">${INFO_SVG}` +
-			`<span class="tooltiptext">${_t('ui_typing.tooltip_sfb_pct')}</span>` +
-			`</span></div>`;
+			`<button type="button" class="tooltip stat-inline-tooltip" style="color:var(--kpi-sfb-color);">${INFO_SVG}` +
+			`<small class="tooltiptext">${_t('ui_typing.tooltip_sfb_pct')}</small>` +
+			`</button>`;
 	}
 
 	// Raw count + avoided count as secondary detail
@@ -1515,7 +1509,7 @@ function render_sfb_table() {
 				// The finger label is intentionally kept whole in every language.
 				const doigt_str = d.finger || '';
 				const main_str = d.hand || '';
-				const pair_html = `<span class="seq-chips">${format_seq_chips(d.pair)}</span>`;
+				const pair_html = `<kbd class="seq-chips">${format_seq_chips(d.pair)}</kbd>`;
 				return `<tr>
 				<td>${pair_html}</td>
 				<td style="text-align:right;font-variant-numeric:tabular-nums;">${format_number(d.count)}</td>
@@ -1528,10 +1522,10 @@ function render_sfb_table() {
 
 	container.innerHTML = `<table class="ekpi-table">
 			<thead><tr>
-				<th onclick="sort_sfb_table('pair')">${h_pair}</th>
-				<th onclick="sort_sfb_table('count')" style="text-align:right">${h_count}</th>
-				<th onclick="sort_sfb_table('finger')">${h_finger}</th>
-				<th onclick="sort_sfb_table('hand')" style="text-align:center">${h_hand}</th>
+				<th><button type="button" class="th-sort" onclick="sort_sfb_table('pair')">${h_pair}</button></th>
+				<th style="text-align:right"><button type="button" class="th-sort" onclick="sort_sfb_table('count')">${h_count}</button></th>
+				<th><button type="button" class="th-sort" onclick="sort_sfb_table('finger')">${h_finger}</button></th>
+				<th style="text-align:center"><button type="button" class="th-sort" onclick="sort_sfb_table('hand')">${h_hand}</button></th>
 			</tr></thead>
 			<tbody>${rows_html}</tbody>
 		</table>`;
@@ -1748,11 +1742,10 @@ function render_distance_kpi() {
 		// and keeps the display consistent across sessions regardless of distance magnitude.
 		const unit_str = `${format_number(total_km.toFixed(3))} <span class="stat-unit">km</span>`;
 		dist_val_el.innerHTML =
-			`<div style="display:flex;align-items:center;gap:6px;">` +
 			`<span>${unit_str}</span>` +
-			`<span class="tooltip stat-inline-tooltip" style="color:var(--kpi-dist-color);">${INFO_SVG}` +
-			`<span class="tooltiptext" style="text-align:left;">${FINGER_DISTANCE_TOOLTIP_HTML}</span>` +
-			`</span></div>`;
+			`<button type="button" class="tooltip stat-inline-tooltip" style="color:var(--kpi-dist-color);">${INFO_SVG}` +
+			`<small class="tooltiptext" style="text-align:left;">${FINGER_DISTANCE_TOOLTIP_HTML}</small>` +
+			`</button>`;
 	}
 
 	// Identify the most-active finger
@@ -1833,10 +1826,10 @@ function render_dist_table() {
 
 	container.innerHTML = `<table class="ekpi-table">
 			<thead><tr>
-				<th onclick="sort_dist_table('label')">${h_name}</th>
-				<th onclick="sort_dist_table('hand')" style="text-align:center">${h_hand}</th>
-				<th onclick="sort_dist_table('usage_pct')">${h_usage}</th>
-				<th onclick="sort_dist_table('km')" style="text-align:right">${h_km}</th>
+				<th><button type="button" class="th-sort" onclick="sort_dist_table('label')">${h_name}</button></th>
+				<th style="text-align:center"><button type="button" class="th-sort" onclick="sort_dist_table('hand')">${h_hand}</button></th>
+				<th><button type="button" class="th-sort" onclick="sort_dist_table('usage_pct')">${h_usage}</button></th>
+				<th style="text-align:right"><button type="button" class="th-sort" onclick="sort_dist_table('km')">${h_km}</button></th>
 			</tr></thead>
 			<tbody>${rows_html}</tbody>
 		</table>`;
@@ -1890,10 +1883,8 @@ function render_avg_words_kpi() {
 	}
 
 	sub_el.innerHTML =
-		`<div style="margin-top:5px;">` +
 		`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(total_words)}</strong>` +
-		` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.unit_words_typed')}</span>` +
-		`</div>`;
+		` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.unit_words_typed')}</span>`;
 }
 
 // ===================================================
@@ -2065,7 +2056,7 @@ function render_ergo_bigram_kpi() {
 	// Info tooltip — concise glossary so users can self-serve the meaning.
 	const info = document.getElementById('ergo_bigram_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_ergo_bigram')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_ergo_bigram')}</small>`;
 	}
 
 	// Build a sortable detail table — the 12 worst pairs from each "bad" group
@@ -2112,9 +2103,9 @@ function render_ergo_bigram_table() {
 
 	container.innerHTML =
 		`<table class="ekpi-table"><thead><tr>` +
-		`<th onclick="sort_ergo_bigram_table('pair')" style="cursor:pointer;">Bigramme${arrow('pair')}</th>` +
-		`<th onclick="sort_ergo_bigram_table('count')" style="cursor:pointer;text-align:right;">Occurrences${arrow('count')}</th>` +
-		`<th onclick="sort_ergo_bigram_table('kind')" style="cursor:pointer;text-align:center;">Type${arrow('kind')}</th>` +
+		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_ergo_bigram_table('pair')">Bigramme${arrow('pair')}</button></th>` +
+		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_ergo_bigram_table('count')">Occurrences${arrow('count')}</button></th>` +
+		`<th style="cursor:pointer;text-align:center;"><button type="button" class="th-sort" onclick="sort_ergo_bigram_table('kind')">Type${arrow('kind')}</button></th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -2254,7 +2245,7 @@ function render_ergo_trigram_kpi() {
 
 	const info = document.getElementById('ergo_trigram_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_ergo_trigram')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_ergo_trigram')}</small>`;
 	}
 
 	const top_n = (arr, n) => arr.sort((a, b) => b.count - a.count).slice(0, n);
@@ -2297,9 +2288,9 @@ function render_ergo_trigram_table() {
 
 	container.innerHTML =
 		`<table class="ekpi-table"><thead><tr>` +
-		`<th onclick="sort_ergo_trigram_table('seq')" style="cursor:pointer;">Trigramme${arrow('seq')}</th>` +
-		`<th onclick="sort_ergo_trigram_table('count')" style="cursor:pointer;text-align:right;">Occurrences${arrow('count')}</th>` +
-		`<th onclick="sort_ergo_trigram_table('kind')" style="cursor:pointer;text-align:center;">Type${arrow('kind')}</th>` +
+		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_ergo_trigram_table('seq')">Trigramme${arrow('seq')}</button></th>` +
+		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_ergo_trigram_table('count')">Occurrences${arrow('count')}</button></th>` +
+		`<th style="cursor:pointer;text-align:center;"><button type="button" class="th-sort" onclick="sort_ergo_trigram_table('kind')">Type${arrow('kind')}</button></th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -2400,7 +2391,7 @@ function render_errors_kpi() {
 
 	const info = document.getElementById('errors_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_errors')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_errors')}</small>`;
 	}
 
 	_err_data = rows;
@@ -2411,7 +2402,7 @@ function render_errors_table() {
 	const container = document.getElementById('errors_bigrams_container');
 	if (!container) return;
 	if (_err_data.length === 0) {
-		container.innerHTML = `<div style="text-align:center;color:var(--text-muted);padding:12px;">${_t('ui_typing.errors_no_data')}</div>`;
+		container.innerHTML = `<p style="text-align:center;color:var(--text-muted);padding:12px;margin:0;">${_t('ui_typing.errors_no_data')}</p>`;
 		return;
 	}
 
@@ -2439,10 +2430,10 @@ function render_errors_table() {
 
 	container.innerHTML =
 		`<table class="ekpi-table"><thead><tr>` +
-		`<th onclick="sort_errors_table('pair')" style="cursor:pointer;">${_t('ui_typing.errors_table_bigram')}${arrow('pair')}</th>` +
-		`<th onclick="sort_errors_table('count')" style="cursor:pointer;text-align:right;">${_t('ui_typing.errors_table_occ')}${arrow('count')}</th>` +
-		`<th onclick="sort_errors_table('errors')" style="cursor:pointer;text-align:right;">${_t('ui_typing.errors_table_errors')}${arrow('errors')}</th>` +
-		`<th onclick="sort_errors_table('rate')" style="cursor:pointer;text-align:right;">${_t('ui_typing.errors_table_rate')}${arrow('rate')}</th>` +
+		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_errors_table('pair')">${_t('ui_typing.errors_table_bigram')}${arrow('pair')}</button></th>` +
+		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_errors_table('count')">${_t('ui_typing.errors_table_occ')}${arrow('count')}</button></th>` +
+		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_errors_table('errors')">${_t('ui_typing.errors_table_errors')}${arrow('errors')}</button></th>` +
+		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_errors_table('rate')">${_t('ui_typing.errors_table_rate')}${arrow('rate')}</button></th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -2570,7 +2561,7 @@ function render_roi_kpi() {
 
 	const info = document.getElementById('roi_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_roi')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_roi')}</small>`;
 	}
 }
 
@@ -2640,7 +2631,7 @@ function render_lexical_kpi() {
 
 	const info = document.getElementById('lexical_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_lexical')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_lexical')}</small>`;
 	}
 
 	// Histogram of word lengths — horizontal bars normalised to the max bucket.
@@ -2669,7 +2660,7 @@ function render_lexical_kpi() {
 		);
 	}
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_word_length_dist')}</div>` +
+		`<p style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_word_length_dist')}</p>` +
 		`<table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>${bars_html.join('')}</tbody></table>`;
 }
 
@@ -2777,7 +2768,7 @@ function render_rhythm_kpi() {
 
 	const info = document.getElementById('rhythm_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_rhythm')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_rhythm')}</small>`;
 	}
 
 	const container = document.getElementById('rhythm_distribution_container');
@@ -2808,7 +2799,7 @@ function render_rhythm_kpi() {
 		})
 		.join('');
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_burst_length_dist')}</div>` +
+		`<p style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_burst_length_dist')}</p>` +
 		`<table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>${bars}</tbody></table>`;
 }
 
@@ -2872,7 +2863,7 @@ function render_sessions_kpi() {
 
 	const info = document.getElementById('sessions_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_sessions')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_sessions')}</small>`;
 	}
 }
 
@@ -3004,7 +2995,7 @@ function render_records_kpi() {
 
 	const info = document.getElementById('records_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_records')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_records')}</small>`;
 	}
 }
 
@@ -3091,7 +3082,7 @@ function render_charmix_kpi() {
 
 	const info = document.getElementById('charmix_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_charmix')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_charmix')}</small>`;
 	}
 
 	// Stacked horizontal bar — segments proportional to each category's share,
@@ -3119,8 +3110,8 @@ function render_charmix_kpi() {
 		)
 		.join('');
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_charmix_dist').replace('%s', format_number(grand))}</div>` +
-		`<div style="display:flex;height:24px;border-radius:6px;overflow:hidden;">${bar_html}</div>`;
+		`<p style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_charmix_dist').replace('%s', format_number(grand))}</p>` +
+		`<div role="img" aria-label="${segments.map((s) => s.tooltip).join(', ')}" style="display:flex;height:24px;border-radius:6px;overflow:hidden;">${bar_html}</div>`;
 }
 
 // =================================================
@@ -3282,7 +3273,7 @@ function render_apps_kpi() {
 
 	const info = document.getElementById('apps_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_apps')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_apps')}</small>`;
 	}
 
 	render_apps_table();
@@ -3336,10 +3327,10 @@ function render_apps_table() {
 
 	container.innerHTML =
 		`<table class="ekpi-table"><thead><tr>` +
-		`<th onclick="sort_apps_table('name')" style="cursor:pointer;">${_t('ui_typing.col_app')}${arrow('name')}</th>` +
-		`<th onclick="sort_apps_table('chars')" style="cursor:pointer;">${_t('ui_typing.col_chars')}${arrow('chars')}</th>` +
-		`<th onclick="sort_apps_table('cpm')" style="cursor:pointer;text-align:right;">${_t('ui_typing.unit_cpm')}${arrow('cpm')}</th>` +
-		`<th onclick="sort_apps_table('time_ms')" style="cursor:pointer;text-align:right;">${_t('ui_typing.col_active_time')}${arrow('time_ms')}</th>` +
+		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_apps_table('name')">${_t('ui_typing.col_app')}${arrow('name')}</button></th>` +
+		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_apps_table('chars')">${_t('ui_typing.col_chars')}${arrow('chars')}</button></th>` +
+		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_apps_table('cpm')">${_t('ui_typing.unit_cpm')}${arrow('cpm')}</button></th>` +
+		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_apps_table('time_ms')">${_t('ui_typing.col_active_time')}${arrow('time_ms')}</button></th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -3492,7 +3483,7 @@ function render_wellness_kpi() {
 
 	const info = document.getElementById('wellness_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_wellness')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_wellness')}</small>`;
 	}
 
 	// Cumulative finger load: horizontal bar showing each finger's share of
@@ -3542,7 +3533,7 @@ function render_wellness_kpi() {
 		);
 	}).join('');
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_finger_load_dist')}</div>` +
+		`<p style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_finger_load_dist')}</p>` +
 		`<table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>${rows}</tbody></table>`;
 }
 
@@ -3692,7 +3683,7 @@ function request_range_data(show_loader = true) {
 		app_state.range_request_previous_table_html = table_body.innerHTML;
 		table_body.innerHTML =
 			'<tr><td colspan="8" style="text-align:center;padding:30px;">' +
-			'<div class="loader-spinner"></div> R\u00E9cup\u00E9ration et d\u00E9chiffrement depuis la DB...' +
+			'<div class="loader-spinner" aria-hidden="true"></div> R\u00E9cup\u00E9ration et d\u00E9chiffrement depuis la DB...' +
 			'</td></tr>';
 	} else {
 		app_state.range_request_previous_table_html = null;

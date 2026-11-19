@@ -1,79 +1,290 @@
 {
 	"files": {
-		"charts.js": [
-			{
-				"tag": "span",
-				"count": 5,
-				"pending": true
-			},
-			{
-				"tag": "div",
-				"count": 4,
-				"pending": true
-			}
-		],
 		"data.js": [
 			{
 				"tag": "span",
-				"count": 65,
-				"pending": true
+				"where": "class=\"stat-unit\"",
+				"count": 24,
+				"reason": "Unit after a number (activations, km, %, words): smaller and muted inside the value; HTML has no element that marks a unit."
+			},
+			{
+				"tag": "span",
+				"where": "class=\"stat-value-line\"",
+				"count": 4,
+				"reason": "One line of the speed value inside its paragraph, which holds only phrasing content; the line needs its own flex layout."
+			},
+			{
+				"tag": "span",
+				"where": "<span>",
+				"count": 7,
+				"reason": "Keeps a number and its unit together as one item of the value paragraph’s flex row."
+			},
+			{
+				"tag": "span",
+				"where": "color:var(--text-muted)",
+				"count": 3,
+				"reason": "Muted secondary words, a separator arrow or the dash of a missing value inside a cell; only their colour differs from the text around."
+			},
+			{
+				"tag": "span",
+				"where": "min-width:",
+				"count": 3,
+				"reason": "Number beside a drawn bar, aligned in a fixed width; it is the bar’s value in words."
+			},
+			{
+				"tag": "span",
+				"where": "${signal_color}",
+				"count": 1,
+				"reason": "Colour of the health signal word; the word itself states the signal, the colour only repeats it."
 			},
 			{
 				"tag": "div",
-				"count": 35,
-				"pending": true
+				"where": "display:flex;align-items:center;gap:6px;",
+				"count": 3,
+				"reason": "Lays a drawn bar and its number out on one line of a table cell; placement only."
+			},
+			{
+				"tag": "div",
+				"where": "flex:1;height:8px",
+				"count": 3,
+				"reason": "Drawn proportion bar beside the number that states it (its track or fill); a meter element cannot take this look in WebView2, WebKit and WebKitGTK alike."
+			},
+			{
+				"tag": "div",
+				"where": "height:100%;width:",
+				"count": 5,
+				"reason": "Drawn proportion bar beside the number that states it (its track or fill); a meter element cannot take this look in WebView2, WebKit and WebKitGTK alike."
+			},
+			{
+				"tag": "div",
+				"where": "height:10px;background",
+				"count": 2,
+				"reason": "Drawn proportion bar beside the number that states it (its track or fill); a meter element cannot take this look in WebView2, WebKit and WebKitGTK alike."
+			},
+			{
+				"tag": "div",
+				"where": "title=\"${s.tooltip}\"",
+				"count": 1,
+				"reason": "Coloured segment of the character mix bar, inside an image named by every segment; its share is in that name and in the figures above."
+			},
+			{
+				"tag": "div",
+				"where": "role=\"img\"",
+				"count": 1,
+				"reason": "The character mix bar: flex segments drawn as one image and named as one; no element draws proportional segments."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"loader-spinner\"",
+				"count": 1,
+				"reason": "Spinning loading mark drawn by CSS, hidden from assistive technology beside the loading text it decorates."
 			}
 		],
 		"format.js": [
 			{
 				"tag": "span",
-				"count": 14,
-				"pending": true
+				"where": "class=\"shortcut-plus\"",
+				"count": 1,
+				"reason": "The plus between the keys of a shortcut, styled apart; HTML marks the keys themselves (kbd), not the joiner."
 			}
 		],
 		"index.html": [
 			{
 				"tag": "div",
-				"count": 332,
-				"pending": true
+				"where": "class=\"filters-bar\"",
+				"count": 1,
+				"reason": "Lays its children out in one wrapping row; it is placement only and carries no meaning to name."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"filter-group-",
+				"count": 2,
+				"reason": "Keeps one group of filter controls together inside the wrapping filter row; placement only."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"stats-grid\"",
+				"count": 1,
+				"reason": "Grid that places the three KPI sections side by side and wraps them; placement only."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"split-col\"",
+				"count": 59,
+				"reason": "Groups one term and its value inside the dl, the one grouping element HTML allows between a dl and its dt and dd."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"sparkline-container\"",
+				"count": 2,
+				"reason": "Sizing box of a chart canvas: Chart.js measures this relatively positioned parent to size its drawing, which carries the name."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"chart-row-block-canvas\"",
+				"count": 2,
+				"reason": "Sizing box of a chart canvas: Chart.js measures this relatively positioned parent to size its drawing, which carries the name."
+			},
+			{
+				"tag": "div",
+				"where": "min-height: 0; position: relative",
+				"count": 1,
+				"reason": "Sizing box of a chart canvas: Chart.js measures this relatively positioned parent to size its drawing, which carries the name."
+			},
+			{
+				"tag": "div",
+				"where": "flex-wrap: wrap;",
+				"count": 1,
+				"reason": "Places the precision and the speed chart sections side by side; placement only."
+			},
+			{
+				"tag": "div",
+				"where": "align-items: baseline; gap: 10px",
+				"count": 3,
+				"reason": "Keeps a chart's heading, its information mark and its gesture hint on one baseline; an hgroup may not hold the mark's button."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"heatmaps-row\"",
+				"count": 1,
+				"reason": "Lays its children out in one wrapping row; it is placement only and carries no meaning to name."
+			},
+			{
+				"tag": "div",
+				"where": "flex-direction: column; align-items: center",
+				"count": 1,
+				"reason": "Stacks the SFB heatmap under its toggle and centres both; placement only."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"ekpi-table-wrap\"",
+				"count": 11,
+				"reason": "Scrolling box of a KPI table, made a named focusable region at run time once it overflows; a role only a generic box takes."
+			},
+			{
+				"tag": "div",
+				"where": "_container\"",
+				"count": 4,
+				"reason": "Mount point the renderer fills with a captioned figure; the figure carries the meaning, the box only places it."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"expanded-kpi-row\"",
+				"count": 12,
+				"reason": "Row that lays one or more KPI sections side by side and wraps them; placement only."
+			},
+			{
+				"tag": "div",
+				"where": "role=\"tablist\"",
+				"count": 1,
+				"reason": "The tab list itself: ARIA gives no native element for a tab list, so a generic box takes its role."
+			},
+			{
+				"tag": "div",
+				"where": "role=\"none\"",
+				"count": 3,
+				"reason": "One visual row of tabs inside the tab list, presentational so that its tabs stay owned by the list."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"th-seq-",
+				"count": 2,
+				"reason": "Stacks the column title, the search field and the row count inside one header cell; placement only."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"modal\"",
+				"count": 1,
+				"reason": "Backdrop of the app filter: a full-window overlay that dims the page behind the dialog section it holds."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"app-modal-controls\"",
+				"count": 1,
+				"reason": "Row of the dialog's select-all and clear buttons; placement only."
 			},
 			{
 				"tag": "span",
-				"count": 56,
-				"pending": true
-			}
-		],
-		"main.js": [
+				"where": "class=\"stat-unit\"",
+				"count": 15,
+				"reason": "Unit after a number (activations, km, %, words): smaller and muted inside the value; HTML has no element that marks a unit."
+			},
 			{
 				"tag": "span",
+				"where": "data-i18n=\"ui_typing.unit_keystrokes\"",
+				"count": 2,
+				"reason": "Unit after a number (activations, km, %, words): smaller and muted inside the value; HTML has no element that marks a unit."
+			},
+			{
+				"tag": "span",
+				"where": "data-i18n=\"ui_typing.lbl_doublings\"",
 				"count": 1,
-				"pending": true
+				"reason": "Unit after a number (activations, km, %, words): smaller and muted inside the value; HTML has no element that marks a unit."
+			},
+			{
+				"tag": "span",
+				"where": "data-i18n=\"ui_typing.h2_",
+				"count": 3,
+				"reason": "Words of a card heading beside its trend image: data-i18n replaces an element's whole text, so the words need their own."
+			},
+			{
+				"tag": "span",
+				"where": "_trend\"",
+				"count": 3,
+				"reason": "Holder of the trend image the script draws, replaced whole on each render; the image inside carries the name."
+			},
+			{
+				"tag": "span",
+				"where": "id=\"metrics_maintenance_text\"",
+				"count": 1,
+				"reason": "Words of the export and purge status line beside its buttons, rewritten by the script; the line is the status paragraph."
 			}
 		],
 		"modal.js": [
 			{
-				"tag": "div",
-				"count": 3,
-				"pending": true
-			},
-			{
 				"tag": "span",
-				"count": 1,
-				"pending": true
+				"where": "class=\"app-",
+				"count": 3,
+				"reason": "Inside a label only phrasing content may sit: the app's icon box and initial (hidden from readers) and its name, styled to fill the row."
 			}
 		],
 		"table.js": [
 			{
+				"tag": "div",
+				"where": "class=\"hm-tooltip\"",
+				"count": 2,
+				"reason": "Hover popup of a heatmap key, hidden from assistive technology: the Keycodes table gives the same counts to the keyboard."
+			},
+			{
 				"tag": "span",
-				"count": 19,
-				"pending": true
+				"where": "color:",
+				"count": 5,
+				"reason": "Muted secondary words, a separator arrow or the dash of a missing value inside a cell; only their colour differs from the text around."
+			},
+			{
+				"tag": "span",
+				"where": "class=\"kc-name\"",
+				"count": 1,
+				"reason": "Name of a key after its code inside the key chip, styled apart from the code."
 			},
 			{
 				"tag": "div",
-				"count": 7,
-				"pending": true
+				"where": "class=\"cell-seq\"",
+				"count": 1,
+				"reason": "Lays the row number, a divider and the sequence out on one line of a cell; placement only."
+			},
+			{
+				"tag": "span",
+				"where": "class=\"row-num\"",
+				"count": 1,
+				"reason": "Row number in front of the sequence, styled apart; the table has no row header to hold it."
+			},
+			{
+				"tag": "span",
+				"where": "class=\"row-divider\"",
+				"count": 1,
+				"reason": "Thin divider drawn between the row number and the sequence; decoration with no text."
 			}
 		]
-	},
-	"pendingProblems": 12
+	}
 }

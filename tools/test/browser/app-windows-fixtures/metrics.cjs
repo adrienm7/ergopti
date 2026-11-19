@@ -36,6 +36,37 @@ async function showsPressed(page, group, which) {
 }
 
 /**
+ * Reaches one tab of a tab list from the keyboard: the selected tab takes the
+ * focus, then the arrow keys move to the asked one, which alone reads as
+ * selected and labels the panel it shows.
+ * @param {string} group - Selector of every tab of the list.
+ * @param {string} which - Attribute selector of the tab to reach.
+ */
+async function showsSelected(page, group, which) {
+	await page.locator(group + '[aria-selected="true"]').focus();
+	for (let step = 0; step < 30; step++) {
+		if (await page.locator(group + which).evaluate((tab) => tab === document.activeElement)) break;
+		await page.keyboard.press('ArrowRight');
+	}
+	const selected = await page.$$eval(group, (tabs) =>
+		tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true').map((tab) => tab.id)
+	);
+	assert.equal(selected.length, 1, 'one tab reads as selected');
+	const target = page.locator(group + which);
+	assert.ok(
+		await target.evaluate(
+			(tab) =>
+				tab === document.activeElement &&
+				tab.tabIndex === 0 &&
+				document
+					.getElementById(tab.getAttribute('aria-controls'))
+					.getAttribute('aria-labelledby') === tab.id
+		),
+		'the arrow keys reach the tab, which is the stop of its list and labels its panel'
+	);
+}
+
+/**
  * Moves the onboarding forward from the language step, as a user presses
  * Next, and optionally answers « Yes » on the page reached.
  * @param {number} steps - Presses of Next.
@@ -192,7 +223,7 @@ module.exports = [
 		states: [
 			...['kc', 'bg', 'w', 'sc'].map((tab) => ({
 				name: 'tab-' + tab,
-				enter: (page) => showsPressed(page, '.tabs .tab-btn', '[data-tab="' + tab + '"]')
+				enter: (page) => showsSelected(page, '.tabs .tab-btn', '[data-tab="' + tab + '"]')
 			})),
 			{
 				// A rebuild in progress and a failed refresh, both banners shown.

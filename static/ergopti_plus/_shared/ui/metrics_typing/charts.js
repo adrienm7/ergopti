@@ -383,7 +383,7 @@ function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = nul
 					? `${ui_thresh_ms / 60000}${NBSP}min`
 					: `${ui_thresh_ms / 1000}${NBSP}s`;
 		const tip = _t('ui_typing.tooltip_precision_formula').replace('{thresh}', thresh_label);
-		info_el.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+		info_el.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${tip}</small>`;
 	}
 
 	// Precision formula
@@ -1111,16 +1111,16 @@ function _render_activity_calendar() {
 	});
 
 	container.innerHTML =
-		`<div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">` +
-		`<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
-		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t('ui_typing.calendar_title')} <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t('ui_typing.calendar_subtitle')}</span></h3>` +
-		`<span style="font-size:11px;color:var(--text-muted);">${active_days} ${_t('ui_typing.calendar_active_days')} · ${format_number(total_chars)} ${_t('ui_typing.calendar_chars')}</span>` +
-		`</div>` +
-		`<svg width="${svg_w}" height="${svg_h}" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
+		`<figure style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:0;">` +
+		`<figcaption id="activity_calendar_caption" style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
+		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t('ui_typing.calendar_title')} <small style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t('ui_typing.calendar_subtitle')}</small></h3>` +
+		`<p style="margin:0;font-size:11px;color:var(--text-muted);">${active_days} ${_t('ui_typing.calendar_active_days')} · ${format_number(total_chars)} ${_t('ui_typing.calendar_chars')}</p>` +
+		`</figcaption>` +
+		`<svg width="${svg_w}" height="${svg_h}" role="img" aria-labelledby="activity_calendar_caption" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
 		weekday_labels +
 		month_labels +
 		cells +
-		`</svg></div>`;
+		`</svg></figure>`;
 }
 
 // ===================================================
@@ -1234,14 +1234,14 @@ function _render_hour_weekday_heatmap() {
 	for (let i = 0; i < 7; i++) for (let j = 0; j < 24; j++) total_chars += matrix[i][j];
 
 	container.innerHTML =
-		`<div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">` +
-		`<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
-		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t('ui_typing.heatmap_hour_title')} <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t('ui_typing.heatmap_hour_subtitle')}</span></h3>` +
-		`<span style="font-size:11px;color:var(--text-muted);">${format_number(total_chars)} ${_t('ui_typing.heatmap_hour_total')}</span>` +
-		`</div>` +
-		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
+		`<figure style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:0;">` +
+		`<figcaption id="hour_weekday_caption" style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
+		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t('ui_typing.heatmap_hour_title')} <small style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t('ui_typing.heatmap_hour_subtitle')}</small></h3>` +
+		`<p style="margin:0;font-size:11px;color:var(--text-muted);">${format_number(total_chars)} ${_t('ui_typing.heatmap_hour_total')}</p>` +
+		`</figcaption>` +
+		`<svg width="${SVG_W}" height="${SVG_H}" role="img" aria-labelledby="hour_weekday_caption" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
 		day_labels +
 		hour_labels.join('') +
 		cells +
-		`</svg></div>`;
+		`</svg></figure>`;
 }
