@@ -339,6 +339,8 @@
 	"layout_editor.score_chip.rank": "{count} 个中排名第 {rank}",
 	"layout_editor.score_chip.change": "自上次编辑以来 {change}",
 	"layout_editor.score_chip.unchanged": "上次编辑未改变",
+	"layout_editor.score_chip.change_named": "{edit} 之后 {change}",
+	"layout_editor.score_chip.unchanged_named": "{edit} 之后未改变",
 	"layout_editor.score_chip.open": "显示布局分析",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock 层",

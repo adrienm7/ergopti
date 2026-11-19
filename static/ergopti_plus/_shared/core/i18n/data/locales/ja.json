@@ -339,6 +339,8 @@
 	"layout_editor.score_chip.rank": "{count} 中 {rank} 位",
 	"layout_editor.score_chip.change": "前回の編集から {change}",
 	"layout_editor.score_chip.unchanged": "前回の編集で変化なし",
+	"layout_editor.score_chip.change_named": "{edit} の後 {change}",
+	"layout_editor.score_chip.unchanged_named": "{edit} の後も変化なし",
 	"layout_editor.score_chip.open": "配列の分析を表示",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock レイヤー",

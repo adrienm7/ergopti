@@ -339,6 +339,8 @@
 	"layout_editor.score_chip.rank": "posição {rank} de {count}",
 	"layout_editor.score_chip.change": "{change} desde a última alteração",
 	"layout_editor.score_chip.unchanged": "inalterado pela última alteração",
+	"layout_editor.score_chip.change_named": "{change} após {edit}",
+	"layout_editor.score_chip.unchanged_named": "inalterado após {edit}",
 	"layout_editor.score_chip.open": "Mostrar a análise do layout",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Camada Caps Lock",

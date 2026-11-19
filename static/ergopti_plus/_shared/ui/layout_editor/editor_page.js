@@ -506,7 +506,9 @@ var LayoutEditorPage = (function () {
 			workspace: { status: host.workspace ? 'loading' : 'none', blocked: false, error: null },
 			persisted: null,
 			// The analysis panel's key colours ({values, max, titles}), null when off.
-			heat: null
+			heat: null,
+			// The last edit's name and the document it made ({doc, text}), for the score chip.
+			lastEdit: null
 		};
 		state.tabs.push({ history: state.history, dirty: false });
 		const doc = () => state.history.current();
@@ -523,9 +525,20 @@ var LayoutEditorPage = (function () {
 					})
 				: null;
 
-		function apply(edit) {
+		/**
+		 * Applies an edit as one step of the history.
+		 * @param {function(object): object} edit - The next document from the current one.
+		 * @param {function(object): string} [name] - The edit in a few characters
+		 *   (« é ↔ a »), read on the document before it; the score chip names the
+		 *   change of score after it.
+		 */
+		function apply(edit, name) {
 			try {
-				state.history.push(edit(doc()));
+				const before = doc();
+				const text = name ? name(before) : null;
+				state.history.push(edit(before));
+				// Kept with the document it made: an undo, a redo or another edit drops it.
+				state.lastEdit = text ? { doc: doc(), text } : null;
 				state.dirty = true;
 				state.message = null;
 			} catch (error) {
@@ -547,23 +560,57 @@ var LayoutEditorPage = (function () {
 			if (codes.length !== 2 && codes.length !== 3)
 				throw new Error(`layout editor: a best move has 2 or 3 keys, not ${codes.length}`);
 			const platform = state.platform || null;
-			apply((d) => {
-				const partner = LayoutEditorModel.caseLayer(d, 'base');
-				let next = d;
-				for (const other of codes.slice(1)) {
-					next = LayoutEditorModel.transferMapping(next, 'base', codes[0], other, platform, false);
-					if (partner)
+			apply(
+				(d) => {
+					const partner = LayoutEditorModel.caseLayer(d, 'base');
+					let next = d;
+					for (const other of codes.slice(1)) {
 						next = LayoutEditorModel.transferMapping(
 							next,
-							partner.id,
+							'base',
 							codes[0],
 							other,
 							platform,
 							false
 						);
-				}
-				return next;
-			});
+						if (partner)
+							next = LayoutEditorModel.transferMapping(
+								next,
+								partner.id,
+								codes[0],
+								other,
+								platform,
+								false
+							);
+					}
+					return next;
+				},
+				moveName('base', codes, false)
+			);
+		}
+
+		/**
+		 * What a key types on a layer, as the board shows it; its name when it
+		 * types nothing there.
+		 */
+		function keyChar(d, layer, code) {
+			const found = layer
+				? LayoutEditorModel.mappingAt(d, layer, code, state.platform || null)
+				: null;
+			const text = found ? legend(found.mapping, d) : '';
+			return text || keyName(code);
+		}
+
+		/**
+		 * The name of a move of keys' characters: « é ↔ a » for a swap, « é → a »
+		 * for a copy, « é → a → s » for a cycle.
+		 * @returns {function(object): string} Read on the document before the move.
+		 */
+		function moveName(layer, codes, copy) {
+			return (d) => {
+				const chars = codes.map((code) => keyChar(d, layer, code));
+				return chars.join(codes.length === 2 && !copy ? ' ↔ ' : ' → ');
+			};
 		}
 
 		function notify(kind, text) {
@@ -2463,15 +2510,17 @@ var LayoutEditorPage = (function () {
 								const from = event.dataTransfer.getData('text/plain');
 								if (!from) return;
 								const keep = event.ctrlKey || event.altKey;
-								apply((d) =>
-									LayoutEditorModel.transferMapping(
-										d,
-										state.layer,
-										from,
-										key.code,
-										state.platform || null,
-										keep
-									)
+								apply(
+									(d) =>
+										LayoutEditorModel.transferMapping(
+											d,
+											state.layer,
+											from,
+											key.code,
+											state.platform || null,
+											keep
+										),
+									moveName(state.layer, [from, key.code], keep)
 								);
 							}
 						},
@@ -2685,23 +2734,25 @@ var LayoutEditorPage = (function () {
 					class: 'primary',
 					text: tl('btn.apply'),
 					onclick: () =>
-						apply((d) =>
-							state.autoCase
-								? LayoutEditorModel.setMappingWithCase(
-										d,
-										state.layer,
-										code,
-										built(),
-										state.platform || null,
-										state.caseOverwrite
-									)
-								: LayoutEditorModel.setMapping(
-										d,
-										state.layer,
-										code,
-										built(),
-										state.platform || null
-									)
+						apply(
+							(d) =>
+								state.autoCase
+									? LayoutEditorModel.setMappingWithCase(
+											d,
+											state.layer,
+											code,
+											built(),
+											state.platform || null,
+											state.caseOverwrite
+										)
+									: LayoutEditorModel.setMapping(
+											d,
+											state.layer,
+											code,
+											built(),
+											state.platform || null
+										),
+							(d) => `${keyChar(d, state.layer, code)} → ${legend(built(), d) || keyName(code)}`
 						)
 				}),
 				el('button', {
@@ -2742,15 +2793,17 @@ var LayoutEditorPage = (function () {
 					id: 'le-swap',
 					text: tl('swap.button'),
 					onclick: () =>
-						apply((d) =>
-							LayoutEditorModel.transferMapping(
-								d,
-								state.layer,
-								code,
-								target.value,
-								state.platform || null,
-								false
-							)
+						apply(
+							(d) =>
+								LayoutEditorModel.transferMapping(
+									d,
+									state.layer,
+									code,
+									target.value,
+									state.platform || null,
+									false
+								),
+							moveName(state.layer, [code, target.value], false)
 						)
 				})
 			]);
@@ -4753,9 +4806,15 @@ var LayoutEditorPage = (function () {
 					// Better or worse with a mark and in words, never by its colour alone.
 					const verdict = !moved ? 'same' : result.change > 0 ? 'better' : 'worse';
 					const signed = `${result.change > 0 ? '+' : '−'}${format(Math.abs(result.change), 1)}`;
-					const text = moved
-						? tl('score_chip.change', { change: signed })
-						: tl('score_chip.unchanged');
+					// The edit named when the analysis is of the document it made.
+					const edit = state.lastEdit && state.lastEdit.doc === doc() ? state.lastEdit.text : null;
+					const text = edit
+						? moved
+							? tl('score_chip.change_named', { change: signed, edit })
+							: tl('score_chip.unchanged_named', { edit })
+						: moved
+							? tl('score_chip.change', { change: signed })
+							: tl('score_chip.unchanged');
 					const mark = { better: '▲', worse: '▼', same: '=' }[verdict];
 					const verdictWords = t(`layout_analysis.details.verdict_${verdict}`);
 					chipChange.classList.add(`le-score-${verdict}`);

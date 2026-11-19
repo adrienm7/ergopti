@@ -339,6 +339,8 @@
 	"layout_editor.score_chip.rank": "المرتبة {rank} من {count}",
 	"layout_editor.score_chip.change": "{change} منذ آخر تعديل",
 	"layout_editor.score_chip.unchanged": "لم يتغير بآخر تعديل",
+	"layout_editor.score_chip.change_named": "{change} بعد {edit}",
+	"layout_editor.score_chip.unchanged_named": "لم يتغير بعد {edit}",
 	"layout_editor.score_chip.open": "عرض تحليل التخطيط",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "طبقة Caps Lock",

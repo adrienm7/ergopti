@@ -339,6 +339,8 @@
 	"layout_editor.score_chip.rank": "{count} içinde {rank}. sıra",
 	"layout_editor.score_chip.change": "son düzenlemeden beri {change}",
 	"layout_editor.score_chip.unchanged": "son düzenlemeyle değişmedi",
+	"layout_editor.score_chip.change_named": "{edit} sonrası {change}",
+	"layout_editor.score_chip.unchanged_named": "{edit} sonrası değişmedi",
 	"layout_editor.score_chip.open": "Düzen analizini göster",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock katmanı",

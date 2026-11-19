@@ -339,6 +339,8 @@
 	"layout_editor.score_chip.rank": "מקום {rank} מתוך {count}",
 	"layout_editor.score_chip.change": "{change} מאז השינוי האחרון",
 	"layout_editor.score_chip.unchanged": "לא השתנה בשינוי האחרון",
+	"layout_editor.score_chip.change_named": "{change} אחרי {edit}",
+	"layout_editor.score_chip.unchanged_named": "לא השתנה אחרי {edit}",
 	"layout_editor.score_chip.open": "הצגת ניתוח הפריסה",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "שכבת Caps Lock",

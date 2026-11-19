@@ -339,6 +339,8 @@
 	"layout_editor.score_chip.rank": "{count} में से {rank}वाँ स्थान",
 	"layout_editor.score_chip.change": "पिछले बदलाव से {change}",
 	"layout_editor.score_chip.unchanged": "पिछले बदलाव से अपरिवर्तित",
+	"layout_editor.score_chip.change_named": "{edit} के बाद {change}",
+	"layout_editor.score_chip.unchanged_named": "{edit} के बाद अपरिवर्तित",
 	"layout_editor.score_chip.open": "लेआउट का विश्लेषण दिखाएँ",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock लेयर",

@@ -3987,6 +3987,7 @@ async function exerciseComparerLink(browser, origin) {
 		await studioUx.exerciseHistoryShortcuts(browser, origin);
 		await studioUx.exerciseImportFormats(browser, origin);
 		await studioUx.exerciseScoreChip(browser, origin);
+		await studioUx.exerciseScoreChipNames(browser, origin);
 		await studioUx.exerciseShareLinkLayouts(browser, origin);
 		await studioUx.exerciseWorstNgrams(browser, origin);
 		await studioUx.exerciseBestSwaps(browser, origin);

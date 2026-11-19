@@ -339,6 +339,8 @@
 	"layout_editor.score_chip.rank": "puesto {rank} de {count}",
 	"layout_editor.score_chip.change": "{change} desde la última modificación",
 	"layout_editor.score_chip.unchanged": "sin cambios tras la última modificación",
+	"layout_editor.score_chip.change_named": "{change} tras {edit}",
+	"layout_editor.score_chip.unchanged_named": "sin cambios tras {edit}",
 	"layout_editor.score_chip.open": "Mostrar el análisis de la distribución",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Capa de Caps Lock",

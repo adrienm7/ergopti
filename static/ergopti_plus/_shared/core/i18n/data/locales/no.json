@@ -339,6 +339,8 @@
 	"layout_editor.score_chip.rank": "plass {rank} av {count}",
 	"layout_editor.score_chip.change": "{change} siden siste endring",
 	"layout_editor.score_chip.unchanged": "uendret av siste endring",
+	"layout_editor.score_chip.change_named": "{change} etter {edit}",
+	"layout_editor.score_chip.unchanged_named": "uendret etter {edit}",
 	"layout_editor.score_chip.open": "Vis analysen av oppsettet",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock-lag",

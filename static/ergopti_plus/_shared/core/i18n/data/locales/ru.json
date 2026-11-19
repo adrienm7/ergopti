@@ -339,6 +339,8 @@
 	"layout_editor.score_chip.rank": "место {rank} из {count}",
 	"layout_editor.score_chip.change": "{change} с последнего изменения",
 	"layout_editor.score_chip.unchanged": "не изменилась после последнего изменения",
+	"layout_editor.score_chip.change_named": "{change} после {edit}",
+	"layout_editor.score_chip.unchanged_named": "без изменений после {edit}",
 	"layout_editor.score_chip.open": "Показать анализ раскладки",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Слой Caps Lock",

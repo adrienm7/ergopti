@@ -327,7 +327,7 @@ async function exerciseScoreChip(browser, origin) {
 	await page.waitForTimeout(400);
 	assert.equal((await chip()).change, after.change, 'a new key colour keeps the change shown');
 	assert.match(after.change, /^(▲|▼|=)/, `the change has its mark: ${JSON.stringify(after)}`);
-	assert.match(after.live, /since the last edit|unchanged by the last edit/, after.live);
+	assert.match(after.live, / after \S+ ↔ \S+/, after.live);
 	const verdict = await page.$eval('#le-score-chip .le-score-change', (node) => node.className);
 	assert.match(verdict, /le-score-(better|worse|same)/);
 	assert.equal(
@@ -353,6 +353,54 @@ async function exerciseScoreChip(browser, origin) {
 		true,
 		'and moves the focus to its title'
 	);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
+/**
+ * (score-chip-edit-name) The chip names the edit its change follows: « after
+ * é ↔ a » for a swap (read on the board before it), « after a → æ » for a
+ * key's new character; an undo is not that edit, so the chip falls back to
+ * « since the last edit ».
+ */
+async function exerciseScoreChipNames(browser, origin) {
+	const { page, errors, context } = await openOnErgopti(browser, origin);
+	const legend = (code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
+	const change = () => page.textContent('#le-score-chip .le-score-change');
+	const [q, w] = [await legend('KeyQ'), await legend('KeyW')];
+	await swap(page, 'KeyQ', 'KeyW');
+	await page.waitForFunction(
+		() => document.querySelector('#le-score-chip .le-score-change').textContent
+	);
+	const swapped = await change();
+	assert.ok(
+		swapped.includes(`after ${q} ↔ ${w}`),
+		`the swap is named: ${JSON.stringify(swapped)}`
+	);
+	assert.ok(
+		(await page.textContent('#le-score-live')).includes(`after ${q} ↔ ${w}`),
+		'and announced with its name'
+	);
+	await page.evaluate(() => document.activeElement.blur());
+	await page.keyboard.press('Control+z');
+	await page.waitForFunction(
+		(text) => document.querySelector('#le-score-chip .le-score-change').textContent !== text,
+		swapped
+	);
+	assert.match(
+		await change(),
+		/since the last edit|unchanged by the last edit/,
+		'an undo is unnamed'
+	);
+	const a = await legend('KeyA');
+	await page.click('#le-board [data-code="KeyA"]');
+	await page.selectOption('#le-kind', 'text');
+	await page.fill('#le-text', 'æ');
+	await page.click('#le-apply');
+	await page.waitForFunction(() =>
+		/ → æ/.test(document.querySelector('#le-score-chip .le-score-change').textContent)
+	);
+	assert.ok((await change()).includes(`after ${a} → æ`), await change());
 	assert.deepEqual(errors, []);
 	await context.close();
 }
@@ -829,6 +877,7 @@ async function exerciseWorstNgramsMore(browser, origin) {
 }
 
 module.exports = {
+	exerciseScoreChipNames,
 	exerciseBestCycles,
 	exerciseWorstNgramsMore,
 	exerciseOptimizeThisLayout,

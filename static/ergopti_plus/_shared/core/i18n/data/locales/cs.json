@@ -339,6 +339,8 @@
 	"layout_editor.score_chip.rank": "pořadí {rank} z {count}",
 	"layout_editor.score_chip.change": "{change} od poslední úpravy",
 	"layout_editor.score_chip.unchanged": "poslední úprava jej nezměnila",
+	"layout_editor.score_chip.change_named": "{change} po {edit}",
+	"layout_editor.score_chip.unchanged_named": "beze změny po {edit}",
 	"layout_editor.score_chip.open": "Zobrazit analýzu rozložení",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Vrstva Caps Lock",

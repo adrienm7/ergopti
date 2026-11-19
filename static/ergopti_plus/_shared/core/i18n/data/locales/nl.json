@@ -339,6 +339,8 @@
 	"layout_editor.score_chip.rank": "plaats {rank} van {count}",
 	"layout_editor.score_chip.change": "{change} sinds de laatste wijziging",
 	"layout_editor.score_chip.unchanged": "ongewijzigd door de laatste wijziging",
+	"layout_editor.score_chip.change_named": "{change} na {edit}",
+	"layout_editor.score_chip.unchanged_named": "ongewijzigd na {edit}",
 	"layout_editor.score_chip.open": "Analyse van de indeling tonen",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock-laag",
