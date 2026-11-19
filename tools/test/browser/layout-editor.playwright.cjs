@@ -3325,6 +3325,7 @@ async function exerciseComparerLink(browser, origin) {
 		await studioUx.exerciseShareLinkLayouts(browser, origin);
 		await studioUx.exerciseWorstNgrams(browser, origin);
 		await studioUx.exerciseBestSwaps(browser, origin);
+		await studioUx.exerciseBoardImage(browser, origin);
 
 		// Every locale names every visible string.
 		for (const lang of LOCALES) {

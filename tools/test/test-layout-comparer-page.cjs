@@ -72,6 +72,8 @@ const SCRIPTS = [
 	'score_settings.js',
 	// The overview's worst n-grams, shared with the editor panel.
 	'worst_groups.js',
+	// The heatmaps' PNG and SVG downloads, shared with the editor's board.
+	'board_image.js',
 	'comparer_page.js'
 ];
 // Floor: a page that lost its strings must not read as complete.
@@ -112,7 +114,8 @@ for (const file of [
 	'undo_offer.js',
 	'analyser_tab.js',
 	'worst_groups.js',
-	'best_swaps.js'
+	'best_swaps.js',
+	'board_image.js'
 ])
 	for (const m of fs.readFileSync(path.join(PAGE_DIR, file), 'utf8').matchAll(/\bt\('([a-z_.]+)'/g))
 		keys.add(m[1]);

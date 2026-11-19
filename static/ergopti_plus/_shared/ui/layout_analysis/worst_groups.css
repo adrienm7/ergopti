@@ -3,8 +3,9 @@
 /* =========================================================================== */
 /* The worst n-grams (worst_groups.js): one card per bad event, each row a     */
 /* button with its keys, a bar of its share and the share in words; the keys   */
-/* of the row hovered or focused outlined and numbered on a board. Light and   */
-/* dark through theme.css.                                                     */
+/* of the row hovered or focused outlined and numbered on a board; and the PNG */
+/* and SVG buttons under a board (board_image.js), on the same two pages.     */
+/* Light and dark through theme.css.                                           */
 /* =========================================================================== */
 
 /* ============================== */
@@ -174,6 +175,31 @@
 	position: absolute;
 	text-align: center;
 	top: -8px;
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 4/ Image buttons ===== */
+/* ============================== */
+/* ============================== */
+
+/* The PNG and SVG downloads of a board (board_image.js), under it. */
+.la-image-buttons {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 10px;
+	margin: 10px 0 4px;
+}
+
+.la-image-label {
+	color: var(--theme-sub);
+	font-size: 0.9em;
+}
+
+.la-image-status {
+	color: var(--theme-sub);
+	font-size: 0.9em;
 }
 
 @media (prefers-reduced-motion: no-preference) {

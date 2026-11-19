@@ -624,6 +624,12 @@ window.LAYOUT_ANALYSIS_HOST = Object.assign(window.LAYOUT_ANALYSIS_HOST || {}, {
 	saveFile: function (filename, text) {
 		if (!_hostExports) return Promise.reject({ code: 'host_save_failed', path: filename });
 		return hostSaveBinary(filename, new TextEncoder().encode(text));
+	},
+	// The keyboard and heatmap images (board_image.js), PNG or SVG bytes: the
+	// same download path. Settles on the file's path.
+	saveBinary: function (filename, bytes) {
+		if (!_hostExports) return Promise.reject({ code: 'host_save_failed', path: filename });
+		return hostSaveBinary(filename, bytes);
 	}
 });
 

@@ -1223,6 +1223,13 @@ for (const [, id, extension] of interop) {
 			`${file}: layout_editor.export.option.${id}`
 		);
 }
+// (board-image-downloads) The keyboard and heatmap images (board_image.js FORMATS)
+// go through the same host download path: the hosts write their types.
+for (const extension of ['png', 'svg'])
+	check(
+		layoutDefaults.source.export_extensions.includes(extension),
+		`the board images (.${extension}) are not in source.export_extensions`
+	);
 // The editor reads a picked UTF-16 KLC as the Comparer does.
 check(
 	F.decode(new Uint8Array(fs.readFileSync(path.join(BUILT, 'ergo_1dk.klc')))) === klcText,

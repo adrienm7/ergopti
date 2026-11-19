@@ -630,6 +630,7 @@
 					</label>
 				</div>
 				<div id="la-heatmap" class="la-heatmap"></div>
+				<div id="la-heatmap-image"></div>
 				<div id="la-heat-legend" class="la-heat-legend"></div>
 				<details id="la-heat-table-box" class="la-section">
 					<summary data-i18n="layout_analysis.heat.table"></summary>
@@ -2523,6 +2524,17 @@
 						`${keyText(layout, code)} · ${heatName(metric)}: ${format(value, HEAT_DIGITS)} ${unit}`
 				});
 				card.append(title, box);
+				// Each card's heatmap as a PNG or SVG image (board_image.js).
+				card.append(
+					window.LAYOUT_BOARD_IMAGE.buttons({
+						id: `la-heat-image-${titleId}`,
+						board: () => box,
+						options: () => ({
+							title: `${result.layout.name} · ${heatName(metric)}`,
+							words: [result.layout.name, 'heatmap', metric]
+						})
+					})
+				);
 				if (!shared) {
 					const legend = el('div', 'la-heat-legend');
 					legend.append(...ramp(extent));
@@ -2906,6 +2918,17 @@
 				focusable: true,
 				title: (code, value) => heatTitle(detail, layout, code, value, Boolean(other))
 			});
+			// The heatmap as a PNG or SVG image (board_image.js).
+			$('la-heatmap-image').replaceChildren(
+				window.LAYOUT_BOARD_IMAGE.buttons({
+					id: 'la-heatmap-image',
+					board: () => $('la-heatmap'),
+					options: () => ({
+						title: `${result.layout.name} · ${heatName(state.heat)}`,
+						words: [result.layout.name, 'heatmap', state.heat]
+					})
+				})
+			);
 			const extent = Math.max(...tableRows.map((row) => Math.abs(row.value)), 0);
 			renderHeatTable(layout, tableRows, Boolean(other));
 			const legend = $('la-heat-legend');

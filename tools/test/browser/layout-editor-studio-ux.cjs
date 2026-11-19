@@ -543,7 +543,103 @@ async function exerciseBestSwaps(browser, origin) {
 	await context.close();
 }
 
+/** The bytes of a download a click starts. */
+async function downloadOf(page, selector) {
+	const [download] = await Promise.all([page.waitForEvent('download'), page.click(selector)]);
+	return { name: download.suggestedFilename(), bytes: fs.readFileSync(await download.path()) };
+}
+
+/** A PNG's signature and its pixel size (IHDR). */
+function pngSize(bytes) {
+	assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', 'a PNG signature');
+	return [bytes.readUInt32BE(16), bytes.readUInt32BE(20)];
+}
+
+/**
+ * (board-image) The editor's board and the Comparer's heatmaps save as SVG and
+ * PNG: on the site as a browser download, in the app through the host's
+ * download path (source_export, the Downloads folder on the three OS). The SVG
+ * draws every key with its legend and its heat colour; the PNG is it at twice
+ * its size.
+ */
+async function exerciseBoardImage(browser, origin) {
+	const { page, errors, context } = await openOnErgopti(browser, origin);
+	const svg = await downloadOf(page, '#le-board-image-svg');
+	assert.match(svg.name, /^my-ergopti\.svg$|\.svg$/);
+	const text = svg.bytes.toString('utf8');
+	assert.match(text, /^<svg [^>]*xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+	const width = Number(/width="(\d+)"/.exec(text)[1]);
+	const keyCount = await page.locator('#le-board [data-code]').count();
+	assert.ok((text.match(/<rect /g) || []).length >= keyCount - 1, 'every key is drawn');
+	assert.ok(text.includes('>é</text>') && text.includes('>^</text>'), 'with its legend');
+	const fills = new Set(Array.from(text.matchAll(/<rect [^>]*fill="([^"]+)"/g), (m) => m[1]));
+	assert.ok(fills.size >= 6, `the heat colours are drawn: ${fills.size} fills`);
+	const png = await downloadOf(page, '#le-board-image-png');
+	assert.match(png.name, /\.png$/);
+	assert.equal(pngSize(png.bytes)[0], width * 2, 'the PNG is the SVG at twice its size');
+	assert.match(
+		await page.textContent('#le-board-image-png ~ .la-image-status'),
+		/^Image downloaded: /
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+
+	// The Comparer's detail heatmap and a side-by-side card.
+	const comparer = await browser.newPage({
+		viewport: { width: 1280, height: 900 },
+		acceptDownloads: true
+	});
+	await comparer.goto(
+		`${origin}/ui/layout_analysis/index.html?lang=en&corpus=fr_nemolivier&layouts=ergopti,azerty&details=ergopti`
+	);
+	await comparer.waitForSelector('#la-heatmap .la-key');
+	const heat = await downloadOf(comparer, '#la-heatmap-image-svg');
+	assert.match(heat.name, /^ergopti-heatmap-.+\.svg$/, heat.name);
+	await comparer.click('#la-tab-heatmaps');
+	await comparer.waitForSelector('.la-heat-card .la-image-save');
+	const card = await downloadOf(comparer, '.la-heat-card [id$="-png"]');
+	pngSize(card.bytes);
+	await comparer.close();
+
+	// The app: the bytes go to the host's download path, which answers with the file's path.
+	const app = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+	const appErrors = [];
+	app.on('pageerror', (error) => appErrors.push(error.message));
+	await app.addInitScript((strings) => {
+		window._i18n_strings = strings;
+		window.__posted = [];
+		window.webkit = {
+			messageHandlers: {
+				layout_editor_window_bridge: { postMessage: (payload) => window.__posted.push(payload) }
+			}
+		};
+	}, EN);
+	await app.goto(`${origin}/ui/layout_editor_window/index.html`);
+	await app.evaluate(() =>
+		window.initData({ strings: {}, state: { platform: 'linux' }, source_export: true })
+	);
+	await app.evaluate(() => window.sourceData({ text: null, folder: 'layout_sources/' }));
+	await app.waitForSelector('#le-board-image-png');
+	await app.click('#le-board-image-png');
+	await app.waitForFunction(() => window.__posted.some((p) => p.action === 'source_export'));
+	const posted = await app.evaluate(() => {
+		const request = window.__posted.find((p) => p.action === 'source_export');
+		return { filename: request.filename, head: atob(request.data).slice(1, 4) };
+	});
+	assert.match(posted.filename, /^[A-Za-z0-9][A-Za-z0-9_.-]*\.png$/, 'a name the hosts write');
+	assert.equal(posted.head, 'PNG');
+	await app.evaluate(() => window.exportResult({ ok: true, path: '/home/me/Downloads/x.png' }));
+	await app.waitForFunction(() =>
+		/\/home\/me\/Downloads\/x\.png/.test(
+			document.querySelector('#le-board-image-png ~ .la-image-status').textContent
+		)
+	);
+	assert.deepEqual(appErrors, []);
+	await app.close();
+}
+
 module.exports = {
+	exerciseBoardImage,
 	exerciseBestSwaps,
 	exerciseWorstNgrams,
 	exerciseShareLinkLayouts,

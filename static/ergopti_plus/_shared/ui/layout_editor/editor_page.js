@@ -2210,6 +2210,18 @@ var LayoutEditorPage = (function () {
 			return el('section', { class: 'le-board-wrap' }, [
 				el('div', { class: 'le-board-scroll' }, container),
 				mediaRow,
+				// The drawing as a PNG or SVG image (board_image.js), heat colours included.
+				typeof window.LAYOUT_BOARD_IMAGE === 'object'
+					? window.LAYOUT_BOARD_IMAGE.buttons({
+							id: 'le-board-image',
+							board: () => root.querySelector('#le-board'),
+							options: () => ({
+								title: doc().layout.name,
+								legend: '.le-legend, .le-code',
+								words: [doc().layout.name]
+							})
+						})
+					: null,
 				boardTable(keys, form, positions)
 			]);
 		}
