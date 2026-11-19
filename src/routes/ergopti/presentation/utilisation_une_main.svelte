@@ -17,11 +17,9 @@
 		droite du clavier, taper dessus, puis retourner à la souris pour continuer la navigation.
 	</p>
 	<p>
-		Par conséquent, il est également important de s’assurer que, grâce à sa disposition clavier,
-		beaucoup d’actions courantes puissent se réaliser avec la seule main gauche <strong
-			>afin de ne pas avoir à lâcher la souris</strong
-		>. À noter que sur ce point AZERTY est très bon, car <kbd>X</kbd>, <kbd>C</kbd>, <kbd>V</kbd>
-		et de nombreuses autres lettres fréquemment utilisées pour faire des raccourcis en combinaison avec
+		Une bonne disposition clavier permet donc de faire beaucoup d’actions courantes avec la seule
+		main gauche, <strong>sans lâcher la souris</strong>. Sur ce point, AZERTY est très bon :
+		<kbd>X</kbd>, <kbd>C</kbd>, <kbd>V</kbd> et beaucoup d’autres lettres des raccourcis avec
 		<kbd>Ctrl</kbd> sont du côté gauche.
 	</p>
 
@@ -60,19 +58,17 @@
 
 	<h3>Touches de raccourci sur la version ISO</h3>
 	<p>
-		La version ISO (pour claviers standards) ne peut quant à elle malheureusement pas bénéficier des
-		touches de raccourci de la version Ergodox, car les touches à sa gauche sont déjà occupées par
-		les touches
-		<kbd>Shift</kbd>, <kbd>CapsLock</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on peut placer
-		ces 3 touches sous les pouces.
+		La version ISO (pour claviers standards) ne peut malheureusement pas avoir les touches de
+		raccourci de la version Ergodox. Les touches à sa gauche sont déjà prises par
+		<kbd>Shift</kbd>, <kbd>CapsLock</kbd> et <kbd>Tab</kbd>, alors que sur l’Ergodox, ces 3 touches
+		peuvent aller sous les pouces.
 	</p>
 	<p>
 		<ErgoptiPlus /> donne toutefois un moyen de contourner les limites de la version ISO grâce à un
 		<strong>mécanisme de tap-hold</strong>. L’idée du tap-hold est qu’il est possible d’assigner
 		deux actions à une même touche : une au tap (appui bref) et une au hold (maintenir pressé).
-		Grâce au tap-hold, il devient possible d’avoir le comportement suivant : presser puis relâcher
-		un modificateur envoie un raccourci, mais le presser en combinaison avec une autre touche le
-		fait se comporter normalement. Cela permet d’intégrer des touches
+		Ainsi, presser puis relâcher un modificateur envoie un raccourci, mais le maintenir avec une
+		autre touche garde son rôle habituel. Cela permet d’intégrer des touches
 		<kbd-output>Copier</kbd-output>, <kbd-output>Coller</kbd-output> et
 		<kbd-output>Alt+Tab</kbd-output>
 		respectivement sur

@@ -52,11 +52,10 @@
 <section>
 	<h2>Optimisation des roulements</h2>
 	<p>
-		L’optimisation de l’alternance des mains engendre que lors de l’utilisation d’une main pour
-		frapper une touche, il y a une forte probabilité que le frappe suivante se produise avec l’autre
-		main. Toutefois, cela n’arrive pas dans la totalité des cas, c’est pourquoi il convient de
-		s’assurer que le plus possible de frappes intra-mains se réalisent à l’aide de roulements, aussi
-		appelés <em lang="en">rolls</em> en anglais.
+		Avec une bonne alternance des mains, après une touche frappée d’une main, la suivante l’est très
+		souvent de l’autre. Ce n’est toutefois pas toujours le cas. Il faut donc que le plus possible
+		des frappes sur une même main se fassent par des roulements, aussi appelés
+		<em lang="en">rolls</em> en anglais.
 	</p>
 	<p>
 		Un roulement consiste à frapper deux touches avec la même main, sans que cela n’entraîne de <SFB
@@ -66,18 +65,18 @@
 	</p>
 	<p>
 		Cependant, tous les roulement ne se valent pas. Les meilleurs sont ceux sur deux doigts
-		consécutifs et jamais à plus d’une rangée d’écart. Cela évite tout problème de coordination, car
-		s’il faut "sauter" un doigt, par exemple pour utiliser l’index puis l’annulaire, le mouvement
-		peut être plus lent et le risque de se tromper un peu plus élevé. Par exemple, un roulement est
-		le <kbd>PO</kbd> de l’AZERTY ou le <kbd>ST</kbd> du BÉPO (idéalement, car mouvement horizontal).
-		Sinon, c’est éventuellement le <kbd>SE</kbd> de l’AZERTY ou le <kbd>DR</kbd> du BÉPO. Toutefois,
-		ce n’est pas le <kbd>CE</kbd> de l’AZERTY ni le
+		consécutifs et jamais à plus d’une rangée d’écart. Cela évite les problèmes de coordination :
+		« sauter » un doigt, par exemple passer de l’index à l’annulaire, rend le mouvement plus lent et
+		l’erreur un peu plus probable. Par exemple, un roulement est le <kbd>PO</kbd> de l’AZERTY ou le
+		<kbd>ST</kbd>
+		du BÉPO (idéalement, car mouvement horizontal). Sinon, c’est éventuellement le <kbd>SE</kbd> de
+		l’AZERTY ou le <kbd>DR</kbd> du BÉPO. Toutefois, ce n’est pas le <kbd>CE</kbd> de l’AZERTY ni le
 		<kbd>GL</kbd> du BÉPO.
 	</p>
 	<p class="encadre">
-		La disposition <Ergopti /> a été construite avec pour contrainte principale de permettre de réaliser
-		les bigrammes consonne-consonne et voyelle-voyelle les plus courants grâce à des roulements, de préférence
-		sur deux doigts consécutifs dans un mouvement horizontal.
+		La disposition <Ergopti /> a été construite avant tout pour que les paires de consonnes et les paires
+		de voyelles les plus courantes se tapent par des roulements, de préférence sur deux doigts consécutifs,
+		dans un mouvement horizontal.
 	</p>
 
 	<tiny-space></tiny-space>

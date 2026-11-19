@@ -23,10 +23,10 @@
 		direction, un peu comme un sportif se replace toujours au milieu du terrain au cours d’un match.
 	</p>
 	<p>
-		Il est alors logique de se dire que nos doigts étant la plupart du temps sur la rangée du
-		milieu, autant y placer les lettres les plus fréquemment utilisées. En procédant ainsi, il n’y a
-		presque plus besoin de bouger les doigts, juste à presser les lettres de la rangée de repos et
-		parfois atteindre les rangées supérieures ou inférieures pour les lettres les moins fréquentes.
+		Nos doigts sont la plupart du temps sur la rangée du milieu : autant y placer les lettres les
+		plus fréquentes. Les doigts n’ont alors presque plus besoin de bouger. Ils pressent les lettres
+		de la rangée de repos et ne vont sur les autres rangées que pour les lettres les moins
+		fréquentes.
 	</p>
 	<keyboard data-color="azerty">
 		<keyboard-row class="center">
@@ -72,12 +72,11 @@
 		publiques, renforçant ainsi l’attrait des machines.
 	</p>
 	<p>
-		Certaines des touches ayant les fréquences d’apparition les plus rares (en français et en
-		anglais) sont sur ces excellents emplacements comme le <kbd>Q</kbd>, le <kbd>F</kbd>, le
-		<kbd>J</kbd> et le <kbd>K</kbd>. Pire, la quasi-totalité des touches les plus utilisées se
-		retrouvent en fait sur la rangée du dessus (<kbd>AZERTYUIOP</kbd>). C’est notamment le cas de
-		toutes les voyelles (sauf du <kbd>A</kbd> en QWERTY), dont le nombre est faible comparé au nombre
-		de consonnes, mais qui sont toutefois incontournables pour l’écriture de chaque mot.
+		Certaines des lettres les plus rares (en français et en anglais) occupent ces excellents
+		emplacements, comme le <kbd>Q</kbd>, le <kbd>F</kbd>, le <kbd>J</kbd> et le <kbd>K</kbd>. Pire,
+		presque toutes les lettres les plus utilisées sont sur la rangée du dessus (<kbd>AZERTYUIOP</kbd
+		>). C’est le cas de toutes les voyelles (sauf du <kbd>A</kbd> en QWERTY) : elles sont peu nombreuses
+		face aux consonnes, mais chaque mot en contient.
 	</p>
 
 	<keyboard data-color="ergopti">
@@ -145,9 +144,9 @@
 		La rangée des chiffres est donc encore moins accessible, car il faut traverser deux rangées
 		depuis la rangée de repos pour l’atteindre. C’est pour cette raison que laisser le <kbd>É</kbd>
 		sur cette ligne comme en AZERTY est une très mauvaise idée, car cette lettre est beaucoup utilisée
-		en français. Par exemple, en français, le <kbd>É</kbd> est environ 2 fois plus fréquent que le
-		<kbd>J</kbd>, dont la touche est pourtant en AZERTY sur l’un des meilleurs emplacements du
-		clavier : la touche de repos de l’index.
+		en français : il y est environ 2 fois plus fréquent que le <kbd>J</kbd>. Pourtant, en AZERTY,
+		c’est le <kbd>J</kbd> qui occupe l’un des meilleurs emplacements du clavier : la touche de repos
+		de l’index.
 	</p>
 	<p>
 		Enfin, contrairement à BÉPO ou Optimot, <Ergopti /> ne place pas de symboles de programmation ou

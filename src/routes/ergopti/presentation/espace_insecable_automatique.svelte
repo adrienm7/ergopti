@@ -16,12 +16,11 @@
 		instantanément en professionnalisme.
 	</p>
 	<p>
-		⚠ <strong>Attention toutefois :</strong> ce raccourci est à réserver uniquement à la rédaction
-		de texte courant — et uniquement pour le français d’ailleurs, car en anglais la convention est
-		de ne pas mettre d’espace avant les ponctuations. En revanche, lors de l’écriture de code
-		informatique, cette espace — souvent non distinguable visuellement d’une espace classique — sera
-		considérée comme un caractère invalide et provoquera des erreurs de syntaxe. Pour coder, il
-		faudra donc plutôt utiliser la couche
+		⚠ <strong>Attention toutefois :</strong> ce raccourci est réservé au texte courant, et au
+		français seulement : en anglais, on ne met pas d’espace avant les ponctuations. En revanche,
+		lors de l’écriture de code informatique, cette espace — souvent non distinguable visuellement
+		d’une espace classique — sera considérée comme un caractère invalide et provoquera des erreurs
+		de syntaxe. Pour coder, il faudra donc plutôt utiliser la couche
 		<kbd>AltGr</kbd>, car celle-ci envoie la
 		<strong>ponctuation brute</strong> (sans espace automatique). Cela permet de programmer
 		sereinement tout en conservant la possibilité d’écrire un français typographiquement impeccable
