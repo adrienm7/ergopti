@@ -159,6 +159,11 @@
 	color: var(--theme-bad-text);
 }
 
+/* The worst n-grams take the panel's whole width, under its columns. */
+.la-panel-ngrams-box {
+	grid-column: 1 / -1;
+}
+
 /* The mark of a better or worse value (▲ ▼), beside its sign and its colour. */
 .la-panel-verdict {
 	font-size: 0.8em;

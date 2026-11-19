@@ -1,0 +1,185 @@
+/* _shared/ui/layout_analysis/worst_groups.css */
+
+/* =========================================================================== */
+/* The worst n-grams (worst_groups.js): one card per bad event, each row a     */
+/* button with its keys, a bar of its share and the share in words; the keys   */
+/* of the row hovered or focused outlined and numbered on a board. Light and   */
+/* dark through theme.css.                                                     */
+/* =========================================================================== */
+
+/* ============================== */
+/* ============================== */
+/* ======= 1/ Cards ============= */
+/* ============================== */
+/* ============================== */
+
+.la-ngrams {
+	display: grid;
+	gap: 16px;
+	grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+	margin: 12px 0;
+}
+
+.la-ngram-card {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 10px;
+	border-top: 4px solid var(--la-ngram-colour, var(--theme-accent));
+	padding: 10px 12px 12px;
+}
+
+/* One colour per event, the charts' categorical palette (theme.css). */
+.la-ngram-sfb {
+	--la-ngram-colour: var(--theme-chart-cat-1);
+}
+
+.la-ngram-sfs {
+	--la-ngram-colour: var(--theme-chart-cat-2);
+}
+
+.la-ngram-lsb {
+	--la-ngram-colour: var(--theme-chart-cat-3);
+}
+
+.la-ngram-scissors {
+	--la-ngram-colour: var(--theme-chart-cat-4);
+}
+
+.la-ngram-redirect_bad {
+	--la-ngram-colour: var(--theme-chart-cat-5);
+}
+
+.la-ngram-title {
+	font-size: 0.95em;
+	margin: 0 0 8px;
+}
+
+.la-ngram-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+/* The Comparer's overview: its board beside the cards, stacked when narrow. */
+.la-ngrams-view {
+	align-items: start;
+	display: grid;
+	gap: 16px;
+	grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1100px) {
+	.la-ngrams-view {
+		grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+	}
+
+	.la-ngrams-view .la-ngrams {
+		margin: 0;
+	}
+}
+
+.la-ngrams-board {
+	position: sticky;
+	top: 8px;
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 2/ Rows ============== */
+/* ============================== */
+/* ============================== */
+
+/* The card prefix outranks the pages' own button rules. */
+.la-ngram-card .la-ngram {
+	align-items: center;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	color: inherit;
+	cursor: default;
+	display: grid;
+	font: inherit;
+	gap: 8px;
+	grid-template-columns: auto minmax(24px, 1fr) auto;
+	min-height: 32px;
+	padding: 3px 6px;
+	text-align: left;
+	width: 100%;
+}
+
+.la-ngram-card .la-ngram:hover,
+.la-ngram-card .la-ngram:focus-visible {
+	background: var(--theme-accent-soft);
+	border-color: var(--theme-accent);
+}
+
+.la-ngram-keys {
+	display: inline-flex;
+	gap: 3px;
+}
+
+.la-ngram-chip {
+	background: var(--theme-surface-2);
+	border: 1px solid var(--theme-separator);
+	border-bottom-width: 2px;
+	border-radius: 5px;
+	font: inherit;
+	min-width: 1.8em;
+	padding: 0 5px;
+	text-align: center;
+}
+
+/* The share against the card's heaviest row, in the event's colour. */
+.la-ngram-bar {
+	background: linear-gradient(var(--la-ngram-colour), var(--la-ngram-colour)) 0 50% /
+		var(--la-ngram-share) 6px no-repeat;
+	border-radius: 3px;
+	height: 6px;
+}
+
+.la-ngram-share {
+	color: var(--theme-sub);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 3/ Board keys ======== */
+/* ============================== */
+/* ============================== */
+
+/* A key of the n-gram shown: a thick outline and its order (1, 2, 3) in a badge.
+   The keys of both boards are positioned, so the badge sits in their corner. */
+.la-ngram-key {
+	outline: 3px solid var(--theme-accent);
+	outline-offset: 1px;
+	z-index: 1;
+}
+
+.la-ngram-key::after {
+	/* The darker accent: white digits keep their 4.5:1 contrast. */
+	background: var(--theme-accent-fill);
+	border-radius: 999px;
+	color: var(--theme-white);
+	content: attr(data-ngram-order);
+	font-size: 11px;
+	font-weight: 700;
+	left: -6px;
+	line-height: 18px;
+	min-width: 18px;
+	position: absolute;
+	text-align: center;
+	top: -8px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.la-ngram-card .la-ngram {
+		transition:
+			background-color 120ms ease,
+			border-color 120ms ease;
+	}
+}

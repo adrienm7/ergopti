@@ -4429,6 +4429,10 @@ var LayoutEditorPage = (function () {
 		if (analysisPanel) {
 			drawScoreChip(null);
 			analysisPanel.onResult(drawScoreChip);
+			// The worst n-gram hovered or focused in the panel: its keys on the board.
+			analysisPanel.onHighlight(
+				window.LAYOUT_ANALYSIS_WORST.highlighter(() => root.querySelector('#le-board'))
+			);
 			document.addEventListener('i18n:applied', () => drawScoreChip(chipResult));
 			sideSlot.append(analysisPanel.node);
 			analysisPanel.onHeat((heat) => {

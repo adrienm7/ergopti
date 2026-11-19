@@ -70,6 +70,8 @@ const SCRIPTS = [
 	'corpus_files.js',
 	// The score settings every Studio score reads (the Comparer's own, shared).
 	'score_settings.js',
+	// The overview's worst n-grams, shared with the editor panel.
+	'worst_groups.js',
 	'comparer_page.js'
 ];
 // Floor: a page that lost its strings must not read as complete.
@@ -108,7 +110,8 @@ for (const file of [
 	'analysis_panel.js',
 	'fingering_editor.js',
 	'undo_offer.js',
-	'analyser_tab.js'
+	'analyser_tab.js',
+	'worst_groups.js'
 ])
 	for (const m of fs.readFileSync(path.join(PAGE_DIR, file), 'utf8').matchAll(/\bt\('([a-z_.]+)'/g))
 		keys.add(m[1]);
@@ -470,6 +473,8 @@ const PANEL_SCRIPTS = [
 	'../layout_analysis/fingering_editor.js',
 	'../layout_analysis/corpus_files.js',
 	'../layout_analysis/score_settings.js',
+	// The panel's worst n-grams (worst_groups.js), before the panel that draws them.
+	'../layout_analysis/worst_groups.js',
 	'../layout_analysis/analysis_panel.js',
 	'../layout_editor/editor_page.js'
 ];

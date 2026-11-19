@@ -38,6 +38,9 @@
  *    costs (the engine's exact per-key parts, keyReport cost and keyScoreCost)
  *    with a tooltip naming its worst pairs or trigrams, and the editor colours
  *    its own keys from green to red.
+ * 10. Worst n-grams (worst_groups.js): the pairs and trigrams that cost the
+ *    layout the most; hovering or focusing one tells the onHighlight
+ *    listeners its keys, which the editor outlines on its board.
  * 9. Score chip: onResult listeners get each analysis's score, rank and
  *    change since the last analysis of the same layout (null when nothing is
  *    analysed), so the editor shows them beside the board; reveal() unfolds
@@ -209,6 +212,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		const sections = [];
 		const heatListeners = [];
 		const resultListeners = [];
+		const highlightListeners = [];
 
 		const node = el('details', 'la-panel');
 		node.id = 'la-live-panel';
@@ -279,6 +283,12 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		const metrics = el('table', 'la-panel-metrics');
 		// Where the layout offers a choice: how often and which characters.
 		const typing = el('p', 'la-panel-note');
+		// The worst n-grams, their keys outlined on the editor's board.
+		const ngramsTitle = el('h3');
+		ngramsTitle.id = 'la-panel-ngrams-title';
+		const ngramsNote = el('p', 'la-panel-note');
+		const ngrams = el('div', 'la-panel-ngrams');
+		ngrams.id = 'la-panel-ngrams';
 		const fingersTitle = el('h3');
 		fingersTitle.id = 'la-panel-fingers-title';
 		const fingers = el('div', 'la-panel-fingers');
@@ -293,12 +303,15 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		// and analysers, then the fingering board.
 		const scoreColumn = el('div', 'la-panel-column');
 		scoreColumn.append(controls, headline, incompleteNote, rankNote, note, metrics, typing);
+		const ngramsBox = el('section', 'la-panel-ngrams-box');
+		ngramsBox.setAttribute('aria-labelledby', ngramsTitle.id);
+		ngramsBox.append(ngramsTitle, ngramsNote, ngrams);
 		const loadColumn = el('div', 'la-panel-column');
 		loadColumn.append(fingersTitle, fingers, analysersTitle, analysers, extra);
 		const fingeringColumn = el('div', 'la-panel-column');
 		fingeringColumn.append(fingering);
 		const body = el('div', 'la-panel-body');
-		body.append(scoreColumn, loadColumn, fingeringColumn);
+		body.append(scoreColumn, loadColumn, fingeringColumn, ngramsBox);
 		node.append(summary, body);
 		const fingeringView = window.LAYOUT_ANALYSIS_FINGERING.mount(fingering, {
 			keyboard: () => state.keyboard
@@ -326,6 +339,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			corpusLabel.textContent = t('layout_analysis.corpus.label');
 			keyboardLabel.textContent = t('layout_analysis.keyboard.label');
 			fingersTitle.textContent = t('layout_analysis.details.fingers');
+			ngramsTitle.textContent = t('layout_analysis.ngrams.title');
+			ngramsNote.textContent = t('layout_analysis.ngrams.caption_editor');
 			analysersTitle.textContent = t('layout_analysis.analysers.title');
 			note.textContent = t('layout_analysis.panel.weights_note');
 			if (compareButton) compareButton.textContent = t('layout_analysis.panel.compare');
@@ -456,6 +471,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			incompleteNote.hidden = true;
 			metrics.replaceChildren();
 			typing.textContent = '';
+			ngrams.replaceChildren();
+			tellHighlight(null);
 			fingers.replaceChildren();
 			analysers.replaceChildren();
 			extra.replaceChildren();
@@ -545,6 +562,12 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				change: before ? result.score.total - before.score : null
 			});
 			drawTyping(result, layout);
+			tellHighlight(null);
+			window.LAYOUT_ANALYSIS_WORST.draw(ngrams, {
+				groups: result.topGroups,
+				layout,
+				highlight: tellHighlight
+			});
 			drawFingers(result);
 			drawAnalysers(layout, prepared, settings, mine);
 			extra.replaceChildren();
@@ -711,6 +734,10 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 
 		function tellHeat(heat) {
 			for (const listener of heatListeners) listener(heat);
+		}
+
+		function tellHighlight(codes) {
+			for (const listener of highlightListeners) listener(codes);
 		}
 
 		function tellResult(result) {
@@ -898,6 +925,15 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				if (typeof listener !== 'function')
 					throw new Error('layout_analysis: a result listener is a function');
 				resultListeners.push(listener);
+			},
+			/**
+			 * Listens to the worst n-gram shown: listener(codes) with the keys of
+			 * the row hovered or focused, in typing order, or null when none is.
+			 */
+			onHighlight(listener) {
+				if (typeof listener !== 'function')
+					throw new Error('layout_analysis: a highlight listener is a function');
+				highlightListeners.push(listener);
 			},
 			/** Unfolds the panel, scrolls it into view and moves the focus to its title. */
 			reveal() {

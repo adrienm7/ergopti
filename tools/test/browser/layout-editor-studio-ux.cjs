@@ -429,7 +429,70 @@ async function exerciseShareLinkLayouts(browser, origin) {
 	await context.close();
 }
 
+/** The keys outlined on a board and their order numbers. */
+function outlined(page, board) {
+	return page.$$eval(`${board} .la-ngram-key`, (keys) =>
+		keys.map((key) => `${key.dataset.code}:${key.getAttribute('data-ngram-order')}`)
+	);
+}
+
+/**
+ * (worst-ngrams) The worst pairs and trigrams show in the editor panel and in
+ * the Comparer's overview; hovering or focusing one outlines its keys on the
+ * board, numbered in typing order, and Escape, blur or leaving it clears them.
+ */
+async function exerciseWorstNgrams(browser, origin) {
+	const { page, errors, context } = await openOnErgopti(browser, origin);
+	await page.waitForSelector('#la-panel-ngrams .la-ngram-sfb .la-ngram');
+	const cards = await page.$$eval('#la-panel-ngrams .la-ngram-card h4', (titles) =>
+		titles.map((title) => title.textContent)
+	);
+	assert.deepEqual(
+		cards,
+		['sfb', 'sfs', 'lsb', 'scissors', 'redirect_bad'].map(
+			(id) => EN[`layout_analysis.metric.${id}`]
+		)
+	);
+	const first = page.locator('#la-panel-ngrams .la-ngram-sfb .la-ngram').first();
+	const label = await first.getAttribute('aria-label');
+	assert.match(label, /^\S+ \S+: \d+[.,]\d+ %$/, `a row says its keys and share: ${label}`);
+	await first.focus();
+	const focused = await outlined(page, '#le-board');
+	assert.equal(focused.length, 2, `focus outlines the pair's two keys: ${focused}`);
+	assert.deepEqual(focused.map((key) => key.split(':')[1]).sort(), ['1', '2']);
+	await page.keyboard.press('Escape');
+	assert.deepEqual(await outlined(page, '#le-board'), [], 'Escape clears them');
+	await page.locator('#la-panel-ngrams .la-ngram-redirect_bad .la-ngram').first().hover();
+	const hovered = await outlined(page, '#le-board');
+	assert.ok(hovered.length >= 2, `hover outlines the trigram's keys: ${hovered}`);
+	await page.mouse.move(0, 0);
+	assert.deepEqual(await outlined(page, '#le-board'), [], 'leaving the row clears them');
+	assert.deepEqual(errors, []);
+	await context.close();
+
+	const comparer = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+	const comparerErrors = [];
+	comparer.on('pageerror', (error) => comparerErrors.push(error.message));
+	await comparer.goto(
+		`${origin}/ui/layout_analysis/index.html?lang=en&corpus=fr_nemolivier&layouts=ergopti,azerty&details=azerty`
+	);
+	// A link that names a detailed layout opens « One layout »: back to the overview.
+	await comparer.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	await comparer.click('#la-tab-overview');
+	await comparer.waitForSelector('#la-ngrams-list .la-ngram-sfb .la-ngram');
+	assert.match(await comparer.textContent('#la-ngrams-caption'), /AZERTY/, 'the detailed layout');
+	await comparer.locator('#la-ngrams-list .la-ngram-sfb .la-ngram').first().focus();
+	const onBoard = await outlined(comparer, '#la-ngrams-board');
+	assert.equal(onBoard.length, 2, `the overview's board outlines the pair: ${onBoard}`);
+	await comparer.keyboard.press('Tab');
+	const next = await outlined(comparer, '#la-ngrams-board');
+	assert.equal(next.length, 2, 'Tab moves to the next pair and outlines it');
+	assert.deepEqual(comparerErrors, []);
+	await comparer.close();
+}
+
 module.exports = {
+	exerciseWorstNgrams,
 	exerciseShareLinkLayouts,
 	exerciseScoreChip,
 	exerciseImportFormats,

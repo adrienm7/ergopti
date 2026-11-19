@@ -508,6 +508,14 @@
 					<table id="la-table" class="la-table"></table>
 				</div>
 			</section>
+			<section class="la-figure la-figure-wide" aria-labelledby="la-ngrams-label">
+				<h3 id="la-ngrams-label" data-i18n="layout_analysis.ngrams.title"></h3>
+				<p id="la-ngrams-caption" class="la-muted"></p>
+				<div class="la-ngrams-view">
+					<div id="la-ngrams-board" class="la-heatmap la-ngrams-board" aria-hidden="true"></div>
+					<div id="la-ngrams-list"></div>
+				</div>
+			</section>
 		</div>
 	</div>
 
@@ -1536,6 +1544,7 @@
 					renderLeaders();
 					renderChart();
 					renderTable();
+					renderNgrams();
 				},
 				fingers: () => {
 					renderFingerTable();
@@ -1922,6 +1931,39 @@
 			}
 			table.append(thead, tbody);
 			return applied;
+		}
+
+		/**
+		 * The overview's worst n-grams of the layout shown in detail (else the
+		 * best ranked): each bad event's heaviest pairs and trigrams, their keys
+		 * outlined on its board when a row is hovered or focused (worst_groups.js).
+		 */
+		function renderNgrams() {
+			const result =
+				state.results.find((r) => r.layout.id === state.details) || state.results[0] || null;
+			const box = $('la-ngrams-list');
+			if (!result) {
+				box.replaceChildren();
+				$('la-ngrams-board').replaceChildren();
+				return;
+			}
+			const layout = layoutOf(result.layout.id);
+			// Every key uncoloured: the board only shows where the n-gram's keys are.
+			const board = E.keyboard(result.keyboard, result.profile || undefined);
+			const flat = Object.fromEntries(board.codes.map((code) => [code, 0]));
+			drawBoard($('la-ngrams-board'), result, layout, flat, {
+				other: false,
+				focusable: false,
+				title: (code) => keyText(layout, code)
+			});
+			$('la-ngrams-caption').textContent = t('layout_analysis.ngrams.caption', {
+				layout: result.layout.name
+			});
+			window.LAYOUT_ANALYSIS_WORST.draw(box, {
+				groups: detailOf(result).topGroups,
+				layout,
+				highlight: window.LAYOUT_ANALYSIS_WORST.highlighter(() => $('la-ngrams-board'))
+			});
 		}
 
 		/** The overview's ranking table, with the viewer's columns and the filters' rows. */
@@ -2803,6 +2845,8 @@
 			board.codes.forEach((code, k) => {
 				if (modifiers.has(code)) return;
 				const key = el('span', 'la-key', keyText(layout, code));
+				// The worst n-grams outline keys by their code (worst_groups.js).
+				key.dataset.code = code;
 				const row = layout.rows[code];
 				if (row && row[0] && typeof row[0] === 'object')
 					key.classList.add(KEY_LEGEND.DEAD_KEY_CLASS);
