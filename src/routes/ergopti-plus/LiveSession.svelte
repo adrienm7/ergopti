@@ -106,12 +106,12 @@ FEATURES & RATIONALE:
 	});
 </script>
 
-<div class="session-block" lang="fr">
+<figure class="session-block" lang="fr">
 	<div class="session-window ep-window os-{ui.osStyle}">
 		<WindowChrome title="message.txt" />
 		<div class="session-body">
 			<p class="session-line">
-				{sessionText}<span class="caret"></span>{#if sessionTooltip}<span
+				{sessionText}<span class="caret" aria-hidden="true"></span>{#if sessionTooltip}<span
 						class="session-tooltip"
 						style="--tt: {sessionTooltip.color};"
 					>
@@ -121,11 +121,11 @@ FEATURES & RATIONALE:
 			</p>
 		</div>
 	</div>
-	<p class="session-caption">
+	<figcaption class="session-caption">
 		Expansion en temps réel — une vraie phrase, plusieurs familles d’expansions, sans jamais rompre
 		le flux de frappe.
-	</p>
-</div>
+	</figcaption>
+</figure>
 
 <style>
 	.session-block {
@@ -148,11 +148,19 @@ FEATURES & RATIONALE:
 		text-align: left;
 	}
 
+	/* The caption was a p: it keeps the prose line height and measure that
+	   typography.css and ergopti-plus.css give every p. */
 	.session-caption {
 		color: var(--ink-faint);
 		font-size: 0.85rem;
+		line-height: 1.5;
 		margin: 12px 0 0;
+		max-width: 55ch;
 		text-align: center;
+	}
+
+	:global(:root[data-a11y-spacing='wide']) .session-caption {
+		margin-bottom: 2em !important;
 	}
 
 	/* Inline in the text flow, right of the caret — mirrors the driver's

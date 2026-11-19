@@ -157,7 +157,7 @@ FEATURES & RATIONALE:
 		</div>
 	</div>
 
-	<div class="live-widget" aria-label="Widget MPM en direct">
+	<figure class="live-widget" aria-label="Widget MPM en direct">
 		<!-- The pill: big number over a darkened unit strip, exactly like the
 		     native widget. Background colour tracks the active typing source. -->
 		<div class="pill" style="--pill: {pillColor};">
@@ -169,8 +169,10 @@ FEATURES & RATIONALE:
 				<span class="bar" style="height: {Math.max(4, (v / barMax) * 100)}%;"></span>
 			{/each}
 		</div>
-		<p class="live-hint">Les pics correspondent aux hotstrings et aux acceptations d’IA.</p>
-	</div>
+		<figcaption class="live-hint">
+			Les pics correspondent aux hotstrings et aux acceptations d’IA.
+		</figcaption>
+	</figure>
 </div>
 
 <style>
@@ -276,6 +278,8 @@ FEATURES & RATIONALE:
 		flex-direction: column;
 		gap: 12px;
 		justify-content: center;
+		/* The figure's own margins are not part of the widget. */
+		margin: 0;
 		/* As narrow as its widest piece (the pill, a word of the hint), at least
 		   118px: a fixed width cut the number at a larger text, and a wider one
 		   took the text field's room. */
@@ -331,12 +335,20 @@ FEATURES & RATIONALE:
 		transition: height 0.13s linear;
 	}
 
+	/* The caption was a p, drawn by the card's paragraph rule
+	   (.ep-root .ep-card p, which outranked this one): it keeps that look
+	   and the measure ergopti-plus.css gives every p. */
 	.live-hint {
-		color: var(--ink-faint);
-		font-size: 0.72rem;
-		line-height: 1.4;
+		color: var(--ink-soft);
+		font-size: 0.95rem;
+		line-height: 1.6;
 		margin: 0;
+		max-width: 55ch;
 		text-align: center;
+	}
+
+	:global(:root[data-a11y-spacing='wide']) .live-hint {
+		margin-bottom: 2em !important;
 	}
 
 	@media (max-width: 620px) {

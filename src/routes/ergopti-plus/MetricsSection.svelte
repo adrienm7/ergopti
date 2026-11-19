@@ -32,6 +32,27 @@ FEATURES & RATIONALE:
 	];
 	let activeDashboard = $state('metrics_typing');
 
+	/** Keys that move between the tabs, as an offset or an absolute end. */
+	const TAB_KEYS = { ArrowLeft: -1, ArrowRight: 1, Home: 'first', End: 'last' };
+
+	/**
+	 * Move the selection and the focus along the tab list (the ARIA tabs
+	 * pattern): the arrows wrap around, Home and End jump to the ends.
+	 * @param {KeyboardEvent} event
+	 * @param {number} index - The tab the key was pressed on.
+	 */
+	function moveTab(event, index) {
+		const move = TAB_KEYS[event.key];
+		if (move === undefined) return;
+		event.preventDefault();
+		const count = dashboards.length;
+		const next =
+			move === 'first' ? 0 : move === 'last' ? count - 1 : (index + move + count) % count;
+		activeDashboard = dashboards[next].id;
+		const list = /** @type {HTMLElement} */ (event.currentTarget).closest('[role="tablist"]');
+		/** @type {HTMLElement} */ (list.querySelectorAll('[role="tab"]')[next]).focus();
+	}
+
 	// Deterministic upward-trending sparkline points (no Math.random — the
 	// page is prerendered and the shape should read as steady progress).
 	const wpmSpark = [38, 42, 41, 47, 52, 50, 57, 61, 60, 66, 71, 74];
@@ -94,88 +115,102 @@ FEATURES & RATIONALE:
 			</p>
 		</header>
 
-		<!-- Hand-drawn dashboard preview -->
-		<div class="preview" use:reveal>
-			<div class="preview-card">
-				<div class="preview-label">Vitesse moyenne</div>
-				<div class="preview-value">74 <span class="preview-unit">MPM</span></div>
-				<svg class="spark" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
-					<polyline points={sparkPoints(wpmSpark)} pathLength="1" />
-				</svg>
-				<div class="preview-delta">+9 % ce mois-ci</div>
-			</div>
+		<!-- Hand-drawn dashboard preview, captioned as an illustration -->
+		<figure class="preview-figure">
+			<div class="preview" use:reveal>
+				<dl class="preview-card">
+					<dt class="preview-label">Vitesse moyenne</dt>
+					<dd class="preview-value">
+						74 <span class="preview-unit">MPM</span>
+						<svg class="spark" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+							<polyline points={sparkPoints(wpmSpark)} pathLength="1" />
+						</svg>
+					</dd>
+					<dd class="preview-delta">+9 % ce mois-ci</dd>
+				</dl>
 
-			<div class="preview-card">
-				<div class="preview-label">Frappe déléguée</div>
-				<div class="preview-value">31 <span class="preview-unit">%</span></div>
-				<svg
-					class="spark spark--pink"
-					viewBox="0 0 100 32"
-					preserveAspectRatio="none"
-					aria-hidden="true"
-				>
-					<polyline points={sparkPoints(delegSpark)} pathLength="1" />
-				</svg>
-				<div class="preview-delta">+ Hotstrings · + IA</div>
-			</div>
+				<dl class="preview-card">
+					<dt class="preview-label">Frappe déléguée</dt>
+					<dd class="preview-value">
+						31 <span class="preview-unit">%</span>
+						<svg
+							class="spark spark--pink"
+							viewBox="0 0 100 32"
+							preserveAspectRatio="none"
+							aria-hidden="true"
+						>
+							<polyline points={sparkPoints(delegSpark)} pathLength="1" />
+						</svg>
+					</dd>
+					<dd class="preview-delta">+ Hotstrings · + IA</dd>
+				</dl>
 
-			<div class="preview-card preview-card--calendar">
-				<div class="preview-label">Activité — 26 semaines</div>
-				<div class="calendar" aria-hidden="true">
-					{#each calendar as level, i}
-						<span class="cell" data-level={level} style="--i: {i};"></span>
-					{/each}
-				</div>
+				<figure class="preview-card preview-card--calendar">
+					<figcaption class="preview-label">Activité — 26 semaines</figcaption>
+					<div class="calendar" aria-hidden="true">
+						{#each calendar as level, i}
+							<span class="cell" data-level={level} style="--i: {i};"></span>
+						{/each}
+					</div>
+				</figure>
 			</div>
-		</div>
-		<p class="preview-note" use:reveal>
-			Aperçu illustratif — les vrais tableaux de bord (<em>Statistiques de frappe</em> et
-			<em>Temps d’écran</em>) sont deux fenêtres du driver, avec vos données réelles.
-		</p>
+			<figcaption class="preview-note" use:reveal>
+				Aperçu illustratif — les vrais tableaux de bord (<em>Statistiques de frappe</em> et
+				<em>Temps d’écran</em>) sont deux fenêtres du driver, avec vos données réelles.
+			</figcaption>
+		</figure>
 
-		<div class="cap-grid">
+		<ul class="cap-grid">
 			{#each capabilities as c, i}
-				<article
-					class="ep-card ep-card--hover cap-card"
-					style="--accent: #00bfa5;"
-					use:reveal={{ delay: (i % 3) * 70 }}
-				>
-					<h3>{c.title}</h3>
-					<p>{c.body}</p>
-				</article>
+				<li class="cap-item">
+					<article
+						class="ep-card ep-card--hover cap-card"
+						style="--accent: #00bfa5;"
+						use:reveal={{ delay: (i % 3) * 70 }}
+					>
+						<h3>{c.title}</h3>
+						<p>{c.body}</p>
+					</article>
+				</li>
 			{/each}
-		</div>
+		</ul>
 
 		<!-- The two REAL dashboard windows -->
-		<div class="dash-block">
+		<section class="dash-block">
 			<h3 class="dash-title" use:reveal>Les vraies fenêtres, servies depuis le driver.</h3>
 			<div class="dash-tabs" role="tablist" aria-label="Tableaux de bord" use:reveal>
-				{#each dashboards as d}
+				{#each dashboards as d, i}
 					<button
 						type="button"
 						role="tab"
+						id="ep-dash-tab-{d.id}"
+						aria-controls="ep-dash-panel"
 						aria-selected={activeDashboard === d.id}
+						tabindex={activeDashboard === d.id ? 0 : -1}
 						class:active={activeDashboard === d.id}
 						onclick={() => (activeDashboard = d.id)}
+						onkeydown={(event) => moveTab(event, i)}
 					>
 						{d.label}
 					</button>
 				{/each}
 			</div>
-			{#key activeDashboard}
-				<DriverFrame
-					id={activeDashboard}
-					width={geo[activeDashboard]?.width ?? 1020}
-					height={geo[activeDashboard]?.height ?? 680}
-				/>
-			{/key}
+			<div id="ep-dash-panel" role="tabpanel" aria-labelledby="ep-dash-tab-{activeDashboard}">
+				{#key activeDashboard}
+					<DriverFrame
+						id={activeDashboard}
+						width={geo[activeDashboard]?.width ?? 1020}
+						height={geo[activeDashboard]?.height ?? 680}
+					/>
+				{/key}
+			</div>
 			<p class="dash-note" use:reveal>
 				Données de démonstration générées pour l’aperçu — chez vous, ces tableaux de bord se
 				remplissent de VOTRE frappe, et rien ne quitte jamais votre machine.
 			</p>
-		</div>
+		</section>
 
-		<div class="widget-live ep-card" use:reveal>
+		<section class="widget-live ep-card" use:reveal>
 			<header class="widget-live-head">
 				<h3>Le widget MPM, toujours sous les yeux</h3>
 				<p>
@@ -185,28 +220,30 @@ FEATURES & RATIONALE:
 				</p>
 			</header>
 			<LiveWpm />
-		</div>
+		</section>
 
-		<div class="deleg-compare ep-card" use:reveal>
+		<section class="deleg-compare ep-card" use:reveal>
 			<h3 class="dc-title">Combien de frappe déléguez-vous&nbsp;?</h3>
-			<div class="dc-row">
-				<span class="dc-label">À la main</span>
-				<div class="dc-track">
-					<span class="dc-seg dc-seg--manual" style="--w: 100%;">100 frappes</span>
+			<dl class="dc-chart">
+				<div class="dc-row">
+					<dt class="dc-label">À la main</dt>
+					<dd class="dc-track">
+						<span class="dc-seg dc-seg--manual" style="--w: 100%;">100 frappes</span>
+					</dd>
 				</div>
-			</div>
-			<div class="dc-row">
-				<span class="dc-label">Avec Ergopti+</span>
-				<div class="dc-track">
-					<span class="dc-seg dc-seg--typed" style="--w: 60%;">60 tapées</span>
-					<span class="dc-seg dc-seg--deleg" style="--w: 40%;">40 déléguées</span>
+				<div class="dc-row">
+					<dt class="dc-label">Avec Ergopti+</dt>
+					<dd class="dc-track">
+						<span class="dc-seg dc-seg--typed" style="--w: 60%;">60 tapées</span>
+						<span class="dc-seg dc-seg--deleg" style="--w: 40%;">40 déléguées</span>
+					</dd>
 				</div>
-			</div>
+			</dl>
 			<p class="dc-note">
 				Hotstrings et IA écrivent le reste — pour le même texte, bien moins de frappes. Proportions
 				illustratives ; les vôtres sont dans le tableau de bord.
 			</p>
-		</div>
+		</section>
 
 		<p class="metrics-privacy" use:reveal>
 			🔐 Tout est calculé et stocké <strong>localement</strong>. Les champs de mot de passe sont
@@ -216,6 +253,11 @@ FEATURES & RATIONALE:
 </section>
 
 <style>
+	/* The figure that pairs the preview with its caption adds no box margin. */
+	.preview-figure {
+		margin: 0;
+	}
+
 	.preview {
 		display: grid;
 		gap: 14px;
@@ -227,7 +269,19 @@ FEATURES & RATIONALE:
 		background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
+		margin: 0;
 		padding: 18px 20px;
+	}
+
+	/* accessibility.css whitens the borders of div boxes in high contrast: the
+	   cards, now a dl and a figure, keep that white border. */
+	:global(:root[data-a11y-contrast='high']) .preview-card {
+		border-color: #fff;
+	}
+
+	.preview-value,
+	.preview-delta {
+		margin-inline-start: 0;
 	}
 
 	.preview-label {
@@ -342,26 +396,57 @@ FEATURES & RATIONALE:
 		}
 	}
 
+	/* The caption was a p: it keeps the prose line height and measure that
+	   typography.css and ergopti-plus.css give every p. */
 	.preview-note {
 		color: var(--ink-faint);
 		font-size: 0.8rem;
+		line-height: 1.5;
 		margin: 0 0 26px;
+		max-width: 55ch;
 		text-align: center;
+	}
+
+	:global(:root[data-a11y-spacing='wide']) .preview-note {
+		margin-bottom: 2em !important;
 	}
 
 	/* ─── Capabilities ──────────────────────────────────────── */
 
+	/* A list of like cards: drop the list look and the prose line height that
+	   typography.css gives ul and li. */
 	.cap-grid {
 		display: grid;
 		gap: 14px;
 		grid-template-columns: repeat(3, 1fr);
+		line-height: inherit;
+		list-style: none;
 		margin-bottom: 26px;
+		text-align: inherit;
+	}
+
+	/* The item is a one-cell grid so its card still stretches to the row. */
+	.cap-item {
+		display: grid;
+		line-height: inherit;
+		text-align: inherit;
 	}
 
 	/* ─── Real dashboards ───────────────────────────────────── */
 
+	/* The sub-sections are not page sections: no section padding, position or
+	   accent hairline from ergopti-plus.css (its ::before rule outranks a
+	   single class, hence the section's own class twice). */
 	.dash-block {
 		margin-bottom: 26px;
+		padding-block: 0;
+		position: static;
+	}
+
+	.dash-block.dash-block::before,
+	.widget-live.widget-live::before,
+	.deleg-compare.deleg-compare::before {
+		content: none;
 	}
 
 	.dash-title {
@@ -454,6 +539,10 @@ FEATURES & RATIONALE:
 		text-align: center;
 	}
 
+	.dc-chart {
+		margin: 0;
+	}
+
 	.dc-row {
 		align-items: center;
 		display: flex;
@@ -475,6 +564,7 @@ FEATURES & RATIONALE:
 		display: flex;
 		flex: 1;
 		gap: 2px;
+		margin: 0;
 		/* At least one bar high, taller when the labels wrap at a larger text. */
 		min-height: 34px;
 		overflow: hidden;

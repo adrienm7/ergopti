@@ -70,14 +70,18 @@ FEATURES & RATIONALE:
 	}
 </script>
 
-<div class="kpi-strip ep-wrap" bind:this={strip}>
+<!--
+  A label and value list: a dl group is dt then dd, so the label comes first
+  in the source and the column-reverse flex draws the number above it.
+-->
+<dl class="kpi-strip ep-wrap" bind:this={strip}>
 	{#each items as kpi, i}
 		<div class="kpi">
-			<div class="kpi-num">{fmt(counters[i] ?? 0)}{kpi.suffix}</div>
-			<div class="kpi-label">{kpi.label}</div>
+			<dt class="kpi-label">{kpi.label}</dt>
+			<dd class="kpi-num">{fmt(counters[i] ?? 0)}{kpi.suffix}</dd>
 		</div>
 	{/each}
-</div>
+</dl>
 
 <style>
 	.kpi-strip {
@@ -85,11 +89,21 @@ FEATURES & RATIONALE:
 		display: grid;
 		gap: 18px;
 		grid-template-columns: repeat(4, 1fr);
+		/* Cancels the dl's own bottom margin; the top one is set here. */
+		margin-bottom: 0;
 		margin-top: clamp(56px, 8vw, 96px);
 		padding-block: clamp(24px, 3.5vw, 40px);
 	}
 
+	/* accessibility.css whitens the borders of div boxes in high contrast:
+	   the strip, now a dl, keeps its white rule lines there. */
+	:global(:root[data-a11y-contrast='high']) .kpi-strip {
+		border-color: #fff;
+	}
+
 	.kpi {
+		display: flex;
+		flex-direction: column-reverse;
 		text-align: center;
 	}
 
@@ -101,6 +115,7 @@ FEATURES & RATIONALE:
 		font-variant-numeric: tabular-nums;
 		font-weight: 800;
 		letter-spacing: -0.02em;
+		margin-inline-start: 0;
 		-webkit-text-fill-color: transparent;
 	}
 

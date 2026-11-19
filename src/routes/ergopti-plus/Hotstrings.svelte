@@ -92,7 +92,8 @@ FEATURES & RATIONALE:
 		<header class="section-head" use:reveal>
 			<p class="kicker">Expansions en temps réel</p>
 			<h2>
-				<span use:countup={total}>{fmt(total)}</span> corrections et expansions, prêtes à l’emploi.
+				<data value={total} use:countup={total}>{fmt(total)}</data> corrections et expansions, prêtes
+				à l’emploi.
 			</h2>
 			<p class="lead">
 				Cinq familles livrées avec le driver, chacune avec sa couleur de tooltip et son délai
@@ -106,14 +107,16 @@ FEATURES & RATIONALE:
 
 		<!-- Family catalog — one row per REAL category, measured at build -->
 		<div class="family-band" use:reveal>
-			{#each categories as cat, i}
-				<div class="family" style="--accent: {cat.color}; --reveal-delay: {i * 60}ms;">
-					<span class="family-dot" aria-hidden="true"></span>
-					<span class="family-name">{cat.label}</span>
-					<span class="family-count">{fmt(cat.count)}</span>
-					<span class="family-delay">{cat.delaySec} s</span>
-				</div>
-			{/each}
+			<ul class="family-list">
+				{#each categories as cat, i}
+					<li class="family" style="--accent: {cat.color}; --reveal-delay: {i * 60}ms;">
+						<span class="family-dot" aria-hidden="true"></span>
+						<span class="family-name">{cat.label}</span>
+						<span class="family-count">{fmt(cat.count)}</span>
+						<span class="family-delay">{cat.delaySec} s</span>
+					</li>
+				{/each}
+			</ul>
 			<p class="family-note">
 				Couleurs et délais réels du driver — chaque famille est personnalisable et désactivable
 				depuis le menu.
@@ -121,81 +124,87 @@ FEATURES & RATIONALE:
 		</div>
 
 		<!-- In-context examples -->
-		<div class="detail-grid">
+		<ul class="detail-grid">
 			{#each details as cat, i}
-				<article
-					class="ep-card detail-card"
-					style="--accent: {cat.color};"
-					use:reveal={{ delay: i * 90 }}
-				>
-					<header class="detail-head">
-						<span class="detail-dot" aria-hidden="true"></span>
-						<div>
-							<h3>{cat.title}</h3>
-							<p class="detail-tag">{cat.tag}</p>
-						</div>
-					</header>
-					<p class="detail-lead">{cat.lead}</p>
-					<ul class="detail-rows">
-						{#each cat.rows as r}
+				<li class="card-item">
+					<article
+						class="ep-card detail-card"
+						style="--accent: {cat.color};"
+						use:reveal={{ delay: i * 90 }}
+					>
+						<header class="detail-head">
+							<span class="detail-dot" aria-hidden="true"></span>
+							<hgroup>
+								<h3>{cat.title}</h3>
+								<p class="detail-tag">{cat.tag}</p>
+							</hgroup>
+						</header>
+						<p class="detail-lead">{cat.lead}</p>
+						<ul class="detail-rows">
+							{#each cat.rows as r}
+								<li>
+									<div class="detail-trig">
+										<span class="hs-key">{r.trig}</span>
+										<span class="hs-arrow">→</span>
+										<span class="hs-out">{r.out}</span>
+									</div>
+									<div class="detail-context">
+										{#each r.words as w}
+											<span class="detail-word">{w}</span>
+										{/each}
+									</div>
+								</li>
+							{/each}
+						</ul>
+					</article>
+				</li>
+			{/each}
+		</ul>
+
+		<!-- Magic key dual behavior -->
+		<ul class="magic-duo">
+			<li class="card-item">
+				<article class="ep-card magic-card" style="--accent: #e53935;" use:reveal>
+					<h3><span class="magic-num">1</span> Répéteur de lettre</h3>
+					<p>
+						Si aucune abréviation ne correspond, <kbd class="star">★</kbd> double simplement la
+						lettre précédente. <strong>Plus aucun SFB sur les doublons.</strong>
+					</p>
+					<ul class="magic-rows">
+						{#each repeaterExamples as r}
 							<li>
-								<div class="detail-trig">
-									<span class="hs-key">{r.trig}</span>
-									<span class="hs-arrow">→</span>
-									<span class="hs-out">{r.out}</span>
-								</div>
-								<div class="detail-context">
-									{#each r.words as w}
-										<span class="detail-word">{w}</span>
-									{/each}
-								</div>
+								<span class="hs-key">{r.trig}</span>
+								<span class="hs-arrow">→</span>
+								<span class="hs-out">{r.out}</span>
+								<span class="hs-desc">{r.word}</span>
 							</li>
 						{/each}
 					</ul>
 				</article>
-			{/each}
-		</div>
+			</li>
 
-		<!-- Magic key dual behavior -->
-		<div class="magic-duo">
-			<article class="ep-card magic-card" style="--accent: #e53935;" use:reveal>
-				<h3><span class="magic-num">1</span> Répéteur de lettre</h3>
-				<p>
-					Si aucune abréviation ne correspond, <kbd class="star">★</kbd> double simplement la lettre
-					précédente. <strong>Plus aucun SFB sur les doublons.</strong>
-				</p>
-				<ul class="magic-rows">
-					{#each repeaterExamples as r}
-						<li>
-							<span class="hs-key">{r.trig}</span>
-							<span class="hs-arrow">→</span>
-							<span class="hs-out">{r.out}</span>
-							<span class="hs-desc">{r.word}</span>
-						</li>
-					{/each}
-				</ul>
-			</article>
-
-			<article class="ep-card magic-card" style="--accent: #e53935;" use:reveal={{ delay: 90 }}>
-				<h3><span class="magic-num">2</span> Déclencheur d’abréviations</h3>
-				<p>
-					Si les lettres précédentes forment une abréviation connue, <kbd class="star">★</kbd> expanse
-					à la place. Les deux modes sont décidés au moment de la frappe — sans configuration.
-				</p>
-				<ul class="magic-rows magic-rows--compact">
-					{#each triggerExamples as r}
-						<li>
-							<span class="hs-key">{r.trig}</span>
-							<span class="hs-arrow">→</span>
-							<span class="hs-out">{r.out}</span>
-						</li>
-					{/each}
-				</ul>
-			</article>
-		</div>
+			<li class="card-item">
+				<article class="ep-card magic-card" style="--accent: #e53935;" use:reveal={{ delay: 90 }}>
+					<h3><span class="magic-num">2</span> Déclencheur d’abréviations</h3>
+					<p>
+						Si les lettres précédentes forment une abréviation connue, <kbd class="star">★</kbd> expanse
+						à la place. Les deux modes sont décidés au moment de la frappe — sans configuration.
+					</p>
+					<ul class="magic-rows magic-rows--compact">
+						{#each triggerExamples as r}
+							<li>
+								<span class="hs-key">{r.trig}</span>
+								<span class="hs-arrow">→</span>
+								<span class="hs-out">{r.out}</span>
+							</li>
+						{/each}
+					</ul>
+				</article>
+			</li>
+		</ul>
 
 		<!-- The REAL editor window, embedded live -->
-		<div class="editor-block">
+		<section class="editor-block">
 			<h3 class="editor-title" use:reveal>Et voici la vraie fenêtre d’édition.</h3>
 			<p class="editor-lead" use:reveal>
 				Pas une capture d’écran : c’est la fenêtre d’édition du driver, servie depuis ses propres
@@ -207,7 +216,7 @@ FEATURES & RATIONALE:
 				width={geo.hotstring_editor?.width ?? 960}
 				height={geo.hotstring_editor?.height ?? 640}
 			/>
-		</div>
+		</section>
 	</div>
 </section>
 
@@ -223,13 +232,23 @@ FEATURES & RATIONALE:
 		padding: 8px 8px 0;
 	}
 
+	/* A list of the families: drop the list look and the prose line height
+	   and alignment that typography.css gives ul and li. */
+	.family-list {
+		line-height: inherit;
+		list-style: none;
+		text-align: inherit;
+	}
+
 	.family {
 		align-items: center;
 		border-radius: var(--radius-sm);
 		display: grid;
 		gap: 14px;
 		grid-template-columns: 12px 1fr auto auto;
+		line-height: inherit;
 		padding: 13px 16px;
+		text-align: inherit;
 		transition: background-color 0.25s var(--ease);
 	}
 
@@ -275,6 +294,22 @@ FEATURES & RATIONALE:
 	}
 
 	/* ─── Detail cards ──────────────────────────────────────── */
+
+	/* The card grids are lists of like cards: drop the list look and the prose
+	   line height and alignment that typography.css gives ul and li. */
+	.detail-grid,
+	.magic-duo {
+		line-height: inherit;
+		list-style: none;
+		text-align: inherit;
+	}
+
+	/* Each item is a one-cell grid so its card still stretches to the row. */
+	.card-item {
+		display: grid;
+		line-height: inherit;
+		text-align: inherit;
+	}
 
 	.detail-grid {
 		display: grid;
@@ -432,8 +467,17 @@ FEATURES & RATIONALE:
 
 	/* ─── Embedded editor window ────────────────────────────── */
 
+	/* A sub-section, not a page section: no section padding, position or
+	   accent hairline from ergopti-plus.css (its ::before rule outranks a
+	   single class, hence the class twice). */
 	.editor-block {
 		margin-top: clamp(28px, 4vw, 44px);
+		padding-block: 0;
+		position: static;
+	}
+
+	.editor-block.editor-block::before {
+		content: none;
 	}
 
 	.editor-title {

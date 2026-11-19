@@ -50,15 +50,17 @@ FEATURES & RATIONALE:
 			<h2>{t('Une suite riche, jamais envahissante.')}</h2>
 		</header>
 
-		<div class="promise-grid">
+		<ul class="promise-grid">
 			{#each promises as p, i}
-				<article class="ep-card ep-card--hover promise-card" use:reveal={{ delay: i * 80 }}>
-					<div class="promise-icon" aria-hidden="true">{p.icon}</div>
-					<h3>{p.title}</h3>
-					<p>{@html p.body}</p>
-				</article>
+				<li class="promise-item">
+					<article class="ep-card ep-card--hover promise-card" use:reveal={{ delay: i * 80 }}>
+						<div class="promise-icon" aria-hidden="true">{p.icon}</div>
+						<h3>{p.title}</h3>
+						<p>{@html p.body}</p>
+					</article>
+				</li>
 			{/each}
-		</div>
+		</ul>
 	</div>
 </section>
 
@@ -67,6 +69,16 @@ FEATURES & RATIONALE:
 		display: grid;
 		gap: 16px;
 		grid-template-columns: repeat(3, 1fr);
+		/* A list of like cards: drop the list look and the prose line height
+		   that typography.css gives ul and li. */
+		line-height: inherit;
+		list-style: none;
+	}
+
+	/* The item is a one-cell grid so its card still stretches to the row. */
+	.promise-item {
+		display: grid;
+		line-height: inherit;
 	}
 
 	.promise-card {

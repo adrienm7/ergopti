@@ -157,7 +157,7 @@ FEATURES & RATIONALE:
 				title={t('Afficher les fenêtres au style Windows (AutoHotkey)')}
 				aria-pressed={ui.osStyle === 'windows'}
 			>
-				<i class="icon-windows"></i><span>Windows</span>
+				<i class="icon-windows" aria-hidden="true"></i>Windows
 			</button>
 			<button
 				type="button"
@@ -166,7 +166,7 @@ FEATURES & RATIONALE:
 				title={t('Afficher les fenêtres au style macOS (Hammerspoon)')}
 				aria-pressed={ui.osStyle === 'macos'}
 			>
-				<i class="icon-appleinc"></i><span>macOS</span>
+				<i class="icon-appleinc" aria-hidden="true"></i>macOS
 			</button>
 			<button
 				type="button"
@@ -175,13 +175,13 @@ FEATURES & RATIONALE:
 				title={t('Afficher les fenêtres au style Linux (daemon Lua, alpha)')}
 				aria-pressed={ui.osStyle === 'linux'}
 			>
-				<i class="icon-linux"></i><span>Linux</span>
+				<i class="icon-linux" aria-hidden="true"></i>Linux
 			</button>
 		</div>
 
 		<p class="eyebrow">
-			{t('Frappe augmentée')} <span class="dot">•</span> Windows, macOS, Linux
-			<span class="dot">•</span>
+			{t('Frappe augmentée')} <span class="dot" aria-hidden="true">•</span> Windows, macOS, Linux
+			<span class="dot" aria-hidden="true">•</span>
 			{t('100 % local')}
 		</p>
 		<h1 class="hero-title">
@@ -202,11 +202,11 @@ FEATURES & RATIONALE:
 
 		<div class="hero-cta">
 			<a class="btn btn-primary" href={primaryDownload.url} download={!!ui.release}>
-				<i class={primaryDownload.icon}></i>
-				<span>{primaryDownload.label}</span>
+				<i class={primaryDownload.icon} aria-hidden="true"></i>
+				{primaryDownload.label}
 			</a>
 			<a class="btn btn-secondary" href={resolve('/ergopti-plus/installation') + '#ep-telecharger'}>
-				<span>{t('Installation & comparatif ↓')}</span>
+				{t('Installation & comparatif ↓')}
 			</a>
 		</div>
 		<p class="hero-meta">
