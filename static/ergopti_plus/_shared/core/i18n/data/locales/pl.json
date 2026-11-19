@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "Usuń",
 	"layout_editor.btn.save": "Zapisz źródło",
 	"layout_editor.btn.undo": "Cofnij",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Warstwa Caps Lock",
 	"layout_editor.caps.separate": "Własne warstwy",

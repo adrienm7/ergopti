@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "Odebrat",
 	"layout_editor.btn.save": "Uložit zdroj",
 	"layout_editor.btn.undo": "Zpět",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Vrstva Caps Lock",
 	"layout_editor.caps.separate": "Vlastní vrstvy",

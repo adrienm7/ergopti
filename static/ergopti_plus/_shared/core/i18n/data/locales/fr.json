@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "Retirer",
 	"layout_editor.btn.save": "Enregistrer",
 	"layout_editor.btn.undo": "Annuler",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Verr. Maj",
 	"layout_editor.caps.layer": "Couche Verr. Maj",
 	"layout_editor.caps.separate": "Ses propres couches",

@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "Rimuovi",
 	"layout_editor.btn.save": "Salva la sorgente",
 	"layout_editor.btn.undo": "Annulla",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Livello Caps Lock",
 	"layout_editor.caps.separate": "Livelli propri",

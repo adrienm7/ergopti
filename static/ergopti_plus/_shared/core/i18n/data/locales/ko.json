@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "제거",
 	"layout_editor.btn.save": "소스 저장",
 	"layout_editor.btn.undo": "실행 취소",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock 레이어",
 	"layout_editor.caps.separate": "전용 레이어",

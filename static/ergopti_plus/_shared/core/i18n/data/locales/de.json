@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "Entfernen",
 	"layout_editor.btn.save": "Quelle speichern",
 	"layout_editor.btn.undo": "Rückgängig",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps-Lock-Ebene",
 	"layout_editor.caps.separate": "Eigene Ebenen",

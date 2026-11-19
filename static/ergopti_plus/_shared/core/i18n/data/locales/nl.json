@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "Verwijderen",
 	"layout_editor.btn.save": "Bron opslaan",
 	"layout_editor.btn.undo": "Ongedaan maken",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock-laag",
 	"layout_editor.caps.separate": "Eigen lagen",

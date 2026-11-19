@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "إزالة",
 	"layout_editor.btn.save": "حفظ المصدر",
 	"layout_editor.btn.undo": "تراجع",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "طبقة Caps Lock",
 	"layout_editor.caps.separate": "طبقات خاصة",

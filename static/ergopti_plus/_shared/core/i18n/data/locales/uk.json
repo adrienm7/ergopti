@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "Видалити",
 	"layout_editor.btn.save": "Зберегти джерело",
 	"layout_editor.btn.undo": "Скасувати",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Шар Caps Lock",
 	"layout_editor.caps.separate": "Власні шари",

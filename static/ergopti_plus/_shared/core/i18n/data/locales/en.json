@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "Remove",
 	"layout_editor.btn.save": "Save",
 	"layout_editor.btn.undo": "Undo",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock layer",
 	"layout_editor.caps.separate": "Its own layers",

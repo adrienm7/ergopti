@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "हटाएँ",
 	"layout_editor.btn.save": "स्रोत सहेजें",
 	"layout_editor.btn.undo": "पूर्ववत करें",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock लेयर",
 	"layout_editor.caps.separate": "अपनी अलग लेयर",

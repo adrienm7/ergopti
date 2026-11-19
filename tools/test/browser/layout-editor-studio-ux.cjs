@@ -188,7 +188,50 @@ async function exerciseOneInfoPerRow(browser, origin) {
 	await editor.context.close();
 }
 
+/**
+ * (history-shortcuts) Ctrl/Cmd+Z undoes and Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z
+ * redoes in the editor, from a key or with nothing focused; a text field keeps
+ * its own undo. The buttons name their shortcut.
+ */
+async function exerciseHistoryShortcuts(browser, origin) {
+	const { page, errors, context } = await openOnErgopti(browser, origin);
+	const legend = (code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
+	const [q, w] = [await legend('KeyQ'), await legend('KeyW')];
+	await swap(page, 'KeyQ', 'KeyW');
+	assert.equal(await legend('KeyQ'), w, 'the swap moved the key');
+	await page.focus('#le-board [data-code="KeyE"]');
+	await page.keyboard.press('Control+z');
+	assert.equal(await legend('KeyQ'), q, 'Ctrl+Z on a key undoes');
+	await page.evaluate(() => document.activeElement.blur());
+	await page.keyboard.press('Control+y');
+	assert.equal(await legend('KeyQ'), w, 'Ctrl+Y with nothing focused redoes');
+	await page.keyboard.press('Meta+z');
+	assert.equal(await legend('KeyQ'), q, 'Cmd+Z undoes');
+	await page.keyboard.press('Control+Shift+z');
+	assert.equal(await legend('KeyQ'), w, 'Ctrl+Shift+Z redoes');
+	// A text field: its Ctrl+Z is its own.
+	await page.click('#le-tools [data-tool="details"]');
+	await page.fill('#le-name', 'Typed name');
+	await page.focus('#le-name');
+	await page.keyboard.press('Control+z');
+	assert.equal(await legend('KeyQ'), w, 'Ctrl+Z in a text field leaves the layout alone');
+	const names = await page.$$eval('#le-undo, #le-redo', (buttons) =>
+		buttons.map((button) => ({
+			label: button.getAttribute('aria-label'),
+			title: button.title,
+			keys: button.getAttribute('aria-keyshortcuts')
+		}))
+	);
+	assert.match(names[0].label, /^Undo \(.*Z\)$/, `undo names its shortcut: ${names[0].label}`);
+	assert.match(names[1].label, /^Redo \(.*Y.*Z\)$/, `redo names its shortcuts: ${names[1].label}`);
+	assert.equal(names[0].title, names[0].label);
+	assert.equal(names[0].keys, 'Control+Z Meta+Z');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseHistoryShortcuts,
 	exerciseOneInfoPerRow,
 	EN,
 	openOnErgopti,

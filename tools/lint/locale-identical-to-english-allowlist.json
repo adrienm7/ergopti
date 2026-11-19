@@ -3788,6 +3788,29 @@
 		"layout_optimizer.library.score": {
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "fr", "nl"]
+		},
+		"layout_editor.btn.with_shortcut": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk"
+			]
 		}
 	}
 }

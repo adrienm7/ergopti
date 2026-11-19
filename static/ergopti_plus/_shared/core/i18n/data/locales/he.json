@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "הסרה",
 	"layout_editor.btn.save": "שמירת המקור",
 	"layout_editor.btn.undo": "ביטול",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "שכבת Caps Lock",
 	"layout_editor.caps.separate": "שכבות משלו",

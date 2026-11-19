@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "移除",
 	"layout_editor.btn.save": "保存源文件",
 	"layout_editor.btn.undo": "撤销",
+	"layout_editor.btn.with_shortcut": "{action}（{keys}）",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock 层",
 	"layout_editor.caps.separate": "独立的层",

@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "Quitar",
 	"layout_editor.btn.save": "Guardar la fuente",
 	"layout_editor.btn.undo": "Deshacer",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Capa de Caps Lock",
 	"layout_editor.caps.separate": "Capas propias",

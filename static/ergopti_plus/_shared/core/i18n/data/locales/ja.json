@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "削除",
 	"layout_editor.btn.save": "ソースを保存",
 	"layout_editor.btn.undo": "元に戻す",
+	"layout_editor.btn.with_shortcut": "{action}（{keys}）",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock レイヤー",
 	"layout_editor.caps.separate": "専用レイヤー",

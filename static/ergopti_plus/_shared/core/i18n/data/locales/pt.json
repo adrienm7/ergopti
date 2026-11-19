@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "Remover",
 	"layout_editor.btn.save": "Guardar a fonte",
 	"layout_editor.btn.undo": "Anular",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Camada Caps Lock",
 	"layout_editor.caps.separate": "Camadas próprias",

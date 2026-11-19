@@ -127,6 +127,21 @@ var LayoutEditorPage = (function () {
 	const DEFAULT_EXPORT_FORMAT = 'toml';
 	// The macOS downloads, in drop-down order: the ISO + ANSI bundle, then one .keylayout per board.
 	const MACOS_EXPORTS = ['bundle', 'iso', 'ansi'];
+	// The history shortcuts (every editor's): the chords LayerModel.chordText writes in
+	// the buttons' names, and the keys each OS's users press for them. Ctrl and Cmd
+	// both work on every OS (a Mac keyboard on Windows, a PC keyboard on a Mac).
+	const HISTORY_SHORTCUTS = {
+		undo: { chords: [{ mods: ['primary'], key: 'KeyZ' }], aria: 'Control+Z Meta+Z' },
+		redo: {
+			chords: [
+				{ mods: ['primary'], key: 'KeyY' },
+				{ mods: ['primary', 'shift'], key: 'KeyZ' }
+			],
+			aria: 'Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z'
+		}
+	};
+	// The fields whose own Ctrl+Z undoes their text: the editor leaves it to them.
+	const TEXT_INPUT_TYPES = new Set(['text', 'search', 'url', 'tel', 'email', 'password', 'number']);
 
 	// ============================
 	// ======= 2/ Helpers =========
@@ -309,6 +324,45 @@ var LayoutEditorPage = (function () {
 				if (typeof mapping.text === 'string' && mapping.text !== '')
 					legends[code] = visible(mapping.text);
 		return { os: platform, data: LAYER_EDITOR_DATA, t, legends };
+	}
+
+	/**
+	 * The user's OS, for the shortcuts the page names: the host's, else the
+	 * browser's (the website).
+	 * @param {string|undefined} hostPlatform - The host's platform, when it has one.
+	 * @returns {'windows'|'macos'|'linux'}
+	 */
+	function userOs(hostPlatform) {
+		if (['windows', 'macos', 'linux'].includes(hostPlatform)) return hostPlatform;
+		const agent = navigator.userAgentData || null;
+		const name = (agent && agent.platform) || navigator.platform || '';
+		if (/mac|iphone|ipad/i.test(name)) return 'macos';
+		return /linux|x11|cros/i.test(name) ? 'linux' : 'windows';
+	}
+
+	/**
+	 * Whether a key press belongs to a text field (its own undo history).
+	 * @param {EventTarget} target - The focused element.
+	 * @returns {boolean}
+	 */
+	function inTextField(target) {
+		if (!target || target.nodeType !== 1) return false;
+		if (target.isContentEditable || target.tagName === 'TEXTAREA') return true;
+		return target.tagName === 'INPUT' && TEXT_INPUT_TYPES.has(target.type);
+	}
+
+	/**
+	 * The history action of a key press: Ctrl or Cmd with Z undoes, with Y or
+	 * Shift+Z redoes, by the character typed (Ctrl+Z on AZERTY is the key
+	 * marked Z).
+	 * @param {KeyboardEvent} event
+	 * @returns {'undo'|'redo'|null}
+	 */
+	function historyAction(event) {
+		if (!(event.ctrlKey || event.metaKey) || event.altKey) return null;
+		const key = String(event.key).toLowerCase();
+		if (key === 'z') return event.shiftKey ? 'redo' : 'undo';
+		return key === 'y' && !event.shiftKey ? 'redo' : null;
 	}
 
 	/** The translated refusal of an edit or a file. */
@@ -1167,6 +1221,38 @@ var LayoutEditorPage = (function () {
 		// ======= 5/ Toolbar =========
 		// ============================
 
+		/** Undoes or redoes the shown tab's last edit; nothing to undo does nothing. */
+		function runHistory(action) {
+			const history = state.history;
+			if (action === 'undo' ? !history.canUndo() : !history.canRedo()) return;
+			if (action === 'undo') history.undo();
+			else history.redo();
+			render();
+		}
+
+		/**
+		 * An Undo or Redo button's state and its shortcut, in its accessible name
+		 * and tooltip (« Undo (Ctrl+Z) », « Redo (⌘Y, ⇧⌘Z) ») and for assistive
+		 * technologies (aria-keyshortcuts).
+		 */
+		function historyButton(action) {
+			const shortcut = HISTORY_SHORTCUTS[action];
+			const keys = LayerModel.chordText(shortcut.chords, {
+				os: userOs(host.platform),
+				data: LAYER_EDITOR_DATA,
+				t,
+				// The letters as printed, whatever the edited layout puts on those keys.
+				legends: { KeyZ: 'Z', KeyY: 'Y' }
+			});
+			const name = tl('btn.with_shortcut', { action: tl(`btn.${action}`), keys });
+			return {
+				disabled: action === 'undo' ? !state.history.canUndo() : !state.history.canRedo(),
+				title: name,
+				'aria-label': name,
+				'aria-keyshortcuts': shortcut.aria
+			};
+		}
+
 		/** The primary actions: the file, the history and, in a window, Close. */
 		function toolbar() {
 			const fileInput = el('input', {
@@ -1209,24 +1295,8 @@ var LayoutEditorPage = (function () {
 						navInput
 					]),
 					el('div', { class: 'le-toolbar-group' }, [
-						button(
-							'le-undo',
-							tl('btn.undo'),
-							() => {
-								state.history.undo();
-								render();
-							},
-							{ disabled: !state.history.canUndo() }
-						),
-						button(
-							'le-redo',
-							tl('btn.redo'),
-							() => {
-								state.history.redo();
-								render();
-							},
-							{ disabled: !state.history.canRedo() }
-						)
+						button('le-undo', tl('btn.undo'), () => runHistory('undo'), historyButton('undo')),
+						button('le-redo', tl('btn.redo'), () => runHistory('redo'), historyButton('redo'))
 					]),
 					el('span', { class: 'le-toolbar-spacer' }),
 					el('span', {
@@ -4307,6 +4377,19 @@ var LayoutEditorPage = (function () {
 				});
 			}
 		}
+
+		// Ctrl/Cmd+Z and Ctrl/Cmd+Y (or Shift+Z) anywhere in the editor shown, but in a
+		// text field, which keeps its own undo. The document listens, so a press with
+		// nothing focused (after a click on the page) works too.
+		document.addEventListener('keydown', (event) => {
+			const action = historyAction(event);
+			if (!action || event.defaultPrevented || inTextField(event.target)) return;
+			const target = event.target;
+			const inside = target === document.body || target === document.documentElement;
+			if (!(inside || root.contains(target)) || root.getClientRects().length === 0) return;
+			event.preventDefault();
+			runHistory(action);
+		});
 
 		const initialSettled = openInitial();
 		render();

@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "Удалить",
 	"layout_editor.btn.save": "Сохранить исходник",
 	"layout_editor.btn.undo": "Отменить",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Слой Caps Lock",
 	"layout_editor.caps.separate": "Свои слои",

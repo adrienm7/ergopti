@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "Kaldır",
 	"layout_editor.btn.save": "Kaynağı kaydet",
 	"layout_editor.btn.undo": "Geri al",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock katmanı",
 	"layout_editor.caps.separate": "Kendi katmanları",

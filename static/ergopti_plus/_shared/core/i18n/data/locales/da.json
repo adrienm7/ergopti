@@ -334,6 +334,7 @@
 	"layout_editor.btn.remove": "Fjern",
 	"layout_editor.btn.save": "Gem kilden",
 	"layout_editor.btn.undo": "Fortryd",
+	"layout_editor.btn.with_shortcut": "{action} ({keys})",
 	"layout_editor.caps.label": "Caps Lock",
 	"layout_editor.caps.layer": "Caps Lock-lag",
 	"layout_editor.caps.separate": "Egne lag",
