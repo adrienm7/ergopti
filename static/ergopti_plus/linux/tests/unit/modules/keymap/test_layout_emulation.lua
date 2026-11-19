@@ -251,6 +251,26 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		helpers.assert_eq(record.typed, { "^" }, "Ergo-L's AltGr symbol")
 	end)
 
+	-- The number-row menu counted any running emulation as typing the row, so
+	-- it offered an ordering nothing applied with the base layer or the number
+	-- row switched off (emulated-number-row-availability).
+	helpers.it("says it orders the number row only with its base layer and number row on (emulated-number-row-availability)", function()
+		for _, case in ipairs({
+			{ { ergopti_base = true, ergopti_variant = "ergopti" }, true },
+			{ { ergopti_base = true, ergopti_variant = "ergopti", emulate_number_row = false }, false },
+			{ { emulated_layout = "ergol", ergopti_alt_gr = true }, false },
+		}) do
+			local M = fixture(case[1])
+			helpers.assert_true(M.reload(), "the layout loads")
+			helpers.assert_true(M.status().active, "the emulation runs")
+			helpers.assert_eq(M.status().number_row, case[2], "the number row typed by the emulation")
+			M._reset_for_test()
+		end
+		local M = fixture({})
+		M.reload()
+		helpers.assert_eq(M.status().number_row, false, "nothing emulated orders nothing")
+	end)
+
 	helpers.it("leaves a row switched off to the system layout (emulation-row-switch-null-registry)", function()
 		-- The registry is decoded losslessly, as in production: its JSON nulls
 		-- must still read as character keys for the rows to exist at all.

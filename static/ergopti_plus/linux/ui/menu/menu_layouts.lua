@@ -208,8 +208,9 @@ local function _build_layouts(ctx)
 	providers["number_row_policy"] = function()
 		local NumberRowLive = require("modules.keymap.number_row_live")
 		local available, reason = NumberRowLive.available()
-		-- An emulation typing the number row applies the ordering itself.
-		local emulating = require("modules.keymap.layout_emulation").status().active == true
+		-- An emulation typing the number row applies the ordering itself; one with
+		-- its base layer or its number row off leaves the row to the system layout.
+		local emulating = require("modules.keymap.layout_emulation").status().number_row == true
 		available = available or emulating
 		local stored = NumberRowLive.stored()
 		-- The choice is stored first; a refusal after that is told, except the two the

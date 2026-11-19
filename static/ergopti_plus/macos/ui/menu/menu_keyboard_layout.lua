@@ -279,8 +279,9 @@ local function number_row_rows(state, save_prefs, update_menu, render_ctx)
 	local started = PhaseStats.now()
 	local available, reason = Live.available()
 	PhaseStats.stop("menu_keyboard_layout.number_row", started)
-	-- An emulation typing the number row applies the ordering itself.
-	local emulating = require("modules.keymap.layout_emulation").status().active == true
+	-- An emulation typing the number row applies the ordering itself; one with
+	-- its base layer or its number row off leaves the row to the system layout.
+	local emulating = require("modules.keymap.layout_emulation").status().number_row == true
 	available = available or emulating
 	local function stored()
 		return { order = state.layout_number_row_mode, edges = state.layout_number_row_reorder_edges == true }

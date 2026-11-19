@@ -178,10 +178,13 @@ function M.legend(code)
 	return text ~= "" and text or nil
 end
 
---- What the emulation does now, for the menu.
---- @return table status { active, id, error }
+--- What the emulation does now, for the menu: number_row says whether it types
+--- the number row itself (base layer and number-row switch on), the only case
+--- where the number-row ordering applies through it.
+--- @return table status { active, id, error, number_row }
 function M.status()
-	return { active = _status.active, id = _status.id, error = _status.error }
+	return { active = _status.active, id = _status.id, error = _status.error,
+		number_row = _status.active == true and Emulation.orders_number_row(_session) }
 end
 
 --- Drops a pending dead key, and a held or locked custom modifier or a

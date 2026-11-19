@@ -464,6 +464,16 @@ function M.configure(session, settings)
 	return effective
 end
 
+--- Whether the configured session types the number row itself, so its ordering
+--- (number_row_policy) applies through the emulation: the base layer and the
+--- number-row switch must both be on, the rule M.configure orders the row with.
+--- @param session table|nil
+--- @return boolean
+function M.orders_number_row(session)
+	local config = type(session) == "table" and session.config or nil
+	return type(config) == "table" and config.base == true and config.row_on.number_row == true
+end
+
 --- Drops a pending dead key.
 --- @param session table
 function M.reset(session)
