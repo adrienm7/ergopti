@@ -11,6 +11,21 @@
 --- 2. File Discovery: Dynamically loads private and public configuration files.
 --- ==============================================================================
 
+-- A boot that fails above the guarded post-onboarding section must still be
+-- logged and reported to the launcher (core/lifecycle/engine/boot_guard.lua):
+-- this file runs itself once more under that guard. Loaded by path, since the
+-- shared tree is not on package.path yet.
+local boot_guard_argument = ...
+do
+	local entry = debug.getinfo(1, "S").source:gsub("^@", "")
+	local BootGuard = assert(loadfile((entry:match("^(.*)/[^/]+$") or ".")
+		.. "/core/lifecycle/engine/boot_guard.lua"))()
+	if not BootGuard.is_guarded(boot_guard_argument) then
+		BootGuard.run(entry)
+		return
+	end
+end
+
 -- Inject the _shared root into package.path so that infra/ shims for
 -- lib.toml.codec, lib.toml.reader, and lib.toml.writer can resolve their shared modules.
 -- This must run before any require() that pulls in those libs.
