@@ -75,6 +75,12 @@
  *    a dead key as its bare accent from the shared key legend and the space as
  *    « ␣ », never a dead state's id (« [s1_circumflex] »); without the legend
  *    loaded the rows refuse instead of falling back to the ids.
+ * 16. Ideas from the other analysers: sfb_distance, pinky_ring, the floors
+ *    and the reference layout of the relative view, weighed by hand.
+ * 17. Thumb keys: two different keys of one thumb are an SFB (analyse and
+ *    scoreSession alike), two thumbs none; a rest key costs no travel and
+ *    KanaMode is reached from the nearest rest; ISO and ANSI have no thumb
+ *    key (a thumb letter is missing there), JIS has them on its thumbs.
  * ==============================================================================
  */
 
@@ -2892,6 +2898,76 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	check(
 		near(awW.typing.cost - aw.typing.cost, 500),
 		`ideas: pinky_ring adds ${awW.typing.cost - aw.typing.cost} to « aw »'s typing cost`
+	);
+}
+
+// ================================
+// ======= 17/ Thumb keys =========
+// ================================
+
+{
+	const qwerty = byId.get('qwerty');
+	const thumbLayout = (rows) => ({
+		id: 'thumb_test',
+		rows: Object.assign({}, qwerty.rows, { KeyT: [null, null, null, null] }, rows)
+	});
+	const text = E.ngramsFromText('t t t t t');
+	// The left thumb types t and the space (NonConvert and the Corne's Space):
+	// every pair is two keys of one thumb, an SFB.
+	const sameThumb = E.analyse(thumbLayout({ NonConvert: ['t', 'T', null, null] }), text, {
+		keyboard: 'corne'
+	});
+	check(
+		near(sameThumb.metrics.sfb, 100),
+		`thumb keys: t and the space on the left thumb are not all SFBs (${sameThumb.metrics.sfb} %)`
+	);
+	// The space on the right thumb instead: no pair of one thumb, none counted.
+	const twoThumbs = E.analyse(
+		thumbLayout({
+			NonConvert: ['t', 'T', null, null],
+			Convert: [' ', ' ', null, null],
+			Space: [null, null, null, null]
+		}),
+		text,
+		{ keyboard: 'corne' }
+	);
+	check(
+		twoThumbs.metrics.sfb === 0 && !twoThumbs.incomplete,
+		`thumb keys: t and the space on two thumbs make ${twoThumbs.metrics.sfb} % SFB`
+	);
+	// The incremental objective counts the thumb SFB as analyse() does.
+	const session = E.scoreSession(thumbLayout({ NonConvert: ['t', 'T', null, null] }), text, {
+		keyboard: 'corne'
+	});
+	check(
+		near(session.total, sameThumb.score.total),
+		`thumb keys: scoreSession ${session.total} is not analyse()'s ${sameThumb.score.total}`
+	);
+	// A rest key costs no travel; KanaMode is reached from the nearest rest.
+	const corne = E.keyboard('corne');
+	const reach = (code) => corne.reach[corne.index.get(code)];
+	check(
+		reach('NonConvert') === 0 && reach('Convert') === 0 && near(reach('KanaMode'), 19.05),
+		`thumb keys: Corne reach ${reach('NonConvert')} ${reach('Convert')} ${reach('KanaMode')} mm`
+	);
+	// ISO and ANSI have no thumb key: there the layout lacks its t.
+	for (const keyboardId of ['iso', 'ansi'])
+		check(
+			E.thumbKeys().every((code) => !E.keyboard(keyboardId).index.has(code)),
+			`thumb keys: ${keyboardId} has a thumb key`
+		);
+	const onIso = E.analyse(thumbLayout({ NonConvert: ['t', 'T', null, null] }), text, {});
+	check(
+		onIso.incomplete && onIso.coverage.missingRequired.includes('t'),
+		'thumb keys: a thumb t is not missing on ISO'
+	);
+	// JIS has them physically, on its own thumbs.
+	const jis = E.keyboard('jis');
+	check(
+		E.thumbKeys().every((code) => jis.index.has(code)) &&
+			jis.finger[jis.index.get('NonConvert')] === 4 &&
+			jis.finger[jis.index.get('Convert')] === 5,
+		'thumb keys: JIS lacks its thumb keys or their thumbs'
 	);
 }
 
