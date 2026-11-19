@@ -76,7 +76,7 @@ FEATURES & RATIONALE:
 		</header>
 
 		<!-- Faithful tooltip mockup with mode tabs -->
-		<div class="ai-demo" use:reveal>
+		<figure class="ai-demo" use:reveal>
 			<div class="mode-tabs" role="tablist" aria-label="Mode du tooltip IA">
 				{#each modes as m}
 					<button
@@ -97,69 +97,79 @@ FEATURES & RATIONALE:
 				<div class="ai-body">
 					{#if activeMode === 'predict'}
 						<p class="ai-context">
-							Bonjour Madame, je vous écris pour <span class="caret"></span>
+							Bonjour Madame, je vous écris pour <span class="caret" aria-hidden="true"></span>
 						</p>
 						<div class="hs-tooltip">
-							<div class="tt-line tt-line--selected">
-								<span class="tt-spark">✨</span>
-								<span class="tt-eq">…je vous écris pour</span>
-								<span class="tt-nw"> vous proposer un rendez-vous mardi prochain.</span>
-								<span class="tt-shortcut">⌥1</span>
-							</div>
-							<div class="tt-line">
-								<span class="tt-eq tt-dim">…je vous écris pour</span>
-								<span class="tt-nw tt-dim">
-									faire suite à notre échange de la semaine dernière.</span
-								>
-								<span class="tt-shortcut tt-dim">⌥2</span>
-							</div>
-							<div class="tt-line">
-								<span class="tt-eq tt-dim">…je vous écris pour</span>
-								<span class="tt-nw tt-dim"> accuser réception de votre dossier complet.</span>
-								<span class="tt-shortcut tt-dim">⌥3</span>
-							</div>
-							<div class="tt-hint">Tab = accepter · ↑↓ = naviguer · Échap = ignorer</div>
-							<div class="tt-info">Llama 3.2 3B · Ollama · Basique — ⏱ 0,18 s</div>
+							<ol class="tt-list">
+								<li class="tt-line tt-line--selected">
+									<span class="tt-spark" aria-hidden="true">✨</span>
+									<span class="tt-eq">…je vous écris pour</span>
+									<span class="tt-nw"> vous proposer un rendez-vous mardi prochain.</span>
+									<span class="tt-shortcut">⌥1</span>
+								</li>
+								<li class="tt-line">
+									<span class="tt-eq tt-dim">…je vous écris pour</span>
+									<span class="tt-nw tt-dim">
+										faire suite à notre échange de la semaine dernière.</span
+									>
+									<span class="tt-shortcut tt-dim">⌥2</span>
+								</li>
+								<li class="tt-line">
+									<span class="tt-eq tt-dim">…je vous écris pour</span>
+									<span class="tt-nw tt-dim"> accuser réception de votre dossier complet.</span>
+									<span class="tt-shortcut tt-dim">⌥3</span>
+								</li>
+							</ol>
+							<p class="tt-hint">Tab = accepter · ↑↓ = naviguer · Échap = ignorer</p>
+							<p class="tt-info">Llama 3.2 3B · Ollama · Basique — ⏱ 0,18 s</p>
 						</div>
 					{:else if activeMode === 'correct'}
 						<p class="ai-context">
 							Je vous remercie de me <span class="typo">recevoire</span> demain matin.<span
 								class="caret"
+								aria-hidden="true"
 							></span>
 						</p>
 						<div class="hs-tooltip">
-							<div class="tt-line tt-line--selected">
-								<span class="tt-spark">✨</span>
-								<span class="tt-eq">Je vous remercie de me</span>
-								<span class="tt-corr"> recevoir</span>
-								<span class="tt-eq"> demain matin.</span>
-								<span class="tt-shortcut">⌥1</span>
-							</div>
-							<div class="tt-hint">Tab = accepter</div>
-							<div class="tt-info">Llama 3.2 3B · Ollama · Avancé — ⏱ 0,21 s</div>
+							<ol class="tt-list">
+								<li class="tt-line tt-line--selected">
+									<span class="tt-spark" aria-hidden="true">✨</span>
+									<span class="tt-eq">Je vous remercie de me</span>
+									<span class="tt-corr"> recevoir</span>
+									<span class="tt-eq"> demain matin.</span>
+									<span class="tt-shortcut">⌥1</span>
+								</li>
+							</ol>
+							<p class="tt-hint">Tab = accepter</p>
+							<p class="tt-info">Llama 3.2 3B · Ollama · Avancé — ⏱ 0,21 s</p>
 						</div>
 					{:else}
 						<p class="ai-context">
-							Le projet est <span class="typo">paralèle</span> à <span class="caret"></span>
+							Le projet est <span class="typo">paralèle</span> à
+							<span class="caret" aria-hidden="true"></span>
 						</p>
 						<div class="hs-tooltip">
-							<div class="tt-line tt-line--selected">
-								<span class="tt-spark">✨</span>
-								<span class="tt-eq">Le projet est</span>
-								<span class="tt-corr"> parallèle</span>
-								<span class="tt-eq"> à</span>
-								<span class="tt-nw"> celui de l’an dernier, avec un budget revu à la hausse.</span>
-								<span class="tt-shortcut">⌥1</span>
-							</div>
-							<div class="tt-line">
-								<span class="tt-eq tt-dim">Le projet est</span>
-								<span class="tt-corr tt-dim"> parallèle</span>
-								<span class="tt-eq tt-dim"> à</span>
-								<span class="tt-nw tt-dim"> ceux que nous avons livrés en 2024.</span>
-								<span class="tt-shortcut tt-dim">⌥2</span>
-							</div>
-							<div class="tt-hint">Tab = accepter la correction ET la suite</div>
-							<div class="tt-info">Mistral 7B · Ollama · Avancé — ⏱ 0,34 s</div>
+							<ol class="tt-list">
+								<li class="tt-line tt-line--selected">
+									<span class="tt-spark" aria-hidden="true">✨</span>
+									<span class="tt-eq">Le projet est</span>
+									<span class="tt-corr"> parallèle</span>
+									<span class="tt-eq"> à</span>
+									<span class="tt-nw">
+										celui de l’an dernier, avec un budget revu à la hausse.</span
+									>
+									<span class="tt-shortcut">⌥1</span>
+								</li>
+								<li class="tt-line">
+									<span class="tt-eq tt-dim">Le projet est</span>
+									<span class="tt-corr tt-dim"> parallèle</span>
+									<span class="tt-eq tt-dim"> à</span>
+									<span class="tt-nw tt-dim"> ceux que nous avons livrés en 2024.</span>
+									<span class="tt-shortcut tt-dim">⌥2</span>
+								</li>
+							</ol>
+							<p class="tt-hint">Tab = accepter la correction ET la suite</p>
+							<p class="tt-info">Mistral 7B · Ollama · Avancé — ⏱ 0,34 s</p>
 						</div>
 						<p class="ai-punch">
 							Un seul <kbd>Tab</kbd> insère la correction <strong>et</strong> la suite : 80 caractères
@@ -169,53 +179,57 @@ FEATURES & RATIONALE:
 				</div>
 			</div>
 
-			<p class="ai-legend">
+			<figcaption class="ai-legend">
 				Code couleur réel du driver : <span class="lg-gray">contexte</span> ·
 				<span class="lg-green">correction</span>
 				· <span class="lg-orange">prédiction</span> ·
 				<span class="lg-yellow">✨ ligne active</span>.
 				{defaults.numPredictions} suggestions, déclenchées après {defaults.debounceMs} ms d’inactivité
 				sur les {defaults.contextLength} derniers caractères — tout est réglable.
-			</p>
-		</div>
+			</figcaption>
+		</figure>
 
 		<!-- Step 1 — local backends -->
-		<div class="ai-step" use:reveal>
+		<section class="ai-step" use:reveal>
 			<h3>
 				<span class="step-badge">1</span>
 				<span class="step-title">Choisissez votre moteur — local d’abord</span>
 			</h3>
-			<div class="backend-grid">
-				<article class="ep-card ep-card--hover backend-card">
-					<header>
-						<span class="backend-icon" aria-hidden="true">🦙</span>
-						<div>
-							<h4>Ollama</h4>
-							<p class="backend-aud">Windows · macOS · Linux</p>
-						</div>
-						<span class="backend-port">port {defaults.ollamaPort}</span>
-					</header>
-					<p>
-						Le plus simple à installer — le driver propose même de le faire pour vous. Catalogue de
-						modèles immense, serveur local en écoute uniquement sur votre machine.
-					</p>
-				</article>
+			<ul class="backend-grid">
+				<li>
+					<article class="ep-card ep-card--hover backend-card">
+						<header>
+							<span class="backend-icon" aria-hidden="true">🦙</span>
+							<hgroup>
+								<h4>Ollama</h4>
+								<p class="backend-aud">Windows · macOS · Linux</p>
+							</hgroup>
+							<span class="backend-port">port {defaults.ollamaPort}</span>
+						</header>
+						<p>
+							Le plus simple à installer — le driver propose même de le faire pour vous. Catalogue
+							de modèles immense, serveur local en écoute uniquement sur votre machine.
+						</p>
+					</article>
+				</li>
 
-				<article class="ep-card ep-card--hover backend-card">
-					<header>
-						<span class="backend-icon" aria-hidden="true">⚡</span>
-						<div>
-							<h4>MLX</h4>
-							<p class="backend-aud">macOS · Apple Silicon (M1 → M4)</p>
-						</div>
-						<span class="backend-port">port {defaults.mlxPort}</span>
-					</header>
-					<p>
-						Inférence accélérée par le GPU des puces Apple. Détecté et sélectionné automatiquement
-						sur les machines compatibles — réponses sous 100 ms sur les petits modèles.
-					</p>
-				</article>
-			</div>
+				<li>
+					<article class="ep-card ep-card--hover backend-card">
+						<header>
+							<span class="backend-icon" aria-hidden="true">⚡</span>
+							<hgroup>
+								<h4>MLX</h4>
+								<p class="backend-aud">macOS · Apple Silicon (M1 → M4)</p>
+							</hgroup>
+							<span class="backend-port">port {defaults.mlxPort}</span>
+						</header>
+						<p>
+							Inférence accélérée par le GPU des puces Apple. Détecté et sélectionné automatiquement
+							sur les machines compatibles — réponses sous 100 ms sur les petits modèles.
+						</p>
+					</article>
+				</li>
+			</ul>
 
 			<!-- Remote API providers — dynamic, from api_providers.json -->
 			<div class="api-band">
@@ -240,10 +254,10 @@ FEATURES & RATIONALE:
 					Liste générée depuis le fichier de configuration du driver — toujours à jour.
 				</p>
 			</div>
-		</div>
+		</section>
 
 		<!-- Step 2 — model catalog -->
-		<div class="ai-step" use:reveal>
+		<section class="ai-step" use:reveal>
 			<h3>
 				<span class="step-badge">2</span>
 				<span class="step-title"
@@ -258,20 +272,20 @@ FEATURES & RATIONALE:
 				Le menu affiche la RAM et l’espace disque requis avant tout téléchargement — et accepte n’importe
 				quel identifiant HuggingFace ou tag Ollama en plus.
 			</p>
-			<div class="provider-grid">
+			<ul class="provider-grid">
 				{#each catalog as p, i}
-					<article class="provider" use:reveal={{ delay: (i % 6) * 50 }}>
-						<div class="provider-name" lang="en">{p.name}</div>
-						<div class="provider-family" title={p.families}>{p.families}</div>
+					<li class="provider" use:reveal={{ delay: (i % 6) * 50 }}>
+						<p class="provider-name" lang="en">{p.name}</p>
+						<p class="provider-family" title={p.families}>{p.families}</p>
 						<div class="provider-meta">
 							<span class="provider-count">{p.modelCount} modèle{p.modelCount > 1 ? 's' : ''}</span>
 							{#if p.range}
 								<span class="provider-range">{p.range}</span>
 							{/if}
 						</div>
-					</article>
+					</li>
 				{/each}
-			</div>
+			</ul>
 			<div class="browser-embed">
 				<p class="step-lead">
 					Et voici la <strong>vraie fenêtre</strong> du navigateur de modèles, alimentée ici avec ce
@@ -287,32 +301,34 @@ FEATURES & RATIONALE:
 			<p class="api-note">
 				Catalogue généré depuis <code>models.json</code> — le même fichier que lit le driver.
 			</p>
-		</div>
+		</section>
 
 		<!-- Step 3 — prompt profiles -->
-		<div class="ai-step" use:reveal>
+		<section class="ai-step" use:reveal>
 			<h3>
 				<span class="step-badge">3</span>
 				<span class="step-title">Choisissez (ou écrivez) votre profil de prompt</span>
 			</h3>
-			<div class="profile-grid">
+			<ul class="profile-grid">
 				{#each profiles as p}
-					<article class="ep-card profile-card">
-						<header class="profile-head">
-							<span class="profile-label">{p.label}</span>
-							{#if p.batch}<span class="profile-batch">batch</span>{/if}
-						</header>
-						<p>{profileNotes[p.id] ?? ''}</p>
-					</article>
+					<li>
+						<article class="ep-card profile-card">
+							<header class="profile-head">
+								<span class="profile-label">{p.label}</span>
+								{#if p.batch}<span class="profile-batch">batch</span>{/if}
+							</header>
+							<p>{profileNotes[p.id] ?? ''}</p>
+						</article>
+					</li>
 				{/each}
-			</div>
+			</ul>
 			<p class="step-foot">
 				L’éditeur de prompts intégré accepte vos propres instructions avec les variables
 				<code>{'{context}'}</code>, <code>{'{min_words}'}</code>, <code>{'{max_words}'}</code> —
 				imposez un ton, une langue, un métier. <em>« Termine mes phrases comme Hemingway »</em> est un
 				profil valide.
 			</p>
-		</div>
+		</section>
 	</div>
 </section>
 
@@ -418,9 +434,17 @@ FEATURES & RATIONALE:
 		padding: 10px 0 0;
 	}
 
+	/* The suggestions are an ordered list: the reset gives back the tooltip's
+	 * own line height and alignment that the global list rules override. */
+	.tt-list {
+		text-align: inherit;
+	}
+
 	.tt-line {
 		display: block;
+		line-height: inherit;
 		padding: 4px 14px;
+		text-align: inherit;
 	}
 
 	.tt-line--selected {
@@ -465,7 +489,9 @@ FEATURES & RATIONALE:
 		border-top: 1px solid rgba(255, 255, 255, 0.08);
 		color: rgba(255, 255, 255, 0.7);
 		font-size: 0.72rem;
-		margin-top: 8px;
+		line-height: inherit;
+		margin: 8px 0 0;
+		max-width: none;
 		padding: 7px 14px;
 		text-align: center;
 	}
@@ -474,6 +500,9 @@ FEATURES & RATIONALE:
 		background: rgba(255, 255, 255, 0.04);
 		color: rgba(255, 255, 255, 0.7);
 		font-size: 0.7rem;
+		line-height: inherit;
+		margin: 0;
+		max-width: none;
 		padding: 6px 14px;
 		text-align: right;
 	}
@@ -506,8 +535,16 @@ FEATURES & RATIONALE:
 
 	/* ─── Steps ─────────────────────────────────────────────── */
 
+	/* Each step is a sub-section with its own heading; it cancels the page's
+	 * top-level section padding, positioning and chapter divider. */
 	.ai-step {
 		margin-bottom: clamp(36px, 5vw, 56px);
+		padding-block: 0;
+		position: static;
+	}
+
+	.ai .ai-step::before {
+		content: none;
 	}
 
 	/* Flex with the title wrapped in its own span: the badge and the whole
@@ -570,8 +607,19 @@ FEATURES & RATIONALE:
 		display: grid;
 		gap: 16px;
 		grid-template-columns: repeat(2, 1fr);
+		line-height: inherit;
 		margin: 0 auto;
 		max-width: 780px;
+		text-align: inherit;
+	}
+
+	/* A one-cell grid stretches the card to the row height, as when the
+	 * card itself was the grid item. */
+	.backend-grid > li,
+	.profile-grid > li {
+		display: grid;
+		line-height: inherit;
+		text-align: inherit;
 	}
 
 	.backend-card {
@@ -675,6 +723,9 @@ FEATURES & RATIONALE:
 		display: flex;
 		flex-wrap: wrap;
 		gap: 10px;
+		line-height: inherit;
+		list-style: none;
+		text-align: inherit;
 	}
 
 	.provider {
@@ -682,9 +733,11 @@ FEATURES & RATIONALE:
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
 		flex: 1 1 280px;
+		line-height: inherit;
 		max-width: 100%;
 		min-width: 0;
 		padding: 13px 15px;
+		text-align: inherit;
 		transition: border-color 0.25s var(--ease);
 	}
 
@@ -695,6 +748,10 @@ FEATURES & RATIONALE:
 	.provider-name {
 		font-size: 0.92rem;
 		font-weight: 700;
+		line-height: inherit;
+		margin: 0;
+		max-width: none;
+		text-align: inherit;
 	}
 
 	/* The families wrap instead of ending in an ellipsis: cut text is lost
@@ -702,8 +759,11 @@ FEATURES & RATIONALE:
 	.provider-family {
 		color: var(--ink-faint);
 		font-size: 0.76rem;
-		margin-top: 2px;
+		line-height: inherit;
+		margin: 2px 0 0;
+		max-width: none;
 		overflow-wrap: anywhere;
+		text-align: inherit;
 	}
 
 	.provider-meta {
@@ -729,6 +789,8 @@ FEATURES & RATIONALE:
 		display: grid;
 		gap: 12px;
 		grid-template-columns: repeat(2, 1fr);
+		line-height: inherit;
+		text-align: inherit;
 	}
 
 	.profile-card {

@@ -119,7 +119,7 @@ const PINNED_PASSAGES = Object.freeze([
 // Labels drawn from English data ({p.name}: the model catalog's provider
 // labels, « Other models » among them): the element itself says lang="en".
 const PINNED_ATTRIBUTES = Object.freeze([
-	['src/routes/ergopti-plus/AiSection.svelte', /<div class="provider-name" lang="en">\{p\.name\}/]
+	['src/routes/ergopti-plus/AiSection.svelte', /<p class="provider-name" lang="en">\{p\.name\}/]
 ]);
 
 /** A word list `word count` per line as a map of each word's share. */

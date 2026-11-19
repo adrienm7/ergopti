@@ -25,19 +25,21 @@ FEATURES & RATIONALE:
 
 <div class="chrome">
 	{#if ui.osStyle === 'macos'}
-		<span class="mac-dots">
+		<span class="mac-dots" aria-hidden="true">
 			<span class="dot dot-r"></span>
 			<span class="dot dot-y"></span>
 			<span class="dot dot-g"></span>
 		</span>
 		<span class="chrome-title">{title}</span>
-		{#if live}<span class="live-badge" lang="en">● live</span>{:else}<span class="chrome-spacer"
+		{#if live}<span class="live-badge" lang="en">● live</span>{:else}<span
+				class="chrome-spacer"
+				aria-hidden="true"
 			></span>{/if}
 	{:else if ui.osStyle === 'linux'}
-		<span class="chrome-spacer chrome-spacer--linux"></span>
+		<span class="chrome-spacer chrome-spacer--linux" aria-hidden="true"></span>
 		<span class="chrome-title">{title}</span>
 		{#if live}<span class="live-badge" lang="en">● live</span>{/if}
-		<span class="linux-controls">
+		<span class="linux-controls" aria-hidden="true">
 			<span class="linux-btn">─</span>
 			<span class="linux-btn">▢</span>
 			<span class="linux-btn">✕</span>
@@ -45,7 +47,7 @@ FEATURES & RATIONALE:
 	{:else}
 		<span class="chrome-title chrome-title--win">{title}</span>
 		{#if live}<span class="live-badge" lang="en">● live</span>{/if}
-		<span class="win-buttons">
+		<span class="win-buttons" aria-hidden="true">
 			<span class="win-btn">─</span>
 			<span class="win-btn">▢</span>
 			<span class="win-btn">✕</span>

@@ -61,7 +61,7 @@ competes with the final call-to-action. OS-aware, like the hero button.
 </script>
 
 <a class="sticky-cta" class:visible href={url} download={!!ui.release}>
-	<i class={icon}></i>
+	<i class={icon} aria-hidden="true"></i>
 	<span>{t('Télécharger')} — {label}</span>
 	{#if ui.release}<span class="scta-tag">{ui.release.tag}</span>{/if}
 </a>

@@ -57,17 +57,17 @@ under another configuration path.
 						<tr>
 							<th class="feat-col">{t('Fonctionnalité ou réglage')}</th>
 							<th>
-								<i class="icon-windows"></i>
+								<i class="icon-windows" aria-hidden="true"></i>
 								<span class="os-name">Windows</span>
 								<span class="os-driver">AutoHotkey v2</span>
 							</th>
 							<th>
-								<i class="icon-appleinc"></i>
+								<i class="icon-appleinc" aria-hidden="true"></i>
 								<span class="os-name">macOS</span>
 								<span class="os-driver">Hammerspoon</span>
 							</th>
 							<th>
-								<i class="icon-linux"></i>
+								<i class="icon-linux" aria-hidden="true"></i>
 								<span class="os-name">Linux</span>
 								<span class="os-driver">Lua · alpha</span>
 							</th>
@@ -139,17 +139,17 @@ under another configuration path.
 						<tr>
 							<th class="feat-col">{t('Action')}</th>
 							<th>
-								<i class="icon-windows"></i>
+								<i class="icon-windows" aria-hidden="true"></i>
 								<span class="os-name">Windows</span>
 								<span class="os-driver">AutoHotkey v2</span>
 							</th>
 							<th>
-								<i class="icon-appleinc"></i>
+								<i class="icon-appleinc" aria-hidden="true"></i>
 								<span class="os-name">macOS</span>
 								<span class="os-driver">Hammerspoon</span>
 							</th>
 							<th>
-								<i class="icon-linux"></i>
+								<i class="icon-linux" aria-hidden="true"></i>
 								<span class="os-name">Linux</span>
 								<span class="os-driver">Lua · alpha</span>
 							</th>
@@ -185,17 +185,17 @@ under another configuration path.
 						<tr>
 							<th class="feat-col">{t('Action')}</th>
 							<th>
-								<i class="icon-windows"></i>
+								<i class="icon-windows" aria-hidden="true"></i>
 								<span class="os-name">Windows</span>
 								<span class="os-driver">AutoHotkey v2</span>
 							</th>
 							<th>
-								<i class="icon-appleinc"></i>
+								<i class="icon-appleinc" aria-hidden="true"></i>
 								<span class="os-name">macOS</span>
 								<span class="os-driver">Hammerspoon</span>
 							</th>
 							<th>
-								<i class="icon-linux"></i>
+								<i class="icon-linux" aria-hidden="true"></i>
 								<span class="os-name">Linux</span>
 								<span class="os-driver">Lua · alpha</span>
 							</th>
@@ -231,17 +231,17 @@ under another configuration path.
 						<tr>
 							<th class="feat-col">{t('Option')}</th>
 							<th>
-								<i class="icon-windows"></i>
+								<i class="icon-windows" aria-hidden="true"></i>
 								<span class="os-name">Windows</span>
 								<span class="os-driver">AutoHotkey v2</span>
 							</th>
 							<th>
-								<i class="icon-appleinc"></i>
+								<i class="icon-appleinc" aria-hidden="true"></i>
 								<span class="os-name">macOS</span>
 								<span class="os-driver">Hammerspoon</span>
 							</th>
 							<th>
-								<i class="icon-linux"></i>
+								<i class="icon-linux" aria-hidden="true"></i>
 								<span class="os-name">Linux</span>
 								<span class="os-driver">Lua · alpha</span>
 							</th>
@@ -276,65 +276,73 @@ under another configuration path.
 
 		<!-- Per-OS bonuses (exclusive features that are not bundled apps); like the
 		     apps and the Linux call below, not translated yet: said French (WCAG 3.1.2). -->
-		<div class="bonus-grid" lang="fr">
-			<article class="ep-card bonus-card" use:reveal>
-				<h3><i class="icon-windows bonus-icon"></i> En bonus sur Windows</h3>
-				<ul class="bonus-list">
-					<li>
-						<strong>Ergopti sans installation.</strong> Le driver peut <em>émuler</em> la disposition
-						Ergopti par-dessus votre layout actuel — aucun installateur, aucun droit admin. Idéal au
-						bureau ou sur un poste verrouillé.
-					</li>
-					<li>
-						<strong>Le meilleur d’Ergopti, même en AZERTY ou Bépo.</strong> Sans changer de
-						disposition, profitez de la couche de symboles AltGr d’Ergopti et des
-						<em>chiffres en accès direct</em> — deux des plus gros gains de la disposition, disponibles
-						partout.
-					</li>
-				</ul>
-			</article>
+		<ul class="bonus-grid" lang="fr">
+			<li>
+				<article class="ep-card bonus-card" use:reveal>
+					<h3><i class="icon-windows bonus-icon" aria-hidden="true"></i> En bonus sur Windows</h3>
+					<ul class="bonus-list">
+						<li>
+							<strong>Ergopti sans installation.</strong> Le driver peut <em>émuler</em> la disposition
+							Ergopti par-dessus votre layout actuel — aucun installateur, aucun droit admin. Idéal au
+							bureau ou sur un poste verrouillé.
+						</li>
+						<li>
+							<strong>Le meilleur d’Ergopti, même en AZERTY ou Bépo.</strong> Sans changer de
+							disposition, profitez de la couche de symboles AltGr d’Ergopti et des
+							<em>chiffres en accès direct</em> — deux des plus gros gains de la disposition, disponibles
+							partout.
+						</li>
+					</ul>
+				</article>
+			</li>
 
-			<article class="ep-card bonus-card" use:reveal={{ delay: 90 }}>
-				<h3><i class="icon-appleinc bonus-icon"></i> En bonus sur macOS</h3>
-				<ul class="bonus-list">
-					<li>
-						<strong>Backend MLX (Apple Silicon).</strong> Inférence IA locale accélérée par la puce Apple
-						— des prédictions plus rapides, toujours sans passer par le cloud.
-					</li>
-					<li>
-						<strong>Moteur de gestes intégral.</strong> 36 emplacements de gestes trackpad et 3 axes
-						continus, là où Windows en propose 10.
-					</li>
-				</ul>
-			</article>
-		</div>
+			<li>
+				<article class="ep-card bonus-card" use:reveal={{ delay: 90 }}>
+					<h3><i class="icon-appleinc bonus-icon" aria-hidden="true"></i> En bonus sur macOS</h3>
+					<ul class="bonus-list">
+						<li>
+							<strong>Backend MLX (Apple Silicon).</strong> Inférence IA locale accélérée par la puce
+							Apple — des prédictions plus rapides, toujours sans passer par le cloud.
+						</li>
+						<li>
+							<strong>Moteur de gestes intégral.</strong> 36 emplacements de gestes trackpad et 3 axes
+							continus, là où Windows en propose 10.
+						</li>
+					</ul>
+				</article>
+			</li>
+		</ul>
 
 		<!-- macOS bundled apps — showcased with their real bundle icons -->
-		<div class="apps-showcase" lang="fr" use:reveal>
-			<h3 class="apps-title"><i class="icon-appleinc"></i> Applications macOS incluses</h3>
+		<section class="apps-showcase" lang="fr" use:reveal>
+			<h3 class="apps-title">
+				<i class="icon-appleinc" aria-hidden="true"></i> Applications macOS incluses
+			</h3>
 			<p class="apps-lead">
 				Des utilitaires signés Ergopti, livrés directement dans le driver macOS — rien de plus à
 				installer.
 			</p>
-			<div class="apps-grid">
+			<ul class="apps-grid">
 				{#each macosApps as app, i (app.id)}
-					<article class="ep-card app-card" use:reveal={{ delay: (i % 3) * 70 }}>
-						<div class="app-icon" aria-hidden="true">
-							{#if app.icon}{@html app.icon}{:else}<span class="app-monogram"
-									>{app.name.charAt(0)}</span
-								>{/if}
-						</div>
-						<div class="app-text">
-							<h4>{app.name}</h4>
-							<p>{app.description}</p>
-						</div>
-					</article>
+					<li>
+						<article class="ep-card app-card" use:reveal={{ delay: (i % 3) * 70 }}>
+							<div class="app-icon" aria-hidden="true">
+								{#if app.icon}{@html app.icon}{:else}<span class="app-monogram"
+										>{app.name.charAt(0)}</span
+									>{/if}
+							</div>
+							<div class="app-text">
+								<h4>{app.name}</h4>
+								<p>{app.description}</p>
+							</div>
+						</article>
+					</li>
 				{/each}
-			</div>
+			</ul>
 			<p class="apps-note">
 				Applications et descriptions extraites automatiquement des bundles embarqués dans le driver.
 			</p>
-		</div>
+		</section>
 
 		<aside class="linux-callout ep-card" lang="fr" use:reveal>
 			<h3>🐧 Vous utilisez Linux ? On vous cherche.</h3>
@@ -351,12 +359,12 @@ under another configuration path.
 		</aside>
 
 		<!-- Final CTA -->
-		<div class="cta-card" use:reveal>
+		<section class="cta-card" use:reveal>
 			<div class="cta-glow" aria-hidden="true"></div>
 			<h2 class="cta-title">{t('Vos doigts vous diront merci.')}</h2>
 			<p class="cta-sub" lang="fr">
 				Installez <ErgoptiPlus></ErgoptiPlus>, lancez-le, tapez <code>ct★</code> — et regardez
-				<span class="cta-demo">c’était</span> s’écrire tout seul. Le reste suivra.
+				<samp class="cta-demo">c’était</samp> s’écrire tout seul. Le reste suivra.
 			</p>
 			<div class="cta-buttons">
 				<a
@@ -364,21 +372,21 @@ under another configuration path.
 					href={urlWindows}
 					download={!!ui.release}
 				>
-					<i class="icon-windows"></i><span>Windows</span>
+					<i class="icon-windows" aria-hidden="true"></i><span>Windows</span>
 				</a>
 				<a
 					class={ui.osStyle === 'macos' ? 'btn btn-primary' : 'btn btn-secondary'}
 					href={urlMacos}
 					download={!!ui.release}
 				>
-					<i class="icon-appleinc"></i><span>macOS</span>
+					<i class="icon-appleinc" aria-hidden="true"></i><span>macOS</span>
 				</a>
 				<a
 					class={ui.osStyle === 'linux' ? 'btn btn-primary' : 'btn btn-secondary'}
 					href={urlLinux}
 					download={!!ui.release}
 				>
-					<i class="icon-linux"></i><span>Linux <small>(alpha)</small></span>
+					<i class="icon-linux" aria-hidden="true"></i><span>Linux <small>(alpha)</small></span>
 				</a>
 			</div>
 			<p class="cta-brew">
@@ -403,7 +411,7 @@ under another configuration path.
 					)}</a
 				>
 			</p>
-		</div>
+		</section>
 	</div>
 </section>
 
@@ -537,7 +545,18 @@ under another configuration path.
 		display: grid;
 		gap: 16px;
 		grid-template-columns: repeat(2, 1fr);
+		line-height: inherit;
 		margin-top: 26px;
+		text-align: inherit;
+	}
+
+	/* A one-cell grid stretches the card to the row height, as when the
+	 * card itself was the grid item. */
+	.bonus-grid > li,
+	.apps-grid > li {
+		display: grid;
+		line-height: inherit;
+		text-align: inherit;
 	}
 
 	.bonus-card h3 {
@@ -580,8 +599,17 @@ under another configuration path.
 
 	/* ─── macOS apps showcase ───────────────────────────────── */
 
+	/* A sub-section with its own heading: it cancels the page's top-level
+	 * section padding, positioning and chapter divider. */
 	.apps-showcase {
 		margin-top: 28px;
+		padding-block: 0;
+		position: static;
+	}
+
+	.platforms .apps-showcase::before,
+	.platforms .cta-card::before {
+		content: none;
 	}
 
 	.apps-title {
@@ -608,6 +636,8 @@ under another configuration path.
 		display: grid;
 		gap: 14px;
 		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+		line-height: inherit;
+		text-align: inherit;
 	}
 
 	.app-card {
