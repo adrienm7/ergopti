@@ -385,6 +385,96 @@ body {
 /* =============================== */
 /* =============================== */
 
+/* Text for screen readers only (the score chip's live region). */
+.le-sr-only {
+	clip-path: inset(50%);
+	height: 1px;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+/* The score chip: above the board, held just under the sticky toolbar while
+   the page scrolls, so an edit's effect shows beside the keys. */
+.le-score-chip {
+	align-self: flex-start;
+	max-width: 100%;
+	position: sticky;
+	top: calc(var(--le-toolbar-height, 0px) + 8px);
+	z-index: 2;
+}
+
+/* The editor prefix outranks the page's button rule (border, radius). */
+.layout-editor .le-score-open {
+	align-items: center;
+	background: var(--le-surface);
+	background-image: linear-gradient(var(--le-accent-soft), var(--le-accent-soft));
+	border: 1px solid var(--le-accent);
+	border-radius: 999px;
+	box-shadow: 0 2px 10px color-mix(in srgb, var(--le-text) 12%, transparent);
+	color: var(--le-text);
+	cursor: pointer;
+	display: flex;
+	flex-wrap: wrap;
+	font: inherit;
+	gap: 6px 14px;
+	max-width: 100%;
+	padding: 8px 18px;
+	text-align: left;
+}
+
+.le-score-label {
+	color: var(--le-sub);
+	font-size: 0.85em;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.le-score-value {
+	color: var(--le-accent);
+	font-size: 1.5em;
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	line-height: 1.1;
+}
+
+.le-score-rank {
+	color: var(--le-sub);
+}
+
+.le-score-change {
+	align-items: center;
+	border-radius: 999px;
+	display: inline-flex;
+	gap: 6px;
+	padding: 2px 10px;
+}
+
+.le-score-change:empty {
+	display: none;
+}
+
+.le-score-better {
+	background: color-mix(in srgb, var(--le-ok) 14%, transparent);
+	color: var(--le-ok);
+}
+
+.le-score-worse {
+	background: color-mix(in srgb, var(--le-danger) 14%, transparent);
+	color: var(--le-danger);
+}
+
+.le-score-same {
+	background: var(--le-surface-2);
+	color: var(--le-sub);
+}
+
+.le-score-mark {
+	font-size: 0.85em;
+}
+
 .le-workspace {
 	align-items: start;
 	display: grid;

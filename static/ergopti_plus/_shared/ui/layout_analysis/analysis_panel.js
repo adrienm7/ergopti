@@ -38,6 +38,10 @@
  *    costs (the engine's exact per-key parts, keyReport cost and keyScoreCost)
  *    with a tooltip naming its worst pairs or trigrams, and the editor colours
  *    its own keys from green to red.
+ * 9. Score chip: onResult listeners get each analysis's score, rank and
+ *    change since the last analysis of the same layout (null when nothing is
+ *    analysed), so the editor shows them beside the board; reveal() unfolds
+ *    the panel and brings it into view.
  * ==============================================================================
  */
 
@@ -204,8 +208,10 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		};
 		const sections = [];
 		const heatListeners = [];
+		const resultListeners = [];
 
 		const node = el('details', 'la-panel');
+		node.id = 'la-live-panel';
 		node.open = saved.open !== false;
 		const summary = el('summary', 'la-panel-title');
 		const corpusSelect = el('select');
@@ -444,6 +450,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 
 		function showError(text) {
 			tellHeat(null);
+			tellResult(null);
 			headline.textContent = text;
 			headline.className = 'la-panel-score la-panel-error';
 			incompleteNote.hidden = true;
@@ -457,6 +464,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		async function run() {
 			if (!state.doc || !node.open) return;
 			const mine = ++state.generation;
+			// The layout this run analyses: an update during its pauses belongs to the next run.
+			const lineage = state.lineage;
 			let layout;
 			try {
 				layout = layoutFromEditorDoc(state.doc);
@@ -516,12 +525,25 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				: '';
 			// Ranked among the Comparer's ticks while none is ticked: say so.
 			rankNote.hidden = !(state.rank === RANK_SELECTION && scores.length === 0);
-			const same =
-				state.previous &&
-				state.previous.lineage === state.lineage &&
-				state.previous.corpus === state.corpus &&
-				state.previous.keyboard === state.keyboard;
-			drawMetrics(result, same ? state.previous.metrics : null);
+			// What the change column compares with: the last analysis of another
+			// state of the same layout, on the same corpus, keyboard and settings.
+			// The same keys analysed again (a render, a rename, another key colour)
+			// keep the comparison they had instead of showing no change.
+			const context = JSON.stringify([state.corpus, state.keyboard, keyboardFormat(), settings]);
+			const keys = JSON.stringify([layout.rows, layout.dead, layout.command]);
+			const previous =
+				state.previous && state.previous.lineage === lineage && state.previous.context === context
+					? state.previous
+					: null;
+			const before = previous ? (previous.keys === keys ? previous.before : previous.now) : null;
+			drawMetrics(result, before ? before.metrics : null);
+			tellResult({
+				score: result.score.total,
+				rank,
+				count: scores.length + 1,
+				incomplete: result.incomplete,
+				change: before ? result.score.total - before.score : null
+			});
 			drawTyping(result, layout);
 			drawFingers(result);
 			drawAnalysers(layout, prepared, settings, mine);
@@ -532,10 +554,11 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				draw(box, { layout, tables: prepared, keyboard: state.keyboard, result });
 			}
 			state.previous = {
-				lineage: state.lineage,
-				corpus: state.corpus,
-				keyboard: state.keyboard,
-				metrics: result.metrics
+				lineage,
+				context,
+				keys,
+				now: { metrics: result.metrics, score: result.score.total },
+				before
 			};
 		}
 
@@ -690,6 +713,10 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			for (const listener of heatListeners) listener(heat);
 		}
 
+		function tellResult(result) {
+			for (const listener of resultListeners) listener(result);
+		}
+
 		/**
 		 * What « Key colours » shows for an analysis: each key's value (points
 		 * lost, % of the presses, or its part of the metric), the largest, and
@@ -787,8 +814,11 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		node.addEventListener('toggle', () => {
 			persist();
 			if (node.open) schedule();
-			// A folded panel analyses nothing: its colours would go stale.
-			else tellHeat(null);
+			// A folded panel analyses nothing: its colours and score would go stale.
+			else {
+				tellHeat(null);
+				tellResult(null);
+			}
 		});
 		document.addEventListener('i18n:applied', () => {
 			fillControls();
@@ -857,6 +887,25 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					throw new Error('layout_analysis: a heat listener is a function');
 				heatListeners.push(listener);
 			},
+			/**
+			 * Listens to the scores: listener(result) after each analysis, with
+			 * {score, rank, count, incomplete, change} (change: the score's change
+			 * since the last analysis of the same layout on the same corpus and
+			 * keyboard, null for a first one), or null when nothing is analysed
+			 * (folded, or the layout cannot be analysed).
+			 */
+			onResult(listener) {
+				if (typeof listener !== 'function')
+					throw new Error('layout_analysis: a result listener is a function');
+				resultListeners.push(listener);
+			},
+			/** Unfolds the panel, scrolls it into view and moves the focus to its title. */
+			reveal() {
+				if (!node.open) node.open = true;
+				const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+				node.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' });
+				summary.focus({ preventScroll: true });
+			},
 			addSection(draw) {
 				if (typeof draw !== 'function') throw new Error('layout_analysis: a section draws itself');
 				sections.push(draw);
@@ -865,5 +914,5 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		};
 	}
 
-	return { create, layoutFromEditorDoc, PANEL_METRICS };
+	return { create, layoutFromEditorDoc, PANEL_METRICS, DELTA_EPSILON };
 })();

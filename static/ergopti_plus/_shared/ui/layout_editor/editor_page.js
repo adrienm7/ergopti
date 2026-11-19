@@ -38,6 +38,9 @@
  * 7. Live key heatmap: the analysis panel's « Key colours » (onHeat) colours
  *    the board's own keys from green to red by what each costs, the tooltip
  *    naming its worst pairs; every edit re-analyses and recolours.
+ * 8. Score chip: above the board, sticky under the toolbar, the panel's score,
+ *    rank and the change of the last edit (onResult), announced politely; a
+ *    click unfolds the analysis and brings it into view.
  * ==============================================================================
  */
 
@@ -4185,6 +4188,7 @@ var LayoutEditorPage = (function () {
 				startPanel(),
 				messageBar(),
 				layerBar(),
+				analysisPanel ? scoreChip : null,
 				el('div', { class: 'le-workspace' }, [
 					el('div', { class: 'le-board-col' }, [board(), preview()]),
 					el('aside', { class: 'le-inspector-col' }, [inspector(), magnifier()]),
@@ -4197,6 +4201,7 @@ var LayoutEditorPage = (function () {
 			root.replaceChildren(...parts.filter(Boolean));
 			fitLegends();
 			applyHeat();
+			placeScoreChip();
 			root.dispatchEvent(new CustomEvent('layout-editor:rendered', { detail: { doc: doc() } }));
 			if (analysisPanel) analysisPanel.update(doc(), lineage());
 			scheduleAutosave();
@@ -4326,14 +4331,105 @@ var LayoutEditorPage = (function () {
 				if (width === lastWidth) return;
 				lastWidth = width;
 				fitLegends();
+				placeScoreChip();
 			}).observe(root);
 		}
 
 		// One persistent element for a host's side panel (the analysis of the Studio):
 		// re-inserted by every render, so what the host appends there survives.
 		const sideSlot = el('div', { class: 'le-side-slot', id: 'le-side-slot' });
+		// The score chip: persistent too, so its live region announces each new score.
+		const chipLabel = el('span', { class: 'le-score-label' });
+		const chipScore = el('span', { class: 'le-score-value' });
+		const chipRank = el('span', { class: 'le-score-rank' });
+		const chipChange = el('span', { class: 'le-score-change' });
+		const chipLive = el('span', {
+			class: 'le-sr-only',
+			id: 'le-score-live',
+			role: 'status',
+			'aria-live': 'polite'
+		});
+		const chipButton = el(
+			'button',
+			{
+				type: 'button',
+				class: 'le-score-open',
+				id: 'le-score-open',
+				'aria-controls': 'la-live-panel',
+				onclick: () => analysisPanel.reveal()
+			},
+			[chipLabel, chipScore, chipRank, chipChange]
+		);
+		const scoreChip = el('div', { class: 'le-score-chip', id: 'le-score-chip' }, [
+			chipButton,
+			chipLive
+		]);
+		// The last result shown, redrawn when the locale arrives.
+		let chipResult = null;
+
+		/**
+		 * Draws the chip for one analysis result (analysis_panel.js onResult), or
+		 * says that the analysis is folded or unavailable; the live region
+		 * announces the text when it changes.
+		 */
+		function drawScoreChip(result) {
+			chipResult = result;
+			chipLabel.textContent = t('layout_analysis.table.score');
+			const format = window.LAYOUT_ANALYSIS_INFO.format;
+			const words = [];
+			chipChange.className = 'le-score-change';
+			chipChange.replaceChildren();
+			if (!result) {
+				chipScore.textContent = '—';
+				chipRank.textContent = tl('score_chip.none');
+				words.push(tl('score_chip.none'));
+			} else {
+				chipScore.textContent = format(result.score, 1);
+				chipRank.textContent = tl('score_chip.rank', { rank: result.rank, count: result.count });
+				words.push(
+					t('layout_analysis.panel.score', {
+						score: format(result.score, 1),
+						rank: result.rank,
+						count: result.count
+					})
+				);
+				if (result.change !== null) {
+					const epsilon = window.LAYOUT_ANALYSIS_PANEL.DELTA_EPSILON;
+					const moved = Math.abs(result.change) >= epsilon;
+					// Better or worse with a mark and in words, never by its colour alone.
+					const verdict = !moved ? 'same' : result.change > 0 ? 'better' : 'worse';
+					const signed = `${result.change > 0 ? '+' : '−'}${format(Math.abs(result.change), 1)}`;
+					const text = moved
+						? tl('score_chip.change', { change: signed })
+						: tl('score_chip.unchanged');
+					const mark = { better: '▲', worse: '▼', same: '=' }[verdict];
+					const verdictWords = t(`layout_analysis.details.verdict_${verdict}`);
+					chipChange.classList.add(`le-score-${verdict}`);
+					chipChange.append(
+						el('span', { class: 'le-score-mark', 'aria-hidden': 'true', text: mark }),
+						el('span', { text: moved ? `${text} · ${verdictWords}` : text })
+					);
+					words.push(moved ? `${text} (${verdictWords})` : text);
+				}
+			}
+			const label = tl('score_chip.open');
+			chipButton.title = label;
+			chipButton.setAttribute('aria-label', `${words.join('. ')}. ${label}`);
+			const spoken = words.join('. ');
+			if (chipLive.textContent !== spoken) chipLive.textContent = spoken;
+		}
+
+		/** Keeps the chip just under the sticky toolbar, whose height follows its wrapping. */
+		function placeScoreChip() {
+			const bar = root.querySelector('.le-toolbar');
+			if (bar) root.style.setProperty('--le-toolbar-height', `${bar.offsetHeight}px`);
+		}
+
 		// The live analysis (layout_analysis/analysis_panel.js), when the page loads it.
 		if (analysisPanel) {
+			drawScoreChip(null);
+			analysisPanel.onResult(drawScoreChip);
+			document.addEventListener('i18n:applied', () => drawScoreChip(chipResult));
 			sideSlot.append(analysisPanel.node);
 			analysisPanel.onHeat((heat) => {
 				state.heat = heat;

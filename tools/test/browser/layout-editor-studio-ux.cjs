@@ -275,7 +275,87 @@ async function exerciseImportFormats(browser, origin) {
 	await context.close();
 }
 
+/**
+ * (score-chip) Above the board, a chip shows the score and rank, then the
+ * change of the last edit, better or worse in words and by a mark; its live
+ * region (one node across renders) announces each new score politely; it stays
+ * on screen while the page scrolls to the analysis, and a click unfolds and
+ * shows the analysis.
+ */
+async function exerciseScoreChip(browser, origin) {
+	const { page, errors, context } = await openOnErgopti(browser, origin);
+	await page.waitForFunction(
+		() => document.querySelector('#le-score-chip .le-score-value').textContent !== '—'
+	);
+	const chip = () =>
+		page.evaluate(() => ({
+			score: document.querySelector('#le-score-chip .le-score-value').textContent,
+			change: document.querySelector('#le-score-chip .le-score-change').textContent,
+			live: document.getElementById('le-score-live').textContent
+		}));
+	const first = await chip();
+	assert.match(first.score, /^\d+([.,]\d)?$/, `the chip shows the score: ${JSON.stringify(first)}`);
+	assert.equal(first.change, '', 'no change on the first analysis');
+	assert.match(first.live, /^Score .* · rank \d+ of \d+$/, `announced: ${first.live}`);
+	const live = await page.$eval('#le-score-live', (node) => [
+		node.getAttribute('role'),
+		node.getAttribute('aria-live')
+	]);
+	assert.deepEqual(live, ['status', 'polite']);
+	await page.evaluate(() => {
+		document.getElementById('le-score-live').dataset.kept = 'yes';
+	});
+	const sticky = await page.$eval('#le-score-chip', (node) => getComputedStyle(node).position);
+	assert.equal(sticky, 'sticky');
+	const chipBox = await page.$eval('#le-score-chip', (node) => node.getBoundingClientRect().bottom);
+	const boardBox = await page.$eval('#le-board', (node) => node.getBoundingClientRect().top);
+	assert.ok(chipBox <= boardBox, 'the chip sits above the board');
+	// A render or a rename analyses the same keys again: still no change.
+	await page.evaluate(() => window.layoutEditor.render());
+	await page.waitForTimeout(400);
+	assert.equal((await chip()).change, '', 'the same keys analysed again show no change');
+	await swap(page, 'KeyQ', 'KeyW');
+	await page.waitForFunction(
+		() => document.querySelector('#le-score-chip .le-score-change').textContent !== ''
+	);
+	const after = await chip();
+	// Another key colour analyses the swapped keys again: the swap's change stays.
+	await page.selectOption('#la-panel-heat', 'presses');
+	await page.waitForTimeout(400);
+	assert.equal((await chip()).change, after.change, 'a new key colour keeps the change shown');
+	assert.match(after.change, /^(▲|▼|=)/, `the change has its mark: ${JSON.stringify(after)}`);
+	assert.match(after.live, /since the last edit|unchanged by the last edit/, after.live);
+	const verdict = await page.$eval('#le-score-chip .le-score-change', (node) => node.className);
+	assert.match(verdict, /le-score-(better|worse|same)/);
+	assert.equal(
+		await page.$eval('#le-score-live', (node) => node.dataset.kept),
+		'yes',
+		'one live region across renders'
+	);
+	// Scrolled down to the analysis, the chip is still on screen.
+	await page.$eval('#la-live-panel', (node) => node.scrollIntoView({ block: 'end' }));
+	const top = await page.$eval('#le-score-chip', (node) => node.getBoundingClientRect().top);
+	assert.ok(top >= 0 && top < 200, `the chip stays in view: top ${top}`);
+	await page.evaluate(() => {
+		document.getElementById('la-live-panel').open = false;
+		window.scrollTo(0, 0);
+	});
+	await page.waitForFunction(
+		() => document.querySelector('#le-score-chip .le-score-value').textContent === '—'
+	);
+	await page.click('#le-score-open');
+	assert.equal(await page.$eval('#la-live-panel', (node) => node.open), true, 'a click unfolds it');
+	assert.equal(
+		await page.evaluate(() => document.activeElement.classList.contains('la-panel-title')),
+		true,
+		'and moves the focus to its title'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseScoreChip,
 	exerciseImportFormats,
 	exerciseHistoryShortcuts,
 	exerciseOneInfoPerRow,
