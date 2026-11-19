@@ -726,6 +726,15 @@ var LayoutEditorPage = (function () {
 		async function importTabs(input) {
 			const files = [...(input.files || [])];
 			input.value = '';
+			await importFiles(files);
+		}
+
+		/**
+		 * Opens each file in a new tab (« Import… », or files dropped on the
+		 * editor); a file that does not read is named, the others open.
+		 * @param {File[]} files
+		 */
+		async function importFiles(files) {
 			if (files.length === 0) return;
 			const entries = [];
 			const refused = [];
@@ -1011,8 +1020,181 @@ var LayoutEditorPage = (function () {
 					text: tl('tabs.import'),
 					onclick: () => importInput.click()
 				}),
+				el('button', {
+					type: 'button',
+					id: 'le-tabs-paste',
+					'aria-haspopup': 'dialog',
+					text: tl('tabs.paste'),
+					onclick: openPaste
+				}),
 				importInput
 			]);
+		}
+
+		// ===================================
+		// ======= 4b2/ Paste and drop =======
+		// ===================================
+
+		// The paste dialog lives outside the rendered tree, so a render (a
+		// message, an autosave) never takes the text being typed away.
+		let pasteDialog = null;
+
+		/** The paste dialog, made once: a field, what it recognises, open and cancel. */
+		function pasteBox() {
+			if (pasteDialog) return pasteDialog;
+			const field = el('textarea', {
+				id: 'le-paste-text',
+				class: 'le-paste-text',
+				rows: '8',
+				spellcheck: 'false',
+				'aria-describedby': 'le-paste-detected le-paste-help'
+			});
+			const detected = el('p', {
+				id: 'le-paste-detected',
+				class: 'le-paste-detected',
+				'aria-live': 'polite'
+			});
+			const submit = el('button', {
+				type: 'button',
+				id: 'le-paste-open',
+				class: 'le-primary',
+				text: tl('tabs.paste_open'),
+				onclick: () => {
+					if (openPasted(field.value)) pasteDialog.close();
+				}
+			});
+			const refusal = el('p', {
+				id: 'le-paste-refusal',
+				class: 'le-paste-refusal',
+				role: 'alert',
+				hidden: true
+			});
+			field.addEventListener('input', () => showPasteFormat(field, detected, submit, refusal));
+			pasteDialog = el(
+				'dialog',
+				{ id: 'le-paste-dialog', class: 'le-paste-dialog', 'aria-labelledby': 'le-paste-title' },
+				[
+					el('h2', { id: 'le-paste-title', text: tl('tabs.paste').replace(/…$/, '') }),
+					el('p', {
+						id: 'le-paste-help',
+						class: 'le-paste-help',
+						text: t('layout_analysis.add.help')
+					}),
+					el('label', { for: 'le-paste-text', text: t('layout_analysis.add.paste_label') }),
+					field,
+					detected,
+					refusal,
+					el('div', { class: 'le-paste-actions' }, [
+						el('button', {
+							type: 'button',
+							id: 'le-paste-cancel',
+							text: tl('btn.cancel'),
+							onclick: () => pasteDialog.close()
+						}),
+						submit
+					])
+				]
+			);
+			document.body.append(pasteDialog);
+			return pasteDialog;
+		}
+
+		/** « Paste a layout… »: the dialog, emptied, its field focused. */
+		function openPaste() {
+			const dialog = pasteBox();
+			const field = dialog.querySelector('#le-paste-text');
+			field.value = '';
+			showPasteFormat(
+				field,
+				dialog.querySelector('#le-paste-detected'),
+				dialog.querySelector('#le-paste-open'),
+				dialog.querySelector('#le-paste-refusal')
+			);
+			dialog.showModal();
+			field.focus();
+		}
+
+		/** Live under the field: the format recognised (an Ergopti source too), or none yet. */
+		function showPasteFormat(field, detected, submit, refusal) {
+			const text = field.value;
+			const format = text.trim() === '' ? null : LAYOUT_FORMATS.detect(text);
+			detected.className = `le-paste-detected ${format ? 'ok' : text.trim() ? 'none' : ''}`;
+			detected.textContent =
+				text.trim() === ''
+					? ''
+					: format
+						? `✓ ${t('layout_analysis.formats.detected', { format: t(LAYOUT_FORMATS.formatNameKey(format)) })}`
+						: t('layout_analysis.formats.not_detected');
+			submit.disabled = !format;
+			refusal.hidden = true;
+		}
+
+		/**
+		 * Reads a pasted (or dropped) text into a new tab: an Ergopti source or a
+		 * .keylayout through « Open… »'s own path, any other format through the
+		 * Comparer's readers by its content. A refusal stays in the dialog, the
+		 * text kept, so it can be fixed where the message points.
+		 * @param {string} text
+		 * @returns {boolean} Whether a tab opened.
+		 */
+		function openPasted(text) {
+			const format = LAYOUT_FORMATS.detect(text);
+			let read;
+			try {
+				if (format === 'ergopti') read = readDocument('pasted.toml', text);
+				else if (format === 'keylayout') read = readDocument('pasted.keylayout', text);
+				else read = readForeign('', text, null, true);
+			} catch (error) {
+				const refusal = pasteBox().querySelector('#le-paste-refusal');
+				refusal.textContent = refusalText(error);
+				refusal.hidden = false;
+				if (!pasteDialog.open) notify('error', refusalText(error));
+				return false;
+			}
+			commitFocused();
+			keepActive();
+			state.tabs.push(newTab(read.doc, false));
+			showTab(state.tabs.length - 1);
+			notify('ok', read.notice);
+			return true;
+		}
+
+		/**
+		 * Files dropped anywhere on the editor open in new tabs, as « Import… »
+		 * opens them; a dropped text (a link, a selection) reads as a paste.
+		 * Bound once on the root, which every render keeps.
+		 */
+		function wireDrop() {
+			const carries = (event) =>
+				event.dataTransfer &&
+				Array.from(event.dataTransfer.types || []).some((type) =>
+					['Files', 'text/plain', 'text/uri-list'].includes(type)
+				);
+			// A drag over a text field drops its text there, as the browser does.
+			const intoField = (event) => event.target.closest && event.target.closest('textarea, input');
+			root.addEventListener('dragover', (event) => {
+				if (!carries(event) || intoField(event)) return;
+				event.preventDefault();
+				event.dataTransfer.dropEffect = 'copy';
+				root.classList.add('le-drop-active');
+				root.dataset.dropHint = tl('tabs.drop');
+			});
+			root.addEventListener('dragleave', (event) => {
+				if (!root.contains(event.relatedTarget)) root.classList.remove('le-drop-active');
+			});
+			root.addEventListener('drop', (event) => {
+				if (!carries(event) || intoField(event)) return;
+				event.preventDefault();
+				root.classList.remove('le-drop-active');
+				const files = Array.from(event.dataTransfer.files || []);
+				if (files.length > 0) {
+					importFiles(files);
+					return;
+				}
+				const text =
+					event.dataTransfer.getData('text/plain') || event.dataTransfer.getData('text/uri-list');
+				if (text) openPasted(text);
+			});
 		}
 
 		// ============================
@@ -1073,7 +1255,7 @@ var LayoutEditorPage = (function () {
 		 * Comparer's readers (layout_formats.js) give each key's characters and
 		 * dead keys, toSource the source; what they could not read is listed.
 		 */
-		function readForeign(name, text, bytes) {
+		function readForeign(name, text, bytes, pasted) {
 			let result;
 			let started;
 			const tools = {
@@ -1085,9 +1267,12 @@ var LayoutEditorPage = (function () {
 				convention: state.importConvention
 			};
 			try {
-				result = bytes
-					? LAYOUT_FORMATS.readBytes(name, bytes, tools)
-					: LAYOUT_FORMATS.read(name, text, tools);
+				// A pasted text has no name: its content says its format.
+				result = pasted
+					? LAYOUT_FORMATS.readText(text, tools)
+					: bytes
+						? LAYOUT_FORMATS.readBytes(name, bytes, tools)
+						: LAYOUT_FORMATS.read(name, text, tools);
 				const base = name.replace(/\.[^.]+$/, '');
 				started = LayoutSourceIO.startFromDocument(
 					LAYOUT_FORMATS.toSource(result.layout),
@@ -1099,14 +1284,17 @@ var LayoutEditorPage = (function () {
 				const refusal = LAYOUT_FORMATS.refusalMessage(error);
 				throw worded(t(refusal.key, refusal.values));
 			}
+			// What the reader recognised, in the page's language; a paste is named by its layout.
+			const format = t(LAYOUT_FORMATS.formatNameKey(result.format));
+			const shown = name || result.layout.name;
 			return {
 				doc: started.doc,
 				notice:
 					result.unmapped.length === 0
-						? tl('status.imported_format', { name, format: result.format })
+						? tl('status.imported_format', { name: shown, format })
 						: tl('status.imported_partial', {
-								name,
-								format: result.format,
+								name: shown,
+								format,
 								count: result.unmapped.length,
 								list: lossList(result.unmapped)
 							})
@@ -4550,6 +4738,7 @@ var LayoutEditorPage = (function () {
 			runHistory(action);
 		});
 
+		wireDrop();
 		const initialSettled = openInitial();
 		render();
 		if (host.startNav) showNav(host.startNav);

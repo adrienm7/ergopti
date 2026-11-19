@@ -479,12 +479,28 @@
 		<button id="la-clear" type="button" data-i18n="layout_analysis.layouts.clear"></button>
 		<button id="la-all" type="button" data-i18n="layout_analysis.layouts.all"></button>
 		<button id="la-none" type="button" data-i18n="layout_analysis.layouts.none"></button>
-		<label class="la-file">
-			<span class="la-file-button" data-i18n="layout_analysis.layouts.import"></span>
-			<input id="la-import" type="file" />
-		</label>
 	</div>
-	<p id="la-import-report" class="la-muted" hidden></p>
+	<section id="la-add" class="la-add" aria-labelledby="la-add-title">
+		<h3 id="la-add-title" class="la-add-title" data-i18n="layout_analysis.add.title"></h3>
+		<p class="la-muted" data-i18n="layout_analysis.add.help"></p>
+		<div id="la-drop" class="la-drop">
+			<svg class="la-drop-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+				<path d="M12 3v12m0 0-5-5m5 5 5-5M4 17v3h16v-3" />
+			</svg>
+			<span data-i18n="layout_analysis.add.drop"></span>
+			<label class="la-file">
+				<span class="la-file-button" data-i18n="layout_analysis.add.file"></span>
+				<input id="la-import" type="file" />
+			</label>
+		</div>
+		<label class="la-paste-label" for="la-paste" data-i18n="layout_analysis.add.paste_label"></label>
+		<textarea id="la-paste" class="la-paste" rows="4" spellcheck="false" aria-describedby="la-paste-detected"></textarea>
+		<div class="la-paste-actions">
+			<p id="la-paste-detected" class="la-detected" aria-live="polite"></p>
+			<button id="la-paste-add" type="button" data-i18n="layout_analysis.add.paste_button"></button>
+		</div>
+	</section>
+	<p id="la-import-report" class="la-import-report" role="status" hidden></p>
 	<nav id="la-letters" class="la-letters"></nav>
 	<div id="la-layout-list" class="la-layout-list"></div>
 	</details>
@@ -4598,22 +4614,85 @@
 			return unmapped.length > 8 ? `${words.join(', ')}…` : words.join(', ');
 		}
 
+		/** What the layout readers need from the page (layout_formats.js). */
+		function readerTools() {
+			return {
+				parseToml: window.exports && window.exports.parse,
+				scancodes: DATA.scancodes,
+				composer: window.LayoutComposer,
+				// A top-level const of composer_data.js: a page global, not a window property.
+				table: LAYOUT_COMPOSER_DATA,
+				analysis: E
+			};
+		}
+
+		/** A format's name in the page's language (what the readers recognised). */
+		function formatName(format) {
+			return t(window.LAYOUT_FORMATS.formatNameKey(format));
+		}
+
 		/** Reads a layout file into the comparison, and says what could not be read. */
 		async function importLayout(file) {
-			const report = $('la-import-report');
-			report.hidden = false;
+			let result;
 			try {
 				const bytes = new Uint8Array(await file.arrayBuffer());
-				const result = window.LAYOUT_FORMATS.readBytes(file.name, bytes, {
-					parseToml: window.exports && window.exports.parse,
-					scancodes: DATA.scancodes,
-					composer: window.LayoutComposer,
-					// A top-level const of composer_data.js: a page global, not a window property.
-					table: LAYOUT_COMPOSER_DATA,
-					analysis: E
-				});
+				result = window.LAYOUT_FORMATS.readBytes(file.name, bytes, readerTools());
+			} catch (error) {
+				refuseImport(error);
+				return;
+			}
+			await addRead(result, file.name);
+		}
+
+		/**
+		 * Reads the pasted text (or a dropped one) into the comparison by its
+		 * content; the text stays in its field when it is refused, to be fixed.
+		 */
+		async function importPasted(text) {
+			let result;
+			try {
+				result = window.LAYOUT_FORMATS.readText(text, readerTools());
+			} catch (error) {
+				refuseImport(error);
+				return false;
+			}
+			await addRead(result, formatName(result.format));
+			return true;
+		}
+
+		/** Says why a file or a text was not added: where it is wrong, and how to fix it. */
+		function refuseImport(error) {
+			const report = $('la-import-report');
+			report.hidden = false;
+			report.className = 'la-import-report la-error';
+			const refusal = window.LAYOUT_FORMATS.refusalMessage(error);
+			report.textContent = t(refusal.key, refusal.values);
+		}
+
+		/** Live under the paste field: the format the text is in, or that none is recognised yet. */
+		function showDetected() {
+			const text = $('la-paste').value;
+			const node = $('la-paste-detected');
+			const format = text.trim() === '' ? null : window.LAYOUT_FORMATS.detect(text);
+			node.classList.toggle('la-detected-yes', Boolean(format));
+			node.classList.toggle('la-detected-no', !format && text.trim() !== '');
+			node.textContent =
+				text.trim() === ''
+					? ''
+					: format
+						? `✓ ${t('layout_analysis.formats.detected', { format: formatName(format) })}`
+						: t('layout_analysis.formats.not_detected');
+			$('la-paste-add').disabled = !format;
+		}
+
+		/** Adds a read layout to the comparison and the user's own layouts, and says what was read. */
+		async function addRead(result, sourceName) {
+			const report = $('la-import-report');
+			report.hidden = false;
+			report.className = 'la-import-report la-ok';
+			try {
 				const layout = E.layoutFromRows(
-					Object.assign({}, result.layout, { origin: 'user', source: file.name })
+					Object.assign({}, result.layout, { origin: 'user', source: sourceName })
 				);
 				let id = `user_${layout.id}`;
 				for (let n = 2; byId.has(id); n++) id = `user_${layout.id}_${n}`;
@@ -4623,12 +4702,13 @@
 				if (HOST.store) await HOST.store.save(layout);
 				else imported.push(layout);
 				state.selected.add(id);
+				const format = formatName(result.format);
 				report.textContent =
 					result.unmapped.length === 0
-						? t('layout_analysis.layouts.imported', { name: layout.name, format: result.format })
+						? t('layout_analysis.layouts.imported', { name: layout.name, format })
 						: t('layout_analysis.layouts.import_partial', {
 								name: layout.name,
-								format: result.format,
+								format,
 								count: result.unmapped.length,
 								list: lossList(result.unmapped)
 							});
@@ -4636,9 +4716,60 @@
 				fillLayouts();
 				analyse();
 			} catch (error) {
-				const refusal = window.LAYOUT_FORMATS.refusalMessage(error);
-				report.textContent = t(refusal.key, refusal.values);
+				refuseImport(error);
 			}
+		}
+
+		/**
+		 * The « Add a layout » card: a file chosen or dropped on the layouts
+		 * card, or a text pasted (or dropped) and read by its content.
+		 */
+		function wireAdd() {
+			// The file types every layout reader opens (layout_formats.js).
+			$('la-import').accept = window.LAYOUT_FORMATS.EXTENSIONS.map((ext) => `.${ext}`).join(',');
+			$('la-import').addEventListener('change', (event) => {
+				const file = event.target.files && event.target.files[0];
+				if (file) importLayout(file);
+				event.target.value = '';
+			});
+			$('la-paste').addEventListener('input', showDetected);
+			$('la-paste-add').addEventListener('click', async () => {
+				if (await importPasted($('la-paste').value)) {
+					$('la-paste').value = '';
+					showDetected();
+				}
+			});
+			showDetected();
+			const card = root.querySelector('.la-layouts');
+			const carries = (event) =>
+				event.dataTransfer &&
+				Array.from(event.dataTransfer.types || []).some((type) =>
+					['Files', 'text/plain', 'text/uri-list'].includes(type)
+				);
+			card.addEventListener('dragover', (event) => {
+				if (!carries(event)) return;
+				event.preventDefault();
+				event.dataTransfer.dropEffect = 'copy';
+				// The list opens, so the drop lands where its result shows.
+				$('la-layouts-box').open = true;
+				$('la-drop').classList.add('la-drop-active');
+			});
+			card.addEventListener('dragleave', (event) => {
+				if (!card.contains(event.relatedTarget)) $('la-drop').classList.remove('la-drop-active');
+			});
+			card.addEventListener('drop', async (event) => {
+				if (!carries(event)) return;
+				event.preventDefault();
+				$('la-drop').classList.remove('la-drop-active');
+				const files = Array.from(event.dataTransfer.files || []);
+				if (files.length > 0) {
+					for (const file of files) await importLayout(file);
+					return;
+				}
+				const text =
+					event.dataTransfer.getData('text/plain') || event.dataTransfer.getData('text/uri-list');
+				if (text) importPasted(text);
+			});
 		}
 
 		function visibleLayoutIds() {
@@ -4721,13 +4852,7 @@
 				}
 			});
 			$('la-filter').addEventListener('input', fillLayouts);
-			// The file types every layout reader opens (layout_formats.js).
-			$('la-import').accept = window.LAYOUT_FORMATS.EXTENSIONS.map((ext) => `.${ext}`).join(',');
-			$('la-import').addEventListener('change', (event) => {
-				const file = event.target.files && event.target.files[0];
-				if (file) importLayout(file);
-				event.target.value = '';
-			});
+			wireAdd();
 			$('la-heat-metric').addEventListener('change', (event) => {
 				state.heat = event.target.value;
 				save();

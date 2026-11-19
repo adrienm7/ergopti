@@ -49,6 +49,13 @@
  *    same keys, the losses named.
  * 10. Malformed files (hand-made, and real ones cut short or overwritten from
  *    a fixed seed) are refused with a stable code, never a crash.
+ * 10b. Pasted text (paste-import): a cyanophage link or string reads to its
+ *    keys (Shift on the thumb, a thumb letter named), a line of 30 characters
+ *    is three rows, Oxeylyzer's .kb is rows; every third-party file pasted
+ *    is detected and reads as its file does; a broken JSON or TOML is
+ *    refused at its line, a character on two keys with both places, a
+ *    cyanophage string by its length, an unknown text as unrecognised; each
+ *    format has a name in every locale.
  * 11. Every refusal and loss has words in all 21 locales; the app's native
  *    open panel offers the pages' file types; the editor's interoperability
  *    downloads have words and a file type the hosts write; a UTF-16 KLC
@@ -1076,7 +1083,11 @@ const REFUSAL_CODES = new Set([
 	'format_unknown',
 	'format_invalid',
 	'format_unsupported_board',
-	'format_kbe_encrypted'
+	'format_kbe_encrypted',
+	'format_syntax',
+	'format_duplicate',
+	'format_length',
+	'format_unrecognised'
 ]);
 const readTools = Object.assign({ parseToml, scancodes: DATA.scancodes }, keylayoutTools);
 const crashes = [];
@@ -1161,6 +1172,115 @@ check(crashes.length === 0, `readers crash instead of refusing:\n    ${crashes.j
 const empty = thrown(() => F.read('a.txt', '\n\n', readTools));
 check(empty && empty.code === 'format_invalid', 'a file that places no character is imported');
 
+// =======================================================
+// ======= 10b/ Pasted text, cyanophage, strict refusals ===
+// =======================================================
+
+// cyanophage's own QWERTY link (its default board, keyboard_svg.js): the three
+// rows of 11, then « ^ », the Shift on the thumb.
+const CYANO_QWERTY =
+	'https://cyanophage.github.io/playground.html?layout=qwertyuiop-asdfghjkl%3B%27zxcvbnm%2C.%2F%5C%5E&mode=ergo&lan=english&thumb=l';
+const cyano = F.fromCyanophage(CYANO_QWERTY);
+check(
+	cyano.format === 'cyanophage' &&
+		cyano.layout.rows.KeyQ[0] === 'q' &&
+		cyano.layout.rows.KeyQ[1] === 'Q' &&
+		cyano.layout.rows.BracketLeft[0] === '-' &&
+		cyano.layout.rows.Quote[0] === "'" &&
+		cyano.layout.rows.IntlBackslash[0] === '\\' &&
+		cyano.layout.rows.Slash[0] === '/' &&
+		cyano.unmapped.length === 0,
+	`cyanophage link: ${JSON.stringify(cyano.layout.rows.KeyQ)} ${JSON.stringify(cyano.unmapped)}`
+);
+// A letter on its thumb has no key here: named, not dropped in silence.
+const cyanoThumb = F.fromCyanophage("qwrtyuiop[-asdfghjkl;'zxcvbnm,./\\e");
+check(
+	cyanoThumb.unmapped.some((u) => u.what === 'key' && u.detail === '34 (e)'),
+	`cyanophage thumb letter: ${JSON.stringify(cyanoThumb.unmapped)}`
+);
+const cyanoTen = F.readText('qwertyuiopasdfghjkl;zxcvbnm,./', readTools);
+check(
+	cyanoTen.format === 'rows' &&
+		cyanoTen.layout.rows.KeyA[0] === 'a' &&
+		cyanoTen.layout.rows.Semicolon[0] === ';' &&
+		cyanoTen.layout.rows.Slash[0] === '/',
+	`a line of 30 characters reads as three rows: ${cyanoTen.format}`
+);
+const shortCyano = thrown(() => F.readText('?layout=qwerty', readTools));
+check(
+	shortCyano &&
+		shortCyano.code === 'format_length' &&
+		F.refusalMessage(shortCyano).values.count === 6,
+	`a cut cyanophage string is refused by its length: ${shortCyano && shortCyano.message}`
+);
+const twice = thrown(() => F.readText('qwertyuiop\nasdfghjkla\nzxcvbnm,./', readTools));
+const twiceValues = twice && F.refusalMessage(twice).values;
+check(
+	twice &&
+		twice.code === 'format_duplicate' &&
+		twiceValues.char === 'a' &&
+		twiceValues.row1 === 2 &&
+		twiceValues.column1 === 1 &&
+		twiceValues.row2 === 2 &&
+		twiceValues.column2 === 10,
+	`a character on two keys is refused with both places: ${twice && twice.message}`
+);
+const badJson = thrown(() =>
+	F.readText('{\n  "keyboardType": "european",\n  "keys": [,]\n}', readTools)
+);
+const badJsonValues = badJson && F.refusalMessage(badJson).values;
+check(
+	badJson &&
+		badJson.code === 'format_syntax' &&
+		badJsonValues.line === 3 &&
+		badJsonValues.format === 'JSON',
+	`a broken JSON is refused at its line: ${badJson && JSON.stringify(badJsonValues)}`
+);
+const badToml = thrown(() => F.read('x.toml', 'name = "x"\nbase = """\nab\n', readTools));
+check(
+	badToml && badToml.code === 'format_syntax' && F.refusalMessage(badToml).values.format === 'TOML',
+	`a broken TOML is refused with its line: ${badToml && badToml.message}`
+);
+const unknownPaste = thrown(() => F.readText('hello there\n'.repeat(9), readTools));
+check(
+	unknownPaste && unknownPaste.code === 'format_unrecognised',
+	`an unknown paste: ${unknownPaste && unknownPaste.message}`
+);
+// Oxeylyzer's legacy .kb: rows, by its extension.
+const kb = F.read(
+	'semimak.kb',
+	'f l h v z q w u o y\ns r n t k c d e a i\nx j b m g p , . ; /\n',
+	readTools
+);
+check(kb.format === 'rows' && kb.layout.rows.KeyQ[0] === 'f', `a .kb file: ${kb.format}`);
+// Every third-party file pasted as text is detected and reads as its file does.
+let pastedFiles = 0;
+for (const name of fs.readdirSync(THIRD_PARTY).filter((file) => !/\.(md|txt)$/.test(file))) {
+	const text = F.decode(new Uint8Array(fs.readFileSync(path.join(THIRD_PARTY, name))));
+	const format = F.detect(text);
+	const fileRefusal = thrown(() => F.read(name, text, readTools));
+	if (fileRefusal) {
+		// A file its reader refuses (libdof's buggy example) is refused pasted, the same way.
+		const pasteRefusal = thrown(() => F.readText(text, readTools));
+		check(
+			pasteRefusal && pasteRefusal.code === fileRefusal.code,
+			`${name} pasted is not refused as its file (${fileRefusal.code})`
+		);
+		pastedFiles++;
+		continue;
+	}
+	const fromFile = F.read(name, text, readTools);
+	const pasted = F.readText(text, readTools);
+	check(
+		pasted.format === fromFile.format && same(pasted.layout.rows, fromFile.layout.rows),
+		`${name} pasted reads as ${pasted.format} (${format}), its file as ${fromFile.format}`
+	);
+	pastedFiles++;
+}
+check(pastedFiles >= 14, `only ${pastedFiles} third-party files pasted`);
+check(F.detect(CYANO_QWERTY) === 'cyanophage', 'a cyanophage link is not detected');
+check(F.detect('') === null && F.detect('just words') === null, 'an empty text is detected');
+
 // =================================================
 // ======= 11/ Messages, pickers and decoding ======
 // =================================================
@@ -1187,6 +1307,10 @@ for (const code of REFUSAL_CODES) {
 	for (const [file, strings] of catalogues)
 		check(typeof strings[key] === 'string', `${file}: ${key}`);
 }
+// Each detected format has a name in every locale (the pages say what they recognised).
+for (const format of F.FORMAT_NAMES)
+	for (const [file, strings] of catalogues)
+		check(typeof strings[F.formatNameKey(format)] === 'string', `${file}: name of ${format}`);
 const other = F.refusalMessage(new Error('disk full'));
 check(
 	other.key === 'layout_analysis.layouts.import_failed' && other.values.reason === 'disk full',

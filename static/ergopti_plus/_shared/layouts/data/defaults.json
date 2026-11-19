@@ -55,7 +55,8 @@
 			"xkb_symbols",
 			"yaml",
 			"dof",
-			"txt"
+			"txt",
+			"kb"
 		],
 		"max_export_suffix": 99,
 		"max_export_step_bytes": 16777216,

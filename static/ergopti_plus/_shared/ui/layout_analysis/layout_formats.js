@@ -21,7 +21,13 @@
  *    layouts, cmini JSON and plain rows of characters. A macOS .keylayout
  *    goes through the layout composer's reader, which the editor already
  *    loads. A KbdEdit .kbe is recognised and refused: its body is encrypted
- *    (KBE_SIGNATURE).
+ *    (KBE_SIGNATURE). A cyanophage playground link or string, and
+ *    Oxeylyzer's legacy .kb rows, are read too.
+ * 1b. Pasted or dropped text: detect names the format from the content
+ *    alone, readText reads it with that format's reader. Every refusal is
+ *    strict and says where: a JSON or TOML error by line and column, a
+ *    character on two keys by both places, a cyanophage string of the wrong
+ *    length by its count.
  * 2. Dead keys of the standard accents compose by Unicode normalisation (the
  *    accent's combining mark after the letter, NFC), the same table XKB's
  *    Compose and Kalamine's built-in dead keys hold for those accents; any
@@ -76,7 +82,9 @@ var LAYOUT_FORMATS = (function () {
 		'xkb_symbols',
 		'yaml',
 		'dof',
-		'txt'
+		'txt',
+		// Oxeylyzer's legacy layout files: three rows of keys, as plain text.
+		'kb'
 	];
 	// The refusals and losses a page words in the user's language
 	// (layout_analysis.formats.refused.* and .loss.* in every locale).
@@ -85,12 +93,50 @@ var LAYOUT_FORMATS = (function () {
 		'format_invalid',
 		'format_unsupported_board',
 		'format_kbe_encrypted',
+		// The strict reading of a file or a pasted text: where it is wrong, and how to fix it.
+		'format_syntax',
+		'format_duplicate',
+		'format_length',
+		'format_unrecognised',
 		'link_version',
 		'link_damaged',
 		'link_too_large',
 		'link_invalid',
 		'link_unsupported'
 	];
+	// The formats a reader names in its result, each worded in every locale
+	// (layout_analysis.formats.name.<format>): what the Studio says it detected.
+	const FORMAT_NAMES = [
+		'kla',
+		'kalamine_json',
+		'kalamine_toml',
+		'xkb',
+		'klc',
+		'keylayout',
+		'dof',
+		'genkey',
+		'cmini',
+		'rows',
+		'cyanophage',
+		// Recognised to be named, not read here: a KbdEdit export is refused
+		// (encrypted), an Ergopti source is the editor's own (LayoutSourceIO).
+		'kbe',
+		'ergopti'
+	];
+	// A cyanophage playground layout (its keyboard_svg.js, importLayout and
+	// exportLayout): its « layout » parameter holds 34 characters, three rows of
+	// 11 then the thumb key. Index 10 is the top row's 11th key, 21 the home
+	// row's, 32 the bottom row's key left of Z (row 2, column 0 of its rcdata),
+	// 33 the left thumb, 34 (a 35-character string) a key of its own boards
+	// with no place here. « ^ » marks the Shift key, which types no character,
+	// and « $ » stands for « = ». A 30-character string is the three rows of
+	// 10, as its import box takes it.
+	const CYANOPHAGE_LENGTHS = [30, 33, 34, 35];
+	const CYANOPHAGE_THUMB = 33;
+	const CYANOPHAGE_SHIFT = '^';
+	const CYANOPHAGE_ALIASES = { $: '=' };
+	// Its link: any URL or query with a layout= parameter.
+	const CYANOPHAGE_LINK = /(?:^|[?&#])layout=([^&#\s]*)/;
 	// A share link's fragment part (#l=1.<data>): its version, and the caps it is
 	// read under (its text, its unpacked JSON, its layouts, a name and a cell).
 	const LINK_PARAM = 'l';
@@ -187,6 +233,8 @@ var LAYOUT_FORMATS = (function () {
 			});
 		return out;
 	})();
+	// The keys of a one-line layout (three rows of 10), read as its three rows.
+	const ROWS_LINE = 30;
 	// Rows of a 3-row character block (DOF, cmini, plain text), by column.
 	const ROW_CODES = [
 		[
@@ -809,12 +857,105 @@ var LAYOUT_FORMATS = (function () {
 	// ======= 2/ Helpers =======
 	// ==========================
 
-	/** A rejection with a stable code the caller can show. */
-	function fail(code, detail) {
+	/**
+	 * A rejection with a stable code the caller can show.
+	 * @param {string} code - One of REFUSALS (or an internal code).
+	 * @param {string} detail - What was wrong, for the message and the logs.
+	 * @param {object} [values] - More placeholders of the refusal's words (a
+	 *   line and a column, a key, a count).
+	 */
+	function fail(code, detail, values) {
 		const error = new Error(`${code}: ${detail}`);
 		error.code = code;
 		error.detail = detail;
+		if (values) error.values = values;
 		throw error;
+	}
+
+	/** The line and column (from 1) of an offset of a text. */
+	function lineColumn(text, offset) {
+		const before = text.slice(0, Math.max(0, Math.min(offset, text.length))).split('\n');
+		return { line: before.length, column: before[before.length - 1].length + 1 };
+	}
+
+	/**
+	 * Parses a JSON text, or refuses it with the line and column of its first
+	 * error (V8 and SpiderMonkey name an offset or a line and a column).
+	 */
+	function parseJson(text) {
+		try {
+			return JSON.parse(text);
+		} catch (error) {
+			const message = String(error && error.message);
+			const lineCol = /line (\d+) column (\d+)/.exec(message);
+			const offset = /position (\d+)/.exec(message);
+			const where = lineCol
+				? { line: Number(lineCol[1]), column: Number(lineCol[2]) }
+				: lineColumn(text, offset ? Number(offset[1]) : jsonErrorOffset(text));
+			return fail('format_syntax', `json ${message}`, Object.assign({ format: 'JSON' }, where));
+		}
+	}
+
+	/**
+	 * Where a JSON text breaks when the engine's message names no place
+	 * (V8's « Unexpected token »): every prefix before the error only ends too
+	 * soon, so the shortest prefix that fails otherwise ends on the error.
+	 */
+	function jsonErrorOffset(text) {
+		const broken = (end) => {
+			try {
+				JSON.parse(text.slice(0, end));
+				return false;
+			} catch (error) {
+				return !/end of (JSON|data)|Unterminated/i.test(String(error && error.message));
+			}
+		};
+		let low = 0;
+		let high = text.length;
+		while (low < high) {
+			const middle = Math.floor((low + high) / 2);
+			if (broken(middle + 1)) high = middle;
+			else low = middle + 1;
+		}
+		return low;
+	}
+
+	/** Parses a TOML text with the page's codec, or refuses it with the line and column of its error. */
+	function parseTomlText(text, parseToml) {
+		try {
+			return parseToml(text);
+		} catch (error) {
+			const where =
+				Number.isInteger(error && error.line) && Number.isInteger(error.column)
+					? { line: error.line, column: error.column }
+					: lineColumn(text, text.length);
+			const first = String((error && error.message) || error).split('\n')[0];
+			return fail('format_syntax', `toml ${first}`, Object.assign({ format: 'TOML' }, where));
+		}
+	}
+
+	/**
+	 * Refuses a character placed on two keys: a layout types it from one key,
+	 * so the user is told both places to choose from.
+	 * @param {Map<string, {row: number, column: number}>} seen - Character → its first place.
+	 * @param {string} char - The character.
+	 * @param {{row: number, column: number}} place - Its place now (from 1).
+	 */
+	function once(seen, char, place) {
+		const first = seen.get(char);
+		if (first)
+			fail(
+				'format_duplicate',
+				`${char} ${first.row}:${first.column} ${place.row}:${place.column}`,
+				{
+					char,
+					row1: first.row,
+					column1: first.column,
+					row2: place.row,
+					column2: place.column
+				}
+			);
+		seen.set(char, place);
 	}
 
 	/** A fresh result: the layout being built and what could not be mapped. */
@@ -1300,8 +1441,16 @@ var LAYOUT_FORMATS = (function () {
 		let format = 'rows';
 		let label = name || 'Layout';
 		const outside = [];
-		if (typeof input === 'string') rows = input.split('\n').filter((l) => l.trim() !== '');
-		else if (input && input.layers) return fromDof(input);
+		if (typeof input === 'string') {
+			rows = input
+				.replace(/\r/g, '')
+				.split('\n')
+				.filter((l) => l.trim() !== '');
+			// One line of the 30 keys (a one-line export): three rows of 10.
+			const one = rows.length === 1 ? Array.from(rows[0].replace(/\s+/g, '')) : [];
+			if (one.length === ROWS_LINE)
+				rows = [0, 1, 2].map((r) => one.slice(r * 10, r * 10 + 10).join(''));
+		} else if (input && input.layers) return fromDof(input);
 		else if (input && input.keys && !Array.isArray(input.keys)) {
 			format = 'cmini';
 			label = typeof input.name === 'string' && input.name !== '' ? input.name : label;
@@ -1324,6 +1473,7 @@ var LAYOUT_FORMATS = (function () {
 				detail: `${ROW_CODES.length + r}:* (${String(row).trim()})`
 			})
 		);
+		const seen = new Map();
 		rows.slice(0, ROW_CODES.length).forEach((row, r) => {
 			if (!Array.isArray(row) && typeof row !== 'string') fail('format_invalid', `rows[${r}]`);
 			const chars = Array.isArray(row)
@@ -1333,6 +1483,7 @@ var LAYOUT_FORMATS = (function () {
 					: Array.from(row.trim());
 			chars.forEach((char, c) => {
 				if (char === undefined || char === '' || char === '~' || char === '*') return;
+				once(seen, char, { row: r + 1, column: c + 1 });
 				const code = ROW_CODES[r][c];
 				if (!code) {
 					result.unmapped.push({ what: 'key', detail: `${r}:${c}` });
@@ -1607,12 +1758,7 @@ var LAYOUT_FORMATS = (function () {
 	 *   when the file is damaged or places no character on any key.
 	 */
 	function read(name, text, tools) {
-		const result = recognise(name, text, tools);
-		const typing = Object.entries(result.layout.rows).some(
-			([code, row]) => code !== 'Space' && row.some((cell) => cell !== NONE)
-		);
-		if (!typing) fail('format_invalid', 'no key');
-		return result;
+		return checked(recognise(name, text, tools));
 	}
 
 	/** The reader of a file's format, by extension and content. */
@@ -1626,29 +1772,170 @@ var LAYOUT_FORMATS = (function () {
 		if (/xkb_symbols\s+"/.test(text)) return fromXkb(text);
 		if (extension === 'toml' || extension === 'yaml') {
 			if (!tools.parseToml) fail('format_unknown', name);
-			let doc;
-			try {
-				doc = tools.parseToml(text);
-			} catch (error) {
-				fail('format_invalid', `toml ${error.message}`);
-			}
-			return fromKalamineToml(doc);
+			return fromKalamineToml(parseTomlText(text, tools.parseToml));
 		}
 		if (extension === 'json' || extension === 'dof' || /^\s*\{/.test(text)) {
-			let json;
-			try {
-				json = JSON.parse(text);
-			} catch (error) {
-				fail('format_invalid', `json ${error.message}`);
-			}
+			const json = parseJson(text);
 			if (!json || typeof json !== 'object') fail('format_invalid', 'json');
 			if (Array.isArray(json.keys)) return fromKla(json);
 			if (json.keymap) return fromKalamineJson(json);
 			return fromRows(json, name.replace(/\.[^.]+$/, ''));
 		}
 		if ((extension === 'txt' || extension === '') && isGenkey(text)) return fromGenkey(text);
-		if (extension === 'txt') return fromRows(text, name.replace(/\.[^.]+$/, ''));
+		if (extension === 'txt' || extension === 'kb')
+			return fromRows(text, name.replace(/\.[^.]+$/, ''));
 		return fail('format_unknown', name);
+	}
+
+	/**
+	 * Reads a cyanophage playground layout: its link (or any text holding its
+	 * layout= parameter) or the string its import box takes (CYANOPHAGE_LENGTHS).
+	 * @param {string} text - The link or the string.
+	 * @returns {object} {format, layout, unmapped}.
+	 * @throws {Error} format_length for a string of another length,
+	 *   format_duplicate for a character on two keys, format_invalid for a
+	 *   damaged link.
+	 */
+	function fromCyanophage(text) {
+		const link = CYANOPHAGE_LINK.exec(String(text).trim());
+		let value = link ? link[1] : String(text);
+		if (link)
+			try {
+				value = decodeURIComponent(value.replace(/\+/g, ' '));
+			} catch {
+				fail('format_invalid', 'cyanophage layout= is not URL-encoded');
+			}
+		const chars = Array.from(value.replace(/\s+/g, ''));
+		if (!CYANOPHAGE_LENGTHS.includes(chars.length))
+			fail('format_length', `cyanophage ${chars.length}`, {
+				count: chars.length,
+				expected: CYANOPHAGE_LENGTHS.join(', ')
+			});
+		const result = start('cyanophage', 'cyanophage', 'Cyanophage layout');
+		const ten = [0, 1, 2].flatMap((r) => ROW_CODES[r].slice(0, 10));
+		// The key of each index: the three rows of 10, or of 11 with their 11th
+		// keys (BracketLeft, Quote, the key left of Z) after each row.
+		const columns = chars.length === ROWS_LINE ? 10 : 11;
+		const codes =
+			columns === 10
+				? ten
+				: ten
+						.slice(0, 10)
+						.concat(['BracketLeft'], ten.slice(10, 20), ['Quote'], ten.slice(20, 30), [
+							'IntlBackslash'
+						]);
+		const seen = new Map();
+		chars.forEach((raw, i) => {
+			if (raw === CYANOPHAGE_SHIFT) return;
+			const char = CYANOPHAGE_ALIASES[raw] || raw;
+			once(seen, char, { row: Math.floor(i / columns) + 1, column: (i % columns) + 1 });
+			const code = i < CYANOPHAGE_THUMB ? codes[i] : null;
+			if (!code) {
+				// A letter on the thumb key, or the 35th key: no key of this keyboard holds it.
+				result.unmapped.push({ what: 'key', detail: `${i + 1} (${char})` });
+				return;
+			}
+			put(result, code, 0, char);
+			const upper = char.toUpperCase();
+			if (upper !== char && Array.from(upper).length === 1) put(result, code, 1, upper);
+		});
+		put(result, 'Space', 0, ' ');
+		return result;
+	}
+
+	/**
+	 * The format a pasted text is in, from its content alone (no file name):
+	 * the reader readText would use, or null when none matches.
+	 * @param {string} text - The pasted text.
+	 * @returns {string|null} A FORMAT_NAMES id, 'kbe', or null.
+	 */
+	function detect(text) {
+		const s = String(text)
+			.replace(/^\uFEFF/, '')
+			.trim();
+		if (s === '') return null;
+		if (isKbe(s)) return 'kbe';
+		if (/^\s*format\s*=\s*"ergopti-layout"/m.test(s)) return 'ergopti';
+		if (/<keyboard\s/.test(s)) return 'keylayout';
+		if (/^KBD\s/m.test(s)) return 'klc';
+		if (/xkb_symbols\s+"/.test(s)) return 'xkb';
+		if (s[0] === '{') {
+			let json = null;
+			try {
+				json = JSON.parse(s);
+			} catch {
+				// A damaged JSON is still JSON: its reader says where it breaks.
+				return 'kla';
+			}
+			if (!json || typeof json !== 'object') return null;
+			if (Array.isArray(json.keys)) return 'kla';
+			if (json.keymap) return 'kalamine_json';
+			if (json.layers) return 'dof';
+			if (json.keys) return 'cmini';
+			return null;
+		}
+		if (CYANOPHAGE_LINK.test(s)) return 'cyanophage';
+		if (isGenkey(s)) return 'genkey';
+		if (/^\s*(name|base|full|altgr|geometry)\s*=/m.test(s)) return 'kalamine_toml';
+		const lines = s.split(/\r?\n/).filter((line) => line.trim() !== '');
+		if (lines.length === 1) {
+			const count = Array.from(lines[0].replace(/\s+/g, '')).length;
+			if (CYANOPHAGE_LENGTHS.includes(count) && count !== ROWS_LINE) return 'cyanophage';
+			// One row of keys apart (a key a word), or the 30 keys at once.
+			const words = lines[0].trim().split(/\s+/).length;
+			return words >= ROW_CODES[2].length || count === ROWS_LINE ? 'rows' : null;
+		}
+		return lines.length <= 4 ? 'rows' : null;
+	}
+
+	/**
+	 * Reads a pasted text (or a dropped one) by its content: the format detect
+	 * names, through that format's reader, as strictly as a file.
+	 * @param {string} text - The text.
+	 * @param {object} tools - As read.
+	 * @returns {object} {format, layout, unmapped}.
+	 * @throws {Error} format_unrecognised when no format matches, else as the reader.
+	 */
+	function readText(text, tools) {
+		const clean = String(text).replace(/^\uFEFF/, '');
+		const format = detect(clean);
+		if (!format) fail('format_unrecognised', `${clean.split('\n').length} lines`);
+		if (format === 'cyanophage') return checked(fromCyanophage(clean));
+		// The editor opens its own sources before it calls readText; the Comparer cannot.
+		if (format === 'ergopti') fail('format_unknown', 'ergopti-layout');
+		const names = {
+			kbe: 'pasted.kbe',
+			keylayout: 'pasted.keylayout',
+			klc: 'pasted.klc',
+			xkb: 'pasted.xkb',
+			kla: 'pasted.json',
+			kalamine_json: 'pasted.json',
+			dof: 'pasted.dof',
+			cmini: 'pasted.json',
+			genkey: 'pasted',
+			kalamine_toml: 'pasted.toml',
+			rows: 'pasted.txt'
+		};
+		return read(names[format], clean.trim(), tools);
+	}
+
+	/** A result that types something, or the refusal of a layout without a character. */
+	function checked(result) {
+		const typing = Object.entries(result.layout.rows).some(
+			([code, row]) => code !== 'Space' && row.some((cell) => cell !== NONE)
+		);
+		if (!typing) fail('format_invalid', 'no key');
+		return result;
+	}
+
+	/**
+	 * The locale key of a format's name, as a page shows what it detected.
+	 * @param {string} format - A reader's result format.
+	 * @returns {string} The key.
+	 */
+	function formatNameKey(format) {
+		if (!FORMAT_NAMES.includes(format)) fail('format_name_unknown', String(format));
+		return `layout_analysis.formats.name.${format}`;
 	}
 
 	/**
@@ -1678,7 +1965,7 @@ var LAYOUT_FORMATS = (function () {
 		if (error && REFUSALS.includes(error.code))
 			return {
 				key: `layout_analysis.formats.refused.${error.code}`,
-				values: { detail: String(error.detail) }
+				values: Object.assign({ detail: String(error.detail) }, error.values || {})
 			};
 		const reason = (error && (error.code || error.message)) || String(error);
 		return { key: 'layout_analysis.layouts.import_failed', values: { reason } };
@@ -2281,8 +2568,13 @@ var LAYOUT_FORMATS = (function () {
 		fromGenkey,
 		fromKeylayout,
 		fromKbe,
+		fromCyanophage,
+		FORMAT_NAMES,
+		formatNameKey,
+		detect,
 		decode,
 		read,
+		readText,
 		readBytes,
 		refusalMessage,
 		lossMessage,

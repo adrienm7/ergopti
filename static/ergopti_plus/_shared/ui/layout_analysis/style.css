@@ -1545,3 +1545,100 @@ body:has(> main.layout-analysis) {
 .la-detail-loads {
 	max-width: 720px;
 }
+
+/* « Add a layout »: a framed card with a drop zone, the file button inside
+   it, and the paste field with what it recognised (ux-study items 6 and 15). */
+.la-add {
+	background: var(--la-surface-2);
+	border: 1px solid var(--la-border);
+	border-left: 6px solid var(--la-cat-2);
+	border-radius: 10px;
+	display: grid;
+	gap: 10px;
+	margin: 16px 0;
+	padding: 16px 18px;
+}
+
+.la-add-title {
+	font-size: 1.05rem;
+	margin: 0;
+}
+
+.la-drop {
+	align-items: center;
+	border: 2px dashed var(--la-border);
+	border-radius: 10px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	justify-content: center;
+	padding: 18px 12px;
+	text-align: center;
+	transition:
+		background-color 0.15s,
+		border-color 0.15s;
+}
+
+.la-drop-icon {
+	fill: none;
+	height: 28px;
+	stroke: var(--la-cat-2);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 2;
+	width: 28px;
+}
+
+.la-drop-active {
+	background: var(--la-accent-soft);
+	border-color: var(--la-accent);
+}
+
+.la-paste-label {
+	font-weight: 600;
+}
+
+.la-paste {
+	box-sizing: border-box;
+	font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+	min-height: 5.5em;
+	resize: vertical;
+	width: 100%;
+}
+
+.la-paste-actions {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	justify-content: space-between;
+}
+
+.la-detected {
+	margin: 0;
+	min-height: 1.4em;
+}
+
+.la-detected-yes {
+	color: var(--la-good);
+	font-weight: 600;
+}
+
+.la-detected-no {
+	color: var(--la-sub);
+}
+
+.la-import-report {
+	background: var(--la-surface-2);
+	border-radius: 8px;
+	margin: 8px 0;
+	padding: 8px 12px;
+}
+
+.la-import-report.la-ok {
+	border-left: 4px solid var(--la-good);
+}
+
+.la-import-report.la-error {
+	border-left: 4px solid var(--la-bad);
+}

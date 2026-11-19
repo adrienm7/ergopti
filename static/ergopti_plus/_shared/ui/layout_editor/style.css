@@ -1211,3 +1211,120 @@ body {
 .le-layout-tab-roles {
 	display: contents;
 }
+
+/* « Paste a layout… »: a modal dialog outside the rendered tree (it keeps
+   its text across renders), so it reads the theme's tokens directly. */
+.le-paste-dialog {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 12px;
+	border-top: 6px solid var(--theme-chart-cat-2);
+	box-sizing: border-box;
+	color: var(--theme-text);
+	max-width: min(720px, calc(100vw - 32px));
+	padding: 20px 24px;
+	width: 720px;
+}
+
+.le-paste-dialog::backdrop {
+	background: rgb(0 0 0 / 45%);
+}
+
+.le-paste-dialog h2 {
+	font-size: 1.2rem;
+	margin: 0 0 8px;
+}
+
+.le-paste-dialog label {
+	display: block;
+	font-weight: 600;
+	margin: 14px 0 6px;
+}
+
+.le-paste-help {
+	color: var(--theme-sub);
+	margin: 0;
+}
+
+.le-paste-text {
+	background: var(--theme-surface-2);
+	border: 1px solid var(--theme-separator);
+	border-radius: 8px;
+	box-sizing: border-box;
+	color: var(--theme-text);
+	font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+	padding: 8px 10px;
+	resize: vertical;
+	width: 100%;
+}
+
+.le-paste-detected {
+	margin: 8px 0 0;
+	min-height: 1.4em;
+}
+
+.le-paste-detected.ok {
+	color: var(--theme-good-text);
+	font-weight: 600;
+}
+
+.le-paste-detected.none {
+	color: var(--theme-sub);
+}
+
+.le-paste-refusal {
+	background: var(--theme-surface-2);
+	border-left: 4px solid var(--theme-bad-text);
+	border-radius: 6px;
+	color: var(--theme-bad-text);
+	margin: 10px 0 0;
+	padding: 8px 12px;
+}
+
+.le-paste-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	justify-content: flex-end;
+	margin-top: 16px;
+}
+
+.le-paste-actions button {
+	border-radius: 8px;
+	min-height: 36px;
+	padding: 6px 14px;
+}
+
+.le-paste-actions .le-primary {
+	background: var(--theme-accent-fill);
+	border: 1px solid var(--theme-accent-fill);
+	color: var(--theme-white);
+}
+
+.le-paste-actions .le-primary:disabled {
+	opacity: 0.55;
+}
+
+/* Files dragged over the editor: the whole editor is the drop target, and
+   says what a drop does. */
+.layout-editor.le-drop-active {
+	outline: 3px dashed var(--le-accent);
+	outline-offset: -3px;
+	position: relative;
+}
+
+.layout-editor.le-drop-active::after {
+	background: var(--le-surface);
+	border: 2px solid var(--le-accent);
+	border-radius: 10px;
+	box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+	content: attr(data-drop-hint);
+	font-weight: 600;
+	left: 50%;
+	padding: 12px 18px;
+	pointer-events: none;
+	position: fixed;
+	top: 40%;
+	transform: translateX(-50%);
+	z-index: 10;
+}

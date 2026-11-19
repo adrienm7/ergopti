@@ -31,6 +31,7 @@ const studioUx = require('./layout-editor-studio-ux.cjs');
 const studioNumbers = require('./studio-numbers.cjs');
 // The ranking's compact headers and their popovers (studio-header-popovers).
 const studioHeaders = require('./studio-headers.cjs');
+const studioManage = require('./layout-studio-manage.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const KEYLAYOUT = path.join(ROOT, 'static', 'layouts', 'registry', 'ergopti', 'ergopti.keylayout');
@@ -3990,6 +3991,8 @@ async function exerciseComparerLink(browser, origin) {
 		await studioUx.exerciseBoardImage(browser, origin);
 		await studioNumbers.exerciseNumbers(browser, origin);
 		await studioHeaders.exerciseHeaderPopovers(browser, origin);
+		await studioManage.exerciseEditorPasteImport(browser, origin);
+		await studioManage.exerciseComparerPasteImport(browser, origin);
 
 		// Every locale names every visible string.
 		for (const lang of LOCALES) {
