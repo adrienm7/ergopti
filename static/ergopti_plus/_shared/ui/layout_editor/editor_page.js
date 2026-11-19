@@ -4813,7 +4813,9 @@ var LayoutEditorPage = (function () {
 				'aria-controls': 'la-live-panel',
 				onclick: () => analysisPanel.reveal()
 			},
-			[chipLabel, chipScore, chipRank, chipChange]
+			// The spaces are not drawn (flex items) but part the visible words, which
+			// the button's name then contains (WCAG 2.5.3), not « Score27,4rang ».
+			[chipLabel, ' ', chipScore, ' ', chipRank, ' ', chipChange]
 		);
 		const scoreChip = el('div', { class: 'le-score-chip', id: 'le-score-chip' }, [
 			chipButton,
@@ -4831,16 +4833,21 @@ var LayoutEditorPage = (function () {
 			chipResult = result;
 			chipLabel.textContent = t('layout_analysis.table.score');
 			const format = window.LAYOUT_ANALYSIS_INFO.format;
+			// What the live region says, and the button's name: the visible text
+			// in the same order, so a voice command saying it reaches the button.
 			const words = [];
+			const named = [];
 			chipChange.className = 'le-score-change';
 			chipChange.replaceChildren();
 			if (!result) {
 				chipScore.textContent = '—';
 				chipRank.textContent = tl('score_chip.none');
 				words.push(tl('score_chip.none'));
+				named.push(chipLabel.textContent, chipScore.textContent, chipRank.textContent);
 			} else {
 				chipScore.textContent = format(result.score, 1);
 				chipRank.textContent = tl('score_chip.rank', { rank: result.rank, count: result.count });
+				named.push(chipLabel.textContent, chipScore.textContent, chipRank.textContent);
 				words.push(
 					t('layout_analysis.panel.score', {
 						score: format(result.score, 1),
@@ -4865,17 +4872,19 @@ var LayoutEditorPage = (function () {
 							: tl('score_chip.unchanged');
 					const mark = { better: '▲', worse: '▼', same: '=' }[verdict];
 					const verdictWords = t(`layout_analysis.details.verdict_${verdict}`);
+					const shown = moved ? `${text} · ${verdictWords}` : text;
 					chipChange.classList.add(`le-score-${verdict}`);
 					chipChange.append(
 						el('span', { class: 'le-score-mark', 'aria-hidden': 'true', text: mark }),
-						el('span', { text: moved ? `${text} · ${verdictWords}` : text })
+						el('span', { text: shown })
 					);
 					words.push(moved ? `${text} (${verdictWords})` : text);
+					named.push(shown);
 				}
 			}
 			const label = tl('score_chip.open');
 			chipButton.title = label;
-			chipButton.setAttribute('aria-label', `${words.join('. ')}. ${label}`);
+			chipButton.setAttribute('aria-label', `${named.join(' ')}. ${label}`);
 			const spoken = words.join('. ');
 			if (chipLive.textContent !== spoken) chipLive.textContent = spoken;
 		}
