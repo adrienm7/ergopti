@@ -19,6 +19,7 @@ FEATURES & RATIONALE:
 -->
 
 <script>
+	import { moveTab } from './tabs.js';
 	import DriverFrame from './DriverFrame.svelte';
 	import { countup } from './countup.js';
 	import { reveal } from './reveal.js';
@@ -78,20 +79,30 @@ FEATURES & RATIONALE:
 		<!-- Faithful tooltip mockup with mode tabs -->
 		<figure class="ai-demo" use:reveal>
 			<div class="mode-tabs" role="tablist" aria-label="Mode du tooltip IA">
-				{#each modes as m}
+				{#each modes as m, i (m.id)}
 					<button
 						type="button"
 						role="tab"
+						id="ai-mode-tab-{m.id}"
 						aria-selected={activeMode === m.id}
+						aria-controls="ai-mode-panel"
+						tabindex={activeMode === m.id ? 0 : -1}
 						class:active={activeMode === m.id}
 						onclick={() => (activeMode = m.id)}
+						onkeydown={(event) =>
+							moveTab(event, i, modes.length, (next) => (activeMode = modes[next].id))}
 					>
 						{m.label}
 					</button>
 				{/each}
 			</div>
 
-			<div class="ai-window ep-window os-{ui.osStyle}">
+			<div
+				class="ai-window ep-window os-{ui.osStyle}"
+				id="ai-mode-panel"
+				role="tabpanel"
+				aria-labelledby="ai-mode-tab-{activeMode}"
+			>
 				<WindowChrome title="~/inbox/brouillon.eml" />
 
 				<div class="ai-body">

@@ -95,7 +95,10 @@ competes with the final call-to-action. OS-aware, like the hero button.
 		z-index: 80;
 	}
 
-	.sticky-cta.visible {
+	/* Shown when the keyboard reaches it too: hidden, it was an invisible
+	   focus stop under the page (WCAG 2.4.7, 2.4.11). */
+	.sticky-cta.visible,
+	.sticky-cta:focus-visible {
 		opacity: 1;
 		pointer-events: auto;
 		transform: translate(-50%, 0);

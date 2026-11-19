@@ -99,8 +99,11 @@ window.initData = function (data) {
 	});
 
 	_initialized = true;
+	// The window's first field takes the focus; the same page framed as a demo
+	// in the website must not pull the reader's focus (and the page's scroll)
+	// into the frame while it loads (WCAG 2.4.3, 3.2.1).
 	const first = document.querySelector('#rows input, #rows textarea');
-	if (first) first.focus();
+	if (first && window.top === window) first.focus();
 };
 
 /**

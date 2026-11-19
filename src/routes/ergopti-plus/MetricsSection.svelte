@@ -18,6 +18,7 @@ FEATURES & RATIONALE:
 -->
 
 <script>
+	import { moveTab } from './tabs.js';
 	import DriverFrame from './DriverFrame.svelte';
 	import LiveWpm from './LiveWpm.svelte';
 	import { reveal } from './reveal.js';
@@ -33,25 +34,6 @@ FEATURES & RATIONALE:
 	let activeDashboard = $state('metrics_typing');
 
 	/** Keys that move between the tabs, as an offset or an absolute end. */
-	const TAB_KEYS = { ArrowLeft: -1, ArrowRight: 1, Home: 'first', End: 'last' };
-
-	/**
-	 * Move the selection and the focus along the tab list (the ARIA tabs
-	 * pattern): the arrows wrap around, Home and End jump to the ends.
-	 * @param {KeyboardEvent} event
-	 * @param {number} index - The tab the key was pressed on.
-	 */
-	function moveTab(event, index) {
-		const move = TAB_KEYS[event.key];
-		if (move === undefined) return;
-		event.preventDefault();
-		const count = dashboards.length;
-		const next =
-			move === 'first' ? 0 : move === 'last' ? count - 1 : (index + move + count) % count;
-		activeDashboard = dashboards[next].id;
-		const list = /** @type {HTMLElement} */ (event.currentTarget).closest('[role="tablist"]');
-		/** @type {HTMLElement} */ (list.querySelectorAll('[role="tab"]')[next]).focus();
-	}
 
 	// Deterministic upward-trending sparkline points (no Math.random — the
 	// page is prerendered and the shape should read as steady progress).
@@ -189,7 +171,13 @@ FEATURES & RATIONALE:
 						tabindex={activeDashboard === d.id ? 0 : -1}
 						class:active={activeDashboard === d.id}
 						onclick={() => (activeDashboard = d.id)}
-						onkeydown={(event) => moveTab(event, i)}
+						onkeydown={(event) =>
+							moveTab(
+								event,
+								i,
+								dashboards.length,
+								(next) => (activeDashboard = dashboards[next].id)
+							)}
 					>
 						{d.label}
 					</button>
