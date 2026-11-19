@@ -1976,6 +1976,27 @@
 		},
 		{
 			"file": "src/routes/studio/+layout.svelte",
+			"element": "span.studio-brand-name",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The « Ergopti Studio » words beside the mark, hidden on a narrow shell (src/routes/studio/+layout.svelte, owned by another pass)."
+		},
+		{
+			"file": "src/routes/studio/+layout.svelte",
+			"element": "span.visually-hidden",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Words of the menu button read by screen readers only, before the current tab (src/routes/studio/+layout.svelte, owned by another pass)."
+		},
+		{
+			"file": "src/routes/studio/+layout.svelte",
+			"element": "div.studio-menu",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The fold-out panel of the tabs and the appearance choice, which the menu button controls; it has no heading (src/routes/studio/+layout.svelte, owned by another pass)."
+		},
+		{
+			"file": "src/routes/studio/+layout.svelte",
 			"element": "span (none)",
 			"count": 1,
 			"kind": "styling-hook",
@@ -1987,6 +2008,11 @@
 			"file": "src/lib/components/A11ySettings.svelte",
 			"codes": ["a11y_click_events_have_key_events", "a11y_no_noninteractive_element_interactions"],
 			"reason": "A click on the dialog backdrop (the dialog element itself) closes it; the keyboard closes it with Escape and the Fermer button."
+		},
+		{
+			"file": "src/routes/studio/+layout.svelte",
+			"codes": ["a11y_no_static_element_interactions"],
+			"reason": "The Studio menu panel catches Escape bubbling from its tabs and select to close itself; the panel is not operated itself (owned by another pass, to review)."
 		},
 		{
 			"file": "src/routes/ergopti/utilisation/introduction_utilisation.svelte",

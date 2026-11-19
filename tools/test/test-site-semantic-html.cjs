@@ -17,7 +17,7 @@
  *    reviewed entry); a count above the entry fails; a count below it fails
  *    too until the entry is lowered, so the list can only shrink by review.
  * 2. No div or span is interactive: no event handler (onclick, on:click,
- *    onkeydown…), no interactive role (button, link, tab…) and no tabindex
+ *    onmousedown…), no interactive role (button, link, tab…) and no tabindex
  *    other than -1. A native button, link or input is the only answer; the
  *    allowlist cannot excuse it (WCAG 2.1.1, 4.1.2).
  * 3. No Svelte accessibility warning (a11y_*) in any file, and every
@@ -69,7 +69,13 @@ function measureSite(root = markup.ROOT) {
 function checkTheChecker() {
 	const sample = (body) => inventoryOf(body, 'sample.svelte');
 	assert.match(sample('<div onclick={go}>x</div>').interactive[0], /click handler/);
-	assert.match(sample('<span on:keydown={go}>x</span>').interactive[0], /keydown handler/);
+	assert.match(sample('<span on:mousedown={go}>x</span>').interactive[0], /mousedown handler/);
+	assert.match(sample('<div onmouseenter={show}>x</div>').interactive[0], /mouseenter handler/);
+	// A popup panel catching Escape from its controls is not operated itself.
+	assert.deepEqual(
+		sample('<div onkeydown={closeOnEscape}><button>x</button></div>').interactive,
+		[]
+	);
 	assert.match(sample('<div role="button">x</div>').interactive[0], /role="button"/);
 	assert.match(sample('<span tabindex="0">x</span>').interactive[0], /focusable/);
 	assert.deepEqual(sample('<div id="target" tabindex="-1"></div>').interactive, []);

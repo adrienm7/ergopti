@@ -54,6 +54,19 @@ const INTERACTIVE_ROLES = Object.freeze([
 	'scrollbar'
 ]);
 const MIN_REASON_LENGTH = 20;
+// Events a container may listen to for the controls inside it: a key that
+// bubbles from them (Escape closing a popup), a focus moving between them,
+// a scroll, a finished transition. None makes the container itself something
+// a user operates; any other handler (click, pointer, hover) does.
+const CONTAINER_EVENTS = Object.freeze([
+	'keydown',
+	'keyup',
+	'focusin',
+	'focusout',
+	'scroll',
+	'transitionend',
+	'animationend'
+]);
 
 /**
  * One element as a scope's reader describes it.
@@ -88,10 +101,9 @@ function inventoryOf(descriptors, file) {
 		const key = elementKey(element);
 		counts.set(key, (counts.get(key) || 0) + 1);
 		const where = `${file}:${element.line} <${key}>`;
-		if (element.handlers.length)
-			interactive.push(
-				`${where} has a ${element.handlers.join(', ')} handler: use a button or a link`
-			);
+		const operated = element.handlers.filter((event) => !CONTAINER_EVENTS.includes(event));
+		if (operated.length)
+			interactive.push(`${where} has a ${operated.join(', ')} handler: use a button or a link`);
 		if (element.role === undefined)
 			interactive.push(`${where} has a computed role: write it statically`);
 		else if (
@@ -198,6 +210,7 @@ function ignoreProblems(file, ignores, allowlist) {
 
 module.exports = {
 	GENERIC,
+	CONTAINER_EVENTS,
 	KINDS,
 	INTERACTIVE_ROLES,
 	elementKey,
