@@ -573,7 +573,9 @@ async function exerciseBestSwaps(browser, origin) {
 			label: button.getAttribute('aria-label')
 		}))
 	);
-	assert.ok(swaps.length > 0 && swaps.length <= 10, `${swaps.length} swaps`);
+	// The panel's own limit (best_swaps.js), not a copy of it.
+	const limit = await page.evaluate(() => window.LAYOUT_ANALYSIS_SWAPS.LIMIT);
+	assert.ok(swaps.length > 0 && swaps.length <= limit, `${swaps.length} swaps, limit ${limit}`);
 	assert.match(swaps[0].label, /^Swap \S+ and \S+ \(\+\d+[.,]\d+\)$/, swaps[0].label);
 	const [a, b] = swaps[0].codes;
 	const before = [await legend(a), await legend(b)];
@@ -629,7 +631,8 @@ async function exerciseBestCycles(browser, origin) {
 			words: button.parentElement.querySelector('.la-sr-only').textContent
 		}))
 	);
-	assert.ok(cycles.length > 0 && cycles.length <= 10, `${cycles.length} cycles`);
+	const limit = await page.evaluate(() => window.LAYOUT_ANALYSIS_SWAPS.CYCLE_LIMIT);
+	assert.ok(cycles.length > 0 && cycles.length <= limit, `${cycles.length} cycles, limit ${limit}`);
 	assert.match(
 		cycles[0].label,
 		/^Apply the cycle \S+ → \S+ → \S+ \(\+\d+[.,]\d+\)$/,
