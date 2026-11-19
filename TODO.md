@@ -142,6 +142,15 @@ baseline as violations go.
       three Studio pages in the Studio keyboard walk, which they pass, and the 21 app windows in their scan's
       ratchet, where only the apps dashboard's chart tabs are left (their h3 chart titles follow the h1, their h2
       cards being on another tab). Left: screen-reader runs; that dashboard's headings.
+- [ ] **Semantic markup and mouse-only controls.** The site's div and span are held by
+      `npm run test:site-semantic-html` (576 → 448, each justified in `tools/test/site-semantic-html-allowlist.json`)
+      and its images by `npm run test:site-image-alternatives`; every site page is checked for controls only a
+      mouse can use by `tools/test/browser/keyboard-operability.playwright.cjs` in CI
+      ([ninth pass](docs/audits/accessibility/README.md#ninth-pass-semantic-markup-keyboard-operability-and-reading-choices-2026-11-19-paris-time)).
+      Left: the app windows' 673 `keyboard-operability` ratchet nodes (sortable headers and chart canvases of the
+      metrics windows, action picker rows, hotstring editor command references and drag handles, hotstring
+      settings category titles); the app windows' and the Studio pages' own div and span lists; the site's
+      custom elements (`bloc-main`, `keyboard-reference`…), as generic as a div but outside the gate.
 - [ ] **Keyboard and motor.** The Studio keyboard walk is a CI gate (`npm run test:browser:studio-keyboard`, the
       editor's « Try » field trap fixed) and the Studio has no time limit. The Windows driver's native windows
       (14 of them: settings prompts, pickers, editors, the hotstring settings, paths and update fallbacks) are walked

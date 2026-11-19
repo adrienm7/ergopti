@@ -902,6 +902,69 @@ Space in words), and « Changed » or « Unchanged », with a glyph and a
 dashed edge as the boards outline it. `exerciseResultTable` in
 `layout-optimizer.playwright.cjs` checks it against both boards.
 
+## Ninth pass, semantic markup, keyboard operability and reading choices (2026-11-19, Paris time)
+
+Maintainer requests of 2026-11-19: no div or span where an element has the
+meaning, blocking gates, and everything operable from the keyboard on the site
+and in the WebView windows.
+
+- **Semantic markup.** The site's Svelte files held 576 div and span
+  elements (255 div, 321 span, counted by the compiler's parser); 448 are
+  left (162 div, 286 span), each justified. Cards and lists became ul / li
+  (with article where a card stands alone), label and value pairs dl, steps
+  of a page section with a heading, page tops header, captions figure /
+  figcaption, the contact box address, the installation links a named nav,
+  the filter row search, the corner banner a named aside, the footer links a
+  named nav. What stays is listed in
+  `tools/test/site-semantic-html-allowlist.json`, one entry per file and
+  element (first class, id or none) with its exact count, a kind (layout,
+  styling-hook, icon-layer, decorative, mount, aria-widget, dl-group,
+  language) and a reason. Pixel screenshots of every page at 320 px and
+  1280 px, light and dark, before and after: identical except the regions
+  that differ between two runs of the same build (the framed Comparer, whose
+  results and height settle at different times).
+- **Gates.** `tools/test/test-site-semantic-html.cjs` (shared judgement
+  `tools/test/lib/semantic-markup.cjs`, Svelte reader
+  `tools/test/lib/svelte-markup.cjs`) fails on an unlisted div or span, on a
+  count above or below its entry, on any interactive div or span (handler,
+  interactive role, tabindex other than -1), on any Svelte a11y warning and
+  on an unlisted svelte-ignore. `tools/test/test-site-image-alternatives.cjs`
+  fails on an img without alt, an svg neither hidden nor a named image, and an
+  icon-font glyph neither hidden nor named. On the code before this pass they
+  report 2 interactive div, 3 Svelte a11y warnings and 55 unnamed icons.
+- **Keyboard operability.** `tools/test/lib/keyboard-operability.cjs`
+  records every pointer and key listener before the page's scripts and fails
+  on a shown element the mouse can use that Tab cannot reach, that has no
+  interactive role or that no key answers; it drives every disclosure (Enter
+  opens and closes), popup (Escape closes and gives the focus back) and
+  composite widget (arrow keys move the focus). The site runner
+  `tools/test/browser/keyboard-operability.playwright.cjs` (CI, on the
+  received site, after the axe gate) also walks each page with Tab and
+  Shift+Tab, refusing a stop without a visible indicator (2.4.7) or hidden
+  under another box (2.4.11). The app windows gate counts the same problems
+  under the rule `keyboard-operability` of its ratchet: 673 nodes on
+  2026-11-19 (sortable table headers and chart canvases of the metrics
+  windows, the action picker's rows, the hotstring editor's command
+  references and drag handles, the category titles of the hotstring settings),
+  a higher count fails.
+- **Fixes.** The narrow-screen menu is a button with `aria-expanded` that
+  Escape closes (it was a checkbox, focusable but invisible on a wide
+  screen); the table of contents' click catcher is no longer a div with a
+  handler; the reference keyboard's button says whether it is open and Escape
+  closes it; the SFB definition, shown on hover only and hidden from screen
+  readers, is a toggletip (a button described by a role="tooltip", shown on
+  focus, Escape hides it); the keyboard drawings' toggle buttons no longer
+  hold a p; the Ergopti+ metrics tabs follow the tabs pattern (arrows, Home,
+  End); each drawn key says its finger (`aria-description`), which only its
+  colour told (1.4.1).
+- **Reading choices.** The settings dialog adds OpenDyslexic (SIL OFL 1.1,
+  `static/fonts/opendyslexic/`, served by the site), shorter lines (50
+  characters), all text aligned to the start, and colours for colour-blind
+  readers (Okabe-Ito finger colours and a one-hue frequency map on the
+  keyboard drawings, blue instead of green in the AI demo, blue and orange
+  status text in the Studio, 5.5:1 and more). All apply before the first
+  paint through `a11y_prefs.js`.
+
 ## What remains
 
 The open items live in TODO.md, section « Full accessibility ». The rows of
