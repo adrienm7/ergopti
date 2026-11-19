@@ -1,0 +1,530 @@
+# _shared/settings/data/features/platform_parity.toml
+# What the platform parity table (docs/platform-parity-table.md) cannot derive
+# from the catalogues by itself. tools/lib/platform-parity.cjs reads it and
+# tools/test/test-linux-feature-parity.cjs fails on any entry that is missing,
+# unused or untrue. Regenerate the table with
+# `node tools/codegen/codegen-platform-parity.cjs`.
+#
+# [reasons."<locale key>"]
+#   Every reason key a non-supported cell carries (a feature's reason_key or
+#   degraded key, an action's reason_<driver>, a layer entry's reason_key, a menu
+#   row's reason_key or hidden-row reason). The locale text is what the menu
+#   shows, in all 21 locales; `technical` is the developer's reason (the OS API,
+#   the session, the permission model) and `kind` classifies it:
+#     os_api         the OS, its session or its permission model offers no way
+#     os_concept     the concept exists only on the OS that has it
+#     os_equivalent  the OS reaches the same result its own way
+#     driver_storage the same capability, kept under another name or place
+#     menu_layout    a menu-structure difference: the control exists elsewhere
+#     not_yet        possible on that OS but not delivered: a real parity gap
+#
+# Owners. A cell's owner is the production file of that driver whose code
+# spells the entry the most often. When no file spells it, the first match of:
+#   [owners.<os>."<entry path, or prefix*>"]   one entry or a family of entries
+#   [section_owners.<os>."<feature section>"]  the generic reader of a section
+#   [kind_owners.<os>.<feature|action|layer|menu>]  the reader of a whole catalogue
+# Each names `file` and a `token` that must appear in a code line of that file
+# (comments and module names do not count), and each must serve a cell.
+#
+# [unowned.<os>."<entry path>"]
+#   A supported cell no code of that driver reads: a real gap, ratcheted. Each
+#   names its PPT-nn finding of docs/platform-parity-audit.md. An entry goes
+#   away when the gap is fixed or the declaration is corrected.
+
+
+
+# =========================
+# =========================
+# ======= 1. Reasons =======
+# =========================
+# =========================
+
+[reasons."platform_reason.windows_touchpad_slots_are_three_and_four_fingers"]
+kind = "os_api"
+technical = "Windows Precision Touchpad settings expose only three- and four-finger taps and the four straight swipes as assignable gestures, and deliver them to applications as hotkeys; no raw contact data reaches a user-mode application, so two- and five-finger, diagonal and horizontal-axis slots cannot be read."
+
+[reasons."platform_reason.menu_container_rows_are_built_per_driver"]
+kind = "menu_layout"
+technical = "AutoHotkey Menu objects, Hammerspoon menubar tables and the Linux AppIndicator tray build parent and frame rows differently; each driver declares its own container rows around the same controls."
+
+[reasons."platform_reason.shortcut_settings_are_stored_per_driver"]
+kind = "driver_storage"
+technical = "Each driver binds actions on the chords its OS leaves free (Win combinations, Ctrl and Cmd, Linux keyboard slots) and stores the choice under a slot id of its own (`meta_*`, `secondary_*`, `primary_*` in shortcuts.keyboard); the same action is assignable on every OS."
+
+[reasons."platform_reason.action_continuous_swipe_is_macos"]
+kind = "os_api"
+technical = "Only Hammerspoon receives gesture deltas while the fingers move; Windows delivers finished Precision Touchpad gestures as hotkeys and the Linux libinput reader acts on the swipe end, so neither has an axis to feed."
+
+[reasons."platform_reason.touchpad_stack_is_per_driver"]
+kind = "os_concept"
+technical = "Each driver reads the touchpad through its own stack (Windows Precision Touchpad settings, Hammerspoon gesture events, Linux evdev and libinput), so the status, setup and slot rows of one stack do not exist on the others."
+
+[reasons."platform_reason.menu_control_rows_are_laid_out_per_driver"]
+kind = "menu_layout"
+technical = "The value, reset and variant rows of one setting are laid out by each native menu toolkit; the control exists on every driver under a row of its own."
+
+[reasons."platform_reason.debug_surface_is_each_drivers_own"]
+kind = "os_concept"
+technical = "Window Spy, ListVars and KeyHistory are AutoHotkey runtime tools and the Lua console is Hammerspoon's; the LuaJIT daemon on Linux has no interactive console to open."
+
+[reasons."platform_reason.accented_shortcuts_need_a_layout_file_on_macos"]
+kind = "os_equivalent"
+technical = "A macOS .keylayout carries its own Command and Control layers, so Cmd plus an accented key already resolves to the shortcut the layout gives it; Windows and Linux need the remap of Ctrl, Alt and Super chords on those keys."
+
+[reasons."platform_reason.layout_bundle_and_menubar_are_macos"]
+kind = "os_concept"
+technical = "The .bundle keyboard layout, its user and system install scopes (TIS input sources) and the menubar icon are macOS concepts; Windows installs a .klc DLL through its installer and Linux an XKB layout, and neither has a menubar."
+
+[reasons."platform_reason.remap_engine_is_per_driver"]
+kind = "os_concept"
+technical = "Windows remaps with its own AutoHotkey tap-hold layer, macOS with Karabiner-Elements (its virtual HID driver, login items and approvals), Linux with the evdev/uinput tap-hold daemon; the setup rows of one engine do not apply to another."
+
+[reasons."platform_reason.action_spaces_and_desktops_are_one_thing"]
+kind = "os_equivalent"
+technical = "macOS Spaces and Windows or Linux virtual desktops are the same feature; each OS lists the action under its own name and the other name points to the equivalent action."
+
+[reasons."platform_reason.llm_generation_settings_are_inline_on_linux"]
+kind = "menu_layout"
+technical = "The Linux tray lists the AI models and generation settings inline; macOS and Windows put the same settings behind a submenu row."
+
+[reasons."platform_reason.category_gates_are_windows"]
+kind = "driver_storage"
+technical = "Windows keeps one master gate per category in category_enabled; macOS keeps the hotstrings master as hotstrings.enabled and Linux switches its hotstring groups one by one."
+
+[reasons."platform_reason.action_shortcut_is_a_modifier_chord_here"]
+kind = "os_equivalent"
+technical = "On macOS the action is a Cmd chord of the Shortcuts list, not a separate bindable action; Windows and Linux bind it as an action."
+
+[reasons."platform_reason.chord_families_are_each_platforms"]
+kind = "os_concept"
+technical = "Windows binds AltGr and CapsLock chord families and a personal AutoHotkey shortcuts file; macOS binds Ctrl and Cmd families through Karabiner; each driver lists only the families its OS lets it bind."
+
+[reasons."platform_reason.action_application_switching_is_macos"]
+kind = "os_equivalent"
+technical = "macOS switches applications (NSRunningApplication), each holding its windows; Windows and Linux switch windows with Alt+Tab, offered as the equivalent action."
+
+[reasons."platform_reason.action_same_action_under_another_name"]
+kind = "os_equivalent"
+technical = "The OS offers the same action under another catalogue id; the equivalent action is bound instead."
+
+[reasons."platform_reason.selection_operations_are_a_block_on_linux"]
+kind = "menu_layout"
+technical = "Linux groups CapsWord, case transforms, select word or line and plain paste in one menu block; macOS reaches them through Ctrl shortcuts and Windows through its key combinations."
+
+[reasons."platform_reason.tray_top_level_rows_are_each_drivers"]
+kind = "os_concept"
+technical = "The in-app updater row exists on Linux, the suspend switch on Windows (AutoHotkey Suspend); each tray carries the top-level rows its runtime has."
+
+[reasons."platform_reason.action_window_overview_is_each_systems"]
+kind = "os_equivalent"
+technical = "Mission Control and App Exposé on macOS, Task View on Windows; Linux desktops each bind their own overview key, bound as a keystroke there."
+
+[reasons."platform_reason.action_word_deletion_modifier_differs"]
+kind = "os_equivalent"
+technical = "Word deletion is Option+Backspace on macOS text fields and Ctrl+Backspace on Windows and Linux; each OS lists its own action."
+
+[reasons."platform_reason.personal_shortcut_switches_are_windows"]
+kind = "os_concept"
+technical = "These switches name personal setups of the Windows AutoHotkey shortcuts (broken laptop key remap, window dragging and tab switching with the mouse, programmable keyboard, professional environment) that have no macOS or Linux counterpart."
+
+[reasons."platform_reason.key_combinations_are_karabiner_settings_on_macos"]
+kind = "driver_storage"
+technical = "Karabiner-Elements runs the key combinations on macOS, so macOS keeps them and their switch with its Karabiner settings (mod_combos in tap_hold.toml) instead of shortcuts.key_combination_taps."
+
+[reasons."platform_reason.action_window_switching_is_not_macos"]
+kind = "os_equivalent"
+technical = "Alt+Tab window stepping is the Windows and Linux model; macOS switches applications with Cmd+Tab and cycles one application's windows, offered as the equivalent action."
+
+[reasons."platform_reason.action_download_mark_is_each_systems"]
+kind = "os_concept"
+technical = "macOS marks downloads with the com.apple.quarantine extended attribute and Windows with the Zone.Identifier stream (Mark of the Web); Linux file systems carry no download mark to remove."
+
+[reasons."platform_reason.action_navigation_layer_switch_is_karabiner"]
+kind = "os_concept"
+technical = "The navigation layer switch is a Karabiner-Elements variable on macOS; on Windows and Linux the layer follows the held key and has no state to set."
+
+[reasons."platform_reason.action_line_deletion_is_macos"]
+kind = "os_concept"
+technical = "Cmd+Delete deletes to the line edge in Cocoa text fields; Windows and Linux text controls have no such key binding."
+
+[reasons."platform_reason.layer_spotlight_is_macos"]
+kind = "os_concept"
+technical = "Spotlight is the macOS search; Windows and Linux desktops bind their own search key, bound as a keystroke there."
+
+[reasons."platform_reason.llm_lists_are_inline_on_linux"]
+kind = "menu_layout"
+technical = "These rows list the models and generation settings inline in the Linux tray; macOS and Windows declare the same choices behind their own submenu rows."
+
+[reasons."platform_reason.layout_system_install_is_windows"]
+kind = "os_concept"
+technical = "The row downloads the unsigned MSKLC-built keyboard layout installer for Windows, which needs administrator rights; macOS installs its .bundle and Linux its XKB layout from their own rows."
+
+[reasons."platform_reason.category_master_is_a_gate_on_windows"]
+kind = "driver_storage"
+technical = "Windows keeps this master switch as the category gate in category_enabled; macOS and Linux keep it as enabled in the category's own section."
+
+[reasons."platform_reason.virtual_keyboard_is_karabiner"]
+kind = "os_concept"
+technical = "The Karabiner-Elements virtual HID keyboard type decides which keycodes the two ISO-only keys reach on macOS; Windows and Linux name these keys by scan code and have no virtual keyboard."
+
+[reasons."platform_reason.layout_emulation_is_windows_only"]
+kind = "os_concept"
+technical = "Only the Windows driver emulates the layout with AutoHotkey hotkeys; macOS installs it as a TIS input source and Linux as an XKB layout, so there is no emulation to switch off."
+
+[reasons."platform_reason.action_lookup_is_macos_dictionary"]
+kind = "os_api"
+technical = "Look Up opens the macOS Dictionary panel through NSPerformService; Windows and Linux have no system dictionary panel an application can open on a word."
+
+[reasons."platform_reason.action_app_windows_unreachable_on_wayland"]
+kind = "os_api"
+technical = "Wayland gives no client a protocol to list or focus another client's windows (no foreign-toplevel access on GNOME), so the windows of the active application cannot be told apart."
+
+[reasons."platform_reason.action_spaces_are_edited_in_mission_control"]
+kind = "os_api"
+technical = "macOS exposes no public API to add or remove Spaces; only Mission Control edits them."
+
+[reasons."platform_reason.action_desktop_count_belongs_to_the_desktop"]
+kind = "os_api"
+technical = "The desktop count belongs to each desktop's settings (GNOME dynamic workspaces, KDE and Xfce fixed counts), and Wayland offers no client request to change it."
+
+[reasons."platform_reason.action_recording_starts_from_the_capture_tool"]
+kind = "os_equivalent"
+technical = "macOS and the GNOME or KDE screenshot tools start screen recording from their own capture UI, which the equivalent action opens; no stable API starts a recording directly."
+
+[reasons."platform_reason.action_apple_shortcuts_are_macos"]
+kind = "os_concept"
+technical = "Apple Shortcuts run through the macOS shortcuts command; Windows and Linux have no Shortcuts application."
+
+[reasons."platform_reason.action_notifications_are_cleared_from_their_centre"]
+kind = "os_api"
+technical = "Windows and the Linux notification daemons let no application dismiss another application's notifications; the equivalent action opens the notification centre."
+
+[reasons."platform_reason.action_office_bold_key_is_windows"]
+kind = "os_concept"
+technical = "French Microsoft Office on Windows uses Ctrl+G for bold, so the action picks the key per application; macOS (Cmd+B) and Linux (Ctrl+B) need one plain shortcut."
+
+[reasons."platform_reason.input_probe_is_autohotkey_specific"]
+kind = "os_concept"
+technical = "These checks measure AutoHotkey's SendInput and its low-level keyboard hook, which only the Windows driver runs."
+
+[reasons."platform_reason.shortcuts_restore_is_composed_on_macos"]
+kind = "not_yet"
+technical = "macOS keeps its key combinations in Karabiner settings, and no restore yet rebuilds them together with the other shortcut settings outside the Configuration menu's restore."
+
+[reasons."platform_reason.alt_gr_is_kana_remap"]
+kind = "os_concept"
+technical = "KbdEdit and MSKLC layouts can reassign AltGr to VK_KANA, a Windows keyboard-driver virtual key with no macOS or Linux counterpart."
+
+[reasons."platform_reason.hotstrings_master_is_macos_engine"]
+kind = "driver_storage"
+technical = "hotstrings.enabled starts and stops the macOS typing engine; Windows keeps its master in category_enabled and Linux switches its groups one by one."
+
+[reasons."platform_reason.magic_key_detection_is_windows"]
+kind = "os_concept"
+technical = "With no key chosen, Windows asks its keyboard layout (VkKeyScanEx) for the key that types the character; on macOS and Linux the installed layout types the magic key itself."
+
+[reasons."platform_reason.ai_menu_bookkeeping_is_windows"]
+kind = "driver_storage"
+technical = "A bookkeeping flag of the Windows AI menu, not a user choice; the macOS and Linux AI menus keep no such record."
+
+[reasons."platform_reason.llm_saved_user_models_are_macos"]
+kind = "driver_storage"
+technical = "The saved My models list is kept by the macOS AI menu; Windows and Linux list their models from their own model sources."
+
+[reasons."platform_reason.llm_mlx_is_apple_silicon"]
+kind = "os_api"
+technical = "MLX is Apple's inference framework on Metal and Apple Silicon unified memory; no Windows or Linux build exists."
+
+[reasons."platform_reason.arrow_navigation_is_macos"]
+kind = "driver_storage"
+technical = "A macOS AI-menu preference; Windows and Linux choose their prediction navigation keys with llm.navigation.nav_modifiers."
+
+[reasons."platform_reason.wrap_selection_is_a_shortcut_key_on_macos"]
+kind = "driver_storage"
+technical = "macOS lists the option among its Ctrl and Cmd shortcuts and stores it as shortcuts.keys.wrap_text_if_selected."
+
+[reasons."platform_reason.caps_word_gestures_stay_with_windows"]
+kind = "os_api"
+technical = "Windows keeps Precision Touchpad gestures to the system and passes no touch to applications, so a gesture cannot end CapsWord there; two-finger scrolling still counts as a scroll."
+
+[reasons."platform_reason.proxy_override_is_native_settings"]
+kind = "driver_storage"
+technical = "macOS and Linux keep the proxy override in the driver's own settings store, not in config.toml."
+
+[reasons."platform_reason.action_executable_permission_is_unix"]
+kind = "os_concept"
+technical = "Windows runs a file by its extension; NTFS has no POSIX executable bit to set."
+
+[reasons."platform_reason.action_text_recognition_is_live_text_on_macos"]
+kind = "os_equivalent"
+technical = "macOS Live Text (VisionKit) reads the text of any capture or image, so the capture action replaces a separate OCR action."
+
+[reasons."platform_reason.action_take_note_uses_notepad"]
+kind = "os_equivalent"
+technical = "macOS provides Quick Note (Fn+Q) instead of a plain-text notes file opened in an editor."
+
+[reasons."platform_reason.action_mirroring_is_the_systems_projection_menu"]
+kind = "os_api"
+technical = "GNOME and KDE choose display duplication in their own Super+P switcher and expose no stable client API for it on Wayland."
+
+[reasons."platform_reason.layer_fn_modifier_is_macos"]
+kind = "os_api"
+technical = "A PC keyboard resolves Fn in its firmware and never reports it to the OS, so Windows and Linux can neither receive nor send it."
+
+[reasons."platform_reason.token_streaming_unvalidated_on_windows"]
+kind = "not_yet"
+technical = "Token-by-token display uses the WinHTTP streaming path, which has not been validated on Windows; the option stays inactive there until it is."
+
+[reasons."platform_reason.chatgpt_url_editor_is_placed_per_driver"]
+kind = "menu_layout"
+technical = "macOS embeds the URL editor below its Ctrl+G shortcut and Windows keeps a GPT shortcut setting; only Linux shows it as a separate row."
+
+[reasons."platform_reason.no_personal_shortcuts_file_on_linux"]
+kind = "os_concept"
+technical = "macOS (Lua) and Windows (AutoHotkey) run a personal shortcuts script; the Linux daemon binds shortcuts to actions in config.toml slots and has no script to edit."
+
+[reasons."platform_reason.only_linux_lacks_metric_sources"]
+kind = "os_api"
+technical = "Under Wayland a client gets no global cursor position, and the current desktop only from sway, Hyprland or KDE Plasma; Windows and macOS measure both on every session."
+
+[reasons."platform_reason.only_linux_migrates_in_the_background"]
+kind = "os_concept"
+technical = "The Linux daemon converts stored metrics to encrypted form in the background; Windows and macOS convert on the next launch and have no progress to show."
+
+[reasons."platform_reason.compose_input_method_is_linux"]
+kind = "os_concept"
+technical = "Compose sequences come from ~/.XCompose, which GTK 3 reads only in part without an input method; macOS and Windows type through their own layouts."
+
+[reasons."platform_reason.layout_install_is_the_macos_bundle"]
+kind = "os_concept"
+technical = "The row installs the macOS .bundle layout; Windows and Linux install Ergopti from their own rows."
+
+[reasons."platform_reason.base_layout_is_the_linux_decode_table"]
+kind = "os_concept"
+technical = "The Linux daemon reads raw evdev keycodes and needs the physical layout that produced them; macOS asks TIS for its input sources and Windows installs a layout, so neither has a decode table."
+
+[reasons."platform_reason.lists_windows_only_settings"]
+kind = "os_concept"
+technical = "Everything the row lists is Windows-only (layout emulation helpers), so on macOS and Linux it would draw an empty list."
+
+[reasons."platform_reason.only_linux_rereads_its_catalogue"]
+kind = "os_concept"
+technical = "The Linux daemon watches the hotstring files (inotify) and can reload them while running; Windows and macOS load the catalogue at launch and reload with the Reload row."
+
+[reasons."platform_reason.libinput_reader_is_linux_only"]
+kind = "os_concept"
+technical = "The Linux driver runs its own libinput touchpad reader, which this row starts and stops; macOS and Windows receive gestures from the system and have no reader."
+
+[reasons."platform_reason.profile_shortcut_uses_prompt_action"]
+kind = "os_equivalent"
+technical = "On Windows and Linux a custom profile is bound through the AI prediction with a chosen prompt action, which applies the profile to that request only."
+
+[reasons."platform_reason.number_row_live_session"]
+kind = "os_api"
+technical = "Linux applies the number-row choice live only where the session lets a client change the active layout: X11 (setxkbmap) and GNOME or KDE on Wayland; other Wayland compositors keep the layout until it is reinstalled."
+
+
+
+# ===================================
+# ===================================
+# ======= 2. Declared owners =======
+# ===================================
+# ===================================
+
+# Layer entries are data: each driver's layer engine resolves the keystroke the
+# vocabulary gives for its OS.
+[kind_owners.windows.layer]
+file = "static/ergopti_plus/windows/platform/remap/layers_loader.ahk"
+token = '== "keystroke:"'
+
+[kind_owners.macos.layer]
+file = "static/ergopti_plus/_shared/layouts/engine/layers/layers.lua"
+token = '== "keystroke:"'
+
+[kind_owners.linux.layer]
+file = "static/ergopti_plus/_shared/layouts/engine/layers/layers.lua"
+token = '== "keystroke:"'
+
+# Hotstring sections are toggled by name: the catalogue loader of each Lua
+# driver asks for any section, so no file spells each one.
+[section_owners.macos."hotstrings.autocorrection"]
+file = "static/ergopti_plus/macos/hotstrings/engine/expander/registry_index.lua"
+token = "function M.is_section_enabled(group_name, section_name)"
+
+[section_owners.macos."hotstrings.distances_reduction"]
+file = "static/ergopti_plus/macos/hotstrings/engine/expander/registry_index.lua"
+token = "function M.is_section_enabled(group_name, section_name)"
+
+[section_owners.macos."hotstrings.sfbs_reduction"]
+file = "static/ergopti_plus/macos/hotstrings/engine/expander/registry_index.lua"
+token = "function M.is_section_enabled(group_name, section_name)"
+
+[section_owners.macos."hotstrings.rolls"]
+file = "static/ergopti_plus/macos/hotstrings/engine/expander/registry_index.lua"
+token = "function M.is_section_enabled(group_name, section_name)"
+
+[section_owners.macos."hotstrings.magic_key"]
+file = "static/ergopti_plus/macos/hotstrings/engine/expander/registry_index.lua"
+token = "function M.is_section_enabled(group_name, section_name)"
+
+[section_owners.macos."hotstrings.french_distancesreduction"]
+file = "static/ergopti_plus/macos/hotstrings/engine/expander/registry_index.lua"
+token = "function M.is_section_enabled(group_name, section_name)"
+
+[section_owners.macos."hotstrings.french_autocorrection"]
+file = "static/ergopti_plus/macos/hotstrings/engine/expander/registry_index.lua"
+token = "function M.is_section_enabled(group_name, section_name)"
+
+[section_owners.macos."hotstrings.french_magickey"]
+file = "static/ergopti_plus/macos/hotstrings/engine/expander/registry_index.lua"
+token = "function M.is_section_enabled(group_name, section_name)"
+
+[section_owners.macos."hotstrings.personal"]
+file = "static/ergopti_plus/macos/hotstrings/engine/expander/registry_index.lua"
+token = "function M.is_section_enabled(group_name, section_name)"
+
+[section_owners.linux."hotstrings.distances_reduction"]
+file = "static/ergopti_plus/linux/hotstrings/engine/catalogue/config.lua"
+token = "function M.is_section_enabled(category, section)"
+
+[section_owners.linux."hotstrings.sfbs_reduction"]
+file = "static/ergopti_plus/linux/hotstrings/engine/catalogue/config.lua"
+token = "function M.is_section_enabled(category, section)"
+
+[section_owners.linux."hotstrings.rolls"]
+file = "static/ergopti_plus/linux/hotstrings/engine/catalogue/config.lua"
+token = "function M.is_section_enabled(category, section)"
+
+[section_owners.linux."hotstrings.magic_key"]
+file = "static/ergopti_plus/linux/hotstrings/engine/catalogue/config.lua"
+token = "function M.is_section_enabled(category, section)"
+
+[section_owners.linux."hotstrings.french_distancesreduction"]
+file = "static/ergopti_plus/linux/hotstrings/engine/catalogue/config.lua"
+token = "function M.is_section_enabled(category, section)"
+
+[section_owners.linux."hotstrings.french_autocorrection"]
+file = "static/ergopti_plus/linux/hotstrings/engine/catalogue/config.lua"
+token = "function M.is_section_enabled(category, section)"
+
+[section_owners.linux."hotstrings.french_magickey"]
+file = "static/ergopti_plus/linux/hotstrings/engine/catalogue/config.lua"
+token = "function M.is_section_enabled(category, section)"
+
+[section_owners.linux."hotstrings.personal"]
+file = "static/ergopti_plus/linux/hotstrings/engine/catalogue/config.lua"
+token = "function M.is_section_enabled(category, section)"
+
+[section_owners.windows."hotstrings.personal"]
+file = "static/ergopti_plus/windows/hotstrings/engine/catalogue/personal.ahk"
+token = '_PersonalGroup := Features["hotstrings"]["personal"]'
+
+# The dynamic families are the manifest's rule families, read in one list.
+[section_owners.linux."hotstrings.dynamic"]
+file = "static/ergopti_plus/linux/hotstrings/engine/dynamic/manager.lua"
+token = "get_dynamic_hotstring_families()"
+
+# Shortcut slots are named by per-OS prefixes, never one by one.
+[section_owners.windows."shortcuts.keyboard"]
+file = "static/ergopti_plus/windows/settings/engine/io.ahk"
+token = "KeyboardShortcutAssignments[Slot] := Action"
+
+[section_owners.macos."shortcuts.keyboard"]
+file = "static/ergopti_plus/_shared/shortcuts/engine/slot_roles_data.lua"
+token = '{ driver = "macos", prefix = "secondary_", roles = { "secondary" } }'
+
+[section_owners.linux."shortcuts.keyboard"]
+file = "static/ergopti_plus/_shared/shortcuts/engine/slot_roles_data.lua"
+token = '{ driver = "linux", prefix = "primary_", roles = { "primary" } }'
+
+[section_owners.macos."shortcuts.tap_keys"]
+file = "static/ergopti_plus/macos/modules/shortcuts/tap_keys.lua"
+token = 'keys_rel_path = "shortcuts/data/actions/tap_keys.json",'
+
+[section_owners.linux."shortcuts.tap_keys"]
+file = "static/ergopti_plus/linux/modules/shortcuts/tap_keys.lua"
+token = 'keys_rel_path = "shortcuts/data/actions/tap_keys.json",'
+
+[section_owners.windows."shortcuts.key_combination_taps"]
+file = "static/ergopti_plus/windows/core/text/engine/toml/config_loader.ahk"
+token = 'SectionPath == "shortcuts.key_combination_taps"'
+
+[section_owners.linux."shortcuts.key_combination_taps"]
+file = "static/ergopti_plus/_shared/tap_hold/engine/key_combinations.lua"
+token = 'TAP_SECTION = "shortcuts.key_combination_taps",'
+
+# Gesture slots come from the shared slot catalogue.
+[section_owners.linux.gestures]
+file = "static/ergopti_plus/linux/gestures/engine/manager.lua"
+token = "M.SINGLE_SLOTS = copy_list(Catalogue.slots.single)"
+
+[section_owners.linux."gestures.modes"]
+file = "static/ergopti_plus/linux/gestures/engine/manager.lua"
+token = "local _modes, _sensitivities = {}, {}"
+
+[section_owners.linux."gestures.sensitivities"]
+file = "static/ergopti_plus/linux/gestures/engine/manager.lua"
+token = "local _modes, _sensitivities = {}, {}"
+
+# The four emulated rows are read by a name built from the row id.
+[owners.windows."layout.emulate_*"]
+file = "static/ergopti_plus/_shared/settings/data/features/layout_rows_policy.ahk"
+token = 'Layout.Get("emulate_" . Row, "")'
+
+[owners.windows."layout_emulated_rows_group.layout.emulate_*"]
+file = "static/ergopti_plus/_shared/settings/data/features/layout_rows_policy.ahk"
+token = 'Layout.Get("emulate_" . Row, "")'
+
+[owners.windows."layout.pause_switch_enabled"]
+file = "static/ergopti_plus/windows/modules/keymap/pause_layout_switch.ahk"
+token = "PauseSwitchPolicyTarget(PauseLayoutSwitch_Settings(Features), Event)"
+
+
+
+# ==================================
+# ==================================
+# ======= 3. Recorded gaps =======
+# ==================================
+# ==================================
+
+# PPT-01: no driver registers these two rolls and no hotstring file holds them.
+[unowned.windows."hotstrings.rolls.chevron_greater"]
+finding = "PPT-01"
+
+[unowned.windows."hotstrings.rolls.chevron_less"]
+finding = "PPT-01"
+
+[unowned.macos."hotstrings.rolls.chevron_greater"]
+finding = "PPT-01"
+
+[unowned.macos."hotstrings.rolls.chevron_less"]
+finding = "PPT-01"
+
+[unowned.linux."hotstrings.rolls.chevron_greater"]
+finding = "PPT-01"
+
+[unowned.linux."hotstrings.rolls.chevron_less"]
+finding = "PPT-01"
+
+# PPT-02: the five Windows personal shortcut switches have no reader.
+[unowned.windows."shortcuts.personal.laptop_broken_key"]
+finding = "PPT-02"
+
+[unowned.windows."shortcuts.personal.mouse_drag_window"]
+finding = "PPT-02"
+
+[unowned.windows."shortcuts.personal.mouse_tab_switching"]
+finding = "PPT-02"
+
+[unowned.windows."shortcuts.personal.professional_environment"]
+finding = "PPT-02"
+
+[unowned.windows."shortcuts.personal.programmable_keyboard"]
+finding = "PPT-02"
+
+# PPT-03: only macOS reads llm.generation.sequential_mode.
+[unowned.windows."llm.generation.sequential_mode"]
+finding = "PPT-03"
+
+[unowned.linux."llm.generation.sequential_mode"]
+finding = "PPT-03"

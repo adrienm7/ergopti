@@ -276,6 +276,18 @@
 					"type": "string",
 					"description": "Locale key explaining WHY this feature is unavailable on the platforms its \"platforms\" list excludes. Read by the platform-coverage report (Menu → Debug → Healthcheck), which is the only place a user can ask why a row is missing. Meaningless without a platforms restriction, and the generator refuses one that has none."
 				},
+				"degraded": {
+					"type": "object",
+					"propertyNames": {
+						"enum": ["windows", "macos", "linux"]
+					},
+					"additionalProperties": {
+						"type": "string",
+						"pattern": "^[a-z][a-z0-9_.]*$"
+					},
+					"minProperties": 1,
+					"description": "Per OS the feature is on but only partly, the locale key of the reason the menu shows (some sessions or some hardware of that OS cannot apply it). Read by the platform parity table; each OS must be one of the feature's platforms."
+				},
 				"superseded_reason_key": {
 					"type": "string",
 					"pattern": "^[a-z][a-z0-9_.]*$",

@@ -6,7 +6,10 @@
  * DESCRIPTION:
  * Ensures every canonical feature has an explicit Linux status, absence reason,
  * implementation state, owner, and proof tier without treating declaration as
- * runtime or hardware evidence.
+ * runtime or hardware evidence. It also gates the three-OS parity table
+ * (docs/platform-parity-table.md, tools/lib/platform-parity.cjs): fresh output,
+ * a reason in the 21 locales for every unavailable or degraded cell, an owner
+ * for every available one, and no feature row drawn where its feature is not.
  * ============================================================================
  */
 
@@ -629,6 +632,126 @@ duplicateGroupMember.evidence_groups.duplicate = {
 	members: [duplicateGroupMember.evidence_groups.gestures.members[0]]
 };
 assert.throws(() => build(duplicateGroupMember), /belongs to more than one evidence group/);
+
+// ======= The three-OS parity table (docs/platform-parity-table.md) =======
+// One build serves the freshness check and the mutations: each mutation breaks
+// one rule of tools/lib/platform-parity.cjs and must be named by the gate.
+const parityTable = require('../codegen/codegen-platform-parity.cjs');
+const Parity = require('../lib/platform-parity.cjs');
+const parityBuild = parityTable.build();
+assert.deepStrictEqual(parityBuild.errors, [], 'the platform parity rules must hold');
+assert.strictEqual(
+	fs.readFileSync(path.join(ROOT, 'docs/platform-parity-table.md'), 'utf8'),
+	parityTable.format(parityTable.render(parityBuild.table, parityBuild)),
+	'docs/platform-parity-table.md is stale; run node tools/codegen/codegen-platform-parity.cjs'
+);
+// The table and the Linux evidence above read the same catalogue.
+assert.strictEqual(
+	parityBuild.table.filter(
+		(row) => row.kind === 'feature' && row.cells.linux.status !== 'unavailable'
+	).length,
+	summary.claimed_supported,
+	'the parity table and the Linux evidence must count the same Linux features'
+);
+const parityContext = {
+	parity: parityBuild.parity,
+	locales: parityBuild.locales,
+	readSource: (rel) =>
+		fs.existsSync(path.join(ROOT, rel)) ? fs.readFileSync(path.join(ROOT, rel), 'utf8') : null
+};
+const parityErrors = (mutate) => {
+	const table = structuredClone(parityBuild.table);
+	const context = { ...parityContext, parity: structuredClone(parityBuild.parity) };
+	mutate(table, context);
+	return Parity.validateTable(table, context).join('\n');
+};
+const firstCell = (table, kind, status) => {
+	for (const row of table)
+		if (row.kind === kind)
+			for (const [os, state] of Object.entries(row.cells))
+				if (state.status === status) return { row, os, state };
+	throw new Error(`no ${kind} cell is ${status}`);
+};
+// A cell left out without a reason key.
+assert.match(
+	parityErrors((table) => {
+		firstCell(table, 'feature', 'unavailable').state.reason_key = null;
+	}),
+	/is unavailable on \w+ without a reason key/
+);
+// A reason with no technical explanation.
+assert.match(
+	parityErrors((table, context) => {
+		delete context.parity.reasons[firstCell(table, 'action', 'unavailable').state.reason_key];
+	}),
+	/has no kind and technical text in platform_parity.toml/
+);
+// A reason the menu cannot show in one of the 21 locales.
+assert.match(
+	parityErrors((table, context) => {
+		const key = firstCell(table, 'menu', 'unavailable').state.reason_key;
+		context.locales = { ...context.locales, ja: { ...context.locales.ja, [key]: '' } };
+	}),
+	/menu reason [\w.]+ is missing in ja/
+);
+// A degraded cell is as much in need of its reason as an unavailable one.
+assert.match(
+	parityErrors((table) => {
+		firstCell(table, 'feature', 'degraded').state.reason_key = null;
+	}),
+	/is degraded on linux without a reason key/
+);
+// Supported on an OS where no production file reads it.
+assert.match(
+	parityErrors((table) => {
+		firstCell(table, 'feature', 'supported').state.owner = null;
+	}),
+	/but no \w+ production file spells it/
+);
+// A menu row bound to a feature, drawn where the feature is unavailable.
+assert.match(
+	parityErrors((table) => {
+		const row = table.find((entry) => entry.kind === 'menu' && entry.feature_path);
+		const feature = table.find((entry) => entry.path === row.feature_path);
+		feature.cells.windows = {
+			status: 'unavailable',
+			reason_key: 'platform_reason.lists_windows_only_settings'
+		};
+		row.cells.windows = { ...row.cells.windows, status: 'supported', owner: 'x' };
+	}),
+	/shows on windows where its feature [\w.]+ is unavailable/
+);
+// A recorded gap that a driver now reads is stale, and so is an unused owner rule.
+assert.match(
+	parityErrors((table) => {
+		const row = table.find((entry) => entry.path === 'hotstrings.rolls.chevron_greater');
+		row.cells.windows.owner =
+			'static/ergopti_plus/windows/hotstrings/engine/catalogue/distances.ahk';
+	}),
+	/unowned windows hotstrings.rolls.chevron_greater is stale/
+);
+assert.match(
+	parityErrors((table) => {
+		for (const row of table)
+			if (row.kind === 'layer')
+				for (const state of Object.values(row.cells)) state.owner_rule = 'spelled';
+	}),
+	/kind_owners.windows.layer is stale/
+);
+// A declared owner whose file does not hold its token in code.
+assert.match(
+	parityErrors((_table, context) => {
+		context.parity.kind_owners.windows.layer.token = 'no such code line';
+	}),
+	/kind_owners.windows.layer: .* has no code line with no such code line/
+);
+// A feature row of the menu inherits its feature's platforms (the macOS-only
+// wrap option is drawn from each driver's manifest, so macOS shows no row).
+assert.strictEqual(
+	parityBuild.table.find((row) => row.path === 'shortcuts_menu.shortcuts.wrap_text_if_selected')
+		.cells.macos.status,
+	'unavailable'
+);
 
 if (process.argv.includes('--report')) {
 	process.stdout.write(`${JSON.stringify({ summary, features: rows }, null, 2)}\n`);

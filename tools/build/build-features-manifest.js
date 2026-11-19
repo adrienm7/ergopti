@@ -336,6 +336,21 @@ function validate(features) {
 					'there is no absence to explain'
 			);
 		}
+		// degraded: the OS the feature is on but only on some sessions or hardware.
+		// A degraded OS the feature is not declared for would be a contradiction.
+		if (f.degraded !== undefined) {
+			const driverOf = { windows: 'ahk', macos: 'hs', linux: 'linux' };
+			const entries =
+				f.degraded && typeof f.degraded === 'object' ? Object.entries(f.degraded) : [];
+			if (entries.length === 0)
+				throw new Error(`feature ${f.path} has an empty or invalid degraded table`);
+			for (const [os, key] of entries) {
+				if (!driverOf[os] || !(f.platforms || PLATFORMS).includes(driverOf[os]))
+					throw new Error(`feature ${f.path} is degraded on ${os}, which it is not declared for`);
+				if (typeof key !== 'string' || !/^[a-z][a-z0-9_.]*$/.test(key))
+					throw new Error(`feature ${f.path} has an invalid degraded reason for ${os}`);
+			}
+		}
 		// superseded_reason_key: a feature an emulated registry layout replaces
 		// (the Ergopti emulation, the digit-row swap). The Windows master gate
 		// reads it and can only turn a boolean off; the Lua drivers type the

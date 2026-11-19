@@ -92,4 +92,4 @@ function platformReadViolations(manifest, sources) {
 	return violations;
 }
 
-module.exports = { PLATFORMS, entryPlatforms, platformReadViolations };
+module.exports = { PLATFORMS, codeLines, entryPlatforms, platformReadViolations };

@@ -4278,6 +4278,9 @@ superseded_reason_key = "menu.layout.superseded_ergopti_only"
 [[features.layout]]
 id = "direct_access_digits"
 platforms = ["ahk", "hs", "linux"]
+# Linux applies it live only on X11 and on GNOME or KDE under Wayland
+# (linux/ui/menu/menu_layouts.lua greys the rows elsewhere).
+degraded = { linux = "platform_reason.number_row_live_session" }
 requires = { macos = [], linux = [], windows = [] }
 default = "native"
 recommended_per_platform = { ahk = "digits", hs = "native", linux = "native" }
@@ -4319,6 +4322,9 @@ description_key = "menu.layout.virtual_keyboard"
 [[features.layout]]
 id = "number_row_reorder_edges"
 platforms = ["ahk", "hs", "linux"]
+# Linux applies it live only on X11 and on GNOME or KDE under Wayland
+# (linux/ui/menu/menu_layouts.lua greys the rows elsewhere).
+degraded = { linux = "platform_reason.number_row_live_session" }
 requires = { macos = [], linux = [], windows = [] }
 default = false
 recommended = false
