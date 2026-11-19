@@ -106,7 +106,7 @@ const SPEED_CORPUS = path.join(
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
 // The layouts the library held at its last import: it may only grow.
-const LIBRARY_COUNT = 180;
+const LIBRARY_COUNT = 614;
 // The collections imported from their authors' own files: each of their
 // layouts is credited from the author's page (layout_credits.json).
 const CREDITED_SOURCES = ['handsdown'];
@@ -2500,14 +2500,34 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		['notarise', 'Semicolon', 0, 'r'],
 		['heads_up', 'KeyL', 0, 'o'],
 		['hands_on', 'KeyT', 0, 'j'],
-		['hands_on_sym', 'KeyB', 0, 'j']
+		['hands_on_sym', 'KeyB', 0, 'j'],
+		// KLAnext's layouts/ files (2026-11-19): Fargas (ISO), Navarre's 1907
+		// French layout, SteveP's ISO Colemak-DH on the angle mod, Alphametric.
+		['fargas', 'KeyQ', 0, '$'],
+		['fargas', 'KeyW', 0, 'l'],
+		['fargas', 'IntlBackslash', 0, 'q'],
+		['fargas', 'KeyB', 0, '['],
+		['zhjayscpg_1907_fr', 'KeyQ', 0, 'à'],
+		['zhjayscpg_1907_fr', 'KeyA', 0, '-'],
+		['zhjayscpg_1907_fr', 'IntlBackslash', 0, '<'],
+		['zhjayscpg_1907_fr', 'KeyB', 0, 'o'],
+		['colemak_mod_dh', 'IntlBackslash', 0, 'z'],
+		['colemak_mod_dh', 'KeyB', 0, '\\'],
+		['alphametric', 'KeyQ', 0, '/'],
+		['alphametric', 'KeyA', 0, 'a'],
+		['alphametric', 'KeyZ', 0, "'"]
 	];
 	for (const [id, code, level, expected] of official)
 		check(
 			cell(id, code, level) === expected,
 			`collections: ${id} ${code} level ${level} is ${cell(id, code, level)}, its official file has ${expected}`
 		);
-	for (const id of ['hands_down_polyglot_sym', 'hands_down_ref_sym', 'hands_on_sym'])
+	for (const id of [
+		'hands_down_polyglot_sym',
+		'hands_down_ref_sym',
+		'hands_on_sym',
+		'colemak_mod_dh'
+	])
 		check(byId.get(id).fingering === 'angle', `collections: ${id} is not on the angle fingering`);
 	// What a collection leaves out says why: a Hands Down letter on a thumb key
 	// has no key on the library's keyboards, and its Reference is held once.
@@ -2520,6 +2540,16 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	check(
 		(left.get('JSON/HandsDownArchive/Hands_Down_ref_ansi.json') || {}).same_as === 'hands_down',
 		'collections: Hands Down Reference is not the library’s hands_down'
+	);
+	// KLAnext's copy of a library layout is left out, naming the one held.
+	check(
+		(left.get('layouts/colemak.en.ansi.json') || {}).same_as === 'colemak',
+		'collections: KLAnext’s Colemak is not the library’s colemak'
+	);
+	// A collection's credit names the author its file states (KLAnext's « author »).
+	check(
+		(credits.fargas || {}).authors[0] === 'Peter Fargas, captured by Ian Douglas',
+		'collections: Fargas is not credited as its KLAnext file states'
 	);
 }
 

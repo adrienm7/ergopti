@@ -635,6 +635,16 @@ that may only grow and a checked credit for each):
   not done here. The matrix, ortho and ErgoDox copies that put letters on
   combos or outer columns, and Neu's JIS and ErgoDox files, are listed with
   their reason; Neu stays cmini's.
+- **KLAnext** (klanext.keyboard-design.com, version 0.06; no licence
+  published, user-submitted files): its `db.js` lists 723 layout files, of
+  which 711 answered (read as data, never run, through the Studio's KLA
+  reader). 434 layouts are new (430 English, Navarre's 1907 and 2023 French
+  layouts, two Dutch); the files' own fingers put 66 of them on the angle
+  fingering (ring and middle on the first bottom keys). 142 repeat a library
+  layout, the others place letters off the library's keys or on two keys, or
+  could not be read; `not_imported` lists each. Its ISO QWERTY, whose N and
+  M are swapped, is left out by judgement. Each is credited to the author its
+  file names (basis « collection »); its corpus texts are not stored.
 
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not

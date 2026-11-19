@@ -488,6 +488,1944 @@
 			"basis": "source",
 			"checked": "2026-11-19",
 			"evidence": "moutis/HandsDown e8f532f62c, JSON/MiscLayouts/Notarise_ansi.json: « author »: « Alan Reiser », label « Notarise ansi »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"colemak_mod_dh": {
+			"authors": ["SteveP"],
+			"url": "https://colemakmods.github.io/mod-dh/",
+			"basis": "collection"
+		},
+		"fargas": {
+			"authors": ["Peter Fargas, captured by Ian Douglas"],
+			"url": "https://informatik-handwerk.de/greyLiterature/whitepaper/dvorak/unreleasedDraft.html",
+			"basis": "collection"
+		},
+		"jnrf": {
+			"authors": ["fullgrid"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/mj2bsl/jnrf_layout/",
+			"basis": "collection"
+		},
+		"zhjayscpg_1907_fr": {
+			"authors": ["Albert Navarre"],
+			"url": "https://fr.wikipedia.org/wiki/ZHJAYSCPG",
+			"basis": "collection"
+		},
+		"zhjayscpg_2023_fr": {
+			"authors": ["Albert Navarre & Patrick Jamet"],
+			"url": "https://fr.wikipedia.org/wiki/ZHJAYSCPG",
+			"basis": "collection"
+		},
+		"kn_14_maks": {
+			"authors": ["Philipp Kiefer"],
+			"basis": "collection"
+		},
+		"kn_16_maks": {
+			"authors": ["Philipp Kiefer"],
+			"basis": "collection"
+		},
+		"kn_93fk_optimal": {
+			"authors": ["Filip Kaiser"],
+			"url": "https://github.com/93fk/Optimal_Keyboard_Layout",
+			"basis": "collection"
+		},
+		"a_joy_rehomed": {
+			"authors": ["Ajoy, rehomed by Ian"],
+			"url": "http://aj0y.blogspot.co.za/2014/09/keyboard-layouts-new-kid-on-block.html",
+			"basis": "collection"
+		},
+		"ace_vim_test": {
+			"authors": ["Donji"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"ace_vim": {
+			"authors": ["Donji"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"adnw_english_bigram": {
+			"authors": ["KLCord"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"adnw_mod_keen": {
+			"authors": ["Stephen Keen"],
+			"url": "https://geekhack.org/index.php?topic=66546.0",
+			"basis": "collection"
+		},
+		"adnw_klanext": {
+			"authors": ["Andreas Wettstein"],
+			"url": "http://www.adnw.de",
+			"basis": "collection"
+		},
+		"aehi": {
+			"authors": ["bye"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"ahei_klanext": {
+			"authors": ["Christian Rosdahl"],
+			"url": "https://github.com/christianrosdahl/ahei-keyboard",
+			"basis": "collection"
+		},
+		"ali_kian": {
+			"authors": ["Ali Asghar Poorhajikazam, Kian Nimgaz Naghsh"],
+			"url": "http://jipet.iaun.ac.ir/article_558771_2207fa613ad387597ee833e108980f9d.pdf",
+			"basis": "collection"
+		},
+		"alphametric": {
+			"authors": ["Martin (1972), with ANSI top row and punctuation"],
+			"basis": "collection"
+		},
+		"ammon134": {
+			"authors": ["u/ammon134"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/15wvi7t/modded_version_of_dwarfwhorf_optimized_for/",
+			"basis": "collection"
+		},
+		"another_method_non_mirrored": {
+			"authors": ["Yarick Antonov"],
+			"url": "https://vk.com/wall-58052526_30",
+			"basis": "collection"
+		},
+		"another_method_non": {
+			"authors": ["Yarick Antonov"],
+			"url": "https://vk.com/wall-58052526_30",
+			"basis": "collection"
+		},
+		"anrt": {
+			"authors": ["bye"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"antithesis": {
+			"authors": ["PanicJoker03"],
+			"url": "https://github.com/PanicJoker03/antithesis-layout",
+			"basis": "collection"
+		},
+		"ants": {
+			"authors": ["Donji"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"apt_klanext": {
+			"authors": ["Evan Callicoat"],
+			"url": "https://github.com/Apsu/APT",
+			"basis": "collection"
+		},
+		"apt3_am": {
+			"authors": ["Evan Callicoat"],
+			"url": "https://github.com/Apsu/APT",
+			"basis": "collection"
+		},
+		"apthd": {
+			"authors": ["Evan Callicoat"],
+			"url": "https://github.com/Apsu/APTHD",
+			"basis": "collection"
+		},
+		"aptsym": {
+			"authors": ["Evan Callicoat"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"aptsym2": {
+			"authors": ["Evan Callicoat"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"aptx": {
+			"authors": ["bye"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"argon": {
+			"authors": ["Bryson James"],
+			"url": "https://github.com/GalileoBlues/LayoutCollection",
+			"basis": "collection"
+		},
+		"arinh": {
+			"authors": ["SpeedMorph"],
+			"url": "https://forum.colemak.com/topic/397-keyboard-optimizer-genetic-algorithm/p2/",
+			"basis": "collection"
+		},
+		"armel_mod_ian": {
+			"authors": ["Gerald J. Armel mod Ian"],
+			"url": "https://www.google.com/patents/US5879089",
+			"basis": "collection"
+		},
+		"armel_refingered_ian": {
+			"authors": ["Armel"],
+			"url": "https://www.google.com/patents/US5879089",
+			"basis": "collection"
+		},
+		"arts": {
+			"authors": ["ClemenPine"],
+			"url": "https://docs.google.com/document/d/1_a5Nzbkwyk1o0bvTctZrtgsee9jSP-6I0q3A0_9Mzm0/edit#",
+			"basis": "collection"
+		},
+		"aryo": {
+			"authors": ["Ben Lu"],
+			"url": "https://medium.com/@benlu/making-my-own-keyboard-layout-what-i-learned-a8b731f87bff",
+			"basis": "collection"
+		},
+		"as_in_red_hot_mod_ian": {
+			"authors": ["John I. M. Choate mod Ian, captured by Ian Douglas"],
+			"url": "http://www.google.sr/patents/US5836705",
+			"basis": "collection"
+		},
+		"as_in_red_hot": {
+			"authors": ["John I. M. Choate, captured by Ian Douglas"],
+			"url": "http://www.google.sr/patents/US5836705",
+			"basis": "collection"
+		},
+		"aserth": {
+			"authors": ["someguy3"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/jr6k0h/wow_check_out_this_layout_aserthqwdfgy_row_swap/",
+			"basis": "collection"
+		},
+		"asrt_dh": {
+			"authors": ["bye"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"asrt_hrl2": {
+			"authors": ["bye"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"asrt": {
+			"authors": ["bye"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"asthl": {
+			"authors": ["Sasha Viminitz"],
+			"url": "https://mathematicalmulticore.wordpress.com/the-keyboard-layout-project/",
+			"basis": "collection"
+		},
+		"athena_alt": {
+			"authors": ["Hazaskull"],
+			"url": "https://github.com/ijzerbroot/handsonui/blob/main/README.md",
+			"basis": "collection"
+		},
+		"athena": {
+			"authors": ["Hazaskull"],
+			"url": "https://github.com/ijzerbroot/handsonui/blob/main/README.md",
+			"basis": "collection"
+		},
+		"atreyata": {
+			"authors": ["Atreyata"],
+			"url": "https://forum.colemak.com/topic/2644-shais-colemak-mod/p3/#p24243",
+			"basis": "collection"
+		},
+		"austenmak": {
+			"authors": ["Hirou"],
+			"url": "https://github.com/semilin/key-analyzer/blob/main/main.go",
+			"basis": "collection"
+		},
+		"autogen_1": {
+			"authors": ["KeyGen"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"balance_12_klanext": {
+			"authors": ["found on net, slightly modded by Ian."],
+			"basis": "collection"
+		},
+		"balanced": {
+			"authors": ["Xay Voong"],
+			"url": "http://shenafu.com/smf/index.php?topic=89.0",
+			"basis": "collection"
+		},
+		"banaji": {
+			"authors": ["F.M.M. Banaji,"],
+			"url": "https://patentimages.storage.googleapis.com/f2/fa/74/3d4be1d5f7028f/US1336122.pdf",
+			"basis": "collection"
+		},
+		"beakl_hm1_mod_ian": {
+			"authors": ["Shenafu"],
+			"url": "https://ieants.cc/smf/index.php?topic=89",
+			"basis": "collection"
+		},
+		"beakl_opted4": {
+			"authors": ["Patrick Gillespie"],
+			"url": "https://en.wikipedia.org/wiki/QWERTY",
+			"basis": "collection"
+		},
+		"beakl421_mod_ian": {
+			"authors": ["Mateusz G. Kluczyk, mod Ian"],
+			"basis": "collection"
+		},
+		"beakl421": {
+			"authors": ["Mateusz G. Kluczyk"],
+			"basis": "collection"
+		},
+		"beakl49": {
+			"authors": ["Mateusz G. Kluczyk"],
+			"basis": "collection"
+		},
+		"beakl_stretch": {
+			"authors": ["Amuseum"],
+			"url": "http://shenafu.com/smf/index.php?topic=89.0",
+			"basis": "collection"
+		},
+		"beesechurger": {
+			"authors": ["ClemenPine"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"bgrassy": {
+			"authors": ["Brock Grassy"],
+			"url": "https://brockgrassy.com/blog/posts/keyboard-layout-project-version-1",
+			"basis": "collection"
+		},
+		"big_guyy": {
+			"authors": ["shaharzur123"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/n9brte/big_guy_layout/",
+			"basis": "collection"
+		},
+		"blick_mod_ian": {
+			"authors": [
+				"Nick Matavka from George Canfield Blickensderfer, mod Ian, captured by Ian Douglas"
+			],
+			"url": "https://en.wikipedia.org/wiki/Keyboard_layout#Modified_Blickensderfer",
+			"basis": "collection"
+		},
+		"blick": {
+			"authors": ["Nick Matavka from George Canfield Blickensderfer, captured by Ian Douglas"],
+			"url": "https://en.wikipedia.org/wiki/Keyboard_layout#Modified_Blickensderfer",
+			"basis": "collection"
+		},
+		"blou": {
+			"authors": ["web"],
+			"basis": "collection"
+		},
+		"bone_klanext": {
+			"authors": ["DonjiDonji"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/xkh13w/lowest_possible_bigram_count_introducing_the_bone/",
+			"basis": "collection"
+		},
+		"boo_20211119": {
+			"authors": ["Samuel Tan"],
+			"url": "https://ballerboo.github.io/boolayout/",
+			"basis": "collection"
+		},
+		"box_x": {
+			"authors": ["X, captured by Ian Douglas"],
+			"url": "https://www.google.com/patents/US3847263",
+			"basis": "collection"
+		},
+		"bsdhacker": {
+			"authors": ["bsdhacker"],
+			"url": "https://forum.colemak.com/post/4386/#p4386",
+			"basis": "collection"
+		},
+		"bubbletea": {
+			"authors": ["KayOS"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"burroughs_bower_mod_ian": {
+			"authors": ["Raymond G Bower mod Ian Douglas"],
+			"url": "http://www.google.la/patents/US2080457",
+			"basis": "collection"
+		},
+		"calemog": {
+			"authors": ["KLCord"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"canary_gv": {
+			"authors": ["verdant"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"canary_plusplus": {
+			"authors": ["Apsu, AKL collab, Ian"],
+			"url": "https://github.com/Apsu/Canary",
+			"basis": "collection"
+		},
+		"canary_pow_123": {
+			"authors": ["Pow_123"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/15ruprh/cool_little_layout_i_made_and_started_using/",
+			"basis": "collection"
+		},
+		"canary_klanext": {
+			"authors": ["Apsu"],
+			"url": "https://github.com/Apsu/Canary",
+			"basis": "collection"
+		},
+		"capewell_qwerf": {
+			"authors": ["Michael Capewell, captured by Ian Douglas"],
+			"url": "http://www.michaelcapewell.com/projects/keyboard/index.htm#The_QWERF_Layout",
+			"basis": "collection"
+		},
+		"carbyne_ian": {
+			"authors": ["cyanophage mod ian"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/18ils2y/a_new_layout/",
+			"basis": "collection"
+		},
+		"carbyne": {
+			"authors": ["cyanophage"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/18ils2y/a_new_layout/",
+			"basis": "collection"
+		},
+		"castra": {
+			"authors": ["trulicups"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"celestial_klanext": {
+			"authors": ["furtissim2"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"chendan_cmu_no_contraints": {
+			"authors": ["ChenDanCMU"],
+			"url": "https://github.com/ChenDanCMU/Keyboard-Layout-Search",
+			"basis": "collection"
+		},
+		"chendan_cmu_punctuation": {
+			"authors": ["ChenDanCMU"],
+			"url": "https://github.com/ChenDanCMU/Keyboard-Layout-Search",
+			"basis": "collection"
+		},
+		"chendan_cmu_qawzxc": {
+			"authors": ["ChenDanCMU"],
+			"url": "https://github.com/ChenDanCMU/Keyboard-Layout-Search",
+			"basis": "collection"
+		},
+		"chendan_cmu_qawzxcv": {
+			"authors": ["ChenDanCMU"],
+			"url": "https://github.com/ChenDanCMU/Keyboard-Layout-Search",
+			"basis": "collection"
+		},
+		"chendan_cmu_zxcv": {
+			"authors": ["ChenDanCMU"],
+			"url": "https://github.com/ChenDanCMU/Keyboard-Layout-Search",
+			"basis": "collection"
+		},
+		"cmbk_nlhy_2": {
+			"authors": ["bye"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"code_weaver": {
+			"authors": ["Logan Hall"],
+			"url": "https://gitlab.com/CodeWeaver/kbd-eff/-/blob/master/kbds/CW.txt",
+			"basis": "collection"
+		},
+		"code": {
+			"authors": ["BJM Wang"],
+			"url": "https://github.com/osls/code-layout",
+			"basis": "collection"
+		},
+		"codemak": {
+			"authors": ["kkarmadonov"],
+			"url": "https://github.com/kkarmadonov/codemak",
+			"basis": "collection"
+		},
+		"codemakx": {
+			"authors": ["kkarmadonov"],
+			"url": "https://github.com/kkarmadonov/codemak",
+			"basis": "collection"
+		},
+		"colemak_asrt_mod_hazaskull": {
+			"authors": ["someguy3"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/10hvcpa/colemakasrt_a_colemak_variant_that_uses_the/",
+			"basis": "collection"
+		},
+		"colemak_cousin": {
+			"authors": ["Autogen, program by Ian Douglas"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"colemak_dh_ring_20211116": {
+			"authors": ["cheechlabeech"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/qusrbc/colemakdhring_mod_3rd_atbat/",
+			"basis": "collection"
+		},
+		"colemak_h": {
+			"authors": ["Shai Coleman, mod triple_a"],
+			"url": "https://forum.colemak.com/topic/2644-shais-colemak-mod/p3/",
+			"basis": "collection"
+		},
+		"colemak_lf": {
+			"authors": ["Hazaskull"],
+			"url": "https://github.com/ijzerbroot/handsonui/blob/main/colemak-lf-kla.json",
+			"basis": "collection"
+		},
+		"colemak_lite": {
+			"authors": ["Shai Coleman mod Antithesis"],
+			"url": "https://forum.colemak.com/topic/1483-colemak-lite-new-keyboard-layout/",
+			"basis": "collection"
+		},
+		"colemak_mod_fox": {
+			"authors": ["Fred B. Fox"],
+			"url": "https://forum.colemak.com/topic/2120-newbie-modifies-colemak-5-keys-changed-for-comfort-and-symmetry/",
+			"basis": "collection"
+		},
+		"colemak_pine": {
+			"authors": ["Shai Coleman, ClemenPine"],
+			"url": "https://docs.google.com/document/d/1_a5Nzbkwyk1o0bvTctZrtgsee9jSP-6I0q3A0_9Mzm0/edit#heading=h.ds6a09c45va",
+			"basis": "collection"
+		},
+		"colemak_qi_klanext": {
+			"authors": ["Shai Coleman, Steves Pugh, Nyfee"],
+			"url": "https://docs.google.com/document/d/1_a5Nzbkwyk1o0bvTctZrtgsee9jSP-6I0q3A0_9Mzm0/edit#",
+			"basis": "collection"
+		},
+		"colemak_qix": {
+			"authors": ["Nyfee"],
+			"url": "https://github.com/DreymaR/BigBagKbdTrixPKL/tree/master/Layouts/Colemak/Cmk-Qmods#colemak-qix-by-nyfee-2021-03",
+			"basis": "collection"
+		},
+		"colemak_textblade": {
+			"authors": ["Wout Mertens"],
+			"url": "https://waytools.com/threads/blog/colemak",
+			"basis": "collection"
+		},
+		"colemak_wide": {
+			"authors": ["evgar"],
+			"url": "https://forum.colemak.com/topic/839-colemak-extrawide-layout-alternate-home-position/",
+			"basis": "collection"
+		},
+		"colemak_vcp": {
+			"authors": ["Dutchnesss1"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/soqx0i/found_a_comfier_for_me_mod_to_colemakdh/",
+			"basis": "collection"
+		},
+		"colemaq_f_klanext": {
+			"authors": ["Nyfee"],
+			"url": "https://docs.google.com/document/d/1_a5Nzbkwyk1o0bvTctZrtgsee9jSP-6I0q3A0_9Mzm0/edit#",
+			"basis": "collection"
+		},
+		"colevim": {
+			"authors": ["Donji"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"colibius_august_mod_ian": {
+			"authors": ["Colibius August mod Ian"],
+			"url": "http://colibius.tumblr.com/post/117989525096",
+			"basis": "collection"
+		},
+		"colibius_august": {
+			"authors": ["Colibius"],
+			"url": "http://colibius.tumblr.com/post/117989525096",
+			"basis": "collection"
+		},
+		"combinational": {
+			"authors": ["Nelson (1920)"],
+			"basis": "collection"
+		},
+		"crankiest_y": {
+			"authors": ["cheechlabeech"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/rb8gzh/crankiesty_layout/",
+			"basis": "collection"
+		},
+		"crate": {
+			"authors": ["Cheap_Theory9697"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/1b9g9uv/crate_a_keyboard_layout_focused_into/",
+			"basis": "collection"
+		},
+		"crstm": {
+			"authors": ["Apsu"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"ctgap_ev": {
+			"authors": ["EV"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"ctgap_final": {
+			"authors": ["Colby Chai"],
+			"url": "https://github.com/CTGAP/ctgap-keyboard-layout",
+			"basis": "collection"
+		},
+		"ctgap": {
+			"authors": ["Evan Callicoat"],
+			"url": "https://github.com/Apsu/APT#notes",
+			"basis": "collection"
+		},
+		"culemak_mod_ian_hp": {
+			"authors": ["Wade Fitzpatrick mod Ian+Den"],
+			"url": "http://waddles.org/culemak-slight-variation-colemak/",
+			"basis": "collection"
+		},
+		"culemak": {
+			"authors": ["Wade Fitzpatrick"],
+			"url": "http://waddles.org/culemak-slight-variation-colemak/",
+			"basis": "collection"
+		},
+		"cyberswarm_mod_ian": {
+			"authors": ["Peng-Yeng Yin, En-Ping Su, mod Ian"],
+			"basis": "collection"
+		},
+		"cyberswarm": {
+			"authors": ["Peng-Yeng Yin, En-Ping Su"],
+			"basis": "collection"
+		},
+		"de_correspondent_nl": {
+			"authors": ["Martin Krzywinsk"],
+			"url": "http://mkweb.bcgsc.ca/carpalx/?de_correspondent",
+			"basis": "collection"
+		},
+		"debian": {
+			"authors": ["ClemenPine"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"dhorf_klanext": {
+			"authors": ["Oxey"],
+			"url": "https://docs.google.com/document/d/1_a5Nzbkwyk1o0bvTctZrtgsee9jSP-6I0q3A0_9Mzm0/edit#heading=h.51u71eogj80",
+			"basis": "collection"
+		},
+		"dickens_lsf": {
+			"authors": ["Michael Dickens, captured by Ian Douglas"],
+			"url": "http://mtgap.bilfo.com/keyboard.html",
+			"basis": "collection"
+		},
+		"dilbert": {
+			"authors": ["Autogen, program by Ian Douglas"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"doerak": {
+			"authors": ["KLCord"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"dtk_eia": {
+			"authors": ["Philipp Kiefer"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"dutchman": {
+			"authors": ["jgeeliss"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/177534s/dutchman_workmanmod_to_accommodate_dutch/",
+			"basis": "collection"
+		},
+		"dvarf": {
+			"authors": ["Oxey"],
+			"url": "https://docs.google.com/document/d/1_a5Nzbkwyk1o0bvTctZrtgsee9jSP-6I0q3A0_9Mzm0/edit#",
+			"basis": "collection"
+		},
+		"dvimcat": {
+			"authors": ["Donji"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"dvorak_mod_elazharty_azmi_suliman_mod_ian": {
+			"authors": ["El-Azharty, Azmi, Suliman (1985), slightly modded for KLA by Ian"],
+			"basis": "collection"
+		},
+		"dvorak_original_numbers": {
+			"authors": ["Patrick Gillespie"],
+			"url": "https://en.wikipedia.org/wiki/Dvorak_Simplified_Keyboard",
+			"basis": "collection"
+		},
+		"dvorky": {
+			"authors": ["ClemenPine"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"dvormax": {
+			"authors": ["PieterGen"],
+			"url": "https://geekhack.org/index.php?topic=80310.0",
+			"basis": "collection"
+		},
+		"einbinder_10_finger": {
+			"authors": ["Harvey Einbinder, modded to ANSI by Ian Douglas"],
+			"url": "http://www.google.la/patents/US4332493",
+			"basis": "collection"
+		},
+		"eito": {
+			"authors": ["ClemenPine"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"eka": {
+			"authors": ["adi.lela"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"em0gus": {
+			"authors": ["Oxey"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"embizone_mod_ian": {
+			"authors": ["embizone mod Ian"],
+			"url": "https://geekhack.org/index.php?topic=89827.0",
+			"basis": "collection"
+		},
+		"embizone": {
+			"authors": ["embizone"],
+			"url": "https://geekhack.org/index.php?topic=89827.0",
+			"basis": "collection"
+		},
+		"english_p": {
+			"authors": ["Iso Lee"],
+			"url": "https://naver.com",
+			"basis": "collection"
+		},
+		"etni": {
+			"authors": ["Steve Pugh"],
+			"url": "https://stevep99.github.io/etni/",
+			"basis": "collection"
+		},
+		"eureka_plus": {
+			"authors": ["Hazaskull"],
+			"url": "https://github.com/ijzerbroot/handsonui",
+			"basis": "collection"
+		},
+		"eureka": {
+			"authors": ["Hazaskull"],
+			"url": "https://github.com/ijzerbroot/handsonui",
+			"basis": "collection"
+		},
+		"ev29": {
+			"authors": ["Ec0vid"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"f_you": {
+			"authors": ["RusDoomer"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"fitch": {
+			"authors": ["Fitch (1886), slightly modded to ANSI (only one O) by Ian Douglas"],
+			"basis": "collection"
+		},
+		"flame_klanext": {
+			"authors": ["Oxey"],
+			"url": "https://docs.google.com/document/d/1_a5Nzbkwyk1o0bvTctZrtgsee9jSP-6I0q3A0_9Mzm0/edit#heading=h.9fdi0f4uz2dt",
+			"basis": "collection"
+		},
+		"flare_klanext": {
+			"authors": ["Oxey"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/xxrd2t/what_is_the_best_ai_generated_layout/",
+			"basis": "collection"
+		},
+		"freq3": {
+			"authors": ["bye"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"frontier": {
+			"authors": ["oodarioo"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"full_157_64_17e2a0": {
+			"authors": ["Autogen, program by Ian Douglas"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"full_r2_rt161_57_47179e": {
+			"authors": ["Autogen, program by Ian Douglas"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"full_r2_rt161_57_5bc1aa": {
+			"authors": ["Autogen, program by Ian Douglas"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"full_r2_rt162_25_2ec2c1": {
+			"authors": ["Autogen, program by Ian Douglas"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"g_ansi_maks": {
+			"authors": ["Philipp Kiefer"],
+			"basis": "collection"
+		},
+		"gallium_angle": {
+			"authors": ["Bryson James"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"gardner": {
+			"authors": ["Kathleen Gardner"],
+			"url": "https://worldwide.espacenet.com/patent/search/family/006212235/publication/DE3338013A1?q=pn%3DDE3338013A1",
+			"basis": "collection"
+		},
+		"gardner2": {
+			"authors": ["Kathleen Gardner"],
+			"url": "https://worldwide.espacenet.com/patent/search/family/006212235/publication/DE3338013A1?q=pn%3DDE3338013A1",
+			"basis": "collection"
+		},
+		"gemini": {
+			"authors": ["KayOS"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"goettl_brugh_julstrom": {
+			"authors": ["Goettl, Brughm, Julstrom (2005)"],
+			"basis": "collection"
+		},
+		"haeik": {
+			"authors": ["Arne Babenhauserheide"],
+			"url": "http://www.draketo.de/licht/freie-software/neo-tastaturlayout-pruefen-und-evolutionaer-entwickeln",
+			"basis": "collection"
+		},
+		"halmak_klanext": {
+			"authors": ["Nikolay Nemshilov"],
+			"url": "http://nikolay.rocks/2016-04-02-meet-halmak",
+			"basis": "collection"
+		},
+		"hands_down_hazamod": {
+			"authors": ["Hazaskull / Alan Reiser"],
+			"url": "https://github.com/ijzerbroot/hdrefmod",
+			"basis": "collection"
+		},
+		"hands_right": {
+			"authors": ["Oxey"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/umwfh5/i_put_the_full_maks_minimo_layout_onto_my_5x15/",
+			"basis": "collection"
+		},
+		"hands_up": {
+			"authors": ["Oxey"],
+			"url": "https://docs.google.com/document/d/1_a5Nzbkwyk1o0bvTctZrtgsee9jSP-6I0q3A0_9Mzm0/edit#",
+			"basis": "collection"
+		},
+		"hands_down_alt_klanext": {
+			"authors": ["Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown#h.7vp2l0jfbr5z",
+			"basis": "collection"
+		},
+		"handson_ui_v2": {
+			"authors": ["Hazaskull"],
+			"url": "https://github.com/ijzerbroot/handsonui",
+			"basis": "collection"
+		},
+		"handymak": {
+			"authors": ["phbonachi"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/kaw9sv/if_i_were_to_use_colemak_it_would_be_handymak/",
+			"basis": "collection"
+		},
+		"harbaugh": {
+			"authors": ["Gary B. Harbaugh, modded to ANSI by Ian Douglas"],
+			"url": "https://www.google.com/patents/US5584588",
+			"basis": "collection"
+		},
+		"harrison": {
+			"authors": ["Harrison, captured by Ian Douglas"],
+			"url": "http://langbreeze.blogspot.co.za/2008/07/alternative-keyboard-layouts-not-dvorak.html",
+			"basis": "collection"
+		},
+		"heart_klanext": {
+			"authors": ["mindhatch"],
+			"url": "https://github.com/mindhatch/heart",
+			"basis": "collection"
+		},
+		"heartae": {
+			"authors": ["ehhe 1"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"heiadtsrn_wfgv": {
+			"authors": ["Sasha Viminitz, modded by lalop"],
+			"basis": "collection"
+		},
+		"hein_rightshift": {
+			"authors": ["Kennet Chaz"],
+			"url": "https://kennetchaz.github.io/symmetric-typing/hein.html",
+			"basis": "collection"
+		},
+		"hein": {
+			"authors": ["Kennet Chaz"],
+			"url": "https://kennetchaz.github.io/symmetric-typing/hein.html",
+			"basis": "collection"
+		},
+		"helium": {
+			"authors": ["Bryson James"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"hexalgram": {
+			"authors": ["hexalgram"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/18egn9f/searching_for_even_lower_redirects/",
+			"basis": "collection"
+		},
+		"hieamtsrn_optimized": {
+			"authors": ["Sasha Viminitz mod Daniel Sirait"],
+			"url": "https://github.com/dns/Keyboard-HIEAMTSRN-Optimized",
+			"basis": "collection"
+		},
+		"hieaqmtsrn": {
+			"authors": ["Sasha Viminitz, modded by lalop"],
+			"basis": "collection"
+		},
+		"hinsty": {
+			"authors": ["ClemenPine"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"hirou": {
+			"authors": ["Hirou"],
+			"url": "https://github.com/semilin/key-analyzer/blob/main/main.go",
+			"basis": "collection"
+		},
+		"hiyou_satan": {
+			"authors": ["RusDoomer"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"hiyou_klanext": {
+			"authors": ["RusDoomer"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"hoke": {
+			"authors": ["Hoke (1924)"],
+			"basis": "collection"
+		},
+		"homework": {
+			"authors": ["taro_null"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/z9ssbs/i_need_your_assessment_of_my_layout/",
+			"basis": "collection"
+		},
+		"hoogendoorn_nl": {
+			"authors": ["Pieter Hogendoorn"],
+			"url": "http://mkweb.bcgsc.ca/carpalx/?de_correspondent",
+			"basis": "collection"
+		},
+		"hrnia": {
+			"authors": ["SpeedMorph"],
+			"url": "https://forum.colemak.com/topic/397-keyboard-optimizer-genetic-algorithm/",
+			"basis": "collection"
+		},
+		"hrst": {
+			"authors": ["semi"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"hydrogen": {
+			"authors": ["Bryson James"],
+			"url": "https://github.com/GalileoBlues/LayoutCollection",
+			"basis": "collection"
+		},
+		"iaenh": {
+			"authors": ["SpeedMorph"],
+			"url": "https://forum.colemak.com/topic/397-keyboard-optimizer-genetic-algorithm/p3/",
+			"basis": "collection"
+		},
+		"ina_dv": {
+			"authors": ["M Rizki Fadhilah"],
+			"url": "https://en.wikipedia.org/wiki/Dvorak_Simplified_Keyboard",
+			"basis": "collection"
+		},
+		"inrolly2": {
+			"authors": ["Ec0vid"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/18mrp5j/looking_for_a_layout_with_high_inward_rolls_what/",
+			"basis": "collection"
+		},
+		"international_p": {
+			"authors": ["Iso Lee"],
+			"url": "https://naver.com",
+			"basis": "collection"
+		},
+		"irstmak": {
+			"authors": ["ClemenPine"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"isrt_anglemod": {
+			"authors": ["NotGate"],
+			"url": "https://github.com/NotGate/layout/blob/gh-pages/isrt_ansi.json",
+			"basis": "collection"
+		},
+		"isrtgap": {
+			"authors": ["ClemenPine"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"jan": {
+			"authors": ["Jan, translated from ISO to ANSI by Ian Douglas"],
+			"url": "https://stackoverflow.com/questions/2306423/an-ideal-keyboard-layout-for-programming",
+			"basis": "collection"
+		},
+		"jesan": {
+			"authors": ["Michael C. Mortenson and Cassandra S. Sweeten"],
+			"url": "https://figshare.com/articles/Novel_Keyboard_Layout_Optimization_pdf/12135858/2",
+			"basis": "collection"
+		},
+		"jnsf": {
+			"authors": ["fullgrid"],
+			"url": "https://preview.redd.it/gt6z8jbcwsf61.jpg?width=1000&format=pjpg&auto=webp&s=9e5eb39aec1f126ecf04aaa91c871026b01e2916",
+			"basis": "collection"
+		},
+		"juyanith": {
+			"authors": ["juyanith"],
+			"url": "https://geekhack.org/index.php?topic=67604.0",
+			"basis": "collection"
+		},
+		"jyz": {
+			"authors": ["Autogen, program by Ian Douglas"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"k_u_tea_shrt_pnct": {
+			"authors": ["Ian Douglas, mod Philipp Kiefer"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"karrenbauer_oulasvirta_mod_ian": {
+			"authors": [
+				"Karrenbauer, Oulasvirta, slightly modded by Ian Douglas, keeps punctuation pairs, and quotes on main board"
+			],
+			"url": "http://resources.mpi-inf.mpg.de/keyboardoptimization/",
+			"basis": "collection"
+		},
+		"keyboardsamurai_july": {
+			"authors": ["Syperk"],
+			"url": "https://forum.colemak.com/topic/607-qwertyish-layouts/",
+			"basis": "collection"
+		},
+		"keymacs_madand": {
+			"authors": ["Andriy Kmit"],
+			"url": "https://github.com/madand/keymacs-madand",
+			"basis": "collection"
+		},
+		"keymacs": {
+			"authors": ["Axel"],
+			"url": "http://github.com/keyboard-ergonomics/keymacs",
+			"basis": "collection"
+		},
+		"keymacs2": {
+			"authors": ["Axel"],
+			"url": "http://github.com/keyboard-ergonomics/keymacs",
+			"basis": "collection"
+		},
+		"khlc": {
+			"authors": ["Kiri"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"kilo_37_vanilla": {
+			"authors": ["tghaleb, vanilla by Ian"],
+			"url": "https://github.com/tghaleb/kilo-layouts-en",
+			"basis": "collection"
+		},
+		"kilo_62_vanilla": {
+			"authors": ["tghaleb, Vanilla by Ian"],
+			"url": "https://github.com/tghaleb/kilo-layouts-en",
+			"basis": "collection"
+		},
+		"kirana_melayu": {
+			"authors": ["adi.lela"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"kumar_desai": {
+			"authors": ["Akarsh Kumar, Kush Desai"],
+			"url": "http://www.akarshkumar.com/",
+			"basis": "collection"
+		},
+		"kurriss": {
+			"authors": ["Francis Kurriss, captured by Ian Douglas"],
+			"url": "https://www.google.com/patents/US20040202501",
+			"basis": "collection"
+		},
+		"kyu_vanilla": {
+			"authors": ["solambo"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/vx4774/kyu_layout/",
+			"basis": "collection"
+		},
+		"kyudi": {
+			"authors": ["Dario Götz"],
+			"url": "https://github.com/dariogoetz/keyboard_layout_optimizer",
+			"basis": "collection"
+		},
+		"l_you": {
+			"authors": ["RusDoomer"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"layman": {
+			"authors": ["almonds0166"],
+			"url": "https://github.com/almonds0166/layman",
+			"basis": "collection"
+		},
+		"layoutfluid": {
+			"authors": ["strongly-typed"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/19a8j90/layoutfluid_graphite_mtgap_at_136wpm/",
+			"basis": "collection"
+		},
+		"layoutissimus": {
+			"authors": ["semi"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"lela_rus": {
+			"authors": ["adi.lela"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"lela": {
+			"authors": ["Adi.lela"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"light_anderson_mod_ian": {
+			"authors": ["Light, Anderson, mod Ian"],
+			"url": "http://scholarworks.rit.edu/cgi/viewcontent.cgi?article=1729&context=article",
+			"basis": "collection"
+		},
+		"light_anderson": {
+			"authors": ["Light, Anderson"],
+			"url": "http://scholarworks.rit.edu/cgi/viewcontent.cgi?article=1729&context=article",
+			"basis": "collection"
+		},
+		"liigol_mod_ian_2": {
+			"authors": ["LiiGol mod Ian"],
+			"url": "https://www.patrick-wied.at/projects/heatmap-keyboard/",
+			"basis": "collection"
+		},
+		"liigol": {
+			"authors": ["LiiGol"],
+			"url": "https://www.patrick-wied.at/projects/heatmap-keyboard/",
+			"basis": "collection"
+		},
+		"louda": {
+			"authors": ["someguy3"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/whulmb/take_on_workman_workmanlouda/",
+			"basis": "collection"
+		},
+		"lowerpinky": {
+			"authors": ["REDDITz3r0"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/jky3tw/layout_for_lower_pinky_usage/",
+			"basis": "collection"
+		},
+		"lumin_klanext": {
+			"authors": ["Roman Koshchei"],
+			"url": "https://github.com/roman-koshchei/lumin",
+			"basis": "collection"
+		},
+		"maplefyre": {
+			"authors": ["furtissim2"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"mcgunnigle_peoples_rehomed": {
+			"authors": ["Roger J. McGunnigle"],
+			"url": "https://patents.google.com/patent/US4613247A/en",
+			"basis": "collection"
+		},
+		"mcgunnigle_perfect": {
+			"authors": ["Roger J. McGunnigle"],
+			"url": "https://patents.google.com/patent/US4613247A/en",
+			"basis": "collection"
+		},
+		"mcgunnigle_scientific": {
+			"authors": ["Roger J. McGunnigle"],
+			"url": "https://patents.google.com/patent/US4613247A/en",
+			"basis": "collection"
+		},
+		"megamak": {
+			"authors": ["Smudge"],
+			"url": "https://docs.google.com/document/d/1_a5Nzbkwyk1o0bvTctZrtgsee9jSP-6I0q3A0_9Mzm0/edit#",
+			"basis": "collection"
+		},
+		"middlemak_nh": {
+			"authors": ["u/someguy3"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/1464vck/introducing_middlemaknh_a_variant_that_puts_all/",
+			"basis": "collection"
+		},
+		"middlephobia": {
+			"authors": ["lexycorn"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"minimak_4key": {
+			"authors": ["Ted Lilley"],
+			"url": "http://www.minimak.org/",
+			"basis": "collection"
+		},
+		"minimotion": {
+			"authors": ["Griffith (1949), slightly modded to ANSI by Ian Douglas"],
+			"basis": "collection"
+		},
+		"minred": {
+			"authors": ["obafgkm"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"minred2": {
+			"authors": ["obafgkm"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"moyaimak": {
+			"authors": ["stronglytyped"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"mtgap_hybrid_vanilla": {
+			"authors": ["strongly-typed"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/paa6ke/switching_from_dvorak_to_mtgapengram/",
+			"basis": "collection"
+		},
+		"mtgap_mod_joey2216": {
+			"authors": ["Michael Dickens mod Joey2216"],
+			"url": "https://www.purezc.net/forums/index.php?showtopic=70715",
+			"basis": "collection"
+		},
+		"mtgap_optimised_shifted": {
+			"authors": ["Dave Ferree from Michael Dickens"],
+			"url": "https://mathematicalmulticore.wordpress.com/the-keyboard-layout-project/",
+			"basis": "collection"
+		},
+		"mtgap_r": {
+			"authors": ["Ec0vid"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/18mrp5j/looking_for_a_layout_with_high_inward_rolls_what/",
+			"basis": "collection"
+		},
+		"my_life_for_aeir": {
+			"authors": ["KayOS"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"n_ansi_maks": {
+			"authors": ["Philipp Keiffer"],
+			"basis": "collection"
+		},
+		"narts_9": {
+			"authors": ["ClemenPine"],
+			"url": "https://github.com/ClemenPine/DOF/tree/main/layouts",
+			"basis": "collection"
+		},
+		"neo2": {
+			"authors": ["Julian Asamer"],
+			"url": "http://neo-layout.org",
+			"basis": "collection"
+		},
+		"nerps_klanext": {
+			"authors": ["incompletetrembling"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/tpwyjc/sertain_nerts_nerps_low_redirect_low_sfb_low/",
+			"basis": "collection"
+		},
+		"nerts_klanext": {
+			"authors": ["incompletetrembling"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/tpwyjc/sertain_nerts_nerps_low_redirect_low_sfb_low/",
+			"basis": "collection"
+		},
+		"newden_mod_ian": {
+			"authors": ["Scholes"],
+			"url": "https://en.wikipedia.org/wiki/QWERTY",
+			"basis": "collection"
+		},
+		"nila": {
+			"authors": ["Adi.lela"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"ninedotnine_mod_ian": {
+			"authors": ["ninedotnine mod Ian"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/134a7n9/custom_60_layout_ive_been_using_designed_for/",
+			"basis": "collection"
+		},
+		"ninedotnine": {
+			"authors": ["ninedotnine"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/134a7n9/custom_60_layout_ive_been_using_designed_for/",
+			"basis": "collection"
+		},
+		"niro_rightshift": {
+			"authors": ["Kennet Chaz"],
+			"url": "https://kennetchaz.github.io/symmetric-typing/niro.html",
+			"basis": "collection"
+		},
+		"nitro_s": {
+			"authors": ["Bryson James"],
+			"url": "https://github.com/GalileoBlues/LayoutCollection",
+			"basis": "collection"
+		},
+		"nitrogen": {
+			"authors": ["Bryson"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"noctum_klanext": {
+			"authors": ["Oxey"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"noel": {
+			"authors": ["Ron Noel"],
+			"url": "https://journals.sagepub.com/doi/abs/10.1177/154193129804200616",
+			"basis": "collection"
+		},
+		"noname_30": {
+			"authors": ["ksweber"],
+			"url": "https://geekhack.org/index.php?topic=57491.0",
+			"basis": "collection"
+		},
+		"nrstmak": {
+			"authors": ["ClemenPine"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"oatpie": {
+			"authors": ["eamouee"],
+			"url": "https://github.com/eamouee/oatpie",
+			"basis": "collection"
+		},
+		"oistd": {
+			"authors": ["Michael Dickens"],
+			"url": "http://mtgap.bilfo.com/keyboard.html",
+			"basis": "collection"
+		},
+		"oneproduct_zxcv": {
+			"authors": ["OneProduct"],
+			"url": "https://geekhack.org/index.php?topic=67604.0",
+			"basis": "collection"
+		},
+		"oneproduct_klanext": {
+			"authors": ["OneProduct"],
+			"url": "https://geekhack.org/index.php?topic=67604.0",
+			"basis": "collection"
+		},
+		"onsorodi_korhan": {
+			"authors": ["Onsorodi, Korhan"],
+			"url": "https://doi.org/10.1371/journal.pone.0226611",
+			"basis": "collection"
+		},
+		"optimal_digram": {
+			"authors": ["Steven Tammen"],
+			"url": "https://groups.google.com/forum/#!msg/adnw/E5NnQMf15KE/BRsW4uvoDgAJ",
+			"basis": "collection"
+		},
+		"optimal_trigram": {
+			"authors": ["Steven Tammen"],
+			"url": "https://groups.google.com/forum/#!msg/adnw/E5NnQMf15KE/BRsW4uvoDgAJ",
+			"basis": "collection"
+		},
+		"orthocarpus": {
+			"authors": ["George Chavchanidze"],
+			"url": "https://lykt.xyz/jnsf/ortho/",
+			"basis": "collection"
+		},
+		"orthographic": {
+			"authors": ["Gilbert (1930)"],
+			"basis": "collection"
+		},
+		"parkinson": {
+			"authors": ["John V. Parkinson, captured by Ian Douglas"],
+			"url": "https://www.google.com/patents/US6053647",
+			"basis": "collection"
+		},
+		"paw177_mod_ian": {
+			"authors": ["u/paw177"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/16kmgrk/my_own_keyboard_layout/",
+			"basis": "collection"
+		},
+		"paw177": {
+			"authors": ["u/paw177"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/16kmgrk/my_own_keyboard_layout/",
+			"basis": "collection"
+		},
+		"phynnboi": {
+			"authors": ["Phynnboi"],
+			"url": "https://mathematicalmulticore.wordpress.com/rate-these-keyboard-layouts/",
+			"basis": "collection"
+		},
+		"pieter_saeio": {
+			"authors": ["Pieter"],
+			"url": "https://forum.colemak.com/topic/2034-longterm-experience-of-a-keyboard-hobbyist/",
+			"basis": "collection"
+		},
+		"pietergen_2": {
+			"authors": ["PieterGen"],
+			"url": "https://deskthority.net/keyboards-f2/how-i-beat-both-colemak-and-dvorak-t8674.html",
+			"basis": "collection"
+		},
+		"pine_klanext": {
+			"authors": ["ClemenPine"],
+			"url": "https://github.com/ClemenPine/pine",
+			"basis": "collection"
+		},
+		"pittard": {
+			"authors": [
+				"Arthur George Pittard, captured by Ian Douglas. Punctuation pairs as per QWERTY."
+			],
+			"url": "https://www.google.com/patents/WO1999006216A1?cl=en",
+			"basis": "collection"
+		},
+		"poqtea_klopt": {
+			"authors": ["Autogen, program by Ian Douglas, + Keyboard Layout Optimizer"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"poqtea_tuned": {
+			"authors": ["Autogen, program by Ian Douglas, manually tweaked"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"poutea": {
+			"authors": ["Autogen, program by Ian Douglas"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"pow_123": {
+			"authors": ["Pow_123"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/15ruprh/cool_little_layout_i_made_and_started_using/",
+			"basis": "collection"
+		},
+		"power": {
+			"authors": ["Pat Laugh"],
+			"url": "https://github.com/pat-laugh/power-layout-keyboard",
+			"basis": "collection"
+		},
+		"print_face": {
+			"authors": ["Frank L Paul (1938), modded to ANSI by Ian Douglas"],
+			"url": "https://patentimages.storage.googleapis.com/02/e0/96/4029d09c652fbd/US2187592.pdf",
+			"basis": "collection"
+		},
+		"qgmlwb_programmer": {
+			"authors": ["Maxim Erofeev"],
+			"url": "https://gitlab.com/siberian5/keyboardlayouts/-/blob/master/linuxLayouts/qgmlwb_prog/qgmlwb_prog",
+			"basis": "collection"
+		},
+		"qphyx_adapted": {
+			"authors": ["uqqu, adapted by Ian"],
+			"url": "https://github.com/uqqu/layout",
+			"basis": "collection"
+		},
+		"quartz_glyph": {
+			"authors": ["DreymaR"],
+			"url": "https://forum.colemak.com/topic/2157-joking-around/",
+			"basis": "collection"
+		},
+		"quesnel_mtgap": {
+			"authors": ["Michael Dickens mod Phillip Quesnel, adjusted by Ian"],
+			"basis": "collection"
+		},
+		"quickstephen": {
+			"authors": ["Stephen Malinowski"],
+			"url": "http://www.musanim.com/mam/qhkcstfpn.html",
+			"basis": "collection"
+		},
+		"qwerty_comfort": {
+			"authors": ["junkyver"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/103u2y0/qwerty_comfort_layout/",
+			"basis": "collection"
+		},
+		"qwerty_p": {
+			"authors": ["Martin Krzywinski"],
+			"url": "http://mkweb.bcgsc.ca/carpalx/?component_optimization",
+			"basis": "collection"
+		},
+		"qwerty_q_layout": {
+			"authors": ["UBTC"],
+			"url": "https://github.com/UBTC/Q-layout",
+			"basis": "collection"
+		},
+		"qwerty_revised": {
+			"authors": ["Ferguson and Duncan, 1974 ?"],
+			"basis": "collection"
+		},
+		"qwerty_row_swap_mod_ian": {
+			"authors": ["Scholes modified"],
+			"url": "https://www.slant.co/topics/512/viewpoints/19/~best-keyboard-layouts-for-programming~row-swap-qwdfgy",
+			"basis": "collection"
+		},
+		"qwerty_row_swap": {
+			"authors": ["Scholes modified"],
+			"url": "https://www.slant.co/topics/512/viewpoints/19/~best-keyboard-layouts-for-programming~row-swap-qwdfgy",
+			"basis": "collection"
+		},
+		"qwerty_wide_programmer": {
+			"authors": ["Comrade 4n53"],
+			"url": "https://github.com/bits-of-static/wide-querty",
+			"basis": "collection"
+		},
+		"qwickly_comma": {
+			"authors": ["Keith Kim"],
+			"url": "https://github.com/qwickly-org/Qwickly",
+			"basis": "collection"
+		},
+		"qwickly_kz_comma": {
+			"authors": ["Keith Kim"],
+			"url": "https://github.com/qwickly-org/Qwickly",
+			"basis": "collection"
+		},
+		"qwickly_nrio": {
+			"authors": ["Keith Kim"],
+			"url": "https://github.com/qwickly-org/Qwickly",
+			"basis": "collection"
+		},
+		"qwicklystep1": {
+			"authors": ["Keith Kim"],
+			"url": "https://github.com/qwickly-org/QwickSteps",
+			"basis": "collection"
+		},
+		"qwicklystep2": {
+			"authors": ["Keith Kim"],
+			"url": "https://github.com/qwickly-org/QwickSteps",
+			"basis": "collection"
+		},
+		"qwicklystep3": {
+			"authors": ["Keith Kim"],
+			"url": "https://github.com/qwickly-org/QwickSteps",
+			"basis": "collection"
+		},
+		"qwicklystep4": {
+			"authors": ["Keith Kim"],
+			"url": "https://github.com/qwickly-org/QwickSteps",
+			"basis": "collection"
+		},
+		"qwkrfy": {
+			"authors": ["captured by Ian Douglas"],
+			"basis": "collection"
+		},
+		"qwuio": {
+			"authors": ["Duncan Priebe"],
+			"url": "http://www.duncanpriebe.com/blog/archives/3910",
+			"basis": "collection"
+		},
+		"qwyrfm": {
+			"authors": ["captured by Ian Douglas"],
+			"basis": "collection"
+		},
+		"rain_klanext": {
+			"authors": ["Ibrahimab"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/18mrp5j/looking_for_a_layout_with_high_inward_rolls_what/",
+			"basis": "collection"
+		},
+		"reverse_qwerty": {
+			"authors": ["Assistive Technology"],
+			"url": "http://atri.misericordia.edu/Papers/Dvorak.php",
+			"basis": "collection"
+		},
+		"rhythmic": {
+			"authors": ["Maxwell (1953), slightly modded to ANSI by Ian Douglas"],
+			"basis": "collection"
+		},
+		"righty": {
+			"authors": ["necdetaliozdur"],
+			"url": "https://forum.colemak.com/topic/2724-engram-layout/",
+			"basis": "collection"
+		},
+		"rike": {
+			"authors": ["Rike"],
+			"basis": "collection"
+		},
+		"rl_eai": {
+			"authors": ["Philipp Kiefer"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"rollla_klanext": {
+			"authors": ["Tanamr"],
+			"url": "https://github.com/samuelxyz/layouts",
+			"basis": "collection"
+		},
+		"rollly": {
+			"authors": ["Ec0vid"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"rollly2": {
+			"authors": ["Ec0vid"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"romberg": {
+			"authors": ["Harvey Romberg"],
+			"url": "https://www.google.com/patents/US5166669",
+			"basis": "collection"
+		},
+		"rotsw": {
+			"authors": ["SpeedMorph"],
+			"url": "https://forum.colemak.com/topic/397-keyboard-optimizer-genetic-algorithm/p2/",
+			"basis": "collection"
+		},
+		"rowell": {
+			"authors": ["Rowell (1909)"],
+			"basis": "collection"
+		},
+		"rsi_terminated_vanilla": {
+			"authors": ["timeopochin"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/kjhkar/rsi_terminated_an_evolved_ergonogic_layout_for/",
+			"basis": "collection"
+		},
+		"rstlne_ai": {
+			"authors": ["adumb"],
+			"url": "https://www.youtube.com/watch?v=EOaPb9wrgDY",
+			"basis": "collection"
+		},
+		"rstlne_manual": {
+			"authors": ["adumb"],
+			"url": "https://www.youtube.com/watch?v=EOaPb9wrgDY",
+			"basis": "collection"
+		},
+		"rtnsg": {
+			"authors": ["jdmpapin"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/qj4lsz/hiive_decided_to_switch_from_dvorak_because_i/",
+			"basis": "collection"
+		},
+		"rukia": {
+			"authors": ["sazk07"],
+			"url": "https://github.com/sazk07/Rukia-Optimized-Keyboard-Layout-Project",
+			"basis": "collection"
+		},
+		"rushforth": {
+			"authors": ["Shelagh Jane Rushforth (1982), modded to ANHI by Ian Douglas"],
+			"url": "https://patentimages.storage.googleapis.com/4b/d3/b1/acf8a8f808da42/EP0066991A2.pdf",
+			"basis": "collection"
+		},
+		"rusk_mod_ian": {
+			"authors": ["John Rusk mod Ian"],
+			"url": "http://www.agilekiwi.com/off-topic/my-keyboard-layout/",
+			"basis": "collection"
+		},
+		"rusk": {
+			"authors": ["John Rusk"],
+			"url": "http://www.agilekiwi.com/off-topic/my-keyboard-layout/",
+			"basis": "collection"
+		},
+		"ruthenium_nl": {
+			"authors": ["Bryson James"],
+			"url": "https://github.com/GalileoBlues/LayoutCollection",
+			"basis": "collection"
+		},
+		"ruthenium": {
+			"authors": ["Bryson James"],
+			"url": "https://github.com/GalileoBlues/LayoutCollection",
+			"basis": "collection"
+		},
+		"s2_klopt": {
+			"authors": ["Ian Douglas + Keyboard Layout Optimizer"],
+			"basis": "collection"
+		},
+		"saiga": {
+			"authors": ["RusDoomer"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/18mrp5j/looking_for_a_layout_with_high_inward_rolls_what/",
+			"basis": "collection"
+		},
+		"sanie": {
+			"authors": ["Blake Sanie"],
+			"url": "https://codeburst.io/generating-optimal-keyboard-layouts-with-code-44f1752c48cc",
+			"basis": "collection"
+		},
+		"savard_vertical_alpha": {
+			"authors": ["John J. G. Savard ?"],
+			"url": "http://www.quadibloc.com/comp/kyb04.htm",
+			"basis": "collection"
+		},
+		"savard": {
+			"authors": ["John Savard, captured by Ian Douglas"],
+			"url": "http://www.quadibloc.com/comp/kyb04.htm",
+			"basis": "collection"
+		},
+		"sclarb": {
+			"authors": ["sclarb/"],
+			"url": "http://www.geocities.ws/sclarb/keyboards.html",
+			"basis": "collection"
+		},
+		"sertain2_mod_ian": {
+			"authors": ["incompletetrembling mod Ian"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/tpwyjc/sertain_nerts_nerps_low_redirect_low_sfb_low/",
+			"basis": "collection"
+		},
+		"sertain2": {
+			"authors": ["incompletetrembling"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/tpwyjc/sertain_nerts_nerps_low_redirect_low_sfb_low/",
+			"basis": "collection"
+		},
+		"seruxie": {
+			"authors": ["Seruxie, captured by Ian Douglas"],
+			"url": "https://forum.colemak.com/topic/25-another-layout-for-your-reference/",
+			"basis": "collection"
+		},
+		"shai": {
+			"authors": ["shai coleman"],
+			"url": "https://forum.colemak.com/topic/2644-shais-colemak-mod/#p23603",
+			"basis": "collection"
+		},
+		"sholes": {
+			"authors": ["Scholes modded to ANSI by Ian"],
+			"url": "https://www.researchgate.net/publication/237105161_The_Great_Keyboard_Debate_QWERTY_versus_Dvorak",
+			"basis": "collection"
+		},
+		"snorkle": {
+			"authors": ["Untwo"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/18l13kg/why_is_an_ao_column_necessary_for_minimal/",
+			"basis": "collection"
+		},
+		"snug": {
+			"authors": ["mndscp"],
+			"url": "https://github.com/mndscp/snug-keyboard-layout#snug-keyboard-layout",
+			"basis": "collection"
+		},
+		"solemak_rightshift": {
+			"authors": ["Kennet Chaz"],
+			"url": "https://kennetchaz.github.io/symmetric-typing/solemak.html",
+			"basis": "collection"
+		},
+		"solemak": {
+			"authors": ["Kennet Chaz"],
+			"url": "https://kennetchaz.github.io/symmetric-typing/solemak.html",
+			"basis": "collection"
+		},
+		"sorenk": {
+			"authors": ["SorenK, captured by Ian Douglas"],
+			"url": "https://forum.colemak.com/topic/90-dvorak-user-pondering-punctuation-placement/#p406",
+			"basis": "collection"
+		},
+		"soul": {
+			"authors": ["kennetchaz"],
+			"url": "https://kennetchaz.github.io/symmetric-typing/soul.html",
+			"basis": "collection"
+		},
+		"speedkeys": {
+			"authors": ["Halil Murat Unver, Bergen Karabulut"],
+			"basis": "collection"
+		},
+		"stial": {
+			"authors": ["AdolfsMoistDream"],
+			"url": "https://preview.redd.it/kcr85msn6y561.jpg?width=2336&format=pjpg&auto=webp&s=4dc56ed357ba449ffa80e577ce51d8c8109a19ab",
+			"basis": "collection"
+		},
+		"stnc_fhm": {
+			"authors": ["Philipp Kiefer"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/18ntyz8/new_great_allround_stats_layout/",
+			"basis": "collection"
+		},
+		"stndc_klanext": {
+			"authors": ["Sasha Viminitz"],
+			"url": "https://mathematicalmulticore.wordpress.com/the-keyboard-layout-project/",
+			"basis": "collection"
+		},
+		"streitz": {
+			"authors": ["Paul Streitz"],
+			"url": "https://patents.google.com/patent/US20140152568A1/en",
+			"basis": "collection"
+		},
+		"sturdy_anglemod": {
+			"authors": ["Oxey"],
+			"url": "https://o-x-e-y.github.io/layouts/sturdy/index.html",
+			"basis": "collection"
+		},
+		"synth": {
+			"authors": ["ClemenPine"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"syperk_qwfrj": {
+			"authors": ["Syperk"],
+			"url": "https://forum.colemak.com/topic/607-qwertyish-layouts/",
+			"basis": "collection"
+		},
+		"tahan": {
+			"authors": ["Piotr Grochowski and HughLaurie1959"],
+			"url": "https://workman2.fandom.com/wiki/TAHAN",
+			"basis": "collection"
+		},
+		"tesc": {
+			"authors": ["StronglyTyped"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"thallium": {
+			"authors": ["Bryson James"],
+			"url": "https://github.com/GalileoBlues/LayoutCollection",
+			"basis": "collection"
+		},
+		"three_vanilla": {
+			"authors": ["Jack Rosenthal, modded to vanilla"],
+			"url": "https://github.com/jackrosenthal/threelayout",
+			"basis": "collection"
+		},
+		"thumb_o_board_tweaked": {
+			"authors": ["leizoor (slightly tweaked by Ian)"],
+			"url": "http://capsoff.wikidot.com/forum/t-1839/thumb-o-board-2000",
+			"basis": "collection"
+		},
+		"trotman": {
+			"authors": ["Douglas L. Trotman"],
+			"url": "https://patents.google.com/patent/US6932525B2/en",
+			"basis": "collection"
+		},
+		"ttast": {
+			"authors": ["Tim Trumpf"],
+			"url": "https://en.wikipedia.org/wiki/QWERTY",
+			"basis": "collection"
+		},
+		"tyler": {
+			"authors": ["Tim Tyler"],
+			"url": "http://mykeyboard.co.uk/kinesis/",
+			"basis": "collection"
+		},
+		"uciea_gcsv": {
+			"authors": ["Ian Douglas, mod Philipp Kiefer"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"uciea_pcrw": {
+			"authors": ["Ian Douglas, mod Philipp Kiefer"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"uciea_vanilla_mod_gergely": {
+			"authors": ["Ian Douglas, Gergely Szabó"],
+			"url": "https://keyboard-design.com",
+			"basis": "collection"
+		},
+		"uhiea_davison": {
+			"authors": ["Richard Davison"],
+			"basis": "collection"
+		},
+		"uiy_g_ansi_maks": {
+			"authors": ["Philipp Kiefer"],
+			"basis": "collection"
+		},
+		"uiy_n_ansi_maks": {
+			"authors": ["Philipp Keiffer"],
+			"basis": "collection"
+		},
+		"urts": {
+			"authors": ["Ec0vid"],
+			"url": "https://bit.ly/keyboard-layouts-doc",
+			"basis": "collection"
+		},
+		"us_split_v3": {
+			"authors": ["Cheater"],
+			"url": "https://github.com/cheater/us_split_v3",
+			"basis": "collection"
+		},
+		"vas_keys": {
+			"authors": ["Vasileios Pasialiokis"],
+			"url": "https://vas.neocities.org",
+			"basis": "collection"
+		},
+		"vimak_beta": {
+			"authors": ["u/AsqArslano, Ian Douglas"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/1an2v66/introducing_vimak_colemak_moddhjkl/",
+			"basis": "collection"
+		},
+		"vimak": {
+			"authors": ["u/AsqArslano"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/1an2v66/introducing_vimak_colemak_moddhjkl/",
+			"basis": "collection"
+		},
+		"voxveritas": {
+			"authors": ["VoxVeritas"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/18yoklu/time_is_running_out_gallium_recurva_or_engram/",
+			"basis": "collection"
+		},
+		"vukeys_swapped_mod_ian_2": {
+			"authors": ["Ian Douglas from Vu Keys by Vu Dang"],
+			"basis": "collection"
+		},
+		"walker": {
+			"authors": ["Christopher P Walker, captured by Ian Douglas"],
+			"basis": "collection"
+		},
+		"ward": {
+			"authors": ["Ward (1936), slightly modded by Ian Douglas"],
+			"basis": "collection"
+		},
+		"wedlock": {
+			"authors": ["_ggabi_"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/18ece2j/introducing_the_wedlock_layout/",
+			"basis": "collection"
+		},
+		"weltsch": {
+			"authors": ["Andre Weltsch"],
+			"url": "https://andreweltsch.com/post/layout-optimization/",
+			"basis": "collection"
+		},
+		"white_refingered": {
+			"authors": ["Michael White"],
+			"url": "https://github.com/mw8/white_keyboard_layout",
+			"basis": "collection"
+		},
+		"whorf_am": {
+			"authors": ["Whorf"],
+			"url": "https://docs.google.com/document/u/0/d/1_a5Nzbkwyk1o0bvTctZrtgsee9jSP-6I0q3A0_9Mzm0/mobilebasic",
+			"basis": "collection"
+		},
+		"widely_alternating_a": {
+			"authors": ["lalop"],
+			"url": "http://forum.colemak.com/viewtopic.php?pid=14397#p14397",
+			"basis": "collection"
+		},
+		"willems": {
+			"authors": ["Remy Willems"],
+			"url": "https://sites.google.com/site/keyboardep/",
+			"basis": "collection"
+		},
+		"wolcott": {
+			"authors": ["Wolcott (1920)"],
+			"basis": "collection"
+		},
+		"wong_oiuea": {
+			"authors": ["Kwok Wong"],
+			"url": "https://patents.google.com/patent/US20040201502A1/en",
+			"basis": "collection"
+		},
+		"wong_poiea": {
+			"authors": ["Kwok Wong"],
+			"url": "https://patents.google.com/patent/US20040201502A1/en",
+			"basis": "collection"
+		},
+		"wordslow_sf": {
+			"authors": ["Philipp Kiefer"],
+			"basis": "collection"
+		},
+		"workman_ld": {
+			"authors": ["Someguy 3"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/p4bs4r/a_take_on_workman_workmanld/",
+			"basis": "collection"
+		},
+		"workwoman": {
+			"authors": ["Piotr Grochowski"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/l0to23/workwoman_is_now_released/",
+			"basis": "collection"
+		},
+		"wreathy": {
+			"authors": ["Apsuity"],
+			"url": "https://docs.google.com/document/d/1_a5Nzbkwyk1o0bvTctZrtgsee9jSP-6I0q3A0_9Mzm0/edit#",
+			"basis": "collection"
+		},
+		"xenia": {
+			"authors": ["Russian Doomer"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/11g3xlx/keyboard_layout_family_tree/",
+			"basis": "collection"
+		},
+		"xpert_express": {
+			"authors": ["Rike Maria Wedding"],
+			"url": "https://patents.google.com/patent/US7137749?oq=keyboard+layout",
+			"basis": "collection"
+		},
+		"xsvmtkrnl_fhy": {
+			"authors": ["Philipp Kiefer"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/1bbbqfm/updated_results_from_indepth_layout_comparison/",
+			"basis": "collection"
+		},
+		"yak": {
+			"authors": ["wincent, captured by Ian Douglas"],
+			"url": "https://github.com/wincent/yak-layout",
+			"basis": "collection"
+		},
+		"zsvmtjrnl_fkhy": {
+			"authors": ["Philipp Kiefer"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/1bbbqfm/updated_results_from_indepth_layout_comparison/",
+			"basis": "collection"
+		},
+		"hands_on_ts": {
+			"authors": ["Alan Reiser"],
+			"url": "https://alanreiser.com/",
+			"basis": "collection"
+		},
+		"ntsc": {
+			"authors": ["Amuseum"],
+			"url": "http://shenafu.com/smf/index.php?topic=89.0",
+			"basis": "collection"
 		}
 	}
 }
