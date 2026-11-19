@@ -150,6 +150,9 @@ body {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px 12px;
+	/* A menu element: no list margins or markers. */
+	list-style: none;
+	margin: 0;
 	padding: 8px;
 	position: sticky;
 	top: 0;
@@ -161,12 +164,10 @@ body {
 	gap: 6px;
 }
 
-.le-toolbar-spacer {
-	flex: 1 1 0;
-}
-
 .le-doc-state {
 	color: var(--le-sub);
+	/* The layout's name and what follows it sit at the toolbar's end. */
+	margin-inline-start: auto;
 	max-width: 40ch;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -370,6 +371,11 @@ body {
 	gap: 6px;
 }
 
+/* « Swap with the key » is a paragraph: no margins of its own. */
+.le-swap {
+	margin: 0;
+}
+
 .le-field {
 	display: flex;
 	flex-direction: column;
@@ -419,6 +425,7 @@ body {
 	background: var(--le-surface-2);
 	border: 1px solid var(--le-border);
 	border-radius: var(--le-radius);
+	color: inherit;
 	margin: 0;
 	padding: 8px 12px;
 }
@@ -426,6 +433,17 @@ body {
 .le-confirm button,
 .le-preserved button {
 	margin-right: 6px;
+}
+
+/* An open dialog in the flow of the messages, not over the page: no UA
+   positioning or sizing. */
+.le-confirm {
+	height: auto;
+	inset: auto;
+	max-height: none;
+	max-width: none;
+	position: static;
+	width: auto;
 }
 
 .le-tab.active,
@@ -455,11 +473,18 @@ body {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px 12px;
+	margin: 0;
 }
 
 .le-label {
 	color: var(--le-sub);
 	font-weight: 600;
+}
+
+/* The layer bar's heading reads as a label, not as a section title. */
+.layout-editor .le-label {
+	font-size: inherit;
+	margin: 0;
 }
 
 .le-layerbar .le-tabs {
@@ -514,6 +539,7 @@ body {
    the page scrolls, so an edit's effect shows beside the keys. */
 .le-score-chip {
 	align-self: flex-start;
+	margin: 0;
 	max-width: 100%;
 	position: sticky;
 	top: calc(var(--le-toolbar-height, 0px) + 8px);
@@ -557,12 +583,15 @@ body {
 
 .le-score-rank {
 	color: var(--le-sub);
+	/* A small element: the rank keeps the chip's size. */
+	font-size: inherit;
 }
 
 .le-score-change {
 	align-items: center;
 	border-radius: 999px;
 	display: inline-flex;
+	font-style: normal;
 	gap: 6px;
 	padding: 2px 10px;
 }
@@ -588,6 +617,7 @@ body {
 
 .le-score-mark {
 	font-size: 0.85em;
+	font-weight: inherit;
 }
 
 .le-workspace {
@@ -1007,9 +1037,16 @@ body {
 	display: grid;
 	gap: 2px;
 	grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
-	margin-top: 6px;
+	list-style: none;
+	margin: 6px 0 0;
 	max-height: 200px;
 	overflow-y: auto;
+	padding: 0;
+}
+
+/* Each character's item is its cell: the button fills it. */
+.le-palette-grid > li {
+	display: grid;
 }
 
 .le-glyph {
@@ -1271,6 +1308,7 @@ body {
 .le-magnifier-glyph {
 	font-size: 56px;
 	line-height: 1.2;
+	margin: 0;
 	min-height: 72px;
 	overflow-wrap: anywhere;
 	text-align: center;
@@ -1311,6 +1349,11 @@ body {
 		display: none;
 	}
 
+	/* The name hidden, « Close » still sits at the end. */
+	.le-toolbar-close {
+		margin-inline-start: auto;
+	}
+
 	.le-layerbar {
 		align-items: stretch;
 		flex-direction: column;
@@ -1321,8 +1364,8 @@ body {
 	}
 }
 
-/* The group wrapper only carries the role: its tabs and the add button stay
-   one flex row of .le-layout-tab-list. */
+/* The list of open layouts only carries its meaning: its items and the add
+   button stay one flex row of .le-layout-tab-list. */
 .le-layout-tab-roles {
 	display: contents;
 }
@@ -1401,7 +1444,7 @@ body {
 	flex-wrap: wrap;
 	gap: 10px;
 	justify-content: flex-end;
-	margin-top: 16px;
+	margin: 16px 0 0;
 }
 
 .le-paste-actions button {

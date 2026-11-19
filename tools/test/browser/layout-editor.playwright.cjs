@@ -1245,7 +1245,32 @@ async function exerciseFingeringPerKeyboard(page) {
 		'the panel shows the key map'
 	);
 	await page.click('.la-panel-fingering .la-fingering-key[title^="KeyQ "]');
-	await page.selectOption('.la-panel-fingering div.la-fingering-row select', 'lr');
+	// (fingering-keys-keyboard) The map is one Tab stop: the chosen key keeps
+	// the focus through the redraw, and the arrows move it across the board.
+	const focusedKey = () =>
+		page.evaluate(() => {
+			const map = document.querySelector('.la-panel-fingering .la-fingering-map');
+			return {
+				code: map.contains(document.activeElement) ? document.activeElement.dataset.code : null,
+				stops: map.querySelectorAll('.la-fingering-key[tabindex="0"]').length
+			};
+		});
+	assert.deepEqual(
+		await focusedKey(),
+		{ code: 'KeyQ', stops: 1 },
+		'the chosen key keeps the focus'
+	);
+	await page.keyboard.press('ArrowRight');
+	assert.deepEqual(await focusedKey(), { code: 'KeyW', stops: 1 }, 'ArrowRight: the next key');
+	await page.keyboard.press('ArrowDown');
+	assert.deepEqual(await focusedKey(), { code: 'KeyS', stops: 1 }, 'ArrowDown: the key below');
+	await page.keyboard.press('Home');
+	const rowStart = await focusedKey();
+	assert.notEqual(rowStart.code, 'KeyS', 'Home: the first key of the row');
+	await page.keyboard.press('Enter');
+	assert.deepEqual(await focusedKey(), rowStart, 'Enter chooses the key and keeps the focus');
+	await page.click('.la-panel-fingering .la-fingering-key[title^="KeyQ "]');
+	await page.selectOption('.la-panel-fingering .la-fingering-key-line select', 'lr');
 	await waitFinger('KeyQ', 'lr');
 	const stored = await page.evaluate(() =>
 		JSON.parse(window.localStorage.getItem('ergopti.layout_analysis.profiles.v2'))
@@ -2953,6 +2978,118 @@ async function exerciseLayerSelector(browser, origin) {
 }
 
 /**
+ * The editor with the keyboard alone (WCAG 2.1.1, 2.4.3, 2.5.7): the board is
+ * one Tab stop walked with the arrow keys as it is drawn, Enter chooses a key
+ * and the focus stays on it, two keys are swapped without a drag through the
+ * inspector's « Swap with the key », the tool and layer tab lists follow the
+ * ARIA tabs pattern, the arrows move between the open layouts, and the
+ * in-page question takes the focus, closes on Escape and gives it back.
+ */
+async function exerciseKeyboardOnly(browser, origin) {
+	const { page, errors } = await open(browser, origin, 'en');
+	const focused = () =>
+		page.evaluate(() => {
+			const node = document.activeElement;
+			return node.dataset.code || node.dataset.tab || node.dataset.closeTab || node.id;
+		});
+	const stops = (selector) =>
+		page.$$eval(selector, (nodes) => nodes.filter((node) => node.tabIndex >= 0).length);
+	assert.equal(await stops('#le-board .le-key'), 1, 'the board is one Tab stop');
+	await page.focus('#le-board [data-code="KeyA"]');
+	for (const [key, code] of [
+		['ArrowRight', 'KeyS'],
+		['ArrowLeft', 'KeyA'],
+		['ArrowUp', 'KeyQ'],
+		['ArrowDown', 'KeyA'],
+		['Home', 'CapsLock'],
+		['ArrowRight', 'KeyA']
+	]) {
+		await page.keyboard.press(key);
+		assert.equal(await focused(), code, `${key} moves the focus to ${code}`);
+	}
+	// The key focused last is where Tab enters the board again.
+	assert.equal(
+		await page.getAttribute('#le-board [data-code="KeyA"]', 'tabindex'),
+		'0',
+		'the focused key is the Tab stop'
+	);
+	// Enter chooses the key; the render keeps the focus on it.
+	await page.keyboard.press('ArrowUp');
+	await page.keyboard.press('Enter');
+	await page.waitForSelector('#le-board [data-code="KeyQ"].selected');
+	assert.equal(await focused(), 'KeyQ', 'the chosen key keeps the focus');
+	// A legend to move, typed in the inspector; then the swap with keys only.
+	await page.selectOption('#le-kind', 'text');
+	await page.fill('#le-text', '@');
+	await page.click('#le-apply');
+	await page.focus('#le-board [data-code="KeyQ"]');
+	for (let step = 0; step < 200 && (await focused()) !== 'le-swap-target'; step++)
+		await page.keyboard.press('Tab');
+	assert.equal(await focused(), 'le-swap-target', 'Tab reaches « Swap with the key »');
+	for (let step = 0; step < 300 && (await page.inputValue('#le-swap-target')) !== 'KeyW'; step++)
+		await page.keyboard.press('ArrowDown');
+	assert.equal(await page.inputValue('#le-swap-target'), 'KeyW');
+	await page.keyboard.press('Tab');
+	assert.equal(await focused(), 'le-swap');
+	await page.keyboard.press('Enter');
+	const legendOf = (code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
+	assert.equal(await legendOf('KeyW'), '@', 'the swap moved the legend to W');
+	assert.equal(await legendOf('KeyQ'), '', 'and took Q’s empty mapping');
+	assert.equal(await focused(), 'le-swap', 'the focus stays on the swap button');
+
+	// The tool tabs: one Tab stop, the arrows choose the next tab and keep the focus.
+	assert.equal(await stops('#le-tools [role="tab"]'), 1, 'the tool tabs are one Tab stop');
+	const tools = await page.$$eval('#le-tools [role="tab"]', (tabs) => tabs.map((tab) => tab.id));
+	await page.focus(`#${tools[0]}`);
+	for (const [key, id] of [
+		['ArrowRight', tools[1]],
+		['ArrowLeft', tools[0]],
+		['End', tools[tools.length - 1]],
+		['ArrowRight', tools[0]],
+		['Home', tools[0]]
+	]) {
+		await page.keyboard.press(key);
+		assert.equal(await focused(), id, `${key} on the tool tabs focuses ${id}`);
+		assert.equal(await page.getAttribute(`#${id}`, 'aria-selected'), 'true', `${id} is chosen`);
+	}
+	// The layer tabs: Shift added, then reached from Base with the arrow.
+	await page.click('#le-layerbar [data-level="shift"]');
+	await page.waitForSelector('[data-layer="shift"].active');
+	assert.equal(await stops('#le-layerbar .le-segmented [role="tab"]'), 1);
+	await page.focus('[data-layer="shift"]');
+	await page.keyboard.press('ArrowLeft');
+	assert.equal(
+		await page.evaluate(() => document.activeElement.dataset.layer),
+		'base',
+		'ArrowLeft focuses Base'
+	);
+	assert.equal(await page.getAttribute('[data-layer="base"]', 'aria-selected'), 'true');
+
+	// The open layouts: the arrows move between them.
+	await page.click('#le-tab-add');
+	await page.waitForSelector('#le-layout-tabs [data-tab="1"]');
+	await page.focus('#le-layout-tabs [data-tab="1"]');
+	await page.keyboard.press('ArrowLeft');
+	assert.equal(await focused(), '0', 'ArrowLeft focuses the first layout');
+	// The question asked by closing an edited layout: focus in, Escape, focus back.
+	await page.focus('#le-layout-tabs [data-close-tab="0"]');
+	await page.keyboard.press('Enter');
+	await page.waitForSelector('#le-confirm[open]');
+	assert.equal(await page.getAttribute('#le-confirm', 'role'), 'alertdialog');
+	assert.equal(await focused(), 'le-confirm-no', 'the question takes the focus');
+	await page.keyboard.press('Escape');
+	assert.equal(await page.locator('#le-confirm').count(), 0, 'Escape cancels the question');
+	assert.equal(await focused(), '0', 'the focus goes back to the close button');
+	assert.equal(
+		await page.evaluate(() => document.activeElement.hasAttribute('data-close-tab')),
+		true
+	);
+	assert.equal(await page.locator('#le-layout-tabs .le-layout-tab').count(), 2, 'nothing closed');
+	assert.deepEqual(errors, []);
+	await page.context().close();
+}
+
+/**
  * The « Shortcuts » view: a key with no override reads « = » (same as the base
  * key); an override for any modifier combination sends any chord, is marked on
  * the board, listed with Edit and Remove, named by the export tab for the
@@ -4213,6 +4350,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseSiteOpensOnErgopti(browser, origin);
 		await exerciseHandedDownload(browser, origin);
 		await exerciseLayerSelector(browser, origin);
+		await exerciseKeyboardOnly(browser, origin);
 		await exercisePhoneWidth(browser, origin);
 		await exerciseLongLabels(browser, origin);
 		await exerciseShortcuts(browser, origin);

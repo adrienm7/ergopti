@@ -444,6 +444,8 @@ var LayoutEditorPage = (function () {
 			layer: 'base',
 			platform: '',
 			selected: null,
+			// The board key the Tab key enters the board on (the last one focused).
+			boardFocus: null,
 			// The keyboard format shown (analysis_model.json keyboard_formats, the
 			// Comparer's too): each hides the blocks it lacks.
 			format: LAYOUT_ANALYSIS.keyboardFormats().some(
@@ -1122,7 +1124,7 @@ var LayoutEditorPage = (function () {
 				const tab = tabAt(index);
 				const name = tab.history.current().layout.name;
 				const active = index === state.active;
-				return el('span', { class: `le-layout-tab-item${active ? ' active' : ''}` }, [
+				return el('li', { class: `le-layout-tab-item${active ? ' active' : ''}` }, [
 					state.tabRenaming === index
 						? tabRenameField(index, name)
 						: el('button', {
@@ -1137,9 +1139,10 @@ var LayoutEditorPage = (function () {
 								onclick: () => switchTab(index),
 								ondblclick: () => startTabRename(index),
 								onkeydown: (event) => {
-									if (event.key !== 'F2') return;
-									event.preventDefault();
-									startTabRename(index);
+									if (event.key === 'F2') {
+										event.preventDefault();
+										startTabRename(index);
+									} else layoutTabKeys(event);
 								}
 							}),
 					el(
@@ -1176,17 +1179,14 @@ var LayoutEditorPage = (function () {
 				hidden: true,
 				onchange: (event) => importTabs(event.target)
 			});
-			return el('div', { class: 'le-layout-tabs', id: 'le-layout-tabs' }, [
+			return el('header', { class: 'le-layout-tabs', id: 'le-layout-tabs' }, [
 				el('div', { class: 'le-layout-tab-list' }, [
-					// A named group of buttons, the current one marked: a tablist
-					// may hold only tabs, and each layout has a close button
-					// (WCAG 4.1.2). The add button stays in the same row
-					// (display: contents, style.css).
-					el(
-						'div',
-						{ class: 'le-layout-tab-roles', role: 'group', 'aria-label': tl('tabs.label') },
-						tabs
-					),
+					// A named list of the open layouts, the current one marked: a
+					// tablist may hold only tabs, and each layout has its duplicate
+					// and close buttons (WCAG 4.1.2). The arrows move between the
+					// layouts' buttons (layoutTabKeys). The add button stays in the
+					// same row (display: contents, style.css).
+					el('ul', { class: 'le-layout-tab-roles', 'aria-label': tl('tabs.label') }, tabs),
 					el(
 						'button',
 						{
@@ -1200,7 +1200,7 @@ var LayoutEditorPage = (function () {
 						tabIcon('add')
 					)
 				]),
-				el('span', {
+				el('output', {
 					class: `le-autosave ${state.workspace.status}`,
 					id: 'le-autosave',
 					role: 'status',
@@ -1284,7 +1284,7 @@ var LayoutEditorPage = (function () {
 					field,
 					detected,
 					refusal,
-					el('div', { class: 'le-paste-actions' }, [
+					el('p', { class: 'le-paste-actions' }, [
 						el('button', {
 							type: 'button',
 							id: 'le-paste-cancel',
@@ -1619,9 +1619,16 @@ var LayoutEditorPage = (function () {
 			});
 		}
 
+		/**
+		 * Asks a question in the page (see messageBar): the focus moves to its
+		 * « Cancel », and goes back to the control that asked once answered.
+		 */
 		function ask(text, onYes) {
-			state.confirm = { text, onYes };
+			const opener = focusAnchor(document.activeElement);
+			state.confirm = { text, onYes, opener };
 			render();
+			const cancel = root.querySelector('#le-confirm-no');
+			if (cancel) cancel.focus();
 		}
 
 		function adoptConverted(converted) {
@@ -1710,42 +1717,44 @@ var LayoutEditorPage = (function () {
 			});
 			const button = (id, label, onclick, extra) =>
 				el('button', Object.assign({ type: 'button', id, text: label, onclick }, extra || {}));
-			return el(
-				'div',
-				{ class: 'le-toolbar', role: 'toolbar', 'aria-label': tl('toolbar.label') },
-				[
-					el('div', { class: 'le-toolbar-group' }, [
-						button(
-							'le-new',
-							tl('btn.new'),
-							() => {
-								state.starting = !state.starting;
-								if (state.starting && state.fillSources === null) loadFillSources();
-								else render();
-							},
-							{ 'aria-expanded': String(state.starting) }
-						),
-						button('le-open', tl('btn.open'), () =>
-							host.pickFile ? pickWithHost() : fileInput.click()
-						),
-						button('le-save', tl('btn.save'), saveSource, { class: 'primary' }),
-						fileInput,
-						navInput
-					]),
-					el('div', { class: 'le-toolbar-group' }, [
-						button('le-undo', tl('btn.undo'), () => runHistory('undo'), historyButton('undo')),
-						button('le-redo', tl('btn.redo'), () => runHistory('redo'), historyButton('redo'))
-					]),
-					el('span', { class: 'le-toolbar-spacer' }),
-					el('span', {
-						class: `le-doc-state${state.dirty ? ' dirty' : ''}`,
-						id: 'le-doc-state',
-						text: `${doc().layout.name}${state.dirty ? ' •' : ''}`,
-						title: tl(state.dirty ? 'toolbar.unsaved' : 'toolbar.saved')
-					}),
-					host.onClose ? button('le-close', tl('btn.close'), host.onClose) : null
-				]
-			);
+			// A menu element: the HTML toolbar, a list of commands each reached with Tab.
+			return el('menu', { class: 'le-toolbar', 'aria-label': tl('toolbar.label') }, [
+				el('li', { class: 'le-toolbar-group' }, [
+					button(
+						'le-new',
+						tl('btn.new'),
+						() => {
+							state.starting = !state.starting;
+							if (state.starting && state.fillSources === null) loadFillSources();
+							else render();
+						},
+						{ 'aria-expanded': String(state.starting) }
+					),
+					button('le-open', tl('btn.open'), () =>
+						host.pickFile ? pickWithHost() : fileInput.click()
+					),
+					button('le-save', tl('btn.save'), saveSource, { class: 'primary' }),
+					fileInput,
+					navInput
+				]),
+				el('li', { class: 'le-toolbar-group' }, [
+					button('le-undo', tl('btn.undo'), () => runHistory('undo'), historyButton('undo')),
+					button('le-redo', tl('btn.redo'), () => runHistory('redo'), historyButton('redo'))
+				]),
+				el('li', {
+					class: `le-doc-state${state.dirty ? ' dirty' : ''}`,
+					id: 'le-doc-state',
+					text: `${doc().layout.name}${state.dirty ? ' •' : ''}`,
+					title: tl(state.dirty ? 'toolbar.unsaved' : 'toolbar.saved')
+				}),
+				host.onClose
+					? el(
+							'li',
+							{ class: 'le-toolbar-close' },
+							button('le-close', tl('btn.close'), host.onClose)
+						)
+					: null
+			]);
 		}
 
 		function messageBar() {
@@ -1756,24 +1765,50 @@ var LayoutEditorPage = (function () {
 					state.confirm = null;
 					if (yes) question.onYes();
 					else render();
+					// Back to the control that asked, or its counterpart after the render.
+					const opener = question.opener;
+					if (!opener || document.activeElement !== document.body) return;
+					const back = opener.node.isConnected
+						? opener.node
+						: opener.selector && root.querySelector(opener.selector);
+					if (back) back.focus({ preventScroll: true });
 				};
+				// Not modal: the question sits where the page's messages show. The
+				// focus moves in on « Cancel », Escape cancels, and the focus goes
+				// back to the control that asked (ask, answerConfirm).
 				parts.push(
-					el('div', { class: 'le-confirm', id: 'le-confirm', role: 'alertdialog' }, [
-						el('p', { text: question.text }),
-						el('button', {
-							type: 'button',
-							id: 'le-confirm-yes',
-							class: 'primary',
-							text: tl('btn.confirm'),
-							onclick: () => answer(true)
-						}),
-						el('button', {
-							type: 'button',
-							id: 'le-confirm-no',
-							text: tl('btn.cancel'),
-							onclick: () => answer(false)
-						})
-					])
+					el(
+						'dialog',
+						{
+							class: 'le-confirm',
+							id: 'le-confirm',
+							role: 'alertdialog',
+							open: true,
+							'aria-describedby': 'le-confirm-text',
+							'aria-label': tl('btn.confirm'),
+							onkeydown: (event) => {
+								if (event.key !== 'Escape') return;
+								event.preventDefault();
+								answer(false);
+							}
+						},
+						[
+							el('p', { id: 'le-confirm-text', text: question.text }),
+							el('button', {
+								type: 'button',
+								id: 'le-confirm-yes',
+								class: 'primary',
+								text: tl('btn.confirm'),
+								onclick: () => answer(true)
+							}),
+							el('button', {
+								type: 'button',
+								id: 'le-confirm-no',
+								text: tl('btn.cancel'),
+								onclick: () => answer(false)
+							})
+						]
+					)
 				);
 			}
 			if (state.message)
@@ -1787,7 +1822,7 @@ var LayoutEditorPage = (function () {
 				);
 			if (LayoutSourceIO.isPreserved(doc()))
 				parts.push(
-					el('div', { class: 'le-preserved', id: 'le-preserved' }, [
+					el('div', { class: 'le-preserved', id: 'le-preserved', role: 'note' }, [
 						el('p', { text: tl('preserved_note') }),
 						el('button', {
 							type: 'button',
@@ -2051,6 +2086,52 @@ var LayoutEditorPage = (function () {
 		}
 
 		/**
+		 * One Tab stop per tab list (the ARIA tabs pattern): the chosen tab, else
+		 * the first; the arrows reach the others (tabListKeys).
+		 * @param {HTMLElement[]} tabs - The list's tabs, in order.
+		 */
+		function rove(tabs) {
+			const chosen = tabs.find((tab) => tab.getAttribute('aria-selected') === 'true') || tabs[0];
+			for (const tab of tabs) tab.tabIndex = tab === chosen ? 0 : -1;
+		}
+
+		/**
+		 * The arrow keys, Home and End on a tab: the focus moves to the next,
+		 * previous, first or last tab of its list, round from end to start, and
+		 * chooses it (automatic activation: a tab only shows its panel). The
+		 * render that follows gives the focus back to the chosen tab.
+		 * @param {KeyboardEvent} event - A keydown on a tab.
+		 */
+		function tabListKeys(event) {
+			if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+			const list = event.currentTarget.closest('[role="tablist"]');
+			const tabs = [...list.querySelectorAll('[role="tab"]')].filter((tab) => !tab.disabled);
+			const at = tabs.indexOf(event.currentTarget);
+			const steps = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: tabs.length - 1 };
+			if (!(event.key in steps) || at < 0) return;
+			event.preventDefault();
+			const next = tabs[(steps[event.key] + tabs.length) % tabs.length];
+			next.focus();
+			if (next.getAttribute('aria-selected') !== 'true') next.click();
+		}
+
+		/**
+		 * The arrow keys, Home and End on an open layout's button: the focus
+		 * moves between the layouts (round from end to start); Enter or Space
+		 * shows the one focused. Its duplicate and close buttons stay on Tab.
+		 * @param {KeyboardEvent} event - A keydown on a .le-layout-tab button.
+		 */
+		function layoutTabKeys(event) {
+			if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+			const tabs = [...root.querySelectorAll('#le-layout-tabs .le-layout-tab')];
+			const at = tabs.indexOf(event.currentTarget);
+			const steps = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: tabs.length - 1 };
+			if (!(event.key in steps) || at < 0) return;
+			event.preventDefault();
+			tabs[(steps[event.key] + tabs.length) % tabs.length].focus();
+		}
+
+		/**
 		 * The layer selector: the four character levels always shown (a missing one
 		 * is added by choosing it), then every other layer of the layout.
 		 */
@@ -2070,9 +2151,11 @@ var LayoutEditorPage = (function () {
 						'aria-selected': String(layer.id === current),
 						'data-layer': layer.id,
 						'data-level': level.id,
+						'aria-controls': 'le-board',
 						title: layer.required.join('+') || tl('layer.no_modifier'),
 						text: label,
-						onclick: () => showLayer(layer.id)
+						onclick: () => showLayer(layer.id),
+						onkeydown: tabListKeys
 					});
 				}
 				return el('button', {
@@ -2098,11 +2181,15 @@ var LayoutEditorPage = (function () {
 						class: `le-tab${layer.id === current ? ' active' : ''}`,
 						'aria-selected': String(layer.id === current),
 						'data-layer': layer.id,
+						'aria-controls': 'le-board',
 						title: `${layer.id} (${layer.required.join('+') || tl('layer.no_modifier')})`,
 						text: layerLabel(layer),
-						onclick: () => showLayer(layer.id)
+						onclick: () => showLayer(layer.id),
+						onkeydown: tabListKeys
 					})
 				);
+			rove(levels.filter((tab) => tab.getAttribute('role') === 'tab'));
+			rove(others);
 			const scope = select(
 				[['', tl('scope.all')]].concat(
 					LayoutEditorModel.PLATFORMS.map((p) => [p, tl(`scope.${p}`)])
@@ -2116,7 +2203,8 @@ var LayoutEditorPage = (function () {
 			);
 			return el('section', { class: 'le-layerbar', id: 'le-layerbar' }, [
 				el('div', { class: 'le-layer-pick' }, [
-					el('span', { class: 'le-label', id: 'le-layers-label', text: tl('layer.selector') }),
+					// The layer bar's heading, which also names the levels' tab list.
+					el('h2', { class: 'le-label', id: 'le-layers-label', text: tl('layer.selector') }),
 					el(
 						'div',
 						{
@@ -2127,7 +2215,15 @@ var LayoutEditorPage = (function () {
 						levels
 					),
 					others.length
-						? el('div', { class: 'le-tabs le-other-layers', role: 'tablist' }, others)
+						? el(
+								'div',
+								{
+									class: 'le-tabs le-other-layers',
+									role: 'tablist',
+									'aria-labelledby': 'le-layers-label'
+								},
+								others
+							)
 						: null,
 					preserved
 						? null
@@ -2152,7 +2248,7 @@ var LayoutEditorPage = (function () {
 								onclick: () => showTool('layers')
 							})
 				]),
-				el('div', { class: 'le-view' }, [
+				el('p', { class: 'le-view' }, [
 					el('label', { class: 'le-inline' }, [tl('scope.label'), scope]),
 					el('label', { class: 'le-inline' }, [
 						tl('board.label'),
@@ -2196,10 +2292,10 @@ var LayoutEditorPage = (function () {
 			const checks = modifierOptions().map((id) =>
 				el('label', { class: 'le-check' }, [el('input', { type: 'checkbox', value: id }), id])
 			);
-			const addForm = el('div', { class: 'le-subpanel le-add', id: 'le-layer-add-form' }, [
+			const addForm = el('section', { class: 'le-subpanel le-add', id: 'le-layer-add-form' }, [
 				el('h3', { text: tl('layer.add') }),
 				idInput,
-				el('div', { class: 'le-checks', id: 'le-layer-required' }, checks),
+				el('p', { class: 'le-checks', id: 'le-layer-required' }, checks),
 				el('button', {
 					type: 'button',
 					id: 'le-layer-add',
@@ -2228,10 +2324,10 @@ var LayoutEditorPage = (function () {
 			};
 			const current =
 				state.layer && others.length
-					? el('div', { class: 'le-subpanel le-add', id: 'le-move-all' }, [
+					? el('section', { class: 'le-subpanel le-add', id: 'le-move-all' }, [
 							el('h3', { text: tl('layer.move_all') }),
 							el('label', { class: 'le-inline' }, [tl('layer.move_target'), moveTarget]),
-							el('div', { class: 'le-buttons' }, [
+							el('p', { class: 'le-buttons' }, [
 								el('button', {
 									type: 'button',
 									id: 'le-move-layer',
@@ -2274,7 +2370,7 @@ var LayoutEditorPage = (function () {
 			return el('section', { class: 'le-panel', id: 'le-navigation' }, [
 				el('h2', { text: tl('tools.navigation') }),
 				el('p', { class: 'le-note', text: tl('nav.note') }),
-				el('div', { class: 'le-buttons' }, [
+				el('p', { class: 'le-buttons' }, [
 					el('label', { class: 'le-inline' }, [
 						tl('nav_hold'),
 						select(
@@ -2302,7 +2398,7 @@ var LayoutEditorPage = (function () {
 			return el('section', { class: 'le-panel', id: 'le-sticker-tool' }, [
 				el('h2', { text: tl('tools.stickers') }),
 				el('p', { class: 'le-note', text: tl('sticker.note') }),
-				el('div', { class: 'le-buttons' }, [
+				el('p', { class: 'le-buttons' }, [
 					el('label', { class: 'le-inline' }, [
 						tl('sticker.size'),
 						el('input', {
@@ -2367,8 +2463,10 @@ var LayoutEditorPage = (function () {
 					'data-tool': id,
 					'aria-selected': String(id === active),
 					'aria-controls': 'le-tool-panel',
+					tabindex: id === active ? '0' : '-1',
 					text: tl(`tools.${id}`),
-					onclick: () => showTool(id)
+					onclick: () => showTool(id),
+					onkeydown: tabListKeys
 				})
 			);
 			return el('section', { class: 'le-tools', id: 'le-tools' }, [
@@ -2378,7 +2476,7 @@ var LayoutEditorPage = (function () {
 					tabs
 				),
 				el(
-					'div',
+					'section',
 					{
 						class: 'le-tool-panel',
 						id: 'le-tool-panel',
@@ -2425,6 +2523,56 @@ var LayoutEditorPage = (function () {
 			event.preventDefault();
 		}
 
+		/**
+		 * The arrow keys, Home and End on a focused key move the focus over the
+		 * board as it is drawn (Enter or Space then chooses the key): left and
+		 * right along the key's row, up and down to the nearest row above or
+		 * below, to the key closest under the key's centre; Home and End to the
+		 * ends of the row. The board is one Tab stop, so this is how a keyboard
+		 * reaches every key.
+		 * @param {KeyboardEvent} event - A keydown on a board key.
+		 * @param {string} code - The focused key.
+		 * @param {Map<string, {x: number, y: number, w: number, h: number}>} places - Each drawn key's box, in key units.
+		 */
+		function boardKeys(event, code, places) {
+			if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+			const from = places.get(code);
+			if (!from) return;
+			// The row a key is in: the middle of its top unit (a two-row key is in its top row).
+			const row = from.y + 0.5;
+			const centre = from.x + from.w / 2;
+			const inRow = [...places].filter(([, p]) => p.y <= row && row < p.y + p.h);
+			const middle = (p) => p.x + p.w / 2;
+			let candidates = [];
+			if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+				const sign = event.key === 'ArrowRight' ? 1 : -1;
+				candidates = inRow
+					.filter(([, p]) => sign * (middle(p) - centre) > 0)
+					.sort(([, a], [, b]) => sign * (middle(a) - middle(b)));
+			} else if (event.key === 'Home' || event.key === 'End') {
+				candidates = inRow.sort(([, a], [, b]) => (event.key === 'Home' ? a.x - b.x : b.x - a.x));
+			} else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+				const up = event.key === 'ArrowUp';
+				const gap = (p) => (up ? from.y - (p.y + p.h) : p.y - (from.y + from.h));
+				// How far the centre is from a key's span, 0 when the key is under it.
+				const aside = (p) => Math.max(0, p.x - centre, centre - (p.x + p.w));
+				candidates = [...places]
+					.filter(([, p]) => gap(p) > -0.01)
+					.sort(([, a], [, b]) => gap(a) - gap(b) || aside(a) - aside(b));
+				if (candidates.length) {
+					const nearest = gap(candidates[0][1]);
+					candidates = candidates
+						.filter(([, p]) => gap(p) - nearest < 0.01)
+						.sort(([, a], [, b]) => aside(a) - aside(b) || middle(a) - middle(b));
+				}
+			} else return;
+			event.preventDefault();
+			const next = candidates.find(([other]) => other !== code);
+			if (!next) return;
+			const button = root.querySelector(`#le-board .le-key[data-code="${CSS.escape(next[0])}"]`);
+			if (button) button.focus();
+		}
+
 		/** The board drawn: the one chosen, else the keyboard the source is for. */
 		function boardForm() {
 			return state.board || doc().physical.keyboard || 'iso';
@@ -2445,9 +2593,23 @@ var LayoutEditorPage = (function () {
 				class: 'le-board',
 				id: 'le-board',
 				// The stylesheet sizes one key unit to the width available (style.css, Board).
-				style: `--le-cols:${width};--le-rows:${height}`
+				style: `--le-cols:${width};--le-rows:${height}`,
+				// The keys as one group named by the layout; one Tab stop, the arrows
+				// walk it (boardKeys).
+				role: 'group',
+				'aria-label': doc().layout.name
 			});
 			const remap = doc().remap || {};
+			const places = new Map(
+				keys.map((k) => {
+					const g = k.geometry[form];
+					return [k.code, { x: g.col, y: g.row, w: g.width, h: g.height || 1 }];
+				})
+			);
+			// The key the Tab key enters the board on: the last one focused, else
+			// the selected one, else the first.
+			const entry = [state.boardFocus, state.selected].find((code) => places.has(code));
+			const roving = entry || keys[0].code;
 			const positions = boardPositions(keys, form);
 			for (const key of keys) {
 				const g = key.geometry[form];
@@ -2519,7 +2681,16 @@ var LayoutEditorPage = (function () {
 								state.selected = key.code;
 								render();
 							},
-							onkeydown: (event) => clipboardKey(event, key.code),
+							tabindex: key.code === roving ? '0' : '-1',
+							onkeydown: (event) => {
+								clipboardKey(event, key.code);
+								if (!event.defaultPrevented) boardKeys(event, key.code, places);
+							},
+							onfocusin: () => {
+								state.boardFocus = key.code;
+								for (const other of container.querySelectorAll('.le-key[data-code]'))
+									other.tabIndex = other.dataset.code === key.code ? 0 : -1;
+							},
 							...magnifyOn(
 								magnifiedText(found && found.mapping),
 								!state.shortcutView && isDeadKey(found && found.mapping)
@@ -2581,7 +2752,7 @@ var LayoutEditorPage = (function () {
 			}
 			const media = data.keys.filter((k) => k.kind === 'key' && !k.geometry);
 			const mediaRow = el(
-				'div',
+				'p',
 				{ class: 'le-media' },
 				media.map((key) =>
 					el('button', {
@@ -2660,11 +2831,10 @@ var LayoutEditorPage = (function () {
 			);
 			box.append(
 				el(
-					'div',
+					'section',
 					{
 						class: 'le-board-table-wrap',
 						tabindex: '0',
-						role: 'region',
 						'aria-label': tl('board.table')
 					},
 					[el('table', {}, [el('thead', {}, head), el('tbody', {}, body)])]
@@ -2717,8 +2887,7 @@ var LayoutEditorPage = (function () {
 							: el('p', { class: 'le-note', text: tl('dead.none_yet') })
 					);
 				if (kind === 'action') area.append(fields.action);
-				if (kind === 'key')
-					area.append(fields.key, el('div', { class: 'le-checks' }, sendModifiers));
+				if (kind === 'key') area.append(fields.key, el('p', { class: 'le-checks' }, sendModifiers));
 			}
 			showFields();
 			const kindSelect = select(
@@ -2746,7 +2915,7 @@ var LayoutEditorPage = (function () {
 				}
 				return { disabled: true };
 			}
-			return el('div', { class: 'le-group' }, [
+			return el('section', { class: 'le-group' }, [
 				el('h3', {
 					text: tl('inspector.mapping', {
 						layer: state.layer,
@@ -2755,7 +2924,7 @@ var LayoutEditorPage = (function () {
 				}),
 				kindSelect,
 				area,
-				el('div', { class: 'le-checks' }, [
+				el('p', { class: 'le-checks' }, [
 					checkbox('le-auto-case', tl('case.auto'), state.autoCase, (on) => {
 						state.autoCase = on;
 					}),
@@ -2820,7 +2989,7 @@ var LayoutEditorPage = (function () {
 				() => {},
 				{ id: 'le-swap-target' }
 			);
-			return el('div', { class: 'le-inline le-swap' }, [
+			return el('p', { class: 'le-inline le-swap' }, [
 				el('label', { for: 'le-swap-target', text: tl('swap.label') }),
 				target,
 				el('button', {
@@ -2850,7 +3019,8 @@ var LayoutEditorPage = (function () {
 				type: 'text',
 				id: 'le-locate',
 				size: 8,
-				placeholder: tl('palette.locate_placeholder')
+				placeholder: tl('palette.locate_placeholder'),
+				'aria-label': tl('palette.locate_placeholder')
 			});
 			const results = el('ul', { class: 'le-list', id: 'le-locate-results' });
 			const run = () => {
@@ -2870,7 +3040,7 @@ var LayoutEditorPage = (function () {
 					...(found.length ? found : [tl('palette.locate_none')]).map((text) => el('li', { text }))
 				);
 			};
-			return el('span', { class: 'le-inline' }, [
+			return el('search', { class: 'le-inline le-locate', 'aria-label': tl('palette.locate') }, [
 				input,
 				el('button', {
 					type: 'button',
@@ -2884,23 +3054,27 @@ var LayoutEditorPage = (function () {
 
 		function palette(target) {
 			const block = PALETTE_BLOCKS.find((b) => b.id === state.paletteBlock);
-			const grid = el('div', { class: 'le-palette-grid', id: 'le-palette' });
+			const grid = el('ul', { class: 'le-palette-grid', id: 'le-palette' });
 			for (let point = block.from; point <= block.to; point++) {
 				const char = String.fromCodePoint(point);
 				grid.append(
-					el('button', {
-						type: 'button',
-						class: 'le-glyph',
-						title: UnicodeNames.codeLabel(point),
-						text: visible(char),
-						draggable: 'true',
-						ondragstart: (event) => event.dataTransfer.setData(CHAR_DRAG_TYPE, char),
-						onclick: () => {
-							target.value += char;
-							target.focus();
-						},
-						...magnifyOn(char)
-					})
+					el(
+						'li',
+						{},
+						el('button', {
+							type: 'button',
+							class: 'le-glyph',
+							title: UnicodeNames.codeLabel(point),
+							text: visible(char),
+							draggable: 'true',
+							ondragstart: (event) => event.dataTransfer.setData(CHAR_DRAG_TYPE, char),
+							onclick: () => {
+								target.value += char;
+								target.focus();
+							},
+							...magnifyOn(char)
+						})
+					)
 				);
 			}
 			const hex = el('input', { type: 'text', id: 'le-codepoint', placeholder: 'U+00E9', size: 8 });
@@ -3029,13 +3203,13 @@ var LayoutEditorPage = (function () {
 				return el('li', { class: 'le-magnifier-row' }, [
 					el('code', { text: UnicodeNames.codeLabel(point) }),
 					' ',
-					el('span', {
+					el('small', {
 						class: 'le-magnifier-name',
 						text: named
 							? name || tl('magnifier.unnamed')
 							: tl(state.nameSearch.failed ? 'names.unavailable' : 'names.loading')
 					}),
-					block ? el('span', { class: 'le-magnifier-block', text: ` · ${block}` }) : null
+					block ? el('small', { class: 'le-magnifier-block', text: ` · ${block}` }) : null
 				]);
 			});
 			return el(
@@ -3043,7 +3217,7 @@ var LayoutEditorPage = (function () {
 				{ class: 'le-magnifier', id: 'le-magnifier', 'aria-labelledby': 'le-magnifier-title' },
 				[
 					el('h3', { id: 'le-magnifier-title', text: tl('magnifier.title') }),
-					el('div', {
+					el('p', {
 						class: state.magnifiedDead
 							? `le-magnifier-glyph ${KEY_LEGEND.DEAD_KEY_CLASS}`
 							: 'le-magnifier-glyph',
@@ -3062,9 +3236,9 @@ var LayoutEditorPage = (function () {
 		}
 
 		/** The search's answer as clickable cells, or its state. */
-		function nameResults(target) {
+		function nameResults(box, target) {
 			const search = state.nameSearch;
-			const box = el('div', { class: 'le-name-results', id: 'le-name-results' });
+			box.replaceChildren();
 			if (search.failed) {
 				box.append(el('p', { class: 'le-message error', text: tl('names.unavailable') }));
 				return box;
@@ -3080,23 +3254,27 @@ var LayoutEditorPage = (function () {
 						: tl('names.none')
 				}),
 				el(
-					'div',
+					'ul',
 					{ class: 'le-palette-grid' },
 					results.map((result) =>
-						el('button', {
-							type: 'button',
-							class: 'le-glyph',
-							'data-point': result.code,
-							title: `${result.code} ${result.name}`,
-							text: visible(result.char),
-							draggable: 'true',
-							ondragstart: (event) => event.dataTransfer.setData(CHAR_DRAG_TYPE, result.char),
-							onclick: () => {
-								target.value += result.char;
-								target.focus();
-							},
-							...magnifyOn(result.char)
-						})
+						el(
+							'li',
+							{},
+							el('button', {
+								type: 'button',
+								class: 'le-glyph',
+								'data-point': result.code,
+								title: `${result.code} ${result.name}`,
+								text: visible(result.char),
+								draggable: 'true',
+								ondragstart: (event) => event.dataTransfer.setData(CHAR_DRAG_TYPE, result.char),
+								onclick: () => {
+									target.value += result.char;
+									target.focus();
+								},
+								...magnifyOn(result.char)
+							})
+						)
 					)
 				)
 			);
@@ -3125,7 +3303,10 @@ var LayoutEditorPage = (function () {
 				max: UnicodeNames.MAX_LIMIT,
 				value: search.limit
 			});
-			const holder = el('div', {}, nameResults(target));
+			const box = nameResults(
+				el('div', { class: 'le-name-results', id: 'le-name-results' }),
+				target
+			);
 			function run() {
 				search.query = query.value;
 				search.limit = Math.min(
@@ -3133,13 +3314,13 @@ var LayoutEditorPage = (function () {
 					UnicodeNames.MAX_LIMIT
 				);
 				limit.value = search.limit;
-				holder.replaceChildren(el('p', { class: 'le-note', text: tl('names.loading') }));
+				box.replaceChildren(el('p', { class: 'le-note', text: tl('names.loading') }));
 				withNames(() => {
 					if (!search.failed) search.answer = UnicodeNames.search(search.query, search.limit);
-					holder.replaceChildren(nameResults(target));
+					nameResults(box, target);
 				});
 			}
-			return el('div', { class: 'le-name-search' }, [
+			return el('search', { class: 'le-name-search', 'aria-label': tl('names.search') }, [
 				el('label', { class: 'le-inline' }, [tl('names.label'), query]),
 				el('label', { class: 'le-inline' }, [tl('names.limit'), limit]),
 				el('button', {
@@ -3149,7 +3330,7 @@ var LayoutEditorPage = (function () {
 					onclick: run
 				}),
 				el('p', { class: 'le-note', text: tl('names.help') }),
-				holder
+				box
 			]);
 		}
 
@@ -3293,7 +3474,7 @@ var LayoutEditorPage = (function () {
 			const group = state.shortcutView
 				? (id, children) =>
 						el(
-							'div',
+							'section',
 							{ class: 'le-group', id: `le-group-${id}` },
 							[el('h3', { text: tl(`inspector.${id}`) })].concat(children)
 						)
@@ -3337,9 +3518,7 @@ var LayoutEditorPage = (function () {
 					{ class: 'le-list le-shortcut-list', id: 'le-shortcuts' },
 					shortcuts.map((s) =>
 						el('li', { 'data-chord': s.modifiers.slice().sort().join('+') }, [
-							el('span', {
-								text: `${chordLabel(s.modifiers, s.key)} → ${chordLabel(s.send_modifiers, s.send_key)} `
-							}),
+							`${chordLabel(s.modifiers, s.key)} → ${chordLabel(s.send_modifiers, s.send_key)} `,
 							el('button', {
 								type: 'button',
 								class: 'le-shortcut-edit',
@@ -3359,11 +3538,29 @@ var LayoutEditorPage = (function () {
 						])
 					)
 				),
-				el('p', { class: 'le-note', text: tl('shortcut.when') }),
-				el('div', { class: 'le-checks', id: 'le-shortcut-from' }, from),
-				el('p', { class: 'le-note', text: tl('shortcut.sends') }),
+				el('p', { class: 'le-note', id: 'le-shortcut-from-label', text: tl('shortcut.when') }),
+				el(
+					'p',
+					{
+						class: 'le-checks',
+						id: 'le-shortcut-from',
+						role: 'group',
+						'aria-labelledby': 'le-shortcut-from-label'
+					},
+					from
+				),
+				el('p', { class: 'le-note', id: 'le-shortcut-to-label', text: tl('shortcut.sends') }),
 				sendKey,
-				el('div', { class: 'le-checks', id: 'le-shortcut-to' }, to),
+				el(
+					'p',
+					{
+						class: 'le-checks',
+						id: 'le-shortcut-to',
+						role: 'group',
+						'aria-labelledby': 'le-shortcut-to-label'
+					},
+					to
+				),
 				el('button', {
 					type: 'button',
 					id: 'le-shortcut-add',
@@ -3622,7 +3819,7 @@ var LayoutEditorPage = (function () {
 				state.fillUnavailable
 					? el('p', { class: 'le-message error', text: problemText(state.fillUnavailable) })
 					: null,
-				el('div', { class: 'le-buttons' }, choices),
+				el('p', { class: 'le-buttons' }, choices),
 				libraryStart(begin)
 			]);
 		}
@@ -3678,7 +3875,7 @@ var LayoutEditorPage = (function () {
 				oninput: (event) => fill(event.target.value)
 			});
 			fill('');
-			return el('div', { class: 'le-start-library' }, [
+			return el('section', { class: 'le-start-library' }, [
 				el('h3', { text: tl('start.library') }),
 				search,
 				list,
@@ -3827,7 +4024,7 @@ var LayoutEditorPage = (function () {
 					)
 				),
 				key,
-				el('div', { class: 'le-checks' }, modifiers),
+				el('p', { class: 'le-checks' }, modifiers),
 				el('label', { class: 'le-field' }, [tl('windows.nls_function'), fn]),
 				el('label', { class: 'le-field' }, [tl('windows.nls_parameter'), parameter]),
 				el('button', {
@@ -3922,12 +4119,14 @@ var LayoutEditorPage = (function () {
 				el('h2', { text: tl('dead.title') }),
 				el('p', { class: 'le-note', text: tl('dead.note') }),
 				el(
-					'div',
+					'p',
 					{ class: 'le-tabs' },
 					deadKeys.map((d) =>
 						el('button', {
 							type: 'button',
 							class: `le-tab${current && current.id === d.id ? ' active' : ''}`,
+							// The dead key edited below, said in words as well as drawn.
+							'aria-current': current && current.id === d.id ? 'true' : null,
 							'data-dead': d.id,
 							text: `${d.name || d.id} ${visible(d.terminator)}`,
 							onclick: () => {
@@ -4516,7 +4715,7 @@ var LayoutEditorPage = (function () {
 				// KbdEdit encrypts its .kbe (layout_formats.js, KBE_SIGNATURE): say where to go instead.
 				el('p', { class: 'le-note', id: 'le-kbe-note', text: tl('export.kbe_note') }),
 				host.exportAssets ? null : el('p', { class: 'le-note', text: tl('export.targets_note') }),
-				el('div', { class: 'le-buttons le-export-download' }, [
+				el('p', { class: 'le-buttons le-export-download' }, [
 					el('label', { class: 'le-inline' }, [
 						tl('export.format'),
 						select(
@@ -4541,7 +4740,7 @@ var LayoutEditorPage = (function () {
 						}
 					})
 				]),
-				actions.length ? el('div', { class: 'le-buttons' }, actions) : null,
+				actions.length ? el('p', { class: 'le-buttons' }, actions) : null,
 				host.install
 					? el('p', { class: 'le-note', id: 'le-install-hint', text: tl('install_hint') })
 					: null,
@@ -4578,10 +4777,10 @@ var LayoutEditorPage = (function () {
 		/** Which layers the stickers print, and whether capitals are hidden. */
 		function stickerOptions() {
 			const chosen = stickerLevels();
-			return el('div', { class: 'le-subpanel', id: 'le-sticker-levels' }, [
+			return el('section', { class: 'le-subpanel', id: 'le-sticker-levels' }, [
 				el('h3', { text: tl('sticker.levels') }),
 				el(
-					'div',
+					'p',
 					{ class: 'le-checks' },
 					(doc().layers || []).map((layer) =>
 						checkbox(`le-sticker-layer-${layer.id}`, layer.id, chosen.includes(layer.id), (on) => {
@@ -4645,6 +4844,7 @@ var LayoutEditorPage = (function () {
 				return;
 			}
 			rendering = true;
+			const anchor = focusAnchor(document.activeElement);
 			try {
 				// Commit a focused field's edit before its node leaves the page, so its change
 				// renders (as the pass below) before the tree is replaced, instead of being lost
@@ -4658,6 +4858,55 @@ var LayoutEditorPage = (function () {
 			} finally {
 				rendering = false;
 			}
+			restoreFocus(anchor);
+		}
+
+		// The attributes that name one control across renders, after its id.
+		const FOCUS_HOOKS = Object.freeze([
+			'data-code',
+			'data-tab',
+			'data-duplicate-tab',
+			'data-close-tab',
+			'data-tool',
+			'data-layer',
+			'data-level',
+			'data-dead',
+			'data-start'
+		]);
+
+		/**
+		 * The focused control and its selector in the next tree, or null when
+		 * the focus is outside the editor or in a text field (a field commits on
+		 * blur and keeps its own undo: it is not focused again behind the user).
+		 * @param {Element|null} node - The focused element before a render.
+		 * @returns {{node: Element, selector: string|null}|null}
+		 */
+		function focusAnchor(node) {
+			if (!node || node === root || !root.contains(node) || inTextField(node)) return null;
+			if (node.id) return { node, selector: `#${CSS.escape(node.id)}` };
+			const hook = FOCUS_HOOKS.find((name) => node.hasAttribute(name));
+			return {
+				node,
+				selector: hook ? `[${hook}="${CSS.escape(node.getAttribute(hook))}"]` : null
+			};
+		}
+
+		/**
+		 * Gives the focus back after a render replaced the focused control (a
+		 * key chosen with Enter, a tab chosen with an arrow, a drop-down that
+		 * redraws the page): a keyboard user stays where they were instead of
+		 * starting again from the top of the page. The same node when the render
+		 * kept it (the host's side panel), else its counterpart in the new tree.
+		 * A focus the render did not take (a field focused on purpose) is left alone.
+		 * @param {{node: Element, selector: string|null}|null} anchor - From focusAnchor.
+		 */
+		function restoreFocus(anchor) {
+			const now = document.activeElement;
+			if (!anchor || (now && now !== document.body && now !== document.documentElement)) return;
+			const target = anchor.node.isConnected
+				? anchor.node
+				: anchor.selector && root.querySelector(anchor.selector);
+			if (target) target.focus({ preventScroll: true });
 		}
 
 		function renderTree() {
@@ -4848,11 +5097,11 @@ var LayoutEditorPage = (function () {
 		// re-inserted by every render, so what the host appends there survives.
 		const sideSlot = el('div', { class: 'le-side-slot', id: 'le-side-slot' });
 		// The score chip: persistent too, so its live region announces each new score.
-		const chipLabel = el('span', { class: 'le-score-label' });
-		const chipScore = el('span', { class: 'le-score-value' });
-		const chipRank = el('span', { class: 'le-score-rank' });
-		const chipChange = el('span', { class: 'le-score-change' });
-		const chipLive = el('span', {
+		const chipLabel = el('small', { class: 'le-score-label' });
+		const chipScore = el('strong', { class: 'le-score-value' });
+		const chipRank = el('small', { class: 'le-score-rank' });
+		const chipChange = el('em', { class: 'le-score-change' });
+		const chipLive = el('output', {
 			class: 'le-sr-only',
 			id: 'le-score-live',
 			role: 'status',
@@ -4871,7 +5120,7 @@ var LayoutEditorPage = (function () {
 			// the button's name then contains (WCAG 2.5.3), not « Score27,4rang ».
 			[chipLabel, ' ', chipScore, ' ', chipRank, ' ', chipChange]
 		);
-		const scoreChip = el('div', { class: 'le-score-chip', id: 'le-score-chip' }, [
+		const scoreChip = el('p', { class: 'le-score-chip', id: 'le-score-chip' }, [
 			chipButton,
 			chipLive
 		]);
@@ -4930,8 +5179,8 @@ var LayoutEditorPage = (function () {
 					const shown = moved ? `${text} · ${verdictWords}` : text;
 					chipChange.classList.add(`le-score-${verdict}`);
 					chipChange.append(
-						el('span', { class: 'le-score-mark', 'aria-hidden': 'true', text: mark }),
-						el('span', { text: shown })
+						el('b', { class: 'le-score-mark', 'aria-hidden': 'true', text: mark }),
+						shown
 					);
 					words.push(moved ? `${text} (${verdictWords})` : text);
 					named.push(shown);
