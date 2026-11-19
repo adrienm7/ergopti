@@ -115,8 +115,7 @@ baseline as violations go.
       layout presentation, Linux installation and Ergopti+ overview pages had a plain-language review
       ([seventh pass](docs/audits/accessibility/README.md#seventh-pass-header-offset-media-and-plain-language-2026-11-19-paris-time)).
       Left: the same review of the other pages (layout use, information and benchmarks, the Ergopti+ hotstrings, AI,
-      features, configuration and FAQ pages); the Studio frames are not measured, and the Studio shell
-      (`src/routes/studio/+layout.svelte`) still sizes itself by `--header-height` instead of `--header-offset`.
+      features, configuration and FAQ pages); the Studio frames are not measured.
 - [ ] **Blind and low-vision users.** Screen-reader runs; heading order and landmarks per page; the Optimiser's
       result board (plain characters) has no table view of its own (« Open in the editor » gives one).
 - [ ] **Keyboard and motor.** The Studio keyboard walk is a CI gate (`npm run test:browser:studio-keyboard`, the
