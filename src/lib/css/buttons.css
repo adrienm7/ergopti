@@ -11,6 +11,14 @@ button p {
 	margin: 0;
 }
 
+/* The keyboard drawing's toggle buttons hold their label directly (a button
+   may hold phrasing content only, not a p); they keep the 1.5 line height the
+   label's p gave them, and its start alignment when the label wraps. */
+:is(keyboard-control-color, keyboard-control-plus, keyboard-control-type) button {
+	line-height: 1.5;
+	text-align: start;
+}
+
 .download-buttons {
 	align-content: center;
 	align-items: center;

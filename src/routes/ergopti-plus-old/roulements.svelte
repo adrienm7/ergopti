@@ -9,7 +9,7 @@
 <section>
 	<h2>Ajout d’excellents roulements</h2>
 
-	<div class="encadre">
+	<aside class="encadre">
 		<p class="margin0">
 			<b>Note :</b> Dans de très rares cas, ces raccourcis vous empêcheront d’écrire ce que vous
 			voulez réellement écrire. En effet, avec <ErgoptiPlus />, les combinaisons de touches
@@ -33,7 +33,7 @@
 			XG en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce n’était
 			qu’un exemple illustratif.
 		</p>
-	</div>
+	</aside>
 
 	<small-space></small-space>
 

@@ -17,7 +17,8 @@
 </script>
 
 <h2 id="windows">
-	<i class="icon-windows purple" style="vertical-align:-0.05em"></i> Installation Windows
+	<i class="icon-windows purple" style="vertical-align:-0.05em" aria-hidden="true"></i> Installation
+	Windows
 </h2>
 <p>
 	Le pilote ci-dessous a été réalisé à l'aide de <a
@@ -36,7 +37,7 @@
 		aria-disabled={release ? undefined : 'true'}
 		download={!!release}
 	>
-		<i class="icon-windows" style="vertical-align:-0.05em"></i>
+		<i class="icon-windows" style="vertical-align:-0.05em" aria-hidden="true"></i>
 		Installateur KbdEdit d'Ergopti {tag}
 	</a>
 </div>

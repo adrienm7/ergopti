@@ -7,7 +7,7 @@
 
 <section>
 	<h2>Contact</h2>
-	<div class="encadre">
+	<address class="encadre">
 		<p class="text-center margin0">
 			Le créateur de la disposition <Ergopti /> et de ce site est <strong>Adrien MOYAUX</strong>.
 		</p>
@@ -23,5 +23,13 @@
 			>
 			où <Ergopti></Ergopti> dispose d’un canal dédié, simplifiant les échanges.
 		</p>
-	</div>
+	</address>
 </section>
+
+<style>
+	/* The contact box is the author's contact information; it keeps the
+	   upright text of the box it was, not the address's own italics. */
+	.encadre {
+		font-style: normal;
+	}
+</style>

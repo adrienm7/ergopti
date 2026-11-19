@@ -16,7 +16,10 @@
 </script>
 
 <h2 id="macos">
-	<i class="icon-appleinc purple" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
+	<i
+		class="icon-appleinc purple"
+		style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
+		aria-hidden="true"
 	></i>Installation macOS
 </h2>
 <tiny-space></tiny-space>
@@ -27,7 +30,7 @@
 		aria-disabled={release ? undefined : 'true'}
 		download={!!release}
 	>
-		<i class="icon-appleinc" style="font-size:0.8em; vertical-align:0"></i>
+		<i class="icon-appleinc" style="font-size:0.8em; vertical-align:0" aria-hidden="true"></i>
 		Ergopti {tag}.bundle
 	</a>
 </div>

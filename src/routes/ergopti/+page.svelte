@@ -38,7 +38,7 @@ sub-pages that hold the details (siteNavigation.js lists them).
 			<li>
 				<a href={resolve(entry.route)}>
 					<strong>{entry.label}</strong>
-					<span>{entry.summary}</span>
+					<p>{entry.summary}</p>
 				</a>
 			</li>
 		{/each}
@@ -71,6 +71,15 @@ sub-pages that hold the details (siteNavigation.js lists them).
 
 	.overview-pages li {
 		margin: 0;
+	}
+
+	/* The summary is a paragraph of the card: none of the prose column's
+	   spacing, measure or line height applies inside the link. */
+	.overview-pages p {
+		line-height: inherit;
+		margin: 0;
+		max-width: none;
+		text-align: inherit;
 	}
 
 	.overview-pages a {

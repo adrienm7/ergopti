@@ -37,9 +37,9 @@
 <keyboard-control-plus>
 	<button onclick={togglePlus}>
 		{#if plusValue === 'yes'}
-			<p><strong>Plus</strong>&nbsp;➜ Standard</p>
+			<strong>Plus</strong>&nbsp;➜ Standard
 		{:else}
-			<p>Standard ➜&nbsp;<strong style="padding:0; margin:0">Plus</strong></p>
+			Standard ➜&nbsp;<strong style="padding:0; margin:0">Plus</strong>
 		{/if}
 	</button>
 </keyboard-control-plus>

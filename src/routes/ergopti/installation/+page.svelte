@@ -41,7 +41,7 @@
 	</svelte:fragment>
 
 	<p>
-		<span style="font-weight:bold;">Note :</span> Après toute installation ou réinstallation, il est
+		<b style="font-weight:bold;">Note :</b> Après toute installation ou réinstallation, il est
 		important de <strong>toujours penser à redémarrer son ordinateur</strong>. Cela permet d’être
 		certain que la nouvelle version soit prise en compte et évite bien des problèmes.
 	</p>
@@ -49,11 +49,15 @@
 		Pour tout problème, vous pouvez être aidé sur le <a
 			href={discordLink}
 			target="_blank"
-			class="text-white"><strong>Serveur Discord</strong> <i class="icon-discord"></i></a
+			class="text-white"
+			><strong>Serveur Discord</strong> <i class="icon-discord" aria-hidden="true"></i></a
 		>.
 	</p>
 	<tiny-space></tiny-space>
-	<div style="display: flex; gap: 1rem; justify-content:center; font-size:1.5rem">
+	<nav
+		style="display: flex; gap: 1rem; justify-content:center; font-size:1.5rem"
+		aria-label="Installation par système"
+	>
 		<!-- Links styled as buttons: a button inside a link is two focus stops
 		     for one action (WCAG 4.1.2). -->
 		<a href="#windows" class="alt-button anchor-button"
@@ -65,7 +69,7 @@
 		<a href="#linux" class="alt-button anchor-button"
 			><i class="icon-linux" aria-hidden="true"></i> Linux</a
 		>
-	</div>
+	</nav>
 	<div style="height:1rem"></div>
 	<div style="display: flex; gap: 1rem; justify-content:center;">
 		<a class="button-link" href={asset('documents/printable_layout_v2.2.pdf')} download>

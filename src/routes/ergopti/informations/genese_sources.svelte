@@ -108,11 +108,13 @@
 
 	<h3>Comment la disposition a été développée</h3>
 	<p>
-		<i class="icon-circle-1"><span class="path1"></span><span class="path2"></span></i> La première
-		étape dans la création d’<Ergopti /> a été de partager les touches du clavier en deux groupes : main
-		gauche et main droite. L’objectif est de maximiser l’alternance des mains, c’est-à-dire de faire
-		en sorte que les touches qui sont le plus souvent tapées l’une après l’autre le soient par des mains
-		différentes.
+		<i class="icon-circle-1" aria-hidden="true"
+			><span class="path1"></span><span class="path2"></span></i
+		>
+		La première étape dans la création d’<Ergopti /> a été de partager les touches du clavier en deux
+		groupes : main gauche et main droite. L’objectif est de maximiser l’alternance des mains, c’est-à-dire
+		de faire en sorte que les touches qui sont le plus souvent tapées l’une après l’autre le soient par
+		des mains différentes.
 	</p>
 	<p>
 		Pour optimiser ce critère, les voyelles ont toutes été placées d’un côté du clavier. Celles-ci
@@ -139,12 +141,14 @@
 	<tiny-space></tiny-space>
 
 	<p>
-		<i class="icon-circle-2"><span class="path1"></span><span class="path2"></span></i> La deuxième
-		étape dans la création de la disposition a été de placer les touches les plus souvent utilisées
-		le plus proche possible des doigts. Les doigts sont effectivement toujours censés reposer sur la
-		rangée de repos du clavier (la ligne du milieu, aussi appelée <em>homerow</em>). Il est donc
-		naturel de chercher à placer sur cette rangée les lettres les plus utilisées pour réduire les
-		déplacements de doigts aux touches.
+		<i class="icon-circle-2" aria-hidden="true"
+			><span class="path1"></span><span class="path2"></span></i
+		>
+		La deuxième étape dans la création de la disposition a été de placer les touches les plus souvent
+		utilisées le plus proche possible des doigts. Les doigts sont effectivement toujours censés reposer
+		sur la rangée de repos du clavier (la ligne du milieu, aussi appelée
+		<em>homerow</em>). Il est donc naturel de chercher à placer sur cette rangée les lettres les
+		plus utilisées pour réduire les déplacements de doigts aux touches.
 	</p>
 	<p>
 		De même, certaines touches sont plus facilement accessibles que d’autres sur les claviers
@@ -158,10 +162,12 @@
 	<tiny-space></tiny-space>
 
 	<p>
-		<i class="icon-circle-3"><span class="path1"></span><span class="path2"></span></i> La troisième
-		étape a été de déplacer des lettres pour réduire au maximum le nombre de <SFB />s et de ciseaux,
-		tout en maximisant les roulements. Encore une fois, la maximisation des roulements était la
-		priorité dès le début du projet.
+		<i class="icon-circle-3" aria-hidden="true"
+			><span class="path1"></span><span class="path2"></span></i
+		>
+		La troisième étape a été de déplacer des lettres pour réduire au maximum le nombre de <SFB />s
+		et de ciseaux, tout en maximisant les roulements. Encore une fois, la maximisation des
+		roulements était la priorité dès le début du projet.
 	</p>
 	<p>
 		Cette étape a été la plus difficile, car intervertir seulement deux touches peut transformer une

@@ -46,8 +46,8 @@ page is forwarded there.
 			<li>
 				<a class="product" href={resolve(product.route)} data-product={product.id}>
 					<img src={asset(product.icon)} alt="" width="64" height="64" />
-					<span class="product-name">{product.name}</span>
-					<span class="product-summary">{product.summary}</span>
+					<b class="product-name">{product.name}</b>
+					<p class="product-summary">{product.summary}</p>
 					<span class="product-link">Découvrir →</span>
 				</a>
 			</li>
@@ -133,9 +133,14 @@ page is forwarded there.
 		font-weight: bold;
 	}
 
+	/* The summary is a paragraph; it keeps the card's centring and none of
+	   the page's paragraph spacing. */
 	.product-summary {
 		flex-grow: 1;
 		line-height: 1.4;
+		margin: 0;
+		max-width: none;
+		text-align: inherit;
 	}
 
 	.product-link {

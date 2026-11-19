@@ -66,63 +66,60 @@
 		</bloc-introduction>
 	</svelte:fragment>
 
-	<div>
-		<CommentComparer></CommentComparer>
-		<Corpus></Corpus>
+	<CommentComparer></CommentComparer>
+	<Corpus></Corpus>
 
-		<h2>Résultats de benchmarks</h2>
-		<p>
-			Voici enfin les résultats de benchmarks que vous attendiez. Comme vous pourrez le constater, <Ergopti
-			/>
-			fait beaucoup mieux que le BÉPO (et évidemment AZERTY) et au moins aussi bien qu’Optimot.
-		</p>
-		<!-- <p>
-			À noter qu’en version ISO, la version Thumbshift d’Optimot fait systématiquement mieux qu’<Ergopti
-			/>, avec notamment une grande différence en distance parcourue. C’était un résultat attendu,
-			car dans cette disposition <kbd>Shift</kbd> est déplacé en <kbd>AltGr</kbd> tandis que
-			<kbd>AltGr</kbd>
-			est quant à lui déplacé en <kbd>Alt</kbd>. Cela explique aussi les excellents scores de
-			Engram, qui a le même placement des touches <kbd>Shift</kbd> et <kbd>AltGr</kbd>.
-		</p> -->
-		<p>
-			En version Ergodox, <Ergopti /> n’arrive cependant pas toujours au niveau d’Adextre, qui est probablement
-			la disposition clavier française la mieux notée sur KLAnext. Là encore, ce n’est pas parce qu’Adextre
-			est mieux notée que cette disposition est "meilleure". Par exemple, Adextre nécessite un clavier
-			de type Ergodox et ne peut donc pas être utilisée sur les claviers standards (ISO). En outre, elle
-			a une faible alternance des mains ainsi que la touche <kbd>E</kbd> sur le pouce gauche, ce qui
-			peut entraver la fluidité lors de l’écriture de texte ainsi que le confort général.
-		</p>
-		<p>
-			Enfin, gardez en tête que les dispositions dont le nom est suffixé par « en » plutôt que
-			« fr » ne contiennent pas les touches accentuées nécessaires à l’écriture du français. Elles
-			vont donc forcément surperformer sur les corpus français. Et même sur les corpus anglais,
-			elles feront un peu mieux car il y aura moins de touches à disposer et donc davantage de bons
-			emplacements.
-		</p>
-
-		<h3 id="comparaison">Comparaison en direct</h3>
-		<p>
-			Ces résultats sont calculés dans votre navigateur, avec le même moteur d’analyse, la même
-			bibliothèque de dispositions et les mêmes corpus que l’onglet <a
-				class="link"
-				href={resolve('/studio/comparer')}>Comparer</a
-			>
-			d’Ergopti Studio et que le Studio d’<ErgoptiPlus></ErgoptiPlus>. Choisissez le corpus
-			(français, anglais, code…), le clavier (ISO, Ergodox, Corne…) et les dispositions comparées.
-			Chaque mesure est expliquée par son bouton « i », et les colonnes des autres analyseurs
-			(KLAnext, Ergo‑L, Oxeylyzer…) donnent le score que chacun de ces outils calculerait.
-		</p>
-		<SiteFrame
-			class="benchmark-frame"
-			title="Benchmarks — comparaison des dispositions"
-			src={comparerSrc}
-			height={comparerHeight}
-			bind:frame={comparerFrame}
+	<h2>Résultats de benchmarks</h2>
+	<p>
+		Voici enfin les résultats de benchmarks que vous attendiez. Comme vous pourrez le constater, <Ergopti
 		/>
+		fait beaucoup mieux que le BÉPO (et évidemment AZERTY) et au moins aussi bien qu’Optimot.
+	</p>
+	<!-- <p>
+		À noter qu’en version ISO, la version Thumbshift d’Optimot fait systématiquement mieux qu’<Ergopti
+		/>, avec notamment une grande différence en distance parcourue. C’était un résultat attendu,
+		car dans cette disposition <kbd>Shift</kbd> est déplacé en <kbd>AltGr</kbd> tandis que
+		<kbd>AltGr</kbd>
+		est quant à lui déplacé en <kbd>Alt</kbd>. Cela explique aussi les excellents scores de
+		Engram, qui a le même placement des touches <kbd>Shift</kbd> et <kbd>AltGr</kbd>.
+	</p> -->
+	<p>
+		En version Ergodox, <Ergopti /> n’arrive cependant pas toujours au niveau d’Adextre, qui est probablement
+		la disposition clavier française la mieux notée sur KLAnext. Là encore, ce n’est pas parce qu’Adextre
+		est mieux notée que cette disposition est "meilleure". Par exemple, Adextre nécessite un clavier
+		de type Ergodox et ne peut donc pas être utilisée sur les claviers standards (ISO). En outre, elle
+		a une faible alternance des mains ainsi que la touche <kbd>E</kbd> sur le pouce gauche, ce qui peut
+		entraver la fluidité lors de l’écriture de texte ainsi que le confort général.
+	</p>
+	<p>
+		Enfin, gardez en tête que les dispositions dont le nom est suffixé par « en » plutôt que « fr »
+		ne contiennent pas les touches accentuées nécessaires à l’écriture du français. Elles vont donc
+		forcément surperformer sur les corpus français. Et même sur les corpus anglais, elles feront un
+		peu mieux car il y aura moins de touches à disposer et donc davantage de bons emplacements.
+	</p>
 
-		<AnalyseErgoptiPlus></AnalyseErgoptiPlus>
-		<ComparateursDispositions></ComparateursDispositions>
-	</div>
+	<h3 id="comparaison">Comparaison en direct</h3>
+	<p>
+		Ces résultats sont calculés dans votre navigateur, avec le même moteur d’analyse, la même
+		bibliothèque de dispositions et les mêmes corpus que l’onglet <a
+			class="link"
+			href={resolve('/studio/comparer')}>Comparer</a
+		>
+		d’Ergopti Studio et que le Studio d’<ErgoptiPlus></ErgoptiPlus>. Choisissez le corpus (français,
+		anglais, code…), le clavier (ISO, Ergodox, Corne…) et les dispositions comparées. Chaque mesure
+		est expliquée par son bouton « i », et les colonnes des autres analyseurs (KLAnext, Ergo‑L,
+		Oxeylyzer…) donnent le score que chacun de ces outils calculerait.
+	</p>
+	<SiteFrame
+		class="benchmark-frame"
+		title="Benchmarks — comparaison des dispositions"
+		src={comparerSrc}
+		height={comparerHeight}
+		bind:frame={comparerFrame}
+	/>
+
+	<AnalyseErgoptiPlus></AnalyseErgoptiPlus>
+	<ComparateursDispositions></ComparateursDispositions>
 </PageWrapper>
 
 <style>

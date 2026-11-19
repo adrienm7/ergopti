@@ -8,7 +8,7 @@
 </script>
 
 <section>
-	<div>
+	<header>
 		<h1 data-aos="zoom-in" class="ergopti-title">
 			Disposition clavier<br /><span style="line-height: 0.75!important;"
 				><ErgoptiPlus></ErgoptiPlus></span
@@ -17,7 +17,7 @@
 		<KeyboardBasis id="presentation_plus" />
 		<tiny-space></tiny-space>
 		<KeyboardControls id="presentation_plus" />
-	</div>
+	</header>
 
 	<small-space></small-space>
 
@@ -27,42 +27,55 @@
 		fonctionnalités des claviers programmables et outils d’automatisation. Elle se rapproche de très
 		près <span class="nowrap">de la <strong>disposition clavier idéale</strong> :</span>
 	</p>
-	<div class="cards">
-		<div class="card">
-			<i class="icon-circle-1"><span class="path1"></span><span class="path2"></span></i>
+	<ul class="cards">
+		<li class="card">
+			<i class="icon-circle-1" aria-hidden="true"
+				><span class="path1"></span><span class="path2"></span></i
+			>
 			Ajout de
-			<span class="text-bold">nouveaux roulements</span> extrêmement confortables.
-		</div>
-		<div class="card">
-			<i class="icon-circle-2"><span class="path1"></span><span class="path2"></span></i>
+			<b class="text-bold">nouveaux roulements</b> extrêmement confortables.
+		</li>
+		<li class="card">
+			<i class="icon-circle-2" aria-hidden="true"
+				><span class="path1"></span><span class="path2"></span></i
+			>
 			<strong>Éradication de la quasi-totalité des <span class="nowrap"><SFB />s</span></strong> pour
 			une frappe ultra-fluide et sans inconfort.
-		</div>
-		<div class="card">
-			<i class="icon-circle-3"><span class="path1"></span><span class="path2"></span></i>
-			<span class="text-bold">Réduction des distances parcourues par les doigts</span>, en
-			particulier l’auriculaire droit.
-		</div>
-		<div class="card">
-			<i class="icon-circle-4"><span class="path1"></span><span class="path2"></span></i> Ajout de
+		</li>
+		<li class="card">
+			<i class="icon-circle-3" aria-hidden="true"
+				><span class="path1"></span><span class="path2"></span></i
+			>
+			<b class="text-bold">Réduction des distances parcourues par les doigts</b>, en particulier
+			l’auriculaire droit.
+		</li>
+		<li class="card">
+			<i class="icon-circle-4" aria-hidden="true"
+				><span class="path1"></span><span class="path2"></span></i
+			>
+			Ajout de
 			<strong>nombreux raccourcis</strong>
 			tels qu’un layer de navigation, des tap-holds et des touches
 			<kbd-output>Alt + Tab</kbd-output>,
 			<kbd-output>OneShotShift</kbd-output> et <kbd-output>CapsWord</kbd-output>.
-		</div>
-		<div class="card">
-			<i class="icon-circle-5"><span class="path1"></span><span class="path2"></span></i>
-			Fonctionnalités d’<span class="text-bold">autocorrection et de snippets</span>. Cela permet
+		</li>
+		<li class="card">
+			<i class="icon-circle-5" aria-hidden="true"
+				><span class="path1"></span><span class="path2"></span></i
+			>
+			Fonctionnalités d’<b class="text-bold">autocorrection et de snippets</b>. Cela permet
 			également d’écrire des
-			<span class="text-bold">symboles complexes et des emojis</span>.
-		</div>
-		<div class="card">
-			<i class="icon-circle-6"><span class="path1"></span><span class="path2"></span></i> Chaque
-			fonctionnalité est optionnelle, désactivable et
+			<b class="text-bold">symboles complexes et des emojis</b>.
+		</li>
+		<li class="card">
+			<i class="icon-circle-6" aria-hidden="true"
+				><span class="path1"></span><span class="path2"></span></i
+			>
+			Chaque fonctionnalité est optionnelle, désactivable et
 			<strong>peut être intégrée au fil du temps</strong>. Nul besoin de chercher à tout apprendre
 			ou utiliser dès le départ.
-		</div>
-	</div>
+		</li>
+	</ul>
 	<tiny-space></tiny-space>
 	<hr />
 
@@ -107,3 +120,18 @@
 		<p>Voici maintenant les nombreuses fonctionnalités d’<ErgoptiPlus /> :</p>
 	</div>
 </section>
+
+<style>
+	/* The cards are a list of features: drop the list's own marker, indent,
+	   column cap and item spacing so the grid looks as it did with divs. */
+	.cards {
+		list-style: none;
+		padding: 0;
+		text-align: inherit;
+	}
+
+	.card {
+		margin: 0;
+		text-align: inherit;
+	}
+</style>

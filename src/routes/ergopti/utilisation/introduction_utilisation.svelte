@@ -275,10 +275,10 @@
 	let isSampleCollapsed = true;
 </script>
 
-<div class="main">
+<header class="main">
 	<h1 data-aos="zoom-in">Essayer la Disposition <Ergopti></Ergopti></h1>
 	<hr class="margin-h1" />
-</div>
+</header>
 
 <div style="overflow-x: hidden;">
 	<h2 class="first-h2">Essayer la disposition en ligne</h2>
@@ -290,7 +290,7 @@
 	{#if orderedSections.length}
 		<section style="margin-top:1rem;">
 			<h3>Remplacements de texte <ErgoptiPlus></ErgoptiPlus></h3>
-			<div
+			<search
 				style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin-top:0.25rem;"
 			>
 				<select
@@ -310,12 +310,15 @@
 					bind:value={searchQuery}
 					style="flex:1; min-width:160px; padding:0.35rem; color:#000; background: rgba(255,255,255,0.8); border:1px solid #ccc; border-radius:3px;"
 				/>
-			</div>
+			</search>
 			{#if displayedEntries.length}
-				<div
+				<!-- A box that scrolls is focusable, so a keyboard user can scroll it
+				     (WCAG 2.1.1, axe scrollable-region-focusable); it is a named region
+				     to say what the focus stop holds. -->
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+				<section
 					style="max-height:20rem; overflow:auto; margin-top:0.5rem;"
 					tabindex="0"
-					role="region"
 					aria-label="Remplacements de texte"
 				>
 					<table style="width:100%; border-collapse:collapse; table-layout:fixed;">
@@ -364,7 +367,7 @@
 							{/each}
 						</tbody>
 					</table>
-				</div>
+				</section>
 			{:else}
 				<p style="margin-top:0.5rem;">Aucun élément correspondant.</p>
 			{/if}
@@ -372,9 +375,9 @@
 			{#if otherMatches.length}
 				<div style="margin-top:1rem;">
 					{#each otherMatches as m}
-						<div style="margin-top:0.6rem;">
+						<section style="margin-top:0.6rem;">
 							<h4 style="margin:0 0 0.25rem 0; font-size:0.95rem;">
-								Dans {m.title} <span style="color:#666; font-size:0.9rem;">(autre section)</span>
+								Dans {m.title} <small style="color:#666; font-size:0.9rem;">(autre section)</small>
 							</h4>
 							<table
 								style="width:100%; border-collapse:collapse; table-layout:fixed; font-size:0.95rem;"
@@ -398,7 +401,7 @@
 									{/each}
 								</tbody>
 							</table>
-						</div>
+						</section>
 					{/each}
 				</div>
 			{/if}

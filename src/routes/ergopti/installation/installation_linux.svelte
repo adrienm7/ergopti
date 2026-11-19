@@ -11,7 +11,9 @@
 	const uninstallCmd = `${cmd} -s -- --uninstall --yes`;
 </script>
 
-<h2 id="linux"><i class="icon-linux purple" style="margin-right:0.15em"></i>Installation Linux</h2>
+<h2 id="linux">
+	<i class="icon-linux purple" style="margin-right:0.15em" aria-hidden="true"></i>Installation Linux
+</h2>
 
 <code
 	style="display:inline-block; width:100%; padding:1em; border-bottom-left-radius:0; border-bottom-right-radius:0; text-align:left"
@@ -30,7 +32,7 @@
 						el.textContent = 'Code copié';
 						setTimeout(
 							() =>
-								(el.innerHTML = `<i class="icon-linux"></i> Copier le code bash d’installation`),
+								(el.innerHTML = `<i class="icon-linux" aria-hidden="true"></i> Copier le code bash d’installation`),
 							1600
 						);
 					}
@@ -44,7 +46,7 @@
 	}}
 	class="download-buttons"
 >
-	<i class="icon-linux"></i> Copier le code bash d'installation
+	<i class="icon-linux" aria-hidden="true"></i> Copier le code bash d'installation
 </button>
 
 <p>

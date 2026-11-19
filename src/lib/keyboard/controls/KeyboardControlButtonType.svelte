@@ -22,9 +22,9 @@
 <keyboard-control-type>
 	<button onclick={toggleType}>
 		{#if typeValue === 'ergodox'}
-			<p><span class="ergodox-text-gradient">Ergodox</span> ➜&nbsp;ISO</p>
+			<span class="ergodox-text-gradient">Ergodox</span> ➜&nbsp;ISO
 		{:else}
-			<p>ISO&nbsp;➜ <span class="ergodox-text-gradient">Ergodox</span></p>
+			ISO&nbsp;➜ <span class="ergodox-text-gradient">Ergodox</span>
 		{/if}
 	</button>
 </keyboard-control-type>

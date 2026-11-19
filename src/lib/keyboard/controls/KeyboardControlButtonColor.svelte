@@ -22,9 +22,9 @@
 <keyboard-control-color>
 	<button onclick={toggleColor}>
 		{#if colorValue === 'yes'}
-			<p><span class="color-text-gradient">Couleur</span>&nbsp;➜ Bicolore</p>
+			<span class="color-text-gradient">Couleur</span>&nbsp;➜ Bicolore
 		{:else}
-			<p>Bicolore ➜&nbsp;<span class="color-text-gradient">Couleur</span></p>
+			Bicolore ➜&nbsp;<span class="color-text-gradient">Couleur</span>
 		{/if}
 	</button>
 </keyboard-control-color>

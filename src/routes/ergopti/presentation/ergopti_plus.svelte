@@ -8,13 +8,13 @@
 </script>
 
 <section>
-	<div style="border-bottom: 1px solid rgba(255, 255, 255, 0.5);"></div>
+	<div style="border-bottom: 1px solid rgba(255, 255, 255, 0.5);" aria-hidden="true"></div>
 	<div
 		style="background:black; padding-top: 10px; padding-bottom: 100px;
 	overflow-x: hidden; /* Très important pour que les animations AOS horizontales n’agrandissent pas l’écran */"
 	>
 		<div id="orb">
-			<div class="wrap">
+			<div class="wrap" aria-hidden="true">
 				{#each Array(300) as _, index}
 					<div class="c" />
 				{/each}
