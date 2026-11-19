@@ -5,6 +5,7 @@
 		<meta charset="utf-8" />
 		<title data-i18n="layout_editor.title"></title>
 		<link rel="stylesheet" href="../theme.css" />
+		<script src="../a11y_prefs.js"></script>
 		<link rel="stylesheet" href="../layout_editor/style.css" />
 		<link rel="stylesheet" href="../layout_analysis/analysis_panel.css" />
 		<link rel="stylesheet" href="../layout_analysis/info_popover.css" />
@@ -71,7 +72,7 @@
 		<!-- Ergopti Studio's menu bar: its name and mark, then its tabs (the editor,
 		     the comparison of layouts, the optimizer), each with its icon and mark. -->
 		<header class="studio-bar">
-			<span class="studio-brand">
+			<p class="studio-brand" id="studio-name" data-i18n="layout_editor.title">
 				<!-- The Studio mark of static/img/logo/studio.svg: a keycap and a pencil. -->
 				<svg class="studio-logo" viewBox="-256 -256 512 512" aria-hidden="true" focusable="false">
 					<circle r="244" class="studio-logo-ink studio-logo-rim" stroke-width="20" />
@@ -94,12 +95,12 @@
 						<polygon points="51,129 69,129 60,150" class="studio-logo-ink" />
 					</g>
 				</svg>
-				<span id="studio-name" data-i18n="layout_editor.title"></span>
-			</span>
+			</p>
 			<nav class="studio-tabs" role="tablist" aria-labelledby="studio-name">
 				<button
 					type="button"
 					id="studio-tab-edit"
+					data-i18n="layout_editor.studio.tab.edit"
 					class="studio-tab studio-mark-1"
 					role="tab"
 					aria-selected="true"
@@ -109,11 +110,11 @@
 					<svg class="studio-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
 						<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />
 					</svg>
-					<span data-i18n="layout_editor.studio.tab.edit"></span>
 				</button>
 				<button
 					type="button"
 					id="studio-tab-compare"
+					data-i18n="layout_editor.studio.tab.compare"
 					class="studio-tab studio-mark-2"
 					role="tab"
 					aria-selected="false"
@@ -123,11 +124,11 @@
 					<svg class="studio-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
 						<path d="M4 20V11M10 20V4M16 20v-7M2 20h20" />
 					</svg>
-					<span data-i18n="layout_editor.studio.tab.compare"></span>
 				</button>
 				<button
 					type="button"
 					id="studio-tab-optimize"
+					data-i18n="layout_editor.studio.tab.optimize"
 					class="studio-tab studio-mark-3"
 					role="tab"
 					aria-selected="false"
@@ -139,7 +140,6 @@
 							d="M11 3l1.8 4.7L17.5 9.5l-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8zM18 14l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"
 						/>
 					</svg>
-					<span data-i18n="layout_editor.studio.tab.optimize"></span>
 				</button>
 			</nav>
 		</header>

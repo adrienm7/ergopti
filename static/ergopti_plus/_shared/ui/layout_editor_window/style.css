@@ -70,6 +70,8 @@ body {
 	font-size: 15px;
 	font-weight: 700;
 	gap: 10px;
+	/* A paragraph: its default margins would move the bar. */
+	margin: 0;
 	white-space: nowrap;
 }
 

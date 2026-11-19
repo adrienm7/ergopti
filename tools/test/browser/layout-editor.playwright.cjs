@@ -1917,7 +1917,9 @@ async function exerciseStudioBar(browser, origin) {
 		await page.evaluate(() =>
 			window.initData({ strings: {}, state: { platform: 'linux' }, studio_store: true })
 		);
-		await page.waitForSelector('#studio-tab-edit span:not(:empty)');
+		await page.waitForFunction(
+			() => document.getElementById('studio-tab-edit').textContent.trim() !== ''
+		);
 		const bar = await page.evaluate(() => {
 			const rgb = (text) => (text.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
 			const luminance = ([r, g, b]) => {
@@ -1935,10 +1937,13 @@ async function exerciseStudioBar(browser, origin) {
 			const brand = document.querySelector('.studio-brand');
 			const list = document.querySelector('.studio-tabs');
 			return {
+				// The name and the tabs hold their text beside their icon, no wrapper.
+				spans: document.querySelectorAll('.studio-bar span, .studio-bar div').length,
 				brand: brand.textContent.trim(),
 				logo: brand.querySelector('svg').getAttribute('aria-hidden'),
 				brandLeft: brand.getBoundingClientRect().right <= list.getBoundingClientRect().left,
-				listName: document.getElementById(list.getAttribute('aria-labelledby')).textContent,
+				// The name's element also holds the hidden mark, whose drawing has no text.
+				listName: document.getElementById(list.getAttribute('aria-labelledby')).textContent.trim(),
 				tabs: [...list.querySelectorAll('[role="tab"]')].map((tab) => {
 					const icon = tab.querySelector('svg');
 					const style = getComputedStyle(tab);
@@ -1957,6 +1962,7 @@ async function exerciseStudioBar(browser, origin) {
 				})
 			};
 		});
+		assert.equal(bar.spans, 0, 'the bar has no div or span');
 		assert.equal(bar.brand, 'Ergopti Studio', 'the bar names the Studio');
 		assert.equal(bar.logo, 'true', 'its mark is decorative');
 		assert.ok(bar.brandLeft, 'the name sits left of the tabs');

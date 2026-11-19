@@ -79,6 +79,20 @@ function hasString(key) {
 }
 
 /**
+ * Writes a translated label, keeping the element's decorative icon: the
+ * Studio's name and its tabs carry their svg mark beside their text, with no
+ * wrapper element around the text alone.
+ * @param {Element} el
+ * @param {string} text
+ */
+function setLabel(el, text) {
+	const icon = el.firstElementChild;
+	if (icon && icon.tagName.toLowerCase() === 'svg' && icon.getAttribute('aria-hidden') === 'true')
+		el.replaceChildren(icon, text);
+	else el.textContent = text;
+}
+
+/**
  * Applies translations to every element carrying data-i18n, and to the
  * placeholders and options the Comparer's markup names (as i18n.js does).
  */
@@ -87,7 +101,7 @@ function applyDomStrings() {
 		const key = el.getAttribute('data-i18n');
 		if (!hasString(key)) return;
 		if (el.tagName === 'TITLE') document.title = _strings[key];
-		else el.textContent = _strings[key];
+		else setLabel(el, _strings[key]);
 	});
 	document.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
 		const key = el.getAttribute('data-i18n-placeholder');
