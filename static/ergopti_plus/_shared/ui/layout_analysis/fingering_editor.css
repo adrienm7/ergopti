@@ -29,6 +29,11 @@
 	overflow-x: auto;
 }
 
+/* The reset, export and import buttons: a paragraph spaced as the row it replaced. */
+.la-fingering-actions {
+	margin: 0;
+}
+
 .la-fingering-map {
 	flex: none;
 	position: relative;

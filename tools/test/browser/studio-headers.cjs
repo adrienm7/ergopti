@@ -67,6 +67,44 @@ async function openFromKeyboard(page, key) {
 	});
 }
 
+/**
+ * (fingering-keys-keyboard) The fingering map of the Comparer's settings is
+ * one Tab stop: the arrows move across its keys, Home goes to the row's first
+ * key, and a key chosen with Enter keeps the focus through the map's redraw.
+ */
+async function checkFingeringKeys(page, lang) {
+	// The settings, fingering included, sit under « Home ».
+	await page.click('#la-tab-home');
+	await page.evaluate(() => {
+		document.getElementById('la-settings').open = true;
+	});
+	const focusedKey = () =>
+		page.evaluate(() => {
+			const map = document.querySelector('#la-fingering .la-fingering-map');
+			return {
+				code: map.contains(document.activeElement) ? document.activeElement.dataset.code : null,
+				stops: map.querySelectorAll('.la-fingering-key[tabindex="0"]').length
+			};
+		});
+	const keyQ = page.locator('#la-fingering .la-fingering-key[data-code="KeyQ"]');
+	await keyQ.waitFor({ state: 'visible' });
+	await keyQ.focus();
+	await page.keyboard.press('Enter');
+	assert.deepEqual(
+		await focusedKey(),
+		{ code: 'KeyQ', stops: 1 },
+		`${lang}: the chosen key keeps the focus, the map one Tab stop`
+	);
+	await page.keyboard.press('ArrowRight');
+	assert.deepEqual(await focusedKey(), { code: 'KeyW', stops: 1 }, `${lang}: ArrowRight`);
+	await page.keyboard.press('ArrowDown');
+	assert.deepEqual(await focusedKey(), { code: 'KeyS', stops: 1 }, `${lang}: ArrowDown`);
+	await page.keyboard.press('Home');
+	const start = await focusedKey();
+	assert.notEqual(start.code, 'KeyS', `${lang}: Home goes to the row's first key`);
+	await page.keyboard.press('Escape');
+}
+
 /** One language: the headers, then the popovers of three of them. */
 async function checkHeaders(browser, origin, lang) {
 	const strings = stringsOf(lang);
@@ -173,6 +211,7 @@ async function checkHeaders(browser, origin, lang) {
 		true,
 		`${lang}: Escape gives the focus back to the row's chip`
 	);
+	await checkFingeringKeys(page, lang);
 	assert.deepEqual(errors, [], `${lang}: no page error`);
 	await context.close();
 }

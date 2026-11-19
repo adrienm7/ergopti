@@ -176,6 +176,41 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 	}
 
 	/**
+	 * The key an arrow, Home or End moves to from key k of a board: the
+	 * nearest key of the same row to the left or right, the nearest by column
+	 * in the row above or below, the row's first or last key; null for any
+	 * other key, or at the board's edge.
+	 * @param {{codes: string[], x: number[], y: number[]}} board - E.keyboard()'s answer.
+	 * @param {number} k
+	 * @param {string} name - A KeyboardEvent key.
+	 * @returns {number|null}
+	 */
+	function neighbour(board, k, name) {
+		const all = board.codes.map((_, j) => j);
+		const sameRow = all.filter((j) => board.y[j] === board.y[k]);
+		const nearest = (list) =>
+			list.reduce((best, j) =>
+				Math.abs(board.x[j] - board.x[k]) < Math.abs(board.x[best] - board.x[k]) ? j : best
+			);
+		if (name === 'Home' || name === 'End') {
+			const row = sameRow.sort((a, b) => board.x[a] - board.x[b]);
+			const end = row[name === 'Home' ? 0 : row.length - 1];
+			return end === k ? null : end;
+		}
+		if (name === 'ArrowLeft' || name === 'ArrowRight') {
+			const side = name === 'ArrowRight' ? 1 : -1;
+			const ahead = sameRow.filter((j) => (board.x[j] - board.x[k]) * side > 0);
+			return ahead.length === 0 ? null : nearest(ahead);
+		}
+		if (name === 'ArrowUp' || name === 'ArrowDown') {
+			const rows = Array.from(new Set(board.y)).sort((a, b) => a - b);
+			const row = rows[rows.indexOf(board.y[k]) + (name === 'ArrowDown' ? 1 : -1)];
+			return row === undefined ? null : nearest(all.filter((j) => board.y[j] === row));
+		}
+		return null;
+	}
+
+	/**
 	 * Draws the editor into a container: base fingering, key map, finger and
 	 * home-key controls for the selected key, reset, export and import.
 	 * @param {HTMLElement} root
@@ -186,28 +221,30 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 	function mount(root, options) {
 		const keyboardId = () => (options && options.keyboard ? options.keyboard() : MAP_KEYBOARD);
 		let selected = null;
-		const head = el('div', 'la-heading');
+		// The one key of the map in the Tab order (a roving tabindex): the arrows
+		// move it across the board, so the map is one Tab stop, not one per key.
+		let roving = null;
+		const head = el('header', 'la-heading');
 		const title = el('h2');
 		head.append(title, INFO.button('fingering'));
 		const help = el('p', 'la-muted');
 		const baseLabel = el('label', 'la-fingering-row');
-		const baseText = el('span');
+		const baseText = document.createTextNode('');
 		const baseSelect = el('select');
 		baseLabel.append(baseText, baseSelect);
 		const map = el('div', 'la-heatmap la-fingering-map');
 		// The board keeps its key size and scrolls inside this focusable box, so
 		// a narrow screen never scrolls the page sideways (WCAG 1.4.10).
-		const mapBox = el('div', 'la-fingering-scroll');
+		const mapBox = el('section', 'la-fingering-scroll');
 		mapBox.tabIndex = 0;
-		mapBox.setAttribute('role', 'region');
 		mapBox.append(map);
-		const keyLine = el('div', 'la-fingering-row');
+		const keyLine = el('p', 'la-fingering-row la-fingering-key-line');
 		const keyName = el('strong');
 		const fingerSelect = el('select');
 		const homeButton = el('button');
 		homeButton.type = 'button';
 		keyLine.append(keyName, fingerSelect, homeButton);
-		const actions = el('div', 'la-row');
+		const actions = el('p', 'la-row la-fingering-actions');
 		const reset = el('button');
 		reset.type = 'button';
 		const exportButton = el('button');
@@ -231,10 +268,25 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 		});
 		const profile = () => profiles[keyboardId()] || null;
 
+		/** The key button of a code on the map drawn. */
+		function keyOf(code) {
+			return Array.from(map.children).find((key) => key.dataset.code === code);
+		}
+
+		/** Gives the map's Tab stop to another key and focuses it. */
+		function moveTo(code) {
+			const from = keyOf(roving);
+			if (from) from.tabIndex = -1;
+			roving = code;
+			const to = keyOf(code);
+			to.tabIndex = 0;
+			to.focus();
+		}
+
 		function draw() {
 			title.textContent = t('layout_analysis.fingering.title');
 			help.textContent = t('layout_analysis.fingering.help');
-			baseText.textContent = t('layout_analysis.fingering.base');
+			baseText.data = t('layout_analysis.fingering.base');
 			baseSelect.replaceChildren(
 				...BASES.map((id) => {
 					const option = el('option', '', t(`layout_analysis.fingering.base_${id}`));
@@ -255,12 +307,19 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 			mapBox.setAttribute('aria-label', t('layout_analysis.fingering.title'));
 			const board = E.keyboard(keyboardId(), profile() || undefined);
 			const rows = Array.from(new Set(board.y)).sort((a, b) => a - b);
+			// A redraw replaces the keys: the focused one is focused again after it.
+			const focused = map.contains(document.activeElement)
+				? document.activeElement.dataset.code
+				: null;
+			if (!board.index.has(roving)) roving = board.index.has(selected) ? selected : board.codes[0];
 			map.replaceChildren();
 			let width = 0;
 			let height = 0;
 			board.codes.forEach((code, k) => {
 				const key = el('button', 'la-key la-fingering-key');
 				key.type = 'button';
+				key.dataset.code = code;
+				key.tabIndex = code === roving ? 0 : -1;
 				const finger = DATA.model.fingers[board.finger[k]];
 				key.dataset.finger = finger;
 				key.textContent = finger;
@@ -283,7 +342,14 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 				key.style.top = `${top}px`;
 				key.addEventListener('click', () => {
 					selected = code;
+					roving = code;
 					draw();
+				});
+				key.addEventListener('keydown', (event) => {
+					const next = neighbour(board, k, event.key);
+					if (next === null) return;
+					event.preventDefault();
+					moveTo(board.codes[next]);
 				});
 				map.append(key);
 				width = Math.max(width, left + KEY_UNIT_PX);
@@ -291,6 +357,7 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 			});
 			map.style.width = `${width}px`;
 			map.style.height = `${height}px`;
+			if (focused) keyOf(board.index.has(focused) ? focused : roving).focus();
 			keyLine.hidden = !selected;
 			if (selected) {
 				const k = board.index.get(selected);
