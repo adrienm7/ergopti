@@ -494,6 +494,13 @@ async function exerciseStudioLayout(browser, origin) {
 		() => getComputedStyle(document.querySelector('#studio-comparer')).color
 	);
 	assert.ok(luminance(heading) > 0.7, `the Comparer's text is light, got ${heading}`);
+	// (score-settings-on-home) The optimizer's « Edit in Compare » opens the
+	// score settings, which sit in the Comparer's « Home », from any of its tabs.
+	await comparerTab(page, 'overview');
+	await page.click('#studio-tab-optimize');
+	await page.click('#lo-settings-edit');
+	assert.equal(await page.isVisible('#la-settings'), true, 'the score settings are shown');
+	assert.equal(await page.getAttribute('#la-tab-home', 'aria-selected'), 'true', 'on « Home »');
 	// « Create or edit a layout… » on a Studio left on « Comparer » (maintainer,
 	// 2026-11-17): the host's studioTab brings the editor back, and so does a
 	// « Navigation layer » entry's studioNav.

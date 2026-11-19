@@ -848,6 +848,10 @@ function showScoreSettings() {
 	showTab('compare');
 	const settings = document.getElementById('la-settings');
 	if (!settings) throw new Error('layout_editor_window: the Comparer has no score settings');
+	// They sit in the Comparer's « Home » tab, which its button opens.
+	const home = document.getElementById('la-tab-home');
+	if (!home) throw new Error('layout_editor_window: the Comparer has no « Home » tab');
+	if (home.getAttribute('aria-selected') !== 'true') home.click();
 	settings.open = true;
 	settings.scrollIntoView({ block: 'start' });
 }
