@@ -143,7 +143,7 @@ baseline as violations go.
       ratchet, where only the apps dashboard's chart tabs are left (their h3 chart titles follow the h1, their h2
       cards being on another tab). Left: screen-reader runs; that dashboard's headings.
 - [ ] **Semantic markup and mouse-only controls.** The site's div and span are held by
-      `npm run test:site-semantic-html` (576 → 448, each justified in `tools/test/site-semantic-html-allowlist.json`)
+      `npm run test:site-semantic-html` (576 → 451, each justified in `tools/test/site-semantic-html-allowlist.json`)
       and its images by `npm run test:site-image-alternatives`; every site page is checked for controls only a
       mouse can use by `tools/test/browser/keyboard-operability.playwright.cjs` in CI
       ([ninth pass](docs/audits/accessibility/README.md#ninth-pass-semantic-markup-keyboard-operability-and-reading-choices-2026-11-19-paris-time)).

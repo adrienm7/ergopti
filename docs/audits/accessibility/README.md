@@ -909,8 +909,9 @@ meaning, blocking gates, and everything operable from the keyboard on the site
 and in the WebView windows.
 
 - **Semantic markup.** The site's Svelte files held 576 div and span
-  elements (255 div, 321 span, counted by the compiler's parser); 448 are
-  left (162 div, 286 span), each justified. Cards and lists became ul / li
+  elements (255 div, 321 span, counted by the compiler's parser); 451 are
+  left (163 div, 288 span, three of them from the Studio shell's new menu),
+  each justified. Cards and lists became ul / li
   (with article where a card stands alone), label and value pairs dl, steps
   of a page section with a heading, page tops header, captions figure /
   figcaption, the contact box address, the installation links a named nav,
