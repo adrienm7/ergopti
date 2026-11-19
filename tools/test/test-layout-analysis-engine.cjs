@@ -388,6 +388,35 @@ check(heat.KeyF.sfb === 0 && heat.KeyE.presses === 50, 'keys: other keys carry n
 	check(refused, 'standing: a layout not among the results is refused');
 }
 
+// percentiles, worked by hand (library-percentile): SFB (lower is better) of
+// 40 references 1, 2, …, 40 %. 10.5 % beats the 30 above it: P75; 10 % ties
+// one and beats 30: (30 + 0.5) / 40 = P76; better than all is P100, worse
+// than all P0. Roll-in (higher is better) mirrors it; fewer references than
+// the floor, or an unscored metric, give no percentile.
+{
+	const refs = Array.from({ length: 40 }, (_, i) => i + 1);
+	const sfb = E.percentiles('sfb', refs);
+	check(
+		JSON.stringify(sfb(10.5)) === '{"percent":75,"count":40}',
+		`percentile: ${JSON.stringify(sfb(10.5))}`
+	);
+	check(sfb(10).percent === 76, `percentile with a tie: ${sfb(10).percent}`);
+	check(sfb(0).percent === 100 && sfb(99).percent === 0, 'percentile: the ends');
+	check(E.percentiles('roll_in', refs)(10.5).percent === 25, 'percentile: higher is better');
+	check(
+		E.percentiles('sfb', refs.slice(0, E.PERCENTILE_MIN_REFERENCES - 1))(3) === null,
+		'percentile: floor'
+	);
+	check(E.percentiles('hand_change', refs)(3) === null, 'percentile: an unscored metric');
+	let refusedPercentile = false;
+	try {
+		E.percentiles('nope', refs);
+	} catch {
+		refusedPercentile = true;
+	}
+	check(refusedPercentile, 'percentile: an unknown metric is refused');
+}
+
 // =====================================
 // ======= 2/ Exact key n-grams ========
 // =====================================

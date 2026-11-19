@@ -2094,6 +2094,10 @@
 											: measure(value, column.digits, column.unit)
 								);
 					if (column.key === 'name' && result.incomplete) cell.append(' ', incompleteFlag(result));
+					// The relative view shows differences: a percentile is of a value.
+					const standing =
+						E.METRICS[column.key] && !versus ? libraryPercentile(column.key, value) : null;
+					if (standing) cell.append(INFO.percentile(metricName(column.key), standing));
 					tr.append(cell);
 				}
 				tr.tabIndex = 0;
@@ -2219,6 +2223,30 @@
 			const result = referenceAnalysis.result;
 			result.score = E.score(result, state.weights);
 			return result;
+		}
+
+		// Each metric's percentile function over the library's complete layouts
+		// of the current results (E.percentiles), made once per comparison.
+		let percentileResults = null;
+		const percentileOf = new Map();
+
+		/**
+		 * A metric value's percentile against the library (ux-study item 9): the
+		 * complete library layouts of this comparison, the user's own left out;
+		 * null when fewer are compared than E.PERCENTILE_MIN_REFERENCES.
+		 */
+		function libraryPercentile(metric, value) {
+			if (percentileResults !== state.results) {
+				percentileResults = state.results;
+				percentileOf.clear();
+			}
+			if (!percentileOf.has(metric)) {
+				const references = state.results
+					.filter((r) => !r.incomplete && !isPersonal(r))
+					.map((r) => r.metrics[metric]);
+				percentileOf.set(metric, E.percentiles(metric, references));
+			}
+			return percentileOf.get(metric)(value);
 		}
 
 		/** The overview's ranking table, with the viewer's columns and the filters' rows. */

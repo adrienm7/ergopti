@@ -1119,7 +1119,9 @@ check(
 	vm.createContext(context);
 	vm.runInContext(
 		['relativeCell', 'referenceLanguage', 'rankingTable', 'validTable'].map(fnSource).join('\n') +
-			"\nconst TABLE_METRICS = ['sfb']; const ALL = ''; const COMPLETE_CHOICES = ['all']; const RANK_CELL = 'la-rank';",
+			"\nconst TABLE_METRICS = ['sfb']; const ALL = ''; const COMPLETE_CHOICES = ['all']; const RANK_CELL = 'la-rank';" +
+			// Two results are too few references for a percentile (E.percentiles).
+			'\nconst libraryPercentile = () => null;',
 		context
 	);
 	const language = (corpus, locale) =>

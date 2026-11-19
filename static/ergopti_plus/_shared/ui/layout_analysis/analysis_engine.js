@@ -86,6 +86,9 @@ var LAYOUT_ANALYSIS = (function () {
 	const DEFAULT_KEYBOARD = 'iso';
 	// An edited ideal finger load may miss 100 % by this much (rounding of inputs).
 	const LOAD_SUM_TOLERANCE = 0.05;
+	// A percentile needs this many reference layouts to mean something: fewer
+	// (a handful ticked) and each layout would move it by several points.
+	const PERCENTILE_MIN_REFERENCES = 20;
 	/**
 	 * A refusal with a stable code and the values its message names, so a page
 	 * shows it in the reader's language (layout_analysis.error.<code>).
@@ -3620,6 +3623,49 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
+	 * A metric's percentile against reference layouts (the library's complete
+	 * ones, ux-study item 9): for a value, the share of the references it does
+	 * better than, a tie counting half, so P100 is better than all of them and
+	 * P0 worse than all. Sorted once, each value is placed by two binary searches.
+	 * @param {string} metric - A metric whose `better` is higher or lower.
+	 * @param {number[]} references - The references' values of that metric.
+	 * @returns {function(number): ({percent: number, count: number}|null)} Null
+	 *   for every value when there are fewer than PERCENTILE_MIN_REFERENCES
+	 *   references, or for a metric that is not scored.
+	 * @throws {Error} On an unknown metric or a reference that is not a number.
+	 */
+	function percentiles(metric, references) {
+		const definition = METRICS[metric];
+		if (!definition) throw new Error(`layout_analysis: percentiles of an unknown metric ${metric}`);
+		if (!references.every(Number.isFinite))
+			throw new Error(`layout_analysis: percentiles of ${metric} need numbers`);
+		if (definition.better === 'none' || references.length < PERCENTILE_MIN_REFERENCES)
+			return () => null;
+		const sorted = references.slice().sort((a, b) => a - b);
+		// The number of references below (strictly) a value, and at or below it.
+		const below = (value, orEqual) => {
+			let low = 0;
+			let high = sorted.length;
+			while (low < high) {
+				const middle = (low + high) >> 1;
+				if (orEqual ? sorted[middle] <= value : sorted[middle] < value) low = middle + 1;
+				else high = middle;
+			}
+			return low;
+		};
+		return (value) => {
+			if (!Number.isFinite(value)) return null;
+			const less = below(value, false);
+			const ties = below(value, true) - less;
+			const worse = definition.better === 'lower' ? sorted.length - less - ties : less;
+			return {
+				percent: Math.round((100 * (worse + ties / 2)) / sorted.length),
+				count: sorted.length
+			};
+		};
+	}
+
+	/**
 	 * The scored metrics a key pair or a word can raise, with their weight and
 	 * direction: one place for the points of a pair (bigramMatrix) and of a
 	 * word (wordEfforts).
@@ -6458,6 +6504,8 @@ var LAYOUT_ANALYSIS = (function () {
 		keyValues,
 		keyDiff,
 		standing,
+		percentiles,
+		PERCENTILE_MIN_REFERENCES,
 		bigramMatrix,
 		countWords,
 		wordTable,

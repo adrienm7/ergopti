@@ -3995,6 +3995,7 @@ async function exerciseComparerLink(browser, origin) {
 		await studioManage.exerciseComparerPasteImport(browser, origin);
 		await studioManage.exerciseManageLayoutsSite(browser, origin);
 		await studioManage.exerciseManageLayoutsStore(browser, origin);
+		await studioManage.exercisePercentiles(browser, origin);
 
 		// Every locale names every visible string.
 		for (const lang of LOCALES) {

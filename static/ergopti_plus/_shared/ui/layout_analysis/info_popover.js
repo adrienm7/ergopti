@@ -31,6 +31,8 @@
  *    formula of what it is a share of): a compact header (« SFB », a name on
  *    two lines) keeps its full meaning one key press away (maintainer,
  *    2026-11-19). metricShort() gives the usual acronym of a metric's name.
+ * 8. Percentile chips (percentile): « P70 » beside a metric's value opens a
+ *    popover of its own words, with no references.
  * ==============================================================================
  */
 
@@ -416,7 +418,32 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		document.body.append(popover);
 	}
 
+	/**
+	 * A percentile chip beside a metric's value (ux-study item 9): « P70 »,
+	 * coloured from red (P0) to green (P100) with its number always written,
+	 * named in full for assistive technology; a click explains it in the
+	 * popover.
+	 * @param {string} metric - The metric's name, as the page shows it.
+	 * @param {{percent: number, count: number}} standing - LAYOUT_ANALYSIS.percentiles' answer.
+	 * @returns {HTMLButtonElement}
+	 */
+	function percentile(metric, standing) {
+		const values = { metric, percent: standing.percent, count: standing.count };
+		const node = el('button', 'la-note la-pct', t('layout_analysis.percentile.chip', values));
+		node.type = 'button';
+		node.style.setProperty('--la-pct', String(standing.percent));
+		node.dataset.note = t('layout_analysis.percentile.explain', values);
+		node.setAttribute('aria-label', t('layout_analysis.percentile.label', values));
+		node.setAttribute('aria-controls', POPOVER_ID);
+		node.setAttribute('aria-expanded', 'false');
+		return node;
+	}
+
 	function show(trigger) {
+		if (trigger.classList.contains('la-note')) {
+			showNote(trigger);
+			return;
+		}
 		const item = trigger.dataset.info;
 		const data = window.LAYOUT_ANALYSIS_DATA.sources;
 		if (!data.items[item]) throw new Error(`layout_analysis: no sources for ${item}`);
@@ -424,6 +451,8 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		// The references of every explanation shown, each once.
 		const refs = [...new Set(items.flatMap((id) => data.items[id]))];
 		hide();
+		popover.querySelector('.la-popover-title').hidden = false;
+		popover.querySelector('ul').hidden = false;
 		popover
 			.querySelector('.la-popover-texts')
 			.replaceChildren(
@@ -461,6 +490,23 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 			if (!ref.checked) li.append(` (${t('layout_analysis.info.unchecked')})`);
 			list.append(li);
 		}
+		open(trigger);
+	}
+
+	/** A note's popover (a percentile chip): its text alone, no references. */
+	function showNote(trigger) {
+		hide();
+		popover
+			.querySelector('.la-popover-texts')
+			.replaceChildren(el('p', 'la-popover-text', trigger.dataset.note));
+		popover.querySelector('.la-popover-title').hidden = true;
+		popover.querySelector('ul').hidden = true;
+		popover.querySelector('.la-popover-close').textContent = t('layout_analysis.info.close');
+		open(trigger);
+	}
+
+	/** Shows the filled popover under its trigger and moves the focus into it. */
+	function open(trigger) {
 		owner = trigger;
 		trigger.setAttribute('aria-expanded', 'true');
 		popover.hidden = false;
@@ -491,7 +537,7 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		document.addEventListener(
 			'click',
 			(event) => {
-				const trigger = event.target.closest('.la-info');
+				const trigger = event.target.closest('.la-info, .la-note');
 				if (trigger) {
 					// Inside a sortable header or a label: open only.
 					event.preventDefault();
@@ -522,6 +568,7 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		t,
 		refusal,
 		button,
+		percentile,
 		routeLink,
 		locale,
 		format,

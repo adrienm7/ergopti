@@ -358,7 +358,79 @@ async function exerciseManageLayoutsStore(browser, origin) {
 	await context.close();
 }
 
+/** The SFB column of the ranking: each row's value and its percentile chip's number. */
+function sfbColumn(page) {
+	return page.evaluate(() => {
+		const heads = [...document.querySelectorAll('#la-table thead th')];
+		const at = heads.findIndex((th) => th.querySelector('button[data-sort="sfb"]'));
+		return [...document.querySelectorAll('#la-table tbody tr')].map((tr) => {
+			const cell = tr.children[at];
+			const chip = cell.querySelector('.la-pct');
+			return {
+				value: parseFloat(cell.firstChild.textContent.replace(',', '.')),
+				percent: chip ? Number(chip.textContent.slice(1)) : null,
+				label: chip ? chip.getAttribute('aria-label') : null
+			};
+		});
+	});
+}
+
+/**
+ * (library-percentile) Beside each metric of the ranking, « P70 »: higher
+ * for a better value (SFB: lower is better), named in full, explained in a
+ * popover that closes with Escape back to its chip; a comparison of two
+ * layouts has none (too few references); the editor's panel shows them too.
+ */
+async function exercisePercentiles(browser, origin) {
+	const { page, errors, context } = await openComparer(browser, origin, '&keyboard=iso');
+	await page.waitForFunction(() =>
+		/^\d+ layouts compared/.test(document.getElementById('la-status').textContent)
+	);
+	const rows = (await sfbColumn(page)).filter((row) => row.percent !== null);
+	assert.ok(rows.length >= 20, `percentiles shown: ${rows.length}`);
+	// Values shown rounded: equal ones may hide an order the percentiles keep.
+	const sorted = rows.slice().sort((a, b) => a.value - b.value || b.percent - a.percent);
+	for (let i = 1; i < sorted.length; i++)
+		assert.ok(
+			sorted[i].percent <= sorted[i - 1].percent,
+			`a higher SFB never has a higher percentile: ${JSON.stringify([sorted[i - 1], sorted[i]])}`
+		);
+	assert.ok(sorted[0].percent >= 95, `the lowest SFB is near P100: ${sorted[0].percent}`);
+	assert.match(sorted[0].label, /^Percentile \d+ on .*: better than \d+ % of \d+ complete layouts/);
+	const chip = page.locator('#la-table tbody tr .la-pct').first();
+	const text = await chip.textContent();
+	await chip.click();
+	await page.waitForSelector('#la-popover:not([hidden])');
+	const said = await page.textContent('#la-popover .la-popover-texts');
+	assert.ok(said.startsWith(`${text} is this layout’s percentile on `), `explained: ${said}`);
+	assert.equal(await page.$eval('#la-popover ul', (ul) => ul.hidden), true, 'no references list');
+	await page.keyboard.press('Escape');
+	assert.equal(
+		await page.evaluate(() => document.activeElement.classList.contains('la-pct')),
+		true,
+		'Escape gives the focus back to the chip'
+	);
+	await context.close();
+	const two = await openComparer(browser, origin);
+	assert.equal(
+		await two.page.locator('#la-table .la-pct').count(),
+		0,
+		'two layouts: no percentile'
+	);
+	await two.context.close();
+	const editor = await openOnErgopti(browser, origin);
+	await editor.page.waitForSelector('.la-panel-metrics tr[data-metric="sfb"] .la-pct');
+	assert.match(
+		await editor.page.textContent('.la-panel-metrics tr[data-metric="sfb"] .la-pct'),
+		/^P\d+$/,
+		'the editor panel shows the percentile'
+	);
+	assert.deepEqual(errors.concat(two.errors, editor.errors), []);
+	await editor.context.close();
+}
+
 module.exports = {
+	exercisePercentiles,
 	exerciseManageLayoutsSite,
 	exerciseManageLayoutsStore,
 	dropOn,

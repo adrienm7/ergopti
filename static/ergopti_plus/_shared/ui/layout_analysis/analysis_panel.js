@@ -459,6 +459,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		 */
 		function libraryScores(prepared, settings) {
 			const pool = rankPool();
+			const libraryIds = new Set(E.libraryLayouts().map((layout) => layout.id));
 			const key = rankKey(settings, pool);
 			if (state.libraryKey !== key) {
 				state.library = E.compare(pool, prepared, {
@@ -469,7 +470,14 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					shortcuts: settings.shortcuts,
 					formWeights: settings.formWeights,
 					profile: settings.profile
-				}).map((r) => ({ incomplete: r.incomplete, score: { total: r.score.total } }));
+				}).map((r) => ({
+					incomplete: r.incomplete,
+					// A library layout (not the user's own): the percentiles' references.
+					library: libraryIds.has(r.layout.id),
+					score: { total: r.score.total },
+					// The listed metrics, for each one's percentile among the ranked layouts.
+					metrics: Object.fromEntries(PANEL_METRICS.map((id) => [id, r.metrics[id]]))
+				}));
 				state.libraryKey = key;
 			}
 			return state.library;
@@ -567,7 +575,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					? state.previous
 					: null;
 			const before = previous ? (previous.keys === keys ? previous.before : previous.now) : null;
-			drawMetrics(result, before ? before.metrics : null);
+			drawMetrics(result, before ? before.metrics : null, scores);
 			// Other keys, or another corpus or setting: the swaps found are stale.
 			if (swaps && !(previous && previous.keys === keys)) swaps.stale();
 			swapContext = {
@@ -614,8 +622,10 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			};
 		}
 
-		function drawMetrics(result, before) {
+		function drawMetrics(result, before, scores) {
 			metrics.replaceChildren();
+			// The complete layouts the edited one is ranked among: each metric's percentile.
+			const references = scores.filter((other) => !other.incomplete && other.library);
 			for (const id of PANEL_METRICS) {
 				const tr = el('tr');
 				tr.dataset.metric = id;
@@ -624,6 +634,13 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				th.append(' ', INFO.button(id));
 				const value = result.metrics[id];
 				const td = el('td', '', measure(value, metricDigits(id), unitText(id)));
+				const standing = E.percentiles(
+					id,
+					references.map((other) => other.metrics[id])
+				)(value);
+				// Its own cell, so the value's cell keeps the value alone.
+				const pct = el('td', 'la-panel-pct');
+				if (standing) pct.append(INFO.percentile(t(`layout_analysis.metric.${id}`), standing));
 				const delta = el('td', 'la-panel-delta');
 				if (before && Math.abs(value - before[id]) >= DELTA_EPSILON) {
 					const change = value - before[id];
@@ -642,7 +659,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 						delta.append(el('span', 'la-sr-only', ` ${words}`));
 					}
 				}
-				tr.append(th, td, delta);
+				tr.append(th, td, pct, delta);
 				metrics.append(tr);
 			}
 		}

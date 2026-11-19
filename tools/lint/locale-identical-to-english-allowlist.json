@@ -4083,6 +4083,31 @@
 				"ja",
 				"ko"
 			]
+		},
+		"layout_analysis.percentile.chip": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": [
+				"da",
+				"de",
+				"es",
+				"fr",
+				"it",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"sv",
+				"tr",
+				"cs",
+				"ru",
+				"uk",
+				"he",
+				"ar",
+				"hi",
+				"zh",
+				"ja",
+				"ko"
+			]
 		}
 	}
 }
