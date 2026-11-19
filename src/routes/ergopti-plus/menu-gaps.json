@@ -623,22 +623,6 @@
 		}
 	},
 	{
-		"path": "layout_menu.virtual_keyboard",
-		"visibility": "hide",
-		"labels": { "fr": "Clavier virtuel Karabiner", "en": "Karabiner virtual keyboard" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
-		"reasons": {
-			"windows": {
-				"en": "macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.",
-				"fr": "macOS uniquement : Karabiner-Elements, qu'Ergopti utilise sur macOS pour remapper les touches, a un clavier virtuel dont le type décide des codes de touche atteints par les deux touches propres au format ISO. Windows et Linux nomment ces touches par leur position et n'ont pas de clavier virtuel."
-			},
-			"linux": {
-				"en": "macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.",
-				"fr": "macOS uniquement : Karabiner-Elements, qu'Ergopti utilise sur macOS pour remapper les touches, a un clavier virtuel dont le type décide des codes de touche atteints par les deux touches propres au format ISO. Windows et Linux nomment ces touches par leur position et n'ont pas de clavier virtuel."
-			}
-		}
-	},
-	{
 		"path": "layout_menu.compose_input_method",
 		"visibility": "hide",
 		"labels": { "fr": "compose_input_method", "en": "compose_input_method" },
@@ -687,22 +671,6 @@
 		}
 	},
 	{
-		"path": "layout_menu.base_layouts",
-		"visibility": "hide",
-		"labels": { "fr": "base_layouts", "en": "base_layouts" },
-		"platforms": { "windows": false, "macos": false, "linux": true },
-		"reasons": {
-			"windows": {
-				"en": "Linux only: this driver reads raw keycodes from the kernel and needs to know which physical layout produced them, so it picks the table it decodes with. macOS asks the system for its input sources and Windows installs a keyboard layout; neither has a decode table to choose.",
-				"fr": "Linux uniquement : ce pilote lit les codes touches bruts du noyau et doit savoir quelle disposition physique les a produits ; il choisit donc la table avec laquelle il décode. macOS interroge le système pour ses sources de saisie et Windows installe une disposition clavier ; ni l'un ni l'autre n'a de table de décodage à choisir."
-			},
-			"macos": {
-				"en": "Linux only: this driver reads raw keycodes from the kernel and needs to know which physical layout produced them, so it picks the table it decodes with. macOS asks the system for its input sources and Windows installs a keyboard layout; neither has a decode table to choose.",
-				"fr": "Linux uniquement : ce pilote lit les codes touches bruts du noyau et doit savoir quelle disposition physique les a produits ; il choisit donc la table avec laquelle il décode. macOS interroge le système pour ses sources de saisie et Windows installe une disposition clavier ; ni l'un ni l'autre n'a de table de décodage à choisir."
-			}
-		}
-	},
-	{
 		"path": "layout_menu.accented_letters",
 		"visibility": "hide",
 		"labels": {
@@ -730,6 +698,38 @@
 			"linux": {
 				"en": "Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.",
 				"fr": "Windows uniquement : tout ce que cette ligne listerait est lui-même propre à Windows, donc sur macOS et Linux elle n'affiche qu'une liste vide."
+			}
+		}
+	},
+	{
+		"path": "layout_menu.base_layouts",
+		"visibility": "hide",
+		"labels": { "fr": "base_layouts", "en": "base_layouts" },
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: this driver reads raw keycodes from the kernel and needs to know which physical layout produced them, so it picks the table it decodes with. macOS asks the system for its input sources and Windows installs a keyboard layout; neither has a decode table to choose.",
+				"fr": "Linux uniquement : ce pilote lit les codes touches bruts du noyau et doit savoir quelle disposition physique les a produits ; il choisit donc la table avec laquelle il décode. macOS interroge le système pour ses sources de saisie et Windows installe une disposition clavier ; ni l'un ni l'autre n'a de table de décodage à choisir."
+			},
+			"macos": {
+				"en": "Linux only: this driver reads raw keycodes from the kernel and needs to know which physical layout produced them, so it picks the table it decodes with. macOS asks the system for its input sources and Windows installs a keyboard layout; neither has a decode table to choose.",
+				"fr": "Linux uniquement : ce pilote lit les codes touches bruts du noyau et doit savoir quelle disposition physique les a produits ; il choisit donc la table avec laquelle il décode. macOS interroge le système pour ses sources de saisie et Windows installe une disposition clavier ; ni l'un ni l'autre n'a de table de décodage à choisir."
+			}
+		}
+	},
+	{
+		"path": "layout_menu.virtual_keyboard",
+		"visibility": "hide",
+		"labels": { "fr": "Clavier virtuel Karabiner", "en": "Karabiner virtual keyboard" },
+		"platforms": { "windows": false, "macos": true, "linux": false },
+		"reasons": {
+			"windows": {
+				"en": "macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.",
+				"fr": "macOS uniquement : Karabiner-Elements, qu'Ergopti utilise sur macOS pour remapper les touches, a un clavier virtuel dont le type décide des codes de touche atteints par les deux touches propres au format ISO. Windows et Linux nomment ces touches par leur position et n'ont pas de clavier virtuel."
+			},
+			"linux": {
+				"en": "macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.",
+				"fr": "macOS uniquement : Karabiner-Elements, qu'Ergopti utilise sur macOS pour remapper les touches, a un clavier virtuel dont le type décide des codes de touche atteints par les deux touches propres au format ISO. Windows et Linux nomment ces touches par leur position et n'ont pas de clavier virtuel."
 			}
 		}
 	},
