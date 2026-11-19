@@ -191,6 +191,10 @@ function _fmt(key, values) {
 var _orig_i18n_apply = window.i18n_apply;
 window.i18n_apply = function (strings) {
 	if (typeof _orig_i18n_apply === 'function') _orig_i18n_apply(strings);
+	// The search landmark is named as its field is: what it searches.
+	document
+		.getElementById('toolbar')
+		.setAttribute('aria-label', _t('model_browser.search_placeholder'));
 	buildFilter();
 	render();
 };
@@ -714,25 +718,25 @@ function buildSectionHead(b, section, open, searching) {
 		return m.backend === b.id && m.provider === section.provider;
 	}).length;
 	var current = open ? null : section.rows.filter(isCurrent)[0];
-	var toggle = document.createElement('span');
+	// A native button: the keyboard reaches it and a reader hears its state.
+	var toggle = document.createElement('button');
+	toggle.type = 'button';
 	toggle.className = 'group-toggle';
-	toggle.setAttribute('role', 'button');
-	toggle.setAttribute('tabindex', '0');
 	toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
 	toggle.setAttribute('data-section', section.key);
 	toggle.setAttribute('data-nav', 'true');
 	toggle.innerHTML =
-		'<span class="chevron" aria-hidden="true">▸</span> ' +
-		'<span class="group-title">' +
+		'<b class="chevron" aria-hidden="true">▸</b> ' +
+		'<b class="group-title">' +
 		_escHtml(section.provider) +
-		'</span>' +
-		' <span class="group-count">' +
+		'</b>' +
+		' <small class="group-count">' +
 		_escHtml(_fmt('model_browser.count_label', { n: section.rows.length, total: total })) +
-		'</span>' +
+		'</small>' +
 		(current
-			? ' <span class="group-active">' +
+			? ' <small class="group-active">' +
 				_escHtml(_fmt('model_browser.current_label', { model: current.name })) +
-				'</span>'
+				'</small>'
 			: '');
 	bindHeaderToggle(th, toggle, function () {
 		if (_catalogueOwner === catalogueOwner) toggleGroup(section.key, searching, open);
@@ -832,7 +836,8 @@ function buildInstallButton(b, catalogueOwner) {
 
 /** The words next to an install button: why it refuses or why it did not start. */
 function installNote(text) {
-	var note = document.createElement('span');
+	// A message the install answered: an output, read at once as an alert.
+	var note = document.createElement('output');
 	note.className = 'install-note';
 	note.setAttribute('role', 'alert');
 	note.textContent = text;
@@ -864,24 +869,24 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 		return m.backend === b.id;
 	}).length;
 	var active = expanded ? null : activeIn(b);
-	var toggle = document.createElement('span');
+	// A native button: the keyboard reaches it and a reader hears its state.
+	var toggle = document.createElement('button');
+	toggle.type = 'button';
 	toggle.className = 'group-toggle';
-	toggle.setAttribute('role', 'button');
-	toggle.setAttribute('tabindex', '0');
 	toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
 	toggle.setAttribute('data-group', b.id);
 	toggle.innerHTML =
-		'<span class="chevron" aria-hidden="true">▸</span> ' +
-		'<span class="group-title">' +
+		'<b class="chevron" aria-hidden="true">▸</b> ' +
+		'<b class="group-title">' +
 		_escHtml(backendHeading(b)) +
-		'</span>' +
-		' <span class="group-count">' +
+		'</b>' +
+		' <small class="group-count">' +
 		_escHtml(_fmt('model_browser.count_label', { n: rows.length, total: total })) +
-		'</span>' +
+		'</small>' +
 		(active
-			? ' <span class="group-active">' +
+			? ' <small class="group-active">' +
 				_escHtml(_fmt('model_browser.current_label', { model: active.name })) +
-				'</span>'
+				'</small>'
 			: '');
 	var narrowedWithRows = narrowed && rows.length > 0;
 	var toggleHere = function () {
@@ -890,9 +895,11 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 	bindHeaderToggle(th, toggle, toggleHere);
 	_toggles[b.id] = toggle;
 	th.appendChild(toggle);
-	var tools = document.createElement('div');
+	// The header's two lines of controls: the install and the backend's own
+	// actions, then the fields that add a model or a provider.
+	var tools = document.createElement('p');
 	tools.className = 'group-tools';
-	var adders = document.createElement('div');
+	var adders = document.createElement('p');
 	adders.className = 'group-add';
 
 	if (b.install) {
@@ -919,7 +926,7 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 	});
 
 	if (reason) {
-		var status = document.createElement('span');
+		var status = document.createElement('small');
 		status.className = 'reason';
 		status.textContent = reason;
 		tools.appendChild(status);
@@ -946,7 +953,7 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 		addBtn.type = 'button';
 		addBtn.className = 'act';
 		addBtn.textContent = _t('model_browser.add_model_button');
-		var error = document.createElement('span');
+		var error = document.createElement('output');
 		error.className = 'add-error';
 		error.setAttribute('role', 'alert');
 		var submit = function () {
@@ -1035,56 +1042,50 @@ function bindHeaderToggle(cell, toggle, run) {
 function rowCells(m) {
 	var current = isCurrent(m);
 	var cells = {
-		current:
-			'<span class="mark' +
-			(current ? ' on' : '') +
-			'" aria-label="' +
-			_escHtml(current ? _t('model_browser.status_current') : '') +
-			'">' +
-			(current ? '✓' : '') +
-			'</span>',
+		// The check is drawn; the row says it is the current one (aria-current).
+		current: current ? '<b class="mark on" aria-hidden="true">✓</b>' : '',
 		name:
-			'<span class="name-cell">' +
+			'<b class="name-cell">' +
 			_escHtml(m.name || '') +
-			'</span>' +
+			'</b>' +
 			(m.family || m.provider
-				? '<span class="sub">' + _escHtml(m.family || m.provider) + '</span>'
+				? '<small class="sub">' + _escHtml(m.family || m.provider) + '</small>'
 				: '') +
 			(m.custom
-				? ' <span class="chip">' + _escHtml(_t('model_browser.chip_custom')) + '</span>'
+				? ' <small class="chip">' + _escHtml(_t('model_browser.chip_custom')) + '</small>'
 				: '') +
 			(m.is_default
-				? ' <span class="chip default">' + _escHtml(_t('model_browser.chip_default')) + '</span>'
+				? ' <small class="chip default">' + _escHtml(_t('model_browser.chip_default')) + '</small>'
 				: '') +
 			(m.type === 'completion'
-				? ' <span class="chip completion">' +
+				? ' <small class="chip completion">' +
 					_escHtml(_t('model_browser.type_completion')) +
-					'</span>'
+					'</small>'
 				: '') +
-			(m.hint_key ? '<span class="sub hint">' + _escHtml(_t(m.hint_key)) + '</span>' : ''),
+			(m.hint_key ? '<small class="sub hint">' + _escHtml(_t(m.hint_key)) + '</small>' : ''),
 		disk: _escHtml(fmtGb(m.disk_gb)),
 		ram: _escHtml(fmtGb(m.ram_gb)),
 		params: _escHtml(fmtParams(m)),
 		status:
 			m.pending === 'download'
-				? '<span class="status pending">' +
+				? '<data class="status pending" value="downloading">' +
 					_escHtml(
 						typeof m.progress === 'number'
 							? _fmt('model_browser.status_downloading_percent', { n: m.progress })
 							: _t('model_browser.status_downloading')
 					) +
-					'</span>'
+					'</data>'
 				: m.inventory_unknown === true
-					? '<span class="status">' +
+					? '<data class="status" value="unknown">' +
 						_escHtml(_t('model_browser.inventory_unavailable')) +
-						'</span>'
+						'</data>'
 					: isRemote(m)
-						? '<span class="status remote">' +
+						? '<data class="status remote" value="remote">' +
 							_escHtml(_t('model_browser.status_remote')) +
-							'</span>'
-						: '<span class="dot' +
+							'</data>'
+						: '<svg class="dot' +
 							(m.installed ? ' on' : '') +
-							'" aria-hidden="true"></span> ' +
+							'" aria-hidden="true" focusable="false"></svg> ' +
 							_escHtml(
 								_t(
 									m.installed ? 'model_browser.status_installed' : 'model_browser.status_available'
@@ -1169,6 +1170,7 @@ function buildRow(m) {
 		tr.setAttribute('data-nav', 'true');
 		tr.setAttribute('aria-disabled', isSelectable(m) ? 'false' : 'true');
 		tr.setAttribute('aria-selected', key === _selected ? 'true' : 'false');
+		if (isCurrent(m)) tr.setAttribute('aria-current', 'true');
 	}
 	tr.innerHTML = rowCells(m);
 

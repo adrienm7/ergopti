@@ -192,11 +192,19 @@ tbody tr.active .name-cell::after {
 	font-weight: 600;
 }
 
+/* A family or a tag is small by its own rule, not the browser's. */
+.sub,
+.chip,
+.reason {
+	font-size: inherit;
+}
+
 .dot {
 	background: var(--theme-grey-555);
 	border-radius: 50%;
 	display: inline-block;
 	height: 9px;
+	vertical-align: baseline;
 	width: 9px;
 }
 
@@ -251,6 +259,13 @@ tbody tr.active .name-cell::after {
 #hint {
 	color: var(--text-dim);
 	font-size: 12px;
+	margin: 0;
+}
+
+/* The paragraphs and lists keep the box the plain blocks had. */
+#current,
+#empty {
+	margin: 0;
 }
 
 #btn-use {
@@ -316,7 +331,7 @@ tbody tr.group .group-add {
 	flex-wrap: wrap;
 	font-weight: 400;
 	gap: 6px;
-	margin-top: 4px;
+	margin: 4px 0 0;
 }
 
 tbody tr.group .group-tools:empty,
@@ -324,11 +339,25 @@ tbody tr.group .group-add:empty {
 	display: none;
 }
 
+/* A button that reads as the header's text. */
 tbody tr.group .group-toggle {
+	background: none;
+	border: 0;
 	border-radius: 4px;
+	color: inherit;
 	display: inline-block;
+	font: inherit;
 	font-weight: 600;
 	padding: 2px 4px;
+	text-align: start;
+}
+
+/* The header's words keep the size and weight of its text. */
+tbody tr.group .chevron,
+tbody tr.group .group-title,
+tbody tr.group small {
+	font-size: inherit;
+	font-weight: inherit;
 }
 
 /* A provider inside a backend: a step in from the backend's own header. */
@@ -468,6 +497,9 @@ thead th:focus-visible,
 #footer-actions {
 	display: flex;
 	gap: 8px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
 }
 
 #btn-disable,

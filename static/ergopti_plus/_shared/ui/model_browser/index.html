@@ -12,7 +12,8 @@
 	</head>
 	<body>
 		<h1 class="theme-sr-only" data-i18n="model_browser.window_title"></h1>
-		<div id="toolbar" role="toolbar">
+		<!-- The search and the backend filter narrow the table; the count says by how much. -->
+		<search id="toolbar">
 			<input
 				id="search"
 				type="search"
@@ -27,27 +28,31 @@
 				data-i18n="model_browser.filter_backend"
 			></label>
 			<select id="backend-filter"></select>
-			<span id="count" aria-live="polite"></span>
-		</div>
+			<output id="count" aria-live="polite"></output>
+		</search>
 
-		<div id="current" aria-live="polite"></div>
+		<p id="current" aria-live="polite"></p>
 
-		<div id="table-wrap" role="main">
+		<main id="table-wrap">
 			<table id="models" aria-describedby="hint">
 				<thead>
 					<tr id="head-row"></tr>
 				</thead>
 			</table>
-			<div id="empty" style="display: none" data-i18n="model_browser.no_models"></div>
-		</div>
+			<p id="empty" style="display: none" data-i18n="model_browser.no_models"></p>
+		</main>
 
-		<div id="footer">
-			<div id="hint" data-i18n="model_browser.select_hint"></div>
-			<div id="footer-actions">
-				<button id="btn-disable" type="button" data-i18n="model_browser.disable_button"></button>
-				<button id="btn-use" type="button" disabled data-i18n="model_browser.use_button"></button>
-			</div>
-		</div>
+		<footer id="footer">
+			<p id="hint" data-i18n="model_browser.select_hint"></p>
+			<menu id="footer-actions">
+				<li>
+					<button id="btn-disable" type="button" data-i18n="model_browser.disable_button"></button>
+				</li>
+				<li>
+					<button id="btn-use" type="button" disabled data-i18n="model_browser.use_button"></button>
+				</li>
+			</menu>
+		</footer>
 
 		<script src="script.js"></script>
 	</body>

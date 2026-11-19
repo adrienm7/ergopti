@@ -119,6 +119,7 @@ function makeDocument() {
 	const doc = { readyState: 'complete', activeElement: null };
 	const byId = {};
 	for (const id of [
+		'toolbar',
 		'search',
 		'backend-filter',
 		'backend-filter-label',
@@ -288,12 +289,14 @@ assert.deepEqual(
 assert.deepEqual(rowNames(page), [], 'every group opens collapsed');
 for (const id of ['mlx', 'ollama', 'api']) {
 	const toggle = toggleOf(page, id);
-	assert.equal(toggle.getAttribute('role'), 'button');
-	assert.equal(toggle.getAttribute('tabindex'), '0', `${id} header is focusable`);
+	// A native button: the keyboard reaches it without a role or a tabindex.
+	assert.equal(toggle.tagName, 'BUTTON', `${id} header is a button`);
+	assert.equal(toggle.type, 'button', `${id} header submits nothing`);
+	assert.equal(toggle.getAttribute('role'), null, `${id} header needs no role`);
 	assert.equal(toggle.getAttribute('aria-expanded'), 'false', `${id} starts collapsed`);
 	assert.ok(toggle.innerHTML.includes('class="chevron"'), `${id} header has a chevron`);
 	// model-selector-single-emoji: the emoji once, before the brand.
-	const title = toggle.innerHTML.match(/<span class="group-title">([^<]*)<\/span>/)[1];
+	const title = toggle.innerHTML.match(/<b class="group-title">([^<]*)<\/b>/)[1];
 	assert.ok(title.startsWith(`${brands[id].emoji} ${brands[id].brand}`), `${id} title: ${title}`);
 	assert.equal(title.split(brands[id].emoji).length - 1, 1, `${id} title has one emoji`);
 }
