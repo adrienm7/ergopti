@@ -4739,7 +4739,7 @@
 	"layout_analysis.info.sfb": "Twee toetsen na elkaar met dezelfde vinger: voor elke analysator het ergste geval.",
 	"layout_analysis.info.repeat": "Dezelfde toets twee keer na elkaar. Getoond, niet gescoord: de vinger beweegt niet.",
 	"layout_analysis.info.sfs": "Eerste en derde toets van een trigram met dezelfde vinger. Lichter dan een bigram met dezelfde vinger.",
-	"layout_analysis.info.sfb_distance": "Weg van dezelfde vinger: voor elk bigram van dezelfde vinger de afstand tussen de twee toetsen in mm maal de factor van de vinger (pink 1,7, ringvinger 1,3, andere 1), per 100 toetsbigrammen, plus de helft daarvan voor de skipgrammen van dezelfde vinger per 100 toetstrigrammen (genkey, Oxeylyzer, Keyboard Layout Optimizer). Standaardgewicht 0: getoond, niet in de score.",
+	"layout_analysis.info.sfb_distance": "Weg van dezelfde vinger: voor elk bigram van dezelfde vinger de afstand tussen de twee toetsen in mm maal de factor van de vinger (pink 1,7, ringvinger 1,3, andere 1), per 100 toetsbigrammen, plus de helft daarvan voor de skipgrammen van dezelfde vinger per 100 toetstrigrammen (genkey, Oxeylyzer, Keyboard Layout Optimizer). Standaardgewicht 0,5, naast 5 voor een SFB: de helft van de kosten van een SFB is vast, de helft volgt zijn weg.",
 	"layout_analysis.info.lsb": "Twee naburige vingers van één hand, één toets in een zijkolom (binnenkolom van de wijsvinger of buitentoetsen van de pink).",
 	"layout_analysis.info.scissors": "Naburige vingers van één hand, de langere twee of meer rijen onder de kortere.",
 	"layout_analysis.info.half_scissors": "Zoals volle scharen, maar één rij uit elkaar.",

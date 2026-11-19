@@ -4739,7 +4739,7 @@
 	"layout_analysis.info.sfb": "Zwei aufeinanderfolgende Tasten mit demselben Finger: für jeden Analysator das schlimmste Ereignis.",
 	"layout_analysis.info.repeat": "Dieselbe Taste zweimal hintereinander. Angezeigt, nicht bewertet: der Finger bewegt sich nicht.",
 	"layout_analysis.info.sfs": "Erste und dritte Taste eines Trigramms mit demselben Finger. Leichter als ein Bigramm mit demselben Finger.",
-	"layout_analysis.info.sfb_distance": "Weg desselben Fingers: für jedes Bigramm desselben Fingers der Abstand seiner beiden Tasten in mm mal dem Faktor des Fingers (kleiner Finger 1,7, Ringfinger 1,3, sonst 1), je 100 Tastenbigramme, plus die Hälfte davon für die Skipgramme desselben Fingers je 100 Tastentrigramme (genkey, Oxeylyzer, Keyboard Layout Optimizer). Standardgewicht 0: angezeigt, nicht im Score.",
+	"layout_analysis.info.sfb_distance": "Weg desselben Fingers: für jedes Bigramm desselben Fingers der Abstand seiner beiden Tasten in mm mal dem Faktor des Fingers (kleiner Finger 1,7, Ringfinger 1,3, sonst 1), je 100 Tastenbigramme, plus die Hälfte davon für die Skipgramme desselben Fingers je 100 Tastentrigramme (genkey, Oxeylyzer, Keyboard Layout Optimizer). Standardgewicht 0,5 neben 5 für ein SFB: Die Hälfte der Kosten eines SFB ist fest, die Hälfte folgt seinem Weg.",
 	"layout_analysis.info.lsb": "Zwei benachbarte Finger einer Hand, eine Taste in einer seitlichen Spalte (innere Zeigefingerspalte oder äußere Kleinfingertasten).",
 	"layout_analysis.info.scissors": "Benachbarte Finger einer Hand, der längere zwei oder mehr Reihen unter dem kürzeren.",
 	"layout_analysis.info.half_scissors": "Wie volle Scheren, aber eine Reihe Abstand.",

@@ -458,7 +458,7 @@ metric a share of the typed characters.
 | `sfb`              | %     | lower  | Same-finger bigram: two consecutive keys on one finger, different keys (two keys of one thumb too).                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `repeat`           | %     | none   | The same key twice.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `sfs`              | %     | lower  | Same-finger skipgram: first and third key of a trigram on one finger, different keys.                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `sfb_distance`     | mm    | lower  | Same-finger travel: Σ over the SFBs of n × the distance between the two keys' centres (mm, the `distance` metric's geometry) × the finger's `same_finger_factor` (pinky 1.7, ring 1.3, middle and index 1), per 100 key bigrams, plus 0.5 × the same sum over the SFS (first to third key) per 100 key trigrams. genkey's finger speed, Oxeylyzer's SFB × distance / finger weight and the Keyboard Layout Optimizer's `finger_repeats`; the finger factors are Cyanophage's. Weight 0 by default.       |
+| `sfb_distance`     | mm    | lower  | Same-finger travel: Σ over the SFBs of n × the distance between the two keys' centres (mm, the `distance` metric's geometry) × the finger's `same_finger_factor` (pinky 1.7, ring 1.3, middle and index 1), per 100 key bigrams, plus 0.5 × the same sum over the SFS (first to third key) per 100 key trigrams. genkey's finger speed, Oxeylyzer's SFB × distance / finger weight and the Keyboard Layout Optimizer's `finger_repeats`; the finger factors are Cyanophage's. Weight 0.5 beside `sfb` 5. |
 | `lsb`              | %     | lower  | Lateral stretch bigram: one hand, adjacent fingers, one key lateral (index inner column Digit5/T/G/B, Digit6/Y/H/N; pinky outer keys Backquote, IntlBackslash, Minus, Equal, brackets, Quote, Backslash).                                                                                                                                                                                                                                                                                                |
 | `scissors`         | %     | lower  | Full scissor: one hand, adjacent fingers, the longer finger two or more rows below the shorter one (lengths: middle > ring > index > pinky).                                                                                                                                                                                                                                                                                                                                                             |
 | `half_scissors`    | %     | lower  | Half scissor: the same, one row apart.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -508,7 +508,9 @@ efforts give per-unit points without floors (a floor belongs to a whole
 text's share), and the ways of typing choose by the default weights alone. Every weight
 is a finite number ≥ 0, in points per percentage point (or per millimetre).
 The defaults and their justification are in the study, section « Default
-weights ». A weight of 0 removes a metric from the score; the Studio shows each
+weights »; the maintainer set `sfb` 5 with `sfb_distance` 0.5 (half of an
+SFB's cost flat, half by its travel), `altgr_usage` 5 and `dead_key_usage` 3
+on 2026-11-19. A weight of 0 removes a metric from the score; the Studio shows each
 contribution beside the metric.
 
 ## Ways of typing
@@ -552,27 +554,27 @@ w.roll3_in − w.roll3_out − w.alternation)` by the same classification.
 `finger_imbalance` and `hand_imbalance` are not sums over keystrokes and take
 no part. `result.typing.cost` is that sum over the path typed, in points.
 
-**Access weights** (decided by the agent on 2026-11-18, to review by the
-maintainer). How a character is reached is costed by three weights of the
-score, which the user edits with the others in the Comparer's « Réglages du
-score »:
+**Access weights** (maintainer, 2026-11-19). How a character is reached is
+costed by three weights of the score, which the user edits with the others
+in the Comparer's « Réglages du score »:
 
 | Weight           | Default | Per character typed this way                                                    |
 | ---------------- | ------: | ------------------------------------------------------------------------------- |
 | `modifier_usage` |     0.5 | Shift or AltGr held.                                                            |
-| `altgr_usage`    |       2 | AltGr held: the cost of the AltGr layer, added to `modifier_usage`.             |
-| `dead_key_usage` |       2 | Typed through a dead key: the cost of the sequence's extra press, per sequence. |
+| `altgr_usage`    |       5 | AltGr held: the cost of the AltGr layer, added to `modifier_usage`.             |
+| `dead_key_usage` |       3 | Typed through a dead key: the cost of the sequence's extra press, per sequence. |
 
 The positions are costed by the per-press weights above (`distance`,
 `pinky_load`, `outer_column`, `home_row`), the dead key's own press
 included, and its pairs by the pair weights (an SFB from the letter before to
 the dead key, Ergo-L's « ié »). By default, per character and in points per
-percentage point: an AltGr chord costs 2.5 plus the AltGr thumb's reach; a
-dead key 2 plus its press (its reach, a pinky or outer-column key, its pairs),
-so about as much; a direct key off the centre about 1 to 1.7 (outer column 1,
-pinky 0.3, its reach); an SFB 10. So a direct key, even off the centre, beats a
-dead key or AltGr, and both beat an SFB. The user decides otherwise by these
-weights: `altgr_usage` below `dead_key_usage` prefers AltGr, a larger
+percentage point: an AltGr chord costs 5.5 plus the AltGr thumb's reach; a
+dead key 3 plus its press (its reach, a pinky or outer-column key, its pairs),
+so less than AltGr; a direct key off the centre about 1 to 1.7 (outer column
+1, pinky 0.3, its reach); an SFB 5 plus 0.5 per millimetre of its travel
+(`sfb_distance`: 14.8 for E to D, 1 u down, and 39.6 for a pinky's Q to Z).
+So a direct key, even off the centre, beats a dead key, a dead key beats
+AltGr, and both beat an SFB. The user decides otherwise by these weights: `altgr_usage` below `dead_key_usage` prefers AltGr, a larger
 `dead_key_usage` prefers an off-centre key. A chained dead key pays
 `dead_key_usage` once and its further presses through their positions and
 pairs.
@@ -588,9 +590,12 @@ the default access weights.
 Measured on the Nemolivier anthology (ISO): Ergo-L's SFB is 1.79 % typed the
 fixed way and 0.97 % typed the best way, which reaches 26 characters by a
 second way (é through Shift+AltGr and its acute dead key, è through its grave
-one, `'` through AltGr): at `altgr_usage` 0 it is 0.97 %, at 2 (default)
-0.97 % with fewer detours (1.02 → 0.78 % of the characters typed another way),
-at 10 1.52 % and at 20 1.78 %.
+one, `'` through AltGr). With the default weights (`sfb` 5 and its travel,
+`altgr_usage` 5, `dead_key_usage` 3) it is 0.97 %, 0.84 % of the characters
+typed another way; at `altgr_usage` 0, 2 and 10 still 0.97 %, at 20 1.28 %.
+Under the former defaults (`sfb` 10 flat, `altgr_usage` 2) it was 1.52 % at
+10 and 1.78 % at 20: the SFB's travel keeps the detours that avoid a long
+SFB.
 
 **Choice.** For a character `b` with several ways between `a` and `c`, the
 engine picks the way `v` of least
@@ -647,7 +652,8 @@ not the best of the layouts compared, so a layout's value never depends on the
 others and the optimizer's objective stays stable; 1,000 is past every
 layout but bépo (1,771) and Ergo-L (557), Ergopti 480, AZERTY 129, QWERTY 95.
 Its weight, 0.05, makes the whole bonus worth 5 points, less than one point
-of SFB (weight 10): the gate checks that a toy layout of 1,094 characters with
+of SFB (5 flat and 0.5 per millimetre of travel, at least 14.5 for a one-key
+move): the gate checks that a toy layout of 1,094 characters with
 SFBs ranks below one of 2 characters without. The older `char_coverage` (share
 of `reference_characters`) is unchanged.
 
@@ -1502,9 +1508,9 @@ form with the score's own weights, typed alone (no space around it); a word
 table keeps 1,000 words.
 
 Decided by the agent on 2026-11-19, to review by the maintainer, for the
-analyser study's ideas (report section 10): `sfb_distance` and `pinky_ring`
-weigh 0 and every floor is 0, so no score moved (the library's golden values
-and scores stayed bit-identical); the skipgram half of `sfb_distance` is 0.5
+analyser study's ideas (report section 10): `pinky_ring` weighs 0 and every
+floor is 0 (the maintainer weighed `sfb_distance` 0.5 and lowered `sfb` to 5
+the same day, [Global score](#global-score)); the skipgram half of `sfb_distance` is 0.5
 (genkey's and Oxeylyzer's discount of gap 1 under an SFB); `pinky_ring`
 counts the same row too (Oxeylyzer); the relative view is a difference to
 AZERTY on French and QWERTY otherwise. Floors are read from

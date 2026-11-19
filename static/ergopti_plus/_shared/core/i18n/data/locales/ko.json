@@ -4739,7 +4739,7 @@
 	"layout_analysis.info.sfb": "같은 손가락으로 연달아 두 키를 누르는 것: 모든 분석기에서 가장 나쁜 경우입니다.",
 	"layout_analysis.info.repeat": "같은 키를 연달아 두 번. 표시만 하고 점수에 넣지 않음: 손가락이 움직이지 않습니다.",
 	"layout_analysis.info.sfs": "트라이그램의 첫째와 셋째 키를 같은 손가락으로. 같은 손가락 바이그램보다 가볍습니다.",
-	"layout_analysis.info.sfb_distance": "같은 손가락의 이동 거리: 같은 손가락 바이그램마다 두 키 사이의 거리(mm)에 손가락 계수(새끼 1.7, 약지 1.3, 나머지 1)를 곱해 키 바이그램 100개당 합산하고, 같은 손가락 스킵그램은 키 트라이그램 100개당 그 절반을 더한 값 (genkey, Oxeylyzer, Keyboard Layout Optimizer). 기본 가중치 0: 표시만 되고 점수에는 들어가지 않습니다.",
+	"layout_analysis.info.sfb_distance": "같은 손가락의 이동 거리: 같은 손가락 바이그램마다 두 키 사이의 거리(mm)에 손가락 계수(새끼 1.7, 약지 1.3, 나머지 1)를 곱해 키 바이그램 100개당 합산하고, 같은 손가락 스킵그램은 키 트라이그램 100개당 그 절반을 더한 값 (genkey, Oxeylyzer, Keyboard Layout Optimizer). 기본 가중치 0.5, SFB의 5와 함께: SFB 비용의 절반은 고정, 절반은 이동 거리에 따릅니다.",
 	"layout_analysis.info.lsb": "한 손의 이웃한 두 손가락, 한 키가 옆 열(검지 안쪽 열 또는 새끼손가락 바깥 키)에 있는 경우.",
 	"layout_analysis.info.scissors": "한 손의 이웃한 손가락, 긴 손가락이 짧은 손가락보다 두 줄 이상 아래에 있는 경우.",
 	"layout_analysis.info.half_scissors": "완전 가위와 같지만 한 줄 차이.",

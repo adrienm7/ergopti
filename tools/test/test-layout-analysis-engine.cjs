@@ -1305,14 +1305,15 @@ for (const layout of library) {
 
 	// (bigram-matrix) The same text, pair by pair: each pair's class from the
 	// one visitor, its share of the five bigrams, and its points with the
-	// default weights: Q→Z an SFB (−10 × 20 = −200), 4→D a full scissor and
-	// an outward roll (−3 × 20 + 0.5 × 20 = −50), E→A and E→X outward rolls
-	// (+10), E→J a hand change (0).
+	// default weights: Q→Z an SFB, flat and by its travel (Q and Z 40.691 mm
+	// apart, × 1.7 for the pinky: 69.174 mm), −5 × 20 − 0.5 × 20 × 69.174 =
+	// −791.744; 4→D a full scissor and an outward roll (−3 × 20 + 0.5 × 20 =
+	// −50), E→A and E→X outward rolls (+10), E→J a hand change (0).
 	const matrix = E.bigramMatrix(qwerty, tables, { keyboard: 'iso' });
 	check(matrix.bigrams === 5, `bigram matrix: ${matrix.bigrams} bigrams, expected 5`);
 	const byPair = new Map(matrix.pairs.map((p) => [p.keys.join('+'), p]));
 	const expected = {
-		'KeyQ+KeyZ': [['row_jump', 'sfb'], -200],
+		'KeyQ+KeyZ': [['row_jump', 'sfb'], -791.7439032302706],
 		'Digit4+KeyD': [['roll_out', 'row_jump', 'scissors'], -50],
 		'KeyE+KeyA': [['roll_out'], 10],
 		'KeyE+KeyX': [['roll_out', 'row_jump'], 10],
@@ -1332,16 +1333,23 @@ for (const layout of library) {
 	}
 	check(matrix.keys[0] === 'KeyE', `bigram matrix: the busiest key is ${matrix.keys[0]}`);
 	check(!matrix.keys.includes('Space'), 'bigram matrix: no thumb key');
-	const heavier = E.bigramMatrix(qwerty, tables, { keyboard: 'iso', weights: { sfb: 1 } });
+	const heavier = E.bigramMatrix(qwerty, tables, {
+		keyboard: 'iso',
+		weights: { sfb: 1, sfb_distance: 0 }
+	});
 	check(
 		near(heavier.pairs.find((p) => p.keys.join('+') === 'KeyQ+KeyZ').points, -20),
 		'bigram matrix: the points follow the weights'
 	);
-	// On a real text, the pairs add up to analyse()'s bigram metrics and their part of the score.
+	// On a real text, the pairs add up to analyse()'s bigram metrics and their
+	// part of the score. sfb_distance also counts the skipgrams, which no pair
+	// holds: its weight is 0 here, and its pairs' part is checked on « ed »
+	// (section « analyser-ideas »).
 	const swann = E.ngramsFromText(fs.readFileSync(SPEED_CORPUS, 'utf8').slice(0, 20000));
+	const pairWeights = { weights: { sfb_distance: 0 } };
 	for (const id of ['azerty', 'ergopti']) {
-		const r = E.analyse(byId.get(id), swann, {});
-		const m = E.bigramMatrix(byId.get(id), swann, {});
+		const r = E.analyse(byId.get(id), swann, pairWeights);
+		const m = E.bigramMatrix(byId.get(id), swann, pairWeights);
 		check(m.bigrams === r.coverage.bigrams, `bigram matrix: ${id} counts ${m.bigrams} bigrams`);
 		const bigramMetrics = Object.keys(E.METRICS).filter((k) => E.METRICS[k].of === 'bigrams');
 		for (const metric of bigramMetrics) {
@@ -1377,21 +1385,27 @@ for (const layout of library) {
 	const proto = E.wordsFromText('constructor Constructor hasOwnProperty');
 	check(proto.constructor === 2 && proto.hasownproperty === 1, `words: ${JSON.stringify(proto)}`);
 	// Each word measured alone, worked by hand on QWERTY with the default
-	// weights: « qz » is one bigram, an SFB (100 % × 10 = 1000 points) with a
-	// mean travel of (19.636 + 21.299) / 2 mm (Q and Z from the pinky's home);
-	// « ea » is a roll from the top row to home (19.636 / 2 mm, no event).
+	// weights: « qz » is one bigram, an SFB (100 % × 5 = 500 points flat, and
+	// 0.5 × 100 × 69.174 = 3458.720 by its travel: Q and Z 40.691 mm apart,
+	// × 1.7 for the pinky) with a mean travel of (19.636 + 21.299) / 2 mm (Q
+	// and Z from the pinky's home); « ea » is a roll from the top row to home
+	// (19.636 / 2 mm, no event).
 	const efforts = E.wordEfforts(qwerty, { qz: 1, ea: 3, qé: 2 }, { keyboard: 'iso' });
 	const board = E.keyboard('iso');
 	const reach = (code) => board.reach[board.index.get(code)];
 	const qz = efforts.words.find((w) => w.word === 'qz');
 	const ea = efforts.words.find((w) => w.word === 'ea');
-	check(near(qz.parts.sfb, 1000), `word effort: qz SFB part ${qz.parts.sfb}`);
+	check(near(qz.parts.sfb, 500), `word effort: qz SFB part ${qz.parts.sfb}`);
+	check(
+		near(qz.parts.sfb_distance, 3458.7195161513527),
+		`word effort: qz SFB travel part ${qz.parts.sfb_distance}`
+	);
 	check(
 		near(qz.parts.distance, (reach('KeyQ') + reach('KeyZ')) / 2),
 		`word effort: qz travel ${qz.parts.distance}`
 	);
 	check(
-		near(qz.effort, 1000 + (reach('KeyQ') + reach('KeyZ')) / 2),
+		near(qz.effort, 500 + 3458.7195161513527 + (reach('KeyQ') + reach('KeyZ')) / 2),
 		`word effort: qz ${qz.effort}`
 	);
 	check(near(ea.effort, reach('KeyE') / 2), `word effort: ea ${ea.effort}`);
@@ -1403,8 +1417,14 @@ for (const layout of library) {
 	check(near(efforts.mean, (qz.effort + 3 * ea.effort) / 4), `word effort: mean ${efforts.mean}`);
 	check(
 		near(
-			E.wordEfforts(qwerty, { qz: 1 }, { keyboard: 'iso', weights: { sfb: 1, distance: 0 } })
-				.words[0].effort,
+			E.wordEfforts(
+				qwerty,
+				{ qz: 1 },
+				{
+					keyboard: 'iso',
+					weights: { sfb: 1, sfb_distance: 0, distance: 0 }
+				}
+			).words[0].effort,
 			100
 		),
 		'word effort: the weights apply'
@@ -1779,15 +1799,16 @@ const onlyKind = (result, char) =>
 }
 
 // Direct, AltGr or dead key, by the documented costs (default weights:
-// distance 1/mm, home_row 0.3, pinky_load 0.3, sfb 10, and the access weights
-// modifier_usage 0.5, altgr_usage 2, dead_key_usage 2; ISO reaches KeyR, KeyP,
-// KeyE 19.636 mm, AltRight 69.056 mm). In « fé » there are 2 characters and 1
-// bigram, so a pair counts 100 × 2 per point of weight:
-// - é on KeyR (left index, like f): 19.636 + 10 × 200 (SFB) = 2019.636;
-// - AltGr+KeyL (home): −30 (home) + 69.056 (AltRight) + 50 (modifier) + 200
-//   (AltGr layer) = 289.056;
-// - dead key KeyP then e on KeyE: 19.636 + 30 (pinky) + 19.636 + 200 (dead key)
-//   = 269.272, both pairs changing hands.
+// distance 1/mm, home_row 0.3, pinky_load 0.3, sfb 5, sfb_distance 0.5, and
+// the access weights modifier_usage 0.5, altgr_usage 5, dead_key_usage 3; ISO
+// reaches KeyR, KeyP, KeyE 19.636 mm, AltRight 69.056 mm). In « fé » there
+// are 2 characters and 1 bigram, so a pair counts 100 × 2 per point of weight:
+// - é on KeyR (left index, like f): 19.636 + 5 × 200 (SFB) + 0.5 × 200 ×
+//   19.636 (its travel, F to R) = 2983.265;
+// - AltGr+KeyL (home): −30 (home) + 69.056 (AltRight) + 50 (modifier) + 500
+//   (AltGr layer) = 589.056;
+// - dead key KeyP then e on KeyE: 19.636 + 30 (pinky) + 19.636 + 300 (dead key)
+//   = 369.272, both pairs changing hands.
 // Alone, é is typed directly (19.636 is the least). The user's access weights
 // choose too: with altgr_usage 0, AltGr costs 89.056 and wins.
 {
@@ -1804,9 +1825,9 @@ const onlyKind = (result, char) =>
 	check(onlyKind(alone, 'é') === 'direct', `ways: é alone is typed ${onlyKind(alone, 'é')}`);
 	const afterF = E.analyse(full, E.ngramsFromText('fé'), { keyboard: 'iso' });
 	check(onlyKind(afterF, 'é') === 'dead', `ways: « fé » types é by ${onlyKind(afterF, 'é')}`);
-	// f on the home row (−30), é through the dead key (269.272), over 2 characters.
+	// f on the home row (−30), é through the dead key (369.272), over 2 characters.
 	check(
-		Math.abs(afterF.typing.cost - (-30 + 269.272) / 2) < 1e-3,
+		Math.abs(afterF.typing.cost - (-30 + 369.272) / 2) < 1e-3,
 		`ways: « fé » costs ${afterF.typing.cost}`
 	);
 	check(afterF.metrics.altgr_usage === 0, 'ways: « fé » through the dead key holds no AltGr');
@@ -1827,10 +1848,10 @@ const onlyKind = (result, char) =>
 		'ways: AltGr types one character of two, counted in altgr_usage and modifier_usage'
 	);
 	check(
-		cheapAltGr.typing.access.altgr_usage === 0 && afterF.typing.access.altgr_usage === 2,
+		cheapAltGr.typing.access.altgr_usage === 0 && afterF.typing.access.altgr_usage === 5,
 		'ways: a result names the access weights its ways were chosen by'
 	);
-	// A dearer dead key sends é back to AltGr: 89.056 + 200 < 19.636 + 30 + 19.636 + 1000.
+	// A dearer dead key sends é back to AltGr: 89.056 + 500 < 19.636 + 30 + 19.636 + 1000.
 	const dearDead = E.analyse(full, E.ngramsFromText('fé'), {
 		keyboard: 'iso',
 		weights: { dead_key_usage: 10 }
@@ -2041,13 +2062,16 @@ const bigLayout = (() => {
 	const small = toy('toy_small', { KeyE: 'e', KeyJ: 'd' });
 	const ranked = E.compare([bigLayout, small], E.ngramsFromText('ed ed ed'), { keyboard: 'iso' });
 	check(ranked[0].layout.id === 'toy_small', 'coverage: more characters do not outrank worse SFBs');
+	// One point of SFB costs its flat weight and its travel, one key (19.05 mm)
+	// at the least, on a finger of factor 1.
 	const w = E.defaultWeights();
+	const sfbPoint = w.sfb + w.sfb_distance * 19.05;
 	check(
-		w.coverage_bonus * 100 < w.sfb,
+		w.coverage_bonus * 100 < sfbPoint,
 		'coverage: the whole bonus is worth less than one point of SFB'
 	);
 	check(
-		w.simplicity * 100 < w.sfb,
+		w.simplicity * 100 < sfbPoint,
 		'simplicity: the whole bonus is worth less than one point of SFB'
 	);
 }
@@ -2976,11 +3000,16 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	const qwerty = byId.get('qwerty');
 	const ed = E.analyse(qwerty, E.ngramsFromText('ed'), { keyboard: 'iso' });
 	const edMm = 100 * Math.hypot(0.25, 1) * 19.05;
-	// New metrics weigh 0 by default: shown, out of the score until the maintainer weighs them.
-	for (const id of ['sfb_distance', 'pinky_ring'])
+	// The maintainer weighed sfb_distance 0.5 beside sfb 5 (2026-11-19);
+	// pinky_ring weighs 0: shown, out of the score until weighed.
+	for (const [id, weight] of [
+		['sfb', 5],
+		['sfb_distance', 0.5],
+		['pinky_ring', 0]
+	])
 		check(
-			E.defaultWeights()[id] === 0,
-			`ideas: ${id} has the default weight ${E.defaultWeights()[id]}`
+			E.defaultWeights()[id] === weight,
+			`ideas: ${id} has the default weight ${E.defaultWeights()[id]}, not ${weight}`
 		);
 	const weighed = E.analyse(qwerty, E.ngramsFromText('ed'), {
 		keyboard: 'iso',
@@ -2988,17 +3017,17 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	});
 	check(
 		near(weighed.score.contributions.sfb_distance, -edMm) &&
-			near(weighed.score.total, ed.score.total - edMm),
+			near(weighed.score.total, ed.score.total - edMm / 2),
 		`ideas: a weight of 1 on sfb_distance takes ${-weighed.score.contributions.sfb_distance} points`
 	);
-	// Floors: « ed » is 100 % SFB at 10 points a point; a floor of 30 leaves 70 points of it.
+	// Floors: « ed » is 100 % SFB at 5 points a point; a floor of 30 leaves 70 points of it.
 	check(
-		E.defaultFloors().sfb === 0 && near(ed.score.contributions.sfb, -1000),
+		E.defaultFloors().sfb === 0 && near(ed.score.contributions.sfb, -500),
 		'ideas: no default floor'
 	);
 	const floored = E.score(ed, undefined, { sfb: 30 });
 	check(
-		near(floored.contributions.sfb, -700) && near(floored.total, ed.score.total + 300),
+		near(floored.contributions.sfb, -350) && near(floored.total, ed.score.total + 150),
 		`ideas: a floor of 30 on sfb leaves ${floored.contributions.sfb} points`
 	);
 	check(
@@ -3013,10 +3042,10 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	const refloored = E.rescore([E.analyse(qwerty, E.ngramsFromText('ed'), {})], undefined, {
 		sfb: 30
 	})[0];
-	check(near(refloored.score.contributions.sfb, -700), 'ideas: rescore() reads the floors');
+	check(near(refloored.score.contributions.sfb, -350), 'ideas: rescore() reads the floors');
 	const keySum = (costs) => Object.values(costs).reduce((sum, v) => sum + v, 0);
 	check(
-		near(keySum(E.keyScoreCost(ed)) - keySum(E.keyScoreCost(ed, undefined, { sfb: 30 })), 300),
+		near(keySum(E.keyScoreCost(ed)) - keySum(E.keyScoreCost(ed, undefined, { sfb: 30 })), 150),
 		'ideas: the keys share only the part above the floor'
 	);
 	check(
@@ -3068,7 +3097,7 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		weights: { sfb_distance: 1 }
 	}).pairs[0];
 	check(
-		near(pair.points, -1000 - edMm) && !pair.events.includes('sfb_cost'),
+		near(pair.points, -500 - edMm) && !pair.events.includes('sfb_cost'),
 		`ideas: the « ed » pair is worth ${pair.points} points (${pair.events.join(' ')})`
 	);
 	// The heatmap blames a pinky–ring pair on both its keys.
@@ -3086,7 +3115,8 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	);
 
 	// The typing choice and its cost read the new weights when they are the
-	// defaults: an engine whose score_weights give pinky_ring 5 types « b »
+	// defaults: an engine whose score_weights give pinky_ring 5 (and one more
+	// point to sfb_distance) types « b »
 	// after « a » (left pinky, KeyA) on the right index (KeyU) instead of the
 	// ring (KeyW), whose pair now costs 5 − 1 (inward roll) points a point.
 	const weighted = {};
@@ -3094,7 +3124,7 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	for (const file of [LEGEND_PATH, DATA_PATH])
 		vm.runInContext(fs.readFileSync(file, 'utf8'), weighted, { filename: file });
 	vm.runInContext(
-		'LAYOUT_ANALYSIS_DATA.weights.pinky_ring = 5; LAYOUT_ANALYSIS_DATA.weights.sfb_distance = 1;',
+		'LAYOUT_ANALYSIS_DATA.weights.pinky_ring = 5; LAYOUT_ANALYSIS_DATA.weights.sfb_distance += 1;',
 		weighted
 	);
 	vm.runInContext(fs.readFileSync(ENGINE_PATH, 'utf8'), weighted, { filename: ENGINE_PATH });

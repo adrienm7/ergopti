@@ -4739,7 +4739,7 @@
 	"layout_analysis.info.sfb": "Two keys in a row typed by the same finger: the worst event for every analyser.",
 	"layout_analysis.info.repeat": "The same key twice in a row. Shown, not scored: the finger does not move.",
 	"layout_analysis.info.sfs": "First and third keys of a trigram on the same finger. Lighter than a same-finger bigram.",
-	"layout_analysis.info.sfb_distance": "Same-finger travel: for each same-finger bigram, the distance between its two keys in mm times its finger's factor (pinky 1.7, ring 1.3, others 1), per 100 key bigrams, plus half of the same for the same-finger skipgrams per 100 key trigrams (genkey, Oxeylyzer, Keyboard Layout Optimizer). Its default weight is 0: shown, not in the score.",
+	"layout_analysis.info.sfb_distance": "Same-finger travel: for each same-finger bigram, the distance between its two keys in mm times its finger's factor (pinky 1.7, ring 1.3, others 1), per 100 key bigrams, plus half of the same for the same-finger skipgrams per 100 key trigrams (genkey, Oxeylyzer, Keyboard Layout Optimizer). Its default weight is 0.5, beside 5 for an SFB: half of an SFB's cost is flat, half follows its travel.",
 	"layout_analysis.info.lsb": "Two adjacent fingers of one hand, one key in a lateral column (inner index column or outer pinky keys).",
 	"layout_analysis.info.scissors": "Adjacent fingers of one hand, the longer finger two or more rows below the shorter one.",
 	"layout_analysis.info.half_scissors": "Like full scissors, but one row apart.",

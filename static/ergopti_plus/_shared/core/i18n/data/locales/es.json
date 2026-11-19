@@ -4739,7 +4739,7 @@
 	"layout_analysis.info.sfb": "Dos teclas seguidas con el mismo dedo: el peor evento para todos los analizadores.",
 	"layout_analysis.info.repeat": "La misma tecla dos veces seguidas. Se muestra, no puntúa: el dedo no se mueve.",
 	"layout_analysis.info.sfs": "Primera y tercera tecla de un trigrama con el mismo dedo. Menos grave que un bigrama del mismo dedo.",
-	"layout_analysis.info.sfb_distance": "Recorrido de un mismo dedo: para cada bigrama del mismo dedo, la distancia entre sus dos teclas en mm por el factor de su dedo (meñique 1,7, anular 1,3, otros 1), por 100 bigramas de teclas, más la mitad de lo mismo para los skipgramas del mismo dedo por 100 trigramas (genkey, Oxeylyzer, Keyboard Layout Optimizer). Peso por defecto 0: se muestra, fuera de la puntuación.",
+	"layout_analysis.info.sfb_distance": "Recorrido de un mismo dedo: para cada bigrama del mismo dedo, la distancia entre sus dos teclas en mm por el factor de su dedo (meñique 1,7, anular 1,3, otros 1), por 100 bigramas de teclas, más la mitad de lo mismo para los skipgramas del mismo dedo por 100 trigramas (genkey, Oxeylyzer, Keyboard Layout Optimizer). Peso por defecto 0,5, junto a 5 para un SFB: la mitad del coste de un SFB es fija y la otra mitad sigue su recorrido.",
 	"layout_analysis.info.lsb": "Dos dedos vecinos de una mano, una tecla en una columna lateral (columna interior del índice o teclas exteriores del meñique).",
 	"layout_analysis.info.scissors": "Dedos vecinos de una mano, el más largo dos filas o más por debajo del más corto.",
 	"layout_analysis.info.half_scissors": "Como las tijeras completas, pero a una fila de distancia.",

@@ -4739,7 +4739,7 @@
 	"layout_analysis.info.sfb": "Dvě klávesy za sebou stejným prstem: nejhorší událost pro každý analyzátor.",
 	"layout_analysis.info.repeat": "Stejná klávesa dvakrát za sebou. Zobrazeno, nehodnoceno: prst se nepohne.",
 	"layout_analysis.info.sfs": "První a třetí klávesa trigramu stejným prstem. Lehčí než bigram stejným prstem.",
-	"layout_analysis.info.sfb_distance": "Dráha téhož prstu: u každého bigramu téhož prstu vzdálenost jeho dvou kláves v mm krát faktor prstu (malíček 1,7, prsteníček 1,3, ostatní 1) na 100 bigramů kláves, plus polovina téhož pro skipgramy téhož prstu na 100 trigramů (genkey, Oxeylyzer, Keyboard Layout Optimizer). Výchozí váha 0: zobrazeno, mimo skóre.",
+	"layout_analysis.info.sfb_distance": "Dráha téhož prstu: u každého bigramu téhož prstu vzdálenost jeho dvou kláves v mm krát faktor prstu (malíček 1,7, prsteníček 1,3, ostatní 1) na 100 bigramů kláves, plus polovina téhož pro skipgramy téhož prstu na 100 trigramů (genkey, Oxeylyzer, Keyboard Layout Optimizer). Výchozí váha 0,5 vedle 5 pro SFB: polovina ceny SFB je pevná, polovina podle jeho dráhy.",
 	"layout_analysis.info.lsb": "Dva sousední prsty jedné ruky, jedna klávesa v boční sloupci (vnitřní sloupec ukazováčku nebo vnější klávesy malíčku).",
 	"layout_analysis.info.scissors": "Sousední prsty jedné ruky, delší dvě či více řad pod kratším.",
 	"layout_analysis.info.half_scissors": "Jako plné nůžky, ale o jednu řadu.",

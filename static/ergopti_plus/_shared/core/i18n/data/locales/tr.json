@@ -4739,7 +4739,7 @@
 	"layout_analysis.info.sfb": "Aynı parmakla art arda iki tuş: her analizci için en kötü olay.",
 	"layout_analysis.info.repeat": "Aynı tuşa art arda iki kez. Gösterilir, puanlanmaz: parmak hareket etmez.",
 	"layout_analysis.info.sfs": "Bir trigramın birinci ve üçüncü tuşu aynı parmakla. Aynı parmak bigramından daha hafiftir.",
-	"layout_analysis.info.sfb_distance": "Aynı parmağın yolu: aynı parmakla basılan her bigram için iki tuş arasındaki mm cinsinden mesafe çarpı parmağın katsayısı (serçe 1,7, yüzük 1,3, diğerleri 1), 100 tuş bigramı başına; artı aynı parmaklı skipgramlar için 100 tuş trigramı başına bunun yarısı (genkey, Oxeylyzer, Keyboard Layout Optimizer). Varsayılan ağırlık 0: gösterilir, puana girmez.",
+	"layout_analysis.info.sfb_distance": "Aynı parmağın yolu: aynı parmakla basılan her bigram için iki tuş arasındaki mm cinsinden mesafe çarpı parmağın katsayısı (serçe 1,7, yüzük 1,3, diğerleri 1), 100 tuş bigramı başına; artı aynı parmaklı skipgramlar için 100 tuş trigramı başına bunun yarısı (genkey, Oxeylyzer, Keyboard Layout Optimizer). Varsayılan ağırlık 0,5, SFB için 5'in yanında: bir SFB'nin maliyetinin yarısı sabit, yarısı yoluna bağlıdır.",
 	"layout_analysis.info.lsb": "Bir elin iki komşu parmağı, bir tuş yan sütunda (işaret parmağının iç sütunu veya serçe parmağın dış tuşları).",
 	"layout_analysis.info.scissors": "Bir elin komşu parmakları, uzun olan kısa olanın iki veya daha fazla sıra altında.",
 	"layout_analysis.info.half_scissors": "Tam makaslar gibi, ama bir sıra arayla.",

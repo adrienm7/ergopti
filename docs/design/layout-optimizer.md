@@ -324,10 +324,10 @@ verdict reads the best existing layout's gap:
 | `existing_better` | gap < 0                       | An existing layout scores more; a longer run may close the gap.         |
 
 `similar_score_gap` (`analysis_model.json`, read by
-`LAYOUT_ANALYSIS.similarScoreGap()`, checked by the codegen) is 2 points by
-default: 0.2 % of SFB at its weight 10, about the gap between Ergopti+ and
-Ergopti on the Nemolivier anthology (decided by the agent on 2026-11-19, to
-review by the maintainer, `TODO.md`).
+`LAYOUT_ANALYSIS.similarScoreGap()`, checked by the codegen) is 2 points
+(confirmed by the maintainer on 2026-11-19): 0.4 % of SFB at its flat weight 5. It was about the gap between Ergopti+ and Ergopti on the Nemolivier
+anthology under the former weights; it is 3.7 points since `sfb_distance`
+weighs 0.5.
 
 **Card.** A card under the result: the verdict with a mark (≈, ▲, ★) and a
 coloured edge; the best existing layout with a ring gauge of its

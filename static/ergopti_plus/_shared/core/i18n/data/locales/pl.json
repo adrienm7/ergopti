@@ -4739,7 +4739,7 @@
 	"layout_analysis.info.sfb": "Dwa klawisze z rzędu tym samym palcem: najgorsze zdarzenie dla każdego analizatora.",
 	"layout_analysis.info.repeat": "Ten sam klawisz dwa razy z rzędu. Pokazywane, nieoceniane: palec się nie porusza.",
 	"layout_analysis.info.sfs": "Pierwszy i trzeci klawisz trigramu tym samym palcem. Lżejsze niż bigram tym samym palcem.",
-	"layout_analysis.info.sfb_distance": "Droga tego samego palca: dla każdego bigramu tego samego palca odległość między jego dwoma klawiszami w mm razy współczynnik palca (mały 1,7, serdeczny 1,3, pozostałe 1) na 100 bigramów klawiszy, plus połowa tego samego dla skipgramów tego samego palca na 100 trigramów (genkey, Oxeylyzer, Keyboard Layout Optimizer). Domyślna waga 0: pokazana, poza wynikiem.",
+	"layout_analysis.info.sfb_distance": "Droga tego samego palca: dla każdego bigramu tego samego palca odległość między jego dwoma klawiszami w mm razy współczynnik palca (mały 1,7, serdeczny 1,3, pozostałe 1) na 100 bigramów klawiszy, plus połowa tego samego dla skipgramów tego samego palca na 100 trigramów (genkey, Oxeylyzer, Keyboard Layout Optimizer). Domyślna waga 0,5 obok 5 dla SFB: połowa kosztu SFB jest stała, połowa zależy od jego drogi.",
 	"layout_analysis.info.lsb": "Dwa sąsiednie palce jednej ręki, jeden klawisz w kolumnie bocznej (wewnętrzna kolumna palca wskazującego lub zewnętrzne klawisze małego palca).",
 	"layout_analysis.info.scissors": "Sąsiednie palce jednej ręki, dłuższy dwa lub więcej rzędów pod krótszym.",
 	"layout_analysis.info.half_scissors": "Jak pełne nożyce, ale o jeden rząd.",

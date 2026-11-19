@@ -92,8 +92,8 @@ layout file of its format. Ergo-L follows dead keys and chained dead keys with
 its own preference rule.
 
 **Access weights.** Ergopti's own score costs the way a character is reached
-by three weights the user edits (`modifier_usage` 0.5, `altgr_usage` 2,
-`dead_key_usage` 2; [layout-analysis.md](layout-analysis.md#ways-of-typing),
+by three weights the user edits (`modifier_usage` 0.5, `altgr_usage` 5,
+`dead_key_usage` 3; [layout-analysis.md](layout-analysis.md#ways-of-typing),
 « Access weights »), which also choose the way of typing of a character that
 has several. The scorers of this page model other tools, so they type
 (`keyNgrams`) by the default access weights whatever the user's: an edit of
@@ -559,7 +559,8 @@ cmini and a200 (Python, `--python=<exe>` with `--cmini-data=<its folder>` or
 
 The study's ideas (docs/audits/layout-analysers/report.md, section 10) that
 became metrics or options of the Ergopti engine, each defined in
-[layout-analysis.md](layout-analysis.md#metrics) with a default weight of 0:
+[layout-analysis.md](layout-analysis.md#metrics) with a default weight of 0
+but `sfb_distance`'s 0.5 (beside `sfb` 5, maintainer, 2026-11-19):
 
 - **`sfb_distance`**, the same-finger travel: `100 · Σ_SFB n · d · f / bigrams
   - 0.5 · 100 · Σ_SFS n · d · f / trigrams`, d the distance between the two
