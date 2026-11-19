@@ -6,6 +6,31 @@ import characterFrequencies from '#lib/keyboard/data/characterFrequencies.json';
 // Create the "max" and "min" keys containing the maximum value among the frequencies (the frequency of E) and the minimum value
 characterFrequencies.max = Math.max(...Object.values(characterFrequencies));
 characterFrequencies.min = Math.min(...Object.values(characterFrequencies));
+// The finger and hand of a key, said in its accessible description: the
+// drawing tells them by the key's colour, which a screen reader cannot see and
+// a colour-blind reader may not tell apart (WCAG 1.4.1).
+const FINGER_NAMES = Object.freeze({
+	index: 'index',
+	majeur: 'majeur',
+	annulaire: 'annulaire',
+	auriculaire: 'auriculaire',
+	thumb: 'pouce'
+});
+const HAND_NAMES = Object.freeze({ left: 'gauche', right: 'droit' });
+
+/**
+ * The words for a key's finger, or null for a key that no finger owns.
+ * @param {string|undefined} finger - The layout data's finger.
+ * @param {string|undefined} hand - The layout data's hand.
+ * @returns {string|null}
+ */
+export function fingerDescription(finger, hand) {
+	if (finger === undefined && hand === undefined) return null;
+	if (!Object.hasOwn(FINGER_NAMES, finger) || !Object.hasOwn(HAND_NAMES, hand))
+		throw new Error(`Unknown finger or hand in the layout data: ${finger}, ${hand}`);
+	return `${FINGER_NAMES[finger]} ${HAND_NAMES[hand]}`;
+}
+
 function logarithmicTransformation(value, scaleFactor) {
 	// Apply a logarithmic scale to smooth differences between very common and very rare characters
 	return Math.log(1 + scaleFactor * value) / Math.log(1 + scaleFactor);
@@ -80,6 +105,13 @@ export class Keyboard {
 			return;
 		}
 
+		// A click on a key switches the layer; the keyboard does it with the
+		// layer select of the drawing's controls (KeyboardControlButtonLayer),
+		// which the keyboard operability gate checks is there.
+		if (get(stores_infos[this.id])['controls'] === 'yes')
+			this.location.setAttribute('data-keyboard-equivalent', '#keyboard-layer-' + this.id);
+		else this.location.removeAttribute('data-keyboard-equivalent');
+
 		for (let row = 1; row <= 7; row++) {
 			for (let column = 0; column <= 15; column++) {
 				const key = this.cleanKey(this.location, row, column);
@@ -142,6 +174,7 @@ export class Keyboard {
 		});
 		newKey.dataset['key'] = '';
 		newKey.removeAttribute('aria-label');
+		newKey.removeAttribute('aria-description');
 
 		// Key content and style cleaning
 		newKey.replaceChildren(document.createElement('div'));
@@ -208,6 +241,9 @@ export class Keyboard {
 		key.dataset['hand'] = keyIdentifier['hand'];
 		key.dataset['type'] = keyContent['type'];
 		key.dataset['column'] = column;
+		const finger = fingerDescription(keyIdentifier['finger'], keyIdentifier['hand']);
+		if (finger === null) key.removeAttribute('aria-description');
+		else key.setAttribute('aria-description', 'Doigt : ' + finger);
 
 		if (
 			get(stores_infos[this.id])['layer'] === 'Visuel' &&

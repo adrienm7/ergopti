@@ -50,6 +50,7 @@
 
 <keyboard-control-layer>
 	<select
+		id={'keyboard-layer-' + id}
 		bind:value={layerValue}
 		onchange={() => changeLayer(layerValue)}
 		aria-label="Couche affichée sur le clavier"

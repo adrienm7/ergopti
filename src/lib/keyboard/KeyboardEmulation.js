@@ -235,6 +235,10 @@ export class KeyboardEmulation extends Keyboard {
 			return;
 		}
 
+		// Tab and Shift+Tab leave the field, as in any text field: typed into the
+		// emulation, they held the keyboard focus there for good (WCAG 2.1.2).
+		if (event.code === 'Tab') return;
+
 		// If a key other than a modifier was pressed
 		const keyCodePressed = event.code;
 		const keyIdentifier = layoutData[type].find((el) => el['code'] === keyCodePressed);
