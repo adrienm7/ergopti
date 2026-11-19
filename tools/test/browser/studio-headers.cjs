@@ -155,6 +155,24 @@ async function checkHeaders(browser, origin, lang) {
 		`${lang}: the score's formula`
 	);
 	await page.keyboard.press('Escape');
+	// A row's percentile chip: the row opens its details on Enter and once
+	// cancelled the key, so the chip's own popover never opened from the
+	// keyboard and the focus was lost with the redrawn row.
+	const chip = page.locator('#la-table tbody tr[tabindex] .la-pct').first();
+	await chip.focus();
+	await page.keyboard.press('Enter');
+	await page.waitForSelector('#la-popover:not([hidden])', { timeout: 5000 });
+	assert.equal(
+		await chip.getAttribute('aria-expanded'),
+		'true',
+		`${lang}: Enter on a row's percentile chip opens its popover`
+	);
+	await page.keyboard.press('Escape');
+	assert.equal(
+		await chip.evaluate((node) => node === document.activeElement),
+		true,
+		`${lang}: Escape gives the focus back to the row's chip`
+	);
 	assert.deepEqual(errors, [], `${lang}: no page error`);
 	await context.close();
 }

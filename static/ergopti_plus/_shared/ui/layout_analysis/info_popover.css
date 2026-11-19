@@ -37,10 +37,20 @@ button.la-note-info {
 	border: 1px solid var(--theme-separator);
 	border-radius: 8px;
 	box-shadow: 0 4px 16px rgb(0 0 0 / 20%);
+	/* A <dialog>: its own placement (left and top from the script) and size,
+	   none of the browser's centring. The width the script sets includes the
+	   padding and border, as on the Comparer (whose page sizes every box so):
+	   at 320 px the editor's popover once overflowed and scrolled the page sideways. */
+	box-sizing: border-box;
 	color: var(--theme-text);
 	font:
 		14px/1.45 system-ui,
 		sans-serif;
+	height: auto;
+	inset: auto;
+	margin: 0;
+	max-height: none;
+	max-width: none;
 	padding: 10px 12px;
 	position: absolute;
 	z-index: 10;

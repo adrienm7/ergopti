@@ -415,13 +415,14 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 	}
 
 	function build() {
-		popover = el('div', 'la-popover');
+		// A non-modal dialog (show(), not showModal()): the page stays usable
+		// beside it, Escape and « Close » end it and give the focus back.
+		popover = el('dialog', 'la-popover');
 		popover.id = POPOVER_ID;
-		popover.setAttribute('role', 'dialog');
 		popover.hidden = true;
 		const close = el('button', 'la-popover-close');
 		close.type = 'button';
-		close.addEventListener('click', hide);
+		close.addEventListener('click', () => hide());
 		const name = el('p', 'la-popover-name');
 		name.id = `${POPOVER_ID}-name`;
 		popover.append(
@@ -510,7 +511,7 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		if (formula !== null)
 			line.append(
 				el('strong', '', `${t('layout_analysis.formula.label')} `),
-				el('span', 'la-formula', t(`layout_analysis.formula.${formula}`, formulaValues()))
+				t(`layout_analysis.formula.${formula}`, formulaValues())
 			);
 		popover.querySelector('.la-popover-title').textContent = t('layout_analysis.info.sources');
 		popover.querySelector('.la-popover-close').textContent = t('layout_analysis.info.close');
@@ -550,6 +551,7 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		owner = trigger;
 		trigger.setAttribute('aria-expanded', 'true');
 		popover.hidden = false;
+		if (!popover.open) popover.show();
 		const box = trigger.getBoundingClientRect();
 		const page = document.documentElement.clientWidth;
 		const width = Math.min(POPOVER_WIDTH_PX, page - 2 * POPOVER_GUTTER_PX);
@@ -560,15 +562,27 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		popover.querySelector('.la-popover-close').focus();
 	}
 
-	function hide() {
+	/**
+	 * Closes the popover. Escape and « Close » give the focus back to its
+	 * button; a click elsewhere leaves it where that click put it.
+	 * @param {boolean} [restore=true]
+	 */
+	function hide(restore = true) {
 		if (!popover || popover.hidden) return;
 		popover.hidden = true;
+		if (popover.open) popover.close();
 		const previous = owner;
 		owner = null;
 		if (previous && previous.isConnected) {
 			previous.setAttribute('aria-expanded', 'false');
-			previous.focus();
+			if (restore) previous.focus();
 		}
+	}
+
+	/** Opens or closes the popover of a trigger, as its click does. */
+	function toggle(trigger) {
+		if (trigger === owner) hide();
+		else show(trigger);
 	}
 
 	function start() {
@@ -582,11 +596,26 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 					// Inside a sortable header or a label: open only.
 					event.preventDefault();
 					event.stopPropagation();
-					if (trigger === owner) hide();
-					else show(trigger);
+					toggle(trigger);
 					return;
 				}
-				if (!event.target.closest(`#${POPOVER_ID}`)) hide();
+				if (!event.target.closest(`#${POPOVER_ID}`)) hide(false);
+			},
+			true
+		);
+		// Enter on a trigger opens it before any ancestor sees the key: a
+		// Comparer row opens its details on Enter and cancels the key, which
+		// once kept the button's own click from ever firing, and re-rendered
+		// the row the focus was to come back to.
+		document.addEventListener(
+			'keydown',
+			(event) => {
+				if (event.key !== 'Enter' || event.repeat) return;
+				const trigger = event.target.closest && event.target.closest('.la-info, .la-note');
+				if (!trigger || trigger.disabled) return;
+				event.preventDefault();
+				event.stopPropagation();
+				toggle(trigger);
 			},
 			true
 		);

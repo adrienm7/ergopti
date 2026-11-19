@@ -1,0 +1,9 @@
+[
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/info_popover.js",
+		"tag": "div",
+		"anchor": ".la-popover-texts",
+		"count": 1,
+		"reason": "Groups the popover's explanation paragraphs, replaced together on each opening; it is no section (no heading of its own) and no other element means a run of paragraphs."
+	}
+]
