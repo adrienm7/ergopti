@@ -273,6 +273,10 @@ var LAYOUT_ANALYSIS = (function () {
 	 */
 	function fingeringProfile(profile) {
 		const { model, geometry } = data();
+		// A board-only key (the ErgoDox's outer columns) has no row-staggered
+		// geometry; a profile may still finger it on its board.
+		const boardOnly = new Set(model.board_only_keys);
+		const known = (code) => Boolean(geometry[code]) || boardOnly.has(code);
 		if (!profile || typeof profile !== 'object')
 			throw new AnalysisError('fingering_not_object', {}, 'a fingering profile is an object');
 		if (profile.base !== undefined && !model.fingerings[profile.base])
@@ -284,12 +288,12 @@ var LAYOUT_ANALYSIS = (function () {
 		const fingers = profile.fingers || {};
 		const home = profile.home || {};
 		for (const [code, finger] of Object.entries(fingers)) {
-			if (!geometry[code]) throw unknownKey(code);
+			if (!known(code)) throw unknownKey(code);
 			if (!model.fingers.includes(finger)) throw unknownFinger(finger);
 		}
 		for (const [finger, code] of Object.entries(home)) {
 			if (!model.fingers.includes(finger)) throw unknownFinger(finger);
-			if (!geometry[code]) throw unknownKey(code);
+			if (!known(code)) throw unknownKey(code);
 		}
 		return {
 			id: profile.id || 'custom',
@@ -340,7 +344,8 @@ var LAYOUT_ANALYSIS = (function () {
 			checked ? checked.home : {}
 		);
 		const form = spec.geometry === 'ortho' ? 'iso' : spec.geometry;
-		const outer = new Set(model.outer_keys);
+		// A board names its own outer columns (the ErgoDox's two pinky columns).
+		const outer = new Set(board3d && board3d.outer_keys ? board3d.outer_keys : model.outer_keys);
 		const modifierCodes = new Set(Object.values(model.modifier_keys));
 		const homeCodes = new Set(Object.values(homeKeys));
 		const board = {
@@ -572,17 +577,21 @@ var LAYOUT_ANALYSIS = (function () {
 
 	/**
 	 * The keys a layout types characters on: every finger-assigned key but the
-	 * held modifiers. The codes layoutFromComposerSource keeps.
+	 * held modifiers, the thumb keys, then the board-only keys (board_only_keys:
+	 * the ErgoDox's keys without a KeyboardEvent code, measured on that board
+	 * only). The codes layoutFromComposerSource keeps.
 	 * @param {object} [model] - analysis_model.json; the loaded data's when absent
 	 *   (the codegen passes it before the data exists).
-	 * @returns {string[]} KeyboardEvent codes.
+	 * @returns {string[]} KeyboardEvent codes, then the board-only codes.
 	 */
 	function typingCodes(model) {
 		const m = model || data().model;
 		const modifiers = new Set(Object.values(m.modifier_keys));
+		const thumbs = new Set(m.thumb_keys);
 		return Object.keys(m.fingerings.standard)
 			.filter((code) => !modifiers.has(code))
-			.concat(m.thumb_keys);
+			.concat(m.thumb_keys)
+			.concat(m.board_only_keys.filter((code) => !thumbs.has(code)));
 	}
 
 	/**

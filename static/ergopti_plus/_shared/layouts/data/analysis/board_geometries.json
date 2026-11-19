@@ -1,5 +1,5 @@
 {
-	"_description": "Keyboards beyond the row-staggered ISO and ANSI boards (physical_keys.json): ortholinear, split and column-staggered ergonomic boards with thumb clusters. For each: the centre of each key in key units (19.05 mm) and its logical row (rank in its column, the home row being 3, thumb keys 5), the default finger of each key and each finger's home key. Imported on 2026-11-14 from QMK's layout file (key positions) and default keymap (which key code each position types); « placed » lists the modifiers the default keymap lacks and where they were put, and the thumb keys of the model (thumb_keys of analysis_model.json: NonConvert for the left thumb, Convert and KanaMode for the right) on free thumb keys beside the space bar and AltGr, added on 2026-11-19 for the layouts that put a letter on a thumb key. A key code the board lacks is reported per layout by the engine. Decided by the agent, to review by the maintainer.",
+	"_description": "Keyboards beyond the row-staggered ISO and ANSI boards (physical_keys.json): ortholinear, split and column-staggered ergonomic boards with thumb clusters. For each: the centre of each key in key units (19.05 mm) and its logical row (rank in its column, the home row being 3, thumb keys 5), the default finger of each key and each finger's home key. Imported on 2026-11-14 from QMK's layout file (key positions) and default keymap (which key code each position types); « placed » lists the modifiers the default keymap lacks and where they were put, and the thumb keys of the model (thumb_keys of analysis_model.json: NonConvert for the left thumb, Convert and KanaMode for the right) on free thumb keys beside the space bar and AltGr, added on 2026-11-19 for the layouts that put a letter on a thumb key. A key code the board lacks is reported per layout by the engine. The ErgoDox has every key of its QMK layout since 2026-11-19, coded by KLA's ErgoDox QWERTY (its Minus and Equal on the inner number-row keys, Backquote, BracketLeft, BracketRight and Quote below the letters), the keys with no KeyboardEvent code on the model's board-only codes (board_only_keys of analysis_model.json; LeftOuterBottom and RightOuterBottom at the Shift keys' place: the character a tapped Shift key types); « outer_keys » names a board's own outer columns, which replace the model's there. Decided by the agent, to review by the maintainer.",
 	"schema_version": 1,
 	"boards": {
 		"corne": {
@@ -602,11 +602,12 @@
 				"fetched": "2026-11-14",
 				"placed": [
 					"AltRight (AltGr) on the nearest free right thumb key (KC_ENT)",
-					"The thumb keys of the thumb-letter layouts, on QMK layout keys: NonConvert on the left thumb key 71, Convert on the right thumb key 74, KanaMode on the right thumb key 73 (2026-11-19)"
+					"The thumb keys of the thumb-letter layouts, on QMK layout keys: NonConvert on the left thumb key 71, Convert on the right thumb key 74, KanaMode on the right thumb key 73 (2026-11-19)",
+					"Every other key (2026-11-19), coded by KLA's ErgoDox QWERTY key set (common/pat/keyboard/js/kb.js, KB.keySet.ergodox.qwerty), which the layout files follow: Minus and Equal on the inner number-row keys (QMK KC_LEFT, KC_RGHT), Backquote, BracketLeft, BracketRight and Quote on the row below the letters; QMK's own Equal, Minus, Quote and Backquote keys and the keys with no KeyboardEvent code take the model's board-only codes (board_only_keys of analysis_model.json); LeftOuterBottom and RightOuterBottom are the character the Shift keys type when tapped, as QMK's mod-tap does"
 				]
 			},
 			"keys": {
-				"Equal": {
+				"LeftOuterNumber": {
 					"x": 0.75,
 					"y": 0.875,
 					"w": 1.5,
@@ -642,6 +643,18 @@
 					"w": 1,
 					"row": 1
 				},
+				"Minus": {
+					"x": 7,
+					"y": 0.75,
+					"w": 1,
+					"row": 1
+				},
+				"Equal": {
+					"x": 10,
+					"y": 0.75,
+					"w": 1,
+					"row": 1
+				},
 				"Digit6": {
 					"x": 11,
 					"y": 0.75,
@@ -672,11 +685,17 @@
 					"w": 1,
 					"row": 1
 				},
-				"Minus": {
+				"RightOuterNumber": {
 					"x": 16.25,
 					"y": 0.875,
 					"w": 1.5,
 					"row": 1
+				},
+				"LeftOuterTop": {
+					"x": 0.75,
+					"y": 1.875,
+					"w": 1.5,
+					"row": 2
 				},
 				"KeyQ": {
 					"x": 2,
@@ -705,6 +724,18 @@
 				"KeyT": {
 					"x": 6,
 					"y": 1.75,
+					"w": 1,
+					"row": 2
+				},
+				"LeftInnerTop": {
+					"x": 7,
+					"y": 2,
+					"w": 1,
+					"row": 2
+				},
+				"RightInnerTop": {
+					"x": 10,
+					"y": 2,
 					"w": 1,
 					"row": 2
 				},
@@ -743,6 +774,12 @@
 					"y": 1.875,
 					"w": 1.5,
 					"row": 2
+				},
+				"LeftOuterHome": {
+					"x": 0.75,
+					"y": 2.875,
+					"w": 1.5,
+					"row": 3
 				},
 				"KeyA": {
 					"x": 2,
@@ -804,13 +841,19 @@
 					"w": 1,
 					"row": 3
 				},
-				"Quote": {
+				"RightOuterHome": {
 					"x": 16.25,
 					"y": 2.875,
 					"w": 1.5,
 					"row": 3
 				},
 				"ShiftLeft": {
+					"x": 0.75,
+					"y": 3.875,
+					"w": 1.5,
+					"row": 4
+				},
+				"LeftOuterBottom": {
 					"x": 0.75,
 					"y": 3.875,
 					"w": 1.5,
@@ -843,6 +886,18 @@
 				"KeyB": {
 					"x": 6,
 					"y": 3.75,
+					"w": 1,
+					"row": 4
+				},
+				"LeftInnerBottom": {
+					"x": 7,
+					"y": 3.5,
+					"w": 1,
+					"row": 4
+				},
+				"RightInnerBottom": {
+					"x": 10,
+					"y": 3.5,
 					"w": 1,
 					"row": 4
 				},
@@ -882,32 +937,86 @@
 					"w": 1.5,
 					"row": 4
 				},
-				"Backquote": {
+				"RightOuterBottom": {
+					"x": 16.25,
+					"y": 3.875,
+					"w": 1.5,
+					"row": 4
+				},
+				"LeftLowerOuter": {
 					"x": 1,
 					"y": 4.875,
 					"w": 1,
 					"row": 5
 				},
+				"LeftLowerPinky": {
+					"x": 2,
+					"y": 4.875,
+					"w": 1,
+					"row": 5
+				},
+				"LeftLowerRing": {
+					"x": 3,
+					"y": 4.625,
+					"w": 1,
+					"row": 5
+				},
+				"LeftLowerMiddle": {
+					"x": 4,
+					"y": 4.5,
+					"w": 1,
+					"row": 5
+				},
+				"Backquote": {
+					"x": 5,
+					"y": 4.625,
+					"w": 1,
+					"row": 5
+				},
+				"RightLowerIndex": {
+					"x": 12,
+					"y": 4.625,
+					"w": 1,
+					"row": 5
+				},
 				"BracketLeft": {
+					"x": 13,
+					"y": 4.5,
+					"w": 1,
+					"row": 5
+				},
+				"BracketRight": {
 					"x": 14,
 					"y": 4.625,
 					"w": 1,
 					"row": 5
 				},
-				"BracketRight": {
+				"Quote": {
 					"x": 15,
 					"y": 4.875,
 					"w": 1,
 					"row": 5
 				},
-				"Space": {
-					"x": 5.5,
-					"y": 7,
+				"RightLowerOuter": {
+					"x": 16,
+					"y": 4.875,
 					"w": 1,
 					"row": 5
 				},
-				"AltRight": {
-					"x": 11.5,
+				"LeftThumbUpperOuter": {
+					"x": 6.5,
+					"y": 5.5,
+					"w": 1,
+					"row": 5
+				},
+				"LeftThumbUpperInner": {
+					"x": 7.5,
+					"y": 5.5,
+					"w": 1,
+					"row": 5
+				},
+				"Space": {
+					"x": 5.5,
 					"y": 7,
 					"w": 1,
 					"row": 5
@@ -918,9 +1027,33 @@
 					"w": 1,
 					"row": 5
 				},
-				"Convert": {
+				"LeftThumbMiddle": {
+					"x": 7.5,
+					"y": 6.5,
+					"w": 1,
+					"row": 5
+				},
+				"LeftThumbLower": {
+					"x": 7.5,
+					"y": 7.5,
+					"w": 1,
+					"row": 5
+				},
+				"RightThumbUpperInner": {
+					"x": 9.5,
+					"y": 5.5,
+					"w": 1,
+					"row": 5
+				},
+				"RightThumbUpperOuter": {
 					"x": 10.5,
-					"y": 7,
+					"y": 5.5,
+					"w": 1,
+					"row": 5
+				},
+				"RightThumbMiddle": {
+					"x": 9.5,
+					"y": 6.5,
 					"w": 1,
 					"row": 5
 				},
@@ -929,32 +1062,50 @@
 					"y": 7.5,
 					"w": 1,
 					"row": 5
+				},
+				"Convert": {
+					"x": 10.5,
+					"y": 7,
+					"w": 1,
+					"row": 5
+				},
+				"AltRight": {
+					"x": 11.5,
+					"y": 7,
+					"w": 1,
+					"row": 5
 				}
 			},
 			"fingers": {
-				"Equal": "lp",
+				"LeftOuterNumber": "lp",
 				"Digit1": "lp",
 				"Digit2": "lr",
 				"Digit3": "lm",
 				"Digit4": "li",
 				"Digit5": "li",
+				"Minus": "li",
+				"Equal": "ri",
 				"Digit6": "ri",
 				"Digit7": "ri",
 				"Digit8": "rm",
 				"Digit9": "rr",
 				"Digit0": "rp",
-				"Minus": "rp",
+				"RightOuterNumber": "rp",
+				"LeftOuterTop": "lp",
 				"KeyQ": "lp",
 				"KeyW": "lr",
 				"KeyE": "lm",
 				"KeyR": "li",
 				"KeyT": "li",
+				"LeftInnerTop": "li",
+				"RightInnerTop": "ri",
 				"KeyY": "ri",
 				"KeyU": "ri",
 				"KeyI": "rm",
 				"KeyO": "rr",
 				"KeyP": "rp",
 				"Backslash": "rp",
+				"LeftOuterHome": "lp",
 				"KeyA": "lp",
 				"KeyS": "lr",
 				"KeyD": "lm",
@@ -965,27 +1116,45 @@
 				"KeyK": "rm",
 				"KeyL": "rr",
 				"Semicolon": "rp",
-				"Quote": "rp",
+				"RightOuterHome": "rp",
 				"ShiftLeft": "lp",
+				"LeftOuterBottom": "lp",
 				"KeyZ": "lp",
 				"KeyX": "lr",
 				"KeyC": "lm",
 				"KeyV": "li",
 				"KeyB": "li",
+				"LeftInnerBottom": "li",
+				"RightInnerBottom": "ri",
 				"KeyN": "ri",
 				"KeyM": "ri",
 				"Comma": "rm",
 				"Period": "rr",
 				"Slash": "rp",
 				"ShiftRight": "rp",
-				"Backquote": "lp",
-				"BracketLeft": "rp",
-				"BracketRight": "rp",
+				"RightOuterBottom": "rp",
+				"LeftLowerOuter": "lp",
+				"LeftLowerPinky": "lp",
+				"LeftLowerRing": "lr",
+				"LeftLowerMiddle": "lm",
+				"Backquote": "li",
+				"RightLowerIndex": "ri",
+				"BracketLeft": "rm",
+				"BracketRight": "rr",
+				"Quote": "rp",
+				"RightLowerOuter": "rp",
+				"LeftThumbUpperOuter": "lt",
+				"LeftThumbUpperInner": "lt",
 				"Space": "lt",
-				"AltRight": "rt",
 				"NonConvert": "lt",
+				"LeftThumbMiddle": "lt",
+				"LeftThumbLower": "lt",
+				"RightThumbUpperInner": "rt",
+				"RightThumbUpperOuter": "rt",
+				"RightThumbMiddle": "rt",
+				"KanaMode": "rt",
 				"Convert": "rt",
-				"KanaMode": "rt"
+				"AltRight": "rt"
 			},
 			"home_keys": {
 				"lp": "KeyA",
@@ -998,7 +1167,19 @@
 				"rp": "Semicolon",
 				"lt": "Space",
 				"rt": "AltRight"
-			}
+			},
+			"outer_keys": [
+				"LeftOuterNumber",
+				"LeftOuterTop",
+				"LeftOuterHome",
+				"LeftOuterBottom",
+				"LeftLowerOuter",
+				"RightOuterNumber",
+				"Backslash",
+				"RightOuterHome",
+				"RightOuterBottom",
+				"RightLowerOuter"
+			]
 		},
 		"moonlander": {
 			"name": "ZSA Moonlander",

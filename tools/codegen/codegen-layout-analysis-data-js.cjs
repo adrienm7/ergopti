@@ -1039,9 +1039,9 @@ function buildInfoSources(engine) {
 /**
  * The split, ortholinear and column-staggered boards, checked against the
  * model: every key has a position, a row and a known finger; every finger has
- * its home key on the board; the held modifiers exist.
+ * its home key on the board; the held modifiers and its own outer keys exist.
  * @param {object} model - analysis_model.json.
- * @returns {object} board id → {name, source, keys, fingers, home_keys}.
+ * @returns {object} board id → {name, source, keys, fingers, home_keys, outer_keys?}.
  * @throws {Error} On a board the engine could not measure.
  */
 function buildBoards(model) {
@@ -1061,6 +1061,9 @@ function buildBoards(model) {
 				throw new Error(`board ${id}: no home key for ${finger}`);
 		for (const code of Object.values(model.modifier_keys))
 			if (!board.keys[code]) throw new Error(`board ${id}: no ${code}`);
+		// A board's own outer columns replace the model's outer_keys on it.
+		for (const code of board.outer_keys || [])
+			if (!board.keys[code]) throw new Error(`board ${id}: outer key ${code} is not on it`);
 	}
 	return boards;
 }
@@ -1171,8 +1174,9 @@ function checkThumbKeys(model) {
 	const thumbs = new Set(['lt', 'rt']);
 	if (!Array.isArray(model.thumb_keys) || model.thumb_keys.length === 0)
 		throw new Error('thumb_keys: none');
+	const boardOnly = new Set(model.board_only_keys);
 	for (const code of model.thumb_keys) {
-		if (!physical[code]) throw new Error(`thumb_keys: unknown key ${code}`);
+		if (!physical[code] && !boardOnly.has(code)) throw new Error(`thumb_keys: unknown key ${code}`);
 		if (model.fingerings.standard[code]) throw new Error(`thumb_keys: ${code} is on ISO and ANSI`);
 	}
 	for (const code of model.thumb_rest_keys)
@@ -1185,6 +1189,33 @@ function checkThumbKeys(model) {
 		for (const code of model.thumb_keys)
 			if (fingers[code] !== undefined && !thumbs.has(fingers[code]))
 				throw new Error(`thumb_keys: ${code} is pressed by ${fingers[code]}, not a thumb`);
+}
+
+/**
+ * Rejects board-only keys (board_only_keys: the keys of a board that have no
+ * KeyboardEvent code, docs/design/layout-analysis.md « ErgoDox keys ») that
+ * could be mistaken for a physical key or measured nowhere: none is a code of
+ * the drivers' registry (physical_keys.json) or of a row-staggered keyboard,
+ * each is on a board, and each one a thumb presses is a thumb key.
+ * @param {object} model - analysis_model.json.
+ * @throws {Error} On a broken board-only key.
+ */
+function checkBoardOnlyKeys(model) {
+	const physical = JSON.parse(fs.readFileSync(PHYSICAL_KEYS_PATH, 'utf8')).keys;
+	const boards = JSON.parse(fs.readFileSync(BOARDS_PATH, 'utf8')).boards;
+	if (!Array.isArray(model.board_only_keys)) throw new Error('board_only_keys: not a list');
+	const row = new Set(fingeredCodes(model));
+	for (const code of model.board_only_keys) {
+		if (physical[code]) throw new Error(`board_only_keys: ${code} is a physical key`);
+		if (row.has(code)) throw new Error(`board_only_keys: ${code} is on a row-staggered keyboard`);
+		const on = Object.values(boards).filter((board) => board.fingers[code] !== undefined);
+		if (on.length === 0) throw new Error(`board_only_keys: ${code} is on no board`);
+		for (const board of on)
+			if (['lt', 'rt'].includes(board.fingers[code]) && !model.thumb_keys.includes(code))
+				throw new Error(`board_only_keys: ${code} is pressed by a thumb but no thumb key`);
+	}
+	if (new Set(model.board_only_keys).size !== model.board_only_keys.length)
+		throw new Error('board_only_keys: a code twice');
 }
 
 /**
@@ -1268,6 +1299,7 @@ function buildData() {
 	checkSimilarScoreGap(model);
 	checkThumbKeys(model);
 	checkChangePenalty(weights.change_penalty);
+	checkBoardOnlyKeys(model);
 	delete model._description;
 	return {
 		schema_version: 1,

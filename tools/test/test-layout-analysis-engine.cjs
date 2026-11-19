@@ -3254,10 +3254,17 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		onIso.incomplete && onIso.coverage.missingRequired.includes('t'),
 		'thumb keys: a thumb t is not missing on ISO'
 	);
-	// JIS has them physically, on its own thumbs.
+	// JIS has them physically, on its own thumbs: its three, not the
+	// ErgoDox's board-only thumb keys (board_only_keys).
 	const jis = E.keyboard('jis');
+	const boardOnly = new Set(sandbox.LAYOUT_ANALYSIS_DATA.model.board_only_keys);
 	check(
-		E.thumbKeys().every((code) => jis.index.has(code)) &&
+		E.thumbKeys()
+			.filter((code) => !boardOnly.has(code))
+			.every((code) => jis.index.has(code)) &&
+			E.thumbKeys()
+				.filter((code) => boardOnly.has(code))
+				.every((code) => !jis.index.has(code)) &&
 			jis.finger[jis.index.get('NonConvert')] === 4 &&
 			jis.finger[jis.index.get('Convert')] === 5,
 		'thumb keys: JIS lacks its thumb keys or their thumbs'

@@ -272,6 +272,12 @@ const QWERTY_CODE = {
 	']': 'BracketRight',
 	"'": 'Quote'
 };
+// The ErgoDox finger keys KLA's QWERTY gives no character take the model's
+// board-only codes (board_only_keys, docs/design/layout-analysis.md « ErgoDox
+// keys »): the outer columns, the inner 1.5-unit keys, the Shift keys'
+// tapped character (40, 53) and the row below the letters.
+const KLA_ERGODOX_BOARD_ONLY =
+	'0 LeftOuterNumber 13 RightOuterNumber 14 LeftOuterTop 20 LeftInnerTop 21 RightInnerTop 28 LeftOuterHome 39 RightOuterHome 40 LeftOuterBottom 46 LeftInnerBottom 47 RightInnerBottom 53 RightOuterBottom 54 LeftLowerOuter 55 LeftLowerPinky 56 LeftLowerRing 57 LeftLowerMiddle 59 RightLowerIndex 63 RightLowerOuter';
 const klaErgodoxExpected = {};
 const klaErgodoxTokens = KLA_ERGODOX_QWERTY.split(' ');
 for (let i = 0; i < klaErgodoxTokens.length; i += 2) {
@@ -279,6 +285,17 @@ for (let i = 0; i < klaErgodoxTokens.length; i += 2) {
 	klaErgodoxExpected[klaErgodoxTokens[i]] =
 		QWERTY_CODE[char] ?? (/[0-9]/.test(char) ? `Digit${char}` : `Key${char.toUpperCase()}`);
 }
+const boardOnlyTokens = KLA_ERGODOX_BOARD_ONLY.split(' ');
+for (let i = 0; i < boardOnlyTokens.length; i += 2)
+	klaErgodoxExpected[boardOnlyTokens[i]] = boardOnlyTokens[i + 1];
+for (const code of Object.values(klaErgodoxExpected))
+	check(
+		DATA.boards.ergodox.keys[code] !== undefined,
+		`KLA ErgoDox: ${code} is not a key of the ErgoDox board`
+	);
+// Every finger key (0-63) has a code.
+for (let index = 0; index < 64; index++)
+	check(klaErgodoxExpected[index] !== undefined, `KLA ErgoDox: index ${index} has no code`);
 check(
 	JSON.stringify(F.KLA_KEYS.ergodox) === JSON.stringify(klaErgodoxExpected),
 	`KLA ErgoDox key indexes differ from KLA's own key set: ${JSON.stringify(F.KLA_KEYS.ergodox)}`
@@ -419,8 +436,8 @@ check(
 	`Kalamine qwerty-prog: ${JSON.stringify(prog.layout.rows.KeyQ)} ${JSON.stringify(prog.unmapped)}`
 );
 // KLA's own built-in layouts, one per board: the home row each one types, and
-// the keys only KLA's ErgoDox board has (index 39, its QWERTY Enter, among
-// them) named as unread instead of dropped.
+// what they leave unread (the ErgoDox's keys without a KeyboardEvent code,
+// its outer key 39 among them, read to the model's board-only keys).
 const klaThirdParty = {
 	'kla-european.azerty.json': { name: 'AZERTY', home: 'qsdfghjklm', unmapped: [] },
 	'kla-european.bepo.json': { name: 'BÉPO', home: 'auie,ctsrn', unmapped: [] },
@@ -429,10 +446,12 @@ const klaThirdParty = {
 		home: 'aoeiudhtns',
 		unmapped: []
 	},
+	// Its outer keys 0, 13 and 39 and its right big thumb key 75 (a second
+	// space) have codes now: nothing is left unread.
 	'kla-ergodox.workman.json': {
 		name: 'Ergodox/Workman/Cub',
 		home: 'ashtgyneoi',
-		unmapped: ['key:0 (~ `)', 'key:13 (= +)', 'key:39 (- _)', 'key:75 ( )']
+		unmapped: []
 	}
 };
 const HOME_ROW = [
@@ -460,6 +479,38 @@ for (const [file, expected] of Object.entries(klaThirdParty)) {
 		`${file}: ${result.format} « ${result.layout.name} », home row ${home}, unread ${JSON.stringify(unmapped)}`
 	);
 	klaResults.push([file, result]);
+}
+// The ErgoDox Workman's outer keys as KLA's file states them: « ~ ` » left of
+// 1 (index 0), « = + » right of 0 (13), « - _ » right of the home row (39),
+// and its second space on the right big outer thumb key (75) is the space bar.
+{
+	const workman = klaResults.find(([file]) => file === 'kla-ergodox.workman.json')[1].layout;
+	check(
+		JSON.stringify(workman.rows.LeftOuterNumber) === '["~","`",null,null]' &&
+			JSON.stringify(workman.rows.RightOuterNumber) === '["=","+",null,null]' &&
+			JSON.stringify(workman.rows.RightOuterHome) === '["-","_",null,null]' &&
+			workman.rows.Space[0] === ' ',
+		`KLA ErgoDox Workman: its outer keys read ${JSON.stringify(workman.rows)}`
+	);
+	// Written back, it goes on the ErgoDox board, each key at its index with
+	// the ErgoDox's finger of that key, and reads to the same layout.
+	const written = F.toKla(workman, DATA.model.fingerings.standard);
+	const back = F.fromKla(JSON.parse(JSON.stringify(written)));
+	const KLA_FINGER = { lp: 1, lr: 2, lm: 3, li: 4, lt: 5, rt: 6, ri: 7, rm: 8, rr: 9, rp: 10 };
+	check(
+		written.keyboardType === 'ergodox' &&
+			written.keys[0].primary === '~'.codePointAt(0) &&
+			written.keys[39].primary === '-'.codePointAt(0) &&
+			back.unmapped.length === 0 &&
+			canonical(back.layout) === canonical(workman),
+		`KLA ErgoDox Workman: the ErgoDox export does not read back: ${JSON.stringify(back.layout.rows)}`
+	);
+	// The finger keys (the thumbs' space bar is the left one's, 66).
+	for (const [index, code] of Object.entries(F.KLA_KEYS.ergodox).filter(([i]) => i < 64))
+		check(
+			written.keys[index].finger === KLA_FINGER[DATA.boards.ergodox.fingers[code]],
+			`KLA ErgoDox export: key ${index} (${code}) has finger ${written.keys[index].finger}, the board ${DATA.boards.ergodox.fingers[code]}`
+		);
 }
 // The library's KLA layouts are the reader's reading of KLA's published files
 // (tools/build/import-kla-layouts.cjs): the codegen keeps every key and level
@@ -1498,18 +1549,28 @@ async function checkLinks() {
 			gold.unmapped.length === 0,
 		`thumb keys: the Gold file reads ${JSON.stringify(gold.layout.rows)} ${JSON.stringify(gold.unmapped)}`
 	);
-	// A third right thumb key has no code: it is named, not dropped; the big
-	// keys (74, 75) take Convert before the small one (72) takes KanaMode.
+	// Three right thumb keys (every ErgoDox key, 2026-11-19): a key whose own
+	// code is a thumb code keeps it (73, KanaMode), a board-only thumb key
+	// keeps its own (72, RightThumbMiddle), and a big key with neither (75,
+	// AltGr's) takes the code its thumb left free (Convert); nothing is lost.
 	const many = F.fromKla(
 		thumbFile([key(66, 32, 5), key(72, 45, 6), key(75, 101, 6), key(73, 120, 6)])
 	);
 	check(
 		many.layout.rows.NonConvert[0] === ' ' &&
 			many.layout.rows.Convert[0] === 'e' &&
-			many.layout.rows.KanaMode[0] === '-' &&
-			many.unmapped.length === 1 &&
-			/^73 \(x\)$/.test(many.unmapped[0].detail),
-		`thumb keys: the big keys first, the extra named: ${JSON.stringify(many.layout.rows)} ${JSON.stringify(many.unmapped)}`
+			many.layout.rows.KanaMode[0] === 'x' &&
+			many.layout.rows.RightThumbMiddle[0] === '-' &&
+			many.unmapped.length === 0,
+		`thumb keys: each thumb key on its own code, the big key on the free one: ${JSON.stringify(many.layout.rows)} ${JSON.stringify(many.unmapped)}`
+	);
+	// A letter on the left big outer key beside a space on the inner one has
+	// no code of its own (the board keeps Space there): it is named.
+	const outerLetter = F.fromKla(thumbFile([key(66, 117, 5), key(67, 32, 5), key(74, 32, 6)]));
+	check(
+		outerLetter.layout.rows.NonConvert[0] === ' ' &&
+			outerLetter.unmapped.some((entry) => /^66 \(u\)$/.test(entry.detail)),
+		`thumb keys: the left big outer key's letter: ${JSON.stringify(outerLetter.layout.rows)} ${JSON.stringify(outerLetter.unmapped)}`
 	);
 	// The space alone on the thumbs reads as before: the shared space bar.
 	const plain = F.fromKla(thumbFile([key(66, 32, 5), key(74, 32, 6)]));
@@ -1541,12 +1602,32 @@ async function checkLinks() {
 			canonical(back.layout) === canonical(gold.layout),
 		`thumb keys: the ErgoDox export does not read back: ${JSON.stringify(back.layout.rows)}`
 	);
-	// The reader's thumb codes are the model's.
+	// The reader's thumb codes are the model's: the three every thumb board
+	// has, then the ErgoDox's board-only thumb keys (its upper pairs and small
+	// columns), each on the ErgoDox board under a thumb.
 	const codes = ['NonConvert', 'Convert', 'KanaMode'];
+	const ergodoxThumbs = DATA.model.board_only_keys.filter((code) =>
+		['lt', 'rt'].includes(DATA.boards.ergodox.fingers[code])
+	);
 	check(
-		JSON.stringify(DATA.model.thumb_keys) === JSON.stringify(codes) &&
+		JSON.stringify(DATA.model.thumb_keys) === JSON.stringify(codes.concat(ergodoxThumbs)) &&
+			ergodoxThumbs.length === 7 &&
 			JSON.stringify(DATA.model.thumb_rest_keys) === JSON.stringify(codes.slice(0, 2)),
-		`thumb keys: the model's ${DATA.model.thumb_keys} are not the KLA reader's ${codes}`
+		`thumb keys: the model's ${DATA.model.thumb_keys} are not the KLA reader's ${codes} and the ErgoDox's ${ergodoxThumbs}`
+	);
+	// A space key's AltGr digit (Hands Down XKCD: « ␣ » and « 0 » on 74) makes
+	// no thumb letter: the file reads the space bar, and a key 66 that types
+	// no space (its Enter with « = ») is not the space bar but named.
+	const xkcdFile = thumbFile([
+		{ id: 66, primary: 13, shift: -1, altGr: 61, shiftAltGr: -1, finger: 5 },
+		{ id: 74, primary: 32, shift: -1, altGr: 48, shiftAltGr: -1, finger: 6 }
+	]);
+	const xkcdRead = F.fromKla(xkcdFile);
+	check(
+		JSON.stringify(xkcdRead.layout.rows.Space) === '[" ",null,"0",null]' &&
+			!xkcdRead.layout.rows.Convert &&
+			xkcdRead.unmapped.some((entry) => /^66 \(=\)$/.test(entry.detail)),
+		`thumb keys: a space key's AltGr digit reads ${JSON.stringify(xkcdRead.layout.rows)} ${JSON.stringify(xkcdRead.unmapped)}`
 	);
 }
 

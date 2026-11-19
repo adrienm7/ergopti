@@ -458,6 +458,75 @@ board's missing number row.
   score on both French corpora and the eleven keyboards, bit for bit; of the
   50 with one, 49 moved on the six boards that have thumb keys.
 
+**ErgoDox keys** (maintainer, 2026-11-19: « Complete the model »; the codes,
+the Shift keys and the thumb rule decided by the agent, to review by the
+maintainer). The `ergodox` board has every key of the ErgoDox EZ (QMK's
+`LAYOUT_ergodox_pretty`, 76 positions), coded by the convention of KLA's
+ErgoDox QWERTY (`KB.keySet.ergodox.qwerty`), which KLA, KLAnext and Hands
+Down's files follow: Minus and Equal on the inner keys of the number row,
+Backslash right of P, Backquote, BracketLeft, BracketRight and Quote on the
+row below the letters (Backquote under the left index, the three others
+under the right middle, ring and pinky). QMK's default keymap puts Equal,
+Minus, Quote and Backquote on the outer keys instead; the board followed it
+until then, so every layout's ErgoDox values changed with this convention.
+
+- The keys with no KeyboardEvent code take **board-only codes**
+  (`board_only_keys` of `analysis_model.json`): `LeftOuterNumber`,
+  `LeftOuterTop`, `LeftOuterHome`, `RightOuterNumber`, `RightOuterHome` (the
+  pinkies' outer columns), `LeftInnerTop`, `LeftInnerBottom`,
+  `RightInnerTop`, `RightInnerBottom` (the index's 1.5-unit inner keys, rows
+  2 and 4), `LeftLowerOuter`, `LeftLowerPinky`, `LeftLowerRing`,
+  `LeftLowerMiddle`, `RightLowerIndex`, `RightLowerOuter` (the row below the
+  letters, by the finger column each sits under), the thumb keys
+  `LeftThumbUpperOuter`, `LeftThumbUpperInner`, `LeftThumbMiddle`,
+  `LeftThumbLower`, `RightThumbUpperInner`, `RightThumbUpperOuter`,
+  `RightThumbMiddle`, and the Shift keys' tapped characters below.
+- They are analysis-only names: never in `physical_keys.json`, the drivers'
+  registry, whose every record needs a scan code, an evdev code and a macOS
+  keycode, nor on the row-staggered keyboards (the codegen's
+  `checkBoardOnlyKeys` refuses either). The registry's F13–F24 would have
+  named another key; Tab or CapsLock would give a character key a
+  modifier's name. A layout with characters there is measured on the
+  ErgoDox; on another keyboard they are on a key it lacks, so unsupported
+  (a letter there makes the layout incomplete), as the thumb keys are on ISO.
+- **Letters on the Shift keys.** Many files put a letter (q, z, j) on the
+  ErgoDox's outer bottom keys, where the board holds Shift. They read as
+  QMK's mod-tap does it (`LSFT_T(KC_Q)`): tapped the key types its
+  character, held it is Shift. The character takes `LeftOuterBottom` or
+  `RightOuterBottom`, at the Shift key's own place and finger; ShiftLeft and
+  ShiftRight stay the Shift the engine measures. A held Shift never types
+  its own hand's letter (a left-hand character takes ShiftRight), so the two
+  uses never meet. The drawings skip the modifiers, so the place shows the
+  character. The other boards keep their Shift keys as modifiers only.
+- The 7 board-only thumb keys are also `thumb_keys` (pairs, reach from the
+  nearest rest key, the optimizer's `thumbKeys`), present on the ErgoDox
+  only. In a thumb-letter file a thumb key keeps its own code when it is a
+  thumb code (67 NonConvert, 74 Convert, 73 KanaMode) or a board-only thumb
+  key; the other typed keys of that thumb take its thumb codes left free,
+  big keys first, as before. The left 2-unit outer key (66) holds the
+  board's Space: a letter there, beside a space on the inner key, has no
+  code and is named unread (KLAnext's Einbinder, VCKB, VCKB2 and Yp Hina Fu
+  stay out for it).
+- The board names its own outer columns (`outer_keys` in
+  `board_geometries.json`: both pinky columns and the two outer keys of the
+  row below), which replace the model's `outer_keys` there.
+- The reader maps every KLA ErgoDox index to these codes
+  (`LAYOUT_FORMATS.KLA_KEYS.ergodox`), and `toKla` writes a layout with a
+  board-only or thumb key on the ErgoDox board, each key at its index with
+  the board's finger. A thumb key drawing only action signs (⌦ ⇞ ⌘,
+  `KLA_ACTION_SIGN`) types nothing and is named unread; KLA's key code 127
+  (Delete) and the C1 controls type nothing. A space key whose other levels
+  hold a digit (Hands Down XKCD's « ␣ » with « 0 » on AltGr) no longer makes
+  a thumb-letter file, and an ErgoDox space-bar index that types no space is
+  not read as Space.
+- The model change alone left every value on the ten other keyboards
+  bit for bit (710 layouts, two French corpora); on the ErgoDox 1376 of its
+  1420 rows moved. Reading the 22 library layouts taken from ErgoDox files
+  again moved 17 of them; on the other keyboards only Hands Down Extreme
+  (its thumb's AltGr « ; » instead of « : »), Enne P 111 69 (its thumb
+  symbols on their own upper keys instead of Convert) and Blickensderfer 5
+  (its space on the space bar again, complete on ISO) changed.
+
 **Fingering profiles.** `keyboard(id, profile)` and `analyse(…, {profile})`
 take a user model of the hand: `{id, name, base: 'standard'|'angle',
 fingers: {code: finger}, home: {finger: code}}`. The base fingering and the

@@ -497,7 +497,11 @@ check(
 const THUMBS = E.thumbKeys();
 const onThumbs = (layout) =>
 	THUMBS.filter((code) => (layout.rows[code] || []).some((cell) => cell !== null));
-check(THUMBS.length === 3, `the model has three thumb keys, not ${THUMBS.join(' ')}`);
+// Three on every thumb board, then the ErgoDox's seven board-only ones.
+check(
+	THUMBS.length === 10 && THUMBS.slice(0, 3).join() === 'NonConvert,Convert,KanaMode',
+	`the model has the three thumb keys and the ErgoDox's seven, not ${THUMBS.join(' ')}`
+);
 const noThumbs = search(azerty, {}, { start: 'random' });
 check(
 	everyLayout(noThumbs, (layout) => onThumbs(layout).length === 0),
