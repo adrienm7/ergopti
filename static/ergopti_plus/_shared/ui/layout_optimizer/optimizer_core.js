@@ -5,9 +5,9 @@
  * MODULE: Layout Optimizer Core
  * DESCRIPTION:
  * Searches key arrangements for the one the layout analysis engine
- * (layout_analysis/analysis_engine.js) scores best on a corpus: simulated
- * annealing over swaps of character pairs, with several restarts, under the
- * constraints the user chose. The score of an arrangement is always the
+ * (layout_analysis/analysis_engine.js) scores best on a corpus: a local
+ * search over swaps of character pairs (simulated annealing by default),
+ * with several restarts, under the constraints the user chose. The score of an arrangement is always the
  * engine's own global score (analyse(...).score.total) with the user's
  * weights: this module measures nothing itself. The design note is
  * docs/design/layout-optimizer.md.
@@ -28,7 +28,13 @@
  *    them (thumbKeys).
  * 4. Restarts are independent and numbered: restart k draws from its own seed,
  *    so a page may run them in parallel workers and keep the same result.
- * 5. Fail fast: an impossible constraint throws an OptimizerError with a
+ * 5. One interface, several search methods (METHODS): simulated annealing,
+ *    late-acceptance hill climbing, tabu search, a steady-state genetic
+ *    algorithm and best-improvement hill climbing with kicks. Each is a pair
+ *    begin(run) / iterate(run, fraction) over the same restarts, scorer,
+ *    change penalty and constraints; one iteration is one scored trial, so
+ *    an iteration budget is the same work for every method.
+ * 6. Fail fast:an impossible constraint throws an OptimizerError with a
  *    stable code the page shows in the reader's language.
  * ==============================================================================
  */
@@ -118,6 +124,42 @@ var LAYOUT_OPTIMIZER = (function () {
 	const SHUFFLE_SWAPS_PER_UNIT = 20;
 	// Scores kept per layout signature: annealing revisits arrangements.
 	const CACHE_LIMIT = 20000;
+
+	// The search methods a run may use (createSearch's `method`), in the order
+	// the page lists them; the design note's benchmark chose the default.
+	const METHODS = Object.freeze([
+		'annealing',
+		'late_acceptance',
+		'tabu',
+		'genetic',
+		'hill_climbing'
+	]);
+	const DEFAULT_METHOD = 'annealing';
+	// A move counts as an improvement only past this gain: the incremental
+	// score of one arrangement may differ in its last bits by the path to it.
+	const IMPROVEMENT_EPSILON = 1e-9;
+	// Late acceptance: a candidate is kept when it beats the current
+	// arrangement or the one this many trials ago (Burke and Bykov, 2017).
+	const LATE_ACCEPTANCE_HISTORY = 50;
+	// Tabu search: random valid swaps drawn and scored per move, the best of
+	// them made even when it loses; the two units it moves may not move again
+	// for a quarter of the movable units' count, within these bounds.
+	const TABU_CANDIDATES = 24;
+	const TABU_TENURE_MIN = 3;
+	const TABU_TENURE_MAX = 12;
+	// Genetic algorithm (steady state): the population, the tournament that
+	// picks each parent, the chance a child is a crossover of two parents
+	// (else a copy of the first), the chance of each further mutation swap
+	// after the first, and the most swaps that make a seed individual from
+	// the start.
+	const GENETIC_POPULATION = 24;
+	const GENETIC_TOURNAMENT = 3;
+	const GENETIC_CROSSOVER = 0.7;
+	const GENETIC_MORE_MUTATION = 0.5;
+	const GENETIC_SEED_SWAPS = 8;
+	// Hill climbing: random valid swaps that kick a local optimum before the
+	// next climb (an iterated local search from the restart's best optimum).
+	const HILL_KICK_SWAPS = 3;
 
 	/** A refusal with a stable code the page translates (layout_optimizer.error.<code>). */
 	class OptimizerError extends Error {
@@ -947,24 +989,65 @@ var LAYOUT_OPTIMIZER = (function () {
 	}
 
 	/**
-	 * A resumable annealing run over several restarts.
+	 * A valid arrangement whose every unit sits where parent a or parent b
+	 * has it (cycle crossover): each cycle of the two permutations comes
+	 * whole from one parent, drawn at random. Any constraint a place puts on
+	 * its unit (allowed) therefore holds without repair, and the fixed units,
+	 * on the same slot in both parents, stay there.
+	 * @param {number[]} a - Slot index → unit index.
+	 * @param {number[]} b - The other parent, a permutation of the same units.
+	 * @param {function(): number} next - The generator.
+	 * @returns {number[]}
+	 */
+	function cycleCrossover(a, b, next) {
+		const slotInA = slotsOf(a);
+		const child = new Array(a.length).fill(-1);
+		for (let s = 0; s < a.length; s++) {
+			if (child[s] !== -1) continue;
+			const from = next() < 0.5 ? a : b;
+			let at = s;
+			do {
+				child[at] = from[at];
+				at = slotInA[b[at]];
+			} while (at !== s);
+		}
+		return child;
+	}
+
+	/**
+	 * A resumable search over several restarts.
 	 * @param {object} p - From problem().
-	 * @param {{objective: function(object): number, seed?: number, restarts?: number,
-	 *   firstRestart?: number, iterations?: number, start?: 'layout'|'random',
-	 *   timeBudgetMs?: number, now?: function(): number}} settings - objective scores a
-	 *   layout (higher is better, engineObjective); iterations is per restart;
-	 *   restarts firstRestart… firstRestart+restarts-1 run (a page splits them
-	 *   between workers); start: every restart from the start layout, or each
-	 *   from its own random arrangement; timeBudgetMs bounds the whole run, and
-	 *   the cooling then follows the clock (now, Date.now by default).
+	 * @param {{objective: function(object): number, method?: string, seed?: number,
+	 *   restarts?: number, firstRestart?: number, iterations?: number,
+	 *   start?: 'layout'|'random', timeBudgetMs?: number, now?: function(): number}} settings -
+	 *   objective scores a layout (higher is better, engineObjective); method is
+	 *   one of METHODS (DEFAULT_METHOD); iterations is per restart, one scored
+	 *   trial each; restarts firstRestart… firstRestart+restarts-1 run (a page
+	 *   splits them between workers); start: every restart from the start
+	 *   layout, or each from its own random arrangement; timeBudgetMs bounds
+	 *   the whole run, and the annealing's cooling then follows the clock (now,
+	 *   Date.now by default).
 	 * @returns {{step: function(number): object, done: function(): boolean, result: function(): object}}
 	 */
 	function createSearch(p, settings) {
 		const s = Object.assign(
-			{ seed: 1, restarts: 1, firstRestart: 0, iterations: 2000, start: 'layout' },
+			{
+				seed: 1,
+				restarts: 1,
+				firstRestart: 0,
+				iterations: 2000,
+				start: 'layout',
+				method: DEFAULT_METHOD
+			},
 			settings
 		);
 		if (typeof s.objective !== 'function') throw new Error('layout_optimizer: no objective');
+		if (!METHODS.includes(s.method))
+			throw new OptimizerError(
+				'option_value',
+				{ option: 'method' },
+				`method is one of ${METHODS.join(', ')}`
+			);
 		if (!(Number.isInteger(s.restarts) && s.restarts >= 1))
 			throw new OptimizerError('option_value', { option: 'restarts' }, 'restarts ≥ 1');
 		if (!(Number.isInteger(s.iterations) && s.iterations >= 0))
@@ -1026,7 +1109,294 @@ var LAYOUT_OPTIMIZER = (function () {
 		let run = null;
 		let stopped = false;
 
-		/** Prepares restart k: its generator, start and temperature. */
+		/** Keeps an arrangement as the best when it beats it. */
+		const offer = (value, engineScore, assignment, k) => {
+			if (value > best.score)
+				best = { score: value, engine: engineScore, assignment: assignment.slice(), restart: k };
+		};
+		/** Scores the run's arrangement with units a and b traded, and leaves them traded. */
+		const tryPair = (r, a, b) => {
+			swap(r.assignment, r.slotOf, a, b);
+			const engineScore = score(r.assignment);
+			const moved = r.follow ? r.follow.trial(a, b) : 0;
+			return { engineScore, value: objectiveOf(engineScore, moved) };
+		};
+		/** Keeps the trade tryPair left: the run now stands on it. */
+		const keepPair = (r, a, b, value, engineScore) => {
+			r.current = value;
+			if (r.follow) r.follow.swap(a, b);
+			accept(r.assignment);
+			offer(value, engineScore, r.assignment, r.k);
+		};
+		/** Moves the run onto a whole arrangement (a kick, a child) and scores it. */
+		const standOn = (r, assignment) => {
+			r.assignment = assignment;
+			r.slotOf = slotsOf(assignment);
+			r.follow = follows ? cost.tracker(assignment) : null;
+			const engineScore = score(assignment);
+			r.current = objectiveOf(engineScore, r.follow ? r.follow.moved() : 0);
+			accept(assignment);
+			offer(r.current, engineScore, assignment, r.k);
+			return engineScore;
+		};
+		/** Random valid swaps of an arrangement, in place, within the change limit. */
+		const kicked = (assignment, swaps, next) => {
+			const slotOf = slotsOf(assignment);
+			const follow = p.options.maxChanges === null ? null : homeTracker(p, assignment);
+			for (let i = 0; i < swaps; i++) {
+				const pair = pickSwap(p, assignment, slotOf, next, follow);
+				if (!pair) continue;
+				if (follow) follow.swap(pair[0], pair[1]);
+				swap(assignment, slotOf, pair[0], pair[1]);
+			}
+			return assignment;
+		};
+		/** The objective of a whole arrangement, scored on its own (no session move). */
+		const valueOf = (assignment) => {
+			const engineScore = score(assignment);
+			return {
+				engineScore,
+				value: objectiveOf(engineScore, follows ? cost.moved(assignment) : 0)
+			};
+		};
+
+		const strategy = {
+			/**
+			 * Simulated annealing: a random valid swap, kept when it is better or
+			 * with probability e^(Δ/T); T falls geometrically from T₀, set by the
+			 * mean worsening of CALIBRATION_SWAPS swaps, to T₀ × FINAL_TEMPERATURE_RATIO.
+			 */
+			annealing: {
+				begin(r) {
+					let worse = 0;
+					let counted = 0;
+					for (let i = 0; i < CALIBRATION_SWAPS; i++) {
+						const pair = pickSwap(p, r.assignment, r.slotOf, r.next, r.follow);
+						if (!pair) break;
+						swap(r.assignment, r.slotOf, pair[0], pair[1]);
+						const moved = r.follow ? r.follow.trial(pair[0], pair[1]) : 0;
+						const delta = objectiveOf(score(r.assignment), moved) - r.current;
+						swap(r.assignment, r.slotOf, pair[0], pair[1]);
+						if (delta < 0) {
+							worse += -delta;
+							counted += 1;
+						}
+					}
+					r.t0 = counted > 0 ? worse / counted / Math.LN2 : 1;
+					r.temperature = r.t0;
+				},
+				iterate(r, fraction) {
+					r.temperature = r.t0 * Math.pow(FINAL_TEMPERATURE_RATIO, fraction);
+					const pair = pickSwap(p, r.assignment, r.slotOf, r.next, r.follow);
+					if (!pair) return;
+					const trial = tryPair(r, pair[0], pair[1]);
+					const delta = trial.value - r.current;
+					if (delta >= 0 || r.next() < Math.exp(delta / r.temperature))
+						keepPair(r, pair[0], pair[1], trial.value, trial.engineScore);
+					else swap(r.assignment, r.slotOf, pair[0], pair[1]);
+				}
+			},
+
+			/**
+			 * Late-acceptance hill climbing: a random valid swap, kept when it is
+			 * no worse than the current arrangement or than the current one
+			 * LATE_ACCEPTANCE_HISTORY trials ago; one parameter, no schedule.
+			 */
+			late_acceptance: {
+				begin(r) {
+					r.history = new Array(LATE_ACCEPTANCE_HISTORY).fill(r.current);
+				},
+				iterate(r) {
+					const pair = pickSwap(p, r.assignment, r.slotOf, r.next, r.follow);
+					if (!pair) return;
+					const slot = r.iteration % LATE_ACCEPTANCE_HISTORY;
+					const trial = tryPair(r, pair[0], pair[1]);
+					if (trial.value >= r.current || trial.value >= r.history[slot])
+						keepPair(r, pair[0], pair[1], trial.value, trial.engineScore);
+					else swap(r.assignment, r.slotOf, pair[0], pair[1]);
+					if (r.current > r.history[slot]) r.history[slot] = r.current;
+				}
+			},
+
+			/**
+			 * Tabu search on a candidate list: TABU_CANDIDATES random valid swaps
+			 * are scored, and the best one whose units are not tabu (or that beats
+			 * the best arrangement found, the aspiration) is made, even when it
+			 * loses; its two units are tabu for the tenure.
+			 */
+			tabu: {
+				begin(r) {
+					r.tabuUntil = new Array(p.units.length).fill(0);
+					r.tenure = Math.min(
+						TABU_TENURE_MAX,
+						Math.max(TABU_TENURE_MIN, Math.floor(p.movable.length / 4))
+					);
+					r.moves = 0;
+					r.candidates = null;
+				},
+				iterate(r) {
+					if (r.candidates === null) r.candidates = { tried: 0, best: null };
+					const list = r.candidates;
+					list.tried += 1;
+					const pair = pickSwap(p, r.assignment, r.slotOf, r.next, r.follow);
+					if (pair) {
+						const [a, b] = pair;
+						const trial = tryPair(r, a, b);
+						swap(r.assignment, r.slotOf, a, b);
+						const tabu = r.tabuUntil[a] > r.moves || r.tabuUntil[b] > r.moves;
+						if (
+							(!tabu || trial.value > best.score) &&
+							(!list.best || trial.value > list.best.value)
+						)
+							list.best = { a, b, value: trial.value, engineScore: trial.engineScore };
+					}
+					if (list.tried < TABU_CANDIDATES) return;
+					r.candidates = null;
+					r.moves += 1;
+					if (!list.best) return;
+					const { a, b, value, engineScore } = list.best;
+					swap(r.assignment, r.slotOf, a, b);
+					keepPair(r, a, b, value, engineScore);
+					r.tabuUntil[a] = r.moves + r.tenure;
+					r.tabuUntil[b] = r.moves + r.tenure;
+				}
+			},
+
+			/**
+			 * A steady-state genetic algorithm: a population seeded from the
+			 * restart's start (mutants of it, or random arrangements), then one
+			 * child per trial: two parents by tournament, cycle crossover
+			 * (cycleCrossover, which keeps every constraint) or a copy, one or
+			 * more mutation swaps; the child replaces the worst individual when
+			 * it beats it, never one of the GENETIC_ELITE best (elitism), and
+			 * never joins twice.
+			 */
+			genetic: {
+				begin(r) {
+					r.population = [
+						{ assignment: r.assignment.slice(), value: r.current, key: r.assignment.join(',') }
+					];
+					r.keys = new Set([r.population[0].key]);
+				},
+				iterate(r) {
+					const population = r.population;
+					let child;
+					if (population.length < GENETIC_POPULATION) {
+						child =
+							s.start === 'random'
+								? shuffled(p, r.next)
+								: kicked(p.start.slice(), 1 + Math.floor(r.next() * GENETIC_SEED_SWAPS), r.next);
+					} else {
+						const pick = () => {
+							let winner = population[Math.floor(r.next() * population.length)];
+							for (let i = 1; i < GENETIC_TOURNAMENT; i++) {
+								const rival = population[Math.floor(r.next() * population.length)];
+								if (rival.value > winner.value) winner = rival;
+							}
+							return winner;
+						};
+						const first = pick();
+						const second = pick();
+						child =
+							r.next() < GENETIC_CROSSOVER
+								? cycleCrossover(first.assignment, second.assignment, r.next)
+								: first.assignment.slice();
+						const limit = p.options.maxChanges;
+						if (limit !== null && changedUnits(p, child).length > limit)
+							child = first.assignment.slice();
+						let swaps = 1;
+						while (r.next() < GENETIC_MORE_MUTATION) swaps += 1;
+						kicked(child, swaps, r.next);
+					}
+					const key = child.join(',');
+					if (r.keys.has(key)) return;
+					const { value, engineScore } = valueOf(child);
+					// The session follows the children, which stay near one another.
+					accept(child);
+					offer(value, engineScore, child, r.k);
+					const entry = { assignment: child, value, key };
+					if (population.length < GENETIC_POPULATION) population.push(entry);
+					else {
+						// Only the worst is ever replaced: every better individual survives (elitism).
+						population.sort((x, y) => y.value - x.value);
+						const worst = population[population.length - 1];
+						if (value <= worst.value) return;
+						r.keys.delete(worst.key);
+						population[population.length - 1] = entry;
+					}
+					r.keys.add(key);
+					if (value > r.current) {
+						r.current = value;
+						r.assignment = child.slice();
+						r.slotOf = slotsOf(r.assignment);
+					}
+				}
+			},
+
+			/**
+			 * Best-improvement hill climbing: every valid swap of the arrangement
+			 * is scored, in an order the restart's generator shuffles, and the
+			 * best gain is made; at a local optimum, the restart's best optimum
+			 * is kicked by HILL_KICK_SWAPS random swaps and the climb starts again.
+			 */
+			hill_climbing: {
+				begin(r) {
+					r.scan = null;
+					r.optimum = { value: r.current, assignment: r.assignment.slice() };
+				},
+				iterate(r) {
+					if (r.scan === null) r.scan = { pairs: neighbours(r), at: 0, best: null };
+					const scan = r.scan;
+					if (scan.at < scan.pairs.length) {
+						const [a, b] = scan.pairs[scan.at];
+						scan.at += 1;
+						const trial = tryPair(r, a, b);
+						swap(r.assignment, r.slotOf, a, b);
+						if (
+							trial.value > r.current + IMPROVEMENT_EPSILON &&
+							(!scan.best || trial.value > scan.best.value)
+						)
+							scan.best = { a, b, value: trial.value, engineScore: trial.engineScore };
+						if (scan.at < scan.pairs.length) return;
+					}
+					r.scan = null;
+					if (scan.best) {
+						const { a, b, value, engineScore } = scan.best;
+						swap(r.assignment, r.slotOf, a, b);
+						keepPair(r, a, b, value, engineScore);
+						return;
+					}
+					if (r.current > r.optimum.value)
+						r.optimum = { value: r.current, assignment: r.assignment.slice() };
+					standOn(r, kicked(r.optimum.assignment.slice(), HILL_KICK_SWAPS, r.next));
+				}
+			}
+		}[s.method];
+
+		/** Every valid swap of the run's arrangement, shuffled by its generator. */
+		function neighbours(r) {
+			const limit = p.options.maxChanges;
+			const pairs = [];
+			const units = p.movable;
+			for (let i = 0; i < units.length; i++)
+				for (let j = i + 1; j < units.length; j++) {
+					const a = units[i];
+					const b = units[j];
+					if (p.units[a].kind === 'empty' && p.units[b].kind === 'empty') continue;
+					if (!allowed(p, a, r.slotOf[b]) || !allowed(p, b, r.slotOf[a])) continue;
+					if (limit !== null && r.follow.unitsAfter(a, b) > limit) continue;
+					pairs.push([a, b]);
+				}
+			for (let i = pairs.length - 1; i > 0; i--) {
+				const j = Math.floor(r.next() * (i + 1));
+				const held = pairs[i];
+				pairs[i] = pairs[j];
+				pairs[j] = held;
+			}
+			return pairs;
+		}
+
+		/** Prepares restart k: its generator, start and the method's own state. */
 		function begin(k) {
 			const next = random(restartSeed(s.seed, k));
 			const assignment = s.start === 'random' ? shuffled(p, next) : p.start.slice();
@@ -1035,36 +1405,10 @@ var LAYOUT_OPTIMIZER = (function () {
 			const engineScore = score(assignment);
 			const current = objectiveOf(engineScore, follow ? follow.moved() : 0);
 			accept(assignment);
-			// The mean worsening of a few random swaps sets the first temperature.
-			let worse = 0;
-			let counted = 0;
-			for (let i = 0; i < CALIBRATION_SWAPS; i++) {
-				const pair = pickSwap(p, assignment, slotOf, next, follow);
-				if (!pair) break;
-				swap(assignment, slotOf, pair[0], pair[1]);
-				const moved = follow ? follow.trial(pair[0], pair[1]) : 0;
-				const delta = objectiveOf(score(assignment), moved) - current;
-				swap(assignment, slotOf, pair[0], pair[1]);
-				if (delta < 0) {
-					worse += -delta;
-					counted += 1;
-				}
-			}
-			const t0 = counted > 0 ? worse / counted / Math.LN2 : 1;
-			run = {
-				k,
-				next,
-				assignment,
-				slotOf,
-				follow,
-				current,
-				iteration: 0,
-				t0,
-				began: timed ? now() : 0,
-				temperature: t0
-			};
-			if (current > best.score)
-				best = { score: current, engine: engineScore, assignment: assignment.slice(), restart: k };
+			run = { k, next, assignment, slotOf, follow, current, iteration: 0, temperature: 0 };
+			strategy.begin(run);
+			run.began = timed ? now() : 0;
+			offer(current, engineScore, assignment, k);
 		}
 
 		function finished() {
@@ -1097,28 +1441,9 @@ var LAYOUT_OPTIMIZER = (function () {
 					run = null;
 					continue;
 				}
-				run.temperature = run.t0 * Math.pow(FINAL_TEMPERATURE_RATIO, fraction);
 				run.iteration += 1;
 				left -= 1;
-				const pair = pickSwap(p, run.assignment, run.slotOf, run.next, run.follow);
-				if (!pair) continue;
-				swap(run.assignment, run.slotOf, pair[0], pair[1]);
-				const engineScore = score(run.assignment);
-				const moved = run.follow ? run.follow.trial(pair[0], pair[1]) : 0;
-				const value = objectiveOf(engineScore, moved);
-				const delta = value - run.current;
-				if (delta >= 0 || run.next() < Math.exp(delta / run.temperature)) {
-					run.current = value;
-					if (run.follow) run.follow.swap(pair[0], pair[1]);
-					accept(run.assignment);
-					if (value > best.score)
-						best = {
-							score: value,
-							engine: engineScore,
-							assignment: run.assignment.slice(),
-							restart: run.k
-						};
-				} else swap(run.assignment, run.slotOf, pair[0], pair[1]);
+				strategy.iterate(run, fraction);
 			}
 			return progress();
 		}
@@ -1151,6 +1476,7 @@ var LAYOUT_OPTIMIZER = (function () {
 			 */
 			result(identity) {
 				return {
+					method: s.method,
 					score: best.score,
 					engineScore: best.engine,
 					startScore,
@@ -1191,6 +1517,8 @@ var LAYOUT_OPTIMIZER = (function () {
 
 	return {
 		DEFAULT_OPTIONS,
+		METHODS,
+		DEFAULT_METHOD,
 		QWERTY_PIN_PRESETS,
 		NUMBER_ROW,
 		OptimizerError,
