@@ -1107,6 +1107,76 @@ macOS only). What each host needs:
   physical shortcuts page does not load theme.css, so the seed has no style
   to apply there.
 
+## Tenth pass, the Studio's markup and keyboard (2026-11-19, Paris time)
+
+The same requests on the Studio pages under `static/ergopti_plus/_shared/ui/`
+(the Comparer and its panels, the editor and its app window, the Optimiser,
+the layout manager, the composer and the layer editor), counted in their HTML
+and in the DOM their scripts build.
+
+| Folder                 | div and span before |   After | Interactive before |
+| ---------------------- | ------------------: | ------: | -----------------: |
+| `layout_analysis`      |                 263 |      76 |                 16 |
+| `layout_editor`        |                  76 |      22 |                  2 |
+| `layout_editor_window` |                   5 |       0 |                  0 |
+| `layout_optimizer`     |                  82 |      45 |                  0 |
+| `layout_manager`       |                  18 |       0 |                  0 |
+| **Total**              |             **444** | **143** |             **18** |
+
+« Interactive » counts the divs and spans the shared judgement refuses
+outright (a pointer handler, an interactive or computed role, a tabindex):
+the Comparer's chart rows played buttons, its tables' scroll boxes and heat
+keys took the focus. In the rendered pages the Comparer went from 376 div and
+3074 span to 41 and 984, the editor from 102 and 287 to 75 and 358 (the
+analysis panel's table cells), the Optimiser from 44 and 22 to 30 and 0.
+
+- **Markup.** Sections with their heading, header and footer, lists, dl
+  tiles, native tables for every bar figure (their rows laid out as grids,
+  their roles kept for WebKit), fieldset and legend, output for live values,
+  data for shares, kbd for keys, b, small and strong for inline text, a
+  `<dialog>` for the editor's question and the « i » popover, `main` for the
+  layout manager. Every UA style a new tag adds is reset by class, and
+  screenshots in light and dark at 320 and 1280 px match before and after
+  (run-time text and timings aside).
+- **Keyboard.** The Comparer's chart rows and table rows open a layout from
+  a native name button; its tabs, the editor's tool, layer and document tabs
+  and the Optimiser's tabs follow the tabs pattern (one stop, arrows, Home,
+  End); the editor's board, the fingering map and the Optimiser's boards are
+  toolbars of key buttons walked with the arrows, a key swapped without a
+  drag (2.5.7); the « i » popovers open with Enter inside a row, close with
+  Escape and give the focus back even after the panel redraws; renders keep
+  the focus on the same control.
+- **Reading.** The app's Studio window and the layout manager now load
+  `a11y_prefs.js` after the theme, as the site's Studio pages did, so the
+  hyperlegible font, the larger text, the wider spacing and reduced motion
+  reach them. The layout manager's muted text, links and filled buttons
+  reach AA in both themes (35 axe nodes, removed from the app windows
+  baseline).
+- **Gates.** `tools/test/test-studio-semantic-html.cjs` is the Studio scope
+  of the shared judgement (`lib/semantic-markup.cjs`), with its reader
+  `lib/studio-markup.cjs` (HTML, template strings and builder calls,
+  followed through their variable) and `studio-semantic-html-allowlist.json`
+  (97 entries, 143 elements, each with its kind and reason).
+  `tools/test/browser/studio-keyboard.playwright.cjs` now opens every tab of
+  each page's main tab list (the Comparer's on a link naming four layouts, a
+  fresh visit ranking some 650 rows) and on each runs the shared operability
+  judgement and widget driver, a focus indicator at every stop, the rendered
+  images check (`lib/page-images.cjs`) and its tab lists' single stop, Home
+  and End. `tools/test/test-studio-reading-preferences.cjs` requires the
+  preferences script on the five Studio pages.
+- **Proof by revert.** On the pages before this pass the semantic gate finds
+  444 unjustified elements, 18 of them interactive; the keyboard gate's
+  report lists the chart rows answering to the pointer only, the editor's
+  nine-stop tool tabs, the Optimiser's End key and the « i » popovers'
+  focus return; the reading check fails on the Studio window.
+
+Left: the Comparer's ranking table on a fresh visit offers some 11,000 Tab
+stops (650 rows of percentile chips), one grid stop with arrow keys would
+fit it; the heat board's keys are images read in their table, no longer
+stops; the editor's « + level » buttons sit inside its levels tab list; the
+board's arrow keys have no visible hint (a new string in 21 locales); the
+fingering map's scroll box is a stop of its own beside the map.
+
 ## What remains
 
 The open items live in TODO.md, section « Full accessibility ». The rows of
