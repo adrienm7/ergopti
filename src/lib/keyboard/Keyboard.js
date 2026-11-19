@@ -107,8 +107,13 @@ export class Keyboard {
 
 		// A click on a key switches the layer; the keyboard does it with the
 		// layer select of the drawing's controls (KeyboardControlButtonLayer),
-		// which the keyboard operability gate checks is there.
-		if (get(stores_infos[this.id])['controls'] === 'yes')
+		// which the keyboard operability gate checks is there. A drawing shown
+		// without its controls keeps static keys: a click there was the one way
+		// to change the layer, which no key could do.
+		const layerSwitching =
+			get(stores_infos[this.id])['controls'] === 'yes' &&
+			document.getElementById('keyboard-layer-' + this.id) !== null;
+		if (layerSwitching)
 			this.location.setAttribute('data-keyboard-equivalent', '#keyboard-layer-' + this.id);
 		else this.location.removeAttribute('data-keyboard-equivalent');
 
@@ -133,7 +138,7 @@ export class Keyboard {
 					this.postProcessingKey(key);
 
 					// Functionality to switch layer by clicking on a key
-					if (get(stores_infos[this.id])['controls'] === 'yes') {
+					if (layerSwitching) {
 						key.addEventListener(
 							'click',
 							() => {
