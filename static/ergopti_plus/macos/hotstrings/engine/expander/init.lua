@@ -116,6 +116,7 @@ M.DEFAULT_STATE = {
 	preview_autocorrect_enabled = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_AUTOCORRECT_ENABLED),
 	preview_ai_enabled          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_AI_ENABLED),
 	preview_colored_tooltips    = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS),
+	preview_category_glyphs     = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_CATEGORY_GLYPHS),
 	magic_key_source            = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_MAGIC_KEY_SOURCE),
 }
 
@@ -1067,6 +1068,7 @@ M.set_preview_star_enabled        = LLMBridge.set_preview_star_enabled
 M.set_preview_autocorrect_enabled = LLMBridge.set_preview_autocorrect_enabled
 M.set_preview_ai_enabled          = LLMBridge.set_preview_ai_enabled
 M.set_preview_colored_tooltips    = LLMBridge.set_preview_colored_tooltips
+M.set_preview_category_glyphs     = LLMBridge.set_preview_category_glyphs
 
 M.trigger_prediction = LLMBridge._perform_llm_check
 M.request_manual_prediction = LLMBridge.request_manual_prediction

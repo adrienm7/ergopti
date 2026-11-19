@@ -133,11 +133,29 @@ function M.build_management(ctx)
 		["preview_colored_ready"] = function() return true end,
 	})
 	if colored_row then table.insert(bubble_sub, colored_row) end
+	local GLYPHS = require("settings.engine.keys").LEAF.PREVIEW_CATEGORY_GLYPHS
+	local glyph_row = ManifestMenu.check_row("preview_glyphs_control", GLYPHS, {
+		[GLYPHS] = function()
+			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview(GLYPHS) ~= true then
+				return false
+			end
+			ctx.notify_feature(i18n.get("menu.hotstrings.notify_bubble_glyphs"), state.preview_category_glyphs)
+			ctx.updateMenu()
+			return true
+		end,
+	}, {
+		[require("settings.engine.keys").KEY.HOTSTRINGS_PREVIEW_CATEGORY_GLYPHS] = function()
+			return state.preview_category_glyphs == true
+		end,
+		["preview_glyphs_ready"] = function() return true end,
+	})
+	local glyph_rows = glyph_row and { glyph_row } or {}
 
 	local preview_rows = ManifestMenu.template_rows("hotstrings_preview_frame", {}, {}, {
 		["parameter_preview_magic"] = function() return preview_magic_rows end,
 		["parameter_preview_presence"] = function() return preview_presence_rows end,
 		["parameter_preview_colored"] = function() return bubble_sub end,
+		["parameter_preview_glyphs"] = function() return glyph_rows end,
 	})
 	if not preview_rows then return nil end
 	-- The preview and delay rows run while paused: a pause stops typing, not

@@ -72,7 +72,10 @@ local SAFETY_TIMEOUT_SEC      = nil
 M.settings = {
 	timeout_sec          = 0,
 	llm_timeout_sec      = 0,
-	colorization_enabled = true
+	colorization_enabled = true,
+	-- The category glyph beside each preview row's trigger label
+	-- (hotstrings.preview_category_glyphs); set by the menu's switch.
+	category_glyphs_enabled = true,
 }
 
 -- Accent colors per display context — loaded from TOML [accent_colors].
@@ -119,6 +122,13 @@ end
 function M.set_colorization_enabled(enabled)
 	M.settings.colorization_enabled = (enabled == true)
 	Logger.info(LOG, "Colorization explicitly set to: " .. tostring(M.settings.colorization_enabled) .. ".")
+end
+
+--- Shows or hides the category glyph of the hotstring previews.
+--- @param enabled boolean
+function M.set_category_glyphs_enabled(enabled)
+	M.settings.category_glyphs_enabled = (enabled == true)
+	Logger.info(LOG, "Category glyphs explicitly set to: " .. tostring(M.settings.category_glyphs_enabled) .. ".")
 end
 
 --- Applies a table of configuration parameters.
@@ -187,6 +197,24 @@ function M.tint(key)
 	end
 
 	return M.accent_colors[key]
+end
+
+--- The category glyph of a display context and the i18n key that names it,
+--- resolved like the tint through the same category; nil when the glyph switch
+--- is off or the key has no category. resolve() is memoised, so this costs a
+--- table lookup on the preview path.
+--- @param key string The context key ("hotstring_star", …).
+--- @return string|nil glyph
+--- @return string|nil name_key
+function M.glyph(key)
+	if not M.settings.category_glyphs_enabled then return nil, nil end
+	local category = TINT_KEY_TO_CATEGORY[key]
+	if not category then return nil, nil end
+	local ok, hs_cfg = pcall(require, "hotstrings.engine.catalogue.config")
+	if not ok or type(hs_cfg) ~= "table" or type(hs_cfg.resolve) ~= "function" then return nil, nil end
+	local resolved = hs_cfg.resolve(category, nil)
+	if type(resolved) ~= "table" then return nil, nil end
+	return resolved.glyph, resolved.glyph_name_key
 end
 
 --- Overrides the accent color for a given tooltip display context.

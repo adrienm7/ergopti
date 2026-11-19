@@ -205,4 +205,13 @@ helpers.describe("preview: the rows describe the outcome the engine will produce
 				.. "the pending expansion instead of firing it")
 	end)
 
+	helpers.it("gives each row the glyph of the category its tint comes from", function()
+		local code = builder_code():gsub("%-%-[^\n]*", "")
+		local lookup = code:find("local glyph,%s*glyph_name_key%s*=%s*tooltip%.glyph%(tint_key%)")
+		helpers.assert_true(lookup ~= nil,
+			"the glyph must come from the tint's own category, so the shape and the colour agree")
+		helpers.assert_true(code:find("glyph%s*=%s*glyph,") ~= nil and code:find("glyph_name_key%s*=%s*glyph_name_key") ~= nil,
+			"the row must carry the glyph and the key that names it to VoiceOver")
+	end)
+
 end)

@@ -21,6 +21,7 @@ local AXResponsiveness = require("adapters.accessibility_permission")
 local SharedTint   = require("core.ui.engine.tooltip.tint")
 local SystemA11y   = require("core.ui.adapters.system_accessibility")
 local SharedLayout = require("core.ui.engine.tooltip.layout")
+local CategoryGlyph = require("hotstrings.engine.category_glyph")
 
 -- Corner arc radius for ALL tooltip rounding (single + stacked canvases). Read
 -- from the shared cross-driver source (_shared/core/ui/data/tooltip/constants.toml → Config)
@@ -463,7 +464,13 @@ function M.announcement_for_stacked(rows)
 	for _, row in ipairs(type(rows) == "table" and rows or {}) do
 		if type(row) == "table" and type(row.text) == "string" and row.text ~= "" and not row.dimmed then
 			local label = type(row.trigger_label) == "string" and row.trigger_label ~= "" and (" " .. row.trigger_label) or ""
-			parts[#parts + 1] = row.text .. label
+			-- The glyph is a shape a screen reader cannot describe usefully: it is
+			-- named by its category instead, and only when the row shows one.
+			local category = ""
+			if type(row.glyph) == "string" and row.glyph ~= "" and type(row.glyph_name_key) == "string" then
+				category = ", " .. require("core.i18n.engine.i18n").get(row.glyph_name_key)
+			end
+			parts[#parts + 1] = row.text .. label .. category
 		end
 	end
 	if #parts == 0 then return nil end
@@ -761,7 +768,10 @@ end
 M._measure_styled = measure_styled
 
 --- Renders a stack of hotstring rows into a single canvas.
---- Each row is { text: string, tint: table|nil, trigger_label: string|nil }.
+--- Each row is { text: string, tint: table|nil, trigger_label: string|nil,
+--- glyph: string|nil }. The label drawn at the right is the category glyph, a
+--- space, then the trigger label (CategoryGlyph.row_label), in the label's font
+--- and colour so the glyph keeps the label's contrast on every tint.
 --- @param rows table Array of row descriptors.
 --- @param state table Must contain fixed_width (or nil) and timeout_sec.
 --- @param start_watchers_callback function|nil Called after canvas is shown.
@@ -788,6 +798,7 @@ function M.render_stacked(rows, state, start_watchers_callback)
 		local max_label_w  = 0
 		local row_heights  = {}
 		local label_heights = {}
+		local labels       = {}
 
 		-- Dimmed (non-firing) alternative rows use a gray, strikethrough style so
 		-- the user can still read them but understands they will NOT be sent.
@@ -813,8 +824,10 @@ function M.render_stacked(rows, state, start_watchers_callback)
 			local sz = measure_styled(temp_canvas, 2, row.text, "main", build_text_style(row.dimmed))
 			if sz.w > max_text_w then max_text_w = sz.w end
 			table.insert(row_heights, sz.h)
-			if row.trigger_label and row.trigger_label ~= "" then
-				local lsz = measure_styled(temp_canvas, 2, row.trigger_label, "hint", {
+			local label = CategoryGlyph.row_label(row.glyph, row.trigger_label)
+			table.insert(labels, label)
+			if label ~= "" then
+				local lsz = measure_styled(temp_canvas, 2, label, "hint", {
 					font  = { name = Config.fonts.main, size = Config.sizes.hint },
 					color = { white = 0.45, alpha = 1 },
 				})
@@ -908,14 +921,14 @@ function M.render_stacked(rows, state, start_watchers_callback)
 			-- Vertically centred relative to the main text row height.
 			-- The label is pulled further down (alpha 0.25 vs 0.45) on dimmed
 			-- rows so the whole row reads as "disabled" together.
-			if row.trigger_label and row.trigger_label ~= "" and label_zone > 0 then
+			if labels[i] ~= "" and label_zone > 0 then
 				local label_x      = pad_x + max_text_w + label_gap
 				local label_h      = label_heights[i] > 0 and label_heights[i] or row_heights[i]
 				local label_offset = math.floor((row_heights[i] - label_h) / 2)
 				local label_color  = row.dimmed and { white = 0.45, alpha = 0.55 }
 					or { white = 0.45, alpha = 1 }
 				M.stacked_canvas[base + 3].action = "fill"
-				M.stacked_canvas[base + 3].text   = hs.styledtext.new(row.trigger_label, {
+				M.stacked_canvas[base + 3].text   = hs.styledtext.new(labels[i], {
 					font  = { name = Config.fonts.main, size = Config.sizes.hint },
 					color = label_color,
 				})

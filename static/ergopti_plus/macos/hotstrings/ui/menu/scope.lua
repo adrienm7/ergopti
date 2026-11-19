@@ -64,6 +64,7 @@ local OWNERS = {
 	{ key = require("settings.engine.keys").LEAF.PREVIEW_STAR_ENABLED, setter = "set_preview_star_enabled" },
 	{ key = require("settings.engine.keys").LEAF.PREVIEW_AUTOCORRECT_ENABLED, setter = "set_preview_autocorrect_enabled" },
 	{ key = require("settings.engine.keys").LEAF.PREVIEW_COLORED_TOOLTIPS, setter = "set_preview_colored_tooltips" },
+	{ key = require("settings.engine.keys").LEAF.PREVIEW_CATEGORY_GLYPHS, setter = "set_preview_category_glyphs" },
 	{ key = require("settings.engine.keys").LEAF.PREVIEW_AI_ENABLED, setter = "set_preview_ai_enabled" },
 	{ key = "dynamichotstrings_enabled" },
 	-- The date feature row's enabled leaf (hotstrings.dynamic.date.enabled since

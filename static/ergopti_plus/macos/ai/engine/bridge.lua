@@ -625,6 +625,20 @@ function M.set_preview_colored_tooltips(v)
 	return true
 end
 
+--- Shows or hides the category glyph beside each preview row's trigger label.
+--- Delegates to the tooltip module, which owns the flag, after revoking the
+--- visible preview so no bubble keeps the old look.
+--- @param v boolean
+function M.set_preview_category_glyphs(v)
+	if M.invalidate_hotstring_preview() ~= true then
+		Logger.error(LOG, "Category glyph change refused because the active preview could not be revoked.")
+		return false
+	end
+	tooltip.set_category_glyphs_enabled(v == true)
+	Logger.debug(LOG, "Category glyphs: %s.", v and "on" or "off")
+	return true
+end
+
 --- Overrides the accent tint for ★ hotstring tooltips.
 --- @param color table|nil RGBA table, or nil to restore the default.
 function M.set_preview_star_color(color)
@@ -1055,6 +1069,10 @@ local function update_preview_body(buf)
 				if not min_timeout or row_timeout < min_timeout then
 					min_timeout = row_timeout
 				end
+				-- The category glyph rides beside the trigger label, from the same
+				-- category as the tint, so a reader who cannot tell the tints apart
+				-- still tells the categories apart; nil when its switch is off.
+				local glyph, glyph_name_key = tooltip.glyph(tint_key)
 				rows[#rows + 1] = {
 					-- Masked when the value is a declared secret, in full otherwise.
 					-- Which fields are secrets, and how much of one stays visible, is
@@ -1068,6 +1086,8 @@ local function update_preview_body(buf)
 					-- accept Enter, but advertising Enter is false whenever that
 					-- terminator is disabled; magic is the action actually resolved.
 					trigger_label = validates_magic and magic_key or "↵",
+					glyph         = glyph,
+					glyph_name_key = glyph_name_key,
 					dimmed        = not m.is_winner,
 					duration      = row_timeout,
 					expires_at    = m.expires_at,
