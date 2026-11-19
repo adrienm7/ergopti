@@ -8,7 +8,8 @@
 ; driver once a saved .ahk settles. These tests pin the exact-root resolution,
 ; the derived root of a Git checkout only, that the variable wins, that a
 ; compiled build ignores both, that test and generated files never reload, and
-; that a change reloads once, after a quiet poll.
+; that a change reloads once, after a quiet poll; a burst of many files after
+; the whole tree settled, and never while Git rewrites the tree.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -16,6 +17,19 @@
 global _DST_Reloads := 0
 global _DST_Arms := []
 global _DST_Driver := "C:\clone\static\ergopti_plus\windows"
+global _DST_Clock := 1000
+
+_DST_Now() {
+	global _DST_Clock
+	return _DST_Clock
+}
+
+; Advances the fake clock by one poll and runs it.
+_DST_Poll(Ms := DEV_SOURCE_POLL_MS) {
+	global _DST_Clock
+	_DST_Clock += Ms
+	_DevSourceWatcherTick()
+}
 
 ; A scratch driver tree with one source, one test and one generated file.
 _DST_Tree() {
@@ -161,8 +175,8 @@ _DST_ReloadsOnce() {
 	_DST_Arms := []
 	Root := _DST_Tree()
 	try {
-		DevSourceWatcher_Start(Root, _DST_Reload, _DST_Arm)
-		AssertThrows(() => DevSourceWatcher_Start(Root, _DST_Reload, _DST_Arm), "a second start is refused")
+		DevSourceWatcher_Start(Root, "", _DST_Reload, _DST_Arm, _DST_Now)
+		AssertThrows(() => DevSourceWatcher_Start(Root, "", _DST_Reload, _DST_Arm, _DST_Now), "a second start is refused")
 		_DevSourceWatcherTick()
 		AssertEqual(0, _DST_Reloads, "nothing changed")
 		_DST_Touch(Root . "\tests\unit\b.ahk")
@@ -186,6 +200,112 @@ _DST_ReloadsOnce() {
 }
 Test("dev source: a saved .ahk reloads once, after a quiet poll (windows-dev-mode)", _DST_ReloadsOnce)
 
+; A git fast-forward that moved 651 files reloaded the driver on the first file
+; that settled, mid-checkout, and the successor booted from a half-updated tree
+; (dev-source-git-operation). While index.lock exists nothing reloads, in a
+; clone and in a linked worktree whose .git file points to its gitdir; once the
+; lock is gone the reload waits one more quiet poll, then runs once.
+_DST_GitOperationHoldsTheReload() {
+	global _DevSourceWatcher, _DST_Reloads
+	for Kind in ["clone", "worktree"] {
+		_DST_Reloads := 0
+		Root := _DST_Tree()
+		Clone := _DST_Clone(Kind == "clone" ? "dir" : "none")
+		try {
+			if (Kind == "worktree") {
+				DirCreate(Clone . "\gitdirs\wt")
+				FileAppend("gitdir: gitdirs/wt`n", Clone . "\.git", "UTF-8")
+			}
+			GitDir := DevSource_GitDir(Clone)
+			AssertEqual(Kind == "clone" ? Clone . "\.git" : Clone . "\gitdirs\wt", GitDir, Kind . ": the gitdir")
+			DevSourceWatcher_Start(Root, GitDir, _DST_Reload, _DST_Arm, _DST_Now)
+			FileAppend("", GitDir . "\index.lock")
+			AssertEqual("index.lock", DevSource_GitOperation(GitDir))
+			_DST_Touch(Root . "\infra\a.ahk")
+			_DST_Poll()
+			loop 5
+				_DST_Poll()
+			AssertEqual(0, _DST_Reloads, Kind . ": no reload while index.lock exists")
+			FileDelete(GitDir . "\index.lock")
+			_DST_Poll()
+			AssertEqual(0, _DST_Reloads, Kind . ": the end of the operation restarts the quiet time")
+			_DST_Poll()
+			AssertEqual(1, _DST_Reloads, Kind . ": the reload runs once the operation ended")
+			_DST_Poll()
+			AssertEqual(1, _DST_Reloads, Kind . ": once")
+		} finally {
+			DevSourceWatcher_Stop()
+			DirDelete(Root, true)
+			DirDelete(Clone, true)
+		}
+	}
+	AssertEqual(0, _DevSourceWatcher)
+}
+Test("dev source: no reload while a Git operation holds index.lock (dev-source-git-operation)",
+	_DST_GitOperationHoldsTheReload)
+
+; Every Git operation that rewrites the tree in steps holds the reload, as on
+; macOS and Linux (dev-source-git-operation).
+_DST_GitMarkers() {
+	Clone := _DST_Clone()
+	try {
+		GitDir := DevSource_GitDir(Clone)
+		AssertEqual("", DevSource_GitOperation(GitDir), "no operation")
+		AssertEqual("", DevSource_GitOperation(""), "a tree without .git")
+		for Marker in DEV_SOURCE_GIT_MARKERS {
+			SplitPath(GitDir . "\" . Marker, , &MarkerDir)
+			DirCreate(MarkerDir)
+			FileAppend("", GitDir . "\" . Marker)
+			AssertEqual(Marker, DevSource_GitOperation(GitDir))
+			FileDelete(GitDir . "\" . Marker)
+		}
+		AssertEqual("", DevSource_GitDir(_DST_Clone("none")), "a launcher tree without .git has no gitdir")
+		FileDelete(Clone . "\.git\*")
+		DirDelete(Clone . "\.git", true)
+		FileAppend("not a pointer`n", Clone . "\.git", "UTF-8")
+		AssertThrows(() => DevSource_GitDir(Clone), "a .git file that names no gitdir")
+		FileDelete(Clone . "\.git")
+		FileAppend("gitdir: C:\ergopti-missing-gitdir`n", Clone . "\.git", "UTF-8")
+		AssertThrows(() => DevSource_GitDir(Clone), "a gitdir that does not exist")
+	} finally DirDelete(Clone, true)
+}
+Test("dev source: every multi-step Git operation is seen (dev-source-git-operation)", _DST_GitMarkers)
+
+; A burst of many files is a pull or a sync: it reloads once, after the whole
+; tree was quiet for the bulk window, never while files keep changing
+; (dev-source-bulk-settle).
+_DST_BulkSettlesAcrossTheTree() {
+	global _DST_Reloads
+	_DST_Reloads := 0
+	Root := _DST_Tree()
+	try {
+		DevSourceWatcher_Start(Root, "", _DST_Reload, _DST_Arm, _DST_Now)
+		Index := 0
+		SettleMs := TimingsGet("ui", "dev_source_bulk_settle_ms")
+		loop TimingsGet("ui", "dev_source_bulk_threshold") + 1 {
+			Index += 1
+			FileAppend("; source`n", Root . "\infra\bulk_" . Index . ".ahk", "UTF-8")
+		}
+		_DST_Poll()
+		_DST_Poll()
+		AssertEqual(0, _DST_Reloads, "a bulk burst does not reload after one quiet poll")
+		; Another file in another folder keeps the whole burst open.
+		FileAppend("; source`n", Root . "\ErgoptiPlus_more.ahk", "UTF-8")
+		_DST_Poll()
+		_DST_Poll(SettleMs - 1)
+		AssertEqual(0, _DST_Reloads, "a change anywhere restarts the quiet time")
+		_DST_Poll(1)
+		AssertEqual(1, _DST_Reloads, "the settled burst reloads once")
+		_DST_Poll(SettleMs)
+		AssertEqual(1, _DST_Reloads, "once")
+	} finally {
+		DevSourceWatcher_Stop()
+		DirDelete(Root, true)
+	}
+}
+Test("dev source: a burst of many files reloads after the whole tree settled (dev-source-bulk-settle)",
+	_DST_BulkSettlesAcrossTheTree)
+
 _DST_SharedPaths() {
 	; This runner is a source run without the developer variable: the clone's copy.
 	AssertEqual("", DevSource_Root())
@@ -193,7 +313,7 @@ _DST_SharedPaths() {
 	Body := _DriverFuncBody("DevSource_UsesInstalledPaths")
 	AssertContains(Body, 'DevSource_Root() != ""', "a developer run reads the installed build's paths.toml")
 	Source := _DriverSourceConcat()
-	AssertContains(Source, "DevSourceWatcher_Start(_DriverDir, ReloadPreservingSuspend)",
+	AssertContains(Source, "DevSourceWatcher_Start(_DriverDir, DevSource_GitDir(DevSource_Root()), ReloadPreservingSuspend)",
 		"the driver arms the watcher on the tray's Reload path")
 	AssertContains(Source, ": (DevSource_UsesInstalledPaths()", "boot.ahk asks the paths owner")
 }

@@ -864,6 +864,25 @@ suspend_pending_poll_ms = 25
 # AHK: core/lifecycle/engine/reload/terminal_handoff.ahk.
 reload_successor_deadline_ms = 30000
 
+# Windows: the quiet time a burst of many saved sources (a pull, a checkout, a
+# sync) needs before the developer source watcher reloads. Pinned to
+# BULK_SETTLE_SEC of _shared/core/lifecycle/engine/reload/gate.lua, the macOS
+# and Linux policy, by tools/test/test-reload-gate-single-source.cjs.
+# AHK: core/lifecycle/engine/dev_source.ahk.
+dev_source_bulk_settle_ms = 3000
+
+# Windows: more distinct saved sources than this in one burst is a bulk write,
+# which waits dev_source_bulk_settle_ms, not a hand edit. Pinned to
+# BULK_THRESHOLD of _shared/core/lifecycle/engine/reload/gate.lua by
+# tools/test/test-reload-gate-single-source.cjs.
+# AHK: core/lifecycle/engine/dev_source.ahk.
+dev_source_bulk_threshold = 3
+
+# Windows: a Git operation that holds the developer reload this long is
+# reported once as a possible stale lock; the hold itself never expires.
+# AHK: core/lifecycle/engine/dev_source.ahk.
+dev_source_git_hold_report_ms = 60000
+
 # Windows: how often a diagnostics collection polls its worker process until it ends.
 # AHK: diagnostics/ui/healthcheck/collection.ahk.
 diagnostic_collection_poll_ms = 100

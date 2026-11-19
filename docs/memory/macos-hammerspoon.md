@@ -1212,7 +1212,11 @@ that wrote `&amp;` read back as typing nothing on that key on macOS
 ### project-macos-reload-during-git-pull
 
 Auto-reload watchers must debounce and hold reload while any bulk writer is
-rewriting the tree, including Git, cloud sync, and rsync.
+rewriting the tree, including Git, cloud sync, and rsync. The Windows developer
+source watcher (`core/lifecycle/engine/dev_source.ahk`) applies the same
+policy as `_shared/core/lifecycle/engine/reload/gate.lua`, pinned by
+`tools/test/test-reload-gate-single-source.cjs`: change a marker or a settle
+window in both.
 
 ### project-macos-startup-winfilter-cost
 

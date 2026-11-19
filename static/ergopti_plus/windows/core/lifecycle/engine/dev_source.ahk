@@ -24,10 +24,19 @@
 ;    time and size of every driver .ahk. It runs only in a developer run and
 ;    needs no overlapped I/O or callback thread; a change reloads only after one
 ;    quiet tick, so an editor's multi-file save reloads once.
-; 5. Same configuration: boot.ahk reads the installed build's paths.toml in a
+; 5. Whole-tree settle: a burst of more than dev_source_bulk_threshold distinct
+;    files (a pull, a checkout, a sync) waits dev_source_bulk_settle_ms of quiet
+;    across the whole tree, and no reload starts while Git rewrites the tree
+;    (index.lock, a merge, cherry-pick, revert or rebase marker in the gitdir).
+;    A fast-forward that moved 651 files once reloaded on the first file that
+;    settled, and the successor booted from a half-updated tree. The policy is
+;    the macOS and Linux one (_shared/core/lifecycle/engine/reload/gate.lua),
+;    pinned by tools/test/test-reload-gate-single-source.cjs. The hold never
+;    expires: it is the safe side, and a stale index.lock is reported.
+; 6. Same configuration: boot.ahk reads the installed build's paths.toml in a
 ;    developer run, not the clone's _generated copy, so the run sees the
 ;    configuration folder the user chose.
-; 6. The tray's Reload path: the watcher calls ReloadPreservingSuspend, which
+; 7. The tray's Reload path: the watcher calls ReloadPreservingSuspend, which
 ;    keeps a pause, retires workers and hands off to the successor exactly as
 ;    the menu row does.
 ; ==============================================================================
@@ -35,6 +44,11 @@
 #Requires AutoHotkey v2.0
 
 global DEV_SOURCE_POLL_MS := 1000
+; Files of the gitdir whose presence means Git is rewriting the tree: the lock
+; of every index and working-tree update, the multi-step merge markers, and the
+; file every rebase backend keeps in its state folder.
+global DEV_SOURCE_GIT_MARKERS := ["index.lock", "MERGE_HEAD", "CHERRY_PICK_HEAD",
+	"REVERT_HEAD", "rebase-merge\head-name", "rebase-apply\head-name"]
 ; The watcher's single owner: 0 until DevSourceWatcher_Start, then a Map.
 global _DevSourceWatcher := 0
 
@@ -144,6 +158,46 @@ DevSource_DeriveRoot(ScriptDir) {
 
 
 
+; The Git directory of a clone: its .git folder, or the folder a linked
+; worktree's .git file points to. A launcher root may be a tree without .git,
+; where no Git operation can run. A .git file that names no existing gitdir
+; raises, since the watcher could not see a Git operation then.
+; @param Root {String} The clone root.
+; @returns {String} The gitdir, "" for a tree without .git.
+DevSource_GitDir(Root) {
+	DotGit := Root . "\.git"
+	Attributes := FileExist(DotGit)
+	if (Attributes == "")
+		return ""
+	if InStr(Attributes, "D")
+		return DotGit
+	if !RegExMatch(FileRead(DotGit, "UTF-8"), "m)^gitdir:[ \t]*(.+?)[ \t\r]*$", &Match)
+		throw Error("The .git file of the developer clone names no gitdir: " . DotGit)
+	GitDir := StrReplace(Match[1], "/", "\")
+	if !RegExMatch(GitDir, "^(?:[A-Za-z]:\\|\\\\)")
+		GitDir := Root . "\" . GitDir
+	if !InStr(FileExist(GitDir), "D")
+		throw Error("The gitdir of the developer clone does not exist: " . GitDir)
+	return GitDir
+}
+
+; The first Git marker present in GitDir, "" while no operation runs.
+; @param GitDir {String} DevSource_GitDir's answer.
+; @returns {String}
+DevSource_GitOperation(GitDir) {
+	if (GitDir == "")
+		return ""
+	for Marker in DEV_SOURCE_GIT_MARKERS {
+		if (FileExist(GitDir . "\" . Marker) != "")
+			return Marker
+	}
+	return ""
+}
+
+
+
+
+
 ; ======================================
 ; ======================================
 ; ======= 2/ Source Change Watch =======
@@ -166,35 +220,46 @@ DevSource_Snapshot(DriverDir) {
 	return Snapshot
 }
 
-; The first path that was added, removed or changed between two snapshots.
+; Every path that was added, removed or changed between two snapshots.
 ; @param Old {Map}
 ; @param New {Map}
-; @returns {String} The changed path, "" when nothing changed.
-DevSource_SnapshotChange(Old, New) {
+; @returns {Array} The changed paths, empty when nothing changed.
+DevSource_SnapshotChanges(Old, New) {
+	Changed := []
 	for Path, Stamp in New {
 		if (!Old.Has(Path) || Old[Path] != Stamp)
-			return Path
+			Changed.Push(Path)
 	}
 	for Path in Old {
 		if !New.Has(Path)
-			return Path
+			Changed.Push(Path)
 	}
-	return ""
+	return Changed
 }
 
 ; Starts the developer watcher. Raises when it already runs.
 ; @param DriverDir {String} The driver folder.
+; @param GitDir {String} DevSource_GitDir of the clone, "" for a tree without .git.
 ; @param ReloadFn {Func} Called once a change settles; ReloadPreservingSuspend in production.
 ; @param ArmFn {Func} Test seam for SetTimer.
-DevSourceWatcher_Start(DriverDir, ReloadFn, ArmFn := SetTimer) {
+; @param NowFn {Func} Test seam for the millisecond clock.
+DevSourceWatcher_Start(DriverDir, GitDir, ReloadFn, ArmFn := SetTimer, NowFn := _DevSourceNow) {
 	global _DevSourceWatcher
 	if (_DevSourceWatcher is Map)
 		throw Error("The developer source watcher is already running")
-	_DevSourceWatcher := Map("dir", DriverDir, "snapshot", DevSource_Snapshot(DriverDir),
-		"pending", "", "reload", ReloadFn, "arm", ArmFn)
+	if (GitDir != "") && !InStr(FileExist(GitDir), "D")
+		throw Error("The developer source watcher needs the clone's gitdir: " . GitDir)
+	_DevSourceWatcher := Map("dir", DriverDir, "git_dir", GitDir,
+		"snapshot", DevSource_Snapshot(DriverDir), "burst", Map(), "last_change", 0,
+		"git_hold", "", "git_hold_since", 0, "git_hold_reported", false,
+		"reload", ReloadFn, "arm", ArmFn, "now", NowFn)
 	ArmFn(_DevSourceWatcherTick, DEV_SOURCE_POLL_MS)
-	LoggerInfo("DevSource", "Developer source watcher started on {1} ({2} file(s)).",
-		DriverDir, _DevSourceWatcher["snapshot"].Count)
+	LoggerInfo("DevSource", "Developer source watcher started on {1} ({2} file(s)); Git operations are read in {3}.",
+		DriverDir, _DevSourceWatcher["snapshot"].Count, (GitDir == "") ? "no gitdir (the tree has no .git)" : GitDir)
+}
+
+_DevSourceNow() {
+	return A_TickCount
 }
 
 ; Stops the developer watcher; a no-op when it does not run.
@@ -203,26 +268,76 @@ DevSourceWatcher_Stop() {
 	if !(_DevSourceWatcher is Map)
 		return
 	_DevSourceWatcher["arm"](_DevSourceWatcherTick, 0)
+	if (_DevSourceWatcher["git_hold"] != "")
+		LoggerWarn("DevSource", "Developer source watcher stopped while a Git operation ({1}) held its reload.",
+			_DevSourceWatcher["git_hold"])
 	_DevSourceWatcher := 0
 	LoggerInfo("DevSource", "Developer source watcher stopped.")
 }
 
-; One poll: a change arms the reload, the next quiet poll performs it.
+; One poll. A change joins the current burst; the burst reloads once the whole
+; tree was quiet long enough for its size and no Git operation is under way.
 _DevSourceWatcherTick() {
 	global _DevSourceWatcher
 	if !(_DevSourceWatcher is Map)
 		return
-	Snapshot := DevSource_Snapshot(_DevSourceWatcher["dir"])
-	Changed := DevSource_SnapshotChange(_DevSourceWatcher["snapshot"], Snapshot)
-	_DevSourceWatcher["snapshot"] := Snapshot
-	if (Changed != "") {
-		_DevSourceWatcher["pending"] := Changed
+	Watcher := _DevSourceWatcher
+	Now := Watcher["now"]()
+	Snapshot := DevSource_Snapshot(Watcher["dir"])
+	Changed := DevSource_SnapshotChanges(Watcher["snapshot"], Snapshot)
+	Watcher["snapshot"] := Snapshot
+	Burst := Watcher["burst"]
+	for Path in Changed
+		Burst[Path] := true
+	if (Changed.Length > 0) {
+		Watcher["last_change"] := Now
 		return
 	}
-	Pending := _DevSourceWatcher["pending"]
-	if (Pending == "")
+	if (Burst.Count == 0)
 		return
-	_DevSourceWatcher["pending"] := ""
-	LoggerInfo("DevSource", "Saved source {1} settled; reloading the driver.", Pending)
-	_DevSourceWatcher["reload"]()
+	if !_DevSourceGitSettled(Watcher, Now)
+		return
+	if (Burst.Count > TimingsGet("ui", "dev_source_bulk_threshold")
+			&& !TickExpired(Watcher["last_change"], TimingsGet("ui", "dev_source_bulk_settle_ms"), Now))
+		return
+	for Path in Burst {
+		First := Path
+		break
+	}
+	Watcher["burst"] := Map()
+	if (Burst.Count == 1)
+		LoggerInfo("DevSource", "Saved source {1} settled; reloading the driver.", First)
+	else
+		LoggerInfo("DevSource", "{1} saved source files settled across the tree (first {2}); reloading the driver.",
+			Burst.Count, First)
+	Watcher["reload"]()
+}
+
+; Whether no Git operation holds the pending reload. The hold is paired: its
+; start is logged once, and its end both logs and restarts the quiet time, since
+; Git may still have been writing when the lock went away.
+_DevSourceGitSettled(Watcher, Now) {
+	Marker := DevSource_GitOperation(Watcher["git_dir"])
+	if (Marker != "") {
+		if (Watcher["git_hold"] == "") {
+			Watcher["git_hold"] := Marker
+			Watcher["git_hold_since"] := Now
+			Watcher["git_hold_reported"] := false
+			LoggerStart("DevSource", "Holding the reload while a Git operation rewrites the tree ({1})…", Marker)
+		} else if !Watcher["git_hold_reported"]
+				&& TickExpired(Watcher["git_hold_since"], TimingsGet("ui", "dev_source_git_hold_report_ms"), Now) {
+			Watcher["git_hold_reported"] := true
+			LoggerWarn("DevSource", "A Git operation has held the reload for {1} ms ({2} in {3}); a stale lock blocks it until removed.",
+				Now - Watcher["git_hold_since"], Marker, Watcher["git_dir"])
+		}
+		return false
+	}
+	if (Watcher["git_hold"] == "")
+		return true
+	LoggerSuccess("DevSource", "The Git operation ended after {1} ms; the reload waits for the tree to settle.",
+		Now - Watcher["git_hold_since"])
+	Watcher["git_hold"] := ""
+	; Git may have written the last files just before it released the lock.
+	Watcher["last_change"] := Now
+	return false
 }

@@ -1002,6 +1002,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-windows-lua-export-out-parameters.cjs"],
 			"repro": "npm run test:windows-lua-export-out-parameters"
+		},
+		{
+			"id": "reload-gate-single-source",
+			"ordinal": 702,
+			"name": "the Windows developer reload gate matches gate.lua (Git markers, bulk threshold, bulk settle)",
+			"cmd": "node",
+			"args": ["tools/test/test-reload-gate-single-source.cjs"],
+			"repro": "npm run test:reload-gate-single-source"
 		}
 	]
 }

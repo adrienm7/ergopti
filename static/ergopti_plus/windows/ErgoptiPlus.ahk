@@ -1573,7 +1573,7 @@ try {
 	if (DevSource_Root() != "") {
 		LoggerInfo("ErgoptiPlus", "Developer source mode; the driver runs from {1} (clone root from {2}).",
 			_DriverDir, DevSource_Resolution()["origin"])
-		DevSourceWatcher_Start(_DriverDir, ReloadPreservingSuspend)
+		DevSourceWatcher_Start(_DriverDir, DevSource_GitDir(DevSource_Root()), ReloadPreservingSuspend)
 		; The collector's field run (diagnostics/engine/field_run/field_run.ahk) is optional too: the
 		; driver keeps running without it.
 		try FieldRun_Start(DevSource_Root())
