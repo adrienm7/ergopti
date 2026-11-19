@@ -968,6 +968,193 @@ check(after.done && timed.done(), 'the time budget stops the search');
 	);
 }
 
+// ===================================
+// ======= 9/ Search methods =========
+// ===================================
+
+// Every method of METHODS runs behind the same interface: it reports itself,
+// is deterministic for a seed, finds the toy's optimum, never returns worse
+// than its start, honours every constraint in every layout it scores, pays
+// the change penalty, and its incremental scores are the engine's own.
+{
+	check(
+		O.METHODS.length >= 5 && O.METHODS.includes(O.DEFAULT_METHOD),
+		`methods: ${O.METHODS} with the default ${O.DEFAULT_METHOD}`
+	);
+	check(
+		refusal(() => O.createSearch(O.problem(E, azerty), { objective, method: 'gradient' })) ===
+			'option_value',
+		'methods: an unknown method is accepted'
+	);
+	const near = (a, b) => Math.abs(a - b) <= TOLERANCE;
+	const constrained = {
+		pinnedCodes: ['KeyE', 'KeyJ'],
+		qwertyPins: ['z', 'x'],
+		zones: { r: ['KeyR', 'KeyF', 'KeyU'] },
+		maxChanges: 8
+	};
+	const startCells = (code) => cellsOf(azerty, code, [0, 1]);
+	const changedKeys = (layout) =>
+		Object.keys(layout.rows).filter(
+			(code) =>
+				code !== 'Space' &&
+				cellsOf(layout, code, [0, 1]) !== startCells(code) &&
+				cellsOf(layout, code, [0, 1]) !== JSON.stringify([null, null])
+		).length;
+	const holds = (layout) =>
+		cellsOf(layout, 'KeyE', [0, 1, 2, 3]) === cellsOf(azerty, 'KeyE', [0, 1, 2, 3]) &&
+		cellsOf(layout, 'KeyJ', [0, 1]) === cellsOf(azerty, 'KeyJ', [0, 1]) &&
+		layout.rows.KeyZ[0] === 'z' &&
+		layout.rows.KeyX[0] === 'x' &&
+		['KeyR', 'KeyF', 'KeyU'].some((code) => layout.rows[code][0] === 'r') &&
+		[...NUMBER_ROW].every((code) => cellsOf(layout, code, [0, 1]) === startCells(code)) &&
+		cellsOf(layout, 'Space', [0, 1]) === startCells('Space') &&
+		changedKeys(layout) <= constrained.maxChanges;
+	const firstScored = new Map();
+	for (const method of O.METHODS) {
+		const named = (settings) => Object.assign({ method }, settings);
+		// It reports itself, and a seed gives one result.
+		const once = search(azerty, {}, named({ iterations: 120 }));
+		const twice = search(azerty, {}, named({ iterations: 120 }));
+		check(once.result.method === method, `${method}: the search ran ${once.result.method}`);
+		check(
+			JSON.stringify(once.result.assignment) === JSON.stringify(twice.result.assignment) &&
+				Object.is(once.result.score, twice.result.score) &&
+				JSON.stringify(once.seen) === JSON.stringify(twice.seen),
+			`${method}: one seed gives two searches`
+		);
+		firstScored.set(method, JSON.stringify(once.seen.slice(0, 40)));
+
+		// The toy's optimum, counted by brute force.
+		const toyRun = O.run(toyProblem, { objective: toyObjective, method, seed: 3, iterations: 200 });
+		check(
+			Math.abs(toyRun.score - bruteBest) <= TOLERANCE,
+			`${method}: the toy's best is ${bruteBest}, the search found ${toyRun.score}`
+		);
+
+		// Never worse than the start, from the layout or a random arrangement.
+		for (const start of ['layout', 'random']) {
+			const run = search(azerty, {}, named({ start, iterations: 60, seed: 21 }));
+			check(
+				run.result.score >= run.result.startScore &&
+					near(run.result.score, objective(run.result.layout)),
+				`${method}: from a ${start} start it returns ${run.result.score}, the start scores ${run.result.startScore}`
+			);
+		}
+
+		// Every constraint at once, in every layout it scores, from both starts.
+		for (const start of ['layout', 'random']) {
+			const run = search(azerty, constrained, named({ start, iterations: 150 }));
+			check(
+				everyLayout(run, holds) && holds(run.result.layout),
+				`${method}: a layout scored from a ${start} start breaks a constraint`
+			);
+		}
+		// The thumb keys: places on the Corne only, the space never moves.
+		const corne = O.problem(E, azerty, { thumbKeys: 'corne' });
+		const thumbSeen = [];
+		const corneObjective = O.engineObjective(E, tables, ON_CORNE);
+		O.run(corne, {
+			objective: (layout) => {
+				thumbSeen.push(layout);
+				return corneObjective(layout);
+			},
+			method,
+			seed: 6,
+			iterations: 150,
+			start: 'random'
+		});
+		check(
+			thumbSeen.length > 10 &&
+				thumbSeen.every((layout) => cellsOf(layout, 'Space', [0, 1]) === startCells('Space')) &&
+				thumbSeen.some((layout) => onThumbs(layout).some((code) => layout.rows[code][0])),
+			`${method}: the thumb keys are not places on the Corne`
+		);
+		const noThumb = search(azerty, {}, named({ start: 'random', iterations: 100 }));
+		check(
+			everyLayout(noThumb, (layout) => onThumbs(layout).length === 0),
+			`${method}: a letter moves onto a thumb key without the option`
+		);
+
+		// The change penalty: the objective is the engine's score less weight × share.
+		const plain = O.problem(E, azerty);
+		const plainCost = O.changeCost(E, plain, tables);
+		const paid = O.run(plain, {
+			objective,
+			method,
+			seed: 11,
+			iterations: 150,
+			changeWeight: 2,
+			changeCost: plainCost
+		});
+		check(
+			near(paid.score, paid.engineScore - 2 * paid.change.share) &&
+				near(paid.change.share, plainCost.share(plainCost.moved(paid.assignment))) &&
+				paid.score >= paid.startScore,
+			`${method}: the penalised objective ${paid.score} is not ${paid.engineScore} − 2 × ${paid.change.share}`
+		);
+
+		// Incremental scoring: every layout it scores gets the engine's full
+		// score, and the search returns what the full objective finds.
+		for (const [start, options, analysis] of [
+			[azerty, {}, ANALYSIS],
+			[ergol, { deadKeyLayer: true }, ANALYSIS],
+			[azerty, { thumbKeys: 'corne', maxChanges: 10 }, ON_CORNE]
+		]) {
+			const p = O.problem(E, start, options);
+			const fullObjective = O.engineObjective(E, tables, analysis);
+			const incremental = O.incrementalObjective(E, tables, analysis);
+			let worst = 0;
+			let scored = 0;
+			const checked = (layout) => {
+				const value = incremental(layout);
+				worst = Math.max(worst, Math.abs(value - fullObjective(layout)));
+				scored += 1;
+				return value;
+			};
+			checked.accept = incremental.accept;
+			const settings = { method, seed: 4, iterations: 100, start: 'random' };
+			const viaIncremental = O.run(p, Object.assign({ objective: checked }, settings));
+			const viaFull = O.run(p, Object.assign({ objective: fullObjective }, settings));
+			check(
+				scored > 50 && worst <= TOLERANCE,
+				`${method} incremental (${start.id}): ${scored} scored, a score ${worst} off the engine's`
+			);
+			check(
+				JSON.stringify(viaIncremental.assignment) === JSON.stringify(viaFull.assignment),
+				`${method} incremental (${start.id}): the search returns another layout than the full objective's`
+			);
+		}
+	}
+	// The methods are different searches: no two score the same layouts first.
+	check(
+		new Set(firstScored.values()).size === O.METHODS.length,
+		'methods: two methods score the same layouts'
+	);
+	// The genetic algorithm's crossover keeps both parents' constraints: its
+	// children are valid permutations whose every unit sits where a parent has it.
+	{
+		const p = O.problem(E, azerty, { zones: { r: ['KeyR', 'KeyF', 'KeyU'] } });
+		const next = O.random(5);
+		const a = O.run(p, { objective, seed: 1, iterations: 30, start: 'random' }).assignment;
+		const b = O.run(p, { objective, seed: 2, iterations: 30, start: 'random' }).assignment;
+		const child = O.cycleCrossover(a, b, next);
+		check(
+			child
+				.slice()
+				.sort((x, y) => x - y)
+				.join() ===
+				a
+					.slice()
+					.sort((x, y) => x - y)
+					.join() &&
+				child.every((u, s) => u === a[s] || u === b[s]) &&
+				child.every((u, s) => O.allowed(p, u, s)),
+			'methods: the cycle crossover breaks a permutation or a place'
+		);
+	}
+}
+
 if (errors.length) {
 	console.error(`FAIL test-layout-optimizer: ${errors.length} problem(s)`);
 	for (const e of errors) console.error(`  - ${e}`);

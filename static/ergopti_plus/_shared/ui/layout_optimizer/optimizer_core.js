@@ -152,7 +152,7 @@ var LAYOUT_OPTIMIZER = (function () {
 	// (else a copy of the first), the chance of each further mutation swap
 	// after the first, and the most swaps that make a seed individual from
 	// the start.
-	const GENETIC_POPULATION = 24;
+	const GENETIC_POPULATION = 12;
 	const GENETIC_TOURNAMENT = 3;
 	const GENETIC_CROSSOVER = 0.7;
 	const GENETIC_MORE_MUTATION = 0.5;
@@ -160,6 +160,14 @@ var LAYOUT_OPTIMIZER = (function () {
 	// Hill climbing: random valid swaps that kick a local optimum before the
 	// next climb (an iterated local search from the restart's best optimum).
 	const HILL_KICK_SWAPS = 3;
+	// What the page says of each method's settings (its explanations quote them).
+	const METHOD_PARAMETERS = Object.freeze({
+		annealing: Object.freeze({}),
+		late_acceptance: Object.freeze({ history: LATE_ACCEPTANCE_HISTORY }),
+		tabu: Object.freeze({ candidates: TABU_CANDIDATES }),
+		genetic: Object.freeze({ population: GENETIC_POPULATION }),
+		hill_climbing: Object.freeze({ kick: HILL_KICK_SWAPS })
+	});
 
 	/** A refusal with a stable code the page translates (layout_optimizer.error.<code>). */
 	class OptimizerError extends Error {
@@ -1042,6 +1050,8 @@ var LAYOUT_OPTIMIZER = (function () {
 			settings
 		);
 		if (typeof s.objective !== 'function') throw new Error('layout_optimizer: no objective');
+		// A request that names no method (a runner's request.method left out) runs the default.
+		if (s.method === undefined) s.method = DEFAULT_METHOD;
 		if (!METHODS.includes(s.method))
 			throw new OptimizerError(
 				'option_value',
@@ -1519,6 +1529,7 @@ var LAYOUT_OPTIMIZER = (function () {
 		DEFAULT_OPTIONS,
 		METHODS,
 		DEFAULT_METHOD,
+		METHOD_PARAMETERS,
 		QWERTY_PIN_PRESETS,
 		NUMBER_ROW,
 		OptimizerError,
@@ -1533,6 +1544,7 @@ var LAYOUT_OPTIMIZER = (function () {
 		searchTables,
 		changeCost,
 		changedUnits,
+		cycleCrossover,
 		createSearch,
 		run,
 		bestOf
