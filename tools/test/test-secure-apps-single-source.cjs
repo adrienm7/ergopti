@@ -11,7 +11,8 @@
  *
  * WHAT THIS PINS:
  *   1. The list is well formed: unique ids, a windows, macos and linux list
- *      on every row, lowercase Linux fragments, no empty identity.
+ *      on every row, lowercase Linux fragments, Windows process image names
+ *      (`*.exe`), no empty identity.
  *   2. Neither Lua driver declares a list of its own: the detectors and the
  *      Linux metrics read the shared file through _shared/apps/engine/secure_apps.lua,
  *      over its generated projection secure_apps_data.lua, which matches it.
@@ -51,6 +52,10 @@ for (const app of document.apps || []) {
 				errors.push(`secure_apps.json: ${app.id} holds an empty ${platform} identity`);
 			else if (platform === 'linux' && identity !== identity.toLowerCase())
 				errors.push(`secure_apps.json: Linux fragment ${identity} is not lowercase`);
+			// Windows compares the focused window's process image name
+			// (WinGetProcessName), so any other identity can never match.
+			else if (platform === 'windows' && !/^[^\\/:*?"<>|\s][^\\/:*?"<>|]*\.exe$/i.test(identity))
+				errors.push(`secure_apps.json: Windows identity ${identity} is not a process image name`);
 			else if (platform === 'windows') windowsNames.add(identity.toLowerCase());
 		}
 	}

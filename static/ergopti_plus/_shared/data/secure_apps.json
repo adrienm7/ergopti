@@ -57,7 +57,7 @@
 		},
 		{
 			"id": "system_keychain",
-			"windows": ["credential_guard"],
+			"windows": ["CredentialUIBroker.exe"],
 			"macos": ["Keychain Access", "Touch ID & Password"],
 			"linux": ["gnome-keyring-3", "seahorse"]
 		},

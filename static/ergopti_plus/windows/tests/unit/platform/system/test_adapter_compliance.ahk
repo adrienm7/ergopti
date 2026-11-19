@@ -90,6 +90,32 @@ _SFD_SecureApps_Shared() {
 }
 Test("SFD secure applications: the shared list, a RoboForm.exe window is secure (ADD-1)", _SFD_SecureApps_Shared)
 
+; The system keychain row covers Keychain Access on macOS and seahorse on Linux.
+; Its Windows counterpart is the Windows Security credential prompt, hosted by
+; CredentialUIBroker.exe; the row used to name "credential_guard", which no
+; process is called, so that prompt was secure only field by field.
+; SFD_IsSecureField cannot carry this check: the script window is no Edit
+; control, so the field path already fails closed. The application axis is
+; asserted alone, against an ordinary process.
+_SFD_SecureApps_CredentialPrompt() {
+	global SFD_SECURE_APP_ROOT
+	SavedRoot := SFD_SECURE_APP_ROOT.Clone()
+	try {
+		for ProcName, Expected in Map("CredentialUIBroker.exe", true, "notepad.exe", false) {
+			SFD_SECURE_APP_ROOT["hwnd"] := 0
+			; Bound, not closed over: a closure would read the loop variable after
+			; the for loop restores it.
+			SFD_ProcessNameOf.DefineProp("Call", { Call: ((Name, Self, Root) => Name).Bind(ProcName) })
+			try AssertEqual(Expected, !!SFD_IsSecureAppWindow(A_ScriptHwnd),
+				"a " . ProcName . " window is " . (Expected ? "" : "not ") . "a secure application")
+			finally SFD_ProcessNameOf.DeleteProp("Call")
+		}
+	} finally {
+		SFD_SECURE_APP_ROOT := SavedRoot
+	}
+}
+Test("SFD secure applications: the Windows credential prompt is the system keychain row (ADD-1)", _SFD_SecureApps_CredentialPrompt)
+
 ; Refresh must revoke negative focused-element verdicts. Otherwise a caller
 ; asking for a refresh can keep authorising an old browser field until TTL.
 _SFD_RefreshInvalidatesFieldVerdict() {

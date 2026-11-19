@@ -111,7 +111,7 @@ return {
 		{
 			["id"] = "system_keychain",
 			["windows"] = {
-				"credential_guard",
+				"CredentialUIBroker.exe",
 			},
 			["macos"] = {
 				"Keychain Access",

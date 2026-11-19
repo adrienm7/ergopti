@@ -74,6 +74,9 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
 
 ### Typing, hotstrings and shortcuts
 
+- [ ] Windows Security prompt (2026-11-19, SFC-01): open a credential prompt (`\\<host>\share` for an unknown host
+      in Explorer), type a hotstring trigger in its user-name box: nothing expands, no AI suggestion shows and
+      keystats records nothing; the same trigger in Notepad expands.
 - [ ] AltGr rolls and script shortcuts (2026-11-17): on Ergopti+, AltGr held over J then I types `("`, over the
       `)` key then I types `)#`, and the `chevron_equal` roll works again; AltGr then Enter alone pauses, but « (# »
       then Enter or Backspace with AltGr still down types Enter or erases, and never pauses or reloads.
