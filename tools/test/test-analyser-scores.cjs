@@ -46,12 +46,16 @@ const SCRIPTS = [
 const MIN_VECTORS = 20;
 const MIN_ANALYSERS = 11;
 // Scoring a layout with every analyser, both fingerings, inside a vm context
-// (global lookups go through the context), costs about 2100 reference walks
-// of the corpus table with every core of a Windows PC busy (2026-11-19).
-// The engine's library ratio was 1.6 times higher on a quieter PC, about 3400
-// here. The bound is twice that: scorers three times slower fail on a loaded
-// machine, twice as slow on a quiet one.
-const SCORES_WALKS_BOUND = 7000;
+// (global lookups go through the context), costs 1400 to 2100 reference walks
+// of the corpus table with every core of a Windows PC busy (2026-11-19). The
+// engine's library ratio was 1.6 times higher on a quieter PC, about 3400
+// here. The bound sits above that and below five times the lowest ratio:
+// scorers five times slower fail (four more passes of every scorer read
+// 11300).
+const SCORES_WALKS_BOUND = 5000;
+// Walks of the table per layout in the reference: one walk takes a quarter of
+// a millisecond, too short to time after the scorers have filled the caches.
+const REFERENCE_WALKS = 20;
 // The sample is scored up to this many rounds, one layout per timed chunk.
 const SPEED_ROUNDS = 3;
 const LIBRARY_SAMPLE = 30;
@@ -267,19 +271,23 @@ for (const layout of sample) {
 }
 // A copy of each layout: the engine keeps its key n-grams per layout object,
 // so every round scores from the start.
+const walk = tableWalk(corpus);
 const speed = relativeSpeed({
 	items: sample,
 	chunk: 1,
-	reference: tableWalk(corpus),
+	reference: (layouts) => {
+		for (let pass = 0; pass < REFERENCE_WALKS; pass++) walk(layouts);
+	},
 	subject: ([layout]) => S.scoreAll({ ...layout }, corpus, { keyboard: 'iso' }),
-	bound: SCORES_WALKS_BOUND,
+	bound: SCORES_WALKS_BOUND / REFERENCE_WALKS,
 	maxRounds: SPEED_ROUNDS
 });
+const walks = speed.ratio * REFERENCE_WALKS;
 check(
-	speed.ratio <= SCORES_WALKS_BOUND,
-	`every analyser costs ${speed.ratio.toFixed(0)} reference walks of the corpus per layout ` +
+	walks <= SCORES_WALKS_BOUND,
+	`every analyser costs ${walks.toFixed(0)} reference walks of the corpus per layout ` +
 		`(bound ${SCORES_WALKS_BOUND}): ${speed.subjectMs.toFixed(0)} ms against ` +
-		`${speed.referenceMs.toFixed(3)} ms on ${sample.length} layouts, fastest of ${speed.rounds} rounds`
+		`${speed.referenceMs.toFixed(0)} ms on ${sample.length} layouts, fastest of ${speed.rounds} rounds`
 );
 
 if (errors.length > 0) {
@@ -290,5 +298,5 @@ if (errors.length > 0) {
 console.log(
 	`test-analyser-scores: OK (${analysers.length} analysers, ${vectors.length} vectors, ${compared} values, ` +
 		`${sample.length} layouts at ${(speed.subjectMs / sample.length).toFixed(0)} ms each, ` +
-		`${speed.ratio.toFixed(0)} table walks)`
+		`${walks.toFixed(0)} table walks)`
 );
