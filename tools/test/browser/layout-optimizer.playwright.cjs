@@ -257,7 +257,7 @@ async function exerciseProgressChart(browser, origin) {
 	// The pointer over the drawing shows the point under it.
 	const box = await page.locator('#lo-chart-svg').boundingBox();
 	await page.hover('#lo-chart-svg', { position: { x: box.width * 0.9, y: box.height / 2 } });
-	assert.match(await page.textContent('#lo-chart-tip'), / s · .* points$/);
+	assert.match(await page.textContent('#lo-chart-tip'), /\u00a0s · .*\u00a0points$/);
 	await page.mouse.move(0, 0);
 	assert.equal(await page.isHidden('#lo-chart-tip'), true, 'leaving the drawing hides it');
 	assert.deepEqual(errors, []);
@@ -342,6 +342,65 @@ async function exerciseThumbKeys(browser, origin) {
 	await shortBudget(page);
 	assert.match(await runToEnd(page), /^Done/);
 	assert.deepEqual(await page.evaluate(() => window.__thumbKeys), [null], 'ISO: no thumb key');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
+/**
+ * (results-shelf) A run keeps its best distinct layouts on a shelf, best
+ * first and at most five, each named with its rank, its score, its gain and
+ * the keys it moves in words, and buttons that open that very layout in the
+ * editor or the Comparer.
+ */
+async function exerciseResultsShelf(browser, origin) {
+	const { page, errors, context } = await open(browser, origin);
+	assert.equal(await page.isHidden('#lo-shelf'), true, 'no shelf before a run');
+	await page.evaluate(() => {
+		document.querySelector('.lo-advanced').open = true;
+	});
+	await page.fill('#lo-seconds', '2');
+	await page.fill('#lo-iterations', '1000000');
+	await page.fill('#lo-restarts', '2');
+	assert.match(await runToEnd(page), /^Done/);
+	const items = await page.$$eval('#lo-shelf-list .lo-shelf-item', (nodes) =>
+		nodes.map((node) => ({
+			rank: node.dataset.rank,
+			name: node.querySelector('.lo-shelf-name').textContent,
+			facts: node.querySelector('.lo-shelf-facts').textContent,
+			labels: Array.from(node.querySelectorAll('button'), (b) => b.getAttribute('aria-label'))
+		}))
+	);
+	assert.ok(items.length >= 2 && items.length <= 5, `${items.length} layouts on the shelf`);
+	assert.deepEqual(
+		items.map((item) => item.rank),
+		items.map((_, i) => String(i + 1))
+	);
+	assert.equal(new Set(items.map((item) => item.name)).size, items.length, 'one name each');
+	const scores = items.map((item) => {
+		const match =
+			/^Score (-?[\d,]+\.\d\d)\u00a0points \([+-]?[\d,]+\.\d\d\u00a0points over the start\) · \d+\u00a0keys moved$/.exec(
+				item.facts
+			);
+		assert.ok(match, `the facts in words: ${JSON.stringify(item.facts)}`);
+		return Number(match[1].replace(/,/g, ''));
+	});
+	assert.ok(
+		scores.every((score, i) => i === 0 || scores[i - 1] >= score),
+		`best first: ${scores}`
+	);
+	assert.match(items[0].name, /^AZERTY \(FR\) \(optimized, no\. 1\)$/, items[0].name);
+	assert.deepEqual(items[1].labels, [`Edit ${items[1].name}`, `Compare ${items[1].name}`]);
+	// The second layout's « Edit » hands that layout over.
+	await page.evaluate(() => {
+		window.LAYOUT_ANALYSIS_FILES.handOffToEditor = (layout) => {
+			window.__handed = layout;
+			throw Object.assign(new Error('kept'), { code: 'studio_handoff_failed' });
+		};
+	});
+	await page.click('#lo-shelf-list .lo-shelf-item[data-rank="2"] button[data-shelf="editor"]');
+	const handed = await page.evaluate(() => window.__handed);
+	assert.equal(handed.name, items[1].name);
+	assert.ok(handed.rows && handed.rows.KeyQ, 'a whole layout');
 	assert.deepEqual(errors, []);
 	await context.close();
 }
@@ -834,6 +893,9 @@ async function main() {
 		// ======= 4f/ The thumb keys' switch =======
 		await exerciseThumbKeys(browser, origin);
 
+		// ======= 4g/ The results shelf =======
+		await exerciseResultsShelf(browser, origin);
+
 		// ======= 5/ Light and dark at phone width, every locale =======
 		for (const colorScheme of ['light', 'dark']) {
 			const { page, errors, context } = await open(browser, origin, {
@@ -882,7 +944,7 @@ async function main() {
 	console.log('PASS layout-optimizer.playwright');
 }
 
-module.exports = { exerciseProgressChart, exerciseThumbKeys };
+module.exports = { exerciseProgressChart, exerciseThumbKeys, exerciseResultsShelf };
 
 if (require.main === module)
 	main().catch((error) => {

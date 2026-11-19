@@ -687,6 +687,80 @@ body:has(> main.layout-optimizer) {
 	color: var(--lo-bad);
 }
 
+/* The results shelf: the run's best distinct layouts as cards, each with
+   its rank badge, a bar of its gain over the start and its buttons. */
+.lo-shelf {
+	margin-top: var(--lo-space-5);
+}
+
+.lo-shelf-list {
+	display: grid;
+	gap: var(--lo-space-3);
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	list-style: none;
+	margin: var(--lo-space-3) 0 0;
+	padding: 0;
+}
+
+.lo-shelf-item {
+	background: var(--lo-card);
+	border: 1px solid var(--lo-border);
+	border-radius: 10px;
+	border-top: 4px solid var(--theme-chart-cat-1);
+	display: flex;
+	flex-direction: column;
+	gap: var(--lo-space-2);
+	min-width: 0;
+	padding: var(--lo-space-3) var(--lo-space-4);
+}
+
+.lo-shelf-item[data-rank='1'] {
+	border-top-color: var(--lo-accent);
+}
+
+.lo-shelf-head {
+	align-items: center;
+	display: flex;
+	gap: var(--lo-space-2);
+	min-width: 0;
+}
+
+.lo-shelf-rank {
+	background: var(--lo-accent-soft);
+	border-radius: 999px;
+	color: var(--lo-accent);
+	font-weight: 700;
+	padding: 0 var(--lo-space-2);
+}
+
+.lo-shelf-name {
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.lo-shelf-bar {
+	background: var(--lo-inset);
+	border-radius: 4px;
+	display: block;
+	height: 8px;
+	overflow: hidden;
+	position: relative;
+}
+
+.lo-shelf-bar::after {
+	background: var(--lo-good);
+	border-radius: 4px;
+	content: '';
+	inset: 0 auto 0 0;
+	position: absolute;
+	width: var(--lo-shelf, 0%);
+}
+
+.lo-shelf-facts {
+	font-variant-numeric: tabular-nums;
+	margin: 0;
+}
+
 /* The start and the best layout side by side when both fit. */
 .lo-boards {
 	display: grid;

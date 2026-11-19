@@ -847,7 +847,7 @@ async function exerciseWorstNgramsMore(browser, origin) {
 	assert.equal(await rows(), 8, 'eight rows first');
 	const more = page.locator(`${card} .la-ngram-more`);
 	const label = await more.textContent();
-	const extra = Number(/\((\d+) more\)$/.exec(label)[1]);
+	const extra = Number(/\((\d+)\u00a0more\)$/.exec(label)[1]);
 	assert.ok(extra > 0, `the button says how many it adds: ${JSON.stringify(label)}`);
 	assert.equal(await more.getAttribute('aria-expanded'), 'false');
 	const controlled = await more.getAttribute('aria-controls');

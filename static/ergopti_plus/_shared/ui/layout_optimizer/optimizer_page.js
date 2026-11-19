@@ -51,6 +51,9 @@
  * 14. Thumb keys: a switch lets the search place characters on the thumb
  *    keys (the core's thumbKeys, the chosen keyboard), enabled only on a
  *    keyboard that has them; its « i » says why it is off by default.
+ * 15. A results shelf: the SHELF_SIZE best distinct layouts the search
+ *    reported, each with its score, the keys it moves and its buttons to
+ *    open it in « Éditer » or « Comparer ».
  * 13. Progress in sight: a live chart draws the best score over the
  *    run's time above the start's score, with the evaluations per second, the
  *    same said in words and as a table (the drawing is hidden from assistive
@@ -133,6 +136,8 @@
 	const CHART_TABLE_ROWS = 12;
 	const CHART_POINT_SECONDS = 1;
 	const SVG_NS = 'http://www.w3.org/2000/svg';
+	// The best distinct layouts of a run the results shelf keeps.
+	const SHELF_SIZE = 5;
 	// The corpus a pasted text or an opened file makes.
 	const CUSTOM_ID = 'custom';
 	// The app's keystats corpus (« My typing ») and the event its Studio window
@@ -320,6 +325,11 @@
 		<button type="button" id="lo-open-editor" class="lo-primary" data-i18n="layout_optimizer.result.open_editor" disabled></button>
 		<button type="button" id="lo-open-comparer" data-i18n="layout_optimizer.result.open_comparer" disabled></button>
 	</div>
+	<section id="lo-shelf" class="lo-shelf" aria-labelledby="lo-shelf-title" hidden>
+		<h3 id="lo-shelf-title" data-i18n="layout_optimizer.shelf.title"></h3>
+		<p class="lo-muted" data-i18n="layout_optimizer.shelf.help"></p>
+		<ol id="lo-shelf-list" class="lo-shelf-list"></ol>
+	</section>
 	<section id="lo-library" class="lo-library" aria-labelledby="lo-library-title" hidden>
 		<h3 id="lo-library-title" data-i18n="layout_optimizer.library.title"></h3>
 		<p class="lo-muted" data-i18n="layout_optimizer.library.help"></p>
@@ -617,6 +627,8 @@
 			lastMetrics: 0,
 			// The run's progress chart: {start, points: [{seconds, best, evaluations}]}.
 			chart: null,
+			// The best distinct layouts reported, best first: [{layout, score, key}].
+			shelf: [],
 			// The library scan after a run (scanLibrary): {runner}, or null.
 			library: null
 		};
@@ -1296,6 +1308,8 @@
 			$('lo-open-comparer').disabled = true;
 			showBest(start, state.startResult.score.total, false);
 			resetChart();
+			state.shelf = [];
+			drawShelf();
 
 			enter('search');
 			// One share of the restarts per worker, in order, so the split never changes the winner.
@@ -1394,6 +1408,7 @@
 				}
 				showProgress(running, began, iterations);
 				chartProgress(running, began, false);
+				if (message.layout) shelve(message.layout, message.progress.best);
 				return;
 			}
 			part.result = message.result;
@@ -1858,6 +1873,86 @@
 		}
 
 		// ============================
+		// ======= 5c/ Results shelf ==
+		// ============================
+
+		/**
+		 * Keeps a layout a runner reported among the run's SHELF_SIZE best: a
+		 * layout already kept (the same keys) is not listed twice.
+		 */
+		function shelve(layout, score) {
+			const key = JSON.stringify(layout.rows);
+			if (state.shelf.some((entry) => entry.key === key)) return;
+			state.shelf.push({ layout, score, key });
+			state.shelf.sort((a, b) => b.score - a.score);
+			state.shelf.length = Math.min(state.shelf.length, SHELF_SIZE);
+			drawShelf();
+		}
+
+		/**
+		 * The shelf: each kept layout's rank, score, a bar of its gain over the
+		 * start (its number said beside it), the keys it moves, and its buttons.
+		 */
+		function drawShelf() {
+			const list = $('lo-shelf-list');
+			$('lo-shelf').hidden = state.shelf.length === 0;
+			if (state.shelf.length === 0 || !state.chart || state.chart.start === null) {
+				list.replaceChildren();
+				return;
+			}
+			const start = state.startInUse;
+			const from = state.chart.start;
+			const top = Math.max(...state.shelf.map((entry) => entry.score - from), 0);
+			list.replaceChildren(
+				...state.shelf.map((entry, i) => {
+					const rank = i + 1;
+					const layout = Object.assign({}, entry.layout, {
+						id: `${entry.layout.id}_${rank}`,
+						name: t(`${PREFIX}shelf.name`, { name: start.name, rank })
+					});
+					const item = el('li', 'lo-shelf-item');
+					item.dataset.rank = String(rank);
+					const head = el('div', 'lo-shelf-head');
+					const badge = el('span', 'lo-shelf-rank', `#${number(rank, 0)}`);
+					badge.setAttribute('aria-hidden', 'true');
+					head.append(badge, el('span', 'lo-shelf-name', layout.name));
+					const gain = entry.score - from;
+					const bar = el('span', 'lo-shelf-bar');
+					bar.setAttribute('aria-hidden', 'true');
+					bar.style.setProperty('--lo-shelf', `${top > 0 ? (Math.max(0, gain) / top) * 100 : 0}%`);
+					const moved = Object.keys(entry.layout.rows).filter(
+						(code) => code !== 'Space' && legend(entry.layout, code) !== legend(start, code)
+					).length;
+					const facts = el(
+						'p',
+						'lo-shelf-facts',
+						t(`${PREFIX}shelf.facts`, {
+							score: pointsText(entry.score),
+							gain: withUnit(signed(gain, 2), t('layout_analysis.unit.points')),
+							count: moved
+						})
+					);
+					const actions = el('div', 'lo-library-actions');
+					for (const where of ['editor', 'comparer']) {
+						const button = el('button', 'lo-link', t(`${PREFIX}library.open_${where}`));
+						button.type = 'button';
+						button.dataset.shelf = where;
+						button.setAttribute(
+							'aria-label',
+							t(`${PREFIX}library.open_${where}_label`, { name: layout.name })
+						);
+						button.addEventListener('click', () =>
+							where === 'editor' ? openInEditor(layout) : openInComparer(layout)
+						);
+						actions.append(button);
+					}
+					item.append(head, bar, facts, actions);
+					return item;
+				})
+			);
+		}
+
+		// ============================
 		// ======= 6/ Hand-offs =======
 		// ============================
 
@@ -2100,6 +2195,7 @@
 			fillPresets();
 			drawSettings();
 			if (state.chart) drawChart();
+			drawShelf();
 		}
 
 		// Saving waits until the saved choices are back, or the defaults would replace them.
