@@ -134,10 +134,10 @@ function checkWiring() {
 	assert.match(app, /operabilityProblems\(/, 'The app windows gate judges their operability');
 	assert.match(app, /rule: OPERABILITY_RULE/, 'Its mouse-only controls are counted by its ratchet');
 	assert.match(app, /instrumentListeners/, 'The app windows gate records their listeners');
-	const studio = fs.readFileSync(
-		path.join(ROOT, 'tools/test/browser/studio-keyboard.playwright.cjs'),
-		'utf8'
-	);
+	// The Studio gate judges its pages in its operability module.
+	const studio = ['studio-keyboard.playwright.cjs', 'studio-operability.cjs']
+		.map((name) => fs.readFileSync(path.join(ROOT, 'tools/test/browser', name), 'utf8'))
+		.join('\n');
 	assert.match(studio, /operabilityProblems\(rows\)/, 'The Studio keyboard gate judges its pages');
 }
 

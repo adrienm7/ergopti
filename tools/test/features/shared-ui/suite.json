@@ -661,6 +661,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-studio-reading-preferences.cjs"],
 			"repro": "npm run test:studio-reading-preferences"
+		},
+		{
+			"id": "page-images",
+			"ordinal": 710,
+			"name": "the rendered page image check refuses an img without alt, a shown svg neither hidden nor named and a nameless role=img element",
+			"cmd": "node",
+			"args": ["tools/test/test-page-images.cjs"],
+			"repro": "npm run test:page-images"
 		}
 	]
 }

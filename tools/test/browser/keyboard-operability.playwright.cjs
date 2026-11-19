@@ -279,43 +279,58 @@ async function operabilityOf(page) {
 async function exerciseWidgets(frame, page) {
 	const widgets = await frame.evaluate(operability.collectWidgets);
 	const results = [];
-	const state = (selector) =>
-		frame.evaluate((target) => {
-			const element = document.querySelector(target);
-			const controls = element.getAttribute('aria-controls');
-			const controlled = controls ? document.getElementById(controls) : null;
-			return {
-				expanded: element.getAttribute('aria-expanded'),
-				checked: element.checked === true,
-				dialog: Boolean(document.querySelector('dialog[open]')),
-				shown: controlled
-					? controlled.getClientRects().length > 0 &&
-						getComputedStyle(controlled).visibility !== 'hidden'
-					: null,
-				focused: document.activeElement === element,
-				name:
-					element.tagName.toLowerCase() +
-					(element.id ? '#' + element.id : '') +
-					' «' +
-					(element.getAttribute('aria-label') || element.textContent || '')
-						.replace(/\s+/g, ' ')
-						.trim()
-						.slice(0, 40) +
-					'»'
-			};
-		}, selector);
+	// A page that draws itself again on a key (the Studio editor) replaces the
+	// probed element by one with the same id: the probe follows it by that id.
+	const state = (selector, id) =>
+		frame.evaluate(
+			([target, sameId]) => {
+				const element =
+					document.querySelector(target) || (sameId ? document.getElementById(sameId) : null);
+				if (!element) return null;
+				const controls = element.getAttribute('aria-controls');
+				const controlled = controls ? document.getElementById(controls) : null;
+				return {
+					expanded: element.getAttribute('aria-expanded'),
+					checked: element.checked === true,
+					dialog: Boolean(document.querySelector('dialog[open]')),
+					shown: controlled
+						? controlled.getClientRects().length > 0 &&
+							getComputedStyle(controlled).visibility !== 'hidden'
+						: null,
+					focused: document.activeElement === element,
+					name:
+						element.tagName.toLowerCase() +
+						(element.id ? '#' + element.id : '') +
+						' «' +
+						(element.getAttribute('aria-label') || element.textContent || '')
+							.replace(/\s+/g, ' ')
+							.trim()
+							.slice(0, 40) +
+						'»'
+				};
+			},
+			[selector, id]
+		);
 	const open = (before, after) =>
-		(before.expanded !== 'true' && after.expanded === 'true') ||
-		(!before.dialog && after.dialog) ||
-		(before.shown === false && after.shown === true);
+		after !== null &&
+		((before.expanded !== 'true' && after.expanded === 'true') ||
+			(!before.dialog && after.dialog) ||
+			(before.shown === false && after.shown === true));
 	for (const disclosure of widgets.disclosures) {
-		const locator = frame.locator(disclosure.selector);
+		// A probe an earlier one's render removed is no longer on the page.
+		const id = await frame.evaluate((target) => {
+			const element = document.querySelector(target);
+			return element ? element.id : null;
+		}, disclosure.selector);
+		if (id === null) continue;
+		const follow = id ? `${disclosure.selector}, [id="${id}"]` : disclosure.selector;
+		const locator = frame.locator(follow).first();
 		await locator.focus();
-		const before = await state(disclosure.selector);
+		const before = await state(disclosure.selector, id);
 		// Only a closed control is probed: an open one is closed by its own walk.
 		if (before.expanded === 'true' || before.dialog) continue;
 		await page.keyboard.press(disclosure.checkbox ? 'Space' : 'Enter');
-		const after = await state(disclosure.selector);
+		const after = await state(disclosure.selector, id);
 		const result = {
 			kind: 'disclosure',
 			id: before.name,
@@ -324,41 +339,69 @@ async function exerciseWidgets(frame, page) {
 		};
 		if (result.opened && disclosure.popup) {
 			await page.keyboard.press('Escape');
-			const closed = await state(disclosure.selector);
-			result.closed = closed.expanded !== 'true' && !closed.dialog;
-			result.focusBack = closed.focused;
+			const closed = await state(disclosure.selector, id);
+			result.closed = closed !== null && closed.expanded !== 'true' && !closed.dialog;
+			result.focusBack = closed !== null && closed.focused;
 		} else if (result.opened) {
 			await locator.focus();
 			await page.keyboard.press(disclosure.checkbox ? 'Space' : 'Enter');
-			const closed = await state(disclosure.selector);
-			result.closed = !open(before, closed) && closed.expanded !== 'true';
+			const closed = await state(disclosure.selector, id);
+			result.closed = closed !== null && !open(before, closed) && closed.expanded !== 'true';
 		}
 		// Leave nothing open for the next probe.
 		if (result.opened && !result.closed) await page.keyboard.press('Escape');
 		results.push(result);
 	}
+	// The item role of each composite widget, as collectWidgets reads them.
+	const ITEM = {
+		tablist: 'tab',
+		menu: 'menuitem',
+		menubar: 'menuitem',
+		listbox: 'option',
+		radiogroup: 'radio',
+		tree: 'treeitem',
+		grid: 'gridcell'
+	};
 	for (const composite of widgets.composites) {
 		const target = composite.start || composite.selector;
+		// A probe an earlier one's render removed is no longer on the page.
+		if (!(await frame.evaluate((selector) => Boolean(document.querySelector(selector)), target)))
+			continue;
 		await frame.locator(target).focus();
+		// Where the focus is: inside the widget (its place among the widget's
+		// elements, or the active descendant), or on an item of the same role
+		// when an arrow key made the page draw the widget again.
 		const where = () =>
-			frame.evaluate((selector) => {
-				const widget = document.querySelector(selector);
-				return (
-					(widget.getAttribute('aria-activedescendant') || '') +
-					'|' +
-					(widget.contains(document.activeElement)
-						? [...widget.querySelectorAll('*')].indexOf(document.activeElement)
-						: -1)
-				);
-			}, composite.selector);
+			frame.evaluate(
+				([selector, item]) => {
+					const widget = document.querySelector(selector);
+					const active = document.activeElement;
+					const onItem = Boolean(active && active.getAttribute('role') === item);
+					const name = active ? `${active.id}|${active.textContent.trim().slice(0, 40)}` : '';
+					if (!widget) return { place: null, onItem, name };
+					return {
+						place:
+							(widget.getAttribute('aria-activedescendant') || '') +
+							'|' +
+							(widget.contains(active) ? [...widget.querySelectorAll('*')].indexOf(active) : -1),
+						onItem,
+						name
+					};
+				},
+				[composite.selector, ITEM[composite.role]]
+			);
 		const before = await where();
 		await page.keyboard.press(composite.vertical ? 'ArrowDown' : 'ArrowRight');
 		const after = await where();
-		const inside = !after.endsWith('|-1') || after.split('|')[0] !== '';
+		const moved =
+			after.place === null
+				? after.onItem && after.name !== before.name
+				: (!after.place.endsWith('|-1') || after.place.split('|')[0] !== '') &&
+					after.place !== before.place;
 		results.push({
 			kind: 'composite',
 			id: `[role="${composite.role}"] ${composite.selector}`,
-			moved: inside && after !== before
+			moved
 		});
 		await page.keyboard.press(composite.vertical ? 'ArrowUp' : 'ArrowLeft');
 	}

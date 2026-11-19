@@ -811,6 +811,7 @@
 		"test:site-semantic-html": "node ./tools/test/test-site-semantic-html.cjs",
 		"test:studio-semantic-html": "node ./tools/test/test-studio-semantic-html.cjs",
 		"test:studio-reading-preferences": "node ./tools/test/test-studio-reading-preferences.cjs",
+		"test:page-images": "node ./tools/test/test-page-images.cjs",
 		"test:site-image-alternatives": "node ./tools/test/test-site-image-alternatives.cjs",
 		"test:keyboard-operability": "node ./tools/test/test-keyboard-operability.cjs",
 		"test:browser:keyboard-operability": "node ./tools/test/browser/keyboard-operability.playwright.cjs build \"\"",

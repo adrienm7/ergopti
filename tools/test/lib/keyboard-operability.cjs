@@ -205,6 +205,16 @@ function collectOperability(lists) {
 						(item) => item.tabIndex >= 0 && shown(item)
 					);
 		}
+		// A native control inside a toolbar (a drawn keyboard's keys) is one of
+		// its items: the toolbar keeps one of them in the Tab order and the arrow
+		// keys move between them, with no item role of their own.
+		if (!roving && element.matches(NATIVE)) {
+			const bar = element.parentElement && element.parentElement.closest('[role="toolbar"]');
+			if (bar)
+				roving = [...bar.querySelectorAll(FOCUSABLE)].some(
+					(item) => item !== element && item.tabIndex >= 0 && shown(item)
+				);
+		}
 		// A control elsewhere that offers the same action (see the header).
 		const holder = element.closest('[data-keyboard-equivalent]');
 		let equivalent = false;
@@ -279,6 +289,9 @@ function operabilityProblems(rows) {
  * @returns {{disclosures: object[], composites: object[]}}
  */
 function collectWidgets() {
+	// A page read again (each tab of a Studio page) drops its earlier marks first.
+	for (const marked of document.querySelectorAll('[data-operability-probe]'))
+		marked.removeAttribute('data-operability-probe');
 	const shown = (element) =>
 		element.getClientRects().length > 0 &&
 		getComputedStyle(element).visibility !== 'hidden' &&
