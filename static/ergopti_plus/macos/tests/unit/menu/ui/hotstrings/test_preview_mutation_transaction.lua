@@ -285,7 +285,8 @@ helpers.describe("declared coloured preview checkbox", function()
 					end
 				end
 				local rows = assert(group(f.menus))
-				helpers.assert_eq(#rows, 5)
+				helpers.assert_eq(#rows, 6, "the glyph switch follows the coloured one")
+				helpers.assert_eq(rows[6].label, translate("menu.hotstrings.tooltip_glyphs"))
 				for index, label in ipairs(corpus.siblings) do helpers.assert_eq(rows[index].label, translate(label)) end
 				helpers.assert_eq(rows[corpus.separator_position].separator, true)
 				helpers.assert_eq(f.row.label, translate(corpus.row.i18n))
@@ -466,7 +467,7 @@ helpers.describe("ordered presence checkbox locale contract", function()
 						end
 					end
 					local rows = assert(preview(f.menus))
-					helpers.assert_eq(#rows, 5)
+					helpers.assert_eq(#rows, 6, "the glyph switch follows the coloured one")
 					helpers.assert_eq(rows[1].label, translate("menu.hotstrings.tooltip_magic"))
 					for index, expected in ipairs(corpus.rows) do
 						local position = reverse and (4 - index) or (index + 1)
