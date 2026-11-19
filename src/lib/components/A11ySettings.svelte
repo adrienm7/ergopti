@@ -5,8 +5,9 @@
 MODULE: Accessibility Settings
 DESCRIPTION:
 The header button and dialog where a visitor sets how the site looks to them:
-less motion, a hyperlegible font, a larger text, wider text spacing and high
-contrast. The choices are owned by static/ergopti_plus/_shared/ui/a11y_prefs.js
+less motion, a hyperlegible or a dyslexia font, a larger text, wider text
+spacing, shorter lines, text aligned to the start, high contrast and colours
+that colour-blind readers tell apart. The choices are owned by static/ergopti_plus/_shared/ui/a11y_prefs.js
 (loaded by app.html before the page), which stores them per visitor and carries
 them into the Ergopti Studio frames; this component only edits them. A browser
 that refuses storage still gets the look for the current page, and is told so.
@@ -16,6 +17,12 @@ that refuses storage still gets the look for the current page, and is told so.
 <script>
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
+
+	const FONTS = [
+		['default', 'Police du site'],
+		['hyperlegible', 'Atkinson Hyperlegible (très lisible)'],
+		['dyslexic', 'OpenDyslexic (dyslexie)']
+	];
 
 	const TEXT_SIZES = [
 		['100', '100 %'],
@@ -105,21 +112,24 @@ that refuses storage still gets the look for the current page, and is told so.
 				checked={prefs.motion === 'reduce'}
 				onchange={(event) => toggle('motion', event.currentTarget.checked)}
 			/>
-			<span>Réduire les animations et les défilements</span>
-		</label>
-
-		<label class="a11y-row">
-			<input
-				type="checkbox"
-				id="a11y-font"
-				checked={prefs.font === 'hyperlegible'}
-				onchange={(event) => toggle('font', event.currentTarget.checked)}
-			/>
-			<span>Police très lisible (Atkinson Hyperlegible)</span>
+			Réduire les animations et les défilements
 		</label>
 
 		<label class="a11y-row a11y-select">
-			<span>Taille du texte</span>
+			Police
+			<select
+				id="a11y-font"
+				value={prefs.font || 'default'}
+				onchange={(event) => set('font', event.currentTarget.value)}
+			>
+				{#each FONTS as [value, label] (value)}
+					<option {value}>{label}</option>
+				{/each}
+			</select>
+		</label>
+
+		<label class="a11y-row a11y-select">
+			Taille du texte
 			<select
 				id="a11y-text"
 				value={prefs.text || '100'}
@@ -138,7 +148,27 @@ that refuses storage still gets the look for the current page, and is told so.
 				checked={prefs.spacing === 'wide'}
 				onchange={(event) => toggle('spacing', event.currentTarget.checked)}
 			/>
-			<span>Espacer les lettres, les mots et les lignes</span>
+			Espacer les lettres, les mots et les lignes
+		</label>
+
+		<label class="a11y-row">
+			<input
+				type="checkbox"
+				id="a11y-measure"
+				checked={prefs.measure === 'short'}
+				onchange={(event) => toggle('measure', event.currentTarget.checked)}
+			/>
+			Raccourcir les lignes de texte
+		</label>
+
+		<label class="a11y-row">
+			<input
+				type="checkbox"
+				id="a11y-align"
+				checked={prefs.align === 'start'}
+				onchange={(event) => toggle('align', event.currentTarget.checked)}
+			/>
+			Aligner tout le texte à gauche
 		</label>
 
 		<label class="a11y-row">
@@ -148,7 +178,17 @@ that refuses storage still gets the look for the current page, and is told so.
 				checked={prefs.contrast === 'high'}
 				onchange={(event) => toggle('contrast', event.currentTarget.checked)}
 			/>
-			<span>Contraste élevé</span>
+			Contraste élevé
+		</label>
+
+		<label class="a11y-row">
+			<input
+				type="checkbox"
+				id="a11y-colors"
+				checked={prefs.colors === 'cvd'}
+				onchange={(event) => toggle('colors', event.currentTarget.checked)}
+			/>
+			Couleurs adaptées au daltonisme
 		</label>
 
 		<p class="a11y-status" role="status">

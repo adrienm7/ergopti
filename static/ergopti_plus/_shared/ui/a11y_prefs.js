@@ -5,8 +5,10 @@
  * MODULE: Accessibility Preferences
  * DESCRIPTION:
  * The one owner of the visitor's display preferences on the website and in the
- * Ergopti Studio pages it frames: reduced motion, a hyperlegible font, a larger
- * text size, wider text spacing and high contrast. Each preference becomes a
+ * Ergopti Studio pages it frames: reduced motion, a hyperlegible or a
+ * dyslexia font, a larger text size, wider text spacing, shorter lines, text
+ * aligned to the start, high contrast and colours that colour-blind readers
+ * tell apart. Each preference becomes a
  * data attribute on the document's root element, which the site stylesheet
  * (src/lib/css/accessibility.css) and the shared theme (theme.css) style.
  *
@@ -28,22 +30,23 @@
 	'use strict';
 
 	var STORAGE_KEY = 'ergopti-a11y-preferences';
-	// The hyperlegible font's stylesheet, served by the site next to this
-	// file's folder (static/fonts/). Resolved from this script's own address,
-	// so the site under any base path and its frames find the same file.
+	// Each reading font's stylesheet, served by the site next to this file's
+	// folder (static/fonts/), never from a CDN. Resolved from this script's own
+	// address, so the site under any base path and its frames find the same file.
 	var SCRIPT_SRC = document.currentScript ? document.currentScript.src : '';
-	var FONT_STYLESHEET = SCRIPT_SRC
-		? new URL('../../../fonts/atkinson-hyperlegible/font.css', SCRIPT_SRC).href
-		: '';
-	var FONT_LINK_ID = 'ergopti-a11y-font';
+	var FONT_FOLDERS = { hyperlegible: 'atkinson-hyperlegible', dyslexic: 'opendyslexic' };
+	var FONT_LINK_ID = 'ergopti-a11y-font-';
 	// Each preference: its root attribute and its allowed values, the first
 	// being the default (no attribute written).
 	var PREFERENCES = {
 		motion: { attribute: 'data-a11y-motion', values: ['system', 'reduce'] },
-		font: { attribute: 'data-a11y-font', values: ['default', 'hyperlegible'] },
+		font: { attribute: 'data-a11y-font', values: ['default', 'hyperlegible', 'dyslexic'] },
 		text: { attribute: 'data-a11y-text', values: ['100', '125', '150', '200'] },
 		spacing: { attribute: 'data-a11y-spacing', values: ['default', 'wide'] },
-		contrast: { attribute: 'data-a11y-contrast', values: ['default', 'high'] }
+		measure: { attribute: 'data-a11y-measure', values: ['default', 'short'] },
+		align: { attribute: 'data-a11y-align', values: ['default', 'start'] },
+		contrast: { attribute: 'data-a11y-contrast', values: ['default', 'high'] },
+		colors: { attribute: 'data-a11y-colors', values: ['default', 'cvd'] }
 	};
 
 	/** Keep only known preferences with allowed values. */
@@ -68,13 +71,13 @@
 		}
 	}
 
-	/** Link the font stylesheet once, the first time the font is picked. */
-	function linkFont(doc) {
-		if (!FONT_STYLESHEET || doc.getElementById(FONT_LINK_ID)) return;
+	/** Link a font's stylesheet once, the first time that font is picked. */
+	function linkFont(doc, font) {
+		if (!SCRIPT_SRC || doc.getElementById(FONT_LINK_ID + font)) return;
 		var link = doc.createElement('link');
-		link.id = FONT_LINK_ID;
+		link.id = FONT_LINK_ID + font;
 		link.rel = 'stylesheet';
-		link.href = FONT_STYLESHEET;
+		link.href = new URL('../../../fonts/' + FONT_FOLDERS[font] + '/font.css', SCRIPT_SRC).href;
 		doc.head.appendChild(link);
 	}
 
@@ -87,7 +90,7 @@
 			if (clean[name]) target.setAttribute(attribute, clean[name]);
 			else target.removeAttribute(attribute);
 		});
-		if (clean.font === 'hyperlegible') linkFont(target.ownerDocument);
+		if (clean.font) linkFont(target.ownerDocument, clean.font);
 		return clean;
 	}
 

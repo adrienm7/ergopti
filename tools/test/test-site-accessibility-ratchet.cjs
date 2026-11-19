@@ -178,6 +178,26 @@ function checkPreferences() {
 		font: 'hyperlegible',
 		contrast: 'high'
 	});
+	// The dyslexia font is served by the site too, from its own folder, and
+	// the reading and colour settings reach the root as their attributes.
+	loaded.api.save({ font: 'dyslexic', measure: 'short', align: 'start', colors: 'cvd' });
+	assert.equal(loaded.head.length, 2, 'Each picked font links its own stylesheet once');
+	assert.equal(loaded.head[1].href, 'https://ergopti.fr/dev/fonts/opendyslexic/font.css');
+	assert.equal(loaded.attributes.get('data-a11y-font'), 'dyslexic');
+	assert.equal(loaded.attributes.get('data-a11y-measure'), 'short');
+	assert.equal(loaded.attributes.get('data-a11y-align'), 'start');
+	assert.equal(loaded.attributes.get('data-a11y-colors'), 'cvd');
+	loaded.api.save({ colors: 'protanopia', align: 'justify' });
+	assert.equal(loaded.attributes.has('data-a11y-colors'), false, 'Unknown colour value ignored');
+	assert.equal(loaded.attributes.has('data-a11y-align'), false, 'Unknown alignment ignored');
+	for (const font of ['atkinson-hyperlegible', 'opendyslexic']) {
+		const folder = path.join(ROOT, 'static', 'fonts', font);
+		assert.ok(fs.existsSync(path.join(folder, 'OFL.txt')), font + ' ships its licence');
+		const css = fs.readFileSync(path.join(folder, 'font.css'), 'utf8');
+		for (const [, file] of css.matchAll(/url\('([^']+)'\)/g))
+			assert.ok(fs.existsSync(path.join(folder, file)), font + ' serves ' + file + ' itself');
+		assert.doesNotMatch(css, /https?:/, font + ' is never loaded from a CDN');
+	}
 	// Defaults remove the stored entry instead of writing a no-op map.
 	loaded.api.save({ font: 'default' });
 	assert.equal(Object.hasOwn(stored.values, key), false);

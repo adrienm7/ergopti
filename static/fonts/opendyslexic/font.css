@@ -1,0 +1,39 @@
+/* static/fonts/opendyslexic/font.css */
+
+/* OpenDyslexic, by Abbie Gonzalez, under the SIL Open Font License 1.1     */
+/* (OFL.txt, Reserved Font Name OpenDyslexic: the files are unmodified).     */
+/* Latin subset of @fontsource/opendyslexic 5.3.0, served by the site, never */
+/* from a CDN. The accessibility settings link this file only when the      */
+/* visitor picks the font (static/ergopti_plus/_shared/ui/a11y_prefs.js).    */
+
+@font-face {
+	font-display: swap;
+	font-family: 'OpenDyslexic';
+	font-style: normal;
+	font-weight: 400;
+	src: url('opendyslexic-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+	font-display: swap;
+	font-family: 'OpenDyslexic';
+	font-style: italic;
+	font-weight: 400;
+	src: url('opendyslexic-latin-400-italic.woff2') format('woff2');
+}
+
+@font-face {
+	font-display: swap;
+	font-family: 'OpenDyslexic';
+	font-style: normal;
+	font-weight: 700;
+	src: url('opendyslexic-latin-700-normal.woff2') format('woff2');
+}
+
+@font-face {
+	font-display: swap;
+	font-family: 'OpenDyslexic';
+	font-style: italic;
+	font-weight: 700;
+	src: url('opendyslexic-latin-700-italic.woff2') format('woff2');
+}

@@ -532,6 +532,27 @@
 	--theme-bad-text: #ff6961;
 }
 
+/* The colour-blind setting of the site (a11y_prefs.js): green and red merge
+   under protanopia and deuteranopia, blue and orange stay apart. 5.8:1 and
+   5.5:1 on white, 5.7:1 and 6.8:1 on the dark surface (#2c2c2e). The charts'
+   own palettes were already chosen for colour-blind readers. */
+:root[data-a11y-colors='cvd'] {
+	--theme-good-text: #0062cc;
+	--theme-bad-text: #b34700;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root[data-a11y-colors='cvd']:not([data-theme='light']) {
+		--theme-good-text: #64a8ff;
+		--theme-bad-text: #ff9f45;
+	}
+}
+
+:root[data-a11y-colors='cvd'][data-theme='dark'] {
+	--theme-good-text: #64a8ff;
+	--theme-bad-text: #ff9f45;
+}
+
 /* Windows high contrast (forced colours) drops background colours, which
    would erase the bars and the heatmap's shades: the figures keep their
    validated colours, and their numbers stay in text beside them. */
@@ -616,6 +637,39 @@
    in pixels, so a larger text zooms the page, as the browser's own zoom does. */
 :root[data-a11y-font='hyperlegible'] :is(body, body *) {
 	font-family: 'Atkinson Hyperlegible', system-ui, sans-serif !important;
+}
+
+:root[data-a11y-font='dyslexic'] :is(body, body *) {
+	font-family: 'OpenDyslexic', system-ui, sans-serif !important;
+}
+
+/* Shorter lines and text aligned to the start, as on the site
+   (src/lib/css/accessibility.css): running text only, not the tools' grids,
+   tables and buttons. */
+:root[data-a11y-measure='short'] :is(p, li, dd, dt, blockquote, figcaption, caption, summary) {
+	max-width: 50ch !important;
+}
+
+:root[data-a11y-align='start']
+	:is(
+		p,
+		li,
+		dd,
+		dt,
+		h1,
+		h2,
+		h3,
+		h4,
+		h5,
+		h6,
+		blockquote,
+		figcaption,
+		caption,
+		summary,
+		legend,
+		label
+	):not(table *, button *) {
+	text-align: start !important;
 }
 
 :root[data-a11y-text='125'] body {

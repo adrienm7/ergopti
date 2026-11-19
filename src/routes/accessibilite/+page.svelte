@@ -88,11 +88,17 @@ in docs/audits/accessibility/; update both together.
 			</li>
 			<li>
 				une police très lisible, <span lang="en">Atkinson Hyperlegible</span>, conçue par le Braille
-				Institute pour les personnes malvoyantes ;
+				Institute pour les personnes malvoyantes, ou une police pensée pour les personnes
+				dyslexiques, <span lang="en">OpenDyslexic</span> ;
 			</li>
 			<li>un texte plus grand, jusqu’à 200 % ;</li>
 			<li>un espacement élargi des lettres, des mots et des lignes ;</li>
-			<li>un contraste élevé.</li>
+			<li>des lignes de texte plus courtes, et tout le texte aligné à gauche ;</li>
+			<li>un contraste élevé ;</li>
+			<li>
+				des couleurs que les personnes daltoniennes distinguent, sur les claviers dessinés et les
+				démonstrations.
+			</li>
 		</ul>
 		<p>
 			Toutes les pages ont aussi un lien « Aller au contenu », visible au premier appui sur la

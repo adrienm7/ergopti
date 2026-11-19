@@ -121,11 +121,16 @@
 /* ================================== */
 /* ================================== */
 
-/* Atkinson Hyperlegible is served by the site (static/fonts/), and
-   a11y_prefs.js links its stylesheet only when the setting is on. */
+/* Atkinson Hyperlegible and OpenDyslexic are served by the site
+   (static/fonts/), and a11y_prefs.js links a font's stylesheet only when the
+   visitor picks it. */
 /* Every text takes the font, except the icon font glyphs. */
 :root[data-a11y-font='hyperlegible'] :is(body, body *):not([class^='icon-'], [class*=' icon-']) {
 	font-family: 'Atkinson Hyperlegible', 'Noto Sans', sans-serif !important;
+}
+
+:root[data-a11y-font='dyslexic'] :is(body, body *):not([class^='icon-'], [class*=' icon-']) {
+	font-family: 'OpenDyslexic', 'Noto Sans', sans-serif !important;
 }
 
 /* Text size: the root size scales every rem and em of the site. */
@@ -156,6 +161,39 @@
 	margin-bottom: 2em !important;
 }
 
+/* Shorter lines: every block of running text holds at most about 50
+   characters (the site's default prose column is 58ch; WCAG 1.4.8 asks for
+   80 at most, and dyslexic readers lose the next line's start on long ones).
+   Centred blocks stay centred: only their width shrinks. */
+:root[data-a11y-measure='short'] :is(p, li, dd, dt, blockquote, figcaption, caption, summary) {
+	max-width: 50ch !important;
+}
+
+/* Text aligned to the start: centred and right-aligned running text makes
+   every line start at a new place. The keyboard drawings, tables, buttons and
+   the corner banner keep their layout, which is not running text. */
+:root[data-a11y-align='start']
+	:is(
+		p,
+		li,
+		dd,
+		dt,
+		h1,
+		h2,
+		h3,
+		h4,
+		h5,
+		h6,
+		blockquote,
+		figcaption,
+		caption,
+		summary,
+		legend,
+		label
+	):not(keyboard *, table *, button *, .banner *) {
+	text-align: start !important;
+}
+
 /* ============================== */
 /* ============================== */
 /* ======= 4/ High contrast ===== */
@@ -181,7 +219,8 @@
 	text-shadow: none !important;
 }
 
-:root[data-a11y-contrast='high'] :is(main, header, footer, nav, section, article, aside, div) {
+/* Every separator and frame, whatever its element. */
+:root[data-a11y-contrast='high'] body * {
 	border-color: #fff;
 }
 
@@ -198,4 +237,95 @@
 	background: #000 !important;
 	border: 2px solid #fff !important;
 	color: #fff !important;
+}
+
+/* ======================================== */
+/* ======================================== */
+/* ======= 5/ Colour-blind safe colours ===== */
+/* ======================================== */
+/* ======================================== */
+
+/* The keyboard drawings tell fingers apart by eight hues at one lightness,
+   which red-green and blue-yellow colour blindness merge. This setting gives
+   each finger an Okabe-Ito colour (chosen to stay apart under protanopia,
+   deuteranopia and tritanopia) and turns the frequency heat map into one hue
+   whose lightness carries the value. The finger and the frequency are also
+   in each key's name, so the colour is never the only way to read them. */
+:root[data-a11y-colors='cvd']
+	keyboard[data-color='yes']
+	keyboard-key[data-hand='left'][data-finger='auriculaire'] {
+	--key-color-hue: 41deg;
+	--key-color-saturation: 100%;
+	--key-color-luminosity: 45%;
+}
+
+:root[data-a11y-colors='cvd']
+	keyboard[data-color='yes']
+	keyboard-key[data-hand='left'][data-finger='annulaire'] {
+	--key-color-hue: 202deg;
+	--key-color-saturation: 77%;
+	--key-color-luminosity: 63%;
+}
+
+:root[data-a11y-colors='cvd']
+	keyboard[data-color='yes']
+	keyboard-key[data-hand='left'][data-finger='majeur'] {
+	--key-color-hue: 164deg;
+	--key-color-saturation: 100%;
+	--key-color-luminosity: 31%;
+}
+
+:root[data-a11y-colors='cvd']
+	keyboard[data-color='yes']
+	keyboard-key[data-hand='left'][data-finger='index'] {
+	--key-color-hue: 56deg;
+	--key-color-saturation: 85%;
+	--key-color-luminosity: 60%;
+}
+
+:root[data-a11y-colors='cvd']
+	keyboard[data-color='yes']
+	keyboard-key[data-hand='right'][data-finger='index'] {
+	--key-color-hue: 202deg;
+	--key-color-saturation: 100%;
+	--key-color-luminosity: 35%;
+}
+
+:root[data-a11y-colors='cvd']
+	keyboard[data-color='yes']
+	keyboard-key[data-hand='right'][data-finger='majeur'] {
+	--key-color-hue: 26deg;
+	--key-color-saturation: 100%;
+	--key-color-luminosity: 42%;
+}
+
+:root[data-a11y-colors='cvd']
+	keyboard[data-color='yes']
+	keyboard-key[data-hand='right'][data-finger='annulaire'] {
+	--key-color-hue: 327deg;
+	--key-color-saturation: 45%;
+	--key-color-luminosity: 64%;
+}
+
+:root[data-a11y-colors='cvd']
+	keyboard[data-color='yes']
+	keyboard-key[data-hand='right'][data-finger='auriculaire'] {
+	--key-color-hue: 0deg;
+	--key-color-saturation: 0%;
+	--key-color-luminosity: 60%;
+}
+
+:root[data-a11y-colors='cvd']
+	keyboard[data-color='freq']
+	keyboard-key:is([data-type='letter'], [data-type='french'], [data-type='ponctuation']) {
+	--key-color-hue: 215deg;
+	--key-color-saturation: 90%;
+	--key-color-luminosity: calc(85% - 50% * var(--frequency_normalized));
+}
+
+/* The Ergopti+ AI tooltip demo tells a correction (green) from a prediction
+   (orange), which deuteranopia merges: blue and orange stay apart. The legend
+   under the demo names each colour as well. */
+:root[data-a11y-colors='cvd'] :is(.tt-corr, .lg-green) {
+	color: #6cb8ff !important;
 }
