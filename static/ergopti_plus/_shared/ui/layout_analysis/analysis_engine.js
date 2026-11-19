@@ -844,8 +844,9 @@ var LAYOUT_ANALYSIS = (function () {
 		// tails are the lists, at the versions, of its last pass would only
 		// offer again what it offered then: lists only get better, so every
 		// such offer is refused, and the rule is skipped (the same ways, in a
-		// fraction of the joins).
-		const versions = new WeakMap();
+		// fraction of the joins). A Map: it lives for this call alone, and a
+		// trial writes no weak table (WAY_TIME).
+		const versions = new Map();
 		const version = (list) => versions.get(list) || 0;
 		const count = order === null ? rules.length : order.length;
 		// By position in the order: each rule is in it once.
