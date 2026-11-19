@@ -215,6 +215,19 @@ the host: the macOS and Linux builders seed `window._i18n_strings` (the
 The store in i18n.js only merges; a replacing `apply()` let the always-failing
 fetch wipe the host's strings and the diagnostics page showed raw keys.
 
+### project-a-host-sends-the-whole-catalogue
+
+A page reads keys of families its own folder does not name: the Studio
+draws the layer model's `layer_editor.key.*` key names and the action
+labels beside its `layout_editor.*` keys. The Windows host once sent the
+Studio a prefix-filtered subset and the board read
+`layer_editor.key.shift` for Shift. Action: a host that sends a page its
+strings sends the whole catalogue (`LayoutManager_EditorStrings`), as
+macOS and Linux seed it; only a window's own markup list (strings.json)
+is a declared subset. A key built at run time (`'prefix.' + id`) needs a
+family module in `tools/test/lib/i18n-dynamic-keys/` that enumerates its
+ids from the code's data (`test-i18n-referenced-keys-resolve.cjs`).
+
 ### project-shared-ui-logic-is-a-classic-script
 
 `package.json` declares `"type": "module"`, so Node loads any `.js` under
