@@ -3085,14 +3085,6 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["fr", "nl"]
 		},
-		"ui_apps.prod_negative": {
-			"reason": "loanword-or-cognate",
-			"locales": ["fr"]
-		},
-		"ui_apps.prod_neutral": {
-			"reason": "loanword-or-cognate",
-			"locales": ["da", "de", "es", "sv"]
-		},
 		"ui_apps.tile_backspaces": {
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "he", "nl", "pt"]
