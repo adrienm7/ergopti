@@ -484,7 +484,7 @@
 		},
 		{
 			"id": "js-0477",
-			"ordinal": 459,
+			"ordinal": 460,
 			"name": "local runners refuse a host whose toolchain differs from CI (pinned Node, Lua 5.4, non-root, pwsh)",
 			"cmd": "node",
 			"args": ["tools/test/test-host-toolchain.cjs"],
@@ -492,7 +492,7 @@
 		},
 		{
 			"id": "js-0499",
-			"ordinal": 480,
+			"ordinal": 481,
 			"name": "Wine runner preserves process exclusion without forking per unrelated PID",
 			"cmd": "node",
 			"args": ["tools/test/test-wine-runner-process-guard.cjs"],
@@ -501,7 +501,7 @@
 		},
 		{
 			"id": "js-linux-private-runner-output",
-			"ordinal": 502,
+			"ordinal": 503,
 			"name": "Linux private helper failures stay private while canonical failures remain reportable",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-runner-private-output.cjs"],
@@ -510,7 +510,7 @@
 		},
 		{
 			"id": "js-windows-sendinput-consumers",
-			"ordinal": 505,
+			"ordinal": 506,
 			"name": "Windows SendInput: every direct call is decided in the input hooks design note",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-sendinput-consumers.cjs"],
@@ -518,7 +518,7 @@
 		},
 		{
 			"id": "js-no-pinned-source-reads-linux",
-			"ordinal": 543,
+			"ordinal": 544,
 			"name": "no new location-pinned source reads in Linux tests (ratchet)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-no-pinned-source-reads-linux.cjs"],
@@ -526,7 +526,7 @@
 		},
 		{
 			"id": "js-ahk-parallel-runner",
-			"ordinal": 555,
+			"ordinal": 556,
 			"name": "parallel AHK runner reads results by exact test name",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ahk-parallel.cjs"],
@@ -534,7 +534,7 @@
 		},
 		{
 			"id": "js-git-paths",
-			"ordinal": 589,
+			"ordinal": 590,
 			"name": "Git path inventories retain every record beyond the default capture ceiling",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-git-paths.cjs"],
@@ -542,7 +542,7 @@
 		},
 		{
 			"id": "js-0540",
-			"ordinal": 669,
+			"ordinal": 670,
 			"name": "commit identity gate refuses AI assistant identities and attribution trailers",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-commit-identity.cjs"],
@@ -550,7 +550,7 @@
 		},
 		{
 			"id": "js-0543",
-			"ordinal": 682,
+			"ordinal": 683,
 			"name": "startup benchmark fixture paths follow app_dirs.toml",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-bench-ahk-startup-paths.cjs"],

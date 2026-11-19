@@ -285,7 +285,7 @@
 		},
 		{
 			"id": "js-macos-swiftpm-cache-scope",
-			"ordinal": 545,
+			"ordinal": 546,
 			"name": "macOS SwiftPM build cache scope (only the Intel XCTest cell restores a build tree, by an exact key)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-swiftpm-cache-scope.cjs"],
@@ -293,7 +293,7 @@
 		},
 		{
 			"id": "js-linux-flatpak-module-cache",
-			"ordinal": 615,
+			"ordinal": 616,
 			"name": "the Linux Build job caches the flatpak-builder state directory the Flatpak packager uses",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-flatpak-module-cache.cjs"],
@@ -301,7 +301,7 @@
 		},
 		{
 			"id": "js-macos-tsm-refusal",
-			"ordinal": 624,
+			"ordinal": 625,
 			"name": "a keyboard-source refusal after an unanswered com.apple.tsm.uiserver message is named tsm_uiserver_unanswered",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-tsm-refusal.cjs"],
@@ -309,7 +309,7 @@
 		},
 		{
 			"id": "js-0519",
-			"ordinal": 663,
+			"ordinal": 664,
 			"name": "a managed phase worker keeps its published closure status under a late owner TERM",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-managed-phase-late-term.cjs"],
@@ -317,7 +317,7 @@
 		},
 		{
 			"id": "macos-tis-cache-probe",
-			"ordinal": 681,
+			"ordinal": 682,
 			"name": "the macOS TIS current-source cache probe stays a manual workflow on the hosted images of the refusals, runs every run-loop mode the probe accepts in its own process, uploads its evidence on failure and is run by no other workflow",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-tis-cache-probe.cjs"],
@@ -325,7 +325,7 @@
 		},
 		{
 			"id": "windows-stable-signing-retirement",
-			"ordinal": 692,
+			"ordinal": 693,
 			"name": "deleting the unsigned stable Windows exception is one step that refuses unsigned stable receipts and still publishes signed releases",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-stable-signing-retirement.cjs"],

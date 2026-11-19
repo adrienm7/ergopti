@@ -255,7 +255,7 @@
 		},
 		{
 			"id": "shared-ui-no-platform-branches",
-			"ordinal": 443,
+			"ordinal": 444,
 			"name": "shared pages read host capabilities and never compare a platform or driver name",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-ui-no-platform-branches.cjs"],
@@ -263,7 +263,7 @@
 		},
 		{
 			"id": "js-0473",
-			"ordinal": 444,
+			"ordinal": 445,
 			"name": "tooltip duration decrement and floor have one declaration that every engine and vector uses",
 			"cmd": "node",
 			"args": ["tools/test/test-tooltip-timing-single-source.cjs"],
@@ -271,7 +271,7 @@
 		},
 		{
 			"id": "js-0474",
-			"ordinal": 445,
+			"ordinal": 446,
 			"name": "hex colour census counts literals, not comments, issue numbers or entities",
 			"cmd": "node",
 			"args": ["tools/test/test-hex-colours.cjs"],
@@ -279,7 +279,7 @@
 		},
 		{
 			"id": "shared-ui-theme",
-			"ordinal": 456,
+			"ordinal": 457,
 			"name": "shared pages take their recurring colours from theme.css and link it",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-ui-theme.cjs"],
@@ -287,7 +287,7 @@
 		},
 		{
 			"id": "encryptor-startup-receipt",
-			"ordinal": 479,
+			"ordinal": 480,
 			"name": "Encryptor startup preserves icon helper and process replacement without a fixed temporary log",
 			"cmd": "node",
 			"args": ["tools/test/test-encryptor-launch.cjs"],
@@ -295,7 +295,7 @@
 		},
 		{
 			"id": "paths-editor-initialization",
-			"ordinal": 584,
+			"ordinal": 585,
 			"name": "paths editor keeps typed and browsed folders across delayed initialization",
 			"cmd": "node",
 			"args": ["tools/test/test-paths-editor-initialization.cjs"],
@@ -303,7 +303,7 @@
 		},
 		{
 			"id": "encryptor-conversion-receipts",
-			"ordinal": 591,
+			"ordinal": 592,
 			"name": "Encryptor conversion reads the password from a private file and never from a command argument",
 			"cmd": "node",
 			"args": ["tools/test/test-encryptor-convert.cjs"],
@@ -312,7 +312,7 @@
 		},
 		{
 			"id": "encryptor-shared-vectors",
-			"ordinal": 594,
+			"ordinal": 595,
 			"name": "Encryptor containers are the shared OpenSSL envelope every driver reads and writes",
 			"cmd": "node",
 			"args": ["tools/test/test-encryptor-shared-vectors.cjs"],
@@ -320,7 +320,7 @@
 		},
 		{
 			"id": "app-cloner-shared-families",
-			"ordinal": 596,
+			"ordinal": 597,
 			"name": "App Cloner families are one catalogue the macOS detection agrees with",
 			"cmd": "node",
 			"args": ["tools/test/test-app-cloner-families.cjs"],
@@ -328,7 +328,7 @@
 		},
 		{
 			"id": "personal-info-editor-multiline",
-			"ordinal": 597,
+			"ordinal": 598,
 			"name": "personal-info editor preserves multiline values through its save bridge",
 			"cmd": "node",
 			"args": ["tools/test/test-personal-info-editor-multiline.cjs"],
@@ -336,7 +336,7 @@
 		},
 		{
 			"id": "prompt-editor-raw-whitespace",
-			"ordinal": 598,
+			"ordinal": 599,
 			"name": "prompt editor preserves raw prompt whitespace",
 			"cmd": "node",
 			"args": ["tools/test/test-prompt-editor-raw-whitespace.cjs"],
@@ -344,7 +344,7 @@
 		},
 		{
 			"id": "layout-source",
-			"ordinal": 602,
+			"ordinal": 603,
 			"name": "versioned layout source preserves imported keylayout and refuses unimplemented exports",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-source.cjs"],
@@ -352,7 +352,7 @@
 		},
 		{
 			"id": "layout-source-compiler",
-			"ordinal": 607,
+			"ordinal": 608,
 			"name": "layout source compiler round-trips the registry and generates bundle, XKB and KLC",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-source-compiler.cjs"],
@@ -360,7 +360,7 @@
 		},
 		{
 			"id": "layout-editor-model",
-			"ordinal": 608,
+			"ordinal": 609,
 			"name": "unified layout editor reads, edits and writes the layout source through one module",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-editor-model.cjs"],
@@ -368,7 +368,7 @@
 		},
 		{
 			"id": "layout-source-emulation",
-			"ordinal": 609,
+			"ordinal": 610,
 			"name": "layout source emulation table matches its golden file and types the shared vectors",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-source-emulation.cjs"],
@@ -376,7 +376,7 @@
 		},
 		{
 			"id": "macos-layout-bundle-plan",
-			"ordinal": 613,
+			"ordinal": 614,
 			"name": "macOS bundle native check types source vectors that match the compiled cells",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-layout-bundle-plan.cjs"],
@@ -384,7 +384,7 @@
 		},
 		{
 			"id": "layout-editor-unicode-names",
-			"ordinal": 614,
+			"ordinal": 615,
 			"name": "layout editor Unicode names table decodes every name and answers wildcard searches",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-editor-unicode-names.cjs"],
@@ -392,7 +392,7 @@
 		},
 		{
 			"id": "layout-sources",
-			"ordinal": 616,
+			"ordinal": 617,
 			"name": "kept layout sources reproduce the layouts they were made from, Kana level included",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-sources.cjs"],
@@ -400,7 +400,7 @@
 		},
 		{
 			"id": "layout-editor-target-exports",
-			"ordinal": 617,
+			"ordinal": 618,
 			"name": "layout editor page writes the tool's XKB and KLC bytes through fengari and the shared adapters",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-editor-target-exports.cjs"],
@@ -408,7 +408,7 @@
 		},
 		{
 			"id": "kbd-dll",
-			"ordinal": 618,
+			"ordinal": 619,
 			"name": "Windows layout DLLs build from a KLC and read back as their model on every architecture",
 			"cmd": "node",
 			"args": ["tools/test/test-kbd-dll.cjs"],
@@ -416,7 +416,7 @@
 		},
 		{
 			"id": "kbd-installer",
-			"ordinal": 619,
+			"ordinal": 620,
 			"name": "keyboard layout installer holds the verified DLLs and registers and unregisters the layout",
 			"cmd": "node",
 			"args": ["tools/test/test-kbd-installer.cjs"],
@@ -424,7 +424,7 @@
 		},
 		{
 			"id": "linux-pages-post-ready",
-			"ordinal": 627,
+			"ordinal": 628,
 			"name": "every shared page a Linux bridge waits for posts ready, so none opens empty on Linux",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-pages-post-ready.cjs"],
@@ -432,7 +432,7 @@
 		},
 		{
 			"id": "host-context-menu",
-			"ordinal": 628,
+			"ordinal": 629,
 			"name": "host pages keep the native context menu closed outside text fields",
 			"cmd": "node",
 			"args": ["tools/test/test-host-context-menu.cjs"],
@@ -440,7 +440,7 @@
 		},
 		{
 			"id": "layout-analysis-engine",
-			"ordinal": 662,
+			"ordinal": 663,
 			"name": "layout analysis engine gives the hand-computed metrics, rebuilds the exact key n-grams, scores with editable weights and ranks the whole library in well under a second",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-analysis-engine.cjs"],
@@ -448,7 +448,7 @@
 		},
 		{
 			"id": "layout-optimizer",
-			"ordinal": 664,
+			"ordinal": 665,
 			"name": "layout optimizer finds the brute-force optimum of a toy problem, reports the engine score of its layout, repeats with a seed and holds every constraint switch",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-optimizer.cjs"],
@@ -456,7 +456,7 @@
 		},
 		{
 			"id": "layout-optimizer-page",
-			"ordinal": 665,
+			"ordinal": 666,
 			"name": "the Studio's layout optimizer page loads the engine and the optimizer in order, in its worker too, finds every string it shows in all 21 locales and opens its result in the editor",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-optimizer-page.cjs"],
@@ -464,7 +464,7 @@
 		},
 		{
 			"id": "layout-comparer-page",
-			"ordinal": 666,
+			"ordinal": 667,
 			"name": "the Studio's layout comparer page loads the engine in order, finds every string it shows in all 21 locales and has the tables of every built-in corpus",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-comparer-page.cjs"],
@@ -472,7 +472,7 @@
 		},
 		{
 			"id": "layout-formats",
-			"ordinal": 667,
+			"ordinal": 668,
 			"name": "layout file readers give the same keys for one layout's Kalamine TOML, JSON, KLC and XKB files, read KLA and .keylayout files, and write sources, KLA JSON and Kalamine TOML that read back",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-formats.cjs"],
@@ -480,7 +480,7 @@
 		},
 		{
 			"id": "analyser-scores",
-			"ordinal": 668,
+			"ordinal": 669,
 			"name": "the Studio scores a layout as KLA, KLAnext, a200, carpalx, keygen, genkey, Oxeylyzer, Keyboard Layout Optimizer, cmini and the Ergo-L analyser compute it, reproducing their own, published or hand-computed values",
 			"cmd": "node",
 			"args": ["tools/test/test-analyser-scores.cjs"],
@@ -488,7 +488,7 @@
 		},
 		{
 			"id": "key-legend",
-			"ordinal": 673,
+			"ordinal": 674,
 			"name": "the one key legend formatter shows a dead key as its bare accent, never on a dotted circle, and the app pages' generated copy of it is current",
 			"cmd": "node",
 			"args": ["tools/test/test-key-legend.cjs"],
@@ -496,7 +496,7 @@
 		},
 		{
 			"id": "corpus-count-tables",
-			"ordinal": 678,
+			"ordinal": 679,
 			"name": "every published count table under static/corpus/frequency passes the strict reader and traces to its pinned archive and register entry, and the importer's Leipzig, Lexique and pruning rules give hand-computed counts",
 			"cmd": "node",
 			"args": ["tools/test/test-corpus-count-tables.cjs"],
@@ -504,7 +504,7 @@
 		},
 		{
 			"id": "corpus-text-sources",
-			"ordinal": 679,
+			"ordinal": 680,
 			"name": "every Project Gutenberg text under static/corpus/original traces to its pinned ebook, register entry and shipped corpus, keeps no Project Gutenberg header or footer, and the importer strips an ebook as hand-computed",
 			"cmd": "node",
 			"args": ["tools/test/test-corpus-text-sources.cjs"],
@@ -512,7 +512,7 @@
 		},
 		{
 			"id": "pdf-text",
-			"ordinal": 680,
+			"ordinal": 681,
 			"name": "the Comparer reads the text of a PDF in the page: whole words and lines for Chrome, Firefox and Google Docs exports, and refuses a locked or text-less PDF",
 			"cmd": "node",
 			"args": ["tools/test/test-pdf-text.cjs"],
@@ -520,7 +520,7 @@
 		},
 		{
 			"id": "kbd-dll-wow64",
-			"ordinal": 684,
+			"ordinal": 685,
 			"name": "the compiler-free SysWOW64 layout DLL returns kbd.h's 64-bit descriptor and holds the MSVC build's tables, and the reader refuses a truncated descriptor",
 			"cmd": "node",
 			"args": ["tools/test/test-kbd-dll-wow64.cjs"],
@@ -528,7 +528,7 @@
 		},
 		{
 			"id": "js-0544",
-			"ordinal": 685,
+			"ordinal": 686,
 			"name": "site accessibility ratchet refuses new violations, its baseline is well formed and every site page is audited",
 			"cmd": "node",
 			"args": ["tools/test/test-site-accessibility-ratchet.cjs"],
@@ -536,7 +536,7 @@
 		},
 		{
 			"id": "site-keyboard-data",
-			"ordinal": 686,
+			"ordinal": 687,
 			"name": "site keyboard data is generated from the Ergopti layout source and its display patch cannot hide the source",
 			"cmd": "node",
 			"args": ["tools/test/test-site-keyboard-data.cjs"],
@@ -544,7 +544,7 @@
 		},
 		{
 			"id": "layout-jis-abnt",
-			"ordinal": 688,
+			"ordinal": 689,
 			"name": "the JIS and ABNT keyboards: their boards in the editor and the analysis engine, and their keys through the .keylayout, KLC, XKB and keyboard DLL round trips, with Microsoft's own JIS and ABNT layouts read where present",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-jis-abnt.cjs"],
@@ -552,7 +552,7 @@
 		},
 		{
 			"id": "app-colour-contrast",
-			"ordinal": 689,
+			"ordinal": 690,
 			"name": "Studio heatmap keys keep a visible edge, finger hues stay told apart and readable, metrics muted text reads at 4.5:1, in both themes",
 			"cmd": "node",
 			"args": ["tools/test/test-app-colour-contrast.cjs"],
@@ -560,7 +560,7 @@
 		},
 		{
 			"id": "ergopti-plus-languages",
-			"ordinal": 690,
+			"ordinal": 691,
 			"name": "Ergopti+ sections written only in French say so under the English page and every t() key has its English entry",
 			"cmd": "node",
 			"args": ["tools/test/test-ergopti-plus-languages.cjs"],
@@ -568,7 +568,7 @@
 		},
 		{
 			"id": "keyboard-walk",
-			"ordinal": 693,
+			"ordinal": 694,
 			"name": "the Studio keyboard walk refuses a trap, a repeated or hidden stop, a positive tabindex, a jump back up the page and a Shift+Tab order that differs",
 			"cmd": "node",
 			"args": ["tools/test/test-keyboard-walk.cjs"],
@@ -576,7 +576,7 @@
 		},
 		{
 			"id": "key-shape",
-			"ordinal": 695,
+			"ordinal": 696,
 			"name": "the Studio board draws the ISO Enter as one L-shaped path, its lower row from bottom_col, and no other key as an L",
 			"cmd": "node",
 			"args": ["tools/test/test-key-shape.cjs"],
@@ -584,7 +584,7 @@
 		},
 		{
 			"id": "heat-scale",
-			"ordinal": 696,
+			"ordinal": 697,
 			"name": "the Studio's heat figures read one blue-to-red scale, readable with its ink on every point in both themes, with key edges and legends",
 			"cmd": "node",
 			"args": ["tools/test/test-heat-scale.cjs"],
@@ -592,7 +592,7 @@
 		},
 		{
 			"id": "app-windows-accessibility-ratchet",
-			"ordinal": 697,
+			"ordinal": 698,
 			"name": "the app windows accessibility ratchet refuses new violations and walk problems, its baseline is well formed, every window page is audited and each fixture posts to its page's bridge",
 			"cmd": "node",
 			"args": ["tools/test/test-app-windows-accessibility-ratchet.cjs"],
@@ -600,7 +600,7 @@
 		},
 		{
 			"id": "site-languages",
-			"ordinal": 700,
+			"ordinal": 701,
 			"name": "English passages in the French site say lang=\"en\", the French site chrome says lang=\"fr\" under the English Ergopti+ page, and a new unmarked one is refused",
 			"cmd": "node",
 			"args": ["tools/test/test-site-languages.cjs"],
@@ -608,7 +608,7 @@
 		},
 		{
 			"id": "site-video-captions",
-			"ordinal": 701,
+			"ordinal": 702,
 			"name": "every video and embedded player of the site has a WebVTT captions track whose file exists and a transcript, and the checker refuses each missing part",
 			"cmd": "node",
 			"args": ["tools/test/test-site-video-captions.cjs"],

@@ -71,6 +71,7 @@
 		"test:keymap-layers-corpus": "node ./tools/test/test-keymap-layers-corpus.cjs",
 		"test:config-schema": "node ./tools/test/test-config-schema.cjs",
 		"test:audit-translations-scope": "node ./tools/test/test-audit-translations-scope.cjs",
+		"test:i18n-referenced-keys-resolve": "node ./tools/test/test-i18n-referenced-keys-resolve.cjs",
 		"test:visible-text-is-localized": "node ./tools/test/test-visible-text-is-localized.cjs",
 		"test:no-hardcoded-ui-strings": "node ./tools/test/test-no-hardcoded-ui-strings.cjs",
 		"test:config-migrations": "node ./tools/test/test-config-migrations.cjs",
