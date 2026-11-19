@@ -97,7 +97,8 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		const intro = el('p', 'la-muted');
 		const status = el('p', 'la-muted');
 		const viewField = el('label', 'la-filter-field');
-		const viewName = el('span');
+		// The field's words are the label's own text, before its select.
+		const viewName = document.createTextNode('');
 		const view = el('select');
 		view.id = 'la-analysers-view';
 		viewField.append(viewName, view);
@@ -153,7 +154,7 @@ var LAYOUT_ANALYSER_TAB = (function () {
 				const th = el('th', 'la-analyser');
 				th.scope = 'colgroup';
 				th.colSpan = FINGERINGS.length;
-				th.append(el('span', '', a.name), INFO.button(`analyser.${a.id}`));
+				th.append(a.name, INFO.button(`analyser.${a.id}`));
 				th.append(el('small', 'la-muted', DIRECTION_LABEL[a.better]()));
 				top.append(th);
 				for (const fingering of FINGERINGS) {

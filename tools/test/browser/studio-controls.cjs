@@ -25,8 +25,9 @@
  *    formats it reads, 4.5:1; the file it loads becomes the chosen corpus.
  * 4. (no-colon-button) colonButtons lists every button, disclosure, tab and
  *    button-styled label whose text holds a colon (a drawn key typing « : »
- *    aside), for the 21-locale loops of the editor and the Comparer in
- *    layout-editor.playwright.cjs and the optimiser's own run.
+ *    and a button naming a layout aside), for the 21-locale loops of the
+ *    editor and the Comparer in layout-editor.playwright.cjs and the
+ *    optimiser's own run.
  * ==============================================================================
  */
 
@@ -72,6 +73,8 @@ function colonButtons(page) {
 		]
 			// A key of a drawn keyboard shows the character it types (« : » too).
 			.filter((node) => !node.closest('[data-code]'))
+			// A button whose words are a layout's own name shows data (« QWERTY: Wide Mod »).
+			.filter((node) => !node.matches('.la-chart-name, .la-leader-name'))
 			.map((node) =>
 				(node.tagName === 'INPUT' ? node.value : node.textContent).replace(/\s+/g, ' ').trim()
 			)

@@ -102,7 +102,13 @@ const page = fs.readFileSync(path.join(PAGE_DIR, 'comparer_page.js'), 'utf8');
 // page and into the app's Studio window); index.html holds only its root.
 const markup = html + page;
 const keys = new Set();
-for (const m of markup.matchAll(/data-i18n(?:-placeholder|-title)?="([^"]+)"/g)) keys.add(m[1]);
+for (const m of markup.matchAll(/data-i18n(?:-placeholder|-title|-text)?="([^"]+)"/g))
+	keys.add(m[1]);
+// (i18n-own-text) i18n.js replaces a data-i18n element's whole content: one that
+// holds a field or an icon beside its words (a label's input, a button's icon)
+// names its key in data-i18n-text, which only the page writes (setText).
+for (const m of markup.matchAll(/<([a-z]+)\b[^>]*\sdata-i18n="([^"]+)"[^>]*>\s*<(?!\/)/g))
+	check(false, `strings: the ${m[1]} of ${m[2]} holds an element that i18n.js would erase`);
 for (const m of markup.matchAll(/data-i18n-option-prefix="([^"]+)"[^>]*>([\s\S]*?)<\/select>/g))
 	for (const option of m[2].matchAll(/value="([^"]+)"/g)) keys.add(`${m[1]}.${option[1]}`);
 // The page, its popovers and the editor's analysis panel share these strings.

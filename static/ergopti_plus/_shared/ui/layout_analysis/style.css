@@ -254,11 +254,19 @@ body:has(> main.layout-analysis) {
 	margin-top: 8px;
 }
 
+/* A field: its label, its control and its note (a p when it holds no note,
+   whose margins it drops). */
 .la-field {
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
+	margin: 0;
 	min-width: 0;
+}
+
+/* A label and its « i » on one line, above the field's control. */
+.la-heading {
+	margin: 0;
 }
 
 .la-custom {
@@ -304,7 +312,7 @@ body:has(> main.layout-analysis) {
 	background: var(--la-accent-soft);
 }
 
-.la-file:focus-within .la-file-button {
+.la-file:focus-within {
 	outline: 2px solid var(--la-accent);
 	outline-offset: 1px;
 }
@@ -370,6 +378,7 @@ body:has(> main.layout-analysis) {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px;
+	margin: 0;
 }
 
 .la-row input[type='search'] {
@@ -533,6 +542,18 @@ body:has(> main.layout-analysis) {
 	transition: opacity 0.2s;
 }
 
+/* A bar figure is a table (comparer_page.js barRow) drawn as one grid per
+   row: the table and its rows lose the table layout, their cells the
+   table cell's padding, weight and centring. */
+.la-bars {
+	display: block;
+}
+
+.la-chart-row > th,
+.la-chart-row > td {
+	padding: 0;
+}
+
 .la-chart-row {
 	align-items: center;
 	border-radius: 4px;
@@ -542,20 +563,36 @@ body:has(> main.layout-analysis) {
 	padding: 2px 4px;
 }
 
-.la-chart-row[role='button'] {
-	cursor: pointer;
-}
-
-.la-chart-row[role='button']:hover,
 .la-chart-row.la-selected {
 	--la-sub: var(--theme-text);
 	background: var(--la-accent-soft);
 }
 
 .la-chart-label {
+	font-weight: inherit;
 	overflow: hidden;
+	text-align: start;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* The name that opens a layout's details: the row's text, a button for the
+   keyboard (the row answers to the pointer too). */
+.layout-analysis .la-chart-name {
+	background: none;
+	border: 0;
+	border-radius: 2px;
+	display: block;
+	overflow: hidden;
+	padding: 0;
+	text-align: inherit;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	width: 100%;
+}
+
+.layout-analysis .la-chart-name:hover {
+	background: none;
 }
 
 /* A layout that cannot type the space or a letter: ranked last, flagged in
@@ -769,6 +806,11 @@ body:has(> main.layout-analysis) {
 	text-align: left;
 }
 
+/* The layout's credit, an attribution in the line's own size. */
+.la-details-credit {
+	font-size: inherit;
+}
+
 .la-versus {
 	margin: 4px 0 8px;
 	max-width: 320px;
@@ -808,13 +850,18 @@ body:has(> main.layout-analysis) {
 	position: absolute;
 }
 
+/* A line of the scale's ends, its drawn ramp between them, and its note. */
 .la-heat-legend {
 	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
 	font-variant-numeric: tabular-nums;
 	gap: 4px 8px;
-	margin-bottom: 8px;
+	margin: 0 0 8px;
+}
+
+.la-heat-legend small {
+	font-size: inherit;
 }
 
 /* Against another layout: orange where this one puts more, blue where less,
@@ -845,6 +892,7 @@ body:has(> main.layout-analysis) {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px 16px;
+	margin: 0;
 }
 
 .la-check {
@@ -961,10 +1009,15 @@ body:has(> main.layout-analysis) {
 	padding: 6px 10px;
 }
 
+/* The column choices: a group of boxes named by its summary, unframed. */
 .la-column-list {
+	border: 0;
 	display: grid;
 	gap: 4px 12px;
 	grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+	margin: 0;
+	min-inline-size: 0;
+	padding: 0;
 }
 
 .la-table-filters {
@@ -1021,6 +1074,7 @@ body:has(> main.layout-analysis) {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px 12px;
+	margin: 0;
 }
 
 /* Each settings section and weight group: a mark (theme.css « Marks », 3:1
@@ -1109,6 +1163,7 @@ body:has(> main.layout-analysis) {
 	font-weight: 600;
 	gap: 8px;
 	justify-content: space-between;
+	margin: 0;
 }
 
 .la-weight-field {
@@ -1116,6 +1171,7 @@ body:has(> main.layout-analysis) {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px 10px;
+	margin: 0;
 }
 
 .la-weight-field input {
@@ -1126,8 +1182,10 @@ body:has(> main.layout-analysis) {
 	border-color: var(--la-bad);
 }
 
+/* The unit beside a weight, a side note in the text's own size. */
 .la-weight-unit {
 	color: var(--la-sub);
+	font-size: inherit;
 }
 
 .la-weight-help {
@@ -1183,12 +1241,21 @@ body:has(> main.layout-analysis) {
 	top: 3px;
 }
 
+/* A list of weights or values: a grid of fields, unmarked. */
 .la-weight-list {
 	display: grid;
 	gap: 12px 16px;
 	/* One column under 240 px: the page reflows at 320 px wide. */
 	grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
-	margin-top: 10px;
+	list-style: none;
+	margin: 10px 0 0;
+	padding: 0;
+}
+
+/* A value list's item: its label fills the grid cell, as the cell's row is
+   as tall as its tallest label. */
+.la-weight-item {
+	display: grid;
 }
 
 .la-weight {
@@ -1227,15 +1294,19 @@ body:has(> main.layout-analysis) {
 	padding: 4px 0;
 }
 
-.la-filters-box > summary > span + span {
+.la-filters-box > summary > .la-table-count {
 	margin-left: 8px;
 }
 
+/* The filters' group, named by the summary's title, unframed. */
 .la-filters {
 	align-items: flex-end;
+	border: 0;
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px 12px;
+	margin: 0;
+	min-inline-size: 0;
 	padding: 4px 0 8px;
 }
 
@@ -1640,6 +1711,7 @@ body:has(> main.layout-analysis) {
 	flex-wrap: wrap;
 	gap: 12px;
 	justify-content: center;
+	margin: 0;
 	padding: 18px 12px;
 	text-align: center;
 	transition:
@@ -1680,6 +1752,7 @@ body:has(> main.layout-analysis) {
 	flex-wrap: wrap;
 	gap: 10px;
 	justify-content: space-between;
+	margin: 0;
 }
 
 .la-detected {

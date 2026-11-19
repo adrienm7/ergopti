@@ -1410,13 +1410,18 @@ async function exerciseComparerTabs(page) {
 	]) {
 		await page.click(`#la-tab-${tab}`);
 		const figures = await page.$$eval(`#la-charts-${tab} .la-figure`, (sections) =>
-			sections.map((section) => ({
-				id: section.getAttribute('aria-labelledby'),
-				named: Boolean(
-					document.getElementById(section.getAttribute('aria-labelledby'))?.textContent
-				),
-				table: section.querySelector('[role="table"], table') !== null
-			}))
+			sections.map((section) => {
+				// A table's figure names its scrolling region, not a second landmark of the same name.
+				const named = section.hasAttribute('aria-labelledby')
+					? section
+					: section.querySelector('[role="region"][aria-labelledby]');
+				const id = named && named.getAttribute('aria-labelledby');
+				return {
+					id,
+					named: Boolean(id && document.getElementById(id)?.textContent),
+					table: section.querySelector('[role="table"], table') !== null
+				};
+			})
 		);
 		assert.equal(figures.length, charts + 1, `${tab}: ${charts} charts and a table`);
 		assert.ok(
@@ -1834,7 +1839,10 @@ async function exerciseComparerHome(browser, origin) {
 					hidden: icon ? icon.getAttribute('aria-hidden') === 'true' : false,
 					focusable: icon ? icon.getAttribute('focusable') : null,
 					name: tab.textContent.trim(),
-					label: tab.querySelector('.la-tab-label')?.textContent.trim(),
+					// The tab's own words beside its icon.
+					label: Array.from(tab.childNodes, (node) => (node.nodeType === 3 ? node.textContent : ''))
+						.join('')
+						.trim(),
 					selected: tab.getAttribute('aria-selected') === 'true',
 					bar: parseFloat(style.borderBottomWidth),
 					barColour: style.borderBottomColor,
@@ -2317,7 +2325,8 @@ async function exerciseStudioComparer(page) {
 		'pairs gain and lose points'
 	);
 	assert.equal(
-		await page.textContent('#la-matrix td.la-cell-loss span'),
+		// The cell's own text, before its screen-reader words.
+		await page.$eval('#la-matrix td.la-cell-loss', (td) => td.firstChild.textContent),
 		'−',
 		'a lost pair is marked'
 	);
@@ -2482,7 +2491,11 @@ async function exerciseStudioComparer(page) {
 	const inputs = await page.$$eval('#studio-comparer input[type="file"]', (nodes) =>
 		nodes.map((node) => {
 			const box = node.getBoundingClientRect();
-			const button = node.closest('label').querySelector('.la-file-button');
+			// The label is the button face, or holds it.
+			const label = node.closest('label');
+			const button = label.matches('.la-file-button')
+				? label
+				: label.querySelector('.la-file-button');
 			return {
 				id: node.id || node.accept,
 				hidden: box.width <= 1 && box.height <= 1,

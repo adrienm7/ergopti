@@ -1,0 +1,296 @@
+[
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-tabs",
+		"count": 1,
+		"reason": "The tablist container: no HTML element carries the tablist role, its tabs are native buttons with role tab."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": ".la-setup",
+		"count": 1,
+		"reason": "A layout grid putting the corpus card beside the options card; each card is a section, the wrapper means nothing."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": ".la-field",
+		"count": 2,
+		"reason": "A field grouping a label, its control and a note paragraph (or the label line with its « i »): a p cannot hold a p, so the group is a div."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-text-mode-field",
+		"count": 1,
+		"reason": "The text mode field: its label, its select and the note paragraph under them; a p cannot hold that note."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": ".la-corpus-file",
+		"count": 1,
+		"reason": "Lays the corpus file button beside its formats, name and error paragraphs; a p cannot hold them and the group has no heading of its own."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": ".la-option-pair",
+		"count": 1,
+		"reason": "A two-column layout grid of the keyboard and format fields, which are already grouped by their section."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": ".la-row",
+		"count": 1,
+		"reason": "A wrapping row laying out the three filter labels of the layout list; the list's section and summary already name it."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-layout-list",
+		"count": 1,
+		"reason": "The scrolling box of the layout list's letter groups (each a heading and a ul); it only clips and scrolls them."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-weight-list",
+		"count": 1,
+		"reason": "A layout grid of the weight group sections, each named by its own heading; the grid itself means nothing."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": ".la-ideal-layout",
+		"count": 1,
+		"reason": "A layout grid putting the hands picture beside the list of ideal loads it draws."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": ".la-overview",
+		"count": 1,
+		"reason": "The overview's layout grid of its figure sections, side by side when the width holds them."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": ".la-ranking-tools",
+		"count": 1,
+		"reason": "Lays a checkbox, its help paragraph and the CSV button on one wrapping line; a p cannot hold the help paragraph."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": ".la-table-wrap",
+		"count": 12,
+		"reason": "The focusable box a wide table scrolls in sideways (WCAG 1.4.10): no element is a scroll container; named ones take the region role."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": ".la-matrix-wrap",
+		"count": 1,
+		"reason": "The focusable box the key pair matrix scrolls in, a region named by its caption: no element is a scroll container."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": ".la-ngrams-view",
+		"count": 1,
+		"reason": "A layout grid putting the n-gram board beside its list, both inside their figure section."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-ngrams-board",
+		"count": 1,
+		"reason": "The hidden board drawing: a box of absolutely positioned key caps that repeats the n-gram list, no element draws a board."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-ngrams-list",
+		"count": 1,
+		"reason": "The mount point board/worst_groups.js fills with its own n-gram list markup; it adds no meaning of its own."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-heatmap",
+		"count": 1,
+		"reason": "The heatmap board: a scaled box of absolutely positioned key caps; each key is a named image, the box only places them."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": ".la-heatmap",
+		"count": 1,
+		"reason": "A heat card's board: a scaled box of absolutely positioned key caps, each a named image; no element draws a board."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-heatmap-image",
+		"count": 1,
+		"reason": "The mount point of the image buttons group that board/board_image.js builds for the heatmap."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-charts-fingers",
+		"count": 1,
+		"reason": "A layout grid of the tab's metric figures, each a section named by its heading."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-charts-bigrams",
+		"count": 1,
+		"reason": "A layout grid of the tab's metric figures, each a section named by its heading."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-charts-trigrams",
+		"count": 1,
+		"reason": "A layout grid of the tab's metric figures, each a section named by its heading."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-charts-rows",
+		"count": 1,
+		"reason": "A layout grid of the tab's metric figures, each a section named by its heading."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-charts-misc",
+		"count": 1,
+		"reason": "A layout grid of the tab's metric figures, each a section named by its heading."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-heats",
+		"count": 1,
+		"reason": "A layout grid of the side-by-side heat cards, each a section named by its heading."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-trigram-mix",
+		"count": 1,
+		"reason": "The mount point stackedFigure() redraws with the figure's legend, bar table, note and folded table, inside its named section."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "#la-row-mix",
+		"count": 1,
+		"reason": "The mount point stackedFigure() redraws with the figure's legend, bar table, note and folded table, inside its named section."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": ".la-detail-grid",
+		"count": 2,
+		"reason": "A layout grid of the details' figure sections, two or three columns where the width holds them."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "div",
+		"anchor": "var:item",
+		"count": 1,
+		"reason": "One leader tile of the dl: HTML allows only a div to wrap a dt and its dd, and the tile needs that box for its frame."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "span",
+		"anchor": ".la-swatch",
+		"count": 5,
+		"reason": "A legend's colour sample, aria-hidden: a drawn box beside the entry's words, which say what it stands for."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "span",
+		"anchor": ".la-heat-key",
+		"count": 2,
+		"reason": "Keeps a swatch with its words as one item of the legend's flex line (its own 6 px gap); no phrasing element means a legend entry."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "span",
+		"anchor": ".la-heat-ramp",
+		"count": 1,
+		"reason": "The heat scale's drawn ramp, aria-hidden, between its two ends written as text."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "span",
+		"anchor": ".la-bar",
+		"count": 4,
+		"reason": "A drawn bar or bar part, absolutely positioned in its aria-hidden track cell; the row's cells say its value."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "span",
+		"anchor": "var:bar",
+		"count": 3,
+		"reason": "A drawn bar, absolutely positioned in its aria-hidden track cell; the row's cells say its value."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "span",
+		"anchor": ".la-target",
+		"count": 2,
+		"reason": "A drawn mark (the ideal load, the middle) positioned in an aria-hidden track; the value cell says it in words."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "span",
+		"anchor": ".la-key",
+		"count": 1,
+		"reason": "A positioned key cap of the heat board, a named image (role img, its value and place in its name); no element is a key cap."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "span",
+		"anchor": ".la-sr-only",
+		"count": 3,
+		"reason": "Words read by assistive technology only (a cell's unit or verdict); no element is visually hidden text."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "span",
+		"anchor": ".la-verdict",
+		"count": 1,
+		"reason": "A relative cell's drawn mark (▲ ▼ =), aria-hidden; the words beside it in la-sr-only say the verdict."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "span",
+		"anchor": ".la-verdict-mark",
+		"count": 1,
+		"reason": "A verdict's drawn mark (▲ ▼ =), aria-hidden, before the words that say it."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+		"tag": "span",
+		"anchor": ".la-th-head",
+		"count": 1,
+		"reason": "Keeps a column header's sort button and its « i » together on the header's last line; no phrasing element groups two controls."
+	},
+	{
+		"file": "static/ergopti_plus/_shared/ui/layout_analysis/analyser_tab.js",
+		"tag": "div",
+		"anchor": ".la-table-wrap",
+		"count": 1,
+		"reason": "The focusable box the analysers' wide table scrolls in sideways (WCAG 1.4.10): no element is a scroll container."
+	}
+]

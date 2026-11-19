@@ -175,8 +175,14 @@ assert.match(
 assert.match(editorHeat, /color: var\(--theme-chart-heat-ink\);/);
 assert.ok(!/hsl\(calc\(/.test(EDITOR_CSS), 'no second heat formula in the editor');
 // The legend from 0 to the largest value, beside each heat figure.
+assert.match(
+	COMPARER,
+	/function heatRamp\(\) \{\s*const ramp = el\('span', 'la-heat-ramp'\);/,
+	'heatRamp() draws the legend ramp'
+);
+// Each legend calls it once; its declaration is not a call.
 assert.ok(
-	(COMPARER.match(/el\('span', 'la-heat-ramp'\)/g) || []).length >= 4,
+	(COMPARER.match(/heatRamp\(\)/g) || []).length - 1 >= 4,
 	'each heat figure has its legend'
 );
 

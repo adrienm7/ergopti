@@ -390,16 +390,16 @@
 	if (lang && /^[a-z]{2}$/.test(lang)) window._i18n_locale = lang;
 
 	// The Comparer's markup; data-i18n* attributes are filled by applyStrings().
-	const MARKUP = `<div class="la-top">
+	const MARKUP = `<header class="la-top">
 	<h1 id="la-title" data-i18n="layout_analysis.title"></h1>
 	<button id="la-share" type="button" data-i18n="layout_analysis.share.button"></button>
-</div>
+</header>
 <p id="la-share-status" class="la-muted" role="status" hidden></p>
 
 <div id="la-tabs" class="la-tabs" role="tablist" aria-labelledby="la-title"></div>
 <p id="la-status" class="la-status" role="status" aria-live="polite"></p>
 
-<div id="la-panel-home" class="la-tab-panel la-home" role="tabpanel" aria-labelledby="la-tab-home" hidden>
+<section id="la-panel-home" class="la-tab-panel la-home" role="tabpanel" aria-labelledby="la-tab-home" hidden>
 <div class="la-setup">
 <section class="la-card la-corpus-card" aria-labelledby="la-corpus-label">
 	<div class="la-field">
@@ -413,13 +413,10 @@
 		<p id="la-corpus-info" class="la-muted"></p>
 	</div>
 	<div class="la-corpus-file">
-		<label class="la-file">
-			<span class="la-file-button la-file-primary">
-				<svg class="la-file-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-					<path d="M8 10.5V2.5M4.75 5.75 8 2.5l3.25 3.25M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10" />
-				</svg>
-				<span data-i18n="layout_analysis.corpus.file"></span>
-			</span>
+		<label class="la-file la-file-button la-file-primary" data-i18n-text="layout_analysis.corpus.file">
+			<svg class="la-file-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+				<path d="M8 10.5V2.5M4.75 5.75 8 2.5l3.25 3.25M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10" />
+			</svg>
 			<input id="la-file" type="file" />
 		</label>
 		<p id="la-file-formats" class="la-muted la-file-formats"></p>
@@ -435,20 +432,20 @@
 		</select>
 		<p id="la-text-mode-info" class="la-muted"></p>
 	</div>
-	<div id="la-custom" class="la-field la-custom" hidden>
+	<p id="la-custom" class="la-field la-custom" hidden>
 		<textarea
 			id="la-text"
 			rows="5"
 			data-i18n-placeholder="layout_analysis.corpus.paste_placeholder"
 		></textarea>
-	</div>
+	</p>
 </section>
 
 <section class="la-card la-options" aria-labelledby="la-options-label">
 	<h2 id="la-options-label" class="la-card-title" data-i18n="layout_analysis.options.title"></h2>
 	<div class="la-option-pair">
 		<div class="la-field">
-			<div class="la-heading">
+			<p class="la-heading">
 				<label for="la-keyboard" data-i18n="layout_analysis.keyboard.label"></label>
 				<button
 					class="la-info"
@@ -458,13 +455,13 @@
 				>
 					i
 				</button>
-			</div>
+			</p>
 			<select id="la-keyboard" data-i18n-option-prefix="layout_analysis.keyboard"></select>
 		</div>
-		<div class="la-field">
+		<p class="la-field">
 			<label for="la-format" data-i18n="layout_analysis.format.label"></label>
 			<select id="la-format" data-i18n-option-prefix="layout_analysis.format"></select>
-		</div>
+		</p>
 	</div>
 </section>
 </div>
@@ -474,8 +471,7 @@
 	<details id="la-layouts-box" class="la-layouts-box">
 	<summary id="la-layouts-summary"></summary>
 	<div class="la-row">
-		<label class="la-filter-field la-pick-search">
-			<span data-i18n="layout_analysis.layouts.search"></span>
+		<label class="la-filter-field la-pick-search" data-i18n-text="layout_analysis.layouts.search">
 			<input
 				id="la-filter"
 				type="search"
@@ -483,41 +479,37 @@
 				data-i18n-placeholder="layout_analysis.layouts.filter_placeholder"
 			/>
 		</label>
-		<label class="la-filter-field">
-			<span data-i18n="layout_analysis.filter.origin"></span>
+		<label class="la-filter-field" data-i18n-text="layout_analysis.filter.origin">
 			<select id="la-pick-origin"></select>
 		</label>
-		<label class="la-filter-field">
-			<span data-i18n="layout_analysis.filter.language"></span>
+		<label class="la-filter-field" data-i18n-text="layout_analysis.filter.language">
 			<select id="la-pick-language"></select>
 		</label>
 	</div>
 	<p id="la-pick-count" class="la-pick-count" role="status" aria-live="polite"></p>
-	<div class="la-row la-pick-actions">
+	<p class="la-row la-pick-actions">
 		<button id="la-every" type="button" data-i18n="layout_analysis.layouts.every"></button>
 		<button id="la-clear" type="button" data-i18n="layout_analysis.layouts.clear"></button>
 		<button id="la-all" type="button" data-i18n="layout_analysis.layouts.all"></button>
 		<button id="la-none" type="button" data-i18n="layout_analysis.layouts.none"></button>
-	</div>
+	</p>
 	<section id="la-add" class="la-add" aria-labelledby="la-add-title">
 		<h3 id="la-add-title" class="la-add-title" data-i18n="layout_analysis.add.title"></h3>
 		<p class="la-muted" data-i18n="layout_analysis.add.help"></p>
-		<div id="la-drop" class="la-drop">
+		<p id="la-drop" class="la-drop" data-i18n-text="layout_analysis.add.drop">
 			<svg class="la-drop-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
 				<path d="M12 3v12m0 0-5-5m5 5 5-5M4 17v3h16v-3" />
 			</svg>
-			<span data-i18n="layout_analysis.add.drop"></span>
-			<label class="la-file">
-				<span class="la-file-button" data-i18n="layout_analysis.add.file"></span>
+			<label class="la-file la-file-button" data-i18n-text="layout_analysis.add.file">
 				<input id="la-import" type="file" />
 			</label>
-		</div>
+		</p>
 		<label class="la-paste-label" for="la-paste" data-i18n="layout_analysis.add.paste_label"></label>
 		<textarea id="la-paste" class="la-paste" rows="4" spellcheck="false" aria-describedby="la-paste-detected"></textarea>
-		<div class="la-paste-actions">
-			<p id="la-paste-detected" class="la-detected" aria-live="polite"></p>
+		<p class="la-paste-actions">
+			<output id="la-paste-detected" class="la-detected" for="la-paste" aria-live="polite"></output>
 			<button id="la-paste-add" type="button" data-i18n="layout_analysis.add.paste_button"></button>
-		</div>
+		</p>
 	</section>
 	<p id="la-import-report" class="la-import-report" role="status" hidden></p>
 	<p id="la-mine-status" class="la-mine-status" role="status" hidden></p>
@@ -529,20 +521,19 @@
 <details id="la-settings" class="la-settings">
 <summary data-i18n="layout_analysis.settings.title"></summary>
 <section class="la-weights la-config la-accent-1" data-section-icon="config" aria-labelledby="la-config-label">
-	<div class="la-heading">
+	<header class="la-heading">
 		<h2 id="la-config-label" data-i18n="layout_analysis.config.title"></h2>
-	</div>
+	</header>
 	<p class="la-muted" data-i18n="layout_analysis.config.help"></p>
-	<div class="la-config-actions">
+	<p class="la-config-actions">
 		<button id="la-config-export" type="button" data-i18n="layout_analysis.config.export"></button>
-		<label class="la-file">
-			<span class="la-file-button" data-i18n="layout_analysis.config.import"></span>
+		<label class="la-file la-file-button" data-i18n-text="layout_analysis.config.import">
 			<input id="la-config-import" type="file" accept=".json,application/json" />
 		</label>
 		<button id="la-config-reset" type="button" data-i18n="layout_analysis.config.reset"></button>
-	</div>
+	</p>
 	<p id="la-config-status" class="la-muted" role="status"></p>
-	<div class="la-presets">
+	<section class="la-presets" aria-labelledby="la-presets-title">
 		<h3 id="la-presets-title" data-i18n="layout_analysis.presets.title"></h3>
 		<p class="la-muted" data-i18n="layout_analysis.presets.help"></p>
 		<ul id="la-preset-list" class="la-preset-list" aria-labelledby="la-presets-title"></ul>
@@ -554,11 +545,11 @@
 			<input id="la-preset-name" type="text" maxlength="60" autocomplete="off" />
 			<button type="submit" data-i18n="layout_analysis.presets.save"></button>
 		</form>
-	</div>
+	</section>
 </section>
 
 <section class="la-weights la-accent-2" data-section-icon="weights" aria-labelledby="la-weights-label">
-	<div class="la-heading">
+	<header class="la-heading">
 		<h2 id="la-weights-label" data-i18n="layout_analysis.weights.title"></h2>
 		<button
 			class="la-info"
@@ -568,14 +559,14 @@
 		>
 			i
 		</button>
-	</div>
+	</header>
 	<p class="la-muted" data-i18n="layout_analysis.weights.help"></p>
 	<button id="la-restore" type="button" data-i18n="layout_analysis.weights.restore"></button>
 	<div id="la-weight-list" class="la-weight-groups"></div>
 </section>
 
 <section class="la-weights la-accent-3" data-section-icon="ideal" aria-labelledby="la-ideal-label">
-	<div class="la-heading">
+	<header class="la-heading">
 		<h2 id="la-ideal-label" data-i18n="layout_analysis.ideal.title"></h2>
 		<button
 			class="la-info"
@@ -585,7 +576,7 @@
 		>
 			i
 		</button>
-	</div>
+	</header>
 	<p class="la-muted" data-i18n="layout_analysis.ideal.help"></p>
 	<button
 		id="la-ideal-restore"
@@ -600,13 +591,13 @@
 			aria-hidden="true"
 			focusable="false"
 		></svg>
-		<div id="la-ideal-list" class="la-weight-list"></div>
+		<ul id="la-ideal-list" class="la-weight-list"></ul>
 	</div>
 	<p id="la-ideal-sum" class="la-muted" role="status"></p>
 </section>
 
 <section class="la-weights la-accent-4" data-section-icon="shortcuts" aria-labelledby="la-shortcuts-label">
-	<div class="la-heading">
+	<header class="la-heading">
 		<h2 id="la-shortcuts-label" data-i18n="layout_analysis.shortcuts.title"></h2>
 		<button
 			class="la-info"
@@ -616,7 +607,7 @@
 		>
 			i
 		</button>
-	</div>
+	</header>
 	<p class="la-muted" data-i18n="layout_analysis.shortcuts.help"></p>
 	<button
 		id="la-shortcuts-restore"
@@ -624,14 +615,14 @@
 		data-i18n="layout_analysis.shortcuts.restore"
 	></button>
 	<h3 data-i18n="layout_analysis.shortcuts.letters"></h3>
-	<div id="la-shortcut-letters" class="la-weight-list"></div>
+	<ul id="la-shortcut-letters" class="la-weight-list"></ul>
 	<h3 data-i18n="layout_analysis.shortcuts.ease"></h3>
-	<div id="la-shortcut-ease" class="la-weight-list"></div>
+	<ul id="la-shortcut-ease" class="la-weight-list"></ul>
 	<p id="la-shortcuts-status" class="la-muted" role="status"></p>
 </section>
 
 <section class="la-weights la-accent-6" data-section-icon="forms" aria-labelledby="la-forms-label">
-	<div class="la-heading">
+	<header class="la-heading">
 		<h2 id="la-forms-label" data-i18n="layout_analysis.forms.title"></h2>
 		<button
 			class="la-info"
@@ -641,94 +632,84 @@
 		>
 			i
 		</button>
-	</div>
+	</header>
 	<p class="la-muted" data-i18n="layout_analysis.forms.help"></p>
 	<button id="la-forms-restore" type="button" data-i18n="layout_analysis.forms.restore"></button>
-	<div id="la-form-list" class="la-weight-list"></div>
+	<ul id="la-form-list" class="la-weight-list"></ul>
 	<p id="la-forms-status" class="la-muted" role="status"></p>
 </section>
 
 <section id="la-fingering" class="la-weights la-fingering"></section>
 </details>
-</div>
+</section>
 
 <section id="la-results" class="la-results" aria-labelledby="la-results-label">
 	<h2 id="la-results-label" class="la-sr-only" data-i18n="layout_analysis.results.title"></h2>
 	<details id="la-filters-box" class="la-filters-box">
 	<summary>
-		<span id="la-filters-label" class="la-filters-title" data-i18n="layout_analysis.filter.title"></span>
-		<span id="la-table-count" class="la-muted" role="status"></span>
+		<b id="la-filters-label" class="la-filters-title" data-i18n="layout_analysis.filter.title"></b>
+		<output id="la-table-count" class="la-muted la-table-count" role="status"></output>
 	</summary>
-	<div class="la-filters" role="group" aria-labelledby="la-filters-label">
-		<label class="la-filter-field la-filter-name">
-			<span data-i18n="layout_analysis.table.filter_name"></span>
+	<fieldset class="la-filters" aria-labelledby="la-filters-label">
+		<label class="la-filter-field la-filter-name" data-i18n-text="layout_analysis.table.filter_name">
 			<input id="la-row-name" type="search" />
 		</label>
-		<label class="la-filter-field">
-			<span data-i18n="layout_analysis.table.filter_family"></span>
+		<label class="la-filter-field" data-i18n-text="layout_analysis.table.filter_family">
 			<select id="la-row-family"></select>
 		</label>
-		<label class="la-filter-field">
-			<span data-i18n="layout_analysis.filter.origin"></span>
+		<label class="la-filter-field" data-i18n-text="layout_analysis.filter.origin">
 			<select id="la-row-origin"></select>
 		</label>
-		<label class="la-filter-field">
-			<span data-i18n="layout_analysis.filter.language"></span>
+		<label class="la-filter-field" data-i18n-text="layout_analysis.filter.language">
 			<select id="la-row-language"></select>
 		</label>
-		<label class="la-filter-field">
-			<span data-i18n="layout_analysis.filter.complete"></span>
+		<label class="la-filter-field" data-i18n-text="layout_analysis.filter.complete">
 			<select id="la-row-complete" data-i18n-option-prefix="layout_analysis.filter.complete_choice">
 				<option value="all"></option>
 				<option value="yes"></option>
 				<option value="no"></option>
 			</select>
 		</label>
-		<label class="la-filter-field la-filter-score">
-			<span data-i18n="layout_analysis.table.score_min"></span>
+		<label class="la-filter-field la-filter-score" data-i18n-text="layout_analysis.table.score_min">
 			<input id="la-row-min" type="number" step="any" />
 		</label>
-		<label class="la-filter-field la-filter-score">
-			<span data-i18n="layout_analysis.table.score_max"></span>
+		<label class="la-filter-field la-filter-score" data-i18n-text="layout_analysis.table.score_max">
 			<input id="la-row-max" type="number" step="any" />
 		</label>
 		<button id="la-table-reset" type="button" data-i18n="layout_analysis.table.reset"></button>
-	</div>
+	</fieldset>
 	</details>
 
-	<div id="la-panel-overview" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-overview">
+	<section id="la-panel-overview" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-overview">
 		<div class="la-overview">
 			<section class="la-figure" aria-labelledby="la-chart-label">
 				<h3 id="la-chart-label" data-i18n="layout_analysis.chart.title"></h3>
 				<p class="la-muted" data-i18n="layout_analysis.chart.caption"></p>
-				<div id="la-chart" class="la-chart"></div>
+				<table id="la-chart" class="la-chart la-bars" role="table" aria-labelledby="la-chart-label"></table>
 			</section>
 			<section class="la-leaders-box" aria-labelledby="la-leaders-label">
 				<h3 id="la-leaders-label" data-i18n="layout_analysis.leaders.title"></h3>
 				<dl id="la-leaders" class="la-leaders"></dl>
 			</section>
-			<section class="la-figure la-figure-wide" aria-labelledby="la-ranking-label">
+			<section class="la-figure la-figure-wide">
 				<h3 id="la-ranking-label" data-i18n="layout_analysis.ranking.title"></h3>
 				<details id="la-table-options" class="la-table-options">
-					<summary data-i18n="layout_analysis.table.columns"></summary>
-					<div id="la-column-list" class="la-column-list"></div>
+					<summary id="la-table-columns" data-i18n="layout_analysis.table.columns"></summary>
+					<fieldset id="la-column-list" class="la-column-list" aria-labelledby="la-table-columns"></fieldset>
 				</details>
-				<label class="la-check">
+				<label id="la-table-relative-label" class="la-check">
 					<input id="la-table-relative" type="checkbox" aria-describedby="la-table-relative-help" />
-					<span id="la-table-relative-label"></span>
 				</label>
 				<p id="la-table-relative-help" class="la-muted" hidden></p>
 				<div class="la-ranking-tools">
-					<label class="la-check">
+					<label class="la-check" data-i18n-text="layout_analysis.table.fold">
 						<input id="la-table-fold" type="checkbox" aria-describedby="la-table-fold-help" />
-						<span data-i18n="layout_analysis.table.fold"></span>
 					</label>
 					<p id="la-table-fold-help" class="la-muted" data-i18n="layout_analysis.table.fold_help"></p>
-					<button id="la-table-csv" class="la-csv-button" type="button">
+					<button id="la-table-csv" class="la-csv-button" type="button" data-i18n-text="layout_analysis.table.csv">
 						<svg class="la-row-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
 							<path d="M12 3v12m0 0-5-5m5 5 5-5M4 17v3h16v-3" />
 						</svg>
-						<span data-i18n="layout_analysis.table.csv"></span>
 					</button>
 				</div>
 				<p id="la-table-csv-status" class="la-muted" role="status"></p>
@@ -745,16 +726,16 @@
 				</div>
 			</section>
 		</div>
-	</div>
+	</section>
 
-	<div id="la-panel-fingers" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-fingers" hidden>
+	<section id="la-panel-fingers" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-fingers" hidden>
 		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.tab.intro_fingers"></p>
-		<section class="la-figure la-figure-wide" aria-labelledby="la-finger-table-label">
+		<section class="la-figure la-figure-wide">
 			<h3 id="la-finger-table-label" data-i18n="layout_analysis.fingers.title"></h3>
 			<p class="la-muted" data-i18n="layout_analysis.fingers.caption"></p>
 			<ul class="la-legend">
-				<li><span class="la-swatch la-swatch-more"></span><span data-i18n="layout_analysis.fingers.over"></span></li>
-				<li><span class="la-swatch la-swatch-less"></span><span data-i18n="layout_analysis.fingers.under"></span></li>
+				<li data-i18n-text="layout_analysis.fingers.over"><span class="la-swatch la-swatch-more" aria-hidden="true"></span></li>
+				<li data-i18n-text="layout_analysis.fingers.under"><span class="la-swatch la-swatch-less" aria-hidden="true"></span></li>
 			</ul>
 			<div class="la-table-wrap" tabindex="0" role="region" aria-labelledby="la-finger-table-label">
 				<table id="la-finger-table" class="la-table la-heat-table"></table>
@@ -764,17 +745,17 @@
 			<h3 id="la-hands-label" data-i18n="layout_analysis.hands.title"></h3>
 			<p class="la-muted" data-i18n="layout_analysis.hands.caption"></p>
 			<ul id="la-hands-legend" class="la-legend"></ul>
-			<div id="la-hands" class="la-bars" aria-labelledby="la-hands-label"></div>
+			<table id="la-hands" class="la-bars" aria-labelledby="la-hands-label" role="table"></table>
 		</section>
 		<div id="la-charts-fingers" class="la-chart-grid"></div>
-	</div>
+	</section>
 
-	<div id="la-panel-bigrams" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-bigrams" hidden>
+	<section id="la-panel-bigrams" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-bigrams" hidden>
 		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.tab.intro_bigrams"></p>
 		<div id="la-charts-bigrams" class="la-chart-grid"></div>
-	</div>
+	</section>
 
-	<div id="la-panel-trigrams" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-trigrams" hidden>
+	<section id="la-panel-trigrams" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-trigrams" hidden>
 		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.tab.intro_trigrams"></p>
 		<section class="la-figure la-figure-wide" aria-labelledby="la-trigram-mix-label">
 			<h3 id="la-trigram-mix-label" data-i18n="layout_analysis.trigram_mix.title"></h3>
@@ -782,106 +763,102 @@
 			<div id="la-trigram-mix"></div>
 		</section>
 		<div id="la-charts-trigrams" class="la-chart-grid"></div>
-	</div>
+	</section>
 
-	<div id="la-panel-rows" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-rows" hidden>
+	<section id="la-panel-rows" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-rows" hidden>
 		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.tab.intro_rows"></p>
 		<section class="la-figure la-figure-wide" aria-labelledby="la-row-mix-label">
 			<h3 id="la-row-mix-label" data-i18n="layout_analysis.row_mix.title"></h3>
 			<p class="la-muted" data-i18n="layout_analysis.row_mix.caption"></p>
 			<div id="la-row-mix"></div>
 		</section>
-		<section class="la-figure la-figure-wide" aria-labelledby="la-travel-table-label">
+		<section class="la-figure la-figure-wide">
 			<h3 id="la-travel-table-label" data-i18n="layout_analysis.travel.title"></h3>
 			<p class="la-muted" data-i18n="layout_analysis.travel.caption"></p>
-			<div id="la-travel-legend" class="la-heat-legend"></div>
+			<p id="la-travel-legend" class="la-heat-legend"></p>
 			<div class="la-table-wrap" tabindex="0" role="region" aria-labelledby="la-travel-table-label">
 				<table id="la-travel-table" class="la-table la-heat-table"></table>
 			</div>
 		</section>
 		<div id="la-charts-rows" class="la-chart-grid"></div>
-	</div>
+	</section>
 
-	<div id="la-panel-heatmaps" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-heatmaps" hidden>
+	<section id="la-panel-heatmaps" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-heatmaps" hidden>
 		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.tab.intro_heatmaps"></p>
-		<div class="la-heat-controls">
-			<label class="la-filter-field">
-				<span data-i18n="layout_analysis.heats.metric"></span>
+		<p class="la-heat-controls">
+			<label class="la-filter-field" data-i18n-text="layout_analysis.heats.metric">
 				<select id="la-heats-metric"></select>
 			</label>
-			<label class="la-filter-field">
-				<span data-i18n="layout_analysis.heats.count"></span>
+			<label class="la-filter-field" data-i18n-text="layout_analysis.heats.count">
 				<select id="la-heats-count"></select>
 			</label>
-			<label class="la-check">
+			<label class="la-check" data-i18n-text="layout_analysis.heats.shared">
 				<input id="la-heats-shared" type="checkbox" />
-				<span data-i18n="layout_analysis.heats.shared"></span>
 			</label>
-		</div>
-		<div id="la-heats-legend" class="la-heat-legend"></div>
+		</p>
+		<p id="la-heats-legend" class="la-heat-legend"></p>
 		<div id="la-heats" class="la-heat-grid"></div>
-	</div>
+	</section>
 
-	<div id="la-panel-misc" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-misc" hidden>
+	<section id="la-panel-misc" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-misc" hidden>
 		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.tab.intro_misc"></p>
 		<div id="la-charts-misc" class="la-chart-grid"></div>
-	</div>
+	</section>
 
-	<div id="la-panel-analysers" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-analysers" hidden>
+	<section id="la-panel-analysers" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-analysers" hidden>
 		<section id="la-analysers" class="la-card" hidden></section>
-	</div>
+	</section>
 
-	<div id="la-panel-details" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-details" hidden>
-	<div class="la-field la-details-pick">
+	<section id="la-panel-details" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-details" hidden>
+	<p class="la-field la-details-pick">
 		<label for="la-details-layout" data-i18n="layout_analysis.details.layout"></label>
 		<select id="la-details-layout"></select>
-	</div>
+	</p>
 	<section id="la-details" class="la-details" hidden>
 		<h2 id="la-details-title"></h2>
 		<p class="la-muted">
-			<span id="la-details-credit"></span>
+			<small id="la-details-credit" class="la-details-credit"></small>
 			<a id="la-details-link" target="_blank" rel="noopener" hidden></a>
 		</p>
-		<div class="la-field la-versus">
+		<p class="la-field la-versus">
 			<label for="la-versus" data-i18n="layout_analysis.details.versus"></label>
 			<select id="la-versus"></select>
-		</div>
+		</p>
 		<div class="la-detail-grid">
-			<div class="la-detail-main">
+			<section class="la-detail-main">
 				<h3 data-i18n="layout_analysis.details.heatmap"></h3>
-				<div class="la-heat-controls">
+				<p class="la-heat-controls">
 					<label class="la-sr-only" for="la-heat-metric" data-i18n="layout_analysis.details.heatmap"></label>
 					<select id="la-heat-metric"></select>
 					<label id="la-heat-diff-field" class="la-check" hidden>
 						<input id="la-heat-diff" type="checkbox" />
-						<span id="la-heat-diff-label"></span>
 					</label>
-				</div>
+				</p>
 				<div id="la-heatmap" class="la-heatmap"></div>
 				<div id="la-heatmap-image"></div>
-				<div id="la-heat-legend" class="la-heat-legend"></div>
+				<p id="la-heat-legend" class="la-heat-legend"></p>
 				<details id="la-heat-table-box" class="la-section">
 					<summary data-i18n="layout_analysis.heat.table"></summary>
 					<div class="la-table-wrap" tabindex="0">
 						<table id="la-heat-table" class="la-table"></table>
 					</div>
 				</details>
-				<div class="la-detail-loads">
+				<section class="la-detail-loads">
 				<h3 id="la-fingers-label" data-i18n="layout_analysis.details.fingers"></h3>
 				<p class="la-muted" data-i18n="layout_analysis.details.fingers_caption"></p>
 				<ul class="la-legend">
-					<li><span class="la-swatch la-swatch-load"></span><span data-i18n="layout_analysis.details.share_mark"></span></li>
-					<li><span class="la-swatch la-swatch-ideal"></span><span data-i18n="layout_analysis.details.ideal_mark"></span></li>
+					<li data-i18n-text="layout_analysis.details.share_mark"><span class="la-swatch la-swatch-load" aria-hidden="true"></span></li>
+					<li data-i18n-text="layout_analysis.details.ideal_mark"><span class="la-swatch la-swatch-ideal" aria-hidden="true"></span></li>
 				</ul>
-				<div id="la-fingers" class="la-bars" aria-labelledby="la-fingers-label"></div>
+				<table id="la-fingers" class="la-bars" aria-labelledby="la-fingers-label" role="table"></table>
 				<h3 id="la-hands-rows-label" data-i18n="layout_analysis.details.hands_rows"></h3>
-				<div id="la-hands-rows" class="la-bars" aria-labelledby="la-hands-rows-label"></div>
-				</div>
-			</div>
-			<div>
+				<table id="la-hands-rows" class="la-bars" aria-labelledby="la-hands-rows-label" role="table"></table>
+				</section>
+			</section>
+			<section>
 				<h3 id="la-contributions-label" data-i18n="layout_analysis.details.contributions"></h3>
-				<div id="la-contributions" class="la-bars" aria-labelledby="la-contributions-label"></div>
-			</div>
+				<table id="la-contributions" class="la-bars" aria-labelledby="la-contributions-label" role="table"></table>
+			</section>
 		</div>
 		<details class="la-section">
 			<summary data-i18n="layout_analysis.worst.title"></summary>
@@ -897,7 +874,7 @@
 			<p id="la-matrix-caption" class="la-muted"></p>
 			<label for="la-matrix-by" data-i18n="layout_analysis.matrix.by"></label>
 			<select id="la-matrix-by"></select>
-			<div id="la-matrix-legend" class="la-heat-legend"></div>
+			<p id="la-matrix-legend" class="la-heat-legend"></p>
 			<div class="la-matrix-wrap" tabindex="0" role="region" aria-labelledby="la-matrix-caption">
 				<table id="la-matrix" class="la-matrix"></table>
 			</div>
@@ -911,37 +888,37 @@
 			<summary data-i18n="layout_analysis.words.title"></summary>
 			<p class="la-muted" data-i18n="layout_analysis.words.caption"></p>
 			<p id="la-words-none" class="la-muted" data-i18n="layout_analysis.words.none" hidden></p>
-			<div id="la-words-body">
+			<section id="la-words-body">
 				<p id="la-words-mean" class="la-muted"></p>
 				<h4 id="la-words-bins-label" data-i18n="layout_analysis.words.distribution"></h4>
-				<div id="la-words-bins" class="la-bars" aria-labelledby="la-words-bins-label"></div>
+				<table id="la-words-bins" class="la-bars" aria-labelledby="la-words-bins-label" role="table"></table>
 				<h4 data-i18n="layout_analysis.words.hardest"></h4>
 				<div class="la-table-wrap" tabindex="0">
 					<table id="la-words" class="la-table"></table>
 				</div>
-			</div>
+			</section>
 		</details>
 		<details class="la-section">
 			<summary data-i18n="layout_analysis.classes.title"></summary>
 			<h4 id="la-bigram-classes-label" data-i18n="layout_analysis.classes.bigrams"></h4>
-			<div id="la-bigram-classes" class="la-bars" aria-labelledby="la-bigram-classes-label"></div>
+			<table id="la-bigram-classes" class="la-bars" aria-labelledby="la-bigram-classes-label" role="table"></table>
 			<h4 id="la-trigram-classes-label" data-i18n="layout_analysis.classes.trigrams"></h4>
-			<div id="la-trigram-classes" class="la-bars" aria-labelledby="la-trigram-classes-label"></div>
+			<table id="la-trigram-classes" class="la-bars" aria-labelledby="la-trigram-classes-label" role="table"></table>
 		</details>
 		<details class="la-section">
 			<summary id="la-travel-label" data-i18n="layout_analysis.travel.title"></summary>
 			<p class="la-muted" data-i18n="layout_analysis.travel.caption"></p>
-			<div id="la-travel" class="la-bars" aria-labelledby="la-travel-label"></div>
+			<table id="la-travel" class="la-bars" aria-labelledby="la-travel-label" role="table"></table>
 		</details>
 		<details class="la-section">
 			<summary id="la-layers-label" data-i18n="layout_analysis.layers.title"></summary>
 			<p class="la-muted" data-i18n="layout_analysis.layers.caption"></p>
-			<div id="la-layers" class="la-bars" aria-labelledby="la-layers-label"></div>
+			<table id="la-layers" class="la-bars" aria-labelledby="la-layers-label" role="table"></table>
 		</details>
 		<details class="la-section">
 			<summary id="la-standing-label" data-i18n="layout_analysis.standing.title"></summary>
 			<p class="la-muted" data-i18n="layout_analysis.standing.caption"></p>
-			<div id="la-standing" class="la-bars" aria-labelledby="la-standing-label"></div>
+			<table id="la-standing" class="la-bars" aria-labelledby="la-standing-label" role="table"></table>
 		</details>
 		<h3 data-i18n="layout_analysis.details.metrics"></h3>
 		<div class="la-table-wrap" tabindex="0">
@@ -949,20 +926,20 @@
 		</div>
 		<p id="la-unsupported" class="la-muted"></p>
 		<div class="la-detail-grid">
-			<div>
+			<section>
 				<h3 data-i18n="layout_analysis.details.typing"></h3>
 				<p id="la-typing-caption" class="la-muted"></p>
 				<div class="la-table-wrap" tabindex="0">
 					<table id="la-typing" class="la-table"></table>
 				</div>
-			</div>
-			<div>
+			</section>
+			<section>
 				<h3 data-i18n="layout_analysis.details.simplicity"></h3>
 				<table id="la-simplicity" class="la-table"></table>
-			</div>
+			</section>
 		</div>
 	</section>
-	</div>
+	</section>
 </section>`;
 
 	/**
@@ -1642,7 +1619,7 @@
 		/** The flag an incomplete layout carries in the chart and the table. */
 		function incompleteFlag(result) {
 			return el(
-				'span',
+				'strong',
 				'la-incomplete-flag',
 				t('layout_analysis.incomplete.flag', {
 					chars: missingText(result.coverage.missingRequired)
@@ -1798,7 +1775,7 @@
 			list.replaceChildren(
 				...TABS.map((id) => {
 					const button = el('button', `la-tab la-tab-accent-${TAB_SLOT[id]}`);
-					button.append(tabIcon(id), el('span', 'la-tab-label', TAB_LABEL[id]()));
+					button.append(tabIcon(id), TAB_LABEL[id]());
 					button.type = 'button';
 					button.id = `la-tab-${id}`;
 					button.setAttribute('role', 'tab');
@@ -1862,22 +1839,6 @@
 		}
 
 		/**
-		 * Makes a row act as a button: a click or Enter / Space opens the
-		 * layout's details, and it takes the keyboard focus in reading order.
-		 */
-		function openOnActivate(node, id, label) {
-			node.tabIndex = 0;
-			node.setAttribute('role', 'button');
-			node.setAttribute('aria-label', label);
-			node.addEventListener('click', () => showDetails(id));
-			node.addEventListener('keydown', (event) => {
-				if (event.key !== 'Enter' && event.key !== ' ') return;
-				event.preventDefault();
-				showDetails(id);
-			});
-		}
-
-		/**
 		 * Horizontal bars of the global score, best first. The score has no
 		 * natural zero (each metric adds or removes its weighted value), so the
 		 * bars run from the weakest layout shown to the best one: the longest is
@@ -1889,20 +1850,28 @@
 			box.replaceChildren();
 			const rows = shownRows();
 			const shown = rows.slice(0, CHART_MAX_BARS);
+			moreNoteAfter(box, shown.length, rows.length);
 			if (shown.length === 0) return;
 			const totals = shown.map((r) => r.score.total);
 			const best = Math.max(...totals);
 			const worst = Math.min(...totals);
 			const span = best - worst;
 			for (const result of shown) {
-				const row = el('div', 'la-chart-row');
 				const value = format(result.score.total, 1);
 				const gap = result.score.total - best;
 				// An incomplete layout ranks after the complete ones and says what it lacks.
 				const flag = result.incomplete ? incompleteFlag(result) : null;
-				openOnActivate(
-					row,
-					result.layout.id,
+				const track = el('td', 'la-chart-track');
+				const bar = el('span', isPersonal(result) ? 'la-bar la-bar-mine' : 'la-bar la-bar-score');
+				// The weakest keeps a sliver, so every row shows a bar; one layout alone is full.
+				const share = span > 0 ? (result.score.total - worst) / span : 1;
+				bar.style.left = '0%';
+				bar.style.width = `${3 + share * 97}%`;
+				track.append(bar);
+				const row = barRow(result.layout.name, track, value, undefined, result.layout.id);
+				// The button's name starts with its visible text, the layout (WCAG 2.5.3).
+				rowName(row).setAttribute(
+					'aria-label',
 					t('layout_analysis.chart.row', {
 						layout: flag ? `${result.layout.name} (${flag.textContent})` : result.layout.name,
 						rank: result.rank,
@@ -1910,34 +1879,38 @@
 					})
 				);
 				if (state.details === result.layout.id) row.classList.add('la-selected');
-				if (flag) row.classList.add('la-incomplete');
-				// The name starts with the visible text, name then value (WCAG 2.5.3);
-				// the spaces between the cells, unrendered in the grid, keep the
-				// two words apart in that visible text.
-				const label = el('span', 'la-chart-label', result.layout.name);
-				if (flag) label.append(' ', flag);
-				row.append(label, ' ');
-				const track = el('span', 'la-chart-track');
-				const bar = el('span', isPersonal(result) ? 'la-bar la-bar-mine' : 'la-bar la-bar-score');
-				// The weakest keeps a sliver, so every row shows a bar; one layout alone is full.
-				const share = span > 0 ? (result.score.total - worst) / span : 1;
-				bar.style.left = '0%';
-				bar.style.width = `${3 + share * 97}%`;
-				track.append(bar);
+				if (flag) {
+					row.classList.add('la-incomplete');
+					rowName(row).append(' ', flag);
+				}
 				row.title = `${result.layout.name}: ${withUnit(value, t('layout_analysis.unit.points'))}${
 					flag ? ` (${flag.textContent})` : ''
 				}`;
-				const cell = el('span', 'la-chart-value', value);
-				if (gap < 0) cell.append(' ', el('span', 'la-chart-gap', `(${format(gap, 1)})`));
-				row.append(track, ' ', cell);
+				if (gap < 0) row.lastChild.append(' ', el('small', 'la-chart-gap', `(${format(gap, 1)})`));
 				box.append(row);
 			}
-			if (rows.length > shown.length) box.append(moreNote(shown.length, rows.length));
 		}
 
 		/** The line under a chart that shows the first of the layouts only. */
 		function moreNote(shown, total) {
 			return el('p', 'la-muted', t('layout_analysis.chart.more', { shown, total }));
+		}
+
+		/**
+		 * The « more » line after a figure's table, which holds rows only:
+		 * replaced at each drawing, absent when every layout is shown.
+		 * @param {HTMLTableElement} table - A figure with an id.
+		 * @param {number} shown
+		 * @param {number} total
+		 */
+		function moreNoteAfter(table, shown, total) {
+			const id = `${table.id}-more`;
+			const old = document.getElementById(id);
+			if (old) old.remove();
+			if (total <= shown) return;
+			const note = moreNote(shown, total);
+			note.id = id;
+			table.after(note);
 		}
 
 		/**
@@ -2030,7 +2003,7 @@
 						save();
 						renderTable();
 					});
-					label.append(box, el('span', '', metricName(id)));
+					label.append(box, metricName(id));
 					return label;
 				})
 			);
@@ -2558,9 +2531,12 @@
 			toggle.checked = state.table.relative;
 			toggle.disabled = reference === null;
 			const name = reference ? reference.layout.name : '';
-			$('la-table-relative-label').textContent = t('layout_analysis.table.relative', {
-				layout: name
-			});
+			setText(
+				$('la-table-relative-label'),
+				t('layout_analysis.table.relative', {
+					layout: name
+				})
+			);
 			const help = $('la-table-relative-help');
 			help.hidden = !state.table.relative || reference === null;
 			help.textContent = t('layout_analysis.table.relative_help', { layout: name });
@@ -2583,25 +2559,22 @@
 		/**
 		 * A bar of one result in a figure from zero: the user's own layouts in the
 		 * accent colour, an incomplete one faded with its flag in words. Read as a
-		 * table row (barRow); a click opens the layout's details, whose keyboard
-		 * way is the table under the figure.
+		 * table row (barRow) whose name is the button opening the layout's details.
 		 */
 		function resultBar(result, value, scale, text) {
-			const track = el('span', 'la-chart-track');
+			const track = el('td', 'la-chart-track');
 			const bar = el('span', isPersonal(result) ? 'la-bar la-bar-mine' : 'la-bar la-bar-score');
 			bar.style.left = '0';
 			bar.style.width = `${scale > 0 ? Math.max(0, Math.min(100, (value / scale) * 100)) : 0}%`;
 			track.append(bar);
 			const flag = result.incomplete ? incompleteFlag(result) : null;
-			const row = barRow(result.layout.name, track, text);
+			const row = barRow(result.layout.name, track, text, undefined, result.layout.id);
 			if (flag) {
 				row.classList.add('la-incomplete');
-				row.firstChild.append(' ', flag);
+				rowName(row).append(' ', flag);
 			}
 			if (state.details === result.layout.id) row.classList.add('la-selected');
-			row.classList.add('la-clickable');
 			row.title = `${result.layout.name}: ${text}${flag ? ` (${flag.textContent})` : ''}`;
-			row.addEventListener('click', () => showDetails(result.layout.id));
 			return row;
 		}
 
@@ -2632,8 +2605,7 @@
 			section.setAttribute('aria-labelledby', titleId);
 			const better = E.METRICS[id].better;
 			section.append(title, el('p', 'la-muted la-direction', DIRECTION_LABEL[better]()));
-			const box = el('div', 'la-bars');
-			box.setAttribute('role', 'table');
+			const box = barTable();
 			box.setAttribute('aria-labelledby', titleId);
 			const sorted = figureOrder(rows, (r) => r.metrics[id], better);
 			const shown = sorted.slice(0, CHART_MAX_BARS);
@@ -2655,7 +2627,7 @@
 			const titleId = `la-table-${name}-label`;
 			const title = el('h3', '', t('layout_analysis.heat.table'));
 			title.id = titleId;
-			section.setAttribute('aria-labelledby', titleId);
+			// The scrolling box is the region named by the title, the section only groups.
 			const wrap = el('div', 'la-table-wrap');
 			wrap.tabIndex = 0;
 			wrap.setAttribute('role', 'region');
@@ -2800,7 +2772,7 @@
 						`${Math.round((Math.abs(gap) / extent) * HEAT_DIFF_MAX_SHARE * 100)}%`
 					);
 					const signed = `${gap > 0 ? '+' : ''}${format(gap, 1)}`;
-					td.append(el('span', '', measure(value, 1, '%')), el('small', 'la-gap', signed));
+					td.append(measure(value, 1, '%'), el('small', 'la-gap', signed));
 					td.title = `${t(`layout_analysis.finger.${id}`)}: ${measure(value, 1, '%')} (${t(
 						'layout_analysis.details.ideal_mark'
 					)} ${measure(ideal[id], 1, '%')}, ${signed})`;
@@ -2831,7 +2803,6 @@
 		function renderHands() {
 			const box = $('la-hands');
 			box.replaceChildren();
-			box.setAttribute('role', 'table');
 			const left = t('layout_analysis.details.hand_left');
 			const right = t('layout_analysis.details.hand_right');
 			$('la-hands-legend').replaceChildren(
@@ -2840,8 +2811,9 @@
 			);
 			const sorted = figureOrder(shownRows(), (r) => r.metrics.hand_imbalance, 'lower');
 			const shown = sorted.slice(0, CHART_MAX_BARS);
+			moreNoteAfter(box, shown.length, sorted.length);
 			for (const result of shown) {
-				const track = el('span', 'la-chart-track la-stack');
+				const track = el('td', 'la-chart-track la-stack');
 				const share = result.hands.left;
 				const leftBar = el('span', 'la-bar la-seg la-seg-1');
 				leftBar.style.left = '0';
@@ -2857,26 +2829,45 @@
 					result.layout.name,
 					track,
 					text,
-					` (${left} ${measure(result.hands.left, 1, '%')}, ${right} ${measure(result.hands.right, 1, '%')})`
+					` (${left} ${measure(result.hands.left, 1, '%')}, ${right} ${measure(result.hands.right, 1, '%')})`,
+					result.layout.id
 				);
 				if (result.incomplete) {
 					row.classList.add('la-incomplete');
-					row.firstChild.append(' ', incompleteFlag(result));
+					rowName(row).append(' ', incompleteFlag(result));
 				}
 				if (state.details === result.layout.id) row.classList.add('la-selected');
-				row.classList.add('la-clickable');
 				row.title = `${result.layout.name}: ${left} ${measure(result.hands.left, 1, '%')}, ${right} ${measure(result.hands.right, 1, '%')}`;
-				row.addEventListener('click', () => showDetails(result.layout.id));
 				box.append(row);
 			}
-			if (sorted.length > shown.length) box.append(moreNote(shown.length, sorted.length));
 		}
 
 		/** A legend entry: a swatch of a class and its name. */
 		function legendItem(swatch, label) {
 			const item = el('li');
-			item.append(el('span', `la-swatch ${swatch}`), el('span', '', label));
+			item.append(swatchMark(swatch), label);
 			return item;
+		}
+
+		/** A heat scale's ramp between its two ends: drawn only, the ends are its text. */
+		function heatRamp() {
+			const ramp = el('span', 'la-heat-ramp');
+			ramp.setAttribute('aria-hidden', 'true');
+			return ramp;
+		}
+
+		/** One item of a value list holding its labelled field (style.css la-weight-item). */
+		function weightItem(node) {
+			const item = el('li', 'la-weight-item');
+			item.append(node);
+			return item;
+		}
+
+		/** A legend's colour sample: drawn only, its entry's words say what it stands for. */
+		function swatchMark(swatch) {
+			const mark = el('span', `la-swatch ${swatch}`);
+			mark.setAttribute('aria-hidden', 'true');
+			return mark;
 		}
 
 		/**
@@ -2896,12 +2887,11 @@
 			if (rows.length === 0) return;
 			const legend = el('ul', 'la-legend');
 			parts.forEach((part, i) => legend.append(legendItem(`la-swatch-cat-${i + 1}`, part.label)));
-			const bars = el('div', 'la-bars');
-			bars.setAttribute('role', 'table');
+			const bars = barTable();
 			bars.setAttribute('aria-labelledby', box.closest('section').getAttribute('aria-labelledby'));
 			const shown = rows.slice(0, CHART_MAX_BARS);
 			for (const result of shown) {
-				const track = el('span', 'la-chart-track la-stack');
+				const track = el('td', 'la-chart-track la-stack');
 				let at = 0;
 				parts.forEach((part, i) => {
 					const share = value(result, part.id);
@@ -2919,16 +2909,15 @@
 					result.layout.name,
 					track,
 					written ? measure(value(result, written), 1, '%') : '',
-					` (${said})`
+					` (${said})`,
+					result.layout.id
 				);
 				if (result.incomplete) {
 					row.classList.add('la-incomplete');
-					row.firstChild.append(' ', incompleteFlag(result));
+					rowName(row).append(' ', incompleteFlag(result));
 				}
 				if (state.details === result.layout.id) row.classList.add('la-selected');
-				row.classList.add('la-clickable');
 				row.title = `${result.layout.name}: ${said}`;
-				row.addEventListener('click', () => showDetails(result.layout.id));
 				bars.append(row);
 			}
 			const tableBox = el('details', 'la-section');
@@ -3054,11 +3043,7 @@
 				tbody.append(tr);
 			}
 			table.append(tabSortHead(columns, 'travel', renderTravelTable), tbody);
-			$('la-travel-legend').replaceChildren(
-				el('span', '', measure(0, 2, mm)),
-				el('span', 'la-heat-ramp'),
-				el('span', '', measure(extent, 2, mm))
-			);
+			$('la-travel-legend').replaceChildren(measure(0, 2, mm), heatRamp(), measure(extent, 2, mm));
 		}
 
 		/**
@@ -3089,14 +3074,14 @@
 				);
 			const common = Math.max(...boards.map((b) => extentOf(b.values)), 0);
 			const ramp = (extent) => [
-				el('span', '', measure(0, HEAT_DIGITS, unit)),
-				el('span', 'la-heat-ramp'),
-				el('span', '', `≥ ${measure(extent, HEAT_DIGITS, unit)}`)
+				measure(0, HEAT_DIGITS, unit),
+				heatRamp(),
+				`≥ ${measure(extent, HEAT_DIGITS, unit)}`
 			];
 			if (shared)
 				$('la-heats-legend').replaceChildren(
 					...ramp(common),
-					el('span', 'la-muted', t('layout_analysis.heat.scale', { metric: heatName(metric) }))
+					el('small', 'la-muted', t('layout_analysis.heat.scale', { metric: heatName(metric) }))
 				);
 			for (const { result, values } of boards) {
 				const layout = layoutOf(result.layout.id);
@@ -3139,7 +3124,7 @@
 					})
 				);
 				if (!shared) {
-					const legend = el('div', 'la-heat-legend');
+					const legend = el('p', 'la-heat-legend');
 					legend.append(...ramp(extent));
 					card.append(legend);
 				}
@@ -3186,10 +3171,9 @@
 		 */
 		function signedBars(box, entries, digits, unit) {
 			box.replaceChildren();
-			box.setAttribute('role', 'table');
 			const extent = Math.max(...entries.map(([, v]) => Math.abs(v)), 1e-9);
 			for (const [label, value] of entries) {
-				const track = el('span', 'la-chart-track la-signed');
+				const track = el('td', 'la-chart-track la-signed');
 				const bar = el('span', value >= 0 ? 'la-bar la-bar-gain' : 'la-bar la-bar-loss');
 				const width = (Math.abs(value) / extent) * 50;
 				bar.style.left = value >= 0 ? '50%' : `${50 - width}%`;
@@ -3203,28 +3187,57 @@
 		}
 
 		/**
-		 * One bar of a figure, read as a table row by assistive technology:
-		 * the label is its row header, the value its cell, the drawn bar
-		 * hidden (it repeats the value). The box holding the rows is the table,
-		 * named by its heading (aria-labelledby in the markup).
+		 * A bar figure's table, named by its heading. Its rows are laid out as a
+		 * grid (style.css), which drops a table's implicit roles in some
+		 * browsers, so the table, its rows and cells state them.
+		 * @returns {HTMLTableElement}
+		 */
+		function barTable() {
+			const table = el('table', 'la-bars');
+			table.setAttribute('role', 'table');
+			return table;
+		}
+
+		/**
+		 * One bar of a figure, a row of its table (barTable, or a la-bars table
+		 * of the markup): the label is its row header, the value its cell, the
+		 * drawn bar hidden (it repeats the value). With a layout to open, the
+		 * label is the button opening that layout's details, and a click
+		 * anywhere on the row does the same.
 		 * @param {string} label
-		 * @param {HTMLElement} track The drawn bar.
+		 * @param {HTMLTableCellElement} track The drawn bar, a td.
 		 * @param {string} text The value as written beside the bar.
 		 * @param {string} [spoken] What the cell adds for a screen reader only:
 		 *   the unit, the ideal load.
-		 * @returns {HTMLElement}
+		 * @param {string} [open] The id of the layout the row opens.
+		 * @returns {HTMLTableRowElement}
 		 */
-		function barRow(label, track, text, spoken) {
-			const row = el('div', 'la-chart-row');
+		function barRow(label, track, text, spoken, open) {
+			const row = el('tr', 'la-chart-row');
 			row.setAttribute('role', 'row');
-			const header = el('span', 'la-chart-label', label);
+			const header = el('th', 'la-chart-label');
+			header.scope = 'row';
 			header.setAttribute('role', 'rowheader');
+			if (open === undefined) header.append(label);
+			else {
+				const button = el('button', 'la-chart-name', label);
+				button.type = 'button';
+				header.append(button);
+				row.classList.add('la-clickable');
+				// The button's own activation (Enter, Space, a click) reaches the row too.
+				row.addEventListener('click', () => showDetails(open));
+			}
 			track.setAttribute('aria-hidden', 'true');
-			const value = el('span', 'la-chart-value', text);
+			const value = el('td', 'la-chart-value', text);
 			value.setAttribute('role', 'cell');
 			if (spoken) value.append(el('span', 'la-sr-only', spoken));
 			row.append(header, track, value);
 			return row;
+		}
+
+		/** Where a bar row writes its layout's name: its button, else its header. */
+		function rowName(row) {
+			return row.querySelector('.la-chart-name') || row.firstChild;
 		}
 
 		/**
@@ -3242,9 +3255,8 @@
 			const digits = written && written.digits !== undefined ? written.digits : 1;
 			const value = (v) => measure(v, digits, unit);
 			box.replaceChildren();
-			box.setAttribute('role', 'table');
 			for (const entry of entries) {
-				const track = el('span', 'la-chart-track');
+				const track = el('td', 'la-chart-track');
 				const bar = el('span', 'la-bar la-bar-load');
 				bar.style.left = '0';
 				bar.style.width = `${scale > 0 ? Math.min(100, (entry.value / scale) * 100) : 0}%`;
@@ -3509,9 +3521,12 @@
 			const field = $('la-heat-diff-field');
 			field.hidden = !versus;
 			if (versus)
-				$('la-heat-diff-label').textContent = t('layout_analysis.heat.diff', {
-					layout: versus.layout.name
-				});
+				setText(
+					field,
+					t('layout_analysis.heat.diff', {
+						layout: versus.layout.name
+					})
+				);
 			$('la-heat-diff').checked = state.heatDiff;
 			const other = versus && state.heatDiff ? versus : null;
 			const layout = layoutOf(result.layout.id);
@@ -3540,22 +3555,22 @@
 				// Both directions in words with a sign, never by colour alone.
 				const swatch = (kind, mark, words) => {
 					const item = el('span', 'la-heat-key');
-					item.append(el('span', `la-swatch la-swatch-${kind}`), `${mark} ${words}`);
+					item.append(swatchMark(`la-swatch-${kind}`), `${mark} ${words}`);
 					return item;
 				};
 				legend.replaceChildren(
 					swatch('more', '+', t('layout_analysis.heat.diff_more', { layout: other.layout.name })),
 					swatch('less', '−', t('layout_analysis.heat.diff_less', { layout: other.layout.name })),
-					el('span', 'la-muted', `± ${measure(extent, HEAT_DIGITS, unit)}`)
+					el('small', 'la-muted', `± ${measure(extent, HEAT_DIGITS, unit)}`)
 				);
 				return;
 			}
 			// The scale: what the lightest and the darkest key stand for.
 			legend.replaceChildren(
-				el('span', '', measure(0, HEAT_DIGITS, unit)),
-				el('span', 'la-heat-ramp'),
-				el('span', '', measure(extent, HEAT_DIGITS, unit)),
-				el('span', 'la-muted', t('layout_analysis.heat.scale', { metric: heatName(state.heat) }))
+				measure(0, HEAT_DIGITS, unit),
+				heatRamp(),
+				measure(extent, HEAT_DIGITS, unit),
+				el('small', 'la-muted', t('layout_analysis.heat.scale', { metric: heatName(state.heat) }))
 			);
 		}
 
@@ -3768,7 +3783,7 @@
 								'--la-share',
 								`${Math.round(share * HEAT_DIFF_MAX_SHARE * 100)}%`
 							);
-							td.append(el('span', '', v > 0 ? '+' : v < 0 ? '−' : ''));
+							td.append(v > 0 ? '+' : v < 0 ? '−' : '');
 						} else {
 							td.classList.add('la-cell-count');
 							td.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
@@ -3787,21 +3802,21 @@
 			if (byPoints) {
 				const swatch = (kind, mark, words) => {
 					const item = el('span', 'la-heat-key');
-					item.append(el('span', `la-swatch la-swatch-${kind}`), `${mark} ${words}`);
+					item.append(swatchMark(`la-swatch-${kind}`), `${mark} ${words}`);
 					return item;
 				};
 				legend.replaceChildren(
 					swatch('less', '+', t('layout_analysis.chart.gain')),
 					swatch('more', '−', t('layout_analysis.chart.loss')),
-					el('span', 'la-muted', `± ${measure(extent, HEAT_DIGITS, unit)}`)
+					el('small', 'la-muted', `± ${measure(extent, HEAT_DIGITS, unit)}`)
 				);
 			} else {
 				legend.replaceChildren(
-					el('span', '', measure(0, HEAT_DIGITS, unit)),
-					el('span', 'la-heat-ramp'),
-					el('span', '', measure(extent, HEAT_DIGITS, unit)),
+					measure(0, HEAT_DIGITS, unit),
+					heatRamp(),
+					measure(extent, HEAT_DIGITS, unit),
 					el(
-						'span',
+						'small',
 						'la-muted',
 						t('layout_analysis.heat.scale', { metric: t('layout_analysis.matrix.by_count') })
 					)
@@ -4044,9 +4059,13 @@
 				none: ['', t('layout_analysis.details.verdict_none')]
 			};
 			const verdictCell = (verdict) => {
-				const cell = el('span', `la-verdict la-verdict-${verdict}`);
+				const cell = el('small', `la-verdict la-verdict-${verdict}`);
 				const [mark, words] = verdicts[verdict];
-				if (mark) cell.append(el('span', 'la-verdict-mark', mark), ' ');
+				if (mark) {
+					const drawn = el('span', 'la-verdict-mark', mark);
+					drawn.setAttribute('aria-hidden', 'true');
+					cell.append(drawn, ' ');
+				}
 				cell.append(words);
 				return cell;
 			};
@@ -4514,7 +4533,7 @@
 				showPickCount(visibleLayoutIds().length);
 				analyse();
 			});
-			label.append(box, el('span', 'la-layout-name', layout.name));
+			label.append(box, el('b', 'la-layout-name', layout.name));
 			const authors = Array.isArray(layout.authors) ? layout.authors.join(', ') : '';
 			// The authors beside the label, so the box is named by the layout alone.
 			item.append(label);
@@ -4522,7 +4541,7 @@
 				item.classList.add('la-own');
 				item.append(state.renaming === layout.id ? renameForm(layout) : ownActions(layout, item));
 			}
-			if (authors) item.append(el('span', 'la-layout-meta', authors));
+			if (authors) item.append(el('small', 'la-layout-meta', authors));
 			// « + »: this layout also ranks as « <name>+ », typing the keys typed with
 			// the Ergopti+ hotstrings, while the others type the final text.
 			if (appliedTextMode() !== TEXT_MIXED) return item;
@@ -4540,7 +4559,7 @@
 				save();
 				analyse();
 			});
-			plusLabel.append(plus, el('span', '', layout.name + PLUS_SUFFIX));
+			plusLabel.append(plus, layout.name + PLUS_SUFFIX);
 			item.append(plusLabel);
 			return item;
 		}
@@ -4568,7 +4587,7 @@
 			button.type = 'button';
 			button.dataset.mine = id;
 			button.dataset.layout = layout.id;
-			button.append(mineIcon(id), el('span', 'la-mine-word', t(`layout_analysis.mine.${id}`)));
+			button.append(mineIcon(id), t(`layout_analysis.mine.${id}`));
 			button.setAttribute(
 				'aria-label',
 				t(`layout_analysis.mine.${id}_named`, { name: layout.name })
@@ -4579,9 +4598,9 @@
 
 		/** « Rename », « Duplicate » and « Remove » beside an own layout of the list. */
 		function ownActions(layout) {
-			const box = el('span', 'la-mine-actions');
+			const box = el('p', 'la-mine-actions');
 			box.append(
-				el('span', 'la-mine-badge', t('layout_analysis.mine.badge')),
+				el('b', 'la-mine-badge', t('layout_analysis.mine.badge')),
 				mineButton('rename', layout, () => {
 					state.renaming = layout.id;
 					fillLayouts();
@@ -4633,7 +4652,7 @@
 			const node = $('la-mine-status');
 			node.hidden = false;
 			node.className = `la-mine-status ${error ? 'la-error' : 'la-ok'}`;
-			node.replaceChildren(el('span', '', text));
+			node.replaceChildren(text);
 			if (!undo) return;
 			const button = el('button', 'la-mine-undo', t('layout_analysis.undo.button'));
 			button.type = 'button';
@@ -4862,11 +4881,11 @@
 					const active = isCurrent(config);
 					button.setAttribute('aria-pressed', String(active));
 					button.append(
-						el('span', 'la-preset-name', name),
-						el('span', 'la-preset-help', t(`layout_analysis.presets.${id}.help`))
+						el('b', 'la-preset-name', name),
+						el('small', 'la-preset-help', t(`layout_analysis.presets.${id}.help`))
 					);
 					if (active)
-						button.append(el('span', 'la-preset-active', t('layout_analysis.presets.active')));
+						button.append(el('b', 'la-preset-active', t('layout_analysis.presets.active')));
 					button.addEventListener('click', () => applyPreset(config, name));
 					item.append(button);
 					return item;
@@ -4934,12 +4953,12 @@
 			} catch {
 				readable = false;
 			}
-			item.append(el('span', 'la-preset-name', preset.name));
+			item.append(el('b', 'la-preset-name', preset.name));
 			if (readable && isCurrent(preset.config))
-				item.append(el('span', 'la-preset-active', t('layout_analysis.presets.active')));
+				item.append(el('b', 'la-preset-active', t('layout_analysis.presets.active')));
 			// A preset saved by an older Studio: said, never applied in part.
-			if (!readable) item.append(el('span', 'la-preset-stale', t('layout_analysis.presets.stale')));
-			const actions = el('span', 'la-mine-actions');
+			if (!readable) item.append(el('b', 'la-preset-stale', t('layout_analysis.presets.stale')));
+			const actions = el('p', 'la-mine-actions');
 			const apply = el(
 				'button',
 				'la-mine-button la-preset-use',
@@ -5170,13 +5189,13 @@
 		 */
 		function weightControl(id) {
 			const metric = E.METRICS[id];
-			const control = el('div', 'la-weight-card');
+			const control = el('li', 'la-weight-card');
 			const inputId = `la-weight-${id}`;
-			const top = el('div', 'la-weight-top');
+			const top = el('p', 'la-weight-top');
 			const label = el('label', 'la-weight-name', t(`layout_analysis.metric.${id}`));
 			label.htmlFor = inputId;
 			top.append(label, infoButton(id));
-			const field = el('div', 'la-weight-field');
+			const field = el('p', 'la-weight-field');
 			const input = el('input');
 			input.id = inputId;
 			input.type = 'number';
@@ -5185,7 +5204,7 @@
 			input.value = String(state.weights[id]);
 			input.setAttribute('aria-describedby', `${inputId}-unit ${inputId}-help`);
 			const unit = el(
-				'span',
+				'small',
 				'la-weight-unit',
 				t(`layout_analysis.weights.per_${metric.better}`, {
 					unit: metric.unit === 'mm' ? t('layout_analysis.unit.mm') : '%'
@@ -5205,7 +5224,7 @@
 		/** A penalty metric's floor field, in its unit, re-scoring as it is edited. */
 		function floorField(id, metric) {
 			const inputId = `la-floor-${id}`;
-			const field = el('div', 'la-weight-field la-floor-field');
+			const field = el('p', 'la-weight-field la-floor-field');
 			const label = el('label', 'la-floor-name', t('layout_analysis.weights.floor'));
 			label.htmlFor = inputId;
 			const input = el('input');
@@ -5215,7 +5234,7 @@
 			input.step = 'any';
 			input.value = String(state.floors[id]);
 			const unit = el(
-				'span',
+				'small',
 				'la-weight-unit',
 				t('layout_analysis.weights.floor_unit', {
 					unit: metric.unit === 'mm' ? t('layout_analysis.unit.mm') : '%'
@@ -5255,11 +5274,8 @@
 				section.setAttribute('aria-labelledby', headingId);
 				const heading = el('h3', 'la-group-heading');
 				heading.id = headingId;
-				heading.append(
-					sectionIcon(group),
-					el('span', '', t(`layout_analysis.weights.group.${group}`))
-				);
-				const grid = el('div', 'la-weight-list');
+				heading.append(sectionIcon(group), t(`layout_analysis.weights.group.${group}`));
+				const grid = el('ul', 'la-weight-list');
 				section.append(
 					heading,
 					el('p', 'la-muted', t(`layout_analysis.weights.group_help.${group}`)),
@@ -5334,7 +5350,7 @@
 			};
 			for (const id of Object.keys(E.defaultIdealLoad())) {
 				const label = el('label', 'la-weight');
-				label.append(el('span', '', t(`layout_analysis.finger.${id}`)));
+				label.append(t(`layout_analysis.finger.${id}`));
 				const input = el('input');
 				input.type = 'number';
 				input.min = '0';
@@ -5344,7 +5360,7 @@
 				input.addEventListener('input', showSum);
 				inputs[id] = input;
 				label.append(input);
-				list.append(label);
+				list.append(weightItem(label));
 			}
 			drawIdealHands(state.idealLoad);
 			$('la-ideal-sum').textContent = t('layout_analysis.ideal.sum', {
@@ -5396,7 +5412,7 @@
 				list.replaceChildren();
 				for (const [id, value] of Object.entries(part.values)) {
 					const label = el('label', 'la-weight');
-					label.append(el('span', '', part.label(id)));
+					label.append(part.label(id));
 					const input = el('input');
 					input.type = 'number';
 					input.min = '0';
@@ -5407,7 +5423,7 @@
 					input.addEventListener('input', changed);
 					inputs[index][id] = input;
 					label.append(input);
-					list.append(label);
+					list.append(weightItem(label));
 				}
 			});
 		}
@@ -6054,9 +6070,33 @@
 		}
 
 		/** Fills the markup's data-i18n, -placeholder, -title and option-prefix strings. */
+		/**
+		 * Writes an element's own text and keeps the elements it holds: a label
+		 * keeps its field, a button or a legend entry its icon. The text comes
+		 * after a decorative icon or a checkbox and before any other field, so a
+		 * label's words are the label itself rather than a span inside it.
+		 * @param {Element} node
+		 * @param {string} text
+		 */
+		function setText(node, text) {
+			const kept = Array.from(node.children);
+			const before = kept.filter(
+				(child) =>
+					child.matches('svg, [aria-hidden="true"]') ||
+					(child.tagName === 'INPUT' && child.type === 'checkbox')
+			);
+			const after = kept.filter((child) => !before.includes(child));
+			node.replaceChildren(...before, text, ...after);
+		}
+
 		function applyStrings() {
 			for (const node of root.querySelectorAll('[data-i18n]'))
 				node.textContent = t(node.dataset.i18n);
+			// An element that holds a field or an icon beside its words: i18n.js
+			// replaces a data-i18n element's whole content, so these name their
+			// key apart and only the page writes them.
+			for (const node of root.querySelectorAll('[data-i18n-text]'))
+				setText(node, t(node.dataset.i18nText));
 			for (const node of root.querySelectorAll('[data-i18n-placeholder]'))
 				node.placeholder = t(node.dataset.i18nPlaceholder);
 			for (const node of root.querySelectorAll('[data-i18n-title]'))
