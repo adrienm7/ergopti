@@ -613,12 +613,12 @@
 		"platforms": { "windows": true, "macos": false, "linux": false },
 		"reasons": {
 			"macos": {
-				"en": "Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.",
-				"fr": "Windows uniquement : ce pilote émule lui-même la disposition Ergopti, il a donc une émulation à désactiver. macOS installe la disposition comme source de saisie du système et Linux l'installe comme disposition de clavier du système (XKB) : il n'y a rien à désactiver là-bas."
+				"en": "Windows only: this switch is the Windows driver's gate for the whole layout section. macOS and Linux have no such gate: choose no layout to emulate and switch both emulated layers off to type with the system layout alone.",
+				"fr": "Windows uniquement : cet interrupteur est la barrière du pilote Windows pour toute la section des dispositions. macOS et Linux n’en ont pas : choisissez de n’émuler aucune disposition et désactivez les deux couches émulées pour taper avec la seule disposition du système."
 			},
 			"linux": {
-				"en": "Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.",
-				"fr": "Windows uniquement : ce pilote émule lui-même la disposition Ergopti, il a donc une émulation à désactiver. macOS installe la disposition comme source de saisie du système et Linux l'installe comme disposition de clavier du système (XKB) : il n'y a rien à désactiver là-bas."
+				"en": "Windows only: this switch is the Windows driver's gate for the whole layout section. macOS and Linux have no such gate: choose no layout to emulate and switch both emulated layers off to type with the system layout alone.",
+				"fr": "Windows uniquement : cet interrupteur est la barrière du pilote Windows pour toute la section des dispositions. macOS et Linux n’en ont pas : choisissez de n’émuler aucune disposition et désactivez les deux couches émulées pour taper avec la seule disposition du système."
 			}
 		}
 	},

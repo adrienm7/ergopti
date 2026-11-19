@@ -163,9 +163,13 @@ technical = "Windows keeps this master switch as the category gate in category_e
 kind = "os_concept"
 technical = "The Karabiner-Elements virtual HID keyboard type decides which keycodes the two ISO-only keys reach on macOS; Windows and Linux name these keys by scan code and have no virtual keyboard."
 
-[reasons."platform_reason.layout_emulation_is_windows_only"]
-kind = "os_concept"
-technical = "Only the Windows driver emulates the layout with AutoHotkey hotkeys; macOS installs it as a TIS input source and Linux as an XKB layout, so there is no emulation to switch off."
+[reasons."platform_reason.layout_master_switch_is_windows"]
+kind = "driver_storage"
+technical = "Windows gates the whole layout section with its category switch (category_enabled.layout). macOS and Linux emulate layouts too (modules/keymap/layout_emulation.lua) but keep no category gate: emulated_layout none with ergopti_base and ergopti_alt_gr off leaves every key to the system layout."
+
+[reasons."platform_reason.ctrl_magic_save_is_windows"]
+kind = "not_yet"
+technical = "Ctrl plus the magic key sends a bare Ctrl+S from the Windows hotkeys (modules/keymap/layout.ahk). macOS has its own Cmd plus magic key shortcut (cmd_star); the Linux emulation could send it too but does not yet (TODO BND-1, a pending maintainer decision)."
 
 [reasons."platform_reason.action_lookup_is_macos_dictionary"]
 kind = "os_api"

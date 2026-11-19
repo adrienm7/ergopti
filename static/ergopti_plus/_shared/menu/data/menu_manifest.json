@@ -2374,7 +2374,7 @@
 			"platforms": [
 				"ahk"
 			],
-			"reason_key": "platform_reason.layout_emulation_is_windows_only"
+			"reason_key": "platform_reason.layout_master_switch_is_windows"
 		},
 		{
 			"type": "command",

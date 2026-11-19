@@ -4350,7 +4350,7 @@ description_key = "menu.layout.emulate_bottom_row"
 id = "ctrl_magic_save"
 platforms = ["ahk"]
 requires = { windows = [] }
-reason_key = "platform_reason.layout_emulation_is_windows_only"
+reason_key = "platform_reason.ctrl_magic_save_is_windows"
 default = false
 recommended = false
 family = "feature"

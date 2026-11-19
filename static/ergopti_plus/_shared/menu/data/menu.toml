@@ -2140,12 +2140,13 @@ i18n = "menu.layout.enable"
 checked_when = ["layout_enabled"]
 category = "Layout"
 submenu_off_reason_key = "menu.category_off_reason"
-# Only Windows emulates the Ergopti layout itself, so only Windows has an
-# emulation to switch off. macOS installs the layout as a system input source and
-# Linux remaps through kanata; declared for them, this row had no command and was
-# skipped in silence, which is the failure the renderer now reports.
+# The Windows category gate of the whole layout section (category_enabled.layout).
+# macOS and Linux emulate layouts too but keep no such gate: no layout to emulate
+# with both emulated layers off leaves the system layout alone. Declared for them,
+# this row had no command and was skipped in silence, which is the failure the
+# renderer now reports.
 platforms = ["ahk"]
-reason_key = "platform_reason.layout_emulation_is_windows_only"
+reason_key = "platform_reason.layout_master_switch_is_windows"
 
 # The keyboard-layout scope's restore and clear, right after the switch Windows
 # shows (the first group). Every driver registers both on its scope owner; on

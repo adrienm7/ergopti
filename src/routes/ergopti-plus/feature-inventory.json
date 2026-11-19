@@ -5462,10 +5462,10 @@
 			"macos": false,
 			"linux": false
 		},
-		"reason_key": "platform_reason.layout_emulation_is_windows_only",
+		"reason_key": "platform_reason.ctrl_magic_save_is_windows",
 		"reason": {
-			"fr": "Windows uniquement : ce pilote émule lui-même la disposition Ergopti, il a donc une émulation à désactiver. macOS installe la disposition comme source de saisie du système et Linux l'installe comme disposition de clavier du système (XKB) : il n'y a rien à désactiver là-bas.",
-			"en": "Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there."
+			"fr": "Windows uniquement : Ctrl et la touche magique enregistrent (Ctrl+S) par les raccourcis propres au pilote Windows. macOS propose à la place Cmd et la touche magique dans ses raccourcis ; Linux n’a pas encore ce raccourci.",
+			"en": "Windows only: Ctrl plus the magic key saves (Ctrl+S) through the Windows driver's own hotkeys. macOS offers Cmd plus the magic key in its shortcuts instead; Linux does not have this shortcut yet."
 		}
 	},
 	{
