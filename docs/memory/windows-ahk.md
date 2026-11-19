@@ -1607,3 +1607,13 @@ password given, unverified, with no administrator right. A fake server can then 
 real NTLMv2 proof against a known password (`tools/test/lib/windows-job-host.ps1`). Its
 command line is limited to 1024 characters, and SSPI's Negotiate without a domain sends
 raw NTLM and refuses an answer wrapped in SPNEGO (`SEC_E_INVALID_TOKEN`).
+
+### project-config-save-holds-config-toml-exclusively
+
+A settings save holds `config.toml` exclusively between its rename and its close,
+so any reader in that window, typically a timer poll, gets
+`ERROR_SHARING_VIOLATION` (Win32 32). A poll that revalidates the file treats 32
+as "not readable yet, read it next tick" inside its own deadline and lets every
+other error fail fast (`OllamaManagedBootstrap._Currency`, `managed-held-source`
+tests). A one-shot callback step cannot wait and fails closed. POSIX drivers see
+the old or the new inode, never a busy file.
