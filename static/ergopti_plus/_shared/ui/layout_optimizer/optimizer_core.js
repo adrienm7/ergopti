@@ -23,7 +23,9 @@
  *    kinds of units move, whether digits leave the number row, whether the
  *    AltGr levels and a dead key's layer take part, keys pinned where they
  *    are, letters pinned at their QWERTY place (the Ctrl shortcuts), or only
- *    their Ctrl/Cmd shortcut kept on that key while the letter moves, zones.
+ *    their Ctrl/Cmd shortcut kept on that key while the letter moves, zones,
+ *    and the thumb keys, places only when the user names a keyboard that has
+ *    them (thumbKeys).
  * 4. Restarts are independent and numbered: restart k draws from its own seed,
  *    so a page may run them in parallel workers and keep the same result.
  * 5. Fail fast: an impossible constraint throws an OptimizerError with a
@@ -69,7 +71,12 @@ var LAYOUT_OPTIMIZER = (function () {
 		// command map) while the letter itself may move.
 		qwertyShortcuts: [],
 		// Character → the only codes its unit may sit on.
-		zones: {}
+		zones: {},
+		// The keyboard (a LAYOUT_ANALYSIS keyboard id) whose thumb keys
+		// (LAYOUT_ANALYSIS.thumbKeys: NonConvert, Convert, KanaMode) become
+		// places; null keeps them out of the search: nothing moves onto a thumb
+		// key, and the start layout's thumb characters stay where they are.
+		thumbKeys: null
 	});
 
 	/** The presets of the QWERTY pins the pages offer. */
@@ -195,6 +202,12 @@ var LAYOUT_OPTIMIZER = (function () {
 			throw new OptimizerError('option_value', { option: 'pins' }, 'pins are lists');
 		if (!opts.zones || typeof opts.zones !== 'object')
 			throw new OptimizerError('option_value', { option: 'zones' }, 'zones is an object');
+		if (opts.thumbKeys !== null && typeof opts.thumbKeys !== 'string')
+			throw new OptimizerError(
+				'option_value',
+				{ option: 'thumbKeys' },
+				'thumbKeys is a keyboard id or null'
+			);
 		return opts;
 	}
 
@@ -246,20 +259,29 @@ var LAYOUT_OPTIMIZER = (function () {
 			slots.push(slot);
 			units.push({ index: units.length, cells, kind: kindOf(cells) });
 		};
+		// The thumb keys are places only on a keyboard that has them, when asked;
+		// those the start layout leaves empty join as holes.
+		const thumbCodes = new Set(engine.thumbKeys());
+		const thumbPlaces = new Set();
+		if (opts.thumbKeys !== null) {
+			const board = engine.keyboard(opts.thumbKeys);
+			for (const code of thumbCodes) if (board.index.has(code)) thumbPlaces.add(code);
+			if (thumbPlaces.size === 0)
+				throw new OptimizerError(
+					'thumb_keys_absent',
+					{ keyboard: opts.thumbKeys },
+					`${opts.thumbKeys} has no thumb key`
+				);
+		}
 		const rowCodes = Object.keys(layout.rows)
 			.filter((code) => codes.has(code))
+			.concat([...thumbPlaces].filter((code) => !layout.rows[code]))
 			.sort();
-		for (const code of rowCodes)
-			place(
-				{ kind: 'key', code },
-				LEVEL_PAIRS.key.map((i) => layout.rows[code][i])
-			);
+		const cellsOf = (code, levels) =>
+			levels.map((i) => (layout.rows[code] ? layout.rows[code][i] : null));
+		for (const code of rowCodes) place({ kind: 'key', code }, cellsOf(code, LEVEL_PAIRS.key));
 		if (opts.altgr)
-			for (const code of rowCodes)
-				place(
-					{ kind: 'altgr', code },
-					LEVEL_PAIRS.altgr.map((i) => layout.rows[code][i])
-				);
+			for (const code of rowCodes) place({ kind: 'altgr', code }, cellsOf(code, LEVEL_PAIRS.altgr));
 
 		// The dead key's layer: one place per letter of the base level, typed after
 		// the dead key (« dead + e »); the place follows its letter, which keeps
@@ -295,6 +317,10 @@ var LAYOUT_OPTIMIZER = (function () {
 		const movable = units.map((unit) => movableKind[unit.kind]);
 		for (const slot of slots)
 			if (slot.code && pinnedCodes.has(slot.code)) movable[slot.index] = false;
+		// A thumb key outside the search keeps what the start puts there, a hole too.
+		for (const slot of slots)
+			if (slot.code && thumbCodes.has(slot.code) && !thumbPlaces.has(slot.code))
+				movable[slot.index] = false;
 		// The letters typed after the dead key stay on base places, or their rules would be lost.
 		const typedLetters = new Set(deadKeys);
 
@@ -491,6 +517,9 @@ var LAYOUT_OPTIMIZER = (function () {
 	function arrange(p, assignment, identity, dead) {
 		const rows = {};
 		for (const [code, row] of Object.entries(p.layout.rows)) rows[code] = row.slice();
+		// A thumb key the start left empty is a row only once something lands on it.
+		for (const slot of p.slots)
+			if (slot.code && !rows[slot.code]) rows[slot.code] = [null, null, null, null];
 		if (p.deadState !== null) {
 			// The layer's places replace the rules of the letters they follow.
 			for (const slot of p.slots)
@@ -509,6 +538,8 @@ var LAYOUT_OPTIMIZER = (function () {
 			rows[slot.code][levels[0]] = cells[0];
 			rows[slot.code][levels[1]] = cells[1];
 		});
+		for (const code of Object.keys(rows))
+			if (!p.layout.rows[code] && rows[code].every((cell) => cell === null)) delete rows[code];
 		// A Ctrl/Cmd letter that the key now types on its base level needs no entry.
 		const command = {};
 		for (const [code, letter] of Object.entries(p.layout.command))

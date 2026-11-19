@@ -493,6 +493,47 @@ check(
 	'non-boolean switch refused'
 );
 
+// Thumb keys: places only when the user names a keyboard that has them.
+const THUMBS = E.thumbKeys();
+const onThumbs = (layout) =>
+	THUMBS.filter((code) => (layout.rows[code] || []).some((cell) => cell !== null));
+check(THUMBS.length === 3, `the model has three thumb keys, not ${THUMBS.join(' ')}`);
+const noThumbs = search(azerty, {}, { start: 'random' });
+check(
+	everyLayout(noThumbs, (layout) => onThumbs(layout).length === 0),
+	'by default nothing moves onto a thumb key'
+);
+const corneThumbs = search(azerty, { thumbKeys: 'corne' }, { start: 'random' });
+check(
+	corneThumbs.seen.some((layout) => onThumbs(layout).length > 0) &&
+		everyLayout(corneThumbs, (layout) =>
+			onThumbs(layout).every((code) => E.keyboard('corne').index.has(code))
+		),
+	'thumbKeys: corne lets letters onto the Corne thumb keys, and only those'
+);
+check(
+	refusal(() => O.problem(E, azerty, { thumbKeys: 'iso' })) === 'thumb_keys_absent',
+	'thumbKeys on a board without thumb keys is refused'
+);
+check(
+	refusal(() => O.problem(E, azerty, { thumbKeys: true })) === 'option_value',
+	'thumbKeys that is no keyboard id is refused'
+);
+// A start with a letter on a thumb key keeps it there while the search leaves them out.
+const thumbStart = JSON.parse(JSON.stringify(azerty));
+thumbStart.rows.NonConvert = thumbStart.rows.KeyE;
+delete thumbStart.rows.KeyE;
+const keptThumb = search(thumbStart, {}, { start: 'random' });
+check(
+	everyLayout(
+		keptThumb,
+		(layout) =>
+			cellsOf(layout, 'NonConvert', [0, 1]) === cellsOf(thumbStart, 'NonConvert', [0, 1]) &&
+			onThumbs(layout).join() === 'NonConvert'
+	),
+	'a start letter on a thumb key stays there, and nothing joins it, without thumbKeys'
+);
+
 // ======================================
 // ======= 5/ Incremental scoring =======
 // ======================================
