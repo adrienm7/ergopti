@@ -11,10 +11,14 @@
  * suggestion, clipboard injection) when either method returns true.
  *
  * FEATURES & RATIONALE:
- * 1. Privacy by default: when detection fails or is uncertain, both methods
- *    return false (not secure) rather than throwing — callers must treat a
- *    return value of false as "detection unavailable, proceed with caution",
- *    not as a guarantee that the field is safe.
+ * 1. Fail closed: when field detection fails or is uncertain (no focused
+ *    window or application, no accessibility API, a refused or raised read),
+ *    isSecureField() returns true (secure) rather than throwing. A missed
+ *    expansion or prediction is recoverable; a captured password is not. The
+ *    three adapters do so (SFC-03): Windows on a missing focus or an
+ *    inconclusive control, Linux on its unknown verdict, macOS on every refresh
+ *    that classifies nothing. An application that answers that nothing has
+ *    focus has been classified, and stays not secure.
  * 2. Two-axis detection: isSecureField() checks the OS-level input type
  *    (password field, PIN pad, system auth prompt), while isSecureApp() checks
  *    the parent process against a configurable allowlist of known sensitive apps
@@ -47,8 +51,9 @@ const portContract = {
 	/**
 	 * isSecureField() — Return true if the active input field is a secure or
 	 *   password-type field as reported by the OS accessibility layer.
-	 *   @returns {boolean} true if the focused field is a password/secure type.
-	 *   @error_behavior "return_false" — if detection fails, assume not secure.
+	 *   @returns {boolean} true if the focused field is a password/secure type,
+	 *     or could not be classified.
+	 *   @error_behavior "return_true" — if detection fails, assume secure.
 	 *
 	 * isSecureApp(appId) — Return true if the given process name is in the
 	 *   configured list of sensitive applications where all input capture must
@@ -120,6 +125,16 @@ function contractTestVectors() {
 			steps: [
 				{ call: 'isSecureField', args: [] },
 				{ assert: 'return_type', expected: 'boolean' }
+			]
+		},
+		{
+			id: 'isSecureField_unclassified_returns_true',
+			description:
+				'isSecureField() returns true after a refresh() that classified nothing (fail closed).',
+			steps: [
+				{ call: 'refresh', args: [], given: 'no focused window and no accessibility answer' },
+				{ call: 'isSecureField', args: [] },
+				{ assert: 'return_true' }
 			]
 		},
 		{

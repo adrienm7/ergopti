@@ -86,6 +86,24 @@ if (total < 100) {
 	);
 }
 
+// SFC-03: the secure-field port says fail closed, as the three adapters do, and
+// its fail-closed vector is replayed on all three drivers, not on macOS alone:
+// the spec used to promise « not secure » on a failure that no driver returned.
+const SECURE_SPEC = fs.readFileSync(path.join(PORTS, 'SecureFieldDetector.spec.js'), 'utf8');
+const FAIL_CLOSED_VECTOR = 'isSecureField_unclassified_returns_true';
+if (!/isSecureField\(\)[\s\S]*?@error_behavior "return_true"/.test(SECURE_SPEC))
+	errors.push('SecureFieldDetector.spec.js must declare isSecureField() fail-closed (return_true)');
+if (!SECURE_SPEC.includes(`id: '${FAIL_CLOSED_VECTOR}'`))
+	errors.push(`SecureFieldDetector.spec.js must carry the ${FAIL_CLOSED_VECTOR} vector`);
+for (const mirror of [
+	'static/ergopti_plus/macos/tests/unit/core/lifecycle/adapters/test_adapter_contract_vectors_input_and_system.lua',
+	'static/ergopti_plus/windows/tests/unit/platform/system/test_adapter_contract_vectors_system.ahk',
+	'static/ergopti_plus/linux/tests/unit/platform/focus/atspi/test_secure_field_detector.lua'
+]) {
+	if (!fs.readFileSync(path.join(ROOT, mirror), 'utf8').includes(FAIL_CLOSED_VECTOR))
+		errors.push(`${mirror} must replay the ${FAIL_CLOSED_VECTOR} vector`);
+}
+
 if (traceable < BASELINE_TRACEABLE) {
 	const worst = perPort
 		.filter((p) => p.hit < p.n)

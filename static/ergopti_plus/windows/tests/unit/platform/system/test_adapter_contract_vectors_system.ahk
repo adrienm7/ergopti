@@ -87,6 +87,13 @@ _RunSecureFieldDetectorContractVectors() {
 	}
 	Test("SecureFieldDetector: isSecureField returns a boolean and never throws", _Result_sfd_field_bool)
 
+	; isSecureField fails closed when nothing has focus (isSecureField_unclassified_returns_true)
+	_Result_sfd_unclassified_true() {
+		Assert(SFD_IsSecureField(0) == true,
+			"isSecureField_unclassified_returns_true: no focused window must read as secure")
+	}
+	Test("SecureFieldDetector: isSecureField fails closed when nothing is classified", _Result_sfd_unclassified_true)
+
 	; isSecureApp returns false for an unknown process (isSecureApp_unknown_returns_false)
 	_Result_sfd_unknown_false() {
 		Out := SFD_IsSecureApp("notanapp.exe")

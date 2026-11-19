@@ -321,6 +321,15 @@ helpers.describe("Adapter contract vectors: SecureFieldDetector", function()
 		helpers.assert_true(type(out) == "boolean", "isSecureField() must return a boolean")
 	end)
 
+	helpers.it("isSecureField fails closed when refresh classifies nothing (isSecureField_unclassified_returns_true)", function()
+		local unclassified = helpers.load_with_stubs("platform.focus.secure_field_detector", {
+			application = { frontmostApplication = function() return nil end },
+		})
+		unclassified.refresh()
+		helpers.assert_eq(true, unclassified.isSecureField(),
+			"isSecureField_unclassified_returns_true: no frontmost application must read as secure")
+	end)
+
 	helpers.it("isSecureApp returns false for an unknown process (isSecureApp_unknown_returns_false)", function()
 		helpers.assert_eq(false, adapter.isSecureApp("notanapp.exe"), "isSecureApp(unknown) must be false")
 	end)
