@@ -122,7 +122,7 @@ const SPEED_CORPUS = path.join(
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
 // The layouts the library held at its last import: it may only grow.
-const LIBRARY_COUNT = 700;
+const LIBRARY_COUNT = 710;
 // The collections imported from their authors' own files: each of their
 // layouts is credited from the author's page (layout_credits.json).
 const CREDITED_SOURCES = ['handsdown', 'ergol_repo'];
@@ -2738,7 +2738,44 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		['qwerty_hawaiian', 'Quote', 0, 'ʻ'],
 		['qwerty_german', 'Quote', 0, 'ä'],
 		['bone_eszett_home', 'Quote', 0, 'ß'],
-		['bone_eszett_home', 'KeyQ', 0, 'j']
+		['bone_eszett_home', 'KeyQ', 0, 'j'],
+		// KLAnext's janiso board (2026-11-19), read from its QWERTY on it:
+		// uciea-vanilla.za « [ { » left of p, « c C ç » first on the home row,
+		// v right of r, q right of j; poqdea.es « w » first on the top row,
+		// « ' " ´ » right of i, « / ? ¿ » right of the bottom row.
+		['uciea_vanilla', 'BracketLeft', 0, '['],
+		['uciea_vanilla', 'KeyQ', 0, 'p'],
+		['uciea_vanilla', 'KeyA', 2, 'ç'],
+		['uciea_vanilla', 'Minus', 0, 'v'],
+		['uciea_vanilla', 'Quote', 0, 'q'],
+		['poqdea_es', 'KeyQ', 0, 'w'],
+		['poqdea_es', 'Semicolon', 0, 'i'],
+		['poqdea_es', 'Minus', 2, '´'],
+		['poqdea_es', 'Quote', 2, '¿'],
+		// moutis/HandsDown's ortho files on KLAnext's ergolinear board, by
+		// position: Alt « wchmv"kujq rsntgyieoa xbldfzp,./ », Alt-x « m v »
+		// on the top row's 4th and 5th keys, Polyglot « k j » ending it, Ref
+		// « q » first and « z » 5th, Hands On « p » 5th on the home row; Alt-ex
+		// « k K q Q » 7th on the top row and its thumb « e E », Alt-nx's « n »
+		// and Alt-tx's « t » on the left thumb.
+		['hands_down_alt_ortho', 'KeyR', 0, 'm'],
+		['hands_down_alt_ortho', 'KeyY', 0, '"'],
+		['hands_down_alt_ortho', 'Semicolon', 0, 'a'],
+		['hands_down_alt_ortho', 'KeyZ', 2, '7'],
+		['hands_down_alt_x_ortho', 'KeyR', 0, 'm'],
+		['hands_down_alt_x_ortho', 'KeyT', 0, 'v'],
+		['hands_down_polyglot_ortho', 'KeyO', 0, 'k'],
+		['hands_down_polyglot_ortho', 'KeyP', 0, 'j'],
+		['hands_down_ref_ortho', 'KeyQ', 0, 'q'],
+		['hands_down_ref_ortho', 'KeyT', 0, 'z'],
+		['hands_on_ortho', 'KeyG', 0, 'p'],
+		['hands_down_alt_ex_ortho', 'KeyU', 2, 'q'],
+		['hands_down_alt_ex_ortho', 'NonConvert', 1, 'E'],
+		['hands_down_alt_ex_ortho', 'Convert', 0, ' '],
+		['hands_down_alt_nx_ortho', 'NonConvert', 0, 'n'],
+		['hands_down_alt_nx_ortho', 'KeyD', 0, 't'],
+		['hands_down_alt_tx_ortho', 'NonConvert', 0, 't'],
+		['hands_down_alt_tx_ortho', 'KeyD', 0, 'n']
 	];
 	for (const [id, code, level, expected] of official)
 		check(
@@ -2773,6 +2810,12 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			(entry) => !/only the space bar for the thumbs/.test(entry.reason)
 		),
 		'collections: a file is still left out for want of thumb keys'
+	);
+	// The KLAnext boards the reader places (janiso, ergolinear) leave no file
+	// out for the board itself (klanext-janiso-ergolinear-2026-11-19).
+	check(
+		libraryFile.not_imported.every((entry) => !/janiso|ergolinear/.test(entry.reason)),
+		'collections: a file is still left out for its janiso or ergolinear board'
 	);
 	// Thumb keys as the official files state them. moutis/HandsDown: Gold's
 	// key 67 « t » (finger 5) and 69 « T », 74 « ␣ _ » (finger 6); Silver's

@@ -2726,6 +2726,62 @@
 			"basis": "source",
 			"checked": "2026-11-19",
 			"evidence": "moutis/HandsDown e8f532f62c, layouts/hd/vfj-config.h: its layout as the cyanophage playground link « layout=xwmgj%3B.%2F%3D%27zscntk%2Caeihqfpldv-uoyb%5Cr » under « The Hands Down Variation dependent defs »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_alt_ex_ortho": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt-ex_ortho.json: « author »: « Alan Reiser », label « Hands Down Alt-ex ortho ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_alt_nx_ortho": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt-nx_ortho.json: « author »: « Alan Reiser », label « Hands Down Alt-nx ortho ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_alt_tx_ortho": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt-tx_ortho.json: « author »: « Alan Reiser », label « Hands Down Alt-tx ortho ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_alt_x_ortho": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt-x_ortho.json: « author »: « Alan Reiser », label « Hands Down Alt-x ortho ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_alt_ortho": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt_ortho.json: « author »: « Alan Reiser », label « Hands Down Alt ortho ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_polyglot_ortho": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownArchive/Hands_Down_polyglot_ortho.json: « author »: « Alan Reiser », label « Hands Down Polyglot ortho ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_ref_ortho": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownArchive/Hands_Down_ref_ortho.json: « author »: « Alan Reiser », label « Hands Down Ref ortho ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_on_ortho": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/MiscLayouts/Hands_On_ortho.json: « author »: « Alan Reiser », label « Hands On ortho ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
 		}
 	}
 }
