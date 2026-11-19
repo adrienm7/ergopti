@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "Anschläge dieser Art ÷ alle Anschläge ohne Daumen × 100",
 	"layout_analysis.formula.characters": "Zeichen dieser Art ÷ alle Zeichen des Texts × 100",
 	"layout_analysis.formula.distance": "Σ Abstand von der Grundtaste des Fingers zu jeder gedrückten Taste ÷ getippte Zeichen; eine Taste = {key}",
+	"layout_analysis.formula.sfb_distance": "Σ über Gleichfinger-Bigramme der Entfernung zwischen beiden Tasten × Fingerfaktor, je 100 Bigramme, + die Hälfte davon über Gleichfinger-Skipgramme, je 100 Trigramme; eine Taste = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ über die acht Finger |Anteil des Fingers − sein idealer Anteil|",
 	"layout_analysis.formula.hand_imbalance": "|Anteil der linken Hand − Anteil der rechten Hand|",
 	"layout_analysis.formula.char_coverage": "getippte Referenzzeichen ÷ Referenzzeichen × 100",

@@ -1107,6 +1107,8 @@ check(
 				: `${key}${values ? JSON.stringify(values) : ''}`,
 		format: (value, digits) => Number(value).toFixed(digits),
 		metricName: (id) => id,
+		INFO: { metricShort: () => null },
+		measure: (value, digits, unit) => `${Number(value).toFixed(digits)} ${unit}`,
 		unitText: (id) => E.METRICS[id].unit,
 		metricDigits: E.metricDigits,
 		infoButton: () => new Node('button'),
@@ -1117,7 +1119,7 @@ check(
 	vm.createContext(context);
 	vm.runInContext(
 		['relativeCell', 'referenceLanguage', 'rankingTable', 'validTable'].map(fnSource).join('\n') +
-			"\nconst TABLE_METRICS = ['sfb']; const ALL = ''; const COMPLETE_CHOICES = ['all'];",
+			"\nconst TABLE_METRICS = ['sfb']; const ALL = ''; const COMPLETE_CHOICES = ['all']; const RANK_CELL = 'la-rank';",
 		context
 	);
 	const language = (corpus, locale) =>
@@ -1160,24 +1162,27 @@ check(
 	const plain = draw(null);
 	const relative = draw(qwerty);
 	const rowOf = (rows, name) => rows.find((cells) => cells[1] === name);
+	// Every cell carries its unit after a no-break space (the stub measure()).
+	const pct = (text) => `${text} %`;
+	const pts = (text) => `${text} layout_analysis.unit.points`;
 	check(
-		rowOf(plain, dvorak.layout.name)[3] === '0.00',
+		rowOf(plain, dvorak.layout.name)[3] === pct('0.00'),
 		`relative: the plain table shows Dvorak's SFB as ${rowOf(plain, dvorak.layout.name)[3]}`
 	);
 	const delta = (dvorak.score.total - qwerty.score.total).toFixed(1);
 	check(
-		rowOf(relative, dvorak.layout.name)[2] === `+${delta} ▲ better` &&
-			rowOf(relative, dvorak.layout.name)[3] === '-100.00 ▲ better',
+		rowOf(relative, dvorak.layout.name)[2] === `${pts(`+${delta}`)} ▲ better` &&
+			rowOf(relative, dvorak.layout.name)[3] === `${pct('-100.00')} ▲ better`,
 		`relative: Dvorak against QWERTY reads ${JSON.stringify(rowOf(relative, dvorak.layout.name))}`
 	);
 	check(
-		rowOf(relative, qwerty.layout.name)[3] === '0.00 = same' &&
+		rowOf(relative, qwerty.layout.name)[3] === `${pct('0.00')} = same` &&
 			rowOf(relative, qwerty.layout.name)[0] === String(qwerty.rank),
 		`relative: QWERTY against itself reads ${JSON.stringify(rowOf(relative, qwerty.layout.name))}`
 	);
 	// A metric shown but not scored has a difference and no verdict.
 	check(
-		rowOf(relative, dvorak.layout.name)[4] === '0.00',
+		rowOf(relative, dvorak.layout.name)[4] === pct('0.00'),
 		`relative: row_jump reads ${rowOf(relative, dvorak.layout.name)[4]}`
 	);
 }

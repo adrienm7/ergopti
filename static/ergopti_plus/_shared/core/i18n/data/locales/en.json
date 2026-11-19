@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "presses of this kind ÷ all presses, thumbs aside, × 100",
 	"layout_analysis.formula.characters": "characters of this kind ÷ all characters of the text × 100",
 	"layout_analysis.formula.distance": "Σ distance from the finger’s home key to each pressed key ÷ characters typed; one key = {key}",
+	"layout_analysis.formula.sfb_distance": "Σ over same-finger bigrams of distance between the two keys × finger factor, per 100 bigrams, + half the same over same-finger skipgrams, per 100 trigrams; one key = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ over the eight fingers |finger’s share − its ideal share|",
 	"layout_analysis.formula.hand_imbalance": "|left hand’s share − right hand’s share|",
 	"layout_analysis.formula.char_coverage": "reference characters typed ÷ reference characters × 100",

@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "הקשות מסוג זה ÷ כל ההקשות ללא האגודלים × 100",
 	"layout_analysis.formula.characters": "תווים מסוג זה ÷ כל התווים בטקסט × 100",
 	"layout_analysis.formula.distance": "Σ המרחק ממקש הבית של האצבע לכל מקש שנלחץ ÷ התווים שהוקלדו; מקש אחד = {key}",
+	"layout_analysis.formula.sfb_distance": "Σ על ביגרמות של אותה אצבע של המרחק בין שני המקשים × מקדם האצבע, לכל 100 ביגרמות, + מחצית מאותו סכום על דילוגים באותה אצבע, לכל 100 טריגרמות; מקש אחד = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ על שמונה האצבעות |חלק האצבע − החלק האידאלי שלה|",
 	"layout_analysis.formula.hand_imbalance": "|חלק יד שמאל − חלק יד ימין|",
 	"layout_analysis.formula.char_coverage": "תווי הייחוס שהוקלדו ÷ תווי הייחוס × 100",

@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "이 유형의 타건 ÷ 엄지를 뺀 전체 타건 × 100",
 	"layout_analysis.formula.characters": "이 유형의 문자 ÷ 텍스트의 전체 문자 × 100",
 	"layout_analysis.formula.distance": "Σ 손가락 홈 키에서 누른 각 키까지의 거리 ÷ 입력한 문자 수; 키 하나 = {key}",
+	"layout_analysis.formula.sfb_distance": "같은 손가락 바이그램에서 두 키 사이 거리 × 손가락 계수의 합(바이그램 100개당) + 같은 손가락 스킵그램에서 그 절반(트라이그램 100개당). 키 하나 = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ 여덟 손가락에 대해 |손가락 비율 − 이상 비율|",
 	"layout_analysis.formula.hand_imbalance": "|왼손 비율 − 오른손 비율|",
 	"layout_analysis.formula.char_coverage": "입력되는 기준 문자 ÷ 기준 문자 × 100",

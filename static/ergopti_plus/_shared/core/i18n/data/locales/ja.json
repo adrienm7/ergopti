@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "この種の打鍵 ÷ 親指を除く全打鍵 × 100",
 	"layout_analysis.formula.characters": "この種の文字 ÷ テキストの全文字 × 100",
 	"layout_analysis.formula.distance": "Σ 指のホームキーから押した各キーまでの距離 ÷ 入力文字数（1キー = {key}）",
+	"layout_analysis.formula.sfb_distance": "同指バイグラムについて2キー間の距離 × 指の係数の総和（100バイグラムあたり）＋同指スキップグラムについてその半分（100トライグラムあたり）。1キー = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ 8本の指について |指の割合 − 理想の割合|",
 	"layout_analysis.formula.hand_imbalance": "|左手の割合 − 右手の割合|",
 	"layout_analysis.formula.char_coverage": "入力できる基準文字 ÷ 基準文字 × 100",

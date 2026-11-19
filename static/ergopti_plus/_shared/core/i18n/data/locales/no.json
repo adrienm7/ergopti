@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "tastetrykk av denne typen ÷ alle trykk uten tomler × 100",
 	"layout_analysis.formula.characters": "tegn av denne typen ÷ alle tegn i teksten × 100",
 	"layout_analysis.formula.distance": "Σ avstand fra fingerens hjemtast til hver trykket tast ÷ skrevne tegn; én tast = {key}",
+	"layout_analysis.formula.sfb_distance": "Σ over bigrammer med samme finger av avstanden mellom de to tastene × fingerfaktor, per 100 bigrammer, + halvparten av det samme over hopp med samme finger, per 100 trigrammer; én tast = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ over de åtte fingrene |fingerens andel − dens ideelle andel|",
 	"layout_analysis.formula.hand_imbalance": "|venstre hånds andel − høyre hånds andel|",
 	"layout_analysis.formula.char_coverage": "skrevne referansetegn ÷ referansetegn × 100",

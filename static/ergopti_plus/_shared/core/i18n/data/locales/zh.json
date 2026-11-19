@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "此类击键 ÷ 除拇指外的全部击键 × 100",
 	"layout_analysis.formula.characters": "此类字符 ÷ 文本的全部字符 × 100",
 	"layout_analysis.formula.distance": "Σ 从手指的基准键到每个按下的键的距离 ÷ 输入的字符数；一个键 = {key}",
+	"layout_analysis.formula.sfb_distance": "对同指双字组求两键间距离 × 手指系数之和（每 100 个双字组），再加上同指跳字组的一半（每 100 个三字组）；一个键 = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ 八个手指的 |手指占比 − 理想占比|",
 	"layout_analysis.formula.hand_imbalance": "|左手占比 − 右手占比|",
 	"layout_analysis.formula.char_coverage": "可输入的参考字符 ÷ 参考字符 × 100",

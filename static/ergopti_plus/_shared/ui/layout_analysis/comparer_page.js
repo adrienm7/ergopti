@@ -2042,7 +2042,8 @@
 				for (const column of columns) {
 					const value = column.value(result);
 					const cell =
-						versus && column.digits !== undefined
+						// The rank is an ordinal: it reads as is in the relative view too.
+						versus && column.digits !== undefined && column.key !== 'rank'
 							? relativeCell(
 									column.key === 'score' ? versus.score : versus.metrics[column.key],
 									column.digits,

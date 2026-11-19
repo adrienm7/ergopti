@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "натискання цього виду ÷ усі натискання без великих пальців × 100",
 	"layout_analysis.formula.characters": "символи цього виду ÷ усі символи тексту × 100",
 	"layout_analysis.formula.distance": "Σ відстань від вихідної клавіші пальця до кожної натиснутої клавіші ÷ набрані символи; одна клавіша = {key}",
+	"layout_analysis.formula.sfb_distance": "Σ за біграмами одного пальця відстані між двома клавішами × коефіцієнт пальця, на 100 біграм, + половина того ж за пропусками одного пальця, на 100 триграм; одна клавіша = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ по восьми пальцях |частка пальця − його ідеальна частка|",
 	"layout_analysis.formula.hand_imbalance": "|частка лівої руки − частка правої руки|",
 	"layout_analysis.formula.char_coverage": "набрані еталонні символи ÷ еталонні символи × 100",

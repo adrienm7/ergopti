@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "tangenttryck av detta slag ÷ alla tryck utom tummar × 100",
 	"layout_analysis.formula.characters": "tecken av detta slag ÷ alla tecken i texten × 100",
 	"layout_analysis.formula.distance": "Σ avstånd från fingrets hemtangent till varje tryckt tangent ÷ skrivna tecken; en tangent = {key}",
+	"layout_analysis.formula.sfb_distance": "Σ över bigram med samma finger av avståndet mellan de två tangenterna × fingerfaktor, per 100 bigram, + hälften av detsamma över hopp med samma finger, per 100 trigram; en tangent = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ över de åtta fingrarna |fingrets andel − dess ideala andel|",
 	"layout_analysis.formula.hand_imbalance": "|vänster hands andel − höger hands andel|",
 	"layout_analysis.formula.char_coverage": "skrivna referenstecken ÷ referenstecken × 100",

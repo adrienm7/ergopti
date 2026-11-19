@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "toques deste tipo ÷ todos os toques sem polegares × 100",
 	"layout_analysis.formula.characters": "caracteres deste tipo ÷ todos os caracteres do texto × 100",
 	"layout_analysis.formula.distance": "Σ distância da tecla de repouso do dedo a cada tecla premida ÷ caracteres digitados; uma tecla = {key}",
+	"layout_analysis.formula.sfb_distance": "Σ sobre os bigramas do mesmo dedo da distância entre as duas teclas × fator do dedo, por 100 bigramas, + metade do mesmo sobre os saltos do mesmo dedo, por 100 trigramas; uma tecla = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ sobre os oito dedos |parte do dedo − a sua parte ideal|",
 	"layout_analysis.formula.hand_imbalance": "|parte da mão esquerda − parte da mão direita|",
 	"layout_analysis.formula.char_coverage": "caracteres de referência digitados ÷ caracteres de referência × 100",

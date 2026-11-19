@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "الضغطات من هذا النوع ÷ كل الضغطات عدا الإبهامين × 100",
 	"layout_analysis.formula.characters": "الأحرف من هذا النوع ÷ كل أحرف النص × 100",
 	"layout_analysis.formula.distance": "Σ المسافة من مفتاح راحة الإصبع إلى كل مفتاح مضغوط ÷ الأحرف المكتوبة؛ مفتاح واحد = {key}",
+	"layout_analysis.formula.sfb_distance": "Σ على ثنائيات الإصبع نفسه للمسافة بين المفتاحين × معامل الإصبع، لكل 100 ثنائية، + نصف ذلك على التخطيات بالإصبع نفسه، لكل 100 ثلاثية؛ مفتاح واحد = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ على الأصابع الثمانية |حصة الإصبع − حصته المثالية|",
 	"layout_analysis.formula.hand_imbalance": "|حصة اليد اليسرى − حصة اليد اليمنى|",
 	"layout_analysis.formula.char_coverage": "الأحرف المرجعية المكتوبة ÷ الأحرف المرجعية × 100",

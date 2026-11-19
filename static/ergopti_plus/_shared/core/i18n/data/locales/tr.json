@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "bu türdeki basışlar ÷ başparmaklar hariç tüm basışlar × 100",
 	"layout_analysis.formula.characters": "bu türdeki karakterler ÷ metnin tüm karakterleri × 100",
 	"layout_analysis.formula.distance": "Σ parmağın ev tuşundan basılan her tuşa uzaklık ÷ yazılan karakterler; bir tuş = {key}",
+	"layout_analysis.formula.sfb_distance": "Aynı parmak ikililerinde iki tuş arası mesafe × parmak katsayısının toplamı, 100 ikili başına, + aynı parmak atlamalarında bunun yarısı, 100 üçlü başına; bir tuş = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ sekiz parmak üzerinde |parmağın payı − ideal payı|",
 	"layout_analysis.formula.hand_imbalance": "|sol elin payı − sağ elin payı|",
 	"layout_analysis.formula.char_coverage": "yazılan referans karakterler ÷ referans karakterler × 100",

@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "aanslagen van dit soort ÷ alle aanslagen zonder duimen × 100",
 	"layout_analysis.formula.characters": "tekens van dit soort ÷ alle tekens van de tekst × 100",
 	"layout_analysis.formula.distance": "Σ afstand van de rusttoets van de vinger tot elke ingedrukte toets ÷ getypte tekens; één toets = {key}",
+	"layout_analysis.formula.sfb_distance": "Σ over bigrammen met dezelfde vinger van de afstand tussen beide toetsen × vingerfactor, per 100 bigrammen, + de helft daarvan over sprongen met dezelfde vinger, per 100 trigrammen; één toets = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ over de acht vingers |aandeel van de vinger − zijn ideale aandeel|",
 	"layout_analysis.formula.hand_imbalance": "|aandeel linkerhand − aandeel rechterhand|",
 	"layout_analysis.formula.char_coverage": "getypte referentietekens ÷ referentietekens × 100",

@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "naciśnięcia tego rodzaju ÷ wszystkie naciśnięcia bez kciuków × 100",
 	"layout_analysis.formula.characters": "znaki tego rodzaju ÷ wszystkie znaki tekstu × 100",
 	"layout_analysis.formula.distance": "Σ odległość od klawisza spoczynkowego palca do każdego naciśniętego klawisza ÷ wpisane znaki; jeden klawisz = {key}",
+	"layout_analysis.formula.sfb_distance": "Σ po bigramach tego samego palca odległości między dwoma klawiszami × współczynnik palca, na 100 bigramów, + połowa tego po przeskokach tego samego palca, na 100 trigramów; jeden klawisz = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ po ośmiu palcach |udział palca − jego idealny udział|",
 	"layout_analysis.formula.hand_imbalance": "|udział lewej ręki − udział prawej ręki|",
 	"layout_analysis.formula.char_coverage": "wpisane znaki wzorcowe ÷ znaki wzorcowe × 100",

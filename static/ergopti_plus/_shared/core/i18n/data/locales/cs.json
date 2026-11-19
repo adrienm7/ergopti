@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "stisky tohoto druhu ÷ všechny stisky bez palců × 100",
 	"layout_analysis.formula.characters": "znaky tohoto druhu ÷ všechny znaky textu × 100",
 	"layout_analysis.formula.distance": "Σ vzdálenost od výchozí klávesy prstu ke každé stisknuté klávese ÷ napsané znaky; jedna klávesa = {key}",
+	"layout_analysis.formula.sfb_distance": "Σ přes bigramy stejného prstu vzdálenost obou kláves × koeficient prstu, na 100 bigramů, + polovina téhož přes přeskoky stejného prstu, na 100 trigramů; jedna klávesa = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ přes osm prstů |podíl prstu − jeho ideální podíl|",
 	"layout_analysis.formula.hand_imbalance": "|podíl levé ruky − podíl pravé ruky|",
 	"layout_analysis.formula.char_coverage": "napsané referenční znaky ÷ referenční znaky × 100",

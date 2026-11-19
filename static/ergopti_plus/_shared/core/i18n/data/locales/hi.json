@@ -4822,6 +4822,7 @@
 	"layout_analysis.formula.keystrokes": "इस प्रकार के दबाव ÷ अंगूठों को छोड़कर सभी दबाव × 100",
 	"layout_analysis.formula.characters": "इस प्रकार के अक्षर ÷ पाठ के सभी अक्षर × 100",
 	"layout_analysis.formula.distance": "Σ उँगली की होम कुंजी से हर दबाई गई कुंजी तक दूरी ÷ टाइप किए गए अक्षर; एक कुंजी = {key}",
+	"layout_analysis.formula.sfb_distance": "समान-उंगली बाइग्राम पर दोनों कुंजियों की दूरी × उंगली गुणांक का Σ, प्रति 100 बाइग्राम, + समान-उंगली स्किपग्राम पर उसी का आधा, प्रति 100 ट्राइग्राम; एक कुंजी = {key}",
 	"layout_analysis.formula.finger_imbalance": "½ × Σ आठ उँगलियों पर |उँगली का हिस्सा − उसका आदर्श हिस्सा|",
 	"layout_analysis.formula.hand_imbalance": "|बाएँ हाथ का हिस्सा − दाएँ हाथ का हिस्सा|",
 	"layout_analysis.formula.char_coverage": "टाइप किए गए संदर्भ अक्षर ÷ संदर्भ अक्षर × 100",

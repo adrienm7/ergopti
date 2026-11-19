@@ -54,6 +54,7 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 	// what they are a share of (LAYOUT_ANALYSIS.METRICS[id].of).
 	const OWN_FORMULAS = Object.freeze([
 		'distance',
+		'sfb_distance',
 		'finger_imbalance',
 		'hand_imbalance',
 		'char_coverage',
