@@ -7,7 +7,8 @@
  * Generates `_shared/ui/layout_analysis/_generated/analysis_data.js`, every
  * datum the layout analysis engine reads, from:
  *   - _shared/layouts/data/analysis/analysis_model.json (fingers, keyboards…);
- *   - _shared/layouts/data/analysis/score_weights.json (default weights);
+ *   - _shared/layouts/data/analysis/score_weights.json (default weights and
+ *     the penalty metrics' floors);
  *   - _shared/layouts/data/analysis/layout_library.json (alphabetic blocks
  *     and whole layouts);
  *   - _shared/layouts/data/analysis/sources.json (the « i » references);
@@ -1212,6 +1213,7 @@ function buildData() {
 		boards: buildBoards(model),
 		scancodes: buildScancodes(model),
 		weights: weights.weights,
+		floors: weights.floors,
 		library_sources: library.sources,
 		layouts: buildLibrary(model),
 		corpora: corpora.catalogue,
@@ -1249,6 +1251,7 @@ function buildSource(data) {
 		`\t"boards": ${JSON.stringify(data.boards)},`,
 		`\t"scancodes": ${JSON.stringify(data.scancodes)},`,
 		`\t"weights": ${JSON.stringify(data.weights)},`,
+		`\t"floors": ${JSON.stringify(data.floors)},`,
 		`\t"library_sources": ${JSON.stringify(data.library_sources)},`,
 		`\t"corpora": ${JSON.stringify(data.corpora)},`,
 		`\t"sources": ${JSON.stringify(data.sources)},`,

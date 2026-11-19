@@ -1,5 +1,5 @@
 {
-	"_description": "Shared parameters of the layout analysis engine (_shared/ui/layout_analysis/analysis_engine.js): which finger types each physical key (KeyboardEvent.code), which keys are home (the space bar rests both thumbs: shared_home_keys) or outer (7th right-hand column); lateral keys are derived from each finger's home column, the keyboards it measures on, the reference character set, the required characters (the space and the 26 letters in each case: a layout that cannot type one of them is incomplete and ranked after every complete layout; any other missing character only counts as unsupported), the keyboard formats (100 %, TKL, 75 %, 65 %, 60 %: the blocks each lacks, shown by the editor and the Comparer and measured by the compact form factors), the compact form factors and the shortcut letters. Every value is defined in docs/design/layout-analysis.md. Geometry comes from _shared/layouts/data/keycodes/physical_keys.json, and for the JIS and ABNT keyboards from keyboard_forms.json beside it; such a keyboard adds its own keys to its fingering (extra_fingers) and ticks the layouts made for its layout_geometry (ISO). « similar_score_gap » is the score gap, in points, under which the optimizer says an existing layout does the job of the one it found. « substitutions » lists the plain character typed instead of a typographic one the layout lacks (the Kalamine analyser's rule).",
+	"_description": "Shared parameters of the layout analysis engine (_shared/ui/layout_analysis/analysis_engine.js): which finger types each physical key (KeyboardEvent.code), which keys are home (the space bar rests both thumbs: shared_home_keys) or outer (7th right-hand column); lateral keys are derived from each finger's home column, the keyboards it measures on, the reference character set, the required characters (the space and the 26 letters in each case: a layout that cannot type one of them is incomplete and ranked after every complete layout; any other missing character only counts as unsupported), the keyboard formats (100 %, TKL, 75 %, 65 %, 60 %: the blocks each lacks, shown by the editor and the Comparer and measured by the compact form factors), the compact form factors and the shortcut letters. Every value is defined in docs/design/layout-analysis.md. Geometry comes from _shared/layouts/data/keycodes/physical_keys.json, and for the JIS and ABNT keyboards from keyboard_forms.json beside it; such a keyboard adds its own keys to its fingering (extra_fingers) and ticks the layouts made for its layout_geometry (ISO). « similar_score_gap » is the score gap, in points, under which the optimizer says an existing layout does the job of the one it found. « same_finger_factor » weights a same-finger move of each finger in sfb_distance (Cyanophage's optimiser: a pinky SFB costs 0.7 and a ring SFB 0.3 more than an index or middle one). « reference_layouts » names the layout the Comparer's « relative » ranking view measures every layout against: by the corpus's language, else the default. « substitutions » lists the plain character typed instead of a typographic one the layout lacks (the Kalamine analyser's rule).",
 	"schema_version": 1,
 	"key_unit_mm": 19.05,
 	"fingers": ["lp", "lr", "lm", "li", "lt", "rt", "ri", "rm", "rr", "rp"],
@@ -193,6 +193,22 @@
 		"rm": 15.5,
 		"rr": 11.5,
 		"rp": 6.5
+	},
+	"same_finger_factor": {
+		"lp": 1.7,
+		"lr": 1.3,
+		"lm": 1,
+		"li": 1,
+		"ri": 1,
+		"rm": 1,
+		"rr": 1.3,
+		"rp": 1.7
+	},
+	"reference_layouts": {
+		"default": "qwerty",
+		"by_language": {
+			"fr": "azerty"
+		}
 	},
 	"keyboard_blocks": {
 		"numpad": [

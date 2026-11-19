@@ -137,6 +137,7 @@
 		'lsb',
 		'scissors',
 		'half_scissors',
+		'pinky_ring',
 		'row_jump',
 		'roll_in',
 		'roll_out',
@@ -225,7 +226,7 @@
 	// The score settings' weight groups, each a titled sub-section; every
 	// weight of the score is in exactly one (test-layout-comparer-page.cjs).
 	const WEIGHT_GROUPS = {
-		pairs: ['sfb', 'sfs', 'lsb', 'scissors', 'half_scissors'],
+		pairs: ['sfb', 'sfs', 'sfb_distance', 'lsb', 'scissors', 'half_scissors', 'pinky_ring'],
 		rolls: [
 			'roll_in',
 			'roll_out',
@@ -304,9 +305,11 @@
 		bigrams: [
 			'sfb',
 			'sfs',
+			'sfb_distance',
 			'lsb',
 			'scissors',
 			'half_scissors',
+			'pinky_ring',
 			'row_jump',
 			'repeat',
 			'roll_in',

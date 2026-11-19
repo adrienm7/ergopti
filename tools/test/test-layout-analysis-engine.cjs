@@ -1391,7 +1391,12 @@ for (const layout of library) {
 		{ layout: 'azerty', options: { format: 'tkl' } },
 		{ layout: 'ergol', options: {} },
 		{ layout: 'ergopti', options: { keyboard: 'ansi', weights: { sfb: 9, distance: 0.5 } } },
-		{ layout: 'bepo', options: { keyboard: 'corne', format: '60' } }
+		{ layout: 'bepo', options: { keyboard: 'corne', format: '60' } },
+		// The weighted same-finger travel, the pinky–ring pairs and a floor (analyser-ideas).
+		{
+			layout: 'qwerty',
+			options: { weights: { sfb_distance: 0.4, pinky_ring: 3 }, floors: { sfs: 1 } }
+		}
 	];
 	let trials = 0;
 	let planned = 0;
@@ -2733,6 +2738,161 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		refused = /key legend/.test(error.message);
 	}
 	check(refused, 'typed via: rows without the key legend did not refuse');
+}
+
+// ===================================================
+// ======= 16/ Ideas from the other analysers =======
+// ===================================================
+
+// (analyser-ideas) The metrics, floors and reference added after the analyser
+// study (docs/audits/layout-analysers/report.md, section 10): each weighed by
+// hand on QWERTY ISO, where E to D is 0.25 u across and 1 u down (19.6363 mm).
+{
+	const qwerty = byId.get('qwerty');
+	const ed = E.analyse(qwerty, E.ngramsFromText('ed'), { keyboard: 'iso' });
+	const edMm = 100 * Math.hypot(0.25, 1) * 19.05;
+	// New metrics weigh 0 by default: shown, out of the score until the maintainer weighs them.
+	for (const id of ['sfb_distance', 'pinky_ring'])
+		check(
+			E.defaultWeights()[id] === 0,
+			`ideas: ${id} has the default weight ${E.defaultWeights()[id]}`
+		);
+	const weighed = E.analyse(qwerty, E.ngramsFromText('ed'), {
+		keyboard: 'iso',
+		weights: { sfb_distance: 1 }
+	});
+	check(
+		near(weighed.score.contributions.sfb_distance, -edMm) &&
+			near(weighed.score.total, ed.score.total - edMm),
+		`ideas: a weight of 1 on sfb_distance takes ${-weighed.score.contributions.sfb_distance} points`
+	);
+	// Floors: « ed » is 100 % SFB at 10 points a point; a floor of 30 leaves 70 points of it.
+	check(
+		E.defaultFloors().sfb === 0 && near(ed.score.contributions.sfb, -1000),
+		'ideas: no default floor'
+	);
+	const floored = E.score(ed, undefined, { sfb: 30 });
+	check(
+		near(floored.contributions.sfb, -700) && near(floored.total, ed.score.total + 300),
+		`ideas: a floor of 30 on sfb leaves ${floored.contributions.sfb} points`
+	);
+	check(
+		E.score(ed, undefined, { sfb: 150 }).contributions.sfb === 0,
+		'ideas: under its floor, free'
+	);
+	const analysedFloor = E.analyse(qwerty, E.ngramsFromText('ed'), {
+		keyboard: 'iso',
+		floors: { sfb: 30 }
+	});
+	check(near(analysedFloor.score.total, floored.total), 'ideas: analyse() reads the floors');
+	const refloored = E.rescore([E.analyse(qwerty, E.ngramsFromText('ed'), {})], undefined, {
+		sfb: 30
+	})[0];
+	check(near(refloored.score.contributions.sfb, -700), 'ideas: rescore() reads the floors');
+	const keySum = (costs) => Object.values(costs).reduce((sum, v) => sum + v, 0);
+	check(
+		near(keySum(E.keyScoreCost(ed)) - keySum(E.keyScoreCost(ed, undefined, { sfb: 30 })), 300),
+		'ideas: the keys share only the part above the floor'
+	);
+	check(
+		near(
+			E.scoreSession(qwerty, E.ngramsFromText('ed'), { keyboard: 'iso', floors: { sfb: 30 } })
+				.total,
+			floored.total
+		),
+		'ideas: scoreSession() reads the floors'
+	);
+	for (const [floors, why] of [
+		[{ roll_in: 1 }, 'a higher-is-better metric'],
+		[{ row_jump: 1 }, 'a metric not scored'],
+		[{ sfb: -1 }, 'a negative floor'],
+		[{ sfb: Infinity }, 'an infinite floor']
+	]) {
+		let refused = false;
+		try {
+			E.score(ed, undefined, floors);
+		} catch {
+			refused = true;
+		}
+		check(refused, `ideas: a floor on ${why} is refused`);
+	}
+	// The optimizer's session counts the weighted travel as analyse() does.
+	const swann = E.ngramsFromText(fs.readFileSync(SPEED_CORPUS, 'utf8').slice(0, 20000));
+	const heavy = { weights: { sfb_distance: 0.4, pinky_ring: 3 }, floors: { sfs: 1 } };
+	for (const id of ['azerty', 'ergopti']) {
+		const full = E.analyse(byId.get(id), swann, heavy);
+		const session = E.scoreSession(byId.get(id), swann, heavy).total;
+		check(
+			Math.abs(full.score.total - session) <= 1e-9 * Math.abs(full.score.total),
+			`ideas: ${id} session ${session}, analyse ${full.score.total}`
+		);
+		check(
+			full.metrics.sfb_distance > 0 && full.metrics.pinky_ring > 0,
+			`ideas: ${id} measures both`
+		);
+		// A word made of one SFB carries its travel in its effort.
+		const words = E.wordEfforts(byId.get(id), { ed: 1 }, heavy).words;
+		check(
+			words[0].parts.sfb_distance >= 0 && 'pinky_ring' in words[0].parts,
+			`ideas: ${id} word effort parts ${Object.keys(words[0].parts).join(' ')}`
+		);
+	}
+	// The pair matrix: an SFB pair's points carry its travel times the weight.
+	const pair = E.bigramMatrix(qwerty, E.ngramsFromText('ed'), {
+		keyboard: 'iso',
+		weights: { sfb_distance: 1 }
+	}).pairs[0];
+	check(
+		near(pair.points, -1000 - edMm) && !pair.events.includes('sfb_cost'),
+		`ideas: the « ed » pair is worth ${pair.points} points (${pair.events.join(' ')})`
+	);
+	// The heatmap blames a pinky–ring pair on both its keys.
+	const aw = E.analyse(qwerty, E.ngramsFromText('aw'), { keyboard: 'iso' });
+	check(
+		aw.keys.KeyA.cost.pinky_ring === 50 && aw.keys.KeyW.cost.pinky_ring === 50,
+		'ideas: both keys of « aw » carry its pinky–ring pair'
+	);
+	// The reference of the relative view: AZERTY for French, QWERTY otherwise.
+	check(
+		E.referenceLayout('fr') === 'azerty' &&
+			E.referenceLayout('en') === 'qwerty' &&
+			E.referenceLayout(undefined) === 'qwerty',
+		'ideas: the reference layouts'
+	);
+
+	// The typing choice and its cost read the new weights when they are the
+	// defaults: an engine whose score_weights give pinky_ring 5 types « b »
+	// after « a » (left pinky, KeyA) on the right index (KeyU) instead of the
+	// ring (KeyW), whose pair now costs 5 − 1 (inward roll) points a point.
+	const weighted = {};
+	vm.createContext(weighted);
+	for (const file of [LEGEND_PATH, DATA_PATH])
+		vm.runInContext(fs.readFileSync(file, 'utf8'), weighted, { filename: file });
+	vm.runInContext(
+		'LAYOUT_ANALYSIS_DATA.weights.pinky_ring = 5; LAYOUT_ANALYSIS_DATA.weights.sfb_distance = 1;',
+		weighted
+	);
+	vm.runInContext(fs.readFileSync(ENGINE_PATH, 'utf8'), weighted, { filename: ENGINE_PATH });
+	const W = vm.runInContext('LAYOUT_ANALYSIS', weighted);
+	const choice = toy('toy_pinky_ring', { KeyA: 'a', KeyW: 'b', KeyU: 'b' });
+	const before = E.analyse(choice, E.ngramsFromText('ab'), { keyboard: 'iso' });
+	const after = W.analyse(choice, E.ngramsFromText('ab'), { keyboard: 'iso' });
+	check(
+		firstStep(before, 'b') === 'KeyW' && firstStep(after, 'b') === 'KeyU',
+		`ideas: « ab » types b on ${firstStep(before, 'b')}, then ${firstStep(after, 'b')} with pinky_ring 5`
+	);
+	// typing.cost: the travel of « ed » (1963.63 mm per 100 bigrams, over 2
+	// characters per bigram) and the pinky–ring pair of « aw » (5 × 100).
+	const edW = W.analyse(qwerty, E.ngramsFromText('ed'), { keyboard: 'iso' });
+	check(
+		near(edW.typing.cost - ed.typing.cost, edMm),
+		`ideas: sfb_distance adds ${edW.typing.cost - ed.typing.cost} to « ed »'s typing cost`
+	);
+	const awW = W.analyse(qwerty, E.ngramsFromText('aw'), { keyboard: 'iso' });
+	check(
+		near(awW.typing.cost - aw.typing.cost, 500),
+		`ideas: pinky_ring adds ${awW.typing.cost - aw.typing.cost} to « aw »'s typing cost`
+	);
 }
 
 if (errors.length > 0) {

@@ -1,12 +1,14 @@
 {
-	"_description": "Default weights of the global layout score (one shared source read by the site and the app through _shared/ui/layout_analysis/_generated/analysis_data.js). Each weight is the number of score points one unit of the metric is worth (one percentage point, or one millimetre for distance); the sign comes from the metric's direction, so every weight is positive. The choice of each value is justified in docs/audits/layout-analysers/report.md, section « Default weights ».",
+	"_description": "Default weights of the global layout score (one shared source read by the site and the app through _shared/ui/layout_analysis/_generated/analysis_data.js). Each weight is the number of score points one unit of the metric is worth (one percentage point, or one millimetre for distance); the sign comes from the metric's direction, so every weight is positive. « floors » gives each penalty metric (lower is better) a floor in its own unit: only the part of its value above the floor costs points (Cyanophage's optimiser), so tiny differences between good layouts do not decide the rank; 0, the default, counts the whole value. A weight of 0 (sfb_distance and pinky_ring, added on 2026-11-19) shows a metric without moving the score until the maintainer chooses its weight. The choice of each value is justified in docs/audits/layout-analysers/report.md, section « Default weights ».",
 	"schema_version": 1,
 	"weights": {
 		"sfb": 10,
 		"sfs": 3,
+		"sfb_distance": 0,
 		"lsb": 2,
 		"scissors": 3,
 		"half_scissors": 1,
+		"pinky_ring": 0,
 		"redirect": 1.5,
 		"redirect_bad": 3,
 		"roll_in": 1,
@@ -30,5 +32,25 @@
 		"simplicity": 0.03,
 		"direct_digits": 0.03,
 		"shortcut_left": 0.15
+	},
+	"floors": {
+		"sfb": 0,
+		"sfs": 0,
+		"sfb_distance": 0,
+		"lsb": 0,
+		"scissors": 0,
+		"half_scissors": 0,
+		"pinky_ring": 0,
+		"redirect": 0,
+		"redirect_bad": 0,
+		"distance": 0,
+		"finger_imbalance": 0,
+		"hand_imbalance": 0,
+		"pinky_load": 0,
+		"modifier_usage": 0,
+		"altgr_usage": 0,
+		"dead_key_usage": 0,
+		"outer_column": 0,
+		"unsupported": 0
 	}
 }

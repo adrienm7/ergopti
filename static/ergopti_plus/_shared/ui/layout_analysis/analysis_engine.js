@@ -108,6 +108,12 @@ var LAYOUT_ANALYSIS = (function () {
 	// The character layoutSimilarity leaves out: every layout types it on the
 	// space bar, which would add about a sixth of any text to every pair.
 	const SIMILARITY_SKIPPED = ' ';
+	// The share of a same-finger skipgram's travel sfb_distance counts beside a
+	// same-finger bigram's (genkey's and Oxeylyzer's skipgram discount).
+	const SFS_DISTANCE_SHARE = 0.5;
+	// Finger orders of the pinky and the ring finger (pinky_ring).
+	const PINKY_ORDER = 0;
+	const RING_ORDER = 1;
 	// Dead-key chains deeper than this are not followed.
 	const MAX_DEAD_DEPTH = 4;
 	// A row jump: two keys of one hand at least this many rows apart (top and
@@ -137,9 +143,12 @@ var LAYOUT_ANALYSIS = (function () {
 		sfb: { unit: '%', better: 'lower', of: 'bigrams' },
 		repeat: { unit: '%', better: 'none', of: 'bigrams' },
 		sfs: { unit: '%', better: 'lower', of: 'trigrams' },
+		// Per 100 key bigrams (the SFBs' travel) and trigrams (the skipgrams').
+		sfb_distance: { unit: 'mm', better: 'lower', of: 'ngrams' },
 		lsb: { unit: '%', better: 'lower', of: 'bigrams' },
 		scissors: { unit: '%', better: 'lower', of: 'bigrams' },
 		half_scissors: { unit: '%', better: 'lower', of: 'bigrams' },
+		pinky_ring: { unit: '%', better: 'lower', of: 'bigrams' },
 		row_jump: { unit: '%', better: 'none', of: 'bigrams' },
 		roll_in: { unit: '%', better: 'higher', of: 'bigrams' },
 		roll_out: { unit: '%', better: 'higher', of: 'bigrams' },
@@ -1919,7 +1928,7 @@ var LAYOUT_ANALYSIS = (function () {
 		// One layout analysed in detail: each event's heaviest groups over the board.
 		if (opts.keyGroups === true) result.topGroups = topGroups(board, groups, c);
 		result.incomplete = result.coverage.missingRequired.length > 0;
-		result.score = score(result, opts.weights);
+		result.score = score(result, opts.weights, opts.floors);
 		return result;
 	}
 
@@ -2043,6 +2052,56 @@ var LAYOUT_ANALYSIS = (function () {
 		return out;
 	}
 
+	const sameFingerCache = new WeakMap();
+
+	/**
+	 * What a move between two keys of one finger costs sfb_distance: the
+	 * distance between the keys' centres in millimetres (the distance metric's
+	 * geometry) times the finger's same_finger_factor (a pinky's move costs
+	 * more than an index's), (k1 * K + k2); 0 between keys of two fingers.
+	 * @param {object} board - From keyboard().
+	 * @returns {Float64Array} K × K costs.
+	 * @throws {Error} When the model gives a non-thumb finger no factor > 0.
+	 */
+	function sameFingerCosts(board) {
+		let out = sameFingerCache.get(board);
+		if (out) return out;
+		const { model } = data();
+		const factors = model.fingers.map((id, f) => {
+			if (f === LEFT_THUMB || f === RIGHT_THUMB) return 0;
+			const factor = model.same_finger_factor[id];
+			if (typeof factor !== 'number' || !Number.isFinite(factor) || factor <= 0)
+				throw new Error(`layout_analysis: same_finger_factor of ${id} must be a number > 0`);
+			return factor;
+		});
+		const K = board.codes.length;
+		out = new Float64Array(K * K);
+		for (let k1 = 0; k1 < K; k1++)
+			for (let k2 = 0; k2 < K; k2++) {
+				const f = board.finger[k1];
+				if (f !== board.finger[k2] || k1 === k2) continue;
+				const mm =
+					Math.hypot(board.x[k1] - board.x[k2], board.y[k1] - board.y[k2]) * model.key_unit_mm;
+				out[k1 * K + k2] = mm * factors[f];
+			}
+		sameFingerCache.set(board, out);
+		return out;
+	}
+
+	/**
+	 * sfb_distance from the stream counters: the same-finger travel of the
+	 * SFBs per 100 key bigrams plus SFS_DISTANCE_SHARE of the skipgrams' per
+	 * 100 key trigrams, each move weighted by its finger (sameFingerCosts).
+	 */
+	function sfbDistance(c) {
+		const per100 = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
+		return per100(c.sfb_cost, c.bigrams) + SFS_DISTANCE_SHARE * per100(c.sfs_cost, c.trigrams);
+	}
+
+	// The stream counters that add a weight per n-gram, not one (sfb_distance's
+	// travel): a key pair raises them by its cost, so they are no event of their own.
+	const WEIGHTED_COUNTS = new Set(['sfb_cost', 'sfs_cost']);
+
 	/** The counters the key stream adds to: every one a sum over the n-grams. */
 	function streamCounts() {
 		return {
@@ -2054,16 +2113,19 @@ var LAYOUT_ANALYSIS = (function () {
 			distance: 0,
 			bigrams: 0,
 			sfb: 0,
+			sfb_cost: 0,
 			repeat: 0,
 			lsb: 0,
 			scissors: 0,
 			half_scissors: 0,
+			pinky_ring: 0,
 			row_jump: 0,
 			roll_in: 0,
 			roll_out: 0,
 			hand_change: 0,
 			trigrams: 0,
 			sfs: 0,
+			sfs_cost: 0,
 			roll3_in: 0,
 			roll3_out: 0,
 			alternation: 0,
@@ -2090,6 +2152,7 @@ var LAYOUT_ANALYSIS = (function () {
 		const thumb = thumbKeys(board);
 		const K = board.codes.length;
 		const kinds = tripleKinds(board);
+		const sameFinger = sameFingerCosts(board);
 		const blame2 = blame ? blame.pair : () => {};
 		const blame3 = blame ? blame.triple : () => {};
 		return {
@@ -2129,6 +2192,7 @@ var LAYOUT_ANALYSIS = (function () {
 				}
 				if (f1 === f2) {
 					c.sfb += n;
+					c.sfb_cost += n * sameFinger[k1 * K + k2];
 					blame2('sfb', n, k1, k2);
 					return;
 				}
@@ -2138,6 +2202,11 @@ var LAYOUT_ANALYSIS = (function () {
 				}
 				const o1 = board.order[k1];
 				const o2 = board.order[k2];
+				// A pinky and a ring finger of one hand, whatever their rows.
+				if (Math.min(o1, o2) === PINKY_ORDER && Math.max(o1, o2) === RING_ORDER) {
+					c.pinky_ring += n;
+					blame2('pinky_ring', n, k1, k2);
+				}
 				if (Math.abs(o1 - o2) === 1) {
 					// A scissor: the longer finger bends down while the shorter one
 					// reaches up, one row apart (half) or two (full).
@@ -2168,6 +2237,7 @@ var LAYOUT_ANALYSIS = (function () {
 				c.trigrams += n;
 				if (kind & TRIPLE_SFS) {
 					c.sfs += n;
+					c.sfs_cost += n * sameFinger[k1 * K + k3];
 					blame2('sfs', n, k1, k3);
 				}
 				switch (kind & TRIPLE_CLASS) {
@@ -2263,9 +2333,11 @@ var LAYOUT_ANALYSIS = (function () {
 			sfb: pct(c.sfb, c.bigrams),
 			repeat: pct(c.repeat, c.bigrams),
 			sfs: pct(c.sfs, c.trigrams),
+			sfb_distance: sfbDistance(c),
 			lsb: pct(c.lsb, c.bigrams),
 			scissors: pct(c.scissors, c.bigrams),
 			half_scissors: pct(c.half_scissors, c.bigrams),
+			pinky_ring: pct(c.pinky_ring, c.bigrams),
 			row_jump: pct(c.row_jump, c.bigrams),
 			roll_in: pct(c.roll_in, c.bigrams),
 			roll_out: pct(c.roll_out, c.bigrams),
@@ -2566,6 +2638,7 @@ var LAYOUT_ANALYSIS = (function () {
 		lsb: 2,
 		scissors: 2,
 		half_scissors: 2,
+		pinky_ring: 2,
 		redirect: 3,
 		redirect_bad: 3,
 		row_jump: 2
@@ -2600,9 +2673,9 @@ var LAYOUT_ANALYSIS = (function () {
 	// for the hardest frequent words, a few kilobytes per corpus.
 	const WORD_TABLE_SIZE = 1000;
 	// The penalty metrics a word's effort adds up (wordEfforts): the scored key
-	// events and the travel; the loads (finger, pinky, outer column) belong to a
-	// whole text, not to a word.
-	const WORD_EFFORT_METRICS = SCORED_EVENTS.concat(['distance']);
+	// events, the travel and the same-finger travel; the loads (finger, pinky,
+	// outer column) belong to a whole text, not to a word.
+	const WORD_EFFORT_METRICS = SCORED_EVENTS.concat(['distance', 'sfb_distance']);
 	const keyNgramCache = new WeakMap();
 
 	/**
@@ -2810,8 +2883,9 @@ var LAYOUT_ANALYSIS = (function () {
 		const sequences = (best) => chars.map((char) => best.get(char));
 
 		// What one key bigram or trigram adds, probed once from the visitor with
-		// n = 1: the counters it raises (each by n). The trial then adds n to
-		// those counters in a typed array, the same sums at a fraction of the cost.
+		// n = 1: the counters it raises, each by n (a weighted counter by n times
+		// its weight). The trial then adds those to the counters in a typed
+		// array, the same sums at a fraction of the cost.
 		const names = Object.keys(streamCounts());
 		const K = board.codes.length;
 		const patterns = [];
@@ -2820,16 +2894,18 @@ var LAYOUT_ANALYSIS = (function () {
 			const counts = streamCounts();
 			call(streamVisitor(board, counts, new Float64Array(K), {}, null));
 			const raised = [];
+			const by = [];
 			names.forEach((name, j) => {
 				if (counts[name] === 0) return;
-				if (counts[name] !== 1)
+				if (counts[name] !== 1 && !WEIGHTED_COUNTS.has(name))
 					throw new Error(`layout_analysis: ${name} is not a plain count of the key stream`);
 				raised.push(j);
+				by.push(counts[name]);
 			});
-			const key = raised.join(',');
+			const key = `${raised.join(',')}|${by.join(',')}`;
 			if (!patternOf.has(key)) {
 				patternOf.set(key, patterns.length);
-				patterns.push(Int32Array.from(raised));
+				patterns.push({ at: Int32Array.from(raised), by: Float64Array.from(by) });
 			}
 			return patternOf.get(key);
 		};
@@ -2846,13 +2922,13 @@ var LAYOUT_ANALYSIS = (function () {
 					const at = k1 * K + k2;
 					if (pairPattern[at] < 0) pairPattern[at] = probe((v) => v.bigram(k1, k2, 1));
 					const raised = patterns[pairPattern[at]];
-					for (let j = 0; j < raised.length; j++) counts[raised[j]] += n;
+					for (let j = 0; j < raised.at.length; j++) counts[raised.at[j]] += n * raised.by[j];
 				},
 				trigram(k1, k2, k3, n) {
 					const at = (k1 * K + k2) * K + k3;
 					if (triplePattern[at] < 0) triplePattern[at] = probe((v) => v.trigram(k1, k2, k3, 1));
 					const raised = patterns[triplePattern[at]];
-					for (let j = 0; j < raised.length; j++) counts[raised[j]] += n;
+					for (let j = 0; j < raised.at.length; j++) counts[raised.at[j]] += n * raised.by[j];
 				}
 			};
 		};
@@ -2862,7 +2938,8 @@ var LAYOUT_ANALYSIS = (function () {
 			for (let j = 0; j < names.length; j++) all[names[j]] = c[names[j]] + counts[j];
 			return score(
 				streamMetrics(layout, board, compiled, all, keyCount, opts, weightedFit(forms, formValues)),
-				opts.weights
+				opts.weights,
+				opts.floors
 			).total;
 		};
 
@@ -3405,17 +3482,28 @@ var LAYOUT_ANALYSIS = (function () {
 	/**
 	 * What each key costs the global score: the points of the score's penalty
 	 * metrics (KEY_COST_METRICS) it causes, with these weights. The keys' costs
-	 * add up to those metrics' part of the score.
+	 * add up to those metrics' part of the score: a metric with a floor shares
+	 * only its part above the floor, in proportion to each key's part.
 	 * @param {object} result - analyse() output.
 	 * @param {object} [weights] - As score(); the defaults when absent.
+	 * @param {object} [floors] - As score(); the defaults when absent.
 	 * @returns {object} code → points lost.
 	 */
-	function keyScoreCost(result, weights) {
+	function keyScoreCost(result, weights, floors) {
 		const used = weights ? Object.assign(defaultWeights(), weights) : defaultWeights();
+		const floorOf = scoreFloors(floors);
+		// Each metric's weight times the share of its value above its floor.
+		const factor = {};
+		for (const id of KEY_COST_METRICS) {
+			const value = result.metrics[id];
+			const floor = floorOf[id] || 0;
+			factor[id] =
+				(used[id] || 0) * (floor > 0 && value > 0 ? aboveFloor(value, floor) / value : 1);
+		}
 		const out = {};
 		for (const [code, key] of Object.entries(result.keys)) {
 			let points = 0;
-			for (const id of KEY_COST_METRICS) points += (used[id] || 0) * key.cost[id];
+			for (const id of KEY_COST_METRICS) points += factor[id] * key.cost[id];
 			out[code] = points;
 		}
 		return out;
@@ -3535,15 +3623,20 @@ var LAYOUT_ANALYSIS = (function () {
 		const compiled = compileWays(layout, board, null);
 		const plan = planTyping(compiled, board, table, planMode(opts));
 		const K = board.codes.length;
-		const names = Object.keys(streamCounts()).filter((name) => name !== 'bigrams');
-		// A pair's class, probed once from the visitor: the counters it raises.
+		const names = Object.keys(streamCounts()).filter(
+			(name) => name !== 'bigrams' && !WEIGHTED_COUNTS.has(name)
+		);
+		// A pair's class, probed once from the visitor: the counters it raises,
+		// and its same-finger travel (sfb_distance's part of it).
 		const classes = new Map();
+		const travels = new Map();
 		const classOf = (k1, k2) => {
 			const at = k1 * K + k2;
 			if (!classes.has(at)) {
 				const counts = streamCounts();
 				streamVisitor(board, counts, new Float64Array(K), {}, null).bigram(k1, k2, 1);
 				classes.set(at, counts.bigrams === 0 ? null : names.filter((name) => counts[name] !== 0));
+				travels.set(at, counts.sfb_cost);
 			}
 			return classes.get(at);
 		};
@@ -3571,7 +3664,9 @@ var LAYOUT_ANALYSIS = (function () {
 			busy[k2] += n;
 			const events = classOf(k1, k2);
 			const share = total > 0 ? (100 * n) / total : 0;
-			const points = events.reduce((sum, id) => sum + signed(id) * share, 0);
+			const points =
+				events.reduce((sum, id) => sum + signed(id) * share, 0) +
+				signed('sfb_distance') * share * travels.get(at);
 			return { keys: [board.codes[k1], board.codes[k2]], count: n, share, events, points, at };
 		})
 			.filter((pair) => pair.count !== 0)
@@ -3684,7 +3779,13 @@ var LAYOUT_ANALYSIS = (function () {
 			let effort = 0;
 			for (const id of WORD_EFFORT_METRICS) {
 				const whole = id === 'distance' ? c.chars : TRIGRAM_EVENTS.has(id) ? c.trigrams : c.bigrams;
-				const value = whole > 0 ? ((id === 'distance' ? 1 : 100) * c[id]) / whole : 0;
+				// sfb_distance is no count: its travel has its own two totals.
+				const value =
+					id === 'sfb_distance'
+						? sfbDistance(c)
+						: whole > 0
+							? ((id === 'distance' ? 1 : 100) * c[id]) / whole
+							: 0;
 				// A penalty metric's signed weight is negative: the points it takes off.
 				parts[id] = -signed(id) * value;
 				effort += parts[id];
@@ -4088,13 +4189,16 @@ var LAYOUT_ANALYSIS = (function () {
 		const per = (n, total) => (total > 0 ? (100 * n) / total : 0);
 		const bigrams =
 			w.sfb * c.sfb +
+			w.sfb_distance * c.sfb_cost +
 			w.lsb * c.lsb +
 			w.scissors * c.scissors +
-			w.half_scissors * c.half_scissors -
+			w.half_scissors * c.half_scissors +
+			w.pinky_ring * c.pinky_ring -
 			w.roll_in * c.roll_in -
 			w.roll_out * c.roll_out;
 		const trigrams =
 			w.sfs * c.sfs +
+			SFS_DISTANCE_SHARE * w.sfb_distance * c.sfs_cost +
 			w.redirect * c.redirect +
 			w.redirect_bad * c.redirect_bad -
 			w.roll3_in * c.roll3_in -
@@ -4350,18 +4454,21 @@ var LAYOUT_ANALYSIS = (function () {
 	/**
 	 * The points one key pair takes from the score by the given weights, per
 	 * percentage point of the bigrams: the events of analyse()'s bigram rule
-	 * (SFB, scissors, lateral stretch, rolls), the same classification.
+	 * (SFB and its travel, pinky–ring pair, scissors, lateral stretch, rolls),
+	 * the same classification.
 	 */
 	function bigramPoints(board, w, k1, k2) {
 		const f1 = board.finger[k1];
 		const f2 = board.finger[k2];
 		const thumb = (f) => f === LEFT_THUMB || f === RIGHT_THUMB;
 		if (thumb(f1) || thumb(f2) || k1 === k2) return 0;
-		if (f1 === f2) return w.sfb;
+		if (f1 === f2)
+			return w.sfb + w.sfb_distance * sameFingerCosts(board)[k1 * board.codes.length + k2];
 		if (board.hand[k1] !== board.hand[k2]) return 0;
 		const o1 = board.order[k1];
 		const o2 = board.order[k2];
 		let points = 0;
+		if (Math.min(o1, o2) === PINKY_ORDER && Math.max(o1, o2) === RING_ORDER) points += w.pinky_ring;
 		if (Math.abs(o1 - o2) === 1) {
 			const longer = FINGER_LENGTH[o1] > FINGER_LENGTH[o2] ? k1 : k2;
 			const shorter = longer === k1 ? k2 : k1;
@@ -4384,7 +4491,11 @@ var LAYOUT_ANALYSIS = (function () {
 		const f3 = board.finger[k3];
 		const thumb = (f) => f === LEFT_THUMB || f === RIGHT_THUMB;
 		if (thumb(f1) || thumb(f2) || thumb(f3)) return 0;
-		let points = f1 === f3 && k1 !== k3 ? w.sfs : 0;
+		let points =
+			f1 === f3 && k1 !== k3
+				? w.sfs +
+					SFS_DISTANCE_SHARE * w.sfb_distance * sameFingerCosts(board)[k1 * board.codes.length + k3]
+				: 0;
 		if (f1 === f2 || f2 === f3) return points;
 		const h1 = board.hand[k1];
 		const h2 = board.hand[k2];
@@ -5836,16 +5947,53 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
+	 * The floors of the penalty metrics, each default replaced by the given
+	 * one (Cyanophage's optimiser: a share under its floor costs nothing).
+	 * @param {object} [given] - metric → floor in the metric's unit.
+	 * @returns {object} Every floor of score_weights.json, a copy.
+	 * @throws {Error} On a floor for a metric that has no weight or is not
+	 *   lower-is-better, or a negative or non-finite floor.
+	 */
+	function scoreFloors(given) {
+		const out = Object.assign({}, data().floors, given || {});
+		const weights = data().weights;
+		for (const [id, floor] of Object.entries(out)) {
+			if (!(id in weights) || METRICS[id].better !== 'lower')
+				throw new Error(`layout_analysis: ${id} is not a weighted penalty metric, it has no floor`);
+			if (!(floor >= 0) || !Number.isFinite(floor))
+				throw new Error(`layout_analysis: floor of ${id} must be a finite number >= 0`);
+		}
+		return out;
+	}
+
+	/** A copy of the default floors (score_weights.json), checked. */
+	function defaultFloors() {
+		return scoreFloors();
+	}
+
+	/**
+	 * What a penalty metric's value costs above its floor: the value itself
+	 * under a floor of 0 (every metric is ≥ 0), else the part above the floor.
+	 */
+	function aboveFloor(value, floor) {
+		return floor > 0 ? Math.max(0, value - floor) : value;
+	}
+
+	/**
 	 * The global score of an analysis: each metric adds weight × value points
-	 * when higher is better and subtracts them when lower is better.
+	 * when higher is better and subtracts them when lower is better; a penalty
+	 * metric counts only its part above its floor (0 by default).
 	 * @param {object} result - analyse() output (or {metrics}).
 	 * @param {object} [weights] - metric → points per unit; defaults when absent.
-	 * @returns {{total: number, contributions: object, weights: object}} Score.
+	 * @param {object} [floors] - penalty metric → floor; defaults when absent.
+	 * @returns {{total: number, contributions: object, weights: object,
+	 *   floors: object}} Score.
 	 * @throws {Error} On a weight for an unknown or unscored metric, or a
-	 *   negative or non-finite weight.
+	 *   negative or non-finite weight; on a floor scoreFloors() refuses.
 	 */
-	function score(result, weights) {
+	function score(result, weights, floors) {
 		const used = weights ? Object.assign(defaultWeights(), weights) : defaultWeights();
+		const floorOf = scoreFloors(floors);
 		const contributions = {};
 		let total = 0;
 		for (const [id, weight] of Object.entries(used)) {
@@ -5854,11 +6002,15 @@ var LAYOUT_ANALYSIS = (function () {
 				throw new Error(`layout_analysis: ${id} is not a scored metric`);
 			if (!(weight >= 0) || !Number.isFinite(weight))
 				throw new Error(`layout_analysis: weight of ${id} must be a finite number >= 0`);
+			const value =
+				metric.better === 'lower'
+					? aboveFloor(result.metrics[id], floorOf[id] || 0)
+					: result.metrics[id];
 			const sign = metric.better === 'higher' ? 1 : -1;
-			contributions[id] = sign * weight * result.metrics[id];
+			contributions[id] = sign * weight * value;
 			total += contributions[id];
 		}
-		return { total, contributions, weights: used };
+		return { total, contributions, weights: used, floors: floorOf };
 	}
 
 	/**
@@ -6062,15 +6214,34 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
-	 * Re-scores and re-ranks results with new weights (no re-analysis).
+	 * The layout the ranking's « relative » view measures the others against
+	 * on a corpus of a language (model reference_layouts: AZERTY for French,
+	 * QWERTY otherwise, Alt Alpha Ranker's QWERTY baseline).
+	 * @param {string} [language] - The corpus's language code; unknown: the default.
+	 * @returns {string} A library layout id.
+	 * @throws {Error} When the model's reference is not a library layout.
+	 */
+	function referenceLayout(language) {
+		const refs = data().model.reference_layouts;
+		const id = Object.prototype.hasOwnProperty.call(refs.by_language, language)
+			? refs.by_language[language]
+			: refs.default;
+		if (!data().layouts.some((layout) => layout.id === id))
+			throw new Error(`layout_analysis: reference layout ${id} is not in the library`);
+		return id;
+	}
+
+	/**
+	 * Re-scores and re-ranks results with new weights or floors (no re-analysis).
 	 * @param {object[]} results - analyse() outputs.
 	 * @param {object} [weights] - As score().
+	 * @param {object} [floors] - As score().
 	 * @returns {object[]} The same results, re-scored and ranked.
 	 * @throws {Error} When an access weight differs from the one a result's
 	 *   ways were chosen by: those weights change the typing, so the layouts
 	 *   must be analysed again.
 	 */
-	function rescore(results, weights) {
+	function rescore(results, weights, floors) {
 		const access = accessWeights(weights);
 		for (const result of results) {
 			const used = result.typing && result.typing.access;
@@ -6081,7 +6252,7 @@ var LAYOUT_ANALYSIS = (function () {
 						`layout_analysis: ${id} chooses the ways of typing; analyse again instead of rescore`
 					);
 		}
-		for (const result of results) result.score = score(result, weights);
+		for (const result of results) result.score = score(result, weights, floors);
 		return rank(results);
 	}
 
@@ -6253,6 +6424,8 @@ var LAYOUT_ANALYSIS = (function () {
 		wordEfforts,
 		effortDistribution,
 		defaultWeights,
+		defaultFloors,
+		scoreFloors,
 		accessWeights,
 		scoreConfig,
 		readScoreConfig,
@@ -6268,7 +6441,8 @@ var LAYOUT_ANALYSIS = (function () {
 		rescore,
 		diff,
 		layoutSimilarity,
-		similarScoreGap
+		similarScoreGap,
+		referenceLayout
 	};
 })();
 

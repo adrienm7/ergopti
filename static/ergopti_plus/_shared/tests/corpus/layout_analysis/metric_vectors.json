@@ -260,6 +260,84 @@
 			}
 		},
 		{
+			"name": "sfb_distance: E to D is 0.25 u across and 1 u down, 19.05 mm a unit, middle finger factor 1",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "ed",
+			"expect": {
+				"sfb_distance": 1963.629054
+			}
+		},
+		{
+			"name": "sfb_distance: a pinky SFB (Q to A) costs its finger factor 1.7",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "qa",
+			"expect": {
+				"sfb": 100,
+				"sfb_distance": 3338.169392
+			}
+		},
+		{
+			"name": "sfb_distance: a skipgram (E, I, C) counts half its travel, E to C 0.75 u across and 2 u down",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "eic",
+			"expect": {
+				"sfb": 0,
+				"sfs": 100,
+				"sfb_distance": 2034.540892
+			}
+		},
+		{
+			"name": "sfb_distance: each part over its own total, E-D and D-C over two bigrams, E-C over one trigram",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "edc",
+			"expect": {
+				"sfb_distance": 4081.282793
+			}
+		},
+		{
+			"name": "pinky_ring: pinky home, ring above is no half scissor but a pinky-ring pair",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "aw",
+			"expect": {
+				"pinky_ring": 100,
+				"half_scissors": 0
+			}
+		},
+		{
+			"name": "pinky_ring: ring home, pinky above is both",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "sq",
+			"expect": {
+				"pinky_ring": 100,
+				"half_scissors": 100
+			}
+		},
+		{
+			"name": "pinky_ring: same row, one pair of two bigrams (a-s, s-d)",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "asd",
+			"expect": {
+				"pinky_ring": 50,
+				"sfb_distance": 0
+			}
+		},
+		{
+			"name": "pinky_ring: pinky and ring of two hands are no pair",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "al",
+			"expect": {
+				"pinky_ring": 0
+			}
+		},
+		{
 			"name": "QWERTY shortcut letters on the left hand",
 			"layout": "qwerty",
 			"keyboard": "iso",
