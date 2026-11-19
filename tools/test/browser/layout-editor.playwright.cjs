@@ -33,6 +33,8 @@ const studioNumbers = require('./studio-numbers.cjs');
 const studioHeaders = require('./studio-headers.cjs');
 const studioManage = require('./layout-studio-manage.cjs');
 const { catalogueShape, pageRawKeys } = require('../lib/raw-locale-keys.cjs');
+// The editor's document tab strip (studio-controls).
+const studioControls = require('./studio-controls.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const KEYLAYOUT = path.join(ROOT, 'static', 'layouts', 'registry', 'ergopti', 'ergopti.keylayout');
@@ -4069,6 +4071,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseComparerLayoutList(browser, origin);
 		await exerciseComparerHome(browser, origin);
 		await exerciseStudioBar(browser, origin);
+		await studioControls.exerciseTabStrip(browser, origin);
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);

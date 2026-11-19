@@ -186,34 +186,73 @@ body {
 	margin-bottom: 8px;
 }
 
+/* A document tab bar: every tab and « + » share one height. The chosen tab is
+   filled, bold and carries an accent bar along its foot (not colour alone);
+   its « Duplicate » and « Close » are small icon buttons inside it, spaced
+   evenly and kept off its border, so hover and focus never cut its outline
+   (maintainer, 2026-11-19). */
 .le-layout-tab-list {
+	--le-tab-height: 38px;
+	align-items: center;
 	display: flex;
 	flex: 1 1 auto;
 	flex-wrap: wrap;
-	gap: 4px;
+	gap: 8px;
 	min-width: 0;
 }
 
 .le-layout-tab-item {
+	align-items: center;
+	background: var(--le-surface);
 	border: 1px solid var(--le-border);
 	border-radius: var(--le-radius);
 	display: inline-flex;
+	gap: 4px;
+	height: var(--le-tab-height);
 	max-width: 100%;
 	min-width: 0;
+	overflow: hidden;
+	padding: 0 4px 0 0;
+	position: relative;
+	transition:
+		background-color 0.12s,
+		border-color 0.12s;
+}
+
+.le-layout-tab-item:hover {
+	border-color: var(--le-accent);
 }
 
 .le-layout-tab-item.active {
+	background: var(--le-accent-soft);
 	border-color: var(--le-accent);
-	box-shadow: inset 0 -2px 0 var(--le-accent);
 }
 
-.le-layout-tab-item button {
+/* The chosen tab's bar, inside its border so the outline stays whole. */
+.le-layout-tab-item.active::after {
+	background: var(--le-accent);
+	border-radius: 3px 3px 0 0;
+	bottom: 0;
+	content: '';
+	height: 3px;
+	left: 10px;
+	pointer-events: none;
+	position: absolute;
+	right: 10px;
+}
+
+.layout-editor .le-layout-tab-item button {
+	background: transparent;
 	border: 0;
+	min-height: 0;
 }
 
-.le-layout-tab {
+.layout-editor .le-layout-tab {
+	align-self: stretch;
+	border-radius: calc(var(--le-radius) - 1px) 0 0 calc(var(--le-radius) - 1px);
 	max-width: 24ch;
 	overflow: hidden;
+	padding: 0 8px 0 14px;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
@@ -222,19 +261,79 @@ body {
 	font-weight: 600;
 }
 
-/* « ⧉ » duplicates the layout (ux-study item 20); the name field takes the
-   tab's place while it is renamed. */
-.le-layout-tab-duplicate {
-	color: var(--le-accent);
-	min-width: 24px;
+/* Focus rings drawn inside their control: the tab's border stays unbroken. */
+.layout-editor .le-layout-tab-item button:focus-visible,
+.layout-editor .le-layout-tab-rename:focus-visible {
+	outline-offset: -3px;
 }
 
-.le-layout-tab-rename {
+/* « Duplicate » (ux-study item 20) and « Close »: 28 px icon buttons, as far
+   from each other as the last one is from the tab's edge. */
+.layout-editor .le-tab-icon-button {
+	align-items: center;
+	border-radius: 6px;
+	color: var(--le-sub);
+	display: inline-flex;
+	flex: none;
+	height: 28px;
+	justify-content: center;
+	padding: 0;
+	width: 28px;
+}
+
+.layout-editor .le-tab-icon-button:hover:not(:disabled) {
+	background: var(--le-surface-2);
+	color: var(--le-text);
+}
+
+.le-layout-tab-item.active .le-tab-icon-button {
+	color: var(--le-text);
+}
+
+.layout-editor .le-layout-tab-item.active .le-tab-icon-button:hover:not(:disabled) {
+	background: var(--le-surface);
+}
+
+.layout-editor .le-layout-tab-close:hover:not(:disabled) {
+	color: var(--le-danger);
+}
+
+.le-tab-icon {
+	fill: none;
+	height: 16px;
+	stroke: currentColor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.6;
+	width: 16px;
+}
+
+/* « + » opens a new tab: a square of the tabs' height. */
+.layout-editor .le-layout-tab-add {
+	align-items: center;
+	color: var(--le-accent);
+	display: inline-flex;
+	height: var(--le-tab-height);
+	justify-content: center;
+	padding: 0;
+	width: var(--le-tab-height);
+}
+
+.layout-editor .le-layout-tab-add .le-tab-icon {
+	height: 18px;
+	stroke-width: 2;
+	width: 18px;
+}
+
+/* The name field takes the tab's place while it is renamed. */
+.layout-editor .le-layout-tab-rename {
+	align-self: stretch;
+	background: var(--le-bg);
 	border: 0;
-	border-radius: var(--le-radius);
+	border-radius: calc(var(--le-radius) - 1px) 0 0 calc(var(--le-radius) - 1px);
 	font: inherit;
-	min-height: 28px;
-	padding: 0 8px;
+	min-height: 0;
+	padding: 0 10px;
 	width: 18ch;
 }
 

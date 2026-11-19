@@ -241,6 +241,32 @@ var LayoutEditorPage = (function () {
 		return svg;
 	}
 
+	// The tab strip's icons (style.css .le-tab-icon), stroked on a 16 px grid:
+	// two stacked sheets for « Duplicate », a cross for « Close », a plus for « + ».
+	const TAB_ICONS = Object.freeze({
+		duplicate:
+			'M6 2.5h6.5a1 1 0 0 1 1 1V10M3.5 5.5h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z',
+		close: 'M4.5 4.5l7 7M11.5 4.5l-7 7',
+		add: 'M8 3v10M3 8h10'
+	});
+
+	/**
+	 * A decorative icon of the tab strip; its button is named by its aria-label.
+	 * @param {string} name - A TAB_ICONS key.
+	 * @returns {SVGSVGElement}
+	 */
+	function tabIcon(name) {
+		const svg = document.createElementNS(SVG_NS, 'svg');
+		svg.setAttribute('class', 'le-tab-icon');
+		svg.setAttribute('viewBox', '0 0 16 16');
+		svg.setAttribute('aria-hidden', 'true');
+		svg.setAttribute('focusable', 'false');
+		const path = document.createElementNS(SVG_NS, 'path');
+		path.setAttribute('d', TAB_ICONS[name]);
+		svg.append(path);
+		return svg;
+	}
+
 	/**
 	 * The export format this viewer chose last (a per-viewer convenience: a
 	 * private window or blocked storage just starts on the default).
@@ -1116,24 +1142,30 @@ var LayoutEditorPage = (function () {
 									startTabRename(index);
 								}
 							}),
-					el('button', {
-						type: 'button',
-						class: 'le-layout-tab-duplicate',
-						'data-duplicate-tab': String(index),
-						'aria-label': t('layout_analysis.mine.duplicate_named', { name }),
-						title: t('layout_analysis.mine.duplicate_named', { name }),
-						text: '⧉',
-						onclick: () => duplicateTab(index)
-					}),
-					el('button', {
-						type: 'button',
-						class: 'le-layout-tab-close',
-						'data-close-tab': String(index),
-						'aria-label': tl('tabs.close', { name }),
-						title: tl('tabs.close', { name }),
-						text: '×',
-						onclick: () => closeTab(index)
-					})
+					el(
+						'button',
+						{
+							type: 'button',
+							class: 'le-tab-icon-button le-layout-tab-duplicate',
+							'data-duplicate-tab': String(index),
+							'aria-label': t('layout_analysis.mine.duplicate_named', { name }),
+							title: t('layout_analysis.mine.duplicate_named', { name }),
+							onclick: () => duplicateTab(index)
+						},
+						tabIcon('duplicate')
+					),
+					el(
+						'button',
+						{
+							type: 'button',
+							class: 'le-tab-icon-button le-layout-tab-close',
+							'data-close-tab': String(index),
+							'aria-label': tl('tabs.close', { name }),
+							title: tl('tabs.close', { name }),
+							onclick: () => closeTab(index)
+						},
+						tabIcon('close')
+					)
 				]);
 			});
 			const importInput = el('input', {
@@ -1155,15 +1187,18 @@ var LayoutEditorPage = (function () {
 						{ class: 'le-layout-tab-roles', role: 'group', 'aria-label': tl('tabs.label') },
 						tabs
 					),
-					el('button', {
-						type: 'button',
-						id: 'le-tab-add',
-						class: 'le-layout-tab-add',
-						'aria-label': tl('tabs.add'),
-						title: tl('tabs.add'),
-						text: '+',
-						onclick: addTab
-					})
+					el(
+						'button',
+						{
+							type: 'button',
+							id: 'le-tab-add',
+							class: 'le-layout-tab-add',
+							'aria-label': tl('tabs.add'),
+							title: tl('tabs.add'),
+							onclick: addTab
+						},
+						tabIcon('add')
+					)
 				]),
 				el('span', {
 					class: `le-autosave ${state.workspace.status}`,
