@@ -563,16 +563,24 @@ def resolve(layout: Keylayout, index: int, code: int) -> Resolved:
     return Resolved("none")
 
 
-def load_keycodes(path: Path, convention: str) -> List[Tuple[str, int]]:
-    """(XKB key name, macOS code) pairs from the shared keycode table."""
+def load_keycodes(path: Path, convention: str) -> List[Tuple[str, int, bool]]:
+    """(XKB key name, macOS code, optional) from the shared keycode table.
+
+    Its character keys, then its ``extra_keys`` (the JIS and ABNT keys: Yen,
+    Ro or ABNT C1, the keypad comma or ABNT C2), marked optional: the symbols
+    file writes an optional key only when the layout types on it, so a layout
+    without them keeps its bytes. Twin of the Lua converter's M.keycodes.
+    """
     table = json.loads(Path(path).read_text(encoding="utf-8"))
     if convention not in table["conventions"]:
         raise KeylayoutError("unknown keycode convention %r" % convention)
-    pairs = []
+    keys = []
     for key in table["keys"]:
         mac = key["mac"]
-        pairs.append((key["xkb"], mac[convention] if isinstance(mac, dict) else mac))
-    return pairs
+        keys.append((key["xkb"], mac[convention] if isinstance(mac, dict) else mac, False))
+    for key in table.get("extra_keys", []):
+        keys.append((key["xkb"], key["mac"], True))
+    return keys
 
 
 def load_keysym_table() -> Dict[str, str]:
@@ -615,7 +623,8 @@ class Conversion:
         # macOS codes of keys the layout defines (an output that types
         # something, or an action) that the shared keycode table names no XKB
         # key for, keypad excepted: what they type is not on the Linux layout.
-        # A JIS or ABNT key is the usual case. Reported, so a registry layout
+        # An input-method key (Eisu, Kana) is the usual case: the JIS and ABNT
+        # character keys are the table's extra_keys. Reported, so a registry layout
         # that has one fails its conversion test instead of losing keys.
         self.unplaced: List[int] = []
 
@@ -624,7 +633,7 @@ class _Converter:
     def __init__(
         self,
         layout: Keylayout,
-        keycodes: Sequence[Tuple[str, int]],
+        keycodes: Sequence[Tuple[str, int, bool]],
         hints: XkbHints,
         private_states: frozenset = frozenset(),
     ) -> None:
@@ -642,7 +651,7 @@ class _Converter:
         self.borrowed: Dict[str, str] = dict(self.overrides)
         self.grid: Dict[str, List[Resolved]] = {
             xkb: [resolve(layout, index, code) for index in self.level_indices]
-            for xkb, code in self.keycodes
+            for xkb, code, _optional in self.keycodes
         }
         for cells in self.grid.values():
             for cell in cells[1:]:
@@ -776,7 +785,7 @@ class _Converter:
             # One pass over the keyboard, built once every keysym is chosen
             # (after symbols()): compose() asks it for every dead-key output.
             by_action: Dict[str, List[str]] = {}
-            for xkb, code in self.keycodes:
+            for xkb, code, _optional in self.keycodes:
                 for level, index in enumerate(self.level_indices):
                     entry = self.layout.key_entry(index, code)
                     if entry is None or entry[0] != "action":
@@ -831,15 +840,17 @@ class _Converter:
             lambda _match: 'name[Group1] = "%s";' % display_name,
             text,
         )
-        for xkb, _code in self.keycodes:
+        # Optional keys the template has no line for, written after its level3 include.
+        added: List[str] = []
+        for xkb, _code, optional in self.keycodes:
             names: List[str] = []
             comments: List[str] = []
+            types_something = any(cell.kind != "none" for cell in self.grid[xkb])
             for cell in self.grid[xkb]:
                 keysym = self._cell_keysym(cell)
                 names.append(keysym or NO_SYMBOL)
                 shown = cell.text if cell.kind != "none" else ""
                 comments.append('"%s"' % shown if len(shown) >= 2 else shown)
-            self.result.key_symbols[xkb] = names
             pattern = r"key <%s>[^\n]*;" % re.escape(xkb)
             line = 'key <%s> { type[group1] = "%s", [%s] }; // %s' % (
                 xkb,
@@ -847,9 +858,22 @@ class _Converter:
                 ", ".join(names),
                 " ".join(comments),
             )
+            if optional and not re.search(pattern, text):
+                # A JIS or ABNT key: written only when the layout types on it.
+                if types_something:
+                    added.append("\n\t" + line)
+                    self.result.key_symbols[xkb] = names
+                continue
             text, count = re.subn(pattern, lambda _match, line=line: line, text)
             if count != 1:
                 raise KeylayoutError("the symbols template has no single line for <%s>" % xkb)
+            self.result.key_symbols[xkb] = names
+        if added:
+            # After the template's level3 include, so a later include cannot take them back.
+            close = text.rfind("\n};")
+            if close < 0:
+                raise KeylayoutError("the symbols template has no closing };")
+            text = text[:close] + "\n" + "".join(added) + text[close:]
         return text
 
     def compose(self) -> str:
@@ -928,7 +952,7 @@ class _Converter:
         """
         found: List[Tuple[str, str]] = []
         seen = set()
-        for xkb, _code in self.keycodes:
+        for xkb, _code, _optional in self.keycodes:
             for cell in self.grid[xkb]:
                 if cell.kind != "text":
                     continue
@@ -995,7 +1019,7 @@ def compose_string(text: str) -> str:
 
 def convert(
     keylayout_text: str,
-    keycodes: Sequence[Tuple[str, int]],
+    keycodes: Sequence[Tuple[str, int, bool]],
     layout_id: str,
     display_name: str,
     hints: Optional[XkbHints] = None,
@@ -1004,7 +1028,7 @@ def convert(
 
     Args:
         keylayout_text: Content of the .keylayout.
-        keycodes: (XKB key name, macOS code) pairs, see load_keycodes().
+        keycodes: (XKB key name, macOS code, optional), see load_keycodes().
         layout_id: Name of the xkb_symbols section (no dots).
         display_name: Name shown by desktop layout pickers.
         hints: Per-layout choices from the registry index (XkbHints).
@@ -1014,7 +1038,7 @@ def convert(
 
 def convert_layout(
     layout: Keylayout,
-    keycodes: Sequence[Tuple[str, int]],
+    keycodes: Sequence[Tuple[str, int, bool]],
     layout_id: str,
     display_name: str,
     hints: Optional[XkbHints] = None,
@@ -1042,7 +1066,7 @@ def convert_layout(
 def _run_conversion(
     converter: "_Converter",
     layout: Keylayout,
-    keycodes: Sequence[Tuple[str, int]],
+    keycodes: Sequence[Tuple[str, int, bool]],
     template: str,
     layout_id: str,
     display_name: str,
@@ -1062,9 +1086,9 @@ def _run_conversion(
     return result
 
 
-def unplaced_codes(layout: Keylayout, keycodes: Sequence[Tuple[str, int]]) -> List[int]:
+def unplaced_codes(layout: Keylayout, keycodes: Sequence[Tuple[str, int, bool]]) -> List[int]:
     """Codes of defined keys the keycode table places nowhere (keypad excepted)."""
-    placed = {code for _xkb, code in keycodes}
+    placed = {code for _xkb, code, _optional in keycodes}
     found = set()
     for maps in layout.key_map_sets.values():
         for entries in maps.values():

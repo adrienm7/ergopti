@@ -482,11 +482,17 @@ Each question names the default kept meanwhile; an answer moves into the item or
       threshold, whether a gap in % of the run's gain over its start would read better, and the measure shown
       first (docs/design/layout-optimizer.md, « Existing layouts »).
 
-- [ ] **Python XKB converter and the JIS and ABNT keys (decided by the agent on 2026-11-18, to review by the
-      maintainer).** 2f96fa2f4f places Yen, Ro and the keypad comma (`mac_keycodes.json` `extra_keys`) in the Lua
-      converter only; `keylayout_to_xkb.py` still reads `keys` alone and reports macOS 93 and 94 as unplaced
-      (`test_registry_conversion.py`). Kept meanwhile: the Lua contract probes Eisu and Kana (102, 104) instead, and
-      the Python twin is unchanged. Choose whether the Python twin reads `extra_keys` too.
+- [ ] **Python XKB converter and the JIS and ABNT keys (implemented by the agent on 2026-11-19, to review by
+      the maintainer).** 2f96fa2f4f placed Yen, Ro and the keypad comma (`mac_keycodes.json` `extra_keys`) in the
+      Lua converter only, so the two twins disagreed on macOS 93, 94 and 95. Done the parity way:
+      `keylayout_to_xkb.py` now reads `extra_keys` as optional keys, as the Lua converter does, and writes one only
+      when a layout types on it, so every shipped layout keeps its bytes. Why parity: the Lua converter is the one
+      the Linux driver and the Studio's exports run, the shared table names those keys for both, and two converters that place
+      different keys make `test-keylayout-canonical-parity.cjs` meaningless for JIS and ABNT layouts; that gate
+      now also checks that both read the same keys for every convention and convert Ergo-L with the three keys
+      the same way. To revert: drop the `extra_keys` loop of `load_keycodes` and the optional branch of
+      `symbols()`, and restore `test_registry_conversion.py`'s `[93, 94]` expectation; the parity gate's two new
+      checks then have to go too.
 - [ ] **Screen-reader announcements of tooltips, decided by the agent on 2026-11-17.** Hotstring previews and
       finished AI predictions are announced only while the system says a screen reader runs (Windows
       `SPI_GETSCREENREADER`, VoiceOver, Orca), with no Ergopti+ setting; add a menu switch if users find them noisy.

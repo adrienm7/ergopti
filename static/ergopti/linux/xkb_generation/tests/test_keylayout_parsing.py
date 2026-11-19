@@ -49,7 +49,7 @@ def synthetic(
 
 
 # Keycode table limited to two keys so each test states every key it uses.
-TWO_KEYS = [("AC01", 0), ("AC02", 1)]
+TWO_KEYS = [("AC01", 0, False), ("AC02", 1, False)]
 
 
 class ModifierMapTests(unittest.TestCase):
@@ -188,8 +188,16 @@ class KeycodeTableTests(unittest.TestCase):
         self.assertEqual(len({key["xkb"] for key in table["keys"]}), 49)
         self.assertEqual(len({key["ahk"] for key in table["keys"]}), 49)
         self.assertEqual(len({key["code"] for key in table["keys"]}), 49)
-        iso = dict(keylayout_to_xkb.load_keycodes(KEYCODES_PATH, "iso"))
-        ansi = dict(keylayout_to_xkb.load_keycodes(KEYCODES_PATH, "ansi"))
+        iso = {
+            xkb: code
+            for xkb, code, optional in keylayout_to_xkb.load_keycodes(KEYCODES_PATH, "iso")
+            if not optional
+        }
+        ansi = {
+            xkb: code
+            for xkb, code, optional in keylayout_to_xkb.load_keycodes(KEYCODES_PATH, "ansi")
+            if not optional
+        }
         self.assertEqual(len(set(iso.values())), 49)
         self.assertEqual(len(set(ansi.values())), 49)
         swapped = sorted(name for name in iso if iso[name] != ansi[name])
