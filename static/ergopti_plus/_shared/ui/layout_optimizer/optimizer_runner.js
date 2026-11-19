@@ -42,7 +42,12 @@ var LAYOUT_OPTIMIZER_RUNNER = (function () {
 	 *   options: weights, keyboard, format), share (0 < share ≤ 1 of each
 	 *   n-gram table the search scores on), seed, restarts, firstRestart,
 	 *   iterations, startMode ('layout' | 'random'), timeBudgetMs?, identity
-	 *   ({id, name} of the result)}.
+	 *   ({id, name} of the result), changeWeight (score points per % of the
+	 *   corpus's characters moved from the start, LAYOUT_OPTIMIZER.changeCost;
+	 *   0 for none)}. A progress message with a new best carries its layout
+	 *   and change (changeCost's changed()); the done message's result has
+	 *   engineScore, the engine's score on the whole corpus, and score, that
+	 *   less the change penalty (the objective bestOf compares).
 	 * @param {function(object): void} post - Receives the messages.
 	 * @returns {{stop: function(): void}}
 	 */
@@ -51,9 +56,12 @@ var LAYOUT_OPTIMIZER_RUNNER = (function () {
 		const O = LAYOUT_OPTIMIZER;
 		let search;
 		let full;
+		let changeCost;
 		try {
 			const p = O.problem(E, request.start, request.options);
 			full = O.engineObjective(E, request.tables, request.analysis);
+			// What the result changes is always said; it costs only with a weight.
+			changeCost = O.changeCost(E, p, request.tables);
 			// The search scores each swap incrementally; the last word is the full analysis.
 			const objective = O.incrementalObjective(
 				E,
@@ -67,7 +75,9 @@ var LAYOUT_OPTIMIZER_RUNNER = (function () {
 				firstRestart: request.firstRestart,
 				iterations: request.iterations,
 				start: request.startMode,
-				timeBudgetMs: request.timeBudgetMs
+				timeBudgetMs: request.timeBudgetMs,
+				changeWeight: request.changeWeight,
+				changeCost
 			});
 		} catch (error) {
 			post({
@@ -92,10 +102,12 @@ var LAYOUT_OPTIMIZER_RUNNER = (function () {
 				const improved = state.best > lastBest;
 				if (improved || search.done() || Date.now() - lastPost >= PROGRESS_MS) {
 					lastPost = Date.now();
+					const best = improved ? search.result(request.identity) : null;
 					post({
 						type: 'progress',
 						progress: state,
-						layout: improved ? search.result(request.identity).layout : null
+						layout: best ? best.layout : null,
+						change: best ? best.change : null
 					});
 					lastBest = state.best;
 				}
@@ -105,7 +117,11 @@ var LAYOUT_OPTIMIZER_RUNNER = (function () {
 				}
 				const result = search.result(request.identity);
 				result.searchScore = result.score;
-				result.score = full(result.layout);
+				result.engineScore = full(result.layout);
+				result.score =
+					request.changeWeight > 0
+						? result.engineScore - request.changeWeight * result.change.share
+						: result.engineScore;
 				post({ type: 'done', result });
 			} catch (error) {
 				post({

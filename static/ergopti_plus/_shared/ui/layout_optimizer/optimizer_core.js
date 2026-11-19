@@ -76,7 +76,10 @@ var LAYOUT_OPTIMIZER = (function () {
 		// (LAYOUT_ANALYSIS.thumbKeys: NonConvert, Convert, KanaMode) become
 		// places; null keeps them out of the search: nothing moves onto a thumb
 		// key, and the start layout's thumb characters stay where they are.
-		thumbKeys: null
+		thumbKeys: null,
+		// At most this many units (a character and its Shift pair) off the key
+		// and level the start layout gives them; null sets no limit.
+		maxChanges: null
 	});
 
 	/** The presets of the QWERTY pins the pages offer. */
@@ -207,6 +210,12 @@ var LAYOUT_OPTIMIZER = (function () {
 				'option_value',
 				{ option: 'thumbKeys' },
 				'thumbKeys is a keyboard id or null'
+			);
+		if (opts.maxChanges !== null && !(Number.isInteger(opts.maxChanges) && opts.maxChanges >= 0))
+			throw new OptimizerError(
+				'option_value',
+				{ option: 'maxChanges' },
+				'maxChanges is an integer ≥ 0 or null'
 			);
 		return opts;
 	}
@@ -402,6 +411,14 @@ var LAYOUT_OPTIMIZER = (function () {
 					`the start puts a unit where its zone forbids`
 				);
 		});
+		// The QWERTY pins and zones move units before the search: they count.
+		const forced = changedUnits(result, assignment).length;
+		if (opts.maxChanges !== null && forced > opts.maxChanges)
+			throw new OptimizerError(
+				'change_limit_start',
+				{ count: forced, limit: opts.maxChanges },
+				`the pins and zones already move ${forced} characters, over ${opts.maxChanges}`
+			);
 		return result;
 	}
 
@@ -643,7 +660,226 @@ var LAYOUT_OPTIMIZER = (function () {
 	}
 
 	// ============================
-	// ======= 5/ Search ==========
+	// ======= 5/ Changes =========
+	// ============================
+
+	/**
+	 * The units holding a character (a hole aside) that an arrangement puts
+	 * off their home, the slot the start layout gives them (the problem makes
+	 * one unit per slot, in slot order, so unit u's home is slot u): what « at
+	 * most N changed characters » counts, a letter and its capital being one
+	 * unit. The QWERTY pins and zones count as changes.
+	 * @param {object} p - From problem().
+	 * @param {number[]} assignment - Slot index → unit index.
+	 * @returns {number[]} Unit indices, in order.
+	 */
+	function changedUnits(p, assignment) {
+		const out = [];
+		assignment.forEach((u, s) => {
+			if (u !== s && p.units[u].kind !== 'empty') out.push(u);
+		});
+		return out.sort((a, b) => a - b);
+	}
+
+	/**
+	 * The cost of leaving the start layout, weighted by the corpus: the share
+	 * of the characters typed (each by its occurrences, the space left out:
+	 * LAYOUT_ANALYSIS.similarityWeights, the weighting of layoutSimilarity)
+	 * whose keys change. A character is typed by the units on its way in the
+	 * start layout: its own cell on a key or AltGr level, else the dead key
+	 * that enters its rule and the letter typed after it (and the dead-key
+	 * layer's place when that layer moves). It has changed when any of those
+	 * units has left its home: 100 − layoutSimilarity's weighted sameKey for
+	 * the arrangements a search makes. A character reached only through a
+	 * chain of dead keys is left out, as one the start does not type.
+	 * @param {object} engine - LAYOUT_ANALYSIS.
+	 * @param {object} p - From problem().
+	 * @param {object} tables - Counts or prepareNgrams() output.
+	 * @returns {{total: number, share: function(number): number,
+	 *   moved: function(number[]): number, tracker: function(number[]): object,
+	 *   changed: function(number[]): object}} total: the weight of every
+	 *   character weighed; share(weight) in %; moved(assignment) the weight
+	 *   it moves, recomputed; tracker(assignment) follows swaps; changed()
+	 *   says what an arrangement moves.
+	 */
+	function changeCost(engine, p, tables) {
+		return costOf(p, engine.similarityWeights(tables), engine.substitutions());
+	}
+
+	/**
+	 * changeCost's body, on each character's weight (character → occurrences)
+	 * and the engine's substitutions (fancy character → plain text).
+	 */
+	function costOf(p, weighed, substituted) {
+		const keyUnitOf = new Map();
+		const deadUnitOf = new Map();
+		p.units.forEach((unit, u) => {
+			if (p.slots[u].kind === 'dead') return;
+			for (const cell of unit.cells) {
+				if (typeof cell === 'string' && !keyUnitOf.has(cell)) keyUnitOf.set(cell, u);
+				if (isDead(cell) && !deadUnitOf.has(cell.dead)) deadUnitOf.set(cell.dead, u);
+			}
+		});
+		// What the start types on cells no unit holds (a level or key outside
+		// the search): those never move, but they weigh as typed characters.
+		const typedCells = new Set();
+		const enteredStates = new Set();
+		for (const row of Object.values(p.layout.rows))
+			for (const cell of row) {
+				if (typeof cell === 'string') typedCells.add(cell);
+				if (isDead(cell)) enteredStates.add(cell.dead);
+			}
+		const typedKey = (char) => keyUnitOf.has(char) || typedCells.has(char);
+		// The units among a way's dead key and typed letter; a fixed one adds none.
+		const unitsOf = (state, typed) =>
+			[deadUnitOf.get(state), keyUnitOf.get(typed)].filter((u) => u !== undefined);
+		/** The units on a character's way in the start layout ([] if none moves), or null. */
+		const wayOf = (char) => {
+			if (keyUnitOf.has(char)) return [keyUnitOf.get(char)];
+			if (typedCells.has(char)) return [];
+			for (const slot of p.slots) {
+				if (slot.kind !== 'dead') continue;
+				const i = p.units[slot.index].cells.indexOf(char);
+				if (i >= 0) return [slot.index].concat(unitsOf(slot.state, slot.typed[i]));
+			}
+			for (const state of Object.keys(p.layout.dead).sort()) {
+				if (!enteredStates.has(state)) continue;
+				for (const [typed, made] of Object.entries(p.layout.dead[state]))
+					if (made === char && typedKey(typed)) return unitsOf(state, typed);
+			}
+			return null;
+		};
+		/** wayOf, or a character the start lacks typed as its plain form (the engine's ways). */
+		const wayOrPlain = (char) => {
+			const way = wayOf(char);
+			if (way !== null || !Object.prototype.hasOwnProperty.call(substituted, char)) return way;
+			const parts = Array.from(substituted[char], wayOf);
+			return parts.some((part) => part === null) ? null : [].concat(...parts);
+		};
+		const weights = [];
+		const ways = [];
+		const charsOf = p.units.map(() => []);
+		for (const [char, n] of weighed) {
+			const way = wayOrPlain(char);
+			if (!way) continue;
+			const c = weights.length;
+			weights.push(n);
+			ways.push(Array.from(new Set(way)));
+			for (const u of ways[c]) charsOf[u].push(c);
+		}
+		const total = weights.reduce((sum, n) => sum + n, 0);
+		const share = (weight) => {
+			if (!(total > 0))
+				throw new OptimizerError('change_empty', {}, 'the corpus types no character to weigh');
+			return (100 * weight) / total;
+		};
+		const awayIn = (slotOf, u) => slotOf[u] !== u;
+		/** The weight of the characters an arrangement moves, recomputed from nothing. */
+		const movedOf = (slotOf) => {
+			let sum = 0;
+			ways.forEach((way, c) => {
+				if (way.some((u) => awayIn(slotOf, u))) sum += weights[c];
+			});
+			return sum;
+		};
+
+		/**
+		 * Follows one arrangement swap by swap: a swap of units a and b walks
+		 * only the characters whose way holds a or b.
+		 * @param {number[]} assignment - The arrangement it starts on (copied).
+		 */
+		function tracker(assignment) {
+			const slotOf = slotsOf(assignment);
+			const isAway = p.units.map((unit, u) => (awayIn(slotOf, u) ? 1 : 0));
+			const out = ways.map((way) => way.reduce((n, u) => n + isAway[u], 0));
+			const seen = new Uint32Array(weights.length);
+			let stamp = 0;
+			let moved = 0;
+			out.forEach((n, c) => {
+				if (n > 0) moved += weights[c];
+			});
+			const counts = (u) => p.units[u].kind !== 'empty';
+			let units = isAway.reduce((n, flag, u) => n + (flag && counts(u) ? 1 : 0), 0);
+			/** Each unit's home flag once a and b trade places. */
+			const after = (a, b) => [slotOf[b] !== a ? 1 : 0, slotOf[a] !== b ? 1 : 0];
+			/** The moved weight a swap adds; write keeps its counts. */
+			const walk = (a, b, write) => {
+				const [na, nb] = after(a, b);
+				const da = na - isAway[a];
+				const db = nb - isAway[b];
+				if (da === 0 && db === 0) return 0;
+				let delta = 0;
+				stamp += 1;
+				for (const u of [a, b])
+					for (const c of charsOf[u]) {
+						if (seen[c] === stamp) continue;
+						seen[c] = stamp;
+						const way = ways[c];
+						const next = out[c] + (way.includes(a) ? da : 0) + (way.includes(b) ? db : 0);
+						if (out[c] > 0 !== next > 0) delta += next > 0 ? weights[c] : -weights[c];
+						if (write) out[c] = next;
+					}
+				return delta;
+			};
+			const unitsAfter = (a, b) => {
+				const [na, nb] = after(a, b);
+				return units + (counts(a) ? na - isAway[a] : 0) + (counts(b) ? nb - isAway[b] : 0);
+			};
+			return {
+				/** The moved weight of the arrangement followed. */
+				moved: () => moved,
+				/** Its changed units, holes aside. */
+				units: () => units,
+				/** The moved weight if a and b traded places; nothing changes. */
+				trial: (a, b) => moved + walk(a, b, false),
+				/** The changed units if a and b traded places. */
+				unitsAfter,
+				/** Follows the swap of a and b (the caller swaps its own arrangement). */
+				swap(a, b) {
+					const [na, nb] = after(a, b);
+					units = unitsAfter(a, b);
+					moved += walk(a, b, true);
+					isAway[a] = na;
+					isAway[b] = nb;
+					const sa = slotOf[a];
+					slotOf[a] = slotOf[b];
+					slotOf[b] = sa;
+				}
+			};
+		}
+
+		return {
+			total,
+			share,
+			moved: (assignment) => movedOf(slotsOf(assignment)),
+			tracker,
+			/**
+			 * What an arrangement changes: the share of the corpus's characters
+			 * it moves, and the units it moves, each with its cells and the
+			 * share of the characters it carries, most weighed first.
+			 * @param {number[]} assignment
+			 * @returns {{share: number, count: number, units: {cells: Array, share: number}[]}}
+			 */
+			changed(assignment) {
+				const slotOf = slotsOf(assignment);
+				const weigh = (weight) => (total > 0 ? share(weight) : 0);
+				const units = changedUnits(p, assignment).map((u) => {
+					let weight = 0;
+					for (const c of charsOf[u]) if (ways[c][0] === u) weight += weights[c];
+					return { u, cells: p.units[u].cells.slice(), weight };
+				});
+				units.sort((x, y) => y.weight - x.weight || x.u - y.u);
+				return {
+					share: weigh(movedOf(slotOf)),
+					count: units.length,
+					units: units.map((entry) => ({ cells: entry.cells, share: weigh(entry.weight) }))
+				};
+			}
+		};
+	}
+
+	// ============================
+	// ======= 6/ Search ==========
 	// ============================
 
 	/**
@@ -653,12 +889,22 @@ var LAYOUT_OPTIMIZER = (function () {
 	function shuffled(p, next) {
 		const assignment = p.start.slice();
 		const slotOf = slotsOf(assignment);
+		// Under a change limit the shuffle stays within it, as every swap of the search does.
+		const limit = p.options.maxChanges;
+		const follow = limit === null ? null : homeTracker(p, assignment);
 		const swaps = SHUFFLE_SWAPS_PER_UNIT * p.movable.length;
 		for (let i = 0; i < swaps; i++) {
-			const pair = pickSwap(p, assignment, slotOf, next);
-			if (pair) swap(assignment, slotOf, pair[0], pair[1]);
+			const pair = pickSwap(p, assignment, slotOf, next, follow);
+			if (!pair) continue;
+			if (follow) follow.swap(pair[0], pair[1]);
+			swap(assignment, slotOf, pair[0], pair[1]);
 		}
 		return assignment;
+	}
+
+	/** A tracker of the changed units alone (no corpus), for the change limit. */
+	function homeTracker(p, assignment) {
+		return costOf(p, new Map(), {}).tracker(assignment);
 	}
 
 	const slotsOf = (assignment) => {
@@ -678,17 +924,24 @@ var LAYOUT_OPTIMIZER = (function () {
 		slotOf[b] = sa;
 	}
 
-	/** Two movable units that may trade places, or null after PICK_ATTEMPTS tries. */
-	function pickSwap(p, assignment, slotOf, next) {
+	/**
+	 * Two movable units that may trade places, or null after PICK_ATTEMPTS
+	 * tries; with a change limit (p.options.maxChanges), only a swap that
+	 * keeps the changed units within it (follow: the arrangement's tracker).
+	 */
+	function pickSwap(p, assignment, slotOf, next, follow) {
 		const n = p.movable.length;
 		if (n < 2) return null;
+		const limit = p.options.maxChanges;
 		for (let i = 0; i < PICK_ATTEMPTS; i++) {
 			const a = p.movable[Math.floor(next() * n)];
 			const b = p.movable[Math.floor(next() * n)];
 			if (a === b) continue;
 			// Two holes trading places change nothing.
 			if (p.units[a].kind === 'empty' && p.units[b].kind === 'empty') continue;
-			if (allowed(p, a, slotOf[b]) && allowed(p, b, slotOf[a])) return [a, b];
+			if (!allowed(p, a, slotOf[b]) || !allowed(p, b, slotOf[a])) continue;
+			if (limit !== null && follow.unitsAfter(a, b) > limit) continue;
+			return [a, b];
 		}
 		return null;
 	}
@@ -722,6 +975,17 @@ var LAYOUT_OPTIMIZER = (function () {
 		const now = s.now || (() => Date.now());
 		const began = timed ? now() : 0;
 		const budgetPerRestart = timed ? s.timeBudgetMs / s.restarts : Infinity;
+		// The change penalty: changeWeight points per % of the corpus's
+		// characters moved (changeCost), taken off the objective; with no
+		// weight and no change limit the search follows no change at all.
+		const changeWeight = s.changeWeight === undefined ? 0 : s.changeWeight;
+		if (!(Number.isFinite(changeWeight) && changeWeight >= 0))
+			throw new OptimizerError('option_value', { option: 'changeWeight' }, 'changeWeight ≥ 0');
+		if (changeWeight > 0 && !s.changeCost)
+			throw new Error('layout_optimizer: a change weight needs its changeCost');
+		const follows = changeWeight > 0 || p.options.maxChanges !== null;
+		const cost = follows ? s.changeCost || costOf(p, new Map(), {}) : null;
+		const penalty = (moved) => (changeWeight > 0 ? changeWeight * cost.share(moved) : 0);
 
 		const cache = new Map();
 		let evaluations = 0;
@@ -746,8 +1010,18 @@ var LAYOUT_OPTIMIZER = (function () {
 			s.objective.accept(scored.key === key ? scored.layout : scoredLayoutOf(p, assignment));
 		};
 
-		const startScore = score(p.start);
-		let best = { score: startScore, assignment: p.start.slice(), restart: -1 };
+		// The objective of an arrangement: the engine's score, less the change
+		// penalty of the moved weight a tracker gives for it.
+		const objectiveOf = (engineScore, moved) =>
+			follows ? engineScore - penalty(moved) : engineScore;
+		const startEngine = score(p.start);
+		const startScore = objectiveOf(startEngine, follows ? cost.moved(p.start) : 0);
+		let best = {
+			score: startScore,
+			engine: startEngine,
+			assignment: p.start.slice(),
+			restart: -1
+		};
 		let restart = -1;
 		let run = null;
 		let stopped = false;
@@ -757,16 +1031,19 @@ var LAYOUT_OPTIMIZER = (function () {
 			const next = random(restartSeed(s.seed, k));
 			const assignment = s.start === 'random' ? shuffled(p, next) : p.start.slice();
 			const slotOf = slotsOf(assignment);
-			let current = score(assignment);
+			const follow = follows ? cost.tracker(assignment) : null;
+			const engineScore = score(assignment);
+			const current = objectiveOf(engineScore, follow ? follow.moved() : 0);
 			accept(assignment);
 			// The mean worsening of a few random swaps sets the first temperature.
 			let worse = 0;
 			let counted = 0;
 			for (let i = 0; i < CALIBRATION_SWAPS; i++) {
-				const pair = pickSwap(p, assignment, slotOf, next);
+				const pair = pickSwap(p, assignment, slotOf, next, follow);
 				if (!pair) break;
 				swap(assignment, slotOf, pair[0], pair[1]);
-				const delta = score(assignment) - current;
+				const moved = follow ? follow.trial(pair[0], pair[1]) : 0;
+				const delta = objectiveOf(score(assignment), moved) - current;
 				swap(assignment, slotOf, pair[0], pair[1]);
 				if (delta < 0) {
 					worse += -delta;
@@ -779,6 +1056,7 @@ var LAYOUT_OPTIMIZER = (function () {
 				next,
 				assignment,
 				slotOf,
+				follow,
 				current,
 				iteration: 0,
 				t0,
@@ -786,7 +1064,7 @@ var LAYOUT_OPTIMIZER = (function () {
 				temperature: t0
 			};
 			if (current > best.score)
-				best = { score: current, assignment: assignment.slice(), restart: k };
+				best = { score: current, engine: engineScore, assignment: assignment.slice(), restart: k };
 		}
 
 		function finished() {
@@ -796,7 +1074,9 @@ var LAYOUT_OPTIMIZER = (function () {
 		/**
 		 * Runs up to `count` iterations.
 		 * @returns {object} The progress: restart, iteration, evaluations,
-		 *   temperature, current, best (score), startScore, done.
+		 *   temperature, current, best (the objective: the score less the
+		 *   change penalty), bestEngine (the engine's score of the best),
+		 *   startScore (the start's objective), done.
 		 */
 		function step(count) {
 			let left = count;
@@ -820,16 +1100,24 @@ var LAYOUT_OPTIMIZER = (function () {
 				run.temperature = run.t0 * Math.pow(FINAL_TEMPERATURE_RATIO, fraction);
 				run.iteration += 1;
 				left -= 1;
-				const pair = pickSwap(p, run.assignment, run.slotOf, run.next);
+				const pair = pickSwap(p, run.assignment, run.slotOf, run.next, run.follow);
 				if (!pair) continue;
 				swap(run.assignment, run.slotOf, pair[0], pair[1]);
-				const value = score(run.assignment);
+				const engineScore = score(run.assignment);
+				const moved = run.follow ? run.follow.trial(pair[0], pair[1]) : 0;
+				const value = objectiveOf(engineScore, moved);
 				const delta = value - run.current;
 				if (delta >= 0 || run.next() < Math.exp(delta / run.temperature)) {
 					run.current = value;
+					if (run.follow) run.follow.swap(pair[0], pair[1]);
 					accept(run.assignment);
 					if (value > best.score)
-						best = { score: value, assignment: run.assignment.slice(), restart: run.k };
+						best = {
+							score: value,
+							engine: engineScore,
+							assignment: run.assignment.slice(),
+							restart: run.k
+						};
 				} else swap(run.assignment, run.slotOf, pair[0], pair[1]);
 			}
 			return progress();
@@ -843,6 +1131,7 @@ var LAYOUT_OPTIMIZER = (function () {
 				temperature: run ? run.temperature : 0,
 				current: run ? run.current : best.score,
 				best: best.score,
+				bestEngine: best.engine,
 				startScore,
 				done: finished()
 			};
@@ -855,15 +1144,21 @@ var LAYOUT_OPTIMIZER = (function () {
 				stopped = true;
 			},
 			progress,
-			/** The best arrangement so far, its layout and score. */
+			/**
+			 * The best arrangement so far: its layout, its objective (score), the
+			 * engine's score of it (engineScore) and, when a changeCost is given,
+			 * what it changes from the start (changeCost's changed()).
+			 */
 			result(identity) {
 				return {
 					score: best.score,
+					engineScore: best.engine,
 					startScore,
 					restart: best.restart,
 					evaluations,
 					assignment: best.assignment.slice(),
-					layout: layoutOf(p, best.assignment, identity)
+					layout: layoutOf(p, best.assignment, identity),
+					change: s.changeCost ? s.changeCost.changed(best.assignment) : null
 				};
 			}
 		};
@@ -908,6 +1203,8 @@ var LAYOUT_OPTIMIZER = (function () {
 		engineObjective,
 		incrementalObjective,
 		searchTables,
+		changeCost,
+		changedUnits,
 		createSearch,
 		run,
 		bestOf

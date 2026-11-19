@@ -272,6 +272,15 @@ occurrences}`: how alike two layouts type a corpus, in %. Each corpus
   corpus with nothing else than spaces is refused (`similarity_empty`). The
   optimizer reads the weighted `sameKey` first
   ([layout-optimizer.md](layout-optimizer.md#existing-layouts)).
+- `similarityWeights(ngrams)` → `Map` character → occurrences, the space
+  left out: the weighting of `layoutSimilarity`'s weighted shares, which the
+  optimizer's change penalty shares
+  ([layout-optimizer.md](layout-optimizer.md#change-penalty)).
+- `substitutions()` → a copy of the model's `substitutions`: the plain form
+  a layout that lacks a typographic character types it as.
+- `changePenalty()` → `{presets, defaultPreset, maxWeight}`: the optimizer's
+  change penalty settings (`score_weights.json` `change_penalty`), in score
+  points per % of the corpus's characters moved.
 - `same_finger_factor` of `analysis_model.json` weighs each finger's
   same-finger move in `sfb_distance` (Cyanophage's factors).
 - `similarScoreGap()` → `similar_score_gap` of `analysis_model.json` (default

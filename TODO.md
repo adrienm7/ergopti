@@ -579,6 +579,16 @@ Each question names the default kept meanwhile; an answer moves into the item or
       aside, with the same finger and row and the unweighted share beside it; five alike layouts are listed.
       Choose whether a gap in % of the run's gain over its start would read better, and the measure shown first
       (docs/design/layout-optimizer.md, « Existing layouts »).
+- [ ] **Optimizer change penalty (decided by the agent on 2026-11-19, to review by the maintainer).** The
+      Optimiser can take off its objective the cost of leaving the start layout: a weight in score points per % of
+      the corpus's characters moved, each weighted by its occurrences as `layoutSimilarity` weighs them (100 − its
+      weighted same-key share), and a hard « at most N changed characters » (a letter and its capital count once).
+      Kept meanwhile (`score_weights.json` `change_penalty`): presets « few changes » 3, « balanced » 1, « free » 0,
+      the slider up to 5, and « free » chosen first, so a run moves what pays as before until the reader asks
+      otherwise. Measured on AZERTY, the first 60 000 characters of Nemolivier, 3 000 swaps: weight 0 moves 92 % of
+      the typed characters for +102 points, 1 moves 71 % for +95, 3 moves 8 % for +36. Choose the presets, whether
+      « balanced » should be the first one, and whether the hard limit should count a letter and its capital as two
+      (docs/design/layout-optimizer.md, « Change penalty »).
 
 - [ ] **Python XKB converter and the JIS and ABNT keys (implemented by the agent on 2026-11-19, to review by
       the maintainer).** 2f96fa2f4f placed Yen, Ro and the keypad comma (`mac_keycodes.json` `extra_keys`) in the

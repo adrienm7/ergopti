@@ -57,6 +57,7 @@ the move set and each unit-tested:
 | `qwertyShortcuts`        | `[]`    | Letters whose Ctrl/Cmd shortcut stays on their QWERTY key (`command`); the letter moves.  |
 | `zones`                  | `{}`    | Character → the only codes its unit may sit on.                                           |
 | `thumbKeys`              | `null`  | A keyboard id whose thumb keys (NonConvert, Convert, KanaMode) become places.             |
+| `maxChanges`             | `null`  | At most this many units off their start place ([Change penalty](#change-penalty)).        |
 
 **Thumb keys** (decided by the agent on 2026-11-19, to review by the
 maintainer). The analysis model's thumb keys
@@ -225,6 +226,52 @@ it gains its speed from:
 **Honesty.** The score shown at the end is the engine's score of the returned
 layout on the whole corpus, with the same options: the number the Comparer
 shows for it.
+
+## Change penalty
+
+« The best layout derived from AZERTY with the fewest changes »: the search
+may pay for leaving its start layout. `LAYOUT_OPTIMIZER.changeCost(engine, p,
+tables)` weighs each corpus character by its occurrences, the space left out
+(`LAYOUT_ANALYSIS.similarityWeights`, the weighting of `layoutSimilarity`), so
+moving « e » costs far more than moving « § ». A character is typed by the
+units on its way in the start layout: its own cell, else the dead key of its
+rule and the letter typed after it (and the dead-key layer's place when that
+layer moves), else, for a typographic character the start lacks, the ways of
+its plain form (the engine's `substitutions()`: « … » as « ... »). It has
+changed when any of those units has left its home, the slot the start gives
+it (the QWERTY pins and zones count). The share changed, in %, is 100 −
+`layoutSimilarity`'s weighted same-key share for the arrangements a search
+makes (property test on AZERTY and bépo, gap 0). Two cases differ a little:
+a character typed several ways (Ergopti's « ù »: AltGr+R, or the circumflex
+then « w ») is placed on its first way where the engine takes its cheapest,
+and a character reached only through a chain of dead keys (Ergo-L's « ¨ »)
+is left out, as one the start does not type (gap under 1 point of % on
+Ergopti after 300 random swaps).
+
+**Objective.** With `changeWeight` w (score points per % moved; a search
+setting with `changeCost`), the search maximises score − w × share. A tracker
+(`changeCost(...).tracker`) follows the arrangement the search stands on: a
+swap of units a and b walks only the characters whose way holds a or b, and
+`trial(a, b)` equals the full recompute `moved()` after every swap (property
+test: 400 random swaps on AZERTY, bépo with AltGr, Ergopti with its dead-key
+layer, gap 0). With w = 0 and no limit the search follows no change at all:
+every draw and score is the one without a penalty, to the bit. The result
+says what it changes (`change`: the share, the units moved, each with its
+share); a runner's `done` result has `engineScore`, the engine's score on the
+whole corpus, and `score`, that less the penalty, which `bestOf` compares.
+
+**Hard limit.** `maxChanges` N keeps every arrangement within N changed units
+(a letter and its capital are one unit; a hole is none): `pickSwap` refuses a
+swap that would pass it, a random start shuffles within it, and pins or zones
+that already pass it are refused (`change_limit_start`).
+
+**Defaults** (`score_weights.json` `change_penalty`, read by
+`LAYOUT_ANALYSIS.changePenalty()`, checked by the codegen): presets « few
+changes » 3, « balanced » 1 and « free » 0, the slider up to 5, « free »
+chosen first (decided by the agent on 2026-11-19, to review by the
+maintainer, `TODO.md`). Measured on AZERTY, the first 60 000 characters of
+Nemolivier, 3 000 swaps, seed 1: weight 0 moves 92 % of the typed characters
+for +102 points, 1 moves 71 % for +95, 3 moves 8 % for +36.
 
 ## Page
 

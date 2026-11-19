@@ -6252,6 +6252,57 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
+	 * The weight of each corpus character in layoutSimilarity's weighted
+	 * shares: its occurrences in the corpus, the space left out (every layout
+	 * types it on the space bar). The optimizer's change penalty weighs a
+	 * moved character with the same numbers, so both read one weighting.
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @returns {Map<string, number>} Character → occurrences, in the table's order.
+	 */
+	function similarityWeights(ngrams) {
+		const out = new Map();
+		for (const [char, n] of prepareNgrams(ngrams).uni)
+			if (char !== SIMILARITY_SKIPPED) out.set(char, n);
+		return out;
+	}
+
+	/**
+	 * The plain form a layout that lacks a typographic character types it as
+	 * (the model's substitutions: « … » as « ... »), as the engine's ways do.
+	 * @returns {Object<string, string>} A copy: fancy character → plain text.
+	 */
+	function substitutions() {
+		return Object.assign({}, data().model.substitutions);
+	}
+
+	/**
+	 * The optimizer's change penalty settings (score_weights.json
+	 * change_penalty): score points per % of the corpus's characters moved,
+	 * weighted as layoutSimilarity weighs them.
+	 * @returns {{presets: Object<string, number>, defaultPreset: string,
+	 *   maxWeight: number}} A copy; presets in the file's order.
+	 * @throws {Error} When a weight is not in [0, maxWeight] or the default is no preset.
+	 */
+	function changePenalty() {
+		const raw = data().change_penalty;
+		if (!raw || typeof raw !== 'object')
+			throw new Error('layout_analysis: the data has no change_penalty');
+		const max = raw.max_weight;
+		if (!(typeof max === 'number' && Number.isFinite(max) && max > 0))
+			throw new Error(`layout_analysis: change_penalty max_weight ${max} is not a number > 0`);
+		for (const [id, weight] of Object.entries(raw.presets))
+			if (!(typeof weight === 'number' && weight >= 0 && weight <= max))
+				throw new Error(`layout_analysis: change_penalty preset ${id} is not in [0, ${max}]`);
+		if (!Object.prototype.hasOwnProperty.call(raw.presets, raw.default_preset))
+			throw new Error(`layout_analysis: change_penalty default ${raw.default_preset} is no preset`);
+		return {
+			presets: Object.assign({}, raw.presets),
+			defaultPreset: raw.default_preset,
+			maxWeight: max
+		};
+	}
+
+	/**
 	 * How alike two layouts type a corpus, in two measures of two strictness:
 	 * `sameKey`, the share of the characters typed on the same keys at the
 	 * same levels (a dead key and its key both alike); `sameFingerRow`, the
@@ -6283,12 +6334,10 @@ var LAYOUT_ANALYSIS = (function () {
 		const b = layoutFromRows(bInput);
 		const placesA = typedPlaces(a, boardFor(a, keyboardId, opts.profile));
 		const placesB = typedPlaces(b, boardFor(b, keyboardId, opts.profile));
-		const table = prepareNgrams(ngrams);
 		let chars = 0;
 		let occurrences = 0;
 		const same = { key: 0, fingerRow: 0, keyN: 0, fingerRowN: 0 };
-		for (const [char, n] of table.uni) {
-			if (char === SIMILARITY_SKIPPED) continue;
+		for (const [char, n] of similarityWeights(ngrams)) {
 			const pa = placesA.get(char);
 			const pb = placesB.get(char);
 			if (!pa && !pb) continue;
@@ -6605,6 +6654,9 @@ var LAYOUT_ANALYSIS = (function () {
 		rescore,
 		diff,
 		layoutSimilarity,
+		similarityWeights,
+		substitutions,
+		changePenalty,
 		similarScoreGap,
 		referenceLayout
 	};

@@ -1130,6 +1130,30 @@ function checkSimilarScoreGap(model) {
 }
 
 /**
+ * Rejects a change penalty the optimizer could not offer: each preset a
+ * finite weight ≥ 0 within the slider's largest weight, the free preset 0,
+ * the default one of the presets (docs/design/layout-optimizer.md).
+ * @param {object} penalty - score_weights.json change_penalty.
+ * @throws {Error} On a broken penalty.
+ */
+function checkChangePenalty(penalty) {
+	if (!penalty || typeof penalty !== 'object') throw new Error('change_penalty: missing');
+	const { presets, default_preset: chosen, max_weight: max } = penalty;
+	if (typeof max !== 'number' || !Number.isFinite(max) || max <= 0)
+		throw new Error(`change_penalty.max_weight: ${JSON.stringify(max)} is not a number > 0`);
+	if (!presets || typeof presets !== 'object' || Object.keys(presets).length === 0)
+		throw new Error('change_penalty.presets: none');
+	for (const [id, weight] of Object.entries(presets))
+		if (typeof weight !== 'number' || !Number.isFinite(weight) || weight < 0 || weight > max)
+			throw new Error(
+				`change_penalty.presets.${id}: ${JSON.stringify(weight)} is not in [0, ${max}]`
+			);
+	if (presets.free !== 0) throw new Error('change_penalty.presets.free: must be 0');
+	if (!Object.prototype.hasOwnProperty.call(presets, chosen))
+		throw new Error(`change_penalty.default_preset: ${JSON.stringify(chosen)} is no preset`);
+}
+
+/**
  * Rejects thumb keys the engine could not measure: each a physical key, each
  * rest key one of them, and on every keyboard that has one (a board, or a
  * JIS keyboard's extra fingers) pressed by a thumb. A thumb-letter layout
@@ -1239,6 +1263,7 @@ function buildData() {
 	checkRequiredCharacters(model);
 	checkSimilarScoreGap(model);
 	checkThumbKeys(model);
+	checkChangePenalty(weights.change_penalty);
 	delete model._description;
 	return {
 		schema_version: 1,
@@ -1248,6 +1273,7 @@ function buildData() {
 		scancodes: buildScancodes(model),
 		weights: weights.weights,
 		floors: weights.floors,
+		change_penalty: weights.change_penalty,
 		library_sources: library.sources,
 		layouts: buildLibrary(model),
 		corpora: corpora.catalogue,
@@ -1286,6 +1312,7 @@ function buildSource(data) {
 		`\t"scancodes": ${JSON.stringify(data.scancodes)},`,
 		`\t"weights": ${JSON.stringify(data.weights)},`,
 		`\t"floors": ${JSON.stringify(data.floors)},`,
+		`\t"change_penalty": ${JSON.stringify(data.change_penalty)},`,
 		`\t"library_sources": ${JSON.stringify(data.library_sources)},`,
 		`\t"corpora": ${JSON.stringify(data.corpora)},`,
 		`\t"sources": ${JSON.stringify(data.sources)},`,

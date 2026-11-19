@@ -2631,6 +2631,46 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			gap === sandbox.LAYOUT_ANALYSIS_DATA.model.similar_score_gap,
 		`similarity: the small score gap is ${gap}`
 	);
+
+	// The weighting the optimizer's change penalty shares: each character's
+	// occurrences, the space left out, the numbers the weighted shares use.
+	const weights = E.similarityWeights(counts);
+	check(
+		typeof weights.get === 'function' &&
+			!weights.has(' ') &&
+			weights.size === typed.length &&
+			typed.every((char) => weights.get(char) === uni.get(char)) &&
+			[...weights.values()].reduce((sum, n) => sum + n, 0) === same.occurrences,
+		`similarity: the weights ${JSON.stringify([...weights])} are not the corpus's own`
+	);
+	const tinyWeights = E.similarityWeights(E.ngramsFromText('ee e a'));
+	check(
+		JSON.stringify([...tinyWeights]) ===
+			JSON.stringify([
+				['e', 3],
+				['a', 1]
+			]),
+		`similarity: « ee e a » weighs ${JSON.stringify([...tinyWeights])}`
+	);
+	const subs = E.substitutions();
+	subs['…'] = 'changed';
+	check(
+		E.substitutions()['…'] === sandbox.LAYOUT_ANALYSIS_DATA.model.substitutions['…'],
+		'similarity: substitutions() hands out the model itself'
+	);
+	// The change penalty's settings (score_weights.json change_penalty).
+	const penalty = E.changePenalty();
+	const rawPenalty = sandbox.LAYOUT_ANALYSIS_DATA.change_penalty;
+	check(
+		penalty.maxWeight === rawPenalty.max_weight &&
+			penalty.defaultPreset === rawPenalty.default_preset &&
+			JSON.stringify(penalty.presets) === JSON.stringify(rawPenalty.presets) &&
+			penalty.presets.free === 0 &&
+			penalty.presets.few > penalty.presets.balanced &&
+			penalty.presets.balanced > 0 &&
+			Object.values(penalty.presets).every((w) => w >= 0 && w <= penalty.maxWeight),
+		`similarity: the change penalty reads ${JSON.stringify(penalty)}`
+	);
 }
 
 // ===============================================

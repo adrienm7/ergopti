@@ -715,6 +715,255 @@ check(after.done && timed.done(), 'the time budget stops the search');
 	);
 }
 
+// ===================================
+// ======= 8/ Change penalty =========
+// ===================================
+
+{
+	const near = (a, b) => Math.abs(a - b) <= TOLERANCE;
+	/** The arrangement of a problem with units a and b traded. */
+	const traded = (p, assignment, a, b) => {
+		const out = assignment.slice();
+		const sa = out.indexOf(a);
+		const sb = out.indexOf(b);
+		out[sa] = b;
+		out[sb] = a;
+		return out;
+	};
+	const unitOf = (p, char) => p.units.findIndex((unit) => unit.cells[0] === char);
+
+	// A tiny layout: each character weighs its occurrences, the space none.
+	const tiny = {
+		id: 'tiny',
+		rows: {
+			KeyF: ['a', 'A', null, null],
+			KeyJ: ['b', 'B', null, null],
+			KeyK: ['c', 'C', null, null],
+			KeyL: ['d', 'D', null, null],
+			Space: [' ', ' ', null, null]
+		}
+	};
+	const tinyTables = E.ngramsFromText('aaaa aaaa bb c A');
+	const tinyProblem = O.problem(E, tiny);
+	const tinyCost = O.changeCost(E, tinyProblem, tinyTables);
+	// a 8, A 1, b 2, c 1: 12 occurrences, d and the space weigh nothing.
+	check(tinyCost.total === 12, `change: the tiny corpus weighs ${tinyCost.total}, not 12`);
+	check(tinyCost.moved(tinyProblem.start) === 0, 'change: the start moves something');
+	const ab = traded(
+		tinyProblem,
+		tinyProblem.start,
+		unitOf(tinyProblem, 'a'),
+		unitOf(tinyProblem, 'b')
+	);
+	check(
+		tinyCost.moved(ab) === 11 && near(tinyCost.share(tinyCost.moved(ab)), (100 * 11) / 12),
+		`change: a↔b moves ${tinyCost.moved(ab)} of 12 (a, A and b)`
+	);
+	const cd = traded(
+		tinyProblem,
+		tinyProblem.start,
+		unitOf(tinyProblem, 'c'),
+		unitOf(tinyProblem, 'd')
+	);
+	check(
+		tinyCost.moved(cd) === 1,
+		`change: c↔d moves ${tinyCost.moved(cd)}: only c is typed, d weighs nothing`
+	);
+	const cdChange = tinyCost.changed(cd);
+	check(
+		cdChange.count === 2 &&
+			cdChange.units[0].cells[0] === 'c' &&
+			near(cdChange.units[0].share, 100 / 12) &&
+			cdChange.units[1].share === 0,
+		`change: c↔d lists ${JSON.stringify(cdChange)}`
+	);
+
+	// A dead key's rule: « ê » moves with its dead key or with « e ».
+	const withDead = {
+		id: 'tiny_dead',
+		rows: {
+			KeyQ: [{ dead: 'circ' }, null, null, null],
+			KeyE: ['e', 'E', null, null],
+			KeyR: ['r', 'R', null, null],
+			KeyT: ['§', '%', null, null],
+			Space: [' ', ' ', null, null]
+		},
+		dead: { circ: { e: 'ê', ' ': '^' } }
+	};
+	const deadTables = E.ngramsFromText('ê e e r § ê');
+	const deadProblem = O.problem(E, withDead, { moveSymbols: true });
+	const deadCost = O.changeCost(E, deadProblem, deadTables);
+	const deadUnit = deadProblem.units.findIndex((unit) => unit.kind === 'dead');
+	const er = traded(
+		deadProblem,
+		deadProblem.start,
+		unitOf(deadProblem, 'e'),
+		unitOf(deadProblem, 'r')
+	);
+	check(
+		deadCost.moved(er) === 5,
+		`change: e↔r moves e, r and ê (5 of 6), not ${deadCost.moved(er)}`
+	);
+	const deadMoved = traded(deadProblem, deadProblem.start, deadUnit, unitOf(deadProblem, '§'));
+	check(
+		deadCost.moved(deadMoved) === 3,
+		`change: the dead key ↔ § moves ê twice and §, not ${deadCost.moved(deadMoved)}`
+	);
+
+	// Weighting: on AZERTY, moving « e » costs far more than moving « § ».
+	const azertyProblem = O.problem(E, azerty, { moveSymbols: true });
+	const azertyCost = O.changeCost(E, azertyProblem, tables);
+	const kUnit = unitOf(azertyProblem, 'k');
+	const eShare = azertyCost.share(
+		azertyCost.moved(traded(azertyProblem, azertyProblem.start, unitOf(azertyProblem, 'e'), kUnit))
+	);
+	const sectionUnit = azertyProblem.units.findIndex((unit) => unit.cells.includes('§'));
+	const sectionShare = azertyCost.share(
+		azertyCost.moved(traded(azertyProblem, azertyProblem.start, sectionUnit, kUnit))
+	);
+	check(
+		eShare > 10 * sectionShare && eShare > 10,
+		`change: moving e costs ${eShare} %, moving § ${sectionShare} %`
+	);
+
+	// The penalty is 100 − layoutSimilarity's weighted same-key share, and the
+	// tracker's incremental value is the full one after every swap (property test).
+	// A character a layout types several ways (Ergopti's « ù »: AltGr+R, or the
+	// circumflex then « w ») is placed on its first way, where the engine takes
+	// its cheapest one: there the two may differ a little (gap: in points of %).
+	for (const [id, options, gap] of [
+		['azerty', { movePunctuation: true, moveSymbols: true }, 1e-9],
+		['bepo', { moveSymbols: true, altgr: true }, 1e-9],
+		['ergopti', { movePunctuation: true, deadKeyLayer: true }, 1]
+	]) {
+		const start = library.get(id);
+		const p = O.problem(E, start, options);
+		const cost = O.changeCost(E, p, tables);
+		const next = O.random(97);
+		const assignment = p.start.slice();
+		const follow = cost.tracker(assignment);
+		let worst = 0;
+		let swaps = 0;
+		for (let i = 0; i < 400; i++) {
+			const a = p.movable[Math.floor(next() * p.movable.length)];
+			const b = p.movable[Math.floor(next() * p.movable.length)];
+			if (
+				a === b ||
+				!O.allowed(p, a, assignment.indexOf(b)) ||
+				!O.allowed(p, b, assignment.indexOf(a))
+			)
+				continue;
+			const after = traded(p, assignment, a, b);
+			const full = cost.moved(after);
+			worst = Math.max(worst, Math.abs(follow.trial(a, b) - full));
+			follow.swap(a, b);
+			assignment.splice(0, assignment.length, ...after);
+			worst = Math.max(worst, Math.abs(follow.moved() - full));
+			check(
+				follow.units() === O.changedUnits(p, assignment).length,
+				`change: ${id} tracks ${follow.units()} changed units, ${O.changedUnits(p, assignment).length} changed`
+			);
+			swaps += 1;
+			if (swaps % 100 === 0) {
+				const similar = E.layoutSimilarity(start, O.layoutOf(p, assignment), tables, {});
+				check(
+					Math.abs(cost.share(full) - (100 - similar.weighted.sameKey)) <= gap,
+					`change: ${id} penalty ${cost.share(full)} %, layoutSimilarity says ${100 - similar.weighted.sameKey} %`
+				);
+			}
+		}
+		check(swaps > 150, `change: ${id} made only ${swaps} swaps`);
+		check(worst <= TOLERANCE, `change: ${id} incremental and full differ by ${worst}`);
+	}
+
+	// The objective: the engine's score less weight × share, the result's own numbers.
+	const weight = 2;
+	const azertyPlain = O.problem(E, azerty);
+	const plainCost = O.changeCost(E, azertyPlain, tables);
+	const penalised = O.run(azertyPlain, {
+		objective: O.engineObjective(E, tables, ANALYSIS),
+		seed: 11,
+		iterations: 200,
+		changeWeight: weight,
+		changeCost: plainCost
+	});
+	check(
+		near(penalised.score, penalised.engineScore - weight * penalised.change.share) &&
+			near(penalised.engineScore, E.analyse(penalised.layout, tables, ANALYSIS).score.total) &&
+			near(penalised.change.share, plainCost.share(plainCost.moved(penalised.assignment))),
+		`change: the objective ${penalised.score} is not ${penalised.engineScore} − ${weight} × ${penalised.change.share}`
+	);
+	const free = O.run(azertyPlain, {
+		objective: O.engineObjective(E, tables, ANALYSIS),
+		seed: 11,
+		iterations: 200,
+		changeCost: plainCost
+	});
+	check(
+		penalised.change.share < free.change.share,
+		`change: a weight of ${weight} moves ${penalised.change.share} %, none ${free.change.share} %`
+	);
+	// A weight of 0 is the search without a penalty, to the bit.
+	const unpenalised = O.run(azertyPlain, {
+		objective: O.engineObjective(E, tables, ANALYSIS),
+		seed: 11,
+		iterations: 200
+	});
+	check(
+		JSON.stringify(unpenalised.layout) === JSON.stringify(free.layout) &&
+			Object.is(unpenalised.score, free.score) &&
+			free.score === free.engineScore,
+		'change: a weight of 0 changes the search'
+	);
+	check(
+		refusal(() => O.createSearch(azertyPlain, { objective: () => 0, changeWeight: -1 })) ===
+			'option_value',
+		'change: a negative weight is accepted'
+	);
+
+	// The hard limit: no layout the search scores moves more than N units.
+	const limited = (start, options, settings) => {
+		const run = search(start, options, settings);
+		const startCells = (code) => cellsOf(start, code, [0, 1]);
+		const changedKeys = (layout) =>
+			Object.keys(layout.rows).filter(
+				(code) =>
+					code !== 'Space' &&
+					cellsOf(layout, code, [0, 1]) !== startCells(code) &&
+					cellsOf(layout, code, [0, 1]) !== JSON.stringify([null, null])
+			).length;
+		return { run, most: Math.max(...run.seen.map(changedKeys)) };
+	};
+	for (const [limit, mode, scored] of [
+		[4, 'layout', 10],
+		[2, 'random', 2],
+		[0, 'layout', 1]
+	]) {
+		const { run, most } = limited(azerty, { maxChanges: limit }, { start: mode, iterations: 150 });
+		check(
+			run.seen.length >= scored && most <= limit,
+			`change: at most ${limit} changes (${mode}), yet a scored layout moves ${most}`
+		);
+		check(
+			O.changedUnits(run.p, run.result.assignment).length <= limit,
+			`change: the result moves more than ${limit}`
+		);
+	}
+	check(
+		limited(azerty, {}, { iterations: 150 }).most > 4,
+		'change: without a limit the search never moves more than 4 units'
+	);
+	check(
+		refusal(() => O.problem(E, azerty, { qwertyPins: ['z', 'x', 'c', 'v'], maxChanges: 1 })) ===
+			'change_limit_start',
+		'change: QWERTY pins over the limit are accepted'
+	);
+	check(
+		refusal(() => O.problem(E, azerty, { maxChanges: 1.5 })) === 'option_value',
+		'change: a fractional limit is accepted'
+	);
+}
+
 if (errors.length) {
 	console.error(`FAIL test-layout-optimizer: ${errors.length} problem(s)`);
 	for (const e of errors) console.error(`  - ${e}`);
