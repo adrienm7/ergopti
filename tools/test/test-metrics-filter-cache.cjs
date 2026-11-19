@@ -872,7 +872,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 				const html = page.elements.get('app_modal_layouts').innerHTML;
 				for (const [, , layout] of rows)
 					assert.equal(
-						html.includes(`<span>${layout}</span>`),
+						html.includes(`<bdi>${layout}</bdi>`),
 						vector.layouts.includes(layout),
 						'layout rows must obey the same accepted dates as the hourly chart'
 					);
@@ -5260,7 +5260,8 @@ test('apps focus latency displays measured zero and distinguishes absence', () =
 		'render-error-banner': {},
 		'apps-tbody': tbody,
 		'kpi-tx-focus-lat': {},
-		app_drilldown_modal: { style: {} },
+		// The drill-down binds its backdrop click once, on first opening.
+		app_drilldown_modal: { style: {}, addEventListener() {} },
 		app_modal_title: {},
 		app_modal_tiles: {},
 		app_modal_hourly: { getContext: () => 'hourly' },
@@ -5310,9 +5311,9 @@ test('apps focus latency displays measured zero and distinguishes absence', () =
 	assert.equal(tbody.children[0].children[6].textContent, '0 ms');
 	assert.equal(tbody.children[1].children[6].textContent, '—');
 	context.openAppDrilldown('Editor');
-	assert.match(elements['app_modal_tiles'].innerHTML, />Focus<\/div>\s*<div[^>]*>0 ms<\/div>/);
+	assert.match(elements['app_modal_tiles'].innerHTML, />Focus<\/p>\s*<p[^>]*>0 ms<\/p>/);
 	context.openAppDrilldown('Other');
-	assert.match(elements['app_modal_tiles'].innerHTML, />Focus<\/div>\s*<div[^>]*>—<\/div>/);
+	assert.match(elements['app_modal_tiles'].innerHTML, />Focus<\/p>\s*<p[^>]*>—<\/p>/);
 });
 for (const host of ['linux', 'macos', 'windows'])
 	test(`${host} dominant category preserves a colon in the fallback name`, () => {

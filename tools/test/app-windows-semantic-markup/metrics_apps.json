@@ -1,53 +1,36 @@
 {
 	"files": {
-		"charts.js": [
-			{
-				"tag": "div",
-				"count": 13,
-				"pending": true
-			},
-			{
-				"tag": "span",
-				"count": 2,
-				"pending": true
-			}
-		],
 		"index.html": [
 			{
 				"tag": "div",
-				"count": 211,
-				"pending": true
+				"where": "style=\"position: relative; height:",
+				"count": 12,
+				"reason": "Chart.js sizes its canvas from a dedicated, relatively positioned parent of fixed height; the figure also holds the heading, so no element of its own carries that box."
 			},
 			{
-				"tag": "span",
-				"count": 25,
-				"pending": true
-			}
-		],
-		"main.js": [
+				"tag": "div",
+				"where": "_container\" style=\"overflow-x: auto\"",
+				"count": 6,
+				"reason": "A horizontal scroll box the script fills with a drawn chart (an svg named as an image) and its caption, so the figure's heading and buttons stay in place; scrolling is not a meaning any element carries."
+			},
 			{
-				"tag": "span",
+				"tag": "div",
+				"where": "style=\"display: flex; gap: 20px; margin-bottom: 20px\"",
 				"count": 1,
-				"pending": true
+				"reason": "Places the two overview chart figures side by side; it groups nothing a reader needs, each figure carries its own heading."
 			},
 			{
 				"tag": "div",
-				"count": 4,
-				"pending": true
-			}
-		],
-		"modal.js": [
-			{
-				"tag": "div",
-				"count": 17,
-				"pending": true
+				"where": "id=\"app_drilldown_modal\"",
+				"count": 1,
+				"reason": "The dimmed backdrop behind the drill-down dialog, which a click closes as Escape and the close button do; the dialog itself is the section with role dialog inside."
 			},
 			{
-				"tag": "span",
-				"count": 4,
-				"pending": true
+				"tag": "div",
+				"where": "class=\"app-modal-section app-modal-grid-2\"",
+				"count": 2,
+				"reason": "A two-column grid that lays out a pair of headed sections of the drill-down side by side; the sections carry the meaning."
 			}
 		]
-	},
-	"pendingProblems": 7
+	}
 }

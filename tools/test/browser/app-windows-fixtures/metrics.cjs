@@ -67,6 +67,35 @@ async function showsSelected(page, group, which) {
 }
 
 /**
+ * Moves through the apps dashboard's tabs with the keyboard, as a user does:
+ * the focus on the selected tab, ArrowRight as many times as the target's
+ * place, then checks the tab pattern (one selected tab, the only Tab stop,
+ * its panel alone shown and named by it).
+ * @param {import('playwright').Page} page
+ * @param {string} tab - The target tab's data-tab-target.
+ * @param {number} presses - ArrowRight presses from the first tab.
+ */
+async function showsAppsTab(page, tab, presses) {
+	await page.focus('[role="tab"][aria-selected="true"]');
+	for (let press = 0; press < presses; press++) await page.keyboard.press('ArrowRight');
+	const state = await page.evaluate(() => ({
+		focused: document.activeElement.getAttribute('data-tab-target'),
+		selected: [...document.querySelectorAll('[role="tab"][aria-selected="true"]')].map((t) =>
+			t.getAttribute('data-tab-target')
+		),
+		stops: [...document.querySelectorAll('[role="tab"]')].filter((t) => t.tabIndex === 0).length,
+		shown: [...document.querySelectorAll('[role="tabpanel"]')]
+			.filter((panel) => !panel.hidden)
+			.map((panel) => [panel.id, panel.getAttribute('aria-labelledby')])
+	}));
+	assert.deepEqual(
+		state,
+		{ focused: tab, selected: [tab], stops: 1, shown: [['panel-' + tab, 'tab-' + tab]] },
+		'the arrow keys select the tab and show its panel alone'
+	);
+}
+
+/**
  * Moves the onboarding forward from the language step, as a user presses
  * Next, and optionally answers « Yes » on the page reached.
  * @param {number} steps - Presses of Next.
@@ -267,12 +296,33 @@ module.exports = [
 				appsManifest.toString()
 			),
 		ready: '#apps_bar_chart',
-		// The overview tab is the filled state; each other tab is its own.
+		// The overview tab is the filled state; each other tab is its own,
+		// reached with the arrow keys from the selected tab (WAI-ARIA tabs).
 		states: [
-			...['time', 'apps', 'typing', 'system'].map((tab) => ({
+			...['time', 'apps', 'typing', 'system'].map((tab, index) => ({
 				name: 'tab-' + tab,
-				enter: (page) => showsPressed(page, '.tab-btn', '[data-tab-target="' + tab + '"]')
+				enter: (page) => showsAppsTab(page, tab, index + 1)
 			})),
+			{
+				// A card's explanation opens on keyboard focus, not on hover only,
+				// Escape hides it, and the next card's opens (WCAG 1.4.13).
+				name: 'card-tip',
+				enter: async (page) => {
+					await page.click('.tab-btn[data-tab-target="apps"]');
+					const shown = (id) =>
+						page.evaluate((tip) => {
+							const node = document.getElementById(tip);
+							const card = document.querySelector(`[aria-describedby="${tip}"]`);
+							return Boolean(node && card && node.checkVisibility());
+						}, id);
+					await page.focus('[aria-describedby="tip-app-hopping"]');
+					assert.ok(await shown('tip-app-hopping'), 'the focused card shows its explanation');
+					await page.keyboard.press('Escape');
+					assert.ok(!(await shown('tip-app-hopping')), 'Escape hides the explanation');
+					await page.keyboard.press('Tab');
+					assert.ok(await shown('tip-depth'), 'the next card shows its own');
+				}
+			},
 			{
 				// Opened from the keyboard: the focus goes into the dialog and the
 				// page behind it is inert, Escape closes it and gives the focus back.
