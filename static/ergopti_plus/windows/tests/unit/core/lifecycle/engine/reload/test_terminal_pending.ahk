@@ -431,25 +431,70 @@ _RTP_ExitSupersedesThePendingReload() {
 Test("reload terminal: an accepted exit supersedes the pending reload "
 	. "(reload-superseded-by-exit)", _RTP_ExitSupersedesThePendingReload)
 
-_RTP_StalledSuccessorIsReportedOnceAndKept() {
-	global RELOAD_SUCCESSOR_STALL_MS
-	Bundle := _RTP_Acquire("stall")
+; A successor held by a load-error dialog nobody saw stayed pending for 40
+; minutes with configuration writes blocked: the stall bound only logged
+; (reload-successor-deadline). It is still awaited at the stall bound, then
+; stopped at the deadline, and the refusal hands the bundle back.
+_RTP_SilentSuccessorIsStoppedAtTheDeadline() {
+	global RELOAD_SUCCESSOR_STALL_MS, RELOAD_SUCCESSOR_DEADLINE_MS, _RTP_Events
+	_RTP_Events := []
+	Bundle := _RTP_Acquire("deadline")
 	Port := _RTP_NewPort()
+	Reasons := []
 	try {
-		Record := _RTP_Pending(Bundle, Port)
+		Record := _RTP_Pending(Bundle, Port, _RTP_Record.Bind("success"),
+			_RTP_Record.Bind("commit"), _RTP_Record.Bind("abort"),
+			(Reason) => (_RTP_Events.Push("refused"), Reasons.Push(Reason)),
+			_RTP_Record.Bind("release"))
+		AssertTrue(RELOAD_SUCCESSOR_STALL_MS < RELOAD_SUCCESSOR_DEADLINE_MS,
+			"the stall report comes before the deadline")
 		Port["probe"]["now"] += RELOAD_SUCCESSOR_STALL_MS
 		_RTP_RunArmed(Port)
-		AssertTrue(Record["stall_reported"],
-			"a successor silent past the stall bound must be reported")
-		AssertEqual(Record, ReloadTerminalHandoffPending(),
-			"a live successor is never killed: its close request may be queued")
+		AssertTrue(Record["stall_reported"], "a successor silent past the stall bound is reported")
+		AssertEqual(Record, ReloadTerminalHandoffPending(), "it is still awaited before the deadline")
 		AssertEqual(0, Port["probe"]["terminated"])
-		AssertEqual(1, Port["probe"]["armed"].Length,
-			"the probe keeps watching the stalled successor")
+		Port["probe"]["now"] += RELOAD_SUCCESSOR_DEADLINE_MS - RELOAD_SUCCESSOR_STALL_MS
+		_RTP_RunArmed(Port)
+		AssertEqual(1, Port["probe"]["terminated"], "the silent successor is stopped at the deadline")
+		AssertFalse(ReloadTerminalHandoffPending(), "the reload is no longer pending")
+		AssertFalse(ReloadTerminalHandoffClaim("Reload"),
+			"a close request queued at the deadline can no longer claim the reload")
+		Port["probe"]["alive"] := false
+		loop 4
+			_RTP_RunArmed(Port)
+		AssertEqual("launch,abort,refused,release", _RTP_Join(_RTP_Events),
+			"the refusal reaches the caller and releases the bundle")
+		AssertEqual(1, Reasons.Length)
+		AssertTrue(InStr(Reasons[1], "within " . RELOAD_SUCCESSOR_DEADLINE_MS . " ms"),
+			"the refusal names the deadline: " . Reasons[1])
+		AssertFalse(ReloadTerminalHandoffActive(), "no hand-off remains once the successor is gone")
+		AssertEqual(1, Port["probe"]["closed"])
 	} finally _RTP_Cleanup(Bundle)
 }
-Test("reload terminal: a stalled successor is reported, not killed "
-	. "(reload-successor-stall)", _RTP_StalledSuccessorIsReportedOnceAndKept)
+Test("reload terminal: a silent successor is stopped at the deadline "
+	. "(reload-successor-deadline)", _RTP_SilentSuccessorIsStoppedAtTheDeadline)
+
+; The refusal of a successor that ended names its exit code, so a load error
+; reads as one in the log (reload-successor-deadline).
+_RTP_SuccessorExitNamesTheLoadError() {
+	global _RTP_Events
+	_RTP_Events := []
+	Bundle := _RTP_Acquire("exit-code")
+	Port := _RTP_NewPort()
+	Reasons := []
+	try {
+		Record := _RTP_Pending(Bundle, Port, , , , (Reason) => Reasons.Push(Reason))
+		Record["successor"]["exit_code"] := 2
+		Port["probe"]["alive"] := false
+		loop 4
+			_RTP_RunArmed(Port)
+		AssertEqual(1, Reasons.Length)
+		AssertTrue(InStr(Reasons[1], "exited without asking this instance to close (exit code 2: an AutoHotkey load-time error"),
+			"the refusal names the load error: " . Reasons[1])
+	} finally _RTP_Cleanup(Bundle)
+}
+Test("reload terminal: a successor's exit code reaches the refusal "
+	. "(reload-successor-deadline)", _RTP_SuccessorExitNamesTheLoadError)
 
 
 
@@ -489,6 +534,46 @@ _RTP_RealPortOwnsTheSuccessorProcess() {
 }
 Test("reload terminal: the real successor port owns the process "
 	. "(reload-successor-port)", _RTP_RealPortOwnsTheSuccessorProcess)
+
+; A successor whose boot fails must end on its own, never wait on a modal error
+; dialog: a git fast-forward reloaded mid-checkout and the successor sat on an
+; unseen "#Include file cannot be opened" dialog for 40 minutes
+; (reload-successor-load-error). Each fixture runs through the production
+; command line and port and must exit with AutoHotkey's load-error code.
+_RTP_FailingSuccessorExitsOnItsOwn() {
+	Dir := A_Temp . "\ergopti_reload_successor_" . A_TickCount . "_" . Random(1, 1000000)
+	DirCreate(Dir)
+	Fixtures := Map(
+		"missing include", "#Requires AutoHotkey v2.0`n#Include %A_ScriptDir%\moved_away.ahk`nPersistent`n",
+		"syntax error", "#Requires AutoHotkey v2.0`nPersistent`nValue := (`n")
+	try {
+		for Name, Body in Fixtures {
+			Script := Dir . "\" . StrReplace(Name, " ", "_") . ".ahk"
+			FileAppend(Body, Script, "UTF-8")
+			Command := ReloadSuccessorCommand(false, A_AhkPath, Script)
+			AssertTrue(InStr(Command, "/restart /ErrorStdOut"), Name . ": the successor runs with /ErrorStdOut")
+			AssertTrue(InStr(ReloadSuccessorCommand(true, A_AhkPath, Script), "/restart /ErrorStdOut"),
+				Name . ": a compiled successor too")
+			Successor := ReloadSuccessorLaunch(Command, Dir)
+			try {
+				Started := A_TickCount
+				while ReloadSuccessorAlive(Successor) && !TickExpired64(Started, 10000)
+					Sleep(50)
+				AssertFalse(ReloadSuccessorAlive(Successor),
+					Name . ": a successor whose boot fails must exit, not wait on a dialog")
+				AssertEqual(2, Successor["exit_code"], Name . ": the exit code is AutoHotkey's load error")
+			} finally {
+				if Successor["handle"] && PLC_WaitHandle(Successor["handle"], 0) != 0
+					ReloadSuccessorTerminate(Successor)
+				ReloadSuccessorClose(Successor)
+			}
+		}
+		AssertTrue(InStr(_DriverFuncBody("LifecycleLaunchSuccessor"), "ReloadSuccessorCommand("),
+			"the production launcher builds its command line here")
+	} finally DirDelete(Dir, true)
+}
+Test("reload terminal: a successor whose boot fails exits on its own "
+	. "(reload-successor-load-error)", _RTP_FailingSuccessorExitsOnItsOwn)
 
 
 

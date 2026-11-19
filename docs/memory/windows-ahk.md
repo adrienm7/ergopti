@@ -376,12 +376,17 @@ close the previous instance of this script. Keep waiting?" until answered.
 through `ReloadPreservingSuspend`; its hand-off launches the successor with an
 owned handle, stays pending until OnExit claims it, and on a later refusal
 stops the successor and returns the bundle through the caller's `RefusedFn`.
-A successor that stops on a load-error dialog (a syntax error in the included
-personal shortcuts file) is alive and has not asked to close, so the pending
-reload keeps the configuration barrier until someone dismisses that dialog; it
-is logged once after `RELOAD_SUCCESSOR_STALL_MS` and never killed, because its
-close request may already be queued. Action: when configuration writes stay
-blocked after a reload, look for that dialog before suspecting a barrier leak.
+A successor launched without `/ErrorStdOut` stops on a modal load-error dialog
+(a missing `#Include` or a syntax error, as in a checkout Git is still
+rewriting) and stays alive without asking to close: one held the configuration
+barrier for 40 minutes. `ReloadSuccessorCommand` passes `/ErrorStdOut`, which
+makes such a successor exit with code 2 at once (measured on v2.0.26; OnError
+still runs for runtime errors), and the refusal names that code. A successor
+still silent after `RELOAD_SUCCESSOR_DEADLINE_MS` is stopped and the reload
+refused: a close request queued at that moment finds the record no longer
+pending, so OnExit refuses it and the old instance stays the driver with writes
+reopened. Action: keep `/ErrorStdOut` on every successor command line and the
+deadline as the wait's end state; never wait on a successor without a bound.
 A refused reload also spends one of the process's
 `LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS` OnExit vetoes, and past the last honored
 one the exit goes through the gate that refuses it. Action: a reload nobody

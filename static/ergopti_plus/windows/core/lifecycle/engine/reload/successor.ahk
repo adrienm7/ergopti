@@ -12,19 +12,34 @@
 
 #Requires AutoHotkey v2.0
 
-; Starts Target and returns the successor descriptor.
+; The successor's command line. /ErrorStdOut turns a load-time error (a missing
+; #Include, a syntax error in a half-updated checkout) into exit code 2 instead
+; of a modal dialog: that dialog kept a successor alive for 40 minutes with
+; configuration writes blocked, because nobody saw it.
+; @param IsCompiled {Boolean} A_IsCompiled.
+; @param AhkPath {String} The interpreter, unused when compiled.
+; @param ScriptPath {String} The script, or the compiled executable.
+; @returns {String}
+ReloadSuccessorCommand(IsCompiled, AhkPath, ScriptPath) {
+	return IsCompiled
+		? '"' . ScriptPath . '" /restart /ErrorStdOut'
+		: '"' . AhkPath . '" /restart /ErrorStdOut "' . ScriptPath . '"'
+}
+
+; Starts Target and returns the successor descriptor. Once the successor ended,
+; ReloadSuccessorAlive adds its "exit_code".
 ; @param Target {String} The command line to run.
 ; @param WorkingDir {String} The directory the successor starts in.
 ; @param Options {String} Run options, such as "Hide".
 ; @returns {Map} The successor's "pid" and owned process "handle".
 ReloadSuccessorLaunch(Target, WorkingDir, Options := "") {
-	global PLC_PROCESS_TERMINATE, PLC_SYNCHRONIZE
+	global PLC_PROCESS_TERMINATE, PLC_SYNCHRONIZE, PLC_PROCESS_QUERY_LIMITED_INFORMATION
 	ProcessId := 0
 	Run(Target, WorkingDir, Options, &ProcessId)
 	if !(ProcessId is Integer) || ProcessId <= 0
 		throw Error("The reload successor started without a process id.")
 	Handle := PLC_OpenProcessHandle(ProcessId,
-		PLC_SYNCHRONIZE | PLC_PROCESS_TERMINATE)
+		PLC_SYNCHRONIZE | PLC_PROCESS_TERMINATE | PLC_PROCESS_QUERY_LIMITED_INFORMATION)
 	if !Handle {
 		; An unowned successor could replace this instance after its caller was
 		; told the reload failed. It is still loading, so stop it by id now.
@@ -56,8 +71,12 @@ ReloadSuccessorAlive(Successor) {
 	Wait := PLC_WaitHandle(Successor["handle"], 0)
 	if (Wait == PLC_WAIT_TIMEOUT)
 		return true
-	if (Wait == PLC_WAIT_OBJECT_0)
+	if (Wait == PLC_WAIT_OBJECT_0) {
+		; The hand-off names the exit code in its refusal: 2 is a load-time error.
+		if !Successor.Has("exit_code")
+			Successor["exit_code"] := PLC_ProcessExitCode(Successor["handle"])
 		return false
+	}
 	throw OSError(A_LastError, "WaitForSingleObject",
 		"The reload successor handle could not be waited on")
 }

@@ -313,10 +313,8 @@ _ReloadPreservingSuspendRefused(CallerRefusedFn, Reason) {
 ; @returns {Map} The successor's "pid" and owned process "handle".
 LifecycleLaunchSuccessor() {
 	LifecycleRetireWorkers()
-	Target := A_IsCompiled
-		? '"' . A_ScriptFullPath . '" /restart'
-		: '"' . A_AhkPath . '" /restart "' . A_ScriptFullPath . '"'
-	return ReloadSuccessorLaunch(Target, A_InitialWorkingDir)
+	return ReloadSuccessorLaunch(ReloadSuccessorCommand(A_IsCompiled,
+		A_AhkPath, A_ScriptFullPath), A_InitialWorkingDir)
 }
 
 ; Stops the detached workers before a successor launches. A worker that re-runs
