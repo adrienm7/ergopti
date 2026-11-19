@@ -2782,6 +2782,364 @@
 			"basis": "source",
 			"checked": "2026-11-19",
 			"evidence": "moutis/HandsDown e8f532f62c, JSON/MiscLayouts/Hands_On_ortho.json: « author »: « Alan Reiser », label « Hands On ortho ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"buteck": {
+			"authors": ["Wolf Belschner"],
+			"url": "http://www.adnw.de",
+			"basis": "collection"
+		},
+		"colemakcub": {
+			"authors": ["Oleg Kostyuk"],
+			"url": "https://github.com/cub-uanic/tmk_keyboard/tree/cub_layout",
+			"basis": "collection"
+		},
+		"gelatin": {
+			"authors": ["Jarl Stefansson"],
+			"url": "http://geekhack.org",
+			"basis": "collection"
+		},
+		"jeff": {
+			"authors": ["Stuart Gale"],
+			"basis": "collection"
+		},
+		"kinesis_asr": {
+			"authors": ["Robert Samuelsson"],
+			"basis": "collection"
+		},
+		"modified_upd": {
+			"authors": ["Carlos Avila"],
+			"basis": "collection"
+		},
+		"neo2_inprogress": {
+			"authors": ["Samuel Suther"],
+			"basis": "collection"
+		},
+		"qgmlwbcub": {
+			"authors": ["Oleg Kostyuk"],
+			"url": "https://github.com/cub-uanic/tmk_keyboard/tree/cub_layout",
+			"basis": "collection"
+		},
+		"qgmlwycub": {
+			"authors": ["Oleg Kostyuk"],
+			"url": "https://github.com/cub-uanic/tmk_keyboard/tree/cub_layout",
+			"basis": "collection"
+		},
+		"taserfr": {
+			"authors": ["kigiri"],
+			"basis": "collection"
+		},
+		"workman_kla": {
+			"authors": ["Oleg Kostyuk"],
+			"url": "https://github.com/cub-uanic/tmk_keyboard/tree/cub_layout",
+			"basis": "collection"
+		},
+		"hands_down_platinum": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/Hands_Down_platinum.ergo.json: « author »: « Alan Reiser », label « hands-down-platinum-ts.en.ergodox »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_promethium": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/hands-down-promethium.ts.eu.ergodox.json: « author »: « Alan Reiser », label « hands-down-promethium.ts.eu »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_dash": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/Hands_Down_dash_ergo.json: « author »: « Alan Reiser », label « Hands Down Dash »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_elan": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownArchive/Hands_Down_elan_ergo.json: « author »: « Alan Reiser », label « Hands Down Élan ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_alt_ex": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt-ex_ergo.json: « author »: « Alan Reiser », label « Hands Down Alt-ex ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_alt_nx": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt-nx_ergo.json: « author »: « Alan Reiser », label « Hands Down Alt-nx ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_alt_tx": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt-tx_ergo.json: « author »: « Alan Reiser », label « Hands Down Alt-tx ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_unobtanium": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/hd-unobtanium.ts.eu.json: « author »: « Philipp Keifer and Alan Reiser », label « hands-down-unobtanium-ts.eu.ergodox »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_polyglot_archive_ergodox": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownArchive/Hands_Down_polyglot_ergo.json: « author »: « Alan Reiser », label « Hands Down Polyglot ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_reference_ergodox": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownArchive/Hands_Down_ref_ergo.json: « author »: « Alan Reiser », label « Hands Down Reference ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_neu_ergodox": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/hands-down-neu.ts.eu.ergodox.json: « author »: « Alan Reiser », label « hands-down-neu.ts.eu.ergodox »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_on_ergodox": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/MiscLayouts/Hands_On_ergo.json: « author »: « Alan Reiser », label « Hands On ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"neauwr_bits": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/MiscLayouts/neauwr-bits_ergo_ts.json: « author »: « Alan Reiser », label « neauwr bits ergo ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"adextre_fr": {
+			"authors": ["Patrick Jamet"],
+			"basis": "collection"
+		},
+		"adore": {
+			"authors": ["Gergely Nagy"],
+			"url": "https://asylum.madhouse-project.org/",
+			"basis": "collection"
+		},
+		"arensito_kinesis": {
+			"authors": ["Håkon Hallingstad"],
+			"url": "http://www.pvv.org/~hakonhal/main.cgi/keyboard",
+			"basis": "collection"
+		},
+		"ashe": {
+			"authors": ["Chad Capra"],
+			"basis": "collection"
+		},
+		"balanced_v": {
+			"authors": ["Amuseum"],
+			"url": "http://www.shenafu.com/layout.php",
+			"basis": "collection"
+		},
+		"beakl_4_mod_ian_1": {
+			"authors": ["Amuseum"],
+			"url": "http://shenafu.com/smf/index.php?topic=89.0",
+			"basis": "collection"
+		},
+		"beakl_mod_ctgap": {
+			"authors": ["Colby Chai"],
+			"basis": "collection"
+		},
+		"beakl_opted36": {
+			"authors": ["Amuseum"],
+			"url": "http://shenafu.com/smf/index.php?topic=89.0",
+			"basis": "collection"
+		},
+		"beakrak_mod_ian": {
+			"authors": ["ZeptByteS mod Ian"],
+			"url": "https://translate.google.com/translate?hl=en&sl=ja&u=http://qiita.com/ZeptByteS/items/6e6a3e46552dcb105948&prev=search",
+			"basis": "collection"
+		},
+		"beakrak": {
+			"authors": ["ZeptByteS"],
+			"url": "https://translate.google.com/translate?hl=en&sl=ja&u=http://qiita.com/ZeptByteS/items/6e6a3e46552dcb105948&prev=search",
+			"basis": "collection"
+		},
+		"benkeyless": {
+			"authors": ["bwe"],
+			"url": "https://configure.ergodox-ez.com/ergodox-ez/layouts/K0eDw/latest/0",
+			"basis": "collection"
+		},
+		"bepo_fr": {
+			"authors": ["Communauté Bépo & Pyjam"],
+			"url": "http://bepo.fr",
+			"basis": "collection"
+		},
+		"bl13_2": {
+			"authors": ["Moesasji"],
+			"basis": "collection"
+		},
+		"bl13": {
+			"authors": ["moesasji"],
+			"basis": "collection"
+		},
+		"brown": {
+			"authors": ["Travis Brown"],
+			"url": "http://travisbrown.ca/projects/keyboard_optimizer.html",
+			"basis": "collection"
+		},
+		"ctgap_2": {
+			"authors": ["Colby Chai"],
+			"url": "https://github.com/CTGAP/ctgap-keyboard-layout",
+			"basis": "collection"
+		},
+		"dnat": {
+			"authors": ["Salavat Galiamov"],
+			"url": "https://github.com/sgaliamov/ergo-layouts",
+			"basis": "collection"
+		},
+		"dsend_thumbshift": {
+			"authors": ["Zammux"],
+			"url": "https://geekhack.org/index.php?topic=90911.msg2470065#msg2470065",
+			"basis": "collection"
+		},
+		"dvorak_mod_kengo": {
+			"authors": ["Kengo"],
+			"url": "https://qiita.com/ZeptByteS/items/6e6a3e46552dcb105948",
+			"basis": "collection"
+		},
+		"full_maks": {
+			"authors": ["Philipp Kiefer"],
+			"basis": "collection"
+		},
+		"gg_beakl_15": {
+			"authors": ["Graeme Geldenhuys"],
+			"url": "http://geldenhuys.co.uk",
+			"basis": "collection"
+		},
+		"gg_beakl_19": {
+			"authors": ["Graeme Geldenhuys"],
+			"url": "http://geldenhuys.co.uk",
+			"basis": "collection"
+		},
+		"hands_down_alt_ts": {
+			"authors": ["Alan Reiser"],
+			"url": "https://alanreiser.com/",
+			"basis": "collection"
+		},
+		"hands_down_bronze_ts": {
+			"authors": ["Alan Reiser"],
+			"url": "https://alanreiser.com/",
+			"basis": "collection"
+		},
+		"hands_down_gold_ts": {
+			"authors": ["Alan Reiser"],
+			"url": "https://alanreiser.com/",
+			"basis": "collection"
+		},
+		"hands_down_rhodium_ts": {
+			"authors": ["Alan Reiser"],
+			"url": "https://alanreiser.com/",
+			"basis": "collection"
+		},
+		"hands_down_silver_ts": {
+			"authors": ["Alan Reiser"],
+			"url": "https://alanreiser.com/",
+			"basis": "collection"
+		},
+		"hands_down_titanium_ts": {
+			"authors": ["Alan Reiser"],
+			"url": "https://alanreiser.com/",
+			"basis": "collection"
+		},
+		"hands_down_vibranium_ts": {
+			"authors": ["Alan Reiser"],
+			"url": "https://alanreiser.com/",
+			"basis": "collection"
+		},
+		"hands_down_vibranium_vb_klanext": {
+			"authors": ["Alan Reiser"],
+			"url": "https://alanreiser.com/",
+			"basis": "collection"
+		},
+		"hands_down_vibranium_vf_klanext": {
+			"authors": ["Alan Reiser"],
+			"url": "https://alanreiser.com/",
+			"basis": "collection"
+		},
+		"hands_down_vibranium_vp_klanext": {
+			"authors": ["Alan Reiser"],
+			"url": "https://alanreiser.com/",
+			"basis": "collection"
+		},
+		"harmony": {
+			"authors": ["Yasuo Higano"],
+			"url": "https://github.com/bottilabo/harmony-keyboard-layout",
+			"basis": "collection"
+		},
+		"hs_indeks_ex": {
+			"authors": ["Philipp Kiefer"],
+			"basis": "collection"
+		},
+		"hs_indeks": {
+			"authors": ["Philipp Kiefer"],
+			"basis": "collection"
+		},
+		"iena": {
+			"authors": ["Chad Capra"],
+			"basis": "collection"
+		},
+		"lsnt": {
+			"authors": ["Chad Capra"],
+			"url": "https://github.com/ChadCapra/layouts",
+			"basis": "collection"
+		},
+		"maks_ex": {
+			"authors": ["Philipp Kiefer"],
+			"basis": "collection"
+		},
+		"maks_sx": {
+			"authors": ["Philipp Kiefer"],
+			"basis": "collection"
+		},
+		"marsan_english": {
+			"authors": ["Marsan, modded and adapted to Ergodox by Ian Douglas"],
+			"basis": "collection"
+		},
+		"mithril_ts": {
+			"authors": ["Philipp Keifer and Alan Reiser"],
+			"url": "https://handsdownlayout.com",
+			"basis": "collection"
+		},
+		"neo2_us": {
+			"authors": ["Graeme Geldenhuys"],
+			"url": "http://geldenhuys.co.uk",
+			"basis": "collection"
+		},
+		"optimot_fr": {
+			"authors": ["Patrick Jamet"],
+			"url": "https://optimot.fr/",
+			"basis": "collection"
+		},
+		"smartly_modified_dvorak": {
+			"authors": ["Shuji Ogino"],
+			"url": "https://www.hsph.harvard.edu/shuji-ogino/about-shuji-ogino/",
+			"basis": "collection"
+		},
+		"x1_atreus_44_keys": {
+			"authors": ["Graeme Geldenhuys"],
+			"url": "http://ieants.cc/smf/index.php?topic=89.0",
+			"basis": "collection"
+		},
+		"x6_mod_sc0ty_nongr": {
+			"authors": ["Sc0tTy"],
+			"basis": "collection"
 		}
 	}
 }

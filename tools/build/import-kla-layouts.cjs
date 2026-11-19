@@ -24,10 +24,11 @@
  * 2. Whole layouts: a KLA file states every key and level, so its entry keeps
  *    them (`rows`) instead of an alphabetic block the codegen completes.
  * 3. No silent loss: a file with characters on keys the library's keyboard
- *    model has no KeyboardEvent.code for (ErgoDox thumbs and outer columns,
- *    TypeMatrix's middle column, a modifier key), or that places a letter
- *    twice, is not imported; every file left out is listed in `not_imported`
- *    with its reason.
+ *    model has no code for (TypeMatrix's middle column, a modifier key of the
+ *    standard board; every ErgoDox key has one, its board-only keys
+ *    included), or that places a letter twice, is not imported; a thumb key
+ *    drawing only KLA's action signs (⌦ ⇞) types nothing and loses nothing.
+ *    Every file left out is listed in `not_imported` with its reason.
  * 4. One entry per arrangement: a file with the same letters on the same keys
  *    and the same digits as a layout already in the library is a duplicate;
  *    it gives that layout a credit only when the layout has none.
@@ -94,7 +95,12 @@ const LANGUAGES = {
 	'standard.neo2': 'de',
 	'standard.neo2_new': 'de',
 	'standard.qwerty-danish': 'da',
-	'standard.spanish-dvorak': 'es'
+	'standard.spanish-dvorak': 'es',
+	'ergodox.buteck': 'de',
+	'ergodox.kinesis-asr': 'sv',
+	'ergodox.neo2_inprogress': 'de',
+	'ergodox.neo2_inprogress2': 'de',
+	'ergodox.taserfr': 'fr'
 };
 // Display names where KLA's label is not one: the board in the name, a label
 // in lower case like an identifier, a key the analysis does not measure, the
@@ -105,7 +111,18 @@ const NAMES = {
 	'standard.siwei': 'Siwei',
 	// The caps-lock key KLA turns into Backspace is not measured.
 	'standard.dvorakmod': 'Dvorak IU Swap',
-	'standard.spanish-dvorak': 'Spanish Dvorak (Jorge Sanz)'
+	'standard.spanish-dvorak': 'Spanish Dvorak (Jorge Sanz)',
+	'ergodox.buteck': 'BuTeck',
+	'ergodox.colemakcub': 'Colemak Cub',
+	'ergodox.gelatin': 'Gelatin',
+	'ergodox.jeff': 'Jeff',
+	'ergodox.kinesis-asr': 'Svorak-r',
+	'ergodox.modified-upd': 'Modified UPD',
+	'ergodox.neo2_inprogress': 'Neo 2 in progress (Samuel Suther)',
+	'ergodox.neo2_inprogress2': 'Neo 2 in progress (Wolf Belschner)',
+	'ergodox.qgmlwbcub': 'QGMLWB Cub',
+	'ergodox.qgmlwycub': 'QGMLWY Cub',
+	'ergodox.workman': 'Workman Cub'
 };
 // Authors where the file names KLA's own author, who added the layout.
 const AUTHORS = {
@@ -135,7 +152,8 @@ const BOARD_RANK = { european: 0, standard: 1, ergodox: 2 };
 
 /**
  * The Studio's layout readers, loaded as the classic scripts a page loads.
- * @returns {{F: object, DATA: object}} LAYOUT_FORMATS and LAYOUT_ANALYSIS_DATA.
+ * @returns {{F: object, DATA: object, E: object}} LAYOUT_FORMATS,
+ *   LAYOUT_ANALYSIS_DATA and LAYOUT_ANALYSIS.
  */
 function loadReaders() {
 	const sandbox = { TextDecoder };
@@ -148,7 +166,8 @@ function loadReaders() {
 		vm.runInContext(fs.readFileSync(path.join(UI_DIR, file), 'utf8'), sandbox, { filename: file });
 	return {
 		F: vm.runInContext('LAYOUT_FORMATS', sandbox),
-		DATA: vm.runInContext('LAYOUT_ANALYSIS_DATA', sandbox)
+		DATA: vm.runInContext('LAYOUT_ANALYSIS_DATA', sandbox),
+		E: vm.runInContext('LAYOUT_ANALYSIS', sandbox)
 	};
 }
 
@@ -225,12 +244,10 @@ function idOf(file, taken) {
  * @returns {{imported: object[], notImported: object[], credits: object}} The result.
  */
 function classify(klaDir) {
-	const { F, DATA } = loadReaders();
+	const { F, DATA, E } = loadReaders();
 	const library = JSON.parse(fs.readFileSync(LIBRARY_PATH, 'utf8'));
-	const modifiers = new Set(Object.values(DATA.model.modifier_keys));
-	const codes = Object.keys(DATA.model.fingerings.standard)
-		.filter((code) => !modifiers.has(code))
-		.concat(DATA.model.thumb_keys);
+	// Every key a layout types on, the ErgoDox's board-only keys included.
+	const codes = E.typingCodes();
 	// The layouts already in the library, from the generated data (alphabetic
 	// blocks completed), less any earlier KLA import.
 	const known = new Map();
@@ -281,12 +298,13 @@ function classify(klaDir) {
 				credits[sameAs] = { authors: [author.trim()], url: linkOf(json) };
 			continue;
 		}
-		// What the board has no code for: ErgoDox thumbs and outer columns,
-		// TypeMatrix's middle column, a character on a modifier key.
+		// What the board has no code for: TypeMatrix's middle column, a
+		// character on a modifier key; an ErgoDox thumb key's action signs type
+		// nothing.
 		const lost = unmapped
 			.filter((entry) => entry.what === 'key')
 			.flatMap((entry) => entry.detail.replace(/^\d+ \(|\)$/g, '').split(' '))
-			.filter((cell) => cell.trim() !== '');
+			.filter((cell) => cell.trim() !== '' && !F.KLA_ACTION_SIGN.test(cell));
 		if (lost.length > 0) {
 			leave(`characters on keys the library's keyboards have no code for: ${lost.join(' ')}`);
 			continue;
@@ -318,6 +336,28 @@ function classify(klaDir) {
 }
 
 /**
+ * A list's KLA entries replaced by this import's: each kept entry at its
+ * earlier place, a new one appended, one no longer produced removed, so a run
+ * that changes a few files changes only their entries.
+ * @param {object[]} list - The library's entries (layouts or not_imported).
+ * @param {object[]} fresh - This import's entries for that list.
+ * @param {function(object): string} keyOf - The identity of an entry.
+ * @returns {object[]} The new list.
+ */
+function inPlace(list, fresh, keyOf) {
+	const byKey = new Map(fresh.map((entry) => [keyOf(entry), entry]));
+	const out = [];
+	for (const entry of list) {
+		if (entry.source !== SOURCE_ID) out.push(entry);
+		else if (byKey.has(keyOf(entry))) {
+			out.push(byKey.get(keyOf(entry)));
+			byKey.delete(keyOf(entry));
+		}
+	}
+	return out.concat(Array.from(byKey.values()));
+}
+
+/**
  * Writes the library and the credits.
  * @param {string} klaDir - The KLA checkout.
  */
@@ -327,16 +367,23 @@ function main(klaDir) {
 			'usage: node tools/build/import-kla-layouts.cjs <checkout of patorjk/keyboard-layout-analyzer>'
 		);
 	const { imported, notImported, credits, library } = classify(klaDir);
+	const earlier = new Set(
+		library.layouts.filter((entry) => entry.source === SOURCE_ID).map((entry) => entry.id)
+	);
 	library.sources[SOURCE_ID] = SOURCE;
-	library.layouts = library.layouts.filter((entry) => entry.source !== SOURCE_ID).concat(imported);
-	library.not_imported = (library.not_imported || [])
-		.filter((entry) => entry.source !== SOURCE_ID)
-		.concat(notImported);
+	library.layouts = inPlace(library.layouts, imported, (entry) => entry.id);
+	library.not_imported = inPlace(
+		library.not_imported || [],
+		notImported,
+		(entry) => entry.source_path
+	);
 	fs.writeFileSync(LIBRARY_PATH, `${JSON.stringify(library, null, '\t')}\n`);
 	const creditFile = JSON.parse(fs.readFileSync(CREDITS_PATH, 'utf8'));
-	// An earlier import's credits are replaced; a checked credit is kept.
+	// An earlier KLA import's credits are replaced and a checked credit kept;
+	// the other collections' credits, of the same basis, are not this file's.
 	for (const [id, entry] of Object.entries(creditFile.credits))
-		if (entry.basis === CREDIT_BASIS) delete creditFile.credits[id];
+		if (entry.basis === CREDIT_BASIS && (earlier.has(id) || credits[id]))
+			delete creditFile.credits[id];
 	for (const [id, credit] of Object.entries(credits)) {
 		if (creditFile.credits[id]) continue;
 		creditFile.credits[id] = {

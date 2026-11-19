@@ -18,7 +18,8 @@
  *    .keylayout reads to the library's entry.
  * 2. KLA: Ergopti's published ISO and ErgoDox JSON files place the same
  *    characters on the same physical keys, and the ErgoDox key indexes are
- *    those of KLA's own ErgoDox QWERTY key set.
+ *    those of KLA's own ErgoDox QWERTY key set, its keys without a character
+ *    on the model's board-only keys.
  * 3. Writers: every imported layout becomes an Ergopti source the source
  *    model validates; Kalamine TOML and KLA JSON read back to what was written.
  * 4. Plain rows, DOF and cmini blocks; unknown and malformed files refused.
@@ -28,8 +29,9 @@
  *    the dead keys whose rules Kalamine keeps built in; Kalamine's qwerty-prog
  *    example reads on its ANSI board; four of KLA's own built-in layouts (its
  *    european, standard and ergodox boards) read with their home row, the
- *    ErgoDox keys the ISO model lacks named as unread; each becomes a valid
- *    Ergopti source.
+ *    ErgoDox Workman's outer keys on the model's board-only keys, written
+ *    back on the ErgoDox board with its fingers and read to the same keys;
+ *    each becomes a valid Ergopti source.
  * 6. KbdEdit .kbe: every committed KbdEdit export is recognised by its header
  *    (as bytes, renamed, or as text) and refused as encrypted, a truncated one
  *    as damaged; a ratchet keeps the evidence that the body is encrypted.
@@ -67,8 +69,10 @@
  *    whole with its stable code.
  * 13. KLA thumb keys: an ErgoDox file with a letter on a thumb key reads its
  *    thumbs to the model's thumb keys (a lone capital as its letter's Shift,
- *    the big keys first, a key beyond the codes named), a space-only file
- *    still reads the space bar, and the ErgoDox export reads back the same.
+ *    a key on its own code, the big keys first on the codes left free, a
+ *    letter on the left big outer key named), a space-only file or a space
+ *    key's AltGr digit still reads the space bar, and the ErgoDox export
+ *    reads back the same.
  * 14. KLAnext's janiso and ergolinear boards read: janiso by KLAnext's own
  *    QWERTY on it, ergolinear by position with its thumb letter on the
  *    model's thumb key.
@@ -505,8 +509,10 @@ for (const [file, expected] of Object.entries(klaThirdParty)) {
 			canonical(back.layout) === canonical(workman),
 		`KLA ErgoDox Workman: the ErgoDox export does not read back: ${JSON.stringify(back.layout.rows)}`
 	);
-	// The finger keys (the thumbs' space bar is the left one's, 66).
-	for (const [index, code] of Object.entries(F.KLA_KEYS.ergodox).filter(([i]) => i < 64))
+	// The finger keys (the thumbs' space bar is the left one's, 66), once the
+	// export is on the ErgoDox board (checked above).
+	const fingered = written.keyboardType === 'ergodox' ? Object.entries(F.KLA_KEYS.ergodox) : [];
+	for (const [index, code] of fingered.filter(([i]) => i < 64))
 		check(
 			written.keys[index].finger === KLA_FINGER[DATA.boards.ergodox.fingers[code]],
 			`KLA ErgoDox export: key ${index} (${code}) has finger ${written.keys[index].finger}, the board ${DATA.boards.ergodox.fingers[code]}`
@@ -542,9 +548,19 @@ for (const [file, expected] of Object.entries(klaThirdParty)) {
 		['layouts/european.azerty', 'azerty']
 	])
 		check(left.get(file)?.same_as === sameAs, `KLA library: ${file} is not left out as ${sameAs}`);
+	// Every ErgoDox key has a code (2026-11-19): KLA's ErgoDox Workman, left out
+	// for its outer keys before, is the reader's reading of its file.
+	const workman = DATA.layouts.find((l) => l.id === imported.get('layouts/ergodox.workman'));
+	const workmanRead = klaResults.find(([file]) => file === 'kla-ergodox.workman.json')[1];
 	check(
-		/no code for: ~ ` = \+ - _$/.test(left.get('layouts/ergodox.workman')?.reason || ''),
-		'KLA library: the ErgoDox Workman does not name the characters it would lose'
+		workman !== undefined && same(workman.rows, workmanRead.layout.rows),
+		'KLA library: the ErgoDox Workman is not the reader’s reading of KLA’s file'
+	);
+	check(
+		Array.from(left.keys()).every(
+			(file) => !/^layouts\/ergodox\./.test(file) || left.get(file).same_as
+		),
+		'KLA library: a KLA ErgoDox file is left out but as a duplicate'
 	);
 }
 for (const [name, result] of [
@@ -1606,7 +1622,7 @@ async function checkLinks() {
 	// has, then the ErgoDox's board-only thumb keys (its upper pairs and small
 	// columns), each on the ErgoDox board under a thumb.
 	const codes = ['NonConvert', 'Convert', 'KanaMode'];
-	const ergodoxThumbs = DATA.model.board_only_keys.filter((code) =>
+	const ergodoxThumbs = (DATA.model.board_only_keys || []).filter((code) =>
 		['lt', 'rt'].includes(DATA.boards.ergodox.fingers[code])
 	);
 	check(

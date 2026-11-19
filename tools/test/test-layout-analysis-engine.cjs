@@ -126,7 +126,7 @@ const SPEED_CORPUS = path.join(
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
 // The layouts the library held at its last import: it may only grow.
-const LIBRARY_COUNT = 710;
+const LIBRARY_COUNT = 783;
 // The collections imported from their authors' own files: each of their
 // layouts is credited from the author's page (layout_credits.json).
 const CREDITED_SOURCES = ['handsdown', 'ergol_repo'];
@@ -2856,6 +2856,195 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			cell(id, code, level) === expected,
 			`collections: ${id} ${code} level ${level} is ${cell(id, code, level)}, its official file has ${expected}`
 		);
+	// Every ErgoDox key (ergodox-keys-2026-11-19): a cell of each file the
+	// model's board-only keys brought in, and of each library layout read
+	// again from its ErgoDox file, as the file states it at its KLA key index
+	// (KLA's ErgoDox QWERTY: 0 left of 1, 14 left of Q, 28 left of A, 39 right
+	// of the home row, 40 and 53 the Shift keys, 21 the right inner upper key,
+	// 56 to 59 the row below the letters).
+	const ergodoxKeys = [
+		// ergodox.buteck key 14
+		['buteck', 'LeftOuterTop', 0, 'ß'],
+		// ergodox.colemakcub key 0
+		['colemakcub', 'LeftOuterNumber', 0, '~'],
+		// ergodox.gelatin key 28
+		['gelatin', 'LeftOuterHome', 0, "'"],
+		// ergodox.jeff key 0
+		['jeff', 'LeftOuterNumber', 0, '`'],
+		// ergodox.kinesis-asr key 56
+		['kinesis_asr', 'LeftLowerRing', 0, 'ö'],
+		// ergodox.modified-upd key 40
+		['modified_upd', 'LeftOuterBottom', 0, 'ö'],
+		// ergodox.neo2_inprogress key 46
+		['neo2_inprogress', 'LeftInnerBottom', 0, 'z'],
+		// ergodox.qgmlwbcub key 0
+		['qgmlwbcub', 'LeftOuterNumber', 0, '~'],
+		// ergodox.qgmlwycub key 0
+		['qgmlwycub', 'LeftOuterNumber', 0, '~'],
+		// ergodox.taserfr key 14
+		['taserfr', 'LeftOuterTop', 0, '['],
+		// ergodox.workman key 0
+		['workman_kla', 'LeftOuterNumber', 0, '~'],
+		// JSON/HandsDownNeu/Hands_Down_platinum.ergo.json key 57
+		['hands_down_platinum', 'LeftLowerMiddle', 0, 'z'],
+		// JSON/HandsDownNeu/hands-down-promethium.ts.eu.ergodox.json key 39
+		['hands_down_promethium', 'RightOuterHome', 0, 'z'],
+		// JSON/HandsDownNeu/Hands_Down_dash_ergo.json key 57
+		['hands_down_dash', 'LeftLowerMiddle', 0, 'z'],
+		// JSON/HandsDownArchive/Hands_Down_elan_ergo.json key 57
+		['hands_down_elan', 'LeftLowerMiddle', 0, 'z'],
+		// JSON/HandsDownAlt/Hands_Down_alt-ex_ergo.json key 57
+		['hands_down_alt_ex', 'LeftLowerMiddle', 0, 'z'],
+		// JSON/HandsDownAlt/Hands_Down_alt-nx_ergo.json key 57
+		['hands_down_alt_nx', 'LeftLowerMiddle', 0, 'z'],
+		// JSON/HandsDownAlt/Hands_Down_alt-tx_ergo.json key 57
+		['hands_down_alt_tx', 'LeftLowerMiddle', 0, 'z'],
+		// JSON/hd-unobtanium.ts.eu.json key 28
+		['hands_down_unobtanium', 'LeftOuterHome', 0, 'z'],
+		// JSON/HandsDownArchive/Hands_Down_polyglot_ergo.json key 57
+		['hands_down_polyglot_archive_ergodox', 'LeftLowerMiddle', 0, 'z'],
+		// JSON/HandsDownArchive/Hands_Down_ref_ergo.json key 0
+		['hands_down_reference_ergodox', 'LeftOuterNumber', 0, '`'],
+		// JSON/HandsDownNeu/hands-down-neu.ts.eu.ergodox.json key 28
+		['hands_down_neu_ergodox', 'LeftOuterHome', 0, 'z'],
+		// JSON/MiscLayouts/Hands_On_ergo.json key 0
+		['hands_on_ergodox', 'LeftOuterNumber', 0, '`'],
+		// JSON/MiscLayouts/neauwr-bits_ergo_ts.json key 0
+		['neauwr_bits', 'LeftOuterNumber', 0, '`'],
+		// adextre.fr.ergodox.json key 59
+		['adextre_fr', 'RightLowerIndex', 0, 'z'],
+		// adore.en.ergodox.json key 14
+		['adore', 'LeftOuterTop', 0, '\\'],
+		// arensito-kinesis.en.ergodox.json key 28
+		['arensito_kinesis', 'LeftOuterHome', 0, "'"],
+		// ashe.en.ergodox.json key 14
+		['ashe', 'LeftOuterTop', 0, '`'],
+		// balanced-v.en.ergodox.json key 14
+		['balanced_v', 'LeftOuterTop', 0, 'z'],
+		// beakl-4-mod-ian-1.en.ergodox.json key 14
+		['beakl_4_mod_ian_1', 'LeftOuterTop', 0, '['],
+		// beakl-mod-ctgap.en.ergodox.json key 28
+		['beakl_mod_ctgap', 'LeftOuterHome', 0, '`'],
+		// beakl-opted36.en.ergodox.json key 14
+		['beakl_opted36', 'LeftOuterTop', 0, 'q'],
+		// beakrak-mod-ian.en.ergodox.json key 40
+		['beakrak_mod_ian', 'LeftOuterBottom', 0, 'q'],
+		// beakrak.en.ergodox.json key 40
+		['beakrak', 'LeftOuterBottom', 0, 'q'],
+		// benkeyless.en.ergodox.json key 40
+		['benkeyless', 'LeftOuterBottom', 0, '\\'],
+		// bepo.fr.ergodox.json key 39
+		['bepo_fr', 'RightOuterHome', 0, 'm'],
+		// bl13-2.en.ergodox.json key 39
+		['bl13_2', 'RightOuterHome', 0, 'k'],
+		// bl13.en.ergodox.json key 39
+		['bl13', 'RightOuterHome', 0, 'q'],
+		// brown.en.ergodox.json key 59
+		['brown', 'RightLowerIndex', 0, 'j'],
+		// ctgap-2.en.ergodox.json key 28
+		['ctgap_2', 'LeftOuterHome', 0, '`'],
+		// dnat.en.ergodox.json key 14
+		['dnat', 'LeftOuterTop', 0, '\\'],
+		// dsend-thumbshift.en.ergodox.json key 14
+		['dsend_thumbshift', 'LeftOuterTop', 0, '`'],
+		// dvorak-mod-kengo.en.ergodox.json key 28
+		['dvorak_mod_kengo', 'LeftOuterHome', 0, 'k'],
+		// full-maks.en.ergodox.json key 21
+		['full_maks', 'RightInnerTop', 0, 'q'],
+		// gg-beakl-15.en.ergodox.json key 28
+		['gg_beakl_15', 'LeftOuterHome', 0, ';'],
+		// gg-beakl-19.en.ergodox.json key 28
+		['gg_beakl_19', 'LeftOuterHome', 0, '-'],
+		// hands-down-alt-ts.en.ergodox.json key 0
+		['hands_down_alt_ts', 'LeftOuterNumber', 0, '`'],
+		// hands-down-bronze-ts.eu.ergodox.json key 28
+		['hands_down_bronze_ts', 'LeftOuterHome', 0, 'z'],
+		// hands-down-gold-ts.eu.ergodox.json key 28
+		['hands_down_gold_ts', 'LeftOuterHome', 0, 'z'],
+		// hands-down-rhodium-ts.eu.ergodox.json key 28
+		['hands_down_rhodium_ts', 'LeftOuterHome', 0, 'z'],
+		// hands-down-silver-ts.eu.ergodox.json key 28
+		['hands_down_silver_ts', 'LeftOuterHome', 0, 'z'],
+		// hands-down-titanium-ts.eu.ergodox.json key 28
+		['hands_down_titanium_ts', 'LeftOuterHome', 0, 'z'],
+		// hands-down-vibranium-ts.en.ergodox.json key 57
+		['hands_down_vibranium_ts', 'LeftLowerMiddle', 0, 'z'],
+		// hands-down-vibranium-vb.ts.eu.ergodox.json key 28
+		['hands_down_vibranium_vb_klanext', 'LeftOuterHome', 0, 'z'],
+		// hands-down-vibranium-vf.ts.eu.ergodox.json key 28
+		['hands_down_vibranium_vf_klanext', 'LeftOuterHome', 0, 'z'],
+		// hands-down-vibranium-vp.ts.eu.ergodox.json key 28
+		['hands_down_vibranium_vp_klanext', 'LeftOuterHome', 0, 'z'],
+		// harmony.en.ergodox.json key 0
+		['harmony', 'LeftOuterNumber', 0, '`'],
+		// hs-indeks-ex.en.ergodox.json key 39
+		['hs_indeks_ex', 'RightOuterHome', 0, 'z'],
+		// hs-indeks.en.ergodox.json key 21
+		['hs_indeks', 'RightInnerTop', 0, 'j'],
+		// iena.en.ergodox.json key 14
+		['iena', 'LeftOuterTop', 0, '`'],
+		// lsnt.en.ergodox.json key 28
+		['lsnt', 'LeftOuterHome', 0, '-'],
+		// maks-ex.en.ergodox.json key 59
+		['maks_ex', 'RightLowerIndex', 0, 'z'],
+		// maks-sx.en.ergodox.json key 59
+		['maks_sx', 'RightLowerIndex', 0, 'q'],
+		// marsan-english.en.ergodox.json key 39
+		['marsan_english', 'RightOuterHome', 0, 'b'],
+		// mithril-ts.eu.ergodox.json key 28
+		['mithril_ts', 'LeftOuterHome', 0, 'q'],
+		// neo2-us.en.ergodox.json key 39
+		['neo2_us', 'RightOuterHome', 0, 'y'],
+		// optimot.fr.ergodox.json key 0
+		['optimot_fr', 'LeftOuterNumber', 0, '#'],
+		// smartly-modified-dvorak.en.ergodox.json key 0
+		['smartly_modified_dvorak', 'LeftOuterNumber', 0, '='],
+		// t-ht01-75-54.en.ergodox.json key 53
+		['t_ht01_75_54', 'RightOuterBottom', 0, 'z'],
+		// uciea-vanilla.en.ergodox.json key 39
+		['uciea_vanilla_klanext', 'RightOuterHome', 0, 'j'],
+		// x1.en.ergodox.json key 39
+		['x1', 'RightOuterHome', 0, 'v'],
+		// x1_atreus-44-keys.en.ergodox.json key 21
+		['x1_atreus_44_keys', 'RightInnerTop', 2, '⌦'],
+		// x6-mod-sc0ty-nongr.en.ergodox.json key 39
+		['x6_mod_sc0ty_nongr', 'RightOuterHome', 0, 'z'],
+		// JSON/HandsDownNeu/hands-down-gold-ts.eu.ergodox.json key 0
+		['hands_down_gold', 'LeftOuterNumber', 0, '`'],
+		// JSON/HandsDownNeu/hands-down-silver-ts.eu.ergodox.json key 0
+		['hands_down_silver', 'LeftOuterNumber', 0, '`'],
+		// JSON/HandsDownNeu/hands-down-bronze-ts.eu.ergodox.json key 0
+		['hands_down_bronze', 'LeftOuterNumber', 0, '`'],
+		// JSON/HandsDownNeu/hands-down-titanium-ts.eu.ergodox.json key 0
+		['hands_down_titanium', 'LeftOuterNumber', 0, '`'],
+		// JSON/HandsDownNeu/hands-down-rhodium-ts.eu.ergodox.json key 0
+		['hands_down_rhodium', 'LeftOuterNumber', 0, '`'],
+		// JSON/HandsDownNeu/hands-down-vibranium-vb.ts.eu.ergodox.json key 0
+		['hands_down_vibranium_vb', 'LeftOuterNumber', 0, '`'],
+		// JSON/HandsDownNeu/hands-down-vibranium-vf.ts.eu.ergodox.json key 0
+		['hands_down_vibranium_vf', 'LeftOuterNumber', 0, '`'],
+		// JSON/HandsDownNeu/hands-down-vibranium-vp.ts.eu.ergodox.json key 0
+		['hands_down_vibranium_vp', 'LeftOuterNumber', 0, '`'],
+		// JSON/HandsDownNeu/hands-down-vibranium-vv.ts.eu.ergodox.json key 0
+		['hands_down_vibranium_vv', 'LeftOuterNumber', 0, '`'],
+		// cole-shift-e.en.ergodox.json key 0
+		['cole_shift_e', 'LeftOuterNumber', 0, '1'],
+		// enne_p_111_69.en.ergodox.json key 0
+		['enne_p_111_69', 'LeftOuterNumber', 0, '⌦'],
+		// lydell-anishtro.en.ergodox.json key 0
+		['lydell_anishtro', 'LeftOuterNumber', 0, '`'],
+		// maltron-us-90-mod-andreas.en.ergodox.json key 0
+		['maltron_us_90_mod_andreas', 'LeftOuterNumber', 0, '1'],
+		// maltron-us-90.en.ergodox.json key 0
+		['maltron_us_90', 'LeftOuterNumber', 0, '1'],
+		// proxkb-thumbshift.en.ergodox.json key 28
+		['proxkb_thumbshift', 'LeftOuterHome', 0, '`']
+	];
+	for (const [id, code, level, expected] of ergodoxKeys)
+		check(
+			cell(id, code, level) === expected,
+			`collections: ${id} ${code} level ${level} is ${cell(id, code, level)}, its ErgoDox file has ${expected}`
+		);
 	for (const id of [
 		'hands_down_polyglot_sym',
 		'hands_down_ref_sym',
@@ -2864,9 +3053,10 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		'ergol_iso'
 	])
 		check(byId.get(id).fingering === 'angle', `collections: ${id} is not on the angle fingering`);
-	// What a collection leaves out says why: a Hands Down variant whose z is
-	// typed by a combo has no key for it (Promethium), and its Reference is
-	// held once. The thumb-letter variants are in (thumb keys, 2026-11-19).
+	// What a collection leaves out says why. The thumb-letter variants are in
+	// (thumb keys, 2026-11-19), and so is Promethium, whose ErgoDox file puts
+	// z right of the home row and q on the right Shift key, typed when tapped
+	// (every ErgoDox key, 2026-11-19).
 	const left = new Map(libraryFile.not_imported.map((entry) => [entry.source_path, entry]));
 	check(
 		!left.has('JSON/HandsDownNeu/hands-down-gold-ts.eu.ergodox.json') &&
@@ -2874,10 +3064,27 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		'collections: Hands Down Gold is still left out'
 	);
 	check(
-		/places q z on no key/.test(
-			(left.get('JSON/HandsDownNeu/hands-down-promethium.ts.eu.ergodox.json') || {}).reason
+		!left.has('JSON/HandsDownNeu/hands-down-promethium.ts.eu.ergodox.json') &&
+			cell('hands_down_promethium', 'RightOuterHome', 0) === 'z' &&
+			cell('hands_down_promethium', 'RightOuterBottom', 0) === 'q',
+		'collections: Hands Down Promethium does not type z and q on its ErgoDox keys'
+	);
+	// An ErgoDox file is left out only for a letter on the left big outer thumb
+	// key, which the model keeps as the space bar, as a duplicate, or when
+	// KLAnext does not serve it.
+	for (const entry of libraryFile.not_imported) {
+		if (!/ergodox|_ergo/.test(entry.source_path) || entry.same_as) continue;
+		check(
+			/left 2-unit outer thumb key|answers 404/.test(entry.reason) ||
+				/^layouts\/ergodox\./.test(entry.source_path),
+			`collections: ${entry.source_path} is still left out: ${entry.reason}`
+		);
+	}
+	check(
+		libraryFile.not_imported.every(
+			(entry) => !/^layouts\/ergodox\./.test(entry.source_path) || entry.same_as
 		),
-		'collections: Hands Down Promethium is not left out for its combo q and z'
+		'collections: a KLA ErgoDox file is still left out but as a duplicate'
 	);
 	check(
 		libraryFile.not_imported.every(
