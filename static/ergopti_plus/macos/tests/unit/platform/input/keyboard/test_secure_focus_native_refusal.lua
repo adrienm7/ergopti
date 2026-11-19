@@ -69,11 +69,13 @@ helpers.describe("Native AXFocusedUIElement error return", function()
    helpers.assert_eq(detector.isSecureField(), true); helpers.assert_eq(complete, true); helpers.assert_eq(pid, 4242)
   end)
  end)
- helpers.it("preserves the existing absent AX application contract", function()
+ -- SFC-02: an application Accessibility cannot reach classified nothing, so it
+ -- fails closed as Windows and Linux do (it used to read as not secure).
+ helpers.it("fails closed when the AX application element is absent (sfc-02)", function()
   with_detector(function(detector, control)
    control.mode = "no_app_element"; local complete
    detector.refresh(function(known) complete = known end)
-   helpers.assert_eq(detector.isSecureField(), false); helpers.assert_eq(complete, false)
+   helpers.assert_eq(detector.isSecureField(), true); helpers.assert_eq(complete, false)
   end)
  end)
 end)

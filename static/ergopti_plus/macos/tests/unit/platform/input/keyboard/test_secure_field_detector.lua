@@ -162,10 +162,13 @@ end)
 
 helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 
-	helpers.it("isSecureField returns false before any refresh()", function()
+	-- SFC-02: nothing has been classified yet, so the answer is the unknown one,
+	-- which is secure on the three drivers (Linux starts unknown, Windows reads
+	-- live and refuses a missing focus).
+	helpers.it("isSecureField fails closed before any refresh() (sfc-02)", function()
 		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector")
-		helpers.assert_eq(false, adapter.isSecureField(),
-			"before refresh(), isSecureField must be false")
+		helpers.assert_eq(true, adapter.isSecureField(),
+			"before refresh(), nothing is classified, so isSecureField must be true")
 	end)
 
 	helpers.it("isSecureField returns true after refresh detects AXSecureTextField", function()
@@ -264,24 +267,26 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 			"plain AXTextField must NOT be detected as secure")
 	end)
 
-	helpers.it("refresh when frontmost app is nil — isSecureField stays false", function()
+	helpers.it("refresh when frontmost app is nil fails closed (sfc-02)", function()
 		local adapter = helpers.load_with_stubs(
 			"platform.focus.secure_field_detector",
 			{ application = make_app_stub({ frontmostApplication = function() return nil end }) })
 
 		adapter.refresh()
-		helpers.assert_eq(false, adapter.isSecureField(),
-			"nil frontmost app must leave isSecureField false")
+		helpers.assert_eq(true, adapter.isSecureField(),
+			"a nil frontmost app cannot be classified, so isSecureField must be true")
 	end)
 
-	helpers.it("refresh when AXFocusedUIElement is nil — isSecureField stays false", function()
+	-- The application answered: nothing has focus, so no field receives the keys.
+	-- This is a classification, unlike every failure below (sfc-02).
+	helpers.it("refresh when AXFocusedUIElement is nil without an error is not secure", function()
 		local adapter = helpers.load_with_stubs(
 			"platform.focus.secure_field_detector",
 			make_ax_stub(nil))
 
 		adapter.refresh()
 		helpers.assert_eq(false, adapter.isSecureField(),
-			"nil focused element must leave isSecureField false")
+			"an answered absence of focus must leave isSecureField false")
 	end)
 
 	helpers.it("refresh when axuielement.applicationElementForPID is missing — graceful", function()
@@ -291,24 +296,22 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 		})
 
 		adapter.refresh()
-		helpers.assert_eq(adapter.isSecureField(), false,
+		helpers.assert_eq(true, adapter.isSecureField(),
 			"with no axuielement API there is nothing to inspect, so the answer must be "
-				.. "false — but it must BE an answer, not a mute detector")
-		helpers.assert_eq(false, adapter.isSecureField(),
-			"missing axuielement API must leave isSecureField false")
+				.. "the fail-closed true (sfc-02), and it must BE an answer, not a mute detector")
 	end)
 
 	helpers.it("refresh when axuielement is nil entirely — graceful", function()
+		-- An override of nil is skipped by pairs(), so the default stub API stayed
+		-- in place and this case read a plain field: remove it from the live stub.
 		local adapter = helpers.load_with_stubs("platform.focus.secure_field_detector", {
-			axuielement = nil,
 			application = make_app_stub(),
 		})
+		hs.axuielement = nil
 
 		adapter.refresh()
-		helpers.assert_eq(adapter.isSecureField(), false,
-			"same for a nil axuielement")
-		helpers.assert_eq(false, adapter.isSecureField(),
-			"nil axuielement must leave isSecureField false")
+		helpers.assert_eq(true, adapter.isSecureField(),
+			"a nil axuielement must fail closed (sfc-02)")
 	end)
 
 	helpers.it("refresh catches and absorbs exceptions inside the pcall", function()
@@ -322,11 +325,9 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 		})
 
 		adapter.refresh()
-		helpers.assert_eq(adapter.isSecureField(), false,
-			"an AX error must be absorbed into a definite answer, not left as whatever "
-				.. "the previous refresh happened to have decided")
-		helpers.assert_eq(false, adapter.isSecureField(),
-			"throwing AX API must leave isSecureField false")
+		helpers.assert_eq(true, adapter.isSecureField(),
+			"an AX error must be absorbed into the fail-closed answer (sfc-02), not left as "
+				.. "whatever the previous refresh happened to have decided")
 	end)
 
 	helpers.it("refresh when applicationElementForPID returns nil — graceful", function()
@@ -338,8 +339,8 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 		})
 
 		adapter.refresh()
-		helpers.assert_eq(false, adapter.isSecureField(),
-			"nil app element must leave isSecureField false")
+		helpers.assert_eq(true, adapter.isSecureField(),
+			"a nil app element cannot be classified, so isSecureField must be true (sfc-02)")
 	end)
 
 	helpers.it("multiple refresh calls reset the cached role correctly", function()
