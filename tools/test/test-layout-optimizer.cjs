@@ -29,6 +29,11 @@
  *    result's dead-key tables are its own, not the ones the scored layouts
  *    share.
  * 6. Budget: a time budget stops the search on the clock it is given.
+ * 7. Best swaps (best-swaps-ranking): the editor panel's ranking of single
+ *    swaps (layout_analysis/best_swaps.js) gives each listed swap the
+ *    engine's own gain, best first, only gains, only the optimiser's moves
+ *    (letters and punctuation with their capital, never Space or a digit),
+ *    and the same list whether it is scored at once or in small slices.
  * ==============================================================================
  */
 
@@ -55,7 +60,8 @@ vm.createContext(sandbox);
 for (const file of [
 	'layout_analysis/_generated/analysis_data.js',
 	'layout_analysis/analysis_engine.js',
-	'layout_optimizer/optimizer_core.js'
+	'layout_optimizer/optimizer_core.js',
+	'layout_analysis/best_swaps.js'
 ])
 	vm.runInContext(fs.readFileSync(path.join(UI, file), 'utf8'), sandbox, { filename: file });
 const E = vm.runInContext('LAYOUT_ANALYSIS', sandbox);
@@ -566,6 +572,48 @@ timed.step(5);
 clock = 60;
 const after = timed.step(1000);
 check(after.done && timed.done(), 'the time budget stops the search');
+
+// 7/ Best swaps
+{
+	const SWAPS = vm.runInContext('LAYOUT_ANALYSIS_SWAPS', sandbox);
+	const start = library.get('azerty');
+	const whole = SWAPS.createRanking(O, E, start, tables, ANALYSIS);
+	check(whole.total > 100, `best swaps: only ${whole.total} swaps tried`);
+	while (whole.step(1000));
+	const best = whole.best();
+	check(best.length > 0 && best.length <= SWAPS.LIMIT, `best swaps: ${best.length} listed`);
+	check(
+		best.every((swap, i) => i === 0 || best[i - 1].gain >= swap.gain),
+		'best swaps: not best first'
+	);
+	const digitOrSpace = /^(Digit\d|Space)$/;
+	for (const swap of best) {
+		check(swap.gain >= SWAPS.MIN_GAIN, `best swaps: ${swap.chars.join('↔')} gains nothing`);
+		check(
+			!swap.codes.some((code) => digitOrSpace.test(code)),
+			`best swaps: ${swap.codes.join('↔')} moves a digit or Space`
+		);
+		const [a, b] = swap.codes;
+		const rows = Object.assign({}, start.rows);
+		rows[a] = [start.rows[b][0], start.rows[b][1], start.rows[a][2], start.rows[a][3]];
+		rows[b] = [start.rows[a][0], start.rows[a][1], start.rows[b][2], start.rows[b][3]];
+		const full =
+			E.analyse(Object.assign({}, start, { rows }), tables, ANALYSIS).score.total -
+			E.analyse(start, tables, ANALYSIS).score.total;
+		check(
+			Math.abs(full - swap.gain) <= 1e-6,
+			`best swaps: ${swap.chars.join('↔')} gains ${swap.gain}, the engine says ${full}`
+		);
+	}
+	const sliced = SWAPS.createRanking(O, E, start, tables, ANALYSIS);
+	let slices = 0;
+	while (sliced.step(3)) slices++;
+	check(slices > 30, `best swaps: ${slices} slices`);
+	check(
+		JSON.stringify(sliced.best()) === JSON.stringify(best),
+		'best swaps: slices give another list'
+	);
+}
 
 if (errors.length) {
 	console.error(`FAIL test-layout-optimizer: ${errors.length} problem(s)`);

@@ -491,7 +491,60 @@ async function exerciseWorstNgrams(browser, origin) {
 	await comparer.close();
 }
 
+/**
+ * (best-swaps) « Best swaps » ranks the single swaps in slices (the progress
+ * moves while the page stays responsive), lists those that raise the score
+ * best first, and one click applies a swap as one edit that Ctrl+Z undoes.
+ */
+async function exerciseBestSwaps(browser, origin) {
+	const { page, errors, context } = await openOnErgopti(browser, origin);
+	const legend = (code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
+	await page.click('#la-swaps-run');
+	// The bar moves in steps: the search yields between slices.
+	const seen = new Set();
+	await page.waitForFunction(
+		() => {
+			const bar = document.getElementById('la-swaps-progress');
+			return bar.hidden || bar.value > 0;
+		},
+		null,
+		{ timeout: 60000 }
+	);
+	for (let i = 0; i < 40 && !(await page.isHidden('#la-swaps-progress')); i++) {
+		seen.add(await page.$eval('#la-swaps-progress', (bar) => bar.value));
+		await page.waitForTimeout(25);
+	}
+	assert.ok(seen.size >= 2, `the progress moves in steps: ${[...seen].join(', ')}`);
+	await page.waitForSelector('#la-swaps-list .la-swap', { timeout: 60000 });
+	const swaps = await page.$$eval('#la-swaps-list .la-swap-apply', (buttons) =>
+		buttons.map((button) => ({
+			codes: button.dataset.codes.split(' '),
+			label: button.getAttribute('aria-label')
+		}))
+	);
+	assert.ok(swaps.length > 0 && swaps.length <= 10, `${swaps.length} swaps`);
+	assert.match(swaps[0].label, /^Swap \S+ and \S+ \(\+\d+[.,]\d+\)$/, swaps[0].label);
+	const [a, b] = swaps[0].codes;
+	const before = [await legend(a), await legend(b)];
+	await page.click('#la-swaps-list .la-swap-apply');
+	assert.deepEqual([await legend(a), await legend(b)], [before[1], before[0]], 'applied');
+	await page.waitForFunction(() =>
+		document.querySelector('#le-score-chip .le-score-change').classList.contains('le-score-better')
+	);
+	await page.waitForFunction(
+		(text) => document.querySelector('.la-swaps-status').textContent === text,
+		EN['layout_analysis.swaps.stale']
+	);
+	assert.equal(await page.locator('#la-swaps-list .la-swap').count(), 0, 'the old list is gone');
+	await page.evaluate(() => document.activeElement.blur());
+	await page.keyboard.press('Control+z');
+	assert.deepEqual([await legend(a), await legend(b)], before, 'one edit: Ctrl+Z undoes it');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseBestSwaps,
 	exerciseWorstNgrams,
 	exerciseShareLinkLayouts,
 	exerciseScoreChip,

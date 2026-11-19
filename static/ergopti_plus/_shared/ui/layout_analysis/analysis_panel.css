@@ -159,6 +159,69 @@
 	color: var(--theme-bad-text);
 }
 
+/* The best swaps (best_swaps.js): a card under the score, one row per swap. */
+.la-panel-swaps {
+	background: var(--theme-surface-2);
+	border: 1px solid var(--theme-separator);
+	border-left: 4px solid var(--theme-good-text);
+	border-radius: 10px;
+	margin: 14px 0;
+	padding: 10px 14px 12px;
+}
+
+.la-panel .la-swaps-title {
+	margin-top: 0;
+}
+
+.la-swaps-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.la-swaps-progress {
+	accent-color: var(--theme-good-text);
+	height: 10px;
+	margin: 10px 0 0;
+	width: 100%;
+}
+
+.la-swaps-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	list-style: none;
+	margin: 8px 0 0;
+	padding: 0;
+}
+
+.la-swap {
+	align-items: center;
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 8px;
+	display: grid;
+	gap: 10px;
+	grid-template-columns: auto 1fr auto;
+	padding: 4px 6px 4px 10px;
+}
+
+.la-swap-keys {
+	align-items: center;
+	display: inline-flex;
+	gap: 6px;
+}
+
+.la-swap-arrow {
+	color: var(--theme-sub);
+}
+
+.la-swap-gain {
+	color: var(--theme-good-text);
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
 /* The worst n-grams take the panel's whole width, under its columns. */
 .la-panel-ngrams-box {
 	grid-column: 1 / -1;

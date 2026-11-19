@@ -111,7 +111,8 @@ for (const file of [
 	'fingering_editor.js',
 	'undo_offer.js',
 	'analyser_tab.js',
-	'worst_groups.js'
+	'worst_groups.js',
+	'best_swaps.js'
 ])
 	for (const m of fs.readFileSync(path.join(PAGE_DIR, file), 'utf8').matchAll(/\bt\('([a-z_.]+)'/g))
 		keys.add(m[1]);
@@ -475,6 +476,8 @@ const PANEL_SCRIPTS = [
 	'../layout_analysis/score_settings.js',
 	// The panel's worst n-grams (worst_groups.js), before the panel that draws them.
 	'../layout_analysis/worst_groups.js',
+	// The panel's best swaps (best_swaps.js; the optimiser core is loaded too).
+	'../layout_analysis/best_swaps.js',
 	'../layout_analysis/analysis_panel.js',
 	'../layout_editor/editor_page.js'
 ];

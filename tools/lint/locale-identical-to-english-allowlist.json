@@ -3811,6 +3811,10 @@
 				"tr",
 				"uk"
 			]
+		},
+		"layout_analysis.swaps.stop": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da"]
 		}
 	}
 }

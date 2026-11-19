@@ -41,6 +41,9 @@
  * 10. Worst n-grams (worst_groups.js): the pairs and trigrams that cost the
  *    layout the most; hovering or focusing one tells the onHighlight
  *    listeners its keys, which the editor outlines on its board.
+ * 11. Best swaps (best_swaps.js): on a page that gives onSwap, the single
+ *    swaps that most improve the score under the panel's settings, searched
+ *    in slices on demand, each applied in one click.
  * 9. Score chip: onResult listeners get each analysis's score, rank and
  *    change since the last analysis of the same layout (null when nothing is
  *    analysed), so the editor shows them beside the board; reveal() unfolds
@@ -183,15 +186,21 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	 *   addSection: function(function(HTMLElement, object): void): void}}
 	 */
 	/**
-	 * @param {{onCompare?: function(object): void, format?: function(): string}} [options]
+	 * @param {{onCompare?: function(object): void, format?: function(): string,
+	 *   onSwap?: function(string[]): void}} [options]
 	 *   - onCompare receives the edited layout in the library shape when the user
 	 *   asks to compare it; format gives the editor's keyboard format, which
-	 *   compact_fit measures on (the engine's default format when absent).
+	 *   compact_fit measures on (the engine's default format when absent);
+	 *   onSwap receives the two keys of a best swap to apply.
+	 * @throws {Error} When onSwap is given without the optimiser on the page.
 	 */
 	function create(options) {
 		const onCompare = options && typeof options.onCompare === 'function' ? options.onCompare : null;
 		const keyboardFormat =
 			options && typeof options.format === 'function' ? options.format : E.defaultKeyboardFormat;
+		const onSwap = options && typeof options.onSwap === 'function' ? options.onSwap : null;
+		if (onSwap && typeof window.LAYOUT_OPTIMIZER !== 'object')
+			throw new Error('layout_analysis: best swaps need the optimiser (optimizer_core.js)');
 		const saved = readStorage(STORAGE_KEY);
 		const corpora = DATA.corpora.map((c) => ({ id: c.id, title: c.title, builtin: c }));
 		const state = {
@@ -306,6 +315,16 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		const ngramsBox = el('section', 'la-panel-ngrams-box');
 		ngramsBox.setAttribute('aria-labelledby', ngramsTitle.id);
 		ngramsBox.append(ngramsTitle, ngramsNote, ngrams);
+		// The best swaps: what to rank (the last analysis), and the block itself.
+		let swapContext = null;
+		const swapsBox = el('section', 'la-panel-swaps');
+		const swaps = onSwap
+			? window.LAYOUT_ANALYSIS_SWAPS.mount(swapsBox, {
+					context: () => swapContext,
+					onApply: onSwap
+				})
+			: null;
+		if (swaps) scoreColumn.append(swapsBox);
 		const loadColumn = el('div', 'la-panel-column');
 		loadColumn.append(fingersTitle, fingers, analysersTitle, analysers, extra);
 		const fingeringColumn = el('div', 'la-panel-column');
@@ -341,6 +360,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			fingersTitle.textContent = t('layout_analysis.details.fingers');
 			ngramsTitle.textContent = t('layout_analysis.ngrams.title');
 			ngramsNote.textContent = t('layout_analysis.ngrams.caption_editor');
+			if (swaps) swaps.label();
 			analysersTitle.textContent = t('layout_analysis.analysers.title');
 			note.textContent = t('layout_analysis.panel.weights_note');
 			if (compareButton) compareButton.textContent = t('layout_analysis.panel.compare');
@@ -472,6 +492,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			metrics.replaceChildren();
 			typing.textContent = '';
 			ngrams.replaceChildren();
+			swapContext = null;
+			if (swaps) swaps.stale();
 			tellHighlight(null);
 			fingers.replaceChildren();
 			analysers.replaceChildren();
@@ -554,6 +576,21 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					: null;
 			const before = previous ? (previous.keys === keys ? previous.before : previous.now) : null;
 			drawMetrics(result, before ? before.metrics : null);
+			// Other keys, or another corpus or setting: the swaps found are stale.
+			if (swaps && !(previous && previous.keys === keys)) swaps.stale();
+			swapContext = {
+				layout,
+				tables: prepared,
+				analysis: {
+					keyboard: state.keyboard,
+					format: keyboardFormat(),
+					weights: settings.weights,
+					idealLoad: settings.idealLoad,
+					shortcuts: settings.shortcuts,
+					formWeights: settings.formWeights,
+					profile: settings.profile
+				}
+			};
 			tellResult({
 				score: result.score.total,
 				rank,

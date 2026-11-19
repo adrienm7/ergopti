@@ -517,7 +517,8 @@ var LayoutEditorPage = (function () {
 				? window.LAYOUT_ANALYSIS_PANEL.create({
 						onCompare:
 							typeof host.compare === 'function' ? (layout) => compareActive(layout) : null,
-						format: () => state.format
+						format: () => state.format,
+						onSwap: (codes) => applySwap(codes[0], codes[1])
 					})
 				: null;
 
@@ -530,6 +531,22 @@ var LayoutEditorPage = (function () {
 				state.message = { kind: 'error', text: problemText(error) };
 			}
 			render();
+		}
+
+		/**
+		 * Applies one of the analysis panel's best swaps as one edit: the two keys
+		 * trade their base characters and, on the Shift layer, their capitals (the
+		 * pair the optimiser moves together), at the scope shown.
+		 */
+		function applySwap(a, b) {
+			const platform = state.platform || null;
+			apply((d) => {
+				const partner = LayoutEditorModel.caseLayer(d, 'base');
+				let next = LayoutEditorModel.transferMapping(d, 'base', a, b, platform, false);
+				if (partner)
+					next = LayoutEditorModel.transferMapping(next, partner.id, a, b, platform, false);
+				return next;
+			});
 		}
 
 		function notify(kind, text) {
