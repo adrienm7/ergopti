@@ -519,7 +519,7 @@ var LayoutEditorPage = (function () {
 						onOptimize:
 							typeof host.optimize === 'function' ? (layout) => optimizeActive(layout) : null,
 						format: () => state.format,
-						onSwap: (codes) => applySwap(codes[0], codes[1])
+						onSwap: (codes) => applyMove(codes)
 					})
 				: null;
 
@@ -535,17 +535,33 @@ var LayoutEditorPage = (function () {
 		}
 
 		/**
-		 * Applies one of the analysis panel's best swaps as one edit: the two keys
-		 * trade their base characters and, on the Shift layer, their capitals (the
-		 * pair the optimiser moves together), at the scope shown.
+		 * Applies one of the analysis panel's best moves as one edit: a swap of two
+		 * keys, or a cycle of three (codes[0]'s characters to codes[1], codes[1]'s
+		 * to codes[2], codes[2]'s to codes[0]), each key moving its base character
+		 * and, on the Shift layer, its capital (the pair the optimiser moves
+		 * together), at the scope shown. A cycle is two swaps with the first key.
+		 * @param {string[]} codes - Two or three KeyboardEvent codes.
+		 * @throws {Error} On another count of keys.
 		 */
-		function applySwap(a, b) {
+		function applyMove(codes) {
+			if (codes.length !== 2 && codes.length !== 3)
+				throw new Error(`layout editor: a best move has 2 or 3 keys, not ${codes.length}`);
 			const platform = state.platform || null;
 			apply((d) => {
 				const partner = LayoutEditorModel.caseLayer(d, 'base');
-				let next = LayoutEditorModel.transferMapping(d, 'base', a, b, platform, false);
-				if (partner)
-					next = LayoutEditorModel.transferMapping(next, partner.id, a, b, platform, false);
+				let next = d;
+				for (const other of codes.slice(1)) {
+					next = LayoutEditorModel.transferMapping(next, 'base', codes[0], other, platform, false);
+					if (partner)
+						next = LayoutEditorModel.transferMapping(
+							next,
+							partner.id,
+							codes[0],
+							other,
+							platform,
+							false
+						);
+				}
 				return next;
 			});
 		}

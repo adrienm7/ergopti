@@ -546,6 +546,66 @@ async function exerciseBestSwaps(browser, origin) {
 	await context.close();
 }
 
+/**
+ * (best-cycles) After the swaps, « Best swaps » ranks the three-key cycles of
+ * the keys the swaps help most, in the same slices and on the same bar, under
+ * their own heading; applying one moves the three keys' characters round as
+ * one edit that one Ctrl+Z undoes.
+ */
+async function exerciseBestCycles(browser, origin) {
+	const { page, errors, context } = await openOnErgopti(browser, origin);
+	const legend = (code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
+	await page.click('#la-swaps-run');
+	// The cycles' own phase, said while it runs.
+	await page.waitForFunction(
+		(text) => document.querySelector('.la-swaps-status').textContent.endsWith(text),
+		EN['layout_analysis.swaps.searching_cycles'].split('{total}')[1],
+		{ timeout: 120000 }
+	);
+	await page.waitForFunction(() => document.getElementById('la-swaps-progress').hidden, null, {
+		timeout: 120000
+	});
+	const status = await page.textContent('.la-swaps-status');
+	assert.match(status, /cycles of three keys/, `the outcome names the cycles: ${status}`);
+	const titles = await page.$$eval('.la-swaps-subtitle:not([hidden])', (nodes) =>
+		nodes.map((node) => node.textContent)
+	);
+	assert.deepEqual(titles, [
+		EN['layout_analysis.swaps.pairs_title'],
+		EN['layout_analysis.swaps.cycles_title']
+	]);
+	const cycles = await page.$$eval('#la-cycles-list .la-swap-apply', (buttons) =>
+		buttons.map((button) => ({
+			codes: button.dataset.codes.split(' '),
+			label: button.getAttribute('aria-label'),
+			words: button.parentElement.querySelector('.la-sr-only').textContent
+		}))
+	);
+	assert.ok(cycles.length > 0 && cycles.length <= 10, `${cycles.length} cycles`);
+	assert.match(
+		cycles[0].label,
+		/^Apply the cycle \S+ → \S+ → \S+ \(\+\d+[.,]\d+\)$/,
+		cycles[0].label
+	);
+	assert.match(
+		cycles[0].words,
+		/^\S+ to the key of \S+, \S+ to the key of \S+, \S+ to the key of \S+$/
+	);
+	const [a, b, c] = cycles[0].codes;
+	const before = [await legend(a), await legend(b), await legend(c)];
+	await page.click('#la-cycles-list .la-swap-apply');
+	assert.deepEqual(
+		[await legend(a), await legend(b), await legend(c)],
+		[before[2], before[0], before[1]],
+		'each character moves to the next key of the cycle'
+	);
+	await page.evaluate(() => document.activeElement.blur());
+	await page.keyboard.press('Control+z');
+	assert.deepEqual([await legend(a), await legend(b), await legend(c)], before, 'one edit');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 /** The bytes of a download a click starts. */
 async function downloadOf(page, selector) {
 	const [download] = await Promise.all([page.waitForEvent('download'), page.click(selector)]);
@@ -769,6 +829,7 @@ async function exerciseWorstNgramsMore(browser, origin) {
 }
 
 module.exports = {
+	exerciseBestCycles,
 	exerciseWorstNgramsMore,
 	exerciseOptimizeThisLayout,
 	exerciseBoardImage,

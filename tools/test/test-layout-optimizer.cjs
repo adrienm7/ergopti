@@ -654,6 +654,51 @@ check(after.done && timed.done(), 'the time budget stops the search');
 		JSON.stringify(sliced.best()) === JSON.stringify(best),
 		'best swaps: slices give another list'
 	);
+
+	// 7b/ Three-key cycles of the keys the swaps help most.
+	let refused = false;
+	try {
+		SWAPS.createRanking(O, E, start, tables, ANALYSIS).cycles();
+	} catch {
+		refused = true;
+	}
+	check(refused, 'cycles: refused before every swap is scored');
+	const cycles = whole.cycles();
+	const keys = SWAPS.CYCLE_KEYS;
+	check(
+		cycles.total > 0 && cycles.total <= (keys * (keys - 1) * (keys - 2)) / 3,
+		`cycles: ${cycles.total} tried`
+	);
+	while (cycles.step(500));
+	const loops = cycles.best();
+	check(loops.length > 0 && loops.length <= SWAPS.CYCLE_LIMIT, `cycles: ${loops.length} listed`);
+	check(
+		loops.every((loop, i) => i === 0 || loops[i - 1].gain >= loop.gain),
+		'cycles: not best first'
+	);
+	const startScore = E.analyse(start, tables, ANALYSIS).score.total;
+	for (const loop of loops) {
+		check(loop.codes.length === 3 && new Set(loop.codes).size === 3, 'cycles: three keys');
+		// codes[0]'s characters go to codes[1], codes[1]'s to codes[2], codes[2]'s to codes[0].
+		const rows = Object.assign({}, start.rows);
+		loop.codes.forEach((code, i) => {
+			const to = loop.codes[(i + 1) % 3];
+			rows[to] = [start.rows[code][0], start.rows[code][1], start.rows[to][2], start.rows[to][3]];
+		});
+		const full = E.analyse(Object.assign({}, start, { rows }), tables, ANALYSIS).score.total;
+		check(
+			Math.abs(full - startScore - loop.gain) <= 1e-6,
+			`cycles: ${loop.chars.join('→')} gains ${loop.gain}, the engine says ${full - startScore}`
+		);
+	}
+	const slicedCycles = sliced.cycles();
+	let cycleSlices = 0;
+	while (slicedCycles.step(7)) cycleSlices++;
+	check(cycleSlices > 10, `cycles: ${cycleSlices} slices`);
+	check(
+		JSON.stringify(slicedCycles.best()) === JSON.stringify(loops),
+		'cycles: slices give another list'
+	);
 }
 
 if (errors.length) {

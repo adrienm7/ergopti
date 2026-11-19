@@ -3990,6 +3990,7 @@ async function exerciseComparerLink(browser, origin) {
 		await studioUx.exerciseShareLinkLayouts(browser, origin);
 		await studioUx.exerciseWorstNgrams(browser, origin);
 		await studioUx.exerciseBestSwaps(browser, origin);
+		await studioUx.exerciseBestCycles(browser, origin);
 		await studioUx.exerciseBoardImage(browser, origin);
 		await studioUx.exerciseOptimizeThisLayout(browser, origin);
 		await studioUx.exerciseWorstNgramsMore(browser, origin);

@@ -228,6 +228,21 @@
 	color: var(--theme-sub);
 }
 
+.la-panel .la-swaps-subtitle {
+	font-size: 0.9em;
+	margin: 14px 0 0;
+}
+
+/* A cycle of three keys: its own accent stripe, the loop mark in the accent. */
+.la-cycle {
+	border-left: 4px solid var(--theme-accent);
+}
+
+.la-cycle-back {
+	color: var(--theme-accent);
+	font-weight: 700;
+}
+
 .la-swap-gain {
 	color: var(--theme-good-text);
 	font-variant-numeric: tabular-nums;
