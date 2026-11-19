@@ -75,9 +75,9 @@ function render() {
 	node('entries').replaceChildren();
 	node('empty').hidden = entries.length !== 0 || !writable;
 	for (const record of entries) {
-		const row = document.createElement('div');
+		const row = document.createElement('li');
 		row.className = 'entry';
-		const label = document.createElement('span');
+		const label = document.createElement('p');
 		label.textContent =
 			modifierNames
 				.filter((name) => record.mods[name])
@@ -125,6 +125,12 @@ function init(data) {
 		node(id).textContent = strings[id];
 	}
 	document.title = strings.title;
+	// The strings come in the user's language: the root says which, as
+	// i18n.js does for the other windows (WCAG 3.1.1). Every host seeds it.
+	if (typeof window._i18n_locale === 'string' && window._i18n_locale)
+		document.documentElement.lang = window._i18n_locale;
+	else
+		console.error('physical shortcuts: no window._i18n_locale seeded; the page language stays en');
 	node('position').replaceChildren();
 	for (const position of data.positions) {
 		const option = document.createElement('option');

@@ -12,14 +12,20 @@ select {
 	margin: 4px;
 	padding: 8px 12px;
 }
+#entries {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
 .entry {
 	align-items: center;
 	display: flex;
 	gap: 8px;
 	margin: 12px 0;
 }
-.entry span {
+.entry p {
 	flex: 1;
+	margin: 0;
 	overflow-wrap: anywhere;
 }
 fieldset {

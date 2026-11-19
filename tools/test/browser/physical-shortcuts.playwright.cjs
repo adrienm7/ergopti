@@ -32,6 +32,8 @@ const assert = (condition, label) => {
 				// as is, so the string check below fails on it.
 				window.requests = [];
 				window.raw = [];
+				// Every host seeds the active locale before the page's scripts.
+				window._i18n_locale = 'fr';
 				window.webkit = {
 					messageHandlers: {
 						physical_shortcuts_bridge: {
@@ -100,6 +102,10 @@ const assert = (condition, label) => {
 				capture: false
 			};
 			await page.evaluate((data) => init(data), packet);
+			assert(
+				(await page.evaluate(() => document.documentElement.lang)) === 'fr',
+				'The page declares the language of its strings, not a fixed English'
+			);
 			assert(
 				JSON.stringify(
 					await page
@@ -204,7 +210,7 @@ const assert = (condition, label) => {
 				'Committed inventory replaces displayed list'
 			);
 			assert(
-				(await page.locator('.entry span').first().textContent()) === 'Ctrl + K → None',
+				(await page.locator('.entry p').first().textContent()) === 'Ctrl + K → None',
 				'An entry reads its key names'
 			);
 			await page.locator('.entry button').first().click();
