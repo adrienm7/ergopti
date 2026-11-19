@@ -1651,11 +1651,12 @@ var LAYOUT_ANALYSIS = (function () {
 	 * table's order: a walk indexes arrays instead of looking each token up
 	 * by string. Cached per table.
 	 * @param {object} table - From prepareNgrams() or tokenTable().
-	 * @returns {{tokens: string[], uniId: Int32Array, uniN: Float64Array,
-	 *   biA: Int32Array, biB: Int32Array, biN: Float64Array, triA: Int32Array,
-	 *   triB: Int32Array, triC: Int32Array, triN: Float64Array, allBi: Int32Array,
-	 *   allTri: Int32Array, whole: boolean}} Ids; allBi, allTri: every entry's
-	 *   index; whole: every count an integer, small enough for exact sums.
+	 * @returns {{tokens: string[], idOf: Map<string, number>, uniId: Int32Array,
+	 *   uniN: Float64Array, biA: Int32Array, biB: Int32Array, biN: Float64Array,
+	 *   triA: Int32Array, triB: Int32Array, triC: Int32Array, triN: Float64Array,
+	 *   allBi: Int32Array, allTri: Int32Array, whole: boolean}} Ids (idOf: token
+	 *   → id); allBi, allTri: every entry's index; whole: every count an
+	 *   integer, small enough for exact sums.
 	 */
 	function tableIds(table) {
 		let out = tableIdsCache.get(table);
@@ -1690,6 +1691,7 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 		out = {
 			tokens,
+			idOf,
 			uniId: ids(table.uni, 0),
 			uniN: counts(table.uni, 1),
 			biA: ids(table.bi, 0),
@@ -4652,7 +4654,7 @@ var LAYOUT_ANALYSIS = (function () {
 			keptLists.push(kept);
 		}
 		if (filtered.length && plan.ways === compiled.ways) {
-			plan.ways = waysToFilter(compiled, previous, from);
+			plan.ways = waysToFilter(compiled, previous, from, table);
 			if (from) plan.filtered = filtered;
 		}
 		for (let i = 0; i < filtered.length; i++) plan.ways.set(filtered[i], keptLists[i]);
@@ -4708,16 +4710,27 @@ var LAYOUT_ANALYSIS = (function () {
 	/**
 	 * A copy of a compile's ways for planTyping to filter: with a score
 	 * session's spare maps, the previous plan's own ways with only the
-	 * characters that may differ written again (those the compile changed and
-	 * those the previous plan filtered), else a whole copy.
+	 * table's tokens that may differ written again (those the compile changed
+	 * and those the previous plan filtered), else a whole copy. A plan reads
+	 * its ways for the table's tokens alone, so the characters no n-gram holds
+	 * (most of the accented letters a letter swap compiles again) keep the
+	 * lists of an earlier compile there.
+	 * @param {object} compiled - From compileWays() or finishWaysFrom().
+	 * @param {object} [previous] - The previous plan.
+	 * @param {{spare: object, changed: Set<string>|null}} [from] - As planTyping.
+	 * @param {object} table - The plan's token table.
+	 * @returns {Map} Token → ways, filtered in place by planTyping.
 	 */
-	function waysToFilter(compiled, previous, from) {
+	function waysToFilter(compiled, previous, from, table) {
 		if (!from) return new Map(compiled.ways);
 		const { spare, changed } = from;
 		if (changed === null || !previous || !previous.filtered || !spare.owns(previous.ways))
 			return spare.copyWhole(compiled.ways);
 		const ways = spare.copyOf(previous.ways);
-		for (const keys of [changed, previous.filtered]) {
+		const { idOf } = tableIds(table);
+		const read = [];
+		for (const key of changed) if (idOf.has(key)) read.push(key);
+		for (const keys of [read, previous.filtered]) {
 			for (const key of keys) {
 				const list = compiled.ways.get(key);
 				if (list === undefined) ways.delete(key);
