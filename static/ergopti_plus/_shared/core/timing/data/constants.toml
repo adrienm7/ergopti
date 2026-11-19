@@ -857,6 +857,13 @@ hesitation_cooldown_ms = 10000
 # Windows: the poll that awaits a pending suspend. AHK: core/lifecycle/engine/lifecycle.ahk.
 suspend_pending_poll_ms = 25
 
+# Windows: how long a reload waits for its successor to ask this instance to
+# close before stopping it and refusing the reload, so a successor held by a
+# hidden modal never keeps configuration writes blocked. A normal reload asks
+# within about two seconds.
+# AHK: core/lifecycle/engine/reload/terminal_handoff.ahk.
+reload_successor_deadline_ms = 30000
+
 # Windows: how often a diagnostics collection polls its worker process until it ends.
 # AHK: diagnostics/ui/healthcheck/collection.ahk.
 diagnostic_collection_poll_ms = 100

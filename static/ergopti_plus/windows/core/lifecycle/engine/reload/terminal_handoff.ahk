@@ -24,13 +24,6 @@ global RELOAD_SUCCESSOR_POLL_MS := 500
 ; this long is reported once and still awaited.
 global RELOAD_SUCCESSOR_STALL_MS := 15000
 
-; A successor still silent after this long is stopped and the reload refused,
-; so this instance keeps running and configuration writes reopen. It is launched
-; with /ErrorStdOut, so a load error ends it at once; what remains is a hidden
-; modal or a hang. A close request queued at that moment finds the record no
-; longer pending, so OnExit refuses it and this instance stays the driver. A
-; normal reload asks within about two seconds.
-global RELOAD_SUCCESSOR_DEADLINE_MS := 30000
 
 
 
@@ -319,7 +312,7 @@ ReloadTerminalInvoke(Bundle, SuccessFn, LaunchFn, Port, CommitFn := 0,
 
 _ReloadTerminalInvokeNonCritical(Bundle, SuccessFn, LaunchFn, Port, CommitFn,
 		AbortFn, RefusedFn, ReleaseFn, RetractFn) {
-	global _ReloadTerminalHandoff, _ReloadTerminalRetirements, RELOAD_SUCCESSOR_DEADLINE_MS
+	global _ReloadTerminalHandoff, _ReloadTerminalRetirements
 	if !HasMethod(LaunchFn, "Call")
 		throw TypeError("Reload terminal hand-off requires a successor launcher.")
 	_ReloadTerminalRequirePort(Port)
@@ -376,7 +369,7 @@ _ReloadTerminalInvokeNonCritical(Bundle, SuccessFn, LaunchFn, Port, CommitFn,
 	}
 	; The claim closes this wait, a refusal ends it in an error.
 	try LoggerStart("Lifecycle", "Waiting up to {2} ms for reload successor pid {1} to ask this instance to close…",
-		Successor["pid"], RELOAD_SUCCESSOR_DEADLINE_MS)
+		Successor["pid"], ReloadSuccessorDeadlineMs())
 	_ReloadTerminalHandoffArmWatch(Record)
 	return true
 }
@@ -421,7 +414,7 @@ _ReloadTerminalHandoffArmWatch(Record) {
 ; One liveness probe. A successor that exited without asking this instance to
 ; close failed to load, so the reload is refused and handed back.
 _ReloadTerminalHandoffWatch(Record, *) {
-	global _ReloadTerminalHandoff, RELOAD_SUCCESSOR_STALL_MS, RELOAD_SUCCESSOR_DEADLINE_MS
+	global _ReloadTerminalHandoff, RELOAD_SUCCESSOR_STALL_MS
 	PreviousCritical := Critical("On")
 	try {
 		if !(_ReloadTerminalHandoff is Map)
@@ -447,21 +440,32 @@ _ReloadTerminalHandoffWatch(Record, *) {
 			"the successor exited without asking this instance to close"
 			. _ReloadTerminalHandoffExitDetail(Successor))
 	Now := Port["now"].Call()
+	DeadlineMs := ReloadSuccessorDeadlineMs()
 	; A deferred claim means the successor already asked; its retry owns its budget.
 	if !Record["retry_deferred"]
-			&& TickExpired(Record["launch_tick"], RELOAD_SUCCESSOR_DEADLINE_MS, Now)
+			&& TickExpired(Record["launch_tick"], DeadlineMs, Now)
 		return ReloadTerminalHandoffRefuse(Record,
 			"the successor neither asked this instance to close nor exited within "
-			. RELOAD_SUCCESSOR_DEADLINE_MS . " ms; it was stopped and this instance keeps running")
+			. DeadlineMs . " ms; it was stopped and this instance keeps running")
 	if !Record["stall_reported"] && TickExpired(Record["launch_tick"],
 			RELOAD_SUCCESSOR_STALL_MS, Now) {
 		Record["stall_reported"] := true
 		try LoggerWarn("Lifecycle",
 			"Reload successor pid {1} has neither asked this instance to close nor exited after {2} ms; it is stopped at {3} ms.",
-			Successor["pid"], RELOAD_SUCCESSOR_STALL_MS, RELOAD_SUCCESSOR_DEADLINE_MS)
+			Successor["pid"], RELOAD_SUCCESSOR_STALL_MS, DeadlineMs)
 	}
 	_ReloadTerminalHandoffArmWatch(Record)
 	return true
+}
+
+; How long a pending reload waits for its successor before stopping it and
+; refusing the reload, so this instance keeps running and configuration writes
+; reopen. The successor runs with /ErrorStdOut, so a load error ends it at once;
+; what remains is a hidden modal or a hang. A close request queued at that moment
+; finds the record no longer pending, so OnExit refuses it and this instance
+; stays the driver.
+ReloadSuccessorDeadlineMs() {
+	return TimingsGet("ui", "reload_successor_deadline_ms")
 }
 
 ; The exit code the production port read from a successor that ended, for the

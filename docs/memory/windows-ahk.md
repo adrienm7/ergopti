@@ -382,7 +382,7 @@ rewriting) and stays alive without asking to close: one held the configuration
 barrier for 40 minutes. `ReloadSuccessorCommand` passes `/ErrorStdOut`, which
 makes such a successor exit with code 2 at once (measured on v2.0.26; OnError
 still runs for runtime errors), and the refusal names that code. A successor
-still silent after `RELOAD_SUCCESSOR_DEADLINE_MS` is stopped and the reload
+still silent after `[ui] reload_successor_deadline_ms` is stopped and the reload
 refused: a close request queued at that moment finds the record no longer
 pending, so OnExit refuses it and the old instance stays the driver with writes
 reopened. Action: keep `/ErrorStdOut` on every successor command line and the

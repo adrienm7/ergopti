@@ -436,7 +436,8 @@ Test("reload terminal: an accepted exit supersedes the pending reload "
 ; (reload-successor-deadline). It is still awaited at the stall bound, then
 ; stopped at the deadline, and the refusal hands the bundle back.
 _RTP_SilentSuccessorIsStoppedAtTheDeadline() {
-	global RELOAD_SUCCESSOR_STALL_MS, RELOAD_SUCCESSOR_DEADLINE_MS, _RTP_Events
+	global RELOAD_SUCCESSOR_STALL_MS, _RTP_Events
+	DeadlineMs := ReloadSuccessorDeadlineMs()
 	_RTP_Events := []
 	Bundle := _RTP_Acquire("deadline")
 	Port := _RTP_NewPort()
@@ -446,14 +447,14 @@ _RTP_SilentSuccessorIsStoppedAtTheDeadline() {
 			_RTP_Record.Bind("commit"), _RTP_Record.Bind("abort"),
 			(Reason) => (_RTP_Events.Push("refused"), Reasons.Push(Reason)),
 			_RTP_Record.Bind("release"))
-		AssertTrue(RELOAD_SUCCESSOR_STALL_MS < RELOAD_SUCCESSOR_DEADLINE_MS,
+		AssertTrue(RELOAD_SUCCESSOR_STALL_MS < DeadlineMs,
 			"the stall report comes before the deadline")
 		Port["probe"]["now"] += RELOAD_SUCCESSOR_STALL_MS
 		_RTP_RunArmed(Port)
 		AssertTrue(Record["stall_reported"], "a successor silent past the stall bound is reported")
 		AssertEqual(Record, ReloadTerminalHandoffPending(), "it is still awaited before the deadline")
 		AssertEqual(0, Port["probe"]["terminated"])
-		Port["probe"]["now"] += RELOAD_SUCCESSOR_DEADLINE_MS - RELOAD_SUCCESSOR_STALL_MS
+		Port["probe"]["now"] += DeadlineMs - RELOAD_SUCCESSOR_STALL_MS
 		_RTP_RunArmed(Port)
 		AssertEqual(1, Port["probe"]["terminated"], "the silent successor is stopped at the deadline")
 		AssertFalse(ReloadTerminalHandoffPending(), "the reload is no longer pending")
@@ -465,7 +466,7 @@ _RTP_SilentSuccessorIsStoppedAtTheDeadline() {
 		AssertEqual("launch,abort,refused,release", _RTP_Join(_RTP_Events),
 			"the refusal reaches the caller and releases the bundle")
 		AssertEqual(1, Reasons.Length)
-		AssertTrue(InStr(Reasons[1], "within " . RELOAD_SUCCESSOR_DEADLINE_MS . " ms"),
+		AssertTrue(InStr(Reasons[1], "within " . DeadlineMs . " ms"),
 			"the refusal names the deadline: " . Reasons[1])
 		AssertFalse(ReloadTerminalHandoffActive(), "no hand-off remains once the successor is gone")
 		AssertEqual(1, Port["probe"]["closed"])
