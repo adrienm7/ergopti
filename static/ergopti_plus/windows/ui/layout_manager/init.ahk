@@ -445,13 +445,14 @@ _LayMgrWeb_ConfigDir(Deps) {
 }
 
 /**
- * The layout editor's strings in the active locale. The macOS and Linux hosts
- * seed window._i18n_strings before the page runs; this host sends them with
- * sourceData, the first message the editor reads.
- * The Ergopti Studio analysis panels (_shared/ui/layout_analysis) mounted in
- * the editor read their layout_analysis.* keys from the same store, and its
- * « Optimiser » tab (_shared/ui/layout_optimizer) its layout_optimizer.* keys.
- * @returns {Map} Every layout_editor.*, layout_analysis.* and layout_optimizer.* key -> its translation.
+ * The layout editor's strings in the active locale: the whole catalogue, as
+ * the macOS and Linux hosts seed it in window._i18n_strings before the page
+ * runs; this host sends it with sourceData, the first message the editor reads.
+ * The Studio reads keys of many families (layout_editor.*, layout_analysis.*,
+ * layout_optimizer.*, the layer editor's layer_editor.key.* key names, the
+ * action labels), so a prefix filter here dropped every family it did not
+ * list and the « Edit » tab showed layer_editor.key.shift for Shift.
+ * @returns {Map} Every catalogue key -> its translation (active over en over fr).
  */
 LayoutManager_EditorStrings() {
 	global _I18nCache, _I18nCacheEn
@@ -459,8 +460,7 @@ LayoutManager_EditorStrings() {
 	Strings := Map()
 	for Cache in [_I18nCache, _I18nCacheEn]
 		for Key in Cache
-			if (SubStr(Key, 1, 14) == "layout_editor." || SubStr(Key, 1, 16) == "layout_analysis."
-					|| SubStr(Key, 1, 17) == "layout_optimizer.") && !Strings.Has(Key)
+			if !Strings.Has(Key)
 				Strings[Key] := I18nLookup(Key)
 	return Strings
 }
