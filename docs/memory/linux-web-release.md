@@ -753,8 +753,11 @@ The same gate measures reading (`site-reading.cjs`): clipped, overlapping,
 justified and over-80-character text at 200 % zoom with the WCAG 1.4.12
 spacing and at the site's 200 % text. Since 2026-11-19 the site header is
 sticky with `--header-height` as a minimum, not fixed at that height, so code
-that offsets by `--header-height` (the sidebar table of contents, the Studio
-shell, the narrow-screen banner) is only right at the default text size.
+that offsets by `--header-height` is only right at the default text size.
+`Header.svelte` measures itself and publishes `--header-offset`: a box placed
+under the header reads that (the `header-cover` reading check and
+`test-site-accessibility-ratchet.cjs` enforce it; the Studio shell is the one
+listed pending).
 Prose widths are in `ch` (58ch articles, 55ch Ergopti+), and a block holding a
 keyboard drawing keeps the full width because the drawing is sized on the
 window. Text clip and overlap boxes are client rects: rotated text (the corner

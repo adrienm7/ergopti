@@ -663,7 +663,7 @@ Not measured: a plain-language review of the texts (only « trigger »,
 « output » and « tracking » were replaced by French words), the table of
 contents, which is
 sticky at `--header-height` and slides under a header grown taller at 200 %
-text, and the Studio frames.
+text, and the Studio frames. The seventh pass did the first two.
 
 ### Languages (WCAG 3.1.2)
 
@@ -716,6 +716,82 @@ its 1552 elements. On the Windows host of this pass the axe rows matched
 the base (6 rows, all in Studio frames, the same counts), and the Comparer's
 « fits a phone » check failed on the base as well as after the pass (its
 compact tabs measure 327 px in a 320 px window with this host's fonts).
+
+## Seventh pass, header offset, media and plain language (2026-11-19, Paris time)
+
+The three items the sixth pass left on the site (`src/`): the sticky table
+of contents, « Images and media », and a plain-language review.
+
+### Nothing under the sticky header (WCAG 1.4.10, 1.4.12)
+
+The header is sticky with `--header-height` as a minimum and grows with the
+text. The boxes placed under it read that minimum: the sidebar table of
+contents (`layout.css`), the narrow-screen banner (`banner.css`), the
+keyboard reference (`+layout.svelte`), the anchored headings
+(`scroll-padding-top`) and the narrow-screen menu. The header now measures
+itself (a `ResizeObserver` in `Header.svelte`) and publishes its height as
+`--header-offset`, which all of them read; the sidebar's `max-height` also
+lost a missing space that made its `calc()` invalid.
+
+The reading gate gained a `header-cover` check in the zoom and text modes:
+each box positioned sticky or fixed at a nonzero `top` (so meant to sit
+under the header) is measured where it starts to stick, the window scrolled
+to the top of its parent, and must not start above the header's bottom edge
+(a box pushed up by the end of its parent scrolls away, as it should).
+`test-site-accessibility-ratchet.cjs` refuses `var(--header-height)` outside
+the header itself.
+
+| Mode and check     | Before | After |
+| ------------------ | -----: | ----: |
+| text, header cover |      6 |     0 |
+| zoom, header cover |     20 |     0 |
+
+Before, the table of contents started 71 px under the header at 200 % text
+on the six pages that have one, and the dev banner 8 px under it at 200 %
+zoom on the 20 pages scanned at that width. Left: the Studio shell
+(`src/routes/studio/+layout.svelte`) still subtracts `--header-height` from
+the window height; it was being changed elsewhere, so the ratchet lists it
+as pending and it should read `--header-offset`.
+
+### Images and media (WCAG 1.2.1 to 1.2.3)
+
+The site has no `<video>` and no embedded player. Its demos (the Ergopti+
+hero, the live session, the WPM widget) are animated text in the page, so
+their words are in the DOM, and the hero has a pause button. The GIFs under
+`static/media/ergopti_plus/` are shown only by the repository README on
+GitHub, not by the site; the promo video under `video/` is not published
+on it. Nothing needed captions. `tools/test/test-site-video-captions.cjs`
+guards the next video: each `<video>` under `src/` holds a default
+`<track kind="captions">` whose WebVTT file exists under `static/`, and each
+video or embedded player is tied to a transcript (`aria-describedby`, or a
+link marked `data-transcript-for`). Its self-test proves it refuses each
+missing part.
+
+### Plain language (WCAG 3.1.5)
+
+Sentences of 30 words or more were listed on the main pages and edited,
+not rewritten, one commit per page group: the layout presentation (10
+sentences), the Linux installation (5, and a typo), the Ergopti+ overview
+and presentation (« hotstrings » and « tap-holds » glossed as « expansions
+de texte » and « touches à double fonction », « driver » and « layout »
+replaced by « logiciel » and « disposition », « snippets de boilerplate »
+dropped; the English dictionary follows), the home card of Ergopti+ and
+the accessibility statement. The diffs are the evidence. The longer hero
+subtitle then made an 86-character line in its 600 px box: the box is now
+`min(600px, 55ch)` like the other Ergopti+ paragraphs. Left: the layout
+use, information and benchmark pages and the other Ergopti+ pages.
+
+### Gates and host
+
+`node tools/test/test-site-accessibility-ratchet.cjs`,
+`node tools/test/test-site-video-captions.cjs`,
+`node tools/test/test-site-languages.cjs`,
+`node tools/test/test-ergopti-plus-languages.cjs`, and the reading gate
+(`node tools/test/browser/site-accessibility.playwright.cjs build ""
+--reading-only`) on a fresh build: 0 reading elements, and the 26 above on
+the base build. The full gate stops on the Comparer's « fits a phone »
+check, on the base build as well, as in the sixth pass. `npm run test:js`
+and `verify-change` refuse this host (Node 22.16, pinned 22.22.2).
 
 ## What remains
 
