@@ -300,6 +300,19 @@
 		</figure>
 	</div>
 	<p id="lo-changed" class="lo-muted"></p>
+	<details id="lo-board-table" class="lo-chart-details lo-board-table">
+		<summary id="lo-board-table-title" data-i18n="layout_optimizer.result.table"></summary>
+		<div class="lo-table-box lo-board-table-box" tabindex="0" role="region"
+			aria-labelledby="lo-board-table-title"><table class="lo-table">
+			<thead><tr>
+				<th scope="col" data-i18n="layout_editor.board.table_key"></th>
+				<th scope="col" data-i18n="layout_optimizer.start.label"></th>
+				<th scope="col" data-i18n="layout_optimizer.result.best_board"></th>
+				<th scope="col" data-i18n="layout_optimizer.result.table_changed"></th>
+			</tr></thead>
+			<tbody id="lo-board-rows"></tbody>
+		</table></div>
+	</details>
 	<h3 data-i18n="layout_optimizer.result.metrics"></h3>
 	<div class="lo-metric-tables">
 	<div class="lo-table-box"><table class="lo-table">
@@ -1622,6 +1635,52 @@
 			drawBoard($('lo-result-board'), best, { changed });
 			const count = Object.keys(best.rows).filter(changed).length;
 			$('lo-changed').textContent = t(`${PREFIX}result.changed`, { count: number(count, 0) });
+			drawBoardTable(start, best, changed);
+		}
+
+		/** What a key types on a layout's base level, in words a screen reader says. */
+		function spokenLegend(layout, code) {
+			const cell = (layout.rows[code] || [])[0];
+			if (code === 'Space') return t('key_name.space');
+			if (cell && typeof cell === 'object')
+				return t('layout_editor.board.dead_key', { name: legend(layout, code) });
+			return legend(layout, code);
+		}
+
+		/**
+		 * The two boards as one table, their text alternative: a row per drawn
+		 * key in reading order (where it is), what it types on the start and on
+		 * the best layout, and whether it changed, in words and with a mark.
+		 */
+		function drawBoardTable(start, best, changed) {
+			const board = E.keyboard($('lo-keyboard').value);
+			const modifiers = new Set(Object.values(DATA.model.modifier_keys));
+			const where = keyPlaces(board, modifiers);
+			const keys = board.codes
+				.map((code, k) => ({ code, x: board.x[k], y: board.y[k] }))
+				.filter((key) => !modifiers.has(key.code))
+				.sort((a, b) => a.y - b.y || a.x - b.x);
+			const rows = keys.map(({ code }) => {
+				const moved = changed(code);
+				const tr = el('tr', moved ? 'lo-board-row-changed' : '');
+				tr.dataset.code = code;
+				const mark = el('td', 'lo-board-mark');
+				mark.append(
+					el('span', 'lo-board-mark-glyph', moved ? '⇄' : '·'),
+					' ',
+					t(`${PREFIX}result.table_${moved ? 'yes' : 'no'}`)
+				);
+				mark.firstChild.setAttribute('aria-hidden', 'true');
+				tr.append(
+					el('th', '', where.get(code)),
+					el('td', 'lo-board-char', spokenLegend(start, code)),
+					el('td', 'lo-board-char', spokenLegend(best, code)),
+					mark
+				);
+				tr.firstChild.scope = 'row';
+				return tr;
+			});
+			$('lo-board-rows').replaceChildren(...rows);
 		}
 
 		/**

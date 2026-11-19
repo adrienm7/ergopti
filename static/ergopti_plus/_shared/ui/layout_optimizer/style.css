@@ -614,6 +614,47 @@ body:has(> main.layout-optimizer) {
 	box-shadow: inset 0 0 0 1px var(--lo-accent);
 }
 
+/* The boards as a table, their text alternative: it scrolls inside its own
+   focusable box, never the page; a changed key is tinted, edged and said. */
+.lo-board-table {
+	margin: var(--lo-space-3) 0 var(--lo-space-4);
+}
+
+.lo-board-table summary {
+	font-weight: 600;
+	padding: var(--lo-space-2) 0;
+}
+
+.lo-board-table-box {
+	max-height: 60vh;
+	overflow: auto;
+}
+
+.lo-board-table-box thead th {
+	background: var(--lo-card);
+	position: sticky;
+	top: 0;
+}
+
+.lo-board-table .lo-board-char {
+	font-size: 1.25em;
+	font-weight: 600;
+}
+
+.lo-board-row-changed {
+	background: var(--lo-accent-soft);
+}
+
+.lo-board-row-changed > th {
+	border-left: 4px dashed var(--lo-accent);
+}
+
+.lo-board-mark-glyph {
+	display: inline-block;
+	min-width: 1.2em;
+	text-align: center;
+}
+
 /* The mark of a better or worse change (▲ ▼), beside its sign and colour. */
 .lo-verdict {
 	font-size: 0.8em;

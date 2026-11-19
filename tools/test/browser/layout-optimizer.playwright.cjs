@@ -265,6 +265,88 @@ async function exerciseProgressChart(browser, origin) {
 }
 
 /**
+ * (result-board-table) The start and best boards have a table view of their
+ * own, their text alternative: folded under its summary, a focusable region
+ * named by it, a row per drawn key in reading order headed by where the key
+ * is, what it types on each layout (as the boards draw it, a dead key and
+ * Space in words) and whether it changed, in words, marking the same keys as
+ * the dashed outline. Until 2026-11-19 only « Open in the editor » gave one.
+ */
+async function exerciseResultTable(browser, origin) {
+	const { page, errors, context } = await open(browser, origin);
+	await shortBudget(page);
+	assert.match(await runToEnd(page), /^Done/);
+	const summary = page.locator('#lo-board-table > summary');
+	assert.equal(await summary.textContent(), 'Show both layouts as a table');
+	assert.equal(await page.locator('#lo-board-table').getAttribute('open'), null, 'folded');
+	await summary.click();
+	const region = page.getByRole('region', { name: 'Show both layouts as a table' });
+	assert.equal(await region.getAttribute('tabindex'), '0', 'the region takes the focus');
+	const view = await page.evaluate(() => {
+		const drawn = (id) =>
+			new Map(
+				Array.from(document.querySelectorAll(`#${id} .lo-key`), (key) => [
+					key.dataset.code,
+					{ text: key.textContent, changed: key.classList.contains('lo-changed') }
+				])
+			);
+		const cols = Array.from(
+			document.querySelectorAll('#lo-board-table thead th'),
+			(th) => `${th.getAttribute('scope')}:${th.textContent}`
+		);
+		const rows = Array.from(document.querySelectorAll('#lo-board-rows tr'), (tr) => ({
+			code: tr.dataset.code,
+			scope: tr.cells[0].getAttribute('scope'),
+			// What a screen reader says: the mark's glyph is hidden from it.
+			cells: Array.from(tr.cells, (cell) => {
+				const said = cell.cloneNode(true);
+				for (const hidden of said.querySelectorAll('[aria-hidden="true"]')) hidden.remove();
+				return said.textContent.trim();
+			}),
+			glyph: (tr.cells[3].querySelector('[aria-hidden="true"]') || {}).textContent,
+			changed: tr.classList.contains('lo-board-row-changed')
+		}));
+		return {
+			cols,
+			rows,
+			start: Object.fromEntries(drawn('lo-start-board')),
+			best: Object.fromEntries(drawn('lo-result-board')),
+			count: document.querySelector('#lo-changed').textContent
+		};
+	});
+	assert.deepEqual(view.cols, [
+		'col:Key',
+		'col:Start layout',
+		'col:Best layout',
+		'col:Key changed'
+	]);
+	assert.equal(view.rows.length, Object.keys(view.best).length, 'a row per drawn key');
+	const spoken = (text, code) => (code === 'Space' ? 'Space' : text);
+	let changed = 0;
+	view.rows.forEach((row, index) => {
+		assert.equal(row.scope, 'row', `${row.code}: its place heads the row`);
+		assert.match(row.cells[0], /^row \d+, key \d+$/, `${row.code}: ${row.cells[0]}`);
+		const start = view.start[row.code];
+		const best = view.best[row.code];
+		for (const [cell, key] of [
+			[row.cells[1], start],
+			[row.cells[2], best]
+		])
+			if (/^dead key /.test(cell)) assert.ok(cell.endsWith(key.text), `${row.code}: ${cell}`);
+			else assert.equal(cell, spoken(key.text, row.code), `${row.code}: as the board draws it`);
+		assert.equal(row.changed, best.changed, `${row.code}: marked as the board outlines it`);
+		assert.equal(row.cells[3], best.changed ? 'Changed' : 'Unchanged', row.code);
+		assert.equal(row.glyph, best.changed ? '⇄' : '·', `${row.code}: its mark, not colour alone`);
+		if (row.changed) changed += 1;
+		if (index > 0) assert.notEqual(row.cells[0], view.rows[index - 1].cells[0], 'one row a key');
+	});
+	assert.ok(changed > 0, 'the search moved some key');
+	assert.match(view.count, new RegExp(`^${changed}\\u00a0keys changed`), view.count);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
+/**
  * (thumb-keys-switch) The thumb keys' switch is off by default and disabled
  * on a keyboard without thumb keys, whose help line names the keyboards
  * that have them; its « i » opens a popover that says why it is off by
@@ -896,6 +978,9 @@ async function main() {
 		// ======= 4g/ The results shelf =======
 		await exerciseResultsShelf(browser, origin);
 
+		// ======= 4h/ The result boards as a table =======
+		await exerciseResultTable(browser, origin);
+
 		// ======= 5/ Light and dark at phone width, every locale =======
 		for (const colorScheme of ['light', 'dark']) {
 			const { page, errors, context } = await open(browser, origin, {
@@ -944,7 +1029,12 @@ async function main() {
 	console.log('PASS layout-optimizer.playwright');
 }
 
-module.exports = { exerciseProgressChart, exerciseThumbKeys, exerciseResultsShelf };
+module.exports = {
+	exerciseProgressChart,
+	exerciseThumbKeys,
+	exerciseResultsShelf,
+	exerciseResultTable
+};
 
 if (require.main === module)
 	main().catch((error) => {
