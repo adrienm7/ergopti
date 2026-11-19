@@ -628,11 +628,15 @@ async function exerciseBoardImage(browser, origin) {
 	});
 	assert.match(posted.filename, /^[A-Za-z0-9][A-Za-z0-9_.-]*\.png$/, 'a name the hosts write');
 	assert.equal(posted.head, 'PNG');
-	await app.evaluate(() => window.exportResult({ ok: true, path: '/home/me/Downloads/x.png' }));
-	await app.waitForFunction(() =>
-		/\/home\/me\/Downloads\/x\.png/.test(
-			document.querySelector('#le-board-image-png ~ .la-image-status').textContent
-		)
+	// The host reports where it wrote the file; any absolute path stands in for it.
+	const writtenPath = path.join(ROOT, 'build', 'x.png');
+	await app.evaluate((written) => window.exportResult({ ok: true, path: written }), writtenPath);
+	await app.waitForFunction(
+		(written) =>
+			document
+				.querySelector('#le-board-image-png ~ .la-image-status')
+				.textContent.includes(written),
+		writtenPath
 	);
 	assert.deepEqual(appErrors, []);
 	await app.close();
