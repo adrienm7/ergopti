@@ -139,11 +139,6 @@ Design: [layout-editor.md](docs/design/layout-editor.md), [layout-analysis.md](d
 analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-analysers/report.md) (its section 15
 waits for the maintainer's review).
 
-- [ ] **Optimiser speed on bépo.** The aim is 95–130 trials per second on the layouts with choices; measured on
-      2026-11-17 (Swann, 99 %, loaded PC): Ergopti 110, Ergo-L 93, bépo 57; since the spare maps of 2026-11-18
-      (bépo ×1.28, Ergopti ×1.12, Ergo-L ×1.18, scores bit-identical): about 124, 110 and 73. Left on bépo: the
-      per-character cost of the ~120 lists a letter swap compiles, finishes and plans again, then the plan and context
-      walk and the compact forms' reachability (layout-optimizer.md, « Follow-ups »).
 - [ ] **Layout formats, what is left.** KLA's 16 files with characters on keys the library's keyboards lack (12 of
       them ErgoDox) stay in `not_imported` of `layout_library.json` until the keyboard model, the KLA reader and the
       library can place ErgoDox thumb and outer keys. KLAnext's `janiso` board is refused
