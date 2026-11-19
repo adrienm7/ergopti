@@ -738,6 +738,14 @@ function M.is_file_sink_active()
 	return _installed and not _stdout_only and _main_handle ~= nil
 end
 
+--- Reports whether the sink is installed, durable or stdout-only: the entry
+--- point's boot guard then logs a failure through it, redacted, instead of
+--- falling back to the closed bootstrap record.
+--- @return boolean
+function M.is_installed()
+	return _installed
+end
+
 --- Captures this exact privacy admission without acquiring output resources.
 --- Closing/reinstalling retires both functions; no successor is substituted.
 --- @return function|nil redact Returns a string only while the admission is live.

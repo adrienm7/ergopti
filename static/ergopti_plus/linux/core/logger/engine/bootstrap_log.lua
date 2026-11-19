@@ -4,8 +4,9 @@
 --- MODULE: Pre-sink Fatal Record (Linux)
 --- DESCRIPTION:
 --- Appends one line to bootstrap.log in the DEFAULT logs folder for the fatal
---- outcomes that happen before the logger sink can exist: a refused session lock
---- and a refused privacy admission. Windows keeps the same file for the same
+--- outcomes that happen before the logger sink can exist: a refused session lock,
+--- a refused privacy admission, and a boot that failed before the sink opened
+--- (the entry point's boot guard). Windows keeps the same file for the same
 --- purpose (a yielding second instance, a refused configuration transition) and
 --- macOS keeps launcher.log and a fatal report in the native launcher; the name is
 --- declared once in _shared/core/fs/data/paths/app_dirs.toml.
@@ -41,6 +42,7 @@ M.CODES = {
 	session_lock_refused = "Session lock refused; daemon not started.",
 	privacy_admission_refused = "Privacy initialization refused; daemon not started.",
 	second_instance_yielded = "Another daemon owns the session lock; this start yielded.",
+	boot_failed = "Daemon boot failed before its log opened; the error is on stderr.",
 }
 
 local AppDirs = require("core.fs.engine.app_dirs")

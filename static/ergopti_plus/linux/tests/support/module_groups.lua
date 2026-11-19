@@ -36,6 +36,7 @@ M.INTEGRATION = "integration"
 M.GROUPS = {
 	{ name = "integration", prefixes = {
 		"tests/meta/boot/test_daemon_cli.lua",
+		"tests/meta/boot/test_daemon_boot_guard.lua",
 		"tests/unit/core/process/test_owned_process_deadline.lua",
 		"tests/unit/core/lifecycle/test_callback_error_description.lua",
 		"tests/unit/core/lifecycle/test_native_timer.lua",

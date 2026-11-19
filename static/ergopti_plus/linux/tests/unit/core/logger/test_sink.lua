@@ -1155,7 +1155,7 @@ helpers.describe("linux-bootstrap-log", function()
 
 	helpers.it("linux-bootstrap-log: the entry point records each fatal that precedes the sink", function()
 		local entry = strip_comment_lines(read_file(DRIVER_ROOT .. "/ergopti_hotstrings.lua"))
-		for _, code in ipairs({ "session_lock_refused", "privacy_admission_refused", "second_instance_yielded" }) do
+		for _, code in ipairs({ "session_lock_refused", "privacy_admission_refused", "second_instance_yielded", "boot_failed" }) do
 			helpers.assert_contains(entry, '"' .. code .. '"', "the entry point must append " .. code)
 			helpers.assert_not_nil(Bootstrap.CODES[code], code .. " must be a declared code")
 		end

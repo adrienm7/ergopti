@@ -395,6 +395,7 @@ return {
 	"tests.unit.diagnostics.engine.reports.test_crash_reporter",
 	"tests.unit.core.fs.adapters.test_crypto_adapter",
 	"tests.meta.boot.test_daemon_cli",
+	"tests.meta.boot.test_daemon_boot_guard",
 	"tests.meta.boot.test_daemon_smoke",
 	"tests.unit.core.ui.editors.test_dashboard_bridge_actions",
 	"tests.unit.hotstrings.engine.dynamic.test_manager",

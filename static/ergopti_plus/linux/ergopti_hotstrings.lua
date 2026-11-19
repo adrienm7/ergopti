@@ -52,6 +52,45 @@
 -- =========================================
 -- =========================================
 
+-- Boot guard. main() runs under the crash reporter, but the code above it does
+-- not: a module that will not load from a half-updated tree, or any other error
+-- at the top of this file, reached LuaJIT's own handler, which writes to stderr
+-- only. A relayed restart sends stderr to /dev/null, so the successor died with
+-- nothing in the log and no notice. This file therefore runs itself once more
+-- under xpcall; a failure is logged through the sink when it is installed (and
+-- reported like a crash), else as a closed bootstrap record, and the process
+-- exits non-zero for the supervisor.
+local boot_guard = ...
+if type(boot_guard) ~= "table" or boot_guard.ergopti_boot_guard ~= true then
+	local entry = assert(debug.getinfo(1, "S").source:match("^@(.+)$"), "the entry point has no file")
+	local chunk = assert(loadfile(entry))
+	local traceback = nil
+	local booted, failure = xpcall(chunk, function(err)
+		traceback = debug.traceback(tostring(err), 2)
+		return err
+	end, { ergopti_boot_guard = true })
+	if booted then return end
+	local Sink = package.loaded["core.logger.engine.sink"]
+	local BootLogger = package.loaded["core.logger.engine.shim"]
+	if type(Sink) == "table" and type(Sink.is_installed) == "function" and Sink.is_installed()
+		and type(BootLogger) == "table" then
+		pcall(BootLogger.flush_repeats, true)
+		pcall(BootLogger.error, "ergopti_hotstrings", "Daemon boot failed before its main loop: %s",
+			tostring(traceback or failure))
+		local CrashReporter = package.loaded["diagnostics.engine.reports.crash_reporter"]
+		if type(CrashReporter) == "table" then
+			pcall(CrashReporter.dump, "ergopti_hotstrings", tostring(failure), { stack_trace = traceback })
+		end
+	else
+		-- Before the sink no redaction exists: stderr keeps the text, the file a code.
+		pcall(io.stderr.write, io.stderr, "[ergopti_hotstrings] Daemon boot failed: "
+			.. tostring(traceback or failure) .. "\n")
+		local loaded, BootstrapLog = pcall(require, "core.logger.engine.bootstrap_log")
+		if loaded then pcall(BootstrapLog.append, "boot_failed") end
+	end
+	os.exit(1)
+end
+
 -- Resolve the directory that contains this script so relative requires work
 -- when the daemon is launched from any working directory.
 local SCRIPT_DIR = (function()
