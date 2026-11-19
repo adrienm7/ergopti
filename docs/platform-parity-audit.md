@@ -10,6 +10,31 @@ entry is not the same thing as a user-facing capability: an OS can provide the
 same capability through a different path. A declaration is not a runtime or
 hardware test.
 
+## Census after the structure phase — November 19, 2026
+
+`tools/audit/source-areas.py --ref HEAD` at `b90ad8de` (S26 included) gives
+190 areas against the 381 of the pinned November 12 census
+(`audits/platform-parity/2026-11-12-tap-holds-followup/source-areas.json`).
+The structure phase folded many of the old areas into feature folders. Of the
+381, 237 moved whole, 20 split and 3 left (the retired `ui/layer_editor`).
+`tools/audit/parity-census.cjs` matches every area, and every finer unit (an
+area plus its layer folder, 316 of them), to the campaigns whose reports name
+its files. It measures the drift since the latest campaign's pin, renames and
+path-only rewrites left out.
+
+- **Areas:** 108 drifted, 13 stable, 69 never campaigned.
+- **Units:** 188 drifted, 29 stable, 99 never campaigned. 25 of the 99 are
+  generated, vendored or data files.
+
+The [census report](audits/platform-parity/2026-11-19-census/report.md) holds
+the old-to-new area map, the drift table, the ranked never-campaigned list
+and the proposed order of the next campaigns. Coverage there is lexical: a
+named file is not a reviewed file.
+
+| Module                         | Campaign                                                                                           |
+| ------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Secure-field detection (focus) | [report](audits/platform-parity/2026-11-19-census/report.md#first-campaign-secure-field-detection) |
+
 ## Review status at resumption — November 12, 2026
 
 The audit resumed on November 10. `tools/audit/source-areas.py --ref HEAD` at
@@ -219,6 +244,7 @@ rewriting historical audit evidence:
 
 ```sh
 python3 -B tools/audit/source-areas.py --ref HEAD --output /tmp/ergopti-source-areas-current.json
+node tools/audit/parity-census.cjs --census /tmp/ergopti-source-areas-current.json --output /tmp/ergopti-reconciliation.json
 ```
 
 When work resumes, read the relevant report's coverage and source receipts,

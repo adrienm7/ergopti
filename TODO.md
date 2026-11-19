@@ -262,14 +262,16 @@ The [coverage and remaining-work register](docs/platform-parity-audit.md#review-
 and the campaign reports under [docs/audits/platform-parity/](docs/audits/platform-parity/) record what is done.
 Native receiving stays unqualified everywhere; the real-machine scenarios are in the TODO-tests files.
 
-- [ ] **[CODE] Parity audit continuation.** Reconcile current source areas with the register (the 2026-11-12 census
-      listed 381 areas, many changed since their campaign), then take one bounded module at a time across Windows,
-      macOS, Linux and shared; do not restart a finished campaign without source drift or a new hypothesis. Left:
-  - a fresh census against the last pinned one
-    ([tap-holds follow-up](docs/audits/platform-parity/2026-11-12-tap-holds-followup/source-areas.json)) now that the
-    structure phase moved most folders, then the areas outside every campaign (the never-campaigned list of the
-    [start-at-login report](docs/audits/platform-parity/2026-11-12-start-at-login/report.md) was taken by the
-    menus-tray, i18n-runtime, editors, healthcheck, onboarding, Linux install and tooltips-wpm campaigns).
+- [ ] **[CODE] Parity audit continuation.** Take one bounded module at a time across Windows, macOS, Linux and shared;
+      do not restart a finished campaign without source drift or a new hypothesis. The
+      [2026-11-19 census](docs/audits/platform-parity/2026-11-19-census/report.md) (`b90ad8de`, S26 included: 190
+      areas, 108 drifted, 69 never campaigned; 316 units, 99 never campaigned) ranks what is left and proposes the
+      order. Its first campaign, secure-field detection, fixed the Windows system keychain row (SFC-01). Left:
+  - the secure-field findings SFC-02 (macOS `refresh()` publishes « not secure » when it cannot classify), SFC-03
+    (the port spec still says fail open), SFC-04 (missing Yubico and authenticator identities, a maintainer
+    choice) and SFC-05 (the RoboForm AHK case cannot fail);
+  - the next campaigns in the report's order: logger engines, the managed Ollama runtime drift, tray adapters,
+    update and download windows, pickers and prompts, metrics views, small native units, layout tool pages.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
       channel's newest release through its required detached signature on both (`feed-only-install` tests, throwaway
       key in `feed_install_vectors.json`); without a key every feed row keeps the no-details refusal. Left, at release
