@@ -452,6 +452,10 @@ var LAYOUT_FORMATS = (function () {
 	// each thumb is the one it rests on (thumb_rest_keys).
 	const KLA_THUMB_CODES = { left: ['NonConvert'], right: ['Convert', 'KanaMode'] };
 	const KLA_THUMB_HANDS = { 5: 'left', 6: 'right' };
+	// What a thumb key types to be read as one: a letter, a digit, a punctuation
+	// mark or the space, not an action sign (⌦, ⇞, ⌘) that types nothing.
+	const KLA_THUMB_TYPED = /^[\p{L}\p{M}\p{N}\p{P} ]+$/u;
+	const typedCell = (cell) => cell !== NONE && KLA_THUMB_TYPED.test(cell);
 	// The boards with thumb clusters, and their big thumb keys (ErgoDox's
 	// 2-unit keys, KLA's index; KLAnext's matrix draws none bigger).
 	const KLA_THUMB_BOARDS = { ergodox: { big: [66, 67, 74, 75] }, matrix: { big: [] } };
@@ -906,12 +910,14 @@ var LAYOUT_FORMATS = (function () {
 
 	/**
 	 * The thumb keys of a KLA file on a board with thumb clusters (ErgoDox,
-	 * KLAnext's matrix), when one of them types something else than the space:
-	 * each thumb's keys, by the file's own finger (5 left, 6 right), take that
+	 * KLAnext's matrix), when one of them types a letter, a digit or a
+	 * punctuation mark (KLA_THUMB_TYPED; a key drawing only an action sign,
+	 * « ⌦ » or « ⇞ », stays unread): each thumb's keys that type one of them
+	 * or the space, by the file's own finger (5 left, 6 right), take that
 	 * thumb's codes (KLA_THUMB_CODES), the big keys first, then by index; the
 	 * shared space bar (Space) is not used, so the space goes to the thumb the
-	 * file gives it. A key holding only the capital of a letter on another key
-	 * of the same thumb (Hands Down's « T » beside « t ») becomes that key's
+	 * file gives it. A key holding only the capitals of another key's letters on
+	 * the same thumb (Hands Down's « T » beside « t ») becomes that key's
 	 * Shift. A thumb key beyond its thumb's codes stays unmapped (null code),
 	 * reported. Otherwise (the space alone on the thumbs) nothing changes.
 	 * @param {string} type - The file's keyboardType.
@@ -929,29 +935,38 @@ var LAYOUT_FORMATS = (function () {
 			const hand = KLA_THUMB_HANDS[key.finger];
 			if (hand === undefined || (board[index] && board[index] !== 'Space')) return;
 			const cells = cellsOf(key);
-			if (cells.some((cell) => cell !== NONE)) thumbs.push({ index, hand, cells });
+			if (cells.some(typedCell)) thumbs.push({ index, hand, cells });
 		});
-		if (!thumbs.some((thumb) => thumb.cells.some((cell) => cell !== NONE && cell !== ' ')))
+		if (!thumbs.some((thumb) => thumb.cells.some((cell) => typedCell(cell) && cell !== ' ')))
 			return none;
 		const out = { codes: new Map(), cells: new Map() };
+		// The space bar's indexes take no action sign: such a key stays unread.
+		placed.forEach((key, index) => {
+			if (board[index] === 'Space') out.codes.set(index, null);
+		});
 		for (const hand of Object.keys(KLA_THUMB_CODES)) {
 			const own = thumbs
 				.filter((thumb) => thumb.hand === hand)
 				.sort(
 					(a, b) => spec.big.includes(b.index) - spec.big.includes(a.index) || a.index - b.index
 				);
+			// The capitals' key: its base and AltGr cells the capitals of another
+			// key's (Silver's « N Ñ » beside « n ñ »), whose Shift levels are empty.
+			const capitalOf = (cell, lower) =>
+				cell === NONE || (lower !== NONE && cell !== lower && cell === lower.toUpperCase());
 			const kept = own.filter((thumb) => {
-				const [capital, ...rest] = thumb.cells;
-				if (!capital || rest.some((cell) => cell !== NONE)) return true;
+				const cells = thumb.cells;
+				if (cells[0] === NONE || cells[1] !== NONE || cells[3] !== NONE) return true;
 				const lower = own.find(
 					(other) =>
 						other !== thumb &&
 						other.cells[1] === NONE &&
-						other.cells[0] !== capital &&
-						other.cells[0] === capital.toLowerCase()
+						other.cells[3] === NONE &&
+						capitalOf(cells[0], other.cells[0]) &&
+						capitalOf(cells[2], other.cells[2])
 				);
 				if (!lower) return true;
-				lower.cells = [lower.cells[0], capital, lower.cells[2], lower.cells[3]];
+				lower.cells = [lower.cells[0], cells[0], lower.cells[2], cells[2]];
 				out.codes.set(thumb.index, null);
 				out.cells.set(thumb.index, [NONE, NONE, NONE, NONE]);
 				return false;

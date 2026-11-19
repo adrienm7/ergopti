@@ -1383,6 +1383,20 @@ async function checkLinks() {
 		plain.layout.rows.Space[0] === ' ' && !plain.layout.rows.NonConvert,
 		`thumb keys: a space-only file does not read Space: ${JSON.stringify(plain.layout.rows)}`
 	);
+	// An action sign (⌦) on a thumb key types nothing: alone it keeps the
+	// space bar reading; beside a thumb letter it is named, not read as Space.
+	const sign = F.fromKla(thumbFile([key(66, 8, 5, 0x2326), key(74, 32, 6)]));
+	check(
+		sign.layout.rows.Space[0] === ' ' && !sign.layout.rows.NonConvert,
+		`thumb keys: an action sign reads as a thumb letter: ${JSON.stringify(sign.layout.rows)}`
+	);
+	const signed = F.fromKla(thumbFile([key(66, 8, 5, 0x2326), key(67, 116, 5), key(74, 32, 6)]));
+	check(
+		!signed.layout.rows.Space &&
+			signed.layout.rows.NonConvert[0] === 't' &&
+			signed.unmapped.some((entry) => /^66 /.test(entry.detail)),
+		`thumb keys: the action sign beside a thumb letter: ${JSON.stringify(signed.layout.rows)}`
+	);
 	// Written back on KLA's ErgoDox board, it reads to the same keys.
 	const written = F.toKla(gold.layout, DATA.model.fingerings.standard);
 	const back = F.fromKla(JSON.parse(JSON.stringify(written)));
