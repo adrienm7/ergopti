@@ -29,7 +29,7 @@
  * The problems of a walk, in words a failing assertion can print.
  * @param {{forward: Stop[], forwardLeft: boolean, backward: Stop[], backwardLeft: boolean}} walk
  *   forwardLeft and backwardLeft: whether the walk reached the end of the page (the
- *   focus left the document) within its step budget.
+ *   focus left the document) before it met a stop twice.
  * @returns {string[]} Empty when the walk passes.
  */
 function walkProblems(walk) {

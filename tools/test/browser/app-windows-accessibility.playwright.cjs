@@ -60,8 +60,6 @@ const WCAG_TAGS = Object.freeze([
 ]);
 // The rule name under which a window's keyboard-walk problems are counted.
 const WALK_RULE = 'keyboard-walk';
-// More Tab presses than any window has stops: reaching it means the focus is held.
-const STEP_BUDGET = 800;
 const TYPES = {
 	'.html': 'text/html',
 	'.js': 'text/javascript',
@@ -238,7 +236,11 @@ async function walk(page, key) {
 		mark.remove();
 	}, key !== 'Tab');
 	const stops = [];
-	for (let step = 0; step < STEP_BUDGET; step++) {
+	const seen = new Set();
+	// Every stop is an element: a walk that neither leaves nor meets a stop
+	// twice ends within the document's elements, so their count bounds it.
+	const elements = () => page.evaluate(() => document.getElementsByTagName('*').length);
+	for (let step = 0; step <= (await elements()); step++) {
 		await page.keyboard.press(key);
 		const stop = await page.evaluate(focusedStop);
 		if (stop === null) {
@@ -248,6 +250,9 @@ async function walk(page, key) {
 		// The next segment of the same date field is the same stop.
 		if (stops.length && stops[stops.length - 1].id === stop.id) continue;
 		stops.push(stop);
+		// A stop met twice before the focus left: the focus is held.
+		if (seen.has(stop.id)) break;
+		seen.add(stop.id);
 	}
 	return { stops, left: false };
 }

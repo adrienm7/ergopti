@@ -49,8 +49,6 @@ const PAGES = Object.freeze([
 	},
 	{ name: 'Optimiser', path: UI + 'layout_optimizer/index.html', ready: '.layout-optimizer h1' }
 ]);
-// More Tab presses than any page has stops: reaching it means the focus is held.
-const STEP_BUDGET = 1500;
 const VIEWPORT = { width: 1280, height: 900 };
 
 /** Serves static/ read-only on loopback, as the site serves its pages. */
@@ -124,7 +122,11 @@ async function walk(page, key) {
 		if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
 	});
 	const stops = [];
-	for (let step = 0; step < STEP_BUDGET; step++) {
+	const seen = new Set();
+	// Every stop is an element: a walk that neither leaves nor meets a stop
+	// twice ends within the document's elements, so their count bounds it.
+	const elements = () => page.evaluate(() => document.getElementsByTagName('*').length);
+	for (let step = 0; step <= (await elements()); step++) {
 		await page.keyboard.press(key);
 		const stop = await page.evaluate(focusedStop);
 		if (stop === null) {
@@ -132,6 +134,9 @@ async function walk(page, key) {
 			continue;
 		}
 		stops.push(stop);
+		// A stop met twice before the focus left: the focus is held.
+		if (seen.has(stop.id)) break;
+		seen.add(stop.id);
 	}
 	return { stops, left: false };
 }
