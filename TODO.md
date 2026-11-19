@@ -270,7 +270,18 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       selects through the launcher's headless role, and refusals name `system_current_layout_stale` or
       `process_current_source_stale` from the recorded system layout. Left: `NumberRowSourceProbeTests.swift` keeps
       its own in-process selection because its bytes are the reviewed image `number_row_current_test_causal.py` pins
-      (`CURRENT_TEST_SHA`); moving it to the shared fixture needs that review renewed. No retry is added.
+      (`CURRENT_TEST_SHA`); moving it to the shared fixture needs that review renewed. No retry is added. Prepared,
+      held for that review: 685cec9b89 (branch `agent/macos-number-row-xctest-review-candidate`, review notes in its
+      message) drops the suite's private copy of the fixture (lines 19-72: the 5 s bound, the observed-selection
+      loop, `selectAndObserve`'s in-process `TISSelectInputSource`, the restoration-observed guard) for
+      `KeyboardSourceSelectionFixture.withSelectedSource`, which runs the same phases (`original.capture`, `select`,
+      `restore.inner`, `restore.outer`) and refusal messages; the twelve methods and every assertion stay, the causal
+      `XCTAssertThrowsError` moves from line 435 to 339, and the fixture's source scan now covers this file. The
+      counterfactual is still the sole `NEEDLE` omission of `NumberRowSourceProbe.swift`, so the expected red stays
+      one « did not throw error » in `testActualFrozenProbeRefusesChangedFinalBytesOnSamePrivateDataObject`. Left:
+      the reviewer renews the image (« Maintainer decisions pending »), then CI proves it in ci-macos.yml's
+      `e2e-hs` (« E2E tests ») lots of role managed-ollama-native, step « Qualify actual selected number-row Carbon
+      XCTest controls » (twelve cases, seven TIS closures restored).
 
 ## Carried over from the 1.0.9 requests
 
@@ -483,6 +494,17 @@ Each question names the default kept meanwhile; an answer moves into the item or
       the ErgoDox, Gold scores 11.2 against Hands Down Alt's −1.5 on Alice. Choose the thumb effort, whether a thumb
       letter's pairs should count, whether the left thumb needs a second key (Cahi, Chia, SNTH stay out), and
       whether the optimizer page should offer the switch.
+- [ ] **Renew the reviewed number-row test image (prepared by the agent on 2026-11-19, to review by the
+      maintainer).** `number_row_current_test_causal.py` says no transcript or approval may select another test
+      image, and its approval record needs a published source commit and a source review hash, so the agent did not
+      renew `CURRENT_TEST_SHA`. Kept meanwhile: `NumberRowSourceProbeTests.swift` selects in the XCTest process.
+      To accept 685cec9b89 (see the [CI] number-row item), review it, then set `CURRENT_TEST_SHA`
+      `769b8165854f4dd4d7b854385adca1f273c5d3149f5fbdece4b524fd7d9d64ca`, `CURRENT_TEST_BLOB` `7b09f33223`
+      (full id from `git hash-object`) and `CURRENT_ASSERTION_LINE` 339 there and in
+      `test_number_row_current_test_causal.py` (its `TEST_SHA`, `TEST_BLOB`, line 435 of its controlled log), the
+      test row of `fixtures/number-row-current-test/build-inputs.json.raw` with `ROSTER_SHA`, and issue the new
+      approval record for the published commit. Or keep the in-process selection and accept its rare stale restores.
+
 - [ ] **Access weights of the score (decided by the agent on 2026-11-18, to review by the maintainer).** New
       metric `altgr_usage` (characters typed with AltGr held) with weight 2, on top of `modifier_usage` 0.5;
       `dead_key_usage` raised from 0.5 to 2. Per character, an AltGr chord costs 2.5 plus the thumb's reach, a dead
