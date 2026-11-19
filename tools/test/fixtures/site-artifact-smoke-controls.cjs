@@ -678,7 +678,10 @@ async function run() {
 			'utf8'
 		);
 		assert.match(header, /@media\s*\(max-width:\s*1280px\)/);
-		assert.match(header, /header \.menu-btn:not\(:checked\) ~ #menu\s*\{\s*height: 0;/);
+		assert.match(
+			header,
+			/header \.menu-btn:not\(\[aria-expanded='true'\]\) ~ #menu\s*\{\s*height: 0;/
+		);
 		assert.ok(
 			options.viewport.width > 1280,
 			'desktop navigation stays outside the closed mobile menu'

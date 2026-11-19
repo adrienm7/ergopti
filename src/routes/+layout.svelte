@@ -91,6 +91,13 @@
 		// document.getElementById('menu-btn').checked = false; /* Si le menu était ouvert, on le ferme */
 	}
 
+	/** Escape closes the open reference keyboard and gives the focus back to its button. */
+	function closeReferenceOnEscape(event) {
+		if (event.key !== 'Escape' || affiche === 'none') return;
+		toggleZIndex();
+		document.getElementById('afficher-clavier-reference').focus();
+	}
+
 	const isDev = detectDev();
 
 	/**
@@ -141,6 +148,8 @@
   lang="en" on the document: each part says lang="fr" so a screen reader
   reads it as French there too (WCAG 3.1.2, tools/test/test-site-languages.cjs).
 -->
+<svelte:window onkeydown={closeReferenceOnEscape} />
+
 <a class="skip-link" href="#contenu" lang="fr">Aller au contenu</a>
 
 <bloc-page id="page" class="bg-blue">
@@ -161,13 +170,15 @@
 			id="afficher-clavier-reference"
 			onclick={toggleZIndex}
 			aria-label="Afficher la référence clavier"
+			aria-controls="clavier-ref"
+			aria-expanded={affiche !== 'none'}
 		>
 			<i
 				class="icon-keyboard-duotone"
 				style="width:100%; display:{affiche === 'none' ? 'block' : 'none'}"
-				><span class="path1"></span><span class="path2"></span></i
+				aria-hidden="true"><span class="path1"></span><span class="path2"></span></i
 			>
-			<i class="icon-square-xmark" style="width:100%; display:{affiche}"
+			<i class="icon-square-xmark" aria-hidden="true" style="width:100%; display:{affiche}"
 				><span class="path1"></span><span class="path2"></span></i
 			>
 		</button>
@@ -186,7 +197,7 @@
 	</keyboard-reference>
 {/if}
 
-<div class="banner" lang="fr">
+<aside class="banner" lang="fr" aria-label="Annonce">
 	{#if isDev}
 		<a href={stableHref(page.url.pathname)}>
 			<div class="dev-banner-content">
@@ -202,7 +213,7 @@
 			<span class="banner-line subtitle">découvrez les nouveautés</span>
 		</a>
 	{/if}
-</div>
+</aside>
 
 <style>
 	#afficher-clavier-reference {

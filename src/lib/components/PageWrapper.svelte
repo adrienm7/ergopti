@@ -5,9 +5,12 @@
 <slot name="introduction" />
 
 <bloc-main>
-	<nav id="sidebar">
+	<nav id="sidebar" aria-labelledby="sidebar-title">
 		<div>
-			<p style="text-align:center; color:white; margin:0; padding:0; font-weight: bold">
+			<p
+				id="sidebar-title"
+				style="text-align:center; color:white; margin:0; padding:0; font-weight: bold"
+			>
 				Contenu de la page
 			</p>
 			<div id="page-toc-pc">
@@ -18,13 +21,14 @@
 				<a
 					href="https://github.com/adrienm7/ergopti"
 					target="_blank"
-					style="font-size:0.9em!important; color:white">Repo GitHub <i class="icon-github"></i></a
+					style="font-size:0.9em!important; color:white"
+					>Repo GitHub <i class="icon-github" aria-hidden="true"></i></a
 				>
 				—
 				<a
 					href={discordLink}
 					style="position:relative; bottom:-0.1em; font-size:0.9em!important; color:white"
-					>Serveur Discord <i class="icon-discord"></i></a
+					>Serveur Discord <i class="icon-discord" aria-hidden="true"></i></a
 				>
 			</p>
 		</div>

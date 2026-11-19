@@ -7,17 +7,18 @@
 
 <footer lang="fr">
 	<div>— <Ergopti></Ergopti> —</div>
-	<div style="font-size: 0.8rem; margin-top: 0.2rem;">
+	<nav aria-label="Liens du pied de page" style="font-size: 0.8rem; margin-top: 0.2rem;">
 		<a href="https://github.com/adrienm7/ergopti" target="_blank" class="text-white"
-			>Repo GitHub <i class="icon-github"></i></a
+			>Repo GitHub <i class="icon-github" aria-hidden="true"></i></a
 		>
-		<span style="position:relative; bottom:0.05em;">|</span>
+		<span style="position:relative; bottom:0.05em;" aria-hidden="true">|</span>
 		<a href={discordLink} target="_blank" class="text-white"
-			><span class="min-width-600">Serveur</span> Discord <i class="icon-discord"></i></a
+			><span class="min-width-600">Serveur</span> Discord
+			<i class="icon-discord" aria-hidden="true"></i></a
 		>
-		<span style="position:relative; bottom:0.05em;">|</span>
+		<span style="position:relative; bottom:0.05em;" aria-hidden="true">|</span>
 		<a href={resolve('/accessibilite')} class="text-white">Accessibilité</a>
-	</div>
+	</nav>
 </footer>
 
 <style>

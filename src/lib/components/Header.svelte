@@ -9,22 +9,37 @@
 	import { version, layoutData, versionsList, discordLink } from '#lib/stores_infos.js';
 	import { PRODUCTS, isInSection } from '#lib/js/siteNavigation.js';
 
+	// Whether the narrow-screen menu is open; the menu button's aria-expanded
+	// and the CSS that unfolds #menu both read it.
+	let menuOpen = $state(false);
+
 	function closeMenu() {
-		document.getElementById('menu-btn').checked = false;
+		menuOpen = false;
 		const reference = document.getElementById('clavier-ref');
 		if (reference) reference.style.zIndex = '-999'; /* Si le clavier était ouvert, on le ferme */
 		document.body.style.overflowY = 'visible';
 	}
 
+	function toggleMenu() {
+		menuOpen = !menuOpen;
+		toggleOverflowMenu();
+	}
+
+	/** Escape closes the open menu and gives the focus back to its button (WCAG 2.1.2). */
+	function closeMenuOnEscape(event) {
+		if (event.key !== 'Escape' || !menuOpen) return;
+		closeMenu();
+		document.getElementById('menu-btn').focus();
+	}
+
 	function toggleOverflowMenu() {
-		const menuBtn = document.getElementById('menu-btn');
 		const siteWidth = document.documentElement.clientWidth;
 		const toc = document.querySelector('#page-toc');
 		const tocPc = document.querySelector('#page-toc-pc');
 		const tocMobile = document.querySelector('#page-toc-mobile');
 
 		// Si le menu est ouvert et que la largeur de l'écran est inférieure ou égale à 1280px
-		if (menuBtn.checked && siteWidth <= 1280) {
+		if (menuOpen && siteWidth <= 1280) {
 			document.body.style.overflowY = 'hidden';
 		} else {
 			document.body.style.overflowY = 'visible';
@@ -43,6 +58,22 @@
 	}
 
 	let hasToc = $state(true);
+
+	/** @type {HTMLElement | undefined} */
+	let tocMobile = $state();
+
+	// A link of the moved table of contents closes the menu. The links are
+	// tocbot's, so the click is caught on their container: a link activated
+	// from the keyboard fires the same click.
+	$effect(() => {
+		if (!tocMobile) throw new Error('Header: the mobile table of contents is not bound');
+		const element = tocMobile;
+		const onClick = (event) => {
+			if (event.target instanceof Element && event.target.closest('a')) closeMenu();
+		};
+		element.addEventListener('click', onClick);
+		return () => element.removeEventListener('click', onClick);
+	});
 
 	// Exécuter la fonction après la mise à jour et au redimensionnement
 	$effect(() => {
@@ -93,6 +124,8 @@
 	});
 </script>
 
+<svelte:window onkeydown={closeMenuOnEscape} />
+
 <header lang="fr" bind:this={headerElement}>
 	<div id="ergopti-header">
 		<a href={resolve('/')} aria-label="Ergopti, page d’accueil">
@@ -119,17 +152,19 @@
 							aria-label="Voir l’historique des versions de la Disposition Ergopti"
 							style="position:relative; left:-0.1em; top:-0.65em; font-size:0.8em"
 						>
-							<i class="icon-circle-info"><span class="path1"></span><span class="path2"></span></i>
+							<i class="icon-circle-info" aria-hidden="true"
+								><span class="path1"></span><span class="path2"></span></i
+							>
 						</a>
 					{/if}
-					<span style="display:inline-block; width:0.15em"></span>
+					<span style="display:inline-block; width:0.15em" aria-hidden="true"></span>
 					<span class="links">
 						<a href="https://github.com/adrienm7/ergopti" target="_blank" aria-label="Repo GitHub">
-							<i class="icon-github" style="transform: scale(0.927536)"></i>
+							<i class="icon-github" aria-hidden="true" style="transform: scale(0.927536)"></i>
 						</a>
-						<span> – </span>
+						<span aria-hidden="true"> – </span>
 						<a href={discordLink} target="_blank" aria-label="Serveur Discord">
-							<i class="icon-discord"></i>
+							<i class="icon-discord" aria-hidden="true"></i>
 						</a>
 					</span>
 				</span>
@@ -144,16 +179,17 @@
 		</div>
 	</div>
 	<A11ySettings />
-	<input
+	<button
 		class="menu-btn"
-		type="checkbox"
+		type="button"
 		id="menu-btn"
 		aria-label="Menu"
 		aria-controls="menu"
-		onclick={toggleOverflowMenu}
-	/>
-	<label class="menu-icon" for="menu-btn"><span class="navicon"></span></label>
-	<nav id="menu">
+		aria-expanded={menuOpen}
+		onclick={toggleMenu}
+	></button>
+	<label class="menu-icon" for="menu-btn"><span class="navicon" aria-hidden="true"></span></label>
+	<nav id="menu" aria-label="Menu du site">
 		<div id="menu-pages">
 			{#each PRODUCTS as product (product.id)}
 				<a
@@ -176,27 +212,22 @@
 		</div>
 		<div id="menu-page-content">
 			{#if hasToc}
-				<nav id="menu-page-content-title">Contenu de la page</nav>
+				<p id="menu-page-content-title">Contenu de la page</p>
 				<hr />
 				<br />
 			{/if}
-			<div
-				id="page-toc-mobile"
-				onclick={closeMenu}
-				aria-label="Ouvrir le lien et fermer le menu"
-			></div>
-			<div style="height:70px"></div>
+			<div id="page-toc-mobile" bind:this={tocMobile}></div>
 			<div class="links">
 				<a href="https://github.com/adrienm7/ergopti" target="_blank">
-					Repo GitHub <i class="icon-github" style="transform: scale(0.927536)"></i>
+					Repo GitHub <i class="icon-github" aria-hidden="true" style="transform: scale(0.927536)"
+					></i>
 				</a>
-				<span> — </span>
+				<span aria-hidden="true"> — </span>
 				<a href={discordLink} target="_blank">
 					Serveur Discord
-					<i class="icon-discord"></i>
+					<i class="icon-discord" aria-hidden="true"></i>
 				</a>
 			</div>
-			<div style="height:70px"></div>
 		</div>
 	</nav>
 </header>
@@ -342,6 +373,13 @@
 		width: 1px;
 	}
 
+	/* The wide-screen menu is always shown: no button to reach there. */
+	@media (min-width: 1281px) {
+		header .menu-btn {
+			display: none;
+		}
+	}
+
 	header .menu-btn:focus-visible + .menu-icon {
 		outline: 3px solid #ffd60a;
 		outline-offset: -3px;
@@ -469,31 +507,31 @@
 		/* A closed menu is hidden, not only flattened: its links must not
 		   take the keyboard focus while nobody can see them. */
 		header #menu,
-		header .menu-btn:not(:checked) ~ #menu {
+		header .menu-btn:not([aria-expanded='true']) ~ #menu {
 			height: 0;
 			visibility: hidden;
 		}
 
-		header .menu-btn:checked ~ #menu {
+		header .menu-btn[aria-expanded='true'] ~ #menu {
 			height: calc(100vh - var(--header-offset));
 			overflow: scroll;
 			visibility: visible;
 		}
 
-		header .menu-btn:checked ~ .menu-icon .navicon {
+		header .menu-btn[aria-expanded='true'] ~ .menu-icon .navicon {
 			background: transparent;
 		}
 
-		header .menu-btn:checked ~ .menu-icon .navicon:before {
+		header .menu-btn[aria-expanded='true'] ~ .menu-icon .navicon:before {
 			transform: rotate(-45deg);
 		}
 
-		header .menu-btn:checked ~ .menu-icon .navicon:after {
+		header .menu-btn[aria-expanded='true'] ~ .menu-icon .navicon:after {
 			transform: rotate(45deg);
 		}
 
-		header .menu-btn:checked ~ .menu-icon:not(.steps) .navicon:before,
-		header .menu-btn:checked ~ .menu-icon:not(.steps) .navicon:after {
+		header .menu-btn[aria-expanded='true'] ~ .menu-icon:not(.steps) .navicon:before,
+		header .menu-btn[aria-expanded='true'] ~ .menu-icon:not(.steps) .navicon:after {
 			top: 0;
 		}
 	}
@@ -544,8 +582,15 @@
 	} */
 	}
 
+	/* The room the two 70 px spacers used to hold, above and below the links. */
+	#menu-page-content .links {
+		padding: 70px 0;
+	}
+
 	#menu-page-content-title {
 		font-weight: bold;
+		line-height: inherit;
+		margin: 0;
 		padding-bottom: 5px;
 		padding-top: 30px;
 		text-align: center;
