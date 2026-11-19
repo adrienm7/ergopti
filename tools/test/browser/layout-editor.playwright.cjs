@@ -1022,11 +1022,17 @@ async function exerciseStartAnyLayout(page) {
 	);
 	assert.ok(!names.some((name) => /_/.test(name)), 'display names, not ids');
 	await page.fill('#le-start-search', 'colemak-dh');
+	// The library grows (649 layouts on 2026-11-19): every match, and no other.
+	const found = await page.$$eval('#le-start-layout option', (options) =>
+		options.map((option) => option.textContent)
+	);
+	assert.ok(
+		found.includes('Colemak-DH') && found.length < names.length,
+		`the search narrows the list: ${found.join(' | ')}`
+	);
 	assert.deepEqual(
-		await page.$$eval('#le-start-layout option', (options) =>
-			options.map((option) => option.textContent)
-		),
-		['Colemak-DH', 'Colemak-DH Angle', 'Colemak-DHv'],
+		found.filter((name) => !/colemak[- ]?dh/i.test(name)),
+		[],
 		'the search narrows the list'
 	);
 	assert.equal(await page.inputValue('#le-start-layout'), 'colemak_dh');
