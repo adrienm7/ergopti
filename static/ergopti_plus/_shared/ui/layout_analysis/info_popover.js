@@ -30,7 +30,8 @@
  *    the definitions) and its formula (layout_analysis.formula.<id>, or the
  *    formula of what it is a share of): a compact header (« SFB », a name on
  *    two lines) keeps its full meaning one key press away (maintainer,
- *    2026-11-19). metricShort() gives the usual acronym of a metric's name.
+ *    2026-11-19). metricShort() gives the usual acronym of a metric's name,
+ *    metricSpoken() the name of a header showing it.
  * 8. Percentile chips (percentile): « P70 » beside a metric's value opens a
  *    popover of its own words, with no references; note() makes an « i »
  *    of the same kind for any explanation without references (the
@@ -399,6 +400,20 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		return match ? match[1] : null;
 	}
 
+	/**
+	 * The accessible name of a header that shows a metric's acronym: the
+	 * acronym first, as shown, then the words it stands for (« SFB, Same-finger
+	 * bigrams »), so a voice command saying the visible text reaches it (WCAG
+	 * 2.5.3); the full name when the metric has no acronym.
+	 * @param {string} id - A LAYOUT_ANALYSIS.METRICS id.
+	 * @returns {string}
+	 */
+	function metricSpoken(id) {
+		const name = t(`layout_analysis.metric.${id}`);
+		const match = ACRONYM.exec(name);
+		return match ? `${match[1]}, ${name.slice(0, match.index).trim()}` : name;
+	}
+
 	function build() {
 		popover = el('div', 'la-popover');
 		popover.id = POPOVER_ID;
@@ -602,6 +617,7 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		measure,
 		metricUnit,
 		metricShort,
+		metricSpoken,
 		formulaOf,
 		analyserUnit,
 		NO_BREAK_SPACE,

@@ -4833,8 +4833,9 @@ var LayoutEditorPage = (function () {
 			chipResult = result;
 			chipLabel.textContent = t('layout_analysis.table.score');
 			const format = window.LAYOUT_ANALYSIS_INFO.format;
-			// What the live region says, and the button's name: the visible text
-			// in the same order, so a voice command saying it reaches the button.
+			// What the live region says, and the button's name: the visible text in
+			// the same order, so a voice command saying it reaches the button, its
+			// parts joined by « · » so that no breaking space follows a number.
 			const words = [];
 			const named = [];
 			chipChange.className = 'le-score-change';
@@ -4843,11 +4844,11 @@ var LayoutEditorPage = (function () {
 				chipScore.textContent = '—';
 				chipRank.textContent = tl('score_chip.none');
 				words.push(tl('score_chip.none'));
-				named.push(chipLabel.textContent, chipScore.textContent, chipRank.textContent);
+				named.push(`${chipLabel.textContent} ${chipScore.textContent}`, chipRank.textContent);
 			} else {
 				chipScore.textContent = format(result.score, 1);
 				chipRank.textContent = tl('score_chip.rank', { rank: result.rank, count: result.count });
-				named.push(chipLabel.textContent, chipScore.textContent, chipRank.textContent);
+				named.push(`${chipLabel.textContent} ${chipScore.textContent}`, chipRank.textContent);
 				words.push(
 					t('layout_analysis.panel.score', {
 						score: format(result.score, 1),
@@ -4884,7 +4885,7 @@ var LayoutEditorPage = (function () {
 			}
 			const label = tl('score_chip.open');
 			chipButton.title = label;
-			chipButton.setAttribute('aria-label', `${named.join(' ')}. ${label}`);
+			chipButton.setAttribute('aria-label', `${named.join(' · ')}. ${label}`);
 			const spoken = words.join('. ');
 			if (chipLive.textContent !== spoken) chipLive.textContent = spoken;
 		}

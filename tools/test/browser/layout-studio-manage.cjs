@@ -396,9 +396,10 @@ async function exercisePercentiles(browser, origin) {
 			`a higher SFB never has a higher percentile: ${JSON.stringify([sorted[i - 1], sorted[i]])}`
 		);
 	assert.ok(sorted[0].percent >= 95, `the lowest SFB is near P100: ${sorted[0].percent}`);
+	// Named after the « P70 » it shows (WCAG 2.5.3), then in full.
 	assert.match(
 		sorted[0].label,
-		/^Percentile \d+\s+on .*: better than \d+\s+% of \d+\s+complete layouts/
+		/^P\d+, Percentile \d+\s+on .*: better than \d+\s+% of \d+\s+complete layouts/
 	);
 	const chip = page.locator('#la-table tbody tr .la-pct').first();
 	const text = await chip.textContent();

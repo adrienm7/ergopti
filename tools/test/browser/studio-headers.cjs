@@ -99,7 +99,12 @@ async function checkHeaders(browser, origin, lang) {
 				ACRONYMS[header.key],
 				`${lang}: ${header.key} is headed by its acronym`
 			);
-			assert.equal(header.label, name, `${lang}: ${header.key}'s sort button is named in full`);
+			// The acronym first, as shown, then its words (WCAG 2.5.3).
+			assert.equal(
+				header.label,
+				`${ACRONYMS[header.key]}, ${name.replace(/\s*[(（][A-Z]+[)）]\s*$/, '')}`,
+				`${lang}: ${header.key}'s sort button is named in full`
+			);
 		} else assert.equal(header.text, name, `${lang}: ${header.key} is headed by its name`);
 		assert.equal(header.infos, 1, `${lang}: ${header.key} has one « i »`);
 		assert.ok(
