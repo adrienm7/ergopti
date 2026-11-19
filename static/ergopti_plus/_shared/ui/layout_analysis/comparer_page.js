@@ -4747,6 +4747,7 @@
 			document.addEventListener('i18n:applied', () => {
 				applyStrings();
 				fillCorpora();
+				fillLayouts();
 				fillWeights();
 				fillIdealLoad();
 				fillShortcuts();

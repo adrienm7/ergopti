@@ -434,7 +434,10 @@ body:has(> main.layout-analysis) {
 	flex: 1 1 240px;
 }
 
-.la-pick-search input {
+/* In its column label, the search keeps its own height: the row rule's
+   flex-basis would stretch it 200 px tall. */
+.la-row .la-pick-search input {
+	flex: none;
 	width: 100%;
 }
 

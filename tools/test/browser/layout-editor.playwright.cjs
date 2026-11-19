@@ -1488,6 +1488,9 @@ async function exerciseComparerLayoutList(browser, origin) {
 	);
 	await comparerTab(page, 'home');
 	await page.click('#la-layouts-summary');
+	// (layout-search-height) The search is one line high, not stretched by its row.
+	const search = await page.locator('#la-filter').boundingBox();
+	assert.ok(search.height < 60, `the search is ${search.height} px tall`);
 	const fold = (text) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 	const list = () =>
 		page.$$eval('#la-layout-list .la-letter-group', (groups) =>
@@ -1743,6 +1746,14 @@ async function exerciseComparerHome(browser, origin) {
 	for (const lang of LOCALES) {
 		await page.goto(`${origin}/ui/layout_analysis/index.html?lang=${lang}&corpus=fr_nemolivier`);
 		await page.waitForSelector('#la-tab-home');
+		await page.waitForFunction(
+			() =>
+				!document.getElementById('la-tab-home').textContent.includes('layout_analysis.') &&
+				document.getElementById('la-results').getAttribute('aria-busy') === 'false'
+		);
+		// (layout-count-locale) The layout list's count follows the strings that land.
+		const count = await page.textContent('#la-pick-count');
+		assert.ok(!count.includes('layout_analysis.'), `${lang}: the layout count reads ${count}`);
 		const label = (await page.textContent('#la-tab-home')).trim();
 		assert.ok(
 			label !== '' && !label.startsWith('layout_analysis.'),
