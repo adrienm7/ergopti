@@ -865,6 +865,11 @@ _G4B_EnableOwner(State) {
 		F.Runtime.PublishReady()
 		AssertTrue(F.Flow.Ready, "Managed readiness must precede enable admission.")
 		AssertFalse(F.Flow.MenuIntent["enabled"], "The fixture must capture an OFF enable intent.")
+		; The case drives every tick itself. Its armed poll could otherwise fire
+		; inside the writer, between the rename and the close of the exclusively
+		; held configuration, and read it there (error 32, CI 44432255232).
+		AssertTrue(IsObject(F.Flow.Timer), "Managed readiness keeps its poll armed.")
+		SetTimer(F.Flow.Timer, 0)
 		_LLM_ManagedBootstrap := F.Flow
 		State["port"]["writer"] := _G4B_EnableWriter.Bind(State, F.Flow)
 		State["port"]["persistence_notify"] := _G4B_EnableNotify.Bind(State)
