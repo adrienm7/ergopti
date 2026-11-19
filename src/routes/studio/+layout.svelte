@@ -140,31 +140,44 @@ system's), kept in this browser and sent to each frame (frameTheme.js).
 
 	.studio-bar :global(.subnav.compact) {
 		flex: 1 1 auto;
+		min-width: 0;
 		width: auto;
 	}
 
+	/* The name may break between its two words at 200 % text on a phone. */
 	.studio-brand {
 		align-items: center;
+		box-sizing: border-box;
 		color: rgba(255, 255, 255, 0.95);
 		display: flex;
 		font-weight: bold;
 		gap: 8px;
+		max-width: 100%;
+		min-width: 0;
 		padding: 0.4rem 16px;
-		white-space: nowrap;
+		text-align: center;
 	}
 
+	/* At 200 % text the longest choice (« Thème du système ») outgrows a phone:
+	   the select then goes under its label and narrows to the bar. */
 	.studio-theme {
 		align-items: center;
+		box-sizing: border-box;
 		color: rgba(255, 255, 255, 0.9);
 		display: flex;
+		flex-wrap: wrap;
 		font-size: 0.9rem;
 		gap: 6px;
+		justify-content: center;
+		max-width: 100%;
+		min-width: 0;
 		padding: 0.4rem 16px;
 	}
 
 	.studio-theme select {
 		font: inherit;
 		max-width: 100%;
+		min-width: 0;
 	}
 
 	/* The site's main rule sizes text pages; the workspace is full bleed. */

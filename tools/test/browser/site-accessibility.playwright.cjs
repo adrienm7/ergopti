@@ -47,6 +47,8 @@ const WCAG_TAGS = Object.freeze([
 const VIEWPORT = Object.freeze({ width: 1440, height: 900 });
 // A phone, for the reflow checks (WCAG 1.4.10 asks for 320 CSS pixels).
 const PHONE_VIEWPORT = Object.freeze({ width: 320, height: 800 });
+// The Studio bar's reflow widths: the smallest phone, a common phone, a tablet.
+const STUDIO_BAR_WIDTHS = Object.freeze([320, 375, 768]);
 const BASELINE_PATH = path.join(__dirname, 'site-accessibility-baseline.json');
 // The reading checks' ratchet (site-reading.cjs): offending elements per page,
 // reading mode and check.
@@ -341,6 +343,60 @@ async function exerciseUndo(comparer, page) {
 }
 
 /**
+ * Ergopti Studio's bar (its name, tabs and « Apparence ») reflows on a phone
+ * and a tablet, in both schemes, with the default text and with the site's
+ * 200 % text: no sideways page scroll and every part of the bar, each tab
+ * among them, wholly in view (WCAG 1.4.10). The bar's name and tab icons once pushed the tabs to 327 px at
+ * 320 px.
+ * @param {object} browser
+ * @param {string} origin
+ * @param {string} basePath
+ */
+async function exerciseStudioBar(browser, origin, basePath) {
+	for (const preferences of [null, reading.READING_MODES.text.preferences])
+		for (const colorScheme of COLOR_SCHEMES)
+			await withContext(browser, origin, { colorScheme }, async (context) => {
+				if (preferences)
+					await context.addInitScript(
+						([key, value]) => window.localStorage.setItem(key, value),
+						[PREFERENCES_KEY, JSON.stringify(preferences)]
+					);
+				const page = await context.newPage();
+				try {
+					for (const width of STUDIO_BAR_WIDTHS) {
+						await page.setViewportSize({ width, height: PHONE_VIEWPORT.height });
+						await page.goto(origin + basePath + '/studio/comparer', { waitUntil: 'load' });
+						await page.locator('.studio-bar nav.subnav a').first().waitFor();
+						const where = [width + ' px', colorScheme, preferences ? '200 % text' : 'default text'];
+						// The whole page's reflow at 200 % text also involves the site
+						// header, which is not the bar's; the bar's own parts are measured.
+						if (!preferences)
+							assert.equal(
+								await scrollsSideways(page),
+								false,
+								'The Studio page fits ' + where.join(', ')
+							);
+						const outside = await page.evaluate(() =>
+							[...document.querySelectorAll('.studio-bar, .studio-bar *')]
+								.filter((part) => {
+									const box = part.getBoundingClientRect();
+									return box.left < 0 || box.right > document.documentElement.clientWidth;
+								})
+								.map((part) => part.tagName.toLowerCase() + '.' + part.classList[0])
+						);
+						assert.deepEqual(
+							outside,
+							[],
+							'The Studio bar and its tabs are in view at ' + where.join(', ')
+						);
+					}
+				} finally {
+					await page.close();
+				}
+			});
+}
+
+/**
  * What the scan cannot open: the Comparer's details and settings at phone
  * width (no sideways page scroll, every figure a named table, the heatmap's
  * numbers as a table, no violation once unfolded), the restores' undo, and the editor's board
@@ -604,6 +660,7 @@ async function scanSite(site, basePath, chromium, routes = AUDITED_ROUTES, readi
 					await exerciseStudio(context, origin, basePath, inflight, axeSource);
 					await exerciseHeroPause(context, origin, basePath, inflight);
 				});
+			if (!readingOnly) await exerciseStudioBar(browser, origin, basePath);
 			const readingFindings = [];
 			for (const mode of Object.keys(reading.READING_MODES))
 				readingFindings.push(...(await scanReading(browser, origin, basePath, routes, mode)));

@@ -84,7 +84,11 @@ where the current tab is brought into view.
 	.subnav.compact {
 		background-color: var(--header-color);
 		border-top: 1px solid rgba(255, 255, 255, 0.08);
+		/* Its padding stays inside the full width, and as a flex item of a bar it
+		   may shrink below its tabs' single-row width (they wrap instead). */
+		box-sizing: border-box;
 		max-width: none;
+		min-width: 0;
 		padding: 0 16px;
 		width: 100%;
 	}
@@ -169,6 +173,28 @@ where the current tab is brought into view.
 			overflow-x: auto;
 			padding-bottom: 0.4rem;
 			scrollbar-width: thin;
+		}
+
+		/* The few Studio tabs wrap onto a second row rather than scroll, so every
+		   tab stays in view at 320 px and at 200 % text (WCAG 1.4.10). */
+		.subnav.compact {
+			padding: 0 8px;
+		}
+
+		.subnav.compact ul {
+			flex-wrap: wrap;
+			justify-content: center;
+			overflow-x: visible;
+			padding-bottom: 0;
+		}
+
+		.subnav.compact a {
+			padding: 0.45rem 0.4rem;
+		}
+
+		.subnav.compact a[aria-current='page']::after {
+			left: 0.4rem;
+			right: 0.4rem;
 		}
 	}
 </style>
