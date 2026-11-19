@@ -384,7 +384,7 @@ function sfbColumn(page) {
 async function exercisePercentiles(browser, origin) {
 	const { page, errors, context } = await openComparer(browser, origin, '&keyboard=iso');
 	await page.waitForFunction(() =>
-		/^\d+ layouts compared/.test(document.getElementById('la-status').textContent)
+		/^\d+\s+layouts compared/.test(document.getElementById('la-status').textContent)
 	);
 	const rows = (await sfbColumn(page)).filter((row) => row.percent !== null);
 	assert.ok(rows.length >= 20, `percentiles shown: ${rows.length}`);
@@ -396,13 +396,20 @@ async function exercisePercentiles(browser, origin) {
 			`a higher SFB never has a higher percentile: ${JSON.stringify([sorted[i - 1], sorted[i]])}`
 		);
 	assert.ok(sorted[0].percent >= 95, `the lowest SFB is near P100: ${sorted[0].percent}`);
-	assert.match(sorted[0].label, /^Percentile \d+ on .*: better than \d+ % of \d+ complete layouts/);
+	assert.match(
+		sorted[0].label,
+		/^Percentile \d+\s+on .*: better than \d+\s+% of \d+\s+complete layouts/
+	);
 	const chip = page.locator('#la-table tbody tr .la-pct').first();
 	const text = await chip.textContent();
 	await chip.click();
 	await page.waitForSelector('#la-popover:not([hidden])');
 	const said = await page.textContent('#la-popover .la-popover-texts');
-	assert.ok(said.startsWith(`${text} is this layout’s percentile on `), `explained: ${said}`);
+	// The number keeps its next word with a no-break space (studio-numbers).
+	assert.ok(
+		said.replace(/\s/g, ' ').startsWith(`${text} is this layout’s percentile on `),
+		`explained: ${said}`
+	);
 	assert.equal(await page.$eval('#la-popover ul', (ul) => ul.hidden), true, 'no references list');
 	await page.keyboard.press('Escape');
 	assert.equal(
@@ -551,7 +558,7 @@ function rankingRows(page) {
 async function exerciseRankingViews(browser, origin) {
 	const { page, errors, context } = await openComparer(browser, origin, '&keyboard=iso');
 	await page.waitForFunction(() =>
-		/^\d+ layouts compared/.test(document.getElementById('la-status').textContent)
+		/^\d+\s+layouts compared/.test(document.getElementById('la-status').textContent)
 	);
 	const all = await rankingRows(page);
 	await page.check('#la-table-fold');
@@ -568,7 +575,7 @@ async function exerciseRankingViews(browser, origin) {
 	assert.equal(await fold.getAttribute('aria-expanded'), 'false');
 	assert.match(
 		await fold.getAttribute('aria-label'),
-		/^Show the \d+ other layouts of the family of /
+		/^Show the \d+\s+other layouts of the family of /
 	);
 	await fold.click();
 	assert.equal((await rankingRows(page)).length, folded.length + count, 'its members are shown');
@@ -590,7 +597,7 @@ async function exerciseRankingViews(browser, origin) {
 	assert.equal((await rankingRows(page))[0].id, last, 'first under another sort');
 	await page.reload();
 	await page.waitForFunction(() =>
-		/^\d+ layouts compared/.test(document.getElementById('la-status').textContent)
+		/^\d+\s+layouts compared/.test(document.getElementById('la-status').textContent)
 	);
 	const again = await rankingRows(page);
 	assert.equal(again[0].id, last, 'still first after a reload');
