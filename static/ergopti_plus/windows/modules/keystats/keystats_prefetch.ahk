@@ -97,9 +97,6 @@ class KLPFWorker {
 		static owner_id := KLPF_NewOwnerId()
 		static process_id := DllCall("Kernel32\GetCurrentProcessId", "UInt")
 		static jobs := Map()
-		; How often a Studio job looks for its finished stage. The worker writes it
-		; before it saves the reader image, which takes seconds on a large store.
-		static STUDIO_STAGE_POLL_MS := 250
 		; Studio workers whose read was delivered while they still save the reader
 		; image: generation -> process handle, kept until the worker exits.
 		static settling := Map()
@@ -823,13 +820,13 @@ _KLPF_WatchStudioStage(job_key, generation) {
 		Token := Map()
 		Watch := KLPF_PollStudioStage.Bind(Token, job_key, generation)
 		Token["callback"] := Watch
-		KLPFWorker.jobs[job_key]["stage_watch"] := Token
 		try {
+				Period := TimingsGet("keystats", "studio_stage_poll_ms")
 				if IsObject(KLPFWorker.stage_watch_fn) {
-						if !KLPFWorker.stage_watch_fn.Call(Watch, KLPFWorker.STUDIO_STAGE_POLL_MS)
+						if !KLPFWorker.stage_watch_fn.Call(Watch, Period)
 								throw Error("the stage watch scheduler refused the timer")
 				} else {
-						SetTimer(Watch, KLPFWorker.STUDIO_STAGE_POLL_MS)
+						SetTimer(Watch, Period)
 				}
 				return true
 		} catch as Err {
@@ -862,17 +859,29 @@ _KLPF_StopStudioStageWatch(Token) {
  * @returns {Boolean} True when the read was delivered by this tick.
  */
 KLPF_PollStudioStage(Token, job_key, generation, *) {
-		if !KLPFWorker.jobs.Has(job_key) || KLPFWorker.jobs[job_key]["generation"] != generation
-						|| KLPFWorker.jobs[job_key].Get("terminal_claimed", false) {
-				_KLPF_StopStudioStageWatch(Token)
-				return false
+		; The worker's exit callback is another timer: deciding that this job is
+		; still unclaimed and registering its settling owner is one transaction,
+		; so whichever of the two runs second sees what the first one did.
+		PreviousCritical := Critical("On")
+		try {
+				Live := KLPFWorker.jobs.Has(job_key)
+						&& KLPFWorker.jobs[job_key]["generation"] = generation
+						&& !KLPFWorker.jobs[job_key].Get("terminal_claimed", false)
+				Ready := Live && IsObject(KLPFWorker.jobs[job_key]["handle"])
+						&& FSExists(KLPFWorker.jobs[job_key]["stage"])
+				if Ready {
+						Stage := KLPFWorker.jobs[job_key]["stage"]
+						KLPFWorker.settling[generation] := KLPFWorker.jobs[job_key]["handle"]
+				}
+		} finally {
+				Critical(PreviousCritical)
 		}
-		job := KLPFWorker.jobs[job_key]
-		if !IsObject(job["handle"]) || !FSExists(job["stage"])
+		if Live && !Ready
 				return false
 		_KLPF_StopStudioStageWatch(Token)
-		KLPFWorker.settling[generation] := job["handle"]
-		KLPF_CompleteJob(job_key, generation, "ok", job["stage"])
+		if !Ready
+				return false
+		KLPF_CompleteJob(job_key, generation, "ok", Stage)
 		return true
 }
 

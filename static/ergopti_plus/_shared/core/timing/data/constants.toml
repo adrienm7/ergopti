@@ -536,6 +536,11 @@ first_push_delay_ms = 1500
 # (the atomic state write).
 state_rename_retry_ms = 50
 
+# Windows: how often an Ergopti Studio « My typing » read looks for its worker's
+# finished stage, which it hands over before the worker saves the reader image.
+# AHK: keystats_prefetch.ahk _KLPF_WatchStudioStage.
+studio_stage_poll_ms = 250
+
 # Background ingest tick — how often buffered events are flushed to disk.
 # AHK: keystats.ahk INGEST_TICK_MS. HS: log_manager.lua INGEST_TICK_SEC.
 ingest_tick_ms = 5000
