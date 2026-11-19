@@ -416,8 +416,9 @@ async function exerciseStudioBar(browser, origin, basePath) {
 }
 
 /**
- * What the scan cannot open: the Comparer's details and settings at phone
- * width (no sideways page scroll, every figure a named table, the heatmap's
+ * What the scan cannot open: the Comparer's « Home », its results tabs
+ * reached from the keyboard, its details and settings at phone width (no violation in
+ * each, no sideways page scroll, every figure a named table, the heatmap's
  * numbers as a table, no violation once unfolded), the restores' undo, and the editor's board
  * (every key named with its place and its layers, the layout as a table, a
  * swap without dragging, WCAG 2.5.7).
@@ -431,6 +432,53 @@ async function exerciseStudio(context, origin, basePath, inflight, axeSource) {
 		const comparer = await studioFrame(page, '/layout_analysis/');
 		assert.equal(await scrollsSideways(page), false, 'The Comparer page fits a phone');
 		assert.equal(await scrollsSideways(comparer), false, 'The Comparer fits a phone');
+		// A fresh visit opens on « Home », the Comparer's first tab: its controls
+		// are checked there, then every results tab up to « One layout » (checked
+		// below, from the ranking) is reached from the keyboard, as the tabs
+		// pattern offers it: an arrow from the focused tab shows the next one.
+		const home = comparer.locator('#la-tab-home');
+		assert.equal(await home.getAttribute('aria-selected'), 'true', 'A fresh visit opens on Home');
+		await comparer.locator('#la-panel-home').waitFor({ state: 'visible' });
+		// Unfolded, so the scan reaches the layout list and the settings too.
+		await comparer.evaluate(() =>
+			document.querySelectorAll('#la-panel-home details').forEach((node) => {
+				node.open = true;
+			})
+		);
+		assert.deepEqual(
+			await scanFrame(comparer, axeSource, '#la-panel-home'),
+			[],
+			'No violation in #la-panel-home'
+		);
+		const tabs = await comparer
+			.locator('#la-tabs [role="tab"]')
+			.evaluateAll((nodes) => nodes.map((node) => node.id));
+		assert.equal(tabs[0], 'la-tab-home', 'Home is the first tab');
+		assert.equal(tabs.at(-1), 'la-tab-details', '« One layout » is the last tab');
+		const results = tabs.slice(1, -1);
+		assert.ok(results.includes('la-tab-overview'), 'The ranking has its tab');
+		await home.focus();
+		for (const id of results) {
+			await comparer.locator(':focus').press('ArrowRight');
+			const tab = comparer.locator('#' + id);
+			assert.equal(await tab.getAttribute('aria-selected'), 'true', 'The arrow shows ' + id);
+			assert.equal(
+				await comparer.evaluate(() => document.activeElement.id),
+				id,
+				'The arrow moves the focus with the tab'
+			);
+			await comparer.locator('#' + (await tab.getAttribute('aria-controls'))).waitFor();
+			await comparer.waitForFunction(() => !document.querySelector('[aria-busy="true"]'), null, {
+				timeout: BUSY_TIMEOUT_MS
+			});
+			assert.equal(await scrollsSideways(comparer), false, id + ' fits a phone');
+			assert.deepEqual(
+				await scanFrame(comparer, axeSource, '#la-results'),
+				[],
+				'No violation in #la-results under ' + id
+			);
+		}
+		await comparer.locator('#la-tab-overview').click();
 		await comparer
 			.locator('#la-results[aria-busy="false"] #la-chart .la-chart-row')
 			.first()
