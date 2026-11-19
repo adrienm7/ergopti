@@ -41147,6 +41147,1526 @@
 				"Period": ".",
 				"Slash": "/"
 			}
+		},
+		{
+			"id": "dvorak_classic",
+			"name": "Dvorak (classic)",
+			"language": "en",
+			"source": "xkeyboard_config",
+			"source_path": "symbols/us, dvorak-classic",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": [
+					"`",
+					"~",
+					{
+						"dead": "grave"
+					},
+					{
+						"dead": "tilde"
+					}
+				],
+				"Digit1": ["[", "{", null, null],
+				"Digit2": ["7", "&", null, null],
+				"Digit3": ["5", "%", null, null],
+				"Digit4": ["3", "#", null, null],
+				"Digit5": ["1", "!", null, null],
+				"Digit6": [
+					"9",
+					"(",
+					{
+						"dead": "grave"
+					},
+					null
+				],
+				"Digit7": ["0", ")", null, null],
+				"Digit8": ["2", "@", null, null],
+				"Digit9": ["4", "$", null, null],
+				"Digit0": [
+					"6",
+					"^",
+					{
+						"dead": "circumflex"
+					},
+					{
+						"dead": "circumflex"
+					}
+				],
+				"Minus": ["8", "*", null, null],
+				"Equal": [
+					"]",
+					"}",
+					{
+						"dead": "tilde"
+					},
+					null
+				],
+				"KeyQ": ["/", "?", null, null],
+				"KeyW": [
+					",",
+					"<",
+					{
+						"dead": "cedilla"
+					},
+					{
+						"dead": "caron"
+					}
+				],
+				"KeyE": [
+					".",
+					">",
+					{
+						"dead": "abovedot"
+					},
+					"·"
+				],
+				"KeyR": ["p", "P", null, null],
+				"KeyT": ["y", "Y", null, null],
+				"KeyY": ["f", "F", null, null],
+				"KeyU": ["g", "G", null, null],
+				"KeyI": ["c", "C", null, null],
+				"KeyO": ["r", "R", null, null],
+				"KeyP": ["l", "L", null, null],
+				"BracketLeft": [
+					"'",
+					"\"",
+					{
+						"dead": "acute"
+					},
+					{
+						"dead": "diaeresis"
+					}
+				],
+				"BracketRight": ["=", "+", null, null],
+				"KeyA": ["a", "A", null, null],
+				"KeyS": ["o", "O", null, null],
+				"KeyD": ["e", "E", null, null],
+				"KeyF": ["u", "U", null, null],
+				"KeyG": ["i", "I", null, null],
+				"KeyH": ["d", "D", null, null],
+				"KeyJ": ["h", "H", null, null],
+				"KeyK": ["t", "T", null, null],
+				"KeyL": ["n", "N", null, null],
+				"Semicolon": ["s", "S", null, null],
+				"Quote": ["-", "_", null, null],
+				"Backslash": ["\\", "|", null, null],
+				"IntlBackslash": ["<", ">", "|", "¦"],
+				"KeyZ": [
+					";",
+					":",
+					{
+						"dead": "ogonek"
+					},
+					{
+						"dead": "doubleacute"
+					}
+				],
+				"KeyX": ["q", "Q", null, null],
+				"KeyC": ["j", "J", null, null],
+				"KeyV": ["k", "K", null, null],
+				"KeyB": ["x", "X", null, null],
+				"KeyN": ["b", "B", null, null],
+				"KeyM": ["m", "M", null, null],
+				"Comma": ["w", "W", null, null],
+				"Period": ["v", "V", null, null],
+				"Slash": ["z", "Z", null, null],
+				"Space": [" ", " ", null, null]
+			},
+			"dead_rules": {
+				"grave": {
+					"dead:grave": "`",
+					"V": "Ǜ",
+					"v": "ǜ",
+					"m": "m̀",
+					"M": "M̀"
+				},
+				"tilde": {
+					"dead:tilde": "~",
+					"=": "≃",
+					"<": "≲",
+					">": "≳"
+				},
+				"circumflex": {
+					"0": "⁰",
+					"1": "¹",
+					"2": "²",
+					"3": "³",
+					"4": "⁴",
+					"5": "⁵",
+					"6": "⁶",
+					"7": "⁷",
+					"8": "⁸",
+					"9": "⁹",
+					"dead:circumflex": "^",
+					".": "·",
+					"+": "⁺",
+					"-": "⁻",
+					"=": "⁼",
+					"(": "⁽",
+					")": "⁾"
+				},
+				"cedilla": {
+					"dead:cedilla": "¸"
+				},
+				"caron": {
+					"0": "₀",
+					"1": "₁",
+					"2": "₂",
+					"3": "₃",
+					"4": "₄",
+					"5": "₅",
+					"6": "₆",
+					"7": "₇",
+					"8": "₈",
+					"9": "₉",
+					"dead:caron": "ˇ",
+					"+": "₊",
+					"-": "₋",
+					"=": "₌",
+					"(": "₍",
+					")": "₎",
+					"V": "Ǚ",
+					"v": "ǚ"
+				},
+				"abovedot": {
+					"dead:abovedot": "˙",
+					"i": "ı",
+					"j": "ȷ",
+					"L": "Ŀ",
+					"l": "ŀ"
+				},
+				"acute": {
+					" ": "'",
+					"dead:acute": "´",
+					"J": "J́",
+					"j": "j́",
+					"V": "Ǘ",
+					"v": "ǘ"
+				},
+				"diaeresis": {
+					"dead:diaeresis": "¨",
+					" ": "\"",
+					"'": "̈́"
+				},
+				"ogonek": {
+					"dead:ogonek": "˛"
+				},
+				"doubleacute": {
+					"dead:doubleacute": "˝"
+				}
+			}
+		},
+		{
+			"id": "colemak_dh_wide_iso",
+			"name": "Colemak-DH Wide ISO",
+			"language": "en",
+			"source": "xkeyboard_config",
+			"source_path": "symbols/us, colemak_dh_wide_iso",
+			"fingering": "angle",
+			"rows": {
+				"Backquote": [
+					"`",
+					"~",
+					{
+						"dead": "tilde"
+					},
+					"~"
+				],
+				"Digit1": ["1", "!", "¡", "¹"],
+				"Digit2": ["2", "@", "º", "²"],
+				"Digit3": ["3", "#", "ª", "³"],
+				"Digit4": ["4", "$", "¢", "£"],
+				"Digit5": ["5", "%", "€", "¥"],
+				"Digit6": ["6", "^", "ħ", "Ħ"],
+				"Digit7": ["=", "+", "×", "÷"],
+				"Digit8": ["7", "&", "ð", "Ð"],
+				"Digit9": ["8", "*", "þ", "Þ"],
+				"Digit0": ["9", "(", "‘", "“"],
+				"Minus": ["0", ")", "’", "”"],
+				"Equal": ["-", "_", "–", "—"],
+				"KeyQ": ["q", "Q", "ä", "Ä"],
+				"KeyW": ["w", "W", "å", "Å"],
+				"KeyE": ["f", "F", "ã", "Ã"],
+				"KeyR": ["p", "P", "ø", "Ø"],
+				"KeyT": [
+					"b",
+					"B",
+					{
+						"dead": "breve"
+					},
+					"~"
+				],
+				"KeyY": ["[", "{", "«", "‹"],
+				"KeyU": ["j", "J", "đ", "Đ"],
+				"KeyI": ["l", "L", "ł", "Ł"],
+				"KeyO": ["u", "U", "ú", "Ú"],
+				"KeyP": ["y", "Y", "ü", "Ü"],
+				"BracketLeft": [";", ":", "ö", "Ö"],
+				"BracketRight": ["/", "?", "¿", "~"],
+				"KeyA": ["a", "A", "á", "Á"],
+				"KeyS": [
+					"r",
+					"R",
+					{
+						"dead": "grave"
+					},
+					"~"
+				],
+				"KeyD": ["s", "S", "ß", "ẞ"],
+				"KeyF": [
+					"t",
+					"T",
+					{
+						"dead": "acute"
+					},
+					{
+						"dead": "doubleacute"
+					}
+				],
+				"KeyG": [
+					"g",
+					"G",
+					{
+						"dead": "ogonek"
+					},
+					"~"
+				],
+				"KeyH": ["]", "}", "»", "›"],
+				"KeyJ": [
+					"m",
+					"M",
+					{
+						"dead": "macron"
+					},
+					"~"
+				],
+				"KeyK": ["n", "N", "ñ", "Ñ"],
+				"KeyL": ["e", "E", "é", "É"],
+				"Semicolon": ["i", "I", "í", "Í"],
+				"Quote": ["o", "O", "ó", "Ó"],
+				"Backslash": ["'", "\"", "õ", "Õ"],
+				"IntlBackslash": ["z", "Z", "æ", "Æ"],
+				"KeyZ": [
+					"x",
+					"X",
+					{
+						"dead": "circumflex"
+					},
+					"~"
+				],
+				"KeyX": ["c", "C", "ç", "Ç"],
+				"KeyC": [
+					"d",
+					"D",
+					{
+						"dead": "diaeresis"
+					},
+					"~"
+				],
+				"KeyV": ["v", "V", "œ", "Œ"],
+				"KeyB": ["\\", "|", "~", "¦"],
+				"KeyN": ["#", "~", "\\", "|"],
+				"KeyM": [
+					"k",
+					"K",
+					{
+						"dead": "abovering"
+					},
+					"~"
+				],
+				"Comma": [
+					"h",
+					"H",
+					{
+						"dead": "caron"
+					},
+					"~"
+				],
+				"Period": [
+					",",
+					"<",
+					{
+						"dead": "cedilla"
+					},
+					"~"
+				],
+				"Slash": [
+					".",
+					">",
+					{
+						"dead": "abovedot"
+					},
+					"~"
+				],
+				"Space": [" ", " ", " ", " "]
+			},
+			"dead_rules": {
+				"tilde": {
+					"dead:tilde": "~",
+					"Ó": "Ṍ",
+					"ó": "ṍ",
+					"Ö": "Ṏ",
+					"ö": "ṏ",
+					"Ú": "Ṹ",
+					"ú": "ṹ",
+					"=": "≃",
+					"<": "≲",
+					">": "≳",
+					" ": "̃"
+				},
+				"breve": {
+					"dead:breve": "˘",
+					"Á": "Ắ",
+					"á": "ắ",
+					"Ã": "Ẵ",
+					"ã": "ẵ",
+					" ": "̆"
+				},
+				"grave": {
+					"dead:grave": "`",
+					"V": "Ǜ",
+					"v": "ǜ",
+					" ": "̀",
+					"m": "m̀",
+					"M": "M̀"
+				},
+				"acute": {
+					" ": "'",
+					"dead:acute": "´",
+					"J": "J́",
+					"j": "j́",
+					"V": "Ǘ",
+					"v": "ǘ",
+					" ": "́"
+				},
+				"doubleacute": {
+					"dead:doubleacute": "˝",
+					" ": "̋"
+				},
+				"ogonek": {
+					"dead:ogonek": "˛",
+					" ": "̨"
+				},
+				"macron": {
+					"dead:macron": "¯",
+					"É": "Ḗ",
+					"é": "ḗ",
+					"Ó": "Ṓ",
+					"ó": "ṓ",
+					"V": "Ǖ",
+					"v": "ǖ",
+					" ": "̄"
+				},
+				"circumflex": {
+					"0": "⁰",
+					"1": "¹",
+					"2": "²",
+					"3": "³",
+					"4": "⁴",
+					"5": "⁵",
+					"6": "⁶",
+					"7": "⁷",
+					"8": "⁸",
+					"9": "⁹",
+					"dead:circumflex": "^",
+					".": "·",
+					"+": "⁺",
+					"-": "⁻",
+					"=": "⁼",
+					"(": "⁽",
+					")": "⁾",
+					"Á": "Ấ",
+					"á": "ấ",
+					"Ã": "Ẫ",
+					"ã": "ẫ",
+					"É": "Ế",
+					"é": "ế",
+					"Ó": "Ố",
+					"ó": "ố",
+					"Õ": "Ỗ",
+					"õ": "ỗ",
+					" ": "̂"
+				},
+				"diaeresis": {
+					"dead:diaeresis": "¨",
+					" ": "\"",
+					"'": "̈́",
+					"Í": "Ḯ",
+					"í": "ḯ",
+					"Ú": "Ǘ",
+					"ú": "ǘ",
+					" ": "̈"
+				},
+				"abovering": {
+					" ": "°",
+					"dead:abovering": "°",
+					"Á": "Ǻ",
+					"á": "ǻ",
+					" ": "̊"
+				},
+				"caron": {
+					"0": "₀",
+					"1": "₁",
+					"2": "₂",
+					"3": "₃",
+					"4": "₄",
+					"5": "₅",
+					"6": "₆",
+					"7": "₇",
+					"8": "₈",
+					"9": "₉",
+					"dead:caron": "ˇ",
+					"+": "₊",
+					"-": "₋",
+					"=": "₌",
+					"(": "₍",
+					")": "₎",
+					"V": "Ǚ",
+					"v": "ǚ",
+					" ": "̌"
+				},
+				"cedilla": {
+					"dead:cedilla": "¸",
+					" ": "̧"
+				},
+				"abovedot": {
+					"dead:abovedot": "˙",
+					"i": "ı",
+					"j": "ȷ",
+					"L": "Ŀ",
+					"l": "ŀ",
+					" ": "̇"
+				}
+			}
+		},
+		{
+			"id": "carpalx_full",
+			"name": "Carpalx (full optimization)",
+			"language": "en",
+			"source": "xkeyboard_config",
+			"source_path": "symbols/us, carpalx-full",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": ["`", "~", null, null],
+				"Digit1": ["1", "!", null, null],
+				"Digit2": ["2", "@", null, null],
+				"Digit3": ["3", "#", null, null],
+				"Digit4": ["4", "$", null, null],
+				"Digit5": ["5", "%", null, null],
+				"Digit6": ["6", "^", null, null],
+				"Digit7": ["7", "&", null, null],
+				"Digit8": ["8", "*", null, null],
+				"Digit9": ["9", "(", null, null],
+				"Digit0": ["0", ")", null, null],
+				"Minus": ["-", "_", null, null],
+				"Equal": ["=", "+", null, null],
+				"KeyQ": ["q", "Q", null, null],
+				"KeyW": ["g", "G", null, null],
+				"KeyE": ["m", "M", null, null],
+				"KeyR": ["l", "L", null, null],
+				"KeyT": ["w", "W", null, null],
+				"KeyY": ["b", "B", null, null],
+				"KeyU": ["y", "Y", null, null],
+				"KeyI": ["u", "U", null, null],
+				"KeyO": ["v", "V", null, null],
+				"KeyP": [";", ":", null, null],
+				"BracketLeft": ["[", "{", null, null],
+				"BracketRight": ["]", "}", null, null],
+				"KeyA": ["d", "D", null, null],
+				"KeyS": ["s", "S", null, null],
+				"KeyD": ["t", "T", null, null],
+				"KeyF": ["n", "N", null, null],
+				"KeyG": ["r", "R", null, null],
+				"KeyH": ["i", "I", null, null],
+				"KeyJ": ["a", "A", null, null],
+				"KeyK": ["e", "E", null, null],
+				"KeyL": ["o", "O", null, null],
+				"Semicolon": ["h", "H", null, null],
+				"Quote": ["'", "\"", null, null],
+				"Backslash": ["\\", "|", null, null],
+				"IntlBackslash": ["<", ">", "|", "¦"],
+				"KeyZ": ["z", "Z", null, null],
+				"KeyX": ["x", "X", null, null],
+				"KeyC": ["c", "C", null, null],
+				"KeyV": ["f", "F", null, null],
+				"KeyB": ["j", "J", null, null],
+				"KeyN": ["k", "K", null, null],
+				"KeyM": ["p", "P", null, null],
+				"Comma": [",", "<", null, null],
+				"Period": [".", ">", null, null],
+				"Slash": ["/", "?", null, null],
+				"Space": [" ", " ", null, null]
+			}
+		},
+		{
+			"id": "drix",
+			"name": "Drix",
+			"language": "en",
+			"source": "xkeyboard_config",
+			"source_path": "symbols/us, drix",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": [
+					"@",
+					"~",
+					"£",
+					{
+						"dead": "tilde"
+					}
+				],
+				"Digit1": [
+					"1",
+					"\"",
+					"¹",
+					{
+						"dead": "grave"
+					}
+				],
+				"Digit2": [
+					"2",
+					"'",
+					"²",
+					{
+						"dead": "acute"
+					}
+				],
+				"Digit3": [
+					"3",
+					"^",
+					"³",
+					{
+						"dead": "circumflex"
+					}
+				],
+				"Digit4": [
+					"4",
+					"`",
+					"⁴",
+					{
+						"dead": "diaeresis"
+					}
+				],
+				"Digit5": [
+					"5",
+					"°",
+					"⁵",
+					{
+						"dead": "abovering"
+					}
+				],
+				"Digit6": [
+					"6",
+					"6",
+					"⁶",
+					{
+						"dead": "macron"
+					}
+				],
+				"Digit7": [
+					"7",
+					"7",
+					"⁷",
+					{
+						"dead": "cedilla"
+					}
+				],
+				"Digit8": [
+					"8",
+					"8",
+					"⁸",
+					{
+						"dead": "ogonek"
+					}
+				],
+				"Digit9": [
+					"9",
+					"9",
+					"⁹",
+					{
+						"dead": "caron"
+					}
+				],
+				"Digit0": [
+					"0",
+					"|",
+					"⁰",
+					{
+						"dead": "doubleacute"
+					}
+				],
+				"Minus": ["-", "_", "\"", "±"],
+				"Equal": ["+", "=", "'", "≠"],
+				"KeyQ": ["q", "Q", "ø", "Ø"],
+				"KeyW": ["w", "W", "w", "↑"],
+				"KeyE": ["e", "E", "€", "€"],
+				"KeyR": ["r", "R", "®", "₽"],
+				"KeyT": ["t", "T", "™", "τ"],
+				"KeyY": ["y", "Y", "¥", "¥"],
+				"KeyU": ["u", "U", "u", "U"],
+				"KeyI": ["i", "I", "‘", "’"],
+				"KeyO": ["o", "O", "œ", "Ω"],
+				"KeyP": ["p", "P", "π", "₱"],
+				"BracketLeft": ["(", "[", "{", "«"],
+				"BracketRight": [")", "]", "}", "»"],
+				"KeyA": ["a", "A", "æ", "←"],
+				"KeyS": ["s", "S", "ß", "↓"],
+				"KeyD": ["d", "D", "Δ", "→"],
+				"KeyF": ["f", "F", "ƒ", "Ƒ"],
+				"KeyG": ["g", "G", "g", "G"],
+				"KeyH": ["h", "H", "h", "H"],
+				"KeyJ": ["j", "J", "“", "”"],
+				"KeyK": ["k", "K", "‚", "„"],
+				"KeyL": ["l", "L", "£", "λ"],
+				"Semicolon": ["m", "M", "µ", "M"],
+				"Quote": ["#", "%", "~", "‰"],
+				"Backslash": ["*", "&", "$", "×"],
+				"IntlBackslash": ["<", ">", "≤", "≥"],
+				"KeyZ": ["z", "Z", "§", "¶"],
+				"KeyX": ["x", "X", "×", "÷"],
+				"KeyC": ["c", "C", "©", "¢"],
+				"KeyV": ["v", "V", "♀", "V"],
+				"KeyB": ["b", "B", "♂", "₿"],
+				"KeyN": ["n", "N", "⚥", "N"],
+				"KeyM": ["!", "?", "¡", "¿"],
+				"Comma": [".", ",", "…", "·"],
+				"Period": [":", ";", "`", "´"],
+				"Slash": ["/", "\\", "|", "¦"],
+				"Space": [" ", " ", null, null]
+			},
+			"dead_rules": {
+				"tilde": {
+					"dead:tilde": "~",
+					"=": "≃",
+					"<": "≲",
+					">": "≳"
+				},
+				"grave": {
+					"dead:grave": "`",
+					"V": "Ǜ",
+					"v": "ǜ",
+					"m": "m̀",
+					"M": "M̀"
+				},
+				"acute": {
+					" ": "'",
+					"dead:acute": "´",
+					"J": "J́",
+					"j": "j́",
+					"V": "Ǘ",
+					"v": "ǘ"
+				},
+				"circumflex": {
+					"0": "⁰",
+					"1": "¹",
+					"2": "²",
+					"3": "³",
+					"4": "⁴",
+					"5": "⁵",
+					"6": "⁶",
+					"7": "⁷",
+					"8": "⁸",
+					"9": "⁹",
+					"dead:circumflex": "^",
+					".": "·",
+					"+": "⁺",
+					"-": "⁻",
+					"=": "⁼",
+					"(": "⁽",
+					")": "⁾"
+				},
+				"diaeresis": {
+					"dead:diaeresis": "¨",
+					" ": "\"",
+					"´": "̈́",
+					"'": "̈́"
+				},
+				"abovering": {
+					" ": "°",
+					"dead:abovering": "°"
+				},
+				"macron": {
+					"dead:macron": "¯",
+					"V": "Ǖ",
+					"v": "ǖ"
+				},
+				"cedilla": {
+					"dead:cedilla": "¸"
+				},
+				"ogonek": {
+					"dead:ogonek": "˛"
+				},
+				"caron": {
+					"0": "₀",
+					"1": "₁",
+					"2": "₂",
+					"3": "₃",
+					"4": "₄",
+					"5": "₅",
+					"6": "₆",
+					"7": "₇",
+					"8": "₈",
+					"9": "₉",
+					"dead:caron": "ˇ",
+					"+": "₊",
+					"-": "₋",
+					"=": "₌",
+					"(": "₍",
+					")": "₎",
+					"V": "Ǚ",
+					"v": "ǚ"
+				},
+				"doubleacute": {
+					"dead:doubleacute": "˝"
+				}
+			}
+		},
+		{
+			"id": "qwerty_hawaiian",
+			"name": "Hawaiian",
+			"language": "haw",
+			"source": "xkeyboard_config",
+			"source_path": "symbols/us, haw",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": ["`", "~", null, null],
+				"Digit1": ["1", "!", null, null],
+				"Digit2": ["2", "@", null, null],
+				"Digit3": ["3", "#", null, null],
+				"Digit4": ["4", "$", null, null],
+				"Digit5": ["5", "%", null, null],
+				"Digit6": ["6", "^", null, null],
+				"Digit7": ["7", "&", null, null],
+				"Digit8": ["8", "*", null, null],
+				"Digit9": ["9", "(", null, null],
+				"Digit0": ["0", ")", null, null],
+				"Minus": ["-", "_", null, null],
+				"Equal": ["=", "+", null, null],
+				"KeyQ": ["q", "Q", null, null],
+				"KeyW": ["w", "W", null, null],
+				"KeyE": ["e", "E", "ē", "Ē"],
+				"KeyR": ["r", "R", null, null],
+				"KeyT": ["t", "T", null, null],
+				"KeyY": ["y", "Y", null, null],
+				"KeyU": ["u", "U", "ū", "Ū"],
+				"KeyI": ["i", "I", "ī", "Ī"],
+				"KeyO": ["o", "O", "ō", "Ō"],
+				"KeyP": ["p", "P", null, null],
+				"BracketLeft": ["[", "{", null, null],
+				"BracketRight": ["]", "}", null, null],
+				"KeyA": ["a", "A", "ā", "Ā"],
+				"KeyS": ["s", "S", null, null],
+				"KeyD": ["d", "D", null, null],
+				"KeyF": ["f", "F", null, null],
+				"KeyG": ["g", "G", null, null],
+				"KeyH": ["h", "H", null, null],
+				"KeyJ": ["j", "J", null, null],
+				"KeyK": ["k", "K", null, null],
+				"KeyL": ["l", "L", null, null],
+				"Semicolon": [";", ":", null, null],
+				"Quote": ["ʻ", "\"", "'", null],
+				"Backslash": ["\\", "|", null, null],
+				"IntlBackslash": ["<", ">", "|", "¦"],
+				"KeyZ": ["z", "Z", null, null],
+				"KeyX": ["x", "X", null, null],
+				"KeyC": ["c", "C", null, null],
+				"KeyV": ["v", "V", null, null],
+				"KeyB": ["b", "B", null, null],
+				"KeyN": ["n", "N", null, null],
+				"KeyM": ["m", "M", null, null],
+				"Comma": [",", "<", null, null],
+				"Period": [".", ">", null, null],
+				"Slash": ["/", "?", null, null],
+				"Space": [" ", " ", null, null]
+			}
+		},
+		{
+			"id": "qwerty_german",
+			"name": "German QWERTY",
+			"language": "de",
+			"source": "xkeyboard_config",
+			"source_path": "symbols/de, qwerty",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": [
+					{
+						"dead": "circumflex"
+					},
+					"°",
+					"′",
+					"″"
+				],
+				"Digit1": ["1", "!", "¹", "¡"],
+				"Digit2": ["2", "\"", "²", "⅛"],
+				"Digit3": ["3", "§", "³", "£"],
+				"Digit4": ["4", "$", "¼", "¤"],
+				"Digit5": ["5", "%", "½", "⅜"],
+				"Digit6": ["6", "&", "¬", "⅝"],
+				"Digit7": ["7", "/", "{", "⅞"],
+				"Digit8": ["8", "(", "[", "™"],
+				"Digit9": ["9", ")", "]", "±"],
+				"Digit0": ["0", "=", "}", "°"],
+				"Minus": ["ß", "?", "\\", "¿"],
+				"Equal": [
+					{
+						"dead": "acute"
+					},
+					{
+						"dead": "grave"
+					},
+					{
+						"dead": "cedilla"
+					},
+					{
+						"dead": "ogonek"
+					}
+				],
+				"KeyQ": ["q", "Q", "@", "Ω"],
+				"KeyW": ["w", "W", "ſ", "§"],
+				"KeyE": ["e", "E", "€", "€"],
+				"KeyR": ["r", "R", "¶", "®"],
+				"KeyT": ["t", "T", "ŧ", "Ŧ"],
+				"KeyY": ["y", "Y", "«", "<"],
+				"KeyU": ["u", "U", "↓", "↑"],
+				"KeyI": ["i", "I", "→", "ı"],
+				"KeyO": ["o", "O", "ø", "Ø"],
+				"KeyP": ["p", "P", "þ", "Þ"],
+				"BracketLeft": [
+					"ü",
+					"Ü",
+					{
+						"dead": "diaeresis"
+					},
+					{
+						"dead": "abovering"
+					}
+				],
+				"BracketRight": ["+", "*", "~", "¯"],
+				"KeyA": ["a", "A", "æ", "Æ"],
+				"KeyS": ["s", "S", "ſ", "ẞ"],
+				"KeyD": ["d", "D", "ð", "Ð"],
+				"KeyF": ["f", "F", "đ", "ª"],
+				"KeyG": ["g", "G", "ŋ", "Ŋ"],
+				"KeyH": ["h", "H", "ħ", "Ħ"],
+				"KeyJ": [
+					"j",
+					"J",
+					{
+						"dead": "belowdot"
+					},
+					{
+						"dead": "abovedot"
+					}
+				],
+				"KeyK": ["k", "K", "ĸ", "&"],
+				"KeyL": ["l", "L", "ł", "Ł"],
+				"Semicolon": [
+					"ö",
+					"Ö",
+					{
+						"dead": "doubleacute"
+					},
+					{
+						"dead": "belowdot"
+					}
+				],
+				"Quote": [
+					"ä",
+					"Ä",
+					{
+						"dead": "circumflex"
+					},
+					{
+						"dead": "caron"
+					}
+				],
+				"Backslash": [
+					"#",
+					"'",
+					"’",
+					{
+						"dead": "breve"
+					}
+				],
+				"IntlBackslash": [
+					"<",
+					">",
+					"|",
+					{
+						"dead": "belowmacron"
+					}
+				],
+				"KeyZ": ["z", "Z", "←", "¥"],
+				"KeyX": ["x", "X", "«", "‹"],
+				"KeyC": ["c", "C", "¢", "©"],
+				"KeyV": ["v", "V", "„", "‚"],
+				"KeyB": ["b", "B", "“", "‘"],
+				"KeyN": ["n", "N", "”", "’"],
+				"KeyM": ["m", "M", "µ", "º"],
+				"Comma": [",", ";", "·", "×"],
+				"Period": [".", ":", "…", "÷"],
+				"Slash": ["-", "_", "–", "—"],
+				"Space": [" ", " ", null, null]
+			},
+			"dead_rules": {
+				"circumflex": {
+					"0": "⁰",
+					"1": "¹",
+					"2": "²",
+					"3": "³",
+					"4": "⁴",
+					"5": "⁵",
+					"6": "⁶",
+					"7": "⁷",
+					"8": "⁸",
+					"9": "⁹",
+					"dead:circumflex": "^",
+					".": "·",
+					"+": "⁺",
+					"-": "⁻",
+					"=": "⁼",
+					"(": "⁽",
+					")": "⁾"
+				},
+				"acute": {
+					" ": "'",
+					"dead:acute": "´",
+					"J": "J́",
+					"j": "j́",
+					"V": "Ǘ",
+					"v": "ǘ",
+					"ŋ": "ŋ́",
+					"Ŋ": "Ŋ́"
+				},
+				"grave": {
+					"dead:grave": "`",
+					"V": "Ǜ",
+					"v": "ǜ",
+					"m": "m̀",
+					"M": "M̀",
+					"ŋ": "ŋ̀",
+					"Ŋ": "Ŋ̀"
+				},
+				"cedilla": {
+					"dead:cedilla": "¸"
+				},
+				"ogonek": {
+					"dead:ogonek": "˛"
+				},
+				"diaeresis": {
+					"dead:diaeresis": "¨",
+					" ": "\"",
+					"'": "̈́"
+				},
+				"abovering": {
+					" ": "°",
+					"dead:abovering": "°"
+				},
+				"belowdot": {
+					"+": "⨥",
+					"-": "⨪",
+					"=": "⩦",
+					"dead:belowdot": "̣",
+					" ": "̣"
+				},
+				"abovedot": {
+					"dead:abovedot": "˙",
+					"i": "ı",
+					"j": "ȷ",
+					"L": "Ŀ",
+					"l": "ŀ"
+				},
+				"doubleacute": {
+					"dead:doubleacute": "˝"
+				},
+				"caron": {
+					"0": "₀",
+					"1": "₁",
+					"2": "₂",
+					"3": "₃",
+					"4": "₄",
+					"5": "₅",
+					"6": "₆",
+					"7": "₇",
+					"8": "₈",
+					"9": "₉",
+					"dead:caron": "ˇ",
+					"+": "₊",
+					"-": "₋",
+					"=": "₌",
+					"(": "₍",
+					")": "₎",
+					"V": "Ǚ",
+					"v": "ǚ"
+				},
+				"breve": {
+					"dead:breve": "˘"
+				},
+				"belowmacron": {
+					"B": "Ḇ",
+					"b": "ḇ",
+					"D": "Ḏ",
+					"d": "ḏ",
+					"K": "Ḵ",
+					"k": "ḵ",
+					"L": "Ḻ",
+					"l": "ḻ",
+					"N": "Ṉ",
+					"n": "ṉ",
+					"R": "Ṟ",
+					"r": "ṟ",
+					"T": "Ṯ",
+					"t": "ṯ",
+					"Z": "Ẕ",
+					"z": "ẕ",
+					"h": "ẖ"
+				}
+			}
+		},
+		{
+			"id": "bone_eszett_home",
+			"name": "Bone (ß in the home row)",
+			"language": "de",
+			"source": "xkeyboard_config",
+			"source_path": "symbols/de, bone_eszett_home",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": [
+					{
+						"dead": "circumflex"
+					},
+					{
+						"dead": "caron"
+					},
+					"↻",
+					"˞"
+				],
+				"Digit1": ["1", "°", "¹", "₁"],
+				"Digit2": ["2", "§", "²", "₂"],
+				"Digit3": ["3", "ℓ", "³", "₃"],
+				"Digit4": ["4", "»", "›", "♀"],
+				"Digit5": ["5", "«", "‹", "♂"],
+				"Digit6": ["6", "$", "¢", "⚥"],
+				"Digit7": ["7", "€", "¥", "ϰ"],
+				"Digit8": ["8", "„", "‚", "⟨"],
+				"Digit9": ["9", "“", "‘", "⟩"],
+				"Digit0": ["0", "”", "’", "₀"],
+				"Minus": ["-", "—", null, "‑"],
+				"Equal": [
+					{
+						"dead": "grave"
+					},
+					{
+						"dead": "cedilla"
+					},
+					{
+						"dead": "abovering"
+					},
+					{
+						"dead": "dasia"
+					}
+				],
+				"KeyQ": ["j", "J", "…", "θ"],
+				"KeyW": ["d", "D", "_", "δ"],
+				"KeyE": ["u", "U", "[", "λ"],
+				"KeyR": ["a", "A", "]", "α"],
+				"KeyT": ["x", "X", "^", "ξ"],
+				"KeyY": ["p", "P", "!", "π"],
+				"KeyU": ["h", "H", "<", "ψ"],
+				"KeyI": ["l", "L", ">", "λ"],
+				"KeyO": ["m", "M", "=", "μ"],
+				"KeyP": ["w", "W", "&", "ω"],
+				"BracketLeft": ["q", "Q", "ſ", "ϕ"],
+				"BracketRight": [
+					{
+						"dead": "acute"
+					},
+					{
+						"dead": "tilde"
+					},
+					{
+						"dead": "stroke"
+					},
+					{
+						"dead": "psili"
+					}
+				],
+				"KeyA": ["c", "C", "\\", "χ"],
+				"KeyS": ["t", "T", "/", "τ"],
+				"KeyD": ["i", "I", "{", "ι"],
+				"KeyF": ["e", "E", "}", "ε"],
+				"KeyG": ["o", "O", "*", "ο"],
+				"KeyH": ["b", "B", "?", "β"],
+				"KeyJ": ["n", "N", "(", "ν"],
+				"KeyK": ["r", "R", ")", "ρ"],
+				"KeyL": ["s", "S", "-", "σ"],
+				"Semicolon": ["g", "G", ":", "γ"],
+				"Quote": ["ß", "ẞ", "@", "ς"],
+				"KeyZ": ["f", "F", "#", "φ"],
+				"KeyX": ["v", "V", "$", "ϵ"],
+				"KeyC": ["ü", "Ü", "|", "η"],
+				"KeyV": ["ä", "Ä", "~", "η"],
+				"KeyB": ["ö", "Ö", "`", "ϵ"],
+				"KeyN": ["y", "Y", "+", "υ"],
+				"KeyM": ["z", "Z", "%", "ζ"],
+				"Comma": [",", "–", "\"", "ϱ"],
+				"Period": [".", "•", "'", "ϑ"],
+				"Slash": ["k", "K", ";", "κ"],
+				"Space": [" ", " ", " ", " "]
+			},
+			"dead_rules": {
+				"circumflex": {
+					"0": "⁰",
+					"1": "¹",
+					"2": "²",
+					"3": "³",
+					"4": "⁴",
+					"5": "⁵",
+					"6": "⁶",
+					"7": "⁷",
+					"8": "⁸",
+					"9": "⁹",
+					"dead:circumflex": "̂",
+					".": "·",
+					"+": "⨣",
+					"-": "⁻",
+					"=": "≙",
+					"(": "⁽",
+					")": "⁾",
+					" ": "ˆ",
+					"…": "⋯",
+					">": "⃗",
+					"α": "ᵅ",
+					"ε": "ᵋ",
+					"υ": "ᶷ",
+					"<": "⃖",
+					"?": "ˀ",
+					"ϕ": "ᶲ"
+				},
+				"caron": {
+					"0": "₀",
+					"1": "₁",
+					"2": "₂",
+					"3": "₃",
+					"4": "₄",
+					"5": "₅",
+					"6": "₆",
+					"7": "₇",
+					"8": "₈",
+					"9": "₉",
+					"dead:caron": "̌",
+					"+": "₊",
+					"-": "₋",
+					"=": "≚",
+					"(": "₍",
+					")": "₎",
+					"V": "Ǚ",
+					"v": "ǚ",
+					" ": "ˇ"
+				},
+				"grave": {
+					"dead:grave": "̀",
+					"V": "Ǜ",
+					"v": "ǜ",
+					" ": "`",
+					"m": "m̀",
+					"M": "M̀"
+				},
+				"cedilla": {
+					"dead:cedilla": "̧",
+					"E": "Ę",
+					"e": "ę",
+					" ": "¸",
+					"a": "ą",
+					"A": "Ą",
+					"¢": "₵",
+					"α": "ᾳ",
+					"η": "ῃ",
+					"ω": "ῳ",
+					"i": "į",
+					"I": "Į",
+					"o": "ǫ",
+					"O": "Ǫ",
+					"u": "ų",
+					"U": "Ų"
+				},
+				"abovering": {
+					" ": "°",
+					"dead:abovering": "̊",
+					" ": "˚",
+					"c": "ɕ",
+					"d": "ȡ",
+					"=": "≗",
+					"l": "ȴ",
+					"n": "ȵ",
+					"+": "⨢",
+					"t": "ȶ",
+					"z": "ʑ"
+				},
+				"dasia": {
+					"α": "ἁ",
+					"ε": "ἑ",
+					"η": "ἡ",
+					"ι": "ἱ",
+					"ο": "ὁ",
+					"υ": "ὑ",
+					"ω": "ὡ",
+					"ρ": "ῥ",
+					"dead:dasia": "̔",
+					" ": "῾",
+					" ": "῾"
+				},
+				"acute": {
+					" ": "'",
+					"dead:acute": "́",
+					"J": "J́",
+					"j": "j́",
+					"V": "Ǘ",
+					"v": "ǘ",
+					" ": "´"
+				},
+				"tilde": {
+					"dead:tilde": "̃",
+					"α": "ᾶ",
+					"η": "ῆ",
+					"ι": "ῖ",
+					"υ": "ῦ",
+					"ω": "ῶ",
+					"Ö": "Ṏ",
+					"ö": "ṏ",
+					"=": "≅",
+					"<": "≲",
+					">": "≳",
+					" ": "˜",
+					"~": "≈",
+					"l": "ɫ",
+					"L": "Ɫ",
+					"-": "≃",
+					"+": "⨤"
+				},
+				"stroke": {
+					"0": "∅",
+					"2": "ƻ",
+					"O": "Ø",
+					"o": "ø",
+					"D": "Đ",
+					"d": "đ",
+					"H": "Ħ",
+					"h": "ħ",
+					"L": "Ł",
+					"l": "ł",
+					"T": "Ŧ",
+					"t": "ŧ",
+					"b": "ƀ",
+					"I": "Ɨ",
+					"Z": "Ƶ",
+					"z": "ƶ",
+					"G": "Ǥ",
+					"g": "ǥ",
+					"B": "Ƀ",
+					"i": "ɨ",
+					"=": "≠",
+					"A": "Ⱥ",
+					"a": "ⱥ",
+					"C": "Ȼ",
+					"c": "ȼ",
+					"E": "Ɇ",
+					"e": "ɇ",
+					">": "≯",
+					"J": "ɟ",
+					"j": "ɟ",
+					"<": "≮",
+					"P": "Ᵽ",
+					"p": "ᵽ",
+					"R": "Ɍ",
+					"r": "ɍ",
+					"U": "Ʉ",
+					"u": "ʉ",
+					"Y": "Ɏ",
+					"y": "ɏ",
+					"dead:stroke": "̷",
+					" ": "/",
+					" ": "/",
+					"~": "≁",
+					"\\": "✘",
+					"|": "∤",
+					"ι": "ᵼ",
+					"λ": "ƛ",
+					"ρ": "ϼ",
+					"υ": "ᵿ",
+					"♂": "⚦",
+					"/": "✘",
+					"ſ": "ẜ",
+					"⚥": "⚧"
+				},
+				"psili": {
+					"α": "ἀ",
+					"ε": "ἐ",
+					"η": "ἠ",
+					"ι": "ἰ",
+					"ο": "ὀ",
+					"υ": "ὐ",
+					"ω": "ὠ",
+					"ρ": "ῤ",
+					"a": "ả",
+					"A": "Ả",
+					"dead:psili": "̓",
+					"e": "ẻ",
+					"E": "Ẻ",
+					"i": "ỉ",
+					"I": "Ỉ",
+					" ": "᾿",
+					"o": "ỏ",
+					"O": "Ỏ",
+					" ": "᾿",
+					"u": "ủ",
+					"U": "Ủ",
+					"y": "ỷ",
+					"Y": "Ỷ"
+				}
+			}
+		},
+		{
+			"id": "qwerty_spanish_olpc",
+			"name": "Spanish (OLPC)",
+			"language": "es",
+			"source": "xkeyboard_config",
+			"source_path": "symbols/es, olpc",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": ["`", "~", null, null],
+				"Digit1": ["1", "!", "|", null],
+				"Digit2": ["2", "\"", "@", null],
+				"Digit3": [
+					"3",
+					{
+						"dead": "grave"
+					},
+					"#",
+					"`"
+				],
+				"Digit4": ["4", "$", null, null],
+				"Digit5": [
+					"5",
+					"%",
+					"^",
+					{
+						"dead": "circumflex"
+					}
+				],
+				"Digit6": ["6", "&", "¬", null],
+				"Digit7": ["7", "/", "\\", null],
+				"Digit8": ["8", "(", null, null],
+				"Digit9": ["9", ")", null, null],
+				"Digit0": ["0", "=", null, null],
+				"Minus": ["'", "?", null, null],
+				"Equal": ["¡", "¿", null, null],
+				"KeyQ": ["q", "Q", null, null],
+				"KeyW": ["w", "W", null, null],
+				"KeyE": ["e", "E", "€", null],
+				"KeyR": ["r", "R", null, null],
+				"KeyT": ["t", "T", null, null],
+				"KeyY": ["y", "Y", null, null],
+				"KeyU": ["u", "U", null, null],
+				"KeyI": ["i", "I", null, null],
+				"KeyO": ["o", "O", null, null],
+				"KeyP": ["p", "P", null, null],
+				"BracketLeft": [
+					{
+						"dead": "acute"
+					},
+					{
+						"dead": "diaeresis"
+					},
+					"´",
+					{
+						"dead": "abovering"
+					}
+				],
+				"BracketRight": ["[", "{", null, null],
+				"KeyA": ["a", "A", null, null],
+				"KeyS": ["s", "S", null, null],
+				"KeyD": ["d", "D", null, null],
+				"KeyF": ["f", "F", null, null],
+				"KeyG": ["g", "G", null, null],
+				"KeyH": ["h", "H", null, null],
+				"KeyJ": ["j", "J", null, null],
+				"KeyK": ["k", "K", null, null],
+				"KeyL": ["l", "L", null, null],
+				"Semicolon": ["ñ", "Ñ", null, null],
+				"Quote": [
+					"+",
+					"*",
+					{
+						"dead": "tilde"
+					},
+					null
+				],
+				"Backslash": ["]", "}", "§", null],
+				"IntlBackslash": ["<", ">", "|", "¦"],
+				"KeyZ": ["z", "Z", null, null],
+				"KeyX": ["x", "X", null, null],
+				"KeyC": ["c", "C", null, null],
+				"KeyV": ["v", "V", null, null],
+				"KeyB": ["b", "B", null, null],
+				"KeyN": ["n", "N", null, null],
+				"KeyM": ["m", "M", null, null],
+				"Comma": [",", ";", null, null],
+				"Period": [".", ":", null, null],
+				"Slash": ["-", "_", null, null],
+				"Space": [" ", " ", null, null]
+			},
+			"dead_rules": {
+				"grave": {
+					"dead:grave": "`",
+					"V": "Ǜ",
+					"v": "ǜ",
+					"m": "m̀",
+					"M": "M̀"
+				},
+				"circumflex": {
+					"0": "⁰",
+					"1": "¹",
+					"2": "²",
+					"3": "³",
+					"4": "⁴",
+					"5": "⁵",
+					"6": "⁶",
+					"7": "⁷",
+					"8": "⁸",
+					"9": "⁹",
+					"dead:circumflex": "^",
+					".": "·",
+					"+": "⁺",
+					"-": "⁻",
+					"=": "⁼",
+					"(": "⁽",
+					")": "⁾"
+				},
+				"acute": {
+					" ": "'",
+					"dead:acute": "´",
+					"J": "J́",
+					"j": "j́",
+					"V": "Ǘ",
+					"v": "ǘ"
+				},
+				"diaeresis": {
+					"dead:diaeresis": "¨",
+					" ": "\"",
+					"´": "̈́",
+					"'": "̈́"
+				},
+				"abovering": {
+					" ": "°",
+					"dead:abovering": "°"
+				},
+				"tilde": {
+					"dead:tilde": "~",
+					"=": "≃",
+					"<": "≲",
+					">": "≳"
+				}
+			}
 		}
 	],
 	"not_imported": [
@@ -43958,6 +45478,21 @@
 			"source": "cyanophage",
 			"source_path": "index2.html#pfouyhai",
 			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "xkeyboard_config",
+			"source_path": "symbols/us, colemak_dh",
+			"reason": "places z on two keys (the key left of Z and its ANSI place)"
+		},
+		{
+			"source": "xkeyboard_config",
+			"source_path": "symbols/us, colemak_dh_wide",
+			"reason": "places z on two keys (the key left of Z and its ANSI place)"
+		},
+		{
+			"source": "xkeyboard_config",
+			"source_path": "symbols/us, colemak_dh_ortho",
+			"reason": "places z on two keys (the key left of Z and its ANSI place)"
 		}
 	]
 }

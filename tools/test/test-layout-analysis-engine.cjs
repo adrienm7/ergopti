@@ -106,7 +106,7 @@ const SPEED_CORPUS = path.join(
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
 // The layouts the library held at its last import: it may only grow.
-const LIBRARY_COUNT = 641;
+const LIBRARY_COUNT = 649;
 // The collections imported from their authors' own files: each of their
 // layouts is credited from the author's page (layout_credits.json).
 const CREDITED_SOURCES = ['handsdown', 'ergol_repo'];
@@ -2552,7 +2552,19 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		['handsdown_neu', 'BracketLeft', 0, 'z'],
 		['handsdown_neu', 'Quote', 0, 'j'],
 		['pine_v4', 'KeyP', 0, 'y'],
-		['beakl19bis', 'KeyA', 0, 'h']
+		['beakl19bis', 'KeyA', 0, 'h'],
+		// xkeyboard-config symbols/us, de, es (f4d3ed8b): the classic Dvorak's
+		// « [ 7 5 3 1 » number row, Colemak-DH Wide ISO's z left of x and \ on
+		// B, Carpalx's « qgmlwb », the ʻokina, ä right of ö, ß in Bone's home row.
+		['dvorak_classic', 'Digit1', 0, '['],
+		['dvorak_classic', 'Digit2', 0, '7'],
+		['colemak_dh_wide_iso', 'IntlBackslash', 0, 'z'],
+		['colemak_dh_wide_iso', 'KeyB', 0, '\\'],
+		['carpalx_full', 'KeyW', 0, 'g'],
+		['qwerty_hawaiian', 'Quote', 0, 'ʻ'],
+		['qwerty_german', 'Quote', 0, 'ä'],
+		['bone_eszett_home', 'Quote', 0, 'ß'],
+		['bone_eszett_home', 'KeyQ', 0, 'j']
 	];
 	for (const [id, code, level, expected] of official)
 		check(

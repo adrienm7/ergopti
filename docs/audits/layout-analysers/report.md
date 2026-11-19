@@ -678,6 +678,15 @@ that may only grow and a checked credit for each):
   IRST, Pine v4, BEAKL 19bis). 21 repeat a library layout and 20 put a letter
   on a thumb key (Hands Down Vibranium, Promethium…) and one string has 35
   characters, so they are left out.
+- **xkeyboard-config's other English, German and Spanish layouts**
+  (`symbols/us`, `de`, `es` at f4d3ed8b): the classic Dvorak, Colemak-DH
+  Wide ISO (angle), Carpalx (full optimization), Drix, Hawaiian, German
+  QWERTY, Bone with ß in the home row and the OLPC Spanish, eight layouts.
+  Its Colemak-DH, Colemak-DH Wide and Colemak-DH Ortholinear place z on two
+  keys (left of Z and its ANSI place) and are left out; the Mac ISO and
+  Carpalx international variants include files the reader does not resolve.
+
+The library went from 170 layouts to 649 on 2026-11-19.
 
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not
