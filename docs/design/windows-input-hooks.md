@@ -385,7 +385,7 @@ buffer, so the next typed character completes a trigger that spans the output
 and the keystroke (`ab` gives `cd`, `cde` gives `xyz`, `abe` gives `xyz`). A
 trigger wholly inside an output fires nothing alone, so no loop exists even for
 the 124 of 2786 replacements that end with their own trigger. Pinned on the real
-engine by `test_hotstring_chaining.ahk` (SendEvent and SendInput, watcher, plain
+engine by `test_chaining.ahk` (SendEvent and SendInput, watcher, plain
 and Space tap-hold paths, identical before and after the level-0 change).
 
 Suspected separate defect, not touched: `_SpaceTap` (`platform/remap/space.ahk`)

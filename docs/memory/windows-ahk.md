@@ -700,7 +700,7 @@ shared Lua engine does the same in `apply_expansion`. A trigger wholly inside an
 output fires nothing alone, which is also why no loop exists. Proven on the real
 engine with SendEvent and SendInput, from the watcher, the plain path and the
 Space tap-hold, on HEAD and on the sources before the level change: the level-0
-change did not touch it (`test_hotstring_chaining.ahk`, `--interactive`). Any
+change did not touch it (`test_chaining.ahk`, `--interactive`). Any
 change that stops committing the expansion to the buffer, or that clears it
 (`HSE_HardReset`, a wipe after a fire), breaks chaining. The earlier note that
 chaining does not exist was wrong: it only looked for a re-feed of the output.
@@ -724,7 +724,7 @@ the primitive); modifier releases
 ellipsis, the ê dead key, TextSender, predictions and paste already use
 `SendInput`.
 `tests/unit/hotstrings/engine/engine/test_output_is_final.ahk` and
-`test_hotstring_chaining.ahk` (`--interactive` adds the real engine and keyboard).
+`test_chaining.ahk` (`--interactive` adds the real engine and keyboard).
 A test of this contract pins `HSE_CascadeMaxArrows := 1`: with the default
 three arrows the engine resolves a chain before sending, and the interactive
 session's `foo bar final` (2026-11-17) was that cascade, not a level-0 burst

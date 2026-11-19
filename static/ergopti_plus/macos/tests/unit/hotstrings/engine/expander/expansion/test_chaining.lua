@@ -9,7 +9,7 @@
 --- and "attention★" gives a warning sign. Only a typed keystroke completes a
 --- trigger: a trigger wholly inside an expansion's output fires nothing alone, so
 --- no loop is possible. The same examples are pinned on Windows
---- (test_hotstring_chaining.ahk) and Linux (test_shared_hotstring_engine.lua).
+--- (test_chaining.ahk) and Linux (test_shared_hotstring_engine.lua).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
