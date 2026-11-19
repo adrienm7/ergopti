@@ -297,6 +297,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-menu-category-off-rule.cjs"],
 			"repro": "npm run test:menu-category-off-rule"
+		},
+		{
+			"id": "menu-no-duplicate-actions",
+			"ordinal": 705,
+			"name": "every tray action has one place, and Ergopti Studio precedes the layout menu (menu-no-duplicate-actions)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-no-duplicate-actions.cjs"],
+			"repro": "node tools/test/test-menu-no-duplicate-actions.cjs"
 		}
 	]
 }
