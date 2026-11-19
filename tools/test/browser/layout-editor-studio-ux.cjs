@@ -123,7 +123,73 @@ async function exercisePanelFirstChange(browser, origin) {
 	await context.close();
 }
 
+/** The number of « i » buttons in each row header of a table, by its text. */
+function infoPerRow(page, selector) {
+	return page.$$eval(`${selector} tr`, (rows) =>
+		rows
+			.map((row) => row.querySelector('th'))
+			.filter(Boolean)
+			.map((th) => [
+				th.textContent.replace(/\s*i\s*$/g, '').trim(),
+				th.querySelectorAll('.la-info').length
+			])
+	);
+}
+
+/**
+ * (one-info-per-row) Every metric row of « All measures » (Comparer › One
+ * layout) and of the editor panel has one « i »: the left-hand shortcuts row
+ * had a second one for the letters' usefulness, which its single popover now
+ * explains after its own text.
+ */
+async function exerciseOneInfoPerRow(browser, origin) {
+	const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(
+		`${origin}/ui/layout_analysis/index.html?lang=en&corpus=fr_nemolivier&layouts=ergopti,azerty&details=ergopti&versus=azerty`
+	);
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	await page.click('#la-tab-details');
+	await page.waitForSelector('#la-metrics tbody tr');
+	const rows = await infoPerRow(page, '#la-metrics tbody');
+	assert.ok(rows.length >= 20, `all measures: ${rows.length} rows`);
+	const metricRows = rows.filter(([, count]) => count > 0);
+	assert.deepEqual(
+		metricRows.filter(([, count]) => count !== 1),
+		[],
+		'one « i » per row of All measures'
+	);
+	const shortcutRow = page
+		.locator('#la-metrics tbody tr')
+		.filter({ hasText: EN['layout_analysis.metric.shortcut_left'] });
+	await shortcutRow.locator('.la-info').click();
+	const texts = await page.$$eval('#la-popover .la-popover-text', (nodes) =>
+		nodes.map((node) => node.textContent)
+	);
+	assert.deepEqual(
+		texts,
+		[EN['layout_analysis.info.shortcut_left'], EN['layout_analysis.info.shortcut_letters']],
+		'its popover explains the letters too'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+
+	const editor = await openOnErgopti(browser, origin);
+	const panelRows = await infoPerRow(editor.page, '.la-panel-metrics:not(.la-panel-analysers)');
+	assert.ok(panelRows.length > 10, `panel: ${panelRows.length} rows`);
+	assert.deepEqual(
+		panelRows.filter(([, count]) => count !== 1),
+		[],
+		'one « i » per row of the panel'
+	);
+	assert.deepEqual(editor.errors, []);
+	await editor.context.close();
+}
+
 module.exports = {
+	exerciseOneInfoPerRow,
 	EN,
 	openOnErgopti,
 	analysed,

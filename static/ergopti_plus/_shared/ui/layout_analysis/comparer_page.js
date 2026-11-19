@@ -3403,7 +3403,6 @@
 				const th = el('th', '', t(`layout_analysis.metric.${id}`));
 				th.scope = 'row';
 				th.append(' ', infoButton(id));
-				if (id === 'shortcut_left') th.append(' ', infoButton('shortcut_letters'));
 				const digits = metricDigits(id);
 				const unit = unitText(id);
 				const values = [`${format(result.metrics[id], digits)} ${unit}`];

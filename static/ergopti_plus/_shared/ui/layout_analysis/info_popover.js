@@ -19,6 +19,9 @@
  *    the values they quote come from the data, never from the text.
  * 5. format() writes every number of the Studio pages in the language of
  *    their strings (locale()), the same in the app and on the site.
+ * 6. One « i » per value: an item whose explanation needs another one's
+ *    (ALSO_EXPLAINS) shows both in its own popover, so a page never draws a
+ *    second button with the same name beside the first.
  * ==============================================================================
  */
 
@@ -33,6 +36,10 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 	const POPOVER_ID = 'la-popover';
 	// Digits of the shares an explanation quotes.
 	const SHARE_DIGITS = 1;
+	// The explanations an item's popover adds after its own: the left-hand
+	// shortcuts metric is computed from the letters' usefulness, which once had a
+	// second « i » on the same row.
+	const ALSO_EXPLAINS = Object.freeze({ shortcut_left: Object.freeze(['shortcut_letters']) });
 
 	let popover = null;
 	let owner = null;
@@ -135,8 +142,9 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 	 * @throws {Error} On an item without references.
 	 */
 	function button(item) {
-		if (!window.LAYOUT_ANALYSIS_DATA.sources.items[item])
-			throw new Error(`layout_analysis: no sources for ${item}`);
+		const items = window.LAYOUT_ANALYSIS_DATA.sources.items;
+		for (const id of [item].concat(ALSO_EXPLAINS[item] || []))
+			if (!items[id]) throw new Error(`layout_analysis: no sources for ${id}`);
 		const node = el('button', 'la-info', 'i');
 		node.type = 'button';
 		node.dataset.info = item;
@@ -183,20 +191,25 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		const close = el('button', 'la-popover-close');
 		close.type = 'button';
 		close.addEventListener('click', hide);
-		popover.append(el('p', 'la-popover-text'), el('p', 'la-popover-title'), el('ul'), close);
+		popover.append(el('div', 'la-popover-texts'), el('p', 'la-popover-title'), el('ul'), close);
 		document.body.append(popover);
 	}
 
 	function show(trigger) {
 		const item = trigger.dataset.info;
 		const data = window.LAYOUT_ANALYSIS_DATA.sources;
-		const refs = data.items[item];
-		if (!refs) throw new Error(`layout_analysis: no sources for ${item}`);
+		if (!data.items[item]) throw new Error(`layout_analysis: no sources for ${item}`);
+		const items = [item].concat(ALSO_EXPLAINS[item] || []);
+		// The references of every explanation shown, each once.
+		const refs = [...new Set(items.flatMap((id) => data.items[id]))];
 		hide();
-		popover.querySelector('.la-popover-text').textContent = t(
-			`layout_analysis.info.${item}`,
-			values(item)
-		);
+		popover
+			.querySelector('.la-popover-texts')
+			.replaceChildren(
+				...items.map((id) =>
+					el('p', 'la-popover-text', t(`layout_analysis.info.${id}`, values(id)))
+				)
+			);
 		popover.querySelector('.la-popover-title').textContent = t('layout_analysis.info.sources');
 		popover.querySelector('.la-popover-close').textContent = t('layout_analysis.info.close');
 		const list = popover.querySelector('ul');
@@ -268,5 +281,5 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		else start();
 	}
 
-	return { t, refusal, button, routeLink, locale, format };
+	return { t, refusal, button, routeLink, locale, format, ALSO_EXPLAINS };
 })();

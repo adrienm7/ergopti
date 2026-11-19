@@ -299,9 +299,22 @@ check(
 );
 for (const id of ['fingering', 'weights', 'ideal_finger_load'])
 	check(markup.includes(`data-info="${id}"`), `sources: no « i » button for ${id}`);
+// The letters' usefulness: its own « i » in the score settings, and in the
+// left-hand shortcuts row's single popover (info_popover.js ALSO_EXPLAINS),
+// never a second button on that row (browser case one-info-per-row).
 check(
-	page.includes("infoButton('shortcut_letters')"),
+	markup.includes('data-info="shortcut_letters"'),
 	'sources: no « i » button for shortcut_letters'
+);
+check(
+	/ALSO_EXPLAINS = Object\.freeze\(\{ shortcut_left: Object\.freeze\(\['shortcut_letters'\]\) \}\)/.test(
+		fs.readFileSync(path.join(PAGE_DIR, 'info_popover.js'), 'utf8')
+	),
+	'sources: the left-hand shortcuts popover no longer explains the letters'
+);
+check(
+	!page.includes("infoButton('shortcut_letters')"),
+	'sources: a metric row draws a second « i » for shortcut_letters'
 );
 const english = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, 'en.json'), 'utf8'));
 const placeholders = (text) => (text.match(/\{\w+\}/g) || []).sort().join(',');

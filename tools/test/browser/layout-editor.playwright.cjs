@@ -3318,6 +3318,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);
 		await studioUx.exercisePanelFirstChange(browser, origin);
+		await studioUx.exerciseOneInfoPerRow(browser, origin);
 
 		// Every locale names every visible string.
 		for (const lang of LOCALES) {
