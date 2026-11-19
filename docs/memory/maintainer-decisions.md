@@ -158,6 +158,23 @@ recorded again.
 3 (Ergopti+ 25.2 to −2.9). Do not re-propose a flat SFB weight; tune these
 two numbers instead.
 
+## The ErgoDox model is complete, by KLA's convention (2026-11-19)
+
+Decided by the maintainer on 2026-11-19 (« Complete the model »): the
+`ergodox` board has every ErgoDox key, coded as KLA's ErgoDox QWERTY places
+them (Minus and Equal on the inner number-row keys, Backquote, BracketLeft,
+BracketRight and Quote below the letters), not as QMK's default keymap, and
+the library's ErgoDox layouts may change their values. The keys with no
+KeyboardEvent code are analysis-only codes (`board_only_keys`), never added to
+`physical_keys.json`; a letter on a Shift key is its tapped character
+(`LeftOuterBottom`, `RightOuterBottom`, QMK's mod-tap), Shift staying there
+(the last two choices by the agent, to review). Why: most files follow KLA's
+convention, so the reader and the board agree on one place per character,
+and the drivers' registry keeps only keys a driver can bind. Do not move the
+ErgoDox codes back to QMK's places or name these keys after F13–F24, Tab or
+CapsLock; a new board's extra keys take board-only codes too
+(`docs/design/layout-analysis.md`, « ErgoDox keys »).
+
 ## The Optimiser's small gap stays 2 points (2026-11-19)
 
 Decided by the maintainer on 2026-11-19: `similar_score_gap` stays 2 points

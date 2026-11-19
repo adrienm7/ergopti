@@ -748,35 +748,98 @@ Hands Down Neu files (two in each collection) keep « ` ~ » on the key left of
 layouts held before is bit-identical on the eleven keyboards (15 400
 layout × corpus × keyboard rows), and their golden values are unchanged.
 
-**Still out: the ErgoDox outer, inner and bottom keys.** KLA's 16 files with
-characters on keys the library's keyboards lack (12 ErgoDox, TypeMatrix,
-AOEYK, the full Arensito, the ANSI BvoFRak) and 75 ErgoDox files of KLAnext
-and Hands Down stay out for the same reason, and modelling those keys is not
-a small change:
+**Every ErgoDox key** (2026-11-19, the maintainer's « Complete the model »;
+the codes, the Shift keys and the thumb rule decided by the agent, to review
+by the maintainer). 91 files stayed out for keys the model lacked: KLA's 12
+ErgoDox files and four standard-board files, and 75 ErgoDox files of KLAnext
+and Hands Down. The reader followed KLA's ErgoDox QWERTY (- and = on the
+inner number-row keys, `` ` `` [ ] ' below the letters) while the engine's
+board followed QMK's EZ keymap (= - ' `` ` `` on the outer keys); eleven
+keys had no code; some files put letters on the Shift keys. The board now
+has all 76 QMK positions, coded by KLA's convention; the keys without a
+KeyboardEvent code take analysis-only codes (`board_only_keys`: outer and
+inner columns, the row below the letters, seven thumb keys), which never
+enter `physical_keys.json`, the drivers' registry; a letter on a Shift key is
+the character it types when tapped (QMK's mod-tap, `LeftOuterBottom` and
+`RightOuterBottom`), Shift staying there (`docs/design/layout-analysis.md`,
+« ErgoDox keys »). The same files were read again from the same commits and
+pages; 73 came in, credited as their collections' earlier layouts:
 
-- The reader reads an ErgoDox file on KLA's own QWERTY key set (Ergopti's
-  ErgoDox file follows it): - and = on the inner top keys, `` ` `` [ ] ' on
-  the bottom row. The engine's ErgoDox board follows QMK's EZ default keymap
-  and puts = - ' `` ` `` on the outer keys (left and right of the number row,
-  right of the home row, bottom left). A file's character on those outer keys
-  has no place: moving the board's codes changes every layout's ErgoDox
-  values, and a second code on the same key draws two keys at one place.
-- The other keys (left of Q and A, the four inner keys, the bottom row) have
-  no KeyboardEvent code in the model. Codes such as F13–F23 would have to be
-  added to `physical_keys.json`, the drivers' shared key registry; reusing
-  Tab, CapsLock or Escape gives a character key another key's name.
-- Several files put letters on the ErgoDox Shift keys, where the board types
-  Shift.
-- Most of the 22 library layouts read from an ErgoDox file already left their
-  symbols on those keys out; reading them would change their values.
+- **KLA** (c4f2f9bb43, MIT repository), 11: BuTeck, Colemak Cub, Gelatin,
+  Jeff, Svorak-r, Modified UPD, Neo 2 in progress (Samuel Suther), QGMLWB
+  Cub, QGMLWY Cub, TaserFR and Workman Cub (Oleg Kostyuk's Cub files type the
+  shifted digits on the number row, so they are not Colemak's, QGMLWY's or
+  Workman's digits). `tools/build/import-kla-layouts.cjs` now reads every
+  typing code, counts no action sign as a loss, keeps each entry at its place
+  and replaces only KLA's own credits (it deleted every « collection »
+  credit); its other output was not taken, as two KLA entries were changed
+  by hand after it last ran (bvofrak1's dead keys, the Spanish Dvorak
+  replaced by xkeyboard-config's).
+- **Hands Down** (moutis/HandsDown e8f532f62c, GPL-3.0), 13, credited to
+  R. Alan Reiser from his site: Platinum, Promethium (ErgoDox), Dash
+  (ErgoDox), Élan, Alt-ex, Alt-nx, Alt-tx, Unobtanium, Polyglot (ErgoDox,
+  archive), Reference (ErgoDox), Neu (ErgoDox), Hands On (ErgoDox) and
+  Neauwr Bits. Their ErgoDox files type z (and q) on a key of the row below
+  the letters or an outer key, where the earlier reading saw a combo.
+- **KLAnext** (0.06), 49, each credited to the author its file names: Adextre,
+  Adore, Arensito Kinesis, Ashe, Balanced V, BEAKL 4 Mod Ian 1, BEAKL Mod
+  Ctgap, BEAKL Opted36, Beakrak and its Ian mod, Benkeyless, Bépo (ErgoDox),
+  Bl13 and Bl13 2, Brown, Ctgap 2, Dnat, Dsend Thumbshift, Dvorak Mod Kengo,
+  Full Maks, GG BEAKL 15 and 19, its ErgoDox copies of ten Hands Down
+  variants (their q and z on outer keys, where Reiser's own files put them on
+  AltGr: other arrangements, « (KLAnext, ErgoDox) »), Harmony, HS Indeks and
+  its Ex, Iena, LSNT, Maks Ex and SX, Marsan English, Mithril, Neo2 US,
+  Optimot (ErgoDox), Smartly Modified Dvorak, T Ht01 75 54, Uciea Vanilla
+  (KLAnext, ErgoDox), X1, X1 Atreus 44 Keys and X6 Mod Sc0ty Nongr.
 
-KLA's four standard-board files put characters on its Tab and Caps Lock keys
+18 stay out, each with its reason in `not_imported`: ten duplicates (KLA's
+second Neo 2 in progress is BuTeck; KLAnext's Ctgap 3, Gelatin, GG BEAKL and
+its copies of six Hands Down layouts repeat a library layout or another board
+copy), KLAnext's Einbinder Orthogonal, VCKB, VCKB2 and Yp Hina Fu, which put
+a letter on the left 2-unit outer thumb key, where the board keeps Space (a
+code of its own there would draw two keys at one place), and KLA's four
+standard-board files, which put characters on its Tab and Caps Lock keys
 (TypeMatrix's q and a, BvoFRak's q), its Enter key (Arensito's à) and a
 modifier of its bottom row right of the space bar (AOEYK's \): ISO and ANSI
-type no character there, and
-making them character keys would also offer them to the optimizer.
+type no character there, and making them character keys would also offer
+them to the optimizer.
 
-The library holds 710 layouts.
+Values, proved by dumping every metric, score and cost of every layout on
+the eleven keyboards and two corpora (French Nemolivier, the first 300 000
+characters, and English Alice) before and after:
+
+- The model change alone (the library untouched) left the ten other
+  keyboards bit for bit (14 200 rows); on the ErgoDox 1376 of its 1420 rows
+  moved, as every layout's - = ' `` ` `` [ ] changed place.
+- Reading the 22 library layouts taken from ErgoDox files again changed the
+  rows of 17 (their outer and lower keys' symbols; Hands Down XKCD, Alt-x,
+  Polyglot (ErgoDox) and both Ingulish are unchanged). On the other
+  keyboards only three of them moved: Blickensderfer 5 (its space key's AltGr
+  « 0 » had made it a thumb-letter file; it types the space bar again and is
+  complete on ISO: −295.15 to −204.38 on Nemolivier), Enne P 111 69 (its
+  thumb symbols on their own ErgoDox upper keys instead of Convert: −85.68 to
+  −95.20 on the Corne) and Hands Down Extreme (« ; » instead of « : » on its
+  thumb's AltGr: 0.02 to 0.10 points lower). The other 707 layouts held before are bit
+  for bit on those ten keyboards.
+- On the ErgoDox (Nemolivier / Alice): Hands Down Gold −14.86 → −13.92 /
+  −2.97 → 1.54, Silver −16.09 → −15.14 / −5.26 → 0.47, Bronze −18.30 →
+  −17.36 / −7.21 → −0.90, Titanium −13.46 → −12.52 / −5.02 → −1.04, Rhodium
+  −10.20 → −9.28 / −9.31 → −8.13, Vibranium vb −13.87 → −12.93 / −2.38 →
+  −0.03, vf −13.27 → −12.33 / −1.01 → 1.41, vp −10.99 → −10.06 / 0.30 →
+  1.71, vv −19.22 → −18.30 / 3.02 → 4.14, Extreme −29.83 → −29.96 / −56.57 →
+  −56.77, Ingulish −119.01 → −120.13 / −120.25 → −121.38, Cole Shift E
+  −32.76 → −30.54 / −41.49 → −51.21, Enne P 111 69 −76.92 → −75.84 / −62.66
+  → −62.61, Lydell Anishtro −31.07 → −28.86 / −16.20 → −27.89, Maltron US 90
+  mod Andreas −21.82 → −21.62 / −29.62 → −29.72, Maltron US 90 −13.87 →
+  −22.33 / −15.60 → −25.42, ProxKB Thumbshift −10.13 → −8.93 / −34.66 →
+  −33.35; XKCD, Alt-x, Polyglot (ErgoDox), Blickensderfer 5 and Ingulish v2
+  keep their ErgoDox values.
+- `library_golden.json`: on the default keyboard only Blickensderfer 5
+  changed (and the 73 new layouts were added); on the ErgoDox, the board of
+  the thumb-letter layouts, 41 of those 50 moved, Blickensderfer 5 left them
+  and 26 new ones joined.
+
+The library holds 783 layouts.
 
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not
