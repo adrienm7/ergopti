@@ -286,6 +286,7 @@ return {
 	"tests.unit.core.lifecycle.reload.test_timing",
 	"tests.unit.core.lifecycle.test_dev_source",
 	"tests.unit.settings.test_file_watchers_dev_source",
+	"tests.unit.settings.test_file_watchers_git_hold",
 	"tests.unit.settings.scope.test_dynamic_hotstrings_scope",
 	"tests.unit.settings.scope.test_gesture_scope",
 	"tests.unit.settings.scope.test_global_scope",

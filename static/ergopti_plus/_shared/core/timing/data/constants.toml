@@ -880,6 +880,8 @@ dev_source_bulk_threshold = 3
 
 # Windows: a Git operation that holds the developer reload this long is
 # reported once as a possible stale lock; the hold itself never expires.
+# Pinned to GIT_HOLD_REPORT_SEC of _shared/core/lifecycle/engine/reload/gate.lua,
+# the macOS and Linux policy, by tools/test/test-reload-gate-single-source.cjs.
 # AHK: core/lifecycle/engine/dev_source.ahk.
 dev_source_git_hold_report_ms = 60000
 

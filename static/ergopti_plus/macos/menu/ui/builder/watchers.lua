@@ -47,11 +47,6 @@ end
 -- settle poll interval below.
 local DEBOUNCE_SEC = Timings.sec("ui", "hs_reload_debounce_ms")
 
--- Consecutive Git-hold re-polls before one visible warning is emitted. A live
--- index.lock remains authoritative regardless of elapsed time: bypassing it can
--- reload a half-checked-out tree. Kept identical to infra/file_watchers.
-local GIT_HOLD_WARN_DEFERRALS = 120   -- 120 * 0.5s = 60s before one warning
-
 --- Whether a developer field run is running (diagnostics/engine/field_run/field_run.lua), read through
 --- package.loaded: only a developer app ever loads that module.
 --- @return boolean
@@ -106,9 +101,9 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 	local _lifecycle_active = true
 	local _lifecycle_generation = 0
 	local _callback_admitted = false
-	-- Consecutive Git-hold re-polls with no new file activity; reset by an event or
-	-- committed reload. The threshold is diagnostic only: a live lock is never bypassed.
-	local defer_count = 0
+	-- The current Git hold episode (reload_gate.step_git_hold). A live marker holds
+	-- the reload for as long as it exists, as in core/fs/engine/file_watchers.
+	local git_hold = { since = nil, reported = false }
 	-- Distinct source paths changed since the current burst began, and the awake
 	-- time (s) of the last change — together they drive the adaptive settle so a
 	-- BULK write (git pull, OneDrive / Dropbox sync, rsync, mass save) is held
@@ -194,18 +189,13 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 			return
 		end
 		field_run_hold_logged = false
-		if git_status.operation_in_progress(base_dir) then
-			if defer_count < GIT_HOLD_WARN_DEFERRALS then
-				defer_count = defer_count + 1
-				if defer_count == GIT_HOLD_WARN_DEFERRALS then
-					Logger.warn(LOG,
-						"Git operation still owns the reload fence after %d checks on '%s'; reload remains pending.",
-						GIT_HOLD_WARN_DEFERRALS, base_dir)
-				else
-					Logger.debug(LOG, "Reload held (git operation in progress) on '%s' (%d/%d).",
-						base_dir, defer_count, GIT_HOLD_WARN_DEFERRALS)
-				end
-			end
+		local now = TimerScheduler.awake_time()
+		local event, held_sec = reload_gate.step_git_hold(git_hold,
+			git_status.operation_in_progress(base_dir), now)
+		if event ~= "clear" then
+			reload_gate.log_git_hold(Logger, LOG, event, held_sec, base_dir)
+			-- Git may have written the last files just before it released the lock.
+			if event == "end" then last_change_sec = now end
 			arm_reload()
 			return
 		end
@@ -245,7 +235,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 					arm_reload()
 					return false
 				end
-				burst_paths, burst_count, defer_count = {}, 0, 0
+				burst_paths, burst_count = {}, 0
 				reload_refusal_logged = false
 				return true
 			end)
@@ -336,8 +326,6 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 			Logger.debug(LOG, "File change detected (%d distinct in burst) — settle armed.", burst_count)
 			last_change_sec = TimerScheduler.awake_time()
 			reload_refusal_logged = false
-			-- A genuine file event resets the stuck-state counter.
-			defer_count = 0
 			arm_reload()
 		end
 	end
@@ -359,6 +347,10 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 		_lifecycle_active = false
 		_callback_admitted = false
 		_lifecycle_generation = _lifecycle_generation + 1
+		if git_hold.since ~= nil then
+			Logger.warn(LOG, "Menu watcher stopped while a Git operation held its reload.")
+			git_hold.since, git_hold.reported = nil, false
+		end
 		local all_stopped = true
 		if _debounce_timer then
 			if stop_capability(_debounce_timer, "Menu debounce timer") then

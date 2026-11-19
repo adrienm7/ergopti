@@ -228,6 +228,11 @@ helpers.describe("personal file watchers measure their private boot window in aw
 			helpers.assert_eq(world.reloads, 0)
 			helpers.assert_nil(active_timer(world, 1), "a Git-held burst must not enter the UI queue")
 			world.git_locked = false
+			local released = active_timer(world, 0.5)
+			helpers.assert_not_nil(released, "a Git-held burst keeps its settle poll")
+			advance(world, 0.5)
+			released:fire()
+			helpers.assert_nil(active_timer(world, 1), "the released lock restarts the quiet window")
 			settle_and_close_ui(world)
 		end)
 	end)

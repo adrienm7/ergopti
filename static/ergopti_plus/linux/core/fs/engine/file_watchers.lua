@@ -129,10 +129,11 @@ local _burst_paths = {}
 local _burst_count = 0
 local _last_change_ms = 0
 
--- Consecutive hold re-polls with no new file activity; reset by any real event,
--- capped so only a quiet-but-stuck state (a stale index.lock) can bypass the hold.
-local _defer_count = 0
-local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * _debounce_sec = 60s of a quiet-but-stuck repo
+-- The current Git hold episode, advanced by reload_gate.step_git_hold. A live
+-- marker holds the reload for as long as it exists: a stale index.lock is
+-- reported once after reload_gate.GIT_HOLD_REPORT_SEC, never reloaded through,
+-- because reloading mid-rebase re-scans a half-updated tree.
+local _git_hold = { since = nil, reported = false }
 
 
 -- =========================================
@@ -270,9 +271,6 @@ local function _schedule_reload(reason, paths)
 		end
 	end
 	_last_change_ms = _now_ms()
-	-- Genuine activity resets the stuck-state counter, so an ongoing bulk write
-	-- never bypasses the hold; only a quiet-but-stuck state climbs toward the cap.
-	_defer_count = 0
 	_reload_deadline = _now_ms() + _debounce_sec * 1000
 end
 
@@ -303,17 +301,20 @@ local function _check_deadline()
 	-- bulk write of many files, and the precise git index.lock guard. (The Linux
 	-- reload is an in-process TOML re-scan, so this prevents loading a partial file
 	-- rather than a crash — macos-reload-during-git-pull.)
-	local elapsed_sec = (_now_ms() - _last_change_ms) / 1000
-	local hold, why
+	local now_ms = _now_ms()
+	local elapsed_sec = (now_ms - _last_change_ms) / 1000
 	if not reload_gate.is_settled(elapsed_sec, _burst_count) then
-		hold, why = true, "filesystem settling"
-	elseif reload_gate.git_operation_in_progress(FileSystem, _base_dir) then
-		hold, why = true, "git operation in progress"
+		Logger.debug(LOG, "Reload held (filesystem settling) — re-polling.")
+		_reload_deadline = now_ms + _debounce_sec * 1000
+		return
 	end
-	if hold and _defer_count < GIT_SETTLE_MAX_DEFERRALS then
-		_defer_count = _defer_count + 1
-		Logger.debug(LOG, "Reload held (%s) — re-polling (%d/%d).", why, _defer_count, GIT_SETTLE_MAX_DEFERRALS)
-		_reload_deadline = _now_ms() + _debounce_sec * 1000
+	local busy = reload_gate.git_operation_in_progress(FileSystem, _base_dir)
+	local event, held_sec = reload_gate.step_git_hold(_git_hold, busy, now_ms / 1000)
+	if event ~= "clear" then
+		reload_gate.log_git_hold(Logger, LOG, event, held_sec, tostring(_base_dir))
+		-- Git may have written the last files just before it released the lock.
+		if event == "end" then _last_change_ms = now_ms end
+		_reload_deadline = now_ms + _debounce_sec * 1000
 		return
 	end
 
@@ -331,7 +332,7 @@ local function _check_deadline()
 	-- thrown away, so a reload in the log could never be traced back to a file.
 	local changed = RuntimeLog.describe_paths(_burst_paths)
 	local source_edit = _on_source_change ~= nil and _burst_has_source(_burst_paths)
-	_burst_paths, _burst_count, _defer_count = {}, 0, 0
+	_burst_paths, _burst_count = {}, 0
 	if source_edit then
 		Logger.info(LOG, "Debounced source reload firing (%s).", changed)
 		local ok, err = pcall(_on_source_change)
@@ -1130,7 +1131,11 @@ function M.stop()
 
 	-- Clear pending debounce deadline and adaptive-settle burst state.
 	_reload_deadline = nil
-	_burst_paths, _burst_count, _last_change_ms, _defer_count = {}, 0, 0, 0
+	_burst_paths, _burst_count, _last_change_ms = {}, 0, 0
+	if _git_hold.since ~= nil then
+		Logger.warn(LOG, "File watchers stopped while a Git operation held their reload.")
+	end
+	_git_hold = { since = nil, reported = false }
 	_base_dir = nil
 	_source_dirs, _on_source_change = {}, nil
 

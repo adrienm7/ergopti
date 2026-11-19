@@ -381,6 +381,11 @@ helpers.describe("actual menu producers and watcher share one awake suppression 
 			helpers.assert_eq(world.reloads, 0)
 			helpers.assert_nil(world.deferred_reload, "a live Git lock must precede UI admission")
 			world.git_locked = false
+			local released = pending_settle(world)
+			helpers.assert_not_nil(released, "a Git-held burst keeps its settle poll")
+			advance(world, 0.5)
+			released:fire()
+			helpers.assert_nil(world.deferred_reload, "the released lock restarts the quiet window")
 			settle_and_close(world)
 		end)
 	end)
