@@ -986,6 +986,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-error-messages-say-how-to-recover.cjs"],
 			"repro": "node tools/test/test-error-messages-say-how-to-recover.cjs"
+		},
+		{
+			"id": "windows-lua-export-out-parameters",
+			"ordinal": 698,
+			"name": "the Windows Lua export host initializes every out-parameter local, as MSVC C4701 under /WX requires",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-lua-export-out-parameters.cjs"],
+			"repro": "npm run test:windows-lua-export-out-parameters"
 		}
 	]
 }

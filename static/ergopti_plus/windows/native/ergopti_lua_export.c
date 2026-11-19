@@ -131,13 +131,13 @@ static int admitted_module(const char *name, size_t length)
 /* require(name): <shared>/<name with dots as slashes>.lua, run once, as text only. */
 static int host_require(lua_State *L)
 {
-	size_t length;
+	size_t length = 0;
 	const char *name = luaL_checklstring(L, 1, &length);
 	const char *root;
 	char path[MAX_PATH_BYTES];
-	size_t root_length, index;
+	size_t root_length = 0, index;
 	char *source;
-	size_t source_length;
+	size_t source_length = 0;
 	const char *reason = NULL;
 	if (!admitted_module(name, length)) return luaL_error(L, "module name refused: %s", name);
 	lua_getfield(L, LUA_REGISTRYINDEX, LOADED_KEY);
@@ -237,10 +237,12 @@ static int run_step(const char *root, const char *step, const char *input_path)
 {
 	char defaults_path[MAX_PATH_BYTES];
 	char *defaults;
-	size_t defaults_length;
+	size_t defaults_length = 0;
 	const char *reason = NULL;
 	char *input;
-	size_t input_length;
+	/* Initialized: MSVC /W4 /WX (C4701) cannot see that the stream == NULL path,
+	 * which skips read_input, returns before input_length is read. */
+	size_t input_length = 0;
 	lua_Integer bound;
 	int status;
 	lua_State *L;
@@ -288,7 +290,7 @@ static int run_step(const char *root, const char *step, const char *input_path)
 		return status;
 	}
 	if (lua_toboolean(L, -3)) {
-		size_t output_length;
+		size_t output_length = 0;
 		const char *output = lua_tolstring(L, -2, &output_length);
 		if (output == NULL || fwrite(output, 1, output_length, stdout) != output_length || fflush(stdout) != 0) {
 			lua_close(L);
