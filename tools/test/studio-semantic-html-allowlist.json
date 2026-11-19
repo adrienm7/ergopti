@@ -1,0 +1,684 @@
+{
+	"elements": [
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/analysis_panel.js",
+			"element": "div.la-panel-ngrams",
+			"count": 1,
+			"kind": "mount",
+			"reason": "The grid worst_groups.js fills with its titled n-gram cards (sections), itself inside the titled n-gram section: a layout box, no element means a grid of cards."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/analysis_panel.js",
+			"element": "div.la-panel-column",
+			"count": 3,
+			"kind": "layout",
+			"reason": "The panel grid's three columns, which stack or sit side by side with its width; layout only, without a heading to make each a section."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/analysis_panel.js",
+			"element": "div.la-panel-body",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The open panel's layout grid of its columns and its n-gram section; a pure layout box with no meaning of its own."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/analysis_panel.js",
+			"element": "span.la-panel-verdict",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The decorative ▲ or ▼ beside a change, aria-hidden and said in words by the cell's screen-reader text; no element carries a decorative glyph."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/analysis_panel.js",
+			"element": "span.la-sr-only",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "Text for screen readers only (the verdict in words, a finger's ideal load), visually hidden; it is inline text inside a cell, with no meaning beyond the words."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/analysis_panel.js",
+			"element": "span.la-panel-bar",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The coloured fill of a finger's load bar inside its aria-hidden track; a purely visual shape (a meter cannot draw the ideal-load mark across it)."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/analysis_panel.js",
+			"element": "span.la-panel-target",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The ideal-load mark drawn across a finger's bar, inside its aria-hidden track; a positioned visual line, said in words in the value's cell."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/board/best_swaps.js",
+			"element": "span.la-swap-arrow",
+			"count": 3,
+			"kind": "decorative",
+			"reason": "The decorative ↔, → and ↺ between the keys of a swap or a cycle, coloured, inside the aria-hidden drawing that the cycle's sentence and the « Apply » name say in words."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/board/best_swaps.js",
+			"element": "span.la-panel-verdict",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The decorative ▲ of a swap's gain, aria-hidden and said in words by the gain's screen-reader text; no element carries a decorative glyph."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/board/best_swaps.js",
+			"element": "span.la-sr-only",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "Text for screen readers only (a cycle's moves, the gain's verdict in words), visually hidden; inline words with no meaning of their own."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/board/board_image.js",
+			"element": "div.la-image-buttons",
+			"count": 1,
+			"kind": "aria-widget",
+			"reason": "The named group (role group) of the PNG and SVG save buttons and their status, a button row; a fieldset's legend would leave the row's flex layout."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/board/board_image.js",
+			"element": "span.la-image-label",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The group's visible caption, aria-hidden since the group carries the same name; a legend needs a fieldset and a label names one control, not a group of buttons."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/board/worst_groups.js",
+			"element": "span.la-ngram-bar",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden bar of an n-gram's share inside its button, a purely visual shape; the share is said in the button's text and name."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-tabs",
+			"count": 1,
+			"kind": "aria-widget",
+			"reason": "The tablist container: no HTML element carries the tablist role, its tabs are native buttons with role tab."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-setup",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A layout grid putting the corpus card beside the options card; each card is a section, the wrapper means nothing."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-field",
+			"count": 3,
+			"kind": "layout",
+			"reason": "A field grouping a label, its control and a note paragraph (or the label line with its « i »): a p cannot hold a p, so the group is a div. The text mode field: its label, its select and the note paragraph under them; a p cannot hold that note."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-corpus-file",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Lays the corpus file button beside its formats, name and error paragraphs; a p cannot hold them and the group has no heading of its own."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-option-pair",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A two-column layout grid of the keyboard and format fields, which are already grouped by their section."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-row",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A wrapping row laying out the three filter labels of the layout list; the list's section and summary already name it."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-layout-list",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The scrolling box of the layout list's letter groups (each a heading and a ul); it only clips and scrolls them."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-weight-groups",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A layout grid of the weight group sections, each named by its own heading; the grid itself means nothing."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-ideal-layout",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A layout grid putting the hands picture beside the list of ideal loads it draws."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-overview",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The overview's layout grid of its figure sections, side by side when the width holds them."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-ranking-tools",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Lays a checkbox, its help paragraph and the CSV button on one wrapping line; a p cannot hold the help paragraph."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-ngrams-view",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A layout grid putting the n-gram board beside its list, both inside their figure section."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-heatmap",
+			"count": 3,
+			"kind": "layout",
+			"reason": "The hidden board drawing: a box of absolutely positioned key caps that repeats the n-gram list, no element draws a board. The heatmap board: a scaled box of absolutely positioned key caps; each key is a named image, the box only places them. A heat card's board: a scaled box of absolutely positioned key caps, each a named image; no element draws a board."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div#la-ngrams-list",
+			"count": 1,
+			"kind": "mount",
+			"reason": "The mount point board/worst_groups.js fills with its own n-gram list markup; it adds no meaning of its own."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span.la-swatch",
+			"count": 5,
+			"kind": "decorative",
+			"reason": "A legend's colour sample, aria-hidden: a drawn box beside the entry's words, which say what it stands for."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-chart-grid",
+			"count": 5,
+			"kind": "layout",
+			"reason": "A layout grid of the tab's metric figures, each a section named by its heading."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div#la-trigram-mix",
+			"count": 1,
+			"kind": "mount",
+			"reason": "The mount point stackedFigure() redraws with the figure's legend, bar table, note and folded table, inside its named section."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div#la-row-mix",
+			"count": 1,
+			"kind": "mount",
+			"reason": "The mount point stackedFigure() redraws with the figure's legend, bar table, note and folded table, inside its named section."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-heat-grid",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A layout grid of the side-by-side heat cards, each a section named by its heading."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div.la-detail-grid",
+			"count": 2,
+			"kind": "layout",
+			"reason": "A layout grid of the details' figure sections, two or three columns where the width holds them."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div#la-heatmap-image",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The mount point of the image buttons group that board/board_image.js builds for the heatmap."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span (none)",
+			"count": 3,
+			"kind": "decorative",
+			"reason": "A drawn bar, absolutely positioned in its aria-hidden track cell; the row's cells say its value."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div (none)",
+			"count": 1,
+			"kind": "dl-group",
+			"reason": "One leader tile of the dl: HTML allows only a div to wrap a dt and its dd, and the tile needs that box for its frame."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span.la-th-head",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Keeps a column header's sort button and its « i » together on the header's last line; no phrasing element groups two controls."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span.la-verdict",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "A relative cell's drawn mark (▲ ▼ =), aria-hidden; the words beside it in la-sr-only say the verdict."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span.la-sr-only",
+			"count": 3,
+			"kind": "styling-hook",
+			"reason": "Words read by assistive technology only (a cell's unit or verdict); no element is visually hidden text."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span.la-bar",
+			"count": 4,
+			"kind": "decorative",
+			"reason": "A drawn bar or bar part, absolutely positioned in its aria-hidden track cell; the row's cells say its value."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span.la-target",
+			"count": 2,
+			"kind": "decorative",
+			"reason": "A drawn mark (the ideal load, the middle) positioned in an aria-hidden track; the value cell says it in words."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span.la-heat-ramp",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The heat scale's drawn ramp, aria-hidden, between its two ends written as text."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span.la-key",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A positioned key cap of the heat board, a named image (role img, its value and place in its name); no element is a key cap."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span.la-heat-key",
+			"count": 2,
+			"kind": "layout",
+			"reason": "Keeps a swatch with its words as one item of the legend's flex line (its own 6 px gap); no phrasing element means a legend entry."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span.la-verdict-mark",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "A verdict's drawn mark (▲ ▼ =), aria-hidden, before the words that say it."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/fingering_editor.js",
+			"element": "div.la-heatmap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The board on which the key buttons are absolutely positioned, sized by the script; a drawing surface with no meaning of its own (the keys carry the names)."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/fingering_editor.js",
+			"element": "span.la-file-button",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The visible button face of the import label (the native file input's own words stay hidden): the label element is the control's name, the face is only its look."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/info_popover.js",
+			"element": "div.la-popover-texts",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Groups the popover's explanation paragraphs, replaced together on each opening; it is no section (no heading of its own) and no other element means a run of paragraphs."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-layout-tab-list",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The flex row that wraps the list of open layouts (display: contents) and its « + » button together, so « + » follows the last tab on its line; it means nothing itself."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-preserved",
+			"count": 1,
+			"kind": "aria-widget",
+			"reason": "A note (role=note) holding its paragraph and its two convert buttons; HTML has no note element, and a section would need a heading this notice does not have."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-messages",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The column that stacks the page's current question, message, note and lost-features list with their own gap, hidden while empty; each child carries its own meaning."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-form-grid",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The CSS grid of the details' labelled fields; the fields commit on change, so a form element (whose Enter submits) would be wrong, and the grid has no legend."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-layer-pick",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The wrapping flex row of the layer bar's heading, its two tab lists and its two buttons; a block holding a heading and tab lists, no element carries that grouping."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-tabs",
+			"count": 2,
+			"kind": "aria-widget",
+			"reason": "The containers of the layer tab lists (role=tablist: the four levels and the other layers), which HTML has no element for."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-subpanels",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The auto-fit CSS grid placing the layers tool's two sections side by side; each section has its heading."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-tool-tabs",
+			"count": 1,
+			"kind": "aria-widget",
+			"reason": "The container of the secondary tools' tabs (role=tablist), which HTML has no element for."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-board",
+			"count": 1,
+			"kind": "aria-widget",
+			"reason": "The drawn keyboard: a named group (role=group) of key buttons positioned in key units by CSS variables, walked with the arrow keys; no element is a two-dimensional set of positioned controls."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The legend of a positioned key cap (.le-legend), centred and shrunk to fit inside the key button by fitLegends; plain text inside a button, no element carries it."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "span.le-code",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The printed name (Tab, Shift) on a positioned key cap, laid out under its legend inside the key button; plain text inside a button."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-board-scroll",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The sideways scroll box and size container (container-type) of the drawn board; purely a layout box around the key group."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-mapping-fields",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The slot whose fields change with the mapping kind chosen (a text field with its palette details, or a drop-down); it holds block content, so no paragraph, and it has no legend of its own."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-name-results",
+			"count": 1,
+			"kind": "mount",
+			"reason": "The box a name search refills with its count paragraph and its list of characters; it means nothing beyond its two children."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-act-as",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The bordered block of the simple shortcut case: its labelled drop-down, its pick button and its note paragraph; block content without a heading or a legend."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-try",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The drawn input bar of « Try »: a transparent field laid over the output it fills, and the clear button; a visual frame around native controls."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-sticker",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "A printed key cap (print only, aria-hidden), a CSS grid of its level legends."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "span.le-sticker-",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "One level's legend placed in a grid cell of a printed key cap (print only, aria-hidden)."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-workspace",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The CSS grid of the board column, the key inspector and the host's side panel, whose columns follow the editor's width."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-board-col",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The first column of the workspace grid, stacking the board's section and the preview's section."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "div.le-side-slot",
+			"count": 1,
+			"kind": "mount",
+			"reason": "The persistent slot a host fills with its own panel (the Studio's analysis, itself a named section); the slot only places it in the grid."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-steps",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid that places the four step sections in two columns on a wide screen; it groups nothing a reader needs, and an ol would announce a list around sections that already carry numbered headings."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-fields",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid that sets the three labelled selects side by side; each field is a p with its label, and the row itself has no meaning (a fieldset would need a legend the step heading already gives)."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-tabs",
+			"count": 1,
+			"kind": "aria-widget",
+			"reason": "The tablist container of the ARIA tabs pattern (role=tablist, named by its h3); its tabs are native buttons with a roving tabindex and the arrow, Home and End keys, and no HTML element is a tab list."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-board-box",
+			"count": 5,
+			"kind": "layout",
+			"reason": "The box a board wider than a phone scrolls in (overflow-x), around the board; a purely visual frame."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-board",
+			"count": 5,
+			"kind": "aria-widget",
+			"reason": "The toolbar container (role=toolbar, named by its tab) of the absolutely positioned key buttons; one tab stop, the arrow keys move between keys. No element lays out keys on a keyboard's geometry. The toolbar container (role=toolbar, named by its tab) of the absolutely positioned QWERTY key buttons; one tab stop, the arrow keys move between keys. The toolbar container (role=toolbar, named by its tab) of the absolutely positioned zone key buttons; one tab stop, the arrow keys move between keys. The positioning frame of the start layout's drawn key caps, inside a figure with its caption; the table under the boards is their text alternative. The positioning frame of the best layout's drawn key caps, inside a figure with its caption; the table under the boards is their text alternative."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-buttons",
+			"count": 4,
+			"kind": "layout",
+			"reason": "A wrapping row of native preset buttons; it adds no meaning to them (menu would announce a list). A wrapping row of native buttons (and the zone's labelled select); it adds no meaning to them."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-row",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of the five budget fields inside their details, whose summary names the group; each field is a p with its label."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-tile",
+			"count": 3,
+			"kind": "dl-group",
+			"reason": "The group of one dt and its dd inside the score dl, the one wrapper HTML allows there, drawn as a tile. The dt and dd group of the score change inside the score dl (the one wrapper HTML allows there), drawn as a tile coloured by the change's sign."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-chart-box",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The positioning frame of the chart's hidden svg and its pointer tip, inside the figure; purely visual."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-table-box",
+			"count": 3,
+			"kind": "layout",
+			"reason": "The box a table wider than a phone scrolls in (overflow-x), around a real table; a purely visual frame."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-boards",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid that sets the start and best boards' two figures side by side; it adds no meaning."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-metric-tables",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid that sets the two halves of the metrics table side by side under their h3; it adds no meaning."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-library-content",
+			"count": 1,
+			"kind": "mount",
+			"reason": "The flex column the library card's verdict, best layout section, heading, list and legend are drawn into once the scan ends; the section around it carries the heading."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "span.lo-library-mark",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The decorative glyph of the verdict, hidden from assistive technology, so the verdict is not told by colour alone; its words follow."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "span.lo-gap-mark",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The decorative arrow of a score gap, hidden from assistive technology; the gap's words follow it."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-library-actions",
+			"count": 2,
+			"kind": "layout",
+			"reason": "A wrapping row of a layout's two native « Compare » and « Edit » buttons; it adds no meaning to them."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-gauge",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "A decorative conic ring hidden from assistive technology (aria-hidden); the same percentage is said in words beside it, and a meter cannot be drawn as a ring."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "span.lo-gauge-value",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The number drawn in the decorative ring, hidden with it; the same value is said in words beside it."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-library-best-text",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The flex column of the best layout's facts beside its gauge, inside its section, so the two wrap on a phone; it adds no meaning."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-bars",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The decorative track of a layout's two similarity bars, hidden from assistive technology; the values are said in words under it."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "span.lo-bar",
+			"count": 2,
+			"kind": "decorative",
+			"reason": "A purely visual bar inside the hidden track, its width the value said in words under it."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "span.lo-swatch",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The decorative colour chip beside each legend entry's words, hidden from assistive technology."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "div.lo-switch-head",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The flex row that keeps the thumb keys switch's label and its separate « i » button on one line; a button cannot sit inside the label."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "span.lo-board-mark-glyph",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The decorative changed or unchanged glyph of a table row, hidden from assistive technology; its words follow."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "span.lo-verdict",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The decorative better or worse triangle of a metric change, hidden from assistive technology; the visually hidden words beside it say the same."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "span.lo-sr-only",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Words for assistive technology only (better or worse) beside the triangle; no element hides text visually while keeping it read."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "span.lo-shelf-rank",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The decorative rank badge, hidden from assistive technology; the ordered list gives each layout its rank."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_optimizer/optimizer_page.js",
+			"element": "span.lo-shelf-bar",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "A decorative bar of the gain over the start, hidden from assistive technology; the gain is said in the facts line."
+		}
+	],
+	"svelteIgnores": []
+}

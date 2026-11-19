@@ -647,12 +647,20 @@
 			"repro": "npm run test:keyboard-operability"
 		},
 		{
-			"id": "app-windows-semantic-markup",
-			"ordinal": 709,
-			"name": "the app windows write no div or span without a listed reason, no div or span acts as a control, and every img and svg has a text alternative or is hidden",
+			"id": "studio-semantic-html",
+			"ordinal": 708,
+			"name": "every div and span of the Studio pages, in their HTML and in the DOM their scripts build, is justified in the Studio list, and none has a pointer handler, an interactive or computed role or a tabindex",
 			"cmd": "node",
-			"args": ["tools/test/test-app-windows-semantic-markup.cjs"],
-			"repro": "npm run test:app-windows-semantic-markup"
+			"args": ["tools/test/test-studio-semantic-html.cjs"],
+			"repro": "npm run test:studio-semantic-html"
+		},
+		{
+			"id": "studio-reading-preferences",
+			"ordinal": 709,
+			"name": "every Studio page, on the site and in the app's windows, loads the shared reading preferences right after the theme, and the theme styles each of them",
+			"cmd": "node",
+			"args": ["tools/test/test-studio-reading-preferences.cjs"],
+			"repro": "npm run test:studio-reading-preferences"
 		}
 	]
 }
