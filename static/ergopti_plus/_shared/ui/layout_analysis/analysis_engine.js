@@ -117,6 +117,10 @@ var LAYOUT_ANALYSIS = (function () {
 	// keys, on AltGr and behind a dead key all stay; more never occur in the
 	// library and would multiply the cost of the choice.
 	const MAX_WAYS = 4;
+	// Sets of touched symbols whose closure a rule graph keeps (touchedClosure):
+	// every pair of a search's movable units (about 45 on a letter layout) fits,
+	// and a few megabytes bound what a longer stream of distinct changes holds.
+	const CLOSURE_CACHE_LIMIT = 1024;
 	// Separates two tokens in a map key (no layout types this control character).
 	const TOKEN_SEP = '\u0001';
 	// The largest stamp a Uint32Array holds: a stamp counter starts over below it.
@@ -1091,9 +1095,55 @@ var LAYOUT_ANALYSIS = (function () {
 			add(producers, out, r);
 			return out;
 		});
-		const graph = { outputs, users, producers };
+		const graph = { outputs, users, producers, closures: new Map() };
 		ruleGraphCache.set(rules, graph);
 		return graph;
+	}
+
+	/**
+	 * What a partial compile does again for the symbols its changed cells and
+	 * rules touch: those symbols, every output of a rule that reads one of
+	 * them, and so on, by kind (the lists it compiles again), and the rules
+	 * that give one of them, ascending (those a whole compile follows first).
+	 * Both depend on the rule graph and the touched symbols alone, so they are
+	 * kept on the graph per set of touched symbols: a search swaps the same
+	 * few units again and again. The result is shared: never written.
+	 * @param {object} graph - From ruleGraph().
+	 * @param {Set<string>} touched - The symbols the changes touch.
+	 * @returns {{only: {chars: Set<string>, dead: Set<string>, texts: Set<string>},
+	 *   order: number[]}} The touched characters, dead states and texts, and the rule order.
+	 */
+	function touchedClosure(graph, touched) {
+		const key = [...touched].sort().join(TOKEN_SEP);
+		const cached = graph.closures.get(key);
+		if (cached !== undefined) return cached;
+		const { outputs, users, producers } = graph;
+		// What reads a touched symbol is touched in turn.
+		const all = new Set(touched);
+		const queue = [...all];
+		while (queue.length) {
+			for (const r of users.get(queue.pop()) || []) {
+				const out = outputs[r];
+				if (all.has(out)) continue;
+				all.add(out);
+				queue.push(out);
+			}
+		}
+		const only = { chars: new Set(), dead: new Set(), texts: new Set() };
+		const order = [];
+		for (const symbol of all) {
+			const name = symbol.slice(1);
+			if (symbol[0] === 'c') only.chars.add(name);
+			else if (symbol[0] === 'd') only.dead.add(name);
+			else only.texts.add(name);
+			const given = producers.get(symbol);
+			if (given) for (const r of given) order.push(r);
+		}
+		order.sort((x, y) => x - y);
+		if (graph.closures.size >= CLOSURE_CACHE_LIMIT) graph.closures.clear();
+		const closure = { only, order };
+		graph.closures.set(key, closure);
+		return closure;
 	}
 
 	/** Whether two cells (or dead-key rule results) are alike: null and undefined are no cell. */
@@ -1213,7 +1263,8 @@ var LAYOUT_ANALYSIS = (function () {
 			if (board.index.has(code) && !(code in layout.rows))
 				compareRows(before.rows[code], undefined);
 		const rules = deadRules(layout.dead);
-		const { outputs, users, producers } = ruleGraph(rules);
+		const graph = ruleGraph(rules);
+		const { outputs } = graph;
 		if (before.dead !== layout.dead) {
 			const changedStates = new Set();
 			const compareStates = (ra, rb, state) => {
@@ -1241,23 +1292,7 @@ var LAYOUT_ANALYSIS = (function () {
 			}
 		}
 		if (touched.size === 0) return previous;
-		// What reads a touched symbol is touched in turn.
-		const queue = [...touched];
-		while (queue.length) {
-			for (const r of users.get(queue.pop()) || []) {
-				const out = outputs[r];
-				if (touched.has(out)) continue;
-				touched.add(out);
-				queue.push(out);
-			}
-		}
-		const only = { chars: new Set(), dead: new Set(), texts: new Set() };
-		for (const symbol of touched) {
-			const name = symbol.slice(1);
-			if (symbol[0] === 'c') only.chars.add(name);
-			else if (symbol[0] === 'd') only.dead.add(name);
-			else only.texts.add(name);
-		}
+		const { only, order } = touchedClosure(graph, touched);
 		// The previous maps, less the lists compiled again: only those keys are written.
 		const without = (map, keys, spare) => {
 			const out = spare ? spare.copyOf(map) : new Map(map);
@@ -1274,13 +1309,6 @@ var LAYOUT_ANALYSIS = (function () {
 			texts: without(previous.texts, only.texts, spares && spares.texts)
 		};
 		offerCells(core, layout, board, null, only);
-		// The rules that give a touched symbol, ascending: those a whole compile follows first.
-		const order = [];
-		for (const symbol of touched) {
-			const given = producers.get(symbol);
-			if (given) for (const r of given) order.push(r);
-		}
-		order.sort((x, y) => x - y);
 		if (!followRules(core, rules, order, board, 'partial'))
 			return Object.assign(compileCore(layout, board, null, 'record'), { whole: true });
 		return core;
