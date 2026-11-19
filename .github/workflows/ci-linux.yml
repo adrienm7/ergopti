@@ -5389,7 +5389,7 @@ jobs:
           for f in build/linux/flatpak/org.ergopti.Ergopti.yml \
                    build/linux/flatpak/payload/bin/ergopti \
                    build/linux/flatpak/payload/lib/ergopti/ergopti_hotstrings.lua \
-                   build/linux/flatpak/payload/lib/ergopti/infra/paths.lua \
+                   build/linux/flatpak/payload/lib/ergopti/core/fs/engine/paths.lua \
                    build/linux/flatpak/payload/lib/ergopti/_shared/core/logger/engine/shim.lua \
                    build/linux/flatpak/payload/lib/ergopti/_shared/core/i18n/data/locales/en.json; do
               if [ ! -f "$f" ]; then
@@ -5716,7 +5716,7 @@ jobs:
           fail=0
           for f in /usr/bin/ergopti \
                    /usr/lib/ergopti/ergopti_hotstrings.lua \
-                   /usr/lib/ergopti/infra/paths.lua \
+                   /usr/lib/ergopti/core/fs/engine/paths.lua \
                    /usr/lib/ergopti/_shared/core/logger/engine/shim.lua \
                    /usr/lib/ergopti/_shared/core/i18n/data/locales/en.json \
                    /usr/lib/systemd/user/ergopti-hotstrings.service; do

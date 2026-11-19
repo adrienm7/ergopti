@@ -791,6 +791,41 @@ if (!rpmArchMatch) {
 	}
 }
 
+// Every installed driver file a build or a CI step names exists in the source
+// tree. The payload checks of the Flatpak and the .deb named infra/paths.lua
+// for days after a structure step moved it to core/fs/engine/: the build lane
+// was the first to notice, after the whole Flatpak compile (CI 44454150119).
+// <prefix>/lib/ergopti/ is the driver root; its _shared/ is the shared tree,
+// and the user install nests the driver under linux/ beside it.
+const INSTALLED_FILE = /lib\/ergopti\/([A-Za-z0-9_./-]+\.(?:lua|json))/g;
+const PATH_NAMERS = [
+	'.github/workflows/ci-linux.yml',
+	'.github/workflows/ci-release.yml',
+	'tools/build/build-linux-flatpak.sh',
+	'tools/build/build-linux-deb.sh',
+	'tools/build/build-linux-rpm.sh',
+	'tools/build/PKGBUILD',
+	'tools/build/nix/flake.nix'
+];
+let installedFilesChecked = 0;
+for (const rel of PATH_NAMERS) {
+	for (const [, installed] of read(rel).matchAll(INSTALLED_FILE)) {
+		const source = installed.startsWith('_shared/')
+			? `static/ergopti_plus/${installed}`
+			: `static/ergopti_plus/linux/${installed.replace(/^linux\//, '')}`;
+		installedFilesChecked += 1;
+		if (!fs.existsSync(path.join(ROOT, source))) {
+			errors.push(
+				`${rel}: names the installed lib/ergopti/${installed}, but ${source} does not exist ` +
+					'(a structure step moved it without updating this check).'
+			);
+		}
+	}
+}
+if (installedFilesChecked === 0) {
+	errors.push('no installed driver file found in the package and CI checks (pattern drift).');
+}
+
 // window_info.getAll() lists X11 windows through wmctrl: every system package that
 // can install it names it, and the Flatpak states that it is a host program.
 for (const [rel, pattern] of [
