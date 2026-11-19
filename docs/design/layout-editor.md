@@ -271,7 +271,9 @@ comparer is embedded were decided by the agent, to be reviewed by the maintainer
   `layout_sources/studio_layouts.json`. Each layout is stored as the JSON text the page sent and returned
   unchanged (`_shared/layouts/engine/composer/studio_store.lua`, Windows `StudioStore_*`). An unreadable store
   refuses every operation and is never overwritten. The store waits for initData (`studio_store`), and a host
-  without one refuses its calls.
+  without one refuses its calls. The Comparer's list renames an own layout (a save of the same id), duplicates it
+  (a save of a new id) and removes it (`studio_layout_remove`, with an « Undo » that saves it again); the site keeps
+  the same layouts in this browser's storage.
 - Built-in corpora on request: `LAYOUT_ANALYSIS_HOST.loadCorpus(id)` posts `studio_corpus`; the host reads
   `_shared/ui/layout_analysis/_generated/corpus_<id>.js` (an id of `[a-z0-9_]`, so it names no other file; bounded by
   `studio.max_corpus_bytes`), runs it in the page as a classic script and answers `studioCorpus`, or refuses with

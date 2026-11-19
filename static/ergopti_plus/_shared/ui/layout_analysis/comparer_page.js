@@ -70,6 +70,13 @@
  *    (name, family, origin, language, completeness, score) and has a table;
  *    the corpus picker groups the built-in texts by language, each entry
  *    naming its kind.
+ * 17. Add a layout (ux-study items 6 and 15): a file chosen or dropped on the
+ *    layouts card, or a text pasted or dropped, read by its content with the
+ *    format it recognised named live; a refusal says where to fix it.
+ * 18. The user's own layouts (ux-study item 5): « Rename » in place,
+ *    « Duplicate » and « Remove » with an « Undo », kept through the host's
+ *    store in the app (the same studio_layout_save and studio_layout_remove
+ *    on the three OS) or this browser's storage on the site.
  * ==============================================================================
  */
 
@@ -272,6 +279,12 @@
 		forms: 'M3 8h18v8H3zM3 12h18M9 8v8M15 8v8'
 	};
 	const SVG_NS = 'http://www.w3.org/2000/svg';
+	// The actions on the user's own layouts in the list: a pencil, two sheets, a bin.
+	const MINE_ICONS = {
+		rename: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4',
+		duplicate: 'M8 8h12v12H8zM4 16V4h12',
+		remove: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6'
+	};
 	// Each tab's icon (24 × 24 strokes, the settings sections' set) and its
 	// accent slot of theme.css « Chart look » (maintainer, 2026-11-18: the tabs
 	// say at a glance what each holds). Both are decorative: the tab's text
@@ -501,6 +514,7 @@
 		</div>
 	</section>
 	<p id="la-import-report" class="la-import-report" role="status" hidden></p>
+	<p id="la-mine-status" class="la-mine-status" role="status" hidden></p>
 	<nav id="la-letters" class="la-letters"></nav>
 	<div id="la-layout-list" class="la-layout-list"></div>
 	</details>
@@ -1034,6 +1048,9 @@
 		const saved = loadSaved();
 		// Layouts the user imported from files, kept with the other conveniences.
 		const imported = Array.isArray(saved.imported) ? saved.imported.filter(isLayout) : [];
+		// The layouts the user keeps (imported here, in the host's store or this
+		// browser's storage): the ones « Rename », « Duplicate » and « Remove » manage.
+		const own = new Set(imported.map((layout) => layout.id));
 		const layouts = E.libraryLayouts()
 			.concat((HOST.layouts || []).map(E.layoutFromRows))
 			.concat(imported.map(E.layoutFromRows));
@@ -1079,6 +1096,8 @@
 				(E.keyboardFormats().some((f) => f.id === window.LAYOUT_ANALYSIS_FILES.savedFormat())
 					? window.LAYOUT_ANALYSIS_FILES.savedFormat()
 					: E.defaultKeyboardFormat()),
+			// The id of the own layout whose name is being edited in the list, if any.
+			renaming: null,
 			// Whether the user chose the ticked layouts; until then they follow the keyboard.
 			selectionChosen: saved.selectionChosen === true && Array.isArray(saved.selected),
 			selected: null,
@@ -4161,6 +4180,10 @@
 			const authors = Array.isArray(layout.authors) ? layout.authors.join(', ') : '';
 			// The authors beside the label, so the box is named by the layout alone.
 			item.append(label);
+			if (own.has(layout.id)) {
+				item.classList.add('la-own');
+				item.append(state.renaming === layout.id ? renameForm(layout) : ownActions(layout, item));
+			}
 			if (authors) item.append(el('span', 'la-layout-meta', authors));
 			// « + »: this layout also ranks as « <name>+ », typing the keys typed with
 			// the Ergopti+ hotstrings, while the others type the final text.
@@ -4182,6 +4205,228 @@
 			plusLabel.append(plus, el('span', '', layout.name + PLUS_SUFFIX));
 			item.append(plusLabel);
 			return item;
+		}
+
+		// ======================================
+		// ======= 4b/ The user's own layouts ===
+		// ======================================
+
+		/** A small icon of a list action (MINE_ICONS); its button's name says what it does. */
+		function mineIcon(id) {
+			const svg = document.createElementNS(SVG_NS, 'svg');
+			svg.setAttribute('viewBox', '0 0 24 24');
+			svg.setAttribute('class', `la-mine-icon la-mine-icon-${id}`);
+			svg.setAttribute('aria-hidden', 'true');
+			svg.setAttribute('focusable', 'false');
+			const path = document.createElementNS(SVG_NS, 'path');
+			path.setAttribute('d', MINE_ICONS[id]);
+			svg.append(path);
+			return svg;
+		}
+
+		/** One action button of an own layout: its icon and its word, named with the layout. */
+		function mineButton(id, layout, run) {
+			const button = el('button', `la-mine-button la-mine-${id}`);
+			button.type = 'button';
+			button.dataset.mine = id;
+			button.dataset.layout = layout.id;
+			button.append(mineIcon(id), el('span', 'la-mine-word', t(`layout_analysis.mine.${id}`)));
+			button.setAttribute(
+				'aria-label',
+				t(`layout_analysis.mine.${id}_named`, { name: layout.name })
+			);
+			button.addEventListener('click', run);
+			return button;
+		}
+
+		/** « Rename », « Duplicate » and « Remove » beside an own layout of the list. */
+		function ownActions(layout) {
+			const box = el('span', 'la-mine-actions');
+			box.append(
+				el('span', 'la-mine-badge', t('layout_analysis.mine.badge')),
+				mineButton('rename', layout, () => {
+					state.renaming = layout.id;
+					fillLayouts();
+					const field = $('la-rename-field');
+					field.focus();
+					field.select();
+				}),
+				mineButton('duplicate', layout, () => duplicateLayout(layout.id)),
+				mineButton('remove', layout, () => removeLayout(layout.id))
+			);
+			return box;
+		}
+
+		/** The name field that replaces an own layout's actions while it is renamed. */
+		function renameForm(layout) {
+			const form = el('form', 'la-rename');
+			const field = el('input', 'la-rename-input');
+			field.id = 'la-rename-field';
+			field.value = layout.name;
+			field.setAttribute('aria-label', t('layout_analysis.mine.name_label', { name: layout.name }));
+			field.setAttribute('aria-describedby', 'la-mine-status');
+			const saveButton = el('button', 'la-mine-button', t('layout_analysis.mine.save'));
+			saveButton.type = 'submit';
+			const cancel = el('button', 'la-mine-button', t('layout_analysis.mine.cancel'));
+			cancel.type = 'button';
+			const close = () => {
+				state.renaming = null;
+				fillLayouts();
+				const again = root.querySelector(`button[data-mine="rename"][data-layout="${layout.id}"]`);
+				if (again) again.focus();
+			};
+			cancel.addEventListener('click', close);
+			field.addEventListener('keydown', (event) => {
+				if (event.key !== 'Escape') return;
+				event.preventDefault();
+				close();
+			});
+			form.addEventListener('submit', async (event) => {
+				event.preventDefault();
+				if (await renameLayout(layout.id, field.value)) close();
+				else field.focus();
+			});
+			form.append(field, saveButton, cancel);
+			return form;
+		}
+
+		/** The line under the list that says what was done to an own layout, with its « Undo ». */
+		function mineStatus(text, error, undo) {
+			const node = $('la-mine-status');
+			node.hidden = false;
+			node.className = `la-mine-status ${error ? 'la-error' : 'la-ok'}`;
+			node.replaceChildren(el('span', '', text));
+			if (!undo) return;
+			const button = el('button', 'la-mine-undo', t('layout_analysis.undo.button'));
+			button.type = 'button';
+			button.addEventListener('click', async () => {
+				button.disabled = true;
+				await undo();
+			});
+			node.append(' ', button);
+		}
+
+		/** Keeps an own layout where the user's layouts live: the host's store, else this browser. */
+		async function keepOwn(layout) {
+			if (HOST.store) {
+				await HOST.store.save(layout);
+				return;
+			}
+			const at = imported.findIndex((entry) => entry.id === layout.id);
+			if (at >= 0) imported.splice(at, 1, layout);
+			else imported.push(layout);
+			save();
+		}
+
+		/** Takes an own layout out of where it is kept. */
+		async function dropOwn(id) {
+			if (HOST.store) {
+				await HOST.store.remove(id);
+				return;
+			}
+			const at = imported.findIndex((entry) => entry.id === id);
+			if (at >= 0) imported.splice(at, 1);
+			save();
+		}
+
+		/** A reason a host or a browser gave for a failed save, for the status line. */
+		function failure(error) {
+			return t('layout_analysis.mine.failed', {
+				reason: (error && (error.code || error.message)) || String(error)
+			});
+		}
+
+		/**
+		 * Renames an own layout, kept at once; an empty name is refused in words.
+		 * @returns {Promise<boolean>} Whether the name was taken.
+		 */
+		async function renameLayout(id, name) {
+			const clean = String(name).trim();
+			if (clean === '') {
+				mineStatus(t('layout_analysis.mine.name_empty'), true);
+				return false;
+			}
+			const layout = byId.get(id);
+			const before = layout.name;
+			if (clean === before) return true;
+			layout.name = clean;
+			try {
+				await keepOwn(layout);
+			} catch (error) {
+				layout.name = before;
+				mineStatus(failure(error), true);
+				return false;
+			}
+			mineStatus(t('layout_analysis.mine.renamed', { before, name: clean }), false);
+			fillLayouts();
+			analyse();
+			return true;
+		}
+
+		/** Adds a copy of an own layout, named as a copy, kept and ticked. */
+		async function duplicateLayout(id) {
+			const layout = byId.get(id);
+			const copy = E.layoutFromRows(
+				Object.assign(JSON.parse(JSON.stringify(layout)), {
+					name: t('layout_analysis.mine.copy_name', { name: layout.name })
+				})
+			);
+			let copyId = `${id}_copy`;
+			for (let n = 2; byId.has(copyId); n++) copyId = `${id}_copy_${n}`;
+			copy.id = copyId;
+			try {
+				await keepOwn(copy);
+			} catch (error) {
+				mineStatus(failure(error), true);
+				return;
+			}
+			layouts.push(copy);
+			byId.set(copyId, copy);
+			own.add(copyId);
+			state.selected.add(copyId);
+			save();
+			mineStatus(t('layout_analysis.mine.duplicated', { name: copy.name }), false);
+			fillLayouts();
+			analyse();
+		}
+
+		/** Removes an own layout from the list and from where it is kept, with an « Undo ». */
+		async function removeLayout(id) {
+			const layout = byId.get(id);
+			const wasSelected = state.selected.has(id);
+			try {
+				await dropOwn(id);
+			} catch (error) {
+				mineStatus(failure(error), true);
+				return;
+			}
+			layouts.splice(layouts.indexOf(layout), 1);
+			byId.delete(id);
+			own.delete(id);
+			state.selected.delete(id);
+			state.plus.delete(id);
+			if (state.details === id) state.details = null;
+			if (state.versus === id) state.versus = null;
+			save();
+			fillLayouts();
+			analyse();
+			mineStatus(t('layout_analysis.mine.removed', { name: layout.name }), false, async () => {
+				try {
+					await keepOwn(layout);
+				} catch (error) {
+					mineStatus(failure(error), true);
+					return;
+				}
+				layouts.push(layout);
+				byId.set(id, layout);
+				own.add(id);
+				if (wasSelected) state.selected.add(id);
+				save();
+				mineStatus(t('layout_analysis.mine.restored', { name: layout.name }), false);
+				fillLayouts();
+				analyse();
+			});
+			$('la-mine-status').querySelector('button').focus();
 		}
 
 		// The file name a score settings export is saved under.
@@ -4701,6 +4946,7 @@
 				byId.set(id, layout);
 				if (HOST.store) await HOST.store.save(layout);
 				else imported.push(layout);
+				own.add(id);
 				state.selected.add(id);
 				const format = formatName(result.format);
 				report.textContent =
@@ -5229,9 +5475,13 @@
 			if (opts.reportHeight) reportHeight();
 			// The host's personal layouts (app data folder, site IndexedDB).
 			if (HOST.store)
-				HOST.store
-					.list()
-					.then(addLayouts, () => showStatus(t('layout_analysis.status.store_failed')));
+				HOST.store.list().then(
+					(list) => {
+						for (const layout of list) own.add(layout.id);
+						addLayouts(list);
+					},
+					() => showStatus(t('layout_analysis.status.store_failed'))
+				);
 		}
 
 		start();

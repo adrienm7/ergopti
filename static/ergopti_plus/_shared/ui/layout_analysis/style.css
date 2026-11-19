@@ -1642,3 +1642,83 @@ body:has(> main.layout-analysis) {
 .la-import-report.la-error {
 	border-left: 4px solid var(--la-bad);
 }
+
+/* The user's own layouts in the list: a « Mine » badge and three actions,
+   each an icon with its word, at a 32px target (ux-study item 5). */
+.la-layout-item.la-own {
+	border-left-color: var(--la-cat-3);
+}
+
+.la-mine-actions,
+.la-rename {
+	align-items: center;
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 2px 0;
+}
+
+.la-mine-badge {
+	border: 2px solid var(--la-cat-3);
+	border-radius: 999px;
+	color: var(--theme-text);
+	font-size: 0.75rem;
+	font-weight: 700;
+	padding: 1px 8px;
+}
+
+.la-mine-button {
+	align-items: center;
+	border-radius: 6px;
+	display: inline-flex;
+	gap: 4px;
+	min-height: 32px;
+	padding: 2px 8px;
+}
+
+.la-mine-icon {
+	fill: none;
+	height: 16px;
+	stroke: currentcolor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 2;
+	width: 16px;
+}
+
+.la-mine-icon-rename {
+	stroke: var(--la-cat-1);
+}
+
+.la-mine-icon-duplicate {
+	stroke: var(--la-cat-4);
+}
+
+.la-mine-icon-remove {
+	stroke: var(--la-bad);
+}
+
+.la-rename-input {
+	min-height: 32px;
+	min-width: 14em;
+}
+
+.la-mine-status {
+	background: var(--la-surface-2);
+	border-radius: 8px;
+	margin: 8px 0;
+	padding: 8px 12px;
+}
+
+.la-mine-status.la-ok {
+	border-left: 4px solid var(--la-good);
+}
+
+.la-mine-status.la-error {
+	border-left: 4px solid var(--la-bad);
+}
+
+.la-mine-undo {
+	font-weight: 600;
+	margin-left: 8px;
+}

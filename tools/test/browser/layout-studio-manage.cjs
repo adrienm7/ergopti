@@ -190,7 +190,177 @@ async function exerciseComparerPasteImport(browser, origin) {
 	await context.close();
 }
 
+/** The names of the list's own layouts (each with its « Mine » actions). */
+function ownNames(page) {
+	return page.$$eval('.la-layout-item.la-own .la-layout-name', (nodes) =>
+		nodes.map((node) => node.textContent)
+	);
+}
+
+/**
+ * (manage-layouts) On the site (this browser's storage): an own layout is
+ * renamed in the list (Escape cancels, an empty name is refused in words),
+ * duplicated as « (copy) » and ticked, removed with an « Undo » that brings it
+ * back; each change survives a reload. Library layouts have no such actions.
+ */
+async function exerciseManageLayoutsSite(browser, origin) {
+	const { page, errors, context } = await openComparer(browser, origin);
+	await openLayoutList(page);
+	await page.fill('#la-paste', 'qwfpgjluy;\narstdhneio\nzxcvbkm,./');
+	await page.click('#la-paste-add');
+	await page.waitForFunction(() => document.querySelectorAll('.la-own').length === 1);
+	const [first] = await ownNames(page);
+	assert.equal(
+		await page.locator('.la-layout-item:not(.la-own) [data-mine]').count(),
+		0,
+		'a library layout has no actions'
+	);
+	assert.equal(
+		await page.getAttribute(`.la-own button[data-mine="rename"]`, 'aria-label'),
+		EN['layout_analysis.mine.rename_named'].replace('{name}', first),
+		'each action is named with its layout'
+	);
+	// Rename: Escape cancels and gives the focus back; an empty name is refused.
+	await page.click('.la-own button[data-mine="rename"]');
+	assert.equal(await page.evaluate(() => document.activeElement.id), 'la-rename-field');
+	await page.keyboard.press('Escape');
+	assert.equal(await page.evaluate(() => document.activeElement.dataset.mine), 'rename');
+	await page.click('.la-own button[data-mine="rename"]');
+	await page.fill('#la-rename-field', '   ');
+	await page.keyboard.press('Enter');
+	assert.equal(await page.textContent('#la-mine-status'), EN['layout_analysis.mine.name_empty']);
+	await page.fill('#la-rename-field', 'My Colemak');
+	await page.keyboard.press('Enter');
+	await page.waitForFunction(() =>
+		[...document.querySelectorAll('#la-table tbody tr td:nth-child(2)')].some(
+			(cell) => cell.textContent === 'My Colemak'
+		)
+	);
+	assert.deepEqual(await ownNames(page), ['My Colemak'], 'renamed in the list and the ranking');
+	// Duplicate: a copy, ticked.
+	await page.click('.la-own button[data-mine="duplicate"]');
+	const copy = EN['layout_analysis.mine.copy_name'].replace('{name}', 'My Colemak');
+	await page.waitForFunction(() => document.querySelectorAll('.la-own').length === 2);
+	assert.deepEqual((await ownNames(page)).sort(), ['My Colemak', copy].sort());
+	await page.waitForFunction(
+		(name) =>
+			[...document.querySelectorAll('#la-table tbody tr td:nth-child(2)')].some(
+				(cell) => cell.textContent === name
+			),
+		copy
+	);
+	// Reload: both kept, under their names.
+	await page.reload();
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	await openLayoutList(page);
+	assert.deepEqual((await ownNames(page)).sort(), ['My Colemak', copy].sort(), 'kept on reload');
+	// Remove, then Undo.
+	await page.click(
+		`.la-own button[aria-label="${EN['layout_analysis.mine.remove_named'].replace('{name}', copy)}"]`
+	);
+	await page.waitForFunction(() => document.querySelectorAll('.la-own').length === 1);
+	assert.equal(
+		await page.evaluate(() => document.activeElement.className),
+		'la-mine-undo',
+		'the focus goes to « Undo »'
+	);
+	await page.click('.la-mine-undo');
+	await page.waitForFunction(() => document.querySelectorAll('.la-own').length === 2);
+	await page.click(
+		`.la-own button[aria-label="${EN['layout_analysis.mine.remove_named'].replace('{name}', copy)}"]`
+	);
+	await page.waitForFunction(() => document.querySelectorAll('.la-own').length === 1);
+	await page.reload();
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	await openLayoutList(page);
+	assert.deepEqual(await ownNames(page), ['My Colemak'], 'the removal is kept on reload');
+	const names = await rowNames(page);
+	assert.ok(!names.includes(copy), `the copy left the ranking: ${names}`);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
+/**
+ * (manage-layouts) In the app, the host's store keeps the user's layouts (the
+ * same path on the three OS): a rename saves the same id under its new name,
+ * a duplicate saves a new id, a remove asks the host to remove it, and Undo
+ * saves it again. A store that refuses leaves the list unchanged, in words.
+ */
+async function exerciseManageLayoutsStore(browser, origin) {
+	const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	await context.addInitScript(() => {
+		const kept = new Map();
+		window.__storeCalls = [];
+		window.__storeRefuses = false;
+		window.LAYOUT_ANALYSIS_HOST = {
+			store: {
+				list: () => Promise.resolve([...kept.values()].map((text) => JSON.parse(text))),
+				save: (layout) => {
+					window.__storeCalls.push(['save', layout.id, layout.name]);
+					if (window.__storeRefuses) return Promise.reject({ code: 'studio_store_unreadable' });
+					kept.set(layout.id, JSON.stringify(layout));
+					return Promise.resolve();
+				},
+				remove: (id) => {
+					window.__storeCalls.push(['remove', id]);
+					kept.delete(id);
+					return Promise.resolve();
+				}
+			}
+		};
+	});
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(
+		`${origin}/ui/layout_analysis/index.html?lang=en&corpus=fr_nemolivier&layouts=ergopti,azerty`
+	);
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	await openLayoutList(page);
+	await page.fill('#la-paste', 'qwfpgjluy;\narstdhneio\nzxcvbkm,./');
+	await page.click('#la-paste-add');
+	await page.waitForFunction(() => document.querySelectorAll('.la-own').length === 1);
+	const calls = () => page.evaluate(() => window.__storeCalls.splice(0));
+	const [[, id]] = await calls();
+	await page.click('.la-own button[data-mine="rename"]');
+	await page.fill('#la-rename-field', 'Store name');
+	await page.keyboard.press('Enter');
+	await page.waitForFunction(
+		() => document.querySelector('.la-own .la-layout-name').textContent === 'Store name'
+	);
+	assert.deepEqual(await calls(), [['save', id, 'Store name']], 'a rename saves the same id');
+	await page.click('.la-own button[data-mine="duplicate"]');
+	await page.waitForFunction(() => document.querySelectorAll('.la-own').length === 2);
+	assert.deepEqual(await calls(), [['save', `${id}_copy`, 'Store name (copy)']]);
+	await page.click(`.la-own button[data-layout="${id}_copy"][data-mine="remove"]`);
+	await page.waitForFunction(() => document.querySelectorAll('.la-own').length === 1);
+	assert.deepEqual(await calls(), [['remove', `${id}_copy`]], 'a removal asks the host');
+	await page.click('.la-mine-undo');
+	await page.waitForFunction(() => document.querySelectorAll('.la-own').length === 2);
+	assert.deepEqual(
+		await calls(),
+		[['save', `${id}_copy`, 'Store name (copy)']],
+		'Undo saves it again'
+	);
+	// A store that refuses: the name stays, the reason is said.
+	await page.evaluate(() => {
+		window.__storeRefuses = true;
+	});
+	await page.click(`.la-own button[data-layout="${id}"][data-mine="rename"]`);
+	await page.fill('#la-rename-field', 'Refused');
+	await page.keyboard.press('Enter');
+	await page.waitForFunction(() =>
+		/studio_store_unreadable/.test(document.getElementById('la-mine-status').textContent)
+	);
+	await page.keyboard.press('Escape');
+	assert.ok(!(await ownNames(page)).includes('Refused'), 'a refused rename changes nothing');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseManageLayoutsSite,
+	exerciseManageLayoutsStore,
 	dropOn,
 	openComparer,
 	openLayoutList,
