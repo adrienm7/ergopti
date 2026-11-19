@@ -1031,6 +1031,15 @@
 				"hand_balance": 13.009708737864074
 			},
 			"parts_tolerance": 1e-9
+		},
+		{
+			"analyser": "genkey",
+			"basis": "tool",
+			"layout": "engram",
+			"keyboard": "ansi",
+			"text": "The lad said \"it is done\", then left; \"so what?\" asked Liz.",
+			"value": 36.458585859,
+			"tolerance": 0.000001
 		}
 	]
 }

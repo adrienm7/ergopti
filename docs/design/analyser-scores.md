@@ -320,16 +320,25 @@ quiz, jumping!` on ten and twelve lines (across spaces and punctuation), ten
 - **Fidelity: close.** Measured against genkey itself (built from f1f4173, its
   default config, `load` then `rank`), on its 28 layout files whose finger
   matrix is its column fingering, over _Alice_, _Sherlock Holmes_, English
-  Wikipedia, Python code and _Germinal_ (140 points): 1.4 % on average, 9.9 %
-  at most (code). An own transcription of the formula fed with genkey's exact
-  skipgrams gives its output to 9 decimals, so the skipgram chain is the whole
-  gap. Before (skip-1 scaled by 1.5486, the ratio of all skipgrams to skip-1
-  on genkey's default corpus): 5.5 % on average, 20.5 % at most. Gate:
+  Wikipedia, Python code and _Germinal_ (140 points): 1.3 % on average, 8.3 %
+  at most (code). Its `analyze` statistics that hold no skipgram are within
+  its printed rounding: index use within 0.05 point (1 decimal), SFB within
+  0.0005, LSB within 0.005. An own transcription of the formula fed with
+  genkey's exact skipgrams gives its output to 9 decimals, so the skipgram
+  chain is the whole gap left (finger speed per finger within 0.1 on average,
+  1.6 at most, the pinkies, whose low speed magnifies it). Before
+  2026-11-19, a key whose character genkey's corpus filter substitutes (the
+  `"` of Engram, read as `'`) took the place of the key the corpus reaches,
+  though genkey's layout reader only lower-cases: 1.4 % on average, 9.9 % at
+  most, index use off by 2.4 points on Engram. Before (skip-1 scaled by
+  1.5486, the ratio of all skipgrams to skip-1 on genkey's default corpus):
+  5.5 % on average, 20.5 % at most. Gate:
   hand-computed (`ge` 65) and genkey's own output (`rank`, printed to 9
   decimals by a local build) on short texts where the chain is exact: `ded`
   on QWERTY 341.666666667 (342.581 with the old scale), `The Lazy Dog` on
   Colemak, `minimum: "on-off" aloud` on Workman (case, substitutions), three
-  lines on QWERTY (the reset at each line end).
+  lines on QWERTY (the reset at each line end), a quoted sentence on Engram
+  (36.458585859; 68.95 before the fix above).
 
 ### Oxeylyzer
 

@@ -1331,8 +1331,10 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			codes.forEach((code, col) => {
 				const row = ctx.layout.rows[code];
 				if (!row || typeof row[0] !== 'string' || row[0] === '') return;
-				const char = norm(Array.from(row[0])[0]);
-				if (!char) return;
+				// Its layout reader lower-cases a key and nothing else: a key whose
+				// character the corpus filter substitutes (« " » for « ' ») is never
+				// typed, and must not take the place of the key the corpus reaches.
+				const char = Array.from(row[0])[0].toLowerCase();
 				let finger = model.column_fingers[Math.min(col, model.column_fingers.length - 1)];
 				if (angle && r === 2 && model.angle_fingers[col] !== undefined)
 					finger = model.angle_fingers[col];
