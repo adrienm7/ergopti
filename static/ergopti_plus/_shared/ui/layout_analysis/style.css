@@ -1722,3 +1722,133 @@ body:has(> main.layout-analysis) {
 	font-weight: 600;
 	margin-left: 8px;
 }
+
+/* A penalty's floor under its weight: a second, quieter field. */
+.la-floor-field {
+	border-top: 1px dashed var(--la-border);
+	margin-top: 6px;
+	padding-top: 6px;
+}
+
+.la-floor-name {
+	color: var(--la-sub);
+	font-size: 0.9em;
+	font-weight: 600;
+}
+
+/* Score presets (ux-study item 13): one coloured card per built-in preset,
+   the one in use marked in words, then the user's own in a list. */
+.la-presets {
+	display: grid;
+	gap: 10px;
+	margin-top: 18px;
+}
+
+.la-presets h3 {
+	font-size: 1rem;
+	margin: 6px 0 0;
+}
+
+.la-preset-list {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.la-preset-apply {
+	align-content: start;
+	border: 1px solid var(--la-border);
+	border-left: 6px solid var(--la-preset-colour, var(--la-accent));
+	border-radius: 10px;
+	box-sizing: border-box;
+	cursor: pointer;
+	display: grid;
+	gap: 4px;
+	height: 100%;
+	padding: 12px 14px;
+	text-align: left;
+	width: 100%;
+}
+
+.la-preset-apply[aria-pressed='true'] {
+	background: var(--la-accent-soft);
+	border-color: var(--la-accent);
+	border-left-color: var(--la-preset-colour, var(--la-accent));
+}
+
+.la-preset-accent-1 {
+	--la-preset-colour: var(--la-cat-1);
+}
+
+.la-preset-accent-2 {
+	--la-preset-colour: var(--la-cat-2);
+}
+
+.la-preset-accent-3 {
+	--la-preset-colour: var(--la-cat-3);
+}
+
+.la-preset-accent-4 {
+	--la-preset-colour: var(--la-cat-4);
+}
+
+.la-preset-accent-5 {
+	--la-preset-colour: var(--la-cat-5);
+}
+
+.la-preset-name {
+	font-weight: 700;
+}
+
+.la-preset-help {
+	color: var(--la-sub);
+	font-size: 0.9em;
+}
+
+.la-preset-active,
+.la-preset-stale {
+	border: 2px solid var(--la-good);
+	border-radius: 999px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	justify-self: start;
+	padding: 0 8px;
+}
+
+.la-preset-stale {
+	border-color: var(--la-bad);
+}
+
+.la-preset-mine {
+	display: grid;
+	gap: 6px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.la-preset-own {
+	align-items: center;
+	background: var(--la-surface-2);
+	border-left: 4px solid var(--la-cat-3);
+	border-radius: 8px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 12px;
+	padding: 6px 10px;
+}
+
+.la-preset-save {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.la-preset-save input {
+	min-height: 32px;
+	min-width: 14em;
+}

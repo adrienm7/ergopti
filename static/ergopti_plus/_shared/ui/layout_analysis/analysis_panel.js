@@ -466,6 +466,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					keyboard: state.keyboard,
 					format: keyboardFormat(),
 					weights: settings.weights,
+					floors: settings.floors,
 					idealLoad: settings.idealLoad,
 					shortcuts: settings.shortcuts,
 					formWeights: settings.formWeights,
@@ -529,6 +530,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				keyboard: state.keyboard,
 				format: keyboardFormat(),
 				weights: settings.weights,
+				floors: settings.floors,
 				idealLoad: settings.idealLoad,
 				shortcuts: settings.shortcuts,
 				formWeights: settings.formWeights,
@@ -585,6 +587,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					keyboard: state.keyboard,
 					format: keyboardFormat(),
 					weights: settings.weights,
+					floors: settings.floors,
 					idealLoad: settings.idealLoad,
 					shortcuts: settings.shortcuts,
 					formWeights: settings.formWeights,
@@ -803,7 +806,10 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		 */
 		function heatOf(result, layout, settings) {
 			if (state.heat === HEAT_OFF) return null;
-			const points = state.heat === HEAT_SCORE ? E.keyScoreCost(result, settings.weights) : null;
+			const points =
+				state.heat === HEAT_SCORE
+					? E.keyScoreCost(result, settings.weights, settings.floors)
+					: null;
 			const used = Object.assign(E.defaultWeights(), settings.weights || {});
 			const typed = (code) => {
 				const row = layout.rows[code];

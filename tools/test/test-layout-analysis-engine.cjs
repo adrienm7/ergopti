@@ -913,6 +913,7 @@ for (const id of E.ACCESS_WEIGHTS) {
 {
 	const custom = {
 		weights: Object.assign(E.defaultWeights(), { sfb: 7.25, altgr_usage: 0, dead_key_usage: 4 }),
+		floors: Object.assign(E.defaultFloors(), { sfb: 0.3, scissors: 0.1 }),
 		idealLoad: Object.assign({}, E.defaultIdealLoad()),
 		shortcuts: E.defaultShortcuts(),
 		formWeights: E.defaultFormFactorWeights()
@@ -920,6 +921,7 @@ for (const id of E.ACCESS_WEIGHTS) {
 	custom.shortcuts.letters.c = 3;
 	const defaultsSettings = {
 		weights: E.defaultWeights(),
+		floors: E.defaultFloors(),
 		idealLoad: Object.assign({}, E.defaultIdealLoad()),
 		shortcuts: E.defaultShortcuts(),
 		formWeights: E.defaultFormFactorWeights()
@@ -931,7 +933,7 @@ for (const id of E.ACCESS_WEIGHTS) {
 		const file = JSON.parse(JSON.stringify(E.scoreConfig(settings)));
 		check(
 			file.format === 'ergopti-score-settings' &&
-				file.schema_version === 1 &&
+				file.schema_version === 2 &&
 				file.analyser === 'ergopti',
 			`score config: ${name} names its format, version and analyser`
 		);
@@ -970,7 +972,56 @@ for (const id of E.ACCESS_WEIGHTS) {
 			}
 		],
 		['config_format', () => Object.assign(good(), { format: 'kla' })],
-		['config_version', () => Object.assign(good(), { schema_version: 2 })],
+		// A version 1 file (before the floors) is refused, never read with guessed floors.
+		[
+			'config_version',
+			() => {
+				const file = Object.assign(good(), { schema_version: 1 });
+				delete file.floors;
+				return file;
+			}
+		],
+		['config_version', () => Object.assign(good(), { schema_version: 3 })],
+		[
+			'config_missing',
+			() => {
+				const file = good();
+				delete file.floors;
+				return file;
+			}
+		],
+		[
+			'config_missing',
+			() => {
+				const file = good();
+				delete file.floors.sfb;
+				return file;
+			}
+		],
+		[
+			'config_unknown_key',
+			() => {
+				const file = good();
+				file.floors.roll_in = 1;
+				return file;
+			}
+		],
+		[
+			'config_weight_range',
+			() => {
+				const file = good();
+				file.floors.sfb = -0.5;
+				return file;
+			}
+		],
+		[
+			'config_weight_type',
+			() => {
+				const file = good();
+				file.floors.sfb = '0.3';
+				return file;
+			}
+		],
 		['config_analyser', () => Object.assign(good(), { analyser: 'oxeylyzer' })],
 		[
 			'config_weight_type',

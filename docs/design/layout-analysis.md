@@ -226,12 +226,18 @@ b)` → its order, negative when `a` ranks first; a result without a boolean
 - `ACCESS_WEIGHTS` → `['modifier_usage', 'altgr_usage', 'dead_key_usage']`;
   `accessWeights(weights?)` → those three, each default replaced by the given
   weight.
-- `scoreConfig({weights, idealLoad, shortcuts, formWeights})` → the score
+- `scoreConfig({weights, floors, idealLoad, shortcuts, formWeights})` → the score
   settings file the Comparer exports (« Import, export and reset » in « Réglages
-  du score »): `{format: "ergopti-score-settings", schema_version: 1, analyser:
-"ergopti", weights, ideal_load, shortcuts, form_weights}`, every weight of the
+  du score »): `{format: "ergopti-score-settings", schema_version: 2, analyser:
+"ergopti", weights, floors, ideal_load, shortcuts, form_weights}`, every weight of the
   score (a metric is in the score when its weight is above 0; the access
-  weights among them). `readScoreConfig(json)` reads such a file whole or not
+  weights among them) and every penalty floor. Version 2 (2026-11-19) added the
+  floors: a version 1 file is refused by its version (`config_version`, checked
+  before any entry), never read with guessed floors. The same file is a score
+  preset: the built-in ones (`LAYOUT_ANALYSIS_SCORE_SETTINGS.presetConfig`:
+  balanced, pinkies, rolls, code, forgiving, each documented in
+  `score_settings.js`) and the user's own, saved under a name with the
+  Comparer's settings. `readScoreConfig(json)` reads such a file whole or not
   at all: an entry missing (`config_missing`, a weight included) or unknown
   (`config_unknown_key`), another format, version or analyser
   (`config_format`, `config_version`, `config_analyser`), a value of the wrong

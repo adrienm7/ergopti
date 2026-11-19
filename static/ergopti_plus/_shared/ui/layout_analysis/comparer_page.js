@@ -536,6 +536,19 @@
 		<button id="la-config-reset" type="button" data-i18n="layout_analysis.config.reset"></button>
 	</div>
 	<p id="la-config-status" class="la-muted" role="status"></p>
+	<div class="la-presets">
+		<h3 id="la-presets-title" data-i18n="layout_analysis.presets.title"></h3>
+		<p class="la-muted" data-i18n="layout_analysis.presets.help"></p>
+		<ul id="la-preset-list" class="la-preset-list" aria-labelledby="la-presets-title"></ul>
+		<h3 id="la-presets-mine-title" data-i18n="layout_analysis.presets.mine_title"></h3>
+		<p id="la-preset-none" class="la-muted" data-i18n="layout_analysis.presets.none"></p>
+		<ul id="la-preset-mine" class="la-preset-mine" aria-labelledby="la-presets-mine-title"></ul>
+		<form id="la-preset-save" class="la-preset-save">
+			<label for="la-preset-name" data-i18n="layout_analysis.presets.name_label"></label>
+			<input id="la-preset-name" type="text" maxlength="60" autocomplete="off" />
+			<button type="submit" data-i18n="layout_analysis.presets.save"></button>
+		</form>
+	</div>
 </section>
 
 <section class="la-weights la-accent-2" data-section-icon="weights" aria-labelledby="la-weights-label">
@@ -1005,6 +1018,9 @@
 
 		/** Saves the conveniences; an unavailable or full storage keeps none. */
 		function save() {
+			// Which preset the settings now match (a weight edited by hand matches none);
+			// a preset's name field being edited is left as it is.
+			if (presetsReady && state.presetRenaming === null) fillPresets();
 			try {
 				window.localStorage.setItem(
 					STORAGE_KEY,
@@ -1015,6 +1031,7 @@
 						selected: state.linkedSelection ? saved.selected : Array.from(state.selected),
 						selectionChosen: state.linkedSelection ? saved.selectionChosen : state.selectionChosen,
 						weights: state.weights,
+						floors: state.floors,
 						idealLoad: state.idealLoad,
 						shortcuts: state.shortcuts,
 						formWeights: state.formWeights,
@@ -1031,6 +1048,8 @@
 						// choices and the layout list's filters.
 						tab: state.tabSaved,
 						heats: state.heats,
+						// The user's own score presets, each a score settings file and its name.
+						presets: state.presets,
 						pick: state.pick
 					})
 				);
@@ -1051,6 +1070,8 @@
 		// The layouts the user keeps (imported here, in the host's store or this
 		// browser's storage): the ones « Rename », « Duplicate » and « Remove » manage.
 		const own = new Set(imported.map((layout) => layout.id));
+		// Whether the presets' lists are drawn (wirePresets), so a save can mark the one in use.
+		let presetsReady = false;
 		const layouts = E.libraryLayouts()
 			.concat((HOST.layouts || []).map(E.layoutFromRows))
 			.concat(imported.map(E.layoutFromRows));
@@ -1098,6 +1119,14 @@
 					: E.defaultKeyboardFormat()),
 			// The id of the own layout whose name is being edited in the list, if any.
 			renaming: null,
+			// The user's score presets: {name, config}, config a score settings file.
+			presets: Array.isArray(saved.presets)
+				? saved.presets.filter(
+						(p) => p && typeof p.name === 'string' && p.name.trim() !== '' && p.config
+					)
+				: [],
+			// The index of the user preset whose name is being edited, if any.
+			presetRenaming: null,
 			// Whether the user chose the ticked layouts; until then they follow the keyboard.
 			selectionChosen: saved.selectionChosen === true && Array.isArray(saved.selected),
 			selected: null,
@@ -1344,6 +1373,7 @@
 				keyboard: state.keyboard,
 				format: state.format,
 				weights: state.weights,
+				floors: state.floors,
 				idealLoad: state.idealLoad,
 				shortcuts: state.shortcuts,
 				formWeights: state.formWeights,
@@ -1510,7 +1540,7 @@
 
 		/** Re-scores after a weight change, without re-analysis. */
 		function rescore() {
-			state.results = E.rescore(state.results, state.weights);
+			state.results = E.rescore(state.results, state.weights, state.floors);
 			save();
 			render();
 		}
@@ -2221,7 +2251,7 @@
 					result: E.analyse(byId.get(id), state.tables, analysisOptions())
 				};
 			const result = referenceAnalysis.result;
-			result.score = E.score(result, state.weights);
+			result.score = E.score(result, state.weights, state.floors);
 			return result;
 		}
 
@@ -3003,9 +3033,9 @@
 		/** Each key's value of a heatmap choice for one result (heatValues), any choice. */
 		function heatValuesOf(result, metric, other) {
 			if (metric === HEAT_SCORE) {
-				const own = E.keyScoreCost(result, state.weights);
+				const own = E.keyScoreCost(result, state.weights, state.floors);
 				if (!other) return own;
-				const theirs = E.keyScoreCost(other, state.weights);
+				const theirs = E.keyScoreCost(other, state.weights, state.floors);
 				return Object.fromEntries(Object.keys(own).map((code) => [code, own[code] - theirs[code]]));
 			}
 			return other ? E.keyDiff(result, other, metric) : E.keyValues(result, metric);
@@ -4469,6 +4499,7 @@
 
 		/** Fills every score settings control again, then analyses with them. */
 		function applyScoreSettings() {
+			fillPresets();
 			fillWeights();
 			fillIdealLoad();
 			fillShortcuts();
@@ -4483,12 +4514,227 @@
 		 * a browser download on the site), a strict import that applies a file
 		 * whole or not at all, and a reset of every setting with an « Undo ».
 		 */
+		/** The current score settings as a file (E.scoreConfig): what a preset holds. */
+		function currentConfig() {
+			return E.scoreConfig({
+				weights: state.weights,
+				floors: state.floors,
+				idealLoad: state.idealLoad,
+				shortcuts: state.shortcuts,
+				formWeights: state.formWeights
+			});
+		}
+
+		/**
+		 * Applies a preset's settings whole (as an import does) and offers to
+		 * put the previous ones back.
+		 * @returns {boolean} Whether it applied; a refusal is said in words.
+		 */
+		function applyPreset(config, name) {
+			let settings;
+			try {
+				settings = E.readScoreConfig(config);
+			} catch (error) {
+				configStatus(
+					t('layout_analysis.presets.refused', { name, reason: INFO.refusal(error) }),
+					true
+				);
+				return false;
+			}
+			const before = currentConfig();
+			Object.assign(state, settings);
+			applyScoreSettings();
+			presetStatus(t('layout_analysis.presets.applied', { name }), () => {
+				Object.assign(state, E.readScoreConfig(before));
+				applyScoreSettings();
+				configStatus(t('layout_analysis.presets.undone', { name }), false);
+			});
+			return true;
+		}
+
+		/** The settings status with an « Undo » that runs undo. */
+		function presetStatus(text, undo) {
+			configStatus(text, false);
+			const button = el('button', 'la-mine-undo', t('layout_analysis.undo.button'));
+			button.type = 'button';
+			button.addEventListener('click', () => {
+				button.disabled = true;
+				undo();
+			});
+			$('la-config-status').append(' ', button);
+		}
+
+		/** Whether a preset holds exactly the settings in use. */
+		function isCurrent(config) {
+			return JSON.stringify(config) === JSON.stringify(currentConfig());
+		}
+
+		/** The built-in presets as cards, then the user's own, each with its actions. */
+		function fillPresets() {
+			$('la-preset-list').replaceChildren(
+				...SCORE_SETTINGS.PRESET_IDS.map((id, index) => {
+					const config = SCORE_SETTINGS.presetConfig(id);
+					const name = t(`layout_analysis.presets.${id}.name`);
+					const item = el('li', `la-preset la-preset-accent-${(index % 5) + 1}`);
+					const button = el('button', 'la-preset-apply');
+					button.type = 'button';
+					button.dataset.preset = id;
+					const active = isCurrent(config);
+					button.setAttribute('aria-pressed', String(active));
+					button.append(
+						el('span', 'la-preset-name', name),
+						el('span', 'la-preset-help', t(`layout_analysis.presets.${id}.help`))
+					);
+					if (active)
+						button.append(el('span', 'la-preset-active', t('layout_analysis.presets.active')));
+					button.addEventListener('click', () => applyPreset(config, name));
+					item.append(button);
+					return item;
+				})
+			);
+			$('la-preset-none').hidden = state.presets.length > 0;
+			$('la-preset-mine').replaceChildren(...state.presets.map(userPresetItem));
+		}
+
+		/** The name field of a user preset being renamed; Escape cancels. */
+		function presetRenameForm(preset, index) {
+			const form = el('form', 'la-rename');
+			const field = el('input', 'la-rename-input');
+			field.id = 'la-preset-rename-field';
+			field.value = preset.name;
+			field.maxLength = 60;
+			field.setAttribute('aria-label', t('layout_analysis.mine.name_label', { name: preset.name }));
+			const ok = el('button', 'la-mine-button', t('layout_analysis.mine.save'));
+			ok.type = 'submit';
+			const cancel = el('button', 'la-mine-button', t('layout_analysis.mine.cancel'));
+			cancel.type = 'button';
+			const close = () => {
+				state.presetRenaming = null;
+				fillPresets();
+				const again = $('la-preset-mine').querySelector(
+					`li[data-index="${index}"] button[data-mine="rename"]`
+				);
+				if (again) again.focus();
+			};
+			cancel.addEventListener('click', close);
+			field.addEventListener('keydown', (event) => {
+				if (event.key !== 'Escape') return;
+				event.preventDefault();
+				close();
+			});
+			form.addEventListener('submit', (event) => {
+				event.preventDefault();
+				const name = field.value.trim();
+				if (name === '') {
+					configStatus(t('layout_analysis.mine.name_empty'), true);
+					field.focus();
+					return;
+				}
+				const before = preset.name;
+				preset.name = name;
+				save();
+				configStatus(t('layout_analysis.mine.renamed', { before, name }), false);
+				close();
+			});
+			form.append(field, ok, cancel);
+			return form;
+		}
+
+		/** One of the user's presets: its name, « Apply », « Rename » and « Remove ». */
+		function userPresetItem(preset, index) {
+			const item = el('li', 'la-preset-own');
+			item.dataset.index = String(index);
+			if (state.presetRenaming === index) {
+				item.append(presetRenameForm(preset, index));
+				return item;
+			}
+			let readable = true;
+			try {
+				E.readScoreConfig(preset.config);
+			} catch {
+				readable = false;
+			}
+			item.append(el('span', 'la-preset-name', preset.name));
+			if (readable && isCurrent(preset.config))
+				item.append(el('span', 'la-preset-active', t('layout_analysis.presets.active')));
+			// A preset saved by an older Studio: said, never applied in part.
+			if (!readable) item.append(el('span', 'la-preset-stale', t('layout_analysis.presets.stale')));
+			const actions = el('span', 'la-mine-actions');
+			const apply = el(
+				'button',
+				'la-mine-button la-preset-use',
+				t('layout_analysis.presets.apply')
+			);
+			apply.type = 'button';
+			apply.disabled = !readable;
+			apply.setAttribute(
+				'aria-label',
+				t('layout_analysis.presets.apply_named', { name: preset.name })
+			);
+			apply.addEventListener('click', () => applyPreset(preset.config, preset.name));
+			const named = { id: `preset-${index}`, name: preset.name };
+			actions.append(
+				apply,
+				mineButton('rename', named, () => {
+					state.presetRenaming = index;
+					fillPresets();
+					const field = $('la-preset-rename-field');
+					field.focus();
+					field.select();
+				}),
+				mineButton('remove', named, () => {
+					const [removed] = state.presets.splice(index, 1);
+					save();
+					fillPresets();
+					presetStatus(t('layout_analysis.mine.removed', { name: removed.name }), () => {
+						state.presets.splice(Math.min(index, state.presets.length), 0, removed);
+						save();
+						fillPresets();
+						configStatus(t('layout_analysis.mine.restored', { name: removed.name }), false);
+					});
+					$('la-config-status').querySelector('button').focus();
+				})
+			);
+			item.append(actions);
+			return item;
+		}
+
+		/** « Save as a preset »: the current settings under a name; a name taken replaces that preset. */
+		function wirePresets() {
+			$('la-preset-save').addEventListener('submit', (event) => {
+				event.preventDefault();
+				const name = $('la-preset-name').value.trim();
+				if (name === '') {
+					configStatus(t('layout_analysis.mine.name_empty'), true);
+					$('la-preset-name').focus();
+					return;
+				}
+				const entry = { name, config: currentConfig() };
+				const at = state.presets.findIndex((p) => p.name === name);
+				if (at >= 0) state.presets.splice(at, 1, entry);
+				else state.presets.push(entry);
+				save();
+				$('la-preset-name').value = '';
+				fillPresets();
+				configStatus(
+					t(at >= 0 ? 'layout_analysis.presets.replaced' : 'layout_analysis.presets.saved', {
+						name
+					}),
+					false
+				);
+			});
+			presetsReady = true;
+			fillPresets();
+		}
+
 		function wireScoreConfig() {
-			const parts = ['weights', 'idealLoad', 'shortcuts', 'formWeights'];
+			wirePresets();
+			const parts = ['weights', 'floors', 'idealLoad', 'shortcuts', 'formWeights'];
 			$('la-config-export').addEventListener('click', async () => {
 				const text = `${JSON.stringify(
 					E.scoreConfig({
 						weights: state.weights,
+						floors: state.floors,
 						idealLoad: state.idealLoad,
 						shortcuts: state.shortcuts,
 						formWeights: state.formWeights
@@ -4546,6 +4792,7 @@
 			reset.addEventListener('click', () => {
 				const before = JSON.stringify(parts.map((part) => state[part]));
 				state.weights = E.defaultWeights();
+				state.floors = E.defaultFloors();
 				state.idealLoad = Object.assign({}, E.defaultIdealLoad());
 				state.shortcuts = E.defaultShortcuts();
 				state.formWeights = E.defaultFormFactorWeights();
@@ -4668,8 +4915,51 @@
 			field.append(input, unit);
 			const help = el('p', 'la-weight-help', t(`layout_analysis.info.${id}`));
 			help.id = `${inputId}-help`;
-			control.append(top, field, help);
+			control.append(top, field);
+			// A penalty's floor: the part of its value under it costs nothing.
+			if (id in state.floors) control.append(floorField(id, metric));
+			control.append(help);
 			return { control, input };
+		}
+
+		/** A penalty metric's floor field, in its unit, re-scoring as it is edited. */
+		function floorField(id, metric) {
+			const inputId = `la-floor-${id}`;
+			const field = el('div', 'la-weight-field la-floor-field');
+			const label = el('label', 'la-floor-name', t('layout_analysis.weights.floor'));
+			label.htmlFor = inputId;
+			const input = el('input');
+			input.id = inputId;
+			input.type = 'number';
+			input.min = '0';
+			input.step = 'any';
+			input.value = String(state.floors[id]);
+			const unit = el(
+				'span',
+				'la-weight-unit',
+				t('layout_analysis.weights.floor_unit', {
+					unit: metric.unit === 'mm' ? t('layout_analysis.unit.mm') : '%'
+				})
+			);
+			unit.id = `${inputId}-unit`;
+			input.setAttribute('aria-describedby', unit.id);
+			// Every card has a floor: each field is named with its metric.
+			input.setAttribute(
+				'aria-label',
+				t('layout_analysis.weights.floor_named', { metric: t(`layout_analysis.metric.${id}`) })
+			);
+			input.addEventListener('input', () => {
+				const value = Number(input.value);
+				if (input.value === '' || !Number.isFinite(value) || value < 0) {
+					input.setAttribute('aria-invalid', 'true');
+					return;
+				}
+				input.removeAttribute('aria-invalid');
+				state.floors[id] = value;
+				rescore();
+			});
+			field.append(label, input, unit);
+			return field;
 		}
 
 		function fillWeights() {

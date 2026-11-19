@@ -429,7 +429,107 @@ async function exercisePercentiles(browser, origin) {
 	await editor.context.close();
 }
 
+/** The first ranked row's score, as shown. */
+function topScore(page) {
+	return page.$eval('#la-table tbody tr td:nth-child(3)', (cell) => cell.firstChild.textContent);
+}
+
+/**
+ * (score-presets) The built-in presets apply every weight at once, the one
+ * in use marked in words, with an « Undo »; a penalty floor is edited in its
+ * weight's card and moves the score; the current settings saved under a name
+ * survive a reload, apply, rename and remove with an « Undo ». The settings
+ * file is version 2 with its floors, and a version 1 file is refused by its
+ * version.
+ */
+async function exercisePresets(browser, origin) {
+	const { page, errors, context } = await openComparer(browser, origin);
+	await page.click('#la-tab-home');
+	await page.click('#la-settings > summary');
+	const pressed = () =>
+		page.$$eval('#la-preset-list button[aria-pressed="true"]', (b) =>
+			b.map((n) => n.dataset.preset)
+		);
+	assert.deepEqual(await pressed(), ['balanced'], 'the defaults are « Balanced »');
+	const before = await topScore(page);
+	await page.click('#la-preset-list button[data-preset="rolls"]');
+	assert.deepEqual(await pressed(), ['rolls']);
+	assert.equal(await page.inputValue('#la-weight-roll_in'), '3', 'its weights are in the fields');
+	assert.ok(
+		(await page.textContent('#la-config-status')).startsWith(
+			EN['layout_analysis.presets.applied'].replace(
+				'{name}',
+				EN['layout_analysis.presets.rolls.name']
+			)
+		)
+	);
+	await page.waitForFunction((score) => {
+		const cell = document.querySelector('#la-table tbody tr td:nth-child(3)');
+		return cell && cell.firstChild.textContent !== score;
+	}, before);
+	await page.click('#la-config-status .la-mine-undo');
+	assert.deepEqual(await pressed(), ['balanced'], 'Undo brings the previous settings back');
+	assert.equal(await page.inputValue('#la-weight-roll_in'), '1');
+	// A floor: a large SFB floor makes SFB cost nothing, so the score moves.
+	const plain = await topScore(page);
+	await page.fill('#la-floor-sfb', '100');
+	await page.waitForFunction((score) => {
+		const cell = document.querySelector('#la-table tbody tr td:nth-child(3)');
+		return cell && cell.firstChild.textContent !== score;
+	}, plain);
+	assert.deepEqual(await pressed(), [], 'an edited floor matches no built-in preset');
+	assert.equal(
+		await page.getAttribute('#la-floor-sfb', 'aria-label'),
+		EN['layout_analysis.weights.floor_named'].replace('{metric}', EN['layout_analysis.metric.sfb'])
+	);
+	// The export holds the floors, at version 2.
+	const download = page.waitForEvent('download');
+	await page.click('#la-config-export');
+	const file = JSON.parse(fs.readFileSync(await (await download).path(), 'utf8'));
+	assert.equal(file.schema_version, 2);
+	assert.equal(file.floors.sfb, 100, 'the floor is exported');
+	const old = Object.assign({}, file, { schema_version: 1 });
+	delete old.floors;
+	await page.setInputFiles('#la-config-import', {
+		name: 'old.json',
+		mimeType: 'application/json',
+		buffer: Buffer.from(JSON.stringify(old))
+	});
+	// The file is read asynchronously: wait for its refusal.
+	await page.waitForFunction(() =>
+		/version 1; this Studio reads version 2/.test(
+			document.getElementById('la-config-status').textContent
+		)
+	);
+	// Save the settings as a preset, then reload.
+	await page.fill('#la-preset-name', 'Floor test');
+	await page.click('#la-preset-save button[type="submit"]');
+	assert.match(await page.textContent('#la-preset-mine'), /Floor test/);
+	assert.equal(await page.locator('#la-preset-mine .la-preset-active').count(), 1, 'in use');
+	await page.reload();
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	await page.click('#la-tab-home');
+	await page.click('#la-settings > summary');
+	assert.equal(await page.inputValue('#la-floor-sfb'), '100', 'the floor is kept');
+	await page.click('#la-preset-list button[data-preset="balanced"]');
+	assert.equal(await page.inputValue('#la-floor-sfb'), '0');
+	await page.click('#la-preset-mine .la-preset-use');
+	assert.equal(await page.inputValue('#la-floor-sfb'), '100', 'the saved preset applies its floor');
+	await page.click('#la-preset-mine button[data-mine="rename"]');
+	await page.fill('#la-preset-rename-field', 'Renamed preset');
+	await page.keyboard.press('Enter');
+	assert.equal(await page.textContent('#la-preset-mine .la-preset-name'), 'Renamed preset');
+	await page.click('#la-preset-mine button[data-mine="remove"]');
+	assert.equal(await page.locator('#la-preset-mine li').count(), 0);
+	assert.equal(await page.isVisible('#la-preset-none'), true);
+	await page.click('#la-config-status .la-mine-undo');
+	assert.equal(await page.textContent('#la-preset-mine .la-preset-name'), 'Renamed preset');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exercisePresets,
 	exercisePercentiles,
 	exerciseManageLayoutsSite,
 	exerciseManageLayoutsStore,
