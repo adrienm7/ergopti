@@ -124,9 +124,15 @@ async function focusedStop() {
 	let indicated = true;
 	// A frame draws its own ring inside; its walk is the Studio gate's.
 	if (element.tagName !== 'IFRAME') {
+		// The unfocused look is read once a transition back would be over, and
+		// a second time if it still matches: a busy page can paint late.
 		element.blur();
-		await settle();
-		indicated = focused !== look();
+		indicated = false;
+		for (let attempt = 0; attempt < 3 && !indicated; attempt++) {
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			await settle();
+			indicated = focused !== look();
+		}
 		element.focus({ preventScroll: true });
 		await settle();
 	}
