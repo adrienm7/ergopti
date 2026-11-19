@@ -368,6 +368,13 @@ function requireValue(schema, key, value) {
 					}
 				]
 			},
+			"hotstrings.backspace_restore_window_ms": {
+				"file": "config.toml",
+				"type": "integer",
+				"unit": "ms",
+				"min": 50,
+				"max": 10000
+			},
 			"hotstrings.cascade_max_arrows": {
 				"file": "config.toml",
 				"type": "integer",
@@ -579,6 +586,7 @@ function requireValue(schema, key, value) {
 		"MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS": "mod_combos.simultaneous_threshold_ms",
 		"HOTSTRINGS_EXPANSION_DELAY": "hotstrings.expansion_delay",
 		"HOTSTRINGS_IDLE_RESET_SECONDS": "hotstrings.idle_reset_seconds",
+		"HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS": "hotstrings.backspace_restore_window_ms",
 		"HOTSTRINGS_CASCADE_MAX_ARROWS": "hotstrings.cascade_max_arrows",
 		"HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS": "hotstrings.dynamic.user_code.time_activation_seconds",
 		"HOTSTRINGS_CONFIG_ANY_DELAY": "hotstrings_config.*.delay",

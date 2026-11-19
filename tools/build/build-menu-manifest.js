@@ -297,6 +297,30 @@ function cascadeMaxArrowsChoices(feature) {
 	);
 }
 
+/**
+ * Projects the Backspace undo windows (milliseconds) from their numeric
+ * feature: ascending whole positive values containing the defaults, each
+ * labelled with the shared millisecond unit. The free entry takes any other.
+ */
+function backspaceRestoreWindowChoices(feature) {
+	const values = feature?.preset_values;
+	if (
+		feature?.type !== 'number' ||
+		!Array.isArray(values) ||
+		values.length < 2 ||
+		values.some(
+			(value, index) =>
+				!Number.isInteger(value) || value < 1 || (index > 0 && value <= values[index - 1])
+		) ||
+		!values.includes(feature.default) ||
+		!values.includes(feature.recommended)
+	)
+		throw new Error(
+			'hotstrings.backspace_restore_window: presets need ascending positive whole numbers containing the defaults'
+		);
+	return values.map((value) => ({ value, i18n: 'hs_config.unit_ms', label_prefix: `${value} ` }));
+}
+
 const { KEY } = configKeys;
 
 const CHOICE_REGISTRIES = {
@@ -309,6 +333,10 @@ const CHOICE_REGISTRIES = {
 		project: cascadeMaxArrowsChoices
 	},
 	'hotstrings.idle_reset': { path: KEY.HOTSTRINGS_IDLE_RESET_SECONDS, project: idleResetChoices },
+	'hotstrings.backspace_restore_window': {
+		path: KEY.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS,
+		project: backspaceRestoreWindowChoices
+	},
 	'llm.indentation': { path: KEY.LLM_DISPLAY_PRED_INDENT, project: indentationChoices },
 	'updater.channels': { path: KEY.UPDATER_CHANNEL, project: updaterChannelChoices },
 	'updater.check_intervals': {

@@ -2712,6 +2712,27 @@ id = "repeat_key"
 i18n = "menu.hotstrings.repeat_key_toggle"
 checked_when = ["hotstrings_repeat_enabled"]
 
+# The Backspace undo (hotstrings.backspace_restore_enabled) and its window
+# (hotstrings.backspace_restore_window_ms): the feature's preset_values plus a
+# free entry each driver answers with its native prompt, as the idle reset.
+[[menu.hotstrings_params_group]]
+type = "check"
+id = "backspace_restore"
+i18n = "menu.hotstrings.backspace_restore_enabled"
+checked_when = ["hotstrings_backspace_restore_enabled"]
+
+[[menu.hotstrings_params_group]]
+type = "choice"
+id = "backspace_restore_window"
+path = "hotstrings.backspace_restore_window_ms"
+i18n = "menu.hotstrings.backspace_restore_window"
+choice_registry = "hotstrings.backspace_restore_window"
+show_current_choice = true
+current_choice_label_value = true
+custom_command = "backspace_restore_window_custom"
+custom_i18n = "menu.hotstrings.backspace_restore_window_custom"
+custom_unit_i18n = "hs_config.unit_ms"
+
 # When the hotstring engine forgets the current word: after a pause without
 # typing (the feature's preset_values, plus a free entry each
 # driver answers with its native prompt) and after a mouse click. Each driver

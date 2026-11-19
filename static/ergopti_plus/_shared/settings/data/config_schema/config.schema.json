@@ -131,6 +131,8 @@
 				},
 				"magic_key_source_char": { "type": "string", "minLength": 1, "maxLength": 1 },
 				"repeat_key_enabled": { "type": "boolean" },
+				"backspace_restore_enabled": { "type": "boolean" },
+				"backspace_restore_window_ms": { "type": "integer", "minimum": 50, "maximum": 10000 },
 				"idle_reset_seconds": { "type": "number", "minimum": 0, "maximum": 3600 },
 				"cascade_max_arrows": { "type": "integer", "minimum": 1, "maximum": 10 },
 				"click_resets_word": { "type": "boolean" },

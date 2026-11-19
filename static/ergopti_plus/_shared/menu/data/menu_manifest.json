@@ -2845,6 +2845,47 @@
 			]
 		},
 		{
+			"type": "check",
+			"id": "backspace_restore",
+			"i18n": "menu.hotstrings.backspace_restore_enabled",
+			"checked_when": [
+				"hotstrings_backspace_restore_enabled"
+			]
+		},
+		{
+			"type": "choice",
+			"id": "backspace_restore_window",
+			"path": "hotstrings.backspace_restore_window_ms",
+			"i18n": "menu.hotstrings.backspace_restore_window",
+			"show_current_choice": true,
+			"current_choice_label_value": true,
+			"custom_command": "backspace_restore_window_custom",
+			"custom_i18n": "menu.hotstrings.backspace_restore_window_custom",
+			"custom_unit_i18n": "hs_config.unit_ms",
+			"choices": [
+				{
+					"value": 250,
+					"i18n": "hs_config.unit_ms",
+					"label_prefix": "250 "
+				},
+				{
+					"value": 500,
+					"i18n": "hs_config.unit_ms",
+					"label_prefix": "500 "
+				},
+				{
+					"value": 1000,
+					"i18n": "hs_config.unit_ms",
+					"label_prefix": "1000 "
+				},
+				{
+					"value": 2000,
+					"i18n": "hs_config.unit_ms",
+					"label_prefix": "2000 "
+				}
+			]
+		},
+		{
 			"type": "---"
 		},
 		{

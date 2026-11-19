@@ -95,6 +95,16 @@
 				"manifest": "hotstrings.idle_reset_seconds"
 			}
 		},
+		"hotstrings.backspace_restore_window_ms": {
+			"file": "config.toml",
+			"type": "integer",
+			"unit": "ms",
+			"min": 50,
+			"max": 10000,
+			"default_from": {
+				"manifest": "hotstrings.backspace_restore_window_ms"
+			}
+		},
 		"hotstrings.cascade_max_arrows": {
 			"file": "config.toml",
 			"type": "integer",

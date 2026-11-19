@@ -523,6 +523,39 @@ family = "feature"
 type = "boolean"
 description_key = "menu.hotstrings.repeat_key_enabled"
 
+# Whether a Backspace pressed right after an expansion undoes it: the output
+# goes and the text typed for it comes back, the terminator that fired it
+# included: « adn » then Space types « ADN » and a Space, and Backspace leaves
+# « adn » and a Space, not « ADN ». A trigger fired by the magic key comes back
+# without the magic key, which is an action and not text, and a consumed
+# terminator, never typed, does not come back either. Off, the
+# Backspace deletes the last character, as everywhere else. The rule is one
+# shared function, _shared/hotstrings/engine/backspace_restore.lua, which the
+# AutoHotkey port replays from _shared/tests/corpus/hotstrings/
+# backspace_restore_vectors.json.
+[[features.hotstrings]]
+id = "backspace_restore_enabled"
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
+default = true
+recommended = true
+family = "setting"
+type = "boolean"
+description_key = "menu.hotstrings.backspace_restore_enabled"
+
+# How long after an expansion that Backspace still undoes it, in milliseconds.
+# Past the window, or after any other key, the Backspace deletes the last
+# character. The menu offers the `preset_values` plus a free entry for any
+# other whole number of the value schema's range.
+[[features.hotstrings]]
+id = "backspace_restore_window_ms"
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
+default = 500
+recommended = 500
+family = "setting"
+type = "number"
+preset_values = [250, 500, 1000, 2000]
+description_key = "menu.hotstrings.backspace_restore_window"
+
 # Seconds without a keystroke after which the next key starts a new word, as
 # if a delimiter had been typed: a word-start hotstring fires again after a
 # pause instead of reading the text typed before it. 0 disables the reset (the

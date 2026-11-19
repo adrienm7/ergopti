@@ -9,6 +9,7 @@ return {
 	["version"] = 1,
 	["keys"] = {
 		["GESTURES_SENSITIVITIES_ANY"] = "gestures.sensitivities.*",
+		["HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS"] = "hotstrings.backspace_restore_window_ms",
 		["HOTSTRINGS_CASCADE_MAX_ARROWS"] = "hotstrings.cascade_max_arrows",
 		["HOTSTRINGS_CONFIG_ANY_ANY_DELAY"] = "hotstrings_config.*.*.delay",
 		["HOTSTRINGS_CONFIG_ANY_ANY_PRIORITY"] = "hotstrings_config.*.*.priority",
@@ -48,6 +49,13 @@ return {
 			["min"] = 1,
 			["type"] = "decimal",
 			["unit"] = "mm",
+		},
+		["hotstrings.backspace_restore_window_ms"] = {
+			["file"] = "config.toml",
+			["max"] = 10000,
+			["min"] = 50,
+			["type"] = "integer",
+			["unit"] = "ms",
 		},
 		["hotstrings.cascade_max_arrows"] = {
 			["file"] = "config.toml",
