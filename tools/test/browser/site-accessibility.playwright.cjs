@@ -14,8 +14,9 @@
  * for a totally accessible project on 2026-11-16 (TODO « Full accessibility »).
  * Each page is then measured for reading (site-reading.cjs): at 200 % zoom
  * with the WCAG 1.4.12 spacing and with the site's 200 % text and wide
- * spacing, no text may be clipped or drawn over another, no block justified
- * and no prose line longer than 80 characters; those counts have their own
+ * spacing, no text may be clipped or drawn over another, no block justified,
+ * no prose line longer than 80 characters and nothing placed under the
+ * sticky header covered by it; those counts have their own
  * ratchet (site-reading-baseline.json).
  * ==============================================================================
  */
@@ -615,7 +616,11 @@ async function scanReading(browser, origin, basePath, routes, mode) {
 							})
 					);
 					await page.waitForTimeout(FRAME_QUIET_MS);
-					const measured = await page.evaluate(reading.measureReading, reading.optionsFor(mode));
+					const options = reading.optionsFor(mode);
+					const measured = await page.evaluate(reading.measureReading, options);
+					// Scrolls the page, so after the measures taken from its top.
+					if (settings.checks.includes('header-cover'))
+						measured['header-cover'] = await page.evaluate(reading.measureHeaderCover, options);
 					for (const check of settings.checks)
 						findings.push({ route, mode, check, elements: measured[check] });
 				} finally {

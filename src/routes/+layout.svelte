@@ -255,7 +255,7 @@
 		left: 0;
 		overflow: scroll;
 		overscroll-behavior: contain; /* Pour désactiver le scroll derrière le menu */
-		padding-top: calc(var(--header-height) + var(--banner-height));
+		padding-top: calc(var(--header-offset) + var(--banner-height));
 		position: fixed;
 		transition: all 0.2s ease-in-out;
 		width: 100vw;
@@ -269,7 +269,7 @@
 		flex-direction: column;
 		justify-content: center;
 		margin: var(--marge) 0;
-		min-height: calc(100vh - var(--header-height) - var(--banner-height) - 2 * var(--marge) + 1px);
+		min-height: calc(100vh - var(--header-offset) - var(--banner-height) - 2 * var(--marge) + 1px);
 	}
 
 	/* Banner dev links */

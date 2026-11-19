@@ -11,7 +11,8 @@
  * is audited, the visitor's accessibility preferences survive blocked
  * storage and refuse unknown values (static/ergopti_plus/_shared/ui/a11y_prefs.js),
  * the reading ratchet (site-reading.cjs) applies the WCAG 1.4.12 values and
- * names only known rows, and no source justifies text.
+ * names only known rows, no source justifies text, and nothing outside the
+ * header offsets by its minimum height instead of its measured one.
  * ==============================================================================
  */
 
@@ -277,6 +278,10 @@ function checkReadingRatchet() {
 	}
 	const options = reading.optionsFor('default');
 	assert.deepEqual(options.checks, ['justified-text', 'line-length']);
+	// The header grows with the text: what sits under it is checked where it grows.
+	for (const mode of ['zoom', 'text'])
+		assert.ok(reading.READING_MODES[mode].checks.includes('header-cover'), mode + ' header cover');
+	assert.equal(reading.optionsFor('text').headerSelector, reading.SITE_HEADER_SELECTOR);
 	assert.throws(() => reading.optionsFor('huge'), /Unknown reading mode/);
 }
 
@@ -303,6 +308,38 @@ function checkNoJustifiedText() {
 	assert.deepEqual(offenders, [], 'Justified text on the site');
 }
 
+/**
+ * The sticky header is at least --header-height tall and grows with the
+ * text, so a box placed under it offsets by --header-offset, its measured
+ * height (Header.svelte). Only the header itself reads the minimum; the
+ * Studio shell is a known offender owned by another change, listed so the
+ * list can only shrink.
+ */
+const HEADER_HEIGHT_PENDING = Object.freeze(['src/routes/studio/+layout.svelte']);
+function checkHeaderOffset() {
+	const users = [];
+	const walk = (directory) => {
+		for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+			const full = path.join(directory, entry.name);
+			if (entry.isDirectory()) walk(full);
+			else if (/\.(css|svelte)$/.test(entry.name)) {
+				const source = fs.readFileSync(full, 'utf8');
+				if (source.includes('var(--header-height)'))
+					users.push(path.relative(ROOT, full).split(path.sep).join('/'));
+			}
+		}
+	};
+	walk(path.join(ROOT, 'src'));
+	assert.deepEqual(
+		users.sort(),
+		['src/lib/components/Header.svelte', ...HEADER_HEIGHT_PENDING].sort(),
+		'Offset by var(--header-offset), the header measured height, not its minimum'
+	);
+	const header = fs.readFileSync(path.join(ROOT, 'src/lib/components/Header.svelte'), 'utf8');
+	assert.match(header, /new ResizeObserver/, 'The header measures itself');
+	assert.match(header, /setProperty\('--header-offset'/, 'The header publishes its height');
+}
+
 checkComparison();
 checkBaseline();
 checkRouteCoverage();
@@ -311,6 +348,7 @@ checkNoButtonInLink();
 checkHeroPause();
 checkReadingRatchet();
 checkNoJustifiedText();
+checkHeaderOffset();
 console.log(
-	'ok - site accessibility ratchet, baseline, page coverage, preferences, links, hero pause, reading ratchet and no justified text'
+	'ok - site accessibility ratchet, baseline, page coverage, preferences, links, hero pause, reading ratchet, no justified text and header offset'
 );

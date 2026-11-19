@@ -10,7 +10,9 @@
  * the WCAG 1.4.12 spacing and 200 % text apply, no justified prose (its
  * uneven word gaps make rivers that dyslexic readers lose their line in,
  * WCAG 1.4.8), and prose lines of at most MAX_LINE_CHARACTERS characters
- * (WCAG 1.4.8 asks for 80 at most; 45 to 80 reads best).
+ * (WCAG 1.4.8 asks for 80 at most; 45 to 80 reads best). Nothing placed
+ * under the sticky header (the table of contents, the narrow-screen banner)
+ * may slide under it once the header grows with the text.
  *
  * The measuring function runs inside the page (page.evaluate), so it only
  * uses what it receives as arguments. site-accessibility.playwright.cjs runs
@@ -31,6 +33,8 @@ const OVERLAP_MIN_SHARE = 0.25;
 const OVERLAP_MIN_WIDTH_PX = 2;
 // Sub-pixel rounding of text boxes against their container.
 const CLIP_TOLERANCE_PX = 1;
+// The site header (Header.svelte), sticky at the top of the window.
+const SITE_HEADER_SELECTOR = '#page > header';
 
 // The user style sheet of the WCAG 1.4.12 test (the « text spacing »
 // bookmarklet): a reader's own spacing, which the site must not break.
@@ -60,14 +64,14 @@ const READING_MODES = Object.freeze({
 		deviceScaleFactor: 2,
 		preferences: null,
 		styleSheet: TEXT_SPACING_CSS,
-		checks: Object.freeze(['text-clipped', 'text-overlap', 'justified-text'])
+		checks: Object.freeze(['text-clipped', 'text-overlap', 'justified-text', 'header-cover'])
 	}),
 	text: Object.freeze({
 		viewport: Object.freeze({ width: 1440, height: 900 }),
 		deviceScaleFactor: 1,
 		preferences: Object.freeze({ text: '200', spacing: 'wide' }),
 		styleSheet: null,
-		checks: Object.freeze(['text-clipped', 'text-overlap', 'justified-text'])
+		checks: Object.freeze(['text-clipped', 'text-overlap', 'justified-text', 'header-cover'])
 	})
 });
 
@@ -280,6 +284,70 @@ function measureReading(options) {
 }
 
 /**
+ * The boxes the sticky site header covers (« header-cover »): each element
+ * positioned sticky or fixed at a nonzero `top`, so meant to sit under the
+ * header, whose box starts above the header's bottom edge while beside it.
+ * A sticky box is measured where it starts to hold its place: the window is
+ * scrolled to the top of its parent. Self-contained: Playwright serializes
+ * it into the page.
+ * @param {{headerSelector: string, clipTolerance: number}} options
+ * @returns {Promise<string[]>} A description of each covered element, with the overlap in pixels.
+ */
+async function measureHeaderCover(options) {
+	const header = document.querySelector(options.headerSelector);
+	if (!header) throw new Error('No site header: ' + options.headerSelector);
+	const frames = () =>
+		new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+	const describe = (element) => {
+		const parts = [];
+		for (
+			let node = element;
+			node && node !== document.body && parts.length < 3;
+			node = node.parentElement
+		) {
+			let part = node.tagName.toLowerCase();
+			if (node.id) part += '#' + node.id;
+			else if (typeof node.className === 'string' && node.className.trim())
+				part += '.' + node.className.trim().split(/\s+/).slice(0, 2).join('.');
+			parts.unshift(part);
+		}
+		return parts.join(' > ');
+	};
+	const placed = [];
+	for (const element of document.body.querySelectorAll('*')) {
+		if (header.contains(element) || element.contains(header)) continue;
+		const style = getComputedStyle(element);
+		if (style.position !== 'sticky' && style.position !== 'fixed') continue;
+		if (!(parseFloat(style.top) > 0)) continue;
+		if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
+		placed.push(element);
+	}
+	const covered = [];
+	for (const element of placed) {
+		const sticky = getComputedStyle(element).position === 'sticky';
+		if (sticky) {
+			const parent = element.parentElement.getBoundingClientRect();
+			window.scrollTo(0, window.scrollY + parent.top);
+			await frames();
+		}
+		const box = element.getBoundingClientRect();
+		const bar = header.getBoundingClientRect();
+		if (box.width === 0 || box.height === 0) continue;
+		// A sticky box at the end of its parent is pushed up by it: it scrolls
+		// away with the content, as it should, instead of holding its place.
+		const end = element.parentElement.getBoundingClientRect().bottom;
+		if (sticky && box.bottom >= end - options.clipTolerance) continue;
+		const beside = box.left < bar.right && box.right > bar.left;
+		const under = bar.bottom - box.top;
+		if (beside && box.top < bar.bottom - options.clipTolerance && box.bottom > bar.top)
+			covered.push(describe(element) + ' ' + Math.round(under) + ' px under the header');
+	}
+	window.scrollTo(0, 0);
+	await frames();
+	return covered;
+}
+
+/**
  * The measuring options for one reading mode.
  * @param {string} mode - A key of READING_MODES.
  */
@@ -292,14 +360,17 @@ function optionsFor(mode) {
 		minMeasured: MIN_MEASURED_CHARACTERS,
 		overlapShare: OVERLAP_MIN_SHARE,
 		overlapWidth: OVERLAP_MIN_WIDTH_PX,
-		clipTolerance: CLIP_TOLERANCE_PX
+		clipTolerance: CLIP_TOLERANCE_PX,
+		headerSelector: SITE_HEADER_SELECTOR
 	};
 }
 
 module.exports = {
 	MAX_LINE_CHARACTERS,
 	READING_MODES,
+	SITE_HEADER_SELECTOR,
 	TEXT_SPACING_CSS,
+	measureHeaderCover,
 	measureReading,
 	optionsFor
 };

@@ -63,7 +63,7 @@
 		border-top: 2px solid white;
 		height: var(--banner-height);
 		right: 0;
-		top: var(--header-height);
+		top: var(--header-offset);
 		transform: none;
 	}
 

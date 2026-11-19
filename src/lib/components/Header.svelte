@@ -55,6 +55,26 @@
 		};
 	});
 
+	/** @type {HTMLElement | undefined} */
+	let headerElement = $state();
+
+	// The header is at least --header-height tall and grows with the text
+	// (200 % text, wide spacing, a narrow window): what sits under it (the
+	// sticky table of contents, the narrow-screen banner, anchored headings)
+	// offsets by its measured height, --header-offset, not by that minimum.
+	$effect(() => {
+		if (!headerElement) throw new Error('Header: the header element is not bound');
+		const root = document.documentElement;
+		const observer = new ResizeObserver(([entry]) => {
+			root.style.setProperty('--header-offset', entry.borderBoxSize[0].blockSize + 'px');
+		});
+		observer.observe(headerElement);
+		return () => {
+			observer.disconnect();
+			root.style.removeProperty('--header-offset');
+		};
+	});
+
 	function isCurrent(route) {
 		return isInSection(page.url.pathname, resolve(route));
 	}
@@ -73,7 +93,7 @@
 	});
 </script>
 
-<header lang="fr">
+<header lang="fr" bind:this={headerElement}>
 	<div id="ergopti-header">
 		<a href={resolve('/')} aria-label="Ergopti, page d’accueil">
 			<img src={asset('img/logo/logo.svg')} class="logo" alt="" />
@@ -191,6 +211,9 @@
 		--menu-separators-color: rgb(200, 233, 255);
 		--marge-fenetre: var(--marge-bords-menu);
 		--header-height: clamp(70px, 5.5vw, 120px);
+		/* The header's real height, measured once the page runs (the effect
+		   above); until then the header is at its minimum height. */
+		--header-offset: var(--header-height);
 		--couleur-icone-hamburger: white;
 		--marge-bords-menu: clamp(15px, 1vw, 50px);
 		--longueur-traits-hamburger: 18px;
@@ -438,7 +461,7 @@
 		}
 
 		header .menu-btn:checked ~ #menu {
-			height: calc(100vh - var(--header-height));
+			height: calc(100vh - var(--header-offset));
 			overflow: scroll;
 			visibility: visible;
 		}
