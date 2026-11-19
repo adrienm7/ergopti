@@ -522,6 +522,8 @@ async function selfCheck(chromium) {
 			<button id="real">Real</button>
 			<img src="data:," id="noalt"><svg id="bare" viewBox="0 0 1 1"></svg><svg aria-hidden="true"></svg>
 			<canvas id="chart" width="4" height="4"></canvas>
+			<section role="dialog" aria-modal="true" aria-label="Hidden" hidden><button>Hidden</button></section>
+			<section id="shown" role="dialog" aria-modal="true" aria-label="Shown" hidden><button>Close</button></section>
 			<dialog id="sticky"><button>Stay</button></dialog></main>`);
 		await page.evaluate(() => {
 			document.getElementById('mouse').addEventListener('click', () => {});
@@ -582,6 +584,22 @@ async function selfCheck(chromium) {
 			fresh.showModal();
 		});
 		assert.deepEqual(await appChecks.escapeProblems(page), [], 'Escape that closes passes');
+		// A window keeps every dialog in its markup: the check presses Escape in
+		// the one shown, after a walk that left the focus on the body.
+		await page.evaluate(() => {
+			document.getElementById('sticky').close();
+			const shown = document.getElementById('shown');
+			shown.hidden = false;
+			shown.addEventListener('keydown', (event) => {
+				if (event.key === 'Escape') shown.hidden = true;
+			});
+			document.activeElement.blur();
+		});
+		assert.deepEqual(
+			await appChecks.escapeProblems(page),
+			[],
+			'Escape pressed in the shown dialog, not in the first hidden one'
+		);
 	} finally {
 		await browser.close();
 	}
