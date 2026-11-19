@@ -713,10 +713,14 @@ var LAYOUT_ANALYSIS = (function () {
 		}
 	}
 
-	// When a joined way was first offered by a whole compile (followRules):
-	// way → {d: pass, r: rule index, p: prefix, t: tail}. A cell's own way has
-	// none (it is there before the first pass). Kept for scoreSession only.
-	const wayTimes = new WeakMap();
+	// When a joined way was first offered by a whole compile (followRules), on
+	// the way under this key: {d: pass, r: rule index, p: prefix, t: tail}. A
+	// cell's own way has none (it is there before the first pass). Kept for
+	// scoreSession only; a symbol, so a way reads (JSON, keys) as without it.
+	// A WeakMap cost more than the joins: a partial compile sets one time per
+	// way it keeps, into a table every young way's entry stays in until a full
+	// collection.
+	const WAY_TIME = Symbol('wayTime');
 	// Passes a partial compile may take before it gives up and compiles whole.
 	const PARTIAL_PASS_LIMIT = 4 * MAX_DEAD_DEPTH;
 	// No key changed (planTyping's from.changed when the compile is the same).
@@ -757,7 +761,7 @@ var LAYOUT_ANALYSIS = (function () {
 		if (!list) {
 			completeJoin(candidate, time, board);
 			map.set(key, [candidate]);
-			wayTimes.set(candidate, time);
+			candidate[WAY_TIME] = time;
 			return true;
 		}
 		for (let i = 0; i < list.length; i++) {
@@ -765,13 +769,13 @@ var LAYOUT_ANALYSIS = (function () {
 			if (!sameWayKeys(held, candidate)) continue;
 			if (!betterWay(candidate, held)) {
 				if (betterWay(held, candidate)) return false;
-				const order = compareTimes(time, wayTimes.get(held));
+				const order = compareTimes(time, held[WAY_TIME]);
 				if (order > 0) return false;
 				completeJoin(candidate, time, board);
 				// An equal time is the same offer from inputs replaced since: the newer reads right.
 				if (order === 0 && sameLabels(held, candidate)) return false;
 				list[i] = candidate;
-				wayTimes.set(candidate, time);
+				candidate[WAY_TIME] = time;
 				return true;
 			}
 			list.splice(i, 1);
@@ -783,7 +787,7 @@ var LAYOUT_ANALYSIS = (function () {
 		completeJoin(candidate, time, board);
 		list.splice(at, 0, candidate);
 		if (list.length > MAX_WAYS) list.pop();
-		wayTimes.set(candidate, time);
+		candidate[WAY_TIME] = time;
 		return true;
 	}
 
@@ -806,7 +810,7 @@ var LAYOUT_ANALYSIS = (function () {
 
 	/** The first pass of a whole compile in which rule r can read a way. */
 	function readablePass(way, r) {
-		const time = wayTimes.get(way);
+		const time = way[WAY_TIME];
 		if (time === undefined) return 0;
 		return time.r < r ? time.d : time.d + 1;
 	}
@@ -820,7 +824,7 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {number[]|null} order - Rule indexes, ascending; null for all.
 	 * @param {object} board - From keyboard().
 	 * @param {string} [timing] - 'record': note when each way is offered
-	 *   (wayTimes); 'partial': the rules of a partial compile, which reads the
+	 *   (WAY_TIME); 'partial': the rules of a partial compile, which reads the
 	 *   other lists as they end and gives each offer the time a whole compile
 	 *   would (an offer a whole compile makes after its last pass is left out).
 	 * @returns {boolean} Whether the rules were followed to their end (a pass
@@ -911,7 +915,6 @@ var LAYOUT_ANALYSIS = (function () {
 						changed = true;
 						const list = map.get(target);
 						versions.set(list, version(list) + 1);
-						if (record) wayTimes.set(candidate, { d: depth, r, p: prefix, t: tail });
 						candidate.layers = joined(prefix.layers, tail.layers);
 						candidate.level = `${rule.state}/${tail.level}`;
 						// A dead key closed by a thumb key (the space bar, on any level)
@@ -920,6 +923,8 @@ var LAYOUT_ANALYSIS = (function () {
 						const closing = board.finger[candidate.keys[candidate.keys.length - 1]];
 						if (closing === LEFT_THUMB || closing === RIGHT_THUMB) candidate.terminated = true;
 						if (map === texts) candidate.width = codeLength(target);
+						// Last, as a partial compile sets it: both build ways of one shape.
+						if (record) candidate[WAY_TIME] = { d: depth, r, p: prefix, t: tail };
 					}
 			}
 			if (!changed) return true;
