@@ -101,13 +101,16 @@ helpers.describe("declared coloured preview native row", function()
 		with_preferences(function(_, _, _, _)
 			local rows = menu_controls(false, true)
 			local i18n = require("core.i18n.engine.i18n")
-			helpers.assert_eq(#rows, 5)
+			helpers.assert_eq(#rows, 6)
 			for index, label in ipairs({ "tooltip_magic", "tooltip_autocorrect", "tooltip_ai" }) do
 				helpers.assert_eq(rows[index].title, i18n.get("menu.hotstrings." .. label))
 			end
 			helpers.assert_eq(rows[4].title, "-")
 			helpers.assert_eq(rows[5].title, i18n.get("button.ok"))
 			helpers.assert_eq(rows[5].checked, true)
+			-- The category-symbol switch follows the colours, on by default.
+			helpers.assert_eq(rows[6].title, i18n.get("menu.hotstrings.tooltip_glyphs"))
+			helpers.assert_eq(rows[6].checked, true)
 		end)
 	end)
 	helpers.it("does not refresh or change physical data while the durable lease refuses", function()

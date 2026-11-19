@@ -99,6 +99,7 @@ local _enabled = {
 	autocorrect = true,
 	ai = true,
 	colored = true,
+	glyphs = true,
 }
 
 --- Initialises the preview.
@@ -116,8 +117,8 @@ function M.init(opts)
 	end
 end
 
---- Sets one of the four preview toggles.
---- @param name string "star" | "autocorrect" | "ai" | "colored"
+--- Sets one of the five preview toggles.
+--- @param name string "star" | "autocorrect" | "ai" | "colored" | "glyphs"
 --- @param value boolean
 function M.set_enabled(name, value)
 	if _enabled[name] == nil then
@@ -307,17 +308,31 @@ local function masked_for_preview(candidate)
 	return Fields.for_preview(value, candidate.field)
 end
 
+--- The accent and the category glyph for a row, from ONE resolve of the tint
+--- category: the glyph names the category whose colour the row wears, so the
+--- two can never disagree, and the keystroke pays for one cached lookup.
+--- @param kind string|nil
+--- @param group string|nil
+--- @return table|nil accent { red, green, blue }, nil when colouring is off.
+--- @return string|nil glyph nil when the glyph switch is off.
+--- @return string|nil glyph_name_key The i18n key naming the glyph.
+local function style_for(kind, group)
+	if not _enabled.colored and not _enabled.glyphs then return nil end
+	local category = tint_category(kind, group)
+	if not _config or type(_config.resolve) ~= "function" or not category then return nil end
+	local ok, resolved = pcall(_config.resolve, category, nil)
+	if not ok or type(resolved) ~= "table" then return nil end
+	local accent = _enabled.colored and type(resolved.color) == "string" and HexColor.parse(resolved.color) or nil
+	if not _enabled.glyphs or type(resolved.glyph) ~= "string" then return accent end
+	return accent, resolved.glyph, resolved.glyph_name_key
+end
+
 --- The accent for a row, or nil when colouring is off.
 --- @param kind string|nil
 --- @param group string|nil
 --- @return table|nil { red, green, blue }
 local function accent_for(kind, group)
-	if not _enabled.colored then return nil end
-	local category = tint_category(kind, group)
-	if not _config or type(_config.resolve) ~= "function" or not category then return nil end
-	local ok, resolved = pcall(_config.resolve, category, nil)
-	if not ok or type(resolved) ~= "table" or type(resolved.color) ~= "string" then return nil end
-	return HexColor.parse(resolved.color)
+	return (style_for(kind, group))
 end
 
 --- Schedules the bubble's own disappearance.
@@ -413,6 +428,7 @@ function M.build_rows(candidates, opts)
 
 	for _, candidate in ipairs(candidates or {}) do
 		if #rows >= limit then break end
+		local accent, glyph, glyph_name_key = style_for(kind, candidate.group)
 		rows[#rows + 1] = {
 			-- The replacement is what the user is about to get; the right-hand
 			-- column is the key that VALIDATES it — ★ for the magic-key family, ↵
@@ -436,7 +452,12 @@ function M.build_rows(candidates, opts)
 			-- from the first candidate, so with several categories pending at once
 			-- — the common case — every row after the first wore a colour belonging
 			-- to a different one.
-			accent = accent_for(kind, candidate.group),
+			accent = accent,
+			-- The category's symbol beside the label, so a reader who cannot tell
+			-- the tints apart still tells the categories apart (2026-11-19); the
+			-- renderer draws it and names it for the screen reader.
+			glyph = glyph,
+			glyph_name_key = glyph_name_key,
 		}
 	end
 

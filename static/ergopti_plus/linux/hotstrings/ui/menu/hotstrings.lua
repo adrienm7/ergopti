@@ -1561,11 +1561,27 @@ local function _manifest_hotstring_rows(ctx, config)
 				["preview_colored_ready"] = function() return true end,
 			})
 			if row then choices[#choices + 1] = row end
+			-- The category symbols, a style switch beside the colours (2026-11-19).
+			local glyph_rows = {}
+			local glyph_row = ManifestMenu.check_row("preview_glyphs_control", require("settings.engine.keys").LEAF.PREVIEW_CATEGORY_GLYPHS, {
+				[require("settings.engine.keys").LEAF.PREVIEW_CATEGORY_GLYPHS] = function()
+					if not toggle_preview("glyphs") then return false end
+					require("menu.ui.builder.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_glyphs"), PreviewSettings.get("glyphs") == true)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			}, {
+				[require("settings.engine.keys").KEY.HOTSTRINGS_PREVIEW_CATEGORY_GLYPHS] = function() return PreviewSettings.get("glyphs") == true end,
+				-- Configuring a preview remains allowed while the Linux engine is paused.
+				["preview_glyphs_ready"] = function() return true end,
+			})
+			if glyph_row then glyph_rows[#glyph_rows + 1] = glyph_row end
 
 			local children = ManifestMenu.template_rows("hotstrings_preview_frame", {}, {}, {
 				["parameter_preview_magic"] = function() return magic_rows end,
 				["parameter_preview_presence"] = function() return presence_rows end,
 				["parameter_preview_colored"] = function() return choices end,
+				["parameter_preview_glyphs"] = function() return glyph_rows end,
 			})
 			if not children then return {} end
 			return ManifestMenu.template_rows("hotstrings_preview_parent", {},

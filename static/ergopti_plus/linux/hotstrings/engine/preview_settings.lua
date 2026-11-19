@@ -50,6 +50,9 @@ local TOGGLES = {
 	{ name = "autocorrect", manifest = ConfigKeys.KEY.HOTSTRINGS_PREVIEW_AUTOCORRECT_ENABLED, label = "menu.hotstrings.tooltip_autocorrect" },
 	{ name = "ai",          manifest = ConfigKeys.KEY.HOTSTRINGS_PREVIEW_AI_ENABLED,          label = "menu.hotstrings.tooltip_ai" },
 	{ name = "colored",     manifest = ConfigKeys.KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS,    label = "menu.hotstrings.tooltip_colored" },
+	-- The category symbol beside each row's trigger label (2026-11-19), for a
+	-- reader who cannot tell the tints apart.
+	{ name = "glyphs",      manifest = ConfigKeys.KEY.HOTSTRINGS_PREVIEW_CATEGORY_GLYPHS,     label = "menu.hotstrings.tooltip_glyphs" },
 }
 
 -- The manifest path is the canonical config.toml leaf: the two name the same

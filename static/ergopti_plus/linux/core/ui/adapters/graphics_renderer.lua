@@ -38,6 +38,7 @@ local Tint = require("core.ui.engine.tooltip.tint")
 local Layout = require("core.ui.engine.tooltip.layout")
 local LlmLine = require("core.ui.engine.tooltip.llm_line")
 local SystemA11y = require("core.ui.adapters.system_accessibility")
+local CategoryGlyph = require("hotstrings.engine.category_glyph")
 
 local LOG = "core.ui.adapters.graphics_renderer"
 
@@ -54,6 +55,15 @@ local GTK_WINDOW_POPUP = 1
 -- the text that starts at pad_x.
 local ACCENT_BAR_WIDTH = 3
 local ACCENT_BAR_INSET = 4
+
+--- The label a hotstring row draws at its right: its category glyph, a space,
+--- then the key that fires it, in the label's font and colour so the glyph keeps
+--- the label's contrast on every tint. Shared by the measure and the paint.
+--- @param row table { label?, glyph? }
+--- @return string
+function M.row_label(row)
+	return CategoryGlyph.row_label(row.glyph, row.label)
+end
 
 
 
@@ -249,8 +259,9 @@ function M.measure_rows(rows, style, pango_layout)
 		else
 			local text_w, text_h = measure(pango_layout, row.text or "", style.fonts.main, style.sizes.main)
 			local label_w, label_h = 0, 0
-			if row.label and row.label ~= "" then
-				label_w, label_h = measure(pango_layout, row.label, style.fonts.main, style.sizes.hint)
+			local label = M.row_label(row)
+			if label ~= "" then
+				label_w, label_h = measure(pango_layout, label, style.fonts.main, style.sizes.hint)
 			end
 
 			-- The label is right-aligned on the same line, so the row is as wide as
@@ -427,11 +438,12 @@ local function paint(cr, rows, metrics, style, size, background)
 			cr:stroke()
 		end
 
-		if row.label and row.label ~= "" then
+		local label = M.row_label(row)
+		if label ~= "" then
 			local label_description = g.Pango.FontDescription.from_string(style.fonts.main)
 			label_description:set_size(style.sizes.hint * PANGO_SCALE)
 			pango_layout:set_font_description(label_description)
-			pango_layout:set_text(row.label, -1)
+			pango_layout:set_text(label, -1)
 			cr:set_source_rgba(1, 1, 1, alpha * 0.6)
 			-- Right-aligned against the panel's inner edge, which is what makes a
 			-- column of triggers readable down the right-hand side.
@@ -448,15 +460,20 @@ end
 
 
 --- The plain text of a preview, for AT-SPI: the rows that will be sent, each
---- with its trigger, never the struck-through alternatives.
---- @param rows table Array of { text, label?, dimmed?, struck? }.
+--- with its trigger and the category its glyph stands for, never the
+--- struck-through alternatives. The glyph itself is not read: its name is.
+--- @param rows table Array of { text, label?, glyph?, glyph_name_key?, dimmed?, struck? }.
 --- @return string
 function M.accessible_text(rows)
 	local parts = {}
 	for _, row in ipairs(type(rows) == "table" and rows or {}) do
 		if type(row) == "table" and type(row.text) == "string" and row.text ~= "" and not row.dimmed and not row.struck then
 			local label = type(row.label) == "string" and row.label ~= "" and (" " .. row.label) or ""
-			parts[#parts + 1] = row.text .. label
+			local category = ""
+			if type(row.glyph) == "string" and row.glyph ~= "" and type(row.glyph_name_key) == "string" then
+				category = ", " .. require("core.i18n.engine.i18n").get(row.glyph_name_key)
+			end
+			parts[#parts + 1] = row.text .. label .. category
 		end
 	end
 	return table.concat(parts, "; ")
