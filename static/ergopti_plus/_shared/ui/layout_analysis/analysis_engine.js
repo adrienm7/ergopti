@@ -1030,7 +1030,7 @@ var LAYOUT_ANALYSIS = (function () {
 		let { accented, mnemonic } = previous.accents;
 		const recount = new Set(changed);
 		for (const char of changed) {
-			const users = accentUsers.get(char.toLowerCase());
+			const users = accentUsers.get(lowerCase(char));
 			if (users && char.length === 1) for (const user of users) recount.add(user);
 		}
 		for (const char of recount) {
