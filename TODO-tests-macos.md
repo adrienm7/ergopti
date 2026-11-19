@@ -87,6 +87,7 @@ Field run, no person needed (read the next report):
 
 Hands needed:
 
+- [ ] <!-- field-point: bundle_remove --> Remove the Ergopti bundle (LCP-02, 2026-11-19): with the bundle installed in the user scope and one of its layouts selected, Keyboard layout > « 🗑️ Retirer Ergopti (utilisateur) »: its layouts leave the input sources (macOS selects another), `~/Library/Keyboard Layouts` holds no `Ergopti_v*.bundle` nor `.ergopti-remove.*` folder, the success notice shows, and « Installer » puts it back. A system copy is left untouched.
 - [ ] <!-- field-point: layout_emulation --> Layout emulation (2026-11-06): with French (or ABC) selected as the input source, choose Keyboard layout >
       Layout to emulate > Ergopti➕ and type in TextEdit: letters, Shift, CapsLock, Option levels and the
       circumflex dead key (`^` then `e` gives ê) follow Ergopti➕; Cmd+Z undoes where Ergopti has z; a row switched

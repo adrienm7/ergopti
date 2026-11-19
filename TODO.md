@@ -293,6 +293,24 @@ The [coverage and remaining-work register](docs/platform-parity-audit.md#review-
 and the campaign reports under [docs/audits/platform-parity/](docs/audits/platform-parity/) record what is done.
 Native receiving stays unqualified everywhere; the real-machine scenarios are in the TODO-tests files.
 
+- [ ] **[CODE] Layout capabilities left open (maintainer request 2026-11-19, « installer, retirer, émuler, petits
+      changements sur les 3 OS »).** The audit and its matrix are in
+      [platform-parity-audit.md](docs/platform-parity-audit.md#layout-capabilities--november-19-2026); X11 install,
+      the macOS `.bundle` removal and the number-row offer are fixed, `test-layout-capability-contract.cjs` pins every
+      path. Left:
+  - Windows: the layout manager lists no layout Studio registered as a DLL, so removing it goes through Windows
+    Settings › Apps (`KbdRegister_Install`'s uninstall entry). List the `Ergopti_kbd_*` uninstall entries as installed
+    layouts and route their removal to `_LayoutComposer_UninstallNative`.
+  - Windows: a source re-saved under another `dll_name`, a declaration save (`_LayoutComposer_DeleteStale`) or an
+    emulation that replaces the stored source leaves the previous DLL registered with nothing in the app that finds
+    it again. Uninstall the previous DLL before `_LayoutComposer_StoreSource` overwrites its source.
+  - Accented-letter shortcuts under an emulated base: the Windows built-in Ergopti base reads the four choices
+    (`ErgoptiBaseMapping`), registry layouts on Windows and every layout on macOS and Linux take the chord from the
+    layout's Command level, and the Linux row stays enabled while it does nothing. 1. **(recommended)** The shared
+    emulation reads the four choices for Ergopti's own layouts, as the Windows base does. 2. Keep the Command level and
+    grey the row while emulating.
+  - Linux X11: a layout loaded with `apply-x11` lasts for the session; re-apply the selected one at daemon start.
+
 - [ ] **[CODE] Parity audit continuation.** Take one bounded module at a time across Windows, macOS, Linux and shared;
       do not restart a finished campaign without source drift or a new hypothesis. The
       [2026-11-19 census](docs/audits/platform-parity/2026-11-19-census/report.md) (`b90ad8de`, S26 included: 190
@@ -732,8 +750,8 @@ more`, macOS and WebKit) does not switch the Studio frames to the black-and-yell
     2. Leave each OS's menu as it is.
 - [ ] **Ctrl+★ → Ctrl+S on Linux (BND-1, BND-2, 2026-11-17 pass).** macOS has `cmd_star` (Cmd+★ to Cmd+S, extra
       modifiers kept), Windows `layout.ctrl_magic_save` (Ctrl + magic key to a bare Ctrl+S), Linux neither; its
-      reason `platform_reason.layout_emulation_is_windows_only` says Linux installs the layout as XKB with nothing to
-      switch off, stale since Linux emulates the layout (`modules/keymap/layout_emulation.lua`). Kept meanwhile: no
+      reason is now `platform_reason.ctrl_magic_save_is_windows` (`not_yet`, corrected 2026-11-19: Linux emulates the
+      layout and could send it). Kept meanwhile: no
       Linux option. 1. **(recommended)** Port `ctrl_magic_save` to the Linux emulation, keep extra modifiers on
       Windows and Linux as macOS does, and correct the reason in the 21 locales ([CODE]). 2. Keep it off Linux and
       only correct the reason's text.

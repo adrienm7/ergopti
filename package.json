@@ -41,6 +41,7 @@
 		"test:defaults-single-source": "node ./tools/test/test-defaults-single-source.cjs",
 		"test:feature-family-rule": "node ./tools/test/test-feature-family-rule.cjs",
 		"test:linux-feature-parity": "node ./tools/test/test-linux-feature-parity.cjs",
+		"test:layout-capability-contract": "node ./tools/test/test-layout-capability-contract.cjs",
 		"test:linux-xi2-cookie-ci-contract": "node ./tools/test/test-linux-xi2-cookie-ci-contract.cjs",
 		"test:llm-legacy-basic-prompt-single-source": "node ./tools/test/test-llm-legacy-basic-prompt-single-source.cjs",
 		"test:keycode-data-js-parity": "node ./tools/test/test-keycode-data-js-parity.cjs",

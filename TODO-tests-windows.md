@@ -28,6 +28,11 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
       listed and types as with the tool's own installer; edit `layout.ini` (a space, an extra key or line) and run it
       again: it refuses before writing anything; uninstall from Settings → Apps leaves no `a0nn040c` key. See
       docs/design/layout-windows-dll.md « Windows check », step 6.
+- [ ] Layout capabilities (2026-11-19): with French AZERTY selected and no layout emulated, « Couches émulées »
+      AltGr on types Ergopti's AltGr symbols over AZERTY, Ctrl+é sends the chosen letter's chord and the number
+      row order applies; with Ergo-L emulated from Studio (« Émuler »), the same rows apply on top of it. A
+      Studio-installed DLL shows in Settings > Apps and its removal there leaves no `Keyboard Layouts` key (the
+      layout manager does not list it yet, TODO).
 - [ ] Layout editor host (2026-11-12): the real UAC install of a source's DLLs, typing, switching and the uninstall
       (Settings > Apps and « Remove »), in source and compiled mode.
 - [ ] Ergopti Studio opens maximized (2026-11-17), at 100 %, 150 % and 200 % display scale: the title bar and its

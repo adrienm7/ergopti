@@ -104,6 +104,11 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       the drive off through udisks and polkit, with no root prompt: the stick leaves `lsblk` and the file manager,
       and the system's own disks stay mounted. The hosted CI runner has no removable or hot-plugged disk, and a loop
       device is neither, so the action rightly skips it there.
+- [ ] <!-- field-point: x11_layout_install --> Layouts on an X11 session (LCP-01, 2026-11-19): in « Installer ou
+      retirer des dispositions… » install Ergo-L, then « Utiliser »: the next typed letters follow Ergo-L with no
+      sudo, `xkbcomp -xkb $DISPLAY -` names `ergol`, plugging a keyboard keeps it (GNOME and Plasma under X11), and
+      « Désinstaller » takes it out of `~/.config/xkb`. In Studio, « Installer » a source does the same. A new login
+      starts with the desktop's own layouts (Xorg reads no user tree).
 - [ ] <!-- field-point: kde_input_sources_live --> Live layout switch on KDE Plasma: with two layouts in System
       Settings > Keyboard, Layout > « Input sources » switches the active layout at once through the Plasma keyboard
       daemon (`org.kde.keyboard /Layouts setLayout`), on Wayland and on X11; the daemon's `getLayout` answers the

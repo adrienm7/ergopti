@@ -10,6 +10,63 @@ entry is not the same thing as a user-facing capability: an OS can provide the
 same capability through a different path. A declaration is not a runtime or
 hardware test.
 
+## Layout capabilities — November 19, 2026
+
+Maintainer request: on Windows, macOS and Linux, from the tray menu and from
+Ergopti Studio, (1) install and remove keyboard layouts on the OS and switch
+between them, (2) emulate a layout without installing it, (3) emulate small
+changes (layers, AltGr, emulated rows, number row, accented-letter shortcuts,
+magic key) on top of the OS layout or the emulated one.
+`tools/test/test-layout-capability-contract.cjs` now pins every path below per
+OS and surface (44 code paths, the six Studio messages each host accepts, the
+Optimiser's Download / Install / Emulate, and the reason of every row drawn on
+fewer than three OS), each with a mutation that must fail.
+
+| Capability                    | Windows menu                       | Windows Studio                                | macOS menu                                    | macOS Studio                    | Linux menu                                             | Linux Studio                                  |
+| ----------------------------- | ---------------------------------- | --------------------------------------------- | --------------------------------------------- | ------------------------------- | ------------------------------------------------------ | --------------------------------------------- |
+| Install                       | ✓ installer download (admin)       | ✓ DLL registration (one UAC prompt)           | ✓ `.bundle`, user scope                       | ✓ registry and composed layouts | ✓ opens the layout manager                             | ✓ Wayland; **X11 fixed** (was always refused) |
+| Remove                        | ✓ the installer's own uninstaller  | ◐ catalogue layouts; a Studio DLL in Settings | **fixed** (no removal of the `.bundle`)       | ✓                               | ✓ through the manager                                  | ✓                                             |
+| Switch                        | ✓                                  | ✓ through « Install and use »                 | ✓                                             | ✓ registry layouts              | ✓ GNOME, KDE, X11                                      | ✓ Wayland; **X11 fixed** (activate refused)   |
+| Emulate without installing    | ✓ overrides the active layout      | ✓ `composer_emulate`                          | ✓ overrides the input source                  | ✓                               | ✓ overrides the XKB layout                             | ✓                                             |
+| Tune, OS layout as base       | ✓ AltGr, rows, number row, é è ê à | —                                             | ◐ AltGr, rows; number row only on our layouts | —                               | ◐ AltGr, rows, é è ê à; number row only on our layouts | —                                             |
+| Tune, emulated layout as base | ✓                                  | —                                             | ✓ **number-row offer fixed**                  | —                               | ✓ **number-row offer fixed**                           | —                                             |
+
+Fixed, each with a regression red on the old code:
+
+| Id     | OS           | Gap                                                                                                                                                                                                                                                          | Fix and regression                                                                                                                                                                                                                                                         |
+| ------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LCP-01 | Linux        | The user installer refuses an Xorg session unless the caller loads the layout itself, and only the number-row options passed `--allow-xorg`: the layout manager and Studio installed nothing on X11, and a selection ran `activate`, which refuses Xorg too. | `install` and `install_local` pass `--allow-xorg` on X11 (`with_x11_permission`), `select` runs `apply-x11` and keeps the layout through `x11_layout_reapply`. `test_layout_registry.lua` (`x11-layout-install`, two cases) red on the old code.                           |
+| LCP-02 | macOS        | The `.bundle` row installed the layout in `~/Library/Keyboard Layouts` and offered no way to remove it.                                                                                                                                                      | `layout_install.remove_user` moves the exact checked bundle into a private folder, then deletes it, under the install owner; the new `layout_bundle_remove` row disables the bundle's input sources first. `test_layout_install_transaction.lua` (`layout-bundle-remove`). |
+| LCP-03 | macOS, Linux | The number-row order was offered as soon as any layout was emulated, though the emulation orders that row only with its base layer and number-row switch on (AltGr alone over the OS layout, or the row switched off, applied nothing).                      | `keylayout_emulation.orders_number_row` and `status().number_row`; both menus read it. `test_layout_emulation.lua` on macOS and Linux (`emulated-number-row-availability`).                                                                                                |
+| LCP-04 | reasons      | `platform_reason.layout_emulation_is_windows_only` said macOS and Linux install the layout and have no emulation, false since both emulate.                                                                                                                  | Replaced by `layout_master_switch_is_windows` (the Windows category gate of the layout section) and `ctrl_magic_save_is_windows` (`not_yet` on Linux, TODO BND-1), in the 21 locales.                                                                                      |
+
+What an OS cannot do, with its reason (menu text in the 21 locales):
+
+- The macOS system scope (`/Library/Keyboard Layouts`) is neither installed nor
+  removed: it needs administrator rights the driver cannot yet bind to its
+  verified launcher (`install_system_unavailable`).
+- Linux on X11 loads a layout into the running server only: Xorg reads no user
+  XKB tree, so a new session starts with the desktop's own layouts until the
+  layout is selected again; a permanent install there is the root
+  `xkb_installation/install.sh`. wlroots compositors (sway, Hyprland) get no
+  live selection (`session_unsupported`).
+- The number row on the OS layout: macOS and Linux rebuild a layout this app
+  installed (`number_row_live`); a stock input source or XKB layout has no
+  source to rebuild (`platform_reason.number_row_live_no_layout`), and Linux
+  under Wayland only does so on GNOME and KDE (`number_row_live_session`).
+  Windows remaps the row with hotkeys on any layout.
+- The accented-letter shortcuts are not drawn on macOS
+  (`accented_shortcuts_need_a_layout_file_on_macos`): a `.keylayout`'s Command
+  level carries the chord. Under any emulation, Linux and Windows registry
+  layouts also take the chord from the layout's Command level, while the
+  Windows built-in Ergopti base reads the four choices (open, TODO).
+
+Left open (TODO): Windows lists no layout Studio registered as a DLL in the
+layout manager, so its removal is Windows Settings › Apps (the entry
+`KbdRegister_Install` writes); a renamed source or a declaration save leaves
+the previous DLL registered (`_LayoutComposer_StoreSource`,
+`_LayoutComposer_DeleteStale`).
+
 ## Platform parity table — November 19, 2026
 
 [platform-parity-table.md](platform-parity-table.md) is generated by
@@ -45,22 +102,23 @@ Counts at this revision:
 
 | OS      | Supported | Degraded | Unavailable |
 | ------- | --------: | -------: | ----------: |
-| Windows |       829 |        0 |         295 |
-| macOS   |       942 |        0 |         182 |
-| Linux   |       874 |        2 |         248 |
+| Windows |       827 |        0 |         296 |
+| macOS   |       941 |        0 |         182 |
+| Linux   |       872 |        2 |         249 |
 
-Of the 727 unavailable or degraded cells, the reasons class them as:
-`os_concept` 208 (the concept exists only on one OS: Karabiner, the .bundle
+Of the 729 unavailable or degraded cells, the reasons class them as:
+`os_concept` 206 (the concept exists only on one OS: Karabiner, the .bundle
 layout, AutoHotkey's debug tools, NTFS without an executable bit…),
 `menu_layout` 187 (the control exists under another row of that driver's menu),
 `os_api` 135 (no API, session or permission for it: Windows passes no touch
 data to applications, Wayland gives no cursor position and no other client's
 windows, MLX exists only on Apple Silicon, a PC keyboard never reports Fn),
-`driver_storage` 122 (same capability, stored under another name),
+`driver_storage` 124 (same capability, stored under another name),
 `os_equivalent` 72 (the OS does it its own way; the equivalent action is
-offered) and `not_yet` 3, the only cells the reasons themselves call a gap:
-token streaming on Windows (`token_streaming_unvalidated_on_windows`) and the
-shortcut restore on macOS (`shortcuts_restore_is_composed_on_macos`). The
+offered) and `not_yet` 5, the only cells the reasons themselves call a gap:
+token streaming on Windows (`token_streaming_unvalidated_on_windows`), the
+shortcut restore on macOS (`shortcuts_restore_is_composed_on_macos`) and
+Ctrl+★ save on macOS and Linux (`ctrl_magic_save_is_windows`, TODO BND-1). The
 per-reason list, with each technical text, is in the table.
 
 Building the owners found three declared features no driver code reads. They
@@ -493,9 +551,9 @@ and Fn and Spotlight belong to macOS. The source explains each restriction.
 | Tap-hold copy confirmation                                  | Check supported by platform implementation | Check supported by platform implementation                     | Unchecked on Wayland or X11 without xclip                                                  | `linux/platform/remap/tap_copy.lua`: copy is sent, but the counter-dependent retry and warning cannot run                                                                                            |
 | Pointer center, teleport, spotlight                         | Declared                                   | Declared                                                       | No implementation                                                                          | `sg_actions` reasons: Wayland restricts pointer moves/overlays; X11-only implementations remain potential work                                                                                       |
 | Open terminal or create file in current file-manager folder | Declared                                   | Declared                                                       | No implementation                                                                          | Action catalogue records lack of a common Linux file-manager interface; per-file-manager support remains potential work                                                                              |
-| Accented-key shortcut remapping                             | Declared                                   | Native layout control/command layer                            | No equivalent                                                                              | `platform_reason.accented_shortcuts_are_windows`                                                                                                                                                     |
+| Accented-key shortcut remapping                             | Declared                                   | Native layout control/command layer                            | Declared on the system layout                                                              | `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`; under emulation the layout's Command level decides (layout capabilities above)                                                     |
 | MLX local inference                                         | Not applicable                             | Apple Silicon                                                  | Not applicable                                                                             | `platform_reason.llm_mlx_is_apple_silicon`; Ollama is separate                                                                                                                                       |
-| Keyboard layout emulation                                   | Declared                                   | Installed system input source                                  | Installed XKB layout                                                                       | `platform_reason.layout_emulation_is_windows_only`; these are different installation models                                                                                                          |
+| Keyboard layout emulation                                   | Declared                                   | Declared, over any input source                                | Declared, over any XKB layout                                                              | Each driver types the emulated layout itself (layout capabilities above); `platform_reason.layout_master_switch_is_windows` covers only the Windows category gate                                    |
 | App Cloner bundled application                              | No bundled counterpart found               | Bundled                                                        | No bundled counterpart found                                                               | `macos/apps/App Cloner.app/Contents/Info.plist`; separate app clones and profiles                                                                                                                    |
 | Encryptor bundled application                               | No bundled counterpart found               | Bundled                                                        | No bundled counterpart found                                                               | `macos/apps/Encryptor.app/Contents/Info.plist`; file encryption/decryption is distinct from text and metrics encryption                                                                              |
 
