@@ -2148,6 +2148,10 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["es"]
 		},
+		"app_category.general": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es"]
+		},
 		"metrics_apps.score_title": {
 			"reason": "loanword-or-cognate",
 			"locales": ["ar", "cs", "da", "de", "fr", "nl"]
