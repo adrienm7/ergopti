@@ -302,7 +302,7 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   base fingering, finger of each key and home key of each finger replace
 	 *   the keyboard's own; absent, the model's defaults.
 	 * @returns {object} {id, codes, index: Map code → i, finger, order, hand,
-	 *   row, relRow (row relative to the finger's home key), x, y, home,
+	 *   row, relRow (row relative to the finger's home key), x, y, width (in key units), home,
 	 *   lateral, outer, homeOf: finger → key index}.
 	 * @throws {Error} On an unknown keyboard, an invalid profile, or a home key
 	 *   that is not on the board or not pressed by its own finger (a shared
@@ -352,6 +352,7 @@ var LAYOUT_ANALYSIS = (function () {
 			y: [],
 			// The column grid: x without the row stagger, for lateral keys.
 			grid: [],
+			width: [],
 			home: [],
 			lateral: [],
 			outer: []
@@ -384,6 +385,7 @@ var LAYOUT_ANALYSIS = (function () {
 			// A column-staggered board measures its real height; the others their rows.
 			board.y.push(board3d ? g.y : g.row);
 			board.grid.push(grid);
+			board.width.push(g.width);
 			board.home.push(homeCodes.has(code));
 			board.outer.push(outer.has(code));
 			// A wide modifier is pressed at its end nearest the home row.

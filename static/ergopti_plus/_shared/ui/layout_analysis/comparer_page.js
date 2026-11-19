@@ -172,7 +172,7 @@
 	// Widest size of one key unit of the heatmap, in pixels; narrower screens
 	// shrink the whole board instead of scrolling it.
 	const HEAT_UNIT_PX = 44;
-	// Width of the space bar in key units.
+	// Widest the space bar is drawn, in key units (the ISO and ANSI bar, shortened).
 	const SPACE_UNITS = 6;
 	const SPACE_CODE = 'Space';
 	// Where a shared link opens when the page has no web address of its own
@@ -3067,8 +3067,10 @@
 					key.classList.add(KEY_LEGEND.DEAD_KEY_CLASS);
 				const value = byCode[code];
 				const share = extent > 0 ? Math.min(1, Math.abs(value) / extent) : 0;
-				const span = code === 'Space' ? SPACE_UNITS : 1;
-				const left = code === 'Space' ? board.x[k] - SPACE_UNITS / 2 : board.x[k] - 0.5;
+				// The space bar as wide as the board makes it, at most SPACE_UNITS: a split
+				// board's one-unit thumb key, JIS's shorter bar beside its thumb keys.
+				const span = code === 'Space' ? Math.min(SPACE_UNITS, board.width[k]) : 1;
+				const left = board.x[k] - span / 2;
 				key.style.left = across(left - minX);
 				key.style.top = down(board.y[k] - 1);
 				key.style.width = across(span);
