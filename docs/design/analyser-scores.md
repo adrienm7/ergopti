@@ -555,6 +555,40 @@ cmini and a200 (Python, `--python=<exe>` with `--cmini-data=<its folder>` or
 `--a200-data=<its app folder>`) needed no change: every statistic within
 1e-13 point of their own code on 65 and 50 points.
 
+## Taken into the Ergopti score
+
+The study's ideas (docs/audits/layout-analysers/report.md, section 10) that
+became metrics or options of the Ergopti engine, each defined in
+[layout-analysis.md](layout-analysis.md#metrics) with a default weight of 0:
+
+- **`sfb_distance`**, the same-finger travel: `100 · Σ_SFB n · d · f / bigrams
+  - 0.5 · 100 · Σ_SFS n · d · f / trigrams`, d the distance between the two
+keys' centres in mm, f the finger's `same_finger_factor`(pinky 1.7, ring
+1.3, middle and index 1). From genkey's finger speed (distance-weighted
+SFBs and skipgrams), Oxeylyzer's`SFB × distance × 5.5 / finger weight`,
+the Keyboard Layout Optimizer's `finger_repeats` (SFB with distance) and
+    Cyanophage's extra 0.7 for pinky and 0.3 for ring SFBs. Our skipgram is
+    gap 1 only, from the trigrams, so the key stream stays exact.
+- **`pinky_ring`**, the pinky–ring pairs of one hand on any rows:
+  Oxeylyzer's `pinky_ring_bigrams` (its share, not its weight); Cyanophage's
+  pinky–ring scissor and keygen's pinky/ring twist are its parts on
+  different rows.
+- **Floors** (`floors` of `score_weights.json`, 0 by default): Cyanophage's
+  `max(0, (metric − floor) · weight)` for every penalty metric.
+- **The relative ranking** (the Comparer's « Difference to … »): Alt Alpha
+  Ranker's normalisation against QWERTY, written as a difference to AZERTY on
+  a French corpus and QWERTY otherwise.
+
+Longer skipgrams (genkey's gaps 1 to 9 weighted 1/2^(g−1), Oxeylyzer's 1 to 3
+weighted (1/7)^g) stay out: the corpus format has uni-, bi- and trigrams only.
+Measured on 2026-11-19, character pairs at gaps 2 and 3 would add 1.26 MB to
+the 9.2 MB of corpus files (about 40 % of each of the 25 text corpora: 57 KB
+on Don Quichotte's 148 KB) and gaps 2 to 9 5.93 MB (about 185 %), while the 12
+count-table corpora (Google Books, Leipzig counts) have no text to count them
+from; and a character pair at gap g is a key pair at gap g only when no
+character between them takes two keys (a dead key, a chord), so such tables
+would not keep the key stream exact.
+
 ## Not covered
 
 Listed by the search for this work, not reproduced (no score, or a score made

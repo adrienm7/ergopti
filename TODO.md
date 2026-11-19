@@ -190,12 +190,22 @@ waits for the maintainer's review).
       its `.json`) into `windows/vendor` with their `required` entries in `tools/build/windows_bundle_manifest.json`;
       then `test-windows-lua-export-identity.cjs` checks them and the Windows lane runs the byte-equality proof.
 
-- [ ] **Ideas from the other analysers (2026-11-19).** Six metric corrections our score lacks are listed with a
-      recommendation in `docs/audits/layout-analysers/report.md`, section 10 « Ideas from the other analysers ».
-      First: a distance- and finger-weighted SFB (`sfb_distance`, genkey's, Oxeylyzer's and KLO's model), then
-      pinky–ring bigrams on any row, optional per-term floors (Cyanophage), a « relative to QWERTY » ranking view
-      (keycraft, Alt Alpha Ranker) and longer skipgrams (needs skipgram tables in the corpus format). Each new metric
-      needs its id in the Comparer's metric lists (`comparer_page.js`) and a maintainer decision on its weight.
+- [ ] **Ideas from the other analysers, weights to decide (2026-11-19).** `sfb_distance` (same-finger travel
+      weighted by finger, genkey's, Oxeylyzer's and KLO's model), `pinky_ring` (pinky–ring pairs on any row), the
+      penalty floors (`floors` of `score_weights.json`) and the ranking's « Difference to QWERTY / AZERTY » view are
+      in the engine and the Comparer, all at weight or floor 0 (docs/design/layout-analysis.md, « Metrics » and
+      « Global score »). Pending decisions: the study recommends moving part of `sfb`'s weight (10) onto
+      `sfb_distance` once both rankings are compared (about 0.5 a point keeps one 1 u SFB's cost: 10 / 19 mm);
+      whether `pinky_ring` gets a weight once it is seen to rank layouts differently from `half_scissors`; any
+      non-zero floor (Cyanophage: SFB 0.3 %, hand balance 1 point). Left: the floors are read from
+      `score_weights.json` only; the Comparer's score settings, their export file (`ergopti-score-settings`,
+      a new required entry) and `score_settings.js` do not edit them yet.
+- [ ] **Longer skipgrams (2026-11-19).** genkey's gaps 1 to 9 and Oxeylyzer's 1 to 3 need skipgram tables in the
+      corpus format. Measured: gaps 2–3 add 1.26 MB to the 9.2 MB of corpus files (about +40 % per text corpus,
+      57 KB on Don Quichotte's 148 KB), gaps 2–9 5.93 MB (about +185 %); the 12 count-table corpora have no text to
+      count them from, and a character pair at gap g is a key pair at gap g only when no character between takes
+      two keys, so the key stream would no longer be exact (docs/design/analyser-scores.md, « Taken into the
+      Ergopti score »).
 - [ ] **Other analysers, what is left (2026-11-19).** genkey (1.3 % mean, 8.3 % max on code) and Oxeylyzer (trigram
       shares within 0.07–0.29 point) stay « close » until the corpus tables carry skipgrams of gap 2 to 9 and
       Oxeylyzer's token totals exactly (its saved counts lose one at a rate set by its exact total's bits).

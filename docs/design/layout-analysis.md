@@ -186,10 +186,16 @@ count}`), `chords` the multi-character outputs used with their counts.
   global score, Σ weight × `cost` over `KEY_COST_METRICS`; the keys' points add
   up to those metrics' part of the score.
 
-- `score(result, weights?)` → `{total, contributions, weights}`; the given
-  weights override the defaults metric by metric.
+- `score(result, weights?, floors?)` → `{total, contributions, weights,
+floors}`; the given weights and floors override the defaults metric by
+  metric (see [Global score](#global-score)).
 - `defaultWeights()` → a copy of `score_weights.json` (the « restore defaults »
-  action).
+  action); `defaultFloors()` → a copy of its `floors`; `scoreFloors(floors?)`
+  → the floors with the given ones, refusing a floor on a metric that has no
+  weight or is not lower-is-better, or one below 0 or not finite.
+- `referenceLayout(language?)` → the library id the ranking's relative view
+  measures against: `reference_layouts.by_language[language]` of
+  `analysis_model.json` (`fr`: `azerty`), else its `default` (`qwerty`).
 - `compare(layouts, ngrams, options)` → the results ranked best first, each
   with `rank`: every complete layout before every incomplete one, each group
   by score (`rankOrder`, below).
@@ -245,6 +251,8 @@ occurrences}`: how alike two layouts type a corpus, in %. Each corpus
   corpus with nothing else than spaces is refused (`similarity_empty`). The
   optimizer reads the weighted `sameKey` first
   ([layout-optimizer.md](layout-optimizer.md#existing-layouts)).
+- `same_finger_factor` of `analysis_model.json` weighs each finger's
+  same-finger move in `sfb_distance` (Cyanophage's factors).
 - `similarScoreGap()` → `similar_score_gap` of `analysis_model.json` (default
   2 points): the score gap under which the optimizer says an existing layout
   does the job of the one it found.
@@ -399,9 +407,11 @@ metric a share of the typed characters.
 | `sfb`              | %     | lower  | Same-finger bigram: two consecutive keys on one finger, different keys.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `repeat`           | %     | none   | The same key twice.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `sfs`              | %     | lower  | Same-finger skipgram: first and third key of a trigram on one finger, different keys.                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `sfb_distance`     | mm    | lower  | Same-finger travel: Σ over the SFBs of n × the distance between the two keys' centres (mm, the `distance` metric's geometry) × the finger's `same_finger_factor` (pinky 1.7, ring 1.3, middle and index 1), per 100 key bigrams, plus 0.5 × the same sum over the SFS (first to third key) per 100 key trigrams. genkey's finger speed, Oxeylyzer's SFB × distance / finger weight and the Keyboard Layout Optimizer's `finger_repeats`; the finger factors are Cyanophage's. Weight 0 by default.       |
 | `lsb`              | %     | lower  | Lateral stretch bigram: one hand, adjacent fingers, one key lateral (index inner column Digit5/T/G/B, Digit6/Y/H/N; pinky outer keys Backquote, IntlBackslash, Minus, Equal, brackets, Quote, Backslash).                                                                                                                                                                                                                                                                                                |
 | `scissors`         | %     | lower  | Full scissor: one hand, adjacent fingers, the longer finger two or more rows below the shorter one (lengths: middle > ring > index > pinky).                                                                                                                                                                                                                                                                                                                                                             |
 | `half_scissors`    | %     | lower  | Half scissor: the same, one row apart.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `pinky_ring`       | %     | lower  | Pinky–ring pair: one hand, the pinky and the ring finger, any rows (the same row included; Oxeylyzer's `pinky_ring_bigrams`; Cyanophage's pinky–ring scissor is its part on different rows). A half scissor between them is counted in both. Weight 0 by default.                                                                                                                                                                                                                                        |
 | `row_jump`         | %     | none   | Row jump: two consecutive keys of one hand at least two logical rows apart (top and bottom row, number and home row), whatever the fingers (it may also be an SFB or a scissor); informative, not in the global score.                                                                                                                                                                                                                                                                                   |
 | `roll_in`          | %     | higher | Two-key inward roll: one hand, different fingers, toward the index.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `roll_out`         | %     | higher | Two-key outward roll: toward the pinky.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -435,7 +445,16 @@ metric a share of the typed characters.
 ## Global score
 
 `contribution(m) = sign(m) × weight(m) × value(m)`, with `sign = +1` when higher
-is better and `−1` when lower is better; `total = Σ contributions`. Every weight
+is better and `−1` when lower is better; `total = Σ contributions`. A penalty
+metric (lower is better) counts only its part above its floor:
+`value(m) = max(0, metric − floor(m))` (Cyanophage's optimiser, so tiny
+differences between good layouts do not decide the rank). The floors are
+`floors` in `score_weights.json`, all 0 (the whole value) by default;
+`analyse()`, `scoreSession()`, `score()`, `rescore()` and `keyScoreCost()`
+take `floors` (metric → floor, the defaults for the others), and a key's cost
+is its share of the part above the floor. The pair matrix and the word
+efforts give per-unit points without floors (a floor belongs to a whole
+text's share), and the ways of typing choose by the default weights alone. Every weight
 is a finite number ≥ 0, in points per percentage point (or per millimetre).
 The defaults and their justification are in the study, section « Default
 weights ». A weight of 0 removes a metric from the score; the Studio shows each
@@ -921,7 +940,17 @@ analysis, another tab when it is shown.
   the gap to the first in brackets; each bar opens the details with a click or
   Enter), the best complete layout shown by the score and by nine metrics as
   tiles, and the sortable ranking (header buttons, units in the headers, its
-  columns the viewer's: `#la-table-options`).
+  columns the viewer's: `#la-table-options`). « Difference to … »
+  (`#la-table-relative`, saved as `table.relative`) writes the score and every
+  metric column as its difference to the reference layout, in the metric's
+  unit, with ▲ or ▼ and the verdict in words (`E.diff`); the sort stays on the
+  values. The reference is `reference_layouts` of the model
+  (`E.referenceLayout`): AZERTY on a French corpus, QWERTY on any other, the
+  page's language deciding for the user's own text and « My typing »; it is
+  analysed on the same text when it is not compared. A difference, not a
+  ratio (Alt Alpha Ranker divides by QWERTY's value): it stays defined where
+  the reference's value is 0 (QWERTY's unsupported share on English, its
+  direct digits) and keeps the score's points.
 - **Fingers and hands**: the finger load against the ideal as a heat table
   (each finger's share, its signed gap to the ideal under it, the cell orange
   above and blue below the ideal, into the neutral surface; the ideal load is
@@ -1382,6 +1411,16 @@ Decided by the agent on 2026-11-17, to review by the maintainer: `row_jump`
 the study gives it no weight; a word's effort is measured on its lower-case
 form with the score's own weights, typed alone (no space around it); a word
 table keeps 1,000 words.
+
+Decided by the agent on 2026-11-19, to review by the maintainer, for the
+analyser study's ideas (report section 10): `sfb_distance` and `pinky_ring`
+weigh 0 and every floor is 0, so no score moved (the library's golden values
+and scores stayed bit-identical); the skipgram half of `sfb_distance` is 0.5
+(genkey's and Oxeylyzer's discount of gap 1 under an SFB); `pinky_ring`
+counts the same row too (Oxeylyzer); the relative view is a difference to
+AZERTY on French and QWERTY otherwise. Floors are read from
+`score_weights.json` only: the Comparer's score settings and their file do
+not edit them yet (TODO).
 
 Decided by the agent on 2026-11-18, to review by the maintainer, for the
 Comparer's sub-tabs: the tab order and names; the overview's nine leader

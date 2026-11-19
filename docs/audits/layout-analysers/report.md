@@ -458,10 +458,13 @@ below are where the tools disagree.
 
 ### Ideas from the other analysers that our score lacks (2026-11-19)
 
-Read while reproducing each tool exactly. None is in Ergopti's score yet: each
-adds a metric (the Comparer lists its metrics by id, in `comparer_page.js`,
-which another work stream owns) or moves the default weights, which section 11
-leaves to the maintainer. Each is a TODO item with this recommendation.
+Read while reproducing each tool exactly. Items 1 to 5 are in the engine
+since 2026-11-19 (`sfb_distance` with the finger factors, `pinky_ring`,
+`floors` in `score_weights.json`, the Comparer's « Difference to … » view),
+each with a default weight or floor of 0, so no score moved; item 6 waits for
+skipgram tables (measured in
+[analyser-scores.md](../../design/analyser-scores.md#taken-into-the-ergopti-score)).
+Moving weight onto them is left to the maintainer (section 11, TODO).
 
 1. **Distance-weighted same-finger cost** (genkey's finger speed, Oxeylyzer's
    SFB × distance × 5.5 / finger weight, Keyboard Layout Optimizer's
