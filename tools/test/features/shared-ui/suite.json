@@ -605,6 +605,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-site-languages.cjs"],
 			"repro": "npm run test:site-languages"
+		},
+		{
+			"id": "site-video-captions",
+			"ordinal": 701,
+			"name": "every video and embedded player of the site has a WebVTT captions track whose file exists and a transcript, and the checker refuses each missing part",
+			"cmd": "node",
+			"args": ["tools/test/test-site-video-captions.cjs"],
+			"repro": "npm run test:site-video-captions"
 		}
 	]
 }
