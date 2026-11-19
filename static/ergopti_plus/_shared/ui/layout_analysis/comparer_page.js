@@ -1960,6 +1960,8 @@
 				{
 					key: 'score',
 					label: t('layout_analysis.table.score'),
+					// Its popover: the weights' explanation and the score's formula.
+					info: 'weights',
 					value: (r) => r.score.total,
 					digits: 1,
 					unit: t('layout_analysis.unit.points')
@@ -1967,7 +1969,11 @@
 			].concat(
 				metricIds.map((id) => ({
 					key: id,
-					label: metricName(id),
+					// The usual acronym when the name has one (« SFB »), the full
+					// name in the button's accessible name and the « i » popover.
+					label: INFO.metricShort(id) || metricName(id),
+					name: metricName(id),
+					info: id,
 					value: (r) => r.metrics[id],
 					digits: metricDigits(id),
 					unit: unitText(id),
@@ -1981,12 +1987,16 @@
 				: { key: 'rank', descending: false };
 			const head = el('tr');
 			for (const column of columns) {
-				const th = el('th', 'la-sortable');
+				// A metric's header wraps on two lines at most (style.css la-th-metric).
+				const th = el('th', column.name ? 'la-sortable la-th-metric' : 'la-sortable');
 				th.scope = 'col';
 				// The sort is a button, so the keyboard reaches it.
 				const button = el('button', 'la-sort', column.label);
 				button.type = 'button';
 				button.dataset.sort = column.key;
+				// An acronym's button is named in full; the name starts the same (WCAG 2.5.3).
+				if (column.name && column.name !== column.label)
+					button.setAttribute('aria-label', column.name);
 				button.addEventListener('click', () => {
 					resort(
 						applied.key === column.key
@@ -1998,8 +2008,17 @@
 					const focus = again.querySelector(`button[data-sort="${column.key}"]`);
 					if (focus) focus.focus();
 				});
-				th.append(button);
-				if (DATA.sources.items[column.key]) th.append(' ', infoButton(column.key));
+				const info =
+					column.info && DATA.sources.items[column.info] ? infoButton(column.info) : null;
+				if (column.name) {
+					// The « i » stays beside the header's last line, never on a line of its own.
+					const head = el('span', 'la-th-head');
+					head.append(button, info);
+					th.append(head);
+				} else {
+					th.append(button);
+					if (info) th.append(' ', info);
+				}
 				if (applied.key === column.key)
 					th.setAttribute('aria-sort', applied.descending ? 'descending' : 'ascending');
 				head.append(th);

@@ -1167,6 +1167,21 @@ layout object compared. A host `store` (`{list(), save(layout), remove(id)}`, ea
 promise; the app's data folder, the site's IndexedDB) replaces `localStorage`
 for the layouts imported from files.
 
+### Numbers, units and headers
+
+Every number the Studio shows goes through `info_popover.js`: `format()`
+writes it in the language of the page's strings (`Intl.NumberFormat`, U+202F
+groups in French), `t()` writes a whole number placeholder the same way, and
+`measure()` / `withUnit()` tie it to its unit by a no-break space (the
+percent sign where the language's Intl pattern puts it). Every table cell
+writes its unit (`metricUnit()`, `analyserUnit()`); a rank alone does not.
+A ranking column is headed by its metric's acronym when its name ends with
+one (« SFB ») or by its name on two lines at most; its « i » popover gives
+the full name, the definition (`layout_analysis.info.<id>`) and the formula
+(`layout_analysis.formula.<id>`, or the formula of what the metric is a
+share of, after the `of` of `METRICS`). `tools/test/browser/studio-numbers.cjs`
+and `studio-headers.cjs` hold this in the rendered pages.
+
 ### Text modes
 
 « Text typed » (`#la-text-mode`, saved as `textMode`; maintainer, 2026-11-17)

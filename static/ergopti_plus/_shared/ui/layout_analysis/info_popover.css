@@ -58,6 +58,21 @@ button.la-info {
 	font-weight: 600;
 }
 
+/* A metric's full name heads its popover; its formula sits on a tinted band. */
+.la-popover .la-popover-name {
+	font-size: 1.05em;
+	font-weight: 700;
+	margin-bottom: 8px;
+}
+
+.la-popover .la-popover-formula {
+	background: var(--theme-surface-2);
+	border: 1px solid var(--theme-separator);
+	border-radius: 6px;
+	margin: 8px 0 10px;
+	padding: 6px 8px;
+}
+
 .la-popover a {
 	color: var(--theme-accent);
 	overflow-wrap: anywhere;

@@ -615,10 +615,31 @@ body:has(> main.layout-analysis) {
 	background: var(--la-surface);
 	position: sticky;
 	top: 0;
+	vertical-align: bottom;
 }
 
 .la-sortable {
 	cursor: pointer;
+}
+
+/* A metric's header: its acronym (« SFB ») or its name on two lines at most,
+   the bottom of every header on one line; the full name, the definition and
+   the formula are in its « i » popover. */
+.la-table thead th.la-th-metric {
+	hyphens: auto;
+	line-height: 1.25;
+	max-width: 12em;
+	/* The table scrolls sideways rather than squeeze a header past two lines. */
+	min-width: 10em;
+	vertical-align: bottom;
+	white-space: normal;
+}
+
+.la-th-head {
+	align-items: flex-end;
+	display: inline-flex;
+	gap: 4px;
+	justify-content: flex-end;
 }
 
 /* The header text is the sort button: plain text that the keyboard reaches. */

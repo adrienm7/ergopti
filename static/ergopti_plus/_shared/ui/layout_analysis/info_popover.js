@@ -25,6 +25,12 @@
  * 6. One « i » per value: an item whose explanation needs another one's
  *    (ALSO_EXPLAINS) shows both in its own popover, so a page never draws a
  *    second button with the same name beside the first.
+ * 7. A metric's popover (and the score's, item weights) names it in full,
+ *    then gives its definition (layout_analysis.info.<id>, the one source of
+ *    the definitions) and its formula (layout_analysis.formula.<id>, or the
+ *    formula of what it is a share of): a compact header (« SFB », a name on
+ *    two lines) keeps its full meaning one key press away (maintainer,
+ *    2026-11-19). metricShort() gives the usual acronym of a metric's name.
  * ==============================================================================
  */
 
@@ -37,12 +43,33 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 	const POPOVER_WIDTH_PX = 360;
 	const POPOVER_GUTTER_PX = 12;
 	const POPOVER_ID = 'la-popover';
-	// Digits of the shares an explanation quotes.
+	// Digits of the shares an explanation quotes, and of a key's width in a formula.
 	const SHARE_DIGITS = 1;
+	const KEY_MM_DIGITS = 2;
 	// The explanations an item's popover adds after its own: the left-hand
 	// shortcuts metric is computed from the letters' usefulness, which once had a
 	// second « i » on the same row.
 	const ALSO_EXPLAINS = Object.freeze({ shortcut_left: Object.freeze(['shortcut_letters']) });
+	// The metrics with a formula of their own; the others take the formula of
+	// what they are a share of (LAYOUT_ANALYSIS.METRICS[id].of).
+	const OWN_FORMULAS = Object.freeze([
+		'distance',
+		'finger_imbalance',
+		'hand_imbalance',
+		'char_coverage',
+		'coverage_bonus',
+		'direct_digits',
+		'shortcut_left',
+		'simplicity',
+		'compact_fit',
+		'distinct_chars'
+	]);
+	const SHARE_FORMULAS = Object.freeze(['bigrams', 'trigrams', 'keystrokes', 'characters']);
+	// The score's popover: its weights' explanation and the score's formula.
+	const SCORE_ITEM = 'weights';
+	const SCORE_FORMULA = 'score';
+	// The usual acronym a metric's name ends with: « Same-finger bigrams (SFB) ».
+	const ACRONYM = /[(（]([A-Z]{2,5})[)）]\s*$/;
 
 	// The language of the numbers when the page declares no usable one: the
 	// locale i18n.js loads when none is set (its load()), never the browser's.
@@ -322,6 +349,51 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		};
 	}
 
+	/**
+	 * The formula an item's popover gives: the metric's own, the formula of
+	 * what it is a share of, the score's for its weights, else none.
+	 * @param {string} item - A key of LAYOUT_ANALYSIS_DATA.sources.items.
+	 * @returns {string|null} A layout_analysis.formula.<id> suffix.
+	 * @throws {Error} On a metric with neither.
+	 */
+	function formulaOf(item) {
+		if (item === SCORE_ITEM) return SCORE_FORMULA;
+		const metrics = window.LAYOUT_ANALYSIS && window.LAYOUT_ANALYSIS.METRICS;
+		if (!metrics || !Object.hasOwn(metrics, item)) return null;
+		if (OWN_FORMULAS.includes(item)) return item;
+		if (SHARE_FORMULAS.includes(metrics[item].of)) return metrics[item].of;
+		throw new Error(`layout_analysis: metric ${item} has no formula`);
+	}
+
+	/** The full name an item's popover starts with: a metric's, the score's, else none. */
+	function nameOf(item) {
+		if (item === SCORE_ITEM) return t('layout_analysis.table.score');
+		const metrics = window.LAYOUT_ANALYSIS && window.LAYOUT_ANALYSIS.METRICS;
+		return metrics && Object.hasOwn(metrics, item) ? t(`layout_analysis.metric.${item}`) : null;
+	}
+
+	/** The values a formula quotes, written the page's way, from the data. */
+	function formulaValues() {
+		const model = window.LAYOUT_ANALYSIS_DATA.model;
+		return {
+			cap: format(model.coverage_cap, 0),
+			key: measure(model.key_unit_mm, KEY_MM_DIGITS, t('layout_analysis.unit.mm')),
+			zero: measure(0, 0, PERCENT),
+			full: measure(100, 0, PERCENT)
+		};
+	}
+
+	/**
+	 * The usual acronym of a metric, the end of its name in the reader's
+	 * language (« SFB »), for a compact header; null when its name has none.
+	 * @param {string} id - A LAYOUT_ANALYSIS.METRICS id.
+	 * @returns {string|null}
+	 */
+	function metricShort(id) {
+		const match = ACRONYM.exec(t(`layout_analysis.metric.${id}`));
+		return match ? match[1] : null;
+	}
+
 	function build() {
 		popover = el('div', 'la-popover');
 		popover.id = POPOVER_ID;
@@ -330,7 +402,16 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		const close = el('button', 'la-popover-close');
 		close.type = 'button';
 		close.addEventListener('click', hide);
-		popover.append(el('div', 'la-popover-texts'), el('p', 'la-popover-title'), el('ul'), close);
+		const name = el('p', 'la-popover-name');
+		name.id = `${POPOVER_ID}-name`;
+		popover.append(
+			name,
+			el('div', 'la-popover-texts'),
+			el('p', 'la-popover-formula'),
+			el('p', 'la-popover-title'),
+			el('ul'),
+			close
+		);
 		document.body.append(popover);
 	}
 
@@ -348,6 +429,22 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 				...items.map((id) =>
 					el('p', 'la-popover-text', t(`layout_analysis.info.${id}`, values(id)))
 				)
+			);
+		// A metric's full name heads its popover and names the dialog.
+		const name = nameOf(item);
+		const heading = popover.querySelector('.la-popover-name');
+		heading.textContent = name || '';
+		heading.hidden = name === null;
+		if (name === null) popover.removeAttribute('aria-labelledby');
+		else popover.setAttribute('aria-labelledby', heading.id);
+		const formula = formulaOf(item);
+		const line = popover.querySelector('.la-popover-formula');
+		line.hidden = formula === null;
+		line.replaceChildren();
+		if (formula !== null)
+			line.append(
+				el('strong', '', `${t('layout_analysis.formula.label')} `),
+				el('span', 'la-formula', t(`layout_analysis.formula.${formula}`, formulaValues()))
 			);
 		popover.querySelector('.la-popover-title').textContent = t('layout_analysis.info.sources');
 		popover.querySelector('.la-popover-close').textContent = t('layout_analysis.info.close');
@@ -430,6 +527,8 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		withUnit,
 		measure,
 		metricUnit,
+		metricShort,
+		formulaOf,
 		analyserUnit,
 		NO_BREAK_SPACE,
 		ALSO_EXPLAINS

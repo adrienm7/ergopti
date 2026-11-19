@@ -3779,6 +3779,10 @@
 		"layout_analysis.unit.effort": {
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
+		},
+		"layout_analysis.formula.label": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it"]
 		}
 	}
 }

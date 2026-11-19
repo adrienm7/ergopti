@@ -757,6 +757,44 @@ check(
 		unknown = error;
 	}
 	check(unknown !== null, 'an analyser unit without words is refused');
+	// (studio-header-popovers) Every metric's « i » gives its formula: its own,
+	// or the formula of what it is a share of; the score's gives the score's.
+	// Each formula is in every locale with English's placeholders, and the
+	// acronym of a metric's name (« SFB ») is its compact header in each one.
+	pageWindow.LAYOUT_ANALYSIS = { METRICS: E.METRICS };
+	const formulaKeys = new Set(['layout_analysis.formula.label']);
+	for (const id of Object.keys(E.METRICS)) {
+		let formula = null;
+		try {
+			formula = info.formulaOf(id);
+		} catch {
+			formula = null;
+		}
+		check(formula !== null, `metric ${id}: no formula`);
+		if (formula !== null) formulaKeys.add(`layout_analysis.formula.${formula}`);
+	}
+	check(info.formulaOf('weights') === 'score', "the score's popover gives the score's formula");
+	formulaKeys.add('layout_analysis.formula.score');
+	const placeholdersOf = (text) => (text.match(/\{\w+\}/g) || []).sort().join(',');
+	const englishStrings = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, 'en.json'), 'utf8'));
+	for (const locale of fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'))) {
+		const strings = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, locale), 'utf8'));
+		for (const key of formulaKeys)
+			check(
+				typeof strings[key] === 'string' &&
+					strings[key] !== '' &&
+					placeholdersOf(strings[key]) === placeholdersOf(englishStrings[key]),
+				`${locale}: ${key} missing or with other placeholders`
+			);
+		pageWindow._i18n_strings = strings;
+		for (const [id, acronym] of [
+			['sfb', 'SFB'],
+			['sfs', 'SFS'],
+			['lsb', 'LSB']
+		])
+			check(info.metricShort(id) === acronym, `${locale}: ${id} has no compact header ${acronym}`);
+		check(info.metricShort('distance') === null, `${locale}: distance has no acronym`);
+	}
 	delete pageWindow.LAYOUT_ANALYSIS;
 	// The Studio's strings tie their numbers too: no breaking space before a percent sign.
 	for (const locale of fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'))) {
