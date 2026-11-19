@@ -644,15 +644,18 @@ if (typeof RUNNER.librarySummary === 'function') {
 	check(typeof PAGE.libraryCard === 'function', 'the page has no library card');
 	if (typeof PAGE.libraryCard === 'function' && librarySummary) {
 		const opened = [];
-		const card = PAGE.libraryCard(fakeDocument(), librarySummary, {
-			t: (key, values) =>
-				Object.entries(values || {}).reduce(
-					(text, [name, value]) => text.split(`{${name}}`).join(String(value)),
-					english[key]
-				),
-			number: (value, digits) => Number(value).toFixed(digits),
-			onOpen: (entry, where) => opened.push(`${where}:${entry.id}`)
-		});
+		// The card is the children of #lo-library-body, no wrapper of its own.
+		const card = {
+			children: PAGE.libraryCard(fakeDocument(), librarySummary, {
+				t: (key, values) =>
+					Object.entries(values || {}).reduce(
+						(text, [name, value]) => text.split(`{${name}}`).join(String(value)),
+						english[key]
+					),
+				number: (value, digits) => Number(value).toFixed(digits),
+				onOpen: (entry, where) => opened.push(`${where}:${entry.id}`)
+			})
+		};
 		const all = descendants(card);
 		const text = textOf(card);
 		const best = librarySummary.best;

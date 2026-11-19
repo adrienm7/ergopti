@@ -185,31 +185,32 @@
 <section class="lo-card lo-step lo-step-setup" aria-labelledby="lo-setup-title">
 	<h2 id="lo-setup-title" data-i18n="layout_optimizer.setup.title"></h2>
 	<div class="lo-fields">
-		<label class="lo-field"><span data-i18n="layout_optimizer.corpus.label"></span>
-			<select id="lo-corpus"></select></label>
-		<label class="lo-field"><span data-i18n="layout_optimizer.start.label"></span>
-			<select id="lo-start"></select></label>
-		<label class="lo-field"><span data-i18n="layout_optimizer.keyboard"></span>
-			<select id="lo-keyboard"></select></label>
+		<p class="lo-field"><label for="lo-corpus" data-i18n="layout_optimizer.corpus.label"></label>
+			<select id="lo-corpus"></select></p>
+		<p class="lo-field"><label for="lo-start" data-i18n="layout_optimizer.start.label"></label>
+			<select id="lo-start"></select></p>
+		<p class="lo-field"><label for="lo-keyboard" data-i18n="layout_optimizer.keyboard"></label>
+			<select id="lo-keyboard"></select></p>
 	</div>
-	<div id="lo-custom" class="lo-field lo-custom" hidden>
+	<fieldset id="lo-custom" class="lo-field lo-custom" hidden>
+		<legend class="lo-sr-only" data-i18n="layout_optimizer.corpus.custom"></legend>
 		<textarea id="lo-text" rows="4" data-i18n-placeholder="layout_optimizer.corpus.paste_placeholder"></textarea>
-		<label class="lo-file"><span data-i18n="layout_optimizer.corpus.file"></span>
-			<input id="lo-file" type="file" accept=".txt,.md,.csv,.tsv,.html,.htm,.json,.tex,.docx,.odt,.pdf" /></label>
+		<p class="lo-file"><label for="lo-file" data-i18n="layout_optimizer.corpus.file"></label>
+			<input id="lo-file" type="file" accept=".txt,.md,.csv,.tsv,.html,.htm,.json,.tex,.docx,.odt,.pdf" /></p>
 		<p id="lo-text-status" class="lo-muted" role="status" aria-live="polite"></p>
-	</div>
+	</fieldset>
 	<fieldset class="lo-radios">
 		<legend data-i18n="layout_optimizer.start.mode"></legend>
-		<label><input type="radio" name="lo-start-mode" value="layout" checked />
-			<span data-i18n="layout_optimizer.start.mode_layout"></span></label>
-		<label><input type="radio" name="lo-start-mode" value="random" />
-			<span data-i18n="layout_optimizer.start.mode_random"></span></label>
+		<input type="radio" name="lo-start-mode" id="lo-start-mode-layout" value="layout" checked />
+		<label for="lo-start-mode-layout" data-i18n="layout_optimizer.start.mode_layout"></label>
+		<input type="radio" name="lo-start-mode" id="lo-start-mode-random" value="random" />
+		<label for="lo-start-mode-random" data-i18n="layout_optimizer.start.mode_random"></label>
 	</fieldset>
 </section>
 <section class="lo-card lo-step lo-step-move" aria-labelledby="lo-move-title">
 	<h2 id="lo-move-title" data-i18n="layout_optimizer.constraints.title"></h2>
 	<p class="lo-muted" data-i18n="layout_optimizer.constraints.fixed"></p>
-	<div id="lo-switches" class="lo-switches"></div>
+	<ul id="lo-switches" class="lo-switches"></ul>
 	<fieldset id="lo-change" class="lo-change">
 		<legend data-i18n="layout_optimizer.change.title"></legend>
 		<p class="lo-muted" data-i18n="layout_optimizer.change.help"></p>
@@ -237,43 +238,43 @@
 		<button type="button" role="tab" id="lo-tab-shortcuts" aria-controls="lo-panel-shortcuts" data-i18n="layout_optimizer.shortcuts.tab"></button>
 		<button type="button" role="tab" id="lo-tab-zones" aria-controls="lo-panel-zones" data-i18n="layout_optimizer.zones.title"></button>
 	</div>
-	<div id="lo-panel-pins" class="lo-tab-panel" role="tabpanel" aria-labelledby="lo-tab-pins">
+	<section id="lo-panel-pins" class="lo-tab-panel" role="tabpanel" aria-labelledby="lo-tab-pins">
 		<p class="lo-muted" data-i18n="layout_optimizer.pins.help"></p>
-		<div class="lo-board-box"><div id="lo-pin-board" class="lo-board"></div></div>
-	</div>
-	<div id="lo-panel-shortcuts" class="lo-tab-panel" role="tabpanel" aria-labelledby="lo-tab-shortcuts" hidden>
+		<div class="lo-board-box"><div id="lo-pin-board" class="lo-board" role="toolbar" aria-labelledby="lo-tab-pins"></div></div>
+	</section>
+	<section id="lo-panel-shortcuts" class="lo-tab-panel" role="tabpanel" aria-labelledby="lo-tab-shortcuts" hidden>
 		<p class="lo-muted" data-i18n="layout_optimizer.qwerty.help"></p>
 		<fieldset class="lo-radios">
 			<legend data-i18n="layout_optimizer.qwerty.mode"></legend>
-			<label><input type="radio" name="lo-shortcut-mode" value="letter" checked />
-				<span data-i18n="layout_optimizer.qwerty.mode_letter"></span></label>
-			<label><input type="radio" name="lo-shortcut-mode" value="shortcut" />
-				<span data-i18n="layout_optimizer.qwerty.mode_shortcut"></span></label>
+			<input type="radio" name="lo-shortcut-mode" id="lo-shortcut-mode-letter" value="letter" checked />
+			<label for="lo-shortcut-mode-letter" data-i18n="layout_optimizer.qwerty.mode_letter"></label>
+			<input type="radio" name="lo-shortcut-mode" id="lo-shortcut-mode-shortcut" value="shortcut" />
+			<label for="lo-shortcut-mode-shortcut" data-i18n="layout_optimizer.qwerty.mode_shortcut"></label>
 		</fieldset>
 		<div class="lo-buttons" id="lo-qwerty-presets"></div>
-		<div class="lo-board-box"><div id="lo-qwerty-board" class="lo-board"></div></div>
+		<div class="lo-board-box"><div id="lo-qwerty-board" class="lo-board" role="toolbar" aria-labelledby="lo-tab-shortcuts"></div></div>
 		<p class="lo-muted lo-note" data-i18n="layout_optimizer.qwerty.scored"></p>
-	</div>
-	<div id="lo-panel-zones" class="lo-tab-panel" role="tabpanel" aria-labelledby="lo-tab-zones" hidden>
+	</section>
+	<section id="lo-panel-zones" class="lo-tab-panel" role="tabpanel" aria-labelledby="lo-tab-zones" hidden>
 		<p class="lo-muted" data-i18n="layout_optimizer.zones.help"></p>
 		<div class="lo-buttons">
-			<label class="lo-field lo-inline"><span data-i18n="layout_optimizer.zones.char"></span>
-				<select id="lo-zone-char"></select></label>
+			<p class="lo-field lo-inline"><label for="lo-zone-char" data-i18n="layout_optimizer.zones.char"></label>
+				<select id="lo-zone-char"></select></p>
 			<button type="button" id="lo-zone-clear" data-i18n="layout_optimizer.zones.clear"></button>
 			<button type="button" id="lo-zones-clear" data-i18n="layout_optimizer.zones.clear_all"></button>
 		</div>
-		<div class="lo-board-box"><div id="lo-zone-board" class="lo-board"></div></div>
+		<div class="lo-board-box"><div id="lo-zone-board" class="lo-board" role="toolbar" aria-labelledby="lo-tab-zones"></div></div>
 		<p id="lo-zones-summary" class="lo-muted" role="status"></p>
-	</div>
+	</section>
 </section>
 <section class="lo-card lo-step lo-step-run" aria-labelledby="lo-run-title">
 	<h2 id="lo-run-title" data-i18n="layout_optimizer.run_title"></h2>
-	<div class="lo-settings">
-		<h3 data-i18n="layout_optimizer.settings.title"></h3>
+	<section class="lo-settings" aria-labelledby="lo-settings-title">
+		<h3 id="lo-settings-title" data-i18n="layout_optimizer.settings.title"></h3>
 		<p class="lo-muted" data-i18n="layout_optimizer.settings.help"></p>
 		<ul id="lo-settings-list" class="lo-settings-list"></ul>
 		<button type="button" id="lo-settings-edit" data-i18n="layout_optimizer.settings.edit"></button>
-	</div>
+	</section>
 	<p class="lo-method">
 		<label for="lo-method" data-i18n="layout_optimizer.method.label"></label>
 		<select id="lo-method" aria-describedby="lo-method-help"></select>
@@ -282,19 +283,19 @@
 	<details class="lo-advanced">
 		<summary data-i18n="layout_optimizer.budget.advanced"></summary>
 		<div class="lo-row">
-			<label class="lo-field"><span data-i18n="layout_optimizer.budget.seconds"></span>
-				<input id="lo-seconds" type="number" min="1" max="3600" step="1" /></label>
-			<label class="lo-field"><span data-i18n="layout_optimizer.budget.iterations"></span>
-				<input id="lo-iterations" type="number" min="10" max="1000000" step="10" /></label>
-			<label class="lo-field"><span data-i18n="layout_optimizer.budget.restarts"></span>
-				<input id="lo-restarts" type="number" min="1" max="64" step="1" /></label>
-			<label class="lo-field"><span data-i18n="layout_optimizer.budget.seed"></span>
-				<input id="lo-seed" type="number" min="0" max="4294967295" step="1" /></label>
-			<label class="lo-field"><span data-i18n="layout_optimizer.budget.accuracy"></span>
+			<p class="lo-field"><label for="lo-seconds" data-i18n="layout_optimizer.budget.seconds"></label>
+				<input id="lo-seconds" type="number" min="1" max="3600" step="1" /></p>
+			<p class="lo-field"><label for="lo-iterations" data-i18n="layout_optimizer.budget.iterations"></label>
+				<input id="lo-iterations" type="number" min="10" max="1000000" step="10" /></p>
+			<p class="lo-field"><label for="lo-restarts" data-i18n="layout_optimizer.budget.restarts"></label>
+				<input id="lo-restarts" type="number" min="1" max="64" step="1" /></p>
+			<p class="lo-field"><label for="lo-seed" data-i18n="layout_optimizer.budget.seed"></label>
+				<input id="lo-seed" type="number" min="0" max="4294967295" step="1" /></p>
+			<p class="lo-field"><label for="lo-accuracy" data-i18n="layout_optimizer.budget.accuracy"></label>
 				<select id="lo-accuracy" data-i18n-option-prefix="layout_optimizer.accuracy">
 					<option value="full"></option>
 					<option value="fast"></option>
-				</select></label>
+				</select></p>
 		</div>
 		<p class="lo-muted" data-i18n="layout_optimizer.budget.help"></p>
 	</details>
@@ -309,7 +310,14 @@
 <section id="lo-result" class="lo-card lo-step lo-step-result" aria-labelledby="lo-result-title" hidden>
 	<h2 id="lo-result-title" data-i18n="layout_optimizer.result.title"></h2>
 	<p id="lo-result-method" class="lo-muted"></p>
-	<div id="lo-score" class="lo-tiles"></div>
+	<dl id="lo-score" class="lo-tiles">
+		<div class="lo-tile"><dt class="lo-tile-label" data-i18n="layout_optimizer.result.start"></dt>
+			<dd class="lo-tile-value"><output id="lo-score-start"></output></dd></div>
+		<div class="lo-tile lo-tile-best"><dt class="lo-tile-label" data-i18n="layout_optimizer.result.best"></dt>
+			<dd class="lo-tile-value"><output id="lo-score-best"></output></dd></div>
+		<div id="lo-score-change" class="lo-tile"><dt class="lo-tile-label" data-i18n="layout_optimizer.result.change"></dt>
+			<dd class="lo-tile-value"><output id="lo-score-gain"></output></dd></div>
+	</dl>
 	<figure id="lo-chart" class="lo-chart" aria-labelledby="lo-chart-title" hidden>
 		<figcaption id="lo-chart-title" data-i18n="layout_optimizer.chart.title"></figcaption>
 		<div class="lo-chart-box">
@@ -349,7 +357,7 @@
 	</section>
 	<details id="lo-board-table" class="lo-chart-details lo-board-table">
 		<summary id="lo-board-table-title" data-i18n="layout_optimizer.result.table"></summary>
-		<div class="lo-table-box lo-board-table-box" tabindex="0" role="region"
+		<section class="lo-table-box lo-board-table-box" tabindex="0"
 			aria-labelledby="lo-board-table-title"><table class="lo-table">
 			<thead><tr>
 				<th scope="col" data-i18n="layout_editor.board.table_key"></th>
@@ -358,7 +366,7 @@
 				<th scope="col" data-i18n="layout_optimizer.result.table_changed"></th>
 			</tr></thead>
 			<tbody id="lo-board-rows"></tbody>
-		</table></div>
+		</table></section>
 	</details>
 	<h3 data-i18n="layout_optimizer.result.metrics"></h3>
 	<div class="lo-metric-tables">
@@ -410,7 +418,7 @@
 		<p class="lo-muted" data-i18n="layout_optimizer.library.help"></p>
 		<progress id="lo-library-progress" max="1" value="0" aria-labelledby="lo-library-status"></progress>
 		<p id="lo-library-status" class="lo-muted" role="status" aria-live="polite"></p>
-		<div id="lo-library-body"></div>
+		<div id="lo-library-body" class="lo-library-content"></div>
 	</section>
 </section>
 </div>`;
@@ -442,7 +450,7 @@
 	 *   number): string, onOpen: function(object, string): void}} deps - The
 	 *   page's translator and number writer, and what opens a layout
 	 *   (`comparer` or `editor`).
-	 * @returns {HTMLElement} The card's content.
+	 * @returns {HTMLElement[]} The card's content, the children of #lo-library-body.
 	 */
 	function libraryCard(doc, summary, deps) {
 		const { t, number, onOpen } = deps;
@@ -455,35 +463,28 @@
 		const percent = (value) => t('layout_optimizer.library.percent', { value: number(value, 1) });
 		const points = (value) => number(Math.abs(value), 2);
 		const best = summary.best;
-		const box = el('div', 'lo-library-content');
+		const box = [];
 
 		// The verdict, the best existing layout's gap read against the small gap.
-		const banner = el('div', `lo-library-verdict lo-library-${summary.verdict}`);
+		const banner = el('p', `lo-library-verdict lo-library-${summary.verdict}`);
 		const mark = el('span', 'lo-library-mark', VERDICT_MARKS[summary.verdict]);
 		mark.setAttribute('aria-hidden', 'true');
 		banner.append(
 			mark,
-			el(
-				'p',
-				'',
-				t(`layout_optimizer.library.verdict.${summary.verdict}`, {
-					name: best.name,
-					gap: points(best.gap),
-					threshold: number(summary.smallGap, 2)
-				})
-			)
+			t(`layout_optimizer.library.verdict.${summary.verdict}`, {
+				name: best.name,
+				gap: points(best.gap),
+				threshold: number(summary.smallGap, 2)
+			})
 		);
-		box.append(banner);
+		box.push(banner);
 
 		const gapChip = (entry) => {
 			const side = entry.gap > 0 ? 'behind' : entry.gap < 0 ? 'ahead' : 'same';
-			const chip = el('span', `lo-gap lo-gap-${side}`);
+			const chip = el('p', `lo-gap lo-gap-${side}`);
 			const glyph = el('span', 'lo-gap-mark', GAP_MARKS[side]);
 			glyph.setAttribute('aria-hidden', 'true');
-			chip.append(
-				glyph,
-				el('span', '', t(`layout_optimizer.library.gap_${side}`, { gap: points(entry.gap) }))
-			);
+			chip.append(glyph, t(`layout_optimizer.library.gap_${side}`, { gap: points(entry.gap) }));
 			return chip;
 		};
 		const buttons = (entry) => {
@@ -528,7 +529,7 @@
 		};
 
 		// The best-scoring existing layout: a gauge of how alike it is.
-		const bestBox = el('div', 'lo-library-best');
+		const bestBox = el('section', 'lo-library-best');
 		const alike = best.similarity.weighted.sameKey;
 		const gauge = el('div', 'lo-gauge');
 		gauge.style.setProperty('--lo-gauge', String(Math.max(0, Math.min(100, alike))));
@@ -544,10 +545,10 @@
 			buttons(best)
 		);
 		bestBox.append(gauge, bestText);
-		box.append(bestBox);
+		box.push(bestBox);
 
 		// The most alike layouts: a bar each, same key over same finger and row.
-		box.append(el('h4', 'lo-library-subtitle', t('layout_optimizer.library.closest_title')));
+		box.push(el('h4', 'lo-library-subtitle', t('layout_optimizer.library.closest_title')));
 		const list = el('ol', 'lo-library-list');
 		for (const entry of summary.closest) {
 			const item = el(
@@ -555,8 +556,8 @@
 				entry.id === best.id ? 'lo-library-item lo-library-is-best' : 'lo-library-item'
 			);
 			item.dataset.layout = entry.id;
-			const head = el('div', 'lo-library-item-head');
-			head.append(el('span', 'lo-library-name', entry.name), gapChip(entry));
+			const head = el('header', 'lo-library-item-head');
+			head.append(el('h5', 'lo-library-name', entry.name), gapChip(entry));
 			const bars = el('div', 'lo-bars');
 			bars.setAttribute('aria-hidden', 'true');
 			const finger = el('span', 'lo-bar lo-bar-finger');
@@ -577,21 +578,21 @@
 			);
 			list.append(item);
 		}
-		box.append(list);
+		box.push(list);
 		// The bars' key, in words beside its two swatches.
-		const legend = el('p', 'lo-library-legend lo-muted');
+		const legend = el('ul', 'lo-library-legend lo-muted');
 		const swatch = (className, text) => {
-			const part = el('span', 'lo-legend-item');
+			const part = el('li', 'lo-legend-item');
 			const chip = el('span', `lo-swatch ${className}`);
 			chip.setAttribute('aria-hidden', 'true');
-			part.append(chip, el('span', '', text));
+			part.append(chip, text);
 			return part;
 		};
 		legend.append(
 			swatch('lo-bar-key', t('layout_optimizer.library.legend_key')),
 			swatch('lo-bar-finger', t('layout_optimizer.library.legend_finger'))
 		);
-		box.append(legend);
+		box.push(legend);
 		return box;
 	}
 
@@ -953,9 +954,9 @@
 					input.id = `lo-switch-${id}`;
 					input.checked = id in checked ? checked[id] : O.DEFAULT_OPTIONS[id];
 					const label = el('label', 'lo-switch');
-					label.append(input, el('span', '', t(`${PREFIX}option.${id}.label`)));
+					label.append(input, t(`${PREFIX}option.${id}.label`));
 					const help = el('p', 'lo-muted lo-help', t(`${PREFIX}option.${id}.help`));
-					const item = el('div', 'lo-switch-item');
+					const item = el('li', 'lo-switch-item');
 					item.append(label, help);
 					return item;
 				}),
@@ -976,10 +977,9 @@
 			input.value = THUMB_SWITCH;
 			input.id = `lo-switch-${THUMB_SWITCH}`;
 			input.checked = checked;
-			const name = el('span', '', t(`${PREFIX}option.thumbKeys.label`));
 			const label = el('label', 'lo-switch');
 			label.htmlFor = input.id;
-			label.append(input, name);
+			label.append(input, t(`${PREFIX}option.thumbKeys.label`));
 			const why = window.LAYOUT_ANALYSIS_INFO.note(
 				t(`${PREFIX}option.thumbKeys.why_label`),
 				t(`${PREFIX}option.thumbKeys.why`)
@@ -990,7 +990,7 @@
 			const help = el('p', 'lo-muted lo-help');
 			help.id = 'lo-thumb-help';
 			input.setAttribute('aria-describedby', help.id);
-			const item = el('div', 'lo-switch-item lo-switch-thumb');
+			const item = el('li', 'lo-switch-item lo-switch-thumb');
 			item.append(head, help);
 			return item;
 		}
@@ -1191,7 +1191,12 @@
 		 */
 		function drawBoard(box, layout, how) {
 			const opts = how || {};
+			// A click redraws the board: the focus comes back to the same key.
+			const active = box.contains(document.activeElement)
+				? document.activeElement.dataset.code
+				: null;
 			box.replaceChildren();
+			const drawn = [];
 			const board = E.keyboard($('lo-keyboard').value);
 			const modifiers = new Set(Object.values(DATA.model.modifier_keys));
 			const minX = Math.min(...board.x) - 0.5;
@@ -1229,7 +1234,66 @@
 					key.addEventListener('click', () => opts.onKey(code));
 				}
 				box.append(key);
+				drawn.push({ key, code, x: board.x[k], y: board.y[k] });
 			});
+			if (opts.onKey) roveBoard(box, drawn, active);
+		}
+
+		// The keys of each board of buttons, in reading order (rows from the
+		// top, keys from the left), for its arrow keys.
+		const boardKeys = new Map();
+
+		/**
+		 * Makes a board of key buttons one tab stop (a toolbar with a roving
+		 * tabindex): the arrows move along a row and to the nearest key of the
+		 * row above or below, Home and End to the row's ends, Ctrl+Home and
+		 * Ctrl+End to the board's.
+		 * @param {HTMLElement} box - The board, role="toolbar".
+		 * @param {{key: HTMLElement, code: string, x: number, y: number}[]} drawn - Its keys.
+		 * @param {?string} active - The code of the key that had the focus.
+		 */
+		function roveBoard(box, drawn, active) {
+			const ys = Array.from(new Set(drawn.map((item) => item.y))).sort((a, b) => a - b);
+			const rows = ys.map((y) => drawn.filter((item) => item.y === y).sort((a, b) => a.x - b.x));
+			if (!boardKeys.has(box)) box.addEventListener('keydown', (event) => moveOnBoard(box, event));
+			boardKeys.set(box, rows);
+			const flat = rows.flat();
+			const current = flat.find((item) => item.code === (active || box.dataset.current)) || flat[0];
+			for (const item of flat) item.key.tabIndex = item === current ? 0 : -1;
+			if (!current) return;
+			box.dataset.current = current.code;
+			if (active) current.key.focus();
+		}
+
+		function moveOnBoard(box, event) {
+			const rows = boardKeys.get(box);
+			const r = rows.findIndex((row) => row.some((item) => item.code === box.dataset.current));
+			if (r < 0) return;
+			const c = rows[r].findIndex((item) => item.code === box.dataset.current);
+			const flat = rows.flat();
+			const at = flat.indexOf(rows[r][c]);
+			const nearest = (row) =>
+				row.reduce((best, item) =>
+					Math.abs(item.x - rows[r][c].x) < Math.abs(best.x - rows[r][c].x) ? item : best
+				);
+			const ctrl = event.ctrlKey || event.metaKey;
+			const moves = {
+				ArrowLeft: flat[at - 1],
+				ArrowRight: flat[at + 1],
+				ArrowUp: r > 0 ? nearest(rows[r - 1]) : null,
+				ArrowDown: r < rows.length - 1 ? nearest(rows[r + 1]) : null,
+				Home: ctrl ? flat[0] : rows[r][0],
+				End: ctrl ? flat[flat.length - 1] : rows[r][rows[r].length - 1]
+			};
+			if (!Object.hasOwn(moves, event.key) || event.altKey) return;
+			// At an edge the focus stays put, and the page does not scroll.
+			event.preventDefault();
+			const target = moves[event.key];
+			if (!target) return;
+			rows[r][c].key.tabIndex = -1;
+			target.key.tabIndex = 0;
+			box.dataset.current = target.code;
+			target.key.focus();
 		}
 
 		function drawPinBoards() {
@@ -1762,7 +1826,7 @@
 			$('lo-library-progress').hidden = true;
 			setLibraryStatus(t(`${PREFIX}library.done`, { total: number(message.entries.length, 0) }));
 			$('lo-library-body').replaceChildren(
-				libraryCard(document, summary, { t, number, onOpen: openLibraryLayout })
+				...libraryCard(document, summary, { t, number, onOpen: openLibraryLayout })
 			);
 		}
 
@@ -1786,20 +1850,13 @@
 			drawTradeoff(score, moved);
 			const startScore = state.startResult.score.total;
 			const change = score - startScore;
-			const tile = (key, value, className) => {
-				const node = el('div', `lo-tile ${className || ''}`.trim());
-				node.append(el('span', 'lo-tile-label', t(key)), el('span', 'lo-tile-value', value));
-				return node;
-			};
-			$('lo-score').replaceChildren(
-				tile(`${PREFIX}result.start`, number(startScore, 2)),
-				tile(`${PREFIX}result.best`, number(score, 2), 'lo-tile-best'),
-				tile(
-					`${PREFIX}result.change`,
-					signed(change, 2),
-					change > 0 ? 'lo-tile-good' : change < 0 ? 'lo-tile-bad' : ''
-				)
-			);
+			// The tiles' outputs stay in place and only their text changes, so a
+			// screen reader says each new best score (an <output> is a live status).
+			$('lo-score-start').value = number(startScore, 2);
+			$('lo-score-best').value = number(score, 2);
+			$('lo-score-gain').value = signed(change, 2);
+			$('lo-score-change').classList.toggle('lo-tile-good', change > 0);
+			$('lo-score-change').classList.toggle('lo-tile-bad', change < 0);
 			if (!final && Date.now() - state.lastMetrics < METRICS_MS) return;
 			state.lastMetrics = Date.now();
 			const result = E.analyse(layout, state.tablesInUse, state.analysisInUse);
@@ -1960,7 +2017,9 @@
 					// Better or worse with a mark and in words, never by its colour alone.
 					const words = t(`layout_analysis.details.verdict_${good ? 'better' : 'worse'}`);
 					cell.title = words;
-					cell.append(' ', el('span', 'lo-verdict', good ? '▲' : '▼'));
+					const glyph = el('span', 'lo-verdict', good ? '▲' : '▼');
+					glyph.setAttribute('aria-hidden', 'true');
+					cell.append(' ', glyph);
 					cell.append(el('span', 'lo-sr-only', ` ${words}`));
 				}
 				tr.append(
@@ -2227,10 +2286,10 @@
 					});
 					const item = el('li', 'lo-shelf-item');
 					item.dataset.rank = String(rank);
-					const head = el('div', 'lo-shelf-head');
+					const head = el('header', 'lo-shelf-head');
 					const badge = el('span', 'lo-shelf-rank', `#${number(rank, 0)}`);
 					badge.setAttribute('aria-hidden', 'true');
-					head.append(badge, el('span', 'lo-shelf-name', layout.name));
+					head.append(badge, el('h4', 'lo-shelf-name', layout.name));
 					const gain = entry.score - from;
 					const bar = el('span', 'lo-shelf-bar');
 					bar.setAttribute('aria-hidden', 'true');
@@ -2559,12 +2618,20 @@
 			});
 			for (const id of PLACE_TABS)
 				$(`lo-tab-${id}`).addEventListener('click', () => showPlaceTab(id));
+			// The ARIA tabs pattern: the arrows go round the tabs, Home and End
+			// reach the first and the last; each selects as it focuses.
 			root.querySelector('.lo-tabs').addEventListener('keydown', (event) => {
-				const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
-				if (!step) return;
-				event.preventDefault();
 				const at = PLACE_TABS.indexOf(state.placeTab);
-				showPlaceTab(PLACE_TABS[(at + step + PLACE_TABS.length) % PLACE_TABS.length], true);
+				const last = PLACE_TABS.length - 1;
+				const to = {
+					ArrowRight: at === last ? 0 : at + 1,
+					ArrowLeft: at === 0 ? last : at - 1,
+					Home: 0,
+					End: last
+				}[event.key];
+				if (to === undefined || event.altKey || event.ctrlKey || event.metaKey) return;
+				event.preventDefault();
+				showPlaceTab(PLACE_TABS[to], true);
 			});
 			for (const input of root.querySelectorAll('input[name="lo-shortcut-mode"]'))
 				input.addEventListener('change', () => {

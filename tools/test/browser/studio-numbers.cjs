@@ -268,7 +268,7 @@ async function optimizerBypasses(browser, origin, lang) {
 	await page.fill('#lo-iterations', '30');
 	await page.fill('#lo-restarts', '1');
 	await page.click('#lo-run');
-	await page.waitForSelector('#lo-library-body .lo-library-content', { timeout: 180000 });
+	await page.waitForSelector('#lo-library-body .lo-library-verdict', { timeout: 180000 });
 	const problems = await readView(page, `${lang} optimiser`, ['.layout-optimizer']);
 	assert.deepEqual(errors, [], `${lang}: no page error in the optimiser`);
 	await context.close();

@@ -159,7 +159,7 @@ async function runToEnd(page) {
 async function libraryToEnd(page) {
 	await page.waitForFunction(
 		() =>
-			document.querySelector('#lo-library-body .lo-library-content') ||
+			document.querySelector('#lo-library-body .lo-library-verdict') ||
 			document.querySelector('#lo-library-status.lo-error'),
 		null,
 		{ timeout: 180000 }
@@ -664,6 +664,108 @@ async function exerciseChangePenalty(browser, origin) {
 	assert.equal(await page.isChecked('#lo-change-limit'), true);
 	assert.equal(await page.inputValue('#lo-change-max'), '2');
 	assert.equal(await page.inputValue('#lo-get-format'), 'klc');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
+/**
+ * The page by keyboard alone: the sub-tabs follow the ARIA tabs pattern
+ * (arrows round the list, Home and End, one tab stop); a board of keys is
+ * one tab stop whose arrows move between keys, and a key pressed with Enter
+ * or Space keeps the focus although the board is drawn again; the score
+ * tiles are outputs that stay in place, so each new best score is said.
+ */
+async function exerciseKeyboard(browser, origin) {
+	const { page, errors, context } = await open(browser, origin);
+	const focused = () =>
+		page.evaluate(() => ({
+			id: document.activeElement.id,
+			code: document.activeElement.dataset.code || null,
+			board: document.activeElement.closest('.lo-board')?.id || null,
+			pressed: document.activeElement.getAttribute('aria-pressed'),
+			top: document.activeElement.style.top
+		}));
+	const stops = () =>
+		page.$$eval('.lo-tabs [role="tab"]', (tabs) =>
+			tabs.filter((tab) => tab.tabIndex === 0).map((tab) => tab.id)
+		);
+
+	// The tabs: End, Home, and the arrows going round.
+	await page.focus('#lo-tab-pins');
+	await page.keyboard.press('End');
+	assert.equal((await focused()).id, 'lo-tab-zones', 'End reaches the last tab');
+	assert.equal(await page.getAttribute('#lo-tab-zones', 'aria-selected'), 'true');
+	assert.equal(await page.locator('#lo-panel-zones').isVisible(), true, 'End shows its panel');
+	assert.deepEqual(await stops(), ['lo-tab-zones'], 'one tab stop');
+	await page.keyboard.press('Home');
+	assert.equal((await focused()).id, 'lo-tab-pins', 'Home reaches the first tab');
+	await page.keyboard.press('ArrowLeft');
+	assert.equal((await focused()).id, 'lo-tab-zones', 'ArrowLeft goes round to the last tab');
+	await page.keyboard.press('ArrowRight');
+	assert.equal((await focused()).id, 'lo-tab-pins', 'ArrowRight goes round to the first tab');
+
+	// The fixed keys' board: one tab stop, then the arrows.
+	assert.equal(await page.getAttribute('#lo-pin-board', 'role'), 'toolbar');
+	const boardStops = await page.$$eval('#lo-pin-board .lo-key', (keys) =>
+		keys.filter((key) => key.tabIndex === 0).map((key) => key.dataset.code)
+	);
+	assert.equal(boardStops.length, 1, `one tab stop on the board: ${boardStops}`);
+	await page.keyboard.press('Tab');
+	let at = await focused();
+	assert.equal(
+		at.board,
+		'lo-pin-board',
+		`Tab from the tabs enters the board: ${JSON.stringify(at)}`
+	);
+	const first = at.code;
+	const firstRow = at.top;
+	await page.keyboard.press('ArrowRight');
+	at = await focused();
+	assert.ok(at.board === 'lo-pin-board' && at.code !== first, `ArrowRight moves on: ${at.code}`);
+	assert.equal(at.top, firstRow, 'ArrowRight stays on the row');
+	await page.keyboard.press('ArrowLeft');
+	assert.equal((await focused()).code, first, 'ArrowLeft comes back');
+	await page.keyboard.press('ArrowDown');
+	at = await focused();
+	assert.ok(
+		at.board === 'lo-pin-board' && at.top !== firstRow,
+		`ArrowDown goes to the next row: ${at.code}`
+	);
+	// Up goes to the nearest key of the row above, on a staggered row not always the first.
+	await page.keyboard.press('ArrowUp');
+	assert.equal((await focused()).top, firstRow, 'ArrowUp comes back to the first row');
+	await page.keyboard.press('End');
+	at = await focused();
+	assert.ok(at.top === firstRow && at.code !== first, `End reaches the row's end: ${at.code}`);
+	await page.keyboard.press('Home');
+	assert.equal((await focused()).code, first, "Home reaches the row's start");
+	await page.keyboard.press('ArrowDown');
+	const down = (await focused()).code;
+	// Enter pins the key and redraws the board: the focus stays on that key.
+	await page.keyboard.press('Enter');
+	at = await focused();
+	assert.deepEqual(
+		[at.board, at.code, at.pressed],
+		['lo-pin-board', down, 'true'],
+		'Enter pins the key and keeps the focus'
+	);
+	await page.keyboard.press('Space');
+	at = await focused();
+	assert.deepEqual([at.code, at.pressed], [down, 'false'], 'Space frees it, focus kept');
+	await page.keyboard.press('Tab');
+	assert.notEqual((await focused()).board, 'lo-pin-board', 'one Tab leaves the board');
+
+	// The score: three outputs, filled in place by the run.
+	await shortBudget(page);
+	assert.match(await runToEnd(page), /^Done/);
+	const tiles = await page.$$eval('#lo-score dd > output', (outputs) =>
+		outputs.map((output) => output.value)
+	);
+	assert.equal(tiles.length, 3, 'the start, the best and the change are outputs');
+	assert.ok(
+		tiles.every((value) => /\d/.test(value)),
+		`each output holds its number: ${tiles}`
+	);
 	assert.deepEqual(errors, []);
 	await context.close();
 }
@@ -1216,6 +1318,9 @@ async function main() {
 
 		// ======= 4h/ The result boards as a table =======
 		await exerciseResultTable(browser, origin);
+
+		// ======= 4i/ The keyboard: tabs, boards and the live score =======
+		await exerciseKeyboard(browser, origin);
 
 		// ======= 5/ Light and dark at phone width, every locale =======
 		for (const colorScheme of ['light', 'dark']) {

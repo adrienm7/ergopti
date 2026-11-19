@@ -209,14 +209,16 @@ body:has(> main.layout-optimizer) {
 	width: 28px;
 }
 
+/* A field is a paragraph of its bold label above its control. */
 .lo-field {
 	display: flex;
 	flex-direction: column;
 	gap: var(--lo-space-1);
+	margin: 0;
 	min-width: 0;
 }
 
-.lo-field > span {
+.lo-field > label {
 	font-weight: 600;
 }
 
@@ -229,7 +231,11 @@ body:has(> main.layout-optimizer) {
 
 /* « Your own text »: the box takes the card's width; the file picker wraps under it. */
 .lo-custom {
-	margin-top: var(--lo-space-4);
+	/* A fieldset named by its hidden legend: no frame of its own. */
+	border: 0;
+	margin: var(--lo-space-4) 0 0;
+	min-width: 0;
+	padding: 0;
 }
 
 .lo-custom textarea {
@@ -242,6 +248,7 @@ body:has(> main.layout-optimizer) {
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--lo-space-2);
+	margin: 0;
 	max-width: 100%;
 }
 
@@ -256,11 +263,13 @@ body:has(> main.layout-optimizer) {
 	gap: var(--lo-space-2);
 }
 
+/* Each radio beside its label, in two columns: the radio, then its words. */
 .lo-radios {
+	align-items: start;
 	border: 0;
-	display: flex;
-	flex-direction: column;
-	gap: var(--lo-space-1);
+	display: grid;
+	gap: var(--lo-space-1) var(--lo-space-2);
+	grid-template-columns: auto minmax(0, 1fr);
 	margin: var(--lo-space-4) 0 0;
 	min-width: 0;
 	padding: 0;
@@ -270,12 +279,6 @@ body:has(> main.layout-optimizer) {
 	font-weight: 600;
 	margin-bottom: var(--lo-space-1);
 	padding: 0;
-}
-
-.lo-radios label {
-	align-items: flex-start;
-	display: flex;
-	gap: var(--lo-space-2);
 }
 
 .lo-radios input {
@@ -294,7 +297,9 @@ body:has(> main.layout-optimizer) {
 	display: grid;
 	gap: var(--lo-space-3) var(--lo-space-5);
 	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-	margin-top: var(--lo-space-4);
+	list-style: none;
+	margin: var(--lo-space-4) 0 0;
+	padding: 0;
 }
 
 .lo-switch-item {
@@ -713,7 +718,7 @@ body:has(> main.layout-optimizer) {
 	display: grid;
 	gap: var(--lo-space-3);
 	grid-template-columns: repeat(3, minmax(0, 1fr));
-	margin-bottom: var(--lo-space-4);
+	margin: 0 0 var(--lo-space-4);
 }
 
 .lo-tile {
@@ -736,6 +741,7 @@ body:has(> main.layout-optimizer) {
 	font-size: 1.5em;
 	font-variant-numeric: tabular-nums;
 	font-weight: 700;
+	margin: 0;
 	overflow-wrap: anywhere;
 }
 
@@ -798,7 +804,9 @@ body:has(> main.layout-optimizer) {
 }
 
 .lo-shelf-name {
+	font-size: inherit;
 	font-weight: 600;
+	margin: 0;
 	overflow-wrap: anywhere;
 }
 
@@ -926,6 +934,11 @@ body:has(> main.layout-optimizer) {
 	margin-top: var(--lo-space-4);
 }
 
+/* Nothing to space out before the scan ends. */
+.lo-library-content:empty {
+	display: none;
+}
+
 /* The verdict: a mark and a coloured edge, and always its words. */
 .lo-library-verdict {
 	align-items: center;
@@ -934,14 +947,11 @@ body:has(> main.layout-optimizer) {
 	border-inline-start: 6px solid var(--lo-accent);
 	border-radius: 10px;
 	display: flex;
-	gap: var(--lo-space-4);
-	padding: var(--lo-space-4) var(--lo-space-5);
-}
-
-.lo-library-verdict p {
 	font-size: 1.05em;
 	font-weight: 600;
+	gap: var(--lo-space-4);
 	margin: 0;
+	padding: var(--lo-space-4) var(--lo-space-5);
 }
 
 .lo-library-mark {
@@ -950,7 +960,8 @@ body:has(> main.layout-optimizer) {
 	border-radius: 50%;
 	display: inline-flex;
 	flex: none;
-	font-size: 1.4em;
+	/* 1.4 times the page's text, inside a verdict of 1.05em. */
+	font-size: calc(1.4em / 1.05);
 	font-weight: 700;
 	height: 44px;
 	justify-content: center;
@@ -1057,6 +1068,7 @@ body:has(> main.layout-optimizer) {
 	font-variant-numeric: tabular-nums;
 	font-weight: 600;
 	gap: var(--lo-space-2);
+	margin: 0;
 	padding: 2px var(--lo-space-3);
 }
 
@@ -1158,7 +1170,9 @@ body:has(> main.layout-optimizer) {
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--lo-space-2) var(--lo-space-5);
+	list-style: none;
 	margin: 0;
+	padding: 0;
 }
 
 .lo-legend-item {
