@@ -261,7 +261,7 @@ FEATURES & RATIONALE:
 			<div class="provider-grid">
 				{#each catalog as p, i}
 					<article class="provider" use:reveal={{ delay: (i % 6) * 50 }}>
-						<div class="provider-name">{p.name}</div>
+						<div class="provider-name" lang="en">{p.name}</div>
 						<div class="provider-family" title={p.families}>{p.families}</div>
 						<div class="provider-meta">
 							<span class="provider-count">{p.modelCount} modèle{p.modelCount > 1 ? 's' : ''}</span>

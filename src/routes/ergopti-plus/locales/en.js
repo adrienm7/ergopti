@@ -131,7 +131,7 @@ export default {
 	'Frappe, hotstrings, prédictions, métriques : tout est calculé et stocké sur votre machine. Aucun serveur, aucun cloud par défaut.':
 		'Keystrokes, hotstrings, predictions, metrics: everything is computed and stored on your machine. No server, no cloud by default.',
 	'Aucune télémétrie': 'No telemetry',
-	'Pas de compte, pas de tracking, pas de « statistiques anonymes ». Le logiciel ne vous observe pas.':
+	'Pas de compte, pas de pistage, pas de « statistiques anonymes ». Le logiciel ne vous observe pas.':
 		'No account, no tracking, no “anonymous statistics”. The software does not watch you.',
 	'Mots de passe ignorés': 'Passwords ignored',
 	'Les champs de saisie sécurisés sont exclus de toute capture et de tout enregistrement de frappe.':

@@ -56,7 +56,7 @@
 		frapper une touche, il y a une forte probabilité que le frappe suivante se produise avec l’autre
 		main. Toutefois, cela n’arrive pas dans la totalité des cas, c’est pourquoi il convient de
 		s’assurer que le plus possible de frappes intra-mains se réalisent à l’aide de roulements, aussi
-		appelés <em>rolls</em> en anglais.
+		appelés <em lang="en">rolls</em> en anglais.
 	</p>
 	<p>
 		Un roulement consiste à frapper deux touches avec la même main, sans que cela n’entraîne de <SFB
@@ -122,7 +122,7 @@
 		</li>
 		<li><kbd>IEU</kbd> ;</li>
 		<li><kbd>OUI</kbd> ;</li>
-		<li><kbd>YOU</kbd>.</li>
+		<li><kbd lang="en">YOU</kbd>.</li>
 	</ul>
 
 	<h3>Bons bigrammes consonne-consonne</h3>
@@ -135,15 +135,18 @@
 		<li><kbd>D’</kbd> ;</li>
 		<li><kbd>GR</kbd> ;</li>
 		<li>
-			<kbd>LD</kbd> : fréquent en anglais (O<strong>LD</strong>, COU<strong>LD</strong>, SHOU<strong
-				>LD</strong
-			>, WOU<strong>LD</strong>, etc.) ;
+			<kbd>LD</kbd> : fréquent en anglais (<span lang="en"
+				>O<strong>LD</strong>, COU<strong>LD</strong>, SHOU<strong>LD</strong>, WOU<strong
+					>LD</strong
+				></span
+			>, etc.) ;
 		</li>
 		<li><kbd>NC</kbd> ;</li>
 		<li>
-			<kbd>ND</kbd> : extrêmement fréquent, notamment pour tous les A<strong>ND</strong> en anglais ;
+			<kbd>ND</kbd> : extrêmement fréquent, notamment pour tous les
+			<span lang="en">A<strong>ND</strong></span> en anglais ;
 		</li>
-		<li><kbd>NG</kbd> : pour tous les -I<strong>NG</strong> en anglais ;</li>
+		<li><kbd>NG</kbd> : pour tous les <span lang="en">-I<strong>NG</strong></span> en anglais ;</li>
 		<li><kbd>NS</kbd> et <kbd>SN</kbd> ;</li>
 		<li>
 			<kbd>NT</kbd> : c’est le
@@ -162,25 +165,27 @@
 	<ul>
 		<li><kbd>NTR</kbd> ;</li>
 		<li>
-			<kbd>GHT</kbd> : très fréquent en anglais pour tous les -OU<strong>GHT</strong> et -I<strong
-				>GHT</strong
-			> ;
+			<kbd>GHT</kbd> : très fréquent en anglais pour tous les
+			<span lang="en">-OU<strong>GHT</strong></span>
+			et
+			<span lang="en">-I<strong>GHT</strong></span> ;
 		</li>
 	</ul>
 
 	<h3>Autres bons bigrammes</h3>
 	<ul>
 		<li>
-			<kbd>OW</kbd> : très utilisé en anglais (ALL<strong>OW</strong>, D<strong>OW</strong>N, FOLL<strong
-				>OW</strong
-			>, H<strong>OW</strong>, KN<strong>OW</strong>, N<strong>OW</strong>,
-			<strong>OW</strong>N, SH<strong>OW</strong>, etc.) ;
+			<kbd>OW</kbd> : très utilisé en anglais (<span lang="en"
+				>ALL<strong>OW</strong>, D<strong>OW</strong>N, FOLL<strong>OW</strong>, H<strong>OW</strong
+				>, KN<strong>OW</strong>, N<strong>OW</strong>, <strong>OW</strong>N, SH<strong>OW</strong
+				></span
+			>, etc.) ;
 		</li>
 		<li>
-			<kbd>WO</kbd> : très utilisé en anglais (T<strong>WO</strong>,
-			<strong>WO</strong>MAN, <strong>WO</strong>RD,
-			<strong>WO</strong>RK, <strong>WO</strong>RLD,
-			<strong>WO</strong>RTH, <strong>WO</strong>ULD, etc.) ;
+			<kbd>WO</kbd> : très utilisé en anglais (<span lang="en"
+				>T<strong>WO</strong>, <strong>WO</strong>MAN, <strong>WO</strong>RD, <strong>WO</strong>RK,
+				<strong>WO</strong>RLD, <strong>WO</strong>RTH, <strong>WO</strong>ULD</span
+			>, etc.) ;
 		</li>
 		<li><kbd>+=</kbd> : utilisé en programmation pour incrémenter.</li>
 	</ul>

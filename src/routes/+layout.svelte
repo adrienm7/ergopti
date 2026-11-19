@@ -135,7 +135,13 @@
 	{/if}
 </svelte:head>
 
-<a class="skip-link" href="#contenu">Aller au contenu</a>
+<!--
+  The site's own chrome (this link, the header, the footer and the banner) is
+  French on every page, while the Ergopti+ pages read in English set
+  lang="en" on the document: each part says lang="fr" so a screen reader
+  reads it as French there too (WCAG 3.1.2, tools/test/test-site-languages.cjs).
+-->
+<a class="skip-link" href="#contenu" lang="fr">Aller au contenu</a>
 
 <bloc-page id="page" class="bg-blue">
 	<!-- A direct child of the page, so its sticky position holds down to the footer. -->
@@ -180,7 +186,7 @@
 	</keyboard-reference>
 {/if}
 
-<div class="banner">
+<div class="banner" lang="fr">
 	{#if isDev}
 		<a href={stableHref(page.url.pathname)}>
 			<div class="dev-banner-content">

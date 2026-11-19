@@ -24,8 +24,8 @@
 	<p>
 		Un clic droit sur l’icône du script dans la barre des tâches permet d’ouvrir le menu du script.
 		Chaque fonctionnalité y est visible et peut être activée ou désactivée, avec toutes les autres
-		features activées qui restent fonctionnelles. Ce menu permet de voir rapidement toutes les
-		possibilités d’<ErgoptiPlus></ErgoptiPlus> et de désactiver les fonctionnalités dont vous ne voulez
-		pas.
+		<span lang="en">features</span> activées qui restent fonctionnelles. Ce menu permet de voir
+		rapidement toutes les possibilités d’<ErgoptiPlus></ErgoptiPlus> et de désactiver les fonctionnalités
+		dont vous ne voulez pas.
 	</p>
 </section>

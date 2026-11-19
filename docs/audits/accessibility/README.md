@@ -580,7 +580,7 @@ Linux `tests/unit/core/ui/test_system_accessibility.lua` and
 
 ## Sixth pass, reading and languages of the site (2026-11-19, Paris time)
 
-The TODO item « Dyslexia and reading », on the site only
+The TODO items « Dyslexia and reading » and « Languages », on the site only
 (`src/`); the Studio pages framed by the site keep their own gates.
 
 ### Reading (WCAG 1.4.8, 1.4.10, 1.4.12)
@@ -659,17 +659,59 @@ What changed, at the root:
 - **Code blocks** wrap their long lines (`white-space: break-spaces`): the
   article column hides what passes its edge.
 
-Not measured: a plain-language review of the texts, the table of
+Not measured: a plain-language review of the texts (only « trigger »,
+« output » and « tracking » were replaced by French words), the table of
 contents, which is
 sticky at `--header-height` and slides under a header grown taller at 200 %
 text, and the Studio frames.
 
+### Languages (WCAG 3.1.2)
+
+`tools/test/test-site-languages.cjs` lists, in the markup of every Svelte
+file under `src/`, the French text runs holding words at least 20 times more
+frequent in English than in French subtitles (the tracked OpenSubtitles 2018
+lists of `static/corpus/frequency/`), outside an element that declares a
+language, code (`code`, `pre`, `samp`), addresses and identifiers. The
+detector found 25 such words on 20 files; each was reviewed by hand:
+
+- **Marked `lang="en"`:** the quoted terms « Same Finger Bigram(s) », « 1u
+  Distance From Home » and « rolls », the example words (people, does, don't,
+  won't, can't, TYPEWRITER, YOU, the OLD/COULD, AND, -ING, -OUGHT, ALLOW…,
+  TWO/WOMAN… lists), « features », « Data Scientists », the « ● live » badge
+  of the window frames, and the model catalog's provider labels (English data,
+  « Other models » among them).
+- **Reworded in French:** « un trigger connu » became « une abréviation
+  connue », « les output » « les sorties », « pas de tracking » « pas de
+  pistage » (twice, with its English key), and « La license MIT » « La
+  licence MIT ».
+- **Accepted without `lang`** (`ACCEPTED_TERMS`): the technical terms,
+  key names and product or mode names WCAG 3.1.2 exempts (tap-hold, driver,
+  layer, layout, bundle, Shift, Enter, Home, Windows, Sway, XKB Symbols, the
+  Legacy method, Batch Avancé…), and four French words spelled like English
+  ones (office, relatives, natives, replace).
+
+The French site's header, footer, skip link and banner say `lang="fr"`: the
+Ergopti+ pages read in English set `lang="en"` on the document, under which
+the whole chrome was read as English. The test pins the 17 English passages,
+the 6 French chrome texts and the provider label's attribute, refuses a new
+English word without `lang` (ratchet `site-foreign-passages-baseline.json`,
+empty) and asks to lower the baseline when one goes. Text built by
+expressions (`{…}`) is out of its reach: the same detector run over the
+built pages' HTML found « tracking » twice (reworded) and otherwise only
+names (the model families, « Window Spy », the menu's « Dossier Logs »,
+Slack) and a list of letter groups.
+
+The accessibility statement and the settings dialog stay French without the
+21 locales (decided by the agent, TODO.md « Maintainer decisions pending »).
+
 ### Gates and host
 
-`node tools/test/test-site-accessibility-ratchet.cjs` and the browser gate
+`node tools/test/test-site-languages.cjs`,
+`node tools/test/test-site-accessibility-ratchet.cjs`, and the browser gate
 (`npx vite build`, then
 `node tools/test/browser/site-accessibility.playwright.cjs build ""`). Each
-fails on the base commit: the ratchet contract on `typography.css`'s justification, the reading gate on
+fails on the base commit: the languages test on the 25 unmarked words, the
+ratchet contract on `typography.css`'s justification, the reading gate on
 its 1552 elements. On the Windows host of this pass the axe rows matched
 the base (6 rows, all in Studio frames, the same counts), and the Comparer's
 « fits a phone » check failed on the base as well as after the pass (its

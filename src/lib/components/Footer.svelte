@@ -5,7 +5,7 @@
 	const date = new Date().getFullYear();
 </script>
 
-<footer>
+<footer lang="fr">
 	<div>— <Ergopti></Ergopti> —</div>
 	<div style="font-size: 0.8rem; margin-top: 0.2rem;">
 		<a href="https://github.com/adrienm7/ergopti" target="_blank" class="text-white"

@@ -134,8 +134,6 @@ baseline as violations go.
       the spotlight overlay and the `hs.alert` banners reach a running screen reader, and the Linux previews
       follow the GNOME text scale (fifth pass). Left: the Swift update panel's XCTest, not yet run in CI. The
       spoken results are the « Accessibility » items of the three TODO-tests files.
-- [ ] **Languages.** `lang` on foreign passages across the rest of the site (English names, quotes); decide whether
-      the accessibility texts get the 21 locales.
 
 ## Ergopti Studio
 
@@ -541,6 +539,15 @@ Each question names the default kept meanwhile; an answer moves into the item or
       the same way. To revert: drop the `extra_keys` loop of `load_keycodes` and the optional branch of
       `symbols()`, and restore `test_registry_conversion.py`'s `[93, 94]` expectation; the parity gate's two new
       checks then have to go too.
+- [ ] **Accessibility texts stay French (decided by the agent on 2026-11-19, to review by the maintainer).** The
+      site's accessibility statement (`/accessibilite`) and its settings dialog (`A11ySettings.svelte`) do not get
+      the 21 locales: the site has no locale system (only the Ergopti+ pages read in English, through `t()`), and
+      what Ergopti+ and Ergopti Studio show in the app already goes through the 21 locales. Under the English
+      Ergopti+ page they say `lang="fr"` with the rest of the site's header, footer and banner, so a screen reader
+      reads them as French (`tools/test/test-site-languages.cjs`). Kept meanwhile: French only.
+  1. **(recommended) Keep them French** until the site itself offers a language choice, then route them through it.
+  2. Translate the dialog and the statement into English now, with the Ergopti+ `t()` dictionary.
+  3. Give them the 21 locales, which first needs a locale system for the whole site.
 - [ ] **Screen-reader announcements of tooltips, decided by the agent on 2026-11-17.** Hotstring previews and
       finished AI predictions are announced only while the system says a screen reader runs (Windows
       `SPI_GETSCREENREADER`, VoiceOver, Orca), with no Ergopti+ setting; add a menu switch if users find them noisy.

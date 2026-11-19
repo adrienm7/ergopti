@@ -67,16 +67,17 @@
 	<tiny-space></tiny-space>
 	<p>
 		Enfin, un gros changement concerne <ErgoptiPlus></ErgoptiPlus> dont le code AutoHotkey a été complètement
-		réécrit. Celui-ci est désormais beaucoup plus simple et robuste. En outre, chaque feature peut désormais
-		s’activer ou se désactiver grâce à un menu de configuration apparaissant lors du clic sur l’icône
-		du script dans la barre des taches.
+		réécrit. Celui-ci est désormais beaucoup plus simple et robuste. En outre, chaque
+		<span lang="en">feature</span> peut désormais s’activer ou se désactiver grâce à un menu de configuration
+		apparaissant lors du clic sur l’icône du script dans la barre des taches.
 	</p>
 	<p>
 		Cette nouvelle version permet à tout le monde d’utiliser des raccourcis, la couche de symboles,
 		les chiffres en accès direct, etc. à la carte, quelle que soit sa disposition actuelle. Ainsi,
 		même une personne utilisant AZERTY, BÉPO, Optimot, etc. et ne souhaitant pas apprendre <Ergopti
-		></Ergopti> peut avoir à sa disposition ces nombreuses features. Certains raccourcis de cette nouvelle
-		version ont été inversés afin d’être encore plus confortables à utiliser et de nombreux ont été ajoutés.
+		></Ergopti> peut avoir à sa disposition ces nombreuses <span lang="en">features</span>. Certains
+		raccourcis de cette nouvelle version ont été inversés afin d’être encore plus confortables à
+		utiliser et de nombreux ont été ajoutés.
 	</p>
 
 	<h3>Version 2.1 (Janvier 2025)</h3>

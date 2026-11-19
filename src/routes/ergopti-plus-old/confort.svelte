@@ -117,8 +117,8 @@
 		par un roulement. Effectivement, <kbd>nt'</kbd> se transforme en
 		<kbd-output>n't</kbd-output> pour pouvoir faire [majeur, annulaire, auriculaire] plutôt que
 		[majeur, auriculaire, annulaire]. Ce raccourci est utile pour réaliser les négations en anglais
-		telles que <kbd-output>don't</kbd-output>, <kbd-output>won't</kbd-output> ou
-		<kbd-output>can't</kbd-output>.
+		telles que <kbd-output lang="en">don't</kbd-output>, <kbd-output lang="en">won't</kbd-output> ou
+		<kbd-output lang="en">can't</kbd-output>.
 	</p>
 
 	<h3>
@@ -199,10 +199,12 @@
 	<p>
 		La disposition <Ergopti></Ergopti> n’est pas 1DFH de base. En effet, il y a trop de lettres à placer,
 		notamment les voyelles accentuées du français, pour que toutes les touches soient à une distance
-		maximale d’une touche de la position de repos de chaque doigt (« 1u Distance From Home »). C’est
-		pourquoi il y a les lettres <kbd>Q</kbd> et <kbd>Z</kbd> sur l’auriculaire droit, non sur la
-		colonne de repos de ce doigt, mais à droite de celle-ci. De même pour la touche <kbd>K</kbd> qui
-		est pile au milieu du clavier, mais trop loin de chacun des deux index pour être considérée 1DFH.
+		maximale d’une touche de la position de repos de chaque doigt («
+		<span lang="en">1u Distance From Home</span>
+		»). C’est pourquoi il y a les lettres <kbd>Q</kbd> et <kbd>Z</kbd> sur l’auriculaire droit, non
+		sur la colonne de repos de ce doigt, mais à droite de celle-ci. De même pour la touche
+		<kbd>K</kbd> qui est pile au milieu du clavier, mais trop loin de chacun des deux index pour être
+		considérée 1DFH.
 	</p>
 	<p>
 		En outre, réaliser un <kbd-output>ç</kbd-output> ou un <kbd-output>où</kbd-output> est un peu

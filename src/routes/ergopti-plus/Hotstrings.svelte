@@ -179,8 +179,8 @@ FEATURES & RATIONALE:
 			<article class="ep-card magic-card" style="--accent: #e53935;" use:reveal={{ delay: 90 }}>
 				<h3><span class="magic-num">2</span> Déclencheur d’abréviations</h3>
 				<p>
-					Si les lettres précédentes forment un trigger connu, <kbd class="star">★</kbd> expanse à la
-					place. Les deux modes sont décidés au moment de la frappe — sans configuration.
+					Si les lettres précédentes forment une abréviation connue, <kbd class="star">★</kbd> expanse
+					à la place. Les deux modes sont décidés au moment de la frappe — sans configuration.
 				</p>
 				<ul class="magic-rows magic-rows--compact">
 					{#each triggerExamples as r}

@@ -225,8 +225,8 @@
 	<li>
 		Sur Wayland, XCompose ne fonctionne pas dans certains programmes. C'est notamment le cas des
 		applications Electron comme VSCode. Ce problème implique que les touches mortes ne vont pas
-		fonctionner, de même pour les output de plusieurs caractères comme les ponctuations avec espaces
-		insécables automatiques. Il existe peut-être des workarounds.
+		fonctionner, de même pour les sorties de plusieurs caractères comme les ponctuations avec
+		espaces insécables automatiques. Il existe peut-être des workarounds.
 	</li>
 	<li>
 		Avec la version <ErgoptiPlus></ErgoptiPlus> directement intégrée au driver clavier (« Ergopti++ »),

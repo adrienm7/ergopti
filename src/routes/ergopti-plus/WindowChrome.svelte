@@ -31,11 +31,12 @@ FEATURES & RATIONALE:
 			<span class="dot dot-g"></span>
 		</span>
 		<span class="chrome-title">{title}</span>
-		{#if live}<span class="live-badge">● live</span>{:else}<span class="chrome-spacer"></span>{/if}
+		{#if live}<span class="live-badge" lang="en">● live</span>{:else}<span class="chrome-spacer"
+			></span>{/if}
 	{:else if ui.osStyle === 'linux'}
 		<span class="chrome-spacer chrome-spacer--linux"></span>
 		<span class="chrome-title">{title}</span>
-		{#if live}<span class="live-badge">● live</span>{/if}
+		{#if live}<span class="live-badge" lang="en">● live</span>{/if}
 		<span class="linux-controls">
 			<span class="linux-btn">─</span>
 			<span class="linux-btn">▢</span>
@@ -43,7 +44,7 @@ FEATURES & RATIONALE:
 		</span>
 	{:else}
 		<span class="chrome-title chrome-title--win">{title}</span>
-		{#if live}<span class="live-badge">● live</span>{/if}
+		{#if live}<span class="live-badge" lang="en">● live</span>{/if}
 		<span class="win-buttons">
 			<span class="win-btn">─</span>
 			<span class="win-btn">▢</span>

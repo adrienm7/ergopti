@@ -73,7 +73,7 @@
 	});
 </script>
 
-<header>
+<header lang="fr">
 	<div id="ergopti-header">
 		<a href={resolve('/')} aria-label="Ergopti, page d’accueil">
 			<img src={asset('img/logo/logo.svg')} class="logo" alt="" />

@@ -597,6 +597,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-app-windows-accessibility-ratchet.cjs"],
 			"repro": "npm run test:app-windows-accessibility-ratchet"
+		},
+		{
+			"id": "site-languages",
+			"ordinal": 700,
+			"name": "English passages in the French site say lang=\"en\", the French site chrome says lang=\"fr\" under the English Ergopti+ page, and a new unmarked one is refused",
+			"cmd": "node",
+			"args": ["tools/test/test-site-languages.cjs"],
+			"repro": "npm run test:site-languages"
 		}
 	]
 }

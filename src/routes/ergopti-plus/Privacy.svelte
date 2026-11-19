@@ -27,7 +27,7 @@ nothing is collected, and the whole thing is auditable.
 			icon: '🚫',
 			title: t('Aucune télémétrie'),
 			body: t(
-				'Pas de compte, pas de tracking, pas de « statistiques anonymes ». Le logiciel ne vous observe pas.'
+				'Pas de compte, pas de pistage, pas de « statistiques anonymes ». Le logiciel ne vous observe pas.'
 			)
 		},
 		{

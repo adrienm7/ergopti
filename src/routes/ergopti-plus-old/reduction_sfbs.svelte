@@ -16,9 +16,9 @@
 		<kbd>pt</kbd>, <kbd>eo</kbd>, <kbd>oe</kbd>,
 		<kbd>ub</kbd>, <kbd>bu</kbd> et <kbd>ds</kbd>. <kbd>ct</kbd> est de loin le plus fréquent.
 		<kbd>eo</kbd> et <kbd>oe</kbd> sont aussi relativement fréquents en anglais (pour écrire
-		<kbd-output>does</kbd-output>,
-		<kbd-output>people</kbd-output>, etc.) Tous ces <SFB />s sont supprimés avec <ErgoptiPlus />,
-		plus de nombreux autres encore plus rares.
+		<kbd-output lang="en">does</kbd-output>,
+		<kbd-output lang="en">people</kbd-output>, etc.) Tous ces <SFB />s sont supprimés avec <ErgoptiPlus
+		/>, plus de nombreux autres encore plus rares.
 	</p>
 
 	<h3>

@@ -86,7 +86,7 @@ FEATURES & RATIONALE:
 			icon: '🚫',
 			color: '#8e44ad',
 			title: 'Zéro télémétrie',
-			body: 'Aucun appel réseau en dehors du backend IA que vous avez choisi et de la vérification de mise à jour. Pas de « données anonymisées », pas de tracking. Rien.'
+			body: 'Aucun appel réseau en dehors du backend IA que vous avez choisi et de la vérification de mise à jour. Pas de « données anonymisées », pas de pistage. Rien.'
 		}
 	];
 </script>

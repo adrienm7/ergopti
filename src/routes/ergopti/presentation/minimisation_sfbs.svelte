@@ -37,7 +37,7 @@
 		>
 		(ou <em>digramme</em>). Pour optimiser une disposition clavier, il faut s’assurer que les
 		bigrammes les plus fréquents ne se fassent pas avec le même doigt : on parle de
-		<strong>limiter les <em>Same Finger Bigrams</em></strong>.
+		<strong>limiter les <em lang="en">Same Finger Bigrams</em></strong>.
 	</p>
 	<p>
 		➜ Cette tâche est bien plus difficile qu’on puisse le penser, car certaines lettres comme le <kbd

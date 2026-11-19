@@ -68,8 +68,8 @@
 		machines à écrire. Cependant, cette explication est remise en question par de nombreuses
 		personnes. D’autres motivations, notamment d’ordre commercial, ont également pu influencer ce
 		choix. À titre d’exemple, la rangée supérieure des touches aurait été organisée de façon à
-		permettre d’écrire aisément le mot <kbd-output>TYPEWRITER</kbd-output> lors de démonstrations publiques,
-		renforçant ainsi l’attrait des machines.
+		permettre d’écrire aisément le mot <kbd-output lang="en">TYPEWRITER</kbd-output> lors de démonstrations
+		publiques, renforçant ainsi l’attrait des machines.
 	</p>
 	<p>
 		Certaines des touches ayant les fréquences d’apparition les plus rares (en français et en

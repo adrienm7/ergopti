@@ -17,7 +17,7 @@
 		>.
 	</p>
 	<p>
-		La license MIT est une licence permissive, simple et courte, qui n'impose que quelques
+		La licence MIT est une licence permissive, simple et courte, qui n'impose que quelques
 		conditions, notamment la préservation des mentions de droits d’auteur et de licence. Les travaux
 		sous cette licence, y compris les modifications et œuvres dérivées, peuvent être redistribués
 		sous d’autres termes, et ce, même sans fournir le code source. La seule condition est de
