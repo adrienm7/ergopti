@@ -1278,7 +1278,8 @@ async function exerciseComparerTabs(page) {
 	// Each themed tab: one named chart per metric, read as a table, and the sortable table.
 	for (const [tab, charts] of [
 		['fingers', 3],
-		['bigrams', 10],
+		// sfb_distance and pinky_ring joined the bigrams with the score floors.
+		['bigrams', 12],
 		['trigrams', 5],
 		['rows', 6],
 		['misc', 11]
