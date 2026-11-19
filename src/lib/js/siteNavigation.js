@@ -31,7 +31,7 @@ export const PRODUCTS = Object.freeze([
 		name: 'Ergopti+',
 		icon: 'img/logo/logo_simple.svg',
 		summary:
-			'Le logiciel qui accélère votre frappe : hotstrings, tap-holds, raccourcis, métriques et IA locale.'
+			'Le logiciel qui accélère votre frappe : expansions de texte, touches à double fonction, raccourcis, statistiques de frappe et IA locale.'
 	}),
 	Object.freeze({
 		id: 'studio',
