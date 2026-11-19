@@ -438,7 +438,11 @@ body:has(> main.layout-analysis) {
 	padding: 1px 8px;
 }
 
+/* The muted grey reads at 4.3:1 (light) and 4.4:1 (dark) on the accent tint,
+   under the 4.5:1 small text needs (WCAG 1.4.3): a tinted item, row or card
+   writes its muted text in the text colour. */
 .la-layout-item.la-picked {
+	--la-sub: var(--theme-text);
 	background: var(--la-accent-soft);
 	border-left-color: var(--la-accent);
 }
@@ -544,6 +548,7 @@ body:has(> main.layout-analysis) {
 
 .la-chart-row[role='button']:hover,
 .la-chart-row.la-selected {
+	--la-sub: var(--theme-text);
 	background: var(--la-accent-soft);
 }
 
@@ -740,6 +745,7 @@ body:has(> main.layout-analysis) {
 
 .la-table tbody tr:hover,
 .la-selected {
+	--la-sub: var(--theme-text);
 	background: var(--la-accent-soft);
 }
 
@@ -1836,6 +1842,7 @@ body:has(> main.layout-analysis) {
 }
 
 .la-preset-apply[aria-pressed='true'] {
+	--la-sub: var(--theme-text);
 	background: var(--la-accent-soft);
 	border-color: var(--la-accent);
 	border-left-color: var(--la-preset-colour, var(--la-accent));
