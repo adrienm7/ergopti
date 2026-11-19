@@ -200,8 +200,7 @@ waits for the maintainer's review).
       shares within 0.07–0.29 point) stay « close » until the corpus tables carry skipgrams of gap 2 to 9 and
       Oxeylyzer's token totals exactly (its saved counts lose one at a rate set by its exact total's bits).
       keycraft (BSD-3, Go, its score scaled on its own layout set) needs a Go toolchain to be checked; shirolyzer's
-      score is undocumented. genkey's « i » text in the 21 locales still says « approximate, the closest skipgrams
-      only »: it now uses the trigram chain (« close »).
+      score is undocumented.
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 

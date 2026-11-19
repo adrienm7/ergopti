@@ -4804,7 +4804,7 @@
 	"layout_analysis.info.analyser.a200": "ClemenPine’s a200: trigram statistics (alternation, rolls, redirects, same finger), no score. Reproduced exactly.",
 	"layout_analysis.info.analyser.carpalx": "Martin Krzywinski’s carpalx: mean typing effort of letter triads, lower is better (QWERTY = 3 on its corpus). Exact on letters-only text, close otherwise.",
 	"layout_analysis.info.analyser.keygen": "xsznix’s keygen: penalty per character, lower is better. Close: its runs of four keys are estimated from trigrams.",
-	"layout_analysis.info.analyser.genkey": "semi’s genkey: finger speed, lateral stretches and index balance, lower is better. Approximate: genkey counts skipgrams up to nine letters apart, we have the closest only.",
+	"layout_analysis.info.analyser.genkey": "semi’s genkey: finger speed, lateral stretches and index balance, lower is better. Close: same-finger bigrams, lateral stretches and index use match genkey to its printed rounding; only its skipgrams more than one letter apart are estimated, from trigrams.",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer: rolls, alternation and redirects against same-finger bigrams and skipgrams and stretches, higher is better. Close: its far skipgrams are estimated.",
 	"layout_analysis.info.analyser.dariogoetz": "Dario Götz’s Keyboard Layout Optimizer: a cost from twelve measures, lower is better. Exact for the base and Shift layers; AltGr is our adaptation.",
 	"layout_analysis.info.analyser.cyanophage": "Cyanophage’s optimiser: eleven weighted terms (same-finger bigrams, effort, scissors, lateral stretches, skipgrams, vowels on one hand, hand balance), lower is better. Reproduced exactly, but for a bigram with a character the layout lacks, which its tool miscounts.",

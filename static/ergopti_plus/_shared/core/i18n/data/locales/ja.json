@@ -4804,7 +4804,7 @@
 	"layout_analysis.info.analyser.a200": "ClemenPine の a200：トライグラムの統計（交互打鍵、ロール、方向転換、同指）で、スコアなし。完全に再現。",
 	"layout_analysis.info.analyser.carpalx": "Martin Krzywinski の carpalx：文字の 3 連の平均打鍵労力で、低いほど良い（そのコーパスで QWERTY = 3）。文字のみのテキストでは正確、それ以外では近い値。",
 	"layout_analysis.info.analyser.keygen": "xsznix の keygen：1 文字あたりのペナルティで、低いほど良い。近い値：4 キーの連続はトライグラムから推定。",
-	"layout_analysis.info.analyser.genkey": "semi の genkey：指の速度、横方向の伸び、人差し指のバランスで、低いほど良い。近似：genkey は最大 9 文字離れたスキップグラムを数えますが、こちらは最も近いものだけです。",
+	"layout_analysis.info.analyser.genkey": "semi の genkey：指の速度、横方向の伸び、人差し指のバランスで、低いほど良い。近い値：同指バイグラム、横方向の伸び、人差し指の使用率は genkey の表示桁まで一致し、1 文字より離れたスキップグラムだけをトライグラムから推定します。",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer：ロール、交互打鍵、方向転換を、同指バイグラム、スキップグラム、伸びと対比し、高いほど良い。近い値：離れたスキップグラムは推定。",
 	"layout_analysis.info.analyser.dariogoetz": "Dario Götz の Keyboard Layout Optimizer：12 の指標から算出するコストで、低いほど良い。基本レイヤーと Shift レイヤーでは正確、AltGr は独自の適応です。",
 	"layout_analysis.info.analyser.cyanophage": "Cyanophage のオプティマイザー：重み付きの 11 項目（同指バイグラム、労力、シザー、横方向のストレッチ、スキップグラム、片手の母音、左右のバランス）で、低いほど良い。配列にない文字を含むバイグラム（このツールは数え間違える）を除き、正確に再現。",

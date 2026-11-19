@@ -4804,7 +4804,7 @@
 	"layout_analysis.info.analyser.a200": "ClemenPine의 a200: 트라이그램 통계(교대, 롤, 방향 전환, 같은 손가락), 점수 없음. 정확히 재현.",
 	"layout_analysis.info.analyser.carpalx": "Martin Krzywinski의 carpalx: 글자 3개 묶음의 평균 타건 노력, 낮을수록 좋음(자체 말뭉치에서 QWERTY = 3). 글자만 있는 텍스트에서는 정확, 그 밖에는 근접.",
 	"layout_analysis.info.analyser.keygen": "xsznix의 keygen: 글자당 벌점, 낮을수록 좋음. 근접: 4키 연속은 트라이그램에서 추정합니다.",
-	"layout_analysis.info.analyser.genkey": "semi의 genkey: 손가락 속도, 옆으로 뻗기, 검지 균형, 낮을수록 좋음. 근사: genkey는 최대 9글자 떨어진 스킵그램까지 세지만, 여기서는 가장 가까운 것만 셉니다.",
+	"layout_analysis.info.analyser.genkey": "semi의 genkey: 손가락 속도, 옆으로 뻗기, 검지 균형, 낮을수록 좋음. 근접: 같은 손가락 바이그램, 옆으로 뻗기, 검지 사용률은 genkey가 출력하는 반올림 범위 안에서 일치하며, 한 글자보다 멀리 떨어진 스킵그램만 트라이그램으로 추정합니다.",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer: 롤, 교대, 방향 전환을 같은 손가락 바이그램, 스킵그램, 뻗기와 대비, 높을수록 좋음. 근접: 먼 스킵그램은 추정합니다.",
 	"layout_analysis.info.analyser.dariogoetz": "Dario Götz의 Keyboard Layout Optimizer: 12개 지표로 계산한 비용, 낮을수록 좋음. 기본 및 Shift 레이어는 정확하며, AltGr은 자체 적용입니다.",
 	"layout_analysis.info.analyser.cyanophage": "Cyanophage의 최적화기: 가중치가 있는 11개 항목(같은 손가락 바이그램, 노력, 가위, 측면 뻗기, 스킵그램, 한 손의 모음, 손 균형), 낮을수록 좋음. 배열에 없는 문자가 들어간 바이그램(이 도구가 잘못 셈)을 빼고 정확히 재현.",
