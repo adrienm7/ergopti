@@ -125,29 +125,37 @@ baseline as violations go.
       layout presentation, Linux installation and Ergopti+ overview pages had a plain-language review
       ([seventh pass](docs/audits/accessibility/README.md#seventh-pass-header-offset-media-and-plain-language-2026-11-19-paris-time)).
       Left: the same review of the other pages (layout use, information and benchmarks, the Ergopti+ hotstrings, AI,
-      features, configuration and FAQ pages); the Studio frames are not measured.
+      features, configuration and FAQ pages); the Studio frames are not measured. The app's windows load
+      `a11y_prefs.js` and take a host's seeded `window.__ergopti_reading`, but no driver has the setting yet nor
+      ships the font: what each host needs is in the
+      [tenth pass](docs/audits/accessibility/README.md#reading-preferences-in-the-app-windows).
 - [ ] **Blind and low-vision users.** The Optimiser's result boards have a table view of their own (each key's
       place, what it types on both layouts, whether it changed). Heading order and landmarks are a gate
       (`tools/test/lib/heading-landmarks.cjs`: one h1, no skipped level, one main, every other landmark named): the
       three Studio pages in the Studio keyboard walk, which they pass, and the 21 app windows in their scan's
-      ratchet, where only the apps dashboard's chart tabs are left (their h3 chart titles follow the h1, their h2
-      cards being on another tab). Left: screen-reader runs; that dashboard's headings.
+      ratchet, which they all pass since the apps dashboard's tabs became tab panels with their own headings
+      ([tenth pass](docs/audits/accessibility/README.md#tenth-pass-semantic-markup-and-keyboard-operability-of-the-app-windows-2026-11-19-paris-time)).
+      Left: screen-reader runs.
 - [ ] **Semantic markup and mouse-only controls.** The site's div and span are held by
       `npm run test:site-semantic-html` (576 → 451, each justified in `tools/test/site-semantic-html-allowlist.json`)
       and its images by `npm run test:site-image-alternatives`; every site page is checked for controls only a
       mouse can use by `tools/test/browser/keyboard-operability.playwright.cjs` in CI
       ([ninth pass](docs/audits/accessibility/README.md#ninth-pass-semantic-markup-keyboard-operability-and-reading-choices-2026-11-19-paris-time)).
-      Left: the app windows' 673 `keyboard-operability` ratchet nodes (sortable headers and chart canvases of the
-      metrics windows, action picker rows, hotstring editor command references and drag handles, hotstring
-      settings category titles); the app windows' and the Studio pages' own div and span lists; the site's
-      custom elements (`bloc-main`, `keyboard-reference`…), as generic as a div but outside the gate.
+      The app windows' div and span are held by `npm run test:app-windows-semantic-markup` (1162 → 276, each
+      justified in `tools/test/app-windows-semantic-markup/`) and their mouse-only controls by the app windows scan
+      ([tenth pass](docs/audits/accessibility/README.md#tenth-pass-semantic-markup-and-keyboard-operability-of-the-app-windows-2026-11-19-paris-time)).
+      Left: the Studio pages' own div and span lists; the site's custom elements (`bloc-main`,
+      `keyboard-reference`…), as generic as a div but outside the gate.
 - [ ] **Keyboard and motor.** The Studio keyboard walk is a CI gate (`npm run test:browser:studio-keyboard`, the
       editor's « Try » field trap fixed) and the Studio has no time limit. The Windows driver's native windows
       (14 of them: settings prompts, pickers, editors, the hotstring settings, paths and update fallbacks) are walked
       with Tab and Shift+Tab in the AHK suite (`test_native_keyboard_walk.ahk`); none traps the keyboard. The app's
       21 WebView windows are walked the same way, each stop with a visible focus indicator, in the same gate as
-      their scan (fifth pass). Left: the macOS and Linux native windows; the hotstring editor's section reordering
-      is drag only (WCAG 2.5.7); the metrics tooltips open on hover only (1.4.13).
+      their scan (fifth pass), and since the tenth pass that scan also blocks an element a mouse can click or hover
+      that the keyboard cannot reach, arrow keys that do nothing in a tab list, list box or menu, and a modal that
+      Escape leaves open; the hotstring editor's sections move with the arrow keys and the metrics tooltips open on
+      focus. Left: the macOS and Linux native windows; the typing heatmaps' key popups and the apps table's column
+      explanations are still hover only (the same counts are in the tables).
 - [ ] **Cognitive.** Consistent navigation; every metric and setting has its help text. Error messages: the
       about 60 shown on Windows or in the shared pages without a next step now say one, 63 of them pinned by
       `tools/test/test-error-messages-say-how-to-recover.cjs`

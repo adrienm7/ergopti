@@ -965,6 +965,136 @@ and in the WebView windows.
   keyboard drawings, blue instead of green in the AI demo, blue and orange
   status text in the Studio, 5.5:1 and more). All apply before the first
   paint through `a11y_prefs.js`.
+## Tenth pass, semantic markup and keyboard operability of the app windows (2026-11-19, Paris time)
+
+The maintainer asked for windows with no non-semantic tag (« no span or div
+if possible »), for blocking tests, and for everything to work from the
+keyboard alone. Scope: the 20 app windows outside the Studio and the shared
+helpers they load.
+
+### Gates (all blocking)
+
+- **`tools/test/test-app-windows-semantic-markup.cjs`** (`npm run
+test:app-windows-semantic-markup`, shared-ui suite). Static, so it reads
+  every branch of the scripts: each `<div`/`<span` in HTML, strings and
+  templates, each `createElement('div')` and `el('span')` call. Every one must
+  be claimed by an entry of the window's list,
+  `tools/test/app-windows-semantic-markup/<window>.json`: the part of its
+  opening tag that finds it, its exact count and the reason no element
+  carries its meaning (30 characters at least, « layout » or « wrapper »
+  refused). A new div needs its own reason, a removed one lowers its count in
+  the same change. Refused whatever the list says: a div or span with an
+  interactive role or a pointer handler (in its tag, or a listener added to
+  the created element), an img without alt, an svg neither hidden nor named
+  as an image. The scanner is `tools/test/lib/semantic-markup.cjs`, shared
+  with the site and Studio scopes.
+- **The app windows scan** (`app-windows-accessibility.playwright.cjs`)
+  counts two more rules per state, in the same ratchet: `keyboard-operable`
+  (an element with a click or hover listener, recorded before the page's
+  scripts run, that the keyboard cannot reach; a control role without focus;
+  a tab list, list box, menu, grid, tree or radio group whose arrow key moves
+  neither the focus nor the active descendant; an open modal dialog that
+  Escape leaves open) and `text-alternatives` (an image, drawing or chart
+  canvas neither named nor hidden). A self check proves each detection on a
+  small page before any window is read (`--self-check` runs it alone).
+
+### Results
+
+The first run of the new rules counted 506 nodes (action picker 42,
+hotstring editor 8, hotstring settings 2, apps dashboard 64, typing
+dashboard 390). After: none; the baseline keeps only the layout manager's
+contrast rows (a Studio page). div and span, before → after (each one left
+is listed with its reason):
+
+| Window                   | Before | After |
+| ------------------------ | -----: | ----: |
+| metrics_typing           |    542 |   207 |
+| metrics_apps             |    277 |    22 |
+| hotstring_editor         |    101 |    27 |
+| changelog                |     35 |     1 |
+| model_browser            |     34 |     0 |
+| hotstrings_config_window |     27 |     0 |
+| download_window          |     26 |     3 |
+| onboarding               |     22 |    11 |
+| action_picker            |     22 |     0 |
+| prompt_editor            |     15 |     2 |
+| paths_editor             |     13 |     0 |
+| healthcheck              |     11 |     0 |
+| numeric_prompt           |      6 |     0 |
+| token_prompt             |      6 |     1 |
+| config_cleanup           |      5 |     1 |
+| update_check             |      3 |     0 |
+| personal_info_editor     |      3 |     0 |
+| physical_shortcuts       |      3 |     0 |
+| error_dialog             |      1 |     1 |
+| release_notes            |      0 |     0 |
+| shared helpers           |      7 |     0 |
+| **Total**                |   1162 |   276 |
+
+What stays: the boxes Chart.js needs to size a canvas, horizontal scroll
+boxes, grid rows and cells with no element of their own, the rich text
+editors (a contenteditable box named as a text box), dialog backdrops,
+`div` groups inside a `dl`, and label text whose style follows the checked
+state of its input.
+
+- **Apps dashboard outline.** The five tabs are a tab list (roving tab
+  stop, arrows, Home, End); each tab's blocks sit in their own tab panel
+  named by the tab, under a hidden h2, with h3 card and chart titles. Its
+  three heading rows left the baseline. The overview's two charts showed on
+  every tab (an inline `display: flex` beat the hiding rule); they no longer
+  do.
+- **Keyboard.** Tooltips of both dashboards open on focus too, stay while
+  hovered and close with Escape (1.4.13); the typing dashboard's 19 table
+  tabs are one tab list and every sortable header is a button; the hotstring
+  editor's sections move with the arrow keys on their handle, the focus
+  follows and a status says the new place (2.5.7); the action picker's
+  search is a combobox over list boxes, so the highlight is announced; the
+  prompt editor's and hotstring editor's suggestions are list boxes; the
+  changelog's releases are buttons the arrows move through; folds are native
+  buttons.
+- **Text alternatives.** Chart canvases and svgs are named images (their
+  title and largest entries); the typing trend arrows say rising, falling or
+  stable; flags and glyphs are hidden.
+- **Semantics.** Headers, footers, mains, named sections and searches,
+  fieldsets with legends, lists, description lists, `progress`, `output`,
+  `time`, `kbd`, `samp`, `data`, `mark`, `bdi` where they fit.
+
+Proof by reverting: the semantic gate on the old pages refuses every pending
+element (the apps dashboard's old `index.html` alone gives 314 lines); the
+browser scan with `--root=` on the old tree fails on the new fixture states
+(a tab read as selected, the keyboard section move, the card tooltip on
+focus, the announced picker highlight, the arrows of the release list).
+
+### Reading preferences in the app windows
+
+Every app window loads `a11y_prefs.js` first in its head. A host may seed
+`window.__ergopti_reading` (the same names and values as the site's
+preferences: `font`, `spacing`, `motion`, `text`, `contrast`) next to
+`window._i18n_locale`; the seed wins over storage and is sanitized
+(`test-site-accessibility-ratchet.cjs`). theme.css then applies the
+hyperlegible font stack, the WCAG 1.4.12 spacing and reduced motion. No
+driver writes the seed yet: there is no setting for it in
+`_shared/settings/data/features/manifest.toml` (its `[sections.ui]` is
+macOS only). What each host needs:
+
+- **Windows (WebView2).** The seed goes in `Seed` beside `_i18n_locale`
+  (`windows/core/ui/engine/webview/utils.ahk`, about line 622). The system's
+  « Show animations » setting already reaches `prefers-reduced-motion`.
+  The font: the page is served from the `_shared` virtual host, so a copy of
+  the woff2 files under `_shared/ui/fonts/` would load by URL;
+  `static/fonts/` is not in `windows_bundle_manifest.json`.
+- **macOS (hs.webview).** The page is an inline string without a base URL
+  (`macos/core/ui/ui/builder.lua`): the seed joins `i18n_boot`, and the
+  HTML cache key must include the preference. A font file cannot load by
+  URL there; it must be inlined as a `data:` URL, or the page loaded with a
+  base URL. Reduce Motion reaching WKWebView is not verified here.
+- **Linux (WebKitGTK).** The seed joins the boot script in
+  `webkit_host.lua` (`build_i18n_boot_script` pattern, JSON encoded, before
+  the CSP pass that adds the nonce); a file:// fetch is refused, the policy
+  allows `font-src data:`, so the font is a `data:` URL too.
+- **All.** The font is outside every package today (`static/fonts/`); the
+  physical shortcuts page does not load theme.css, so the seed has no style
+  to apply there.
 
 ## What remains
 
