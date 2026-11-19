@@ -11,7 +11,7 @@
  * is audited, the visitor's accessibility preferences survive blocked
  * storage and refuse unknown values (static/ergopti_plus/_shared/ui/a11y_prefs.js),
  * the reading ratchet (site-reading.cjs) applies the WCAG 1.4.12 values and
- * names only known rows.
+ * names only known rows, and no source justifies text.
  * ==============================================================================
  */
 
@@ -280,6 +280,29 @@ function checkReadingRatchet() {
 	assert.throws(() => reading.optionsFor('huge'), /Unknown reading mode/);
 }
 
+/**
+ * No justified text anywhere on the site (WCAG 1.4.8): the uneven word gaps
+ * make « rivers » that dyslexic readers lose their line in. The browser gate
+ * counts justified blocks on the built pages; this one refuses the rule in the
+ * sources, where it is cheaper to see.
+ */
+function checkNoJustifiedText() {
+	const offenders = [];
+	const walk = (directory) => {
+		for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+			const full = path.join(directory, entry.name);
+			if (entry.isDirectory()) walk(full);
+			else if (/\.(css|svelte)$/.test(entry.name)) {
+				const source = fs.readFileSync(full, 'utf8');
+				for (const match of source.matchAll(/text-align\s*:\s*justify|text-justify\s*:/g))
+					offenders.push(path.relative(ROOT, full) + ' @' + match.index);
+			}
+		}
+	};
+	walk(path.join(ROOT, 'src'));
+	assert.deepEqual(offenders, [], 'Justified text on the site');
+}
+
 checkComparison();
 checkBaseline();
 checkRouteCoverage();
@@ -287,6 +310,7 @@ checkPreferences();
 checkNoButtonInLink();
 checkHeroPause();
 checkReadingRatchet();
+checkNoJustifiedText();
 console.log(
-	'ok - site accessibility ratchet, baseline, page coverage, preferences, links, hero pause and reading ratchet'
+	'ok - site accessibility ratchet, baseline, page coverage, preferences, links, hero pause, reading ratchet and no justified text'
 );

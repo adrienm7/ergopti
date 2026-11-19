@@ -101,10 +101,12 @@ former one-page version is forwarded to the sub-page that now holds it.
 		text-align: center;
 	}
 
+	/* Cards at least 15rem wide: the rem follows the text size, so larger text
+	   gives fewer columns instead of names cut or drawn over their neighbours. */
 	.ep-pages-list {
 		display: grid;
 		gap: 12px;
-		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
 		list-style: none;
 	}
 

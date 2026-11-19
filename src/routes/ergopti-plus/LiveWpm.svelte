@@ -178,7 +178,7 @@ FEATURES & RATIONALE:
 		align-items: stretch;
 		display: grid;
 		gap: 18px;
-		grid-template-columns: 1fr auto;
+		grid-template-columns: minmax(0, 1fr) auto;
 		margin: 0 auto;
 		max-width: 720px;
 	}
@@ -212,6 +212,9 @@ FEATURES & RATIONALE:
 		font-family: 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
 		font-size: 0.72rem;
 		margin-left: 8px;
+		/* The file name wraps in a narrow window instead of being cut. */
+		min-width: 0;
+		overflow-wrap: anywhere;
 	}
 
 	.le-body {
@@ -226,6 +229,7 @@ FEATURES & RATIONALE:
 
 	.le-text {
 		color: var(--ink);
+		overflow-wrap: anywhere;
 	}
 
 	.le-caret {
@@ -272,19 +276,24 @@ FEATURES & RATIONALE:
 		flex-direction: column;
 		gap: 12px;
 		justify-content: center;
-		width: 118px;
+		/* As narrow as its widest piece (the pill, a word of the hint), at least
+		   118px: a fixed width cut the number at a larger text, and a wider one
+		   took the text field's room. */
+		min-width: 118px;
+		width: min-content;
 	}
 
 	.pill {
 		background: var(--pill);
 		border-radius: 14px;
 		box-shadow: 0 10px 30px -8px color-mix(in srgb, var(--pill) 60%, transparent);
+		/* At least the widget's width, wider when the number grows with the text. */
+		min-width: 96px;
 		overflow: hidden;
 		text-align: center;
 		transition:
 			background-color 0.35s var(--ease, ease),
 			box-shadow 0.35s var(--ease, ease);
-		width: 96px;
 	}
 
 	.pill-num {

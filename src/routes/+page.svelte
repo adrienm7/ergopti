@@ -78,14 +78,18 @@ page is forwarded there.
 
 	.accueil-naming {
 		margin: 0 auto 2rem;
-		max-width: 760px;
+		/* At most 80 characters per line (WCAG 1.4.8). */
+		max-width: min(760px, 58ch);
 		text-align: center;
 	}
 
+	/* As many columns as fit cards at least 16rem wide: the rem follows the
+	   text size, so at 200 % text the cards stack instead of overflowing the
+	   page, which clipped their names (site-reading.cjs). */
 	.products {
 		display: grid;
 		gap: 1rem;
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
 		list-style: none;
 		margin: 0;
 		padding: 0;
@@ -137,12 +141,6 @@ page is forwarded there.
 	.product-link {
 		color: #5ccbff;
 		font-weight: bold;
-	}
-
-	@media (max-width: 800px) {
-		.products {
-			grid-template-columns: 1fr;
-		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {

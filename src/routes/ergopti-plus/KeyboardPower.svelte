@@ -310,10 +310,12 @@ FEATURES & RATIONALE:
 </section>
 
 <style>
+	/* Four cards per row at most, each at least 13rem wide: larger text takes
+	   fewer columns instead of cutting the cards' words. */
 	.tap-grid {
 		display: grid;
 		gap: 14px;
-		grid-template-columns: repeat(4, 1fr);
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, max(13rem, 22%)), 1fr));
 		margin-bottom: 26px;
 	}
 
@@ -324,7 +326,7 @@ FEATURES & RATIONALE:
 	}
 
 	.tap-card--nav {
-		grid-column: span 4;
+		grid-column: 1 / -1;
 	}
 
 	.tap-keycap kbd {
@@ -365,14 +367,19 @@ FEATURES & RATIONALE:
 		color: var(--ink-faint);
 	}
 
+	/* In em, so the glyph's column grows with the text instead of the glyph
+	   spilling over the action's name. */
 	.tap-glyph {
+		flex-shrink: 0;
 		font-size: 1rem;
-		width: 26px;
+		min-width: 1.6em;
 	}
 
 	.tap-action {
 		font-size: 0.9rem;
 		font-weight: 650;
+		min-width: 0;
+		overflow-wrap: anywhere;
 	}
 
 	.tap-note {
@@ -396,10 +403,12 @@ FEATURES & RATIONALE:
 		font-weight: 500;
 	}
 
+	/* Cells at least 4.5rem wide (the rem follows the text size): five per row
+	   at the default size, fewer when the text grows, never cut. */
 	.nav-grid {
 		display: grid;
 		gap: 8px;
-		grid-template-columns: repeat(5, 1fr);
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 4.5rem), 1fr));
 	}
 
 	.nav-cell {
@@ -422,15 +431,18 @@ FEATURES & RATIONALE:
 	.nav-desc {
 		color: var(--ink-faint);
 		font-size: 0.7rem;
+		overflow-wrap: anywhere;
 		text-align: center;
 	}
 
 	/* ─── Power moves ───────────────────────────────────────── */
 
+	/* Four cards per row at most, each at least 13rem wide so that larger
+	   text takes fewer columns instead of cutting the cards' words. */
 	.power-grid {
 		display: grid;
 		gap: 14px;
-		grid-template-columns: repeat(4, 1fr);
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, max(13rem, 22%)), 1fr));
 	}
 
 	.power-card {
@@ -505,7 +517,7 @@ FEATURES & RATIONALE:
 		font-size: 0.92rem;
 		line-height: 1.6;
 		margin: 0 auto 18px;
-		max-width: 660px;
+		max-width: min(660px, 55ch);
 		text-align: center;
 	}
 
@@ -578,33 +590,9 @@ FEATURES & RATIONALE:
 		text-transform: uppercase;
 	}
 
-	@media (max-width: 1100px) {
-		.tap-grid {
-			grid-template-columns: repeat(2, 1fr);
-		}
-
-		.tap-card--nav {
-			grid-column: span 2;
-		}
-
-		.power-grid {
-			grid-template-columns: repeat(2, 1fr);
-		}
-	}
-
 	@media (max-width: 720px) {
-		.tap-grid,
-		.power-grid,
 		.actions-groups {
 			grid-template-columns: 1fr;
-		}
-
-		.tap-card--nav {
-			grid-column: span 1;
-		}
-
-		.nav-grid {
-			grid-template-columns: repeat(3, 1fr);
 		}
 	}
 </style>

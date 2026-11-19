@@ -24,7 +24,9 @@
 	outline-offset: 2px;
 }
 
-/* Hidden until focused: the first stop of the keyboard on every page. */
+/* Hidden until focused: the first stop of the keyboard on every page. It is
+   moved up by its own height, not by a fixed distance: at 200 % text a link
+   taller than that distance hung over the header (site-reading.cjs). */
 .skip-link {
 	background: #000;
 	border: 2px solid #ffd60a;
@@ -35,12 +37,14 @@
 	padding: 0.6rem 1rem;
 	position: fixed;
 	text-decoration: none;
-	top: -100px;
+	top: 0;
+	transform: translateY(-100%);
 	z-index: 1000;
 }
 
 .skip-link:focus {
 	top: 0.5rem;
+	transform: none;
 }
 
 /* The skip link's target receives the focus without drawing a ring. */

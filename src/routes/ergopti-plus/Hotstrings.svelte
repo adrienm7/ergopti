@@ -448,7 +448,7 @@ FEATURES & RATIONALE:
 		font-size: 0.92rem;
 		line-height: 1.6;
 		margin: 0 auto 20px;
-		max-width: 640px;
+		max-width: min(640px, 55ch);
 		text-align: center;
 	}
 </style>

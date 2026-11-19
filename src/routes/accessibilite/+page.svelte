@@ -65,9 +65,11 @@ in docs/audits/accessibility/; update both together.
 			Chaque page du site et chaque page d’Ergopti Studio est analysée automatiquement à chaque
 			modification, en thème clair et en thème sombre, avec l’outil
 			<span lang="en">axe-core</span>. Le nombre de défauts détectés ne peut que baisser : une
-			modification qui en ajoute un est refusée. Les vérifications manuelles (lecteurs d’écran,
-			navigation au clavier, zoom) complètent cette analyse automatique, qui ne détecte qu’une
-			partie des problèmes.
+			modification qui en ajoute un est refusée. Chaque page est aussi relue avec un texte agrandi à
+			200 % et l’espacement élargi : aucun texte ne doit y être coupé ni en recouvrir un autre,
+			aucun paragraphe n’est justifié et une ligne ne dépasse pas 80 caractères. Les vérifications
+			manuelles (lecteurs d’écran, navigation au clavier, zoom) complètent cette analyse
+			automatique, qui ne détecte qu’une partie des problèmes.
 		</p>
 	</section>
 

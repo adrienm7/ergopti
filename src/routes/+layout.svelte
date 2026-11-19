@@ -138,8 +138,9 @@
 <a class="skip-link" href="#contenu">Aller au contenu</a>
 
 <bloc-page id="page" class="bg-blue">
+	<!-- A direct child of the page, so its sticky position holds down to the footer. -->
+	<Header />
 	<div style="flex-grow:1">
-		<Header />
 		<div id="contenu" tabindex="-1"></div>
 		<slot />
 	</div>

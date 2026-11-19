@@ -339,9 +339,20 @@
 	color: var(--ink-soft);
 	font-size: clamp(0.95rem, 1.2vw, 1.05rem);
 	line-height: 1.65;
-	margin: 0;
+	margin: 0 auto;
 	text-align: center;
 	text-wrap: pretty;
+}
+
+/* A paragraph holds at most about 77 characters per line (55ch in these
+ * pages' font, and the components that set a wider max-width cap it at
+ * 55ch too; WCAG 1.4.8,
+ * tools/test/browser/site-reading.cjs): wider lines make the eye lose the
+ * next line's start. A paragraph narrower than its block is centred in it,
+ * like the section heads above it. */
+.ep-root p {
+	margin-inline: auto;
+	max-width: 55ch;
 }
 
 /* ==============================
@@ -513,15 +524,16 @@
 	background: #28c840;
 }
 
+/* The title wraps rather than ending in an ellipsis, so a reader with
+ * larger text still reads the whole file name. */
 .ep-root .chrome-title {
 	color: var(--ink-faint);
 	flex: 1;
 	font-family: 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
 	font-size: 0.75rem;
-	overflow: hidden;
+	min-width: 0;
+	overflow-wrap: anywhere;
 	text-align: center;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 }
 
 .ep-root .chrome-title--win {

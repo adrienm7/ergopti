@@ -578,6 +578,103 @@ Tests (slugs `a11y-macos-event`, `a11y-macos-spotlight`, `a11y-macos-alert`,
 Linux `tests/unit/core/ui/test_system_accessibility.lua` and
 `test_drawn_surfaces_for_atspi.lua`.
 
+## Sixth pass, reading and languages of the site (2026-11-19, Paris time)
+
+The TODO item « Dyslexia and reading », on the site only
+(`src/`); the Studio pages framed by the site keep their own gates.
+
+### Reading (WCAG 1.4.8, 1.4.10, 1.4.12)
+
+`tools/test/browser/site-reading.cjs` measures each page of the site's own
+document, in three reading modes, inside the axe gate
+(`site-accessibility.playwright.cjs`, `--reading-only` to run it alone):
+
+- **zoom**: a 200 % browser zoom of the scan's 1440 × 900 window (720 × 450
+  CSS pixels, device scale 2) with the WCAG 1.4.12 user style sheet (line
+  height 1.5, paragraph spacing 2 em, letter spacing 0.12 em, word spacing
+  0.16 em);
+- **text**: the site's own reading settings at their largest, 200 % text and
+  wide spacing, in the full window;
+- **default**: an unchanged visit.
+
+Checks: `text-clipped`, a text line outside the padding box of an ancestor
+that hides its overflow (up to the first one that scrolls);
+`text-overlap`, two text lines of different elements sharing at least a
+quarter of the shorter one's height, each cut to what its scrolling
+ancestors show (rotated text, the corner banner, is left out: its client
+rects are its upright bounding box); `justified-text`, a block laid out
+justified; `line-length`, a paragraph, list item or quote of 120 characters
+or more with a line of more than 80 characters (counted per laid-out line).
+Elements are counted per page, mode and check in
+`site-reading-baseline.json`, ratcheted like the axe rows;
+`test-site-accessibility-ratchet.cjs` checks the modes' values and the
+baseline's rows without a browser, and refuses `text-align: justify` in the
+sources.
+
+| Mode and check          | Before | After |
+| ----------------------- | -----: | ----: |
+| default, justified text |    406 |     0 |
+| default, line length    |    255 |     0 |
+| zoom, justified text    |    406 |     0 |
+| zoom, clipped text      |      6 |     0 |
+| zoom, overlapping text  |      2 |     0 |
+| text, justified text    |    406 |     0 |
+| text, clipped text      |     29 |     0 |
+| text, overlapping text  |     42 |     0 |
+| **Total**               |   1552 |     0 |
+
+« Before » is the base commit measured with the final checks; the first run
+of the checks, before they cut lines to their scrolling boxes, counted 195
+overlaps in the text mode, most of them a scrolled table's hidden rows.
+
+What changed, at the root:
+
+- **No justified text.** `typography.css` justified every paragraph and list
+  above 600 px; prose now starts at the line's start. Its line height is
+  unitless (1.5, not 1.5em), so a larger child gets its own height.
+- **Line length.** The article pages' prose column is `58ch` wide and
+  centred (`bloc-main main`), the Ergopti+ pages' paragraphs `55ch` (their
+  font is narrower), and the components that set a wider `max-width` in
+  pixels cap it at `55ch` too; the home and overview introductions likewise.
+  70ch measured 84 to 91 characters per line. A block holding a keyboard
+  drawing keeps the full width (`:not(:has(keyboard))`): the drawing is
+  sized on the window and lost its last keys in a narrowed list.
+- **Header.** It was `position: fixed` at `height: var(--header-height)` over
+  a spacer of that height: at 200 % text its title wrapped out of the box,
+  above the window and over the page. It is now sticky in the page's flow
+  with that height as a minimum, a direct child of the page so it holds down
+  to the footer, and the narrow-screen menu opens under it whatever its
+  height.
+- **Skip link.** Hidden at `top: -100px`, it hung over the header once taller
+  than 100 px; it now moves up by its own height (`translateY(-100%)`).
+- **Banner.** Its subtitle was pulled over its title by a negative margin;
+  the two lines now stack in the flow.
+- **Cards and grids.** The home products, the overview pages of Ergopti and
+  Ergopti+, and the Ergopti+ tap-hold, navigation and power grids had fixed
+  column counts or pixel minimums: they now fit as many columns as cards of
+  at least a few rem, so larger text gives fewer columns instead of cut or
+  overlapping names. Fixed pixel sizes became minimums (the WPM pill, the
+  delegation bar, a glyph column), and the provider families and window
+  titles wrap instead of ending in an ellipsis.
+- **Code blocks** wrap their long lines (`white-space: break-spaces`): the
+  article column hides what passes its edge.
+
+Not measured: a plain-language review of the texts, the table of
+contents, which is
+sticky at `--header-height` and slides under a header grown taller at 200 %
+text, and the Studio frames.
+
+### Gates and host
+
+`node tools/test/test-site-accessibility-ratchet.cjs` and the browser gate
+(`npx vite build`, then
+`node tools/test/browser/site-accessibility.playwright.cjs build ""`). Each
+fails on the base commit: the ratchet contract on `typography.css`'s justification, the reading gate on
+its 1552 elements. On the Windows host of this pass the axe rows matched
+the base (6 rows, all in Studio frames, the same counts), and the Comparer's
+« fits a phone » check failed on the base as well as after the pass (its
+compact tabs measure 327 px in a 320 px window with this host's fonts).
+
 ## What remains
 
 The open items live in TODO.md, section « Full accessibility ». The rows of

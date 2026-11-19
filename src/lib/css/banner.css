@@ -35,10 +35,21 @@
 	text-decoration: none;
 }
 
+/* The two lines stack in the flow, with no negative margin pulling the
+   subtitle up: under a wider line height (WCAG 1.4.12) that margin drew it
+   over the title. */
+.banner a {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2em;
+}
+
+.banner p {
+	margin: 0;
+}
+
 .banner .subtitle {
 	font-size: 0.6rem;
-	margin-bottom: 1.1rem;
-	margin-top: -0.65rem;
 }
 
 @media (max-width: 800px) {
@@ -69,6 +80,5 @@
 
 	.banner .subtitle {
 		font-size: 0.65em;
-		margin-top: -0.8rem;
 	}
 }

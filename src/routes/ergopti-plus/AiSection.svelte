@@ -483,7 +483,7 @@ FEATURES & RATIONALE:
 		font-size: 0.82rem;
 		line-height: 1.6;
 		margin: 16px auto 0;
-		max-width: 640px;
+		max-width: min(640px, 55ch);
 		text-align: center;
 	}
 
@@ -551,7 +551,7 @@ FEATURES & RATIONALE:
 		font-size: 0.95rem;
 		line-height: 1.65;
 		margin: 0 auto 22px;
-		max-width: 700px;
+		max-width: min(700px, 55ch);
 		text-align: center;
 	}
 
@@ -697,13 +697,13 @@ FEATURES & RATIONALE:
 		font-weight: 700;
 	}
 
+	/* The families wrap instead of ending in an ellipsis: cut text is lost
+	   to every reader, and at 200 % text most of the list was. */
 	.provider-family {
 		color: var(--ink-faint);
 		font-size: 0.76rem;
 		margin-top: 2px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		overflow-wrap: anywhere;
 	}
 
 	.provider-meta {

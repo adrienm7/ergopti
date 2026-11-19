@@ -747,6 +747,21 @@ row. Action: rebuild before rescanning (the scan reads `build/`, a 7-minute
 build on the maintainer's PC) and lower the baseline in the same change as a
 fix.
 
+### project-site-reading-checks-and-header-height
+
+The same gate measures reading (`site-reading.cjs`): clipped, overlapping,
+justified and over-80-character text at 200 % zoom with the WCAG 1.4.12
+spacing and at the site's 200 % text. Since 2026-11-19 the site header is
+sticky with `--header-height` as a minimum, not fixed at that height, so code
+that offsets by `--header-height` (the sidebar table of contents, the Studio
+shell, the narrow-screen banner) is only right at the default text size.
+Prose widths are in `ch` (58ch articles, 55ch Ergopti+), and a block holding a
+keyboard drawing keeps the full width because the drawing is sized on the
+window. Text clip and overlap boxes are client rects: rotated text (the corner
+banner) is left out, and lines are cut to their scrolling ancestors first.
+Action: when a layout uses `--header-height` or a fixed pixel size on text,
+run `--reading-only` on the build before and after.
+
 ### project-pages-deploy-branch-vs-workflow
 
 GitHub Pages deployment source can be branch-based or workflow-based. Verify the

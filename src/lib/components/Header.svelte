@@ -178,7 +178,8 @@
 		</div>
 	</nav>
 </header>
-<div style="height: calc(var(--header-height) + var(--banner-height));"></div>
+<!-- Room for the banner, fixed under the header on narrow screens. -->
+<div style="height: var(--banner-height);"></div>
 
 <style>
 	:root {
@@ -195,20 +196,22 @@
 		--longueur-traits-hamburger: 18px;
 	}
 
+	/* Sticky in the page's flow and at least --header-height tall, not fixed
+	   at that height over a spacer of the same height: with 200 % text or the
+	   wide spacing the title wrapped out of a fixed box, above the window and
+	   over the page (tools/test/browser/site-reading.cjs). */
 	header {
 		align-items: center;
 		backdrop-filter: blur(30px);
 		background-color: var(--header-color);
 		box-shadow: 0px 0px 5px 2px var(--couleur-ombre);
 		display: flex;
-		height: var(--header-height);
 		justify-content: space-between;
-		left: 0;
 		margin: 0;
+		min-height: var(--header-height);
 		padding: 0;
-		position: fixed;
+		position: sticky;
 		top: 0;
-		width: 100vw;
 		z-index: 100;
 	}
 	header a {
@@ -367,8 +370,9 @@
 			margin: 0;
 			overflow: hidden;
 			padding: 0;
-			position: fixed;
-			top: var(--header-height);
+			/* Under the header whatever its height (the header is its containing block). */
+			position: absolute;
+			top: 100%;
 			transition: height 0.15s ease-out; /* Effet de déroulement du menu vers le bas si passage de height 0 à 100 */
 			width: 100%;
 			z-index: 98;

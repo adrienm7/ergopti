@@ -1,27 +1,42 @@
+/* Prose is aligned to the start, never justified: the uneven word gaps of
+   justified text make « rivers » that dyslexic readers lose their line in
+   (WCAG 1.4.8). The line height is unitless so that a larger child (a key,
+   a code span) gets its own height instead of inheriting a fixed one. */
 p,
 ul,
 .encadre,
 .tooltiptext,
 li {
-	line-height: 1.5em;
-	text-align: justify;
+	line-height: 1.5;
+	text-align: start;
 }
 
-@media (max-width: 600px) {
-	p,
-	ul,
-	.encadre,
-	.tooltiptext,
-	li {
-		text-align: left;
-	}
+/* The prose column of the article pages holds 45 to 80 characters per line
+   (WCAG 1.4.8, tools/test/browser/site-reading.cjs): wider lines make the eye
+   lose the next line's start. 58ch is at most about 78 characters of French
+   text in the site's font (70ch measured 84 to 91), and the column stays centred
+   under the centred titles and keyboards. A block that holds a keyboard
+   drawing keeps the full width: the drawing is sized on the window, so in a
+   narrower list it passed the column's edge and lost its last keys. */
+bloc-main main :is(p, ul, ol, dl, blockquote):not(:has(keyboard)) {
+	margin-inline: auto;
+	max-width: 58ch;
+}
+
+/* A code block wraps its long lines: the article column hides what passes
+   its edge (main { overflow-x: hidden }), so at 200 % text the end of a
+   command was cut off. Spaces wrap too (break-spaces), so the ones that
+   align a comment do not hang past the edge. */
+pre {
+	overflow-wrap: anywhere;
+	white-space: break-spaces;
 }
 
 .encart-introduction {
 	line-height: 1.35rem;
 	margin: 0 auto;
 	/* background: linear-gradient(to right, transparent, rgba(0,0,0, 0.3) 50%, transparent 100%); */
-	max-width: 820px;
+	max-width: min(820px, 58ch);
 	padding: 20px;
 	text-align: center;
 }

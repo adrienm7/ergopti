@@ -437,7 +437,7 @@ FEATURES & RATIONALE:
 		font-size: 0.92rem;
 		line-height: 1.6;
 		margin: 0 auto;
-		max-width: 620px;
+		max-width: min(620px, 55ch);
 	}
 
 	/* ─── Delegated-typing before/after ─────────────────────── */
@@ -475,7 +475,8 @@ FEATURES & RATIONALE:
 		display: flex;
 		flex: 1;
 		gap: 2px;
-		height: 34px;
+		/* At least one bar high, taller when the labels wrap at a larger text. */
+		min-height: 34px;
 		overflow: hidden;
 	}
 
@@ -487,8 +488,8 @@ FEATURES & RATIONALE:
 		font-weight: 700;
 		justify-content: center;
 		min-width: 0;
-		overflow: hidden;
-		white-space: nowrap;
+		overflow-wrap: anywhere;
+		text-align: center;
 		width: var(--w);
 	}
 
@@ -529,7 +530,7 @@ FEATURES & RATIONALE:
 		color: var(--ink-soft);
 		font-size: 0.9rem;
 		margin: 22px auto 0;
-		max-width: 640px;
+		max-width: min(640px, 55ch);
 		text-align: center;
 	}
 

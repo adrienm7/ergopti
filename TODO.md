@@ -105,8 +105,13 @@ baseline as violations go.
       [audit](docs/audits/accessibility/README.md#colour-vision-review)). Left: the tooltip tints sit at one
       lightness, so a colour-blind reader tells hotstring categories apart by the preview's text only; naming the
       category in the tooltip is a design change for the maintainer.
-- [ ] **Dyslexia and reading.** Check every page at 200 % text with the wide spacing setting for clipped or
-      overlapping text; plain-language texts, no justified text, comfortable line length.
+- [ ] **Dyslexia and reading, what is left.** Every site page is measured at 200 % zoom with the WCAG 1.4.12
+      spacing and at the site's 200 % text with wide spacing (`tools/test/browser/site-reading.cjs`, in the site
+      accessibility gate, ratchet `site-reading-baseline.json`, empty): no clipped, overlapping or justified text and
+      no prose line over 80 characters ([sixth pass](docs/audits/accessibility/README.md#reading-wcag-148-1410-1412)).
+      Left: a plain-language review of the site's texts (sentence length, jargon such as « hotstring », « tap-hold »,
+      « driver »); the sticky table of contents, placed at `--header-height`, slides under a header grown taller at
+      200 % text; the Studio frames are not measured.
 - [ ] **Blind and low-vision users.** Screen-reader runs; heading order and landmarks per page; the Optimiser's
       result board (plain characters) has no table view of its own (« Open in the editor » gives one).
 - [ ] **Keyboard and motor.** The Studio keyboard walk is a CI gate (`npm run test:browser:studio-keyboard`, the

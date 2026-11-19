@@ -166,7 +166,7 @@ FEATURES & RATIONALE:
 		color: var(--ink-faint);
 		font-size: 0.82rem;
 		margin: 12px auto 0;
-		max-width: 620px;
+		max-width: min(620px, 55ch);
 	}
 
 	.bigram-grid {

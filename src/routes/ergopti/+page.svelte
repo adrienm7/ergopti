@@ -58,10 +58,12 @@ sub-pages that hold the details (siteNavigation.js lists them).
 		margin: 1.5rem 0 0.5rem;
 	}
 
+	/* Cards at least 15rem wide: the rem follows the text size, so larger text
+	   gives fewer columns instead of names cut or drawn over their neighbours. */
 	.overview-pages {
 		display: grid;
 		gap: 0.75rem;
-		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
 		list-style: none;
 		margin: 2rem 0 0;
 		padding: 0;

@@ -278,7 +278,7 @@ FEATURES & RATIONALE:
 		font-size: 0.9rem;
 		line-height: 1.65;
 		margin: 0 auto 12px;
-		max-width: 760px;
+		max-width: min(760px, 55ch);
 		text-align: center;
 	}
 
