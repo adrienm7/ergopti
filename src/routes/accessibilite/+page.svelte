@@ -66,10 +66,10 @@ in docs/audits/accessibility/; update both together.
 			modification, en thème clair et en thème sombre, avec l’outil
 			<span lang="en">axe-core</span>. Le nombre de défauts détectés ne peut que baisser : une
 			modification qui en ajoute un est refusée. Chaque page est aussi relue avec un texte agrandi à
-			200 % et l’espacement élargi : aucun texte ne doit y être coupé ni en recouvrir un autre,
-			aucun paragraphe n’est justifié et une ligne ne dépasse pas 80 caractères. Les vérifications
-			manuelles (lecteurs d’écran, navigation au clavier, zoom) complètent cette analyse
-			automatique, qui ne détecte qu’une partie des problèmes.
+			200 % et l’espacement élargi. Aucun texte ne doit y être coupé, en recouvrir un autre ou
+			passer sous l’en-tête. Aucun paragraphe n’est justifié et aucune ligne ne dépasse 80
+			caractères. L’analyse automatique ne détecte qu’une partie des problèmes : des vérifications
+			manuelles (lecteurs d’écran, navigation au clavier, zoom) la complètent.
 		</p>
 	</section>
 
