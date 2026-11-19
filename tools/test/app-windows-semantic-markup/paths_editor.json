@@ -1,16 +1,3 @@
 {
-	"files": {
-		"index.html": [
-			{
-				"tag": "div",
-				"count": 7,
-				"pending": true
-			},
-			{
-				"tag": "span",
-				"count": 6,
-				"pending": true
-			}
-		]
-	}
+	"files": {}
 }

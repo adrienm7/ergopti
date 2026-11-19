@@ -15,17 +15,21 @@
 			<p class="subtitle" data-i18n="paths_editor.subtitle"></p>
 
 			<form id="paths-form">
-				<div class="row">
-					<div class="row-header">
-						<span class="row-icon">📁</span>
-						<label for="input-config-dir" data-i18n="paths_editor.label_config_dir"></label>
-						<span
+				<section class="row" aria-labelledby="label-config-dir">
+					<header class="row-header" data-icon="📁">
+						<label
+							for="input-config-dir"
+							id="label-config-dir"
+							data-i18n="paths_editor.label_config_dir"
+						></label>
+						<output
 							id="tag-config-dir"
 							class="tag-default"
+							for="input-config-dir"
 							data-i18n="paths_editor.tag_default"
-						></span>
-					</div>
-					<div class="path-input-wrap">
+						></output>
+					</header>
+					<p class="path-input-wrap">
 						<input type="text" id="input-config-dir" value="" />
 						<button
 							type="button"
@@ -33,19 +37,27 @@
 							class="btn-browse"
 							data-i18n="paths_editor.btn_browse"
 						></button>
-					</div>
-					<p class="row-default">
-						<span data-i18n="paths_editor.default_label"></span>
-						<code id="default-config-dir"></code>
 					</p>
-				</div>
-				<div class="row">
-					<div class="row-header">
-						<span class="row-icon">📄</span>
-						<label for="input-logs-dir" data-i18n="paths_editor.label_logs_dir"></label>
-						<span id="tag-logs-dir" class="tag-default" data-i18n="paths_editor.tag_default"></span>
-					</div>
-					<div class="path-input-wrap">
+					<dl class="row-default">
+						<dt data-i18n="paths_editor.default_label"></dt>
+						<dd><code id="default-config-dir"></code></dd>
+					</dl>
+				</section>
+				<section class="row" aria-labelledby="label-logs-dir">
+					<header class="row-header" data-icon="📄">
+						<label
+							for="input-logs-dir"
+							id="label-logs-dir"
+							data-i18n="paths_editor.label_logs_dir"
+						></label>
+						<output
+							id="tag-logs-dir"
+							class="tag-default"
+							for="input-logs-dir"
+							data-i18n="paths_editor.tag_default"
+						></output>
+					</header>
+					<p class="path-input-wrap">
 						<input type="text" id="input-logs-dir" value="" />
 						<button
 							type="button"
@@ -53,16 +65,16 @@
 							class="btn-browse"
 							data-i18n="paths_editor.btn_browse"
 						></button>
-					</div>
-					<p class="row-default">
-						<span data-i18n="paths_editor.default_label"></span>
-						<code id="default-logs-dir"></code>
 					</p>
+					<dl class="row-default">
+						<dt data-i18n="paths_editor.default_label"></dt>
+						<dd><code id="default-logs-dir"></code></dd>
+					</dl>
 					<p class="row-hint" data-i18n="paths_editor.hint_logs_dir"></p>
-				</div>
+				</section>
 			</form>
 
-			<div class="btns">
+			<footer class="btns">
 				<button
 					type="button"
 					id="btn-reset"
@@ -76,7 +88,7 @@
 					data-i18n="paths_editor.btn_cancel"
 				></button>
 				<button type="button" id="btn-save" class="save" data-i18n="paths_editor.btn_save"></button>
-			</div>
+			</footer>
 		</main>
 
 		<script src="script.js"></script>

@@ -86,8 +86,11 @@ h1 {
 	margin-bottom: 5px;
 }
 
-.row-icon {
+/* The row's icon is drawn, not read: its label names the row. */
+.row-header::before {
 	color: var(--theme-blue);
+	content: attr(data-icon);
+	content: attr(data-icon) / '';
 	flex-shrink: 0;
 	font-size: 13px;
 	line-height: 1;
@@ -104,6 +107,7 @@ label {
 	align-items: center;
 	display: flex;
 	gap: 5px;
+	margin: 0;
 }
 
 input[type='text'] {
@@ -137,6 +141,13 @@ input[type='text'].is-default {
 	color: var(--theme-grey-666);
 	font-size: 10.5px;
 	margin: 5px 0 0;
+}
+
+/* « Default: <folder> » reads as one line. */
+.row-default dt,
+.row-default dd {
+	display: inline;
+	margin: 0;
 }
 
 .row-default code {
