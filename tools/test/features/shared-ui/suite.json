@@ -624,7 +624,7 @@
 		},
 		{
 			"id": "site-semantic-html",
-			"ordinal": 705,
+			"ordinal": 706,
 			"name": "every div and span of the site is justified in the reviewed allowlist with its exact count, none is interactive, and no Svelte accessibility warning is left",
 			"cmd": "node",
 			"args": ["tools/test/test-site-semantic-html.cjs"],
@@ -632,7 +632,7 @@
 		},
 		{
 			"id": "site-image-alternatives",
-			"ordinal": 706,
+			"ordinal": 707,
 			"name": "every img of the site has an alt, every inline svg and icon glyph is hidden or a named image, and the checker refuses each missing one",
 			"cmd": "node",
 			"args": ["tools/test/test-site-image-alternatives.cjs"],
@@ -640,7 +640,7 @@
 		},
 		{
 			"id": "keyboard-operability",
-			"ordinal": 707,
+			"ordinal": 708,
 			"name": "the keyboard operability judgement refuses every control only a mouse can use and every disclosure, popup or composite widget the keys do not drive, and the site and app window gates call it",
 			"cmd": "node",
 			"args": ["tools/test/test-keyboard-operability.cjs"],
