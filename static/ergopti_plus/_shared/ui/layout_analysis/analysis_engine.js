@@ -2839,10 +2839,8 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 
 		const totalOf = (layout, compiled, c, counts, keyCount, formValues) => {
-			const all = Object.assign({}, c);
-			names.forEach((name, j) => {
-				all[name] += counts[j];
-			});
+			const all = streamCounts();
+			for (let j = 0; j < names.length; j++) all[names[j]] = c[names[j]] + counts[j];
 			return score(
 				streamMetrics(layout, board, compiled, all, keyCount, opts, weightedFit(forms, formValues)),
 				opts.weights
@@ -3091,8 +3089,8 @@ var LAYOUT_ANALYSIS = (function () {
 					walkTriple(seqs[a], seqs[b], seqs[d], n, visit);
 				}
 			}
-			const nextC = Object.assign({}, state.c);
-			for (const name of names) nextC[name] += delta.c[name];
+			const nextC = streamCounts();
+			for (const name of names) nextC[name] = state.c[name] + delta.c[name];
 			const nextCounts = state.counts.slice();
 			for (let j = 0; j < nextCounts.length; j++) nextCounts[j] += delta.counts[j];
 			const nextKeys = state.keyCount.slice();
@@ -3188,8 +3186,8 @@ var LAYOUT_ANALYSIS = (function () {
 				const p = rightKeys.list[j];
 				for (let k = byLast.start[p]; k < byLast.start[p + 1]; k++) triple(byLast.items[k]);
 			}
-			const nextC = Object.assign({}, state.c);
-			for (const name of names) nextC[name] += delta.c[name];
+			const nextC = streamCounts();
+			for (const name of names) nextC[name] = state.c[name] + delta.c[name];
 			const nextCounts = state.counts.slice();
 			for (let j = 0; j < nextCounts.length; j++) nextCounts[j] += delta.counts[j];
 			const nextKeys = state.keyCount.slice();
