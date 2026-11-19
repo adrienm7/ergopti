@@ -854,7 +854,13 @@ The Studio pages are left out of `text-320` by name (`PENDING_ROUTES`):
 the Studio shell (`src/routes/studio/+layout.svelte`, changed elsewhere)
 is at least 480 px tall under the header and its menu bar alone takes
 about 500 px there, so the workspace is 0 px tall and the page never
-shows. Fix the shell, then remove that row.
+shows. Fixed afterwards (2026-11-19, Paris time): below 24 em of its own
+text the shell folds its tabs and « Apparence » into a menu button named
+after the current tab, the open menu laid over the workspace, and the row
+is removed. At 320 × 640 px with 200 % text the bar went from 503 to 83 px
+and the workspace from 0 to 397 px; `exerciseStudioBar` in
+`site-accessibility.playwright.cjs` opens that menu on every tab and
+requires the workspace to outgrow the bar.
 
 Gates: `node tools/test/test-site-accessibility-ratchet.cjs` and
 `node tools/test/browser/site-accessibility.playwright.cjs build ""

@@ -348,7 +348,9 @@ async function exerciseUndo(comparer, page) {
  * and a tablet, in both schemes, with the default text and with the site's
  * 200 % text: no sideways page scroll and every part of the bar, each tab
  * among them, wholly in view (WCAG 1.4.10). The bar's name and tab icons once pushed the tabs to 327 px at
- * 320 px.
+ * 320 px. Where the tabs fold into the bar's menu, the menu opens on every
+ * tab; the workspace stays taller than the bar, which at 320 px with 200 %
+ * text once took 503 px and left it 0 px (WCAG 1.4.4).
  * @param {object} browser
  * @param {string} origin
  * @param {string} basePath
@@ -367,8 +369,24 @@ async function exerciseStudioBar(browser, origin, basePath) {
 					for (const width of STUDIO_BAR_WIDTHS) {
 						await page.setViewportSize({ width, height: PHONE_VIEWPORT.height });
 						await page.goto(origin + basePath + '/studio/comparer', { waitUntil: 'load' });
-						await page.locator('.studio-bar nav.subnav a').first().waitFor();
+						await page.locator('.studio-bar').waitFor();
 						const where = [width + ' px', colorScheme, preferences ? '200 % text' : 'default text'];
+						const [bar, workspace] = await page.evaluate(() =>
+							['.studio-bar', 'main'].map((part) => document.querySelector(part).offsetHeight)
+						);
+						assert.ok(
+							workspace > bar,
+							'The workspace outgrows the Studio bar at ' + where.join(', ')
+						);
+						const menu = page.locator('.studio-menu-button');
+						if (await menu.isVisible()) {
+							// Hydrated first: the button opens the menu from its handler.
+							await page.waitForLoadState('networkidle');
+							await menu.click();
+							await page.locator('.studio-menu.open').waitFor();
+						}
+						for (const tab of await page.locator('.studio-bar nav.subnav a').all())
+							await tab.waitFor({ state: 'visible' });
 						// The whole page's reflow at 200 % text also involves the site
 						// header, which is not the bar's; the bar's own parts are measured.
 						if (!preferences)

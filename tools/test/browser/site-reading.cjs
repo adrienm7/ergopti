@@ -89,13 +89,7 @@ const PHONE_MODES = Object.fromEntries(
  * the gate skips them (isPending) and test-site-accessibility-ratchet.cjs
  * checks the names. Remove a row once its reason is fixed.
  */
-const PENDING_ROUTES = Object.freeze({
-	// The Studio shell (src/routes/studio/+layout.svelte, changed in another
-	// session) is at least 480 px tall under the header, and at 320 px with
-	// 200 % text its menu bar alone is about 500 px: the workspace, the page's
-	// <main>, is left 0 px tall and never shows.
-	'text-320': Object.freeze(['/studio', '/studio/comparer', '/studio/optimiser'])
-});
+const PENDING_ROUTES = Object.freeze({});
 
 /**
  * Whether a page is left out of a reading mode (PENDING_ROUTES).
