@@ -7,7 +7,8 @@
  * The Studio's document tab strip and its controls, driven in Chromium by
  * layout-editor.playwright.cjs on its loopback server (run alone, it serves
  * the shared tree itself). The maintainer looked at the Studio on 2026-11-19:
- * the tab chip was cramped and its outline broken.
+ * the tab chip was cramped and its outline broken, and the editor's tab
+ * still read « Mon Ergopti ».
  *
  * WHAT IS CHECKED:
  * 1. (tab-strip) Every tab and « + » share one height and one middle line;
@@ -15,6 +16,9 @@
  *    « Duplicate » and « Close » are icon buttons kept off the tab's border
  *    and evenly spaced, whose focus ring stays inside the tab; texts hold
  *    4.5:1 and icons 3:1, in light and dark, at 1280 and 320 px.
+ * 2. (restored-start-name) A workspace saved while the start copy was named
+ *    « Mon Ergopti » opens with the copy's current name and its stored id; a
+ *    tab whose keys differ from the start keeps the name it has.
  * ==============================================================================
  */
 
@@ -26,12 +30,46 @@ const http = require('node:http');
 const path = require('node:path');
 const { shared } = require('../../lib/paths.cjs');
 
+const ROOT = path.resolve(__dirname, '..', '..', '..');
+const KEYLAYOUT = path.join(ROOT, 'static', 'layouts', 'registry', 'ergopti', 'ergopti.keylayout');
+// The page's former name for its Ergopti start copy (before 2026-11-19).
+const RETIRED_NAME = 'Mon Ergopti';
 const TYPES = {
 	'.html': 'text/html',
 	'.js': 'text/javascript',
 	'.css': 'text/css',
 	'.json': 'application/json'
 };
+
+/** The locale's strings, read as the page reads them. */
+function stringsOf(lang) {
+	return JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', `${lang}.json`), 'utf8')
+	);
+}
+
+/** Routes the registry to Ergopti alone, as the site serves it. */
+async function routeRegistry(context) {
+	const keylayout = fs.readFileSync(KEYLAYOUT, 'utf8');
+	await context.route('**/layouts/registry/index.json', (route) =>
+		route.fulfill({
+			contentType: 'application/json',
+			body: JSON.stringify({
+				layouts: [
+					{
+						id: 'ergopti',
+						name: 'Ergopti',
+						file: 'ergopti.keylayout',
+						keycode_convention: 'iso'
+					}
+				]
+			})
+		})
+	);
+	await context.route('**/layouts/registry/ergopti.keylayout', (route) =>
+		route.fulfill({ contentType: 'text/plain', body: keylayout })
+	);
+}
 
 /**
  * Reads the tab strip's geometry and colours in the page.
@@ -70,12 +108,21 @@ function readStrip(page) {
 		};
 		const box = (node) => {
 			const r = node.getBoundingClientRect();
-			return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height };
+			return {
+				top: r.top,
+				bottom: r.bottom,
+				left: r.left,
+				right: r.right,
+				height: r.height
+			};
 		};
 		const items = [...document.querySelectorAll('#le-layout-tabs .le-layout-tab-item')];
 		const add = document.getElementById('le-tab-add');
 		return {
-			add: { ...box(add), icon: Boolean(add.querySelector('svg[aria-hidden="true"]')) },
+			add: {
+				...box(add),
+				icon: Boolean(add.querySelector('svg[aria-hidden="true"]'))
+			},
 			items: items.map((item) => {
 				const style = getComputedStyle(item);
 				const bar = getComputedStyle(item, '::after');
@@ -119,7 +166,10 @@ async function exerciseTabStrip(browser, origin) {
 	for (const colorScheme of ['light', 'dark'])
 		for (const width of [1280, 320]) {
 			const where = `${colorScheme} ${width} px`;
-			const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme });
+			const context = await browser.newContext({
+				viewport: { width, height: 900 },
+				colorScheme
+			});
 			const page = await context.newPage();
 			const errors = [];
 			page.on('pageerror', (error) => errors.push(error.message));
@@ -199,6 +249,80 @@ async function exerciseTabStrip(browser, origin) {
 		}
 }
 
+/**
+ * (restored-start-name) The start copy a workspace kept under its former name.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseRestoredStartName(browser, origin) {
+	const en = stringsOf('en');
+	const copyName = en['layout_editor.start.copy_name'].replace('{name}', 'Ergopti');
+	const context = await browser.newContext({
+		viewport: { width: 1280, height: 900 }
+	});
+	await routeRegistry(context);
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	const url = `${origin}/ui/layout_editor/index.html?lang=en`;
+	const tabNames = () =>
+		page.$$eval('#le-layout-tabs .le-layout-tab', (tabs) => tabs.map((tab) => tab.textContent));
+	const settled = () =>
+		page.waitForFunction((text) => {
+			const node = document.querySelector('#le-autosave');
+			return node && node.textContent.startsWith(text);
+		}, en['layout_editor.tabs.autosave.saved']);
+	await page.goto(url);
+	await page.waitForFunction(
+		(expected) => document.querySelector('#le-name').value === expected,
+		copyName
+	);
+	await settled();
+	// The workspace as the page saved it before the rename: the same start copy
+	// named « Mon Ergopti », and a second tab, its keys changed, under that name too.
+	const stored = await page.evaluate(
+		async ({ copyName, retired }) => {
+			const store = LayoutEditorWorkspace.indexedDbStore(window);
+			const saved = LayoutEditorWorkspace.parse(await store.load());
+			const [start] = saved.tabs;
+			const named = (text) => text.replace(JSON.stringify(copyName), JSON.stringify(retired));
+			const edited = LayoutSourceIO.parse(start.text).doc;
+			const keys = edited.layers[0].keys;
+			keys[Object.keys(keys)[0]] = { text: 'ŵ' };
+			const tabs = [
+				{ text: named(start.text), dirty: false },
+				{ text: named(LayoutSourceIO.serialize(edited)), dirty: false }
+			];
+			await store.save(LayoutEditorWorkspace.serialize(tabs, 0));
+			return {
+				id: LayoutSourceIO.parse(start.text).doc.layout.id,
+				text: tabs[0].text
+			};
+		},
+		{ copyName, retired: RETIRED_NAME }
+	);
+	assert.ok(stored.text.includes(RETIRED_NAME), 'the stored tab reads « Mon Ergopti »');
+	await page.reload();
+	await page.waitForFunction(
+		(expected) => document.querySelector('#le-layout-tabs .le-layout-tab').textContent === expected,
+		copyName
+	);
+	assert.deepEqual(
+		await tabNames(),
+		[copyName, RETIRED_NAME],
+		'the start copy takes its current name; an edited tab keeps its own'
+	);
+	await settled();
+	const resaved = await page.evaluate(async () =>
+		LayoutEditorWorkspace.parse(await LayoutEditorWorkspace.indexedDbStore(window).load())
+	);
+	assert.ok(resaved.tabs[0].text.includes(JSON.stringify(copyName)), 'the new name is saved');
+	assert.ok(resaved.tabs[0].text.includes(`id = ${JSON.stringify(stored.id)}`), 'its id stays');
+	assert.equal(await page.isDisabled('#le-undo'), true, 'the rename is not an edit to undo');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 /** Serves the shared tree read-only on loopback, for a run of this file alone. */
 function serve() {
 	const root = shared();
@@ -225,6 +349,7 @@ async function main() {
 	const origin = `http://127.0.0.1:${server.address().port}`;
 	try {
 		await exerciseTabStrip(browser, origin);
+		await exerciseRestoredStartName(browser, origin);
 	} finally {
 		await browser.close();
 		server.close();
@@ -238,4 +363,4 @@ if (require.main === module)
 		process.exitCode = 1;
 	});
 
-module.exports = { exerciseTabStrip };
+module.exports = { exerciseTabStrip, exerciseRestoredStartName };

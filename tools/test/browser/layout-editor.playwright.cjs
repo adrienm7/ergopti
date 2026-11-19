@@ -33,7 +33,7 @@ const studioNumbers = require('./studio-numbers.cjs');
 const studioHeaders = require('./studio-headers.cjs');
 const studioManage = require('./layout-studio-manage.cjs');
 const { catalogueShape, pageRawKeys } = require('../lib/raw-locale-keys.cjs');
-// The editor's document tab strip (studio-controls).
+// The editor's document tab strip and its restored tabs' names (studio-controls).
 const studioControls = require('./studio-controls.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
@@ -4072,6 +4072,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseComparerHome(browser, origin);
 		await exerciseStudioBar(browser, origin);
 		await studioControls.exerciseTabStrip(browser, origin);
+		await studioControls.exerciseRestoredStartName(browser, origin);
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);

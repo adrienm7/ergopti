@@ -4910,6 +4910,9 @@ var LayoutEditorPage = (function () {
 		 */
 		// The start the page opened on, renamed when the locale arrives after it.
 		let openedStart = null;
+		// Whether the tabs came from the host's workspace: their start copies are
+		// renamed again when the locale arrives after them.
+		let restoredTabs = false;
 
 		/**
 		 * The first document: the host's workspace restored when it holds tabs, else
@@ -4923,7 +4926,8 @@ var LayoutEditorPage = (function () {
 			if (!host.workspace) return Promise.resolve(openStart());
 			return fromHost(() => host.workspace.load()).then(
 				(text) => {
-					const started = restoreWorkspace(text) ? null : openStart();
+					restoredTabs = restoreWorkspace(text);
+					const started = restoredTabs ? renameRestoredStarts() : openStart();
 					render();
 					return started;
 				},
@@ -4936,6 +4940,41 @@ var LayoutEditorPage = (function () {
 					return started;
 				}
 			);
+		}
+
+		/**
+		 * Names each restored tab that is still the host's start copy (the keys
+		 * the start made, no unsaved edit) with this locale's copy name: that
+		 * name was the page's, never the user's, so the former copy name of a
+		 * workspace saved before the copy was renamed (maintainer, 2026-11-19),
+		 * or another locale's name, gives way. Ids stay as stored; a tab whose
+		 * keys differ from the start keeps its name.
+		 * @returns {Promise<void>} Settles once the start source was compared.
+		 */
+		function renameRestoredStarts() {
+			if (typeof host.startFrom !== 'string') return Promise.resolve();
+			return loadFillSources().then(() => {
+				const entry = (state.fillSources || []).find((source) => source.id === host.startFrom);
+				if (!entry) return;
+				const name = tl('start.copy_name', { name: entry.name });
+				let renamed = false;
+				try {
+					state.tabs.forEach((stored, index) => {
+						const tab = tabAt(index);
+						const current = tab.history.current();
+						if (tab.dirty || tab.history.canUndo() || current.layout.name === name) return;
+						if (LayoutSourceIO.isPreserved(current)) return;
+						const start = LayoutSourceIO.startFrom(entry, current.layout.id, current.layout.name);
+						if (LayoutSourceIO.serialize(start.doc) !== LayoutSourceIO.serialize(current)) return;
+						tab.history.reset(LayoutEditorModel.setLayout(current, { name }));
+						renamed = true;
+					});
+				} catch (error) {
+					state.message = { kind: 'error', text: problemText(error) };
+					renamed = true;
+				}
+				if (renamed) render();
+			});
 		}
 
 		function openStart() {
@@ -5016,6 +5055,7 @@ var LayoutEditorPage = (function () {
 				state.history.reset(LayoutEditorModel.setLayout(doc(), { name }));
 				openedStart.doc = doc();
 			}
+			if (restoredTabs) renameRestoredStarts();
 			if (state.message && state.message.translate) state.message.text = state.message.translate();
 			render();
 		});

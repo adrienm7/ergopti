@@ -871,6 +871,25 @@ check('a copied layout is named as the user’s own layout, not « My Ergopti »
 			!/^(Mon|My) Ergopti$/.test(name.replace('{name}', 'Ergopti')),
 			`${code}.json still says « ${name.replace('{name}', 'Ergopti')} »`
 		);
+		// The editor's own names: its blank tab and the Comparer's copy of a tab.
+		assert.ok(!own.includes('Ergopti'), `${code}.json: the editor's default tab is « ${own} »`);
+		const duplicate = table['layout_analysis.mine.copy_name'];
+		assert.ok(
+			typeof duplicate === 'string' && duplicate.includes('{name}'),
+			`${code}.json: the duplicate's name lacks {name}`
+		);
+		const named = Object.entries(table).filter(([, text]) => /\b(Mon|My) Ergopti\b/.test(text));
+		assert.deepEqual(named, [], `${code}.json says « Mon Ergopti »`);
+	}
+	// No page of the Studio names a tab, a workspace or a layout « Mon Ergopti »
+	// in code, the editor included (its restored tabs are renamed, editor_page.js).
+	for (const folder of ['layout_editor', 'layout_editor_window', 'layout_analysis']) {
+		const dir = path.join(SHARED, 'ui', folder);
+		for (const file of fs.readdirSync(dir).filter((name) => /\.(js|html)$/.test(name)))
+			assert.ok(
+				!/\b(Mon|My) Ergopti\b/.test(fs.readFileSync(path.join(dir, file), 'utf8')),
+				`ui/${folder}/${file} names « Mon Ergopti »`
+			);
 	}
 });
 
