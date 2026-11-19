@@ -17,6 +17,9 @@
  * 2. The search may score on the corpus's most frequent n-grams (request.share);
  *    the score reported at the end is always the engine's score on the whole
  *    corpus, so it is the one the Comparer shows for the same layout.
+ * 3. After a run, scoreLibrary() scores the layout library on the same corpus
+ *    and settings, with each layout's similarity to the optimized one, in the
+ *    same slices; librarySummary() reads which existing layout comes close.
  * ==============================================================================
  */
 
@@ -123,5 +126,126 @@ var LAYOUT_OPTIMIZER_RUNNER = (function () {
 		};
 	}
 
-	return { start };
+	/**
+	 * Scores the layout library on a run's corpus and settings, and measures
+	 * how alike each library layout is to the optimized one
+	 * (LAYOUT_ANALYSIS.layoutSimilarity), a few layouts per slice so the
+	 * thread keeps answering: one analysis of a layout with many dead keys
+	 * takes a few hundred milliseconds.
+	 * @param {object} request - {layout (the optimized layout, library
+	 *   shape), tables (n-gram counts), analysis (the run's analyse()
+	 *   options: keyboard, format, weights, profile…)}.
+	 * @param {function(object): void} post - Receives {type:
+	 *   'library_progress', done, total}, then {type: 'library_done',
+	 *   entries: [{id, name, score, incomplete, similarity: {weighted,
+	 *   unweighted}}]} in the library's order, or {type: 'error', code,
+	 *   values, message}.
+	 * @returns {{stop: function(): void}} Ends the scan at the next slice, with
+	 *   no further message.
+	 */
+	function scoreLibrary(request, post) {
+		const E = LAYOUT_ANALYSIS;
+		const fail = (error) =>
+			post({
+				type: 'error',
+				code: error.code || '',
+				values: error.values || {},
+				message: String(error.message)
+			});
+		let layouts;
+		let table;
+		try {
+			layouts = E.libraryLayouts();
+			table = E.prepareNgrams(request.tables);
+		} catch (error) {
+			fail(error);
+			return { stop() {} };
+		}
+		const placing = { keyboard: request.analysis.keyboard, profile: request.analysis.profile };
+		const entries = [];
+		let at = 0;
+		let stopped = false;
+
+		function tick() {
+			if (stopped) return;
+			try {
+				const until = Date.now() + SLICE_MS;
+				do {
+					const layout = layouts[at];
+					at += 1;
+					const result = E.analyse(layout, table, request.analysis);
+					const similarity = E.layoutSimilarity(request.layout, layout, table, placing);
+					entries.push({
+						id: layout.id,
+						name: layout.name,
+						score: result.score.total,
+						incomplete: result.incomplete,
+						similarity: { weighted: similarity.weighted, unweighted: similarity.unweighted }
+					});
+				} while (at < layouts.length && Date.now() < until);
+				post({ type: 'library_progress', done: at, total: layouts.length });
+				if (at < layouts.length) setTimeout(tick, 0);
+				else post({ type: 'library_done', entries });
+			} catch (error) {
+				fail(error);
+			}
+		}
+		setTimeout(tick, 0);
+		return {
+			stop() {
+				stopped = true;
+			}
+		};
+	}
+
+	/**
+	 * What the library comparison says of an optimized layout: the library
+	 * layouts most alike to it, and the best-scoring one (every complete
+	 * layout before an incomplete one, as the Comparer ranks), each with its
+	 * gap; the verdict reads the best one's gap against the small gap.
+	 * @param {object[]} entries - scoreLibrary()'s entries.
+	 * @param {number} optimized - The optimized layout's score.
+	 * @param {{smallGap: number, closest: number}} settings - The score gap
+	 *   under which an existing layout does the job
+	 *   (LAYOUT_ANALYSIS.similarScoreGap), and how many alike layouts to list.
+	 * @returns {{closest: object[], best: object, verdict: string, smallGap:
+	 *   number}} Each layout {id, name, score, incomplete, similarity, gap},
+	 *   gap = optimized − its score (positive: the optimized layout scores
+	 *   more); verdict `existing_better` (gap < 0), `small_gap` (gap ≤
+	 *   smallGap) or `optimized_ahead`.
+	 * @throws {Error} On no entry, a non-finite score or invalid settings.
+	 */
+	function librarySummary(entries, optimized, settings) {
+		if (!Array.isArray(entries) || entries.length === 0)
+			throw new Error('layout_optimizer: no library layout to compare with');
+		if (!Number.isFinite(optimized))
+			throw new Error(`layout_optimizer: the optimized score ${optimized} is not a number`);
+		const { smallGap, closest } = settings;
+		if (!Number.isFinite(smallGap) || smallGap < 0)
+			throw new Error(`layout_optimizer: small gap ${smallGap} is not a number ≥ 0`);
+		if (!Number.isInteger(closest) || closest < 1)
+			throw new Error(`layout_optimizer: ${closest} alike layouts to list`);
+		const rows = entries.map((entry) => {
+			if (!Number.isFinite(entry.score))
+				throw new Error(`layout_optimizer: ${entry.id} has no score`);
+			return Object.assign({}, entry, { gap: optimized - entry.score });
+		});
+		const alike = rows
+			.slice()
+			.sort(
+				(a, b) =>
+					b.similarity.weighted.sameKey - a.similarity.weighted.sameKey ||
+					b.similarity.weighted.sameFingerRow - a.similarity.weighted.sameFingerRow ||
+					b.score - a.score
+			)
+			.slice(0, closest);
+		const best = rows
+			.slice()
+			.sort((a, b) => Number(a.incomplete) - Number(b.incomplete) || b.score - a.score)[0];
+		const verdict =
+			best.gap < 0 ? 'existing_better' : best.gap <= smallGap ? 'small_gap' : 'optimized_ahead';
+		return { closest: alike, best, verdict, smallGap };
+	}
+
+	return { start, scoreLibrary, librarySummary };
 })();

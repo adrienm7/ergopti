@@ -3780,6 +3780,14 @@
 		"layout_editor.export.option.cmini": {
 			"reason": "brand-or-feature-name",
 			"locales": ["hi", "ko", "tr"]
+		},
+		"layout_optimizer.library.percent": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "no", "pt", "ru", "sv", "uk"]
+		},
+		"layout_optimizer.library.score": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "fr", "nl"]
 		}
 	}
 }

@@ -150,6 +150,51 @@ async function runToEnd(page) {
 	return page.locator('#lo-status').textContent();
 }
 
+/**
+ * Waits for the library comparison that follows a run, and checks its card:
+ * a verdict naming the best existing layout, five alike layouts with their
+ * bars, and labelled buttons to open each one.
+ * @returns {Promise<string>} The verdict's words.
+ */
+async function libraryToEnd(page) {
+	await page.waitForFunction(
+		() =>
+			document.querySelector('#lo-library-body .lo-library-content') ||
+			document.querySelector('#lo-library-status.lo-error'),
+		null,
+		{ timeout: 180000 }
+	);
+	const status = await page.locator('#lo-library-status').textContent();
+	assert.match(status, /library layouts scored/, `the library is compared: ${status}`);
+	const card = await page.evaluate(() => {
+		const body = document.querySelector('#lo-library-body');
+		return {
+			verdict: body.querySelector('.lo-library-verdict').textContent,
+			best: body.querySelector('.lo-library-best .lo-library-name').textContent,
+			items: body.querySelectorAll('.lo-library-item').length,
+			bars: Array.from(
+				body.querySelectorAll('.lo-library-item .lo-bar-key'),
+				(bar) => bar.offsetWidth
+			),
+			labels: Array.from(body.querySelectorAll('button[data-open]'), (button) =>
+				button.getAttribute('aria-label')
+			)
+		};
+	});
+	assert.ok(card.verdict.includes(card.best), `the verdict names ${card.best}: ${card.verdict}`);
+	assert.equal(card.items, 5, 'five alike layouts');
+	assert.ok(
+		card.bars.every((width) => width > 0),
+		`every alike layout has its bar: ${card.bars}`
+	);
+	assert.equal(card.labels.length, 12, 'a Compare and an Edit button per layout');
+	assert.ok(
+		card.labels.every((label) => /^(Compare|Edit) ./.test(label)),
+		`the buttons name their layout: ${card.labels.join(', ')}`
+	);
+	return card.verdict;
+}
+
 async function main() {
 	const server = await serve();
 	const origin = `http://127.0.0.1:${server.address().port}`;
@@ -240,6 +285,21 @@ async function main() {
 			assert.match(status, /^Done/, `the run on the pasted text ends: ${status}`);
 			assert.equal(await page.locator('#lo-result').isVisible(), true, 'the result shows');
 			assert.match(await page.locator('#lo-score').textContent(), /\d/, 'a score shows');
+			// The library, scored in a worker on the same corpus, and its card.
+			await libraryToEnd(page);
+			const best = await page
+				.locator('#lo-library-body .lo-library-best .lo-library-name')
+				.textContent();
+			// The layout handed to « Compare »: caught before the page leaves.
+			await page.evaluate(() => {
+				window.LAYOUT_ANALYSIS_FILES.handOff = (layout) => {
+					window.__handed = layout;
+					throw Object.assign(new Error('kept'), { code: 'studio_handoff_failed' });
+				};
+			});
+			await page.click('#lo-library-body .lo-library-best button[data-open="comparer"]');
+			const handed = await page.evaluate(() => window.__handed);
+			assert.equal(handed && handed.name, best, 'Compare hands the library layout over');
 			assert.deepEqual(errors, []);
 			await context.close();
 		}
@@ -469,6 +529,8 @@ async function main() {
 			let status = await runToEnd(page);
 			assert.match(status, /^Done: \d+ layouts scored in \d+,\d s$/, `fallback numbers: ${status}`);
 			assert.match(await page.locator('#lo-score').textContent(), /\d,\d\d/, 'the score shows');
+			// The library is scored on this page's thread: the engine is idle after it.
+			await libraryToEnd(page);
 
 			// Measuring the start fails once: the reason shows, then « Try again » runs.
 			await page.evaluate(() => {
@@ -615,6 +677,12 @@ async function main() {
 				viewport: PHONE,
 				colorScheme
 			});
+			// With a result and its library card on the page.
+			await page.selectOption('#lo-corpus', 'custom');
+			await page.fill('#lo-text', TEXT.repeat(2));
+			await shortBudget(page);
+			assert.match(await runToEnd(page), /^Done/, `${colorScheme}: the phone run ends`);
+			await libraryToEnd(page);
 			const overflow = await page.evaluate(
 				() => document.documentElement.scrollWidth - document.documentElement.clientWidth
 			);

@@ -40,6 +40,11 @@
  *    compact keyboards, fingering), read through score_settings.js at each
  *    run; the page sums them up and opens the Comparer to change them, so
  *    no second copy of a weight exists.
+ * 11. Honest about the library: after a run, the library is scored on the
+ *    same corpus and settings (in a worker, or the runner's slices) and the
+ *    result says which existing layout comes close, by how much it is alike
+ *    (LAYOUT_ANALYSIS.layoutSimilarity) and its score gap, with links to
+ *    open it in « Comparer » or « Éditer ».
  * ==============================================================================
  */
 
@@ -97,6 +102,8 @@
 	// Size of one key unit of a drawn board, in pixels, at most and at least.
 	const KEY_UNIT_MAX = 44;
 	const KEY_UNIT_MIN = 20;
+	// The library layouts most alike to the optimized one the result lists.
+	const LIBRARY_CLOSEST = 5;
 	// The best layout's metrics are measured again at most this often (ms).
 	const METRICS_MS = 500;
 	const HEIGHT_MESSAGE = 'ergopti-layout-optimizer:height';
@@ -273,6 +280,13 @@
 		<button type="button" id="lo-open-editor" class="lo-primary" data-i18n="layout_optimizer.result.open_editor" disabled></button>
 		<button type="button" id="lo-open-comparer" data-i18n="layout_optimizer.result.open_comparer" disabled></button>
 	</div>
+	<section id="lo-library" class="lo-library" aria-labelledby="lo-library-title" hidden>
+		<h3 id="lo-library-title" data-i18n="layout_optimizer.library.title"></h3>
+		<p class="lo-muted" data-i18n="layout_optimizer.library.help"></p>
+		<progress id="lo-library-progress" max="1" value="0" aria-labelledby="lo-library-status"></progress>
+		<p id="lo-library-status" class="lo-muted" role="status" aria-live="polite"></p>
+		<div id="lo-library-body"></div>
+	</section>
 </section>
 </div>`;
 
@@ -312,6 +326,176 @@
 			minimumFractionDigits: digits,
 			maximumFractionDigits: digits
 		});
+	}
+
+	// The glyph beside each verdict and gap, so none is told by its colour alone.
+	const VERDICT_MARKS = { small_gap: '≈', optimized_ahead: '▲', existing_better: '★' };
+	const GAP_MARKS = { behind: '▼', ahead: '▲', same: '=' };
+
+	/**
+	 * The card that compares the optimized layout with the library: the
+	 * verdict in words, the best-scoring existing layout with a gauge of how
+	 * alike it is, and the most alike layouts as bars, each with its score
+	 * gap and its buttons to open it in « Comparer » or « Éditer ». Every
+	 * visual repeats its number in text (the bars and the gauge are hidden
+	 * from assistive technology, their text is not).
+	 * @param {Document} doc - The document that makes the nodes.
+	 * @param {object} summary - LAYOUT_OPTIMIZER_RUNNER.librarySummary().
+	 * @param {{t: function(string, object=): string, number: function(number,
+	 *   number): string, onOpen: function(object, string): void}} deps - The
+	 *   page's translator and number writer, and what opens a layout
+	 *   (`comparer` or `editor`).
+	 * @returns {HTMLElement} The card's content.
+	 */
+	function libraryCard(doc, summary, deps) {
+		const { t, number, onOpen } = deps;
+		const el = (tag, className, text) => {
+			const node = doc.createElement(tag);
+			if (className) node.className = className;
+			if (text !== undefined) node.textContent = text;
+			return node;
+		};
+		const percent = (value) => t('layout_optimizer.library.percent', { value: number(value, 1) });
+		const points = (value) => number(Math.abs(value), 2);
+		const best = summary.best;
+		const box = el('div', 'lo-library-content');
+
+		// The verdict, the best existing layout's gap read against the small gap.
+		const banner = el('div', `lo-library-verdict lo-library-${summary.verdict}`);
+		const mark = el('span', 'lo-library-mark', VERDICT_MARKS[summary.verdict]);
+		mark.setAttribute('aria-hidden', 'true');
+		banner.append(
+			mark,
+			el(
+				'p',
+				'',
+				t(`layout_optimizer.library.verdict.${summary.verdict}`, {
+					name: best.name,
+					gap: points(best.gap),
+					threshold: number(summary.smallGap, 2)
+				})
+			)
+		);
+		box.append(banner);
+
+		const gapChip = (entry) => {
+			const side = entry.gap > 0 ? 'behind' : entry.gap < 0 ? 'ahead' : 'same';
+			const chip = el('span', `lo-gap lo-gap-${side}`);
+			const glyph = el('span', 'lo-gap-mark', GAP_MARKS[side]);
+			glyph.setAttribute('aria-hidden', 'true');
+			chip.append(
+				glyph,
+				el('span', '', t(`layout_optimizer.library.gap_${side}`, { gap: points(entry.gap) }))
+			);
+			return chip;
+		};
+		const buttons = (entry) => {
+			const row = el('div', 'lo-library-actions');
+			for (const where of ['comparer', 'editor']) {
+				const button = el('button', 'lo-link', t(`layout_optimizer.library.open_${where}`));
+				button.type = 'button';
+				button.dataset.open = where;
+				button.dataset.layout = entry.id;
+				// The visible word first (WCAG 2.5.3), then the layout it opens.
+				button.setAttribute(
+					'aria-label',
+					t(`layout_optimizer.library.open_${where}_label`, { name: entry.name })
+				);
+				button.addEventListener('click', () => onOpen(entry, where));
+				row.append(button);
+			}
+			return row;
+		};
+		const facts = (entry) => {
+			const list = el('ul', 'lo-library-facts');
+			list.append(
+				el('li', '', t('layout_optimizer.library.score', { score: number(entry.score, 2) })),
+				el(
+					'li',
+					'',
+					t('layout_optimizer.library.same_finger', {
+						value: percent(entry.similarity.weighted.sameFingerRow)
+					})
+				),
+				el(
+					'li',
+					'',
+					t('layout_optimizer.library.distinct', {
+						value: percent(entry.similarity.unweighted.sameKey)
+					})
+				)
+			);
+			if (entry.incomplete)
+				list.append(el('li', 'lo-bad', t('layout_optimizer.library.incomplete')));
+			return list;
+		};
+
+		// The best-scoring existing layout: a gauge of how alike it is.
+		const bestBox = el('div', 'lo-library-best');
+		const alike = best.similarity.weighted.sameKey;
+		const gauge = el('div', 'lo-gauge');
+		gauge.style.setProperty('--lo-gauge', String(Math.max(0, Math.min(100, alike))));
+		gauge.setAttribute('aria-hidden', 'true');
+		gauge.append(el('span', 'lo-gauge-value', percent(alike)));
+		const bestText = el('div', 'lo-library-best-text');
+		bestText.append(
+			el('p', 'lo-library-kicker', t('layout_optimizer.library.best_title')),
+			el('h4', 'lo-library-name', best.name),
+			el('p', 'lo-library-alike', t('layout_optimizer.library.alike', { value: percent(alike) })),
+			gapChip(best),
+			facts(best),
+			buttons(best)
+		);
+		bestBox.append(gauge, bestText);
+		box.append(bestBox);
+
+		// The most alike layouts: a bar each, same key over same finger and row.
+		box.append(el('h4', 'lo-library-subtitle', t('layout_optimizer.library.closest_title')));
+		const list = el('ol', 'lo-library-list');
+		for (const entry of summary.closest) {
+			const item = el(
+				'li',
+				entry.id === best.id ? 'lo-library-item lo-library-is-best' : 'lo-library-item'
+			);
+			item.dataset.layout = entry.id;
+			const head = el('div', 'lo-library-item-head');
+			head.append(el('span', 'lo-library-name', entry.name), gapChip(entry));
+			const bars = el('div', 'lo-bars');
+			bars.setAttribute('aria-hidden', 'true');
+			const finger = el('span', 'lo-bar lo-bar-finger');
+			finger.style.width = `${Math.max(0, Math.min(100, entry.similarity.weighted.sameFingerRow))}%`;
+			const key = el('span', 'lo-bar lo-bar-key');
+			key.style.width = `${Math.max(0, Math.min(100, entry.similarity.weighted.sameKey))}%`;
+			bars.append(finger, key);
+			item.append(
+				head,
+				bars,
+				el(
+					'p',
+					'lo-library-alike',
+					t('layout_optimizer.library.alike', { value: percent(entry.similarity.weighted.sameKey) })
+				),
+				facts(entry),
+				buttons(entry)
+			);
+			list.append(item);
+		}
+		box.append(list);
+		// The bars' key, in words beside its two swatches.
+		const legend = el('p', 'lo-library-legend lo-muted');
+		const swatch = (className, text) => {
+			const part = el('span', 'lo-legend-item');
+			const chip = el('span', `lo-swatch ${className}`);
+			chip.setAttribute('aria-hidden', 'true');
+			part.append(chip, el('span', '', text));
+			return part;
+		};
+		legend.append(
+			swatch('lo-bar-key', t('layout_optimizer.library.legend_key')),
+			swatch('lo-bar-finger', t('layout_optimizer.library.legend_finger'))
+		);
+		box.append(legend);
+		return box;
 	}
 
 	let mounted = null;
@@ -418,7 +602,9 @@
 			startResult: null,
 			best: null,
 			bestLayout: null,
-			lastMetrics: 0
+			lastMetrics: 0,
+			// The library scan after a run (scanLibrary): {runner}, or null.
+			library: null
 		};
 
 		function startLayouts() {
@@ -930,18 +1116,24 @@
 				};
 				return {
 					start: (request) => worker.postMessage({ type: 'start', request }),
+					scan: (request) => worker.postMessage({ type: 'library', request }),
 					stop: () => worker.postMessage({ type: 'stop' }),
 					end: () => worker.terminate()
 				};
 			} catch {
 				// A page the host inlines has no URL to load a worker from: run here.
 				let local = null;
+				let scanner = null;
 				return {
 					start: (request) => {
 						local = window.LAYOUT_OPTIMIZER_RUNNER.start(request, onMessage);
 					},
+					scan: (request) => {
+						scanner = window.LAYOUT_OPTIMIZER_RUNNER.scoreLibrary(request, onMessage);
+					},
 					stop: () => local && local.stop(),
-					end: () => {}
+					// A finished search needs no end; a library scan stops at its next slice.
+					end: () => scanner && scanner.stop()
 				};
 			}
 		}
@@ -1011,6 +1203,7 @@
 			state.tablesInUse = tables;
 			state.analysisInUse = analysis;
 			state.startInUse = start;
+			endLibrary();
 			$('lo-result').hidden = false;
 			$('lo-open-editor').disabled = true;
 			$('lo-open-comparer').disabled = true;
@@ -1120,6 +1313,7 @@
 				const winner = O.bestOf(running.shares.map((entry) => entry.result));
 				showBest(winner.layout, winner.score, true, true);
 				finish(running, began, null);
+				scanLibrary(winner.layout, winner.score);
 			}
 		}
 
@@ -1181,6 +1375,100 @@
 			if (!running) return;
 			running.stopped = true;
 			for (const runner of running.runners) runner.stop();
+		}
+
+		/** Ends the library scan under way, if any, and hides its card. */
+		function endLibrary() {
+			const scan = state.library;
+			state.library = null;
+			if (scan) scan.runner.end();
+			$('lo-library').hidden = true;
+			$('lo-library-body').replaceChildren();
+		}
+
+		/**
+		 * Scores the library on the run's corpus and settings, off the page's
+		 * thread where a worker starts (else in the runner's slices), then
+		 * shows which existing layouts come close to the optimized one.
+		 * @param {object} layout - The optimized layout.
+		 * @param {number} score - Its score on the whole corpus.
+		 */
+		function scanLibrary(layout, score) {
+			endLibrary();
+			$('lo-library').hidden = false;
+			$('lo-library-progress').value = 0;
+			$('lo-library-progress').hidden = false;
+			setLibraryStatus(t(`${PREFIX}library.starting`));
+			const scan = { runner: null };
+			scan.runner = makeRunner((message) => {
+				if (state.library !== scan) return;
+				try {
+					libraryMessage(scan, message, score);
+				} catch (error) {
+					failLibrary(error);
+				}
+			});
+			state.library = scan;
+			scan.runner.scan({ layout, tables: state.tablesInUse, analysis: state.analysisInUse });
+		}
+
+		function setLibraryStatus(text, error) {
+			$('lo-library-status').textContent = text;
+			$('lo-library-status').classList.toggle('lo-error', Boolean(error));
+		}
+
+		/** A library scan that failed: logged, said in words, the run's result kept. */
+		function failLibrary(error) {
+			console.error('[layout_optimizer] the library comparison failed:', error);
+			const scan = state.library;
+			state.library = null;
+			if (scan) scan.runner.end();
+			$('lo-library-progress').hidden = true;
+			setLibraryStatus(
+				t(`${PREFIX}library.failed`, {
+					message: error && error.message ? error.message : String(error)
+				}),
+				true
+			);
+		}
+
+		function libraryMessage(scan, message, score) {
+			if (message.type === 'error') {
+				failLibrary(new Error(message.message || message.code));
+				return;
+			}
+			if (message.type === 'library_progress') {
+				$('lo-library-progress').value = message.done / message.total;
+				setLibraryStatus(
+					t(`${PREFIX}library.scoring`, {
+						done: number(message.done, 0),
+						total: number(message.total, 0)
+					})
+				);
+				return;
+			}
+			if (message.type !== 'library_done')
+				throw new Error(`layout_optimizer: unknown library message ${message.type}`);
+			state.library = null;
+			scan.runner.end();
+			const summary = window.LAYOUT_OPTIMIZER_RUNNER.librarySummary(message.entries, score, {
+				smallGap: E.similarScoreGap(),
+				closest: LIBRARY_CLOSEST
+			});
+			$('lo-library-progress').hidden = true;
+			setLibraryStatus(t(`${PREFIX}library.done`, { total: number(message.entries.length, 0) }));
+			$('lo-library-body').replaceChildren(
+				libraryCard(document, summary, { t, number, onOpen: openLibraryLayout })
+			);
+		}
+
+		/** Opens a library layout of the card in « Comparer » or « Éditer ». */
+		function openLibraryLayout(entry, where) {
+			const layout = library.find((item) => item.id === entry.id);
+			if (!layout) throw new Error(`layout_optimizer: no library layout ${entry.id}`);
+			if (where === 'comparer') openInComparer(layout);
+			else if (where === 'editor') openInEditor(layout);
+			else throw new Error(`layout_optimizer: cannot open a layout in ${where}`);
 		}
 
 		/**
@@ -1277,14 +1565,14 @@
 			else location.href = new URL(`${page}${location.search}`, BASE).href;
 		}
 
-		function openEditor() {
-			if (!state.bestLayout) return;
+		/** Opens a layout in « Éditer »: the app's own tab, or the site's page. */
+		function openInEditor(layout) {
 			if (typeof HOST.openEditor === 'function') {
-				HOST.openEditor(state.bestLayout);
+				HOST.openEditor(layout);
 				return;
 			}
 			try {
-				FILES.handOffToEditor(state.bestLayout);
+				FILES.handOffToEditor(layout);
 			} catch (error) {
 				setStatus(errorText(error.code, error.message), true);
 				return;
@@ -1292,19 +1580,30 @@
 			openTab(FILES.OPEN_EDITOR_MESSAGE, '../layout_editor/index.html');
 		}
 
-		function openComparer() {
-			if (!state.bestLayout) return;
+		/**
+		 * Opens a layout in « Comparer », added and ticked there (a library
+		 * layout replaces its own entry): the app's own tab, or the site's page.
+		 */
+		function openInComparer(layout) {
 			if (typeof HOST.openComparer === 'function') {
-				HOST.openComparer(state.bestLayout);
+				HOST.openComparer(layout);
 				return;
 			}
 			try {
-				FILES.handOff(state.bestLayout);
+				FILES.handOff(layout);
 			} catch (error) {
 				setStatus(errorText(error.code, error.message), true);
 				return;
 			}
 			openTab(FILES.OPEN_COMPARER_MESSAGE, '../layout_analysis/index.html');
+		}
+
+		function openEditor() {
+			if (state.bestLayout) openInEditor(state.bestLayout);
+		}
+
+		function openComparer() {
+			if (state.bestLayout) openInComparer(state.bestLayout);
 		}
 
 		/**
@@ -1572,7 +1871,7 @@
 			: null;
 	const BASE = SCRIPT_BASE || location.href;
 
-	window.LAYOUT_OPTIMIZER_PAGE = { mount, numberLocale, formatNumber };
+	window.LAYOUT_OPTIMIZER_PAGE = { mount, numberLocale, formatNumber, libraryCard };
 
 	/** The site's page: mount into its <main>. */
 	function autostart() {

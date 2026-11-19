@@ -458,6 +458,16 @@ Each question names the default kept meanwhile; an answer moves into the item or
       best, 1.79 % fixed); `altgr_usage` 10 gives 1.52 %, 20 gives 1.78 %. Choose the defaults, and whether such
       detours should count at all (docs/design/layout-analysis.md, « Access weights »).
 
+- [ ] **Optimizer « an existing layout would do the job » (decided by the agent on 2026-11-19, to review by the
+      maintainer).** After a run the Optimiser scores the library on the same corpus and settings and shows the
+      most alike layouts and the best-scoring one. Kept meanwhile: the small gap is `similar_score_gap` = 2 points
+      (`analysis_model.json`; 2 points are 0.2 % of SFB at weight 10, about the gap between Ergopti+ and Ergopti on
+      Nemolivier); the gap is said in points, not in %, since the score has no zero (AZERTY is about −88); the
+      similarity shown first is the weighted share of the characters on the same key and level, spaces aside,
+      with the same finger and row and the unweighted share beside it; five alike layouts are listed. Choose the
+      threshold, whether a gap in % of the run's gain over its start would read better, and the measure shown
+      first (docs/design/layout-optimizer.md, « Existing layouts »).
+
 - [ ] **Python XKB converter and the JIS and ABNT keys (decided by the agent on 2026-11-18, to review by the
       maintainer).** 2f96fa2f4f places Yen, Ro and the keypad comma (`mac_keycodes.json` `extra_keys`) in the Lua
       converter only; `keylayout_to_xkb.py` still reads `keys` alone and reports macOS 93 and 94 as unplaced

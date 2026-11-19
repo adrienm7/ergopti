@@ -624,6 +624,312 @@ body:has(> main.layout-optimizer) {
 
 /* ============================== */
 /* ============================== */
+/* ======= 6b/ Library ========== */
+/* ============================== */
+/* ============================== */
+
+/* The optimized layout against the library: a card of its own in the result. */
+.lo-library {
+	--lo-key-bar: var(--theme-chart-cat-1);
+	--lo-finger-bar: var(--theme-chart-ramp-edge);
+	background: var(--lo-inset);
+	border: 1px solid var(--lo-border);
+	border-radius: var(--lo-radius);
+	margin-top: var(--lo-space-6);
+	padding: var(--lo-space-5);
+}
+
+.lo-library > h3 {
+	font-size: 1.1em;
+	margin-top: 0;
+}
+
+#lo-library-progress {
+	accent-color: var(--lo-accent);
+	height: 8px;
+	width: 100%;
+}
+
+.lo-library-content {
+	display: flex;
+	flex-direction: column;
+	gap: var(--lo-space-5);
+	margin-top: var(--lo-space-4);
+}
+
+/* The verdict: a mark and a coloured edge, and always its words. */
+.lo-library-verdict {
+	align-items: center;
+	background: var(--lo-card);
+	border: 1px solid var(--lo-border);
+	border-inline-start: 6px solid var(--lo-accent);
+	border-radius: 10px;
+	display: flex;
+	gap: var(--lo-space-4);
+	padding: var(--lo-space-4) var(--lo-space-5);
+}
+
+.lo-library-verdict p {
+	font-size: 1.05em;
+	font-weight: 600;
+	margin: 0;
+}
+
+.lo-library-mark {
+	align-items: center;
+	background: var(--lo-accent-soft);
+	border-radius: 50%;
+	display: inline-flex;
+	flex: none;
+	font-size: 1.4em;
+	font-weight: 700;
+	height: 44px;
+	justify-content: center;
+	width: 44px;
+}
+
+.lo-library-small_gap {
+	border-inline-start-color: var(--theme-chart-cat-3);
+}
+
+.lo-library-existing_better {
+	border-inline-start-color: var(--theme-chart-cat-4);
+}
+
+/* The best existing layout: its gauge beside its facts. */
+.lo-library-best {
+	align-items: center;
+	background: var(--lo-card);
+	border: 1px solid var(--lo-border);
+	border-radius: 10px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--lo-space-5) var(--lo-space-6);
+	padding: var(--lo-space-5);
+}
+
+.lo-gauge {
+	align-items: center;
+	background: conic-gradient(var(--lo-key-bar) calc(var(--lo-gauge, 0) * 1%), var(--lo-inset) 0);
+	border: 1px solid var(--lo-border);
+	border-radius: 50%;
+	display: flex;
+	flex: none;
+	height: 132px;
+	justify-content: center;
+	position: relative;
+	width: 132px;
+}
+
+/* The ring's hole, where its number stands. */
+.lo-gauge::before {
+	background: var(--lo-card);
+	border-radius: 50%;
+	content: '';
+	inset: 16px;
+	position: absolute;
+}
+
+.lo-gauge-value {
+	font-size: 1.35em;
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	position: relative;
+}
+
+.lo-library-best-text {
+	display: flex;
+	flex: 1 1 260px;
+	flex-direction: column;
+	gap: var(--lo-space-2);
+	min-width: 0;
+}
+
+.lo-library-kicker {
+	color: var(--lo-sub);
+	font-size: 0.85em;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	margin: 0;
+	text-transform: uppercase;
+}
+
+.layout-optimizer .lo-library-name {
+	font-size: 1.15em;
+	font-weight: 700;
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+.lo-library-alike {
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+	margin: 0;
+}
+
+.lo-library-facts {
+	color: var(--lo-sub);
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--lo-space-1) var(--lo-space-4);
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+/* The score gap: a mark, its words and a coloured outline. */
+.lo-gap {
+	align-items: center;
+	align-self: flex-start;
+	border: 1px solid currentColor;
+	border-radius: 12px;
+	display: inline-flex;
+	font-size: 0.92em;
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+	gap: var(--lo-space-2);
+	padding: 2px var(--lo-space-3);
+}
+
+.lo-gap-behind {
+	color: var(--lo-bad);
+}
+
+.lo-gap-ahead {
+	color: var(--lo-good);
+}
+
+.lo-gap-same {
+	color: var(--lo-sub);
+}
+
+.lo-library-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--lo-space-2);
+	margin-top: var(--lo-space-1);
+}
+
+.layout-optimizer .lo-link {
+	border-color: var(--lo-accent);
+	color: var(--lo-accent);
+	font-weight: 600;
+}
+
+.lo-library-subtitle {
+	font-size: 1em;
+	margin: 0;
+}
+
+/* The most alike layouts, a bar each. */
+.lo-library-list {
+	display: grid;
+	gap: var(--lo-space-4);
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.lo-library-item {
+	background: var(--lo-card);
+	border: 1px solid var(--lo-border);
+	border-radius: 10px;
+	display: flex;
+	flex-direction: column;
+	gap: var(--lo-space-3);
+	min-width: 0;
+	padding: var(--lo-space-4);
+}
+
+/* The best-scoring layout, also among the most alike: a double edge, not colour alone. */
+.lo-library-is-best {
+	border: 3px double var(--lo-accent);
+}
+
+.lo-library-item-head {
+	align-items: flex-start;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--lo-space-2) var(--lo-space-3);
+	justify-content: space-between;
+}
+
+.lo-library-item-head .lo-library-name {
+	font-size: 1em;
+}
+
+/* Same finger and row behind, same key over it, on one track. */
+.lo-bars {
+	background: var(--lo-inset);
+	border: 1px solid var(--lo-border);
+	border-radius: 999px;
+	height: 14px;
+	overflow: hidden;
+	position: relative;
+}
+
+.lo-bar {
+	border-radius: 999px;
+	inset-block: 0;
+	inset-inline-start: 0;
+	position: absolute;
+}
+
+.lo-bar-key {
+	background: var(--lo-key-bar);
+}
+
+/* Hatched as well as lighter, so the two bars differ without colour. */
+.lo-bar-finger {
+	background: repeating-linear-gradient(135deg, var(--lo-finger-bar) 0 4px, transparent 4px 7px);
+}
+
+.lo-library-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--lo-space-2) var(--lo-space-5);
+	margin: 0;
+}
+
+.lo-legend-item {
+	align-items: center;
+	display: inline-flex;
+	gap: var(--lo-space-2);
+}
+
+.lo-swatch {
+	border: 1px solid var(--lo-border);
+	border-radius: 4px;
+	display: inline-block;
+	height: 12px;
+	width: 24px;
+}
+
+.lo-swatch.lo-bar-key {
+	background: var(--lo-key-bar);
+}
+
+/* High-contrast modes draw the bars and the gauge in the system's colours. */
+@media (forced-colors: active) {
+	.lo-bar-key,
+	.lo-swatch.lo-bar-key {
+		background: CanvasText;
+	}
+
+	.lo-bar-finger,
+	.lo-swatch.lo-bar-finger {
+		background: repeating-linear-gradient(135deg, GrayText 0 4px, transparent 4px 7px);
+	}
+
+	.lo-gauge {
+		background: conic-gradient(CanvasText calc(var(--lo-gauge, 0) * 1%), Canvas 0);
+		forced-color-adjust: none;
+	}
+}
+
+/* ============================== */
+/* ============================== */
 /* ======= 7/ Phone ============= */
 /* ============================== */
 /* ============================== */
@@ -643,6 +949,20 @@ body:has(> main.layout-optimizer) {
 
 	.lo-tile-value {
 		font-size: 1.15em;
+	}
+
+	.lo-library,
+	.lo-library-best {
+		padding: var(--lo-space-4) var(--lo-space-3);
+	}
+
+	.lo-library-verdict {
+		padding: var(--lo-space-3);
+	}
+
+	.lo-gauge {
+		height: 108px;
+		width: 108px;
 	}
 
 	.lo-table th,

@@ -7,8 +7,10 @@
  * Runs a share of the optimizer's restarts off the page's thread, so the
  * Studio stays responsive while thousands of layouts are scored. It loads
  * the engine and the optimizer next to it and speaks the runner's protocol:
- * {type: 'start', request} starts, {type: 'stop'} stops; the runner's
- * messages go back to the page as they are.
+ * {type: 'start', request} starts, {type: 'stop'} stops; {type: 'library',
+ * request} scores the layout library against the optimized layout instead
+ * (LAYOUT_OPTIMIZER_RUNNER.scoreLibrary); the runner's messages go back to
+ * the page as they are.
  * ==============================================================================
  */
 
@@ -29,5 +31,8 @@ self.onmessage = (event) => {
 	if (message.type === 'start') {
 		if (running) throw new Error('layout_optimizer: this worker already runs a search');
 		running = LAYOUT_OPTIMIZER_RUNNER.start(message.request, (out) => self.postMessage(out));
+	} else if (message.type === 'library') {
+		if (running) throw new Error('layout_optimizer: this worker already runs a search');
+		running = LAYOUT_OPTIMIZER_RUNNER.scoreLibrary(message.request, (out) => self.postMessage(out));
 	} else if (message.type === 'stop' && running) running.stop();
 };

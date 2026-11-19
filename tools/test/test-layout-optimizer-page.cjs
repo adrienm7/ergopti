@@ -26,6 +26,12 @@
  *    declares none (or a malformed one) writes them in the documented
  *    fallback instead of throwing; every stage of a run has its failure
  *    message, and a runner message the page cannot show ends the run.
+ * 6. Library: after a run, the runner scores every library layout on the
+ *    run's corpus and settings in slices (the worker too), each score and
+ *    similarity the engine's; the summary's verdict reads the best existing
+ *    layout's gap against the small gap; the library card renders its
+ *    verdict, the gauge and bars with their numbers in words, a score gap
+ *    per layout and labelled buttons that open each layout.
  * ==============================================================================
  */
 
@@ -76,6 +82,54 @@ const check = (condition, message) => {
 	if (!condition) errors.push(message);
 };
 const read = (file) => fs.readFileSync(file, 'utf8');
+
+/**
+ * A document small enough for the library card: elements with children,
+ * classes, attributes, dataset, style, text and click listeners.
+ */
+function fakeDocument() {
+	const node = (tagName) => ({
+		tagName: tagName.toUpperCase(),
+		className: '',
+		children: [],
+		text: '',
+		attributes: {},
+		dataset: {},
+		listeners: [],
+		style: {
+			props: {},
+			setProperty(name, value) {
+				this.props[name] = value;
+			}
+		},
+		set textContent(value) {
+			this.children = [];
+			this.text = String(value);
+		},
+		get textContent() {
+			return textOf(this);
+		},
+		append(...items) {
+			for (const item of items)
+				this.children.push(typeof item === 'string' ? { text: item, children: [] } : item);
+		},
+		setAttribute(name, value) {
+			this.attributes[name] = String(value);
+		},
+		addEventListener(type, listener) {
+			if (type === 'click') this.listeners.push(listener);
+		},
+		click() {
+			for (const listener of this.listeners) listener();
+		}
+	});
+	return { createElement: node };
+}
+
+/** A fake node and every node under it. */
+const descendants = (root) => [root].concat(...(root.children || []).map(descendants));
+/** A fake node's text, its children's after its own. */
+const textOf = (root) => (root.text || '') + (root.children || []).map(textOf).join('');
 
 // =========================
 // ======= 1/ Scripts ======
@@ -144,6 +198,30 @@ check(
 	page.includes('SCORE_SETTINGS.analysisOptions(') && !/defaultWeights\(\)/.test(page),
 	'the optimizer scores with the shared score settings, not weights of its own'
 );
+// The library card builds its verdict, gap and button keys from lists.
+const listKeys = (name) =>
+	Array.from(
+		(page.match(new RegExp(`const ${name} = \\{([^}]*)\\}`)) || ['', ''])[1].matchAll(
+			/([a-z_]+):/g
+		),
+		(m) => m[1]
+	);
+const verdicts = listKeys('VERDICT_MARKS');
+const gapSides = listKeys('GAP_MARKS');
+check(
+	JSON.stringify(verdicts) === JSON.stringify(['small_gap', 'optimized_ahead', 'existing_better']),
+	`library verdicts: ${verdicts.join(', ')}`
+);
+check(
+	JSON.stringify(gapSides) === JSON.stringify(['behind', 'ahead', 'same']),
+	`library gap sides: ${gapSides.join(', ')}`
+);
+for (const id of verdicts) keys.add(`${PREFIX}library.verdict.${id}`);
+for (const id of gapSides) keys.add(`${PREFIX}library.gap_${id}`);
+for (const where of ['comparer', 'editor']) {
+	keys.add(`${PREFIX}library.open_${where}`);
+	keys.add(`${PREFIX}library.open_${where}_label`);
+}
 for (const corpus of DATA.corpora) keys.add(`${PREFIX}language.${corpus.language}`);
 // A count table's localized name, shown in the corpus picker.
 for (const corpus of DATA.corpora) if (corpus.title_key) keys.add(corpus.title_key);
@@ -343,6 +421,77 @@ check(
 	'a refusal comes back with its code'
 );
 
+// The library after a run: every library layout scored on the run's corpus
+// and settings, in slices, with its similarity to the optimized layout.
+let librarySummary = null;
+if (done && typeof RUNNER.scoreLibrary === 'function') {
+	const scanned = [];
+	RUNNER.scoreLibrary(
+		{ layout: done.result.layout, tables, analysis: request.analysis },
+		(message) => scanned.push(message)
+	);
+	for (let i = 0; queue.length && i < 100000; i++) queue.shift()();
+	const libraryDone = scanned.find((message) => message.type === 'library_done');
+	const libraryLayouts = E.libraryLayouts();
+	check(
+		scanned.filter((message) => message.type === 'library_progress').length > 0,
+		'the library scan posts its progress'
+	);
+	check(
+		Boolean(libraryDone) && libraryDone.entries.length === libraryLayouts.length,
+		`the library scan scores every library layout: ${libraryDone ? libraryDone.entries.length : 'none'}`
+	);
+	if (libraryDone) {
+		for (const id of ['azerty', 'ergol', 'bepo']) {
+			const entry = libraryDone.entries.find((item) => item.id === id);
+			const layout = libraryLayouts.find((item) => item.id === id);
+			const score = E.analyse(layout, tables, request.analysis).score.total;
+			const alike = E.layoutSimilarity(done.result.layout, layout, tables, {});
+			check(
+				entry && entry.score === score,
+				`library scan: ${id} scores ${entry && entry.score}, the engine ${score}`
+			);
+			check(
+				entry && JSON.stringify(entry.similarity.weighted) === JSON.stringify(alike.weighted),
+				`library scan: ${id} similarity is the engine's`
+			);
+		}
+		librarySummary = RUNNER.librarySummary(libraryDone.entries, done.result.score, {
+			smallGap: E.similarScoreGap(),
+			closest: 5
+		});
+		check(librarySummary.closest.length === 5, 'the summary lists five alike layouts');
+	}
+} else check(false, 'the runner has no scoreLibrary');
+
+// The summary's verdict, the best existing layout against the small gap.
+if (typeof RUNNER.librarySummary === 'function') {
+	const entry = (id, score, sameKey, incomplete) => ({
+		id,
+		name: id,
+		score,
+		incomplete: Boolean(incomplete),
+		similarity: {
+			weighted: { sameKey, sameFingerRow: sameKey },
+			unweighted: { sameKey, sameFingerRow: sameKey }
+		}
+	});
+	const entries = [entry('near', 9, 80), entry('far', 4, 20), entry('broken', 30, 10, true)];
+	const summary = (score) => RUNNER.librarySummary(entries, score, { smallGap: 2, closest: 2 });
+	const small = summary(10.5);
+	check(
+		small.verdict === 'small_gap' && small.best.id === 'near' && small.best.gap === 1.5,
+		`a gap of 1.5 points is small: ${small.verdict}, ${small.best.id}`
+	);
+	check(
+		JSON.stringify(small.closest.map((item) => item.id)) === JSON.stringify(['near', 'far']),
+		'the alike layouts come most alike first'
+	);
+	check(summary(15).verdict === 'optimized_ahead', 'a gap of 6 points is not small');
+	check(summary(8).verdict === 'existing_better', 'an existing layout that scores more says so');
+	check(summary(11).verdict === 'small_gap', 'a gap equal to the threshold is small');
+}
+
 // =============================
 // ======= 5/ Robustness =======
 // =============================
@@ -399,6 +548,85 @@ check(
 	check(PAGE.numberLocale() === 'en', 'the strings’ language comes first');
 	pageBox._i18n_locale = '';
 	check(PAGE.numberLocale() === 'de', 'an empty strings’ language gives way to the declared one');
+
+	// The library card, drawn into a small document from a real summary.
+	check(typeof PAGE.libraryCard === 'function', 'the page has no library card');
+	if (typeof PAGE.libraryCard === 'function' && librarySummary) {
+		const opened = [];
+		const card = PAGE.libraryCard(fakeDocument(), librarySummary, {
+			t: (key, values) =>
+				Object.entries(values || {}).reduce(
+					(text, [name, value]) => text.split(`{${name}}`).join(String(value)),
+					english[key]
+				),
+			number: (value, digits) => Number(value).toFixed(digits),
+			onOpen: (entry, where) => opened.push(`${where}:${entry.id}`)
+		});
+		const all = descendants(card);
+		const text = textOf(card);
+		const best = librarySummary.best;
+		const hasClass = (node, name) => (node.className || '').split(' ').includes(name);
+		const verdict = all.find((node) => hasClass(node, 'lo-library-verdict'));
+		check(
+			Boolean(verdict) && verdict.className.includes(`lo-library-${librarySummary.verdict}`),
+			`library card: no ${librarySummary.verdict} verdict`
+		);
+		check(
+			Boolean(verdict) && textOf(verdict).includes(best.name),
+			'library card: the verdict names the best existing layout'
+		);
+		const gauge = all.find((node) => node.className === 'lo-gauge');
+		check(
+			Boolean(gauge) &&
+				gauge.style.props['--lo-gauge'] === String(best.similarity.weighted.sameKey) &&
+				gauge.attributes['aria-hidden'] === 'true',
+			'library card: the gauge shows the best layout’s similarity, hidden from assistive technology'
+		);
+		check(
+			text.includes(`${best.similarity.weighted.sameKey.toFixed(1)} %`),
+			'library card: the gauge’s value is also in words'
+		);
+		const items = all.filter((node) => hasClass(node, 'lo-library-item'));
+		check(
+			items.length === librarySummary.closest.length,
+			`library card: ${items.length} alike layouts drawn`
+		);
+		librarySummary.closest.forEach((entry, i) => {
+			const item = items[i];
+			if (!item) return;
+			const bar = descendants(item).find((node) => node.className === 'lo-bar lo-bar-key');
+			check(
+				Boolean(bar) && bar.style.width === `${entry.similarity.weighted.sameKey}%`,
+				`library card: ${entry.id} has no similarity bar`
+			);
+			check(textOf(item).includes(entry.name), `library card: ${entry.id} is not named`);
+			const gap = descendants(item).find((node) => hasClass(node, 'lo-gap'));
+			check(
+				Boolean(gap) && textOf(gap).includes(Math.abs(entry.gap).toFixed(2)),
+				`library card: ${entry.id} has no score gap in words`
+			);
+		});
+		const buttons = all.filter((node) => node.tagName === 'BUTTON');
+		check(
+			buttons.length === 2 * (librarySummary.closest.length + 1),
+			`library card: ${buttons.length} buttons`
+		);
+		for (const button of buttons) {
+			const name = librarySummary.closest
+				.concat([best])
+				.find((entry) => entry.id === button.dataset.layout).name;
+			check(
+				button.attributes['aria-label'].includes(name) &&
+					button.attributes['aria-label'].includes(textOf(button)),
+				`library card: the ${button.dataset.open} button of ${name} is not labelled`
+			);
+			button.click();
+		}
+		check(
+			opened.includes(`comparer:${best.id}`) && opened.includes(`editor:${best.id}`),
+			`library card: the buttons open nothing: ${opened.join(', ')}`
+		);
+	}
 }
 // Every runner message goes through receive, which ends a run it cannot show.
 check(
@@ -411,6 +639,18 @@ check(
 		page
 	),
 	'run() ends every failing stage in failRun'
+);
+// The library is compared once the final layout is shown, off the page's
+// thread where a worker starts.
+check(
+	/showBest\(winner\.layout, winner\.score, true, true\);\s*finish\(running, began, null\);\s*scanLibrary\(winner\.layout, winner\.score\);/.test(
+		page
+	),
+	'the final layout is compared with the library'
+);
+check(
+	/message\.type === 'library'[\s\S]{0,160}LAYOUT_OPTIMIZER_RUNNER\.scoreLibrary\(/.test(worker),
+	'the worker scores the library'
 );
 
 if (errors.length) {

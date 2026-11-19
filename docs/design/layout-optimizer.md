@@ -19,7 +19,7 @@ optimizer with no change here.
 | File                                              | Role                                                                                                 |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `_shared/ui/layout_optimizer/optimizer_core.js`   | The search: global `LAYOUT_OPTIMIZER`, pure, no DOM, seeded. Node, a worker or a page load it.       |
-| `_shared/ui/layout_optimizer/optimizer_runner.js` | Runs a share of the restarts in slices and posts `progress`, `done` or `error` messages.             |
+| `_shared/ui/layout_optimizer/optimizer_runner.js` | Runs a share of the restarts in slices, or scores the library after a run, and posts its messages.   |
 | `_shared/ui/layout_optimizer/optimizer_worker.js` | The Web Worker: loads the engine, the core and the runner.                                           |
 | `_shared/ui/layout_optimizer/optimizer_page.js`   | The page (`LAYOUT_OPTIMIZER_PAGE.mount(root)`), framed by the site at `/studio/optimiser`.           |
 | `tools/test/test-layout-optimizer.cjs`            | The core gate: brute-force optimum, honest score, determinism, every constraint switch, time budget. |
@@ -219,6 +219,7 @@ first two (sticky), on a phone everything is one column:
    the layout to « Éditer », which opens it in a new tab
    (`LAYOUT_ANALYSIS_FILES.handOffToEditor`, editor `openLayout`); « Compare
    with other layouts » hands it to « Comparer » the way the editor does.
+   Under them, the library card ([Existing layouts](#existing-layouts)).
 
 The page keeps the reader's choices (corpus, start, keyboard, switches, pins,
 QWERTY letters and what of them stays, zones, the open sub-tab, budget) and their last text in this browser's storage
@@ -252,6 +253,64 @@ CSP forbids workers), so the search runs on the page; Windows serves them
 from its virtual host, so workers start there. The tab reads its strings from
 the catalogue macOS and Linux seed, and from the `layout_optimizer.*` keys the
 Windows host sends with the editor's (`LayoutManager_EditorStrings`).
+
+## Existing layouts
+
+Once a run ends (or is stopped), the page asks whether an existing layout
+already does the job: « for your use case, layout X would do; the optimized
+one is only so much better ». A worker of its own (`{type: 'library'}`, or
+the runner's slices on a page without workers) scores every library layout
+(`LAYOUT_ANALYSIS.libraryLayouts()`) with `analyse()` on the run's whole
+corpus and its analysis options (the Comparer's score settings, keyboard,
+format, fingering), a few layouts per 40 ms slice
+(`LAYOUT_OPTIMIZER_RUNNER.scoreLibrary`), and measures how alike each one is
+to the optimized layout (`LAYOUT_ANALYSIS.layoutSimilarity`,
+[layout-analysis.md](layout-analysis.md#api)). The library is never scored
+in one go on the page: it takes about 2 s in Node, and a layout with many
+dead keys (bépo) about 0.3 s on its own.
+
+**Measure.** Both candidates are kept, and the weighted one is read first:
+the share of the characters typed, each counted by its occurrences in the
+corpus (spaces aside), that sit on the same keys at the same levels, a dead
+key and the key after it both alike. Weighted, because moving « e » changes
+a typist's habits far more than moving « § »; the unweighted share (each
+distinct corpus character once) and the share on the same finger and row
+(a letter moved between the index's two columns) are written beside it.
+
+**Comparison.** `LAYOUT_OPTIMIZER_RUNNER.librarySummary(entries, score,
+{smallGap, closest})` lists the five most alike layouts (`LIBRARY_CLOSEST`)
+and the best-scoring existing layout (every complete layout before an
+incomplete one, as the Comparer ranks), each with its gap: the optimized
+layout's score minus its own, in the score's points. A ratio of scores
+would mean nothing, since the score has no zero (AZERTY is about −88). The
+verdict reads the best existing layout's gap:
+
+| Verdict           | When                          | Says                                                                    |
+| ----------------- | ----------------------------- | ----------------------------------------------------------------------- |
+| `small_gap`       | 0 ≤ gap ≤ `similar_score_gap` | That layout would do the job; the optimized one is only so much better. |
+| `optimized_ahead` | gap > `similar_score_gap`     | The optimized layout leads the best existing one by that much.          |
+| `existing_better` | gap < 0                       | An existing layout scores more; a longer run may close the gap.         |
+
+`similar_score_gap` (`analysis_model.json`, read by
+`LAYOUT_ANALYSIS.similarScoreGap()`, checked by the codegen) is 2 points by
+default: 0.2 % of SFB at its weight 10, about the gap between Ergopti+ and
+Ergopti on the Nemolivier anthology (decided by the agent on 2026-11-19, to
+review by the maintainer, `TODO.md`).
+
+**Card.** A card under the result: the verdict with a mark (≈, ▲, ★) and a
+coloured edge; the best existing layout with a ring gauge of its
+similarity, its score, its gap (▲ above, ▼ below the optimized layout, in
+words) and its other two similarities; the alike layouts as bars on one
+track (same key solid, same finger and row hatched behind it), each with
+its gap; buttons « Comparer » and « Éditer » whose accessible names carry
+the layout's name (`LAYOUT_ANALYSIS_FILES.handOff` and `handOffToEditor`,
+or the host's `openComparer` and `openEditor` in the app). A library layout
+handed to the Comparer replaces its own entry there and is ticked, so the
+Comparer needs no new hook. Every visual repeats its number in text; the
+bars and the gauge are hidden from assistive technology, and forced-colours
+modes draw them in the system's colours. `LAYOUT_OPTIMIZER_PAGE.libraryCard`
+builds the card from a summary, so the page gate renders it without a
+browser.
 
 ## Example
 
