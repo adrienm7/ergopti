@@ -384,16 +384,26 @@ document.addEventListener('DOMContentLoaded', () => {
 	// heading, so its rows scroll without a pointer (WCAG 2.1.1); a box that fits
 	// is no stop. Its rows and its visibility change after every render.
 	document.querySelectorAll('.ekpi-table-wrap').forEach((box) => {
+		// The card's heading: a box can sit deeper than its card's first level.
+		const card = box.closest('.expanded-kpi-block') || box.parentElement;
+		const heading = card && card.querySelector('h2, h3');
 		const sync = () => {
+			// The heading's own words, without its info tooltip; empty until translated.
+			let name = '';
+			if (heading) {
+				const words = heading.cloneNode(true);
+				words.querySelectorAll('.tooltip').forEach((tip) => tip.remove());
+				name = words.textContent.replace(/s+/g, ' ').trim();
+			}
 			if (box.scrollHeight > box.clientHeight || box.scrollWidth > box.clientWidth) {
-				const heading = box.parentElement && box.parentElement.querySelector('h2, h3');
 				box.tabIndex = 0;
-				box.setAttribute('role', 'region');
-				if (heading) {
-					// The heading's own words, without its info tooltip.
-					const name = heading.cloneNode(true);
-					name.querySelectorAll('.tooltip').forEach((tip) => tip.remove());
-					box.setAttribute('aria-label', name.textContent.replace(/\s+/g, ' ').trim());
+				// A region needs its name: an unnamed box stays a plain focusable box.
+				if (name) {
+					box.setAttribute('role', 'region');
+					box.setAttribute('aria-label', name);
+				} else {
+					box.removeAttribute('role');
+					box.removeAttribute('aria-label');
 				}
 			} else {
 				box.removeAttribute('tabindex');
@@ -402,6 +412,13 @@ document.addEventListener('DOMContentLoaded', () => {
 			}
 		};
 		new MutationObserver(sync).observe(box, { childList: true, subtree: true });
+		// The heading is translated after this runs: name the box again then.
+		if (heading)
+			new MutationObserver(sync).observe(heading, {
+				childList: true,
+				subtree: true,
+				characterData: true
+			});
 		new ResizeObserver(sync).observe(box);
 		sync();
 	});

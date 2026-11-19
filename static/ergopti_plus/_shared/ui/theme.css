@@ -575,6 +575,17 @@
 	outline-offset: 2px;
 }
 
+/* Text a screen reader reads and the eye does not see: the h1 of a window
+   whose title is its title bar, so its outline starts at the top level. */
+.theme-sr-only {
+	clip-path: inset(50%);
+	height: 1px;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
 /* The system's reduced motion setting, and the website's own setting carried
    into the Studio frames by a11y_prefs.js: no animation, no smooth scrolling,
    instant transitions (WCAG 2.3.3). */

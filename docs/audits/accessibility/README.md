@@ -862,6 +862,40 @@ Gates: `node tools/test/test-site-accessibility-ratchet.cjs` and
 convention lints. `npm run test:js` and `verify-change` refuse this host
 (Node 22.16, pinned 22.22.2).
 
+## Eighth pass, outline, tables and error steps (2026-11-19, Paris time)
+
+### Headings and landmarks (WCAG 1.3.1, 2.4.1, 2.4.6)
+
+`tools/test/lib/heading-landmarks.cjs` reads a page as a screen reader moves
+through it (hidden, unrendered and inert parts left out; inside an open
+modal dialog, the dialog alone) and asks for one h1, no skipped level, one
+main landmark, and a name on every navigation, region, complementary,
+search and form landmark, never two of one kind under one name.
+`tools/test/test-heading-landmarks.cjs` proves each refusal without a
+browser. The Studio keyboard walk now fails on any of them: the editor had
+no h1 and two unnamed complementary landmarks (the inspector column and the
+magnifier inside it); it has a visually hidden h1 « Layout editor », the
+column is « Key properties » and the magnifier a region named by its
+heading. The app windows' scan counts them under `heading-landmarks` in its
+ratchet. Its first run found problems in 50 states of 17 windows (a few of them open modal dialogs, which it now reads alone); the windows
+now have one main each (a `main` element or `role="main"` on the existing
+container, so no layout changes), an h1 (the visible title, or a visually
+hidden one, `.theme-sr-only` in `theme.css`, where the title bar is the
+title), release notes read from level 2 under it (`renderMarkdownInto`
+`topLevel`, through `aria-level`, so the look stays) and the typing
+dashboard's scrolling tables named once their card's heading is
+translated. Left in the baseline: the apps dashboard's three chart tabs,
+whose h3 chart titles follow the h1 while their h2 cards sit on another tab.
+
+### The Optimiser's result as a table (WCAG 1.1.1, 1.3.1)
+
+Under the two boards, « Show both layouts as a table » unfolds a focusable
+region with a row per drawn key in reading order: its place (« row 2,
+key 3 »), what it types on the start and the best layout (a dead key and
+Space in words), and « Changed » or « Unchanged », with a glyph and a
+dashed edge as the boards outline it. `exerciseResultTable` in
+`layout-optimizer.playwright.cjs` checks it against both boards.
+
 ## What remains
 
 The open items live in TODO.md, section « Full accessibility ». The rows of

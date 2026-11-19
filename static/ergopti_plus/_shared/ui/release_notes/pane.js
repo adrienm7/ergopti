@@ -45,7 +45,9 @@
 			allow: function (url) {
 				return isRepositoryUrl(url, notes.owner, notes.repo);
 			},
-			open: openUrl
+			open: openUrl,
+			// Read under the window's h1: the notes' own headings start at level 2.
+			topLevel: 2
 		});
 	}
 

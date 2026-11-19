@@ -15,7 +15,9 @@
  *    and the dark colour schemes;
  * 2. walked with Tab to the end and back with Shift+Tab (WCAG 2.1.2 no
  *    keyboard trap, 2.4.3 focus order, 2.4.7 focus visible), every stop
- *    showing a focus indicator of its own.
+ *    showing a focus indicator of its own;
+ * 3. read as an outline (heading-landmarks.cjs): one h1, no skipped heading
+ *    level, one main landmark, every other landmark named.
  * Every axe rule's node count and every window's walk problems are counted
  * and compared with the committed baseline beside this file: a new row or a
  * higher count fails, so the violations can only go down. The maintainer
@@ -34,6 +36,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
+const { collectOutline, outlineProblems } = require('../lib/heading-landmarks.cjs');
 const { walkProblems } = require('../lib/keyboard-walk.cjs');
 const { WINDOWS } = require('./app-windows-fixtures.cjs');
 
@@ -60,6 +63,8 @@ const WCAG_TAGS = Object.freeze([
 ]);
 // The rule name under which a window's keyboard-walk problems are counted.
 const WALK_RULE = 'keyboard-walk';
+// The rule name under which a window's heading and landmark problems are counted.
+const OUTLINE_RULE = 'heading-landmarks';
 const TYPES = {
 	'.html': 'text/html',
 	'.js': 'text/javascript',
@@ -388,6 +393,18 @@ async function auditWindows(chromium, windows, family, port) {
 									targets: problems
 								});
 							assert.ok(stops >= 1, target.id + ' (' + state.name + ') offers no keyboard stop');
+							const outline = outlineProblems(await page.evaluate(collectOutline));
+							if (outline.length)
+								findings.push({
+									window: target.id,
+									scheme,
+									state: state.name,
+									rule: OUTLINE_RULE,
+									impact: 'moderate',
+									help: 'Heading order and landmarks',
+									nodes: outline.length,
+									targets: outline
+								});
 							console.log(`  ${target.id} (${state.name}): ${stops} stops`);
 						}
 						assert.deepEqual(errors, [], target.id + ' (' + state.name + ', ' + scheme + ')');
@@ -535,6 +552,7 @@ module.exports = {
 	BASELINE_PATH,
 	COLOR_SCHEMES,
 	WALK_RULE,
+	OUTLINE_RULE,
 	rowKey,
 	countsOf,
 	compareWithBaseline,

@@ -24,6 +24,8 @@
  * @typedef {object} Outline
  * @property {{level: number, text: string}[]} headings - In document order.
  * @property {{role: string, name: string, id: string}[]} landmarks - In document order.
+ * @property {boolean} [modal] - Read inside an open modal dialog, the only part a reader
+ *   reaches then: its headings may start below h1 and it holds no main landmark.
  */
 
 // The landmarks a reader lists by name; banner, contentinfo and main are one of a kind.
@@ -76,8 +78,13 @@ function collectOutline() {
 		'region',
 		'form'
 	]);
+	// An open modal dialog is all a reader reaches: the rest of the page is inert.
+	const modal = Array.from(document.querySelectorAll('dialog, [aria-modal="true"]')).find((node) =>
+		node.matches('dialog') ? node.matches(':modal') : exposed(node)
+	);
+	const scope = modal || document.body;
 	const headings = [];
-	for (const node of document.querySelectorAll('h1, h2, h3, h4, h5, h6, [role="heading"]')) {
+	for (const node of scope.querySelectorAll('h1, h2, h3, h4, h5, h6, [role="heading"]')) {
 		if (!exposed(node)) continue;
 		const role = (node.getAttribute('role') || '').trim();
 		if (role && role !== 'heading') continue;
@@ -87,13 +94,13 @@ function collectOutline() {
 		headings.push({ level, text: textOf(node).slice(0, 60) || describe(node) });
 	}
 	const landmarks = [];
-	for (const node of document.body.querySelectorAll('*')) {
+	for (const node of scope.querySelectorAll('*')) {
 		const explicit = (node.getAttribute('role') || '').trim().split(/\s+/)[0];
 		const role = explicit || (IMPLICIT[node.tagName] ? IMPLICIT[node.tagName](node) : '');
 		if (!LANDMARKS.has(role) || !exposed(node)) continue;
 		landmarks.push({ role, name: nameOf(node), id: describe(node) });
 	}
-	return { headings, landmarks };
+	return { headings, landmarks, modal: Boolean(modal) };
 }
 
 /**
@@ -103,12 +110,13 @@ function collectOutline() {
  */
 function outlineProblems(outline) {
 	const problems = [];
-	const { headings, landmarks } = outline;
+	const { headings, landmarks, modal } = outline;
 	const firsts = headings.filter((heading) => heading.level === 1);
-	if (firsts.length === 0) problems.push('no h1');
+	if (firsts.length === 0 && !modal) problems.push('no h1');
 	if (firsts.length > 1)
 		problems.push(`${firsts.length} h1: ${firsts.map((heading) => heading.text).join(' | ')}`);
-	let previous = 0;
+	// A dialog's outline starts at its own first heading.
+	let previous = modal && headings.length ? headings[0].level - 1 : 0;
 	for (const heading of headings) {
 		if (heading.level > previous + 1)
 			problems.push(
@@ -119,7 +127,7 @@ function outlineProblems(outline) {
 		previous = heading.level;
 	}
 	const mains = landmarks.filter((landmark) => landmark.role === 'main');
-	if (mains.length !== 1) problems.push(`${mains.length} main landmarks`);
+	if (mains.length !== (modal ? 0 : 1)) problems.push(`${mains.length} main landmarks`);
 	const seen = new Map();
 	for (const landmark of landmarks) {
 		if (!NAMED_ROLES.includes(landmark.role)) continue;

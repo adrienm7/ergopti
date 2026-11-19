@@ -306,3 +306,11 @@ select:focus {
 	background: var(--chip-bg);
 	color: var(--chip-c);
 }
+
+/* The main landmark holds the page and keeps the body's column layout. */
+main {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+}

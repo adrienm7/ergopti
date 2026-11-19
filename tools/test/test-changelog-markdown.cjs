@@ -382,6 +382,53 @@ function checkFenceInsideFold() {
 	);
 }
 
+/**
+ * A release body's « ### » sections read as level 2 under the window's h1
+ * (topLevel), each deeper level one below, the tags (and their look) kept;
+ * the changelog page passes topLevel 2 for its release bodies.
+ */
+function checkHeadingLevels() {
+	const { sandbox, document } = runPage();
+	const root = document.createElement('div');
+	sandbox.renderMarkdownInto(root, '### New\n\ntext\n\n##### Fixed\n\n### Removed', {
+		topLevel: 2
+	});
+	const read = elements(root)
+		.filter((node) => /^h\d$/.test(node.tagName))
+		.map((node) => `${node.tagName}:${node.getAttribute('aria-level')}`);
+	expect(
+		JSON.stringify(read) === JSON.stringify(['h3:2', 'h5:3', 'h3:2']),
+		`headings read from level 2 without a gap: ${read.join(', ')}`
+	);
+	const plain = document.createElement('div');
+	sandbox.renderMarkdownInto(plain, '### New', {});
+	expect(
+		byTag(plain, 'h3')[0].getAttribute('aria-level') === null,
+		'without topLevel a heading keeps its own level'
+	);
+	let refused = false;
+	try {
+		sandbox.renderMarkdownInto(plain, '### New', { topLevel: 0 });
+	} catch {
+		refused = true;
+	}
+	expect(refused, 'a topLevel outside 1 to 6 is refused');
+	const page = require('node:fs').readFileSync(
+		require('node:path').join(
+			__dirname,
+			'../../static/ergopti_plus/_shared/ui/changelog/script.js'
+		),
+		'utf8'
+	);
+	expect(/topLevel: 2/.test(page), 'the changelog page reads its release bodies from level 2');
+}
+
+try {
+	checkHeadingLevels();
+} catch (error) {
+	expect(false, `the heading levels raised: ${error.message}`);
+}
+
 try {
 	checkRendering();
 } catch (error) {

@@ -137,8 +137,12 @@ baseline as violations go.
       ([seventh pass](docs/audits/accessibility/README.md#seventh-pass-header-offset-media-and-plain-language-2026-11-19-paris-time)).
       Left: the same review of the other pages (layout use, information and benchmarks, the Ergopti+ hotstrings, AI,
       features, configuration and FAQ pages); the Studio frames are not measured.
-- [ ] **Blind and low-vision users.** Screen-reader runs; heading order and landmarks per page; the Optimiser's
-      result board (plain characters) has no table view of its own (« Open in the editor » gives one).
+- [ ] **Blind and low-vision users.** The Optimiser's result boards have a table view of their own (each key's
+      place, what it types on both layouts, whether it changed). Heading order and landmarks are a gate
+      (`tools/test/lib/heading-landmarks.cjs`: one h1, no skipped level, one main, every other landmark named): the
+      three Studio pages in the Studio keyboard walk, which they pass, and the 21 app windows in their scan's
+      ratchet, where only the apps dashboard's chart tabs are left (their h3 chart titles follow the h1, their h2
+      cards being on another tab). Left: screen-reader runs; that dashboard's headings.
 - [ ] **Keyboard and motor.** The Studio keyboard walk is a CI gate (`npm run test:browser:studio-keyboard`, the
       editor's « Try » field trap fixed) and the Studio has no time limit. The Windows driver's native windows
       (14 of them: settings prompts, pickers, editors, the hotstring settings, paths and update fallbacks) are walked

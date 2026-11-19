@@ -53,6 +53,21 @@ function checkComparison() {
 		baseline
 	);
 	assert.equal(walk.regressions.length, 1, 'A keyboard-walk problem is a regression');
+	// The scan reads each window's outline and counts its problems under their own rule.
+	assert.equal(scan.OUTLINE_RULE, 'heading-landmarks', 'The outline has its counted rule');
+	assert.match(
+		fs.readFileSync(
+			path.join(__dirname, 'browser', 'app-windows-accessibility.playwright.cjs'),
+			'utf8'
+		),
+		/outlineProblems\(await page\.evaluate\(collectOutline\)\)/,
+		'The scan judges every window state by its outline'
+	);
+	const outline = scan.compareWithBaseline(
+		{ ...baseline, ['a | light | filled | ' + scan.OUTLINE_RULE]: 1 },
+		baseline
+	);
+	assert.equal(outline.regressions.length, 1, 'A heading or landmark problem is a regression');
 	const better = scan.compareWithBaseline({ 'a | light | filled | rule': 2 }, baseline);
 	assert.deepEqual(better.regressions, []);
 	assert.equal(better.improvements.length, 2, 'A lower or vanished count asks to lower it');

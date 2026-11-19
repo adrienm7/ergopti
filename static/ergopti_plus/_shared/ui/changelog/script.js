@@ -893,7 +893,9 @@ function selectRelease(idx) {
 		allow: _isAllowedRepositoryUrl,
 		open: function (url) {
 			_postChangelogMessage({ action: 'open_url', url: url });
-		}
+		},
+		// Read under the window's h1: the body's own headings start at level 2.
+		topLevel: 2
 	};
 	// CI orders the body for github.com (downloads first, changelog folded);
 	// the sections are read before rendering, which strips their markers.

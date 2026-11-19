@@ -1,4 +1,7 @@
 {
 	"layout_manager | dark | filled | color-contrast": 18,
-	"layout_manager | light | filled | color-contrast": 17
+	"layout_manager | light | filled | color-contrast": 17,
+	"metrics_apps | light | tab-system | heading-landmarks": 1,
+	"metrics_apps | light | tab-time | heading-landmarks": 1,
+	"metrics_apps | light | tab-typing | heading-landmarks": 1
 }

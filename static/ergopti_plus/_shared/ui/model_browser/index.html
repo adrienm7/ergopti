@@ -10,6 +10,7 @@
 		<script src="../host_bridge.js"></script>
 	</head>
 	<body>
+		<h1 class="theme-sr-only" data-i18n="model_browser.window_title"></h1>
 		<div id="toolbar" role="toolbar">
 			<input
 				id="search"
@@ -30,7 +31,7 @@
 
 		<div id="current" aria-live="polite"></div>
 
-		<div id="table-wrap">
+		<div id="table-wrap" role="main">
 			<table id="models" aria-describedby="hint">
 				<thead>
 					<tr id="head-row"></tr>

@@ -649,6 +649,9 @@
 	 * @param {{allow: function(string): boolean, open: function(string)}} options
 	 *   allow() decides which https: URLs become clickable; open() receives the
 	 *   URL of a clicked link. Without them every link renders as plain text.
+	 *   topLevel (1 to 6), when given, is the level a screen reader reads the
+	 *   shallowest heading at, the others following (aria-level, so the look of
+	 *   each heading stays): a release body's « ### » under the window's h1.
 	 */
 	function renderMarkdownInto(container, source, options) {
 		if (!container) throw new Error('renderMarkdownInto requires a container element');
@@ -660,6 +663,37 @@
 			.replace(/\t/g, '    ');
 		container.replaceChildren();
 		_renderBlocks(text.split('\n'), container, options || {}, false);
+		if (options && options.topLevel !== undefined) _levelHeadings(container, options.topLevel);
+	}
+
+	/** Reads the container's headings from topLevel down, keeping their gaps closed. */
+	function _levelHeadings(container, topLevel) {
+		if (!(topLevel >= 1 && topLevel <= 6 && topLevel % 1 === 0))
+			throw new Error('renderMarkdownInto topLevel must be an integer from 1 to 6');
+		var headings = [];
+		(function collect(node) {
+			// children: the elements (a test double may list its text nodes there too).
+			var kids = node.children || node.childNodes;
+			for (var c = 0; c < kids.length; c++) {
+				var child = kids[c];
+				if (child.nodeType !== 1) continue;
+				if (/^h[1-6]$/i.test(child.tagName)) headings.push(child);
+				else collect(child);
+			}
+		})(container);
+		if (!headings.length) return;
+		var levels = [];
+		for (var k = 0; k < headings.length; k++) levels.push(Number(headings[k].tagName.slice(1)));
+		// Each distinct level, shallowest first, takes the next level from topLevel.
+		var distinct = levels
+			.filter(function (level, index) {
+				return levels.indexOf(level) === index;
+			})
+			.sort();
+		for (var j = 0; j < headings.length; j++) {
+			var read = Math.min(6, topLevel + distinct.indexOf(levels[j]));
+			if (read !== levels[j]) headings[j].setAttribute('aria-level', String(read));
+		}
 	}
 
 	global.renderMarkdownInto = renderMarkdownInto;

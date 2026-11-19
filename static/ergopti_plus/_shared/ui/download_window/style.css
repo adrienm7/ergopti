@@ -46,7 +46,7 @@ body {
 	position: relative;
 }
 
-h2 {
+h1 {
 	color: var(--theme-white);
 	font-size: 14px;
 	font-weight: 600;

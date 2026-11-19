@@ -76,4 +76,18 @@ assert.deepEqual(
 	[]
 );
 
-console.log(`PASS test-heading-landmarks (${cases.length + 3} outlines)`);
+// An open modal dialog is read alone: its headings start at its own level, no main.
+const dialog = { modal: true, headings: [heading(2), heading(3)], landmarks: [] };
+assert.deepEqual(outlineProblems(dialog), [], 'a dialog starts at its own heading');
+assert.deepEqual(
+	outlineProblems({ ...dialog, headings: [heading(2), heading(4, 'Deep')] }),
+	['h2 then h4 skips a level (Deep)'],
+	'a dialog still keeps its levels'
+);
+assert.deepEqual(
+	outlineProblems({ ...dialog, landmarks: [landmark('main')] }),
+	['1 main landmarks'],
+	'a dialog holds no main'
+);
+
+console.log(`PASS test-heading-landmarks (${cases.length + 6} outlines)`);
