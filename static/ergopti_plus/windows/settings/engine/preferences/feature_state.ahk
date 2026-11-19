@@ -302,6 +302,11 @@ ReadScriptConfig(Cache) {
 		HSE_ArrowResetsWord := _FeatureStateWordResetFlag(Cache, ConfigLeaf.ARROW_RESETS_WORD)
 		HSE_ShortcutResetsWord := _FeatureStateWordResetFlag(Cache, ConfigLeaf.SHORTCUT_RESETS_WORD)
 		HSE_TapHoldResetsWord := _FeatureStateWordResetFlag(Cache, ConfigLeaf.TAP_HOLD_RESETS_WORD)
+		; Whether a Backspace right after an expansion undoes it, and for how long.
+		global HSE_BackspaceRestoreEnabled, HSE_BackspaceRestoreWindowMs
+		HSE_BackspaceRestoreEnabled := _FeatureStateWordResetFlag(Cache, ConfigLeaf.BACKSPACE_RESTORE_ENABLED)
+		HSE_BackspaceRestoreWindowMs := _FeatureStateBackspaceRestoreWindowMs(
+			_FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.BACKSPACE_RESTORE_WINDOW_MS))
 		; The preview-bubble switches: the stored value, or the manifest default.
 		global HSE_PreviewSwitches
 		HSE_PreviewSwitches := Map()
@@ -346,6 +351,23 @@ _FeatureStateIdleResetSeconds(Raw) {
 	if Checked["ok"]
 		return Raw
 	try LoggerWarn("Config", "hotstrings.idle_reset_seconds '{1}' is refused ({2}, {3} to {4} s) — using {5} s.",
+		Raw is Object ? Type(Raw) : String(Raw), Checked["reason"], Checked["min"], Checked["max"], Default)
+	return Default
+}
+
+; The configured Backspace undo window, or the manifest default for an absent
+; value. A value outside the value schema's whole-millisecond range is outdated
+; configuration: one WARNING, read as absent, never a boot failure.
+; @param Raw {Any} The raw TOML value, "_" when absent.
+; @returns {Integer} Milliseconds after an expansion during which Backspace undoes it.
+_FeatureStateBackspaceRestoreWindowMs(Raw) {
+	Default := ManifestDefaultFor(ConfigKey.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS)
+	if Raw == "_"
+		return Default
+	Checked := ValueCheckValue(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS), Raw)
+	if Checked["ok"]
+		return Raw
+	try LoggerWarn("Config", "hotstrings.backspace_restore_window_ms '{1}' is refused ({2}, {3} to {4} ms) — using {5} ms.",
 		Raw is Object ? Type(Raw) : String(Raw), Checked["reason"], Checked["min"], Checked["max"], Default)
 	return Default
 }

@@ -385,3 +385,82 @@ _HICR_IdleNativePrecisionControls() {
  AssertFalse(HSE_IdleResetsWord(0, 999999, 0), "Explicit zero continues to disable idle reset")
 }
 Test("Hotstring idle keeps exact deadlines and uncapped finite delays (hotstring-idle-native-integer-domain)", _HICR_IdleNativePrecisionControls)
+
+; The Backspace undo settings go through the same desired-state gateway: the
+; toggle is written as a TOML boolean, the window as a whole number of
+; milliseconds within the value schema's range, and the engine reads both at once.
+_HICR_BackspaceRestoreSettersPersistAndPublish() {
+	global _HICR_Writes, HSE_BackspaceRestoreEnabled, HSE_BackspaceRestoreWindowMs, Features
+	Hotstrings := Features["hotstrings"]
+	Leaves := ["backspace_restore_enabled", "backspace_restore_window_ms"]
+	SavedLeaves := Map()
+	for Key in Leaves
+		if Hotstrings.Has(Key)
+			SavedLeaves[Key] := Hotstrings[Key]
+	SavedEnabled := HSE_BackspaceRestoreEnabled, SavedWindow := HSE_BackspaceRestoreWindowMs
+	try {
+		_HICR_Writes := []
+		HSE_BackspaceRestoreEnabled := ""
+		HSE_BackspaceRestoreWindowMs := ""
+		AssertTrue(HSE_BackspaceRestoreEnabledCurrent(), "the manifest default is on")
+		AssertEqual(500, HSE_BackspaceRestoreWindowMsCurrent(), "the manifest default window is 500 ms")
+		AssertTrue(ToggleHotstringsBackspaceRestore(_HICR_Writer, (*) => 0, _HICR_Rebuild))
+		AssertFalse(HSE_BackspaceRestoreEnabledCurrent(), "the engine reads the toggle at once")
+		AssertEqual("backspace_restore_enabled", _HICR_Writes[1].Key)
+		AssertTrue(_HICR_Writes[1].Value is TOML_Bool, "the toggle is written as a TOML boolean")
+		AssertTrue(SetHotstringsBackspaceRestoreWindowMs(1000, _HICR_Writer, (*) => 0, _HICR_Rebuild))
+		AssertEqual(1000, HSE_BackspaceRestoreWindowMsCurrent(), "the engine reads the window at once")
+		AssertEqual("backspace_restore_window_ms", _HICR_Writes[2].Key)
+		AssertEqual(1000, _HICR_Writes[2].Value)
+		AssertFalse(SetHotstringsBackspaceRestoreWindowMs(0, _HICR_Writer, (*) => 0, _HICR_Rebuild),
+			"an empty window is never written")
+		AssertFalse(SetHotstringsBackspaceRestoreWindowMs(20000, _HICR_Writer, (*) => 0, _HICR_Rebuild),
+			"nor one past the value schema's range")
+		Notices := []
+		AssertFalse(PromptHotstringsBackspaceRestoreWindowMs((*) => ({ Result: "OK", Value: "-3" }),
+			_HICR_Writer, (Message, *) => Notices.Push(Message), _HICR_Rebuild))
+		AssertEqual(1, Notices.Length, "an invalid entry is explained")
+		AssertTrue(InStr(Notices[1], "10000") > 0, "the refusal names the accepted range: " . Notices[1])
+		AssertTrue(PromptHotstringsBackspaceRestoreWindowMs((*) => ({ Result: "OK", Value: "750" }),
+			_HICR_Writer, (*) => 0, _HICR_Rebuild))
+		AssertEqual(750, HSE_BackspaceRestoreWindowMsCurrent())
+		AssertEqual(3, _HICR_Writes.Length, "refused values write nothing")
+	} finally {
+		HSE_BackspaceRestoreEnabled := SavedEnabled, HSE_BackspaceRestoreWindowMs := SavedWindow
+		for Key in Leaves {
+			if SavedLeaves.Has(Key)
+				Hotstrings[Key] := SavedLeaves[Key]
+			else if Hotstrings.Has(Key)
+				Hotstrings.Delete(Key)
+		}
+	}
+}
+Test("hotstring backspace restore: setters persist and publish (backspace-restore)",
+	(*) => _HICR_WithFixture(_HICR_BackspaceRestoreSettersPersistAndPublish))
+
+; The window's choice row draws the presets and a free entry, in milliseconds;
+; the checkbox row is declared for Windows with its tick.
+_HICR_BackspaceRestoreRows() {
+	Chosen := []
+	Custom := 0
+	Commands := Map("backspace_restore_window", (V) => Chosen.Push(V),
+		"backspace_restore_window_custom", (*) => Custom++)
+	Unit := t("hs_config.unit_ms")
+	Row := MenuRenderer_ChoiceRow("hotstrings_params_group", "backspace_restore_window", Commands,
+		Map("hotstrings.backspace_restore_window_ms", () => 500))
+	AssertTrue(Row is Map, "the window choice must be declared for Windows")
+	Items := Row["items"]
+	AssertEqual(6, Items.Length, "four presets, a separator and the free entry")
+	AssertEqual("250 " . Unit, Items[1]["label"])
+	AssertTrue(Items[2]["checked"], "500 ms is ticked")
+	AssertEqual(t("menu.hotstrings.backspace_restore_window_custom"), Items[6]["label"])
+	Items[3]["action"].Call()
+	Items[6]["action"].Call("item", 6, 0)
+	AssertEqual(1000, Chosen[1])
+	AssertEqual(1, Custom)
+	Body := _DriverFuncBody("ReadScriptConfig")
+	AssertTrue(InStr(Body, "_FeatureStateBackspaceRestoreWindowMs(") > 0, "the loader reads the window")
+	AssertTrue(InStr(Body, '_FeatureStateWordResetFlag(Cache, "backspace_restore_enabled")') > 0,
+		"and the toggle")
+}
+Test("hotstring backspace restore: the menu rows (backspace-restore)", _HICR_BackspaceRestoreRows)

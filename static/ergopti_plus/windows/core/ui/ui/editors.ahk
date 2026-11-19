@@ -623,8 +623,13 @@ ToggleRepeatKeyEnabled(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 _EditorWordResetGlobal(Key, Value) {
 	global HSE_IdleResetSeconds, HSE_ClickResetsWord, HSE_CascadeMaxArrows
 	global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
+	global HSE_BackspaceRestoreEnabled, HSE_BackspaceRestoreWindowMs
 	if (Key == ConfigLeaf.IDLE_RESET_SECONDS)
 		HSE_IdleResetSeconds := Value
+	else if (Key == ConfigLeaf.BACKSPACE_RESTORE_ENABLED)
+		HSE_BackspaceRestoreEnabled := Value
+	else if (Key == ConfigLeaf.BACKSPACE_RESTORE_WINDOW_MS)
+		HSE_BackspaceRestoreWindowMs := Value
 	else if (Key == ConfigLeaf.CASCADE_MAX_ARROWS)
 		HSE_CascadeMaxArrows := Value
 	else if (Key == ConfigLeaf.CLICK_RESETS_WORD)
@@ -750,6 +755,64 @@ PromptHotstringsIdleResetSeconds(PromptFn := 0, WriterFn := 0, NotifyFn := 0, Re
 	}
 	Seconds := Typed["value"]
 	return SetHotstringsIdleResetSeconds(Seconds, WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Flips whether a Backspace right after an expansion undoes it.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+ToggleHotstringsBackspaceRestore(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	return _EditorCommitWordReset(ConfigLeaf.BACKSPACE_RESTORE_ENABLED, !HSE_BackspaceRestoreEnabledCurrent(),
+		"the Backspace undo toggle", WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Sets how long after an expansion a Backspace still undoes it.
+ * @param {Integer} Milliseconds A whole number within the value schema's range.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+SetHotstringsBackspaceRestoreWindowMs(Milliseconds, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	if !HSE_ValidBackspaceRestoreWindowMs(Milliseconds)
+			|| !ValueCheckValue(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS), Milliseconds)["ok"] {
+		try LoggerError("Editors", "Refused Backspace undo window: not a whole number of milliseconds within its declared range.")
+		return false
+	}
+	return _EditorCommitWordReset(ConfigLeaf.BACKSPACE_RESTORE_WINDOW_MS, Milliseconds,
+		"the Backspace undo window", WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Asks for a free Backspace undo window, prefilled with the current one.
+ * @param {Func} PromptFn Optional seam with Ui_InputBox's signature.
+ * @param {Func} NotifyFn Optional seam called with the invalid-value message.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+PromptHotstringsBackspaceRestoreWindowMs(PromptFn := 0, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return PromptHotstringsBackspaceRestoreWindowMs(PromptFn, WriterFn, NotifyFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	Entry := ValueCheckEntryFor(ConfigKey.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS)
+	Prefill := _MR_FormatFreeNumber(HSE_BackspaceRestoreWindowMsCurrent())
+	Prompt := t("menu.hotstrings.backspace_restore_window_prompt")
+	Title := t("menu.hotstrings.backspace_restore_window_title")
+	Answer := HasMethod(PromptFn, "Call") ? PromptFn.Call(Prompt, Title, "w380 h170", Prefill)
+		: Ui_InputBox(Prompt, Title, "w380 h170", Prefill)
+	if !(Answer is Object) || Answer.Result != "OK"
+		return false
+	; The shared value schema owns the accepted range and its localized refusal.
+	Typed := ValueCheckParseEntry(Entry, Answer.Value)
+	if !Typed["ok"] {
+		if HasMethod(NotifyFn, "Call") {
+			try LoggerWarn("Editors", "Invalid Backspace undo window typed — ignored.")
+			NotifyFn.Call(ValueCheckRenderMessage(ValueCheckMessageParts(Entry, Typed), (K) => t(K)), "Icon!")
+		} else
+			ValueCheckShowRefusal(ConfigKey.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS, Typed, Answer.Value)
+		return false
+	}
+	return SetHotstringsBackspaceRestoreWindowMs(Typed["value"], WriterFn, NotifyFn, RebuildFn)
 }
 
 /**

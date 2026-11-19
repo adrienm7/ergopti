@@ -303,6 +303,11 @@ _MI_StageHotstrings() {
 	; was three copies of one checkbox before that, one per driver.
 	_HotParamCommands := Map(
 		MenuCommand.REPEAT_KEY, ToggleRepeatKeyEnabled,
+		; The Backspace undo: its checkbox, its window choice (called with the
+		; chosen milliseconds) and the window's free entry.
+		MenuCommand.BACKSPACE_RESTORE, (*) => ToggleHotstringsBackspaceRestore(),
+		MenuCommand.BACKSPACE_RESTORE_WINDOW, (Milliseconds) => SetHotstringsBackspaceRestoreWindowMs(Milliseconds),
+		"backspace_restore_window_custom", (*) => PromptHotstringsBackspaceRestoreWindowMs(),
 		; The word-reset rows: the idle choice is called with the chosen seconds,
 		; its free entry and the click checkbox with the native menu arguments,
 		; which the seams of these commands must never receive.
@@ -316,6 +321,8 @@ _MI_StageHotstrings() {
 	)
 	_HotParamGetters := Map(
 		"hotstrings_repeat_enabled", () => ReadFeatureStateV2(ConfigKey.HOTSTRINGS_REPEAT_KEY_ENABLED).Get("enabled", false),
+		"hotstrings_backspace_restore_enabled", () => HSE_BackspaceRestoreEnabledCurrent(),
+		ConfigKey.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS, () => HSE_BackspaceRestoreWindowMsCurrent(),
 		ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS, () => HSE_IdleResetSecondsCurrent(),
 		ConfigKey.HOTSTRINGS_CASCADE_MAX_ARROWS, () => HSE_CascadeMaxArrowsCurrent(),
 		"hotstrings_click_resets_word", () => HSE_ClickResetsWordCurrent(),

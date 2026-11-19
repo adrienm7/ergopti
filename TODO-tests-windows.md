@@ -96,6 +96,11 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
       Notepad, WordPad and Edge or an Electron app, and so does one ending in « 🇫🇷 »; the DEBUG log names the
       host family (« Undo: N Backspace step(s) in a richedit host »); a letter typed before the trigger stays, in Word
       too.
+- [ ] Backspace restore (2026-11-19): in Notepad, Edge and Windows Terminal, a ★ trigger (`td★`) then Backspace
+      within half a second leaves `td`, never `td★`; `adn` then Space, a comma or Enter, then Backspace, leaves `adn`
+      and that terminator, never `ADN`; a Backspace a second after the expansion, or after Escape, deletes one
+      character; with Hotstrings > « Backspace undoes the last expansion » off, Backspace deletes one character, and
+      the window's choices and free entry (« Other value… », 50 to 10000 ms) take effect without a reload.
 - [ ] One-shot modifiers (2026-11-13): the sticky delay row accepts 0 and shows « no time limit », and the one-shot
       Shift and `sticky_*` captures then wait with no InputHook timeout; `sticky_altgr` types the AltGr level on the
       Ergopti layout, through Kana on a Kana-style layout; a tap-hold key set to tap `sticky_altgr` and hold AltGr

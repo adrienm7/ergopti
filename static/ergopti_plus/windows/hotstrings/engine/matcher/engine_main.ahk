@@ -297,6 +297,12 @@ global HSE_RepeatEnabled := true
 global HSE_IdleResetSeconds := ""
 global HSE_ClickResetsWord := ""
 
+; hotstrings.backspace_restore_enabled and hotstrings.backspace_restore_window_ms,
+; published the same way: whether a Backspace right after an expansion undoes
+; it, and for how long. "" reads the manifest default.
+global HSE_BackspaceRestoreEnabled := ""
+global HSE_BackspaceRestoreWindowMs := ""
+
 ; hotstrings.cascade_max_arrows, published the same way: how many expansions
 ; (arrows) a chain of hotstrings may hold, 1 = a single expansion. "" reads the
 ; manifest default (HSE_CascadeMaxArrowsCurrent, in cascade.ahk). The
@@ -1303,6 +1309,65 @@ HSE_ClickResetsWordCurrent() {
 		return Value ? true : false
 }
 
+; Whether a Backspace right after an expansion undoes it: the published value,
+; or the manifest default before the loader ran.
+; @returns {Boolean}
+HSE_BackspaceRestoreEnabledCurrent() {
+		global HSE_BackspaceRestoreEnabled
+		Value := HSE_BackspaceRestoreEnabled == ""
+				? ManifestDefaultFor(ConfigKey.HOTSTRINGS_BACKSPACE_RESTORE_ENABLED)
+				: HSE_BackspaceRestoreEnabled
+		return Value ? true : false
+}
+
+; How long after an expansion a Backspace still undoes it, in milliseconds:
+; the published value, or the manifest default before the loader ran.
+; @returns {Integer}
+HSE_BackspaceRestoreWindowMsCurrent() {
+		global HSE_BackspaceRestoreWindowMs
+		return HSE_BackspaceRestoreWindowMs == ""
+				? ManifestDefaultFor(ConfigKey.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS)
+				: HSE_BackspaceRestoreWindowMs
+}
+
+; Whether a value is a valid hotstrings.backspace_restore_window_ms: a whole
+; positive number of milliseconds. Same rule as the shared Lua
+; backspace_restore.valid_window_ms; the value schema bounds its range.
+; @param Value {Any} Candidate read from config.toml or a menu prompt.
+; @returns {Boolean}
+HSE_ValidBackspaceRestoreWindowMs(Value) {
+		return (Value is Integer) and Value >= 1
+}
+
+; Whether a Backspace at NowTick still undoes an expansion committed at
+; CommittedTick: the window is inclusive, as the shared Lua
+; backspace_restore.within_window.
+; @param CommittedTick {Integer} A_TickCount of the expansion's commit.
+; @param NowTick {Integer} A_TickCount of the Backspace.
+; @param WindowMs {Integer} hotstrings.backspace_restore_window_ms.
+; @returns {Boolean}
+HSE_BackspaceRestoreWithinWindow(CommittedTick, NowTick, WindowMs) {
+		if !HSE_ValidBackspaceRestoreWindowMs(WindowMs)
+				throw ValueError("HSE_BackspaceRestoreWithinWindow: the window must be a whole positive number of milliseconds.")
+		Elapsed := NowTick - CommittedTick
+		return Elapsed >= 0 and Elapsed <= WindowMs
+}
+
+; The text a restore types back (shared Lua backspace_restore.restored_text):
+; the trigger without a final magic key, which is an action and not text, then
+; the terminator typed after the output, so « adn » and Space come back whole.
+; @param Trigger {String} What the user typed for the expansion, as on screen.
+; @param MagicKey {String} The magic key in effect, "" when none.
+; @param Replayed {String} The terminator typed back after the output, "" when none.
+; @returns {String}
+HSE_BackspaceRestoredText(Trigger, MagicKey, Replayed) {
+		Text := Trigger
+		if (MagicKey != "" and StrLen(Text) >= StrLen(MagicKey)
+				and SubStr(Text, -StrLen(MagicKey)) == MagicKey)
+				Text := SubStr(Text, 1, StrLen(Text) - StrLen(MagicKey))
+		return Text . Replayed
+}
+
 ; Whether one of the event word-reset settings is on: the published value, or
 ; the manifest default before the loader ran.
 ; @param Key {String} "arrow_resets_word", "shortcut_resets_word" or
@@ -1347,6 +1412,8 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 				DeleteFromEnd: StripLen,
 				InsertedText: InsertedText,
 				EndCharEmitted: EmittedEndChar != "",
+				; The terminator typed after the output: a Backspace undo types it back.
+				EndCharText: ClearAll ? "" : EmittedEndChar,
 				; A consumed end character is absent from the screen and cannot
 				; terminate the replacement context merely because it selected the match.
 				; The replacement itself may nevertheless end at a real boundary, so

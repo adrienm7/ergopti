@@ -67,13 +67,14 @@ _BSU_BackspaceRestoresTheTrigger() {
 		Sent := _Stub_RecordedSends.Length
 		AssertTrue(HSE_UndoExpansion(Undo, 1), "the immediate Backspace restores the trigger")
 		AssertEqual(Sent + 1, _Stub_RecordedSends.Length, "one burst restores it")
-		AssertEqual("{BackSpace 3}{Text}adn", _BSU_LastBurst(),
-			"the Space is already gone: the rest of the replacement is erased, then the trigger typed")
+		AssertEqual("{BackSpace 3}{Text}adn ", _BSU_LastBurst(),
+			"the Space is already gone: the rest of the replacement is erased, then the trigger and its Space typed")
 		AssertEqual("", HSE_Buffer, "the restored trigger stays out of the buffer")
-		AssertFalse(HSE_StartIsWordBoundary, "and no word is known to start after it")
+		AssertTrue(HSE_StartIsWordBoundary, "and the Space typed back ends the word")
 	} finally HSE_TestReset()
 }
-Test("hotstrings: an immediate Backspace restores the trigger (backspace-undo)", _BSU_BackspaceRestoresTheTrigger)
+Test("hotstrings: an immediate Backspace restores the trigger and its Space (backspace-undo)",
+	_BSU_BackspaceRestoresTheTrigger)
 
 ; Fires « pce » + Space into a host whose focused control has ControlClass,
 ; then restores it, and returns the burst.
@@ -110,17 +111,17 @@ _BSU_UndoBurstIn(Replacement, ControlClass) {
 _BSU_EmojiStepsFollowTheHost() {
 	Thumb := Chr(0x1F44D) . Chr(0x1F3FD)
 	Flag := Chr(0x1F1EB) . Chr(0x1F1F7)
-	AssertEqual("{BackSpace 5}{Text}pce", _BSU_UndoBurstIn("ok " . Thumb, "Edit"),
+	AssertEqual("{BackSpace 5}{Text}pce ", _BSU_UndoBurstIn("ok " . Thumb, "Edit"),
 		"an EDIT erases the skin tone and its base one by one")
-	AssertEqual("{BackSpace 4}{Text}pce", _BSU_UndoBurstIn("ok " . Thumb, "RICHEDIT50W"),
+	AssertEqual("{BackSpace 4}{Text}pce ", _BSU_UndoBurstIn("ok " . Thumb, "RICHEDIT50W"),
 		"a RichEdit erases the toned emoji with one Backspace")
-	AssertEqual("{BackSpace 4}{Text}pce", _BSU_UndoBurstIn("ok " . Thumb, "Chrome_RenderWidgetHostHWND"),
+	AssertEqual("{BackSpace 4}{Text}pce ", _BSU_UndoBurstIn("ok " . Thumb, "Chrome_RenderWidgetHostHWND"),
 		"Chromium erases the toned emoji with one Backspace")
-	AssertEqual("{BackSpace 2}{Text}pce", _BSU_UndoBurstIn(Flag, "RichEditD2DPT"),
+	AssertEqual("{BackSpace 2}{Text}pce ", _BSU_UndoBurstIn(Flag, "RichEditD2DPT"),
 		"the Store Notepad's RichEdit erases a flag one indicator at a time")
-	AssertEqual("{BackSpace 1}{Text}pce", _BSU_UndoBurstIn(Flag, "Chrome_RenderWidgetHostHWND"),
+	AssertEqual("{BackSpace 1}{Text}pce ", _BSU_UndoBurstIn(Flag, "Chrome_RenderWidgetHostHWND"),
 		"Chromium erases a flag with one Backspace")
-	AssertEqual("{BackSpace 3}{Text}pce", _BSU_UndoBurstIn("ok" . Chr(0x2764) . Chr(0xFE0F), "Chrome_WidgetWin_1"),
+	AssertEqual("{BackSpace 3}{Text}pce ", _BSU_UndoBurstIn("ok" . Chr(0x2764) . Chr(0xFE0F), "Chrome_WidgetWin_1"),
 		"a VS16 heart is one step in the omnibox too")
 }
 Test("hotstrings: the Backspace undo counts emoji as the focused host erases them (backspace-steps)",
@@ -136,7 +137,7 @@ _BSU_EmojiReplacementErasedByCharacter() {
 		["Ze" . Chr(0x301), "combining accent", 3]
 	]
 	for Row in Cases
-		AssertEqual("{BackSpace " . Row[3] . "}{Text}pce", _BSU_UndoBurstIn(Row[1], "Chrome_RenderWidgetHostHWND"),
+		AssertEqual("{BackSpace " . Row[3] . "}{Text}pce ", _BSU_UndoBurstIn(Row[1], "Chrome_RenderWidgetHostHWND"),
 			"Chromium: the Space is gone and only the " . Row[2] . " replacement is left to erase")
 }
 Test("hotstrings: the Backspace undo erases an emoji or accent replacement by character (windows-undo-graphemes)",
@@ -219,3 +220,215 @@ _BSU_KeyDownRoutesBackspace() {
 	Assert(Take < InStr(Body, "_PrefixFeedBackspace()"), "before a Backspace shortens the buffers")
 }
 Test("hotstrings: the watcher's key-down asks the undo first (backspace-undo)", _BSU_KeyDownRoutesBackspace)
+
+
+
+
+
+; ============================================================
+; ============================================================
+; ======= 3/ Magic key, terminators, option and window =======
+; ============================================================
+; ============================================================
+
+; Runs Body with the Backspace undo settings, the magic key and a regular host
+; in place, and restores all of them afterwards.
+_BSU_WithSettings(Enabled, WindowMs, Body) {
+	global HSE_BackspaceRestoreEnabled, HSE_BackspaceRestoreWindowMs, ScriptInformation
+	global _PrefixFocusedControlToken
+	SavedEnabled := HSE_BackspaceRestoreEnabled
+	SavedWindow := HSE_BackspaceRestoreWindowMs
+	HadMagic := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
+	SavedMagic := HadMagic ? ScriptInformation["MagicKey"] : ""
+	if !IsSet(ScriptInformation)
+		ScriptInformation := Map()
+	try {
+		HSE_BackspaceRestoreEnabled := Enabled
+		HSE_BackspaceRestoreWindowMs := WindowMs
+		ScriptInformation["MagicKey"] := "★"
+		ResetHotstringRecorders()
+		SimulateRegularApp()
+		HSE_TestReset()
+		_PrefixFocusedControlToken := 1
+		Body.Call()
+	} finally {
+		HSE_BackspaceRestoreEnabled := SavedEnabled
+		HSE_BackspaceRestoreWindowMs := SavedWindow
+		if HadMagic
+			ScriptInformation["MagicKey"] := SavedMagic
+		else
+			ScriptInformation.Delete("MagicKey")
+		HSE_TestReset()
+	}
+}
+
+; Types Trigger through the production feed, then EndChar ("" for a trigger
+; that fires on its last character), and dispatches the match.
+; @returns {Object|String} The undo record the fire kept, "" when none.
+_BSU_Fire(Options, Trigger, Output, EndChar) {
+	global HSE_Undoable
+	ResetHotstringRecorders()
+	HSE_TestReset()
+	CreateHotstring(Options, Trigger, Output)
+	HSE_FeedReset(true)
+	Match := ""
+	Loop Parse Trigger
+		Match := HSE_FeedChar(A_LoopField)
+	if EndChar != ""
+		Match := HSE_FeedChar(EndChar)
+	Assert(IsObject(Match), "control: " . Trigger . " matches")
+	AssertTrue(HSE_DispatchMatch(Match, EndChar), "control: " . Trigger . " fires")
+	return HSE_Undoable
+}
+
+; The text the undo burst types back, "" when it typed none.
+_BSU_TypedBack(Burst) {
+	Position := InStr(Burst, "{Text}")
+	return Position ? SubStr(Burst, Position + 6) : ""
+}
+
+; « td★ » fires on its magic key: the star is an action, not text, so the
+; Backspace gives « td » back and never « td★ » (decision of 2026-11-19).
+_BSU_AssertMagicKeyUndo() {
+	global HSE_Undoable
+	Undo := _BSU_Fire("*", "td★", "2026", "")
+	Assert(IsObject(Undo), "the magic-key expansion keeps its undo record")
+	AssertEqual("td★", Undo.Trigger, "the record keeps the typed trigger")
+	AssertEqual("td", Undo.Restored, "and types it back without the magic key")
+	HSE_Undoable := ""
+	AssertTrue(HSE_UndoExpansion(Undo, 1, , , Undo.CommittedTick + 100), "the Backspace undoes the expansion")
+	AssertEqual("{BackSpace 3}{Text}td", _BSU_LastBurst(),
+		"the physical Backspace took the 6: the rest of 2026 goes and td comes back alone")
+	AssertFalse(HSE_StartIsWordBoundary, "td is still the word being typed")
+}
+Test("hotstrings: a magic-key trigger comes back without the magic key (backspace-restore)",
+	_BSU_WithSettings.Bind(true, 500, _BSU_AssertMagicKeyUndo))
+
+; A terminator typed back after the output is part of what the user typed:
+; « adn » and a comma, a Space or Enter come back whole, never as « ADN » and it.
+_BSU_AssertTerminatorUndo() {
+	global HSE_Undoable
+	for EndChar in [",", " ", "`n"] {
+		Expected := "adn" . EndChar
+		Undo := _BSU_Fire("C", "adn", "ADN", EndChar)
+		Assert(IsObject(Undo), "control: the expansion keeps its undo record")
+		AssertEqual(Expected, Undo.Restored, "the terminator follows the trigger back")
+		HSE_Undoable := ""
+		AssertTrue(HSE_UndoExpansion(Undo, 1, , , Undo.CommittedTick + 100), "the Backspace undoes the expansion")
+		AssertEqual("{BackSpace 3}{Text}" . Expected, _BSU_LastBurst(),
+			"the output goes after the terminator the Backspace took, then trigger and terminator")
+		AssertTrue(HSE_StartIsWordBoundary, "the terminator typed back ends the word")
+	}
+}
+Test("hotstrings: a Backspace gives trigger and terminator back, not the output (backspace-restore)",
+	_BSU_WithSettings.Bind(true, 500, _BSU_AssertTerminatorUndo))
+
+; Within hotstrings.backspace_restore_window_ms the Backspace undoes; past it,
+; it is a plain Backspace that deletes the last character.
+_BSU_AssertWindow(ElapsedMs, Undoes) {
+	global HSE_Undoable
+	Undo := _BSU_Fire("C", "adn", "ADN", " ")
+	HSE_Undoable := ""
+	Sent := _Stub_RecordedSends.Length
+	AssertEqual(Undoes, HSE_UndoExpansion(Undo, 1, , , Undo.CommittedTick + ElapsedMs),
+		ElapsedMs . " ms after the expansion")
+	AssertEqual(Sent + (Undoes ? 1 : 0), _Stub_RecordedSends.Length,
+		Undoes ? "the undo goes out" : "past the window nothing is sent: the Backspace deletes the Space")
+}
+_BSU_TheWindowBoundsTheUndo() {
+	_BSU_WithSettings(true, 500, _BSU_AssertWindow.Bind(500, true))
+	_BSU_WithSettings(true, 500, _BSU_AssertWindow.Bind(501, false))
+	_BSU_WithSettings(true, 2000, _BSU_AssertWindow.Bind(1000, true))
+}
+Test("hotstrings: the Backspace undo lasts its window, then deletes a character (backspace-restore)",
+	_BSU_TheWindowBoundsTheUndo)
+
+; Off, an expansion keeps no undo and an older record no longer restores.
+_BSU_AssertOffKeepsNoUndo() {
+	AssertEqual("", _BSU_Fire("C", "adn", "ADN", " "), "an expansion keeps no undo while the option is off")
+}
+_BSU_AssertOffVoidsARecord() {
+	global HSE_Undoable, HSE_BackspaceRestoreEnabled
+	Undo := _BSU_Fire("C", "adn", "ADN", " ")
+	HSE_Undoable := ""
+	HSE_BackspaceRestoreEnabled := false
+	Sent := _Stub_RecordedSends.Length
+	AssertFalse(HSE_UndoExpansion(Undo, 1, , , Undo.CommittedTick + 10), "turned off, the record restores nothing")
+	AssertEqual(Sent, _Stub_RecordedSends.Length, "and nothing is sent")
+}
+_BSU_OptionOffKeepsThePlainBackspace() {
+	_BSU_WithSettings(false, 500, _BSU_AssertOffKeepsNoUndo)
+	_BSU_WithSettings(true, 500, _BSU_AssertOffVoidsARecord)
+}
+Test("hotstrings: the Backspace undo option off keeps a plain Backspace (backspace-restore)",
+	_BSU_OptionOffKeepsThePlainBackspace)
+
+; Escape, or any other key, between the expansion and the Backspace ends the undo.
+_BSU_AssertKeyBetween() {
+	global HSE_Undoable
+	_BSU_Fire("C", "adn", "ADN", " ")
+	AssertFalse(_PrefixTakeUndoOnKeyDown(0x1B), "Escape is no Backspace")
+	AssertEqual("", HSE_Undoable, "and it ends the undo")
+	Sent := _Stub_RecordedSends.Length
+	AssertFalse(_PrefixTakeUndoOnKeyDown(0x08), "the Backspace after it is a plain Backspace")
+	AssertEqual(Sent, _Stub_RecordedSends.Length, "nothing is sent")
+}
+Test("hotstrings: another key between the expansion and Backspace ends the undo (backspace-restore)",
+	_BSU_WithSettings.Bind(true, 500, _BSU_AssertKeyBetween))
+
+; One corpus vector through the dispatcher's own undo.
+_BSU_ReplayVector(Vector, Replay, KeyBetween) {
+	global HSE_Undoable
+	Undo := _BSU_Fire(Replay == "" ? "*C" : "C", Vector["trigger"], Vector["output"], Replay)
+	if !Vector["enabled"] {
+		AssertEqual("", Undo, Vector["id"] . ": off, the expansion keeps no undo")
+		return
+	}
+	if KeyBetween {
+		_PrefixTakeUndoOnKeyDown(0x1B)
+		AssertEqual("", HSE_Undoable, Vector["id"] . ": the other key ends the undo")
+		return
+	}
+	HSE_Undoable := ""
+	Sent := _Stub_RecordedSends.Length
+	Restored := HSE_UndoExpansion(Undo, 1, , , Undo.CommittedTick + Vector["elapsed_ms"])
+	AssertEqual(Vector["undoes"] ? true : false, Restored ? true : false, Vector["id"] . ": undoes")
+	if Vector["undoes"]
+		AssertEqual(Vector["screen_after"], _BSU_TypedBack(_BSU_LastBurst()), Vector["id"] . ": the text typed back")
+	else
+		AssertEqual(Sent, _Stub_RecordedSends.Length, Vector["id"] . ": a plain Backspace sends nothing")
+}
+
+; The shared corpus, replayed through the AutoHotkey rule and, for every vector
+; a typed hotstring can produce, through the dispatcher's own undo.
+_BSU_ReplaysTheSharedCorpus() {
+	Path := A_ScriptDir . "\..\..\_shared\tests\corpus\hotstrings\backspace_restore_vectors.json"
+	if !FileExist(Path)
+		throw Error("shared corpus not found at '" . Path . "'")
+	Vectors := JsonParse(FileRead(Path, "UTF-8"))["vectors"]
+	AssertTrue(Vectors.Length >= 10, "the corpus lists its vectors")
+	Replayed := 0
+	for Vector in Vectors {
+		Terminator := Vector.Has("terminator") ? Vector["terminator"] : ""
+		Consumed := Vector.Has("terminator_consumed") and Vector["terminator_consumed"]
+		KeyBetween := Vector.Has("key_between") and Vector["key_between"]
+		Replay := Consumed ? "" : Terminator
+		Undoes := Vector["enabled"] and !KeyBetween
+			and HSE_BackspaceRestoreWithinWindow(0, Vector["elapsed_ms"], Vector["window_ms"])
+		Screen := Vector["output"] . Replay
+		Screen := Undoes ? HSE_BackspaceRestoredText(Vector["trigger"], Vector["magic_key"], Replay)
+			: SubStr(Screen, 1, StrLen(Screen) - _TextTailCodeUnits(Screen, 1))
+		AssertEqual(Vector["undoes"] ? true : false, Undoes ? true : false, Vector["id"] . ": undoes")
+		AssertEqual(Vector["screen_after"], Screen, Vector["id"] . ": " . Vector["description"])
+		; A consumed terminator and the repeat key need their own catalogue: the
+		; rule above covers them, the typed hotstrings go through the dispatcher.
+		if (Consumed or Vector["trigger"] == Vector["magic_key"])
+			continue
+		Replayed += 1
+		_BSU_WithSettings(Vector["enabled"], Vector["window_ms"],
+			_BSU_ReplayVector.Bind(Vector, Replay, KeyBetween))
+	}
+	AssertTrue(Replayed >= 8, "most vectors go through the dispatcher")
+}
+Test("hotstrings: the Backspace undo replays the shared backspace_restore_vectors corpus (backspace-restore-vectors)",
+	_BSU_ReplaysTheSharedCorpus)

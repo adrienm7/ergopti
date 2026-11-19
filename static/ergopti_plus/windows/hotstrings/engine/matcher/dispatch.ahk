@@ -303,6 +303,7 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 		DeleteFromEnd: DeleteCount,
 		InsertedText: InsertedText,
 		EndCharEmitted: Owner["EndCharPart"] != "",
+		EndCharText: ClearAll ? "" : Owner["EndCharPart"],
 		KnownBoundaryAfter: !ClearAll && InsertedText != ""
 			&& _HSE_CharOpensWord(SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)), _HSE_WordBoundarySet())
 	}
@@ -815,6 +816,7 @@ _HSE_CommitNotepadOwner(Owner) {
 	InsertedText := Owner["PlainInsertedText"]
 	Effect := { IsPrivate: Owner["IsPrivate"], ClearAll: false, DeleteFromEnd: Owner["EraseUnits"],
 		InsertedText: InsertedText, EndCharEmitted: Owner["EndCharPart"] != "",
+		EndCharText: Owner["EndCharPart"],
 		KnownBoundaryAfter: InsertedText != ""
 			&& _HSE_CharOpensWord(SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)), _HSE_WordBoundarySet()) }
 	PreviousBuffer := HSE_Buffer
@@ -1864,15 +1866,30 @@ _HSE_RememberUndo(Spec, BufferBefore, Effect, CascadeUnits, OutputHost) {
 ; @param Route {String} The owned output: "atomic", "notepad" or "terminal".
 _HSE_RememberUndoRecord(TriggerUnits, BufferBefore, Effect, Hwnd, Route) {
 		global HSE_Undoable, HSE_Buffer, _PrefixInputContextGeneration, _PrefixFocusedControlToken
+		global ScriptInformation
 		HSE_Undoable := ""
+		if !Effect.HasOwnProp("EndCharText")
+				throw Error("An undoable hotstring effect must say which terminator it typed (EndCharText).")
+		; hotstrings.backspace_restore_enabled off: the Backspace stays a Backspace.
 		if (TriggerUnits < 1 or Effect.ClearAll or Effect.InsertedText == ""
+				or !HSE_BackspaceRestoreEnabledCurrent()
 				or !IsSet(_PrefixInputContextGeneration) or !IsSet(_PrefixFocusedControlToken))
 				return
 		Start := StrLen(BufferBefore) - Effect.DeleteFromEnd + 1
 		if (Start < 1 or TriggerUnits > Effect.DeleteFromEnd)
 				return
+		Trigger := SubStr(BufferBefore, Start, TriggerUnits)
+		MagicKey := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
+				? ScriptInformation["MagicKey"] : ""
 		HSE_Undoable := {
-				Trigger: SubStr(BufferBefore, Start, TriggerUnits),
+				Trigger: Trigger,
+				; What the Backspace types back: the trigger less a final magic key,
+				; then the terminator typed after the output (decision of 2026-11-19).
+				Restored: HSE_BackspaceRestoredText(Trigger, MagicKey, Effect.EndCharText),
+				CommittedTick: A_TickCount,
+				; A terminator typed back ends the word: the next key starts one.
+				BoundaryAfter: Effect.EndCharText != "" and _HSE_CharOpensWord(
+						SubStr(Effect.EndCharText, -_TextTailCodeUnits(Effect.EndCharText, 1)), _HSE_WordBoundarySet()),
 				Typed: Effect.InsertedText,
 				IsPrivate: Effect.IsPrivate,
 				BufferAfter: HSE_Buffer,
@@ -1887,8 +1904,13 @@ _HSE_RememberUndoRecord(TriggerUnits, BufferBefore, Effect, Hwnd, Route) {
 ; physical Backspace has already reached the application and removed the last
 ; step of what the expansion typed, so the burst erases what is left of it and
 ; types the trigger, outside the buffers so it cannot fire again at once (Linux's
-; undo). A step is what the focused host erases per Backspace: a code point in an
-; EDIT, a whole emoji in a RichEdit or Chromium (HSE_BackspaceSegments).
+; undo). The trigger comes back without a final magic key and followed by the
+; terminator the expansion typed back (HSE_BackspaceRestoredText). Only within
+; hotstrings.backspace_restore_window_ms of the expansion and while
+; hotstrings.backspace_restore_enabled is on: otherwise the Backspace stays the
+; application's and deletes the last character. A step is what the focused host
+; erases per Backspace: a code point in an EDIT, a whole emoji in a RichEdit or
+; Chromium (HSE_BackspaceSegments).
 ; Any edit, click, focus change or other window in between voids the record, and
 ; the burst takes the expansion's own output: Notepad's verified editor, the
 ; terminal's paced capture or the atomic SendInput.
@@ -1896,13 +1918,19 @@ _HSE_RememberUndoRecord(TriggerUnits, BufferBefore, Effect, Hwnd, Route) {
 ; @param FocusToken {Integer} The focused control, probed live when unset.
 ; @param NativeSendFn {Func} The Notepad editor sender, TextSend when unset.
 ; @param SchedulerFn {Func|0} The terminal owner's scheduler, a timer when 0.
+; @param NowTick {Integer} The Backspace's A_TickCount, now when unset.
 ; @returns {Boolean} True when this function owns the Backspace's buffer effect:
 ;   the trigger went out or is going out, or a failure left the context reset.
-HSE_UndoExpansion(Undo, FocusToken := unset, NativeSendFn := unset, SchedulerFn := 0) {
+HSE_UndoExpansion(Undo, FocusToken := unset, NativeSendFn := unset, SchedulerFn := 0, NowTick := unset) {
 		global HSE_Buffer, HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook
 		global _PrefixInputContextGeneration, _PrefixFocusedControlToken
 		if !IsObject(Undo) or A_IsSuspended or !IsSet(_PrefixInputContextGeneration)
 				return false
+		if (!HSE_BackspaceRestoreEnabledCurrent() or !HSE_BackspaceRestoreWithinWindow(
+				Undo.CommittedTick, IsSet(NowTick) ? NowTick : A_TickCount, HSE_BackspaceRestoreWindowMsCurrent())) {
+				LoggerDebug("HSE", "Undo: the Backspace came after the undo window; it deletes a character.")
+				return false
+		}
 		if !_PrefixEnsureInputContext(FocusToken?)
 				return false
 		if (HSE_Buffer !== Undo.BufferAfter or _PrefixInputContextGeneration != Undo.InputGeneration
@@ -1919,9 +1947,17 @@ HSE_UndoExpansion(Undo, FocusToken := unset, NativeSendFn := unset, SchedulerFn 
 		; What the physical Backspace left on screen.
 		Left := SubStr(Undo.Typed, 1, StrLen(Undo.Typed) - StrLen(Segments[Remaining]))
 		LoggerDebug("HSE", "Undo: {1} Backspace step(s) in a {2} host.", Remaining - 1, Family)
+		; The repeat key's lone ★ gives nothing back: the physical Backspace
+		; already removed the repeated character, which is the whole undo.
+		if (Remaining == 1 and Undo.Restored == "") {
+				_HSE_ResetUndoContext(false)
+				_HSE_LogUndoRestored(Undo)
+				return true
+		}
 		if Undo.Route != "atomic"
 				return _HSE_UndoThroughOwner(Undo, Remaining - 1, Left, Host, NativeSendFn?, SchedulerFn)
-		Burst := (Remaining > 1 ? "{BackSpace " . (Remaining - 1) . "}" : "") . "{Text}" . Undo.Trigger
+		Burst := (Remaining > 1 ? "{BackSpace " . (Remaining - 1) . "}" : "")
+				. (Undo.Restored != "" ? "{Text}" . Undo.Restored : "")
 		PrefixWatcherSuppress(true)
 		SyntheticOwner := 0
 		try SyntheticOwner := KL_MarkSynthetic("hotstring", Undo.IsPrivate)
@@ -1944,7 +1980,7 @@ HSE_UndoExpansion(Undo, FocusToken := unset, NativeSendFn := unset, SchedulerFn 
 				SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
 				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -HSE_SUPPRESS_RELEASE_DELAY_MS)
 		}
-		_HSE_ResetUndoContext()
+		_HSE_ResetUndoContext(Sent and Undo.BoundaryAfter)
 		if !Sent {
 				LoggerError("HSE", "Undo: restoring the trigger failed ({1}); the context is reset.",
 						SendError != "" ? SendError : "send refused")
@@ -1954,12 +1990,15 @@ HSE_UndoExpansion(Undo, FocusToken := unset, NativeSendFn := unset, SchedulerFn 
 		return true
 }
 
-; The restored trigger is not in the buffers and the caret follows it: the next
-; key starts no known word, so a word-start rule cannot fire inside it. A failed
-; or partial send leaves the line unknown, which the same reset says.
-_HSE_ResetUndoContext() {
+; The restored text is not in the buffers and the caret follows it. Without a
+; terminator typed back the next key starts no known word, so a word-start rule
+; cannot fire inside the trigger; a word-opening terminator typed back (Space,
+; punctuation, Enter) ends it, so the next key starts a word. A failed or
+; partial send leaves the line unknown, which the same reset says.
+; @param KnownBoundary {Boolean} Whether the restored text ends at a word boundary.
+_HSE_ResetUndoContext(KnownBoundary) {
 		global _PrefixFocusedControlToken
-		_PrefixInvalidateInputContext(_PrefixFocusedControlToken, false)
+		_PrefixInvalidateInputContext(_PrefixFocusedControlToken, KnownBoundary ? true : false)
 		_LSCResetFrom([])
 		if IsSet(LLM_Bridge_OnUnknownEdit)
 				try LLM_Bridge_OnUnknownEdit("Backspace undo")
@@ -2004,7 +2043,7 @@ _HSE_LogUndoRestored(Undo) {
 		if Undo.IsPrivate
 				LoggerInfo("HSE", "Undo: restored a private trigger (content withheld).")
 		else
-				LoggerInfo("HSE", "Undo: restored the trigger ({1} char(s)).", _TextCodepointLength(Undo.Trigger))
+				LoggerInfo("HSE", "Undo: restored the trigger ({1} char(s)).", _TextCodepointLength(Undo.Restored))
 }
 
 ; Sends the undo through the Notepad editor or the terminal capture, as the
@@ -2027,7 +2066,7 @@ _HSE_UndoThroughOwner(Undo, Erased, Left, Host, NativeSendFn := unset, Scheduler
 		Owner := Map("Id", ++_HSE_TerminalOwnerSerial, "Pending", true, "UndoRestore", true,
 			"Backspaces", Undo.Route == "notepad" ? _TextCodepointLength(Left) : Erased,
 			"EraseUnits", 0, "DeletedText", Left,
-			"PlainInsertedText", Undo.Trigger, "SendPayload", "{Text}" . Undo.Trigger,
+			"PlainInsertedText", Undo.Restored, "SendPayload", "{Text}" . Undo.Restored,
 			"EndCharPart", "", "OnlyText", true, "TrailingText", "", "TrailingChars", [],
 			"Hwnd", Host["Hwnd"], "Pid", Host["Pid"], "IsPrivate", Undo.IsPrivate, "Port", 0)
 		if Undo.Route == "notepad" {
@@ -2047,7 +2086,7 @@ _HSE_UndoThroughOwner(Undo, Erased, Left, Host, NativeSendFn := unset, Scheduler
 		PrefixWatcherSuppress(true)
 		Owner["SyntheticOwner"] := 0
 		try Owner["SyntheticOwner"] := KL_MarkSynthetic("hotstring", Undo.IsPrivate)
-		_HSE_ResetUndoContext()
+		_HSE_ResetUndoContext(Undo.BoundaryAfter)
 		Owner["BufferSnapshot"] := HSE_Buffer
 		Owner["RegistryGeneration"] := HSE_RegistryGeneration
 		Owner["DecisionGeneration"] := HSE_RuntimeDecisionGeneration

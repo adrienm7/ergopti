@@ -1793,7 +1793,7 @@ _HNPU_BackspaceRestoresThroughTheEditor(Mode) {
 		AssertEqual(2, State["Requests"].Length, "one editor request restores the trigger")
 		Request := State["Requests"][2]
 		AssertEqual("native", Request.Opts["mode"], "the same verified editor, never a keyboard burst")
-		AssertEqual("ab", Request.Text, "the trigger comes back")
+		AssertEqual("ab ", Request.Text, "the trigger comes back with the Space that fired it")
 		AssertEqual(1, Request.Opts["erase_before"], "the Space is already gone: the rest of the output is erased")
 		AssertEqual("Z", Request.Opts["deleted_text"], "and named exactly")
 		AssertEqual("", HSE_Buffer, "the restored trigger stays out of the buffer")
@@ -1815,7 +1815,7 @@ _HNPU_BackspaceRestoresThroughTheEditor(Mode) {
 			if State["Requests"].Length == Count
 				break
 			Retry := State["Requests"][State["Requests"].Length]
-			AssertEqual("ab", Retry.Text, "a retry asks for the same trigger")
+			AssertEqual("ab ", Retry.Text, "a retry asks for the same trigger and Space")
 			AssertEqual("Z", Retry.Opts["deleted_text"], "over the same remaining output")
 		}
 		if Mode != "never" {
