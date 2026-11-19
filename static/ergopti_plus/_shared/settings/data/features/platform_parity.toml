@@ -123,10 +123,6 @@ technical = "Mission Control and App Exposé on macOS, Task View on Windows; Lin
 kind = "os_equivalent"
 technical = "Word deletion is Option+Backspace on macOS text fields and Ctrl+Backspace on Windows and Linux; each OS lists its own action."
 
-[reasons."platform_reason.personal_shortcut_switches_are_windows"]
-kind = "os_concept"
-technical = "These switches name personal setups of the Windows AutoHotkey shortcuts (broken laptop key remap, window dragging and tab switching with the mouse, programmable keyboard, professional environment) that have no macOS or Linux counterpart."
-
 [reasons."platform_reason.key_combinations_are_karabiner_settings_on_macos"]
 kind = "driver_storage"
 technical = "Karabiner-Elements runs the key combinations on macOS, so macOS keeps them and their switch with its Karabiner settings (mod_combos in tap_hold.toml) instead of shortcuts.key_combination_taps."
@@ -486,41 +482,6 @@ token = "PauseSwitchPolicyTarget(PauseLayoutSwitch_Settings(Features), Event)"
 # ======= 3. Recorded gaps =======
 # ==================================
 # ==================================
-
-# PPT-01: no driver registers these two rolls and no hotstring file holds them.
-[unowned.windows."hotstrings.rolls.chevron_greater"]
-finding = "PPT-01"
-
-[unowned.windows."hotstrings.rolls.chevron_less"]
-finding = "PPT-01"
-
-[unowned.macos."hotstrings.rolls.chevron_greater"]
-finding = "PPT-01"
-
-[unowned.macos."hotstrings.rolls.chevron_less"]
-finding = "PPT-01"
-
-[unowned.linux."hotstrings.rolls.chevron_greater"]
-finding = "PPT-01"
-
-[unowned.linux."hotstrings.rolls.chevron_less"]
-finding = "PPT-01"
-
-# PPT-02: the five Windows personal shortcut switches have no reader.
-[unowned.windows."shortcuts.personal.laptop_broken_key"]
-finding = "PPT-02"
-
-[unowned.windows."shortcuts.personal.mouse_drag_window"]
-finding = "PPT-02"
-
-[unowned.windows."shortcuts.personal.mouse_tab_switching"]
-finding = "PPT-02"
-
-[unowned.windows."shortcuts.personal.professional_environment"]
-finding = "PPT-02"
-
-[unowned.windows."shortcuts.personal.programmable_keyboard"]
-finding = "PPT-02"
 
 # PPT-03: only macOS reads llm.generation.sequential_mode.
 [unowned.windows."llm.generation.sequential_mode"]

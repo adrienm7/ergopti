@@ -77,8 +77,6 @@ two disagree in either direction.
 | `hotstrings.rolls.assign_arrow_minus_right`                   | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.rolls.bracket_quote`                              | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.rolls.chevron_equal`                              | —               | `evdev`, `uinput`                      | —                    |
-| `hotstrings.rolls.chevron_greater`                            | —               | `evdev`, `uinput`                      | —                    |
-| `hotstrings.rolls.chevron_less`                               | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.rolls.close_chevron_tag`                          | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.rolls.comment_close`                              | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.rolls.comment_open`                               | —               | `evdev`, `uinput`                      | —                    |
@@ -190,11 +188,6 @@ two disagree in either direction.
 | `shortcuts.key_combination_taps.left_alt_then_caps_lock`      | n/a             | `evdev`, `uinput`                      | —                    |
 | `mod_combos.simultaneous_threshold_ms`                        | `karabiner`     | `evdev`, `uinput`                      | —                    |
 | `mod_combos.symmetric`                                        | `karabiner`     | `evdev`, `uinput`                      | —                    |
-| `shortcuts.personal.laptop_broken_key`                        | n/a             | n/a                                    | —                    |
-| `shortcuts.personal.mouse_drag_window`                        | n/a             | n/a                                    | —                    |
-| `shortcuts.personal.mouse_tab_switching`                      | n/a             | n/a                                    | —                    |
-| `shortcuts.personal.professional_environment`                 | n/a             | n/a                                    | —                    |
-| `shortcuts.personal.programmable_keyboard`                    | n/a             | n/a                                    | —                    |
 | `shortcuts.script_control.chords_enabled`                     | `karabiner`     | `evdev`, `uinput`                      | —                    |
 | `shortcuts.script_control.script_altgr_backspace`             | `karabiner`     | `evdev`, `uinput`                      | —                    |
 | `shortcuts.script_control.script_altgr_delete`                | `karabiner`     | `evdev`, `uinput`                      | —                    |

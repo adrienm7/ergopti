@@ -204,12 +204,6 @@ M.features = {
 		path = "hotstrings.rolls.chevron_equal", id = "chevron_equal", section = "hotstrings.rolls", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.rolls.chevron_equal", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true }, family = "feature",
 	},
 	{
-		path = "hotstrings.rolls.chevron_greater", id = "chevron_greater", section = "hotstrings.rolls", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.rolls.chevron_greater", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true }, family = "feature",
-	},
-	{
-		path = "hotstrings.rolls.chevron_less", id = "chevron_less", section = "hotstrings.rolls", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.rolls.chevron_less", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true }, family = "feature",
-	},
-	{
 		path = "hotstrings.rolls.close_chevron_tag", id = "close_chevron_tag", section = "hotstrings.rolls", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.rolls.close_chevron_tag", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true, time_activation_seconds = 0.5 }, family = "feature",
 	},
 	{
@@ -541,21 +535,6 @@ M.features = {
 	},
 	{
 		path = "mod_combos.symmetric", id = "symmetric", section = "mod_combos", default = false, type = "boolean", description_key = "menu.tapholds.symmetric", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "setting",
-	},
-	{
-		path = "shortcuts.personal.laptop_broken_key", section = "shortcuts.personal", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.personal.mouse_drag_window", section = "shortcuts.personal", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.personal.mouse_tab_switching", section = "shortcuts.personal", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.personal.professional_environment", section = "shortcuts.personal", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.personal.programmable_keyboard", section = "shortcuts.personal", platforms = { "ahk" },
 	},
 	{
 		path = "shortcuts.script_control.chords_enabled", id = "chords_enabled", section = "shortcuts.script_control", default = true, type = "boolean", description_key = "menu.shortcuts.script_shortcuts_enable", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",

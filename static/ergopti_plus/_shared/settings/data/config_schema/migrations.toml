@@ -111,7 +111,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 22
+current_version = 23
 unstamped_version = 2
 oldest_version = 20
 
@@ -154,4 +154,23 @@ ops = [
 	{ op = "import_companion", file = "tap_hold.toml", section = "tap_hold", key = "lone_modifier_tap_max_ms", to_section = "tap_holds" },
 	{ op = "import_companion", file = "tap_hold.toml", section = "tap_hold", key = "sticky_timeout_ms", to_section = "tap_holds" },
 	{ op = "import_companion", file = "tap_hold.toml", section = "mod_combos", to_section = "mod_combos" },
+]
+
+[steps.v22_to_v23]
+from = 22
+to = 23
+drivers = ["ahk", "hs", "linux"]
+reason = "The chevron_greater and chevron_less rolls and the five built-in Windows personal shortcut switches had no reader on any OS; the maintainer removed them on 2026-11-19 (PPT-01, PPT-02), so their saved values leave config.toml."
+# A recommended import or a menu toggle wrote [hotstrings.rolls.chevron_greater]
+# and [hotstrings.rolls.chevron_less] on every OS. The five switches lived in the
+# Windows [shortcuts.personal] namespace; switches a personal_shortcuts.ahk
+# registers under other names stay. Absent values are a no-op.
+ops = [
+	{ op = "delete", section = "hotstrings.rolls.chevron_greater" },
+	{ op = "delete", section = "hotstrings.rolls.chevron_less" },
+	{ op = "delete", section = "shortcuts.personal", key = "laptop_broken_key" },
+	{ op = "delete", section = "shortcuts.personal", key = "mouse_drag_window" },
+	{ op = "delete", section = "shortcuts.personal", key = "mouse_tab_switching" },
+	{ op = "delete", section = "shortcuts.personal", key = "professional_environment" },
+	{ op = "delete", section = "shortcuts.personal", key = "programmable_keyboard" },
 ]

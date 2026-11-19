@@ -714,36 +714,6 @@
 		"reason": null
 	},
 	{
-		"path": "hotstrings.rolls.chevron_greater",
-		"family": "feature",
-		"labels": {
-			"fr": ">% ➜ >=",
-			"en": ">% ➜ >="
-		},
-		"platforms": {
-			"windows": true,
-			"macos": true,
-			"linux": true
-		},
-		"reason_key": null,
-		"reason": null
-	},
-	{
-		"path": "hotstrings.rolls.chevron_less",
-		"family": "feature",
-		"labels": {
-			"fr": "<% ➜ <=",
-			"en": "<% ➜ <="
-		},
-		"platforms": {
-			"windows": true,
-			"macos": true,
-			"linux": true
-		},
-		"reason_key": null,
-		"reason": null
-	},
-	{
 		"path": "hotstrings.rolls.close_chevron_tag",
 		"family": "feature",
 		"labels": {
@@ -2470,96 +2440,6 @@
 		},
 		"reason_key": null,
 		"reason": null
-	},
-	{
-		"path": "shortcuts.personal.laptop_broken_key",
-		"family": "feature",
-		"labels": {
-			"fr": "shortcuts.personal.laptop_broken_key",
-			"en": "shortcuts.personal.laptop_broken_key"
-		},
-		"platforms": {
-			"windows": true,
-			"macos": false,
-			"linux": false
-		},
-		"reason_key": "platform_reason.personal_shortcut_switches_are_windows",
-		"reason": {
-			"fr": "Windows uniquement : ces cinq interrupteurs désignent des configurations personnelles Windows (une touche d’ordinateur portable cassée, le déplacement de fenêtres et le changement d’onglet à la souris, un clavier programmable, un environnement professionnel). macOS et Linux n’ont pas d’équivalent.",
-			"en": "Windows only: these five switches name personal Windows setups (a broken laptop key, window dragging and tab switching with the mouse, a programmable keyboard, a professional environment). macOS and Linux have no counterpart."
-		}
-	},
-	{
-		"path": "shortcuts.personal.mouse_drag_window",
-		"family": "feature",
-		"labels": {
-			"fr": "shortcuts.personal.mouse_drag_window",
-			"en": "shortcuts.personal.mouse_drag_window"
-		},
-		"platforms": {
-			"windows": true,
-			"macos": false,
-			"linux": false
-		},
-		"reason_key": "platform_reason.personal_shortcut_switches_are_windows",
-		"reason": {
-			"fr": "Windows uniquement : ces cinq interrupteurs désignent des configurations personnelles Windows (une touche d’ordinateur portable cassée, le déplacement de fenêtres et le changement d’onglet à la souris, un clavier programmable, un environnement professionnel). macOS et Linux n’ont pas d’équivalent.",
-			"en": "Windows only: these five switches name personal Windows setups (a broken laptop key, window dragging and tab switching with the mouse, a programmable keyboard, a professional environment). macOS and Linux have no counterpart."
-		}
-	},
-	{
-		"path": "shortcuts.personal.mouse_tab_switching",
-		"family": "feature",
-		"labels": {
-			"fr": "shortcuts.personal.mouse_tab_switching",
-			"en": "shortcuts.personal.mouse_tab_switching"
-		},
-		"platforms": {
-			"windows": true,
-			"macos": false,
-			"linux": false
-		},
-		"reason_key": "platform_reason.personal_shortcut_switches_are_windows",
-		"reason": {
-			"fr": "Windows uniquement : ces cinq interrupteurs désignent des configurations personnelles Windows (une touche d’ordinateur portable cassée, le déplacement de fenêtres et le changement d’onglet à la souris, un clavier programmable, un environnement professionnel). macOS et Linux n’ont pas d’équivalent.",
-			"en": "Windows only: these five switches name personal Windows setups (a broken laptop key, window dragging and tab switching with the mouse, a programmable keyboard, a professional environment). macOS and Linux have no counterpart."
-		}
-	},
-	{
-		"path": "shortcuts.personal.professional_environment",
-		"family": "feature",
-		"labels": {
-			"fr": "shortcuts.personal.professional_environment",
-			"en": "shortcuts.personal.professional_environment"
-		},
-		"platforms": {
-			"windows": true,
-			"macos": false,
-			"linux": false
-		},
-		"reason_key": "platform_reason.personal_shortcut_switches_are_windows",
-		"reason": {
-			"fr": "Windows uniquement : ces cinq interrupteurs désignent des configurations personnelles Windows (une touche d’ordinateur portable cassée, le déplacement de fenêtres et le changement d’onglet à la souris, un clavier programmable, un environnement professionnel). macOS et Linux n’ont pas d’équivalent.",
-			"en": "Windows only: these five switches name personal Windows setups (a broken laptop key, window dragging and tab switching with the mouse, a programmable keyboard, a professional environment). macOS and Linux have no counterpart."
-		}
-	},
-	{
-		"path": "shortcuts.personal.programmable_keyboard",
-		"family": "feature",
-		"labels": {
-			"fr": "shortcuts.personal.programmable_keyboard",
-			"en": "shortcuts.personal.programmable_keyboard"
-		},
-		"platforms": {
-			"windows": true,
-			"macos": false,
-			"linux": false
-		},
-		"reason_key": "platform_reason.personal_shortcut_switches_are_windows",
-		"reason": {
-			"fr": "Windows uniquement : ces cinq interrupteurs désignent des configurations personnelles Windows (une touche d’ordinateur portable cassée, le déplacement de fenêtres et le changement d’onglet à la souris, un clavier programmable, un environnement professionnel). macOS et Linux n’ont pas d’équivalent.",
-			"en": "Windows only: these five switches name personal Windows setups (a broken laptop key, window dragging and tab switching with the mouse, a programmable keyboard, a professional environment). macOS and Linux have no counterpart."
-		}
 	},
 	{
 		"path": "shortcuts.script_control.chords_enabled",

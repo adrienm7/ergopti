@@ -190,16 +190,6 @@ enabled = false
 
 
 
-[hotstrings.rolls.chevron_greater]
-enabled = false
-
-
-
-[hotstrings.rolls.chevron_less]
-enabled = false
-
-
-
 [hotstrings.rolls.close_chevron_tag]
 enabled = false
 time_activation_seconds = 0.5
@@ -589,15 +579,6 @@ symmetric = false
 
 
 
-[shortcuts.personal]
-laptop_broken_key = false
-mouse_drag_window = false
-mouse_tab_switching = false
-professional_environment = false
-programmable_keyboard = false
-
-
-
 [shortcuts.script_control]
 chords_enabled = true
 script_altgr_backspace = "script_reload"
@@ -949,8 +930,6 @@ sections = [
 	"hotstrings.rolls.assign_arrow_minus_right",
 	"hotstrings.rolls.bracket_quote",
 	"hotstrings.rolls.chevron_equal",
-	"hotstrings.rolls.chevron_greater",
-	"hotstrings.rolls.chevron_less",
 	"hotstrings.rolls.close_chevron_tag",
 	"hotstrings.rolls.comment_close",
 	"hotstrings.rolls.comment_open",
@@ -1002,7 +981,6 @@ sections = [
 	"shortcuts.e_grave",
 	"shortcuts.key_combination_taps",
 	"mod_combos",
-	"shortcuts.personal",
 	"shortcuts.script_control",
 	"shortcuts.keyboard",
 	"shortcuts.tap_keys",
@@ -1058,8 +1036,6 @@ sections = [
 	"hotstrings.rolls.assign_arrow_minus_right",
 	"hotstrings.rolls.bracket_quote",
 	"hotstrings.rolls.chevron_equal",
-	"hotstrings.rolls.chevron_greater",
-	"hotstrings.rolls.chevron_less",
 	"hotstrings.rolls.close_chevron_tag",
 	"hotstrings.rolls.comment_close",
 	"hotstrings.rolls.comment_open",
@@ -1159,8 +1135,6 @@ sections = [
 	"hotstrings.rolls.assign_arrow_minus_right",
 	"hotstrings.rolls.bracket_quote",
 	"hotstrings.rolls.chevron_equal",
-	"hotstrings.rolls.chevron_greater",
-	"hotstrings.rolls.chevron_less",
 	"hotstrings.rolls.close_chevron_tag",
 	"hotstrings.rolls.comment_close",
 	"hotstrings.rolls.comment_open",

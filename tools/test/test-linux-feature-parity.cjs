@@ -723,12 +723,18 @@ assert.match(
 );
 // A recorded gap that a driver now reads is stale, and so is an unused owner rule.
 assert.match(
-	parityErrors((table) => {
-		const row = table.find((entry) => entry.path === 'hotstrings.rolls.chevron_greater');
-		row.cells.windows.owner =
-			'static/ergopti_plus/windows/hotstrings/engine/catalogue/distances.ahk';
+	parityErrors((table, context) => {
+		// The ledger is empty since the PPT-01 to PPT-03 decisions of 2026-11-19, so
+		// the stale entry is recorded here for a row a driver does own.
+		const row = table.find(
+			(entry) =>
+				entry.kind === 'feature' &&
+				entry.cells.windows.status === 'supported' &&
+				entry.cells.windows.owner
+		);
+		context.parity.unowned = { windows: { [row.path]: { finding: 'PPT-99' } } };
 	}),
-	/unowned windows hotstrings.rolls.chevron_greater is stale/
+	/unowned windows [\w.*]+ is stale: .+ owns it now/
 );
 assert.match(
 	parityErrors((table) => {

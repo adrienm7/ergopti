@@ -1924,14 +1924,6 @@
 			"reason": "symbol-or-placeholder-only",
 			"locales": "*"
 		},
-		"menu.hotstrings.rolls.chevron_greater": {
-			"reason": "symbol-or-placeholder-only",
-			"locales": "*"
-		},
-		"menu.hotstrings.rolls.chevron_less": {
-			"reason": "symbol-or-placeholder-only",
-			"locales": "*"
-		},
 		"menu.hotstrings.rolls.close_chevron_tag": {
 			"reason": "symbol-or-placeholder-only",
 			"locales": "*"

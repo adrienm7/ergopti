@@ -954,24 +954,6 @@ type = "feature"
 description_key = "menu.hotstrings.rolls.chevron_equal"
 
 [[features.hotstrings.rolls]]
-id = "chevron_greater"
-requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = { enabled = false }
-recommended = { enabled = true }
-family = "feature"
-type = "feature"
-description_key = "menu.hotstrings.rolls.chevron_greater"
-
-[[features.hotstrings.rolls]]
-id = "chevron_less"
-requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = { enabled = false }
-recommended = { enabled = true }
-family = "feature"
-type = "feature"
-description_key = "menu.hotstrings.rolls.chevron_less"
-
-[[features.hotstrings.rolls]]
 id = "close_chevron_tag"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
@@ -2216,64 +2198,8 @@ family = "setting"
 type = "boolean"
 description_key = "menu.tapholds.symmetric"
 
-# ====================================
-# ===== 3.5.6 shortcuts.personal =====
-# ====================================
-
-[[features.shortcuts.personal]]
-id = "laptop_broken_key"
-platforms = ["ahk"]
-requires = { windows = [] }
-default = false
-recommended = true
-family = "feature"
-type = "boolean"
-description_key = "menu.shortcuts.personal.laptop_broken_key"
-
-[[features.shortcuts.personal]]
-id = "mouse_drag_window"
-platforms = ["ahk"]
-requires = { windows = [] }
-default = false
-recommended = true
-family = "feature"
-type = "boolean"
-description_key = "menu.shortcuts.personal.mouse_drag_window"
-
-[[features.shortcuts.personal]]
-id = "mouse_tab_switching"
-platforms = ["ahk"]
-requires = { windows = [] }
-default = false
-recommended = true
-family = "feature"
-type = "boolean"
-description_key = "menu.shortcuts.personal.mouse_tab_switching"
-
-[[features.shortcuts.personal]]
-id = "professional_environment"
-platforms = ["ahk"]
-requires = { windows = [] }
-default = false
-recommended = false
-family = "feature"
-type = "boolean"
-description_key = "menu.shortcuts.personal.professional_environment"
-
-[[features.shortcuts.personal]]
-id = "programmable_keyboard"
-platforms = ["ahk"]
-requires = { windows = [] }
-default = false
-recommended = true
-family = "feature"
-type = "boolean"
-description_key = "menu.shortcuts.personal.programmable_keyboard"
-
-
-
 # ==========================================
-# ===== 3.5.7 shortcuts.script_control =====
+# ===== 3.5.6 shortcuts.script_control =====
 # ==========================================
 
 # The script-management chords start with their preset in an empty
@@ -2358,7 +2284,7 @@ description_key = "menu.shortcuts.script_control.script_altgr_escape"
 
 
 # ====================================
-# ===== 3.5.8 shortcuts.keyboard =====
+# ===== 3.5.7 shortcuts.keyboard =====
 
 [[features.shortcuts.keyboard]]
 id = "magic_editor"
@@ -2785,7 +2711,7 @@ description_key = "menu.shortcuts.keyboard.super_space"
 
 
 # ====================================
-# ===== 3.5.9 shortcuts.tap_keys =====
+# ===== 3.5.8 shortcuts.tap_keys =====
 # ====================================
 
 # The three keys at the edges of the number row, tapped alone. Each runs the
@@ -2828,9 +2754,9 @@ description_key = "menu.shortcuts.tap_keys.number_row_right_2"
 
 
 
-# ======================================
-# ===== 3.5.10 shortcuts.caps_word =====
-# ======================================
+# =====================================
+# ===== 3.5.9 shortcuts.caps_word =====
+# =====================================
 
 # What ends CapsWord on its own, the same settings on every driver; the policy
 # is _shared/keyboard/engine/caps_word_auto_off.lua and its AHK port, both replaying
@@ -2880,7 +2806,7 @@ description_key = "menu.caps_word.terminators_header"
 
 
 # ==============================================
-# ===== 3.5.11 shortcuts.caps_word.pointer =====
+# ===== 3.5.10 shortcuts.caps_word.pointer =====
 # ==============================================
 
 # The pointer actions that end CapsWord: the hand has left the keyboard. One

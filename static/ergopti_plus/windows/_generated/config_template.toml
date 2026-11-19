@@ -222,16 +222,6 @@ enabled = false
 
 
 
-[hotstrings.rolls.chevron_greater]
-enabled = false
-
-
-
-[hotstrings.rolls.chevron_less]
-enabled = false
-
-
-
 [hotstrings.rolls.close_chevron_tag]
 enabled = false
 time_activation_seconds = 0.5
@@ -567,15 +557,6 @@ left_alt_then_caps_lock = "none"
 [mod_combos]
 simultaneous_threshold_ms = 100
 symmetric = false
-
-
-
-[shortcuts.personal]
-laptop_broken_key = false
-mouse_drag_window = false
-mouse_tab_switching = false
-professional_environment = false
-programmable_keyboard = false
 
 
 

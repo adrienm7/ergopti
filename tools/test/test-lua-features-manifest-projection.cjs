@@ -135,9 +135,17 @@ for (const platform of Object.keys(DRIVER_ROOTS)) {
 		expected,
 		`${driverRoot}: the loaded manifest differs from the generator's ${platform} model`
 	);
+	// Every catalogue row is either available or unavailable on a Lua driver, so
+	// the two lists together must cover the whole catalogue and neither be empty.
 	assert.ok(
-		expected.features.length > 150 && expected.unavailable.length > 50,
-		`${driverRoot}: the compared manifest is too small to prove anything`
+		expected.features.length > 0 && expected.unavailable.length > 0,
+		`${driverRoot}: the compared manifest is empty on one side and proves nothing`
+	);
+	const catalogue = Generator.luaDriverManifest(platform === 'hs' ? 'linux' : 'hs').model;
+	assert.equal(
+		expected.features.length + expected.unavailable.length,
+		catalogue.features.length + catalogue.unavailable.length,
+		`${driverRoot}: the compared manifest does not cover the whole catalogue`
 	);
 	checks += 1;
 

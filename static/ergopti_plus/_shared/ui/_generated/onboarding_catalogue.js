@@ -2390,28 +2390,6 @@
 												]
 											},
 											{
-												"path": "hotstrings.rolls.chevron_less.enabled",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text": "<% ➜ <="
-													}
-												]
-											},
-											{
-												"path": "hotstrings.rolls.chevron_greater.enabled",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text": ">% ➜ >="
-													}
-												]
-											},
-											{
 												"path": "hotstrings.rolls.comment_open.enabled",
 												"value": true,
 												"default": false,
@@ -4424,28 +4402,6 @@
 												]
 											},
 											{
-												"path": "hotstrings.modules.rolls.chevron_less",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text": "<% ➜ <="
-													}
-												]
-											},
-											{
-												"path": "hotstrings.modules.rolls.chevron_greater",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text": ">% ➜ >="
-													}
-												]
-											},
-											{
 												"path": "hotstrings.modules.rolls.comment_open",
 												"value": true,
 												"default": false,
@@ -5863,28 +5819,6 @@
 												"label": [
 													{
 														"text": "<@ ➜ </"
-													}
-												]
-											},
-											{
-												"path": "hotstrings.modules.rolls.chevron_less",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text": "<% ➜ <="
-													}
-												]
-											},
-											{
-												"path": "hotstrings.modules.rolls.chevron_greater",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text": ">% ➜ >="
 													}
 												]
 											},

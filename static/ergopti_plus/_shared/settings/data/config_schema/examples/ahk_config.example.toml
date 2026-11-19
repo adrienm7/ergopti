@@ -195,12 +195,6 @@ enabled = true
 [hotstrings.rolls.chevron_equal]
 enabled = true
 
-[hotstrings.rolls.chevron_greater]
-enabled = true
-
-[hotstrings.rolls.chevron_less]
-enabled = true
-
 [hotstrings.rolls.close_chevron_tag]
 enabled = true
 time_activation_seconds = 0.5
@@ -573,19 +567,6 @@ left_alt_then_caps_lock = "caps_word"
 # "nav"...). Absent: the pair holds nothing.
 [shortcuts.key_combination_holds]
 caps_lock_then_left_alt = "shift"
-
-
-
-# ==================================
-# ===== 6.5 shortcuts.personal =====
-# ==================================
-
-[shortcuts.personal]
-laptop_broken_key = true
-mouse_drag_window = true
-mouse_tab_switching = true
-professional_environment = false
-programmable_keyboard = true
 
 
 

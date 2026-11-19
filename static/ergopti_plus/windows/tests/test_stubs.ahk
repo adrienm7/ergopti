@@ -168,8 +168,6 @@ global Features := Map(
             "ez",                       Map("enabled", true),
             "ct",                       Map("enabled", true),
             "close_chevron_tag",        Map("enabled", true),
-            "chevron_less",             Map("enabled", true),
-            "chevron_greater",          Map("enabled", true),
             "chevron_equal",            Map("enabled", true),
             "comment_open",             Map("enabled", true),
             "comment_close",            Map("enabled", true),

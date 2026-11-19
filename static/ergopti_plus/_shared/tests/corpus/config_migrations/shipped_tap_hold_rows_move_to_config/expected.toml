@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_tap_hold_rows_move_to_config/expected.toml
 
 [_meta]
-schema_version = 22
+schema_version = 23
 
 [mod_combos]
 enabled = false

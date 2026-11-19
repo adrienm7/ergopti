@@ -135,12 +135,6 @@ enabled = false
 [hotstrings.rolls.chevron_equal]
 enabled = true
 
-[hotstrings.rolls.chevron_greater]
-enabled = true
-
-[hotstrings.rolls.chevron_less]
-enabled = true
-
 [hotstrings.rolls.close_chevron_tag]
 enabled = true
 time_activation_seconds = 0.5

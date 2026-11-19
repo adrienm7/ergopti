@@ -123,7 +123,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.keys.wrap_text_if_selected` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keys.cmd_star` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 
-## macos — 54 paths not declared
+## macos — 49 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `hotstrings.magic_key_source_char` (setting; declared: windows; reason: `platform_reason.magic_key_detection_is_windows`)
@@ -144,11 +144,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.key_combination_taps.alt_gr_then_left_alt` (feature; declared: windows, linux; reason: `platform_reason.key_combinations_are_karabiner_settings_on_macos`)
 - [ ] `shortcuts.key_combination_taps.alt_gr_then_caps_lock` (feature; declared: windows, linux; reason: `platform_reason.key_combinations_are_karabiner_settings_on_macos`)
 - [ ] `shortcuts.key_combination_taps.left_alt_then_caps_lock` (feature; declared: windows, linux; reason: `platform_reason.key_combinations_are_karabiner_settings_on_macos`)
-- [ ] `shortcuts.personal.laptop_broken_key` (feature; declared: windows; reason: `platform_reason.personal_shortcut_switches_are_windows`)
-- [ ] `shortcuts.personal.mouse_drag_window` (feature; declared: windows; reason: `platform_reason.personal_shortcut_switches_are_windows`)
-- [ ] `shortcuts.personal.mouse_tab_switching` (feature; declared: windows; reason: `platform_reason.personal_shortcut_switches_are_windows`)
-- [ ] `shortcuts.personal.professional_environment` (feature; declared: windows; reason: `platform_reason.personal_shortcut_switches_are_windows`)
-- [ ] `shortcuts.personal.programmable_keyboard` (feature; declared: windows; reason: `platform_reason.personal_shortcut_switches_are_windows`)
 - [ ] `shortcuts.keyboard.primary_b` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_a` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_d` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -180,7 +175,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `category_enabled.rolls` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.magic_key` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 
-## linux — 67 paths not declared
+## linux — 62 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `hotstrings.enabled` (feature; declared: macos; reason: `platform_reason.hotstrings_master_is_macos_engine`)
@@ -193,11 +188,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.search.search_engine_url_query` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.take_note.dated_notes` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.take_note.destination_folder` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
-- [ ] `shortcuts.personal.laptop_broken_key` (feature; declared: windows; reason: `platform_reason.personal_shortcut_switches_are_windows`)
-- [ ] `shortcuts.personal.mouse_drag_window` (feature; declared: windows; reason: `platform_reason.personal_shortcut_switches_are_windows`)
-- [ ] `shortcuts.personal.mouse_tab_switching` (feature; declared: windows; reason: `platform_reason.personal_shortcut_switches_are_windows`)
-- [ ] `shortcuts.personal.professional_environment` (feature; declared: windows; reason: `platform_reason.personal_shortcut_switches_are_windows`)
-- [ ] `shortcuts.personal.programmable_keyboard` (feature; declared: windows; reason: `platform_reason.personal_shortcut_switches_are_windows`)
 - [ ] `shortcuts.keyboard.primary_b` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_a` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_d` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
