@@ -807,6 +807,8 @@
 		"test:app-windows-accessibility-ratchet": "node ./tools/test/test-app-windows-accessibility-ratchet.cjs",
 		"test:keyboard-walk": "node ./tools/test/test-keyboard-walk.cjs",
 		"test:heading-landmarks": "node ./tools/test/test-heading-landmarks.cjs",
+		"test:site-semantic-html": "node ./tools/test/test-site-semantic-html.cjs",
+		"test:site-image-alternatives": "node ./tools/test/test-site-image-alternatives.cjs",
 		"test:layout-source-emulation": "node ./tools/test/test-layout-source-emulation.cjs",
 		"test:site-keyboard-data": "node ./tools/test/test-site-keyboard-data.cjs",
 		"test:layout-shortcut-keys": "node ./tools/test/test-layout-shortcut-keys.cjs",

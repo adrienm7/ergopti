@@ -1,0 +1,1997 @@
+{
+	"elements": [
+		{
+			"file": "src/lib/components/A11ySettings.svelte",
+			"element": "div.a11y-actions",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The flex row of the Reset and Close buttons of the settings dialog."
+		},
+		{
+			"file": "src/lib/components/Ergopti.svelte",
+			"element": "span.namecolor",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Colours the Ergopti brand name wherever it sits in running text."
+		},
+		{
+			"file": "src/lib/components/ErgoptiPlus.svelte",
+			"element": "span.glow",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Colours the Â« + Â» of the Ergopti+ name; no phrasing element means a coloured character."
+		},
+		{
+			"file": "src/lib/components/Footer.svelte",
+			"element": "div (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The Â« â€” Ergopti â€” Â» brand line of the footer; not a paragraph, the reader 2 em paragraph spacing would overflow the fixed-height footer."
+		},
+		{
+			"file": "src/lib/components/Footer.svelte",
+			"element": "span (none)",
+			"count": 2,
+			"kind": "decorative",
+			"reason": "The aria-hidden Â« | Â» separators between the footer links."
+		},
+		{
+			"file": "src/lib/components/Footer.svelte",
+			"element": "span.min-width-600",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Hides a part of the text on narrow windows (a media query hook inside a run of text)."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "div#ergopti-header",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Flex row of the logo link and the title block inside the site header."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "div#ergopti-title",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Holds the brand line and the tagline as one flex item next to the logo."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "span.min-width-400",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Hides a part of the text on narrow windows (a media query hook inside a run of text)."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "span.path1",
+			"count": 1,
+			"kind": "icon-layer",
+			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "span.path2",
+			"count": 1,
+			"kind": "icon-layer",
+			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "span (none)",
+			"count": 3,
+			"kind": "decorative",
+			"reason": "The aria-hidden spacer and the Â« â€“ Â» and Â« â€” Â» separators between the header links."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "span.links",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Groups the two icon links on the brand line; they sit inside the banner landmark, a third nav for two icons would only add noise."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "div#ergopti-subtitle",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The tagline under the brand; not a paragraph, the reader 2 em paragraph spacing made the wrapped header taller still."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "span.navicon",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden three bars of the menu button, drawn in CSS."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "div#menu-pages",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Flex row (a column on a phone) of the three product links inside the nav; the site gates select them as its direct children."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "span.title",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The product name inside a menu link, which takes the gradient on hover."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "span.glow",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Colours the Â« + Â» of the Ergopti+ name; no phrasing element means a coloured character."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "div#menu-page-content",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The phone menu block that receives the table of contents and the external links; shown on narrow screens only."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "div#page-toc-mobile",
+			"count": 1,
+			"kind": "mount",
+			"reason": "Empty container that tocbot fills with the page table of contents, moved between the sidebar and the phone menu."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "div.links",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Centred line of the GitHub and Discord links at the end of the phone menu, padded where two spacers were."
+		},
+		{
+			"file": "src/lib/components/Header.svelte",
+			"element": "div (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Empty spacer that keeps the room of the fixed banner under the header on narrow screens."
+		},
+		{
+			"file": "src/lib/components/PageWrapper.svelte",
+			"element": "div (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The sticky scrolling box of the sidebar table of contents inside its nav."
+		},
+		{
+			"file": "src/lib/components/PageWrapper.svelte",
+			"element": "div#page-toc-pc",
+			"count": 1,
+			"kind": "mount",
+			"reason": "Empty container that tocbot fills with the page table of contents, moved between the sidebar and the phone menu."
+		},
+		{
+			"file": "src/lib/components/PageWrapper.svelte",
+			"element": "div#page-toc",
+			"count": 1,
+			"kind": "mount",
+			"reason": "Empty container that tocbot fills with the page table of contents, moved between the sidebar and the phone menu."
+		},
+		{
+			"file": "src/lib/components/PageWrapper.svelte",
+			"element": "div#main-content",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Width box around main that the site layout scans for heading ids; main itself is the landmark."
+		},
+		{
+			"file": "src/lib/components/SFB.svelte",
+			"element": "span.nowrap",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Keeps the term and the letter typed after it on one line (white-space: nowrap)."
+		},
+		{
+			"file": "src/lib/components/SFB.svelte",
+			"element": "span.tooltip",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Positioning box of the term button and its definition, which is absolutely placed under it."
+		},
+		{
+			"file": "src/lib/components/SFB.svelte",
+			"element": "span.tooltiptext",
+			"count": 1,
+			"kind": "aria-widget",
+			"reason": "The role=\"tooltip\" definition that describes the term button; HTML has no tooltip element."
+		},
+		{
+			"file": "src/lib/components/SFB.svelte",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "language",
+			"reason": "Â« Same Finger Bigram Â» in English inside the French definition (lang=\"en\", WCAG 3.1.2)."
+		},
+		{
+			"file": "src/lib/components/SubNav.svelte",
+			"element": "span.label",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The label text of a sub-navigation link, a flex item next to its icon."
+		},
+		{
+			"file": "src/lib/keyboard/KeyboardEmulation.svelte",
+			"element": "div.main",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Width wrapper with the site column padding (.main); not a landmark, the page already has its main."
+		},
+		{
+			"file": "src/lib/keyboard/controls/KeyboardControlButtonColor.svelte",
+			"element": "span.color-text-gradient",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "Puts the gradient on the word of the selected option inside the button label."
+		},
+		{
+			"file": "src/lib/keyboard/controls/KeyboardControlButtonType.svelte",
+			"element": "span.ergodox-text-gradient",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "Puts the gradient on the word of the selected option inside the button label."
+		},
+		{
+			"file": "src/routes/+layout.svelte",
+			"element": "div (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The flex-grow box between the header and the footer that keeps the footer at the bottom."
+		},
+		{
+			"file": "src/routes/+layout.svelte",
+			"element": "div#contenu",
+			"count": 1,
+			"kind": "mount",
+			"reason": "The skip link target: an empty element that takes the focus (tabindex=\"-1\") right before the page content."
+		},
+		{
+			"file": "src/routes/+layout.svelte",
+			"element": "span.path1",
+			"count": 2,
+			"kind": "icon-layer",
+			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
+		},
+		{
+			"file": "src/routes/+layout.svelte",
+			"element": "span.path2",
+			"count": 2,
+			"kind": "icon-layer",
+			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
+		},
+		{
+			"file": "src/routes/+layout.svelte",
+			"element": "div.conteneur",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Centring box of the reference keyboard overlay."
+		},
+		{
+			"file": "src/routes/+layout.svelte",
+			"element": "div.dev-banner-content",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Stacks the two lines of the development banner inside its link."
+		},
+		{
+			"file": "src/routes/+layout.svelte",
+			"element": "span.banner-line",
+			"count": 4,
+			"kind": "styling-hook",
+			"reason": "One line of the corner banner link text; not a paragraph, the reader 2 em spacing would spill it out of the banner."
+		},
+		{
+			"file": "src/routes/+layout.svelte",
+			"element": "span.button-link",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The button look of the development banner link text."
+		},
+		{
+			"file": "src/routes/+page.svelte",
+			"element": "span.product-link",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The coloured Â« DÃ©couvrir â†’ Â» call inside a product card link."
+		},
+		{
+			"file": "src/routes/accessibilite/+page.svelte",
+			"element": "span (none)",
+			"count": 3,
+			"kind": "language",
+			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
+		},
+		{
+			"file": "src/routes/ergopti-plus-old/confort.svelte",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "language",
+			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
+		},
+		{
+			"file": "src/routes/ergopti-plus-old/introduction_ergopti_plus.svelte",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Tightens the line height of the name inside the h1; no element means a line height."
+		},
+		{
+			"file": "src/routes/ergopti-plus-old/introduction_ergopti_plus.svelte",
+			"element": "span.nowrap",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "Keeps a word and the punctuation after it on one line (white-space: nowrap)."
+		},
+		{
+			"file": "src/routes/ergopti-plus-old/introduction_ergopti_plus.svelte",
+			"element": "span.path1",
+			"count": 6,
+			"kind": "icon-layer",
+			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
+		},
+		{
+			"file": "src/routes/ergopti-plus-old/introduction_ergopti_plus.svelte",
+			"element": "span.path2",
+			"count": 6,
+			"kind": "icon-layer",
+			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
+		},
+		{
+			"file": "src/routes/ergopti-plus-old/introduction_ergopti_plus.svelte",
+			"element": "div.main",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Width wrapper with the site column padding (.main); not a landmark, the page already has its main."
+		},
+		{
+			"file": "src/routes/ergopti-plus-old/introduction_ergopti_plus.svelte",
+			"element": "div.encadre",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The framed box of a summary in the main flow; it is part of the text, not tangential to it, so not an aside."
+		},
+		{
+			"file": "src/routes/ergopti-plus-old/menu.svelte",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "language",
+			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
+		},
+		{
+			"file": "src/routes/ergopti-plus-old/roulements.svelte",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "language",
+			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
+		},
+		{
+			"file": "src/routes/ergopti-plus/+layout.svelte",
+			"element": "div.ep-shell",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The #main-content width box around main that the site layout scans for heading ids; main is the landmark."
+		},
+		{
+			"file": "src/routes/ergopti-plus/+layout.svelte",
+			"element": "div#page-toc-pc",
+			"count": 1,
+			"kind": "mount",
+			"reason": "Empty container that tocbot fills with the page table of contents, moved between the sidebar and the phone menu."
+		},
+		{
+			"file": "src/routes/ergopti-plus/+layout.svelte",
+			"element": "div#page-toc",
+			"count": 1,
+			"kind": "mount",
+			"reason": "Empty container that tocbot fills with the page table of contents, moved between the sidebar and the phone menu."
+		},
+		{
+			"file": "src/routes/ergopti-plus/+layout.svelte",
+			"element": "div.ep-root",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Scope of the Ergopti+ page design tokens and resets inside main."
+		},
+		{
+			"file": "src/routes/ergopti-plus/+layout.svelte",
+			"element": "div.ep-endspace",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "Empty spacer at the end of the Ergopti+ pages."
+		},
+		{
+			"file": "src/routes/ergopti-plus/+page.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/+page.svelte",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The summary text inside each page link of the overview, under the link title."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "div.ai-glow",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden background glow layer."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "div.mode-tabs",
+			"count": 1,
+			"kind": "aria-widget",
+			"reason": "The role=\"tablist\" container of the tab buttons; HTML has no tab list element."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "div.ai-window",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Frame or padding box of a drawn imitation of an app window; no element means a window or its parts."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "div.ai-body",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Frame or padding box of a drawn imitation of an app window; no element means a window or its parts."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.caret",
+			"count": 3,
+			"kind": "decorative",
+			"reason": "The aria-hidden blinking caret of a typing demo."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "div.hs-tooltip",
+			"count": 3,
+			"kind": "layout",
+			"reason": "Box of the imitation AI tooltip that holds its list of suggestions and its two notes."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.tt-spark",
+			"count": 3,
+			"kind": "decorative",
+			"reason": "The aria-hidden sparkle emoji of the selected suggestion."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.tt-eq",
+			"count": 9,
+			"kind": "styling-hook",
+			"reason": "A colour-coded run of a suggestion line in the tooltip demo (context, correction, prediction, shortcut)."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.tt-nw",
+			"count": 5,
+			"kind": "styling-hook",
+			"reason": "A colour-coded run of a suggestion line in the tooltip demo (context, correction, prediction, shortcut)."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.tt-shortcut",
+			"count": 6,
+			"kind": "styling-hook",
+			"reason": "A colour-coded run of a suggestion line in the tooltip demo (context, correction, prediction, shortcut)."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.typo",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "The wavy underline of a misspelt word in the demo; no element means a spelling error."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.tt-corr",
+			"count": 3,
+			"kind": "styling-hook",
+			"reason": "A colour-coded run of a suggestion line in the tooltip demo (context, correction, prediction, shortcut)."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.lg-gray",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A colour sample inside the legend text, which names each colour in words too."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.lg-green",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A colour sample inside the legend text, which names each colour in words too."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.lg-orange",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A colour sample inside the legend text, which names each colour in words too."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.lg-yellow",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A colour sample inside the legend text, which names each colour in words too."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.step-badge",
+			"count": 3,
+			"kind": "styling-hook",
+			"reason": "A round number badge before a step title or inside a heading; the list or heading carries the order."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.step-title",
+			"count": 3,
+			"kind": "layout",
+			"reason": "The heading text as one flex item next to its number badge."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.backend-icon",
+			"count": 2,
+			"kind": "decorative",
+			"reason": "An aria-hidden emoji or glyph icon beside the text it illustrates; it carries no text of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.backend-port",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "A pill around a short tag of a card (port, badge, version); no phrasing element means a tag."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "div.api-band",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Groups a lead, its content and a note that have no heading of their own (so not a section), for spacing."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "mount",
+			"reason": "The number that the countup action animates; its text is the value, no element means it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "div.provider-meta",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A flex row of small items (tags or links) inside a card or a section; the items carry the meaning."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.provider-count",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A coloured run of a card line (a count, a range, a label)."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.provider-range",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A coloured run of a card line (a count, a range, a label)."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "div.browser-embed",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Groups a lead, its content and a note that have no heading of their own (so not a section), for spacing."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.profile-label",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A coloured run of a card line (a count, a range, a label)."
+		},
+		{
+			"file": "src/routes/ergopti-plus/AiSection.svelte",
+			"element": "span.profile-batch",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A pill around a short tag of a card (port, badge, version); no phrasing element means a tag."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Compare.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Compare.svelte",
+			"element": "div.table-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The rounded scrolling box around a table; the table carries the meaning."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Customization.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Customization.svelte",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "mount",
+			"reason": "The number that the countup action animates; its text is the value, no element means it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Customization.svelte",
+			"element": "div.comfort-grid",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of cards, each card an article; a list would only wrap every article in one more li."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Customization.svelte",
+			"element": "span.lang-flag",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden emoji or glyph icon beside the text it illustrates; it carries no text of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Customization.svelte",
+			"element": "div.changelog-embed",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Groups a lead, its content and a note that have no heading of their own (so not a section), for spacing."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Customization.svelte",
+			"element": "div.win-all",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Groups a lead, its content and a note that have no heading of their own (so not a section), for spacing."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Customization.svelte",
+			"element": "div.trust-grid",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of cards, each card an article; a list would only wrap every article in one more li."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Customization.svelte",
+			"element": "span.trust-icon",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden emoji or glyph icon beside the text it illustrates; it carries no text of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/DriverFrame.svelte",
+			"element": "div.frame-shell",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Frame or padding box of a drawn imitation of an app window; no element means a window or its parts."
+		},
+		{
+			"file": "src/routes/ergopti-plus/DriverFrame.svelte",
+			"element": "div.frame-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Frame or padding box of a drawn imitation of an app window; no element means a window or its parts."
+		},
+		{
+			"file": "src/routes/ergopti-plus/DriverFrame.svelte",
+			"element": "div.frame-skeleton",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden loading shimmer behind an embedded window."
+		},
+		{
+			"file": "src/routes/ergopti-plus/ErgoptiExclusives.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/ErgoptiExclusives.svelte",
+			"element": "div.ergo-keyboard-controls",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Groups a lead, its content and a note that have no heading of their own (so not a section), for spacing."
+		},
+		{
+			"file": "src/routes/ergopti-plus/ErgoptiExclusives.svelte",
+			"element": "div.bigram-grid",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of cards, each card an article; a list would only wrap every article in one more li."
+		},
+		{
+			"file": "src/routes/ergopti-plus/ErgoptiExclusives.svelte",
+			"element": "span.bigram-dot",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden colour dot beside the name it stands for."
+		},
+		{
+			"file": "src/routes/ergopti-plus/ErgoptiExclusives.svelte",
+			"element": "span.hs-key",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "One part of a trigger, arrow, output example chip; kbd would take the site key style and samp a monospace font."
+		},
+		{
+			"file": "src/routes/ergopti-plus/ErgoptiExclusives.svelte",
+			"element": "span.hs-arrow",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "One part of a trigger, arrow, output example chip; kbd would take the site key style and samp a monospace font."
+		},
+		{
+			"file": "src/routes/ergopti-plus/ErgoptiExclusives.svelte",
+			"element": "span.hs-out",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "One part of a trigger, arrow, output example chip; kbd would take the site key style and samp a monospace font."
+		},
+		{
+			"file": "src/routes/ergopti-plus/ErgoptiExclusives.svelte",
+			"element": "span.hs-desc",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "One part of a trigger, arrow, output example chip; kbd would take the site key style and samp a monospace font."
+		},
+		{
+			"file": "src/routes/ergopti-plus/ErgoptiExclusives.svelte",
+			"element": "div.super-grid",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of cards, each card an article; a list would only wrap every article in one more li."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Faq.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Faq.svelte",
+			"element": "div.faq-list",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Flex column of the FAQ details cards; each details carries the meaning."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Faq.svelte",
+			"element": "span.faq-q",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The question text inside summary; a heading inside summary would break its button role."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Faq.svelte",
+			"element": "span.faq-chevron",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden chevron drawn in CSS."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Faq.svelte",
+			"element": "div.faq-a",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The padded, animated box of an answer inside its details."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "div.hero-glow",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden background glow layer."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "div.os-toggle",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A role=\"group\" pill of two toggle buttons named by aria-label; a fieldset would need a visible legend."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.os-slider",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden sliding highlight behind the pressed button."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.dot",
+			"count": 2,
+			"kind": "decorative",
+			"reason": "The aria-hidden bullet separators between the hero facts."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.grad",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The gradient run inside the h1; em or strong would take the page weight and colour rules."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.ht-ico",
+			"count": 3,
+			"kind": "decorative",
+			"reason": "An aria-hidden emoji or glyph icon beside the text it illustrates; it carries no text of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "div.hero-cta",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A flex row of small items (tags or links) inside a card or a section; the items carry the meaning."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.hero-version",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A pill around a short tag of a card (port, badge, version); no phrasing element means a tag."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "div.demo-stage",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Frame or padding box of a drawn imitation of an app window; no element means a window or its parts."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "div.demo-window",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "Part of the aria-hidden demo window of the hero; the demo is described in text beside it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "div.demo-viewport",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "Part of the aria-hidden demo window of the hero; the demo is described in text beside it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "div.demo-body",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "Part of the aria-hidden demo window of the hero; the demo is described in text beside it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.demo-typed",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "Text inside the aria-hidden demo window of the hero; the browser gate reads it, a reader gets the description beside it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.caret",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "Part of the aria-hidden demo window of the hero."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.demo-tooltip",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "Text inside the aria-hidden demo window of the hero; the browser gate reads it, a reader gets the description beside it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.tt-text",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "Part of the aria-hidden demo window of the hero."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.tt-tag",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "Part of the aria-hidden demo window of the hero."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden â–¶ or âšâš glyph of the pause button, whose words name it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.pager-input",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A part of a demo pager chip label (trigger, arrow, output); the button aria-label names it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.pager-arrow",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A part of a demo pager chip label (trigger, arrow, output); the button aria-label names it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.pager-output",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A part of a demo pager chip label (trigger, arrow, output); the button aria-label names it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hero.svelte",
+			"element": "span.scroll-chevron",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden chevron of the scroll link, drawn in CSS."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "div.family-band",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The bordered panel that holds the family list and its note."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "span.family-dot",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden colour dot beside the name it stands for."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "span.family-name",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A cell of a family row laid out on a grid inside its list item."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "span.family-count",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A cell of a family row laid out on a grid inside its list item."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "span.family-delay",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A cell of a family row laid out on a grid inside its list item."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "span.detail-dot",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden colour dot beside the name it stands for."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "div.detail-trig",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A flex row of small items (tags or links) inside a card or a section; the items carry the meaning."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "span.hs-key",
+			"count": 3,
+			"kind": "styling-hook",
+			"reason": "One part of a trigger, arrow, output example chip; kbd would take the site key style and samp a monospace font."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "span.hs-arrow",
+			"count": 3,
+			"kind": "styling-hook",
+			"reason": "One part of a trigger, arrow, output example chip; kbd would take the site key style and samp a monospace font."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "span.hs-out",
+			"count": 3,
+			"kind": "styling-hook",
+			"reason": "One part of a trigger, arrow, output example chip; kbd would take the site key style and samp a monospace font."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "div.detail-context",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A flex row of small items (tags or links) inside a card or a section; the items carry the meaning."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "span.detail-word",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "An example word chip; q or samp would add quotes or a monospace font."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "span.magic-num",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "A round number badge before a step title or inside a heading; the list or heading carries the order."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Hotstrings.svelte",
+			"element": "span.hs-desc",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "One part of a trigger, arrow, output example chip; kbd would take the site key style and samp a monospace font."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "div.ep-wrap",
+			"count": 2,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "div.tap-grid",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of cards, each card an article; a list would only wrap every article in one more li."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "div.tap-keycap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Block box that puts the key (kbd) on its own line in the card."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "div.tap-row",
+			"count": 2,
+			"kind": "dl-group",
+			"reason": "Groups a dt and its dd inside a dl, the one wrapper HTML allows there, for the flex row."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "span.nav-glyph",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden emoji or glyph icon beside the text it illustrates; it carries no text of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "span.nav-desc",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The description run of a navigation cell, a flex item next to its glyph."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "div.power-grid",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of cards, each card an article; a list would only wrap every article in one more li."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "span.power-icon",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden emoji or glyph icon beside the text it illustrates; it carries no text of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "div.super-actions",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of cards, each card an article; a list would only wrap every article in one more li."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "span.sa-icon",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden emoji or glyph icon beside the text it illustrates; it carries no text of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "div.sa-text",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Flex item that groups a heading and its text next to an icon."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "mount",
+			"reason": "The number that the countup action animates; its text is the value, no element means it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "div.actions-groups",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of cards, each card an article; a list would only wrap every article in one more li."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KeyboardPower.svelte",
+			"element": "span.axis-tag",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A pill around a short tag of a card (port, badge, version); no phrasing element means a tag."
+		},
+		{
+			"file": "src/routes/ergopti-plus/KpiStrip.svelte",
+			"element": "div.kpi",
+			"count": 1,
+			"kind": "dl-group",
+			"reason": "Groups a dt and its dd inside a dl, the one wrapper HTML allows there, for the flex row."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LangToggle.svelte",
+			"element": "div.lang-toggle",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A role=\"group\" pill of two toggle buttons named by aria-label; a fieldset would need a visible legend."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LangToggle.svelte",
+			"element": "span.lang-slider",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden sliding highlight behind the pressed button."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveSession.svelte",
+			"element": "div.session-window",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Frame or padding box of a drawn imitation of an app window; no element means a window or its parts."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveSession.svelte",
+			"element": "div.session-body",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Frame or padding box of a drawn imitation of an app window; no element means a window or its parts."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveSession.svelte",
+			"element": "span.caret",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden blinking caret of a typing demo."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveSession.svelte",
+			"element": "span.session-tooltip",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The inline tooltip box drawn inside a paragraph of the demo."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveSession.svelte",
+			"element": "span.tt-text",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A colour-coded run of a suggestion line in the tooltip demo (context, correction, prediction, shortcut)."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveSession.svelte",
+			"element": "span.tt-tag",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A colour-coded run of a suggestion line in the tooltip demo (context, correction, prediction, shortcut)."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "div.live",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The two-column grid of the live WPM demo, the component root that carries its lang."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "div.live-editor",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Frame or padding box of a drawn imitation of an app window; no element means a window or its parts."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "div.le-chrome",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Frame or padding box of a drawn imitation of an app window; no element means a window or its parts."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "span.dot",
+			"count": 3,
+			"kind": "decorative",
+			"reason": "The three fake window-control dots of a drawn title bar."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "span.le-title",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The file name in a drawn title bar."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "div.le-body",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Frame or padding box of a drawn imitation of an app window; no element means a window or its parts."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "span.le-text",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The typed text run of the live editor demo."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "span.le-caret",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden blinking caret of a typing demo."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "span.le-tag",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A pill around a short tag of a card (port, badge, version); no phrasing element means a tag."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "div.pill",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The coloured box stacking the WPM number over its unit strip."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "div.pill-num",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The WPM number; an output element would make it a live region announced every 130 ms."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "div.pill-unit",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The darker unit strip under the WPM number."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "div.bars",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden bar chart of the live WPM demo; its figure is in text."
+		},
+		{
+			"file": "src/routes/ergopti-plus/LiveWpm.svelte",
+			"element": "span.bar",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden bar chart of the live WPM demo; its figure is in text."
+		},
+		{
+			"file": "src/routes/ergopti-plus/MetricsSection.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/MetricsSection.svelte",
+			"element": "div.preview",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of cards, each card an article; a list would only wrap every article in one more li."
+		},
+		{
+			"file": "src/routes/ergopti-plus/MetricsSection.svelte",
+			"element": "span.preview-unit",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "The smaller unit inside a figure."
+		},
+		{
+			"file": "src/routes/ergopti-plus/MetricsSection.svelte",
+			"element": "div.calendar",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden activity calendar of the metrics preview; its caption says what it shows."
+		},
+		{
+			"file": "src/routes/ergopti-plus/MetricsSection.svelte",
+			"element": "span.cell",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "One aria-hidden day cell of the activity calendar."
+		},
+		{
+			"file": "src/routes/ergopti-plus/MetricsSection.svelte",
+			"element": "div.dash-tabs",
+			"count": 1,
+			"kind": "aria-widget",
+			"reason": "The role=\"tablist\" container of the tab buttons; HTML has no tab list element."
+		},
+		{
+			"file": "src/routes/ergopti-plus/MetricsSection.svelte",
+			"element": "div#ep-dash-panel",
+			"count": 1,
+			"kind": "aria-widget",
+			"reason": "The role=\"tabpanel\" labelled by the selected tab; HTML has no tab panel element."
+		},
+		{
+			"file": "src/routes/ergopti-plus/MetricsSection.svelte",
+			"element": "div.dc-row",
+			"count": 2,
+			"kind": "dl-group",
+			"reason": "Groups a dt and its dd inside a dl, the one wrapper HTML allows there, for the flex row."
+		},
+		{
+			"file": "src/routes/ergopti-plus/MetricsSection.svelte",
+			"element": "span.dc-seg",
+			"count": 3,
+			"kind": "styling-hook",
+			"reason": "A bar segment inside a value, sized by its share; the value is written beside it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/PersonalHotstrings.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/PersonalHotstrings.svelte",
+			"element": "div.personal-grid",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of cards, each card an article; a list would only wrap every article in one more li."
+		},
+		{
+			"file": "src/routes/ergopti-plus/PersonalHotstrings.svelte",
+			"element": "span.step-num",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A round number badge before a step title or inside a heading; the list or heading carries the order."
+		},
+		{
+			"file": "src/routes/ergopti-plus/PersonalHotstrings.svelte",
+			"element": "span.hs-key",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "One part of a trigger, arrow, output example chip; kbd would take the site key style and samp a monospace font."
+		},
+		{
+			"file": "src/routes/ergopti-plus/PersonalHotstrings.svelte",
+			"element": "span.hs-arrow",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "One part of a trigger, arrow, output example chip; kbd would take the site key style and samp a monospace font."
+		},
+		{
+			"file": "src/routes/ergopti-plus/PersonalHotstrings.svelte",
+			"element": "span.hs-out",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "One part of a trigger, arrow, output example chip; kbd would take the site key style and samp a monospace font."
+		},
+		{
+			"file": "src/routes/ergopti-plus/PersonalHotstrings.svelte",
+			"element": "span.hs-desc",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "One part of a trigger, arrow, output example chip; kbd would take the site key style and samp a monospace font."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Personas.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Personas.svelte",
+			"element": "div.personas-grid",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of cards, each card an article; a list would only wrap every article in one more li."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Personas.svelte",
+			"element": "span.persona-ico",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden emoji or glyph icon beside the text it illustrates; it carries no text of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Personas.svelte",
+			"element": "div.persona-text",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Flex item that groups a heading and its text next to an icon."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Platforms.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Platforms.svelte",
+			"element": "span.os-name",
+			"count": 12,
+			"kind": "styling-hook",
+			"reason": "Two stacked lines of a table header cell (the OS name and its driver)."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Platforms.svelte",
+			"element": "span.os-driver",
+			"count": 12,
+			"kind": "styling-hook",
+			"reason": "Two stacked lines of a table header cell (the OS name and its driver)."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Platforms.svelte",
+			"element": "span.cell",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Colours the âœ“ or â€” mark of a table cell that also holds a note."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Platforms.svelte",
+			"element": "span.lg",
+			"count": 2,
+			"kind": "styling-hook",
+			"reason": "A colour sample inside the legend text, which names each colour in words too."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Platforms.svelte",
+			"element": "div.app-icon",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden box that {@html} fills with the app SVG icon."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Platforms.svelte",
+			"element": "span.app-monogram",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The fallback letter inside the aria-hidden app icon."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Platforms.svelte",
+			"element": "div.app-text",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Flex item that groups a heading and its text next to an icon."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Platforms.svelte",
+			"element": "div.cta-glow",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden background glow layer."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Platforms.svelte",
+			"element": "div.cta-buttons",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A flex row of small items (tags or links) inside a card or a section; the items carry the meaning."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Platforms.svelte",
+			"element": "span (none)",
+			"count": 3,
+			"kind": "layout",
+			"reason": "The label of a download link, a flex item next to its icon."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Platforms.svelte",
+			"element": "span.cta-version",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A pill around a short tag of a card (port, badge, version); no phrasing element means a tag."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Privacy.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Privacy.svelte",
+			"element": "div.privacy-grid",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of cards, each card an article; a list would only wrap every article in one more li."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Privacy.svelte",
+			"element": "span.privacy-ico",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden emoji or glyph icon beside the text it illustrates; it carries no text of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Promises.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Promises.svelte",
+			"element": "div.promise-icon",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden emoji or glyph icon beside the text it illustrates; it carries no text of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Steps.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Steps.svelte",
+			"element": "span.step-n",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A round number badge before a step title or inside a heading; the list or heading carries the order."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Steps.svelte",
+			"element": "span.step-ico",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden emoji or glyph icon beside the text it illustrates; it carries no text of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/StickyCta.svelte",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The label of a download link, a flex item next to its icon."
+		},
+		{
+			"file": "src/routes/ergopti-plus/StickyCta.svelte",
+			"element": "span.scta-tag",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A pill around a short tag of a card (port, badge, version); no phrasing element means a tag."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Trackpad.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Trackpad.svelte",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "mount",
+			"reason": "The number that the countup action animates; its text is the value, no element means it."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Trackpad.svelte",
+			"element": "div.gesture-grid",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The grid of cards, each card an article; a list would only wrap every article in one more li."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Trackpad.svelte",
+			"element": "div.gesture-meta",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A flex row of small items (tags or links) inside a card or a section; the items carry the meaning."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Trackpad.svelte",
+			"element": "span.gesture-fingers",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A pill around a short tag of a card (port, badge, version); no phrasing element means a tag."
+		},
+		{
+			"file": "src/routes/ergopti-plus/Trackpad.svelte",
+			"element": "span.gesture-type",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "A pill around a short tag of a card (port, badge, version); no phrasing element means a tag."
+		},
+		{
+			"file": "src/routes/ergopti-plus/WindowChrome.svelte",
+			"element": "div.chrome",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Frame or padding box of a drawn imitation of an app window; no element means a window or its parts."
+		},
+		{
+			"file": "src/routes/ergopti-plus/WindowChrome.svelte",
+			"element": "span.mac-dots",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden fake window control of a drawn title bar."
+		},
+		{
+			"file": "src/routes/ergopti-plus/WindowChrome.svelte",
+			"element": "span.dot",
+			"count": 3,
+			"kind": "decorative",
+			"reason": "The three fake window-control dots of a drawn title bar."
+		},
+		{
+			"file": "src/routes/ergopti-plus/WindowChrome.svelte",
+			"element": "span.chrome-title",
+			"count": 3,
+			"kind": "styling-hook",
+			"reason": "The file name in a drawn title bar."
+		},
+		{
+			"file": "src/routes/ergopti-plus/WindowChrome.svelte",
+			"element": "span.live-badge",
+			"count": 3,
+			"kind": "language",
+			"reason": "The Â« â— live Â» tag in English (lang=\"en\") of a drawn title bar."
+		},
+		{
+			"file": "src/routes/ergopti-plus/WindowChrome.svelte",
+			"element": "span.chrome-spacer",
+			"count": 2,
+			"kind": "decorative",
+			"reason": "An aria-hidden fake window control of a drawn title bar."
+		},
+		{
+			"file": "src/routes/ergopti-plus/WindowChrome.svelte",
+			"element": "span.linux-controls",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden fake window control of a drawn title bar."
+		},
+		{
+			"file": "src/routes/ergopti-plus/WindowChrome.svelte",
+			"element": "span.linux-btn",
+			"count": 3,
+			"kind": "decorative",
+			"reason": "An aria-hidden fake window control of a drawn title bar."
+		},
+		{
+			"file": "src/routes/ergopti-plus/WindowChrome.svelte",
+			"element": "span.win-buttons",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An aria-hidden fake window control of a drawn title bar."
+		},
+		{
+			"file": "src/routes/ergopti-plus/WindowChrome.svelte",
+			"element": "span.win-btn",
+			"count": 3,
+			"kind": "decorative",
+			"reason": "An aria-hidden fake window control of a drawn title bar."
+		},
+		{
+			"file": "src/routes/ergopti/benchmarks/comparateurs_dispositions.svelte",
+			"element": "div (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Puts the layout select on its own line above the comparison."
+		},
+		{
+			"file": "src/routes/ergopti/informations/autocritiques.svelte",
+			"element": "span (none)",
+			"count": 2,
+			"kind": "language",
+			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
+		},
+		{
+			"file": "src/routes/ergopti/informations/autocritiques.svelte",
+			"element": "span.path1",
+			"count": 1,
+			"kind": "icon-layer",
+			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
+		},
+		{
+			"file": "src/routes/ergopti/informations/autocritiques.svelte",
+			"element": "span.path2",
+			"count": 1,
+			"kind": "icon-layer",
+			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
+		},
+		{
+			"file": "src/routes/ergopti/informations/changelog.svelte",
+			"element": "span (none)",
+			"count": 2,
+			"kind": "language",
+			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
+		},
+		{
+			"file": "src/routes/ergopti/informations/genese_sources.svelte",
+			"element": "span.path1",
+			"count": 3,
+			"kind": "icon-layer",
+			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
+		},
+		{
+			"file": "src/routes/ergopti/informations/genese_sources.svelte",
+			"element": "span.path2",
+			"count": 3,
+			"kind": "icon-layer",
+			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
+		},
+		{
+			"file": "src/routes/ergopti/installation/+page.svelte",
+			"element": "div (none)",
+			"count": 2,
+			"kind": "layout",
+			"reason": "A 1rem spacer and the flex row of the two PDF links."
+		},
+		{
+			"file": "src/routes/ergopti/installation/installation_macos.svelte",
+			"element": "div.download-buttons",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A flex row of small items (tags or links) inside a card or a section; the items carry the meaning."
+		},
+		{
+			"file": "src/routes/ergopti/installation/installation_macos.svelte",
+			"element": "div (none)",
+			"count": 5,
+			"kind": "layout",
+			"reason": "Margin spacers between the download blocks of the installation steps."
+		},
+		{
+			"file": "src/routes/ergopti/installation/installation_windows.svelte",
+			"element": "div.download-buttons",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A flex row of small items (tags or links) inside a card or a section; the items carry the meaning."
+		},
+		{
+			"file": "src/routes/ergopti/installation/installation_windows.svelte",
+			"element": "div (none)",
+			"count": 3,
+			"kind": "layout",
+			"reason": "Margin spacers between the download blocks of the installation steps."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/distance_doigts_touches.svelte",
+			"element": "div (none)",
+			"count": 18,
+			"kind": "styling-hook",
+			"reason": "The legend boxes of the hand-drawn keys, styled by Keyboard.css as keyboard-key div like the generated keys, and the gap between the hands."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/ergopti_plus.svelte",
+			"element": "div (none)",
+			"count": 2,
+			"kind": "layout",
+			"reason": "The aria-hidden border line and the black box that clips the orb animation."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/ergopti_plus.svelte",
+			"element": "div#orb",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Positions the orb animation and its text over it."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/ergopti_plus.svelte",
+			"element": "div.wrap",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden particles of the orb animation."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/ergopti_plus.svelte",
+			"element": "div.c",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The aria-hidden particles of the orb animation."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/ergopti_plus.svelte",
+			"element": "div.texte-orb",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Positions the orb animation and its text over it."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/espace_insecable_automatique.svelte",
+			"element": "div.encadre",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The framed box of a summary in the main flow; it is part of the text, not tangential to it, so not an aside."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
+			"element": "span (none)",
+			"count": 3,
+			"kind": "styling-hook",
+			"reason": "The two aria-hidden dashes around the name in the h1 and the hook that tightens its line height."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
+			"element": "div (none)",
+			"count": 2,
+			"kind": "layout",
+			"reason": "Centres the scroll-down link and the call-to-action link."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
+			"element": "div#debut",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The anchor target wrapper of the first part, which has no heading of its own."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
+			"element": "span.path1",
+			"count": 6,
+			"kind": "icon-layer",
+			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
+			"element": "span.path2",
+			"count": 6,
+			"kind": "icon-layer",
+			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
+			"element": "span.nowrap",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Keeps a word and the punctuation after it on one line (white-space: nowrap)."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/optimisation_roulements.svelte",
+			"element": "div (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "A 20 px spacer between two blocks."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/optimisation_roulements.svelte",
+			"element": "span (none)",
+			"count": 7,
+			"kind": "language",
+			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
+		},
+		{
+			"file": "src/routes/ergopti/utilisation/introduction_utilisation.svelte",
+			"element": "div (none)",
+			"count": 2,
+			"kind": "layout",
+			"reason": "Clips the h2 for its reveal animation, and wraps the match sections."
+		},
+		{
+			"file": "src/routes/ergopti/utilisation/introduction_utilisation.svelte",
+			"element": "div.main",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Width wrapper with the site column padding (.main); not a landmark, the page already has its main."
+		},
+		{
+			"file": "src/routes/ergopti/utilisation/introduction_utilisation.svelte",
+			"element": "span (none)",
+			"count": 2,
+			"kind": "decorative",
+			"reason": "The aria-hidden sort arrows of the table headers; aria-sort says the order."
+		},
+		{
+			"file": "src/routes/studio/+layout.svelte",
+			"element": "div.studio-shell",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The Studio shell box and its top bar flex row (src/routes/studio/+layout.svelte, owned by another pass)."
+		},
+		{
+			"file": "src/routes/studio/+layout.svelte",
+			"element": "div.studio-bar",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The Studio shell box and its top bar flex row (src/routes/studio/+layout.svelte, owned by another pass)."
+		},
+		{
+			"file": "src/routes/studio/+layout.svelte",
+			"element": "span.studio-brand",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The Studio name in the top bar (src/routes/studio/+layout.svelte, owned by another pass)."
+		},
+		{
+			"file": "src/routes/studio/+layout.svelte",
+			"element": "span (none)",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "The Â« Apparence Â» label of the theme control (src/routes/studio/+layout.svelte, owned by another pass)."
+		}
+	],
+	"svelteIgnores": [
+		{
+			"file": "src/lib/components/A11ySettings.svelte",
+			"codes": ["a11y_click_events_have_key_events", "a11y_no_noninteractive_element_interactions"],
+			"reason": "A click on the dialog backdrop (the dialog element itself) closes it; the keyboard closes it with Escape and the Fermer button."
+		},
+		{
+			"file": "src/routes/ergopti/utilisation/introduction_utilisation.svelte",
+			"codes": ["a11y_no_noninteractive_tabindex"],
+			"reason": "The scrolling table box is a named region that takes the focus so the keyboard can scroll it (WCAG 2.1.1, axe scrollable-region-focusable)."
+		}
+	]
+}

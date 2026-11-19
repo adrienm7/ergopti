@@ -621,6 +621,22 @@
 			"cmd": "node",
 			"args": ["tools/test/test-heading-landmarks.cjs"],
 			"repro": "npm run test:heading-landmarks"
+		},
+		{
+			"id": "site-semantic-html",
+			"ordinal": 705,
+			"name": "every div and span of the site is justified in the reviewed allowlist with its exact count, none is interactive, and no Svelte accessibility warning is left",
+			"cmd": "node",
+			"args": ["tools/test/test-site-semantic-html.cjs"],
+			"repro": "npm run test:site-semantic-html"
+		},
+		{
+			"id": "site-image-alternatives",
+			"ordinal": 706,
+			"name": "every img of the site has an alt, every inline svg and icon glyph is hidden or a named image, and the checker refuses each missing one",
+			"cmd": "node",
+			"args": ["tools/test/test-site-image-alternatives.cjs"],
+			"repro": "npm run test:site-image-alternatives"
 		}
 	]
 }
