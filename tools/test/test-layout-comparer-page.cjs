@@ -894,6 +894,152 @@ check(
 		);
 }
 
+// (comparer-relative) The ranking's « relative » toggle (analyser study,
+// section 10): a saved choice, a reference picked by the corpus's language
+// (AZERTY on a French text, QWERTY otherwise, the page's language for the
+// user's own text), and the table drawn as differences to it, each with its
+// verdict in words. The page's own functions run on a minimal element model.
+{
+	const fnSource = (name) => {
+		const at = page.indexOf(`function ${name}(`);
+		check(at >= 0, `relative: the page lost ${name}`);
+		return at >= 0 ? page.slice(at, page.indexOf('\n\t\t}\n', at) + 4) : '';
+	};
+	check(
+		/<input id="la-table-relative" type="checkbox"[^>]*aria-describedby="la-table-relative-help"/.test(
+			page
+		) &&
+			page.includes('id="la-table-relative-label"') &&
+			page.includes('id="la-table-relative-help"'),
+		'relative: no toggle with its label and help in the ranking'
+	);
+	check(
+		/state\.table\.relative = event\.target\.checked;\s*save\(\);\s*renderTable\(\);/.test(page),
+		'relative: the toggle is not saved and drawn'
+	);
+	check(
+		/state\.table\.relative \? reference : null/.test(fnSource('renderTable')),
+		'relative: the ranking does not hand the reference to its table'
+	);
+	class Node {
+		constructor(tag, className, text) {
+			this.tag = tag;
+			this.className = className || '';
+			this.children = text === undefined ? [] : [String(text)];
+			this.attributes = {};
+			this.dataset = {};
+			this.style = {};
+			this.classList = { add: (c) => (this.className += ` ${c}`) };
+		}
+		append(...items) {
+			this.children.push(...items);
+		}
+		replaceChildren() {
+			this.children = [];
+		}
+		setAttribute(name, value) {
+			this.attributes[name] = value;
+		}
+		addEventListener() {}
+		querySelector() {
+			return null;
+		}
+		get textContent() {
+			return this.children.map((c) => (typeof c === 'string' ? c : c.textContent)).join('');
+		}
+		find(test) {
+			if (test(this)) return [this];
+			return this.children.flatMap((c) => (typeof c === 'string' ? [] : c.find(test)));
+		}
+	}
+	const words = { better: 'better', worse: 'worse', same: 'same', none: 'none' };
+	const context = {
+		E,
+		DATA,
+		state: { details: null },
+		document: { getElementById: () => null },
+		el: (tag, className, text) => new Node(tag, className, text),
+		t: (key, values) =>
+			key.startsWith('layout_analysis.details.verdict_')
+				? words[key.slice('layout_analysis.details.verdict_'.length)]
+				: `${key}${values ? JSON.stringify(values) : ''}`,
+		format: (value, digits) => Number(value).toFixed(digits),
+		metricName: (id) => id,
+		unitText: (id) => E.METRICS[id].unit,
+		metricDigits: E.metricDigits,
+		infoButton: () => new Node('button'),
+		isPersonal: () => false,
+		incompleteFlag: () => new Node('span'),
+		showDetails() {}
+	};
+	vm.createContext(context);
+	vm.runInContext(
+		['relativeCell', 'referenceLanguage', 'rankingTable', 'validTable'].map(fnSource).join('\n') +
+			"\nconst TABLE_METRICS = ['sfb']; const ALL = ''; const COMPLETE_CHOICES = ['all'];",
+		context
+	);
+	const language = (corpus, locale) =>
+		vm.runInContext('referenceLanguage', context)(corpus, locale);
+	check(
+		E.referenceLayout(language({ builtin: { language: 'fr' } }, 'en')) === 'azerty' &&
+			E.referenceLayout(language({ builtin: { language: 'en' } }, 'fr')) === 'qwerty' &&
+			E.referenceLayout(language({ id: 'custom' }, 'fr')) === 'azerty' &&
+			E.referenceLayout(language({ host: { language: 'en' } }, 'fr')) === 'qwerty',
+		'relative: the reference follows the corpus, else the page’s language'
+	);
+	const validTable = vm.runInContext('validTable', context);
+	check(
+		validTable({ relative: true }).relative === true && validTable(null).relative === false,
+		'relative: the saved table does not keep the toggle'
+	);
+	// Two results on « ed »: QWERTY's SFB against Dvorak's hand change.
+	const library = new Map(DATA.layouts.map((l) => [l.id, l]));
+	const tables = E.prepareNgrams(E.ngramsFromText('ed'));
+	const results = E.rank(
+		['qwerty', 'dvorak'].map((id) => E.analyse(library.get(id), tables, { keyboard: 'iso' }))
+	);
+	const qwerty = results.find((r) => r.layout.id === 'qwerty');
+	const dvorak = results.find((r) => r.layout.id === 'dvorak');
+	const draw = (reference) => {
+		const table = new Node('table');
+		vm.runInContext('rankingTable', context)(
+			table,
+			results,
+			['sfb', 'row_jump'],
+			{ key: 'rank', descending: false },
+			() => {},
+			reference
+		);
+		return table
+			.find((n) => n.tag === 'tr')
+			.slice(1)
+			.map((tr) => tr.children.map((td) => td.textContent));
+	};
+	const plain = draw(null);
+	const relative = draw(qwerty);
+	const rowOf = (rows, name) => rows.find((cells) => cells[1] === name);
+	check(
+		rowOf(plain, dvorak.layout.name)[3] === '0.00',
+		`relative: the plain table shows Dvorak's SFB as ${rowOf(plain, dvorak.layout.name)[3]}`
+	);
+	const delta = (dvorak.score.total - qwerty.score.total).toFixed(1);
+	check(
+		rowOf(relative, dvorak.layout.name)[2] === `+${delta} ▲ better` &&
+			rowOf(relative, dvorak.layout.name)[3] === '-100.00 ▲ better',
+		`relative: Dvorak against QWERTY reads ${JSON.stringify(rowOf(relative, dvorak.layout.name))}`
+	);
+	check(
+		rowOf(relative, qwerty.layout.name)[3] === '0.00 = same' &&
+			rowOf(relative, qwerty.layout.name)[0] === String(qwerty.rank),
+		`relative: QWERTY against itself reads ${JSON.stringify(rowOf(relative, qwerty.layout.name))}`
+	);
+	// A metric shown but not scored has a difference and no verdict.
+	check(
+		rowOf(relative, dvorak.layout.name)[4] === '0.00',
+		`relative: row_jump reads ${rowOf(relative, dvorak.layout.name)[4]}`
+	);
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
 	console.error(`test-layout-comparer-page: ${errors.length} problem(s)`);

@@ -661,6 +661,11 @@
 					<summary data-i18n="layout_analysis.table.columns"></summary>
 					<div id="la-column-list" class="la-column-list"></div>
 				</details>
+				<label class="la-check">
+					<input id="la-table-relative" type="checkbox" aria-describedby="la-table-relative-help" />
+					<span id="la-table-relative-label"></span>
+				</label>
+				<p id="la-table-relative-help" class="la-muted" hidden></p>
 				<div class="la-table-wrap" tabindex="0" role="region" aria-labelledby="la-ranking-label">
 					<table id="la-table" class="la-table"></table>
 				</div>
@@ -1184,7 +1189,9 @@
 				language: text(value.language),
 				complete: COMPLETE_CHOICES.includes(value.complete) ? value.complete : COMPLETE_CHOICES[0],
 				min: bound(value.min),
-				max: bound(value.max)
+				max: bound(value.max),
+				// The relative view: each value as its difference to the reference layout.
+				relative: value.relative === true
 			};
 		}
 
@@ -1939,10 +1946,12 @@
 		 * @param {{key: string, descending: boolean}} sort
 		 * @param {function({key: string, descending: boolean}): void} resort
 		 *   Called with the new sort when a header is chosen.
+		 * @param {object} [reference] The result the relative view measures the
+		 *   score and the metrics against (referenceResult), or none.
 		 * @returns {{key: string, descending: boolean}} The sort applied (rank
 		 *   when the sorted column is gone).
 		 */
-		function rankingTable(table, rows, metricIds, sort, resort) {
+		function rankingTable(table, rows, metricIds, sort, resort, reference) {
 			table.replaceChildren();
 			if (rows.length === 0) return sort;
 			const columns = [
@@ -2007,13 +2016,21 @@
 				const tr = el('tr');
 				if (state.details === result.layout.id) tr.className = 'la-selected';
 				if (isPersonal(result)) tr.classList.add('la-row-mine');
+				// The relative view: the score and each metric as their difference to the reference.
+				const versus = reference ? E.diff(result, reference) : null;
 				for (const column of columns) {
 					const value = column.value(result);
-					const cell = el(
-						'td',
-						'',
-						column.digits === undefined ? String(value) : format(value, column.digits)
-					);
+					const cell =
+						versus && column.digits !== undefined
+							? relativeCell(
+									column.key === 'score' ? versus.score : versus.metrics[column.key],
+									column.digits
+								)
+							: el(
+									'td',
+									'',
+									column.digits === undefined ? String(value) : format(value, column.digits)
+								);
 					if (column.key === 'name' && result.incomplete) cell.append(' ', incompleteFlag(result));
 					tr.append(cell);
 				}
@@ -2063,8 +2080,97 @@
 			});
 		}
 
+		/**
+		 * One cell of the relative view: a difference to the reference, signed,
+		 * with which side the metric prefers as a mark and in words (never by
+		 * the mark alone).
+		 * @param {{delta: number, verdict: string}} entry - From E.diff().
+		 * @param {number} digits - The column's decimals.
+		 * @returns {HTMLTableCellElement}
+		 */
+		function relativeCell(entry, digits) {
+			const marks = { better: '▲', worse: '▼', same: '=', none: '' };
+			const cell = el(
+				'td',
+				'la-delta',
+				`${entry.delta > 0 ? '+' : ''}${format(entry.delta, digits)}`
+			);
+			if (marks[entry.verdict]) {
+				const mark = el(
+					'span',
+					`la-verdict la-verdict-${entry.verdict}`,
+					` ${marks[entry.verdict]}`
+				);
+				mark.setAttribute('aria-hidden', 'true');
+				cell.append(
+					mark,
+					el('span', 'la-sr-only', ` ${t(`layout_analysis.details.verdict_${entry.verdict}`)}`)
+				);
+			}
+			return cell;
+		}
+
+		/**
+		 * The language the relative view picks its reference by: a corpus's own
+		 * (a built-in text, the app's), else the page's (the user's own text).
+		 * @param {{builtin?: object, host?: object}} [corpus] - An entry of corpora.
+		 * @param {string} pageLocale - The page's language code.
+		 * @returns {string} A language code.
+		 */
+		function referenceLanguage(corpus, pageLocale) {
+			const own = corpus && (corpus.builtin || corpus.host);
+			return own && typeof own.language === 'string' ? own.language : pageLocale;
+		}
+
+		// The reference analysed for the relative view when it is not compared,
+		// per analysis (generation) and layout id.
+		let referenceAnalysis = null;
+
+		/**
+		 * The result the relative view measures against on this corpus
+		 * (E.referenceLayout: AZERTY on a French text, QWERTY otherwise): the
+		 * compared one, else that layout analysed once on the same text with
+		 * the same options and scored with the current weights.
+		 * @returns {object|null} An analyse() result; null without a text.
+		 */
+		function referenceResult() {
+			const id = E.referenceLayout(
+				referenceLanguage(
+					corpora.find((c) => c.id === state.corpus),
+					INFO.locale()
+				)
+			);
+			const compared = state.results.find((r) => r.layout.id === id);
+			if (compared) return compared;
+			if (!state.tables || !byId.has(id)) return null;
+			if (
+				!referenceAnalysis ||
+				referenceAnalysis.generation !== generation ||
+				referenceAnalysis.id !== id
+			)
+				referenceAnalysis = {
+					generation,
+					id,
+					result: E.analyse(byId.get(id), state.tables, analysisOptions())
+				};
+			const result = referenceAnalysis.result;
+			result.score = E.score(result, state.weights);
+			return result;
+		}
+
 		/** The overview's ranking table, with the viewer's columns and the filters' rows. */
 		function renderTable() {
+			const reference = state.results.length > 0 ? referenceResult() : null;
+			const toggle = $('la-table-relative');
+			toggle.checked = state.table.relative;
+			toggle.disabled = reference === null;
+			const name = reference ? reference.layout.name : '';
+			$('la-table-relative-label').textContent = t('layout_analysis.table.relative', {
+				layout: name
+			});
+			const help = $('la-table-relative-help');
+			help.hidden = !state.table.relative || reference === null;
+			help.textContent = t('layout_analysis.table.relative_help', { layout: name });
 			state.sort = rankingTable(
 				$('la-table'),
 				shownRows(),
@@ -2073,7 +2179,8 @@
 				(sort) => {
 					state.sort = sort;
 					renderTable();
-				}
+				},
+				state.table.relative ? reference : null
 			);
 		}
 
@@ -4625,6 +4732,11 @@
 				$(id).addEventListener('input', filtered);
 			for (const id of ['la-row-family', 'la-row-origin', 'la-row-language', 'la-row-complete'])
 				$(id).addEventListener('change', filtered);
+			$('la-table-relative').addEventListener('change', (event) => {
+				state.table.relative = event.target.checked;
+				save();
+				renderTable();
+			});
 			$('la-table-reset').addEventListener('click', () => {
 				state.table = validTable(null);
 				fillTableOptions();
