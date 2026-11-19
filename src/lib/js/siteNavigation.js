@@ -115,9 +115,23 @@ export const ERGOPTI_PLUS_PAGES = Object.freeze([
 
 /** Tabs of Ergopti Studio: the editor, the layout comparison and the layout optimizer. */
 export const STUDIO_PAGES = Object.freeze([
-	Object.freeze({ route: '/studio', label: 'Éditer' }),
-	Object.freeze({ route: '/studio/comparer', label: 'Comparer' }),
-	Object.freeze({ route: '/studio/optimiser', label: 'Optimiser' })
+	// Each tab's icon: the app window's (layout_editor_window/index.html), a
+	// 24 × 24 stroke path, decorative beside the tab's text.
+	Object.freeze({
+		route: '/studio',
+		label: 'Éditer',
+		icon: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4'
+	}),
+	Object.freeze({
+		route: '/studio/comparer',
+		label: 'Comparer',
+		icon: 'M4 20V11M10 20V4M16 20v-7M2 20h20'
+	}),
+	Object.freeze({
+		route: '/studio/optimiser',
+		label: 'Optimiser',
+		icon: 'M11 3l1.8 4.7L17.5 9.5l-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8zM18 14l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z'
+	})
 ]);
 
 /**

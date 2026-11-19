@@ -245,7 +245,7 @@ async function exerciseStudioLayout(browser, origin) {
 	const colours = await page.evaluate(() => ({
 		body: getComputedStyle(document.body).backgroundColor,
 		text: getComputedStyle(document.body).color,
-		tabs: getComputedStyle(document.querySelector('.studio-tabs')).backgroundColor
+		tabs: getComputedStyle(document.querySelector('.studio-bar')).backgroundColor
 	}));
 	assert.ok(luminance(colours.body) < 0.3, `a dark page, got ${colours.body}`);
 	assert.ok(luminance(colours.tabs) < 0.3, `a dark tab bar, got ${colours.tabs}`);
@@ -1750,6 +1750,125 @@ async function exerciseComparerHome(browser, origin) {
 		);
 	}
 	await page.close();
+}
+
+/**
+ * (studio-menu-bar) The Studio window's menu bar: « Ergopti Studio » and its
+ * mark on the left, then the tabs, each with a hidden icon in its mark and
+ * named by its text, the chosen one marked by more than colour, the arrows
+ * moving between them, and nothing hidden or scrolled sideways at 320 px, in
+ * light and dark (maintainer, 2026-11-18).
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseStudioBar(browser, origin) {
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
+	for (const colorScheme of ['light', 'dark']) {
+		const context = await browser.newContext({
+			viewport: { width: 1280, height: 800 },
+			colorScheme
+		});
+		const page = await context.newPage();
+		const errors = [];
+		page.on('pageerror', (error) => errors.push(error.message));
+		await page.addInitScript((strings) => {
+			window._i18n_strings = strings;
+			window.webkit = {
+				messageHandlers: { layout_editor_window_bridge: { postMessage: () => {} } }
+			};
+		}, strings);
+		await page.goto(`${origin}/ui/layout_editor_window/index.html`);
+		await page.evaluate(() =>
+			window.initData({ strings: {}, state: { platform: 'linux' }, studio_store: true })
+		);
+		await page.waitForSelector('#studio-tab-edit span:not(:empty)');
+		const bar = await page.evaluate(() => {
+			const rgb = (text) => (text.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+			const luminance = ([r, g, b]) => {
+				const lin = (c) => {
+					const v = c / 255;
+					return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+				};
+				return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+			};
+			const contrast = (a, b) => {
+				const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m);
+				return (x + 0.05) / (y + 0.05);
+			};
+			const back = rgb(getComputedStyle(document.querySelector('.studio-bar')).backgroundColor);
+			const brand = document.querySelector('.studio-brand');
+			const list = document.querySelector('.studio-tabs');
+			return {
+				brand: brand.textContent.trim(),
+				logo: brand.querySelector('svg').getAttribute('aria-hidden'),
+				brandLeft: brand.getBoundingClientRect().right <= list.getBoundingClientRect().left,
+				listName: document.getElementById(list.getAttribute('aria-labelledby')).textContent,
+				tabs: [...list.querySelectorAll('[role="tab"]')].map((tab) => {
+					const icon = tab.querySelector('svg');
+					const style = getComputedStyle(tab);
+					return {
+						id: tab.id,
+						name: tab.textContent.trim(),
+						hidden: icon && icon.getAttribute('aria-hidden') === 'true',
+						controls: Boolean(document.getElementById(tab.getAttribute('aria-controls'))),
+						tabIndex: tab.tabIndex,
+						selected: tab.getAttribute('aria-selected') === 'true',
+						weight: Number(style.fontWeight),
+						shadow: style.boxShadow,
+						icon: icon ? contrast(rgb(getComputedStyle(icon).stroke), back) : 0,
+						text: contrast(rgb(style.color), back)
+					};
+				})
+			};
+		});
+		assert.equal(bar.brand, 'Ergopti Studio', 'the bar names the Studio');
+		assert.equal(bar.logo, 'true', 'its mark is decorative');
+		assert.ok(bar.brandLeft, 'the name sits left of the tabs');
+		assert.equal(bar.listName, 'Ergopti Studio', 'the tab list is named');
+		assert.deepEqual(
+			bar.tabs.map((tab) => [tab.id, tab.name, tab.hidden, tab.controls]),
+			[
+				['studio-tab-edit', 'Edit', true, true],
+				['studio-tab-compare', 'Compare', true, true],
+				['studio-tab-optimize', 'Optimize', true, true]
+			],
+			'three tabs, each with a hidden icon, named by its text, controlling its panel'
+		);
+		for (const tab of bar.tabs) {
+			assert.ok(tab.icon >= 3, `${colorScheme} ${tab.id}: icon ${tab.icon}`);
+			assert.ok(tab.text >= 4.5, `${colorScheme} ${tab.id}: text ${tab.text}`);
+		}
+		const [chosen, ...others] = bar.tabs;
+		assert.ok(chosen.selected && chosen.tabIndex === 0, 'the chosen tab takes the focus');
+		assert.ok(
+			others.every((tab) => tab.tabIndex === -1 && tab.weight < chosen.weight),
+			'the others leave the Tab order and are lighter'
+		);
+		assert.match(chosen.shadow, /inset/, 'the chosen tab has its bar');
+		await page.focus('#studio-tab-edit');
+		await page.keyboard.press('ArrowRight');
+		assert.equal(await page.evaluate(() => document.activeElement.id), 'studio-tab-compare');
+		assert.equal(await page.getAttribute('#studio-tab-compare', 'aria-selected'), 'true');
+		assert.equal(await page.isVisible('#studio-comparer'), true, 'the arrow opens its panel');
+		await page.keyboard.press('End');
+		assert.equal(await page.evaluate(() => document.activeElement.id), 'studio-tab-optimize');
+		await page.keyboard.press('Home');
+		assert.equal(await page.evaluate(() => document.activeElement.id), 'studio-tab-edit');
+		// 320 px: the tabs wrap under the name, none hidden, no sideways scroll.
+		await page.setViewportSize({ width: 320, height: 640 });
+		const narrow = await page.evaluate(() => ({
+			scroll: document.documentElement.scrollWidth,
+			inside: [...document.querySelectorAll('.studio-tabs [role="tab"]')].every((tab) => {
+				const box = tab.getBoundingClientRect();
+				return box.width > 0 && box.left >= 0 && box.right <= 320;
+			})
+		}));
+		assert.deepEqual(narrow, { scroll: 320, inside: true }, `${colorScheme}: the bar fits 320 px`);
+		assert.deepEqual(errors, [], `${colorScheme}: page errors`);
+		await context.close();
+	}
 }
 
 /**
@@ -3831,6 +3950,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseComparerWholeLibrary(browser, origin);
 		await exerciseComparerLayoutList(browser, origin);
 		await exerciseComparerHome(browser, origin);
+		await exerciseStudioBar(browser, origin);
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);

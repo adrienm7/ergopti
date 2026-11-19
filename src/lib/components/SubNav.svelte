@@ -14,7 +14,7 @@ where the current tab is brought into view.
 	/**
 	 * @type {{
 	 *   label: string,
-	 *   items: Array<{href: string, label: string, current: boolean}>,
+	 *   items: Array<{href: string, label: string, current: boolean, icon?: string}>,
 	 *   compact?: boolean
 	 * }}
 	 */
@@ -36,7 +36,9 @@ where the current tab is brought into view.
 		{#each items as item (item.href)}
 			<li>
 				<a href={item.href} aria-current={item.current ? 'page' : undefined}
-					><span class="label">{item.label}</span></a
+					>{#if item.icon}<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"
+							><path d={item.icon} /></svg
+						>{/if}<span class="label">{item.label}</span></a
 				>
 			</li>
 		{/each}
@@ -133,6 +135,19 @@ where the current tab is brought into view.
 		left: 0.6rem;
 		position: absolute;
 		right: 0.6rem;
+	}
+
+	/* A tab's decorative icon (items[].icon), in the link's colour. */
+	.subnav .icon {
+		fill: none;
+		height: 1.1em;
+		margin-right: 0.4em;
+		stroke: currentColor;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 2;
+		vertical-align: -0.2em;
+		width: 1.1em;
 	}
 
 	.subnav a:hover,

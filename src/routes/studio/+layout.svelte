@@ -20,7 +20,7 @@ system's), kept in this browser and sent to each frame (frameTheme.js).
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { resolve } from '$app/paths';
+	import { asset, resolve } from '$app/paths';
 	import SubNav from '#lib/components/SubNav.svelte';
 	import { STUDIO_PAGES } from '#lib/js/siteNavigation.js';
 	import {
@@ -90,6 +90,7 @@ system's), kept in this browser and sent to each frame (frameTheme.js).
 		STUDIO_PAGES.map((entry) => ({
 			href: resolve(entry.route),
 			label: entry.label,
+			icon: entry.icon,
 			current: page.url.pathname.replace(/\/$/, '') === resolve(entry.route)
 		}))
 	);
@@ -97,6 +98,11 @@ system's), kept in this browser and sent to each frame (frameTheme.js).
 
 <div class="studio-shell">
 	<div class="studio-bar">
+		<!-- « Ergopti Studio » and its mark on the left of its tabs (maintainer, 2026-11-18). -->
+		<span class="studio-brand">
+			<img src={asset('img/logo/studio.svg')} alt="" width="24" height="24" />
+			Ergopti Studio
+		</span>
 		<SubNav label="Onglets d’Ergopti Studio" {items} compact />
 		<label class="studio-theme">
 			<span>Apparence</span>
@@ -135,6 +141,16 @@ system's), kept in this browser and sent to each frame (frameTheme.js).
 	.studio-bar :global(.subnav.compact) {
 		flex: 1 1 auto;
 		width: auto;
+	}
+
+	.studio-brand {
+		align-items: center;
+		color: rgba(255, 255, 255, 0.95);
+		display: flex;
+		font-weight: bold;
+		gap: 8px;
+		padding: 0.4rem 16px;
+		white-space: nowrap;
 	}
 
 	.studio-theme {

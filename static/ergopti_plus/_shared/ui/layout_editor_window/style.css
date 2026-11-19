@@ -44,12 +44,19 @@ body {
 /* =================================== */
 /* =================================== */
 
-.studio-tabs {
+/* The menu bar (maintainer, 2026-11-18): « Ergopti Studio » and its mark on
+   the left, the tabs on the right, wrapping under the name in a narrow
+   window so no tab is hidden. Each tab carries its icon in its theme.css
+   mark (3:1 on the surface); the chosen one has a filled background, a bar
+   in its mark and heavier text, not colour alone. */
+.studio-bar {
+	align-items: center;
 	background: var(--theme-surface);
 	border-bottom: 1px solid var(--theme-separator);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 	display: flex;
 	flex-wrap: wrap;
-	gap: 4px;
+	gap: 8px 20px;
 	/* Room around the tabs so their focus ring is never cut by the window edge. */
 	padding: 8px clamp(12px, 2.5vw, 28px);
 	position: sticky;
@@ -57,16 +64,91 @@ body {
 	z-index: 10;
 }
 
+.studio-brand {
+	align-items: center;
+	display: inline-flex;
+	font-size: 15px;
+	font-weight: 700;
+	gap: 10px;
+	white-space: nowrap;
+}
+
+.studio-logo {
+	flex: none;
+	height: 26px;
+	width: 26px;
+}
+
+/* The Studio mark's parts (theme.css « logo » colours). */
+.studio-logo-ink {
+	fill: var(--theme-logo-ink);
+}
+
+.studio-logo-rim {
+	stroke: var(--theme-logo-paper);
+}
+
+.studio-logo-paper {
+	fill: var(--theme-logo-paper);
+}
+
+.studio-logo-line {
+	fill: none;
+	stroke: var(--theme-logo-ink);
+}
+
+.studio-logo-red {
+	fill: var(--theme-logo-red);
+}
+
+.studio-logo-yellow {
+	fill: var(--theme-logo-yellow);
+}
+
+.studio-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-left: auto;
+}
+
+.studio-mark-1 {
+	--studio-mark: var(--theme-mark-1);
+}
+
+.studio-mark-2 {
+	--studio-mark: var(--theme-mark-2);
+}
+
+.studio-mark-3 {
+	--studio-mark: var(--theme-mark-3);
+}
+
 .studio-tabs button {
+	align-items: center;
 	background: none;
 	border: 0;
-	border-radius: 6px;
+	border-radius: 8px;
 	color: var(--theme-sub);
 	cursor: pointer;
+	display: inline-flex;
 	font: inherit;
 	font-size: 14px;
 	font-weight: 500;
-	padding: 7px 16px;
+	gap: 8px;
+	min-height: 36px;
+	padding: 6px 14px;
+}
+
+.studio-tab-icon {
+	fill: none;
+	flex: none;
+	height: 18px;
+	stroke: var(--studio-mark);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 2;
+	width: 18px;
 }
 
 .studio-tabs button:hover {
@@ -76,10 +158,10 @@ body {
 
 .studio-tabs button[aria-selected='true'] {
 	background: var(--theme-accent-soft);
-	/* The selected tab's underline sits inside its own box, never clipped. */
-	box-shadow: inset 0 -2px 0 var(--theme-accent);
+	/* The selected tab's bar sits inside its own box, never clipped. */
+	box-shadow: inset 0 -3px 0 var(--studio-mark);
 	color: var(--theme-text);
-	font-weight: 600;
+	font-weight: 700;
 }
 
 /* An inset ring: the tabs touch nothing, but the bar scrolls with the page. */

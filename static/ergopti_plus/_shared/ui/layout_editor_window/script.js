@@ -787,6 +787,8 @@ let _comparerMounted = false;
 // The optimizer mounts the same way; it runs its search on the page, in short
 // slices, where the host inlines the scripts (no URL to start a worker from).
 let _optimizerMounted = false;
+// The Studio's tabs in their order on the menu bar.
+const STUDIO_TABS = ['edit', 'compare', 'optimize'];
 
 /**
  * Shows one of the three tabs.
@@ -797,9 +799,12 @@ function showTab(tab) {
 	const optimize = tab === 'optimize';
 	const comparer = document.getElementById('studio-comparer');
 	const optimizer = document.getElementById('studio-optimizer');
-	document.getElementById('studio-tab-edit').setAttribute('aria-selected', String(tab === 'edit'));
-	document.getElementById('studio-tab-compare').setAttribute('aria-selected', String(compare));
-	document.getElementById('studio-tab-optimize').setAttribute('aria-selected', String(optimize));
+	// One tab in the Tab order, the chosen one (the ARIA tabs pattern).
+	for (const id of STUDIO_TABS) {
+		const button = document.getElementById('studio-tab-' + id);
+		button.setAttribute('aria-selected', String(id === tab));
+		button.tabIndex = id === tab ? 0 : -1;
+	}
 	document.getElementById('layout-editor').hidden = tab !== 'edit';
 	comparer.hidden = !compare;
 	optimizer.hidden = !optimize;
@@ -874,6 +879,21 @@ document.getElementById('studio-tab-compare').addEventListener('click', function
 document.getElementById('studio-tab-optimize').addEventListener('click', function () {
 	showTab('optimize');
 });
+// Arrows, Home and End move between the Studio's tabs (the ARIA tabs pattern).
+for (const id of STUDIO_TABS)
+	document.getElementById('studio-tab-' + id).addEventListener('keydown', function (event) {
+		const at = STUDIO_TABS.indexOf(id);
+		const next = {
+			ArrowRight: STUDIO_TABS[(at + 1) % STUDIO_TABS.length],
+			ArrowLeft: STUDIO_TABS[(at - 1 + STUDIO_TABS.length) % STUDIO_TABS.length],
+			Home: STUDIO_TABS[0],
+			End: STUDIO_TABS[STUDIO_TABS.length - 1]
+		}[event.key];
+		if (!next) return;
+		event.preventDefault();
+		showTab(next);
+		document.getElementById('studio-tab-' + next).focus();
+	});
 
 // ========================================
 // ========================================

@@ -68,30 +68,81 @@
 		<script src="../layout_editor/_generated/export_assets.js"></script>
 	</head>
 	<body>
-		<!-- Ergopti Studio's tabs: the editor, the comparison of layouts, and the optimizer. -->
-		<nav class="studio-tabs" role="tablist">
-			<button
-				type="button"
-				id="studio-tab-edit"
-				role="tab"
-				aria-selected="true"
-				data-i18n="layout_editor.studio.tab.edit"
-			></button>
-			<button
-				type="button"
-				id="studio-tab-compare"
-				role="tab"
-				aria-selected="false"
-				data-i18n="layout_editor.studio.tab.compare"
-			></button>
-			<button
-				type="button"
-				id="studio-tab-optimize"
-				role="tab"
-				aria-selected="false"
-				data-i18n="layout_editor.studio.tab.optimize"
-			></button>
-		</nav>
+		<!-- Ergopti Studio's menu bar: its name and mark, then its tabs (the editor,
+		     the comparison of layouts, the optimizer), each with its icon and mark. -->
+		<header class="studio-bar">
+			<span class="studio-brand">
+				<!-- The Studio mark of static/img/logo/studio.svg: a keycap and a pencil. -->
+				<svg class="studio-logo" viewBox="-256 -256 512 512" aria-hidden="true" focusable="false">
+					<circle r="244" class="studio-logo-ink studio-logo-rim" stroke-width="20" />
+					<rect x="-170" y="-150" width="280" height="280" rx="56" class="studio-logo-paper" />
+					<rect
+						x="-128"
+						y="-128"
+						width="196"
+						height="186"
+						rx="36"
+						class="studio-logo-line"
+						stroke-width="18"
+					/>
+					<g transform="rotate(45 60 60)">
+						<rect x="22" y="-150" width="76" height="230" class="studio-logo-ink" />
+						<rect x="36" y="-136" width="48" height="56" class="studio-logo-red" />
+						<rect x="36" y="-74" width="48" height="140" class="studio-logo-yellow" />
+						<polygon points="22,80 98,80 60,170" class="studio-logo-ink" />
+						<polygon points="36,94 84,94 60,150" class="studio-logo-paper" />
+						<polygon points="51,129 69,129 60,150" class="studio-logo-ink" />
+					</g>
+				</svg>
+				<span id="studio-name" data-i18n="layout_editor.title"></span>
+			</span>
+			<nav class="studio-tabs" role="tablist" aria-labelledby="studio-name">
+				<button
+					type="button"
+					id="studio-tab-edit"
+					class="studio-tab studio-mark-1"
+					role="tab"
+					aria-selected="true"
+					aria-controls="layout-editor"
+					tabindex="0"
+				>
+					<svg class="studio-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+						<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />
+					</svg>
+					<span data-i18n="layout_editor.studio.tab.edit"></span>
+				</button>
+				<button
+					type="button"
+					id="studio-tab-compare"
+					class="studio-tab studio-mark-2"
+					role="tab"
+					aria-selected="false"
+					aria-controls="studio-comparer"
+					tabindex="-1"
+				>
+					<svg class="studio-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+						<path d="M4 20V11M10 20V4M16 20v-7M2 20h20" />
+					</svg>
+					<span data-i18n="layout_editor.studio.tab.compare"></span>
+				</button>
+				<button
+					type="button"
+					id="studio-tab-optimize"
+					class="studio-tab studio-mark-3"
+					role="tab"
+					aria-selected="false"
+					aria-controls="studio-optimizer"
+					tabindex="-1"
+				>
+					<svg class="studio-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+						<path
+							d="M11 3l1.8 4.7L17.5 9.5l-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8zM18 14l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"
+						/>
+					</svg>
+					<span data-i18n="layout_editor.studio.tab.optimize"></span>
+				</button>
+			</nav>
+		</header>
 		<main id="layout-editor" class="layout-editor"></main>
 		<!-- The Comparer (_shared/ui/layout_analysis) mounts here when its tab first opens. -->
 		<section id="studio-comparer" class="studio-comparer" hidden></section>
