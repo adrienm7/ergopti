@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ 모두 지우기 (시스템 동작)",
 	"common.save": "저장",
 	"common.saved": "저장됨 ✓",
+	"common.chart_values": "차트 값",
 	"common.warning": "경고",
 	"crash.report.save_failed": "충돌 보고서를 저장할 수 없습니다",
 	"crash.report.saved_title": "충돌 보고서가 저장되었습니다",

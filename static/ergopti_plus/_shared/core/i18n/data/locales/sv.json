@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ Rensa allt (systemets beteende)",
 	"common.save": "Spara",
 	"common.saved": "Sparad ✓",
+	"common.chart_values": "Diagrammets värden",
 	"common.warning": "Varning",
 	"crash.report.save_failed": "Kraschrapport kunde inte sparas",
 	"crash.report.saved_title": "Kraschrapport sparad",

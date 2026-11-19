@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ 全部清除（系统行为）",
 	"common.save": "保存",
 	"common.saved": "已保存 ✓",
+	"common.chart_values": "图表数值",
 	"common.warning": "警告",
 	"crash.report.save_failed": "无法保存崩溃报告",
 	"crash.report.saved_title": "崩溃报告已保存",

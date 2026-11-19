@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ सब साफ़ करें (सिस्टम का व्यवहार)",
 	"common.save": "सहेजें",
 	"common.saved": "सहेजा गया ✓",
+	"common.chart_values": "चार्ट के मान",
 	"common.warning": "चेतावनी",
 	"crash.report.save_failed": "क्रैश रिपोर्ट सहेजी नहीं जा सकी",
 	"crash.report.saved_title": "क्रैश रिपोर्ट सहेजी गई",

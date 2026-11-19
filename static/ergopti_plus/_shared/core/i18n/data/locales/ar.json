@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ مسح الكل (سلوك النظام)",
 	"common.save": "حفظ",
 	"common.saved": "تم الحفظ ✓",
+	"common.chart_values": "قيم الرسم البياني",
 	"common.warning": "تحذير",
 	"crash.report.save_failed": "تعذّر حفظ تقرير الأعطال",
 	"crash.report.saved_title": "تم حفظ تقرير الأعطال",

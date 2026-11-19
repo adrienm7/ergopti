@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ Alles löschen (Systemverhalten)",
 	"common.save": "Speichern",
 	"common.saved": "Gespeichert ✓",
+	"common.chart_values": "Werte des Diagramms",
 	"common.warning": "Warnung",
 	"crash.report.save_failed": "Absturzbericht konnte nicht gespeichert werden",
 	"crash.report.saved_title": "Absturzbericht gespeichert",

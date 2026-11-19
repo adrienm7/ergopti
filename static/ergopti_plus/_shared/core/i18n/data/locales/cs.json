@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ Vymazat vše (chování systému)",
 	"common.save": "Uložit",
 	"common.saved": "Uloženo ✓",
+	"common.chart_values": "Hodnoty grafu",
 	"common.warning": "Upozornění",
 	"crash.report.save_failed": "Zprávu o pádu se nepodařilo uložit",
 	"crash.report.saved_title": "Hlášení pádu uloženo",

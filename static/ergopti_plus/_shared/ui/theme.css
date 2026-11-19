@@ -610,6 +610,33 @@
 	width: 1px;
 }
 
+/* A metrics chart's values for the keyboard (metrics_chart_values.js): out
+   of sight until the focus enters it, then a panel over the window's corner
+   so the dashboard's layout never moves. */
+.theme-chart-values:not([open]):not(:focus-within) {
+	clip-path: inset(50%);
+	height: 1px;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+.theme-chart-values:is([open], :focus-within) {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 8px;
+	bottom: 16px;
+	color: var(--theme-text);
+	inset-inline-start: 16px;
+	max-height: 50vh;
+	max-width: calc(100vw - 32px);
+	overflow: auto;
+	padding: 6px 12px;
+	position: fixed;
+	z-index: 1000;
+}
+
 /* The system's reduced motion setting, and the website's own setting carried
    into the Studio frames by a11y_prefs.js: no animation, no smooth scrolling,
    instant transitions (WCAG 2.3.3). */

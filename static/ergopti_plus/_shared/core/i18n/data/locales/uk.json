@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ Очистити все (поведінка системи)",
 	"common.save": "Зберегти",
 	"common.saved": "Збережено ✓",
+	"common.chart_values": "Значення графіка",
 	"common.warning": "Увага",
 	"crash.report.save_failed": "Не вдалося зберегти звіт про збій",
 	"crash.report.saved_title": "Звіт про збій збережено",

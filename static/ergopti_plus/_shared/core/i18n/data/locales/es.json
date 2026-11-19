@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ Borrar todo (comportamiento del sistema)",
 	"common.save": "Guardar",
 	"common.saved": "Guardado ✓",
+	"common.chart_values": "Valores del gráfico",
 	"common.warning": "Atención",
 	"crash.report.save_failed": "No se pudo guardar el informe de errores",
 	"crash.report.saved_title": "Informe de error guardado",

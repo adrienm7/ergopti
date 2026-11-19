@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ Ryd alt (systemets adfærd)",
 	"common.save": "Gem",
 	"common.saved": "Gemt ✓",
+	"common.chart_values": "Diagrammets værdier",
 	"common.warning": "Advarsel",
 	"crash.report.save_failed": "Krasjrapporten kunne ikke gemmes",
 	"crash.report.saved_title": "Fejlrapport gemt",

@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ נקה הכול (התנהגות המערכת)",
 	"common.save": "שמור",
 	"common.saved": "נשמר ✓",
+	"common.chart_values": "ערכי התרשים",
 	"common.warning": "אזהרה",
 	"crash.report.save_failed": "לא ניתן לשמור את דוח הקריסה",
 	"crash.report.saved_title": "דוח הקריסה נשמר",

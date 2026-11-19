@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ Alles wissen (systeemgedrag)",
 	"common.save": "Opslaan",
 	"common.saved": "Opgeslagen ✓",
+	"common.chart_values": "Waarden van de grafiek",
 	"common.warning": "Waarschuwing",
 	"crash.report.save_failed": "Crashrapport kon niet worden opgeslagen",
 	"crash.report.saved_title": "Crashrapport opgeslagen",

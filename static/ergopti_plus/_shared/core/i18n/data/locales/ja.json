@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ すべてクリア（システムの動作）",
 	"common.save": "保存",
 	"common.saved": "保存済み ✓",
+	"common.chart_values": "グラフの値",
 	"common.warning": "警告",
 	"crash.report.save_failed": "クラッシュレポートを保存できませんでした",
 	"crash.report.saved_title": "クラッシュレポートを保存しました",

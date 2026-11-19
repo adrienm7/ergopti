@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ Cancella tutto (comportamento di sistema)",
 	"common.save": "Salva",
 	"common.saved": "Salvato ✓",
+	"common.chart_values": "Valori del grafico",
 	"common.warning": "Attenzione",
 	"crash.report.save_failed": "Impossibile salvare il rapporto di arresto anomalo",
 	"crash.report.saved_title": "Rapporto di errore salvato",

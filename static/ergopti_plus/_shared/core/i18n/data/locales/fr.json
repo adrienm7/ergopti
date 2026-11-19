@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ Tout effacer (comportement du système)",
 	"common.save": "Enregistrer",
 	"common.saved": "Enregistré ✓",
+	"common.chart_values": "Valeurs du graphique",
 	"common.warning": "Attention",
 	"crash.report.save_failed": "Impossible d'enregistrer le rapport d'erreur",
 	"crash.report.saved_title": "Rapport d'erreur enregistré",

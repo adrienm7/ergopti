@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ Tümünü temizle (sistem davranışı)",
 	"common.save": "Kaydet",
 	"common.saved": "Kaydedildi ✓",
+	"common.chart_values": "Grafik değerleri",
 	"common.warning": "Uyarı",
 	"crash.report.save_failed": "Çökme raporu kaydedilemedi",
 	"crash.report.saved_title": "Çökme raporu kaydedildi",

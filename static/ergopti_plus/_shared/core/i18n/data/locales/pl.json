@@ -675,6 +675,7 @@
 	"common.clear_to_system": "✕ Wyczyść wszystko (zachowanie systemu)",
 	"common.save": "Zapisz",
 	"common.saved": "Zapisano ✓",
+	"common.chart_values": "Wartości wykresu",
 	"common.warning": "Uwaga",
 	"crash.report.save_failed": "Nie można zapisać raportu awaryjnego",
 	"crash.report.saved_title": "Raport awarii zapisany",
