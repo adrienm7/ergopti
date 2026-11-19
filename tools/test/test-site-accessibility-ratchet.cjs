@@ -8,8 +8,10 @@
  * in CI on the built site; this check runs everywhere, without a browser, and
  * proves the parts a passing scan cannot: the ratchet refuses a new or higher
  * count, the committed baseline is well formed, every real page of the site
- * is audited, and the visitor's accessibility preferences survive blocked
- * storage and refuse unknown values (static/ergopti_plus/_shared/ui/a11y_prefs.js).
+ * is audited, the visitor's accessibility preferences survive blocked
+ * storage and refuse unknown values (static/ergopti_plus/_shared/ui/a11y_prefs.js),
+ * the reading ratchet (site-reading.cjs) applies the WCAG 1.4.12 values and
+ * names only known rows.
  * ==============================================================================
  */
 
@@ -20,6 +22,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const scan = require('./browser/site-accessibility.playwright.cjs');
+const reading = require('./browser/site-reading.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -234,12 +237,56 @@ function checkHeroPause() {
 		assert.ok(english.includes(`'${words}'`), 'English for ' + words);
 }
 
+/**
+ * The reading ratchet (site-reading.cjs): its rows are counted per page,
+ * reading mode and check, its baseline only names audited pages, known modes
+ * and their checks, and the « zoom » mode applies the WCAG 1.4.12 values.
+ */
+function checkReadingRatchet() {
+	assert.deepEqual(Object.keys(reading.READING_MODES).sort(), ['default', 'text', 'zoom']);
+	for (const value of [
+		'line-height: 1.5',
+		'letter-spacing: 0.12em',
+		'word-spacing: 0.16em',
+		'margin-bottom: 2em'
+	])
+		assert.ok(reading.TEXT_SPACING_CSS.includes(value), 'WCAG 1.4.12 spacing: ' + value);
+	assert.deepEqual(reading.READING_MODES.text.preferences, { text: '200', spacing: 'wide' });
+	// 200 % zoom of the scan's 1440 × 900 window: half the CSS pixels, twice the device pixels.
+	assert.deepEqual(reading.READING_MODES.zoom.viewport, { width: 720, height: 450 });
+	assert.equal(reading.READING_MODES.zoom.deviceScaleFactor, 2);
+	assert.equal(reading.MAX_LINE_CHARACTERS, 80);
+	assert.deepEqual(
+		scan.readingCountsOf([
+			{ route: '/b', mode: 'text', check: 'text-clipped', elements: ['x', 'y'] },
+			{ route: '/a', mode: 'zoom', check: 'text-overlap', elements: [] }
+		]),
+		{ '/b | text | text-clipped': 2 },
+		'Rows without an element are left out'
+	);
+	for (const key of Object.keys(scan.readBaseline(scan.READING_BASELINE_PATH, 3))) {
+		const [route, mode, check] = key.split(' | ');
+		assert.ok(
+			scan.AUDITED_ROUTES.includes(route),
+			'Reading baseline names an unaudited page: ' + key
+		);
+		assert.ok(
+			reading.READING_MODES[mode]?.checks.includes(check),
+			'Reading baseline names an unknown mode or check: ' + key
+		);
+	}
+	const options = reading.optionsFor('default');
+	assert.deepEqual(options.checks, ['justified-text', 'line-length']);
+	assert.throws(() => reading.optionsFor('huge'), /Unknown reading mode/);
+}
+
 checkComparison();
 checkBaseline();
 checkRouteCoverage();
 checkPreferences();
 checkNoButtonInLink();
 checkHeroPause();
+checkReadingRatchet();
 console.log(
-	'ok - site accessibility ratchet, baseline, page coverage, preferences, links and hero pause'
+	'ok - site accessibility ratchet, baseline, page coverage, preferences, links, hero pause and reading ratchet'
 );

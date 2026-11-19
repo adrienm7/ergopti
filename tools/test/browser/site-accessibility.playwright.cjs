@@ -12,6 +12,11 @@
  * violations can only go down. A lower count asks for the baseline to be
  * lowered (--update-baseline) to lock the improvement in. The maintainer asked
  * for a totally accessible project on 2026-11-16 (TODO « Full accessibility »).
+ * Each page is then measured for reading (site-reading.cjs): at 200 % zoom
+ * with the WCAG 1.4.12 spacing and with the site's 200 % text and wide
+ * spacing, no text may be clipped or drawn over another, no block justified
+ * and no prose line longer than 80 characters; those counts have their own
+ * ratchet (site-reading-baseline.json).
  * ==============================================================================
  */
 
@@ -22,6 +27,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const smoke = require('./site-artifact-smoke.playwright.cjs');
+const reading = require('./site-reading.cjs');
 const { SITE_ROUTES } = require('../../ci/site-artifact.cjs');
 
 // Pages audited: every real page of the site, plus the pages the artifact
@@ -42,6 +48,11 @@ const VIEWPORT = Object.freeze({ width: 1440, height: 900 });
 // A phone, for the reflow checks (WCAG 1.4.10 asks for 320 CSS pixels).
 const PHONE_VIEWPORT = Object.freeze({ width: 320, height: 800 });
 const BASELINE_PATH = path.join(__dirname, 'site-accessibility-baseline.json');
+// The reading checks' ratchet (site-reading.cjs): offending elements per page,
+// reading mode and check.
+const READING_BASELINE_PATH = path.join(__dirname, 'site-reading-baseline.json');
+// Where a11y_prefs.js keeps the visitor's settings (the « text » reading mode).
+const PREFERENCES_KEY = 'ergopti-a11y-preferences';
 // A frame that settles its scripts after load (the Studio pages build their
 // keyboards from fetched data) needs a quiet period before the scan.
 const FRAME_QUIET_MS = 500;
@@ -90,15 +101,38 @@ function compareWithBaseline(current, baseline) {
 }
 
 /**
- * Read the committed baseline; a missing or malformed file is an error, not an
+ * Key of one counted reading row (site-reading-baseline.json).
+ * @param {{route: string, mode: string, check: string}} row
+ * @returns {string}
+ */
+function readingKey(row) {
+	return [row.route, row.mode, row.check].join(' | ');
+}
+
+/**
+ * Turn the reading findings into the baseline shape: key to number of elements.
+ * @param {Array<{route: string, mode: string, check: string, elements: string[]}>} findings
+ * @returns {Object<string, number>} Sorted by key, rows without an element left out.
+ */
+function readingCountsOf(findings) {
+	const counts = {};
+	for (const finding of findings)
+		if (finding.elements.length) counts[readingKey(finding)] = finding.elements.length;
+	return Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+/**
+ * Read a committed baseline; a missing or malformed file is an error, not an
  * empty baseline, so the gate cannot pass by losing its reference.
+ * @param {string} [file] - The axe baseline by default, or the reading one.
+ * @param {number} [parts] - Fields of each key (4 for axe rows, 3 for reading rows).
  * @returns {Object<string, number>}
  */
-function readBaseline() {
-	const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+function readBaseline(file = BASELINE_PATH, parts = 4) {
+	const baseline = JSON.parse(fs.readFileSync(file, 'utf8'));
 	assert.ok(baseline && typeof baseline === 'object' && !Array.isArray(baseline), 'Baseline shape');
 	for (const [key, nodes] of Object.entries(baseline)) {
-		assert.equal(key.split(' | ').length, 4, 'Baseline key: ' + key);
+		assert.equal(key.split(' | ').length, parts, 'Baseline key: ' + key);
 		assert.ok(Number.isSafeInteger(nodes) && nodes > 0, 'Baseline count: ' + key);
 	}
 	return baseline;
@@ -432,8 +466,118 @@ async function exerciseHeroPause(context, origin, basePath, inflight) {
 	}
 }
 
-/** Serve the built site on loopback and scan every audited page in Chromium. */
-async function scanSite(site, basePath, chromium, routes = AUDITED_ROUTES) {
+/**
+ * Open a browser context on the served site, with the same inert fixtures as
+ * the structure gate (the scan never depends on the network), and track its
+ * requests so a page can wait for its network to settle.
+ * @param {object} browser
+ * @param {string} origin
+ * @param {object} options - Extra newContext options (viewport, deviceScaleFactor).
+ * @param {function(object, Set): Promise<void>} visit - Receives the context and its in-flight requests.
+ */
+async function withContext(browser, origin, options, visit) {
+	const context = await browser.newContext({
+		serviceWorkers: 'block',
+		viewport: { ...VIEWPORT },
+		...options
+	});
+	try {
+		context.setDefaultTimeout(30000);
+		const inflight = new Set();
+		context.on('request', (request) => {
+			if (new URL(request.url()).origin === origin) inflight.add(request);
+		});
+		for (const settled of ['requestfinished', 'requestfailed'])
+			context.on(settled, (request) => inflight.delete(request));
+		await context.route('**/*', async (route) => {
+			const url = route.request().url();
+			if (new URL(url).origin === origin) return route.continue();
+			const fixture = smoke.githubFixture(url);
+			if (fixture !== null)
+				return route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					headers: { 'Access-Control-Allow-Origin': '*' },
+					body: JSON.stringify(fixture)
+				});
+			const external = smoke.authoredExternalFixture(url);
+			if (external !== null) return route.fulfill({ status: 200, ...external });
+			return route.abort();
+		});
+		await visit(context, inflight);
+	} finally {
+		await context.close();
+	}
+}
+
+/**
+ * Measure every page in one reading mode (site-reading.cjs): its window, its
+ * spacing style sheet or the site's own reading settings, then the mode's
+ * checks in the page's own document (the Studio frames have their own gates).
+ * @returns {Promise<Array<{route: string, mode: string, check: string, elements: string[]}>>}
+ */
+async function scanReading(browser, origin, basePath, routes, mode) {
+	const settings = reading.READING_MODES[mode];
+	const findings = [];
+	await withContext(
+		browser,
+		origin,
+		{ viewport: { ...settings.viewport }, deviceScaleFactor: settings.deviceScaleFactor },
+		async (context, inflight) => {
+			if (settings.preferences)
+				await context.addInitScript(
+					([key, value]) => window.localStorage.setItem(key, value),
+					[PREFERENCES_KEY, JSON.stringify(settings.preferences)]
+				);
+			for (const route of routes) {
+				const page = await context.newPage();
+				try {
+					await page.emulateMedia({ reducedMotion: 'reduce' });
+					const response = await page.goto(origin + basePath + route, {
+						waitUntil: 'networkidle'
+					});
+					assert.ok(response?.ok(), 'Route refused: ' + route);
+					await page.locator('main').first().waitFor({ state: 'visible' });
+					await smoke.settleFrames(page);
+					await smoke.settleNetwork(inflight, { quietMs: FRAME_QUIET_MS });
+					if (settings.preferences)
+						assert.equal(
+							await page.evaluate(() => document.documentElement.getAttribute('data-a11y-text')),
+							settings.preferences.text,
+							'The reading settings apply to ' + route
+						);
+					if (settings.styleSheet) await page.addStyleTag({ content: settings.styleSheet });
+					// From the top of the page (a sticky header covers what scrolls under
+					// it by design), once the page's scripts that fit text to its boxes
+					// (the keyboard drawings) have answered the new style: two frames,
+					// then a quiet period.
+					await page.evaluate(
+						() =>
+							new Promise((resolve) => {
+								window.scrollTo(0, 0);
+								requestAnimationFrame(() => requestAnimationFrame(resolve));
+							})
+					);
+					await page.waitForTimeout(FRAME_QUIET_MS);
+					const measured = await page.evaluate(reading.measureReading, reading.optionsFor(mode));
+					for (const check of settings.checks)
+						findings.push({ route, mode, check, elements: measured[check] });
+				} finally {
+					await page.close();
+				}
+			}
+		}
+	);
+	return findings;
+}
+
+/**
+ * Serve the built site on loopback and scan every audited page in Chromium:
+ * axe in both colour schemes and the behaviour checks, unless readingOnly,
+ * then the reading checks in every reading mode.
+ * @returns {Promise<{findings: object[], reading: object[]}>}
+ */
+async function scanSite(site, basePath, chromium, routes = AUDITED_ROUTES, readingOnly = false) {
 	const axeSource = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 	// Resource integrity is the artifact smoke and structure gates' job; this
 	// scan only answers. The loopback host also makes isDev.js probe absent
@@ -448,48 +592,22 @@ async function scanSite(site, basePath, chromium, routes = AUDITED_ROUTES) {
 	try {
 		const origin = 'http://127.0.0.1:' + server.address().port;
 		return await smoke.withBrowser(chromium, async (browser) => {
-			const context = await browser.newContext({
-				serviceWorkers: 'block',
-				viewport: { ...VIEWPORT }
-			});
-			try {
-				context.setDefaultTimeout(30000);
-				const inflight = new Set();
-				context.on('request', (request) => {
-					if (new URL(request.url()).origin === origin) inflight.add(request);
+			const findings = [];
+			if (!readingOnly)
+				await withContext(browser, origin, {}, async (context, inflight) => {
+					for (const route of routes)
+						for (const scheme of COLOR_SCHEMES)
+							findings.push(
+								...(await scanRoute(context, origin, basePath, route, scheme, inflight, axeSource))
+							);
+					await exerciseKeyboardAndSettings(context, origin, basePath, inflight, axeSource);
+					await exerciseStudio(context, origin, basePath, inflight, axeSource);
+					await exerciseHeroPause(context, origin, basePath, inflight);
 				});
-				for (const settled of ['requestfinished', 'requestfailed'])
-					context.on(settled, (request) => inflight.delete(request));
-				// Same inert fixtures as the structure gate: the scan never
-				// depends on the network.
-				await context.route('**/*', async (route) => {
-					const url = route.request().url();
-					if (new URL(url).origin === origin) return route.continue();
-					const fixture = smoke.githubFixture(url);
-					if (fixture !== null)
-						return route.fulfill({
-							status: 200,
-							contentType: 'application/json',
-							headers: { 'Access-Control-Allow-Origin': '*' },
-							body: JSON.stringify(fixture)
-						});
-					const external = smoke.authoredExternalFixture(url);
-					if (external !== null) return route.fulfill({ status: 200, ...external });
-					return route.abort();
-				});
-				const findings = [];
-				for (const route of routes)
-					for (const scheme of COLOR_SCHEMES)
-						findings.push(
-							...(await scanRoute(context, origin, basePath, route, scheme, inflight, axeSource))
-						);
-				await exerciseKeyboardAndSettings(context, origin, basePath, inflight, axeSource);
-				await exerciseStudio(context, origin, basePath, inflight, axeSource);
-				await exerciseHeroPause(context, origin, basePath, inflight);
-				return findings;
-			} finally {
-				await context.close();
-			}
+			const readingFindings = [];
+			for (const mode of Object.keys(reading.READING_MODES))
+				readingFindings.push(...(await scanReading(browser, origin, basePath, routes, mode)));
+			return { findings, reading: readingFindings };
 		});
 	} finally {
 		await new Promise((resolve, reject) =>
@@ -512,10 +630,20 @@ function printSummary(findings, routes) {
 		}
 }
 
+/** Print each reading finding with its elements, the rows a reader fixes. */
+function printReading(findings, keys = null) {
+	for (const finding of findings)
+		if (keys === null || keys.has(readingKey(finding)))
+			for (const element of finding.elements)
+				console.log('  ' + readingKey(finding) + ': ' + element);
+}
+
 /**
- * Usage: site-directory base-path [--update-baseline] [--report=file.json].
- * The report holds every finding with its impact and first targets, the raw
- * material of docs/audits/accessibility/.
+ * Usage: site-directory base-path [--update-baseline] [--report=file.json]
+ * [--only=route,…] [--reading-only]. The report holds every finding with its
+ * impact and first targets, the raw material of docs/audits/accessibility/.
+ * --reading-only skips axe and the behaviour checks and compares the reading
+ * baseline alone.
  */
 async function main(args = process.argv.slice(2)) {
 	const flags = args.filter((arg) => arg.startsWith('--'));
@@ -525,25 +653,38 @@ async function main(args = process.argv.slice(2)) {
 	assert.ok(basePath === '' || basePath === '/dev', 'Unknown site base path');
 	for (const flag of flags)
 		assert.ok(
-			flag === '--update-baseline' || /^--(report|only)=/.test(flag),
+			flag === '--update-baseline' || flag === '--reading-only' || /^--(report|only)=/.test(flag),
 			'Unknown flag ' + flag
 		);
 	// --only=route[,route] scans a subset while fixing a page; it reports
 	// without comparing, since the other pages are not measured.
 	const only = flags.find((flag) => flag.startsWith('--only='));
+	const readingOnly = flags.includes('--reading-only');
 	const routes = only ? only.slice('--only='.length).split(',') : AUDITED_ROUTES;
 	for (const route of routes) assert.ok(AUDITED_ROUTES.includes(route), 'Unknown route ' + route);
 	assert.ok(
 		!(only && flags.includes('--update-baseline')),
 		'A partial scan cannot set the baseline'
 	);
-	const findings = await scanSite(site, basePath, require('playwright').chromium, routes);
+	const scanned = await scanSite(
+		site,
+		basePath,
+		require('playwright').chromium,
+		routes,
+		readingOnly
+	);
+	const findings = scanned.findings;
 	const report = flags.find((flag) => flag.startsWith('--report='));
 	if (report)
-		fs.writeFileSync(report.slice('--report='.length), JSON.stringify(findings, null, '\t') + '\n');
+		fs.writeFileSync(
+			report.slice('--report='.length),
+			JSON.stringify({ axe: findings, reading: scanned.reading }, null, '\t') + '\n'
+		);
 	const current = countsOf(findings);
 	const total = Object.values(current).reduce((sum, nodes) => sum + nodes, 0);
-	printSummary(findings, routes);
+	const currentReading = readingCountsOf(scanned.reading);
+	const readingTotal = Object.values(currentReading).reduce((sum, count) => sum + count, 0);
+	if (!readingOnly) printSummary(findings, routes);
 	if (only) {
 		for (const finding of findings)
 			console.log(
@@ -556,21 +697,48 @@ async function main(args = process.argv.slice(2)) {
 					': ' +
 					finding.targets.join(', ')
 			);
+		printReading(scanned.reading);
 		return;
 	}
 	if (flags.includes('--update-baseline')) {
-		fs.writeFileSync(BASELINE_PATH, JSON.stringify(current, null, '\t') + '\n');
-		console.log('Site accessibility: baseline written (' + total + ' node(s)).');
+		if (!readingOnly) fs.writeFileSync(BASELINE_PATH, JSON.stringify(current, null, '\t') + '\n');
+		fs.writeFileSync(READING_BASELINE_PATH, JSON.stringify(currentReading, null, '\t') + '\n');
+		console.log(
+			'Site accessibility: baseline(s) written (' +
+				(readingOnly ? 'axe not scanned' : total + ' node(s)') +
+				', ' +
+				readingTotal +
+				' reading element(s)).'
+		);
 		return;
 	}
-	const { regressions, improvements } = compareWithBaseline(current, readBaseline());
+	const axe = readingOnly
+		? { regressions: [], improvements: [] }
+		: compareWithBaseline(current, readBaseline());
+	const read = compareWithBaseline(currentReading, readBaseline(READING_BASELINE_PATH, 3));
+	const improvements = [...axe.improvements, ...read.improvements];
 	if (improvements.length)
 		console.log(
 			'Site accessibility: fewer violations than the baseline; lower it with --update-baseline:\n  ' +
 				improvements.join('\n  ')
 		);
-	assert.deepEqual(regressions, [], 'New accessibility violations (the ratchet only goes down)');
-	console.log('Site accessibility: ' + total + ' node(s), within the baseline, PASS in Chromium.');
+	printReading(scanned.reading, new Set(read.regressions.map((line) => line.split(':')[0])));
+	assert.deepEqual(
+		axe.regressions,
+		[],
+		'New accessibility violations (the ratchet only goes down)'
+	);
+	assert.deepEqual(
+		read.regressions,
+		[],
+		'New reading problems: clipped, overlapping, justified or too long text (the ratchet only goes down)'
+	);
+	console.log(
+		'Site accessibility: ' +
+			(readingOnly ? '' : total + ' node(s) and ') +
+			readingTotal +
+			' reading element(s), within the baseline(s), PASS in Chromium.'
+	);
 }
 
 module.exports = {
@@ -578,8 +746,11 @@ module.exports = {
 	COLOR_SCHEMES,
 	WCAG_TAGS,
 	BASELINE_PATH,
+	READING_BASELINE_PATH,
 	rowKey,
 	countsOf,
+	readingKey,
+	readingCountsOf,
 	compareWithBaseline,
 	readBaseline,
 	scanSite,
