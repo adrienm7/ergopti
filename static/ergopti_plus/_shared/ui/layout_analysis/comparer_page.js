@@ -2125,9 +2125,10 @@
 				const button = el('button', 'la-sort', column.label);
 				button.type = 'button';
 				button.dataset.sort = column.key;
-				// An acronym's button is named in full; the name starts the same (WCAG 2.5.3).
+				// An acronym's button is named in full after the acronym it shows, so a
+				// voice command saying the visible text still reaches it (WCAG 2.5.3).
 				if (column.name && column.name !== column.label)
-					button.setAttribute('aria-label', column.name);
+					button.setAttribute('aria-label', `${column.label} (${column.name})`);
 				button.addEventListener('click', () => {
 					resort(
 						applied.key === column.key

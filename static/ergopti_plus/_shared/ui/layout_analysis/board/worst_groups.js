@@ -132,11 +132,17 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 				const button = el('button', 'la-ngram');
 				button.type = 'button';
 				const chips = el('span', 'la-ngram-keys');
-				for (const key of keys) chips.append(el('kbd', 'la-ngram-chip', key));
+				// The spaces between the keys and before the share are not drawn (flex
+				// and grid items), but they part the words of the visible text, which
+				// the name then contains (WCAG 2.5.3) instead of one run « ct0,06 % ».
+				keys.forEach((key, at) => {
+					if (at > 0) chips.append(' ');
+					chips.append(el('kbd', 'la-ngram-chip', key));
+				});
 				const bar = el('span', 'la-ngram-bar');
 				bar.setAttribute('aria-hidden', 'true');
 				bar.style.setProperty('--la-ngram-share', `${top > 0 ? (group.share / top) * 100 : 0}%`);
-				button.append(chips, bar, el('span', 'la-ngram-share', share));
+				button.append(chips, ' ', bar, ' ', el('span', 'la-ngram-share', share));
 				button.setAttribute('aria-label', `${keys.join(' ')}: ${share}`);
 				const show = () => options.highlight(group.keys);
 				button.addEventListener('mouseenter', show);

@@ -423,19 +423,21 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 	/**
 	 * A percentile chip beside a metric's value, written « P70 » and
 	 * coloured from red at the lowest percentile to green at the highest, with
-	 * its number always written and named in full for assistive technology; a
-	 * click explains it in the popover.
+	 * its number always written, named in full for assistive technology after
+	 * the text it shows (WCAG 2.5.3: a voice command saying « P70 » reaches
+	 * it); a click explains it in the popover.
 	 * @param {string} metric - The metric's name, as the page shows it.
 	 * @param {{percent: number, count: number}} standing - LAYOUT_ANALYSIS.percentiles' answer.
 	 * @returns {HTMLButtonElement}
 	 */
 	function percentile(metric, standing) {
 		const values = { metric, percent: standing.percent, count: standing.count };
-		const node = el('button', 'la-note la-pct', t('layout_analysis.percentile.chip', values));
+		const chip = t('layout_analysis.percentile.chip', values);
+		const node = el('button', 'la-note la-pct', chip);
 		node.type = 'button';
 		node.style.setProperty('--la-pct', String(standing.percent));
 		node.dataset.note = t('layout_analysis.percentile.explain', values);
-		node.setAttribute('aria-label', t('layout_analysis.percentile.label', values));
+		node.setAttribute('aria-label', `${chip}, ${t('layout_analysis.percentile.label', values)}`);
 		node.setAttribute('aria-controls', POPOVER_ID);
 		node.setAttribute('aria-expanded', 'false');
 		return node;
