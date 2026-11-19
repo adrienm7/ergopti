@@ -241,7 +241,7 @@ function showConfirm(msg, fn, opts = {}) {
 	// A warning is the dialog's heading and names it; the question describes it.
 	const title = document.getElementById('confirm-title');
 	const dialog = title.closest('[role="alertdialog"]');
-	title.textContent = opts.isWarning ? _t('common.warning') || 'Attention' : '';
+	title.textContent = opts.isWarning ? _t('common.warning') : '';
 	title.hidden = !opts.isWarning;
 	if (opts.isWarning) dialog.setAttribute('aria-labelledby', 'confirm-title');
 	else dialog.removeAttribute('aria-labelledby');

@@ -143,9 +143,9 @@
 			'#metrics_rebuild_banner .track{appearance:none;border:0;display:block;width:100%;height:6px;' +
 			'border-radius:3px;background:rgba(127,127,127,0.25);margin-top:6px;overflow:hidden}' +
 			'#metrics_rebuild_banner .track::-webkit-progress-bar{background:rgba(127,127,127,0.25);border-radius:3px}' +
-			'#metrics_rebuild_banner .track::-webkit-progress-value{background:' +
+			'#metrics_rebuild_banner .track::-webkit-progress-value{transition:width .4s ease;background:' +
 			ThemeTokens.color('hue-3b82f6') +
-			';transition:width .4s ease}' +
+			'}' +
 			'#metrics_rebuild_banner .notice{margin-top:4px;opacity:.8}';
 		document.head.appendChild(style);
 		// The rebuild's status: its line, its progress bar (named by that line)
