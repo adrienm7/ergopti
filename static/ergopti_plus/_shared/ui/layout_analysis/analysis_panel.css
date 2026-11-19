@@ -189,6 +189,7 @@
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px;
+	margin: 0;
 }
 
 .la-swaps-progress {
@@ -222,6 +223,7 @@
 	align-items: center;
 	display: inline-flex;
 	gap: 6px;
+	margin: 0;
 }
 
 .la-swap-arrow {
@@ -273,6 +275,22 @@
 .la-panel h3 {
 	font-size: 1em;
 	margin: 12px 0 6px;
+}
+
+/* The finger load is a table whose rows are grids: the cells take no table
+   padding, and the finger's name no header weight or centring. */
+.la-panel-fingers {
+	display: block;
+}
+
+.la-panel-finger > th,
+.la-panel-finger > td {
+	padding: 0;
+}
+
+.la-panel-finger-name {
+	font-weight: normal;
+	text-align: start;
 }
 
 .la-panel-finger {

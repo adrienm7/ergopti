@@ -131,10 +131,11 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 				const share = measure(group.share, SHARE_DIGITS, '%');
 				const button = el('button', 'la-ngram');
 				button.type = 'button';
-				const chips = el('span', 'la-ngram-keys');
+				// The keys typed in turn: a kbd of kbds, as HTML writes a key sequence.
 				// The spaces between the keys and before the share are not drawn (flex
 				// and grid items), but they part the words of the visible text, which
 				// the name then contains (WCAG 2.5.3) instead of one run « ct0,06 % ».
+				const chips = el('kbd', 'la-ngram-keys');
 				keys.forEach((key, at) => {
 					if (at > 0) chips.append(' ');
 					chips.append(el('kbd', 'la-ngram-chip', key));
@@ -142,7 +143,9 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 				const bar = el('span', 'la-ngram-bar');
 				bar.setAttribute('aria-hidden', 'true');
 				bar.style.setProperty('--la-ngram-share', `${top > 0 ? (group.share / top) * 100 : 0}%`);
-				button.append(chips, ' ', bar, ' ', el('span', 'la-ngram-share', share));
+				const value = el('data', 'la-ngram-share', share);
+				value.value = String(group.share);
+				button.append(chips, ' ', bar, ' ', value);
 				button.setAttribute('aria-label', `${keys.join(' ')}: ${share}`);
 				const show = () => options.highlight(group.keys);
 				button.addEventListener('mouseenter', show);

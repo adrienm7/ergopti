@@ -216,7 +216,7 @@ var LAYOUT_ANALYSIS_SWAPS = (function () {
 		cycleTitle.hidden = true;
 		const cycleList = el('ol', 'la-swaps-list la-cycles-list');
 		cycleList.id = 'la-cycles-list';
-		const actions = el('div', 'la-swaps-actions');
+		const actions = el('p', 'la-swaps-actions');
 		actions.append(run, stop);
 		box.replaceChildren(title, note, actions, bar, status, swapsTitle, list, cycleTitle, cycleList);
 		box.classList.add('la-swaps');
@@ -254,13 +254,15 @@ var LAYOUT_ANALYSIS_SWAPS = (function () {
 			const gain = `+${format(swap.gain, GAIN_DIGITS)}`;
 			const cycle = keys.length === 3;
 			const item = el('li', cycle ? 'la-swap la-cycle' : 'la-swap');
-			const pair = el('span', 'la-swap-keys');
+			// The keys and their arrows, drawn: a reader hears the move in words
+			// instead (the cycle's sentence, the pair's « Apply » name).
+			const pair = el('p', 'la-swap-keys');
+			pair.setAttribute('aria-hidden', 'true');
 			if (cycle) {
 				pair.append(el('kbd', 'la-ngram-chip', keys[0]));
 				for (const key of keys.slice(1))
 					pair.append(el('span', 'la-swap-arrow', '→'), el('kbd', 'la-ngram-chip', key));
 				pair.append(el('span', 'la-swap-arrow la-cycle-back', '↺'));
-				pair.setAttribute('aria-hidden', 'true');
 			} else
 				pair.append(
 					el('kbd', 'la-ngram-chip', keys[0]),
@@ -268,8 +270,11 @@ var LAYOUT_ANALYSIS_SWAPS = (function () {
 					el('kbd', 'la-ngram-chip', keys[1])
 				);
 			const verdict = t('layout_analysis.details.verdict_better');
-			const score = el('span', 'la-swap-gain');
-			score.append(el('span', 'la-panel-verdict', '▲'), ` ${gain}`);
+			const score = el('data', 'la-swap-gain');
+			score.value = String(swap.gain);
+			const mark = el('span', 'la-panel-verdict', '▲');
+			mark.setAttribute('aria-hidden', 'true');
+			score.append(mark, ` ${gain}`, el('span', 'la-sr-only', ` ${verdict}`));
 			score.title = verdict;
 			const apply = el('button', 'la-swap-apply', t('layout_analysis.swaps.apply'));
 			apply.type = 'button';

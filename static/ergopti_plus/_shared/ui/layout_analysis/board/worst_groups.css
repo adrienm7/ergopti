@@ -148,8 +148,10 @@
 	border-color: var(--theme-accent);
 }
 
+/* A kbd of the chips' kbds: the browser's monospace stays on the chips alone. */
 .la-ngram-keys {
 	display: inline-flex;
+	font: inherit;
 	gap: 3px;
 }
 

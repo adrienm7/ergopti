@@ -243,7 +243,9 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		rankSelect.id = 'la-panel-rank';
 		const rankLabel = el('label');
 		rankLabel.htmlFor = rankSelect.id;
-		const controls = el('div', 'la-panel-controls');
+		// The panel's settings: labelled selects and the hand-off buttons, never submitted.
+		const controls = el('form', 'la-panel-controls');
+		controls.addEventListener('submit', (event) => event.preventDefault());
 		controls.append(
 			corpusLabel,
 			corpusSelect,
@@ -309,13 +311,14 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		ngrams.id = 'la-panel-ngrams';
 		const fingersTitle = el('h3');
 		fingersTitle.id = 'la-panel-fingers-title';
-		const fingers = el('div', 'la-panel-fingers');
+		const fingers = el('table', 'la-panel-fingers');
 		const analysersTitle = el('h3');
 		const analysers = el('table', 'la-panel-metrics la-panel-analysers');
-		const extra = el('div', 'la-panel-extra');
+		// The sections other scripts add (addSection), under the analysers.
+		const extraBoxes = [];
 		// Who presses each key on the keyboard analysed, editable here as in the
-		// Comparer (one profile per keyboard, shared with it).
-		const fingering = el('div', 'la-panel-fingering');
+		// Comparer (one profile per keyboard, shared with it); its h2 names it.
+		const fingering = el('section', 'la-panel-fingering');
 		// Three columns that stack in a narrow panel and sit side by side when the
 		// panel spans the editor's width: the settings and score, the finger load
 		// and analysers, then the fingering board.
@@ -335,7 +338,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			: null;
 		if (swaps) scoreColumn.append(swapsBox);
 		const loadColumn = el('div', 'la-panel-column');
-		loadColumn.append(fingersTitle, fingers, analysersTitle, analysers, extra);
+		loadColumn.append(fingersTitle, fingers, analysersTitle, analysers);
 		const fingeringColumn = el('div', 'la-panel-column');
 		fingeringColumn.append(fingering);
 		const body = el('div', 'la-panel-body');
@@ -622,10 +625,11 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			});
 			drawFingers(result);
 			drawAnalysers(layout, prepared, settings, mine);
-			extra.replaceChildren();
+			for (const box of extraBoxes.splice(0)) box.remove();
 			for (const draw of sections) {
-				const box = el('div', 'la-panel-section');
-				extra.append(box);
+				const box = el('section', 'la-panel-section');
+				loadColumn.append(box);
+				extraBoxes.push(box);
 				draw(box, { layout, tables: prepared, keyboard: state.keyboard, result });
 			}
 			state.previous = {
@@ -670,8 +674,9 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 						// Better or worse with a mark and in words, never by its colour alone.
 						const words = t(`layout_analysis.details.verdict_${good ? 'better' : 'worse'}`);
 						delta.title = words;
-						delta.append(' ', el('span', 'la-panel-verdict', good ? '▲' : '▼'));
-						delta.append(el('span', 'la-sr-only', ` ${words}`));
+						const mark = el('span', 'la-panel-verdict', good ? '▲' : '▼');
+						mark.setAttribute('aria-hidden', 'true');
+						delta.append(' ', mark, el('span', 'la-sr-only', ` ${words}`));
 					}
 				}
 				tr.append(th, td, pct, delta);
@@ -709,7 +714,10 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		 */
 		function drawFingers(result) {
 			fingers.replaceChildren();
-			// Read as a table: each finger a row, its share the cell, the ideal said with it.
+			// A table: each finger a row, its share the cell, the ideal said with it.
+			// Its rows are laid out as grids (analysis_panel.css), so the native
+			// roles are also written: a reader that drops a restyled table's
+			// semantics (older WebKit) still reads it as one.
 			fingers.setAttribute('role', 'table');
 			fingers.setAttribute('aria-labelledby', fingersTitle.id);
 			const scale = Math.max(
@@ -718,7 +726,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				...Object.values(result.idealLoad)
 			);
 			for (const [id, share] of Object.entries(result.fingerShares)) {
-				const row = el('div', 'la-panel-finger');
+				const row = el('tr', 'la-panel-finger');
 				const bar = el('span', 'la-panel-bar');
 				bar.style.width = `${(share / scale) * 100}%`;
 				const target = result.idealLoad[id];
@@ -727,12 +735,14 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				const ideal = ` (${t('layout_analysis.details.ideal_mark')}: ${measure(target, 1, '%')})`;
 				row.title = `${measure(share, 1, '%')}${ideal}`;
 				row.setAttribute('role', 'row');
-				const name = el('span', 'la-panel-finger-name', t(`layout_analysis.finger.${id}`));
+				const name = el('th', 'la-panel-finger-name', t(`layout_analysis.finger.${id}`));
+				name.scope = 'row';
 				name.setAttribute('role', 'rowheader');
-				const track = el('span', 'la-panel-track');
+				// The bar repeats the value's cell: hidden from readers, which hear the cell.
+				const track = el('td', 'la-panel-track');
 				track.setAttribute('aria-hidden', 'true');
 				track.append(bar, mark);
-				const value = el('span', 'la-panel-finger-value', measure(share, 1, '%'));
+				const value = el('td', 'la-panel-finger-value', measure(share, 1, '%'));
 				value.setAttribute('role', 'cell');
 				value.append(el('span', 'la-sr-only', ideal));
 				row.append(name, track, value);

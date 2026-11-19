@@ -60,8 +60,6 @@ var LAYOUT_ANALYSIS_UNDO = (function () {
 			if (!what || typeof what.undo !== 'function' || typeof what.name !== 'string')
 				throw new Error('layout_analysis: an undo offer needs a name and an undo function');
 			current = what;
-			const text = document.createElement('span');
-			text.textContent = t('layout_analysis.undo.restored', { name: what.name });
 			const button = document.createElement('button');
 			button.type = 'button';
 			button.className = 'la-undo-button';
@@ -73,7 +71,7 @@ var LAYOUT_ANALYSIS_UNDO = (function () {
 				node.replaceChildren(t('layout_analysis.undo.undone', { name: what.name }));
 				if (what.focus && typeof what.focus.focus === 'function') what.focus.focus();
 			});
-			node.replaceChildren(text, ' ', button);
+			node.replaceChildren(t('layout_analysis.undo.restored', { name: what.name }), ' ', button);
 		}
 
 		// An edit after the restore: undoing would erase it, so the offer goes.

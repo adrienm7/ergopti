@@ -345,9 +345,9 @@ var LAYOUT_BOARD_IMAGE = (function () {
 		group.className = 'la-image-buttons';
 		group.setAttribute('role', 'group');
 		group.setAttribute('aria-label', t('layout_analysis.image.label'));
-		const status = document.createElement('span');
+		// An output: the status of the save it reports, said politely.
+		const status = document.createElement('output');
 		status.className = 'la-image-status';
-		status.setAttribute('role', 'status');
 		const label = document.createElement('span');
 		label.className = 'la-image-label';
 		label.textContent = t('layout_analysis.image.label');
