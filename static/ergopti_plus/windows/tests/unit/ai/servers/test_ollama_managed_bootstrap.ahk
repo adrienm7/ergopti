@@ -832,6 +832,164 @@ _G4B_EnableHandoffModel() {
 	finally F.Close()
 }
 
+; An install still waiting for its daemon, polled against a private
+; configuration image that the case can lock as a settings save does between
+; its rename and its close. Only the ticks the case calls run.
+_G4B_HeldSourceFixture(F, Path) {
+	AssertTrue(FSWrite(Path, '[llm]`nenabled = false`nmodel = "captured"`n'))
+	F.Start()
+	AssertFalse(F.Flow.Ready, "The case polls an install that is not ready yet.")
+	AssertTrue(IsObject(F.Flow.Timer), "The waiting install keeps its poll armed.")
+	SetTimer(F.Flow.Timer, 0)
+	F.Flow.Port["read_source"] := (*) => Map("path", Path, "bytes", FSReadBytesStrict(Path))
+	Menu := Map("backend", "ollama", "model", "captured", "enabled", false, "api_entry_id", "")
+	F.Flow.Port["menu_intent"] := (*) => Menu
+	F.Flow.Port["aux_generation"] := (*) => 8102
+	F.Flow.Source := F.Flow.Port["read_source"].Call()
+	F.Flow.MenuIntent := Menu.Clone()
+	F.Flow.AuxGeneration := 8102
+}
+
+_G4B_HeldSourceSurvives() {
+	F := _G4B_Fixture()
+	Path := A_Temp . "\ergopti-held-source-" . A_TickCount . ".toml"
+	Lock := 0
+	try {
+		_G4B_HeldSourceFixture(F, Path)
+		; The exclusive open a settings save holds (Win32 error 32 for readers).
+		Lock := FileOpen(Path, "rw -rwd")
+		AssertTrue(IsObject(Lock), "The case holds the configuration exclusively.")
+		AssertThrows(() => FSReadBytesStrict(Path), "The held configuration refuses every reader.")
+		F.Now += 150
+		F.Flow._Tick()
+		AssertFalse(F.Flow.Cancelled, "A held configuration is not readable yet; it withdraws nothing.")
+		AssertFalse(F.Flow.Failed)
+		AssertEqual(0, F.Runtime.Stops, "The waiting install keeps its runtime while the save finishes.")
+		Lock.Close(), Lock := 0
+		F.Now += 150
+		F.Flow._Tick()
+		AssertFalse(F.Flow.Cancelled, "The unchanged configuration is current again on the next tick.")
+		F.Runtime.PublishReady()
+		AssertTrue(F.Flow.Ready, "The install survives the save and reaches READY.")
+		AssertEqual(1, F.ReadyCalls)
+		AssertEqual(0, F.FailedCalls)
+	} finally {
+		if IsObject(Lock)
+			Lock.Close()
+		F.Close()
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("managed bootstrap: a save holding config.toml cannot cancel the install (managed-held-source)", _G4B_HeldSourceSurvives)
+
+; The production branch reads ConfigurationFile and the live menu itself. The
+; case points both at private state and lifts the test port for its two ticks.
+_G4B_HeldSourceProduction() {
+	global ConfigurationFile, _LLM_Menu
+	F := _G4B_Fixture()
+	Path := A_Temp . "\ergopti-held-production-" . A_TickCount . ".toml"
+	SavedFile := ConfigurationFile, SavedMenu := _LLM_Menu
+	Lock := 0, Port := 0
+	try {
+		_G4B_HeldSourceFixture(F, Path)
+		ConfigurationFile := Path
+		_LLM_Menu := Map("backend", "ollama", "model", "captured", "enabled", false, "api_entry_id", "")
+		F.Flow.Source := _LLM_Menu_EnableReadSource()
+		F.Flow.MenuIntent := _G4B_LiveMenuIntent()
+		F.Flow.AuxGeneration := LLM_AuxGeneration()
+		F.Flow.AuxPrefix := "ollama_managed_held_source_"
+		Port := F.Flow.Port
+		F.Flow.Port := 0
+		F.Flow.StartedTick := OllamaRuntime_Now()
+		Lock := FileOpen(Path, "rw -rwd")
+		AssertTrue(IsObject(Lock), "The case holds the configuration exclusively.")
+		F.Flow._Tick()
+		AssertFalse(F.Flow.Cancelled, "The production poll waits for a held configuration.")
+		Lock.Close(), Lock := 0
+		F.Flow._Tick()
+		AssertFalse(F.Flow.Cancelled, "The unchanged configuration is current again on the next tick.")
+	} finally {
+		if IsObject(Lock)
+			Lock.Close()
+		if Port is Map
+			F.Flow.Port := Port
+		ConfigurationFile := SavedFile
+		_LLM_Menu := SavedMenu
+		F.Close()
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("managed bootstrap: the production poll waits for a held config.toml (managed-held-source)", _G4B_HeldSourceProduction)
+
+_G4B_HeldSourceDeadline() {
+	F := _G4B_Fixture()
+	Path := A_Temp . "\ergopti-held-deadline-" . A_TickCount . ".toml"
+	Lock := 0
+	try {
+		_G4B_HeldSourceFixture(F, Path)
+		Lock := FileOpen(Path, "rw -rwd")
+		F.Now += 150
+		F.Flow._Tick()
+		AssertFalse(F.Flow.Cancelled)
+		F.Now += F.Flow.Plan["deadline_ms"]
+		F.Flow._Tick()
+		AssertTrue(F.Flow.Failed, "A configuration held past the deadline ends in the existing timeout.")
+		AssertEqual(1, F.FailedCalls)
+		AssertEqual(0, F.ReadyCalls)
+	} finally {
+		if IsObject(Lock)
+			Lock.Close()
+		F.Close()
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("managed bootstrap: a held config.toml waits only within the deadline (managed-held-source)", _G4B_HeldSourceDeadline)
+
+_G4B_HeldSourceOtherError() {
+	F := _G4B_Fixture()
+	Path := A_Temp . "\ergopti-held-missing-" . A_TickCount . ".toml"
+	try {
+		_G4B_HeldSourceFixture(F, Path)
+		FileDelete(Path)
+		AssertThrows(() => F.Flow._Tick(), "Any other read failure still fails fast.")
+		AssertFalse(F.Flow.Ready)
+		AssertEqual(0, F.ReadyCalls)
+	} finally {
+		F.Close()
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("managed bootstrap: a missing config.toml is not a held one (managed-held-source)", _G4B_HeldSourceOtherError)
+
+_G4B_HeldSourceWithdrawn() {
+	F := _G4B_Fixture()
+	Path := A_Temp . "\ergopti-held-withdrawn-" . A_TickCount . ".toml"
+	Lock := 0
+	try {
+		_G4B_HeldSourceFixture(F, Path)
+		Lock := FileOpen(Path, "rw -rwd")
+		F.Now += 150
+		F.Flow._Tick()
+		Lock.Write("# saved change`n")
+		Lock.Close(), Lock := 0
+		F.Now += 150
+		F.Flow._Tick()
+		AssertTrue(F.Flow.Cancelled, "Bytes the save changed still withdraw the install once readable.")
+		AssertEqual(0, F.ReadyCalls)
+	} finally {
+		if IsObject(Lock)
+			Lock.Close()
+		F.Close()
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("managed bootstrap: a held save that changed config.toml still withdraws (managed-held-source)", _G4B_HeldSourceWithdrawn)
+
 _G4B_DisplayModelTag() {
 	Index := LLM_GetModelIndex()
 	for Name, Entry in Index {

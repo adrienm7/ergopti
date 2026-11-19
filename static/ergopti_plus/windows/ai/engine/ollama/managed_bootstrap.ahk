@@ -311,6 +311,8 @@ class OllamaManagedBootstrap {
 		this.RuntimeRetiring := false
 		this.Target := 0
 		this.Timer := 0
+		; Clock reading of the first poll that found config.toml held by a save, or 0.
+		this.SourceBusySince := 0
 		this.Sources := Map()
 		if Port is Map {
 			this.Plan := Port["plan"].Clone()
@@ -473,27 +475,58 @@ class OllamaManagedBootstrap {
 	}
 
 	_Current() {
+		State := this._Currency()
+		; Only the poll can wait for the next tick; a callback step fails closed.
+		if State == "busy"
+			LoggerWarn("LLM.managed", "Managed source revalidation met config.toml held by a save; this step stops.")
+		return State == "current"
+	}
+
+	; "current", "withdrawn", or "busy". Busy means only that a settings save holds
+	; config.toml exclusively (ERROR_SHARING_VIOLATION, between its rename and its
+	; close): the bytes are not readable yet, which proves no withdrawal.
+	_Currency() {
 		global _LLM_Deps_Epoch, LLM_OLLAMA_BASE_URL, _LLM_Menu
 		if this.Cancelled || this.Failed || A_IsSuspended || (this.Epoch != _LLM_Deps_Epoch && !this.Ready)
 				|| this.Endpoint != LLM_OLLAMA_BASE_URL
-			return false
+			return "withdrawn"
 		if this.Port is Map {
-			return this._True(this.Port["current"].Call()) && (!this.Port.Has("read_source")
-				|| this._ConfigCurrent(this.Port["read_source"].Call(),
-					this.Port["menu_intent"].Call(), this.Port["aux_generation"].Call()))
+			if !this._True(this.Port["current"].Call())
+				return "withdrawn"
+			if !this.Port.Has("read_source")
+				return "current"
+			if !this._ReadSource(this.Port["read_source"], &Source)
+				return "busy"
+			return this._ConfigCurrent(Source, this.Port["menu_intent"].Call(), this.Port["aux_generation"].Call())
+				? "current" : "withdrawn"
 		}
 		try {
 			; READY outlives ordinary saves: a running daemon only follows the AI
 			; intent, and hashing every source each tick would tax the session.
 			if this.Ready
-				return this._ReadyIntentCurrent(_LLM_Menu, LLM_AuxGeneration())
-			if !this._ConfigCurrent(_LLM_Menu_EnableReadSource(), _LLM_Menu, LLM_AuxGeneration())
-				return false
+				return this._ReadyIntentCurrent(_LLM_Menu, LLM_AuxGeneration()) ? "current" : "withdrawn"
+			if !this._ReadSource(_LLM_Menu_EnableReadSource, &Source)
+				return "busy"
+			if !this._ConfigCurrent(Source, _LLM_Menu, LLM_AuxGeneration())
+				return "withdrawn"
 			for Path, Digest in this.Sources
 				if this._Hash(Path) != Digest
-					return false
+					return "withdrawn"
 		} catch as Err {
 			this._Error("source_revalidation", Err)
+			return "withdrawn"
+		}
+		return "current"
+	}
+
+	; Every other read failure propagates to the caller's fail-fast path.
+	_ReadSource(Reader, &Source) {
+		global SR_ERROR_SHARING_VIOLATION
+		try Source := Reader.Call()
+		catch OSError as Err {
+			if Err.Number != SR_ERROR_SHARING_VIOLATION
+				throw Err
+			Source := 0
 			return false
 		}
 		return true
@@ -696,9 +729,27 @@ class OllamaManagedBootstrap {
 			return this.Cancel()
 		if this.MenuPull is Map && !this._MenuPullCurrent(this.MenuPull)
 			return this.Cancel()
-		if !this.Ready && (this._Now() < this.StartedTick || this._Now() - this.StartedTick >= this.Plan["deadline_ms"])
+		if !this.Ready && (this._Now() < this.StartedTick || this._Now() - this.StartedTick >= this.Plan["deadline_ms"]) {
+			if this.SourceBusySince {
+				LoggerError("LLM.managed", "config.toml stayed held by a save until the managed deadline.")
+				this.SourceBusySince := 0
+			}
 			return this._Fail("bootstrap_timeout")
-		if !this._Current()
+		}
+		State := this._Currency()
+		if State == "busy" {
+			; The deadline above still bounds the wait; the next tick reads again.
+			if !this.SourceBusySince {
+				this.SourceBusySince := Max(this._Now(), 1)
+				LoggerStart("LLM.managed", "config.toml is held by a settings save; the managed poll reads it again next tick.")
+			}
+			return true
+		}
+		if this.SourceBusySince {
+			LoggerSuccess("LLM.managed", "config.toml is readable again after {1} ms.", this._Now() - this.SourceBusySince)
+			this.SourceBusySince := 0
+		}
+		if State != "current"
 			return this._Declined()
 		if this.Ready
 			return true
@@ -1173,6 +1224,10 @@ class OllamaManagedBootstrap {
 	Cancel(*) {
 		global _LLM_ManagedBootstrap, _LLM_Deps_State
 		this.Cancelled := true
+		if this.SourceBusySince {
+			LoggerWarn("LLM.managed", "The managed flow ended while config.toml was still held by a save.")
+			this.SourceBusySince := 0
+		}
 		if this.MenuPull is Map
 			this._MenuPullRetire(this.MenuPull)
 		if this.Ready && IsObject(_LLM_ManagedBootstrap) && _LLM_ManagedBootstrap == this
