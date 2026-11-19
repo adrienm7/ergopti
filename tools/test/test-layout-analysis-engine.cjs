@@ -59,6 +59,12 @@
  *    re-encoded from their official files (Ergo-L's 1DK, Optimot 1.8.0, the
  *    Neo family, QWERTZ, the Spanish layouts, Engram-es), and their language's
  *    text typed in full.
+ * 13. Similarity: a layout and its copy are 100 % alike; one swap of two keys
+ *    moves exactly their characters, by occurrences (weighted) and by
+ *    distinct characters, and keeps them alike on finger and row when both
+ *    keys share them; moving « e » weighs far more than moving a rare letter;
+ *    a moved dead key moves the characters behind it, a level change moves
+ *    its character; the measure is symmetric and refuses a corpus of spaces.
  * ==============================================================================
  */
 
@@ -2281,6 +2287,134 @@ if (UPDATE_GOLDEN) {
 				`official layouts: ${id} cannot type ${Object.keys(result.coverage.unsupportedChars).join('')}`
 			);
 		}
+}
+
+// =========================================
+// ======= 13/ Similarity of layouts =======
+// =========================================
+
+// How alike two layouts type a corpus (layoutSimilarity): the optimizer's
+// « an existing layout would do the job ».
+check(typeof E.layoutSimilarity === 'function', 'similarity: the engine has no layoutSimilarity');
+check(typeof E.similarScoreGap === 'function', 'similarity: the engine has no similarScoreGap');
+if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'function') {
+	const azerty = byId.get('azerty');
+	const counts = E.ngramsFromText(
+		'Tarte et ratatouille, le rat trotte sur la terre. Elle a vu un kiwi, Waouh, et un xylophone ! '.repeat(
+			3
+		)
+	);
+	const uni = new Map(E.prepareNgrams(counts).uni);
+	// Every character of the text but the space, each counted by its occurrences.
+	const typed = [...uni.keys()].filter((char) => char !== ' ');
+	const occurrences = typed.reduce((sum, char) => sum + uni.get(char), 0);
+	const shares = (moved) => ({
+		weighted: 100 * (1 - moved.reduce((sum, char) => sum + (uni.get(char) || 0), 0) / occurrences),
+		unweighted: 100 * (1 - moved.filter((char) => uni.has(char)).length / typed.length)
+	});
+	const swapped = (layout, a, b) => {
+		const rows = Object.assign({}, layout.rows, { [a]: layout.rows[b], [b]: layout.rows[a] });
+		return Object.assign({}, layout, { id: `${layout.id}_${a}_${b}`, rows });
+	};
+	const same = E.layoutSimilarity(azerty, JSON.parse(JSON.stringify(azerty)), counts, {});
+	for (const [kind, value] of [
+		['weighted.sameKey', same.weighted.sameKey],
+		['weighted.sameFingerRow', same.weighted.sameFingerRow],
+		['unweighted.sameKey', same.unweighted.sameKey],
+		['unweighted.sameFingerRow', same.unweighted.sameFingerRow]
+	])
+		check(value === 100, `similarity: a layout and its copy are ${value} % alike (${kind})`);
+	check(
+		same.chars === typed.length && same.occurrences === occurrences,
+		`similarity: ${same.chars} characters and ${same.occurrences} occurrences compared, the text has ${typed.length} and ${occurrences} without its spaces`
+	);
+	// R and T: the left index on the top row, both of them. A swap moves r, R,
+	// t and T to another key, never to another finger or row.
+	const rt = E.layoutSimilarity(azerty, swapped(azerty, 'KeyR', 'KeyT'), counts, {});
+	const rtExpected = shares(['r', 'R', 't', 'T']);
+	check(
+		near(rt.weighted.sameKey, rtExpected.weighted) &&
+			near(rt.unweighted.sameKey, rtExpected.unweighted),
+		`similarity: one swap of R and T gives ${rt.weighted.sameKey} / ${rt.unweighted.sameKey} %, expected ${rtExpected.weighted} / ${rtExpected.unweighted}`
+	);
+	check(
+		rt.weighted.sameFingerRow === 100 && rt.unweighted.sameFingerRow === 100,
+		`similarity: R and T keep their finger and row, yet ${rt.weighted.sameFingerRow} %`
+	);
+	// E (middle finger) and R (index): another finger, so both measures fall alike.
+	const er = E.layoutSimilarity(azerty, swapped(azerty, 'KeyE', 'KeyR'), counts, {});
+	const erExpected = shares(['e', 'E', 'r', 'R']);
+	check(
+		near(er.weighted.sameFingerRow, erExpected.weighted) &&
+			near(er.weighted.sameKey, erExpected.weighted),
+		`similarity: E and R on two fingers give ${er.weighted.sameFingerRow} %, expected ${erExpected.weighted}`
+	);
+	const back = E.layoutSimilarity(swapped(azerty, 'KeyE', 'KeyR'), azerty, counts, {});
+	check(JSON.stringify(back) === JSON.stringify(er), 'similarity: the measure is not symmetric');
+	// The weighting: moving the frequent « e » with « k » and moving the rare
+	// « w » with « x » move as many characters, far from as many occurrences.
+	const frequent = E.layoutSimilarity(azerty, swapped(azerty, 'KeyE', 'KeyK'), counts, {});
+	const rare = E.layoutSimilarity(azerty, swapped(azerty, 'KeyZ', 'KeyX'), counts, {});
+	const frequentExpected = shares(['e', 'E', 'k', 'K']);
+	const rareExpected = shares(['w', 'W', 'x', 'X']);
+	check(
+		near(frequent.weighted.sameKey, frequentExpected.weighted) &&
+			near(rare.weighted.sameKey, rareExpected.weighted),
+		`similarity: the weighted shares are ${frequent.weighted.sameKey} and ${rare.weighted.sameKey}, expected ${frequentExpected.weighted} and ${rareExpected.weighted}`
+	);
+	check(
+		frequent.unweighted.sameKey === rare.unweighted.sameKey &&
+			frequent.weighted.sameKey < rare.weighted.sameKey - 10,
+		`similarity: moving « e » weighs ${frequent.weighted.sameKey} %, moving « w » ${rare.weighted.sameKey} %, unweighted ${frequent.unweighted.sameKey} and ${rare.unweighted.sameKey}`
+	);
+	// Levels and dead keys, as the engine types them: « a » moved from the
+	// base to AltGr of its own key moves; « ê » moves with its dead key.
+	const toy = (deadCode, aRow) => ({
+		id: `toy_${deadCode}`,
+		rows: Object.assign(
+			{ KeyE: ['e', 'E', null, null], KeyA: aRow, Space: [' ', ' ', null, null] },
+			{ [deadCode]: [{ dead: 'circ' }, null, null, null] }
+		),
+		dead: { circ: { e: 'ê', ' ': '^' } }
+	});
+	const toyCounts = E.ngramsFromText('ê e a ee aa');
+	const toyUni = new Map(E.prepareNgrams(toyCounts).uni);
+	const toyTotal = toyUni.get('ê') + toyUni.get('e') + toyUni.get('a');
+	const dead = E.layoutSimilarity(
+		toy('KeyQ', ['a', 'A', null, null]),
+		toy('KeyW', ['a', 'A', null, null]),
+		toyCounts,
+		{}
+	);
+	check(
+		near(dead.weighted.sameKey, (100 * (toyTotal - toyUni.get('ê'))) / toyTotal) &&
+			near(dead.unweighted.sameKey, (100 * 2) / 3),
+		`similarity: a moved dead key moves « ê » only: ${dead.weighted.sameKey} / ${dead.unweighted.sameKey} %`
+	);
+	const level = E.layoutSimilarity(
+		toy('KeyQ', ['a', 'A', null, null]),
+		toy('KeyQ', [null, 'A', 'a', null]),
+		toyCounts,
+		{}
+	);
+	check(
+		near(level.weighted.sameFingerRow, (100 * (toyTotal - toyUni.get('a'))) / toyTotal),
+		`similarity: « a » moved to AltGr of its own key stays alike: ${level.weighted.sameFingerRow} %`
+	);
+	let empty = null;
+	try {
+		E.layoutSimilarity(azerty, azerty, E.ngramsFromText('    '), {});
+	} catch (error) {
+		empty = error.code;
+	}
+	check(empty === 'similarity_empty', `similarity: a corpus of spaces gives ${empty}`);
+	const gap = E.similarScoreGap();
+	check(
+		Number.isFinite(gap) &&
+			gap >= 0 &&
+			gap === sandbox.LAYOUT_ANALYSIS_DATA.model.similar_score_gap,
+		`similarity: the small score gap is ${gap}`
+	);
 }
 
 if (errors.length > 0) {

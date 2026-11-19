@@ -225,6 +225,29 @@ b)` → its order, negative when `a` ranks first; a result without a boolean
 verdict}}`: two results side by side, `delta = a − b`, `verdict` `better` or
   `worse` for `a` by the metric's `better`, `same` when equal, `none` for a
   metric shown but not scored. The Comparer's « Compare with » column.
+- `layoutSimilarity(a, b, ngrams, {keyboard?, profile?})` → `{weighted:
+{sameKey, sameFingerRow}, unweighted: {sameKey, sameFingerRow}, chars,
+occurrences}`: how alike two layouts type a corpus, in %. Each corpus
+  character is placed where the engine types it out of context (its cheapest
+  way, the fixed path of [Ways of typing](#ways-of-typing)): the keys pressed
+  and their levels, so a letter moved from the base level to AltGr of the
+  same key moves, and a character behind a dead key moves with the dead key.
+  `sameKey` is the share typed on the same keys at the same levels;
+  `sameFingerRow` the share on the same keys or, press by press, on the same
+  finger and row at the same level (a letter moved between the index's two
+  columns), each layout on its own board (an angle-mod fingering). `weighted`
+  counts each character by its occurrences, so moving « e » weighs far more
+  than moving a rare symbol; `unweighted` counts each distinct corpus
+  character once. The space is left out (every layout types it on the space
+  bar: about a sixth of a text, it would lift every pair alike), as is a
+  character neither layout types; one that only one of them types counts as
+  moved. The measure is symmetric and gives 100 for two identical layouts; a
+  corpus with nothing else than spaces is refused (`similarity_empty`). The
+  optimizer reads the weighted `sameKey` first
+  ([layout-optimizer.md](layout-optimizer.md#existing-layouts)).
+- `similarScoreGap()` → `similar_score_gap` of `analysis_model.json` (default
+  2 points): the score gap under which the optimizer says an existing layout
+  does the job of the one it found.
 - `scoreSession(layout, ngrams, options)` → `{total, trial(layout) → {total,
 changed, walk, compile, compiled, commit()}}`: the global score of layouts
   that change a little at a time (the layout optimizer), equal to

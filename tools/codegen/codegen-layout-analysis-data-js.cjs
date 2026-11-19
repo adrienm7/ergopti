@@ -1113,6 +1113,19 @@ function checkRequiredCharacters(model) {
 }
 
 /**
+ * Rejects a similar score gap the optimizer could not compare with: the
+ * score points under which an existing layout does the job of the optimized
+ * one (docs/design/layout-optimizer.md, « Existing layouts »).
+ * @param {object} model - analysis_model.json.
+ * @throws {Error} On a gap that is not a finite number ≥ 0.
+ */
+function checkSimilarScoreGap(model) {
+	const gap = model.similar_score_gap;
+	if (typeof gap !== 'number' || !Number.isFinite(gap) || gap < 0)
+		throw new Error(`similar_score_gap: ${JSON.stringify(gap)} is not a number ≥ 0`);
+}
+
+/**
  * Rejects an ideal finger load that breaks the maintainer's rule: each hand
  * sums to half, index ≥ middle ≥ ring ≥ pinky, pinkies under 8 %.
  * @param {object} load - finger → %.
@@ -1190,6 +1203,7 @@ function buildData() {
 	model.ideal_finger_load_hands = HAND_FINGERS;
 	checkKeyboardFormats(model);
 	checkRequiredCharacters(model);
+	checkSimilarScoreGap(model);
 	delete model._description;
 	return {
 		schema_version: 1,

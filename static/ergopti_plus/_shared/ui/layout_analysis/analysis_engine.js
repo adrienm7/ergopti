@@ -105,6 +105,9 @@ var LAYOUT_ANALYSIS = (function () {
 	// A key is lateral from this far (in key units, on the column grid) beyond
 	// its finger's home column: the index's inner column, the pinky's outer keys.
 	const LATERAL_MIN_STEP = 0.75;
+	// The character layoutSimilarity leaves out: every layout types it on the
+	// space bar, which would add about a sixth of any text to every pair.
+	const SIMILARITY_SKIPPED = ' ';
 	// Dead-key chains deeper than this are not followed.
 	const MAX_DEAD_DEPTH = 4;
 	// A row jump: two keys of one hand at least this many rows apart (top and
@@ -5830,6 +5833,131 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 	}
 
+	// Where each character of a layout is typed (typedPlaces), per rows object
+	// and board: the optimizer compares one layout with the whole library.
+	const placesCache = new WeakMap();
+
+	/**
+	 * Where a layout types each character: its cheapest way out of context
+	 * (compileWays().best, the engine's fixed path), written twice as a
+	 * signature: the keys and levels pressed (a dead key and the key after
+	 * it, AltGr and Shift as levels), and the finger, row and level of each
+	 * of those presses.
+	 * @param {object} layout - Library shape (layoutFromRows).
+	 * @param {object} board - From boardFor().
+	 * @returns {Map<string, {keys: string, fingerRows: string}>}
+	 */
+	function typedPlaces(layout, board) {
+		let byBoard = placesCache.get(layout.rows);
+		if (!byBoard) {
+			byBoard = new Map();
+			placesCache.set(layout.rows, byBoard);
+		}
+		const cached = byBoard.get(board);
+		if (cached && cached.dead === layout.dead) return cached.places;
+		const places = new Map();
+		for (const [char, way] of compileWays(layout, board, null).best) {
+			const keys = [];
+			const fingerRows = [];
+			for (let i = 0; i < way.keys.length; i++) {
+				const k = way.keys[i];
+				keys.push(`${board.codes[k]}:${way.layers[i]}`);
+				fingerRows.push(`${board.finger[k]}:${board.row[k]}:${way.layers[i]}`);
+			}
+			places.set(char, { keys: keys.join(' '), fingerRows: fingerRows.join(' ') });
+		}
+		byBoard.set(board, { dead: layout.dead, places });
+		return places;
+	}
+
+	/**
+	 * How alike two layouts type a corpus, in two measures of two strictness:
+	 * `sameKey`, the share of the characters typed on the same keys at the
+	 * same levels (a dead key and its key both alike); `sameFingerRow`, the
+	 * share on the same keys, or on the same finger and row at the same level
+	 * for every press (a letter moved between the index's two columns).
+	 * `weighted` counts each corpus character by its occurrences, so moving
+	 * « e » weighs far more than moving a rare symbol; `unweighted` counts each
+	 * distinct corpus character once. A character is placed as the engine
+	 * types it out of context (its cheapest way: level, AltGr, dead key), each
+	 * layout on its own board (an angle-mod layout's fingering). The space,
+	 * which every layout types on the space bar, is left out; a character
+	 * neither layout types is left out, one only one types counts as moved.
+	 * Symmetric; 100 for two identical layouts.
+	 * @param {object} aInput - Library shape (see layoutFromRows).
+	 * @param {object} bInput - Library shape.
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {{keyboard?: string, profile?: object}} [options] - As analyse().
+	 * @returns {{weighted: {sameKey: number, sameFingerRow: number},
+	 *   unweighted: {sameKey: number, sameFingerRow: number}, chars: number,
+	 *   occurrences: number}} Shares in %, and the distinct characters and
+	 *   occurrences compared.
+	 * @throws {AnalysisError} similarity_empty when the corpus has no
+	 *   character either layout types (the space aside).
+	 */
+	function layoutSimilarity(aInput, bInput, ngrams, options) {
+		const opts = options || {};
+		const keyboardId = opts.keyboard || DEFAULT_KEYBOARD;
+		const a = layoutFromRows(aInput);
+		const b = layoutFromRows(bInput);
+		const placesA = typedPlaces(a, boardFor(a, keyboardId, opts.profile));
+		const placesB = typedPlaces(b, boardFor(b, keyboardId, opts.profile));
+		const table = prepareNgrams(ngrams);
+		let chars = 0;
+		let occurrences = 0;
+		const same = { key: 0, fingerRow: 0, keyN: 0, fingerRowN: 0 };
+		for (const [char, n] of table.uni) {
+			if (char === SIMILARITY_SKIPPED) continue;
+			const pa = placesA.get(char);
+			const pb = placesB.get(char);
+			if (!pa && !pb) continue;
+			chars += 1;
+			occurrences += n;
+			const key = Boolean(pa && pb && pa.keys === pb.keys);
+			const fingerRow = key || Boolean(pa && pb && pa.fingerRows === pb.fingerRows);
+			if (key) {
+				same.key += 1;
+				same.keyN += n;
+			}
+			if (fingerRow) {
+				same.fingerRow += 1;
+				same.fingerRowN += n;
+			}
+		}
+		if (chars === 0)
+			throw new AnalysisError(
+				'similarity_empty',
+				{},
+				'no corpus character to compare the layouts on'
+			);
+		return {
+			weighted: {
+				sameKey: (100 * same.keyN) / occurrences,
+				sameFingerRow: (100 * same.fingerRowN) / occurrences
+			},
+			unweighted: {
+				sameKey: (100 * same.key) / chars,
+				sameFingerRow: (100 * same.fingerRow) / chars
+			},
+			chars,
+			occurrences
+		};
+	}
+
+	/**
+	 * The score gap under which an existing layout « does the job » of an
+	 * optimized one (the optimizer's library comparison), in score points:
+	 * the model's similar_score_gap.
+	 * @returns {number} A finite number ≥ 0.
+	 * @throws {Error} When the model's value is not one.
+	 */
+	function similarScoreGap() {
+		const gap = data().model.similar_score_gap;
+		if (typeof gap !== 'number' || !Number.isFinite(gap) || gap < 0)
+			throw new Error(`layout_analysis: similar_score_gap ${gap} is not a number ≥ 0`);
+		return gap;
+	}
+
 	/**
 	 * Re-scores and re-ranks results with new weights (no re-analysis).
 	 * @param {object[]} results - analyse() outputs.
@@ -6035,7 +6163,9 @@ var LAYOUT_ANALYSIS = (function () {
 		rank,
 		rankOrder,
 		rescore,
-		diff
+		diff,
+		layoutSimilarity,
+		similarScoreGap
 	};
 })();
 
