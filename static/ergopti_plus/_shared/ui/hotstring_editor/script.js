@@ -238,18 +238,14 @@ let _confirmCb = null;
  * @param {Object} [opts] - Additional UI modifiers for the dialog.
  */
 function showConfirm(msg, fn, opts = {}) {
-	let titleHtml = '';
-	if (opts.isWarning) {
-		titleHtml =
-			'<div style="display:flex;align-items:center;gap:8px;color:var(--warning);font-weight:600;font-size:15px;margin-bottom:10px;"><span style="font-size:20px;">⚠️</span> ' +
-			(_t('common.warning') || 'Attention') +
-			'</div>';
-	}
-	document.getElementById('confirm-text').innerHTML =
-		titleHtml +
-		'<div style="font-size:13px;line-height:1.5;margin-bottom:16px;color:var(--text);">' +
-		msg +
-		'</div>';
+	// A warning is the dialog's heading and names it; the question describes it.
+	const title = document.getElementById('confirm-title');
+	const dialog = title.closest('[role="alertdialog"]');
+	title.textContent = opts.isWarning ? _t('common.warning') || 'Attention' : '';
+	title.hidden = !opts.isWarning;
+	if (opts.isWarning) dialog.setAttribute('aria-labelledby', 'confirm-title');
+	else dialog.removeAttribute('aria-labelledby');
+	document.getElementById('confirm-text').innerHTML = msg;
 
 	const okBtn = document.getElementById('confirm-ok');
 	okBtn.textContent = opts.okLabel || _t('common.delete');
@@ -342,14 +338,15 @@ function updateHints() {
 	const hint = document.getElementById('trig-hint');
 	if (hint) {
 		if (TRIGGER_CHAR !== STAR) {
+			// The magic key as shown and as stored: keys, so kbd.
 			hint.innerHTML =
-				'<span class="star-badge">' +
+				'<kbd class="star-badge">' +
 				escapeHtml(TRIGGER_CHAR) +
-				'</span> ' +
+				'</kbd> ' +
 				(_t('editor.hotstrings.trig_hint_text') || 'shown, stored as') +
-				' <span class="star-badge">' +
+				' <kbd class="star-badge">' +
 				escapeHtml(STAR) +
-				'</span>';
+				'</kbd>';
 		} else {
 			hint.textContent = '';
 		}
@@ -376,7 +373,7 @@ function toggleCompact() {
 function checkPh() {
 	const ed = document.getElementById('e-out');
 	const ph = document.getElementById('e-out-ph');
-	const isEmpty = ed.textContent.length === 0 && ed.innerHTML.indexOf('<span') === -1;
+	const isEmpty = ed.textContent.length === 0 && ed.innerHTML.indexOf('<kbd') === -1;
 	ph.style.display = isEmpty ? 'block' : 'none';
 }
 
@@ -386,8 +383,9 @@ function checkPh() {
 // ====================================
 // ====================================
 
+// A token of the output is a key or a command the engine types: kbd.
 function makeChip(name) {
-	const s = document.createElement('span');
+	const s = document.createElement('kbd');
 	s.className = 'token-chip';
 	s.contentEditable = 'false';
 	s.dataset.token = name;
@@ -396,7 +394,7 @@ function makeChip(name) {
 }
 
 function makeTrigChip() {
-	const s = document.createElement('span');
+	const s = document.createElement('kbd');
 	s.className = 'token-chip';
 	s.contentEditable = 'false';
 	s.dataset.trigChar = 'true';
@@ -675,30 +673,40 @@ function showAc(matches) {
 		return;
 	}
 	const rect = sel.getRangeAt(0).getBoundingClientRect();
+	// A list box the output editor owns: the editor keeps the focus and names
+	// the highlighted suggestion through aria-activedescendant, so the arrow
+	// keys' choice is announced (WCAG 4.1.2).
 	matches.forEach((name, i) => {
-		const d = document.createElement('div');
-		d.className = 'ac-item' + (i === 0 ? ' active' : '');
-		d.textContent = name;
-		d.addEventListener('mousedown', (e) => {
+		const option = document.createElement('li');
+		option.className = 'ac-item' + (i === 0 ? ' active' : '');
+		option.id = 'ac-option-' + i;
+		option.setAttribute('role', 'option');
+		option.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
+		option.textContent = name;
+		option.addEventListener('mousedown', (e) => {
 			e.preventDefault();
 			applyAc(name);
 		});
-		popup.appendChild(d);
+		popup.appendChild(option);
 	});
 	popup.style.left = rect.left + 'px';
 	popup.style.top = rect.bottom + 4 + 'px';
 	popup.classList.add('on');
+	document.getElementById('e-out').setAttribute('aria-activedescendant', 'ac-option-0');
 }
 
 function hideAc() {
 	document.getElementById('ac-popup').classList.remove('on');
 	acItems = [];
+	document.getElementById('e-out').removeAttribute('aria-activedescendant');
 }
 
 function updateAcSel() {
 	document.querySelectorAll('.ac-item').forEach((el, i) => {
 		el.classList.toggle('active', i === acIdx);
+		el.setAttribute('aria-selected', i === acIdx ? 'true' : 'false');
 	});
+	document.getElementById('e-out').setAttribute('aria-activedescendant', 'ac-option-' + acIdx);
 }
 
 function applyAc(name) {
@@ -796,6 +804,27 @@ function onDragEnd() {
 	cleanDrag();
 }
 
+/**
+ * Moves a section one place up or down from the keyboard, the way a drag
+ * does (WCAG 2.1.1, 2.5.7), keeps the focus on its handle and says where it
+ * now stands.
+ * @param {number} si - The section's index.
+ * @param {number} step - -1 to move it up, 1 to move it down.
+ */
+function moveSection(si, step) {
+	const to = si + step;
+	if (to < 0 || to >= D.sections.length) return;
+	const moved = D.sections.splice(si, 1)[0];
+	D.sections.splice(to, 0, moved);
+	persist();
+	const handle = document.getElementById('dh-' + to);
+	if (handle) handle.focus();
+	document.getElementById('move-status').textContent = _t('editor.hotstrings.section_moved')
+		.replace('{name}', moved.description || moved.name)
+		.replace('{n}', String(to + 1))
+		.replace('{total}', String(D.sections.length));
+}
+
 function cleanDrag() {
 	dragSrcIdx = null;
 	document
@@ -818,25 +847,28 @@ function buildCmdGrid() {
 			s.className = 'cmd-sep';
 			b.appendChild(s);
 		}
-		const l = document.createElement('div');
+		// Each group of commands under its heading, inside the dialog's h2.
+		const l = document.createElement('h3');
 		l.className = 'cmd-grp-lbl';
 		l.textContent = g.lbl;
 		b.appendChild(l);
 		g.cmds.forEach((c) => {
-			const el = document.createElement('div');
+			// A button: the keyboard inserts a command as the mouse does.
+			const el = document.createElement('button');
+			el.type = 'button';
 			el.className = 'cmd-ref';
 			el.title = '{' + c.token + '} — ' + c.desc;
 			// Label shows the canonical token name (Enter, Tab, Left…) — identical
 			// across every locale and always capitalised; the localisable French
 			// description stays in the hover tooltip above.
 			el.innerHTML =
-				'<span class="cmd-sym" data-tok="' +
+				'<b class="cmd-sym" aria-hidden="true" data-tok="' +
 				escapeHtml(c.token) +
 				'">' +
 				escapeHtml(c.sym) +
-				'</span><span class="cmd-lbl">' +
+				'</b><kbd class="cmd-lbl">' +
 				escapeHtml(c.token) +
-				'</span>';
+				'</kbd>';
 			el.addEventListener('mousedown', (e) => e.preventDefault());
 			el.addEventListener('click', () => insertChipAtCursor(c.token));
 			b.appendChild(el);
@@ -848,7 +880,7 @@ function dispTrig(s) {
 	if (!s) return '';
 	return escapeHtml(toDisplay(s))
 		.split(escapeHtml(TRIGGER_CHAR))
-		.join('<span class="trig-star">' + escapeHtml(TRIGGER_CHAR) + '</span>');
+		.join('<kbd class="trig-star">' + escapeHtml(TRIGGER_CHAR) + '</kbd>');
 }
 
 function dispOutput(s) {
@@ -861,12 +893,12 @@ function dispOutput(s) {
 	while ((match = tokens.exec(display)) !== null) {
 		out += escapeHtml(display.slice(last, match.index));
 		const canon = normToken(match[1]);
-		out += '<span class="tc" data-tok="' + escapeHtml(canon) + '">' + escapeHtml(canon) + '</span>';
+		out += '<kbd class="tc" data-tok="' + escapeHtml(canon) + '">' + escapeHtml(canon) + '</kbd>';
 		last = tokens.lastIndex;
 	}
 	out += escapeHtml(display.slice(last));
 	if (!compactView) {
-		out = out.replace(/<span class="tc" data-tok="Enter">Enter<\/span>/g, '<br>');
+		out = out.replace(/<kbd class="tc" data-tok="Enter">Enter<\/kbd>/g, '<br>');
 	}
 	return out;
 }
@@ -991,19 +1023,25 @@ function render() {
 		// Force-expand while searching so matches are always visible.
 		const exp = searching ? true : s._exp !== false;
 
-		html += '<div class="sec-card" id="sc-' + si + '">';
-		html += '<div class="sec-head' + (exp ? ' open' : '') + '">';
-		// Reordering by drag is meaningless on a filtered view, so hide the handle.
+		html += '<li class="sec-card" id="sc-' + si + '">';
+		html += '<header class="sec-head' + (exp ? ' open' : '') + '">';
+		// Buttons, not clickable spans: the keyboard folds, edits, deletes and
+		// moves a section as the mouse does (WCAG 2.1.1), and the fold says its
+		// state.
+		const secName = escapeHtml(s.description || s.name);
+		// Reordering is meaningless on a filtered view, so hide the handle. It
+		// drags with the mouse and moves with the Up and Down arrows.
 		if (!searching)
 			html +=
-				'<span class="drag-handle" id="dh-' +
+				'<button type="button" class="drag-handle" id="dh-' +
 				si +
 				'" title="' +
 				(_t('editor.hotstrings.drag_handle_title') || 'Drag') +
-				'">☰</span>';
-		// Buttons, not clickable spans: the keyboard folds, edits and deletes a
-		// section as the mouse does (WCAG 2.1.1), and the fold says its state.
-		const secName = escapeHtml(s.description || s.name);
+				'" aria-label="' +
+				escapeHtml(
+					_t('editor.hotstrings.move_section').replace('{name}', s.description || s.name)
+				) +
+				'" aria-keyshortcuts="ArrowUp ArrowDown">☰</button>';
 		html +=
 			'<button type="button" class="caret' +
 			(exp ? ' open' : '') +
@@ -1015,14 +1053,14 @@ function render() {
 			si +
 			')">▶</button>';
 		html +=
-			'<button type="button" class="sec-title" title="' +
+			'<h2 class="sec-heading"><button type="button" class="sec-title" title="' +
 			escapeHtml(_t('editor.hotstrings.click_to_edit')) +
 			'" onmousedown="onRowMouseDown(event)" onclick="handleSecTitleClick(event,' +
 			si +
 			')">' +
 			secName +
-			'</button>';
-		html += '<span class="sec-cnt">(' + (searching ? idx.length : cnt) + ')</span>';
+			'</button></h2>';
+		html += '<small class="sec-cnt">(' + (searching ? idx.length : cnt) + ')</small>';
 		html +=
 			'<button type="button" class="sec-del" aria-label="' +
 			escapeHtml(_t('common.delete')) +
@@ -1033,14 +1071,14 @@ function render() {
 			'" onclick="delSec(' +
 			si +
 			')" onmousedown="event.stopPropagation()">✕</button>';
-		html += '</div>';
+		html += '</header>';
 
 		if (exp) {
-			html += '<div class="' + (compactView ? 'compact' : 'expanded') + '">';
+			html += '<ul class="entries ' + (compactView ? 'compact' : 'expanded') + '">';
 			idx.forEach((ei) => {
 				const e = allEntries[ei];
 				html +=
-					'<div class="entry-row" onmousedown="onRowMouseDown(event)" onclick="handleRowClick(event,' +
+					'<li class="entry-row" onmousedown="onRowMouseDown(event)" onclick="handleRowClick(event,' +
 					si +
 					',' +
 					ei +
@@ -1059,21 +1097,24 @@ function render() {
 					'">' +
 					dispTrig(e.trigger) +
 					'</button></div>';
-				html += '<span class="e-arrow">→</span>';
+				html += '<span class="e-arrow" aria-hidden="true">→</span>';
 				html +=
-					'<div class="e-out-cell"><div class="e-out" data-f="out" title="' +
+					'<div class="e-out-cell"><p class="e-out" data-f="out" title="' +
 					escapeHtml(_t('editor.hotstrings.click_to_edit')) +
 					'">' +
 					dispOutput(e.output) +
-					'</div></div>';
-				html += '<div class="e-tags">';
-				if (e.is_word) html += '<span class="tag on" data-f="cb-word">Mot</span>';
-				if (e.auto_expand) html += '<span class="tag on" data-f="cb-auto">Auto</span>';
-				if (e.is_case_sensitive) html += '<span class="tag on" data-f="cb-case">Casse</span>';
-				if (e.final_result) html += '<span class="tag on" data-f="cb-final">Final</span>';
+					'</p></div>';
+				// The options the entry has, as a list of tags.
+				const tag = (field, key) =>
+					'<li class="tag on" data-f="' + field + '">' + escapeHtml(_t(key)) + '</li>';
+				html += '<ul class="e-tags">';
+				if (e.is_word) html += tag('cb-word', 'editor.hotstrings.tag_word');
+				if (e.auto_expand) html += tag('cb-auto', 'editor.hotstrings.tag_auto');
+				if (e.is_case_sensitive) html += tag('cb-case', 'editor.hotstrings.tag_case');
+				if (e.final_result) html += tag('cb-final', 'editor.hotstrings.tag_final');
 				if (typeof e.priority === 'number')
-					html += '<span class="tag on tag-prio" data-f="prio">P' + e.priority + '</span>';
-				html += '</div>';
+					html += '<li class="tag on tag-prio" data-f="prio">P' + e.priority + '</li>';
+				html += '</ul>';
 				html +=
 					'<button type="button" class="e-del" aria-label="' +
 					escapeHtml(_t('common.delete') + ' ' + e.trigger) +
@@ -1084,8 +1125,9 @@ function render() {
 					',' +
 					ei +
 					')">✕</button>';
-				html += '</div>';
+				html += '</li>';
 			});
+			html += '</ul>';
 			// The add button is hidden on a filtered view to avoid appending into
 			// a section the user is only browsing through search results.
 			if (!searching)
@@ -1095,9 +1137,8 @@ function render() {
 					')">' +
 					(_t('editor.hotstrings.btn_add_entry') || '＋ Add a hotstring') +
 					'</button>';
-			html += '</div>';
 		}
-		html += '</div>';
+		html += '</li>';
 	});
 
 	if (searching && shownSections === 0) {
@@ -1118,6 +1159,11 @@ function render() {
 
 		handle.addEventListener('mousedown', () => {
 			card.draggable = true;
+		});
+		handle.addEventListener('keydown', (e) => {
+			if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+			e.preventDefault();
+			moveSection(si, e.key === 'ArrowUp' ? -1 : 1);
 		});
 		card.addEventListener('dragstart', (e) => onDragStart(e, si));
 		card.addEventListener('dragover', (e) => onDragOver(e, si));

@@ -356,8 +356,8 @@ test('rendered token text escapes entities exactly once', () => {
 	);
 	vm.runInContext(modelSource, context, { filename: SCRIPT });
 	const rendered = context.dispOutput('before {a&b} and {x<😀} after');
-	assert.match(rendered, /data-tok="a&amp;b">a&amp;b<\/span>/);
-	assert.match(rendered, /data-tok="x&lt;😀">x&lt;😀<\/span>/);
+	assert.match(rendered, /data-tok="a&amp;b">a&amp;b<\/kbd>/);
+	assert.match(rendered, /data-tok="x&lt;😀">x&lt;😀<\/kbd>/);
 	assert.doesNotMatch(rendered, /&amp;amp;|&amp;lt;/);
 });
 

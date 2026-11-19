@@ -122,6 +122,17 @@ body {
 	padding: 14px 16px;
 }
 
+/* The section list, the entries of a section and their tags are lists that
+   keep the look of the plain blocks they replaced. */
+#secs-container,
+.entries,
+.e-tags,
+.cbs,
+.foot-btns,
+#ac-popup {
+	list-style: none;
+}
+
 /* ================================ */
 /* ================================ */
 /* ======= 3/ Section Cards ======= */
@@ -158,10 +169,14 @@ body {
 	border-bottom-color: var(--row-sep);
 }
 
+/* A button: it drags with the mouse and moves with the Up and Down arrows. */
 .drag-handle {
+	background: none;
+	border: none;
 	color: var(--hint);
 	cursor: grab;
 	flex-shrink: 0;
+	font-family: inherit;
 	font-size: 14px;
 	line-height: 1;
 	padding: 2px 4px;
@@ -188,6 +203,14 @@ body {
 
 .caret.open {
 	transform: rotate(90deg);
+}
+
+/* The section's heading holds its title button and takes its place in the row. */
+.sec-heading {
+	display: flex;
+	flex: 1;
+	font-size: inherit;
+	font-weight: inherit;
 }
 
 .sec-title {
@@ -323,6 +346,7 @@ body {
 .trig-star {
 	color: var(--accent);
 	display: inline;
+	font-family: inherit;
 	font-size: 14px;
 	font-weight: 800;
 }
@@ -462,8 +486,11 @@ body {
 	padding: 8px 16px;
 }
 
-.search-icon {
+/* The search glyph is drawn, not read: the field is named by its label. */
+#search-bar::before {
 	color: var(--hint);
+	content: '⌕';
+	content: '⌕' / '';
 	font-size: 16px;
 	line-height: 1;
 }
@@ -500,6 +527,11 @@ body {
 	justify-content: center;
 	line-height: 1;
 	width: 20px;
+}
+
+.search-clear::before {
+	content: '✕';
+	content: '✕' / '';
 }
 
 .search-clear:hover {
@@ -704,6 +736,7 @@ body {
 	align-items: center;
 	display: flex;
 	gap: 8px;
+	margin-inline-start: auto;
 }
 
 .foot-kbd {
@@ -726,6 +759,27 @@ body {
 #msg-modal .modal,
 #confirm-modal .modal {
 	max-width: 340px;
+}
+
+/* A warning heads the confirmation and names it. */
+.modal .confirm-title {
+	align-items: center;
+	color: var(--warning);
+	display: flex;
+	font-size: 15px;
+	gap: 8px;
+	margin-bottom: 10px;
+}
+
+.modal .confirm-title[hidden] {
+	display: none;
+}
+
+.confirm-title::before {
+	content: '⚠️';
+	content: '⚠️' / '';
+	font-size: 20px;
+	font-weight: 400;
 }
 
 #msg-modal p,
@@ -1092,6 +1146,7 @@ details.cmd-help[open] summary::before {
 .cmd-grp-lbl {
 	color: var(--hint);
 	font-size: 10px;
+	font-weight: 400;
 	grid-column: 1/-1;
 	letter-spacing: 0.06em;
 	padding: 2px 0;
@@ -1107,6 +1162,7 @@ details.cmd-help[open] summary::before {
 	cursor: pointer;
 	display: flex;
 	flex-direction: column;
+	font: inherit;
 	gap: 2px;
 	padding: 6px 3px;
 	transition:
@@ -1126,6 +1182,7 @@ details.cmd-help[open] summary::before {
 		'Helvetica Neue',
 		sans-serif;
 	font-size: 18px;
+	font-weight: 400;
 	line-height: 1.1;
 }
 
@@ -1145,6 +1202,7 @@ details.cmd-help[open] summary::before {
 
 .cmd-ref .cmd-lbl {
 	color: var(--hint);
+	font-family: inherit;
 	font-size: 9px;
 	line-height: 1.2;
 	text-align: center;
@@ -1194,6 +1252,7 @@ details.cmd-help[open] summary::before {
 
 .bulk-sep {
 	background: var(--border);
+	border: 0;
 	height: 18px;
 	width: 1px;
 }
@@ -1215,11 +1274,13 @@ details.cmd-help[open] summary::before {
 	justify-content: center;
 }
 
-.spinner {
+/* The spinner is drawn before the words that say the page is loading. */
+#loading::before {
 	animation: spin 0.7s linear infinite;
 	border: 2.5px solid var(--border);
 	border-radius: 50%;
 	border-top-color: var(--accent);
+	content: '';
 	height: 24px;
 	width: 24px;
 }

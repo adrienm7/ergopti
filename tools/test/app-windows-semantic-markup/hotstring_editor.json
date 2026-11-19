@@ -3,27 +3,78 @@
 		"index.html": [
 			{
 				"tag": "div",
-				"count": 48,
-				"pending": true
+				"where": "id=\"content\"",
+				"count": 1,
+				"reason": "The box that scrolls the section list and its empty notices under the fixed header and search; the main landmark around it already says what it is."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"overlay\"",
+				"count": 4,
+				"reason": "The backdrop that dims the window behind a dialog and closes it on a click; the dialog inside it carries the role, and no element means a backdrop."
 			},
 			{
 				"tag": "span",
-				"count": 21,
-				"pending": true
+				"where": "data-i18n=\"editor.hotstrings.",
+				"count": 8,
+				"reason": "A label's own words beside its hint or its checkbox inside one label element: i18n.js writes an element's whole text, and no phrasing element means plain text."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"fg\"",
+				"count": 2,
+				"reason": "Groups a rich editor's label, the editor and its error; a paragraph cannot hold the editor's box and no element names such a group."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"trig-row\"",
+				"count": 1,
+				"reason": "Lays the trigger editor and its magic key button on one line; the pair has no meaning beyond the field the label names."
+			},
+			{
+				"tag": "div",
+				"where": "contenteditable=\"true\"",
+				"count": 2,
+				"reason": "The trigger and output editors draw keys and commands as chips inside the text: no native field styles part of its value, so a contenteditable named as a text box is the pattern."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"editor-wrap\"",
+				"count": 1,
+				"reason": "Positions the placeholder text over the output editor; the two have no meaning together that an element names."
+			},
+			{
+				"tag": "span",
+				"where": "class=\"cb-row\"",
+				"count": 4,
+				"reason": "Lays a checkbox and its words on one line inside their label, where only phrasing content is allowed and no phrasing element means a line."
 			}
 		],
 		"script.js": [
 			{
 				"tag": "div",
-				"count": 14,
-				"pending": true
+				"where": "class=\"entry-cb-wrap\"",
+				"count": 1,
+				"reason": "The selection checkbox's cell in an entry row, sized and centred apart from the trigger; the row's list item is the entry and the checkbox names itself."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"e-trig\"",
+				"count": 1,
+				"reason": "The trigger button's cell in an entry row, with its own width bounds; the button inside names the trigger and edits it."
 			},
 			{
 				"tag": "span",
-				"count": 18,
-				"pending": true
+				"where": "class=\"e-arrow\"",
+				"count": 1,
+				"reason": "The arrow drawn between a trigger and its output, hidden from assistive technology: it only shows the direction the row reads."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"e-out-cell\"",
+				"count": 1,
+				"reason": "The output paragraph's cell in an entry row, which takes the remaining width and lets the text shrink; the paragraph inside is the content."
 			}
 		]
-	},
-	"pendingProblems": 3
+	}
 }

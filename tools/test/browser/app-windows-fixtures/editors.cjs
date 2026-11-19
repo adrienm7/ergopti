@@ -208,6 +208,33 @@ module.exports = [
 					await page.keyboard.press('Enter');
 					await page.locator('#entry-modal.on').waitFor();
 				}
+			},
+			{
+				// The keyboard alone reorders the sections, as a drag does (WCAG
+				// 2.1.1, 2.5.7): ArrowDown on a section's handle moves it down, the
+				// focus follows it and a status says where it stands.
+				name: 'keyboard move',
+				enter: async (page) => {
+					const order = () =>
+						page.evaluate(() =>
+							Array.from(document.querySelectorAll('.sec-title'), (title) => title.textContent)
+						);
+					const before = await order();
+					await page.focus('#dh-0');
+					await page.keyboard.press('ArrowDown');
+					const after = await order();
+					if (after.join('|') !== [before[1], before[0], ...before.slice(2)].join('|'))
+						throw new Error('ArrowDown did not move the first section down: ' + after.join(', '));
+					const focused = await page.evaluate(() => document.activeElement.id);
+					if (focused !== 'dh-1')
+						throw new Error('The focus did not follow the section: ' + focused);
+					const status = await page.locator('#move-status').textContent();
+					if (!status.includes(before[0]) || !status.includes('2'))
+						throw new Error('The move is not announced: ' + status);
+					await page.keyboard.press('ArrowUp');
+					if ((await order()).join('|') !== before.join('|'))
+						throw new Error('ArrowUp did not move the section back');
+				}
 			}
 		]
 	},

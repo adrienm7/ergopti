@@ -18,7 +18,7 @@ const document = {
 		nodeType: 1,
 		tagName: tag.toUpperCase(),
 		dataset: {},
-		classList: { contains: (name) => tag === 'span' && name === 'token-chip' }
+		classList: { contains: (name) => tag === 'kbd' && name === 'token-chip' }
 	})
 };
 const context = vm.createContext({
