@@ -331,6 +331,11 @@ document.addEventListener('i18n:applied', () => {
 	render_records_kpi();
 	_render_activity_calendar();
 	render_apps_kpi();
+	// The units, headings and tables of the views read the locale too: data
+	// published before a fetched locale landed (Windows) showed their keys
+	// (ui_typing.unit_mpm). Draw them again from the data already accepted.
+	if (app_state.did_apply_initial_reset) compute_manifest_metrics();
+	apply_local_filters();
 });
 
 document.addEventListener('DOMContentLoaded', () => {
