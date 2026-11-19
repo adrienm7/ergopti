@@ -582,5 +582,22 @@ ManifestBuildFeaturesMap() {
 		Cursor[Entry["id"]] := ManifestCloneValue(Entry["default"])
 	}
 
+	; A dynamic namespace a scope declares (`dynamic_defaults`, such as the
+	; switches a personal_shortcuts.ahk registers under [shortcuts.personal]) is a
+	; table of the tree even when no catalogue row lives in it, so its section
+	; stays loadable once the last built-in row is gone (PPT-02).
+	for _, Scope in FEATURES_MANIFEST["scopes"] {
+		for Definition in Scope.Get("dynamic_defaults", []) {
+			Cursor := FeaturesMap
+			for Part in StrSplit(Definition["prefix"], ".") {
+				if !Cursor.Has(Part)
+					Cursor[Part] := Map()
+				else if !(Cursor[Part] is Map)
+					throw TypeError("Dynamic namespace " . Definition["prefix"] . " crosses a setting that is not a table.")
+				Cursor := Cursor[Part]
+			}
+		}
+	}
+
 	return FeaturesMap
 }
