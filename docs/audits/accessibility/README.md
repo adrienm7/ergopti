@@ -965,6 +965,7 @@ and in the WebView windows.
   keyboard drawings, blue instead of green in the AI demo, blue and orange
   status text in the Studio, 5.5:1 and more). All apply before the first
   paint through `a11y_prefs.js`.
+
 ## Tenth pass, semantic markup and keyboard operability of the app windows (2026-11-19, Paris time)
 
 The maintainer asked for windows with no non-semantic tag (« no span or div
@@ -981,15 +982,17 @@ test:app-windows-semantic-markup`, shared-ui suite). Static, so it reads
   be claimed by an entry of the window's list,
   `tools/test/app-windows-semantic-markup/<window>.json`: the part of its
   opening tag that finds it, its exact count and the reason no element
-  carries its meaning (30 characters at least, « layout » or « wrapper »
-  refused). A new div needs its own reason, a removed one lowers its count in
+  carries its meaning (« layout » or « wrapper » alone refused). A new div needs its own reason, a removed one lowers its count in
   the same change. Refused whatever the list says: a div or span with an
   interactive role or a pointer handler (in its tag, or a listener added to
   the created element), an img without alt, an svg neither hidden nor named
-  as an image. The scanner is `tools/test/lib/semantic-markup.cjs`, shared
-  with the site and Studio scopes.
+  as an image. Its source scanner (HTML and the scripts that build DOM) is
+  a section of the shared `tools/test/lib/semantic-markup.cjs`, beside the
+  site's Svelte judgement.
 - **The app windows scan** (`app-windows-accessibility.playwright.cjs`)
-  counts two more rules per state, in the same ratchet: `keyboard-operable`
+  counts, besides the shared `keyboard-operability` rule of the ninth pass,
+  two rules of its own (`tools/test/lib/app-window-checks.cjs`) per state,
+  in the same ratchet: `keyboard-operable`
   (an element with a click or hover listener, recorded before the page's
   scripts run, that the keyboard cannot reach; a control role without focus;
   a tab list, list box, menu, grid, tree or radio group whose arrow key moves
@@ -1000,10 +1003,18 @@ test:app-windows-semantic-markup`, shared-ui suite). Static, so it reads
 
 ### Results
 
-The first run of the new rules counted 506 nodes (action picker 42,
+The first run of the two rules counted 506 nodes (action picker 42,
 hotstring editor 8, hotstring settings 2, apps dashboard 64, typing
-dashboard 390). After: none; the baseline keeps only the layout manager's
-contrast rows (a Studio page). div and span, before → after (each one left
+dashboard 390), and the shared `keyboard-operability` rule held 673. After:
+none; the baseline keeps only the layout manager's contrast rows (a Studio
+page). The last ones were the chart canvases (a shared Chart.js plugin,
+`metrics_chart_values.js`, now writes next to each chart a disclosure of
+the values its tooltips show, in the tooltips' own words, out of sight
+until the focus enters it, and names it as the canvas's keyboard
+equivalent), the model browser's sortable header cells (buttons now), and
+two readings of the shared judgement: the options a combobox drives through
+`aria-activedescendant` and the rich editors, which Tab reaches although
+Chromium reports `tabIndex -1` for them. div and span, before → after (each one left
 is listed with its reason):
 
 | Window                   | Before | After |
