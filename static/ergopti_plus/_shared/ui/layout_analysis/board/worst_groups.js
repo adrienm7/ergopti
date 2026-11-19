@@ -19,6 +19,10 @@
  *    keys on the board carry their order as a number.
  * 4. The keys read as every board shows them (the shared key legend): a dead
  *    key as its bare accent, the space as « ␣ ».
+ * 5. « Show more »: each card lists its first rows; a button under it unfolds
+ *    the rest the engine keeps (and folds them again), says how many it adds,
+ *    moves the focus to the first row it adds, and stays unfolded across the
+ *    next analyses of the same box.
  * ==============================================================================
  */
 
@@ -34,6 +38,8 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 	const SHARE_DIGITS = 2;
 	// The class of a key the focused n-gram uses, and its order attribute.
 	const KEY_CLASS = 'la-ngram-key';
+	// The events each box shows unfolded (« Show more »), kept across redraws.
+	const unfolded = new WeakMap();
 	const ORDER_ATTRIBUTE = 'data-ngram-order';
 
 	function el(tag, className, text) {
@@ -102,8 +108,11 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 		box.replaceChildren();
 		box.classList.add('la-ngrams');
 		const clear = () => options.highlight(null);
+		if (!unfolded.has(box)) unfolded.set(box, new Set());
+		const open = unfolded.get(box);
 		for (const event of EVENTS) {
-			const groups = (options.groups[event] || []).slice(0, limit);
+			const all = options.groups[event] || [];
+			const groups = open.has(event) ? all : all.slice(0, limit);
 			const card = el('section', `la-ngram-card la-ngram-${event}`);
 			const title = el('h4', 'la-ngram-title', t(`layout_analysis.metric.${event}`));
 			title.id = `${box.id || 'la-ngrams'}-${event}`;
@@ -115,6 +124,7 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 				continue;
 			}
 			const list = el('ol', 'la-ngram-list');
+			list.id = `${title.id}-list`;
 			const top = groups[0].share;
 			for (const group of groups) {
 				const keys = group.keys.map((code) => keyLabel(options.layout, code));
@@ -143,9 +153,64 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 				list.append(item);
 			}
 			card.append(list);
+			if (all.length > limit) card.append(moreButton(box, event, all.length - limit, list, limit));
 			box.append(card);
 		}
 	}
 
-	return { EVENTS, keyLabel, highlighter, draw, KEY_CLASS, ORDER_ATTRIBUTE };
+	/**
+	 * The button under a card that unfolds its other rows, or folds them back.
+	 * @param {HTMLElement} box - The cards' box (its unfolded events).
+	 * @param {string} event - The card's event.
+	 * @param {number} extra - The rows beyond the first ones.
+	 * @param {HTMLElement} list - The card's list, which the button controls.
+	 * @param {number} limit - The first rows shown.
+	 * @returns {HTMLElement}
+	 */
+	function moreButton(box, event, extra, list, limit) {
+		const t = window.LAYOUT_ANALYSIS_INFO.t;
+		const open = unfolded.get(box);
+		const shown = open.has(event);
+		const button = el(
+			'button',
+			'la-ngram-more',
+			t(`layout_analysis.worst.${shown ? 'fewer' : 'more'}`, { count: extra })
+		);
+		button.type = 'button';
+		button.dataset.event = event;
+		button.setAttribute('aria-expanded', String(shown));
+		button.setAttribute('aria-controls', list.id);
+		button.addEventListener('click', () => {
+			if (shown) open.delete(event);
+			else open.add(event);
+			const draw = drawn.get(box);
+			draw();
+			// The focus on the first row added, or back on the button once folded.
+			const card = box.querySelector(`.la-ngram-${event}`);
+			const target = shown
+				? card.querySelector('.la-ngram-more')
+				: card.querySelectorAll('.la-ngram')[limit];
+			if (target) target.focus();
+		});
+		return button;
+	}
+
+	// The last draw of each box, so « Show more » draws it again with the same groups.
+	const drawn = new WeakMap();
+
+	/** draw(), remembered for « Show more ». */
+	function drawRemembered(box, options) {
+		drawn.set(box, () => draw(box, options));
+		draw(box, options);
+	}
+
+	return {
+		EVENTS,
+		DEFAULT_LIMIT,
+		keyLabel,
+		highlighter,
+		draw: drawRemembered,
+		KEY_CLASS,
+		ORDER_ATTRIBUTE
+	};
 })();

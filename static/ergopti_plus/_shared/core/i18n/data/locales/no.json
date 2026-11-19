@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "Ganger i korpuset",
 	"layout_analysis.worst.share": "Andel",
 	"layout_analysis.worst.none": "Ingen i dette korpuset.",
+	"layout_analysis.worst.more": "Vis flere ({count} til)",
+	"layout_analysis.worst.fewer": "Vis færre",
 	"layout_analysis.classes.title": "Bigram- og trigramklasser",
 	"layout_analysis.classes.bigrams": "Andel av bigrammene",
 	"layout_analysis.classes.trigrams": "Andel av trigrammene",

@@ -725,7 +725,51 @@ async function exerciseOptimizeThisLayout(browser, origin) {
 	await app.close();
 }
 
+/**
+ * (worst-ngrams-more) Each card of the editor's worst n-grams lists its first
+ * eight rows and a « Show more » button that unfolds the rest (its count in
+ * its name, aria-expanded and aria-controls set), moves the focus to the
+ * first row it adds, stays unfolded across a new analysis, and folds back.
+ */
+async function exerciseWorstNgramsMore(browser, origin) {
+	const { page, errors, context } = await openOnErgopti(browser, origin);
+	await page.waitForSelector('#la-panel-ngrams .la-ngram-sfb .la-ngram');
+	const card = '#la-panel-ngrams .la-ngram-sfb';
+	const rows = () => page.locator(`${card} .la-ngram`).count();
+	assert.equal(await rows(), 8, 'eight rows first');
+	const more = page.locator(`${card} .la-ngram-more`);
+	const label = await more.textContent();
+	const extra = Number(/\((\d+) more\)$/.exec(label)[1]);
+	assert.ok(extra > 0, `the button says how many it adds: ${JSON.stringify(label)}`);
+	assert.equal(await more.getAttribute('aria-expanded'), 'false');
+	const controlled = await more.getAttribute('aria-controls');
+	assert.equal(await page.locator(`${card} .la-ngram-list`).getAttribute('id'), controlled);
+	await more.focus();
+	await page.keyboard.press('Enter');
+	assert.equal(await rows(), 8 + extra, 'Enter unfolds the rest');
+	assert.equal(
+		await page.evaluate(
+			(selector) =>
+				document.activeElement === document.querySelectorAll(`${selector} .la-ngram`)[8],
+			card
+		),
+		true,
+		'the focus is on the first row added'
+	);
+	assert.equal(await more.getAttribute('aria-expanded'), 'true');
+	assert.equal(await more.textContent(), EN['layout_analysis.worst.fewer']);
+	// A new analysis (another key colour) keeps the card unfolded.
+	await page.selectOption('#la-panel-heat', 'presses');
+	await page.waitForTimeout(600);
+	assert.equal(await rows(), 8 + extra, 'still unfolded after a new analysis');
+	await more.click();
+	assert.equal(await rows(), 8, 'folded back');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseWorstNgramsMore,
 	exerciseOptimizeThisLayout,
 	exerciseBoardImage,
 	exerciseBestSwaps,

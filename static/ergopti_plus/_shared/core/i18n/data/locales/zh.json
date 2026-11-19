@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "语料中的次数",
 	"layout_analysis.worst.share": "占比",
 	"layout_analysis.worst.none": "此语料中没有。",
+	"layout_analysis.worst.more": "显示更多（另 {count} 项）",
+	"layout_analysis.worst.fewer": "收起",
 	"layout_analysis.classes.title": "二连键与三连键类别",
 	"layout_analysis.classes.bigrams": "占二连键的比例",
 	"layout_analysis.classes.trigrams": "占三连键的比例",

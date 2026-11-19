@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "Vorkommen im Korpus",
 	"layout_analysis.worst.share": "Anteil",
 	"layout_analysis.worst.none": "Keine in diesem Korpus.",
+	"layout_analysis.worst.more": "Mehr zeigen ({count} weitere)",
+	"layout_analysis.worst.fewer": "Weniger zeigen",
 	"layout_analysis.classes.title": "Bigramm- und Trigrammklassen",
 	"layout_analysis.classes.bigrams": "Anteil der Bigramme",
 	"layout_analysis.classes.trigrams": "Anteil der Trigramme",

@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "מופעים בקורפוס",
 	"layout_analysis.worst.share": "חלק",
 	"layout_analysis.worst.none": "אין בקורפוס זה.",
+	"layout_analysis.worst.more": "הצג עוד ({count} נוספים)",
+	"layout_analysis.worst.fewer": "הצג פחות",
 	"layout_analysis.classes.title": "סוגי צמדים ושלשות",
 	"layout_analysis.classes.bigrams": "חלק מהצמדים",
 	"layout_analysis.classes.trigrams": "חלק מהשלשות",

@@ -2708,8 +2708,9 @@ var LAYOUT_ANALYSIS = (function () {
 	const KEY_METRICS = ['presses'].concat(KEY_COST_METRICS, KEY_GAINS, KEY_INFO_METRICS);
 	// How many of its worst pairs or trigrams each key names.
 	const WORST_GROUPS = 3;
-	// How many groups of each event topGroups() lists for the whole board.
-	const TOP_GROUPS = 10;
+	// How many groups of each event topGroups() lists for the whole board: three
+	// times the worst n-grams' first rows (worst_groups.js), which « Show more » unfolds.
+	const TOP_GROUPS = 24;
 	// A word: a run of letters and combining marks (countWords).
 	const WORD_PATTERN = /[\p{L}\p{M}]+/gu;
 	// How many words a corpus's word table keeps, the most frequent ones: enough

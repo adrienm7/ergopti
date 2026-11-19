@@ -64,6 +64,37 @@
 	padding: 0;
 }
 
+/* « Show more » under a card: a full-width link-like button in the card's ink,
+   its chevron turning when the list is unfolded. */
+.la-ngram-more {
+	background: transparent;
+	border: 1px dashed var(--theme-separator);
+	border-radius: 8px;
+	color: var(--theme-accent);
+	cursor: pointer;
+	font: inherit;
+	font-size: 0.9em;
+	margin-top: 8px;
+	min-height: 32px;
+	padding: 4px 8px;
+	width: 100%;
+}
+
+.la-ngram-more::before {
+	content: '▾ ';
+	display: inline-block;
+}
+
+.la-ngram-more[aria-expanded='true']::before {
+	content: '▴ ';
+}
+
+.la-ngram-more:hover,
+.la-ngram-more:focus-visible {
+	background: var(--theme-accent-soft);
+	border-style: solid;
+}
+
 /* The Comparer's overview: its board beside the cards, stacked when narrow. */
 .la-ngrams-view {
 	align-items: start;

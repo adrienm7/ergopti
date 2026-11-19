@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "Wystąpienia w korpusie",
 	"layout_analysis.worst.share": "Udział",
 	"layout_analysis.worst.none": "Brak w tym korpusie.",
+	"layout_analysis.worst.more": "Pokaż więcej ({count} kolejnych)",
+	"layout_analysis.worst.fewer": "Pokaż mniej",
 	"layout_analysis.classes.title": "Klasy bigramów i trigramów",
 	"layout_analysis.classes.bigrams": "Udział bigramów",
 	"layout_analysis.classes.trigrams": "Udział trigramów",

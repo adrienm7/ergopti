@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "Occorrenze nel corpus",
 	"layout_analysis.worst.share": "Quota",
 	"layout_analysis.worst.none": "Nessuno in questo corpus.",
+	"layout_analysis.worst.more": "Mostra altro ({count} in più)",
+	"layout_analysis.worst.fewer": "Mostra meno",
 	"layout_analysis.classes.title": "Classi di bigrammi e trigrammi",
 	"layout_analysis.classes.bigrams": "Quota dei bigrammi",
 	"layout_analysis.classes.trigrams": "Quota dei trigrammi",

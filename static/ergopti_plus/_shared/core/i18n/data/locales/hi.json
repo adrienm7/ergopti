@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "कॉर्पस में बार",
 	"layout_analysis.worst.share": "हिस्सा",
 	"layout_analysis.worst.none": "इस कॉर्पस में कोई नहीं।",
+	"layout_analysis.worst.more": "और दिखाएँ ({count} और)",
+	"layout_analysis.worst.fewer": "कम दिखाएँ",
 	"layout_analysis.classes.title": "बिग्राम और त्रिग्राम वर्ग",
 	"layout_analysis.classes.bigrams": "बिग्राम का हिस्सा",
 	"layout_analysis.classes.trigrams": "त्रिग्राम का हिस्सा",

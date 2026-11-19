@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "Výskyty v korpusu",
 	"layout_analysis.worst.share": "Podíl",
 	"layout_analysis.worst.none": "V tomto korpusu žádné.",
+	"layout_analysis.worst.more": "Zobrazit více (o {count} další)",
+	"layout_analysis.worst.fewer": "Zobrazit méně",
 	"layout_analysis.classes.title": "Třídy bigramů a trigramů",
 	"layout_analysis.classes.bigrams": "Podíl bigramů",
 	"layout_analysis.classes.trigrams": "Podíl trigramů",

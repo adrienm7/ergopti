@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "Keer in het corpus",
 	"layout_analysis.worst.share": "Aandeel",
 	"layout_analysis.worst.none": "Geen in dit corpus.",
+	"layout_analysis.worst.more": "Meer tonen ({count} extra)",
+	"layout_analysis.worst.fewer": "Minder tonen",
 	"layout_analysis.classes.title": "Bigram- en trigramklassen",
 	"layout_analysis.classes.bigrams": "Aandeel van de bigrammen",
 	"layout_analysis.classes.trigrams": "Aandeel van de trigrammen",

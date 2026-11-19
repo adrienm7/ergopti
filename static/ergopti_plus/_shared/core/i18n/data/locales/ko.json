@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "말뭉치 내 횟수",
 	"layout_analysis.worst.share": "비율",
 	"layout_analysis.worst.none": "이 말뭉치에는 없습니다.",
+	"layout_analysis.worst.more": "더 보기 ({count} 개 더)",
+	"layout_analysis.worst.fewer": "간단히 보기",
 	"layout_analysis.classes.title": "2-그램과 3-그램 분류",
 	"layout_analysis.classes.bigrams": "2-그램 중 비율",
 	"layout_analysis.classes.trigrams": "3-그램 중 비율",

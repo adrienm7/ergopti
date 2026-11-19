@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "コーパス内の回数",
 	"layout_analysis.worst.share": "割合",
 	"layout_analysis.worst.none": "このコーパスにはありません。",
+	"layout_analysis.worst.more": "さらに表示（あと {count} 件）",
+	"layout_analysis.worst.fewer": "表示を減らす",
 	"layout_analysis.classes.title": "バイグラムとトライグラムの分類",
 	"layout_analysis.classes.bigrams": "バイグラムに占める割合",
 	"layout_analysis.classes.trigrams": "トライグラムに占める割合",

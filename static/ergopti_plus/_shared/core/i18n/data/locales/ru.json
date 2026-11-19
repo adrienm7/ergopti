@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "Раз в корпусе",
 	"layout_analysis.worst.share": "Доля",
 	"layout_analysis.worst.none": "В этом корпусе нет.",
+	"layout_analysis.worst.more": "Показать ещё ({count} шт.)",
+	"layout_analysis.worst.fewer": "Показать меньше",
 	"layout_analysis.classes.title": "Классы биграмм и триграмм",
 	"layout_analysis.classes.bigrams": "Доля биграмм",
 	"layout_analysis.classes.trigrams": "Доля триграмм",

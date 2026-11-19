@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "Derlemdeki sayısı",
 	"layout_analysis.worst.share": "Pay",
 	"layout_analysis.worst.none": "Bu derlemde yok.",
+	"layout_analysis.worst.more": "Daha fazla göster ({count} tane daha)",
+	"layout_analysis.worst.fewer": "Daha az göster",
 	"layout_analysis.classes.title": "İkili ve üçlü sınıfları",
 	"layout_analysis.classes.bigrams": "İkililerin payı",
 	"layout_analysis.classes.trigrams": "Üçlülerin payı",

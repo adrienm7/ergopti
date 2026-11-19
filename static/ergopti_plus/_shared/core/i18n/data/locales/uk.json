@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "Разів у корпусі",
 	"layout_analysis.worst.share": "Частка",
 	"layout_analysis.worst.none": "У цьому корпусі немає.",
+	"layout_analysis.worst.more": "Показати ще ({count} шт.)",
+	"layout_analysis.worst.fewer": "Показати менше",
 	"layout_analysis.classes.title": "Класи біграм і триграм",
 	"layout_analysis.classes.bigrams": "Частка біграм",
 	"layout_analysis.classes.trigrams": "Частка триграм",

@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "Times in the corpus",
 	"layout_analysis.worst.share": "Share",
 	"layout_analysis.worst.none": "None on this corpus.",
+	"layout_analysis.worst.more": "Show more ({count} more)",
+	"layout_analysis.worst.fewer": "Show fewer",
 	"layout_analysis.classes.title": "Bigram and trigram classes",
 	"layout_analysis.classes.bigrams": "Share of the bigrams",
 	"layout_analysis.classes.trigrams": "Share of the trigrams",

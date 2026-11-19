@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "مرات الورود في المدوّنة",
 	"layout_analysis.worst.share": "النسبة",
 	"layout_analysis.worst.none": "لا شيء في هذه المدوّنة.",
+	"layout_analysis.worst.more": "عرض المزيد ({count} إضافية)",
+	"layout_analysis.worst.fewer": "عرض أقل",
 	"layout_analysis.classes.title": "فئات الثنائيات والثلاثيات",
 	"layout_analysis.classes.bigrams": "نسبة الثنائيات",
 	"layout_analysis.classes.trigrams": "نسبة الثلاثيات",

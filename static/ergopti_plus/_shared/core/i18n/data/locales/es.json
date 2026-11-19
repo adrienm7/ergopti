@@ -5121,6 +5121,8 @@
 	"layout_analysis.worst.count": "Veces en el corpus",
 	"layout_analysis.worst.share": "Proporción",
 	"layout_analysis.worst.none": "Ninguno en este corpus.",
+	"layout_analysis.worst.more": "Ver más ({count} más)",
+	"layout_analysis.worst.fewer": "Ver menos",
 	"layout_analysis.classes.title": "Clases de bigramas y trigramas",
 	"layout_analysis.classes.bigrams": "Proporción de los bigramas",
 	"layout_analysis.classes.trigrams": "Proporción de los trigramas",
