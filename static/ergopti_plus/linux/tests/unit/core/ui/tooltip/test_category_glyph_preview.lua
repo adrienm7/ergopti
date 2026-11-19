@@ -79,6 +79,9 @@ helpers.describe("preview: category glyph", function()
 			helpers.assert_nil(row.glyph, "row " .. index .. " has no glyph")
 			assert(row.accent ~= nil, "row " .. index .. " keeps its tint")
 		end
+		helpers.assert_eq(P.is_enabled("glyphs"), true, "the switch is one of the preview toggles")
+		helpers.assert_eq(P.build_rows(CANDIDATES, { kind = "autocorrect" })[1].glyph, "✓",
+			"switched back on, the glyph returns")
 	end)
 
 	helpers.it("measures the glyph beside the trigger label, in the label's size", function()
