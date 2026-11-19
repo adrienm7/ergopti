@@ -232,16 +232,14 @@ waits for the maintainer's review).
       its `.json`) into `windows/vendor` with their `required` entries in `tools/build/windows_bundle_manifest.json`;
       then `test-windows-lua-export-identity.cjs` checks them and the Windows lane runs the byte-equality proof.
 
-- [ ] **Ideas from the other analysers, weights to decide (2026-11-19).** `sfb_distance` (same-finger travel
-      weighted by finger, genkey's, Oxeylyzer's and KLO's model), `pinky_ring` (pinky–ring pairs on any row), the
-      penalty floors (`floors` of `score_weights.json`) and the ranking's « Difference to QWERTY / AZERTY » view are
-      in the engine and the Comparer, all at weight or floor 0 (docs/design/layout-analysis.md, « Metrics » and
-      « Global score »). Pending decisions: the study recommends moving part of `sfb`'s weight (10) onto
-      `sfb_distance` once both rankings are compared (about 0.5 a point keeps one 1 u SFB's cost: 10 / 19 mm);
-      whether `pinky_ring` gets a weight once it is seen to rank layouts differently from `half_scissors`; any
-      non-zero floor (Cyanophage: SFB 0.3 %, hand balance 1 point). Left: the floors are read from
-      `score_weights.json` only; the Comparer's score settings, their export file (`ergopti-score-settings`,
-      a new required entry) and `score_settings.js` do not edit them yet.
+- [ ] **Ideas from the other analysers, weights to decide (2026-11-19).** `pinky_ring` (pinky–ring pairs on any
+      row), the penalty floors (`floors` of `score_weights.json`) and the ranking's « Difference to QWERTY / AZERTY »
+      view are in the engine and the Comparer, at weight or floor 0 (docs/design/layout-analysis.md, « Metrics » and
+      « Global score »); `sfb_distance` was weighed by the maintainer on 2026-11-19. Pending decisions: whether
+      `pinky_ring` gets a weight once it is seen to rank layouts differently from `half_scissors`; any non-zero
+      floor (Cyanophage: SFB 0.3 %, hand balance 1 point). Left: the floors are read from `score_weights.json` only;
+      the Comparer's score settings, their export file (`ergopti-score-settings`, a new required entry) and
+      `score_settings.js` do not edit them yet.
 - [ ] **Longer skipgrams (2026-11-19).** genkey's gaps 1 to 9 and Oxeylyzer's 1 to 3 need skipgram tables in the
       corpus format. Measured: gaps 2–3 add 1.26 MB to the 9.2 MB of corpus files (about +40 % per text corpus,
       57 KB on Don Quichotte's 148 KB), gaps 2–9 5.93 MB (about +185 %); the 12 count-table corpora have no text to
@@ -534,19 +532,11 @@ Each closes on a named green hosted or native run, recorded here.
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
-- [ ] **Thumb keys of the analysis model (decided by the agent on 2026-11-19, to review by the maintainer).** The
-      thumbs gained their own keys beside the space bar, named by the JIS keys: NonConvert (left thumb), Convert and
-      KanaMode (right), on JIS and on free thumb keys of the Corne, Planck, ErgoDox, Moonlander and Kinesis boards;
-      none on ISO, ANSI, ABNT or the angle mod. Defaults kept: NonConvert and Convert are rest keys (thumb effort
-      0 mm, like a home key), KanaMode costs its distance from the nearest rest (19 mm on the Corne); two keys of one
-      thumb are an SFB, the only pair a thumb is in (a thumb letter's other pairs stay out of the pair metrics, as the
-      space's); a thumb-letter layout types its space on its own thumb key, never on the shared bar; the optimizer
-      leaves thumb keys alone unless `thumbKeys` names a board; a thumb-letter file is imported even when symbols of
-      its ErgoDox outer keys have no code. 51 layouts came in (Hands Down Gold and family, cyanophage, KLAnext); on
-      the ErgoDox, Gold scores 11.2 against Hands Down Alt's −1.5 on Alice. Choose the thumb effort, whether a thumb
-      letter's pairs should count, and whether the left thumb needs a second key (Cahi, Chia, SNTH stay out).
-      The Optimiser page offers the switch since 2026-11-19 (off by default, enabled on boards with thumb
-      keys, its popover saying why).
+- [ ] **The left thumb's second key (decided by the agent on 2026-11-19, to review by the maintainer).** The
+      thumbs' own keys are NonConvert (left thumb), Convert and KanaMode (right), as on JIS; their effort and pairs
+      were settled on 2026-11-19 (docs/memory/maintainer-decisions.md). Kept meanwhile: one key for the left thumb,
+      so the layouts that need two there (Cahi, Chia, SNTH) stay out of the library. Choose whether the left thumb
+      gets a second key.
 - [ ] **Renew the reviewed number-row test image (prepared by the agent on 2026-11-19, to review by the
       maintainer).** `number_row_current_test_causal.py` says no transcript or approval may select another test
       image, and its approval record needs a published source commit and a source review hash, so the agent did not
@@ -558,25 +548,14 @@ Each question names the default kept meanwhile; an answer moves into the item or
       test row of `fixtures/number-row-current-test/build-inputs.json.raw` with `ROSTER_SHA`, and issue the new
       approval record for the published commit. Or keep the in-process selection and accept its rare stale restores.
 
-- [ ] **Access weights of the score (decided by the agent on 2026-11-18, to review by the maintainer).** New
-      metric `altgr_usage` (characters typed with AltGr held) with weight 2, on top of `modifier_usage` 0.5;
-      `dead_key_usage` raised from 0.5 to 2. Per character, an AltGr chord costs 2.5 plus the thumb's reach, a dead
-      key 2 plus its own press, an off-centre direct key about 1 to 1.7, an SFB 10. These three weights are the
-      user's in the choice of ways (an edit analyses again; `rescore` refuses it), the others stay the defaults'.
-      Nemolivier: Ergo-L 24.38 → 17.65 (rank 5 → 6), bépo 5.39 → −0.42, Ergopti 26.89 → 23.11, Optimot 18.18 →
-      15.17. Ergo-L still reaches é, è and `'` by Shift+AltGr or AltGr detours where they avoid an SFB (SFB 0.97 %
-      best, 1.79 % fixed); `altgr_usage` 10 gives 1.52 %, 20 gives 1.78 %. Choose the defaults, and whether such
-      detours should count at all (docs/design/layout-analysis.md, « Access weights »).
-
 - [ ] **Optimizer « an existing layout would do the job » (decided by the agent on 2026-11-19, to review by the
       maintainer).** After a run the Optimiser scores the library on the same corpus and settings and shows the
-      most alike layouts and the best-scoring one. Kept meanwhile: the small gap is `similar_score_gap` = 2 points
-      (`analysis_model.json`; 2 points are 0.2 % of SFB at weight 10, about the gap between Ergopti+ and Ergopti on
-      Nemolivier); the gap is said in points, not in %, since the score has no zero (AZERTY is about −88); the
-      similarity shown first is the weighted share of the characters on the same key and level, spaces aside,
-      with the same finger and row and the unweighted share beside it; five alike layouts are listed. Choose the
-      threshold, whether a gap in % of the run's gain over its start would read better, and the measure shown
-      first (docs/design/layout-optimizer.md, « Existing layouts »).
+      most alike layouts and the best-scoring one; its small gap, `similar_score_gap` = 2 points, was confirmed by
+      the maintainer on 2026-11-19. Kept meanwhile: the gap is said in points, not in %, since the score has no
+      zero; the similarity shown first is the weighted share of the characters on the same key and level, spaces
+      aside, with the same finger and row and the unweighted share beside it; five alike layouts are listed.
+      Choose whether a gap in % of the run's gain over its start would read better, and the measure shown first
+      (docs/design/layout-optimizer.md, « Existing layouts »).
 
 - [ ] **Python XKB converter and the JIS and ABNT keys (implemented by the agent on 2026-11-19, to review by
       the maintainer).** 2f96fa2f4f placed Yen, Ro and the keypad comma (`mac_keycodes.json` `extra_keys`) in the

@@ -5,6 +5,63 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Layout score: SFB travel and access weights (2026-11-19)
+
+Decided by the maintainer on 2026-11-19: `sfb` is 5 and `sfb_distance` 0.5
+(`score_weights.json`), so half of an SFB's cost is flat and half follows its
+travel, weighted by finger (`same_finger_factor`); `altgr_usage` is 5 and
+`dead_key_usage` 3, `modifier_usage` stays 0.5. Why: a long or pinky SFB is
+worse than a short index one, which a flat weight cannot say, and a character
+behind AltGr or a dead key costs more than the former weights said. These
+defaults also choose the ways of typing, so the metrics of a layout that has
+several ways to type a character move with them; the golden values were
+recorded again. A 1 u index SFB now costs 14.8 points per percentage point
+(5 + 0.5 × 19.6 mm, against 10 before), a pinky's Q to Z 39.6, and a
+skipgram's travel counts at half (`SFS_DISTANCE_SHARE`), so every total
+dropped (Ergopti+ on Nemolivier 25.2 to −27.5, AZERTY −88.9 to −229.8). Do not
+re-propose a flat SFB weight; tune these two numbers instead.
+
+## The Optimiser's small gap stays 2 points (2026-11-19)
+
+Decided by the maintainer on 2026-11-19: `similar_score_gap` stays 2 points
+(`analysis_model.json`), under which the Optimiser says an existing layout
+does the job of the one it found. Why: a fixed number of score points reads
+the same on every corpus and needs no zero of the score. The unit (points or
+% of the run's gain) and the similarity shown first are still open in
+`TODO.md`.
+
+## Thumb keys: rest, travel, letter pairs and thumb SFBs (2026-11-19)
+
+Decided by the maintainer on 2026-11-19 (« attention on a position de repos
+thumb mais après il y a travel distance aussi, et même SFB des pouces, par
+exemple si e et espace sur le même pouce »):
+
+- A thumb's rest keys (its home key and `thumb_rest_keys`) cost no travel;
+  every other thumb key costs its distance from the nearest of them
+  (`board.reach`).
+- A character on a thumb key takes part in the pair and trigram metrics like
+  a finger's key (rolls, hand changes, alternation, redirects). Only the
+  space stays out, as before: the shared bar and the thumb key a layout types
+  its space on (`board.outOfPairs`, set per layout by `boardFor`). A thumb
+  pair is never a scissor, a lateral stretch or a row jump: the thumbs' keys
+  lie below the fingers' rows.
+- Two consecutive presses of two different keys of one thumb are a thumb SFB,
+  with its travel (the thumbs' `same_finger_factor` is 1): a letter and the
+  space on the same thumb (« e » then space, space then « e »), or two thumb
+  letters of one thumb.
+- The space's thumb: a layout that types it on a thumb key uses that key's
+  thumb; the shared bar keeps the fingering's thumb (`Space` → `lt`, the
+  left one; the right one on the Kinesis), the convention since 2026-11-14.
+
+Why: a thumb letter's rolls and hand changes are real typing, and a thumb
+pressing two keys in a row is as slow as any finger doing so. Proof kept by
+the tests: the 660 library layouts without a character on a thumb key keep
+every metric and score, bit for bit, on both French corpora and eleven
+keyboards; `test-layout-analysis-engine.cjs` section 17 pins the rules on
+tiny texts, and `test-layout-optimizer.cjs` checks the incremental objective
+with letters on the Corne's thumbs. Whether the left thumb gets a second key
+is still open in `TODO.md`.
+
 ## Windows layout DLLs come from CI and the website (2026-11-17)
 
 Decided by the maintainer on 2026-11-17 (asked 2026-11-16): the layout DLLs must
