@@ -3,147 +3,147 @@
 	"original_sha": "98572fe1a57dde86c6e8591e79112fc5400ec819",
 	"captions": {
 		"ar": {
-			"keyboard_layout": "🌐 تخطيط لوحة المفاتيح",
+			"keyboard_layout": "🌐 التخطيطات والمحاكاة",
 			"hotstrings": "⚡ سلاسل نصية",
 			"shortcuts": "🎯 اختصارات",
 			"tap_holds": "⌨️ نقر-ضغط",
 			"gestures": "🖐️ إيماءات"
 		},
 		"cs": {
-			"keyboard_layout": "🌐 Rozložení klávesnice",
+			"keyboard_layout": "🌐 Rozložení a emulace",
 			"hotstrings": "⚡ Hotstring",
 			"shortcuts": "🎯 Zkratky",
 			"tap_holds": "⌨️ Klepnutí-Přidržení",
 			"gestures": "🖐️ Gesta"
 		},
 		"da": {
-			"keyboard_layout": "🌐 Tastaturlayout",
+			"keyboard_layout": "🌐 Layouts og emulering",
 			"hotstrings": "⚡ Hotstrings",
 			"shortcuts": "🎯 Genveje",
 			"tap_holds": "⌨️ Tap-Holds",
 			"gestures": "🖐️ Gestus"
 		},
 		"de": {
-			"keyboard_layout": "🌐 Tastaturbelegung",
+			"keyboard_layout": "🌐 Layouts und Emulation",
 			"hotstrings": "⚡ Hotstrings",
 			"shortcuts": "🎯 Tastenkürzel",
 			"tap_holds": "⌨️ Tap-Holds",
 			"gestures": "🖐️ Gesten"
 		},
 		"en": {
-			"keyboard_layout": "🌐 Keyboard layout",
+			"keyboard_layout": "🌐 Layouts and emulation",
 			"hotstrings": "⚡ Hotstrings",
 			"shortcuts": "🎯 Shortcuts",
 			"tap_holds": "⌨️ Tap-Holds",
 			"gestures": "🖐️ Gestures"
 		},
 		"es": {
-			"keyboard_layout": "🌐 Disposición del teclado",
+			"keyboard_layout": "🌐 Distribuciones y emulación",
 			"hotstrings": "⚡ Hotstrings",
 			"shortcuts": "🎯 Atajos",
 			"tap_holds": "⌨️ Tap-Holds",
 			"gestures": "🖐️ Gestos"
 		},
 		"fr": {
-			"keyboard_layout": "🌐 Disposition clavier",
+			"keyboard_layout": "🌐 Dispositions et émulation",
 			"hotstrings": "⚡ Hotstrings",
 			"shortcuts": "🎯 Raccourcis",
 			"tap_holds": "⌨️ Tap-Holds",
 			"gestures": "🖐️ Gestes"
 		},
 		"he": {
-			"keyboard_layout": "🌐 פריסת מקלדת",
+			"keyboard_layout": "🌐 פריסות והדמיה",
 			"hotstrings": "⚡ Hotstrings",
 			"shortcuts": "🎯 קיצורים",
 			"tap_holds": "⌨️ Tap-Holds",
 			"gestures": "🖐️ מחוות"
 		},
 		"hi": {
-			"keyboard_layout": "🌐 कीबोर्ड लेआउट",
+			"keyboard_layout": "🌐 लेआउट और अनुकरण",
 			"hotstrings": "⚡ Hotstrings",
 			"shortcuts": "🎯 शॉर्टकट",
 			"tap_holds": "⌨️ Tap-Holds",
 			"gestures": "🖐️ इशारे"
 		},
 		"it": {
-			"keyboard_layout": "🌐 Layout tastiera",
+			"keyboard_layout": "🌐 Layout ed emulazione",
 			"hotstrings": "⚡ Hotstring",
 			"shortcuts": "🎯 Scorciatoie",
 			"tap_holds": "⌨️ Tap-Hold",
 			"gestures": "🖐️ Gesti"
 		},
 		"ja": {
-			"keyboard_layout": "🌐 キーボードレイアウト",
+			"keyboard_layout": "🌐 配列とエミュレーション",
 			"hotstrings": "⚡ ホットストリング",
 			"shortcuts": "🎯 ショートカット",
 			"tap_holds": "⌨️ タップホールド",
 			"gestures": "🖐️ ジェスチャー"
 		},
 		"ko": {
-			"keyboard_layout": "🌐 키보드 레이아웃",
+			"keyboard_layout": "🌐 자판 및 에뮬레이션",
 			"hotstrings": "⚡ 핫스트링",
 			"shortcuts": "🎯 단축키",
 			"tap_holds": "⌨️ 탭-홀드",
 			"gestures": "🖐️ 제스처"
 		},
 		"nl": {
-			"keyboard_layout": "🌐 Toetsenbordindeling",
+			"keyboard_layout": "🌐 Indelingen en emulatie",
 			"hotstrings": "⚡ Hotstrings",
 			"shortcuts": "🎯 Sneltoetsen",
 			"tap_holds": "⌨️ Tik-vasthouden",
 			"gestures": "🖐️ Gebaren"
 		},
 		"no": {
-			"keyboard_layout": "🌐 Tastaturoppsett",
+			"keyboard_layout": "🌐 Tastaturoppsett og emulering",
 			"hotstrings": "⚡ Hotstrings",
 			"shortcuts": "🎯 Snarveier",
 			"tap_holds": "⌨️ Tap-Holds",
 			"gestures": "🖐️ Gester"
 		},
 		"pl": {
-			"keyboard_layout": "🌐 Układ klawiatury",
+			"keyboard_layout": "🌐 Układy i emulacja",
 			"hotstrings": "⚡ Hotstring'i",
 			"shortcuts": "🎯 Skróty",
 			"tap_holds": "⌨️ Dotknięcie-Przytrzymanie",
 			"gestures": "🖐️ Gesty"
 		},
 		"pt": {
-			"keyboard_layout": "🌐 Layout do teclado",
+			"keyboard_layout": "🌐 Disposições e emulação",
 			"hotstrings": "⚡ Hotstrings",
 			"shortcuts": "🎯 Atalhos",
 			"tap_holds": "⌨️ Tap-Holds",
 			"gestures": "🖐️ Gestos"
 		},
 		"ru": {
-			"keyboard_layout": "🌐 Раскладка клавиатуры",
+			"keyboard_layout": "🌐 Раскладки и эмуляция",
 			"hotstrings": "⚡ Хотстринги",
 			"shortcuts": "🎯 Сочетания клавиш",
 			"tap_holds": "⌨️ Касание-Удержание",
 			"gestures": "🖐️ Жесты"
 		},
 		"sv": {
-			"keyboard_layout": "🌐 Tangentbordslayout",
+			"keyboard_layout": "🌐 Layouter och emulering",
 			"hotstrings": "⚡ Hotstrings",
 			"shortcuts": "🎯 Genvägar",
 			"tap_holds": "⌨️ Tap-Holds",
 			"gestures": "🖐️ Gester"
 		},
 		"tr": {
-			"keyboard_layout": "🌐 Klavye düzeni",
+			"keyboard_layout": "🌐 Düzenler ve taklit",
 			"hotstrings": "⚡ Kısaltmalar",
 			"shortcuts": "🎯 Kısayollar",
 			"tap_holds": "⌨️ Dokunma-Basılı Tutma",
 			"gestures": "🖐️ Hareketler"
 		},
 		"uk": {
-			"keyboard_layout": "🌐 Розкладка клавіатури",
+			"keyboard_layout": "🌐 Розкладки та емуляція",
 			"hotstrings": "⚡ Хотстринги",
 			"shortcuts": "🎯 Скорочення",
 			"tap_holds": "⌨️ Натискання-Утримання",
 			"gestures": "🖐️ Жести"
 		},
 		"zh": {
-			"keyboard_layout": "🌐 键盘布局",
+			"keyboard_layout": "🌐 布局与模拟",
 			"hotstrings": "⚡ 热字符串",
 			"shortcuts": "🎯 快捷键",
 			"tap_holds": "⌨️ 点按/长按",

@@ -4,7 +4,7 @@
 ; MODULE: Layout Manager WebView2 Host
 ; DESCRIPTION:
 ; Hosts the shared layout manager page (_shared/ui/layout_manager) on Windows
-; through WebView2: the "Manage layouts…" row of the keyboard-layout submenu
+; through WebView2: the « Install or remove layouts… » row of the layout submenu
 ; opens it, and it lists, installs, updates, uninstalls and selects the
 ; layouts of the registry through modules/keymap/keylayout/layout_catalogue.ahk.
 ;

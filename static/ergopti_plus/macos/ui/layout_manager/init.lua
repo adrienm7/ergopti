@@ -4,7 +4,7 @@
 --- MODULE: Layout Manager Window (macOS host)
 --- DESCRIPTION:
 --- Hosts the shared layout manager page (_shared/ui/layout_manager) in a
---- WKWebView: the "Manage layouts…" row of the keyboard-layout submenu opens
+--- WKWebView: the « Install or remove layouts… » row of the layout submenu opens
 --- it, and it lists, installs, updates, uninstalls and selects the layouts of
 --- the registry through modules/keymap/layout_registry.lua.
 ---
@@ -557,7 +557,7 @@ function M.editor_window() return Editor.window() end
 --- @return boolean committed
 function M.close_editor() return Editor.close() end
 
---- Builds the "Manage layouts…" menu command.
+--- Builds the « Install or remove layouts… » menu command.
 --- @return function
 function M.menu_command()
 	return function()

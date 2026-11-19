@@ -1255,7 +1255,6 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 			'layout_native_select = callback',
 			'layout_native_select = "callback"'
 		],
-		['layout_native_record_choice', 'LayoutRegistry.select(id,', 'Foreign.select(id,'],
 		[
 			'layout_native_record_choice',
 			'set_input_source_async(target_localised, target_kl_name,',

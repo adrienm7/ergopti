@@ -145,7 +145,7 @@ M._version_gt        = version_gt
 --- ==================================
 --- ==================================
 
---- Builds the complete "Disposition clavier" submenu item.
+--- Builds the complete « Dispositions et émulation » submenu item.
 --- @param ctx table Global UI context. Must contain ctx.base_dir and ctx.updateMenu.
 --- @return table A single hs.menubar item with a populated submenu.
 --- Schedules a deferred menu rebuild. macOS reloads its input-source list
