@@ -3206,19 +3206,33 @@ var LAYOUT_ANALYSIS = (function () {
 	/**
 	 * The « typed via » rows of an analysis, for the pages: each character a
 	 * choice concerned (several ways used, or a chord), most frequent first,
-	 * with each way's keys written with the layout's own characters
-	 * (« AltGr+o », a dead key as [its state]) and its share.
+	 * with each way's keys written with the layout's own characters as its
+	 * boards show them (« AltGr+o », the space as « ␣ », a dead key as its bare
+	 * accent « ^ »: the shared key legend, never the state's id) and its share.
 	 * @param {object} result - analyse() output.
 	 * @param {object} layoutInput - The layout analysed (library shape).
 	 * @param {number} [limit] - At most this many rows; all when absent.
 	 * @returns {Array<{char: string, count: number, ways: Array<{kind: string,
 	 *   keys: string, share: number}>}>} share in % of the character's count.
+	 * @throws {Error} When the page did not load the shared key legend
+	 *   (_shared/ui/_generated/key_legend.js) before the engine.
 	 */
 	function typingRows(result, layoutInput, limit) {
+		// A top-level var of key_legend.js: a page global the pages load first.
+		if (typeof KEY_LEGEND === 'undefined')
+			throw new Error('layout_analysis: typingRows needs the shared key legend (key_legend.js)');
+		const legend = KEY_LEGEND;
 		const rows = layoutInput.rows || {};
+		const dead = layoutInput.dead || {};
 		const label = (code, level) => {
 			const base = rows[code] ? rows[code][0] : null;
-			const name = typeof base === 'string' ? base : base && base.dead ? `[${base.dead}]` : code;
+			let name = code;
+			if (typeof base === 'string' && base !== '') name = legend.visibleText(base);
+			else if (base && base.dead) {
+				// What the dead key types alone (its terminator), as its key shows it.
+				const accent = legend.deadKeyText((dead[base.dead] || {})[' '] || '');
+				if (accent !== '') name = accent;
+			}
 			return LEVEL_PREFIX[level] + name;
 		};
 		const out = [];

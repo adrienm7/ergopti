@@ -70,6 +70,10 @@
  *    file, each layout of an author's own collection has a checked credit,
  *    key cells read in each collection's official files, and the reasons a
  *    file is left out.
+ * 15. « Typed via » (typingRows): a way's keys read as the boards show them,
+ *    a dead key as its bare accent from the shared key legend and the space as
+ *    « ␣ », never a dead state's id (« [s1_circumflex] »); without the legend
+ *    loaded the rows refuse instead of falling back to the ids.
  * ==============================================================================
  */
 
@@ -83,6 +87,8 @@ const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 
 const DATA_PATH = shared('ui', 'layout_analysis', '_generated', 'analysis_data.js');
 const ENGINE_PATH = shared('ui', 'layout_analysis', 'analysis_engine.js');
+// The shared key legend, which every page loads before the engine.
+const LEGEND_PATH = shared('ui', '_generated', 'key_legend.js');
 const VECTORS_PATH = shared('tests', 'corpus', 'layout_analysis', 'metric_vectors.json');
 const GOLDEN_PATH = shared('tests', 'corpus', 'layout_analysis', 'library_golden.json');
 const DON_QUICHOTTE_PATH = shared(
@@ -132,7 +138,7 @@ const near = (a, b) => Math.abs(a - b) <= TOLERANCE * Math.max(1, Math.abs(b));
 
 const sandbox = {};
 vm.createContext(sandbox);
-for (const file of [DATA_PATH, ENGINE_PATH])
+for (const file of [LEGEND_PATH, DATA_PATH, ENGINE_PATH])
 	vm.runInContext(fs.readFileSync(file, 'utf8'), sandbox, { filename: file });
 const E = vm.runInContext('LAYOUT_ANALYSIS', sandbox);
 const library = E.libraryLayouts();
@@ -2643,6 +2649,44 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		(credits.fargas || {}).authors[0] === 'Peter Fargas, captured by Ian Douglas',
 		'collections: Fargas is not credited as its KLAnext file states'
 	);
+}
+
+// ==============================
+// ======= 15/ Typed via =======
+// ==============================
+
+// (typed-via-legend) Ergopti types « î » through its circumflex dead key and
+// « _ » through AltGr+Space on Don Quichotte.
+{
+	const ergopti = byId.get('ergopti');
+	const rows = E.typingRows(E.analyse(ergopti, goldenCorpora.fr_don_quichotte, {}), ergopti);
+	const keys = rows.flatMap((row) => row.ways.map((way) => way.keys));
+	check(keys.length > 0, 'typed via: Ergopti shows no way on Don Quichotte');
+	check(
+		keys.every((text) => !/\[|\]/.test(text)),
+		`typed via: a dead state id is shown: ${keys.filter((text) => /\[/.test(text)).join(' · ')}`
+	);
+	const ways = (char) => (rows.find((row) => row.char === char) || { ways: [] }).ways;
+	check(
+		ways('î').some((way) => way.kind === 'dead' && way.keys === '^ i'),
+		`typed via: î is not « ^ i »: ${JSON.stringify(ways('î'))}`
+	);
+	check(
+		ways('_').some((way) => way.keys === 'AltGr+␣'),
+		`typed via: _ is not « AltGr+␣ »: ${JSON.stringify(ways('_'))}`
+	);
+	const bare = {};
+	vm.createContext(bare);
+	for (const file of [DATA_PATH, ENGINE_PATH])
+		vm.runInContext(fs.readFileSync(file, 'utf8'), bare, { filename: file });
+	const engine = vm.runInContext('LAYOUT_ANALYSIS', bare);
+	let refused = false;
+	try {
+		engine.typingRows(E.analyse(ergopti, goldenCorpora.fr_don_quichotte, {}), ergopti);
+	} catch (error) {
+		refused = /key legend/.test(error.message);
+	}
+	check(refused, 'typed via: rows without the key legend did not refuse');
 }
 
 if (errors.length > 0) {
