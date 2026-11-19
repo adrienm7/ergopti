@@ -120,8 +120,8 @@ baseline as violations go.
       the first word of its `description`; a user category with neither shows none. (3) One pure resolver beside
       `tint.js`, `tint.lua` and `_TooltipMixTintHex`, with a shared contract vector; the label rides on the row next
       to the trigger label: AHK `Item.CategoryLabel` measured in the pass that fills `Header.LabelSizes`
-      (`helpers.ahk`), the Hammerspoon renderer's rows and the Linux `preview.lua` rows (`{ text, label, dimmed,
-  struck }`). (4) Shown with the coloured tooltips only, under its own preview switch in the three menus (21
+      (`helpers.ahk`), the Hammerspoon renderer's rows and the Linux `preview.lua` rows (text, label, dimmed,
+      struck). (4) Shown with the coloured tooltips only, under its own preview switch in the three menus (21
       locales), and added to what a running screen reader is told. To decide: the switch's default, and a glyph
       per built-in category instead of words.
 - [ ] **Dyslexia and reading, what is left.** Every site page is measured at 200 % zoom with the WCAG 1.4.12
