@@ -617,6 +617,25 @@ one. Ergo-L and bépo already matched their official files (the Kalamine TOML of
 ergol-v1.0.2; bépo 1.1rc2's KLC and XKB). BEO and Morgenstern have no official
 source that could be found and stay letter blocks.
 
+On 2026-11-19 the library took more collections (section 13 of
+`tools/test/test-layout-analysis-engine.cjs` holds their key cells, a count
+that may only grow and a checked credit for each):
+
+- **Hands Down** (R. Alan Reiser, github.com/moutis/HandsDown at e8f532f62c,
+  GPL-3.0, read through the Studio's KLA reader): Alt, Extreme, XKCD and
+  Reiser's Hands On, Heads Up and Notarise, and the « sym » (angle) files of
+  Alt, Polyglot, Reference and Hands On, ten layouts. Its Reference is
+  Oxeylyzer's `hands_down`. Every thumb-alpha variant (Gold T, Silver N,
+  Bronze H, Platinum L, Titanium, Rhodium, Promethium, Mithril, Unobtanium and
+  the Vibranium files R, Chromium and Cesium C, Dash and Alt-ex E, Alt-tx T,
+  Alt-nx N, Élan . and ,) is left out: the author's site states « Thumbs up
+  variations require dedicated thumb keys », and the model's only typing
+  thumb key is the space bar. Adding one (AltLeft) would change the typing
+  area of the optimizer, the KLA export and every board geometry, so it was
+  not done here. The matrix, ortho and ErgoDox copies that put letters on
+  combos or outer columns, and Neu's JIS and ErgoDox files, are listed with
+  their reason; Neu stays cmini's.
+
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not
 protected by copyright, only its implementation, and points to _SAS Institute

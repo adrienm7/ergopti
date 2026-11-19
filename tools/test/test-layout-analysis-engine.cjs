@@ -65,6 +65,11 @@
  *    keys share them; moving « e » weighs far more than moving a rare letter;
  *    a moved dead key moves the characters behind it, a level change moves
  *    its character; the measure is symmetric and refuses a corpus of spaces.
+ * 14. Collections: the library never holds fewer layouts than at its last
+ *    import, each entry names its source (with a commit, version or date) and
+ *    file, each layout of an author's own collection has a checked credit,
+ *    key cells read in each collection's official files, and the reasons a
+ *    file is left out.
  * ==============================================================================
  */
 
@@ -100,6 +105,11 @@ const SPEED_CORPUS = path.join(
 // Floors: an empty library or vector file must not read as a pass.
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
+// The layouts the library held at its last import: it may only grow.
+const LIBRARY_COUNT = 180;
+// The collections imported from their authors' own files: each of their
+// layouts is credited from the author's page (layout_credits.json).
+const CREDITED_SOURCES = ['handsdown'];
 // Budget per library layout on the speed corpus, from prepared tables: the
 // 1.5 s the whole library had when it held 115 layouts, so a growing library
 // keeps the same budget per layout. The measured time is about 3 ms.
@@ -2414,6 +2424,102 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			gap >= 0 &&
 			gap === sandbox.LAYOUT_ANALYSIS_DATA.model.similar_score_gap,
 		`similarity: the small score gap is ${gap}`
+	);
+}
+
+// ===============================================
+// ======= 14/ Collections of the library ========
+// ===============================================
+
+{
+	// (layout-collections-2026-11-19) The library only grows: a regenerated
+	// collection that lost layouts must fail here, not read as a pass.
+	check(
+		library.length >= LIBRARY_COUNT,
+		`collections: the library holds ${library.length} layouts, fewer than its ${LIBRARY_COUNT}`
+	);
+	const libraryFile = JSON.parse(
+		fs.readFileSync(shared('layouts', 'data', 'analysis', 'layout_library.json'), 'utf8')
+	);
+	const credits = JSON.parse(
+		fs.readFileSync(shared('layouts', 'data', 'analysis', 'layout_credits.json'), 'utf8')
+	).credits;
+	// Every entry names its collection and file; an entry of a collection
+	// imported from its author's own files is credited to its author, with the
+	// page, the date it was read and what it says.
+	for (const entry of libraryFile.layouts) {
+		const source = libraryFile.sources[entry.source];
+		check(
+			source !== undefined && typeof entry.source_path === 'string' && entry.source_path !== '',
+			`collections: ${entry.id} names no known source and file`
+		);
+		check(
+			source === undefined || Boolean(source.commit || source.version || source.date),
+			`collections: the source ${entry.source} of ${entry.id} has no commit, version or date`
+		);
+		if (!CREDITED_SOURCES.includes(entry.source)) continue;
+		const credit = credits[entry.id];
+		check(
+			credit !== undefined &&
+				credit.authors.length > 0 &&
+				typeof credit.url === 'string' &&
+				typeof credit.checked === 'string',
+			`collections: ${entry.id} (${entry.source}) has no checked credit with an author and a page`
+		);
+	}
+	// Key cells as each collection's official file states them.
+	const cell = (id, code, level) => {
+		const layout = byId.get(id);
+		const row = layout && layout.rows[code];
+		const value = row ? row[level] : undefined;
+		return value && typeof value === 'object' ? `dead:${value.dead}` : value;
+	};
+	const official = [
+		// moutis/HandsDown JSON/: Alt « wchfv/yujq rsntgkieoa xmldbzp',. ».
+		['hands_down_alt', 'KeyQ', 0, 'w'],
+		['hands_down_alt', 'KeyY', 0, '/'],
+		['hands_down_alt', 'KeyH', 0, 'k'],
+		['hands_down_alt', 'Semicolon', 0, 'a'],
+		['hands_down_alt', 'KeyN', 0, 'z'],
+		// Extreme « xchgzkyoj/ rsntpwueia 'mldbvfq,. ».
+		['hands_down_extreme', 'KeyQ', 0, 'x'],
+		['hands_down_extreme', 'KeyZ', 0, "'"],
+		['hands_down_extreme', 'KeyM', 0, 'f'],
+		// XKCD « qmhgzyfob' srntpwueia » on its ErgoDox number row 7 5 3 1 9.
+		['hands_down_xkcd', 'KeyA', 0, 's'],
+		['hands_down_xkcd', 'KeyS', 0, 'r'],
+		['hands_down_xkcd', 'Digit1', 0, '7'],
+		// The sym (angle) files: Polyglot « wgmfq'uokx rsntbyieah cldvzjp,./ ».
+		['hands_down_polyglot_sym', 'KeyP', 0, 'x'],
+		['hands_down_polyglot_sym', 'KeyZ', 0, 'c'],
+		['hands_down_ref_sym', 'KeyQ', 0, 'q'],
+		['hands_down_alt_sym', 'KeyH', 0, 'y'],
+		// Reiser's other layouts: Notarise « qwfdpyulk' asetghnoir », Heads Up
+		// « qwdgmyukl' rsetfhnioa », Hands On « wgldjykuq' rsntpfieoa ».
+		['notarise', 'KeyD', 0, 'e'],
+		['notarise', 'Semicolon', 0, 'r'],
+		['heads_up', 'KeyL', 0, 'o'],
+		['hands_on', 'KeyT', 0, 'j'],
+		['hands_on_sym', 'KeyB', 0, 'j']
+	];
+	for (const [id, code, level, expected] of official)
+		check(
+			cell(id, code, level) === expected,
+			`collections: ${id} ${code} level ${level} is ${cell(id, code, level)}, its official file has ${expected}`
+		);
+	for (const id of ['hands_down_polyglot_sym', 'hands_down_ref_sym', 'hands_on_sym'])
+		check(byId.get(id).fingering === 'angle', `collections: ${id} is not on the angle fingering`);
+	// What a collection leaves out says why: a Hands Down letter on a thumb key
+	// has no key on the library's keyboards, and its Reference is held once.
+	const left = new Map(libraryFile.not_imported.map((entry) => [entry.source_path, entry]));
+	const gold = left.get('JSON/HandsDownNeu/hands-down-gold-ts.eu.ergodox.json');
+	check(
+		gold && /T on a thumb key/.test(gold.reason),
+		'collections: Hands Down Gold is not left out for its thumb T'
+	);
+	check(
+		(left.get('JSON/HandsDownArchive/Hands_Down_ref_ansi.json') || {}).same_as === 'hands_down',
+		'collections: Hands Down Reference is not the library’s hands_down'
 	);
 }
 

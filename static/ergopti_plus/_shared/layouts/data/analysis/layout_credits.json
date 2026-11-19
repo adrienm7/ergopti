@@ -418,6 +418,76 @@
 			"basis": "source",
 			"checked": "2026-11-18",
 			"evidence": "Engram repository, engram-es/README.md: « Engram-es is a keyboard layout optimized for comfortable and efficient touch typing in Spanish created by Arno Klein »; engram-es-2021: Engram-es v1.0 dated 2021-09-30."
+		},
+		"hands_down_alt": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt_ansi.json: « author »: « Alan Reiser », label « Hands-Down-Alt.en.ansi »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_alt_sym": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt_sym.json: « author »: « Alan Reiser », label « Hands Down Alt sym »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_extreme": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownArchive/Hands_Down_extreme_ansi.json: « author »: « Alan Reiser », label « Hands Down Extreme ansi »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_polyglot_sym": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownArchive/Hands_Down_polyglot_sym.json: « author »: « Alan Reiser », label « Hands Down Polyglot sym »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_ref_sym": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownArchive/Hands_Down_ref_sym.json: « author »: « Alan Reiser », label « Hands Down Ref sym »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_xkcd": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/MiscLayouts/Hands_Down_XKCD.json: « author »: « Alan Reiser », label « Hands Down XKCD »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_on": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/MiscLayouts/Hands_On_ansi.json: « author »: « Alan Reiser », label « Hands On ansi »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_on_sym": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/MiscLayouts/Hands_On_sym.json: « author »: « Alan Reiser », label « Hands On sym »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"heads_up": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/MiscLayouts/Heads_Up_ansi.json: « author »: « Alan Reiser », label « Heads Up ansi »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"notarise": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/MiscLayouts/Notarise_ansi.json: « author »: « Alan Reiser », label « Notarise ansi »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
 		}
 	}
 }
