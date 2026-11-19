@@ -276,7 +276,7 @@ function init(page, detailed) {
 		['center', ['btn-copy', 'btn-save', 'btn-report']],
 		['right', ['btn-cancel', 'btn-refresh']]
 	]) {
-		const group = new RegExp(`<div class="toolbar-${area}">([\\s\\S]*?)</div>`).exec(markup);
+		const group = new RegExp(`<li class="toolbar-${area}">([\\s\\S]*?)</li>`).exec(markup);
 		const ids = group ? [...group[1].matchAll(/\bid="(btn-[a-z-]+)"/g)].map((m) => m[1]) : [];
 		if (ids.join(',') !== expected.join(','))
 			fail(`the ${area} toolbar area contains ${ids.join(',')}, expected ${expected.join(',')}`);

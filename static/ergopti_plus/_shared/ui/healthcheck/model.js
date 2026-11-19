@@ -614,9 +614,7 @@
 					}
 					if (item.state === 'missing' && permissions[item.id] && permissions[item.id].fix) {
 						cell +=
-							'<div class="fix">' +
-							escapeHtml(t('healthcheck.permission_fix.' + item.id)) +
-							'</div>';
+							'<p class="fix">' + escapeHtml(t('healthcheck.permission_fix.' + item.id)) + '</p>';
 					}
 				}
 				html += '<td>' + cell + '</td>';
@@ -647,10 +645,18 @@
 				blocks += '<h3>' + escapeHtml(label) + '</h3><pre>' + escapeHtml(shown.text) + '</pre>';
 				return;
 			}
-			var cell = '<span class="' + shown.state + '">' + escapeHtml(shown.text) + '</span>';
+			// The cell carries the value's state, which its text also says.
+			var cell = escapeHtml(shown.text);
 			if (field.type === 'path' && shown.state === 'value')
 				cell += ' ' + actionButton('open_path', field.id, t('healthcheck.action.open'));
-			rows += '<tr><th scope="row">' + escapeHtml(label) + '</th><td>' + cell + '</td></tr>';
+			rows +=
+				'<tr><th scope="row">' +
+				escapeHtml(label) +
+				'</th><td class="' +
+				shown.state +
+				'">' +
+				cell +
+				'</td></tr>';
 		});
 		return (rows ? '<table class="fields">' + rows + '</table>' : '') + blocks;
 	}
@@ -679,7 +685,7 @@
 			);
 		var html = '<ul class="problems">';
 		list.forEach(function (problem) {
-			html += '<li><span class="fail">' + escapeHtml(problemText(problem, t)) + '</span>';
+			html += '<li class="fail">' + escapeHtml(problemText(problem, t));
 			if (problem.action && problem.action.name === 'open_settings') {
 				html +=
 					' ' +

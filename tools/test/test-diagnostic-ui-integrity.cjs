@@ -199,7 +199,7 @@ function render(driver, sections) {
 
 /** The escaped text of a table row: its label cell, then its value. */
 function rowPattern(label, value) {
-	return new RegExp(`<th scope="row">${label}</th><td><span class="[a-z]+">${value}</span>`);
+	return new RegExp(`<th scope="row">${label}</th><td class="[a-z]+">${value}`);
 }
 
 {

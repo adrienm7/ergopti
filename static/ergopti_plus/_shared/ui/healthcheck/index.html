@@ -17,16 +17,16 @@
 	<body>
 		<h1 class="theme-sr-only" data-i18n="menu.debug.healthcheck"></h1>
 		<header class="toolbar">
-			<div class="buttons">
-				<div class="toolbar-left">
+			<menu class="buttons">
+				<li class="toolbar-left">
 					<button
 						type="button"
 						id="btn-open-logs"
 						disabled
 						data-i18n="healthcheck.toolbar.open_logs"
 					></button>
-				</div>
-				<div id="collection-controls">
+				</li>
+				<li id="collection-controls">
 					<button
 						type="button"
 						id="btn-collect-windows"
@@ -58,8 +58,8 @@
 						hidden
 					></button>
 					<p id="collection-progress" role="status" aria-live="polite"></p>
-				</div>
-				<div class="toolbar-center">
+				</li>
+				<li class="toolbar-center">
 					<button
 						type="button"
 						id="btn-copy"
@@ -79,8 +79,8 @@
 						disabled
 						data-i18n="healthcheck.toolbar.report"
 					></button>
-				</div>
-				<div class="toolbar-right">
+				</li>
+				<li class="toolbar-right">
 					<button type="button" id="btn-cancel" disabled data-i18n="common.cancel"></button>
 					<button
 						type="button"
@@ -88,21 +88,25 @@
 						disabled
 						data-i18n="healthcheck.toolbar.refresh"
 					></button>
-				</div>
-			</div>
-			<label class="details">
+				</li>
+			</menu>
+			<p class="details">
 				<input type="checkbox" id="chk-details" disabled />
-				<span data-i18n="healthcheck.details_checkbox"></span>
-			</label>
-			<label class="details">
+				<label for="chk-details" data-i18n="healthcheck.details_checkbox"></label>
+			</p>
+			<p class="details">
 				<input type="checkbox" id="chk-extensive" disabled />
-				<span id="deep-tests-label" data-i18n="healthcheck.deep_tests_checkbox"></span>
-			</label>
+				<label
+					for="chk-extensive"
+					id="deep-tests-label"
+					data-i18n="healthcheck.deep_tests_checkbox"
+				></label>
+			</p>
 			<section id="day-log" class="day-log">
-				<label class="details">
+				<p class="details">
 					<input type="checkbox" id="chk-day-log" disabled />
-					<span data-i18n="healthcheck.day_log.checkbox"></span>
-				</label>
+					<label for="chk-day-log" data-i18n="healthcheck.day_log.checkbox"></label>
+				</p>
 				<p class="hint" data-i18n="healthcheck.day_log.hint"></p>
 				<p class="hint" data-i18n="healthcheck.day_log.upload_notice"></p>
 				<p id="day-log-status" role="status" aria-live="polite"></p>
