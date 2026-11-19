@@ -455,7 +455,7 @@ function checkAtomFallbackRendering() {
 	const page = renderedFeed('dev');
 	expect(!page.errorShown() && !page.loading(), 'the Atom feed must render as release data');
 	const list = page.el('release-list');
-	const tags = byTag(list, 'div')
+	const tags = byTag(list, 'strong')
 		.filter((node) => node.className === 'release-item-tag')
 		.map((node) => node.textContent);
 	expect(
@@ -464,7 +464,7 @@ function checkAtomFallbackRendering() {
 	);
 	// The feed has no pre-release flag: the page takes it from the channel
 	// registry (github_prerelease of the channel owning each tag).
-	const flags = byTag(list, 'div')
+	const flags = byTag(list, 'button')
 		.filter((node) => node.className.split(' ').includes('release-item'))
 		.map((node) => node.className.split(' ').includes('prerelease'));
 	expect(
@@ -544,7 +544,7 @@ function checkAtomFallbackRendering() {
 
 function checkAtomHostileContent() {
 	const page = renderedFeed('main');
-	const tags = byTag(page.el('release-list'), 'div')
+	const tags = byTag(page.el('release-list'), 'strong')
 		.filter((node) => node.className === 'release-item-tag')
 		.map((node) => node.textContent);
 	expect(

@@ -271,7 +271,7 @@ function checkMenuChangesReachTheOpenPage() {
 // ==========================================
 
 function listedTags(page) {
-	return byTag(page.el('release-list'), 'div')
+	return byTag(page.el('release-list'), 'strong')
 		.filter((node) => node.className === 'release-item-tag')
 		.map((node) => node.textContent);
 }

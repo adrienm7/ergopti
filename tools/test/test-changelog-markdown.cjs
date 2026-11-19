@@ -385,7 +385,8 @@ function checkFenceInsideFold() {
 /**
  * A release body's « ### » sections read as level 2 under the window's h1
  * (topLevel), each deeper level one below, the tags (and their look) kept;
- * the changelog page passes topLevel 2 for its release bodies.
+ * the changelog page passes topLevel 3 for its release bodies (under the
+ * release's h2).
  */
 function checkHeadingLevels() {
 	const { sandbox, document } = runPage();
@@ -420,7 +421,10 @@ function checkHeadingLevels() {
 		),
 		'utf8'
 	);
-	expect(/topLevel: 2/.test(page), 'the changelog page reads its release bodies from level 2');
+	expect(
+		/topLevel: 3/.test(page),
+		'the changelog page reads its release bodies from level 3, under the release h2'
+	);
 }
 
 try {

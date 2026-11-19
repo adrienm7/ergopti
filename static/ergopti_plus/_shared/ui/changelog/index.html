@@ -24,57 +24,57 @@
 		<script src="../version_order.js"></script>
 	</head>
 	<body>
-		<h1 class="theme-sr-only" data-i18n="changelog_window.window_title"></h1>
-		<div id="sidebar">
-			<div id="sidebar-header">
-				<div id="channel-toggle"></div>
-			</div>
-			<div id="release-list"></div>
-		</div>
+		<h1 class="theme-sr-only" id="changelog-title" data-i18n="changelog_window.window_title"></h1>
+		<nav id="sidebar" aria-labelledby="changelog-title">
+			<header id="sidebar-header">
+				<p id="channel-toggle"></p>
+			</header>
+			<ul id="release-list"></ul>
+		</nav>
 
-		<div id="content" role="main">
-			<div id="restore-banner" style="display: none">
-				<span id="restore-text"></span>
+		<main id="content">
+			<section id="restore-banner" style="display: none">
+				<p id="restore-text"></p>
 				<button id="btn-restore" type="button"></button>
-			</div>
-			<div id="subscribe-banner" style="display: none">
-				<span id="subscribe-text"></span>
+			</section>
+			<section id="subscribe-banner" style="display: none">
+				<p id="subscribe-text"></p>
 				<button id="btn-subscribe"></button>
-				<div id="subscribe-confirm" style="display: none">
-					<span id="subscribe-confirm-text"></span>
+				<section id="subscribe-confirm" style="display: none">
+					<p id="subscribe-confirm-text"></p>
 					<button id="btn-subscribe-confirm"></button>
 					<button id="btn-subscribe-cancel"></button>
-				</div>
-			</div>
-			<div id="content-header">
-				<div id="release-tag"></div>
-				<div id="release-meta"></div>
+				</section>
+			</section>
+			<header id="content-header">
+				<h2 id="release-tag"></h2>
+				<p id="release-meta"></p>
 				<button id="btn-install" type="button"></button>
 				<button id="btn-github"></button>
-			</div>
-			<div id="install-note" style="display: none"></div>
-			<div id="install-panel" style="display: none">
-				<span id="install-text"></span>
+			</header>
+			<p id="install-note" style="display: none"></p>
+			<section id="install-panel" style="display: none">
+				<p id="install-text" aria-live="polite"></p>
 				<button id="btn-install-retry" type="button"></button>
 				<button id="btn-install-restart" type="button" style="display: none"></button>
-				<div id="install-failure-actions" style="display: none"></div>
-			</div>
-			<div id="release-body"></div>
-		</div>
+				<p id="install-failure-actions" style="display: none"></p>
+			</section>
+			<article id="release-body"></article>
+		</main>
 
-		<div id="loading-overlay">
-			<div id="loading-spinner"></div>
-			<div id="loading-text" data-i18n="changelog_window.loading"></div>
-		</div>
+		<section id="loading-overlay">
+			<progress id="loading-spinner" aria-labelledby="loading-text"></progress>
+			<p id="loading-text" role="status" data-i18n="changelog_window.loading"></p>
+		</section>
 
-		<div id="error-overlay" style="display: none">
-			<div id="error-icon">⚠️</div>
-			<div id="error-text"></div>
-			<div id="error-actions">
+		<section id="error-overlay" style="display: none">
+			<p id="error-icon" aria-hidden="true">⚠️</p>
+			<p id="error-text" role="alert"></p>
+			<p id="error-actions">
 				<button id="btn-retry"></button>
 				<button id="btn-releases-page"></button>
-			</div>
-		</div>
+			</p>
+		</section>
 
 		<script src="script.js"></script>
 	</body>

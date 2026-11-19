@@ -1,24 +1,12 @@
 {
 	"files": {
-		"index.html": [
-			{
-				"tag": "div",
-				"count": 22,
-				"pending": true
-			},
-			{
-				"tag": "span",
-				"count": 4,
-				"pending": true
-			}
-		],
 		"script.js": [
 			{
 				"tag": "div",
-				"count": 9,
-				"pending": true
+				"where": "var body = document.createElement('div');",
+				"count": 1,
+				"reason": "The body of a folded release section after its summary, the box the Markdown renderer fills; the details element already carries the section"
 			}
 		]
-	},
-	"pendingProblems": 1
+	}
 }

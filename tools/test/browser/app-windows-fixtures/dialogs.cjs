@@ -445,6 +445,15 @@ module.exports = [
 						'Enter on a focused release row selects it'
 					);
 					assert.equal(await page.textContent('#release-tag'), 'v0.0.0-dev.149');
+					// The arrow keys, Home and End move along the list.
+					const focusedIndex = () =>
+						page.evaluate(() => document.activeElement.getAttribute('data-idx'));
+					await page.keyboard.press('ArrowDown');
+					assert.equal(await focusedIndex(), '2', 'ArrowDown moves to the next release');
+					await page.keyboard.press('ArrowUp');
+					assert.equal(await focusedIndex(), '1', 'ArrowUp moves to the previous release');
+					await page.keyboard.press('Home');
+					assert.equal(await focusedIndex(), '0', 'Home moves to the first release');
 				}
 			},
 			{

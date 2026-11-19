@@ -107,9 +107,10 @@ function openPage(globals) {
 		shown: (id) => el(id).style.display !== 'none',
 		select: (tag) => page.sandbox.selectRelease(RELEASES.findIndex((r) => r.tag_name === tag)),
 		row: (tag) =>
-			el('release-list').children.find(
-				(item) => item.children[0] && item.children[0].textContent === tag
-			),
+			// Each list item holds the release's button.
+			el('release-list')
+				.children.map((row) => row.children[0])
+				.find((item) => item && item.children[0] && item.children[0].textContent === tag),
 		payloads: (action) =>
 			page.posted.map((message) => message.payload).filter((p) => p && p.action === action),
 		answer: (response) =>
@@ -441,7 +442,8 @@ function openFeedPage(globals) {
 	const el = (id) => page.document.getElementById(id);
 	const tags = () =>
 		el('release-list')
-			.children.map((item) => item.children[0] && item.children[0].textContent)
+			.children.map((row) => row.children[0])
+			.map((item) => item && item.children[0] && item.children[0].textContent)
 			.filter(Boolean);
 	return {
 		...page,

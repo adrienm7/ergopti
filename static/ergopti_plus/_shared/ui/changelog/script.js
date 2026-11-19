@@ -759,7 +759,7 @@ function renderReleaseList() {
 	list.replaceChildren();
 
 	if (_releases.length === 0) {
-		var empty = document.createElement('div');
+		var empty = document.createElement('li');
 		empty.style.cssText =
 			'color:' + ThemeTokens.color('grey-555') + ';font-size:12px;padding:16px 14px;';
 		empty.textContent = _t('changelog_window.no_releases');
@@ -768,54 +768,72 @@ function renderReleaseList() {
 	}
 
 	_releases.forEach(function (release, idx) {
-		var item = document.createElement('div');
+		// A button in a list item: the keyboard reaches it and Enter or Space
+		// picks it (WCAG 2.1.1); aria-current names the release on screen
+		// (_markSelectedRelease) and the arrow keys move along the list.
+		var row = document.createElement('li');
+		var item = document.createElement('button');
+		item.type = 'button';
 		item.className = 'release-item' + (release.prerelease ? ' prerelease' : '');
 		item.setAttribute('data-idx', idx);
-		// A keyboard stop that Enter and Space pick, as a click does (WCAG 2.1.1);
-		// aria-current names the release on screen (_markSelectedRelease).
-		item.setAttribute('role', 'button');
-		item.tabIndex = 0;
 		item.onclick = function () {
 			selectRelease(idx);
 		};
-		item.onkeydown = function (event) {
-			if (event.key !== 'Enter' && event.key !== ' ') return;
-			event.preventDefault();
-			selectRelease(idx);
-		};
+		item.onkeydown = _moveInReleaseList;
 
-		var tag = document.createElement('div');
+		var tag = document.createElement('strong');
 		tag.className = 'release-item-tag';
 		tag.textContent = release.tag_name || '?';
 		item.appendChild(tag);
 
-		var date = document.createElement('div');
+		var date = document.createElement('time');
 		date.className = 'release-item-date';
+		if (release.published_at) date.setAttribute('datetime', release.published_at);
 		date.textContent = _formatDate(release.published_at);
 		item.appendChild(date);
 
 		if (release.prerelease) {
-			var badge = document.createElement('div');
+			var badge = document.createElement('small');
 			badge.className = 'release-item-badge badge-prerelease';
 			badge.textContent = _t('changelog_window.badge_prerelease');
 			item.appendChild(badge);
 		} else if (idx === 0) {
-			var badge2 = document.createElement('div');
+			var badge2 = document.createElement('small');
 			badge2.className = 'release-item-badge badge-latest';
 			badge2.textContent = _t('changelog_window.badge_latest');
 			item.appendChild(badge2);
 		}
 		if (_isInstalled(release)) {
 			item.classList.add('installed');
-			var installedBadge = document.createElement('div');
+			var installedBadge = document.createElement('small');
 			installedBadge.className = 'release-item-badge badge-installed';
 			installedBadge.setAttribute('data-i18n', 'changelog_window.badge_installed');
 			installedBadge.textContent = _t('changelog_window.badge_installed') || '';
 			item.appendChild(installedBadge);
 		}
 
-		list.appendChild(item);
+		row.appendChild(item);
+		list.appendChild(row);
 	});
+}
+
+/**
+ * Moves the focus along the release list with the arrow keys, Home and End,
+ * so a long list is walked without a Tab stop per release.
+ * @param {KeyboardEvent} event
+ */
+function _moveInReleaseList(event) {
+	var items = Array.prototype.slice.call(document.querySelectorAll('.release-item'));
+	var at = items.indexOf(event.currentTarget);
+	var next = {
+		ArrowDown: at + 1,
+		ArrowUp: at - 1,
+		Home: 0,
+		End: items.length - 1
+	}[event.key];
+	if (next === undefined || at === -1 || next < 0 || next >= items.length) return;
+	event.preventDefault();
+	items[next].focus();
 }
 
 // =========================================
@@ -894,8 +912,8 @@ function selectRelease(idx) {
 		open: function (url) {
 			_postChangelogMessage({ action: 'open_url', url: url });
 		},
-		// Read under the window's h1: the body's own headings start at level 2.
-		topLevel: 2
+		// Read under the release's h2: the body's own headings start at level 3.
+		topLevel: 3
 	};
 	// CI orders the body for github.com (downloads first, changelog folded);
 	// the sections are read before rendering, which strips their markers.
@@ -940,7 +958,7 @@ function _renderReleaseSections(bodyEl, parts, markdownOptions) {
 	}
 
 	if (parts.footer !== '') {
-		var footer = document.createElement('div');
+		var footer = document.createElement('footer');
 		footer.className = 'release-footer';
 		renderMarkdownInto(footer, parts.footer, markdownOptions);
 		bodyEl.appendChild(footer);
