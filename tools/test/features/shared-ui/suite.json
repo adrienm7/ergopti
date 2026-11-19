@@ -608,7 +608,7 @@
 		},
 		{
 			"id": "site-video-captions",
-			"ordinal": 702,
+			"ordinal": 703,
 			"name": "every video and embedded player of the site has a WebVTT captions track whose file exists and a transcript, and the checker refuses each missing part",
 			"cmd": "node",
 			"args": ["tools/test/test-site-video-captions.cjs"],
@@ -616,7 +616,7 @@
 		},
 		{
 			"id": "heading-landmarks",
-			"ordinal": 703,
+			"ordinal": 704,
 			"name": "the Studio and app window outline check refuses no h1 or two, a skipped heading level, no main or two, an unnamed landmark and two landmarks under one name",
 			"cmd": "node",
 			"args": ["tools/test/test-heading-landmarks.cjs"],
