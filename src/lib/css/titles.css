@@ -78,6 +78,16 @@ h4 {
 	margin-top: 13vh;
 }
 
+/* A word longer than a phone's width at 200 % text (« Disposition » in a
+   page title) breaks instead of making the page scroll sideways (WCAG
+   1.4.10, the reflow check of tools/test/browser/site-reading.cjs). */
+h1,
+h2,
+h3,
+h4 {
+	overflow-wrap: break-word;
+}
+
 /* Deactivate AOS for people who get animation sick */
 @media (prefers-reduced-motion: reduce) {
 	[data-aos] {

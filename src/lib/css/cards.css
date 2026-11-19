@@ -5,6 +5,10 @@
 	--icon-color-white2: #5ccbff;
 	display: grid;
 	gap: 1rem;
+	/* One column no wider than the window: an implicit track is as wide as
+	   its longest word, which at 200 % text on a phone passed the window's
+	   edge (WCAG 1.4.10); the card breaks that word instead. */
+	grid-template-columns: minmax(0, 1fr);
 	margin: 0 auto;
 	max-width: min(1000px, 95vw);
 }
@@ -13,6 +17,7 @@
 	border-radius: 7px;
 	display: block;
 	line-height: 1.3em;
+	overflow-wrap: break-word;
 	padding: 1rem;
 }
 
