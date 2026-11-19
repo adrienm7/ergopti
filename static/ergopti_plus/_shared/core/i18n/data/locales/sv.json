@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: andelen måste vara ett tal på 0 eller mer",
 	"layout_analysis.error.ideal_load_sum": "andelarna blir {sum} % tillsammans, inte 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} bär mindre än {below}: varje hand håller pekfinger ≥ långfinger ≥ ringfinger ≥ lillfinger",
+	"layout_analysis.error.similarity_empty": "Ingen av layouterna skriver något tecken ur denna korpus: välj en korpus på deras språk för att jämföra dem",
 	"layout_analysis.ideal.refused": "Denna belastning kan inte användas: {reason}",
 	"layout_analysis.shortcuts.title": "Kortkommandobokstäver",
 	"layout_analysis.shortcuts.help": "Hur användbart Ctrl- eller Cmd-kortkommandot för varje bokstav är (0 till 10), och hur lätt varje vänsterhandstangent är att nå med höger hand på musen (0 till 1): placeringen av kortkommandon multiplicerar dem.",

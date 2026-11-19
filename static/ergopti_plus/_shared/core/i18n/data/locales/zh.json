@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}：占比必须是大于或等于 0 的数字",
 	"layout_analysis.error.ideal_load_sum": "占比之和为 {sum} %，而不是 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} 的占比低于 {below}：每只手须保持食指 ≥ 中指 ≥ 无名指 ≥ 小指",
+	"layout_analysis.error.similarity_empty": "两种布局都无法输入此语料库中的任何字符：请选择其语言的语料库进行比较",
 	"layout_analysis.ideal.refused": "无法使用此负荷：{reason}",
 	"layout_analysis.shortcuts.title": "快捷键字母",
 	"layout_analysis.shortcuts.help": "每个字母的 Ctrl 或 Cmd 快捷键有多有用（0 到 10），以及右手放在鼠标上时左手各键有多容易按到（0 到 1）：快捷键位置将两者相乘。",

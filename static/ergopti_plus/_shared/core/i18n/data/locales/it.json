@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: la quota deve essere un numero pari o superiore a 0",
 	"layout_analysis.error.ideal_load_sum": "le quote sommano {sum} %, non 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} porta meno di {below}: ogni mano mantiene indice ≥ medio ≥ anulare ≥ mignolo",
+	"layout_analysis.error.similarity_empty": "Nessuno dei due layout digita alcun carattere di questo corpus: scegli un corpus nella loro lingua per confrontarli",
 	"layout_analysis.ideal.refused": "Questo carico non può essere usato: {reason}",
 	"layout_analysis.shortcuts.title": "Lettere delle scorciatoie",
 	"layout_analysis.shortcuts.help": "Quanto è utile la scorciatoia Ctrl o Cmd di ogni lettera (da 0 a 10) e quanto è comodo ogni tasto della mano sinistra con la destra sul mouse (da 0 a 1): il posizionamento delle scorciatoie li moltiplica.",

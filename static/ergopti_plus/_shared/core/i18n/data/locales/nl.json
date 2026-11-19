@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: het aandeel moet een getal van 0 of meer zijn",
 	"layout_analysis.error.ideal_load_sum": "de aandelen tellen op tot {sum} %, niet 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} draagt minder dan {below}: elke hand houdt wijsvinger ≥ middelvinger ≥ ringvinger ≥ pink",
+	"layout_analysis.error.similarity_empty": "Geen van beide indelingen typt een teken uit dit corpus: kies een corpus in hun taal om ze te vergelijken",
 	"layout_analysis.ideal.refused": "Deze belasting kan niet worden gebruikt: {reason}",
 	"layout_analysis.shortcuts.title": "Sneltoetsletters",
 	"layout_analysis.shortcuts.help": "Hoe nuttig de Ctrl- of Cmd-sneltoets van elke letter is (0 tot 10), en hoe makkelijk elke toets van de linkerhand te bereiken is met de rechterhand op de muis (0 tot 1): de plaatsing van sneltoetsen vermenigvuldigt ze.",

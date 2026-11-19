@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: the share must be a number of 0 or more",
 	"layout_analysis.error.ideal_load_sum": "the shares add up to {sum} %, not 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} carries less than {below}: each hand keeps index ≥ middle ≥ ring ≥ pinky",
+	"layout_analysis.error.similarity_empty": "No character of this corpus is typed by either layout: choose a corpus in their language to compare them",
 	"layout_analysis.ideal.refused": "This load cannot be used: {reason}",
 	"layout_analysis.shortcuts.title": "Shortcut letters",
 	"layout_analysis.shortcuts.help": "How useful the Ctrl or Cmd shortcut of each letter is (0 to 10), and how easy each left-hand key is to reach with the right hand on the mouse (0 to 1): shortcut placement multiplies them.",

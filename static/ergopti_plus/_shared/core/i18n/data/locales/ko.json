@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: 비율은 0 이상의 숫자여야 합니다",
 	"layout_analysis.error.ideal_load_sum": "비율의 합이 100 %가 아니라 {sum} %입니다",
 	"layout_analysis.error.ideal_load_order": "{finger}의 비율이 {below}보다 작습니다: 각 손에서 검지 ≥ 중지 ≥ 약지 ≥ 새끼를 유지하세요",
+	"layout_analysis.error.similarity_empty": "두 배열 모두 이 말뭉치의 문자를 입력하지 않습니다. 비교하려면 해당 언어의 말뭉치를 선택하세요",
 	"layout_analysis.ideal.refused": "이 부하는 사용할 수 없습니다: {reason}",
 	"layout_analysis.shortcuts.title": "단축키 글자",
 	"layout_analysis.shortcuts.help": "각 글자의 Ctrl 또는 Cmd 단축키가 얼마나 유용한지(0~10)와, 오른손을 마우스에 둔 채 왼손의 각 키를 얼마나 쉽게 누를 수 있는지(0~1): 단축키 배치는 이 둘을 곱합니다.",

@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: andelen må være et tall på 0 eller mer",
 	"layout_analysis.error.ideal_load_sum": "andelene blir {sum} % til sammen, ikke 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} bærer mindre enn {below}: hver hånd holder pekefinger ≥ langfinger ≥ ringfinger ≥ lillefinger",
+	"layout_analysis.error.similarity_empty": "Ingen av oppsettene skriver et eneste tegn fra dette korpuset: velg et korpus på deres språk for å sammenligne dem",
 	"layout_analysis.ideal.refused": "Denne belastningen kan ikke brukes: {reason}",
 	"layout_analysis.shortcuts.title": "Snarveisbokstaver",
 	"layout_analysis.shortcuts.help": "Hvor nyttig Ctrl- eller Cmd-snarveien for hver bokstav er (0 til 10), og hvor lett hver venstrehåndstast er å nå med høyre hånd på musen (0 til 1): plasseringen av snarveier multipliserer dem.",

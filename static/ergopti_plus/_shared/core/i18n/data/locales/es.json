@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: la parte debe ser un número igual o mayor que 0",
 	"layout_analysis.error.ideal_load_sum": "las partes suman {sum} %, no 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} lleva menos que {below}: cada mano mantiene índice ≥ medio ≥ anular ≥ meñique",
+	"layout_analysis.error.similarity_empty": "Ninguna de las dos distribuciones escribe ningún carácter de este corpus: elija un corpus en su idioma para compararlas",
 	"layout_analysis.ideal.refused": "Esta carga no se puede usar: {reason}",
 	"layout_analysis.shortcuts.title": "Letras de atajo",
 	"layout_analysis.shortcuts.help": "Utilidad del atajo Ctrl o Cmd de cada letra (0 a 10) y facilidad de cada tecla de la mano izquierda con la derecha en el ratón (0 a 1): la colocación de los atajos las multiplica.",

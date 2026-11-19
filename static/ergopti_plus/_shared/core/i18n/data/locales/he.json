@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: החלק חייב להיות מספר 0 ומעלה",
 	"layout_analysis.error.ideal_load_sum": "סכום החלקים הוא {sum} %, לא 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} נושאת פחות מ-{below}: בכל יד אצבע מורה ≥ אמה ≥ קמיצה ≥ זרת",
+	"layout_analysis.error.similarity_empty": "אף אחת מהפריסות אינה מקלידה אף תו מהקורפוס הזה: בחרו קורפוס בשפתן כדי להשוות ביניהן",
 	"layout_analysis.ideal.refused": "לא ניתן להשתמש בעומס הזה: {reason}",
 	"layout_analysis.shortcuts.title": "אותיות קיצור",
 	"layout_analysis.shortcuts.help": "עד כמה שימושי קיצור ה-Ctrl או ה-Cmd של כל אות (0 עד 10), ועד כמה קל להגיע לכל מקש של יד שמאל כשיד ימין על העכבר (0 עד 1): מיקום הקיצורים מכפיל ביניהם.",

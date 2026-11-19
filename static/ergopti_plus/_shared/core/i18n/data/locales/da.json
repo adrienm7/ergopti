@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: andelen skal være et tal på 0 eller mere",
 	"layout_analysis.error.ideal_load_sum": "andelene giver {sum} % tilsammen, ikke 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} bærer mindre end {below}: hver hånd holder pegefinger ≥ langfinger ≥ ringfinger ≥ lillefinger",
+	"layout_analysis.error.similarity_empty": "Ingen af layoutene skriver et eneste tegn fra dette korpus: vælg et korpus på deres sprog for at sammenligne dem",
 	"layout_analysis.ideal.refused": "Denne belastning kan ikke bruges: {reason}",
 	"layout_analysis.shortcuts.title": "Genvejsbogstaver",
 	"layout_analysis.shortcuts.help": "Hvor nyttig Ctrl- eller Cmd-genvejen for hvert bogstav er (0 til 10), og hvor let hver venstrehåndstast er at nå med højre hånd på musen (0 til 1): placeringen af genveje ganger dem.",

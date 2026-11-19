@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger} : la part doit être un nombre positif ou nul",
 	"layout_analysis.error.ideal_load_sum": "les parts totalisent {sum} %, pas 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} porte moins que {below} : chaque main garde index ≥ majeur ≥ annulaire ≥ auriculaire",
+	"layout_analysis.error.similarity_empty": "Aucun caractère de ce corpus n'est tapé par l'une ou l'autre disposition : choisissez un corpus dans leur langue pour les comparer",
 	"layout_analysis.ideal.refused": "Cette charge ne peut pas être utilisée : {reason}",
 	"layout_analysis.shortcuts.title": "Lettres des raccourcis",
 	"layout_analysis.shortcuts.help": "Utilité du raccourci Ctrl ou Cmd de chaque lettre (0 à 10), et facilité de chaque touche de la main gauche quand la droite est sur la souris (0 à 1) : le placement des raccourcis les multiplie.",

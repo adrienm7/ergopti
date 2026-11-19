@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: доля должна быть числом не меньше 0",
 	"layout_analysis.error.ideal_load_sum": "доли дают в сумме {sum} %, а не 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} несёт меньше, чем {below}: на каждой руке указательный ≥ средний ≥ безымянный ≥ мизинец",
+	"layout_analysis.error.similarity_empty": "Ни одна из раскладок не набирает ни одного символа этого корпуса: для сравнения выберите корпус на их языке",
 	"layout_analysis.ideal.refused": "Эту нагрузку нельзя использовать: {reason}",
 	"layout_analysis.shortcuts.title": "Буквы сочетаний",
 	"layout_analysis.shortcuts.help": "Насколько полезно сочетание Ctrl или Cmd для каждой буквы (от 0 до 10) и насколько легко дотянуться до каждой клавиши левой руки, когда правая на мыши (от 0 до 1): размещение сочетаний перемножает их.",

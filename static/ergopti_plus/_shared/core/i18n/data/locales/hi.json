@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: हिस्सा 0 या उससे अधिक की संख्या होना चाहिए",
 	"layout_analysis.error.ideal_load_sum": "हिस्सों का योग {sum} % है, 100 % नहीं",
 	"layout_analysis.error.ideal_load_order": "{finger} का हिस्सा {below} से कम है: हर हाथ में तर्जनी ≥ मध्यमा ≥ अनामिका ≥ कनिष्ठा रहना चाहिए",
+	"layout_analysis.error.similarity_empty": "इस कॉर्पस का कोई भी अक्षर किसी भी लेआउट से टाइप नहीं होता: तुलना के लिए उनकी भाषा में कॉर्पस चुनें",
 	"layout_analysis.ideal.refused": "यह भार उपयोग नहीं हो सकता: {reason}",
 	"layout_analysis.shortcuts.title": "शॉर्टकट अक्षर",
 	"layout_analysis.shortcuts.help": "हर अक्षर का Ctrl या Cmd शॉर्टकट कितना उपयोगी है (0 से 10), और दायाँ हाथ माउस पर रहते हुए बाएँ हाथ की हर कुंजी तक पहुँचना कितना आसान है (0 से 1): शॉर्टकट की जगह इन दोनों को गुणा करती है।",

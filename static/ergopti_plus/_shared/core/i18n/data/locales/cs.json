@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: podíl musí být číslo 0 nebo větší",
 	"layout_analysis.error.ideal_load_sum": "podíly dávají dohromady {sum} %, ne 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} nese méně než {below}: každá ruka zachovává ukazováček ≥ prostředníček ≥ prsteníček ≥ malíček",
+	"layout_analysis.error.similarity_empty": "Žádné z rozložení nepíše žádný znak tohoto korpusu: pro porovnání zvolte korpus v jejich jazyce",
 	"layout_analysis.ideal.refused": "Toto zatížení nelze použít: {reason}",
 	"layout_analysis.shortcuts.title": "Písmena zkratek",
 	"layout_analysis.shortcuts.help": "Jak užitečná je zkratka Ctrl nebo Cmd každého písmene (0 až 10) a jak snadno lze dosáhnout každé klávesy levé ruky, když je pravá ruka na myši (0 až 1): umístění zkratek je násobí.",

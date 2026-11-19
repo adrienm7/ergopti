@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: pay 0 veya daha büyük bir sayı olmalıdır",
 	"layout_analysis.error.ideal_load_sum": "payların toplamı 100 % değil, {sum} %",
 	"layout_analysis.error.ideal_load_order": "{finger}, {below} parmağından daha az taşıyor: her elde işaret ≥ orta ≥ yüzük ≥ serçe olmalıdır",
+	"layout_analysis.error.similarity_empty": "İki düzen de bu derlemin hiçbir karakterini yazmıyor: karşılaştırmak için onların dilinde bir derlem seçin",
 	"layout_analysis.ideal.refused": "Bu yük kullanılamaz: {reason}",
 	"layout_analysis.shortcuts.title": "Kısayol harfleri",
 	"layout_analysis.shortcuts.help": "Her harfin Ctrl veya Cmd kısayolunun ne kadar yararlı olduğu (0 ile 10 arası) ve sağ el faredeyken her sol el tuşuna ne kadar kolay ulaşıldığı (0 ile 1 arası): kısayol yerleşimi bunları çarpar.",

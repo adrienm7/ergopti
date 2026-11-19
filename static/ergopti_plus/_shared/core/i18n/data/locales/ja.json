@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}：割合は 0 以上の数値にしてください",
 	"layout_analysis.error.ideal_load_sum": "割合の合計が 100 % ではなく {sum} % です",
 	"layout_analysis.error.ideal_load_order": "{finger} の割合が {below} より小さくなっています：各手で人差し指 ≥ 中指 ≥ 薬指 ≥ 小指を保ってください",
+	"layout_analysis.error.similarity_empty": "どちらの配列もこのコーパスの文字を入力できません。比較するには、その言語のコーパスを選んでください",
 	"layout_analysis.ideal.refused": "この負荷は使用できません：{reason}",
 	"layout_analysis.shortcuts.title": "ショートカットの文字",
 	"layout_analysis.shortcuts.help": "各文字の Ctrl または Cmd ショートカットの有用度（0〜10）と、右手をマウスに置いたまま左手の各キーをどれだけ押しやすいか（0〜1）。ショートカット配置はこの 2 つを掛け合わせます。",

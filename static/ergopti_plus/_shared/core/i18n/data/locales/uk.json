@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: частка має бути числом не менше 0",
 	"layout_analysis.error.ideal_load_sum": "частки разом дають {sum} %, а не 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} несе менше, ніж {below}: на кожній руці вказівний ≥ середній ≥ безіменний ≥ мізинець",
+	"layout_analysis.error.similarity_empty": "Жодна з розкладок не набирає жодного символу цього корпусу: для порівняння виберіть корпус їхньою мовою",
 	"layout_analysis.ideal.refused": "Це навантаження не можна використати: {reason}",
 	"layout_analysis.shortcuts.title": "Літери сполучень",
 	"layout_analysis.shortcuts.help": "Наскільки корисне сполучення Ctrl або Cmd для кожної літери (від 0 до 10) і наскільки легко дотягнутися до кожної клавіші лівої руки, коли права на миші (від 0 до 1): розміщення сполучень перемножує їх.",

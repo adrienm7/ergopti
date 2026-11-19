@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: udział musi być liczbą równą 0 lub większą",
 	"layout_analysis.error.ideal_load_sum": "udziały sumują się do {sum} %, a nie 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} ma mniej niż {below}: w każdej ręce wskazujący ≥ środkowy ≥ serdeczny ≥ mały",
+	"layout_analysis.error.similarity_empty": "Żaden z układów nie wpisuje żadnego znaku tego korpusu: aby je porównać, wybierz korpus w ich języku",
 	"layout_analysis.ideal.refused": "Tego obciążenia nie można użyć: {reason}",
 	"layout_analysis.shortcuts.title": "Litery skrótów",
 	"layout_analysis.shortcuts.help": "Jak przydatny jest skrót Ctrl lub Cmd każdej litery (od 0 do 10) i jak łatwo sięgnąć każdego klawisza lewej ręki, gdy prawa ręka jest na myszy (od 0 do 1): rozmieszczenie skrótów je mnoży.",

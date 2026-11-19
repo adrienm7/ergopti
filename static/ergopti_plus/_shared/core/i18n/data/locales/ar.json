@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: يجب أن تكون الحصة رقمًا يساوي 0 أو أكثر",
 	"layout_analysis.error.ideal_load_sum": "مجموع الحصص {sum} % وليس 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} يحمل أقل من {below}: في كل يد السبابة ≥ الوسطى ≥ البنصر ≥ الخنصر",
+	"layout_analysis.error.similarity_empty": "لا يكتب أيّ من التخطيطين أيّ حرف من هذه المدوّنة: اختر مدوّنة بلغتهما لمقارنتهما",
 	"layout_analysis.ideal.refused": "لا يمكن استخدام هذا الحِمل: {reason}",
 	"layout_analysis.shortcuts.title": "حروف الاختصارات",
 	"layout_analysis.shortcuts.help": "مدى فائدة اختصار Ctrl أو Cmd لكل حرف (من 0 إلى 10)، ومدى سهولة الوصول إلى كل مفتاح من مفاتيح اليد اليسرى واليد اليمنى على الفأرة (من 0 إلى 1): يضربهما موضع الاختصارات أحدهما في الآخر.",

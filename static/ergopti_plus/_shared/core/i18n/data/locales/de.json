@@ -4711,6 +4711,7 @@
 	"layout_analysis.error.ideal_load_share": "{finger}: Der Anteil muss eine Zahl ab 0 sein",
 	"layout_analysis.error.ideal_load_sum": "die Anteile ergeben zusammen {sum} %, nicht 100 %",
 	"layout_analysis.error.ideal_load_order": "{finger} trägt weniger als {below}: Jede Hand behält Zeigefinger ≥ Mittelfinger ≥ Ringfinger ≥ kleiner Finger",
+	"layout_analysis.error.similarity_empty": "Keines der beiden Layouts tippt ein Zeichen dieses Korpus: Wählen Sie zum Vergleich ein Korpus in ihrer Sprache",
 	"layout_analysis.ideal.refused": "Diese Last kann nicht verwendet werden: {reason}",
 	"layout_analysis.shortcuts.title": "Kürzelbuchstaben",
 	"layout_analysis.shortcuts.help": "Wie nützlich das Strg- oder Cmd-Kürzel jedes Buchstabens ist (0 bis 10) und wie leicht jede Taste der linken Hand erreichbar ist, während die rechte an der Maus liegt (0 bis 1): Die Kürzelplatzierung multipliziert beide.",
