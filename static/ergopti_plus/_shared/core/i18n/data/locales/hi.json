@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "लेआउट चिपकाएँ…",
 	"layout_editor.tabs.paste_open": "नए टैब में खोलें",
 	"layout_editor.tabs.drop": "हर एक को नए टैब में खोलने के लिए लेआउट फ़ाइलें छोड़ें",
+	"layout_editor.tabs.rename_hint": "(नाम बदलने के लिए डबल-क्लिक या F2)",
 	"layout_editor.tabs.restore_failed": "आपके सहेजे गए टैब बहाल नहीं हो सके; वे जैसे हैं वैसे रखे गए हैं और उनके ऊपर कुछ नहीं सहेजा जाता: {reason}",
 	"layout_editor.tabs.autosave.loading": "आपके टैब बहाल हो रहे हैं…",
 	"layout_editor.tabs.autosave.saving": "इस डिवाइस पर सहेजा जा रहा है…",

@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "배열 붙여 넣기…",
 	"layout_editor.tabs.paste_open": "새 탭에서 열기",
 	"layout_editor.tabs.drop": "배열 파일을 끌어다 놓으면 각각 새 탭에서 열립니다",
+	"layout_editor.tabs.rename_hint": "(두 번 클릭하거나 F2로 이름 바꾸기)",
 	"layout_editor.tabs.restore_failed": "저장된 탭을 복원할 수 없습니다. 탭은 그대로 보관되며 그 위에 아무것도 저장하지 않습니다: {reason}",
 	"layout_editor.tabs.autosave.loading": "탭을 복원하는 중…",
 	"layout_editor.tabs.autosave.saving": "이 기기에 저장하는 중…",

@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Layout einfügen…",
 	"layout_editor.tabs.paste_open": "In neuem Tab öffnen",
 	"layout_editor.tabs.drop": "Layout-Dateien ablegen, um jede in einem neuen Tab zu öffnen",
+	"layout_editor.tabs.rename_hint": "(Doppelklick oder F2 zum Umbenennen)",
 	"layout_editor.tabs.restore_failed": "Deine gespeicherten Tabs konnten nicht wiederhergestellt werden; sie bleiben unverändert erhalten und nichts wird darüber gespeichert: {reason}",
 	"layout_editor.tabs.autosave.loading": "Tabs werden wiederhergestellt…",
 	"layout_editor.tabs.autosave.saving": "Wird auf diesem Gerät gespeichert…",

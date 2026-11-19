@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Colar um layout…",
 	"layout_editor.tabs.paste_open": "Abrir num novo separador",
 	"layout_editor.tabs.drop": "Largue ficheiros de layout para abrir cada um num novo separador",
+	"layout_editor.tabs.rename_hint": "(duplo clique ou F2 para mudar o nome)",
 	"layout_editor.tabs.restore_failed": "Não foi possível restaurar os seus separadores guardados; são mantidos como estão e nada é guardado por cima: {reason}",
 	"layout_editor.tabs.autosave.loading": "A restaurar os seus separadores…",
 	"layout_editor.tabs.autosave.saving": "A guardar neste dispositivo…",

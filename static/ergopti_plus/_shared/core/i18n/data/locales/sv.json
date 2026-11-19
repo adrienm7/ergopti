@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Klistra in en layout…",
 	"layout_editor.tabs.paste_open": "Öppna i en ny flik",
 	"layout_editor.tabs.drop": "Släpp layoutfiler för att öppna var och en i en ny flik",
+	"layout_editor.tabs.rename_hint": "(dubbelklicka eller F2 för att byta namn)",
 	"layout_editor.tabs.restore_failed": "Dina sparade flikar kunde inte återställas; de behålls som de är och inget sparas över dem: {reason}",
 	"layout_editor.tabs.autosave.loading": "Återställer dina flikar…",
 	"layout_editor.tabs.autosave.saving": "Sparar på den här enheten…",

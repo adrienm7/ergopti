@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Paste a layout…",
 	"layout_editor.tabs.paste_open": "Open in a new tab",
 	"layout_editor.tabs.drop": "Drop layout files to open each one in a new tab",
+	"layout_editor.tabs.rename_hint": "(double-click or F2 to rename)",
 	"layout_editor.tabs.restore_failed": "Your saved tabs could not be restored; they are kept as they are and nothing is saved over them: {reason}",
 	"layout_editor.tabs.autosave.loading": "Restoring your tabs…",
 	"layout_editor.tabs.autosave.saving": "Saving on this device…",

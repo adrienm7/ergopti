@@ -222,6 +222,22 @@ body {
 	font-weight: 600;
 }
 
+/* « ⧉ » duplicates the layout (ux-study item 20); the name field takes the
+   tab's place while it is renamed. */
+.le-layout-tab-duplicate {
+	color: var(--le-accent);
+	min-width: 24px;
+}
+
+.le-layout-tab-rename {
+	border: 0;
+	border-radius: var(--le-radius);
+	font: inherit;
+	min-height: 28px;
+	padding: 0 8px;
+	width: 18ch;
+}
+
 .le-autosave {
 	color: var(--le-sub);
 	font-size: 0.9em;

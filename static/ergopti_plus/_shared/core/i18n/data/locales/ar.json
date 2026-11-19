@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "لصق تخطيط…",
 	"layout_editor.tabs.paste_open": "فتح في علامة تبويب جديدة",
 	"layout_editor.tabs.drop": "أفلت ملفات التخطيط لفتح كل منها في علامة تبويب جديدة",
+	"layout_editor.tabs.rename_hint": "(نقر مزدوج أو F2 لإعادة التسمية)",
 	"layout_editor.tabs.restore_failed": "تعذّرت استعادة علامات التبويب المحفوظة؛ تُركت كما هي ولا يُحفظ شيء فوقها: {reason}",
 	"layout_editor.tabs.autosave.loading": "جارٍ استعادة علامات التبويب…",
 	"layout_editor.tabs.autosave.saving": "جارٍ الحفظ على هذا الجهاز…",

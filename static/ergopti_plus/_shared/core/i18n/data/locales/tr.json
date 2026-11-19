@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Düzen yapıştır…",
 	"layout_editor.tabs.paste_open": "Yeni sekmede aç",
 	"layout_editor.tabs.drop": "Her birini yeni bir sekmede açmak için düzen dosyalarını bırakın",
+	"layout_editor.tabs.rename_hint": "(yeniden adlandırmak için çift tıklayın veya F2)",
 	"layout_editor.tabs.restore_failed": "Kayıtlı sekmeleriniz geri yüklenemedi; oldukları gibi tutuluyor ve üzerlerine hiçbir şey kaydedilmiyor: {reason}",
 	"layout_editor.tabs.autosave.loading": "Sekmeleriniz geri yükleniyor…",
 	"layout_editor.tabs.autosave.saving": "Bu cihaza kaydediliyor…",

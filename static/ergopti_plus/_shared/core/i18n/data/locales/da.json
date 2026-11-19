@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Indsæt et layout…",
 	"layout_editor.tabs.paste_open": "Åbn i en ny fane",
 	"layout_editor.tabs.drop": "Slip layoutfiler for at åbne hver af dem i en ny fane",
+	"layout_editor.tabs.rename_hint": "(dobbeltklik eller F2 for at omdøbe)",
 	"layout_editor.tabs.restore_failed": "Dine gemte faner kunne ikke gendannes; de bevares, som de er, og intet gemmes oven i dem: {reason}",
 	"layout_editor.tabs.autosave.loading": "Gendanner dine faner…",
 	"layout_editor.tabs.autosave.saving": "Gemmer på denne enhed…",

@@ -433,6 +433,8 @@ var LayoutEditorPage = (function () {
 			nameSearch: { query: '', limit: UnicodeNames.DEFAULT_LIMIT, answer: null, failed: false },
 			// The text the character magnifier shows ('' shows its hint).
 			magnified: '',
+			// The index of the tab whose name is being edited in place, if any.
+			tabRenaming: null,
 			// Whether the magnified text is a dead key's: its bare accent, marked.
 			magnifiedDead: false,
 			presses: [],
@@ -666,6 +668,83 @@ var LayoutEditorPage = (function () {
 		/** A blank layout, as « New » makes it. */
 		function blankDoc() {
 			return LayoutSourceIO.create('my_layout', tl('default_name'));
+		}
+
+		/** Turns a tab into its name field (double-click or F2), focused with its text selected. */
+		function startTabRename(index) {
+			commitFocused();
+			state.tabRenaming = index;
+			render();
+			const field = root.querySelector('#le-tab-rename');
+			field.focus();
+			field.select();
+		}
+
+		/**
+		 * A tab's name field: Enter renames the layout (one edit, undone by
+		 * Undo), Escape or leaving it keeps the name; an empty name is refused in
+		 * words and the field stays.
+		 */
+		function tabRenameField(index, name) {
+			let done = false;
+			const finish = (rename, value) => {
+				if (done) return;
+				done = true;
+				state.tabRenaming = null;
+				const clean = String(value || '').trim();
+				if (rename && clean !== '' && clean !== name) {
+					if (index !== state.active) {
+						keepActive();
+						showTab(index);
+					}
+					apply((d) => LayoutEditorModel.setLayout(d, { name: clean }));
+				} else render();
+				const tab = root.querySelector(`.le-layout-tab[data-tab="${index}"]`);
+				if (tab) tab.focus();
+			};
+			return el('input', {
+				type: 'text',
+				id: 'le-tab-rename',
+				class: 'le-layout-tab-rename',
+				value: name,
+				'aria-label': t('layout_analysis.mine.name_label', { name }),
+				onkeydown: (event) => {
+					if (event.key === 'Escape') {
+						event.preventDefault();
+						finish(false);
+					} else if (event.key === 'Enter') {
+						event.preventDefault();
+						if (event.target.value.trim() === '') {
+							notify('error', t('layout_analysis.mine.name_empty'));
+							// The message's render drew the field again: keep typing there.
+							root.querySelector('#le-tab-rename').focus();
+							return;
+						}
+						finish(true, event.target.value);
+					}
+				},
+				onblur: (event) => {
+					// A render (a message) replaces the field: only a real blur cancels.
+					const field = event.target;
+					setTimeout(() => {
+						if (!done && field.isConnected && state.tabRenaming === index) finish(false);
+					}, 0);
+				}
+			});
+		}
+
+		/** « ⧉ »: the layout in a new tab named as its copy, the original left as it is. */
+		function duplicateTab(index) {
+			commitFocused();
+			keepActive();
+			const current = tabAt(index).history.current();
+			const copy = LayoutEditorModel.setLayout(current, {
+				name: t('layout_analysis.mine.copy_name', { name: current.layout.name }),
+				id: LayoutSourceIO.identifierFrom(`${current.layout.id}_copy`, 'layout')
+			});
+			state.tabs.splice(index + 1, 0, newTab(copy, true));
+			showTab(index + 1);
+			notify('ok', t('layout_analysis.mine.duplicated', { name: copy.layout.name }));
 		}
 
 		/** « + »: a blank layout in a new tab, with « Start from » open to pick another. */
@@ -951,14 +1030,33 @@ var LayoutEditorPage = (function () {
 				const name = tab.history.current().layout.name;
 				const active = index === state.active;
 				return el('span', { class: `le-layout-tab-item${active ? ' active' : ''}` }, [
+					state.tabRenaming === index
+						? tabRenameField(index, name)
+						: el('button', {
+								type: 'button',
+								class: 'le-layout-tab',
+								'data-tab': String(index),
+								'aria-current': active ? 'true' : 'false',
+								// Double-click or F2 renames the layout in place (ux-study item 20).
+								title: `${tl(tab.dirty ? 'toolbar.unsaved' : 'toolbar.saved')} ${tl('tabs.rename_hint')}`,
+								'aria-keyshortcuts': 'F2',
+								text: `${name}${tab.dirty ? ' •' : ''}`,
+								onclick: () => switchTab(index),
+								ondblclick: () => startTabRename(index),
+								onkeydown: (event) => {
+									if (event.key !== 'F2') return;
+									event.preventDefault();
+									startTabRename(index);
+								}
+							}),
 					el('button', {
 						type: 'button',
-						class: 'le-layout-tab',
-						'data-tab': String(index),
-						'aria-current': active ? 'true' : 'false',
-						title: tl(tab.dirty ? 'toolbar.unsaved' : 'toolbar.saved'),
-						text: `${name}${tab.dirty ? ' •' : ''}`,
-						onclick: () => switchTab(index)
+						class: 'le-layout-tab-duplicate',
+						'data-duplicate-tab': String(index),
+						'aria-label': t('layout_analysis.mine.duplicate_named', { name }),
+						title: t('layout_analysis.mine.duplicate_named', { name }),
+						text: '⧉',
+						onclick: () => duplicateTab(index)
 					}),
 					el('button', {
 						type: 'button',

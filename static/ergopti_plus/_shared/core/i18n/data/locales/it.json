@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Incolla un layout…",
 	"layout_editor.tabs.paste_open": "Apri in una nuova scheda",
 	"layout_editor.tabs.drop": "Rilascia file di layout per aprire ciascuno in una nuova scheda",
+	"layout_editor.tabs.rename_hint": "(doppio clic o F2 per rinominare)",
 	"layout_editor.tabs.restore_failed": "Impossibile ripristinare le tue schede salvate; restano come sono e nulla viene salvato sopra: {reason}",
 	"layout_editor.tabs.autosave.loading": "Ripristino delle tue schede…",
 	"layout_editor.tabs.autosave.saving": "Salvataggio su questo dispositivo…",

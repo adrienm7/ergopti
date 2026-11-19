@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Indeling plakken…",
 	"layout_editor.tabs.paste_open": "Openen in een nieuw tabblad",
 	"layout_editor.tabs.drop": "Sleep indelingsbestanden hierheen om elk in een nieuw tabblad te openen",
+	"layout_editor.tabs.rename_hint": "(dubbelklik of F2 om te hernoemen)",
 	"layout_editor.tabs.restore_failed": "Je opgeslagen tabbladen konden niet worden hersteld; ze blijven zoals ze zijn en er wordt niets overheen opgeslagen: {reason}",
 	"layout_editor.tabs.autosave.loading": "Je tabbladen herstellen…",
 	"layout_editor.tabs.autosave.saving": "Opslaan op dit apparaat…",

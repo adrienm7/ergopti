@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Lim inn et oppsett…",
 	"layout_editor.tabs.paste_open": "Åpne i en ny fane",
 	"layout_editor.tabs.drop": "Slipp oppsettsfiler for å åpne hver av dem i en ny fane",
+	"layout_editor.tabs.rename_hint": "(dobbeltklikk eller F2 for å gi nytt navn)",
 	"layout_editor.tabs.restore_failed": "De lagrede fanene dine kunne ikke gjenopprettes; de beholdes som de er, og ingenting lagres over dem: {reason}",
 	"layout_editor.tabs.autosave.loading": "Gjenoppretter fanene dine…",
 	"layout_editor.tabs.autosave.saving": "Lagrer på denne enheten…",

@@ -695,7 +695,55 @@ async function exerciseRankingCsv(browser, origin) {
 	await context.close();
 }
 
+/**
+ * (tab-rename-duplicate) In the editor, « ⧉ » opens the layout's copy in the
+ * next tab, named as a copy with the same keys and the original untouched;
+ * F2 or a double-click renames a tab in place (Escape keeps the name, an
+ * empty name is refused in words), as one edit Undo takes back.
+ */
+async function exerciseTabRenameDuplicate(browser, origin) {
+	const { page, errors, context } = await openOnErgopti(browser, origin);
+	const tabNames = () =>
+		page.$$eval('.le-layout-tab', (tabs) => tabs.map((tab) => tab.textContent.replace(/ •$/, '')));
+	const [original] = await tabNames();
+	await page.click('.le-layout-tab-duplicate[data-duplicate-tab="0"]');
+	const copy = EN['layout_analysis.mine.copy_name'].replace('{name}', original);
+	assert.deepEqual(await tabNames(), [original, copy], 'the copy opens next to it');
+	assert.equal(await page.getAttribute('.le-layout-tab[data-tab="1"]', 'aria-current'), 'true');
+	const legends = () =>
+		page.$$eval('#le-board [data-code] .le-legend', (nodes) =>
+			nodes.map((n) => n.textContent).join('')
+		);
+	const copyKeys = await legends();
+	// F2 renames; Escape keeps the name.
+	await page.focus('.le-layout-tab[data-tab="1"]');
+	await page.keyboard.press('F2');
+	assert.equal(await page.evaluate(() => document.activeElement.id), 'le-tab-rename');
+	await page.keyboard.press('Escape');
+	assert.deepEqual(await tabNames(), [original, copy]);
+	assert.equal(
+		await page.evaluate(() => document.activeElement.dataset.tab),
+		'1',
+		'focus back on the tab'
+	);
+	await page.dblclick('.le-layout-tab[data-tab="1"]');
+	await page.fill('#le-tab-rename', '');
+	await page.keyboard.press('Enter');
+	assert.equal(await page.textContent('#le-message'), EN['layout_analysis.mine.name_empty']);
+	await page.fill('#le-tab-rename', 'My variant');
+	await page.keyboard.press('Enter');
+	assert.deepEqual(await tabNames(), [original, 'My variant'], 'renamed in place');
+	await page.keyboard.press('Control+z');
+	assert.deepEqual(await tabNames(), [original, copy], 'Undo takes the rename back');
+	await page.click('.le-layout-tab[data-tab="0"]');
+	assert.deepEqual((await tabNames())[0], original, 'the original is untouched');
+	assert.equal(await legends(), copyKeys, 'the copy has the same keys');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseTabRenameDuplicate,
 	exerciseRankingCsv,
 	exerciseRankingViews,
 	exercisePresets,

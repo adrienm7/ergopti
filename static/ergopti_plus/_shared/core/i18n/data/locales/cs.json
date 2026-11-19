@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Vložit rozložení…",
 	"layout_editor.tabs.paste_open": "Otevřít na nové kartě",
 	"layout_editor.tabs.drop": "Přetáhněte soubory rozložení, každý se otevře na nové kartě",
+	"layout_editor.tabs.rename_hint": "(dvojklik nebo F2 pro přejmenování)",
 	"layout_editor.tabs.restore_failed": "Uložené karty se nepodařilo obnovit; zůstávají beze změny a nic se přes ně neuloží: {reason}",
 	"layout_editor.tabs.autosave.loading": "Obnovování karet…",
 	"layout_editor.tabs.autosave.saving": "Ukládání v tomto zařízení…",

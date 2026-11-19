@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "הדבקת פריסה…",
 	"layout_editor.tabs.paste_open": "פתיחה בכרטיסייה חדשה",
 	"layout_editor.tabs.drop": "שחררו קובצי פריסה כדי לפתוח כל אחד בכרטיסייה חדשה",
+	"layout_editor.tabs.rename_hint": "(לחיצה כפולה או F2 לשינוי השם)",
 	"layout_editor.tabs.restore_failed": "לא ניתן היה לשחזר את הלשוניות השמורות; הן נשארות כמות שהן ושום דבר לא נשמר מעליהן: {reason}",
 	"layout_editor.tabs.autosave.loading": "משחזר את הלשוניות…",
 	"layout_editor.tabs.autosave.saving": "שומר במכשיר זה…",

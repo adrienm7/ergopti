@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "粘贴布局…",
 	"layout_editor.tabs.paste_open": "在新标签页中打开",
 	"layout_editor.tabs.drop": "拖放布局文件，每个文件将在新标签页中打开",
+	"layout_editor.tabs.rename_hint": "（双击或按 F2 重命名）",
 	"layout_editor.tabs.restore_failed": "无法恢复你保存的标签页；它们保持原样，不会被覆盖保存：{reason}",
 	"layout_editor.tabs.autosave.loading": "正在恢复你的标签页…",
 	"layout_editor.tabs.autosave.saving": "正在保存到本设备…",

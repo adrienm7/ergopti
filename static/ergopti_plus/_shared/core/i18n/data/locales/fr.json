@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Coller une disposition…",
 	"layout_editor.tabs.paste_open": "Ouvrir dans un nouvel onglet",
 	"layout_editor.tabs.drop": "Déposez des fichiers de disposition pour ouvrir chacun dans un nouvel onglet",
+	"layout_editor.tabs.rename_hint": "(double-clic ou F2 pour renommer)",
 	"layout_editor.tabs.restore_failed": "Vos onglets enregistrés n’ont pas pu être restaurés ; ils sont conservés tels quels et rien n’est enregistré par-dessus : {reason}",
 	"layout_editor.tabs.autosave.loading": "Restauration de vos onglets…",
 	"layout_editor.tabs.autosave.saving": "Enregistrement sur cet appareil…",

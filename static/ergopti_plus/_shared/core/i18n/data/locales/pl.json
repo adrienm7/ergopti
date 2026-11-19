@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Wklej układ…",
 	"layout_editor.tabs.paste_open": "Otwórz w nowej karcie",
 	"layout_editor.tabs.drop": "Upuść pliki układów, aby otworzyć każdy w nowej karcie",
+	"layout_editor.tabs.rename_hint": "(dwuklik lub F2, aby zmienić nazwę)",
 	"layout_editor.tabs.restore_failed": "Nie udało się przywrócić zapisanych kart; pozostają bez zmian i nic nie zostanie na nich zapisane: {reason}",
 	"layout_editor.tabs.autosave.loading": "Przywracanie kart…",
 	"layout_editor.tabs.autosave.saving": "Zapisywanie na tym urządzeniu…",

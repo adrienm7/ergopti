@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Pegar una distribución…",
 	"layout_editor.tabs.paste_open": "Abrir en una pestaña nueva",
 	"layout_editor.tabs.drop": "Suelte archivos de distribución para abrir cada uno en una pestaña nueva",
+	"layout_editor.tabs.rename_hint": "(doble clic o F2 para renombrar)",
 	"layout_editor.tabs.restore_failed": "No se pudieron restaurar tus pestañas guardadas; se conservan tal cual y no se guarda nada encima: {reason}",
 	"layout_editor.tabs.autosave.loading": "Restaurando tus pestañas…",
 	"layout_editor.tabs.autosave.saving": "Guardando en este dispositivo…",

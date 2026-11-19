@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "配列を貼り付け…",
 	"layout_editor.tabs.paste_open": "新しいタブで開く",
 	"layout_editor.tabs.drop": "配列ファイルをドロップすると、それぞれ新しいタブで開きます",
+	"layout_editor.tabs.rename_hint": "（ダブルクリックまたは F2 で名前を変更）",
 	"layout_editor.tabs.restore_failed": "保存したタブを復元できませんでした。タブはそのまま保持され、上書き保存はされません：{reason}",
 	"layout_editor.tabs.autosave.loading": "タブを復元しています…",
 	"layout_editor.tabs.autosave.saving": "この端末に保存しています…",

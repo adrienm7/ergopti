@@ -595,6 +595,7 @@
 	"layout_editor.tabs.paste": "Вставити розкладку…",
 	"layout_editor.tabs.paste_open": "Відкрити в новій вкладці",
 	"layout_editor.tabs.drop": "Перетягніть файли розкладок, щоб відкрити кожен у новій вкладці",
+	"layout_editor.tabs.rename_hint": "(подвійне клацання або F2 — перейменувати)",
 	"layout_editor.tabs.restore_failed": "Не вдалося відновити збережені вкладки; їх залишено як є, і поверх них нічого не зберігається: {reason}",
 	"layout_editor.tabs.autosave.loading": "Відновлення вкладок…",
 	"layout_editor.tabs.autosave.saving": "Збереження на цьому пристрої…",
