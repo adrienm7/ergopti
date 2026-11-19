@@ -193,10 +193,11 @@ async function checkHeaders(browser, origin, lang) {
 		`${lang}: the score's formula`
 	);
 	await page.keyboard.press('Escape');
-	// A row's percentile chip: the row opens its details on Enter and once
+	// A row's percentile chip: the row opened its details on Enter and once
 	// cancelled the key, so the chip's own popover never opened from the
-	// keyboard and the focus was lost with the redrawn row.
-	const chip = page.locator('#la-table tbody tr[tabindex] .la-pct').first();
+	// keyboard and the focus was lost with the redrawn row. The row now opens
+	// them through its name button and the pointer; the chip must still win.
+	const chip = page.locator('#la-table tbody tr .la-pct').first();
 	await chip.focus();
 	await page.keyboard.press('Enter');
 	await page.waitForSelector('#la-popover:not([hidden])', { timeout: 5000 });

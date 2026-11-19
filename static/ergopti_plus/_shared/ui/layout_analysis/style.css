@@ -595,6 +595,22 @@ body:has(> main.layout-analysis) {
 	background: none;
 }
 
+/* A table row's layout name, a button for the keyboard drawn as the cell's
+   text (the row answers to the pointer too). */
+.layout-analysis .la-row-name {
+	background: none;
+	border: 0;
+	border-radius: 2px;
+	color: inherit;
+	font: inherit;
+	padding: 0;
+	text-align: inherit;
+}
+
+.layout-analysis .la-row-name:hover {
+	background: none;
+}
+
 /* A layout that cannot type the space or a letter: ranked last, flagged in
    words (never by colour alone), its bar faded. */
 .la-incomplete-flag {

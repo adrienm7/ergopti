@@ -2175,6 +2175,9 @@
 											? format(value, column.digits)
 											: measure(value, column.digits, column.unit)
 								);
+					// The name opens the layout's details: a button for the keyboard, the
+					// row answers to the pointer too.
+					if (column.key === 'name') cell.replaceChildren(rowNameButton(String(value)));
 					if (column.key === 'name' && result.incomplete) cell.append(' ', incompleteFlag(result));
 					if (column.key === 'name' && view) cell.prepend(...view.controls(result));
 					// The relative view shows differences: a percentile is of a value.
@@ -2183,13 +2186,7 @@
 					if (standing) cell.append(INFO.percentile(metricName(column.key), standing));
 					tr.append(cell);
 				}
-				tr.tabIndex = 0;
 				tr.addEventListener('click', () => showDetails(result.layout.id));
-				tr.addEventListener('keydown', (event) => {
-					if (event.key !== 'Enter') return;
-					event.preventDefault();
-					showDetails(result.layout.id);
-				});
 				tbody.append(tr);
 			}
 			table.append(thead, tbody);
@@ -2694,21 +2691,26 @@
 			});
 		}
 
+		/**
+		 * A table row's layout name, the native control that opens its details
+		 * (Enter, Space or a click, which reaches the row's own listener).
+		 */
+		function rowNameButton(name) {
+			const button = el('button', 'la-row-name', name);
+			button.type = 'button';
+			return button;
+		}
+
 		/** A row of a heat table: the layout as its header, opening its details. */
 		function heatTableRow(result) {
 			const tr = el('tr');
 			if (state.details === result.layout.id) tr.className = 'la-selected';
-			const th = el('th', '', result.layout.name);
+			const th = el('th');
+			th.append(rowNameButton(result.layout.name));
 			th.scope = 'row';
 			if (result.incomplete) th.append(' ', incompleteFlag(result));
 			tr.append(th);
-			tr.tabIndex = 0;
 			tr.addEventListener('click', () => showDetails(result.layout.id));
-			tr.addEventListener('keydown', (event) => {
-				if (event.key !== 'Enter') return;
-				event.preventDefault();
-				showDetails(result.layout.id);
-			});
 			return tr;
 		}
 

@@ -1082,8 +1082,8 @@ check(
 		append(...items) {
 			this.children.push(...items);
 		}
-		replaceChildren() {
-			this.children = [];
+		replaceChildren(...items) {
+			this.children = items;
 		}
 		setAttribute(name, value) {
 			this.attributes[name] = value;
@@ -1124,7 +1124,9 @@ check(
 	};
 	vm.createContext(context);
 	vm.runInContext(
-		['relativeCell', 'referenceLanguage', 'rankingTable', 'validTable'].map(fnSource).join('\n') +
+		['relativeCell', 'referenceLanguage', 'rankingTable', 'rowNameButton', 'validTable']
+			.map(fnSource)
+			.join('\n') +
 			"\nconst TABLE_METRICS = ['sfb']; const ALL = ''; const COMPLETE_CHOICES = ['all']; const RANK_CELL = 'la-rank';" +
 			// Two results are too few references for a percentile (E.percentiles).
 			'\nconst libraryPercentile = () => null;',
