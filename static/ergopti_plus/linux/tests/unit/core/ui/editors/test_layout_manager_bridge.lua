@@ -651,7 +651,7 @@ helpers.describe("layout editor menu row (Linux)", function()
 				if top.title == I18n.get("menu.studio.title") then studio, studio_index = top, index end
 			end
 			helpers.assert_eq(type(studio), "table", "the Ergopti Studio row reaches the tray root")
-			helpers.assert_eq(studio_index, layout_index + 1, "the row follows the keyboard layout group")
+			helpers.assert_eq(studio_index + 1, layout_index, "the row comes right before the keyboard layout group")
 			helpers.assert_eq(studio.menu, nil, "the row is a command, not a submenu")
 			helpers.assert_eq(type(studio.fn), "function")
 			studio.fn()

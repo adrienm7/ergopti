@@ -274,6 +274,12 @@
 			"id": "---"
 		},
 		{
+			"type": "command",
+			"id": "ergopti_studio",
+			"i18n": "menu.studio.title",
+			"boot_deferred": true
+		},
+		{
 			"type": "group",
 			"id": "keyboard_layout",
 			"i18n": "menu.layout.title",
@@ -281,12 +287,6 @@
 			"checked_when": [
 				"layout_enabled"
 			],
-			"boot_deferred": true
-		},
-		{
-			"type": "command",
-			"id": "ergopti_studio",
-			"i18n": "menu.studio.title",
 			"boot_deferred": true
 		},
 		{

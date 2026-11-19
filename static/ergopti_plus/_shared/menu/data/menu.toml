@@ -262,22 +262,23 @@ boot_deferred = true
 [[menu.top_level]]
 id = "---"
 
+# Ergopti Studio, the layout editor, as a top-level entry beside the layout and
+# tap-hold groups (maintainer request, 2026-11-14), right before the layout
+# group since 2026-11-19 (maintainer request: « intervertir Studio et le menu
+# Disposition clavier »): it opens the layout editor window, where the user
+# creates or edits a layout, analyses it and installs it on the machine.
+[[menu.top_level]]
+type = "command"
+id = "ergopti_studio"
+i18n = "menu.studio.title"
+boot_deferred = true
+
 [[menu.top_level]]
 type = "group"
 id = "keyboard_layout"
 i18n = "menu.layout.title"
 rows = []
 checked_when = ["layout_enabled"]
-boot_deferred = true
-
-# Ergopti Studio, the layout editor, as a top-level entry beside the layout and
-# tap-hold groups (maintainer request, 2026-11-14): it opens the same layout
-# editor window as the layout submenu's « Create or edit a layout… » row, where
-# the user edits a layout, analyses it and installs it on the machine.
-[[menu.top_level]]
-type = "command"
-id = "ergopti_studio"
-i18n = "menu.studio.title"
 boot_deferred = true
 
 [[menu.top_level]]

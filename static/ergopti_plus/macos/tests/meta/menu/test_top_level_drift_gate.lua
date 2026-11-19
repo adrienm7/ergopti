@@ -369,7 +369,7 @@ helpers.describe("menu drift gate (macOS): the tray root is the manifest's top l
 				if id == "keyboard_layout" then layout_index = index end
 			end
 			helpers.assert_true(type(studio) == "table", "the Ergopti Studio row reaches the tray root")
-			helpers.assert_eq(studio_index, layout_index + 1, "the row follows the keyboard layout group")
+			helpers.assert_eq(studio_index + 1, layout_index, "the row comes right before the keyboard layout group")
 			helpers.assert_nil(studio.menu, "the row is a command, not a submenu")
 			helpers.assert_eq(opened, 0, "drawing the tray opens no window")
 			studio.fn()
