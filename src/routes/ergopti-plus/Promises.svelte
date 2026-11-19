@@ -30,14 +30,14 @@ FEATURES & RATIONALE:
 			icon: '🌱',
 			title: t('Progressif, jamais imposé'),
 			body: t(
-				'Chaque fonctionnalité est <strong>activable indépendamment</strong>. Démarrez avec les hotstrings, ajoutez les tap-holds plus tard, l’IA en bonus. Tout se désactive d’un clic.'
+				'Chaque fonctionnalité est <strong>activable indépendamment</strong>. Démarrez avec les expansions de texte (hotstrings), ajoutez les touches à double fonction (tap-holds) plus tard, l’IA en bonus. Tout se désactive d’un clic.'
 			)
 		},
 		{
 			icon: '🌐',
 			title: t('Toutes les dispositions'),
 			body: t(
-				'AZERTY, QWERTY, Bépo, Dvorak… Le driver agit sur le <strong>texte produit</strong>, pas sur la touche physique. Gardez votre layout — ou adoptez Ergopti pour le combo idéal.'
+				'AZERTY, QWERTY, Bépo, Dvorak… Le logiciel agit sur le <strong>texte produit</strong>, pas sur la touche physique. Gardez votre disposition — ou adoptez Ergopti pour le combo idéal.'
 			)
 		}
 	]);

@@ -19,7 +19,7 @@ Placed early so a visitor recognises themselves before diving into details.
 			icon: '💻',
 			who: t('Développeur'),
 			body: t(
-				'Symboles de code en roulements (<code>=></code>, <code>!=</code>), snippets de boilerplate, ouverture de chemins de fichiers, et une IA locale qui complète sans jamais envoyer votre code ailleurs.'
+				'Symboles de code en roulements (<code>=></code>, <code>!=</code>), modèles de code tout prêts, ouverture de chemins de fichiers, et une IA locale qui complète sans jamais envoyer votre code ailleurs.'
 			)
 		},
 		{

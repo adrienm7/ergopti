@@ -190,7 +190,7 @@ FEATURES & RATIONALE:
 		<p class="hero-sub">
 			<ErgoptiPlus></ErgoptiPlus>
 			{@html t(
-				'transforme votre frappe en temps réel : expansions de texte, autocorrection, prédictions IA locales, tap-holds, gestes trackpad. Pensé pour le français, l’anglais et le code — <strong>gratuit et open-source</strong>.'
+				'transforme votre frappe en temps réel : expansions de texte, autocorrection, prédictions IA locales, touches à double fonction (tap-holds), gestes trackpad. Pensé pour le français, l’anglais et le code — <strong>gratuit et open-source</strong>.'
 			)}
 		</p>
 

@@ -61,8 +61,8 @@ export default {
 	'100 % local': '100% local',
 	'Tapez moins.': 'Type less.',
 	'Écrivez plus.': 'Write more.',
-	'transforme votre frappe en temps réel : expansions de texte, autocorrection, prédictions IA locales, tap-holds, gestes trackpad. Pensé pour le français, l’anglais et le code — <strong>gratuit et open-source</strong>.':
-		'transforms your typing in real time: text expansions, autocorrection, local AI predictions, tap-holds, trackpad gestures. Built for French, English and code — <strong>free and open-source</strong>.',
+	'transforme votre frappe en temps réel : expansions de texte, autocorrection, prédictions IA locales, touches à double fonction (tap-holds), gestes trackpad. Pensé pour le français, l’anglais et le code — <strong>gratuit et open-source</strong>.':
+		'transforms your typing in real time: text expansions, autocorrection, local AI predictions, dual-function keys (tap-holds), trackpad gestures. Built for French, English and code — <strong>free and open-source</strong>.',
 	'En bref': 'In brief',
 	'Toute disposition': 'Any layout',
 	'Installation & comparatif ↓': 'Setup & comparison ↓',
@@ -86,19 +86,19 @@ export default {
 	'Apostrophes typographiques, accents, expansions classiques : l’essentiel du gain est livré <strong>par défaut</strong>, sans rien apprendre. Vous tapez normalement, le reste se règle tout seul.':
 		'Typographic apostrophes, accents, classic expansions: most of the gain ships <strong>by default</strong>, with nothing to learn. You type normally, the rest takes care of itself.',
 	'Progressif, jamais imposé': 'Progressive, never imposed',
-	'Chaque fonctionnalité est <strong>activable indépendamment</strong>. Démarrez avec les hotstrings, ajoutez les tap-holds plus tard, l’IA en bonus. Tout se désactive d’un clic.':
-		'Every feature can be <strong>enabled independently</strong>. Start with hotstrings, add tap-holds later, AI as a bonus. Everything switches off in one click.',
+	'Chaque fonctionnalité est <strong>activable indépendamment</strong>. Démarrez avec les expansions de texte (hotstrings), ajoutez les touches à double fonction (tap-holds) plus tard, l’IA en bonus. Tout se désactive d’un clic.':
+		'Every feature can be <strong>enabled independently</strong>. Start with text expansions (hotstrings), add dual-function keys (tap-holds) later, AI as a bonus. Everything switches off in one click.',
 	'Toutes les dispositions': 'Every layout',
-	'AZERTY, QWERTY, Bépo, Dvorak… Le driver agit sur le <strong>texte produit</strong>, pas sur la touche physique. Gardez votre layout — ou adoptez Ergopti pour le combo idéal.':
-		'AZERTY, QWERTY, Bépo, Dvorak… The driver acts on the <strong>text produced</strong>, not the physical key. Keep your layout — or adopt Ergopti for the ideal combo.',
+	'AZERTY, QWERTY, Bépo, Dvorak… Le logiciel agit sur le <strong>texte produit</strong>, pas sur la touche physique. Gardez votre disposition — ou adoptez Ergopti pour le combo idéal.':
+		'AZERTY, QWERTY, Bépo, Dvorak… The software acts on the <strong>text produced</strong>, not the physical key. Keep your layout — or adopt Ergopti for the ideal combo.',
 
 	// ── Personas ─────────────────────────────────────────────────────────────
 	'Chacun y gagne, à sa façon.': 'Everyone gains, their own way.',
 	'Ergopti+ n’impose pas une manière de travailler — il accélère la vôtre. Quelques exemples.':
 		'Ergopti+ doesn’t impose a way of working — it accelerates yours. A few examples.',
 	Développeur: 'Developer',
-	'Symboles de code en roulements (<code>=></code>, <code>!=</code>), snippets de boilerplate, ouverture de chemins de fichiers, et une IA locale qui complète sans jamais envoyer votre code ailleurs.':
-		'Code symbols as rolls (<code>=></code>, <code>!=</code>), boilerplate snippets, opening file paths, and a local AI that completes without ever sending your code anywhere.',
+	'Symboles de code en roulements (<code>=></code>, <code>!=</code>), modèles de code tout prêts, ouverture de chemins de fichiers, et une IA locale qui complète sans jamais envoyer votre code ailleurs.':
+		'Code symbols as rolls (<code>=></code>, <code>!=</code>), ready-made code templates, opening file paths, and a local AI that completes without ever sending your code anywhere.',
 	Rédacteur: 'Writer',
 	'Autocorrection en continu, signatures et formules en une abréviation, apostrophes typographiques automatiques, et des prédictions qui terminent vos phrases.':
 		'Continuous autocorrection, signatures and set phrases in one abbreviation, automatic typographic apostrophes, and predictions that finish your sentences.',
