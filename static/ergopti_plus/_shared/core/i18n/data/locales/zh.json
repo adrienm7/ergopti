@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "此键盘缺少的键，其字符无法输入：{keys}",
 	"layout_analysis.analysers.title": "其他分析器",
 	"layout_analysis.analysers.intro": "各公开布局分析器计算出的每个布局得分：使用各分析器自带的指法（官方）和使用你的指法（你的）。“i”给出来源、许可证以及复现的准确程度。",
+	"layout_analysis.analysers.capped": "显示排名中 {total} 个布局里最好的 {count} 个；比较更少的布局即可为其余布局评分。",
 	"layout_analysis.analysers.layout": "布局",
 	"layout_analysis.analysers.official": "官方",
 	"layout_analysis.analysers.custom": "你的",

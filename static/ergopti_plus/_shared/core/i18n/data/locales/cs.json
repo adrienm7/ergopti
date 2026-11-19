@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Klávesy, které této klávesnici chybí, jejich znaky se nepíší: {keys}",
 	"layout_analysis.analysers.title": "Další analyzátory",
 	"layout_analysis.analysers.intro": "Skóre každého rozložení tak, jak ho počítají veřejné analyzátory rozložení: s vlastním prstokladem každého analyzátoru (Oficiální) a s vaším prstokladem (Vaše). « i » uvádí zdroj, jeho licenci a věrnost reprodukce.",
+	"layout_analysis.analysers.capped": "Ukazuje {count} nejlepších z {total} rozložení pořadí; ostatní ohodnotíte porovnáním menšího počtu rozložení.",
 	"layout_analysis.analysers.layout": "Rozložení",
 	"layout_analysis.analysers.official": "Oficiální",
 	"layout_analysis.analysers.custom": "Vaše",

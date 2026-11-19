@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "이 키보드에 없는 키, 해당 글자는 입력되지 않습니다: {keys}",
 	"layout_analysis.analysers.title": "다른 분석기",
 	"layout_analysis.analysers.intro": "공개 자판 분석기가 계산한 각 배열의 점수: 각 분석기 고유의 운지법으로 계산한 값(공식)과 내 운지법으로 계산한 값(내 모델). « i »에서 출처, 라이선스, 재현의 정확도를 볼 수 있습니다.",
+	"layout_analysis.analysers.capped": "순위의 배열 {total}개 중 상위 {count}개를 보여 줍니다. 나머지를 채점하려면 비교할 배열을 줄이세요.",
 	"layout_analysis.analysers.layout": "배열",
 	"layout_analysis.analysers.official": "공식",
 	"layout_analysis.analysers.custom": "내 모델",

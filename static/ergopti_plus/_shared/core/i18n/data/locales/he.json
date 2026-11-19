@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "מקשים שחסרים במקלדת זו, התווים שלהם אינם מוקלדים: {keys}",
 	"layout_analysis.analysers.title": "מנתחים אחרים",
 	"layout_analysis.analysers.intro": "הציון של כל פריסה כפי שמנתחי הפריסות הציבוריים מחשבים אותו: עם האצבוע של כל מנתח (רשמי) ועם האצבוע שלכם (שלכם). ה-« i » מציג את המקור, את הרישיון שלו ואת מידת הנאמנות של השחזור.",
+	"layout_analysis.analysers.capped": "מוצגות {count} הטובות מבין {total} הפריסות בדירוג; השוו פחות פריסות כדי לדרג את האחרות.",
 	"layout_analysis.analysers.layout": "פריסה",
 	"layout_analysis.analysers.official": "רשמי",
 	"layout_analysis.analysers.custom": "שלכם",

@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Keys this keyboard lacks, so their characters are not typed: {keys}",
 	"layout_analysis.analysers.title": "Other analysers",
 	"layout_analysis.analysers.intro": "Each layout’s score as the public layout analysers compute it: with each analyser’s own fingering (Official) and with your fingering (Yours). The “i” gives the source, its licence and how faithful the reproduction is.",
+	"layout_analysis.analysers.capped": "Shows the {count} best of the ranking's {total} layouts; compare fewer layouts to score the others.",
 	"layout_analysis.analysers.layout": "Layout",
 	"layout_analysis.analysers.official": "Official",
 	"layout_analysis.analysers.custom": "Yours",

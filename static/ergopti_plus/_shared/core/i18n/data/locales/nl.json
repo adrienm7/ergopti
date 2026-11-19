@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Toetsen die dit toetsenbord mist, hun tekens worden niet getypt: {keys}",
 	"layout_analysis.analysers.title": "Andere analysatoren",
 	"layout_analysis.analysers.intro": "De score van elke indeling zoals de openbare indelingsanalysatoren hem berekenen: met de eigen vingerzetting van elke analysator (Officieel) en met je eigen vingerzetting (Eigen). De « i » geeft de bron, de licentie en hoe getrouw de nabootsing is.",
+	"layout_analysis.analysers.capped": "Toont de {count} beste van de {total} lay-outs in de ranglijst; vergelijk minder lay-outs om de andere te beoordelen.",
 	"layout_analysis.analysers.layout": "Indeling",
 	"layout_analysis.analysers.official": "Officieel",
 	"layout_analysis.analysers.custom": "Eigen",

@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Bu klavyede olmayan tuşlar, karakterleri yazılmaz: {keys}",
 	"layout_analysis.analysers.title": "Diğer analizciler",
 	"layout_analysis.analysers.intro": "Her düzenin, herkese açık düzen analizcilerinin hesapladığı puanı: her analizcinin kendi parmak düzeniyle (Resmî) ve sizin parmak düzeninizle (Sizinki). « i » kaynağı, lisansını ve yeniden üretimin ne kadar sadık olduğunu gösterir.",
+	"layout_analysis.analysers.capped": "Sıralamadaki {total} düzenin en iyi {count} tanesini gösterir; diğerlerini puanlamak için daha az düzen karşılaştırın.",
 	"layout_analysis.analysers.layout": "Düzen",
 	"layout_analysis.analysers.official": "Resmî",
 	"layout_analysis.analysers.custom": "Sizinki",

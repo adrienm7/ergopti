@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Touches absentes de ce clavier, leurs caractères ne sont pas tapés : {keys}",
 	"layout_analysis.analysers.title": "Autres analyseurs",
 	"layout_analysis.analysers.intro": "Le score de chaque disposition selon les analyseurs publics : avec le doigté propre à chaque analyseur (Officiel) et avec votre doigté (Le vôtre). Le « i » donne la source, sa licence et la fidélité de la reproduction.",
+	"layout_analysis.analysers.capped": "Montre les {count} meilleures des {total} dispositions du classement ; comparez-en moins pour évaluer les autres.",
 	"layout_analysis.analysers.layout": "Disposition",
 	"layout_analysis.analysers.official": "Officiel",
 	"layout_analysis.analysers.custom": "Le vôtre",

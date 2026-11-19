@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Tasti assenti su questa tastiera, i loro caratteri non vengono digitati: {keys}",
 	"layout_analysis.analysers.title": "Altri analizzatori",
 	"layout_analysis.analysers.intro": "Il punteggio di ogni layout come lo calcolano gli analizzatori pubblici di layout: con la diteggiatura propria di ogni analizzatore (Ufficiale) e con la tua diteggiatura (Tua). La « i » indica la fonte, la sua licenza e quanto è fedele la riproduzione.",
+	"layout_analysis.analysers.capped": "Mostra i {count} migliori dei {total} layout della classifica; confronta meno layout per valutare gli altri.",
 	"layout_analysis.analysers.layout": "Layout",
 	"layout_analysis.analysers.official": "Ufficiale",
 	"layout_analysis.analysers.custom": "Tua",

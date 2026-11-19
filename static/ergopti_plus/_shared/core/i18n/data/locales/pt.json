@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Teclas que este teclado não tem, os seus caracteres não são escritos: {keys}",
 	"layout_analysis.analysers.title": "Outros analisadores",
 	"layout_analysis.analysers.intro": "A pontuação de cada layout tal como os analisadores públicos de layouts a calculam: com o dedilhado próprio de cada analisador (Oficial) e com o seu dedilhado (O seu). O « i » indica a fonte, a sua licença e a fidelidade da reprodução.",
+	"layout_analysis.analysers.capped": "Mostra os {count} melhores dos {total} layouts da classificação; compare menos layouts para avaliar os outros.",
 	"layout_analysis.analysers.layout": "Layout",
 	"layout_analysis.analysers.official": "Oficial",
 	"layout_analysis.analysers.custom": "O seu",

@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Tangenter som saknas på detta tangentbord, deras tecken skrivs inte: {keys}",
 	"layout_analysis.analysers.title": "Andra analysverktyg",
 	"layout_analysis.analysers.intro": "Varje layouts poäng som de offentliga analysverktygen beräknar den: med varje verktygs egen fingersättning (Officiell) och med din fingersättning (Din). « i » anger källan, dess licens och hur trogen återgivningen är.",
+	"layout_analysis.analysers.capped": "Visar de {count} bästa av rankningens {total} layouter; jämför färre layouter för att bedöma de andra.",
 	"layout_analysis.analysers.layout": "Layout",
 	"layout_analysis.analysers.official": "Officiell",
 	"layout_analysis.analysers.custom": "Din",

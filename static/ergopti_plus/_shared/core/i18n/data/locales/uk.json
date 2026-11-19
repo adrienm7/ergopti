@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Клавіші, яких немає на цій клавіатурі, їхні символи не набираються: {keys}",
 	"layout_analysis.analysers.title": "Інші аналізатори",
 	"layout_analysis.analysers.intro": "Оцінка кожної розкладки так, як її обчислюють публічні аналізатори розкладок: із власною аплікатурою кожного аналізатора (Офіційна) і з вашою аплікатурою (Ваша). Значок « i » показує джерело, його ліцензію та точність відтворення.",
+	"layout_analysis.analysers.capped": "Показано {count} найкращих із {total} розкладок рейтингу; порівняйте менше розкладок, щоб оцінити інші.",
 	"layout_analysis.analysers.layout": "Розкладка",
 	"layout_analysis.analysers.official": "Офіційна",
 	"layout_analysis.analysers.custom": "Ваша",

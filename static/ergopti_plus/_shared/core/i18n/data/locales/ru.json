@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Клавиши, которых нет на этой клавиатуре, их символы не набираются: {keys}",
 	"layout_analysis.analysers.title": "Другие анализаторы",
 	"layout_analysis.analysers.intro": "Оценка каждой раскладки так, как её вычисляют публичные анализаторы раскладок: с собственной аппликатурой каждого анализатора (Официальная) и с вашей аппликатурой (Ваша). Значок « i » показывает источник, его лицензию и точность воспроизведения.",
+	"layout_analysis.analysers.capped": "Показаны {count} лучших из {total} раскладок рейтинга; сравните меньше раскладок, чтобы оценить остальные.",
 	"layout_analysis.analysers.layout": "Раскладка",
 	"layout_analysis.analysers.official": "Официальная",
 	"layout_analysis.analysers.custom": "Ваша",

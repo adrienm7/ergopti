@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "مفاتيح تنقص هذه اللوحة، فلا تُكتب حروفها: {keys}",
 	"layout_analysis.analysers.title": "محللات أخرى",
 	"layout_analysis.analysers.intro": "نتيجة كل تخطيط كما تحسبها محللات التخطيطات العامة: بتوزيع الأصابع الخاص بكل محلل (الرسمي) وبتوزيع أصابعك (الخاص بك). يعرض « i » المصدر وترخيصه ومدى دقة إعادة الإنتاج.",
+	"layout_analysis.analysers.capped": "يعرض أفضل {count} من {total} تخطيطًا في الترتيب؛ قارن تخطيطات أقل لتقييم غيرها.",
 	"layout_analysis.analysers.layout": "التخطيط",
 	"layout_analysis.analysers.official": "الرسمي",
 	"layout_analysis.analysers.custom": "الخاص بك",

@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Tasten, die dieser Tastatur fehlen, ihre Zeichen werden nicht getippt: {keys}",
 	"layout_analysis.analysers.title": "Andere Analysatoren",
 	"layout_analysis.analysers.intro": "Die Punktzahl jedes Layouts, wie die öffentlichen Layout-Analysatoren sie berechnen: mit dem eigenen Fingersatz jedes Analysators (Offiziell) und mit Ihrem Fingersatz (Ihrer). Das « i » nennt die Quelle, ihre Lizenz und wie treu die Nachbildung ist.",
+	"layout_analysis.analysers.capped": "Zeigt die {count} besten der {total} Layouts der Rangliste; vergleichen Sie weniger Layouts, um die anderen zu bewerten.",
 	"layout_analysis.analysers.layout": "Layout",
 	"layout_analysis.analysers.official": "Offiziell",
 	"layout_analysis.analysers.custom": "Ihrer",

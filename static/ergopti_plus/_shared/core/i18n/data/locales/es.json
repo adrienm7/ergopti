@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Teclas que faltan en este teclado, sus caracteres no se escriben: {keys}",
 	"layout_analysis.analysers.title": "Otros analizadores",
 	"layout_analysis.analysers.intro": "La puntuación de cada distribución tal como la calculan los analizadores públicos de distribuciones: con la digitación propia de cada analizador (Oficial) y con tu digitación (Tuya). La « i » indica la fuente, su licencia y la fidelidad de la reproducción.",
+	"layout_analysis.analysers.capped": "Muestra las {count} mejores de las {total} distribuciones de la clasificación; compara menos distribuciones para puntuar las demás.",
 	"layout_analysis.analysers.layout": "Distribución",
 	"layout_analysis.analysers.official": "Oficial",
 	"layout_analysis.analysers.custom": "Tuya",

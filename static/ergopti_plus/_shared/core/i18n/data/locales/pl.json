@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Klawisze, których brak na tej klawiaturze, ich znaki nie są pisane: {keys}",
 	"layout_analysis.analysers.title": "Inne analizatory",
 	"layout_analysis.analysers.intro": "Wynik każdego układu obliczony tak jak w publicznych analizatorach układów: z palcowaniem własnym każdego analizatora (Oficjalny) i z Twoim palcowaniem (Twój). « i » podaje źródło, jego licencję i wierność odtworzenia.",
+	"layout_analysis.analysers.capped": "Pokazuje {count} najlepszych z {total} układów rankingu; porównaj mniej układów, aby ocenić pozostałe.",
 	"layout_analysis.analysers.layout": "Układ",
 	"layout_analysis.analysers.official": "Oficjalny",
 	"layout_analysis.analysers.custom": "Twój",

@@ -15,9 +15,10 @@
  *    its state: the same layouts, corpus and keyboard.
  * 2. Lazy: nothing is scored until the view is shown, then one layout per
  *    idle slice, so the Comparer stays responsive (every analyser, both
- *    fingerings, costs about 70 ms per layout). The table is drawn again at
- *    most every RENDER_MS: drawn after each layout of the whole library, the
- *    growing table cost more than the scores.
+ *    fingerings, costs about 370 ms per layout on 2026-11-19), and only the
+ *    best ANALYSED_MAX of the ranking: a minute for the whole library, which
+ *    the Comparer compares by default. The table is drawn again at most every
+ *    RENDER_MS.
  * 3. Every string is a locale key; numbers use the page's locale.
  * 4. Scores or ranks: each analyser's rank of the layouts beside the
  *    Comparer's, the cell shaded on one blue ramp (rank 1 darkest), the rank
@@ -42,6 +43,9 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		scores: () => t('layout_analysis.analysers.view_scores'),
 		ranks: () => t('layout_analysis.analysers.view_ranks')
 	};
+	// The best layouts of the Comparer's ranking this view scores, every analyser
+	// costing some 370 ms a layout (a minute for the whole library).
+	const ANALYSED_MAX = 40;
 	// The table is drawn again at most this often while the layouts are scored (ms).
 	const RENDER_MS = 500;
 	// A rank cell at least this share of the darkest is dark enough for light ink.
@@ -112,6 +116,8 @@ var LAYOUT_ANALYSER_TAB = (function () {
 
 		const state = {
 			results: [],
+			// How many layouts the Comparer ranked, of which results holds the best.
+			total: 0,
 			layouts: new Map(),
 			tables: null,
 			keyboard: 'iso',
@@ -231,6 +237,11 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		function render() {
 			title.textContent = t('layout_analysis.analysers.title');
 			intro.textContent = t('layout_analysis.analysers.intro');
+			if (state.total > state.results.length)
+				intro.textContent += ` ${t('layout_analysis.analysers.capped', {
+					count: state.results.length,
+					total: state.total
+				})}`;
 			viewName.textContent = t('layout_analysis.analysers.view');
 			view.replaceChildren(
 				...VIEWS.map((id) => {
@@ -325,7 +336,13 @@ var LAYOUT_ANALYSER_TAB = (function () {
 			// Each result's own tables: the Comparer's « + » layouts type another text.
 			if (typeof tablesOf !== 'function')
 				throw new Error('analyser_tab: the Comparer names the tables of each result');
-			state.results = results;
+			// The best ANALYSED_MAX of the ranking: every analyser costs some 370 ms a
+			// layout, a minute for the whole library.
+			state.total = results.length;
+			state.results = results
+				.slice()
+				.sort((a, b) => a.rank - b.rank)
+				.slice(0, ANALYSED_MAX);
 			state.layouts = layouts;
 			state.tables = tables;
 			state.tablesOf = tablesOf;

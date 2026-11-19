@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "このキーボードにないキー（その文字は入力されません）：{keys}",
 	"layout_analysis.analysers.title": "他の分析ツール",
 	"layout_analysis.analysers.intro": "公開されている配列分析ツールが算出する各配列のスコア：各ツール独自の運指によるもの（公式）と、あなたの運指によるもの（あなた）。「i」から出典、ライセンス、再現の忠実度を確認できます。",
+	"layout_analysis.analysers.capped": "ランキング {total} 配列のうち上位 {count} 件を表示します。ほかを採点するには比較する配列を減らします。",
 	"layout_analysis.analysers.layout": "配列",
 	"layout_analysis.analysers.official": "公式",
 	"layout_analysis.analysers.custom": "あなた",

@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Taster dette tastaturet mangler, tegnene deres skrives ikke: {keys}",
 	"layout_analysis.analysers.title": "Andre analyseverktøy",
 	"layout_analysis.analysers.intro": "Poengsummen til hvert oppsett slik de offentlige analyseverktøyene beregner den: med hvert verktøys egen fingersetting (Offisiell) og med fingersettingen din (Din). « i » viser kilden, lisensen og hvor tro gjengivelsen er.",
+	"layout_analysis.analysers.capped": "Viser de {count} beste av rangeringens {total} oppsett; sammenlign færre oppsett for å vurdere de andre.",
 	"layout_analysis.analysers.layout": "Oppsett",
 	"layout_analysis.analysers.official": "Offisiell",
 	"layout_analysis.analysers.custom": "Din",

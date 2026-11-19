@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "इस कीबोर्ड में न होने वाली कुंजियाँ, उनके वर्ण टाइप नहीं होते: {keys}",
 	"layout_analysis.analysers.title": "अन्य विश्लेषक",
 	"layout_analysis.analysers.intro": "सार्वजनिक लेआउट विश्लेषक हर लेआउट का जो स्कोर निकालते हैं: हर विश्लेषक के अपने अँगुली-क्रम से (आधिकारिक) और आपके अँगुली-क्रम से (आपका)। « i » स्रोत, उसका लाइसेंस और पुनरुत्पादन कितना सटीक है, यह बताता है।",
+	"layout_analysis.analysers.capped": "रैंकिंग के {total} लेआउट में से सर्वश्रेष्ठ {count} दिखाता है; बाक़ी के लिए कम लेआउट की तुलना करें।",
 	"layout_analysis.analysers.layout": "लेआउट",
 	"layout_analysis.analysers.official": "आधिकारिक",
 	"layout_analysis.analysers.custom": "आपका",

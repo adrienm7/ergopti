@@ -1313,6 +1313,18 @@ async function exerciseComparerTabs(page) {
 		null,
 		{ timeout: 60000 }
 	);
+	// The whole library is compared: the analysers score its 40 best and say so.
+	assert.equal(
+		await page.locator('.la-analysers-table tbody tr').count(),
+		Math.min(results, 40),
+		'the other analysers score the 40 best layouts'
+	);
+	if (results > 40)
+		assert.match(
+			await page.textContent('#la-panel-analysers'),
+			new RegExp(`Shows the 40 best of the ranking's ${results} layouts`),
+			'and say so'
+		);
 	await page.selectOption('#la-analysers-view', 'ranks');
 	assert.ok(
 		await page.$$eval(

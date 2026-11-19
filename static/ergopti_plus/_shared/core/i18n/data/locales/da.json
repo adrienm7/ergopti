@@ -4785,6 +4785,7 @@
 	"layout_analysis.details.missing_keys": "Taster, som dette tastatur mangler, deres tegn skrives ikke: {keys}",
 	"layout_analysis.analysers.title": "Andre analyseværktøjer",
 	"layout_analysis.analysers.intro": "Hvert layouts score, som de offentlige analyseværktøjer beregner den: med hvert værktøjs egen fingersætning (Officiel) og med din fingersætning (Din). « i » angiver kilden, dens licens og hvor tro gengivelsen er.",
+	"layout_analysis.analysers.capped": "Viser de {count} bedste af rangeringens {total} layouts; sammenlign færre layouts for at vurdere de andre.",
 	"layout_analysis.analysers.layout": "Layout",
 	"layout_analysis.analysers.official": "Officiel",
 	"layout_analysis.analysers.custom": "Din",
