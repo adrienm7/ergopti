@@ -1668,7 +1668,7 @@
 				mark.append(
 					el('span', 'lo-board-mark-glyph', moved ? '⇄' : '·'),
 					' ',
-					t(`${PREFIX}result.table_${moved ? 'yes' : 'no'}`)
+					moved ? t(`${PREFIX}result.table_yes`) : t(`${PREFIX}result.table_no`)
 				);
 				mark.firstChild.setAttribute('aria-hidden', 'true');
 				tr.append(
