@@ -157,8 +157,12 @@
 	// task (each layout takes some 6 to 50 ms, by the corpus), so the page
 	// answers while the whole library is scored and shows it as it comes.
 	const ANALYSE_SLICE = 4;
-	// The ranking is drawn again at most this often while the slices run (ms).
+	// The best so far is drawn again at most this often while the slices run
+	// (ms), and at most once per this many times its own drawing cost, so the
+	// drawing never takes more than a fifth of the time (649 layouts,
+	// 2026-11-19: a full redraw of every tab cost 300 to 800 ms each time).
 	const PARTIAL_RENDER_MS = 400;
+	const PARTIAL_RENDER_FACTOR = 4;
 	// The letter heading of a layout whose name starts with a digit or a sign.
 	const LETTER_OTHER = '#';
 	// The collapsed layout list names this many compared layouts, then counts the rest.
@@ -1418,6 +1422,7 @@
 			state.compared = compared;
 			const scored = [];
 			let drawn = start;
+			let drawEvery = PARTIAL_RENDER_MS;
 			for (let at = 0; at < pending.length; at += ANALYSE_SLICE) {
 				for (const [layout, table] of pending.slice(at, at + ANALYSE_SLICE))
 					scored.push(E.analyse(layout, table, options));
@@ -1425,11 +1430,16 @@
 				showStatus(
 					t('layout_analysis.status.scoring', { done: scored.length, count: pending.length })
 				);
-				// The ranking so far, drawn now and then while the rest is scored.
-				if (performance.now() - drawn >= PARTIAL_RENDER_MS) {
+				// The best so far (chart and leaders, not the table or the other tabs),
+				// drawn now and then while the rest is scored, less often as it costs
+				// more, and not at all behind « Home ».
+				if (state.tab !== HOME_TAB && performance.now() - drawn >= drawEvery) {
 					state.results = E.rank(scored.slice());
-					render();
+					const began = performance.now();
+					renderLeaders();
+					renderChart();
 					drawn = performance.now();
+					drawEvery = Math.max(PARTIAL_RENDER_MS, PARTIAL_RENDER_FACTOR * (drawn - began));
 				}
 				await nextTask();
 				if (mine !== generation) return;
