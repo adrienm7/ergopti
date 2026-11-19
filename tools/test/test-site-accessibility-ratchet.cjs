@@ -244,7 +244,38 @@ function checkHeroPause() {
  * and their checks, and the « zoom » mode applies the WCAG 1.4.12 values.
  */
 function checkReadingRatchet() {
-	assert.deepEqual(Object.keys(reading.READING_MODES).sort(), ['default', 'text', 'zoom']);
+	assert.deepEqual(Object.keys(reading.READING_MODES).sort(), [
+		'default',
+		'text',
+		'text-320',
+		'text-375',
+		'zoom',
+		'zoom-320',
+		'zoom-375'
+	]);
+	// Reflow (WCAG 1.4.10) on a phone, with 200 % text and with 200 % zoom.
+	assert.deepEqual(reading.REFLOW_WIDTHS, [320, 375]);
+	for (const width of reading.REFLOW_WIDTHS) {
+		const text = reading.READING_MODES['text-' + width];
+		const zoom = reading.READING_MODES['zoom-' + width];
+		assert.equal(text.viewport.width, width);
+		assert.deepEqual(text.preferences, { text: '200', spacing: 'wide' });
+		assert.equal(text.deviceScaleFactor, 1);
+		assert.equal(zoom.viewport.width, width);
+		assert.equal(zoom.deviceScaleFactor, 2);
+		assert.equal(zoom.preferences, null);
+		for (const mode of [text, zoom]) assert.deepEqual(mode.checks, ['reflow']);
+	}
+	// A page left out of a mode is named, audited and left out of that mode only.
+	for (const [mode, routes] of Object.entries(reading.PENDING_ROUTES)) {
+		assert.ok(Object.hasOwn(reading.READING_MODES, mode), 'Pending reading mode: ' + mode);
+		for (const route of routes) {
+			assert.ok(scan.AUDITED_ROUTES.includes(route), 'Pending page not audited: ' + route);
+			assert.ok(reading.isPending(mode, route));
+		}
+	}
+	assert.equal(reading.isPending('text-375', '/studio'), false);
+	assert.equal(reading.isPending('zoom-320', '/studio'), false);
 	for (const value of [
 		'line-height: 1.5',
 		'letter-spacing: 0.12em',

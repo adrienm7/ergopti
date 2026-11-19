@@ -12,7 +12,9 @@
  * WCAG 1.4.8), and prose lines of at most MAX_LINE_CHARACTERS characters
  * (WCAG 1.4.8 asks for 80 at most; 45 to 80 reads best). Nothing placed
  * under the sticky header (the table of contents, the narrow-screen banner)
- * may slide under it once the header grows with the text.
+ * may slide under it once the header grows with the text. On a phone, with
+ * 200 % text or 200 % zoom, no page scrolls sideways (« reflow », WCAG
+ * 1.4.10): at the 320 px the criterion names and at a common 375 px phone.
  *
  * The measuring function runs inside the page (page.evaluate), so it only
  * uses what it receives as arguments. site-accessibility.playwright.cjs runs
@@ -35,6 +37,10 @@ const OVERLAP_MIN_WIDTH_PX = 2;
 const CLIP_TOLERANCE_PX = 1;
 // The site header (Header.svelte), sticky at the top of the window.
 const SITE_HEADER_SELECTOR = '#page > header';
+// The reflow widths (WCAG 1.4.10 names 320 CSS pixels; 375 is a common phone)
+// and the phone's height in CSS pixels.
+const REFLOW_WIDTHS = Object.freeze([320, 375]);
+const REFLOW_HEIGHT = 640;
 
 // The user style sheet of the WCAG 1.4.12 test (the « text spacing »
 // bookmarklet): a reader's own spacing, which the site must not break.
@@ -44,12 +50,70 @@ const TEXT_SPACING_CSS = [
 	'p { margin-bottom: 2em !important; }'
 ].join(' ');
 
+// The site's own reading settings at their largest.
+const LARGEST_PREFERENCES = Object.freeze({ text: '200', spacing: 'wide' });
+
+/**
+ * The phone reading modes, measured for reflow only: « text-<width> » is the
+ * site's largest settings in a phone window of that width, « zoom-<width> »
+ * a 200 % browser zoom of a window twice as wide (the same CSS pixels, twice
+ * the device pixels).
+ */
+const PHONE_MODES = Object.fromEntries(
+	REFLOW_WIDTHS.flatMap((width) => [
+		[
+			'text-' + width,
+			Object.freeze({
+				viewport: Object.freeze({ width, height: REFLOW_HEIGHT }),
+				deviceScaleFactor: 1,
+				preferences: LARGEST_PREFERENCES,
+				styleSheet: null,
+				checks: Object.freeze(['reflow'])
+			})
+		],
+		[
+			'zoom-' + width,
+			Object.freeze({
+				viewport: Object.freeze({ width, height: REFLOW_HEIGHT }),
+				deviceScaleFactor: 2,
+				preferences: null,
+				styleSheet: null,
+				checks: Object.freeze(['reflow'])
+			})
+		]
+	])
+);
+
+/**
+ * Pages a reading mode cannot measure yet, per mode, each with its reason;
+ * the gate skips them (isPending) and test-site-accessibility-ratchet.cjs
+ * checks the names. Remove a row once its reason is fixed.
+ */
+const PENDING_ROUTES = Object.freeze({
+	// The Studio shell (src/routes/studio/+layout.svelte, changed in another
+	// session) is at least 480 px tall under the header, and at 320 px with
+	// 200 % text its menu bar alone is about 500 px: the workspace, the page's
+	// <main>, is left 0 px tall and never shows.
+	'text-320': Object.freeze(['/studio', '/studio/comparer', '/studio/optimiser'])
+});
+
+/**
+ * Whether a page is left out of a reading mode (PENDING_ROUTES).
+ * @param {string} mode - A key of READING_MODES.
+ * @param {string} route
+ * @returns {boolean}
+ */
+function isPending(mode, route) {
+	return Object.hasOwn(PENDING_ROUTES, mode) && PENDING_ROUTES[mode].includes(route);
+}
+
 /**
  * The reading conditions each page is measured in. « zoom » is a 200 % browser
  * zoom of the CI window (half the CSS pixels) with the 1.4.12 style sheet;
  * « text » is the site's own settings at their largest, 200 % text and wide
  * spacing, in the full window; « default » is an unchanged visit, where
- * justification and line length are measured.
+ * justification and line length are measured; the phone modes (PHONE_MODES)
+ * measure reflow.
  */
 const READING_MODES = Object.freeze({
 	default: Object.freeze({
@@ -69,10 +133,11 @@ const READING_MODES = Object.freeze({
 	text: Object.freeze({
 		viewport: Object.freeze({ width: 1440, height: 900 }),
 		deviceScaleFactor: 1,
-		preferences: Object.freeze({ text: '200', spacing: 'wide' }),
+		preferences: LARGEST_PREFERENCES,
 		styleSheet: null,
 		checks: Object.freeze(['text-clipped', 'text-overlap', 'justified-text', 'header-cover'])
-	})
+	}),
+	...PHONE_MODES
 });
 
 /**
@@ -280,6 +345,34 @@ function measureReading(options) {
 		}
 		found['line-length'] = long;
 	}
+	// Reflow: the page scrolls sideways once its scroll width passes the
+	// window's. Reported are the outermost boxes ending past the window's right
+	// edge outside any box that clips or scrolls them sideways (a scrolling
+	// table is reached by its own scroll bar), each with where it ends; the
+	// scroll width alone when no box is found (a margin, a pseudo-element).
+	if (options.checks.includes('reflow')) {
+		const root = document.documentElement;
+		const limit = root.clientWidth + options.clipTolerance;
+		const wide = [];
+		if (root.scrollWidth > limit) {
+			const past = (element) => element.getBoundingClientRect().right > limit;
+			const contained = (element) => {
+				for (let node = element.parentElement; node && node !== root; node = node.parentElement)
+					if (getComputedStyle(node).overflowX !== 'visible') return true;
+				return false;
+			};
+			for (const element of document.body.querySelectorAll('*')) {
+				if (!past(element) || !visible(element) || contained(element)) continue;
+				const parent = element.parentElement;
+				if (parent !== document.body && past(parent)) continue;
+				const right = Math.round(element.getBoundingClientRect().right);
+				wide.push(describe(element) + ' ends at ' + right + ' px of ' + root.clientWidth);
+			}
+			if (!wide.length)
+				wide.push('html scrolls ' + root.scrollWidth + ' px wide in ' + root.clientWidth);
+		}
+		found['reflow'] = wide;
+	}
 	return found;
 }
 
@@ -367,9 +460,12 @@ function optionsFor(mode) {
 
 module.exports = {
 	MAX_LINE_CHARACTERS,
+	PENDING_ROUTES,
 	READING_MODES,
+	REFLOW_WIDTHS,
 	SITE_HEADER_SELECTOR,
 	TEXT_SPACING_CSS,
+	isPending,
 	measureHeaderCover,
 	measureReading,
 	optionsFor

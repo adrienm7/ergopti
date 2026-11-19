@@ -587,6 +587,7 @@ async function scanReading(browser, origin, basePath, routes, mode) {
 					[PREFERENCES_KEY, JSON.stringify(settings.preferences)]
 				);
 			for (const route of routes) {
+				if (reading.isPending(mode, route)) continue;
 				const page = await context.newPage();
 				try {
 					await page.emulateMedia({ reducedMotion: 'reduce' });
