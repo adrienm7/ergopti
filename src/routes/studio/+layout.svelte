@@ -74,6 +74,9 @@ system's), kept in this browser and sent to each frame (frameTheme.js).
 	// The optimizer's « Open in the editor »: the layout waits in this tab's
 	// storage (corpus_files.js handOffToEditor, OPEN_EDITOR_MESSAGE).
 	const OPEN_EDITOR_MESSAGE = 'ergopti-studio:open-editor';
+	// The editor's « Optimize this layout »: the layout waits in this tab's
+	// storage (corpus_files.js OPEN_OPTIMIZER_MESSAGE).
+	const OPEN_OPTIMIZER_MESSAGE = 'ergopti-studio:open-optimizer';
 
 	onMount(() => {
 		const open = (event) => {
@@ -81,6 +84,7 @@ system's), kept in this browser and sent to each frame (frameTheme.js).
 			if (!event.data) return;
 			if (event.data.type === OPEN_COMPARER_MESSAGE) goto(resolve('/studio/comparer'));
 			else if (event.data.type === OPEN_EDITOR_MESSAGE) goto(resolve('/studio'));
+			else if (event.data.type === OPEN_OPTIMIZER_MESSAGE) goto(resolve('/studio/optimiser'));
 		};
 		window.addEventListener('message', open);
 		return () => window.removeEventListener('message', open);

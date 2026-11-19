@@ -38,7 +38,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { shared } = require('../lib/paths.cjs');
+const { shared, REPO_ROOT } = require('../lib/paths.cjs');
 
 const PAGE_DIR = shared('ui', 'layout_analysis');
 const LOCALES_DIR = shared('core', 'i18n', 'data', 'locales');
@@ -1187,6 +1187,30 @@ check(
 		rowOf(relative, dvorak.layout.name)[4] === pct('0.00'),
 		`relative: row_jump reads ${rowOf(relative, dvorak.layout.name)[4]}`
 	);
+}
+
+// (studio-shell-messages) Every hand-off the Studio pages post to the site's
+// shell (corpus_files.js, « ergopti-studio:* ») is one the shell routes: an
+// unhandled one is a button that does nothing on the site.
+{
+	const sent = Array.from(
+		fs
+			.readFileSync(path.join(PAGE_DIR, 'corpus_files.js'), 'utf8')
+			.matchAll(/MESSAGE = '(ergopti-studio:[a-z-]+)'/g),
+		(m) => m[1]
+	);
+	const shell = fs.readFileSync(
+		path.join(REPO_ROOT, 'src', 'routes', 'studio', '+layout.svelte'),
+		'utf8'
+	);
+	check(sent.length > 0, 'shell messages: corpus_files.js posts none');
+	for (const message of sent) {
+		const constant = (shell.match(new RegExp(`const (\\w+) = '${message}'`)) || [])[1];
+		check(
+			constant !== undefined && new RegExp(`event\\.data\\.type === ${constant}\\)`).test(shell),
+			`shell messages: the site's Studio shell does not route ${message}`
+		);
+	}
 }
 
 if (errors.length > 0) {
