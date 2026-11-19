@@ -690,6 +690,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-update-asset-signature.cjs"],
 			"repro": "node tools/test/test-update-asset-signature.cjs"
+		},
+		{
+			"id": "linux-appimage-container-path",
+			"ordinal": 699,
+			"name": "the oldest-LTS AppImage container fronts the runner's node executable alone on its PATH, so no runner program is staged",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-appimage-container-path.cjs"],
+			"repro": "npm run test:linux-appimage-container-path"
 		}
 	]
 }

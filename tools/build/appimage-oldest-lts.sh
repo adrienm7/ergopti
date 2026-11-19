@@ -85,8 +85,9 @@ container_build() {
 		libssl-dev libglib2.0-dev libglib2.0-bin glib-networking \
 		dconf-gsettings-backend gsettings-desktop-schemas libayatana-appindicator3-1
 	build_owned_luaposix
-	# The runner's Node, mounted read-only: the release's own is too old for the
-	# build scripts, and Node itself ships nothing into the image.
+	# The runner's Node executable alone, mounted read-only: the release's own is
+	# too old for the build scripts, and Node itself ships nothing into the image.
+	# /opt/node/bin holds nothing else (see the docker run below).
 	export PATH="/opt/node/bin:$PATH"
 	node --version
 
@@ -288,9 +289,15 @@ case "${1:-}" in
 			echo "[ERR] No driver bundle: run tools/build/build-linux-driver.sh first." >&2
 			exit 1
 		}
-		node_root="$(cd "$(dirname "$(command -v node)")/.." && pwd -P)"
+		# Only the node executable, never its directory: the runner's node is
+		# /usr/local/bin/node, and mounting /usr/local put the runner's own
+		# /usr/local/bin/zstd (built there from source) first on the container's
+		# PATH. The stager then staged it as the owned zstd, and ldd refused it
+		# for a C library newer than the oldest LTS's.
+		node_executable="$(readlink -f "$(command -v node)")"
+		[ -f "$node_executable" ] || { echo "[ERR] No node executable on the runner." >&2; exit 1; }
 		docker run --rm \
-			-v "$PROJECT_ROOT:/src" -v "$node_root:/opt/node:ro" -w /src \
+			-v "$PROJECT_ROOT:/src" -v "$node_executable:/opt/node/bin/node:ro" -w /src \
 			-e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
 			-e ERGOPTI_BUILD_VERSION \
 			"$OLDEST_LTS_IMAGE" bash "$SELF" container-build
