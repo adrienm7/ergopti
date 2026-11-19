@@ -111,7 +111,19 @@ baseline as violations go.
 - [ ] **Colour vision.** The onboarding, download window and hotstring palette review is done (fourth pass,
       [audit](docs/audits/accessibility/README.md#colour-vision-review)). Left: the tooltip tints sit at one
       lightness, so a colour-blind reader tells hotstring categories apart by the preview's text only; naming the
-      category in the tooltip is a design change for the maintainer.
+      category in the tooltip is a design change for the maintainer. Proposal (2026-11-19, not built: it changes
+      the preview's hot-path layout on the three drivers, and macOS and Linux cannot be checked from Windows).
+      (1) A short category label in each preview row, in the trigger label's font and colour
+      (`_TOOLTIP_LABEL_COLOR_HEX`, 4.8:1 or more on every tint), just left of the trigger label (« ★ », « ↵ »), so
+      the design and the tint stay. (2) Its text from an optional localized `short_label` in each category's
+      `[_meta]` (at most 12 characters, such as « ★ » for the magic key or « correction » for autocorrection), else
+      the first word of its `description`; a user category with neither shows none. (3) One pure resolver beside
+      `tint.js`, `tint.lua` and `_TooltipMixTintHex`, with a shared contract vector; the label rides on the row next
+      to the trigger label: AHK `Item.CategoryLabel` measured in the pass that fills `Header.LabelSizes`
+      (`helpers.ahk`), the Hammerspoon renderer's rows and the Linux `preview.lua` rows (`{ text, label, dimmed,
+  struck }`). (4) Shown with the coloured tooltips only, under its own preview switch in the three menus (21
+      locales), and added to what a running screen reader is told. To decide: the switch's default, and a glyph
+      per built-in category instead of words.
 - [ ] **Dyslexia and reading, what is left.** Every site page is measured at 200 % zoom with the WCAG 1.4.12
       spacing and at the site's 200 % text with wide spacing (`tools/test/browser/site-reading.cjs`, in the site
       accessibility gate, ratchet `site-reading-baseline.json`, empty): no clipped, overlapping or justified text and

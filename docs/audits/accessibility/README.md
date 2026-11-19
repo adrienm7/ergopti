@@ -388,7 +388,10 @@ WCAG contrast ratios computed from the resolved `theme.css` tokens.
 Open: the tooltip tints of the other palette hues sit at one lightness by
 design (13 %), so a colour-blind reader tells categories apart by the
 preview's text, not by its wash; a category shown in words in the tooltip
-would be a design change for the maintainer.
+would be a design change for the maintainer. A concrete proposal (a short
+category label beside the trigger label, one resolver with a contract vector
+on the three drivers, its own preview switch) waits in `TODO.md` under
+« Colour vision ».
 
 ### Error messages (WCAG 3.3.3)
 
