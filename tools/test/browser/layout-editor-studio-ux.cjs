@@ -296,7 +296,7 @@ async function exerciseScoreChip(browser, origin) {
 	const first = await chip();
 	assert.match(first.score, /^\d+([.,]\d)?$/, `the chip shows the score: ${JSON.stringify(first)}`);
 	assert.equal(first.change, '', 'no change on the first analysis');
-	assert.match(first.live, /^Score .* · rank \d+ of \d+$/, `announced: ${first.live}`);
+	assert.match(first.live, /^Score .* · rank \d+\sof \d+$/, `announced: ${first.live}`);
 	const live = await page.$eval('#le-score-live', (node) => [
 		node.getAttribute('role'),
 		node.getAttribute('aria-live')
@@ -455,7 +455,7 @@ async function exerciseWorstNgrams(browser, origin) {
 	);
 	const first = page.locator('#la-panel-ngrams .la-ngram-sfb .la-ngram').first();
 	const label = await first.getAttribute('aria-label');
-	assert.match(label, /^\S+ \S+: \d+[.,]\d+ %$/, `a row says its keys and share: ${label}`);
+	assert.match(label, /^\S+ \S+: \d+[.,]\d+\s?%$/, `a row says its keys and share: ${label}`);
 	await first.focus();
 	const focused = await outlined(page, '#le-board');
 	assert.equal(focused.length, 2, `focus outlines the pair's two keys: ${focused}`);

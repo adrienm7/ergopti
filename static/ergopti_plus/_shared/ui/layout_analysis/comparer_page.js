@@ -955,6 +955,9 @@
 		const $ = (id) => document.getElementById(id);
 		// Every number in the language of the page's strings (info_popover.js).
 		const format = INFO.format;
+		// A number and its unit, tied by a no-break space (info_popover.js).
+		const measure = INFO.measure;
+		const withUnit = INFO.withUnit;
 		const metricDigits = E.metricDigits;
 
 		/** Reads the saved conveniences; an unavailable storage gives none. */
@@ -1789,7 +1792,7 @@
 				bar.style.left = '0%';
 				bar.style.width = `${3 + share * 97}%`;
 				track.append(bar);
-				row.title = `${result.layout.name}: ${value} ${t('layout_analysis.unit.points')}${
+				row.title = `${result.layout.name}: ${withUnit(value, t('layout_analysis.unit.points'))}${
 					flag ? ` (${flag.textContent})` : ''
 				}`;
 				const cell = el('span', 'la-chart-value', value);
@@ -1829,14 +1832,14 @@
 			tile(
 				t('layout_analysis.chart.title'),
 				complete[0],
-				`${format(complete[0].score.total, 1)} ${t('layout_analysis.unit.points')}`
+				measure(complete[0].score.total, 1, t('layout_analysis.unit.points'))
 			);
 			for (const id of LEADER_METRICS) {
 				const higher = E.METRICS[id].better === 'higher';
 				const best = complete.reduce((a, b) =>
 					(higher ? b.metrics[id] > a.metrics[id] : b.metrics[id] < a.metrics[id]) ? b : a
 				);
-				tile(metricName(id), best, `${format(best.metrics[id], metricDigits(id))} ${unitText(id)}`);
+				tile(metricName(id), best, measure(best.metrics[id], metricDigits(id), unitText(id)));
 			}
 		}
 
@@ -2240,12 +2243,7 @@
 			const unit = unitText(id);
 			for (const result of shown)
 				box.append(
-					resultBar(
-						result,
-						result.metrics[id],
-						scale,
-						`${format(result.metrics[id], digits)} ${unit}`
-					)
+					resultBar(result, result.metrics[id], scale, measure(result.metrics[id], digits, unit))
 				);
 			section.append(box);
 			if (sorted.length > shown.length) section.append(moreNote(shown.length, sorted.length));
@@ -2404,9 +2402,9 @@
 					);
 					const signed = `${gap > 0 ? '+' : ''}${format(gap, 1)}`;
 					td.append(el('span', '', format(value, 1)), el('small', 'la-gap', signed));
-					td.title = `${t(`layout_analysis.finger.${id}`)}: ${format(value, 1)} % (${t(
+					td.title = `${t(`layout_analysis.finger.${id}`)}: ${measure(value, 1, '%')} (${t(
 						'layout_analysis.details.ideal_mark'
-					)} ${format(ideal[id], 1)} %, ${signed})`;
+					)} ${measure(ideal[id], 1, '%')}, ${signed})`;
 					tr.append(td);
 				}
 				tr.append(
@@ -2447,12 +2445,12 @@
 				const middle = el('span', 'la-target');
 				middle.style.left = '50%';
 				track.append(leftBar, rightBar, middle);
-				const text = `${format(result.hands.left, 1)} % · ${format(result.hands.right, 1)} %`;
+				const text = `${measure(result.hands.left, 1, '%')} · ${measure(result.hands.right, 1, '%')}`;
 				const row = barRow(
 					result.layout.name,
 					track,
 					text,
-					` (${left} ${format(result.hands.left, 1)} %, ${right} ${format(result.hands.right, 1)} %)`
+					` (${left} ${measure(result.hands.left, 1, '%')}, ${right} ${measure(result.hands.right, 1, '%')})`
 				);
 				if (result.incomplete) {
 					row.classList.add('la-incomplete');
@@ -2460,7 +2458,7 @@
 				}
 				if (state.details === result.layout.id) row.classList.add('la-selected');
 				row.classList.add('la-clickable');
-				row.title = `${result.layout.name}: ${left} ${format(result.hands.left, 1)} %, ${right} ${format(result.hands.right, 1)} %`;
+				row.title = `${result.layout.name}: ${left} ${measure(result.hands.left, 1, '%')}, ${right} ${measure(result.hands.right, 1, '%')}`;
 				row.addEventListener('click', () => showDetails(result.layout.id));
 				box.append(row);
 			}
@@ -2507,13 +2505,13 @@
 					track.append(segment);
 				});
 				const said = parts
-					.map((part) => `${part.label} ${format(value(result, part.id), 1)} %`)
+					.map((part) => `${part.label} ${measure(value(result, part.id), 1, '%')}`)
 					.join(', ');
 				// One part's value beside the bar at most; all of them are in the title and the table.
 				const row = barRow(
 					result.layout.name,
 					track,
-					written ? `${format(value(result, written), 1)} %` : '',
+					written ? measure(value(result, written), 1, '%') : '',
 					` (${said})`
 				);
 				if (result.incomplete) {
@@ -2638,7 +2636,7 @@
 					const share = extent > 0 ? value / extent : 0;
 					const td = el('td', 'la-cell la-cell-count', format(value, 2));
 					td.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
-					td.title = `${t(`layout_analysis.finger.${id}`)}: ${format(value, 2)} ${mm}`;
+					td.title = `${t(`layout_analysis.finger.${id}`)}: ${measure(value, 2, mm)}`;
 					tr.append(td);
 				}
 				tr.append(
@@ -2649,9 +2647,9 @@
 			}
 			table.append(tabSortHead(columns, 'travel', renderTravelTable), tbody);
 			$('la-travel-legend').replaceChildren(
-				el('span', '', `${format(0, 2)} ${mm}`),
+				el('span', '', measure(0, 2, mm)),
 				el('span', 'la-heat-ramp'),
-				el('span', '', `${format(extent, 2)} ${mm}`)
+				el('span', '', measure(extent, 2, mm))
 			);
 		}
 
@@ -2683,9 +2681,9 @@
 				);
 			const common = Math.max(...boards.map((b) => extentOf(b.values)), 0);
 			const ramp = (extent) => [
-				el('span', '', `${format(0, HEAT_DIGITS)} ${unit}`),
+				el('span', '', measure(0, HEAT_DIGITS, unit)),
 				el('span', 'la-heat-ramp'),
-				el('span', '', `≥ ${format(extent, HEAT_DIGITS)} ${unit}`)
+				el('span', '', `≥ ${measure(extent, HEAT_DIGITS, unit)}`)
 			];
 			if (shared)
 				$('la-heats-legend').replaceChildren(
@@ -2718,7 +2716,7 @@
 					other: false,
 					focusable: false,
 					title: (code, value) =>
-						`${keyText(layout, code)} · ${heatName(metric)}: ${format(value, HEAT_DIGITS)} ${unit}`
+						`${keyText(layout, code)} · ${heatName(metric)}: ${measure(value, HEAT_DIGITS, unit)}`
 				});
 				card.append(title, box);
 				// Each card's heatmap as a PNG or SVG image (board_image.js).
@@ -2789,9 +2787,9 @@
 				bar.style.left = value >= 0 ? '50%' : `${50 - width}%`;
 				bar.style.width = `${width}%`;
 				track.append(bar);
-				const text = `${value > 0 ? '+' : ''}${format(value, digits)}`;
-				const row = barRow(label, track, text, ` ${unit}`);
-				row.title = `${label}: ${text} ${unit}`;
+				const text = withUnit(`${value > 0 ? '+' : ''}${format(value, digits)}`, unit);
+				const row = barRow(label, track, text);
+				row.title = `${label}: ${text}`;
 				box.append(row);
 			}
 		}
@@ -2834,7 +2832,7 @@
 		function loadBars(box, entries, scale, written) {
 			const unit = (written && written.unit) || '%';
 			const digits = written && written.digits !== undefined ? written.digits : 1;
-			const value = (v) => `${format(v, digits)} ${unit}`;
+			const value = (v) => measure(v, digits, unit);
 			box.replaceChildren();
 			box.setAttribute('role', 'table');
 			for (const entry of entries) {
@@ -2918,7 +2916,7 @@
 		 */
 		function heatTitle(detail, layout, code, value, signed) {
 			const unit = heatUnit(state.heat);
-			const written = `${signed && value > 0 ? '+' : ''}${format(value, HEAT_DIGITS)} ${unit}`;
+			const written = `${signed && value > 0 ? '+' : ''}${measure(value, HEAT_DIGITS, unit)}`;
 			let title = `${keyText(layout, code)} · ${heatName(state.heat)}: ${written}`;
 			if (signed) return title;
 			const key = detail.keys[code];
@@ -2929,7 +2927,7 @@
 							`${[code]
 								.concat(others)
 								.map((c) => keyText(layout, c))
-								.join(' ')} ${format(share, HEAT_DIGITS)} %`
+								.join(' ')} ${measure(share, HEAT_DIGITS, '%')}`
 					)
 					.join(', ');
 				title += ` — ${t('layout_analysis.panel.heat.worst', { groups })}`;
@@ -3142,15 +3140,15 @@
 				legend.replaceChildren(
 					swatch('more', '+', t('layout_analysis.heat.diff_more', { layout: other.layout.name })),
 					swatch('less', '−', t('layout_analysis.heat.diff_less', { layout: other.layout.name })),
-					el('span', 'la-muted', `± ${format(extent, HEAT_DIGITS)} ${unit}`)
+					el('span', 'la-muted', `± ${measure(extent, HEAT_DIGITS, unit)}`)
 				);
 				return;
 			}
 			// The scale: what the lightest and the darkest key stand for.
 			legend.replaceChildren(
-				el('span', '', `${format(0, HEAT_DIGITS)} ${unit}`),
+				el('span', '', measure(0, HEAT_DIGITS, unit)),
 				el('span', 'la-heat-ramp'),
-				el('span', '', `${format(extent, HEAT_DIGITS)} ${unit}`),
+				el('span', '', measure(extent, HEAT_DIGITS, unit)),
 				el('span', 'la-muted', t('layout_analysis.heat.scale', { metric: heatName(state.heat) }))
 			);
 		}
@@ -3235,7 +3233,7 @@
 				tr.append(
 					el('td', 'la-keys', group.keys.map((code) => keyText(layout, code)).join(' ')),
 					el('td', '', format(group.count, 0)),
-					el('td', '', `${format(group.share, HEAT_DIGITS)} %`)
+					el('td', '', measure(group.share, HEAT_DIGITS, '%'))
 				);
 				tbody.append(tr);
 			}
@@ -3389,13 +3387,13 @@
 				legend.replaceChildren(
 					swatch('less', '+', t('layout_analysis.chart.gain')),
 					swatch('more', '−', t('layout_analysis.chart.loss')),
-					el('span', 'la-muted', `± ${format(extent, HEAT_DIGITS)} ${unit}`)
+					el('span', 'la-muted', `± ${measure(extent, HEAT_DIGITS, unit)}`)
 				);
 			} else {
 				legend.replaceChildren(
-					el('span', '', `${format(0, HEAT_DIGITS)} ${unit}`),
+					el('span', '', measure(0, HEAT_DIGITS, unit)),
 					el('span', 'la-heat-ramp'),
-					el('span', '', `${format(extent, HEAT_DIGITS)} ${unit}`),
+					el('span', '', measure(extent, HEAT_DIGITS, unit)),
 					el(
 						'span',
 						'la-muted',
@@ -3671,12 +3669,12 @@
 				th.append(' ', infoButton(id));
 				const digits = metricDigits(id);
 				const unit = unitText(id);
-				const values = [`${format(result.metrics[id], digits)} ${unit}`];
+				const values = [measure(result.metrics[id], digits, unit)];
 				let delta = null;
 				if (diff) {
 					const entry = diff.metrics[id];
-					values.push(`${format(entry.b, digits)} ${unit}`);
-					delta = { text: `${signed(entry.delta, digits)} ${unit}`, verdict: entry.verdict };
+					values.push(measure(entry.b, digits, unit));
+					delta = { text: withUnit(signed(entry.delta, digits), unit), verdict: entry.verdict };
 				}
 				addRow(th, values, delta);
 			}
@@ -3722,7 +3720,7 @@
 					const ways = row.ways
 						.map(
 							(way) =>
-								`${t(`layout_analysis.typing.${way.kind}`)} ${way.keys} (${format(way.share, 0)} %)`
+								`${t(`layout_analysis.typing.${way.kind}`)} ${way.keys} (${measure(way.share, 0, '%')})`
 						)
 						.join(' · ');
 					tr.append(th, el('td', '', ways));
@@ -3738,7 +3736,7 @@
 				const th = el('th', '', t(`layout_analysis.simplicity.${id}`));
 				th.scope = 'row';
 				const value = rule
-					? `${format(rule.value, 0)} %`
+					? measure(rule.value, 0, '%')
 					: t('layout_analysis.simplicity.not_measured');
 				tr.append(th, el('td', '', value));
 				body.append(tr);

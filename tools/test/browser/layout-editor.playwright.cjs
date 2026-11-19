@@ -317,7 +317,11 @@ async function exerciseStudioLayout(browser, origin) {
 	assert.equal(comparer.corpus, 'my_typing', 'the user’s typing becomes the corpus');
 	assert.ok(comparer.mine, 'and the picker shows it');
 	assert.equal(comparer.listOpen, false, 'the layout list is folded');
-	assert.match(comparer.summary, /^\d+ layouts compared: /, 'its line counts the compared layouts');
+	assert.match(
+		comparer.summary,
+		/^\d+\slayouts compared: /,
+		'its line counts the compared layouts'
+	);
 	assert.equal(comparer.widths[0], 100, 'the best layout has the full bar');
 	assert.deepEqual(
 		comparer.widths,
@@ -404,14 +408,14 @@ async function exerciseStudioLayout(browser, origin) {
 		)
 	);
 	await page.waitForFunction(() =>
-		/ on 60 characters/.test(document.getElementById('la-status').textContent)
+		/ on 60\scharacters/.test(document.getElementById('la-status').textContent)
 	);
 	assert.equal(await page.isDisabled('#la-text-mode'), false, 'two texts: the choice is open');
 	assert.equal(await page.inputValue('#la-text-mode'), 'typed', 'the keys typed until chosen');
 	await comparerTab(page, 'home');
 	await page.selectOption('#la-text-mode', 'final');
 	await page.waitForFunction(() =>
-		/ on 90 characters/.test(document.getElementById('la-status').textContent)
+		/ on 90\scharacters/.test(document.getElementById('la-status').textContent)
 	);
 	assert.equal(
 		await page.locator('#la-layout-list .la-plus').count(),
@@ -441,7 +445,7 @@ async function exerciseStudioLayout(browser, origin) {
 		mixed.includes('QWERTY (US)') && mixed.includes('QWERTY (US)+'),
 		`QWERTY and QWERTY+ in one ranking: ${mixed.join(' | ')}`
 	);
-	assert.match(await status(), / on 90 characters/, 'the others type the final text');
+	assert.match(await status(), / on 90\scharacters/, 'the others type the final text');
 	// A « + » layout's details are measured on the keys typed, like its rank.
 	await page.evaluate(() =>
 		[...document.querySelectorAll('#la-table tbody tr')]
@@ -1353,7 +1357,7 @@ async function exerciseComparerTabs(page) {
 	if (results > 40)
 		assert.match(
 			await page.textContent('#la-panel-analysers'),
-			new RegExp(`Shows the 40 best of the ranking's ${results} layouts`),
+			new RegExp(`Shows the 40\\sbest of the ranking's ${results}\\slayouts`),
 			'and say so'
 		);
 	await page.selectOption('#la-analysers-view', 'ranks');
@@ -1412,7 +1416,7 @@ async function exerciseComparerWholeLibrary(browser, origin) {
 	});
 	await page.goto(`${origin}/ui/layout_analysis/index.html?lang=en&corpus=fr_nemolivier`);
 	await page.waitForFunction(() =>
-		/ layouts compared on /.test(document.getElementById('la-status').textContent)
+		/\slayouts compared on /.test(document.getElementById('la-status').textContent)
 	);
 	const ticks = await page.evaluate(() => {
 		const library = window.LAYOUT_ANALYSIS.libraryLayouts();
@@ -1437,17 +1441,17 @@ async function exerciseComparerWholeLibrary(browser, origin) {
 		`the whole library is ticked: ${ticks.checked} of ${ticks.library}`
 	);
 	const statuses = await page.evaluate(() => window.__statuses.slice());
-	const ready = statuses.findIndex((text) => / layouts compared on /.test(text));
+	const ready = statuses.findIndex((text) => /\slayouts compared on /.test(text));
 	const slices = statuses
 		.slice(0, ready)
-		.filter((text) => /^Scoring the layouts: \d+ of \d+…$/.test(text));
+		.filter((text) => /^Scoring the layouts: \d+\sof \d+…$/.test(text));
 	assert.ok(
 		slices.length >= Math.floor(ticks.checked / 4) - 1,
 		`the page is given a turn between slices: ${slices.length} of ${statuses.join(' | ')}`
 	);
 	assert.match(
 		statuses[ready],
-		new RegExp(`^${ticks.checked} layouts compared on `),
+		new RegExp(`^${ticks.checked}\\slayouts compared on `),
 		'every ticked layout is ranked'
 	);
 	assert.equal(
@@ -1465,11 +1469,11 @@ async function exerciseComparerWholeLibrary(browser, origin) {
 		.check();
 	await page.reload();
 	await page.waitForFunction(() =>
-		/ layouts compared on /.test(document.getElementById('la-status').textContent)
+		/\slayouts compared on /.test(document.getElementById('la-status').textContent)
 	);
 	assert.match(
 		await page.textContent('#la-status'),
-		/^1 layouts compared on /,
+		/^1\slayouts compared on /,
 		'a saved selection is kept'
 	);
 	assert.deepEqual(errors, []);
@@ -1561,7 +1565,7 @@ async function exerciseComparerLayoutList(browser, origin) {
 	await page.fill('#la-filter', 'bepo');
 	const bepo = (await list()).flatMap((g) => g.names);
 	assert.ok(bepo.includes('bépo'), `« bepo » finds « bépo »: ${bepo.join(' | ')}`);
-	assert.match(await count(), new RegExp(`^${bepo.length} of \\d+ shown, \\d+ ticked$`));
+	assert.match(await count(), new RegExp(`^${bepo.length}\\sof \\d+\\sshown, \\d+\\sticked$`));
 	const byAuthor = await page.evaluate(() => {
 		const layout = window.LAYOUT_ANALYSIS.libraryLayouts().find(
 			(l) =>
@@ -1579,14 +1583,14 @@ async function exerciseComparerLayoutList(browser, origin) {
 	// Select the shown layouts only.
 	await page.fill('#la-filter', '');
 	await page.click('#la-clear');
-	assert.match(await count(), / 0 ticked$/, 'every layout unticked');
+	assert.match(await count(), / 0\sticked$/, 'every layout unticked');
 	await page.fill('#la-filter', 'colemak');
 	const shown = (await list()).flatMap((g) => g.names);
 	assert.ok(shown.length > 1, `« colemak » shows the family: ${shown.join(' | ')}`);
 	await page.click('#la-all');
 	assert.match(
 		await count(),
-		new RegExp(`^${shown.length} of \\d+ shown, ${shown.length} ticked$`),
+		new RegExp(`^${shown.length}\\sof \\d+\\sshown, ${shown.length}\\sticked$`),
 		'« Select all shown » ticks the shown layouts'
 	);
 	await page.fill('#la-filter', '');
@@ -2028,7 +2032,7 @@ async function exerciseStudioComparer(page) {
 	// English strings: the comparer reports its analysis, not a failure.
 	assert.match(
 		await page.evaluate(() => document.getElementById('la-status').textContent),
-		/^\d+ layouts compared on [\d,]+ characters/
+		/^\d+\slayouts compared on [\d,]+\scharacters/
 	);
 	// (comparer-default-geometry) Until the user chooses, the ticked layouts
 	// follow the keyboard: ISO ticks Ergopti and Ergopti+, ANSI their ANSI
@@ -2091,7 +2095,7 @@ async function exerciseStudioComparer(page) {
 	await page.selectOption('#la-heat-metric', 'sfb');
 	assert.ok(
 		await page.$$eval('#la-heatmap .la-key', (keys) =>
-			keys.some((key) => /: [\d.,]+ % — .+ [\d.,]+ %/.test(key.title))
+			keys.some((key) => /: [\d.,]+\s?% — .+ [\d.,]+\s?%/.test(key.title))
 		),
 		'the Comparer heatmap names SFB partners'
 	);
@@ -2106,7 +2110,7 @@ async function exerciseStudioComparer(page) {
 	await page.selectOption('#la-heat-metric', 'redirect_bad');
 	assert.ok(
 		await page.$$eval('#la-heatmap .la-key', (keys) =>
-			keys.some((key) => / — .+ [\d.,]+ %/.test(key.title))
+			keys.some((key) => / — .+ [\d.,]+\s?%/.test(key.title))
 		),
 		'the Comparer heatmap names the worst bad redirects'
 	);
@@ -2134,7 +2138,7 @@ async function exerciseStudioComparer(page) {
 		(await page.locator('#la-worst tbody tr').count()) > 1,
 		'the worst SFB pairs are listed'
 	);
-	assert.match(await page.textContent('#la-worst tbody tr td:nth-child(3)'), /^[\d.,]+ %$/);
+	assert.match(await page.textContent('#la-worst tbody tr td:nth-child(3)'), /^[\d.,]+\s?%$/);
 	assert.equal(await page.locator('#la-travel .la-chart-row').count(), 10, 'every finger travels');
 	assert.ok(
 		(await page.locator('#la-standing .la-chart-row').count()) > 10,
@@ -2156,7 +2160,7 @@ async function exerciseStudioComparer(page) {
 		tds.map((td) => td.title)
 	);
 	assert.ok(cells.length > 100, `the matrix has ${cells.length} pairs`);
-	assert.match(cells[0], /: [\d.,]+ % .+\(\d[\d,]* .+\), .+, [+−-]?[\d.,]+ /);
+	assert.match(cells[0], /: [\d.,]+\s?% .+\(\d[\d,]*\s.+\), .+, [+−-]?[\d.,]+\s/);
 	assert.ok(
 		await page.$$eval('#la-matrix td.la-cell-count', (tds) =>
 			tds.every((td) => td.querySelector('.la-sr-only').textContent === td.title)
@@ -2199,7 +2203,7 @@ async function exerciseStudioComparer(page) {
 	assert.equal(await page.isHidden('#la-words-none'), true, 'this corpus has a word table');
 	assert.equal(await page.locator('#la-words-bins .la-chart-row').count(), 10, 'ten effort ranges');
 	assert.equal(await page.locator('#la-words tbody tr').count(), 15, 'the 15 hardest words');
-	assert.match(await page.textContent('#la-words-mean'), /[\d.,]+ points over [\d,]+ words/);
+	assert.match(await page.textContent('#la-words-mean'), /[\d.,]+\spoints over [\d,]+\swords/);
 	// (matrix-phone-width) At phone width the matrix scrolls inside its own box.
 	const viewport = page.viewportSize();
 	await page.setViewportSize({ width: 360, height: 740 });
@@ -2239,7 +2243,7 @@ async function exerciseStudioComparer(page) {
 	assert.equal(await page.locator('#la-heat-legend .la-heat-key').count(), 2, 'more and less');
 	assert.ok(
 		await page.$$eval('#la-heatmap .la-key-more', (keys) =>
-			keys.every((key) => / \+[\d.,]+ /.test(key.title))
+			keys.every((key) => / \+[\d.,]+(\s|%)/.test(key.title))
 		),
 		'a key with more is signed +'
 	);
@@ -3094,7 +3098,7 @@ async function exerciseWorkspace(browser, origin) {
 	}
 	assert.deepEqual((await tabNames(crashed)).slice(1, 3), ['My layout', 'Second']);
 	assert.equal(await legendOf(crashed, 'KeyE'), 'ẽ', 'the imported tab is shown with its edits');
-	assert.match(await crashed.textContent('#le-message'), /3 layouts imported/);
+	assert.match(await crashed.textContent('#le-message'), /3\slayouts imported/);
 	await settled(crashed);
 
 	// A damaged store is said and never saved over, even after an edit.

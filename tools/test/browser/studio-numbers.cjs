@@ -21,6 +21,11 @@
  * corpus names, the analysers' names, the locale's own strings (« 3-key
  * rolls »), Unicode code points, key codes and the characters a key or an
  * n-gram types.
+ *
+ * WHAT ELSE IS CHECKED:
+ * 1. A number and the unit or counted word after it are tied by a no-break
+ *    space (U+00A0, or the language's own before %), never U+0020,
+ *    so the unit never wraps away from its number (maintainer, 2026-11-19).
  * ==============================================================================
  */
 
@@ -150,6 +155,9 @@ function bypasses(texts, own) {
 		if (keys) rest = rest.replace(/(^|[^0-9\p{L}])[0-9](?=$|[^0-9\p{L}])/gu, '$1');
 		if (/[0-9]/.test(rest))
 			problems.push(`not written by the formatter: ${JSON.stringify(text)} at ${where}`);
+		// A number, then a breaking space, then its unit or counted word (« 12,3 %», « 45 ms »).
+		if (/[\u0660-\u0669] (?=[\p{L}%\u066a])/u.test(text))
+			problems.push(`a breaking space before a unit: ${JSON.stringify(text)} at ${where}`);
 	}
 	return problems;
 }

@@ -96,7 +96,8 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 	 */
 	function draw(box, options) {
 		const t = window.LAYOUT_ANALYSIS_INFO.t;
-		const format = window.LAYOUT_ANALYSIS_INFO.format;
+		// A number and its unit, tied by a no-break space.
+		const measure = window.LAYOUT_ANALYSIS_INFO.measure;
 		const limit = options.limit || DEFAULT_LIMIT;
 		box.replaceChildren();
 		box.classList.add('la-ngrams');
@@ -117,7 +118,7 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 			const top = groups[0].share;
 			for (const group of groups) {
 				const keys = group.keys.map((code) => keyLabel(options.layout, code));
-				const share = `${format(group.share, SHARE_DIGITS)} %`;
+				const share = measure(group.share, SHARE_DIGITS, '%');
 				const button = el('button', 'la-ngram');
 				button.type = 'button';
 				const chips = el('span', 'la-ngram-keys');

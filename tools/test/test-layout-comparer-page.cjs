@@ -663,7 +663,7 @@ check(
 	pageWindow._i18n_strings = { '_meta.locale': 'fr', chars: '{n} caractères' };
 	check(
 		info.t('chars', { n: 2517297 }) === `${info.format(2517297, 0)} caractères` &&
-			info.t('chars', { n: 2517297 }).includes(' '),
+			info.t('chars', { n: 2517297 }).includes('\u202f'),
 		`a number placeholder is written by the formatter: ${JSON.stringify(info.t('chars', { n: 2517297 }))}`
 	);
 	let refused = null;
@@ -692,7 +692,42 @@ check(
 				!/\.join\(String\(value\)\)/.test(source),
 				`${dir}/${file} fills a sentence's numbers itself`
 			);
+			// (studio-unit-space) A number and its unit tied by measure()/withUnit(),
+			// never a template's breaking space (« ${format(v, 1)} % »).
+			check(
+				!/\)\} (%|\$\{(unit|mm|unitText\(|t\('layout_analysis\.unit))/.test(source),
+				`${dir}/${file} joins a number and its unit with a breaking space`
+			);
 		}
+	// The unit takes the language's own place and space: a no-break space
+	// before % in French, none in English, the sign first in Turkish; U+00A0
+	// before a word.
+	const tied = (locale, run) => {
+		pageWindow._i18n_strings = { '_meta.locale': locale };
+		return run();
+	};
+	check(
+		/^12,3[\u00a0\u202f]%$/.test(tied('fr', () => info.measure(12.34, 1, '%'))),
+		'fr: « 12,3 % »'
+	);
+	check(tied('en', () => info.measure(12.34, 1, '%')) === '12.3%', 'en: « 12.3% »');
+	check(tied('tr', () => info.measure(12.34, 1, '%')) === '%12,3', 'tr: « %12,3 »');
+	check(tied('de', () => info.measure(12.34, 1, '%')) === '12,3\u00a0%', 'de: « 12,3 % »');
+	check(tied('fr', () => info.measure(45, 0, 'ms')) === '45\u00a0ms', 'fr: « 45 ms »');
+	check(
+		tied('fr', () => info.withUnit('+1,5', 'points')) === '+1,5\u00a0points',
+		'a signed number keeps its sign before the tied unit'
+	);
+	// The Studio's strings tie their numbers too: no breaking space before a percent sign.
+	for (const locale of fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'))) {
+		const strings = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, locale), 'utf8'));
+		const loose = Object.keys(strings).filter(
+			(key) =>
+				/^layout_(analysis|optimizer|editor|composer|manager)\./.test(key) &&
+				/(\}|\d) %/.test(strings[key])
+		);
+		check(loose.length === 0, `${locale}: a breaking space before % in ${loose.join(', ')}`);
+	}
 }
 
 // (comparer-incomplete) An incomplete layout (no space or no letter in a case)

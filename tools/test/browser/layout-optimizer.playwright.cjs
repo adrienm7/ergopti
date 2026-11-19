@@ -277,7 +277,7 @@ async function main() {
 				input.dispatchEvent(new Event('change'));
 			});
 			await page.waitForFunction(() =>
-				/up to 50 MB/.test(document.querySelector('#lo-text-status').textContent)
+				/up to 50\sMB/.test(document.querySelector('#lo-text-status').textContent)
 			);
 			await page.fill('#lo-text', TEXT.repeat(2));
 			await shortBudget(page);
@@ -317,7 +317,7 @@ async function main() {
 			await page.click('#lo-zone-board [data-code="KeyK"]');
 			assert.match(
 				await page.locator('#lo-zones-summary').textContent(),
-				/e: 2 keys/,
+				/e: 2\skeys/,
 				'the zone is summed up'
 			);
 			assert.equal(
@@ -370,7 +370,7 @@ async function main() {
 				'true',
 				'a pinned key is kept'
 			);
-			assert.match(await page.locator('#lo-zones-summary').textContent(), /e: 1 keys/);
+			assert.match(await page.locator('#lo-zones-summary').textContent(), /e: 1\skeys/);
 			assert.equal(
 				await page.locator('#lo-tab-zones').getAttribute('aria-selected'),
 				'true',
@@ -480,8 +480,10 @@ async function main() {
 		// ======= 4b/ A host page with no language, and runs that fail =======
 		// A page that declared no language made the number formatter throw in
 		// the middle of run(), and the page stayed on « Loading the corpus… »
-		// with no message (until 2026-11-17). Now its numbers use the fallback
-		// language, and a stage that fails says so in words with « Try again ».
+		// with no message (until 2026-11-17). Now its numbers follow the
+		// language of its strings (English here, info_popover.js locale(), the
+		// fallback language only without strings), and a stage that fails says
+		// so in words with « Try again ».
 		{
 			const context = await browser.newContext({ viewport: { width: 1180, height: 820 } });
 			const page = await context.newPage();
@@ -527,8 +529,12 @@ async function main() {
 			}, TEXT.repeat(4));
 			await shortBudget(page);
 			let status = await runToEnd(page);
-			assert.match(status, /^Done: \d+ layouts scored in \d+,\d s$/, `fallback numbers: ${status}`);
-			assert.match(await page.locator('#lo-score').textContent(), /\d,\d\d/, 'the score shows');
+			assert.match(
+				status,
+				/^Done: \d+\slayouts scored in \d+\.\d\ss$/,
+				`the strings’ numbers: ${status}`
+			);
+			assert.match(await page.locator('#lo-score').textContent(), /\d\.\d\d/, 'the score shows');
 			// The library is scored on this page's thread: the engine is idle after it.
 			await libraryToEnd(page);
 

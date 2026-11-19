@@ -69,6 +69,8 @@ var LAYOUT_ANALYSER_TAB = (function () {
 	// Every number in the language of the page's strings; info_popover.js loads
 	// after this script, so it is read when a number is written.
 	const format = (value, digits) => window.LAYOUT_ANALYSIS_INFO.format(value, digits);
+	// A number and its unit, tied by a no-break space.
+	const measure = (value, digits, unit) => window.LAYOUT_ANALYSIS_INFO.measure(value, digits, unit);
 
 	/**
 	 * Draws the view in a container and follows the Comparer.
@@ -132,7 +134,8 @@ var LAYOUT_ANALYSER_TAB = (function () {
 			if (a.better !== 'none') return format(r.value, a.digits);
 			return a.headline
 				.map(
-					(part) => `${t(`layout_analysis.analysers.part.${part}`)} ${format(r.parts[part], 1)} %`
+					(part) =>
+						`${t(`layout_analysis.analysers.part.${part}`)} ${measure(r.parts[part], 1, '%')}`
 				)
 				.join(' · ');
 		}

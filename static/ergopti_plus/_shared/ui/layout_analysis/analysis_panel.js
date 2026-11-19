@@ -130,6 +130,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 
 	// Every number in the language of the page's strings (info_popover.js).
 	const format = INFO.format;
+	// A number and its unit, tied by a no-break space (info_popover.js).
+	const measure = INFO.measure;
 	const metricDigits = E.metricDigits;
 	const unitText = (id) => {
 		const unit = E.METRICS[id].unit;
@@ -625,7 +627,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				th.scope = 'row';
 				th.append(' ', INFO.button(id));
 				const value = result.metrics[id];
-				const td = el('td', '', `${format(value, metricDigits(id))} ${unitText(id)}`);
+				const td = el('td', '', measure(value, metricDigits(id), unitText(id)));
 				const delta = el('td', 'la-panel-delta');
 				if (before && Math.abs(value - before[id]) >= DELTA_EPSILON) {
 					const change = value - before[id];
@@ -660,7 +662,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			const chars = rows
 				.map(
 					(row) =>
-						`${row.char} ${row.ways.map((way) => `${way.keys} ${format(way.share, 0)} %`).join(', ')}`
+						`${row.char} ${row.ways.map((way) => `${way.keys} ${measure(way.share, 0, '%')}`).join(', ')}`
 				)
 				.join(' · ');
 			typing.textContent = `${t('layout_analysis.details.typing_caption', {
@@ -691,15 +693,15 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				const target = result.idealLoad[id];
 				const mark = el('span', 'la-panel-target');
 				mark.style.left = `${(target / scale) * 100}%`;
-				const ideal = ` (${t('layout_analysis.details.ideal_mark')}: ${format(target, 1)} %)`;
-				row.title = `${format(share, 1)} %${ideal}`;
+				const ideal = ` (${t('layout_analysis.details.ideal_mark')}: ${measure(target, 1, '%')})`;
+				row.title = `${measure(share, 1, '%')}${ideal}`;
 				row.setAttribute('role', 'row');
 				const name = el('span', 'la-panel-finger-name', t(`layout_analysis.finger.${id}`));
 				name.setAttribute('role', 'rowheader');
 				const track = el('span', 'la-panel-track');
 				track.setAttribute('aria-hidden', 'true');
 				track.append(bar, mark);
-				const value = el('span', 'la-panel-finger-value', `${format(share, 1)} %`);
+				const value = el('span', 'la-panel-finger-value', measure(share, 1, '%'));
 				value.setAttribute('role', 'cell');
 				value.append(el('span', 'la-sr-only', ideal));
 				row.append(name, track, value);
@@ -714,7 +716,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			return analyser.headline
 				.map(
 					(part) =>
-						`${t(`layout_analysis.analysers.part.${part}`)} ${format(score.parts[part], PART_DIGITS)} %`
+						`${t(`layout_analysis.analysers.part.${part}`)} ${measure(score.parts[part], PART_DIGITS, '%')}`
 				)
 				.join(' · ');
 		}
@@ -795,7 +797,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				result.keys[code].worst[event]
 					.map(
 						([others, share]) =>
-							`${[code].concat(others).map(typed).join(' ')} ${format(share, HEAT_DIGITS)} %`
+							`${[code].concat(others).map(typed).join(' ')} ${measure(share, HEAT_DIGITS, '%')}`
 					)
 					.join(', ');
 			const values = {};
@@ -816,10 +818,10 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					if (parts.length) title += ` (${parts.join(' · ')})`;
 				} else if (state.heat === HEAT_PRESSES) {
 					value = key.presses;
-					title = `${heatName(HEAT_PRESSES)}: ${format(value, HEAT_DIGITS)} %`;
+					title = `${heatName(HEAT_PRESSES)}: ${measure(value, HEAT_DIGITS, '%')}`;
 				} else {
 					value = key.cost[state.heat];
-					title = `${heatName(state.heat)}: ${format(value, HEAT_DIGITS)} ${unitText(state.heat)}`;
+					title = `${heatName(state.heat)}: ${measure(value, HEAT_DIGITS, unitText(state.heat))}`;
 					const worst = key.worst[state.heat] ? groups(code, state.heat) : '';
 					if (worst) title += ` — ${t('layout_analysis.panel.heat.worst', { groups: worst })}`;
 				}

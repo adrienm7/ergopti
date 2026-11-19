@@ -47,6 +47,9 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 	// The language of the numbers when the page declares no usable one: the
 	// locale i18n.js loads when none is set (its load()), never the browser's.
 	const FALLBACK_LOCALE = 'fr';
+	// The no-break space that ties a number to a unit or a counted word.
+	const NO_BREAK_SPACE = '\u00a0';
+	const PERCENT = '%';
 
 	let popover = null;
 	let owner = null;
@@ -175,6 +178,53 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 			formatters.set(key, formatter);
 		}
 		return formatter.format(Number(value));
+	}
+
+	// Where each language writes the percent sign, its spaces made no-break.
+	const percentPatterns = new Map();
+
+	/**
+	 * The text a language writes before and after a percentage's number
+	 * (« 12,3 % » in French with a no-break space, « 12.3% » in English, « %12,3 » in
+	 * Turkish), from its own Intl pattern.
+	 * @param {string} lang
+	 * @returns {{before: string, after: string}}
+	 */
+	function percentPattern(lang) {
+		let pattern = percentPatterns.get(lang);
+		if (pattern === undefined) {
+			const parts = new Intl.NumberFormat(lang, { style: 'percent' }).formatToParts(0.5);
+			const at = parts.findIndex((part) => part.type === 'integer');
+			const text = (list) =>
+				list
+					.map((part) => part.value)
+					.join('')
+					.replace(/ /g, NO_BREAK_SPACE);
+			pattern = { before: text(parts.slice(0, at)), after: text(parts.slice(at + 1)) };
+			percentPatterns.set(lang, pattern);
+		}
+		return pattern;
+	}
+
+	/**
+	 * A written number with its unit, tied by a no-break space so the unit
+	 * never wraps away from it (maintainer, 2026-11-19): a percentage the
+	 * language's way (percentPattern), any other unit after U+00A0.
+	 * @param {string} text - The number as format() wrote it, a sign included.
+	 * @param {string} unit - '%' or a unit's translated text (mm, points…).
+	 * @returns {string}
+	 */
+	function withUnit(text, unit) {
+		if (unit === PERCENT) {
+			const { before, after } = percentPattern(locale());
+			return `${before}${text}${after}`;
+		}
+		return `${text}${NO_BREAK_SPACE}${unit}`;
+	}
+
+	/** A number with this many decimals and its unit (withUnit), written the page's way. */
+	function measure(value, digits, unit) {
+		return withUnit(format(value, digits), unit);
 	}
 
 	/** Gives a button its translated accessible name and state. */
@@ -332,5 +382,16 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		else start();
 	}
 
-	return { t, refusal, button, routeLink, locale, format, ALSO_EXPLAINS };
+	return {
+		t,
+		refusal,
+		button,
+		routeLink,
+		locale,
+		format,
+		withUnit,
+		measure,
+		NO_BREAK_SPACE,
+		ALSO_EXPLAINS
+	};
 })();

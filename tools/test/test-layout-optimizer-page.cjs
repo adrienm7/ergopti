@@ -593,7 +593,12 @@ if (typeof RUNNER.librarySummary === 'function') {
 			'library card: the gauge shows the best layout’s similarity, hidden from assistive technology'
 		);
 		check(
-			text.includes(`${best.similarity.weighted.sameKey.toFixed(1)} %`),
+			text.includes(
+				english['layout_optimizer.library.percent'].replace(
+					'{value}',
+					best.similarity.weighted.sameKey.toFixed(1)
+				)
+			),
 			'library card: the gauge’s value is also in words'
 		);
 		const items = all.filter((node) => hasClass(node, 'lo-library-item'));

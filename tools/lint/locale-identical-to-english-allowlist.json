@@ -1250,51 +1250,11 @@
 		},
 		"layout_analysis.forms.ansi_60_to_100": {
 			"reason": "unit-or-abbreviation",
-			"locales": [
-				"ar",
-				"cs",
-				"da",
-				"de",
-				"es",
-				"he",
-				"hi",
-				"it",
-				"ja",
-				"ko",
-				"nl",
-				"no",
-				"pl",
-				"pt",
-				"ru",
-				"sv",
-				"tr",
-				"uk",
-				"zh"
-			]
+			"locales": ["ar", "he", "hi", "it", "ja", "ko", "nl", "pl", "pt", "uk", "zh"]
 		},
 		"layout_analysis.forms.iso_60_to_100": {
 			"reason": "unit-or-abbreviation",
-			"locales": [
-				"ar",
-				"cs",
-				"da",
-				"de",
-				"es",
-				"he",
-				"hi",
-				"it",
-				"ja",
-				"ko",
-				"nl",
-				"no",
-				"pl",
-				"pt",
-				"ru",
-				"sv",
-				"tr",
-				"uk",
-				"zh"
-			]
+			"locales": ["ar", "he", "hi", "it", "ja", "ko", "nl", "pl", "pt", "uk", "zh"]
 		},
 		"layout_analysis.format.60": {
 			"reason": "unit-or-abbreviation",
@@ -1308,6 +1268,7 @@
 				"ja",
 				"ko",
 				"nl",
+				"pl",
 				"pt",
 				"ru",
 				"tr",
@@ -1327,6 +1288,7 @@
 				"ja",
 				"ko",
 				"nl",
+				"pl",
 				"pt",
 				"ru",
 				"tr",
@@ -1346,6 +1308,7 @@
 				"ja",
 				"ko",
 				"nl",
+				"pl",
 				"pt",
 				"ru",
 				"tr",
@@ -1365,6 +1328,7 @@
 				"ja",
 				"ko",
 				"nl",
+				"pl",
 				"pt",
 				"ru",
 				"tr",
@@ -1374,7 +1338,7 @@
 		},
 		"layout_analysis.format.tkl": {
 			"reason": "unit-or-abbreviation",
-			"locales": ["ar", "de", "es", "he", "hi", "it", "nl", "pt", "ru", "tr", "uk"]
+			"locales": ["ar", "de", "es", "he", "hi", "it", "nl", "pl", "pt", "ru", "tr", "uk"]
 		},
 		"layout_analysis.keyboard.ortho": {
 			"reason": "loanword-or-cognate",
@@ -1548,7 +1512,7 @@
 		},
 		"layout_analysis.ideal.sum": {
 			"reason": "loanword-or-cognate",
-			"locales": ["es", "pt"]
+			"locales": ["pt"]
 		},
 		"layout_analysis.table.score": {
 			"reason": "loanword-or-cognate",
@@ -3779,7 +3743,7 @@
 		},
 		"layout_optimizer.library.percent": {
 			"reason": "symbol-or-placeholder-only",
-			"locales": ["cs", "da", "de", "es", "fr", "it", "no", "pt", "ru", "sv", "uk"]
+			"locales": ["he", "hi", "it", "ja", "ko", "nl", "pl", "pt", "uk", "zh"]
 		},
 		"layout_optimizer.library.score": {
 			"reason": "loanword-or-cognate",
