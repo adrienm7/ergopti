@@ -631,6 +631,7 @@
 	"layout_editor.target.web": "Website emulation",
 	"layout_editor.target.windows": "Windows KLC",
 	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.heading": "Layout editor",
 	"layout_editor.studio.tab.edit": "Edit",
 	"layout_editor.studio.tab.compare": "Compare",
 	"layout_editor.studio.tab.optimize": "Optimize",

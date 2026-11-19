@@ -631,6 +631,7 @@
 	"layout_editor.target.web": "Web sitesi öykünmesi",
 	"layout_editor.target.windows": "Windows KLC",
 	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.heading": "Düzen düzenleyici",
 	"layout_editor.studio.tab.edit": "Düzenle",
 	"layout_editor.studio.tab.compare": "Karşılaştır",
 	"layout_editor.studio.tab.optimize": "İyileştir",

@@ -631,6 +631,7 @@
 	"layout_editor.target.web": "Emulace na webu",
 	"layout_editor.target.windows": "KLC pro Windows",
 	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.heading": "Editor rozložení",
 	"layout_editor.studio.tab.edit": "Upravit",
 	"layout_editor.studio.tab.compare": "Porovnat",
 	"layout_editor.studio.tab.optimize": "Optimalizovat",

@@ -11,7 +11,9 @@
  * bottom with no positive tabindex (focus order, 2.4.3), land only on
  * elements shown on screen (2.4.7), and come back the same way. The
  * Comparer is walked again with its details and settings unfolded, where
- * most of its controls live. The maintainer asked for a keyboard walk of the
+ * most of its controls live. Each page's outline is read too
+ * (heading-landmarks.cjs): one h1, no skipped heading level, one main
+ * landmark, every other landmark named. The maintainer asked for a keyboard walk of the
  * Studio on 2026-11-16 (TODO « Full accessibility », « Keyboard and motor »).
  * Page errors and requests outside the loopback origin fail the gate.
  * ==============================================================================
@@ -24,6 +26,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const { chromium } = require('playwright');
+const { collectOutline, outlineProblems } = require('../lib/heading-landmarks.cjs');
 const { walkProblems } = require('../lib/keyboard-walk.cjs');
 
 const STATIC_ROOT = path.resolve(__dirname, '..', '..', '..', 'static');
@@ -171,7 +174,13 @@ async function check(page, label) {
 		backwardLeft: backward.left
 	});
 	assert.deepEqual(problems, [], label + ': the keyboard walk must pass');
-	console.log(`  ${label}: ${forward.stops.length} stops, out at both ends`);
+	// The outline a screen reader moves through: one h1, no skipped level, named landmarks.
+	const outline = await page.evaluate(collectOutline);
+	assert.deepEqual(outlineProblems(outline), [], label + ': headings and landmarks');
+	console.log(
+		`  ${label}: ${forward.stops.length} stops, out at both ends; ` +
+			`${outline.headings.length} headings, ${outline.landmarks.length} landmarks`
+	);
 	return forward.stops.length;
 }
 

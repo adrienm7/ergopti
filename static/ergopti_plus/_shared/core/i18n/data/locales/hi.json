@@ -631,6 +631,7 @@
 	"layout_editor.target.web": "वेबसाइट एम्युलेशन",
 	"layout_editor.target.windows": "Windows KLC",
 	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.heading": "लेआउट संपादक",
 	"layout_editor.studio.tab.edit": "संपादित करें",
 	"layout_editor.studio.tab.compare": "तुलना करें",
 	"layout_editor.studio.tab.optimize": "ऑप्टिमाइज़ करें",

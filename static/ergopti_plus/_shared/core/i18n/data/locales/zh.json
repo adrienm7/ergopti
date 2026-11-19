@@ -631,6 +631,7 @@
 	"layout_editor.target.web": "网站模拟",
 	"layout_editor.target.windows": "Windows 的 KLC",
 	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.heading": "布局编辑器",
 	"layout_editor.studio.tab.edit": "编辑",
 	"layout_editor.studio.tab.compare": "比较",
 	"layout_editor.studio.tab.optimize": "优化",

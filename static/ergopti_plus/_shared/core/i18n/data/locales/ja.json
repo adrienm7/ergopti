@@ -631,6 +631,7 @@
 	"layout_editor.target.web": "ウェブサイトでのエミュレーション",
 	"layout_editor.target.windows": "Windows の KLC",
 	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.heading": "配列エディター",
 	"layout_editor.studio.tab.edit": "編集",
 	"layout_editor.studio.tab.compare": "比較",
 	"layout_editor.studio.tab.optimize": "最適化",

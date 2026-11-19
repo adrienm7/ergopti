@@ -631,6 +631,7 @@
 	"layout_editor.target.web": "Emulatie op de website",
 	"layout_editor.target.windows": "KLC voor Windows",
 	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.heading": "Indelingseditor",
 	"layout_editor.studio.tab.edit": "Bewerken",
 	"layout_editor.studio.tab.compare": "Vergelijken",
 	"layout_editor.studio.tab.optimize": "Optimaliseren",

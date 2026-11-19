@@ -631,6 +631,7 @@
 	"layout_editor.target.web": "محاكاة الموقع",
 	"layout_editor.target.windows": "Windows KLC",
 	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.heading": "محرر التخطيطات",
 	"layout_editor.studio.tab.edit": "تحرير",
 	"layout_editor.studio.tab.compare": "مقارنة",
 	"layout_editor.studio.tab.optimize": "تحسين",

@@ -631,6 +631,7 @@
 	"layout_editor.target.web": "Emulación en el sitio web",
 	"layout_editor.target.windows": "KLC para Windows",
 	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.heading": "Editor de distribuciones",
 	"layout_editor.studio.tab.edit": "Editar",
 	"layout_editor.studio.tab.compare": "Comparar",
 	"layout_editor.studio.tab.optimize": "Optimizar",

@@ -2978,10 +2978,14 @@ var LayoutEditorPage = (function () {
 		function magnifier() {
 			const text = state.magnified;
 			if (!text)
-				return el('aside', { class: 'le-magnifier', id: 'le-magnifier' }, [
-					el('h3', { text: tl('magnifier.title') }),
-					el('p', { class: 'le-note', text: tl('magnifier.hint') })
-				]);
+				return el(
+					'section',
+					{ class: 'le-magnifier', id: 'le-magnifier', 'aria-labelledby': 'le-magnifier-title' },
+					[
+						el('h3', { id: 'le-magnifier-title', text: tl('magnifier.title') }),
+						el('p', { class: 'le-note', text: tl('magnifier.hint') })
+					]
+				);
 			const named = UnicodeNames.available();
 			const rows = Array.from(text).map((char) => {
 				const point = char.codePointAt(0);
@@ -2999,23 +3003,27 @@ var LayoutEditorPage = (function () {
 					block ? el('span', { class: 'le-magnifier-block', text: ` · ${block}` }) : null
 				]);
 			});
-			return el('aside', { class: 'le-magnifier', id: 'le-magnifier' }, [
-				el('h3', { text: tl('magnifier.title') }),
-				el('div', {
-					class: state.magnifiedDead
-						? `le-magnifier-glyph ${KEY_LEGEND.DEAD_KEY_CLASS}`
-						: 'le-magnifier-glyph',
-					id: 'le-magnifier-glyph',
-					text: state.magnifiedDead ? KEY_LEGEND.deadKeyText(text) : visible(text)
-				}),
-				el('ul', { class: 'le-list', id: 'le-magnifier-rows' }, rows),
-				el('button', {
-					type: 'button',
-					id: 'le-magnifier-copy',
-					text: tl('magnifier.copy'),
-					onclick: () => copyText(text)
-				})
-			]);
+			return el(
+				'section',
+				{ class: 'le-magnifier', id: 'le-magnifier', 'aria-labelledby': 'le-magnifier-title' },
+				[
+					el('h3', { id: 'le-magnifier-title', text: tl('magnifier.title') }),
+					el('div', {
+						class: state.magnifiedDead
+							? `le-magnifier-glyph ${KEY_LEGEND.DEAD_KEY_CLASS}`
+							: 'le-magnifier-glyph',
+						id: 'le-magnifier-glyph',
+						text: state.magnifiedDead ? KEY_LEGEND.deadKeyText(text) : visible(text)
+					}),
+					el('ul', { class: 'le-list', id: 'le-magnifier-rows' }, rows),
+					el('button', {
+						type: 'button',
+						id: 'le-magnifier-copy',
+						text: tl('magnifier.copy'),
+						onclick: () => copyText(text)
+					})
+				]
+			);
 		}
 
 		/** The search's answer as clickable cells, or its state. */
@@ -4570,6 +4578,8 @@ var LayoutEditorPage = (function () {
 			if (state.layer && !ids.includes(state.layer))
 				state.layer = ids.includes('base') ? 'base' : null;
 			const parts = [
+				// The page's one h1, for a screen reader's outline: the tabs show the documents.
+				el('h1', { class: 'le-sr-only', text: tl('heading') }),
 				tabBar(),
 				toolbar(),
 				startPanel(),
@@ -4578,7 +4588,10 @@ var LayoutEditorPage = (function () {
 				analysisPanel ? scoreChip : null,
 				el('div', { class: 'le-workspace' }, [
 					el('div', { class: 'le-board-col' }, [board(), preview()]),
-					el('aside', { class: 'le-inspector-col' }, [inspector(), magnifier()]),
+					el('aside', { class: 'le-inspector-col', 'aria-label': tl('inspector.key') }, [
+						inspector(),
+						magnifier()
+					]),
 					sideSlot
 				]),
 				tools(),

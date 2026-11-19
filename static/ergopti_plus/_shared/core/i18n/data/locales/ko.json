@@ -631,6 +631,7 @@
 	"layout_editor.target.web": "웹사이트 에뮬레이션",
 	"layout_editor.target.windows": "Windows용 KLC",
 	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.heading": "배열 편집기",
 	"layout_editor.studio.tab.edit": "편집",
 	"layout_editor.studio.tab.compare": "비교",
 	"layout_editor.studio.tab.optimize": "최적화",
