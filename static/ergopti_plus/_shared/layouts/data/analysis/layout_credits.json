@@ -2530,6 +2530,202 @@
 			"authors": ["Nikolay Nemshilov"],
 			"url": "https://web.archive.org/web/20220818151548/https://nikolay.rocks/2016-12-20-the-halmak-reborn",
 			"basis": "knowledge"
+		},
+		"hands_down_gold": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/hands-down-gold-ts.eu.ergodox.json: « author »: « Alan Reiser », label « hands-down-gold-ts.eu »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_silver": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/hands-down-silver-ts.eu.ergodox.json: « author »: « Alan Reiser », label « hands-down-silver-ts.eu »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_bronze": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/hands-down-bronze-ts.eu.ergodox.json: « author »: « Alan Reiser », label « hands-down-bronze-ts.eu »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_titanium": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/hands-down-titanium-ts.eu.ergodox.json: « author »: « Alan Reiser », label « hands-down-titanium-ts.eu »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_rhodium": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/hands-down-rhodium-ts.eu.ergodox.json: « author »: « Alan Reiser », label « hands-down-rhodium-ts.eu »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_vibranium_vb": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/hands-down-vibranium-vb.ts.eu.ergodox.json: « author »: « Alan Reiser », label « hands-down-vibranium-vb.ts.eu »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_vibranium_vf": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/hands-down-vibranium-vf.ts.eu.ergodox.json: « author »: « Alan Reiser », label « hands-down-vibranium-vf.ts.eu »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_vibranium_vp": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/hands-down-vibranium-vp.ts.eu.ergodox.json: « author »: « Alan Reiser », label « hands-down-vibranium-vp.ts.eu »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_vibranium_vv": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/hands-down-vibranium-vv.ts.eu.ergodox.json: « author »: « Alan Reiser », label « hands-down-vibranium-vv.ts.eu »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_elan_matrix": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownArchive/Hands_Down_elan_matrix.json: « author »: « Alan Reiser », label « Hands Down Élan matrix ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_alt_ex_matrix": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt-ex_matrix.json: « author »: « Alan Reiser », label « Hands Down Alt-ex matrix ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_alt_nx_matrix": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt-nx_matrix.json: « author »: « Alan Reiser », label « Hands Down Alt-nx matrix ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_alt_tx_matrix": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt-tx_matrix.json: « author »: « Alan Reiser », label « Hands Down Alt-tx matrix ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_alt_x": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt-x_ergo (1).json: « author »: « Alan Reiser », label « Hands Down Alt-x ergo ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_polyglot_ergodox": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownAlt/Hands_Down_alt-x_ergo.json: « author »: « Alan Reiser », label « Hands Down Polyglot ergo ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_extreme_ergodox": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownArchive/Hands_Down_extreme_ergo.json: « author »: « Alan Reiser », label « Hands Down Extreme ergo ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"blickensderfer_5": {
+			"authors": ["George Canfield Blickensderfer", "R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/MiscLayouts/Blickensderfer_5_21c._ergo_ts.json: « author »: « by George Canfield Blickensderfer », label « Blick 5 21c. ergo ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"ingulish": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/MiscLayouts/Ingulish_layout.json: « author »: « Alan Reiser », label « Ingulish 28 key ergo ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"ingulish_v2": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/MiscLayouts/Ingulish_layout.v2.json: « author »: « Alan Reiser », label « Ingulish v2 28 key ergo ts »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"cole_shift_e": {
+			"authors": ["symphonic, modded to ErgoDox by Ian Douglas"],
+			"url": "https://forum.colemak.com/topic/994-optimizing-the-maltron-layout-please-help-me/",
+			"basis": "collection"
+		},
+		"corny_furry": {
+			"authors": ["fortissim2"],
+			"url": "https://www.reddit.com/r/KeyboardLayouts/comments/vqrwcq/my_corny_furry_layout/",
+			"basis": "collection"
+		},
+		"enne_p_111_69": {
+			"authors": ["Sc0tTy & Ian"],
+			"url": "https://geekhack.org/index.php?topic=90696.msg2463130",
+			"basis": "collection"
+		},
+		"lydell_anishtro": {
+			"authors": ["Simon Lydell"],
+			"url": "https://github.com/lydell/anishtro",
+			"basis": "collection"
+		},
+		"maltron_us_90_mod_andreas": {
+			"authors": ["Andreas"],
+			"url": "http://permalink.gmane.org/gmane.comp.hardware.keyboards.layout.nordtast/700",
+			"basis": "collection"
+		},
+		"proxkb_thumbshift": {
+			"authors": ["Pro XKB"],
+			"url": "https://geekhack.org/index.php?topic=67604.50",
+			"basis": "collection"
+		},
+		"rsthd_2": {
+			"authors": ["Simon / xsznix"],
+			"url": "https://xsznix.wordpress.com/2016/05/16/introducing-the-rsthd-layout/",
+			"basis": "collection"
+		},
+		"hands_down_chromium": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, layouts/hd/cr-config.h: its layout as the cyanophage playground link « layout=xbmgj%3B.%27%3D%2Fzrsntk%2Caeihqwpldv-uoyf%5Cc » under « The Hands Down Variation dependent defs »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_cesium": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, layouts/hd/cs-config.h: its layout as the cyanophage playground link « layout=%3Dbgmj%3B.%27%2Fvzrnthk%2Caeisqwpdlx-uoyf%5Cc » under « The Hands Down Variation dependent defs »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_vibranium_vx": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, layouts/hd/vx-config.h: its layout as the cyanophage playground link « layout=vwmgj%3B.%2F%3D%27zscntb%2Caeihqxfldk-uoyp%5Cr » under « The Hands Down Variation dependent defs »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_vibranium_vfj": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "moutis/HandsDown e8f532f62c, layouts/hd/vfj-config.h: its layout as the cyanophage playground link « layout=xwmgj%3B.%2F%3D%27zscntk%2Caeihqfpldv-uoyb%5Cr » under « The Hands Down Variation dependent defs »; the Hands Down site: « … are trademarks of R. Alan Reiser »."
 		}
 	}
 }

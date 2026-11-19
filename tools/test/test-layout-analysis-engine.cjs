@@ -45,7 +45,8 @@
  *    a budget per layout, on the fastest of a few runs.
  * 9. Golden: every metric of every library layout on both French corpora (the
  *    speed corpus and the built-in Don Quichotte table) equals the reference
- *    values of library_golden.json, recorded before the engine's speed-ups:
+ *    values of library_golden.json, recorded before the engine's speed-ups,
+ *    and every layout with a thumb letter on the ErgoDox (its thumb keys):
  *    an optimisation of the walks must not move any metric. A deliberate
  *    change of a definition, layout or corpus records them again with
  *    `node tools/test/test-layout-analysis-engine.cjs --update-golden`.
@@ -70,7 +71,9 @@
  *    import, each entry names its source (with a commit, version or date) and
  *    file, each layout of an author's own collection has a checked credit,
  *    key cells read in each collection's official files, and the reasons a
- *    file is left out.
+ *    file is left out; the thumb keys of the thumb-letter layouts as their
+ *    Hands Down, KLAnext and cyanophage files state them, never with the
+ *    shared space bar besides.
  * 15. « Typed via » (typingRows): a way's keys read as the boards show them,
  *    a dead key as its bare accent from the shared key legend and the space as
  *    « ␣ », never a dead state's id (« [s1_circumflex] »); without the legend
@@ -119,7 +122,7 @@ const SPEED_CORPUS = path.join(
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
 // The layouts the library held at its last import: it may only grow.
-const LIBRARY_COUNT = 649;
+const LIBRARY_COUNT = 700;
 // The collections imported from their authors' own files: each of their
 // layouts is credited from the author's page (layout_credits.json).
 const CREDITED_SOURCES = ['handsdown', 'ergol_repo'];
@@ -2060,14 +2063,30 @@ for (const [corpus, table] of Object.entries(goldenCorpora)) {
 		measured[corpus][layout.id] = metricIds.map((id) => metrics[id]);
 	}
 }
+// The layouts with a thumb letter on the boards whose thumb keys they use:
+// on the default keyboard they are incomplete, which pins little of them.
+const THUMB_GOLDEN_BOARD = 'ergodox';
+const thumbLayouts = library.filter((layout) =>
+	E.thumbKeys().some((code) => (layout.rows[code] || []).some((cell) => cell !== null))
+);
+const measuredThumbs = {};
+for (const [corpus, table] of Object.entries(goldenCorpora)) {
+	measuredThumbs[corpus] = {};
+	for (const layout of thumbLayouts) {
+		const metrics = E.analyse(layout, table, { keyboard: THUMB_GOLDEN_BOARD }).metrics;
+		measuredThumbs[corpus][layout.id] = metricIds.map((id) => metrics[id]);
+	}
+}
 let goldenValues = 0;
 let goldenGap = 0;
 if (UPDATE_GOLDEN) {
 	const golden = {
 		_description:
-			'Every metric of every library layout on both French corpora, on the default keyboard, as analyse() gives them (tools/test/test-layout-analysis-engine.cjs, section 9): a speed-up of the engine must leave them unchanged. Values follow the order of metrics. Recorded again with node tools/test/test-layout-analysis-engine.cjs --update-golden only when a definition, a layout or a corpus changes on purpose.',
+			'Every metric of every library layout on both French corpora, on the default keyboard, and of the layouts with a thumb letter on the board of thumb_board (thumb_layouts), as analyse() gives them (tools/test/test-layout-analysis-engine.cjs, section 9): a speed-up of the engine must leave them unchanged. Values follow the order of metrics. Recorded again with node tools/test/test-layout-analysis-engine.cjs --update-golden only when a definition, a layout or a corpus changes on purpose.',
 		metrics: metricIds,
-		corpora: measured
+		corpora: measured,
+		thumb_board: THUMB_GOLDEN_BOARD,
+		thumb_layouts: measuredThumbs
 	};
 	fs.writeFileSync(GOLDEN_PATH, `${JSON.stringify(golden, null, '\t')}\n`);
 	// The repository's formatter packs the number arrays: the file keeps its style.
@@ -2085,17 +2104,29 @@ if (UPDATE_GOLDEN) {
 		JSON.stringify(golden.metrics) === JSON.stringify(metricIds),
 		`golden: metrics ${golden.metrics.join(' ')} differ from the engine's; ${update}`
 	);
-	for (const [corpus, layouts] of Object.entries(measured)) {
-		const expected = golden.corpora[corpus] || {};
+	check(
+		golden.thumb_board === THUMB_GOLDEN_BOARD,
+		`golden: the thumb layouts are recorded on ${golden.thumb_board}; ${update}`
+	);
+	for (const [section, corpus, layouts, expected] of Object.entries(measured)
+		.map(([corpus, layouts]) => ['', corpus, layouts, golden.corpora[corpus] || {}])
+		.concat(
+			Object.entries(measuredThumbs).map(([corpus, layouts]) => [
+				`${THUMB_GOLDEN_BOARD} `,
+				corpus,
+				layouts,
+				(golden.thumb_layouts || {})[corpus] || {}
+			])
+		)) {
 		check(
 			Object.keys(expected).length === Object.keys(layouts).length,
-			`golden: ${corpus} has ${Object.keys(expected).length} layouts, the library ` +
+			`golden: ${section}${corpus} has ${Object.keys(expected).length} layouts, the library ` +
 				`${Object.keys(layouts).length}; ${update}`
 		);
 		for (const [id, values] of Object.entries(layouts)) {
 			const want = expected[id];
 			if (!want) {
-				check(false, `golden: ${corpus} lacks ${id}; ${update}`);
+				check(false, `golden: ${section}${corpus} lacks ${id}; ${update}`);
 				continue;
 			}
 			values.forEach((value, i) => {
@@ -2104,7 +2135,7 @@ if (UPDATE_GOLDEN) {
 				goldenValues++;
 				check(
 					gap <= GOLDEN_TOLERANCE,
-					`golden: ${corpus} ${id} ${golden.metrics[i]} = ${value}, recorded ${want[i]}`
+					`golden: ${section}${corpus} ${id} ${golden.metrics[i]} = ${value}, recorded ${want[i]}`
 				);
 			});
 		}
@@ -2642,14 +2673,73 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		'ergol_iso'
 	])
 		check(byId.get(id).fingering === 'angle', `collections: ${id} is not on the angle fingering`);
-	// What a collection leaves out says why: a Hands Down letter on a thumb key
-	// has no key on the library's keyboards, and its Reference is held once.
+	// What a collection leaves out says why: a Hands Down variant whose z is
+	// typed by a combo has no key for it (Promethium), and its Reference is
+	// held once. The thumb-letter variants are in (thumb keys, 2026-11-19).
 	const left = new Map(libraryFile.not_imported.map((entry) => [entry.source_path, entry]));
-	const gold = left.get('JSON/HandsDownNeu/hands-down-gold-ts.eu.ergodox.json');
 	check(
-		gold && /T on a thumb key/.test(gold.reason),
-		'collections: Hands Down Gold is not left out for its thumb T'
+		!left.has('JSON/HandsDownNeu/hands-down-gold-ts.eu.ergodox.json') &&
+			byId.get('hands_down_gold') !== undefined,
+		'collections: Hands Down Gold is still left out'
 	);
+	check(
+		/places q z on no key/.test(
+			(left.get('JSON/HandsDownNeu/hands-down-promethium.ts.eu.ergodox.json') || {}).reason
+		),
+		'collections: Hands Down Promethium is not left out for its combo q and z'
+	);
+	check(
+		libraryFile.not_imported.every(
+			(entry) => !/only the space bar for the thumbs/.test(entry.reason)
+		),
+		'collections: a file is still left out for want of thumb keys'
+	);
+	// Thumb keys as the official files state them. moutis/HandsDown: Gold's
+	// key 67 « t » (finger 5) and 69 « T », 74 « ␣ _ » (finger 6); Silver's
+	// 67 « n ñ » and 69 « N Ñ »; Alt-ex (matrix) 56 « ␣ » and 59 « e » with
+	// « E » on AltGr; Élan (matrix) « , » with « . » on AltGr. KLAnext:
+	// maltron-us-90 66 « e E » (finger 5), 75 « ␣ »; rsthd-2 (matrix) 61 « e E ».
+	// cyanophage: Maltron « qpycbvmuzl= anisfdthor' ,.jg;/wk-x » and « e » on
+	// its thumb key (row 3, column 4: the left thumb; the space on the right),
+	// Nordrassil's « t », Hands Down Gold « jfmpvzuoyk- » and « t ».
+	for (const [id, code, level, expected] of [
+		['hands_down_gold', 'NonConvert', 0, 't'],
+		['hands_down_gold', 'NonConvert', 1, 'T'],
+		['hands_down_gold', 'Convert', 0, ' '],
+		['hands_down_gold', 'Convert', 1, '_'],
+		['hands_down_gold', 'KeyQ', 0, 'j'],
+		['hands_down_gold', 'KeyA', 0, 'r'],
+		['hands_down_silver', 'NonConvert', 2, 'ñ'],
+		['hands_down_silver', 'NonConvert', 3, 'Ñ'],
+		['hands_down_alt_ex_matrix', 'NonConvert', 0, ' '],
+		['hands_down_alt_ex_matrix', 'Convert', 2, 'E'],
+		['hands_down_elan_matrix', 'NonConvert', 0, ','],
+		['hands_down_elan_matrix', 'NonConvert', 2, '.'],
+		['maltron_us_90', 'NonConvert', 1, 'E'],
+		['maltron_us_90', 'Convert', 0, ' '],
+		['rsthd_2', 'NonConvert', 0, 'e'],
+		['maltron', 'NonConvert', 0, 'e'],
+		['maltron', 'Convert', 0, ' '],
+		['maltron', 'KeyQ', 0, 'q'],
+		['maltron', 'BracketLeft', 0, '='],
+		['maltron', 'Slash', 0, 'x'],
+		['nordrassil', 'NonConvert', 0, 't'],
+		['handsdown_gold', 'NonConvert', 0, 't'],
+		['handsdown_gold', 'KeyW', 0, 'f'],
+		// layouts/hd/cr-config.h, its playground link « layout=xbmgj;.'=/zrsntk,… c ».
+		['hands_down_chromium', 'KeyQ', 0, 'x'],
+		['hands_down_chromium', 'KeyA', 0, 'r'],
+		['hands_down_chromium', 'NonConvert', 0, 'c'],
+		['hands_down_chromium', 'Convert', 0, ' ']
+	])
+		check(
+			cell(id, code, level) === expected,
+			`collections: ${id} ${code} level ${level} is ${cell(id, code, level)}, its official file has ${expected}`
+		);
+	// A thumb-letter layout types its space on its own thumb, never the shared bar.
+	for (const layout of library)
+		if (E.thumbKeys().some((code) => layout.rows[code]))
+			check(!layout.rows.Space, `collections: ${layout.id} has thumb keys and the space bar`);
 	check(
 		(left.get('JSON/HandsDownArchive/Hands_Down_ref_ansi.json') || {}).same_as === 'hands_down',
 		'collections: Hands Down Reference is not the library’s hands_down'
@@ -2691,10 +2781,10 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			`collections: ${id} cannot type ${Object.keys(result.coverage.unsupportedChars).join('')}`
 		);
 	}
-	// cyanophage's Hands Down Vibranium puts its R on a thumb key.
+	// cyanophage's Hands Down Vibranium types its R with its left thumb.
 	check(
-		/r on a thumb key/.test((left.get('index.html#hd-vibranium') || {}).reason),
-		'collections: cyanophage’s Hands Down Vibranium is not left out for its thumb R'
+		((byId.get('hd_vibranium') || { rows: {} }).rows.NonConvert || [])[0] === 'r',
+		'collections: cyanophage’s Hands Down Vibranium has no thumb R'
 	);
 	// KLAnext's copy of a library layout is left out, naming the one held.
 	check(

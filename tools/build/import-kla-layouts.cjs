@@ -228,7 +228,9 @@ function classify(klaDir) {
 	const { F, DATA } = loadReaders();
 	const library = JSON.parse(fs.readFileSync(LIBRARY_PATH, 'utf8'));
 	const modifiers = new Set(Object.values(DATA.model.modifier_keys));
-	const codes = Object.keys(DATA.model.fingerings.standard).filter((code) => !modifiers.has(code));
+	const codes = Object.keys(DATA.model.fingerings.standard)
+		.filter((code) => !modifiers.has(code))
+		.concat(DATA.model.thumb_keys);
 	// The layouts already in the library, from the generated data (alphabetic
 	// blocks completed), less any earlier KLA import.
 	const known = new Map();

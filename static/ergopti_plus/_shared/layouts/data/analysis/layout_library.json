@@ -1,5 +1,5 @@
 {
-	"_description": "Layout library of the layout analysis, by KeyboardEvent.code. An entry with « keys » is an alphabetic block (3 rows, base characters only), imported on 2026-11-14 from the Oxeylyzer layout set (Apache-2.0 repository) and, for the classics it lacks, from the cmini collection (GPL-3.0 repository), and on 2026-11-17 from genkey's layouts (GPL-3.0 repository) by tools/build/import-genkey-layouts.cjs; the codegen completes it with the US number row and the US Shift pairs (letters: upper case). An entry with « rows » may state « dead_keys » (a character of its rows → a standard accent of layout_formats.js): a KLA file cannot say that a key is dead, so each is stated where the layout types that accent's letters nowhere else (Optimot, BvoFRak and the Spanish QWERTY: ê, á or ü only through ^, ´ or ¨), and the codegen composes it by Unicode normalisation as the Studio's importers do. An entry with « rows » is a whole layout (base, Shift, AltGr, Shift+AltGr of every key its file states), imported on 2026-11-17 from Keyboard Layout Analyzer's built-in layouts (MIT repository) by tools/build/import-kla-layouts.cjs; the codegen takes it as it is. Only the arrangements are re-encoded, never a file, on the basis given in docs/audits/layout-analysers/report.md, section « Layout library ». « source » and « source_path » name the file each layout comes from; « not_imported » lists the files of these collections left out, with the reason and, for a duplicate, the library layout with the same keys (« same_as »). An entry re-encoded from the layout's official files (« source » optimot, xkeyboard_config, neo_layout or engram, imported on 2026-11-18) states its dead keys as cells ({\"dead\": state}) and their compositions as « dead_rules » (the second key's character, or « dead:<state> » for a dead key, → the output, taken from the layout's XCompose over the libX11 en_US.UTF-8 Compose table, or from its README); a standard accent's state composes by normalisation what its rules leave out, and sequences of three keys or more are left out. The Neo family's four levels are Neo's levels 1, 2, 3 and 5 (Mod3 stands for AltGr), without level 4, which needs Mod4. The registry layouts (static/layouts/registry) and the reference QWERTY and AZERTY (layout_composer/reference_layouts.js) join the library at codegen with all their layers and dead keys, so they are not repeated here.",
+	"_description": "Layout library of the layout analysis, by KeyboardEvent.code. An entry with « keys » is an alphabetic block (3 rows, base characters only), imported on 2026-11-14 from the Oxeylyzer layout set (Apache-2.0 repository) and, for the classics it lacks, from the cmini collection (GPL-3.0 repository), and on 2026-11-17 from genkey's layouts (GPL-3.0 repository) by tools/build/import-genkey-layouts.cjs; the codegen completes it with the US number row and the US Shift pairs (letters: upper case). An entry with « rows » may state « dead_keys » (a character of its rows → a standard accent of layout_formats.js): a KLA file cannot say that a key is dead, so each is stated where the layout types that accent's letters nowhere else (Optimot, BvoFRak and the Spanish QWERTY: ê, á or ü only through ^, ´ or ¨), and the codegen composes it by Unicode normalisation as the Studio's importers do. An entry with « rows » is a whole layout (base, Shift, AltGr, Shift+AltGr of every key its file states), imported on 2026-11-17 from Keyboard Layout Analyzer's built-in layouts (MIT repository) by tools/build/import-kla-layouts.cjs; the codegen takes it as it is. Only the arrangements are re-encoded, never a file, on the basis given in docs/audits/layout-analysers/report.md, section « Layout library ». « source » and « source_path » name the file each layout comes from; « not_imported » lists the files of these collections left out, with the reason and, for a duplicate, the library layout with the same keys (« same_as »). An entry re-encoded from the layout's official files (« source » optimot, xkeyboard_config, neo_layout or engram, imported on 2026-11-18) states its dead keys as cells ({\"dead\": state}) and their compositions as « dead_rules » (the second key's character, or « dead:<state> » for a dead key, → the output, taken from the layout's XCompose over the libX11 en_US.UTF-8 Compose table, or from its README); a standard accent's state composes by normalisation what its rules leave out, and sequences of three keys or more are left out. The Neo family's four levels are Neo's levels 1, 2, 3 and 5 (Mod3 stands for AltGr), without level 4, which needs Mod4. The registry layouts (static/layouts/registry) and the reference QWERTY and AZERTY (layout_composer/reference_layouts.js) join the library at codegen with all their layers and dead keys, so they are not repeated here. A layout with a letter on a thumb key (re-read on 2026-11-19 from the Hands Down, KLAnext and cyanophage files left out for it) types its thumbs on the thumb keys of analysis_model.json (NonConvert, Convert, KanaMode), its space too, never on Space; such a file is taken even when symbols of its ErgoDox outer keys have no code (they count as unsupported). A block may state its space key (the space on a thumb key); the codegen then adds no space bar.",
 	"schema_version": 1,
 	"sources": {
 		"oxeylyzer": {
@@ -56,7 +56,7 @@
 		},
 		"handsdown": {
 			"name": "Hands Down (Alan Reiser)",
-			"url": "https://github.com/moutis/HandsDown/tree/e8f532f62cf8e0537138aad3c75703cf705703dc/JSON",
+			"url": "https://github.com/moutis/HandsDown/tree/e8f532f62cf8e0537138aad3c75703cf705703dc",
 			"commit": "e8f532f62c",
 			"date": "2026-09-24",
 			"licence": "GPL-3.0 (repository); arrangements re-encoded"
@@ -42667,6 +42667,2462 @@
 					">": "≳"
 				}
 			}
+		},
+		{
+			"id": "hands_down_gold",
+			"name": "Hands Down Gold",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownNeu/hands-down-gold-ts.eu.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": [")", ">", null, null],
+				"Digit1": ["9", "£", null, null],
+				"Digit2": ["3", "€", null, null],
+				"Digit3": ["1", "$", null, null],
+				"Digit4": ["5", "%", null, null],
+				"Digit5": ["7", "¥", null, null],
+				"Digit6": ["6", "@", null, null],
+				"Digit7": ["2", "|", null, null],
+				"Digit8": ["0", "&", null, null],
+				"Digit9": ["8", "\\", null, null],
+				"Digit0": ["4", "^", null, null],
+				"KeyQ": ["j", "J", null, null],
+				"KeyW": ["f", "F", "q", "Q"],
+				"KeyE": ["m", "M", null, null],
+				"KeyR": ["p", "P", "z", "Z"],
+				"KeyT": ["v", "V", null, null],
+				"KeyY": [";", ":", "â", "Â"],
+				"KeyU": [".", "#", "à", "À"],
+				"KeyI": ["/", "*", "ë", "Ë"],
+				"KeyO": ["\"", "?", "î", "Î"],
+				"KeyP": ["'", "!", "ù", "Ù"],
+				"BracketLeft": ["]", "}", null, null],
+				"KeyA": ["r", "R", null, null],
+				"KeyS": ["s", "S", "ß", null],
+				"KeyD": ["n", "N", "ñ", "Ñ"],
+				"KeyF": ["d", "D", null, null],
+				"KeyG": ["b", "B", null, null],
+				"KeyH": [",", "=", "å", "Å"],
+				"KeyJ": ["a", "A", "ä", "Ä"],
+				"KeyK": ["e", "E", "é", "É"],
+				"KeyL": ["i", "I", "è", "È"],
+				"Semicolon": ["h", "H", "ê", "Ê"],
+				"Backslash": ["”", "’", "»", "›"],
+				"KeyZ": ["x", "X", null, null],
+				"KeyX": ["g", "G", "œ", "Œ"],
+				"KeyC": ["l", "L", "æ", "Æ"],
+				"KeyV": ["c", "C", "ç", "Ç"],
+				"KeyB": ["w", "W", null, null],
+				"KeyN": ["-", "+", "û", "Û"],
+				"KeyM": ["u", "U", "ü", "Ü"],
+				"Comma": ["o", "O", "ö", "Ö"],
+				"Period": ["y", "Y", "ï", "Ï"],
+				"Slash": ["k", "K", "ô", "Ô"],
+				"NonConvert": ["t", "T", null, null],
+				"Convert": [" ", "_", null, null]
+			}
+		},
+		{
+			"id": "hands_down_silver",
+			"name": "Hands Down Silver",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownNeu/hands-down-silver-ts.eu.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": [")", ">", null, null],
+				"Digit1": ["9", "£", null, null],
+				"Digit2": ["3", "€", null, null],
+				"Digit3": ["1", "$", null, null],
+				"Digit4": ["5", "%", null, null],
+				"Digit5": ["7", "¥", null, null],
+				"Digit6": ["6", "@", null, null],
+				"Digit7": ["2", "|", null, null],
+				"Digit8": ["0", "&", null, null],
+				"Digit9": ["8", "\\", null, null],
+				"Digit0": ["4", "^", null, null],
+				"KeyQ": ["j", "J", null, null],
+				"KeyW": ["f", "F", "q", "Q"],
+				"KeyE": ["m", "M", null, null],
+				"KeyR": ["p", "P", "z", "Z"],
+				"KeyT": ["v", "V", null, null],
+				"KeyY": [";", ":", "â", "Â"],
+				"KeyU": [".", "#", "à", "À"],
+				"KeyI": ["/", "*", "ë", "Ë"],
+				"KeyO": ["'", "!", "ù", "Ù"],
+				"KeyP": ["\"", "?", "î", "Î"],
+				"BracketLeft": ["]", "}", null, null],
+				"KeyA": ["r", "R", null, null],
+				"KeyS": ["s", "S", "ß", null],
+				"KeyD": ["h", "H", null, null],
+				"KeyF": ["t", "T", "ê", "Ê"],
+				"KeyG": ["b", "B", null, null],
+				"KeyH": [",", "=", "ä", "Ä"],
+				"KeyJ": ["a", "A", "å", "Å"],
+				"KeyK": ["e", "E", "é", "É"],
+				"KeyL": ["c", "C", "ç", "Ç"],
+				"Semicolon": ["i", "I", "è", "È"],
+				"Backslash": ["”", "’", "»", "›"],
+				"KeyZ": ["x", "X", null, null],
+				"KeyX": ["g", "G", "œ", "Œ"],
+				"KeyC": ["l", "L", "æ", "Æ"],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["k", "K", null, null],
+				"KeyN": ["-", "+", "û", "Û"],
+				"KeyM": ["u", "U", "ü", "Ü"],
+				"Comma": ["o", "O", "ö", "Ö"],
+				"Period": ["w", "W", "ô", "Ô"],
+				"Slash": ["y", "Y", "ï", "Ï"],
+				"NonConvert": ["n", "N", "ñ", "Ñ"],
+				"Convert": [" ", "_", null, null]
+			}
+		},
+		{
+			"id": "hands_down_bronze",
+			"name": "Hands Down Bronze",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownNeu/hands-down-bronze-ts.eu.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": [")", ">", null, null],
+				"Digit1": ["9", "£", null, null],
+				"Digit2": ["3", "€", null, null],
+				"Digit3": ["1", "$", null, null],
+				"Digit4": ["5", "%", null, null],
+				"Digit5": ["7", "¥", null, null],
+				"Digit6": ["6", "@", null, null],
+				"Digit7": ["2", "|", null, null],
+				"Digit8": ["0", "&", null, null],
+				"Digit9": ["8", "\\", null, null],
+				"Digit0": ["4", "^", null, null],
+				"KeyQ": ["j", "J", null, null],
+				"KeyW": ["f", "F", "q", "Q"],
+				"KeyE": ["m", "M", null, null],
+				"KeyR": ["p", "P", "z", "Z"],
+				"KeyT": ["v", "V", null, null],
+				"KeyY": [";", ":", "â", "Â"],
+				"KeyU": [".", "#", "à", "À"],
+				"KeyI": ["/", "*", "ë", "Ë"],
+				"KeyO": ["'", "!", "ù", "Ù"],
+				"KeyP": ["\"", "?", "î", "Î"],
+				"BracketLeft": ["]", "}", null, null],
+				"KeyA": ["r", "R", null, null],
+				"KeyS": ["s", "S", "ß", null],
+				"KeyD": ["n", "N", "ñ", "Ñ"],
+				"KeyF": ["t", "T", "ê", "Ê"],
+				"KeyG": ["b", "B", null, null],
+				"KeyH": [",", "=", "ä", "Ä"],
+				"KeyJ": ["a", "A", "å", "Å"],
+				"KeyK": ["e", "E", "é", "É"],
+				"KeyL": ["c", "C", "ç", "Ç"],
+				"Semicolon": ["i", "I", "è", "È"],
+				"Backslash": ["”", "’", "»", "›"],
+				"KeyZ": ["x", "X", null, null],
+				"KeyX": ["g", "G", "œ", "Œ"],
+				"KeyC": ["l", "L", "æ", "Æ"],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["k", "K", null, null],
+				"KeyN": ["-", "+", "û", "Û"],
+				"KeyM": ["u", "U", "ü", "Ü"],
+				"Comma": ["o", "O", "ö", "Ö"],
+				"Period": ["w", "W", "ô", "Ô"],
+				"Slash": ["y", "Y", "ï", "Ï"],
+				"NonConvert": ["h", "H", null, null],
+				"Convert": [" ", "_", null, null]
+			}
+		},
+		{
+			"id": "hands_down_titanium",
+			"name": "Hands Down Titanium",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownNeu/hands-down-titanium-ts.eu.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": [")", ">", null, null],
+				"Digit1": ["9", "£", null, null],
+				"Digit2": ["3", "€", null, null],
+				"Digit3": ["1", "$", null, null],
+				"Digit4": ["5", "%", null, null],
+				"Digit5": ["7", "¥", null, null],
+				"Digit6": ["6", "@", null, null],
+				"Digit7": ["2", "|", null, null],
+				"Digit8": ["0", "&", null, null],
+				"Digit9": ["8", "\\", null, null],
+				"Digit0": ["4", "^", null, null],
+				"KeyQ": ["j", "J", null, null],
+				"KeyW": ["g", "G", "q", "Q"],
+				"KeyE": ["m", "M", null, null],
+				"KeyR": ["p", "P", "z", "Z"],
+				"KeyT": ["v", "V", null, null],
+				"KeyY": [";", ":", "â", "Â"],
+				"KeyU": [".", "#", "à", "À"],
+				"KeyI": ["/", "*", "ë", "Ë"],
+				"KeyO": ["\"", "?", "î", "Î"],
+				"KeyP": ["'", "!", "ù", "Ù"],
+				"BracketLeft": ["]", "}", null, null],
+				"KeyA": ["s", "S", "ß", null],
+				"KeyS": ["c", "C", "ç", "Ç"],
+				"KeyD": ["n", "N", "ñ", "Ñ"],
+				"KeyF": ["t", "T", null, null],
+				"KeyG": ["k", "K", null, null],
+				"KeyH": [",", "=", "å", "Å"],
+				"KeyJ": ["a", "A", "ä", "Ä"],
+				"KeyK": ["e", "E", "é", "É"],
+				"KeyL": ["i", "I", "è", "È"],
+				"Semicolon": ["h", "H", "ê", "Ê"],
+				"Backslash": ["”", "’", "»", "›"],
+				"KeyZ": ["x", "X", null, null],
+				"KeyX": ["f", "F", "œ", "Œ"],
+				"KeyC": ["l", "L", "æ", "Æ"],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["w", "W", null, null],
+				"KeyN": ["-", "+", "û", "Û"],
+				"KeyM": ["u", "U", "ü", "Ü"],
+				"Comma": ["o", "O", "ö", "Ö"],
+				"Period": ["y", "Y", "ï", "Ï"],
+				"Slash": ["b", "B", "ô", "Ô"],
+				"NonConvert": ["r", "R", null, null],
+				"Convert": [" ", "_", null, null]
+			}
+		},
+		{
+			"id": "hands_down_rhodium",
+			"name": "Hands Down Rhodium",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownNeu/hands-down-rhodium-ts.eu.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": [")", ">", null, null],
+				"Digit1": ["9", "£", null, null],
+				"Digit2": ["3", "€", null, null],
+				"Digit3": ["1", "$", null, null],
+				"Digit4": ["5", "%", null, null],
+				"Digit5": ["7", "¥", null, null],
+				"Digit6": ["6", "@", null, null],
+				"Digit7": ["2", "|", null, null],
+				"Digit8": ["0", "&", null, null],
+				"Digit9": ["8", "\\", null, null],
+				"Digit0": ["4", "^", null, null],
+				"KeyQ": ["p", "P", null, null],
+				"KeyW": ["x", "X", "q", "Q"],
+				"KeyE": ["h", "H", null, null],
+				"KeyR": ["g", "G", "z", "Z"],
+				"KeyT": ["j", "J", null, null],
+				"KeyY": [";", ":", "â", "Â"],
+				"KeyU": [".", "#", "à", "À"],
+				"KeyI": ["/", "*", "ë", "Ë"],
+				"KeyO": ["\"", "?", "î", "Î"],
+				"KeyP": ["'", "!", "ù", "Ù"],
+				"BracketLeft": ["]", "}", null, null],
+				"KeyA": ["c", "C", "ç", "Ç"],
+				"KeyS": ["s", "S", "ß", null],
+				"KeyD": ["n", "N", "ñ", "Ñ"],
+				"KeyF": ["t", "T", null, null],
+				"KeyG": ["k", "K", null, null],
+				"KeyH": [",", "=", "ä", "Ä"],
+				"KeyJ": ["a", "A", "å", "Å"],
+				"KeyK": ["e", "E", "é", "É"],
+				"KeyL": ["i", "I", "è", "È"],
+				"Semicolon": ["m", "M", "ê", "Ê"],
+				"Backslash": ["”", "’", "»", "›"],
+				"KeyZ": ["b", "B", null, null],
+				"KeyX": ["f", "F", "œ", "Œ"],
+				"KeyC": ["l", "L", "æ", "Æ"],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["v", "V", null, null],
+				"KeyN": ["-", "+", "û", "Û"],
+				"KeyM": ["u", "U", "ü", "Ü"],
+				"Comma": ["o", "O", "ö", "Ö"],
+				"Period": ["y", "Y", "ï", "Ï"],
+				"Slash": ["w", "W", "ô", "Ô"],
+				"NonConvert": ["r", "R", null, null],
+				"Convert": [" ", "_", null, null]
+			}
+		},
+		{
+			"id": "hands_down_vibranium_vb",
+			"name": "Hands Down Vibranium vb",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownNeu/hands-down-vibranium-vb.ts.eu.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": [")", ">", null, null],
+				"Digit1": ["9", "£", null, null],
+				"Digit2": ["3", "€", null, null],
+				"Digit3": ["1", "$", null, null],
+				"Digit4": ["5", "%", null, null],
+				"Digit5": ["7", "¥", null, null],
+				"Digit6": ["6", "@", null, null],
+				"Digit7": ["2", "|", null, null],
+				"Digit8": ["0", "&", null, null],
+				"Digit9": ["8", "\\", null, null],
+				"Digit0": ["4", "^", null, null],
+				"KeyQ": ["x", "X", null, null],
+				"KeyW": ["w", "W", "q", "Q"],
+				"KeyE": ["m", "M", null, null],
+				"KeyR": ["g", "G", "z", "Z"],
+				"KeyT": ["j", "J", null, null],
+				"KeyY": [";", ":", "â", "Â"],
+				"KeyU": [".", "#", "à", "À"],
+				"KeyI": ["/", "*", "ë", "Ë"],
+				"KeyO": ["\"", "?", "î", "Î"],
+				"KeyP": ["'", "!", "ù", "Ù"],
+				"BracketLeft": ["]", "}", null, null],
+				"KeyA": ["s", "S", "ß", null],
+				"KeyS": ["c", "C", "ç", "Ç"],
+				"KeyD": ["n", "N", "ñ", "Ñ"],
+				"KeyF": ["t", "T", null, null],
+				"KeyG": ["k", "K", null, null],
+				"KeyH": [",", "=", "ä", "Ä"],
+				"KeyJ": ["a", "A", "å", "Å"],
+				"KeyK": ["e", "E", "é", "É"],
+				"KeyL": ["i", "I", "è", "È"],
+				"Semicolon": ["h", "H", "ê", "Ê"],
+				"Backslash": ["”", "’", "»", "›"],
+				"KeyZ": ["b", "B", null, null],
+				"KeyX": ["p", "P", "œ", "Œ"],
+				"KeyC": ["l", "L", "æ", "Æ"],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["v", "V", null, null],
+				"KeyN": ["-", "+", "û", "Û"],
+				"KeyM": ["u", "U", "ü", "Ü"],
+				"Comma": ["o", "O", "ö", "Ö"],
+				"Period": ["y", "Y", "ï", "Ï"],
+				"Slash": ["f", "F", "ô", "Ô"],
+				"NonConvert": ["r", "R", null, null],
+				"Convert": [" ", "_", null, null]
+			}
+		},
+		{
+			"id": "hands_down_vibranium_vf",
+			"name": "Hands Down Vibranium vf",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownNeu/hands-down-vibranium-vf.ts.eu.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": [")", ">", null, null],
+				"Digit1": ["9", "£", null, null],
+				"Digit2": ["3", "€", null, null],
+				"Digit3": ["1", "$", null, null],
+				"Digit4": ["5", "%", null, null],
+				"Digit5": ["7", "¥", null, null],
+				"Digit6": ["6", "@", null, null],
+				"Digit7": ["2", "|", null, null],
+				"Digit8": ["0", "&", null, null],
+				"Digit9": ["8", "\\", null, null],
+				"Digit0": ["4", "^", null, null],
+				"KeyQ": ["x", "X", null, null],
+				"KeyW": ["w", "W", "q", "Q"],
+				"KeyE": ["m", "M", null, null],
+				"KeyR": ["g", "G", "z", "Z"],
+				"KeyT": ["j", "J", null, null],
+				"KeyY": [";", ":", "â", "Â"],
+				"KeyU": [".", "#", "à", "À"],
+				"KeyI": ["/", "*", "ë", "Ë"],
+				"KeyO": ["\"", "?", "î", "Î"],
+				"KeyP": ["'", "!", "ù", "Ù"],
+				"BracketLeft": ["]", "}", null, null],
+				"KeyA": ["s", "S", "ß", null],
+				"KeyS": ["c", "C", "ç", "Ç"],
+				"KeyD": ["n", "N", "ñ", "Ñ"],
+				"KeyF": ["t", "T", null, null],
+				"KeyG": ["k", "K", null, null],
+				"KeyH": [",", "=", "ä", "Ä"],
+				"KeyJ": ["a", "A", "å", "Å"],
+				"KeyK": ["e", "E", "é", "É"],
+				"KeyL": ["i", "I", "è", "È"],
+				"Semicolon": ["h", "H", "ê", "Ê"],
+				"Backslash": ["”", "’", "»", "›"],
+				"KeyZ": ["f", "F", null, null],
+				"KeyX": ["p", "P", "œ", "Œ"],
+				"KeyC": ["l", "L", "æ", "Æ"],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["v", "V", null, null],
+				"KeyN": ["-", "+", "û", "Û"],
+				"KeyM": ["u", "U", "ü", "Ü"],
+				"Comma": ["o", "O", "ö", "Ö"],
+				"Period": ["y", "Y", "ï", "Ï"],
+				"Slash": ["b", "B", "ô", "Ô"],
+				"NonConvert": ["r", "R", null, null],
+				"Convert": [" ", "_", null, null]
+			}
+		},
+		{
+			"id": "hands_down_vibranium_vp",
+			"name": "Hands Down Vibranium vp",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownNeu/hands-down-vibranium-vp.ts.eu.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": [")", ">", null, null],
+				"Digit1": ["9", "£", null, null],
+				"Digit2": ["3", "€", null, null],
+				"Digit3": ["1", "$", null, null],
+				"Digit4": ["5", "%", null, null],
+				"Digit5": ["7", "¥", null, null],
+				"Digit6": ["6", "@", null, null],
+				"Digit7": ["2", "|", null, null],
+				"Digit8": ["0", "&", null, null],
+				"Digit9": ["8", "\\", null, null],
+				"Digit0": ["4", "^", null, null],
+				"KeyQ": ["w", "W", null, null],
+				"KeyW": ["x", "X", "q", "Q"],
+				"KeyE": ["m", "M", null, null],
+				"KeyR": ["g", "G", "z", "Z"],
+				"KeyT": ["j", "J", null, null],
+				"KeyY": [";", ":", "â", "Â"],
+				"KeyU": [".", "#", "à", "À"],
+				"KeyI": ["/", "*", "ë", "Ë"],
+				"KeyO": ["\"", "?", "î", "Î"],
+				"KeyP": ["'", "!", "ù", "Ù"],
+				"BracketLeft": ["]", "}", null, null],
+				"KeyA": ["c", "C", "ç", "Ç"],
+				"KeyS": ["s", "S", "ß", null],
+				"KeyD": ["n", "N", "ñ", "Ñ"],
+				"KeyF": ["t", "T", null, null],
+				"KeyG": ["k", "K", null, null],
+				"KeyH": [",", "=", "ä", "Ä"],
+				"KeyJ": ["a", "A", "å", "Å"],
+				"KeyK": ["e", "E", "é", "É"],
+				"KeyL": ["i", "I", "è", "È"],
+				"Semicolon": ["h", "H", "ê", "Ê"],
+				"Backslash": ["”", "’", "»", "›"],
+				"KeyZ": ["p", "P", null, null],
+				"KeyX": ["f", "F", "œ", "Œ"],
+				"KeyC": ["l", "L", "æ", "Æ"],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["v", "V", null, null],
+				"KeyN": ["-", "+", "û", "Û"],
+				"KeyM": ["u", "U", "ü", "Ü"],
+				"Comma": ["o", "O", "ö", "Ö"],
+				"Period": ["y", "Y", "ï", "Ï"],
+				"Slash": ["b", "B", "ô", "Ô"],
+				"NonConvert": ["r", "R", null, null],
+				"Convert": [" ", "_", null, null]
+			}
+		},
+		{
+			"id": "hands_down_vibranium_vv",
+			"name": "Hands Down Vibranium vv",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownNeu/hands-down-vibranium-vv.ts.eu.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": [")", ">", null, null],
+				"Digit1": ["9", "£", null, null],
+				"Digit2": ["3", "€", null, null],
+				"Digit3": ["1", "$", null, null],
+				"Digit4": ["5", "%", null, null],
+				"Digit5": ["7", "¥", null, null],
+				"Digit6": ["6", "@", null, null],
+				"Digit7": ["2", "|", null, null],
+				"Digit8": ["0", "&", null, null],
+				"Digit9": ["8", "\\", null, null],
+				"Digit0": ["4", "^", null, null],
+				"KeyQ": ["x", "X", null, null],
+				"KeyW": ["w", "W", "q", "Q"],
+				"KeyE": ["m", "M", null, null],
+				"KeyR": ["g", "G", "z", "Z"],
+				"KeyT": ["\"", "?", null, null],
+				"KeyY": [";", ":", "â", "Â"],
+				"KeyU": [".", "#", "à", "À"],
+				"KeyI": ["'", "!", "ë", "Ë"],
+				"KeyO": ["j", "J", "î", "Î"],
+				"KeyP": ["b", "B", "ù", "Ù"],
+				"BracketLeft": ["]", "}", null, null],
+				"KeyA": ["s", "S", "ß", null],
+				"KeyS": ["c", "C", "ç", "Ç"],
+				"KeyD": ["n", "N", "ñ", "Ñ"],
+				"KeyF": ["t", "T", null, null],
+				"KeyG": ["k", "K", null, null],
+				"KeyH": [",", "=", "ä", "Ä"],
+				"KeyJ": ["a", "A", "å", "Å"],
+				"KeyK": ["e", "E", "é", "É"],
+				"KeyL": ["i", "I", "è", "È"],
+				"Semicolon": ["h", "H", "ê", "Ê"],
+				"Backslash": ["”", "’", "»", "›"],
+				"KeyZ": ["v", "V", null, null],
+				"KeyX": ["p", "P", "œ", "Œ"],
+				"KeyC": ["l", "L", "æ", "Æ"],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["/", "*", null, null],
+				"KeyN": ["-", "+", "û", "Û"],
+				"KeyM": ["u", "U", "ü", "Ü"],
+				"Comma": ["o", "O", "ö", "Ö"],
+				"Period": ["y", "Y", "ï", "Ï"],
+				"Slash": ["f", "F", "ô", "Ô"],
+				"NonConvert": ["r", "R", null, null],
+				"Convert": [" ", "_", null, null]
+			}
+		},
+		{
+			"id": "hands_down_elan_matrix",
+			"name": "Hands Down Élan (matrix)",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownArchive/Hands_Down_elan_matrix.json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["7", null, null, null],
+				"Digit2": ["3", null, null, null],
+				"Digit3": ["1", null, null, null],
+				"Digit4": ["5", null, null, null],
+				"Digit5": ["9", null, null, null],
+				"Digit6": ["8", null, null, null],
+				"Digit7": ["2", null, null, null],
+				"Digit8": ["0", null, null, null],
+				"Digit9": ["4", null, null, null],
+				"Digit0": ["6", null, null, null],
+				"KeyQ": ["v", "V", "¬", null],
+				"KeyW": ["g", "G", null, null],
+				"KeyE": ["m", "M", "~", null],
+				"KeyR": ["f", "F", null, null],
+				"KeyT": ["k", "K", "q", "Q"],
+				"KeyY": ["-", "_", "\\", null],
+				"KeyU": ["u", "U", "¥", null],
+				"KeyI": ["o", "O", "$", null],
+				"KeyO": ["x", "X", "€", null],
+				"KeyP": ["b", "B", "£", null],
+				"KeyA": ["r", "R", "—", null],
+				"KeyS": ["s", "S", null, null],
+				"KeyD": ["n", "N", "}", null],
+				"KeyF": ["t", "T", null, null],
+				"KeyG": ["p", "P", "#", null],
+				"KeyH": ["y", "Y", "%", null],
+				"KeyJ": ["i", "I", "*", null],
+				"KeyK": ["e", "E", "&", null],
+				"KeyL": ["a", "A", "|", null],
+				"Semicolon": ["h", "H", "^", null],
+				"KeyZ": ["j", "J", "z", "Z"],
+				"KeyX": ["c", "C", "[", null],
+				"KeyC": ["l", "L", "]", null],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["w", "W", "@", null],
+				"KeyN": ["/", "?", null, null],
+				"KeyM": ["(", ";", "<", null],
+				"Comma": [")", ":", ">", null],
+				"Period": ["'", "\"", "`", null],
+				"Slash": ["=", "+", "!", null],
+				"NonConvert": [",", null, ".", null],
+				"Convert": [" ", null, null, null]
+			}
+		},
+		{
+			"id": "hands_down_alt_ex_matrix",
+			"name": "Hands Down Alt-ex (matrix)",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-ex_matrix.json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["7", null, null, null],
+				"Digit2": ["3", null, null, null],
+				"Digit3": ["1", null, null, null],
+				"Digit4": ["5", null, null, null],
+				"Digit5": ["9", null, null, null],
+				"Digit6": ["8", null, null, null],
+				"Digit7": ["2", null, null, null],
+				"Digit8": ["0", null, null, null],
+				"Digit9": ["4", null, null, null],
+				"Digit0": ["6", null, null, null],
+				"KeyQ": [null, null, "¬", null],
+				"KeyW": ["g", "G", "Q", null],
+				"KeyE": ["m", "M", "Z", null],
+				"KeyR": ["f", "F", "#", null],
+				"KeyT": ["v", "V", "¥", null],
+				"KeyY": ["'", "\"", "`", null],
+				"KeyU": ["u", "U", "$", "¢"],
+				"KeyI": ["k", "K", "q", null],
+				"KeyO": ["j", "J", "z", null],
+				"KeyP": [";", ":", "¢", null],
+				"KeyA": ["r", "R", "{", null],
+				"KeyS": ["s", "S", "(", null],
+				"KeyD": ["n", "N", ")", null],
+				"KeyF": ["t", "T", "}", null],
+				"KeyG": ["p", "P", "€", null],
+				"KeyH": ["y", "Y", "^", null],
+				"KeyJ": ["a", "A", "|", null],
+				"KeyK": ["o", "O", "+", null],
+				"KeyL": ["i", "I", "*", null],
+				"Semicolon": ["h", "H", "=", null],
+				"KeyZ": ["x", "X", "~", null],
+				"KeyX": ["c", "C", "[", null],
+				"KeyC": ["l", "L", "]", null],
+				"KeyV": ["d", "D", "%", null],
+				"KeyB": ["b", "B", "£", null],
+				"KeyN": ["-", "_", "\\", null],
+				"KeyM": ["w", "W", "&", null],
+				"Comma": ["/", "?", "!", null],
+				"Period": [",", "<", "@", null],
+				"Slash": [".", ">", "%", null],
+				"NonConvert": [" ", null, null, null],
+				"Convert": ["e", null, "E", null]
+			}
+		},
+		{
+			"id": "hands_down_alt_nx_matrix",
+			"name": "Hands Down Alt-nx (matrix)",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-nx_matrix.json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["7", null, null, null],
+				"Digit2": ["3", null, null, null],
+				"Digit3": ["1", null, null, null],
+				"Digit4": ["5", null, null, null],
+				"Digit5": ["9", null, null, null],
+				"Digit6": ["8", null, null, null],
+				"Digit7": ["2", null, null, null],
+				"Digit8": ["0", null, null, null],
+				"Digit9": ["4", null, null, null],
+				"Digit0": ["6", null, null, null],
+				"KeyQ": [null, null, "¬", null],
+				"KeyW": ["g", "G", "Q", null],
+				"KeyE": ["m", "M", "Z", null],
+				"KeyR": ["f", "F", "#", null],
+				"KeyT": ["v", "V", "¥", null],
+				"KeyY": ["'", "\"", "`", null],
+				"KeyU": ["k", "K", "q", null],
+				"KeyI": ["u", "U", "$", null],
+				"KeyO": ["j", "J", "z", null],
+				"KeyP": [";", ":", "¢", null],
+				"KeyA": ["r", "R", "{", null],
+				"KeyS": ["s", "S", "(", null],
+				"KeyD": ["t", "T", ")", null],
+				"KeyF": ["h", "H", "}", null],
+				"KeyG": ["p", "P", "€", null],
+				"KeyH": ["y", "Y", "^", null],
+				"KeyJ": ["i", "I", "|", null],
+				"KeyK": ["e", "E", "+", null],
+				"KeyL": ["o", "O", "*", null],
+				"Semicolon": ["a", "A", "=", null],
+				"KeyZ": ["x", "X", "~", null],
+				"KeyX": ["c", "C", "[", null],
+				"KeyC": ["l", "L", "]", null],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["b", "B", "£", null],
+				"KeyN": ["-", "_", "\\", null],
+				"KeyM": ["w", "W", "&", null],
+				"Comma": ["/", "?", "!", null],
+				"Period": [",", "<", "@", null],
+				"Slash": [".", ">", "%", null],
+				"NonConvert": ["n", null, "N", null],
+				"Convert": [" ", null, null, null]
+			}
+		},
+		{
+			"id": "hands_down_alt_tx_matrix",
+			"name": "Hands Down Alt-tx (matrix)",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-tx_matrix.json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["9", null, null, null],
+				"Digit2": ["3", null, null, null],
+				"Digit3": ["1", null, null, null],
+				"Digit4": ["5", null, null, null],
+				"Digit5": ["7", null, null, null],
+				"Digit6": ["6", null, null, null],
+				"Digit7": ["2", null, null, null],
+				"Digit8": ["0", null, null, null],
+				"Digit9": ["4", null, null, null],
+				"Digit0": ["8", null, null, null],
+				"KeyQ": ["v", "V", "~", null],
+				"KeyW": ["g", "G", "Q", null],
+				"KeyE": ["m", "M", "Z", null],
+				"KeyR": ["f", "F", "€", null],
+				"KeyT": ["\"", null, "`", null],
+				"KeyY": ["'", null, "¥", null],
+				"KeyU": ["k", "K", "q", null],
+				"KeyI": ["u", "U", "$", "¨"],
+				"KeyO": ["j", "J", "z", null],
+				"KeyP": ["#", "@", "£", null],
+				"KeyA": ["r", "R", "<", null],
+				"KeyS": ["s", "S", "(", null],
+				"KeyD": ["n", "N", ")", null],
+				"KeyF": ["h", "H", ">", null],
+				"KeyG": ["p", "P", "%", null],
+				"KeyH": ["y", "Y", "^", null],
+				"KeyJ": ["i", "I", "|", null],
+				"KeyK": ["e", "E", "=", null],
+				"KeyL": ["o", "O", "*", null],
+				"Semicolon": ["a", "A", "&", null],
+				"KeyZ": ["x", "X", "{", null],
+				"KeyX": ["c", "C", "[", null],
+				"KeyC": ["l", "L", "]", null],
+				"KeyV": ["d", "D", "}", null],
+				"KeyB": ["b", "B", "¬", null],
+				"KeyN": ["-", "+", null, null],
+				"KeyM": ["w", "W", "!", null],
+				"Comma": [",", ";", "_", "–"],
+				"Period": [".", ":", "…", null],
+				"Slash": ["/", "?", "\\", null],
+				"NonConvert": ["t", null, "T", null],
+				"Convert": [" ", null, null, null]
+			}
+		},
+		{
+			"id": "hands_down_alt_x",
+			"name": "Hands Down Alt-x",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-x_ergo (1).json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["7", null, null, null],
+				"Digit2": ["3", null, null, null],
+				"Digit3": ["1", null, null, null],
+				"Digit4": ["5", null, null, null],
+				"Digit5": ["9", null, null, null],
+				"Digit6": ["8", null, null, null],
+				"Digit7": ["2", null, null, null],
+				"Digit8": ["0", null, null, null],
+				"Digit9": ["4", null, null, null],
+				"Digit0": ["6", null, null, null],
+				"KeyQ": ["w", "W", null, null],
+				"KeyW": ["c", "C", null, null],
+				"KeyE": ["h", "H", null, null],
+				"KeyR": ["m", "M", null, null],
+				"KeyT": ["v", "V", "¬", null],
+				"KeyY": ["'", "\"", "#", "`"],
+				"KeyU": ["u", "U", "$", "£"],
+				"KeyI": ["k", "K", "q", "Q"],
+				"KeyO": ["j", "J", "z", "Z"],
+				"KeyP": [";", ":", "¥", "€"],
+				"KeyA": ["r", "R", "{", null],
+				"KeyS": ["s", "S", "(", null],
+				"KeyD": ["n", "N", ")", null],
+				"KeyF": ["t", "T", "}", null],
+				"KeyG": ["f", "F", null, null],
+				"KeyH": ["y", "Y", "|", "^"],
+				"KeyJ": ["i", "I", null, null],
+				"KeyK": ["e", "E", "+", null],
+				"KeyL": ["o", "O", "*", null],
+				"Semicolon": ["a", "A", "=", null],
+				"KeyZ": ["x", "X", "~", null],
+				"KeyX": ["b", "B", "[", null],
+				"KeyC": ["l", "L", "]", null],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["g", "G", null, null],
+				"KeyN": ["-", "_", "\\", null],
+				"KeyM": ["p", "P", "%", null],
+				"Comma": [",", "<", "&", null],
+				"Period": [".", ">", "@", null],
+				"Slash": ["/", "?", "!", null],
+				"Space": [" ", null, null, null]
+			}
+		},
+		{
+			"id": "hands_down_polyglot_ergodox",
+			"name": "Hands Down Polyglot (ErgoDox)",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-x_ergo.json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["7", null, null, null],
+				"Digit2": ["3", null, null, null],
+				"Digit3": ["1", null, null, null],
+				"Digit4": ["5", null, null, null],
+				"Digit5": ["9", null, null, null],
+				"Digit6": ["8", null, null, null],
+				"Digit7": ["2", null, null, null],
+				"Digit8": ["0", null, null, null],
+				"Digit9": ["4", null, null, null],
+				"Digit0": ["6", null, null, null],
+				"KeyQ": ["w", "W", null, null],
+				"KeyW": ["c", "C", null, null],
+				"KeyE": ["m", "M", null, null],
+				"KeyR": ["f", "F", null, null],
+				"KeyT": ["b", "B", null, null],
+				"KeyY": [";", ":", "¥", "€"],
+				"KeyU": ["u", "U", "$", "£"],
+				"KeyI": ["o", "O", "*", null],
+				"KeyO": ["k", "K", "q", "Q"],
+				"KeyP": ["j", "J", "z", "Z"],
+				"KeyA": ["r", "R", "{", null],
+				"KeyS": ["s", "S", "(", null],
+				"KeyD": ["n", "N", ")", null],
+				"KeyF": ["t", "T", "}", null],
+				"KeyG": ["y", "Y", null, null],
+				"KeyH": ["'", "\"", "|", "^"],
+				"KeyJ": ["a", "A", "=", null],
+				"KeyK": ["e", "E", "+", null],
+				"KeyL": ["i", "I", null, null],
+				"Semicolon": ["h", "H", "#", "`"],
+				"KeyZ": ["x", "X", "~", null],
+				"KeyX": ["g", "G", "[", null],
+				"KeyC": ["l", "L", "]", null],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["v", "V", "¬", null],
+				"KeyN": ["-", "_", "\\", null],
+				"KeyM": ["p", "P", "%", null],
+				"Comma": [",", "<", "&", null],
+				"Period": [".", ">", "@", null],
+				"Slash": ["/", "?", "!", null],
+				"Space": [" ", null, null, null]
+			}
+		},
+		{
+			"id": "hands_down_extreme_ergodox",
+			"name": "Hands Down Extreme (ErgoDox)",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownArchive/Hands_Down_extreme_ergo.json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["7", null, null, null],
+				"Digit2": ["3", null, null, null],
+				"Digit3": ["1", null, null, null],
+				"Digit4": ["5", null, null, null],
+				"Digit5": ["9", null, null, null],
+				"Digit6": ["0", null, null, null],
+				"Digit7": ["6", null, null, null],
+				"Digit8": ["2", null, null, null],
+				"Digit9": ["4", null, null, null],
+				"Digit0": ["8", null, null, null],
+				"KeyQ": ["x", "X", "`", "“"],
+				"KeyW": ["c", "C", "ˆ", "‘"],
+				"KeyE": ["h", "H", "´", "’"],
+				"KeyR": ["g", "G", null, "”"],
+				"KeyT": ["z", "Z", "-", "_"],
+				"KeyY": ["v", "V", "¥", null],
+				"KeyU": ["f", "F", "$", null],
+				"KeyI": ["q", "Q", "¢", "ö"],
+				"KeyO": [",", "<", "€", null],
+				"KeyP": [".", ">", "£", null],
+				"KeyA": ["r", "R", "{", null],
+				"KeyS": ["s", "S", "(", "ß"],
+				"KeyD": ["n", "N", ")", "ñ"],
+				"KeyF": ["t", "T", "}", "þ"],
+				"KeyG": ["p", "P", "†", "‡"],
+				"KeyH": ["y", "Y", "&", "æ"],
+				"KeyJ": ["u", "U", "-", "ü"],
+				"KeyK": ["e", "E", "+", "é"],
+				"KeyL": ["i", "I", "*", "ï"],
+				"Semicolon": ["a", "A", "|", "ä"],
+				"KeyZ": ["'", "\"", "~", null],
+				"KeyX": ["m", "M", "[", "«"],
+				"KeyC": ["l", "L", "]", "»"],
+				"KeyV": ["d", "D", "ð", "Ð"],
+				"KeyB": ["b", "B", "•", "°"],
+				"KeyN": ["w", "W", "^", "œ"],
+				"KeyM": ["k", "K", "#", "–"],
+				"Comma": ["o", "O", "@", "—"],
+				"Period": ["j", "J", "…", "¡"],
+				"Slash": ["/", "?", "\\", "!"],
+				"NonConvert": [null, null, ":", null],
+				"Convert": [" ", null, null, null]
+			}
+		},
+		{
+			"id": "blickensderfer_5",
+			"name": "Blickensderfer 5 (thumb)",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/MiscLayouts/Blickensderfer_5_21c._ergo_ts.json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["7", null, null, null],
+				"Digit2": ["5", null, null, null],
+				"Digit3": ["1", null, null, null],
+				"Digit4": ["3", null, null, null],
+				"Digit5": ["9", null, null, null],
+				"Digit7": ["4", null, null, null],
+				"Digit8": ["2", null, null, null],
+				"Digit9": ["6", null, null, null],
+				"Digit0": ["8", null, null, null],
+				"KeyQ": ["/", "?", "\"", "'"],
+				"KeyW": ["z", "Z", "‘", "´"],
+				"KeyE": ["x", "X", "’", "~"],
+				"KeyR": ["k", "K", "”", "`"],
+				"KeyT": ["g", "G", null, null],
+				"KeyY": ["b", "B", "¥", null],
+				"KeyU": ["v", "V", "£", "¨"],
+				"KeyI": ["q", "Q", "$", "¯"],
+				"KeyO": ["j", "J", "€", "-"],
+				"KeyP": [";", ":", "%", null],
+				"KeyA": ["h", "H", "{", "⌃"],
+				"KeyS": ["i", "I", "(", "⎇"],
+				"KeyD": ["a", "A", ")", "⌘"],
+				"KeyF": ["t", "T", "}", "⇧"],
+				"KeyG": ["d", "D", "†", "‡"],
+				"KeyH": ["r", "R", "&", null],
+				"KeyJ": ["e", "E", "-", "⇧"],
+				"KeyK": ["n", "N", "+", "⌘"],
+				"KeyL": ["s", "S", "*", "⎇"],
+				"Semicolon": ["o", "O", "|", "⌃"],
+				"KeyZ": [",", "<", "§", null],
+				"KeyX": ["p", "P", "[", null],
+				"KeyC": ["w", "W", "]", null],
+				"KeyV": ["f", "F", "¶", "•"],
+				"KeyB": ["u", "U", "¡", null],
+				"KeyN": ["l", "L", "^", "—"],
+				"KeyM": ["c", "C", "#", "–"],
+				"Comma": ["m", "M", "@", "_"],
+				"Period": ["y", "Y", "\\", "!"],
+				"Slash": [".", ">", "/", "?"],
+				"Convert": [" ", null, "0", null]
+			}
+		},
+		{
+			"id": "ingulish",
+			"name": "Ingulish",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/MiscLayouts/Ingulish_layout.json",
+			"fingering": "standard",
+			"rows": {
+				"KeyW": ["c", "C", "q", "Q"],
+				"KeyE": ["'", "\"", "=", "+"],
+				"KeyR": ["w", "W", "y", "Y"],
+				"KeyU": [",", "<", "?", "!"],
+				"KeyI": ["*", "/", "5", "@"],
+				"KeyO": ["-", "_", "–", "—"],
+				"KeyA": ["r", "R", "l", "L"],
+				"KeyS": ["s", "S", "3", null],
+				"KeyD": ["n", "N", "1", null],
+				"KeyF": ["t", "T", "d", "D"],
+				"KeyG": ["g", "G", "k", "K"],
+				"KeyH": [";", ":", "4", "\\"],
+				"KeyJ": ["a", "A", "2", "$"],
+				"KeyK": ["e", "E", "0", "^"],
+				"KeyL": ["o", "O", "6", "*"],
+				"Semicolon": ["i", "I", "7", "|"],
+				"KeyZ": ["h", "H", "f", "F"],
+				"KeyX": ["j", "J", "z", "Z"],
+				"KeyC": ["m", "M", "7", "&"],
+				"KeyV": ["p", "P", "b", "B"],
+				"KeyB": ["(", "{", "[", "~"],
+				"KeyN": [")", "}", "]", "`"],
+				"Comma": ["u", "U", "v", "V"],
+				"Period": ["x", "X", "8", "@"],
+				"Slash": [".", ">", "9", "%"],
+				"Space": [" ", null, null, null]
+			}
+		},
+		{
+			"id": "ingulish_v2",
+			"name": "Ingulish v2",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/MiscLayouts/Ingulish_layout.v2.json",
+			"fingering": "standard",
+			"rows": {
+				"KeyW": ["g", "G", "k", "K"],
+				"KeyE": ["c", "C", "q", "Q"],
+				"KeyR": ["w", "W", "y", "Y"],
+				"KeyU": [".", ">", "9", "%"],
+				"KeyI": ["*", "/", "5", "@"],
+				"KeyO": ["'", "\"", "=", "+"],
+				"KeyA": ["r", "R", "l", "L"],
+				"KeyS": ["s", "S", "3", null],
+				"KeyD": ["n", "N", "1", null],
+				"KeyF": ["t", "T", "d", "D"],
+				"KeyG": ["h", "H", "f", "F"],
+				"KeyH": [",", "<", "?", "!"],
+				"KeyJ": ["a", "A", "2", "$"],
+				"KeyK": ["e", "E", "0", "^"],
+				"KeyL": ["o", "O", "6", "*"],
+				"Semicolon": ["i", "I", "7", "|"],
+				"KeyZ": ["x", "X", "8", "@"],
+				"KeyX": ["j", "J", "z", "Z"],
+				"KeyC": ["m", "M", "7", "&"],
+				"KeyV": ["p", "P", "b", "B"],
+				"KeyN": ["-", "_", "–", "—"],
+				"KeyM": [";", ":", "4", "\\"],
+				"Comma": ["u", "U", "v", "V"],
+				"Period": ["(", "{", "[", "~"],
+				"Slash": [")", "}", "]", "`"],
+				"Space": [" ", null, null, null]
+			}
+		},
+		{
+			"id": "cole_shift_e",
+			"name": "Cole Shift E",
+			"language": "en",
+			"source": "klanext",
+			"source_path": "layouts/cole-shift-e.en.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["2", "@", null, null],
+				"Digit2": ["3", "#", null, null],
+				"Digit3": ["4", "$", null, null],
+				"Digit4": ["5", "%", null, null],
+				"Digit5": ["6", "^", null, null],
+				"Digit6": ["7", "&", null, null],
+				"Digit7": ["8", "*", null, null],
+				"Digit8": ["9", "(", null, null],
+				"Digit9": ["0", ")", null, null],
+				"Digit0": ["-", "_", null, null],
+				"KeyQ": ["q", "Q", null, null],
+				"KeyW": ["w", "W", null, null],
+				"KeyE": ["f", "F", null, null],
+				"KeyR": ["p", "P", null, null],
+				"KeyT": ["j", "J", null, null],
+				"KeyU": ["l", "L", null, null],
+				"KeyI": ["u", "U", null, null],
+				"KeyO": ["y", "Y", null, null],
+				"KeyP": [";", ":", null, null],
+				"KeyA": ["a", "A", null, null],
+				"KeyS": ["r", "R", null, null],
+				"KeyD": ["s", "S", null, null],
+				"KeyF": ["t", "T", null, null],
+				"KeyG": ["g", "G", null, null],
+				"KeyH": ["m", "M", null, null],
+				"KeyJ": ["n", "N", null, null],
+				"KeyK": ["h", "H", null, null],
+				"KeyL": ["i", "I", null, null],
+				"Semicolon": ["o", "O", null, null],
+				"Backslash": ["]", "}", null, null],
+				"KeyZ": ["z", "Z", null, null],
+				"KeyX": ["x", "X", null, null],
+				"KeyC": ["b", "B", null, null],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["k", "K", null, null],
+				"KeyN": ["v", "V", null, null],
+				"KeyM": ["c", "C", null, null],
+				"Comma": [",", "<", null, null],
+				"Period": [".", ">", null, null],
+				"Slash": ["/", "?", null, null],
+				"NonConvert": ["e", "E", null, null],
+				"Convert": [" ", null, null, null]
+			}
+		},
+		{
+			"id": "corny_furry",
+			"name": "Corny Furry",
+			"language": "en",
+			"source": "klanext",
+			"source_path": "layouts/corny-furry.en.matrix.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": ["`", "~", null, null],
+				"Digit1": ["1", "!", null, null],
+				"Digit2": ["2", "@", null, null],
+				"Digit3": ["3", "#", null, null],
+				"Digit4": ["4", "$", null, null],
+				"Digit5": ["5", "%", null, null],
+				"Digit6": ["6", "^", null, null],
+				"Digit7": ["7", "&", null, null],
+				"Digit8": ["8", "*", null, null],
+				"Digit9": ["9", "(", null, null],
+				"Digit0": ["0", ")", null, null],
+				"Minus": ["-", "_", null, null],
+				"Equal": ["=", "+", null, null],
+				"KeyQ": ["y", "Y", null, null],
+				"KeyW": ["o", "O", null, null],
+				"KeyE": ["u", "U", null, null],
+				"KeyR": ["l", "L", null, null],
+				"KeyT": ["q", "Q", null, null],
+				"KeyY": ["b", "B", null, null],
+				"KeyU": ["p", "P", null, null],
+				"KeyI": ["f", "F", null, null],
+				"KeyO": ["m", "M", null, null],
+				"KeyP": ["z", "Z", null, null],
+				"BracketLeft": ["[", "{", null, null],
+				"BracketRight": ["]", "}", null, null],
+				"KeyA": ["i", "I", null, null],
+				"KeyS": ["a", "A", null, null],
+				"KeyD": ["e", "E", null, null],
+				"KeyF": ["n", "N", null, null],
+				"KeyG": ["x", "X", null, null],
+				"KeyH": ["c", "C", null, null],
+				"KeyJ": ["d", "D", null, null],
+				"KeyK": ["t", "T", null, null],
+				"KeyL": ["s", "S", null, null],
+				"Semicolon": ["r", "R", null, null],
+				"Backslash": ["\\", "|", null, null],
+				"KeyZ": [",", "<", null, null],
+				"KeyX": [".", ">", null, null],
+				"KeyC": ["'", "\"", null, null],
+				"KeyV": ["/", "?", null, null],
+				"KeyB": [";", ":", null, null],
+				"KeyN": ["v", "V", null, null],
+				"KeyM": ["g", "G", null, null],
+				"Comma": ["k", "K", null, null],
+				"Period": ["w", "W", null, null],
+				"Slash": ["j", "J", null, null],
+				"NonConvert": [" ", null, null, null],
+				"Convert": ["h", "H", null, null]
+			}
+		},
+		{
+			"id": "enne_p_111_69",
+			"name": "Enne P 111 69",
+			"language": "en",
+			"source": "klanext",
+			"source_path": "layouts/enne_p_111_69.en.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": ["→", null, null, null],
+				"Digit1": ["1", "!", null, null],
+				"Digit2": ["2", "@", null, null],
+				"Digit3": ["3", "#", null, null],
+				"Digit4": ["4", "$", null, null],
+				"Digit5": ["5", "%", null, null],
+				"Digit6": ["6", "^", null, null],
+				"Digit7": ["7", "&", null, null],
+				"Digit8": ["8", "*", null, null],
+				"Digit9": ["9", "(", null, null],
+				"Digit0": ["0", ")", null, null],
+				"Minus": ["\\", "|", null, null],
+				"KeyW": ["u", "U", null, null],
+				"KeyE": ["o", "O", null, null],
+				"KeyR": ["k", "K", null, null],
+				"KeyT": ["-", "_", null, null],
+				"KeyY": ["b", "B", null, null],
+				"KeyU": ["g", "G", null, null],
+				"KeyI": ["r", "R", "q", "Q"],
+				"KeyO": ["c", "C", null, null],
+				"KeyP": ["[", "{", null, null],
+				"BracketLeft": ["⎘", null, null, null],
+				"KeyA": [".", ">", null, null],
+				"KeyS": ["i", "I", null, null],
+				"KeyD": ["e", "E", null, null],
+				"KeyF": ["a", "A", null, null],
+				"KeyG": ["f", "F", null, null],
+				"KeyH": ["w", "W", null, null],
+				"KeyJ": ["s", "S", "x", "X"],
+				"KeyK": ["n", "N", "z", "Z"],
+				"KeyL": ["t", "T", "y", "Y"],
+				"Semicolon": ["j", "J", null, null],
+				"Backslash": ["]", "}", null, null],
+				"KeyX": ["v", "V", null, null],
+				"KeyC": ["↑", null, null, null],
+				"KeyV": ["h", "H", null, null],
+				"KeyB": [",", "<", null, null],
+				"KeyN": ["p", "P", null, null],
+				"KeyM": ["d", "D", null, null],
+				"Comma": ["l", "L", null, null],
+				"Period": ["m", "M", null, null],
+				"NonConvert": [" ", null, null, null],
+				"Convert": ["'", "\"", null, null]
+			}
+		},
+		{
+			"id": "lydell_anishtro",
+			"name": "Lydell Anishtro",
+			"language": "en",
+			"source": "klanext",
+			"source_path": "layouts/lydell-anishtro.en.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["1", "!", null, null],
+				"Digit2": ["2", "@", null, null],
+				"Digit3": ["3", "#", null, null],
+				"Digit4": ["4", "$", null, null],
+				"Digit5": ["5", "%", null, null],
+				"Digit6": ["6", "^", null, null],
+				"Digit7": ["7", "&", null, null],
+				"Digit8": ["8", "*", null, null],
+				"Digit9": ["9", "(", null, null],
+				"Digit0": ["0", ")", null, null],
+				"KeyQ": ["q", "Q", null, null],
+				"KeyW": ["l", "L", null, null],
+				"KeyE": ["u", "U", null, null],
+				"KeyR": ["c", "C", null, null],
+				"KeyT": ["j", "J", null, null],
+				"KeyY": ["k", "K", null, null],
+				"KeyU": ["p", "P", null, null],
+				"KeyI": ["m", "M", null, null],
+				"KeyO": ["w", "W", null, null],
+				"KeyP": ["-", "_", null, null],
+				"KeyA": ["a", "A", null, null],
+				"KeyS": ["n", "N", null, null],
+				"KeyD": ["i", "I", null, null],
+				"KeyF": ["s", "S", null, null],
+				"KeyG": ["v", "V", null, null],
+				"KeyH": ["b", "B", null, null],
+				"KeyJ": ["h", "H", null, null],
+				"KeyK": ["t", "T", null, null],
+				"KeyL": ["r", "R", null, null],
+				"Semicolon": ["o", "O", null, null],
+				"Backslash": ["]", "}", null, null],
+				"KeyZ": ["/", "?", null, null],
+				"KeyX": [";", ":", null, null],
+				"KeyC": ["y", "Y", null, null],
+				"KeyV": ["g", "G", null, null],
+				"KeyB": ["x", "X", null, null],
+				"KeyN": ["z", "Z", null, null],
+				"KeyM": ["f", "F", null, null],
+				"Comma": ["d", "D", null, null],
+				"Period": [".", ">", null, null],
+				"Slash": [",", "<", null, null],
+				"NonConvert": ["e", "E", null, null],
+				"Convert": [" ", null, null, null]
+			}
+		},
+		{
+			"id": "maltron_us_90_mod_andreas",
+			"name": "Maltron Us 90 Mod Andreas",
+			"language": "en",
+			"source": "klanext",
+			"source_path": "layouts/maltron-us-90-mod-andreas.en.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["2", "@", null, null],
+				"Digit2": ["3", "#", null, null],
+				"Digit3": ["4", "$", null, null],
+				"Digit4": ["5", "%", null, null],
+				"Digit5": ["6", "^", null, null],
+				"Digit6": ["7", "&", null, null],
+				"Digit7": ["8", "*", null, null],
+				"Digit8": ["9", "(", null, null],
+				"Digit9": ["0", ")", null, null],
+				"KeyQ": ["x", "X", null, null],
+				"KeyW": [",", "<", null, null],
+				"KeyE": [".", ">", null, null],
+				"KeyR": ["p", "P", null, null],
+				"KeyT": ["g", "G", null, null],
+				"KeyY": ["b", "B", null, null],
+				"KeyU": ["f", "F", null, null],
+				"KeyI": ["u", "U", null, null],
+				"KeyO": ["l", "L", null, null],
+				"KeyP": ["y", "Y", null, null],
+				"KeyA": ["r", "R", null, null],
+				"KeyS": ["a", "A", null, null],
+				"KeyD": ["o", "O", null, null],
+				"KeyF": ["t", "T", null, null],
+				"KeyG": ["d", "D", null, null],
+				"KeyH": ["c", "C", null, null],
+				"KeyJ": ["s", "S", null, null],
+				"KeyK": ["h", "H", null, null],
+				"KeyL": ["n", "N", null, null],
+				"Semicolon": ["i", "I", null, null],
+				"Quote": ["/", "?", null, null],
+				"Backslash": ["]", "}", null, null],
+				"KeyZ": ["j", "J", null, null],
+				"KeyX": ["-", "_", null, null],
+				"KeyC": [";", ":", null, null],
+				"KeyV": ["k", "K", null, null],
+				"KeyB": ["q", "Q", null, null],
+				"KeyN": ["z", "Z", null, null],
+				"KeyM": ["w", "W", null, null],
+				"Comma": ["v", "V", null, null],
+				"Period": ["m", "M", null, null],
+				"Slash": ["'", "\"", null, null],
+				"NonConvert": ["e", "E", null, null],
+				"Convert": [" ", null, null, null]
+			}
+		},
+		{
+			"id": "maltron_us_90",
+			"name": "Maltron Us 90",
+			"language": "en",
+			"source": "klanext",
+			"source_path": "layouts/maltron-us-90.en.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["2", "@", null, null],
+				"Digit2": ["3", "#", null, null],
+				"Digit3": ["4", "$", null, null],
+				"Digit4": ["5", "%", null, null],
+				"Digit5": ["6", "^", null, null],
+				"Digit6": ["7", "&", null, null],
+				"Digit7": ["8", "*", null, null],
+				"Digit8": ["9", "(", null, null],
+				"Digit9": ["0", ")", null, null],
+				"Digit0": ["-", "_", null, null],
+				"KeyQ": ["q", "Q", null, null],
+				"KeyW": ["p", "P", null, null],
+				"KeyE": ["y", "Y", null, null],
+				"KeyR": ["c", "C", null, null],
+				"KeyT": ["b", "B", null, null],
+				"KeyY": ["v", "V", null, null],
+				"KeyU": ["m", "M", null, null],
+				"KeyI": ["u", "U", null, null],
+				"KeyO": ["z", "Z", null, null],
+				"KeyP": ["l", "L", null, null],
+				"KeyA": ["a", "A", null, null],
+				"KeyS": ["n", "N", null, null],
+				"KeyD": ["i", "I", null, null],
+				"KeyF": ["s", "S", null, null],
+				"KeyG": ["f", "F", null, null],
+				"KeyH": ["d", "D", null, null],
+				"KeyJ": ["t", "T", null, null],
+				"KeyK": ["h", "H", null, null],
+				"KeyL": ["o", "O", null, null],
+				"Semicolon": ["r", "R", null, null],
+				"Quote": ["/", "?", null, null],
+				"Backslash": ["]", "}", null, null],
+				"KeyZ": [",", "<", null, null],
+				"KeyX": [".", ">", null, null],
+				"KeyC": ["j", "J", null, null],
+				"KeyV": ["g", "G", null, null],
+				"KeyN": [";", ":", null, null],
+				"KeyM": ["w", "W", null, null],
+				"Comma": ["k", "K", null, null],
+				"Period": ["x", "X", null, null],
+				"NonConvert": ["e", "E", null, null],
+				"Convert": [" ", null, null, null]
+			}
+		},
+		{
+			"id": "proxkb_thumbshift",
+			"name": "Proxkb Thumbshift",
+			"language": "en",
+			"source": "klanext",
+			"source_path": "layouts/proxkb-thumbshift.en.ergodox.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": ["→", null, null, null],
+				"Digit1": ["1", "!", null, null],
+				"Digit2": ["2", "@", null, null],
+				"Digit3": ["3", "#", null, null],
+				"Digit4": ["4", "$", null, null],
+				"Digit5": ["5", "%", null, null],
+				"Digit6": ["6", "^", null, null],
+				"Digit7": ["7", "&", null, null],
+				"Digit8": ["8", "*", null, null],
+				"Digit9": ["9", "(", null, null],
+				"Digit0": ["0", ")", null, null],
+				"KeyQ": [":", ";", null, null],
+				"KeyW": [".", ">", null, null],
+				"KeyE": ["u", "U", null, null],
+				"KeyR": ["g", "G", null, null],
+				"KeyT": ["f", "F", null, null],
+				"KeyY": ["v", "V", null, null],
+				"KeyU": ["m", "M", null, null],
+				"KeyI": ["l", "L", null, null],
+				"KeyO": ["p", "P", null, null],
+				"KeyP": ["x", "X", null, null],
+				"BracketLeft": ["↑", null, null, null],
+				"BracketRight": ["[", "{", null, null],
+				"KeyA": ["o", "O", null, null],
+				"KeyS": ["a", "A", null, null],
+				"KeyD": ["i", "I", null, null],
+				"KeyF": ["s", "S", null, null],
+				"KeyG": ["c", "C", null, null],
+				"KeyH": ["d", "D", null, null],
+				"KeyJ": ["t", "T", null, null],
+				"KeyK": ["r", "R", null, null],
+				"KeyL": ["n", "N", null, null],
+				"Semicolon": ["h", "H", null, null],
+				"Quote": ["]", "}", null, null],
+				"Backslash": ["\\", "|", null, null],
+				"KeyZ": ["'", "\"", null, null],
+				"KeyX": [",", "<", null, null],
+				"KeyC": ["y", "Y", null, null],
+				"KeyV": ["j", "J", null, null],
+				"KeyB": ["z", "Z", null, null],
+				"KeyN": ["q", "Q", null, null],
+				"KeyM": ["k", "K", null, null],
+				"Comma": ["w", "W", null, null],
+				"Period": ["-", "_", null, null],
+				"Slash": ["b", "B", null, null],
+				"NonConvert": [" ", null, null, null],
+				"Convert": ["e", "E", null, null]
+			}
+		},
+		{
+			"id": "rsthd_2",
+			"name": "Rsthd 2",
+			"language": "en",
+			"source": "klanext",
+			"source_path": "layouts/rsthd-2.en.matrix.json",
+			"fingering": "standard",
+			"rows": {
+				"KeyQ": ["j", "J", "[", null],
+				"KeyW": ["c", "C", null, null],
+				"KeyE": ["y", "Y", null, null],
+				"KeyR": ["f", "F", "&", null],
+				"KeyT": ["k", "K", "$", null],
+				"KeyY": ["z", "Z", "*", null],
+				"KeyU": ["l", "L", "@", null],
+				"KeyI": [",", "<", "?", null],
+				"KeyO": ["u", "U", "#", null],
+				"KeyP": ["q", "Q", "]", null],
+				"KeyA": ["r", "R", "(", null],
+				"KeyS": ["s", "S", "2", null],
+				"KeyD": ["t", "T", "0", null],
+				"KeyF": ["h", "H", "'", null],
+				"KeyG": ["d", "D", "|", null],
+				"KeyH": ["m", "M", null, null],
+				"KeyJ": ["n", "N", "\"", null],
+				"KeyK": ["a", "A", "1", null],
+				"KeyL": ["i", "I", "3", null],
+				"Semicolon": ["o", "O", ")", null],
+				"Quote": ["=", "+", "`", null],
+				"KeyZ": ["/", "\\", "8", null],
+				"KeyX": ["v", "V", "{", null],
+				"KeyC": ["g", "G", "%", null],
+				"KeyV": ["p", "P", "4", null],
+				"KeyB": ["b", "B", "6", null],
+				"KeyN": ["x", "X", "9", null],
+				"KeyM": ["w", "W", "5", null],
+				"Comma": [".", ">", "!", null],
+				"Period": [";", ":", "}", null],
+				"Slash": ["-", "_", "7", null],
+				"NonConvert": ["e", "E", null, null],
+				"Convert": [" ", null, null, null]
+			}
+		},
+		{
+			"id": "maltron",
+			"name": "Maltron",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#maltron",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "q",
+				"KeyW": "p",
+				"KeyE": "y",
+				"KeyR": "c",
+				"KeyT": "b",
+				"KeyY": "v",
+				"KeyU": "m",
+				"KeyI": "u",
+				"KeyO": "z",
+				"KeyP": "l",
+				"BracketLeft": "=",
+				"KeyA": "a",
+				"KeyS": "n",
+				"KeyD": "i",
+				"KeyF": "s",
+				"KeyG": "f",
+				"KeyH": "d",
+				"KeyJ": "t",
+				"KeyK": "h",
+				"KeyL": "o",
+				"Semicolon": "r",
+				"Quote": "'",
+				"KeyZ": ",",
+				"KeyX": ".",
+				"KeyC": "j",
+				"KeyV": "g",
+				"KeyB": ";",
+				"KeyN": "/",
+				"KeyM": "w",
+				"Comma": "k",
+				"Period": "-",
+				"Slash": "x",
+				"NonConvert": "e",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "rsthd",
+			"name": "RSTHD",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#rsthd",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "j",
+				"KeyW": "c",
+				"KeyE": "y",
+				"KeyR": "f",
+				"KeyT": "k",
+				"KeyY": "z",
+				"KeyU": "l",
+				"KeyI": ",",
+				"KeyO": "u",
+				"KeyP": "q",
+				"BracketLeft": "=",
+				"KeyA": "r",
+				"KeyS": "s",
+				"KeyD": "t",
+				"KeyF": "h",
+				"KeyG": "d",
+				"KeyH": "m",
+				"KeyJ": "n",
+				"KeyK": "a",
+				"KeyL": "i",
+				"Semicolon": "o",
+				"Quote": "'",
+				"KeyZ": "/",
+				"KeyX": "v",
+				"KeyC": "g",
+				"KeyV": "p",
+				"KeyB": "b",
+				"KeyN": "x",
+				"KeyM": "w",
+				"Comma": ".",
+				"Period": ";",
+				"Slash": "-",
+				"NonConvert": "e",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "dsthk",
+			"name": "DSTHK",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#dsthk",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "z",
+				"KeyW": "c",
+				"KeyE": "w",
+				"KeyR": "b",
+				"KeyT": "j",
+				"KeyY": "-",
+				"KeyU": "m",
+				"KeyI": "u",
+				"KeyO": "'",
+				"KeyP": "q",
+				"BracketLeft": "=",
+				"KeyA": "d",
+				"KeyS": "s",
+				"KeyD": "t",
+				"KeyF": "h",
+				"KeyG": "k",
+				"KeyH": "v",
+				"KeyJ": "n",
+				"KeyK": "i",
+				"KeyL": "a",
+				"Semicolon": "o",
+				"Quote": "/",
+				"KeyZ": "f",
+				"KeyX": "g",
+				"KeyC": "p",
+				"KeyV": "r",
+				"KeyB": ";",
+				"KeyN": "x",
+				"KeyM": "l",
+				"Comma": "y",
+				"Period": ",",
+				"Slash": ".",
+				"NonConvert": "e",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "aptmak",
+			"name": "Aptmak",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#aptmak",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "v",
+				"KeyW": "w",
+				"KeyE": "f",
+				"KeyR": "p",
+				"KeyT": "b",
+				"KeyY": "j",
+				"KeyU": "l",
+				"KeyI": "u",
+				"KeyO": "y",
+				"KeyP": "'",
+				"BracketLeft": "=",
+				"KeyA": "r",
+				"KeyS": "s",
+				"KeyD": "t",
+				"KeyF": "h",
+				"KeyG": "k",
+				"KeyH": "x",
+				"KeyJ": "n",
+				"KeyK": "a",
+				"KeyL": "i",
+				"Semicolon": "o",
+				"Quote": ";",
+				"KeyZ": "/",
+				"KeyX": "c",
+				"KeyC": "g",
+				"KeyV": "d",
+				"KeyB": "q",
+				"KeyN": "z",
+				"KeyM": "m",
+				"Comma": ",",
+				"Period": ".",
+				"Slash": "-",
+				"NonConvert": "e",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "caster",
+			"name": "Caster",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#caster",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "b",
+				"KeyW": "w",
+				"KeyE": "d",
+				"KeyR": "l",
+				"KeyT": ";",
+				"KeyY": "/",
+				"KeyU": "f",
+				"KeyI": "o",
+				"KeyO": "u",
+				"KeyP": "j",
+				"BracketLeft": "-",
+				"KeyA": "c",
+				"KeyS": "s",
+				"KeyD": "t",
+				"KeyF": "r",
+				"KeyG": "x",
+				"KeyH": "q",
+				"KeyJ": "n",
+				"KeyK": "a",
+				"KeyL": "i",
+				"Semicolon": "h",
+				"Quote": "'",
+				"KeyZ": "v",
+				"KeyX": "y",
+				"KeyC": "g",
+				"KeyV": "m",
+				"KeyB": "z",
+				"KeyN": "=",
+				"KeyM": "p",
+				"Comma": ".",
+				"Period": ",",
+				"Slash": "k",
+				"NonConvert": "e",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "hd_vibranium",
+			"name": "Hands Down Vibranium",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#hd-vibranium",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "x",
+				"KeyW": "w",
+				"KeyE": "m",
+				"KeyR": "g",
+				"KeyT": "q",
+				"KeyY": "z",
+				"KeyU": ".",
+				"KeyI": "'",
+				"KeyO": "j",
+				"KeyP": "b",
+				"BracketLeft": ";",
+				"KeyA": "s",
+				"KeyS": "c",
+				"KeyD": "n",
+				"KeyF": "t",
+				"KeyG": "k",
+				"KeyH": ",",
+				"KeyJ": "a",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "h",
+				"Quote": "=",
+				"KeyZ": "v",
+				"KeyX": "p",
+				"KeyC": "l",
+				"KeyV": "d",
+				"KeyB": "/",
+				"KeyN": "-",
+				"KeyM": "u",
+				"Comma": "o",
+				"Period": "y",
+				"Slash": "f",
+				"NonConvert": "r",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "hd_promethium",
+			"name": "Hands Down Promethium",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#hd-promethium",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "f",
+				"KeyW": "p",
+				"KeyE": "d",
+				"KeyR": "l",
+				"KeyT": "x",
+				"KeyY": ";",
+				"KeyU": "u",
+				"KeyI": "o",
+				"KeyO": "y",
+				"KeyP": "b",
+				"BracketLeft": "z",
+				"KeyA": "s",
+				"KeyS": "n",
+				"KeyD": "t",
+				"KeyF": "h",
+				"KeyG": "k",
+				"KeyH": ",",
+				"KeyJ": "a",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "c",
+				"Quote": "q",
+				"KeyZ": "v",
+				"KeyX": "w",
+				"KeyC": "g",
+				"KeyV": "m",
+				"KeyB": "j",
+				"KeyN": "-",
+				"KeyM": ".",
+				"Comma": "'",
+				"Period": "=",
+				"Slash": "/",
+				"NonConvert": "r",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "snth",
+			"name": "SNTH",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#snth",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "x",
+				"KeyW": "p",
+				"KeyE": "d",
+				"KeyR": "m",
+				"KeyT": "q",
+				"KeyY": "=",
+				"KeyU": "y",
+				"KeyI": "o",
+				"KeyO": "u",
+				"KeyP": ",",
+				"BracketLeft": "-",
+				"KeyA": "s",
+				"KeyS": "n",
+				"KeyD": "t",
+				"KeyF": "h",
+				"KeyG": "v",
+				"KeyH": "g",
+				"KeyJ": "c",
+				"KeyK": "a",
+				"KeyL": "e",
+				"Semicolon": "i",
+				"Quote": ";",
+				"KeyZ": "f",
+				"KeyX": "b",
+				"KeyC": "k",
+				"KeyV": "l",
+				"KeyB": "j",
+				"KeyN": "z",
+				"KeyM": "w",
+				"Comma": "'",
+				"Period": "/",
+				"Slash": ".",
+				"NonConvert": "r",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "sunlight",
+			"name": "Sunlight",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#sunlight",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "f",
+				"KeyW": "w",
+				"KeyE": "h",
+				"KeyR": "g",
+				"KeyT": "k",
+				"KeyY": ",",
+				"KeyU": "o",
+				"KeyI": "u",
+				"KeyO": "y",
+				"KeyP": "p",
+				"BracketLeft": "j",
+				"KeyA": "s",
+				"KeyS": "n",
+				"KeyD": "l",
+				"KeyF": "t",
+				"KeyG": "v",
+				"KeyH": ".",
+				"KeyJ": "a",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "c",
+				"Quote": "'",
+				"KeyZ": "x",
+				"KeyX": "b",
+				"KeyC": "m",
+				"KeyV": "d",
+				"KeyB": "q",
+				"KeyN": "=",
+				"KeyM": ";",
+				"Comma": "/",
+				"Period": "-",
+				"Slash": "z",
+				"NonConvert": "r",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "nordrassil",
+			"name": "Nordrassil",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#nordrassil",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "j",
+				"KeyW": "y",
+				"KeyE": "o",
+				"KeyR": "u",
+				"KeyT": "-",
+				"KeyY": "q",
+				"KeyU": "g",
+				"KeyI": "n",
+				"KeyO": "w",
+				"KeyP": "k",
+				"BracketLeft": "=",
+				"KeyA": "h",
+				"KeyS": "i",
+				"KeyD": "e",
+				"KeyF": "a",
+				"KeyG": ".",
+				"KeyH": "m",
+				"KeyJ": "d",
+				"KeyK": "r",
+				"KeyL": "s",
+				"Semicolon": "p",
+				"Quote": "v",
+				"KeyZ": "x",
+				"KeyX": "/",
+				"KeyC": "'",
+				"KeyV": ",",
+				"KeyB": ";",
+				"KeyN": "z",
+				"KeyM": "c",
+				"Comma": "l",
+				"Period": "f",
+				"Slash": "b",
+				"NonConvert": "t",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "night",
+			"name": "Night",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#night",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "b",
+				"KeyW": "f",
+				"KeyE": "l",
+				"KeyR": "k",
+				"KeyT": "q",
+				"KeyY": "p",
+				"KeyU": "g",
+				"KeyI": "o",
+				"KeyO": "u",
+				"KeyP": ".",
+				"BracketLeft": "=",
+				"KeyA": "n",
+				"KeyS": "s",
+				"KeyD": "h",
+				"KeyF": "t",
+				"KeyG": "m",
+				"KeyH": "y",
+				"KeyJ": "c",
+				"KeyK": "a",
+				"KeyL": "e",
+				"Semicolon": "i",
+				"Quote": ";",
+				"KeyZ": "x",
+				"KeyX": "v",
+				"KeyC": "j",
+				"KeyV": "d",
+				"KeyB": "z",
+				"KeyN": "'",
+				"KeyM": "w",
+				"Comma": "-",
+				"Period": "/",
+				"Slash": ",",
+				"NonConvert": "r",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "dusk",
+			"name": "Dusk",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index2.html#dusk",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "x",
+				"KeyW": "f",
+				"KeyE": "d",
+				"KeyR": "p",
+				"KeyT": "q",
+				"KeyY": "j",
+				"KeyU": "'",
+				"KeyI": "o",
+				"KeyO": "u",
+				"KeyP": ".",
+				"BracketLeft": "=",
+				"KeyA": "n",
+				"KeyS": "s",
+				"KeyD": "t",
+				"KeyF": "c",
+				"KeyG": "y",
+				"KeyH": "m",
+				"KeyJ": "h",
+				"KeyK": "a",
+				"KeyL": "e",
+				"Semicolon": "i",
+				"Quote": ";",
+				"KeyZ": "b",
+				"KeyX": "v",
+				"KeyC": "k",
+				"KeyV": "g",
+				"KeyB": "w",
+				"KeyN": "z",
+				"KeyM": "l",
+				"Comma": "-",
+				"Period": "/",
+				"Slash": ",",
+				"NonConvert": "r",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "stern",
+			"name": "Stern",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index2.html#stern",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "v",
+				"KeyW": "d",
+				"KeyE": "l",
+				"KeyR": "p",
+				"KeyT": "q",
+				"KeyY": "'",
+				"KeyU": "y",
+				"KeyI": "o",
+				"KeyO": "u",
+				"KeyP": ",",
+				"BracketLeft": "=",
+				"KeyA": "s",
+				"KeyS": "t",
+				"KeyD": "h",
+				"KeyF": "n",
+				"KeyG": "b",
+				"KeyH": "g",
+				"KeyJ": "c",
+				"KeyK": "a",
+				"KeyL": "e",
+				"Semicolon": "i",
+				"Quote": ";",
+				"KeyZ": "x",
+				"KeyX": "k",
+				"KeyC": "m",
+				"KeyV": "f",
+				"KeyB": "z",
+				"KeyN": "j",
+				"KeyM": "w",
+				"Comma": "-",
+				"Period": "/",
+				"Slash": ".",
+				"NonConvert": "r",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "racket",
+			"name": "Racket",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index2.html#racket",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "f",
+				"KeyW": "d",
+				"KeyE": "l",
+				"KeyR": "w",
+				"KeyT": "j",
+				"KeyY": "-",
+				"KeyU": "p",
+				"KeyI": "o",
+				"KeyO": "u",
+				"KeyP": ".",
+				"BracketLeft": "=",
+				"KeyA": "s",
+				"KeyS": "t",
+				"KeyD": "h",
+				"KeyF": "c",
+				"KeyG": "y",
+				"KeyH": "q",
+				"KeyJ": "n",
+				"KeyK": "a",
+				"KeyL": "e",
+				"Semicolon": "i",
+				"Quote": ";",
+				"KeyZ": "x",
+				"KeyX": "k",
+				"KeyC": "m",
+				"KeyV": "g",
+				"KeyB": "v",
+				"KeyN": "z",
+				"KeyM": "b",
+				"Comma": "'",
+				"Period": "/",
+				"Slash": ",",
+				"NonConvert": "r",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "seasalt",
+			"name": "Seasalt",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index2.html#seasalt",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "w",
+				"KeyW": "g",
+				"KeyE": "n",
+				"KeyR": "d",
+				"KeyT": "k",
+				"KeyY": ";",
+				"KeyU": "o",
+				"KeyI": "u",
+				"KeyO": "y",
+				"KeyP": ",",
+				"BracketLeft": "q",
+				"KeyA": "c",
+				"KeyS": "s",
+				"KeyD": "l",
+				"KeyF": "t",
+				"KeyG": "v",
+				"KeyH": "'",
+				"KeyJ": "a",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "h",
+				"Quote": "j",
+				"KeyZ": "b",
+				"KeyX": "f",
+				"KeyC": "m",
+				"KeyV": "p",
+				"KeyB": "z",
+				"KeyN": "=",
+				"KeyM": ".",
+				"Comma": "/",
+				"Period": "-",
+				"Slash": "x",
+				"NonConvert": "r",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "coastland",
+			"name": "Coastland",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index2.html#coastland",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "b",
+				"KeyW": "f",
+				"KeyE": "l",
+				"KeyR": "d",
+				"KeyT": "v",
+				"KeyY": ";",
+				"KeyU": "o",
+				"KeyI": "u",
+				"KeyO": "y",
+				"KeyP": ",",
+				"BracketLeft": "q",
+				"KeyA": "c",
+				"KeyS": "s",
+				"KeyD": "n",
+				"KeyF": "t",
+				"KeyG": "k",
+				"KeyH": "'",
+				"KeyJ": "a",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "p",
+				"Quote": "j",
+				"KeyZ": "w",
+				"KeyX": "g",
+				"KeyC": "h",
+				"KeyV": "m",
+				"KeyB": "z",
+				"KeyN": "=",
+				"KeyM": ".",
+				"Comma": "/",
+				"Period": "x",
+				"Slash": "-",
+				"NonConvert": "r",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "north",
+			"name": "North",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index2.html#north",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "b",
+				"KeyW": "l",
+				"KeyE": "m",
+				"KeyR": "d",
+				"KeyT": "z",
+				"KeyY": "'",
+				"KeyU": "y",
+				"KeyI": "o",
+				"KeyO": "u",
+				"KeyP": ",",
+				"BracketLeft": "=",
+				"KeyA": "n",
+				"KeyS": "r",
+				"KeyD": "t",
+				"KeyF": "h",
+				"KeyG": "f",
+				"KeyH": "g",
+				"KeyJ": "c",
+				"KeyK": "a",
+				"KeyL": "e",
+				"Semicolon": "i",
+				"Quote": "-",
+				"KeyZ": "x",
+				"KeyX": "j",
+				"KeyC": "v",
+				"KeyV": "p",
+				"KeyB": "k",
+				"KeyN": "q",
+				"KeyM": "w",
+				"Comma": ";",
+				"Period": "/",
+				"Slash": ".",
+				"NonConvert": "s",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "handsdown_gold",
+			"name": "Hands Down Gold (cyanophage, page 2)",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index2.html#handsdown-gold",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "j",
+				"KeyW": "f",
+				"KeyE": "m",
+				"KeyR": "p",
+				"KeyT": "v",
+				"KeyY": "z",
+				"KeyU": "u",
+				"KeyI": "o",
+				"KeyO": "y",
+				"KeyP": "k",
+				"BracketLeft": "-",
+				"KeyA": "r",
+				"KeyS": "s",
+				"KeyD": "n",
+				"KeyF": "d",
+				"KeyG": "w",
+				"KeyH": ",",
+				"KeyJ": "a",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "h",
+				"Quote": "=",
+				"KeyZ": "x",
+				"KeyX": "g",
+				"KeyC": "l",
+				"KeyV": "c",
+				"KeyB": "b",
+				"KeyN": ";",
+				"KeyM": ".",
+				"Comma": "/",
+				"Period": "q",
+				"Slash": "'",
+				"NonConvert": "t",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "handsdown_dash",
+			"name": "Hands Down Dash",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index2.html#handsdown-dash",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "j",
+				"KeyW": "g",
+				"KeyE": "m",
+				"KeyR": "p",
+				"KeyT": "v",
+				"KeyY": ";",
+				"KeyU": ".",
+				"KeyI": "'",
+				"KeyO": "=",
+				"KeyP": "/",
+				"BracketLeft": "z",
+				"KeyA": "r",
+				"KeyS": "s",
+				"KeyD": "n",
+				"KeyF": "t",
+				"KeyG": "b",
+				"KeyH": ",",
+				"KeyJ": "h",
+				"KeyK": "a",
+				"KeyL": "o",
+				"Semicolon": "i",
+				"Quote": "q",
+				"KeyZ": "x",
+				"KeyX": "c",
+				"KeyC": "l",
+				"KeyV": "d",
+				"KeyB": "w",
+				"KeyN": "-",
+				"KeyM": "f",
+				"Comma": "u",
+				"Period": "k",
+				"Slash": "y",
+				"NonConvert": "e",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "pfouyhai",
+			"name": "Pfouyhai",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index2.html#pfouyhai",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "p",
+				"KeyW": "f",
+				"KeyE": "o",
+				"KeyR": "u",
+				"KeyT": "/",
+				"KeyY": "k",
+				"KeyU": "d",
+				"KeyI": "c",
+				"KeyO": "l",
+				"KeyP": "w",
+				"BracketLeft": "x",
+				"KeyA": "y",
+				"KeyS": "h",
+				"KeyD": "a",
+				"KeyF": "i",
+				"KeyG": "-",
+				"KeyH": "b",
+				"KeyJ": "t",
+				"KeyK": "s",
+				"KeyL": "n",
+				"Semicolon": "r",
+				"Quote": "j",
+				"KeyZ": ";",
+				"KeyX": "'",
+				"KeyC": ".",
+				"KeyV": ",",
+				"KeyB": "=",
+				"KeyN": "q",
+				"KeyM": "g",
+				"Comma": "v",
+				"Period": "m",
+				"Slash": "z",
+				"NonConvert": "e",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "hands_down_chromium",
+			"name": "Hands Down Chromium",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "layouts/hd/cr-config.h",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "x",
+				"KeyW": "b",
+				"KeyE": "m",
+				"KeyR": "g",
+				"KeyT": "j",
+				"KeyY": ";",
+				"KeyU": ".",
+				"KeyI": "'",
+				"KeyO": "=",
+				"KeyP": "/",
+				"BracketLeft": "z",
+				"KeyA": "r",
+				"KeyS": "s",
+				"KeyD": "n",
+				"KeyF": "t",
+				"KeyG": "k",
+				"KeyH": ",",
+				"KeyJ": "a",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "h",
+				"Quote": "q",
+				"KeyZ": "w",
+				"KeyX": "p",
+				"KeyC": "l",
+				"KeyV": "d",
+				"KeyB": "v",
+				"KeyN": "-",
+				"KeyM": "u",
+				"Comma": "o",
+				"Period": "y",
+				"Slash": "f",
+				"NonConvert": "c",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "hands_down_cesium",
+			"name": "Hands Down Cesium",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "layouts/hd/cs-config.h",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "=",
+				"KeyW": "b",
+				"KeyE": "g",
+				"KeyR": "m",
+				"KeyT": "j",
+				"KeyY": ";",
+				"KeyU": ".",
+				"KeyI": "'",
+				"KeyO": "/",
+				"KeyP": "v",
+				"BracketLeft": "z",
+				"KeyA": "r",
+				"KeyS": "n",
+				"KeyD": "t",
+				"KeyF": "h",
+				"KeyG": "k",
+				"KeyH": ",",
+				"KeyJ": "a",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "s",
+				"Quote": "q",
+				"KeyZ": "w",
+				"KeyX": "p",
+				"KeyC": "d",
+				"KeyV": "l",
+				"KeyB": "x",
+				"KeyN": "-",
+				"KeyM": "u",
+				"Comma": "o",
+				"Period": "y",
+				"Slash": "f",
+				"NonConvert": "c",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "hands_down_vibranium_vx",
+			"name": "Hands Down Vibranium vx",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "layouts/hd/vx-config.h",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "v",
+				"KeyW": "w",
+				"KeyE": "m",
+				"KeyR": "g",
+				"KeyT": "j",
+				"KeyY": ";",
+				"KeyU": ".",
+				"KeyI": "/",
+				"KeyO": "=",
+				"KeyP": "'",
+				"BracketLeft": "z",
+				"KeyA": "s",
+				"KeyS": "c",
+				"KeyD": "n",
+				"KeyF": "t",
+				"KeyG": "b",
+				"KeyH": ",",
+				"KeyJ": "a",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "h",
+				"Quote": "q",
+				"KeyZ": "x",
+				"KeyX": "f",
+				"KeyC": "l",
+				"KeyV": "d",
+				"KeyB": "k",
+				"KeyN": "-",
+				"KeyM": "u",
+				"Comma": "o",
+				"Period": "y",
+				"Slash": "p",
+				"NonConvert": "r",
+				"Convert": " "
+			}
+		},
+		{
+			"id": "hands_down_vibranium_vfj",
+			"name": "Hands Down Vibranium vfj",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "layouts/hd/vfj-config.h",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "x",
+				"KeyW": "w",
+				"KeyE": "m",
+				"KeyR": "g",
+				"KeyT": "j",
+				"KeyY": ";",
+				"KeyU": ".",
+				"KeyI": "/",
+				"KeyO": "=",
+				"KeyP": "'",
+				"BracketLeft": "z",
+				"KeyA": "s",
+				"KeyS": "c",
+				"KeyD": "n",
+				"KeyF": "t",
+				"KeyG": "k",
+				"KeyH": ",",
+				"KeyJ": "a",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "h",
+				"Quote": "q",
+				"KeyZ": "f",
+				"KeyX": "p",
+				"KeyC": "l",
+				"KeyV": "d",
+				"KeyB": "v",
+				"KeyN": "-",
+				"KeyM": "u",
+				"Comma": "o",
+				"Period": "y",
+				"Slash": "b",
+				"NonConvert": "r",
+				"Convert": " "
+			}
 		}
 	],
 	"not_imported": [
@@ -43208,123 +45664,48 @@
 		},
 		{
 			"source": "handsdown",
-			"source_path": "JSON/HandsDownNeu/hands-down-gold-ts.eu.ergodox.json",
-			"reason": "Hands Down Gold puts T on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/HandsDownNeu/hands-down-silver-ts.eu.ergodox.json",
-			"reason": "Hands Down Silver puts N on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/HandsDownNeu/hands-down-bronze-ts.eu.ergodox.json",
-			"reason": "Hands Down Bronze puts H on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
 			"source_path": "JSON/HandsDownNeu/Hands_Down_platinum.ergo.json",
-			"reason": "Hands Down Platinum puts L on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/HandsDownNeu/hands-down-titanium-ts.eu.ergodox.json",
-			"reason": "Hands Down Titanium puts R on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/HandsDownNeu/hands-down-rhodium-ts.eu.ergodox.json",
-			"reason": "Hands Down Rhodium puts R on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/HandsDownNeu/hands-down-promethium.ts.eu.ergodox.json",
-			"reason": "Hands Down Promethium puts R on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/HandsDownNeu/hands-down-vibranium-vb.ts.eu.ergodox.json",
-			"reason": "Hands Down Vibranium vb puts R on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/HandsDownNeu/hands-down-vibranium-vf.ts.eu.ergodox.json",
-			"reason": "Hands Down Vibranium vf puts R on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/HandsDownNeu/hands-down-vibranium-vp.ts.eu.ergodox.json",
-			"reason": "Hands Down Vibranium vp puts R on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/HandsDownNeu/hands-down-vibranium-vv.ts.eu.ergodox.json",
-			"reason": "Hands Down Vibranium vv puts R on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
+			"reason": "places q z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/HandsDownNeu/Hands_Down_dash_ergo.json",
-			"reason": "Hands Down Dash puts E on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/HandsDownArchive/Hands_Down_elan_ergo.json",
-			"reason": "Hands Down Élan puts . and , on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/HandsDownArchive/Hands_Down_elan_matrix.json",
-			"reason": "Hands Down Élan (matrix) puts . and , on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-ex_ergo.json",
-			"reason": "Hands Down Alt-ex puts E on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-ex_matrix.json",
-			"reason": "Hands Down Alt-ex (matrix) puts E on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-nx_ergo.json",
-			"reason": "Hands Down Alt-nx puts N on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-tx_ergo.json",
-			"reason": "Hands Down Alt-tx puts T on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/hd-unobtanium.ts.eu.json",
-			"reason": "Hands Down Unobtanium puts R on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
+			"reason": "places x z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/hd-mithril.ts.eu.json",
-			"reason": "Hands Down Mithril puts R on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "layouts/hd/cr-config.h",
-			"reason": "Hands Down Chromium puts C on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "layouts/hd/cs-config.h",
-			"reason": "Hands Down Cesium puts C on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "layouts/hd/vx-config.h",
-			"reason": "Hands Down Vibranium vx puts R on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "layouts/hd/vfj-config.h",
-			"reason": "Hands Down Vibranium vfj puts R on a thumb key; the author states that the thumb variations need dedicated thumb keys, and the library's keyboards have only the space bar for the thumbs"
+			"reason": "the file is not valid JSON: its « authorUrl » string is not closed (line 19); KLAnext's mithril-ts.eu.ergodox.json lacks q and x"
 		},
 		{
 			"source": "handsdown",
@@ -43339,18 +45720,8 @@
 		},
 		{
 			"source": "handsdown",
-			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-nx_matrix.json",
-			"reason": "places q z on no key the library's keyboards have (thumb, combo or outer-column keys)"
-		},
-		{
-			"source": "handsdown",
 			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-nx_ortho.json",
 			"reason": "the board « ergolinear » is not one of the library's keyboards (KLA reader)"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-tx_matrix.json",
-			"reason": "places q z on no key the library's keyboards have (thumb, combo or outer-column keys)"
 		},
 		{
 			"source": "handsdown",
@@ -43359,18 +45730,8 @@
 		},
 		{
 			"source": "handsdown",
-			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-x_ergo (1).json",
-			"reason": "places q z on no key the library's keyboards have (thumb, combo or outer-column keys)"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-x_ergo.json",
-			"reason": "places q z on no key the library's keyboards have (thumb, combo or outer-column keys)"
-		},
-		{
-			"source": "handsdown",
 			"source_path": "JSON/HandsDownAlt/Hands_Down_alt-x_matrix.json",
-			"reason": "places p q z on no key the library's keyboards have (thumb, combo or outer-column keys)"
+			"reason": "places p on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
@@ -43396,23 +45757,18 @@
 		},
 		{
 			"source": "handsdown",
-			"source_path": "JSON/HandsDownArchive/Hands_Down_extreme_ergo.json",
-			"reason": "characters on keys the library's keyboards have no code for: ;"
-		},
-		{
-			"source": "handsdown",
 			"source_path": "JSON/HandsDownArchive/Hands_Down_extreme_matrix.json",
-			"reason": "places f y on no key the library's keyboards have (thumb, combo or outer-column keys)"
+			"reason": "places f y on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/HandsDownArchive/Hands_Down_polyglot_ergo.json",
-			"reason": "places z on no key the library's keyboards have (thumb, combo or outer-column keys)"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/HandsDownArchive/Hands_Down_polyglot_matrix.json",
-			"reason": "places q z on no key the library's keyboards have (thumb, combo or outer-column keys)"
+			"reason": "places the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
@@ -43422,12 +45778,12 @@
 		{
 			"source": "handsdown",
 			"source_path": "JSON/HandsDownArchive/Hands_Down_ref_ergo.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ = + ; : \\ | [ {"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ = + ; : \\ | [ {"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/HandsDownArchive/Hands_Down_ref_matrix.json",
-			"reason": "places f on no key the library's keyboards have (thumb, combo or outer-column keys)"
+			"reason": "places p on two keys"
 		},
 		{
 			"source": "handsdown",
@@ -43447,37 +45803,22 @@
 		{
 			"source": "handsdown",
 			"source_path": "JSON/HandsDownNeu/hands-down-neu.ts.eu.ergodox.json",
-			"reason": "places j z on no key the library's keyboards have (thumb, combo or outer-column keys)"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/MiscLayouts/Blickensderfer_5_21c._ergo_ts.json",
-			"reason": "characters on keys the library's keyboards have no code for: ="
+			"reason": "places j z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/MiscLayouts/Hands_On_ergo.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ = + ; : \\ | [ {"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ = + ; : \\ | [ {"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/MiscLayouts/Hands_On_matrix.json",
-			"reason": "places j p on no key the library's keyboards have (thumb, combo or outer-column keys)"
+			"reason": "places j p on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "handsdown",
 			"source_path": "JSON/MiscLayouts/Hands_On_ortho.json",
 			"reason": "the board « ergolinear » is not one of the library's keyboards (KLA reader)"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/MiscLayouts/Ingulish_layout.json",
-			"reason": "places b d f k l q v y z on no key the library's keyboards have (thumb, combo or outer-column keys)"
-		},
-		{
-			"source": "handsdown",
-			"source_path": "JSON/MiscLayouts/Ingulish_layout.v2.json",
-			"reason": "places b d f k l q v y z on no key the library's keyboards have (thumb, combo or outer-column keys)"
 		},
 		{
 			"source": "handsdown",
@@ -43488,7 +45829,7 @@
 		{
 			"source": "handsdown",
 			"source_path": "JSON/MiscLayouts/neauwr-bits_ergo_ts.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ - + ; : [ { ( >"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ - + ; : [ { ( >"
 		},
 		{
 			"source": "klanext",
@@ -43754,7 +46095,7 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/colemak-ultra-wide-vanilla.en.ansi.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~"
 		},
 		{
 			"source": "klanext",
@@ -43863,7 +46204,8 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/ferguson.en.ansi.json",
-			"reason": "characters on keys the library's keyboards have no code for: ; : / ?"
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "qwerty_revised"
 		},
 		{
 			"source": "klanext",
@@ -43874,7 +46216,7 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/full-maks-minimo.en.ansi.json",
-			"reason": "places z on no key the library's keyboards have"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
@@ -43891,27 +46233,27 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-neu-angle.eu.ansi.json",
-			"reason": "places x on no key the library's keyboards have"
+			"reason": "places x on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-neu-angle.ts.eu.ansi.json",
-			"reason": "places x on no key the library's keyboards have"
+			"reason": "places x on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-neu-sym.eu.ansi.json",
-			"reason": "places x on no key the library's keyboards have"
+			"reason": "places x on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-neu.eu.ansi.json",
-			"reason": "places q on no key the library's keyboards have"
+			"reason": "places q on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-neu.ts.eu.ansi.json",
-			"reason": "places q on no key the library's keyboards have"
+			"reason": "places q on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
@@ -44000,12 +46342,13 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/kyu-anglemod.en.ansi.json",
-			"reason": "places z on no key the library's keyboards have"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/kyu-normalshift.en.ansi.json",
-			"reason": "characters on keys the library's keyboards have no code for: / ?"
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "kyu_vanilla"
 		},
 		{
 			"source": "klanext",
@@ -44040,7 +46383,7 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/minimotion-mod-elazharty-azmi-suliman-mod-ian.en.ansi.json",
-			"reason": "characters on keys the library's keyboards have no code for: \\ | ' \""
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): \\ | ' \""
 		},
 		{
 			"source": "klanext",
@@ -44200,12 +46543,12 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/rick.en.ansi.json",
-			"reason": "characters on keys the library's keyboards have no code for: / %"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): / %"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/right-pinky-friend.en.ansi.json",
-			"reason": "characters on keys the library's keyboards have no code for: = + - `"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): = + - `"
 		},
 		{
 			"source": "klanext",
@@ -44305,7 +46648,7 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/typematrix.en.ansi.json",
-			"reason": "places a q on no key the library's keyboards have"
+			"reason": "places a q on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
@@ -44326,7 +46669,7 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/vflm.en.ansi.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~"
 		},
 		{
 			"source": "klanext",
@@ -44379,147 +46722,142 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/adextre.fr.ergodox.json",
-			"reason": "places z on no key the library's keyboards have"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/adore.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: \\ | ( { [ ) } ] = + - _ ⇞ ⎘ ⇟ ✂"
+			"reason": "places the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/antcolony.en.matrix.json",
-			"reason": "places f r u x y z on no key the library's keyboards have"
+			"reason": "places f r u x y z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/arensito-kinesis.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ' ` % \" ~ ^"
+			"reason": "places the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/arensito.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ' ` %"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ' ` %"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/ashe.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ | + ="
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ | + ="
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/balanced-v.en.ergodox.json",
-			"reason": "places j q z on no key the library's keyboards have"
+			"reason": "places j q z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/beakl-19.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: - ← ⌦ ↖ ↘ ⇞ ⇟"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): - ← ⌦ ↖ ↘ ⇞ ⇟"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/beakl-27a.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ↑ ⌦ ↖ ↘ ⇞ ⇟"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ↑ ⌦ ↖ ↘ ⇞ ⇟"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/beakl-35.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ↑ ⌦ ↖ ↘ ⇞ ⇟"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ↑ ⌦ ↖ ↘ ⇞ ⇟"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/beakl-4-mod-ian-1.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: [ / \\ ( & ) | < ~ { } > ` ⇟ ✂ ⇞ ⎘ ← ↑"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): [ / \\ ( & ) | < ~ { } > ` ⇟ ✂ ⇞ ⎘ ← ↑"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/beakl-43.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ⌦ ↑ ↖ ↘ ⇞ ⇟"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ⌦ ↑ ↖ ↘ ⇞ ⇟"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/beakl-hm-3.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ⌦ ↖ ↘ ⇞ ⇟"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ⌦ ↖ ↘ ⇞ ⇟"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/beakl-hm-7.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ↑ ⌦ ↖ ↘ ⇞ ⇟"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ↑ ⌦ ↖ ↘ ⇞ ⇟"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/beakl-mod-ctgap.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ \\ |"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ \\ |"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/beakl-opted36.en.ergodox.json",
-			"reason": "places q x on no key the library's keyboards have"
+			"reason": "places q x on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/beakl-t-imt-01.en.matrix.json",
-			"reason": "places i m t on no key the library's keyboards have"
+			"reason": "places the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/beakl15.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: - ← ⌦ ↖ ↘ ⇞ ⇟"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): - ← ⌦ ↖ ↘ ⇞ ⇟"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/beakrak-mod-ian.en.ergodox.json",
-			"reason": "places q t z on no key the library's keyboards have"
+			"reason": "places q z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/beakrak.en.ergodox.json",
-			"reason": "places q t z on no key the library's keyboards have"
+			"reason": "places q z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/benkeyless.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: - _ \\ | / ? ~ `"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): - _ \\ | / ? ~ `"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/bepo.fr.ergodox.json",
-			"reason": "places m w on no key the library's keyboards have"
+			"reason": "places m w on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/bl13-2.en.ergodox.json",
-			"reason": "places k on no key the library's keyboards have"
+			"reason": "places k on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/bl13.en.ergodox.json",
-			"reason": "places q on no key the library's keyboards have"
+			"reason": "places q on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/brown.en.ergodox.json",
-			"reason": "places j on no key the library's keyboards have"
+			"reason": "places j the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/cahi.en.matrix.json",
-			"reason": "places o on no key the library's keyboards have"
+			"reason": "places o on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/chia-vanilla.en.matrix.json",
-			"reason": "places o on no key the library's keyboards have"
+			"reason": "places o on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/chia.en.matrix.json",
-			"reason": "places o on no key the library's keyboards have"
-		},
-		{
-			"source": "klanext",
-			"source_path": "layouts/cole-shift-e.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: 1 ! = + [ { ` ~ ' \" \\ |"
+			"reason": "places e on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
@@ -44558,43 +46896,38 @@
 		},
 		{
 			"source": "klanext",
-			"source_path": "layouts/corny-furry.en.matrix.json",
-			"reason": "places h on no key the library's keyboards have"
-		},
-		{
-			"source": "klanext",
 			"source_path": "layouts/cry.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: - ← ⌦ ↖ ↘ ⇞ ⇟"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): - ← ⌦ ↖ ↘ ⇞ ⇟"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/ctgap-2.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ \\ |"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ \\ |"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/ctgap-3.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ \\ |"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ \\ |"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/dnat.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: - _ \\ | ` ~ / ? ] }"
+			"reason": "places the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/dsend-thumbshift.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ = + - _ ' \" [ { ] }"
+			"reason": "places the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/dvorak-mod-kengo.en.ergodox.json",
-			"reason": "places k l x on no key the library's keyboards have"
+			"reason": "places k l x on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/dvorak.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: @ £"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): @ £"
 		},
 		{
 			"source": "klanext",
@@ -44604,72 +46937,67 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/einbinder-1975-mod-ian.en.matrix.json",
-			"reason": "places l n w y on no key the library's keyboards have"
+			"reason": "places l y on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/einbinder-orthogonal.en.ergodox.json",
-			"reason": "places l q u v on no key the library's keyboards have"
-		},
-		{
-			"source": "klanext",
-			"source_path": "layouts/enne_p_111_69.en.ergodox.json",
-			"reason": "places q x y z on no key the library's keyboards have"
+			"reason": "places q v the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/full-maks.en.ergodox.json",
-			"reason": "places q v z on no key the library's keyboards have"
+			"reason": "places q v z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/gelatin.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: | ? ` ~ - _ ( < ] }"
+			"reason": "places the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/gg-beakl-15.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ← ; - → ⌦ → ⇞ ⎘ ⇟ ✂"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ← ; - → ⌦ → ⇞ ⎘ ⇟ ✂"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/gg-beakl-19.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: - ; ⌦ → ⇞ ⎘ ⇟ ✂"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): - ; ⌦ → ⇞ ⎘ ⇟ ✂"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/gg-beakl.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ← ; : - _ → ⌦ → ⇞ ⎘ ⇟ ✂"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ← ; : - _ → ⌦ → ⇞ ⎘ ⇟ ✂"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/gupta-whrl.en.matrix.json",
-			"reason": "places g q u z on no key the library's keyboards have"
+			"reason": "places g q u z the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-alt-ts.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ = + ; : \\ | [ {"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ = + ; : \\ | [ {"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-alt-tx-ts.en.ergodox.json",
-			"reason": "places t z on no key the library's keyboards have"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-bronze-ts.eu.ergodox.json",
-			"reason": "places h q z on no key the library's keyboards have"
+			"reason": "places q z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-dash.en.ergodox.json",
-			"reason": "places e z on no key the library's keyboards have"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-gold-ts.eu.ergodox.json",
-			"reason": "places q t z on no key the library's keyboards have"
+			"reason": "places q z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
@@ -44679,7 +47007,7 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-neu.ts.eu.ergodox.json",
-			"reason": "places j z on no key the library's keyboards have"
+			"reason": "places j z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
@@ -44689,62 +47017,62 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-platinum-ts.en.ergodox.json",
-			"reason": "places l z on no key the library's keyboards have"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-reference-ts.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ = + ; : \\ | [ {"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ = + ; : \\ | [ {"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-rhodium-ts.eu.ergodox.json",
-			"reason": "places q r z on no key the library's keyboards have"
+			"reason": "places q z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-silver-ts.eu.ergodox.json",
-			"reason": "places n q z on no key the library's keyboards have"
+			"reason": "places q z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-titanium-ts.eu.ergodox.json",
-			"reason": "places q r z on no key the library's keyboards have"
+			"reason": "places q z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-vibranium-ts.en.ergodox.json",
-			"reason": "places r z on no key the library's keyboards have"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-vibranium-vb.ts.eu.ergodox.json",
-			"reason": "places q r z on no key the library's keyboards have"
+			"reason": "places q z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-vibranium-vf.ts.eu.ergodox.json",
-			"reason": "places q r z on no key the library's keyboards have"
+			"reason": "places q z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-vibranium-vp.ts.eu.ergodox.json",
-			"reason": "places q r z on no key the library's keyboards have"
+			"reason": "places q z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/harmony.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ \\ |"
+			"reason": "places the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hs-indeks-ex.en.ergodox.json",
-			"reason": "places e v z on no key the library's keyboards have"
+			"reason": "places v z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/hs-indeks.en.ergodox.json",
-			"reason": "places j v z on no key the library's keyboards have"
+			"reason": "places j v z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
@@ -44754,12 +47082,12 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/hyperdeath.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ⇟ ⇞ ⌦ ↖ ← ↑ ↓ → ↘"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ⇟ ⇞ ⌦ ↖ ← ↑ ↓ → ↘"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/iena.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ | + ="
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ | + ="
 		},
 		{
 			"source": "klanext",
@@ -44781,47 +47109,32 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/krush-200.en.matrix.json",
-			"reason": "places j o q on no key the library's keyboards have"
+			"reason": "places j o q the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/lsnt.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: - _ ; :"
-		},
-		{
-			"source": "klanext",
-			"source_path": "layouts/lydell-anishtro.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ [ { = + \\ | ' \""
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): - _ ; :"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/maks-ex.en.ergodox.json",
-			"reason": "places e z on no key the library's keyboards have"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/maks-sx.en.ergodox.json",
-			"reason": "places q on no key the library's keyboards have"
-		},
-		{
-			"source": "klanext",
-			"source_path": "layouts/maltron-us-90-mod-andreas.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: 1 ! = + [ { ` ~ \\ |"
-		},
-		{
-			"source": "klanext",
-			"source_path": "layouts/maltron-us-90.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: 1 ! = + [ { ` ~ ' \" \\ |"
+			"reason": "places q on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/marsan-english.en.ergodox.json",
-			"reason": "places b c z on no key the library's keyboards have"
+			"reason": "places b c z the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/mithril-ts.eu.ergodox.json",
-			"reason": "places q r x on no key the library's keyboards have"
+			"reason": "places q x on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
@@ -44832,17 +47145,17 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/nawfal.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: #"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): #"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/neauwr-bits-ts.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ - + ; : [ { ( >"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ - + ; : [ { ( >"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/neo2-us.en.ergodox.json",
-			"reason": "places y on no key the library's keyboards have"
+			"reason": "places y on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
@@ -44859,32 +47172,32 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/nunirvana-vf.en.matrix.json",
-			"reason": "places z on no key the library's keyboards have"
+			"reason": "places z the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/opted-zxplcv.en.matrix.json",
-			"reason": "places z on no key the library's keyboards have"
+			"reason": "places z the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/optimot.fr.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: # % ° º $ € £ © @ _ − ‒ ^ ! ¨ ¡ ↑ ⇞ ↓ ⇟ ← ⇜"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): # % ° º $ € £ © @ _ − ‒ ^ ! ¨ ¡ ↑ ⇞ ↓ ⇟ ← ⇜"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/p_nr-mod-ian.en.matrix.json",
-			"reason": "places n p r on no key the library's keyboards have"
+			"reason": "places the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/p_nr.en.matrix.json",
-			"reason": "places n p r on no key the library's keyboards have"
+			"reason": "places the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/plum.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ ^ ; : # } | \\"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ ^ ; : # } | \\"
 		},
 		{
 			"source": "klanext",
@@ -44914,18 +47227,14 @@
 		},
 		{
 			"source": "klanext",
-			"source_path": "layouts/proxkb-thumbshift.en.ergodox.json",
-			"reason": "places e on no key the library's keyboards have"
-		},
-		{
-			"source": "klanext",
 			"source_path": "layouts/proxkb.en.ergodox.json",
-			"reason": "places e on no key the library's keyboards have"
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "proxkb_thumbshift"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/qgmlwy.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ ^"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ ^"
 		},
 		{
 			"source": "klanext",
@@ -44958,33 +47267,28 @@
 		},
 		{
 			"source": "klanext",
-			"source_path": "layouts/rsthd-2.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ~ ^"
-		},
-		{
-			"source": "klanext",
 			"source_path": "layouts/shz-zkq-dblequote.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: { ~"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): { ~"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/smartly-modified-dvorak.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: = + \\ | - _ ` ~"
+			"reason": "places the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/snth.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ⇟ ⇞ ; : ↖ ← ↑ ↓ → ↘"
+			"reason": "places r on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/sorenk-1.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ ^"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ ^"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/t-ht01-75-54.en.ergodox.json",
-			"reason": "places z on no key the library's keyboards have"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
@@ -44995,12 +47299,12 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/uciea-keyboard.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: + *"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): + *"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/uciea-vanilla.en.ergodox.json",
-			"reason": "places j on no key the library's keyboards have"
+			"reason": "places j on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
@@ -45010,67 +47314,67 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/ucieatron.en.matrix.json",
-			"reason": "places u x on no key the library's keyboards have"
+			"reason": "places u x on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/uhia.en.matrix.json",
-			"reason": "places o on no key the library's keyboards have"
+			"reason": "places o on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/vas_keys.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: = +"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): = +"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/vckb.en.ergodox.json",
-			"reason": "places b d f g p u z on no key the library's keyboards have"
+			"reason": "places b f g p z the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/vckb2.en.ergodox.json",
-			"reason": "places d f g l m u z on no key the library's keyboards have"
+			"reason": "places d f g m z the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/vukeys.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ` ~ ^"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~ ^"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/x1-bl13-final-3-suggestions.en.matrix.json",
-			"reason": "places p w on no key the library's keyboards have"
+			"reason": "places p w on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/x1.en.ergodox.json",
-			"reason": "places v on no key the library's keyboards have"
+			"reason": "places v the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/x1_atreus-44-keys.en.ergodox.json",
-			"reason": "characters on keys the library's keyboards have no code for: ⌦"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ⌦"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/x6-mod-sc0ty-nongr.en.ergodox.json",
-			"reason": "places h z on no key the library's keyboards have"
+			"reason": "places z on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/x8-4.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: ! £ ~"
+			"reason": "places the space on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/yp_hina_fu.en.ergodox.json",
-			"reason": "places o q x on no key the library's keyboards have"
+			"reason": "places o q x on no key the library's keyboards have (with their thumb keys)"
 		},
 		{
 			"source": "klanext",
 			"source_path": "layouts/zoinx.en.matrix.json",
-			"reason": "characters on keys the library's keyboards have no code for: \\ | ; : [ { ] } ↖ ⌦ ` ~ ↑ ↓ ⇟ ⇞"
+			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): \\ | ; : [ { ] } ↖ ⌦ ` ~ ↑ ↓ ⇟ ⇞"
 		},
 		{
 			"source": "klanext",
@@ -45364,61 +47668,6 @@
 		},
 		{
 			"source": "cyanophage",
-			"source_path": "index.html#maltron",
-			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index.html#rsthd",
-			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index.html#dsthk",
-			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index.html#aptmak",
-			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index.html#caster",
-			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index.html#hd-vibranium",
-			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index.html#hd-promethium",
-			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index.html#snth",
-			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index.html#sunlight",
-			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index.html#nordrassil",
-			"reason": "puts t on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index.html#night",
-			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
 			"source_path": "index.html#enthium",
 			"reason": "a layout string of 35 characters, not cyanophage's 3 × 11 and a thumb key"
 		},
@@ -45433,51 +47682,6 @@
 			"source_path": "index2.html#middlemak",
 			"reason": "the same letters and digits as a library layout",
 			"same_as": "middlemak"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index2.html#dusk",
-			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index2.html#stern",
-			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index2.html#racket",
-			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index2.html#seasalt",
-			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index2.html#coastland",
-			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index2.html#north",
-			"reason": "puts s on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index2.html#handsdown-gold",
-			"reason": "puts t on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index2.html#handsdown-dash",
-			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
-		},
-		{
-			"source": "cyanophage",
-			"source_path": "index2.html#pfouyhai",
-			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
 		},
 		{
 			"source": "xkeyboard_config",

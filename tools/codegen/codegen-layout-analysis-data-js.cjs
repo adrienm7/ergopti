@@ -288,7 +288,8 @@ function fromComposer(engine, source, origin, codes, name) {
 
 /**
  * An alphabetic block of the library JSON, completed with the US number row
- * and US Shift pairs.
+ * and US Shift pairs, and the space bar unless a key of the block types the
+ * space (a block with a thumb letter puts the space on its other thumb).
  * @param {object} entry - One layout_library.json entry.
  * @param {object} qwerty - The reference QWERTY rows.
  * @returns {object} The library entry.
@@ -301,10 +302,12 @@ function fromAlphaBlock(entry, qwerty) {
 		// A symbol the block moved to the letters leaves the number row.
 		rows[code] = [used.has(base) ? null : base, used.has(shift) ? null : shift, null, null];
 	}
-	rows.Space = [' ', ' ', null, null];
+	// A block with a letter on a thumb key states its space key (the other
+	// thumb's): the shared space bar would put both on one thumb.
+	if (!Object.values(entry.keys).includes(' ')) rows.Space = [' ', ' ', null, null];
 	for (const [code, base] of Object.entries(entry.keys)) {
 		const upper = base.toUpperCase();
-		const shift = upper !== base ? upper : US_SHIFT[base] || null;
+		const shift = base === ' ' ? ' ' : upper !== base ? upper : US_SHIFT[base] || null;
 		rows[code] = [base, shift, null, null];
 	}
 	// The keys outside the block keep QWERTY's characters the block did not
