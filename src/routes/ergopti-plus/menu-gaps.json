@@ -623,6 +623,22 @@
 		}
 	},
 	{
+		"path": "layout_menu.virtual_keyboard",
+		"visibility": "hide",
+		"labels": { "fr": "Clavier virtuel Karabiner", "en": "Karabiner virtual keyboard" },
+		"platforms": { "windows": false, "macos": true, "linux": false },
+		"reasons": {
+			"windows": {
+				"en": "macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.",
+				"fr": "macOS uniquement : Karabiner-Elements, qu'Ergopti utilise sur macOS pour remapper les touches, a un clavier virtuel dont le type décide des codes de touche atteints par les deux touches propres au format ISO. Windows et Linux nomment ces touches par leur position et n'ont pas de clavier virtuel."
+			},
+			"linux": {
+				"en": "macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.",
+				"fr": "macOS uniquement : Karabiner-Elements, qu'Ergopti utilise sur macOS pour remapper les touches, a un clavier virtuel dont le type décide des codes de touche atteints par les deux touches propres au format ISO. Windows et Linux nomment ces touches par leur position et n'ont pas de clavier virtuel."
+			}
+		}
+	},
+	{
 		"path": "layout_menu.compose_input_method",
 		"visibility": "hide",
 		"labels": { "fr": "compose_input_method", "en": "compose_input_method" },
@@ -645,12 +661,12 @@
 		"platforms": { "windows": false, "macos": true, "linux": false },
 		"reasons": {
 			"windows": {
-				"en": "macOS only: this row installs the .bundle layout. Windows installs Ergopti from « Download the Ergopti system layout installer » below; on Linux, install it from « Manage layouts… » (Wayland) or with install.sh (X11).",
-				"fr": "macOS uniquement : cette ligne installe la disposition .bundle. Windows installe Ergopti depuis « Télécharger l’installateur de la disposition système Ergopti » ci-dessous ; sous Linux, installez-la depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+				"en": "macOS only: this row installs the .bundle layout. Windows installs Ergopti from « Download the Ergopti system layout installer » below; on Linux, install it from « Install or remove layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "macOS uniquement : cette ligne installe la disposition .bundle. Windows installe Ergopti depuis « Télécharger l’installateur de la disposition système Ergopti » ci-dessous ; sous Linux, installez-la depuis « Installer ou retirer des dispositions… » (Wayland) ou avec install.sh (X11)."
 			},
 			"linux": {
-				"en": "macOS only: this row installs the .bundle layout. Windows installs Ergopti from « Download the Ergopti system layout installer » below; on Linux, install it from « Manage layouts… » (Wayland) or with install.sh (X11).",
-				"fr": "macOS uniquement : cette ligne installe la disposition .bundle. Windows installe Ergopti depuis « Télécharger l’installateur de la disposition système Ergopti » ci-dessous ; sous Linux, installez-la depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+				"en": "macOS only: this row installs the .bundle layout. Windows installs Ergopti from « Download the Ergopti system layout installer » below; on Linux, install it from « Install or remove layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "macOS uniquement : cette ligne installe la disposition .bundle. Windows installe Ergopti depuis « Télécharger l’installateur de la disposition système Ergopti » ci-dessous ; sous Linux, installez-la depuis « Installer ou retirer des dispositions… » (Wayland) ou avec install.sh (X11)."
 			}
 		}
 	},
@@ -661,44 +677,12 @@
 		"platforms": { "windows": true, "macos": false, "linux": false },
 		"reasons": {
 			"macos": {
-				"en": "Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
-				"fr": "Windows uniquement : cette ligne télécharge l’installateur de la disposition de clavier Ergopti pour Windows, un paquet non signé publié avec chaque version qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+				"en": "Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Install or remove layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "Windows uniquement : cette ligne télécharge l’installateur de la disposition de clavier Ergopti pour Windows, un paquet non signé publié avec chaque version qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Installer ou retirer des dispositions… » (Wayland) ou avec install.sh (X11)."
 			},
 			"linux": {
-				"en": "Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
-				"fr": "Windows uniquement : cette ligne télécharge l’installateur de la disposition de clavier Ergopti pour Windows, un paquet non signé publié avec chaque version qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
-			}
-		}
-	},
-	{
-		"path": "layout_menu.virtual_keyboard",
-		"visibility": "hide",
-		"labels": { "fr": "Clavier virtuel Karabiner", "en": "Karabiner virtual keyboard" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
-		"reasons": {
-			"windows": {
-				"en": "macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.",
-				"fr": "macOS uniquement : Karabiner-Elements, qu'Ergopti utilise sur macOS pour remapper les touches, a un clavier virtuel dont le type décide des codes de touche atteints par les deux touches propres au format ISO. Windows et Linux nomment ces touches par leur position et n'ont pas de clavier virtuel."
-			},
-			"linux": {
-				"en": "macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.",
-				"fr": "macOS uniquement : Karabiner-Elements, qu'Ergopti utilise sur macOS pour remapper les touches, a un clavier virtuel dont le type décide des codes de touche atteints par les deux touches propres au format ISO. Windows et Linux nomment ces touches par leur position et n'ont pas de clavier virtuel."
-			}
-		}
-	},
-	{
-		"path": "layout_menu.menubar_icon",
-		"visibility": "hide",
-		"labels": { "fr": "Icône de la barre des menus", "en": "Menu bar icon" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
-		"reasons": {
-			"windows": {
-				"en": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.",
-				"fr": "macOS uniquement : ces lignes installent la disposition .bundle via le mécanisme de sources de saisie du système, avec une portée utilisateur et une portée système, et choisissent l'icône de la barre de menus. Windows installe un .klc par son propre installateur, Linux engendre une disposition XKB, et aucun des deux n'a de barre de menus."
-			},
-			"linux": {
-				"en": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.",
-				"fr": "macOS uniquement : ces lignes installent la disposition .bundle via le mécanisme de sources de saisie du système, avec une portée utilisateur et une portée système, et choisissent l'icône de la barre de menus. Windows installe un .klc par son propre installateur, Linux engendre une disposition XKB, et aucun des deux n'a de barre de menus."
+				"en": "Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Install or remove layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "Windows uniquement : cette ligne télécharge l’installateur de la disposition de clavier Ergopti pour Windows, un paquet non signé publié avec chaque version qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Installer ou retirer des dispositions… » (Wayland) ou avec install.sh (X11)."
 			}
 		}
 	},
@@ -746,6 +730,22 @@
 			"linux": {
 				"en": "Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.",
 				"fr": "Windows uniquement : tout ce que cette ligne listerait est lui-même propre à Windows, donc sur macOS et Linux elle n'affiche qu'une liste vide."
+			}
+		}
+	},
+	{
+		"path": "layout_menu.menubar_icon",
+		"visibility": "hide",
+		"labels": { "fr": "Icône de la barre des menus", "en": "Menu bar icon" },
+		"platforms": { "windows": false, "macos": true, "linux": false },
+		"reasons": {
+			"windows": {
+				"en": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.",
+				"fr": "macOS uniquement : ces lignes installent la disposition .bundle via le mécanisme de sources de saisie du système, avec une portée utilisateur et une portée système, et choisissent l'icône de la barre de menus. Windows installe un .klc par son propre installateur, Linux engendre une disposition XKB, et aucun des deux n'a de barre de menus."
+			},
+			"linux": {
+				"en": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.",
+				"fr": "macOS uniquement : ces lignes installent la disposition .bundle via le mécanisme de sources de saisie du système, avec une portée utilisateur et une portée système, et choisissent l'icône de la barre de menus. Windows installe un .klc par son propre installateur, Linux engendre une disposition XKB, et aucun des deux n'a de barre de menus."
 			}
 		}
 	},
@@ -1258,12 +1258,12 @@
 		"platforms": { "windows": true, "macos": false, "linux": false },
 		"reasons": {
 			"macos": {
-				"en": "Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
-				"fr": "Windows uniquement : cette ligne télécharge l’installateur de la disposition de clavier Ergopti pour Windows, un paquet non signé publié avec chaque version qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+				"en": "Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Install or remove layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "Windows uniquement : cette ligne télécharge l’installateur de la disposition de clavier Ergopti pour Windows, un paquet non signé publié avec chaque version qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Installer ou retirer des dispositions… » (Wayland) ou avec install.sh (X11)."
 			},
 			"linux": {
-				"en": "Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
-				"fr": "Windows uniquement : cette ligne télécharge l’installateur de la disposition de clavier Ergopti pour Windows, un paquet non signé publié avec chaque version qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+				"en": "Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Install or remove layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "Windows uniquement : cette ligne télécharge l’installateur de la disposition de clavier Ergopti pour Windows, un paquet non signé publié avec chaque version qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Installer ou retirer des dispositions… » (Wayland) ou avec install.sh (X11)."
 			}
 		}
 	},
@@ -1277,12 +1277,12 @@
 		"platforms": { "windows": true, "macos": false, "linux": false },
 		"reasons": {
 			"macos": {
-				"en": "Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
-				"fr": "Windows uniquement : cette ligne télécharge l’installateur de la disposition de clavier Ergopti pour Windows, un paquet non signé publié avec chaque version qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+				"en": "Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Install or remove layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "Windows uniquement : cette ligne télécharge l’installateur de la disposition de clavier Ergopti pour Windows, un paquet non signé publié avec chaque version qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Installer ou retirer des dispositions… » (Wayland) ou avec install.sh (X11)."
 			},
 			"linux": {
-				"en": "Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
-				"fr": "Windows uniquement : cette ligne télécharge l’installateur de la disposition de clavier Ergopti pour Windows, un paquet non signé publié avec chaque version qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+				"en": "Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Install or remove layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "Windows uniquement : cette ligne télécharge l’installateur de la disposition de clavier Ergopti pour Windows, un paquet non signé publié avec chaque version qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Installer ou retirer des dispositions… » (Wayland) ou avec install.sh (X11)."
 			}
 		}
 	},
@@ -2799,7 +2799,7 @@
 	{
 		"path": "layout_native_parent.layout_parent_content",
 		"visibility": "hide",
-		"labels": { "fr": "🌐 Disposition clavier", "en": "🌐 Keyboard layout" },
+		"labels": { "fr": "🌐 Dispositions et émulation", "en": "🌐 Layouts and emulation" },
 		"platforms": { "windows": false, "macos": true, "linux": false },
 		"reasons": {
 			"windows": {
