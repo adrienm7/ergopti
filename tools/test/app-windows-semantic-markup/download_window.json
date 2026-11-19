@@ -1,0 +1,30 @@
+{
+	"files": {
+		"index.html": [
+			{
+				"tag": "div",
+				"count": 22,
+				"pending": true
+			},
+			{
+				"tag": "span",
+				"count": 1,
+				"pending": true
+			}
+		],
+		"network_failure.js": [
+			{
+				"tag": "div",
+				"count": 1,
+				"pending": true
+			}
+		],
+		"script.js": [
+			{
+				"tag": "span",
+				"count": 2,
+				"pending": true
+			}
+		]
+	}
+}

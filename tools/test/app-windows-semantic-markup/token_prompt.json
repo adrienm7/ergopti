@@ -1,0 +1,16 @@
+{
+	"files": {
+		"index.html": [
+			{
+				"tag": "div",
+				"count": 5,
+				"pending": true
+			},
+			{
+				"tag": "span",
+				"count": 1,
+				"pending": true
+			}
+		]
+	}
+}

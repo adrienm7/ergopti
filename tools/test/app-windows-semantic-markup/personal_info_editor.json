@@ -1,0 +1,18 @@
+{
+	"files": {
+		"index.html": [
+			{
+				"tag": "div",
+				"count": 2,
+				"pending": true
+			}
+		],
+		"script.js": [
+			{
+				"tag": "div",
+				"count": 1,
+				"pending": true
+			}
+		]
+	}
+}

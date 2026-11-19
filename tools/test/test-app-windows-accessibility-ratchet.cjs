@@ -68,6 +68,30 @@ function checkComparison() {
 		baseline
 	);
 	assert.equal(outline.regressions.length, 1, 'A heading or landmark problem is a regression');
+	// The keyboard operability and text alternative checks run on every state
+	// and count under their own rules; their self check runs before any window.
+	const source = fs.readFileSync(
+		path.join(__dirname, 'browser', 'app-windows-accessibility.playwright.cjs'),
+		'utf8'
+	);
+	assert.equal(scan.OPERABLE_RULE, 'keyboard-operable');
+	assert.equal(scan.IMAGES_RULE, 'text-alternatives');
+	for (const call of [
+		/page\.evaluate\(appChecks\.operabilityProblems\)/,
+		/appChecks\.arrowProblems\(page\)/,
+		/appChecks\.escapeProblems\(page\)/,
+		/page\.evaluate\(appChecks\.imageProblems\)/,
+		/addInitScript\(appChecks\.recordListeners\)/,
+		/await selfCheck\(require\('playwright'\)\.chromium\);\s+if \(args\.includes\('--self-check'\)\)/
+	])
+		assert.match(source, call, 'The scan wires ' + call.source);
+	for (const rule of [scan.OPERABLE_RULE, scan.IMAGES_RULE]) {
+		const row = scan.compareWithBaseline(
+			{ ...baseline, ['a | light | filled | ' + rule]: 1 },
+			baseline
+		);
+		assert.equal(row.regressions.length, 1, rule + ' problems are regressions');
+	}
 	const better = scan.compareWithBaseline({ 'a | light | filled | rule': 2 }, baseline);
 	assert.deepEqual(better.regressions, []);
 	assert.equal(better.improvements.length, 2, 'A lower or vanished count asks to lower it');

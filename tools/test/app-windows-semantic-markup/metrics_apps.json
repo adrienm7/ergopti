@@ -1,0 +1,53 @@
+{
+	"files": {
+		"charts.js": [
+			{
+				"tag": "div",
+				"count": 13,
+				"pending": true
+			},
+			{
+				"tag": "span",
+				"count": 2,
+				"pending": true
+			}
+		],
+		"index.html": [
+			{
+				"tag": "div",
+				"count": 211,
+				"pending": true
+			},
+			{
+				"tag": "span",
+				"count": 25,
+				"pending": true
+			}
+		],
+		"main.js": [
+			{
+				"tag": "span",
+				"count": 1,
+				"pending": true
+			},
+			{
+				"tag": "div",
+				"count": 4,
+				"pending": true
+			}
+		],
+		"modal.js": [
+			{
+				"tag": "div",
+				"count": 17,
+				"pending": true
+			},
+			{
+				"tag": "span",
+				"count": 4,
+				"pending": true
+			}
+		]
+	},
+	"pendingProblems": 7
+}

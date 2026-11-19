@@ -19,7 +19,14 @@
  * 3. read as an outline (heading-landmarks.cjs): one h1, no skipped heading
  *    level, one main landmark, every other landmark named.
  * 4. searched for an unresolved locale key in any visible text or accessible
- *    name (lib/raw-locale-keys.cjs), which fails the run outright.
+ *    name (lib/raw-locale-keys.cjs), which fails the run outright;
+ * 5. checked for keyboard operability (lib/app-window-checks.cjs): no
+ *    element a mouse can click or hover that the keyboard cannot reach, no
+ *    control role without focus, arrow keys that move inside every tab list,
+ *    list box, menu, grid, tree and radio group, and Escape that closes an
+ *    open modal dialog;
+ * 6. checked for text alternatives: every image, drawing and chart canvas
+ *    named or hidden from assistive technology.
  * Every axe rule's node count and every window's walk problems are counted
  * and compared with the committed baseline beside this file: a new row or a
  * higher count fails, so the violations can only go down. The maintainer
@@ -41,6 +48,9 @@ const path = require('node:path');
 const { collectOutline, outlineProblems } = require('../lib/heading-landmarks.cjs');
 const { walkProblems } = require('../lib/keyboard-walk.cjs');
 const operability = require('../lib/keyboard-operability.cjs');
+// The app windows' own checks: hover-only content, control roles without
+// focus, arrow keys in composite widgets, Escape in modals, text alternatives.
+const appChecks = require('../lib/app-window-checks.cjs');
 const { catalogueShape, pageRawKeys } = require('../lib/raw-locale-keys.cjs');
 const { WINDOWS } = require('./app-windows-fixtures.cjs');
 
@@ -74,6 +84,9 @@ const OUTLINE_RULE = 'heading-landmarks';
 // The rule name under which a window's controls only a mouse can use are
 // counted (lib/keyboard-operability.cjs): the ratchet refuses a new one.
 const OPERABILITY_RULE = 'keyboard-operability';
+// The rule names of the keyboard operability and text alternative checks.
+const OPERABLE_RULE = 'keyboard-operable';
+const IMAGES_RULE = 'text-alternatives';
 const TYPES = {
 	'.html': 'text/html',
 	'.js': 'text/javascript',
@@ -349,6 +362,7 @@ async function openWindow(browser, origin, target, scheme, family) {
 		pointer: operability.POINTER_EVENTS,
 		keys: operability.KEY_EVENTS
 	});
+	await page.addInitScript(appChecks.recordListeners);
 	await page.addInitScript(installFakeHost, {
 		bridge: target.bridge,
 		family,
@@ -445,6 +459,35 @@ async function auditWindows(chromium, windows, family, port) {
 									nodes: outline.length,
 									targets: outline
 								});
+							const images = await page.evaluate(appChecks.imageProblems);
+							if (images.length)
+								findings.push({
+									window: target.id,
+									scheme,
+									state: state.name,
+									rule: IMAGES_RULE,
+									impact: 'serious',
+									help: 'Images, drawings and charts have a text alternative',
+									nodes: images.length,
+									targets: images
+								});
+							// The arrow keys and Escape change the state: they come last.
+							const operable = [
+								...(await page.evaluate(appChecks.operabilityProblems)),
+								...(await appChecks.arrowProblems(page)),
+								...(await appChecks.escapeProblems(page))
+							];
+							if (operable.length)
+								findings.push({
+									window: target.id,
+									scheme,
+									state: state.name,
+									rule: OPERABLE_RULE,
+									impact: 'serious',
+									help: 'Everything a mouse can do, the keyboard can do',
+									nodes: operable.length,
+									targets: operable
+								});
 							console.log(`  ${target.id} (${state.name}): ${stops} stops`);
 						}
 						assert.deepEqual(errors, [], target.id + ' (' + state.name + ', ' + scheme + ')');
@@ -457,6 +500,91 @@ async function auditWindows(chromium, windows, family, port) {
 		await new Promise((resolve) => server.close(resolve));
 	}
 	return findings;
+}
+
+/**
+ * Proves, on a small page, that the operability and text alternative checks
+ * see each failure they count, so a window counted at zero was really read.
+ */
+async function selfCheck(chromium) {
+	const browser = await chromium.launch();
+	try {
+		const page = await browser.newPage();
+		await page.addInitScript(appChecks.recordListeners);
+		// The init script runs from the next navigation on.
+		await page.goto('about:blank');
+		await page.setContent(`<main><h1>Check</h1>
+			<div id="mouse">Click me</div>
+			<span id="hover">Hover me</span>
+			<div id="fake" role="button">Fake</div>
+			<div role="tablist" id="tabs"><button role="tab" id="t1">One</button><button role="tab" id="t2" tabindex="-1">Two</button></div>
+			<ul><li><button id="delegated">Inside</button></li></ul>
+			<button id="real">Real</button>
+			<img src="data:," id="noalt"><svg id="bare" viewBox="0 0 1 1"></svg><svg aria-hidden="true"></svg>
+			<canvas id="chart" width="4" height="4"></canvas>
+			<dialog id="sticky"><button>Stay</button></dialog></main>`);
+		await page.evaluate(() => {
+			document.getElementById('mouse').addEventListener('click', () => {});
+			document.getElementById('hover').addEventListener('mouseenter', () => {});
+			document.querySelector('ul').addEventListener('click', () => {});
+			document.getElementById('real').onclick = () => {};
+		});
+		const problems = (await page.evaluate(appChecks.operabilityProblems)).join('\n');
+		assert.match(
+			problems,
+			/mouse only \(click\): div#mouse/,
+			'A clickable div the keyboard cannot reach'
+		);
+		assert.match(problems, /mouse only \(hover\): span#hover/, 'Content shown on hover only');
+		assert.match(problems, /role button without focus: div#fake/, 'A control role without focus');
+		assert.doesNotMatch(
+			problems,
+			/\bul\b|button#real/,
+			'A delegated list and a native button pass'
+		);
+		assert.deepEqual(
+			await appChecks.arrowProblems(page),
+			['ArrowRight does not move inside the tablist op-0'],
+			'A tab list whose arrows do nothing'
+		);
+		await page.evaluate(() => {
+			const second = document.getElementById('t2');
+			document.getElementById('tabs').addEventListener('keydown', (event) => {
+				if (event.key === 'ArrowRight') second.focus();
+			});
+		});
+		assert.deepEqual(await appChecks.arrowProblems(page), [], 'Arrows that move pass');
+		const images = await page.evaluate(appChecks.imageProblems);
+		assert.deepEqual(
+			images,
+			[
+				'img#noalt has no alt',
+				'svg#bare is neither aria-hidden nor a named image',
+				'canvas#chart is neither aria-hidden nor a named image'
+			],
+			'Images without a text alternative, a hidden svg passing'
+		);
+		await page.evaluate(() => {
+			const dialog = document.getElementById('sticky');
+			dialog.addEventListener('cancel', (event) => event.preventDefault());
+			dialog.showModal();
+		});
+		assert.deepEqual(
+			await appChecks.escapeProblems(page),
+			['Escape does not close the modal dialog#sticky'],
+			'A modal dialog that Escape leaves open'
+		);
+		await page.evaluate(() => {
+			const dialog = document.getElementById('sticky');
+			dialog.close();
+			const fresh = dialog.cloneNode(true);
+			dialog.replaceWith(fresh);
+			fresh.showModal();
+		});
+		assert.deepEqual(await appChecks.escapeProblems(page), [], 'Escape that closes passes');
+	} finally {
+		await browser.close();
+	}
 }
 
 /**
@@ -516,14 +644,17 @@ function readBaseline() {
 
 /**
  * Usage: [--bridge=windows|webkit] [--only=id[,id]] [--update-baseline]
- * [--report=file.json] [--port=n] [--root=static-dir]. The server takes any free port unless
+ * [--report=file.json] [--port=n] [--root=static-dir] [--self-check]. --self-check
+ * only proves the operability and image checks on their small page. The server takes any free port unless
  * --port names one. --only audits a subset while fixing a window and
  * prints every finding without comparing.
  */
 async function main(args = process.argv.slice(2)) {
 	for (const flag of args)
 		assert.ok(
-			flag === '--update-baseline' || /^--(report|only|bridge|port|root)=/.test(flag),
+			flag === '--update-baseline' ||
+				flag === '--self-check' ||
+				/^--(report|only|bridge|port|root)=/.test(flag),
 			'Unknown argument ' + flag
 		);
 	const value = (name) => {
@@ -550,6 +681,11 @@ async function main(args = process.argv.slice(2)) {
 	const windows = ids ? WINDOWS.filter((target) => ids.includes(target.id)) : WINDOWS;
 	const port = Number(value('port') || 0);
 	assert.ok(Number.isSafeInteger(port) && port >= 0 && port < 65536, 'Bad port');
+	await selfCheck(require('playwright').chromium);
+	if (args.includes('--self-check')) {
+		console.log('App windows accessibility: the operability and image checks see each failure.');
+		return;
+	}
 	const findings = await auditWindows(require('playwright').chromium, windows, family, port);
 	const report = value('report');
 	if (report) fs.writeFileSync(report, JSON.stringify(findings, null, '\t') + '\n');
@@ -594,6 +730,9 @@ module.exports = {
 	WALK_RULE,
 	OUTLINE_RULE,
 	OPERABILITY_RULE,
+	OPERABLE_RULE,
+	IMAGES_RULE,
+	selfCheck,
 	rowKey,
 	countsOf,
 	compareWithBaseline,

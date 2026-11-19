@@ -1,0 +1,24 @@
+{
+	"files": {
+		"index.html": [
+			{
+				"tag": "div",
+				"count": 13,
+				"pending": true
+			}
+		],
+		"script.js": [
+			{
+				"tag": "span",
+				"count": 1,
+				"pending": true
+			},
+			{
+				"tag": "div",
+				"count": 1,
+				"pending": true
+			}
+		]
+	},
+	"pendingProblems": 1
+}
