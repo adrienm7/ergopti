@@ -322,7 +322,10 @@ async function exerciseStudio(context, origin, basePath, inflight, axeSource) {
 		const comparer = await studioFrame(page, '/layout_analysis/');
 		assert.equal(await scrollsSideways(page), false, 'The Comparer page fits a phone');
 		assert.equal(await scrollsSideways(comparer), false, 'The Comparer fits a phone');
-		await comparer.locator('#la-chart .la-chart-row').first().click();
+		await comparer
+			.locator('#la-results[aria-busy="false"] #la-chart .la-chart-row')
+			.first()
+			.click();
 		await comparer.evaluate(() =>
 			document.querySelectorAll('#la-details details, #la-settings').forEach((node) => {
 				node.open = true;

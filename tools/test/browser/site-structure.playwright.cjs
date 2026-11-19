@@ -224,7 +224,9 @@ async function exerciseBenchmarks(page) {
 	const comparer = page.frameLocator('iframe.benchmark-frame');
 	await page.waitForFunction(() => {
 		const doc = document.querySelector('iframe.benchmark-frame').contentDocument;
-		return Boolean(doc && doc.querySelectorAll('#la-table tbody tr').length > 0);
+		return Boolean(
+			doc && doc.querySelectorAll('#la-results[aria-busy="false"] #la-table tbody tr').length > 0
+		);
 	});
 	assert.equal(await comparer.locator('#la-corpus').inputValue(), 'fr_nemolivier');
 	assert.equal(await comparer.locator('#la-keyboard').inputValue(), 'iso');
@@ -492,7 +494,7 @@ async function exerciseStudioHandoff(page, origin, basePath) {
 	await editor.locator('#la-panel-compare').click();
 	await page.waitForURL(origin + basePath + '/studio/comparer');
 	const comparer = page.frameLocator('iframe.studio-frame');
-	await comparer.locator('#la-table tbody tr').first().waitFor();
+	await comparer.locator('#la-results[aria-busy="false"] #la-table tbody tr').first().waitFor();
 	assert.equal(
 		await comparer.locator('#la-format').inputValue(),
 		'65',

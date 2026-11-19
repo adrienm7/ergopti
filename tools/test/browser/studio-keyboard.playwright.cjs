@@ -41,7 +41,11 @@ const UI = '/ergopti_plus/_shared/ui/';
 // The pages the site frames under /studio, /studio/comparer and /studio/optimiser.
 const PAGES = Object.freeze([
 	{ name: 'editor', path: UI + 'layout_editor/index.html', ready: '#le-board [data-code="KeyA"]' },
-	{ name: 'Comparer', path: UI + 'layout_analysis/index.html', ready: '#la-chart .la-chart-row' },
+	{
+		name: 'Comparer',
+		path: UI + 'layout_analysis/index.html',
+		ready: '#la-results[aria-busy="false"] #la-chart .la-chart-row'
+	},
 	{ name: 'Optimiser', path: UI + 'layout_optimizer/index.html', ready: '.layout-optimizer h1' }
 ]);
 // More Tab presses than any page has stops: reaching it means the focus is held.

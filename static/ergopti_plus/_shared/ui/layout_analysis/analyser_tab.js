@@ -15,7 +15,9 @@
  *    its state: the same layouts, corpus and keyboard.
  * 2. Lazy: nothing is scored until the view is shown, then one layout per
  *    idle slice, so the Comparer stays responsive (every analyser, both
- *    fingerings, costs about 70 ms per layout).
+ *    fingerings, costs about 70 ms per layout). The table is drawn again at
+ *    most every RENDER_MS: drawn after each layout of the whole library, the
+ *    growing table cost more than the scores.
  * 3. Every string is a locale key; numbers use the page's locale.
  * 4. Scores or ranks: each analyser's rank of the layouts beside the
  *    Comparer's, the cell shaded on one blue ramp (rank 1 darkest), the rank
@@ -40,6 +42,8 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		scores: () => t('layout_analysis.analysers.view_scores'),
 		ranks: () => t('layout_analysis.analysers.view_ranks')
 	};
+	// The table is drawn again at most this often while the layouts are scored (ms).
+	const RENDER_MS = 500;
 	// A rank cell at least this share of the darkest is dark enough for light ink.
 	const STRONG_SHARE = 0.55;
 	const DIRECTION_LABEL = {
@@ -281,6 +285,7 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		function compute() {
 			const job = ++state.job;
 			const pending = state.results.filter((r) => !state.scores.has(r.layout.id));
+			let drawn = performance.now();
 			const next = () => {
 				if (job !== state.job || pending.length === 0) return;
 				const result = pending.shift();
@@ -294,7 +299,10 @@ var LAYOUT_ANALYSER_TAB = (function () {
 						profile: FINGERING.current(state.keyboard) || undefined
 					})
 				);
-				render();
+				if (pending.length === 0 || performance.now() - drawn >= RENDER_MS) {
+					render();
+					drawn = performance.now();
+				}
 				idle(next);
 			};
 			render();

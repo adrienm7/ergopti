@@ -286,7 +286,11 @@ async function exerciseStudioLayout(browser, origin) {
 			})
 		)
 	);
-	await page.waitForFunction(() => document.querySelectorAll('#la-chart .la-bar').length > 1);
+	await page.waitForFunction(
+		() =>
+			document.querySelectorAll('#la-chart .la-bar').length > 1 &&
+			document.getElementById('la-results').getAttribute('aria-busy') === 'false'
+	);
 	const comparer = await page.evaluate(() => ({
 		corpus: document.getElementById('la-corpus').value,
 		mine: document.getElementById('la-corpus').classList.contains('la-corpus-mine'),
@@ -323,6 +327,12 @@ async function exerciseStudioLayout(browser, origin) {
 			{ id: 'user_ergopti_no_k', name: 'Ergopti without k', rows, dead: ergopti.dead }
 		]);
 	});
+	// The chart draws its 40 best bars: the Ergopti layouts alone bring the
+	// incomplete one into it.
+	await page.evaluate(() => {
+		document.getElementById('la-filters-box').open = true;
+	});
+	await page.fill('#la-row-name', 'Ergopti');
 	await page.waitForFunction(() => document.querySelector('#la-chart .la-incomplete'));
 	const incomplete = await page.evaluate(() => {
 		const bars = [...document.querySelectorAll('#la-chart .la-chart-row')];
@@ -394,6 +404,8 @@ async function exerciseStudioLayout(browser, origin) {
 		'no « + » outside its mode'
 	);
 	await page.selectOption('#la-text-mode', 'mixed');
+	// One layout and its « + » twin in the chart, under its 40 bars.
+	await page.fill('#la-row-name', 'QWERTY (US)');
 	const before = await page.locator('#la-chart .la-chart-row').count();
 	// The layout list is folded under its summary line.
 	await page.click('#la-layouts-summary');
@@ -436,7 +448,11 @@ async function exerciseStudioLayout(browser, origin) {
 			})
 		)
 	);
-	await page.waitForFunction(() => document.getElementById('la-text-mode').disabled);
+	await page.waitForFunction(
+		() =>
+			document.getElementById('la-text-mode').disabled &&
+			document.getElementById('la-results').getAttribute('aria-busy') === 'false'
+	);
 	assert.match(
 		await page.textContent('#la-text-mode-info'),
 		/^This corpus is one text/,
@@ -457,6 +473,7 @@ async function exerciseStudioLayout(browser, origin) {
 		).includes('QWERTY (US)+'),
 		'one text: no « + » layout is ranked'
 	);
+	await page.fill('#la-row-name', '');
 	const heading = await page.evaluate(
 		() => getComputedStyle(document.querySelector('#studio-comparer')).color
 	);
@@ -632,7 +649,11 @@ async function exerciseMyTypingRefresh(browser, origin) {
 		const list = window.__posted.find((p) => p.action === 'studio_layouts');
 		window.studioLayouts({ request: list.request, ok: true, layouts: [] });
 	});
-	await page.waitForFunction(() => document.querySelectorAll('#la-chart .la-bar').length > 1);
+	await page.waitForFunction(
+		() =>
+			document.querySelectorAll('#la-chart .la-bar').length > 1 &&
+			document.getElementById('la-results').getAttribute('aria-busy') === 'false'
+	);
 	assert.equal(
 		await page.inputValue('#la-corpus'),
 		'my_typing',
@@ -1212,7 +1233,9 @@ async function exerciseComparerTabs(page) {
 		),
 		'every finger writes its gap to the ideal'
 	);
-	assert.equal(await page.locator('#la-hands .la-chart-row').count(), results, 'a hand bar each');
+	// A chart draws its 40 best bars (CHART_MAX_BARS), the table every layout.
+	const bars = Math.min(results, 40);
+	assert.equal(await page.locator('#la-hands .la-chart-row').count(), bars, 'a hand bar each');
 	assert.equal(await page.locator('#la-hands-legend li').count(), 2, 'left and right named');
 	// Each themed tab: one named chart per metric, read as a table, and the sortable table.
 	for (const [tab, charts] of [
@@ -1307,10 +1330,11 @@ async function exerciseComparerTabs(page) {
 	assert.equal(await page.locator('#la-table-bigrams tbody tr').count(), registry);
 	await page.selectOption('#la-row-origin', '');
 	await page.selectOption('#la-row-complete', 'no');
-	assert.equal(
-		await page.locator('#la-table tbody tr').count(),
-		0,
-		'no incomplete layout is compared here'
+	assert.ok(
+		await page.$$eval('#la-table tbody tr', (rows) =>
+			rows.every((row) => row.querySelector('.la-incomplete-flag'))
+		),
+		'the incomplete layouts only'
 	);
 	await page.selectOption('#la-row-complete', 'all');
 	await page.click('#la-tab-overview');
@@ -1318,6 +1342,94 @@ async function exerciseComparerTabs(page) {
 		(await page.locator('#la-leaders .la-leader').count()) >= 2,
 		'the overview names the best layouts'
 	);
+}
+
+/**
+ * (comparer-whole-library) With nothing saved, the Comparer ticks every layout
+ * it lists (maintainer, 2026-11-18), the other board's twin of a family
+ * excepted, and scores them by slices, yielding to the page between them, so
+ * the page answers while the library is scored; a saved selection stays.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseComparerWholeLibrary(browser, origin) {
+	const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	// Every text the status line shows, in order.
+	await page.addInitScript(() => {
+		window.__statuses = [];
+		new MutationObserver(() => {
+			const status = document.getElementById('la-status');
+			const text = status ? status.textContent : '';
+			if (text && window.__statuses[window.__statuses.length - 1] !== text)
+				window.__statuses.push(text);
+		}).observe(document, { childList: true, subtree: true, characterData: true });
+	});
+	await page.goto(`${origin}/ui/layout_analysis/index.html?lang=en&corpus=fr_nemolivier`);
+	await page.waitForFunction(() =>
+		/ layouts compared on /.test(document.getElementById('la-status').textContent)
+	);
+	const ticks = await page.evaluate(() => {
+		const library = window.LAYOUT_ANALYSIS.libraryLayouts();
+		const boxes = [...document.querySelectorAll('#la-layout-list .la-layout')].map((label) => ({
+			name: label.textContent,
+			checked: label.querySelector('input').checked
+		}));
+		return {
+			library: library.length,
+			listed: boxes.length,
+			checked: boxes.filter((box) => box.checked).length,
+			unchecked: boxes.filter((box) => !box.checked).map((box) => box.name)
+		};
+	});
+	assert.equal(ticks.listed, ticks.library, 'the list holds the whole library');
+	assert.ok(
+		ticks.unchecked.every((name) => /ANSI|ISO|JIS|ABNT/.test(name)),
+		`only the other board's twins stay unticked: ${ticks.unchecked.join(' | ')}`
+	);
+	assert.ok(
+		ticks.checked >= ticks.library - ticks.unchecked.length && ticks.checked > 100,
+		`the whole library is ticked: ${ticks.checked} of ${ticks.library}`
+	);
+	const statuses = await page.evaluate(() => window.__statuses.slice());
+	const ready = statuses.findIndex((text) => / layouts compared on /.test(text));
+	const slices = statuses
+		.slice(0, ready)
+		.filter((text) => /^Scoring the layouts: \d+ of \d+…$/.test(text));
+	assert.ok(
+		slices.length >= Math.floor(ticks.checked / 4) - 1,
+		`the page is given a turn between slices: ${slices.length} of ${statuses.join(' | ')}`
+	);
+	assert.match(
+		statuses[ready],
+		new RegExp(`^${ticks.checked} layouts compared on `),
+		'every ticked layout is ranked'
+	);
+	assert.equal(
+		await page.getAttribute('#la-results', 'aria-busy'),
+		'false',
+		'the results are no longer busy once every slice is scored'
+	);
+	// A saved selection stays the user's.
+	await page.click('#la-layouts-summary');
+	await page.click('#la-none');
+	await page
+		.locator('#la-layout-list .la-layout', { hasText: /^Ergopti$/ })
+		.locator('input')
+		.check();
+	await page.reload();
+	await page.waitForFunction(() =>
+		/ layouts compared on /.test(document.getElementById('la-status').textContent)
+	);
+	assert.match(
+		await page.textContent('#la-status'),
+		/^1 layouts compared on /,
+		'a saved selection is kept'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
 }
 
 /**
@@ -1338,7 +1450,11 @@ async function exerciseComparerPicker(browser, origin) {
 		const errors = [];
 		page.on('pageerror', (error) => errors.push(error.message));
 		await page.goto(`${origin}/ui/layout_analysis/index.html?lang=en&corpus=fr_nemolivier`);
-		await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+		await page.waitForFunction(
+			() =>
+				document.querySelectorAll('#la-table tbody tr').length > 0 &&
+				document.getElementById('la-results').getAttribute('aria-busy') === 'false'
+		);
 		if (colorScheme === 'light') {
 			// One picker (maintainer, 2026-11-18): no language or kind filter beside it.
 			assert.equal(
@@ -1445,7 +1561,11 @@ async function exerciseStudioComparer(page) {
 			if (posted.action === 'studio_corpus' && posted.id === id)
 				window.studioCorpus({ request: posted.request, ok: true });
 	}, corpus);
-	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	await page.waitForFunction(
+		() =>
+			document.querySelectorAll('#la-table tbody tr').length > 0 &&
+			document.getElementById('la-results').getAttribute('aria-busy') === 'false'
+	);
 	// English strings: the comparer reports its analysis, not a failure.
 	assert.match(
 		await page.evaluate(() => document.getElementById('la-status').textContent),
@@ -1474,7 +1594,11 @@ async function exerciseStudioComparer(page) {
 		'ANSI ticks their ANSI versions'
 	);
 	await page.selectOption('#la-keyboard', 'iso');
-	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	await page.waitForFunction(
+		() =>
+			document.querySelectorAll('#la-table tbody tr').length > 0 &&
+			document.getElementById('la-results').getAttribute('aria-busy') === 'false'
+	);
 	// (dead-key-legend) Ergopti's heatmap shows its dead keys as bare accents, marked.
 	await page.evaluate(() =>
 		[...document.querySelectorAll('#la-table tbody tr')]
@@ -2891,7 +3015,11 @@ async function exerciseComparerLink(browser, origin) {
 	});
 	const choices = async (query) => {
 		await page.goto(`${origin}/ui/layout_analysis/index.html?lang=en&${query}`);
-		await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+		await page.waitForFunction(
+			() =>
+				document.querySelectorAll('#la-table tbody tr').length > 0 &&
+				document.getElementById('la-results').getAttribute('aria-busy') === 'false'
+		);
 		return [
 			await page.inputValue('#la-corpus'),
 			await page.inputValue('#la-keyboard'),
@@ -3369,6 +3497,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseShortcuts(browser, origin);
 		await exerciseComparerLink(browser, origin);
 		await exerciseComparerPicker(browser, origin);
+		await exerciseComparerWholeLibrary(browser, origin);
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);

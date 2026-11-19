@@ -153,7 +153,14 @@
 	// How many characters « typed via » lists, most frequent first.
 	const TYPING_ROWS = 12;
 	// Layouts ticked on a first visit: the registry and the two references.
-	const DEFAULT_ORIGINS = ['registry', 'reference'];
+	// The layouts scored between two yields to the page: one slice stays a short
+	// task (each layout takes some 6 to 50 ms, by the corpus), so the page
+	// answers while the whole library is scored and shows it as it comes.
+	const ANALYSE_SLICE = 4;
+	// The ranking is drawn again at most this often while the slices run (ms).
+	const PARTIAL_RENDER_MS = 400;
+	// The collapsed layout list names this many compared layouts, then counts the rest.
+	const SUMMARY_NAMES = 8;
 	const CHART_MAX_BARS = 40;
 	// Widest size of one key unit of the heatmap, in pixels; narrower screens
 	// shrink the whole board instead of scrolling it.
@@ -961,11 +968,13 @@
 		const byId = new Map(layouts.map((layout) => [layout.id, layout]));
 
 		/**
-		 * The layouts ticked until the user chooses (maintainer, 2026-11-15): the
-		 * registry, reference and personal layouts, but of a family that ships
-		 * one layout per board (Ergopti and Ergopti ANSI) only the one of the
-		 * chosen keyboard's geometry; the other stays listed, unticked. A board
-		 * with no row-staggered geometry (split, ortholinear) takes ISO's.
+		 * The layouts ticked until the user chooses: every layout the page lists
+		 * (maintainer, 2026-11-18, after the registry and reference ones of
+		 * 2026-11-15), but of a family that ships one layout per board (Ergopti
+		 * and Ergopti ANSI) only the one of the chosen keyboard's geometry; the
+		 * other stays listed, unticked. A board with no row-staggered geometry
+		 * (split, ortholinear) takes ISO's. The page scores them by slices
+		 * (ANALYSE_SLICE), so the whole library keeps it responsive.
 		 * @param {string} keyboard A model keyboard id.
 		 * @returns {Set<string>} The ids to tick.
 		 */
@@ -977,12 +986,7 @@
 				layout.geometry !== '' &&
 				layout.geometry !== geometry &&
 				layouts.some((other) => other.family === layout.family && other.geometry === geometry);
-			return new Set(
-				layouts
-					.filter((l) => DEFAULT_ORIGINS.includes(l.origin) || l.origin === 'user')
-					.filter((l) => !otherBoard(l))
-					.map((l) => l.id)
-			);
+			return new Set(layouts.filter((l) => !otherBoard(l)).map((l) => l.id));
 		}
 		const corpora = (HOST.corpora || [])
 			.map((corpus) => ({ id: corpus.id, title: corpus.title, host: corpus }))
@@ -1295,9 +1299,25 @@
 		/** The collapsed list's line: how many layouts are compared, and which. */
 		function showLayoutsSummary() {
 			const names = layouts.filter((l) => state.selected.has(l.id)).map((l) => l.name);
-			$('la-layouts-summary').textContent = t('layout_analysis.layouts.summary', {
-				count: names.length,
-				names: names.join(', ')
+			$('la-layouts-summary').textContent =
+				names.length > SUMMARY_NAMES
+					? t('layout_analysis.layouts.summary_more', {
+							count: names.length,
+							names: names.slice(0, SUMMARY_NAMES).join(', '),
+							more: names.length - SUMMARY_NAMES
+						})
+					: t('layout_analysis.layouts.summary', {
+							count: names.length,
+							names: names.join(', ')
+						});
+		}
+
+		/** Gives the page a turn (input, paint) before the next slice of scoring. */
+		function nextTask() {
+			return new Promise((resolve) => {
+				const channel = new MessageChannel();
+				channel.port1.onmessage = () => resolve();
+				channel.port2.postMessage(null);
 			});
 		}
 
@@ -1317,7 +1337,6 @@
 				return;
 			}
 			if (mine !== generation) return;
-			setBusy(false);
 			state.tables = tables;
 			state.rawTables = raw;
 			state.words = tables ? corpusWords() : null;
@@ -1332,6 +1351,7 @@
 						plusById.set(plus.id, plus);
 					}
 			if (!tables || chosen.length + plusById.size === 0) {
+				setBusy(false);
 				state.results = [];
 				showStatus(t('layout_analysis.status.empty'));
 				render();
@@ -1339,20 +1359,34 @@
 			}
 			const start = performance.now();
 			const options = analysisOptions();
-			state.results =
-				plusById.size === 0
-					? E.compare(chosen, tables, options)
-					: E.rank(
-							chosen
-								.map((layout) => E.analyse(layout, tables, options))
-								.concat(Array.from(plusById.values(), (layout) => E.analyse(layout, raw, options)))
-						);
-			const ms = Math.round(performance.now() - start);
+			// Each layout on its text: the « + » layouts on the keys typed.
+			const pending = chosen
+				.map((layout) => [layout, tables])
+				.concat(Array.from(plusById.values(), (layout) => [layout, raw]));
 			// The compared layouts themselves (rows, dead keys…), for extra scorers.
-			const compared = new Map(
-				chosen.concat(Array.from(plusById.values())).map((layout) => [layout.id, layout])
-			);
+			const compared = new Map(pending.map(([layout]) => [layout.id, layout]));
 			state.compared = compared;
+			const scored = [];
+			let drawn = start;
+			for (let at = 0; at < pending.length; at += ANALYSE_SLICE) {
+				for (const [layout, table] of pending.slice(at, at + ANALYSE_SLICE))
+					scored.push(E.analyse(layout, table, options));
+				if (scored.length === pending.length) break;
+				showStatus(
+					t('layout_analysis.status.scoring', { done: scored.length, count: pending.length })
+				);
+				// The ranking so far, drawn now and then while the rest is scored.
+				if (performance.now() - drawn >= PARTIAL_RENDER_MS) {
+					state.results = E.rank(scored.slice());
+					render();
+					drawn = performance.now();
+				}
+				await nextTask();
+				if (mine !== generation) return;
+			}
+			state.results = E.rank(scored);
+			setBusy(false);
+			const ms = Math.round(performance.now() - start);
 			for (const listener of resultListeners)
 				listener(state.results, tables, {
 					keyboard: state.keyboard,

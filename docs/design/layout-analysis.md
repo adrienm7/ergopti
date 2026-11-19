@@ -1043,10 +1043,20 @@ each tab's analysis layout after its autosave delay (`publishEditorLayouts`),
 and the Comparer follows (`onEditorLayouts`: the same page through an event, the
 site's other frame through localStorage and its `storage` event).
 Until the user ticks or unticks a layout, the ticked layouts follow the
-keyboard: the registry, reference and personal layouts, but of a family that
-ships one layout per board (registry `geometry`: Ergopti and Ergopti ANSI)
-only the one of the keyboard's geometry, ISO for a split or ortholinear board;
-the other stays listed, unticked. The page also
+keyboard: every layout listed (maintainer, 2026-11-18: the whole library, the
+references and the user's own), but of a family that ships one layout per
+board (registry `geometry`: Ergopti and Ergopti ANSI) only the one of the
+keyboard's geometry, ISO for a split or ortholinear board; the other stays
+listed, unticked. A saved selection stays the user's. Scoring the 171 library
+layouts takes 1.1 to 3.3 s of engine time (V8, 2026-11-18: some 6 ms a layout
+on a book, 20 ms on a million Wikipedia sentences), too long for one task, so
+`analyse` scores `ANALYSE_SLICE` (4) layouts at a time and yields to the page
+between slices (a `MessageChannel` turn, not a clamped timer): the status counts
+« Scoring the layouts: n of N », the ranking so far is drawn at most every
+`PARTIAL_RENDER_MS` (400), the results stay `aria-busy` until the last slice,
+and a newer choice abandons the running pass. The chart keeps its 40 best bars
+(`CHART_MAX_BARS`); the table sorts, its « Layouts shown » filters narrow it and
+the user's layouts keep their accent. The page also
 listens for the app's `studio-ngrams` DOM event (`detail` = the keystats tables)
 and turns it into the « My typing » corpus (`my_typing`), the default in the
 app. A host that inlines its pages defines `loadCorpus(id)` (a promise resolved
