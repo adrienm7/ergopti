@@ -134,11 +134,13 @@
 					</span>
 				</span>
 			</strong>
-			<p id="ergopti-subtitle">
+			<!-- A tagline, not a paragraph: the wide spacing setting's 2 em under
+			     each paragraph would make the wrapped header taller still. -->
+			<div id="ergopti-subtitle">
 				<strong class="min-width-300" style="font-size:1.1em"
 					>Optimisation de l’ergonomie clavier</strong
 				>
-			</p>
+			</div>
 		</div>
 	</div>
 	<A11ySettings />
@@ -222,13 +224,19 @@
 	/* Sticky in the page's flow and at least --header-height tall, not fixed
 	   at that height over a spacer of the same height: with 200 % text or the
 	   wide spacing the title wrapped out of a fixed box, above the window and
-	   over the page (tools/test/browser/site-reading.cjs). */
+	   over the page (tools/test/browser/site-reading.cjs).
+	   It wraps: with 200 % text on a phone the title alone fills the width, so
+	   the accessibility button and the menu icon go to a second row, right
+	   aligned by the button's auto margin, instead of past the window's edge
+	   where the whole page scrolled sideways (WCAG 1.4.10, the « reflow »
+	   check of site-reading.cjs). */
 	header {
 		align-items: center;
 		backdrop-filter: blur(30px);
 		background-color: var(--header-color);
 		box-shadow: 0px 0px 5px 2px var(--couleur-ombre);
 		display: flex;
+		flex-wrap: wrap;
 		justify-content: space-between;
 		margin: 0;
 		min-height: var(--header-height);
@@ -257,10 +265,14 @@
 =============================
 */
 
+	/* Alone on its row, the title may still be wider than the window (the
+	   logo and one long word at 200 % text): it shrinks and breaks that word
+	   rather than overflow, as a flex item's min-content would make it. */
 	#ergopti-header {
 		align-items: center;
 		display: flex;
 		margin-left: calc(0.125 * var(--header-height));
+		min-width: 0;
 	}
 
 	#ergopti-header .logo {
@@ -271,6 +283,8 @@
 	#ergopti-header #ergopti-title {
 		margin-left: calc(0.1 * var(--header-height));
 		margin-top: 1px; /* Looks better as the (i) takes vertical space */
+		min-width: 0;
+		overflow-wrap: break-word;
 	}
 
 	#ergopti-header #ergopti-subtitle {
