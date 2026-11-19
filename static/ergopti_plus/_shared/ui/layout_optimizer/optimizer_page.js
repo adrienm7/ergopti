@@ -274,6 +274,11 @@
 		<ul id="lo-settings-list" class="lo-settings-list"></ul>
 		<button type="button" id="lo-settings-edit" data-i18n="layout_optimizer.settings.edit"></button>
 	</div>
+	<p class="lo-method">
+		<label for="lo-method" data-i18n="layout_optimizer.method.label"></label>
+		<select id="lo-method" aria-describedby="lo-method-help"></select>
+	</p>
+	<p id="lo-method-help" class="lo-muted lo-method-help"></p>
 	<details class="lo-advanced">
 		<summary data-i18n="layout_optimizer.budget.advanced"></summary>
 		<div class="lo-row">
@@ -303,6 +308,7 @@
 </section>
 <section id="lo-result" class="lo-card lo-step lo-step-result" aria-labelledby="lo-result-title" hidden>
 	<h2 id="lo-result-title" data-i18n="layout_optimizer.result.title"></h2>
+	<p id="lo-result-method" class="lo-muted"></p>
 	<div id="lo-score" class="lo-tiles"></div>
 	<figure id="lo-chart" class="lo-chart" aria-labelledby="lo-chart-title" hidden>
 		<figcaption id="lo-chart-title" data-i18n="layout_optimizer.chart.title"></figcaption>
@@ -897,6 +903,44 @@
 			select.value = kept;
 		}
 
+		/**
+		 * The search methods (O.METHODS), the default one marked; the reader's
+		 * choice is kept across a change of language.
+		 */
+		function fillMethods() {
+			const select = $('lo-method');
+			const kept = select.value || O.DEFAULT_METHOD;
+			select.replaceChildren(
+				...O.METHODS.map((id) => {
+					const name = t(`${PREFIX}method.${id}.label`);
+					const option = el(
+						'option',
+						'',
+						id === O.DEFAULT_METHOD ? t(`${PREFIX}method.default`, { name }) : name
+					);
+					option.value = id;
+					return option;
+				})
+			);
+			select.value = O.METHODS.includes(kept) ? kept : O.DEFAULT_METHOD;
+			syncMethod();
+		}
+
+		/** The chosen method's short explanation, and its « i » saying how it searches. */
+		function syncMethod() {
+			const id = $('lo-method').value;
+			const values = O.METHOD_PARAMETERS[id];
+			$('lo-method-help').textContent = t(`${PREFIX}method.${id}.help`, values);
+			const why = window.LAYOUT_ANALYSIS_INFO.note(
+				t(`${PREFIX}method.info_label`, { name: t(`${PREFIX}method.${id}.label`) }),
+				t(`${PREFIX}method.${id}.info`, values)
+			);
+			why.id = 'lo-method-info';
+			const old = $('lo-method-info');
+			if (old) old.replaceWith(why);
+			else $('lo-method').after(why);
+		}
+
 		function fillSwitches() {
 			const box = $('lo-switches');
 			const checked = {};
@@ -1444,6 +1488,7 @@
 			state.startInUse = start;
 			endLibrary();
 			$('lo-result').hidden = false;
+			$('lo-result-method').textContent = '';
 			$('lo-open-editor').disabled = true;
 			$('lo-open-comparer').disabled = true;
 			state.weightInUse = weight;
@@ -1486,6 +1531,7 @@
 					restarts: part.restarts,
 					firstRestart: part.firstRestart,
 					iterations,
+					method: $('lo-method').value,
 					startMode: root.querySelector('input[name="lo-start-mode"]:checked').value,
 					timeBudgetMs: seconds * 1000,
 					identity,
@@ -1565,6 +1611,10 @@
 			if (running.finished === running.shares.length) {
 				chartProgress(running, began, true);
 				const winner = O.bestOf(running.shares.map((entry) => entry.result));
+				// The method the search itself reports, not the list's value: what really ran.
+				$('lo-result-method').textContent = t(`${PREFIX}result.method`, {
+					name: t(`${PREFIX}method.${winner.method}.label`)
+				});
 				showBest(winner.layout, winner.engineScore, true, true, winner.change);
 				finish(running, began, null);
 				scanLibrary(winner.layout, winner.engineScore);
@@ -2411,6 +2461,7 @@
 				restarts: $('lo-restarts').value,
 				seed: $('lo-seed').value,
 				accuracy: $('lo-accuracy').value,
+				method: $('lo-method').value,
 				changeWeight: $('lo-change-weight').value,
 				changeLimit: $('lo-change-limit').checked,
 				changeMax: $('lo-change-max').value,
@@ -2455,6 +2506,8 @@
 				if (typeof saved[id] === 'string' && /^\d+$/.test(saved[id]))
 					$(`lo-${id}`).value = saved[id];
 			choose('lo-accuracy', saved.accuracy);
+			choose('lo-method', saved.method);
+			syncMethod();
 			const weight = Number(saved.changeWeight);
 			if (typeof saved.changeWeight === 'string' && weight >= 0 && weight <= CHANGE.maxWeight)
 				$('lo-change-weight').value = saved.changeWeight;
@@ -2479,6 +2532,7 @@
 
 		function bind() {
 			$('lo-corpus').addEventListener('change', syncCorpus);
+			$('lo-method').addEventListener('change', syncMethod);
 			let textTimer = null;
 			$('lo-text').addEventListener('input', (event) => {
 				clearTimeout(textTimer);
@@ -2558,6 +2612,7 @@
 			fillCorpora();
 			fillStarts();
 			fillKeyboards();
+			fillMethods();
 			fillSwitches();
 			fillPresets();
 			fillChangePresets();

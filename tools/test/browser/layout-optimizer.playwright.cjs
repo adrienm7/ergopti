@@ -434,6 +434,69 @@ async function exerciseThumbKeys(browser, origin) {
  * the keys it moves in words, and buttons that open that very layout in the
  * editor or the Comparer.
  */
+/**
+ * The search method list: every method of the core is offered, the default
+ * one marked, each with its explanation and « i »; the method chosen is the
+ * one the search reports it ran (the result says so), and a reload keeps it.
+ */
+async function exerciseSearchMethod(browser, origin) {
+	const { page, errors, context } = await open(browser, origin);
+	const methods = await page.evaluate(() => Array.from(window.LAYOUT_OPTIMIZER.METHODS));
+	const fallback = await page.evaluate(() => window.LAYOUT_OPTIMIZER.DEFAULT_METHOD);
+	const options = await page.$$eval('#lo-method option', (nodes) =>
+		nodes.map((node) => ({ value: node.value, text: node.textContent }))
+	);
+	assert.deepEqual(
+		options.map((option) => option.value),
+		methods,
+		'the list offers every method'
+	);
+	assert.equal(await page.inputValue('#lo-method'), fallback, 'the default method is chosen');
+	assert.match(
+		options.find((option) => option.value === fallback).text,
+		/\(default\)$/,
+		'the default method is marked'
+	);
+	const seen = new Set();
+	for (const method of methods) {
+		await page.selectOption('#lo-method', method);
+		const help = await page.locator('#lo-method-help').textContent();
+		const note = await page.locator('#lo-method-info').getAttribute('data-note');
+		assert.ok(help && !help.startsWith('layout_optimizer.'), `${method} is explained: ${help}`);
+		assert.ok(note && !note.startsWith('layout_optimizer.'), `${method} has its « i »`);
+		assert.ok(!seen.has(help), `${method} has its own explanation`);
+		seen.add(help);
+	}
+	assert.equal(
+		await page.getAttribute('#lo-method', 'aria-describedby'),
+		'lo-method-help',
+		'the list is described by the explanation'
+	);
+	await page.selectOption('#lo-corpus', 'custom');
+	await page.fill('#lo-text', TEXT);
+	await page.waitForFunction(() =>
+		/characters, counted/.test(document.querySelector('#lo-text-status').textContent)
+	);
+	await shortBudget(page);
+	for (const [method, name] of [
+		['tabu', 'Tabu search'],
+		['genetic', 'Genetic algorithm']
+	]) {
+		await page.selectOption('#lo-method', method);
+		assert.match(await runToEnd(page), /^Done/, `a ${method} run ends`);
+		assert.equal(
+			await page.locator('#lo-result-method').textContent(),
+			`Found by: ${name}`,
+			`the run used ${method}`
+		);
+	}
+	await page.reload();
+	await page.waitForFunction(() => document.querySelector('#lo-method option'));
+	assert.equal(await page.inputValue('#lo-method'), 'genetic', 'the method is kept');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 async function exerciseResultsShelf(browser, origin) {
 	const { page, errors, context } = await open(browser, origin);
 	assert.equal(await page.isHidden('#lo-shelf'), true, 'no shelf before a run');
@@ -1148,6 +1211,7 @@ async function main() {
 
 		// ======= 4g/ The results shelf =======
 		await exerciseResultsShelf(browser, origin);
+		await exerciseSearchMethod(browser, origin);
 		await exerciseChangePenalty(browser, origin);
 
 		// ======= 4h/ The result boards as a table =======

@@ -435,6 +435,28 @@ body:has(> main.layout-optimizer) {
 	border-color: var(--lo-accent);
 }
 
+/* The search method: its label, the list and its « i » on one line while they fit. */
+.lo-method {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--lo-space-2);
+	margin: var(--lo-space-4) 0 0;
+}
+
+.lo-method label {
+	font-weight: 600;
+}
+
+.lo-method select {
+	max-width: 100%;
+}
+
+.lo-method-help {
+	font-size: 0.92em;
+	margin: var(--lo-space-1) 0 0;
+}
+
 .lo-advanced {
 	border-bottom: 1px solid var(--lo-border);
 	border-top: 1px solid var(--lo-border);

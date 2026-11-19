@@ -501,6 +501,17 @@ module.exports = [
 			])
 	},
 	{
+		prefix: 'layout_optimizer.method.',
+		files: [OPTIMIZER],
+		source: 'optimizer_core.js METHODS',
+		keys: () =>
+			withEndings('layout_optimizer.method.', ctx.literal(OPTIMIZER_CORE, 'METHODS'), [
+				'.label',
+				'.help',
+				'.info'
+			])
+	},
+	{
 		prefix: 'layout_optimizer.qwerty.preset.',
 		files: [OPTIMIZER],
 		source: 'optimizer_core.js QWERTY_PIN_PRESETS',

@@ -41,7 +41,8 @@ var LAYOUT_OPTIMIZER_RUNNER = (function () {
 	 *   problem's constraints), tables (n-gram counts), analysis (analyse()
 	 *   options: weights, keyboard, format), share (0 < share ≤ 1 of each
 	 *   n-gram table the search scores on), seed, restarts, firstRestart,
-	 *   iterations, startMode ('layout' | 'random'), timeBudgetMs?, identity
+	 *   iterations, method (one of LAYOUT_OPTIMIZER.METHODS), startMode
+	 *   ('layout' | 'random'), timeBudgetMs?, identity
 	 *   ({id, name} of the result), changeWeight (score points per % of the
 	 *   corpus's characters moved from the start, LAYOUT_OPTIMIZER.changeCost;
 	 *   0 for none)}. A progress message with a new best carries its layout
@@ -74,6 +75,7 @@ var LAYOUT_OPTIMIZER_RUNNER = (function () {
 				restarts: request.restarts,
 				firstRestart: request.firstRestart,
 				iterations: request.iterations,
+				method: request.method,
 				start: request.startMode,
 				timeBudgetMs: request.timeBudgetMs,
 				changeWeight: request.changeWeight,
