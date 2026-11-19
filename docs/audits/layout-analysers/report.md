@@ -41,6 +41,7 @@ Points that could not be confirmed in a primary source are marked
 | Colemak Mod-DH            | https://github.com/ColemakMods/mod-dh, `gh-pages` branch                                | 1d23c82 (2026-10)  |
 | Keyboard Layouts Doc      | Markdown port https://github.com/aoi-buh/Keyboard-Layouts-Doc                           | aad1ded (2024-12)  |
 | bepo.fr tools             | https://bepo.fr/wiki/Outils                                                             | fetched 2026-11-14 |
+| Cyanophage optimiser      | https://github.com/cyanophage/cyanophage.github.io (no licence file)                    | b02780b (2026-06)  |
 
 ## 1. Keyboard Layout Analyzer (KLA)
 
@@ -286,7 +287,48 @@ r³·skip3)` with `r = 1/7`, times the distance scaled by `5.5/finger weight`;
   Nicolas Brodu's comparator, mostly behind dead links; the bépo method is
   corpus → symbol and digram statistics → key accessibility costs → global
   cost. xlamorlette/optimiseur-clavier only optimises the left/right split.
-- **Not found:** a200, « Pinelyzer », playground.colemak.com.
+- **Not found:** « Pinelyzer », playground.colemak.com. a200 was found later
+  (ClemenPine's final variant in https://github.com/Waterdragen/akl-ws,
+  GPL-3.0) and is reproduced (docs/design/analyser-scores.md).
+
+### Found by the search of 2026-11-19
+
+A second search (GitHub API and repository metadata, crates.io, npm, web
+search; Reddit could not be searched from the session, so a tool known only
+there may be missing) found these. Licence is the repository's licence file;
+« none » means none is published (all rights reserved). Activity is the last
+push.
+
+| Tool                                                                                                     | Licence, language, activity     | What it measures                                                                                                                                                                                                                                                                                                                                                                            | Score                                                                                          |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Cyanophage playground and optimiser**, https://cyanophage.github.io, `cyanophage/cyanophage.github.io` | none, JavaScript, 2026-06       | Playground: SFB and SFB of two rows, SFS, LSB, scissors, wide and pinky–ring scissors, pinky off home, finger, row and column use, travel distance, trigram classes (alternation, rolls, redirects, weak redirects), same-hand runs; word lists in 15 languages (French included). Optimiser: the eleven terms of its score.                                                                | Optimiser only: `Σ max(0, (metric − floor) · weight)`, lower is better. **Reproduced, exact.** |
+| **Alt Alpha Ranker**, altalpha.timvink.nl, `timvink/alt_alpha_ranker`                                    | none, 2026-11                   | Cyanophage's figures (SFB, SFS, LSB, scissors, inward rolls, alternation, redirects, pinky) of many layouts.                                                                                                                                                                                                                                                                                | Each metric normalised against QWERTY, `100 · Σ w·norm / Σ w`, presets.                        |
+| **LayerBench**, https://layerbench.github.io, `rafaelromao/layerbench`                                   | MIT, TypeScript, 2026-11, web   | Simulates ZMK keymaps (layers, combos, adaptive and repeat keys, caps word); the Keyboard Layouts Doc metrics plus effort (cyanophage's key costs and thumbs).                                                                                                                                                                                                                              | Two numbers, effort and SFB.                                                                   |
+| **keycraft**, `rbscholtus/keycraft`                                                                      | BSD-3-Clause, Go, 2026-11       | 29 metrics after the Keyboard Layouts Doc; Shai, MonkeyRacer and AKL corpora.                                                                                                                                                                                                                                                                                                               | Weighted sum after robust scaling (median, interquartile range) over its own layout set.       |
+| **shirolyzer**, `akai-hana/shirolyzer`                                                                   | none, Rust, 2026-11, CLI        | Analyser and generator with context-dependent alternative fingering, YAML geometry, preference tiers for rolls, redirects and scissors; Shai and Douglas corpora.                                                                                                                                                                                                                           | A score with « primary sacrifice » limits.                                                     |
+| **GULAG**, `RusDoomer/GULAG` (and its Nim port **kblag**, `greenm01/kblag`, MIT)                         | GPL-3.0, C/OpenCL, 2026-10      | GPU analyse, compare, rank, generate; mono-, bi-, tri-, quad- and skipgrams.                                                                                                                                                                                                                                                                                                                | Weighted sum from a weights file.                                                              |
+| **Oxeylyzer 2**, https://o2.oxey.dev                                                                     | none, Rust/web, 2026-03         | The Oxeylyzer model on the web; its trigram weights are not used in its score yet. Oxeylyzer 1 now ships a Tauri desktop app (already reproduced).                                                                                                                                                                                                                                          | As Oxeylyzer.                                                                                  |
+| **perky**, `csmclaren/perky` (crates.io)                                                                 | MIT, Rust, 2025-09, CLI         | Exhaustive evaluation by permutation over n-gram tables; many metrics, sort and filter, JSON output.                                                                                                                                                                                                                                                                                        | None (multi-key sort).                                                                         |
+| **klayan**, `Lysquid/klayan`                                                                             | MIT, Rust, 2025-08, CLI         | A port of the Ergo-L analyser with nested dead keys, on Kalamine layouts and corpus files.                                                                                                                                                                                                                                                                                                  | None, as Ergo-L.                                                                               |
+| **keyboard-layout-battles**, `malfple/keyboard-layout-battles`                                           | MIT, Rust, 2025-11, web         | Human comparisons of two layouts.                                                                                                                                                                                                                                                                                                                                                           | Elo rating, not computed from metrics.                                                         |
+| **AdNW `opt`** (Andreas Wettstein), http://509.ch/opt.htm, mirror `christophkroeppl/opt`                 | BSD-2-Clause, C, mirror 2026-09 | The weighted-cost optimiser behind AdNW and KOY.                                                                                                                                                                                                                                                                                                                                            | Weighted cost.                                                                                 |
+| **evolve-keyboard-layout** (ArneBab), hg.sr.ht/~arnebab/evolve-keyboard-layout                           | **unverified**, Python          | Neo community optimiser, ancestor of Keyboard Layout Optimizer.                                                                                                                                                                                                                                                                                                                             | Weighted cost.                                                                                 |
+| **SteveP's keyboard-layout-analysis-tool**, `stevep99/keyboard-layout-analysis-tool`                     | none, Kotlin, 2024-01           | The engine of colemakmods.github.io/mod-dh/analyze.html: key effort against frequency, SFB and awkward-bigram penalties (section 8, « Colemak Mod-DH site »).                                                                                                                                                                                                                               | Effort.                                                                                        |
+| **chogalyzer**, `Lenchog/chogalyzer`                                                                     | none, Rust, 2026-06             | Analyser and generator with magic-key rules; no documentation.                                                                                                                                                                                                                                                                                                                              | **unverified**                                                                                 |
+| Smaller or dormant                                                                                       |                                 | keyboard-genetics (`kaievns`, the optimiser behind Halmak, 2016), yak-layout (`wincent`, MIT), keyrita-core (`kayoscode`), d3dat/keyboard-layout-analyzer (MIT, Russian), keynergy / kcli (dormant since 2022), bclnr/kb-layout-evaluation (MIT), matey-jack/keylayout-eval (MIT), kanalyzer, ergoanalyzer, a Vue remake of KLA, Thai, pinyin and Russian tools built on dariogoetz, klopt. | —                                                                                              |
+
+Corrections to the entries above: Keysolve's live repositories are
+`GalileoBlues/keysolve-web` (GPL-3.0) and `GalileoBlues/Keysolve2` (a mirror
+kept with permission, no licence); Halmak is `kaievns/halmak` (MIT); keygen,
+km_metrics and SteveP's KLA fork publish no licence file. No trace was found of
+« Pinelyzer », rulyzer, optimak, kloak, KLAtest, Oxidizer, mana, a genkey port
+in Rust, or an analyser on Getreuer's site or on layouts.wiki (guides only).
+
+Of these, the Cyanophage optimiser is now reproduced (it has a single score,
+a public formula and word lists in French). keycraft could not be built here
+(no Go toolchain on this PC) and its score is relative to its own layout set;
+shirolyzer's score is undocumented and changes every week: both are TODO, with
+a recommendation in section 10.
 
 ## 9. Comparison
 
@@ -307,6 +349,47 @@ r³·skip3)` with `r = 1/7`, times the distance scaled by `5.5/finger weight`;
 | Coverage, compact boards, shortcuts  | no                 | no       | warning only      | no     | no        | no    | no         | yes                |
 | One global score, editable weights   | fixed              | fixed    | none              | yes    | yes       | none  | yes        | yes, contributions |
 | Layout library                       | 107                | many     | 22                | 30     | 815       | 4 121 | some       | 165                |
+
+### Fidelity of the reproductions shown in the Studio
+
+The Studio shows each analyser's own score beside Ergopti's
+(docs/design/analyser-scores.md, `analyser_scores.js`). Each was checked
+against the real tool, run locally on our texts (`node
+tools/dev/verify-analyser-scores.cjs`, maintainer tool; the texts are the
+shippable ones of `static/corpus`: _Alice_, _Sherlock Holmes_, 20 English
+Wikipedia articles, the Python source of rich, _Germinal_; no third-party
+corpus is stored). A gap is ours minus the tool's, in the tool's own unit;
+« before » is the reproduction before the fix of that date. A tolerance is
+never chosen: it is the tool's printed rounding, the floating point of two
+summation orders, or the named approximation.
+
+| Analyser (how checked)                                                                       | Points    | Metric                                                                      | Mean gap                                                 | Largest gap                       | Source of the gap left                                                                                                  |
+| -------------------------------------------------------------------------------------------- | --------- | --------------------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| KLA (its own `analyzer.js`, run on the same texts in an earlier session)                     | 5 vectors | score (parts not printed)                                                   | < 5e-5 (1e-9 on `the`)                                   | < 5e-5                            | its 4-decimal print                                                                                                     |
+| SteveP's KLA (its own code)                                                                  | 5 vectors | score                                                                       | < 5e-5                                                   | < 5e-5                            | 4-decimal print                                                                                                         |
+| KLAnext (its site, closed source; 14 presets × 9 layouts)                                    | 126       | Overall / Distance / Same Finger / Same Hand                                | 0.0024 / 0.0022 / 0.0024 / 0.0027                        | 0.005 each                        | its 2-decimal print, with its own layout files; with our library's layouts (other keys for brackets): 0.18 % on Overall |
+| Oxeylyzer (its REPL, 5a85ca0; 4 texts × 18 layouts)                                          | 72        | Score                                                                       | 0.0032 (0.0044 before 2026-11-19)                        | 0.012                             | skip-2/3 grams taken as skip-1; its truncated saved counts depend on bits of a total the chain only estimates           |
+|                                                                                              |           | SFB / finger speed / stretches (points of its %)                            | 0.003 / 0.03 / 0.04 (0.007 / 0.04 / 0.08 before)         | 0.010 / 0.08 / 0.15               | as above                                                                                                                |
+|                                                                                              |           | inrolls / outrolls / alternates / redirects / bad redirects                 | 0.07 / 0.07 / 0.09 / 0.02 / 0.002                        | 0.19 / 0.21 / 0.29 / 0.06 / 0.015 | the truncation above (code text: 73 % of its trigrams lose a count at its total)                                        |
+| genkey (its build, f1f4173; 5 texts × 28 layouts)                                            | 140       | Score                                                                       | 1.3 % (1.4 % before 2026-11-19, 5.5 % before 2026-11-18) | 8.3 % (9.9 %)                     | skipgrams of gap 2 to 9 carried by the trigrams' chain (exact skipgrams give its output to 9 decimals)                  |
+|                                                                                              |           | finger speed per finger                                                     | 0.05–0.11                                                | 1.6 (pinkies)                     | same                                                                                                                    |
+|                                                                                              |           | index use / SFB / LSB (points)                                              | 0.02 / 0.0002 / 0.002 (index 0.05, max 2.4 before)       | 0.05 / 0.0005 / 0.005             | its printed rounding (1, 3 and 2 decimals)                                                                              |
+| keygen (its build, 37ae949; 5 texts × 17 layouts; 4 short texts to 1e-9 in the gate)         | 85        | penalty per character (it prints no part)                                   | 0.11 % (its layouts), 0.09 % (ours)                      | 0.34 %                            | its four-key runs estimated from trigrams                                                                               |
+| carpalx (Perl 0.12, its `carpalx.conf`; 5 texts × 10 keyboards)                              | 50        | effort / base / penalty / path                                              | 0.007 / 0.003 / 0.003 / 0.002 (0.31 % on effort)         | 0.028 / 0.007 / 0.027 / 0.008     | letter triads across a deleted run, carried by the trigrams' chain                                                      |
+| Keyboard Layout Optimizer (its `evaluate`, 8c8ec9f; 5 texts × 8 layouts)                     | 40        | total cost and each of its 12 weighted metrics                              | < 1e-9                                                   | < 1e-9                            | floating point                                                                                                          |
+| cmini (its `util/analyzer.py`; 5 texts × 13 layouts)                                         | 65        | SFB, alternation, rolls, one-hands, redirects, bad redirects, SFS, hand use | < 1e-14                                                  | 7e-15                             | floating point                                                                                                          |
+| a200 (its `src/analyzer.py`, AVG mode; 5 texts × 10 layouts)                                 | 50        | its 16 statistics                                                           | < 1e-14                                                  | 1.4e-14                           | floating point                                                                                                          |
+| Ergo-L analyser and Kalamine statistics (its own `layout-analyzer.js` on its en+fr tables)   | 2 vectors | SFB, SKB, LSB, scissors, rolls, SFS, SKS, redirects, finger and hand load   | < 1e-6 (Ergo-L), < 1e-4 (QWERTY)                         | 0.001 (load)                      | its 6- and 4-decimal output; its rounded tables sum to slightly less than 100                                           |
+| **Cyanophage optimiser** (its own `optimiser.js` and `worker.js`; 6 word lists × 10 layouts) | 60        | score                                                                       | 0.79 %                                                   | 3.7 % (code)                      | a slip of its worker (a bigram with a character the layout lacks reads the previous bigram's key); without it 1e-9      |
+|                                                                                              |           | SFB, pSFB, rSFB, pinky–ring scissors, SFS, effort, vowels, hand balance     | < 1e-9                                                   | < 1e-9                            | floating point                                                                                                          |
+|                                                                                              |           | scissors / wide scissors / LSB (points of its %)                            | 0.09 / 0.09 / 0.21                                       | 0.55 / 0.73 / 1.10                | the same slip                                                                                                           |
+
+Kalamine's statistics are the Ergo-L analyser's code (section 4); its Python
+package computes none, so the Ergo-L check covers both. Not reproduced:
+keycraft (Go, its score scales each metric against its own layout set: no Go
+toolchain here), shirolyzer (undocumented score), LayerBench (ZMK keymap
+simulation, two numbers), Keysolve 2 and trialyzer (no score of their own,
+section 8 and docs/design/analyser-scores.md « Not covered »).
 
 ## 10. What the Ergopti engine takes and adds
 
@@ -366,11 +449,56 @@ below are where the tools disagree.
   the 30-key base layer only), French and accented text, Shift and AltGr cost,
   coverage and compact-keyboard fitness, shortcut placement, in the browser and
   in the app with no install; Oxeylyzer's and genkey's distance-weighted finger
-  speed is the one model this engine does not reproduce (it reports SFB and
-  distance separately).
+  speed is the one model this engine does not reproduce in its own score (it
+  reports SFB and distance separately; the Studio shows genkey's and
+  Oxeylyzer's own scores beside it).
 - **dariogoetz's optimiser**: the same layer and modifier coverage, with far
   fewer and documented weights, each contribution shown; no optimiser yet (a
   possible next step: swap search on the same engine).
+
+### Ideas from the other analysers that our score lacks (2026-11-19)
+
+Read while reproducing each tool exactly. None is in Ergopti's score yet: each
+adds a metric (the Comparer lists its metrics by id, in `comparer_page.js`,
+which another work stream owns) or moves the default weights, which section 11
+leaves to the maintainer. Each is a TODO item with this recommendation.
+
+1. **Distance-weighted same-finger cost** (genkey's finger speed, Oxeylyzer's
+   SFB × distance × 5.5 / finger weight, Keyboard Layout Optimizer's
+   `finger_repeats`, all three exact in the Studio). Ergopti counts an SFB
+   the same whether the finger moves one row or two, and from home or not.
+   **Recommended**: an `sfb_distance` metric, Σ (SFB + 0.5 · SFS) · key
+   distance in mm / finger strength (the engine already has both), shown
+   beside `sfb`; move part of `sfb`'s weight to it once the maintainer has
+   compared the two rankings. The clearest win of the list.
+2. **Finger-specific SFB weight** (Cyanophage's extra 0.7 for pinky and 0.3
+   for ring SFBs, Oxeylyzer's finger weights). A pinky SFB is worse than an
+   index one. Recommended inside item 1 (the finger strength term), not as a
+   separate metric.
+3. **Pinky–ring bigrams on any row difference** (Cyanophage's PRScissor,
+   Oxeylyzer's pinky_ring_bigrams, keygen's pinky–ring twist). Ergopti's half
+   scissors count only the one-row jumps where the longer finger is lower.
+   Recommended as a statistic first (no weight), to see whether it ranks
+   layouts differently from `half_scissors`.
+4. **Floors per term** (Cyanophage: an SFB share under 0.3 %, a hand imbalance
+   under 1 point cost nothing). It keeps tiny differences between good layouts
+   from deciding the rank. Recommended as an optional floor per weight in
+   `score_weights.json`, default 0 (today's behaviour), shown in the score
+   settings.
+5. **Scores relative to a reference** (keycraft: each metric scaled by the
+   median and interquartile range of its layout set; Alt Alpha Ranker: each
+   metric against QWERTY). It makes weights comparable across metrics of
+   different spreads. Recommended as a second view of the ranking (« relative
+   to QWERTY »), not a replacement of the weights.
+6. **Longer skipgrams with a decay** (genkey: gaps 1 to 9 weighted 1/2^(g−1);
+   Oxeylyzer: gaps 1 to 3 weighted (1/7)^g). Ergopti's SFS is gap 1 only. It
+   needs skipgram tables in the corpus format (the engine has uni-, bi- and
+   trigrams), which would also make genkey's and Oxeylyzer's scores exact.
+   Recommended once the corpus format is next revised.
+7. **Rejected**: Cyanophage's « vowels on one hand » (a design preference, not
+   a cost), carpalx's and Cyanophage's drop of rare triads (it discards data
+   to save time the tables do not need), KLA's per-press same-hand penalty
+   (it penalises rolls).
 
 ## 11. Default weights
 

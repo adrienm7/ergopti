@@ -195,6 +195,19 @@ waits for the maintainer's review).
       its `.json`) into `windows/vendor` with their `required` entries in `tools/build/windows_bundle_manifest.json`;
       then `test-windows-lua-export-identity.cjs` checks them and the Windows lane runs the byte-equality proof.
 
+- [ ] **Ideas from the other analysers (2026-11-19).** Six metric corrections our score lacks are listed with a
+      recommendation in `docs/audits/layout-analysers/report.md`, section 10 « Ideas from the other analysers ».
+      First: a distance- and finger-weighted SFB (`sfb_distance`, genkey's, Oxeylyzer's and KLO's model), then
+      pinky–ring bigrams on any row, optional per-term floors (Cyanophage), a « relative to QWERTY » ranking view
+      (keycraft, Alt Alpha Ranker) and longer skipgrams (needs skipgram tables in the corpus format). Each new metric
+      needs its id in the Comparer's metric lists (`comparer_page.js`) and a maintainer decision on its weight.
+- [ ] **Other analysers, what is left (2026-11-19).** genkey (1.3 % mean, 8.3 % max on code) and Oxeylyzer (trigram
+      shares within 0.07–0.29 point) stay « close » until the corpus tables carry skipgrams of gap 2 to 9 and
+      Oxeylyzer's token totals exactly (its saved counts lose one at a rate set by its exact total's bits).
+      keycraft (BSD-3, Go, its score scaled on its own layout set) needs a Go toolchain to be checked; shirolyzer's
+      score is undocumented. genkey's « i » text in the 21 locales still says « approximate, the closest skipgrams
+      only »: it now uses the trigram chain (« close »).
+
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 
 Design: [docs/design/layout-analysis.md](docs/design/layout-analysis.md), « Ways of typing » and « Coverage and
