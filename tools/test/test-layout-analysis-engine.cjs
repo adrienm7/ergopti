@@ -31,8 +31,9 @@
  *    the counts per way a plan from nothing gives, keeps a trial only once
  *    committed (an earlier trial too, after a later one replaced its plan),
  *    writes its compile into spare maps rather than copies (the committed
- *    layout's maps left as a whole compile gives them), and refuses a
- *    layout on another board.
+ *    layout's maps left as a whole compile gives them), writes no
+ *    weak-table entry on repeated letter swaps (a joined way's time sits
+ *    on the way), and refuses a layout on another board.
  * 6. Ways of typing: in context the cheaper copy of a character (« a. »,
  *    « b. »), direct, AltGr or dead key by their documented costs, a
  *    two-character output only when cheaper than its two taps, one way per
