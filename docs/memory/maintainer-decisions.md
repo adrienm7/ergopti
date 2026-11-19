@@ -5,6 +5,81 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The Backspace undo counts per host, not per perceived character (2026-11-19)
+
+Decided by the maintainer on 2026-11-19: undoing an expansion keeps the
+measured per-host Backspace count (`HSE_BackspaceSegments` with the family of
+the focused control: Win32 Edit, RichEdit, Chromium; vectors in
+`_shared/tests/corpus/hotstrings/backspace_step_vectors.json`, see
+`project-backspace-steps-per-host` in `text-input-and-config.md`), not the
+perceived-character (grapheme) count `dev` had: one Backspace erases a
+different span in each host, so a grapheme count leaves accents or emoji parts
+behind in an Edit and erases too much in Chromium. A new host is measured into
+the vector file before it gets its own count.
+
+## Library licences: Optimot and Dvorak-fr stay, credited (2026-11-19)
+
+Decided by the maintainer on 2026-11-19: the Studio library keeps Optimot (from
+optimot.fr's 1.8.0 Linux driver, CC BY-NC-SA) and Francis Leboutte's Dvorak-fr
+(xkeyboard-config `symbols/fr`), each credited with its author and source. Only
+the arrangement is re-encoded (keys, levels, dead-key compositions), never the
+original files, as `docs/audits/layout-analysers/report.md` records. Do not
+drop either for its licence again without a changed licence or a request from
+its author.
+
+## The percent sign follows each language's convention (2026-11-19)
+
+Decided by the maintainer on 2026-11-19: a percentage is written as its
+language writes it: `12.3%` in English (no space, decimal point), `12,3 %` in
+French (no-break space before the sign, decimal comma), and each other locale
+its own convention. A shared formatter or locale string decides it, never one
+format hard-coded for every language.
+
+## The Python XKB converter keeps JIS and ABNT parity (2026-11-19)
+
+Decided by the maintainer on 2026-11-19: `keylayout_to_xkb.py` keeps reading
+`mac_keycodes.json` `extra_keys` (Yen, Ro, the keypad comma: macOS 93, 94 and 95) as optional keys, as the Lua converter does, and writes one only when a
+layout types on it, so every shipped layout keeps its bytes. The Lua converter
+is the one the Linux driver and the Studio exports run, and two converters
+that place different keys would make `test-keylayout-canonical-parity.cjs`
+meaningless for JIS and ABNT layouts; that gate checks both read the same keys
+for every convention.
+
+## Sequential mode is a request plan input on every OS (2026-11-19)
+
+Decided by the maintainer on 2026-11-19 (PPT-03): `llm.generation.sequential_mode`
+is read on Windows and Linux too, through the shared request plan, as macOS
+reads it. `_shared/ai/engine/request_plan/batching.lua` `plan(batch_profile,
+requested, sequential_mode)` and its Windows twin `LLM_RequestPlanBatching`
+return `concurrent`: whether the calls of one request may overlap (never for a
+batch or a single call, never with the switch on). macOS dispatches on it,
+Linux reads the switch through `ai/engine/settings/settings.lua`, Windows
+through `LLM_Engine_SequentialMode` (`Features["llm"]["generation"]`), and the
+shared `request_plan_batching_vectors.json` is replayed on the three drivers.
+No backend overlaps calls today (every macOS `fetch_parallel` is its
+`fetch_sequential`, the Windows WinHTTP client is single flight, a Linux
+backend serves one request at a time), so the switch reorders no request on any
+OS; a backend that starts overlapping calls must read `concurrent`, not its own
+copy of the rule.
+
+## Dead rolls and Windows personal switches are removed (2026-11-19)
+
+Decided by the maintainer on 2026-11-19 (PPT-01, PPT-02): the
+`hotstrings.rolls.chevron_greater` (`>%` to `>=`) and `chevron_less` (`<%` to
+`<=`) rolls and the five built-in `shortcuts.personal.*` switches
+(`laptop_broken_key`, `mouse_drag_window`, `mouse_tab_switching`,
+`professional_environment`, `programmable_keyboard`) are gone from the feature
+catalogue, the Ergopti `rolls.toml`, the locales, the examples and every
+generated table. Config schema v23 (`migrations.toml`, step `v22_to_v23`,
+corpus case `shipped_dead_rolls_and_personal_switches_removed`) deletes their
+saved values on the three OS. The `[shortcuts.personal]` section itself stays:
+it is the namespace a Windows `personal_shortcuts.ahk` fills at run time with
+`RegisterPersonalFeature`, so a switch registered under another name keeps its
+value. Do not restore the two rolls by section alone: macOS registers every
+`rolls.toml` section that no stored value or manifest default switches off
+(`registry_index.is_section_enabled`), so a section without its manifest row
+would turn on by default there.
+
 ## Yubico Authenticator is a secure application (2026-11-19)
 
 Decided by the maintainer on 2026-11-19 (SFC-04): the `yubikey_manager` row of
@@ -19,6 +94,7 @@ Authenticator gets no Windows or macOS name (no desktop build) and KeePass no
 macOS name (no native macOS build). `test-secure-apps-single-source.cjs` fails
 when one of these identities is dropped; regressions `sfc-04` in the macOS
 detector and the Windows adapter compliance suites.
+
 ## The layout menu: one menu, three sections (2026-11-19)
 
 Maintainer requests of 2026-11-19: swap « Ergopti Studio » and the layout menu

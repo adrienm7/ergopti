@@ -305,9 +305,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       asserts the application axis). The generated
       [platform parity table](docs/platform-parity-table.md) now gives every feature, action, layer entry and menu
       row its status, owner and reasons per OS, and `test-linux-feature-parity.cjs` gates it. Left:
-  - the maintainer decisions of the register (« Maintainer decisions pending »): PPT-01 (the two chevron rolls no
-    driver registers), PPT-02 (the five Windows personal shortcut switches no code reads), PPT-03
-    (`llm.generation.sequential_mode` read by macOS only);
   - the two `not_yet` reasons of the table (three cells): `token_streaming_unvalidated_on_windows`,
     `shortcuts_restore_is_composed_on_macos` (the only real parity gaps the reasons declare);
   - SFC-06 (Credential Manager inside `explorer.exe`, field path only; no fix possible by process name);
@@ -590,17 +587,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       « balanced » should be the first one, and whether the hard limit should count a letter and its capital as two
       (docs/design/layout-optimizer.md, « Change penalty »).
 
-- [ ] **Python XKB converter and the JIS and ABNT keys (implemented by the agent on 2026-11-19, to review by
-      the maintainer).** 2f96fa2f4f placed Yen, Ro and the keypad comma (`mac_keycodes.json` `extra_keys`) in the
-      Lua converter only, so the two twins disagreed on macOS 93, 94 and 95. Done the parity way:
-      `keylayout_to_xkb.py` now reads `extra_keys` as optional keys, as the Lua converter does, and writes one only
-      when a layout types on it, so every shipped layout keeps its bytes. Why parity: the Lua converter is the one
-      the Linux driver and the Studio's exports run, the shared table names those keys for both, and two converters that place
-      different keys make `test-keylayout-canonical-parity.cjs` meaningless for JIS and ABNT layouts; that gate
-      now also checks that both read the same keys for every convention and convert Ergo-L with the three keys
-      the same way. To revert: drop the `extra_keys` loop of `load_keycodes` and the optional branch of
-      `symbols()`, and restore `test_registry_conversion.py`'s `[93, 94]` expectation; the parity gate's two new
-      checks then have to go too.
 - [ ] **Accessibility texts stay French (decided by the agent on 2026-11-19, to review by the maintainer).** The
       site's accessibility statement (`/accessibilite`) and its settings dialog (`A11ySettings.svelte`) do not get
       the 21 locales: the site has no locale system (only the Ergopti+ pages read in English, through `t()`), and

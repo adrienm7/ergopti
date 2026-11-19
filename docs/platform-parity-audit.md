@@ -64,8 +64,8 @@ shortcut restore on macOS (`shortcuts_restore_is_composed_on_macos`). The
 per-reason list, with each technical text, is in the table.
 
 Building the owners found three declared features no driver code reads. They
-are recorded under `[unowned]` in `platform_parity.toml` (a ratchet: an entry
-fails as soon as code reads it) and wait for a maintainer decision below.
+were recorded under `[unowned]` in `platform_parity.toml` (a ratchet: an entry
+fails as soon as code reads it); the maintainer decided them on 2026-11-19.
 
 ### Fixed with the table
 
@@ -76,23 +76,13 @@ fails as soon as code reads it) and wait for a maintainer decision below.
 | SFC-05 | Windows test   | « a RoboForm.exe window is secure » asserted `SFD_IsSecureField(A_ScriptHwnd)`, true for any process                                                                          | The case asserts `SFD_IsSecureAppWindow`, with `notepad.exe` as the negative control.                                                                                                                                                                                                                                                                                                              |
 | —      | table          | `shortcuts.wrap_text_if_selected`'s menu row counted as shown on macOS                                                                                                        | A `type = "feature"` row inherits its feature's platforms (each driver draws it from its own generated manifest); the gate asserts it.                                                                                                                                                                                                                                                             |
 | SFC-04 | Windows, macOS | Yubico Authenticator had no Windows or macOS identity in `secure_apps.json`                                                                                                   | Maintainer decision of 2026-11-19: `authenticator.exe` and `yubioath-desktop.exe` on Windows, the display name `Yubico Authenticator` on macOS; no Google Authenticator desktop name, no KeePass macOS name. `test-secure-apps-single-source.cjs` and the `sfc-04` cases of the macOS and Windows suites fail when one is dropped.                                                                 |
+| PPT-01 | all three OS   | `hotstrings.rolls.chevron_greater` and `chevron_less` were declared and shown, and no driver registered them                                                                  | Maintainer decision of 2026-11-19: removed from the catalogue, the Ergopti `rolls.toml`, the locales and every generated table; config schema v23 deletes their saved values (corpus case `shipped_dead_rolls_and_personal_switches_removed`).                                                                                                                                                     |
+| PPT-02 | Windows        | The five built-in `shortcuts.personal.*` switches had no reader                                                                                                               | Maintainer decision of 2026-11-19: removed the same way; v23 deletes their saved values, and the `[shortcuts.personal]` namespace stays for the switches a `personal_shortcuts.ahk` registers.                                                                                                                                                                                                     |
+| PPT-03 | Windows, Linux | `llm.generation.sequential_mode` was read by macOS only                                                                                                                       | Maintainer decision of 2026-11-19: the shared request plan takes it and returns `concurrent` on the three drivers (`request_plan_batching_vectors.json`, replayed by each); Windows reads it through `LLM_Engine_SequentialMode`, Linux through its generation settings. No backend overlaps calls on any OS, so no request changes order.                                                         |
 
 ### Maintainer decisions pending
 
-- **PPT-01** (all three OS): `hotstrings.rolls.chevron_greater` and
-  `chevron_less` are declared and shown in the menu, but no driver registers
-  them (the Windows roll loader `distances.ahk` lists every other roll) and no
-  hotstring file holds them. Recommendation: remove the two toggles unless the
-  rolls are wanted, in which case add their sections to the shared catalogue.
-- **PPT-02** (Windows): the five `shortcuts.personal.*` switches
-  (`laptop_broken_key`, `mouse_drag_window`, `mouse_tab_switching`,
-  `professional_environment`, `programmable_keyboard`) have no reader in the
-  driver; only the master gate validates their values. Recommendation: remove
-  them, or restore the personal shortcut blocks they used to gate.
-- **PPT-03** (Windows, Linux): `llm.generation.sequential_mode` is read only by
-  macOS (`ai/engine/prediction/engine.lua`); the Windows and Linux request
-  planners decide batch or sequential by themselves. Recommendation: either
-  make it macOS-only with a reason, or feed it to the shared request plan.
+None: SFC-04 and PPT-01 to PPT-03 were decided by the maintainer on 2026-11-19 (see the table above).
 
 ## Census after the structure phase — November 19, 2026
 
