@@ -1107,7 +1107,7 @@ check(
 				: `${key}${values ? JSON.stringify(values) : ''}`,
 		format: (value, digits) => Number(value).toFixed(digits),
 		metricName: (id) => id,
-		INFO: { metricShort: () => null },
+		INFO: { metricShort: () => null, metricSpoken: (id) => id },
 		measure: (value, digits, unit) => `${Number(value).toFixed(digits)} ${unit}`,
 		unitText: (id) => E.METRICS[id].unit,
 		metricDigits: E.metricDigits,
