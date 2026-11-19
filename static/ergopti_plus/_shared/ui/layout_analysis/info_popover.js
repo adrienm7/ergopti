@@ -86,6 +86,8 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 
 	let popover = null;
 	let owner = null;
+	// Where the owner sits (successor()): its scope and its rank among its twins.
+	let ownerPlace = null;
 	let warnedLocale = false;
 
 	/**
@@ -546,9 +548,47 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		open(trigger);
 	}
 
+	/** The same kind of trigger as the owner: its class, item, note and name. */
+	function sameTrigger(node, trigger) {
+		return (
+			node.className === trigger.className &&
+			node.dataset.info === trigger.dataset.info &&
+			node.dataset.note === trigger.dataset.note &&
+			node.getAttribute('aria-label') === trigger.getAttribute('aria-label')
+		);
+	}
+
+	/**
+	 * The owner, or the button that replaced it: a page that redraws its
+	 * table while the popover is open (the editor's panel after an edit)
+	 * draws a new « i » in its place, the one the focus goes back to. Found as
+	 * the same rank among the same triggers of the nearest ancestor with an id
+	 * still in the page (a redrawn row may carry an id of its own), noted when
+	 * the popover opened.
+	 */
+	function successor() {
+		if (!owner || owner.isConnected || !ownerPlace) return owner;
+		const place = ownerPlace.find((candidate) => candidate.scope.isConnected);
+		if (!place) return null;
+		return twinsIn(place.scope, owner)[place.rank] || null;
+	}
+
+	/** The triggers of a scope like this one, in document order. */
+	function twinsIn(scope, trigger) {
+		return Array.from(scope.querySelectorAll('.la-info, .la-note')).filter((node) =>
+			sameTrigger(node, trigger)
+		);
+	}
+
 	/** Shows the filled popover under its trigger and moves the focus into it. */
 	function open(trigger) {
 		owner = trigger;
+		// Each ancestor with an id, nearest first, then the body: where a
+		// redrawn trigger is looked for (successor()).
+		ownerPlace = [];
+		for (let scope = trigger.parentElement; scope; scope = scope.parentElement)
+			if (scope.id || scope === document.body)
+				ownerPlace.push({ scope, rank: twinsIn(scope, trigger).indexOf(trigger) });
 		trigger.setAttribute('aria-expanded', 'true');
 		popover.hidden = false;
 		if (!popover.open) popover.show();
@@ -571,8 +611,9 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		if (!popover || popover.hidden) return;
 		popover.hidden = true;
 		if (popover.open) popover.close();
-		const previous = owner;
+		const previous = successor();
 		owner = null;
+		ownerPlace = null;
 		if (previous && previous.isConnected) {
 			previous.setAttribute('aria-expanded', 'false');
 			if (restore) previous.focus();

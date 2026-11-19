@@ -223,6 +223,75 @@ async function checkHeaders(browser, origin, lang) {
  */
 async function exerciseHeaderPopovers(browser, origin) {
 	for (const lang of LANGS) await checkHeaders(browser, origin, lang);
+	await checkPanelRefresh(browser, origin);
+}
+
+/**
+ * (panel-refresh-keeps-popover) The editor's analysis panel: a render with
+ * the same document (a tool-tab switch calls update() again) keeps the « i »
+ * and its open popover, and a refresh that does redraw the table gives the
+ * focus back, on Escape, to the « i » drawn in the old one's place.
+ */
+async function checkPanelRefresh(browser, origin) {
+	const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(`${origin}/ui/layout_editor/index.html?lang=fr`);
+	const selector = '#la-live-panel .la-panel-metrics button[data-info="sfb"]';
+	await page.waitForSelector(selector, { timeout: 120000 });
+	// The panel's first analyses (the board drawn, the library ranked) settle.
+	await page.waitForTimeout(3000);
+	const settle = () => page.waitForTimeout(1500);
+	await page.evaluate((s) => {
+		window.__sfbInfo = document.querySelector(s);
+		window.__sfbInfo.focus();
+	}, selector);
+	await page.keyboard.press('Enter');
+	await page.waitForSelector('#la-popover:not([hidden])');
+	await page.evaluate(() => window.layoutEditor.render());
+	await settle();
+	assert.deepEqual(
+		await page.evaluate(() => ({
+			open: !document.getElementById('la-popover').hidden,
+			kept: window.__sfbInfo.isConnected,
+			focus: document.activeElement.className
+		})),
+		{ open: true, kept: true, focus: 'la-popover-close' },
+		'a render of the same document keeps the « i » and its open popover'
+	);
+	await page.keyboard.press('Escape');
+	assert.equal(
+		await page.evaluate(() => document.activeElement === window.__sfbInfo),
+		true,
+		'Escape gives the focus back to the « i »'
+	);
+	await page.keyboard.press('Enter');
+	await page.waitForSelector('#la-popover:not([hidden])');
+	// Another key colour: the panel analyses again and redraws its table.
+	await page.evaluate(() => {
+		const heat = document.getElementById('la-panel-heat');
+		heat.value = Array.from(heat.options).find((option) => option.value !== heat.value).value;
+		heat.dispatchEvent(new Event('change'));
+	});
+	await settle();
+	assert.equal(
+		await page.evaluate(() => window.__sfbInfo.isConnected),
+		false,
+		'the new analysis drew a new « i »'
+	);
+	await page.keyboard.press('Escape');
+	assert.equal(
+		await page.evaluate(
+			(s) =>
+				document.activeElement === document.querySelector(s) && document.activeElement.isConnected,
+			selector
+		),
+		true,
+		'Escape gives the focus to the « i » that replaced the opener'
+	);
+	assert.deepEqual(errors, [], 'the editor: no page error');
+	await context.close();
 }
 
 /** Serves the shared tree read-only on loopback (a run of this module alone). */

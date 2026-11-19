@@ -213,6 +213,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			// metric is measured only against an earlier analysis of the same one.
 			lineage: null,
 			previous: null,
+			// drawnSignature() of the analysis shown, null when none is.
+			drawn: null,
 			library: null,
 			libraryKey: '',
 			timer: null,
@@ -513,11 +515,45 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			tellHighlight(null);
 			fingers.replaceChildren();
 			analysers.replaceChildren();
-			extra.replaceChildren();
+			for (const box of extraBoxes.splice(0)) box.remove();
+			state.drawn = null;
+		}
+
+		/**
+		 * What the last full analysis drew from: the layout, the corpus, the
+		 * keyboard, every setting and the ranking pool. The editor calls update()
+		 * after each of its renders, a tab switch included: the same analysis
+		 * again would replace every « i » button and close the popover the reader
+		 * opened (and lose its focus), so a run that would draw the same keeps
+		 * the panel as it is. null when the document cannot be read.
+		 */
+		function drawnSignature() {
+			let layout;
+			try {
+				layout = layoutFromEditorDoc(state.doc);
+			} catch {
+				return null;
+			}
+			const settings = comparerSettings(state.keyboard);
+			return JSON.stringify([
+				state.lineage,
+				layout,
+				state.corpus,
+				state.keyboard,
+				keyboardFormat(),
+				state.heat,
+				state.rank,
+				settings,
+				rankKey(settings, rankPool())
+			]);
 		}
 
 		async function run() {
 			if (!state.doc || !node.open) return;
+			// Checked before a new generation starts: the shown analysis's pending
+			// analyser scores keep arriving.
+			const signature = drawnSignature();
+			if (signature !== null && signature === state.drawn) return;
 			const mine = ++state.generation;
 			// The layout this run analyses: an update during its pauses belongs to the next run.
 			const lineage = state.lineage;
@@ -639,6 +675,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				now: { metrics: result.metrics, score: result.score.total },
 				before
 			};
+			state.drawn = signature;
 		}
 
 		function drawMetrics(result, before, scores) {
@@ -895,6 +932,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		corpusSelect.addEventListener('change', () => {
 			state.corpus = corpusSelect.value;
 			state.previous = null;
+			state.drawn = null;
 			persist();
 			schedule();
 		});
@@ -902,6 +940,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			state.keyboard = keyboardSelect.value;
 			fingeringView.draw();
 			state.previous = null;
+			state.drawn = null;
 			persist();
 			schedule();
 		});
@@ -918,6 +957,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		});
 		node.addEventListener('toggle', () => {
 			persist();
+			// Folding cleared the board's colours and score: an unfolding draws again.
+			state.drawn = null;
 			if (node.open) schedule();
 			// A folded panel analyses nothing: its colours and score would go stale.
 			else {
@@ -927,11 +968,13 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		});
 		document.addEventListener('i18n:applied', () => {
 			fillControls();
+			state.drawn = null;
 			schedule();
 		});
 		// A new fingering profile changes every metric and the library's ranking.
 		window.LAYOUT_ANALYSIS_FINGERING.onChange(() => {
 			state.previous = null;
+			state.drawn = null;
 			schedule();
 		});
 		/**
@@ -956,6 +999,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				fillControls();
 			}
 			state.previous = null;
+			state.drawn = null;
 			state.libraryKey = '';
 			schedule();
 		}
