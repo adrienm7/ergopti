@@ -1022,7 +1022,11 @@ function M.predict(context, output_context, override, automatic)
 		params.context_tail = Rewrite.sentence_span(params.context)
 		params.max_tokens = Rewrite.max_tokens(params.context_tail)
 	end
-	local batching = require("ai.engine.request_plan.batching").plan(profile.batch == true, requested)
+	-- llm.generation.sequential_mode is a plan input on every driver (PPT-03). A
+	-- Linux backend serves one request at a time, so the variants below go one
+	-- after another whatever the plan's `concurrent` says, as every macOS backend does.
+	local batching = require("ai.engine.request_plan.batching").plan(profile.batch == true, requested,
+		Settings.get(require("settings.engine.keys").LEAF.SEQUENTIAL_MODE))
 	local is_batch = batching.mode == "batch"
 	local base_temperature = Settings.get("temperature")
 	local auto_raise = Settings.get(require("settings.engine.keys").LEAF.AUTO_RAISE_TEMP) == true

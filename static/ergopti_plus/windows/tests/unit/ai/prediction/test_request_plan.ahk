@@ -67,18 +67,45 @@ _LReqPlan_ReplayBatchingVectors() {
 	for Vector in Corpus["vectors"] {
 		if Vector.Has("expect_error") {
 			Message := ""
-			try LLM_RequestPlanBatching(Vector["batch_profile"], Vector["requested"])
+			try LLM_RequestPlanBatching(Vector["batch_profile"], Vector["requested"], Vector["sequential_mode"])
 			catch as Err
 				Message := Err.Message
 			AssertContains(Message, Vector["expect_error"], Vector["id"])
 			continue
 		}
-		Plan := LLM_RequestPlanBatching(Vector["batch_profile"], Vector["requested"])
+		Plan := LLM_RequestPlanBatching(Vector["batch_profile"], Vector["requested"], Vector["sequential_mode"])
 		for Key, Value in Vector["expect"]
 			AssertEqual(Value, Plan[Key], Vector["id"] . ": " . Key)
 	}
 }
 Test("LLM request plan: replays every shared batching vector (par-65)", _LReqPlan_ReplayBatchingVectors)
+
+; PPT-03 (decided by the maintainer on 2026-11-19): the plan reads
+; llm.generation.sequential_mode from the loaded configuration, as macOS and
+; Linux do; a value that is no boolean is a broken load, never a silent default.
+_LReqPlan_SequentialModeFromFeatures() {
+	global Features
+	Generation := Features["llm"]["generation"]
+	AssertTrue(Generation.Has(ConfigLeaf.SEQUENTIAL_MODE), "Features carries llm.generation.sequential_mode")
+	Saved := Generation[ConfigLeaf.SEQUENTIAL_MODE]
+	try {
+		for Value in [true, false] {
+			Generation[ConfigLeaf.SEQUENTIAL_MODE] := Value
+			AssertEqual(Value, LLM_Engine_SequentialMode(), "the configured switch reaches the plan")
+			AssertEqual(Value ? false : true, LLM_RequestPlanBatching(false, 3, LLM_Engine_SequentialMode())["concurrent"],
+				"the switch decides whether a plain profile's variants may overlap")
+		}
+		Generation[ConfigLeaf.SEQUENTIAL_MODE] := "yes"
+		Message := ""
+		try LLM_Engine_SequentialMode()
+		catch as Err
+			Message := Err.Message
+		AssertContains(Message, "sequential_mode", "a non-boolean switch is refused")
+	} finally {
+		Generation[ConfigLeaf.SEQUENTIAL_MODE] := Saved
+	}
+}
+Test("LLM request plan: llm.generation.sequential_mode reaches the plan (ppt-03)", _LReqPlan_SequentialModeFromFeatures)
 
 /** Runs Body with a usable engine and a fresh plan, restoring both. */
 _LReqPlan_WithEngine(Debounce, Floor, Body) {

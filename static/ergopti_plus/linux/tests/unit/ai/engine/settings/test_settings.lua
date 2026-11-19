@@ -63,7 +63,8 @@ helpers.describe("llm settings: where the default comes from", function()
 		local settings = load_over_storage()
 		local Manifest = helpers.load_module("menu.engine.manifest_reader")
 		local actual = {}
-		for _, name in ipairs({ "temperature", "context_length", "min_words", "max_words", "auto_raise_temp", "reset_on_nav" }) do
+		for _, name in ipairs({ "temperature", "context_length", "min_words", "max_words", "auto_raise_temp", "reset_on_nav",
+				"sequential_mode" }) do
 			actual[name] = settings.get(name)
 		end
 		drop_storage()
@@ -74,9 +75,19 @@ helpers.describe("llm settings: where the default comes from", function()
 		end
 	end)
 
+	-- PPT-03 (decided by the maintainer on 2026-11-19): the request plan reads
+	-- llm.generation.sequential_mode on Linux too, as macOS and Windows do.
+	helpers.it("reads llm.generation.sequential_mode from the configuration (ppt-03)", function()
+		local settings = load_over_storage({ ["llm.generation.sequential_mode"] = true })
+		local stored = settings.get("sequential_mode")
+		drop_storage()
+		helpers.assert_eq(stored, true, "the saved switch must reach the request plan")
+	end)
+
 	helpers.it("stores nothing while both are at their shipped values", function()
 		local settings, storage = load_over_storage()
-		for _, name in ipairs({ "temperature", "context_length", "min_words", "max_words", "auto_raise_temp", "reset_on_nav" }) do
+		for _, name in ipairs({ "temperature", "context_length", "min_words", "max_words", "auto_raise_temp", "reset_on_nav",
+				"sequential_mode" }) do
 			settings.get(name)
 		end
 		local written = 0

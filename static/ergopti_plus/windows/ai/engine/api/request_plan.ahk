@@ -213,16 +213,20 @@ class LLMRequestPlan {
 
 /**
  * Plans the backend calls of one prediction request: a batch profile asks once
- * for every variant, any other asks once per variant.
+ * for every variant, any other asks once per variant. llm.generation.sequential_mode
+ * decides whether those calls may overlap, as on macOS and Linux (PPT-03).
  * @param {Boolean} BatchProfile Whether the profile asks for a batch.
  * @param {Integer} Requested Predictions the request asks for (at least 1).
- * @returns {Map} mode ("batch" or "sequential"), calls and per_call.
+ * @param {Boolean} SequentialMode llm.generation.sequential_mode.
+ * @returns {Map} mode ("batch" or "sequential"), calls, per_call and concurrent.
  */
-LLM_RequestPlanBatching(BatchProfile, Requested) {
+LLM_RequestPlanBatching(BatchProfile, Requested, SequentialMode) {
 	_LLM_RequestPlanRequireBool(BatchProfile, "batch_profile")
 	if !(Requested is Integer) || Requested < 1
 		throw ValueError("requested must be a whole number from 1")
+	_LLM_RequestPlanRequireBool(SequentialMode, "sequential_mode")
 	if BatchProfile && Requested > 1
-		return Map("mode", "batch", "calls", 1, "per_call", Requested)
-	return Map("mode", "sequential", "calls", Requested, "per_call", 1)
+		return Map("mode", "batch", "calls", 1, "per_call", Requested, "concurrent", false)
+	return Map("mode", "sequential", "calls", Requested, "per_call", 1,
+		"concurrent", (Requested > 1 && !SequentialMode) ? true : false)
 }

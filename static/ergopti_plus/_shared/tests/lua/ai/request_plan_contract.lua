@@ -109,7 +109,7 @@ function M.run_batching(helpers, corpus_path)
 	helpers.describe("Shared request plan batching transcripts", function()
 		for _, vector in ipairs(corpus.vectors) do
 			helpers.it("transcript '" .. vector.id .. "'", function()
-				local ok, result = pcall(Batching.plan, vector.batch_profile, vector.requested)
+				local ok, result = pcall(Batching.plan, vector.batch_profile, vector.requested, vector.sequential_mode)
 				if vector.expect_error then
 					helpers.assert_eq(ok, false, "must raise")
 					helpers.assert_contains(tostring(result), vector.expect_error)

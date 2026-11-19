@@ -2242,10 +2242,12 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
 	-- A batch profile asks once for every variant, but only above one prediction:
 	-- the rule of the shared plan and of the prompt selector, as on Windows and
 	-- Linux. A single prediction of a batch profile used to take the batch path.
+	-- Overlap or not is the plan's answer too, from llm.generation.sequential_mode,
+	-- as on Windows and Linux (PPT-03).
 	local batching = require("ai.engine.request_plan.batching").plan(
-		type(profile) == "table" and (profile.batch and true or false), num_predictions)
+		type(profile) == "table" and (profile.batch and true or false), num_predictions, sequential_mode == true)
 	if type(profile) == "table" and batching.mode == "sequential" then
-		if num_predictions > 1 and not sequential_mode then
+		if batching.concurrent then
 			api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, _streaming_enabled, on_partial)
 		else
 			api.fetch_sequential(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, _streaming_enabled, on_partial)

@@ -483,9 +483,6 @@ token = "PauseSwitchPolicyTarget(PauseLayoutSwitch_Settings(Features), Event)"
 # ==================================
 # ==================================
 
-# PPT-03: only macOS reads llm.generation.sequential_mode.
-[unowned.windows."llm.generation.sequential_mode"]
-finding = "PPT-03"
-
-[unowned.linux."llm.generation.sequential_mode"]
-finding = "PPT-03"
+# None is open: PPT-01 to PPT-03 were decided by the maintainer on 2026-11-19.
+# A declared cell no driver reads goes here as [unowned.<os>."<path>"] with its
+# PPT-nn finding, and fails as soon as code reads it.

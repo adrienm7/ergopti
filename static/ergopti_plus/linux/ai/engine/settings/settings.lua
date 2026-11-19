@@ -73,6 +73,8 @@ local FEATURE_PATH = {
 	max_words = KEY.LLM_GENERATION_MAX_WORDS,
 	auto_raise_temp = KEY.LLM_GENERATION_AUTO_RAISE_TEMP,
 	reset_on_nav = KEY.LLM_GENERATION_RESET_ON_NAV,
+	-- Read by the shared request plan, as on macOS and Windows (PPT-03).
+	sequential_mode = KEY.LLM_GENERATION_SEQUENTIAL_MODE,
 }
 
 -- Resolved shipped answers, read once.
@@ -113,7 +115,9 @@ end
 --- @param value any
 --- @return boolean
 local function in_bounds(name, value)
-	if name == LEAF.AUTO_RAISE_TEMP or name == LEAF.RESET_ON_NAV then return type(value) == "boolean" end
+	if name == LEAF.AUTO_RAISE_TEMP or name == LEAF.RESET_ON_NAV or name == LEAF.SEQUENTIAL_MODE then
+		return type(value) == "boolean"
+	end
 	local bounds = BOUNDS[name]
 	if not bounds or type(value) ~= "number" then return false end
 	return value >= bounds.min and value <= bounds.max

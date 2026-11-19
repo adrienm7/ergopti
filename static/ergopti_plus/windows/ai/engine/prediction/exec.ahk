@@ -64,6 +64,21 @@ _LLM_Engine_NormalizePromptOverride(Override) {
 }
 
 /**
+ * The configured llm.generation.sequential_mode, the plan input macOS and Linux
+ * read too (PPT-03). Features carries the manifest default until config.toml
+ * overrides it, so an absent or non-boolean value is a broken load and throws.
+ * @returns {Integer} 1 or 0.
+ */
+LLM_Engine_SequentialMode() {
+	global Features
+	Generation := Features["llm"]["generation"]
+	Value := Generation[ConfigLeaf.SEQUENTIAL_MODE]
+	if !(Value is Integer) || (Value != 0 && Value != 1)
+		throw ValueError(ConfigKey.LLM_GENERATION_SEQUENTIAL_MODE . " must be a boolean")
+	return Value
+}
+
+/**
  * Per-call output-token budget for a backend request, the twin of
  * _shared/ai/engine/request_plan/token_budget.lua `for_call`: a call returning one
  * prediction keeps the base budget; a batch call returning N gets N * (base + 5),
@@ -613,7 +628,12 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 
 	; A batch call returns all N predictions in one response; a sequential-variant
 	; call returns one. Size the per-call token budget accordingly (macOS parity).
-	preds_per_call := LLM_RequestPlanBatching(is_batch_profile ? true : false, n_predictions)["per_call"]
+	; llm.generation.sequential_mode is a plan input on every driver (PPT-03). The
+	; WinHTTP client is single flight, so the variants below go one after another
+	; whatever the plan's "concurrent" says, as every macOS backend does.
+	request_batching := LLM_RequestPlanBatching(is_batch_profile ? true : false, n_predictions,
+		LLM_Engine_SequentialMode())
+	preds_per_call := request_batching["per_call"]
 	call_tokens := _LLM_Engine_CallTokenBudget(max_tokens, preds_per_call)
 
 	_LLM_Engine_Plan().OnSent(A_TickCount)
