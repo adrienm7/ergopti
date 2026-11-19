@@ -32,7 +32,9 @@
  *    two lines) keeps its full meaning one key press away (maintainer,
  *    2026-11-19). metricShort() gives the usual acronym of a metric's name.
  * 8. Percentile chips (percentile): « P70 » beside a metric's value opens a
- *    popover of its own words, with no references.
+ *    popover of its own words, with no references; note() makes an « i »
+ *    of the same kind for any explanation without references (the
+ *    Optimiser's switches).
  * ==============================================================================
  */
 
@@ -439,6 +441,23 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		return node;
 	}
 
+	/**
+	 * An « i » button whose popover says one text, with no references.
+	 * @param {string} name - Its accessible name (what it explains).
+	 * @param {string} text - The popover's text.
+	 * @returns {HTMLButtonElement}
+	 */
+	function note(name, text) {
+		const node = el('button', 'la-note la-note-info', 'i');
+		node.type = 'button';
+		node.dataset.note = text;
+		node.title = name;
+		node.setAttribute('aria-label', name);
+		node.setAttribute('aria-controls', POPOVER_ID);
+		node.setAttribute('aria-expanded', 'false');
+		return node;
+	}
+
 	function show(trigger) {
 		if (trigger.classList.contains('la-note')) {
 			showNote(trigger);
@@ -501,6 +520,10 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 			.replaceChildren(el('p', 'la-popover-text', trigger.dataset.note));
 		popover.querySelector('.la-popover-title').hidden = true;
 		popover.querySelector('ul').hidden = true;
+		// A metric's name and formula, from a popover shown before, are not this note's.
+		popover.querySelector('.la-popover-name').hidden = true;
+		popover.querySelector('.la-popover-formula').hidden = true;
+		popover.removeAttribute('aria-labelledby');
 		popover.querySelector('.la-popover-close').textContent = t('layout_analysis.info.close');
 		open(trigger);
 	}
@@ -569,6 +592,7 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		refusal,
 		button,
 		percentile,
+		note,
 		routeLink,
 		locale,
 		format,

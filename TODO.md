@@ -505,8 +505,9 @@ Each question names the default kept meanwhile; an answer moves into the item or
       leaves thumb keys alone unless `thumbKeys` names a board; a thumb-letter file is imported even when symbols of
       its ErgoDox outer keys have no code. 51 layouts came in (Hands Down Gold and family, cyanophage, KLAnext); on
       the ErgoDox, Gold scores 11.2 against Hands Down Alt's −1.5 on Alice. Choose the thumb effort, whether a thumb
-      letter's pairs should count, whether the left thumb needs a second key (Cahi, Chia, SNTH stay out), and
-      whether the optimizer page should offer the switch.
+      letter's pairs should count, and whether the left thumb needs a second key (Cahi, Chia, SNTH stay out).
+      The Optimiser page offers the switch since 2026-11-19 (off by default, enabled on boards with thumb
+      keys, its popover saying why).
 - [ ] **Renew the reviewed number-row test image (prepared by the agent on 2026-11-19, to review by the
       maintainer).** `number_row_current_test_causal.py` says no transcript or approval may select another test
       image, and its approval record needs a published source commit and a source review hash, so the agent did not

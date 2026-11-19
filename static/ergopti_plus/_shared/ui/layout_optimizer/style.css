@@ -312,6 +312,27 @@ body:has(> main.layout-optimizer) {
 	margin-top: 4px;
 }
 
+/* The thumb keys' switch: its label and its « i » on one line, an accent
+   stripe, grey and muted when the chosen keyboard has no thumb key. */
+.lo-switch-head {
+	align-items: flex-start;
+	display: flex;
+	gap: var(--lo-space-2);
+}
+
+.lo-switch-thumb {
+	border-left: 4px solid var(--lo-accent);
+	padding-left: var(--lo-space-3);
+}
+
+.lo-switch-off {
+	border-left-color: var(--lo-border);
+}
+
+.lo-switch-off .lo-switch {
+	color: var(--lo-sub);
+}
+
 .lo-help {
 	font-size: 0.92em;
 	margin: 2px 0 0 22px;

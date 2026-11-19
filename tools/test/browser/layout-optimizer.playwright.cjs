@@ -264,6 +264,88 @@ async function exerciseProgressChart(browser, origin) {
 	await context.close();
 }
 
+/**
+ * (thumb-keys-switch) The thumb keys' switch is off by default and disabled
+ * on a keyboard without thumb keys, whose help line names the keyboards
+ * that have them; its « i » opens a popover that says why it is off by
+ * default and gives the focus back on Escape. On the Corne it can be
+ * switched on: the run's problem then places the Corne's thumb keys, the
+ * choice is kept across a reload, and switching to ISO leaves it out.
+ */
+async function exerciseThumbKeys(browser, origin) {
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
+	const { page, errors, context } = await open(browser, origin);
+	const thumb = '#lo-switch-thumbKeys';
+	await page.selectOption('#lo-keyboard', 'iso');
+	assert.equal(await page.isChecked(thumb), false, 'off by default');
+	assert.equal(await page.isDisabled(thumb), true, 'disabled on ISO, which has no thumb key');
+	const absent = await page.textContent('#lo-thumb-help');
+	assert.ok(
+		absent.startsWith(
+			strings['layout_optimizer.option.thumbKeys.absent'].split('{keyboards}')[0]
+		) &&
+			absent.includes(strings['layout_analysis.keyboard.corne']) &&
+			!absent.includes(strings['layout_analysis.keyboard.ansi']),
+		`the help names the keyboards with thumb keys: ${absent}`
+	);
+	assert.equal(await page.getAttribute(thumb, 'aria-describedby'), 'lo-thumb-help');
+	// The « i »: why it is off, in a popover that gives the focus back.
+	assert.equal(
+		await page.getAttribute('#lo-thumb-why', 'aria-label'),
+		strings['layout_optimizer.option.thumbKeys.why_label']
+	);
+	await page.click('#lo-thumb-why');
+	await page.waitForSelector('#la-popover:not([hidden])');
+	assert.equal(
+		await page.textContent('#la-popover .la-popover-texts'),
+		strings['layout_optimizer.option.thumbKeys.why']
+	);
+	assert.equal(await page.isHidden('#la-popover .la-popover-name'), true, 'a note has no title');
+	await page.keyboard.press('Escape');
+	assert.equal(await page.isHidden('#la-popover'), true);
+	assert.equal(await page.evaluate(() => document.activeElement.id), 'lo-thumb-why');
+	// The Corne has thumb keys: the switch is offered and reaches the problem.
+	await page.selectOption('#lo-keyboard', 'corne');
+	assert.equal(await page.isDisabled(thumb), false, 'enabled on the Corne');
+	assert.equal(
+		await page.textContent('#lo-thumb-help'),
+		strings['layout_optimizer.option.thumbKeys.help']
+	);
+	await page.check(thumb);
+	await page.evaluate(() => {
+		const problem = window.LAYOUT_OPTIMIZER.problem;
+		window.__thumbKeys = [];
+		window.LAYOUT_OPTIMIZER.problem = (engine, layout, options) => {
+			window.__thumbKeys.push(options.thumbKeys);
+			return problem(engine, layout, options);
+		};
+	});
+	await shortBudget(page);
+	assert.match(await runToEnd(page), /^Done/, 'a run with the thumb keys ends');
+	assert.deepEqual(await page.evaluate(() => window.__thumbKeys), ['corne']);
+	await page.reload();
+	await page.waitForSelector(thumb);
+	assert.equal(await page.inputValue('#lo-keyboard'), 'corne');
+	assert.equal(await page.isChecked(thumb), true, 'the choice is kept across a reload');
+	await page.selectOption('#lo-keyboard', 'iso');
+	assert.equal(await page.isDisabled(thumb), true);
+	await page.evaluate(() => {
+		const problem = window.LAYOUT_OPTIMIZER.problem;
+		window.__thumbKeys = [];
+		window.LAYOUT_OPTIMIZER.problem = (engine, layout, options) => {
+			window.__thumbKeys.push(options.thumbKeys);
+			return problem(engine, layout, options);
+		};
+	});
+	await shortBudget(page);
+	assert.match(await runToEnd(page), /^Done/);
+	assert.deepEqual(await page.evaluate(() => window.__thumbKeys), [null], 'ISO: no thumb key');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 async function main() {
 	const server = await serve();
 	const origin = `http://127.0.0.1:${server.address().port}`;
@@ -749,6 +831,9 @@ async function main() {
 		// ======= 4e/ The search's progress as a live chart =======
 		await exerciseProgressChart(browser, origin);
 
+		// ======= 4f/ The thumb keys' switch =======
+		await exerciseThumbKeys(browser, origin);
+
 		// ======= 5/ Light and dark at phone width, every locale =======
 		for (const colorScheme of ['light', 'dark']) {
 			const { page, errors, context } = await open(browser, origin, {
@@ -797,7 +882,7 @@ async function main() {
 	console.log('PASS layout-optimizer.playwright');
 }
 
-module.exports = { exerciseProgressChart };
+module.exports = { exerciseProgressChart, exerciseThumbKeys };
 
 if (require.main === module)
 	main().catch((error) => {

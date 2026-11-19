@@ -48,6 +48,9 @@
  * 12. Edit, then improve: the editor's « Optimize this layout » opens the
  *    page on the edited layout as its start (setStart in the app, the tab's
  *    hand-off on the site), said in the status line.
+ * 14. Thumb keys: a switch lets the search place characters on the thumb
+ *    keys (the core's thumbKeys, the chosen keyboard), enabled only on a
+ *    keyboard that has them; its « i » says why it is off by default.
  * 13. Progress in sight: a live chart draws the best score over the
  *    run's time above the start's score, with the evaluations per second, the
  *    same said in words and as a table (the drawing is hidden from assistive
@@ -75,6 +78,9 @@
 		'altgr',
 		'deadKeyLayer'
 	];
+	// The switch that lets characters onto the chosen keyboard's thumb keys
+	// (LAYOUT_OPTIMIZER thumbKeys: that keyboard's id, or null when off).
+	const THUMB_SWITCH = 'thumbKeys';
 	// The metrics compared with the start, as the Comparer's table shows them.
 	const DELTA_METRICS = [
 		'sfb',
@@ -818,9 +824,50 @@
 					const item = el('div', 'lo-switch-item');
 					item.append(label, help);
 					return item;
-				})
+				}),
+				thumbSwitch(THUMB_SWITCH in checked ? checked[THUMB_SWITCH] : false)
 			);
 			syncSwitches();
+		}
+
+		/**
+		 * The thumb keys' switch: off by default (O.DEFAULT_OPTIONS.thumbKeys is
+		 * null), its « i » saying why, its help line saying which keyboards have
+		 * thumb keys.
+		 * @param {boolean} checked - The reader's choice.
+		 */
+		function thumbSwitch(checked) {
+			const input = el('input');
+			input.type = 'checkbox';
+			input.value = THUMB_SWITCH;
+			input.id = `lo-switch-${THUMB_SWITCH}`;
+			input.checked = checked;
+			const name = el('span', '', t(`${PREFIX}option.thumbKeys.label`));
+			const label = el('label', 'lo-switch');
+			label.htmlFor = input.id;
+			label.append(input, name);
+			const why = window.LAYOUT_ANALYSIS_INFO.note(
+				t(`${PREFIX}option.thumbKeys.why_label`),
+				t(`${PREFIX}option.thumbKeys.why`)
+			);
+			why.id = 'lo-thumb-why';
+			const head = el('div', 'lo-switch-head');
+			head.append(label, why);
+			const help = el('p', 'lo-muted lo-help');
+			help.id = 'lo-thumb-help';
+			input.setAttribute('aria-describedby', help.id);
+			const item = el('div', 'lo-switch-item lo-switch-thumb');
+			item.append(head, help);
+			return item;
+		}
+
+		/** The keyboards of the model that have thumb keys, in the model's order. */
+		function thumbKeyboards() {
+			const codes = E.thumbKeys();
+			return Object.keys(DATA.model.keyboards).filter((id) => {
+				const board = E.keyboard(id);
+				return codes.some((code) => board.index.has(code));
+			});
 		}
 
 		/** A switch that only means something with another one follows it. */
@@ -829,6 +876,17 @@
 			const outside = $('lo-switch-digitsOutsideNumberRow');
 			outside.disabled = !digits.checked;
 			if (!digits.checked) outside.checked = false;
+			// The thumb keys only on a keyboard that has them; the choice is kept for one that does.
+			const thumb = $(`lo-switch-${THUMB_SWITCH}`);
+			const boards = thumbKeyboards();
+			const has = boards.includes($('lo-keyboard').value);
+			thumb.disabled = !has;
+			thumb.closest('.lo-switch-item').classList.toggle('lo-switch-off', !has);
+			$('lo-thumb-help').textContent = has
+				? t(`${PREFIX}option.thumbKeys.help`)
+				: t(`${PREFIX}option.thumbKeys.absent`, {
+						keyboards: boards.map((id) => t(`layout_analysis.keyboard.${id}`)).join(', ')
+					});
 		}
 
 		function fillPresets() {
@@ -1083,6 +1141,8 @@
 				)
 			};
 			for (const id of SWITCHES) out[id] = $(`lo-switch-${id}`).checked;
+			const thumb = $(`lo-switch-${THUMB_SWITCH}`);
+			out.thumbKeys = thumb.checked && !thumb.disabled ? $('lo-keyboard').value : null;
 			return out;
 		}
 
@@ -1889,7 +1949,7 @@
 		function save() {
 			if (!restored) return;
 			const switches = {};
-			for (const id of SWITCHES) switches[id] = $(`lo-switch-${id}`).checked;
+			for (const id of SWITCHES.concat(THUMB_SWITCH)) switches[id] = $(`lo-switch-${id}`).checked;
 			writeStored(STORAGE_KEY, {
 				corpus: $('lo-corpus').value,
 				start: $('lo-start').value,
@@ -1929,7 +1989,7 @@
 				root.querySelector(`input[name="lo-start-mode"][value="${saved.startMode}"]`).checked =
 					true;
 			choose('lo-keyboard', saved.keyboard);
-			for (const id of SWITCHES)
+			for (const id of SWITCHES.concat(THUMB_SWITCH))
 				if (saved.switches && typeof saved.switches[id] === 'boolean')
 					$(`lo-switch-${id}`).checked = saved.switches[id];
 			syncSwitches();
@@ -1981,6 +2041,7 @@
 				drawPinBoards();
 			});
 			$('lo-keyboard').addEventListener('change', () => {
+				syncSwitches();
 				drawPinBoards();
 				// Each keyboard has its own fingering profile.
 				drawSettings();

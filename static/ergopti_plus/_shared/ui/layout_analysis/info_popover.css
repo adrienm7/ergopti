@@ -18,7 +18,8 @@
 }
 
 /* As specific as a page's own button rule, and loaded after it. */
-button.la-info {
+button.la-info,
+button.la-note-info {
 	border-radius: 50%;
 	cursor: pointer;
 	font-size: 0.8em;
