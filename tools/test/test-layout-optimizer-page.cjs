@@ -500,7 +500,8 @@ if (typeof RUNNER.librarySummary === 'function') {
 // =============================
 
 // The page script in a bare context (no element to mount into): its number
-// formatter. A host page without a language once made toLocaleString('')
+// formatter, the Studio's one (info_popover.js, loaded before it as the page
+// loads it). A host page without a language once made toLocaleString('')
 // throw a RangeError in the middle of run(), which left the page on
 // « Loading the corpus… ».
 {
@@ -522,9 +523,15 @@ if (typeof RUNNER.librarySummary === 'function') {
 	};
 	pageBox.window = pageBox;
 	vm.createContext(pageBox);
+	const info = read(path.join(PAGE_DIR, '..', 'layout_analysis', 'info_popover.js'));
+	// Still loading: the popover waits for a DOMContentLoaded that never comes.
+	doc.readyState = 'loading';
+	vm.runInContext(info, pageBox, { filename: 'info_popover.js' });
+	doc.readyState = 'complete';
 	vm.runInContext(page, pageBox, { filename: 'optimizer_page.js' });
 	const PAGE = pageBox.LAYOUT_OPTIMIZER_PAGE;
-	const fallback = (page.match(/const FALLBACK_NUMBER_LOCALE = '([a-z]+)'/) || [])[1];
+	check(!/toLocaleString\(/.test(page), 'the optimizer writes its numbers itself');
+	const fallback = (info.match(/const FALLBACK_LOCALE = '([a-z]+)'/) || [])[1];
 	check(Boolean(fallback), 'the page names its fallback number language');
 	const expect = (locale, value) =>
 		Number(value).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });

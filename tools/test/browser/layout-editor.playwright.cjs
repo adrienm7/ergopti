@@ -27,6 +27,8 @@ const { chromium } = require('playwright');
 const { shared } = require('../../lib/paths.cjs');
 // The UX study's cases (docs/audits/layout-analysers/ux-study.md).
 const studioUx = require('./layout-editor-studio-ux.cjs');
+// Every number the Studio shows, through its one formatter (studio-numbers).
+const studioNumbers = require('./studio-numbers.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const KEYLAYOUT = path.join(ROOT, 'static', 'layouts', 'registry', 'ergopti', 'ergopti.keylayout');
@@ -3980,6 +3982,7 @@ async function exerciseComparerLink(browser, origin) {
 		await studioUx.exerciseWorstNgrams(browser, origin);
 		await studioUx.exerciseBestSwaps(browser, origin);
 		await studioUx.exerciseBoardImage(browser, origin);
+		await studioNumbers.exerciseNumbers(browser, origin);
 
 		// Every locale names every visible string.
 		for (const lang of LOCALES) {

@@ -159,14 +159,8 @@ var LayoutEditorPage = (function () {
 	// ======= 2/ Helpers =========
 	// ============================
 
-	/** Translates a locale key; an unknown key shows itself so the gap is visible. */
-	function t(key, values) {
-		const strings = window._i18n_strings || {};
-		let text = typeof strings[key] === 'string' ? strings[key] : key;
-		for (const [name, value] of Object.entries(values || {}))
-			text = text.split(`{${name}}`).join(String(value));
-		return text;
-	}
+	/** Translates a locale key (info_popover.js t(): numbers as every number shown). */
+	const t = (key, values) => window.LAYOUT_ANALYSIS_INFO.t(key, values);
 	const tl = (key, values) => t(PREFIX + key, values);
 
 	/**

@@ -657,12 +657,41 @@ check(
 		written({}) === (1949220.5).toLocaleString('fr', { minimumFractionDigits: 1 }),
 		"without either, the page's declared language decides"
 	);
-	// The whole class: every Studio script writes its numbers through INFO.format.
-	for (const dir of ['layout_analysis', 'layout_editor', 'layout_editor_window'])
+	// (studio-numbers) A number in a sentence is written as in a table: t() writes a
+	// whole number placeholder through format() (« 2 517 297 caractères », not
+	// « 2517297 »), and refuses a fraction, whose decimals only its caller knows.
+	pageWindow._i18n_strings = { '_meta.locale': 'fr', chars: '{n} caractères' };
+	check(
+		info.t('chars', { n: 2517297 }) === `${info.format(2517297, 0)} caractères` &&
+			info.t('chars', { n: 2517297 }).includes(' '),
+		`a number placeholder is written by the formatter: ${JSON.stringify(info.t('chars', { n: 2517297 }))}`
+	);
+	let refused = null;
+	try {
+		info.t('chars', { n: 1.5 });
+	} catch (error) {
+		refused = error;
+	}
+	check(
+		refused !== null && refused.name === 'TypeError',
+		'a fractional placeholder is refused, not written raw'
+	);
+	// The whole class: every Studio script writes its numbers through INFO.format
+	// and translates through INFO.t, never a translator of its own.
+	for (const dir of [
+		'layout_analysis',
+		'layout_editor',
+		'layout_editor_window',
+		'layout_optimizer'
+	])
 		for (const file of fs.readdirSync(shared('ui', dir)).filter((f) => f.endsWith('.js'))) {
 			if (dir === 'layout_analysis' && file === 'info_popover.js') continue;
 			const source = fs.readFileSync(shared('ui', dir, file), 'utf8');
 			check(!/\.toLocaleString\(/.test(source), `${dir}/${file} formats numbers itself`);
+			check(
+				!/\.join\(String\(value\)\)/.test(source),
+				`${dir}/${file} fills a sentence's numbers itself`
+			);
 		}
 }
 

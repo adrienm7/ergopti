@@ -125,9 +125,6 @@
 	const STANDALONE_ROOT_ID = 'layout-optimizer';
 	// The stages of a run, each with its own failure message (error.stage.<id>).
 	const RUN_STAGES = ['start', 'corpus', 'analysis', 'search', 'result'];
-	// The language of the numbers when the page declares no usable one: the
-	// locale i18n.js loads when none is set (its load()), never the browser's.
-	const FALLBACK_NUMBER_LOCALE = 'fr';
 
 	// The site passes ?lang=<code>; i18n.js loads that locale, then English and French.
 	const lang = new URLSearchParams(location.search).get('lang');
@@ -288,43 +285,15 @@
 </section>
 </div>`;
 
-	let warnedLocale = false;
-
 	/**
-	 * The language the page writes its numbers in: that of its strings
-	 * (i18n.js's _i18n_locale), else the page's declared language (<html
-	 * lang>). A missing, empty or malformed tag (a host page that declares no
-	 * language) makes toLocaleString throw a RangeError: such a page writes
-	 * its numbers in FALLBACK_NUMBER_LOCALE, said once in the console.
+	 * The language the page writes its numbers in: info_popover.js locale(),
+	 * the one language of every Studio page's numbers.
 	 * @returns {string} A BCP 47 language tag.
 	 */
-	function numberLocale() {
-		const tags = [window._i18n_locale, document.documentElement.lang];
-		for (const tag of tags) {
-			if (typeof tag !== 'string' || tag === '') continue;
-			try {
-				Intl.getCanonicalLocales(tag);
-				return tag;
-			} catch (error) {
-				if (!(error instanceof RangeError)) throw error;
-			}
-		}
-		if (!warnedLocale) {
-			warnedLocale = true;
-			console.warn(
-				`[layout_optimizer] no usable page language (${JSON.stringify(tags)}): numbers use ${FALLBACK_NUMBER_LOCALE}`
-			);
-		}
-		return FALLBACK_NUMBER_LOCALE;
-	}
+	const numberLocale = () => window.LAYOUT_ANALYSIS_INFO.locale();
 
-	/** A number written with `digits` decimals in the page's language (numberLocale). */
-	function formatNumber(value, digits) {
-		return Number(value).toLocaleString(numberLocale(), {
-			minimumFractionDigits: digits,
-			maximumFractionDigits: digits
-		});
-	}
+	/** A number written with `digits` decimals in the page's language (info_popover.js format()). */
+	const formatNumber = (value, digits) => window.LAYOUT_ANALYSIS_INFO.format(value, digits);
 
 	// The glyph beside each verdict and gap, so none is told by its colour alone.
 	const VERDICT_MARKS = { small_gap: '≈', optimized_ahead: '▲', existing_better: '★' };
@@ -533,14 +502,8 @@
 		// ======= 1/ Helpers =========
 		// ============================
 
-		/** Translates a locale key; an unknown key shows itself so the gap is visible. */
-		function t(key, values) {
-			const strings = window._i18n_strings || {};
-			let text = typeof strings[key] === 'string' ? strings[key] : key;
-			for (const [name, value] of Object.entries(values || {}))
-				text = text.split(`{${name}}`).join(String(value));
-			return text;
-		}
+		/** Translates a locale key (info_popover.js t(): numbers as every number shown). */
+		const t = (key, values) => window.LAYOUT_ANALYSIS_INFO.t(key, values);
 
 		function el(tag, className, text) {
 			const node = document.createElement(tag);

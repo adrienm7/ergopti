@@ -941,14 +941,8 @@
 		// ======= 1/ Helpers =========
 		// ============================
 
-		/** Translates a locale key; an unknown key shows itself so the gap is visible. */
-		function t(key, values) {
-			const strings = window._i18n_strings || {};
-			let text = typeof strings[key] === 'string' ? strings[key] : key;
-			for (const [name, value] of Object.entries(values || {}))
-				text = text.split(`{${name}}`).join(String(value));
-			return text;
-		}
+		/** Translates a locale key (info_popover.js t(): numbers as every number shown). */
+		const t = INFO.t;
 
 		/** Creates an element with a class and optional text. */
 		function el(tag, className, text) {
@@ -1955,7 +1949,7 @@
 			table.replaceChildren();
 			if (rows.length === 0) return sort;
 			const columns = [
-				{ key: 'rank', label: t('layout_analysis.table.rank'), value: (r) => r.rank },
+				{ key: 'rank', label: t('layout_analysis.table.rank'), value: (r) => r.rank, digits: 0 },
 				{ key: 'name', label: t('layout_analysis.table.layout'), value: (r) => r.layout.name },
 				{
 					key: 'score',
@@ -2417,7 +2411,7 @@
 				}
 				tr.append(
 					el('td', '', format(result.metrics.finger_imbalance, metricDigits('finger_imbalance'))),
-					el('td', '', String(result.rank))
+					el('td', '', format(result.rank, 0))
 				);
 				tbody.append(tr);
 			}
@@ -2565,7 +2559,7 @@
 				for (const result of sortedBy(rows, columns, tabSort(name))) {
 					const tr = heatTableRow(result);
 					for (const part of parts) tr.append(el('td', '', format(value(result, part.id), 1)));
-					tr.append(el('td', '', String(result.rank)));
+					tr.append(el('td', '', format(result.rank, 0)));
 					tbody.append(tr);
 				}
 				target.replaceChildren(tabSortHead(columns, name, drawTable), tbody);
@@ -2649,7 +2643,7 @@
 				}
 				tr.append(
 					el('td', '', format(result.metrics.distance, metricDigits('distance'))),
-					el('td', '', String(result.rank))
+					el('td', '', format(result.rank, 0))
 				);
 				tbody.append(tr);
 			}
@@ -2764,7 +2758,7 @@
 			fillSelect(
 				$('la-details-layout'),
 				state.results.length > 0
-					? state.results.map((r) => [r.layout.id, `${r.rank}. ${r.layout.name}`])
+					? state.results.map((r) => [r.layout.id, `${format(r.rank, 0)}. ${r.layout.name}`])
 					: [['', t('layout_analysis.status.empty')]],
 				state.details || ''
 			);

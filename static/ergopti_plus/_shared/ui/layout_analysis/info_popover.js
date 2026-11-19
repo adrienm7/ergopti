@@ -18,7 +18,10 @@
  * 4. Explanations are locale keys layout_analysis.info.<item> (21 locales);
  *    the values they quote come from the data, never from the text.
  * 5. format() writes every number of the Studio pages in the language of
- *    their strings (locale()), the same in the app and on the site.
+ *    their strings (locale()), the same in the app and on the site: the
+ *    group separator of that language (U+202F in French) and its decimal
+ *    mark. t() writes a number placeholder through it too, so a sentence
+ *    never shows a number another way than a table (maintainer, 2026-11-19).
  * 6. One « i » per value: an item whose explanation needs another one's
  *    (ALSO_EXPLAINS) shows both in its own popover, so a page never draws a
  *    second button with the same name beside the first.
@@ -41,16 +44,39 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 	// second « i » on the same row.
 	const ALSO_EXPLAINS = Object.freeze({ shortcut_left: Object.freeze(['shortcut_letters']) });
 
+	// The language of the numbers when the page declares no usable one: the
+	// locale i18n.js loads when none is set (its load()), never the browser's.
+	const FALLBACK_LOCALE = 'fr';
+
 	let popover = null;
 	let owner = null;
+	let warnedLocale = false;
 
-	/** Translates a locale key; an unknown key shows itself so the gap is visible. */
+	/**
+	 * Translates a locale key; an unknown key shows itself so the gap is
+	 * visible. A whole number placeholder is written by format(); a fraction
+	 * is written by its caller, who knows its decimals.
+	 * @param {string} key
+	 * @param {Object<string, string|number>} [values]
+	 * @returns {string}
+	 * @throws {TypeError} On a fractional or non-finite number placeholder.
+	 */
 	function t(key, values) {
 		const strings = window._i18n_strings || {};
 		let text = typeof strings[key] === 'string' ? strings[key] : key;
 		for (const [name, value] of Object.entries(values || {}))
-			text = text.split(`{${name}}`).join(String(value));
+			text = text.split(`{${name}}`).join(placeholder(key, name, value));
 		return text;
+	}
+
+	/** A placeholder's text: a number as format() writes it, anything else as itself. */
+	function placeholder(key, name, value) {
+		if (typeof value !== 'number') return String(value);
+		if (!Number.isInteger(value))
+			throw new TypeError(
+				`layout_analysis: ${key} {${name}} is ${value}; write a fraction with format(value, digits)`
+			);
+		return format(value, 0);
 	}
 
 	// The refusal values that name a finger or a keyboard, shown by their label
@@ -79,7 +105,7 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 				: null;
 			if (label !== null && typeof strings[label] === 'string') values[name] = strings[label];
 			else if (typeof value === 'number')
-				values[name] = String(Number(value.toFixed(REFUSAL_DIGITS)));
+				values[name] = format(value, Number.isInteger(value) ? 0 : REFUSAL_DIGITS);
 			else values[name] = value;
 		}
 		return t(`layout_analysis.error.${error.code}`, values);
@@ -97,13 +123,38 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 	 * app window seeds them without naming a locale), else the one asked for,
 	 * else the page's declared language. Numbers follow it, never the
 	 * browser's own language, so a French browser shows an English page's
-	 * numbers in English.
+	 * numbers in English. A missing, empty or malformed tag (a host page that
+	 * declares no language) would make Intl throw a RangeError: such a page
+	 * writes its numbers in FALLBACK_LOCALE, said once in the console.
 	 * @returns {string} A BCP 47 language code.
 	 */
 	function locale() {
 		const strings = window._i18n_strings || {};
-		if (typeof strings['_meta.locale'] === 'string') return strings['_meta.locale'];
-		return window._i18n_locale || document.documentElement.lang;
+		// Read in order: a context without a document (a script gate) names its strings' locale.
+		const sources = [
+			() => strings['_meta.locale'],
+			() => window._i18n_locale,
+			() => document.documentElement.lang
+		];
+		const tags = [];
+		for (const source of sources) {
+			const tag = source();
+			tags.push(tag);
+			if (typeof tag !== 'string' || tag === '') continue;
+			try {
+				Intl.getCanonicalLocales(tag);
+				return tag;
+			} catch (error) {
+				if (!(error instanceof RangeError)) throw error;
+			}
+		}
+		if (!warnedLocale) {
+			warnedLocale = true;
+			console.warn(
+				`[layout_analysis] no usable page language (${JSON.stringify(tags)}): numbers use ${FALLBACK_LOCALE}`
+			);
+		}
+		return FALLBACK_LOCALE;
 	}
 
 	// One formatter per language and decimals: toLocaleString with options
