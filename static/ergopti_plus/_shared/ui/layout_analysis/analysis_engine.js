@@ -1329,15 +1329,18 @@ var LAYOUT_ANALYSIS = (function () {
 	/**
 	 * The characters a layout still types when some keys are missing (a
 	 * compact form factor): the same reach as compileWays, without the costs.
+	 * The rules' characters and states are followed on ids; only the cells'
+	 * own characters are kept by name, so no set of every character is built.
 	 * @param {object} layout - Library shape.
 	 * @param {object} board - From keyboard().
 	 * @param {Set<string>} missing - Codes absent from the form factor.
-	 * @returns {Set<string>} The characters typed, substitutes included.
+	 * @returns {{has: function(string): boolean}} Whether a character is typed,
+	 *   substitutes included.
 	 */
 	function reachableChars(layout, board, missing) {
 		const graph = reachGraph(deadRules(layout.dead));
-		const chars = new Set();
-		// The rules' characters and states reached, by id.
+		// The cells' characters the rules never name, and the rules' ones reached, by id.
+		const cellChars = new Set();
 		const hasChar = new Uint8Array(graph.chars.length);
 		const hasState = new Uint8Array(graph.states.length);
 		for (const code in layout.rows) {
@@ -1348,9 +1351,9 @@ var LAYOUT_ANALYSIS = (function () {
 					const s = graph.stateId.get(cell.dead);
 					if (s !== undefined) hasState[s] = 1;
 				} else if (codeLength(cell) === 1) {
-					chars.add(cell);
 					const c = graph.charId.get(cell);
 					if (c !== undefined) hasChar[c] = 1;
+					else cellChars.add(cell);
 				}
 			}
 		}
@@ -1363,7 +1366,6 @@ var LAYOUT_ANALYSIS = (function () {
 				if (outKind[r] === REACH_CHAR) {
 					if (hasChar[out[r]]) continue;
 					hasChar[out[r]] = 1;
-					chars.add(graph.chars[out[r]]);
 					changed = true;
 				} else if (outKind[r] === REACH_STATE && !hasState[out[r]]) {
 					hasState[out[r]] = 1;
@@ -1372,9 +1374,15 @@ var LAYOUT_ANALYSIS = (function () {
 			}
 			if (!changed) break;
 		}
+		// The substitutes, in order: one may be a part of a later one.
+		const substitutes = new Set();
+		const typedChar = (char) => {
+			const c = graph.charId.get(char);
+			return (c !== undefined && hasChar[c] === 1) || cellChars.has(char) || substitutes.has(char);
+		};
 		for (const [fancy, plain] of substitutionParts())
-			if (!chars.has(fancy) && plain.every((c) => chars.has(c))) chars.add(fancy);
-		return chars;
+			if (!typedChar(fancy) && plain.every(typedChar)) substitutes.add(fancy);
+		return { has: typedChar };
 	}
 
 	// What a rule gives in reachGraph: a character, a dead state, or a text (nothing reached).
