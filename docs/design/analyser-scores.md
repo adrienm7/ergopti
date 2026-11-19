@@ -560,7 +560,7 @@ cmini and a200 (Python, `--python=<exe>` with `--cmini-data=<its folder>` or
 The study's ideas (docs/audits/layout-analysers/report.md, section 10) that
 became metrics or options of the Ergopti engine, each defined in
 [layout-analysis.md](layout-analysis.md#metrics) with a default weight of 0
-but `sfb_distance`'s 0.5 (beside `sfb` 5, maintainer, 2026-11-19):
+but `sfb_distance`'s 0.26 (beside `sfb` 5, maintainer, 2026-11-19):
 
 - **`sfb_distance`**, the same-finger travel: `100 · Σ_SFB n · d · f / bigrams
   - 0.5 · 100 · Σ_SFS n · d · f / trigrams`, d the distance between the two

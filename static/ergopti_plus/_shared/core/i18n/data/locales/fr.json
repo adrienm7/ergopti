@@ -4739,7 +4739,7 @@
 	"layout_analysis.info.sfb": "Deux touches de suite tapées par le même doigt : le pire événement pour tous les analyseurs.",
 	"layout_analysis.info.repeat": "La même touche deux fois de suite. Affichée, hors score : le doigt ne bouge pas.",
 	"layout_analysis.info.sfs": "Première et troisième touches d’un trigramme sur le même doigt. Moins grave qu’un bigramme de même doigt.",
-	"layout_analysis.info.sfb_distance": "Trajet d’un même doigt : pour chaque bigramme d’un même doigt, la distance entre ses deux touches en mm fois le facteur de son doigt (auriculaire 1,7, annulaire 1,3, autres 1), pour 100 bigrammes de touches, plus la moitié de la même mesure pour les skipgrammes d’un même doigt pour 100 trigrammes (genkey, Oxeylyzer, Keyboard Layout Optimizer). Poids par défaut 0,5, à côté de 5 pour un SFB : la moitié du coût d’un SFB est fixe, l’autre suit son trajet.",
+	"layout_analysis.info.sfb_distance": "Trajet d’un même doigt : pour chaque bigramme d’un même doigt, la distance entre ses deux touches en mm fois le facteur de son doigt (auriculaire 1,7, annulaire 1,3, autres 1), pour 100 bigrammes de touches, plus la moitié de la même mesure pour les skipgrammes d’un même doigt pour 100 trigrammes (genkey, Oxeylyzer, Keyboard Layout Optimizer). Poids par défaut 0,26, à côté de 5 pour un SFB : un SFB d’une touche coûte environ 10, un plus long davantage.",
 	"layout_analysis.info.lsb": "Deux doigts voisins d’une main, dont une touche dans une colonne latérale (colonne intérieure de l’index ou touches extérieures de l’auriculaire).",
 	"layout_analysis.info.scissors": "Doigts voisins d’une main, le plus long deux rangées ou plus sous le plus court.",
 	"layout_analysis.info.half_scissors": "Comme les ciseaux complets, mais à une rangée d’écart.",

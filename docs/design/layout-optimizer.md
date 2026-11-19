@@ -331,9 +331,10 @@ verdict reads the best existing layout's gap:
 
 `similar_score_gap` (`analysis_model.json`, read by
 `LAYOUT_ANALYSIS.similarScoreGap()`, checked by the codegen) is 2 points
-(confirmed by the maintainer on 2026-11-19): 0.4 % of SFB at its flat weight 5. It was about the gap between Ergopti+ and Ergopti on the Nemolivier
-anthology under the former weights; it is 3.7 points since `sfb_distance`
-weighs 0.5.
+(confirmed by the maintainer on 2026-11-19): about one 1 u SFB in 500
+bigrams (0.2 % at 5 flat and 0.26 per millimetre of its travel), and about
+the gap between Ergopti+ and Ergopti on the Nemolivier anthology (1.7
+points).
 
 **Card.** A card under the result: the verdict with a mark (≈, ▲, ★) and a
 coloured edge; the best existing layout with a ring gauge of its

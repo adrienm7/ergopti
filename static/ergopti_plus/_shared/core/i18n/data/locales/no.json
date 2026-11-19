@@ -4739,7 +4739,7 @@
 	"layout_analysis.info.sfb": "To taster etter hverandre med samme finger: den verste hendelsen for alle analyseverktøy.",
 	"layout_analysis.info.repeat": "Samme tast to ganger etter hverandre. Vises, poengsettes ikke: fingeren beveger seg ikke.",
 	"layout_analysis.info.sfs": "Første og tredje tast i et trigram med samme finger. Mildere enn et bigram med samme finger.",
-	"layout_analysis.info.sfb_distance": "Samme fingers vei: for hvert bigram med samme finger avstanden mellom de to tastene i mm ganger fingerens faktor (lillefinger 1,7, ringfinger 1,3, andre 1) per 100 tastebigrammer, pluss halvparten av det samme for samme fingers skipgrammer per 100 tastetrigrammer (genkey, Oxeylyzer, Keyboard Layout Optimizer). Standardvekt 0,5 ved siden av 5 for et SFB: halvparten av kostnaden for et SFB er fast, halvparten følger veien.",
+	"layout_analysis.info.sfb_distance": "Samme fingers vei: for hvert bigram med samme finger avstanden mellom de to tastene i mm ganger fingerens faktor (lillefinger 1,7, ringfinger 1,3, andre 1) per 100 tastebigrammer, pluss halvparten av det samme for samme fingers skipgrammer per 100 tastetrigrammer (genkey, Oxeylyzer, Keyboard Layout Optimizer). Standardvekt 0,26 ved siden av 5 for et SFB: et SFB på én tast koster omtrent 10, et lengre mer.",
 	"layout_analysis.info.lsb": "To nabofingre på én hånd, én tast i en sidekolonne (pekefingerens indre kolonne eller lillefingerens ytre taster).",
 	"layout_analysis.info.scissors": "Nabofingre på én hånd, den lengste to eller flere rader under den korteste.",
 	"layout_analysis.info.half_scissors": "Som hele sakser, men én rad fra hverandre.",

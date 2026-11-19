@@ -4739,7 +4739,7 @@
 	"layout_analysis.info.sfb": "Due tasti di seguito con lo stesso dito: l'evento peggiore per ogni analizzatore.",
 	"layout_analysis.info.repeat": "Lo stesso tasto due volte di seguito. Mostrato, non valutato: il dito non si muove.",
 	"layout_analysis.info.sfs": "Primo e terzo tasto di un trigramma con lo stesso dito. Meno grave di un bigramma con lo stesso dito.",
-	"layout_analysis.info.sfb_distance": "Percorso dello stesso dito: per ogni bigramma dello stesso dito, la distanza tra i due tasti in mm per il fattore del dito (mignolo 1,7, anulare 1,3, altri 1), ogni 100 bigrammi di tasti, più metà della stessa misura per gli skipgrammi dello stesso dito ogni 100 trigrammi (genkey, Oxeylyzer, Keyboard Layout Optimizer). Peso predefinito 0,5, accanto a 5 per un SFB: metà del costo di un SFB è fissa, metà segue il suo percorso.",
+	"layout_analysis.info.sfb_distance": "Percorso dello stesso dito: per ogni bigramma dello stesso dito, la distanza tra i due tasti in mm per il fattore del dito (mignolo 1,7, anulare 1,3, altri 1), ogni 100 bigrammi di tasti, più metà della stessa misura per gli skipgrammi dello stesso dito ogni 100 trigrammi (genkey, Oxeylyzer, Keyboard Layout Optimizer). Peso predefinito 0,26, accanto a 5 per un SFB: un SFB di un tasto costa circa 10, uno più lungo di più.",
 	"layout_analysis.info.lsb": "Due dita vicine di una mano, un tasto in una colonna laterale (colonna interna dell'indice o tasti esterni del mignolo).",
 	"layout_analysis.info.scissors": "Dita vicine di una mano, il più lungo due o più file sotto il più corto.",
 	"layout_analysis.info.half_scissors": "Come le forbici complete, ma a una fila di distanza.",

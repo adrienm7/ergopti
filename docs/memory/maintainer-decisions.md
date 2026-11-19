@@ -7,19 +7,24 @@ named constraint changes; a change of mind comes from the maintainer.
 
 ## Layout score: SFB travel and access weights (2026-11-19)
 
-Decided by the maintainer on 2026-11-19: `sfb` is 5 and `sfb_distance` 0.5
-(`score_weights.json`), so half of an SFB's cost is flat and half follows its
-travel, weighted by finger (`same_finger_factor`); `altgr_usage` is 5 and
+Decided by the maintainer on 2026-11-19: `sfb` is 5 and `sfb_distance` 0.26
+(`score_weights.json`), so half of a 1 u SFB's cost is flat and half follows
+its travel, weighted by finger (`same_finger_factor`); `altgr_usage` is 5 and
 `dead_key_usage` 3, `modifier_usage` stays 0.5. Why: a long or pinky SFB is
 worse than a short index one, which a flat weight cannot say, and a character
 behind AltGr or a dead key costs more than the former weights said. These
 defaults also choose the ways of typing, so the metrics of a layout that has
 several ways to type a character move with them; the golden values were
-recorded again. A 1 u index SFB now costs 14.8 points per percentage point
-(5 + 0.5 × 19.6 mm, against 10 before), a pinky's Q to Z 39.6, and a
-skipgram's travel counts at half (`SFS_DISTANCE_SHARE`), so every total
-dropped (Ergopti+ on Nemolivier 25.2 to −27.5, AZERTY −88.9 to −229.8). Do not
-re-propose a flat SFB weight; tune these two numbers instead.
+recorded again.
+
+`sfb_distance` 0.5 was applied first the same day, then replaced by 0.26:
+0.5 made a 1 u index SFB cost 14.8 points per percentage point instead of
+10, a pinky's Q to Z 39.6, and added the skipgrams' travel at half
+(`SFS_DISTANCE_SHARE`), so every total dropped by 50 to 140 points
+(Ergopti+ on Nemolivier 25.2 to −27.5). At 0.26 a 1 u index SFB costs 10.1
+(5 + 0.26 × 19.6 mm), Q to Z 23.0, and a 1 u index skipgram 5.6 instead of
+3 (Ergopti+ 25.2 to −2.9). Do not re-propose a flat SFB weight; tune these
+two numbers instead.
 
 ## The Optimiser's small gap stays 2 points (2026-11-19)
 

@@ -1,10 +1,10 @@
 {
-	"_description": "Default weights of the global layout score (one shared source read by the site and the app through _shared/ui/layout_analysis/_generated/analysis_data.js). Each weight is the number of score points one unit of the metric is worth (one percentage point, or one millimetre for distance); the sign comes from the metric's direction, so every weight is positive. « floors » gives each penalty metric (lower is better) a floor in its own unit: only the part of its value above the floor costs points (Cyanophage's optimiser), so tiny differences between good layouts do not decide the rank; 0, the default, counts the whole value. A weight of 0 (pinky_ring, added on 2026-11-19) shows a metric without moving the score until the maintainer chooses its weight. The maintainer set sfb 5 and sfb_distance 0.5 (half of an SFB's cost flat, half by its travel) and the access weights altgr_usage 5 and dead_key_usage 3 on 2026-11-19 (docs/memory/maintainer-decisions.md). The choice of each value is justified in docs/audits/layout-analysers/report.md, section « Default weights ».",
+	"_description": "Default weights of the global layout score (one shared source read by the site and the app through _shared/ui/layout_analysis/_generated/analysis_data.js). Each weight is the number of score points one unit of the metric is worth (one percentage point, or one millimetre for distance); the sign comes from the metric's direction, so every weight is positive. « floors » gives each penalty metric (lower is better) a floor in its own unit: only the part of its value above the floor costs points (Cyanophage's optimiser), so tiny differences between good layouts do not decide the rank; 0, the default, counts the whole value. A weight of 0 (pinky_ring, added on 2026-11-19) shows a metric without moving the score until the maintainer chooses its weight. The maintainer set sfb 5 and sfb_distance 0.26 (a 1 u SFB keeps costing about 10: 5 + 0.26 × 19.05 mm; 0.5, applied first the same day, made it 14.8) and the access weights altgr_usage 5 and dead_key_usage 3 on 2026-11-19 (docs/memory/maintainer-decisions.md). The choice of each value is justified in docs/audits/layout-analysers/report.md, section « Default weights ».",
 	"schema_version": 1,
 	"weights": {
 		"sfb": 5,
 		"sfs": 3,
-		"sfb_distance": 0.5,
+		"sfb_distance": 0.26,
 		"lsb": 2,
 		"scissors": 3,
 		"half_scissors": 1,

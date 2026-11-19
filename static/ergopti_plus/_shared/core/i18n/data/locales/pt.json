@@ -4739,7 +4739,7 @@
 	"layout_analysis.info.sfb": "Duas teclas seguidas com o mesmo dedo: o pior evento para todos os analisadores.",
 	"layout_analysis.info.repeat": "A mesma tecla duas vezes seguidas. Mostrada, não pontuada: o dedo não se move.",
 	"layout_analysis.info.sfs": "Primeira e terceira teclas de um trigrama com o mesmo dedo. Menos grave do que um bigrama do mesmo dedo.",
-	"layout_analysis.info.sfb_distance": "Percurso do mesmo dedo: para cada bigrama do mesmo dedo, a distância entre as duas teclas em mm vezes o fator do dedo (mindinho 1,7, anelar 1,3, outros 1), por 100 bigramas de teclas, mais metade do mesmo para os skipgramas do mesmo dedo por 100 trigramas (genkey, Oxeylyzer, Keyboard Layout Optimizer). Peso padrão 0,5, ao lado de 5 para um SFB: metade do custo de um SFB é fixa, metade segue o seu percurso.",
+	"layout_analysis.info.sfb_distance": "Percurso do mesmo dedo: para cada bigrama do mesmo dedo, a distância entre as duas teclas em mm vezes o fator do dedo (mindinho 1,7, anelar 1,3, outros 1), por 100 bigramas de teclas, mais metade do mesmo para os skipgramas do mesmo dedo por 100 trigramas (genkey, Oxeylyzer, Keyboard Layout Optimizer). Peso padrão 0,26, ao lado de 5 para um SFB: um SFB de uma tecla custa cerca de 10, um mais longo, mais.",
 	"layout_analysis.info.lsb": "Dois dedos vizinhos de uma mão, uma tecla numa coluna lateral (coluna interior do indicador ou teclas exteriores do mindinho).",
 	"layout_analysis.info.scissors": "Dedos vizinhos de uma mão, o mais longo duas ou mais filas abaixo do mais curto.",
 	"layout_analysis.info.half_scissors": "Como as tesouras completas, mas a uma fila de distância.",

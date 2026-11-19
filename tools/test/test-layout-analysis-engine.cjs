@@ -1308,14 +1308,14 @@ for (const layout of library) {
 	// (bigram-matrix) The same text, pair by pair: each pair's class from the
 	// one visitor, its share of the five bigrams, and its points with the
 	// default weights: Q→Z an SFB, flat and by its travel (Q and Z 40.691 mm
-	// apart, × 1.7 for the pinky: 69.174 mm), −5 × 20 − 0.5 × 20 × 69.174 =
-	// −791.744; 4→D a full scissor and an outward roll (−3 × 20 + 0.5 × 20 =
+	// apart, × 1.7 for the pinky: 69.174 mm), −5 × 20 − 0.26 × 20 × 69.174 =
+	// −459.707; 4→D a full scissor and an outward roll (−3 × 20 + 0.5 × 20 =
 	// −50), E→A and E→X outward rolls (+10), E→J a hand change (0).
 	const matrix = E.bigramMatrix(qwerty, tables, { keyboard: 'iso' });
 	check(matrix.bigrams === 5, `bigram matrix: ${matrix.bigrams} bigrams, expected 5`);
 	const byPair = new Map(matrix.pairs.map((p) => [p.keys.join('+'), p]));
 	const expected = {
-		'KeyQ+KeyZ': [['row_jump', 'sfb'], -791.7439032302706],
+		'KeyQ+KeyZ': [['row_jump', 'sfb'], -459.7068296797407],
 		'Digit4+KeyD': [['roll_out', 'row_jump', 'scissors'], -50],
 		'KeyE+KeyA': [['roll_out'], 10],
 		'KeyE+KeyX': [['roll_out', 'row_jump'], 10],
@@ -1388,7 +1388,7 @@ for (const layout of library) {
 	check(proto.constructor === 2 && proto.hasownproperty === 1, `words: ${JSON.stringify(proto)}`);
 	// Each word measured alone, worked by hand on QWERTY with the default
 	// weights: « qz » is one bigram, an SFB (100 % × 5 = 500 points flat, and
-	// 0.5 × 100 × 69.174 = 3458.720 by its travel: Q and Z 40.691 mm apart,
+	// 0.26 × 100 × 69.174 = 1798.534 by its travel: Q and Z 40.691 mm apart,
 	// × 1.7 for the pinky) with a mean travel of (19.636 + 21.299) / 2 mm (Q
 	// and Z from the pinky's home); « ea » is a roll from the top row to home
 	// (19.636 / 2 mm, no event).
@@ -1399,7 +1399,7 @@ for (const layout of library) {
 	const ea = efforts.words.find((w) => w.word === 'ea');
 	check(near(qz.parts.sfb, 500), `word effort: qz SFB part ${qz.parts.sfb}`);
 	check(
-		near(qz.parts.sfb_distance, 3458.7195161513527),
+		near(qz.parts.sfb_distance, 1798.5341483987033),
 		`word effort: qz SFB travel part ${qz.parts.sfb_distance}`
 	);
 	check(
@@ -1407,7 +1407,7 @@ for (const layout of library) {
 		`word effort: qz travel ${qz.parts.distance}`
 	);
 	check(
-		near(qz.effort, 500 + 3458.7195161513527 + (reach('KeyQ') + reach('KeyZ')) / 2),
+		near(qz.effort, 500 + 1798.5341483987033 + (reach('KeyQ') + reach('KeyZ')) / 2),
 		`word effort: qz ${qz.effort}`
 	);
 	check(near(ea.effort, reach('KeyE') / 2), `word effort: ea ${ea.effort}`);
@@ -1801,12 +1801,12 @@ const onlyKind = (result, char) =>
 }
 
 // Direct, AltGr or dead key, by the documented costs (default weights:
-// distance 1/mm, home_row 0.3, pinky_load 0.3, sfb 5, sfb_distance 0.5, and
+// distance 1/mm, home_row 0.3, pinky_load 0.3, sfb 5, sfb_distance 0.26, and
 // the access weights modifier_usage 0.5, altgr_usage 5, dead_key_usage 3; ISO
 // reaches KeyR, KeyP, KeyE 19.636 mm, AltRight 69.056 mm). In « fé » there
 // are 2 characters and 1 bigram, so a pair counts 100 × 2 per point of weight:
-// - é on KeyR (left index, like f): 19.636 + 5 × 200 (SFB) + 0.5 × 200 ×
-//   19.636 (its travel, F to R) = 2983.265;
+// - é on KeyR (left index, like f): 19.636 + 5 × 200 (SFB) + 0.26 × 200 ×
+//   19.636 (its travel, F to R) = 2040.723;
 // - AltGr+KeyL (home): −30 (home) + 69.056 (AltRight) + 50 (modifier) + 500
 //   (AltGr layer) = 589.056;
 // - dead key KeyP then e on KeyE: 19.636 + 30 (pinky) + 19.636 + 300 (dead key)
@@ -3002,11 +3002,11 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	const qwerty = byId.get('qwerty');
 	const ed = E.analyse(qwerty, E.ngramsFromText('ed'), { keyboard: 'iso' });
 	const edMm = 100 * Math.hypot(0.25, 1) * 19.05;
-	// The maintainer weighed sfb_distance 0.5 beside sfb 5 (2026-11-19);
+	// The maintainer weighed sfb_distance 0.26 beside sfb 5 (2026-11-19);
 	// pinky_ring weighs 0: shown, out of the score until weighed.
 	for (const [id, weight] of [
 		['sfb', 5],
-		['sfb_distance', 0.5],
+		['sfb_distance', 0.26],
 		['pinky_ring', 0]
 	])
 		check(
@@ -3019,7 +3019,7 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	});
 	check(
 		near(weighed.score.contributions.sfb_distance, -edMm) &&
-			near(weighed.score.total, ed.score.total - edMm / 2),
+			near(weighed.score.total, ed.score.total - edMm * (1 - 0.26)),
 		`ideas: a weight of 1 on sfb_distance takes ${-weighed.score.contributions.sfb_distance} points`
 	);
 	// Floors: « ed » is 100 % SFB at 5 points a point; a floor of 30 leaves 70 points of it.
@@ -3281,7 +3281,7 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		sameThumb.coverage.bigrams === 8 &&
 			near(sameThumb.metrics.sfb_distance, 100 * thumbMm) &&
 			near(sameThumb.score.contributions.sfb, -5 * 100) &&
-			near(sameThumb.score.contributions.sfb_distance, -0.5 * 100 * thumbMm),
+			near(sameThumb.score.contributions.sfb_distance, -0.26 * 100 * thumbMm),
 		`thumb SFB: t and the space on one thumb travel ${sameThumb.metrics.sfb_distance} mm ` +
 			`over ${sameThumb.coverage.bigrams} bigrams`
 	);

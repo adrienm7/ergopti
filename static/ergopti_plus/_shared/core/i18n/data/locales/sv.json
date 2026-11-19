@@ -4739,7 +4739,7 @@
 	"layout_analysis.info.sfb": "Två tangenter i rad med samma finger: den värsta händelsen för varje analysverktyg.",
 	"layout_analysis.info.repeat": "Samma tangent två gånger i rad. Visas, poängsätts inte: fingret rör sig inte.",
 	"layout_analysis.info.sfs": "Första och tredje tangenten i ett trigram med samma finger. Lindrigare än ett bigram med samma finger.",
-	"layout_analysis.info.sfb_distance": "Samma fingers väg: för varje bigram med samma finger avståndet mellan de två tangenterna i mm gånger fingerns faktor (lillfinger 1,7, ringfinger 1,3, övriga 1) per 100 tangentbigram, plus hälften av samma sak för samma fingers skipgram per 100 tangenttrigram (genkey, Oxeylyzer, Keyboard Layout Optimizer). Standardvikt 0,5 bredvid 5 för ett SFB: halva kostnaden för ett SFB är fast, halva följer dess väg.",
+	"layout_analysis.info.sfb_distance": "Samma fingers väg: för varje bigram med samma finger avståndet mellan de två tangenterna i mm gånger fingerns faktor (lillfinger 1,7, ringfinger 1,3, övriga 1) per 100 tangentbigram, plus hälften av samma sak för samma fingers skipgram per 100 tangenttrigram (genkey, Oxeylyzer, Keyboard Layout Optimizer). Standardvikt 0,26 bredvid 5 för ett SFB: ett SFB på en tangent kostar ungefär 10, ett längre mer.",
 	"layout_analysis.info.lsb": "Två grannfingrar på en hand, en tangent i en sidokolumn (pekfingrets inre kolumn eller lillfingrets yttre tangenter).",
 	"layout_analysis.info.scissors": "Grannfingrar på en hand, det längre två eller fler rader under det kortare.",
 	"layout_analysis.info.half_scissors": "Som hela saxar, men en rad isär.",
