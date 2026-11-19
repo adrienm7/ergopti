@@ -53,6 +53,11 @@
  *    open panel offers the pages' file types; the editor's interoperability
  *    downloads have words and a file type the hosts write; a UTF-16 KLC
  *    decodes.
+ * 12. Share links (share-link-fragment): the Comparer's own layouts written in
+ *    a link's fragment read back to the same keys and dead keys; a fragment
+ *    from another version, cut, damaged, too large or holding a layout the
+ *    engine refuses (an unknown key, a bad cell, an unknown field) is refused
+ *    whole with its stable code.
  * ==============================================================================
  */
 
@@ -93,7 +98,15 @@ const check = (condition, message) => {
 };
 
 // The page's globals the readers use: TextDecoder decodes a picked file's bytes.
-const sandbox = { TextDecoder };
+const sandbox = {
+	TextDecoder,
+	TextEncoder,
+	Blob,
+	CompressionStream,
+	DecompressionStream,
+	atob,
+	btoa
+};
 vm.createContext(sandbox);
 for (const file of [
 	'layout_analysis/_generated/analysis_data.js',
@@ -1216,11 +1229,111 @@ check(
 	'a UTF-16 KLC does not decode to its text'
 );
 
-if (errors.length > 0) {
-	for (const error of errors) console.error(`  ✗ ${error}`);
-	console.error(`test-layout-formats: ${errors.length} problem(s)`);
-	process.exit(1);
+// ===============================
+// ======= 12/ Share links =======
+// ===============================
+
+/** The code a share link's fragment is refused with, or 'read' when it reads. */
+async function linkRefusal(hash) {
+	try {
+		await F.fromLink(hash, E);
+		return 'read';
+	} catch (error) {
+		return error.code || error.message;
+	}
 }
-console.log(
-	`test-layout-formats: OK (4 formats of one layout, ${3 + klaResults.length + moreResults.length + 2} third-party files, ${Object.keys(reference).length} characters, ${compared} KLA keys, ${klaRoundTrips} KLAnext, ${keylayoutRoundTrips} .keylayout and ${writerRoundTrips} DOF, genkey and cmini round trips, ${kbeFiles.length} .kbe refused, malformed files refused)`
-);
+
+/** A fragment of the current version holding this JSON, deflated as toLink writes it. */
+async function linkOf(value) {
+	const packed = new Uint8Array(
+		await new Response(
+			new Blob([JSON.stringify(value)]).stream().pipeThrough(new CompressionStream('deflate-raw'))
+		).arrayBuffer()
+	);
+	return `#l=1.${Buffer.from(packed).toString('base64url')}`;
+}
+
+async function checkLinks() {
+	const library = E.libraryLayouts();
+	const shared = ['ergopti', 'bepo'].map((id) => library.find((layout) => layout.id === id));
+	const part = await F.toLink(shared);
+	check(
+		/^l=1\.[A-Za-z0-9_-]+$/.test(part),
+		`share link: not a versioned part: ${part.slice(0, 20)}`
+	);
+	const back = await F.fromLink(`#${part}`, E);
+	check(back.length === 2, `share link: ${back.length} layouts read back`);
+	back.forEach((layout, index) => {
+		const sent = shared[index];
+		check(layout.name === sent.name, `share link: name ${layout.name}`);
+		check(layout.origin === 'user', `share link: ${layout.name} is not a personal layout`);
+		check(
+			JSON.stringify([layout.rows, layout.dead, layout.command]) ===
+				JSON.stringify([sent.rows, sent.dead, sent.command]),
+			`share link: ${sent.id} does not read back to the same keys`
+		);
+	});
+	check((await F.fromLink('', E)).length === 0, 'share link: an empty fragment carries layouts');
+	check(
+		(await F.fromLink('#section', E)).length === 0,
+		'share link: a page anchor carries layouts'
+	);
+	const good = { n: 'Mine', r: { KeyQ: ['a', 'A', null, null] } };
+	check(
+		(await linkRefusal(await linkOf([good]))) === 'read',
+		'share link: a minimal layout is refused'
+	);
+	for (const [hash, code, what] of [
+		[`#l=2.${part.slice(4)}`, 'link_version', 'another version'],
+		[`#${part.slice(0, 40)}`, 'link_damaged', 'a cut link'],
+		['#l=1.$$$', 'link_damaged', 'a link outside base64url'],
+		['#l=1.AAAA', 'link_damaged', 'bytes that do not inflate'],
+		[`#${part}&${part}`, 'link_damaged', 'two layout parts'],
+		[`#l=1.${'A'.repeat(300000)}`, 'link_too_large', 'an oversized fragment'],
+		[await linkOf({ n: 'x' }), 'link_invalid', 'an object instead of a list'],
+		[await linkOf([]), 'link_invalid', 'no layout'],
+		[await linkOf(Array(17).fill(good)), 'link_too_large', 'too many layouts'],
+		[await linkOf([{ ...good, x: 1 }]), 'link_invalid', 'an unknown field'],
+		[await linkOf([{ ...good, n: '' }]), 'link_invalid', 'an empty name'],
+		[
+			await linkOf([{ ...good, r: { Nowhere: ['a', null, null, null] } }]),
+			'link_invalid',
+			'an unknown key'
+		],
+		[await linkOf([{ ...good, r: { KeyQ: ['a', 'A'] } }]), 'link_invalid', 'a short row'],
+		[
+			await linkOf([{ ...good, r: { KeyQ: [7, null, null, null] } }]),
+			'link_invalid',
+			'a number cell'
+		],
+		[
+			await linkOf([{ ...good, r: { KeyQ: [{ dead: 'x', y: 1 }, null, null, null] } }]),
+			'link_invalid',
+			'a dead cell with a field too many'
+		],
+		[await linkOf([{ ...good, d: { x: { a: 5 } } }]), 'link_invalid', 'a bad dead-key result'],
+		[await linkOf([{ ...good, c: { KeyQ: 3 } }]), 'link_invalid', 'a bad shortcut']
+	])
+		check((await linkRefusal(hash)) === code, `share link: ${what} is not refused as ${code}`);
+	const message = F.refusalMessage({ code: 'link_invalid', detail: 'layout 1' });
+	check(
+		message.key === 'layout_analysis.formats.refused.link_invalid',
+		`share link: the refusal is not worded: ${message.key}`
+	);
+}
+
+checkLinks().then(report, (error) => {
+	console.error(error);
+	process.exit(1);
+});
+
+function report() {
+	if (errors.length > 0) {
+		for (const error of errors) console.error(`  ✗ ${error}`);
+		console.error(`test-layout-formats: ${errors.length} problem(s)`);
+		process.exit(1);
+	}
+	console.log(
+		`test-layout-formats: OK (4 formats of one layout, ${3 + klaResults.length + moreResults.length + 2} third-party files, ${Object.keys(reference).length} characters, ${compared} KLA keys, ${klaRoundTrips} KLAnext, ${keylayoutRoundTrips} .keylayout and ${writerRoundTrips} DOF, genkey and cmini round trips, ${kbeFiles.length} .kbe refused, malformed files refused)`
+	);
+}

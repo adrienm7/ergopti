@@ -30,6 +30,12 @@
  *    them the same way in every language.
  * 4. Pure: no DOM, no fetch; a Kalamine TOML is passed already parsed, so the
  *    page's TOML codec (vendor/smol-toml.js) and Node's are the same one.
+ * 5. Share links: the Comparer's « Copy the link » carries the visitor's own
+ *    layouts in the URL fragment (toLink), which never reaches a server:
+ *    versioned (l=<version>.<data>), compact (the layouts' keys as JSON,
+ *    deflated, base64url) and read back strictly (fromLink): a fragment that
+ *    is cut, from a newer version, too large or holding a layout the engine
+ *    refuses is refused with its own code, never half read.
  * ==============================================================================
  */
 
@@ -77,8 +83,25 @@ var LAYOUT_FORMATS = (function () {
 		'format_unknown',
 		'format_invalid',
 		'format_unsupported_board',
-		'format_kbe_encrypted'
+		'format_kbe_encrypted',
+		'link_version',
+		'link_damaged',
+		'link_too_large',
+		'link_invalid',
+		'link_unsupported'
 	];
+	// A share link's fragment part (#l=1.<data>): its version, and the caps it is
+	// read under (its text, its unpacked JSON, its layouts, a name and a cell).
+	const LINK_PARAM = 'l';
+	const LINK_VERSION = 1;
+	const LINK_PART = /^l=(\d+)\.([A-Za-z0-9_-]+)$/;
+	const LINK_MAX_TEXT = 262144;
+	const LINK_MAX_JSON = 1048576;
+	const LINK_MAX_LAYOUTS = 16;
+	const LINK_MAX_NAME = 80;
+	const LINK_MAX_CELL = 64;
+	// A link longer than this may be cut by a chat or mail client: the Comparer says so.
+	const LINK_LONG = 8192;
 	const LOSSES = [
 		'key',
 		'keysym',
@@ -1893,8 +1916,190 @@ var LAYOUT_FORMATS = (function () {
 		return { text: `${JSON.stringify(json, null, 4)}\n`, unmapped };
 	}
 
+	// ===============================
+	// ======= 6/ Share links ========
+	// ===============================
+
+	/** Base64url of bytes, without padding. */
+	function toBase64Url(bytes) {
+		let binary = '';
+		for (const byte of bytes) binary += String.fromCharCode(byte);
+		return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	}
+
+	/** The bytes of a base64url text; a text that is not one is a damaged link. */
+	function fromBase64Url(text) {
+		const padded = text.replace(/-/g, '+').replace(/_/g, '/');
+		let binary;
+		try {
+			binary = atob(padded + '='.repeat((4 - (padded.length % 4)) % 4));
+		} catch {
+			fail('link_damaged', 'base64');
+		}
+		return Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
+	}
+
+	/** Bytes through a CompressionStream or DecompressionStream, stopped past a cap. */
+	async function pipeBytes(bytes, stream, cap) {
+		const reader = new Blob([bytes]).stream().pipeThrough(stream).getReader();
+		const chunks = [];
+		let size = 0;
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			size += value.length;
+			if (size > cap) {
+				await reader.cancel();
+				fail('link_too_large', String(size));
+			}
+			chunks.push(value);
+		}
+		const out = new Uint8Array(size);
+		let at = 0;
+		for (const chunk of chunks) {
+			out.set(chunk, at);
+			at += chunk.length;
+		}
+		return out;
+	}
+
+	/** Whether a value is a plain object (not an array, not null). */
+	const isPlain = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+	/**
+	 * The fragment part that carries layouts in a share link.
+	 * @param {Array<{name: string, rows: object, dead?: object, command?: object}>} layouts
+	 *   The layouts (library shape).
+	 * @returns {Promise<string>} « l=1.<data> », to put after the link's « # ».
+	 * @throws {Error} link_unsupported when the browser cannot deflate;
+	 *   link_too_large past the caps fromLink reads.
+	 */
+	async function toLink(layouts) {
+		if (typeof CompressionStream !== 'function') fail('link_unsupported', 'CompressionStream');
+		if (layouts.length === 0 || layouts.length > LINK_MAX_LAYOUTS)
+			fail('link_too_large', `${layouts.length} layouts`);
+		const compact = layouts.map((layout) => {
+			const entry = { n: String(layout.name || layout.id).slice(0, LINK_MAX_NAME), r: layout.rows };
+			if (layout.dead && Object.keys(layout.dead).length > 0) entry.d = layout.dead;
+			if (layout.command && Object.keys(layout.command).length > 0) entry.c = layout.command;
+			return entry;
+		});
+		const json = new TextEncoder().encode(JSON.stringify(compact));
+		if (json.length > LINK_MAX_JSON) fail('link_too_large', String(json.length));
+		const packed = await pipeBytes(json, new CompressionStream('deflate-raw'), LINK_MAX_TEXT);
+		const part = `${LINK_PARAM}=${LINK_VERSION}.${toBase64Url(packed)}`;
+		if (part.length > LINK_MAX_TEXT) fail('link_too_large', String(part.length));
+		return part;
+	}
+
+	/** One cell of a linked layout: null, a text, or a dead key's state. */
+	function linkCell(cell) {
+		if (cell === null) return true;
+		if (typeof cell === 'string') return cell.length > 0 && cell.length <= LINK_MAX_CELL;
+		return (
+			isPlain(cell) &&
+			Object.keys(cell).length === 1 &&
+			typeof cell.dead === 'string' &&
+			cell.dead.length > 0 &&
+			cell.dead.length <= LINK_MAX_CELL
+		);
+	}
+
+	/**
+	 * Checks one layout of a link against the shape toLink writes, every key a
+	 * key the engine types on, every cell a text or a dead key.
+	 * @returns {object} The layout in the library shape.
+	 * @throws {Error} link_invalid, naming what is wrong.
+	 */
+	function linkLayout(entry, index, analysis, codes) {
+		const where = `layout ${index + 1}`;
+		if (!isPlain(entry)) fail('link_invalid', where);
+		for (const key of Object.keys(entry))
+			if (!['n', 'r', 'd', 'c'].includes(key)) fail('link_invalid', `${where}: ${key}`);
+		const name = typeof entry.n === 'string' ? entry.n.trim() : '';
+		if (name === '' || name.length > LINK_MAX_NAME) fail('link_invalid', `${where}: name`);
+		if (!isPlain(entry.r) || Object.keys(entry.r).length === 0)
+			fail('link_invalid', `${where}: keys`);
+		for (const [code, row] of Object.entries(entry.r)) {
+			if (!codes.has(code)) fail('link_invalid', `${where}: ${code}`);
+			if (!Array.isArray(row) || row.length !== LAYERS || !row.every(linkCell))
+				fail('link_invalid', `${where}: ${code}`);
+		}
+		const dead = entry.d === undefined ? {} : entry.d;
+		if (!isPlain(dead)) fail('link_invalid', `${where}: dead keys`);
+		for (const [state, rules] of Object.entries(dead)) {
+			if (!isPlain(rules)) fail('link_invalid', `${where}: ${state}`);
+			for (const [typed, result] of Object.entries(rules))
+				if (typed.length > LINK_MAX_CELL || result === null || !linkCell(result))
+					fail('link_invalid', `${where}: ${state}`);
+		}
+		const command = entry.c === undefined ? {} : entry.c;
+		if (!isPlain(command)) fail('link_invalid', `${where}: shortcuts`);
+		for (const [code, letter] of Object.entries(command))
+			if (!codes.has(code) || typeof letter !== 'string' || !linkCell(letter))
+				fail('link_invalid', `${where}: ${code}`);
+		try {
+			return analysis.layoutFromRows({
+				id: `link_${index + 1}`,
+				name,
+				rows: entry.r,
+				dead,
+				command,
+				origin: 'user'
+			});
+		} catch (error) {
+			fail('link_invalid', `${where}: ${error.message}`);
+		}
+	}
+
+	/**
+	 * The layouts a share link's fragment carries.
+	 * @param {string} hash - The address's fragment (location.hash, with or without « # »).
+	 * @param {object} analysis - The analysis engine (LAYOUT_ANALYSIS).
+	 * @returns {Promise<object[]>} The layouts (ids link_1, link_2…, origin user),
+	 *   none when the fragment carries none.
+	 * @throws {Error} link_version, link_damaged, link_too_large, link_invalid or
+	 *   link_unsupported: the whole fragment is refused.
+	 */
+	async function fromLink(hash, analysis) {
+		const text = String(hash || '').replace(/^#/, '');
+		const parts = text === '' ? [] : text.split('&');
+		const linked = parts.filter((part) => part.startsWith(`${LINK_PARAM}=`));
+		if (linked.length === 0) return [];
+		if (linked.length > 1) fail('link_damaged', 'parts');
+		if (linked[0].length > LINK_MAX_TEXT) fail('link_too_large', String(linked[0].length));
+		const match = LINK_PART.exec(linked[0]);
+		if (!match) fail('link_damaged', 'form');
+		if (Number(match[1]) !== LINK_VERSION) fail('link_version', match[1]);
+		if (typeof DecompressionStream !== 'function') fail('link_unsupported', 'DecompressionStream');
+		let json;
+		try {
+			json = await pipeBytes(
+				fromBase64Url(match[2]),
+				new DecompressionStream('deflate-raw'),
+				LINK_MAX_JSON
+			);
+		} catch (error) {
+			if (REFUSALS.includes(error && error.code)) throw error;
+			fail('link_damaged', 'deflate');
+		}
+		let value;
+		try {
+			value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(json));
+		} catch {
+			fail('link_damaged', 'json');
+		}
+		if (!Array.isArray(value) || value.length === 0) fail('link_invalid', 'layouts');
+		if (value.length > LINK_MAX_LAYOUTS) fail('link_too_large', `${value.length} layouts`);
+		const codes = new Set(analysis.typingCodes());
+		return value.map((entry, index) => linkLayout(entry, index, analysis, codes));
+	}
+
 	return {
 		EXTENSIONS,
+		LINK_LONG,
+		toLink,
+		fromLink,
 		XKB_KEYS,
 		KLA_KEYS,
 		ACCENTS,

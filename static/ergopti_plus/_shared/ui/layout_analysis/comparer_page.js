@@ -3574,8 +3574,9 @@
 		 * The address of this comparison: the site's Comparer (or the page the
 		 * visitor sees it framed in) with the corpus, keyboard, format, the
 		 * shareable compared layouts and the details shown.
-		 * @returns {{url: string, personal: boolean}} personal: some compared
-		 *   layouts are the visitor's own and are not in the link.
+		 * @returns {{url: string, own: object[], personal: boolean}} own: the
+		 *   compared layouts that are the visitor's own, which share() puts in the
+		 *   link's fragment; personal: the text is the visitor's own, not in it.
 		 */
 		function shareLink() {
 			let base = HOST.shareUrl || null;
@@ -3606,22 +3607,35 @@
 			if (lang) query.set('lang', lang);
 			return {
 				url: `${base}?${query.toString().replace(/%2C/g, ',')}`,
-				personal: shareable.length < chosen.length || !(corpus && corpus.builtin)
+				own: chosen.filter((l) => !SHAREABLE_ORIGINS.includes(l.origin)),
+				personal: !(corpus && corpus.builtin)
 			};
 		}
 
 		/** Copies the comparison's link, or shows it when the clipboard refuses. */
 		async function share() {
-			const { url, personal } = shareLink();
+			const { url, own, personal } = shareLink();
 			const status = $('la-share-status');
 			status.hidden = false;
+			// The visitor's own layouts travel in the fragment (layout_formats.js toLink).
+			let link = url;
 			try {
-				await navigator.clipboard.writeText(url);
-				status.textContent = personal
-					? t('layout_analysis.share.copied_partial')
-					: t('layout_analysis.share.copied');
+				if (own.length > 0) link = `${url}#${await window.LAYOUT_FORMATS.toLink(own)}`;
+			} catch (error) {
+				const refusal = window.LAYOUT_FORMATS.refusalMessage(error);
+				status.textContent = t(refusal.key, refusal.values);
+				return;
+			}
+			try {
+				await navigator.clipboard.writeText(link);
+				status.textContent =
+					link.length > window.LAYOUT_FORMATS.LINK_LONG
+						? t('layout_analysis.share.copied_long', { size: format(link.length / 1024, 0) })
+						: personal
+							? t('layout_analysis.share.copied_partial')
+							: t('layout_analysis.share.copied');
 			} catch {
-				status.textContent = t('layout_analysis.share.failed', { url });
+				status.textContent = t('layout_analysis.share.failed', { url: link });
 			}
 		}
 
@@ -4781,6 +4795,54 @@
 		// The layout the site's editor handed over with « Compare with other layouts ».
 		const handed = window.LAYOUT_ANALYSIS_FILES.takeHandoff();
 		if (handed) instance().addLayouts([handed]);
+		openLinkLayouts();
+	}
+
+	/**
+	 * The visitor's own layouts a shared link carries in its fragment (the
+	 * framing page's, on the site), compared as personal layouts named « from
+	 * a link »; a fragment that does not read is refused in words, whole.
+	 */
+	function openLinkLayouts() {
+		let hash = location.hash;
+		try {
+			if (window.top !== window && window.top.location.origin === location.origin)
+				hash = window.top.location.hash;
+		} catch {
+			// A frame from another origin: this page's own address.
+		}
+		const t = INFO.t;
+		// The mark becomes part of the layouts' names: wait for the page's strings.
+		const ready = () =>
+			typeof (window._i18n_strings || {})['layout_analysis.share.from_link'] === 'string';
+		const strings = ready()
+			? Promise.resolve()
+			: new Promise((resolve) => {
+					document.addEventListener('i18n:applied', function wait() {
+						if (!ready()) return;
+						document.removeEventListener('i18n:applied', wait);
+						resolve();
+					});
+				});
+		strings
+			.then(() => window.LAYOUT_FORMATS.fromLink(hash, E))
+			.then(
+				(list) => {
+					if (list.length === 0) return;
+					const mark = t('layout_analysis.share.from_link');
+					instance().addLayouts(
+						list.map((l) => Object.assign({}, l, { name: `${l.name} (${mark})` }))
+					);
+				},
+				(error) => {
+					const refusal = window.LAYOUT_FORMATS.refusalMessage(error);
+					const status = document.getElementById('la-share-status');
+					status.hidden = false;
+					status.textContent = t('layout_analysis.share.link_refused', {
+						reason: t(refusal.key, refusal.values)
+					});
+				}
+			);
 	}
 
 	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', autostart);

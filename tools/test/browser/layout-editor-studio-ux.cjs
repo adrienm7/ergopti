@@ -354,7 +354,83 @@ async function exerciseScoreChip(browser, origin) {
 	await context.close();
 }
 
+/**
+ * (share-link-layouts) « Copy the link » carries the visitor's own layouts in
+ * the URL fragment; opening the link compares them again, named « from a
+ * link »; a damaged fragment is refused in words and the rest still opens.
+ */
+async function exerciseShareLinkLayouts(browser, origin) {
+	const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin });
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	const rowNames = () =>
+		page.$$eval('#la-table tbody tr td:nth-child(2)', (cells) =>
+			cells.map((cell) => cell.textContent)
+		);
+	await page.goto(
+		`${origin}/ui/layout_analysis/index.html?lang=en&corpus=fr_nemolivier&layouts=ergopti,azerty`
+	);
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	await page.evaluate(() => {
+		const azerty = window.LAYOUT_ANALYSIS.libraryLayouts().find((l) => l.id === 'azerty');
+		const rows = Object.assign({}, azerty.rows, { KeyQ: azerty.rows.KeyW, KeyW: azerty.rows.KeyQ });
+		window.LAYOUT_ANALYSIS_COMPARER.addLayouts([
+			{ id: 'user_mine', name: 'My swap', rows, dead: azerty.dead, origin: 'user' }
+		]);
+	});
+	await page.waitForFunction(() =>
+		[...document.querySelectorAll('#la-table tbody tr td:nth-child(2)')].some((th) =>
+			th.textContent.includes('My swap')
+		)
+	);
+	await page.click('#la-share');
+	await page.waitForFunction(() => !document.getElementById('la-share-status').hidden);
+	const link = await page.evaluate(() => navigator.clipboard.readText());
+	const url = new URL(link);
+	assert.match(
+		url.hash,
+		/^#l=1\.[A-Za-z0-9_-]+$/,
+		`the link carries the layout: ${link.slice(0, 120)}`
+	);
+	assert.equal(url.searchParams.get('layouts').split(',').sort().join(','), 'azerty,ergopti');
+	assert.equal(
+		await page.textContent('#la-share-status'),
+		EN['layout_analysis.share.copied'],
+		'a short link with a built-in text: everything is in it'
+	);
+	await page.goto(`${origin}${url.pathname}${url.search}${url.hash}`);
+	const mark = `My swap (${EN['layout_analysis.share.from_link']})`;
+	await page.waitForFunction(
+		(name) =>
+			[...document.querySelectorAll('#la-table tbody tr td:nth-child(2)')].some((th) =>
+				th.textContent.includes(name)
+			),
+		mark
+	);
+	const names = await rowNames();
+	assert.ok(
+		names.some((name) => name.includes('AZERTY')),
+		`the library layouts too: ${names}`
+	);
+	// Another document first: a change of fragment alone would not reload the page.
+	await page.goto('about:blank');
+	await page.goto(`${origin}${url.pathname}${url.search}#l=1.AAAA`);
+	await page.waitForFunction(() => !document.getElementById('la-share-status').hidden);
+	const refusal = await page.textContent('#la-share-status');
+	assert.ok(
+		refusal.startsWith(EN['layout_analysis.share.link_refused'].split('{reason}')[0]) &&
+			refusal.includes(EN['layout_analysis.formats.refused.link_damaged'].split(' (')[0]),
+		`a damaged link is refused in words: ${refusal}`
+	);
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseShareLinkLayouts,
 	exerciseScoreChip,
 	exerciseImportFormats,
 	exerciseHistoryShortcuts,
