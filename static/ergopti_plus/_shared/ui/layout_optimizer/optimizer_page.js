@@ -484,7 +484,8 @@
 	 *   site); host: the app's Studio window, which opens the result, and the
 	 *   score settings, in its own « Éditer » and « Comparer » tabs instead of
 	 *   the site's.
-	 * @returns {{setCorpus: function(object): void}} The mounted page.
+	 * @returns {{setCorpus: function(object): void, setStart: function(string): void}}
+	 *   The mounted page.
 	 * @throws {Error} On a missing root or a second mount.
 	 */
 	function mount(root, options) {
@@ -559,6 +560,9 @@
 			loading: false,
 			// The saved start layout, until the reader picks another.
 			savedStart: null,
+			// The editor layout « Optimize this layout » handed over, said once it is chosen.
+			handedStart: null,
+			handedName: null,
 			// The host's corpora: {id, title, tables}, listed first.
 			hostCorpora: [],
 			running: null,
@@ -710,6 +714,37 @@
 			groups.push(group(t(`${PREFIX}start.library_group`), sorted));
 			select.replaceChildren(...groups);
 			select.value = startLayouts().some((layout) => layout.id === kept) ? kept : DEFAULT_START;
+			// The layout the editor handed over, once listed: chosen, and said in words.
+			if (state.handedStart && select.value === state.handedStart) {
+				state.handedStart = null;
+				state.handedName = startLayout().name;
+				sayHanded();
+				select.focus({ preventScroll: true });
+				select.scrollIntoView({ block: 'nearest' });
+			}
+		}
+
+		/** Says where the search starts; the locale's arrival says it again. */
+		function sayHanded() {
+			setStatus(t(`${PREFIX}start.handed`, { name: state.handedName }));
+			$('lo-status').dataset.handed = 'true';
+		}
+
+		/**
+		 * Starts from a layout of « Éditer » (its « Optimize this layout »): it is
+		 * chosen as soon as the editor's list holds it, the fixed keys of the
+		 * previous start cleared.
+		 * @param {string} id - The editor_… id the editor publishes it under.
+		 * @throws {Error} On an id that is not an editor layout's.
+		 */
+		function setStart(id) {
+			if (typeof id !== 'string' || !id.startsWith('editor_'))
+				throw new Error(`layout_optimizer: ${id} is not a layout of the editor`);
+			if ($('lo-start').value !== id) state.pinnedCodes.clear();
+			state.savedStart = id;
+			state.handedStart = id;
+			fillStarts();
+			drawPinBoards();
 		}
 
 		function fillKeyboards() {
@@ -1036,6 +1071,7 @@
 		}
 
 		function setStatus(text, error) {
+			delete $('lo-status').dataset.handed;
 			$('lo-status').textContent = text;
 			$('lo-status').classList.toggle('lo-error', Boolean(error));
 		}
@@ -1760,6 +1796,13 @@
 		// Every field and switch saves on change; the boards save as they redraw.
 		root.addEventListener('change', save);
 		drawPinBoards();
+		// « Optimize this layout » of the site's editor: its id waits in this tab's storage.
+		const handed = FILES.takeOptimizerHandoff();
+		if (handed) {
+			if (handed !== $('lo-start').value) state.pinnedCodes.clear();
+			state.savedStart = handed;
+			state.handedStart = handed;
+		}
 		FILES.onEditorLayouts((layouts) => {
 			state.editorLayouts = Array.isArray(layouts) ? layouts : [];
 			fillStarts();
@@ -1767,6 +1810,7 @@
 		document.addEventListener('i18n:applied', () => {
 			refreshStrings();
 			drawPinBoards();
+			if ($('lo-status').dataset.handed) sayHanded();
 		});
 		if (opts.reportHeight && window.parent !== window) {
 			const post = () =>
@@ -1804,7 +1848,7 @@
 				default: true
 			});
 		if (lastNgrams) onNgrams(lastNgrams);
-		mounted = { setCorpus };
+		mounted = { setCorpus, setStart };
 		return mounted;
 	}
 

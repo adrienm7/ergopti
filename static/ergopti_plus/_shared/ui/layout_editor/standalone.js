@@ -147,6 +147,18 @@
 							location.origin
 						);
 					}
+				: undefined,
+		// « Optimize this layout »: the Optimiser is the Studio's third framed page,
+		// so the layout's id waits in this tab's storage while the Studio opens it.
+		optimize:
+			window.parent !== window
+				? (layout) => {
+						window.LAYOUT_ANALYSIS_FILES.handOffToOptimizer(layout.id);
+						window.parent.postMessage(
+							{ type: window.LAYOUT_ANALYSIS_FILES.OPEN_OPTIMIZER_MESSAGE },
+							location.origin
+						);
+					}
 				: undefined
 	});
 

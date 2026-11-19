@@ -77,10 +77,22 @@
 	width: 100%;
 }
 
-/* The button takes its own row, so its length never widens the label column. */
-.la-panel-compare {
+/* Each button takes its own row, so its length never widens the label column. */
+.la-panel-compare,
+.la-panel-optimize {
 	grid-column: 1 / -1;
 	justify-self: start;
+}
+
+/* « Optimize this layout » leads to the Optimiser: its accent and its spark mark. */
+.la-panel-optimize {
+	border-color: var(--theme-accent);
+	color: var(--theme-accent);
+	font-weight: 600;
+}
+
+.la-panel-optimize::before {
+	content: '✦ ';
 }
 
 .la-panel-score {

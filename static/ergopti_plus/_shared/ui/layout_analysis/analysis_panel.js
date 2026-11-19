@@ -184,10 +184,10 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	 *   addSection: function(function(HTMLElement, object): void): void}}
 	 */
 	/**
-	 * @param {{onCompare?: function(object): void, format?: function(): string,
-	 *   onSwap?: function(string[]): void}} [options]
+	 * @param {{onCompare?: function(object): void, onOptimize?: function(object): void,
+	 *   format?: function(): string, onSwap?: function(string[]): void}} [options]
 	 *   - onCompare receives the edited layout in the library shape when the user
-	 *   asks to compare it; format gives the editor's keyboard format, which
+	 *   asks to compare it, onOptimize when the user asks to optimise it; format gives the editor's keyboard format, which
 	 *   compact_fit measures on (the engine's default format when absent);
 	 *   onSwap receives the two keys of a best swap to apply.
 	 * @throws {Error} When onSwap is given without the optimiser on the page.
@@ -197,6 +197,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		const keyboardFormat =
 			options && typeof options.format === 'function' ? options.format : E.defaultKeyboardFormat;
 		const onSwap = options && typeof options.onSwap === 'function' ? options.onSwap : null;
+		const onOptimize =
+			options && typeof options.onOptimize === 'function' ? options.onOptimize : null;
 		if (onSwap && typeof window.LAYOUT_OPTIMIZER !== 'object')
 			throw new Error('layout_analysis: best swaps need the optimiser (optimizer_core.js)');
 		const saved = readStorage(STORAGE_KEY);
@@ -252,11 +254,16 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			rankLabel,
 			rankSelect
 		);
-		const compareButton = onCompare ? el('button', 'la-panel-compare') : null;
-		if (compareButton) {
-			compareButton.type = 'button';
-			compareButton.id = 'la-panel-compare';
-			compareButton.addEventListener('click', () => {
+		/**
+		 * A button that hands the edited layout (library shape) to another tab of
+		 * the Studio; a layout the page cannot read, or a tab storage that refuses
+		 * the hand-off, is said in the panel.
+		 */
+		const handOffButton = (id, hand) => {
+			const button = el('button', id);
+			button.type = 'button';
+			button.id = id;
+			button.addEventListener('click', () => {
 				if (!state.doc) return;
 				let layout;
 				try {
@@ -270,15 +277,19 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					return;
 				}
 				try {
-					onCompare(layout);
+					hand(layout);
 				} catch (error) {
-					// The site's handoff to its Comparer needs this tab's storage.
+					// The site's hand-off to its other tabs needs this tab's storage.
 					if (!error || error.code !== 'studio_handoff_failed') throw error;
 					showError(t('layout_analysis.error.studio_handoff_failed'));
 				}
 			});
-			controls.append(compareButton);
-		}
+			controls.append(button);
+			return button;
+		};
+		const compareButton = onCompare ? handOffButton('la-panel-compare', onCompare) : null;
+		// « Optimize this layout »: the optimiser starts from the edited layout.
+		const optimizeButton = onOptimize ? handOffButton('la-panel-optimize', onOptimize) : null;
 		const headline = el('p', 'la-panel-score');
 		headline.setAttribute('role', 'status');
 		const rankNote = el('p', 'la-panel-note');
@@ -362,6 +373,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			analysersTitle.textContent = t('layout_analysis.analysers.title');
 			note.textContent = t('layout_analysis.panel.weights_note');
 			if (compareButton) compareButton.textContent = t('layout_analysis.panel.compare');
+			if (optimizeButton) optimizeButton.textContent = t('layout_analysis.panel.optimize');
 			// The Comparer's picker: « My typing » first, the texts by language.
 			FILES.fillCorpusPicker(corpusSelect, {
 				mine: corpora

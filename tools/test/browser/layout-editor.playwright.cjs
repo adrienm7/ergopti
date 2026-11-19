@@ -3991,6 +3991,7 @@ async function exerciseComparerLink(browser, origin) {
 		await studioUx.exerciseWorstNgrams(browser, origin);
 		await studioUx.exerciseBestSwaps(browser, origin);
 		await studioUx.exerciseBoardImage(browser, origin);
+		await studioUx.exerciseOptimizeThisLayout(browser, origin);
 		await studioNumbers.exerciseNumbers(browser, origin);
 		await studioHeaders.exerciseHeaderPopovers(browser, origin);
 		await studioManage.exerciseEditorPasteImport(browser, origin);

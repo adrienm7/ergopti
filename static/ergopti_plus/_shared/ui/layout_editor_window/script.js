@@ -483,6 +483,8 @@ window.sourceData = function (data) {
 		// « Compare with other layouts »: the Comparer ranks the edited layout
 		// against the layouts ticked there, on its chosen corpus.
 		compare: compareEdited,
+		// « Optimize this layout »: the Optimiser starts from the edited layout.
+		optimize: optimizeEdited,
 		// The editor is the whole window: leaving it closes the window, after the
 		// tabs' last edits (the host answers the messages in order).
 		onClose: function () {
@@ -787,6 +789,8 @@ let _comparerMounted = false;
 // The optimizer mounts the same way; it runs its search on the page, in short
 // slices, where the host inlines the scripts (no URL to start a worker from).
 let _optimizerMounted = false;
+// The mounted optimizer (LAYOUT_OPTIMIZER_PAGE.mount), once its tab has opened.
+let _optimizer = null;
 // The Studio's tabs in their order on the menu bar.
 const STUDIO_TABS = ['edit', 'compare', 'optimize'];
 
@@ -813,7 +817,7 @@ function showTab(tab) {
 		if (_editor) window.LAYOUT_ANALYSIS_FILES.saveFormat(_editor.format());
 		if (!_optimizerMounted) {
 			_optimizerMounted = true;
-			window.LAYOUT_OPTIMIZER_PAGE.mount(optimizer, {
+			_optimizer = window.LAYOUT_OPTIMIZER_PAGE.mount(optimizer, {
 				host: {
 					openEditor: editOptimized,
 					openComparer: compareEdited,
@@ -843,6 +847,16 @@ function showTab(tab) {
 function compareEdited(layout) {
 	showTab('compare');
 	window.LAYOUT_ANALYSIS_COMPARER.addLayouts([layout]);
+}
+
+/**
+ * Opens « Optimiser » on the edited layout as its start: the editor's
+ * « Optimize this layout ».
+ * @param {Object} layout - The editor's published layout (its editor_… id).
+ */
+function optimizeEdited(layout) {
+	showTab('optimize');
+	_optimizer.setStart(layout.id);
 }
 
 /**

@@ -323,6 +323,11 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	// tab, and the message that asks the site's Studio to open « Éditer ».
 	const EDITOR_HANDOFF_KEY = 'ergopti.studio.editor_handoff.v1';
 	const OPEN_EDITOR_MESSAGE = 'ergopti-studio:open-editor';
+	// The editor's « Optimize this layout »: the id the editor publishes the shown
+	// tab under (publishEditorLayouts) waits for the optimizer of this tab, and
+	// the message asks the site's Studio to open « Optimiser ».
+	const OPTIMIZER_HANDOFF_KEY = 'ergopti.studio.optimizer_handoff.v1';
+	const OPEN_OPTIMIZER_MESSAGE = 'ergopti-studio:open-optimizer';
 
 	/**
 	 * The keyboard format chosen in the Studio, if storage keeps one.
@@ -402,6 +407,36 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	}
 
 	/**
+	 * Hands the id of a layout « Éditer » publishes to the optimizer of this
+	 * tab, which starts from it.
+	 * @param {string} id - An editor_… id of publishEditorLayouts.
+	 * @throws {Error} studio_handoff_failed when the tab's storage refuses it.
+	 */
+	function handOffToOptimizer(id) {
+		if (typeof id !== 'string' || id === '')
+			throw new Error('layout_analysis: the optimizer hand-off needs a layout id');
+		try {
+			window.sessionStorage.setItem(OPTIMIZER_HANDOFF_KEY, id);
+		} catch {
+			throw failure('studio_handoff_failed');
+		}
+	}
+
+	/**
+	 * Takes the layout id handed to the optimizer, once.
+	 * @returns {string|null} The id, or null when none waits.
+	 */
+	function takeOptimizerHandoff() {
+		try {
+			const id = window.sessionStorage.getItem(OPTIMIZER_HANDOFF_KEY);
+			window.sessionStorage.removeItem(OPTIMIZER_HANDOFF_KEY);
+			return id;
+		} catch {
+			return null;
+		}
+	}
+
+	/**
 	 * Tells the Comparer which layouts « Éditer » has open (library shape).
 	 * @param {object[]} layouts
 	 */
@@ -446,7 +481,10 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 		onEditorLayouts,
 		OPEN_COMPARER_MESSAGE,
 		OPEN_EDITOR_MESSAGE,
+		OPEN_OPTIMIZER_MESSAGE,
 		handOffToEditor,
+		handOffToOptimizer,
+		takeOptimizerHandoff,
 		takeEditorHandoff,
 		readText,
 		builtinTables,

@@ -645,7 +645,88 @@ async function exerciseBoardImage(browser, origin) {
 	await app.close();
 }
 
+/**
+ * (optimize-this-layout) The editor's « Optimize this layout » opens the
+ * Optimiser on the edited layout as its start. On the site, the framed editor
+ * leaves the layout's editor_… id in the tab's storage and asks the Studio
+ * for « Optimiser », whose page then starts from it and says so; in the app,
+ * one click shows the « Optimize » tab with that start chosen.
+ */
+async function exerciseOptimizeThisLayout(browser, origin) {
+	const { page, errors, context } = await openOnErgopti(browser, origin);
+	// The site's Studio frames the editor: the frame posts to its parent.
+	await page.route(`${origin}/studio-frame.html`, (route) =>
+		route.fulfill({
+			contentType: 'text/html',
+			body:
+				'<!doctype html><script>window.posted = [];' +
+				"addEventListener('message', (e) => window.posted.push(e.data && e.data.type));" +
+				'</script><iframe id="editor" src="/ui/layout_editor/index.html?lang=en" style="width:1300px;height:850px"></iframe>'
+		})
+	);
+	await page.goto(`${origin}/studio-frame.html`);
+	const frame = page.frameLocator('#editor');
+	const button = frame.locator('#la-panel-optimize');
+	await button.waitFor({ state: 'visible', timeout: 120000 });
+	assert.equal((await button.textContent()).trim(), EN['layout_analysis.panel.optimize']);
+	// The copy of Ergopti, analysed, before the click.
+	await page.waitForFunction(() => {
+		const doc = document.getElementById('editor').contentDocument;
+		const row = doc.querySelector('.la-panel-metrics tr[data-metric="distinct_chars"] td');
+		return row && parseFloat(row.textContent.replace(/[^\d.,]/g, '').replace(',', '.')) > 40;
+	});
+	await button.click();
+	await page.waitForFunction(() => window.posted.includes('ergopti-studio:open-optimizer'));
+	const handed = await page.evaluate(() =>
+		window.sessionStorage.getItem('ergopti.studio.optimizer_handoff.v1')
+	);
+	assert.match(handed || '', /^editor_/, `the editor's id waits for the Optimiser: ${handed}`);
+	// The Studio opens « Optimiser » in the same tab: it starts from that layout.
+	await page.goto(`${origin}/ui/layout_optimizer/index.html?lang=en`);
+	await page.waitForFunction((id) => document.getElementById('lo-start').value === id, handed);
+	const name = await page.$eval('#lo-start', (select) => select.selectedOptions[0].textContent);
+	assert.match(name, /Ergopti/, `the edited copy of Ergopti is the start: ${name}`);
+	assert.equal(
+		await page.textContent('#lo-status'),
+		EN['layout_optimizer.start.handed'].replace('{name}', name),
+		'the status line says where the search starts'
+	);
+	assert.equal(
+		await page.evaluate(() => window.sessionStorage.getItem('ergopti.studio.optimizer_handoff.v1')),
+		null,
+		'the hand-off is taken once'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+
+	// The app's Studio window: one page, three tabs.
+	const app = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+	const appErrors = [];
+	app.on('pageerror', (error) => appErrors.push(error.message));
+	await app.addInitScript((strings) => {
+		window._i18n_strings = strings;
+		window.webkit = { messageHandlers: { layout_editor_window_bridge: { postMessage() {} } } };
+	}, EN);
+	await app.goto(`${origin}/ui/layout_editor_window/index.html`);
+	await app.evaluate(() => window.initData({ strings: {}, state: { platform: 'linux' } }));
+	await app.evaluate(() => window.sourceData({ text: null, folder: 'layout_sources/' }));
+	await app.waitForSelector('#la-panel-optimize');
+	// The window's layout drawn: every render hands it to the panel.
+	await app.waitForSelector('#le-board [data-code="KeyQ"]');
+	await app.click('#la-panel-optimize');
+	assert.equal(await app.isVisible('#studio-optimizer'), true, 'the click opens « Optimize »');
+	await app.waitForFunction(() => /^editor_/.test(document.getElementById('lo-start').value));
+	assert.equal(
+		await app.getAttribute('#studio-tab-optimize', 'aria-selected'),
+		'true',
+		'its tab is the selected one'
+	);
+	assert.deepEqual(appErrors, []);
+	await app.close();
+}
+
 module.exports = {
+	exerciseOptimizeThisLayout,
 	exerciseBoardImage,
 	exerciseBestSwaps,
 	exerciseWorstNgrams,

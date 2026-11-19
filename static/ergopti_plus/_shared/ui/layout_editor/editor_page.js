@@ -399,6 +399,8 @@ var LayoutEditorPage = (function () {
 	 *   loadSources or built-in id) the editor copies when it has no initial text
 	 *   and no restored workspace; compare(layout) receives the edited layout from
 	 *   the analysis panel's « Compare with other layouts » (the app's Studio);
+	 *   optimize(layout) receives it, under the editor_… id the Optimiser lists
+	 *   it by, from « Optimize this layout »;
 	 *   workspace {load(): Promise<string|null>, save(text): Promise,
 	 *   persist?(): Promise<boolean>} keeps the tabs (LayoutEditorWorkspace);
 	 *   startNav {text, hold} opens the editor on its navigation layer, as
@@ -514,6 +516,8 @@ var LayoutEditorPage = (function () {
 				? window.LAYOUT_ANALYSIS_PANEL.create({
 						onCompare:
 							typeof host.compare === 'function' ? (layout) => compareActive(layout) : null,
+						onOptimize:
+							typeof host.optimize === 'function' ? (layout) => optimizeActive(layout) : null,
 						format: () => state.format,
 						onSwap: (codes) => applySwap(codes[0], codes[1])
 					})
@@ -4587,6 +4591,26 @@ var LayoutEditorPage = (function () {
 					'layout editor: the shown tab is not published to the Comparer, so it is compared as a copy'
 				);
 			host.compare(entry || layout);
+		}
+
+		/**
+		 * « Optimize this layout »: the host receives the shown tab under the
+		 * editor_… id the Optimiser lists it by, published first, so the
+		 * Optimiser can choose it as its start.
+		 * @param {object} layout - The analysis panel's layout (library shape).
+		 * @throws {Error} When the tab could not be published: the Optimiser
+		 *   would have nothing to start from.
+		 */
+		function optimizeActive(layout) {
+			clearTimeout(publishTimer);
+			publishTimer = null;
+			publishLayouts();
+			const entry = publishedEntries[state.active];
+			if (!entry)
+				throw new Error(
+					`layout editor: the shown tab (${layout.id}) is not published to the Optimiser`
+				);
+			host.optimize(entry);
 		}
 
 		/**
