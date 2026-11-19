@@ -86,8 +86,9 @@ helpers.describe("complete shared Hotstrings parameter frames", function()
 			for index, key in ipairs({ "tooltip_magic", "tooltip_autocorrect", "tooltip_ai" }) do
 				helpers.assert_eq(preview[index].title, i18n.get("menu.hotstrings." .. key))
 			end
-			helpers.assert_eq(preview[#preview - 1].title, "-")
-			helpers.assert_eq(preview[#preview].title, i18n.get("menu.hotstrings.tooltip_colored"))
+			helpers.assert_eq(preview[#preview - 2].title, "-")
+			helpers.assert_eq(preview[#preview - 1].title, i18n.get("menu.hotstrings.tooltip_colored"))
+			helpers.assert_eq(preview[#preview].title, i18n.get("menu.hotstrings.tooltip_glyphs"))
 			local word = assert(find(rows, i18n.get(corpus.parents.word_expander))).menu
 			helpers.assert_eq(word[4].title, "-")
 			helpers.assert_eq(word[#word - 1].title, "-")
