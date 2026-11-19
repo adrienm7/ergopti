@@ -194,11 +194,13 @@ waits for the maintainer's review).
       they save the read too.
 - [ ] **« Ma frappe » fresh read on Windows (2026-11-18).** The Studio now shows the saved read at once (its marker
       keys made every tab refuse it before) and its SQL projection takes 1.7 s instead of 3.8 s on the maintainer's
-      1.1 GB reader image. The worker still took about 45 s on that store (window at 19:59:55, read saved at
-      20:00:41): the rest is the reader image's catch-up on `data.sql` and the image save before the worker exits
-      (`KLPF_SettleReaderCache`), which hold the terminal back. Profile those two phases on the maintainer's store
-      (a copy at another path rebuilds the image from scratch, so it does not measure them) before deciding whether
-      the worker hands its stage over before saving the image.
+      1.1 GB reader image, and the read reaches the window as soon as the worker writes its stage, before the
+      image save (`KLPF_PollStudioStage`). Measured in the store's own `prefetch.log` (8 Studio reads, 2026-11-17
+      to 19): the save took 5.7 to 26 s (16 s in the 45 s read of 2026-11-18 20:00), now off the wait. Left: the
+      catch-up before the projection, 10 to 52 s, which is a clone of the whole read-only image (6 to 20 s, even
+      for 47 KB of new `data.sql`) and the replay of the day the tail touched (4 to 33 s). Making it incremental
+      means mutating the image without a full copy (it is shared by every worker) and replaying less than a day,
+      which `docs/memory/windows-ahk.md` (« A refresh clears and replays whole affected days ») explains.
 - [ ] **Library layouts that lose their own characters, what is left (2026-11-18).** Optimot 1.8.0, Neo 2, Bone,
       KOY, AdNW, Noted, Mine, QWERTZ, the Spanish QWERTY and Dvorak and Engram-es are now re-encoded from their
       official files (`docs/audits/layout-analysers/report.md`, « Layout library »). Left: BEO (0.99 % of Swann
