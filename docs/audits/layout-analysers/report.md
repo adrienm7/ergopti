@@ -632,7 +632,7 @@ that may only grow and a checked credit for each):
   (the author's site states « Thumbs up variations require dedicated thumb
   keys », and the model's only typing thumb key was the space bar); they came
   in with the model's thumb keys the same day (below). The matrix, ortho and
-  ErgoDox copies that put letters on combos or outer columns, and Neu's JIS
+  ErgoDox copies that put letters on combos or outer columns, and Neu's janiso
   and ErgoDox files, are listed with their reason; Neu stays cmini's.
 - **KLAnext** (klanext.keyboard-design.com, version 0.06; no licence
   published, user-submitted files): its `db.js` lists 723 layout files, of
@@ -727,7 +727,56 @@ no code (they count as unsupported). 51 layouts came in:
   North, Pfouyhai), the thumb key on the left thumb and the space on the
   right, as its `keyboard_compare.js` places them (row 3, columns 4 and 7).
 
-The library holds 700 layouts.
+**KLAnext's janiso and ergolinear boards** (2026-11-19, decided by the agent,
+to review by the maintainer). The reader refused both. `janiso` is no JIS
+board, despite the name: KLAnext's `kb.js` draws four unstaggered split rows
+of 14 keys and 11 bottom keys. It is read like the matrix, from KLAnext's
+QWERTY on it (`qwerty.za.janiso.json`, which puts `[` `\` `` ` `` left of the
+letter rows and `]` `-` `'` right of them): a character takes the key its
+QWERTY character has on ANSI, so a letter on an outer column lands on a
+punctuation key of ISO (uciea-vanilla's v and q on Minus and Quote).
+`ergolinear` (three split rows of 12 keys, no number row) has no KLAnext
+layout to read a QWERTY from, so its keys are placed by position, as on the
+Corne; Hands Down's ortho files are on it, and the thumb letter of Alt-ex,
+-nx and -tx goes to the left thumb key. Ten layouts came in: the Hands Down
+Alt, Alt-ex, Alt-nx, Alt-tx, Alt-x, Polyglot and Ref ortho files and Hands On
+ortho (moutis/HandsDown e8f532f62c), KLAnext's Poqdea (Spanish) and Uciea
+Vanilla. Of KLAnext's other janiso files, seven repeat a library layout
+(Colemak, Dvorak, QWERTY, Poqtea twice, Poutea, ZXCV Fingers), and the four
+Hands Down Neu files (two in each collection) keep « ` ~ » on the key left of
+1, which KLAnext's QWERTY leaves without a character. Every value of the 700
+layouts held before is bit-identical on the eleven keyboards (15 400
+layout × corpus × keyboard rows), and their golden values are unchanged.
+
+**Still out: the ErgoDox outer, inner and bottom keys.** KLA's 16 files with
+characters on keys the library's keyboards lack (12 ErgoDox, TypeMatrix,
+AOEYK, the full Arensito, the ANSI BvoFRak) and 75 ErgoDox files of KLAnext
+and Hands Down stay out for the same reason, and modelling those keys is not
+a small change:
+
+- The reader reads an ErgoDox file on KLA's own QWERTY key set (Ergopti's
+  ErgoDox file follows it): - and = on the inner top keys, `` ` `` [ ] ' on
+  the bottom row. The engine's ErgoDox board follows QMK's EZ default keymap
+  and puts = - ' `` ` `` on the outer keys (left and right of the number row,
+  right of the home row, bottom left). A file's character on those outer keys
+  has no place: moving the board's codes changes every layout's ErgoDox
+  values, and a second code on the same key draws two keys at one place.
+- The other keys (left of Q and A, the four inner keys, the bottom row) have
+  no KeyboardEvent code in the model. Codes such as F13–F23 would have to be
+  added to `physical_keys.json`, the drivers' shared key registry; reusing
+  Tab, CapsLock or Escape gives a character key another key's name.
+- Several files put letters on the ErgoDox Shift keys, where the board types
+  Shift.
+- Most of the 22 library layouts read from an ErgoDox file already left their
+  symbols on those keys out; reading them would change their values.
+
+KLA's four standard-board files put characters on its Tab and Caps Lock keys
+(TypeMatrix's q and a, BvoFRak's q), its Enter key (Arensito's à) and a
+modifier of its bottom row right of the space bar (AOEYK's \): ISO and ANSI
+type no character there, and
+making them character keys would also offer them to the optimizer.
+
+The library holds 710 layouts.
 
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not

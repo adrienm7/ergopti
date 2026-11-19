@@ -142,10 +142,18 @@ Design: [layout-editor.md](docs/design/layout-editor.md), [layout-analysis.md](d
 analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-analysers/report.md) (its section 15
 waits for the maintainer's review).
 
-- [ ] **Layout formats, what is left.** KLA's 16 files with characters on keys the library's keyboards lack (12 of
-      them ErgoDox) stay in `not_imported` of `layout_library.json` until the keyboard model, the KLA reader and the
-      library can place ErgoDox thumb and outer keys. KLAnext's `janiso` board is refused
-      (`format_unsupported_board`) until the model has the JIS keys; its `ergolinear` has no layout to read.
+- [ ] **Layout formats, what is left (2026-11-19).** KLAnext's `janiso` and `ergolinear` boards now read (ten layouts
+      in). Still in `not_imported` of `layout_library.json`: KLA's 16 files with characters on keys the library's
+      keyboards lack (12 ErgoDox, TypeMatrix, AOEYK, Arensito, the ANSI BvoFRak) and 75 KLAnext and Hands Down ErgoDox
+      files with characters on the ErgoDox outer, inner or bottom keys. Not a small change, so it needs the
+      maintainer's choice (`docs/audits/layout-analysers/report.md` section 13, « Still out »): the reader follows
+      KLA's ErgoDox QWERTY (- = on the inner keys) while the engine's board follows QMK's (= - ' and the backquote on the
+      outer keys), so either the board's codes move (every layout's ErgoDox values change) or two codes share a key;
+      the 11 keys without a code need new codes in `physical_keys.json` (the drivers' registry, F13–F23) or reused
+      names (Tab, CapsLock); some files put letters on the ErgoDox Shift keys; most of the 22 ErgoDox library layouts
+      would re-read with more symbols (their values change). The four standard-board files need Tab, Caps Lock, Enter
+      or a bottom modifier as character keys. Hands Down Neu's four janiso files keep the backquote and « ~ » on a key
+      KLAnext's QWERTY leaves without a character.
 - [ ] **[LATER] Layout library credits, what is left.** The credits were read on their authors' pages on 2026-11-17
       (`checked` and `evidence` in `layout_credits.json`). Still « knowledge »: QWERTY (US patent 207,559 is Sholes's,
       but its text names no letter order: read its drawings or another primary source) and KOY (neo-layout.org names
