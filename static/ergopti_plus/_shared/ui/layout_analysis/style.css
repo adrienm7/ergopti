@@ -934,32 +934,32 @@ body:has(> main.layout-analysis) {
 	gap: 8px 12px;
 }
 
-/* Each settings section and weight group: an accent slot (« Chart look »)
-   on its edge and its icon only, never on text, so the text keeps the page's
-   contrast in both themes; the heading and the icon tell the sections apart
+/* Each settings section and weight group: a mark (theme.css « Marks », 3:1
+   on the surfaces) on its edge and its icon only, never on text, so the text
+   keeps the page's contrast in both themes; the heading and the icon tell the sections apart
    without the colour. */
 .la-accent-1 {
-	--la-section-accent: var(--la-cat-1);
+	--la-section-accent: var(--theme-mark-1);
 }
 
 .la-accent-2 {
-	--la-section-accent: var(--la-cat-2);
+	--la-section-accent: var(--theme-mark-2);
 }
 
 .la-accent-3 {
-	--la-section-accent: var(--la-cat-3);
+	--la-section-accent: var(--theme-mark-3);
 }
 
 .la-accent-4 {
-	--la-section-accent: var(--la-cat-4);
+	--la-section-accent: var(--theme-mark-4);
 }
 
 .la-accent-5 {
-	--la-section-accent: var(--la-cat-5);
+	--la-section-accent: var(--theme-mark-5);
 }
 
 .la-accent-6 {
-	--la-section-accent: var(--la-cat-6);
+	--la-section-accent: var(--theme-mark-6);
 }
 
 .la-settings > .la-weights {

@@ -889,7 +889,7 @@ check(
 	);
 	for (let slot = 1; slot <= 6; slot++)
 		check(
-			css.includes(`.la-accent-${slot} {\n\t--la-section-accent: var(--la-cat-${slot});`),
+			css.includes(`.la-accent-${slot} {\n\t--la-section-accent: var(--theme-mark-${slot});`),
 			`score settings: no accent for slot ${slot}`
 		);
 }

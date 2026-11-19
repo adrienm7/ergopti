@@ -23,6 +23,9 @@
  * 3. The metrics dashboards' muted text (units, help, table headers) was the
  *    system tertiary grey, 3.3:1 to 3.6:1 in light: it must reach 4.5:1 on
  *    the page, the panels and the table headers in both themes.
+ * 4. The score settings' section icons and edges took the chart hues (2.2:1
+ *    to 2.97:1 in light): each section now takes its theme.css « Marks »
+ *    token, at least 3:1 on every surface of both themes.
  * The dataviz palette validator's run (colour-blind separation included) is
  * recorded in docs/audits/accessibility/README.md.
  * ==============================================================================
@@ -286,6 +289,40 @@ readable(
 	'download Cancel'
 );
 
+// 5/ The score settings' section marks (studio-section-marks): the sections'
+// icons and edges took the chart hues, whose orange and yellow fell to 2.2:1 on
+// the light surfaces; each now holds 3:1 on every surface of both themes.
+/**
+ * A theme colour in one mode: the light value is the token's first one, the dark
+ * value that of the first « :root[data-theme='dark'] » block that sets it.
+ */
+function themeColour(name, dark) {
+	const full = (hex) => hex.replace(/^#(.)(.)(.)$/, '#$1$1$2$2$3$3');
+	if (!dark) return full(resolve(token(THEME, name)));
+	for (const match of THEME.matchAll(/:root\[data-theme='dark'\] \{([^}]*)\}/g))
+		if (match[1].includes('--' + name + ':')) return full(resolve(token(match[1], name)));
+	return assert.fail('No dark --' + name);
+}
+const SURFACES = ['theme-surface', 'theme-surface-2', 'theme-bg'];
+for (const dark of [false, true]) {
+	const mode = dark ? 'dark' : 'light';
+	for (let n = 1; n <= 6; n++) {
+		// The section's accent, through the page's own alias (--la-cat-<n>) to a theme token.
+		let value = token(block(STUDIO_CSS, '.la-accent-' + n), 'la-section-accent');
+		const alias = value.match(/^var\(--(la-[a-z0-9-]+)\)$/);
+		if (alias) value = token(STUDIO_CSS, alias[1]);
+		const name = value.match(/^var\(--(theme-[a-z0-9-]+)\)$/)[1];
+		const colour = channels(themeColour(name, dark));
+		for (const surface of SURFACES) {
+			const ratio = contrast(colour, channels(themeColour(surface, dark)));
+			assert.ok(
+				ratio >= NON_TEXT_CONTRAST,
+				`${mode}: settings section ${n} (${name}) must hold 3:1 on ${surface}: ${ratio.toFixed(2)}:1`
+			);
+		}
+	}
+}
+
 console.log(
-	'test-app-colour-contrast: OK (heatmap edge, finger hues, metrics text, onboarding, download window)'
+	'test-app-colour-contrast: OK (heatmap edge, finger hues, metrics text, onboarding, download window, section marks)'
 );
