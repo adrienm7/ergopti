@@ -161,8 +161,9 @@ const DETECTORS = {
 const ALLOWED = {
 	'macos/init.lua': {
 		dirname: {
-			count: 2,
-			reason: 'boot code that runs before the shared Lua root is on package.path'
+			count: 3,
+			reason:
+				'boot code that runs before the shared Lua root is on package.path (the boot guard, then the search path)'
 		}
 	},
 	'linux/ergopti_hotstrings.lua': {

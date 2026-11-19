@@ -42,6 +42,18 @@ helpers.describe("boot guard", function()
 		helpers.assert_true(not BootGuard.is_guarded(nil), "Hammerspoon's own run is not guarded")
 	end)
 
+	helpers.it("shares its guarded marker with the Linux daemon", function()
+		-- The Linux entry point runs itself through the same shared module: a
+		-- marker spelled per driver could drift and re-run the boot forever.
+		local EntryGuard = require("core.lifecycle.engine.entry_guard")
+		local received = nil
+		local booted = EntryGuard.run("/app/linux/ergopti_hotstrings.lua", function()
+			return function(first) received = first end
+		end)
+		helpers.assert_eq(booted, true)
+		helpers.assert_true(BootGuard.is_guarded(received), "the shared marker must be the one macOS checks")
+	end)
+
 	helpers.it("reports a top-level boot failure to the launcher and exits 1", function()
 		local seams, reported, exited = entry(true), nil, nil
 		BootGuard.run("/app/macos/init.lua", { loadfile = seams.loadfile,

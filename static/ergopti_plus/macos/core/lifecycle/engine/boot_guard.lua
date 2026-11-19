@@ -13,8 +13,11 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Loaded by path from init.lua's first lines, before package.path holds the
----    shared tree, so it needs nothing at load; the reporters it uses are read
----    when a failure happens, after init.lua has set the search path.
+---    shared tree, so it needs nothing at load but the shared entry guard
+---    (_shared/core/lifecycle/engine/entry_guard.lua), loaded by path too: the
+---    guarded re-run and its marker are the ones the Linux daemon uses. The
+---    reporters it uses are read when a failure happens, after init.lua has set
+---    the search path.
 --- 2. Same report as a pre-runtime abort: diagnostics/adapters/boot_fatal.lua
 ---    writes the durable boot log, launcher.log and the launcher's report, then
 ---    the process exits 1 so the launcher shows its modal alert. Hammerspoon
@@ -26,8 +29,11 @@
 
 local M = {}
 
--- The table init.lua receives as its first argument when the guard runs it.
-local MARKER = "ergopti_boot_guard"
+-- This file sits at <driver>/core/lifecycle/engine/ and _shared beside <driver>.
+-- Split at slashes alone, as init.lua does: macOS has no backslash separator.
+local SHARED_ROOT = assert(debug.getinfo(1, "S").source:match("^@?(.*)/[^/]+/core/lifecycle/engine/[^/]+$"),
+	"the boot guard is outside its driver tree") .. "/_shared"
+local EntryGuard = assert(loadfile(SHARED_ROOT .. "/core/lifecycle/engine/entry_guard.lua"))()
 
 
 
@@ -77,7 +83,7 @@ end
 --- @param first any init.lua's first chunk argument.
 --- @return boolean
 function M.is_guarded(first)
-	return type(first) == "table" and first[MARKER] == true
+	return EntryGuard.is_guarded(first)
 end
 
 --- Runs the entry point once more, inside xpcall, and handles its failure.
@@ -87,15 +93,9 @@ end
 function M.run(entry, deps)
 	assert(type(entry) == "string" and entry ~= "", "the boot guard needs the entry point path")
 	deps = type(deps) == "table" and deps or {}
-	local load = deps.loadfile or loadfile
 	local report = deps.report or M.report
 	local exit = deps.exit or os.exit
-	local chunk = assert(load(entry))
-	local traceback = nil
-	local booted, failure = xpcall(chunk, function(err)
-		traceback = debug.traceback(tostring(err), 2)
-		return err
-	end, { [MARKER] = true })
+	local booted, failure, traceback = EntryGuard.run(entry, deps.loadfile)
 	if booted then return true end
 	local notified_ok, notified = pcall(report, failure, traceback)
 	if notified_ok and notified == true then
