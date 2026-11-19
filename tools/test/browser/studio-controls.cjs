@@ -74,7 +74,7 @@ function colonButtons(page) {
 			// A key of a drawn keyboard shows the character it types (« : » too).
 			.filter((node) => !node.closest('[data-code]'))
 			// A button whose words are a layout's own name shows data (« QWERTY: Wide Mod »).
-			.filter((node) => !node.matches('.la-chart-name, .la-leader-name'))
+			.filter((node) => !node.matches('.la-chart-name, .la-leader-name, .la-row-name'))
 			.map((node) =>
 				(node.tagName === 'INPUT' ? node.value : node.textContent).replace(/\s+/g, ' ').trim()
 			)

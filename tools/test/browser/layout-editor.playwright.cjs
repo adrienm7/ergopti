@@ -1414,7 +1414,7 @@ async function exerciseComparerTabs(page) {
 				// A table's figure names its scrolling region, not a second landmark of the same name.
 				const named = section.hasAttribute('aria-labelledby')
 					? section
-					: section.querySelector('[role="region"][aria-labelledby]');
+					: section.querySelector('section[aria-labelledby], [role="region"][aria-labelledby]');
 				const id = named && named.getAttribute('aria-labelledby');
 				return {
 					id,
@@ -2251,7 +2251,9 @@ async function exerciseStudioComparer(page) {
 	);
 	// (comparer-heat-metrics) Every per-key metric of the engine, the presses and
 	// the score; a bad event names its worst groups (the layout analysed with
-	// keyGroups), and every key is reachable from the keyboard with its value.
+	// keyGroups), and every key is an image named by its value and its place,
+	// not a Tab stop: nothing on it is operated, and its number is in the board's
+	// table below (the shared semantic gate refuses a focusable span).
 	const heatChoices = await page.$$eval('#la-heat-metric option', (options) =>
 		options.map((option) => option.value)
 	);
@@ -2268,12 +2270,13 @@ async function exerciseStudioComparer(page) {
 		await page.$$eval('#la-heatmap .la-key', (keys) =>
 			keys.every(
 				(key) =>
-					key.tabIndex === 0 &&
+					key.tabIndex === -1 &&
+					key.getAttribute('role') === 'img' &&
 					key.getAttribute('aria-label').startsWith(key.title + ' (') &&
 					/\d.*\d\)$/.test(key.getAttribute('aria-label'))
 			)
 		),
-		'every heatmap key is named with its value and its place, and focusable'
+		'every heatmap key is an image named with its value and its place, not a Tab stop'
 	);
 	// (comparer-heat-table) The heatmap's numbers as a table, one row per drawn key.
 	assert.equal(
