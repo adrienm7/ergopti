@@ -419,10 +419,10 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 	}
 
 	/**
-	 * A percentile chip beside a metric's value (ux-study item 9): « P70 »,
-	 * coloured from red (P0) to green (P100) with its number always written,
-	 * named in full for assistive technology; a click explains it in the
-	 * popover.
+	 * A percentile chip beside a metric's value, written « P70 » and
+	 * coloured from red at the lowest percentile to green at the highest, with
+	 * its number always written and named in full for assistive technology; a
+	 * click explains it in the popover.
 	 * @param {string} metric - The metric's name, as the page shows it.
 	 * @param {{percent: number, count: number}} standing - LAYOUT_ANALYSIS.percentiles' answer.
 	 * @returns {HTMLButtonElement}
