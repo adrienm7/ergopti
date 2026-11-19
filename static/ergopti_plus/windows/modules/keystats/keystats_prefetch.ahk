@@ -97,6 +97,14 @@ class KLPFWorker {
 		static owner_id := KLPF_NewOwnerId()
 		static process_id := DllCall("Kernel32\GetCurrentProcessId", "UInt")
 		static jobs := Map()
+		; How often a Studio job looks for its finished stage. The worker writes it
+		; before it saves the reader image, which takes seconds on a large store.
+		static STUDIO_STAGE_POLL_MS := 250
+		; Studio workers whose read was delivered while they still save the reader
+		; image: generation -> process handle, kept until the worker exits.
+		static settling := Map()
+		; Test seam: production watches the Studio stage through SetTimer.
+		static stage_watch_fn := 0
 		; Why the last KLPF_RequestBuild returned false, "" after one that started:
 		; the caller only sees false, and the reason names the refusing step.
 		static last_build_refusal := ""
@@ -803,7 +811,81 @@ KLPF_RequestStudio(metrics_dir, on_terminal) {
 				KLPF_CompleteJob(job_key, generation, "failed")
 				return false
 		}
+		_KLPF_WatchStudioStage(job_key, generation)
 		return true
+}
+
+; Arm the watcher that hands a Studio read over as soon as its stage exists.
+; The worker writes the stage atomically, then saves the reader image (a whole
+; copy of it, 6 to 26 s on a 1.1 GB store); the read does not wait for that save.
+; The worker's exit stays the terminal when the watcher cannot be armed.
+_KLPF_WatchStudioStage(job_key, generation) {
+		Token := Map()
+		Watch := KLPF_PollStudioStage.Bind(Token, job_key, generation)
+		Token["callback"] := Watch
+		KLPFWorker.jobs[job_key]["stage_watch"] := Token
+		try {
+				if IsObject(KLPFWorker.stage_watch_fn) {
+						if !KLPFWorker.stage_watch_fn.Call(Watch, KLPFWorker.STUDIO_STAGE_POLL_MS)
+								throw Error("the stage watch scheduler refused the timer")
+				} else {
+						SetTimer(Watch, KLPFWorker.STUDIO_STAGE_POLL_MS)
+				}
+				return true
+		} catch as Err {
+				Token.Delete("callback")
+				try LoggerError("KLReader", "Could not watch the Ergopti Studio stage; the read is delivered when its worker exits: {1}.", Err.Message)
+				return false
+		}
+}
+
+; Stop a stage watcher. The token breaks the token -> callback -> token cycle.
+_KLPF_StopStudioStageWatch(Token) {
+		if !Token.Has("callback")
+				return false
+		Watch := Token["callback"]
+		Token.Delete("callback")
+		if IsObject(KLPFWorker.stage_watch_fn)
+				KLPFWorker.stage_watch_fn.Call(Watch, 0)
+		else
+				try SetTimer(Watch, 0)
+		return true
+}
+
+/**
+ * One tick of a Studio stage watcher: delivers the read once its stage exists,
+ * and keeps the worker's process handle in KLPFWorker.settling until it exits,
+ * so the image save it is running completes instead of being killed with it.
+ * @param Token {Map} The watcher's own token.
+ * @param job_key {String} "studio:typing".
+ * @param generation {Integer} The job this watcher belongs to.
+ * @returns {Boolean} True when the read was delivered by this tick.
+ */
+KLPF_PollStudioStage(Token, job_key, generation, *) {
+		if !KLPFWorker.jobs.Has(job_key) || KLPFWorker.jobs[job_key]["generation"] != generation
+						|| KLPFWorker.jobs[job_key].Get("terminal_claimed", false) {
+				_KLPF_StopStudioStageWatch(Token)
+				return false
+		}
+		job := KLPFWorker.jobs[job_key]
+		if !IsObject(job["handle"]) || !FSExists(job["stage"])
+				return false
+		_KLPF_StopStudioStageWatch(Token)
+		KLPFWorker.settling[generation] := job["handle"]
+		KLPF_CompleteJob(job_key, generation, "ok", job["stage"])
+		return true
+}
+
+; Retire a Studio worker whose read was delivered before it exited. Its only
+; remaining work was the reader image save, so a failure costs the next worker
+; the same catch-up, never the read already shown.
+; @returns {Boolean} True when the worker ended cleanly.
+KLPF_SettleStudioWorker(generation, exit_code, stdout := "", stderr := "") {
+		KLPFWorker.settling.Delete(generation)
+		if exit_code = 0
+				return true
+		try LoggerWarn("KLReader", "The Ergopti Studio worker failed after its read was delivered; the reader image was not saved (exit={1}): {2}", exit_code, KLPF_WorkerDiagnostic(stdout, stderr))
+		return false
 }
 
 KLPF_CancelBuild(which) {
@@ -858,7 +940,17 @@ KLPF_CancelAll() {
 				if !KLPF_CancelBuild(JobKey)
 						AllTerminated := false
 		}
-		return AllTerminated && KLPFWorker.jobs.Count = 0
+		; A delivered Studio read leaves its worker saving the reader image. The
+		; save is atomic, so stopping it keeps the last good image on disk.
+		for Generation, Handle in KLPFWorker.settling.Clone() {
+				Terminated := false
+				try Terminated := Handle.terminate()
+				if (Terminated is Integer) && Terminated == true
+						KLPFWorker.settling.Delete(Generation)
+				else
+						AllTerminated := false
+		}
+		return AllTerminated && KLPFWorker.jobs.Count = 0 && KLPFWorker.settling.Count = 0
 }
 
 KLPF_InvokeTerminal(on_terminal, status, stage := "") {
@@ -950,6 +1042,8 @@ KLPF_CompleteJob(job_key, generation, status, stage := "") {
 }
 
 KLPF_OnWorkerDone(which, generation, exit_code, stdout, stderr) {
+		if KLPFWorker.settling.Has(generation)
+				return KLPF_SettleStudioWorker(generation, exit_code, stdout, stderr)
 		if !KLPFWorker.jobs.Has(which)
 				return
 		job := KLPFWorker.jobs[which]
@@ -1141,7 +1235,16 @@ KLPF_WorkerMain() {
 								KLPF_WorkerFail(stage, phase)
 						if !KLPF_WriteAtomic(stage, KLR_BuildStudioNgramsJson(db, KLR_StudioContract()))
 								KLPF_WorkerFail(stage, phase)
-						KLPF_SettleReaderCache(true)
+						; The resident hands the stage over as soon as it exists
+						; (KLPF_PollStudioStage); the image save below runs after.
+						; A failed save never deletes that stage: the resident may be
+						; reading it, and it owns its cleanup either way.
+						phase := "reader image save"
+						try KLPF_SettleReaderCache(true)
+						catch as Err {
+								KLPF_WorkerReportFailure(phase, Err)
+								ExitApp(1)
+						}
 				} else if (mode = "range") {
 						phase := "range projection"
 						if (A_Args.Length < flag + 14)

@@ -607,3 +607,102 @@ _KLPFW_StartAndPublishFailuresAreTerminal() {
 
 Test("keystats: false/throwing start, worker, and publish failures reach typed terminals",
 	_KLPFW_StartAndPublishFailuresAreTerminal)
+
+global _KLPFW_StageWatches := []
+global _KLPFW_StudioReads := []
+
+_KLPFW_StageWatchTimer(callback, period) {
+	global _KLPFW_StageWatches
+	_KLPFW_StageWatches.Push(Map("callback", callback, "period", period))
+	return true
+}
+
+; Reads the stage the way the Studio window does: synchronously, in the call.
+_KLPFW_StudioTerminal(status, stage := "") {
+	global _KLPFW_StudioReads
+	_KLPFW_StudioReads.Push(Map("status", status,
+		"json", stage != "" ? FileRead(stage, "UTF-8") : ""))
+}
+
+; The watcher the latest Studio request armed, or 0.
+_KLPFW_ArmedStageWatch() {
+	global _KLPFW_StageWatches
+	Armed := 0
+	for Entry in _KLPFW_StageWatches
+		if Entry["period"] > 0
+			Armed := Entry["callback"]
+	return Armed
+}
+
+; A Studio worker writes its stage, then saves the reader image (6 to 26 s on
+; the maintainer's 1.1 GB store). The read must reach the window from the stage,
+; while the worker is still alive and saving, and its exit must add nothing.
+_KLPFW_StudioReadPrecedesImageSave() {
+	global _KLPFW_FakeTerminated, _KLPFW_FakeArgs, _KLPFW_StageWatches, _KLPFW_StudioReads
+	old_jobs := KLPFWorker.jobs
+	old_generation := KLPFWorker.generation
+	old_spawn := KLPFWorker.spawn_fn
+	; Read defensively so a driver without the hand-over fails on behaviour below.
+	old_settling := KLPFWorker.HasOwnProp("settling") ? KLPFWorker.settling : Map()
+	old_watch := KLPFWorker.HasOwnProp("stage_watch_fn") ? KLPFWorker.stage_watch_fn : 0
+	KLPFWorker.jobs := Map()
+	KLPFWorker.settling := Map()
+	KLPFWorker.spawn_fn := _KLPFW_FakeSpawn
+	KLPFWorker.stage_watch_fn := _KLPFW_StageWatchTimer
+	_KLPFW_FakeTerminated := 0
+	_KLPFW_FakeArgs := []
+	_KLPFW_StageWatches := []
+	_KLPFW_StudioReads := []
+	stage := ""
+	try {
+		Assert(KLPF_RequestStudio(A_Temp . "\metrics", _KLPFW_StudioTerminal),
+			"the Studio request must start its worker")
+		job := KLPFWorker.jobs["studio:typing"]
+		generation := job["generation"]
+		stage := job["stage"]
+		Watch := _KLPFW_ArmedStageWatch()
+		Assert(IsObject(Watch),
+			"a Studio request must watch its stage instead of waiting for the worker to exit")
+		AssertFalse(Watch.Call(), "no read can be delivered before the worker wrote its stage")
+		AssertEqual(0, _KLPFW_StudioReads.Length)
+
+		; The worker wrote its stage and is now saving the image: it has not exited.
+		FileAppend('{"schema":1}', stage, "UTF-8-RAW")
+		AssertTrue(Watch.Call(), "the stage must be handed over before the image save ends")
+		AssertEqual(1, _KLPFW_StudioReads.Length)
+		AssertEqual("ok", _KLPFW_StudioReads[1]["status"])
+		AssertEqual('{"schema":1}', _KLPFW_StudioReads[1]["json"])
+		AssertEqual(0, _KLPFW_FakeTerminated,
+			"handing the read over must not stop the worker that saves the image")
+		Assert(!KLPFWorker.jobs.Has("studio:typing") && KLPFWorker.settling.Has(generation),
+			"the saving worker must stay owned until it exits")
+		AssertFalse(FileExist(stage) != "", "the delivered stage is removed")
+
+		_KLPFW_FakeArgs[1]["done"].Call(0, "", "")
+		AssertEqual(1, _KLPFW_StudioReads.Length, "the worker's exit must not deliver the read again")
+		AssertEqual(0, KLPFWorker.settling.Count, "the exit retires the saving worker")
+
+		; A worker still saving at shutdown is stopped with the others.
+		Assert(KLPF_RequestStudio(A_Temp . "\metrics", _KLPFW_StudioTerminal),
+			"a second Studio request must start its worker")
+		stage := KLPFWorker.jobs["studio:typing"]["stage"]
+		FileAppend('{"schema":1}', stage, "UTF-8-RAW")
+		AssertTrue(_KLPFW_ArmedStageWatch().Call())
+		AssertEqual(1, KLPFWorker.settling.Count)
+		AssertTrue(KLPF_CancelAll(), "shutdown must stop a worker that is still saving the image")
+		AssertEqual(1, _KLPFW_FakeTerminated)
+		AssertEqual(0, KLPFWorker.settling.Count)
+	} finally {
+		KLPF_CancelBuild("studio:typing")
+		if stage != ""
+			try FileDelete(stage)
+		KLPFWorker.jobs := old_jobs
+		KLPFWorker.generation := old_generation
+		KLPFWorker.spawn_fn := old_spawn
+		KLPFWorker.settling := old_settling
+		KLPFWorker.stage_watch_fn := old_watch
+	}
+}
+
+Test("keystats Studio: the read is delivered before the worker saves the reader image",
+	_KLPFW_StudioReadPrecedesImageSave)
