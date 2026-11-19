@@ -452,6 +452,40 @@ r·skip1 + r²·skip2 + r³·skip3)` (r = 1/7) times the distance and 5.5 / fing
   library's Ergo-L lacks the one-dead-key-on-itself chain (ë), 0.002 %
   unsupported.
 
+### Cyanophage optimiser
+
+- **Source.** https://cyanophage.github.io/optimiser.html, files
+  `optimiser.js` (e562433) and `worker.js` (9e55a49, 2025-10-12) of
+  https://github.com/cyanophage/cyanophage.github.io (site b02780b,
+  2026-06-12). No licence file: only the formula and its constants are used,
+  no line of its code.
+- **Formula.** Lower is better: `Σ max(0, (metric − floor) · weight)` over
+  eleven terms (the vowels term is not clamped). As a percentage of the input
+  length: SFB (4, floor 0.3), its pinky share (0.7) and ring share (0.3),
+  scissors (two rows, adjacent columns, 0.8), pinky–ring scissors (one row or
+  more, 0.8, floor 0.2), wide scissors (two rows, two columns or more, 0.5,
+  floor 0.05), lateral stretches (index inner column with the middle finger's
+  column, the ring's for half, 0.5, floor 0.12) and same-finger skipgrams on
+  different rows (0.2). Effort per character (4): each character's grid
+  effort, and again for each character of every trigram kept, as its worker
+  sums it. Vowels: how many of a e i o u sit on the hand with fewer (3). Hand
+  balance: |left − right| in points over the three letter rows (0.7, floor 1).
+  Its matrix: 3 rows of 12 columns (the outer ones are `[`, `'` and the ISO
+  key left of Z here), one finger per column, the space bar on the right
+  thumb.
+- **Corpus.** The tool reads a list of words, each counted as « word » with a
+  space on both sides; it halves the space's count and drops the trigrams
+  seen 30 times or fewer (a count, whatever the corpus's size, as carpalx's
+  threshold). A text is read as its words: lower case, split at whitespace.
+  Every count of that word list follows exactly from the n-grams inside the
+  words, which a table holds whole: a word starts at y as often as y is not
+  preceded by a letter of its word, and a one-character word is counted by
+  inclusion and exclusion.
+- **Fidelity: exact.** See « Checking against the real tools ». One slip of
+  the worker is not followed: a bigram with a character the layout lacks reads
+  the previous bigram's key, which depends on the order of its table; we skip
+  that bigram.
+
 ## Checking against the real tools
 
 `node tools/dev/verify-analyser-scores.cjs [--verbose]` (maintainer tool, needs

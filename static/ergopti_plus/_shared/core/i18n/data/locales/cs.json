@@ -4763,6 +4763,7 @@
 	"layout_analysis.info.analyser.genkey": "genkey od semi: rychlost prstů, boční natažení a vyváženost ukazováčků, nižší je lepší. Přibližné: genkey počítá skipgramy až devět písmen od sebe, my máme jen ty nejbližší.",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer: převalení, střídání a změny směru proti bigramům a skipgramům stejným prstem a natažením, vyšší je lepší. Blízké: jeho vzdálené skipgramy se odhadují.",
 	"layout_analysis.info.analyser.dariogoetz": "Keyboard Layout Optimizer Daria Götze: náklad z dvanácti měr, nižší je lepší. Přesné pro základní vrstvu a vrstvu Shift; AltGr je naše úprava.",
+	"layout_analysis.info.analyser.cyanophage": "Optimalizátor Cyanophage: jedenáct vážených členů (bigramy stejným prstem, námaha, nůžky, boční natažení, skipgramy, samohlásky na jedné ruce, vyváženost rukou), nižší je lepší. Reprodukováno přesně, kromě bigramu se znakem, který rozložení nemá a který jeho nástroj počítá chybně.",
 	"layout_analysis.info.analyser.cmini": "cmini, bot komunity alternativních rozložení: statistiky SFB a trigramů, bez skóre. Reprodukováno přesně.",
 	"layout_analysis.info.analyser.ergol": "Analyzátor Ergo-L a statistiky Kalamine: SFB, boční natažení, nůžky, převalení a změny směru, záměrně bez skóre. Reprodukováno přesně, včetně mrtvých kláves.",
 	"layout_optimizer.title": "Optimalizátor rozložení",

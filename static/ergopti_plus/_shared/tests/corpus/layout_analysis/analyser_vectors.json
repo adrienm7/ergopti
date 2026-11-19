@@ -939,6 +939,98 @@
 				"unsupported": 0.012
 			},
 			"parts_tolerance": 0.001
+		},
+		{
+			"analyser": "cyanophage",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "The quick brown fox jumps over the lazy dog.",
+			"value": 52.82611111111111,
+			"tolerance": 1e-9,
+			"parts": {
+				"sfb": 8.88888888888889,
+				"psfb": 2.2222222222222223,
+				"scissors": 2.2222222222222223,
+				"wide_scissors": 2.2222222222222223,
+				"effort": 1.2155555555555557,
+				"vowels": 2,
+				"hand_balance": 5.555555555555557
+			},
+			"parts_tolerance": 1e-9
+		},
+		{
+			"analyser": "cyanophage",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Quick jolly vow pug hid. Quick jolly vow pug hid. Quick jolly vow pug hid. Quick jolly vow pug hid. Quick jolly vow pug hid.",
+			"value": 99.72110154484949,
+			"tolerance": 1e-9,
+			"parts": {
+				"sfb": 10.141509433962264,
+				"rsfb": 2.830188679245283,
+				"scissors": 4.8742138364779874,
+				"wide_scissors": 7.311320754716981,
+				"lsb": 5.463836477987422,
+				"sfs": 2.4371069182389937,
+				"effort": 4.18498427672956,
+				"vowels": 2,
+				"hand_balance": 38.25242718446603
+			},
+			"parts_tolerance": 1e-9
+		},
+		{
+			"analyser": "cyanophage",
+			"basis": "tool",
+			"layout": "colemak_dh",
+			"keyboard": "iso",
+			"text": "Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Quick jolly vow pug hid. Quick jolly vow pug hid. Quick jolly vow pug hid. Quick jolly vow pug hid. Quick jolly vow pug hid.",
+			"value": 21.992028759846118,
+			"tolerance": 1e-9,
+			"parts": {
+				"lsb": 3.6556603773584904,
+				"sfs": 4.8742138364779874,
+				"effort": 2.640251572327043,
+				"vowels": 1,
+				"hand_balance": 9.126213592233007
+			},
+			"parts_tolerance": 1e-9
+		},
+		{
+			"analyser": "cyanophage",
+			"basis": "tool",
+			"layout": "dvorak",
+			"keyboard": "iso",
+			"text": "Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Quick jolly vow pug hid. Quick jolly vow pug hid. Quick jolly vow pug hid. Quick jolly vow pug hid. Quick jolly vow pug hid.",
+			"value": 34.1102494351835,
+			"tolerance": 1e-9,
+			"parts": {
+				"sfb": 3.2232704402515724,
+				"wide_scissors": 4.8742138364779874,
+				"lsb": 4.8742138364779874,
+				"effort": 3.868396226415095,
+				"vowels": 0,
+				"hand_balance": 4.077669902912625
+			},
+			"parts_tolerance": 1e-9
+		},
+		{
+			"analyser": "cyanophage",
+			"basis": "tool",
+			"layout": "ergopti",
+			"keyboard": "iso",
+			"text": "Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Lace minty brews, a few zebras exit. Quick jolly vow pug hid. Quick jolly vow pug hid. Quick jolly vow pug hid. Quick jolly vow pug hid. Quick jolly vow pug hid.",
+			"value": 23.409060267448247,
+			"tolerance": 1e-9,
+			"parts": {
+				"sfb": 0.39308176100628933,
+				"lsb": 2.4371069182389937,
+				"sfs": 2.4371069182389937,
+				"effort": 3.2459905660377357,
+				"hand_balance": 13.009708737864074
+			},
+			"parts_tolerance": 1e-9
 		}
 	]
 }

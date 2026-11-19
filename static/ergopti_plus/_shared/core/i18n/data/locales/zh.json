@@ -4763,6 +4763,7 @@
 	"layout_analysis.info.analyser.genkey": "semi 的 genkey：手指速度、横向伸展和食指平衡，越低越好。近似：genkey 统计相隔最多九个字母的隔字组合，而我们只有最近的那些。",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer：滚动、交替和方向变换，对比同指二元组、隔字组合和伸展，越高越好。接近：其远距离隔字组合为估算值。",
 	"layout_analysis.info.analyser.dariogoetz": "Dario Götz 的 Keyboard Layout Optimizer：由十二项指标得出的成本，越低越好。基础层和 Shift 层精确；AltGr 为我们的改编。",
+	"layout_analysis.info.analyser.cyanophage": "Cyanophage 的优化器：十一个加权项（同指二元组、费力度、剪刀、横向伸展、跳字组、单手元音、双手平衡），越低越好。除含有布局中缺少字符的二元组（其工具会算错）外，完全复现。",
 	"layout_analysis.info.analyser.cmini": "cmini，替代布局社区的机器人：SFB 和三元组统计，无得分。精确复现。",
 	"layout_analysis.info.analyser.ergol": "Ergo-L 分析器和 Kalamine 的统计：SFB、横向伸展、剪刀、滚动和方向变换，按设计不计得分。精确复现，包括死键。",
 	"layout_optimizer.title": "布局优化器",

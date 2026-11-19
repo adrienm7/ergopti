@@ -70,6 +70,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		'genkey',
 		'oxeylyzer',
 		'dariogoetz',
+		'cyanophage',
 		'cmini',
 		'ergol'
 	];
@@ -2182,8 +2183,233 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		return { value, parts };
 	}
 
+	// ======================================
+	// ======= 11/ Cyanophage optimiser =====
+	// ======================================
+
+	/**
+	 * Cyanophage's corpus from a prepared table. Its tool reads a list of words
+	 * and counts each one as « word » with a space on both sides; the space's
+	 * count is then halved and the trigrams seen 30 times or fewer are dropped.
+	 * A text is read as its words: lower case, split at whitespace. Every count
+	 * of that word list follows from the n-grams inside words, which a table
+	 * holds whole (they never span a line break or a tab): a word starts at y
+	 * as often as y is not preceded by a letter of its word, L(y) − Σx W(x y),
+	 * and a one-character word is counted by inclusion and exclusion.
+	 * @param {object} table - prepareNgrams() output.
+	 * @returns {{letters: Map, bigrams: Map, trigrams: Map, length: number}}
+	 *   Character, bigram and trigram counts and its input length (the
+	 *   characters of the words and one space per word).
+	 */
+	function cyanophageTables(table) {
+		const model = entry('cyanophage').model;
+		const space = ' ';
+		const all = withBreaks(table);
+		const lower = new Map();
+		// The character of a word list, or null for whitespace (a word break).
+		const of = (c) => {
+			if (!lower.has(c)) {
+				const l = c.toLowerCase();
+				lower.set(c, /^\s$/u.test(c) ? null : Array.from(l).length === 1 ? l : c);
+			}
+			return lower.get(c);
+		};
+		const add = (map, key, n) => map.set(key, (map.get(key) || 0) + n);
+		const letters = new Map();
+		const inner2 = new Map();
+		const inner3 = new Map();
+		for (const [c, n] of all.uni) {
+			const x = of(c);
+			if (x !== null) add(letters, x, n);
+		}
+		for (const [a, b, n] of all.bi) {
+			const x = of(a);
+			const y = of(b);
+			if (x !== null && y !== null) add(inner2, x + y, n);
+		}
+		for (const [a, m, b, n] of all.tri) {
+			const x = of(a);
+			const y = of(m);
+			const z = of(b);
+			if (x !== null && y !== null && z !== null) add(inner3, x + y + z, n);
+		}
+		// Each character's count followed and preceded by a letter of its word,
+		// and each inner bigram's count preceded and followed by one.
+		const followed = new Map();
+		const preceded = new Map();
+		for (const [xy, n] of inner2) {
+			const [x, y] = Array.from(xy);
+			add(followed, x, n);
+			add(preceded, y, n);
+		}
+		const extendedLeft = new Map();
+		const extendedRight = new Map();
+		const surrounded = new Map();
+		for (const [xyz, n] of inner3) {
+			const [x, y, z] = Array.from(xyz);
+			add(extendedLeft, y + z, n);
+			add(extendedRight, x + y, n);
+			add(surrounded, y, n);
+		}
+		const bigrams = new Map(inner2);
+		const trigrams = new Map(inner3);
+		let words = 0;
+		let length = 0;
+		for (const [x, n] of letters) {
+			const starts = n - (preceded.get(x) || 0);
+			const ends = n - (followed.get(x) || 0);
+			const alone = starts - (followed.get(x) || 0) + (surrounded.get(x) || 0);
+			words += starts;
+			length += n;
+			if (starts > 0) add(bigrams, space + x, starts);
+			if (ends > 0) add(bigrams, x + space, ends);
+			if (alone > 0) add(trigrams, space + x + space, alone);
+		}
+		for (const [xy, n] of inner2) {
+			const first = n - (extendedLeft.get(xy) || 0);
+			const last = n - (extendedRight.get(xy) || 0);
+			if (first > 0) add(trigrams, space + xy, first);
+			if (last > 0) add(trigrams, xy + space, last);
+		}
+		for (const [xyz, n] of trigrams) if (n <= model.trigram_min_count) trigrams.delete(xyz);
+		// Two spaces per word, halved.
+		letters.set(space, words);
+		return { letters, bigrams, trigrams, length: length + words };
+	}
+
+	/**
+	 * Cyanophage's keys for one layout: each grid cell's character (the base
+	 * layer of its key), row, column, finger (1 to 10 from the left pinky, the
+	 * thumbs 5 and 6) and effort; the space bar is its fixed thumb key. A
+	 * character on two cells takes the later one in the grid's order, as its
+	 * worker's lookup does.
+	 * @returns {Map<string, {row: number, col: number, finger: number, effort: number}>}
+	 */
+	function cyanophageKeys(ctx) {
+		const model = entry('cyanophage').model;
+		const keys = new Map();
+		const custom = customModel(ctx);
+		for (const cell of model.grid) {
+			const row = ctx.layout.rows[cell.code];
+			const char = row && single(row[0]) ? row[0] : null;
+			if (char === null || char === ' ') continue;
+			let finger = cell.finger;
+			if (custom && custom.finger.has(cell.code)) finger = custom.finger.get(cell.code) + 1;
+			keys.set(char, { row: cell.row, col: cell.col, finger, effort: cell.effort });
+		}
+		const s = model.space;
+		keys.set(' ', { row: s.row, col: s.col, finger: s.finger, effort: s.effort });
+		return keys;
+	}
+
+	/**
+	 * Cyanophage's optimiser score, lower is better: the sum of eleven terms,
+	 * each max(0, (metric − its floor) · its weight) but the vowels term, on
+	 * its matrix of 3 rows of 12 columns. The metrics: SFB, its pinky and ring
+	 * shares, scissors, pinky–ring scissors, wide scissors, lateral stretches
+	 * and same-finger skipgrams as a percentage of the input length; effort per
+	 * character (each character's grid effort, and again for each character of
+	 * every trigram kept, as its worker sums it); the vowels on the minority
+	 * hand; the hand imbalance in points. A bigram with a character the layout
+	 * lacks is skipped: the worker then reads the previous bigram's key, an
+	 * order-dependent slip no table can follow.
+	 */
+	function scoreCyanophage(ctx) {
+		const model = entry('cyanophage').model;
+		const t = perCorpus(ctx.table, 'cyanophage:tables', cyanophageTables);
+		const keys = cyanophageKeys(ctx);
+		const raw = {
+			sfb: 0,
+			effort: 0,
+			psfb: 0,
+			rsfb: 0,
+			scissors: 0,
+			prscissors: 0,
+			wide_scissors: 0,
+			lsb: 0,
+			sfs: 0
+		};
+		const hands = [0, 0];
+		const vowels = [0, 0];
+		const vowelSet = new Set(Array.from(model.vowels));
+		for (const [c, n] of t.letters) {
+			const k = keys.get(c);
+			if (!k) continue;
+			raw.effort += k.effort * n;
+			const hand = k.col <= model.left_last_col ? 0 : 1;
+			if (k.row <= model.alpha_last_row) hands[hand] += n;
+			if (vowelSet.has(c)) vowels[hand] += 1;
+		}
+		const pinky = new Set(model.pinkies);
+		const ring = new Set(model.rings);
+		const pinkyRing = new Set(model.pinky_ring_pairs.map(([a, b]) => `${a}/${b}`));
+		const lsbPairs = new Map(model.lsb_pairs.map(([a, b, w]) => [`${a}/${b}`, w]));
+		for (const [ab, n] of t.bigrams) {
+			const [a, b] = Array.from(ab);
+			const k1 = keys.get(a);
+			const k2 = keys.get(b);
+			if (!k1 || !k2) continue;
+			if (k1.finger === k2.finger && a !== b) {
+				raw.sfb += n;
+				if (pinky.has(k1.finger)) raw.psfb += n;
+				if (ring.has(k1.finger)) raw.rsfb += n;
+				continue;
+			}
+			const left = k1.col <= model.left_last_col && k2.col <= model.left_last_col;
+			const right = k1.col > model.left_last_col && k2.col > model.left_last_col;
+			if ((!left && !right) || k1.row > model.alpha_last_row || k2.row > model.alpha_last_row)
+				continue;
+			const dRow = Math.abs(k1.row - k2.row);
+			const dCol = Math.abs(k1.col - k2.col);
+			if (dRow === 2) {
+				if (dCol === 1) raw.scissors += n;
+				else if (dCol > 1) raw.wide_scissors += n;
+			}
+			if (pinkyRing.has(`${k1.finger}/${k2.finger}`) && dRow >= 1) raw.prscissors += n;
+			const lsb = lsbPairs.get(`${k1.col}/${k2.col}`);
+			if (lsb !== undefined) raw.lsb += lsb * n;
+		}
+		for (const [abc, n] of t.trigrams) {
+			const [a, b, c] = Array.from(abc);
+			const k1 = keys.get(a);
+			const k2 = keys.get(b);
+			const k3 = keys.get(c);
+			for (const k of [k1, k2, k3]) if (k) raw.effort += k.effort * n;
+			// The worker reads a character it lacks as no finger: a skipgram
+			// around it still counts.
+			if (!k1 || !k3 || k1.finger !== k3.finger || (k2 && k2.finger === k1.finger)) continue;
+			if (
+				Math.abs(k1.row - k3.row) >= 1 &&
+				k1.row <= model.alpha_last_row &&
+				k3.row <= model.alpha_last_row
+			)
+				raw.sfs += n;
+		}
+		const L = t.length;
+		const left = pct(hands[0], hands[0] + hands[1]);
+		const parts = {
+			sfb: pct(raw.sfb, L),
+			effort: L > 0 ? raw.effort / L : 0,
+			psfb: pct(raw.psfb, L),
+			rsfb: pct(raw.rsfb, L),
+			scissors: pct(raw.scissors, L),
+			prscissors: pct(raw.prscissors, L),
+			wide_scissors: pct(raw.wide_scissors, L),
+			lsb: pct(raw.lsb, L),
+			sfs: pct(raw.sfs, L),
+			vowels: Math.min(vowels[0], vowels[1]),
+			hand_balance: Math.abs(left - (100 - left))
+		};
+		let value = 0;
+		for (const [term, { weight, min, clamp }] of Object.entries(model.terms)) {
+			const s = (parts[term] - min) * weight;
+			value += clamp ? Math.max(0, s) : s;
+		}
+		return { value, parts };
+	}
+
 	// ==========================
-	// ======= 11/ Public API ====
+	// ======= 12/ Public API ====
 	// ==========================
 
 	const SCORERS = {
@@ -2197,7 +2423,8 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		cmini: scoreCmini,
 		oxeylyzer: scoreOxeylyzer,
 		ergol: scoreErgol,
-		dariogoetz: scoreDariogoetz
+		dariogoetz: scoreDariogoetz,
+		cyanophage: scoreCyanophage
 	};
 
 	const FINGERINGS = ['official', 'custom'];

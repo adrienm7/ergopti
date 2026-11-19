@@ -4763,6 +4763,7 @@
 	"layout_analysis.info.analyser.genkey": "genkey של semi: מהירות אצבעות, מתיחות צידיות ואיזון אצבעות המורה, נמוך יותר עדיף. משוער: genkey סופר סקיפגרמות במרחק של עד תשע אותיות, ולנו יש רק את הקרובה ביותר.",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer: גלגולים, החלפה בין ידיים ושינויי כיוון מול ביגרמות וסקיפגרמות באותה אצבע ומתיחות, גבוה יותר עדיף. קרוב: הסקיפגרמות הרחוקות שלו מוערכות.",
 	"layout_analysis.info.analyser.dariogoetz": "Keyboard Layout Optimizer של Dario Götz: עלות משנים־עשר מדדים, נמוך יותר עדיף. מדויק לשכבת הבסיס ולשכבת Shift; AltGr הוא התאמה שלנו.",
+	"layout_analysis.info.analyser.cyanophage": "המייעל של Cyanophage: אחד עשר רכיבים משוקללים (צמדים באותה אצבע, מאמץ, מספריים, מתיחות צד, צמדי דילוג, תנועות ביד אחת, איזון ידיים), נמוך יותר עדיף. משוחזר במדויק, מלבד צמד עם תו שחסר בפריסה, שהכלי שלו סופר בטעות.",
 	"layout_analysis.info.analyser.cmini": "cmini, הבוט של קהילת הפריסות החלופיות: סטטיסטיקות SFB וטריגרמים, ללא ציון. משוחזר במדויק.",
 	"layout_analysis.info.analyser.ergol": "מנתח Ergo-L והסטטיסטיקות של Kalamine: SFB, מתיחות צידיות, מספריים, גלגולים ושינויי כיוון, ללא ציון במכוון. משוחזר במדויק, כולל מקשים מתים.",
 	"layout_optimizer.title": "מייעל פריסות",

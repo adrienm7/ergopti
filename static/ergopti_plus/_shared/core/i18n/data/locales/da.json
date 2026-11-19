@@ -4763,6 +4763,7 @@
 	"layout_analysis.info.analyser.genkey": "semis genkey: fingerhastighed, sidelæns stræk og pegefingerbalance, lavere er bedre. Omtrentlig: genkey tæller skipgrammer op til ni bogstaver fra hinanden, vi har kun de nærmeste.",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer: rul, vekslen og retningsskift over for bigrammer og skipgrammer med samme finger samt stræk, højere er bedre. Tæt på: dens fjerne skipgrammer anslås.",
 	"layout_analysis.info.analyser.dariogoetz": "Dario Götz' Keyboard Layout Optimizer: en omkostning ud fra tolv mål, lavere er bedre. Nøjagtig for grundlaget og Shift-laget; AltGr er vores tilpasning.",
+	"layout_analysis.info.analyser.cyanophage": "Cyanophages optimering: elleve vægtede led (samme-finger-bigrammer, indsats, sakse, sidelæns stræk, skipgrammer, vokaler på én hånd, håndbalance), lavere er bedre. Gengivet nøjagtigt, undtagen et bigram med et tegn, layoutet mangler, som værktøjet tæller forkert.",
 	"layout_analysis.info.analyser.cmini": "cmini, botten fra fællesskabet for alternative layouts: SFB- og trigramstatistik, ingen score. Gengivet nøjagtigt.",
 	"layout_analysis.info.analyser.ergol": "Ergo-L-analyseværktøjet og Kalamines statistik: SFB, sidelæns stræk, sakse, rul og retningsskift, bevidst uden score. Gengivet nøjagtigt, inklusive døde taster.",
 	"layout_optimizer.title": "Layoutoptimering",

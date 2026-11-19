@@ -182,6 +182,11 @@
 			"path": "docs/design/analyser-scores.md",
 			"anchor": "ergo-l-analyser-and-kalamine-statistics"
 		},
+		"analyser_doc_cyanophage": {
+			"title": "Ergopti — how the Cyanophage optimiser score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "cyanophage-optimiser"
+		},
 		"kla_stevep": {
 			"title": "Keyboard Layout Analyzer, SteveP's fork",
 			"url": "https://github.com/stevep99/keyboard-layout-analyzer",
@@ -206,6 +211,11 @@
 			"title": "carpalx (Martin Krzywinski), GitHub mirror",
 			"url": "https://github.com/narze/carpalx",
 			"checked": "2026-11-14"
+		},
+		"cyanophage": {
+			"title": "Cyanophage optimiser (cyanophage.github.io)",
+			"url": "https://github.com/cyanophage/cyanophage.github.io",
+			"checked": "2026-11-19"
 		}
 	},
 	"items": {
@@ -266,6 +276,7 @@
 		"analyser.oxeylyzer": ["analyser_doc_oxeylyzer", "oxeylyzer"],
 		"analyser.dariogoetz": ["analyser_doc_dariogoetz", "dariogoetz"],
 		"analyser.cmini": ["analyser_doc_cmini", "cmini"],
-		"analyser.ergol": ["analyser_doc_ergol", "ergol_stats", "kalamine"]
+		"analyser.ergol": ["analyser_doc_ergol", "ergol_stats", "kalamine"],
+		"analyser.cyanophage": ["analyser_doc_cyanophage", "cyanophage"]
 	}
 }

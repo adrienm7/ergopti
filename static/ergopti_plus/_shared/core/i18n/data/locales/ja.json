@@ -4763,6 +4763,7 @@
 	"layout_analysis.info.analyser.genkey": "semi の genkey：指の速度、横方向の伸び、人差し指のバランスで、低いほど良い。近似：genkey は最大 9 文字離れたスキップグラムを数えますが、こちらは最も近いものだけです。",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer：ロール、交互打鍵、方向転換を、同指バイグラム、スキップグラム、伸びと対比し、高いほど良い。近い値：離れたスキップグラムは推定。",
 	"layout_analysis.info.analyser.dariogoetz": "Dario Götz の Keyboard Layout Optimizer：12 の指標から算出するコストで、低いほど良い。基本レイヤーと Shift レイヤーでは正確、AltGr は独自の適応です。",
+	"layout_analysis.info.analyser.cyanophage": "Cyanophage のオプティマイザー：重み付きの 11 項目（同指バイグラム、労力、シザー、横方向のストレッチ、スキップグラム、片手の母音、左右のバランス）で、低いほど良い。配列にない文字を含むバイグラム（このツールは数え間違える）を除き、正確に再現。",
 	"layout_analysis.info.analyser.cmini": "cmini（代替配列コミュニティのボット）：SFB とトライグラムの統計で、スコアなし。完全に再現。",
 	"layout_analysis.info.analyser.ergol": "Ergo-L 分析ツールと Kalamine の統計：SFB、横方向の伸び、シザー、ロール、方向転換で、設計上スコアなし。デッドキーを含め完全に再現。",
 	"layout_optimizer.title": "配列オプティマイザー",

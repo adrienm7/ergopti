@@ -4763,6 +4763,7 @@
 	"layout_analysis.info.analyser.genkey": "semi’s genkey: finger speed, lateral stretches and index balance, lower is better. Approximate: genkey counts skipgrams up to nine letters apart, we have the closest only.",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer: rolls, alternation and redirects against same-finger bigrams and skipgrams and stretches, higher is better. Close: its far skipgrams are estimated.",
 	"layout_analysis.info.analyser.dariogoetz": "Dario Götz’s Keyboard Layout Optimizer: a cost from twelve measures, lower is better. Exact for the base and Shift layers; AltGr is our adaptation.",
+	"layout_analysis.info.analyser.cyanophage": "Cyanophage’s optimiser: eleven weighted terms (same-finger bigrams, effort, scissors, lateral stretches, skipgrams, vowels on one hand, hand balance), lower is better. Reproduced exactly, but for a bigram with a character the layout lacks, which its tool miscounts.",
 	"layout_analysis.info.analyser.cmini": "cmini, the alternative layouts community’s bot: SFB and trigram statistics, no score. Reproduced exactly.",
 	"layout_analysis.info.analyser.ergol": "The Ergo-L analyser and Kalamine’s statistics: SFB, lateral stretches, scissors, rolls and redirects, no score by design. Reproduced exactly, dead keys included.",
 	"layout_optimizer.title": "Layout optimizer",

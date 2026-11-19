@@ -4763,6 +4763,7 @@
 	"layout_analysis.info.analyser.genkey": "genkey de semi: velocidad de los dedos, estiramientos laterales y equilibrio de los índices, más bajo es mejor. Aproximado: genkey cuenta skipgramas de hasta nueve letras de distancia, nosotros solo tenemos el más cercano.",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer: rodamientos, alternancia y redirecciones frente a bigramas y skipgramas del mismo dedo y estiramientos, más alto es mejor. Cercano: sus skipgramas lejanos se estiman.",
 	"layout_analysis.info.analyser.dariogoetz": "El Keyboard Layout Optimizer de Dario Götz: un coste a partir de doce medidas, más bajo es mejor. Exacto para las capas base y Shift; AltGr es nuestra adaptación.",
+	"layout_analysis.info.analyser.cyanophage": "El optimizador de Cyanophage: once términos ponderados (bigramas del mismo dedo, esfuerzo, tijeras, estiramientos laterales, skipgramas, vocales en una mano, equilibrio de manos); cuanto más bajo, mejor. Reproducido con exactitud, salvo un bigrama con un carácter que falta en la distribución, que su herramienta cuenta mal.",
 	"layout_analysis.info.analyser.cmini": "cmini, el bot de la comunidad de distribuciones alternativas: estadísticas de SFB y trigramas, sin puntuación. Reproducido exactamente.",
 	"layout_analysis.info.analyser.ergol": "El analizador de Ergo-L y las estadísticas de Kalamine: SFB, estiramientos laterales, tijeras, rodamientos y redirecciones, sin puntuación por diseño. Reproducido exactamente, teclas muertas incluidas.",
 	"layout_optimizer.title": "Optimizador de distribución",

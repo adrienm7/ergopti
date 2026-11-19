@@ -4763,6 +4763,7 @@
 	"layout_analysis.info.analyser.genkey": "genkey van semi: vingersnelheid, zijwaartse strekkingen en balans van de wijsvingers, lager is beter. Bij benadering: genkey telt skipgrammen tot negen letters uit elkaar, wij hebben alleen de dichtstbijzijnde.",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer: rollen, afwisseling en richtingswissels tegenover bigrammen en skipgrammen met dezelfde vinger en strekkingen, hoger is beter. Dichtbij: de verre skipgrammen worden geschat.",
 	"layout_analysis.info.analyser.dariogoetz": "Keyboard Layout Optimizer van Dario Götz: kosten uit twaalf maten, lager is beter. Exact voor de basis- en Shift-laag; AltGr is onze aanpassing.",
+	"layout_analysis.info.analyser.cyanophage": "De optimizer van Cyanophage: elf gewogen termen (bigrammen met dezelfde vinger, inspanning, scharen, zijwaartse strekkingen, skipgrammen, klinkers op één hand, handbalans), lager is beter. Exact nagebootst, behalve een bigram met een teken dat de indeling mist, dat zijn tool verkeerd telt.",
 	"layout_analysis.info.analyser.cmini": "cmini, de bot van de community voor alternatieve indelingen: SFB- en trigramstatistieken, geen score. Exact nagebootst.",
 	"layout_analysis.info.analyser.ergol": "De Ergo-L-analysator en de statistieken van Kalamine: SFB, zijwaartse strekkingen, scharen, rollen en richtingswissels, bewust geen score. Exact nagebootst, dode toetsen inbegrepen.",
 	"layout_optimizer.title": "Indelingsoptimalisator",

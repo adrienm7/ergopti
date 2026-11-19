@@ -4763,6 +4763,7 @@
 	"layout_analysis.info.analyser.genkey": "genkey von semi: Fingergeschwindigkeit, seitliche Streckungen und Zeigefingerbalance, niedriger ist besser. Ungefähr: genkey zählt Skipgramme bis zu neun Buchstaben Abstand, wir haben nur die nächsten.",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer: Rollen, Wechsel und Richtungswechsel gegen Gleichfinger-Bigramme und -Skipgramme und Streckungen, höher ist besser. Nah dran: Seine weiten Skipgramme werden geschätzt.",
 	"layout_analysis.info.analyser.dariogoetz": "Keyboard Layout Optimizer von Dario Götz: Kosten aus zwölf Maßen, niedriger ist besser. Exakt für die Basis- und Shift-Ebene; AltGr ist unsere Anpassung.",
+	"layout_analysis.info.analyser.cyanophage": "Cyanophages Optimierer: elf gewichtete Terme (Gleichfinger-Bigramme, Aufwand, Scheren, seitliche Dehnungen, Skipgramme, Vokale auf einer Hand, Handbalance), niedriger ist besser. Exakt nachgebildet, außer bei einem Bigramm mit einem Zeichen, das dem Layout fehlt und das sein Werkzeug falsch zählt.",
 	"layout_analysis.info.analyser.cmini": "cmini, der Bot der Community für alternative Layouts: SFB- und Trigramm-Statistiken, keine Punktzahl. Exakt nachgebildet.",
 	"layout_analysis.info.analyser.ergol": "Der Ergo-L-Analysator und die Statistiken von Kalamine: SFB, seitliche Streckungen, Scheren, Rollen und Richtungswechsel, bewusst keine Punktzahl. Exakt nachgebildet, Tottasten inklusive.",
 	"layout_optimizer.title": "Layout-Optimierer",

@@ -4763,6 +4763,7 @@
 	"layout_analysis.info.analyser.genkey": "semi'nin genkey'i: parmak hızı, yanal uzanmalar ve işaret parmağı dengesi, düşük olan daha iyi. Yaklaşık: genkey dokuz harfe kadar aralıklı atlamalı ikilileri sayar, bizde yalnızca en yakını var.",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer: yuvarlamalar, dönüşümlülük ve yön değiştirmelere karşı aynı parmakla bigramlar, atlamalı ikililer ve uzanmalar; yüksek olan daha iyi. Yakın: uzak atlamalı ikilileri tahmin edilir.",
 	"layout_analysis.info.analyser.dariogoetz": "Dario Götz'ün Keyboard Layout Optimizer'ı: on iki ölçüden bir maliyet, düşük olan daha iyi. Temel ve Shift katmanları için birebir; AltGr bizim uyarlamamızdır.",
+	"layout_analysis.info.analyser.cyanophage": "Cyanophage’ın optimize edicisi: on bir ağırlıklı terim (aynı parmak bigramları, efor, makaslar, yanal gerilmeler, skipgramlar, tek eldeki ünlüler, el dengesi); düşük olan daha iyidir. Düzende olmayan bir karakter içeren ve aracının yanlış saydığı bigram dışında tam olarak yeniden üretildi.",
 	"layout_analysis.info.analyser.cmini": "cmini, alternatif düzenler topluluğunun botu: SFB ve trigram istatistikleri, puan yok. Birebir yeniden üretildi.",
 	"layout_analysis.info.analyser.ergol": "Ergo-L analizcisi ve Kalamine istatistikleri: SFB, yanal uzanmalar, makaslar, yuvarlamalar ve yön değiştirmeler; tasarım gereği puan yok. Ölü tuşlar dahil birebir yeniden üretildi.",
 	"layout_optimizer.title": "Düzen iyileştirici",

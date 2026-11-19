@@ -4763,6 +4763,7 @@
 	"layout_analysis.info.analyser.genkey": "genkey di semi: velocità delle dita, allungamenti laterali ed equilibrio degli indici, più basso è meglio. Approssimato: genkey conta gli skipgram fino a nove lettere di distanza, noi abbiamo solo il più vicino.",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer: rotolamenti, alternanza e reindirizzamenti contro bigrammi e skipgram con lo stesso dito e allungamenti, più alto è meglio. Vicino: i suoi skipgram lontani sono stimati.",
 	"layout_analysis.info.analyser.dariogoetz": "Il Keyboard Layout Optimizer di Dario Götz: un costo da dodici misure, più basso è meglio. Esatto per i livelli base e Shift; AltGr è un nostro adattamento.",
+	"layout_analysis.info.analyser.cyanophage": "L’ottimizzatore di Cyanophage: undici termini pesati (bigrammi stesso dito, sforzo, forbici, allungamenti laterali, skipgrammi, vocali su una mano, equilibrio delle mani), più basso è meglio. Riprodotto esattamente, tranne un bigramma con un carattere assente dal layout, che il suo strumento conta male.",
 	"layout_analysis.info.analyser.cmini": "cmini, il bot della comunità dei layout alternativi: statistiche su SFB e trigrammi, nessun punteggio. Riprodotto esattamente.",
 	"layout_analysis.info.analyser.ergol": "L'analizzatore di Ergo-L e le statistiche di Kalamine: SFB, allungamenti laterali, forbici, rotolamenti e reindirizzamenti, nessun punteggio per scelta. Riprodotto esattamente, tasti morti inclusi.",
 	"layout_optimizer.title": "Ottimizzatore di layout",

@@ -4763,6 +4763,7 @@
 	"layout_analysis.info.analyser.genkey": "genkey autorstwa semi: szybkość palców, rozciągnięcia boczne i równowaga palców wskazujących, mniej znaczy lepiej. Przybliżony: genkey liczy skipgramy do dziewięciu liter od siebie, my mamy tylko najbliższe.",
 	"layout_analysis.info.analyser.oxeylyzer": "Oxeylyzer: przetoczenia, naprzemienność i zmiany kierunku wobec bigramów i skipgramów tym samym palcem oraz rozciągnięć, więcej znaczy lepiej. Zbliżony: jego dalekie skipgramy są szacowane.",
 	"layout_analysis.info.analyser.dariogoetz": "Keyboard Layout Optimizer Daria Götza: koszt z dwunastu miar, mniej znaczy lepiej. Dokładny dla warstwy bazowej i warstwy Shift; AltGr to nasza adaptacja.",
+	"layout_analysis.info.analyser.cyanophage": "Optymalizator Cyanophage’a: jedenaście ważonych składników (bigramy tym samym palcem, wysiłek, nożyce, rozciągnięcia boczne, skipgramy, samogłoski na jednej ręce, równowaga rąk), niżej znaczy lepiej. Odtworzony dokładnie, poza bigramem ze znakiem, którego brak w układzie, a który jego narzędzie liczy błędnie.",
 	"layout_analysis.info.analyser.cmini": "cmini, bot społeczności układów alternatywnych: statystyki SFB i trigramów, bez wyniku. Odtworzony dokładnie.",
 	"layout_analysis.info.analyser.ergol": "Analizator Ergo-L i statystyki Kalamine: SFB, rozciągnięcia boczne, nożyce, przetoczenia i zmiany kierunku, celowo bez wyniku. Odtworzony dokładnie, łącznie z klawiszami martwymi.",
 	"layout_optimizer.title": "Optymalizator układu",
