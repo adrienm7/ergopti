@@ -3,20 +3,9 @@
 		"index.html": [
 			{
 				"tag": "div",
-				"count": 2,
-				"pending": true
-			},
-			{
-				"tag": "span",
+				"where": "class=\"buttons\"",
 				"count": 1,
-				"pending": true
-			}
-		],
-		"script.js": [
-			{
-				"tag": "span",
-				"count": 2,
-				"pending": true
+				"reason": "Lays the footer's three buttons out in one row; a row of unrelated actions has no element of its own, and a menu or list would announce a list that is not there."
 			}
 		]
 	}

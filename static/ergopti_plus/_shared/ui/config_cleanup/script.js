@@ -38,11 +38,11 @@
 		el('keys').textContent = '';
 		state.keys.forEach(function (entry) {
 			var row = document.createElement('li');
-			var key = document.createElement('span');
+			var key = document.createElement('code');
 			key.className = 'setting-key';
 			// A bare root key has no section to name.
 			key.textContent = (entry.section === '' ? '' : '[' + entry.section + '] ') + entry.key;
-			var value = document.createElement('span');
+			var value = document.createElement('code');
 			value.className = 'setting-value';
 			value.textContent = entry.value;
 			row.appendChild(key);

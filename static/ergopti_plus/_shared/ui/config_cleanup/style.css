@@ -132,8 +132,9 @@ footer {
 	gap: 8px;
 	padding: 0;
 }
-.spacer {
-	flex: 1;
+/* Refresh stands apart on the left; Close and Clean sit at the right. */
+#btn-close {
+	margin-inline-start: auto;
 }
 button {
 	white-space: normal;
