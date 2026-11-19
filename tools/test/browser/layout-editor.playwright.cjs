@@ -33,7 +33,8 @@ const studioNumbers = require('./studio-numbers.cjs');
 const studioHeaders = require('./studio-headers.cjs');
 const studioManage = require('./layout-studio-manage.cjs');
 const { catalogueShape, pageRawKeys } = require('../lib/raw-locale-keys.cjs');
-// The tab strip, the restored tabs' names and the corpus file button (studio-controls).
+// The tab strip, the restored tabs' names, the corpus file button and the
+// buttons' colons (studio-controls).
 const studioControls = require('./studio-controls.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
@@ -321,7 +322,7 @@ async function exerciseStudioLayout(browser, origin) {
 	assert.equal(comparer.listOpen, false, 'the layout list is folded');
 	assert.match(
 		comparer.summary,
-		/^\d+\slayouts compared: /,
+		/^\d+\slayouts compared — /,
 		'its line counts the compared layouts'
 	);
 	assert.equal(comparer.widths[0], 100, 'the best layout has the full bar');
@@ -1867,6 +1868,13 @@ async function exerciseComparerHome(browser, origin) {
 			label !== '' && !label.startsWith('layout_analysis.'),
 			`${lang}: « Home » is ${label}`
 		);
+		// (no-colon-button) No button of the Comparer holds a colon, in any tab.
+		const colons = new Set();
+		for (const tab of await page.$$eval('#la-tabs [role="tab"]', (tabs) => tabs.map((t) => t.id))) {
+			await page.click(`#${tab}`);
+			for (const text of await studioControls.colonButtons(page)) colons.add(text);
+		}
+		assert.deepEqual([...colons], [], `${lang}: Comparer buttons hold a colon`);
 	}
 	await page.close();
 }
@@ -4074,6 +4082,7 @@ async function exerciseComparerLink(browser, origin) {
 		await studioControls.exerciseTabStrip(browser, origin);
 		await studioControls.exerciseRestoredStartName(browser, origin);
 		await studioControls.exerciseCorpusFileButton(browser, origin);
+		await studioControls.exerciseOptimizerButtons(browser, origin);
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);
@@ -4110,17 +4119,23 @@ async function exerciseComparerLink(browser, origin) {
 			for (const summary of await opened.page.$$('#le-inspector details > summary'))
 				await summary.click();
 			const raw = await rawKeys(opened.page);
+			// (no-colon-button) No button of the editor holds a colon, in any tool.
+			const colons = new Set(await studioControls.colonButtons(opened.page));
 			const tools = await opened.page.$$eval('#le-tools [data-tool]', (tabs) =>
 				tabs.map((tab) => tab.dataset.tool)
 			);
 			for (const id of tools) {
 				await tool(opened.page, id);
 				raw.push(...(await rawKeys(opened.page)));
+				for (const text of await studioControls.colonButtons(opened.page)) colons.add(text);
 			}
 			await opened.page.click('#le-shortcut-view');
 			await opened.page.click('#le-board [data-code="KeyQ"]');
 			raw.push(...(await rawKeys(opened.page)));
+			await opened.page.click('#le-tab-add');
+			for (const text of await studioControls.colonButtons(opened.page)) colons.add(text);
 			assert.deepEqual(raw, [], `${lang}: raw locale keys are shown`);
+			assert.deepEqual([...colons], [], `${lang}: editor buttons hold a colon`);
 			assert.deepEqual(opened.errors, [], `${lang}: page errors`);
 			await opened.page.close();
 		}

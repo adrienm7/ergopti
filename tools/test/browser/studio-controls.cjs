@@ -8,7 +8,8 @@
  * layout-editor.playwright.cjs on its loopback server (run alone, it serves
  * the shared tree itself). The maintainer looked at the Studio on 2026-11-19:
  * the tab chip was cramped and its outline broken, the editor's tab still
- * read « Mon Ergopti », and « Load a file » hid under « Your own text ».
+ * read « Mon Ergopti », « Load a file » hid under « Your own text », and no
+ * button may hold a colon.
  *
  * WHAT IS CHECKED:
  * 1. (tab-strip) Every tab and « + » share one height and one middle line;
@@ -22,6 +23,10 @@
  * 3. (corpus-file-button) « Load a corpus file » shows on the Comparer's
  *    « Home » under a built-in corpus: tinted, bold, with an icon and the
  *    formats it reads, 4.5:1; the file it loads becomes the chosen corpus.
+ * 4. (no-colon-button) colonButtons lists every button, disclosure, tab and
+ *    button-styled label whose text holds a colon (a drawn key typing « : »
+ *    aside), for the 21-locale loops of the editor and the Comparer in
+ *    layout-editor.playwright.cjs and the optimiser's own run.
  * ==============================================================================
  */
 
@@ -48,6 +53,29 @@ const TYPES = {
 function stringsOf(lang) {
 	return JSON.parse(
 		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', `${lang}.json`), 'utf8')
+	);
+}
+
+/**
+ * (no-colon-button) The texts of the page's buttons that hold a colon, « : »
+ * or « ： » (maintainer, 2026-11-19): buttons, disclosures, tabs and the
+ * labels drawn as buttons (a file picker's « .la-file-button »), shown or not.
+ * @param {import('playwright').Page|import('playwright').Frame} page
+ * @returns {Promise<string[]>}
+ */
+function colonButtons(page) {
+	return page.evaluate(() =>
+		[
+			...document.querySelectorAll(
+				'button, summary, [role="button"], [role="tab"], .la-file-button, input[type="button"], input[type="submit"]'
+			)
+		]
+			// A key of a drawn keyboard shows the character it types (« : » too).
+			.filter((node) => !node.closest('[data-code]'))
+			.map((node) =>
+				(node.tagName === 'INPUT' ? node.value : node.textContent).replace(/\s+/g, ' ').trim()
+			)
+			.filter((text) => /[:：]/.test(text))
 	);
 }
 
@@ -418,6 +446,30 @@ async function exerciseCorpusFileButton(browser, origin) {
 		}
 }
 
+/**
+ * (no-colon-button) The optimiser's buttons in every locale: none holds a colon.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseOptimizerButtons(browser, origin) {
+	const locales = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locale_order.json'), 'utf8')
+	).order;
+	const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	for (const lang of locales) {
+		await page.goto(`${origin}/ui/layout_optimizer/index.html?lang=${lang}`);
+		await page.waitForFunction(() => {
+			const title = document.querySelector('.layout-optimizer h1');
+			return title && title.textContent && !title.textContent.startsWith('layout_optimizer.');
+		});
+		assert.deepEqual(await colonButtons(page), [], `${lang}: optimiser buttons hold a colon`);
+	}
+	assert.deepEqual(errors, []);
+	await page.close();
+}
+
 /** Serves the shared tree read-only on loopback, for a run of this file alone. */
 function serve() {
 	const root = shared();
@@ -446,6 +498,7 @@ async function main() {
 		await exerciseTabStrip(browser, origin);
 		await exerciseRestoredStartName(browser, origin);
 		await exerciseCorpusFileButton(browser, origin);
+		await exerciseOptimizerButtons(browser, origin);
 	} finally {
 		await browser.close();
 		server.close();
@@ -459,4 +512,10 @@ if (require.main === module)
 		process.exitCode = 1;
 	});
 
-module.exports = { exerciseTabStrip, exerciseRestoredStartName, exerciseCorpusFileButton };
+module.exports = {
+	exerciseTabStrip,
+	exerciseRestoredStartName,
+	exerciseCorpusFileButton,
+	exerciseOptimizerButtons,
+	colonButtons
+};
