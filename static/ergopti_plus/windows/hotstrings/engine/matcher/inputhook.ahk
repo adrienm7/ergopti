@@ -2918,7 +2918,13 @@ _LookupAndRender(CollectFn := unset, ResolveFn := unset) {
 		if (GateDurationMs > 0 and RemainingMs <= 0)
 			continue
 		TriggerLabel := (Decision.EndChar == "") ? Decision.Completion : "↵"
+		; The category glyph tells the categories apart where the tint cannot
+		; (category_glyph.ahk); its switch hides it. Resolved with the colour, so
+		; the cached Cfg costs nothing more here.
+		ShowGlyph := Cfg.HasOwnProp("Glyph") && Cfg.Glyph != ""
+			&& HSE_PreviewSwitchCurrent(ConfigLeaf.PREVIEW_CATEGORY_GLYPHS)
 		Item := { Text: Entry.Output, TriggerLabel: TriggerLabel,
+		          Glyph: ShowGlyph ? Cfg.Glyph : "", GlyphNameKey: ShowGlyph ? Cfg.GlyphNameKey : "",
 		          ColorHex: Color, DurationSec: GateDurationMs / 1000,
 		          Trigger: Entry.Trigger, Category: Entry.Category,
 		          IsDimmed: false, FireDecision: Decision,

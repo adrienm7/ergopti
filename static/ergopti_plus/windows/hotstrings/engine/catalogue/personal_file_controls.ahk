@@ -311,11 +311,17 @@ class PersonalFileAdoptedOwner {
 		global GLOBAL_DEFAULT_COLOR, HSE_PRIORITY_PACKAGE
 		ConfigFile := this.config
 		Sec := ConfigFile.Sections.Get(Section, { Delay: "", Color: "", ShowTooltip: "", Priority: "" })
+		; A personal file is the user's own hotstrings: the personal glyph unless
+		; its [_meta] declares one. Resolved once per owner, whose metadata is fixed
+		; for its generation: this runs per preview candidate on every keystroke.
+		if !this.HasOwnProp("glyph")
+			this.glyph := _HotstringsResolveGlyph("personal", ConfigFile)
+		Glyph := this.glyph
 		return { Delay: Sec.Delay != "" ? Sec.Delay : (ConfigFile.Delay != "" ? ConfigFile.Delay : PersonalFileDefaultDelay()),
 			Color: Sec.Color != "" ? Sec.Color : (ConfigFile.Color != "" ? ConfigFile.Color : GLOBAL_DEFAULT_COLOR),
 			ShowTooltip: Sec.ShowTooltip != "" ? Sec.ShowTooltip : (ConfigFile.ShowTooltip != "" ? ConfigFile.ShowTooltip : true),
 			Priority: Sec.Priority != "" ? Sec.Priority : (ConfigFile.Priority != "" ? ConfigFile.Priority : HSE_PRIORITY_PACKAGE),
-			HasOverride: false }
+			HasOverride: false, Glyph: Glyph.Glyph, GlyphNameKey: Glyph.NameKey }
 	}
 
 	/** Parse only source metadata, retaining quoted keys and metadata after arrays of tables. */
@@ -348,6 +354,11 @@ class PersonalFileAdoptedOwner {
 					Target.ShowTooltip := Value.Value
 				else if Key == "color" && Value is String
 					Target.Color := Value
+				else if Parts.Length == 1 && (Key == "glyph" || Key == "glyph_name_key") {
+					; Kept as typed: the glyph resolver refuses what is not one symbol.
+					GlyphProp := (Key == "glyph") ? "Glyph" : "GlyphNameKey"
+					Target.%GlyphProp% := Value
+				}
 			}
 		}
 		return Config

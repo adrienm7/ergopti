@@ -462,7 +462,24 @@ _HotstringsResolveUncached(CategoryName, SectionName := "") {
 				HasOverride := true
 		}
 
-		return { Delay: Delay, Color: Color, ShowTooltip: ShowTooltip, Priority: Priority, HasOverride: HasOverride }
+		Glyph := _HotstringsResolveGlyph(CategoryName, TomlCfg)
+		return { Delay: Delay, Color: Color, ShowTooltip: ShowTooltip, Priority: Priority, HasOverride: HasOverride,
+				Glyph: Glyph.Glyph, GlyphNameKey: Glyph.NameKey }
+}
+
+; The preview glyph of a category, the tint's TOML and default rungs: its [_meta],
+; then its per-category default, then the shared one (category_glyph.ahk). No user
+; rung: the settings window offers no glyph to override.
+; @param CategoryName {String}
+; @param TomlCfg {Object} The category's parsed [_meta] (ParseTomlGroupConfig).
+; @returns {Object} { Glyph, NameKey, Rejected }
+_HotstringsResolveGlyph(CategoryName, TomlCfg) {
+		global HOTSTRINGS_DEFAULT_GLYPH, HOTSTRINGS_DEFAULT_GLYPH_NAME_KEY, HOTSTRINGS_CATEGORY_DEFAULT_GLYPHS
+		Own := HOTSTRINGS_CATEGORY_DEFAULT_GLYPHS.Get(StrLower(CategoryName), { Glyph: "", NameKey: "" })
+		Resolved := HotstringCategoryGlyphResolve(TomlCfg, Own.Glyph, Own.NameKey,
+				HOTSTRINGS_DEFAULT_GLYPH, HOTSTRINGS_DEFAULT_GLYPH_NAME_KEY)
+		HotstringCategoryGlyphLogRejected(CategoryName, Resolved)
+		return Resolved
 }
 
 ; Resolve the effective delay and color for an extension hotstring file.
@@ -550,7 +567,9 @@ HotstringsResolveExt(ExtId, TomlPath, SectionName := "") {
 
 		HasOverride := (UserSec != "" and (UserSec.Delay != "" or UserSec.Color != "" or UserSec.ShowTooltip != "" or (UserSec.HasOwnProp("Priority") and UserSec.Priority != "")))
 				or  (UserCat != "" and (UserCat.Delay != "" or UserCat.Color != "" or UserCat.ShowTooltip != "" or (UserCat.HasOwnProp("Priority") and UserCat.Priority != "")))
-		return { Delay: Delay, Color: Color, ShowTooltip: ShowTooltip, Priority: Priority, HasOverride: HasOverride }
+		Glyph := _HotstringsResolveGlyph(OverrideKey, TomlCfg)
+		return { Delay: Delay, Color: Color, ShowTooltip: ShowTooltip, Priority: Priority, HasOverride: HasOverride,
+				Glyph: Glyph.Glyph, GlyphNameKey: Glyph.NameKey }
 }
 
 

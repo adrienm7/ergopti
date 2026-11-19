@@ -425,7 +425,11 @@ _TooltipAnnouncementText(Items, LlmRecord) {
 					continue
 				if Item.HasOwnProp("IsDimmed") && Item.IsDimmed
 					continue
-				Parts.Push(Item.Text)
+				; A shown category glyph is read as the category it stands for:
+				; the shape tells the categories apart, its name says which.
+				Shown := Item.HasOwnProp("Glyph") && Item.Glyph != ""
+					&& Item.HasOwnProp("GlyphNameKey") && Item.GlyphNameKey != ""
+				Parts.Push(Shown ? Item.Text . ", " . t(Item.GlyphNameKey) : Item.Text)
 			}
 		}
 		if IsObject(LlmRecord) && LlmRecord.HasOwnProp("IsFinal") && LlmRecord.IsFinal
@@ -882,6 +886,27 @@ _TooltipDequeueRebuild(Items, ExpectedGeneration, ExpectedSurface) {
 		return true
 }
 
+; The label a preview row draws at its right, in the trigger label's font and
+; colour: the category glyph, a space, then the key that fires it. Either part may
+; be empty. The rule of _shared/hotstrings/engine/category_glyph.lua row_label,
+; pinned by the same vectors.
+; @param Glyph {String}
+; @param TriggerLabel {String}
+; @returns {String}
+TooltipRowLabel(Glyph, TriggerLabel) {
+	if (Glyph != "" && TriggerLabel != "")
+		return Glyph . " " . TriggerLabel
+	return (Glyph != "") ? Glyph : TriggerLabel
+}
+
+; The label of one tooltip row object (Glyph and TriggerLabel are optional).
+; @param Item {Object}
+; @returns {String}
+_TooltipItemLabel(Item) {
+	return TooltipRowLabel(Item.HasOwnProp("Glyph") ? Item.Glyph : "",
+		Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : "")
+}
+
 ; Draws hotstring rows heading a prediction Gui (llm.trigger.while_hotstring_tooltip
 ; = "both") the way _TooltipBuildGui draws the hotstring stack: same tint bands,
 ; text colours and rules, at the geometry _LLM_TooltipHeaderLayout chose.
@@ -902,7 +927,7 @@ _TooltipDrawSharedHotstringRows(G, Items, Header, TotalW) {
 			G.SetFont("norm c" . _TOOLTIP_TEXT_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}", _TOOLTIP_PADDING_X,
 			RowY + _TOOLTIP_PADDING_Y, Header.TextW, Header.Sizes[Idx].H), Item.Text)
-		Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+		Label := _TooltipItemLabel(Item)
 		if (Label != "" && Header.LabelW > 0) {
 			LabelSize := Header.LabelSizes[Idx]
 			G.SetFont("norm c" . (IsDimmed ? _TOOLTIP_DIM_COLOR_HEX : _TOOLTIP_LABEL_COLOR_HEX)
@@ -963,7 +988,7 @@ _TooltipBuildGui(Items) {
 		MaxLabelW := 0
 		LabelSizes := []
 		for , Item in Items {
-				Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+				Label := _TooltipItemLabel(Item)
 				if (Label != "") {
 						LS := _TooltipMeasureTextSize(Label, _TOOLTIP_LABEL_FONT_SIZE)
 						LabelSizes.Push(LS)
@@ -1039,8 +1064,8 @@ _TooltipBuildGui(Items) {
 				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
 						_TOOLTIP_PADDING_X, RowY + _TOOLTIP_PADDING_Y, MaxW, S.H), Item.Text)
 
-				; Trigger label on the right.
-				Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+				; Trigger label on the right, after the category glyph.
+				Label := _TooltipItemLabel(Item)
 				if (Label != "" and LabelZone > 0) {
 						LS := LabelSizes[Idx]
 						LabelX := TotalW - _TOOLTIP_PADDING_X - MaxLabelW

@@ -3,9 +3,9 @@
 ; ==============================================================================
 ; MODULE: Preview-bubble switches
 ; DESCRIPTION:
-; The four switches of the hotstring preview bubble (hotstrings.preview_star_enabled,
-; preview_autocorrect_enabled, preview_ai_enabled, preview_colored_tooltips), as
-; macOS and Linux have them. One home for the key list, the published values and
+; The five switches of the hotstring preview bubble (hotstrings.preview_star_enabled,
+; preview_autocorrect_enabled, preview_ai_enabled, preview_colored_tooltips,
+; preview_category_glyphs), as macOS and Linux have them. One home for the key list, the published values and
 ; the family classification, included by the config loader (settings/engine/preferences/feature_state.ahk)
 ; and by the hotstring engine, so the headless harnesses that load only one of them
 ; still see the same definitions.
@@ -13,12 +13,13 @@
 
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
-; The four preview-bubble switches under [hotstrings], in the menu order. One
+; The five preview-bubble switches under [hotstrings], in the menu order. One
 ; list for the loader, the menu toggle and the engine readers.
 ; @returns {Array}
 HSE_PreviewSwitchKeys() {
 	return [ConfigLeaf.PREVIEW_STAR_ENABLED, ConfigLeaf.PREVIEW_AUTOCORRECT_ENABLED,
-		ConfigLeaf.PREVIEW_AI_ENABLED, ConfigLeaf.PREVIEW_COLORED_TOOLTIPS]
+		ConfigLeaf.PREVIEW_AI_ENABLED, ConfigLeaf.PREVIEW_COLORED_TOOLTIPS,
+		ConfigLeaf.PREVIEW_CATEGORY_GLYPHS]
 }
 
 ; The switches as the loader and the menu publish them. A key absent from the

@@ -187,7 +187,7 @@ _PSW_DefaultsAreTheManifests() {
 	Saved := HSE_PreviewSwitches
 	HSE_PreviewSwitches := Map()
 	try {
-		AssertEqual(4, HSE_PreviewSwitchKeys().Length)
+		AssertEqual(5, HSE_PreviewSwitchKeys().Length)
 		for Key in HSE_PreviewSwitchKeys() {
 			AssertEqual(true, ManifestDefaultFor("hotstrings." . Key),
 				Key . " ships on, on all three drivers (PAR-24)")
@@ -227,7 +227,7 @@ _PSW_TogglesPersistAndPublish() {
 		}
 		AssertFalse(ToggleHotstringsPreviewSwitch("preview_nothing", _PSW_Writer, (*) => 0, (*) => 1),
 			"an unknown switch is refused")
-		AssertEqual(4, _PSW_Writes.Length, "a refused switch writes nothing")
+		AssertEqual(HSE_PreviewSwitchKeys().Length, _PSW_Writes.Length, "a refused switch writes nothing")
 	} finally {
 		ConfigurationFile := Saved.path
 		HSE_PreviewSwitches := Saved.switches
@@ -243,7 +243,7 @@ _PSW_TogglesPersistAndPublish() {
 	}
 }
 
-; The tray draws the four declared rows in the shared order, each ticked from the
+; The tray draws the five declared rows in the shared order, each ticked from the
 ; switch in force and running the toggle for its own key.
 _PSW_MenuRowsFollowTheSwitches() {
 	Toggled := []
@@ -261,9 +261,9 @@ _PSW_MenuRowsFollowTheSwitches() {
 			Switches.Push(Child)
 		}
 	}
-	AssertEqual(4, Labels.Length, "the four switches are offered (PAR-24)")
+	AssertEqual(5, Labels.Length, "the five switches are offered (PAR-24, category glyphs)")
 	Expected := ["menu.hotstrings.tooltip_magic", "menu.hotstrings.tooltip_autocorrect",
-		"menu.hotstrings.tooltip_ai", "menu.hotstrings.tooltip_colored"]
+		"menu.hotstrings.tooltip_ai", "menu.hotstrings.tooltip_colored", "menu.hotstrings.tooltip_glyphs"]
 	for Index, Key in Expected
 		AssertEqual(t(Key), Labels[Index], "row " . Index . " follows the shared order")
 	Keys := HSE_PreviewSwitchKeys()
@@ -279,4 +279,4 @@ _PSW_MenuRowsFollowTheSwitches() {
 
 Test("preview switches: defaults come from the manifest and a stray key is refused (PAR-24)", _PSW_DefaultsAreTheManifests)
 Test("preview switches: toggles persist and publish (PAR-24)", _PSW_TogglesPersistAndPublish)
-Test("preview switches: the tray draws the four shared rows (PAR-24)", _PSW_MenuRowsFollowTheSwitches)
+Test("preview switches: the tray draws the five shared rows (PAR-24)", _PSW_MenuRowsFollowTheSwitches)

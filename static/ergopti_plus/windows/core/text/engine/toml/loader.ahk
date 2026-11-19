@@ -964,6 +964,11 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 							if TOML_TryParseInteger(PrioMatch[1], &ParsedPriority)
 									and HotstringsTryPriority(ParsedPriority, &Priority)
 									Config.Priority := Priority
+							} else if RegExMatch(Line, "^(glyph|glyph_name_key)\s*=\s*(.+)$", &GlyphMatch) {
+									; Kept as typed, an own property only when declared: the
+									; resolver (category_glyph.ahk) refuses what is not one symbol.
+									GlyphProp := (GlyphMatch[1] == "glyph") ? "Glyph" : "GlyphNameKey"
+									Config.%GlyphProp% := TOML_CoerceValue(GlyphMatch[2], true)
 							}
 					} else if (Mode == "meta_section" and CurrentSec != "") {
 							Sec := Config.Sections[CurrentSec]

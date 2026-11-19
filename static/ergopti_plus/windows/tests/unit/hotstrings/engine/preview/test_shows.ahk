@@ -248,3 +248,4 @@ Test("meta hotstrings: the prefix watcher stamps each observed character before 
 
 #Include test_end_scalar.ahk
 #Include test_switches.ahk
+#Include test_category_glyph.ahk

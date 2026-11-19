@@ -87,6 +87,7 @@ global _HSResolveCache := Map()
 global _HSResolveGen := 0
 
 #Include ../../../settings/engine/publication/write_lease.ahk
+#Include category_glyph.ahk
 #Include io.ahk
 #Include catalogue.ahk
 #Include ../matcher/terminator_records.ahk

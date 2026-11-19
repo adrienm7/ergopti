@@ -48,6 +48,7 @@
 HotstringsConfigLoadSharedDefaults(SharedDir := "") {
 		global _SharedDir, GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR, DYN_HOTSTRINGS_DEFAULT_DELAY
 		global HOTSTRINGS_CATEGORY_DEFAULT_COLORS
+		global HOTSTRINGS_DEFAULT_GLYPH, HOTSTRINGS_DEFAULT_GLYPH_NAME_KEY, HOTSTRINGS_CATEGORY_DEFAULT_GLYPHS
 		Dir  := (SharedDir != "") ? SharedDir : (IsSet(_SharedDir) ? _SharedDir : "")
 		Path := Dir . "\hotstrings\data\catalogue\defaults.toml"
 		c    := ParseTomlFile(Path)
@@ -59,6 +60,11 @@ HotstringsConfigLoadSharedDefaults(SharedDir := "") {
 		DYN_HOTSTRINGS_DEFAULT_DELAY := Float(_HSDefaultsRequire(c, "delays", "dynamichotstrings_sec", Path))
 		GLOBAL_DEFAULT_COLOR := _HSDefaultsRequireHex(c, "colors", "global_default", Path)
 		HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"] := _HSDefaultsRequireHex(c, "colors", "personal", Path)
+		HOTSTRINGS_DEFAULT_GLYPH := _HSDefaultsRequireGlyph(c, "global_default", Path)
+		HOTSTRINGS_DEFAULT_GLYPH_NAME_KEY := _HSDefaultsRequireGlyphNameKey(c, "global_default_name_key", Path)
+		HOTSTRINGS_CATEGORY_DEFAULT_GLYPHS["personal"] := {
+				Glyph: _HSDefaultsRequireGlyph(c, "personal", Path),
+				NameKey: _HSDefaultsRequireGlyphNameKey(c, "personal_name_key", Path) }
 
 		try LoggerInfo("HotstringsConfig", "Shared defaults loaded (delay={1}s dyn={2}s color={3} personal={4}).",
 				GLOBAL_DEFAULT_DELAY, DYN_HOTSTRINGS_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR, HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"])
@@ -98,6 +104,22 @@ _HSDefaultsRequireHex(c, Section, Key, Path) {
 				throw Error(Format("_shared/hotstrings/data/catalogue/defaults.toml — couleur hex invalide : [{1}] {2} = {3}", Section, Key, Val))
 		}
 		return "#" . Hex
+}
+
+; A [glyphs] glyph of the canon, refused unless it is one visible symbol.
+_HSDefaultsRequireGlyph(c, Key, Path) {
+		Val := _HSDefaultsRequire(c, "glyphs", Key, Path)
+		if !HotstringCategoryGlyphIsGlyph(Val)
+				throw Error(Format("_shared/hotstrings/data/catalogue/defaults.toml — invalid glyph: [glyphs] {1} = {2}", Key, Val))
+		return Val
+}
+
+; A [glyphs] name key of the canon, refused unless it is a dotted i18n key.
+_HSDefaultsRequireGlyphNameKey(c, Key, Path) {
+		Val := _HSDefaultsRequire(c, "glyphs", Key, Path)
+		if !HotstringCategoryGlyphIsNameKey(Val)
+				throw Error(Format("_shared/hotstrings/data/catalogue/defaults.toml — invalid glyph name key: [glyphs] {1} = {2}", Key, Val))
+		return Val
 }
 
 ; Initialise the module. Must be called before any Resolve/Set call.

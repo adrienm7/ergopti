@@ -1551,7 +1551,7 @@ _LLM_TooltipMeasureHeader(Items) {
 	LabelSizes := []
 	for , Item in Items {
 		Sizes.Push(_TooltipMeasureText(Item.Text))
-		Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+		Label := _TooltipItemLabel(Item)
 		Measured := _LLM_TooltipMeasureOptional(Label, _TOOLTIP_LABEL_FONT_SIZE)
 		LabelSizes.Push(IsObject(Measured) ? Measured : { W: 0, H: 0 })
 	}
