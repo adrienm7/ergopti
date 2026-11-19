@@ -33,6 +33,10 @@ global TOML_DOCUMENT_PARSE_OWNER_LIMIT := 32
 ; that every new shared setting moved. Both maps keep the owner bound above.
 global _TOML_ParseRepeatSources := Map("document", Map(), "flat", Map())
 global _TOML_ParseRepeatOwners := Map("document", Map(), "flat", Map())
+; The sources TOML_ParseDocumentShared remembers, the oldest dropped first, so
+; the memo never pins every text a session read. One named bound: the memo test
+; reads it instead of a copy.
+global TOML_SHARED_PARSE_ENTRIES := 4
 
 /** Returns a case-sensitive semantic table without native configuration effects. */
 _TOML_DocumentTable() {
@@ -508,7 +512,6 @@ _TOML_DocumentAssign(Current, CurrentPath, NativeSection, KeyText, Raw, RawRecor
  */
 TOML_ParseDocumentShared(Source, &Records := 0, &Physical := 0) {
 	static Entries := []
-	static MAX_ENTRIES := 4
 	static MAX_SOURCE_CHARS := 262144
 	if !(Source is String)
 		throw TypeError("TOML document source must be a String")
@@ -523,7 +526,7 @@ TOML_ParseDocumentShared(Source, &Records := 0, &Physical := 0) {
 	Document := TOML_ParseDocument(Source, &Records, &Physical)
 	if StrLen(Source) <= MAX_SOURCE_CHARS {
 		Entries.Push({ Source: Source, Document: Document, Records: Records, Physical: Physical })
-		while Entries.Length > MAX_ENTRIES
+		while Entries.Length > TOML_SHARED_PARSE_ENTRIES
 			Entries.RemoveAt(1)
 	}
 	return Document

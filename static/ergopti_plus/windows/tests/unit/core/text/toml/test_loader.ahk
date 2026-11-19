@@ -1285,15 +1285,19 @@ Test("toml shared parse: malformed input keeps throwing and is not remembered (s
 	_SHP_MalformedSourceThrowsAndIsNotRemembered)
 
 _SHP_MemoIsBounded() {
+	Kept := TOML_SHARED_PARSE_ENTRIES
+	Assert(Kept is Integer && Kept >= 1, "the memo keeps at least one source")
+	Probe := "[shared_probe_d]`nvalue = "
 	Before := _TOML_DocumentParses
-	loop 6
-		TOML_ParseDocumentShared("[shared_probe_d]`nvalue = " A_Index "`n")
-	AssertEqual(Before + 6, _TOML_DocumentParses)
-	; The newest four are remembered, the oldest was dropped.
-	TOML_ParseDocumentShared("[shared_probe_d]`nvalue = 6`n")
-	AssertEqual(Before + 6, _TOML_DocumentParses, "the newest source is still remembered")
-	TOML_ParseDocumentShared("[shared_probe_d]`nvalue = 1`n")
-	AssertEqual(Before + 7, _TOML_DocumentParses, "the oldest source was evicted")
+	loop Kept + 1
+		TOML_ParseDocumentShared(Probe A_Index "`n")
+	AssertEqual(Before + Kept + 1, _TOML_DocumentParses, "each distinct source is parsed once")
+	; The newest TOML_SHARED_PARSE_ENTRIES are remembered, the oldest was dropped.
+	loop Kept
+		TOML_ParseDocumentShared(Probe (A_Index + 1) "`n")
+	AssertEqual(Before + Kept + 1, _TOML_DocumentParses, "every newest source is still remembered")
+	TOML_ParseDocumentShared(Probe 1 "`n")
+	AssertEqual(Before + Kept + 2, _TOML_DocumentParses, "the oldest source was evicted")
 }
 Test("toml shared parse: the memo keeps a bounded number of sources (shared-source-parse)", _SHP_MemoIsBounded)
 
