@@ -503,7 +503,14 @@ async function exerciseStudioHandoff(page, origin, basePath) {
 	await editor.locator('#la-panel-compare').click();
 	await page.waitForURL(origin + basePath + '/studio/comparer');
 	const comparer = page.frameLocator('iframe.studio-frame');
+	// (compare-shows-ranking) A fresh visit opens on « Home », but the handed
+	// layout asks for a comparison: its ranking is shown, not hidden behind it.
 	await comparer.locator('#la-results[aria-busy="false"] #la-table tbody tr').first().waitFor();
+	assert.equal(
+		await comparer.locator('#la-tab-overview').getAttribute('aria-selected'),
+		'true',
+		'the handoff shows the ranking'
+	);
 	assert.equal(
 		await comparer.locator('#la-format').inputValue(),
 		'65',
@@ -522,7 +529,9 @@ async function exerciseStudioHandoff(page, origin, basePath) {
 		1,
 		'the edited layout is listed once'
 	);
-	// The format chosen in the Comparer is the editor's next time.
+	// The format chosen in the Comparer is the editor's next time; the choice
+	// sits in « Home », with the Comparer's other controls.
+	await comparer.locator('#la-tab-home').click();
 	await comparer.locator('#la-format').selectOption('tkl');
 	await visit(page, origin, basePath, '/studio');
 	await page.frameLocator('iframe.studio-frame').locator('#le-board').waitFor();
@@ -534,8 +543,11 @@ async function exerciseStudioHandoff(page, origin, basePath) {
 	// (editor-layouts-in-comparer) The layout open in the editor frame is in the
 	// Comparer frame's list on a later visit, the handoff long taken.
 	await visit(page, origin, basePath, '/studio/comparer');
-	await page
-		.frameLocator('iframe.studio-frame')
+	const later = page.frameLocator('iframe.studio-frame');
+	// The list sits folded in « Home », the tab the visitor chose last.
+	assert.equal(await later.locator('#la-tab-home').getAttribute('aria-selected'), 'true');
+	await later.locator('#la-layouts-box > summary').click();
+	await later
 		.locator('#la-layout-list .la-layout', { hasText: 'Ma disposition (d’après Ergopti)' })
 		.first()
 		.waitFor();

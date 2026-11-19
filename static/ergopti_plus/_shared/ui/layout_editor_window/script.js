@@ -850,7 +850,7 @@ function showTab(tab) {
  */
 function compareEdited(layout) {
 	showTab('compare');
-	window.LAYOUT_ANALYSIS_COMPARER.addLayouts([layout]);
+	window.LAYOUT_ANALYSIS_COMPARER.compare([layout]);
 }
 
 /**

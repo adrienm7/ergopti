@@ -559,6 +559,13 @@ async function exerciseCompareEdited(browser, origin) {
 	assert.equal((await button.textContent()).trim(), strings['layout_analysis.panel.compare']);
 	await button.click();
 	assert.equal(await page.isVisible('#studio-comparer'), true, 'the click opens « Comparer »');
+	// (compare-shows-ranking) A fresh Comparer opens on « Home »; the click asks
+	// for a comparison, so its ranking is shown instead.
+	assert.equal(
+		await page.getAttribute('#la-tab-overview', 'aria-selected'),
+		'true',
+		'the click shows the ranking'
+	);
 	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'studio_layouts'));
 	await page.evaluate(() => {
 		const list = window.__posted.find((p) => p.action === 'studio_layouts');

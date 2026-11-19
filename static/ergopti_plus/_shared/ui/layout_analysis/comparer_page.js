@@ -33,7 +33,9 @@
  *    LAYOUT_ANALYSIS_COMPARER.setCorpus) adds « My typing » and selects it;
  *    a later one (the app's fresh read after its saved one) replaces its
  *    tables without changing the user's corpus;
- *    LAYOUT_ANALYSIS_COMPARER.addLayouts adds personal layouts; a host `store` ({list, save, remove}, promises) keeps imported layouts instead
+ *    LAYOUT_ANALYSIS_COMPARER.addLayouts adds personal layouts, and
+ *    LAYOUT_ANALYSIS_COMPARER.compare adds the layouts a visitor asked to
+ *    compare (a handoff, a link) and shows their ranking; a host `store` ({list, save, remove}, promises) keeps imported layouts instead
  *    of localStorage. LAYOUT_ANALYSIS_COMPARER.onResults(listener) lets an
  *    extra view (other analysers' scores) follow every comparison.
  * 8. Every metric and sourced value has an « i » button (info_popover.js):
@@ -988,7 +990,7 @@
 	 * @param {{host?: object, reportHeight?: boolean}} [options] - host: the
 	 *   LAYOUT_ANALYSIS_HOST contract (window.LAYOUT_ANALYSIS_HOST when absent);
 	 *   reportHeight: post the page height to a framing parent (the site).
-	 * @returns {{setCorpus: function, addLayouts: function, setFormat: function, onResults: function}}
+	 * @returns {{setCorpus: function, addLayouts: function, compare: function, setFormat: function, onResults: function}}
 	 * @throws {Error} On a missing root or a second mount.
 	 */
 	function mount(root, options) {
@@ -6018,6 +6020,19 @@
 		}
 
 		/**
+		 * Adds the layouts the visitor asked to compare (the editor's « Compare
+		 * with other layouts », a link's own layouts) and shows the ranking they
+		 * join: « Home » holds controls only, so a visitor left there would not
+		 * see the comparison asked for. Another results tab stays shown, and the
+		 * visitor's own tab choice (tabSaved) is kept.
+		 * @param {object[]} list - Layouts in the library shape.
+		 */
+		function compare(list) {
+			addLayouts(list);
+			if (state.tab === HOME_TAB) chooseTab(DEFAULT_TAB, false);
+		}
+
+		/**
 		 * Calls a listener after each comparison with (results, tables, {keyboard,
 		 * layouts: Map id → the compared layout object, tablesOf: result → the
 		 * prepared tables it was analysed on (a « + » layout types the keys typed)}),
@@ -6105,7 +6120,7 @@
 		window.LAYOUT_ANALYSER_TAB.attach(root.querySelector('#la-analysers'), {
 			comparer: { onResults }
 		});
-		mounted = { setCorpus, addLayouts, setFormat, onResults };
+		mounted = { setCorpus, addLayouts, compare, setFormat, onResults };
 		return mounted;
 	}
 
@@ -6119,6 +6134,7 @@
 		mount,
 		setCorpus: (corpus) => instance().setCorpus(corpus),
 		addLayouts: (list) => instance().addLayouts(list),
+		compare: (list) => instance().compare(list),
 		setFormat: (id) => instance().setFormat(id),
 		onResults: (listener) => instance().onResults(listener)
 	};
@@ -6137,7 +6153,7 @@
 		mount(root, { reportHeight: true });
 		// The layout the site's editor handed over with « Compare with other layouts ».
 		const handed = window.LAYOUT_ANALYSIS_FILES.takeHandoff();
-		if (handed) instance().addLayouts([handed]);
+		if (handed) instance().compare([handed]);
 		openLinkLayouts();
 	}
 
@@ -6173,7 +6189,7 @@
 				(list) => {
 					if (list.length === 0) return;
 					const mark = t('layout_analysis.share.from_link');
-					instance().addLayouts(
+					instance().compare(
 						list.map((l) => Object.assign({}, l, { name: `${l.name} (${mark})` }))
 					);
 				},
