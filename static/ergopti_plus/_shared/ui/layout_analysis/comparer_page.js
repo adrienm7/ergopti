@@ -125,6 +125,9 @@
 	const HARDEST_WORDS = 15;
 	// Digits of a key's value in the heatmap.
 	const HEAT_DIGITS = 2;
+	// The class of a rank's cell: an ordinal, the one number a table writes
+	// without a unit (studio-numbers.cjs).
+	const RANK_CELL = 'la-rank';
 	// How many metrics a key's score tooltip names, worst first.
 	const HEAT_SCORE_PARTS = 3;
 	// A difference key is at most this mix of its colour, so its ink stays readable.
@@ -1958,14 +1961,16 @@
 					key: 'score',
 					label: t('layout_analysis.table.score'),
 					value: (r) => r.score.total,
-					digits: 1
+					digits: 1,
+					unit: t('layout_analysis.unit.points')
 				}
 			].concat(
 				metricIds.map((id) => ({
 					key: id,
-					label: `${metricName(id)} (${unitText(id)})`,
+					label: metricName(id),
 					value: (r) => r.metrics[id],
 					digits: metricDigits(id),
+					unit: unitText(id),
 					// The order a first click asks for: the metric's better value first.
 					higher: E.METRICS[id].better !== 'lower'
 				}))
@@ -2021,12 +2026,17 @@
 						versus && column.digits !== undefined
 							? relativeCell(
 									column.key === 'score' ? versus.score : versus.metrics[column.key],
-									column.digits
+									column.digits,
+									column.unit
 								)
 							: el(
 									'td',
-									'',
-									column.digits === undefined ? String(value) : format(value, column.digits)
+									column.key === 'rank' ? RANK_CELL : '',
+									column.digits === undefined
+										? String(value)
+										: column.unit === undefined
+											? format(value, column.digits)
+											: measure(value, column.digits, column.unit)
 								);
 					if (column.key === 'name' && result.incomplete) cell.append(' ', incompleteFlag(result));
 					tr.append(cell);
@@ -2083,14 +2093,15 @@
 		 * the mark alone).
 		 * @param {{delta: number, verdict: string}} entry - From E.diff().
 		 * @param {number} digits - The column's decimals.
+		 * @param {string} [unit] - The column's unit, shown beside the difference.
 		 * @returns {HTMLTableCellElement}
 		 */
-		function relativeCell(entry, digits) {
+		function relativeCell(entry, digits, unit) {
 			const marks = { better: '▲', worse: '▼', same: '=', none: '' };
 			const cell = el(
 				'td',
 				'la-delta',
-				`${entry.delta > 0 ? '+' : ''}${format(entry.delta, digits)}`
+				`${entry.delta > 0 ? '+' : ''}${unit === undefined ? format(entry.delta, digits) : measure(entry.delta, digits, unit)}`
 			);
 			if (marks[entry.verdict]) {
 				const mark = el(
@@ -2363,7 +2374,7 @@
 				.concat([
 					{
 						key: 'finger_imbalance',
-						label: `${metricName('finger_imbalance')} (%)`,
+						label: metricName('finger_imbalance'),
 						numeric: true,
 						value: (r) => r.metrics.finger_imbalance
 					},
@@ -2383,7 +2394,7 @@
 			const idealRow = el('tr', 'la-ideal-row');
 			const idealHead = el('th', '', t('layout_analysis.details.ideal_mark'));
 			idealHead.scope = 'row';
-			idealRow.append(idealHead, ...fingers.map((id) => el('td', '', format(ideal[id], 1))));
+			idealRow.append(idealHead, ...fingers.map((id) => el('td', '', measure(ideal[id], 1, '%'))));
 			idealRow.append(el('td'), el('td'));
 			tbody.append(idealRow);
 			for (const result of sortedBy(rows, columns, tabSort('fingers_load'))) {
@@ -2401,15 +2412,23 @@
 						`${Math.round((Math.abs(gap) / extent) * HEAT_DIFF_MAX_SHARE * 100)}%`
 					);
 					const signed = `${gap > 0 ? '+' : ''}${format(gap, 1)}`;
-					td.append(el('span', '', format(value, 1)), el('small', 'la-gap', signed));
+					td.append(el('span', '', measure(value, 1, '%')), el('small', 'la-gap', signed));
 					td.title = `${t(`layout_analysis.finger.${id}`)}: ${measure(value, 1, '%')} (${t(
 						'layout_analysis.details.ideal_mark'
 					)} ${measure(ideal[id], 1, '%')}, ${signed})`;
 					tr.append(td);
 				}
 				tr.append(
-					el('td', '', format(result.metrics.finger_imbalance, metricDigits('finger_imbalance'))),
-					el('td', '', format(result.rank, 0))
+					el(
+						'td',
+						'',
+						measure(
+							result.metrics.finger_imbalance,
+							metricDigits('finger_imbalance'),
+							unitText('finger_imbalance')
+						)
+					),
+					el('td', RANK_CELL, format(result.rank, 0))
 				);
 				tbody.append(tr);
 			}
@@ -2538,7 +2557,7 @@
 				.concat(
 					parts.map((part) => ({
 						key: part.id,
-						label: `${part.label} (%)`,
+						label: part.label,
 						numeric: true,
 						value: (r) => value(r, part.id)
 					}))
@@ -2556,8 +2575,9 @@
 				const tbody = el('tbody');
 				for (const result of sortedBy(rows, columns, tabSort(name))) {
 					const tr = heatTableRow(result);
-					for (const part of parts) tr.append(el('td', '', format(value(result, part.id), 1)));
-					tr.append(el('td', '', format(result.rank, 0)));
+					for (const part of parts)
+						tr.append(el('td', '', measure(value(result, part.id), 1, '%')));
+					tr.append(el('td', RANK_CELL, format(result.rank, 0)));
 					tbody.append(tr);
 				}
 				target.replaceChildren(tabSortHead(columns, name, drawTable), tbody);
@@ -2616,7 +2636,7 @@
 				.concat([
 					{
 						key: 'distance',
-						label: `${metricName('distance')} (${mm})`,
+						label: metricName('distance'),
 						numeric: true,
 						value: (r) => r.metrics.distance
 					},
@@ -2634,14 +2654,14 @@
 				for (const id of fingers) {
 					const value = result.fingerDistance[id];
 					const share = extent > 0 ? value / extent : 0;
-					const td = el('td', 'la-cell la-cell-count', format(value, 2));
+					const td = el('td', 'la-cell la-cell-count', measure(value, 2, mm));
 					td.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
 					td.title = `${t(`layout_analysis.finger.${id}`)}: ${measure(value, 2, mm)}`;
 					tr.append(td);
 				}
 				tr.append(
-					el('td', '', format(result.metrics.distance, metricDigits('distance'))),
-					el('td', '', format(result.rank, 0))
+					el('td', '', measure(result.metrics.distance, metricDigits('distance'), mm)),
+					el('td', RANK_CELL, format(result.rank, 0))
 				);
 				tbody.append(tr);
 			}
@@ -2858,9 +2878,7 @@
 
 		/** A metric's unit as written beside its value. */
 		function unitText(id) {
-			const unit = E.METRICS[id].unit;
-			if (unit === 'chars') return t('layout_analysis.unit.chars');
-			return unit === 'mm' ? t('layout_analysis.unit.mm') : '%';
+			return INFO.metricUnit(id);
 		}
 
 		/** What a key types on its base layer, as the heatmap and the tables show it. */
@@ -2986,7 +3004,7 @@
 				t('layout_analysis.heat.table_key'),
 				t('layout_analysis.heat.table_position'),
 				t('layout_analysis.heat.table_finger'),
-				`${heatName(metric)} (${unit})`
+				heatName(metric)
 			]) {
 				const th = el('th', '', label);
 				th.scope = 'col';
@@ -2999,7 +3017,7 @@
 				const tr = el('tr');
 				const th = el('th', 'la-keys', keyText(layout, row.code));
 				th.scope = 'row';
-				const written = `${signed && row.value > 0 ? '+' : ''}${format(row.value, HEAT_DIGITS)}`;
+				const written = `${signed && row.value > 0 ? '+' : ''}${measure(row.value, HEAT_DIGITS, unit)}`;
 				tr.append(
 					th,
 					el('td', '', row.where),
@@ -3232,7 +3250,7 @@
 				const tr = el('tr');
 				tr.append(
 					el('td', 'la-keys', group.keys.map((code) => keyText(layout, code)).join(' ')),
-					el('td', '', format(group.count, 0)),
+					el('td', '', measure(group.count, 0, t('layout_analysis.unit.times'))),
 					el('td', '', measure(group.share, HEAT_DIGITS, '%'))
 				);
 				tbody.append(tr);
@@ -3432,7 +3450,7 @@
 				},
 				{
 					key: 'share',
-					label: `${t('layout_analysis.worst.share')} (%)`,
+					label: t('layout_analysis.worst.share'),
 					numeric: true,
 					value: (p) => p.share
 				},
@@ -3444,7 +3462,7 @@
 				},
 				{
 					key: 'points',
-					label: `${t('layout_analysis.matrix.points')} (${t('layout_analysis.unit.points')})`,
+					label: t('layout_analysis.matrix.points'),
 					numeric: true,
 					value: (p) => p.points
 				}
@@ -3464,10 +3482,10 @@
 				tr.append(
 					el('td', 'la-keys', keyText(layout, pair.keys[0])),
 					el('td', 'la-keys', keyText(layout, pair.keys[1])),
-					el('td', '', format(pair.count, 0)),
-					el('td', '', format(pair.share, HEAT_DIGITS)),
+					el('td', '', measure(pair.count, 0, t('layout_analysis.unit.times'))),
+					el('td', '', measure(pair.share, HEAT_DIGITS, '%')),
 					el('td', '', eventsText(pair)),
-					el('td', '', signed(pair.points, HEAT_DIGITS))
+					el('td', '', withUnit(signed(pair.points, HEAT_DIGITS), t('layout_analysis.unit.points')))
 				);
 				tbody.append(tr);
 			}
@@ -3526,13 +3544,13 @@
 				const tr = el('tr');
 				tr.append(
 					el('td', 'la-keys', entry.word),
-					el('td', '', format(entry.count, 0)),
-					el('td', '', format(entry.effort, 1)),
+					el('td', '', measure(entry.count, 0, t('layout_analysis.unit.times'))),
+					el('td', '', measure(entry.effort, 1, points)),
 					el(
 						'td',
 						'',
 						worst && worst[1] > 0
-							? `${t(`layout_analysis.metric.${worst[0]}`)} ${format(worst[1], 1)}`
+							? `${t(`layout_analysis.metric.${worst[0]}`)} ${measure(worst[1], 1, points)}`
 							: ''
 					)
 				);
@@ -3658,8 +3676,9 @@
 			if (diff) {
 				const th = el('th', '', t('layout_analysis.table.score'));
 				th.scope = 'row';
-				addRow(th, [format(diff.score.a, 1), format(diff.score.b, 1)], {
-					text: signed(diff.score.delta, 1),
+				const points = t('layout_analysis.unit.points');
+				addRow(th, [measure(diff.score.a, 1, points), measure(diff.score.b, 1, points)], {
+					text: withUnit(signed(diff.score.delta, 1), points),
 					verdict: diff.score.verdict
 				});
 			}

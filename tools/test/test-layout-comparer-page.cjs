@@ -718,6 +718,46 @@ check(
 		tied('fr', () => info.withUnit('+1,5', 'points')) === '+1,5\u00a0points',
 		'a signed number keeps its sign before the tied unit'
 	);
+	// (studio-cell-units) Each table cell writes its unit: a metric's from the
+	// engine's unit, an analyser's score in the analyser's own unit, in words
+	// of every locale; an analyser whose unit has no words is refused.
+	pageWindow._i18n_strings = { '_meta.locale': 'en', 'layout_analysis.unit.mm': 'mm' };
+	pageWindow.LAYOUT_ANALYSIS = { METRICS: { sfb: { unit: '%' }, distance: { unit: 'mm' } } };
+	check(
+		info.metricUnit('sfb') === '%' && info.metricUnit('distance') === 'mm',
+		'a metric cell takes its unit from the engine'
+	);
+	const models = JSON.parse(
+		fs.readFileSync(shared('layouts', 'data', 'analysis', 'analyser_models.json'), 'utf8')
+	);
+	const unitKeys = new Set();
+	for (const [id, model] of Object.entries(models.analysers || models)) {
+		if (!model || typeof model !== 'object' || !model.unit) continue;
+		let words = null;
+		try {
+			words = info.analyserUnit({ id, unit: model.unit });
+		} catch {
+			words = null;
+		}
+		check(words !== null, `analyser ${id}: no words for its unit ${model.unit}`);
+	}
+	for (const match of fs
+		.readFileSync(path.join(PAGE_DIR, 'info_popover.js'), 'utf8')
+		.matchAll(/'(layout_analysis\.unit\.[a-z]+)'/g))
+		unitKeys.add(match[1]);
+	for (const locale of fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'))) {
+		const strings = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, locale), 'utf8'));
+		for (const key of unitKeys)
+			check(typeof strings[key] === 'string' && strings[key] !== '', `${locale}: no ${key}`);
+	}
+	let unknown = null;
+	try {
+		info.analyserUnit({ id: 'new', unit: 'furlongs' });
+	} catch (error) {
+		unknown = error;
+	}
+	check(unknown !== null, 'an analyser unit without words is refused');
+	delete pageWindow.LAYOUT_ANALYSIS;
 	// The Studio's strings tie their numbers too: no breaking space before a percent sign.
 	for (const locale of fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'))) {
 		const strings = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, locale), 'utf8'));

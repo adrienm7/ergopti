@@ -227,6 +227,44 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		return withUnit(format(value, digits), unit);
 	}
 
+	/**
+	 * A metric's unit as a table cell writes it beside its value.
+	 * @param {string} id - A LAYOUT_ANALYSIS.METRICS id.
+	 * @returns {string}
+	 * @throws {Error} On an unknown metric or unit.
+	 */
+	function metricUnit(id) {
+		const metric = window.LAYOUT_ANALYSIS.METRICS[id];
+		if (!metric) throw new Error(`layout_analysis: no metric ${id}`);
+		if (metric.unit === PERCENT) return PERCENT;
+		if (metric.unit === 'mm') return t('layout_analysis.unit.mm');
+		if (metric.unit === 'chars') return t('layout_analysis.unit.chars');
+		throw new Error(`layout_analysis: metric ${id} has no unit text for ${metric.unit}`);
+	}
+
+	// The locale key of each unit the other analysers' scores are in (analyser_models.json).
+	const ANALYSER_UNITS = Object.freeze({
+		points: 'layout_analysis.unit.points',
+		effort: 'layout_analysis.unit.effort',
+		'penalty per character': 'layout_analysis.unit.penalty',
+		cost: 'layout_analysis.unit.cost'
+	});
+
+	/**
+	 * An analyser's score unit in the reader's language.
+	 * @param {{id: string, unit: string}} analyser - LAYOUT_ANALYSER_SCORES.analysers() entry.
+	 * @returns {string}
+	 * @throws {Error} On a unit without its words (a new analyser's model).
+	 */
+	function analyserUnit(analyser) {
+		if (analyser.unit === PERCENT) return PERCENT;
+		if (!Object.hasOwn(ANALYSER_UNITS, analyser.unit))
+			throw new Error(
+				`layout_analysis: analyser ${analyser.id} has no words for unit ${analyser.unit}`
+			);
+		return t(ANALYSER_UNITS[analyser.unit]);
+	}
+
 	/** Gives a button its translated accessible name and state. */
 	function label(button) {
 		const text = t('layout_analysis.info.button');
@@ -391,6 +429,8 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		format,
 		withUnit,
 		measure,
+		metricUnit,
+		analyserUnit,
 		NO_BREAK_SPACE,
 		ALSO_EXPLAINS
 	};

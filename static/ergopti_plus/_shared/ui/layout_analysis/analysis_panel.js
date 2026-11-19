@@ -133,11 +133,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	// A number and its unit, tied by a no-break space (info_popover.js).
 	const measure = INFO.measure;
 	const metricDigits = E.metricDigits;
-	const unitText = (id) => {
-		const unit = E.METRICS[id].unit;
-		if (unit === 'chars') return t('layout_analysis.unit.chars');
-		return unit === 'mm' ? t('layout_analysis.unit.mm') : '%';
-	};
+	const unitText = INFO.metricUnit;
 
 	/**
 	 * The engine's layout for an editor document.
@@ -633,7 +629,10 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					const change = value - before[id];
 					const better = E.METRICS[id].better;
 					const good = better === 'higher' ? change > 0 : better === 'lower' ? change < 0 : null;
-					delta.textContent = `${change > 0 ? '+' : '−'}${format(Math.abs(change), metricDigits(id))}`;
+					delta.textContent = INFO.withUnit(
+						`${change > 0 ? '+' : '−'}${format(Math.abs(change), metricDigits(id))}`,
+						unitText(id)
+					);
 					if (good !== null) {
 						delta.classList.add(good ? 'la-panel-good' : 'la-panel-bad');
 						// Better or worse with a mark and in words, never by its colour alone.
@@ -711,8 +710,9 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 
 		/** One analyser's score, or the headline statistics of one without a score. */
 		function scoreText(analyser, score) {
-			// The value alone, as in the Comparer: the units are the analysers' own words.
-			if (analyser.better !== 'none') return format(score.value, analyser.digits);
+			// The value in the analyser's own unit, as in the Comparer.
+			if (analyser.better !== 'none')
+				return measure(score.value, analyser.digits, INFO.analyserUnit(analyser));
 			return analyser.headline
 				.map(
 					(part) =>

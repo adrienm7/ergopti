@@ -26,6 +26,10 @@
  * 1. A number and the unit or counted word after it are tied by a no-break
  *    space (U+00A0, or the language's own before %), never U+0020,
  *    so the unit never wraps away from its number (maintainer, 2026-11-19).
+ * 2. Every table cell (a td, or a figure's role="cell") that shows a number
+ *    shows its unit too (« 12,3 % », « 45 ms », « 1 234 fois »), so a
+ *    screen reader reads each cell with it; a rank (la-rank, la-cell-rank),
+ *    an ordinal, is the one number written alone.
  * ==============================================================================
  */
 
@@ -53,6 +57,9 @@ const LANGS = ['fr', 'en'];
 // Where a text names the characters of keys: a lone digit there is a key's
 // character, not a number (a board's key, a key column, an n-gram, a pair).
 const KEY_CONTEXT = '.la-key, .la-keys, .la-ngram, .la-cell-count, .la-fingering-key';
+// The cells read whole, and the ranks among them, written without a unit.
+const CELLS = 'td, [role="cell"]';
+const RANKS = '.la-rank, .la-cell-rank';
 const TYPES = {
 	'.html': 'text/html',
 	'.js': 'text/javascript',
@@ -79,11 +86,13 @@ function arabicDigits() {
 /**
  * Runs in the page: every text node and every tooltip or accessible name
  * under the roots, each with where it was read and whether it names keys.
- * @param {{selectors: string[], keyContext: string}} options - The roots,
- *   read whole (hidden parts too), and the selector of the key contexts.
- * @returns {{where: string, text: string, keys: boolean}[]}
+ * Each table cell is read whole too, marked as a cell (a rank apart).
+ * @param {{selectors: string[], keyContext: string, cells: string, ranks: string}} options
+ *   The roots, read whole (hidden parts too), and the selectors of the key
+ *   contexts, the cells and the ranks.
+ * @returns {{where: string, text: string, keys: boolean, cell?: boolean}[]}
  */
-function readTexts({ selectors, keyContext }) {
+function readTexts({ selectors, keyContext, cells, ranks }) {
 	const out = [];
 	const where = (node) => {
 		const parts = [];
@@ -106,6 +115,8 @@ function readTexts({ selectors, keyContext }) {
 					if (node.data.trim()) out.push({ where: where(element), text: node.data, keys });
 					continue;
 				}
+				if (node.matches(cells) && !node.matches(ranks))
+					out.push({ where: where(node), text: node.textContent, keys: false, cell: true });
 				for (const name of ['title', 'aria-label', 'aria-valuetext'])
 					if (node.hasAttribute(name))
 						out.push({ where: `${where(node)} [${name}]`, text: node.getAttribute(name), keys });
@@ -140,13 +151,23 @@ function ownTexts() {
 /**
  * The bypasses of one reading: each ASCII digit left once the texts with
  * digits of their own are left out.
- * @param {{where: string, text: string, keys: boolean}[]} texts
+ * @param {{where: string, text: string, keys: boolean, cell?: boolean}[]} texts
  * @param {string[]} own - ownTexts() of the page.
  * @returns {string[]}
  */
 function bypasses(texts, own) {
 	const problems = [];
-	for (const { where, text, keys } of texts) {
+	for (const { where, text, keys, cell } of texts) {
+		if (cell) {
+			// A number alone, its sign and separators aside: the cell lost its unit.
+			if (
+				/^[\s+\-\u2212\u061c\u066b\u066c]*[\u0660-\u0669][\u0660-\u0669\s\u066b\u066c]*$/u.test(
+					text
+				)
+			)
+				problems.push(`a table cell without its unit: ${JSON.stringify(text)} at ${where}`);
+			continue;
+		}
 		let rest = text;
 		for (const part of own) if (rest.includes(part)) rest = rest.split(part).join(' ');
 		// Unicode code points and the keys' codes (Digit1, Numpad0, F12).
@@ -179,7 +200,12 @@ async function openMarked(browser, url) {
 /** Reads the roots of a page and returns its bypasses, each named by the view. */
 async function readView(page, label, selectors) {
 	const own = await page.evaluate(ownTexts);
-	const texts = await page.evaluate(readTexts, { selectors, keyContext: KEY_CONTEXT });
+	const texts = await page.evaluate(readTexts, {
+		selectors,
+		keyContext: KEY_CONTEXT,
+		cells: CELLS,
+		ranks: RANKS
+	});
 	assert.ok(texts.length > 0, `${label}: nothing to read`);
 	return bypasses(texts, own).map((problem) => `${label}: ${problem}`);
 }

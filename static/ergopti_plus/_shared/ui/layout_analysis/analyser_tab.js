@@ -131,7 +131,8 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		/** The text of one score: its value, or the headline statistics of a score-less analyser. */
 		function cellText(a, r) {
 			if (!r) return '…';
-			if (a.better !== 'none') return format(r.value, a.digits);
+			if (a.better !== 'none')
+				return measure(r.value, a.digits, window.LAYOUT_ANALYSIS_INFO.analyserUnit(a));
 			return a.headline
 				.map(
 					(part) =>

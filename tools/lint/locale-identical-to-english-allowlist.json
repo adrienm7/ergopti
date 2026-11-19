@@ -3775,6 +3775,10 @@
 		"layout_analysis.swaps.stop": {
 			"reason": "loanword-or-cognate",
 			"locales": ["da"]
+		},
+		"layout_analysis.unit.effort": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
 		}
 	}
 }

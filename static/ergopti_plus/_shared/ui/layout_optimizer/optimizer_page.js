@@ -513,6 +513,8 @@
 		}
 
 		const number = formatNumber;
+		// A number and its unit, tied by a no-break space (info_popover.js).
+		const withUnit = (text, unit) => window.LAYOUT_ANALYSIS_INFO.withUnit(text, unit);
 		const signed = (value, digits) => (value > 0 ? '+' : '') + number(value, digits);
 		const metricDigits = E.metricDigits;
 
@@ -1478,7 +1480,8 @@
 				const change = after - before;
 				const tr = el('tr');
 				const digits = metricDigits(id);
-				const cell = el('td', 'lo-num', signed(change, digits));
+				const unit = window.LAYOUT_ANALYSIS_INFO.metricUnit(id);
+				const cell = el('td', 'lo-num', withUnit(signed(change, digits), unit));
 				const better = E.METRICS[id].better;
 				const good = better === 'lower' ? change < 0 : better === 'higher' ? change > 0 : false;
 				const bad = better === 'lower' ? change > 0 : better === 'higher' ? change < 0 : false;
@@ -1492,8 +1495,8 @@
 				}
 				tr.append(
 					el('th', '', t(`layout_analysis.metric.${id}`)),
-					el('td', 'lo-num', number(before, digits)),
-					el('td', 'lo-num', number(after, digits)),
+					el('td', 'lo-num', withUnit(number(before, digits), unit)),
+					el('td', 'lo-num', withUnit(number(after, digits), unit)),
 					cell
 				);
 				return tr;
