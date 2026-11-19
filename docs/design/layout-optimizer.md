@@ -65,7 +65,13 @@ maintainer). The analysis model's thumb keys
 ones join as holes, so a letter may move there. A keyboard without thumb keys
 is refused (`thumb_keys_absent`). With `null`, the default, nothing moves onto
 a thumb key and a start layout's thumb characters stay where they are, as a
-pinned key's. The page offers no switch for it yet: the option is the core's.
+pinned key's. A letter that moves onto a thumb key is scored like any other
+(its pairs and trigrams count, a letter beside the space on one thumb is a
+thumb SFB); the space never moves, so a search keeps its start's board
+(`boardFor`), and the property test of `test-layout-optimizer.cjs` checks the
+incremental objective against the full one with letters on the Corne's thumb
+keys, the space on its Space key (AZERTY) or on a thumb key (Hands Down Gold).
+The page offers no switch for it yet: the option is the core's.
 
 A unit may always stay where the start had it, unless a zone leaves that key
 out: a zoned character never leaves its zone, and one that starts outside it

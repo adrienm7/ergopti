@@ -397,8 +397,8 @@ and `ortho`, the keyboards include `corne`, `planck`, `ergodox`, `moonlander` an
   unsupported.
 - A profile's base fingering applies to the row-staggered boards only.
 
-**Thumb keys** (decided by the agent on 2026-11-19, to review by the
-maintainer). Besides the space bar, the thumbs have their own keys
+**Thumb keys** (the keys decided by the agent on 2026-11-19; their effort
+and pairs by the maintainer the same day). Besides the space bar, the thumbs have their own keys
 (`thumb_keys`), named by the JIS keys around the space bar: NonConvert for
 the left thumb, Convert and KanaMode for the right. Only the boards that have
 them physically measure them: JIS (its own keys, `extra_fingers`) and the
@@ -415,16 +415,39 @@ board's missing number row.
 - NonConvert and Convert are rest keys (`thumb_rest_keys`): a thumb rests on
   the one a layout uses. A thumb key's reach is its distance to the nearest
   of its thumb's home key and rest keys, so a rest key costs no travel and
-  KanaMode costs its distance from Convert or AltGr. The other keys keep
-  their home-key reach.
-- Two different keys of one thumb (a thumb letter and the space on the same
-  thumb, two thumb letters) are an SFB, counted among the bigrams: the only
-  pair a thumb key is in. A thumb trigram stays out of the trigram metrics.
+  KanaMode costs its distance from Convert or AltGr (19.05 mm on the Corne).
+  The other keys keep their home-key reach.
+- A character on a thumb key (a thumb letter, Hands Down Gold's T) takes
+  part in the pair and trigram metrics like a finger's key: its pairs with
+  the fingers are rolls (the thumb is the order after the index), hand
+  changes or alternations, its trigrams rolls, redirects or alternations. A
+  thumb's keys lie below every finger's row, so a pair with a thumb is never
+  a scissor, a lateral stretch or a row jump.
+- The space stays out of them, as it always did: the shared bar, and the
+  thumb key a layout types its space on (`board.outOfPairs`, which
+  `boardFor` sets per layout; a layout without a space on a thumb key keeps
+  the keyboard's own board). Its one exception is the thumb SFB.
+- Two consecutive presses of two different keys of one thumb are a **thumb
+  SFB**, counted among the bigrams with its travel in `sfb_distance` (the
+  thumbs' `same_finger_factor` is 1, as an index's): a letter and the space
+  on the same thumb (« e » then space, space then « e »), or two thumb
+  letters of one thumb. A trigram with the space stays out of the trigram
+  metrics.
+- Which thumb presses the space: a layout that types it on a thumb key, that
+  key's thumb; the shared bar (`Space`), the thumb the fingering gives it,
+  the left one on every board but the Kinesis (the convention since
+  2026-11-14, kept). So on JIS a letter on NonConvert beside a space on the
+  bar is a thumb SFB (2.75 keys between their centres), one on Convert is
+  not. Travel is measured between key centres, as everywhere.
 - The optimizer never moves a character onto a thumb key unless its
   `thumbKeys` option names a keyboard that has them
   ([layout-optimizer.md](layout-optimizer.md)).
 - Adding them changed no value of any layout that does not use them, on any
   keyboard (the 649 layouts of the library, eleven keyboards, bit for bit).
+  Counting thumb letters' pairs (2026-11-19) changed none either: the 660
+  library layouts without a character on a thumb key keep every metric and
+  score on both French corpora and the eleven keyboards, bit for bit; of the
+  50 with one, 49 moved on the six boards that have thumb keys.
 
 **Fingering profiles.** `keyboard(id, profile)` and `analyse(…, {profile})`
 take a user model of the hand: `{id, name, base: 'standard'|'angle',
@@ -446,8 +469,8 @@ numbers.
   finger or key.
 
 **Shares.** A bigram or trigram metric is a share of the key bigrams or
-trigrams **without a thumb key**, plus the thumb SFBs (two keys of one
-thumb, [Thumb keys](#model)); a row metric a share of the non-thumb,
+trigrams **without the space** (a thumb letter's are in), plus the thumb
+SFBs with the space ([Thumb keys](#model)); a row metric a share of the non-thumb,
 non-modifier presses; finger load a share of every press; a « per character »
 metric a share of the typed characters.
 
@@ -455,7 +478,7 @@ metric a share of the typed characters.
 
 | Id                 | Unit  | Better | Definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ------------------ | ----- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sfb`              | %     | lower  | Same-finger bigram: two consecutive keys on one finger, different keys (two keys of one thumb too).                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `sfb`              | %     | lower  | Same-finger bigram: two consecutive keys on one finger, different keys (two keys of one thumb too, the space with a thumb letter of its thumb).                                                                                                                                                                                                                                                                                                                                                          |
 | `repeat`           | %     | none   | The same key twice.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `sfs`              | %     | lower  | Same-finger skipgram: first and third key of a trigram on one finger, different keys.                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `sfb_distance`     | mm    | lower  | Same-finger travel: Σ over the SFBs of n × the distance between the two keys' centres (mm, the `distance` metric's geometry) × the finger's `same_finger_factor` (pinky 1.7, ring 1.3, middle and index 1), per 100 key bigrams, plus 0.5 × the same sum over the SFS (first to third key) per 100 key trigrams. genkey's finger speed, Oxeylyzer's SFB × distance / finger weight and the Keyboard Layout Optimizer's `finger_repeats`; the finger factors are Cyanophage's. Weight 0.5 beside `sfb` 5. |
@@ -528,7 +551,7 @@ reverse; at most four are kept (`MAX_WAYS`; the library never has more). A
 dead key closed by a thumb key (the space bar on any level) types the dead
 key's own sign: it stays the way of a character that has no other, and the
 fixed path keeps it, but it is never a context alternative. The pair metrics
-leave thumb keys out, so such a way would hide an SFB behind an extra press no
+leave the space out, so such a way would hide an SFB behind an extra press no
 typist makes.
 
 **Cost.** The choice minimises the score points the keystroke metrics take,
@@ -1497,9 +1520,10 @@ Decided by the agent on 2026-11-19, to review by the maintainer, for the
 thumb keys ([Model](#model)): their codes (the JIS NonConvert, Convert and
 KanaMode), one for the left thumb and two for the right as on JIS; their
 places on each split board; NonConvert and Convert as rest keys (0 mm of
-travel) and KanaMode measured from the nearest rest; the thumb SFB as the
-only pair a thumb is in; the thumb-letter files taken without the symbols of
-their unread outer keys.
+travel) and KanaMode measured from the nearest rest, which the maintainer
+confirmed on 2026-11-19 with the thumb letters' pairs and the thumb SFB
+([Model](#model)); the thumb-letter files taken without the symbols of their
+unread outer keys.
 
 Decided by the agent on 2026-11-17, to review by the maintainer: `row_jump`
 (two rows or more, any fingers, logical rows) is shown but not scored, since

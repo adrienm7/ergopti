@@ -541,21 +541,31 @@ check(
 // The incremental objective gives every layout the search scores the full
 // engine score, with the AltGr levels and the dead key's layer moving too,
 // and the search it drives returns the same layout as the full objective.
-for (const [start, options] of [
-	[azerty, {}],
-	[ergol, { altgr: true, movePunctuation: true, moveSymbols: true }],
-	[ergol, { deadKeyLayer: true }],
-	[azerty, { qwertyShortcuts: ['z', 'x', 'c', 'v'] }]
+// On the Corne, letters move onto the thumb keys: their pairs with the
+// fingers count, and a letter beside the space on one thumb is an SFB, both
+// with the space on the board's Space key (AZERTY) and on a thumb key of
+// its own (Hands Down Gold's Convert).
+const ON_CORNE = Object.assign({}, ANALYSIS, { keyboard: 'corne' });
+for (const [start, options, analysis] of [
+	[azerty, {}, ANALYSIS],
+	[ergol, { altgr: true, movePunctuation: true, moveSymbols: true }, ANALYSIS],
+	[ergol, { deadKeyLayer: true }, ANALYSIS],
+	[azerty, { qwertyShortcuts: ['z', 'x', 'c', 'v'] }, ANALYSIS],
+	[azerty, { thumbKeys: 'corne' }, ON_CORNE],
+	[library.get('hands_down_gold'), { thumbKeys: 'corne' }, ON_CORNE]
 ]) {
 	const p = O.problem(E, start, options);
-	const fullObjective = O.engineObjective(E, tables, ANALYSIS);
-	const incremental = O.incrementalObjective(E, tables, ANALYSIS);
+	const fullObjective = O.engineObjective(E, tables, analysis);
+	const incremental = O.incrementalObjective(E, tables, analysis);
 	let worst = 0;
 	let scored = 0;
+	let thumbLetters = 0;
 	const checked = (layout) => {
 		const value = incremental(layout);
 		worst = Math.max(worst, Math.abs(value - fullObjective(layout)));
 		scored += 1;
+		if (onThumbs(layout).some((code) => /\p{L}/u.test(layout.rows[code][0] || '')))
+			thumbLetters += 1;
 		return value;
 	};
 	checked.accept = incremental.accept;
@@ -563,6 +573,10 @@ for (const [start, options] of [
 	const viaIncremental = O.run(p, Object.assign({ objective: checked }, settings));
 	check(scored > 100, `incremental (${start.id}): only ${scored} layouts scored`);
 	check(worst <= TOLERANCE, `incremental (${start.id}): a score is ${worst} off the engine's`);
+	check(
+		!options.thumbKeys || thumbLetters > 100,
+		`incremental (${start.id}): only ${thumbLetters} layouts with a thumb letter scored`
+	);
 	const viaFull = O.run(p, Object.assign({ objective: fullObjective }, settings));
 	check(
 		JSON.stringify(viaIncremental.layout) === JSON.stringify(viaFull.layout),
@@ -574,7 +588,7 @@ for (const [start, options] of [
 		delete viaIncremental.layout.dead[state];
 	const again = O.run(
 		p,
-		Object.assign({ objective: O.incrementalObjective(E, tables, ANALYSIS) }, settings)
+		Object.assign({ objective: O.incrementalObjective(E, tables, analysis) }, settings)
 	);
 	check(
 		JSON.stringify(again.layout) === JSON.stringify(viaFull.layout),

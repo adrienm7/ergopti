@@ -81,10 +81,12 @@
  *    loaded the rows refuse instead of falling back to the ids.
  * 16. Ideas from the other analysers: sfb_distance, pinky_ring, the floors
  *    and the reference layout of the relative view, weighed by hand.
- * 17. Thumb keys: two different keys of one thumb are an SFB (analyse and
- *    scoreSession alike), two thumbs none; a rest key costs no travel and
- *    KanaMode is reached from the nearest rest; ISO and ANSI have no thumb
- *    key (a thumb letter is missing there), JIS has them on its thumbs.
+ * 17. Thumb keys: two different keys of one thumb are an SFB with its travel
+ *    (analyse and scoreSession alike), two thumbs none; a thumb letter's pairs
+ *    and trigrams with the fingers count, the space's do not; the shared bar
+ *    is the left thumb's; a rest key costs no travel and KanaMode is reached
+ *    from the nearest rest; ISO and ANSI have no thumb key (a thumb letter is
+ *    missing there), JIS has them on its thumbs.
  * ==============================================================================
  */
 
@@ -3218,6 +3220,132 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			jis.finger[jis.index.get('Convert')] === 5,
 		'thumb keys: JIS lacks its thumb keys or their thumbs'
 	);
+
+	// (thumb-pairs, maintainer 2026-11-19) A thumb letter takes part in the
+	// pair and trigram metrics like a finger's key; only the space stays out,
+	// but for the thumb SFB. On the Corne, t on the left thumb's NonConvert
+	// (row 5) and the space on the right thumb's Convert, worked by hand:
+	const N = [null, null, null, null];
+	const tLeft = thumbLayout({
+		NonConvert: ['t', 'T', null, null],
+		Convert: [' ', ' ', null, null],
+		Space: N
+	});
+	const onCorne = (layout, typed) =>
+		E.analyse(layout, E.ngramsFromText(typed), { keyboard: 'corne' });
+	// « dft »: D→F (middle to index) and F→t (index to thumb) both roll
+	// inward, 2 bigrams; d f t is one inward trigram roll. The thumb's row is
+	// below every finger's: F→t is neither a scissor nor a row jump.
+	const dft = onCorne(tLeft, 'dft');
+	check(
+		dft.coverage.bigrams === 2 &&
+			dft.metrics.roll_in === 100 &&
+			dft.metrics.scissors === 0 &&
+			dft.metrics.half_scissors === 0 &&
+			dft.metrics.row_jump === 0,
+		`thumb pairs: « dft » has ${dft.coverage.bigrams} bigrams, roll in ${dft.metrics.roll_in} %, ` +
+			`scissors ${dft.metrics.scissors} %, row jumps ${dft.metrics.row_jump} %`
+	);
+	check(
+		dft.coverage.trigrams === 1 && dft.metrics.roll3_in === 100,
+		`thumb pairs: « dft » has ${dft.coverage.trigrams} trigrams, roll3 in ${dft.metrics.roll3_in} %`
+	);
+	// « tjf »: t (left thumb), j (right index), f (left index): two hand
+	// changes and one alternation.
+	const tjf = onCorne(tLeft, 'tjf');
+	check(
+		tjf.coverage.bigrams === 2 &&
+			tjf.metrics.hand_change === 100 &&
+			tjf.coverage.trigrams === 1 &&
+			tjf.metrics.alternation === 100,
+		`thumb pairs: « tjf » has hand changes ${tjf.metrics.hand_change} % of ` +
+			`${tjf.coverage.bigrams}, alternation ${tjf.metrics.alternation} % of ${tjf.coverage.trigrams}`
+	);
+	// « ft f »: F→t counts; t→space and space→F (the space on its own thumb
+	// key, the other thumb) count in no metric, nor do the two trigrams.
+	const ftf = onCorne(tLeft, 'ft f');
+	check(
+		ftf.coverage.bigrams === 1 &&
+			ftf.metrics.roll_in === 100 &&
+			ftf.metrics.hand_change === 0 &&
+			ftf.coverage.trigrams === 0,
+		`thumb pairs: « ft f » counts ${ftf.coverage.bigrams} bigrams and ` +
+			`${ftf.coverage.trigrams} trigrams (hand changes ${ftf.metrics.hand_change} %)`
+	);
+	// (thumb-sfb) t and the space on one thumb (NonConvert and the Corne's
+	// Space, 1 key across and 0.25 up: 19.636 mm, thumb factor 1): each of the
+	// 8 bigrams of « t t t t t », t then space and space then t, is an SFB
+	// with its travel, sfb_distance = 100 × 19.636 = 1963.629 mm.
+	const thumbMm = Math.hypot(1, 0.25) * 19.05;
+	check(
+		sameThumb.coverage.bigrams === 8 &&
+			near(sameThumb.metrics.sfb_distance, 100 * thumbMm) &&
+			near(sameThumb.score.contributions.sfb, -5 * 100) &&
+			near(sameThumb.score.contributions.sfb_distance, -0.5 * 100 * thumbMm),
+		`thumb SFB: t and the space on one thumb travel ${sameThumb.metrics.sfb_distance} mm ` +
+			`over ${sameThumb.coverage.bigrams} bigrams`
+	);
+	check(
+		sameThumb.keys.NonConvert.sfb === 100 && sameThumb.keys.Space.sfb === 100,
+		'thumb SFB: both thumb keys carry the SFB'
+	);
+	// Two letters on two keys of the right thumb (e on Convert, n on KanaMode,
+	// 19.636 mm apart), the space on the left thumb: « en » and « ne » are
+	// SFBs with that travel.
+	const twoLetters = thumbLayout({
+		KeyE: N,
+		KeyN: N,
+		Convert: ['e', 'E', null, null],
+		KanaMode: ['n', 'N', null, null],
+		NonConvert: [' ', ' ', null, null],
+		Space: N
+	});
+	for (const typed of ['en', 'ne']) {
+		const r = onCorne(twoLetters, typed);
+		check(
+			r.metrics.sfb === 100 && near(r.metrics.sfb_distance, 100 * thumbMm),
+			`thumb SFB: « ${typed} » on one thumb is ${r.metrics.sfb} % SFB, ${r.metrics.sfb_distance} mm`
+		);
+	}
+	// (thumb-travel) Convert is a rest key (0 mm); KanaMode is 1 key from the
+	// right thumb's home key (AltGr's), 19.05 mm: the distance metric of n
+	// typed alone, and of « en » ((0 + 19.05) / 2 per character).
+	check(
+		onCorne(twoLetters, 'e').metrics.distance === 0 &&
+			near(onCorne(twoLetters, 'n').metrics.distance, 19.05) &&
+			near(onCorne(twoLetters, 'en').metrics.distance, 19.05 / 2),
+		'thumb travel: a rest key costs 0 mm, KanaMode its 19.05 mm from the nearest rest'
+	);
+	// (thumb-shared-bar) The shared space bar is the left thumb's (the
+	// fingering's Space), as before: on JIS, t on NonConvert and the space on
+	// the bar are one thumb (an SFB, 2.75 keys between their centres), t on
+	// Convert and the bar two (no pair counted).
+	const leftOnJis = E.analyse(thumbLayout({ NonConvert: ['t', 'T', null, null] }), text, {
+		keyboard: 'jis'
+	});
+	const rightOnJis = E.analyse(thumbLayout({ Convert: ['t', 'T', null, null] }), text, {
+		keyboard: 'jis'
+	});
+	check(
+		leftOnJis.metrics.sfb === 100 &&
+			near(leftOnJis.metrics.sfb_distance, 100 * 2.75 * 19.05) &&
+			rightOnJis.coverage.bigrams === 0,
+		`thumb shared bar: JIS left thumb ${leftOnJis.metrics.sfb} % SFB, ` +
+			`right thumb ${rightOnJis.coverage.bigrams} bigrams`
+	);
+	// The incremental objective follows every rule, thumb letters included.
+	for (const [layout, typed] of [
+		[tLeft, 'dft tjf ft f'],
+		[twoLetters, 'en ne dense']
+	]) {
+		const ngrams = E.ngramsFromText(typed);
+		const full = E.analyse(layout, ngrams, { keyboard: 'corne' }).score.total;
+		const incremental = E.scoreSession(layout, ngrams, { keyboard: 'corne' }).total;
+		check(
+			near(incremental, full),
+			`thumb keys: scoreSession ${incremental} is not analyse()'s ${full} on « ${typed} »`
+		);
+	}
 }
 
 if (errors.length > 0) {

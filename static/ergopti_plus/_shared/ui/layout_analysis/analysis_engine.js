@@ -79,6 +79,8 @@ var LAYOUT_ANALYSIS = (function () {
 	// Finger indexes: lp lr lm li lt rt ri rm rr rp.
 	const LEFT_THUMB = 4;
 	const RIGHT_THUMB = 5;
+	/** Whether a finger index is a thumb's. */
+	const isThumbFinger = (f) => f === LEFT_THUMB || f === RIGHT_THUMB;
 	// Order from the pinky (0) to the index (3), on either hand.
 	const INDEX_ORDER = 3;
 	// How far each finger reaches, by order (pinky, ring, middle, index), for half scissors.
@@ -446,6 +448,12 @@ var LAYOUT_ANALYSIS = (function () {
 			const own = rests.filter((rest) => board.finger[rest] === board.finger[k]);
 			return Math.min(distance(k, home), ...own.map((rest) => distance(k, rest)));
 		});
+		// The thumb presses the pair and trigram metrics leave out: the space
+		// bar's and AltGr's, every thumb key but the thumbs' own (thumb_keys).
+		// boardFor adds the thumb key a layout types its space on.
+		board.outOfPairs = Uint8Array.from(board.codes, (code, k) =>
+			isThumbFinger(board.finger[k]) && !thumbCodes.has(code) ? 1 : 0
+		);
 		board.modifiers = {
 			shiftForLeft: board.index.get(model.modifier_keys.shift_for_left_hand),
 			shiftForRight: board.index.get(model.modifier_keys.shift_for_right_hand),
@@ -1778,9 +1786,40 @@ var LAYOUT_ANALYSIS = (function () {
 	function boardFor(layout, keyboardId, profile) {
 		// A profile with its own base fingering decides; otherwise an angle-mod
 		// layout on an ISO board takes the angle fingering.
-		if (keyboardId === 'iso' && layout.fingering === 'angle' && !(profile && profile.base))
-			return keyboard('iso_angle', profile);
-		return keyboard(keyboardId, profile);
+		const board =
+			keyboardId === 'iso' && layout.fingering === 'angle' && !(profile && profile.base)
+				? keyboard('iso_angle', profile)
+				: keyboard(keyboardId, profile);
+		return withSpaceThumbKeys(board, layout);
+	}
+
+	const spaceBoardCache = new WeakMap();
+
+	/**
+	 * The board a layout is measured on once the thumb keys it types its space
+	 * on leave the pair metrics, as the space bar does: the board itself when
+	 * the layout types no space on a thumb key (every ISO and ANSI layout), else
+	 * one copy per set of such keys, so a score session keeps one board.
+	 * @param {object} board - From keyboard().
+	 * @param {object} layout - Library shape, checked.
+	 * @returns {object} The board, or its copy with those keys in outOfPairs.
+	 */
+	function withSpaceThumbKeys(board, layout) {
+		const spaceKeys = data()
+			.model.thumb_keys.filter(
+				(code) => board.index.has(code) && (layout.rows[code] || []).some((cell) => cell === ' ')
+			)
+			.map((code) => board.index.get(code));
+		if (spaceKeys.length === 0) return board;
+		let copies = spaceBoardCache.get(board);
+		if (!copies) spaceBoardCache.set(board, (copies = new Map()));
+		const key = spaceKeys.join(',');
+		if (!copies.has(key)) {
+			const outOfPairs = Uint8Array.from(board.outOfPairs);
+			for (const k of spaceKeys) outOfPairs[k] = 1;
+			copies.set(key, Object.assign({}, board, { outOfPairs }));
+		}
+		return copies.get(key);
 	}
 
 	/**
@@ -2020,19 +2059,20 @@ var LAYOUT_ANALYSIS = (function () {
 	const TRIPLE_ALTERNATION = 6;
 	const TRIPLE_ROLL_MIXED = 7;
 	const TRIPLE_SFS = 8;
-	const TRIPLE_THUMB = 16;
+	const TRIPLE_OUT = 16;
 	const tripleKindCache = new WeakMap();
 
 	/**
 	 * The classification of streamVisitor's trigram rule for one key trigram:
-	 * a thumb key leaves it out (TRIPLE_THUMB); otherwise TRIPLE_SFS when the
+	 * a key out of the pair metrics (the space's: board.outOfPairs) leaves it
+	 * out (TRIPLE_OUT); otherwise TRIPLE_SFS when the
 	 * first and last keys are different keys of one finger, and its class: a
 	 * finger repeated in a row, then on one hand a roll in or out or a
 	 * redirect (bad without the index), else alternation or a mixed roll.
 	 */
 	function tripleKind(board, k1, k2, k3) {
-		const thumb = thumbKeys(board);
-		if (thumb[k1] || thumb[k2] || thumb[k3]) return TRIPLE_THUMB;
+		const out = board.outOfPairs;
+		if (out[k1] || out[k2] || out[k3]) return TRIPLE_OUT;
 		const f1 = board.finger[k1];
 		const f2 = board.finger[k2];
 		const f3 = board.finger[k3];
@@ -2065,18 +2105,6 @@ var LAYOUT_ANALYSIS = (function () {
 		return out;
 	}
 
-	const thumbCache = new WeakMap();
-
-	/** Whether each key of a board is a thumb's (1) or not (0). */
-	function thumbKeys(board) {
-		let out = thumbCache.get(board);
-		if (!out) {
-			out = Uint8Array.from(board.finger, (f) => (f === LEFT_THUMB || f === RIGHT_THUMB ? 1 : 0));
-			thumbCache.set(board, out);
-		}
-		return out;
-	}
-
 	const sameFingerCache = new WeakMap();
 
 	/**
@@ -2086,14 +2114,13 @@ var LAYOUT_ANALYSIS = (function () {
 	 * more than an index's), (k1 * K + k2); 0 between keys of two fingers.
 	 * @param {object} board - From keyboard().
 	 * @returns {Float64Array} K × K costs.
-	 * @throws {Error} When the model gives a non-thumb finger no factor > 0.
+	 * @throws {Error} When the model gives a finger no factor > 0.
 	 */
 	function sameFingerCosts(board) {
 		let out = sameFingerCache.get(board);
 		if (out) return out;
 		const { model } = data();
-		const factors = model.fingers.map((id, f) => {
-			if (f === LEFT_THUMB || f === RIGHT_THUMB) return 0;
+		const factors = model.fingers.map((id) => {
 			const factor = model.same_finger_factor[id];
 			if (typeof factor !== 'number' || !Number.isFinite(factor) || factor <= 0)
 				throw new Error(`layout_analysis: same_finger_factor of ${id} must be a number > 0`);
@@ -2128,12 +2155,21 @@ var LAYOUT_ANALYSIS = (function () {
 	const WEIGHTED_COUNTS = new Set(['sfb_cost', 'sfs_cost']);
 
 	/**
-	 * Whether a key pair is a thumb SFB: two different keys of one thumb. It is
-	 * the only bigram a thumb key is in (a space bar alone never makes one).
+	 * Whether a key pair is a thumb SFB: two different keys of one thumb, such
+	 * as a thumb letter and the space on the same thumb. It is the only bigram
+	 * a key out of the pair metrics (board.outOfPairs) is in.
 	 */
 	function thumbSfb(board, k1, k2) {
 		const f = board.finger[k1];
-		return k1 !== k2 && f === board.finger[k2] && (f === LEFT_THUMB || f === RIGHT_THUMB);
+		return k1 !== k2 && f === board.finger[k2] && isThumbFinger(f);
+	}
+
+	/**
+	 * Whether a key pair is one of the fingers' rows: no thumb in it, so a row
+	 * jump, a scissor or a lateral stretch may be one.
+	 */
+	function fingerRows(board, k1, k2) {
+		return !isThumbFinger(board.finger[k1]) && !isThumbFinger(board.finger[k2]);
 	}
 
 	/** The counters the key stream adds to: every one a sum over the n-grams. */
@@ -2183,7 +2219,7 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @returns {object} The visitor.
 	 */
 	function streamVisitor(board, c, keyCount, unsupportedChars, blame) {
-		const thumb = thumbKeys(board);
+		const out = board.outOfPairs;
 		const K = board.codes.length;
 		const kinds = tripleKinds(board);
 		const sameFinger = sameFingerCosts(board);
@@ -2207,12 +2243,13 @@ var LAYOUT_ANALYSIS = (function () {
 				c.distance += board.reach[k] * n;
 			},
 			bigram(k1, k2, n) {
-				if (thumb[k1] || thumb[k2]) {
-					// Two different keys of one thumb (a thumb-letter layout's letter
-					// and the next thumb key): an SFB, the only pair a thumb is in.
+				if (out[k1] || out[k2]) {
+					// The space and a thumb letter or another key of its thumb: an
+					// SFB, its travel included; any other pair with it is in no metric.
 					if (thumbSfb(board, k1, k2)) {
 						c.bigrams += n;
 						c.sfb += n;
+						c.sfb_cost += n * sameFinger[k1 * K + k2];
 						blame2('sfb', n, k1, k2);
 					}
 					return;
@@ -2225,8 +2262,10 @@ var LAYOUT_ANALYSIS = (function () {
 					return;
 				}
 				// A row jump, whatever the fingers (an SFB or a scissor may be one
-				// too): shown, not scored.
+				// too): shown, not scored. A thumb's keys lie below every row.
+				const rows = fingerRows(board, k1, k2);
 				if (
+					rows &&
 					board.hand[k1] === board.hand[k2] &&
 					Math.abs(board.row[k1] - board.row[k2]) >= ROW_JUMP_ROWS
 				) {
@@ -2250,7 +2289,7 @@ var LAYOUT_ANALYSIS = (function () {
 					c.pinky_ring += n;
 					blame2('pinky_ring', n, k1, k2);
 				}
-				if (Math.abs(o1 - o2) === 1) {
+				if (rows && Math.abs(o1 - o2) === 1) {
 					// A scissor: the longer finger bends down while the shorter one
 					// reaches up, one row apart (half) or two (full).
 					const longer = FINGER_LENGTH[o1] > FINGER_LENGTH[o2] ? k1 : k2;
@@ -2276,7 +2315,7 @@ var LAYOUT_ANALYSIS = (function () {
 				const at = (k1 * K + k2) * K + k3;
 				let kind = kinds[at];
 				if (kind === 0) kind = kinds[at] = tripleKind(board, k1, k2, k3);
-				if (kind === TRIPLE_THUMB) return;
+				if (kind === TRIPLE_OUT) return;
 				c.trigrams += n;
 				if (kind & TRIPLE_SFS) {
 					c.sfs += n;
@@ -3686,8 +3725,8 @@ var LAYOUT_ANALYSIS = (function () {
 	/**
 	 * Every key pair a layout makes on a corpus, key × key, with how often it
 	 * occurs and what it is: the bigrams of the key stream analyse() measures
-	 * (the ways of typing it chose, typing option included) without a thumb
-	 * key, the ones every bigram metric is a share of, each classified by the
+	 * (the ways of typing it chose, typing option included) without the space
+	 * (board.outOfPairs) but for the thumb SFBs, the ones every bigram metric is a share of, each classified by the
 	 * one visitor analyse() uses. The pairs' counts and points add up to
 	 * analyse()'s bigram metrics and their part of the score.
 	 * @param {object} layoutInput - Library shape (see layoutFromRows).
@@ -3734,7 +3773,7 @@ var LAYOUT_ANALYSIS = (function () {
 			unsupported() {},
 			press() {},
 			bigram(k1, k2, n) {
-				// A pair with a thumb key is in no bigram metric.
+				// A pair with the space is in no bigram metric, a thumb SFB aside.
 				if (classOf(k1, k2) === null) return;
 				total += n;
 				const at = k1 * K + k2;
@@ -4547,16 +4586,16 @@ var LAYOUT_ANALYSIS = (function () {
 	function bigramPoints(board, w, k1, k2) {
 		const f1 = board.finger[k1];
 		const f2 = board.finger[k2];
-		const thumb = (f) => f === LEFT_THUMB || f === RIGHT_THUMB;
-		if (thumb(f1) || thumb(f2) || k1 === k2) return thumbSfb(board, k1, k2) ? w.sfb : 0;
-		if (f1 === f2)
-			return w.sfb + w.sfb_distance * sameFingerCosts(board)[k1 * board.codes.length + k2];
+		const out = board.outOfPairs;
+		const sfb = () => w.sfb + w.sfb_distance * sameFingerCosts(board)[k1 * board.codes.length + k2];
+		if (out[k1] || out[k2] || k1 === k2) return thumbSfb(board, k1, k2) ? sfb() : 0;
+		if (f1 === f2) return sfb();
 		if (board.hand[k1] !== board.hand[k2]) return 0;
 		const o1 = board.order[k1];
 		const o2 = board.order[k2];
 		let points = 0;
 		if (Math.min(o1, o2) === PINKY_ORDER && Math.max(o1, o2) === RING_ORDER) points += w.pinky_ring;
-		if (Math.abs(o1 - o2) === 1) {
+		if (fingerRows(board, k1, k2) && Math.abs(o1 - o2) === 1) {
 			const longer = FINGER_LENGTH[o1] > FINGER_LENGTH[o2] ? k1 : k2;
 			const shorter = longer === k1 ? k2 : k1;
 			const down = board.row[longer] - board.row[shorter];
@@ -4576,8 +4615,8 @@ var LAYOUT_ANALYSIS = (function () {
 		const f1 = board.finger[k1];
 		const f2 = board.finger[k2];
 		const f3 = board.finger[k3];
-		const thumb = (f) => f === LEFT_THUMB || f === RIGHT_THUMB;
-		if (thumb(f1) || thumb(f2) || thumb(f3)) return 0;
+		const out = board.outOfPairs;
+		if (out[k1] || out[k2] || out[k3]) return 0;
 		let points =
 			f1 === f3 && k1 !== k3
 				? w.sfs +
@@ -4879,7 +4918,7 @@ var LAYOUT_ANALYSIS = (function () {
 			}
 		}
 		// The alternatives: a dead key closed by a thumb key is not one. The
-		// pair metrics leave thumb keys out, so such a way would hide an SFB
+		// pair metrics leave the space out, so such a way would hide an SFB
 		// behind an extra press no typist makes; it stays the way of a
 		// character that has no other, and the fixed path keeps its choice.
 		const { table } = plan;
