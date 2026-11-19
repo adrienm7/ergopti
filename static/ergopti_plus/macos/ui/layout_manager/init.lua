@@ -515,9 +515,9 @@ end
 --- @return boolean opened
 M.open = Manager.open
 
---- Opens the layout editor in its own window (the menu's « Create or edit a
---- layout… », the manager's « Layout editor »), or focuses it when it is
---- already open: an open editor keeps its unsaved work. A new window shows the
+--- Opens the layout editor in its own window (the manager's « Layout
+--- editor »), or focuses it when it is already open: an open editor keeps
+--- its unsaved work. A new window shows the
 --- last saved source once its page is ready; an open Studio comes back to its
 --- editor tab.
 --- @return boolean opened
@@ -572,16 +572,6 @@ function M.editor_menu_command()
 	return function()
 		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), M.open_studio,
 			"layout_manager.open_studio")
-	end
-end
-
---- Builds the « Create or edit a layout… » menu command: the Studio on its
---- editor tab, which an open Studio may have left (studio-edit-tab).
---- @return function
-function M.edit_menu_command()
-	return function()
-		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), M.open_editor,
-			"layout_manager.open_editor")
 	end
 end
 

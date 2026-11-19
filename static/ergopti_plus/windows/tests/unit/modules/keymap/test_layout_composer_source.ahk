@@ -404,30 +404,19 @@ _LCS_ManagerCase() {
 	}
 }
 
-Test("layout editor host: the menu row opens the editor and is no longer greyed on Windows (layout-editor-windows)",
+Test("layout editor host: the layout menu opens no Studio of its own (no-duplicate-studio)",
 	_LCS_MenuCase)
 
+; « Create or edit a layout… » opened the Studio the tray root's « Ergopti
+; Studio… » row opens too; it left the layout menu on 2026-11-19.
 _LCS_MenuCase() {
 	Commands := _LAY_ScopeCommands()
-	AssertTrue(Commands.Has(MenuCommand.OPEN_LAYOUT_EDITOR), "the command is bound")
-	AssertEqual(LayoutManager_OpenEditor, Commands[MenuCommand.OPEN_LAYOUT_EDITOR])
+	AssertFalse(Commands.Has("open_layout_editor"), "the layout menu binds no editor command")
+	AssertTrue(Commands.Has(MenuCommand.LAYOUT_MANAGER), "the layout manager row stays")
 	Manifest := JsonParse(FileRead(_SharedDir . "\menu\data\menu_manifest.json", "UTF-8"))
-	Found := 0
-	Walk(Node) {
-		if Node is Map {
-			if Node.Get("id", "") == "open_layout_editor"
-				Found := Node
-			for , Child in Node
-				Walk(Child)
-		} else if Node is Array {
-			for Child in Node
-				Walk(Child)
-		}
-	}
-	Walk(Manifest)
-	AssertTrue(Found is Map, "the manifest lists the row")
-	AssertFalse(Found.Has("platforms"), "the row is on every platform")
-	AssertFalse(Found.Has("reason_key"), "no grey reason is left")
+	for Row in Manifest["layout_menu"]
+		AssertFalse(Row.Get("id", "") == "open_layout_editor" || Row.Get("id", "") == "ergopti_studio",
+			"Ergopti Studio is a row of the tray root only")
 }
 
 Test("layout editor host: the top-level Ergopti Studio row opens the editor and greys with a pause (ergopti-studio-menu-row)",
@@ -475,14 +464,15 @@ _LCS_StudioTitleCase() {
 	AssertContains(Body, '"Title", t("layout_editor.title")', "the window passes its caption to the composing host")
 }
 
-Test("layout editor window: « Create or edit a layout… » shows the editor tab, the Studio row keeps its tab (studio-edit-tab)",
+Test("layout editor window: the manager's « Layout editor » shows the editor tab, the Studio row keeps its tab (studio-edit-tab)",
 	_LCS_StudioEditTabCase)
 
 ; The maintainer, 2026-11-17: the row brought an open Studio left on
 ; « Comparer » to the front without its editor.
 _LCS_StudioEditTabCase() {
-	AssertContains(_DriverFuncBody("LayoutManager_OpenEditor"), "LayoutEditorWindow_OpenOnEdit()",
-		"the layout submenu's row and the manager's button ask for the editor tab")
+	AssertContains(_DriverFuncBody("LayoutManager_HandleMessage"),
+		'Deps.Get("open_editor", LayoutEditorWindow_OpenOnEdit).Call()',
+		"the manager's button asks for the editor tab, as on macOS and Linux")
 	AssertContains(_DriverFuncBody("_MI_StageErgoptiStudio"), "LayoutEditorWindow_Open))",
 		"the top-level Studio row keeps the tab the Studio was left on")
 	Body := _DriverFuncBody("_LayEdWin_PushTab")

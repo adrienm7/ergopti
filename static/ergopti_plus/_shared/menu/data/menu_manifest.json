@@ -2391,16 +2391,80 @@
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.layout.header_custom"
+			"i18n": "menu.layout.header_emulation"
 		},
 		{
 			"type": "list",
-			"id": "custom_layouts",
+			"id": "layout_emulation"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.layout.header_layers"
+		},
+		{
+			"type": "list",
+			"id": "layout_features_base"
+		},
+		{
+			"type": "list",
+			"id": "layout_features_altgr"
+		},
+		{
+			"type": "group",
+			"id": "layout_emulated_rows",
+			"i18n": "menu.layout.emulated_rows"
+		},
+		{
+			"type": "choice",
+			"id": "virtual_keyboard",
+			"path": "layout.virtual_keyboard",
+			"i18n": "menu.layout.virtual_keyboard",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.virtual_keyboard_is_karabiner",
+			"choices": [
+				{
+					"value": "auto",
+					"i18n": "menu.layout.virtual_keyboard.auto"
+				},
+				{
+					"value": "iso",
+					"i18n": "menu.layout.virtual_keyboard.iso"
+				},
+				{
+					"value": "ansi",
+					"i18n": "menu.layout.virtual_keyboard.ansi"
+				}
+			]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.layout.active_layouts"
+		},
+		{
+			"type": "list",
+			"id": "active_layouts",
 			"status_rows": {
-				"none_installed": [
+				"unsupported_desktop": [
 					{
 						"type": "label",
-						"i18n": "menu.layout.none_installed"
+						"i18n": "menu.layout.active_layouts_unsupported_desktop"
+					}
+				]
+			}
+		},
+		{
+			"type": "list",
+			"id": "layout_switching",
+			"status_rows": {
+				"unsupported_desktop": [
+					{
+						"type": "label",
+						"i18n": "menu.layout.pause_layout_unsupported_desktop"
 					}
 				]
 			}
@@ -2417,11 +2481,6 @@
 			"type": "command",
 			"id": "layout_manager",
 			"i18n": "menu.layout.manage"
-		},
-		{
-			"type": "command",
-			"id": "open_layout_editor",
-			"i18n": "menu.layout.edit"
 		},
 		{
 			"type": "list",
@@ -2462,90 +2521,6 @@
 			}
 		},
 		{
-			"type": "section_header",
-			"i18n": "menu.layout.header_layers"
-		},
-		{
-			"type": "list",
-			"id": "layout_emulation"
-		},
-		{
-			"type": "list",
-			"id": "layout_features_base"
-		},
-		{
-			"type": "list",
-			"id": "layout_features_altgr"
-		},
-		{
-			"type": "group",
-			"id": "layout_emulated_rows",
-			"i18n": "menu.layout.emulated_rows"
-		},
-		{
-			"type": "choice",
-			"id": "virtual_keyboard",
-			"path": "layout.virtual_keyboard",
-			"i18n": "menu.layout.virtual_keyboard",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.virtual_keyboard_is_karabiner",
-			"choices": [
-				{
-					"value": "auto",
-					"i18n": "menu.layout.virtual_keyboard.auto"
-				},
-				{
-					"value": "iso",
-					"i18n": "menu.layout.virtual_keyboard.iso"
-				},
-				{
-					"value": "ansi",
-					"i18n": "menu.layout.virtual_keyboard.ansi"
-				}
-			]
-		},
-		{
-			"type": "choice",
-			"id": "menubar_icon",
-			"path": "ui.menubar_icon",
-			"i18n": "menu.layout.menubar_icon",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos",
-			"choices": [
-				{
-					"value": "v1",
-					"i18n": "menu.layout.menubar_icon.v1"
-				},
-				{
-					"value": "v2",
-					"i18n": "menu.layout.menubar_icon.v2"
-				}
-			]
-		},
-		{
-			"type": "---"
-		},
-		{
-			"type": "section_header",
-			"i18n": "menu.layout.active_layouts"
-		},
-		{
-			"type": "list",
-			"id": "active_layouts",
-			"status_rows": {
-				"unsupported_desktop": [
-					{
-						"type": "label",
-						"i18n": "menu.layout.active_layouts_unsupported_desktop"
-					}
-				]
-			}
-		},
-		{
 			"type": "---"
 		},
 		{
@@ -2576,18 +2551,6 @@
 		},
 		{
 			"type": "list",
-			"id": "layout_switching",
-			"status_rows": {
-				"unsupported_desktop": [
-					{
-						"type": "label",
-						"i18n": "menu.layout.pause_layout_unsupported_desktop"
-					}
-				]
-			}
-		},
-		{
-			"type": "list",
 			"id": "magic_key_source"
 		},
 		{
@@ -2597,6 +2560,26 @@
 				"ahk"
 			],
 			"reason_key": "platform_reason.lists_windows_only_settings"
+		},
+		{
+			"type": "choice",
+			"id": "menubar_icon",
+			"path": "ui.menubar_icon",
+			"i18n": "menu.layout.menubar_icon",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos",
+			"choices": [
+				{
+					"value": "v1",
+					"i18n": "menu.layout.menubar_icon.v1"
+				},
+				{
+					"value": "v2",
+					"i18n": "menu.layout.menubar_icon.v2"
+				}
+			]
 		}
 	],
 	"layout_emulated_rows_group": [

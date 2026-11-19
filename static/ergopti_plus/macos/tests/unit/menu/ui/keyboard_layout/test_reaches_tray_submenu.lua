@@ -18,7 +18,6 @@
 local helpers = require("tests.helpers")
 package.loaded["tests.support.ui.menu.keyboard_layout.menu_keyboard_layout_reaches_tray_fixture"] = nil
 local Fixture = require("tests.support.ui.menu.keyboard_layout.menu_keyboard_layout_reaches_tray_fixture")
-local install_legacy_layout_formats = Fixture.install_legacy_layout_formats
 local make_ctx = Fixture.make_ctx
 local switch_row = Fixture.switch_row
 local titles = Fixture.titles
@@ -37,33 +36,19 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 			"the Keyboard layout submenu reached the tray empty — materialised rows handed over as `items` "
 			.. "are dropped by the tray renderer; they must be handed over as `submenu`")
 		local seen = titles(row.menu)
-		helpers.assert_true(seen["— menu.layout.header_custom —"] or seen["menu.layout.header_custom"],
-			"the manifest's custom layout header must be in the rendered submenu")
+		helpers.assert_true(seen["— menu.layout.header_emulation —"] or seen["menu.layout.header_emulation"],
+			"the manifest's emulation header must be in the rendered submenu")
 		helpers.assert_true(seen["menu.layout.manage"], "the layout manager row must be in the rendered submenu")
 		helpers.assert_true(seen["menu.layout.menubar_icon"], "the menubar icon row must be in the rendered submenu")
 	end)
 
-	helpers.it("« Create or edit a layout… » opens the layout manager straight on the editor (layout-editor-menu)", function()
-		local saved = package.loaded["ui.layout_manager"]
-		local deferred = 0
-		local window = {
-			menu_command = function() return function() end end,
-			edit_menu_command = function() return function() deferred = deferred + 1 end end,
-		}
-		package.loaded["ui.layout_manager"] = window
-		local ok, err = pcall(function()
-			local row = tray_row(make_ctx())
-			local editor
-			for _, child in ipairs(row and row.menu or {}) do
-				if child.title == "menu.layout.edit" then editor = child end
-			end
-			helpers.assert_true(type(editor) == "table", "the editor row must be in the rendered submenu")
-			helpers.assert_eq(type(editor.fn), "function")
-			editor.fn()
-		end)
-		package.loaded["ui.layout_manager"] = saved
-		helpers.assert_true(ok, tostring(err))
-		helpers.assert_eq(deferred, 1, "the row runs the window's editor command")
+	-- « Create or edit a layout… » opened Ergopti Studio, which the tray root's
+	-- row right above this menu opens too; it left on 2026-11-19 (no-duplicate-studio).
+	helpers.it("the submenu holds no Ergopti Studio row (no-duplicate-studio)", function()
+		local row = tray_row(make_ctx())
+		local seen = titles(row and row.menu)
+		helpers.assert_nil(seen["menu.layout.edit"], "creating a layout is Ergopti Studio's, not this menu's")
+		helpers.assert_nil(seen["menu.studio.title"], "Ergopti Studio is a row of the tray root only")
 	end)
 
 	-- The emulated rows group handed its finished rows back as `items` too, so
@@ -111,149 +96,6 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 			"the actual extension provider's replacement row must reach the native renderer")
 	end)
 end)
-
---- Captures actual provider data while forwarding its status and rendering to the real binding.
---- @param callback function Receives the native build, fixture state and binding.
-local function with_empty_layout(callback)
-	helpers.with_stub_scope({ "ui.menu.menu_keyboard_layout", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
-		"core.fs.adapters.json_codec", "menu.engine.renderer", "modules.keymap.layout_registry" }, function()
-		local module = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
-		install_legacy_layout_formats()
-		local binding = require("menu.engine.manifest_menu")
-		local state = { selections = 0, installed = false }
-		package.loaded["modules.keymap.layout_registry"] = {
-			picker = function()
-				return { layouts = state.installed and { { id = "native", name = "Native layout" } } or {}, active = "native" }
-			end,
-			select = function() state.selections = state.selections + 1; return true end,
-		}
-		local native_build = binding.build
-		binding.build = function(key, title, dynamic, click, ctx, providers)
-			if key == "layout_menu" then
-				local provider = providers.custom_layouts
-				providers.custom_layouts = function()
-					state.data = provider()
-					return state.data
-				end
-			end
-			return native_build(key, title, dynamic, click, ctx, providers)
-		end
-		callback(function()
-			local item = module.build(make_ctx())
-			helpers.assert_eq(type(item), "table")
-			helpers.assert_eq(type(item.submenu), "table")
-			return item.submenu
-		end, state, binding)
-	end)
-end
-
--- Independent pre-migration captions; the generated status declaration is the subject.
-local EmptyLayoutJson = require("core.text.engine.json")
-local function read_empty_layout_json(path)
-	local file = assert(io.open(path, "rb"))
-	local value = assert(EmptyLayoutJson.decode(file:read("*a")))
-	file:close()
-	return value
-end
-
-local EmptyLayoutCorpus = read_empty_layout_json(helpers.shared("tests/corpus/menu/layout_empty_status.json"))
-
-local function empty_layout_owner(binding)
-	for _, row in ipairs(binding.get_array(EmptyLayoutCorpus.section)) do
-		if row.id == EmptyLayoutCorpus.provider then return row end
-	end
-	error("The actual custom-layout provider declaration must exist.")
-end
-
-local function count_empty_layout_caption(rows, title)
-	local count = 0
-	for _, row in ipairs(rows or {}) do
-		if row.title == title then
-			count = count + 1
-			helpers.assert_eq(row.disabled, true)
-			helpers.assert_nil(row.fn)
-			helpers.assert_nil(row.menu)
-		end
-	end
-	return count
-end
-
-helpers.describe("the shared empty native-layout status", function()
-	helpers.it("(layout-empty-status) retains the independent inert declaration", function()
-		with_empty_layout(function(_, state, binding)
-			helpers.assert_eq(empty_layout_owner(binding).status_rows[EmptyLayoutCorpus.status], { EmptyLayoutCorpus.row })
-			local count = 0
-			for _ in pairs(EmptyLayoutCorpus.captions) do count = count + 1 end
-			helpers.assert_eq(count, 21)
-			helpers.assert_eq(state.selections, 0)
-		end)
-	end)
-
-	for locale, expected in pairs(EmptyLayoutCorpus.captions) do
-		helpers.it("(layout-empty-status) renders the real empty provider in " .. locale, function()
-			with_empty_layout(function(build, state, binding)
-				local catalogue = read_empty_layout_json(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"))
-				helpers.assert_eq(catalogue[EmptyLayoutCorpus.row.i18n], expected)
-				require("core.i18n.engine.i18n").get = function(key) return catalogue[key] or key end
-				local rows = build()
-				helpers.assert_eq(state.data, { { label = expected, disabled = true } })
-				helpers.assert_eq(count_empty_layout_caption(rows, expected), 1)
-				helpers.assert_eq(state.selections, 0)
-				local declaration = empty_layout_owner(binding).status_rows[EmptyLayoutCorpus.status][1]
-				declaration.i18n = "menu.layout.manage"
-				build()
-				helpers.assert_eq(state.data, { { label = catalogue["menu.layout.manage"], disabled = true } },
-					"The native provider consumes the live declaration, not a repeated native caption.")
-			end)
-		end)
-	end
-
-	for _, invalid in ipairs({ "missing", "empty", "command", "effectful_label" }) do
-		helpers.it("(layout-empty-status) refuses the empty caption after " .. invalid, function()
-			with_empty_layout(function(build, state, binding)
-				local statuses = empty_layout_owner(binding).status_rows
-				local baseline = build()
-				local caption = require("core.i18n.engine.i18n").get(EmptyLayoutCorpus.row.i18n)
-				helpers.assert_eq(count_empty_layout_caption(baseline, caption), 1)
-				local bad = {
-					empty = {}, command = { { type = "command", id = "layout_manager", i18n = "menu.layout.manage" } },
-					effectful_label = { { type = "label", i18n = EmptyLayoutCorpus.row.i18n, action = "layout_manager" } },
-				}
-				statuses[EmptyLayoutCorpus.status] = bad[invalid]
-				local rows = build()
-				helpers.assert_eq(state.data, {})
-				helpers.assert_eq(count_empty_layout_caption(rows, caption), 0)
-				helpers.assert_eq(state.selections, 0)
-			end)
-		end)
-	end
-
-	helpers.it("(layout-empty-status) refuses an unavailable status-renderer port", function()
-		with_empty_layout(function(build, state, binding)
-			build()
-			helpers.assert_eq(#state.data, 1)
-			binding.status_rows = nil
-			build()
-			helpers.assert_eq(state.data, {})
-			helpers.assert_eq(state.selections, 0)
-		end)
-	end)
-
-	helpers.it("(layout-empty-status) leaves installed native layout data actionable", function()
-		with_empty_layout(function(build, state, binding)
-			state.installed = true
-			empty_layout_owner(binding).status_rows[EmptyLayoutCorpus.status] = nil
-			build()
-			helpers.assert_eq(#state.data, 1)
-			helpers.assert_eq(state.data[1].label, "Native layout")
-			helpers.assert_eq(state.data[1].checked, true)
-			helpers.assert_eq(type(state.data[1].action), "function")
-			helpers.assert_true(state.data[1].disabled ~= true)
-			helpers.assert_eq(state.selections, 0)
-		end)
-	end)
-end)
-
 
 --- Uses the actual empty-source list, canonical binding and native row renderer.
 --- Native effect ports are controlled and expose their launch receipt.

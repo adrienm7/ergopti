@@ -132,32 +132,25 @@ local CANONICAL_LAYOUT_MENU = {
 	"command:scope_restore",
 	"command:scope_clear",
 	"---",
-	-- UPDATED: the Ergopti section is the custom layout section, on every
-	-- driver: the registry layouts the layout manager installs, and its window.
-	"section_header:menu.layout.header_custom",
-	"list:custom_layouts",
-	"command:layout_manager",
-	-- UPDATED 2026-11-11: the layout editor opens straight from this menu
-	-- (« Créer ou modifier une disposition… », macOS and Linux).
-	"command:open_layout_editor",
-	-- The two blocks macOS alone has, declared 2026-08-07. It installs a .bundle
-	-- keyboard layout through the OS's input-source mechanism and draws a
-	-- menubar icon; neither concept exists on the other two drivers.
-	"list:layout_bundle",
-	-- UPDATED 2026-11-06: the layout emulation runs on the three drivers, so its
-	-- layers header, the layout picker, the two layer switches and the rows
-	-- submenu are drawn here too (layouts/engine/emulation/menu.lua).
-	"section_header:menu.layout.header_layers",
+	-- UPDATED 2026-11-19: three sections, emulation, input sources, then what
+	-- works on any layout (docs/memory/maintainer-decisions.md, « The layout
+	-- menu: one menu, three sections »). « Disposition personnalisée » and its
+	-- `custom_layouts` list left: on this driver it listed the registry layouts
+	-- the input sources below list too, with the same switch. « Créer ou
+	-- modifier une disposition… » (`open_layout_editor`) left too: Ergopti
+	-- Studio, the tray root's row above this menu, opens the same window.
+	-- The layout emulation runs on the three drivers (2026-11-06), so its
+	-- header, the layout picker, the layers header, the two layer switches and
+	-- the rows submenu are drawn here too (layouts/engine/emulation/menu.lua).
+	"section_header:menu.layout.header_emulation",
 	"list:layout_emulation",
+	"section_header:menu.layout.header_layers",
 	"list:layout_features_base",
 	"list:layout_features_altgr",
 	"group:layout_emulated_rows",
 	-- UPDATED 2026-10-23: the Karabiner virtual keyboard type (Automatic, ISO,
 	-- ANSI) that menu_keyboard_layout.lua registers as a choice command.
 	"choice:virtual_keyboard",
-	-- UPDATED 2026-09-24: the menubar icon is ONE choice row, the last of the
-	-- Ergopti section, and the input sources sit under a header of their own.
-	"choice:menubar_icon",
 	"---",
 	"section_header:menu.layout.active_layouts",
 	-- `list`, not `dynamic`, since 2026-08-07. This driver has always supplied
@@ -165,17 +158,24 @@ local CANONICAL_LAYOUT_MENU = {
 	-- so the renderer looked for a dynamic handler, found none, warned once and
 	-- skipped the row — the layout list did not render at all.
 	"list:active_layouts",
+	-- The pause/resume layout pickers, declared 2026-08-07: their choices are
+	-- macOS input sources.
+	"list:layout_switching",
+	-- The layout manager's window, then the block macOS alone has, declared
+	-- 2026-08-07: it installs a .bundle keyboard layout through the OS's
+	-- input-source mechanism.
+	"command:layout_manager",
+	"list:layout_bundle",
 	"---",
 	"section_header:menu.layout.header_any",
-	-- The pause/resume layout pickers, declared 2026-08-07 with the blocks
-	-- above and for the same reason: their choices are macOS input sources.
 	"list:number_row_policy",
-	"list:layout_switching",
 	-- Replacement is controlled by the shipped Ergopti hotstrings extension.
 	-- The physical key remains selectable here on every driver by pressing it
 	-- or choosing from the candidates
 	-- (hotstrings/ui/menu/magic_key_source_menu.lua).
 	"list:magic_key_source",
+	-- The menubar icon is ONE choice row, the last of the menu.
+	"choice:menubar_icon",
 }
 
 --- Reads and decodes the shared menu_manifest.json.

@@ -2109,6 +2109,26 @@ type = "list"
 id = "metrics_migration"
 platforms = ["linux"]
 reason_key = "platform_reason.only_linux_migrates_in_the_background"
+
+# The layout menu, « Dispositions et émulation » since 2026-11-19 (maintainer:
+# « il faut pas de doublon et que tout soit clair »). One submenu with three
+# sections, never two submenus: about twenty rows per OS, a third of which work
+# whatever the layout, so a split would still leave a third place and push
+# « Rangées émulées » four levels deep (docs/memory/maintainer-decisions.md,
+# « The layout menu: one menu, three sections »).
+#   1. The emulation: Ergopti+ types the chosen layout over the system one,
+#      nothing installed.
+#   2. The input sources: the layouts installed in the OS, switched, switched at
+#      a pause, installed and removed.
+#   3. Whatever the layout: options that act on any layout.
+# Each action has one place. « Create or edit a layout… » left on 2026-11-19:
+# Ergopti Studio, the row right above this menu in the tray root, opens the
+# same window. So did the « Disposition personnalisée » list (`custom_layouts`):
+# on macOS and Linux it listed the registry layouts the input sources below
+# list too, with the same switch; on Windows it repeated the emulated layout
+# the « Disposition à émuler » row already names. The layout manager still
+# selects an installed registry layout. tools/test/test-menu-no-duplicate-actions.cjs
+# refuses a second row for one action.
 [[menu.layout_menu]]
 type = "toggle"
 id = "layout_toggle"
@@ -2137,84 +2157,24 @@ type = "command"
 id = "scope_clear"
 i18n = "common.clear_to_system"
 
-# Two sections, so a user reads at a glance which rows are about the custom
-# layout (the registry layouts the layout manager installs, the one typing
-# uses, and each driver's own Ergopti rows) and which ones work whatever layout
-# they type on.
 [[menu.layout_menu]]
 type = "---"
 
+# 1. The emulation, under its own header: what Ergopti+ types over the system
+# layout while it runs, without installing anything.
 [[menu.layout_menu]]
 type = "section_header"
-i18n = "menu.layout.header_custom"
+i18n = "menu.layout.header_emulation"
 
-# macOS and Linux list installed native input sources and select one through
-# the OS. Windows reports its enabled emulation as a disabled status row;
-# selection belongs to the shared layout manager immediately below it.
+# The layout the emulation types over the system layout, as a submenu of
+# choices: none, the built-in Ergopti variants and the registry layouts the app
+# ships or the layout manager installed. It writes what the onboarding choice
+# writes, and its title names the emulated layout (and says when it cannot be
+# emulated), on the three drivers (Windows from its registry catalogue, through
+# the layout manager's acknowledged handoff).
 [[menu.layout_menu]]
 type = "list"
-id = "custom_layouts"
-status_rows.none_installed = [{ type = "label", i18n = "menu.layout.none_installed" }]
-
-# How far GTK 3 applications compose the installed layouts' Compose sequences
-# (menu/ui/compose_input_method_row.lua): GTK 3's built-in input method takes
-# only the single-character rules, IBus takes them all. Linux only: macOS and
-# Windows type every character through their own layouts, with no Compose file.
-[[menu.layout_menu]]
-type = "list"
-id = "compose_input_method"
-platforms = ["linux"]
-reason_key = "platform_reason.compose_input_method_is_linux"
-
-# Opens the shared layout manager window (_shared/ui/layout_manager): the
-# catalogue of the layout registry, to install, update or uninstall a layout.
-[[menu.layout_menu]]
-type = "command"
-id = "layout_manager"
-i18n = "menu.layout.manage"
-
-# Opens the layout manager window straight on the unified layout editor: create
-# a layout from scratch or from another, export it for every OS, install it on
-# the system or emulate it without installing it (docs/design/layout-editor.md).
-[[menu.layout_menu]]
-type = "command"
-id = "open_layout_editor"
-i18n = "menu.layout.edit"
-
-# The two blocks macOS alone has. It installs a .bundle keyboard layout through
-# TIS — the OS's own input-source mechanism, with a user scope and a system scope
-# — and it draws a menubar icon whose variant the user picks. Neither concept
-# exists on the other two drivers: Windows installs a .klc through its own
-# installer and Linux installs an XKB layout, and neither has a menubar.
-#
-# Both were built by hand in ui/menu/menu_keyboard_layout.lua and described
-# nowhere until 2026-08-07, so ten rows of a shared menu had no platforms field
-# and nothing to compare them against.
-# These .bundle rows are macOS's; Windows installs Ergopti from its own row
-# below and Linux for the user from the layout manager above (an Xorg session
-# needs the system installer, install.sh). The reason text tells the user where.
-[[menu.layout_menu]]
-type = "list"
-id = "layout_bundle"
-status_rows.no_bundle = [{ type = "label", i18n = "menu.layout.no_bundle" }]
-platforms = ["hs"]
-reason_key = "platform_reason.layout_install_is_the_macos_bundle"
-
-# Windows installs Ergopti as a system layout from the unsigned stand-alone
-# package every release publishes (Ergopti_windows_layout.zip, maintainer
-# decision of 2026-11-06). The exe carries neither that elevated installer nor
-# its DLL (maintainer decision of 2026-11-08): this row says
-# whether the layout is installed and opens the package's download
-# (modules/keymap/system_layout_install.ahk). Once installed it is one of the
-# user's layouts, listed and switched by « Input sources » and the pause switch
-# below.
-[[menu.layout_menu]]
-type = "list"
-id = "layout_system_install"
-platforms = ["ahk"]
-reason_key = "platform_reason.layout_system_install_is_windows"
-status_rows.installed = [{ type = "label", i18n = "menu.layout.system_layout_installed" }]
-status_rows.unreadable = [{ type = "label", i18n = "menu.layout.system_layout_unreadable" }]
+id = "layout_emulation"
 
 # Two axes of the emulation, kept apart (maintainer, 2026-11-03): which Ergopti
 # LAYERS it types, under this header, and which keyboard ROWS, in the submenu
@@ -2224,28 +2184,16 @@ status_rows.unreadable = [{ type = "label", i18n = "menu.layout.system_layout_un
 type = "section_header"
 i18n = "menu.layout.header_layers"
 
-# The layout the emulation types over the system layout, as a submenu of
-# choices: none, the built-in Ergopti variants and the registry layouts the app
-# ships or the layout manager installed. It writes what the onboarding choice
-# writes. Windows picks it in the shared layout manager and reports it in the
-# custom_layouts status row above, where macOS and Linux list the system's own
-# input sources; the three drivers draw this row (Windows from its registry
-# catalogue, through the layout manager's acknowledged handoff).
-[[menu.layout_menu]]
-type = "list"
-id = "layout_emulation"
-
 # `list` rather than `dynamic` since 2026-08-07: the driver answers with row
 # DATA and the renderer materialises it, where a `dynamic` handler was handed the
 # menu object and built the rows itself.
+# The emulated layout's base and Shift layers (ergopti_base).
 [[menu.layout_menu]]
 type = "list"
 id = "layout_features_base"
 
-# The emulated layout's base and Shift layers (ergopti_base).
-
 # The Ergopti AltGr layer and its ➕ variant. Only these two: the digit row and
-# Ctrl+★ work on any layout and sit in the second section.
+# Ctrl+★ work on any layout and sit in the third section.
 [[menu.layout_menu]]
 type = "list"
 id = "layout_features_altgr"
@@ -2287,26 +2235,16 @@ i18n = "menu.layout.virtual_keyboard"
 platforms = ["hs"]
 reason_key = "platform_reason.virtual_keyboard_is_karabiner"
 
-# The menubar icon, ONE row with its variants beneath it, last of the Ergopti
-# section. It was two sibling rows, one per variant, stored in hs.settings.
-[[menu.layout_menu]]
-type = "choice"
-id = "menubar_icon"
-path = "ui.menubar_icon"
-i18n = "menu.layout.menubar_icon"
-platforms = ["hs"]
-reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
-
 [[menu.layout_menu]]
 type = "---"
 
-# The system's keyboard layouts, under a header of their own (« Sources de
+# 2. The system's keyboard layouts, under a header of their own (« Sources de
 # saisie »): without it the list read as more Ergopti settings. The active one
 # is ticked and choosing another switches the system layout, on every driver
 # (maintainer, 2026-11-06): macOS selects the input source through TIS, Windows
 # requests the user's installed layout (WM_INPUTLANGCHANGEREQUEST) and Linux
 # asks the desktop's own owner (the Ergopti GNOME Shell extension, the KDE
-# keyboard daemon or setxkbmap).
+# keyboard daemon or setxkbmap). Installing and removing them follows.
 [[menu.layout_menu]]
 type = "section_header"
 i18n = "menu.layout.active_layouts"
@@ -2318,9 +2256,70 @@ type = "list"
 id = "active_layouts"
 status_rows.unsupported_desktop = [{ type = "label", i18n = "menu.layout.active_layouts_unsupported_desktop" }]
 
+# Which layout to switch to when the driver pauses and when it resumes: the
+# choices are the system's input sources (macOS), the desktop's layouts
+# (Linux) or the layouts installed for the user (Windows).
+[[menu.layout_menu]]
+type = "list"
+id = "layout_switching"
+# A Linux desktop with no way to change its layout (a Wayland compositor other
+# than GNOME or KDE Plasma) shows why instead of a switch that could never act.
+status_rows.unsupported_desktop = [{ type = "label", i18n = "menu.layout.pause_layout_unsupported_desktop" }]
+
+# How far GTK 3 applications compose the installed layouts' Compose sequences
+# (menu/ui/compose_input_method_row.lua): GTK 3's built-in input method takes
+# only the single-character rules, IBus takes them all. Linux only: macOS and
+# Windows type every character through their own layouts, with no Compose file.
+[[menu.layout_menu]]
+type = "list"
+id = "compose_input_method"
+platforms = ["linux"]
+reason_key = "platform_reason.compose_input_method_is_linux"
+
+# Opens the shared layout manager window (_shared/ui/layout_manager): the
+# catalogue of the layout registry, to install, update, use or uninstall a
+# layout. Creating one is Ergopti Studio's.
+[[menu.layout_menu]]
+type = "command"
+id = "layout_manager"
+i18n = "menu.layout.manage"
+
+# The block macOS alone has. It installs a .bundle keyboard layout through TIS
+# — the OS's own input-source mechanism, with a user scope and a system scope.
+# Windows installs Ergopti from its own row below and Linux for the user from
+# the layout manager above (an Xorg session needs the system installer,
+# install.sh). The reason text tells the user where.
+#
+# Built by hand in ui/menu/menu_keyboard_layout.lua and described nowhere until
+# 2026-08-07, so ten rows of a shared menu had no platforms field and nothing
+# to compare them against.
+[[menu.layout_menu]]
+type = "list"
+id = "layout_bundle"
+status_rows.no_bundle = [{ type = "label", i18n = "menu.layout.no_bundle" }]
+platforms = ["hs"]
+reason_key = "platform_reason.layout_install_is_the_macos_bundle"
+
+# Windows installs Ergopti as a system layout from the unsigned stand-alone
+# package every release publishes (Ergopti_windows_layout.zip, maintainer
+# decision of 2026-11-06). The exe carries neither that elevated installer nor
+# its DLL (maintainer decision of 2026-11-08): this row says
+# whether the layout is installed and opens the package's download
+# (modules/keymap/system_layout_install.ahk). Once installed it is one of the
+# user's layouts, listed and switched by « Input sources » and the pause switch
+# above.
+[[menu.layout_menu]]
+type = "list"
+id = "layout_system_install"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_system_install_is_windows"
+status_rows.installed = [{ type = "label", i18n = "menu.layout.system_layout_installed" }]
+status_rows.unreadable = [{ type = "label", i18n = "menu.layout.system_layout_unreadable" }]
+
 [[menu.layout_menu]]
 type = "---"
 
+# 3. What works whatever layout the user types on.
 [[menu.layout_menu]]
 type = "section_header"
 i18n = "menu.layout.header_any"
@@ -2359,16 +2358,6 @@ i18n = "menu.shortcuts.group_accented"
 platforms = ["ahk", "linux"]
 reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
-# Which layout to switch to when the driver pauses and when it resumes: the
-# choices are the system's input sources (macOS), the desktop's layouts
-# (Linux) or the layouts installed for the user (Windows).
-[[menu.layout_menu]]
-type = "list"
-id = "layout_switching"
-# A Linux desktop with no way to change its layout (a Wayland compositor other
-# than GNOME or KDE Plasma) shows why instead of a switch that could never act.
-status_rows.unsupported_desktop = [{ type = "label", i18n = "menu.layout.pause_layout_unsupported_desktop" }]
-
 # The physical key whose replacement choice lives in Hotstrings Ergopti
 # (hotstrings.magic_key_source), on every driver: one row naming the key in
 # effect, whose submenu captures the next key pressed, restores the automatic
@@ -2383,6 +2372,18 @@ type = "feature"
 path = "layout.ctrl_magic_save"
 platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
+
+# The menubar icon, ONE row with its variants beneath it, last of the menu: it
+# draws Ergopti on the menu bar whatever the layout. It was two sibling rows,
+# one per variant, stored in hs.settings.
+[[menu.layout_menu]]
+type = "choice"
+id = "menubar_icon"
+path = "ui.menubar_icon"
+i18n = "menu.layout.menubar_icon"
+platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "e_grave"

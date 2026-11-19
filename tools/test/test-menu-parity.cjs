@@ -1239,7 +1239,6 @@ OPENS_SUBMENU.keyboard_layout = [
 	layoutOwner('layout_native_parent')
 ];
 OPENS_SUBMENU.layout_parent_content = 'layout_menu';
-OPENS_SUBMENU.custom_layouts = layoutOwner('layout_native_record_choice');
 OPENS_SUBMENU.active_layouts = [
 	OPENS_SUBMENU.active_layouts,
 	layoutOwner('layout_native_record_choice')

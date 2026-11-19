@@ -1207,7 +1207,6 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 					'withdrawn finished menu',
 					source.replace('"layout_parent_content", submenu, {}', '"layout_parent_content", {}, {}')
 				],
-				['discarded custom result', source.replace('return custom_rows end', 'return {} end')],
 				['discarded active result', source.replace('return active_rows end', 'return {} end')],
 				[
 					'discarded bundle result',

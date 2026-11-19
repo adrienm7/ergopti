@@ -207,7 +207,7 @@ _MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0) {
 }
 
 
-; ── 🌐 Disposition clavier — built from manifest via MenuRenderer_Build.
+; ── 🌐 Dispositions et émulation — built from manifest via MenuRenderer_Build.
 ; The two feature blocks are `list` providers: each names its layout feature
 ; and returns its row, which the renderer materialises.
 ; ``active_layouts`` lists the layouts installed for the user (_LAY_ActiveLayoutRows);
@@ -219,7 +219,6 @@ _MI_StageLayout() {
 		throw Error("The declared keyboard_layout feature parent was refused before native construction.")
 	LayoutListProviders := Map(
 		"number_row_policy",      (*) => _LAY_NumberRowRows(),
-		"custom_layouts",         (*) => _LAY_CustomLayoutRows(),
 		"layout_emulation",       (*) => _LAY_EmulationChoiceRows(),
 		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
 		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),
@@ -742,7 +741,6 @@ _LAY_ScopeCommands(Options := unset) {
 	Commands := ConfigScopeMenuCommands("keyboard_layout", Map(), IsSet(Options) ? Options : Map())
 	Commands[MenuCommand.LAYOUT_TOGGLE] := MenuRenderer_CategoryGateCommand("Layout")
 	Commands[MenuCommand.LAYOUT_MANAGER] := LayoutManager_Open
-	Commands[MenuCommand.OPEN_LAYOUT_EDITOR] := LayoutManager_OpenEditor
 	return Commands
 }
 

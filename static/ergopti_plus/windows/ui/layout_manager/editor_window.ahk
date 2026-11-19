@@ -525,8 +525,8 @@ global _LayEdWin_NavWanted := false
 global _LayEdWin_TabWanted := ""
 
 /**
- * Opens Ergopti Studio on its editor tab: « Create or edit a layout… » and the
- * layout manager's « Layout editor ». An open Studio left on « Comparer » or
+ * Opens Ergopti Studio on its editor tab: the layout manager's « Layout
+ * editor », as on macOS and Linux. An open Studio left on « Comparer » or
  * « Optimiser » comes back to the editor, with its unsaved work.
  * @returns {Boolean} Whether the window is shown.
  */

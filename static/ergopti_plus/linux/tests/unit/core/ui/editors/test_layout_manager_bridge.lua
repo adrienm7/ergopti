@@ -599,35 +599,26 @@ INSERT OR REPLACE INTO meta(key, value) VALUES ('rev', '42');
 end)
 
 helpers.describe("layout editor menu row (Linux)", function()
-	helpers.it("« Create or edit a layout… » shows the layout editor's own window (layout-editor-own-window)", function()
-		local saved = { bridge = package.loaded["ui.layout_manager.bridge"], builder = package.loaded["menu.ui.builder.builder"] }
-		local calls = {}
-		package.loaded["ui.layout_manager.bridge"] = {
-			open_editor_window = function(manager) return manager.show("layout_editor_window") end,
-		}
+	-- « Create or edit a layout… » opened the window the tray root's « Ergopti
+	-- Studio… » row opens too; it left the layout menu on 2026-11-19.
+	helpers.it("the layout submenu holds no Ergopti Studio row (no-duplicate-studio)", function()
+		local saved = package.loaded["menu.ui.builder.builder"]
 		package.loaded["menu.ui.builder.builder"] = nil
 		local ok, err = pcall(function()
 			local module = helpers.load_module("menu.ui.builder.builder")
-			local items = module.build({ webview = { show = function(name)
-				calls[#calls + 1] = "show " .. name
-				return true
-			end } })
+			local items = module.build({ webview = { show = function() return true end } })
 			local I18n = require("core.i18n.engine.i18n")
-			local row = nil
+			local layout = nil
 			for _, top in ipairs(items) do
-				if top.title == I18n.get("menu.layout.title") then
-					for _, child in ipairs(top.menu) do
-						if child.title == I18n.get("menu.layout.edit") then row = child end
-					end
-				end
+				if top.title == I18n.get("menu.layout.title") then layout = top end
 			end
-			helpers.assert_eq(type(row), "table", "the row reaches the tray")
-			helpers.assert_eq(type(row.fn), "function")
-			row.fn()
+			helpers.assert_eq(type(layout), "table", "the layout submenu reaches the tray")
+			for _, child in ipairs(layout.menu) do
+				helpers.assert_true(child.title ~= I18n.get("menu.studio.title"), "Ergopti Studio is a row of the tray root only")
+			end
 		end)
-		package.loaded["ui.layout_manager.bridge"], package.loaded["menu.ui.builder.builder"] = saved.bridge, saved.builder
+		package.loaded["menu.ui.builder.builder"] = saved
 		helpers.assert_true(ok, tostring(err))
-		helpers.assert_eq(calls, { "show layout_editor_window" })
 	end)
 
 	helpers.it("the top-level « Ergopti Studio » row shows the layout editor's own window (ergopti-studio-menu-row)", function()
@@ -663,155 +654,8 @@ helpers.describe("layout editor menu row (Linux)", function()
 	end)
 end)
 
---- Captures actual provider data while forwarding its status and rendering to the real binding.
---- @param callback function Receives the native build, fixture state and binding.
-local function with_empty_layout(callback)
-	local names = { "menu.ui.builder.builder", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "modules.keymap.layout_registry" }
-	local saved = {}
-	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-	local ok, err = xpcall(function()
-		local state = { selections = 0, installed = false }
-		package.loaded["modules.keymap.layout_registry"] = {
-			snapshot = function()
-				return { installed = state.installed and { { id = "native", name = "Native layout" } } or {}, active = "native" }
-			end,
-			select = function() state.selections = state.selections + 1; return true end,
-		}
-		local binding = require("menu.engine.manifest_menu")
-		local module = helpers.load_module("menu.ui.builder.builder")
-		local native_build = binding.build
-		binding.build = function(key, title, dynamic, click, ctx, providers)
-			if key == "layout_menu" then
-				local provider = providers.custom_layouts
-				providers.custom_layouts = function()
-					state.data = provider()
-					return state.data
-				end
-			end
-			return native_build(key, title, dynamic, click, ctx, providers)
-		end
-		callback(function()
-			local items = module.build({})
-			for _, row in ipairs(items) do
-				if row.title == require("core.i18n.engine.i18n").get("menu.layout.title") then
-					helpers.assert_eq(type(row.menu), "table")
-					return row.menu
-				end
-			end
-			error("The actual layout submenu must reach the tray.")
-		end, state, binding)
-	end, debug.traceback)
-	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-	if not ok then error(err, 0) end
-end
-
--- Independent pre-migration captions; the generated status declaration is the subject.
-local EmptyLayoutJson = require("core.text.engine.json")
-local function read_empty_layout_json(path)
-	local file = assert(io.open(path, "rb"))
-	local value = assert(EmptyLayoutJson.decode(file:read("*a")))
-	file:close()
-	return value
-end
-
-local EmptyLayoutCorpus = read_empty_layout_json(require("core.fs.engine.paths").shared("tests/corpus/menu/layout_empty_status.json"))
-
-local function empty_layout_owner(binding)
-	for _, row in ipairs(binding.get_array(EmptyLayoutCorpus.section)) do
-		if row.id == EmptyLayoutCorpus.provider then return row end
-	end
-	error("The actual custom-layout provider declaration must exist.")
-end
-
-local function count_empty_layout_caption(rows, title)
-	local count = 0
-	for _, row in ipairs(rows or {}) do
-		if row.title == title then
-			count = count + 1
-			helpers.assert_eq(row.disabled, true)
-			helpers.assert_nil(row.fn)
-			helpers.assert_nil(row.menu)
-		end
-	end
-	return count
-end
-
-helpers.describe("the shared empty native-layout status", function()
-	helpers.it("(layout-empty-status) retains the independent inert declaration", function()
-		with_empty_layout(function(_, state, binding)
-			helpers.assert_eq(empty_layout_owner(binding).status_rows[EmptyLayoutCorpus.status], { EmptyLayoutCorpus.row })
-			local count = 0
-			for _ in pairs(EmptyLayoutCorpus.captions) do count = count + 1 end
-			helpers.assert_eq(count, 21)
-			helpers.assert_eq(state.selections, 0)
-		end)
-	end)
-
-	for locale, expected in pairs(EmptyLayoutCorpus.captions) do
-		helpers.it("(layout-empty-status) renders the real empty provider in " .. locale, function()
-			with_empty_layout(function(build, state, binding)
-				local catalogue = read_empty_layout_json(require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. locale .. ".json"))
-				helpers.assert_eq(catalogue[EmptyLayoutCorpus.row.i18n], expected)
-				require("core.i18n.engine.i18n").get = function(key) return catalogue[key] or key end
-				local rows = build()
-				helpers.assert_eq(state.data, { { label = expected, disabled = true } })
-				helpers.assert_eq(count_empty_layout_caption(rows, expected), 1)
-				helpers.assert_eq(state.selections, 0)
-				local declaration = empty_layout_owner(binding).status_rows[EmptyLayoutCorpus.status][1]
-				declaration.i18n = "menu.layout.manage"
-				build()
-				helpers.assert_eq(state.data, { { label = catalogue["menu.layout.manage"], disabled = true } },
-					"The native provider consumes the live declaration, not a repeated native caption.")
-			end)
-		end)
-	end
-
-	for _, invalid in ipairs({ "missing", "empty", "command", "effectful_label" }) do
-		helpers.it("(layout-empty-status) refuses the empty caption after " .. invalid, function()
-			with_empty_layout(function(build, state, binding)
-				local statuses = empty_layout_owner(binding).status_rows
-				local baseline = build()
-				local caption = require("core.i18n.engine.i18n").get(EmptyLayoutCorpus.row.i18n)
-				helpers.assert_eq(count_empty_layout_caption(baseline, caption), 1)
-				local bad = {
-					empty = {}, command = { { type = "command", id = "layout_manager", i18n = "menu.layout.manage" } },
-					effectful_label = { { type = "label", i18n = EmptyLayoutCorpus.row.i18n, action = "layout_manager" } },
-				}
-				statuses[EmptyLayoutCorpus.status] = bad[invalid]
-				local rows = build()
-				helpers.assert_eq(state.data, {})
-				helpers.assert_eq(count_empty_layout_caption(rows, caption), 0)
-				helpers.assert_eq(state.selections, 0)
-			end)
-		end)
-	end
-
-	helpers.it("(layout-empty-status) refuses an unavailable status-renderer port", function()
-		with_empty_layout(function(build, state, binding)
-			build()
-			helpers.assert_eq(#state.data, 1)
-			binding.status_rows = nil
-			build()
-			helpers.assert_eq(state.data, {})
-			helpers.assert_eq(state.selections, 0)
-		end)
-	end)
-
-	helpers.it("(layout-empty-status) leaves installed native layout data actionable", function()
-		with_empty_layout(function(build, state, binding)
-			state.installed = true
-			empty_layout_owner(binding).status_rows[EmptyLayoutCorpus.status] = nil
-			build()
-			helpers.assert_eq(#state.data, 1)
-			helpers.assert_eq(state.data[1].label, "Native layout")
-			helpers.assert_eq(state.data[1].checked, true)
-			helpers.assert_eq(type(state.data[1].action), "function")
-			helpers.assert_true(state.data[1].disabled ~= true)
-			helpers.assert_eq(state.selections, 0)
-		end)
-	end)
-end)
-
+-- Decodes the page payloads the bridge pushes.
+local PageJson = require("core.text.engine.json")
 
 --- Keeps native page epochs and asynchronous registry receipts independent.
 --- @return table bridge, table observations, table daemon, function advance
@@ -851,7 +695,7 @@ helpers.describe("layout manager native page ownership", function()
 				expected = pushes + 1
 				helpers.assert_eq(#observed.pushes, expected, "The new ready observer receives fresh global registry state")
 				local body = assert(observed.pushes[expected].js:match("window%.updateState%((.*)%)$"))
-				helpers.assert_nil(assert(EmptyLayoutJson.decode(body)).result,
+				helpers.assert_nil(assert(PageJson.decode(body)).result,
 					"A fresh global snapshot must not forward the retired page's operation result")
 			else
 				helpers.assert_eq(#observed.pushes, pushes, "An old catalogue response has no publication authority")
@@ -923,7 +767,7 @@ helpers.describe("layout manager observes global operation settlement", function
 		observed.installs[1](false, "old operation failure")
 		helpers.assert_eq(#observed.pushes, before + 1)
 		local body = assert(observed.pushes[#observed.pushes].js:match("window%.updateState%((.*)%)$"))
-		local update = assert(EmptyLayoutJson.decode(body))
+		local update = assert(PageJson.decode(body))
 		helpers.assert_nil(update.busy, "The replacement must not remain disabled after the global operation settles")
 		helpers.assert_nil(update.result, "The old page's failure is not the replacement's operation result")
 		observed.installs[1](true, {})

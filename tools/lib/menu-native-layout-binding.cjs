@@ -172,7 +172,6 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 	if (
 		!ordered(build, [
 			'local declared_bundle_rows = bundle_frame_rows()',
-			'local custom_rows = custom_layout_rows(update_menu, ManifestMenu)',
 			'local active_rows = active_layout_rows()',
 			'local submenu = ManifestMenu.build("layout_menu", "Layout", nil, group_builders, render_ctx, {',
 			'return ManifestMenu.group_row("layout_native_parent", "layout_parent_content", submenu, {})'
@@ -181,7 +180,6 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 		return false;
 	if (
 		!one(build, '["layout_bundle"] = function() return declared_bundle_rows end') ||
-		!one(build, '["custom_layouts"] = function() return custom_rows end') ||
 		!one(build, '["active_layouts"] = function() return active_rows end') ||
 		!one(build, '["layout_switching"] = function() return switching_rows end')
 	)
@@ -343,7 +341,6 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 				const choice = body(
 					'local function layout_native_choice(caption, selected, ready, callback)'
 				);
-				const custom = body('local function custom_layout_rows(update_menu, renderer)');
 				const active = bodyOf(build, 'local function active_layout_rows()');
 				const switching = bodyOf(build, 'local function build_layout_switching_rows()');
 				const picker = bodyOf(switching, 'local function picker(current_id, on_pick)');
@@ -359,24 +356,6 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 						layout_native_selected = function() return selected == true end,
 						layout_native_ready = function() return ready == true end,
 					})`
-					) ||
-					!one(
-						custom,
-						'local ok, LayoutRegistry = pcall(require, "modules.keymap.layout_registry")'
-					) ||
-					positions(custom, 'LayoutRegistry =').length !== 1 ||
-					positions(custom, 'local LayoutRegistry').length ||
-					positions(custom, 'LayoutRegistry.select =').length ||
-					!one(
-						custom,
-						`local row = layout_native_choice(type(entry.name) == "string" and entry.name or id, picker.active == id, true, function()
-						defer_tis_call(function()
-							LayoutRegistry.select(id, function(selected)
-								if not selected then pcall(notifications.notify, i18n.get("layout_manager.failure_other"), nil, "error") end
-								schedule_menu_refresh(update_menu)
-							end)
-						end)
-					end)`
 					) ||
 					!one(
 						active,
@@ -550,7 +529,6 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 			definition[0].id === 'layout_parent_content'
 		);
 	if (section === 'layout_native_record_choice') {
-		const custom = body('local function custom_layout_rows(update_menu, renderer)');
 		const active = bodyOf(build, 'local function active_layout_rows()');
 		const switching = bodyOf(build, 'local function build_layout_switching_rows()');
 		const picker = bodyOf(switching, 'local function picker(current_id, on_pick)');
@@ -571,15 +549,6 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 				'layout_native_selected = function() return selected == true end',
 				'layout_native_ready = function() return ready == true end'
 			]) &&
-			one(
-				custom,
-				'local row = layout_native_choice(type(entry.name) == "string" and entry.name or id, picker.active == id, true, function()'
-			) &&
-			ordered(custom, [
-				'local row = layout_native_choice(type(entry.name) == "string" and entry.name or id, picker.active == id, true, function()',
-				'rows[#rows + 1] = row'
-			]) &&
-			positions(custom, 'return rows').filter((at) => custom.scopes[at] === 0).length === 1 &&
 			ordered(active, [
 				'local row = layout_native_choice(row_label, r.selected, not r.selected, function()',
 				'rows[#rows + 1] = row'

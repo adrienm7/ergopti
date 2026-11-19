@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Keyboard Layout Menu
 --- DESCRIPTION:
---- Provides the "Disposition clavier" submenu in the Hammerspoon menu bar.
+--- Provides the « Dispositions et émulation » submenu in the Hammerspoon menu bar.
 --- Lets the user install the bundled Ergopti keyboard layout (user or system),
 --- open the macOS input-source preferences, pick the menubar icon variant,
 --- and inspect / activate any of the input sources currently enabled in macOS.
@@ -231,44 +231,6 @@ local function layout_native_choice(caption, selected, ready, callback)
 		layout_native_selected = function() return selected == true end,
 		layout_native_ready = function() return ready == true end,
 	})
-end
-
---- The custom layout picker: the registry layouts the layout manager
---- installed, the one of the current input source checked; choosing one
---- makes it the current input source.
---- @param update_menu function|nil Menu rebuild callback.
---- @param renderer table Native manifest binding.
---- @return table Rows for the `custom_layouts` provider.
-local function custom_layout_rows(update_menu, renderer)
-	local rows = {}
-	local ok, LayoutRegistry = pcall(require, "modules.keymap.layout_registry")
-	local picked_ok, picker = false, nil
-	if ok then picked_ok, picker = pcall(LayoutRegistry.picker) end
-	if not picked_ok or type(picker) ~= "table" then
-		Logger.error(LOG, "The installed layouts could not be listed: %s.", tostring(picker))
-		picker = { layouts = {}, active = "" }
-	end
-	for _, entry in ipairs(picker.layouts) do
-		local id = entry.id
-		local row = layout_native_choice(type(entry.name) == "string" and entry.name or id, picker.active == id, true, function()
-				defer_tis_call(function()
-					LayoutRegistry.select(id, function(selected)
-						if not selected then
-							pcall(notifications.notify, i18n.get("layout_manager.failure_other"), nil, "error")
-						end
-						schedule_menu_refresh(update_menu)
-					end)
-				end)
-			end)
-		if not row then return nil end
-		rows[#rows + 1] = row
-	end
-	if #rows == 0 then
-		if type(renderer) ~= "table" or type(renderer.status_rows) ~= "function" then return {} end
-		local status = renderer.status_rows("layout_menu", "custom_layouts", "none_installed")
-		return type(status) == "table" and status or {}
-	end
-	return rows
 end
 
 --- Builds an install/update menu item for one scope (user or system).
@@ -838,8 +800,6 @@ function M.build(ctx)
 		return true
 	end
 	render_ctx.commands[require("settings.engine.keys").COMMAND.LAYOUT_MANAGER] = LayoutManagerWindow.menu_command()
-	-- « Create or edit a layout… » opens the same window straight on the layout editor.
-	render_ctx.commands[require("settings.engine.keys").COMMAND.OPEN_LAYOUT_EDITOR] = LayoutManagerWindow.edit_menu_command()
 	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
 		render_ctx.commands[command] = function()
 			-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
@@ -874,8 +834,6 @@ function M.build(ctx)
 	end
 	local declared_bundle_rows = bundle_frame_rows()
 	if declared_bundle_rows == nil then return nil end
-	local custom_rows = custom_layout_rows(update_menu, ManifestMenu)
-	if custom_rows == nil then return nil end
 	local active_rows = active_layout_rows()
 	if active_rows == nil then return nil end
 	-- The layout emulation (modules/keymap/layout_emulation.lua): the layout it
@@ -939,7 +897,6 @@ function M.build(ctx)
 			return { emulation_switch(require("settings.engine.keys").KEY.LAYOUT_ERGOPTI_ALT_GR, "layout.ergoptialtgr") }
 		end,
 		["number_row_policy"] = function() return number_row_rows(state, save_prefs, update_menu, render_ctx) end,
-		["custom_layouts"]   = function() return custom_rows end,
 		["active_layouts"]   = function() return active_rows end,
 		["layout_bundle"] = function() return declared_bundle_rows end,
 		["layout_switching"] = function() return switching_rows end,

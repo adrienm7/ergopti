@@ -10746,7 +10746,6 @@ console.log(
 				'withdrawn finished subtree',
 				native.replace('"layout_parent_content", submenu, {}', '"layout_parent_content", {}, {}')
 			],
-			['discarded custom rows', native.replace('return custom_rows end', 'return {} end')],
 			['discarded native active rows', native.replace('return active_rows end', 'return {} end')],
 			['discarded bundle rows', native.replace('return declared_bundle_rows end', 'return {} end')],
 			['discarded switching rows', native.replace('return switching_rows end', 'return {} end')]

@@ -76,16 +76,16 @@ helpers.describe("layout submenu: the menubar icon is one choice row", LayoutFix
 		helpers.assert_nil(index_of(rows, "menu.layout.logo_custom"), "the per-variant rows are gone")
 	end)
 
-	helpers.it("is the last row of the custom-layout section", function()
+	helpers.it("is the last row of the any-layout section, the last of the menu", function()
 		local rows = tray_rows(make_ctx("v1"))
-		local header = index_of(rows, require("core.i18n.engine.i18n").section("menu.layout.header_custom"))
+		local header = index_of(rows, require("core.i18n.engine.i18n").section("menu.layout.header_any"))
 		local at = index_of(rows, "menu.layout.menubar_icon")
 		helpers.assert_true(header ~= nil and at ~= nil and header < at,
-			"the icon row belongs to the custom-layout section")
+			"the icon row belongs to the any-layout section")
 		for index = header + 1, at - 1 do
-			helpers.assert_true(rows[index].title ~= "-", "no separator may split the custom-layout section before the icon row")
+			helpers.assert_true(rows[index].title ~= "-", "no separator may split the any-layout section before the icon row")
 		end
-		helpers.assert_eq(rows[at + 1].title, "-", "a separator must close the custom-layout section right after the icon row")
+		helpers.assert_nil(rows[at + 1], "the icon row closes the menu")
 	end)
 
 	helpers.it("choosing a value stores it in the saved state and redraws the icon", function()

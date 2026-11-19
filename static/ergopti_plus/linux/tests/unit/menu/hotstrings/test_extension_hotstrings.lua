@@ -371,7 +371,7 @@ helpers.describe("shared Linux standard-category empty status", function()
 
 	helpers.it("(standard-category-empty-status) consumes a changed shared caption through the actual provider", function()
 		with_standard_empty(function(build, state, _, owner, catalogue)
-			local replacement = "menu.layout.none_installed"
+			local replacement = "menu.layout.no_bundle"
 			owner.status_rows = { [StandardEmptyCorpus.status] = { { type = "label", i18n = replacement } } }
 			local rows = build()
 			helpers.assert_eq(state.data, { { label = catalogue[replacement], disabled = true } })
@@ -551,7 +551,7 @@ helpers.describe("shared Linux empty extension status", function()
 	end
 	helpers.it("(extension-empty-status) consumes a changed actual declaration caption", function()
 		with_extension_empty(function(build, state, _, owner, catalogue)
-			local replacement = "menu.layout.none_installed"
+			local replacement = "menu.layout.no_bundle"
 			owner.status_rows = { [ExtensionEmptyCorpus.status] = { { type = "label", i18n = replacement } } }
 			local rows = build()
 			helpers.assert_eq(state.data, { { label = catalogue[replacement], disabled = true } })

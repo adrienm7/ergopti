@@ -38,8 +38,9 @@ Decided by the coordinator on 2026-11-11, to review by the maintainer.
 - **Website.** `src/routes/studio/+page.svelte` (Ergopti Studio; `/editeur` redirects there) frames `layout_editor/index.html` served from `static/`.
 - **ErgoptiPlus, its own window on the three OS.** The editor has a window of its own,
   `layout_editor_window/index.html` (manifest id `layout_editor_window`, bridge `layout_editor_window_bridge`), which
-  loads the same scripts and mounts the editor on the host's first `sourceData`. The menu's « Create or edit a
-  layout… » opens it, and so does the layout manager's « Layout editor » button (shown when `initData` carries
+  loads the same scripts and mounts the editor on the host's first `sourceData`. The tray root's « Ergopti Studio… »
+  opens it (the layout menu's « Create or edit a layout… » did too until 2026-11-19, when it left as a duplicate), and
+  so does the layout manager's « Layout editor » button (shown when `initData` carries
   `source_editor: true`), which posts `open_editor`; a second request brings the open editor to the front and keeps its
   unsaved work, and the editor's « Close » closes the window. The editor window's controller (the shared
   `manager_bridge.lua` with `editor_window`, Windows `editor_window.ahk`) answers the page's `ready` with `initData`,
@@ -125,7 +126,7 @@ host platform; `LayoutSourceIO.emulationTable(doc, "windows")`). Bounds and file
 
 1. `windows/ui/layout_manager/init.ahk`: add `source_open`, `source_save`, `nav_save`, `composer_emulate` (and
    `source_pick` if WebView2's chooser is not enough) to `LAYMGR_ACTIONS`; the three flags in the `initData` that
-   `LayoutManager_HandleMessage` pushes on `ready`; `LayoutManager_OpenEditor()` = `LayoutManager_Open()` then, once
+   `LayoutManager_HandleMessage` pushes on `ready`; `LayoutManager_OpenEditor()` (retired on 2026-11-19 with its menu row) = `LayoutManager_Open()` then, once
    `ready` arrives (`_LayMgrWeb_OnNavigationCompleted` / the page's `ready`), the same answer as `source_open`. Then
    empty `windowsPending` in `tools/test/test-layout-manager-page.cjs`.
 2. `windows/ui/layout_manager/source_store.ahk` (new): the rules of `_shared/layouts/engine/composer/source_store.lua` (file
@@ -146,7 +147,8 @@ host platform; `LayoutSourceIO.emulationTable(doc, "windows")`). Bounds and file
 emulation_vectors.json` like `test-layout-source-emulation.cjs` does.
 5. `windows/ui/layout_manager/kbd_register.ahk` (new): the elevated helper below, `install <staging dir>` and
    `uninstall <dll>`.
-6. Menu: in `_shared/menu/data/menu.toml` row `open_layout_editor`, drop `platforms`, `unavailable` and `reason_key`
+6. Menu (the row `open_layout_editor` left the layout menu on 2026-11-19: Ergopti Studio's top-level row opens the
+   same window): in `_shared/menu/data/menu.toml` row `open_layout_editor`, drop `platforms`, `unavailable` and `reason_key`
    (and the locale key `platform_reason.layout_editor_is_on_the_website_on_windows`); in `windows/menu/ui/builder/menu_init.ahk`
    bind `Commands[MenuCommand.OPEN_LAYOUT_EDITOR] := LayoutManager_OpenEditor` next to `LAYOUT_MANAGER` (line 700).
 

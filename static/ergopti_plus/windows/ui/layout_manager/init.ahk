@@ -20,8 +20,8 @@
 ;    so a late callback of a closed window never writes into its successor.
 ; 4. The unified layout editor (docs/design/layout-editor.md « Windows host »)
 ;    has its own window (editor_window.ahk): the page's « Layout editor » button
-;    posts open_editor and the menu's « Create or edit a layout… » opens it
-;    directly. LayoutManager_HandleEditorAction answers the editor's actions:
+;    posts open_editor and opens it on its editor tab, and the tray root's
+;    « Ergopti Studio… » opens it directly. LayoutManager_HandleEditorAction answers the editor's actions:
 ;    source_open and source_save go to source_store.ahk, composer_save with a
 ;    source and composer_emulate to composer.ahk, nav_save to the navigation
 ;    layer editor's own save; WebView2's own file chooser opens files, so
@@ -278,7 +278,7 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		return true
 	}
 	if (Action == "open_editor")
-		return Deps.Get("open_editor", LayoutEditorWindow_Open).Call()
+		return Deps.Get("open_editor", LayoutEditorWindow_OpenOnEdit).Call()
 	if (Action == "refresh") {
 		Deps["refresh"].Call(_LayMgrWeb_PushState.Bind(Deps))
 		return true
@@ -544,15 +544,6 @@ LayoutManager_HandleEditorAction(Action, Payload, Deps) {
 		return LayoutComposer_Handle(Action, Payload, Deps)
 	LoggerWarn("LayoutManager", "Refused the layout editor action '{1}'.", Action)
 	return false
-}
-
-/**
- * The menu's « Create or edit a layout… »: opens the layout editor in its own
- * window (editor_window.ahk), or brings the open one to the front.
- * @returns {Boolean} Whether the window is shown.
- */
-LayoutManager_OpenEditor(*) {
-	return LayoutEditorWindow_OpenOnEdit()
 }
 
 /**

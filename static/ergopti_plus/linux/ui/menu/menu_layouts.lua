@@ -3,10 +3,10 @@
 --- ==============================================================================
 --- MODULE: Linux Menu Keyboard Layout Submenu
 --- DESCRIPTION:
---- Builds the tray's keyboard layout submenu: the installed layouts with the
---- active one ticked, the custom layouts, the desktop's input sources, the
---- number-row policy and the pause layout rows, with the notices a layout
---- switch shows.
+--- Builds the tray's layouts and emulation submenu: the emulated layout and its
+--- layers and rows, the desktop's input sources with the pause layout rows and
+--- the layout manager, then the number-row policy and the other options that
+--- work on any layout, with the notices a layout switch shows.
 --- ==============================================================================
 
 local M = {}
@@ -40,7 +40,8 @@ local function _build_layouts(ctx)
 	-- restricts the layout emulation switch to Windows with its reason.
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
-	-- The "Manage layouts…" row opens the shared layout manager window.
+	-- « Install or remove layouts… » opens the shared layout manager window.
+	-- Creating a layout is Ergopti Studio's, the tray root's row right above.
 	render_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do render_ctx.commands[key] = value end
 	render_ctx.commands[require("settings.engine.keys").COMMAND.LAYOUT_MANAGER] = function()
@@ -50,55 +51,8 @@ local function _build_layouts(ctx)
 		end
 		return ctx.webview.show(require("settings.engine.keys").COMMAND.LAYOUT_MANAGER)
 	end
-	-- « Create or edit a layout… »: the layout editor's own window, which answers
-	-- its page's ready with the last saved source (ui/layout_manager/bridge.lua).
-	render_ctx.commands[require("settings.engine.keys").COMMAND.OPEN_LAYOUT_EDITOR] = function()
-		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
-			Logger.error(LOG, "No webview manager in the menu context — the layout editor cannot open.")
-			return false
-		end
-		return require("ui.layout_manager.bridge").open_editor_window(ctx.webview, { tab = "edit" })
-	end
-
 
 	local providers = {
-		-- The custom layout picker: the registry layouts the layout manager
-		-- installed, the one this session activated checked; choosing one makes
-		-- it the first input source of the desktop session.
-		["custom_layouts"] = function()
-			local ok_registry, LayoutRegistry = pcall(require, "modules.keymap.layout_registry")
-			if not ok_registry then
-				Logger.error(LOG, "The layout registry client is unavailable: %s.", tostring(LayoutRegistry))
-				return {}
-			end
-			local snapshot = LayoutRegistry.snapshot()
-			local entries = {}
-			for _, entry in pairs(snapshot.installed or {}) do entries[#entries + 1] = entry end
-			table.sort(entries, function(a, b) return tostring(a.name) < tostring(b.name) end)
-			local rows = {}
-			for _, entry in ipairs(entries) do
-				local id = entry.id
-				rows[#rows + 1] = {
-					label   = type(entry.name) == "string" and entry.name or id,
-					checked = snapshot.active == id,
-					action  = function()
-						LayoutRegistry.select(id, function(selected, _, detail)
-							if not selected then
-								Logger.error(LOG, "The '%s' layout could not be activated: %s.", id, tostring(detail))
-							elseif type(ctx.on_menu_changed) == "function" then
-								ctx.on_menu_changed()
-							end
-						end)
-					end,
-				}
-			end
-			if #rows == 0 then
-				if type(ManifestMenu) ~= "table" or type(ManifestMenu.status_rows) ~= "function" then return {} end
-				local status = ManifestMenu.status_rows("layout_menu", "custom_layouts", "none_installed")
-				return type(status) == "table" and status or {}
-			end
-			return rows
-		end,
 		["base_layouts"] = function()
 			local ok_reader, reader = pcall(require, "hotstrings.engine.input_reader")
 			if not ok_reader or type(reader.get_layouts) ~= "function" then

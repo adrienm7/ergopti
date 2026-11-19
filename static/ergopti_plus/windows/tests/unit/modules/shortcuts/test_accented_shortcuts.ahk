@@ -162,16 +162,21 @@ _ACS_TokenIndex(Tokens, Token) {
 	throw Error("Layout menu row '" . Token . "' is not declared.")
 }
 
-Test("layout menu: the custom layout rows precede the any-layout section (layout-menu-sections)", () => _ACS_LayoutSectionsCase())
+Test("layout menu: the emulation, then the input sources, precede the any-layout section (layout-menu-sections)",
+	() => _ACS_LayoutSectionsCase())
 
 _ACS_LayoutSectionsCase() {
 	Tokens := _ACS_LayoutMenuTokens()
-	Custom := _ACS_TokenIndex(Tokens, "menu.layout.header_custom")
+	Emulation := _ACS_TokenIndex(Tokens, "menu.layout.header_emulation")
+	Sources := _ACS_TokenIndex(Tokens, "menu.layout.active_layouts")
 	AnyLayout := _ACS_TokenIndex(Tokens, "menu.layout.header_any")
-	Assert(Custom < AnyLayout, "the custom layout section must come first")
-	for Row in ["custom_layouts", "layout_manager", "layout_features_base", "layout_features_altgr"]
-		Assert(_ACS_TokenIndex(Tokens, Row) > Custom && _ACS_TokenIndex(Tokens, Row) < AnyLayout,
-			Row . " belongs to the custom layout section")
+	Assert(Emulation < Sources && Sources < AnyLayout, "the emulation, the input sources, then any layout")
+	for Row in ["layout_emulation", "layout_features_base", "layout_features_altgr", "layout_emulated_rows"]
+		Assert(_ACS_TokenIndex(Tokens, Row) > Emulation && _ACS_TokenIndex(Tokens, Row) < Sources,
+			Row . " belongs to the emulation section")
+	for Row in ["active_layouts", "layout_switching", "layout_manager", "layout_system_install"]
+		Assert(_ACS_TokenIndex(Tokens, Row) > Sources && _ACS_TokenIndex(Tokens, Row) < AnyLayout,
+			Row . " belongs to the input sources section")
 	for Row in ["number_row_policy", "accented_letters",
 			"magic_key_source", "layout.ctrl_magic_save"]
 		Assert(_ACS_TokenIndex(Tokens, Row) > AnyLayout, Row . " works on any layout")
