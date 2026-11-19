@@ -1545,6 +1545,51 @@ for (const layout of library) {
 			"incremental: a later trial leaves the committed layout's maps as a whole compile gives them"
 		);
 	}
+	// A trial's bookkeeping belongs to the ways and the call that build it:
+	// the time a partial compile gives each joined way sits on the way, and
+	// the engine's weak tables only cache what lives as long as a layout's
+	// dead-key tables, a board or a table. Letter swaps on shared dead-key
+	// tables, made a second time, write no weak-table entry (the times once
+	// went into one, an entry per kept way, about a sixth of a bépo trial).
+	if (byId.has('bepo')) {
+		const weak = vm.runInContext('WeakMap.prototype', sandbox);
+		const set = weak.set;
+		let writes = 0;
+		weak.set = function (key, value) {
+			writes += 1;
+			return set.call(this, key, value);
+		};
+		try {
+			// Dead-key tables the engine has not seen: their rules are cached.
+			E.scoreSession(clone(byId.get('bepo')), sessionTable, {});
+			check(writes > 0, "incremental: the weak-table count sees the engine's caches");
+			const bepo = clone(byId.get('bepo'), true);
+			const session = E.scoreSession(bepo, sessionTable, {});
+			const layouts = [
+				['KeyA', 'KeyS'],
+				['KeyE', 'KeyR'],
+				['KeyF', 'KeyD'],
+				['KeyU', 'KeyI']
+			].map(([a, b]) => {
+				const out = clone(bepo, true);
+				[out.rows[a], out.rows[b]] = [out.rows[b], out.rows[a]];
+				return out;
+			});
+			for (const layout of layouts) session.trial(layout);
+			writes = 0;
+			const compiled = layouts.map((layout) => session.trial(layout).compile);
+			check(
+				compiled.every((how) => how === 'incremental'),
+				`incremental: bépo's repeated letter swaps compile in part (${compiled})`
+			);
+			check(
+				writes === 0,
+				`incremental: bépo's repeated letter swaps write ${writes} weak-table entries, none expected`
+			);
+		} finally {
+			weak.set = set;
+		}
+	}
 	// The partial compile must carry the trials, not the whole-compile fallback.
 	for (const { layout: id } of cases)
 		check(
