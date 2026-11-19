@@ -73,7 +73,8 @@ window.initData = function (data) {
 	rows.innerHTML = '';
 	_initialValues = new WeakMap();
 	(data.fields || []).forEach(function (f) {
-		const row = document.createElement('div');
+		// A label and its field: the paragraph of a form row.
+		const row = document.createElement('p');
 		row.className = 'row';
 
 		const label = document.createElement('label');

@@ -51,8 +51,22 @@ h1 {
 /* ================================ */
 /* ================================ */
 
+/* The field group keeps no frame of its own. */
+#rows {
+	border: 0;
+	margin: 0;
+	min-inline-size: 0;
+	padding: 0;
+}
+
 .row {
-	margin-bottom: 11px;
+	margin: 0 0 11px;
+}
+
+/* The group holds its rows' margins (no collapse through it): the last one
+   leaves the space above the buttons to them. */
+.row:last-child {
+	margin-bottom: 0;
 }
 
 label {
