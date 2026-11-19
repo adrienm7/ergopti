@@ -190,16 +190,16 @@
 	{#if isDev}
 		<a href={stableHref(page.url.pathname)}>
 			<div class="dev-banner-content">
-				<p>🚧 VERSION DE DEV 🚧</p>
-				<p class="subtitle">
+				<span class="banner-line">🚧 VERSION DE DEV 🚧</span>
+				<span class="banner-line subtitle">
 					<span class="button-link">➜ aller sur la version stable</span>
-				</p>
+				</span>
 			</div>
 		</a>
 	{:else}
 		<a href={resolve('/ergopti/informations') + '#changelog'}>
-			<p>NOUVEAU : Ergopti v2.2.1</p>
-			<p class="subtitle">découvrez les nouveautés</p>
+			<span class="banner-line">NOUVEAU : Ergopti v2.2.1</span>
+			<span class="banner-line subtitle">découvrez les nouveautés</span>
 		</a>
 	{/if}
 </div>
