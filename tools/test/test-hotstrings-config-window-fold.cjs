@@ -162,6 +162,8 @@ const root = parse(html.replace(/^<!doctype html>/i, ''));
 const byId = (id) => root.querySelectorAll('[id]').find((element) => element.attrs.id === id);
 const sandbox = {
 	document: {
+		// The page draws again once i18n.js has applied the strings.
+		addEventListener() {},
 		getElementById: byId,
 		createElement: (tag) => new El(tag),
 		importNode: (node) => node.clone()
@@ -275,11 +277,23 @@ sandbox.setData(hostState());
 assert.equal(cards()[0].querySelector('.sections').hidden, true, 'the fold outlives a redraw');
 assert.equal(cards()[1].querySelector('.sections').hidden, false);
 
-// 4/ The title folds and unfolds too.
-cards()[0].querySelector('.cat-title').click();
+// 4/ The title is the fold: one button in the heading, named by the category,
+// that the keyboard reaches, instead of a heading only a mouse could click.
+for (const card of cards()) {
+	const heading = card.querySelector('.cat-title');
+	assert.equal(heading.tag, 'h2', 'the category title is a heading');
+	assert.equal(heading.children.length, 1, 'the heading holds the fold button alone');
+	assert.equal(heading.children[0].tag, 'button', 'the fold is a button');
+	assert.equal(heading.children[0].getAttribute('data-role'), 'toggle');
+	assert.deepEqual(heading.listeners, {}, 'the heading itself takes no click');
+}
+assert.equal(
+	cards()[0].querySelector('[data-role=toggle]').textContent,
+	'first',
+	'the button names the category'
+);
+cards()[0].querySelector('[data-role=toggle]').click();
 assert.equal(cards()[0].querySelector('.sections').hidden, false, 'a click on the title unfolds');
-cards()[1].querySelector('.cat-title').click();
-assert.equal(cards()[1].querySelector('.sections').hidden, true, 'a click on the title folds');
 
 // 5/ A refused personal owner exposes its data without offering mutations.
 // A later admitted state rebuild restores ordinary editability.

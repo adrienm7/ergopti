@@ -78,9 +78,10 @@ let fieldCount = 0;
  * category or section it sets: every card repeats the same four labels, so a
  * screen reader hears which one it is in (WCAG 1.3.1, 2.4.6, 4.1.2).
  * @param {ParentNode} node - A rendered category head or section.
- * @param {string} owner - The category or section title.
+ * @param {Element} heading - The category's or section's heading.
  */
-function labelFields(node, owner) {
+function labelFields(node, heading) {
+	heading.id = 'hs-heading-' + ++fieldCount;
 	node.querySelectorAll('.field').forEach(function (field) {
 		const label = field.querySelector('label');
 		const control = field.querySelector('.ctrl input, .ctrl select');
@@ -88,12 +89,7 @@ function labelFields(node, owner) {
 		control.id = 'hs-field-' + ++fieldCount;
 		label.htmlFor = control.id;
 		label.id = control.id + '-label';
-		const ownerName = document.createElement('span');
-		ownerName.className = 'visually-hidden';
-		ownerName.id = control.id + '-owner';
-		ownerName.textContent = owner;
-		field.appendChild(ownerName);
-		control.setAttribute('aria-labelledby', label.id + ' ' + ownerName.id);
+		control.setAttribute('aria-labelledby', label.id + ' ' + heading.id);
 	});
 }
 
@@ -185,14 +181,11 @@ function render() {
 		applyTemplateI18n(node);
 		const card = node.querySelector('.cat');
 
-		card.querySelector('.cat-title').textContent = cat.title;
-		labelFields(card.querySelector('.cat-head'), cat.title);
-
-		// The caret and the title both fold the category's sections.
+		// The heading's one button, caret and title, folds the category's
+		// sections: a disclosure the keyboard reaches (WCAG 2.1.1, 4.1.2).
 		const toggle = card.querySelector('[data-role=toggle]');
-		// The caret's glyph says nothing; the category names the fold.
-		toggle.setAttribute('aria-label', cat.title);
-		const title = card.querySelector('.cat-title');
+		toggle.textContent = cat.title;
+		labelFields(card.querySelector('.cat-head'), card.querySelector('.cat-title'));
 		const sectionsBox = card.querySelector('.sections');
 		const key = categoryKey(cat);
 		const fold = () => {
@@ -202,7 +195,6 @@ function render() {
 		};
 		applyFold(toggle, sectionsBox, foldedCategories.has(key));
 		toggle.addEventListener('click', fold);
-		title.addEventListener('click', fold);
 
 		// File-level (category) controls
 		bindDelay(card.querySelector('.field-delay'), cat, null);
@@ -215,8 +207,9 @@ function render() {
 		for (const sec of cat.sections) {
 			const secNode = document.importNode(tplSec, true);
 			applyTemplateI18n(secNode);
-			secNode.querySelector('.sec-title').textContent = sec.title || sec.name;
-			labelFields(secNode, sec.title || sec.name);
+			const secTitle = secNode.querySelector('.sec-title');
+			secTitle.textContent = sec.title || sec.name;
+			labelFields(secNode, secTitle);
 			bindDelay(secNode.querySelector('.field-delay'), cat, sec);
 			bindColor(secNode.querySelector('.field-color'), cat, sec);
 			bindPriority(secNode.querySelector('.field-priority'), cat, sec);

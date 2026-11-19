@@ -82,7 +82,13 @@ body {
 .topbar .actions {
 	display: flex;
 	gap: 8px;
+	list-style: none;
 	-webkit-app-region: no-drag;
+}
+
+/* Each button fills its list item's height, as when they stood alone. */
+.topbar .actions li {
+	display: flex;
 }
 
 .btn {
@@ -106,16 +112,6 @@ body {
 	.btn-danger {
 		color: var(--theme-hue-ff8e85);
 	}
-}
-
-/* Read by a screen reader, not shown: which card a repeated field label is in. */
-.visually-hidden {
-	clip-path: inset(50%);
-	height: 1px;
-	overflow: hidden;
-	position: absolute;
-	white-space: nowrap;
-	width: 1px;
 }
 
 .group-bar {
@@ -166,7 +162,7 @@ main {
 	align-items: center;
 	display: grid;
 	gap: 10px;
-	grid-template-columns: 24px 1fr auto;
+	grid-template-columns: 1fr auto;
 	padding: 10px 14px;
 }
 
@@ -176,17 +172,32 @@ main {
 	font-weight: 600;
 }
 
+/* One button: the caret, drawn, then the category's name. */
 .caret {
+	align-items: center;
 	background: transparent;
 	border: 0;
-	color: var(--sub);
+	color: inherit;
+	column-gap: 10px;
 	cursor: pointer;
-	font-size: 13px;
+	display: grid;
+	font: inherit;
+	grid-template-columns: 24px 1fr;
 	padding: 0;
-	transition: transform 0.15s ease;
-	width: 24px;
+	text-align: start;
+	width: 100%;
 }
-.caret.open {
+
+.caret::before {
+	color: var(--sub);
+	content: '▸';
+	content: '▸' / '';
+	font-size: 13px;
+	font-weight: 400;
+	text-align: center;
+	transition: transform 0.15s ease;
+}
+.caret.open::before {
 	transform: rotate(90deg);
 }
 
@@ -194,6 +205,7 @@ main {
 	align-items: center;
 	display: flex;
 	gap: 16px;
+	list-style: none;
 }
 
 .field {
@@ -277,6 +289,7 @@ main {
 	border-top: 1px solid var(--border);
 	display: flex;
 	flex-direction: column;
+	list-style: none;
 }
 
 .sec {
@@ -294,4 +307,5 @@ main {
 .sec-title {
 	color: var(--sub);
 	font-size: 12px;
+	font-weight: 400;
 }
