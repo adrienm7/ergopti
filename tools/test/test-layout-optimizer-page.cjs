@@ -241,6 +241,49 @@ for (const m of page.matchAll(/\{ code: '([a-z_]+)' \}/g)) codes.add(m[1]);
 check(codes.has('text_missing'), 'the page refuses a run without its text');
 for (const code of [...codes, 'failed', 'corpus', 'worker', 'studio_handoff_failed'])
 	keys.add(`${PREFIX}error.${code}`);
+// The change penalty's presets (score_weights.json), the trade-off's facts and
+// « get it »'s notes, all built from lists; « get it » names the editor's own
+// formats and refusals, which the editor shows when it runs the action.
+check(
+	/E\.changePenalty\(\)/.test(page) && !/presets: \{/.test(page),
+	'the page reads the change presets from the engine, with none of its own'
+);
+for (const id of Object.keys(E.changePenalty().presets)) keys.add(`${PREFIX}change.preset.${id}`);
+for (const id of ['gain', 'moved', 'share', 'penalty']) keys.add(`${PREFIX}tradeoff.${id}`);
+for (const id of ['install_note', 'app_only', 'emulate_note', 'no_emulation'])
+	keys.add(`${PREFIX}get.${id}`);
+const FILES_SANDBOX = {};
+vm.createContext(FILES_SANDBOX);
+vm.runInContext(
+	`var window = this; ${read(shared('ui', 'layout_analysis', 'corpus_files.js'))}`,
+	FILES_SANDBOX
+);
+const EDITOR_DOWNLOADS = vm.runInContext('LAYOUT_ANALYSIS_FILES.EDITOR_DOWNLOADS', FILES_SANDBOX);
+check(
+	Array.isArray(EDITOR_DOWNLOADS) &&
+		EDITOR_DOWNLOADS.includes('klc') &&
+		EDITOR_DOWNLOADS.includes('xkb'),
+	`the editor's downloads: ${EDITOR_DOWNLOADS}`
+);
+for (const id of EDITOR_DOWNLOADS) keys.add(`layout_editor.export.option.${id}`);
+for (const id of ['unavailable', 'driver_unavailable', 'no_install', 'no_emulate'])
+	keys.add(`layout_editor.export.${id}`);
+// Every download the editor offers is one of that list (its offer() refuses another).
+{
+	const editor = read(shared('ui', 'layout_editor', 'editor_page.js'));
+	const offered = new Set(Array.from(editor.matchAll(/offer\('([a-z_]+)'/g), (m) => m[1]));
+	for (const m of editor.matchAll(/\['([a-z]+)', (?:LayoutSourceIO|klaExport|LAYOUT_FORMATS)/g))
+		offered.add(m[1]);
+	for (const variant of ['bundle', 'iso', 'ansi']) offered.add(`macos_${variant}`);
+	check(
+		JSON.stringify([...offered].sort()) === JSON.stringify(EDITOR_DOWNLOADS.slice().sort()),
+		`EDITOR_DOWNLOADS ${EDITOR_DOWNLOADS} is not what the editor offers: ${[...offered]}`
+	);
+	check(
+		/EDITOR_DOWNLOADS\.includes\(id\)/.test(editor),
+		'the editor refuses a download outside EDITOR_DOWNLOADS'
+	);
+}
 for (const id of Object.keys(E.defaultWeights())) keys.add(`layout_analysis.metric.${id}`);
 for (const id of Object.keys(DATA.model.keyboards)) keys.add(`layout_analysis.keyboard.${id}`);
 check(keys.size >= MIN_KEYS, `only ${keys.size} keys found`);
@@ -294,8 +337,10 @@ check(
 );
 const standalone = read(shared('ui', 'layout_editor', 'standalone.js'));
 check(
-	/takeEditorHandoff\(\)[\s\S]{0,80}layoutEditor\.openLayout\(/.test(standalone),
-	'the editor host opens the handed layout'
+	/takeEditorHandoff\(\);\s*const intent = window\.LAYOUT_ANALYSIS_FILES\.takeEditorIntent\(\);\s*if \(handed\) window\.layoutEditor\.openLayout\(handed, intent \|\| undefined\);/.test(
+		standalone
+	),
+	'the editor host opens the handed layout, with what « get it » asked'
 );
 check(
 	/\n\t\t\topenLayout,\n/.test(read(shared('ui', 'layout_editor', 'editor_page.js'))),
@@ -349,16 +394,16 @@ check(
 		);
 	const windowScript = read(path.join(windowDir, 'script.js'));
 	check(
-		/LAYOUT_OPTIMIZER_PAGE\.mount\(optimizer, \{\s*host: \{\s*openEditor: editOptimized,\s*openComparer: compareEdited,\s*openScoreSettings: showScoreSettings\s*\}/.test(
+		/LAYOUT_OPTIMIZER_PAGE\.mount\(optimizer, \{\s*host: \{\s*openEditor: editOptimized,\s*openComparer: compareEdited,\s*openScoreSettings: showScoreSettings,[\s\S]{0,200}?exportLayout: editOptimized,[\s\S]{0,200}?emulates: function \(\) \{\s*return _hostEmulates;\s*\}/.test(
 			windowScript
 		),
-		'layout_editor_window: the tab mounts the optimizer with the window as host'
+		'layout_editor_window: the tab mounts the optimizer with the window as host, « get it » included'
 	);
 	check(
-		/function editOptimized\(layout\) \{\s*showTab\('edit'\);\s*if \(_editor\) _editor\.openLayout\(layout\);/.test(
+		/function editOptimized\(layout, intent\) \{\s*showTab\('edit'\);[\s\S]{0,120}_editor\.openLayout\(layout, intent\);/.test(
 			windowScript
 		),
-		'layout_editor_window: the optimizer opens its layout in « Éditer »'
+		'layout_editor_window: the optimizer opens its layout in « Éditer », with its intent'
 	);
 	const windowsHost = read(
 		path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows', 'ui', 'layout_manager', 'init.ahk')
@@ -413,6 +458,39 @@ if (done) {
 	);
 	check(done.result.layout.rows.KeyZ[0] === 'z', 'the final layout keeps the QWERTY pins');
 	check(done.result.layout.name === 'AZERTY (optimized)', 'the result carries its name');
+}
+// The change penalty: the result's score is the engine's less weight ×
+// share, its change says what moved, and the hard limit holds.
+{
+	const penalised = [];
+	RUNNER.start(
+		Object.assign({}, request, {
+			options: { maxChanges: 4 },
+			startMode: 'layout',
+			changeWeight: 2
+		}),
+		(message) => penalised.push(message)
+	);
+	for (let i = 0; queue.length && i < 100000; i++) queue.shift()();
+	const end = penalised.find((message) => message.type === 'done');
+	check(Boolean(end), 'the penalised run finishes');
+	if (end) {
+		const result = end.result;
+		const full = E.analyse(result.layout, tables, request.analysis).score.total;
+		check(
+			Math.abs(result.engineScore - full) < 1e-9 &&
+				Math.abs(result.score - (full - 2 * result.change.share)) < 1e-9,
+			`penalised: score ${result.score}, engine ${result.engineScore}, share ${result.change.share}`
+		);
+		check(
+			result.change.count <= 4 && result.change.units.length === result.change.count,
+			`penalised: ${result.change.count} changes over the limit of 4`
+		);
+	}
+	check(
+		penalised.some((message) => message.type === 'progress' && message.layout && message.change),
+		'a new best carries what it changes'
+	);
 }
 const refused = [];
 RUNNER.start(
@@ -661,7 +739,7 @@ check(
 // The library is compared once the final layout is shown, off the page's
 // thread where a worker starts.
 check(
-	/showBest\(winner\.layout, winner\.score, true, true\);\s*finish\(running, began, null\);\s*scanLibrary\(winner\.layout, winner\.score\);/.test(
+	/showBest\(winner\.layout, winner\.engineScore, true, true, winner\.change\);\s*finish\(running, began, null\);\s*scanLibrary\(winner\.layout, winner\.engineScore\);/.test(
 		page
 	),
 	'the final layout is compared with the library'

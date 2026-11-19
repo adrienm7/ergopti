@@ -454,6 +454,16 @@ module.exports = [
 			)
 	},
 	{
+		prefix: 'layout_optimizer.change.preset.',
+		files: [OPTIMIZER],
+		source: 'the change penalty presets of score_weights.json (LAYOUT_ANALYSIS.changePenalty)',
+		keys: () =>
+			ctx.keysOf(
+				'layout_optimizer.change.preset.',
+				ctx.page(MODEL, 'Object.keys(LAYOUT_ANALYSIS.changePenalty().presets)')
+			)
+	},
+	{
 		prefix: 'layout_optimizer.library.gap_',
 		files: [OPTIMIZER],
 		source: 'the sides optimizer_page.js libraryCard gapChip chooses',

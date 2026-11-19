@@ -825,7 +825,14 @@ function showTab(tab) {
 				host: {
 					openEditor: editOptimized,
 					openComparer: compareEdited,
-					openScoreSettings: showScoreSettings
+					openScoreSettings: showScoreSettings,
+					// « Get it »: « Éditer » downloads, installs or emulates the
+					// optimized layout through this window's own host actions.
+					exportLayout: editOptimized,
+					// Read when the result is drawn: initData may come after the mount.
+					emulates: function () {
+						return _hostEmulates;
+					}
 				}
 			});
 		}
@@ -883,12 +890,16 @@ document.getElementById('studio-tab-edit').addEventListener('click', function ()
 	showTab('edit');
 });
 /**
- * Opens the optimizer's layout in « Éditer », in a new tab of the editor.
+ * Opens the optimizer's layout in « Éditer », in a new tab of the editor and,
+ * given an intent (the optimizer's « get it »), downloads, installs or
+ * emulates it from the editor's « Export » tool (LayoutEditorPage openLayout).
  * @param {Object} layout - Library shape.
+ * @param {Object} [intent] - {action: 'download'|'install'|'emulate', format?}.
  */
-function editOptimized(layout) {
+function editOptimized(layout, intent) {
 	showTab('edit');
-	if (_editor) _editor.openLayout(layout);
+	if (!_editor) throw new Error('layout_editor_window: the editor is not mounted');
+	_editor.openLayout(layout, intent);
 }
 
 document.getElementById('studio-tab-compare').addEventListener('click', function () {

@@ -267,8 +267,8 @@ that already pass it are refused (`change_limit_start`).
 
 **Defaults** (`score_weights.json` `change_penalty`, read by
 `LAYOUT_ANALYSIS.changePenalty()`, checked by the codegen): presets « few
-changes » 3, « balanced » 1 and « free » 0, the slider up to 5, « free »
-chosen first (decided by the agent on 2026-11-19, to review by the
+changes » 3, « balanced » 1 and « free » 0, the slider up to 5, a limit of
+6 when the reader switches it on, « free » chosen first (decided by the agent on 2026-11-19, to review by the
 maintainer, `TODO.md`). Measured on AZERTY, the first 60 000 characters of
 Nemolivier, 3 000 swaps, seed 1: weight 0 moves 92 % of the typed characters
 for +102 points, 1 moves 71 % for +95, 3 moves 8 % for +36.
@@ -305,6 +305,34 @@ first two (sticky), on a phone everything is one column:
    (`LAYOUT_ANALYSIS_FILES.handOffToEditor`, editor `openLayout`); « Compare
    with other layouts » hands it to « Comparer » the way the editor does.
    Under them, the library card ([Existing layouts](#existing-layouts)).
+
+**Changes from the start** (step 2, [Change penalty](#change-penalty)): the
+presets as radio buttons (their weight in their name), a slider of the weight
+whose value is said in words (an `<output>` and the slider's
+`aria-valuetext`), a value of the reader's own ticking no preset, and « at most
+N changed characters » with its count. While the run goes, the result's « What
+it changes » says the best layout's score gain, the characters it moves, their
+weighted share (a `<meter>`, its number in text) and, with a weight, the
+penalty it pays, and lists the moved characters most typed first, each with
+its share and a bar hidden from assistive technology. With a weight, the
+chart and the shelf follow the search's objective (the score less the
+penalty); the tiles and the metrics say the engine's score.
+
+**Use it on your computer.** Under the result, « Download » in a format of
+« Éditer » (`LAYOUT_ANALYSIS_FILES.EDITOR_DOWNLOADS`, the list its export tool
+offers from and refuses to leave, in its own words), « Install on the system »
+and « Emulate without installing ». None of them is the optimizer's own: each
+hands the layout to « Éditer » with an intent (`{action, format?}`), which
+opens it in a new tab on its « Export » tool and runs the same code as its own
+controls (`openLayout(layout, intent)`): the download of that format (said
+when the host cannot make it), or the install or emulation after the same
+confirmation, through the window's host actions (`composer_save`,
+`composer_emulate`). On the site the hand-off goes through the tab's storage
+(`handOffToEditor(layout, intent)`, `takeEditorIntent`) and only downloads:
+installing and emulating say they need the app. In the app (`exportLayout`
+and `emulates` of the host), installing is a layout DLL on Windows, a
+`.keylayout` on macOS and the XKB files on Linux; emulating is offered where
+the driver's layout emulation runs (`initData` `emulate`), and said otherwise.
 
 The page keeps the reader's choices (corpus, start, keyboard, switches, pins,
 QWERTY letters and what of them stays, zones, the open sub-tab, budget) and their last text in this browser's storage

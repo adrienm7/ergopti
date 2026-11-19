@@ -331,6 +331,29 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	// tab, and the message that asks the site's Studio to open « Éditer ».
 	const EDITOR_HANDOFF_KEY = 'ergopti.studio.editor_handoff.v1';
 	const OPEN_EDITOR_MESSAGE = 'ergopti-studio:open-editor';
+	// What « Éditer » does with that layout once open, when asked (the
+	// optimizer's « get it »): {action: 'download' | 'install' | 'emulate',
+	// format?}, run by its « Export » tool.
+	const EDITOR_INTENT_KEY = 'ergopti.studio.editor_intent.v1';
+	const EDITOR_INTENT_ACTIONS = Object.freeze(['download', 'install', 'emulate']);
+	// The downloads of « Éditer », in its « Format » drop-down's order: the one
+	// list its export tool offers from and the optimizer's « get it » names
+	// (each one's words are layout_editor.export.option.<id>).
+	const EDITOR_DOWNLOADS = Object.freeze([
+		'toml',
+		'macos_bundle',
+		'macos_iso',
+		'macos_ansi',
+		'xkb',
+		'klc',
+		'dll',
+		'kla',
+		'kalamine',
+		'dof',
+		'genkey',
+		'cmini',
+		'nav'
+	]);
 	// The editor's « Optimize this layout »: the id the editor publishes the shown
 	// tab under (publishEditorLayouts) waits for the optimizer of this tab, and
 	// the message asks the site's Studio to open « Optimiser ».
@@ -387,16 +410,52 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	}
 
 	/**
-	 * Hands a layout (library shape) to « Éditer » of this tab, which opens it in
-	 * a new tab of its own.
-	 * @throws {Error} studio_handoff_failed when the tab's storage refuses it.
+	 * Checks what « Éditer » is asked to do with a handed layout.
+	 * @param {{action: string, format?: string}} intent
+	 * @returns {{action: string, format?: string}} The intent.
+	 * @throws {Error} On an unknown action or download format.
 	 */
-	function handOffToEditor(layout) {
+	function checkedIntent(intent) {
+		if (!intent || !EDITOR_INTENT_ACTIONS.includes(intent.action))
+			throw new Error(`layout_analysis: no editor action ${intent && intent.action}`);
+		if (intent.action === 'download' && !EDITOR_DOWNLOADS.includes(intent.format))
+			throw new Error(`layout_analysis: no editor download ${intent.format}`);
+		return intent;
+	}
+
+	/**
+	 * Hands a layout (library shape) to « Éditer » of this tab, which opens it in
+	 * a new tab of its own and, given an intent, downloads, installs or
+	 * emulates it from its « Export » tool.
+	 * @param {object} layout - Library shape.
+	 * @param {{action: string, format?: string}} [intent] - See EDITOR_INTENT_ACTIONS.
+	 * @throws {Error} studio_handoff_failed when the tab's storage refuses it;
+	 *   an unknown intent.
+	 */
+	function handOffToEditor(layout, intent) {
+		const asked = intent === undefined ? null : checkedIntent(intent);
 		try {
 			window.sessionStorage.setItem(EDITOR_HANDOFF_KEY, JSON.stringify(layout));
+			if (asked) window.sessionStorage.setItem(EDITOR_INTENT_KEY, JSON.stringify(asked));
+			else window.sessionStorage.removeItem(EDITOR_INTENT_KEY);
 		} catch {
 			throw failure('studio_handoff_failed');
 		}
+	}
+
+	/**
+	 * Takes what « Éditer » is asked to do with the handed layout, once.
+	 * @returns {{action: string, format?: string}|null} The intent, or null.
+	 */
+	function takeEditorIntent() {
+		let text = null;
+		try {
+			text = window.sessionStorage.getItem(EDITOR_INTENT_KEY);
+			window.sessionStorage.removeItem(EDITOR_INTENT_KEY);
+		} catch {
+			return null;
+		}
+		return text === null ? null : checkedIntent(JSON.parse(text));
 	}
 
 	/**
@@ -494,6 +553,10 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 		handOffToOptimizer,
 		takeOptimizerHandoff,
 		takeEditorHandoff,
+		takeEditorIntent,
+		checkedIntent,
+		EDITOR_DOWNLOADS,
+		EDITOR_INTENT_ACTIONS,
 		readText,
 		FILE_EXTENSIONS,
 		builtinTables,

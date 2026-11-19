@@ -6280,7 +6280,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 * change_penalty): score points per % of the corpus's characters moved,
 	 * weighted as layoutSimilarity weighs them.
 	 * @returns {{presets: Object<string, number>, defaultPreset: string,
-	 *   maxWeight: number}} A copy; presets in the file's order.
+	 *   maxWeight: number, defaultLimit: number}} A copy; presets in the file's
+	 *   order; defaultLimit, the « at most N changed characters » a page starts on.
 	 * @throws {Error} When a weight is not in [0, maxWeight] or the default is no preset.
 	 */
 	function changePenalty() {
@@ -6295,10 +6296,15 @@ var LAYOUT_ANALYSIS = (function () {
 				throw new Error(`layout_analysis: change_penalty preset ${id} is not in [0, ${max}]`);
 		if (!Object.prototype.hasOwnProperty.call(raw.presets, raw.default_preset))
 			throw new Error(`layout_analysis: change_penalty default ${raw.default_preset} is no preset`);
+		if (!(Number.isInteger(raw.default_limit) && raw.default_limit >= 0))
+			throw new Error(
+				`layout_analysis: change_penalty default_limit ${raw.default_limit} is not an integer ≥ 0`
+			);
 		return {
 			presets: Object.assign({}, raw.presets),
 			defaultPreset: raw.default_preset,
-			maxWeight: max
+			maxWeight: max,
+			defaultLimit: raw.default_limit
 		};
 	}
 

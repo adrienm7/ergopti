@@ -26,6 +26,8 @@ const ctx = require('./context.cjs');
 
 const UI = 'static/ergopti_plus/_shared/ui/';
 const PAGE = UI + 'layout_editor/editor_page.js';
+// The Optimiser's « get it » names the editor's downloads in the editor's words.
+const OPTIMIZER = UI + 'layout_optimizer/optimizer_page.js';
 const LAYER_MODEL = UI + 'layer_editor/layer_model.js';
 // The model scripts of the editor page, in its index.html order: they define
 // their globals at load and touch no DOM.
@@ -170,8 +172,9 @@ module.exports = [
 	},
 	{
 		prefix: 'layout_editor.export.option.',
-		files: [PAGE],
-		source: 'the downloads offer() lists in editor_page.js, and MACOS_EXPORTS',
+		files: [PAGE, OPTIMIZER],
+		source:
+			'the downloads offer() lists in editor_page.js, and MACOS_EXPORTS (EDITOR_DOWNLOADS, which the Optimiser lists)',
 		keys: () => {
 			// offer('toml', …), and the rows of the loops that offer(target, …).
 			const from = 'const offer = (id, run)';

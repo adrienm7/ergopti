@@ -2677,6 +2677,83 @@ async function exerciseManager(browser, origin) {
 	);
 	assert.equal(await page.textContent('#le-message'), strings['layout_editor.status.emulated']);
 
+	// (optimizer-get-it) The Optimiser's « get it » hands its layout to « Éditer »
+	// (the window's editOptimized, its exportLayout host), whose export tool
+	// installs, emulates or downloads it through this window's own host
+	// actions, after the same confirmation as its buttons.
+	const optimized = await page.evaluate(() =>
+		Object.assign(
+			{},
+			window.LAYOUT_ANALYSIS.libraryLayouts().find((l) => l.id === 'azerty'),
+			{
+				id: 'azerty_optimized',
+				name: 'AZERTY (optimized)'
+			}
+		)
+	);
+	const postedAfter = (count, action) =>
+		page.waitForFunction(
+			([n, wanted]) => window.__posted.slice(n).some((p) => p.action === wanted),
+			[count, action]
+		);
+	const lastPosted = (action) =>
+		page.evaluate((wanted) => window.__posted.filter((p) => p.action === wanted).pop(), action);
+	let count = await page.evaluate(() => window.__posted.length);
+	await page.evaluate((layout) => window.editOptimized(layout, { action: 'install' }), optimized);
+	await page.waitForSelector('#le-tool-tab-export[aria-selected="true"]');
+	await page.click('#le-confirm-yes');
+	await postedAfter(count, 'composer_save');
+	const installed = await lastPosted('composer_save');
+	assert.equal(installed.use, true);
+	assert.match(installed.source, /id = "azerty_optimized"/, 'the optimized layout is installed');
+	assert.match(installed.keylayout, /<keyboard /);
+	await page.evaluate(() =>
+		window.composerResult({ action: 'composer_save', ok: true, used: true })
+	);
+	assert.equal(await page.textContent('#le-message'), strings['layout_editor.status.installed']);
+	count = await page.evaluate(() => window.__posted.length);
+	await page.evaluate((layout) => window.editOptimized(layout, { action: 'emulate' }), optimized);
+	await page.click('#le-confirm-yes');
+	await postedAfter(count, 'composer_emulate');
+	const emulated = await lastPosted('composer_emulate');
+	assert.match(emulated.source, /id = "azerty_optimized"/, 'the optimized layout is emulated');
+	assert.equal(emulated.use, undefined);
+	await page.evaluate(() =>
+		window.composerResult({ action: 'composer_emulate', ok: true, used: true })
+	);
+	assert.equal(await page.textContent('#le-message'), strings['layout_editor.status.emulated']);
+	// A text download goes through the host's save; a format this host cannot make says so.
+	count = await page.evaluate(() => window.__posted.length);
+	await page.evaluate(
+		(layout) => window.editOptimized(layout, { action: 'download', format: 'kalamine' }),
+		optimized
+	);
+	await postedAfter(count, 'source_save');
+	const kalamine = await lastPosted('source_save');
+	assert.equal(kalamine.filename, 'azerty_optimized.kalamine.toml');
+	assert.match(kalamine.text, /^full = '''$/m, 'a Kalamine TOML');
+	await page.evaluate(() =>
+		window.sourceResult({ ok: true, detail: '/d/x', filename: 'azerty_optimized.kalamine.toml' })
+	);
+	await page.evaluate(
+		(layout) => window.editOptimized(layout, { action: 'download', format: 'xkb' }),
+		optimized
+	);
+	await page.waitForFunction(
+		(text) => document.querySelector('#le-message').textContent === text,
+		strings['layout_editor.export.unavailable'].replace(
+			'{format}',
+			strings['layout_editor.export.option.xkb']
+		)
+	);
+	let refusedIntent = null;
+	try {
+		await page.evaluate((layout) => window.editOptimized(layout, { action: 'print' }), optimized);
+	} catch (error) {
+		refusedIntent = error.message;
+	}
+	assert.match(String(refusedIntent), /no editor action print/, 'an unknown intent is refused');
+
 	// « New » starts from a file, blank, or from a reference or a catalogue layout of the host.
 	await page.click('#le-new');
 	const starts = await page.$$eval('#le-start [data-start]', (buttons) =>
@@ -2705,6 +2782,58 @@ async function exerciseManager(browser, origin) {
  * one in one click, finds a level by its modifiers whatever the layer is called,
  * and lists the layout's other layers.
  */
+/**
+ * (optimizer-get-it) On the site, the Optimiser's « Download » hands its
+ * layout and the chosen format to « Éditer » through the tab's storage
+ * (LAYOUT_ANALYSIS_FILES.handOffToEditor): the editor opens it in a tab of its
+ * own, on its « Export » tool, and downloads that format at once.
+ */
+async function exerciseHandedDownload(browser, origin) {
+	const context = await browser.newContext({ acceptDownloads: true });
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(`${origin}/ui/layout_editor/index.html?lang=en`);
+	await page.waitForFunction(() => document.title && !document.title.startsWith('layout_editor.'));
+	await page.evaluate(() => {
+		const azerty = window.LAYOUT_ANALYSIS.libraryLayouts().find((l) => l.id === 'azerty');
+		window.LAYOUT_ANALYSIS_FILES.handOffToEditor(
+			Object.assign({}, azerty, { id: 'azerty_optimized', name: 'AZERTY (optimized)' }),
+			{ action: 'download', format: 'kalamine' }
+		);
+	});
+	const [download] = await Promise.all([page.waitForEvent('download'), page.reload()]);
+	assert.equal(download.suggestedFilename(), 'azerty_optimized.kalamine.toml');
+	assert.match(fs.readFileSync(await download.path(), 'utf8'), /^full = '''$/m);
+	await page.waitForSelector('#le-tool-tab-export[aria-selected="true"]');
+	assert.equal(
+		await page.evaluate(() => sessionStorage.getItem('ergopti.studio.editor_intent.v1')),
+		null,
+		'the intent is taken once'
+	);
+	// A plain « Open in the editor » carries no intent: nothing downloads.
+	let downloads = 0;
+	page.on('download', () => {
+		downloads += 1;
+	});
+	await page.evaluate(() => {
+		const azerty = window.LAYOUT_ANALYSIS.libraryLayouts().find((l) => l.id === 'azerty');
+		window.LAYOUT_ANALYSIS_FILES.handOffToEditor(
+			Object.assign({}, azerty, { id: 'azerty_plain', name: 'Plain hand-off' })
+		);
+	});
+	await page.reload();
+	await page.waitForFunction(() =>
+		[...document.querySelectorAll('.le-layout-tab')].some((tab) =>
+			tab.textContent.includes('Plain hand-off')
+		)
+	);
+	await page.waitForTimeout(500);
+	assert.equal(downloads, 0, 'an open without intent downloads nothing');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 async function exerciseLayerSelector(browser, origin) {
 	const { page, errors } = await open(browser, origin, 'en');
 	const levels = () =>
@@ -4076,6 +4205,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseCompareEdited(browser, origin);
 		await exerciseMyTypingRefresh(browser, origin);
 		await exerciseSiteOpensOnErgopti(browser, origin);
+		await exerciseHandedDownload(browser, origin);
 		await exerciseLayerSelector(browser, origin);
 		await exercisePhoneWidth(browser, origin);
 		await exerciseLongLabels(browser, origin);

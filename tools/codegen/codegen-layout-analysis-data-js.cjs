@@ -1132,7 +1132,7 @@ function checkSimilarScoreGap(model) {
 /**
  * Rejects a change penalty the optimizer could not offer: each preset a
  * finite weight ≥ 0 within the slider's largest weight, the free preset 0,
- * the default one of the presets (docs/design/layout-optimizer.md).
+ * the default one of the presets, the default limit an integer ≥ 0 (docs/design/layout-optimizer.md).
  * @param {object} penalty - score_weights.json change_penalty.
  * @throws {Error} On a broken penalty.
  */
@@ -1149,6 +1149,10 @@ function checkChangePenalty(penalty) {
 				`change_penalty.presets.${id}: ${JSON.stringify(weight)} is not in [0, ${max}]`
 			);
 	if (presets.free !== 0) throw new Error('change_penalty.presets.free: must be 0');
+	if (!Number.isInteger(penalty.default_limit) || penalty.default_limit < 0)
+		throw new Error(
+			`change_penalty.default_limit: ${JSON.stringify(penalty.default_limit)} is not an integer ≥ 0`
+		);
 	if (!Object.prototype.hasOwnProperty.call(presets, chosen))
 		throw new Error(`change_penalty.default_preset: ${JSON.stringify(chosen)} is no preset`);
 }

@@ -4199,58 +4199,90 @@ var LayoutEditorPage = (function () {
 				: problemText({ code });
 		}
 
-		/** Installs the source through the ErgoptiPlus composer host and switches to it. */
+		/** The export report's row of this host's driver, which says whether it can take the source. */
+		const driverRow = (report) =>
+			report.find((entry) => entry.target === `driver_${host.platform}`);
+
+		/**
+		 * Installs the source through the ErgoptiPlus composer host and switches
+		 * to it, once the user agrees; a driver that cannot take it says why.
+		 */
+		function install(report) {
+			const row = driverRow(report);
+			if (!row || row.status === 'unavailable') {
+				notify(
+					'error',
+					row && row.reason ? reasonText(row.reason) : tl('export.driver_unavailable')
+				);
+				return;
+			}
+			ask(tl('install_confirm'), () => {
+				let payload;
+				try {
+					payload = LayoutSourceIO.installPayload(doc(), host.platform);
+				} catch (error) {
+					notify('error', problemText(error));
+					return;
+				}
+				fromHost(() => host.install(payload)).then(
+					(result) =>
+						notify(
+							'ok',
+							tl(result && result.pending ? 'status.installed_pending' : 'status.installed')
+						),
+					(error) => notify('error', problemText(error))
+				);
+			});
+		}
+
+		/**
+		 * « Emulate without installing »: the driver's emulation types the source
+		 * over the system layout, once the user agrees.
+		 */
+		function emulate(report) {
+			const row = driverRow(report);
+			if (!row || row.status === 'unavailable') {
+				notify(
+					'error',
+					row && row.reason ? reasonText(row.reason) : tl('export.driver_unavailable')
+				);
+				return;
+			}
+			ask(tl('emulate_confirm'), () => {
+				let payload;
+				try {
+					payload = LayoutSourceIO.installPayload(doc(), host.platform);
+				} catch (error) {
+					notify('error', problemText(error));
+					return;
+				}
+				fromHost(() => host.emulate(payload)).then(
+					() => notify('ok', tl('status.emulated')),
+					(error) => notify('error', problemText(error))
+				);
+			});
+		}
+
 		function installButton(report) {
-			const row = report.find((entry) => entry.target === `driver_${host.platform}`);
+			const row = driverRow(report);
 			return el('button', {
 				type: 'button',
 				id: 'le-install',
 				class: 'primary',
 				text: tl('btn.install'),
 				disabled: !row || row.status === 'unavailable',
-				onclick: () =>
-					ask(tl('install_confirm'), () => {
-						let payload;
-						try {
-							payload = LayoutSourceIO.installPayload(doc(), host.platform);
-						} catch (error) {
-							notify('error', problemText(error));
-							return;
-						}
-						fromHost(() => host.install(payload)).then(
-							(result) =>
-								notify(
-									'ok',
-									tl(result && result.pending ? 'status.installed_pending' : 'status.installed')
-								),
-							(error) => notify('error', problemText(error))
-						);
-					})
+				onclick: () => install(report)
 			});
 		}
 
-		/** « Emulate without installing »: the driver's emulation types the source over the system layout. */
 		function emulateButton(report) {
-			const row = report.find((entry) => entry.target === `driver_${host.platform}`);
+			const row = driverRow(report);
 			return el('button', {
 				type: 'button',
 				id: 'le-emulate',
 				text: tl('btn.emulate'),
 				disabled: !row || row.status === 'unavailable',
-				onclick: () =>
-					ask(tl('emulate_confirm'), () => {
-						let payload;
-						try {
-							payload = LayoutSourceIO.installPayload(doc(), host.platform);
-						} catch (error) {
-							notify('error', problemText(error));
-							return;
-						}
-						fromHost(() => host.emulate(payload)).then(
-							() => notify('ok', tl('status.emulated')),
-							(error) => notify('error', problemText(error))
-						);
-					})
+				onclick: () => emulate(report)
 			});
 		}
 
@@ -4276,7 +4308,11 @@ var LayoutEditorPage = (function () {
 			});
 		}
 
+		// The export tool's actions as last drawn: openLayout's intent runs them.
+		let exportActions = null;
+
 		function exportPanel() {
+			exportActions = null;
 			let report = [];
 			try {
 				report = LayoutSourceIO.capabilities(doc());
@@ -4311,7 +4347,12 @@ var LayoutEditorPage = (function () {
 			// « Download » button (maintainer decision, 2026-11-15); each entry is
 			// offered only when this host can produce it, and says why when it fails.
 			const downloads = [];
-			const offer = (id, run) => downloads.push({ id, run });
+			const offer = (id, run) => {
+				// One list of downloads for the Studio (the optimizer's « get it » names them too).
+				if (!window.LAYOUT_ANALYSIS_FILES.EDITOR_DOWNLOADS.includes(id))
+					throw new Error(`layout_editor: the download ${id} is not in EDITOR_DOWNLOADS`);
+				downloads.push({ id, run });
+			};
 			const saveBytes = (file, mime) =>
 				fromHost(() => host.saveBinary(file.filename, file.bytes, mime)).then(
 					() => notify('ok', tl('status.saved', { name: file.filename })),
@@ -4423,6 +4464,19 @@ var LayoutEditorPage = (function () {
 				});
 			// The viewer's last choice when this layout offers it, else the first download.
 			const chosen = downloads.find((entry) => entry.id === state.exportFormat) || downloads[0];
+			// What another Studio tool may ask of this layout (openLayout's intent).
+			exportActions = {
+				download(id) {
+					const entry = downloads.find((candidate) => candidate.id === id);
+					if (!entry) {
+						notify('error', tl('export.unavailable', { format: tl(`export.option.${id}`) }));
+						return;
+					}
+					entry.run();
+				},
+				install: host.install ? () => install(report) : null,
+				emulate: host.emulate ? () => emulate(report) : null
+			};
 			const actions = [];
 			// The two ways ErgoptiPlus uses a layout, each said in one line.
 			if (host.install) actions.push(installButton(report));
@@ -5072,11 +5126,18 @@ var LayoutEditorPage = (function () {
 		/**
 		 * Opens a layout another Studio tool made (library shape: the optimizer's
 		 * result) in a new tab, once the first document is in place, so the
-		 * restored tabs are kept beside it.
+		 * restored tabs are kept beside it. With an intent, the « Export » tool
+		 * opens and does what was asked, as its own controls do: a download of
+		 * that format (said when this host cannot make it), or an install or an
+		 * emulation, each after the user agrees (said when this host has none).
 		 * @param {object} layout - {id, name, rows, dead, command}.
+		 * @param {{action: 'download'|'install'|'emulate', format?: string}} [intent]
 		 * @returns {Promise<void>}
+		 * @throws {Error} On an unknown intent (LAYOUT_ANALYSIS_FILES.checkedIntent).
 		 */
-		function openLayout(layout) {
+		function openLayout(layout, intent) {
+			const asked =
+				intent === undefined ? null : window.LAYOUT_ANALYSIS_FILES.checkedIntent(intent);
 			return initialSettled.then(() => {
 				let started;
 				try {
@@ -5095,7 +5156,22 @@ var LayoutEditorPage = (function () {
 				state.tabs.push(newTab(started.doc, true));
 				showTab(state.tabs.length - 1);
 				state.message = null;
+				if (asked) {
+					state.tool = 'export';
+					if (asked.action === 'download') state.exportFormat = asked.format;
+				}
 				render();
+				if (!asked) return;
+				const tab = root.querySelector('#le-tool-tab-export');
+				if (tab) tab.scrollIntoView({ block: 'nearest' });
+				if (!exportActions) return;
+				if (asked.action === 'download') exportActions.download(asked.format);
+				else if (exportActions[asked.action]) exportActions[asked.action]();
+				else
+					notify(
+						'error',
+						tl(asked.action === 'install' ? 'export.no_install' : 'export.no_emulate')
+					);
 			});
 		}
 

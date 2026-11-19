@@ -584,8 +584,8 @@ Each question names the default kept meanwhile; an answer moves into the item or
       the corpus's characters moved, each weighted by its occurrences as `layoutSimilarity` weighs them (100 − its
       weighted same-key share), and a hard « at most N changed characters » (a letter and its capital count once).
       Kept meanwhile (`score_weights.json` `change_penalty`): presets « few changes » 3, « balanced » 1, « free » 0,
-      the slider up to 5, and « free » chosen first, so a run moves what pays as before until the reader asks
-      otherwise. Measured on AZERTY, the first 60 000 characters of Nemolivier, 3 000 swaps: weight 0 moves 92 % of
+      the slider up to 5, « at most 6 changed characters » when the limit is switched on, and « free » chosen
+      first, so a run moves what pays as before until the reader asks otherwise. Measured on AZERTY, the first 60 000 characters of Nemolivier, 3 000 swaps: weight 0 moves 92 % of
       the typed characters for +102 points, 1 moves 71 % for +95, 3 moves 8 % for +36. Choose the presets, whether
       « balanced » should be the first one, and whether the hard limit should count a letter and its capital as two
       (docs/design/layout-optimizer.md, « Change penalty »).

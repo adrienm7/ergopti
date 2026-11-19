@@ -2664,6 +2664,8 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	check(
 		penalty.maxWeight === rawPenalty.max_weight &&
 			penalty.defaultPreset === rawPenalty.default_preset &&
+			penalty.defaultLimit === rawPenalty.default_limit &&
+			Number.isInteger(penalty.defaultLimit) &&
 			JSON.stringify(penalty.presets) === JSON.stringify(rawPenalty.presets) &&
 			penalty.presets.free === 0 &&
 			penalty.presets.few > penalty.presets.balanced &&

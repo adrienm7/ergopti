@@ -487,6 +487,124 @@ async function exerciseResultsShelf(browser, origin) {
 	await context.close();
 }
 
+/**
+ * (change-penalty) « Changes from the start layout »: the presets set the
+ * slider, its value is said in words, and « at most N changed characters »
+ * holds the run: the result's trade-off says the gain, the characters moved
+ * (never more than N), their weighted share and the penalty paid, and lists
+ * them most typed first, each bar with its number. The choices survive a
+ * reload. On the site, « get it » only downloads (install and emulate say
+ * why not), through « Éditer »'s hand-off with the chosen format.
+ */
+async function exerciseChangePenalty(browser, origin) {
+	const { page, errors, context } = await open(browser, origin);
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
+	const preset = () =>
+		page.$eval('input[name="lo-change-preset"]:checked', (input) => input.value).catch(() => null);
+	assert.equal(await preset(), 'free', 'the free preset is the first one');
+	assert.equal(await page.inputValue('#lo-change-weight'), '0');
+	assert.equal(
+		await page.textContent('#lo-change-weight-value'),
+		'0.0 points per % of the typed characters moved'
+	);
+	assert.equal(await page.isDisabled('#lo-change-max'), true, 'the limit waits for its switch');
+	await page.check('input[name="lo-change-preset"][value="few"]');
+	assert.equal(await page.inputValue('#lo-change-weight'), '3', 'a preset sets the slider');
+	assert.equal(
+		await page.getAttribute('#lo-change-weight', 'aria-valuetext'),
+		'3.0 points per % of the typed characters moved'
+	);
+	// A value of its own ticks no preset.
+	await page.$eval('#lo-change-weight', (input) => {
+		input.value = '2.5';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+	});
+	assert.equal(await preset(), null, 'no preset for a value of its own');
+	await page.check('input[name="lo-change-preset"][value="few"]');
+	await page.check('#lo-change-limit');
+	await page.fill('#lo-change-max', '2');
+	await page.evaluate(() => {
+		document.querySelector('.lo-advanced').open = true;
+	});
+	await page.fill('#lo-seconds', '4');
+	await page.fill('#lo-iterations', '300');
+	await page.fill('#lo-restarts', '1');
+	assert.match(await runToEnd(page), /^Done/);
+	const tradeoff = await page.evaluate(() => ({
+		terms: Array.from(document.querySelectorAll('#lo-tradeoff-facts dt'), (n) => n.textContent),
+		values: Array.from(document.querySelectorAll('#lo-tradeoff-facts dd'), (n) => n.textContent),
+		items: Array.from(document.querySelectorAll('#lo-tradeoff-list li'), (n) => n.textContent),
+		bars: Array.from(document.querySelectorAll('#lo-tradeoff-list meter'), (n) =>
+			n.getAttribute('aria-hidden')
+		),
+		meter: document.getElementById('lo-tradeoff-meter').value
+	}));
+	assert.deepEqual(tradeoff.terms, [
+		'Score gain',
+		'Characters moved',
+		'Typed characters changed (weighted)',
+		'Change penalty'
+	]);
+	const moved = Number(tradeoff.values[1]);
+	assert.ok(moved <= 2, `at most 2 characters moved, yet ${moved}`);
+	assert.match(tradeoff.values[2], /^\d+\.\d%$/, tradeoff.values[2]);
+	// The meter holds the share; its text rounds it to one decimal.
+	assert.ok(
+		Math.abs(tradeoff.meter - Number(tradeoff.values[2].replace('%', ''))) <= 0.05,
+		`the meter ${tradeoff.meter} is the share ${tradeoff.values[2]}`
+	);
+	if (moved === 0) assert.deepEqual(tradeoff.items, [strings['layout_optimizer.tradeoff.none']]);
+	else {
+		assert.equal(tradeoff.items.length, moved, `one line per moved character: ${tradeoff.items}`);
+		assert.ok(
+			tradeoff.items.every((text) => /\d\.\d%/.test(text)),
+			`each with its share: ${tradeoff.items}`
+		);
+		assert.ok(
+			tradeoff.bars.every((hidden) => hidden === 'true'),
+			'the bars repeat their text'
+		);
+	}
+	// The site downloads only; installing and emulating say why not.
+	assert.equal(await page.isDisabled('#lo-get-install'), true);
+	assert.equal(await page.isDisabled('#lo-get-emulate'), true);
+	assert.equal(
+		await page.textContent('#lo-get-install-note'),
+		strings['layout_optimizer.get.app_only']
+	);
+	assert.equal(
+		await page.textContent('#lo-get-emulate-note'),
+		strings['layout_optimizer.get.app_only']
+	);
+	await page.evaluate(() => {
+		window.LAYOUT_ANALYSIS_FILES.handOffToEditor = (layout, intent) => {
+			window.__handed = { id: layout.id, rows: Boolean(layout.rows.KeyQ), intent };
+			throw Object.assign(new Error('kept'), { code: 'studio_handoff_failed' });
+		};
+	});
+	await page.selectOption('#lo-get-format', 'klc');
+	await page.click('#lo-get-download');
+	assert.deepEqual(await page.evaluate(() => window.__handed), {
+		id: 'azerty_optimized',
+		rows: true,
+		intent: { action: 'download', format: 'klc' }
+	});
+	// The choices come back on the next visit.
+	await page.reload();
+	await page.waitForFunction(() => {
+		const title = document.querySelector('.layout-optimizer h1');
+		return title && !title.textContent.startsWith('layout_optimizer.');
+	});
+	assert.equal(await preset(), 'few');
+	assert.equal(await page.isChecked('#lo-change-limit'), true);
+	assert.equal(await page.inputValue('#lo-change-max'), '2');
+	assert.equal(await page.inputValue('#lo-get-format'), 'klc');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 async function main() {
 	const server = await serve();
 	const origin = `http://127.0.0.1:${server.address().port}`;
@@ -739,10 +857,13 @@ async function main() {
 				const ngrams = Object.assign(window.LAYOUT_ANALYSIS.ngramsFromText(text), { total: 1 });
 				document.dispatchEvent(new CustomEvent('studio-ngrams', { detail: ngrams }));
 				window.__opened = [];
+				window.__emulates = false;
 				window.LAYOUT_OPTIMIZER_PAGE.mount(document.getElementById('studio-optimizer'), {
 					host: {
 						openEditor: (layout) => window.__opened.push(['edit', layout.id]),
-						openComparer: (layout) => window.__opened.push(['compare', layout.id])
+						openComparer: (layout) => window.__opened.push(['compare', layout.id]),
+						exportLayout: (layout, intent) => window.__opened.push(['get', layout.id, intent]),
+						emulates: () => window.__emulates
 					}
 				});
 			}, TEXT.repeat(4));
@@ -764,6 +885,56 @@ async function main() {
 					['compare', 'azerty_optimized']
 				],
 				'the result opens in the window’s own tabs'
+			);
+			// (optimizer-get-it) « Get it » hands the result to the window's
+			// « Éditer » with what to do: a download of the chosen format, an
+			// install, an emulation where the driver emulates (said when not).
+			assert.equal(await page.isEnabled('#lo-get-install'), true, 'the app installs');
+			assert.equal(await page.isEnabled('#lo-get-emulate'), false, 'no emulation on this host');
+			assert.equal(
+				await page.textContent('#lo-get-emulate-note'),
+				strings['layout_optimizer.get.no_emulation']
+			);
+			assert.equal(
+				await page.textContent('#lo-get-install-note'),
+				strings['layout_optimizer.get.install_note']
+			);
+			const formats = await page.$$eval('#lo-get-format option', (options) =>
+				options.map((option) => [option.value, option.textContent])
+			);
+			assert.deepEqual(
+				formats.map(([id]) => id),
+				await page.evaluate(() =>
+					window.LAYOUT_ANALYSIS_FILES.EDITOR_DOWNLOADS.filter((id) => id !== 'nav')
+				),
+				'the editor’s downloads, in its order'
+			);
+			assert.ok(
+				formats.every(([id, text]) => text === strings[`layout_editor.export.option.${id}`]),
+				`each format in the editor’s words: ${JSON.stringify(formats)}`
+			);
+			await page.selectOption('#lo-get-format', 'kalamine');
+			await page.click('#lo-get-download');
+			await page.click('#lo-get-install');
+			// The driver's emulation, once the window says it has one (read when drawn).
+			await page.evaluate(() => {
+				window.__emulates = true;
+				document.dispatchEvent(new CustomEvent('i18n:applied'));
+			});
+			assert.equal(await page.isEnabled('#lo-get-emulate'), true, 'the app emulates');
+			assert.equal(
+				await page.textContent('#lo-get-emulate-note'),
+				strings['layout_optimizer.get.emulate_note']
+			);
+			await page.click('#lo-get-emulate');
+			assert.deepEqual(
+				(await page.evaluate(() => window.__opened)).slice(2),
+				[
+					['get', 'azerty_optimized', { action: 'download', format: 'kalamine' }],
+					['get', 'azerty_optimized', { action: 'install' }],
+					['get', 'azerty_optimized', { action: 'emulate' }]
+				],
+				'each action hands the layout and its intent to the host'
 			);
 			assert.deepEqual(errors, []);
 			await context.close();
@@ -977,6 +1148,7 @@ async function main() {
 
 		// ======= 4g/ The results shelf =======
 		await exerciseResultsShelf(browser, origin);
+		await exerciseChangePenalty(browser, origin);
 
 		// ======= 4h/ The result boards as a table =======
 		await exerciseResultTable(browser, origin);

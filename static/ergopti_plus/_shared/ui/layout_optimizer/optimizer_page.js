@@ -54,6 +54,14 @@
  * 15. A results shelf: the SHELF_SIZE best distinct layouts the search
  *    reported, each with its score, the keys it moves and its buttons to
  *    open it in « Éditer » or « Comparer ».
+ * 16. Changes cost: the change penalty's presets and slider and « at most N
+ *    changed characters » (score_weights.json change_penalty), and the
+ *    result's trade-off: the gain, the characters moved, their weighted
+ *    share and the moved characters, most typed first.
+ * 17. Use it: « Download », « Install » and « Emulate » hand the result to
+ *    « Éditer », which runs them from its export tool (the app's host
+ *    exportLayout, the site's hand-off, which only downloads); a host that
+ *    cannot do one says why.
  * 13. Progress in sight: a live chart draws the best score over the
  *    run's time above the start's score, with the evaluations per second, the
  *    same said in words and as a table (the drawing is hidden from assistive
@@ -156,6 +164,11 @@
 	const STANDALONE_ROOT_ID = 'layout-optimizer';
 	// The stages of a run, each with its own failure message (error.stage.<id>).
 	const RUN_STAGES = ['start', 'corpus', 'analysis', 'search', 'result'];
+	// The largest « at most N changed characters » the page takes: more units
+	// than any library layout's typing area holds.
+	const CHANGE_LIMIT_MAX = 200;
+	// What the result's « get it » buttons ask « Éditer » to do with the layout.
+	const GET_ACTIONS = ['download', 'install', 'emulate'];
 
 	// The site passes ?lang=<code>; i18n.js loads that locale, then English and French.
 	const lang = new URLSearchParams(location.search).get('lang');
@@ -197,6 +210,27 @@
 	<h2 id="lo-move-title" data-i18n="layout_optimizer.constraints.title"></h2>
 	<p class="lo-muted" data-i18n="layout_optimizer.constraints.fixed"></p>
 	<div id="lo-switches" class="lo-switches"></div>
+	<fieldset id="lo-change" class="lo-change">
+		<legend data-i18n="layout_optimizer.change.title"></legend>
+		<p class="lo-muted" data-i18n="layout_optimizer.change.help"></p>
+		<fieldset id="lo-change-presets" class="lo-radios lo-change-presets">
+			<legend data-i18n="layout_optimizer.change.presets"></legend>
+		</fieldset>
+		<p class="lo-change-row">
+			<label for="lo-change-weight" data-i18n="layout_optimizer.change.weight"></label>
+			<input id="lo-change-weight" type="range" min="0" step="0.1" aria-describedby="lo-change-weight-help" />
+			<output id="lo-change-weight-value" for="lo-change-weight"></output>
+		</p>
+		<p id="lo-change-weight-help" class="lo-muted lo-note" data-i18n="layout_optimizer.change.weight_help"></p>
+		<p class="lo-change-row">
+			<input id="lo-change-limit" type="checkbox" />
+			<label for="lo-change-limit" data-i18n="layout_optimizer.change.limit"></label>
+			<input id="lo-change-max" type="number" min="0" max="200" step="1"
+				aria-labelledby="lo-change-limit lo-change-max-unit" />
+			<label id="lo-change-max-unit" for="lo-change-max" data-i18n="layout_optimizer.change.limit_unit"></label>
+		</p>
+		<p class="lo-muted lo-note" data-i18n="layout_optimizer.change.limit_help"></p>
+	</fieldset>
 	<h3 id="lo-place-title" data-i18n="layout_optimizer.place.title"></h3>
 	<div class="lo-tabs" role="tablist" aria-labelledby="lo-place-title">
 		<button type="button" role="tab" id="lo-tab-pins" aria-controls="lo-panel-pins" data-i18n="layout_optimizer.pins.title"></button>
@@ -300,6 +334,13 @@
 		</figure>
 	</div>
 	<p id="lo-changed" class="lo-muted"></p>
+	<section id="lo-tradeoff" class="lo-tradeoff" aria-labelledby="lo-tradeoff-title" aria-live="polite">
+		<h3 id="lo-tradeoff-title" data-i18n="layout_optimizer.tradeoff.title"></h3>
+		<dl id="lo-tradeoff-facts" class="lo-tradeoff-facts"></dl>
+		<meter id="lo-tradeoff-meter" class="lo-tradeoff-meter" min="0" max="100" value="0" aria-hidden="true"></meter>
+		<h4 id="lo-tradeoff-moved-title" data-i18n="layout_optimizer.tradeoff.moved_title"></h4>
+		<ol id="lo-tradeoff-list" class="lo-tradeoff-list" aria-labelledby="lo-tradeoff-moved-title"></ol>
+	</section>
 	<details id="lo-board-table" class="lo-chart-details lo-board-table">
 		<summary id="lo-board-table-title" data-i18n="layout_optimizer.result.table"></summary>
 		<div class="lo-table-box lo-board-table-box" tabindex="0" role="region"
@@ -338,6 +379,21 @@
 		<button type="button" id="lo-open-editor" class="lo-primary" data-i18n="layout_optimizer.result.open_editor" disabled></button>
 		<button type="button" id="lo-open-comparer" data-i18n="layout_optimizer.result.open_comparer" disabled></button>
 	</div>
+	<section id="lo-get" class="lo-get" aria-labelledby="lo-get-title">
+		<h3 id="lo-get-title" data-i18n="layout_optimizer.get.title"></h3>
+		<p class="lo-muted" data-i18n="layout_optimizer.get.help"></p>
+		<p class="lo-buttons">
+			<label for="lo-get-format" data-i18n="layout_editor.export.format"></label>
+			<select id="lo-get-format"></select>
+			<button type="button" id="lo-get-download" class="lo-primary" data-i18n="layout_editor.export.download" disabled></button>
+		</p>
+		<p class="lo-buttons">
+			<button type="button" id="lo-get-install" data-i18n="layout_editor.btn.install" aria-describedby="lo-get-install-note" disabled></button>
+			<button type="button" id="lo-get-emulate" data-i18n="layout_editor.btn.emulate" aria-describedby="lo-get-emulate-note" disabled></button>
+		</p>
+		<p id="lo-get-install-note" class="lo-muted lo-note"></p>
+		<p id="lo-get-emulate-note" class="lo-muted lo-note"></p>
+	</section>
 	<section id="lo-shelf" class="lo-shelf" aria-labelledby="lo-shelf-title" hidden>
 		<h3 id="lo-shelf-title" data-i18n="layout_optimizer.shelf.title"></h3>
 		<p class="lo-muted" data-i18n="layout_optimizer.shelf.help"></p>
@@ -547,11 +603,14 @@
 	 * Fills an element with the optimizer.
 	 * @param {HTMLElement} root - The element the page fills.
 	 * @param {{reportHeight?: boolean, host?: {openEditor?: function(object): void,
-	 *   openComparer?: function(object): void, openScoreSettings?: function(): void}}}
+	 *   openComparer?: function(object): void, openScoreSettings?: function(): void,
+	 *   exportLayout?: function(object, object): void, emulates?: function(): boolean}}}
 	 *   [options] - reportHeight: post the page height to a framing parent (the
 	 *   site); host: the app's Studio window, which opens the result, and the
 	 *   score settings, in its own « Éditer » and « Comparer » tabs instead of
-	 *   the site's.
+	 *   the site's; exportLayout(layout, {action, format?}) has its « Éditer »
+	 *   download, install or emulate the result, and emulates() says whether
+	 *   its driver emulates a layout (read when the result is drawn).
 	 * @returns {{setCorpus: function(object): void, setStart: function(string): void}}
 	 *   The mounted page.
 	 * @throws {Error} On a missing root or a second mount.
@@ -562,6 +621,8 @@
 		if (mounted) throw new Error('layout_optimizer: the page is already mounted');
 		const opts = options || {};
 		const HOST = opts.host || {};
+		// The change penalty's presets, slider range and default limit (score_weights.json).
+		const CHANGE = E.changePenalty();
 		root.classList.add('layout-optimizer');
 		// A constant of this script, no user data: safe as markup.
 		root.innerHTML = MARKUP;
@@ -637,6 +698,10 @@
 			startResult: null,
 			best: null,
 			bestLayout: null,
+			// The run's last layout, once it has ended: what « get it » hands on.
+			finalLayout: null,
+			// The change weight the run uses (score points per % moved).
+			weightInUse: 0,
 			lastMetrics: 0,
 			// The run's progress chart: {start, points: [{seconds, best, evaluations}]}.
 			chart: null,
@@ -955,6 +1020,60 @@
 			drawPinBoards();
 		}
 
+		/**
+		 * The change penalty's presets as radio buttons (score_weights.json
+		 * change_penalty, in its order); the slider's own value is kept.
+		 */
+		function fillChangePresets() {
+			const box = $('lo-change-presets');
+			const legend = box.querySelector('legend');
+			box.replaceChildren(
+				legend,
+				...Object.keys(CHANGE.presets).map((id) => {
+					const input = el('input');
+					input.type = 'radio';
+					input.name = 'lo-change-preset';
+					input.value = id;
+					input.addEventListener('change', () => {
+						if (!input.checked) return;
+						$('lo-change-weight').value = String(CHANGE.presets[id]);
+						syncChange();
+					});
+					const label = el('label');
+					label.append(
+						input,
+						document.createTextNode(
+							t(`${PREFIX}change.preset.${id}`, { weight: number(CHANGE.presets[id], 1) })
+						)
+					);
+					return label;
+				})
+			);
+			syncChange();
+		}
+
+		/** The change weight the slider holds: score points per % of the characters moved. */
+		function changeWeight() {
+			const value = Number($('lo-change-weight').value);
+			if (!(Number.isFinite(value) && value >= 0 && value <= CHANGE.maxWeight))
+				throw new Error(`layout_optimizer: change weight ${value} out of range`);
+			return value;
+		}
+
+		/**
+		 * The slider's value in words, the preset it matches ticked (none for a
+		 * value of its own), and the limit's count usable only when it is on.
+		 */
+		function syncChange() {
+			const weight = changeWeight();
+			const text = t(`${PREFIX}change.weight_value`, { weight: number(weight, 1) });
+			$('lo-change-weight-value').value = text;
+			$('lo-change-weight').setAttribute('aria-valuetext', text);
+			for (const input of root.querySelectorAll('input[name="lo-change-preset"]'))
+				input.checked = CHANGE.presets[input.value] === weight;
+			$('lo-change-max').disabled = !$('lo-change-limit').checked;
+		}
+
 		/** The score settings the next run uses, summed up beside « Optimize ». */
 		function drawSettings() {
 			const keyboard = $('lo-keyboard').value;
@@ -1166,6 +1285,10 @@
 				)
 			};
 			for (const id of SWITCHES) out[id] = $(`lo-switch-${id}`).checked;
+			// « At most N changed characters », a hard limit of the search.
+			out.maxChanges = $('lo-change-limit').checked
+				? readInteger('lo-change-max', 0, CHANGE_LIMIT_MAX, CHANGE.defaultLimit)
+				: null;
 			const thumb = $(`lo-switch-${THUMB_SWITCH}`);
 			out.thumbKeys = thumb.checked && !thumb.disabled ? $('lo-keyboard').value : null;
 			return out;
@@ -1283,6 +1406,7 @@
 			const restarts = readInteger('lo-restarts', 1, 64, defaultRestarts());
 			const seed = readInteger('lo-seed', 0, 4294967295, DEFAULT_SEED);
 			const share = ACCURACIES[$('lo-accuracy').value];
+			const weight = changeWeight();
 			// Refused constraints are said before anything starts.
 			try {
 				O.problem(E, start, opts);
@@ -1319,7 +1443,14 @@
 			$('lo-result').hidden = false;
 			$('lo-open-editor').disabled = true;
 			$('lo-open-comparer').disabled = true;
-			showBest(start, state.startResult.score.total, false);
+			state.weightInUse = weight;
+			state.finalLayout = null;
+			drawGet();
+			showBest(start, state.startResult.score.total, false, false, {
+				share: 0,
+				count: 0,
+				units: []
+			});
 			resetChart();
 			state.shelf = [];
 			drawShelf();
@@ -1354,7 +1485,8 @@
 					iterations,
 					startMode: root.querySelector('input[name="lo-start-mode"]:checked').value,
 					timeBudgetMs: seconds * 1000,
-					identity
+					identity,
+					changeWeight: weight
 				});
 			});
 		}
@@ -1417,7 +1549,8 @@
 				part.progress = message.progress;
 				if (message.layout && (!state.best || message.progress.best > state.best.searchScore)) {
 					state.best = { searchScore: message.progress.best };
-					showBest(message.layout, message.progress.best, true);
+					// The tiles say the engine's score; the search ranks by its objective.
+					showBest(message.layout, message.progress.bestEngine, true, false, message.change);
 				}
 				showProgress(running, began, iterations);
 				chartProgress(running, began, false);
@@ -1429,9 +1562,9 @@
 			if (running.finished === running.shares.length) {
 				chartProgress(running, began, true);
 				const winner = O.bestOf(running.shares.map((entry) => entry.result));
-				showBest(winner.layout, winner.score, true, true);
+				showBest(winner.layout, winner.engineScore, true, true, winner.change);
 				finish(running, began, null);
-				scanLibrary(winner.layout, winner.score);
+				scanLibrary(winner.layout, winner.engineScore);
 			}
 		}
 
@@ -1590,12 +1723,14 @@
 		}
 
 		/**
-		 * Shows a layout as the best so far: its board, its score and, at most
+		 * Shows a layout as the best so far: its board, its score, what it moves
+		 * from the start (moved: the runner's change, drawTradeoff) and, at most
 		 * every METRICS_MS (always for the final one), its metrics against the start.
 		 */
-		function showBest(layout, score, better, final) {
+		function showBest(layout, score, better, final, moved) {
 			state.bestLayout = layout;
 			drawResultBoards();
+			drawTradeoff(score, moved);
 			const startScore = state.startResult.score.total;
 			const change = score - startScore;
 			const tile = (key, value, className) => {
@@ -1619,7 +1754,75 @@
 			if (final) {
 				$('lo-open-editor').disabled = false;
 				$('lo-open-comparer').disabled = false;
+				state.finalLayout = layout;
+				drawGet();
 			}
+		}
+
+		/** A unit's cells in words: « e E », a dead key by its accent. */
+		function unitText(cells) {
+			const shown = cells
+				.filter((cell) => cell !== null)
+				.map((cell) =>
+					typeof cell === 'object'
+						? t('layout_editor.board.dead_key', {
+								name:
+									KEY_LEGEND.deadKeyText(
+										((state.startInUse.dead || {})[cell.dead] || {})[' '] || ''
+									) || '★'
+							})
+						: cell
+				);
+			return Array.from(new Set(shown)).join(' ');
+		}
+
+		/**
+		 * The trade-off of the best layout so far: its score gain over the
+		 * start, the characters it moves and their weighted share of the corpus
+		 * (what the change penalty reads), the penalty it pays, and the moved
+		 * characters most weighed first, each with a bar of its share; every
+		 * bar repeats its number in text.
+		 * @param {number} score - The engine's score of the best layout.
+		 * @param {{share: number, count: number, units: object[]}} change - The
+		 *   runner's change (LAYOUT_OPTIMIZER.changeCost changed()).
+		 */
+		function drawTradeoff(score, change) {
+			if (!change) return;
+			const gain = score - state.startResult.score.total;
+			const percent = (value) => t(`${PREFIX}library.percent`, { value: number(value, 1) });
+			const points = (value) => withUnit(signed(value, 2), t('layout_analysis.unit.points'));
+			const fact = (term, value) => [el('dt', '', term), el('dd', '', value)];
+			const facts = [
+				...fact(t(`${PREFIX}tradeoff.gain`), points(gain)),
+				...fact(t(`${PREFIX}tradeoff.moved`), number(change.count, 0)),
+				...fact(t(`${PREFIX}tradeoff.share`), percent(change.share))
+			];
+			// The penalty paid, only when the run made changes cost.
+			if (state.weightInUse > 0)
+				facts.push(
+					...fact(t(`${PREFIX}tradeoff.penalty`), points(-state.weightInUse * change.share))
+				);
+			$('lo-tradeoff-facts').replaceChildren(...facts);
+			$('lo-tradeoff-meter').value = Math.max(0, Math.min(100, change.share));
+			const top = Math.max(...change.units.map((unit) => unit.share), 0);
+			$('lo-tradeoff-list').replaceChildren(
+				...(change.units.length
+					? change.units.map((unit) => {
+							const item = el('li', 'lo-tradeoff-item');
+							const bar = el('meter', 'lo-tradeoff-bar');
+							bar.min = 0;
+							bar.max = top > 0 ? top : 1;
+							bar.value = unit.share;
+							bar.setAttribute('aria-hidden', 'true');
+							item.append(
+								el('strong', 'lo-tradeoff-chars', unitText(unit.cells)),
+								document.createTextNode(` ${percent(unit.share)} `),
+								bar
+							);
+							return item;
+						})
+					: [el('li', 'lo-muted', t(`${PREFIX}tradeoff.none`))])
+			);
 		}
 
 		/**
@@ -2058,6 +2261,91 @@
 			if (state.bestLayout) openInEditor(state.bestLayout);
 		}
 
+		// ============================
+		// ======= 6b/ Get it =========
+		// ============================
+
+		/**
+		 * The download formats of « Éditer » (LAYOUT_ANALYSIS_FILES
+		 * EDITOR_DOWNLOADS, its own drop-down's ids and words), the navigation
+		 * layer aside: an optimized layout has none.
+		 */
+		function fillFormats() {
+			const select = $('lo-get-format');
+			const kept = select.value;
+			select.replaceChildren(
+				...FILES.EDITOR_DOWNLOADS.filter((id) => id !== 'nav').map((id) => {
+					const option = el('option', '', t(`layout_editor.export.option.${id}`));
+					option.value = id;
+					return option;
+				})
+			);
+			if (kept) select.value = kept;
+		}
+
+		/**
+		 * Which of « Download », « Install » and « Emulate » this host offers,
+		 * and why not when it does not: the site downloads only; the app
+		 * installs, and emulates where its driver's layout emulation runs.
+		 * @returns {{download: boolean, install: boolean, emulate: boolean,
+		 *   installNote: string, emulateNote: string}}
+		 */
+		function getOffers() {
+			const app = typeof HOST.exportLayout === 'function';
+			const emulates = app && typeof HOST.emulates === 'function' && HOST.emulates() === true;
+			return {
+				download: true,
+				install: app,
+				emulate: emulates,
+				installNote: app ? t(`${PREFIX}get.install_note`) : t(`${PREFIX}get.app_only`),
+				emulateNote: !app
+					? t(`${PREFIX}get.app_only`)
+					: emulates
+						? t(`${PREFIX}get.emulate_note`)
+						: t(`${PREFIX}get.no_emulation`)
+			};
+		}
+
+		/** The « get it » buttons: usable once a run has ended, each refusal said under them. */
+		function drawGet() {
+			const offers = getOffers();
+			const ready = Boolean(state.finalLayout);
+			$('lo-get-download').disabled = !ready;
+			$('lo-get-install').disabled = !ready || !offers.install;
+			$('lo-get-emulate').disabled = !ready || !offers.emulate;
+			$('lo-get-install-note').textContent = offers.installNote;
+			$('lo-get-emulate-note').textContent = offers.emulateNote;
+		}
+
+		/**
+		 * Downloads, installs or emulates the optimized layout through « Éditer »,
+		 * the one owner of the exports and of the drivers' install and emulation
+		 * (its « Export » tool, which asks before it installs or emulates): the
+		 * app's own tab (host exportLayout), or the site's page by the tab's
+		 * hand-off, which only downloads.
+		 * @param {string} action - One of GET_ACTIONS.
+		 */
+		function getLayout(action) {
+			if (!GET_ACTIONS.includes(action))
+				throw new Error(`layout_optimizer: unknown action ${action}`);
+			const layout = state.finalLayout;
+			if (!layout) return;
+			const intent =
+				action === 'download' ? { action, format: $('lo-get-format').value } : { action };
+			if (typeof HOST.exportLayout === 'function') {
+				HOST.exportLayout(layout, intent);
+				return;
+			}
+			if (action !== 'download') throw new Error(`layout_optimizer: the site cannot ${action}`);
+			try {
+				FILES.handOffToEditor(layout, intent);
+			} catch (error) {
+				setStatus(errorText(error.code, error.message), true);
+				return;
+			}
+			openTab(FILES.OPEN_EDITOR_MESSAGE, '../layout_editor/index.html');
+		}
+
 		function openComparer() {
 			if (state.bestLayout) openInComparer(state.bestLayout);
 		}
@@ -2119,7 +2407,11 @@
 				iterations: $('lo-iterations').value,
 				restarts: $('lo-restarts').value,
 				seed: $('lo-seed').value,
-				accuracy: $('lo-accuracy').value
+				accuracy: $('lo-accuracy').value,
+				changeWeight: $('lo-change-weight').value,
+				changeLimit: $('lo-change-limit').checked,
+				changeMax: $('lo-change-max').value,
+				exportFormat: $('lo-get-format').value
 			});
 		}
 
@@ -2160,6 +2452,14 @@
 				if (typeof saved[id] === 'string' && /^\d+$/.test(saved[id]))
 					$(`lo-${id}`).value = saved[id];
 			choose('lo-accuracy', saved.accuracy);
+			const weight = Number(saved.changeWeight);
+			if (typeof saved.changeWeight === 'string' && weight >= 0 && weight <= CHANGE.maxWeight)
+				$('lo-change-weight').value = saved.changeWeight;
+			if (typeof saved.changeLimit === 'boolean') $('lo-change-limit').checked = saved.changeLimit;
+			if (typeof saved.changeMax === 'string' && /^\d+$/.test(saved.changeMax))
+				$('lo-change-max').value = saved.changeMax;
+			syncChange();
+			choose('lo-get-format', saved.exportFormat);
 			const text = readStored(TEXT_KEY);
 			if (text && typeof text.text === 'string') {
 				$('lo-text').value = text.text;
@@ -2225,6 +2525,11 @@
 				drawPinBoards();
 			});
 			$('lo-switches').addEventListener('change', syncSwitches);
+			$('lo-change-weight').addEventListener('input', syncChange);
+			$('lo-change-limit').addEventListener('change', syncChange);
+			$('lo-get-download').addEventListener('click', () => getLayout('download'));
+			$('lo-get-install').addEventListener('click', () => getLayout('install'));
+			$('lo-get-emulate').addEventListener('click', () => getLayout('emulate'));
 			$('lo-run').addEventListener('click', run);
 			$('lo-retry').addEventListener('click', run);
 			$('lo-stop').addEventListener('click', stop);
@@ -2252,13 +2557,21 @@
 			fillKeyboards();
 			fillSwitches();
 			fillPresets();
+			fillChangePresets();
+			fillFormats();
 			drawSettings();
+			drawGet();
 			if (state.chart) drawChart();
 			drawShelf();
 		}
 
 		// Saving waits until the saved choices are back, or the defaults would replace them.
 		let restored = false;
+		// The change controls' defaults, before the strings that describe them.
+		$('lo-change-weight').max = String(CHANGE.maxWeight);
+		$('lo-change-weight').value = String(CHANGE.presets[CHANGE.defaultPreset]);
+		$('lo-change-max').max = String(CHANGE_LIMIT_MAX);
+		$('lo-change-max').value = String(CHANGE.defaultLimit);
 		refreshStrings();
 		$('lo-seconds').value = String(DEFAULT_SECONDS);
 		$('lo-iterations').value = String(DEFAULT_ITERATIONS);
