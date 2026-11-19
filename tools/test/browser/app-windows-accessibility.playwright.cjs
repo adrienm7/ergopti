@@ -18,6 +18,8 @@
  *    showing a focus indicator of its own;
  * 3. read as an outline (heading-landmarks.cjs): one h1, no skipped heading
  *    level, one main landmark, every other landmark named.
+ * 4. searched for an unresolved locale key in any visible text or accessible
+ *    name (lib/raw-locale-keys.cjs), which fails the run outright.
  * Every axe rule's node count and every window's walk problems are counted
  * and compared with the committed baseline beside this file: a new row or a
  * higher count fails, so the violations can only go down. The maintainer
@@ -38,6 +40,7 @@ const http = require('node:http');
 const path = require('node:path');
 const { collectOutline, outlineProblems } = require('../lib/heading-landmarks.cjs');
 const { walkProblems } = require('../lib/keyboard-walk.cjs');
+const { catalogueShape, pageRawKeys } = require('../lib/raw-locale-keys.cjs');
 const { WINDOWS } = require('./app-windows-fixtures.cjs');
 
 // --root=dir serves another copy of static/ (an older commit's, to prove a fix
@@ -51,6 +54,8 @@ const MANIFEST = JSON.parse(
 	fs.readFileSync(path.join(STATIC_ROOT, 'ergopti_plus', '_shared', 'ui', 'apps.manifest.json'))
 );
 const BASELINE_PATH = path.join(__dirname, 'app-windows-accessibility-baseline.json');
+// What a raw locale key looks like on screen (the catalogue's keys and namespaces).
+const RAW_KEY_SHAPE = catalogueShape();
 const COLOR_SCHEMES = Object.freeze(['light', 'dark']);
 const BRIDGES = Object.freeze(['windows', 'webkit']);
 const WCAG_TAGS = Object.freeze([
@@ -378,8 +383,15 @@ async function auditWindows(chromium, windows, family, port) {
 						if (state.enter) await state.enter(page);
 						for (const violation of await scanPage(page, axeSource))
 							findings.push({ window: target.id, scheme, state: state.name, ...violation });
-						// The walk does not depend on the colours: once per state.
+						// The walk and the texts do not depend on the colours: once per state.
 						if (scheme === 'light') {
+							// An unresolved locale key read as a name is no name at all: a
+							// window that shows one fails outright, outside the ratchet.
+							assert.deepEqual(
+								await page.evaluate(pageRawKeys, RAW_KEY_SHAPE),
+								[],
+								`${target.id} (${state.name}) shows raw locale keys`
+							);
 							const { problems, stops } = await walkWindow(page);
 							if (problems.length)
 								findings.push({

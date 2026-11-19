@@ -32,6 +32,7 @@ const studioNumbers = require('./studio-numbers.cjs');
 // The ranking's compact headers and their popovers (studio-header-popovers).
 const studioHeaders = require('./studio-headers.cjs');
 const studioManage = require('./layout-studio-manage.cjs');
+const { catalogueShape, pageRawKeys } = require('../lib/raw-locale-keys.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const KEYLAYOUT = path.join(ROOT, 'static', 'layouts', 'registry', 'ergopti', 'ergopti.keylayout');
@@ -40,6 +41,8 @@ const SOURCE_FIXTURE = shared('tests', 'corpus', 'layouts', 'source', 'source.to
 const LOCALES = JSON.parse(
 	fs.readFileSync(shared('core', 'i18n', 'data', 'locale_order.json'), 'utf8')
 ).order;
+// What a raw locale key looks like on screen (the catalogue's keys and namespaces).
+const RAW_KEY_SHAPE = catalogueShape();
 const TYPES = {
 	'.html': 'text/html',
 	'.js': 'text/javascript',
@@ -146,18 +149,12 @@ function exportFormats(page) {
 	return page.$$eval('#le-export-format option', (options) => options.map((o) => o.value));
 }
 
-/** The raw locale keys the page shows (texts, placeholders and titles). */
+/**
+ * The raw locale keys the page shows: any visible text or accessible name
+ * shaped like a catalogue key, of any family (lib/raw-locale-keys.cjs).
+ */
 function rawKeys(page) {
-	return page.evaluate(() => {
-		const texts = [document.title];
-		for (const node of document.querySelectorAll('body *')) {
-			if (node.children.length === 0) texts.push(node.textContent);
-			if (node.placeholder) texts.push(node.placeholder);
-			if (node.title) texts.push(node.title);
-			if (node.getAttribute('aria-label')) texts.push(node.getAttribute('aria-label'));
-		}
-		return texts.filter((text) => /layout_editor\.|sg_actions\.|layer_editor\./.test(text));
-	});
+	return page.evaluate(pageRawKeys, RAW_KEY_SHAPE);
 }
 
 async function downloaded(page, click) {
@@ -901,6 +898,98 @@ async function exerciseStudioNav(browser, origin) {
 	assert.equal(await unheld.page.$('.le-tab[data-layer="nav"]'), null, 'nothing is imported');
 	assert.deepEqual(unheld.errors, []);
 	await unheld.page.close();
+}
+
+/**
+ * The strings the Windows host sends the Studio window, read from the host's
+ * own source: LayoutEditorWindow_Strings sends the keys of the window's
+ * strings.json with initData, and LayoutManager_EditorStrings the editor's
+ * strings with sourceData (any prefix filter its body applies is applied here
+ * too, so this fixture sends what the driver sends).
+ * @param {string} locale - The active locale.
+ * @returns {{window: Object<string, string>, editor: Object<string, string>}}
+ */
+function windowsStudioStrings(locale) {
+	const read = (name) =>
+		JSON.parse(fs.readFileSync(shared('core', 'i18n', 'data', 'locales', `${name}.json`), 'utf8'));
+	const catalogue = { ...read('en'), ...read(locale) };
+	const source = fs.readFileSync(
+		path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'ui', 'layout_manager', 'init.ahk'),
+		'utf8'
+	);
+	const start = source.indexOf('LayoutManager_EditorStrings() {');
+	const body = source.slice(start, source.indexOf('\n}\n', start));
+	assert.ok(
+		start !== -1 && body.includes('for Cache in [_I18nCache, _I18nCacheEn]'),
+		'host strings'
+	);
+	const prefixes = Array.from(body.matchAll(/SubStr\(Key, 1, \d+\) == "([^"]+)"/g), (m) => m[1]);
+	const editor = Object.fromEntries(
+		Object.entries(catalogue).filter(
+			([key]) => prefixes.length === 0 || prefixes.some((prefix) => key.startsWith(prefix))
+		)
+	);
+	const declared = JSON.parse(
+		fs.readFileSync(shared('ui', 'layout_editor_window', 'strings.json'), 'utf8')
+	).keys;
+	return { window: Object.fromEntries(declared.map((key) => [key, catalogue[key]])), editor };
+}
+
+/**
+ * (studio-windows-strings) The Studio window over the Windows bridge, which
+ * seeds no window._i18n_strings: its strings are only what the host sends
+ * with initData and sourceData. Every key name on the « Edit » board (Shift,
+ * Ctrl, Alt, Enter...) and every text of its inspector and tools is
+ * translated; the board read layer_editor.key.shift when the host sent the
+ * layout_editor.*, layout_analysis.* and layout_optimizer.* keys only.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseWindowsStudioStrings(browser, origin) {
+	const strings = windowsStudioStrings('fr');
+	const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.addInitScript(
+		({ strings, text }) => {
+			window.chrome = {
+				webview: {
+					postMessage: (raw) => {
+						const message = JSON.parse(raw);
+						if (message.action === 'ready')
+							setTimeout(() => {
+								window.initData({ strings: strings.window, state: { platform: 'windows' } });
+								window.sourceData({
+									filename: 'source.toml',
+									text,
+									folder: 'layout_sources/',
+									strings: strings.editor
+								});
+							}, 0);
+					},
+					addEventListener() {},
+					removeEventListener() {}
+				}
+			};
+		},
+		{ strings, text: fs.readFileSync(SOURCE_FIXTURE, 'utf8') }
+	);
+	await page.goto(`${origin}/ui/layout_editor_window/index.html`);
+	await page.waitForSelector('#layout-editor #le-board [data-code="ShiftLeft"]');
+	const shift = (await page.textContent('#le-board [data-code="ShiftLeft"]')).trim();
+	assert.ok(!shift.includes('layer_editor.'), `the Shift key reads ${shift}`);
+	await page.click('#le-board [data-code="ShiftLeft"]');
+	for (const summary of await page.$$('#le-inspector details > summary')) await summary.click();
+	const raw = await rawKeys(page);
+	for (const id of await page.$$eval('#le-tools [data-tool]', (tabs) =>
+		tabs.map((tab) => tab.dataset.tool)
+	)) {
+		await tool(page, id);
+		raw.push(...(await rawKeys(page)));
+	}
+	assert.deepEqual([...new Set(raw)], [], 'the Windows Studio shows raw locale keys');
+	assert.deepEqual(errors, []);
+	await page.close();
 }
 
 /**
@@ -3966,6 +4055,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseOpensOnErgopti(browser, origin);
 		await exerciseStudioNav(browser, origin);
 		await exerciseStudioLayout(browser, origin);
+		await exerciseWindowsStudioStrings(browser, origin);
 		await exerciseCompareEdited(browser, origin);
 		await exerciseMyTypingRefresh(browser, origin);
 		await exerciseSiteOpensOnErgopti(browser, origin);
