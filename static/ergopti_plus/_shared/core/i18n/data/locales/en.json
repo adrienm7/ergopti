@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "The variants of one family (Colemak, Tarmak, Ergopti…) show as one row, its best ranked; « +n » shows the others. A pinned layout always stays at the top.",
 	"layout_analysis.table.pin": "Pin {name} to the top",
 	"layout_analysis.table.unpin": "Unpin {name}",
+	"layout_analysis.table.edit": "Edit a copy of {name}",
 	"layout_analysis.table.expand": "Show the {count} other layouts of the family of {name}",
 	"layout_analysis.table.collapse": "Hide the {count} other layouts of the family of {name}",
 	"layout_analysis.table.csv": "Download the table (CSV)",

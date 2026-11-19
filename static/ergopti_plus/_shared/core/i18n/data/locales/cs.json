@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "Varianty jedné rodiny (Colemak, Tarmak, Ergopti…) zabírají jeden řádek, nejlépe umístěný; „+n“ ukáže ostatní. Připnuté rozložení zůstává vždy nahoře.",
 	"layout_analysis.table.pin": "Připnout {name} nahoru",
 	"layout_analysis.table.unpin": "Odepnout {name}",
+	"layout_analysis.table.edit": "Upravit kopii {name}",
 	"layout_analysis.table.expand": "Zobrazit {count} dalších rozložení z rodiny {name}",
 	"layout_analysis.table.collapse": "Skrýt {count} dalších rozložení z rodiny {name}",
 	"layout_analysis.table.csv": "Stáhnout tabulku (CSV)",

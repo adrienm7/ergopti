@@ -1569,6 +1569,45 @@
 		}
 
 		/**
+		 * « Edit » on a ranking row: the layout opens in « Éditer » as a copy
+		 * (« AZERTY (copy) »), in a new
+		 * tab of its own: the app's editor through the host, the site's through
+		 * this tab's storage and the Studio's message, a page alone by going to
+		 * the editor's page.
+		 * @param {object} result - The row's result.
+		 */
+		function editCopy(result) {
+			const source = layoutOf(result.layout.id);
+			if (!source) throw new Error(`layout_analysis: no compared layout ${result.layout.id}`);
+			const layout = Object.assign({}, source, {
+				id: `${source.id}_copy`,
+				name: t('layout_analysis.mine.copy_name', { name: source.name }),
+				origin: 'user'
+			});
+			if (typeof HOST.openEditor === 'function') {
+				HOST.openEditor(layout);
+				return;
+			}
+			try {
+				window.LAYOUT_ANALYSIS_FILES.handOffToEditor(layout);
+			} catch (error) {
+				if (!error || error.code !== 'studio_handoff_failed') throw error;
+				showStatus(t('layout_analysis.error.studio_handoff_failed'));
+				return;
+			}
+			if (window.parent !== window)
+				window.parent.postMessage(
+					{ type: window.LAYOUT_ANALYSIS_FILES.OPEN_EDITOR_MESSAGE },
+					location.origin
+				);
+			else
+				location.href = new URL(
+					`../layout_editor/index.html${location.search}`,
+					location.href
+				).href;
+		}
+
+		/**
 		 * Marks the results as being computed: the status says so at once and
 		 * assistive technology waits for the new ranking before reading it.
 		 */
@@ -2391,6 +2430,24 @@
 					});
 					pin.addEventListener('keydown', (event) => event.stopPropagation());
 					out.push(pin);
+					// A layout open in « Éditer » is edited there already.
+					if (!id.startsWith('editor_')) {
+						const edit = el('button', 'la-row-button la-edit');
+						edit.type = 'button';
+						edit.dataset.edit = id;
+						edit.setAttribute(
+							'aria-label',
+							t('layout_analysis.table.edit', { name: result.layout.name })
+						);
+						edit.title = edit.getAttribute('aria-label');
+						edit.append(rowIcon('M4 20h4L19 9l-4-4L4 16zM14 6l4 4'));
+						edit.addEventListener('click', (event) => {
+							event.stopPropagation();
+							editCopy(result);
+						});
+						edit.addEventListener('keydown', (event) => event.stopPropagation());
+						out.push(edit);
+					}
 					const family = familyOf(result);
 					const others = (members.get(family) || 0) - 1;
 					if (state.table.fold && best.get(family) === result && others > 0) {

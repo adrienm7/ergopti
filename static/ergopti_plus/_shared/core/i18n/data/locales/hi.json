@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "एक परिवार के संस्करण (Colemak, Tarmak, Ergopti…) एक ही पंक्ति में दिखते हैं, जो सबसे ऊपर रैंक वाला है; “+n” बाकी दिखाता है। पिन किया गया लेआउट हमेशा सबसे ऊपर रहता है।",
 	"layout_analysis.table.pin": "{name} को सबसे ऊपर पिन करें",
 	"layout_analysis.table.unpin": "{name} का पिन हटाएँ",
+	"layout_analysis.table.edit": "{name} की एक प्रति संपादित करें",
 	"layout_analysis.table.expand": "{name} के परिवार के अन्य {count} लेआउट दिखाएँ",
 	"layout_analysis.table.collapse": "{name} के परिवार के अन्य {count} लेआउट छिपाएँ",
 	"layout_analysis.table.csv": "तालिका डाउनलोड करें (CSV)",

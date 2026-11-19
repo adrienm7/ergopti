@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "הגרסאות של משפחה אחת (Colemak, ‏Tarmak, ‏Ergopti…) מוצגות בשורה אחת, המדורגת הטובה ביותר; „‎+n” מציג את האחרות. פריסה מוצמדת נשארת תמיד למעלה.",
 	"layout_analysis.table.pin": "הצמדת {name} למעלה",
 	"layout_analysis.table.unpin": "ביטול ההצמדה של {name}",
+	"layout_analysis.table.edit": "עריכת עותק של {name}",
 	"layout_analysis.table.expand": "הצגת {count} הפריסות האחרות במשפחה של {name}",
 	"layout_analysis.table.collapse": "הסתרת {count} הפריסות האחרות במשפחה של {name}",
 	"layout_analysis.table.csv": "הורדת הטבלה (CSV)",

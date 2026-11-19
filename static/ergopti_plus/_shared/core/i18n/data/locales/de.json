@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "Die Varianten einer Familie (Colemak, Tarmak, Ergopti…) erscheinen als eine Zeile, die bestplatzierte; „+n“ zeigt die anderen. Ein angeheftetes Layout bleibt immer oben.",
 	"layout_analysis.table.pin": "{name} oben anheften",
 	"layout_analysis.table.unpin": "{name} lösen",
+	"layout_analysis.table.edit": "Eine Kopie von {name} bearbeiten",
 	"layout_analysis.table.expand": "Die {count} anderen Layouts der Familie von {name} zeigen",
 	"layout_analysis.table.collapse": "Die {count} anderen Layouts der Familie von {name} ausblenden",
 	"layout_analysis.table.csv": "Tabelle herunterladen (CSV)",

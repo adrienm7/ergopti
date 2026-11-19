@@ -632,6 +632,10 @@ window.LAYOUT_ANALYSIS_HOST = Object.assign(window.LAYOUT_ANALYSIS_HOST || {}, {
 	saveBinary: function (filename, bytes) {
 		if (!_hostExports) return Promise.reject({ code: 'host_save_failed', path: filename });
 		return hostSaveBinary(filename, bytes);
+	},
+	// « Edit » on a ranking row: a copy of the layout in a new tab of « Éditer ».
+	openEditor: function (layout) {
+		editOptimized(layout);
 	}
 });
 

@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "Varianterne af én familie (Colemak, Tarmak, Ergopti…) vises som én række, den bedst placerede; “+n” viser de andre. Et fastgjort layout bliver altid øverst.",
 	"layout_analysis.table.pin": "Fastgør {name} øverst",
 	"layout_analysis.table.unpin": "Frigør {name}",
+	"layout_analysis.table.edit": "Rediger en kopi af {name}",
 	"layout_analysis.table.expand": "Vis de {count} andre layout i familien {name}",
 	"layout_analysis.table.collapse": "Skjul de {count} andre layout i familien {name}",
 	"layout_analysis.table.csv": "Hent tabellen (CSV)",

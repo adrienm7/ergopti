@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "Las variantes de una familia (Colemak, Tarmak, Ergopti…) aparecen en una sola fila, la mejor clasificada; «+n» muestra las demás. Una distribución fijada siempre queda arriba.",
 	"layout_analysis.table.pin": "Fijar {name} arriba",
 	"layout_analysis.table.unpin": "Dejar de fijar {name}",
+	"layout_analysis.table.edit": "Editar una copia de {name}",
 	"layout_analysis.table.expand": "Mostrar las otras {count} distribuciones de la familia de {name}",
 	"layout_analysis.table.collapse": "Ocultar las otras {count} distribuciones de la familia de {name}",
 	"layout_analysis.table.csv": "Descargar la tabla (CSV)",

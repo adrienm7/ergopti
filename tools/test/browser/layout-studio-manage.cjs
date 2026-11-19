@@ -749,7 +749,93 @@ async function exerciseTabRenameDuplicate(browser, origin) {
 	await context.close();
 }
 
+/**
+ * (comparer-edit-copy) « Edit » on a ranking row opens a copy of that layout,
+ * named « AZERTY (copy) », in a new tab of « Éditer »: on the site the framed
+ * Comparer leaves it in the tab's storage and asks the Studio for the
+ * editor, which opens it; in the app the host's openEditor shows it at once.
+ * A layout open in the editor has no such button.
+ */
+async function exerciseComparerEditCopy(browser, origin) {
+	const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.route(`${origin}/studio-frame.html`, (route) =>
+		route.fulfill({
+			contentType: 'text/html',
+			body:
+				'<!doctype html><script>window.posted = [];' +
+				"addEventListener('message', (e) => window.posted.push(e.data && e.data.type));" +
+				'</script><iframe id="comparer" src="/ui/layout_analysis/index.html?lang=en&corpus=fr_nemolivier&layouts=ergopti,azerty" style="width:1260px;height:850px"></iframe>'
+		})
+	);
+	await page.goto(`${origin}/studio-frame.html`);
+	const frame = page.frameLocator('#comparer');
+	const edit = frame.locator('#la-table button.la-edit[data-edit="azerty"]');
+	await edit.waitFor({ timeout: 120000 });
+	assert.equal(await edit.getAttribute('aria-label'), 'Edit a copy of AZERTY (FR)');
+	await edit.click();
+	await page.waitForFunction(() => window.posted.includes('ergopti-studio:open-editor'));
+	const handed = await page.evaluate(() =>
+		JSON.parse(window.sessionStorage.getItem('ergopti.studio.editor_handoff.v1'))
+	);
+	const name = EN['layout_analysis.mine.copy_name'].replace('{name}', 'AZERTY (FR)');
+	assert.equal(handed.name, name);
+	assert.equal(handed.origin, 'user');
+	// The Studio opens « Éditer » in the same tab: the copy has a tab of its own.
+	await page.goto(`${origin}/ui/layout_editor/index.html?lang=en`);
+	await page.waitForFunction(
+		(wanted) =>
+			[...document.querySelectorAll('.le-layout-tab')].some((tab) =>
+				tab.textContent.startsWith(wanted)
+			),
+		name,
+		{ timeout: 60000 }
+	);
+	assert.equal(
+		await page.textContent('#le-board [data-code="KeyQ"] .le-legend'),
+		'a',
+		'the copy types AZERTY'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+
+	// The app: the host's openEditor shows « Éditer » with the copy.
+	const app = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+	const appErrors = [];
+	app.on('pageerror', (error) => appErrors.push(error.message));
+	await app.addInitScript((strings) => {
+		window._i18n_strings = strings;
+		window.webkit = { messageHandlers: { layout_editor_window_bridge: { postMessage() {} } } };
+	}, EN);
+	await app.goto(`${origin}/ui/layout_editor_window/index.html`);
+	await app.evaluate(() => window.initData({ strings: {}, state: { platform: 'linux' } }));
+	// A saved source: the editor opens it, with no start copy to wait for.
+	await app.evaluate(
+		(text) => window.sourceData({ filename: 'source.toml', text, folder: 'layout_sources/' }),
+		fs.readFileSync(shared('tests', 'corpus', 'layouts', 'source', 'source.toml'), 'utf8')
+	);
+	await app.waitForSelector('#le-board [data-code="KeyQ"]');
+	await app.click('#studio-tab-compare');
+	await app.evaluate(
+		(layout) => window.LAYOUT_ANALYSIS_HOST.openEditor(layout),
+		Object.assign({}, handed)
+	);
+	assert.equal(await app.getAttribute('#studio-tab-edit', 'aria-selected'), 'true');
+	await app.waitForFunction(
+		(wanted) =>
+			[...document.querySelectorAll('.le-layout-tab')].some((tab) =>
+				tab.textContent.startsWith(wanted)
+			),
+		name
+	);
+	assert.deepEqual(appErrors, []);
+	await app.close();
+}
+
 module.exports = {
+	exerciseComparerEditCopy,
 	exerciseTabRenameDuplicate,
 	exerciseRankingCsv,
 	exerciseRankingViews,

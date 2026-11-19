@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "De varianten van één familie (Colemak, Tarmak, Ergopti…) staan op één rij, de best gerangschikte; “+n” toont de andere. Een vastgezette indeling blijft altijd bovenaan.",
 	"layout_analysis.table.pin": "{name} bovenaan vastzetten",
 	"layout_analysis.table.unpin": "{name} losmaken",
+	"layout_analysis.table.edit": "Een kopie van {name} bewerken",
 	"layout_analysis.table.expand": "De {count} andere indelingen van de familie van {name} tonen",
 	"layout_analysis.table.collapse": "De {count} andere indelingen van de familie van {name} verbergen",
 	"layout_analysis.table.csv": "Tabel downloaden (CSV)",

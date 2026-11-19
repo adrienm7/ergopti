@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "As variantes de uma família (Colemak, Tarmak, Ergopti…) aparecem numa só linha, a melhor classificada; «+n» mostra as outras. Um layout fixado fica sempre no topo.",
 	"layout_analysis.table.pin": "Fixar {name} no topo",
 	"layout_analysis.table.unpin": "Desafixar {name}",
+	"layout_analysis.table.edit": "Editar uma cópia de {name}",
 	"layout_analysis.table.expand": "Mostrar os outros {count} layouts da família de {name}",
 	"layout_analysis.table.collapse": "Ocultar os outros {count} layouts da família de {name}",
 	"layout_analysis.table.csv": "Descarregar a tabela (CSV)",

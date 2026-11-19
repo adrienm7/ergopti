@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "Warianty jednej rodziny (Colemak, Tarmak, Ergopti…) zajmują jeden wiersz, najwyżej sklasyfikowany; „+n” pokazuje pozostałe. Przypięty układ zawsze zostaje na górze.",
 	"layout_analysis.table.pin": "Przypnij {name} na górze",
 	"layout_analysis.table.unpin": "Odepnij {name}",
+	"layout_analysis.table.edit": "Edytuj kopię {name}",
 	"layout_analysis.table.expand": "Pokaż {count} pozostałych układów z rodziny {name}",
 	"layout_analysis.table.collapse": "Ukryj {count} pozostałych układów z rodziny {name}",
 	"layout_analysis.table.csv": "Pobierz tabelę (CSV)",

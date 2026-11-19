@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "同じファミリーの派生（Colemak、Tarmak、Ergopti など）は最上位の 1 行にまとまり、「+n」で残りを表示します。ピン留めした配列は常に一番上に残ります。",
 	"layout_analysis.table.pin": "{name} を一番上にピン留め",
 	"layout_analysis.table.unpin": "{name} のピン留めを外す",
+	"layout_analysis.table.edit": "{name} のコピーを編集",
 	"layout_analysis.table.expand": "{name} のファミリーの他の配列 {count} 件を表示",
 	"layout_analysis.table.collapse": "{name} のファミリーの他の配列 {count} 件を隠す",
 	"layout_analysis.table.csv": "表をダウンロード（CSV）",

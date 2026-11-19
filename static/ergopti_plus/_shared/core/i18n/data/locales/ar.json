@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "تظهر متغيّرات العائلة الواحدة (Colemak وTarmak وErgopti…) في صف واحد هو الأفضل ترتيبًا؛ ويعرض «‎+n» البقية. ويبقى التخطيط المثبّت دائمًا في الأعلى.",
 	"layout_analysis.table.pin": "تثبيت {name} في الأعلى",
 	"layout_analysis.table.unpin": "إلغاء تثبيت {name}",
+	"layout_analysis.table.edit": "تعديل نسخة من {name}",
 	"layout_analysis.table.expand": "عرض التخطيطات الـ{count} الأخرى من عائلة {name}",
 	"layout_analysis.table.collapse": "إخفاء التخطيطات الـ{count} الأخرى من عائلة {name}",
 	"layout_analysis.table.csv": "تنزيل الجدول (CSV)",

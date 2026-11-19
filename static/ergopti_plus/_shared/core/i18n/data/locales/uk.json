@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "Варіанти однієї родини (Colemak, Tarmak, Ergopti…) займають один рядок — найкращий за рангом; «+n» показує решту. Закріплена розкладка завжди лишається вгорі.",
 	"layout_analysis.table.pin": "Закріпити {name} вгорі",
 	"layout_analysis.table.unpin": "Відкріпити {name}",
+	"layout_analysis.table.edit": "Змінити копію {name}",
 	"layout_analysis.table.expand": "Показати ще {count} розкладок родини {name}",
 	"layout_analysis.table.collapse": "Сховати ще {count} розкладок родини {name}",
 	"layout_analysis.table.csv": "Завантажити таблицю (CSV)",

@@ -4006,6 +4006,7 @@ async function exerciseComparerLink(browser, origin) {
 		await studioManage.exerciseRankingViews(browser, origin);
 		await studioManage.exerciseRankingCsv(browser, origin);
 		await studioManage.exerciseTabRenameDuplicate(browser, origin);
+		await studioManage.exerciseComparerEditCopy(browser, origin);
 
 		// Every locale names every visible string.
 		for (const lang of LOCALES) {

@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "한 계열의 변형(Colemak, Tarmak, Ergopti…)은 순위가 가장 높은 한 줄로 보이고, “+n”으로 나머지를 봅니다. 고정한 배열은 항상 맨 위에 남습니다.",
 	"layout_analysis.table.pin": "{name}을(를) 맨 위에 고정",
 	"layout_analysis.table.unpin": "{name} 고정 해제",
+	"layout_analysis.table.edit": "{name} 사본 편집",
 	"layout_analysis.table.expand": "{name} 계열의 다른 배열 {count}개 보기",
 	"layout_analysis.table.collapse": "{name} 계열의 다른 배열 {count}개 숨기기",
 	"layout_analysis.table.csv": "표 내려받기(CSV)",

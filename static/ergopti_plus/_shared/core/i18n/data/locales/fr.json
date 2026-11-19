@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "Les variantes d’une même famille (Colemak, Tarmak, Ergopti…) n’occupent qu’une ligne, la mieux classée ; « +n » montre les autres. Une disposition épinglée reste toujours en haut.",
 	"layout_analysis.table.pin": "Épingler {name} en haut",
 	"layout_analysis.table.unpin": "Désépingler {name}",
+	"layout_analysis.table.edit": "Modifier une copie de {name}",
 	"layout_analysis.table.expand": "Afficher les {count} autres dispositions de la famille de {name}",
 	"layout_analysis.table.collapse": "Masquer les {count} autres dispositions de la famille de {name}",
 	"layout_analysis.table.csv": "Télécharger le tableau (CSV)",

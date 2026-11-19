@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "Varianterna av en familj (Colemak, Tarmak, Ergopti…) visas som en rad, den bäst placerade; ”+n” visar de andra. En fäst layout stannar alltid överst.",
 	"layout_analysis.table.pin": "Fäst {name} överst",
 	"layout_analysis.table.unpin": "Lossa {name}",
+	"layout_analysis.table.edit": "Redigera en kopia av {name}",
 	"layout_analysis.table.expand": "Visa de {count} andra layouterna i familjen {name}",
 	"layout_analysis.table.collapse": "Dölj de {count} andra layouterna i familjen {name}",
 	"layout_analysis.table.csv": "Ladda ned tabellen (CSV)",

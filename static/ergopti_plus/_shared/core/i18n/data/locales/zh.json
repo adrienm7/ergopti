@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "同一系列的变体（Colemak、Tarmak、Ergopti…）只显示排名最高的一行；“+n”显示其余变体。固定的布局始终保持在最上方。",
 	"layout_analysis.table.pin": "将 {name} 固定在顶部",
 	"layout_analysis.table.unpin": "取消固定 {name}",
+	"layout_analysis.table.edit": "编辑 {name} 的副本",
 	"layout_analysis.table.expand": "显示 {name} 系列的其他 {count} 个布局",
 	"layout_analysis.table.collapse": "隐藏 {name} 系列的其他 {count} 个布局",
 	"layout_analysis.table.csv": "下载表格（CSV）",

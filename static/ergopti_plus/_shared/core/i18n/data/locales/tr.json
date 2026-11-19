@@ -4679,6 +4679,7 @@
 	"layout_analysis.table.fold_help": "Bir ailenin varyantları (Colemak, Tarmak, Ergopti…) en iyi sıralanan tek satırda görünür; “+n” diğerlerini gösterir. Sabitlenen bir düzen her zaman en üstte kalır.",
 	"layout_analysis.table.pin": "{name} düzenini en üste sabitle",
 	"layout_analysis.table.unpin": "{name} sabitlemesini kaldır",
+	"layout_analysis.table.edit": "{name} düzeninin bir kopyasını düzenle",
 	"layout_analysis.table.expand": "{name} ailesinin diğer {count} düzenini göster",
 	"layout_analysis.table.collapse": "{name} ailesinin diğer {count} düzenini gizle",
 	"layout_analysis.table.csv": "Tabloyu indir (CSV)",
