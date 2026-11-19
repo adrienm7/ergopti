@@ -1,4 +1,4 @@
-// _shared/ui/layout_analysis/board_image.js
+// _shared/ui/layout_analysis/board/board_image.js
 
 /**
  * ==============================================================================

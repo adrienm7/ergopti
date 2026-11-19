@@ -71,9 +71,9 @@ const SCRIPTS = [
 	// The score settings every Studio score reads (the Comparer's own, shared).
 	'score_settings.js',
 	// The overview's worst n-grams, shared with the editor panel.
-	'worst_groups.js',
+	'board/worst_groups.js',
 	// The heatmaps' PNG and SVG downloads, shared with the editor's board.
-	'board_image.js',
+	'board/board_image.js',
 	'comparer_page.js'
 ];
 // Floor: a page that lost its strings must not read as complete.
@@ -113,9 +113,9 @@ for (const file of [
 	'fingering_editor.js',
 	'undo_offer.js',
 	'analyser_tab.js',
-	'worst_groups.js',
-	'best_swaps.js',
-	'board_image.js',
+	'board/worst_groups.js',
+	'board/best_swaps.js',
+	'board/board_image.js',
 	// The corpus picker the Comparer, the panel and the Optimiser share.
 	'corpus_files.js'
 ])
@@ -483,9 +483,9 @@ const PANEL_SCRIPTS = [
 	'../layout_analysis/corpus_files.js',
 	'../layout_analysis/score_settings.js',
 	// The panel's worst n-grams (worst_groups.js), before the panel that draws them.
-	'../layout_analysis/worst_groups.js',
+	'../layout_analysis/board/worst_groups.js',
 	// The panel's best swaps (best_swaps.js; the optimiser core is loaded too).
-	'../layout_analysis/best_swaps.js',
+	'../layout_analysis/board/best_swaps.js',
 	'../layout_analysis/analysis_panel.js',
 	'../layout_editor/editor_page.js'
 ];

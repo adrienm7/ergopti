@@ -1,4 +1,4 @@
-// _shared/ui/layout_analysis/worst_groups.js
+// _shared/ui/layout_analysis/board/worst_groups.js
 
 /**
  * ==============================================================================

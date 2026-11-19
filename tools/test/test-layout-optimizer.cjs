@@ -30,7 +30,7 @@
  *    share.
  * 6. Budget: a time budget stops the search on the clock it is given.
  * 7. Best swaps (best-swaps-ranking): the editor panel's ranking of single
- *    swaps (layout_analysis/best_swaps.js) gives each listed swap the
+ *    swaps (layout_analysis/board/best_swaps.js) gives each listed swap the
  *    engine's own gain, best first, only gains, only the optimiser's moves
  *    (letters and punctuation with their capital, never Space or a digit),
  *    and the same list whether it is scored at once or in small slices.
@@ -61,7 +61,7 @@ for (const file of [
 	'layout_analysis/_generated/analysis_data.js',
 	'layout_analysis/analysis_engine.js',
 	'layout_optimizer/optimizer_core.js',
-	'layout_analysis/best_swaps.js'
+	'layout_analysis/board/best_swaps.js'
 ])
 	vm.runInContext(fs.readFileSync(path.join(UI, file), 'utf8'), sandbox, { filename: file });
 const E = vm.runInContext('LAYOUT_ANALYSIS', sandbox);

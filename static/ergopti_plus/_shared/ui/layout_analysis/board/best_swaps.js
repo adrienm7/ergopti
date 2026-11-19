@@ -1,4 +1,4 @@
-// _shared/ui/layout_analysis/best_swaps.js
+// _shared/ui/layout_analysis/board/best_swaps.js
 
 /**
  * ==============================================================================
