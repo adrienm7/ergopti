@@ -3,8 +3,9 @@
 		"index.html": [
 			{
 				"tag": "span",
+				"where": "id=\"logged\"",
 				"count": 1,
-				"pending": true
+				"reason": "The phrase « Logged in … » shares one paragraph with the button that opens that file; the script fills the phrase alone, and no phrasing element means a log location"
 			}
 		]
 	}
