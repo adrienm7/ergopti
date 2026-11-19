@@ -274,7 +274,8 @@ module.exports = [
 				more: 2
 			});
 		},
-		ready: '#btn-copy:not([disabled])',
+		// Enabled by the host's data, named by the locale strings: both must have landed.
+		ready: '#btn-copy:not([disabled]):not(:empty)',
 		states: [{ name: 'details', enter: (page) => page.click('#details > summary') }]
 	},
 	{
