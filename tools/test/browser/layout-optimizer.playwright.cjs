@@ -507,14 +507,14 @@ async function exerciseChangePenalty(browser, origin) {
 	assert.equal(await page.inputValue('#lo-change-weight'), '0');
 	assert.equal(
 		await page.textContent('#lo-change-weight-value'),
-		'0.0 points per % of the typed characters moved'
+		'0.0\u00a0points per % of the typed characters moved'
 	);
 	assert.equal(await page.isDisabled('#lo-change-max'), true, 'the limit waits for its switch');
 	await page.check('input[name="lo-change-preset"][value="few"]');
 	assert.equal(await page.inputValue('#lo-change-weight'), '3', 'a preset sets the slider');
 	assert.equal(
 		await page.getAttribute('#lo-change-weight', 'aria-valuetext'),
-		'3.0 points per % of the typed characters moved'
+		'3.0\u00a0points per % of the typed characters moved'
 	);
 	// A value of its own ticks no preset.
 	await page.$eval('#lo-change-weight', (input) => {

@@ -1043,7 +1043,7 @@
 					label.append(
 						input,
 						document.createTextNode(
-							t(`${PREFIX}change.preset.${id}`, { weight: number(CHANGE.presets[id], 1) })
+							t(`${PREFIX}change.preset.${id}`, { weight: pointsPer(CHANGE.presets[id]) })
 						)
 					);
 					return label;
@@ -1051,6 +1051,9 @@
 			);
 			syncChange();
 		}
+
+		/** A change weight in words: its number and the points unit, tied by a no-break space. */
+		const pointsPer = (weight) => withUnit(number(weight, 1), t('layout_analysis.unit.points'));
 
 		/** The change weight the slider holds: score points per % of the characters moved. */
 		function changeWeight() {
@@ -1066,7 +1069,7 @@
 		 */
 		function syncChange() {
 			const weight = changeWeight();
-			const text = t(`${PREFIX}change.weight_value`, { weight: number(weight, 1) });
+			const text = t(`${PREFIX}change.weight_value`, { weight: pointsPer(weight) });
 			$('lo-change-weight-value').value = text;
 			$('lo-change-weight').setAttribute('aria-valuetext', text);
 			for (const input of root.querySelectorAll('input[name="lo-change-preset"]'))
