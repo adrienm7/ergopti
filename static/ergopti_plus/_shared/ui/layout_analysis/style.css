@@ -881,12 +881,6 @@ body:has(> main.layout-analysis) {
 	color: var(--la-heat-ink);
 }
 
-.la-heatmap .la-key:focus-visible {
-	outline: 2px solid var(--la-accent);
-	outline-offset: 1px;
-	z-index: 1;
-}
-
 .la-heat-controls {
 	align-items: center;
 	display: flex;

@@ -713,9 +713,9 @@
 					</button>
 				</div>
 				<p id="la-table-csv-status" class="la-muted" role="status"></p>
-				<div class="la-table-wrap" tabindex="0" role="region" aria-labelledby="la-ranking-label">
+				<section class="la-table-wrap" tabindex="0" aria-labelledby="la-ranking-label">
 					<table id="la-table" class="la-table"></table>
-				</div>
+				</section>
 			</section>
 			<section class="la-figure la-figure-wide" aria-labelledby="la-ngrams-label">
 				<h3 id="la-ngrams-label" data-i18n="layout_analysis.ngrams.title"></h3>
@@ -737,9 +737,9 @@
 				<li data-i18n-text="layout_analysis.fingers.over"><span class="la-swatch la-swatch-more" aria-hidden="true"></span></li>
 				<li data-i18n-text="layout_analysis.fingers.under"><span class="la-swatch la-swatch-less" aria-hidden="true"></span></li>
 			</ul>
-			<div class="la-table-wrap" tabindex="0" role="region" aria-labelledby="la-finger-table-label">
+			<section class="la-table-wrap" tabindex="0" aria-labelledby="la-finger-table-label">
 				<table id="la-finger-table" class="la-table la-heat-table"></table>
-			</div>
+			</section>
 		</section>
 		<section class="la-figure la-figure-wide" aria-labelledby="la-hands-label">
 			<h3 id="la-hands-label" data-i18n="layout_analysis.hands.title"></h3>
@@ -776,9 +776,9 @@
 			<h3 id="la-travel-table-label" data-i18n="layout_analysis.travel.title"></h3>
 			<p class="la-muted" data-i18n="layout_analysis.travel.caption"></p>
 			<p id="la-travel-legend" class="la-heat-legend"></p>
-			<div class="la-table-wrap" tabindex="0" role="region" aria-labelledby="la-travel-table-label">
+			<section class="la-table-wrap" tabindex="0" aria-labelledby="la-travel-table-label">
 				<table id="la-travel-table" class="la-table la-heat-table"></table>
-			</div>
+			</section>
 		</section>
 		<div id="la-charts-rows" class="la-chart-grid"></div>
 	</section>
@@ -838,10 +838,10 @@
 				<div id="la-heatmap-image"></div>
 				<p id="la-heat-legend" class="la-heat-legend"></p>
 				<details id="la-heat-table-box" class="la-section">
-					<summary data-i18n="layout_analysis.heat.table"></summary>
-					<div class="la-table-wrap" tabindex="0">
+					<summary id="la-heat-table-name" data-i18n="layout_analysis.heat.table"></summary>
+					<section class="la-table-wrap" tabindex="0" aria-labelledby="la-heat-table-name">
 						<table id="la-heat-table" class="la-table"></table>
-					</div>
+					</section>
 				</details>
 				<section class="la-detail-loads">
 				<h3 id="la-fingers-label" data-i18n="layout_analysis.details.fingers"></h3>
@@ -861,13 +861,13 @@
 			</section>
 		</div>
 		<details class="la-section">
-			<summary data-i18n="layout_analysis.worst.title"></summary>
+			<summary id="la-worst-name" data-i18n="layout_analysis.worst.title"></summary>
 			<p class="la-muted" data-i18n="layout_analysis.worst.caption"></p>
 			<label for="la-worst-event" data-i18n="layout_analysis.worst.event"></label>
 			<select id="la-worst-event"></select>
-			<div class="la-table-wrap" tabindex="0">
+			<section class="la-table-wrap" tabindex="0" aria-labelledby="la-worst-name">
 				<table id="la-worst" class="la-table"></table>
-			</div>
+			</section>
 		</details>
 		<details class="la-section">
 			<summary data-i18n="layout_analysis.matrix.title"></summary>
@@ -875,14 +875,14 @@
 			<label for="la-matrix-by" data-i18n="layout_analysis.matrix.by"></label>
 			<select id="la-matrix-by"></select>
 			<p id="la-matrix-legend" class="la-heat-legend"></p>
-			<div class="la-matrix-wrap" tabindex="0" role="region" aria-labelledby="la-matrix-caption">
+			<section class="la-matrix-wrap" tabindex="0" aria-labelledby="la-matrix-caption">
 				<table id="la-matrix" class="la-matrix"></table>
-			</div>
-			<h4 data-i18n="layout_analysis.matrix.table"></h4>
+			</section>
+			<h4 id="la-matrix-pairs-name" data-i18n="layout_analysis.matrix.table"></h4>
 			<p id="la-matrix-count" class="la-muted"></p>
-			<div class="la-table-wrap" tabindex="0">
+			<section class="la-table-wrap" tabindex="0" aria-labelledby="la-matrix-pairs-name">
 				<table id="la-matrix-pairs" class="la-table"></table>
-			</div>
+			</section>
 		</details>
 		<details class="la-section">
 			<summary data-i18n="layout_analysis.words.title"></summary>
@@ -892,10 +892,10 @@
 				<p id="la-words-mean" class="la-muted"></p>
 				<h4 id="la-words-bins-label" data-i18n="layout_analysis.words.distribution"></h4>
 				<table id="la-words-bins" class="la-bars" aria-labelledby="la-words-bins-label" role="table"></table>
-				<h4 data-i18n="layout_analysis.words.hardest"></h4>
-				<div class="la-table-wrap" tabindex="0">
+				<h4 id="la-words-name" data-i18n="layout_analysis.words.hardest"></h4>
+				<section class="la-table-wrap" tabindex="0" aria-labelledby="la-words-name">
 					<table id="la-words" class="la-table"></table>
-				</div>
+				</section>
 			</section>
 		</details>
 		<details class="la-section">
@@ -920,18 +920,18 @@
 			<p class="la-muted" data-i18n="layout_analysis.standing.caption"></p>
 			<table id="la-standing" class="la-bars" aria-labelledby="la-standing-label" role="table"></table>
 		</details>
-		<h3 data-i18n="layout_analysis.details.metrics"></h3>
-		<div class="la-table-wrap" tabindex="0">
+		<h3 id="la-metrics-name" data-i18n="layout_analysis.details.metrics"></h3>
+		<section class="la-table-wrap" tabindex="0" aria-labelledby="la-metrics-name">
 			<table id="la-metrics" class="la-table"></table>
-		</div>
+		</section>
 		<p id="la-unsupported" class="la-muted"></p>
 		<div class="la-detail-grid">
 			<section>
-				<h3 data-i18n="layout_analysis.details.typing"></h3>
+				<h3 id="la-typing-name" data-i18n="layout_analysis.details.typing"></h3>
 				<p id="la-typing-caption" class="la-muted"></p>
-				<div class="la-table-wrap" tabindex="0">
+				<section class="la-table-wrap" tabindex="0" aria-labelledby="la-typing-name">
 					<table id="la-typing" class="la-table"></table>
-				</div>
+				</section>
 			</section>
 			<section>
 				<h3 data-i18n="layout_analysis.details.simplicity"></h3>
@@ -2216,7 +2216,6 @@
 			const flat = Object.fromEntries(board.codes.map((code) => [code, 0]));
 			drawBoard($('la-ngrams-board'), result, layout, flat, {
 				other: false,
-				focusable: false,
 				title: (code) => keyText(layout, code)
 			});
 			$('la-ngrams-caption').textContent = t('layout_analysis.ngrams.caption', {
@@ -2635,9 +2634,8 @@
 			const title = el('h3', '', t('layout_analysis.heat.table'));
 			title.id = titleId;
 			// The scrolling box is the region named by the title, the section only groups.
-			const wrap = el('div', 'la-table-wrap');
+			const wrap = el('section', 'la-table-wrap');
 			wrap.tabIndex = 0;
-			wrap.setAttribute('role', 'region');
 			wrap.setAttribute('aria-labelledby', titleId);
 			const table = el('table', 'la-table');
 			table.id = `la-table-${name}`;
@@ -2928,9 +2926,17 @@
 				bars.append(row);
 			}
 			const tableBox = el('details', 'la-section');
-			tableBox.append(el('summary', '', t('layout_analysis.heat.table')));
-			const wrap = el('div', 'la-table-wrap');
+			const summary = el('summary', '', t('layout_analysis.heat.table'));
+			summary.id = `la-table-${name}-name`;
+			tableBox.append(summary);
+			// The scrolling box is a region named by its figure and its fold, so the
+			// tables of two figures are told apart in the landmarks.
+			const wrap = el('section', 'la-table-wrap');
 			wrap.tabIndex = 0;
+			wrap.setAttribute(
+				'aria-labelledby',
+				`${box.closest('section').getAttribute('aria-labelledby')} ${summary.id}`
+			);
 			const table = el('table', 'la-table');
 			table.id = `la-table-${name}`;
 			wrap.append(table);
@@ -3114,7 +3120,6 @@
 				const tableRows = drawBoard(box, result, layout, values, {
 					extent,
 					other: false,
-					focusable: false,
 					title: (code, value) =>
 						`${keyText(layout, code)} · ${heatName(metric)}: ${measure(value, HEAT_DIGITS, unit)}`
 				});
@@ -3136,9 +3141,13 @@
 					card.append(legend);
 				}
 				const tableBox = el('details', 'la-section');
-				tableBox.append(el('summary', '', t('layout_analysis.heat.table')));
-				const wrap = el('div', 'la-table-wrap');
+				const summary = el('summary', '', t('layout_analysis.heat.table'));
+				summary.id = `${titleId}-table`;
+				tableBox.append(summary);
+				// The scrolling box is a region named by its board and its fold.
+				const wrap = el('section', 'la-table-wrap');
 				wrap.tabIndex = 0;
+				wrap.setAttribute('aria-labelledby', `${titleId} ${summary.id}`);
 				const table = el('table', 'la-table');
 				heatTableInto(table, layout, tableRows, metric, false);
 				wrap.append(table);
@@ -3446,10 +3455,11 @@
 		 * @param {object} result
 		 * @param {object} layout
 		 * @param {object} byCode code → value.
-		 * @param {{extent?: number, other: boolean, focusable: boolean,
+		 * @param {{extent?: number, other: boolean,
 		 *   title: function(string, number): string}} options extent: the value
-		 *   of the darkest key (the box's own largest when absent); focusable:
-		 *   every key takes the focus with its value as its name.
+		 *   of the darkest key (the box's own largest when absent). A key is an
+		 *   image named by its value, never a Tab stop: nothing on it is operated,
+		 *   and the board's table holds every value.
 		 * @returns {Array<{code: string, where: string, finger: string, value: number}>}
 		 *   The drawn keys, the rows of the board's table.
 		 */
@@ -3504,7 +3514,6 @@
 				key.setAttribute('role', 'img');
 				// The name also says where the key is, which the drawing shows.
 				key.setAttribute('aria-label', `${title} (${where})`);
-				if (options.focusable) key.tabIndex = 0;
 				box.append(key);
 				tableRows.push({ code, where, finger: DATA.model.fingers[board.finger[k]], value });
 			});
@@ -3540,7 +3549,6 @@
 			const byCode = heatValues(detail, other);
 			const tableRows = drawBoard(box, result, layout, byCode, {
 				other: Boolean(other),
-				focusable: true,
 				title: (code, value) => heatTitle(detail, layout, code, value, Boolean(other))
 			});
 			// The heatmap as a PNG or SVG image (board_image.js).

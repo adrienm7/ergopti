@@ -103,8 +103,11 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		view.id = 'la-analysers-view';
 		viewField.append(viewName, view);
 		const viewCaption = el('p', 'la-muted');
-		const wrap = el('div', 'la-table-wrap');
+		// The scrolling box is the region named by the tab's title.
+		const wrap = el('section', 'la-table-wrap');
 		wrap.tabIndex = 0;
+		title.id = 'la-analysers-title';
+		wrap.setAttribute('aria-labelledby', title.id);
 		const table = el('table', 'la-table la-heat-table la-analysers-table');
 		wrap.append(table);
 		section.append(title, intro, viewField, viewCaption, status, wrap);
