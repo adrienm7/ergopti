@@ -48,7 +48,14 @@
  *    their analyzers on the corpus each builds from a text (cmini's
  *    scripts/data.py rule; a200's gendata word-list model), on their own
  *    layout files fingered as our model, statistic by statistic.
- * 8. Exit status: 0 when every comparison ran, 1 when a download, a run or a
+ * 8. Cyanophage optimiser (--cyanophage=<folder with its optimiser.js,
+ *    worker.js and, optionally, words-english.json>): its own corpus builder,
+ *    worker and score sum, read from those files and run in a vm context on
+ *    the word list of each text (and on its own English list), against our
+ *    scorer on the same layouts; a second pass leaves out the bigrams with a
+ *    character the layout lacks, which its worker miscounts.
+ * 9. Every tool that prints sub-scores is compared metric by metric too.
+ * 10. Exit status: 0 when every comparison ran, 1 when a download, a run or a
  *    parse failed. The gaps are reported, not judged: the fidelity of each
  *    analyser is recorded in docs/design/analyser-scores.md.
  *
@@ -59,6 +66,7 @@
  *        [--perl=<exe> --carpalx-data=<dir> [--carpalx-perl5lib=<dirs>]]
  *        [--klo=<exe> --klo-data=<dir>]
  *        [--python=<exe> [--cmini-data=<dir>] [--a200-data=<dir>]]
+ *        [--cyanophage=<dir>]
  * ==============================================================================
  */
 
@@ -106,6 +114,21 @@ const OXEYLYZER_TEXTS = {
 	pyrich: 'static/corpus/original/code/rich_13.7.1.py.txt'
 };
 const OXEYLYZER_TIMEOUT_MS = 600000;
+// The REPL's `analyze` lines (its label) and the part of our scorer each is.
+const OXEYLYZER_PARTS = {
+	Sfb: 'sfb_pct',
+	'Finger Speed': 'finger_speed',
+	Stretches: 'stretches',
+	Inrolls: 'inrolls',
+	Outrolls: 'outrolls',
+	Onehands: 'onehands',
+	Alternates: 'alternates',
+	'Alternates (sfs)': 'alternates_sfs',
+	Redirects: 'redirects',
+	'Redirects Sfs': 'redirects_sfs',
+	'Bad Redirects': 'bad_redirects',
+	'Bad Redirects Sfs': 'bad_redirects_sfs'
+};
 // genkey: the same texts and a French one (its filter keeps a-z and a few signs).
 const GENKEY_TEXTS = Object.assign({}, OXEYLYZER_TEXTS, {
 	germinal: 'static/corpus/original/fr/zola_germinal.txt'
@@ -237,6 +260,23 @@ function summary(values, digits, unit) {
 	return `mean |gap| ${mean.toFixed(digits)}${unit}, max ${Math.max(...abs).toFixed(digits)}${unit}`;
 }
 
+/**
+ * Records one sub-score's gap, ours minus the tool's, in its own unit.
+ * @param {object} gaps - {metric: [gap]}, filled in place.
+ */
+function addGap(gaps, metric, ours, theirs) {
+	if (!Number.isFinite(ours) || !Number.isFinite(theirs))
+		throw new Error(`${metric}: not a number (ours ${ours}, theirs ${theirs})`);
+	(gaps[metric] = gaps[metric] || []).push(ours - theirs);
+}
+
+/** Prints the mean and largest gap of every sub-score, one line each. */
+function printMetricGaps(name, gaps, digits) {
+	console.log(`${name}, per metric (ours − theirs, in the tool's unit):`);
+	for (const [metric, values] of Object.entries(gaps))
+		console.log(`  ${metric.padEnd(24)} ${values.length} points, ${summary(values, digits, '')}`);
+}
+
 // =========================
 // ======= 2/ KLAnext ======
 // =========================
@@ -256,6 +296,7 @@ async function verifyKlanext() {
 	const reference = JSON.parse(fs.readFileSync(KLANEXT_REFERENCE, 'utf8'));
 	const columns = reference.columns;
 	const gaps = { library: [], defined: [] };
+	const perColumn = { library: {}, defined: {} };
 	const relative = [];
 	for (const [preset, rows] of Object.entries(reference.presets)) {
 		const text = await download(`${KLANEXT_CORPUS_URL}${encodeURIComponent(preset)}.txt`);
@@ -271,6 +312,7 @@ async function verifyKlanext() {
 				const result = S.score('klanext', scored, tables, { keyboard: 'ansi' });
 				const ours = [result.value, ...columns.slice(1).map((c) => result.parts[c])];
 				ours.forEach((v, k) => gaps[kind].push(v - published[k]));
+				ours.forEach((v, k) => addGap(perColumn[kind], columns[k], v, published[k]));
 				if (kind === 'library') relative.push((100 * (ours[0] - published[0])) / published[0]);
 				line.push(`${kind} ${ours.map((v) => v.toFixed(2)).join(' ')}`);
 			}
@@ -285,6 +327,8 @@ async function verifyKlanext() {
 	console.log(`  library layouts, overall: ${summary(relative, 3, ' %')}`);
 	console.log(`  library layouts, every column: ${summary(gaps.library, 3, '')}`);
 	console.log(`  KLAnext's layout definitions, every column: ${summary(gaps.defined, 4, '')}`);
+	printMetricGaps('KLAnext, its layout definitions', perColumn.defined, 4);
+	printMetricGaps('KLAnext, our library layouts', perColumn.library, 3);
 }
 
 // ===========================
@@ -325,6 +369,7 @@ function verifyOxeylyzer(exe, data, configFile) {
 		}
 		fs.writeFileSync(path.join(root, 'config.toml'), config);
 		const gaps = [];
+		const metricGaps = {};
 		for (const [id, file] of Object.entries(OXEYLYZER_TEXTS)) {
 			const input = [
 				`load ${id}`,
@@ -348,17 +393,31 @@ function verifyOxeylyzer(exe, data, configFile) {
 					`Oxeylyzer on ${id}: ${scores.length} scores, exit ${run.status}
 ${out.slice(-600)}`
 				);
+			// Each layout's block of statistics ends with its Score line.
+			const blocks = out.split(/^Score: .*$/m).slice(0, OXEYLYZER_LAYOUTS.length);
 			const tables = E.prepareNgrams(
 				E.ngramsFromText(fs.readFileSync(path.join(REPO_ROOT, file), 'utf8'))
 			);
 			const line = OXEYLYZER_LAYOUTS.map((layout, k) => {
 				const ours = S.score('oxeylyzer', libraryLayout(layout), tables, { keyboard: 'ortho' });
 				gaps.push(ours.value - scores[k]);
+				addGap(metricGaps, 'score', ours.value, scores[k]);
+				for (const [label, part] of Object.entries(OXEYLYZER_PARTS)) {
+					const m = new RegExp(
+						`^${label.replace(/[()]/g, '\\$&')}:\\s+(-?[0-9.]+)%?\\s*$`,
+						'm'
+					).exec(blocks[k]);
+					if (!m) throw new Error(`Oxeylyzer on ${id}, ${layout}: no « ${label} » line`);
+					addGap(metricGaps, part, ours.parts[part], Number(m[1]));
+					if (verbose)
+						console.log(`    ${id} ${layout} ${part} ${m[1]}/${ours.parts[part].toFixed(4)}`);
+				}
 				return `${layout} ${scores[k]}/${ours.value.toFixed(3)}`;
 			});
 			if (verbose) console.log(`  ${id.padEnd(9)} ${line.join('  ')}`);
 		}
 		console.log(`Oxeylyzer: ${gaps.length} points, Score ${summary(gaps, 4, '')}`);
+		printMetricGaps('Oxeylyzer', metricGaps, 4);
 	} finally {
 		fs.rmSync(root, { recursive: true, force: true });
 	}
@@ -403,6 +462,29 @@ function genkeyLayout(file) {
 	};
 }
 
+/**
+ * genkey's `analyze` statistics of one layout against our parts: its weighted
+ * finger speed per finger (2 decimals), index use, SFB and LSB shares.
+ */
+function genkeyParts(out, parts, gaps) {
+	// eslint-disable-next-line no-control-regex
+	const text = out.replace(/\x1b\[[0-9;]*m/g, '');
+	const speeds = /^Finger Speed \(weighted\): \[([^\]]*)\]/m.exec(text);
+	const index = /^Index Usage: ([0-9.]+)% ([0-9.]+)%/m.exec(text);
+	const sfb = /^SFBs: ([0-9.]+)%/m.exec(text);
+	const lsb = /^LSBs: ([0-9.]+)%/m.exec(text);
+	if (!speeds || !index || !sfb || !lsb)
+		throw new Error(`genkey analyze: unexpected output\n${text.slice(0, 400)}`);
+	const values = speeds[1].trim().split(/\s+/).map(Number);
+	MODELS.genkey.model.finger_ids.forEach((id, f) =>
+		addGap(gaps, `finger_speed_${id}`, parts[`finger_speed_${id}`], values[f])
+	);
+	addGap(gaps, 'index_left_pct', parts.index_left_pct, Number(index[1]));
+	addGap(gaps, 'index_right_pct', parts.index_right_pct, Number(index[2]));
+	addGap(gaps, 'sfb_pct', parts.sfb_pct, Number(sfb[1]));
+	addGap(gaps, 'lsb_pct', parts.lsb_pct, Number(lsb[1]));
+}
+
 function verifyGenkey(exe, data) {
 	if (!fs.existsSync(exe)) throw new Error(`no genkey executable at ${exe}`);
 	for (const needed of ['config.toml', 'layouts', path.join('corpora', 'shai-iweb.json')])
@@ -431,6 +513,7 @@ function verifyGenkey(exe, data) {
 			.map((f) => Object.assign({ file: f }, genkeyLayout(path.join(data, 'layouts', f))))
 			.filter((l) => l.usable);
 		const gaps = [];
+		const metricGaps = {};
 		for (const [id, file] of Object.entries(GENKEY_TEXTS)) {
 			// `load` needs a valid config (an existing corpus) before it writes the new one.
 			fs.writeFileSync(path.join(root, 'config.toml'), withCorpus('shai-iweb'));
@@ -448,8 +531,12 @@ function verifyGenkey(exe, data) {
 				const published = theirs.get(layout.name);
 				if (published === undefined)
 					throw new Error(`genkey on ${id}: no score for ${layout.name}`);
-				const ours = S.score('genkey', layout, tables, { keyboard: 'ansi' }).value;
+				const result = S.score('genkey', layout, tables, { keyboard: 'ansi' });
+				const ours = result.value;
 				gaps.push((100 * (ours - published)) / published);
+				addGap(metricGaps, 'score', ours, published);
+				// It finds a layout by its name, the file's first line.
+				genkeyParts(run(['analyze', layout.name]), result.parts, metricGaps);
 				line.push(`${layout.name} ${published}/${ours.toFixed(3)}`);
 			}
 			if (verbose) console.log(`  ${id.padEnd(9)} ${line.join('  ')}`);
@@ -457,6 +544,7 @@ function verifyGenkey(exe, data) {
 		console.log(
 			`genkey: ${gaps.length} points (${files.length} of its layouts), Score ${summary(gaps, 3, ' %')}`
 		);
+		printMetricGaps('genkey', metricGaps, 4);
 	} finally {
 		fs.rmSync(root, { recursive: true, force: true });
 	}
@@ -643,6 +731,7 @@ function verifyCarpalx(perl, data) {
 		const lib = option('carpalx-perl5lib');
 		if (lib) env.PERL5LIB = env.PERL5LIB ? `${lib}${path.delimiter}${env.PERL5LIB}` : lib;
 		const gaps = [];
+		const metricGaps = {};
 		for (const [id, file] of Object.entries(GENKEY_TEXTS)) {
 			// carpalx caches a corpus's triads beside it: a fresh file per text.
 			const corpus = path.join(root, `${id}.txt`);
@@ -671,8 +760,15 @@ function verifyCarpalx(perl, data) {
 						`carpalx on ${id} with ${keyboard}: exit ${run.status}\n${run.stderr.slice(-400)}`
 					);
 				const theirs = Number(m[1]);
-				const ours = S.score('carpalx', keyboards[keyboard], tables, { keyboard: 'ansi' }).value;
+				const result = S.score('carpalx', keyboards[keyboard], tables, { keyboard: 'ansi' });
+				const ours = result.value;
 				gaps.push((100 * (ours - theirs)) / theirs);
+				addGap(metricGaps, 'score', ours, theirs);
+				for (const part of ['base', 'penalty', 'path']) {
+					const p = new RegExp(`#data effort_${part}=>\\[([0-9.]+)`).exec(run.stdout);
+					if (!p) throw new Error(`carpalx on ${id} with ${keyboard}: no effort_${part}`);
+					addGap(metricGaps, part, result.parts[part], Number(p[1]));
+				}
 				line.push(`${keyboard} ${theirs}/${ours.toFixed(3)}`);
 			}
 			if (verbose) console.log(`  ${id.padEnd(9)} ${line.join('  ')}`);
@@ -680,6 +776,7 @@ function verifyCarpalx(perl, data) {
 		console.log(
 			`carpalx: ${gaps.length} points (${chosen.length} of its keyboards), ${summary(gaps, 3, ' %')}`
 		);
+		printMetricGaps('carpalx', metricGaps, 4);
 	} finally {
 		fs.rmSync(root, { recursive: true, force: true });
 	}
@@ -821,6 +918,8 @@ function verifyKlo(exe, data) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'klo-'));
 	try {
 		const gaps = [];
+		const metricGaps = {};
+		const unmatched = new Set();
 		const skipped = new Set();
 		for (const [id, file] of Object.entries(GENKEY_TEXTS)) {
 			const text = fs.readFileSync(path.join(REPO_ROOT, file), 'utf8');
@@ -844,9 +943,28 @@ function verifyKlo(exe, data) {
 					throw new Error(
 						`evaluate ${layoutId} on ${id}: exit ${run.status}\n${run.stderr.slice(-400)}`
 					);
-				const theirs = JSON.parse(run.stdout)[0].total_cost;
-				const ours = S.score('dariogoetz', kloAsWritten(layout), tables, { keyboard: 'iso' }).value;
+				const evaluation = JSON.parse(run.stdout)[0];
+				const theirs = evaluation.total_cost;
+				const result = S.score('dariogoetz', kloAsWritten(layout), tables, { keyboard: 'iso' });
+				const ours = result.value;
 				gaps.push((100 * (ours - theirs)) / theirs);
+				addGap(metricGaps, 'score', ours, theirs);
+				// Its metrics by name (« Finger Balance » is our finger_balance), weighted.
+				const weighted = {};
+				for (const group of evaluation.details.individual_results)
+					for (const m of group.metric_costs) {
+						const id = m.core.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+						weighted[id] = (weighted[id] || 0) + m.weighted_cost;
+					}
+				for (const [part, value] of Object.entries(result.parts)) {
+					if (part === 'not_found_pct') continue;
+					const name = Object.keys(weighted).find((k) => k === part || `oxey_${k}` === part);
+					if (name === undefined) {
+						unmatched.add(part);
+						continue;
+					}
+					addGap(metricGaps, part, value, weighted[name]);
+				}
 				line.push(`${layoutId} ${theirs.toFixed(3)}/${ours.toFixed(3)}`);
 			}
 			if (verbose) console.log(`  ${id.padEnd(9)} ${line.join('  ')}`);
@@ -857,6 +975,9 @@ function verifyKlo(exe, data) {
 		console.log(
 			`Keyboard Layout Optimizer: ${gaps.length} points, ${summary(gaps, 6, ' %')}${note}`
 		);
+		printMetricGaps('Keyboard Layout Optimizer', metricGaps, 9);
+		if (unmatched.size)
+			console.log(`  parts with no metric of its name: ${[...unmatched].join(', ')}`);
 	} finally {
 		fs.rmSync(root, { recursive: true, force: true });
 	}
@@ -1104,9 +1225,190 @@ function verifyA200(python, data) {
 	}
 }
 
-// ======================
-// ======= 9/ Main ======
-// ======================
+// ======================================
+// ======= 9/ Cyanophage optimiser ======
+// ======================================
+
+/**
+ * One top-level function of a script, by brace matching from its header (the
+ * optimiser's functions hold no brace inside a string).
+ */
+function functionSource(source, name) {
+	const start = source.indexOf(`function ${name}(`);
+	if (start < 0) throw new Error(`cyanophage: no function ${name}`);
+	let depth = 0;
+	for (let i = source.indexOf('{', start); i < source.length; i++) {
+		if (source[i] === '{') depth++;
+		else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+	}
+	throw new Error(`cyanophage: function ${name} is not closed`);
+}
+
+/**
+ * The optimiser's own code, run in a vm context on the word list it is given:
+ * its corpus builder (getCharacters), its worker (calculateMetrics), its
+ * term constants and its score sum, read from the downloaded files.
+ * @returns {Function} (words, layout) → {score, result, input_length}.
+ */
+function cyanophageTool(dir) {
+	const optimiser = fs.readFileSync(path.join(dir, 'optimiser.js'), 'utf8');
+	const worker = fs.readFileSync(path.join(dir, 'worker.js'), 'utf8');
+	const constants = Array.from(optimiser.matchAll(/^var \w+_data = \{.*\}$/gm), (m) => m[0]);
+	if (constants.length !== 11)
+		throw new Error(`cyanophage: ${constants.length} terms, expected 11`);
+	const grid = /^var rcdata = (\[[\s\S]*?\n\])/m.exec(optimiser);
+	if (!grid) throw new Error('cyanophage: no rcdata grid');
+	const from = optimiser.indexOf('sfb_data.score = calculateScore');
+	const to = optimiser.indexOf('results.push', from);
+	if (from < 0 || to < 0) throw new Error('cyanophage: no score sum');
+	const sum = optimiser.slice(from, to);
+	const sandbox = { console: { log() {} }, Reflect, Math, isNaN, Object, JSON };
+	vm.createContext(sandbox);
+	// Inside one function, the tool's globals are locals of its scope: a read
+	// of a vm context's global is far slower.
+	const api = vm.runInContext(
+		[
+			'(function () {',
+			'var self = {};',
+			'var letter_freq = {}, bigram_freq = {}, trigram_freq = {}, input_length = 0;',
+			'var letter_position = [], words = {}, char, bigram, trigram;',
+			'function sortLetterFreq() {}',
+			`var rcdata = ${grid[1]};`,
+			...constants,
+			functionSource(optimiser, 'getCharacters'),
+			functionSource(optimiser, 'calculateScore'),
+			worker,
+			'return {',
+			'  load: function (w) { words = w; getCharacters(); },',
+			'  grid: function () { return JSON.parse(JSON.stringify(rcdata)); },',
+			'  score: function (config, known) {',
+			'    lookup = {};',
+			'    var bigrams = bigram_freq;',
+			'    if (known) {',
+			'      var chars = {}; config.forEach(function (k) { if (k.char !== "") chars[k.char] = 1; });',
+			'      bigrams = {};',
+			'      for (var b in bigram_freq) if (chars[b.charAt(0)] && chars[b.charAt(1)]) bigrams[b] = bigram_freq[b];',
+			'    }',
+			'    var result = calculateMetrics(letter_freq, bigrams, trigram_freq, config);',
+			`    var score = 0; ${sum}`,
+			'    return { score: score, result: result, length: input_length };',
+			'  }',
+			'};',
+			'})()'
+		].join('\n'),
+		sandbox,
+		{ filename: 'cyanophage' }
+	);
+	const model = MODELS.cyanophage.model;
+	return {
+		load: (words) => api.load(words),
+		// known: its bigrams with a character the layout lacks left out first.
+		score: (layout, known) => {
+			// Its grid with the layout's base characters on the cells our model maps.
+			const config = api.grid();
+			for (const key of config) {
+				const cell = model.grid.find((c) => c.row === key.row && c.col === key.col);
+				const row = cell && layout.rows[cell.code];
+				if (row && typeof row[0] === 'string' && Array.from(row[0]).length === 1 && row[0] !== ' ')
+					key.char = row[0];
+			}
+			return JSON.parse(JSON.stringify(api.score(config, known)));
+		}
+	};
+}
+
+/** A text as the optimiser's word list: lower case, split at whitespace, by count. */
+function wordList(text) {
+	const counts = new Map();
+	for (const word of text.toLowerCase().split(/\s+/u))
+		if (word !== '') counts.set(word, (counts.get(word) || 0) + 1);
+	return Object.fromEntries([...counts].sort((a, b) => b[1] - a[1]));
+}
+
+/** A word list's own n-grams, inside its words, as count tables. */
+function wordListTables(words) {
+	const chars = {};
+	const bigrams = {};
+	const trigrams = {};
+	const add = (table, key, n) => (table[key] = (table[key] || 0) + n);
+	for (const [word, n] of Object.entries(words)) {
+		const c = Array.from(word);
+		c.forEach((x, i) => {
+			add(chars, x, n);
+			if (i + 1 < c.length) add(bigrams, x + c[i + 1], n);
+			if (i + 2 < c.length) add(trigrams, x + c[i + 1] + c[i + 2], n);
+		});
+	}
+	return { chars, bigrams, trigrams };
+}
+
+// The worker's names for our parts.
+const CYANOPHAGE_PARTS = {
+	sfb: 'sfb',
+	psfb: 'psfb',
+	rsfb: 'rsfb',
+	scissors: 'scissors',
+	prscissors: 'prscissors',
+	wide_scissors: 'wide_scissors',
+	lsb: 'lat_str',
+	sfs: 'sfs'
+};
+const CYANOPHAGE_LIBRARY = [
+	'qwerty',
+	'azerty',
+	'dvorak',
+	'colemak',
+	'colemak_dh',
+	'workman',
+	'canary',
+	'graphite',
+	'ergopti',
+	'bepo'
+];
+
+function verifyCyanophage(dir) {
+	const tool = cyanophageTool(dir);
+	const texts = Object.entries(GENKEY_TEXTS).map(([id, file]) => {
+		const text = fs.readFileSync(path.join(REPO_ROOT, file), 'utf8');
+		return { id, words: wordList(text), tables: E.prepareNgrams(E.ngramsFromText(text)) };
+	});
+	const own = path.join(dir, 'words-english.json');
+	if (fs.existsSync(own)) {
+		const words = JSON.parse(fs.readFileSync(own, 'utf8'));
+		texts.push({ id: 'its-english', words, tables: E.prepareNgrams(wordListTables(words)) });
+	}
+	const relative = [];
+	const metricGaps = {};
+	const slipless = {};
+	for (const { id, words, tables } of texts) {
+		const line = [];
+		tool.load(words);
+		for (const layoutId of CYANOPHAGE_LIBRARY) {
+			const layout = libraryLayout(layoutId);
+			const theirs = tool.score(layout);
+			const ours = S.score('cyanophage', layout, tables, { keyboard: 'iso' });
+			relative.push((100 * (ours.value - theirs.score)) / theirs.score);
+			addGap(metricGaps, 'score', ours.value, theirs.score);
+			for (const [part, name] of Object.entries(CYANOPHAGE_PARTS))
+				addGap(metricGaps, part, ours.parts[part], (100 * theirs.result[name]) / theirs.length);
+			addGap(metricGaps, 'effort', ours.parts.effort, theirs.result.effort / theirs.length);
+			addGap(metricGaps, 'vowels', ours.parts.vowels, theirs.result.vowels);
+			addGap(metricGaps, 'hand_balance', ours.parts.hand_balance, theirs.result.hand_balance);
+			addGap(slipless, 'score', ours.value, tool.score(layout, true).score);
+			line.push(`${layoutId} ${theirs.score.toFixed(4)}/${ours.value.toFixed(4)}`);
+		}
+		if (verbose) console.log(`  ${id.padEnd(11)} ${line.join('  ')}`);
+	}
+	console.log(
+		`Cyanophage optimiser: ${relative.length} points, Score ${summary(relative, 6, ' %')}`
+	);
+	printMetricGaps('Cyanophage optimiser', metricGaps, 9);
+	printMetricGaps('Cyanophage optimiser without its bigrams of a missing character', slipless, 9);
+}
+
+// =======================
+// ======= 10/ Main ======
+// =======================
 
 async function main() {
 	if (!only || only === 'klanext') await verifyKlanext();
@@ -1144,6 +1446,14 @@ async function main() {
 		else
 			console.log(
 				'Keyboard Layout Optimizer: skipped (needs --klo=<evaluate exe> --klo-data=<its source folder>)'
+			);
+	}
+	if (!only || only === 'cyanophage') {
+		const dir = option('cyanophage');
+		if (dir) verifyCyanophage(dir);
+		else
+			console.log(
+				'Cyanophage optimiser: skipped (needs --cyanophage=<folder with its optimiser.js and worker.js>)'
 			);
 	}
 	const python = option('python');

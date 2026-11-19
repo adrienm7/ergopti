@@ -1322,7 +1322,6 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 */
 	function scoreGenkey(ctx) {
 		const model = entry('genkey').model;
-		const norm = genkeyNorm(model);
 		const t = perCorpus(ctx.table, 'genkey:tables', genkeyTables);
 		const angle = ctx.layout.fingering === 'angle' || ctx.keyboard === 'iso_angle';
 		const rows = ctx.keyboard === 'ansi' ? model.rows_ansi : model.rows_iso;
