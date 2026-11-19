@@ -100,6 +100,33 @@ helpers.describe("api_remote: the shared provider catalogue", function()
 		helpers.assert_eq(decodes, 1, "one decode of the catalogue text per boot")
 	end)
 
+	-- Each local-server catalogue load (local_servers.lua at boot, then this
+	-- module's load) decoded local_servers.json again: one 16 KB text, two decodes.
+	helpers.it("decodes the local servers' text once for both of its boot owners", function()
+		local path = require("core.fs.engine.paths").shared("ai/data/local_servers.json")
+		local fh = assert(io.open(path, "rb"))
+		local text = fh:read("*a")
+		fh:close()
+		local decode = Json.decode
+		local decodes = 0
+		Json.decode = function(raw)
+			if raw == text then decodes = decodes + 1 end
+			return decode(raw)
+		end
+		local ok, err = pcall(function()
+			-- An edited text is decoded again: no root decoded before this test is reused
+			Json.decode_shared(path, "{}")
+			local order = helpers.load_module("ai.engine.local_servers.catalogue").load({})
+			helpers.assert_true(#order > 1, "the local catalogue loads its servers")
+			local remote = load_remote()
+			helpers.assert_true(remote.provider(order[1]) ~= nil, "the remote owner publishes the local servers")
+		end)
+		Json.decode = decode
+		unload()
+		assert(ok, err)
+		helpers.assert_eq(decodes, 1, "one decode of the local servers' text per boot")
+	end)
+
 	helpers.it("exposes the shared connectivity probe", function()
 		local remote = load_remote()
 		local spec = remote.test_request_spec()

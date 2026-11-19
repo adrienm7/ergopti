@@ -413,7 +413,8 @@ Test("_LLMRemoteBuildPayload: a local server turns thinking off (local-request-f
 
 
 _RemotePayload_LocalRequestFields_FailClosed() {
-	Fields := _LLMRemote_LocalRequestFields('{"request_fields":{"_comment":"d","list":[1],"empty":{},"none":null,"flag":true,"max_tokens":9}}')
+	Fields := _LLMRemote_LocalRequestFields(JsonParseWithMemberSpans(
+		'{"request_fields":{"_comment":"d","list":[1],"empty":{},"none":null,"flag":true,"max_tokens":9}}', []))
 	Assert(!Fields.Has("_comment") && !Fields.Has("list") && !Fields.Has("empty") && !Fields.Has("none"),
 		"documentation keys, arrays, empty objects and null are dropped")
 	Assert(Fields.Has("flag") && Fields["flag"] == "true", "a boolean keeps its JSON source")

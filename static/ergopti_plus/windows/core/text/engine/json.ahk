@@ -181,6 +181,20 @@ JsonParseWithMemberSpans(text, pathParts) {
 }
 
 /**
+ * Returns the member span tree of a document JsonParseWithMemberSpans decoded
+ * with the root path [], refusing a root that is not an object as
+ * JsonObjectMemberSpans refuses that text.
+ * @param {Map} Document JsonParseWithMemberSpans(text, []).
+ * @returns {Map} The root object's member span tree.
+ * @throws {TypeError} The root is not an object.
+ */
+JsonDocumentMembers(Document) {
+	if !(Document["members"] is Map)
+		throw _JsonNotAnObjectError()
+	return Document["members"]
+}
+
+/**
  * Returns the member spans of a span tree node (JsonObjectMemberSpanTree).
  * @param {Map} Span One span of a member span tree.
  * @returns {Map} Its own member spans.

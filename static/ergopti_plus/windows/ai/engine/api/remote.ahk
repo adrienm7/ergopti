@@ -2614,16 +2614,22 @@ _LLMRemote_CatalogPriceIsValid(value) {
 ; The source text travels verbatim because JsonParse decodes JSON booleans as
 ; 0/1, and a chat template's enable_thinking must stay the literal false.
 ; Documentation keys start with _; a field that is not plain JSON (arrays,
-; null, empty objects) is dropped alone, as the shared Lua policy does.
-_LLMRemote_LocalRequestFields(Text) {
+; null, empty objects) is dropped alone, as the shared Lua policy does. A
+; missing or non-object request_fields projects no field.
+; @param {Map} Document JsonParseWithMemberSpans(local_servers.json text, []):
+;     each field's source comes from its span and its value from the decoded
+;     root, so no slice of the text is walked again.
+_LLMRemote_LocalRequestFields(Document) {
     Fields := Map()
-    try Members := JsonObjectMemberSpans(Text, ["request_fields"])
-    catch
+    Members := Document["members"]
+    if !(Members is Map) || !Members.Has("request_fields") || Members["request_fields"]["kind"] != "object"
         return Fields
-    for Name, Span in Members {
+    ; Both keep the last of two equal keys, so a name has one value in each
+    Decoded := Document["root"]["request_fields"]
+    for Name, Span in Members["request_fields"]["members"] {
         if !RegExMatch(Name, "^[A-Za-z][A-Za-z0-9_]*$")
             continue
-        if _LLMRemote_RequestValueIsPlain(JsonParse(Span["text"]))
+        if _LLMRemote_RequestValueIsPlain(Decoded[Name])
             Fields[Name] := Span["text"]
     }
     return Fields
@@ -2821,13 +2827,17 @@ _LLMRemote_LoadCatalog() {
     LocalDialect := Map()
     try {
         LocalText := FSReadUtf8Exact(_SharedDir . "\ai\data\local_servers.json")
-        LocalRoot := JsonParse(LocalText)
+        ; One decode also returns every member's source: request_fields and
+        ; thinking_dialect travel as JSON source, and validating the text whole
+        ; twice more for them walked it three times (perf-ai-catalogue-walks-2026-11-18)
+        LocalDocument := JsonParseWithMemberSpans(LocalText, [])
+        LocalRoot := LocalDocument["root"]
         LocalCatalogue := LocalServerAuthCatalogue(LocalRoot, candidateProviders)
-        LocalRequestFields := _LLMRemote_LocalRequestFields(LocalText)
+        LocalRequestFields := _LLMRemote_LocalRequestFields(LocalDocument)
         ; The family controls a local server carries, on top of request_fields
         try {
-            LocalSpans := JsonObjectMemberSpans(LocalText)
-            LocalDialect := LLM_ThinkingOffParseDialect(LocalSpans.Has("thinking_dialect") ? LocalSpans["thinking_dialect"]["text"] : "")
+            LocalSpans := JsonDocumentMembers(LocalDocument)
+            LocalDialect := LLM_ThinkingOffParseDialectSpan(LocalSpans.Get("thinking_dialect", ""))
         } catch as DialectErr {
             LocalDialect := Map()
             try LoggerError("LLM.remote", "local_servers.json thinking_dialect is invalid ({1}); only request_fields apply.", DialectErr.Message)

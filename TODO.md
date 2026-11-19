@@ -309,8 +309,14 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       text, 119 to 61 ms. The whole boot stayed inside its noise (6.53 to 6.43 s). Linux decoded the same text
       three times for two owners (the remote catalogue and both local-server catalogue loads); it now decodes
       it once (`Json.decode_shared`), about 9 ms less (4.4 ms per LuaJIT decode under WSL). macOS decodes it once natively and once lossless, which the shape proof
-      needs, and walks no slice again. Left: `local_servers.json` is still decoded, then walked twice for spans
-      in the same include.
+      needs, and walks no slice again. Done 19 November: the same include decoded `local_servers.json`
+      (16 KB), validated it whole twice more (request_fields, thinking_dialect), decoded each request field's
+      slice and walked the dialect's slice again, 5 passes; one `JsonParseWithMemberSpans` now serves them,
+      1 pass, every logged refusal kept (`test_remote_catalog_refusals.ahk`). Same bench, 4 interleaved
+      rounds, medians of 12: the AI stage 123 to 114 ms wall and 125 to 109 ms CPU, inside a noisy PC's
+      spread; the whole boot inside its noise (5.52 to 5.48 s). Linux decoded the file once per local
+      catalogue load, two at boot; `Json.decode_shared` now serves both (1.2 ms per LuaJIT decode under WSL).
+      macOS loads it once, natively and lossless for the shape proof, like `api_providers.json`.
 - [ ] **[RELEASE] Before publishing.** On a quiet PC with no resident driver: the whole AHK suite,
       `npm run test:ahk-tray-rows-read-as-text`, every live check including `quit-over-a-log-flush`, the JS, macOS and
       Linux suites, and a Windows field report with a driver.

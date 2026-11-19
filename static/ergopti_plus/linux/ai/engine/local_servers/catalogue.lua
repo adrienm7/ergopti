@@ -43,7 +43,9 @@ end
 function M.load(occupied)
 	local path = Paths.shared("ai/data/local_servers.json")
 	local raw = read_source(path)
-	local root = type(raw) == "string" and Json.decode(raw) or nil
+	-- Every load reads the same text (two at boot: local_servers.lua and
+	-- api_remote.lua): one decode serves them while the file is unchanged
+	local root = type(raw) == "string" and Json.decode_shared(path, raw) or nil
 	if type(root) ~= "table" then
 		Logger.error("llm.local_server_catalogue", "The local API catalogue is unavailable; optional authentication is refused.")
 		return {}, {}, false, {}, {}, {}, {}

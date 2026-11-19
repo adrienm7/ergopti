@@ -6,14 +6,18 @@
 ; Feeds malformed api_providers.json catalogues to the real loader
 ; (_LLMRemote_LoadCatalog) and pins each refusal with its exact message: the
 ; whole catalogue for a syntax or shape error, one provider for a malformed
-; thinking_dialect. Then counts the complete-document passes of one load.
+; thinking_dialect. Does the same for local_servers.json, read by the same load,
+; whose refusals are logged instead. Then counts the complete-document passes
+; of one load, per owner.
 ;
 ; ROOT CAUSE ENCODED:
 ; The boot decoded the catalogue, validated the whole text again to find each
 ; provider's source, then validated each provider's source once more for its
 ; thinking_dialect: about 45-60 ms of the AI catalogue stage repeated work the
-; decode had already done. The refusals below were captured on that loader and
-; must not change.
+; decode had already done. It decoded local_servers.json, then validated it
+; whole twice more (for request_fields and for thinking_dialect), decoded each
+; request field's slice again and walked the dialect's slice once more. The
+; refusals below were captured on those loaders and must not change.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -37,12 +41,15 @@ _RCR_Descriptor(Extra := "") {
 ; Loads one catalogue text from a private shared root, then restores every
 ; global the load publishes.
 ; @param {String} Text The api_providers.json source.
+; @param {String} LocalText The local_servers.json source; the file is absent
+;     when it is omitted.
 ; @returns {Map} "thrown" (the load's error message, "" when it returned),
 ;     "threw" (whether the load threw, so an Error("") still counts),
 ;     "logged" (every log line of the load), "providers" (the published
-;     provider registry) and "tally" (JsonDecodeTally deltas of the load).
-_RCR_Load(Text) {
-	global _SharedDir, LLM_API_PROVIDERS
+;     provider registry), "local_servers" (the published local servers) and
+;     "tally" (JsonDecodeTally deltas of the load).
+_RCR_Load(Text, LocalText := unset) {
+	global _SharedDir, LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS
 	static Serial := 0
 	Serial += 1
 	Published := _RemoteCatalog_SnapshotPublished()
@@ -53,6 +60,8 @@ _RCR_Load(Text) {
 	try {
 		DirCreate(Root . "\ai\data")
 		FileAppend(Text, Root . "\ai\data\api_providers.json", "UTF-8-RAW")
+		if IsSet(LocalText)
+			FileAppend(LocalText, Root . "\ai\data\local_servers.json", "UTF-8-RAW")
 		_SharedDir := Root
 		LoggerSetTestSink((Line) => Lines.Push(Line))
 		Before := JsonDecodeTally()
@@ -67,6 +76,7 @@ _RCR_Load(Text) {
 			Delta[Name] := Value - Before[Name]
 		Result["tally"] := Delta
 		Result["providers"] := LLM_API_PROVIDERS
+		Result["local_servers"] := LLM_LOCAL_API_SERVERS
 	} finally {
 		LoggerClearTestSink()
 		_SharedDir := OldSharedDir
@@ -248,3 +258,139 @@ _RCR_ShippedCatalogueWalkedOnce() {
 		"the catalogue's text is walked once, so its extra code units count once")
 }
 Test("api_providers.json: one load walks the catalogue text once", _RCR_ShippedCatalogueWalkedOnce)
+
+
+
+
+
+; ============================================
+; ============================================
+; ======= 5/ Local servers' catalogue ========
+; ============================================
+; ============================================
+
+; A minimal api_providers.json, so that a load reaches local_servers.json.
+_RCR_MinimalCatalogue() {
+	return '{"provider_order": ["p"], "providers": {"p": ' . _RCR_Descriptor() . '}, "model_prices": {}}'
+}
+
+; A local_servers.json with one valid server, srv, and Extra root members.
+_RCR_LocalCatalogue(Extra := "") {
+	return '{"server_order": ["srv"], "servers": {"srv": {"label": "S", "base_url": "http://127.0.0.1:9/v1",'
+		. ' "auth": "optional", "discovery": {"process_names": ["srv"]}}}' . (Extra == "" ? "" : ", " . Extra) . "}"
+}
+
+; The local catalogue's log messages of one load, without their log prefix.
+_RCR_LocalLines(Result) {
+	Lines := []
+	for Line in Result["logged"] {
+		Start := InStr(Line, "The local API catalogue", true)
+		if !Start
+			Start := InStr(Line, "local_servers.json", true)
+		if Start
+			Lines.Push(SubStr(Line, Start))
+	}
+	return Lines
+}
+
+; One line per member of a Map of strings, in key order: "" for an empty Map.
+_RCR_MapText(Fields) {
+	Text := ""
+	for Name, Value in Fields
+		Text .= Name . "=" . Value . "`n"
+	return Text
+}
+
+_RCR_LocalRefusals() {
+	Unavailable := "The local API catalogue is unavailable; optional authentication is refused."
+	NotObject := "local_servers.json thinking_dialect is invalid (Selected JSON member is not an object.); only request_fields apply."
+	; [local_servers.json, its log messages, srv's request fields, srv's dialect];
+	; fields of 0 mean that srv is not published
+	Cases := [
+		['{"server_order": [', [Unavailable], 0, 0],
+		['{} x', [Unavailable], 0, 0],
+		['{"a": tru}', [Unavailable], 0, 0],
+		['[]', [NotObject], 0, 0],
+		['"x"', [NotObject], 0, 0],
+		[_RCR_LocalCatalogue(), [], "", ""],
+		[_RCR_LocalCatalogue('"request_fields": []'), [], "", ""],
+		[_RCR_LocalCatalogue('"request_fields": "x"'), [], "", ""],
+		[_RCR_LocalCatalogue('"request_fields": {"_doc": "d", "1bad": 1, "arr": [1], "nul": null, "empty": {},'
+			. ' "ok": false, "num": 2, "nest": {"a": {"b": true}}, "badnest": {"a-b": 1}}'), [],
+			'nest={"a": {"b": true}}`nnum=2`nok=false`n', ""],
+		; The decoder keeps the last of two equal keys, at every depth
+		[_RCR_LocalCatalogue('"request_fields": {"a": 1}, "request_fields": {"b": 2}'), [], "b=2`n", ""],
+		[_RCR_LocalCatalogue('"request_fields": {"a": [1], "a": 3, "c": 4, "c": [1]}'), [], "a=3`n", ""],
+		[_RCR_LocalCatalogue('"request_fields": {"k": 1}'), [], "k=1`n", ""],
+		; A refused dialect leaves request_fields in force
+		[_RCR_LocalCatalogue('"request_fields": {"k": 1}, "thinking_dialect": "x"'), [NotObject], "k=1`n", ""],
+		[_RCR_LocalCatalogue('"thinking_dialect": null'), [NotObject], "", ""],
+		[_RCR_LocalCatalogue('"thinking_dialect": []'), [NotObject], "", ""],
+		[_RCR_LocalCatalogue('"thinking_dialect": {"bogus": {"a": 1}}'),
+			["local_servers.json thinking_dialect is invalid (thinking_dialect has an unknown kind bogus.); only request_fields apply."], "", ""],
+		[_RCR_LocalCatalogue('"thinking_dialect": {"toggle": {}}'),
+			["local_servers.json thinking_dialect is invalid (thinking_dialect.toggle has invalid fields.); only request_fields apply."], "", ""],
+		[_RCR_LocalCatalogue('"thinking_dialect": {"effort": {"e": "low"}}'),
+			["local_servers.json thinking_dialect is invalid (thinking_dialect.effort needs a level.); only request_fields apply."], "", ""],
+		[_RCR_LocalCatalogue('"thinking_dialect": {"toggle": {"x": "$level"}}'),
+			["local_servers.json thinking_dialect is invalid (thinking_dialect.toggle cannot hold a level.); only request_fields apply."], "", ""],
+		[_RCR_LocalCatalogue('"thinking_dialect": {"_c": [null], "toggle": {"t": false}, "effort": {"r": "$level"}}'), [], "",
+			'effort={"r": "$level"}`ntoggle={"t": false}`n'],
+		[_RCR_LocalCatalogue('"thinking_dialect": 1, "thinking_dialect": {"toggle": {"t": true}}'), [], "", 'toggle={"t": true}`n'],
+		[_RCR_LocalCatalogue('"thinking_dialect": {"toggle": {"t": true}}, "thinking_dialect": 1'), [NotObject], "", ""]
+	]
+	for Row in Cases {
+		Label := SubStr(Row[1], 1, 40) . "..." . SubStr(Row[1], -60)
+		Result := _RCR_Load(_RCR_MinimalCatalogue(), Row[1])
+		AssertFalse(Result["threw"], "a malformed local catalogue never refuses the remote catalogue: " . Label)
+		Lines := _RCR_LocalLines(Result)
+		AssertEqual(Row[2].Length, Lines.Length, "the number of local catalogue messages of " . Label)
+		for Index, Expected in Row[2]
+			AssertEqual(Expected, Lines.Length >= Index ? Lines[Index] : "", "the local catalogue message of " . Label)
+		Published := Result["providers"]
+		if (Row[3] == 0) {
+			AssertFalse(Published.Has("srv"), "no local server is published from " . Label)
+			AssertEqual(0, Result["local_servers"].Count, "no local server is admitted from " . Label)
+			continue
+		}
+		AssertTrue(Published.Has("srv"), "srv is published from " . Label)
+		AssertEqual(Row[3], _RCR_MapText(Published["srv"]["RequestFields"]), "srv's request fields from " . Label)
+		AssertEqual(Row[4], _RCR_MapText(Published["srv"]["ThinkingDialect"]), "srv's dialect from " . Label)
+	}
+}
+Test("local_servers.json: a malformed catalogue, field or dialect is refused with its message", _RCR_LocalRefusals)
+
+; The local servers' owner walks local_servers.json as one complete document:
+; its decode is that walk, and finding the exact source of request_fields and
+; of thinking_dialect walks no text again, neither the whole file nor a field's
+; or the dialect's slice. Counted by owner: a load of the minimal remote
+; catalogue and a minimal local one makes one pass over each text and no other
+; (an absent file is no baseline: its logged refusal costs a pass of its own),
+; and the shipped local catalogue costs that load's passes and no more.
+_RCR_ShippedLocalCatalogueWalkedOnce() {
+	global _SharedDir
+	Shipped := FileRead(_SharedDir . "\ai\data\local_servers.json", "UTF-8")
+	Minimal := _RCR_Load(_RCR_MinimalCatalogue(), _RCR_LocalCatalogue())
+	With := _RCR_Load(_RCR_MinimalCatalogue(), Shipped)
+	AssertFalse(Minimal["threw"], "the minimal local catalogue loads")
+	AssertEqual(0, _RCR_LocalLines(Minimal).Length, "the minimal local catalogue logs no refusal")
+	AssertEqual(2, Minimal["tally"]["document_passes"],
+		"one pass for the remote catalogue's owner and one for the local servers' owner")
+	AssertEqual(StrLen(_RCR_MinimalCatalogue()) + StrLen(_RCR_LocalCatalogue()), Minimal["tally"]["document_units"],
+		"each owner walks its own text once, whole")
+	AssertFalse(With["threw"], "the shipped local catalogue loads")
+	AssertEqual(0, _RCR_LocalLines(With).Length, "the shipped local catalogue logs no refusal")
+	Fields := 0, Dialects := 0
+	for Id in With["local_servers"] {
+		Fields := Max(Fields, With["providers"][Id]["RequestFields"].Count)
+		Dialects := Max(Dialects, With["providers"][Id]["ThinkingDialect"].Count)
+	}
+	AssertTrue(With["local_servers"].Count > 1, "the shipped local catalogue still publishes several servers")
+	AssertTrue(Fields > 0 && Dialects > 1, "the shipped local catalogue still carries request fields and dialect kinds to read")
+	AssertEqual(Minimal["tally"]["document_passes"], With["tally"]["document_passes"],
+		"a server, a request field or a dialect adds no complete-document pass to the load")
+	AssertEqual(StrLen(Shipped) - StrLen(_RCR_LocalCatalogue()),
+		With["tally"]["document_units"] - Minimal["tally"]["document_units"],
+		"local_servers.json is walked once, so its extra code units count once")
+}
+Test("local_servers.json: one load walks the local catalogue text once", _RCR_ShippedLocalCatalogueWalkedOnce)
