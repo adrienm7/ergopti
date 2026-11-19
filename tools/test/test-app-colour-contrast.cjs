@@ -185,10 +185,15 @@ for (const dark of [false, true]) {
 
 // 3/ The metrics dashboards' muted text
 const metricsLook = THEME.slice(THEME.indexOf('4/ Metrics look'), THEME.indexOf('5/ Chart look'));
-/** A token's colour, following var(--theme-…) references through the theme. */
-function resolve(value) {
+/**
+ * A token's colour, following var() references through a page's own
+ * custom properties first, then through the theme.
+ */
+function resolve(value, local = '') {
 	const ref = value.match(/^var\(--([a-z0-9-]+)\)$/);
-	return ref ? resolve(token(THEME, ref[1])) : value;
+	if (!ref) return value;
+	const own = local.match(new RegExp('--' + ref[1] + ':\\s*([^;]+);'));
+	return resolve(own ? own[1].trim() : token(THEME, ref[1]), local);
 }
 for (const dark of [false, true]) {
 	const tokens = dark
@@ -205,6 +210,11 @@ for (const dark of [false, true]) {
 // 4/ The onboarding and the download window (a11y-cvd-2026-11-18)
 const ONBOARDING_CSS = fs.readFileSync(shared('ui', 'onboarding', 'style.css'), 'utf8');
 const DOWNLOAD_CSS = fs.readFileSync(shared('ui', 'download_window', 'style.css'), 'utf8');
+// A page may alias a theme colour as its own custom property (the onboarding pins
+// its accent to the light blue): the measured colour is the one the alias names.
+const PAGE_TOKENS = [ONBOARDING_CSS, DOWNLOAD_CSS]
+	.map((css) => [...css.matchAll(/(?:^|\n):root \{([^}]*)\}/g)].map((m) => m[1]).join('\n'))
+	.join('\n');
 /** A plain property's value in a block of declarations. */
 function prop(declarations, name) {
 	const match = declarations.match(new RegExp('(?:^|[\\s;{])' + name + ':\\s*([^;]+);'));
@@ -218,7 +228,7 @@ function paint(value, ground) {
 		const alpha = Number(rgba[4]);
 		return [1, 2, 3].map((i, j) => (Number(rgba[i]) / 255) * alpha + ground[j] * (1 - alpha));
 	}
-	return channels(resolve(value));
+	return channels(resolve(value, PAGE_TOKENS));
 }
 const readable = (fg, bg, what) =>
 	assert.ok(contrast(fg, bg) >= TEXT_CONTRAST, what + ': ' + contrast(fg, bg).toFixed(2) + ':1');
