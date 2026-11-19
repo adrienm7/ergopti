@@ -3,27 +3,21 @@
 		"index.html": [
 			{
 				"tag": "div",
-				"count": 22,
-				"pending": true
+				"where": "class=\"progress-group\"",
+				"count": 1,
+				"reason": "Holds the download-only rows (percentage, bar, stats) so the bootstrap mode hides them in one rule; the window's h1 already names what they measure"
+			},
+			{
+				"tag": "div",
+				"where": "id=\"bootstrap-group\"",
+				"count": 1,
+				"reason": "Holds the install-only rows (step, detail, bar) so the download mode hides them in one rule; the window's h1 already names what they measure"
 			},
 			{
 				"tag": "span",
+				"where": "data-i18n=\"download_window.eta_label\"",
 				"count": 1,
-				"pending": true
-			}
-		],
-		"network_failure.js": [
-			{
-				"tag": "div",
-				"count": 1,
-				"pending": true
-			}
-		],
-		"script.js": [
-			{
-				"tag": "span",
-				"count": 2,
-				"pending": true
+				"reason": "The label text i18n fills before the bold remaining time in the same list item; the value beside it is updated alone"
 			}
 		]
 	}

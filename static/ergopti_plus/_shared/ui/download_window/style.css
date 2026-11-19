@@ -123,24 +123,33 @@ body.mode-bootstrap .btn-row {
 /* ======================================= */
 /* ======================================= */
 
-#bar-bg {
+/* A progress element drawn as the track and its gradient fill; the
+   WebKit and Chromium engines of the three hosts style its two parts. */
+#bar-fill {
+	appearance: none;
 	background: var(--theme-gray4-dark);
+	border: 0;
 	border-radius: 4px;
+	display: block;
 	flex-shrink: 0; /* Prevent the progress bar from shrinking when logs fill up */
 	height: 12px;
 	margin-bottom: 14px;
 	overflow: hidden;
+	width: 100%;
 }
 
-#bar-fill {
+#bar-fill::-webkit-progress-bar {
+	background: var(--theme-gray4-dark);
+	border-radius: 4px;
+}
+
+#bar-fill::-webkit-progress-value {
 	background: linear-gradient(90deg, var(--theme-green-dark), var(--theme-green));
 	border-radius: 4px;
-	height: 100%;
 	transition: width 0.35s ease;
-	width: 0%;
 }
 
-#bar-fill.error {
+#bar-fill.error::-webkit-progress-value {
 	background: linear-gradient(90deg, var(--theme-red-dark), var(--theme-hue-ff6b5f));
 }
 
@@ -173,6 +182,7 @@ body.mode-bootstrap .btn-row {
 	color: var(--theme-grey-999);
 	font-size: 12px;
 	line-height: 1.8;
+	list-style: none;
 	min-height: 44px;
 }
 
@@ -188,11 +198,6 @@ body.mode-bootstrap .btn-row {
 #eta {
 	color: var(--theme-white);
 	font-size: 16px;
-}
-
-.gap {
-	display: inline-block;
-	width: 1em;
 }
 
 /* ============================================== */
@@ -223,36 +228,44 @@ body.is-error #step-line {
 	white-space: nowrap;
 }
 
-#bootstrap-bar-bg {
+/* The bootstrap progress element, a thin track and a fill coloured by kind. */
+#bootstrap-bar-fill {
+	appearance: none;
 	background: var(--theme-gray4-dark);
+	border: 0;
 	border-radius: 2px;
+	display: block;
 	height: 4px;
 	overflow: hidden;
+	width: 100%;
 }
 
-#bootstrap-bar-fill {
+#bootstrap-bar-fill::-webkit-progress-bar {
+	background: var(--theme-gray4-dark);
+	border-radius: 2px;
+}
+
+#bootstrap-bar-fill::-webkit-progress-value {
 	background: var(--theme-hue-4da6ff);
 	border-radius: 2px;
-	height: 100%;
 	transition:
 		width 0.35s ease,
 		background 0.25s ease;
-	width: 0%;
 }
 
-body.kind-mlx_install #bootstrap-bar-fill {
+body.kind-mlx_install #bootstrap-bar-fill::-webkit-progress-value {
 	background: var(--theme-hue-4da6ff);
 }
-body.kind-ollama_install #bootstrap-bar-fill {
+body.kind-ollama_install #bootstrap-bar-fill::-webkit-progress-value {
 	background: var(--theme-hue-73d98c);
 }
-body.kind-mlx_model #bootstrap-bar-fill {
+body.kind-mlx_model #bootstrap-bar-fill::-webkit-progress-value {
 	background: var(--theme-hue-9973f2);
 }
-body.kind-ollama_model #bootstrap-bar-fill {
+body.kind-ollama_model #bootstrap-bar-fill::-webkit-progress-value {
 	background: var(--theme-hue-f2bf4d);
 }
-body.is-error #bootstrap-bar-fill {
+body.is-error #bootstrap-bar-fill::-webkit-progress-value {
 	background: var(--theme-red-dark);
 }
 

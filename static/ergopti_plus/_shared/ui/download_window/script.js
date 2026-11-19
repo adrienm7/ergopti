@@ -132,11 +132,10 @@ function setProgress(pct) {
 	const fill = document.getElementById('bootstrap-bar-fill');
 	if (!fill) return;
 	if (pct === null || pct === undefined) {
-		fill.style.width = '0%';
+		fill.value = 0;
 		return;
 	}
-	const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
-	fill.style.width = clamped + '%';
+	fill.value = Math.max(0, Math.min(100, Number(pct) || 0));
 }
 
 /**
@@ -202,7 +201,7 @@ function resetUI() {
 	globalErrorKind = null;
 
 	const barFill = document.getElementById('bar-fill');
-	barFill.style.width = '0%';
+	barFill.value = 0;
 	barFill.classList.remove('error');
 
 	const pctEl = document.getElementById('pct');
@@ -261,7 +260,7 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 	if (globalDoneState) return; // Cap at 99% during download: 100% is reserved exclusively for done()
 
 	const cappedPercentage = Math.min(Math.max(0, parseInt(percentage) || 0), 99);
-	document.getElementById('bar-fill').style.width = cappedPercentage + '%';
+	document.getElementById('bar-fill').value = cappedPercentage;
 	document.getElementById('pct').textContent = cappedPercentage + ' %'; // Line 1: Fichiers (next to percentage, pushed right by CSS)
 
 	const fileCountEl = document.getElementById('file-count');
@@ -287,7 +286,8 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 
 	if (detailsParts.length > 0) {
 		statsDetails.innerHTML = detailsParts.join(
-			'<span class="gap"></span>—<span class="gap"></span>'
+			// An em space each side of the dash: the gap the stats always had.
+			' — '
 		);
 		statsDetails.style.display = 'block';
 		document.getElementById('stats-fallback').style.display = 'none';
@@ -355,12 +355,12 @@ function done(isSuccess, message, errorKind) {
 
 	const progressBar = document.getElementById('bar-fill');
 	if (isSuccess) {
-		progressBar.style.width = '100%';
+		progressBar.value = 100;
 		progressBar.classList.remove('error');
 		document.getElementById('pct').textContent = '100 %';
 	} else {
 		progressBar.classList.add('error');
-		progressBar.style.width = '100%';
+		progressBar.value = 100;
 		document.getElementById('pct').textContent = '❌';
 		document.getElementById('pct').style.color = ThemeTokens.color('red-dark');
 	} // Hide specific stats, files count and ETA to make room for the final message
