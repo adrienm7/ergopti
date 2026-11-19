@@ -5,6 +5,48 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The layout menu: one menu, three sections (2026-11-19)
+
+Maintainer requests of 2026-11-19: swap « Ergopti Studio » and the layout menu
+in the tray root, rename the layout menu, perhaps split it into « emulation »
+and « installed layouts », and in any case leave no duplicate of a Studio row.
+The tray root reads « 🎨 Ergopti Studio… » then « 🌐 Dispositions et
+émulation » (`menu.layout.title`, « Layouts and emulation »), on the three OS.
+The menu stays ONE submenu with three headed sections, decided by the agent,
+to review by the maintainer (TODO « Maintainer decisions pending »):
+
+1. « Émulation, sans installer la disposition » (`menu.layout.header_emulation`):
+   the layout to emulate, « Couches émulées » with the two layer rows, the
+   « Rangées émulées » submenu, and the Karabiner keyboard type on macOS.
+2. « Sources de saisie » (the approved `menu.layout.active_layouts` label): the
+   system layouts with the active one ticked, the pause / resume switch,
+   Linux's Compose row, « Installer ou retirer des dispositions… » (the layout
+   manager, `menu.layout.manage`), the macOS `.bundle` rows and the Windows
+   installer download.
+3. « Toutes dispositions » (`menu.layout.header_any`): base layouts (Linux), the
+   number row, accented-letter shortcuts (Windows, Linux), the magic key, Ctrl+★
+   save (Windows) and the menubar icon (macOS), last.
+
+Why not two submenus: 17 rows on Windows and 16 on macOS and Linux, plus four
+headers, before the rework (15, 14 and 14 after it), of which three or four act
+on any layout and would belong to neither submenu, so a split still needs a
+third place; the restore and clear
+rows act on the whole layout scope; every action would take one more click, and
+« Rangées émulées » would sit four levels deep. Three headers in one menu read
+as clearly at that size. The split stays the alternative if the menu grows.
+
+Duplicates removed: « Créer ou modifier une disposition… » (`open_layout_editor`)
+opened Ergopti Studio, which the tray root's row opens (the layout manager's
+« Layout editor » button still opens it on its editor tab, Windows included
+since this change); « Disposition personnalisée » (`custom_layouts`) listed on
+macOS and Linux the registry layouts « Sources de saisie » lists with the same
+switch (the layout manager still selects an installed one), and on Windows the
+emulated layout the « Disposition à émuler » row already names.
+`tools/test/test-menu-no-duplicate-actions.cjs` holds one row per action and the
+root order. Action: a new layout row goes into the section that answers its
+question, never into a fourth place, and a row that opens Studio lives in the
+tray root only.
+
 ## Layout score: SFB travel and access weights (2026-11-19)
 
 Decided by the maintainer on 2026-11-19: `sfb` is 5 and `sfb_distance` 0.26

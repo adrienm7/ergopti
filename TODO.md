@@ -541,6 +541,20 @@ Each closes on a named green hosted or native run, recorded here.
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
+- [ ] **Layout menu: one menu, three sections (decided by the agent on 2026-11-19, to review by the maintainer).**
+      « Ergopti Studio » now comes right before the layout menu, renamed « 🌐 Dispositions et émulation » in the
+      21 locales. Kept as ONE submenu with three headers: « Émulation, sans installer la disposition » (layout to
+      emulate, layers, emulated rows, Karabiner keyboard), « Sources de saisie » (system layouts, pause / resume
+      switch, Compose, « Installer ou retirer des dispositions… », the macOS `.bundle` and Windows installer rows),
+      « Toutes dispositions » (number row, accented shortcuts, magic key, Ctrl+★, menubar icon). Removed as
+      duplicates: « Créer ou modifier une disposition… » (Studio's) and « Disposition personnalisée » (the input
+      sources' and the emulated layout's). Why: 14 to 15 rows per OS, three or four of which fit neither half of a
+      split, and a split adds a click and a fourth level (« The layout menu: one menu, three sections » in
+      [maintainer decisions](docs/memory/maintainer-decisions.md)).
+  1. **(chosen) One menu, three sections**, as above.
+  2. Two submenus, « Émulation de la disposition » and « Dispositions installées », with the any-layout rows and
+     the restore and clear rows left in the parent.
+
 - [ ] **The left thumb's second key (decided by the agent on 2026-11-19, to review by the maintainer).** The
       thumbs' own keys are NonConvert (left thumb), Convert and KanaMode (right), as on JIS; their effort and pairs
       were settled on 2026-11-19 (docs/memory/maintainer-decisions.md). Kept meanwhile: one key for the left thumb,
