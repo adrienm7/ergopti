@@ -224,9 +224,9 @@
 		<p id="lo-change-weight-help" class="lo-muted lo-note" data-i18n="layout_optimizer.change.weight_help"></p>
 		<p class="lo-change-row">
 			<input id="lo-change-limit" type="checkbox" />
-			<label for="lo-change-limit" data-i18n="layout_optimizer.change.limit"></label>
+			<label id="lo-change-limit-label" for="lo-change-limit" data-i18n="layout_optimizer.change.limit"></label>
 			<input id="lo-change-max" type="number" min="0" max="200" step="1"
-				aria-labelledby="lo-change-limit lo-change-max-unit" />
+				aria-labelledby="lo-change-limit-label lo-change-max-unit" />
 			<label id="lo-change-max-unit" for="lo-change-max" data-i18n="layout_optimizer.change.limit_unit"></label>
 		</p>
 		<p class="lo-muted lo-note" data-i18n="layout_optimizer.change.limit_help"></p>
@@ -334,7 +334,7 @@
 		</figure>
 	</div>
 	<p id="lo-changed" class="lo-muted"></p>
-	<section id="lo-tradeoff" class="lo-tradeoff" aria-labelledby="lo-tradeoff-title" aria-live="polite">
+	<section id="lo-tradeoff" class="lo-tradeoff" aria-labelledby="lo-tradeoff-title">
 		<h3 id="lo-tradeoff-title" data-i18n="layout_optimizer.tradeoff.title"></h3>
 		<dl id="lo-tradeoff-facts" class="lo-tradeoff-facts"></dl>
 		<meter id="lo-tradeoff-meter" class="lo-tradeoff-meter" min="0" max="100" value="0" aria-hidden="true"></meter>
