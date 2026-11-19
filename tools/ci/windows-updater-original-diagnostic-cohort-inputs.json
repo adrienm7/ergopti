@@ -70,7 +70,7 @@
 	"diagnostic_only": true,
 	"private_cost_fixture_admitted": false,
 	"role": "candidate",
-	"source_pin_base": "f90ee80d578aa7fc638d2f50b2e778316dff7031",
+	"source_pin_base": "8b10d9a98ee70c0f7e96ef622a946f036eff76a0",
 	"runtime_qualification": "UNRUN",
 	"source_authority": "Pins are data; actual HEAD/Git object/API/artifact receiving remains independently required."
 }
