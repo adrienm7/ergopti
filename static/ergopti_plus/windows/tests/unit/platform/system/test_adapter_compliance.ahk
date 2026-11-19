@@ -77,10 +77,16 @@ _SFD_SecureApps_Shared() {
 	AssertTrue(SFD_IsSecureApp("RoboForm.exe"), "RoboForm is secure")
 	Saved := SFD_SECURE_APPS, SavedRoot := SFD_SECURE_APP_ROOT.Clone()
 	try {
-		SFD_SECURE_APP_ROOT["hwnd"] := 0
-		SFD_ProcessNameOf.DefineProp("Call", { Call: (Self, Root) => "RoboForm.exe" })
-		try AssertTrue(SFD_IsSecureField(A_ScriptHwnd), "a RoboForm.exe window is secure")
-		finally SFD_ProcessNameOf.DeleteProp("Call")
+		; SFC-05: SFD_IsSecureField(A_ScriptHwnd) is true for any process (the script
+		; window is no Edit control and the field path fails closed), so the case
+		; asserts the application axis, with notepad.exe as the negative control.
+		for ProcName, Expected in Map("RoboForm.exe", true, "notepad.exe", false) {
+			SFD_SECURE_APP_ROOT["hwnd"] := 0
+			SFD_ProcessNameOf.DefineProp("Call", { Call: ((Name, Self, Root) => Name).Bind(ProcName) })
+			try AssertEqual(Expected, !!SFD_IsSecureAppWindow(A_ScriptHwnd),
+				"a " . ProcName . " window is " . (Expected ? "" : "not ") . "a secure application (sfc-05)")
+			finally SFD_ProcessNameOf.DeleteProp("Call")
+		}
 		SFD_SECURE_APPS := -1
 		AssertTrue(SFD_IsSecureApp("notepad.exe"), "an unreadable list makes every application secure")
 	} finally {
