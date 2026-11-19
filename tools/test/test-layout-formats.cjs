@@ -1192,11 +1192,18 @@ check(
 		cyano.unmapped.length === 0,
 	`cyanophage link: ${JSON.stringify(cyano.layout.rows.KeyQ)} ${JSON.stringify(cyano.unmapped)}`
 );
-// A letter on its thumb has no key here: named, not dropped in silence.
+// A letter on its thumb goes on the left thumb's rest key; a 35th key is named.
 const cyanoThumb = F.fromCyanophage("qwrtyuiop[-asdfghjkl;'zxcvbnm,./\\e");
 check(
-	cyanoThumb.unmapped.some((u) => u.what === 'key' && u.detail === '34 (e)'),
-	`cyanophage thumb letter: ${JSON.stringify(cyanoThumb.unmapped)}`
+	cyanoThumb.layout.rows.NonConvert &&
+		cyanoThumb.layout.rows.NonConvert[0] === 'e' &&
+		cyanoThumb.unmapped.length === 0,
+	`cyanophage thumb letter: ${JSON.stringify(cyanoThumb.layout.rows.NonConvert)}`
+);
+const cyanoExtra = F.fromCyanophage("qwrtyuiop[-asdfghjkl;'zxcvbnm,./\\e@");
+check(
+	cyanoExtra.unmapped.some((u) => u.what === 'key' && u.detail === '35 (@)'),
+	`cyanophage 35th key: ${JSON.stringify(cyanoExtra.unmapped)}`
 );
 const cyanoTen = F.readText('qwertyuiopasdfghjkl;zxcvbnm,./', readTools);
 check(

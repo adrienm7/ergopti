@@ -127,8 +127,8 @@ var LAYOUT_FORMATS = (function () {
 	// exportLayout): its « layout » parameter holds 34 characters, three rows of
 	// 11 then the thumb key. Index 10 is the top row's 11th key, 21 the home
 	// row's, 32 the bottom row's key left of Z (row 2, column 0 of its rcdata),
-	// 33 the left thumb, 34 (a 35-character string) a key of its own boards
-	// with no place here. « ^ » marks the Shift key, which types no character,
+	// 33 the left thumb (the model's left thumb rest key), 34 (a 35-character
+	// string) a key of its own boards with no place here. « ^ » marks the Shift key, which types no character,
 	// and « $ » stands for « = ». A 30-character string is the three rows of
 	// 10, as its import box takes it.
 	const CYANOPHAGE_LENGTHS = [30, 33, 34, 35];
@@ -1829,9 +1829,12 @@ var LAYOUT_FORMATS = (function () {
 			if (raw === CYANOPHAGE_SHIFT) return;
 			const char = CYANOPHAGE_ALIASES[raw] || raw;
 			once(seen, char, { row: Math.floor(i / columns) + 1, column: (i % columns) + 1 });
-			const code = i < CYANOPHAGE_THUMB ? codes[i] : null;
+			// A character on its thumb key goes on the left thumb's rest key, as a
+			// KLA thumb letter does (KLA_THUMB_CODES).
+			const code =
+				i < CYANOPHAGE_THUMB ? codes[i] : i === CYANOPHAGE_THUMB ? KLA_THUMB_CODES.left[0] : null;
 			if (!code) {
-				// A letter on the thumb key, or the 35th key: no key of this keyboard holds it.
+				// The 35th key: no key of this keyboard holds it.
 				result.unmapped.push({ what: 'key', detail: `${i + 1} (${char})` });
 				return;
 			}
