@@ -2712,7 +2712,7 @@ function typingFindPage(host) {
 		}
 	});
 	document.querySelectorAll = (selector) =>
-		selector === 'span.find-highlight'
+		selector === 'mark.find-highlight'
 			? body.children.filter((node) => node.className === 'find-highlight')
 			: [];
 	document.contains = (node) => body.children.includes(node);
@@ -2964,7 +2964,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 				assert.equal(page.elements.get('total_rows').innerHTML, '');
 			} else {
 				assert.ok(
-					html.includes(`<span class="mono-space">${vector.key}</span>`),
+					html.includes(`<kbd class="mono-space">${vector.key}</kbd>`),
 					'the actual table must render the matching native character'
 				);
 				assert.ok(html.includes(`<td>${vector.count}</td>`));
@@ -3038,7 +3038,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 					page.context.render_current_tab();
 					page.timers.at(-1)();
 					const html = page.elements.get('metrics_table_body').innerHTML;
-					assert.ok(html.includes(`<span class="mono-space">${key}</span>`));
+					assert.ok(html.includes(`<kbd class="mono-space">${key}</kbd>`));
 					assert.ok(html.includes('<td>7</td>'));
 					assert.ok(
 						page.context.build_searchable_key('[BS]', false).includes('backspace'),
@@ -3055,7 +3055,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 					assert.ok(
 						page.elements
 							.get('metrics_table_body')
-							.innerHTML.includes(`<span class="mono-space">${key}</span>`)
+							.innerHTML.includes(`<kbd class="mono-space">${key}</kbd>`)
 					);
 					assert.equal(
 						page.diagnostics.some((entry) => entry.level === 'error'),
@@ -3136,7 +3136,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 					'word sequences keep one literal chip per recorded word'
 				);
 				for (const word of vector.words)
-					assert.ok(html.includes(`<span class="mono-space">${word}</span>`));
+					assert.ok(html.includes(`<kbd class="mono-space">${word}</kbd>`));
 				assert.equal(
 					(html.match(/class="shortcut-chip shortcut-mod-/g) || []).length,
 					vector.modifiers,
@@ -3201,7 +3201,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 					const html = page.elements.get('metrics_table_body').innerHTML;
 					assert.equal(vm.runInContext('app_state.rendered_list.length', page.context), 1);
 					assert.ok(
-						html.includes(`<span class="mono-space">${key}</span>`),
+						html.includes(`<kbd class="mono-space">${key}</kbd>`),
 						'ordinary words keep literal text instead of a keyboard control label'
 					);
 					assert.ok(html.includes('<td>7</td>'));
@@ -3216,7 +3216,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 					assert.ok(
 						page.elements
 							.get('metrics_table_body')
-							.innerHTML.includes(`<span class="mono-space">${key}</span>`)
+							.innerHTML.includes(`<kbd class="mono-space">${key}</kbd>`)
 					);
 					const controlCase = word[0].toUpperCase() + word.slice(1).toLowerCase();
 					const differentCase = word === controlCase ? word.toLowerCase() : controlCase;
@@ -3239,7 +3239,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 					assert.ok(
 						page.elements
 							.get('metrics_table_body')
-							.innerHTML.includes('shortcut-key-control">Space</span>'),
+							.innerHTML.includes('shortcut-key-control">Space</kbd>'),
 						'the characters tab retains the actual keyboard Space marker'
 					);
 					assert.ok(page.context.build_searchable_key(' ', true).includes('Space'));
@@ -4253,7 +4253,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 		assert.match(details, />-3<\/strong>/);
 		assert.doesNotMatch(details, />--3<\/strong>/);
 		assert.equal(vm.runInContext('format_number_plain(-1234.5)', page.context), '-1\u00a0234,5');
-		assert.match(vm.runInContext('format_number(-1234.5)', page.context), />-1\u00a0234,5<\/span>/);
+		assert.match(vm.runInContext('format_number(-1234.5)', page.context), />-1\u00a0234,5<\/data>/);
 		assert.equal(vm.runInContext('format_number_plain(-1200000)', page.context), '-1,2\u00a0M');
 		assert.equal(vm.runInContext('format_number_plain(1234.5)', page.context), '1\u00a0234,5');
 	});
@@ -4271,7 +4271,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 		page.context.render_current_tab();
 		page.timers.at(-1)();
 		const html = page.elements.get('metrics_table_body').innerHTML;
-		assert.ok(html.includes('title="1\u202f234,5">1\u00a0234,5</span> ms'), html);
+		assert.ok(html.includes('title="1\u202f234,5">1\u00a0234,5</data> ms'), html);
 		assert.match(
 			vm.runInContext('format_number(1000000.1234)', page.context),
 			/title="1\u202f000\u202f000,1234"/
