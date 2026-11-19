@@ -712,6 +712,13 @@
 					<span id="la-table-relative-label"></span>
 				</label>
 				<p id="la-table-relative-help" class="la-muted" hidden></p>
+				<div class="la-ranking-tools">
+					<label class="la-check">
+						<input id="la-table-fold" type="checkbox" aria-describedby="la-table-fold-help" />
+						<span data-i18n="layout_analysis.table.fold"></span>
+					</label>
+					<p id="la-table-fold-help" class="la-muted" data-i18n="layout_analysis.table.fold_help"></p>
+				</div>
 				<div class="la-table-wrap" tabindex="0" role="region" aria-labelledby="la-ranking-label">
 					<table id="la-table" class="la-table"></table>
 				</div>
@@ -1255,7 +1262,12 @@
 				min: bound(value.min),
 				max: bound(value.max),
 				// The relative view: each value as its difference to the reference layout.
-				relative: value.relative === true
+				relative: value.relative === true,
+				// Families folded to their best member, and the layouts pinned to the top.
+				fold: value.fold === true,
+				pins: Array.isArray(value.pins)
+					? Array.from(new Set(value.pins.filter((id) => typeof id === 'string')))
+					: []
 			};
 		}
 
@@ -2013,10 +2025,12 @@
 		 *   Called with the new sort when a header is chosen.
 		 * @param {object} [reference] The result the relative view measures the
 		 *   score and the metrics against (referenceResult), or none.
+		 * @param {object} [view] The overview's own view (rankingView): pinned
+		 *   rows first, families folded to their best member.
 		 * @returns {{key: string, descending: boolean}} The sort applied (rank
 		 *   when the sorted column is gone).
 		 */
-		function rankingTable(table, rows, metricIds, sort, resort, reference) {
+		function rankingTable(table, rows, metricIds, sort, resort, reference, view) {
 			table.replaceChildren();
 			if (rows.length === 0) return sort;
 			const columns = [
@@ -2098,8 +2112,10 @@
 				return applied.descending ? -order : order;
 			});
 			const tbody = el('tbody');
-			for (const result of sorted) {
+			const shown = view ? view.order(sorted) : sorted;
+			for (const result of shown) {
 				const tr = el('tr');
+				if (view) view.mark(tr, result);
 				if (state.details === result.layout.id) tr.className = 'la-selected';
 				if (isPersonal(result)) tr.classList.add('la-row-mine');
 				// The relative view: the score and each metric as their difference to the reference.
@@ -2124,6 +2140,7 @@
 											: measure(value, column.digits, column.unit)
 								);
 					if (column.key === 'name' && result.incomplete) cell.append(' ', incompleteFlag(result));
+					if (column.key === 'name' && view) cell.prepend(...view.controls(result));
 					// The relative view shows differences: a percentile is of a value.
 					const standing =
 						E.METRICS[column.key] && !versus ? libraryPercentile(column.key, value) : null;
@@ -2279,6 +2296,128 @@
 			return percentileOf.get(metric)(value);
 		}
 
+		// The families whose other members are shown while folded (not kept: a view).
+		const expandedFamilies = new Set();
+
+		/** An icon of the ranking's row controls (pin, fold); its button's name says what it does. */
+		function rowIcon(path) {
+			const svg = document.createElementNS(SVG_NS, 'svg');
+			svg.setAttribute('viewBox', '0 0 24 24');
+			svg.setAttribute('class', 'la-row-icon');
+			svg.setAttribute('aria-hidden', 'true');
+			svg.setAttribute('focusable', 'false');
+			const line = document.createElementNS(SVG_NS, 'path');
+			line.setAttribute('d', path);
+			svg.append(line);
+			return svg;
+		}
+
+		/**
+		 * The overview ranking's view (ux-study item 14): pinned rows first in
+		 * the order they were pinned, under any sort; with « Fold » on, each
+		 * family shows its best member only (the lowest rank among the rows
+		 * shown), with a button that shows its other members where the sort
+		 * puts them.
+		 */
+		function rankingView(rows) {
+			const pins = state.table.pins;
+			const pinned = new Set(pins);
+			const best = new Map();
+			const members = new Map();
+			for (const result of rows) {
+				const family = familyOf(result);
+				if (!family || pinned.has(result.layout.id)) continue;
+				members.set(family, (members.get(family) || 0) + 1);
+				const current = best.get(family);
+				if (!current || result.rank < current.rank) best.set(family, result);
+			}
+			const folded = (result) => {
+				const family = familyOf(result);
+				return (
+					state.table.fold &&
+					family !== '' &&
+					!pinned.has(result.layout.id) &&
+					best.get(family) !== result &&
+					!expandedFamilies.has(family)
+				);
+			};
+			const togglePin = (result) => {
+				const id = result.layout.id;
+				state.table.pins = pinned.has(id) ? pins.filter((p) => p !== id) : pins.concat([id]);
+				save();
+				renderTable();
+				const again = $('la-table').querySelector(`button[data-pin="${CSS.escape(id)}"]`);
+				if (again) again.focus();
+			};
+			return {
+				order(sorted) {
+					const top = pins.map((id) => sorted.find((r) => r.layout.id === id)).filter(Boolean);
+					return top.concat(sorted.filter((r) => !pinned.has(r.layout.id) && !folded(r)));
+				},
+				mark(tr, result) {
+					if (pinned.has(result.layout.id)) tr.classList.add('la-row-pinned');
+					const family = familyOf(result);
+					if (state.table.fold && expandedFamilies.has(family) && best.get(family) !== result)
+						tr.classList.add('la-row-member');
+				},
+				controls(result) {
+					const out = [];
+					const id = result.layout.id;
+					const isPinned = pinned.has(id);
+					const pin = el('button', 'la-row-button la-pin');
+					pin.type = 'button';
+					pin.dataset.pin = id;
+					pin.setAttribute('aria-pressed', String(isPinned));
+					pin.setAttribute(
+						'aria-label',
+						t(isPinned ? 'layout_analysis.table.unpin' : 'layout_analysis.table.pin', {
+							name: result.layout.name
+						})
+					);
+					pin.title = pin.getAttribute('aria-label');
+					pin.append(rowIcon('M9 3h6l-1 6 4 4H6l4-4zM12 13v8'));
+					pin.addEventListener('click', (event) => {
+						event.stopPropagation();
+						togglePin(result);
+					});
+					pin.addEventListener('keydown', (event) => event.stopPropagation());
+					out.push(pin);
+					const family = familyOf(result);
+					const others = (members.get(family) || 0) - 1;
+					if (state.table.fold && best.get(family) === result && others > 0) {
+						const open = expandedFamilies.has(family);
+						const fold = el('button', 'la-row-button la-fold');
+						fold.type = 'button';
+						fold.dataset.family = family;
+						fold.dataset.count = `+${others}`;
+						fold.setAttribute('aria-expanded', String(open));
+						fold.setAttribute(
+							'aria-label',
+							t(open ? 'layout_analysis.table.collapse' : 'layout_analysis.table.expand', {
+								count: others,
+								name: result.layout.name
+							})
+						);
+						fold.title = fold.getAttribute('aria-label');
+						fold.append(rowIcon(open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'));
+						fold.addEventListener('click', (event) => {
+							event.stopPropagation();
+							if (open) expandedFamilies.delete(family);
+							else expandedFamilies.add(family);
+							renderTable();
+							const again = $('la-table').querySelector(
+								`button[data-family="${CSS.escape(family)}"]`
+							);
+							if (again) again.focus();
+						});
+						fold.addEventListener('keydown', (event) => event.stopPropagation());
+						out.push(fold);
+					}
+					return out;
+				}
+			};
+		}
+
 		/** The overview's ranking table, with the viewer's columns and the filters' rows. */
 		function renderTable() {
 			const reference = state.results.length > 0 ? referenceResult() : null;
@@ -2301,8 +2440,10 @@
 					state.sort = sort;
 					renderTable();
 				},
-				state.table.relative ? reference : null
+				state.table.relative ? reference : null,
+				rankingView(shownRows())
 			);
+			$('la-table-fold').checked = state.table.fold;
 		}
 
 		/**
@@ -5454,13 +5595,22 @@
 				$(id).addEventListener('input', filtered);
 			for (const id of ['la-row-family', 'la-row-origin', 'la-row-language', 'la-row-complete'])
 				$(id).addEventListener('change', filtered);
+			$('la-table-fold').addEventListener('change', (event) => {
+				state.table.fold = event.target.checked;
+				save();
+				renderTable();
+			});
 			$('la-table-relative').addEventListener('change', (event) => {
 				state.table.relative = event.target.checked;
 				save();
 				renderTable();
 			});
 			$('la-table-reset').addEventListener('click', () => {
-				state.table = validTable(null);
+				// The filters go back; the folding and the pinned rows are a view, kept.
+				state.table = Object.assign(validTable(null), {
+					fold: state.table.fold,
+					pins: state.table.pins
+				});
 				fillTableOptions();
 				save();
 				render();

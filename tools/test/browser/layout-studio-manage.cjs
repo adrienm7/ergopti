@@ -528,7 +528,79 @@ async function exercisePresets(browser, origin) {
 	await context.close();
 }
 
+/** The ranking's rows: each layout id (from its pin) and family. */
+function rankingRows(page) {
+	return page.evaluate(() => {
+		const families = new Map(
+			window.LAYOUT_ANALYSIS.libraryLayouts().map((l) => [l.id, l.family || ''])
+		);
+		return [...document.querySelectorAll('#la-table tbody tr')].map((tr) => {
+			const id = tr.querySelector('button.la-pin').dataset.pin;
+			return { id, family: families.get(id) || '', pinned: tr.classList.contains('la-row-pinned') };
+		});
+	});
+}
+
+/**
+ * (ranking-views) « Fold each family » leaves one row per family, its best
+ * ranked, and « +n » shows the others (the focus kept on it); a pinned row
+ * stays first under another sort and after a reload, with the folding.
+ */
+async function exerciseRankingViews(browser, origin) {
+	const { page, errors, context } = await openComparer(browser, origin, '&keyboard=iso');
+	await page.waitForFunction(() =>
+		/^\d+ layouts compared/.test(document.getElementById('la-status').textContent)
+	);
+	const all = await rankingRows(page);
+	await page.check('#la-table-fold');
+	const folded = await rankingRows(page);
+	assert.ok(folded.length < all.length, `folded: ${folded.length} of ${all.length}`);
+	const seen = new Set();
+	for (const row of folded.filter((r) => r.family !== '')) {
+		assert.ok(!seen.has(row.family), `one row per family: ${row.family} twice`);
+		seen.add(row.family);
+	}
+	const fold = page.locator('#la-table button.la-fold').first();
+	const family = await fold.getAttribute('data-family');
+	const count = Number((await fold.getAttribute('data-count')).slice(1));
+	assert.equal(await fold.getAttribute('aria-expanded'), 'false');
+	assert.match(
+		await fold.getAttribute('aria-label'),
+		/^Show the \d+ other layouts of the family of /
+	);
+	await fold.click();
+	assert.equal((await rankingRows(page)).length, folded.length + count, 'its members are shown');
+	assert.equal(
+		await page.evaluate(() => document.activeElement.dataset.family),
+		family,
+		'the focus stays on its button'
+	);
+	assert.equal(await page.locator('#la-table tr.la-row-member').count(), count);
+	// Pin the last row: first under any sort, kept on reload.
+	const last = folded[folded.length - 1].id;
+	await page.click(`#la-table button.la-pin[data-pin="${last}"]`);
+	assert.equal((await rankingRows(page))[0].id, last, 'a pinned row comes first');
+	assert.equal(
+		await page.getAttribute(`#la-table button.la-pin[data-pin="${last}"]`, 'aria-pressed'),
+		'true'
+	);
+	await page.click('#la-table button[data-sort="sfb"]');
+	assert.equal((await rankingRows(page))[0].id, last, 'first under another sort');
+	await page.reload();
+	await page.waitForFunction(() =>
+		/^\d+ layouts compared/.test(document.getElementById('la-status').textContent)
+	);
+	const again = await rankingRows(page);
+	assert.equal(again[0].id, last, 'still first after a reload');
+	assert.equal(await page.isChecked('#la-table-fold'), true, 'the folding is kept');
+	await page.click(`#la-table button.la-pin[data-pin="${last}"]`);
+	assert.notEqual((await rankingRows(page))[0].id, last, 'unpinned, it leaves the top');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseRankingViews,
 	exercisePresets,
 	exercisePercentiles,
 	exerciseManageLayoutsSite,

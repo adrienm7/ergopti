@@ -1852,3 +1852,72 @@ body:has(> main.layout-analysis) {
 	min-height: 32px;
 	min-width: 14em;
 }
+
+/* The ranking's views (ux-study item 14): a pin per row, pinned rows on a
+   tint with an accent edge; a folded family's best row with a « +n »
+   button, its members indented when shown. */
+.la-ranking-tools {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 16px;
+	margin: 4px 0 8px;
+}
+
+.la-ranking-tools .la-muted {
+	margin: 0;
+}
+
+.la-row-button {
+	align-items: center;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	cursor: pointer;
+	display: inline-flex;
+	gap: 2px;
+	margin-right: 4px;
+	min-height: 24px;
+	min-width: 24px;
+	padding: 0 3px;
+	vertical-align: middle;
+}
+
+.la-row-button:hover,
+.la-row-button:focus-visible {
+	border-color: var(--la-border);
+}
+
+.la-row-icon {
+	fill: none;
+	height: 16px;
+	stroke: var(--la-sub);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 2;
+	width: 16px;
+}
+
+.la-pin[aria-pressed='true'] .la-row-icon {
+	fill: var(--la-cat-2);
+	stroke: var(--la-cat-2);
+}
+
+.la-fold::after {
+	color: var(--la-accent);
+	content: attr(data-count);
+	font-size: 0.8em;
+	font-weight: 700;
+}
+
+.la-table tr.la-row-pinned td {
+	background: color-mix(in srgb, var(--la-cat-2) 10%, var(--la-surface));
+}
+
+.la-table tr.la-row-pinned td:first-child {
+	box-shadow: inset 4px 0 0 var(--la-cat-2);
+}
+
+.la-table tr.la-row-member td:nth-child(2) {
+	padding-left: 28px;
+}
