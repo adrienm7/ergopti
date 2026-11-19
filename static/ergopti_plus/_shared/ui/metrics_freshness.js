@@ -131,12 +131,13 @@
 		if (root) return;
 		const style = document.createElement('style');
 		style.textContent =
-			'#metrics_freshness_banner{position:sticky;top:0;z-index:49;padding:8px 14px;font-size:13px;' +
+			'#metrics_freshness_banner{position:sticky;top:0;z-index:49;margin:0;padding:8px 14px;font-size:13px;' +
 			'background:rgba(59,130,246,0.12);border-bottom:1px solid rgba(59,130,246,0.35);display:none}' +
 			'#metrics_freshness_banner.failed{background:rgba(220,53,69,0.16);border-color:rgba(220,53,69,0.5)}' +
 			'#metrics_freshness_banner.incomplete{background:rgba(245,158,11,0.16);border-color:rgba(245,158,11,0.5)}';
 		document.head.appendChild(style);
-		root = document.createElement('div');
+		// A line of text: a paragraph, announced as a status when it changes.
+		root = document.createElement('p');
 		root.id = 'metrics_freshness_banner';
 		root.setAttribute('role', 'status');
 		root.setAttribute('aria-live', 'polite');

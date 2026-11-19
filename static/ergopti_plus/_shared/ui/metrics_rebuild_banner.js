@@ -139,27 +139,31 @@
 			'#metrics_rebuild_banner{position:sticky;top:0;z-index:50;padding:8px 14px;font-size:13px;' +
 			'background:rgba(127,127,127,0.14);border-bottom:1px solid rgba(127,127,127,0.3);display:none}' +
 			'#metrics_rebuild_banner.failed{background:rgba(220,53,69,0.16);border-color:rgba(220,53,69,0.5)}' +
-			'#metrics_rebuild_banner .track{height:6px;border-radius:3px;background:rgba(127,127,127,0.25);' +
-			'margin-top:6px;overflow:hidden}' +
-			'#metrics_rebuild_banner .fill{height:100%;width:0;background:' +
+			'#metrics_rebuild_banner p{margin:0}' +
+			'#metrics_rebuild_banner .track{appearance:none;border:0;display:block;width:100%;height:6px;' +
+			'border-radius:3px;background:rgba(127,127,127,0.25);margin-top:6px;overflow:hidden}' +
+			'#metrics_rebuild_banner .track::-webkit-progress-bar{background:rgba(127,127,127,0.25);border-radius:3px}' +
+			'#metrics_rebuild_banner .track::-webkit-progress-value{background:' +
 			ThemeTokens.color('hue-3b82f6') +
 			';transition:width .4s ease}' +
 			'#metrics_rebuild_banner .notice{margin-top:4px;opacity:.8}';
 		document.head.appendChild(style);
-		root = document.createElement('div');
+		// The rebuild's status: its line, its progress bar (named by that line)
+		// and the partial-data notice, announced when they change.
+		root = document.createElement('section');
 		root.id = 'metrics_rebuild_banner';
 		root.setAttribute('role', 'status');
 		root.setAttribute('aria-live', 'polite');
-		label = document.createElement('div');
-		const track = document.createElement('div');
-		track.className = 'track';
-		bar = document.createElement('div');
-		bar.className = 'fill';
-		track.appendChild(bar);
-		notice = document.createElement('div');
+		label = document.createElement('p');
+		label.id = 'metrics_rebuild_label';
+		bar = document.createElement('progress');
+		bar.className = 'track';
+		bar.max = 100;
+		bar.setAttribute('aria-labelledby', 'metrics_rebuild_label');
+		notice = document.createElement('p');
 		notice.className = 'notice';
 		root.appendChild(label);
-		root.appendChild(track);
+		root.appendChild(bar);
 		root.appendChild(notice);
 		document.body.insertBefore(root, document.body.firstChild);
 	}
@@ -171,9 +175,9 @@
 		root.classList.toggle('failed', !!progress_state.failed);
 		label.textContent = progress_state.visible ? progress_state.text : '';
 		label.style.display = progress_state.visible ? 'block' : 'none';
-		bar.parentNode.style.display =
+		bar.style.display =
 			progress_state.percent === null || !progress_state.visible ? 'none' : 'block';
-		bar.style.width = (progress_state.percent || 0) + '%';
+		bar.value = progress_state.percent || 0;
 		notice.textContent = partial_text;
 		notice.style.display = partial_text ? 'block' : 'none';
 	}

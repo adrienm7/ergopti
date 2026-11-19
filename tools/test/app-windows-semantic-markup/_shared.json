@@ -1,18 +1,3 @@
 {
-	"files": {
-		"metrics_freshness.js": [
-			{
-				"tag": "div",
-				"count": 1,
-				"pending": true
-			}
-		],
-		"metrics_rebuild_banner.js": [
-			{
-				"tag": "div",
-				"count": 5,
-				"pending": true
-			}
-		]
-	}
+	"files": {}
 }
