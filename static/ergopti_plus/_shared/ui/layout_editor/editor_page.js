@@ -2594,9 +2594,9 @@ var LayoutEditorPage = (function () {
 				id: 'le-board',
 				// The stylesheet sizes one key unit to the width available (style.css, Board).
 				style: `--le-cols:${width};--le-rows:${height}`,
-				// The keys as one group named by the layout; one Tab stop, the arrows
-				// walk it (boardKeys).
-				role: 'group',
+				// The keys as one toolbar named by the layout; one Tab stop, the
+				// arrows walk it (boardKeys).
+				role: 'toolbar',
 				'aria-label': doc().layout.name
 			});
 			const remap = doc().remap || {};

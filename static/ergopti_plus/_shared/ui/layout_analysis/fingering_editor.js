@@ -232,7 +232,12 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 		const baseText = document.createTextNode('');
 		const baseSelect = el('select');
 		baseLabel.append(baseText, baseSelect);
+		// The keys as one toolbar named by the section's title: one Tab stop,
+		// the arrows walk it.
 		const map = el('div', 'la-heatmap la-fingering-map');
+		title.id = 'la-fingering-title';
+		map.setAttribute('role', 'toolbar');
+		map.setAttribute('aria-labelledby', title.id);
 		// The board keeps its key size and scrolls inside this focusable box, so
 		// a narrow screen never scrolls the page sideways (WCAG 1.4.10).
 		const mapBox = el('section', 'la-fingering-scroll');

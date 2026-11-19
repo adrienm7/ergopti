@@ -187,6 +187,8 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 		);
 		button.type = 'button';
 		button.dataset.event = event;
+		// An id of its own, so the button drawn again after a click is the same control.
+		button.id = `${list.id}-more`;
 		button.setAttribute('aria-expanded', String(shown));
 		button.setAttribute('aria-controls', list.id);
 		button.addEventListener('click', () => {
