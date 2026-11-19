@@ -143,10 +143,21 @@ public sealed class KanaInstallerJob : IDisposable {
         return result.ToArray();
     }
     public static string Text(IntPtr window) {
+        string text = TryText(window);
+        if (text == null) throw new Win32Exception(1460);
+        return text;
+    }
+    // A control's text, or null when its thread did not answer WM_GETTEXT within
+    // the timeout (ERROR_TIMEOUT): a dialog found as soon as its controls exist
+    // can still be finishing its initialization. Any other failure throws.
+    public static string TryText(IntPtr window) {
         var text = new StringBuilder(2048);
         UIntPtr result;
-        Check(SendMessageTimeout(window, 0xD, (IntPtr)text.Capacity, text, 2, 1000, out result) != IntPtr.Zero);
-        return text.ToString();
+        if (SendMessageTimeout(window, 0xD, (IntPtr)text.Capacity, text, 2, 1000, out result) != IntPtr.Zero)
+            return text.ToString();
+        int error = Marshal.GetLastWin32Error();
+        if (error == 1460) return null;
+        throw new Win32Exception(error);
     }
     public static string[] ChildTexts(IntPtr window) {
         var result = new List<string>();
@@ -211,7 +222,14 @@ try {
 	$owner = [KanaInstallerJob]::new($installer.FullName)
 	$deadline = [Diagnostics.Stopwatch]::StartNew()
 	$main = [IntPtr]::Zero
-	while ($deadline.Elapsed.TotalSeconds -lt 30 -and $main -eq [IntPtr]::Zero) {
+	$layoutText = $null
+	$layoutDll = $null
+	$unanswered = 0
+	# The dialog is admitted once it answers for its identity, within the same
+	# deadline as its appearance: a runner can create its controls before the
+	# installer's thread pumps messages (CI 44432255232 timed out on the first read).
+	while ($deadline.Elapsed.TotalSeconds -lt 30 -and $null -eq $layoutDll) {
+		$main = [IntPtr]::Zero
 		foreach ($window in $owner.Windows()) {
 			if ([KanaInstallerJob]::GetDlgItem($window, 1246) -ne [IntPtr]::Zero -and
 				[KanaInstallerJob]::GetDlgItem($window, 1003) -ne [IntPtr]::Zero) {
@@ -219,12 +237,18 @@ try {
 				$main = $window
 			}
 		}
-		if ($main -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 100 }
+		if ($main -ne [IntPtr]::Zero) {
+			$layoutText = [KanaInstallerJob]::TryText([KanaInstallerJob]::GetDlgItem($main, 1000))
+			if ($null -ne $layoutText) {
+				$layoutDll = [KanaInstallerJob]::TryText([KanaInstallerJob]::GetDlgItem($main, 1002))
+			}
+			if ($null -eq $layoutDll) { $unanswered += 1 }
+		}
+		if ($null -eq $layoutDll) { Start-Sleep -Milliseconds 100 }
 	}
 	if ($main -eq [IntPtr]::Zero) { throw 'The owned layout installer dialog did not appear.' }
-	$layoutText = [KanaInstallerJob]::Text([KanaInstallerJob]::GetDlgItem($main, 1000))
-	$layoutDll = [KanaInstallerJob]::Text([KanaInstallerJob]::GetDlgItem($main, 1002))
-	$trace.Add(@{ layoutText = $layoutText; layoutDll = $layoutDll })
+	if ($null -eq $layoutDll) { throw 'The owned layout installer dialog did not answer for its identity.' }
+	$trace.Add(@{ layoutText = $layoutText; layoutDll = $layoutDll; unansweredReads = $unanswered })
 	if ($layoutText -cne $expectedText -or $layoutDll -ine $expectedDll) {
 		throw "Installer identity mismatch: $layoutText / $layoutDll"
 	}
