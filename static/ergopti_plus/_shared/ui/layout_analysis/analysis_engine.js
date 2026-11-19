@@ -680,9 +680,10 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {{chars: Set<string>, dead: Set<string>, texts: Set<string>}|null} only
 	 */
 	function offerCells(core, layout, board, missing, only) {
-		for (const [code, row] of Object.entries(layout.rows)) {
+		for (const code in layout.rows) {
 			const k = board.index.get(code);
 			if (k === undefined || (missing && missing.has(code))) continue;
+			const row = layout.rows[code];
 			for (let layer = 0; layer < LAYER_IDS.length; layer++) {
 				const cell = row[layer];
 				if (cell === null) continue;
