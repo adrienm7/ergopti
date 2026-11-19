@@ -65,10 +65,19 @@ every maintainer request here.
       terminator records, LLM privacy rows) read the admitted snapshot document. The unit ratchets of the flat
       write and the typed transaction parses now name the owner that must not parse twice. The logger, the
       feature loader and the metrics settings read config.toml through the boot read stretch
-      (`ConfigTomlReadBootServedSnapshot`), so the table has no snapshot-read debt left. Left: the remaining exact
-      counts in unit tests (shared-parse memo bound in test_loader, stretch reads in test_journal_boot,
-      saved-options read in ai/menu test_persistence) state one-read-per-step invariants and stay unless one
-      proves arbitrary.
+      (`ConfigTomlReadBootServedSnapshot`), so the table has no snapshot-read debt left.
+      Done 2026-11-19: the Studio speed checks (13 ms per library layout in the engine test, 600 ms per layout in
+      the analyser scores) time the analysers against a reference walk of the same table in the same process
+      (`tools/test/lib/table-walk-speed.cjs`); an engine five times slower fails the bound on any load. The
+      best-swaps browser test reads the panel's `LIMIT`/`CYCLE_LIMIT`, the Studio and app-window keyboard walks
+      end when a stop repeats (bounded by the document's elements) instead of after 1500/800 presses, and the
+      shared-parse memo test reads `TOML_SHARED_PARSE_ENTRIES`. Reviewed and kept: the stretch counts in
+      test_journal_boot and the saved-options read in ai/menu test_persistence equal one comparison or read per
+      stretch or build, against loop counts the test itself chooses, never a product ceiling. Left: the two
+      speed bounds (120 and 5000 walks) rest on ratios measured with every core busy and a quiet ratio estimated
+      1.6 times higher; read the ratio each test prints on a quiet PC and on CI, and set each bound to twice the
+      highest. Then the per-run budgets outside Studio, `HOTSTRINGS_RENDER_BUDGET_MS` (2000) in
+      test-ahk-full-startup-smoke.cjs first.
 - [ ] **SendInstant paste races Windows' own clipboard readers.** Rerun on a quiet PC on 2026-11-18 (no resident
       driver, 3 runs per group): healthcheck, Ollama native, `groups247-*`, pickers, `idle-caret-context`,
       `key-state-dllcall-uncaught`, `tap-keys-kana-native`, the `config-*` groups and the model browser stayed
