@@ -12,7 +12,7 @@
 	"windows.path_name": 47,
 	"windows.duration": 255,
 	"windows.timer_literal": 4,
-	"windows.limit": 185,
+	"windows.limit": 184,
 	"windows.enum_name": 123,
 	"windows.color": 3,
 	"macos+linux.lua_function": 104,
