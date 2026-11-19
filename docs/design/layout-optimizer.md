@@ -16,14 +16,14 @@ optimizer with no change here.
 
 ## Files
 
-| File                                              | Role                                                                                                 |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `_shared/ui/layout_optimizer/optimizer_core.js`   | The search: global `LAYOUT_OPTIMIZER`, pure, no DOM, seeded. Node, a worker or a page load it.       |
-| `_shared/ui/layout_optimizer/optimizer_runner.js` | Runs a share of the restarts in slices, or scores the library after a run, and posts its messages.   |
-| `_shared/ui/layout_optimizer/optimizer_worker.js` | The Web Worker: loads the engine, the core and the runner.                                           |
-| `_shared/ui/layout_optimizer/optimizer_page.js`   | The page (`LAYOUT_OPTIMIZER_PAGE.mount(root)`), framed by the site at `/studio/optimiser`.           |
-| `tools/test/test-layout-optimizer.cjs`            | The core gate: brute-force optimum, honest score, determinism, every constraint switch, time budget. |
-| `tools/test/test-layout-optimizer-page.cjs`       | The page gate: scripts, strings in 21 locales, Studio wiring, a page-thread run.                     |
+| File                                              | Role                                                                                                                     |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `_shared/ui/layout_optimizer/optimizer_core.js`   | The search: global `LAYOUT_OPTIMIZER`, pure, no DOM, seeded. Node, a worker or a page load it.                           |
+| `_shared/ui/layout_optimizer/optimizer_runner.js` | Runs a share of the restarts in slices, or scores the library after a run, and posts its messages.                       |
+| `_shared/ui/layout_optimizer/optimizer_worker.js` | The Web Worker: loads the engine, the core and the runner.                                                               |
+| `_shared/ui/layout_optimizer/optimizer_page.js`   | The page (`LAYOUT_OPTIMIZER_PAGE.mount(root)`), framed by the site at `/studio/optimiser`.                               |
+| `tools/test/test-layout-optimizer.cjs`            | The core gate: brute-force optimum, honest score, determinism, every constraint switch, time budget, each search method. |
+| `tools/test/test-layout-optimizer-page.cjs`       | The page gate: scripts, strings in 21 locales, Studio wiring, a page-thread run.                                         |
 
 ## Model
 
@@ -95,26 +95,186 @@ key the start lacks is refused (`shortcut_missing`).
 
 ## Search
 
-Simulated annealing over swaps, the metaheuristic of most published layout
-optimizers (Carpalx, dariogoetz's Keyboard Layout Optimizer, Oxeylyzer):
+A local search over swaps of units, with one of five methods
+(`LAYOUT_OPTIMIZER.METHODS`, the `method` setting of `createSearch`, the
+« Search method » list of the page). Every method runs inside the same frame:
 
-1. Each restart k draws from its own seed (`restartSeed(seed, k)`, mulberry32),
-   starts from the start layout or from a random valid arrangement (the start
-   shuffled by random valid swaps), and measures 24 random swaps: the mean
-   worsening sets the first temperature T₀ = mean / ln 2, which accepts an
-   average worsening half of the time.
-2. Each iteration swaps two movable units that may trade places, scores the
-   layout and keeps it when it is better, or with probability e^(Δ/T). The
-   temperature falls geometrically to T₀/1000, following the iterations, or
-   the clock when a time budget is set (whichever is further along).
+1. Each restart k draws from its own seed (`restartSeed(seed, k)`, mulberry32)
+   and starts from the start layout or from a random valid arrangement (the
+   start shuffled by random valid swaps).
+2. One iteration is one scored trial, so an iteration budget is the same work
+   for every method. Every move is a swap `pickSwap` or `allowed` accepts
+   (pins, zones, number row, dead-key layer, thumb keys) within the change
+   limit; the objective is the engine's score less the change penalty; the
+   incremental scorer follows the arrangement the method stands on
+   (`accept`).
 3. Scores are cached per arrangement (annealing revisits them).
-4. The best arrangement of all restarts wins; ties go to the lowest restart,
-   so splitting the restarts between workers never changes the winner
-   (`bestOf`).
+4. The best arrangement of all restarts wins, never worse than the start (the
+   start is the first best); ties go to the lowest restart, so splitting the
+   restarts between workers never changes the winner (`bestOf`).
 
-**Determinism.** With the same start, options, corpus, seed and an iteration
-budget, the result is the same everywhere. A time budget makes the cooling
-follow the clock, so a run stopped by time depends on the machine's speed.
+The methods (`begin(run)` / `iterate(run, fraction)` in `createSearch`):
+
+| Method            | Idea                                                                                                                                                                                                                                                                       | Settings                                         |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `late_acceptance` | Late-acceptance hill climbing (Burke and Bykov): a random valid swap is kept when the result is no worse than the current arrangement or than the current one L trials ago. **Default.**                                                                                   | L = 50 (`LATE_ACCEPTANCE_HISTORY`)               |
+| `annealing`       | Simulated annealing: 24 random swaps measure the mean worsening, T₀ = mean / ln 2 accepts it half of the time; a swap is kept when better, or with probability e^(Δ/T); T falls geometrically to T₀/1000 following the iterations, or the clock when a time budget is set. | `CALIBRATION_SWAPS`, `FINAL_TEMPERATURE_RATIO`   |
+| `hill_climbing`   | Best-improvement hill climbing: every valid swap is scored (in an order the seed shuffles) and the best gain made; at a local optimum the restart's best optimum gets 3 random swaps (a kick) and the climb starts again (an iterated local search).                       | `HILL_KICK_SWAPS` = 3                            |
+| `genetic`         | Steady-state genetic algorithm: a population seeded with mutants of the start (1–8 swaps) or random arrangements; each trial breeds one child (tournament of 3, cycle crossover with probability 0.7, then 1 + geometric swaps); it replaces the worst when better.        | population 12, `GENETIC_*`                       |
+| `tabu`            | Tabu search on a candidate list: 24 random valid swaps are scored, the best one not tabu (or beating the best found) is made even when it loses, and its two units are tabu for a quarter of the movable units (3–12 moves).                                               | `TABU_CANDIDATES` = 24, `TABU_TENURE_MIN`/`_MAX` |
+
+The genetic algorithm's crossover is the cycle crossover (`cycleCrossover`):
+each cycle of the two parents' permutations comes whole from one of them,
+so every unit sits on a place one parent gives it. Every constraint of a
+place on its unit (`allowed`) then holds without repair, the fixed units stay
+put, and a child over the change limit is replaced by a copy of its first
+parent before its mutation. PMX and OX put units on places neither parent
+gave them and would need a repair step for the zones and the number row.
+Elitism is the steady state itself: only the worst individual is ever
+replaced. The genetic population (12) won a short tuning run against 24 and
+48 (AZERTY, Nemolivier, 3,000 trials, 3 seeds: median −15.5 against −22.6 at
+48); late acceptance's L = 50 and tabu's 24 candidates tied with 20 and 48.
+
+**Determinism.** With the same start, options, corpus, seed, method and an
+iteration budget, the result is the same everywhere. A time budget makes the
+annealing's cooling follow the clock, so a run stopped by time depends on the
+machine's speed. The annealing code moved behind the method interface
+unchanged: its results are bit-identical to the annealing-only search (the
+gate pins its annealing checks to `method: 'annealing'`).
+
+### Survey
+
+What published optimizers use (sources read in 2026-11; the analysers'
+report, [docs/audits/layout-analysers/report.md](../audits/layout-analysers/report.md),
+lists them):
+
+| Optimizer                            | Method                                                                                                                                                                             | Parameters                                                                                                                                                                                                                                                     |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Carpalx                              | Simulated annealing, 1 or 2 key swaps per move                                                                                                                                     | T = T₀·e^(−ik/N), acceptance p₀·e^(−ΔE/T); T₀ 10, k 10, p₀ 1, N 10,000                                                                                                                                                                                         |
+| keygen (xsznix)                      | Carpalx's annealing, then exhaustive steepest descent over k swaps                                                                                                                 | T₀ 1.5, k 10, N 15,000                                                                                                                                                                                                                                         |
+| dariogoetz Keyboard Layout Optimizer | Simulated annealing (argmin) and a genetic algorithm (genevo)                                                                                                                      | SA: T₀ from the cost spread of random neighbours, ×0.998 per iteration, stop after 5,000 without acceptance. GA: population 1,000, mutation 0.01, crossover disabled (PMX and cycle crossover commented out); its README says annealing gives the best layouts |
+| Oxeylyzer                            | Random restarts, each a steepest ascent over all swaps (its swaps are scored very cheaply); newer engines add annealing, late acceptance, iterated local search and depth-2 search | 500–1,000 restarts; LAHC history 100                                                                                                                                                                                                                           |
+| genkey                               | First-improvement hill climbing from 1,000 random layouts, then 1, 2, 3 simultaneous swaps on the best 100                                                                         | 500 failures in a row per climb                                                                                                                                                                                                                                |
+| Cyanophage's optimiser               | Steepest descent over all key and column swaps, a kick of shrinking size at each optimum, visited optima remembered                                                                | 20 rounds                                                                                                                                                                                                                                                      |
+| AdNW `opt`                           | Random start, swaps until no gain, many restarts                                                                                                                                   | about 10,000 restarts                                                                                                                                                                                                                                          |
+| Halmak                               | Genetic algorithm with mutation only, elitism                                                                                                                                      | population 12, tournament of 3                                                                                                                                                                                                                                 |
+
+No tool gives evidence for a crossover, and none uses tabu search. The
+expensive objective (100–700 trials per second here, against millions for
+Oxeylyzer's cached swaps) favours a method that learns from every trial over
+one that scans whole neighbourhoods.
+
+### Benchmark
+
+Measured on 2026-11-19 at night, Paris time, by
+`bench.cjs`, `aggregate.cjs` and `pivot.cjs` (the session's scratchpad,
+`optbench`): every method, 5 seeds, one restart from the start layout
+(letters only, the default switches), 5,000 trials, the search on 99 % of
+the n-grams and the final score on the whole corpus; starts AZERTY, QWERTY,
+Ergopti and bépo; corpora Nemolivier (N) and Don Quichotte (DQ); 200 runs, 3
+at a time, on a PC already at 94 % CPU from other work (8 threads), so each
+process got about half a core: the CPU-time columns are the fair ones. The
+equal CPU budget of a case is the annealing runs' median CPU time; a
+method's score there is its search's best when it had spent that much CPU.
+
+| Case           | azerty N | qwerty N | ergopti N | bepo N | azerty DQ | qwerty DQ | ergopti DQ | bepo DQ |
+| -------------- | -------: | -------: | --------: | -----: | --------: | --------: | ---------: | ------: |
+| Start score    |   −142.2 |   −144.5 |      −3.6 |  −34.1 |    −136.3 |    −140.8 |       +3.4 |   −30.5 |
+| CPU budget (s) |      9.1 |      8.3 |      19.2 |   28.0 |       8.9 |       8.2 |       15.6 |    28.2 |
+
+Median at equal CPU (the decision):
+
+| Method          | azerty N | qwerty N | ergopti N |   bepo N | azerty DQ | qwerty DQ | ergopti DQ |  bepo DQ |
+| --------------- | -------: | -------: | --------: | -------: | --------: | --------: | ---------: | -------: |
+| late_acceptance | **−9.1** | **−0.4** | **+11.9** | **+1.6** |      −9.2 |     −6.44 |  **+18.2** |     +4.5 |
+| annealing       |    −15.2 |     −7.6 |      +6.6 |     +1.0 |  **−5.3** | **−6.36** |       +8.4 | **+6.3** |
+| hill_climbing   |    −13.6 |     −9.1 |     +11.4 |     +0.8 |     −15.1 |     −15.4 |      +18.0 |     +1.6 |
+| genetic         |    −17.1 |     −7.6 |      +8.4 |     −3.6 |     −14.0 |     −10.4 |      +16.4 |     +0.3 |
+| tabu            |    −22.6 |    −18.4 |      +5.5 |     −6.0 |     −23.8 |     −24.2 |      +12.4 |     −7.1 |
+
+Best seed at equal CPU:
+
+| Method          | azerty N | qwerty N | ergopti N |   bepo N | azerty DQ | qwerty DQ | ergopti DQ |  bepo DQ |
+| --------------- | -------: | -------: | --------: | -------: | --------: | --------: | ---------: | -------: |
+| late_acceptance | **−1.4** | **+1.2** | **+14.0** | **+4.7** |      −5.5 |  **−2.0** |  **+21.2** |     +6.1 |
+| annealing       |     −9.6 |     −5.4 |     +10.7 |     +2.9 |  **−3.2** |      −3.6 |      +16.2 | **+9.1** |
+| hill_climbing   |    −11.8 |     −8.1 |     +11.4 |     +0.8 |     −15.1 |     −14.7 |      +18.0 |     +1.6 |
+| genetic         |     −6.3 |     −5.5 |     +10.3 |     +0.9 |      −4.2 |      −6.9 |      +17.0 |     +2.4 |
+| tabu            |    −13.0 |    −13.2 |      +6.6 |     −5.5 |     −18.5 |     −10.1 |      +13.9 |     −2.0 |
+
+Spread between seeds at equal CPU (best − worst):
+
+| Method          | azerty N | qwerty N | ergopti N | bepo N | azerty DQ | qwerty DQ | ergopti DQ | bepo DQ |
+| --------------- | -------: | -------: | --------: | -----: | --------: | --------: | ---------: | ------: |
+| late_acceptance |     12.5 |      7.5 |       3.1 |    5.1 |      10.9 |       5.5 |        6.8 |     3.9 |
+| annealing       |      8.3 |     10.2 |       7.4 |   10.9 |       9.8 |       9.7 |       11.7 |     9.1 |
+| hill_climbing   |      1.8 |      2.1 |       0.0 |    0.0 |       1.5 |       1.7 |        0.2 |     0.0 |
+| genetic         |     15.8 |      5.4 |       2.7 |    6.9 |      17.5 |      10.2 |        1.8 |     7.6 |
+| tabu            |     15.3 |     13.0 |       6.2 |    7.2 |      11.9 |      16.4 |        3.9 |     7.3 |
+
+Median final score at 5,000 trials, on the whole corpus (equal trial count):
+
+| Method          | azerty N | qwerty N | ergopti N |   bepo N | azerty DQ | qwerty DQ | ergopti DQ |  bepo DQ |
+| --------------- | -------: | -------: | --------: | -------: | --------: | --------: | ---------: | -------: |
+| late_acceptance | **−8.9** | **−2.3** | **+10.3** |     −0.4 |     −11.0 |      −8.2 |  **+17.0** |     +2.8 |
+| annealing       |    −13.5 |     −9.5 |      +5.8 |     −1.3 |  **−7.0** |  **−8.0** |       +6.8 | **+4.5** |
+| hill_climbing   |    −14.6 |     −9.6 |      +9.9 |     −1.0 |     −17.4 |     −16.4 |      +16.8 |     +0.0 |
+| genetic         |    −15.5 |     −6.5 |      +9.7 | **+1.8** |     −14.1 |      −9.6 |      +16.3 |     +2.6 |
+| tabu            |    −25.2 |    −20.5 |      +4.1 |     −7.7 |     −25.8 |     −26.3 |      +11.0 |     −8.7 |
+
+Convergence, the median at ¼, ½ and all of the CPU budget:
+
+| Method          | azerty N              | ergopti N            | bepo N               | bepo DQ              |
+| --------------- | --------------------- | -------------------- | -------------------- | -------------------- |
+| late_acceptance | −43.6 / −17.5 / −9.1  | +9.4 / +11.8 / +11.9 | −8.5 / −0.3 / +1.6   | −5.8 / +3.1 / +4.5   |
+| annealing       | −63.1 / −35.1 / −15.2 | −3.6 / −3.6 / +6.6   | −34.1 / −31.7 / +1.0 | −30.5 / −11.8 / +6.3 |
+| hill_climbing   | −70.4 / −44.9 / −13.6 | +4.9 / +8.5 / +11.4  | −16.8 / −4.7 / +0.8  | −10.2 / −3.1 / +1.6  |
+| genetic         | −41.6 / −25.9 / −17.1 | +3.6 / +6.7 / +8.4   | −22.8 / −13.8 / −3.6 | −22.1 / −2.8 / +0.3  |
+| tabu            | −22.6 / −22.6 / −22.6 | +5.5 / +5.5 / +5.5   | −6.0 / −6.0 / −6.0   | −7.1 / −7.1 / −7.1   |
+
+Trials per second of CPU time (of wall time):
+
+| Method          | azerty N  | qwerty N  | ergopti N | bepo N    | azerty DQ | qwerty DQ | ergopti DQ | bepo DQ   |
+| --------------- | --------- | --------- | --------- | --------- | --------- | --------- | ---------- | --------- |
+| late_acceptance | 590 (305) | 681 (326) | 388 (199) | 207 (115) | 624 (296) | 734 (369) | 465 (254)  | 214 (114) |
+| annealing       | 549 (271) | 604 (302) | 260 (137) | 178 (104) | 560 (311) | 613 (335) | 321 (170)  | 177 (103) |
+| hill_climbing   | 503 (255) | 586 (312) | 257 (141) | 188 (98)  | 557 (285) | 584 (314) | 321 (173)  | 184 (106) |
+| genetic         | 263 (128) | 317 (160) | 116 (62)  | 61 (33)   | 282 (134) | 326 (159) | 139 (75)   | 60 (37)   |
+| tabu            | 503 (258) | 597 (288) | 245 (125) | 179 (99)  | 528 (274) | 595 (302) | 318 (166)  | 180 (104) |
+
+What the runs show:
+
+- **Late acceptance** has the best median at equal CPU in 5 of the 8 cases
+  and the best sum of ranks (11, against annealing 20, hill climbing 24,
+  genetic 26, tabu 39). From a good start (Ergopti, bépo) it keeps the
+  start's quality and improves at once, where annealing's first, hot half
+  wrecks the start (its median is still the start's score at half of the
+  budget on Ergopti). Its trials are also the cheapest: it stays near the
+  arrangement the incremental scorer holds.
+- **Annealing** wins the other three cases, all on Don Quichotte (AZERTY,
+  bépo, and QWERTY by 0.08 point), and has the widest spread between seeds
+  on the good starts.
+- **Hill climbing** is nearly the same for every seed (a scan's best gain
+  does not depend on the order) and good from a good start, poor from
+  AZERTY or QWERTY: one step scores the whole neighbourhood (about 400 swaps
+  on letters only).
+- **The genetic algorithm** gains the most per trial (best on bépo N at an
+  equal trial count) but its children are far from the arrangement the
+  incremental scorer holds, so a trial costs 2–3 times as much: it loses at
+  equal CPU.
+- **Tabu search** on a candidate list stalls: forced to make the best of 24
+  random swaps, it drifts below its best (a probe on AZERTY: current −67,
+  best −29) and rarely climbs back. A whole-neighbourhood tabu search would
+  cost hill climbing's scans.
+
+**Default** (decided by the agent on 2026-11-20, to review by the
+maintainer): late acceptance, the best by median score at equal CPU in the
+most cases. No method wins everywhere, so the choice follows the most common
+case, the page's defaults (letters only) on a French corpus: late acceptance
+wins all four starts on Nemolivier and both Ergopti cases, and loses to
+annealing on Don Quichotte from AZERTY, bépo and QWERTY (there by 0.08
+point). Annealing stays one choice away in the list. The page lists the
+methods best first.
 
 **Speed.** One analysis costs about 5–12 ms on a 1 MB corpus (Node, Windows
 laptop), most of it in the key-stream walk and the compact-form reachability
@@ -294,7 +454,9 @@ first two (sticky), on a phone everything is one column:
    every zone summed up under the board).
 3. **Run**: the score settings the run uses, each « default » or « your
    own » (the Comparer's, never a copy: « Change them in Compare » opens its
-   « Réglages du score », the app's window unfolds it), the budget folded
+   « Réglages du score », the app's window unfolds it), the search method
+   (a list, best first, the default marked, the chosen method's short
+   explanation under it and an « i » that says how it searches), the budget folded
    (seconds, swaps per restart, restarts, seed, accuracy), « Optimize » and
    « Stop », the progress and the status.
 4. **Result**: the start, best and gain as three tiles; the start and the
@@ -335,7 +497,7 @@ and `emulates` of the host), installing is a layout DLL on Windows, a
 the driver's layout emulation runs (`initData` `emulate`), and said otherwise.
 
 The page keeps the reader's choices (corpus, start, keyboard, switches, pins,
-QWERTY letters and what of them stays, zones, the open sub-tab, budget) and their last text in this browser's storage
+QWERTY letters and what of them stays, zones, the open sub-tab, search method, budget) and their last text in this browser's storage
 (`ergopti.layout_optimizer.v1`, `ergopti.layout_optimizer.text.v1`), and puts
 them back on the next visit, skipping a value it no longer knows; a browser
 that refuses storage, or a text over the quota, gets the same page unsaved.
@@ -429,7 +591,7 @@ browser.
 ## Example
 
 Start AZERTY, corpus « Du côté de chez Swann », default switches (letters
-only), keyboard ISO, format TKL, default weights, 1 restart of 3 000 swaps on
+only), keyboard ISO, format TKL, default weights, 1 annealing restart of 3 000 swaps on
 99 % of the n-grams: 14 s in Node, score −87.9 → +14.0 (Ergo-L 11.8, Ergopti
 24.6 on the same corpus and options, with their own punctuation and digits).
 

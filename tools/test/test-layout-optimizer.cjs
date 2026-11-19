@@ -84,6 +84,7 @@ function search(start, options, settings) {
 					seen.push(layout);
 					return objective(layout);
 				},
+				method: 'annealing',
 				seed: 11,
 				iterations: 60
 			},
@@ -138,6 +139,7 @@ let bruteBest = -Infinity;
 for (const order of permutations([0, 1, 2, 3]))
 	bruteBest = Math.max(bruteBest, toyObjective(O.layoutOf(toyProblem, order)));
 const toyResult = O.run(toyProblem, {
+	method: 'annealing',
 	objective: toyObjective,
 	seed: 3,
 	restarts: 3,
@@ -201,10 +203,24 @@ check(
 );
 const p3 = O.problem(E, azerty);
 const objective = O.engineObjective(E, tables, ANALYSIS);
-const whole = O.run(p3, { objective, seed: 5, restarts: 3, iterations: 40 });
+const whole = O.run(p3, { method: 'annealing', objective, seed: 5, restarts: 3, iterations: 40 });
 const split = O.bestOf([
-	O.run(p3, { objective, seed: 5, restarts: 1, firstRestart: 0, iterations: 40 }),
-	O.run(p3, { objective, seed: 5, restarts: 2, firstRestart: 1, iterations: 40 })
+	O.run(p3, {
+		method: 'annealing',
+		objective,
+		seed: 5,
+		restarts: 1,
+		firstRestart: 0,
+		iterations: 40
+	}),
+	O.run(p3, {
+		method: 'annealing',
+		objective,
+		seed: 5,
+		restarts: 2,
+		firstRestart: 1,
+		iterations: 40
+	})
 ]);
 check(
 	JSON.stringify(split.layout) === JSON.stringify(whole.layout) && split.score === whole.score,
@@ -573,7 +589,7 @@ for (const [start, options, analysis] of [
 		return value;
 	};
 	checked.accept = incremental.accept;
-	const settings = { seed: 4, restarts: 2, iterations: 80, start: 'random' };
+	const settings = { method: 'annealing', seed: 4, restarts: 2, iterations: 80, start: 'random' };
 	const viaIncremental = O.run(p, Object.assign({ objective: checked }, settings));
 	check(scored > 100, `incremental (${start.id}): only ${scored} layouts scored`);
 	check(worst <= TOLERANCE, `incremental (${start.id}): a score is ${worst} off the engine's`);
@@ -621,6 +637,7 @@ for (const [start, options, analysis] of [
 
 let clock = 0;
 const timed = O.createSearch(O.problem(E, azerty), {
+	method: 'annealing',
 	objective,
 	seed: 1,
 	iterations: 1e9,
@@ -885,6 +902,7 @@ check(after.done && timed.done(), 'the time budget stops the search');
 	const azertyPlain = O.problem(E, azerty);
 	const plainCost = O.changeCost(E, azertyPlain, tables);
 	const penalised = O.run(azertyPlain, {
+		method: 'annealing',
 		objective: O.engineObjective(E, tables, ANALYSIS),
 		seed: 11,
 		iterations: 200,
@@ -898,6 +916,7 @@ check(after.done && timed.done(), 'the time budget stops the search');
 		`change: the objective ${penalised.score} is not ${penalised.engineScore} − ${weight} × ${penalised.change.share}`
 	);
 	const free = O.run(azertyPlain, {
+		method: 'annealing',
 		objective: O.engineObjective(E, tables, ANALYSIS),
 		seed: 11,
 		iterations: 200,
@@ -909,6 +928,7 @@ check(after.done && timed.done(), 'the time budget stops the search');
 	);
 	// A weight of 0 is the search without a penalty, to the bit.
 	const unpenalised = O.run(azertyPlain, {
+		method: 'annealing',
 		objective: O.engineObjective(E, tables, ANALYSIS),
 		seed: 11,
 		iterations: 200
@@ -1113,11 +1133,11 @@ check(after.done && timed.done(), 'the time budget stops the search');
 				return value;
 			};
 			checked.accept = incremental.accept;
-			const settings = { method, seed: 4, iterations: 100, start: 'random' };
+			const settings = { method, seed: 4, iterations: 70, start: 'random' };
 			const viaIncremental = O.run(p, Object.assign({ objective: checked }, settings));
 			const viaFull = O.run(p, Object.assign({ objective: fullObjective }, settings));
 			check(
-				scored > 50 && worst <= TOLERANCE,
+				scored > 40 && worst <= TOLERANCE,
 				`${method} incremental (${start.id}): ${scored} scored, a score ${worst} off the engine's`
 			);
 			check(

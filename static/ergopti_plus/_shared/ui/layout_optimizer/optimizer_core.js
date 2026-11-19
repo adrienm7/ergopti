@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Searches key arrangements for the one the layout analysis engine
  * (layout_analysis/analysis_engine.js) scores best on a corpus: a local
- * search over swaps of character pairs (simulated annealing by default),
+ * search over swaps of character pairs (late-acceptance hill climbing by default),
  * with several restarts, under the constraints the user chose. The score of an arrangement is always the
  * engine's own global score (analyse(...).score.total) with the user's
  * weights: this module measures nothing itself. The design note is
@@ -125,16 +125,19 @@ var LAYOUT_OPTIMIZER = (function () {
 	// Scores kept per layout signature: annealing revisits arrangements.
 	const CACHE_LIMIT = 20000;
 
-	// The search methods a run may use (createSearch's `method`), in the order
-	// the page lists them; the design note's benchmark chose the default.
+	// The search methods a run may use (createSearch's `method`), best first
+	// in the design note's benchmark, the order the page lists them. Late
+	// acceptance had the best median score at equal CPU time in 5 of its 8
+	// cases (4 starts × 2 corpora) and the best rank overall; annealing won
+	// the other 3, all on Don Quichotte.
 	const METHODS = Object.freeze([
-		'annealing',
 		'late_acceptance',
-		'tabu',
+		'annealing',
+		'hill_climbing',
 		'genetic',
-		'hill_climbing'
+		'tabu'
 	]);
-	const DEFAULT_METHOD = 'annealing';
+	const DEFAULT_METHOD = 'late_acceptance';
 	// A move counts as an improvement only past this gain: the incremental
 	// score of one arrangement may differ in its last bits by the path to it.
 	const IMPROVEMENT_EPSILON = 1e-9;
