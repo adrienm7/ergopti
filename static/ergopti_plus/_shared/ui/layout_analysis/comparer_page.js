@@ -410,6 +410,20 @@
 		<select id="la-corpus"></select>
 		<p id="la-corpus-info" class="la-muted"></p>
 	</div>
+	<div class="la-corpus-file">
+		<label class="la-file">
+			<span class="la-file-button la-file-primary">
+				<svg class="la-file-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+					<path d="M8 10.5V2.5M4.75 5.75 8 2.5l3.25 3.25M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10" />
+				</svg>
+				<span data-i18n="layout_analysis.corpus.file"></span>
+			</span>
+			<input id="la-file" type="file" />
+		</label>
+		<p id="la-file-formats" class="la-muted la-file-formats"></p>
+		<p id="la-file-name" class="la-muted la-file-name"></p>
+		<p id="la-file-error" class="la-error" hidden></p>
+	</div>
 	<div id="la-text-mode-field" class="la-field" hidden>
 		<label for="la-text-mode" data-i18n="layout_analysis.text_mode.label"></label>
 		<select id="la-text-mode" data-i18n-option-prefix="layout_analysis.text_mode">
@@ -425,16 +439,6 @@
 			rows="5"
 			data-i18n-placeholder="layout_analysis.corpus.paste_placeholder"
 		></textarea>
-		<label class="la-file">
-			<span class="la-file-button" data-i18n="layout_analysis.corpus.file"></span>
-			<input
-				id="la-file"
-				type="file"
-				accept=".txt,.md,.csv,.tsv,.html,.htm,.json,.tex,.docx,.odt,.pdf"
-			/>
-			<span id="la-file-name" class="la-muted"></span>
-		</label>
-		<p id="la-file-error" class="la-error" hidden></p>
 	</div>
 </section>
 
@@ -4373,6 +4377,11 @@
 		function showCorpusInfo() {
 			const corpus = corpora.find((c) => c.id === state.corpus);
 			$('la-custom').hidden = corpus.id !== CUSTOM_ID;
+			$('la-file-formats').textContent = t('layout_analysis.corpus.file_formats', {
+				formats: window.LAYOUT_ANALYSIS_FILES.FILE_EXTENSIONS.map((extension) =>
+					extension.toUpperCase()
+				).join(', ')
+			});
 			$('la-corpus-info').textContent = corpus.builtin
 				? t('layout_analysis.corpus.info', {
 						chars: format(corpus.builtin.characters, 0),
@@ -5659,6 +5668,9 @@
 					window.LAYOUT_ANALYSIS_FILES.TEXT_DEBOUNCE_MS
 				);
 			});
+			$('la-file').accept = window.LAYOUT_ANALYSIS_FILES.FILE_EXTENSIONS.map(
+				(extension) => '.' + extension
+			).join(',');
 			$('la-file').addEventListener('change', async (event) => {
 				const file = event.target.files && event.target.files[0];
 				const error = $('la-file-error');
@@ -5669,6 +5681,14 @@
 				try {
 					const text = await window.LAYOUT_ANALYSIS_FILES.readText(file);
 					$('la-text').value = text;
+					// The button sits under any corpus: its file becomes the chosen one.
+					if (state.corpus !== CUSTOM_ID) {
+						state.corpus = CUSTOM_ID;
+						$('la-corpus').value = CUSTOM_ID;
+						showCorpusInfo();
+						showTextMode();
+						fillLayouts();
+					}
 					useText(text);
 				} catch (failure) {
 					// Each refusal in words: an unknown type, a PDF that is locked or holds no

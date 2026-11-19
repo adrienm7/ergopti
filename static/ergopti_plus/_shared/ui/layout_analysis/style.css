@@ -309,6 +309,62 @@ body:has(> main.layout-analysis) {
 	outline-offset: 1px;
 }
 
+/* « Load a corpus file » under the corpus picker, whatever corpus is chosen
+   (it was hidden under « Your own text »): a tinted button with an icon and
+   the formats it reads (maintainer, 2026-11-19). */
+.la-corpus-file {
+	align-items: center;
+	border-top: 1px solid var(--la-border);
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 14px;
+	margin-top: 14px;
+	padding-top: 14px;
+}
+
+.la-file-button.la-file-primary {
+	align-items: center;
+	background: var(--la-accent-soft);
+	border: 1px solid var(--la-accent);
+	border-radius: 8px;
+	color: var(--theme-text);
+	display: inline-flex;
+	font-weight: 600;
+	gap: 8px;
+	min-height: 40px;
+	padding: 8px 16px;
+}
+
+.la-file-button.la-file-primary:hover {
+	background: var(--la-surface-2);
+}
+
+/* The icon in the accent (3:1 at least); the words in the text colour. */
+.la-file-icon {
+	fill: none;
+	flex: none;
+	height: 18px;
+	stroke: var(--la-accent);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.8;
+	width: 18px;
+}
+
+.la-corpus-file .la-file-formats,
+.la-corpus-file .la-file-name {
+	margin: 0;
+}
+
+.la-corpus-file .la-file-name:empty,
+.la-corpus-file .la-error {
+	flex-basis: 100%;
+}
+
+.la-corpus-file .la-file-name:empty {
+	display: none;
+}
+
 .la-row {
 	align-items: center;
 	display: flex;

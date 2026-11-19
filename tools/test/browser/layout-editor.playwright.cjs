@@ -33,7 +33,7 @@ const studioNumbers = require('./studio-numbers.cjs');
 const studioHeaders = require('./studio-headers.cjs');
 const studioManage = require('./layout-studio-manage.cjs');
 const { catalogueShape, pageRawKeys } = require('../lib/raw-locale-keys.cjs');
-// The editor's document tab strip and its restored tabs' names (studio-controls).
+// The tab strip, the restored tabs' names and the corpus file button (studio-controls).
 const studioControls = require('./studio-controls.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
@@ -2422,7 +2422,7 @@ async function exerciseStudioComparer(page) {
 	// (studio-file-buttons) The file inputs never show the browser's own words
 	// (« Choose File », « No file chosen »): each is hidden inside a label whose
 	// button carries the page's translated text.
-	// The corpus file sits in the panel « custom text » opens: open it first.
+	// The corpus file's button sits under the picker; its text fills « custom text ».
 	await comparerTab(page, 'home');
 	await page.selectOption('#la-corpus', 'custom');
 	// (comparer-reads-pdf) A PDF's text becomes the corpus, read in the page.
@@ -4073,6 +4073,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseStudioBar(browser, origin);
 		await studioControls.exerciseTabStrip(browser, origin);
 		await studioControls.exerciseRestoredStartName(browser, origin);
+		await studioControls.exerciseCorpusFileButton(browser, origin);
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);

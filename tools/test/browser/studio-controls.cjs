@@ -7,8 +7,8 @@
  * The Studio's document tab strip and its controls, driven in Chromium by
  * layout-editor.playwright.cjs on its loopback server (run alone, it serves
  * the shared tree itself). The maintainer looked at the Studio on 2026-11-19:
- * the tab chip was cramped and its outline broken, and the editor's tab
- * still read « Mon Ergopti ».
+ * the tab chip was cramped and its outline broken, the editor's tab still
+ * read « Mon Ergopti », and « Load a file » hid under « Your own text ».
  *
  * WHAT IS CHECKED:
  * 1. (tab-strip) Every tab and « + » share one height and one middle line;
@@ -19,6 +19,9 @@
  * 2. (restored-start-name) A workspace saved while the start copy was named
  *    « Mon Ergopti » opens with the copy's current name and its stored id; a
  *    tab whose keys differ from the start keeps the name it has.
+ * 3. (corpus-file-button) « Load a corpus file » shows on the Comparer's
+ *    « Home » under a built-in corpus: tinted, bold, with an icon and the
+ *    formats it reads, 4.5:1; the file it loads becomes the chosen corpus.
  * ==============================================================================
  */
 
@@ -323,6 +326,98 @@ async function exerciseRestoredStartName(browser, origin) {
 	await context.close();
 }
 
+/**
+ * (corpus-file-button) « Load a corpus file » on the Comparer's « Home »,
+ * under the corpus picker whatever corpus is chosen: a tinted button with an
+ * icon, the formats it reads beside it, and a file it loads becomes the
+ * chosen corpus.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseCorpusFileButton(browser, origin) {
+	const en = stringsOf('en');
+	for (const colorScheme of ['light', 'dark'])
+		for (const width of [1280, 320]) {
+			const where = `${colorScheme} ${width} px`;
+			const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme });
+			const page = await context.newPage();
+			const errors = [];
+			page.on('pageerror', (error) => errors.push(error.message));
+			await page.goto(`${origin}/ui/layout_analysis/index.html?lang=en`);
+			await page.waitForFunction(
+				() => document.getElementById('la-results').getAttribute('aria-busy') === 'false',
+				null,
+				{ timeout: 120000 }
+			);
+			assert.notEqual(await page.inputValue('#la-corpus'), 'custom', `${where}: a built-in text`);
+			const button = page.locator('.la-corpus-card .la-file-button');
+			assert.equal(await button.isVisible(), true, `${where}: the button is shown`);
+			const look = await page.evaluate(() => {
+				const node = document.querySelector('.la-corpus-card .la-file-button');
+				const rgb = (text) => (text.match(/[\d.]+/g) || []).slice(0, 4).map(Number);
+				const luminance = ([r, g, b]) => {
+					const lin = (c) => {
+						const v = c / 255;
+						return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+					};
+					return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+				};
+				// The button's fill over the card behind it.
+				let back = [255, 255, 255];
+				const layers = [];
+				for (let at = node; at; at = at.parentElement) {
+					const colour = rgb(getComputedStyle(at).backgroundColor);
+					if (colour.length === 3 || colour[3] > 0) layers.push(colour);
+					if (colour.length === 3 || colour[3] === 1) break;
+				}
+				for (const layer of layers.reverse()) {
+					const alpha = layer.length === 4 ? layer[3] : 1;
+					back = back.map((c, i) => layer[i] * alpha + c * (1 - alpha));
+				}
+				const [x, y] = [luminance(rgb(getComputedStyle(node).color)), luminance(back)].sort(
+					(m, n) => n - m
+				);
+				const style = getComputedStyle(node);
+				const icon = node.querySelector('svg');
+				return {
+					text: node.textContent.trim(),
+					icon: Boolean(icon) && icon.getAttribute('aria-hidden') === 'true',
+					contrast: (x + 0.05) / (y + 0.05),
+					height: node.getBoundingClientRect().height,
+					weight: Number(style.fontWeight),
+					tinted:
+						style.backgroundColor !== getComputedStyle(node.closest('.la-card')).backgroundColor,
+					formats: document.getElementById('la-file-formats').textContent,
+					formatsShown: document.getElementById('la-file-formats').getClientRects().length > 0,
+					accept: document.getElementById('la-file').accept,
+					scroll: document.documentElement.scrollWidth - window.innerWidth
+				};
+			});
+			assert.equal(look.text, en['layout_analysis.corpus.file'], `${where}: its words`);
+			assert.ok(look.icon, `${where}: a hidden icon`);
+			assert.ok(look.contrast >= 4.5, `${where}: text ${look.contrast}`);
+			assert.ok(look.height >= 40 && look.weight >= 600, `${where}: a prominent button`);
+			assert.ok(look.tinted, `${where}: tinted apart from its card`);
+			assert.ok(look.formatsShown, `${where}: the formats beside it`);
+			for (const format of ['TXT', 'DOCX', 'ODT', 'PDF'])
+				assert.ok(look.formats.includes(format), `${where}: ${look.formats} names ${format}`);
+			assert.ok(/\.pdf\b/.test(look.accept) && /\.docx\b/.test(look.accept), look.accept);
+			assert.ok(look.scroll <= 0, `${where}: no sideways scroll`);
+			// A file loaded under a built-in text becomes the chosen corpus.
+			const text = 'Le vif zéphyr jubile sur les kumquats du clown gracieux.';
+			await page.setInputFiles('#la-file', {
+				name: 'mon-texte.txt',
+				mimeType: 'text/plain',
+				buffer: Buffer.from(text)
+			});
+			await page.waitForFunction(() => document.getElementById('la-corpus').value === 'custom');
+			assert.equal(await page.inputValue('#la-text'), text, `${where}: its text`);
+			assert.equal(await page.textContent('#la-file-name'), 'mon-texte.txt');
+			assert.deepEqual(errors, [], `${where}: page errors`);
+			await context.close();
+		}
+}
+
 /** Serves the shared tree read-only on loopback, for a run of this file alone. */
 function serve() {
 	const root = shared();
@@ -350,6 +445,7 @@ async function main() {
 	try {
 		await exerciseTabStrip(browser, origin);
 		await exerciseRestoredStartName(browser, origin);
+		await exerciseCorpusFileButton(browser, origin);
 	} finally {
 		await browser.close();
 		server.close();
@@ -363,4 +459,4 @@ if (require.main === module)
 		process.exitCode = 1;
 	});
 
-module.exports = { exerciseTabStrip, exerciseRestoredStartName };
+module.exports = { exerciseTabStrip, exerciseRestoredStartName, exerciseCorpusFileButton };

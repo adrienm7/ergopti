@@ -43,6 +43,14 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 		docx: { part: 'word/document.xml', paragraphs: ['p'] },
 		odt: { part: 'content.xml', paragraphs: ['p', 'h'] }
 	};
+	// Every extension readText reads: the pages' file pickers accept these and
+	// name them in their hint.
+	const FILE_EXTENSIONS = Object.freeze([
+		...TEXT_EXTENSIONS,
+		...HTML_EXTENSIONS,
+		...Object.keys(OFFICE),
+		'pdf'
+	]);
 	const EOCD_SIGNATURE = 0x06054b50;
 	const CENTRAL_SIGNATURE = 0x02014b50;
 	const LOCAL_SIGNATURE = 0x04034b50;
@@ -487,6 +495,7 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 		takeOptimizerHandoff,
 		takeEditorHandoff,
 		readText,
+		FILE_EXTENSIONS,
 		builtinTables,
 		savedFormat,
 		saveFormat,
