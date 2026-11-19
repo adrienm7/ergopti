@@ -20,7 +20,7 @@
 	<body>
 		<main id="panel">
 			<h1 class="theme-sr-only" data-i18n="update_check.window_title"></h1>
-			<div id="spinner" class="spinner" hidden></div>
+			<progress id="spinner" class="spinner" aria-labelledby="line1" hidden></progress>
 			<p id="line1" class="line1"></p>
 			<p id="line2" class="line2"></p>
 			<p id="logged" class="logged" hidden></p>
@@ -28,7 +28,7 @@
 			<ul id="others" class="others" hidden></ul>
 			<section id="notes" class="notes" hidden>
 				<p id="empty-notes" class="empty-notes" hidden></p>
-				<div id="release-notes"></div>
+				<article id="release-notes"></article>
 			</section>
 			<p id="status" class="status info" role="status" aria-live="polite"></p>
 		</main>

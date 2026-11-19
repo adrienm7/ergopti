@@ -110,6 +110,11 @@ p {
 	margin: 2px 0;
 }
 
+/* The line names the other channel's release beside its switch button. */
+.others li p {
+	margin: 0;
+}
+
 .status {
 	font-size: 12px;
 	margin-top: 8px;
@@ -128,14 +133,27 @@ p {
 	color: var(--muted);
 }
 
+/* An indeterminate progress element drawn as a spinning ring: the native
+   bar is turned off so only the ring shows. */
 .spinner {
 	animation: spin 0.9s linear infinite;
+	appearance: none;
+	background: transparent;
 	border: 3px solid var(--border);
 	border-radius: 50%;
 	border-top-color: var(--accent);
 	height: 22px;
 	margin-bottom: 12px;
 	width: 22px;
+}
+
+.spinner::-webkit-progress-bar,
+.spinner::-webkit-progress-value {
+	background: transparent;
+}
+
+.spinner::-moz-progress-bar {
+	background: transparent;
 }
 
 @keyframes spin {
@@ -280,10 +298,6 @@ button.link {
 
 #release-notes a:hover {
 	text-decoration-thickness: 2px;
-}
-
-#release-notes .md-link-refused {
-	color: inherit;
 }
 
 #release-notes table {

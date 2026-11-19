@@ -138,7 +138,7 @@
 		entries.forEach(function (entry) {
 			if (!entry || typeof entry.channel !== 'string' || typeof entry.tag !== 'string') return;
 			var item = document.createElement('li');
-			var line = document.createElement('span');
+			var line = document.createElement('p');
 			line.textContent = t('update_check.also_available', {
 				channel: channelName(entry.channel),
 				tag: entry.tag
