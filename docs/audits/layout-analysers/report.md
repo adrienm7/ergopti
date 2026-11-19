@@ -628,16 +628,12 @@ that may only grow and a checked credit for each):
   GPL-3.0, read through the Studio's KLA reader): Alt, Extreme, XKCD and
   Reiser's Hands On, Heads Up and Notarise, and the « sym » (angle) files of
   Alt, Polyglot, Reference and Hands On, ten layouts. Its Reference is
-  Oxeylyzer's `hands_down`. Every thumb-alpha variant (Gold T, Silver N,
-  Bronze H, Platinum L, Titanium, Rhodium, Promethium, Mithril, Unobtanium and
-  the Vibranium files R, Chromium and Cesium C, Dash and Alt-ex E, Alt-tx T,
-  Alt-nx N, Élan . and ,) is left out: the author's site states « Thumbs up
-  variations require dedicated thumb keys », and the model's only typing
-  thumb key is the space bar. Adding one (AltLeft) would change the typing
-  area of the optimizer, the KLA export and every board geometry, so it was
-  not done here. The matrix, ortho and ErgoDox copies that put letters on
-  combos or outer columns, and Neu's JIS and ErgoDox files, are listed with
-  their reason; Neu stays cmini's.
+  Oxeylyzer's `hands_down`. The thumb-alpha variants were left out at first
+  (the author's site states « Thumbs up variations require dedicated thumb
+  keys », and the model's only typing thumb key was the space bar); they came
+  in with the model's thumb keys the same day (below). The matrix, ortho and
+  ErgoDox copies that put letters on combos or outer columns, and Neu's JIS
+  and ErgoDox files, are listed with their reason; Neu stays cmini's.
 - **KLAnext** (klanext.keyboard-design.com, version 0.06; no licence
   published, user-submitted files): its `db.js` lists 723 layout files, of
   which 711 answered (read as data, never run, through the Studio's KLA
@@ -678,9 +674,9 @@ that may only grow and a checked credit for each):
   and a thumb key read as text, enter as alphabetic blocks (the codegen adds
   the US number row and Shift pairs): 11 are new (Gallium, its Hands Down
   Neu, Carbyne, Really?, Northstar and its page-2 version, Halmak, Nerps,
-  IRST, Pine v4, BEAKL 19bis). 21 repeat a library layout and 20 put a letter
-  on a thumb key (Hands Down Vibranium, Promethium…) and one string has 35
-  characters, so they are left out.
+  IRST, Pine v4, BEAKL 19bis). 21 repeat a library layout and one string has
+  35 characters, so they are left out; the 20 that put a letter on a thumb
+  key came in with the thumb keys (below).
 - **xkeyboard-config's other English, German and Spanish layouts**
   (`symbols/us`, `de`, `es` at f4d3ed8b): the classic Dvorak, Colemak-DH
   Wide ISO (angle), Carpalx (full optimization), Drix, Hawaiian, German
@@ -690,6 +686,48 @@ that may only grow and a checked credit for each):
   Carpalx international variants include files the reader does not resolve.
 
 The library went from 170 layouts to 649 on 2026-11-19.
+
+**Thumb-letter layouts** (2026-11-19, decided by the agent, to review by the
+maintainer). The model gained the thumbs' own keys beside the space bar,
+named by the JIS keys around it: NonConvert (left thumb), Convert and
+KanaMode (right thumb), on the boards that have them physically (JIS, and
+free thumb keys of the Corne, Planck, ErgoDox, Moonlander and Kinesis
+boards, `board_geometries.json`); ISO, ANSI, ABNT and the angle-mod ISO
+fingering have none, so a thumb-letter layout is incomplete there. Such a
+layout types its space on its own thumb key, never on the shared space bar,
+so the letter and the space sit on the two thumbs as their authors place
+them. NonConvert and Convert are rest keys (no travel); KanaMode is reached
+from the nearest rest. Two keys of one thumb are an SFB, the only pair a
+thumb key is in. Every value of the 649 layouts held before is bit-identical
+on the eleven keyboards, and their golden values are unchanged.
+
+The files left out for a thumb letter, or for keys the reader had no code
+for, were read again from the same commits and pages. A letter counts on
+any level (q and z on AltGr in Hands Down's ErgoDox files), and a
+thumb-letter file is taken even when symbols of its ErgoDox outer keys have
+no code (they count as unsupported). 51 layouts came in:
+
+- **Hands Down** (moutis/HandsDown e8f532f62c, GPL-3.0): Gold, Silver,
+  Bronze, Titanium, Rhodium, Vibranium vb, vf, vp and vv, Élan, Alt-ex,
+  Alt-nx and Alt-tx (their matrix files), Chromium, Cesium, Vibranium vx and
+  vfj (from the cyanophage playground link their `layouts/hd/*-config.h`
+  states), the ErgoDox Alt-x, Polyglot and Extreme, Ingulish and Ingulish v2,
+  and Reiser's Blickensderfer 5: 23. Platinum, Promethium, Dash, Unobtanium
+  and the ErgoDox Élan, Alt-ex, Alt-nx and Alt-tx type z (and q) with a
+  combo, which no key holds, and Mithril's JSON does not parse (its
+  « authorUrl » is never closed): they stay out with that reason.
+- **KLAnext** (0.06): Cole Shift E, Corny Furry, Enne P 111 69, Lydell
+  Anishtro, both Maltron US 90, Proxkb Thumbshift and RSTHD 2: 8. Its copies
+  of the Hands Down variants lack q and z; the files that need two left thumb
+  keys besides the space (Cahi, Chia, Uhia, Ucieatron, SNTH) or three right
+  ones (Einbinder) keep a letter on no key.
+- **cyanophage** (b02780b39d): its 20 thumb strings (Maltron, RSTHD, DSTHK,
+  Aptmak, Caster, Hands Down Vibranium, Promethium, Gold and Dash, SNTH,
+  Sunlight, Nordrassil, Night, Dusk, Stern, Racket, Seasalt, Coastland,
+  North, Pfouyhai), the thumb key on the left thumb and the space on the
+  right, as its `keyboard_compare.js` places them (row 3, columns 4 and 7).
+
+The library holds 700 layouts.
 
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not

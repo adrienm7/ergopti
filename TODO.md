@@ -471,6 +471,18 @@ Each closes on a named green hosted or native run, recorded here.
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
+- [ ] **Thumb keys of the analysis model (decided by the agent on 2026-11-19, to review by the maintainer).** The
+      thumbs gained their own keys beside the space bar, named by the JIS keys: NonConvert (left thumb), Convert and
+      KanaMode (right), on JIS and on free thumb keys of the Corne, Planck, ErgoDox, Moonlander and Kinesis boards;
+      none on ISO, ANSI, ABNT or the angle mod. Defaults kept: NonConvert and Convert are rest keys (thumb effort
+      0 mm, like a home key), KanaMode costs its distance from the nearest rest (19 mm on the Corne); two keys of one
+      thumb are an SFB, the only pair a thumb is in (a thumb letter's other pairs stay out of the pair metrics, as the
+      space's); a thumb-letter layout types its space on its own thumb key, never on the shared bar; the optimizer
+      leaves thumb keys alone unless `thumbKeys` names a board; a thumb-letter file is imported even when symbols of
+      its ErgoDox outer keys have no code. 51 layouts came in (Hands Down Gold and family, cyanophage, KLAnext); on
+      the ErgoDox, Gold scores 11.2 against Hands Down Alt's −1.5 on Alice. Choose the thumb effort, whether a thumb
+      letter's pairs should count, whether the left thumb needs a second key (Cahi, Chia, SNTH stay out), and
+      whether the optimizer page should offer the switch.
 - [ ] **Access weights of the score (decided by the agent on 2026-11-18, to review by the maintainer).** New
       metric `altgr_usage` (characters typed with AltGr held) with weight 2, on top of `modifier_usage` 0.5;
       `dead_key_usage` raised from 0.5 to 2. Per character, an AltGr chord costs 2.5 plus the thumb's reach, a dead

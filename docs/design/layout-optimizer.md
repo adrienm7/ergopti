@@ -56,6 +56,16 @@ the move set and each unit-tested:
 | `qwertyPins`             | `[]`    | Letters placed on their QWERTY key first, then fixed (presets `z x c v` and `a s`).       |
 | `qwertyShortcuts`        | `[]`    | Letters whose Ctrl/Cmd shortcut stays on their QWERTY key (`command`); the letter moves.  |
 | `zones`                  | `{}`    | Character → the only codes its unit may sit on.                                           |
+| `thumbKeys`              | `null`  | A keyboard id whose thumb keys (NonConvert, Convert, KanaMode) become places.             |
+
+**Thumb keys** (decided by the agent on 2026-11-19, to review by the
+maintainer). The analysis model's thumb keys
+([layout-analysis.md](layout-analysis.md#model)) are places only when
+`thumbKeys` names a keyboard that has them (a split board, JIS); the empty
+ones join as holes, so a letter may move there. A keyboard without thumb keys
+is refused (`thumb_keys_absent`). With `null`, the default, nothing moves onto
+a thumb key and a start layout's thumb characters stay where they are, as a
+pinned key's. The page offers no switch for it yet: the option is the core's.
 
 A unit may always stay where the start had it, unless a zone leaves that key
 out: a zoned character never leaves its zone, and one that starts outside it

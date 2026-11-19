@@ -37,11 +37,26 @@ layouts (`rows`, every key and level its file states), taken as they are.
 `tools/build/import-kla-layouts.cjs <KLA checkout>` re-encodes KLA's files
 through the Studio's own reader (`fromKla`). A file is left out, and listed in
 `not_imported` with its reason, when it has characters on keys the library's
-keyboards have no code for (ErgoDox thumbs and outer columns, TypeMatrix's
+keyboards have no code for (ErgoDox outer columns, TypeMatrix's
 middle column, a modifier key), places a letter twice, or has the same letters
 on the same keys and the same digits as a layout already in the library
 (`same_as`); a duplicate only credits that layout when it has no credit. The
 codegen refuses a `same_as` the library does not hold.
+
+The KLA reader reads an ErgoDox or KLAnext matrix file's thumb keys onto the
+model's thumb keys when one of them types a letter, a digit or a punctuation
+mark: each thumb's keys, by the file's own finger, the big keys first, the
+space included (never the shared space bar); a key holding only the capitals
+of another thumb key's letters becomes its Shift levels (Hands Down's « T »
+beside « t »), a key drawing only an action sign (⌦, ⇞) stays unread, and a
+key beyond its thumb's codes is named. A file with only the space on its
+thumbs reads as before. The KLA writer puts such a layout on KLA's ErgoDox
+board, which KLA and KLAnext both read. On 2026-11-19 the files left out for
+a thumb letter were read again this way (51 layouts, study section 13): a
+letter counts on any level, and such a file is taken even when symbols of
+its ErgoDox outer keys have no code (they count as unsupported). An
+alphabetic block may state its space key (the space on a thumb key); the
+codegen then adds no space bar.
 
 A page loads, from the `_shared/ui/<page>/` folder:
 
@@ -376,6 +391,35 @@ and `ortho`, the keyboards include `corne`, `planck`, `ergodox`, `moonlander` an
   unsupported.
 - A profile's base fingering applies to the row-staggered boards only.
 
+**Thumb keys** (decided by the agent on 2026-11-19, to review by the
+maintainer). Besides the space bar, the thumbs have their own keys
+(`thumb_keys`), named by the JIS keys around the space bar: NonConvert for
+the left thumb, Convert and KanaMode for the right. Only the boards that have
+them physically measure them: JIS (its own keys, `extra_fingers`) and the
+Corne, Planck, ErgoDox, Moonlander and Kinesis boards, on free thumb keys
+beside the space bar and AltGr (`board_geometries.json`, « placed »). ISO,
+ANSI, ABNT and `ortho` have none, nor has the angle mod (a fingering of the
+ISO rows): a layout with a letter there is incomplete on them, like a 36-key
+board's missing number row.
+
+- A layout that puts a character on a thumb key types its space there too,
+  on the thumb its author gives it, never on the shared space bar: on a
+  split board Space is the left thumb's (the right one's on the Kinesis), so
+  the space bar beside a thumb letter would put both on one thumb.
+- NonConvert and Convert are rest keys (`thumb_rest_keys`): a thumb rests on
+  the one a layout uses. A thumb key's reach is its distance to the nearest
+  of its thumb's home key and rest keys, so a rest key costs no travel and
+  KanaMode costs its distance from Convert or AltGr. The other keys keep
+  their home-key reach.
+- Two different keys of one thumb (a thumb letter and the space on the same
+  thumb, two thumb letters) are an SFB, counted among the bigrams: the only
+  pair a thumb key is in. A thumb trigram stays out of the trigram metrics.
+- The optimizer never moves a character onto a thumb key unless its
+  `thumbKeys` option names a keyboard that has them
+  ([layout-optimizer.md](layout-optimizer.md)).
+- Adding them changed no value of any layout that does not use them, on any
+  keyboard (the 649 layouts of the library, eleven keyboards, bit for bit).
+
 **Fingering profiles.** `keyboard(id, profile)` and `analyse(…, {profile})`
 take a user model of the hand: `{id, name, base: 'standard'|'angle',
 fingers: {code: finger}, home: {finger: code}}`. The base fingering and the
@@ -396,7 +440,8 @@ numbers.
   finger or key.
 
 **Shares.** A bigram or trigram metric is a share of the key bigrams or
-trigrams **without a thumb key**; a row metric a share of the non-thumb,
+trigrams **without a thumb key**, plus the thumb SFBs (two keys of one
+thumb, [Thumb keys](#model)); a row metric a share of the non-thumb,
 non-modifier presses; finger load a share of every press; a « per character »
 metric a share of the typed characters.
 
@@ -404,7 +449,7 @@ metric a share of the typed characters.
 
 | Id                 | Unit  | Better | Definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ------------------ | ----- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sfb`              | %     | lower  | Same-finger bigram: two consecutive keys on one finger, different keys.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `sfb`              | %     | lower  | Same-finger bigram: two consecutive keys on one finger, different keys (two keys of one thumb too).                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `repeat`           | %     | none   | The same key twice.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `sfs`              | %     | lower  | Same-finger skipgram: first and third key of a trigram on one finger, different keys.                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `sfb_distance`     | mm    | lower  | Same-finger travel: Σ over the SFBs of n × the distance between the two keys' centres (mm, the `distance` metric's geometry) × the finger's `same_finger_factor` (pinky 1.7, ring 1.3, middle and index 1), per 100 key bigrams, plus 0.5 × the same sum over the SFS (first to third key) per 100 key trigrams. genkey's finger speed, Oxeylyzer's SFB × distance / finger weight and the Keyboard Layout Optimizer's `finger_repeats`; the finger factors are Cyanophage's. Weight 0 by default.       |
@@ -1405,6 +1450,14 @@ or without its plain layout; a built-in corpus has one text (the hotstring
 catalogue is not applied to n-gram tables, above); the editor's panel follows
 the Comparer's mode; a « + » name may repeat a library name (« Ergopti » ticked
 « + » ranks as « Ergopti+ », the name of the registry's Ergopti+ layout).
+
+Decided by the agent on 2026-11-19, to review by the maintainer, for the
+thumb keys ([Model](#model)): their codes (the JIS NonConvert, Convert and
+KanaMode), one for the left thumb and two for the right as on JIS; their
+places on each split board; NonConvert and Convert as rest keys (0 mm of
+travel) and KanaMode measured from the nearest rest; the thumb SFB as the
+only pair a thumb is in; the thumb-letter files taken without the symbols of
+their unread outer keys.
 
 Decided by the agent on 2026-11-17, to review by the maintainer: `row_jump`
 (two rows or more, any fingers, logical rows) is shown but not scored, since
