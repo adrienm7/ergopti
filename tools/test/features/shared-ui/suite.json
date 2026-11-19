@@ -613,6 +613,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-site-video-captions.cjs"],
 			"repro": "npm run test:site-video-captions"
+		},
+		{
+			"id": "heading-landmarks",
+			"ordinal": 702,
+			"name": "the Studio and app window outline check refuses no h1 or two, a skipped heading level, no main or two, an unnamed landmark and two landmarks under one name",
+			"cmd": "node",
+			"args": ["tools/test/test-heading-landmarks.cjs"],
+			"repro": "npm run test:heading-landmarks"
 		}
 	]
 }
