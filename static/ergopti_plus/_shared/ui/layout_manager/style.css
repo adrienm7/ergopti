@@ -122,15 +122,20 @@ h1 {
 	justify-content: space-between;
 }
 
+/* An h2 for the outline, sized as the card's title. */
 .layout-name {
 	color: var(--theme-label);
 	font-size: 13px;
 	font-weight: 600;
+	margin: 0;
 }
 
 .layout-badges {
 	display: flex;
 	gap: 4px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
 }
 
 .badge {
@@ -164,7 +169,9 @@ h1 {
 	flex-wrap: wrap;
 	font-size: 11px;
 	gap: 4px 14px;
+	list-style: none;
 	margin: 4px 0 6px;
+	padding: 0;
 }
 
 .layout-actions {
@@ -174,14 +181,16 @@ h1 {
 	justify-content: flex-end;
 }
 
+/* Two paragraphs, spaced as one block: 8 px above the first, below the note. */
 .layout-content {
 	font-size: 12px;
 	line-height: 1.5;
-	margin: 8px 0;
+	margin: 8px 0 0;
 }
 
 .layout-content-note {
 	font-size: 11px;
+	margin: 0 0 8px;
 	opacity: 0.8;
 }
 
@@ -190,6 +199,7 @@ h1 {
 	flex-grow: 1;
 	font-size: 11px;
 	font-style: italic;
+	margin: 0;
 }
 
 .empty {

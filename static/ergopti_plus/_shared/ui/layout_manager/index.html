@@ -5,15 +5,16 @@
 		<meta charset="utf-8" />
 		<title data-i18n="layout_manager.window_title"></title>
 		<link rel="stylesheet" href="../theme.css" />
+		<script src="../a11y_prefs.js"></script>
 		<link rel="stylesheet" href="style.css" />
 		<script src="../host_bridge.js"></script>
 	</head>
 	<body>
-		<div id="layout-view" role="main">
+		<main id="layout-view">
 			<h1 data-i18n="layout_manager.window_title"></h1>
 			<p class="subtitle" data-i18n="layout_manager.subtitle"></p>
 
-			<div class="toolbar">
+			<header class="toolbar">
 				<p id="catalogue-status" class="catalogue-status" role="status"></p>
 				<button
 					type="button"
@@ -28,22 +29,22 @@
 					class="secondary"
 					data-i18n="layout_manager.btn_refresh"
 				></button>
-			</div>
+			</header>
 
 			<p id="result" class="result" role="alert" hidden></p>
 
 			<ul id="layout-list" class="layout-list"></ul>
 			<p id="empty" class="empty" data-i18n="layout_manager.empty" hidden></p>
 
-			<div class="btns">
+			<footer class="btns">
 				<button
 					type="button"
 					id="btn-close"
 					class="secondary"
 					data-i18n="layout_manager.btn_close"
 				></button>
-			</div>
-		</div>
+			</footer>
+		</main>
 
 		<script src="script.js"></script>
 	</body>

@@ -293,47 +293,53 @@ function element(tag, className, text) {
 function renderRow(row, busy) {
 	const item = element('li', 'layout layout-' + row.status);
 	item.dataset.id = row.id;
+	// Each card is a self-contained article: its name is the heading a screen
+	// reader jumps by, its header carries the badges and its footer the actions.
+	const card = element('article', 'layout-card');
+	item.appendChild(card);
 
-	const header = element('div', 'layout-header');
-	header.appendChild(element('span', 'layout-name', row.name));
-	const badges = element('span', 'layout-badges');
+	const header = element('header', 'layout-header');
+	header.appendChild(element('h2', 'layout-name', row.name));
+	const badges = element('ul', 'layout-badges');
 	badges.appendChild(
-		element('span', 'badge badge-' + row.status, _t('layout_manager.status_' + row.status))
+		element('li', 'badge badge-' + row.status, _t('layout_manager.status_' + row.status))
 	);
 	if (row.active)
-		badges.appendChild(element('span', 'badge badge-active', _t('layout_manager.status_active')));
+		badges.appendChild(element('li', 'badge badge-active', _t('layout_manager.status_active')));
 	header.appendChild(badges);
-	item.appendChild(header);
+	card.appendChild(header);
 
-	const meta = element('div', 'layout-meta');
+	const meta = element('ul', 'layout-meta');
 	if (row.author)
-		meta.appendChild(element('span', '', _fmt('layout_manager.meta_author', row.author)));
+		meta.appendChild(element('li', '', _fmt('layout_manager.meta_author', row.author)));
 	if (row.licence)
-		meta.appendChild(element('span', '', _fmt('layout_manager.meta_licence', row.licence)));
+		meta.appendChild(element('li', '', _fmt('layout_manager.meta_licence', row.licence)));
 	if (row.version)
-		meta.appendChild(element('span', '', _fmt('layout_manager.meta_version', row.version)));
+		meta.appendChild(element('li', '', _fmt('layout_manager.meta_version', row.version)));
 	if (row.installedVersion && row.installedVersion !== row.version) {
 		meta.appendChild(
-			element('span', '', _fmt('layout_manager.meta_installed_version', row.installedVersion))
+			element('li', '', _fmt('layout_manager.meta_installed_version', row.installedVersion))
 		);
 	}
-	item.appendChild(meta);
+	card.appendChild(meta);
 	if (row.hotstrings || row.shortcuts) {
-		const content = element('div', 'layout-content');
-		content.appendChild(
-			element('div', '', _fmt('layout_manager.extension_content', row.hotstrings, row.shortcuts))
+		card.appendChild(
+			element(
+				'p',
+				'layout-content',
+				_fmt('layout_manager.extension_content', row.hotstrings, row.shortcuts)
+			)
 		);
-		content.appendChild(
-			element('div', 'layout-content-note', _t('layout_manager.extension_opt_in'))
+		card.appendChild(
+			element('p', 'layout-content layout-content-note', _t('layout_manager.extension_opt_in'))
 		);
-		item.appendChild(content);
 	}
 
-	const buttons = element('div', 'layout-actions');
+	const buttons = element('footer', 'layout-actions');
 	if (busy && busy.id === row.id && busy.action !== 'select') {
 		const key =
 			busy.action === 'uninstall' ? 'layout_manager.busy_uninstall' : 'layout_manager.busy_install';
-		buttons.appendChild(element('span', 'busy', _t(key)));
+		buttons.appendChild(element('p', 'busy', _t(key)));
 	}
 	if (row.homepage) buttons.appendChild(actionButton('open_homepage', row.id, false, 'link'));
 	for (const action of row.actions) {
@@ -341,7 +347,7 @@ function renderRow(row, busy) {
 			actionButton(action, row.id, Boolean(busy), action === 'uninstall' ? 'danger' : '')
 		);
 	}
-	item.appendChild(buttons);
+	card.appendChild(buttons);
 	return item;
 }
 
