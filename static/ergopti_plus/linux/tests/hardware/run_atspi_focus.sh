@@ -65,6 +65,10 @@ check() {
 	else
 		echo "  FAIL ${what}: expected ${expected}, got ${got}"
 		sed 's/^/       probe: /' "${WORK}/probe.err"
+		# Each window's own view tells a desktop that changed under the probe
+		# (the newest window lost activation) from an AT-SPI answer that
+		# disagrees with what every GTK window reports.
+		report_windows
 		FAILURES=$((FAILURES + 1))
 	fi
 }
@@ -80,10 +84,11 @@ check() {
 # was shorter than a slow run).
 FIXTURE_LIFETIME_SECONDS=$((READY_TIMEOUT_SECONDS * 8))
 OPENED=""
-# Says what each window opened so far reports, and whether it still runs.
+# Says what each window opened so far, and the one being opened if named,
+# reports, and whether it still runs.
 report_windows() {
 	local opened
-	for opened in ${OPENED} "$1"; do
+	for opened in ${OPENED} ${1:-}; do
 		local pid
 		pid="$(cat "${WORK}/${opened}.pid" 2>/dev/null)"
 		echo "       ${opened}: $(cat "${WORK}/${opened}.state" 2>/dev/null || echo 'no state'), process $( [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null && echo running || echo gone)"
