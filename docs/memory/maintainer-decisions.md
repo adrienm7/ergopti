@@ -97,45 +97,63 @@ detector and the Windows adapter compliance suites.
 
 ## The layout menu: one menu, three sections (2026-11-19)
 
-Maintainer requests of 2026-11-19: swap « Ergopti Studio » and the layout menu
-in the tray root, rename the layout menu, perhaps split it into « emulation »
-and « installed layouts », and in any case leave no duplicate of a Studio row.
-The tray root reads « 🎨 Ergopti Studio… » then « 🌐 Dispositions et
-émulation » (`menu.layout.title`, « Layouts and emulation »), on the three OS.
-The menu stays ONE submenu with three headed sections, decided by the agent,
-to review by the maintainer (TODO « Maintainer decisions pending »):
+## The layout menu: input sources, emulation, tuning (2026-11-19)
 
-1. « Émulation, sans installer la disposition » (`menu.layout.header_emulation`):
-   the layout to emulate, « Couches émulées » with the two layer rows, the
-   « Rangées émulées » submenu, and the Karabiner keyboard type on macOS.
-2. « Sources de saisie » (the approved `menu.layout.active_layouts` label): the
-   system layouts with the active one ticked, the pause / resume switch,
-   Linux's Compose row, « Installer ou retirer des dispositions… » (the layout
+Decided by the maintainer on 2026-11-19. The tray root reads « 🎨 Ergopti
+Studio… » then « 🌐 Dispositions et émulation » (`menu.layout.title`,
+« Layouts and emulation »), on the three OS. The emulation overrides whatever
+OS layout is installed and selected, and the shared layout settings are
+emulation too, acting on the OS layout or on the emulated one (« les shared
+settings c'est de l'émulation en fait, ça agit soit sur la dispo dans Windows
+soit sur la dispo émulée. Donc inputs, émulation, puis tuning de dispo »). The
+menu is ONE submenu; after Windows' switch and the scope's restore and clear,
+it reads in this order on the three OS:
+
+1. « Sources de saisie » (the approved `menu.layout.active_layouts` label): the
+   OS layouts with the active one ticked and the switch to another, the pause /
+   resume switch, Linux's Compose row (how GTK 3 composes the installed XKB
+   layouts' sequences), « Installer ou retirer des dispositions… » (the layout
    manager, `menu.layout.manage`), the macOS `.bundle` rows and the Windows
-   installer download.
-3. « Toutes dispositions » (`menu.layout.header_any`): base layouts (Linux), the
-   number row, accented-letter shortcuts (Windows, Linux), the magic key, Ctrl+★
-   save (Windows) and the menubar icon (macOS), last.
+   installer download. Each chooses, installs or feeds an OS layout.
+2. « Émulation : remplace la disposition du système »
+   (`menu.layout.header_emulation`, « Emulation: overrides the system
+   layout »): « Disposition à émuler », the layout Ergopti+ types whatever OS
+   layout is selected. The header says that it overrides that layout.
+3. « Réglages de la disposition, système ou émulée »
+   (`menu.layout.header_tuning`, « Layout tuning, system or emulated »): the
+   base and AltGr layer rows (the AltGr layer alone types Ergopti's AltGr over
+   the OS layout; their labels say « of the selected layout »), « Rangées
+   émulées » (the rows left to the OS layout while learning), the number row
+   (`number_row_policy`, digits in direct access on the OS or emulated
+   layout), the é è ê à shortcuts (Windows, Linux; they follow the key that
+   types the letter in the active layout), the physical magic key and the
+   Ctrl+★ save (Windows). The former « Couches émulées » sub-header
+   (`menu.layout.header_layers`) left: this header covers the two layer rows.
+4. Last, past a separator and without a header, the rows that tune no layout:
+   Linux's base layout (`base_layouts`, the physical qwerty / azerty family
+   the finger map, metrics and heatmap describe; text capture follows the
+   active XKB keymap whatever it says), the Karabiner virtual keyboard (macOS:
+   the ISO / ANSI keyboard macOS sees for every remapped key, emulated or not,
+   so it belongs to neither the emulation nor the tuning) and the menubar icon
+   (macOS, the app's own icon).
 
-Why not two submenus: 17 rows on Windows and 16 on macOS and Linux, plus four
-headers, before the rework (15, 14 and 14 after it), of which three or four act
-on any layout and would belong to neither submenu, so a split still needs a
-third place; the restore and clear
-rows act on the whole layout scope; every action would take one more click, and
-« Rangées émulées » would sit four levels deep. Three headers in one menu read
-as clearly at that size. The split stays the alternative if the menu grows.
+Why one submenu: 15, 14 and 14 rows per OS; a split into emulation and
+installed layouts would still need a third place for the tuning rows, add a
+click to every action and push « Rangées émulées » four levels deep.
 
 Duplicates removed: « Créer ou modifier une disposition… » (`open_layout_editor`)
 opened Ergopti Studio, which the tray root's row opens (the layout manager's
-« Layout editor » button still opens it on its editor tab, Windows included
-since this change); « Disposition personnalisée » (`custom_layouts`) listed on
-macOS and Linux the registry layouts « Sources de saisie » lists with the same
-switch (the layout manager still selects an installed one), and on Windows the
-emulated layout the « Disposition à émuler » row already names.
-`tools/test/test-menu-no-duplicate-actions.cjs` holds one row per action and the
-root order. Action: a new layout row goes into the section that answers its
-question, never into a fourth place, and a row that opens Studio lives in the
-tray root only.
+« Layout editor » button still opens it on its editor tab, Windows included);
+« Disposition personnalisée » (`custom_layouts`) listed on macOS and Linux the
+registry layouts « Sources de saisie » lists with the same switch (the layout
+manager still selects an installed one), and on Windows the emulated layout the
+« Disposition à émuler » row already names.
+`tools/test/test-menu-no-duplicate-actions.cjs` holds one row per action, the
+root order and this section order (`LAYOUT_SECTIONS`). Action: a new layout row
+goes into the section that answers its question (does it choose or install an
+OS layout, choose the emulated layout, or adjust the active layout?), a row
+that adjusts no layout goes last, and a row that opens Studio lives in the tray
+root only.
 
 ## Layout score: SFB travel and access weights (2026-11-19)
 
@@ -1011,8 +1029,10 @@ remap service, so they have no counterpart.
 The Windows Keyboard layout menu read as a duplicate: the Base/Shift and AltGr
 emulation rows, then the four `layout.emulate_*_row` switches. Both axes stay,
 because they answer different questions (which Ergopti layers the emulation
-types, and on which keyboard rows). The layer rows sit under the header
-« Couches émulées » (`menu.layout.header_layers`); the row switches moved into
+types, and on which keyboard rows). The layer rows sat under the header
+« Couches émulées » (`menu.layout.header_layers`), and since 2026-11-19 open
+the layout tuning section (« The layout menu: input sources, emulation,
+tuning »); the row switches moved into
 the submenu « Rangées émulées (apprentissage progressif) »
 (`menu.layout.emulated_rows`, `layout_emulated_rows_group` in `menu.toml`),
 since switching rows on one by one is how a user learns the layout gradually.

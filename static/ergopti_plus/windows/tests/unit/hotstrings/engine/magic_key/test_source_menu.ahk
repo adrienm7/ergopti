@@ -55,7 +55,7 @@ _MKS_RowsCase() {
 	}
 }
 
-Test("magic key source: the row sits under the any-layout section, between switching and shortcut policy (magic-key-source)",
+Test("magic key source: the row sits in the layout tuning section, between the accented shortcuts and Ctrl+★ (magic-key-source)",
 	_MKS_MenuPlacementCase)
 
 _MKS_MenuPlacementCase() {
@@ -73,12 +73,12 @@ _MKS_MenuPlacementCase() {
 	for Index, Token in Tokens
 		Position[Token] := Index
 	AssertTrue(Position.Has("magic_key_source"), "the layout menu declares the physical magic key")
-	AssertTrue(Position["magic_key_source"] > Position["menu.layout.header_any"],
-		"the physical magic key works on any layout")
-	AssertTrue(Position.Has("layout_switching") && Position.Has("layout.ctrl_magic_save"),
+	AssertTrue(Position["magic_key_source"] > Position["menu.layout.header_tuning"],
+		"the physical magic key tunes the active layout, the OS one or the emulated one")
+	AssertTrue(Position.Has("accented_letters") && Position.Has("layout.ctrl_magic_save"),
 		"the independent surrounding rows must exist")
-	AssertEqual(Position["layout_switching"] + 1, Position["magic_key_source"],
-		"the physical source follows the declared layout-switching provider")
+	AssertEqual(Position["accented_letters"] + 1, Position["magic_key_source"],
+		"the physical source follows the accented-letter shortcuts")
 	AssertEqual(Position["magic_key_source"] + 1, Position["layout.ctrl_magic_save"],
 		"the physical source precedes the declared shortcut policy")
 	AssertFalse(Position.Has("hotstrings.magic_key.replace"),

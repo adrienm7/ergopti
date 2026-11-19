@@ -2391,58 +2391,6 @@
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.layout.header_emulation"
-		},
-		{
-			"type": "list",
-			"id": "layout_emulation"
-		},
-		{
-			"type": "section_header",
-			"i18n": "menu.layout.header_layers"
-		},
-		{
-			"type": "list",
-			"id": "layout_features_base"
-		},
-		{
-			"type": "list",
-			"id": "layout_features_altgr"
-		},
-		{
-			"type": "group",
-			"id": "layout_emulated_rows",
-			"i18n": "menu.layout.emulated_rows"
-		},
-		{
-			"type": "choice",
-			"id": "virtual_keyboard",
-			"path": "layout.virtual_keyboard",
-			"i18n": "menu.layout.virtual_keyboard",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.virtual_keyboard_is_karabiner",
-			"choices": [
-				{
-					"value": "auto",
-					"i18n": "menu.layout.virtual_keyboard.auto"
-				},
-				{
-					"value": "iso",
-					"i18n": "menu.layout.virtual_keyboard.iso"
-				},
-				{
-					"value": "ansi",
-					"i18n": "menu.layout.virtual_keyboard.ansi"
-				}
-			]
-		},
-		{
-			"type": "---"
-		},
-		{
-			"type": "section_header",
 			"i18n": "menu.layout.active_layouts"
 		},
 		{
@@ -2525,15 +2473,31 @@
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.layout.header_any"
+			"i18n": "menu.layout.header_emulation"
 		},
 		{
 			"type": "list",
-			"id": "base_layouts",
-			"platforms": [
-				"linux"
-			],
-			"reason_key": "platform_reason.base_layout_is_the_linux_decode_table"
+			"id": "layout_emulation"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.layout.header_tuning"
+		},
+		{
+			"type": "list",
+			"id": "layout_features_base"
+		},
+		{
+			"type": "list",
+			"id": "layout_features_altgr"
+		},
+		{
+			"type": "group",
+			"id": "layout_emulated_rows",
+			"i18n": "menu.layout.emulated_rows"
 		},
 		{
 			"type": "list",
@@ -2560,6 +2524,41 @@
 				"ahk"
 			],
 			"reason_key": "platform_reason.lists_windows_only_settings"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "list",
+			"id": "base_layouts",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.base_layout_is_the_linux_decode_table"
+		},
+		{
+			"type": "choice",
+			"id": "virtual_keyboard",
+			"path": "layout.virtual_keyboard",
+			"i18n": "menu.layout.virtual_keyboard",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.virtual_keyboard_is_karabiner",
+			"choices": [
+				{
+					"value": "auto",
+					"i18n": "menu.layout.virtual_keyboard.auto"
+				},
+				{
+					"value": "iso",
+					"i18n": "menu.layout.virtual_keyboard.iso"
+				},
+				{
+					"value": "ansi",
+					"i18n": "menu.layout.virtual_keyboard.ansi"
+				}
+			]
 		},
 		{
 			"type": "choice",

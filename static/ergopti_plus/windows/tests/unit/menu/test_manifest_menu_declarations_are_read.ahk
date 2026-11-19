@@ -83,7 +83,8 @@ Test("manifest_menu: the key-combinations group opens with its own switch", () =
 ))
 
 ; Maintainer decision of 2026-11-03: the layout menu keeps its two axes apart.
-; The emulated layers sit under their own header, the row switches in a
+; The emulated layers open the layout tuning section (maintainer, 2026-11-19,
+; whose header replaced « Couches émulées »), the row switches sit in a
 ; submenu; flat, the second block read as a copy of the first.
 _MM_LayoutAxesAreApart() {
 	Sequence := ""
@@ -92,13 +93,13 @@ _MM_LayoutAxesAreApart() {
 			continue
 		Type := _MR_Get(Row, "type")
 		Name := Type == "section_header" ? _MR_Get(Row, "i18n") : _MR_Get(Row, Type == "feature" ? "path" : "id")
-		if InStr(Name, "layout_features_") || InStr(Name, "header_layers") || InStr(Name, "emulated_rows")
+		if InStr(Name, "layout_features_") || InStr(Name, "header_tuning") || InStr(Name, "emulated_rows")
 			|| InStr(Name, "emulate_")
 			Sequence .= (Sequence == "" ? "" : ",") . Type . ":" . Name
 	}
-	AssertEqual("section_header:menu.layout.header_layers,list:layout_features_base,list:layout_features_altgr,"
+	AssertEqual("section_header:menu.layout.header_tuning,list:layout_features_base,list:layout_features_altgr,"
 		. "group:layout_emulated_rows", Sequence,
-		"the layers header, its two layer rows, then the one row-switch submenu; no row switch left inline")
+		"the tuning header, the two layer rows, then the one row-switch submenu; no row switch left inline")
 	AssertEqual("layout.emulate_number_row,layout.emulate_top_row,layout.emulate_home_row,layout.emulate_bottom_row",
 		_MM_AhkRowIds("layout_emulated_rows_group", "feature"), "the submenu holds the four row switches in order")
 }

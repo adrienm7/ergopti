@@ -2111,24 +2111,28 @@ platforms = ["linux"]
 reason_key = "platform_reason.only_linux_migrates_in_the_background"
 
 # The layout menu, « Dispositions et émulation » since 2026-11-19 (maintainer:
-# « il faut pas de doublon et que tout soit clair »). One submenu with three
-# sections, never two submenus: about twenty rows per OS, a third of which work
-# whatever the layout, so a split would still leave a third place and push
-# « Rangées émulées » four levels deep (docs/memory/maintainer-decisions.md,
-# « The layout menu: one menu, three sections »).
-#   1. The emulation: Ergopti+ types the chosen layout over the system one,
-#      nothing installed.
-#   2. The input sources: the layouts installed in the OS, switched, switched at
-#      a pause, installed and removed.
-#   3. Whatever the layout: options that act on any layout.
+# « il faut pas de doublon et que tout soit clair »). One submenu, three headed
+# sections in this order on the three OS, decided by the maintainer on
+# 2026-11-19 (« inputs, émulation, puis tuning de dispo »):
+#   1. The input sources: the layouts installed in the OS, switched, switched
+#      at a pause, installed and removed.
+#   2. The emulation: the layout Ergopti+ types whatever OS layout is
+#      selected. It overrides that layout, nothing installed.
+#   3. The layout tuning: what adjusts the active layout, the OS one or the
+#      emulated one (layers, rows, digits in direct access, accented-letter
+#      shortcuts, the magic key, Ctrl+★).
+# Then, after a separator and no header, the rows that tune no layout: the
+# physical keyboard Linux decodes and Karabiner presents, and the menu bar icon.
+# docs/memory/maintainer-decisions.md, « The layout menu: input sources,
+# emulation, tuning », says where each row goes and why.
 # Each action has one place. « Create or edit a layout… » left on 2026-11-19:
 # Ergopti Studio, the row right above this menu in the tray root, opens the
 # same window. So did the « Disposition personnalisée » list (`custom_layouts`):
-# on macOS and Linux it listed the registry layouts the input sources below
-# list too, with the same switch; on Windows it repeated the emulated layout
-# the « Disposition à émuler » row already names. The layout manager still
-# selects an installed registry layout. tools/test/test-menu-no-duplicate-actions.cjs
-# refuses a second row for one action.
+# on macOS and Linux it listed the registry layouts the input sources list
+# too, with the same switch; on Windows it repeated the emulated layout the
+# « Disposition à émuler » row already names. The layout manager still selects
+# an installed registry layout. tools/test/test-menu-no-duplicate-actions.cjs
+# refuses a second row for one action and holds the section order.
 [[menu.layout_menu]]
 type = "toggle"
 id = "layout_toggle"
@@ -2160,85 +2164,7 @@ i18n = "common.clear_to_system"
 [[menu.layout_menu]]
 type = "---"
 
-# 1. The emulation, under its own header: what Ergopti+ types over the system
-# layout while it runs, without installing anything.
-[[menu.layout_menu]]
-type = "section_header"
-i18n = "menu.layout.header_emulation"
-
-# The layout the emulation types over the system layout, as a submenu of
-# choices: none, the built-in Ergopti variants and the registry layouts the app
-# ships or the layout manager installed. It writes what the onboarding choice
-# writes, and its title names the emulated layout (and says when it cannot be
-# emulated), on the three drivers (Windows from its registry catalogue, through
-# the layout manager's acknowledged handoff).
-[[menu.layout_menu]]
-type = "list"
-id = "layout_emulation"
-
-# Two axes of the emulation, kept apart (maintainer, 2026-11-03): which Ergopti
-# LAYERS it types, under this header, and which keyboard ROWS, in the submenu
-# below. Read as one flat block they looked like the same switches twice. The
-# three drivers emulate the layout (maintainer, 2026-11-06).
-[[menu.layout_menu]]
-type = "section_header"
-i18n = "menu.layout.header_layers"
-
-# `list` rather than `dynamic` since 2026-08-07: the driver answers with row
-# DATA and the renderer materialises it, where a `dynamic` handler was handed the
-# menu object and built the rows itself.
-# The emulated layout's base and Shift layers (ergopti_base).
-[[menu.layout_menu]]
-type = "list"
-id = "layout_features_base"
-
-# The Ergopti AltGr layer and its ➕ variant. Only these two: the digit row and
-# Ctrl+★ work on any layout and sit in the third section.
-[[menu.layout_menu]]
-type = "list"
-id = "layout_features_altgr"
-
-# The rows the emulation types, one checkbox each (the layout.emulate_<row>
-# switches), in their own submenu: switching rows on one by one is how a user
-# learns the layout progressively. The same on the three drivers.
-[[menu.layout_menu]]
-type = "group"
-id = "layout_emulated_rows"
-i18n = "menu.layout.emulated_rows"
-
-[[menu.layout_emulated_rows_group]]
-type = "feature"
-path = "layout.emulate_number_row"
-i18n = "menu.layout.emulate_number_row"
-
-[[menu.layout_emulated_rows_group]]
-type = "feature"
-path = "layout.emulate_top_row"
-i18n = "menu.layout.emulate_top_row"
-
-[[menu.layout_emulated_rows_group]]
-type = "feature"
-path = "layout.emulate_home_row"
-i18n = "menu.layout.emulate_home_row"
-
-[[menu.layout_emulated_rows_group]]
-type = "feature"
-path = "layout.emulate_bottom_row"
-i18n = "menu.layout.emulate_bottom_row"
-
-# The Karabiner virtual keyboard type: Automatic, ISO or ANSI.
-[[menu.layout_menu]]
-type = "choice"
-id = "virtual_keyboard"
-path = "layout.virtual_keyboard"
-i18n = "menu.layout.virtual_keyboard"
-platforms = ["hs"]
-reason_key = "platform_reason.virtual_keyboard_is_karabiner"
-
-[[menu.layout_menu]]
-type = "---"
-
-# 2. The system's keyboard layouts, under a header of their own (« Sources de
+# 1. The system's keyboard layouts, under a header of their own (« Sources de
 # saisie »): without it the list read as more Ergopti settings. The active one
 # is ticked and choosing another switches the system layout, on every driver
 # (maintainer, 2026-11-06): macOS selects the input source through TIS, Windows
@@ -2270,6 +2196,8 @@ status_rows.unsupported_desktop = [{ type = "label", i18n = "menu.layout.pause_l
 # (menu/ui/compose_input_method_row.lua): GTK 3's built-in input method takes
 # only the single-character rules, IBus takes them all. Linux only: macOS and
 # Windows type every character through their own layouts, with no Compose file.
+# It belongs to the input sources: it says how the installed XKB layouts reach
+# GTK 3, emulated or not.
 [[menu.layout_menu]]
 type = "list"
 id = "compose_input_method"
@@ -2319,30 +2247,86 @@ status_rows.unreadable = [{ type = "label", i18n = "menu.layout.system_layout_un
 [[menu.layout_menu]]
 type = "---"
 
-# 3. What works whatever layout the user types on.
+# 2. The emulation, under a header that says it overrides the OS layout
+# (maintainer, 2026-11-19: « l'émulation fonctionne quel que soit le layout
+# installé et sélectionné dans l'OS, cela override »).
 [[menu.layout_menu]]
 type = "section_header"
-i18n = "menu.layout.header_any"
+i18n = "menu.layout.header_emulation"
 
-# The base layout the Linux keyboard hook decodes keycodes with. Declared
-# 2026-08-07; the rows were two names written into menu/ui/builder/builder.lua while the
-# driver already owned the list — input_reader.get_layouts() is the table the
-# decoder itself uses, and a menu that enumerates it by hand goes stale the day a
-# third table is added.
-#
-# linux only, because the concept is this driver's: it reads raw evdev keycodes
-# and needs to know which physical layout produced them. macOS asks the system
-# for its input sources and Windows installs a .klc; neither has a decode table
-# to choose.
+# The layout the emulation types over the system layout, as a submenu of
+# choices: none, the built-in Ergopti variants and the registry layouts the app
+# ships or the layout manager installed. It writes what the onboarding choice
+# writes, and its title names the emulated layout (and says when it cannot be
+# emulated), on the three drivers (Windows from its registry catalogue, through
+# the layout manager's acknowledged handoff).
 [[menu.layout_menu]]
 type = "list"
-id = "base_layouts"
-platforms = ["linux"]
-reason_key = "platform_reason.base_layout_is_the_linux_decode_table"
+id = "layout_emulation"
+
+[[menu.layout_menu]]
+type = "---"
+
+# 3. The layout tuning: settings that adjust the active layout, the OS one or
+# the emulated one (maintainer, 2026-11-19: « les shared settings c'est de
+# l'émulation en fait, ça agit soit sur la dispo dans Windows soit sur la dispo
+# émulée »). The header names both, so the former « Couches émulées »
+# sub-header left: the layer rows' own labels say « of the selected layout ».
+[[menu.layout_menu]]
+type = "section_header"
+i18n = "menu.layout.header_tuning"
+
+# Two axes of the emulation, kept apart (maintainer, 2026-11-03): which Ergopti
+# LAYERS it types, these two rows, and which keyboard ROWS, in the submenu
+# below. The AltGr layer alone types Ergopti's AltGr over the OS layout; with
+# the base layer it completes the emulated one. The three drivers emulate the
+# layout (maintainer, 2026-11-06).
+# `list` rather than `dynamic` since 2026-08-07: the driver answers with row
+# DATA and the renderer materialises it, where a `dynamic` handler was handed the
+# menu object and built the rows itself.
+# The emulated layout's base and Shift layers (ergopti_base).
+[[menu.layout_menu]]
+type = "list"
+id = "layout_features_base"
+
+# The Ergopti AltGr layer and its ➕ variant.
+[[menu.layout_menu]]
+type = "list"
+id = "layout_features_altgr"
+
+# The rows the emulation types, one checkbox each (the layout.emulate_<row>
+# switches), in their own submenu: switching rows on one by one is how a user
+# learns the layout progressively, the OS layout typing the others. The same
+# on the three drivers.
+[[menu.layout_menu]]
+type = "group"
+id = "layout_emulated_rows"
+i18n = "menu.layout.emulated_rows"
+
+[[menu.layout_emulated_rows_group]]
+type = "feature"
+path = "layout.emulate_number_row"
+i18n = "menu.layout.emulate_number_row"
+
+[[menu.layout_emulated_rows_group]]
+type = "feature"
+path = "layout.emulate_top_row"
+i18n = "menu.layout.emulate_top_row"
+
+[[menu.layout_emulated_rows_group]]
+type = "feature"
+path = "layout.emulate_home_row"
+i18n = "menu.layout.emulate_home_row"
+
+[[menu.layout_emulated_rows_group]]
+type = "feature"
+path = "layout.emulate_bottom_row"
+i18n = "menu.layout.emulate_bottom_row"
 
 # One policy, with actual source-scoped availability supplied by native owners.
 # Lua drivers report native input only; Windows can also force digits and can
 # force symbols through a supported registry source's original action machine.
+# It orders the number row of the OS layout or of the emulated one.
 [[menu.layout_menu]]
 type = "list"
 id = "number_row_policy"
@@ -2372,6 +2356,39 @@ type = "feature"
 path = "layout.ctrl_magic_save"
 platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
+
+[[menu.layout_menu]]
+type = "---"
+
+# Last, without a header: rows that tune no layout. The base layout the Linux
+# keyboard hook decodes keycodes with names the PHYSICAL keyboard family
+# (qwerty or azerty) the finger map, the metrics and the heatmap describe; text
+# capture follows the active XKB keymap whatever it says
+# (platform/input/keyboard_hook.lua). Declared 2026-08-07; the rows were two
+# names written into menu/ui/builder/builder.lua while the driver already owned
+# the list — input_reader.get_layouts() is the table the decoder itself uses.
+#
+# linux only, because the concept is this driver's: it reads raw evdev keycodes
+# and needs to know which physical layout produced them. macOS asks the system
+# for its input sources and Windows installs a .klc; neither has a decode table
+# to choose.
+[[menu.layout_menu]]
+type = "list"
+id = "base_layouts"
+platforms = ["linux"]
+reason_key = "platform_reason.base_layout_is_the_linux_decode_table"
+
+# The Karabiner virtual keyboard type: Automatic, ISO or ANSI. It is the
+# keyboard macOS sees for every key Karabiner remaps, emulated or not, so it
+# neither chooses nor tunes a layout: it decides which keycodes the two
+# ISO-only keys reach (modules/keymap/layout.lua).
+[[menu.layout_menu]]
+type = "choice"
+id = "virtual_keyboard"
+path = "layout.virtual_keyboard"
+i18n = "menu.layout.virtual_keyboard"
+platforms = ["hs"]
+reason_key = "platform_reason.virtual_keyboard_is_karabiner"
 
 # The menubar icon, ONE row with its variants beneath it, last of the menu: it
 # draws Ergopti on the menu bar whatever the layout. It was two sibling rows,

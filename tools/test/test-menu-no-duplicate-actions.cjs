@@ -25,6 +25,11 @@
  *      by the tray root's row alone.
  *   3. The tray root puts Ergopti Studio right before the layout menu
  *      (maintainer request of 2026-11-19).
+ *   4. The layout menu reads, on each platform, the input sources, the
+ *      emulation, then the tuning of the active layout, OS or emulated, and
+ *      last the rows that tune no layout (maintainer decision of 2026-11-19:
+ *      « inputs, émulation, puis tuning de dispo »). Each row sits in its
+ *      section, in LAYOUT_SECTIONS order, and the menu draws no other row.
  * ==============================================================================
  */
 
@@ -86,8 +91,54 @@ const ACTIONS = [
 	}
 ];
 
+// The layout menu, section by section: its header, then its rows in order. The
+// rows a platform does not draw drop out; the separators between sections stay.
+// docs/memory/maintainer-decisions.md says why each row sits where it does.
+const LAYOUT_LEAD = ['toggle:layout_toggle', 'command:scope_restore', 'command:scope_clear'];
+const LAYOUT_SECTIONS = [
+	{
+		header: 'menu.layout.active_layouts',
+		rows: [
+			'list:active_layouts',
+			'list:layout_switching',
+			'list:compose_input_method',
+			'command:layout_manager',
+			'list:layout_bundle',
+			'list:layout_system_install'
+		]
+	},
+	{ header: 'menu.layout.header_emulation', rows: ['list:layout_emulation'] },
+	{
+		header: 'menu.layout.header_tuning',
+		rows: [
+			'list:layout_features_base',
+			'list:layout_features_altgr',
+			'group:layout_emulated_rows',
+			'list:number_row_policy',
+			'group:accented_letters',
+			'list:magic_key_source',
+			'feature:layout.ctrl_magic_save'
+		]
+	},
+	{ header: null, rows: ['list:base_layouts', 'choice:virtual_keyboard', 'choice:menubar_icon'] }
+];
+
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
 const errors = [];
+
+/**
+ * A sequence with its separators collapsed: none first, last or twice in a row,
+ * as the renderers normalise them.
+ */
+function collapse(tokens) {
+	const out = [];
+	for (const token of tokens) {
+		if (token === SEPARATOR && (out.length === 0 || out[out.length - 1] === SEPARATOR)) continue;
+		out.push(token);
+	}
+	while (out[out.length - 1] === SEPARATOR) out.pop();
+	return out;
+}
 
 /** Whether a platform draws the row, greyed with its reason included. */
 function drawn(row, platform) {
@@ -99,6 +150,33 @@ function drawn(row, platform) {
 function identity(row) {
 	const key = row.id || row.path;
 	return key ? `${row.type || 'row'}:${key}` : null;
+}
+
+/** The layout menu a platform draws, as header and row tokens with separators. */
+function layoutTokens(platform) {
+	return collapse(
+		(manifest.layout_menu || [])
+			.filter((row) => row && (row.type === SEPARATOR || drawn(row, platform)))
+			.map((row) => {
+				if (row.type === SEPARATOR) return SEPARATOR;
+				if (row.type === 'section_header') return `section_header:${row.i18n}`;
+				return identity(row);
+			})
+	);
+}
+
+/** The layout menu LAYOUT_SECTIONS expects, given the rows a platform draws. */
+function expectedLayoutTokens(drawnTokens) {
+	const present = new Set(drawnTokens);
+	const tokens = LAYOUT_LEAD.filter((token) => present.has(token));
+	for (const { header, rows } of LAYOUT_SECTIONS) {
+		const kept = rows.filter((token) => present.has(token));
+		if (kept.length === 0) continue;
+		tokens.push(SEPARATOR);
+		if (header) tokens.push(`section_header:${header}`);
+		tokens.push(...kept);
+	}
+	return collapse(tokens);
 }
 
 /**
@@ -161,6 +239,19 @@ for (const platform of PLATFORMS) {
 			errors.push(`${platform}: ${action} belongs to one row of ${onlyIn} alone`);
 	}
 
+	const layout = layoutTokens(platform);
+	const known = new Set(LAYOUT_LEAD.concat(...LAYOUT_SECTIONS.map(({ rows }) => rows)));
+	for (const token of layout) {
+		if (token !== SEPARATOR && !token.startsWith('section_header:') && !known.has(token))
+			errors.push(`${platform}: layout_menu draws ${token}, which LAYOUT_SECTIONS places nowhere`);
+	}
+	const expected = expectedLayoutTokens(layout);
+	if (layout.join(',') !== expected.join(','))
+		errors.push(
+			`${platform}: the layout menu must read input sources, emulation, tuning, then the rest:\n` +
+				`      drawn    ${layout.join(', ')}\n      expected ${expected.join(', ')}`
+		);
+
 	const order = root.map(({ row }) => row.id);
 	const studio = order.indexOf('ergopti_studio');
 	if (studio < 0 || order[studio + 1] !== 'keyboard_layout')
@@ -173,5 +264,5 @@ if (errors.length) {
 	process.exit(1);
 }
 console.log(
-	'[OK] every tray action has one place on Windows, macOS and Linux; Ergopti Studio precedes the layout menu.'
+	'[OK] every tray action has one place on Windows, macOS and Linux; Ergopti Studio precedes the layout menu, which reads input sources, emulation, then tuning.'
 );

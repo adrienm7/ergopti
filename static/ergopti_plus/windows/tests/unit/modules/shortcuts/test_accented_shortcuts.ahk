@@ -138,9 +138,10 @@ Test("accented shortcuts: Ergopti emulation honours Disabled (accented-shortcut-
 		AssertEqual("v", _ErgoptiLetterOr("a_grave", _ACS_AGrave()))
 	)))
 
-; The Layout menu separates what needs the Ergopti layout from what works on any
-; layout. The rows are read from the generated manifest the renderer draws, so a
-; row moved back across the headers fails here (layout-menu-sections).
+; The Layout menu reads input sources, emulation, then the tuning of the active
+; layout (maintainer, 2026-11-19). The rows are read from the generated manifest
+; the renderer draws, so a row moved back across the headers fails here
+; (layout-menu-sections).
 _ACS_LayoutMenuTokens() {
 	Tokens := []
 	for Row in _MR_GetMenuDef("layout_menu") {
@@ -162,24 +163,23 @@ _ACS_TokenIndex(Tokens, Token) {
 	throw Error("Layout menu row '" . Token . "' is not declared.")
 }
 
-Test("layout menu: the emulation, then the input sources, precede the any-layout section (layout-menu-sections)",
+Test("layout menu: the input sources, then the emulation, precede the layout tuning section (layout-menu-sections)",
 	() => _ACS_LayoutSectionsCase())
 
 _ACS_LayoutSectionsCase() {
 	Tokens := _ACS_LayoutMenuTokens()
-	Emulation := _ACS_TokenIndex(Tokens, "menu.layout.header_emulation")
 	Sources := _ACS_TokenIndex(Tokens, "menu.layout.active_layouts")
-	AnyLayout := _ACS_TokenIndex(Tokens, "menu.layout.header_any")
-	Assert(Emulation < Sources && Sources < AnyLayout, "the emulation, the input sources, then any layout")
-	for Row in ["layout_emulation", "layout_features_base", "layout_features_altgr", "layout_emulated_rows"]
-		Assert(_ACS_TokenIndex(Tokens, Row) > Emulation && _ACS_TokenIndex(Tokens, Row) < Sources,
-			Row . " belongs to the emulation section")
+	Emulation := _ACS_TokenIndex(Tokens, "menu.layout.header_emulation")
+	AnyLayout := _ACS_TokenIndex(Tokens, "menu.layout.header_tuning")
+	Assert(Sources < Emulation && Emulation < AnyLayout, "the input sources, the emulation, then the tuning")
 	for Row in ["active_layouts", "layout_switching", "layout_manager", "layout_system_install"]
-		Assert(_ACS_TokenIndex(Tokens, Row) > Sources && _ACS_TokenIndex(Tokens, Row) < AnyLayout,
+		Assert(_ACS_TokenIndex(Tokens, Row) > Sources && _ACS_TokenIndex(Tokens, Row) < Emulation,
 			Row . " belongs to the input sources section")
-	for Row in ["number_row_policy", "accented_letters",
-			"magic_key_source", "layout.ctrl_magic_save"]
-		Assert(_ACS_TokenIndex(Tokens, Row) > AnyLayout, Row . " works on any layout")
+	Assert(_ACS_TokenIndex(Tokens, "layout_emulation") > Emulation
+		&& _ACS_TokenIndex(Tokens, "layout_emulation") < AnyLayout, "the emulated layout has its own section")
+	for Row in ["layout_features_base", "layout_features_altgr", "layout_emulated_rows", "number_row_policy",
+			"accented_letters", "magic_key_source", "layout.ctrl_magic_save"]
+		Assert(_ACS_TokenIndex(Tokens, Row) > AnyLayout, Row . " tunes the active layout")
 	AssertEqual(0, _ACS_CountLayoutToken(Tokens, "hotstrings.magic_key.replace"),
 		"the removed replacement switch must not reappear in the Layout menu")
 	_ACS_LayoutProviderPlacement(Tokens, AnyLayout)
@@ -218,7 +218,7 @@ _ACS_LayoutProviderPlacement(Tokens, AnyLayout) {
 		for Index, Token in Tokens {
 			if Token == "number_row_policy" {
 				Count += 1
-				Assert(Index > AnyLayout, "the single global policy belongs after the any-layout header")
+				Assert(Index > AnyLayout, "the single global policy belongs after the tuning header")
 			}
 		}
 		AssertEqual(1, Count, "the actual global declaration must contain exactly one number-row policy")

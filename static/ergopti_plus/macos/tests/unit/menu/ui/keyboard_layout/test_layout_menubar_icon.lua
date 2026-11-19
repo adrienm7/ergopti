@@ -76,15 +76,19 @@ helpers.describe("layout submenu: the menubar icon is one choice row", LayoutFix
 		helpers.assert_nil(index_of(rows, "menu.layout.logo_custom"), "the per-variant rows are gone")
 	end)
 
-	helpers.it("is the last row of the any-layout section, the last of the menu", function()
+	-- The icon tunes no layout (maintainer, 2026-11-19): it closes the menu
+	-- after the tuning section, past a separator, beside the virtual keyboard.
+	helpers.it("closes the menu after the tuning section, past a separator", function()
 		local rows = tray_rows(make_ctx("v1"))
-		local header = index_of(rows, require("core.i18n.engine.i18n").section("menu.layout.header_any"))
+		local header = index_of(rows, require("core.i18n.engine.i18n").section("menu.layout.header_tuning"))
 		local at = index_of(rows, "menu.layout.menubar_icon")
 		helpers.assert_true(header ~= nil and at ~= nil and header < at,
-			"the icon row belongs to the any-layout section")
+			"the icon row comes after the tuning section")
+		local separated = false
 		for index = header + 1, at - 1 do
-			helpers.assert_true(rows[index].title ~= "-", "no separator may split the any-layout section before the icon row")
+			if rows[index].title == "-" then separated = true end
 		end
+		helpers.assert_true(separated, "a separator must close the tuning section before the icon row")
 		helpers.assert_nil(rows[at + 1], "the icon row closes the menu")
 	end)
 
