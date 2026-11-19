@@ -1127,6 +1127,36 @@ function checkSimilarScoreGap(model) {
 }
 
 /**
+ * Rejects thumb keys the engine could not measure: each a physical key, each
+ * rest key one of them, and on every keyboard that has one (a board, or a
+ * JIS keyboard's extra fingers) pressed by a thumb. A thumb-letter layout
+ * types its thumbs there (docs/design/layout-analysis.md, « Thumb keys »).
+ * @param {object} model - analysis_model.json.
+ * @throws {Error} On a broken thumb key.
+ */
+function checkThumbKeys(model) {
+	const physical = JSON.parse(fs.readFileSync(PHYSICAL_KEYS_PATH, 'utf8')).keys;
+	const boards = JSON.parse(fs.readFileSync(BOARDS_PATH, 'utf8')).boards;
+	const thumbs = new Set(['lt', 'rt']);
+	if (!Array.isArray(model.thumb_keys) || model.thumb_keys.length === 0)
+		throw new Error('thumb_keys: none');
+	for (const code of model.thumb_keys) {
+		if (!physical[code]) throw new Error(`thumb_keys: unknown key ${code}`);
+		if (model.fingerings.standard[code]) throw new Error(`thumb_keys: ${code} is on ISO and ANSI`);
+	}
+	for (const code of model.thumb_rest_keys)
+		if (!model.thumb_keys.includes(code))
+			throw new Error(`thumb_rest_keys: ${code} is no thumb key`);
+	const fingered = [];
+	for (const spec of Object.values(model.keyboards))
+		fingered.push(spec.board ? boards[spec.board].fingers : spec.extra_fingers || {});
+	for (const fingers of fingered)
+		for (const code of model.thumb_keys)
+			if (fingers[code] !== undefined && !thumbs.has(fingers[code]))
+				throw new Error(`thumb_keys: ${code} is pressed by ${fingers[code]}, not a thumb`);
+}
+
+/**
  * Rejects an ideal finger load that breaks the maintainer's rule: each hand
  * sums to half, index ≥ middle ≥ ring ≥ pinky, pinkies under 8 %.
  * @param {object} load - finger → %.
@@ -1205,6 +1235,7 @@ function buildData() {
 	checkKeyboardFormats(model);
 	checkRequiredCharacters(model);
 	checkSimilarScoreGap(model);
+	checkThumbKeys(model);
 	delete model._description;
 	return {
 		schema_version: 1,

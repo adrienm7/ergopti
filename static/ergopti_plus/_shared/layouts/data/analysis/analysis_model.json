@@ -1,5 +1,5 @@
 {
-	"_description": "Shared parameters of the layout analysis engine (_shared/ui/layout_analysis/analysis_engine.js): which finger types each physical key (KeyboardEvent.code), which keys are home (the space bar rests both thumbs: shared_home_keys) or outer (7th right-hand column); lateral keys are derived from each finger's home column, the keyboards it measures on, the reference character set, the required characters (the space and the 26 letters in each case: a layout that cannot type one of them is incomplete and ranked after every complete layout; any other missing character only counts as unsupported), the keyboard formats (100 %, TKL, 75 %, 65 %, 60 %: the blocks each lacks, shown by the editor and the Comparer and measured by the compact form factors), the compact form factors and the shortcut letters. Every value is defined in docs/design/layout-analysis.md. Geometry comes from _shared/layouts/data/keycodes/physical_keys.json, and for the JIS and ABNT keyboards from keyboard_forms.json beside it; such a keyboard adds its own keys to its fingering (extra_fingers) and ticks the layouts made for its layout_geometry (ISO). « similar_score_gap » is the score gap, in points, under which the optimizer says an existing layout does the job of the one it found. « same_finger_factor » weights a same-finger move of each finger in sfb_distance (Cyanophage's optimiser: a pinky SFB costs 0.7 and a ring SFB 0.3 more than an index or middle one). « reference_layouts » names the layout the Comparer's « relative » ranking view measures every layout against: by the corpus's language, else the default. « substitutions » lists the plain character typed instead of a typographic one the layout lacks (the Kalamine analyser's rule).",
+	"_description": "Shared parameters of the layout analysis engine (_shared/ui/layout_analysis/analysis_engine.js): which finger types each physical key (KeyboardEvent.code), which keys are home (the space bar rests both thumbs: shared_home_keys) or outer (7th right-hand column); « thumb_keys » are the thumbs' own keys beside the space bar (KeyboardEvent codes of the JIS keys around it: NonConvert for the left thumb, Convert and KanaMode for the right), on the boards that have them physically (JIS, the split and ortholinear boards); a layout that puts characters on its thumb keys types them there, never on the shared space bar. « thumb_rest_keys » are the thumb keys a thumb rests on when a layout uses them: a thumb key's reach is its distance to the nearest of its thumb's home key and rest keys, so a rest key costs no travel (decided by the agent on 2026-11-19, to review by the maintainer); lateral keys are derived from each finger's home column, the keyboards it measures on, the reference character set, the required characters (the space and the 26 letters in each case: a layout that cannot type one of them is incomplete and ranked after every complete layout; any other missing character only counts as unsupported), the keyboard formats (100 %, TKL, 75 %, 65 %, 60 %: the blocks each lacks, shown by the editor and the Comparer and measured by the compact form factors), the compact form factors and the shortcut letters. Every value is defined in docs/design/layout-analysis.md. Geometry comes from _shared/layouts/data/keycodes/physical_keys.json, and for the JIS and ABNT keyboards from keyboard_forms.json beside it; such a keyboard adds its own keys to its fingering (extra_fingers) and ticks the layouts made for its layout_geometry (ISO). « similar_score_gap » is the score gap, in points, under which the optimizer says an existing layout does the job of the one it found. « same_finger_factor » weights a same-finger move of each finger in sfb_distance (Cyanophage's optimiser: a pinky SFB costs 0.7 and a ring SFB 0.3 more than an index or middle one). « reference_layouts » names the layout the Comparer's « relative » ranking view measures every layout against: by the corpus's language, else the default. « substitutions » lists the plain character typed instead of a typographic one the layout lacks (the Kalamine analyser's rule).",
 	"schema_version": 1,
 	"key_unit_mm": 19.05,
 	"fingers": ["lp", "lr", "lm", "li", "lt", "rt", "ri", "rm", "rr", "rp"],
@@ -147,7 +147,13 @@
 		"jis": {
 			"geometry": "jis",
 			"fingering": "standard",
-			"extra_fingers": { "IntlYen": "rp", "IntlRo": "rp" },
+			"extra_fingers": {
+				"IntlYen": "rp",
+				"IntlRo": "rp",
+				"NonConvert": "lt",
+				"Convert": "rt",
+				"KanaMode": "rt"
+			},
 			"layout_geometry": "iso"
 		},
 		"abnt": {
@@ -184,6 +190,8 @@
 		"5": 0
 	},
 	"shared_home_keys": ["Space"],
+	"thumb_keys": ["NonConvert", "Convert", "KanaMode"],
+	"thumb_rest_keys": ["NonConvert", "Convert"],
 	"ideal_finger_load": {
 		"lp": 6.5,
 		"lr": 11.5,

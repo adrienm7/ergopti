@@ -426,11 +426,20 @@ var LAYOUT_ANALYSIS = (function () {
 			);
 		});
 		// Distance in millimetres from each finger's home key to each key.
-		board.reach = board.codes.map((_, k) => {
+		const distance = (k, home) =>
+			Math.hypot(board.x[k] - board.x[home], board.y[k] - board.y[home]) * model.key_unit_mm;
+		// A thumb key (thumb_keys) is reached from the nearest place its thumb
+		// rests: its home key or one of its rest keys (thumb_rest_keys), so a
+		// thumb-letter layout's thumb costs no travel on the key it rests on.
+		const thumbCodes = new Set(model.thumb_keys);
+		const rests = model.thumb_rest_keys
+			.map((code) => board.index.get(code))
+			.filter((k) => k !== undefined);
+		board.reach = board.codes.map((code, k) => {
 			const home = board.homeOf[board.finger[k]];
-			const dx = board.x[k] - board.x[home];
-			const dy = board.y[k] - board.y[home];
-			return Math.hypot(dx, dy) * model.key_unit_mm;
+			if (!thumbCodes.has(code)) return distance(k, home);
+			const own = rests.filter((rest) => board.finger[rest] === board.finger[k]);
+			return Math.min(distance(k, home), ...own.map((rest) => distance(k, rest)));
 		});
 		board.modifiers = {
 			shiftForLeft: board.index.get(model.modifier_keys.shift_for_left_hand),
@@ -558,7 +567,18 @@ var LAYOUT_ANALYSIS = (function () {
 	function typingCodes(model) {
 		const m = model || data().model;
 		const modifiers = new Set(Object.values(m.modifier_keys));
-		return Object.keys(m.fingerings.standard).filter((code) => !modifiers.has(code));
+		return Object.keys(m.fingerings.standard)
+			.filter((code) => !modifiers.has(code))
+			.concat(m.thumb_keys);
+	}
+
+	/**
+	 * The thumbs' own keys beside the space bar (the model's thumb_keys), which
+	 * only the boards that have them physically measure.
+	 * @returns {string[]} A copy, in the model's order.
+	 */
+	function thumbKeyCodes() {
+		return data().model.thumb_keys.slice();
 	}
 
 	/** The layouts of the shared library, in the library shape. */
@@ -2102,6 +2122,15 @@ var LAYOUT_ANALYSIS = (function () {
 	// travel): a key pair raises them by its cost, so they are no event of their own.
 	const WEIGHTED_COUNTS = new Set(['sfb_cost', 'sfs_cost']);
 
+	/**
+	 * Whether a key pair is a thumb SFB: two different keys of one thumb. It is
+	 * the only bigram a thumb key is in (a space bar alone never makes one).
+	 */
+	function thumbSfb(board, k1, k2) {
+		const f = board.finger[k1];
+		return k1 !== k2 && f === board.finger[k2] && (f === LEFT_THUMB || f === RIGHT_THUMB);
+	}
+
 	/** The counters the key stream adds to: every one a sum over the n-grams. */
 	function streamCounts() {
 		return {
@@ -2173,7 +2202,16 @@ var LAYOUT_ANALYSIS = (function () {
 				c.distance += board.reach[k] * n;
 			},
 			bigram(k1, k2, n) {
-				if (thumb[k1] || thumb[k2]) return;
+				if (thumb[k1] || thumb[k2]) {
+					// Two different keys of one thumb (a thumb-letter layout's letter
+					// and the next thumb key): an SFB, the only pair a thumb is in.
+					if (thumbSfb(board, k1, k2)) {
+						c.bigrams += n;
+						c.sfb += n;
+						blame2('sfb', n, k1, k2);
+					}
+					return;
+				}
 				c.bigrams += n;
 				const f1 = board.finger[k1];
 				const f2 = board.finger[k2];
@@ -4461,7 +4499,7 @@ var LAYOUT_ANALYSIS = (function () {
 		const f1 = board.finger[k1];
 		const f2 = board.finger[k2];
 		const thumb = (f) => f === LEFT_THUMB || f === RIGHT_THUMB;
-		if (thumb(f1) || thumb(f2) || k1 === k2) return 0;
+		if (thumb(f1) || thumb(f2) || k1 === k2) return thumbSfb(board, k1, k2) ? w.sfb : 0;
 		if (f1 === f2)
 			return w.sfb + w.sfb_distance * sameFingerCosts(board)[k1 * board.codes.length + k2];
 		if (board.hand[k1] !== board.hand[k2]) return 0;
@@ -6397,6 +6435,7 @@ var LAYOUT_ANALYSIS = (function () {
 		layoutFromRows,
 		layoutFromComposerSource,
 		typingCodes,
+		thumbKeys: thumbKeyCodes,
 		keyboardFormats,
 		defaultKeyboardFormat,
 		formatHiddenKeys,

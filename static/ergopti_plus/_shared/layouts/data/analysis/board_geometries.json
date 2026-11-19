@@ -1,5 +1,5 @@
 {
-	"_description": "Keyboards beyond the row-staggered ISO and ANSI boards (physical_keys.json): ortholinear, split and column-staggered ergonomic boards with thumb clusters. For each: the centre of each key in key units (19.05 mm) and its logical row (rank in its column, the home row being 3, thumb keys 5), the default finger of each key and each finger's home key. Imported on 2026-11-14 from QMK's layout file (key positions) and default keymap (which key code each position types); « placed » lists the modifiers the default keymap lacks and where they were put. A key code the board lacks is reported per layout by the engine. Decided by the agent, to review by the maintainer.",
+	"_description": "Keyboards beyond the row-staggered ISO and ANSI boards (physical_keys.json): ortholinear, split and column-staggered ergonomic boards with thumb clusters. For each: the centre of each key in key units (19.05 mm) and its logical row (rank in its column, the home row being 3, thumb keys 5), the default finger of each key and each finger's home key. Imported on 2026-11-14 from QMK's layout file (key positions) and default keymap (which key code each position types); « placed » lists the modifiers the default keymap lacks and where they were put, and the thumb keys of the model (thumb_keys of analysis_model.json: NonConvert for the left thumb, Convert and KanaMode for the right) on free thumb keys beside the space bar and AltGr, added on 2026-11-19 for the layouts that put a letter on a thumb key. A key code the board lacks is reported per layout by the engine. Decided by the agent, to review by the maintainer.",
 	"schema_version": 1,
 	"boards": {
 		"corne": {
@@ -9,7 +9,10 @@
 				"layout": "LAYOUT_split_3x6_3",
 				"keymap": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/crkbd/keymaps/default/keymap.c",
 				"fetched": "2026-11-14",
-				"placed": ["ShiftRight on the free key mirroring ShiftLeft (KC_ESC)"]
+				"placed": [
+					"ShiftRight on the free key mirroring ShiftLeft (KC_ESC)",
+					"The thumb keys of the thumb-letter layouts, on QMK layout keys: NonConvert on the left thumb key 37 (MO(1)), Convert on the right thumb key 39 (KC_ENT), KanaMode on the right thumb key 40 (MO(2)) (2026-11-19)"
+				]
 			},
 			"keys": {
 				"KeyQ": {
@@ -221,6 +224,24 @@
 					"y": 4.2,
 					"w": 1,
 					"row": 5
+				},
+				"NonConvert": {
+					"x": 5.5,
+					"y": 4.2,
+					"w": 1,
+					"row": 5
+				},
+				"Convert": {
+					"x": 8.5,
+					"y": 3.95,
+					"w": 1,
+					"row": 5
+				},
+				"KanaMode": {
+					"x": 9.5,
+					"y": 4.2,
+					"w": 1,
+					"row": 5
 				}
 			},
 			"fingers": {
@@ -258,7 +279,10 @@
 				"Slash": "rp",
 				"ShiftRight": "rp",
 				"Space": "lt",
-				"AltRight": "rt"
+				"AltRight": "rt",
+				"NonConvert": "lt",
+				"Convert": "rt",
+				"KanaMode": "rt"
 			},
 			"home_keys": {
 				"lp": "KeyA",
@@ -282,7 +306,8 @@
 				"fetched": "2026-11-14",
 				"placed": [
 					"ShiftRight on the free key mirroring ShiftLeft (KC_ENT)",
-					"AltRight (AltGr) on the nearest free right thumb key (RAISE)"
+					"AltRight (AltGr) on the nearest free right thumb key (RAISE)",
+					"The thumb keys of the thumb-letter layouts, on QMK layout keys: NonConvert on the left thumb key 40 (LOWER), Convert on the right thumb key 42 (the right KC_SPC), KanaMode on the right thumb key 44 (KC_LEFT) (2026-11-19)"
 				]
 			},
 			"keys": {
@@ -495,6 +520,24 @@
 					"y": 3.5,
 					"w": 1,
 					"row": 5
+				},
+				"NonConvert": {
+					"x": 4.5,
+					"y": 3.5,
+					"w": 1,
+					"row": 5
+				},
+				"Convert": {
+					"x": 6.5,
+					"y": 3.5,
+					"w": 1,
+					"row": 5
+				},
+				"KanaMode": {
+					"x": 8.5,
+					"y": 3.5,
+					"w": 1,
+					"row": 5
 				}
 			},
 			"fingers": {
@@ -532,7 +575,10 @@
 				"Slash": "rp",
 				"ShiftRight": "rp",
 				"Space": "lt",
-				"AltRight": "rt"
+				"AltRight": "rt",
+				"NonConvert": "lt",
+				"Convert": "rt",
+				"KanaMode": "rt"
 			},
 			"home_keys": {
 				"lp": "KeyA",
@@ -554,7 +600,10 @@
 				"layout": "LAYOUT_ergodox_pretty",
 				"keymap": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/ergodox_ez/keymaps/default/keymap.c",
 				"fetched": "2026-11-14",
-				"placed": ["AltRight (AltGr) on the nearest free right thumb key (KC_ENT)"]
+				"placed": [
+					"AltRight (AltGr) on the nearest free right thumb key (KC_ENT)",
+					"The thumb keys of the thumb-letter layouts, on QMK layout keys: NonConvert on the left thumb key 71, Convert on the right thumb key 74, KanaMode on the right thumb key 73 (2026-11-19)"
+				]
 			},
 			"keys": {
 				"Equal": {
@@ -564,61 +613,61 @@
 					"row": 1
 				},
 				"Digit1": {
-					"x": 2.0,
+					"x": 2,
 					"y": 0.875,
 					"w": 1,
 					"row": 1
 				},
 				"Digit2": {
-					"x": 3.0,
+					"x": 3,
 					"y": 0.625,
 					"w": 1,
 					"row": 1
 				},
 				"Digit3": {
-					"x": 4.0,
+					"x": 4,
 					"y": 0.5,
 					"w": 1,
 					"row": 1
 				},
 				"Digit4": {
-					"x": 5.0,
+					"x": 5,
 					"y": 0.625,
 					"w": 1,
 					"row": 1
 				},
 				"Digit5": {
-					"x": 6.0,
+					"x": 6,
 					"y": 0.75,
 					"w": 1,
 					"row": 1
 				},
 				"Digit6": {
-					"x": 11.0,
+					"x": 11,
 					"y": 0.75,
 					"w": 1,
 					"row": 1
 				},
 				"Digit7": {
-					"x": 12.0,
+					"x": 12,
 					"y": 0.625,
 					"w": 1,
 					"row": 1
 				},
 				"Digit8": {
-					"x": 13.0,
+					"x": 13,
 					"y": 0.5,
 					"w": 1,
 					"row": 1
 				},
 				"Digit9": {
-					"x": 14.0,
+					"x": 14,
 					"y": 0.625,
 					"w": 1,
 					"row": 1
 				},
 				"Digit0": {
-					"x": 15.0,
+					"x": 15,
 					"y": 0.875,
 					"w": 1,
 					"row": 1
@@ -630,61 +679,61 @@
 					"row": 1
 				},
 				"KeyQ": {
-					"x": 2.0,
+					"x": 2,
 					"y": 1.875,
 					"w": 1,
 					"row": 2
 				},
 				"KeyW": {
-					"x": 3.0,
+					"x": 3,
 					"y": 1.625,
 					"w": 1,
 					"row": 2
 				},
 				"KeyE": {
-					"x": 4.0,
+					"x": 4,
 					"y": 1.5,
 					"w": 1,
 					"row": 2
 				},
 				"KeyR": {
-					"x": 5.0,
+					"x": 5,
 					"y": 1.625,
 					"w": 1,
 					"row": 2
 				},
 				"KeyT": {
-					"x": 6.0,
+					"x": 6,
 					"y": 1.75,
 					"w": 1,
 					"row": 2
 				},
 				"KeyY": {
-					"x": 11.0,
+					"x": 11,
 					"y": 1.75,
 					"w": 1,
 					"row": 2
 				},
 				"KeyU": {
-					"x": 12.0,
+					"x": 12,
 					"y": 1.625,
 					"w": 1,
 					"row": 2
 				},
 				"KeyI": {
-					"x": 13.0,
+					"x": 13,
 					"y": 1.5,
 					"w": 1,
 					"row": 2
 				},
 				"KeyO": {
-					"x": 14.0,
+					"x": 14,
 					"y": 1.625,
 					"w": 1,
 					"row": 2
 				},
 				"KeyP": {
-					"x": 15.0,
+					"x": 15,
 					"y": 1.875,
 					"w": 1,
 					"row": 2
@@ -696,61 +745,61 @@
 					"row": 2
 				},
 				"KeyA": {
-					"x": 2.0,
+					"x": 2,
 					"y": 2.875,
 					"w": 1,
 					"row": 3
 				},
 				"KeyS": {
-					"x": 3.0,
+					"x": 3,
 					"y": 2.625,
 					"w": 1,
 					"row": 3
 				},
 				"KeyD": {
-					"x": 4.0,
+					"x": 4,
 					"y": 2.5,
 					"w": 1,
 					"row": 3
 				},
 				"KeyF": {
-					"x": 5.0,
+					"x": 5,
 					"y": 2.625,
 					"w": 1,
 					"row": 3
 				},
 				"KeyG": {
-					"x": 6.0,
+					"x": 6,
 					"y": 2.75,
 					"w": 1,
 					"row": 3
 				},
 				"KeyH": {
-					"x": 11.0,
+					"x": 11,
 					"y": 2.75,
 					"w": 1,
 					"row": 3
 				},
 				"KeyJ": {
-					"x": 12.0,
+					"x": 12,
 					"y": 2.625,
 					"w": 1,
 					"row": 3
 				},
 				"KeyK": {
-					"x": 13.0,
+					"x": 13,
 					"y": 2.5,
 					"w": 1,
 					"row": 3
 				},
 				"KeyL": {
-					"x": 14.0,
+					"x": 14,
 					"y": 2.625,
 					"w": 1,
 					"row": 3
 				},
 				"Semicolon": {
-					"x": 15.0,
+					"x": 15,
 					"y": 2.875,
 					"w": 1,
 					"row": 3
@@ -768,61 +817,61 @@
 					"row": 4
 				},
 				"KeyZ": {
-					"x": 2.0,
+					"x": 2,
 					"y": 3.875,
 					"w": 1,
 					"row": 4
 				},
 				"KeyX": {
-					"x": 3.0,
+					"x": 3,
 					"y": 3.625,
 					"w": 1,
 					"row": 4
 				},
 				"KeyC": {
-					"x": 4.0,
+					"x": 4,
 					"y": 3.5,
 					"w": 1,
 					"row": 4
 				},
 				"KeyV": {
-					"x": 5.0,
+					"x": 5,
 					"y": 3.625,
 					"w": 1,
 					"row": 4
 				},
 				"KeyB": {
-					"x": 6.0,
+					"x": 6,
 					"y": 3.75,
 					"w": 1,
 					"row": 4
 				},
 				"KeyN": {
-					"x": 11.0,
+					"x": 11,
 					"y": 3.75,
 					"w": 1,
 					"row": 4
 				},
 				"KeyM": {
-					"x": 12.0,
+					"x": 12,
 					"y": 3.625,
 					"w": 1,
 					"row": 4
 				},
 				"Comma": {
-					"x": 13.0,
+					"x": 13,
 					"y": 3.5,
 					"w": 1,
 					"row": 4
 				},
 				"Period": {
-					"x": 14.0,
+					"x": 14,
 					"y": 3.625,
 					"w": 1,
 					"row": 4
 				},
 				"Slash": {
-					"x": 15.0,
+					"x": 15,
 					"y": 3.875,
 					"w": 1,
 					"row": 4
@@ -834,32 +883,50 @@
 					"row": 4
 				},
 				"Backquote": {
-					"x": 1.0,
+					"x": 1,
 					"y": 4.875,
 					"w": 1,
 					"row": 5
 				},
 				"BracketLeft": {
-					"x": 14.0,
+					"x": 14,
 					"y": 4.625,
 					"w": 1,
 					"row": 5
 				},
 				"BracketRight": {
-					"x": 15.0,
+					"x": 15,
 					"y": 4.875,
 					"w": 1,
 					"row": 5
 				},
 				"Space": {
 					"x": 5.5,
-					"y": 7.0,
+					"y": 7,
 					"w": 1,
 					"row": 5
 				},
 				"AltRight": {
 					"x": 11.5,
-					"y": 7.0,
+					"y": 7,
+					"w": 1,
+					"row": 5
+				},
+				"NonConvert": {
+					"x": 6.5,
+					"y": 7,
+					"w": 1,
+					"row": 5
+				},
+				"Convert": {
+					"x": 10.5,
+					"y": 7,
+					"w": 1,
+					"row": 5
+				},
+				"KanaMode": {
+					"x": 9.5,
+					"y": 7.5,
 					"w": 1,
 					"row": 5
 				}
@@ -915,7 +982,10 @@
 				"BracketLeft": "rp",
 				"BracketRight": "rp",
 				"Space": "lt",
-				"AltRight": "rt"
+				"AltRight": "rt",
+				"NonConvert": "lt",
+				"Convert": "rt",
+				"KanaMode": "rt"
 			},
 			"home_keys": {
 				"lp": "KeyA",
@@ -937,7 +1007,10 @@
 				"layout": "LAYOUT",
 				"keymap": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/zsa/moonlander/keymaps/default/keymap.c",
 				"fetched": "2026-11-14",
-				"placed": ["AltRight (AltGr) on the nearest free right thumb key (KC_ENT)"]
+				"placed": [
+					"AltRight (AltGr) on the nearest free right thumb key (KC_ENT)",
+					"The thumb keys of the thumb-letter layouts, on QMK layout keys: NonConvert on the left thumb key 67, Convert on the right thumb key 70, KanaMode on the right thumb key 69 (2026-11-19)"
+				]
 			},
 			"keys": {
 				"Equal": {
@@ -1245,6 +1318,24 @@
 					"y": 6.25,
 					"w": 1,
 					"row": 5
+				},
+				"NonConvert": {
+					"x": 6.5,
+					"y": 6.25,
+					"w": 1,
+					"row": 5
+				},
+				"Convert": {
+					"x": 10.5,
+					"y": 6.25,
+					"w": 1,
+					"row": 5
+				},
+				"KanaMode": {
+					"x": 9.5,
+					"y": 6.25,
+					"w": 1,
+					"row": 5
 				}
 			},
 			"fingers": {
@@ -1298,7 +1389,10 @@
 				"BracketLeft": "rp",
 				"BracketRight": "rp",
 				"Space": "lt",
-				"AltRight": "rt"
+				"AltRight": "rt",
+				"NonConvert": "lt",
+				"Convert": "rt",
+				"KanaMode": "rt"
 			},
 			"home_keys": {
 				"lp": "KeyA",
@@ -1320,7 +1414,10 @@
 				"layout": "LAYOUT",
 				"keymap": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/kinesis/keymaps/default/keymap.c",
 				"fetched": "2026-11-14",
-				"placed": ["AltRight (AltGr) on the nearest free right thumb key (KC_RCTL)"]
+				"placed": [
+					"AltRight (AltGr) on the nearest free right thumb key (KC_RCTL)",
+					"The thumb keys of the thumb-letter layouts, on QMK layout keys: NonConvert on the left thumb key 81 (KC_DEL), Convert on the right thumb key 84 (KC_ENTER), KanaMode on the right thumb key 76 (KC_RGUI) (2026-11-19)"
+				]
 			},
 			"keys": {
 				"Equal": {
@@ -1625,7 +1722,25 @@
 				},
 				"Space": {
 					"x": 10.75,
-					"y": 8.0,
+					"y": 8,
+					"w": 1,
+					"row": 5
+				},
+				"NonConvert": {
+					"x": 5.75,
+					"y": 8,
+					"w": 1,
+					"row": 5
+				},
+				"Convert": {
+					"x": 9.75,
+					"y": 8,
+					"w": 1,
+					"row": 5
+				},
+				"KanaMode": {
+					"x": 8.75,
+					"y": 6.5,
 					"w": 1,
 					"row": 5
 				}
@@ -1681,7 +1796,10 @@
 				"BracketLeft": "rp",
 				"BracketRight": "rp",
 				"AltRight": "rt",
-				"Space": "rt"
+				"Space": "rt",
+				"NonConvert": "lt",
+				"Convert": "rt",
+				"KanaMode": "rt"
 			},
 			"home_keys": {
 				"lp": "KeyA",
