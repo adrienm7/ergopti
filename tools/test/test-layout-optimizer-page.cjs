@@ -305,8 +305,8 @@ check(
 // The app's Studio window mounts the page in its « Optimiser » tab: it loads
 // the optimizer after the engine and the corpus reader (and before its own
 // script), the optimizer's stylesheet, lists the tab's label, and opens the
-// result in its own tabs. The Windows host sends the layout_optimizer.* keys
-// (macOS and Linux seed the whole catalogue).
+// result in its own tabs. The Windows host sends the whole catalogue, as
+// macOS and Linux seed it, so the layout_optimizer.* keys reach the page.
 {
 	const windowDir = shared('ui', 'layout_editor_window');
 	const windowHtml = read(path.join(windowDir, 'index.html'));
@@ -363,9 +363,12 @@ check(
 	const windowsHost = read(
 		path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows', 'ui', 'layout_manager', 'init.ahk')
 	);
+	const editorStart = windowsHost.indexOf('LayoutManager_EditorStrings() {');
+	const editorStrings = windowsHost.slice(editorStart, windowsHost.indexOf('\n}\n', editorStart));
 	check(
-		windowsHost.includes('SubStr(Key, 1, 17) == "layout_optimizer."'),
-		'the Windows Studio window sends the layout_optimizer.* strings'
+		editorStrings.includes('for Cache in [_I18nCache, _I18nCacheEn]') &&
+			!editorStrings.includes('SubStr(Key'),
+		'the Windows Studio window sends the whole catalogue, the layout_optimizer.* strings included'
 	);
 }
 

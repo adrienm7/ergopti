@@ -283,8 +283,8 @@ the corpus « My typing », listed first and chosen, even when they arrive
 before the tab opens. macOS and Linux inline the scripts (and their document
 CSP forbids workers), so the search runs on the page; Windows serves them
 from its virtual host, so workers start there. The tab reads its strings from
-the catalogue macOS and Linux seed, and from the `layout_optimizer.*` keys the
-Windows host sends with the editor's (`LayoutManager_EditorStrings`).
+the catalogue macOS and Linux seed, and from the whole catalogue the Windows
+host sends with the editor's source (`LayoutManager_EditorStrings`).
 
 ## Existing layouts
 
