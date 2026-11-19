@@ -86,6 +86,7 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 	const vectors = {
 		layout_bundle_installed: ['layout_install_scope', 'layout_install_latest'],
 		layout_bundle_update: ['layout_install_scope', 'layout_install_old', 'layout_install_latest'],
+		layout_bundle_remove: ['layout_install_scope', 'layout_install_old'],
 		layout_bundle_install: [
 			'layout_install_emoji',
 			'layout_install_scope',
@@ -221,13 +222,13 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 			positions(build, 'bundle_frame_rows =').length ||
 			!ordered(frame, [
 				'local function system_provider() return latest and {bundle_rows[1]} or {} end',
-				'local function user_provider() return latest and {bundle_rows[2]} or {} end',
+				'local function user_provider() return latest and {bundle_rows[2], user_remove_row} or {} end',
 				'local function status_provider() return {bundle_rows[#bundle_rows]} end',
 				'local rows = ManifestMenu.template_rows("layout_bundle_frame", {}, {}, {',
 				'layout_bundle_system = system_provider',
 				'layout_bundle_user = user_provider',
 				'layout_bundle_status = status_provider',
-				'if type(rows) ~= "table" or #rows ~= #bundle_rows then return nil end',
+				'if type(rows) ~= "table" or #rows ~= #bundle_rows + (user_remove_row and 1 or 0) then return nil end',
 				'if latest then return rows end',
 				'for _, row in ipairs(rows) do missing[#missing + 1] = row end',
 				'return missing'
@@ -514,6 +515,28 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 					)
 				)
 					return false;
+			} else if (section === 'layout_bundle_remove') {
+				const remove = body('local function run_remove_and_refresh(bundle_name, update_menu)');
+				if (
+					positions(whole, 'local function run_remove_and_refresh').length !== 1 ||
+					positions(whole, 'run_remove_and_refresh =').length ||
+					!one(
+						build,
+						`user_remove_row = layout_declared_row("layout_bundle_remove", {
+						layout_remove = function() run_remove_and_refresh(removed_name, update_menu) end,
+					}, {
+						layout_install_scope = function() return i18n.get("menu.layout.scope_user") end,
+						layout_install_old = function() return removed_version end,
+					})`
+					) ||
+					!ordered(remove, [
+						'local variants = install.bundle_variants(bundle_path)',
+						'local removed, reason = install.remove_user(bundle_name)',
+						'input_sources.disable_keylayout_source_async(variant.name, variant_label(variant.name), function(ok, _, reason)',
+						'return defer_tis_call(function() disable_from(1) end)'
+					])
+				)
+					return false;
 			} else return false;
 		}
 	}
@@ -592,13 +615,13 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 	if (section === 'layout_bundle_frame')
 		return ordered(build, [
 			'local function system_provider() return latest and {bundle_rows[1]} or {} end',
-			'local function user_provider() return latest and {bundle_rows[2]} or {} end',
+			'local function user_provider() return latest and {bundle_rows[2], user_remove_row} or {} end',
 			'local function status_provider() return {bundle_rows[#bundle_rows]} end',
 			'local rows = ManifestMenu.template_rows("layout_bundle_frame", {}, {}, {',
 			'layout_bundle_system = system_provider',
 			'layout_bundle_user = user_provider',
 			'layout_bundle_status = status_provider',
-			'if type(rows) ~= "table" or #rows ~= #bundle_rows then return nil end'
+			'if type(rows) ~= "table" or #rows ~= #bundle_rows + (user_remove_row and 1 or 0) then return nil end'
 		]);
 	const kinds = {
 		layout_bundle_in_list: ['label', 'layout_in_list_caption'],
@@ -608,7 +631,8 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 		layout_bundle_variant_added: ['label', 'layout_added_variant_caption'],
 		layout_bundle_variant_add: ['command', COMMAND.LAYOUT_ENABLE_VARIANT],
 		layout_bundle_variant_parent: ['group', 'layout_variant_choices'],
-		layout_bundle_install_first: ['label', 'layout_install_first_caption']
+		layout_bundle_install_first: ['label', 'layout_install_first_caption'],
+		layout_bundle_remove: ['command', COMMAND.LAYOUT_REMOVE]
 	};
 	const kind = kinds[section];
 	if (
@@ -628,6 +652,17 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 			one(build, 'upgrade_active_list_async(legacy_active, function(ok)')
 		);
 	if (!one(build, 'layout_declared_row("' + section + '", {')) return false;
+	if (section === 'layout_bundle_remove')
+		return (
+			one(
+				build,
+				'layout_remove = function() run_remove_and_refresh(removed_name, update_menu) end'
+			) &&
+			one(
+				body('local function run_remove_and_refresh(bundle_name, update_menu)'),
+				'install.remove_user(bundle_name)'
+			)
+		);
 	if (section === 'layout_bundle_variant_add')
 		return (
 			one(build, 'layout_enable_variant = function()') &&

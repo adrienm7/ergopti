@@ -430,6 +430,7 @@ class MenuCommand {
 	static LAYOUT_NATIVE_SELECT := "layout_native_select"
 	static LAYOUT_OPEN_PREFERENCES := "layout_open_preferences"
 	static LAYOUT_PICKER_AUTO := "layout_picker_auto"
+	static LAYOUT_REMOVE := "layout_remove"
 	static LAYOUT_SWITCH_TOGGLE := "layout_switch_toggle"
 	static LAYOUT_TOGGLE := "layout_toggle"
 	static LAYOUT_UPGRADE_LIST := "layout_upgrade_list"

@@ -2663,6 +2663,22 @@
 		}
 	},
 	{
+		"path": "layout_bundle_remove.layout_remove",
+		"visibility": "hide",
+		"labels": { "fr": "🗑️ Retirer Ergopti (%s) v%s", "en": "🗑️ Remove Ergopti (%s) v%s" },
+		"platforms": { "windows": false, "macos": true, "linux": false },
+		"reasons": {
+			"windows": {
+				"en": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.",
+				"fr": "macOS uniquement : ces lignes installent la disposition .bundle via le mécanisme de sources de saisie du système, avec une portée utilisateur et une portée système, et choisissent l'icône de la barre de menus. Windows installe un .klc par son propre installateur, Linux engendre une disposition XKB, et aucun des deux n'a de barre de menus."
+			},
+			"linux": {
+				"en": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.",
+				"fr": "macOS uniquement : ces lignes installent la disposition .bundle via le mécanisme de sources de saisie du système, avec une portée utilisateur et une portée système, et choisissent l'icône de la barre de menus. Windows installe un .klc par son propre installateur, Linux engendre une disposition XKB, et aucun des deux n'a de barre de menus."
+			}
+		}
+	},
+	{
 		"path": "layout_bundle_install.layout_install",
 		"visibility": "hide",
 		"labels": { "fr": "%s Installer Ergopti (%s) v%s", "en": "%s Install Ergopti (%s) v%s" },

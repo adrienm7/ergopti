@@ -210,6 +210,42 @@ local function variant_label(name)
 	return format_ergopti_display(unversioned) or name
 end
 
+--- Removes the user copy of an Ergopti bundle. Its layouts leave the enabled
+--- input sources first, one TIS mutation after the other, so no removed layout
+--- stays listed; then the bundle leaves the user folder and the menu is rebuilt.
+--- @param bundle_name string Basename of the installed user bundle.
+--- @param update_menu function|nil Menu rebuild callback.
+local function run_remove_and_refresh(bundle_name, update_menu)
+	local bundle_path = NativePath.without_trailing_separators(USER_LAYOUTS_DIR) .. "/" .. bundle_name
+	local variants = install.bundle_variants(bundle_path)
+	local function finish()
+		local removed, reason = install.remove_user(bundle_name)
+		if removed then
+			pcall(notifications.notify, i18n.get("menu.layout.removed_user"), nil, "success")
+		else
+			Logger.error(LOG, "The user bundle %s was not removed (%s).", bundle_name, tostring(reason))
+			pcall(notifications.notify, i18n.get("menu.layout.remove_failed"), nil, "error")
+		end
+		schedule_menu_refresh(update_menu)
+	end
+	local function disable_from(index)
+		local variant = variants[index]
+		if variant == nil then
+			finish()
+			return
+		end
+		input_sources.disable_keylayout_source_async(variant.name, variant_label(variant.name), function(ok, _, reason)
+			if not ok then
+				-- The bundle leaving the folder still takes the layout away: macOS drops a
+				-- stale enabled entry at its next input-source reread.
+				Logger.warn(LOG, "Layout '%s' could not leave the input sources: %s.", variant.name, tostring(reason))
+			end
+			disable_from(index + 1)
+		end)
+	end
+	return defer_tis_call(function() disable_from(1) end)
+end
+
 --- Admits one genuine Layout child through its exact shared presentation declaration.
 --- @param section string Complete declared frame.
 --- @param commands table Native callbacks.
@@ -325,6 +361,8 @@ function M.build(ctx)
 	-- appended here. The menubar icon is the manifest's `choice` row: this
 	-- driver supplies only its current value and what choosing one does.
 	local bundle_rows    = {}
+	-- The user bundle removal row, drawn under the user scope install row.
+	local user_remove_row = nil
 	-- Which layout to switch to when the driver pauses and when it resumes. Three
 	-- more rows this driver alone has, for the same reason as the two above: they
 	-- name macOS input sources.
@@ -421,6 +459,17 @@ function M.build(ctx)
 				)
 			end
 		)
+		-- The user copy can be removed as it was installed; the system copy needs
+		-- administrator rights this driver cannot bind yet (install_system_unlocked).
+		if user_best then
+			local removed_name, removed_version = user_best.name, version_str(user_best.version)
+			user_remove_row = layout_declared_row("layout_bundle_remove", {
+				layout_remove = function() run_remove_and_refresh(removed_name, update_menu) end,
+			}, {
+				layout_install_scope = function() return i18n.get("menu.layout.scope_user") end,
+				layout_install_old = function() return removed_version end,
+			})
+		end
 	else
 		Logger.warn(LOG, "No Ergopti bundle found in %s.", bundles_dir)
 	end
@@ -816,14 +865,14 @@ function M.build(ctx)
 	render_ctx.commands[require("settings.engine.keys").COMMAND.NUMBER_ROW_EDGES] = function() return false end
 	local function bundle_frame_rows()
 		local function system_provider() return latest and {bundle_rows[1]} or {} end
-		local function user_provider() return latest and {bundle_rows[2]} or {} end
+		local function user_provider() return latest and {bundle_rows[2], user_remove_row} or {} end
 		local function status_provider() return {bundle_rows[#bundle_rows]} end
 		local rows = ManifestMenu.template_rows("layout_bundle_frame", {}, {}, {
 			layout_bundle_system = system_provider,
 			layout_bundle_user = user_provider,
 			layout_bundle_status = status_provider,
 		})
-		if type(rows) ~= "table" or #rows ~= #bundle_rows then return nil end
+		if type(rows) ~= "table" or #rows ~= #bundle_rows + (user_remove_row and 1 or 0) then return nil end
 		if latest then return rows end
 		-- The optional inert status may be withdrawn independently of the admitted
 		-- bundle frame. Refusal never replaces it with a native caption or action.

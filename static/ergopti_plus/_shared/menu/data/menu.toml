@@ -5028,6 +5028,16 @@ caption_getters = ["layout_install_scope", "layout_install_old", "layout_install
 platforms = ["hs"]
 unavailable = "hide"
 
+# Removing the user copy of the bundle: the system copy needs administrator
+# rights the driver cannot bind to its launcher yet (install_system_unlocked).
+[[menu.layout_bundle_remove]]
+type = "command"
+id = "layout_remove"
+i18n = "menu.layout.remove_version"
+caption_getters = ["layout_install_scope", "layout_install_old"]
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.layout_bundle_install]]
 type = "command"
 id = "layout_install"

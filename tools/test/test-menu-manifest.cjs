@@ -10708,6 +10708,7 @@ console.log(
 		'layout_bundle_installed',
 		'layout_bundle_update',
 		'layout_bundle_install',
+		'layout_bundle_remove',
 		'layout_bundle_in_list',
 		'layout_bundle_update_install_first',
 		'layout_bundle_upgrade',

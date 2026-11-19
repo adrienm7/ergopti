@@ -83,6 +83,7 @@
 	"layout_native_record_choice": "platform_reason.layout_bundle_and_menubar_are_macos",
 	"layout_bundle_update": "platform_reason.layout_bundle_and_menubar_are_macos",
 	"layout_bundle_install": "platform_reason.layout_bundle_and_menubar_are_macos",
+	"layout_bundle_remove": "platform_reason.layout_bundle_and_menubar_are_macos",
 	"layout_bundle_upgrade": "platform_reason.layout_bundle_and_menubar_are_macos",
 	"layout_bundle_upgrade_to": "platform_reason.layout_bundle_and_menubar_are_macos",
 	"layout_bundle_variant_add": "platform_reason.layout_bundle_and_menubar_are_macos",

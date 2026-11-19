@@ -440,6 +440,7 @@
 			LAYOUT_NATIVE_SELECT: "layout_native_select",
 			LAYOUT_OPEN_PREFERENCES: "layout_open_preferences",
 			LAYOUT_PICKER_AUTO: "layout_picker_auto",
+			LAYOUT_REMOVE: "layout_remove",
 			LAYOUT_SWITCH_TOGGLE: "layout_switch_toggle",
 			LAYOUT_TOGGLE: "layout_toggle",
 			LAYOUT_UPGRADE_LIST: "layout_upgrade_list",

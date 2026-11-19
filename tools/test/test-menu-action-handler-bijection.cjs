@@ -640,6 +640,7 @@ function nativeFunctionReferenceKeys(source) {
 		['layout_native_record_choice', 'layout_native_select'],
 		['layout_bundle_update', 'layout_install'],
 		['layout_bundle_install', 'layout_install'],
+		['layout_bundle_remove', 'layout_remove'],
 		['layout_bundle_upgrade', 'layout_upgrade_list'],
 		['layout_bundle_upgrade_to', 'layout_upgrade_list'],
 		['layout_bundle_variant_add', 'layout_enable_variant']
@@ -811,9 +812,19 @@ function nativeFunctionReferenceKeys(source) {
 			assert.equal(owns(source), true, 'exact canonical/native restoration recovers ownership');
 		}
 	}
-	assert.equal(admittedBehavior, 6);
+	assert.equal(admittedBehavior, 7);
 	assert.equal(admittedInert, 5);
 	for (const [section, from, to] of [
+		[
+			'layout_bundle_remove',
+			'layout_remove = function() run_remove_and_refresh(removed_name, update_menu) end',
+			'layout_remove = function() end'
+		],
+		[
+			'layout_bundle_remove',
+			'local removed, reason = install.remove_user(bundle_name)',
+			'local removed, reason = true, nil'
+		],
 		[
 			'layout_native_record_choice',
 			'layout_native_select = callback',

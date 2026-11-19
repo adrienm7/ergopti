@@ -6018,6 +6018,21 @@
 			"unavailable": "hide"
 		}
 	],
+	"layout_bundle_remove": [
+		{
+			"type": "command",
+			"id": "layout_remove",
+			"i18n": "menu.layout.remove_version",
+			"caption_getters": [
+				"layout_install_scope",
+				"layout_install_old"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"layout_bundle_install": [
 		{
 			"type": "command",
