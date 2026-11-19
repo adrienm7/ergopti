@@ -793,6 +793,58 @@ the base build. The full gate stops on the Comparer's « fits a phone »
 check, on the base build as well, as in the sixth pass. `npm run test:js`
 and `verify-change` refuse this host (Node 22.16, pinned 22.22.2).
 
+## Eighth pass, reflow on a phone (2026-11-19, Paris time)
+
+### No sideways scroll at 320 and 375 px (WCAG 1.4.10)
+
+With the site's 200 % text on a 320 px phone every page was 390 px wide
+(392 at 375 px): the header did not wrap and its title, a flex item, could
+not shrink below its longest word, so the accessibility button and the
+menu icon sat past the window's edge. The header now wraps: the title
+takes the first row, the two controls a second one, right aligned, still
+in the tab order and at 40 and 48 px (WCAG 2.5.8). Its tagline is a block
+rather than a paragraph, so the wide spacing's 2 em under paragraphs no
+longer makes it taller (258 px at 320 px, 269 before). The dev and release
+banner's two lines became block labels for the same reason: under the
+WCAG 1.4.12 spacing they spilled out of the banner's fixed height, under
+the header.
+
+Once the header fitted, four pages still scrolled sideways, each fixed at
+its cause: a page-title word wider than the window (headings break such a
+word), a phrase kept on one line (`.nowrap` wraps under 480 px), the
+gradient name's half-em side padding when it ended a line (its gradient
+keeps its stretch through its background size), and the legacy Ergopti+
+cards, whose implicit grid track was as wide as their longest word.
+
+The reading gate (`site-reading.cjs`) gained four phone modes, `text-320`,
+`text-375` (the site's largest text settings) and `zoom-320`, `zoom-375`
+(a 200 % zoom of a window twice as wide), with a `reflow` check: when the
+page's scroll width passes the window's, the outermost boxes ending past
+its right edge outside a box that scrolls or clips them sideways, or the
+scroll width alone (a text node, a pseudo-element). Rows are ratcheted
+with the other reading rows, and the baseline stays empty.
+
+| Mode and check   | Before | After |
+| ---------------- | -----: | ----: |
+| text-320, reflow |     42 |     0 |
+| text-375, reflow |     22 |     0 |
+| zoom-375, reflow |      1 |     0 |
+
+Before, on the base build with the gate added: 38 rows, every page
+measured at both text widths (the header's two controls), and the four
+pages above.
+The Studio pages are left out of `text-320` by name (`PENDING_ROUTES`):
+the Studio shell (`src/routes/studio/+layout.svelte`, changed elsewhere)
+is at least 480 px tall under the header and its menu bar alone takes
+about 500 px there, so the workspace is 0 px tall and the page never
+shows. Fix the shell, then remove that row.
+
+Gates: `node tools/test/test-site-accessibility-ratchet.cjs` and
+`node tools/test/browser/site-accessibility.playwright.cjs build ""
+--reading-only` on a fresh build (0 reading elements), format and
+convention lints. `npm run test:js` and `verify-change` refuse this host
+(Node 22.16, pinned 22.22.2).
+
 ## What remains
 
 The open items live in TODO.md, section « Full accessibility ». The rows of

@@ -107,7 +107,11 @@ baseline as violations go.
       spacing and at the site's 200 % text with wide spacing (`tools/test/browser/site-reading.cjs`, in the site
       accessibility gate, ratchet `site-reading-baseline.json`, empty): no clipped, overlapping or justified text and
       no prose line over 80 characters, nothing slid under the sticky header
-      ([sixth pass](docs/audits/accessibility/README.md#reading-wcag-148-1410-1412)). The home, accessibility,
+      ([sixth pass](docs/audits/accessibility/README.md#reading-wcag-148-1410-1412)), and no page scrolls sideways
+      on a 320 or 375 px phone at 200 % text or 200 % zoom
+      ([eighth pass](docs/audits/accessibility/README.md#no-sideways-scroll-at-320-and-375-px-wcag-1410)); the
+      Studio pages are left out at 320 px with 200 % text, where the Studio shell leaves its workspace 0 px tall
+      (`PENDING_ROUTES` in `site-reading.cjs`). The home, accessibility,
       layout presentation, Linux installation and Ergopti+ overview pages had a plain-language review
       ([seventh pass](docs/audits/accessibility/README.md#seventh-pass-header-offset-media-and-plain-language-2026-11-19-paris-time)).
       Left: the same review of the other pages (layout use, information and benchmarks, the Ergopti+ hotstrings, AI,
