@@ -2454,6 +2454,67 @@
 			"basis": "source",
 			"checked": "2026-11-19",
 			"evidence": "xkeyboard-config f4d3ed8b, symbols/fr « dvorak »: « Author : Francis Leboutte, http://www.algo.be/ergo/dvorak-fr.html … Licence : X11 Version : 0.3 »."
+		},
+		"bepolar": {
+			"authors": ["Cèd’C"],
+			"url": "https://github.com/Ced-C/Bepolar",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "Nuclear-Squid/ergol 03c6c7c8b3, keymaps/fr/bepolar.toml: « author = Cèd’C », « url = https://github.com/Ced-C/Bepolar »."
+		},
+		"colemak_french_touch": {
+			"authors": ["Cedric Rossi"],
+			"url": "https://codeberg.org/cedricr/colemak-french-touch",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "Nuclear-Squid/ergol 03c6c7c8b3, keymaps/fr/colemak-french-touch.toml: « author = Cedric Rossi », « url = https://codeberg.org/cedricr/colemak-french-touch »."
+		},
+		"erglace": {
+			"authors": ["Lysquid"],
+			"url": "https://github.com/Lysquid/Erglace",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "Nuclear-Squid/ergol 03c6c7c8b3, keymaps/fr/erglace.toml: « author = Lysquid », « url = https://github.com/Lysquid/Erglace »."
+		},
+		"beopy_1dfh": {
+			"authors": ["Malekpe"],
+			"url": "https://malekpe.net",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "Nuclear-Squid/ergol 03c6c7c8b3, keymaps/fr.contrib/beopy-l.toml: « author = Malekpe », « url = https://malekpe.net »."
+		},
+		"beopy": {
+			"authors": ["Beri"],
+			"url": "https://bepo.fr/wiki/Utilisateur:Beri",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "Nuclear-Squid/ergol 03c6c7c8b3, keymaps/fr.contrib/beopy.toml: « author = Beri », « url = https://bepo.fr/wiki/Utilisateur:Beri »."
+		},
+		"ergaie": {
+			"authors": ["MacDamien"],
+			"url": "https://github.com/MacDamien/Ergaie",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "Nuclear-Squid/ergol 03c6c7c8b3, keymaps/fr.contrib/ergaie.toml: « author = MacDamien », « url = https://github.com/MacDamien/Ergaie »."
+		},
+		"erglace_jf": {
+			"authors": ["cmoinard"],
+			"url": "https://github.com/cmoinard/Erglace",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "Nuclear-Squid/ergol 03c6c7c8b3, keymaps/fr.contrib/erglace_jf.toml: « author = cmoinard », « url = https://github.com/cmoinard/Erglace »."
+		},
+		"erglace_nuke": {
+			"authors": ["Lysquid"],
+			"url": "https://github.com/Lysquid/Erglace",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "Nuclear-Squid/ergol 03c6c7c8b3, keymaps/fr.contrib/erglace_nuke.toml: « author = Lysquid », « url = https://github.com/Lysquid/Erglace »."
+		},
+		"kazerty": {
+			"authors": ["Fabien Cazenave"],
+			"url": "https://github.com/Nuclear-Squid/ergol/blob/03c6c7c8b329d53dcf9c8a5b40a82f75e80b64c1/keymaps/fr.contrib/kazerty.yaml",
+			"basis": "knowledge"
 		}
 	}
 }

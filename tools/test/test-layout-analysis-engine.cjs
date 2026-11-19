@@ -106,10 +106,10 @@ const SPEED_CORPUS = path.join(
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
 // The layouts the library held at its last import: it may only grow.
-const LIBRARY_COUNT = 621;
+const LIBRARY_COUNT = 630;
 // The collections imported from their authors' own files: each of their
 // layouts is credited from the author's page (layout_credits.json).
-const CREDITED_SOURCES = ['handsdown'];
+const CREDITED_SOURCES = ['handsdown', 'ergol_repo'];
 // Budget per library layout on the speed corpus, from prepared tables: the
 // 1.5 s the whole library had when it held 115 layouts, so a growing library
 // keeps the same budget per layout. The measured time is about 3 ms.
@@ -2463,8 +2463,8 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			credit !== undefined &&
 				credit.authors.length > 0 &&
 				typeof credit.url === 'string' &&
-				typeof credit.checked === 'string',
-			`collections: ${entry.id} (${entry.source}) has no checked credit with an author and a page`
+				(credit.basis === 'knowledge' || typeof credit.checked === 'string'),
+			`collections: ${entry.id} (${entry.source}) has no credit with an author and a page, checked unless « knowledge »`
 		);
 	}
 	// Key cells as each collection's official file states them.
@@ -2533,7 +2533,18 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		['ergol_iso', 'KeyZ', 0, 'x'],
 		['ergol_iso', 'KeyO', 0, 'dead:1dk'],
 		['azerty_latin9', 'Backquote', 0, 'œ'],
-		['azerty_mac', 'Backquote', 0, '@']
+		['azerty_mac', 'Backquote', 0, '@'],
+		// Nuclear-Squid/ergol keymaps/ (03c6c7c8b3), Kalamine JSON: Bépolar's
+		// 1DK right of B, Erglace's left of O, Ergaie's right of I, Kazerty's
+		// on the key right of M, and Béopy's « b é p o ».
+		['bepolar', 'KeyQ', 0, 'b'],
+		['bepolar', 'KeyN', 0, 'dead:odk'],
+		['erglace', 'KeyQ', 0, 'y'],
+		['erglace', 'KeyW', 0, 'dead:odk'],
+		['ergaie', 'KeyO', 0, 'dead:odk'],
+		['ergaie', 'KeyN', 0, 'z'],
+		['kazerty', 'Quote', 0, 'dead:odk'],
+		['beopy', 'KeyW', 0, 'é']
 	];
 	for (const [id, code, level, expected] of official)
 		check(
@@ -2567,13 +2578,29 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			(left.get(`symbols/fr, ${variant}`) || {}).same_as === 'bepo',
 			`collections: fr(${variant}) is not held as the registry bépo`
 		);
-	// The French layouts type French with their dead keys. The ISO Ergo-L's
-	// ë is its 1DK typed twice, a chain the library's dead_rules cannot state.
+	// Their 1DK tables, as the files' « deadkeys » state them.
+	for (const [id, typed, expected] of [
+		['bepolar', '1', '&'],
+		['erglace', '2', '°'],
+		['kazerty', 'z', 'é'],
+		['kazerty', 'a', 'à']
+	])
+		check(
+			((byId.get(id) || { dead: {} }).dead.odk || {})[typed] === expected,
+			`collections: ${id} 1DK + ${typed} is not ${expected}, as its keymap states`
+		);
+	// The French layouts type French with their dead keys. The ë and ï of the
+	// ISO Ergo-L, Bépolar and Erglace are their 1DK typed twice, a chain the
+	// library's dead_rules cannot state.
 	for (const [id, text] of [
 		['azerty_afnor', 'Ça ? Où « Noël » : être, naïf, cœur.'],
 		['azerty_latin9', 'Ça ? Où « Noël » : être, naïf, cœur.'],
 		['dvorak_fr', 'Ça ? Où « Noël » : être, naïf, cœur.'],
-		['ergol_iso', 'Ça ? Où « Noel » : être, cœur.']
+		['ergol_iso', 'Ça ? Où « Noel » : être, cœur.'],
+		['bepolar', 'Ça ? Où « Noel » : être, cœur.'],
+		['erglace', 'Ça ? Où « Noel » : être, cœur.'],
+		['ergaie', 'Ça ? Où « Noël » : être, naïf, cœur.'],
+		['colemak_french_touch', 'Ça ? Où « Noël » : être, naïf, cœur.']
 	]) {
 		const result = E.analyse(byId.get(id), E.ngramsFromText(text), {});
 		check(

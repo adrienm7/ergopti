@@ -659,6 +659,17 @@ that may only grow and a checked credit for each):
   Occitan) are AZERTY's letters. Breton is left out: its c'h and ch keys are
   keysyms without a Unicode value. No ergonomic-board bépo (TypeMatrix,
   ErgoDox) fits the library's keyboards. BvoFRak was already held (KLA).
+- **The Ergo-L family** (github.com/Nuclear-Squid/ergol `keymaps/` at
+  03c6c7c8b3, WTFPL repository, Kalamine JSON read by the Studio's reader
+  with their 1DK and accent tables): Bépolar, Colemak French Touch, three
+  Erglace versions (Lysquid's, cmoinard's 0.6.17, Lysquid's 0.5.0 « nuke »),
+  Béopy and Béopy 1DFH, Ergaie and Kazerty (AZERTY with a 1DK; its file
+  names no author, credited from knowledge to Fabien Cazenave), each
+  credited from its own TOML or YAML. Qwerty-Lafayette has QWERTY's letters
+  (only its 1DK differs) and the English keymaps are library layouts. A
+  1DK typed twice (their ë, ï) is a chain the library's dead_rules cannot
+  state. Kalamine's own `layouts/` hold only its QWERTY demos (ansi, intl,
+  prog).
 
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not
