@@ -670,6 +670,14 @@ that may only grow and a checked credit for each):
   1DK typed twice (their ë, ï) is a chain the library's dead_rules cannot
   state. Kalamine's own `layouts/` hold only its QWERTY demos (ansi, intl,
   prog).
+- **cyanophage** (cyanophage.github.io at b02780b39d, no licence published):
+  the 53 layouts of its `index.html` and `index2.html`, each a 3 × 11 string
+  and a thumb key read as text, enter as alphabetic blocks (the codegen adds
+  the US number row and Shift pairs): 11 are new (Gallium, its Hands Down
+  Neu, Carbyne, Really?, Northstar and its page-2 version, Halmak, Nerps,
+  IRST, Pine v4, BEAKL 19bis). 21 repeat a library layout and 20 put a letter
+  on a thumb key (Hands Down Vibranium, Promethium…) and one string has 35
+  characters, so they are left out.
 
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not

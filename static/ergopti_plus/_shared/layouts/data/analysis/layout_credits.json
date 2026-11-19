@@ -2515,6 +2515,21 @@
 			"authors": ["Fabien Cazenave"],
 			"url": "https://github.com/Nuclear-Squid/ergol/blob/03c6c7c8b329d53dcf9c8a5b40a82f75e80b64c1/keymaps/fr.contrib/kazerty.yaml",
 			"basis": "knowledge"
+		},
+		"gallium": {
+			"authors": ["GalileoBlues"],
+			"url": "https://github.com/GalileoBlues/Gallium",
+			"basis": "collection"
+		},
+		"handsdown_neu": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "collection"
+		},
+		"halmak_cyanophage": {
+			"authors": ["Nikolay Nemshilov"],
+			"url": "https://web.archive.org/web/20220818151548/https://nikolay.rocks/2016-12-20-the-halmak-reborn",
+			"basis": "knowledge"
 		}
 	}
 }

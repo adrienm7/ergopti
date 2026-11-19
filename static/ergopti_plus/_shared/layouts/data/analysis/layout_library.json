@@ -74,6 +74,13 @@
 			"commit": "03c6c7c8b3",
 			"date": "2026-09-22",
 			"licence": "WTFPL 2 (repository, « Copyright © 2024 Léo Cazenave »); arrangements re-encoded"
+		},
+		"cyanophage": {
+			"name": "cyanophage",
+			"url": "https://github.com/cyanophage/cyanophage.github.io/tree/b02780b39d871cf9cad7306ec9b89c60ed4eaa30",
+			"commit": "b02780b39d",
+			"date": "2026-06-12",
+			"licence": "no licence published (repository); arrangements re-encoded, no file redistributed"
 		}
 	},
 	"layouts": [
@@ -40678,6 +40685,468 @@
 					" ": "'"
 				}
 			}
+		},
+		{
+			"id": "gallium",
+			"name": "Gallium",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#gallium",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "b",
+				"KeyW": "l",
+				"KeyE": "d",
+				"KeyR": "c",
+				"KeyT": "v",
+				"KeyY": "z",
+				"KeyU": "y",
+				"KeyI": "o",
+				"KeyO": "u",
+				"KeyP": ",",
+				"BracketLeft": "-",
+				"KeyA": "n",
+				"KeyS": "r",
+				"KeyD": "t",
+				"KeyF": "s",
+				"KeyG": "g",
+				"KeyH": "p",
+				"KeyJ": "h",
+				"KeyK": "a",
+				"KeyL": "e",
+				"Semicolon": "i",
+				"Quote": "/",
+				"KeyZ": "q",
+				"KeyX": "x",
+				"KeyC": "m",
+				"KeyV": "w",
+				"KeyB": "j",
+				"KeyN": "k",
+				"KeyM": "f",
+				"Comma": "'",
+				"Period": ";",
+				"Slash": "."
+			}
+		},
+		{
+			"id": "handsdown_neu",
+			"name": "Hands Down Neu (cyanophage)",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#handsdown-neu",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "w",
+				"KeyW": "f",
+				"KeyE": "m",
+				"KeyR": "p",
+				"KeyT": "v",
+				"KeyY": "/",
+				"KeyU": ".",
+				"KeyI": "q",
+				"KeyO": ";",
+				"KeyP": "'",
+				"BracketLeft": "z",
+				"KeyA": "r",
+				"KeyS": "s",
+				"KeyD": "n",
+				"KeyF": "t",
+				"KeyG": "b",
+				"KeyH": ",",
+				"KeyJ": "a",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "h",
+				"Quote": "j",
+				"KeyZ": "x",
+				"KeyX": "c",
+				"KeyC": "l",
+				"KeyV": "d",
+				"KeyB": "g",
+				"KeyN": "-",
+				"KeyM": "u",
+				"Comma": "o",
+				"Period": "y",
+				"Slash": "k"
+			}
+		},
+		{
+			"id": "carbyne_cyanophage",
+			"name": "Carbyne (cyanophage)",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#carbyne",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "f",
+				"KeyW": "w",
+				"KeyE": "h",
+				"KeyR": "g",
+				"KeyT": "z",
+				"KeyY": "q",
+				"KeyU": "o",
+				"KeyI": "u",
+				"KeyO": "y",
+				"KeyP": "p",
+				"BracketLeft": "j",
+				"KeyA": "s",
+				"KeyS": "n",
+				"KeyD": "r",
+				"KeyF": "t",
+				"KeyG": "v",
+				"KeyH": "-",
+				"KeyJ": "a",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "c",
+				"Quote": "'",
+				"KeyZ": "b",
+				"KeyX": "m",
+				"KeyC": "l",
+				"KeyV": "d",
+				"KeyB": "k",
+				"KeyN": ";",
+				"KeyM": "x",
+				"Comma": ",",
+				"Period": ".",
+				"Slash": "/"
+			}
+		},
+		{
+			"id": "really",
+			"name": "Really?",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#really?",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "y",
+				"KeyW": "u",
+				"KeyE": "o",
+				"KeyR": "l",
+				"KeyT": "z",
+				"KeyY": "q",
+				"KeyU": "c",
+				"KeyI": "h",
+				"KeyO": "g",
+				"KeyP": "w",
+				"BracketLeft": "k",
+				"KeyA": "i",
+				"KeyS": "e",
+				"KeyD": "a",
+				"KeyF": "r",
+				"KeyG": "x",
+				"KeyH": "v",
+				"KeyJ": "s",
+				"KeyK": "n",
+				"KeyL": "t",
+				"Semicolon": "d",
+				"Quote": "'",
+				"KeyZ": "-",
+				"KeyX": "/",
+				"KeyC": ",",
+				"KeyV": ".",
+				"KeyB": ";",
+				"KeyN": "j",
+				"KeyM": "f",
+				"Comma": "p",
+				"Period": "m",
+				"Slash": "b"
+			}
+		},
+		{
+			"id": "northstar",
+			"name": "Northstar",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#northstar",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "q",
+				"KeyW": "w",
+				"KeyE": "m",
+				"KeyR": "b",
+				"KeyT": "z",
+				"KeyY": "j",
+				"KeyU": "f",
+				"KeyI": "o",
+				"KeyO": "u",
+				"KeyP": ";",
+				"BracketLeft": "-",
+				"KeyA": "n",
+				"KeyS": "r",
+				"KeyD": "s",
+				"KeyF": "t",
+				"KeyG": "g",
+				"KeyH": "y",
+				"KeyJ": "h",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "a",
+				"Quote": "'",
+				"KeyZ": "x",
+				"KeyX": "l",
+				"KeyC": "c",
+				"KeyV": "d",
+				"KeyB": "v",
+				"KeyN": "k",
+				"KeyM": "p",
+				"Comma": ",",
+				"Period": ".",
+				"Slash": "/"
+			}
+		},
+		{
+			"id": "halmak_cyanophage",
+			"name": "Halmak (cyanophage)",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#halmak",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "w",
+				"KeyW": "l",
+				"KeyE": "r",
+				"KeyR": "b",
+				"KeyT": "z",
+				"KeyY": "q",
+				"KeyU": "g",
+				"KeyI": "u",
+				"KeyO": "d",
+				"KeyP": "j",
+				"BracketLeft": "-",
+				"KeyA": "s",
+				"KeyS": "h",
+				"KeyD": "n",
+				"KeyF": "t",
+				"KeyG": ",",
+				"KeyH": ".",
+				"KeyJ": "a",
+				"KeyK": "e",
+				"KeyL": "o",
+				"Semicolon": "i",
+				"Quote": "'",
+				"KeyZ": "f",
+				"KeyX": "m",
+				"KeyC": "v",
+				"KeyV": "c",
+				"KeyB": "/",
+				"KeyN": ";",
+				"KeyM": "p",
+				"Comma": "x",
+				"Period": "k",
+				"Slash": "y"
+			}
+		},
+		{
+			"id": "nerps_cyanophage",
+			"name": "Nerps (cyanophage)",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#nerps",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "x",
+				"KeyW": "l",
+				"KeyE": "d",
+				"KeyR": "p",
+				"KeyT": "v",
+				"KeyY": "z",
+				"KeyU": "k",
+				"KeyI": "o",
+				"KeyO": "u",
+				"KeyP": ";",
+				"BracketLeft": "q",
+				"KeyA": "n",
+				"KeyS": "r",
+				"KeyD": "t",
+				"KeyF": "s",
+				"KeyG": "g",
+				"KeyH": "y",
+				"KeyJ": "h",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "a",
+				"Quote": "-",
+				"KeyZ": "/",
+				"KeyX": "j",
+				"KeyC": "m",
+				"KeyV": "c",
+				"KeyB": "w",
+				"KeyN": "b",
+				"KeyM": "f",
+				"Comma": "'",
+				"Period": ",",
+				"Slash": "."
+			}
+		},
+		{
+			"id": "irst",
+			"name": "Irst",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#irst",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "y",
+				"KeyW": "l",
+				"KeyE": "c",
+				"KeyR": "m",
+				"KeyT": "k",
+				"KeyY": "z",
+				"KeyU": "f",
+				"KeyI": "u",
+				"KeyO": ",",
+				"KeyP": "'",
+				"BracketLeft": "-",
+				"KeyA": "i",
+				"KeyS": "r",
+				"KeyD": "s",
+				"KeyF": "t",
+				"KeyG": "g",
+				"KeyH": "b",
+				"KeyJ": "n",
+				"KeyK": "e",
+				"KeyL": "a",
+				"Semicolon": "o",
+				"Quote": ";",
+				"KeyZ": "j",
+				"KeyX": "x",
+				"KeyC": "w",
+				"KeyV": "d",
+				"KeyB": "v",
+				"KeyN": "p",
+				"KeyM": "h",
+				"Comma": "/",
+				"Period": ".",
+				"Slash": "q"
+			}
+		},
+		{
+			"id": "pine_v4",
+			"name": "Pine V4",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#pine_v4",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "q",
+				"KeyW": "l",
+				"KeyE": "c",
+				"KeyR": "m",
+				"KeyT": "k",
+				"KeyY": "'",
+				"KeyU": "f",
+				"KeyI": "u",
+				"KeyO": "o",
+				"KeyP": "y",
+				"BracketLeft": "-",
+				"KeyA": "n",
+				"KeyS": "r",
+				"KeyD": "s",
+				"KeyF": "t",
+				"KeyG": "w",
+				"KeyH": "p",
+				"KeyJ": "h",
+				"KeyK": "e",
+				"KeyL": "a",
+				"Semicolon": "i",
+				"Quote": "/",
+				"KeyZ": "j",
+				"KeyX": "x",
+				"KeyC": "z",
+				"KeyV": "g",
+				"KeyB": "v",
+				"KeyN": "b",
+				"KeyM": "d",
+				"Comma": ";",
+				"Period": ",",
+				"Slash": "."
+			}
+		},
+		{
+			"id": "beakl19bis",
+			"name": "Beakl19bis",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index.html#beakl19bis",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "q",
+				"KeyW": "y",
+				"KeyE": "o",
+				"KeyR": "u",
+				"KeyT": "z",
+				"KeyY": "w",
+				"KeyU": "d",
+				"KeyI": "n",
+				"KeyO": "c",
+				"KeyP": "k",
+				"BracketLeft": "-",
+				"KeyA": "h",
+				"KeyS": "i",
+				"KeyD": "e",
+				"KeyF": "a",
+				"KeyG": ",",
+				"KeyH": "g",
+				"KeyJ": "t",
+				"KeyK": "r",
+				"KeyL": "s",
+				"Semicolon": "p",
+				"Quote": ";",
+				"KeyZ": "j",
+				"KeyX": "'",
+				"KeyC": "/",
+				"KeyV": ".",
+				"KeyB": "x",
+				"KeyN": "v",
+				"KeyM": "m",
+				"Comma": "l",
+				"Period": "f",
+				"Slash": "b"
+			}
+		},
+		{
+			"id": "northstar_cyanophage",
+			"name": "Northstar (cyanophage, page 2)",
+			"language": "en",
+			"source": "cyanophage",
+			"source_path": "index2.html#northstar",
+			"fingering": "standard",
+			"keys": {
+				"KeyQ": "q",
+				"KeyW": "x",
+				"KeyE": "w",
+				"KeyR": "b",
+				"KeyT": "z",
+				"KeyY": "j",
+				"KeyU": "f",
+				"KeyI": "o",
+				"KeyO": "u",
+				"KeyP": ";",
+				"BracketLeft": "-",
+				"KeyA": "n",
+				"KeyS": "r",
+				"KeyD": "s",
+				"KeyF": "t",
+				"KeyG": "g",
+				"KeyH": "y",
+				"KeyJ": "h",
+				"KeyK": "e",
+				"KeyL": "i",
+				"Semicolon": "a",
+				"Quote": "'",
+				"KeyZ": "m",
+				"KeyX": "l",
+				"KeyC": "c",
+				"KeyV": "d",
+				"KeyB": "v",
+				"KeyN": "k",
+				"KeyM": "p",
+				"Comma": ",",
+				"Period": ".",
+				"Slash": "/"
+			}
 		}
 	],
 	"not_imported": [
@@ -43258,6 +43727,237 @@
 			"source_path": "keymaps/fr/ergol.json",
 			"reason": "the same letters and digits as a library layout",
 			"same_as": "ergol"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#qwerty",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "qwerty"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#dvorak",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "dvorak"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#colemak",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "colemak"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#colemak-dh",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "colemak_dh"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#graphite",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "graphite"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#canary",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "canary_ortho"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#aptV3",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "aptv3"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#sturdy",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "sturdy"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#engram",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "engrammer"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#whorf",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "whorf"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#semimak",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "semimak"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#mtgap",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "mtgap30"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#ctgap",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "ctgap_final"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#recurva",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "recurva"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#workman",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "workman"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#focal",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "focal"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#isrt",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "isrt"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#hyperroll",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "hyperroll"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#pine_v1",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "pine"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#maltron",
+			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#rsthd",
+			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#dsthk",
+			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#aptmak",
+			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#caster",
+			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#hd-vibranium",
+			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#hd-promethium",
+			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#snth",
+			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#sunlight",
+			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#nordrassil",
+			"reason": "puts t on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#night",
+			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index.html#enthium",
+			"reason": "a layout string of 35 characters, not cyanophage's 3 × 11 and a thumb key"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index2.html#gallium",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "gallium_v2"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index2.html#middlemak",
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "middlemak"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index2.html#dusk",
+			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index2.html#stern",
+			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index2.html#racket",
+			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index2.html#seasalt",
+			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index2.html#coastland",
+			"reason": "puts r on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index2.html#north",
+			"reason": "puts s on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index2.html#handsdown-gold",
+			"reason": "puts t on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index2.html#handsdown-dash",
+			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
+		},
+		{
+			"source": "cyanophage",
+			"source_path": "index2.html#pfouyhai",
+			"reason": "puts e on a thumb key; the library's keyboards have only the space bar for the thumbs"
 		}
 	]
 }

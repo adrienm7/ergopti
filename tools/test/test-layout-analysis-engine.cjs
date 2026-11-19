@@ -106,7 +106,7 @@ const SPEED_CORPUS = path.join(
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
 // The layouts the library held at its last import: it may only grow.
-const LIBRARY_COUNT = 630;
+const LIBRARY_COUNT = 641;
 // The collections imported from their authors' own files: each of their
 // layouts is credited from the author's page (layout_credits.json).
 const CREDITED_SOURCES = ['handsdown', 'ergol_repo'];
@@ -2544,7 +2544,15 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		['ergaie', 'KeyO', 0, 'dead:odk'],
 		['ergaie', 'KeyN', 0, 'z'],
 		['kazerty', 'Quote', 0, 'dead:odk'],
-		['beopy', 'KeyW', 0, 'é']
+		['beopy', 'KeyW', 0, 'é'],
+		// cyanophage.github.io (b02780b39d), its 3 × 11 strings: Gallium
+		// « bldcvzyou,- nrtsgphaei/ », Neu « wfmpv/.q;'z rsntb,aeihj », Pine v4.
+		['gallium', 'KeyQ', 0, 'b'],
+		['gallium', 'Quote', 0, '/'],
+		['handsdown_neu', 'BracketLeft', 0, 'z'],
+		['handsdown_neu', 'Quote', 0, 'j'],
+		['pine_v4', 'KeyP', 0, 'y'],
+		['beakl19bis', 'KeyA', 0, 'h']
 	];
 	for (const [id, code, level, expected] of official)
 		check(
@@ -2608,6 +2616,11 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			`collections: ${id} cannot type ${Object.keys(result.coverage.unsupportedChars).join('')}`
 		);
 	}
+	// cyanophage's Hands Down Vibranium puts its R on a thumb key.
+	check(
+		/r on a thumb key/.test((left.get('index.html#hd-vibranium') || {}).reason),
+		'collections: cyanophage’s Hands Down Vibranium is not left out for its thumb R'
+	);
 	// KLAnext's copy of a library layout is left out, naming the one held.
 	check(
 		(left.get('layouts/colemak.en.ansi.json') || {}).same_as === 'colemak',
