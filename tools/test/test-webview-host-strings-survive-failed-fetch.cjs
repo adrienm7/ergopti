@@ -82,7 +82,8 @@ async function runLoader(opts) {
 	const document = {
 		readyState: 'complete',
 		currentScript: null,
-		documentElement: {},
+		// a11y_prefs.js writes the reading preferences on the root (none here).
+		documentElement: { setAttribute() {}, removeAttribute() {}, getAttribute: () => null },
 		addEventListener() {},
 		querySelectorAll(selector) {
 			return selector === '[data-i18n]' ? labels : [];
@@ -224,7 +225,8 @@ function loadPage(app, bridge, seed) {
 	const document = {
 		readyState: 'loading',
 		currentScript: null,
-		documentElement: {},
+		// a11y_prefs.js writes the reading preferences on the root (none here).
+		documentElement: { setAttribute() {}, removeAttribute() {}, getAttribute: () => null },
 		addEventListener(type, handler) {
 			if (type === 'DOMContentLoaded') ready.push(handler);
 		},
@@ -240,6 +242,8 @@ function loadPage(app, bridge, seed) {
 	const fetched = [];
 	const sandbox = { document, console: { warn() {}, error() {}, log() {} }, setTimeout, Promise };
 	sandbox.window = sandbox;
+	// a11y_prefs.js listens for a storage change made by another document.
+	sandbox.addEventListener = () => {};
 	sandbox.webkit = { messageHandlers: { [bridge]: { postMessage() {} } } };
 	sandbox.atob = (text) => Buffer.from(text, 'base64').toString('binary');
 	sandbox.TextDecoder = TextDecoder;

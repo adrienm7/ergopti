@@ -151,6 +151,8 @@ function checkLinuxProtocol() {
 		URL,
 		Date,
 		document: {
+			// a11y_prefs.js writes the reading preferences on the root (none here).
+			documentElement: { setAttribute() {}, removeAttribute() {}, getAttribute: () => null },
 			readyState: 'complete',
 			getElementById: (id) => element(id),
 			querySelectorAll: () => [],
@@ -163,6 +165,8 @@ function checkLinuxProtocol() {
 		clearTimeout() {}
 	};
 	sandbox.window = sandbox;
+	// a11y_prefs.js listens for a storage change made by another document.
+	sandbox.addEventListener = () => {};
 	sandbox.__ergopti_host_capabilities = { document_bridge: true };
 	vm.createContext(sandbox);
 	installHostCapabilities(sandbox);

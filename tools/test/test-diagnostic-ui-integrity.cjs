@@ -101,6 +101,8 @@ const script = read('_shared/ui/healthcheck/script.js');
 const style = read('_shared/ui/healthcheck/style.css');
 const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]);
 const needed = [
+	// The reading preferences come first, before the first paint.
+	'../a11y_prefs.js',
 	'../dom_utils.js',
 	'../host_bridge.js',
 	'../i18n.js',

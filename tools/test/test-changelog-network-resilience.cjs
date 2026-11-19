@@ -163,6 +163,8 @@ function runPage(options) {
 	let timerId = 0;
 	let clock = 0;
 	const document = {
+		// a11y_prefs.js writes the reading preferences on the root (none here).
+		documentElement: { setAttribute() {}, removeAttribute() {}, getAttribute: () => null },
 		readyState: 'complete',
 		getElementById(id) {
 			if (!byId.has(id)) {
@@ -199,6 +201,8 @@ function runPage(options) {
 		fetch: options.fetch || (() => new Promise(() => {}))
 	};
 	sandbox.window = sandbox;
+	// a11y_prefs.js listens for a storage change made by another document.
+	sandbox.addEventListener = () => {};
 	if (options.host === 'windows') sandbox.chrome = { webview: { postMessage() {} } };
 	if (options.host === 'linux') sandbox.__ergopti_host_capabilities = { document_bridge: true };
 	vm.createContext(sandbox);

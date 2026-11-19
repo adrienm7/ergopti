@@ -190,6 +190,8 @@ function runPage(globals = {}, page = 'changelog') {
 	const byId = new Map();
 	const posted = [];
 	const document = {
+		// a11y_prefs.js writes the reading preferences on the root (none here).
+		documentElement: { setAttribute() {}, removeAttribute() {}, getAttribute: () => null },
 		readyState: 'complete',
 		body: new FakeNode('body', 1),
 		getElementById(id) {
@@ -217,6 +219,8 @@ function runPage(globals = {}, page = 'changelog') {
 		...globals
 	};
 	sandbox.window = sandbox;
+	// a11y_prefs.js listens for a storage change made by another document.
+	sandbox.addEventListener = () => {};
 	vm.createContext(sandbox);
 	installHostCapabilities(sandbox);
 	// The page reads theme colours through theme_tokens.js, which asks the document's computed style.

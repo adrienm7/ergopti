@@ -82,7 +82,14 @@ function loadMetricsPage(app, host, afterScript) {
 		readyState: 'loading',
 		currentScript: null,
 		hidden: false,
-		documentElement: { lang: 'fr', style: {} },
+		// a11y_prefs.js writes the reading preferences on the root (none here).
+		documentElement: {
+			lang: 'fr',
+			style: {},
+			setAttribute() {},
+			removeAttribute() {},
+			getAttribute: () => null
+		},
 		body: element(),
 		head: element(),
 		addEventListener(name, callback) {

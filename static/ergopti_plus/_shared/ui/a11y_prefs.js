@@ -4,11 +4,11 @@
  * ==============================================================================
  * MODULE: Accessibility Preferences
  * DESCRIPTION:
- * The one owner of the visitor's display preferences on the website and in the
- * Ergopti Studio pages it frames: reduced motion, a hyperlegible or a
- * dyslexia font, a larger text size, wider text spacing, shorter lines, text
- * aligned to the start, high contrast and colours that colour-blind readers
- * tell apart. Each preference becomes a
+ * The one owner of the visitor's display preferences on the website, in the
+ * Ergopti Studio pages it frames and in the app's own windows: reduced
+ * motion, a hyperlegible or a dyslexia font, a larger text size, wider text
+ * spacing, shorter lines, text aligned to the start, high contrast and
+ * colours that colour-blind readers tell apart. Each preference becomes a
  * data attribute on the document's root element, which the site stylesheet
  * (src/lib/css/accessibility.css) and the shared theme (theme.css) style.
  *
@@ -23,6 +23,11 @@
  *    frames at once.
  * 4. Values are closed lists: an unknown stored value is ignored, so an old or
  *    hand-edited entry cannot put the page in an undefined look.
+ * 5. An app window's host may seed the reader's choice before the page's
+ *    scripts (window.__ergopti_reading, a map of the same names and values,
+ *    next to window._i18n_locale). The seed wins over storage: a native
+ *    window has no storage shared with the others, so the host's setting is
+ *    the one source there. It is sanitized like a stored map.
  * ==============================================================================
  */
 
@@ -61,8 +66,13 @@
 		return clean;
 	}
 
-	/** The stored preferences, or none when storage is blocked or malformed. */
+	/**
+	 * The host's seeded preferences when it gave some, else the stored ones,
+	 * else none (storage blocked or malformed).
+	 */
 	function read() {
+		var seeded = window.__ergopti_reading;
+		if (seeded && typeof seeded === 'object') return sanitize(seeded);
 		try {
 			var text = window.localStorage.getItem(STORAGE_KEY);
 			return text ? sanitize(JSON.parse(text)) : {};

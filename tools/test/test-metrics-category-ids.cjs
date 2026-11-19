@@ -197,7 +197,8 @@ check(
 
 function loadedPage(host) {
 	const page = loadMetricsAppsPage(host);
-	assert.equal(page.scripts.filter((name) => name !== '#inline').length, 15);
+	// a11y_prefs.js leads the head: the reading preferences apply before the first paint.
+	assert.equal(page.scripts.filter((name) => name !== '#inline').length, 16);
 	assert.ok(page.scripts.includes('../metrics_calendar.js'));
 	assert.ok(page.scripts.indexOf('../metrics_calendar.js') < page.scripts.indexOf('helpers.js'));
 	assert.equal(

@@ -183,7 +183,28 @@ function checkFixtures() {
 	}
 }
 
+/**
+ * Every app window outside the Studio loads the reading preferences
+ * (a11y_prefs.js) in its head, before its stylesheets, so a host's seeded
+ * font, spacing or motion choice applies from the first paint.
+ */
+function checkReadingPreferences() {
+	for (const target of WINDOWS) {
+		if (target.id === 'layout_manager') continue;
+		const html = fs.readFileSync(path.join(UI, target.id, 'index.html'), 'utf8');
+		const head = html.slice(0, html.indexOf('</head>'));
+		const script = head.indexOf('<script src="../a11y_prefs.js"></script>');
+		assert.ok(script !== -1, target.id + ' does not load ../a11y_prefs.js in its head');
+		const sheet = head.search(/<link rel="stylesheet"/);
+		assert.ok(
+			sheet === -1 || script < sheet,
+			target.id + ' loads a11y_prefs.js after a stylesheet'
+		);
+	}
+}
+
 checkComparison();
+checkReadingPreferences();
 checkBaseline();
 checkCoverage();
 checkFixtures();

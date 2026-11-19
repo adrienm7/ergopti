@@ -94,7 +94,7 @@ function checkRouteCoverage() {
 }
 
 /** A tiny DOM and storage, enough for a11y_prefs.js. */
-function loadPreferences({ storage }) {
+function loadPreferences({ storage, seed }) {
 	const attributes = new Map();
 	const head = [];
 	const listeners = {};
@@ -115,6 +115,7 @@ function loadPreferences({ storage }) {
 	root.ownerDocument = document;
 	const window = {
 		localStorage: storage,
+		__ergopti_reading: seed,
 		matchMedia: () => ({ matches: false }),
 		addEventListener: (type, listener) => (listeners[type] = listener)
 	};
@@ -212,6 +213,25 @@ function checkPreferences() {
 	assert.equal(blocked.attributes.get('data-a11y-contrast'), 'high');
 	// Malformed JSON is no preference, not a crash.
 	assert.equal(loadPreferences({ storage: memoryStorage({ [key]: '{' }) }).attributes.size, 0);
+	// An app window's host seeds the reader's choice; it wins over storage
+	// and is sanitized like a stored map.
+	const seeded = loadPreferences({
+		storage: blockedStorage(),
+		seed: { font: 'hyperlegible', spacing: 'wide', motion: 'reduce', text: '999' }
+	});
+	assert.equal(seeded.attributes.get('data-a11y-font'), 'hyperlegible');
+	assert.equal(seeded.attributes.get('data-a11y-spacing'), 'wide');
+	assert.equal(seeded.attributes.get('data-a11y-motion'), 'reduce');
+	assert.equal(
+		seeded.attributes.has('data-a11y-text'),
+		false,
+		'An unknown seeded value is ignored'
+	);
+	const over = loadPreferences({
+		storage: memoryStorage({ [key]: JSON.stringify({ contrast: 'high' }) }),
+		seed: { spacing: 'wide' }
+	});
+	assert.equal(over.attributes.has('data-a11y-contrast'), false, 'The seed wins over storage');
 }
 
 /**

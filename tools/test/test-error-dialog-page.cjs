@@ -75,7 +75,13 @@ function makeDocument() {
 	return {
 		elements,
 		// i18n.js gives the root the active locale (WCAG 3.1.1, ce1740a67a).
-		documentElement: { lang: (/<html lang="([^"]+)"/.exec(html) || [])[1] },
+		// a11y_prefs.js writes the reading preferences on the root (none here).
+		documentElement: {
+			lang: (/<html lang="([^"]+)"/.exec(html) || [])[1],
+			setAttribute() {},
+			removeAttribute() {},
+			getAttribute: () => null
+		},
 		readyState: 'complete',
 		addEventListener() {},
 		getElementById(id) {
@@ -93,6 +99,8 @@ function loadPage() {
 	const document = makeDocument();
 	const sandbox = { document, console, posted };
 	sandbox.window = sandbox;
+	// a11y_prefs.js listens for a storage change made by another document.
+	sandbox.addEventListener = () => {};
 	sandbox.window.webkit = {
 		messageHandlers: { error_dialog: { postMessage: (payload) => posted.push(payload) } }
 	};

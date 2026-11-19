@@ -109,7 +109,8 @@ function makeDocument() {
 	const toolbarButtons = Object.values(elements).filter((el) => el.tagName === 'BUTTON');
 	return {
 		elements,
-		documentElement: {},
+		// a11y_prefs.js writes the reading preferences on the root (none here).
+		documentElement: { setAttribute() {}, removeAttribute() {}, getAttribute: () => null },
 		readyState: 'complete',
 		addEventListener() {},
 		getElementById(id) {
@@ -141,6 +142,8 @@ function loadPage() {
 		}
 	};
 	sandbox.window = sandbox;
+	// a11y_prefs.js listens for a storage change made by another document.
+	sandbox.addEventListener = () => {};
 	sandbox.window.webkit = {
 		messageHandlers: { healthcheck: { postMessage: (payload) => posted.push(payload) } }
 	};

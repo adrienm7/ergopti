@@ -125,7 +125,8 @@ function makeDocument() {
 	return {
 		elements,
 		body: element('body', 'body'),
-		documentElement: {},
+		// a11y_prefs.js writes the reading preferences on the root (none here).
+		documentElement: { setAttribute() {}, removeAttribute() {}, getAttribute: () => null },
 		readyState: 'complete',
 		addEventListener() {},
 		createElement: (tag) => element('', tag),
@@ -150,6 +151,8 @@ function loadPage(strings) {
 	};
 	const sandbox = { document, console: pageConsole, posted };
 	sandbox.window = sandbox;
+	// a11y_prefs.js listens for a storage change made by another document.
+	sandbox.addEventListener = () => {};
 	sandbox.window.webkit = {
 		messageHandlers: { update_check_bridge: { postMessage: (payload) => posted.push(payload) } }
 	};
