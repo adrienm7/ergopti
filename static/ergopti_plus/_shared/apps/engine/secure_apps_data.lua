@@ -133,8 +133,13 @@ return {
 		},
 		{
 			["id"] = "yubikey_manager",
-			["windows"] = {},
-			["macos"] = {},
+			["windows"] = {
+				"authenticator.exe",
+				"yubioath-desktop.exe",
+			},
+			["macos"] = {
+				"Yubico Authenticator",
+			},
 			["linux"] = {
 				"yubikey-manager",
 			},

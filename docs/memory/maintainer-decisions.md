@@ -5,6 +5,20 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Yubico Authenticator is a secure application (2026-11-19)
+
+Decided by the maintainer on 2026-11-19 (SFC-04): the `yubikey_manager` row of
+`_shared/data/secure_apps.json` names Yubico Authenticator on Windows and
+macOS too, because it ships there and holds one-time codes. Windows lists its
+process images: `authenticator.exe` (the Flutter build 6 and later, in
+`C:\Program Files\Yubico\Yubico Authenticator\`) and `yubioath-desktop.exe`
+(the Qt build 5); no `Yubico Authenticator.exe` exists. macOS lists the
+display name `Yubico Authenticator`: the macOS rule matches display names
+exactly, never bundle ids, so a bundle id there could not match. Google
+Authenticator gets no Windows or macOS name (no desktop build) and KeePass no
+macOS name (no native macOS build). `test-secure-apps-single-source.cjs` fails
+when one of these identities is dropped; regressions `sfc-04` in the macOS
+detector and the Windows adapter compliance suites.
 ## The layout menu: one menu, three sections (2026-11-19)
 
 Maintainer requests of 2026-11-19: swap « Ergopti Studio » and the layout menu

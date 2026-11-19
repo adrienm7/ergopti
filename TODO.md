@@ -305,9 +305,9 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       asserts the application axis). The generated
       [platform parity table](docs/platform-parity-table.md) now gives every feature, action, layer entry and menu
       row its status, owner and reasons per OS, and `test-linux-feature-parity.cjs` gates it. Left:
-  - the maintainer decisions of the register (« Maintainer decisions pending »): SFC-04 (Yubico and
-    authenticator identities), PPT-01 (the two chevron rolls no driver registers), PPT-02 (the five Windows
-    personal shortcut switches no code reads), PPT-03 (`llm.generation.sequential_mode` read by macOS only);
+  - the maintainer decisions of the register (« Maintainer decisions pending »): PPT-01 (the two chevron rolls no
+    driver registers), PPT-02 (the five Windows personal shortcut switches no code reads), PPT-03
+    (`llm.generation.sequential_mode` read by macOS only);
   - the two `not_yet` reasons of the table (three cells): `token_streaming_unvalidated_on_windows`,
     `shortcuts_restore_is_composed_on_macos` (the only real parity gaps the reasons declare);
   - SFC-06 (Credential Manager inside `explorer.exe`, field path only; no fix possible by process name);

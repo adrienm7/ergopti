@@ -121,6 +121,13 @@ helpers.describe("SecureFieldDetector: isSecureApp", function()
 			"macOS display names stay exact")
 	end)
 
+	-- SFC-04 (decided by the maintainer on 2026-11-19): Yubico Authenticator
+	-- ships on macOS, so its window is secure as a whole.
+	helpers.it("treats Yubico Authenticator as secure (sfc-04)", function()
+		helpers.assert_true(adapter.isSecureApp("Yubico Authenticator") == true,
+			"Yubico Authenticator is a macOS name of _shared/data/secure_apps.json")
+	end)
+
 	helpers.it("returns false for an unknown app", function()
 		helpers.assert_eq(false, adapter.isSecureApp("Safari"),
 			"Safari must not be secure")

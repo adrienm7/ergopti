@@ -61,6 +61,22 @@ for (const app of document.apps || []) {
 	}
 }
 
+// 1b. Identities the maintainer decided (SFC-04, 2026-11-19): Yubico
+// Authenticator on Windows (the Flutter build 6 and later runs as
+// authenticator.exe, the Qt build 5 as yubioath-desktop.exe) and on macOS (its
+// display name; the macOS rule matches display names, not bundle ids). « Expand,
+// never shrink » would let a later edit drop them without any other test noticing.
+const DECIDED = [
+	['yubikey_manager', 'windows', 'authenticator.exe'],
+	['yubikey_manager', 'windows', 'yubioath-desktop.exe'],
+	['yubikey_manager', 'macos', 'Yubico Authenticator']
+];
+for (const [id, platform, identity] of DECIDED) {
+	const app = (document.apps || []).find((row) => row.id === id);
+	if (!app || !Array.isArray(app[platform]) || !app[platform].includes(identity))
+		errors.push(`secure_apps.json: ${id} lost its ${platform} identity ${identity} (SFC-04)`);
+}
+
 // 2. No local list in a Lua driver. A secure-app table is a Lua table literal
 // keyed by a password manager's name next to `= true`, or a flat list of them.
 const LUA_SOURCES = [
