@@ -152,6 +152,9 @@ var LayoutEditorPage = (function () {
 			aria: 'Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z'
 		}
 	};
+	// The spellings a page without a host OS names those shortcuts in: the Ctrl
+	// one (Windows and Linux) and the Cmd one (macOS).
+	const NEUTRAL_SHORTCUT_OSES = Object.freeze(['windows', 'macos']);
 	// The fields whose own Ctrl+Z undoes their text: the editor leaves it to them.
 	const TEXT_INPUT_TYPES = new Set(['text', 'search', 'url', 'tel', 'email', 'password', 'number']);
 
@@ -333,17 +336,15 @@ var LayoutEditorPage = (function () {
 	}
 
 	/**
-	 * The user's OS, for the shortcuts the page names: the host's, else the
-	 * browser's (the website).
+	 * The OSes whose spelling names a shortcut the page offers: the host's
+	 * alone, else both the Ctrl and the Cmd spellings, since the website states
+	 * no OS and its shortcuts answer to either modifier.
 	 * @param {string|undefined} hostPlatform - The host's platform, when it has one.
-	 * @returns {'windows'|'macos'|'linux'}
+	 * @returns {string[]}
 	 */
-	function userOs(hostPlatform) {
-		if (['windows', 'macos', 'linux'].includes(hostPlatform)) return hostPlatform;
-		const agent = navigator.userAgentData || null;
-		const name = (agent && agent.platform) || navigator.platform || '';
-		if (/mac|iphone|ipad/i.test(name)) return 'macos';
-		return /linux|x11|cros/i.test(name) ? 'linux' : 'windows';
+	function shortcutOses(hostPlatform) {
+		if (LayoutEditorModel.PLATFORMS.includes(hostPlatform)) return [hostPlatform];
+		return NEUTRAL_SHORTCUT_OSES;
 	}
 
 	/**
@@ -1282,13 +1283,17 @@ var LayoutEditorPage = (function () {
 		 */
 		function historyButton(action) {
 			const shortcut = HISTORY_SHORTCUTS[action];
-			const keys = LayerModel.chordText(shortcut.chords, {
-				os: userOs(host.platform),
-				data: LAYER_EDITOR_DATA,
-				t,
-				// The letters as printed, whatever the edited layout puts on those keys.
-				legends: { KeyZ: 'Z', KeyY: 'Y' }
-			});
+			const keys = shortcutOses(host.platform)
+				.map((os) =>
+					LayerModel.chordText(shortcut.chords, {
+						os,
+						data: LAYER_EDITOR_DATA,
+						t,
+						// The letters as printed, whatever the edited layout puts on those keys.
+						legends: { KeyZ: 'Z', KeyY: 'Y' }
+					})
+				)
+				.join(', ');
 			const name = tl('btn.with_shortcut', { action: tl(`btn.${action}`), keys });
 			return {
 				disabled: action === 'undo' ? !state.history.canUndo() : !state.history.canRedo(),

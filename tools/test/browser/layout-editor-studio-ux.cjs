@@ -224,6 +224,9 @@ async function exerciseHistoryShortcuts(browser, origin) {
 	);
 	assert.match(names[0].label, /^Undo \(.*Z\)$/, `undo names its shortcut: ${names[0].label}`);
 	assert.match(names[1].label, /^Redo \(.*Y.*Z\)$/, `redo names its shortcuts: ${names[1].label}`);
+	// The website states no OS: the name gives the Ctrl and the Cmd spellings
+	// both, rather than guessing one from the browser.
+	assert.match(names[0].label, /Ctrl.*Z.*⌘Z/, `the site names both spellings: ${names[0].label}`);
 	assert.equal(names[0].title, names[0].label);
 	assert.equal(names[0].keys, 'Control+Z Meta+Z');
 	assert.deepEqual(errors, []);
