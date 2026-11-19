@@ -35,8 +35,9 @@ var LAYOUT_ANALYSIS_SWAPS = (function () {
 	// How many swaps the panel lists, and the smallest gain worth one.
 	const LIMIT = 10;
 	const MIN_GAIN = 0.005;
-	// The page's time per slice before it yields to the frame, and swaps per step.
-	const SLICE_MS = 12;
+	// The main-thread budget of one search slice before the page yields to the
+	// next frame (under one 16 ms frame, unlike a worker's slice), and swaps per step.
+	const FRAME_BUDGET_MS = 12;
 	const STEP_SWAPS = 4;
 	// The moves: the optimiser's defaults with the prose punctuation.
 	const MOVES = Object.freeze({ movePunctuation: true });
@@ -240,7 +241,7 @@ var LAYOUT_ANALYSIS_SWAPS = (function () {
 				status.textContent = t('layout_analysis.swaps.searching', { total: ranking.total });
 				const slice = () => {
 					if (mine !== job) return;
-					const until = performance.now() + SLICE_MS;
+					const until = performance.now() + FRAME_BUDGET_MS;
 					let more = true;
 					while (more && performance.now() < until) more = ranking.step(STEP_SWAPS);
 					bar.value = ranking.done();
