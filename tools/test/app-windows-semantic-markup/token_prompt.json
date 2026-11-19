@@ -2,14 +2,10 @@
 	"files": {
 		"index.html": [
 			{
-				"tag": "div",
-				"count": 5,
-				"pending": true
-			},
-			{
 				"tag": "span",
+				"where": "data-i18n=\"token_prompt.no_token\"",
 				"count": 1,
-				"pending": true
+				"reason": "Holds the translated words that lead into the link inside the same sentence; i18n.js replaces an element's whole text, so the words need an element of their own, and no phrasing element means plain words."
 			}
 		]
 	}
