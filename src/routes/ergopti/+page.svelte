@@ -14,6 +14,7 @@ sub-pages that hold the details (siteNavigation.js lists them).
 
 	import Ergopti from '#lib/components/Ergopti.svelte';
 	import KeyboardBasis from '#lib/keyboard/KeyboardBasis.svelte';
+	import KeyboardControls from '#lib/keyboard/controls/KeyboardControls.svelte';
 	import { LAYOUT_PAGES } from '#lib/js/siteNavigation.js';
 </script>
 
@@ -33,6 +34,10 @@ sub-pages that hold the details (siteNavigation.js lists them).
 		doigts, une frappe fluide et un confort d’exception.
 	</p>
 	<KeyboardBasis id="presentation" />
+	<!-- A click on a key switches the drawn layer; the layer select of the
+	     controls does it from the keyboard (WCAG 2.1.1). -->
+	<tiny-space></tiny-space>
+	<KeyboardControls id="presentation" />
 	<ul class="overview-pages">
 		{#each LAYOUT_PAGES.slice(1) as entry (entry.route)}
 			<li>
