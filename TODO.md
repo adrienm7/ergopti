@@ -137,8 +137,9 @@ baseline as violations go.
 - [ ] **Cognitive.** Consistent navigation; every metric and setting has its help text. Error messages: the
       about 60 shown on Windows or in the shared pages without a next step now say one, 63 of them pinned by
       `tools/test/test-error-messages-say-how-to-recover.cjs`
-      ([audit](docs/audits/accessibility/README.md#error-messages-wcag-333)); left: the `layout_editor.error.*`
-      codes that are labels or validation rules rather than failures.
+      ([audit](docs/audits/accessibility/README.md#error-messages-wcag-333)); the `layout_editor.error.*` codes
+      are done too: 8 more end with their step and the 32 others are classified, each with its reason, so a new
+      code fails the test until it has one or the other.
 - [ ] **Ergopti+ native UI, what is left.** The clear fixes of the code audit
       ([table](docs/audits/accessibility/README.md#native-ergopti-ui-code-audit-2026-11-17)) are in on the three OS
       (tray / menu-bar names with the pause, labels and named controls, tooltips under high contrast, previews told

@@ -185,8 +185,111 @@ const RECOVERY = [
 	[
 		'layout_editor.error.file_unreadable',
 		' Check that it still exists and that no other program holds it, then try again.'
-	]
+	],
+	// Third pass: the editor codes that were failures without a step.
+	['layout_editor.error.compile_refused', ' Undo the last change, then try again.'],
+	['layout_editor.error.elevation_refused', ' Install it again and accept the Windows prompt.'],
+	[
+		'layout_editor.error.registry_unavailable',
+		' Reload the page, or reopen the window, to try again.'
+	],
+	[
+		'layout_editor.error.studio_invalid_layout',
+		' Reload the page, or reopen the window, to try again.'
+	],
+	[
+		'layout_editor.error.nav_file_invalid',
+		' Fix the place named in parentheses, then import the file again.'
+	],
+	['layout_editor.error.source_keylayout', ' Open it in Ukelele, save it again, then import it.'],
+	['layout_editor.error.source_format', ' Choose a layout file the editor saved.'],
+	['layout_editor.error.source_version', ' Update Ergopti+, then import the file again.']
 ];
+
+// The editor codes that are not a failure to recover from, each with why.
+// rule: a validation rule; the rule itself (and the field the editor appends in
+//   parentheses) tells what to change, so a step would only repeat it.
+// inline: the message already gives its next step, quoted in `step`.
+// fragment: shown only inside `within`, which says what happens next.
+// preserved: no step is safe to suggest; `reason` says why.
+const PREFIX = 'layout_editor.error.';
+const CLASSIFIED = {
+	generic: {
+		kind: 'label',
+		reason: 'the fallback that names a code without a message of its own; no known failure uses it'
+	},
+	dead_key_unknown: {
+		kind: 'rule',
+		reason: 'a reference to a dead key the layout does not define; the field is in parentheses'
+	},
+	layer_unknown: {
+		kind: 'rule',
+		reason: 'a reference to a layer the layout does not define; the field is in parentheses'
+	},
+	layer_base_required: { kind: 'rule', reason: 'the base layer is the one layer a layout needs' },
+	nav_action_unknown: {
+		kind: 'rule',
+		reason:
+			'the layer file names an action the navigation layer lacks; the action is in parentheses'
+	},
+	nav_binding_invalid: {
+		kind: 'rule',
+		reason: 'the binding that does not read is quoted in parentheses'
+	},
+	nav_binding_sequence: {
+		kind: 'rule',
+		reason: 'states the limit: one shortcut per key, not a sequence'
+	},
+	nav_mapping_unsupported: { kind: 'rule', reason: 'states which kind of key the layer refuses' },
+	nav_modifier_unsupported: { kind: 'rule', reason: 'states which modifier the layer refuses' },
+	nav_section_unknown: {
+		kind: 'rule',
+		reason: 'the unknown section of the layer file is named in parentheses'
+	},
+	source_base_convention: { kind: 'rule', reason: 'states the keyboard a new layout is drawn on' },
+	source_base_layer: { kind: 'rule', reason: 'states the layer a layout needs' },
+	source_invalid: { kind: 'rule', reason: 'the missing or invalid field is named in parentheses' },
+	source_modifier_overlap: {
+		kind: 'rule',
+		reason: 'states the rule: a modifier is required or optional, not both'
+	},
+	source_reference: {
+		kind: 'rule',
+		reason: 'the reference to nothing is named in parentheses'
+	},
+	source_unicode: {
+		kind: 'rule',
+		reason: 'the field with the invalid character is in parentheses'
+	},
+	source_unknown_field: { kind: 'rule', reason: 'the unknown field is named in parentheses' },
+	source_xml_entity: { kind: 'rule', reason: 'states the rule: entities are refused' },
+	source_shortcut_key_self: { kind: 'rule', reason: 'states the rule the shortcut breaks' },
+	source_export_unavailable: {
+		kind: 'rule',
+		reason: 'the edits this export cannot hold are named in parentheses; the other exports remain'
+	},
+	target_export_refused: {
+		kind: 'rule',
+		reason: 'the converter’s reason is in parentheses; the other targets remain'
+	},
+	import_unsupported: { kind: 'rule', reason: 'lists the files the import takes' },
+	kbd_installer_text: { kind: 'rule', reason: 'states the length and the characters allowed' },
+	foreign_layout: { kind: 'inline', step: 'change it in the Windows options' },
+	profile_not_added: { kind: 'inline', step: 'add it in Settings' },
+	export_assets_unavailable: { kind: 'inline', step: 'check the connection and try again' },
+	lua_vm_unavailable: { kind: 'inline', step: 'The editor on ergopti.fr builds these files.' },
+	workspace_store_unavailable: { kind: 'inline', step: 'export a backup before leaving' },
+	nav_hold_key_missing: { kind: 'inline', step: 'Choose the key held for the layer first.' },
+	source_preserved: { kind: 'inline', step: 'Convert the imported layout before editing it.' },
+	workspace_invalid: { kind: 'fragment', within: 'layout_editor.tabs.restore_failed' },
+	studio_unreadable: {
+		kind: 'preserved',
+		reason:
+			'the damaged file holds the user’s Studio data; every way out (moving it aside) loses it, ' +
+			'so the message says the drivers leave it untouched'
+	}
+};
+const KINDS = new Set(['label', 'rule', 'inline', 'fragment', 'preserved']);
 
 const locales = new Map(
 	fs
@@ -239,7 +342,36 @@ for (const [key, step, label] of RECOVERY) {
 	}
 }
 
+// Every editor code either ends with its step or is classified with a reason, so
+// a new code cannot ship as a bare failure.
+const recovered = new Set(keys);
+for (const key of Object.keys(english).filter((name) => name.startsWith(PREFIX))) {
+	const entry = CLASSIFIED[key.slice(PREFIX.length)];
+	if (recovered.has(key)) {
+		if (entry) problems.push(`${key} both ends with a step and is classified`);
+		continue;
+	}
+	if (!entry) {
+		problems.push(`${key} neither ends with a recovery step nor is classified`);
+		continue;
+	}
+	if (!KINDS.has(entry.kind)) problems.push(`${key}: unknown kind "${entry.kind}"`);
+	if (entry.kind === 'inline') {
+		if (!english[key].includes(entry.step))
+			problems.push(`${key} does not give its step "${entry.step}"`);
+	} else if (entry.kind === 'fragment') {
+		if (!/\{reason\}/.test(english[entry.within] || ''))
+			problems.push(`${key}: ${entry.within} does not hold it as its {reason}`);
+	} else if (typeof entry.reason !== 'string' || entry.reason.trim() === '') {
+		problems.push(`${key} is classified without a reason`);
+	}
+}
+for (const code of Object.keys(CLASSIFIED))
+	if (typeof english[PREFIX + code] !== 'string')
+		problems.push(`${PREFIX + code} is classified but has no message`);
+
 assert.deepEqual(problems, [], problems.join('\n'));
 console.log(
-	`PASS test-error-messages-say-how-to-recover (${RECOVERY.length} messages, ${locales.size} locales)`
+	`PASS test-error-messages-say-how-to-recover (${RECOVERY.length} messages, ` +
+		`${Object.keys(CLASSIFIED).length} classified editor codes, ${locales.size} locales)`
 );

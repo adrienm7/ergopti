@@ -425,6 +425,20 @@ state a validation rule (the fix is the rule itself), and the layout
 manager's « No catalogue available », always followed by the cause that
 names the remedy.
 
+The third batch (2026-11-19) went through the 40 editor codes left. Eight
+were failures after all and now end with their step: a refused compile (undo
+the last change), a refused Windows elevation (install again and accept the
+prompt), the catalogue and the Studio hand-off (reload or reopen), the layer
+file (the place in parentheses), a `.keylayout` that does not read (save it
+again in Ukelele), a file that is not a layout source (one the editor
+saved) and a newer source version (update Ergopti+). The test now lists the
+other 32 with a kind and a reason, and fails on any `layout_editor.error.*`
+key that is neither: 22 validation rules (the field is in parentheses), 7
+that give their step inside the sentence (the step quoted and checked), one
+label (`generic`), one fragment shown only inside « Your saved tabs could not
+be restored » and `studio_unreadable`, which suggests nothing on purpose
+because moving the damaged file aside would lose the user's Studio data.
+
 ### Keyboard walk of the Studio (WCAG 2.1.2, 2.4.3, 2.4.7)
 
 `tools/test/browser/studio-keyboard.playwright.cjs` serves `static/` as the
