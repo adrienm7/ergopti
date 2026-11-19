@@ -106,7 +106,7 @@ const SPEED_CORPUS = path.join(
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
 // The layouts the library held at its last import: it may only grow.
-const LIBRARY_COUNT = 614;
+const LIBRARY_COUNT = 621;
 // The collections imported from their authors' own files: each of their
 // layouts is credited from the author's page (layout_credits.json).
 const CREDITED_SOURCES = ['handsdown'];
@@ -2515,7 +2515,25 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		['colemak_mod_dh', 'KeyB', 0, '\\'],
 		['alphametric', 'KeyQ', 0, '/'],
 		['alphametric', 'KeyA', 0, 'a'],
-		['alphametric', 'KeyZ', 0, "'"]
+		['alphametric', 'KeyZ', 0, "'"],
+		// xkeyboard-config symbols/fr (f4d3ed8b): the AFNOR AZERTY (NF Z71-300)
+		// « @ # ◌̆ ◌̑ », « à 1 § À », « - – − ‑ », « / \ ÷ √ »; Dvorak-fr's
+		// « : ? æ Æ » and « à ç » left of Z; the ISO Ergo-L with z left of x.
+		['azerty_afnor', 'Backquote', 0, '@'],
+		['azerty_afnor', 'Backquote', 2, 'dead:breve'],
+		['azerty_afnor', 'Digit1', 0, 'à'],
+		['azerty_afnor', 'BracketLeft', 0, '-'],
+		['azerty_afnor', 'Quote', 3, '√'],
+		['azerty_afnor', 'Equal', 0, 'dead:circumflex'],
+		['dvorak_fr', 'KeyQ', 0, ':'],
+		['dvorak_fr', 'KeyA', 0, 'o'],
+		['dvorak_fr', 'IntlBackslash', 1, 'ç'],
+		['dvorak_fr', 'BracketLeft', 0, 'z'],
+		['ergol_iso', 'IntlBackslash', 0, 'z'],
+		['ergol_iso', 'KeyZ', 0, 'x'],
+		['ergol_iso', 'KeyO', 0, 'dead:1dk'],
+		['azerty_latin9', 'Backquote', 0, 'œ'],
+		['azerty_mac', 'Backquote', 0, '@']
 	];
 	for (const [id, code, level, expected] of official)
 		check(
@@ -2526,7 +2544,8 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		'hands_down_polyglot_sym',
 		'hands_down_ref_sym',
 		'hands_on_sym',
-		'colemak_mod_dh'
+		'colemak_mod_dh',
+		'ergol_iso'
 	])
 		check(byId.get(id).fingering === 'angle', `collections: ${id} is not on the angle fingering`);
 	// What a collection leaves out says why: a Hands Down letter on a thumb key
@@ -2541,6 +2560,27 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		(left.get('JSON/HandsDownArchive/Hands_Down_ref_ansi.json') || {}).same_as === 'hands_down',
 		'collections: Hands Down Reference is not the library’s hands_down'
 	);
+	// bépo's xkeyboard-config variants (1.0rc2, its Latin-9 subset, AFNOR) share the
+	// registry bépo's letters and digits: held once.
+	for (const variant of ['bepo', 'bepo_latin9', 'bepo_afnor'])
+		check(
+			(left.get(`symbols/fr, ${variant}`) || {}).same_as === 'bepo',
+			`collections: fr(${variant}) is not held as the registry bépo`
+		);
+	// The French layouts type French with their dead keys. The ISO Ergo-L's
+	// ë is its 1DK typed twice, a chain the library's dead_rules cannot state.
+	for (const [id, text] of [
+		['azerty_afnor', 'Ça ? Où « Noël » : être, naïf, cœur.'],
+		['azerty_latin9', 'Ça ? Où « Noël » : être, naïf, cœur.'],
+		['dvorak_fr', 'Ça ? Où « Noël » : être, naïf, cœur.'],
+		['ergol_iso', 'Ça ? Où « Noel » : être, cœur.']
+	]) {
+		const result = E.analyse(byId.get(id), E.ngramsFromText(text), {});
+		check(
+			Object.keys(result.coverage.unsupportedChars).join('') === '',
+			`collections: ${id} cannot type ${Object.keys(result.coverage.unsupportedChars).join('')}`
+		);
+	}
 	// KLAnext's copy of a library layout is left out, naming the one held.
 	check(
 		(left.get('layouts/colemak.en.ansi.json') || {}).same_as === 'colemak',

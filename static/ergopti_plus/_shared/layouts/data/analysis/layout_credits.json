@@ -2426,6 +2426,34 @@
 			"authors": ["Amuseum"],
 			"url": "http://shenafu.com/smf/index.php?topic=89.0",
 			"basis": "collection"
+		},
+		"azerty_afnor": {
+			"authors": ["AFNOR (NF Z71-300)", "Cimbali (XKB)"],
+			"url": "https://norme-azerty.fr",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "xkeyboard-config f4d3ed8b, symbols/fr « afnor »: « New Azerty layout, from the French Standardization Association (AFNOR), defined in norm NF Z71-300. See https://norme-azerty.fr. Original author: Cimbali »."
+		},
+		"azerty_latin9": {
+			"authors": ["René Cougnenc", "Guylhem Aznar"],
+			"url": "http://en.tldp.org/HOWTO/Francophones-HOWTO.html",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "xkeyboard-config f4d3ed8b, symbols/fr « latin9 »: « Historic Linux French keyboard layout (fr-latin9) Copyright (c) 199x, 2002 Rene Cougnenc (original work) Guylhem Aznar (maintainer) »."
+		},
+		"ergol_iso": {
+			"authors": ["Léo Cazenave (NuclearSquid)"],
+			"url": "https://ergol.org",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "xkeyboard-config f4d3ed8b, symbols/fr « ergol »: « Project page: https://ergol.org Author: NuclearSquid »; « ergol_iso »: « Same as regular Ergo‑L, but with a permutation on the lower left keys »."
+		},
+		"dvorak_fr": {
+			"authors": ["Francis Leboutte"],
+			"url": "http://www.algo.be/ergo/dvorak-fr.html",
+			"basis": "source",
+			"checked": "2026-11-19",
+			"evidence": "xkeyboard-config f4d3ed8b, symbols/fr « dvorak »: « Author : Francis Leboutte, http://www.algo.be/ergo/dvorak-fr.html … Licence : X11 Version : 0.3 »."
 		}
 	}
 }

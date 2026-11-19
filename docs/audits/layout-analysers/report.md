@@ -645,6 +645,20 @@ that may only grow and a checked credit for each):
   could not be read; `not_imported` lists each. Its ISO QWERTY, whose N and
   M are swapped, is left out by judgement. Each is credited to the author its
   file names (basis « collection »); its corpus texts are not stored.
+- **bépo and the French layouts of xkeyboard-config** (`symbols/fr` at
+  f4d3ed8b, MIT, read with the libX11 Compose table as on 2026-11-18): the
+  AFNOR AZERTY (NF Z71-300), the legacy fr-latin9 AZERTY, the Macintosh and
+  US-symbol AZERTYs, the French US with dead keys, Francis Leboutte's
+  Dvorak-fr (X11 licence in the file; the debian-legal thread above is about
+  this layout, to review by the maintainer) and the ISO (angle) Ergo-L, whose
+  1DK the XKB file types through ISO_Level5 and is taken from the registry's
+  Ergo-L (its ë, 1DK twice, is a chain the library cannot state). bépo 1.0rc2
+  (`bepo`, and `bepo_latin9` restricted to Latin-9), bépo AFNOR (`bepo_afnor`) share the registry
+  bépo 1.1rc2's letters and digits and differ only on other levels, so the
+  shared duplicate rule holds them once; the AZERTY variants (oss, olpc,
+  Occitan) are AZERTY's letters. Breton is left out: its c'h and ch keys are
+  keysyms without a Unicode value. No ergonomic-board bépo (TypeMatrix,
+  ErgoDox) fits the library's keyboards. BvoFRak was already held (KLA).
 
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not
