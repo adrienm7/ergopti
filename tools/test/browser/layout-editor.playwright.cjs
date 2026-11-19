@@ -1243,7 +1243,7 @@ async function exerciseComparerTabs(page) {
 		['bigrams', 10],
 		['trigrams', 5],
 		['rows', 6],
-		['misc', 10]
+		['misc', 11]
 	]) {
 		await page.click(`#la-tab-${tab}`);
 		const figures = await page.$$eval(`#la-charts-${tab} .la-figure`, (sections) =>
@@ -2006,7 +2006,11 @@ async function exerciseStudioComparer(page) {
 			};
 		})
 	);
-	assert.equal(inputs.length, 3, 'a corpus file, a layout file and a fingering profile');
+	assert.equal(
+		inputs.length,
+		4,
+		'a corpus file, a layout file, a fingering profile and the score settings'
+	);
 	for (const input of inputs) {
 		assert.ok(input.hidden, `${input.id}: the native file control is hidden`);
 		assert.ok(input.shown, `${input.id}: its labelled button is shown`);
