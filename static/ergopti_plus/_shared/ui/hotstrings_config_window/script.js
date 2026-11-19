@@ -121,6 +121,14 @@ function setData(next) {
 	render();
 }
 
+// The cards are built from the host's data, and on Windows the locale strings
+// are fetched: data that lands first drew every field label as its locale key
+// (hs_config.label_delay). Draw again once i18n.js has applied the strings.
+document.addEventListener('i18n:applied', function () {
+	renderGroupSelector();
+	render();
+});
+
 function closeWindow() {
 	send({ action: 'close' });
 }
