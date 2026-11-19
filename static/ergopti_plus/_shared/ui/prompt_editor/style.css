@@ -95,6 +95,15 @@ h1 {
 	margin-bottom: 5px;
 }
 
+/* The token buttons: a toolbar list laid out as the buttons alone were. */
+.chip-bar {
+	list-style: none;
+}
+
+.chip-bar li {
+	display: inline;
+}
+
 label {
 	color: var(--sub);
 	font-size: 12px;
@@ -179,6 +188,7 @@ select:focus {
 	display: inline-block;
 	font-family: 'SF Mono', Menlo, monospace;
 	font-size: 11.5px;
+	font-style: normal;
 	margin: 0 2px;
 	padding: 1px 5px;
 	user-select: all;
@@ -283,6 +293,7 @@ select:focus {
 	border-radius: 8px;
 	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 	display: none;
+	list-style: none;
 	min-width: 140px;
 	padding: 4px 0;
 	position: fixed;

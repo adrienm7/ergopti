@@ -77,6 +77,24 @@ async function main() {
 		assert.equal(await page.locator('#p-name').inputValue(), 'Next');
 		await page.evaluate((seed) => window.init(seed), first);
 		assert.equal(await page.locator('#p-name').inputValue(), 'Next');
+		// The token suggestions are a list box the editor owns: the highlight
+		// the arrow keys move is named through aria-activedescendant, so a
+		// screen reader announces it (WCAG 4.1.2).
+		await page.locator('#e-out').click();
+		await page.keyboard.press('End');
+		await page.keyboard.type(' {');
+		const editor = page.locator('#e-out');
+		await page.locator('#ac-popup.on [role="option"]').first().waitFor();
+		assert.equal(await page.locator('#ac-popup').getAttribute('role'), 'listbox');
+		assert.equal(await editor.getAttribute('aria-controls'), 'ac-popup');
+		assert.equal(await editor.getAttribute('aria-activedescendant'), 'ac-option-0');
+		await page.keyboard.press('ArrowDown');
+		assert.equal(await editor.getAttribute('aria-activedescendant'), 'ac-option-1');
+		assert.equal(await page.locator('#ac-option-1').getAttribute('aria-selected'), 'true');
+		assert.equal(await page.locator('#ac-option-0').getAttribute('aria-selected'), 'false');
+		await page.keyboard.press('Enter');
+		assert.equal(await editor.getAttribute('aria-activedescendant'), null, 'closed, no highlight');
+		assert.equal(await page.locator('#e-out var.token-chip').last().textContent(), '{n}');
 		console.log('prompt editor preserves drafts and admits newer sessions in Chromium');
 	} finally {
 		if (browser) await browser.close();

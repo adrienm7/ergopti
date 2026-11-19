@@ -3,22 +3,16 @@
 		"index.html": [
 			{
 				"tag": "div",
-				"count": 13,
-				"pending": true
-			}
-		],
-		"script.js": [
-			{
-				"tag": "span",
+				"where": "class=\"editor-wrap\"",
 				"count": 1,
-				"pending": true
+				"reason": "Positions the placeholder text over the rich editor; the two have no meaning together that an element names."
 			},
 			{
 				"tag": "div",
+				"where": "contenteditable=\"true\"",
 				"count": 1,
-				"pending": true
+				"reason": "The prompt editor draws its tokens as chips inside the text: no native field styles part of its value, so a contenteditable named as a multiline text box is the pattern."
 			}
 		]
-	},
-	"pendingProblems": 1
+	}
 }

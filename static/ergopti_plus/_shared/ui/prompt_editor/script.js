@@ -19,10 +19,11 @@
 /**
  * Creates a non-editable visual chip element for a specific token.
  * @param {string} name - The token name (e.g., "context").
- * @returns {HTMLElement} The constructed span element representing the chip.
+ * @returns {HTMLElement} The constructed var element representing the chip: a
+ *   placeholder the model fills in, which is what var marks.
  */
 function makeChip(name) {
-	var s = document.createElement('span');
+	var s = document.createElement('var');
 	s.className = 'token-chip';
 	s.contentEditable = 'false';
 	s.dataset.token = name;
@@ -105,7 +106,7 @@ function checkPlaceholder() {
 	var placeholderElement = document.getElementById('e-out-ph');
 
 	var isEmpty =
-		editorElement.textContent.length === 0 && editorElement.innerHTML.indexOf('<span') === -1;
+		editorElement.textContent.length === 0 && editorElement.innerHTML.indexOf('<var') === -1;
 	placeholderElement.style.display = isEmpty ? 'block' : 'none';
 }
 
@@ -266,19 +267,26 @@ function showAc(matches) {
 		return;
 	}
 	var rect = sel.getRangeAt(0).getBoundingClientRect();
+	// A list box the editor owns: the editor keeps the focus and names the
+	// highlighted suggestion through aria-activedescendant, so the arrow
+	// keys' choice is announced (WCAG 4.1.2).
 	matches.forEach(function (name, i) {
-		var d = document.createElement('div');
-		d.className = 'ac-item' + (i === 0 ? ' active' : '');
-		d.textContent = name;
-		d.addEventListener('mousedown', function (e) {
+		var option = document.createElement('li');
+		option.className = 'ac-item' + (i === 0 ? ' active' : '');
+		option.id = 'ac-option-' + i;
+		option.setAttribute('role', 'option');
+		option.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
+		option.textContent = name;
+		option.addEventListener('mousedown', function (e) {
 			e.preventDefault();
 			applyAc(name);
 		});
-		popup.appendChild(d);
+		popup.appendChild(option);
 	});
 	popup.style.left = rect.left + 'px';
 	popup.style.top = rect.bottom + 4 + 'px';
 	popup.classList.add('on');
+	editorElement.setAttribute('aria-activedescendant', 'ac-option-0');
 }
 
 /**
@@ -288,6 +296,7 @@ function hideAc() {
 	var popup = document.getElementById('ac-popup');
 	if (popup) popup.classList.remove('on');
 	acItems = [];
+	editorElement.removeAttribute('aria-activedescendant');
 }
 
 /**
@@ -296,7 +305,9 @@ function hideAc() {
 function updateAcSel() {
 	document.querySelectorAll('.ac-item').forEach(function (el, i) {
 		el.classList.toggle('active', i === acIdx);
+		el.setAttribute('aria-selected', i === acIdx ? 'true' : 'false');
 	});
+	editorElement.setAttribute('aria-activedescendant', 'ac-option-' + acIdx);
 }
 
 /**

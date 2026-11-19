@@ -68,7 +68,7 @@ module.exports = [
 			});
 		},
 		fill: stringsLoaded,
-		ready: '#e-out .chip, #e-out span'
+		ready: '#e-out .token-chip'
 	},
 	{
 		id: 'paths_editor',
