@@ -338,7 +338,7 @@ const CURATED_READS = [
 		reader: 'ergopti_plus/macos/ai/adapters/ollama_daemon_authority.py',
 		needles: [
 			'Path(__file__).with_name("suspended_image_owner.py")',
-			'Path(__file__).absolute().parents[2]\n    / "_shared/ai/adapters/python/managed_ollama_daemon_authority.py"'
+			'Path(__file__).absolute().parents[3]\n    / "_shared/ai/adapters/python/managed_ollama_daemon_authority.py"'
 		],
 		targets: [
 			'ergopti_plus/macos/ai/adapters/suspended_image_owner.py',
