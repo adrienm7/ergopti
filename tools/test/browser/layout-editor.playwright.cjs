@@ -1433,6 +1433,131 @@ async function exerciseComparerWholeLibrary(browser, origin) {
 }
 
 /**
+ * (comparer-layout-list) The layout list is one alphabetical column under a
+ * heading per first letter, with a letter index that jumps there; the search
+ * reads the name, the authors and the family without accents and says how
+ * many it shows; « Select all shown » ticks only what the search shows, and
+ * « Untick every layout » clears the whole selection (maintainer, 2026-11-18).
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseComparerLayoutList(browser, origin) {
+	const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(`${origin}/ui/layout_analysis/index.html?lang=en&corpus=fr_nemolivier`);
+	await page.waitForFunction(
+		() => document.getElementById('la-results').getAttribute('aria-busy') === 'false'
+	);
+	await page.click('#la-layouts-summary');
+	const fold = (text) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+	const list = () =>
+		page.$$eval('#la-layout-list .la-letter-group', (groups) =>
+			groups.map((group) => ({
+				letter: group.querySelector('h3.la-letter').textContent,
+				labelled: group.getAttribute('aria-labelledby') === group.querySelector('h3').id,
+				names: [...group.querySelectorAll('.la-layout-name')].map((n) => n.textContent),
+				lefts: [...group.querySelectorAll('.la-layout-item')].map(
+					(item) => item.getBoundingClientRect().left
+				)
+			}))
+		);
+	const count = () => page.textContent('#la-pick-count');
+	const all = await list();
+	assert.ok(all.length > 10, `a heading per first letter: ${all.map((g) => g.letter).join(' ')}`);
+	assert.ok(
+		all.every((g) => g.labelled),
+		'each letter group is named by its heading'
+	);
+	const letters = all.map((g) => g.letter);
+	assert.deepEqual(letters, [...new Set(letters)], 'each letter once');
+	for (const group of all)
+		for (const name of group.names)
+			assert.ok(
+				group.letter === '#' || fold(name).startsWith(group.letter.toLowerCase()),
+				`${name} is listed under ${group.letter}`
+			);
+	const names = all.flatMap((g) => g.names);
+	assert.deepEqual(
+		names,
+		[...names].sort((a, b) => fold(a).localeCompare(fold(b))),
+		'in alphabetical order'
+	);
+	assert.equal(
+		new Set(all.flatMap((g) => g.lefts)).size,
+		1,
+		'one column: every layout starts at the same left edge'
+	);
+	assert.equal(
+		await page.getAttribute('#la-pick-count', 'role'),
+		'status',
+		'the count is announced'
+	);
+	// The letter index jumps to its heading and gives the focus to its first layout.
+	const jumps = await page.$$eval('#la-letters a', (links) => links.map((a) => a.textContent));
+	assert.deepEqual(jumps, letters, 'the index names every letter heading');
+	assert.ok(
+		(await page.getAttribute('#la-letters', 'aria-label')).length > 0,
+		'the index is a named navigation'
+	);
+	await page.click('#la-letters a:text-is("E")');
+	assert.equal(
+		await page.evaluate(
+			() => document.activeElement.closest('.la-letter-group').querySelector('h3').textContent
+		),
+		'E',
+		'« E » moves the focus to the first layout under E'
+	);
+	// The search: accents do not matter, and the authors and family are read too.
+	await page.fill('#la-filter', 'bepo');
+	const bepo = (await list()).flatMap((g) => g.names);
+	assert.ok(bepo.includes('bépo'), `« bepo » finds « bépo »: ${bepo.join(' | ')}`);
+	assert.match(await count(), new RegExp(`^${bepo.length} of \\d+ shown, \\d+ ticked$`));
+	const byAuthor = await page.evaluate(() => {
+		const layout = window.LAYOUT_ANALYSIS.libraryLayouts().find(
+			(l) =>
+				Array.isArray(l.authors) &&
+				l.authors.length > 0 &&
+				!l.name.toLowerCase().includes(l.authors[0].toLowerCase())
+		);
+		return { name: layout.name, author: layout.authors[0] };
+	});
+	await page.fill('#la-filter', byAuthor.author);
+	assert.ok(
+		(await list()).flatMap((g) => g.names).includes(byAuthor.name),
+		`the author ${byAuthor.author} finds ${byAuthor.name}`
+	);
+	// Select the shown layouts only.
+	await page.fill('#la-filter', '');
+	await page.click('#la-clear');
+	assert.match(await count(), / 0 ticked$/, 'every layout unticked');
+	await page.fill('#la-filter', 'colemak');
+	const shown = (await list()).flatMap((g) => g.names);
+	assert.ok(shown.length > 1, `« colemak » shows the family: ${shown.join(' | ')}`);
+	await page.click('#la-all');
+	assert.match(
+		await count(),
+		new RegExp(`^${shown.length} of \\d+ shown, ${shown.length} ticked$`),
+		'« Select all shown » ticks the shown layouts'
+	);
+	await page.fill('#la-filter', '');
+	assert.equal(
+		await page.locator('#la-layout-list .la-picked').count(),
+		shown.length,
+		'and those only, each marked as ticked'
+	);
+	await page.click('#la-every');
+	assert.equal(
+		await page.locator('#la-layout-list .la-picked').count(),
+		await page.locator('#la-layout-list .la-layout-item').count(),
+		'« Tick every layout » ticks them all'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
+/**
  * (comparer-corpus-picker) One corpus picker: the user's own texts, then one
  * group per language with each entry's kind, code last; it is driven by the
  * keyboard, and the text typed is not offered on a built-in text. (comparer-phone-width) Every sub-tab fits a phone in
@@ -3498,6 +3623,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseComparerLink(browser, origin);
 		await exerciseComparerPicker(browser, origin);
 		await exerciseComparerWholeLibrary(browser, origin);
+		await exerciseComparerLayoutList(browser, origin);
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);

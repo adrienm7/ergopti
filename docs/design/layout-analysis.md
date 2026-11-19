@@ -881,10 +881,22 @@ or written; the chosen corpus stays `corpus`, so saved choices load as they
 were. The Optimiser's own « Language » select went the same way (its saved
 `language` is ignored).
 
-**Layout list.** Besides its text search, « Origin » (`#la-pick-origin`: the
-Ergopti layouts, the references, the user's own, or a library collection by
-its `layout_library.json` `name`) and « Language » (`#la-pick-language`)
-narrow the list, which « Select all shown » follows; saved as `pick`.
+**Layout list.** One column in alphabetical order under a heading per first
+letter (`h3.la-letter`, sticky while the list scrolls; the accent removed, so
+« É » is under « E », a digit or a sign under « # »), with a letter index
+(`#la-letters`, a named navigation of links) that scrolls to a heading and
+gives the focus to its first layout (maintainer, 2026-11-18: the old grid of
+columns made finding a layout by its first letter hard). The search
+(`#la-filter`) reads the name, id, family and authors without accents or case,
+every word of the query in any of them; `#la-pick-count` (a status region)
+says how many layouts are shown and ticked. A ticked layout carries the
+accent's soft fill and an edge bar besides its ticked box, and its authors
+sit beside its label, so the box is named by the layout alone. « Origin »
+(`#la-pick-origin`: the Ergopti layouts, the references, the user's own, or a
+library collection by its `layout_library.json` `name`) and « Language »
+(`#la-pick-language`) narrow the list too (saved as `pick`); « Select all
+shown » and « Deselect all shown » follow the search and filters, « Tick every
+layout » and « Untick every layout » the whole list.
 
 **Filters.** « Layouts shown » (`#la-filters-box`, open from 720 px and
 whenever a filter is set, folded on a phone, its summary counting the layouts

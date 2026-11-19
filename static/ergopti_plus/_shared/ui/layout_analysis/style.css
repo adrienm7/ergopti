@@ -340,16 +340,102 @@ body:has(> main.layout-analysis) {
 	font-weight: 600;
 }
 
+/* The layout list: one column, a sticky heading per first letter, the ticked
+   layouts on the accent's soft fill with a bar on their edge (not colour
+   alone: the box is ticked too). */
 .la-layout-list {
+	background: var(--la-surface);
+	border: 1px solid var(--la-border);
+	border-radius: 10px;
+	margin-top: 8px;
+	max-height: 420px;
+	overflow-y: auto;
+	padding: 0 8px 8px;
+	scroll-padding-top: 40px;
+}
+
+.la-letter {
+	background: var(--la-surface);
+	border-bottom: 1px solid var(--la-border);
+	color: var(--la-accent);
+	font-size: 1rem;
+	margin: 0;
+	padding: 10px 4px 4px;
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+
+.la-letter-items {
+	list-style: none;
+	margin: 4px 0 0;
+	padding: 0;
+}
+
+.la-layout-item {
+	align-items: center;
+	border-left: 4px solid transparent;
+	border-radius: 6px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 16px;
+	padding: 1px 8px;
+}
+
+.la-layout-item.la-picked {
+	background: var(--la-accent-soft);
+	border-left-color: var(--la-accent);
+}
+
+.la-layout-name {
+	font-weight: 600;
+}
+
+.la-layout-meta {
+	color: var(--la-sub);
+	font-size: 0.85em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* The letter index: one button-like link per heading, wrapping on a phone. */
+.la-letters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-top: 10px;
+}
+
+.la-letter-jump {
+	align-items: center;
 	border: 1px solid var(--la-border);
 	border-radius: 6px;
-	display: grid;
-	gap: 2px 12px;
-	grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-	margin-top: 8px;
-	max-height: 220px;
-	overflow-y: auto;
-	padding: 6px;
+	color: inherit;
+	display: inline-flex;
+	font-weight: 600;
+	justify-content: center;
+	min-height: 28px;
+	min-width: 28px;
+	text-decoration: none;
+}
+
+.la-letter-jump:hover,
+.la-letter-jump:focus-visible {
+	background: var(--la-accent-soft);
+	border-color: var(--la-accent);
+}
+
+.la-pick-count {
+	color: var(--la-sub);
+	margin: 6px 0 0;
+}
+
+.la-pick-search {
+	flex: 1 1 240px;
+}
+
+.la-pick-search input {
+	width: 100%;
 }
 
 /* Rows of at least 26 px keep each checkbox 24 px clear of the next one

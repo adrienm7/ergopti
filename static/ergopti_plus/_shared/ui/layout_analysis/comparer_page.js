@@ -159,6 +159,8 @@
 	const ANALYSE_SLICE = 4;
 	// The ranking is drawn again at most this often while the slices run (ms).
 	const PARTIAL_RENDER_MS = 400;
+	// The letter heading of a layout whose name starts with a digit or a sign.
+	const LETTER_OTHER = '#';
 	// The collapsed layout list names this many compared layouts, then counts the rest.
 	const SUMMARY_NAMES = 8;
 	const CHART_MAX_BARS = 40;
@@ -406,12 +408,15 @@
 	<details id="la-layouts-box" class="la-layouts-box">
 	<summary id="la-layouts-summary"></summary>
 	<div class="la-row">
-		<input
-			id="la-filter"
-			type="search"
-			data-i18n-placeholder="layout_analysis.layouts.filter_placeholder"
-			data-i18n-title="layout_analysis.layouts.filter_placeholder"
-		/>
+		<label class="la-filter-field la-pick-search">
+			<span data-i18n="layout_analysis.layouts.search"></span>
+			<input
+				id="la-filter"
+				type="search"
+				aria-describedby="la-pick-count"
+				data-i18n-placeholder="layout_analysis.layouts.filter_placeholder"
+			/>
+		</label>
 		<label class="la-filter-field">
 			<span data-i18n="layout_analysis.filter.origin"></span>
 			<select id="la-pick-origin"></select>
@@ -421,7 +426,10 @@
 			<select id="la-pick-language"></select>
 		</label>
 	</div>
-	<div class="la-row">
+	<p id="la-pick-count" class="la-pick-count" role="status" aria-live="polite"></p>
+	<div class="la-row la-pick-actions">
+		<button id="la-every" type="button" data-i18n="layout_analysis.layouts.every"></button>
+		<button id="la-clear" type="button" data-i18n="layout_analysis.layouts.clear"></button>
 		<button id="la-all" type="button" data-i18n="layout_analysis.layouts.all"></button>
 		<button id="la-none" type="button" data-i18n="layout_analysis.layouts.none"></button>
 		<label class="la-file">
@@ -430,6 +438,7 @@
 		</label>
 	</div>
 	<p id="la-import-report" class="la-muted" hidden></p>
+	<nav id="la-letters" class="la-letters"></nav>
 	<div id="la-layout-list" class="la-layout-list"></div>
 	</details>
 </section>
@@ -3812,54 +3821,138 @@
 			state.linkedSelection = false;
 		}
 
+		/** Text as the layout search compares it: lower case, without accents. */
+		function folded(text) {
+			return String(text).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+		}
+
+		/** The words the layout search reads: the name, id, family and authors. */
+		function searchText(layout) {
+			const authors = Array.isArray(layout.authors)
+				? layout.authors.join(' ')
+				: layout.authors || '';
+			return folded([layout.name, layout.id, layout.family || '', authors].join(' '));
+		}
+
+		/**
+		 * The letter heading a layout is listed under: the first letter of its
+		 * name without its accent (« É » under « E »), « # » for a digit or a sign.
+		 */
+		function letterOf(layout) {
+			const first = folded(layout.name).charAt(0).toUpperCase();
+			return /\p{L}/u.test(first) ? first : LETTER_OTHER;
+		}
+
 		/** Whether the layout list's filters (text, origin, language) show a layout. */
 		function pickShows(layout) {
-			const filter = $('la-filter').value.trim().toLowerCase();
+			const filter = folded($('la-filter').value.trim());
 			return (
-				(!filter || layout.name.toLowerCase().includes(filter) || layout.id.includes(filter)) &&
+				(!filter || filter.split(/\s+/).every((word) => searchText(layout).includes(word))) &&
 				(!state.pick.origin || originOf(layout) === state.pick.origin) &&
 				(!state.pick.language || layout.language === state.pick.language)
 			);
 		}
 
+		/**
+		 * The layout list (maintainer, 2026-11-18): one column in alphabetical
+		 * order under a heading per first letter, a letter index that jumps to
+		 * each heading, the ticked layouts marked, and a count the search and
+		 * the ticks announce.
+		 */
 		function fillLayouts() {
 			const list = $('la-layout-list');
-			list.replaceChildren();
-			for (const layout of layouts) {
-				if (!pickShows(layout)) continue;
-				const label = el('label', 'la-layout');
-				const box = el('input');
-				box.type = 'checkbox';
-				box.checked = state.selected.has(layout.id);
-				box.addEventListener('change', () => {
-					if (box.checked) state.selected.add(layout.id);
-					else state.selected.delete(layout.id);
-					chooseSelection();
-					save();
-					analyse();
-				});
-				label.append(box, el('span', '', layout.name));
-				list.append(label);
-				// « + »: this layout also ranks as « <name>+ », typing the keys typed with
-				// the Ergopti+ hotstrings, while the others type the final text.
-				if (appliedTextMode() !== TEXT_MIXED) continue;
-				const plusLabel = el('label', 'la-plus');
-				const plus = el('input');
-				plus.type = 'checkbox';
-				plus.checked = state.plus.has(layout.id);
-				plus.disabled = !hasTwoTexts();
-				plusLabel.title = hasTwoTexts()
-					? t('layout_analysis.text_mode.plus_title', { layout: layout.name + PLUS_SUFFIX })
-					: t('layout_analysis.text_mode.one_text');
-				plus.addEventListener('change', () => {
-					if (plus.checked) state.plus.add(layout.id);
-					else state.plus.delete(layout.id);
-					save();
-					analyse();
-				});
-				plusLabel.append(plus, el('span', '', layout.name + PLUS_SUFFIX));
-				list.append(plusLabel);
+			const letters = $('la-letters');
+			const shown = layouts
+				.filter(pickShows)
+				.sort((a, b) => folded(a.name).localeCompare(folded(b.name)) || a.id.localeCompare(b.id));
+			const groups = new Map();
+			for (const layout of shown) {
+				const letter = letterOf(layout);
+				if (!groups.has(letter)) groups.set(letter, []);
+				groups.get(letter).push(layout);
 			}
+			const sections = [];
+			const jumps = [];
+			for (const [letter, members] of groups) {
+				const id = `la-letter-${letter === LETTER_OTHER ? 'other' : letter}`;
+				const section = el('section', 'la-letter-group');
+				section.setAttribute('aria-labelledby', id);
+				const heading = el('h3', 'la-letter', letter);
+				heading.id = id;
+				heading.tabIndex = -1;
+				const items = el('ul', 'la-letter-items');
+				for (const layout of members) items.append(layoutItem(layout));
+				section.append(heading, items);
+				sections.push(section);
+				const jump = el('a', 'la-letter-jump', letter);
+				jump.href = `#${id}`;
+				jump.title = t('layout_analysis.layouts.jump', { letter });
+				jump.addEventListener('click', (event) => {
+					event.preventDefault();
+					heading.scrollIntoView({ block: 'start' });
+					const first = section.querySelector('input');
+					(first || heading).focus({ preventScroll: true });
+				});
+				jumps.push(jump);
+			}
+			list.replaceChildren(...sections);
+			letters.replaceChildren(...jumps);
+			letters.setAttribute('aria-label', t('layout_analysis.layouts.letters'));
+			letters.hidden = jumps.length < 2;
+			showPickCount(shown.length);
+		}
+
+		/** The live line under the search: how many layouts are shown and ticked. */
+		function showPickCount(shown) {
+			$('la-pick-count').textContent = t('layout_analysis.layouts.count', {
+				shown,
+				total: layouts.length,
+				selected: layouts.filter((layout) => state.selected.has(layout.id)).length
+			});
+		}
+
+		/** One layout of the list: its box and name, its family, its « + » twin. */
+		function layoutItem(layout) {
+			const item = el('li', 'la-layout-item');
+			const label = el('label', 'la-layout');
+			const box = el('input');
+			box.type = 'checkbox';
+			box.checked = state.selected.has(layout.id);
+			item.classList.toggle('la-picked', box.checked);
+			box.addEventListener('change', () => {
+				if (box.checked) state.selected.add(layout.id);
+				else state.selected.delete(layout.id);
+				item.classList.toggle('la-picked', box.checked);
+				chooseSelection();
+				save();
+				showPickCount(visibleLayoutIds().length);
+				analyse();
+			});
+			label.append(box, el('span', 'la-layout-name', layout.name));
+			const authors = Array.isArray(layout.authors) ? layout.authors.join(', ') : '';
+			// The authors beside the label, so the box is named by the layout alone.
+			item.append(label);
+			if (authors) item.append(el('span', 'la-layout-meta', authors));
+			// « + »: this layout also ranks as « <name>+ », typing the keys typed with
+			// the Ergopti+ hotstrings, while the others type the final text.
+			if (appliedTextMode() !== TEXT_MIXED) return item;
+			const plusLabel = el('label', 'la-plus');
+			const plus = el('input');
+			plus.type = 'checkbox';
+			plus.checked = state.plus.has(layout.id);
+			plus.disabled = !hasTwoTexts();
+			plusLabel.title = hasTwoTexts()
+				? t('layout_analysis.text_mode.plus_title', { layout: layout.name + PLUS_SUFFIX })
+				: t('layout_analysis.text_mode.one_text');
+			plus.addEventListener('change', () => {
+				if (plus.checked) state.plus.add(layout.id);
+				else state.plus.delete(layout.id);
+				save();
+				analyse();
+			});
+			plusLabel.append(plus, el('span', '', layout.name + PLUS_SUFFIX));
+			item.append(plusLabel);
+			return item;
 		}
 
 		// The file name a score settings export is saved under.
@@ -4498,6 +4591,18 @@
 				renderDetails();
 			});
 			$('la-share').addEventListener('click', share);
+			// Every layout or none, whatever the search shows.
+			for (const [id, tick] of [
+				['la-every', true],
+				['la-clear', false]
+			])
+				$(id).addEventListener('click', () => {
+					state.selected = tick ? new Set(layouts.map((l) => l.id)) : new Set();
+					chooseSelection();
+					save();
+					fillLayouts();
+					analyse();
+				});
 			$('la-all').addEventListener('click', () => {
 				for (const id of visibleLayoutIds()) state.selected.add(id);
 				chooseSelection();
