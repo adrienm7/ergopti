@@ -123,7 +123,7 @@ system's), kept in this browser and sent to each frame (frameTheme.js).
 	.studio-shell {
 		display: flex;
 		flex-direction: column;
-		height: calc(100dvh - var(--header-height) - var(--banner-height));
+		height: calc(100dvh - var(--header-offset) - var(--banner-height));
 		min-height: 480px;
 	}
 

@@ -311,11 +311,10 @@ function checkNoJustifiedText() {
 /**
  * The sticky header is at least --header-height tall and grows with the
  * text, so a box placed under it offsets by --header-offset, its measured
- * height (Header.svelte). Only the header itself reads the minimum; the
- * Studio shell is a known offender owned by another change, listed so the
- * list can only shrink.
+ * height (Header.svelte). Only the header itself reads the minimum; a new
+ * offender would be listed here, so the list can only shrink.
  */
-const HEADER_HEIGHT_PENDING = Object.freeze(['src/routes/studio/+layout.svelte']);
+const HEADER_HEIGHT_PENDING = Object.freeze([]);
 function checkHeaderOffset() {
 	const users = [];
 	const walk = (directory) => {
