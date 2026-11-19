@@ -84,10 +84,8 @@
 	function _appendLink(parent, label, url, options) {
 		var allowed = _allowedUrl(url, options);
 		if (!allowed || typeof options.open !== 'function') {
-			var span = document.createElement('span');
-			span.className = 'md-link-refused';
-			_parseInline(label, span, options, true);
-			parent.appendChild(span);
+			// A refused link is its label, read as the text around it.
+			_parseInline(label, parent, options, true);
 			return;
 		}
 		var anchor = document.createElement('a');

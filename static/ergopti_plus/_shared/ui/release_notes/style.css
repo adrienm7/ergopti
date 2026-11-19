@@ -129,10 +129,6 @@ body {
 	text-decoration-thickness: 2px;
 }
 
-#release-notes .md-link-refused {
-	color: inherit;
-}
-
 #release-notes table {
 	border-collapse: collapse;
 	margin: 0.4em 0;

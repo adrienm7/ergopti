@@ -1,12 +1,5 @@
 {
 	"files": {
-		"markdown.js": [
-			{
-				"tag": "span",
-				"count": 1,
-				"pending": true
-			}
-		],
 		"metrics_freshness.js": [
 			{
 				"tag": "div",
