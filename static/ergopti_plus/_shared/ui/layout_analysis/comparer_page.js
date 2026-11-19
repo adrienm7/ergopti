@@ -1868,7 +1868,14 @@
 				bar.style.left = '0%';
 				bar.style.width = `${3 + share * 97}%`;
 				track.append(bar);
-				const row = barRow(result.layout.name, track, value, undefined, result.layout.id);
+				// The cell says its unit to a screen reader; the chart's title says it on screen.
+				const row = barRow(
+					result.layout.name,
+					track,
+					value,
+					` ${t('layout_analysis.unit.points')}`,
+					result.layout.id
+				);
 				// The button's name starts with its visible text, the layout (WCAG 2.5.3).
 				rowName(row).setAttribute(
 					'aria-label',
