@@ -1771,3 +1771,19 @@ driver did not post itself); Shift, AltGr and Shift+AltGr (macOS: both Option
 keys) are level modifiers and never end it. One rule: `[typing_burst]` of
 `_shared/metrics/data/wpm_widget/constants.toml`, keys named by
 `KeyboardEvent.code` through `physical_keys.json`.
+
+## A glyph per hotstring category in the previews (2026-11-19)
+
+The preview tints sit at one lightness, so a colour-blind reader cannot tell
+the categories apart by tint. The maintainer chose a small glyph per category,
+not a text label: ✓ autocorrection, ✦ magic key and text expansion, ✎ the
+user's own hotstrings, • any other category. Each category declares `glyph`
+and `glyph_name_key` in its `[_meta]`; `defaults.toml [glyphs]` holds the
+personal and shared defaults, resolved by
+`_shared/hotstrings/engine/category_glyph.lua` (AHK port `category_glyph.ahk`,
+both pinned by `category_glyph_vectors.json`) on the tint's rungs. The glyph
+sits before the trigger label, in its font and colour (« ✓ ↵ »); the
+screen-reader notice reads its name; `hotstrings.preview_category_glyphs`
+(default on, three OS) hides it. A new glyph must come from a block that
+Segoe UI Symbol, the macOS system fonts and DejaVu Sans all draw (Dingbats,
+Geometric Shapes, General Punctuation).
