@@ -3011,7 +3011,9 @@
 			"disabled_when": [
 				"preview_colored_ready"
 			]
-		},
+		}
+	],
+	"preview_glyphs_control": [
 		{
 			"type": "check",
 			"id": "preview_category_glyphs",
@@ -4290,6 +4292,10 @@
 		{
 			"type": "list",
 			"id": "parameter_preview_colored"
+		},
+		{
+			"type": "list",
+			"id": "parameter_preview_glyphs"
 		}
 	],
 	"hotstrings_delays_frame": [

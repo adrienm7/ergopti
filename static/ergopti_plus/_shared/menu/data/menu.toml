@@ -2648,7 +2648,7 @@ disabled_when = ["preview_colored_ready"]
 
 # The category symbol beside each row's trigger label (2026-11-19): a style
 # switch like the colours, so it sits with them under the same separator.
-[[menu.preview_colored_control]]
+[[menu.preview_glyphs_control]]
 type = "check"
 id = "preview_category_glyphs"
 i18n = "menu.hotstrings.tooltip_glyphs"
@@ -3763,6 +3763,11 @@ type = "---"
 [[menu.hotstrings_preview_frame]]
 type = "list"
 id = "parameter_preview_colored"
+
+# Under the colours, its sibling style switch (2026-11-19).
+[[menu.hotstrings_preview_frame]]
+type = "list"
+id = "parameter_preview_glyphs"
 
 [[menu.hotstrings_delays_frame]]
 type = "list"
