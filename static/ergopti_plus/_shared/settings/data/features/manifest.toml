@@ -685,6 +685,20 @@ cleared = false
 type = "boolean"
 description_key = "menu.hotstrings.preview_colored_tooltips"
 
+# A symbol per category beside each preview row's trigger label, so a reader who
+# cannot tell the tints apart tells the categories apart (the maintainer chose a
+# glyph over a text label on 2026-11-19). On by default: it costs one character
+# and answers a contrast need the tint alone cannot.
+[[features.hotstrings]]
+id = "preview_category_glyphs"
+requires = { macos = [], linux = ["evdev", "uinput", "xdotool"], windows = [] }
+default = true
+recommended = true
+family = "setting"
+cleared = false
+type = "boolean"
+description_key = "menu.hotstrings.preview_category_glyphs"
+
 [[features.hotstrings]]
 id = "preview_star_enabled"
 requires = { macos = [], linux = ["evdev", "uinput", "xdotool"], windows = [] }

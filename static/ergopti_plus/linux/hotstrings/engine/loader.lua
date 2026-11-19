@@ -277,6 +277,10 @@ function M.load_catalogue(paths, options, prepared_sources, inverse_receipt)
 				delay          = tonumber(meta.delay),
 				show_tooltip   = meta.show_tooltip,
 				color          = meta.color,
+				-- The preview row's category symbol and its screen-reader name;
+				-- category_glyph.lua validates them where they are resolved.
+				glyph          = meta.glyph,
+				glyph_name_key = meta.glyph_name_key,
 				-- The file-level priority, kept rather than only folded into each
 				-- entry: the settings window shows it as the category's default, and
 				-- reading it back from an entry would report whatever the last one

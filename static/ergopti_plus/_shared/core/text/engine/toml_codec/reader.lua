@@ -633,6 +633,10 @@ local function parse_lines(lines)
 						result.meta.show_tooltip = val
 					elseif key == "priority" and type(val) == "number" then
 						result.meta.priority = val
+					elseif key == "glyph" or key == "glyph_name_key" then
+						-- Kept whatever its type: category_glyph.lua refuses a value
+						-- that is not one symbol, and the driver logs the refusal.
+						result.meta[key] = val
 					end
 				end
 

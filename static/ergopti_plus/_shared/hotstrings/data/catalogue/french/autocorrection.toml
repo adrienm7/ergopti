@@ -7,6 +7,11 @@
 
 [_meta]
 color = "#2e7d32"
+# The symbol a preview row shows beside its trigger label, so a reader who
+# cannot tell the tints apart still tells the categories apart; the key names it
+# for a screen reader (_shared/hotstrings/engine/category_glyph.lua).
+glyph = "✓"
+glyph_name_key = "hs_config.cat_autocorrection"
 delay = 0.5
 show_tooltip = true
 description = { fr = "Autocorrection", en = "Autocorrection", de = "Autokorrektur", es = "Autocorrección", zh = "自动纠错", ar = "تصحيح تلقائي", cs = "Automatická oprava", da = "Autokorrektur", he = "תיקון אוטומטי", hi = "स्वत: सुधार", it = "Correzione automatica", ja = "自動修正", ko = "자동 수정", nl = "Autocorrectie", no = "Autokorrektur", pl = "Autokorekta", pt = "Autocorreção", ru = "Автокоррекция", sv = "Autokorrigering", tr = "Otomatik düzeltme", uk = "Автовиправлення" }

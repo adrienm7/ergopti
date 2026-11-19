@@ -123,6 +123,9 @@ M.features = {
 		path = "hotstrings.preview_colored_tooltips", id = "preview_colored_tooltips", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_colored_tooltips", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting", cleared = false,
 	},
 	{
+		path = "hotstrings.preview_category_glyphs", id = "preview_category_glyphs", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_category_glyphs", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting", cleared = false,
+	},
+	{
 		path = "hotstrings.preview_star_enabled", id = "preview_star_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_star_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting", cleared = false,
 	},
 	{

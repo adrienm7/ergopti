@@ -2646,6 +2646,15 @@ i18n = "menu.hotstrings.tooltip_colored"
 checked_when = ["hotstrings.preview_colored_tooltips"]
 disabled_when = ["preview_colored_ready"]
 
+# The category symbol beside each row's trigger label (2026-11-19): a style
+# switch like the colours, so it sits with them under the same separator.
+[[menu.preview_colored_control]]
+type = "check"
+id = "preview_category_glyphs"
+i18n = "menu.hotstrings.tooltip_glyphs"
+checked_when = ["hotstrings.preview_category_glyphs"]
+disabled_when = ["preview_glyphs_ready"]
+
 # Preview presence keeps its existing position; native ports supply only the
 # current flag and the acknowledged toggle owner.
 [[menu.preview_magic_control]]

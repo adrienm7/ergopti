@@ -38,6 +38,8 @@
 --- nil explicitly, and that is the whole reason first_set() exists.
 --- ==============================================================================
 
+local CategoryGlyph = require("hotstrings.engine.category_glyph")
+
 local M = {}
 
 
@@ -80,7 +82,11 @@ end
 ---   default_color  string     Shared fallback colour.
 ---   category_color string|nil Per-category default colour, if the driver has one.
 ---   default_priority number   Source fallback collision priority.
---- @return table { delay, color, show_tooltip, priority, has_override }
+---   glyph_meta     table|nil  The category's [_meta] (glyph, glyph_name_key).
+---   category_glyph, category_glyph_name_key string|nil Per-category defaults.
+---   default_glyph, default_glyph_name_key   string     Shared defaults.
+--- @return table { delay, color, show_tooltip, priority, has_override, glyph,
+---   glyph_name_key, glyph_rejected }
 function M.resolve(inputs)
 	inputs = inputs or {}
 	local user_cat = inputs.user_category or {}
@@ -130,12 +136,25 @@ function M.resolve(inputs)
 		or user_cat.delay ~= nil or user_cat.color ~= nil or user_cat.show_tooltip ~= nil
 			or user_cat.priority ~= nil
 
+	-- The glyph walks the tint's TOML and default rungs, never a user one: the
+	-- settings window offers no glyph to override (category_glyph.lua).
+	local glyph = CategoryGlyph.resolve({
+		meta              = inputs.glyph_meta,
+		category_glyph    = inputs.category_glyph,
+		category_name_key = inputs.category_glyph_name_key,
+		default_glyph     = inputs.default_glyph,
+		default_name_key  = inputs.default_glyph_name_key,
+	})
+
 	return {
-		delay        = delay,
-		color        = color,
-		show_tooltip = show_tooltip,
-		priority     = priority,
-		has_override = has_override,
+		delay          = delay,
+		color          = color,
+		show_tooltip   = show_tooltip,
+		priority       = priority,
+		has_override   = has_override,
+		glyph          = glyph.glyph,
+		glyph_name_key = glyph.name_key,
+		glyph_rejected = glyph.rejected,
 	}
 end
 

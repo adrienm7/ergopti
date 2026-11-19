@@ -1,0 +1,92 @@
+{
+	"description": "Cross-driver contract of the hotstring category glyph resolver (_shared/hotstrings/engine/category_glyph.lua and windows/hotstrings/engine/catalogue/category_glyph.ahk). Each vector gives the category's [_meta] fields (omitted when unset), the per-category default (omitted when the category has none) and the expected glyph, name key and refused fields; the shared defaults apply to every vector. row_label vectors pin the label a preview row draws: the glyph, a space, then the trigger label.",
+	"defaults": {
+		"default_glyph": "•",
+		"default_name_key": "hs_config.cat_other"
+	},
+	"vectors": [
+		{
+			"id": "meta_declares_both",
+			"meta": { "glyph": "✓", "glyph_name_key": "hs_config.cat_autocorrection" },
+			"expected": { "glyph": "✓", "name_key": "hs_config.cat_autocorrection" }
+		},
+		{
+			"id": "meta_wins_over_category_default",
+			"meta": { "glyph": "★" },
+			"category_glyph": "✎",
+			"category_name_key": "hs_config.cat_personal",
+			"expected": { "glyph": "★", "name_key": "hs_config.cat_personal" }
+		},
+		{
+			"id": "category_default_when_meta_is_silent",
+			"meta": {},
+			"category_glyph": "✎",
+			"category_name_key": "hs_config.cat_personal",
+			"expected": { "glyph": "✎", "name_key": "hs_config.cat_personal" }
+		},
+		{
+			"id": "shared_default_when_nothing_is_declared",
+			"expected": { "glyph": "•", "name_key": "hs_config.cat_other" }
+		},
+		{
+			"id": "variation_selector_is_one_glyph",
+			"meta": { "glyph": "✓︎" },
+			"expected": { "glyph": "✓︎", "name_key": "hs_config.cat_other" }
+		},
+		{
+			"id": "astral_glyph_is_accepted",
+			"meta": { "glyph": "𝄞" },
+			"expected": { "glyph": "𝄞", "name_key": "hs_config.cat_other" }
+		},
+		{
+			"id": "a_word_is_refused",
+			"meta": { "glyph": "fix" },
+			"category_glyph": "✎",
+			"expected": {
+				"glyph": "✎",
+				"name_key": "hs_config.cat_other",
+				"rejected": { "glyph": "fix" }
+			}
+		},
+		{
+			"id": "whitespace_is_refused",
+			"meta": { "glyph": " " },
+			"expected": { "glyph": "•", "name_key": "hs_config.cat_other", "rejected": { "glyph": " " } }
+		},
+		{
+			"id": "a_glyph_with_a_space_is_refused",
+			"meta": { "glyph": "✓ " },
+			"expected": { "glyph": "•", "name_key": "hs_config.cat_other", "rejected": { "glyph": "✓ " } }
+		},
+		{
+			"id": "empty_glyph_is_refused",
+			"meta": { "glyph": "" },
+			"expected": { "glyph": "•", "name_key": "hs_config.cat_other", "rejected": { "glyph": "" } }
+		},
+		{
+			"id": "non_string_glyph_is_refused",
+			"meta": { "glyph": 7 },
+			"expected": { "glyph": "•", "name_key": "hs_config.cat_other", "rejected": { "glyph": 7 } }
+		},
+		{
+			"id": "malformed_name_key_is_refused",
+			"meta": { "glyph": "✓", "glyph_name_key": "Autocorrection" },
+			"expected": {
+				"glyph": "✓",
+				"name_key": "hs_config.cat_other",
+				"rejected": { "glyph_name_key": "Autocorrection" }
+			}
+		}
+	],
+	"row_label_vectors": [
+		{ "id": "glyph_and_trigger", "glyph": "✓", "trigger_label": "↵", "expected": "✓ ↵" },
+		{ "id": "glyph_only", "glyph": "✦", "trigger_label": "", "expected": "✦" },
+		{
+			"id": "trigger_only_when_glyphs_are_off",
+			"glyph": "",
+			"trigger_label": "★",
+			"expected": "★"
+		},
+		{ "id": "nothing", "glyph": "", "trigger_label": "", "expected": "" }
+	]
+}

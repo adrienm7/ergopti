@@ -44,6 +44,7 @@ local PublicationRecovery = require("hotstrings.engine.publication_recovery")
 -- once in AutoHotkey and the two had already drifted; the rule is the thing
 -- that must not differ, and where the override file lives is the thing that may.
 local DelayResolver = require("hotstrings.engine.delay_resolver")
+local CategoryGlyph = require("hotstrings.engine.category_glyph")
 local Languages = require("hotstrings.engine.languages")
 local HotstringPriority = require("hotstrings.engine.priority")
 local TextUtils = require("core.text.engine.utils_core")
@@ -74,6 +75,12 @@ local GLOBAL_DEFAULT_COLOR = nil
 -- from the shared canon by load_shared_defaults() — kept in one table so all
 -- per-category baselines stay visible in one place.
 local CATEGORY_DEFAULT_COLORS = {}
+
+-- The glyph a preview row shows beside its trigger label, and the i18n key that
+-- names it, when a category's [_meta] declares none; read from the same canon.
+local DEFAULT_GLYPH = nil
+local DEFAULT_GLYPH_NAME_KEY = nil
+local CATEGORY_DEFAULT_GLYPHS = {}
 
 -- =================================
 -- =================================
@@ -108,6 +115,18 @@ local function personal_section_metadata(meta, section)
 		return copy
 	end
 	return selected
+end
+
+--- Logs a glyph or glyph name a category TOML declares and the resolver
+--- refused: the row then shows the default, and the log says why.
+--- @param category string
+--- @param resolved table A DelayResolver.resolve() result.
+local function log_rejected_glyph(category, resolved)
+	if type(resolved.glyph_rejected) ~= "table" then return end
+	for field, value in pairs(resolved.glyph_rejected) do
+		Logger.warn(LOG, "Category '%s' declares %s = '%s', which is not one visible symbol or not an i18n key; "
+			.. "its preview shows the default instead.", tostring(category), field, tostring(value))
+	end
 end
 
 --- Returns the first non-nil argument. Module-level rather than a closure built
@@ -700,11 +719,13 @@ local function get_toml_meta(category)
 	end
 	for _, bound in ipairs(bound_sections(category, toml_path)) do sections[bound.name] = bound.meta end
 	cache[category] = {
-		delay        = parsed.meta.delay,
-		color        = parsed.meta.color,
-		show_tooltip = parsed.meta.show_tooltip,
-		priority     = parsed.meta.priority,
-		sections     = sections,
+		delay          = parsed.meta.delay,
+		color          = parsed.meta.color,
+		show_tooltip   = parsed.meta.show_tooltip,
+		priority       = parsed.meta.priority,
+		glyph          = parsed.meta.glyph,
+		glyph_name_key = parsed.meta.glyph_name_key,
+		sections       = sections,
 	}
 	return cache[category]
 end
@@ -966,7 +987,13 @@ function M.resolve(category, section)
 		default_color  = GLOBAL_DEFAULT_COLOR,
 		category_color = CATEGORY_DEFAULT_COLORS[category],
 		default_priority = HotstringPriority.source_priority(category),
+		glyph_meta     = meta,
+		category_glyph = (CATEGORY_DEFAULT_GLYPHS[category] or {}).glyph,
+		category_glyph_name_key = (CATEGORY_DEFAULT_GLYPHS[category] or {}).name_key,
+		default_glyph  = DEFAULT_GLYPH,
+		default_glyph_name_key = DEFAULT_GLYPH_NAME_KEY,
 	})
+	log_rejected_glyph(category, resolved)
 	if _state.resolve_cache then _state.resolve_cache[cache_key] = resolved end
 	return resolved
 end
@@ -1060,11 +1087,13 @@ function M.resolve_ext(ext_id, toml_path, section)
 		local ok, parsed, committed = pcall(TomlReader.parse, toml_path)
 		if ok and committed == true and type(parsed) == "table" then
 			_state.toml_cache[cache_key] = {
-				delay        = parsed.meta and parsed.meta.delay,
-				color        = parsed.meta and parsed.meta.color,
-				show_tooltip = parsed.meta and parsed.meta.show_tooltip,
-				priority     = parsed.meta and parsed.meta.priority,
-				sections     = (parsed.meta and parsed.meta.sections) or {},
+				delay          = parsed.meta and parsed.meta.delay,
+				color          = parsed.meta and parsed.meta.color,
+				show_tooltip   = parsed.meta and parsed.meta.show_tooltip,
+				priority       = parsed.meta and parsed.meta.priority,
+				glyph          = parsed.meta and parsed.meta.glyph,
+				glyph_name_key = parsed.meta and parsed.meta.glyph_name_key,
+				sections       = (parsed.meta and parsed.meta.sections) or {},
 			}
 		else
 			Logger.error(LOG, "Extension TOML read did not commit: '%s'.", toml_path)
@@ -1076,7 +1105,7 @@ function M.resolve_ext(ext_id, toml_path, section)
 	local meta     = _state.toml_cache[cache_key]
 	local meta_sec = requested_section and meta.sections[requested_section] or nil
 
-	return DelayResolver.resolve({
+	local resolved = DelayResolver.resolve({
 		user_category = user_resolution_entry(user),
 		user_section = user_resolution_entry(user_sec),
 		meta_category = sanitized_resolution_entry(meta),
@@ -1084,7 +1113,12 @@ function M.resolve_ext(ext_id, toml_path, section)
 		default_delay = base_delay(),
 		default_color = GLOBAL_DEFAULT_COLOR,
 		default_priority = HotstringPriority.source_priority(override_key),
+		glyph_meta = meta,
+		default_glyph = DEFAULT_GLYPH,
+		default_glyph_name_key = DEFAULT_GLYPH_NAME_KEY,
 	})
+	log_rejected_glyph(override_key, resolved)
+	return resolved
 end
 
 --- Moves the delays of earlier builds to the stored form, once the base expansion
@@ -1673,6 +1707,16 @@ local function load_shared_defaults()
 	GLOBAL_DEFAULT_DELAY             = tonumber(require("menu.engine.manifest_reader").default_for(ConfigKeys.KEY.HOTSTRINGS_EXPANSION_DELAY))
 	GLOBAL_DEFAULT_COLOR             = require_key("colors", "global_default")
 	CATEGORY_DEFAULT_COLORS.personal = require_key("colors", "personal")
+	DEFAULT_GLYPH                    = require_key("glyphs", "global_default")
+	DEFAULT_GLYPH_NAME_KEY           = require_key("glyphs", "global_default_name_key")
+	CATEGORY_DEFAULT_GLYPHS.personal = {
+		glyph = require_key("glyphs", "personal"), name_key = require_key("glyphs", "personal_name_key") }
+	for _, entry in ipairs({ { glyph = DEFAULT_GLYPH, name_key = DEFAULT_GLYPH_NAME_KEY }, CATEGORY_DEFAULT_GLYPHS.personal }) do
+		if not CategoryGlyph.is_glyph(entry.glyph) or not CategoryGlyph.is_name_key(entry.name_key) then
+			error(string.format("[hotstrings_config] [glyphs] in %s holds an invalid glyph or name key: '%s', '%s'",
+				toml_path, tostring(entry.glyph), tostring(entry.name_key)))
+		end
+	end
 
 	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then
 		error("[hotstrings_config] hotstrings.expansion_delay must be a number in the feature manifest")

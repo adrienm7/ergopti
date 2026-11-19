@@ -33,6 +33,7 @@ local Shell = require("core.process.adapters.shell_runner")
 local Writer = require("core.text.engine.toml_codec.writer")
 local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
 local DelayResolver = require("hotstrings.engine.delay_resolver")
+local CategoryGlyph = require("hotstrings.engine.category_glyph")
 local Priority = require("hotstrings.engine.priority")
 local Extensions = require("hotstrings.engine.extensions")
 local ConfigPaths = require("settings.engine.paths")
@@ -336,6 +337,11 @@ local GLOBAL_DEFAULT_COLOR = nil
 -- macOS bridge, equal by coincidence to the personal category's colour.
 local NEUTRAL_COLOR = nil
 local CATEGORY_DEFAULT_COLORS = {}
+-- The preview row's category symbol, and the i18n key that names it, for a
+-- category whose [_meta] declares none; read from the same canon.
+local DEFAULT_GLYPH = nil
+local DEFAULT_GLYPH_NAME_KEY = nil
+local CATEGORY_DEFAULT_GLYPHS = {}
 
 --- Loads _shared/hotstrings/data/catalogue/defaults.toml, or raises.
 ---
@@ -366,6 +372,16 @@ local function load_shared_defaults()
 	GLOBAL_DEFAULT_COLOR = require_key("colors", "global_default")
 	NEUTRAL_COLOR        = require_key("colors", "neutral")
 	CATEGORY_DEFAULT_COLORS.personal = require_key("colors", "personal")
+	DEFAULT_GLYPH          = require_key("glyphs", "global_default")
+	DEFAULT_GLYPH_NAME_KEY = require_key("glyphs", "global_default_name_key")
+	CATEGORY_DEFAULT_GLYPHS.personal = {
+		glyph = require_key("glyphs", "personal"), name_key = require_key("glyphs", "personal_name_key") }
+	for _, entry in ipairs({ { glyph = DEFAULT_GLYPH, name_key = DEFAULT_GLYPH_NAME_KEY }, CATEGORY_DEFAULT_GLYPHS.personal }) do
+		if not CategoryGlyph.is_glyph(entry.glyph) or not CategoryGlyph.is_name_key(entry.name_key) then
+			error(string.format("[hotstrings_config] [glyphs] in %s holds an invalid glyph or name key: '%s', '%s'",
+				path, tostring(entry.glyph), tostring(entry.name_key)))
+		end
+	end
 
 	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then
 		error("[hotstrings_config] hotstrings.expansion_delay must be a number in the feature manifest")
@@ -800,7 +816,18 @@ function M.resolve(category, section)
 		default_color  = GLOBAL_DEFAULT_COLOR,
 		category_color = CATEGORY_DEFAULT_COLORS[category],
 		default_priority = Priority.source_priority(category),
+		glyph_meta     = meta,
+		category_glyph = (CATEGORY_DEFAULT_GLYPHS[category] or {}).glyph,
+		category_glyph_name_key = (CATEGORY_DEFAULT_GLYPHS[category] or {}).name_key,
+		default_glyph  = DEFAULT_GLYPH,
+		default_glyph_name_key = DEFAULT_GLYPH_NAME_KEY,
 	})
+	-- A glyph the category's TOML declares and the resolver refused: the row
+	-- shows the default, and the log says why. Once per resolve-cache fill.
+	for field, value in pairs(resolved.glyph_rejected or {}) do
+		Logger.warn(LOG, "Category '%s' declares %s = '%s', which is not one visible symbol or not an i18n key; "
+			.. "its preview shows the default instead.", tostring(category), field, tostring(value))
+	end
 	_resolve_cache[key] = resolved
 	return resolved
 end

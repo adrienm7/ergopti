@@ -223,6 +223,7 @@ content = ['["\x27]xdotool[ "\x27]']
 "core/ui/ui/tooltip/preview.lua" = [
 	"hotstrings.preview_ai_enabled",
 	"hotstrings.preview_autocorrect_enabled",
+	"hotstrings.preview_category_glyphs",
 	"hotstrings.preview_colored_tooltips",
 	"hotstrings.preview_star_enabled",
 	"llm.display.*",

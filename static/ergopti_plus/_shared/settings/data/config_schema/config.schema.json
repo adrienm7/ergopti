@@ -140,6 +140,7 @@
 				"expansion_delay": { "type": "number", "minimum": 0, "maximum": 3600 },
 				"preview_ai_enabled": { "type": "boolean" },
 				"preview_autocorrect_enabled": { "type": "boolean" },
+				"preview_category_glyphs": { "type": "boolean" },
 				"preview_colored_tooltips": { "type": "boolean" },
 				"preview_star_enabled": { "type": "boolean" },
 				"order_overrides": {

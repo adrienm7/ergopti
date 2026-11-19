@@ -309,6 +309,21 @@
 		"reason": null
 	},
 	{
+		"path": "hotstrings.preview_category_glyphs",
+		"family": "setting",
+		"labels": {
+			"fr": "hotstrings.preview_category_glyphs",
+			"en": "hotstrings.preview_category_glyphs"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null,
+		"reason": null
+	},
+	{
 		"path": "hotstrings.preview_star_enabled",
 		"family": "setting",
 		"labels": {

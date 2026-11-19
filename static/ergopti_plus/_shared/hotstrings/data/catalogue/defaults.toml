@@ -5,7 +5,8 @@
 # DESCRIPTION:
 # Single source of truth for the hard fallback values used by the hotstring
 # config resolver when neither a user override, the section's manifest row nor a
-# category/section TOML `[_meta]` declares a delay or color. Both drivers read this file at boot:
+# category/section TOML `[_meta]` declares a delay, color or glyph. Every driver
+# reads this file at boot (Linux: hotstrings/engine/catalogue/config.lua too):
 #   AHK         — hotstrings/engine/catalogue/config.ahk
 #                 (HotstringsConfigLoadSharedDefaults, fail-fast).
 #   Hammerspoon — hotstrings/engine/catalogue/config.lua (load_shared_defaults, fail-fast).
@@ -51,7 +52,33 @@ neutral = "#6e6e73"
 
 # =========================
 # =========================
-# ======= 2/ Delays =======
+# ======= 2/ Glyphs =======
+# =========================
+# =========================
+
+[glyphs]
+
+# The symbol a preview row shows beside its trigger label, so a reader who
+# cannot tell the tints apart still tells the categories apart (the
+# maintainer's decision of 2026-11-19). A category declares its own as
+# `glyph` and `glyph_name_key` in its [_meta]; these are the values a category
+# that declares none falls to, through _shared/hotstrings/engine/category_glyph.lua.
+# Each glyph is from the Dingbats or General Punctuation block, which Segoe UI
+# Symbol (linked behind Segoe UI on Windows), the macOS system fonts and DejaVu
+# Sans (Linux) all draw.
+global_default = "•"
+global_default_name_key = "hs_config.cat_other"
+
+# The user's own hotstrings: a pencil, written by the user.
+personal = "✎"
+personal_name_key = "hs_config.cat_personal"
+
+
+
+
+# =========================
+# =========================
+# ======= 3/ Delays =======
 # =========================
 # =========================
 

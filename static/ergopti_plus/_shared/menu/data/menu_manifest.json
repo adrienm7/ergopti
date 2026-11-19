@@ -3011,6 +3011,17 @@
 			"disabled_when": [
 				"preview_colored_ready"
 			]
+		},
+		{
+			"type": "check",
+			"id": "preview_category_glyphs",
+			"i18n": "menu.hotstrings.tooltip_glyphs",
+			"checked_when": [
+				"hotstrings.preview_category_glyphs"
+			],
+			"disabled_when": [
+				"preview_glyphs_ready"
+			]
 		}
 	],
 	"preview_magic_control": [

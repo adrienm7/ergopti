@@ -648,6 +648,7 @@ return {
 	"tests.unit.hotstrings.engine.menu.test_skeleton",
 	"tests.unit.hotstrings.engine.catalogue.test_scope_overrides",
 	"tests.unit.hotstrings.engine.catalogue.test_override_parser",
+	"tests.unit.hotstrings.engine.catalogue.test_category_glyph",
 	"tests.unit.hotstrings.engine.injector.test_caps_lock",
 	"tests.unit.hotstrings.engine.injector.test_erase_pacing",
 	"tests.unit.hotstrings.engine.injector.test_held_terminator",
