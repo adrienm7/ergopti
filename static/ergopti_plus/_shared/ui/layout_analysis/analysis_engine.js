@@ -6512,6 +6512,7 @@ var LAYOUT_ANALYSIS = (function () {
 		KEY_METRICS,
 		WORD_TABLE_SIZE,
 		WORD_EFFORT_METRICS,
+		SFS_DISTANCE_SHARE,
 		hashText,
 		keyboard,
 		fingeringProfile,

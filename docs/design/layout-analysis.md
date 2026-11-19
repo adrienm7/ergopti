@@ -798,10 +798,11 @@ Shipped as of 2026-11-14:
   `prune_ratio` of their table (5e-8) and refuses a table when any metric of
   QWERTY, AZERTY, BÉPO, Ergopti, Dvorak, Colemak or Ergo-L measured on the
   pruned counts differs from the full counts by more than 0.05 (percentage
-  points for shares); the largest change, recorded in `prune_check`, is
-  0.037. Leipzig offers no larger download than a million sentences for
-  these corpora, and the tables are bounded by their pruning, not by the
-  corpus size. Not imported, waiting for the maintainer (TODO.md, « Maintainer
+  points for shares, and for `sfb_distance` in the points of the same-finger
+  shares it weighs: its change divided by its mean travel); the largest
+  change, recorded in `prune_check`, is 0.037. Leipzig offers no larger
+  download than a million sentences for these corpora, and the tables are
+  bounded by their pruning, not by the corpus size. Not imported, waiting for the maintainer (TODO.md, « Maintainer
   decisions pending »): Norvig's counts (derived from the LDC-licensed Google
   Web 1T, no licence for the data) and Tatoeba's full exports as counts
   (CC BY 2.0 FR asks each sentence's author to be credited).

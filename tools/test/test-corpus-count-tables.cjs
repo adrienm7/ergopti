@@ -301,6 +301,59 @@ let checks = 0;
 	assert(kept.max_metric_change <= Import.PRUNE_TOLERANCE, `light pruning changed ${kept.at}`);
 	const harsh = Import.pruneDeviation(engine, counts, Import.prune(counts, 1e-4).tables);
 	assert(harsh.max_metric_change > Import.PRUNE_TOLERANCE, 'a harsh floor is caught');
+	// One n-gram too many: the light tables less BÉPO's most frequent
+	// same-finger bigram (found as the first bigram that alone is an SFB).
+	const library = new Map(engine.libraryLayouts().map((layout) => [layout.id, layout]));
+	const bepo = library.get('bepo');
+	const alone = (bigram) =>
+		engine.analyse(bepo, { chars: {}, bigrams: { [bigram]: 1 }, trigrams: {} }, {}).metrics;
+	const sfbIndex = light.bigrams.findIndex(([bigram]) => alone(bigram).sfb_distance > 0);
+	assert(sfbIndex >= 0, 'the light tables keep a BÉPO same-finger bigram');
+	const short = { ...light, bigrams: light.bigrams.filter((_, i) => i !== sfbIndex) };
+	const before = engine.analyse(bepo, engine.prepareNgrams(counts), {}).metrics;
+	const after = engine.analyse(
+		bepo,
+		engine.prepareNgrams(
+			Object.fromEntries(
+				Object.entries(short).map(([name, rows]) => [name, Object.fromEntries(rows)])
+			)
+		),
+		{}
+	).metrics;
+	assert(
+		Import.pruneChange(engine, 'sfb_distance', before, after) > Import.PRUNE_TOLERANCE,
+		`dropping ${light.bigrams[sfbIndex][0]} is caught by sfb_distance`
+	);
+	assert(
+		Import.pruneDeviation(engine, counts, short).max_metric_change > Import.PRUNE_TOLERANCE,
+		'one n-gram too many is caught'
+	);
+	checks++;
+}
+
+// sfb_distance's change is read in the points of the same-finger shares it
+// weighs: its mean travel per same-finger n-gram converts it; a share stays.
+{
+	const engine = Import.engineWithLibrary();
+	const share = engine.SFS_DISTANCE_SHARE;
+	assert(share > 0 && share < 1, 'the engine names the skipgram share of sfb_distance');
+	// 2 SFB points and 4 SFS points weigh 2 + share × 4 points of travel.
+	const points = 2 + share * 4;
+	const before = { sfb: 2, sfs: 4, sfb_distance: 60 * points, pinky_ring: 1 };
+	const after = { sfb: 1.9, sfs: 4, sfb_distance: 60 * points - 6, pinky_ring: 0.9 };
+	assert.equal(Import.pruneChange(engine, 'sfb_distance', before, after), 6 / 60);
+	assert(Math.abs(Import.pruneChange(engine, 'pinky_ring', before, after) - 0.1) < 1e-12);
+	assert.equal(Import.pruneChange(engine, 'sfb_distance', before, before), 0);
+	assert.throws(
+		() =>
+			Import.pruneChange(
+				engine,
+				'sfb_distance',
+				{ sfb: 0, sfs: 0, sfb_distance: 0 },
+				{ sfb: 0, sfs: 0, sfb_distance: 1 }
+			),
+		/mean travel/
+	);
 	checks++;
 }
 

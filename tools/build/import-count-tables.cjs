@@ -75,9 +75,13 @@ const LINES_PER_CHUNK = 20000;
 // one on French) has metrics over a handful of n-grams, which no table needs.
 const PRUNE_CHECK_LAYOUTS = ['qwerty', 'azerty', 'bepo', 'ergopti', 'dvorak', 'colemak', 'ergol'];
 // The largest change pruning may make to any metric of those layouts, in the
-// metric's own unit (percentage points for the shares). A metric is shown
-// with one decimal; 0.05 never moves it by more than one rounding step.
+// metric's own unit (percentage points for the shares, millimetres for the
+// distance per character), except sfb_distance, which is compared in the
+// points of the same-finger shares it weighs (pruneChange). 0.05 never moves
+// a value read to one decimal by more than one rounding step.
 const PRUNE_TOLERANCE = 0.05;
+// The metric that weighs each same-finger bigram and skipgram by its travel.
+const SAME_FINGER_TRAVEL = 'sfb_distance';
 
 /** Exits with a reason. */
 function fail(message) {
@@ -477,6 +481,30 @@ function engineWithLibrary() {
 }
 
 /**
+ * A metric's change from pruning, in the unit PRUNE_TOLERANCE bounds.
+ * sfb_distance is the SFB share plus SFS_DISTANCE_SHARE of the SFS share,
+ * each n-gram weighted by its travel: pruning those n-grams moves it as it
+ * moves the shares, times their mean travel, so its change divided by that
+ * mean travel is in the shares' percentage points. The thumb SFBs count in
+ * the share with no travel: the mean travel is then lower, the check
+ * stricter. Every other metric is compared in its own unit.
+ * @param {object} engine - LAYOUT_ANALYSIS.
+ * @param {string} metric - A METRICS id.
+ * @param {object} before - The metrics on the full counts.
+ * @param {object} after - The metrics on the pruned counts.
+ * @returns {number} The change.
+ * @throws {Error} When sfb_distance changes while the full counts give it no travel.
+ */
+function pruneChange(engine, metric, before, after) {
+	const change = Math.abs(before[metric] - after[metric]);
+	if (metric !== SAME_FINGER_TRAVEL || change === 0) return change;
+	const travel = before[metric] / (before.sfb + engine.SFS_DISTANCE_SHARE * before.sfs);
+	if (!(travel > 0) || !Number.isFinite(travel))
+		throw new Error(`${metric} changes by ${change} with a mean travel of ${travel}`);
+	return change / travel;
+}
+
+/**
  * The largest change pruning makes to a metric of the check layouts.
  * @param {object} engine - LAYOUT_ANALYSIS with its library.
  * @param {object} counts - The full counts.
@@ -496,8 +524,8 @@ function pruneDeviation(engine, counts, tables) {
 		if (!layout) throw new Error(`the layout library has no ${id}`);
 		const before = engine.analyse(layout, full, {}).metrics;
 		const after = engine.analyse(layout, kept, {}).metrics;
-		for (const [metric, value] of Object.entries(before)) {
-			const change = Math.abs(value - after[metric]);
+		for (const metric of Object.keys(before)) {
+			const change = pruneChange(engine, metric, before, after);
 			if (!Number.isFinite(change)) throw new Error(`${id} ${metric} is not finite`);
 			if (change > worst.max_metric_change)
 				worst = { max_metric_change: change, at: `${id} ${metric}` };
@@ -648,6 +676,7 @@ module.exports = {
 	lexiqueCounts,
 	repairMojibake,
 	prune,
+	pruneChange,
 	pruneDeviation,
 	engineWithLibrary,
 	tableText,
