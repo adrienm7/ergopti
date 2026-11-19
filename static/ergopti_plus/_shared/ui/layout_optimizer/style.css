@@ -600,9 +600,10 @@ body:has(> main.layout-optimizer) {
 	position: absolute;
 }
 
+/* White text sits on the fill accent, the one made for it (theme.css). */
 .layout-optimizer .lo-key.lo-marked {
-	background: var(--lo-accent);
-	border-color: var(--lo-accent);
+	background: var(--theme-accent-fill);
+	border-color: var(--theme-accent-fill);
 	color: var(--theme-white);
 }
 

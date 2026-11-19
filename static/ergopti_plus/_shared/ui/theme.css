@@ -258,7 +258,9 @@
 		--theme-separator: var(--theme-gray4-dark);
 		--theme-text: #fff;
 		--theme-sub: rgba(235, 235, 245, 0.6);
-		--theme-accent: var(--theme-blue-dark);
+		/* Read as text on the dark surfaces: 5.1:1 on the surface and 5.6:1 on
+		   the second one, where the Apple blue gives 3.8:1 and 4.3:1 (WCAG 1.4.3). */
+		--theme-accent: var(--theme-hue-4a9eff);
 		--theme-accent-soft: rgba(10, 132, 255, 0.22);
 		--theme-danger: var(--theme-red-dark);
 	}
@@ -271,7 +273,8 @@
 	--theme-separator: var(--theme-gray4-dark);
 	--theme-text: #fff;
 	--theme-sub: rgba(235, 235, 245, 0.6);
-	--theme-accent: var(--theme-blue-dark);
+	/* The dark accent of the system appearance above, chosen in the settings. */
+	--theme-accent: var(--theme-hue-4a9eff);
 	--theme-accent-soft: rgba(10, 132, 255, 0.22);
 	--theme-danger: var(--theme-red-dark);
 }
