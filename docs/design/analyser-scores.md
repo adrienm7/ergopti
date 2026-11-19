@@ -363,20 +363,35 @@ r·skip1 + r²·skip2 + r³·skip3)` (r = 1/7) times the distance and 5.5 / fing
   the keyboard is `ortho` (its default layouts).
 - **Fidelity: close.** Measured against the real REPL (built from 5a85ca0, its
   default weights, `analyze` on its ortho layouts) on four of our texts
-  (_Alice_, _Sherlock Holmes_, English Wikipedia, Python code) and _Swann_
-  (French), 18 layouts whose letter block our library shares: Score within
-  0.0044 on average, 0.012 at most (72 points of the four English texts and
-  code; _Swann_ within 0.010). Two approximations remain, both measured by
-  feeding the scorer exact token tables built from the text: the tables hold
-  no skip-2 or skip-3 grams, so skip-1 stands for them (about 0.002), and
-  Oxeylyzer stores each count as a share of its table and reads it back
-  truncated, often one lower (about 0.001; reproduced exactly on short texts).
-  The Shift token after a dropped character (a capital starting a word) was
-  missing from the totals and the skipgrams through Shift were missing; with
-  them the gap went from 0.0057 on average (0.028 at most, Canary) to 0.0044.
+  (_Alice_, _Sherlock Holmes_, English Wikipedia, Python code), 18 layouts
+  whose letter block our library shares (72 points): Score within 0.0032 on
+  average, 0.012 at most; per statistic (points of its own percentages) SFB
+  0.003 (0.010 at most), finger speed 0.03 (0.08), stretches 0.04 (0.15),
+  rolls 0.07 (0.21), alternates 0.09 (0.29), redirects 0.02 (0.06), bad
+  redirects 0.002 (0.015). The text is read whole: Shift is held across any
+  run of dropped characters, line breaks included (exact across one, carried
+  by the trigrams' second-order chain across longer runs: blank lines,
+  indentation), so its token totals come within a few counts of its own
+  (_Alice_: 121 146.4 characters for its 121 144, 68 326.5 trigrams for its
+  68 337). Two approximations remain. The tables hold no skip-2 or skip-3
+  grams, so skip-1 stands for them (about 0.002 on the score). Oxeylyzer saves
+  each count as a share of its table and reads it back truncated: whether a
+  count loses one depends on the bits of the table's exact total, from 7 % of
+  the n-grams to 73 % (its trigrams of the Python text), so a total the chain
+  only estimates gives each count its mean loss over the 129 totals around
+  ours; a whole total (the chain was exact, as on short texts) is followed
+  exactly. That loss is the whole gap left on the trigram statistics of the
+  code text (its rolls 1.1 % high relative). Before 2026-11-19 (Shift held
+  across one dropped character at most, line breaks cutting the text, no
+  truncation): Score within 0.0044 on average, SFB 0.007 (0.03), stretches
+  0.08 (0.30). Before that, the Shift token after a dropped character (a
+  capital starting a word) was missing from the totals and the skipgrams
+  through Shift were missing: 0.0057 on average (0.028 at most, Canary).
   Gate: hand-computed from the source (`the` 0.1333, `decided` −6.3314 on
   the staggered board, −6.0214 on ortho) and the REPL's own output on short
-  texts with capitals (`dEd` −2.28, `A Dog ran` 0.174, `sat. A Dog` −0.2).
+  texts with capitals (`dEd` −2.28, `A Dog ran` 0.174, `sat. A Dog` −0.2) and
+  with Shift held across line breaks (QWERTY 0.264, Colemak 0.206; 0.251 and
+  0.196 before).
   Our library's Halmak is not Oxeylyzer's (an ANSI board, 11 columns).
 
 ### Keyboard Layout Optimizer (dariogoetz)
@@ -490,10 +505,22 @@ r·skip1 + r²·skip2 + r³·skip3)` (r = 1/7) times the distance and 5.5 / fing
   words, which a table holds whole: a word starts at y as often as y is not
   preceded by a letter of its word, and a one-character word is counted by
   inclusion and exclusion.
-- **Fidelity: exact.** See « Checking against the real tools ». One slip of
-  the worker is not followed: a bigram with a character the layout lacks reads
-  the previous bigram's key, which depends on the order of its table; we skip
-  that bigram.
+- **Fidelity: exact.** Measured against its own code (`getCharacters` of
+  `optimiser.js`, `calculateMetrics` of `worker.js` and its score sum, run in a
+  vm context) on the word lists of _Alice_, _Sherlock Holmes_, English
+  Wikipedia, Python code and _Germinal_ and on its own English list, with 10
+  library layouts (60 points): SFB, its pinky and ring shares, pinky–ring
+  scissors, skipgrams, effort, vowels and hand balance identical to 1e-9.
+  One slip of its worker is not followed: a bigram with a character the
+  layout lacks reads the previous bigram's key (an order-dependent stale
+  value), which counts phantom scissors and lateral stretches; we skip that
+  bigram. With that slip, Score within 0.79 % on average, 3.7 % at most (code,
+  where brackets and digits are missing from the 30-key grid; 0.08 % on its
+  own English list); scissors, wide scissors and LSB are the only parts that
+  differ. With the tool's bigrams of a missing character left out first, every
+  point is within 1e-9. Gate: its own output on five texts (a pangram and a
+  repeated sentence above and below its trigram threshold) on QWERTY,
+  Colemak-DH, Dvorak and Ergopti, to 1e-9.
 
 ## Checking against the real tools
 
@@ -508,16 +535,21 @@ corpus texts; with `--genkey=<exe> --genkey-data=<its source folder>` and
 keygen; with `--perl=<exe> --carpalx-data=<its source folder>` (and
 `--carpalx-perl5lib` for the Perl modules it needs), carpalx itself; with
 `--klo=<evaluate exe> --klo-data=<its source folder>`, Keyboard Layout
-Optimizer (KLO in the table). Measured on 2026-11-18:
+Optimizer (KLO in the table); with `--cyanophage=<folder with its optimiser.js,
+worker.js and words-english.json>`, the Cyanophage optimiser's own code. Each
+tool that prints sub-scores is also compared metric by metric (the figures
+quoted in each section above). Measured on 2026-11-18, and on 2026-11-19 for
+Oxeylyzer, genkey and Cyanophage:
 
-| Analyser  | Points | Mean gap                                | Largest      |
-| --------- | ------ | --------------------------------------- | ------------ |
-| KLAnext   | 126    | 0.0024 (its definitions), 0.18 % (ours) | 0.005, 2.5 % |
-| Oxeylyzer | 72     | 0.0044                                  | 0.012        |
-| genkey    | 140    | 1.4 % (5.5 % before)                    | 9.9 %        |
-| keygen    | 85     | 0.11 % (its), 0.09 % (ours)             | 0.34 %       |
-| carpalx   | 50     | 0.31 % (1.2 % before)                   | 1.2 %        |
-| KLO       | 40     | < 1e-6 % (5.5 % before)                 | < 1e-6 %     |
+| Analyser   | Points | Mean gap                                | Largest      |
+| ---------- | ------ | --------------------------------------- | ------------ |
+| KLAnext    | 126    | 0.0024 (its definitions), 0.18 % (ours) | 0.005, 2.5 % |
+| Oxeylyzer  | 72     | 0.0032 (0.0044 before)                  | 0.012        |
+| genkey     | 140    | 1.3 % (1.4 % and 5.5 % before)          | 8.3 %        |
+| keygen     | 85     | 0.11 % (its), 0.09 % (ours)             | 0.34 %       |
+| carpalx    | 50     | 0.31 % (1.2 % before)                   | 1.2 %        |
+| KLO        | 40     | < 1e-6 % (5.5 % before)                 | < 1e-6 %     |
+| Cyanophage | 60     | 0.79 %; 1e-9 without its slip           | 3.7 %        |
 
 cmini and a200 (Python, `--python=<exe>` with `--cmini-data=<its folder>` or
 `--a200-data=<its app folder>`) needed no change: every statistic within

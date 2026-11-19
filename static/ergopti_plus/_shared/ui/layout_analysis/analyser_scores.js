@@ -1425,18 +1425,71 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		return null;
 	}
 
+	// The chain below stops once a pass moves the held counts by less than this
+	// share of the corpus's characters: below a double's precision on a count.
+	const HELD_SHIFT_PRECISION = 1e-12;
+	// Oxeylyzer's saved counts: the totals around ours over which a count's
+	// truncation loss is averaged. Our token totals came within a few tens of
+	// its own on the texts measured; a wider window changes the mean loss by
+	// less than 1 %.
+	const HELD_TOTAL_WINDOW = 64;
+
+	/**
+	 * For Oxeylyzer's cleaner, the share of each bigram (a, b) whose last kept
+	 * character at or before a is shifted, so that a capital at b holds Shift
+	 * and writes no Shift token. Exact when a is kept or one dropped character
+	 * follows a kept one; across longer runs of dropped characters, carried by
+	 * the trigrams' second-order chain, H(a b) = Σw T(w a b) · H(w a) / B(w a),
+	 * iterated to its fixed point (a run of spaces loops on itself).
+	 * @param {{uni: Array, bi: Array, tri: Array}} all - Every n-gram of the text.
+	 * @param {Function} of - Character → its Oxeylyzer token, null if dropped.
+	 * @returns {Function} (a, b) → share from 0 to 1.
+	 */
+	function oxeyHeldShift(all, of) {
+		const count = new Map();
+		let total = 0;
+		for (const [, n] of all.uni) total += n;
+		for (const [a, b, n] of all.bi) count.set(a + b, (count.get(a + b) || 0) + n);
+		const after = all.tri.filter(([, m]) => of(m) === null);
+		let held = new Map();
+		const shareOf = (map, a, b) => {
+			const t = of(a);
+			if (t) return t.shift ? 1 : 0;
+			const c = count.get(a + b);
+			return c ? (map.get(a + b) || 0) / c : 0;
+		};
+		for (;;) {
+			const next = new Map();
+			for (const [w, a, b, n] of after) {
+				const r = shareOf(held, w, a);
+				if (r > 0) next.set(a + b, (next.get(a + b) || 0) + n * r);
+			}
+			let moved = 0;
+			for (const [key, n] of next) moved += Math.abs(n - (held.get(key) || 0));
+			for (const [key, n] of held) if (!next.has(key)) moved += n;
+			held = next;
+			if (moved <= HELD_SHIFT_PRECISION * total) break;
+		}
+		return (a, b) => shareOf(held, a, b);
+	}
+
 	/**
 	 * Oxeylyzer's token n-grams of a corpus, from the character tables. Its
 	 * cleaner writes a Shift token before a capital unless the last character
 	 * it kept was shifted too (a dropped character between them does not
 	 * release Shift); a dropped character is a gap no n-gram spans. No layout
 	 * types the Shift token, so the n-grams through it score nothing but count
-	 * in the totals, and a skipgram can span it (x, Shift, y). The Shift state
-	 * is read two characters back at most; skip-2 and skip-3 grams are not in
-	 * the tables and are taken equal to skip-1.
+	 * in the totals, and a skipgram can span it (x, Shift, y). The text is read
+	 * whole, line breaks included (they are dropped characters, and Shift is
+	 * held across them). Whether Shift is held across a run of dropped
+	 * characters is exact across one, and carried by the trigrams'
+	 * second-order chain across longer runs (a blank line, an indentation);
+	 * skip-2 and skip-3 grams are not in the tables and are taken equal to
+	 * skip-1.
 	 */
 	function oxeyTables(table) {
 		const model = entry('oxeylyzer').model;
+		const all = withBreaks(table);
 		const tok = new Map();
 		const of = (char) => {
 			if (!tok.has(char)) tok.set(char, oxeyToken(model, char));
@@ -1450,22 +1503,24 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		let shiftTokens = 0;
 		let bigramTotal = 0;
 		let trigramTotal = 0;
-		for (const [c, n] of table.uni) {
+		for (const [c, n] of all.uni) {
 			const t = of(c);
 			if (!t) continue;
 			chars += n;
 			if (t.shift) shiftTokens += n;
 		}
+		const held = oxeyHeldShift(all, of);
 		// Whether t writes a Shift token after the last kept token, prev.
 		const shiftAfter = (prev, t) => t.shift && !(prev && prev.shift);
 		// Bigrams starting with a capital, to split into run starts and the rest.
 		const shiftedFirst = new Map();
-		for (const [a, b, n] of table.bi) {
-			const x = of(a);
+		for (const [a, b, n] of all.bi) {
 			const y = of(b);
+			// A capital after a character that holds Shift writes no Shift token.
+			if (y && y.shift) shiftTokens -= n * held(a, b);
+			const x = of(a);
 			if (!x || !y) continue;
 			bigramTotal += n;
-			if (x.shift && y.shift) shiftTokens -= n;
 			if (x.shift) add(shiftedFirst, a + b, n);
 			if (shiftAfter(x, y)) {
 				// x, Shift, y: a token trigram and a skipgram through the Shift token.
@@ -1473,15 +1528,13 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 				add(skip, x.token + y.token, n);
 			} else add(bigrams, x.token + y.token, n);
 		}
-		for (const [a, m, c, n] of table.tri) {
+		for (const [a, m, c, n] of all.tri) {
 			const x = of(a);
 			const y = of(m);
 			const z = of(c);
-			// Shift held across one dropped character: no new Shift token.
-			if (x && !y && z && x.shift && z.shift) shiftTokens -= n;
 			// Shift, y, z where y writes the Shift token.
 			if (y && z && y.shift) {
-				if (shiftAfter(x, y)) trigramTotal += n;
+				trigramTotal += n * (1 - held(a, m));
 				shiftedFirst.set(m + c, shiftedFirst.get(m + c) - n);
 			}
 			if (!x || !z) continue;
@@ -1495,6 +1548,35 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		// A capital starting a run writes its Shift token: Shift, y, z.
 		for (const n of shiftedFirst.values()) trigramTotal += Math.max(0, n);
 		shiftTokens = Math.max(0, shiftTokens);
+		// Oxeylyzer saves each count as a percentage of its table's total and
+		// reads it back truncated to an integer, often one lower: its rare
+		// n-grams may lose one count. Whether a count loses one depends on the
+		// bits of its table's total (from 7 % to 73 % of the n-grams on the
+		// texts measured). A whole total is Oxeylyzer's own (the held-Shift
+		// chain was exact): its round trip is followed. A fractional one is the
+		// chain's estimate: each count loses its mean loss over the totals
+		// within HELD_TOTAL_WINDOW of it.
+		const roundTrip = (n, T) => Math.trunc((n / (T / 100) / 100) * T);
+		const stored = (map, total) => {
+			if (!(total > 0)) return;
+			const whole = Math.round(total);
+			if (Math.abs(total - whole) < HELD_SHIFT_PRECISION * whole) {
+				for (const [key, n] of map) map.set(key, roundTrip(n, whole));
+				return;
+			}
+			const loss = new Map();
+			for (const [key, n] of map) {
+				if (!loss.has(n)) {
+					let lost = 0;
+					for (let T = whole - HELD_TOTAL_WINDOW; T <= whole + HELD_TOTAL_WINDOW; T++)
+						lost += n - roundTrip(n, T);
+					loss.set(n, lost / (2 * HELD_TOTAL_WINDOW + 1));
+				}
+				map.set(key, n - loss.get(n));
+			}
+		};
+		stored(bigrams, bigramTotal + shiftTokens);
+		stored(trigrams, trigramTotal);
 		return {
 			bigrams,
 			skip,

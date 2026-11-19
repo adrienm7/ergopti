@@ -1040,6 +1040,24 @@
 			"text": "The lad said \"it is done\", then left; \"so what?\" asked Liz.",
 			"value": 36.458585859,
 			"tolerance": 0.000001
+		},
+		{
+			"analyser": "oxeylyzer",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ortho",
+			"text": "He said No!\n\nYes, I said.\nThe Dog ran:\nBut",
+			"value": 0.264,
+			"tolerance": 0.0005
+		},
+		{
+			"analyser": "oxeylyzer",
+			"basis": "tool",
+			"layout": "colemak",
+			"keyboard": "ortho",
+			"text": "He said No!\n\nYes, I said.\nThe Dog ran:\nBut",
+			"value": 0.206,
+			"tolerance": 0.0005
 		}
 	]
 }
