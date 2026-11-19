@@ -114,6 +114,12 @@ function checkScanner() {
 	assert.equal(scanner.interactiveTag('<span onclick="go()">'), 'onclick');
 	assert.equal(scanner.interactiveTag('<div role="region" tabindex="0">'), null);
 	assert.equal(
+		scanner.interactiveTag('<div contenteditable="true" role="textbox" aria-label="Prompt">'),
+		null,
+		'A rich text editor named as a text box is the pattern'
+	);
+	assert.equal(scanner.interactiveTag('<div role="textbox">'), 'role="textbox"');
+	assert.equal(
 		scanner.interactiveCalls(
 			"const row = document.createElement('div');\nrow.addEventListener('click', go);"
 		).length,
