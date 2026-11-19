@@ -25,6 +25,8 @@ const http = require('node:http');
 const path = require('node:path');
 const { chromium } = require('playwright');
 const { shared } = require('../../lib/paths.cjs');
+// The UX study's cases (docs/audits/layout-analysers/ux-study.md).
+const studioUx = require('./layout-editor-studio-ux.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const KEYLAYOUT = path.join(ROOT, 'static', 'layouts', 'registry', 'ergopti', 'ergopti.keylayout');
@@ -3315,6 +3317,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);
+		await studioUx.exercisePanelFirstChange(browser, origin);
 
 		// Every locale names every visible string.
 		for (const lang of LOCALES) {

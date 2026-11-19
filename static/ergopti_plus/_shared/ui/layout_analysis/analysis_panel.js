@@ -193,6 +193,9 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			heat: HEAT_CHOICES.includes(saved.heat) ? saved.heat : HEAT_SCORE,
 			rank: RANK_CHOICES.includes(saved.rank) ? saved.rank : RANK_LIBRARY,
 			doc: null,
+			// The layout the document belongs to (update's lineage): a change of
+			// metric is measured only against an earlier analysis of the same one.
+			lineage: null,
 			previous: null,
 			library: null,
 			libraryKey: '',
@@ -515,6 +518,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			rankNote.hidden = !(state.rank === RANK_SELECTION && scores.length === 0);
 			const same =
 				state.previous &&
+				state.previous.lineage === state.lineage &&
 				state.previous.corpus === state.corpus &&
 				state.previous.keyboard === state.keyboard;
 			drawMetrics(result, same ? state.previous.metrics : null);
@@ -527,13 +531,19 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				extra.append(box);
 				draw(box, { layout, tables: prepared, keyboard: state.keyboard, result });
 			}
-			state.previous = { corpus: state.corpus, keyboard: state.keyboard, metrics: result.metrics };
+			state.previous = {
+				lineage: state.lineage,
+				corpus: state.corpus,
+				keyboard: state.keyboard,
+				metrics: result.metrics
+			};
 		}
 
 		function drawMetrics(result, before) {
 			metrics.replaceChildren();
 			for (const id of PANEL_METRICS) {
 				const tr = el('tr');
+				tr.dataset.metric = id;
 				const th = el('th', '', t(`layout_analysis.metric.${id}`));
 				th.scope = 'row';
 				th.append(' ', INFO.button(id));
@@ -822,8 +832,20 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 
 		return {
 			node,
-			update(doc) {
+			/**
+			 * Analyses a document after the pause.
+			 * @param {object} doc - The editor document.
+			 * @param {*} lineage - Which layout it is: the same value for every
+			 *   edit of one layout, another for a layout opened, started from or
+			 *   shown in another tab. The change column compares only two analyses
+			 *   of one lineage (the first render's empty board is another layout).
+			 * @throws {Error} Without a lineage.
+			 */
+			update(doc, lineage) {
+				if (lineage === undefined || lineage === null)
+					throw new Error('layout_analysis: update needs the layout lineage');
 				state.doc = doc;
+				state.lineage = lineage;
 				schedule();
 			},
 			/**

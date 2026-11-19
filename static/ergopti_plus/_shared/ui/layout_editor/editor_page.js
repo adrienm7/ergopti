@@ -517,11 +517,22 @@ var LayoutEditorPage = (function () {
 		// How many documents replace() opened: the opening start keeps one the user opened.
 		let replacements = 0;
 
+		// Which layout each history holds, for the analysis panel's change column: a
+		// tab keeps its lineage through its edits, an opened document starts a new one.
+		const lineages = new WeakMap();
+		let lineageCount = 0;
+		function lineage() {
+			if (!lineages.has(state.history)) lineages.set(state.history, ++lineageCount);
+			return lineages.get(state.history);
+		}
+
 		function replace(next, lost) {
 			// The edit belongs to the document being replaced: commit it there first.
 			commitFocused();
 			replacements += 1;
 			state.history.reset(next);
+			// Another layout: its first analysis shows no change against the one replaced.
+			lineages.set(state.history, ++lineageCount);
 			resetView(next, lost);
 			state.dirty = false;
 		}
@@ -4086,7 +4097,7 @@ var LayoutEditorPage = (function () {
 			fitLegends();
 			applyHeat();
 			root.dispatchEvent(new CustomEvent('layout-editor:rendered', { detail: { doc: doc() } }));
-			if (analysisPanel) analysisPanel.update(doc());
+			if (analysisPanel) analysisPanel.update(doc(), lineage());
 			scheduleAutosave();
 			schedulePublish();
 		}
