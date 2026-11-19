@@ -3,25 +3,53 @@
 		"index.html": [
 			{
 				"tag": "div",
-				"count": 11,
-				"pending": true
+				"where": "class=\"radio-row\"",
+				"count": 1,
+				"reason": "Lays the Yes and No cards side by side under the fieldset's legend; the fieldset already groups them, the row only places them"
 			},
 			{
 				"tag": "span",
+				"where": "class=\"radio-label\"",
 				"count": 2,
-				"pending": true
+				"reason": "The text of a radio's label, set by the script beside the radio inside the same label and styled by the radio's checked state"
+			},
+			{
+				"tag": "div",
+				"where": "id=\"page-controls\"",
+				"count": 1,
+				"reason": "The box the script empties and redraws with one fieldset per persistent control; the fieldsets carry the meaning"
+			},
+			{
+				"tag": "div",
+				"where": "id=\"page-magic-options\"",
+				"count": 1,
+				"reason": "The column the script redraws with the trigger choices inside the magic key fieldset, before its error and hint"
+			},
+			{
+				"tag": "div",
+				"where": "id=\"page-checklist-body\"",
+				"count": 1,
+				"reason": "The box the script redraws with the checklist fieldsets under the disclosure's summary and its inactive hint"
 			}
 		],
 		"script.js": [
 			{
-				"tag": "div",
-				"count": 3,
-				"pending": true
+				"tag": "span",
+				"where": "var flag = document.createElement('span');",
+				"count": 1,
+				"reason": "The flag glyph or image beside a language name inside its button, hidden from readers; only decoration, no meaning"
 			},
 			{
 				"tag": "span",
-				"count": 6,
-				"pending": true
+				"where": "var name = document.createElement('span');",
+				"count": 1,
+				"reason": "The language's name inside its button, styled apart from the flag; the button already carries the meaning"
+			},
+			{
+				"tag": "span",
+				"where": "document.createElement('span');",
+				"count": 3,
+				"reason": "The text of a radio or checkbox label beside its input inside the same label, styled by the input's checked or disabled state"
 			}
 		]
 	}

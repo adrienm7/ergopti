@@ -49,7 +49,8 @@ body {
 /* ====================================== */
 /* ====================================== */
 
-#wizard {
+/* The wizard is the page: the step bar, the step and the buttons. */
+body {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
@@ -89,7 +90,9 @@ body {
 	flex-shrink: 0;
 	gap: 6px;
 	justify-content: center;
-	margin-bottom: 18px;
+	list-style: none;
+	margin: 0 0 18px;
+	padding: 0;
 }
 
 /* The three states differ by shape, not only by hue (WCAG 1.4.1): a step to
@@ -254,7 +257,7 @@ h1 {
 
 .field-group {
 	display: flex;
-	margin-bottom: 4px;
+	margin: 0 0 4px;
 	width: 100%;
 }
 
@@ -293,6 +296,18 @@ h1 {
 /* ======= 7/ Question & Radio Cards ==== */
 /* ====================================== */
 /* ====================================== */
+
+/* Every group of choices is a fieldset named by its legend, drawn bare. */
+fieldset {
+	border: 0;
+	margin: 0;
+	min-inline-size: 0;
+	padding: 0;
+}
+
+legend {
+	padding: 0;
+}
 
 .question {
 	margin: 0 0 12px;
@@ -473,6 +488,12 @@ h1 {
 .value-separator {
 	color: var(--onboarding-accent);
 	font-weight: 700;
+}
+
+/* A trigger (kbd) and its action (samp) read in the label's own font. */
+.item-trigger,
+.item-action {
+	font: inherit;
 }
 
 .check-row input[type='checkbox']:disabled + .check-label .value-separator {

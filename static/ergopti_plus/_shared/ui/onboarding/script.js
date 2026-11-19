@@ -508,7 +508,7 @@ function _renderStepBar() {
 			.replace('{2}', String(_steps.length))
 	);
 	_steps.forEach(function (_id, index) {
-		var dot = document.createElement('div');
+		var dot = document.createElement('li');
 		dot.className = 'step-dot';
 		dot.setAttribute('aria-hidden', 'true');
 		if (index < _stepIndex) dot.classList.add('done');
@@ -594,6 +594,8 @@ function _renderLanguage() {
 
 		var flag = document.createElement('span');
 		flag.className = 'lang-flag';
+		// The flag only decorates the language's name, which is read.
+		flag.setAttribute('aria-hidden', 'true');
 		// Windows has no flag-emoji font, so its host injects a flag_url.
 		if (loc.flag_url) {
 			var flagImg = document.createElement('img');
@@ -714,7 +716,8 @@ function _renderControls(page, state) {
 	box.classList.toggle('hidden', controls.length === 0);
 	box.innerHTML = '';
 	controls.forEach(function (control) {
-		var group = document.createElement('div');
+		// A fieldset: the control's choices are one group, named by its legend.
+		var group = document.createElement('fieldset');
 		group.className = 'control-group';
 		group.dataset.control = control.id;
 		var availability = _controlState(control);
@@ -733,7 +736,7 @@ function _renderControls(page, state) {
 				)
 			);
 		} else {
-			var label = document.createElement('p');
+			var label = document.createElement('legend');
 			label.className = 'question-label';
 			label.textContent = _t(control.label_key);
 			group.appendChild(label);
@@ -914,9 +917,11 @@ function _renderChecklist(page, state) {
  * @returns {object} The group element.
  */
 function _groupNode(page, group, state, depth) {
-	var node = document.createElement('div');
+	// A fieldset: the group's boxes belong together, named by its header.
+	var node = document.createElement('fieldset');
 	node.className = 'checklist-group depth-' + depth;
 	if (group.label) {
+		node.setAttribute('aria-label', _label(group.label));
 		var counts = _countItems(group, state);
 		var header = _checkRow(
 			{ text: _label(group.label) },
@@ -979,10 +984,13 @@ function _checkRow(parts, checked, mixed, disabled, onChange) {
 	if (typeof parts.text === 'string') {
 		label.textContent = parts.text;
 	} else {
-		label.appendChild(_textSpan('item-trigger', parts.trigger));
+		// What the user types, then what it does.
+		label.appendChild(_textElement('kbd', 'item-trigger', parts.trigger));
 		// Spaces inside the separator keep a line break possible on each side.
-		label.appendChild(_textSpan('value-separator', ' ' + _catalogue().value_separator + ' '));
-		label.appendChild(_textSpan('item-action', parts.action));
+		label.appendChild(
+			_textElement('b', 'value-separator', ' ' + _catalogue().value_separator + ' ')
+		);
+		label.appendChild(_textElement('samp', 'item-action', parts.action));
 	}
 	row.appendChild(box);
 	row.appendChild(label);
@@ -990,16 +998,17 @@ function _checkRow(parts, checked, mixed, disabled, onChange) {
 }
 
 /**
- * A span showing a text literally.
+ * An element showing a text literally.
+ * @param {string} tag
  * @param {string} className
  * @param {string} text
- * @returns {object} The span.
+ * @returns {object} The element.
  */
-function _textSpan(className, text) {
-	var span = document.createElement('span');
-	span.className = className;
-	span.textContent = text;
-	return span;
+function _textElement(tag, className, text) {
+	var element = document.createElement(tag);
+	element.className = className;
+	element.textContent = text;
+	return element;
 }
 
 // ======================================
