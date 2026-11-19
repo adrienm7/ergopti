@@ -105,6 +105,8 @@ local OWNERS = {
 	"modules.shortcuts.actions.text",
 	"modules.shortcuts.bindings",
 	"modules.shortcuts.keyboard_shortcuts",
+	-- The Shortcuts entry loads the layer wheel's own lifecycle owner at require time.
+	"modules.shortcuts.layer_wheel",
 	"modules.shortcuts.script_control",
 	"platform.input.send_input",
 	"core.text.engine.utils_core",
