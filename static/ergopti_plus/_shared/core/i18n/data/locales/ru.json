@@ -695,6 +695,8 @@
 	"dialog.action_picker.requires_workspaces": "Только X11, KDE Plasma, sway или Hyprland",
 	"dialog.action_picker.requires_ai": "ИИ отключён: включите его в меню «Искусственный интеллект».",
 	"dialog.action_picker.search": "Поиск действия…",
+	"dialog.action_picker.contents": "Содержание",
+	"dialog.action_picker.current": "текущее действие",
 	"dialog.action_picker.prompt_label": "Промпт",
 	"dialog.action_picker.count_label": "Число прогнозов",
 	"dialog.action_picker.count_default": "Настройка меню «Искусственный интеллект» ({1})",

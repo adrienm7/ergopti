@@ -695,6 +695,8 @@
 	"dialog.action_picker.requires_workspaces": "仅限 X11、KDE Plasma、sway 或 Hyprland",
 	"dialog.action_picker.requires_ai": "AI 已关闭：请在人工智能菜单中开启。",
 	"dialog.action_picker.search": "搜索操作…",
+	"dialog.action_picker.contents": "目录",
+	"dialog.action_picker.current": "当前操作",
 	"dialog.action_picker.prompt_label": "提示词",
 	"dialog.action_picker.count_label": "预测数量",
 	"dialog.action_picker.count_default": "“人工智能”菜单设置（{1}）",

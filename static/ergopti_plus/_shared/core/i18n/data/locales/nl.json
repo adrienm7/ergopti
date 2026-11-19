@@ -695,6 +695,8 @@
 	"dialog.action_picker.requires_workspaces": "Alleen X11, KDE Plasma, sway of Hyprland",
 	"dialog.action_picker.requires_ai": "AI staat uit: zet het aan in het menu Kunstmatige intelligentie.",
 	"dialog.action_picker.search": "Zoek een actie…",
+	"dialog.action_picker.contents": "Inhoudsopgave",
+	"dialog.action_picker.current": "huidige actie",
 	"dialog.action_picker.prompt_label": "Prompt",
 	"dialog.action_picker.count_label": "Aantal voorspellingen",
 	"dialog.action_picker.count_default": "Instelling van het menu “Kunstmatige intelligentie” ({1})",

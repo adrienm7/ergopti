@@ -68,8 +68,16 @@ class FakeElement {
 		if (v === '') this.children = [];
 	}
 	appendChild(child) {
+		child.parent = this;
 		this.children.push(child);
 		return child;
+	}
+	/** The page's delegation only asks for the option a click landed in. */
+	closest(selector) {
+		if (selector !== '[role="option"]') throw new Error('unexpected closest(' + selector + ')');
+		for (let node = this; node; node = node.parent)
+			if (node.attributes.role === 'option') return node;
+		return null;
 	}
 	addEventListener(type, fn) {
 		(this.listeners[type] = this.listeners[type] || []).push(fn);
@@ -79,8 +87,12 @@ class FakeElement {
 	}
 	scrollIntoView() {}
 	focus() {}
-	dispatch(type) {
-		for (const fn of this.listeners[type] || []) fn({ preventDefault() {} });
+	dispatch(type, event) {
+		for (const fn of this.listeners[type] || []) fn(event || { preventDefault() {} });
+	}
+	/** Every element under this one, in document order. */
+	descendants() {
+		return this.children.flatMap((child) => [child, ...child.descendants()]);
 	}
 	text() {
 		return this.textContent + this.children.map((c) => c.text()).join('');
@@ -187,8 +199,12 @@ const errors = [];
 const check = (cond, message) => {
 	if (!cond) errors.push(message);
 };
+// The rendered action rows: options of the list boxes inside the list.
+const listRows = () => byId.list.descendants().filter((r) => r.classList.contains('row'));
+// A click on a row reaches the list's one listener, as a real click bubbles.
+const clickRow = (row) => byId.list.dispatch('click', { target: row, preventDefault() {} });
 
-const rows = byId.list.children.filter((r) => r.classList.contains('row'));
+const rows = listRows();
 const greyed = rows.find((r) => r.dataset.id === 'left_click_toggle');
 const live = rows.find((r) => r.dataset.id === 'enter');
 check(rows.length === 4, `expected the none row plus three actions, rendered ${rows.length}`);
@@ -202,9 +218,17 @@ check(
 	'the disabled row must show its reason'
 );
 check(live && !live.classList.contains('disabled'), 'an ordinary row stays enabled');
+check(
+	rows.every((r) => r.tagName === 'li' && r.attributes.role === 'option'),
+	'every row is an option of a list box, so the highlight is announced'
+);
+check(
+	greyed && greyed.attributes['aria-disabled'] === 'true',
+	'a greyed option says it is unavailable'
+);
 
 // Click, arrows and Enter must never confirm the greyed row.
-if (greyed) greyed.dispatch('click');
+if (greyed) clickRow(greyed);
 check(posted.length === 0, 'clicking a disabled row must not confirm it');
 vm.runInContext("doConfirm('left_click_toggle')", context);
 check(posted.length === 0, 'a disabled id must be refused even when confirmed directly');
@@ -213,7 +237,7 @@ check(
 	JSON.stringify(visibleIds) === JSON.stringify(['none', 'enter']),
 	`arrow keys walk only the pickable rows, got ${JSON.stringify(visibleIds)}`
 );
-if (live) live.dispatch('click');
+if (live) clickRow(live);
 check(
 	posted.length === 1 && posted[0].action === 'confirm' && posted[0].id === 'enter',
 	'an enabled row still confirms'
@@ -221,7 +245,7 @@ check(
 
 // Native-unavailable programs retain the same visible/inert DATA contract.
 posted.length = 0;
-const program = byId.list.children.find((row) => row.dataset.id === 'run_program');
+const program = listRows().find((row) => row.dataset.id === 'run_program');
 check(
 	program && program.classList.contains('disabled'),
 	'unavailable program remains visibly disabled'
@@ -230,14 +254,14 @@ check(
 	program && program.text().includes('Unavailable: Native runner'),
 	'unavailable program carries its closed native reason'
 );
-if (program) program.dispatch('click');
+if (program) clickRow(program);
 vm.runInContext("doConfirm('run_program')", context);
 check(posted.length === 0, 'neither click nor direct confirm may acquire an unavailable program');
 
 // A search which finds only an unavailable action still has a visible result.
 byId.search.value = 'program';
 byId.search.dispatch('input');
-const searchProgram = byId.list.children.find((row) => row.dataset.id === 'run_program');
+const searchProgram = listRows().find((row) => row.dataset.id === 'run_program');
 check(
 	searchProgram && searchProgram.classList.contains('disabled'),
 	'matching unavailable action remains visible'
@@ -247,7 +271,7 @@ check(
 	vm.runInContext('visible.length', context) === 0,
 	'disabled matches remain outside keyboard navigation'
 );
-if (searchProgram) searchProgram.dispatch('click');
+if (searchProgram) clickRow(searchProgram);
 check(posted.length === 0, 'search must not make an unavailable action clickable');
 byId.search.value = 'no-such-action';
 byId.search.dispatch('input');
@@ -271,7 +295,7 @@ vm.runInContext(
 byId.search.value = 'e\u0301jecter';
 byId.search.dispatch('input');
 check(
-	byId.list.children.some((row) => row.dataset.id === 'eject_all_disks'),
+	listRows().some((row) => row.dataset.id === 'eject_all_disks'),
 	'a decomposed query must find the canonically equivalent localized action label'
 );
 
@@ -285,7 +309,7 @@ vm.runInContext(
 );
 byId.search.value = 'Éjecter';
 byId.search.dispatch('input');
-const normalizedResult = byId.list.children.find((row) => row.dataset.id === 'eject_all_disks');
+const normalizedResult = listRows().find((row) => row.dataset.id === 'eject_all_disks');
 check(normalizedResult, 'a composed query must find a decomposed localized label');
 check(
 	normalizedResult && normalizedResult.text().includes(context.frenchActionLabel),

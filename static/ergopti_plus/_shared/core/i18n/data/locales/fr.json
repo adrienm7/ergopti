@@ -695,6 +695,8 @@
 	"dialog.action_picker.requires_workspaces": "X11, KDE Plasma, sway ou Hyprland uniquement",
 	"dialog.action_picker.requires_ai": "L’IA est désactivée : activez-la dans le menu Intelligence artificielle.",
 	"dialog.action_picker.search": "Rechercher une action…",
+	"dialog.action_picker.contents": "Sommaire",
+	"dialog.action_picker.current": "action actuelle",
 	"dialog.action_picker.prompt_label": "Prompt",
 	"dialog.action_picker.count_label": "Nombre de prédictions",
 	"dialog.action_picker.count_default": "Réglage du menu « Intelligence Artificielle » ({1})",

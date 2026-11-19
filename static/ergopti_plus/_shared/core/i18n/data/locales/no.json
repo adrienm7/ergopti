@@ -695,6 +695,8 @@
 	"dialog.action_picker.requires_workspaces": "Kun X11, KDE Plasma, sway eller Hyprland",
 	"dialog.action_picker.requires_ai": "AI er slått av: slå den på i menyen Kunstig intelligens.",
 	"dialog.action_picker.search": "Søk etter en handling…",
+	"dialog.action_picker.contents": "Innhold",
+	"dialog.action_picker.current": "gjeldende handling",
 	"dialog.action_picker.prompt_label": "Prompt",
 	"dialog.action_picker.count_label": "Antall prediksjoner",
 	"dialog.action_picker.count_default": "Innstillingen i menyen «Kunstig intelligens» ({1})",

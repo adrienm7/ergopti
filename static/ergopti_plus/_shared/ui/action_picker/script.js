@@ -16,8 +16,12 @@
  * disappears reads as a bug — and it can be neither highlighted nor confirmed.
  *
  * UX: type to filter, ↑/↓ to move the highlight, Enter to confirm, Esc to cancel,
- * click a row to pick it. Headings render as h1/h2/h3… by their level, fold their
- * descendants on click, and a table-of-contents button jumps to any heading.
+ * click a row to pick it. Headings render as h2/h3… under the window's h1 by
+ * their level, each holding a button that folds its descendants, and a
+ * table-of-contents button jumps to any heading. The search field is a
+ * combobox: each run of actions under a heading is a list box of options, and
+ * the field names the highlighted option as its active descendant, so a
+ * screen reader announces the highlight as the arrows move it.
  *
  * An action whose `parameter` is text, key or shortcut is not confirmed at once:
  * the page opens its own editor (a text field, a key capture, a shortcut
@@ -73,14 +77,26 @@ const collapsed = new Set();
 // Visible (rendered + focusable) action rows in display order: {id, el}.
 let visible = [];
 let activeIndex = 0;
+// Ids of the rendered list boxes and options, numbered afresh by each render.
+let listboxIds = [];
+let optionCount = 0;
 
 let currentId = 'none';
+// The name of the list box of the actions shown above any heading.
+let listLabel = '';
 let strings = { noResults: 'No matching action' };
 // Ready and navigation completion can both push the same document payload.
 let initialized = false;
 
 function el(id) {
 	return document.getElementById(id);
+}
+
+// A page string from the shared catalogue i18n.js applies; empty until it has
+// (the page renders again once the strings land).
+function pageString(key) {
+	const strings = window._i18n_strings || {};
+	return typeof strings[key] === 'string' ? strings[key] : '';
 }
 
 // ============================================================
@@ -93,6 +109,7 @@ function init(data) {
 	strings.noResults = data.noResults || 'No matching action';
 
 	el('title').textContent = data.title || '';
+	listLabel = data.title || '';
 	// The window's title for assistive technology too: the native title bar is
 	// the host's, the document's own title is what a screen reader names.
 	document.title = data.title || '';
@@ -244,6 +261,12 @@ function render() {
 	const list = el('list');
 	list.innerHTML = '';
 	visible = [];
+	listboxIds = [];
+	optionCount = 0;
+	// The list box the next action joins: a heading closes it, the next action
+	// under that heading opens one named by it.
+	let listbox = null;
+	let listboxLabel = listLabel;
 
 	const q = el('search').value.trim().toLowerCase().normalize('NFC');
 	const searching = q !== '';
@@ -275,6 +298,8 @@ function render() {
 			}
 			curLevel = Math.min(e.level, 4);
 			list.appendChild(buildHeadingRow(i, e));
+			listbox = null;
+			listboxLabel = e.text;
 		} else {
 			if (searching) {
 				if (!matches(e, q)) continue;
@@ -282,7 +307,16 @@ function render() {
 				continue;
 			}
 			const row = buildActionRow(e, e.special ? 0 : curLevel);
-			list.appendChild(row);
+			if (listbox === null) {
+				listbox = document.createElement('ul');
+				listbox.className = 'options';
+				listbox.id = 'ap-listbox-' + listboxIds.length;
+				listbox.setAttribute('role', 'listbox');
+				listbox.setAttribute('aria-label', listboxLabel);
+				listboxIds.push(listbox.id);
+				list.appendChild(listbox);
+			}
+			listbox.appendChild(row);
 			renderedActions++;
 			// A greyed row is shown but never focusable, so neither the arrows nor
 			// Enter can land on an action this machine cannot run.
@@ -293,6 +327,9 @@ function render() {
 	el('empty').hidden = renderedActions > 0;
 	if (!el('empty').hidden) el('empty').textContent = strings.noResults;
 	el('count').textContent = visible.length ? String(visible.length) : '';
+	el('search').setAttribute('aria-controls', listboxIds.join(' '));
+	// No option to name while nothing is pickable.
+	if (!visible.length) el('search').setAttribute('aria-activedescendant', '');
 
 	let start = 0;
 	for (let k = 0; k < visible.length; k++) {
@@ -327,74 +364,75 @@ function isConfirmable(id) {
 
 function buildHeadingRow(i, e) {
 	// Folding is a fold of the live tree, so it is disabled while searching
-	// (search already expands only the relevant matches). A foldable heading is
-	// a button, so the keyboard folds it as the mouse does (WCAG 2.1.1).
+	// (search already expands only the relevant matches). A foldable heading
+	// holds a button that folds it, so the keyboard folds it as the mouse does
+	// (WCAG 2.1.1); the button carries the row's look, the heading its place in
+	// the outline (h2 for a level-1 heading, under the window's h1).
 	const searching = el('search').value.trim() !== '';
-	const row = document.createElement(searching ? 'div' : 'button');
 	const lvl = Math.min(e.level, 4);
-	row.className = 'heading lvl' + lvl + (collapsed.has(i) ? ' collapsed' : '');
-	row.dataset.entry = String(i);
-	row.style.paddingLeft = 8 + (lvl - 1) * 16 + 'px';
+	const heading = document.createElement('h' + (lvl + 1));
+	heading.dataset.entry = String(i);
+	const face = searching ? heading : document.createElement('button');
+	const look = 'heading lvl' + lvl + (collapsed.has(i) ? ' collapsed' : '');
+	heading.className = searching ? 'heading-row ' + look + ' static' : 'heading-row';
+	face.style.paddingLeft = 8 + (lvl - 1) * 16 + 'px';
 
-	const caret = document.createElement('span');
-	caret.className = 'caret';
-	caret.setAttribute('aria-hidden', 'true');
-	caret.textContent = '▾';
-	const txt = document.createElement('span');
+	// The caret is drawn by the stylesheet; the heading's own words are of the
+	// host's language, isolated from the layout's direction.
+	const txt = document.createElement('bdi');
 	txt.className = 'heading-text';
 	txt.textContent = e.text;
-	row.appendChild(caret);
-	row.appendChild(txt);
+	face.appendChild(txt);
 
 	if (!searching) {
-		row.type = 'button';
-		row.setAttribute('aria-expanded', collapsed.has(i) ? 'false' : 'true');
-		row.addEventListener('click', function () {
+		face.className = look;
+		face.dataset.entry = String(i);
+		face.type = 'button';
+		face.setAttribute('aria-expanded', collapsed.has(i) ? 'false' : 'true');
+		face.addEventListener('click', function () {
 			toggleFold(i);
 		});
-	} else {
-		row.classList.add('static');
+		heading.appendChild(face);
 	}
-	return row;
+	return heading;
 }
 
 function buildActionRow(e, depth) {
-	const row = document.createElement('div');
+	// An option of its heading's list box. The list itself takes the clicks
+	// and the pointer's highlight (see Events): the keyboard reaches every
+	// option from the search field, which names the highlighted one.
+	const row = document.createElement('li');
 	row.className =
 		'row' +
 		(e.special ? ' special' : '') +
 		(e.id === currentId ? ' current' : '') +
 		(e.disabled ? ' disabled' : '');
+	row.id = 'ap-option-' + optionCount++;
+	row.setAttribute('role', 'option');
+	row.setAttribute('aria-selected', 'false');
 	row.dataset.id = e.id;
 	row.style.paddingLeft = 12 + (depth || 0) * 16 + 'px';
 
-	const tick = document.createElement('span');
-	tick.className = 'row-tick';
-	tick.textContent = '✓';
-	const label = document.createElement('span');
+	// The tick of the current action is drawn by the stylesheet; its words are
+	// for a screen reader, so the current action is not told by a glyph alone.
+	const label = document.createElement('bdi');
 	label.className = 'row-label';
 	label.textContent = e.label;
-	row.appendChild(tick);
 	row.appendChild(label);
+	if (e.id === currentId) {
+		const current = document.createElement('small');
+		current.className = 'theme-sr-only';
+		current.textContent = pageString('dialog.action_picker.current');
+		row.appendChild(current);
+	}
 	if (e.hint) {
-		const hint = document.createElement('span');
+		const hint = document.createElement('small');
 		hint.className = 'row-hint';
 		hint.textContent = e.hint;
 		row.appendChild(hint);
 		row.title = e.hint;
 	}
-	if (e.disabled) {
-		row.setAttribute('aria-disabled', 'true');
-		return row;
-	}
-
-	const idx = visible.length;
-	row.addEventListener('click', function () {
-		doConfirm(e.id);
-	});
-	row.addEventListener('mousemove', function () {
-		setActive(idx);
-	});
+	if (e.disabled) row.setAttribute('aria-disabled', 'true');
 	return row;
 }
 
@@ -402,10 +440,13 @@ function setActive(idx, instant) {
 	if (idx < 0 || idx >= visible.length) return;
 	if (visible[activeIndex] && visible[activeIndex].el) {
 		visible[activeIndex].el.classList.remove('active');
+		visible[activeIndex].el.setAttribute('aria-selected', 'false');
 	}
 	activeIndex = idx;
 	const row = visible[activeIndex].el;
 	row.classList.add('active');
+	row.setAttribute('aria-selected', 'true');
+	el('search').setAttribute('aria-activedescendant', row.id);
 	row.scrollIntoView({ block: 'nearest' });
 }
 
@@ -456,7 +497,9 @@ function buildToc() {
 		const e = entries[i];
 		if (e.kind !== 'heading') continue;
 		const lvl = Math.min(e.level, 4);
+		const item = document.createElement('li');
 		const a = document.createElement('button');
+		item.appendChild(a);
 		a.type = 'button';
 		a.className = 'toc-item lvl' + lvl;
 		a.style.paddingLeft = 10 + (lvl - 1) * 16 + 'px';
@@ -464,7 +507,7 @@ function buildToc() {
 		a.addEventListener('click', function () {
 			tocGoto(i);
 		});
-		inner.appendChild(a);
+		inner.appendChild(item);
 	}
 }
 
@@ -475,31 +518,8 @@ function tocGoto(i) {
 	closeToc(false);
 	render();
 	focusHeading(i);
-	// Find the heading row by re-walking; headings carry no id, so match by order.
-	const rows = el('list').children;
-	let seen = -1;
-	for (let r = 0; r < rows.length; r++) {
-		if (rows[r].classList.contains('heading')) {
-			seen++;
-			if (headingDomToEntry(seen) === i) {
-				rows[r].scrollIntoView({ block: 'start' });
-				break;
-			}
-		}
-	}
-}
-
-// Maps the Nth rendered heading (DOM order) back to its entry index. Rebuilt
-// each call from the current fold state so it always matches what is on screen.
-function headingDomToEntry(nth) {
-	let seen = -1;
-	for (let i = 0; i < entries.length; i++) {
-		if (entries[i].kind !== 'heading') continue;
-		if (hiddenByFold(i)) continue;
-		seen++;
-		if (seen === nth) return i;
-	}
-	return -1;
+	const heading = el('list').querySelector('.heading-row[data-entry="' + i + '"]');
+	if (heading) heading.scrollIntoView({ block: 'start' });
 }
 
 // ============================================================
@@ -1002,7 +1022,7 @@ function updateAutomationProviders(packet) {
 }
 
 function appendProgramArgument(value) {
-	const row = document.createElement('div');
+	const row = document.createElement('li');
 	row.className = 'program-argument';
 	const input = document.createElement('textarea');
 	input.value = value;
@@ -1181,6 +1201,23 @@ function onChoiceEditorKeydown(e) {
 document.addEventListener('DOMContentLoaded', function () {
 	el('search').addEventListener('input', function () {
 		render();
+	});
+	// One listener for every option: a click picks it, the pointer moves the
+	// highlight onto it, as the arrows do from the search field.
+	el('list').addEventListener('click', function (event) {
+		const row = event.target.closest('[role="option"]');
+		if (row && !row.classList.contains('disabled')) doConfirm(row.dataset.id);
+	});
+	el('list').addEventListener('mousemove', function (event) {
+		const row = event.target.closest('[role="option"]');
+		if (!row) return;
+		const index = visible.findIndex((each) => each.el === row);
+		if (index !== -1 && index !== activeIndex) setActive(index);
+	});
+	// The current action's words for a screen reader come from the page's own
+	// strings, which may land after the host's init.
+	document.addEventListener('i18n:applied', function () {
+		if (initialized) render();
 	});
 	el('param-back').addEventListener('click', function () {
 		closeParamEditor();

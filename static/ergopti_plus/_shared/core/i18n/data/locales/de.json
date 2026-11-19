@@ -695,6 +695,8 @@
 	"dialog.action_picker.requires_workspaces": "Nur unter X11, KDE Plasma, sway oder Hyprland",
 	"dialog.action_picker.requires_ai": "Die KI ist ausgeschaltet: Schalten Sie sie im Menü Künstliche Intelligenz ein.",
 	"dialog.action_picker.search": "Aktion suchen…",
+	"dialog.action_picker.contents": "Inhaltsverzeichnis",
+	"dialog.action_picker.current": "aktuelle Aktion",
 	"dialog.action_picker.prompt_label": "Prompt",
 	"dialog.action_picker.count_label": "Anzahl der Vorhersagen",
 	"dialog.action_picker.count_default": "Einstellung im Menü „Künstliche Intelligenz“ ({1})",

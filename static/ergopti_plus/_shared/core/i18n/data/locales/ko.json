@@ -695,6 +695,8 @@
 	"dialog.action_picker.requires_workspaces": "X11, KDE Plasma, sway 또는 Hyprland 전용",
 	"dialog.action_picker.requires_ai": "AI가 꺼져 있습니다: 인공 지능 메뉴에서 켜세요.",
 	"dialog.action_picker.search": "동작 검색…",
+	"dialog.action_picker.contents": "목차",
+	"dialog.action_picker.current": "현재 동작",
 	"dialog.action_picker.prompt_label": "프롬프트",
 	"dialog.action_picker.count_label": "예측 개수",
 	"dialog.action_picker.count_default": "“인공 지능” 메뉴 설정 ({1})",

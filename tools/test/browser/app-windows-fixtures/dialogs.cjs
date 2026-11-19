@@ -530,6 +530,46 @@ module.exports = [
 					assert.equal(await page.evaluate(() => document.activeElement.id), 'toc-btn');
 				}
 			},
+			{
+				// The search field is a combobox: the arrows move the highlight
+				// onto an option it names as its active descendant, so a screen
+				// reader announces each one (WCAG 4.1.2).
+				name: 'arrow-highlight',
+				enter: async (page) => {
+					const active = () =>
+						page.evaluate(() => {
+							const search = document.getElementById('search');
+							const option = document.getElementById(
+								search.getAttribute('aria-activedescendant') || ''
+							);
+							return option
+								? [
+										search.getAttribute('role'),
+										option.getAttribute('role'),
+										option.getAttribute('aria-selected'),
+										option.dataset.id,
+										search
+											.getAttribute('aria-controls')
+											.split(' ')
+											.includes(option.parentElement.id)
+									]
+								: null;
+						});
+					await page.focus('#search');
+					const first = await active();
+					assert.ok(first, 'The search field names the highlighted option');
+					await page.keyboard.press('ArrowDown');
+					const next = await active();
+					assert.deepEqual(next.slice(0, 3), ['combobox', 'option', 'true']);
+					assert.equal(next[4], true, 'The field controls the option list box');
+					assert.notEqual(next[3], first[3], 'ArrowDown moves the announced highlight');
+					assert.equal(
+						await page.locator('#list [role="option"][aria-selected="true"]').count(),
+						1,
+						'One option is selected at a time'
+					);
+				}
+			},
 			{ name: 'text-editor', enter: (page) => page.click('#btn-edit-current') },
 			{
 				name: 'prompt-editor',

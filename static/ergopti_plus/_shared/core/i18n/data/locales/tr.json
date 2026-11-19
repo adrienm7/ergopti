@@ -695,6 +695,8 @@
 	"dialog.action_picker.requires_workspaces": "Yalnızca X11, KDE Plasma, sway veya Hyprland",
 	"dialog.action_picker.requires_ai": "Yapay zeka kapalı: Yapay Zeka menüsünden açın.",
 	"dialog.action_picker.search": "Bir eylem ara…",
+	"dialog.action_picker.contents": "İçindekiler",
+	"dialog.action_picker.current": "geçerli eylem",
 	"dialog.action_picker.prompt_label": "İstem",
 	"dialog.action_picker.count_label": "Tahmin sayısı",
 	"dialog.action_picker.count_default": "“Yapay Zeka” menüsü ayarı ({1})",

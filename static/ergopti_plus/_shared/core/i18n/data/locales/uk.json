@@ -695,6 +695,8 @@
 	"dialog.action_picker.requires_workspaces": "Лише X11, KDE Plasma, sway або Hyprland",
 	"dialog.action_picker.requires_ai": "ШІ вимкнено: увімкніть його в меню «Штучний інтелект».",
 	"dialog.action_picker.search": "Пошук дії…",
+	"dialog.action_picker.contents": "Зміст",
+	"dialog.action_picker.current": "поточна дія",
 	"dialog.action_picker.prompt_label": "Промпт",
 	"dialog.action_picker.count_label": "Кількість прогнозів",
 	"dialog.action_picker.count_default": "Налаштування меню «Штучний інтелект» ({1})",

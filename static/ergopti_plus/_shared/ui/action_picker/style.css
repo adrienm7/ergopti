@@ -109,6 +109,13 @@ body {
 #toc-btn:hover {
 	border-color: var(--accent);
 }
+/* The glyph is drawn, not read: the button is named by its title (the
+   « / '' » alternative keeps it out of the name; an engine that does not read
+   it keeps the first declaration). */
+#toc-btn::before {
+	content: '☰';
+	content: '☰' / '';
+}
 
 #search-bar {
 	align-items: center;
@@ -129,8 +136,10 @@ body {
 	box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-.search-ico {
+#search-bar::before {
 	color: var(--sub);
+	content: '⌕';
+	content: '⌕' / '';
 	flex-shrink: 0;
 	font-size: 16px;
 }
@@ -163,9 +172,20 @@ body {
 	outline-offset: -2px;
 }
 
-/* ----- Headings (h1/h2/h3…) ----- */
+/* ----- Headings (h2/h3… under the window's h1) ----- */
 
-/* A foldable heading is a button: it keeps the row's look, not the button's. */
+/* The heading stays at the top of the list while its actions scroll; it takes
+   the list's text, its row its look. */
+.heading-row {
+	background: var(--bg);
+	font: inherit;
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+
+/* A foldable heading holds a button: it keeps the row's look, not the
+   button's. */
 .heading {
 	align-items: center;
 	background: var(--bg);
@@ -176,28 +196,28 @@ body {
 	font: inherit;
 	gap: 6px;
 	padding: 8px;
-	position: sticky;
 	text-align: left;
-	top: 0;
 	user-select: none;
 	width: 100%;
-	z-index: 1;
 }
 .heading.static {
 	cursor: default;
 }
 
-.heading .caret {
+/* The fold caret, drawn and not read (aria-expanded says it). */
+.heading::before {
 	color: var(--sub);
+	content: '▾';
+	content: '▾' / '';
 	flex-shrink: 0;
 	font-size: 10px;
 	transition: transform 0.12s ease;
 	width: 12px;
 }
-.heading.collapsed .caret {
+.heading.collapsed::before {
 	transform: rotate(-90deg);
 }
-.heading.static .caret {
+.heading.static::before {
 	visibility: hidden;
 }
 
@@ -231,6 +251,12 @@ body {
 
 /* ----- Action rows ----- */
 
+.options,
+#toc-inner,
+#param-program-arguments {
+	list-style: none;
+}
+
 .row {
 	align-items: center;
 	border-radius: 8px;
@@ -249,7 +275,7 @@ body {
 	background: var(--theme-accent-fill);
 	color: var(--theme-white);
 }
-.row.active .row-tick {
+.row.active::before {
 	color: var(--theme-white);
 }
 
@@ -260,14 +286,17 @@ body {
 	white-space: nowrap;
 }
 
-.row-tick {
+/* The current action's tick, drawn; the row's hidden words say it too. */
+.row::before {
 	color: var(--accent);
+	content: '✓';
+	content: '✓' / '';
 	flex-shrink: 0;
 	font-size: 13px;
 	visibility: hidden;
 	width: 14px;
 }
-.row.current .row-tick {
+.row.current::before {
 	visibility: visible;
 }
 
@@ -521,6 +550,13 @@ body {
 	background: var(--theme-accent-fill);
 	border-color: var(--theme-accent-fill);
 	color: var(--theme-white);
+}
+
+/* The program's groups keep the editor's flat look. */
+#param-program,
+#param-program-provider {
+	border: 0;
+	min-inline-size: 0;
 }
 
 #param-program input,

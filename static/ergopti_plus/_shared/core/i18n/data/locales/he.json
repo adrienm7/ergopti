@@ -695,6 +695,8 @@
 	"dialog.action_picker.requires_workspaces": "ב-X11, KDE Plasma, sway או Hyprland בלבד",
 	"dialog.action_picker.requires_ai": "הבינה המלאכותית כבויה: הפעילו אותה בתפריט בינה מלאכותית.",
 	"dialog.action_picker.search": "חיפוש פעולה…",
+	"dialog.action_picker.contents": "תוכן עניינים",
+	"dialog.action_picker.current": "הפעולה הנוכחית",
 	"dialog.action_picker.prompt_label": "הנחיה",
 	"dialog.action_picker.count_label": "מספר חיזויים",
 	"dialog.action_picker.count_default": "ההגדרה בתפריט „בינה מלאכותית” ({1})",

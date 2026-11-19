@@ -11,30 +11,39 @@
 	</head>
 	<body>
 		<header id="hdr">
-			<div class="hdr-text">
+			<hgroup class="hdr-text">
 				<h1 id="title"></h1>
 				<p id="subtitle"></p>
-			</div>
+			</hgroup>
 			<button
 				id="toc-btn"
 				type="button"
-				title=""
+				data-i18n-title="dialog.action_picker.contents"
 				onclick="toggleToc()"
-				aria-label="Table of contents"
 				aria-controls="toc"
 				aria-expanded="false"
-			>
-				☰
-			</button>
+			></button>
 		</header>
 
-		<div id="search-bar">
-			<span class="search-ico" aria-hidden="true">⌕</span>
-			<input id="search" type="text" autocomplete="off" autocorrect="off" spellcheck="false" />
-		</div>
+		<!-- The field filters the list and moves its highlight: a combobox whose
+		     active option a screen reader announces as the arrows move it. The
+		     script names the list boxes it controls and the active option. -->
+		<search id="search-bar" role="search" aria-labelledby="title">
+			<input
+				id="search"
+				type="text"
+				role="combobox"
+				aria-autocomplete="list"
+				aria-expanded="true"
+				autocomplete="off"
+				autocorrect="off"
+				spellcheck="false"
+			/>
+		</search>
 
 		<!-- A keyboard stop of its own: the list scrolls, and the arrows and Enter
-		     work from it as from the search field (WCAG 2.1.1). -->
+		     work from it as from the search field (WCAG 2.1.1). Each run of
+		     actions under a heading is a list box of options. -->
 		<main id="list" tabindex="0" aria-labelledby="title"></main>
 
 		<!-- The editor of a send_text / send_key / send_shortcut value, or of the
@@ -54,13 +63,13 @@
 				autocorrect="off"
 				spellcheck="false"
 			/>
-			<div id="param-choice" hidden>
+			<p id="param-choice" hidden>
 				<label id="param-profile-label" for="param-profile"></label>
 				<select id="param-profile"></select>
 				<label id="param-count-label" for="param-count"></label>
 				<select id="param-count"></select>
-			</div>
-			<div id="param-vision" hidden>
+			</p>
+			<p id="param-vision" hidden>
 				<label id="param-vision-provider-label" for="param-vision-provider"></label>
 				<select id="param-vision-provider"></select>
 				<label id="param-vision-model-label" for="param-vision-model"></label>
@@ -71,45 +80,50 @@
 					autocorrect="off"
 					spellcheck="false"
 				/>
-			</div>
-			<div id="param-language" hidden>
+			</p>
+			<p id="param-language" hidden>
 				<label id="param-language-label" for="param-language-select"></label>
 				<select id="param-language-select"></select>
-			</div>
-			<div id="param-program" hidden>
-				<div id="param-program-automation" hidden>
+			</p>
+			<fieldset id="param-program" hidden>
+				<section
+					id="param-program-automation"
+					aria-labelledby="param-program-automation-title"
+					hidden
+				>
 					<p id="param-program-automation-title"></p>
 					<p id="param-program-automation-reason"></p>
 					<ul id="param-program-automation-list"></ul>
-				</div>
-				<div id="param-program-provider" hidden>
+				</section>
+				<fieldset id="param-program-provider" hidden>
 					<label id="param-program-provider-label" for="param-program-provider-select"></label>
 					<select id="param-program-provider-select"></select>
 					<p id="param-program-provider-hint"></p>
 					<p id="param-program-provider-status" role="status"></p>
-				</div>
+				</fieldset>
 				<label id="param-program-executable-label" for="param-program-executable"></label>
 				<input id="param-program-executable" type="text" autocomplete="off" spellcheck="false" />
 				<p id="param-program-arguments-label"></p>
-				<div id="param-program-arguments"></div>
+				<ol id="param-program-arguments"></ol>
 				<button id="param-program-add" type="button"></button>
-			</div>
-			<p id="param-error" hidden></p>
-			<div class="param-buttons">
+			</fieldset>
+			<p id="param-error" role="alert" hidden></p>
+			<footer class="param-buttons">
 				<button id="param-back" type="button"></button>
 				<button id="param-save" type="button"></button>
-			</div>
+			</footer>
 		</section>
 
-		<div id="empty" hidden></div>
+		<p id="empty" role="status" hidden></p>
 
 		<!-- Table-of-contents drawer: lists every heading (indented by level). -->
-		<div id="toc" hidden>
-			<div id="toc-inner"></div>
-		</div>
+		<nav id="toc" aria-labelledby="toc-title" hidden>
+			<h2 id="toc-title" class="theme-sr-only" data-i18n="dialog.action_picker.contents"></h2>
+			<ul id="toc-inner"></ul>
+		</nav>
 
 		<footer id="ftr">
-			<span id="count"></span>
+			<output id="count" for="search"></output>
 			<button id="btn-edit-current" type="button" hidden></button>
 			<button id="btn-cancel" type="button" onclick="doCancel()"></button>
 		</footer>

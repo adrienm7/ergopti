@@ -695,6 +695,8 @@
 	"dialog.action_picker.requires_workspaces": "X11, KDE Plasma, sway or Hyprland only",
 	"dialog.action_picker.requires_ai": "AI is off: turn it on in the Artificial Intelligence menu.",
 	"dialog.action_picker.search": "Search an action…",
+	"dialog.action_picker.contents": "Table of contents",
+	"dialog.action_picker.current": "current action",
 	"dialog.action_picker.prompt_label": "Prompt",
 	"dialog.action_picker.count_label": "Number of predictions",
 	"dialog.action_picker.count_default": "Setting of the “Artificial Intelligence” menu ({1})",

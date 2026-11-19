@@ -695,6 +695,8 @@
 	"dialog.action_picker.requires_workspaces": "Pouze X11, KDE Plasma, sway nebo Hyprland",
 	"dialog.action_picker.requires_ai": "AI je vypnutá: zapněte ji v nabídce Umělá inteligence.",
 	"dialog.action_picker.search": "Hledat akci…",
+	"dialog.action_picker.contents": "Obsah",
+	"dialog.action_picker.current": "aktuální akce",
 	"dialog.action_picker.prompt_label": "Prompt",
 	"dialog.action_picker.count_label": "Počet předpovědí",
 	"dialog.action_picker.count_default": "Nastavení z nabídky „Umělá inteligence“ ({1})",
