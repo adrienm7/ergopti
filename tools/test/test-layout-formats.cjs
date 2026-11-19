@@ -69,6 +69,9 @@
  *    thumbs to the model's thumb keys (a lone capital as its letter's Shift,
  *    the big keys first, a key beyond the codes named), a space-only file
  *    still reads the space bar, and the ErgoDox export reads back the same.
+ * 14. KLAnext's janiso and ergolinear boards read: janiso by KLAnext's own
+ *    QWERTY on it, ergolinear by position with its thumb letter on the
+ *    model's thumb key.
  * ==============================================================================
  */
 
@@ -1544,6 +1547,101 @@ async function checkLinks() {
 		JSON.stringify(DATA.model.thumb_keys) === JSON.stringify(codes) &&
 			JSON.stringify(DATA.model.thumb_rest_keys) === JSON.stringify(codes.slice(0, 2)),
 		`thumb keys: the model's ${DATA.model.thumb_keys} are not the KLA reader's ${codes}`
+	);
+}
+
+// ===================================================
+// ======= 14/ KLAnext's janiso and ergolinear =======
+// ===================================================
+
+{
+	// (klanext-janiso-ergolinear-2026-11-19) Both boards were refused with
+	// format_unsupported_board. Key cells as KLAnext's files state them:
+	// uciea-vanilla.za.janiso.json, [ { left of p (15), c Ç on the home row's
+	// first letter (30), v right of r (40), q right of j (54), the space on 61;
+	// moutis/HandsDown Hands_Down_alt-ex_ortho.json on ergolinear, w at 1,
+	// r at 13, x at 25, its thumb letter e at 41 (finger 5), the space at 44.
+	const key = (id, cells, finger) => {
+		const [primary, shift, altGr] = Array.from(cells).map((c) =>
+			c === '·' ? -1 : c.codePointAt(0)
+		);
+		return { id, primary, shift: shift ?? -1, altGr: altGr ?? -1, shiftAltGr: -1, finger };
+	};
+	const janiso = F.fromKla({
+		label: 'uciea-vanilla.za.janiso',
+		keyboardType: 'janiso',
+		keys: [
+			key(15, '[{', 1),
+			key(16, 'pP', 1),
+			key(30, 'cCç', 1),
+			key(39, 'rR', 10),
+			key(40, 'vV', 10),
+			key(43, '`~', 1),
+			key(53, 'jJ', 10),
+			key(54, 'qQ', 10),
+			key(61, ' ', 5),
+			key(59, String.fromCodePoint(18), 5)
+		]
+	});
+	const rows = janiso.layout.rows;
+	check(
+		JSON.stringify(
+			[rows.BracketLeft, rows.KeyQ, rows.KeyA, rows.Minus, rows.Quote].map((r) => r.slice(0, 3))
+		) ===
+			JSON.stringify([
+				['[', '{', null],
+				['p', 'P', null],
+				['c', 'C', 'ç'],
+				['v', 'V', null],
+				['q', 'Q', null]
+			]) &&
+			rows.Semicolon[0] === 'r' &&
+			rows.Backquote[0] === '`' &&
+			rows.Slash[0] === 'j' &&
+			rows.Space[0] === ' ' &&
+			janiso.unmapped.length === 0,
+		`janiso: ${JSON.stringify(rows)} ${JSON.stringify(janiso.unmapped)}`
+	);
+	const ergolinear = F.fromKla({
+		label: 'Hands Down Alt-ex ortho ts',
+		keyboardType: 'ergolinear',
+		keys: [
+			key(1, 'wW~', 1),
+			key(10, ';:€', 10),
+			key(13, 'rR{', 1),
+			key(22, 'iI=', 10),
+			key(25, 'xX7', 1),
+			key(34, '/?6', 10),
+			key(41, 'eE', 5),
+			key(44, ' ', 6)
+		]
+	});
+	const ortho = ergolinear.layout.rows;
+	check(
+		ortho.KeyQ.join() === 'w,W,~,' &&
+			ortho.KeyP[0] === ';' &&
+			ortho.KeyA.join() === 'r,R,{,' &&
+			ortho.Semicolon[0] === 'i' &&
+			ortho.KeyZ[2] === '7' &&
+			ortho.Slash[0] === '/' &&
+			ortho.NonConvert.slice(0, 2).join() === 'e,E' &&
+			ortho.Convert[0] === ' ' &&
+			!ortho.Space &&
+			ergolinear.unmapped.length === 0,
+		`ergolinear: ${JSON.stringify(ortho)} ${JSON.stringify(ergolinear.unmapped)}`
+	);
+	// An ergolinear file with only the space on its thumbs keeps the space bar,
+	// and a character on a key the board places no code on is named.
+	const plain = F.fromKla({
+		label: 'ortho',
+		keyboardType: 'ergolinear',
+		keys: [key(1, 'qQ', 1), key(11, '\\|', 10), key(44, ' ', 6)]
+	});
+	check(
+		plain.layout.rows.Space[0] === ' ' &&
+			plain.unmapped.length === 1 &&
+			/^11 \(\\ \|\)$/.test(plain.unmapped[0].detail),
+		`ergolinear: ${JSON.stringify(plain.layout.rows)} ${JSON.stringify(plain.unmapped)}`
 	);
 }
 

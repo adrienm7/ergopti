@@ -874,13 +874,21 @@ extension in genkey's own folder: the pickers offer `.txt`, which the editor's
 genkey download writes, and a file opened without an extension is read when
 its content is a genkey layout.
 
-KLAnext's boards beyond KLA's are its `matrix` (read), `ergolinear` and
-`janiso` (refused with `format_unsupported_board`): the matrix key set is the
-key each index of KLAnext's own QWERTY matrix layout types
-(`layouts/qwerty.en.matrix.json`, `kb.js` `KB.keyMap.matrix`), its centre
-block, thumb, page and arrow keys reported when they carry a character.
-KLAnext's layout list (`db.js`) holds no `ergolinear` layout, and `janiso`
-waits for the model's JIS keys.
+KLAnext's boards beyond KLA's are its `matrix`, `janiso` and `ergolinear`,
+all read. The matrix key set is the key each index of KLAnext's own QWERTY
+matrix layout types (`layouts/qwerty.en.matrix.json`, `kb.js`
+`KB.keyMap.matrix`), its centre block, thumb, page and arrow keys reported
+when they carry a character. `janiso` is no JIS board despite its name
+(`KB.keyMap.janiso`: four unstaggered split rows of 14 keys and 11 bottom
+keys); it is read the same way from KLAnext's QWERTY on it
+(`layouts/qwerty.za.janiso.json`), which puts `[` `\` `` ` `` left of the
+letter rows and `]` `-` `'` right of them, so a character there takes the key
+its QWERTY character has on ANSI. KLAnext's layout list (`db.js`) holds no
+`ergolinear` layout (`KB.keyMap.ergolinear`: three split rows of 12 keys, no
+number row), so its keys are placed by position, as on the Corne: the ten
+middle keys of each letter row, Quote right of the home row, the right
+thumb's first key as the space bar; Hands Down's ortho files are on it, and
+the thumb letter of Alt-ex, -nx and -tx reads to the left thumb key.
 
 KbdEdit .kbe, reverse-engineered from the committed exports
 (`static/layouts/registry/bepo/kbdedit`, `static/ergopti/windows`): a UInt16

@@ -14,8 +14,8 @@
  *
  * FEATURES & RATIONALE:
  * 1. Formats read: Keyboard Layout Analyzer JSON (KLA, KLAnext and their
- *    forks, on the standard, european, ErgoDox and KLAnext matrix boards, the
- *    thumb keys of the last two included),
+ *    forks, on the standard, european, ErgoDox and KLAnext matrix, janiso and
+ *    ergolinear boards, the thumb keys of the ErgoDox and matrix included),
  *    Kalamine TOML and JSON (Ergo-L and its family), XKB symbols, Windows
  *    KLC, Oxeylyzer DOF (libdof's boards, anchors and layers), genkey
  *    layouts, cmini JSON and plain rows of characters. A macOS .keylayout
@@ -491,7 +491,38 @@ var LAYOUT_FORMATS = (function () {
 		matrix[53] = 'Minus';
 		matrix[54] = 'BracketRight';
 		matrix[56] = 'Space';
-		return { standard, european, ergodox, matrix };
+		// KLAnext's janiso board (its kb.js, KB.keyMap.janiso: four unstaggered
+		// split rows of 14 keys, then 11 bottom keys; no JIS key, despite the
+		// name), read like the matrix from KLAnext's own QWERTY on it
+		// (layouts/qwerty.za.janiso.json): its two outer columns hold the
+		// punctuation the standard board has right of P, L and the slash, and
+		// each index takes the key its QWERTY character has on an ANSI board.
+		// The outermost columns and the other bottom keys have no character key.
+		const janiso = {};
+		at(2, top.slice(1, 11), janiso);
+		janiso[12] = 'Equal';
+		janiso[15] = 'BracketLeft';
+		at(16, tab.slice(0, 10), janiso);
+		janiso[26] = 'BracketRight';
+		janiso[29] = 'Backslash';
+		at(30, home.slice(0, 10), janiso);
+		janiso[40] = 'Minus';
+		janiso[43] = 'Backquote';
+		at(44, bottom, janiso);
+		janiso[54] = 'Quote';
+		janiso[61] = 'Space';
+		// KLAnext's ergolinear board (KB.keyMap.ergolinear: no number row, three
+		// split rows of 12 keys, then 16 bottom keys). KLAnext has no layout on
+		// it to read a QWERTY from, so its keys are placed by position, as the
+		// Corne's: the three letter rows' ten middle keys, the key right of the
+		// home row's tenth (Quote) and the right thumb's first key (the space
+		// bar of Hands Down's ortho files, the only ones on this board).
+		const ergolinear = {};
+		at(1, tab.slice(0, 10), ergolinear);
+		at(13, home, ergolinear);
+		at(25, bottom, ergolinear);
+		ergolinear[44] = 'Space';
+		return { standard, european, ergodox, matrix, janiso, ergolinear };
 	})();
 	// The KLA finger number of each engine finger (1 left pinky … 10 right pinky).
 	const KLA_FINGERS = { lp: 1, lr: 2, lm: 3, li: 4, lt: 5, rt: 6, ri: 7, rm: 8, rr: 9, rp: 10 };
@@ -505,8 +536,14 @@ var LAYOUT_FORMATS = (function () {
 	const KLA_THUMB_TYPED = /^[\p{L}\p{M}\p{N}\p{P} ]+$/u;
 	const typedCell = (cell) => cell !== NONE && KLA_THUMB_TYPED.test(cell);
 	// The boards with thumb clusters, and their big thumb keys (ErgoDox's
-	// 2-unit keys, KLA's index; KLAnext's matrix draws none bigger).
-	const KLA_THUMB_BOARDS = { ergodox: { big: [66, 67, 74, 75] }, matrix: { big: [] } };
+	// 2-unit keys, KLA's index; KLAnext's matrix and ergolinear draw none
+	// bigger). Hands Down's Alt-ex, -nx and -tx ortho files put their thumb
+	// letter on ergolinear's key 41, the left thumb's.
+	const KLA_THUMB_BOARDS = {
+		ergodox: { big: [66, 67, 74, 75] },
+		matrix: { big: [] },
+		ergolinear: { big: [] }
+	};
 	// KLA's ErgoDox board for the writer: its size, the keys without a
 	// character (their primary and finger, from KLAnext's layouts/qwerty.en.ergodox.json),
 	// the thumb key each thumb code is written on (the ErgoDox inner 2-unit
@@ -1051,7 +1088,7 @@ var LAYOUT_FORMATS = (function () {
 
 	/**
 	 * The thumb keys of a KLA file on a board with thumb clusters (ErgoDox,
-	 * KLAnext's matrix), when one of them types a letter, a digit or a
+	 * KLAnext's matrix and ergolinear), when one of them types a letter, a digit or a
 	 * punctuation mark (KLA_THUMB_TYPED; a key drawing only an action sign,
 	 * « ⌦ » or « ⇞ », stays unread): each thumb's keys that type one of them
 	 * or the space, by the file's own finger (5 left, 6 right), take that
