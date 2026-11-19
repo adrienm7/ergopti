@@ -690,10 +690,15 @@ var LAYOUT_ANALYSIS = (function () {
 				let map;
 				let key = cell;
 				let width = 1;
-				if (typeof cell !== 'string') [map, key] = [core.deadWays, cell.dead];
-				else if (codeLength(cell) === 1) map = core.ways;
-				else if (cell.length > 0) [map, width] = [core.texts, codeLength(cell)];
-				else continue;
+				// Plain assignments: destructuring a fresh array costs more than the offer.
+				if (typeof cell !== 'string') {
+					map = core.deadWays;
+					key = cell.dead;
+				} else if (codeLength(cell) === 1) map = core.ways;
+				else if (cell.length > 0) {
+					map = core.texts;
+					width = codeLength(cell);
+				} else continue;
 				if (
 					only &&
 					!(map === core.ways ? only.chars : map === core.texts ? only.texts : only.dead).has(key)
@@ -868,8 +873,13 @@ var LAYOUT_ANALYSIS = (function () {
 				lastPass[i] = [prefixes, version(prefixes), tails, version(tails)];
 				let map = ways;
 				let target = rule.outChar;
-				if (rule.outDead !== null) [map, target] = [deadWays, rule.outDead];
-				else if (rule.outText !== null) [map, target] = [texts, rule.outText];
+				if (rule.outDead !== null) {
+					map = deadWays;
+					target = rule.outDead;
+				} else if (rule.outText !== null) {
+					map = texts;
+					target = rule.outText;
+				}
 				for (const prefix of prefixes.slice())
 					for (const tail of tails.slice()) {
 						if (partial) {
@@ -3151,7 +3161,10 @@ var LAYOUT_ANALYSIS = (function () {
 					if (m.walkRestBi[r] === mark) continue;
 					m.walkRestBi[r] = mark;
 					const i = m.restBiAt[r];
-					const [a, b, n] = [t.biA[i], t.biB[i], t.biN[i]];
+					// Plain reads: destructuring a fresh array costs more than the walk.
+					const a = t.biA[i];
+					const b = t.biB[i];
+					const n = t.biN[i];
 					walkPair(best(was, a), best(was, b), -n, visit);
 					walkPair(best(now, a), best(now, b), n, visit);
 				}
@@ -3160,7 +3173,10 @@ var LAYOUT_ANALYSIS = (function () {
 					if (m.walkRestTri[r] === mark) continue;
 					m.walkRestTri[r] = mark;
 					const i = m.restTriAt[r];
-					const [a, b, d, n] = [t.triA[i], t.triB[i], t.triC[i], t.triN[i]];
+					const a = t.triA[i];
+					const b = t.triB[i];
+					const d = t.triC[i];
+					const n = t.triN[i];
 					walkTriple(best(was, a), best(was, b), best(was, d), -n, visit);
 					walkTriple(best(now, a), best(now, b), best(now, d), n, visit);
 				}
