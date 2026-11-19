@@ -108,7 +108,7 @@ function checkScanner() {
 			'f'
 		),
 		[],
-		'A pending count holds a window not yet reviewed'
+		'The shared scanner holds a pending count; this gate refuses one (readList)'
 	);
 	assert.equal(scanner.interactiveTag('<div role="button" tabindex="0">'), 'role="button"');
 	assert.equal(scanner.interactiveTag('<span onclick="go()">'), 'onclick');
@@ -210,13 +210,14 @@ function readList(name) {
 		list && typeof list.files === 'object' && !Array.isArray(list.files),
 		name + ': {files: {...}}'
 	);
-	const keys = Object.keys(list).filter((key) => key !== 'pendingProblems');
-	assert.deepEqual(keys, ['files'], name + ': a files map and an optional pendingProblems count');
-	if (Object.hasOwn(list, 'pendingProblems'))
-		assert.ok(
-			Number.isSafeInteger(list.pendingProblems) && list.pendingProblems > 0,
-			name + ': pendingProblems'
-		);
+	assert.deepEqual(Object.keys(list), ['files'], name + ': only a files map');
+	// Every window had its pass: a count held without a reason is refused.
+	for (const [file, entries] of Object.entries(list.files))
+		for (const entry of entries)
+			assert.ok(
+				!Object.hasOwn(entry, 'pending'),
+				`${name}/${file}: a pending entry; give each div or span its reason`
+			);
 	return list;
 }
 
@@ -228,9 +229,6 @@ function scanGroup(name, root, files, report) {
 	const list = readList(name);
 	const listed = list.files;
 	const problems = [];
-	// Controls and images found before this window's pass, held by an exact
-	// count until the pass fixes them.
-	const held = [];
 	const counts = {};
 	for (const key of Object.keys(listed))
 		if (!files.includes(key))
@@ -250,20 +248,16 @@ function scanGroup(name, root, files, report) {
 		for (const each of occurrences) {
 			const control = scanner.interactiveTag(each.context);
 			if (control)
-				held.push(`${where}:${each.line}: <${each.tag}> with ${control}: use the native element`);
+				problems.push(
+					`${where}:${each.line}: <${each.tag}> with ${control}: use the native element`
+				);
 		}
 		if (kind === 'js')
 			for (const each of scanner.interactiveCalls(source))
-				held.push(`${where}:${each.line}: ${each.problem}`);
+				problems.push(`${where}:${each.line}: ${each.problem}`);
 		for (const each of scanner.imageProblems(source, kind))
-			held.push(`${where}:${each.line}: ${each.problem}`);
+			problems.push(`${where}:${each.line}: ${each.problem}`);
 	}
-	const pending = list.pendingProblems || 0;
-	if (held.length !== pending)
-		problems.push(
-			`${name}: ${held.length} control or image problem(s), ${pending} pending listed` +
-				(held.length > pending ? ':\n  ' + held.join('\n  ') : '; lower pendingProblems')
-		);
 	return { problems, counts };
 }
 
