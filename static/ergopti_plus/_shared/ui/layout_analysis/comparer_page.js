@@ -718,7 +718,14 @@
 						<span data-i18n="layout_analysis.table.fold"></span>
 					</label>
 					<p id="la-table-fold-help" class="la-muted" data-i18n="layout_analysis.table.fold_help"></p>
+					<button id="la-table-csv" class="la-csv-button" type="button">
+						<svg class="la-row-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+							<path d="M12 3v12m0 0-5-5m5 5 5-5M4 17v3h16v-3" />
+						</svg>
+						<span data-i18n="layout_analysis.table.csv"></span>
+					</button>
 				</div>
+				<p id="la-table-csv-status" class="la-muted" role="status"></p>
 				<div class="la-table-wrap" tabindex="0" role="region" aria-labelledby="la-ranking-label">
 					<table id="la-table" class="la-table"></table>
 				</div>
@@ -2113,6 +2120,8 @@
 			});
 			const tbody = el('tbody');
 			const shown = view ? view.order(sorted) : sorted;
+			// What the CSV download writes: these rows, in this order, these columns.
+			if (view) Object.assign(view, { shown, columns });
 			for (const result of shown) {
 				const tr = el('tr');
 				if (view) view.mark(tr, result);
@@ -2418,6 +2427,65 @@
 			};
 		}
 
+		// The overview ranking as last drawn (rankingView with its rows and columns).
+		let lastRanking = null;
+		const RANKING_CSV_FILE = 'ergopti-ranking.csv';
+		// A value's decimals in the CSV: the raw value, not the page's rounding.
+		const CSV_DIGITS = 6;
+
+		/** One CSV field (RFC 4180), a text a spreadsheet would read as a formula made inert. */
+		function csvField(value) {
+			if (typeof value === 'number') return String(Number(value.toFixed(CSV_DIGITS)));
+			let text = String(value);
+			if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+			return /[",\r\n;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+		}
+
+		/**
+		 * The ranking as shown (ux-study item 16): its rows in their order (the
+		 * sort, the pinned rows, the folded families) and its columns, each
+		 * value as the engine computed it (a dot for decimals, not rounded as
+		 * the page shows it), the headers in the page's language.
+		 * @returns {string} CSV text, one line per row, ending with a newline.
+		 */
+		function rankingCsv() {
+			if (!lastRanking || !lastRanking.shown) throw new Error('layout_analysis: no ranking drawn');
+			const { columns, shown } = lastRanking;
+			const lines = [columns.map((c) => csvField(c.label))].concat(
+				shown.map((result) => columns.map((c) => csvField(c.value(result))))
+			);
+			return `${lines.map((cells) => cells.join(',')).join('\r\n')}\r\n`;
+		}
+
+		/** « Download the table (CSV) »: the host's download path in the app, a browser download on the site. */
+		async function downloadRanking() {
+			const status = $('la-table-csv-status');
+			const text = `\ufeff${rankingCsv()}`;
+			if (typeof HOST.saveFile === 'function') {
+				try {
+					const where = await HOST.saveFile(RANKING_CSV_FILE, text);
+					status.className = 'la-muted';
+					status.textContent = t('layout_analysis.table.csv_saved', { path: where });
+				} catch (error) {
+					status.className = 'la-error';
+					status.textContent = t('layout_analysis.table.csv_failed', {
+						code: (error && error.code) || String(error)
+					});
+				}
+				return;
+			}
+			const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+			const link = el('a');
+			link.href = url;
+			link.download = RANKING_CSV_FILE;
+			document.body.append(link);
+			link.click();
+			link.remove();
+			setTimeout(() => URL.revokeObjectURL(url), 0);
+			status.className = 'la-muted';
+			status.textContent = t('layout_analysis.table.csv_downloaded', { name: RANKING_CSV_FILE });
+		}
+
 		/** The overview's ranking table, with the viewer's columns and the filters' rows. */
 		function renderTable() {
 			const reference = state.results.length > 0 ? referenceResult() : null;
@@ -2441,8 +2509,9 @@
 					renderTable();
 				},
 				state.table.relative ? reference : null,
-				rankingView(shownRows())
+				(lastRanking = rankingView(shownRows()))
 			);
+			$('la-table-csv').disabled = state.results.length === 0;
 			$('la-table-fold').checked = state.table.fold;
 		}
 
@@ -5595,6 +5664,7 @@
 				$(id).addEventListener('input', filtered);
 			for (const id of ['la-row-family', 'la-row-origin', 'la-row-language', 'la-row-complete'])
 				$(id).addEventListener('change', filtered);
+			$('la-table-csv').addEventListener('click', downloadRanking);
 			$('la-table-fold').addEventListener('change', (event) => {
 				state.table.fold = event.target.checked;
 				save();

@@ -1918,6 +1918,18 @@ body:has(> main.layout-analysis) {
 	box-shadow: inset 4px 0 0 var(--la-cat-2);
 }
 
+.la-csv-button {
+	align-items: center;
+	display: inline-flex;
+	gap: 6px;
+	margin-left: auto;
+	min-height: 32px;
+}
+
+.la-csv-button .la-row-icon {
+	stroke: var(--la-cat-4);
+}
+
 .la-table tr.la-row-member td:nth-child(2) {
 	padding-left: 28px;
 }

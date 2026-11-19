@@ -483,9 +483,11 @@ async function exercisePresets(browser, origin) {
 		EN['layout_analysis.weights.floor_named'].replace('{metric}', EN['layout_analysis.metric.sfb'])
 	);
 	// The export holds the floors, at version 2.
-	const download = page.waitForEvent('download');
-	await page.click('#la-config-export');
-	const file = JSON.parse(fs.readFileSync(await (await download).path(), 'utf8'));
+	const [exported] = await Promise.all([
+		page.waitForEvent('download'),
+		page.click('#la-config-export')
+	]);
+	const file = JSON.parse(fs.readFileSync(await exported.path(), 'utf8'));
 	assert.equal(file.schema_version, 2);
 	assert.equal(file.floors.sfb, 100, 'the floor is exported');
 	const old = Object.assign({}, file, { schema_version: 1 });
@@ -599,7 +601,102 @@ async function exerciseRankingViews(browser, origin) {
 	await context.close();
 }
 
+/** A minimal RFC 4180 reader: rows of fields, quotes and doubled quotes undone. */
+function parseCsv(text) {
+	const rows = [];
+	let row = [];
+	let field = '';
+	let quoted = false;
+	for (let i = 0; i < text.length; i++) {
+		const ch = text[i];
+		if (quoted) {
+			if (ch === '"' && text[i + 1] === '"') {
+				field += '"';
+				i++;
+			} else if (ch === '"') quoted = false;
+			else field += ch;
+		} else if (ch === '"') quoted = true;
+		else if (ch === ',') {
+			row.push(field);
+			field = '';
+		} else if (ch === '\r' && text[i + 1] === '\n') {
+			row.push(field);
+			rows.push(row);
+			row = [];
+			field = '';
+			i++;
+		} else field += ch;
+	}
+	return rows;
+}
+
+/**
+ * (ranking-csv) « Download the table (CSV) » writes the ranking as shown:
+ * its headers in the page's language, its rows in their order (a pinned row
+ * first), its visible columns, the values unrounded with a dot, a layout
+ * name with a comma or a quote quoted, and a name read as a formula made
+ * inert.
+ */
+async function exerciseRankingCsv(browser, origin) {
+	const context = await browser.newContext({
+		acceptDownloads: true,
+		viewport: { width: 1280, height: 900 }
+	});
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(
+		`${origin}/ui/layout_analysis/index.html?lang=fr&corpus=fr_nemolivier&layouts=ergopti,azerty,bepo`
+	);
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	await page.evaluate(() => {
+		const azerty = window.LAYOUT_ANALYSIS.libraryLayouts().find((l) => l.id === 'azerty');
+		window.LAYOUT_ANALYSIS_COMPARER.addLayouts([
+			{
+				id: 'user_odd',
+				name: '=SUM(1,2) "quoted"',
+				rows: azerty.rows,
+				dead: azerty.dead,
+				origin: 'user'
+			}
+		]);
+	});
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length === 4);
+	await page.click('#la-table button.la-pin[data-pin="bepo"]');
+	const shown = await page.$$eval('#la-table tbody tr', (rows) =>
+		rows.map((tr) => tr.querySelector('button.la-pin').dataset.pin)
+	);
+	const heads = await page.$$eval('#la-table thead th button.la-sort', (b) =>
+		b.map((n) => n.textContent)
+	);
+	const [file] = await Promise.all([page.waitForEvent('download'), page.click('#la-table-csv')]);
+	assert.equal(file.suggestedFilename(), 'ergopti-ranking.csv');
+	const text = fs.readFileSync(await file.path(), 'utf8').replace(/^﻿/, '');
+	const rows = parseCsv(text);
+	assert.deepEqual(rows[0], heads, 'the headers as shown, in French');
+	assert.equal(rows.length, shown.length + 1, 'one line per row shown');
+	const names = await page.evaluate(
+		(ids) =>
+			ids.map((id) => {
+				const l = window.LAYOUT_ANALYSIS.libraryLayouts().find((x) => x.id === id);
+				return l ? l.name : null;
+			}),
+		shown
+	);
+	assert.equal(rows[1][1], names[0], 'the pinned row first');
+	assert.ok(
+		rows.some((r) => r[1] === `'=SUM(1,2) "quoted"`),
+		`a formula made inert: ${text}`
+	);
+	const score = rows[1][2];
+	assert.match(score, /^-?\d+(\.\d+)?$/, `the score with a dot, unrounded: ${score}`);
+	assert.match(await page.textContent('#la-table-csv-status'), /ergopti-ranking\.csv/);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseRankingCsv,
 	exerciseRankingViews,
 	exercisePresets,
 	exercisePercentiles,
