@@ -648,10 +648,53 @@ helpers.describe("layout manager (Linux): uninstalling and activating", function
 
 	helpers.it("activates an installed layout through the installer (layout-registry-convert)", function()
 		local LayoutRegistry, deps, state = with_ergol({ OK_RUN, INSTALLED_RUN })
+		deps.session_type = function() return "wayland" end
+		deps.desktop_is = function(token) return token == "gnome" end
 		local result = run(function(done) LayoutRegistry.select("ergol", done, deps) end)
 		helpers.assert_true(result.ok, tostring(result.extra))
 		helpers.assert_eq(state.runs[2].args[2], "activate")
 		helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol")
+	end)
+
+	-- Xorg reads no user XKB tree: the installer refused every install and
+	-- activate there, so the layout manager and Studio could install nothing on
+	-- X11 though apply-x11 loads a user layout live (x11-layout-install).
+	helpers.it("selects a layout on X11 by loading it into the server and keeping it there (x11-layout-install)", function()
+		local LayoutRegistry, deps, state = with_ergol({ OK_RUN, INSTALLED_RUN })
+		deps.session_type = function() return "x11" end
+		local kept = {}
+		deps.keep_x11_layout = function(id) kept[#kept + 1] = id end
+		local result = run(function(done) LayoutRegistry.select("ergol", done, deps) end)
+		helpers.assert_true(result.ok, tostring(result.extra))
+		helpers.assert_eq(state.runs[2].args[2], "apply-x11", "no X11 desktop setting can select a user-tree layout")
+		helpers.assert_eq(arg_value(state.runs[2].args, "--layout-id"), "ergol")
+		helpers.assert_eq(kept, { "ergol" }, "the desktop putting its own layouts back does not undo the choice")
+		helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol")
+	end)
+
+	helpers.it("installs a registry layout and a composed one on X11 with the Xorg permission only there (x11-layout-install)", function()
+		for _, case in ipairs({ { "x11", true }, { "wayland", false } }) do
+			local layout = registry_file("ergol/ergol.keylayout")
+			local LayoutRegistry, deps, state = manager({
+				served = { [INDEX_URL] = INDEX_TEXT, [ERGOL_URL] = layout },
+				runs = { OK_RUN, INSTALLED_RUN },
+			})
+			deps.session_type = function() return case[1] end
+			deps.desktop_is = function(token) return token == "gnome" end
+			local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+			helpers.assert_true(result.ok, tostring(result.extra))
+			local args = state.runs[2].args
+			helpers.assert_eq(args[2], "install")
+			helpers.assert_eq(args[#args] == "--allow-xorg", case[2], case[1] .. ": registry install")
+			local Local, local_deps, local_state = manager({ runs = { OK_RUN, INSTALLED_RUN } })
+			local_deps.session_type = deps.session_type
+			local_deps.desktop_is = deps.desktop_is
+			local composed = run(function(done) Local.install_local(entry_of("ergol"), layout, done, local_deps) end)
+			helpers.assert_true(composed.ok, tostring(composed.extra))
+			local local_args = local_state.runs[2].args
+			helpers.assert_eq(local_args[2], "install")
+			helpers.assert_eq(local_args[#local_args] == "--allow-xorg", case[2], case[1] .. ": composed install")
+		end
 	end)
 
 	helpers.it("keeps the other layouts when one installed entry is outdated (config-outdated-installed)", function()

@@ -844,6 +844,18 @@ local function user_message(deps, code)
 	return nil
 end
 
+--- The installer arguments with the X11 permission when this session is X11:
+--- Xorg reads no user XKB tree, so the daemon loads the layout into the running
+--- server itself (select and apply_rows run apply-x11 and keep it there), and
+--- the installer refuses the tree to every other caller of an Xorg session.
+--- @param deps table Resolved collaborators.
+--- @param args table Installer arguments, extended in place.
+--- @return table args
+local function with_x11_permission(deps, args)
+	if M.live_path(deps) == "x11" then args[#args + 1] = "--allow-xorg" end
+	return args
+end
+
 --- Installs (or updates) one registry layout in the user XKB tree.
 --- on_done(true, { entry, source, verified }) or
 --- on_done(false, failure_code, detail, user_message) runs once unless terminal
@@ -945,7 +957,7 @@ function M.install(id, on_done, deps)
 					args[#args + 1] = "--language"
 					args[#args + 1] = language
 				end
-				run_installer(deps, args, function(installed, report, install_err)
+				run_installer(deps, with_x11_permission(deps, args), function(installed, report, install_err)
 					if not current(epoch) then return end
 					if not installed then
 						finish(false, report, install_err)
@@ -1051,7 +1063,11 @@ function M.select(id, on_done, deps)
 	end
 	if not acquire_slot(id, "select", on_done) then return false end
 	Logger.start(LOG, "Activating the '%s' layout…", id)
-	run_installer(deps, { "activate", "--layout-id", id }, function(ok, report, detail)
+	-- No X11 desktop setting reads the user tree: the layout is compiled into
+	-- the running server instead, and kept there when the desktop puts its own back.
+	local x11 = M.live_path(deps) == "x11"
+	local args = x11 and { "apply-x11", "--layout-id", id } or { "activate", "--layout-id", id }
+	run_installer(deps, args, function(ok, report, detail)
 		if not current(epoch) then return end
 		_busy = nil
 		if not ok then
@@ -1060,6 +1076,7 @@ function M.select(id, on_done, deps)
 			return
 		end
 		_active = id
+		if x11 and deps.keep_x11_layout then deps.keep_x11_layout(id) end
 		Logger.success(LOG, "Activated the '%s' layout.", id)
 		on_done(true, { id = id })
 	end)
@@ -1299,8 +1316,8 @@ function M.install_local(entry, text, on_done, deps)
 				finish(false, code, convert_err)
 				return
 			end
-			run_installer(deps, { "install", "--layout-id", id, "--display-name", entry.name,
-				"--source-dir", deps.local_dir .. id }, function(installed, report, install_err)
+			run_installer(deps, with_x11_permission(deps, { "install", "--layout-id", id, "--display-name", entry.name,
+				"--source-dir", deps.local_dir .. id }), function(installed, report, install_err)
 				if not current(epoch) then return end
 				if not installed then
 					finish(false, report, install_err)
