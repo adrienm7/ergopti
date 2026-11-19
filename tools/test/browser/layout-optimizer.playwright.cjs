@@ -195,6 +195,75 @@ async function libraryToEnd(page) {
 	return card.verdict;
 }
 
+/**
+ * (progress-chart) A run draws the best score over its time while it runs:
+ * a step line above the start's dashed line that gains points as the search
+ * reports, its summary in words (the score, the gain, the evaluations per
+ * second) and its points as a table with their units; the drawing itself is
+ * hidden from assistive technology, the figure named by its caption.
+ */
+async function exerciseProgressChart(browser, origin) {
+	const { page, errors, context } = await open(browser, origin);
+	assert.equal(await page.isHidden('#lo-chart'), true, 'no chart before a run');
+	await page.evaluate(() => {
+		document.querySelector('.lo-advanced').open = true;
+	});
+	// A run long enough to report several times: two seconds of one restart.
+	await page.fill('#lo-seconds', '2');
+	await page.fill('#lo-iterations', '1000000');
+	await page.fill('#lo-restarts', '1');
+	await page.click('#lo-run');
+	await page.waitForSelector('#lo-chart .lo-chart-line', { timeout: 120000 });
+	const live = [];
+	while (await page.isEnabled('#lo-stop')) {
+		live.push(await page.locator('#lo-chart-rows tr').count());
+		await page.waitForTimeout(150);
+	}
+	assert.ok(live.length > 0, 'the chart is drawn while the search runs');
+	await page.waitForFunction(() => !document.querySelector('#lo-run').disabled);
+	const chart = await page.evaluate(() => ({
+		hidden: document.getElementById('lo-chart-svg').getAttribute('aria-hidden'),
+		caption: document.querySelector('#lo-chart figcaption').textContent,
+		labelled: document.getElementById('lo-chart').getAttribute('aria-labelledby'),
+		path: document.querySelector('.lo-chart-line').getAttribute('d'),
+		start: Boolean(document.querySelector('.lo-chart-start')),
+		dot: Boolean(document.querySelector('.lo-chart-dot')),
+		ticks: Array.from(document.querySelectorAll('.lo-chart-tick'), (n) => n.textContent),
+		summary: document.getElementById('lo-chart-summary').textContent,
+		rows: Array.from(document.querySelectorAll('#lo-chart-rows tr'), (tr) =>
+			Array.from(tr.cells, (cell) => cell.textContent)
+		)
+	}));
+	assert.equal(chart.hidden, 'true', 'the drawing is hidden from assistive technology');
+	assert.equal(chart.caption, 'Best score over time');
+	assert.equal(chart.labelled, 'lo-chart-title');
+	assert.ok(chart.start && chart.dot, 'the start line and the last point are drawn');
+	assert.ok((chart.path.match(/ V /g) || []).length >= 2, `a line of points: ${chart.path}`);
+	assert.ok(
+		chart.ticks.some((tick) => /^\d+\u00a0s$/.test(tick)),
+		`the time axis has its unit: ${chart.ticks}`
+	);
+	assert.match(
+		chart.summary,
+		/^Best score -?\d[\d,]*\.\d\d\u00a0points, [+-]?\d[\d,]*\.\d\d\u00a0points over the start; last gain at \d+\.\d\u00a0s\. \d[\d,]*\u00a0layouts scored per second\.$/,
+		`the chart in words: ${JSON.stringify(chart.summary)}`
+	);
+	assert.ok(chart.rows.length >= 2, `the table lists the points: ${chart.rows.length}`);
+	for (const [time, best, gain] of chart.rows) {
+		assert.match(time, /^\d+\.\d\u00a0s$/, time);
+		assert.match(best, /\u00a0points$/, best);
+		assert.match(gain, /^[+-]?\d[\d,]*\.\d\d\u00a0points$/, gain);
+	}
+	// The pointer over the drawing shows the point under it.
+	const box = await page.locator('#lo-chart-svg').boundingBox();
+	await page.hover('#lo-chart-svg', { position: { x: box.width * 0.9, y: box.height / 2 } });
+	assert.match(await page.textContent('#lo-chart-tip'), / s · .* points$/);
+	await page.mouse.move(0, 0);
+	assert.equal(await page.isHidden('#lo-chart-tip'), true, 'leaving the drawing hides it');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 async function main() {
 	const server = await serve();
 	const origin = `http://127.0.0.1:${server.address().port}`;
@@ -677,6 +746,9 @@ async function main() {
 			await context.close();
 		}
 
+		// ======= 4e/ The search's progress as a live chart =======
+		await exerciseProgressChart(browser, origin);
+
 		// ======= 5/ Light and dark at phone width, every locale =======
 		for (const colorScheme of ['light', 'dark']) {
 			const { page, errors, context } = await open(browser, origin, {
@@ -725,7 +797,10 @@ async function main() {
 	console.log('PASS layout-optimizer.playwright');
 }
 
-main().catch((error) => {
-	console.error(error);
-	process.exit(1);
-});
+module.exports = { exerciseProgressChart };
+
+if (require.main === module)
+	main().catch((error) => {
+		console.error(error);
+		process.exit(1);
+	});

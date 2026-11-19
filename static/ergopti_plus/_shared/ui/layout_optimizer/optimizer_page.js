@@ -45,6 +45,13 @@
  *    result says which existing layout comes close, by how much it is alike
  *    (LAYOUT_ANALYSIS.layoutSimilarity) and its score gap, with links to
  *    open it in « Comparer » or « Éditer ».
+ * 12. Edit, then improve: the editor's « Optimize this layout » opens the
+ *    page on the edited layout as its start (setStart in the app, the tab's
+ *    hand-off on the site), said in the status line.
+ * 13. Progress in sight: a live chart draws the best score over the
+ *    run's time above the start's score, with the evaluations per second, the
+ *    same said in words and as a table (the drawing is hidden from assistive
+ *    technology, its text is not).
  * ==============================================================================
  */
 
@@ -107,6 +114,19 @@
 	// The best layout's metrics are measured again at most this often (ms).
 	const METRICS_MS = 500;
 	const HEIGHT_MESSAGE = 'ergopti-layout-optimizer:height';
+	// The progress chart: its width when its box is not laid out yet and its
+	// height (px, drawn at the box's width so the text keeps its size), its
+	// margins for the axes, the room under the start's line for its label, the
+	// points it keeps (older ones thinned), the rows of its table, and a new
+	// point at least this often while the best holds (s).
+	const CHART_WIDTH = 640;
+	const CHART_HEIGHT = 240;
+	const CHART_MARGIN = Object.freeze({ top: 16, right: 20, bottom: 34, left: 64 });
+	const CHART_START_ROOM = 24;
+	const CHART_MAX_POINTS = 240;
+	const CHART_TABLE_ROWS = 12;
+	const CHART_POINT_SECONDS = 1;
+	const SVG_NS = 'http://www.w3.org/2000/svg';
 	// The corpus a pasted text or an opened file makes.
 	const CUSTOM_ID = 'custom';
 	// The app's keystats corpus (« My typing ») and the event its Studio window
@@ -239,6 +259,25 @@
 <section id="lo-result" class="lo-card lo-step lo-step-result" aria-labelledby="lo-result-title" hidden>
 	<h2 id="lo-result-title" data-i18n="layout_optimizer.result.title"></h2>
 	<div id="lo-score" class="lo-tiles"></div>
+	<figure id="lo-chart" class="lo-chart" aria-labelledby="lo-chart-title" hidden>
+		<figcaption id="lo-chart-title" data-i18n="layout_optimizer.chart.title"></figcaption>
+		<div class="lo-chart-box">
+			<svg id="lo-chart-svg" class="lo-chart-svg" aria-hidden="true" focusable="false"></svg>
+			<p id="lo-chart-tip" class="lo-chart-tip" aria-hidden="true" hidden></p>
+		</div>
+		<p id="lo-chart-summary" class="lo-chart-summary"></p>
+		<details class="lo-chart-details">
+			<summary data-i18n="layout_optimizer.chart.table"></summary>
+			<div class="lo-table-box"><table class="lo-table lo-chart-table">
+				<thead><tr>
+					<th scope="col" data-i18n="layout_optimizer.chart.time"></th>
+					<th scope="col" data-i18n="layout_optimizer.chart.best"></th>
+					<th scope="col" data-i18n="layout_optimizer.chart.gain"></th>
+				</tr></thead>
+				<tbody id="lo-chart-rows"></tbody>
+			</table></div>
+		</details>
+	</figure>
 	<div class="lo-boards">
 		<figure class="lo-figure">
 			<figcaption data-i18n="layout_optimizer.start.label"></figcaption>
@@ -570,6 +609,8 @@
 			best: null,
 			bestLayout: null,
 			lastMetrics: 0,
+			// The run's progress chart: {start, points: [{seconds, best, evaluations}]}.
+			chart: null,
 			// The library scan after a run (scanLibrary): {runner}, or null.
 			library: null
 		};
@@ -1194,6 +1235,7 @@
 			$('lo-open-editor').disabled = true;
 			$('lo-open-comparer').disabled = true;
 			showBest(start, state.startResult.score.total, false);
+			resetChart();
 
 			enter('search');
 			// One share of the restarts per worker, in order, so the split never changes the winner.
@@ -1291,11 +1333,13 @@
 					showBest(message.layout, message.progress.best, true);
 				}
 				showProgress(running, began, iterations);
+				chartProgress(running, began, false);
 				return;
 			}
 			part.result = message.result;
 			running.finished += 1;
 			if (running.finished === running.shares.length) {
+				chartProgress(running, began, true);
 				const winner = O.bestOf(running.shares.map((entry) => entry.result));
 				showBest(winner.layout, winner.score, true, true);
 				finish(running, began, null);
@@ -1543,6 +1587,217 @@
 		}
 
 		// ============================
+		// ======= 5b/ Progress chart =
+		// ============================
+
+		/** The run's chart, emptied: it draws from the first progress. */
+		function resetChart() {
+			state.chart = { start: null, points: [], geometry: null };
+			$('lo-chart').hidden = false;
+			drawChart();
+		}
+
+		/**
+		 * Adds the runners' best so far to the chart: a point when it rose, or
+		 * once per CHART_POINT_SECONDS while it holds, so the line reaches now.
+		 */
+		function chartProgress(running, began, final) {
+			const chart = state.chart;
+			if (!chart) return;
+			const reported = running.shares.filter((part) => part.progress);
+			if (reported.length === 0) return;
+			if (chart.start === null) chart.start = reported[0].progress.startScore;
+			const best = Math.max(...reported.map((part) => part.progress.best));
+			const point = {
+				seconds: (Date.now() - began) / 1000,
+				best,
+				evaluations: evaluations(running)
+			};
+			const last = chart.points[chart.points.length - 1];
+			if (last && !final && best <= last.best && point.seconds - last.seconds < CHART_POINT_SECONDS)
+				return;
+			chart.points.push(point);
+			// A long run keeps its first and last points and thins the others.
+			if (chart.points.length > CHART_MAX_POINTS)
+				chart.points = chart.points.filter(
+					(_, i, all) => i === 0 || i === all.length - 1 || i % 2 === 1
+				);
+			drawChart();
+		}
+
+		/** A number of seconds and its unit, tied by a no-break space. */
+		const secondsText = (value, digits) =>
+			withUnit(number(value, digits), t(`${PREFIX}unit.seconds`));
+		/** A score and its unit. */
+		const pointsText = (value) => withUnit(number(value, 2), t('layout_analysis.unit.points'));
+
+		/** The round steps (1, 2 or 5 times a power of ten) that cover [low, high] in about three. */
+		function ticks(low, high) {
+			const raw = (high - low || 1) / 3;
+			const power = Math.pow(10, Math.floor(Math.log10(raw)));
+			const step = [1, 2, 5, 10].map((f) => f * power).find((f) => f >= raw);
+			const values = [];
+			for (let v = Math.ceil(low / step) * step; v <= high + step * 1e-9; v += step) values.push(v);
+			return { values, digits: Math.max(0, -Math.floor(Math.log10(step))) };
+		}
+
+		function svg(tag, attrs, text) {
+			const node = document.createElementNS(SVG_NS, tag);
+			for (const [name, value] of Object.entries(attrs || {}))
+				node.setAttribute(name, String(value));
+			if (text !== undefined) node.textContent = text;
+			return node;
+		}
+
+		/**
+		 * Draws the best score over time: a step line and its area above the
+		 * start's score, a dashed line at the start, the last point marked,
+		 * round ticks on both axes. The summary says the same in words and the
+		 * table gives the points, so nothing is told by the drawing alone.
+		 */
+		function drawChart() {
+			const chart = state.chart;
+			const box = $('lo-chart-svg');
+			const width = Math.round(box.parentElement.clientWidth) || CHART_WIDTH;
+			box.setAttribute('viewBox', `0 0 ${width} ${CHART_HEIGHT}`);
+			box.replaceChildren();
+			$('lo-chart-tip').hidden = true;
+			const points = chart ? chart.points : [];
+			if (!chart || points.length === 0 || chart.start === null) {
+				$('lo-chart-summary').textContent = t(`${PREFIX}chart.waiting`);
+				$('lo-chart-rows').replaceChildren();
+				return;
+			}
+			const m = CHART_MARGIN;
+			const right = width - m.right;
+			const bottom = CHART_HEIGHT - m.bottom;
+			const last = points[points.length - 1];
+			const xMax = Math.max(1, last.seconds);
+			const yLow = Math.min(chart.start, ...points.map((p) => p.best));
+			const yHigh = Math.max(chart.start, ...points.map((p) => p.best));
+			// The start's line sits CHART_START_ROOM above the axis, for its label.
+			const floor = bottom - CHART_START_ROOM;
+			const perPixel = (yHigh - yLow || 1) / (floor - m.top);
+			const y0 = yLow - CHART_START_ROOM * perPixel;
+			const y1 = yLow + (bottom - m.top) * perPixel;
+			const x = (seconds) => m.left + (seconds / xMax) * (right - m.left);
+			const y = (score) => bottom - (score - y0) / perPixel;
+			// The grid and the axes' values, recessive.
+			const yTicks = ticks(y0, y1);
+			for (const value of yTicks.values) {
+				box.append(
+					svg('line', { class: 'lo-chart-grid', x1: m.left, x2: right, y1: y(value), y2: y(value) })
+				);
+				box.append(
+					svg(
+						'text',
+						{ class: 'lo-chart-tick', x: m.left - 8, y: y(value) + 4, 'text-anchor': 'end' },
+						number(value, yTicks.digits)
+					)
+				);
+			}
+			const xTicks = ticks(0, xMax);
+			for (const value of xTicks.values)
+				box.append(
+					svg(
+						'text',
+						{ class: 'lo-chart-tick', x: x(value), y: bottom + 22, 'text-anchor': 'middle' },
+						secondsText(value, xTicks.digits)
+					)
+				);
+			box.append(
+				svg('line', { class: 'lo-chart-axis', x1: m.left, x2: right, y1: bottom, y2: bottom })
+			);
+			// The start's score, the line the search climbs from.
+			box.append(
+				svg('line', {
+					class: 'lo-chart-start',
+					x1: m.left,
+					x2: right,
+					y1: y(chart.start),
+					y2: y(chart.start)
+				})
+			);
+			box.append(
+				svg(
+					'text',
+					{ class: 'lo-chart-label', x: right, y: y(chart.start) + 16, 'text-anchor': 'end' },
+					t(`${PREFIX}result.start`)
+				)
+			);
+			// A step line: the best holds until the next gain.
+			let path = `M ${x(0)} ${y(chart.start)}`;
+			for (const point of points) path += ` H ${x(point.seconds)} V ${y(point.best)}`;
+			const area = `${path} H ${x(last.seconds)} V ${y(chart.start)} Z`;
+			box.append(svg('path', { class: 'lo-chart-area', d: area }));
+			box.append(svg('path', { class: 'lo-chart-line', d: path }));
+			box.append(
+				svg('circle', { class: 'lo-chart-dot', cx: x(last.seconds), cy: y(last.best), r: 5 })
+			);
+			chart.geometry = { x, y, points, width };
+
+			// The same in words, and the points as a table.
+			const gains = points.filter((point, i) => i === 0 || point.best > points[i - 1].best);
+			const lastGain = gains[gains.length - 1];
+			$('lo-chart-summary').textContent = t(`${PREFIX}chart.summary`, {
+				best: pointsText(last.best),
+				at: secondsText(lastGain.seconds, 1),
+				gain: withUnit(signed(last.best - chart.start, 2), t('layout_analysis.unit.points')),
+				rate: number(last.seconds > 0 ? last.evaluations / last.seconds : 0, 0)
+			});
+			const every = Math.max(1, Math.ceil(points.length / CHART_TABLE_ROWS));
+			const rows = points.filter((_, i) => i % every === 0 || i === points.length - 1);
+			$('lo-chart-rows').replaceChildren(
+				...rows.map((point) => {
+					const tr = el('tr');
+					tr.append(
+						el('td', 'lo-num', secondsText(point.seconds, 1)),
+						el('td', 'lo-num', pointsText(point.best)),
+						el(
+							'td',
+							'lo-num',
+							withUnit(signed(point.best - chart.start, 2), t('layout_analysis.unit.points'))
+						)
+					);
+					return tr;
+				})
+			);
+		}
+
+		/** The point under the pointer: a guide line, and its time and score beside it. */
+		function chartHover(event) {
+			const chart = state.chart;
+			if (!chart || !chart.geometry) return;
+			const box = $('lo-chart-svg');
+			const rect = box.getBoundingClientRect();
+			if (rect.width === 0) return;
+			const { x, y, points, width } = chart.geometry;
+			const at = ((event.clientX - rect.left) / rect.width) * width;
+			let point = points[0];
+			for (const candidate of points) if (x(candidate.seconds) <= at) point = candidate;
+			let guide = box.querySelector('.lo-chart-guide');
+			if (!guide) {
+				guide = svg('line', { class: 'lo-chart-guide' });
+				box.append(guide);
+			}
+			guide.setAttribute('x1', x(point.seconds));
+			guide.setAttribute('x2', x(point.seconds));
+			guide.setAttribute('y1', CHART_MARGIN.top);
+			guide.setAttribute('y2', CHART_HEIGHT - CHART_MARGIN.bottom);
+			const tip = $('lo-chart-tip');
+			tip.textContent = `${secondsText(point.seconds, 1)} · ${pointsText(point.best)}`;
+			tip.style.left = `${(x(point.seconds) / width) * 100}%`;
+			tip.style.top = `${(y(point.best) / CHART_HEIGHT) * 100}%`;
+			tip.hidden = false;
+		}
+
+		function chartLeave() {
+			$('lo-chart-tip').hidden = true;
+			const guide = $('lo-chart-svg').querySelector('.lo-chart-guide');
+			if (guide) guide.remove();
+		}
+
+		// ============================
 		// ======= 6/ Hand-offs =======
 		// ============================
 
@@ -1760,6 +2015,8 @@
 			$('lo-stop').addEventListener('click', stop);
 			$('lo-open-editor').addEventListener('click', openEditor);
 			$('lo-open-comparer').addEventListener('click', openComparer);
+			$('lo-chart-svg').addEventListener('pointermove', chartHover);
+			$('lo-chart-svg').addEventListener('pointerleave', chartLeave);
 			if (typeof ResizeObserver === 'function') {
 				let width = root.clientWidth;
 				new ResizeObserver(() => {
@@ -1767,6 +2024,7 @@
 					width = root.clientWidth;
 					drawPinBoards();
 					drawResultBoards();
+					if (state.chart) drawChart();
 				}).observe(root);
 			}
 		}
@@ -1780,6 +2038,7 @@
 			fillSwitches();
 			fillPresets();
 			drawSettings();
+			if (state.chart) drawChart();
 		}
 
 		// Saving waits until the saved choices are back, or the defaults would replace them.

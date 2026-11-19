@@ -437,6 +437,116 @@ body:has(> main.layout-optimizer) {
 	width: 100%;
 }
 
+/* The best score over the run's time: a step line climbing from the start's
+   dashed line, the gain filled under it; the grid and ticks stay recessive. */
+.lo-chart {
+	background: var(--lo-inset);
+	border: 1px solid var(--lo-border);
+	border-radius: var(--lo-radius);
+	margin: var(--lo-space-4) 0 0;
+	padding: var(--lo-space-4);
+}
+
+.lo-chart figcaption {
+	font-weight: 600;
+	margin-bottom: var(--lo-space-2);
+}
+
+.lo-chart-box {
+	position: relative;
+}
+
+.lo-chart-svg {
+	display: block;
+	height: auto;
+	touch-action: pan-y;
+	width: 100%;
+}
+
+.lo-chart-grid {
+	stroke: var(--lo-border);
+	stroke-width: 1;
+}
+
+.lo-chart-axis {
+	stroke: var(--lo-sub);
+	stroke-width: 1;
+}
+
+.lo-chart-start {
+	stroke: var(--lo-sub);
+	stroke-dasharray: 6 4;
+	stroke-width: 1.5;
+}
+
+.lo-chart-tick,
+.lo-chart-label {
+	fill: var(--lo-sub);
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+}
+
+.lo-chart-label {
+	font-weight: 600;
+}
+
+.lo-chart-area {
+	fill: var(--lo-accent-soft);
+	stroke: none;
+}
+
+.lo-chart-line {
+	fill: none;
+	stroke: var(--lo-accent);
+	stroke-linejoin: round;
+	stroke-width: 2.5;
+}
+
+/* The last point, ringed with the card's colour so it reads over the line. */
+.lo-chart-dot {
+	fill: var(--lo-accent);
+	stroke: var(--lo-inset);
+	stroke-width: 2;
+}
+
+.lo-chart-guide {
+	stroke: var(--lo-sub);
+	stroke-width: 1;
+}
+
+.lo-chart-tip {
+	background: var(--lo-card);
+	border: 1px solid var(--lo-border);
+	border-radius: 6px;
+	font-size: 0.85em;
+	font-variant-numeric: tabular-nums;
+	margin: 0;
+	padding: 2px var(--lo-space-2);
+	pointer-events: none;
+	position: absolute;
+	transform: translate(-50%, calc(-100% - 8px));
+	white-space: nowrap;
+}
+
+.lo-chart-summary {
+	margin: var(--lo-space-3) 0 var(--lo-space-2);
+}
+
+.lo-chart-details summary {
+	cursor: pointer;
+}
+
+@media (forced-colors: active) {
+	.lo-chart-line,
+	.lo-chart-dot {
+		stroke: CanvasText;
+	}
+
+	.lo-chart-area {
+		fill: none;
+	}
+}
+
 /* ============================== */
 /* ============================== */
 /* ======= 5/ Boards ============ */
