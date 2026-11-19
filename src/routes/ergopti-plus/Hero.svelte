@@ -497,7 +497,9 @@ FEATURES & RATIONALE:
 		font-size: clamp(0.95rem, 1.2vw, 1.08rem);
 		line-height: 1.65;
 		margin: 0 auto 26px;
-		max-width: 600px;
+		/* At most 80 characters per line (WCAG 1.4.8): 600 px held 86 of them
+		   once the subtitle named the tap-holds in French (site-reading.cjs). */
+		max-width: min(600px, 55ch);
 		text-align: center;
 		text-wrap: pretty;
 	}
