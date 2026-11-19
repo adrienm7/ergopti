@@ -448,6 +448,10 @@ regressions are red on the old data: the gate names `credential_guard`, and the 
 
 ### Open
 
+Follow-up the same day: SFC-02, SFC-03 and SFC-05 are fixed, and SFC-04 waits
+for the maintainer; see the
+[register](../../../platform-parity-audit.md#platform-parity-table--november-19-2026).
+
 - **SFC-02 (medium, macOS, hypothesis on its reach):** `refresh()` publishes
   « not secure » when it cannot classify (`secure_field_detector.lua:263-292`):
   - no frontmost application (`:272`);

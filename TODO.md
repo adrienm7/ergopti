@@ -293,10 +293,17 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       do not restart a finished campaign without source drift or a new hypothesis. The
       [2026-11-19 census](docs/audits/platform-parity/2026-11-19-census/report.md) (`b90ad8de`, S26 included: 190
       areas, 108 drifted, 69 never campaigned; 316 units, 99 never campaigned) ranks what is left and proposes the
-      order. Its first campaign, secure-field detection, fixed the Windows system keychain row (SFC-01). Left:
-  - the secure-field findings SFC-02 (macOS `refresh()` publishes « not secure » when it cannot classify), SFC-03
-    (the port spec still says fail open), SFC-04 (missing Yubico and authenticator identities, a maintainer
-    choice) and SFC-05 (the RoboForm AHK case cannot fail);
+      order. Its first campaign, secure-field detection, fixed SFC-01, SFC-02 (macOS `refresh()` fails closed), SFC-03
+      (the port spec and a fail-closed vector replayed on the three drivers) and SFC-05 (the RoboForm AHK case
+      asserts the application axis). The generated
+      [platform parity table](docs/platform-parity-table.md) now gives every feature, action, layer entry and menu
+      row its status, owner and reasons per OS, and `test-linux-feature-parity.cjs` gates it. Left:
+  - the maintainer decisions of the register (« Maintainer decisions pending »): SFC-04 (Yubico and
+    authenticator identities), PPT-01 (the two chevron rolls no driver registers), PPT-02 (the five Windows
+    personal shortcut switches no code reads), PPT-03 (`llm.generation.sequential_mode` read by macOS only);
+  - the two `not_yet` reasons of the table (three cells): `token_streaming_unvalidated_on_windows`,
+    `shortcuts_restore_is_composed_on_macos` (the only real parity gaps the reasons declare);
+  - SFC-06 (Credential Manager inside `explorer.exe`, field path only; no fix possible by process name);
   - the next campaigns in the report's order: logger engines, the managed Ollama runtime drift, tray adapters,
     update and download windows, pickers and prompts, metrics views, small native units, layout tool pages.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
