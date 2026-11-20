@@ -416,6 +416,20 @@ not adopted (an always-ready source would spin the loop). Action: a new GLib
 or GTK consumer on the daemon's thread relies on this wake, and a change to
 the wait keeps `run_perf_budget_container.py`'s tray budgets green.
 
+### project-linux-idle-wait-libuv-backend-and-wake
+
+The idle wait sleeps inside a libuv idle callback, before libuv polls, so it
+also polls the loop's backend descriptor (`core/events/loop.lua` hands its
+companion to `idleWait`): a socket, pipe or thread-pool completion ends the
+wait at once. That alone cannot see a watcher a callback restarts (a
+`read_start` after a pause): libuv registers it with epoll only on its next
+poll, after the idle tick. Such a callback calls `event_loop.wake()`, which
+skips one wait; the curl output reader does on every resume. Before
+2026-11-20 an owned archive download waited both out on every 64 KiB chunk
+(3 MB/s). Action: a new paused-and-resumed libuv reader on the daemon's
+thread calls `wake()` after its restart; measure with
+`tests/hardware/run_archive_download_throughput.lua`.
+
 ### project-linux-file-manager-folder-needs-the-window-own-bus
 
 The folder of a file manager window is read only where the window publishes

@@ -61,7 +61,7 @@ M.FLUSH_INTERVAL_MS = 60000
 
 -- Every counter, by name. A name is "<area>.<what>".
 local COUNTER_NAMES = {
-	"loop.idle_ticks", "loop.idle_wakes_input", "loop.idle_timeouts",
+	"loop.idle_ticks", "loop.idle_wakes_input", "loop.idle_timeouts", "loop.idle_wakes_requested",
 	"loop.periodic_ticks", "loop.deferred_runs",
 	"input.pump_calls", "input.events", "input.key_events", "input.pointer_events",
 	"input.forwarded_events",

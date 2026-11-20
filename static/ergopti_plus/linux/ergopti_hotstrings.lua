@@ -3846,6 +3846,9 @@ local function main()
 		end
 	end)
 
+	-- The idle wait's companions, refilled on every wait: one array, so a wait
+	-- allocates nothing.
+	local idle_companions = {}
 	event_loop.run({
 		onIdle = function()
 			if shutdown.is_requested() then shutdown.poll(); return end
@@ -3890,9 +3893,16 @@ local function main()
 		onPeriodic = on_periodic,
 		periodSec = 0.25,
 		-- Sleep on the input descriptors between ticks instead of spinning a core,
-		-- and on the tray's GLib descriptors, so a panel's request wakes it too.
-		idleWait = function(timeout_ms)
-			return keyboard_hook.idle_wait(timeout_ms, tray_menu and tray_menu.wait_companion() or nil)
+		-- on the loop's libuv descriptor, so a socket, pipe or file write
+		-- acknowledgement wakes it, and on the tray's GLib descriptors, so a
+		-- panel's request does too.
+		idleWait = function(timeout_ms, loop_companion)
+			local count = 0
+			if loop_companion then count = count + 1; idle_companions[count] = loop_companion end
+			local tray_companion = tray_menu and tray_menu.wait_companion() or nil
+			if tray_companion then count = count + 1; idle_companions[count] = tray_companion end
+			for index = count + 1, #idle_companions do idle_companions[index] = nil end
+			return keyboard_hook.idle_wait(timeout_ms, idle_companions)
 		end,
 	})
 

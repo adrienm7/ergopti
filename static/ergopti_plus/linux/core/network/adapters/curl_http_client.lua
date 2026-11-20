@@ -19,6 +19,7 @@ local ShellRunner = require("core.process.adapters.shell_runner")
 local LibuvExit = require("core.lifecycle.engine.shutdown.libuv_exit")
 local BodyPipe = require("core.network.engine.http_body_pipe")
 local OutputTarget = require("core.network.engine.http_output_target")
+local EventLoop = require("core.events.loop")
 local NativeTimer = require("core.timing.engine.native_timer")
 local ExactIdentity = require("core.network.engine.curl_identity")
 local RedirectReceipt = require("core.network.engine.http_redirect_receipt")
@@ -863,7 +864,11 @@ local function bind_output_target(request, target)
 			end) or not readable() then return false end
 		paused = false -- A synchronous callback may legitimately pause a new write.
 		local called, ack, err = pcall(luv.read_start, reader, read_callback)
-		return called and ack ~= nil and ack ~= false and err == nil and exact()
+		local resumed = called and ack ~= nil and ack ~= false and err == nil
+		-- curl has kept writing while paused: the next chunk is already in the
+		-- pipe, and libuv registers the restarted reader only on its next poll.
+		if resumed then EventLoop.wake() end
+		return resumed and exact()
 	end
 	function input:abort(ticket, producer)
 		if not rawequal(producer, operation) or not OutputTarget.owns(target, ticket, producer) or not exact() then return false end
