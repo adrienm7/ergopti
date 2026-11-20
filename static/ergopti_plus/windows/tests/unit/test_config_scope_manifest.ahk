@@ -461,13 +461,21 @@ _ScopeObsoleteSource(Literal, Parent := false) {
 		: '[layout]`nergopti_base = ' . Literal . ' # retain until explicit cleanup`nergopti_alt_gr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n')
 }
 
-; The four preview switches are active by default, so a hotstrings clear writes
-; their off value (the manifest's cleared value) instead of deleting them. A new
-; key opens its section, as the shared batch-write corpus pins (the vector
-; header-scalar-new-key-gets-the-precise-numeric-literal); keys follow the manifest order.
+; The preview switches (HSE_PreviewSwitchKeys, their one home) are active by
+; default, so a hotstrings clear writes their off value (the manifest's cleared
+; value) instead of deleting them. A new key opens its section, as the shared
+; batch-write corpus pins (the vector
+; header-scalar-new-key-gets-the-precise-numeric-literal); new keys are written
+; in key order.
 _ScopePreviewOffRows() {
-	return "preview_ai_enabled = false`npreview_autocorrect_enabled = false`n"
-		. "preview_colored_tooltips = false`npreview_star_enabled = false`n"
+	Keys := ""
+	for Key in HSE_PreviewSwitchKeys()
+		Keys .= (Keys = "" ? "" : "`n") . Key
+	Assert(InStr(Keys, "preview_star_enabled"), "the preview switch list must name its switches")
+	Rows := ""
+	Loop Parse, Sort(Keys), "`n"
+		Rows .= A_LoopField . " = false`n"
+	return Rows
 }
 
 _ScopeObsoleteLeafClear(Literal, Outcome := "complete") {
