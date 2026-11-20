@@ -1348,6 +1348,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/reader/test_klr_projection_paging.ahk
 #Include unit/modules/keystats/reader/test_klr_worker_memory_bound.ahk
 #Include unit/modules/keystats/reader/test_klr_overlay_refresh.ahk
+#Include unit/modules/keystats/reader/test_klr_replay_scope.ahk
 #Include unit/modules/keystats/reader/test_klr_projection_cursor_int64.ahk
 #Include unit/modules/keystats/reader/test_klr_projection_page_work.ahk
 #Include unit/modules/keystats/reader/test_klr_projection_sql_failure.ahk

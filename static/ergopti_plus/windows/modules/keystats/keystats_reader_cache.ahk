@@ -33,9 +33,12 @@
 ; 3. Publication is atomic: the image is written to a private temp database and
 ;    renamed over the previous one, so an interrupted save can never leave a
 ;    half-written cache for the next worker to trust.
-; 4. A refresh recomputes whole affected days, never just the appended rows. The
-;    walker is stateful and its context is not persisted with the cache, so
-;    folding in a tail alone cannot reproduce cross-event statistics.
+; 4. A refresh recomputes whole affected app-days, never just the appended
+;    rows. The walker is stateful and its context is not persisted with the
+;    cache, so folding in a tail alone cannot reproduce cross-event statistics;
+;    its state is keyed by app, so an app the tail left alone keeps its rows
+;    (KLR_ReplayScopeBegin), and a tail touching the system sweep rebuilds the
+;    whole day.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+

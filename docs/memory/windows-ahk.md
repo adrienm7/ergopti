@@ -1342,9 +1342,31 @@ cold unless the previous worker's image is restored from
 so it must stay the fallback, never the normal path. Only the worker may write
 the image: the resident driver's handle carries live-walker deltas that
 `data.sql` alone cannot reproduce. A refresh clears and replays whole affected
-days rather than folding in just the tail, because the persisted image does not
-carry the walker's cross-event context; the cost of that choice is that n-grams
-no longer chain across a day boundary. JSON distributions must accumulate across
+app-days rather than folding in just the tail, because the persisted image does
+not carry the walker's cross-event context; the cost of that choice is that
+n-grams no longer chain across a day boundary. A worker scopes the replay to the
+(device, day, app) the tail inserted into or deleted from, recorded by TEMP
+triggers during the apply (`KLR_ReplayScopeBegin`): the n-gram context is keyed
+by app, bursts, sessions and errors by app and day, and every row the logical
+and window sweeps write carries the event's app. The system sweep writes per-day
+rows without an app (`agg_system_day`), so a tail touching `events_system`, or
+an event with no app, replays that device's whole day. Replaying less than an
+app-day would need the walker's state at the consumed boundary persisted and a
+flush that merges instead of replacing its JSON columns, and appended rows can
+carry ids below the consumed ones, so the logical order would differ from a
+cold build's; keep the app-day as the unit. Action: a new walker table keyed
+without app, or a sweep that writes another app's rows, belongs in
+`KLRReplayTables.WHOLE_DAY` and must widen the scope to the whole day.
+
+A worker refreshing the shared read-only image writes through a copy-on-write
+overlay of the file it validated (`SQLite_OpenCopyOnWrite`: a `PAGE_WRITECOPY`
+view and a committed growth area in one placeholder range, served by
+`sqlite3_deserialize`), never a copy of the whole image (6 to 20 s on 1.1 GB).
+The file is never written, so readers never see a partial state and closing the
+overlay undoes a failure; the save may replace the file while the overlay still
+maps it. Past `WORKER_OVERLAY_SLACK_BYTES` SQLite reports SQLITE_FULL and the
+refresh fails without publishing. macOS and Linux read `db.sqlite` read only and
+have no worker image to copy, so they have no such step. JSON distributions must accumulate across
 flushes even during cold replay: cold/warm equality alone can compare two equally
 truncated distributions, so pin conservation across batch boundaries as well.
 
