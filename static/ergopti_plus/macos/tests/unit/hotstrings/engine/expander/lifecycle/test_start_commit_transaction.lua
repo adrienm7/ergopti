@@ -12,6 +12,9 @@
 local helpers = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
 local ONE_SHOT_DATA = assert(require("core.text.engine.json").decode(SourceFile.read(helpers.shared("tap_hold/data/one_shot_shift.json"))))
+-- The fixture's manifest stub answers false for a boolean it does not name; a
+-- number is read from the real manifest, which owns its default and its range.
+local RESTORE_WINDOW_MS = require("menu.engine.manifest_reader").default_for("hotstrings.backspace_restore_window_ms")
 
 local RESET_MODULES = {
 	"hotstrings.engine.expander", "hotstrings.engine.expander.init", "hotstrings.engine.expander.registry",
@@ -263,6 +266,7 @@ local function load_fixture(prepare_input)
 			-- The word-reset policy stays neutral: these scenarios are not about pauses.
 			if key == "hotstrings.idle_reset_seconds" then return 0 end
 			if key == "hotstrings.cascade_max_arrows" then return 1 end
+			if key == "hotstrings.backspace_restore_window_ms" then return RESTORE_WINDOW_MS end
 			return false
 		end,
 	}
