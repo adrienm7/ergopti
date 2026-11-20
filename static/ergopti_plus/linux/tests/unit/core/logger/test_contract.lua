@@ -163,14 +163,16 @@ end)
 -- error escape into its caller
 describe("logger shim print fallback", function()
 	it("prints the shared labels and marks a failed format", function()
-		local saved_core, saved_driver = package.loaded["core.logger.engine"], package.loaded["core.logger.engine.logger"]
+		-- The shim's second candidate, the macOS driver logger, is no Linux module:
+		-- refusing the shared core alone leaves the shim on its print fallback.
+		assert_true(package.searchpath("core.logger.engine.logger", package.path) == nil,
+			"Linux has no driver logger module for the shim to find")
+		local saved_core = package.loaded["core.logger.engine"]
 		local saved_preload_core = package.preload["core.logger.engine"]
-		local saved_preload_driver = package.preload["core.logger.engine.logger"]
 		local saved_print = print
 		local printed = {}
-		package.loaded["core.logger.engine"], package.loaded["core.logger.engine.logger"] = nil, nil
+		package.loaded["core.logger.engine"] = nil
 		package.preload["core.logger.engine"] = function() error("core unavailable in this fixture") end
-		package.preload["core.logger.engine.logger"] = function() error("driver logger unavailable in this fixture") end
 		print = function(line) printed[#printed + 1] = line end
 		local ok, err = pcall(function()
 			local fallback = dofile(helpers.driver_root() .. "/../_shared/core/logger/engine/shim.lua")
@@ -179,8 +181,7 @@ describe("logger shim print fallback", function()
 		end)
 		print = saved_print
 		package.preload["core.logger.engine"] = saved_preload_core
-		package.preload["core.logger.engine.logger"] = saved_preload_driver
-		package.loaded["core.logger.engine"], package.loaded["core.logger.engine.logger"] = saved_core, saved_driver
+		package.loaded["core.logger.engine"] = saved_core
 		assert_true(ok, tostring(err))
 		assert_eq(2, #printed)
 		assert_true(printed[1]:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:000 %[WARNING%] %[probe%] careful now$") ~= nil,
