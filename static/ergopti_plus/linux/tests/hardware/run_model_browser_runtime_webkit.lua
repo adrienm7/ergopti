@@ -220,7 +220,7 @@ end
 local OLLAMA_JS = [[
 	(function () {
 		var b = (typeof _backends !== 'undefined' ? _backends : []).filter(function (x) { return x.id === 'ollama'; })[0];
-		var toggle = document.querySelector('span.group-toggle[data-group="ollama"]');
+		var toggle = document.querySelector('.group-toggle[data-group="ollama"]');
 		if (!b || !toggle) return 'null';
 		var head = toggle.closest('tr');
 		var button = head.querySelector('button.act.install');
@@ -304,7 +304,7 @@ local function run()
 
 	print("--- the install button ---")
 	eval([[(function () {
-		var head = document.querySelector('span.group-toggle[data-group="ollama"]').closest('tr');
+		var head = document.querySelector('.group-toggle[data-group="ollama"]').closest('tr');
 		head.querySelector('button.act.install').click(); return 'clicked';
 	})()]])
 	check(wait_for(function() return Engine.runtime_pending() or Engine.is_enabled() end, 30),
