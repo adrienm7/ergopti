@@ -278,7 +278,10 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; repainting, and its publisher (_HS_OrderWrite) returns the exact-source
 	; native receipt. Both are independently admitted above and exercised by
 	; the real configuration owner in test_hotstring_dynamic_menu_scope.ahk.
-	AssertEqual(56, Calls,
+	; 57: the windows' reading choice (ReadingPrefs_Set) returns false and
+	; neither publishes nor repaints on a refusal, driven for real by
+	; test_reading_preferences.ahk.
+	AssertEqual(57, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",

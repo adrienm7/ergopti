@@ -71,3 +71,27 @@ _TRP_UnknownValues() {
 	AssertEqual(0, Writes, "nothing is written for a refused value")
 }
 Test("reading preferences: a value outside the enum is refused (reading-preferences-seed)", _TRP_UnknownValues)
+
+; The menu's save: a refused config.toml transaction keeps the live value and
+; the menu as they were. The test holds the configuration's write lease, so the
+; transaction refuses before any writer runs and nothing reaches the file.
+_TRP_SaveConsumesTheCommit() {
+	_TRP_With(Map(), _TRP_SaveConsumesTheCommitBody)
+}
+
+_TRP_SaveConsumesTheCommitBody() {
+	global ConfigurationFile
+	Writes := 0, Rebuilds := 0
+	Writer := (*) => (Writes += 1, 1)
+	Rebuild := (*) => (Rebuilds += 1)
+	Owner := _ConfigWriteLeaseTryAcquire(ConfigurationFile, "reading-preferences-refusal")
+	AssertTrue(Owner is Object, "the test holds the configuration's write lease")
+	try AssertFalse(ReadingPrefs_Set(ConfigLeaf.READING_FONT, "dyslexic", Writer, (*) => 0, Rebuild),
+		"a refused config.toml transaction is reported to the menu")
+	finally _ConfigWriteLeaseRelease(Owner)
+	AssertEqual(0, Writes, "a refused transaction runs no writer")
+	AssertEqual("default", ReadingPrefs_Get(ConfigLeaf.READING_FONT), "a refused transaction keeps the live font")
+	AssertEqual(0, Rebuilds, "a refused transaction never repaints the menu")
+}
+Test("reading preferences: the menu's save consumes its config.toml refusal (reading-preferences-seed)",
+	_TRP_SaveConsumesTheCommit)
