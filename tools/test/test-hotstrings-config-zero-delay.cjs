@@ -7,8 +7,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const messages = [];
+const documentListeners = {};
 const context = vm.createContext({
-	document: {},
+	document: {
+		// The page draws again once i18n.js has applied the strings.
+		addEventListener(type, fn) {
+			documentListeners[type] = fn;
+		}
+	},
 	makeHostBridge: () => (value) => messages.push(value)
 });
 context.window = context;
@@ -30,6 +36,11 @@ vm.runInContext(
 // The loaded page asks its host for the state once (WVH-001); the bindings
 // under test send nothing else until a field changes.
 assert.deepEqual(messages.splice(0), ['ready'], 'the page posts ready once on load');
+assert.equal(
+	typeof documentListeners['i18n:applied'],
+	'function',
+	'the page redraws its cards once the locale strings are applied'
+);
 function field() {
 	const input = {
 		value: '',
