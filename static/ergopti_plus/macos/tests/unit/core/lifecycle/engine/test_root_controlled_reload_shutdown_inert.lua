@@ -444,7 +444,8 @@ local function run_isolated(options, assertions)
 		-- is not the guarded run, so the fixture boots it the way the guard does:
 		-- the real guard, with only the file load replaced by the truncated chunk.
 		-- A failure is re-raised with its stack instead of reaching the reporter.
-		local BootGuard = assert(loadfile(helpers.driver_root() .. "core/lifecycle/engine/boot_guard.lua"))()
+		package.loaded["core.lifecycle.engine.boot_guard"] = nil
+		local BootGuard = require("core.lifecycle.engine.boot_guard")
 		local booted = BootGuard.run(helpers.driver_root() .. "root_boot_chunk", {
 			loadfile = function() return chunk end,
 			report = function() return false end,
