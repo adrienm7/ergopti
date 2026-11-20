@@ -581,7 +581,9 @@ end)
 
 -- A Backspace pressed right after an expansion brings the trigger back, as on
 -- Linux (bs-undo): the Backspace is consumed, the replacement erased and the
--- trigger typed again. Anything typed in between voids it.
+-- trigger typed again. The buffer then reads the line, the text before the
+-- trigger and the restored trigger, so it can expand again at once (decision
+-- of 2026-11-20). Anything typed in between voids it.
 helpers.describe("immediate Backspace restores the trigger (bs-undo)", function()
 	helpers.it("restores z after z gave Z (bs-undo)", function()
 		with_keymap(function(f)
@@ -592,7 +594,8 @@ helpers.describe("immediate Backspace restores the trigger (bs-undo)", function(
 			helpers.assert_true(f.press("", NO_FLAGS, KEYCODE_BACKSPACE) == true, "the Backspace is consumed")
 			f.settle()
 			helpers.assert_eq(table.concat(f.effects.emitted), "z", "the trigger is typed back")
-			helpers.assert_eq(f.state.buffer, "", "the restored trigger is out of the buffer")
+			-- The fixture's opening Space precedes the trigger.
+			helpers.assert_eq(f.state.buffer, " z", "the buffer holds the line: the text before and the restored trigger")
 		end)
 	end)
 

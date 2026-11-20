@@ -820,9 +820,10 @@ _HOF_RealSession(Primitive, Origin) {
 
 ; The final text and the engine buffers must be the same with either primitive and
 ; from either entry point, and no link may fire a second time. The Backspace
-; that follows is the immediate one, which restores what was typed and keeps it
-; out of the buffer (backspace-undo, 2026-11-06): the trigger, then the Space
-; the expansion typed back after its output (decision of 2026-11-19); this test
+; that follows is the immediate one, which restores what was typed (backspace-undo,
+; 2026-11-06): the trigger, then the Space the expansion typed back after its
+; output (decision of 2026-11-19). The buffer then reads the line again, so the
+; restored trigger can expand at once (decision of 2026-11-20); this test
 ; predates it and expected one character removed, so after the one-arrow pin it
 ; failed on « qzx » for « foo qz » (2026-11-18).
 _HOF_RealChainOfThree() {
@@ -841,8 +842,8 @@ _HOF_RealChainOfThree() {
 				Label . ": the engine buffer must equal the screen")
 			AssertEqual(Trigger, Run["doc_after_backspace"],
 				Label . ": the immediate Backspace must restore the first trigger and the end character it typed")
-			AssertEqual("", Run["buffer_after_backspace"],
-				Label . ": the restored trigger must stay out of the buffer")
+			AssertEqual(Run["doc_after_backspace"], Run["buffer_after_backspace"],
+				Label . ": the buffer must hold the restored trigger, as the screen")
 			try FileAppend("# hotstring-output-is-final " . Label . " settle_ms=" . Run["settle"] . "`n", "*")
 			if (Primitive == "SendEvent") {
 				Baseline := Run
