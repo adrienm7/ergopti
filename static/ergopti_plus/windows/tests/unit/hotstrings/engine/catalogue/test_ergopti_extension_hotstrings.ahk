@@ -33,6 +33,17 @@ _EHX_WithRoutes(RegistryDir, Callback) {
 	}
 }
 
+; The inline entries a shipped TOML file holds, counted from its text rather
+; than through the loader, so the counters are compared with the file itself.
+_EHX_FileEntries(Path) {
+	Count := 0
+	loop parse, FileRead(Path, "UTF-8"), "`n", "`r"
+		if InStr(A_LoopField, "= { output = ")
+			Count += 1
+	Assert(Count > 0, "the shipped file must hold entries: " . Path)
+	return Count
+}
+
 ; The first registered case of a trigger in one TOML section, as LoadHotstringsSection reads it.
 _EHX_Entry(Path, Section, Trigger) {
 	global _HOTSTRING_ENTRY_PATTERN
@@ -75,7 +86,7 @@ _EHX_ShippedGroupsLoadFromTheExtension() {
 			"the other magic key sections stay bundled")
 		Assert(InStr(HotstringsBundledTomlPath("magickey"), "\hotstrings\data\catalogue\magickey.toml"))
 		AssertEqual(34, CountTomlHotstrings("sfbsreduction"))
-		AssertEqual(35, CountTomlHotstrings("rolls"))
+		AssertEqual(_EHX_FileEntries(Registry . "rolls.toml"), CountTomlHotstrings("rolls"))
 		AssertEqual(14, CountTomlSection("magickey", "repeat_corrections"))
 		AssertEqual(CountTomlHotstrings("magickey", HotstringsBundledTomlPath("magickey")) + 14,
 			CountTomlHotstrings("magickey"), "the magic key total counts its bound section")
@@ -132,7 +143,10 @@ _EHX_BoundSourcesDoNotWarn() {
 	}
 	CheckSources(Packs) {
 		Assert(Packs.Length > 0, "the real shipped registry must discover an extension")
-		AssertEqual(83, CountTomlHotstrings("sfbsreduction") + CountTomlHotstrings("rolls")
+		Registry := _LCT_RegistryDir() . "ergopti\hotstrings\"
+		AssertEqual(_EHX_FileEntries(Registry . "sfbsreduction.toml") + _EHX_FileEntries(Registry . "rolls.toml")
+			+ _EHX_FileEntries(Registry . "repeatcorrections.toml"),
+			CountTomlHotstrings("sfbsreduction") + CountTomlHotstrings("rolls")
 			+ CountTomlSection("magickey", "repeat_corrections"), "all three routed sources remain readable")
 	}
 }
