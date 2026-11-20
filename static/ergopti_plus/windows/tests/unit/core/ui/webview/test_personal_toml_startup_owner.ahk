@@ -19,7 +19,8 @@ _PTST_Complete(State, Code, Output, ErrorText) {
 _PTST_ChildSource() {
 	global _DriverDir
 	Includes := "", Owners := Map()
-	for Symbol in ["JsonStringLiteral", "OpenPersonalEditor", "_HsEdWeb_TryOpen", "FSReadBytesStrict", "CryptoSha256Bytes"] {
+	for Symbol in ["JsonStringLiteral", "OpenPersonalEditor", "_HsEdWeb_TryOpen", "FSReadBytesStrict", "CryptoSha256Bytes",
+		"ReadingPrefs_SeedScript"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The personal editor child requires its complete genuine owner: " . Symbol)
 		if !Owners.Has(Owner) {
@@ -27,7 +28,7 @@ _PTST_ChildSource() {
 			Includes .= "#Include " . Owner . "`n"
 		}
 	}
-	AssertEqual(5, Owners.Count, "The public/path/lifecycle/codec owners must all be genuine whole files")
+	AssertEqual(6, Owners.Count, "The public/path/lifecycle/codec/reading owners must all be genuine whole files")
 	PromiseOwner := _DriverDir . "\vendor\Promise.ahk"
 	Fixture := _DriverDir . "\tests\fixtures\personal_toml_startup_owner_body.ahk"
 	AssertTrue(FileExist(PromiseOwner) && FileExist(Fixture))

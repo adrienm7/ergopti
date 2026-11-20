@@ -48,7 +48,7 @@ _HCWT_ChildSource() {
 	global _DriverDir, _SharedDir
 	Includes := "#Include " . _HCWT_LocaleOwner() . "`n", Owners := Map()
 	for Symbol in ["JsonStringLiteral", "OpenHotstringsConfigWindow", "_HCW_RetryRetiredNativeResets", "_HCWWeb_TryOpen", "HotstringsLanguagePacks",
-		"ReadTomlFile", "TOML_StripInlineComment", "CryptoSha256Bytes", "FSReadBytesStrict", "PerfCount"] {
+		"ReadTomlFile", "TOML_StripInlineComment", "CryptoSha256Bytes", "FSReadBytesStrict", "PerfCount", "ReadingPrefs_SeedScript"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The config child requires its complete genuine owner: " . Symbol)
 		if !Owners.Has(Owner) {
@@ -56,7 +56,7 @@ _HCWT_ChildSource() {
 			Includes .= "#Include " . Owner . "`n"
 		}
 	}
-	AssertEqual(10, Owners.Count, "The public/data/lifecycle/reset/codec/counter owners must all be present")
+	AssertEqual(11, Owners.Count, "The public/data/lifecycle/reset/codec/counter/reading owners must all be present")
 	PromiseOwner := _DriverDir . "\vendor\Promise.ahk"
 	Fixture := _DriverDir . "\tests\fixtures\hcw_startup_owner_body.ahk"
 	AssertTrue(FileExist(PromiseOwner) && FileExist(Fixture))

@@ -33,7 +33,7 @@ _MBSTO_Case(Mode) {
 		Fixture := _DriverDir . "\tests\fixtures\model_browser_startup_owner_body.ahk"
 		AssertTrue(FileExist(Fixture), "The native child fixture must exist")
 		Includes := "", Seen := Map()
-		for Symbol in ["LLM_GetModelIndex", "JsonStringLiteral", "FSRead", "WMPresentWindow"] {
+		for Symbol in ["LLM_GetModelIndex", "JsonStringLiteral", "FSRead", "WMPresentWindow", "ReadingPrefs_SeedScript"] {
 			Dependency := _DriverProductionFileForSymbol(Symbol)
 			AssertTrue(Dependency != "" && !Seen.Has(Dependency), "Every real presentation/catalogue owner must be unique")
 			Seen[Dependency] := true
