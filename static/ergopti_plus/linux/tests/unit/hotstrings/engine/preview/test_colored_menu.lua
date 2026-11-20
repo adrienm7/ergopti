@@ -259,7 +259,8 @@ helpers.describe("coloured provider locale contract", function()
 					translated.get = function(key) return catalog[key] or key end
 					package.loaded["core.i18n.engine.i18n"] = translated
 					local rows = menu_controls(false)
-					observed[#observed + 1] = { rows = rows, expected = catalog["menu.hotstrings.tooltip_colored"] }
+					observed[#observed + 1] = { rows = rows, expected = catalog["menu.hotstrings.tooltip_colored"],
+						glyphs = catalog["menu.hotstrings.tooltip_glyphs"] }
 				end
 			end)
 			package.loaded["core.i18n.engine.i18n"] = i18n
@@ -267,10 +268,11 @@ helpers.describe("coloured provider locale contract", function()
 			helpers.assert_eq(package.loaded["core.i18n.engine.i18n"], i18n)
 			helpers.assert_eq(#observed, 21)
 			for _, item in ipairs(observed) do
-				helpers.assert_eq(#item.rows, 5)
+				helpers.assert_eq(#item.rows, 6)
 				helpers.assert_eq(item.rows[4].title, "-")
 				helpers.assert_eq(item.rows[5].title, item.expected)
 				helpers.assert_eq(item.rows[5].checked, true)
+				helpers.assert_eq(item.rows[6].title, item.glyphs)
 			end
 		end)
 	end)
@@ -330,12 +332,13 @@ helpers.describe("magic provider locale contract", function()
 		with_preferences(function()
 			local rows = menu_controls(false, false, true)
 			local i18n = require("core.i18n.engine.i18n")
-			helpers.assert_eq(#rows, 5)
+			helpers.assert_eq(#rows, 6)
 			helpers.assert_eq(rows[1].title, i18n.get("button.ok"))
 			helpers.assert_eq(rows[2].title, i18n.get("menu.hotstrings.tooltip_autocorrect"))
 			helpers.assert_eq(rows[3].title, i18n.get("menu.hotstrings.tooltip_ai"))
 			helpers.assert_eq(rows[4].title, "-")
 			helpers.assert_eq(rows[5].title, i18n.get("menu.hotstrings.tooltip_colored"))
+			helpers.assert_eq(rows[6].title, i18n.get("menu.hotstrings.tooltip_glyphs"))
 		end)
 	end)
 	helpers.it("uses all twenty-one real catalogues for the magic checkbox", function()
@@ -363,7 +366,7 @@ helpers.describe("magic provider locale contract", function()
 			for _, observation in ipairs(observations) do
 				helpers.assert_eq(observation.rows[1].title, observation.label)
 				helpers.assert_eq(observation.rows[4].title, "-")
-				helpers.assert_eq(#observation.rows, 5)
+				helpers.assert_eq(#observation.rows, 6)
 			end
 		end)
 	end)
@@ -508,7 +511,7 @@ helpers.describe("ordered presence provider locale contract", function()
 			helpers.assert_eq(package.loaded["core.i18n.engine.i18n"], i18n)
 			helpers.assert_eq(#observations, 42)
 			for _, observation in ipairs(observations) do
-				helpers.assert_eq(#observation.rows, 5)
+				helpers.assert_eq(#observation.rows, 6)
 				for index, expected in ipairs(corpus.rows) do
 					local position = observation.reverse and (4 - index) or (index + 1)
 					helpers.assert_eq(observation.rows[position].title, observation.catalog[expected.i18n])
@@ -517,6 +520,7 @@ helpers.describe("ordered presence provider locale contract", function()
 				helpers.assert_eq(observation.rows[4].title, "-")
 				helpers.assert_eq(observation.rows[1].title, observation.catalog["menu.hotstrings.tooltip_magic"])
 				helpers.assert_eq(observation.rows[5].title, observation.catalog["menu.hotstrings.tooltip_colored"])
+				helpers.assert_eq(observation.rows[6].title, observation.catalog["menu.hotstrings.tooltip_glyphs"])
 			end
 		end)
 	end)
