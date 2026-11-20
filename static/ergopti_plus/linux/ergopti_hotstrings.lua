@@ -2823,6 +2823,29 @@ local function main()
 			return true
 		end
 		if script_chords.on_key(detail) then return true end
+		-- Ctrl alone on the layout's own magic key saves ([layout] ctrl_magic_save),
+		-- while the magic key is replaced, as the Windows hotkey. Required inline:
+		-- main() sits at LuaJIT's upvalue limit.
+		local saved, saved_repeat = require("modules.keymap.ctrl_magic_save").on_key(detail, {
+			active = function()
+				return not opts.dry_run and not script_actions.is_paused() and input_capture_gate.blocks_text() ~= true
+					and require("hotstrings.engine.catalogue.config").is_section_enabled("magickey", "replace")
+			end,
+			magic_key = function() return require("hotstrings.engine.magic_key").get() end,
+			chosen_source = function() return MagicKeySource.evdev_code() ~= nil end,
+			plain_text = function(code)
+				-- The emulated layout's key when it types one there, else the XKB keymap's.
+				local emulated = require("modules.keymap.layout_emulation").legend_for_evdev(code)
+				if emulated ~= nil then return emulated end
+				local base = require("adapters.keyboard_layout").base_symbol(code)
+				return type(base) == "table" and not base.dead and base.text or nil
+			end,
+			defer = function(fn) return event_loop.defer(fn) end,
+			press = function(combo) return (require("gestures.engine.combo_emitter").press(combo)) end,
+		})
+		if saved then
+			return { consume = true, repeat_callback = input_capture_gate.guard(saved_repeat) }
+		end
 		-- Ctrl+é as Ctrl+C on a layout whose accents are not shortcut letters,
 		-- under the Shortcuts master like the keyboard slots, and only while no
 		-- layout is emulated, as on Windows.

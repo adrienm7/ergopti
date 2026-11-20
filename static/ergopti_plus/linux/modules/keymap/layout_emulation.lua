@@ -173,6 +173,17 @@ function M.legend(code)
 	return text ~= "" and text or nil
 end
 
+--- M.legend for a grabbed key's evdev code: what the running emulation types
+--- unshifted there (the Ctrl + magic key save finds the layout's magic key so).
+--- @param evdev number The key's evdev code.
+--- @return string|nil text nil when the emulation is off or leaves the key to
+---   the system layout.
+function M.legend_for_evdev(evdev)
+	if _evdev_to_code == nil then return nil end
+	local code = _evdev_to_code[evdev]
+	return code ~= nil and M.legend(code) or nil
+end
+
 --- What the emulation does now, for the menu: number_row says whether it types
 --- the number row itself (base layer and number-row switch on), the only case
 --- where the number-row ordering applies through it.

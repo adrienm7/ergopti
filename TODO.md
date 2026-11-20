@@ -750,13 +750,12 @@ more`, macOS and WebKit) does not switch the Studio frames to the black-and-yell
   - KCD-8, the pair rows: summary, empty word, slot order and grouping differ on each OS.
     1. **(recommended)** All follow Windows (tap, hold, chord; a submenu per first key; the chord in the summary).
     2. Leave each OS's menu as it is.
-- [ ] **Ctrl+★ → Ctrl+S on Linux (BND-1, BND-2, 2026-11-17 pass).** macOS has `cmd_star` (Cmd+★ to Cmd+S, extra
-      modifiers kept), Windows `layout.ctrl_magic_save` (Ctrl + magic key to a bare Ctrl+S), Linux neither; its
-      reason is now `platform_reason.ctrl_magic_save_is_windows` (`not_yet`, corrected 2026-11-19: Linux emulates the
-      layout and could send it). Kept meanwhile: no
-      Linux option. 1. **(recommended)** Port `ctrl_magic_save` to the Linux emulation, keep extra modifiers on
-      Windows and Linux as macOS does, and correct the reason in the 21 locales ([CODE]). 2. Keep it off Linux and
-      only correct the reason's text.
+- [ ] **Ctrl+★ extra modifiers (BND-1, BND-2, 2026-11-17 pass).** macOS has `cmd_star` (Cmd+★ to Cmd+S, extra
+      modifiers kept); `layout.ctrl_magic_save` sends a bare Ctrl+S for Ctrl alone on Windows and, since
+      2026-11-20, on Linux (`modules/keymap/ctrl_magic_save.lua`, reason
+      `platform_reason.ctrl_magic_save_is_cmd_star_on_macos`). Kept meanwhile: Ctrl alone on both. 1.
+      **(recommended)** Keep extra modifiers on Windows and Linux as macOS does (Ctrl+Shift+★ to Ctrl+Shift+S)
+      ([CODE]). 2. Keep Ctrl alone.
 - [ ] **Parity decisions THD-1 to THD-4 and HCD-1, HCD-2, HCD-4, HCD-5.** Tap-holds
       ([report](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): THD-1 the pair tap and the layer, THD-2
       the lone window, THD-3 layer-hold pair activity, THD-4 the macOS thumb Backspace under modifiers. Hotstring

@@ -5490,12 +5490,12 @@
 		"platforms": {
 			"windows": true,
 			"macos": false,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.ctrl_magic_save_is_windows",
+		"reason_key": "platform_reason.ctrl_magic_save_is_cmd_star_on_macos",
 		"reason": {
-			"fr": "Windows uniquement : Ctrl et la touche magique enregistrent (Ctrl+S) par les raccourcis propres au pilote Windows. macOS propose à la place Cmd et la touche magique dans ses raccourcis ; Linux n’a pas encore ce raccourci.",
-			"en": "Windows only: Ctrl plus the magic key saves (Ctrl+S) through the Windows driver's own hotkeys. macOS offers Cmd plus the magic key in its shortcuts instead; Linux does not have this shortcut yet."
+			"fr": "Pas sous macOS : macOS propose dans ses raccourcis Cmd et la touche magique, qui enregistrent (Cmd+S). Sous Windows et Linux, Ctrl et la touche magique enregistrent (Ctrl+S).",
+			"en": "Not on macOS: macOS offers Cmd plus the magic key in its shortcuts, which saves (Cmd+S). On Windows and Linux, Ctrl plus the magic key saves (Ctrl+S)."
 		}
 	},
 	{

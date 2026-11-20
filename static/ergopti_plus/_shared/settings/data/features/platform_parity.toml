@@ -167,9 +167,9 @@ technical = "The Karabiner-Elements virtual HID keyboard type decides which keyc
 kind = "driver_storage"
 technical = "Windows gates the whole layout section with its category switch (category_enabled.layout). macOS and Linux emulate layouts too (modules/keymap/layout_emulation.lua) but keep no category gate: emulated_layout none with ergopti_base and ergopti_alt_gr off leaves every key to the system layout."
 
-[reasons."platform_reason.ctrl_magic_save_is_windows"]
-kind = "not_yet"
-technical = "Ctrl plus the magic key sends a bare Ctrl+S from the Windows hotkeys (modules/keymap/layout.ahk). macOS has its own Cmd plus magic key shortcut (cmd_star); the Linux emulation could send it too but does not yet (TODO BND-1, a pending maintainer decision)."
+[reasons."platform_reason.ctrl_magic_save_is_cmd_star_on_macos"]
+kind = "os_equivalent"
+technical = "Ctrl plus the layout's own magic key sends a bare Ctrl+S from the Windows hotkeys (modules/keymap/layout.ahk) and the Linux consumption callback (modules/keymap/ctrl_magic_save.lua). macOS saves with Cmd, so it offers Cmd plus the magic key among its shortcuts (cmd_star) instead."
 
 [reasons."platform_reason.action_lookup_is_macos_dictionary"]
 kind = "os_api"
@@ -294,10 +294,6 @@ technical = "The row installs the macOS .bundle layout; Windows and Linux instal
 [reasons."platform_reason.base_layout_is_the_linux_decode_table"]
 kind = "os_concept"
 technical = "The Linux daemon reads raw evdev keycodes and needs the physical layout that produced them; macOS asks TIS for its input sources and Windows installs a layout, so neither has a decode table."
-
-[reasons."platform_reason.lists_windows_only_settings"]
-kind = "os_concept"
-technical = "Everything the row lists is Windows-only (layout emulation helpers), so on macOS and Linux it would draw an empty list."
 
 [reasons."platform_reason.only_linux_rereads_its_catalogue"]
 kind = "os_concept"

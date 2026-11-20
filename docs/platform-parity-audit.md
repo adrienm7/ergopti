@@ -127,6 +127,9 @@ Shortcuts submenu restores and clears its scope through the composition the
 Configuration menu runs, its key combinations (the remap file Karabiner
 applies) before its config.toml rows (`test_global_scope.lua` and
 `test_scope_rows.lua`, shortcuts-scope-macos).
+per-reason list, with each technical text, is in the table. Since 2026-11-20
+Linux saves with Ctrl+★ too, and macOS keeps its Cmd+★ shortcut under the
+`os_equivalent` reason `ctrl_magic_save_is_cmd_star_on_macos`.
 
 Building the owners found three declared features no driver code reads. They
 were recorded under `[unowned]` in `platform_parity.toml` (a ratchet: an entry

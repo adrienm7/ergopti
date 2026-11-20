@@ -130,6 +130,23 @@ local function _build_layouts(ctx)
 		local path = "layout.emulate_" .. row
 		render_ctx.feature_rows[path] = function() return switch_rows(path, "menu.layout.emulate_" .. row) end
 	end
+	-- Ctrl + magic key saves (modules/keymap/ctrl_magic_save.lua), as on Windows.
+	local CtrlMagicSave = require("modules.keymap.ctrl_magic_save")
+	render_ctx.feature_rows[CtrlMagicSave.PATH] = function()
+		local enabled = CtrlMagicSave.enabled()
+		if enabled == nil then error("config.toml is unreadable", 0) end
+		return EmulationRows.switch_row({
+			t = i18n_safe, label_key = "menu.layout.ctrl_magic_save", checked = enabled,
+			toggle = function(value)
+				if not CtrlMagicSave.set(value) then
+					require("settings.engine.publication.save_failure").present(i18n_safe, function(message)
+						show_error(message, i18n_safe("common.error_title"))
+					end)
+				end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+		})
+	end
 
 	-- The physical magic key: the key typing the magic key, chosen by pressing it
 	-- or from the candidates (hotstrings/engine/magic_key_source.lua); the rows

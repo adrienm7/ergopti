@@ -162,7 +162,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.keyboard.meta_quote` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.primary_g` (feature; declared: linux; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_space` (feature; declared: windows, linux; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
-- [ ] `layout.ctrl_magic_save` (feature; declared: windows; reason: `platform_reason.ctrl_magic_save_is_windows`)
+- [ ] `layout.ctrl_magic_save` (feature; declared: windows, linux; reason: `platform_reason.ctrl_magic_save_is_cmd_star_on_macos`)
 - [ ] `category_enabled.hotstrings` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.layout` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.shortcuts` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
@@ -175,7 +175,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `category_enabled.rolls` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.magic_key` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 
-## linux — 62 paths not declared
+## linux — 61 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `hotstrings.enabled` (feature; declared: macos; reason: `platform_reason.hotstrings_master_is_macos_engine`)
@@ -225,7 +225,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.keyboard.secondary_quote` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.primary_shift_v` (feature; declared: windows, macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `layout.virtual_keyboard` (setting; declared: macos; reason: `platform_reason.virtual_keyboard_is_karabiner`)
-- [ ] `layout.ctrl_magic_save` (feature; declared: windows; reason: `platform_reason.ctrl_magic_save_is_windows`)
 - [ ] `category_enabled.hotstrings` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.layout` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.shortcuts` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
@@ -541,7 +540,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `layout_menu.compose_input_method` (hide): Linux only: Compose sequences come from ~/.XCompose, which GTK 3 reads only in part without an input method. macOS and Windows type every character through their own layouts.
 - [ ] `layout_menu.layout_system_install` (hide): Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Install or remove layouts… » (Wayland) or with install.sh (X11).
 - [ ] `layout_menu.accented_letters` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.
-- [ ] `layout_menu.layout.ctrl_magic_save` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
+- [ ] `layout_menu.layout.ctrl_magic_save` (hide): Not on macOS: macOS offers Cmd plus the magic key in its shortcuts, which saves (Cmd+S). On Windows and Linux, Ctrl plus the magic key saves (Ctrl+S).
 - [ ] `layout_menu.base_layouts` (hide): Linux only: this driver reads raw keycodes from the kernel and needs to know which physical layout produced them, so it picks the table it decodes with. macOS asks the system for its input sources and Windows installs a keyboard layout; neither has a decode table to choose.
 - [ ] `accented_letters_group.e_grave` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.
 - [ ] `accented_letters_group.e_circ` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.
@@ -645,7 +644,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `layout_menu.layout_toggle` (hide): Windows only: this switch is the Windows driver's gate for the whole layout section. macOS and Linux have no such gate: choose no layout to emulate and switch both emulated layers off to type with the system layout alone.
 - [ ] `layout_menu.layout_bundle` (hide): macOS only: this row installs the .bundle layout. Windows installs Ergopti from « Download the Ergopti system layout installer » below; on Linux, install it from « Install or remove layouts… » (Wayland) or with install.sh (X11).
 - [ ] `layout_menu.layout_system_install` (hide): Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Install or remove layouts… » (Wayland) or with install.sh (X11).
-- [ ] `layout_menu.layout.ctrl_magic_save` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
 - [ ] `layout_menu.virtual_keyboard` (hide): macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.
 - [ ] `layout_menu.menubar_icon` (hide): macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.
 - [ ] `gestures_menu.auto_configure` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.

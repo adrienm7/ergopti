@@ -721,7 +721,7 @@ assert.match(
 		const feature = table.find((entry) => entry.path === row.feature_path);
 		feature.cells.windows = {
 			status: 'unavailable',
-			reason_key: 'platform_reason.lists_windows_only_settings'
+			reason_key: 'platform_reason.ctrl_magic_save_is_cmd_star_on_macos'
 		};
 		row.cells.windows = { ...row.cells.windows, status: 'supported', owner: 'x' };
 	}),

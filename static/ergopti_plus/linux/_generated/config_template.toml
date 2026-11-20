@@ -722,6 +722,7 @@ emulate_number_row = true
 emulate_top_row = true
 emulate_home_row = true
 emulate_bottom_row = true
+ctrl_magic_save = false
 emulated_layout = ""
 pause_switch_enabled = false
 on_pause = ""

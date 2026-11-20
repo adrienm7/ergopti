@@ -50,6 +50,7 @@ two disagree in either direction.
 | `hotstrings.preview_ai_enabled`                               | —               | `evdev`, `uinput`, `xdotool`           | —                    |
 | `hotstrings.preview_autocorrect_enabled`                      | —               | `evdev`, `uinput`, `xdotool`           | —                    |
 | `hotstrings.preview_colored_tooltips`                         | —               | `evdev`, `uinput`, `xdotool`           | —                    |
+| `hotstrings.preview_category_glyphs`                          | —               | `evdev`, `uinput`, `xdotool`           | —                    |
 | `hotstrings.preview_star_enabled`                             | —               | `evdev`, `uinput`, `xdotool`           | —                    |
 | `hotstrings.autocorrection.names`                             | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.autocorrection.abbreviations`                     | —               | `evdev`, `uinput`                      | —                    |
@@ -363,7 +364,7 @@ two disagree in either direction.
 | `layout.emulate_top_row`                                      | —               | `evdev`, `uinput`                      | —                    |
 | `layout.emulate_home_row`                                     | —               | `evdev`, `uinput`                      | —                    |
 | `layout.emulate_bottom_row`                                   | —               | `evdev`, `uinput`                      | —                    |
-| `layout.ctrl_magic_save`                                      | n/a             | n/a                                    | —                    |
+| `layout.ctrl_magic_save`                                      | n/a             | `evdev`, `uinput`                      | —                    |
 | `layout.emulated_layout`                                      | —               | `evdev`, `uinput`                      | —                    |
 | `category_enabled.hotstrings`                                 | n/a             | n/a                                    | —                    |
 | `category_enabled.layout`                                     | n/a             | n/a                                    | —                    |

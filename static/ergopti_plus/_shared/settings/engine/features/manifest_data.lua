@@ -1071,7 +1071,7 @@ M.features = {
 		path = "layout.emulate_bottom_row", id = "emulate_bottom_row", section = "layout", default = true, type = "boolean", description_key = "menu.layout.emulate_bottom_row", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "layout.ctrl_magic_save", section = "layout", reason_key = "platform_reason.ctrl_magic_save_is_windows", platforms = { "ahk" },
+		path = "layout.ctrl_magic_save", id = "ctrl_magic_save", section = "layout", default = false, type = "boolean", description_key = "menu.layout.ctrl_magic_save", platforms = { "ahk", "linux" }, recommended = false, family = "feature", reason_key = "platform_reason.ctrl_magic_save_is_cmd_star_on_macos",
 	},
 	{
 		path = "layout.emulated_layout", id = "emulated_layout", section = "layout", default = "", type = "string", description_key = "menu.layout.emulated_layout", platforms = { "ahk", "hs", "linux" }, recommended = "", family = "feature",

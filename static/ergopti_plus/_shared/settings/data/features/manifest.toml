@@ -4381,9 +4381,9 @@ description_key = "menu.layout.emulate_bottom_row"
 
 [[features.layout]]
 id = "ctrl_magic_save"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.ctrl_magic_save_is_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.ctrl_magic_save_is_cmd_star_on_macos"
 default = false
 recommended = false
 family = "feature"

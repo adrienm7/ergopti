@@ -2345,8 +2345,8 @@ id = "magic_key_source"
 [[menu.layout_menu]]
 type = "feature"
 path = "layout.ctrl_magic_save"
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.ctrl_magic_save_is_cmd_star_on_macos"
 
 [[menu.layout_menu]]
 type = "---"

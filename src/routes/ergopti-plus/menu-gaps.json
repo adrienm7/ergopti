@@ -647,15 +647,11 @@
 		"path": "layout_menu.layout.ctrl_magic_save",
 		"visibility": "hide",
 		"labels": { "fr": "layout.ctrl_magic_save", "en": "layout.ctrl_magic_save" },
-		"platforms": { "windows": true, "macos": false, "linux": false },
+		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {
-				"en": "Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.",
-				"fr": "Windows uniquement : tout ce que cette ligne listerait est lui-même propre à Windows, donc sur macOS et Linux elle n'affiche qu'une liste vide."
-			},
-			"linux": {
-				"en": "Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.",
-				"fr": "Windows uniquement : tout ce que cette ligne listerait est lui-même propre à Windows, donc sur macOS et Linux elle n'affiche qu'une liste vide."
+				"en": "Not on macOS: macOS offers Cmd plus the magic key in its shortcuts, which saves (Cmd+S). On Windows and Linux, Ctrl plus the magic key saves (Ctrl+S).",
+				"fr": "Pas sous macOS : macOS propose dans ses raccourcis Cmd et la touche magique, qui enregistrent (Cmd+S). Sous Windows et Linux, Ctrl et la touche magique enregistrent (Ctrl+S)."
 			}
 		}
 	},
