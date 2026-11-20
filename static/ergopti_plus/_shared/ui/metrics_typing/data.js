@@ -547,7 +547,7 @@ function compute_manifest_metrics() {
 	document.getElementById('hs_loading').style.display = 'none';
 	document.getElementById('hs_details').style.display = 'flex';
 	document.getElementById('hs_val').innerHTML =
-		`${format_number(global_hs_triggers)} <span class="stat-unit">activations</span>`;
+		`${format_number(global_hs_triggers)} <span class="stat-unit">${_t('ui_typing.unit_activations')}</span>`;
 	document.getElementById('hs_net_val').innerHTML = format_number(hs_chars_total);
 
 	let hs_pct = global_hs_suggested > 0 ? (global_hs_triggers / global_hs_suggested) * 100 : 0;
@@ -563,7 +563,7 @@ function compute_manifest_metrics() {
 	document.getElementById('llm_loading').style.display = 'none';
 	document.getElementById('llm_details').style.display = 'flex';
 	document.getElementById('llm_val').innerHTML =
-		`${format_number(global_llm_triggers)} <span class="stat-unit">activations</span>`;
+		`${format_number(global_llm_triggers)} <span class="stat-unit">${_t('ui_typing.unit_activations')}</span>`;
 	document.getElementById('llm_net_val').innerHTML = format_number(llm_chars_total);
 
 	let llm_pct = global_llm_suggested > 0 ? (global_llm_triggers / global_llm_suggested) * 100 : 0;
@@ -574,6 +574,17 @@ function compute_manifest_metrics() {
 	document.getElementById('llm_trend').innerHTML = get_trend_svg(
 		llm_points.map((p) => p.y).filter((y) => y > 0)
 	);
+
+	// What each figure of the two cards counts, as on every other card.
+	for (const [id, key] of [
+		['hs_info', 'ui_typing.tooltip_hs'],
+		['llm_info', 'ui_typing.tooltip_llm']
+	]) {
+		const info = document.getElementById(id);
+		if (info && typeof INFO_SVG === 'string') {
+			info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t(key)}</small>`;
+		}
+	}
 
 	// --- Render global WPM KPI card (ONLY place allowed to write this KPI) ---
 	document.getElementById('wpm_trend').innerHTML = get_trend_svg(

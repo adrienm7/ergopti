@@ -482,6 +482,14 @@
 			"args": ["tools/test/test-windows-diagnostic-progress-reader.cjs"],
 			"repro": "node tools/test/test-windows-diagnostic-progress-reader.cjs",
 			"platforms": ["win32"]
+		},
+		{
+			"id": "js-0546",
+			"ordinal": 714,
+			"name": "typing dashboard cards each say what they count (help text, WCAG 3.3.5)",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-cards-explained.cjs"],
+			"repro": "npm run test:metrics-cards-explained"
 		}
 	]
 }
