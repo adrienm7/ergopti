@@ -230,11 +230,15 @@ waits for the maintainer's review).
       keys made every tab refuse it before) and its SQL projection takes 1.7 s instead of 3.8 s on the maintainer's
       1.1 GB reader image, and the read reaches the window as soon as the worker writes its stage, before the
       image save (`KLPF_PollStudioStage`). Measured in the store's own `prefetch.log` (8 Studio reads, 2026-11-17
-      to 19): the save took 5.7 to 26 s (16 s in the 45 s read of 2026-11-18 20:00), now off the wait. Left: the
-      catch-up before the projection, 10 to 52 s, which is a clone of the whole read-only image (6 to 20 s, even
-      for 47 KB of new `data.sql`) and the replay of the day the tail touched (4 to 33 s). Making it incremental
-      means mutating the image without a full copy (it is shared by every worker) and replaying less than a day,
-      which `docs/memory/windows-ahk.md` (« A refresh clears and replays whole affected days ») explains.
+      to 19): the save took 5.7 to 26 s (16 s in the 45 s read of 2026-11-18 20:00), now off the wait. Since
+      2026-11-20 the catch-up no longer copies the image: a worker writes through a copy-on-write overlay of the
+      shared file (`SQLite_OpenCopyOnWrite`), and replays only the app-days the tail changed, a whole day only when
+      it touches `events_system` (`KLR_ReplayScopeBegin`). Measured on a synthetic 1.1 GB image of 595 days with
+      a 53 KB tail of one app on a heavy day (3 runs, a loaded machine): the copy took 20 to 29 s, the overlay 9 to
+      14 ms; the replay took 65 to 98 s for 167 rows, 30 to 35 s for that app's 75; the catch-up 94 to 140 s, now
+      34 to 40 s. Left: the replay of each touched app-day, still whole (`docs/memory/windows-ahk.md`, « A refresh
+      clears and replays whole affected app-days », says why less is not exact). Read the next Studio reads in the
+      store's `prefetch.log` to confirm the gain on the real store.
 - [ ] **Library layouts that lose their own characters, what is left (2026-11-20).** Optimot 1.8.0, Neo 2, Bone,
       KOY, AdNW, Noted, Mine, QWERTZ, the Spanish QWERTY and Dvorak and Engram-es are re-encoded from their
       official files (`docs/audits/layout-analysers/report.md`, « Layout library »); since 2026-11-20 the Neo family
