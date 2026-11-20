@@ -72,6 +72,7 @@ const NEUTRAL_LAYOUT = {
 			number_row_reorder_edges: false,
 			ergopti_alt_gr: false,
 			ergopti_variant: 'none',
+			ctrl_magic_save: false,
 			emulated_layout: '',
 			pause_switch_enabled: false,
 			on_pause: '',
