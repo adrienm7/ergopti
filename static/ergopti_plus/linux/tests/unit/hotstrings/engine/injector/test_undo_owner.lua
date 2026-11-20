@@ -142,7 +142,11 @@ local function with_undo(options, body)
 					discard_roi = function() end, record_roi_key = function() end, record_hotstring = function() end,
 					-- The physical Backspace that requests the Undo is a manual correction.
 					record_correction = function() observations.corrections = (observations.corrections or 0) + 1 end },
-				engine = { reset = function() end, apply_expansion = function() end, on_char = function()
+				engine = { reset = function() end, apply_expansion = function() end,
+					-- What the one erased codepoint leaves: nothing before the trigger.
+					current_buffer = function() return options.trigger:match("[%z\1-\127\194-\244][\128-\191]*$") end,
+					buffer_starts_at_word_boundary = function() return true end,
+					restore = function(_, text) observations.restored_buffer = text end, on_char = function()
 					return { trigger = options.stored_trigger or options.trigger,
 						typed_trigger = options.trigger, replacement = options.replacement or "ZZ", backspace_count = 1,
 						is_private = options.private == true }
@@ -171,6 +175,7 @@ helpers.describe("Main Undo retains its original expansion authority", function(
 				helpers.assert_eq(state.documents["/field/successor"], "SAFE")
 				helpers.assert_eq(state.clipboard, "SAVED")
 				helpers.assert_eq(state.undo, nil)
+				helpers.assert_eq(state.restored_buffer, trigger, "the buffer holds the restored trigger")
 			end)
 		end)
 	end

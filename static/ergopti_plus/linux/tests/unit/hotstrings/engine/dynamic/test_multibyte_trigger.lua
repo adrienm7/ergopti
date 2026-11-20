@@ -137,12 +137,14 @@ helpers.describe("Linux owned unknown-context reset boundaries", function()
 end)
 
 -- unknown-context-resets: a pause, an uncommitted output, a replaced selection,
--- an undo, a typed action result and lost input all leave the caret after text
--- this engine never buffered. A plain reset declared a word start there, so
--- "adn" restored by Undo followed by "dt★" fired the date inside the word.
+-- a typed action result and lost input all leave the caret after text this
+-- engine never buffered. A plain reset declared a word start there, so "adn"
+-- restored by Undo followed by "dt★" fired the date inside the word. The undo
+-- now gives the buffer the restored text instead (decision of 2026-11-20), so
+-- the word it continues is known: injector/test_backspace_restore.lua pins that
+-- « pk★ », Backspace, « adn » and Space stays « pkadn ».
 local UNKNOWN_CONTEXT_MARKERS = {
 	"reset = function()",
-	"if remaining >= 1 then",
 	"invalidated = true",
 	"onDesync = function()",
 }
@@ -172,8 +174,7 @@ helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)
 				.. "local _undoable, _last_offered, tooltip_preview, llm_overlay, prediction_engine\n"
 				.. "local LOG, undo, text, publication = \"fixture\", { trigger = \"adn\" }, \"owned\", {}\n"
 				-- The marker line itself is not part of the prefix: seed what it bound.
-				-- The undo's restored text is bound before its marker too.
-				.. "local remaining, result, restored = 3, { ok = true }, \"adn\"\n"
+				.. "local result = { ok = true }\n"
 				.. prefix .. "\nend", "@reviewed-unknown-reset-prefix"))()
 			local engine = Core.new()
 			helpers.assert_true(engine:load_mappings({ { trigger = "dt", replacement = "owned-date",
