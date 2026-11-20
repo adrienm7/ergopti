@@ -205,7 +205,7 @@ technical = "French Microsoft Office on Windows uses Ctrl+G for bold, so the act
 
 [reasons."platform_reason.input_probe_is_autohotkey_specific"]
 kind = "os_concept"
-technical = "These checks measure AutoHotkey's SendInput and its low-level keyboard hook, which only the Windows driver runs."
+technical = "These checks measure AutoHotkey's synthetic key sending and its low-level keyboard hook, which only the Windows driver runs."
 
 [reasons."platform_reason.shortcuts_restore_is_composed_on_macos"]
 kind = "not_yet"
