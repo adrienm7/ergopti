@@ -92,6 +92,36 @@ helpers.describe("word-reset preferences", function()
 		end)
 	end)
 
+	helpers.it("reads, saves and reloads the Backspace undo and its window (backspace-restore-preferences)", function()
+		with_source("[hotstrings]\nbackspace_restore_enabled = false\nbackspace_restore_window_ms = 1000\n",
+			function(preferences, path)
+				local state, status = preferences.load(path)
+				helpers.assert_eq(status, "ok")
+				helpers.assert_eq(state.backspace_restore_enabled, false)
+				helpers.assert_eq(state.backspace_restore_window_ms, 1000)
+				helpers.assert_eq(preferences.save(path,
+					{ backspace_restore_enabled = false, backspace_restore_window_ms = 2000 }, {}, {}), true)
+				package.loaded["settings.engine.preferences.preferences"] = nil
+				local again = helpers.load_with_stubs("settings.engine.preferences.preferences").load(path)
+				helpers.assert_eq(again.backspace_restore_enabled, false)
+				helpers.assert_eq(again.backspace_restore_window_ms, 2000)
+				local file = assert(io.open(path, "rb")); local text = file:read("*a"); assert(file:close())
+				helpers.assert_true(text:find("backspace_restore_window_ms = 2000", 1, true) ~= nil,
+					"the window is written under [hotstrings]: " .. text)
+			end)
+	end)
+
+	for _, bad in ipairs({ "10", "20000", "1.5", '"500"', "true" }) do
+		helpers.it("reads the outdated Backspace undo window " .. bad .. " as absent with a warning", function()
+			with_source("[hotstrings]\nbackspace_restore_window_ms = " .. bad .. "\n", function(preferences, path, warnings)
+				local state, status = preferences.load(path)
+				helpers.assert_eq(status, "ok", "an outdated value is never a refused file")
+				helpers.assert_nil(state.backspace_restore_window_ms)
+				helpers.assert_true(#warnings >= 1, "one warning names the outdated leaf")
+			end)
+		end)
+	end
+
 	for _, bad in ipairs({ "0", "11", "-1", "1.5", '"deep"', "true" }) do
 		helpers.it("reads the outdated cascade arrow count " .. bad .. " as absent with a warning", function()
 			with_source("[hotstrings]\ncascade_max_arrows = " .. bad .. "\n", function(preferences, path, warnings)

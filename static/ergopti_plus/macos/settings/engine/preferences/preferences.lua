@@ -111,6 +111,8 @@ local KEY_MAP = {
 	idle_reset_seconds                   = { sec = "hotstrings"                                        },
 	cascade_max_arrows                   = { sec = "hotstrings"                                        },
 	click_resets_word                    = { sec = "hotstrings"                                        },
+	backspace_restore_enabled            = { sec = "hotstrings"                                        },
+	backspace_restore_window_ms          = { sec = "hotstrings"                                        },
 	arrow_resets_word                    = { sec = "hotstrings"                                        },
 	shortcut_resets_word                 = { sec = "hotstrings"                                        },
 	tap_hold_resets_word                 = { sec = "hotstrings"                                        },
@@ -642,6 +644,18 @@ local SCALAR_VALUE_RULES = {
 	click_resets_word = function(value)
 		if type(value) == "boolean" then return true end
 		return false, "the click reset is not a boolean"
+	end,
+	backspace_restore_enabled = function(value)
+		if type(value) == "boolean" then return true end
+		return false, "the Backspace restore is not a boolean"
+	end,
+	-- The declared range, through the shared value check the menu entry also uses.
+	backspace_restore_window_ms = function(value)
+		local ValueCheck = require("settings.engine.value_check")
+		local checked = ValueCheck.check_value(
+			ValueCheck.declaration(ConfigKeys.KEY.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS), value)
+		if checked.ok then return true end
+		return false, "the Backspace restore window is outside its declared range of milliseconds"
 	end,
 	arrow_resets_word = function(value)
 		if type(value) == "boolean" then return true end

@@ -107,6 +107,8 @@ M.DEFAULT_STATE = {
 	idle_reset_seconds          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_IDLE_RESET_SECONDS),
 	cascade_max_arrows          = Manifest.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS),
 	click_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_CLICK_RESETS_WORD),
+	backspace_restore_enabled   = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_BACKSPACE_RESTORE_ENABLED),
+	backspace_restore_window_ms = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS),
 	arrow_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_ARROW_RESETS_WORD),
 	shortcut_resets_word        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_SHORTCUT_RESETS_WORD),
 	tap_hold_resets_word        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_TAP_HOLD_RESETS_WORD),
@@ -579,6 +581,49 @@ function M.set_click_resets_word(enabled)
 	return true
 end
 
+--- Returns whether a Backspace right after an expansion undoes it.
+--- @return boolean
+function M.is_backspace_restore_enabled()
+	return CoreState.backspace_restore_enabled == true
+end
+
+--- Sets whether a Backspace right after an expansion undoes it. Off, that
+--- Backspace is a plain Backspace; an undo record kept before is dropped.
+--- @param enabled boolean hotstrings.backspace_restore_enabled.
+--- @return boolean committed False for a non-boolean value.
+function M.set_backspace_restore_enabled(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Backspace restore refused: '%s' is not a boolean.", tostring(enabled))
+		return false
+	end
+	CoreState.backspace_restore_enabled = enabled
+	if not enabled then CoreState.undoable = nil end
+	Logger.debug(LOG, "Backspace restore: %s.", tostring(enabled))
+	return true
+end
+
+--- Returns how long after an expansion a Backspace still undoes it.
+--- @return number|nil Milliseconds.
+function M.get_backspace_restore_window_ms()
+	return CoreState.backspace_restore_window_ms
+end
+
+--- Sets how long after an expansion a Backspace still undoes it.
+--- @param ms number hotstrings.backspace_restore_window_ms, within its declared range.
+--- @return boolean committed False for a value the shared value check refuses.
+function M.set_backspace_restore_window_ms(ms)
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(
+		ValueCheck.declaration(ConfigKeys.KEY.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS), ms)
+	if not checked.ok then
+		Logger.error(LOG, "Backspace restore window refused: '%s' (%s).", tostring(ms), tostring(checked.reason))
+		return false
+	end
+	CoreState.backspace_restore_window_ms = checked.value
+	Logger.debug(LOG, "Backspace restore window: %d ms.", checked.value)
+	return true
+end
+
 --- Returns whether an arrow key starts a new word.
 --- @return boolean
 function M.is_arrow_resets_word_enabled()
@@ -725,6 +770,8 @@ ControlSentinels.set_listener("keymap.tap_hold_word_reset", M.observe_tap_hold_s
 M.set_idle_reset_seconds(M.DEFAULT_STATE.idle_reset_seconds)
 M.set_cascade_max_arrows(M.DEFAULT_STATE.cascade_max_arrows)
 M.set_click_resets_word(M.DEFAULT_STATE.click_resets_word)
+M.set_backspace_restore_enabled(M.DEFAULT_STATE.backspace_restore_enabled)
+M.set_backspace_restore_window_ms(M.DEFAULT_STATE.backspace_restore_window_ms)
 M.set_arrow_resets_word(M.DEFAULT_STATE.arrow_resets_word)
 M.set_shortcut_resets_word(M.DEFAULT_STATE.shortcut_resets_word)
 M.set_tap_hold_resets_word(M.DEFAULT_STATE.tap_hold_resets_word)

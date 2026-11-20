@@ -917,6 +917,12 @@
 			"title": "Accessibility with VoiceOver: the menu-bar item, the dialogs, the WebKit windows and the overlays",
 			"checks": [],
 			"not_testable": "A field run reads no screen reader: a person runs VoiceOver and checks what it reads in the menu-bar item, the dialogs and the WebKit windows, and what it says when a preview appears."
+		},
+		{
+			"id": "backspace_restore",
+			"title": "Backspace restore after an expansion: the magic key, a terminator, the window and the option",
+			"checks": [],
+			"not_testable": "The undo is a person's Backspace timed against an expansion in a real text field; the field run types no hotstring and presses no Backspace into an installed driver."
 		}
 	]
 }

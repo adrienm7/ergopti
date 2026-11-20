@@ -366,6 +366,8 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			{ fn = "set_idle_reset_seconds",          val = state.idle_reset_seconds },
 			{ fn = "set_cascade_max_arrows",          val = state.cascade_max_arrows },
 			{ fn = "set_click_resets_word",           val = state.click_resets_word },
+			{ fn = "set_backspace_restore_enabled",   val = state.backspace_restore_enabled },
+			{ fn = "set_backspace_restore_window_ms", val = state.backspace_restore_window_ms },
 			{ fn = "set_arrow_resets_word",           val = state.arrow_resets_word },
 			{ fn = "set_shortcut_resets_word",        val = state.shortcut_resets_word },
 			{ fn = "set_tap_hold_resets_word",        val = state.tap_hold_resets_word },

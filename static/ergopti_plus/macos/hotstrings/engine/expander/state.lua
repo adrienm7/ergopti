@@ -147,6 +147,13 @@ function M.new(defaults, delays_default)
 		-- features manifest right after construction and owns their setters.
 		IDLE_RESET_SEC             = 0,
 		click_resets_word          = false,
+		-- Whether a Backspace right after an expansion undoes it
+		-- (hotstrings.backspace_restore_enabled) and for how many milliseconds
+		-- after its commit (hotstrings.backspace_restore_window_ms). Off here,
+		-- so a bare registry fixture keeps no undo record; keymap/init.lua seeds
+		-- both from the features manifest and owns their setters.
+		backspace_restore_enabled  = false,
+		backspace_restore_window_ms = nil,
 		-- Whether an arrow key (hotstrings.arrow_resets_word) and a Cmd/Ctrl
 		-- shortcut (hotstrings.shortcut_resets_word) start a new word. Neutral
 		-- (the word continues) until keymap/init.lua seeds them the same way.

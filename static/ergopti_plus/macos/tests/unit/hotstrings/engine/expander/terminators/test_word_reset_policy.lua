@@ -337,6 +337,41 @@ helpers.describe("hotstrings.click_resets_word: a click starts a new word", func
 	end)
 end)
 
+helpers.describe("hotstrings.backspace_restore_*: the keymap owns the Backspace undo (backspace-restore-keymap)", function()
+	helpers.it("seeds the option and the window from the manifest and validates their setters", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.is_backspace_restore_enabled(),
+				Manifest.default_for("hotstrings.backspace_restore_enabled"))
+			helpers.assert_eq(f.keymap.get_backspace_restore_window_ms(),
+				Manifest.default_for("hotstrings.backspace_restore_window_ms"))
+			helpers.assert_eq(f.state.backspace_restore_enabled, true, "the expander reads the seeded option")
+			for _, invalid in ipairs({ 10, 20000, 1.5, "500", true }) do
+				helpers.assert_eq(f.keymap.set_backspace_restore_window_ms(invalid), false,
+					"the shared value check refuses " .. tostring(invalid))
+			end
+			helpers.assert_eq(f.keymap.get_backspace_restore_window_ms(), 500, "a refusal keeps the window")
+			helpers.assert_eq(f.keymap.set_backspace_restore_window_ms(2000), true)
+			helpers.assert_eq(f.state.backspace_restore_window_ms, 2000)
+			helpers.assert_eq(f.keymap.set_backspace_restore_enabled("yes"), false)
+			f.state.undoable = { trigger = "adn", typed = "ADN ", buffer_after = f.state.buffer }
+			helpers.assert_eq(f.keymap.set_backspace_restore_enabled(false), true)
+			helpers.assert_nil(f.state.undoable, "switching the option off drops a kept record")
+		end)
+	end)
+
+	helpers.it("another key in between drops the record before the Backspace", function()
+		with_keymap(function(f)
+			f.state.buffer = "ADN "
+			f.state.undoable = { trigger = "adn", typed = "ADN ", replayed = " ", buffer_after = "ADN ",
+				committed_ms = f.now() * 1000 }
+			f.type_char("x")
+			helpers.assert_nil(f.state.undoable, "the keystroke takes the record off")
+			helpers.assert_eq(f.backspace(), false, "the Backspace is a plain Backspace")
+			helpers.assert_eq(f.state.buffer, "ADN ", "it deletes the x only")
+		end)
+	end)
+end)
+
 helpers.describe("shared idle-reset rule as the macOS driver uses it", function()
 	helpers.it("resets at the delay, not before, and never when disabled", function()
 		helpers.assert_eq(HotstringCore.idle_resets_word(1000, 4000, 3, 0), true)

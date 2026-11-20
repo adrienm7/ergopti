@@ -740,6 +740,44 @@ function M.build_management(ctx)
 	params_ctx.commands[ConfigKeys.COMMAND.CASCADE_MAX_ARROWS] = function(arrows)
 		return commit_word_reset(ConfigKeys.LEAF.CASCADE_MAX_ARROWS, "set_cascade_max_arrows", arrows)
 	end
+	-- The Backspace undo and its window, plumbed as the click reset and the idle
+	-- reset: the window is a fixed choice plus a free entry checked by the shared
+	-- value check, which names the declared range in its refusal.
+	local backspace_restore_enabled = ctx.keymap and type(ctx.keymap.is_backspace_restore_enabled) == "function"
+		and ctx.keymap.is_backspace_restore_enabled()
+	params_ctx.commands[ConfigKeys.COMMAND.BACKSPACE_RESTORE] = function()
+		return commit_word_reset(ConfigKeys.LEAF.BACKSPACE_RESTORE_ENABLED, "set_backspace_restore_enabled",
+			not backspace_restore_enabled)
+	end
+	local function current_backspace_restore_window()
+		if ctx.keymap and type(ctx.keymap.get_backspace_restore_window_ms) == "function" then
+			return ctx.keymap.get_backspace_restore_window_ms()
+		end
+		return ctx.state[ConfigKeys.LEAF.BACKSPACE_RESTORE_WINDOW_MS]
+	end
+	params_ctx.commands[ConfigKeys.COMMAND.BACKSPACE_RESTORE_WINDOW] = function(ms)
+		return commit_word_reset(ConfigKeys.LEAF.BACKSPACE_RESTORE_WINDOW_MS, "set_backspace_restore_window_ms", ms)
+	end
+	params_ctx.commands["backspace_restore_window_custom"] = function()
+		local current = current_backspace_restore_window()
+		local ok_label = i18n.get("button.ok")
+		local ok_p, btn, raw = pcall(dialog.text_prompt,
+			i18n.get("menu.hotstrings.backspace_restore_window_title"),
+			i18n.get("menu.hotstrings.backspace_restore_window_prompt"),
+			type(current) == "number" and string.format("%d", current) or "",
+			ok_label, i18n.get("button.cancel"))
+		if not ok_p or btn ~= ok_label or type(raw) ~= "string" then return false end
+		local key = ValueCheck.KEY.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS
+		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw)
+		if not typed.ok then
+			Logger.warn(LOG, "Invalid Backspace restore window '%s' — ignored (%s).", raw, typed.reason)
+			pcall(dialog.block_alert, i18n.get("dialog.value_check.title"),
+				ValueCheck.refusal_text(key, typed, i18n.get), ok_label)
+			return false
+		end
+		return commit_word_reset(ConfigKeys.LEAF.BACKSPACE_RESTORE_WINDOW_MS, "set_backspace_restore_window_ms",
+			typed.value)
+	end
 	local click_enabled = ctx.keymap and type(ctx.keymap.is_click_resets_word_enabled) == "function"
 		and ctx.keymap.is_click_resets_word_enabled()
 	params_ctx.commands[require("settings.engine.keys").COMMAND.CLICK_RESETS_WORD] = function()
@@ -767,6 +805,8 @@ function M.build_management(ctx)
 	params_ctx.state_getters["hotstrings_repeat_enabled"] = function() return repeat_enabled end
 	params_ctx.state_getters[require("settings.engine.keys").KEY.HOTSTRINGS_IDLE_RESET_SECONDS] = current_idle_reset
 	params_ctx.state_getters[ConfigKeys.KEY.HOTSTRINGS_CASCADE_MAX_ARROWS] = current_cascade_max_arrows
+	params_ctx.state_getters["hotstrings_backspace_restore_enabled"] = function() return backspace_restore_enabled == true end
+	params_ctx.state_getters[ConfigKeys.KEY.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS] = current_backspace_restore_window
 	params_ctx.state_getters["hotstrings_click_resets_word"] = function() return click_enabled == true end
 	params_ctx.state_getters["hotstrings_arrow_resets_word"] = function() return arrow_enabled == true end
 	params_ctx.state_getters["hotstrings_shortcut_resets_word"] = function() return shortcut_enabled == true end

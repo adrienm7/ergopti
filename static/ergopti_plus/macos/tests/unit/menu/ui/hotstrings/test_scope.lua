@@ -145,7 +145,8 @@ local function fake_keymap(controls)
 	local lua_sections = { dynamichotstrings = { { name = "datefr" } } }
 	local km = { DELAY_KEY_TO_CATEGORY = { autocorrection = "autocorrection", rolls = "rolls" },
 		delays = {}, chosen = {}, previews = {}, reloads = {}, repeat_enabled = false, base = 0.9, trigger = "§",
-		idle_reset = 5, cascade = 2, click_resets = false, arrow_resets = false, shortcut_resets = false, tap_hold_resets = false, projected = {} }
+		idle_reset = 5, cascade = 2, click_resets = false, arrow_resets = false, shortcut_resets = false, tap_hold_resets = false,
+		backspace_restore = false, backspace_restore_window = 2000, projected = {} }
 	km.get_terminator_defs = Terminators.get_terminator_defs
 	km.is_terminator_enabled = Terminators.is_terminator_enabled
 	km.add_custom_terminator = Terminators.add_custom_terminator
@@ -236,6 +237,10 @@ local function fake_keymap(controls)
 	function km.set_cascade_max_arrows(value) km.cascade = value; return true end
 	function km.is_click_resets_word_enabled() return km.click_resets end
 	function km.set_click_resets_word(value) km.click_resets = value; return true end
+	function km.is_backspace_restore_enabled() return km.backspace_restore end
+	function km.set_backspace_restore_enabled(value) km.backspace_restore = value; return true end
+	function km.get_backspace_restore_window_ms() return km.backspace_restore_window end
+	function km.set_backspace_restore_window_ms(value) km.backspace_restore_window = value; return true end
 	function km.is_arrow_resets_word_enabled() return km.arrow_resets end
 	function km.set_arrow_resets_word(value) km.arrow_resets = value; return true end
 	function km.is_shortcut_resets_word_enabled() return km.shortcut_resets end
@@ -508,6 +513,8 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.km.idle_reset, 3, "restore applies the recommended idle reset")
 		helpers.assert_eq(f.km.cascade, 3, "restore applies the recommended cascade arrow count (3)")
 		helpers.assert_eq(f.km.click_resets, true, "restore applies the recommended click reset")
+		helpers.assert_eq(f.km.backspace_restore, true, "restore applies the recommended Backspace undo")
+		helpers.assert_eq(f.km.backspace_restore_window, 500, "restore applies the recommended Backspace undo window")
 		helpers.assert_eq(f.km.arrow_resets, true, "restore applies the recommended arrow reset")
 		helpers.assert_eq(f.km.shortcut_resets, true, "restore applies the recommended shortcut reset")
 		helpers.assert_eq(f.km.tap_hold_resets, true, "restore applies the recommended tap-hold reset")
@@ -672,6 +679,8 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.km.idle_reset, 5, "revert restores the idle reset")
 		helpers.assert_eq(f.km.cascade, 2, "revert restores the cascade arrow count")
 		helpers.assert_eq(f.km.click_resets, false, "revert restores the click reset")
+		helpers.assert_eq(f.km.backspace_restore, false, "revert restores the Backspace undo")
+		helpers.assert_eq(f.km.backspace_restore_window, 2000, "revert restores the Backspace undo window")
 		helpers.assert_eq(f.km.arrow_resets, false, "revert restores the arrow reset")
 		helpers.assert_eq(f.km.shortcut_resets, false, "revert restores the shortcut reset")
 		helpers.assert_eq(f.km.tap_hold_resets, false, "revert restores the tap-hold reset")

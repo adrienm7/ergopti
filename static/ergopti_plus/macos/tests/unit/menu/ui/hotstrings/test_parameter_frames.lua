@@ -586,4 +586,85 @@ helpers.describe("hotstrings word-reset rows", function()
 	end
 end)
 
+-- The Backspace undo rows (hotstrings.backspace_restore_enabled and
+-- hotstrings.backspace_restore_window_ms): a checkbox and a choice of the
+-- feature's presets plus a free entry, answered with the keymap setters.
+--- Stubs the keymap's Backspace restore owner for one body.
+--- @param f table The frame fixture.
+--- @param set table The setter call log.
+--- @param window number The live window, in milliseconds.
+local function stub_backspace_restore(f, set, window)
+	local keymap, enabled = f.context.keymap, true
+	keymap.is_backspace_restore_enabled = function() return enabled end
+	keymap.set_backspace_restore_enabled = function(value)
+		set[#set + 1] = { "backspace_restore", value }; enabled = value; return true
+	end
+	keymap.get_backspace_restore_window_ms = function() return window end
+	keymap.set_backspace_restore_window_ms = function(value)
+		set[#set + 1] = { "backspace_restore_window", value }; window = value; return true
+	end
+end
+
+--- Finds the Backspace undo checkbox and its window choice in the built menu.
+--- @return table check_row, table window_row
+local function backspace_restore_rows(f)
+	local check_caption = f.captions("menu.hotstrings.backspace_restore_enabled")
+	local window_caption = f.captions("menu.hotstrings.backspace_restore_window")
+	local check_row, window_row
+	for _, row in ipairs(assert(f.build()).menu) do
+		if row.title == check_caption then check_row = row end
+		if type(row.title) == "string" and row.title:sub(1, #window_caption) == window_caption then window_row = row end
+	end
+	return assert(check_row, "the Backspace undo checkbox must be drawn"),
+		assert(window_row, "the Backspace undo window choice must be drawn")
+end
+
+helpers.describe("hotstrings Backspace undo rows (backspace-restore-menu)", function()
+	helpers.it("ticks the live option and window, toggles the option and sets a preset", function()
+		with_word_reset(function(f, set)
+			stub_backspace_restore(f, set, 500)
+			local check, window = backspace_restore_rows(f)
+			helpers.assert_eq(check.checked, true, "the checkbox reads the keymap's live value")
+			local unit = f.captions("hs_config.unit_ms")
+			helpers.assert_eq(window.title, joined(f, f.captions("menu.hotstrings.backspace_restore_window"), "500 " .. unit))
+			local titles = {}
+			for index, row in ipairs(window.menu) do titles[index] = row.title end
+			helpers.assert_eq(titles, { "250 " .. unit, "500 " .. unit, "1000 " .. unit, "2000 " .. unit, "-",
+				f.captions("menu.hotstrings.backspace_restore_window_custom") })
+			helpers.assert_eq(window.menu[2].checked, true, "the live window is ticked")
+			check.fn()
+			helpers.assert_eq(set, { { "backspace_restore", false } })
+			helpers.assert_eq(f.context.state.backspace_restore_enabled, false)
+			window.menu[4].fn()
+			helpers.assert_eq(set[2], { "backspace_restore_window", 2000 })
+			helpers.assert_eq(f.context.state.backspace_restore_window_ms, 2000)
+			helpers.assert_eq(f.calls.writes, 2, "each change is saved once")
+		end, 3)
+	end)
+
+	helpers.it("stores a free window typed in the prompt", function()
+		with_word_reset(function(f, set, alerts)
+			stub_backspace_restore(f, set, 500)
+			local _, window = backspace_restore_rows(f)
+			window.menu[6].fn()
+			helpers.assert_eq(set, { { "backspace_restore_window", 750 } })
+			helpers.assert_eq(f.context.state.backspace_restore_window_ms, 750)
+			helpers.assert_eq(alerts(), 0)
+		end, 3, " 750 ")
+	end)
+
+	for _, answer in ipairs({ "10", "20000", "abc", "" }) do
+		helpers.it("refuses the free window '" .. answer .. "' outside the declared range with an alert", function()
+			with_word_reset(function(f, set, alerts)
+				stub_backspace_restore(f, set, 500)
+				local _, window = backspace_restore_rows(f)
+				helpers.assert_eq(window.menu[6].fn(), false)
+				helpers.assert_eq(set, {})
+				helpers.assert_eq(alerts(), 1)
+				helpers.assert_eq(f.calls.writes, 0)
+			end, 3, answer)
+		end)
+	end
+end)
+
 return true

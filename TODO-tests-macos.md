@@ -241,3 +241,11 @@ Hands needed:
       driver.
 - [ ] <!-- field-point: agent_composed_menu --> AI Agent submenu: an installed driver shows its composed menu,
       with the provider published before model loading.
+- [ ] <!-- field-point: backspace_restore --> Backspace restore after an expansion (hotstrings.backspace_restore_enabled,
+      hotstrings.backspace_restore_window_ms, default on and 500 ms), in TextEdit and a browser field: 1. `td★` then
+      Backspace at once gives `td`, not `td★`; `po★` (→ `poo`) then Backspace gives `po`. 2. `adn` then Space (→
+      `ADN `) then Backspace at once gives `adn ` with its Space, the caret after it; the same with `,` and Enter.
+      3. Backspace within 500 ms undoes; wait about one second and Backspace deletes the last character only; with
+      the 2000 ms preset a one-second wait still undoes. 4. Another key between the expansion and the Backspace: a
+      plain Backspace. 5. Option off in the Hotstrings parameters menu: Backspace never undoes; the free entry
+      refuses 10 ms with an alert naming 50 to 10000.

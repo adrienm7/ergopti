@@ -42,6 +42,11 @@ local TerminatorReplay = require("hotstrings.engine.expander.terminator_replay")
 local Terminators      = require("hotstrings.engine.expander.terminators")
 local CapsWordOutput   = require("infra.capsword_output")
 local ConfigKeys = require("settings.engine.keys")
+-- What a Backspace right after an expansion gives back, and until when: the
+-- rule the Linux daemon and the AutoHotkey port replay from the same vectors.
+local BackspaceRestore = require("hotstrings.engine.backspace_restore")
+-- The keystroke clock the tap times pauses with (seconds, monotonic across sleep).
+local TimerScheduler   = require("core.events.timer_scheduler")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.
@@ -394,26 +399,43 @@ end
 -- ===================================
 -- ===================================
 
+--- Reads the keystroke clock in the milliseconds the shared window rule takes,
+--- the same seconds-to-milliseconds reading the tap's idle reset makes.
+--- @return number now_ms
+local function hotstring_now_ms()
+	return TimerScheduler.hotstring_time() * 1000
+end
+
 --- Keeps the expansion that just fired for an immediate Backspace, as Linux
 --- does: that Backspace means « not what I wanted » and brings the trigger back
 --- (M.undo_on_backspace). Only a literal replacement is kept: a token or dynamic
 --- output does not say what it typed. The record holds the buffer the expansion
---- left, so any edit, reset or focus change in between voids it.
+--- left, so any edit, reset or focus change in between voids it, and the time of
+--- the commit, so a Backspace after hotstrings.backspace_restore_window_ms is a
+--- plain Backspace. With hotstrings.backspace_restore_enabled off nothing is kept.
 --- @param is_literal boolean Whether the output is plain text (no key directive).
 --- @param trigger string The text the user typed for it, as it was on screen.
 --- @param typed string What the expansion typed, replayed terminator included.
+--- @param replayed string|nil The terminator typed back after the output, if any.
 --- @param is_private boolean The mapping's privacy.
 --- @param eligible boolean False for an ignored window or a composite event.
-local function remember_undo(is_literal, trigger, typed, is_private, eligible)
+local function remember_undo(is_literal, trigger, typed, replayed, is_private, eligible)
 	_state.undoable = nil
+	if _state.backspace_restore_enabled ~= true then return end
 	if not eligible or not is_literal or type(trigger) ~= "string" or trigger == ""
 		or type(typed) ~= "string" or typed == "" or _state.buffer == "" then return end
-	_state.undoable = { trigger = trigger, typed = typed, is_private = is_private == true, buffer_after = _state.buffer }
+	_state.undoable = {
+		trigger = trigger, typed = typed, replayed = replayed, is_private = is_private == true,
+		buffer_after = _state.buffer, committed_ms = hotstring_now_ms(),
+	}
 end
 
 --- Puts the trigger back for a Backspace pressed right after an expansion: the
 --- Backspace is consumed, what the expansion typed is erased and the trigger is
 --- typed again, outside the buffer so it cannot fire at once (Linux's undo).
+--- What comes back is the shared rule's: the trigger without a final magic key
+--- (the key is an action, not text) and then the terminator that was typed after
+--- the output, so « adn » and Space come back as « adn » and Space.
 --- The erase counts user-perceived characters, the unit one Backspace deletes:
 --- an emoji with a skin tone, a ZWJ sequence, a flag or an accent typed as a
 --- combining mark is one character of several code points, and counting code
@@ -423,14 +445,31 @@ end
 function M.undo_on_backspace(undo)
 	if not require_state("undo_on_backspace") then return false end
 	if type(undo) ~= "table" or _state.buffer ~= undo.buffer_after then return false end
+	-- The option may have been switched off after the record was kept.
+	if _state.backspace_restore_enabled ~= true then return false end
+	if not BackspaceRestore.within_window(undo.committed_ms, hotstring_now_ms(),
+		_state.backspace_restore_window_ms) then
+		return false
+	end
+	local text = BackspaceRestore.restored_text(undo.trigger, _state.magic_key, undo.replayed)
+	-- A restore ending on a word-opening terminator leaves the caret at a word
+	-- start; one ending inside a word (no terminator, or the repeat key's empty
+	-- restore) does not, and the restored word is not in the buffer.
+	local last_char = text:match("[%z\1-\127\194-\244][\128-\191]*$")
+	local opens_word = last_char ~= nil and undo.replayed ~= nil and undo.replayed ~= ""
+		and not text_utils.is_hotstring_word_char(last_char)
 	local restored = M.perform_text_replacement(
 		ComposedText.count(undo.typed),
-		function() return km_utils.emit_text(undo.trigger) end,
 		function()
-			-- The restored trigger ends the word and is not in the buffer: a
-			-- word-start rule typed next would otherwise fire inside it.
+			-- The repeat key's lone magic key gives nothing back: the erase alone.
+			if text == "" then return 0, "", "", 0 end
+			return km_utils.emit_text(text)
+		end,
+		function()
+			-- The restored trigger is not in the buffer: a word-start rule typed
+			-- next would otherwise fire inside it.
 			_state.buffer = ""
-			_state.start_is_word_boundary = false
+			_state.start_is_word_boundary = opens_word
 			_state.start_is_line_start = false
 			LlmContext.reset(_state)
 		end,
@@ -439,7 +478,7 @@ function M.undo_on_backspace(undo)
 	if undo.is_private then
 		Logger.info(LOG, "Undo: restored a private trigger (content withheld).")
 	else
-		Logger.info(LOG, "Undo: restored the trigger (%d char(s)).", text_utils.utf8_len(undo.trigger))
+		Logger.info(LOG, "Undo: restored the trigger (%d char(s)).", text_utils.utf8_len(text))
 	end
 	return true
 end
@@ -1245,7 +1284,8 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 		is_private
 	)
 	if not replaced then return false end
-	remember_undo(m.plain_repl == m.repl, typed, injection.text, is_private,
+	-- The auto path's plan types the replacement alone: no terminator follows it.
+	remember_undo(m.plain_repl == m.repl, typed, injection.text, nil, is_private,
 		event_prefix == "" and is_ignored ~= true)
 
 	-- Private mappings carry PII sourced from personal_info.toml (phone, SSN,
@@ -1398,8 +1438,10 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		)
 		if not replacement_ok then return false end
 		-- A stripped no-break space is not typed back, as on Windows and Linux:
-		-- the trigger alone returns, before the replayed colon is erased.
-		remember_undo(m.plain_repl == m.repl, typed_trigger, to_type .. (replay_tail and chars or ""),
+		-- the trigger alone returns, then the replayed colon. A consumed
+		-- terminator was never typed after the output and does not come back.
+		local replayed = replay_tail and chars or nil
+		remember_undo(m.plain_repl == m.repl, typed_trigger, to_type .. (replayed or ""), replayed,
 			is_private, is_ignored ~= true)
 
 		-- Same privacy contract as try_auto_expand: a private mapping's trigger
@@ -1504,9 +1546,9 @@ function M.try_repeat_feature(chars, is_ignored)
 		end,
 		false, is_ignored, "hotstring", ConfigKeys.COMMAND.REPEAT_KEY, is_private)
 	if replaced ~= true then return false end
-	-- The repeat is an expansion of the magic key: an immediate Backspace gives
-	-- the magic key back, as on Windows and Linux.
-	remember_undo(true, chars, last_char, is_private, is_ignored ~= true)
+	-- The repeat is an expansion of the magic key: an immediate Backspace erases
+	-- the repeated character and, the magic key being an action, types nothing back.
+	remember_undo(true, chars, last_char, nil, is_private, is_ignored ~= true)
 
 	if is_private then
 		Logger.debug(LOG, "Repeat feature: repeated a private character (content withheld).")
