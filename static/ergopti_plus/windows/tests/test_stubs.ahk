@@ -632,6 +632,10 @@ global _AHK_InputHookFactory := (Options) => _NoOpInputHook()
 class _NoOpInputHook {
     Input := ""
     InProgress := false
+    EndReason := ""
+    EndKey := ""
+    EndMods := ""
+    KeyOpt(Keys, KeyOptions) => 0
     Start() => 0
     Stop() => 0
 }

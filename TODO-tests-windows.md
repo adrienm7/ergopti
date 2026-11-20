@@ -85,6 +85,10 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
 - [ ] AltGr rolls and script shortcuts (2026-11-17): on Ergopti+, AltGr held over J then I types `("`, over the
       `)` key then I types `)#`, and the `chevron_equal` roll works again; AltGr then Enter alone pauses, but « (# »
       then Enter or Backspace with AltGr still down types Enter or erases, and never pauses or reloads.
+- [ ] Non-text keys during a burst beside another AutoHotkey hook (2026-11-20, `burst-holds-non-text-keys`): with a
+      second AutoHotkey script that installs a keyboard hook running, roll an expanding trigger straight into a
+      letter, Backspace and a letter, then into Ctrl+Left: the Backspace erases the letter typed before it and the
+      caret moves after the expansion, never inside it.
 - [ ] Items 34, 37, 102 and 129: the Windows native cases of native delimiter transactions and packaging with both
       extension TOML files.
 - [ ] Immediate-Backspace restoration in Windows Terminal: `sru` + Space then Backspace types `sru` back through the

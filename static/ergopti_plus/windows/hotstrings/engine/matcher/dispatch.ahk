@@ -28,15 +28,28 @@ global HSE_SUPPRESS_RELEASE_DELAY_MS := 60
 
 ; The InputHook that holds what the user types while an expansion burst is on
 ; its way (_HSE_SendBurstUnpaced). Not visible, so a text key it collects never
-; reaches the window; B0 keeps a Backspace from deleting held text, since it
-; passes (non-text keys are not held). Its input level, set at its first use,
+; reaches the window; B0 keeps a Backspace from deleting held text, since a
+; Backspace is held as a key of its own. Its input level, set at its first use,
 ; lets through the burst (level 0) and the held text it types again (the roll
-; replay's level). A key a hotkey consumes is not collected: the hotkey runs
-; after the burst anyway, its thread waiting for the dispatch's Critical section.
+; replay's level). A key a hotkey consumes is not collected (AutoHotkey offers a
+; key to its InputHooks only once no hotkey suppressed it, hook.cpp AllowIt): the
+; hotkey runs after the burst anyway, its thread waiting for the dispatch's
+; Critical section, so nothing a hotkey takes is held and typed a second time.
 global HSE_BURST_CAPTURE_OPTIONS := "L1023 B0"
-; One capture serves every burst (_HSE_BurstCapture): constructing an InputHook
+; The non-text keys a capture holds too. An InputHook keeps no record of a
+; non-text key's place among the text it collects, so each one ends its capture
+; (an end key, suppressed) and records itself with the modifiers held, and the
+; next older capture, started before it, holds what comes after. A key struck
+; once every stage has ended reaches the window as before.
+global HSE_BURST_HELD_NON_TEXT_KEYS := "{BackSpace}{Delete}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}"
+; How many non-text keys one burst can hold, one capture each: the burst lasts
+; 10 to 15 ms beside another hook, and two such keys in that time is already a
+; deliberate roll.
+global HSE_BURST_CAPTURE_STAGES := 2
+; The captures every burst reuses (_HSE_BurstCaptures), newest first: one is
+; started per stage, the newest receiving keys first. Constructing an InputHook
 ; per burst stalled 75 to 220 ms about three times in 2,000 on the PC, against
-; at most 9 ms for restarting this one (a restart clears its Input).
+; at most 9 ms for restarting one (a restart clears its Input).
 global _HSE_BurstInputHook := 0
 
 ; Terminal/TUI inputs commonly update their edit state once per render turn.
@@ -124,36 +137,65 @@ _HSE_SendWithAltGrUp(SendFn) {
 ; burst took 80 to 90 ms on the PC, and the next word's letters landed between
 ; its keys (« asa », Space, « a » typed « AaSAASA », 2026-11-18). Unpaced, it
 ; took 10 to 15 ms (asa-space-burst-unpaced), and a key struck in those
-; milliseconds still landed inside it. So an InputHook holds what the user types
-; for the length of the burst, and the held text is typed after it
-; (burst-holds-struck-keys).
+; milliseconds still landed inside it. So InputHooks hold what the user types
+; for the length of the burst, text and non-text keys (a Backspace, an arrow),
+; and the held keys are typed after it in the order they were struck
+; (burst-holds-struck-keys, burst-holds-non-text-keys).
 ; @param Burst {String} The Send string of the whole edit.
 _HSE_SendBurstUnpaced(Burst) {
 		global _AHK_SendInput
 		PreviousKeyDelay := A_KeyDelay
 		PreviousKeyDuration := A_KeyDuration
 		SetKeyDelay(-1, -1)
-		Capture := 0
+		Captures := 0
 		try {
-				Capture := _HSE_BurstCapture()
+				Captures := _HSE_BurstCaptures()
 				; A burst sent while another holds the keys leaves them to that one,
 				; which types them after both.
-				if Capture.InProgress
-						Capture := 0
+				if _HSE_BurstCaptureRunning(Captures)
+						Captures := 0
 				else
-						Capture.Start()
+						; The oldest first: the last started receives keys first.
+						loop Captures.Length
+								Captures[Captures.Length - A_Index + 1].Start()
 				return _TextSenderAtSendLevel(_AHK_SendInput.Bind(Burst))
 		} finally {
 				try {
-						if IsObject(Capture)
-								_HSE_ReleaseBurstCapture(Capture)
+						if IsObject(Captures)
+								_HSE_ReleaseBurstCaptures(Captures)
 				} finally SetKeyDelay(PreviousKeyDelay, PreviousKeyDuration)
+		}
+}
+
+; Whether a burst already holds the keys: one of its captures still runs.
+; @param Captures {Array} The burst captures.
+; @return {Boolean}
+_HSE_BurstCaptureRunning(Captures) {
+		for Capture in Captures
+				if Capture.InProgress
+						return true
+		return false
+}
+
+; Types what every capture held, newest first, which is the order the keys were
+; struck in, and stops each one once it is typed.
+; @param Captures {Array} The started burst captures, newest first.
+_HSE_ReleaseBurstCaptures(Captures) {
+		try {
+				for Capture in Captures
+						_HSE_ReleaseBurstCapture(Capture)
+		} finally {
+				; A capture left running by a failed replay would hide every key after it.
+				for Capture in Captures
+						Capture.Stop()
 		}
 }
 
 ; Types the held text while the capture still holds the keys struck meanwhile,
 ; until it holds none, and only then stops it: a key struck between the stop
-; and the typing would otherwise reach the window before the held ones.
+; and the typing would otherwise reach the window before the held ones. The
+; non-text key that ended the capture, if one did, comes after its text; the
+; next older capture holds what was struck after that key.
 ; @param Capture {InputHook} The started burst capture.
 _HSE_ReleaseBurstCapture(Capture) {
 		Typed := 0
@@ -168,17 +210,46 @@ _HSE_ReleaseBurstCapture(Capture) {
 		} finally Capture.Stop()
 		; A key struck in the instant before the stop.
 		_HSE_TypeHeldText(SubStr(Capture.Input, Typed + 1))
+		if (Capture.EndReason == "EndKey")
+				_HSE_TypeHeldKey(Capture.EndKey, Capture.EndMods)
 }
 
-; The burst capture, built at its first use from the injectable InputHook.
-; @return {InputHook} The capture, stopped unless a burst is on its way.
-_HSE_BurstCapture() {
+; The burst captures, built at their first use from the injectable InputHook.
+; @return {Array} HSE_BURST_CAPTURE_STAGES captures, newest first, stopped
+;   unless a burst is on its way.
+_HSE_BurstCaptures() {
 		global _HSE_BurstInputHook, _AHK_InputHookFactory, HSE_BURST_CAPTURE_OPTIONS
-		global TAPHOLD_ROLL_REPLAY_SEND_LEVEL
-		if !IsObject(_HSE_BurstInputHook)
-				_HSE_BurstInputHook := _AHK_InputHookFactory.Call(
+		global HSE_BURST_CAPTURE_STAGES, HSE_BURST_HELD_NON_TEXT_KEYS, TAPHOLD_ROLL_REPLAY_SEND_LEVEL
+		if IsObject(_HSE_BurstInputHook)
+				return _HSE_BurstInputHook
+		Captures := []
+		loop HSE_BURST_CAPTURE_STAGES {
+				Capture := _AHK_InputHookFactory.Call(
 						"I" . (TAPHOLD_ROLL_REPLAY_SEND_LEVEL + 1) . " " . HSE_BURST_CAPTURE_OPTIONS)
-		return _HSE_BurstInputHook
+				Capture.KeyOpt(HSE_BURST_HELD_NON_TEXT_KEYS, "+E +S")
+				Captures.Push(Capture)
+		}
+		_HSE_BurstInputHook := Captures
+		return Captures
+}
+
+; Types a non-text key a burst capture held, with the modifiers that were down
+; when it was struck, at the level _HSE_TypeHeldText types the held text.
+; @param KeyName {String} The capture's EndKey.
+; @param Mods {String} The capture's EndMods, such as "<^<+".
+_HSE_TypeHeldKey(KeyName, Mods) {
+		global _AHK_SendEvent, TAPHOLD_ROLL_REPLAY_SEND_LEVEL
+		; Send names each modifier once; EndMods names a side, both when both are down.
+		Prefix := ""
+		for Symbol in ["^", "!", "+", "#"]
+				if InStr(Mods, Symbol)
+						Prefix .= Symbol
+		PreviousLevel := A_SendLevel
+		SendLevel(TAPHOLD_ROLL_REPLAY_SEND_LEVEL)
+		try
+				_AHK_SendEvent.Call(Prefix . "{" . KeyName . "}")
+		finally
+				SendLevel(PreviousLevel)
 }
 
 ; Types the text a burst capture held, the way the layout emulation types a

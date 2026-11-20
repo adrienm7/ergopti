@@ -22,7 +22,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/dispatch.ahk",
 			"symbol": "HSE_UndoExpansion(Undo",
-			"sha256": "a719a2c0166e07e6a80b7f3406284cf00796496099d93ca915c889ecf5a83866"
+			"sha256": "ff0b36e87bd803bc7d4dc4059722e338f0958b987f4fe6d3d55198d4bee8bcae"
 		},
 		{
 			"id": "macos-repeat",
@@ -64,7 +64,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 			"symbol": "DeadKey(Mapping)",
-			"sha256": "1aa33ce9802ad4945e6eca7d45688389eccef53310c3aba4a92d499d897339a0"
+			"sha256": "db7c4163d5990f2b958e9fe38558216b76853848d696ba11ba2e6e6b01862493"
 		},
 		{
 			"id": "windows-dead-registry",

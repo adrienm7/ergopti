@@ -763,9 +763,20 @@ non-visible InputHook hides a text key it collects from the older watchers
 (neither OnChar nor OnKeyDown), so the replay is the only copy they see. A key
 a remap hotkey suppresses reaches no InputHook (only what the hotkey sends
 does, as the magic-key capture in `editors.ahk` records), and its thread runs
-after the Critical burst anyway. Non-text keys (Backspace, arrows) stay
-visible and can still land inside the burst.
-`(burst-holds-struck-keys)` models the race. Two rejected ways to hold such keys:
+after the Critical burst anyway. That is AutoHotkey's own order, read in
+hook.cpp (v2.0): a key reaches `CollectInput` only from `AllowIt`, once no
+hotkey suppressed it, so a capture never holds a key a hotkey takes and the
+replay cannot type it twice. Non-text keys are held too (2026-11-20): an
+InputHook records no place for a non-text key among its text, so
+`HSE_BURST_HELD_NON_TEXT_KEYS` (Backspace, Delete, arrows, Home, End, PgUp,
+PgDn) are suppressed end keys of each capture, and `HSE_BURST_CAPTURE_STAGES`
+(2) captures are started oldest first: the newest holds the text up to the
+first such key and records it with `EndMods`, the next one holds what follows.
+The release types each stage's text, then its key with its modifiers, at the
+replay level; a key struck once every stage ended still lands inside the burst.
+`(burst-holds-struck-keys)` and `(burst-holds-non-text-keys)` model the race,
+the fake following CollectInputHook (newest running capture first, an
+invisible key hidden from the older ones). Two rejected ways to hold such keys:
 the roll block can capture them, but a `-1` timer that ends the hold runs
 before their hotkey threads, and a capture whose thread finds the same hotkey
 still running is discarded by `#MaxThreadsPerHotkey` (application.cpp

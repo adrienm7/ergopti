@@ -285,7 +285,11 @@ _HOF_BurstIsUnpaced() {
 
 ; The keyboard while a burst is on its way beside another hook: SendEvent lets a
 ; key the user strikes reach the window between the burst's own keys. A started
-; capture takes the key's text instead, as an InputHook that is not visible does.
+; capture takes the key's text instead, as an InputHook that is not visible does,
+; and, as AutoHotkey's hook does (hook.cpp CollectInputHook), the newest running
+; capture sees the key first and hides it from the older ones. A non-text key
+; reaches the window unless the capture made it a suppressed end key, which
+; ends that capture and records the key and the modifiers held.
 global _HOF_Race := 0
 
 class _HOF_RaceCapture {
@@ -295,38 +299,83 @@ class _HOF_RaceCapture {
 		this.Options := Options
 		this.Input := ""
 		this.InProgress := false
+		this.EndReason := ""
+		this.EndKey := ""
+		this.EndMods := ""
+		this.HeldKeys := ""
+	}
+	KeyOpt(Keys, KeyOptions) {
+		AssertEqual("+E +S", KeyOptions, "a held non-text key must end the capture and be suppressed")
+		this.HeldKeys .= Keys
 	}
 	Start() {
 		global _HOF_Race
 		this.InProgress := true
 		this.Input := ""
+		this.EndReason := ""
+		this.EndKey := ""
+		this.EndMods := ""
+		_HOF_Race.Serial += 1
+		this.Serial := _HOF_Race.Serial
 		this.Starts := this.HasOwnProp("Starts") ? this.Starts + 1 : 1
 		if this.Starts == 1
 			_HOF_Race.Captures.Push(this)
 	}
-	; The keys struck right after the hook sees the stop reach the window.
+	; The next keys of StruckAtStop are struck right after the hook sees the stop.
 	Stop() {
 		global _HOF_Race
+		if !this.InProgress
+			return
 		this.InProgress := false
-		Struck := _HOF_Race.StruckAtStop
-		_HOF_Race.StruckAtStop := ""
-		_HOF_RaceStrike(Struck)
+		this.EndReason := "Stopped"
+		if _HOF_Race.StruckAtStop.Length
+			_HOF_RaceStrike(_HOF_Race.StruckAtStop.RemoveAt(1))
 	}
 }
 
-; Keys struck now: a running capture holds them, or they reach the window.
-_HOF_RaceStrike(Chars) {
+; Keys struck now, as characters or as "{Name}" non-text keys, "{<^Name}" with
+; modifiers held: the newest running capture holds them, or they reach the window.
+_HOF_RaceStrike(Keys) {
 	global _HOF_Race
-	for Char in StrSplit(Chars) {
-		Held := false
-		for Capture in _HOF_Race.Captures
-			if Capture.InProgress {
-				Capture.Input .= Char
-				Held := true
-			}
-		if !Held
+	Position := 1
+	while Position <= StrLen(Keys) {
+		if RegExMatch(Keys, "\G\{([<>^!+#]*)(\w+)\}", &Token, Position) {
+			_HOF_RaceStrikeKey(Token[2], Token[1])
+			Position += Token.Len
+			continue
+		}
+		Char := SubStr(Keys, Position, 1)
+		Position += 1
+		Capture := _HOF_RaceNewestRunning()
+		if IsObject(Capture)
+			Capture.Input .= Char
+		else
 			_HOF_Race.Screen.Push("typed " . Char)
 	}
+}
+
+; A non-text key: an end key of the newest running capture, or the window's.
+_HOF_RaceStrikeKey(Name, Mods) {
+	global _HOF_Race
+	Capture := _HOF_RaceNewestRunning()
+	if IsObject(Capture) && InStr(Capture.HeldKeys, "{" . Name . "}") {
+		Capture.InProgress := false
+		Capture.EndReason := "EndKey"
+		Capture.EndKey := Name
+		Capture.EndMods := Mods
+		return
+	}
+	_HOF_Race.Screen.Push("typed " . Mods . "{" . Name . "}")
+}
+
+; The running capture started last, 0 when none runs.
+_HOF_RaceNewestRunning() {
+	global _HOF_Race
+	Newest := 0
+	for Capture in _HOF_Race.Captures
+		if Capture.InProgress && (!IsObject(Newest) || Capture.Serial > Newest.Serial)
+			Newest := Capture
+	return Newest
 }
 
 ; Strikes the user's keys in the middle of the burst, then lets it finish.
@@ -357,7 +406,7 @@ _HOF_RaceRun(Struck, Refuse, Callback) {
 	SavedHook := _AHK_InputHookFactory
 	SavedCapture := _HSE_BurstInputHook
 	_HOF_Race := { Struck: Struck, Refuse: Refuse, Screen: [], Captures: [], Replays: [], Built: 0,
-		StruckDuringReplay: "", StruckAtStop: "" }
+		Serial: 0, StruckDuringReplay: "", StruckAtStop: [] }
 	_AHK_SendInput := _HOF_RaceSendInput
 	_AHK_SendEvent := _HOF_RaceSendEvent
 	_AHK_InputHookFactory := (Options) => _HOF_RaceCapture(Options)
@@ -375,16 +424,18 @@ _HOF_RaceRun(Struck, Refuse, Callback) {
 ; « asa », Space, « a » typed fast beside another hook gave « AaSA »: the next
 ; word's letter reached the window inside the expansion.
 _HOF_StruckKeyWaitsImpl() {
-	global _HOF_Race, HSE_BURST_CAPTURE_OPTIONS, TAPHOLD_ROLL_REPLAY_SEND_LEVEL
+	global _HOF_Race, HSE_BURST_CAPTURE_OPTIONS, HSE_BURST_CAPTURE_STAGES, TAPHOLD_ROLL_REPLAY_SEND_LEVEL
 	_HOF_RegisterChain()
 	_HOF_RaceRun("a", false, () => AssertTrue(_HOF_TypeAndFire("qzx"), "the first link must dispatch"))
 	AssertEqual("burst {BackSpace 3}{Text}foo qzy|burst end|replay {Text}a", _HOF_Join(_HOF_Race.Screen),
 		"a key struck during the burst must reach the window after it, never inside it")
-	AssertEqual(1, _HOF_Race.Captures.Length, "one burst is held by one capture")
-	AssertFalse(_HOF_Race.Captures[1].InProgress, "the capture must end with the burst")
-	AssertEqual("I" . (TAPHOLD_ROLL_REPLAY_SEND_LEVEL + 1) . " " . HSE_BURST_CAPTURE_OPTIONS,
-		_HOF_Race.Captures[1].Options,
-		"the capture must let the burst (level 0) and the held text it types again through")
+	AssertEqual(HSE_BURST_CAPTURE_STAGES, _HOF_Race.Captures.Length, "one burst starts every capture stage")
+	for Capture in _HOF_Race.Captures {
+		AssertFalse(Capture.InProgress, "every capture must end with the burst")
+		AssertEqual("I" . (TAPHOLD_ROLL_REPLAY_SEND_LEVEL + 1) . " " . HSE_BURST_CAPTURE_OPTIONS,
+			Capture.Options,
+			"the capture must let the burst (level 0) and the held text it types again through")
+	}
 	AssertEqual(TAPHOLD_ROLL_REPLAY_SEND_LEVEL, _HOF_Race.Replays[1].Level,
 		"the held text must be typed at a level the watcher sees and no hotkey takes")
 	AssertEqual(-1, _HOF_Race.Replays[1].KeyDelay, "the held text must be typed unpaced too")
@@ -396,19 +447,22 @@ _HOF_StruckKeyWaitsForTheBurst() {
 }
 
 ; The held text is typed before the capture stops: a key struck while it is
-; typed is held too, and one struck as the capture stops comes after them all.
+; typed is held too, one struck as the newest capture stops is held by the
+; older one, and one struck as the last capture stops comes after them all.
 _HOF_HeldKeysKeepOrderImpl() {
 	global _HOF_Race
 	_HOF_RaceRun("a", false, _HOF_StrikeAroundTheRelease)
-	AssertEqual("burst {Text}x|burst end|replay {Text}a|replay {Text}b|typed c", _HOF_Join(_HOF_Race.Screen),
-		"keys struck while the held text is typed, or as the capture stops, must keep their order")
-	AssertFalse(_HOF_Race.Captures[1].InProgress, "the capture must stop once it holds nothing more")
+	AssertEqual("burst {Text}x|burst end|replay {Text}a|replay {Text}b|replay {Text}c|typed d",
+		_HOF_Join(_HOF_Race.Screen),
+		"keys struck while the held text is typed, or as the captures stop, must keep their order")
+	for Capture in _HOF_Race.Captures
+		AssertFalse(Capture.InProgress, "every capture must stop once it holds nothing more")
 }
 
 _HOF_StrikeAroundTheRelease() {
 	global _HOF_Race
 	_HOF_Race.StruckDuringReplay := "b"
-	_HOF_Race.StruckAtStop := "c"
+	_HOF_Race.StruckAtStop := ["c", "d"]
 	_HSE_SendBurstUnpaced("{Text}x")
 }
 
@@ -420,7 +474,7 @@ _HOF_HeldKeysKeepTheirOrder() {
 ; nothing more, each burst restarts the one capture, and a burst sent while the
 ; capture runs leaves the keys to the burst that started it.
 _HOF_StruckKeyEdgesImpl() {
-	global _HOF_Race
+	global _HOF_Race, HSE_BURST_CAPTURE_STAGES
 	_HOF_RaceRun("b", true, () => AssertThrows(() => _HSE_SendBurstUnpaced("{Text}x"),
 		"a refused burst must still fail its caller"))
 	AssertEqual("burst {Text}x|burst end|replay {Text}b", _HOF_Join(_HOF_Race.Screen),
@@ -432,7 +486,8 @@ _HOF_StruckKeyEdgesImpl() {
 		"nothing typed during the burst means nothing to type after it")
 
 	_HOF_RaceRun("c", false, _HOF_TwoBursts)
-	AssertEqual(1, _HOF_Race.Built, "every burst must restart the one capture, never build another")
+	AssertEqual(HSE_BURST_CAPTURE_STAGES, _HOF_Race.Built,
+		"every burst must restart the same captures, never build others")
 	AssertEqual("burst {Text}x|burst end|replay {Text}c|burst {Text}y|burst end|replay {Text}c",
 		_HOF_Join(_HOF_Race.Screen), "a restarted capture must hold only the keys of its own burst")
 
@@ -450,12 +505,58 @@ _HOF_TwoBursts() {
 
 ; The owner's capture is already running when the inner burst goes out.
 _HOF_NestedBurst() {
-	_HSE_BurstCapture().Start()
+	global HSE_BURST_CAPTURE_STAGES
+	_HSE_BurstCaptures()[HSE_BURST_CAPTURE_STAGES].Start()
 	_HSE_SendBurstUnpaced("{Text}y")
 }
 
 _HOF_StruckKeyEdges() {
 	_HOF_Run(_HOF_StruckKeyEdgesImpl)
+}
+
+; A Backspace or an arrow struck during the burst passed through the capture and
+; landed inside the burst, ahead of the text struck before it. Each one now ends
+; its capture and is typed after the text held before it, with its modifiers.
+_HOF_NonTextKeysWaitImpl() {
+	global _HOF_Race, HSE_BURST_HELD_NON_TEXT_KEYS, TAPHOLD_ROLL_REPLAY_SEND_LEVEL
+	_HOF_RaceRun("a{BackSpace}b", false, () => _HSE_SendBurstUnpaced("{Text}x"))
+	AssertEqual("burst {Text}x|burst end|replay {Text}a|replay {BackSpace}|replay {Text}b",
+		_HOF_Join(_HOF_Race.Screen), "a Backspace struck during the burst must keep its place among the text")
+	for Capture in _HOF_Race.Captures
+		AssertEqual(HSE_BURST_HELD_NON_TEXT_KEYS, Capture.HeldKeys, "every capture must hold the non-text keys")
+
+	_HOF_RaceRun("{<^Left}", false, () => _HSE_SendBurstUnpaced("{Text}x"))
+	AssertEqual("burst {Text}x|burst end|replay ^{Left}", _HOF_Join(_HOF_Race.Screen),
+		"a held arrow must be typed with the modifiers that were down when it was struck")
+	AssertEqual(TAPHOLD_ROLL_REPLAY_SEND_LEVEL, _HOF_Race.Replays[1].Level,
+		"a held key must be typed at the level of the held text")
+
+	_HOF_RaceRun("{<^>^<+Delete}", false, () => _HSE_SendBurstUnpaced("{Text}x"))
+	AssertEqual("burst {Text}x|burst end|replay ^+{Delete}", _HOF_Join(_HOF_Race.Screen),
+		"a modifier down on both sides must be named once")
+
+	; One stage per held key: a key struck once every stage ended reaches the
+	; window as before, and the held keys keep their order after the burst.
+	_HOF_RaceRun("{Left}{Right}{Up}", false, () => _HSE_SendBurstUnpaced("{Text}x"))
+	AssertEqual("burst {Text}x|typed {Up}|burst end|replay {Left}|replay {Right}",
+		_HOF_Join(_HOF_Race.Screen), "each capture stage must hold one non-text key, in the order struck")
+
+	; Struck after the held key while the held text is typed: the older stage holds it.
+	_HOF_RaceRun("a{End}", false, _HOF_StrikeDuringHeldText)
+	AssertEqual("burst {Text}x|burst end|replay {Text}a|replay {End}|replay {Text}z",
+		_HOF_Join(_HOF_Race.Screen), "a key struck while the held keys are typed must come after them")
+	for Capture in _HOF_Race.Captures
+		AssertFalse(Capture.InProgress, "every capture must stop once it is typed")
+}
+
+_HOF_StrikeDuringHeldText() {
+	global _HOF_Race
+	_HOF_Race.StruckDuringReplay := "z"
+	_HSE_SendBurstUnpaced("{Text}x")
+}
+
+_HOF_NonTextKeysWaitForTheBurst() {
+	_HOF_Run(_HOF_NonTextKeysWaitImpl)
 }
 
 _HOF_Join(Items) {
@@ -473,6 +574,8 @@ Test("hotstring output: keys struck as the held text is typed keep their order (
 	_HOF_HeldKeysKeepTheirOrder)
 Test("hotstring output: the burst capture survives refused, empty, repeated and nested bursts (burst-holds-struck-keys)",
 	_HOF_StruckKeyEdges)
+Test("hotstring output: a Backspace or an arrow struck during the burst is typed after it, in order (burst-holds-non-text-keys)",
+	_HOF_NonTextKeysWaitForTheBurst)
 Test("hotstring output: text ending with another trigger is not fed back (hotstring-output-is-final)",
 	_HOF_OutputIsFinal)
 Test("hotstring output: text ending mid-trigger is completed by the typed character (hotstring-output-is-final)",

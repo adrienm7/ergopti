@@ -426,11 +426,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Windows
 
-- [ ] **A non-text key struck during an expansion burst beside another AutoHotkey hook.** SendInput then falls
-      back to SendEvent; the burst's InputHook holds the text typed meanwhile and types it after the burst
-      (`burst-holds-struck-keys`), but a Backspace or an arrow stays visible and can still land inside it. Holding
-      those needs to tell a key a hotkey takes from one it does not, or the replay types it twice (see
-      `project-hotstring-output-is-final` in `docs/memory/windows-ahk.md`).
 - **Parity literals.** PAR-58: `terminator_restoration`, `context_buffer`, `request_plan_*` and `row_options` are
   replayed on all three drivers (row options on macOS and Linux through `test-keylayout-row-options` and
   `test-xkb-row-options`). `session_events` and `metrics_maintenance` are replayed on all three drivers since
