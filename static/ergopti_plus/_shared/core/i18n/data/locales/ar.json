@@ -4256,6 +4256,7 @@
 	"menu.layout.number_row_symbols": "الرموز أولًا",
 	"platform_reason.number_row_override_unsupported": "Windows فقط: على هذا النظام يكتب التخطيط المثبّت في النظام صف الأرقام؛ وحده Windows، الذي يحاكي التخطيط، يضع الأرقام أو الرموز أولًا.",
 	"platform_reason.number_row_live_session": "غير متاح: لا تطبّق هذا فورًا إلا جلسة X11، أو GNOME أو KDE على Wayland. يحتفظ سطح المكتب هذا بتخطيطه الحالي، وقد تم حفظ اختيارك.",
+	"platform_reason.caps_lock_level_not_held_on_macos": "محدود على macOS: لا يمكن لمفتاح Caps Lock الإبقاء على مستوى من التخطيط المحاكى (مثل Mod3 في Neo)، لأن macOS لا يُبلغ عن Caps Lock إلا كقفل سبق تبديله. تُبقي المفاتيح الأخرى في التخطيط على هذا المستوى.",
 	"platform_reason.number_row_live_no_layout": "غير متاح: ثبّت أولًا تخطيط ErgoptiPlus للوحة المفاتيح؛ فهذا الاختيار يغيّر التخطيط الذي تستخدمه.",
 	"layouts.linux_rows_not_applied": "تم حفظ اختيار صف الأرقام، لكن تعذّر تحديث تخطيط لوحة المفاتيح الجاري استخدامه.",
 	"layouts.rows_not_applied": "تم حفظ اختيار صف الأرقام، لكن تعذّر تحديث تخطيط لوحة المفاتيح الجاري استخدامه.",

@@ -4256,6 +4256,7 @@
 	"menu.layout.number_row_symbols": "Symbols first",
 	"platform_reason.number_row_override_unsupported": "Windows only: on this system the installed system layout types the number row; only Windows, which emulates the layout, puts digits or symbols first.",
 	"platform_reason.number_row_live_session": "Unavailable: Only an X11 session, or GNOME or KDE on Wayland, applies this live. This desktop keeps its current layout; your choice is saved.",
+	"platform_reason.caps_lock_level_not_held_on_macos": "Limited on macOS: Caps Lock cannot hold a level of the emulated layout (such as Neo's Mod3), because macOS reports Caps Lock only as a lock it has already switched. The layout's other keys hold that level.",
 	"platform_reason.number_row_live_no_layout": "Unavailable: Install an ErgoptiPlus keyboard layout first; this choice changes the layout you use.",
 	"layouts.linux_rows_not_applied": "The number-row choice is saved, but the running keyboard layout could not be updated.",
 	"layouts.rows_not_applied": "The number-row choice is saved, but the running keyboard layout could not be updated.",

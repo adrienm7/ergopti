@@ -4431,6 +4431,9 @@ description_key = "menu.layout.ctrl_magic_save"
 [[features.layout]]
 id = "emulated_layout"
 platforms = ["ahk", "hs", "linux"]
+# macOS holds a layout's custom modifier on every key but Caps Lock (Neo's Mod3
+# there): an event tap never sees Caps Lock held.
+degraded = { macos = "platform_reason.caps_lock_level_not_held_on_macos" }
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = ""
 recommended = ""

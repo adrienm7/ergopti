@@ -307,6 +307,10 @@ technical = "The Linux driver runs its own libinput touchpad reader, which this 
 kind = "os_equivalent"
 technical = "On Windows and Linux a custom profile is bound through the AI prediction with a chosen prompt action, which applies the profile to that request only."
 
+[reasons."platform_reason.caps_lock_level_not_held_on_macos"]
+kind = "os_api"
+technical = "macOS toggles the Caps Lock lock in the HID system before any event tap sees the key, and reports it to a tap only as the alphaShift flag changing on a press, never the key's release, so Hammerspoon cannot hold a custom modifier there (Neo's Mod3) or keep the lock off; only a Karabiner-Elements rule could. The source compiler leaves Caps Lock out of the macOS emulation table (modifier_key_not_holdable_on_macos) and macOS holds the modifier on its other keys and on right Option (macos/modules/keymap/layout_emulation.lua flags_changed); Windows (a suppressed SC03A hotkey) and Linux (the grabbed evdev key kept from XKB) hold it on Caps Lock too."
+
 [reasons."platform_reason.number_row_live_session"]
 kind = "os_api"
 technical = "Linux applies the number-row choice live only where the session lets a client change the active layout: X11 (setxkbmap) and GNOME or KDE on Wayland; other Wayland compositors keep the layout until it is reinstalled."

@@ -4256,6 +4256,7 @@
 	"menu.layout.number_row_symbols": "Símbolos primeiro",
 	"platform_reason.number_row_override_unsupported": "Apenas Windows: neste sistema, o layout instalado no sistema digita a fila de números; só o Windows, que emula o layout, coloca primeiro os dígitos ou os símbolos.",
 	"platform_reason.number_row_live_session": "Indisponível: Apenas uma sessão X11, ou GNOME ou KDE em Wayland, o aplica de imediato. Este ambiente de trabalho mantém a disposição atual; a sua escolha está guardada.",
+	"platform_reason.caps_lock_level_not_held_on_macos": "Limitado no macOS: Caps Lock não pode manter um nível do layout emulado (como o Mod3 do Neo), porque o macOS só informa Caps Lock como um bloqueio já alternado. As outras teclas do layout mantêm esse nível.",
 	"platform_reason.number_row_live_no_layout": "Indisponível: Instale primeiro uma disposição ErgoptiPlus: esta opção altera a disposição que utiliza.",
 	"layouts.linux_rows_not_applied": "A escolha da fila de números está guardada, mas não foi possível atualizar a disposição de teclado em uso.",
 	"layouts.rows_not_applied": "A escolha da fila de números está guardada, mas não foi possível atualizar a disposição de teclado em uso.",

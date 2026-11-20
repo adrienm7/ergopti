@@ -4256,6 +4256,7 @@
 	"menu.layout.number_row_symbols": "Simboli prima",
 	"platform_reason.number_row_override_unsupported": "Solo Windows: su questo sistema il layout installato nel sistema digita la riga dei numeri; solo Windows, che emula il layout, mette prima le cifre o i simboli.",
 	"platform_reason.number_row_live_session": "Non disponibile: Solo una sessione X11, o GNOME o KDE su Wayland, lo applica subito. Questo desktop mantiene il layout attuale; la tua scelta è salvata.",
+	"platform_reason.caps_lock_level_not_held_on_macos": "Limitato su macOS: Bloc Maiusc non può tenere un livello del layout emulato (come il Mod3 di Neo), perché macOS segnala Bloc Maiusc solo come un blocco già commutato. Gli altri tasti del layout tengono quel livello.",
 	"platform_reason.number_row_live_no_layout": "Non disponibile: Installa prima un layout ErgoptiPlus: questa scelta modifica il layout che usi.",
 	"layouts.linux_rows_not_applied": "La scelta della riga dei numeri è salvata, ma non è stato possibile aggiornare il layout di tastiera in uso.",
 	"layouts.rows_not_applied": "La scelta della riga dei numeri è salvata, ma non è stato possibile aggiornare il layout di tastiera in uso.",

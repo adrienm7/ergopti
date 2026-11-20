@@ -4256,6 +4256,7 @@
 	"menu.layout.number_row_symbols": "Símbolos primero",
 	"platform_reason.number_row_override_unsupported": "Solo Windows: en este sistema, la distribución instalada en el sistema escribe la fila de números; solo Windows, que emula la distribución, pone primero los dígitos o los símbolos.",
 	"platform_reason.number_row_live_session": "No disponible: Solo una sesión X11, o GNOME o KDE en Wayland, lo aplica al instante. Este escritorio conserva su disposición actual; tu elección está guardada.",
+	"platform_reason.caps_lock_level_not_held_on_macos": "Limitado en macOS: Bloq Mayús no puede mantener un nivel de la distribución emulada (como el Mod3 de Neo), porque macOS solo comunica Bloq Mayús como un bloqueo ya conmutado. Las demás teclas de la distribución mantienen ese nivel.",
 	"platform_reason.number_row_live_no_layout": "No disponible: Instala primero una disposición ErgoptiPlus: esta opción modifica la disposición que usas.",
 	"layouts.linux_rows_not_applied": "La elección de la fila de números está guardada, pero no se pudo actualizar la disposición de teclado en uso.",
 	"layouts.rows_not_applied": "La elección de la fila de números está guardada, pero no se pudo actualizar la disposición de teclado en uso.",

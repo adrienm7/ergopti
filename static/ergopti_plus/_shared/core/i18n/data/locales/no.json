@@ -4256,6 +4256,7 @@
 	"menu.layout.number_row_symbols": "Symboler først",
 	"platform_reason.number_row_override_unsupported": "Bare Windows: på dette systemet skriver det installerte systemoppsettet tallraden; bare Windows, som emulerer oppsettet, setter sifre eller symboler først.",
 	"platform_reason.number_row_live_session": "Utilgjengelig: Bare en X11-økt, eller GNOME eller KDE på Wayland, bruker dette med en gang. Dette skrivebordet beholder det nåværende oppsettet; valget ditt er lagret.",
+	"platform_reason.caps_lock_level_not_held_on_macos": "Begrenset på macOS: Caps Lock kan ikke holde et nivå i det emulerte oppsettet (som Neos Mod3), fordi macOS bare melder Caps Lock som en lås som allerede er slått om. Oppsettets andre taster holder det nivået.",
 	"platform_reason.number_row_live_no_layout": "Utilgjengelig: Installer først et ErgoptiPlus-oppsett; dette valget endrer oppsettet du bruker.",
 	"layouts.linux_rows_not_applied": "Valget for tallraden er lagret, men det aktive tastaturoppsettet kunne ikke oppdateres.",
 	"layouts.rows_not_applied": "Valget for tallraden er lagret, men det aktive tastaturoppsettet kunne ikke oppdateres.",

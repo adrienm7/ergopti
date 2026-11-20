@@ -4256,6 +4256,7 @@
 	"menu.layout.number_row_symbols": "Önce simgeler",
 	"platform_reason.number_row_override_unsupported": "Yalnızca Windows: bu sistemde rakam sırasını sisteme kurulu düzen yazar; rakamları veya simgeleri öne yalnızca düzeni taklit eden Windows alır.",
 	"platform_reason.number_row_live_session": "Kullanılamıyor: Bunu anında yalnızca bir X11 oturumu ya da Wayland üzerinde GNOME veya KDE uygular. Bu masaüstü mevcut düzenini korur; seçiminiz kaydedildi.",
+	"platform_reason.caps_lock_level_not_held_on_macos": "macOS'ta sınırlı: Caps Lock, öykünülen düzenin bir seviyesini (Neo'nun Mod3'ü gibi) basılı tutamaz, çünkü macOS Caps Lock'u yalnızca zaten değiştirilmiş bir kilit olarak bildirir. Düzenin diğer tuşları bu seviyeyi tutar.",
 	"platform_reason.number_row_live_no_layout": "Kullanılamıyor: Önce bir ErgoptiPlus klavye düzeni kurun; bu seçim kullandığınız düzeni değiştirir.",
 	"layouts.linux_rows_not_applied": "Rakam sırası seçimi kaydedildi, ancak çalışan klavye düzeni güncellenemedi.",
 	"layouts.rows_not_applied": "Rakam sırası seçimi kaydedildi, ancak çalışan klavye düzeni güncellenemedi.",

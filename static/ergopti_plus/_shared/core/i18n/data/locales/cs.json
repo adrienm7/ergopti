@@ -4256,6 +4256,7 @@
 	"menu.layout.number_row_symbols": "Nejprve symboly",
 	"platform_reason.number_row_override_unsupported": "Pouze Windows: v tomto systému píše řadu číslic rozložení nainstalované v systému; číslice nebo symboly dává na první místo jen Windows, který rozložení emuluje.",
 	"platform_reason.number_row_live_session": "Nedostupné: Okamžitě to použije jen relace X11 nebo GNOME či KDE na Waylandu. Toto prostředí si ponechá současné rozložení; vaše volba je uložena.",
+	"platform_reason.caps_lock_level_not_held_on_macos": "Omezeno v macOS: Caps Lock nemůže držet úroveň emulovaného rozložení (například Mod3 rozložení Neo), protože macOS hlásí Caps Lock jen jako již přepnutý zámek. Ostatní klávesy rozložení tuto úroveň drží.",
 	"platform_reason.number_row_live_no_layout": "Nedostupné: Nejprve nainstalujte rozložení ErgoptiPlus; tato volba mění rozložení, které používáte.",
 	"layouts.linux_rows_not_applied": "Volba číselné řady je uložena, ale aktivní rozložení klávesnice se nepodařilo aktualizovat.",
 	"layouts.rows_not_applied": "Volba číselné řady je uložena, ale aktivní rozložení klávesnice se nepodařilo aktualizovat.",

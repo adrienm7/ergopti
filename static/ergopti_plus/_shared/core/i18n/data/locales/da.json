@@ -4256,6 +4256,7 @@
 	"menu.layout.number_row_symbols": "Symboler først",
 	"platform_reason.number_row_override_unsupported": "Kun Windows: på dette system skriver det installerede systemlayout talrækken; kun Windows, der emulerer layoutet, sætter tal eller symboler først.",
 	"platform_reason.number_row_live_session": "Ikke tilgængelig: Kun en X11-session eller GNOME eller KDE på Wayland anvender dette med det samme. Dette skrivebord beholder sit nuværende layout; dit valg er gemt.",
+	"platform_reason.caps_lock_level_not_held_on_macos": "Begrænset på macOS: Caps Lock kan ikke holde et niveau i det emulerede layout (som Neos Mod3), fordi macOS kun melder Caps Lock som en lås, der allerede er skiftet. Layoutets andre taster holder det niveau.",
 	"platform_reason.number_row_live_no_layout": "Ikke tilgængelig: Installer først et ErgoptiPlus-layout; dette valg ændrer det layout, du bruger.",
 	"layouts.linux_rows_not_applied": "Valget for talrækken er gemt, men det aktive tastaturlayout kunne ikke opdateres.",
 	"layouts.rows_not_applied": "Valget for talrækken er gemt, men det aktive tastaturlayout kunne ikke opdateres.",

@@ -4256,6 +4256,7 @@
 	"menu.layout.number_row_symbols": "符号优先",
 	"platform_reason.number_row_override_unsupported": "仅限 Windows：在此系统上，数字行由系统中安装的布局输入；只有模拟布局的 Windows 才能让数字或符号优先。",
 	"platform_reason.number_row_live_session": "不可用：只有 X11 会话，或 Wayland 上的 GNOME 或 KDE，会即时应用此设置。当前桌面保持现有布局，您的选择已保存。",
+	"platform_reason.caps_lock_level_not_held_on_macos": "macOS 上受限：Caps Lock 无法按住模拟布局的某一层级（例如 Neo 的 Mod3），因为 macOS 只把 Caps Lock 报告为已切换的锁定键。布局的其他按键可以按住该层级。",
 	"platform_reason.number_row_live_no_layout": "不可用：请先安装 ErgoptiPlus 键盘布局；此选项会更改您正在使用的布局。",
 	"layouts.linux_rows_not_applied": "数字行的选择已保存，但无法更新当前使用的键盘布局。",
 	"layouts.rows_not_applied": "数字行的选择已保存，但无法更新当前使用的键盘布局。",

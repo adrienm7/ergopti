@@ -4256,6 +4256,7 @@
 	"menu.layout.number_row_symbols": "Symboles en premier",
 	"platform_reason.number_row_override_unsupported": "Windows uniquement : sur ce système, la disposition installée dans le système tape la rangée des chiffres ; seul Windows, qui émule la disposition, met les chiffres ou les symboles en premier.",
 	"platform_reason.number_row_live_session": "Indisponible : seules les sessions X11, et GNOME ou KDE sous Wayland, l’appliquent en direct. Ce bureau garde sa disposition actuelle ; votre choix est enregistré.",
+	"platform_reason.caps_lock_level_not_held_on_macos": "Limité sur macOS : Verr. Maj ne peut pas maintenir un niveau de la disposition émulée (comme le Mod3 de Neo), car macOS ne signale Verr. Maj que comme un verrou déjà basculé. Les autres touches de la disposition maintiennent ce niveau.",
 	"platform_reason.number_row_live_no_layout": "Indisponible : installez d’abord une disposition ErgoptiPlus : ce choix modifie la disposition que vous utilisez.",
 	"layouts.linux_rows_not_applied": "Le choix de la rangée des nombres est enregistré, mais la disposition de clavier en cours n’a pas pu être mise à jour.",
 	"layouts.rows_not_applied": "Le choix de la rangée des nombres est enregistré, mais la disposition de clavier en cours n’a pas pu être mise à jour.",
