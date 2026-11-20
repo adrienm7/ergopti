@@ -28,23 +28,10 @@ helpers.describe("hotstrings_config.resolve early-return — show_tooltip defaul
 
 	local function load_fresh()
 		package.loaded["hotstrings.engine.catalogue.config"] = nil
-		-- lib.toml_reader requires toml_codec (a Hammerspoon C extension). Stub it so
-		-- the module loads cleanly in headless tests. load_shared_defaults() at module
-		-- level calls parse() and requires a valid sections structure or it errors out.
-		package.loaded["core.text.engine.toml.reader"] = {
-			parse = function()
-				return {
-					sections = {
-						colors = { global_default = "#cccccc", personal = "#aaaaaa" },
-					},
-				}, true
-			end,
-		}
-		local mod = helpers.load_with_stubs("hotstrings.engine.catalogue.config")
-		-- Clear the stub so it doesn't leak into subsequent test files that require
-		-- the real lib.toml_reader (e.g. ui.tooltip.config reads constants.toml).
-		package.loaded["core.text.engine.toml.reader"] = nil
-		return mod
+		-- The module reads the real shared defaults (colors, glyphs) at load, through
+		-- the pure-Lua TOML reader: a partial stub of that file would fail every key
+		-- the defaults later gain, so the test loads exactly what production loads.
+		return helpers.load_with_stubs("hotstrings.engine.catalogue.config")
 	end
 
 	helpers.it("M.resolve() returns show_tooltip=true when called before M.init()", function()
