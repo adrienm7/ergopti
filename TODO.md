@@ -440,6 +440,21 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       spread; the whole boot inside its noise (5.52 to 5.48 s). Linux decoded the file once per local
       catalogue load, two at boot; `Json.decode_shared` now serves both (1.2 ms per LuaJIT decode under WSL).
       macOS loads it once, natively and lossless for the shape proof, like `api_providers.json`.
+      Done 20 November (same bench, interleaved rounds of one warm-up and one boot per variant, PC loaded by other
+      agents, medians): the InputHook scalar end-key table (64,515 units, warmed in `core/lifecycle/engine/boot.ahk`)
+      was filled by one `NumPut` per unit; it is written four units per Int64 store now, the same units in the same
+      order (`test_siho_boot_window.ahk`): 'Paths and shared configuration loaded' 219 to 109 ms CPU over 5 rounds, a
+      QPC harness 145-380 to 21-28 ms. `JsonParse` reads a member whose key has no escape and whose value is a plain
+      scalar (a string without escapes, an integer of up to 18 digits, a literal) with its separator by one anchored
+      match, a key before a container value and a plain array element likewise; the rest and every refusal keep the
+      exact walk, with the same trees, counters and messages on the 728 JSON files of the tree
+      (`test_json_decode_fast_path.ahk`). Over 620 shipped files 21.9 to 10.7 s, the menu manifest 190 to 82 ms; at
+      boot over 15 rounds 'Config parsed (TOML + i18n)', where `HotstringsSeedLanguageCategoryGates` decodes the
+      manifest first, 172 to 78 ms CPU, the shortcuts stage 94 to 47 ms and 'LLM defaults loaded' 78 to 63 ms. The
+      whole boot stayed inside its noise. Measured and left: the script parse (1.1-2.6 s CPU here) follows code volume,
+      11.9 MB over 577 included files, of which the functions no production code names are about 46 KB, so dead code
+      is no lever, and `vendor/UIA.ahk` is about 70 ms; config.toml is decoded twice by design (the private shadow);
+      the menu manifest is needed whole before the tray.
 - [ ] **[RELEASE] Before publishing.** On a quiet PC with no resident driver: the whole AHK suite,
       `npm run test:ahk-tray-rows-read-as-text`, every live check including `quit-over-a-log-flush`, the JS, macOS and
       Linux suites, and a Windows field report with a driver.
