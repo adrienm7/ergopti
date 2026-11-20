@@ -475,11 +475,20 @@ local function emit_record(exempt, variant, module_name, msg, ...)
 		return nil
 	end
 
-	-- Build message body, guarding against format errors
+	-- Build the body. A format error must not cost the line, nor pass for a
+	-- normal one: the template alone keeps its placeholders and loses every
+	-- value, so the failure rides on the line itself, worded as the Windows
+	-- logger words it (logger parity audit LOG-02)
 	local body
-	if select("#", ...) > 0 then
+	local count = select("#", ...)
+	if count > 0 then
 		local ok, result = pcall(string.format, msg, ...)
-		body = ok and result or tostring(msg)
+		if ok then
+			body = result
+		else
+			body = string.format("%s  [!! log format failed: %s \u{2014} %d arg(s) not substituted]",
+				tostring(msg), tostring(result), count)
+		end
 	else
 		body = tostring(msg)
 	end
