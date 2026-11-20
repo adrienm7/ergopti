@@ -171,7 +171,20 @@ const manifest = TOML.parse(
 	read(path.join(PLUS, '_shared', 'settings', 'data', 'features', 'manifest.toml'))
 );
 const previews = manifest.features.hotstrings.filter((entry) => /^preview_/.test(entry.id));
-check(previews.length === 4, 'the manifest must declare the four hotstring preview switches');
+// The Windows key list (HSE_PreviewSwitchKeys) is the one home the loader, the
+// menu toggle and the engine readers share; the manifest must declare exactly it.
+const switchKeysBody = (read(
+	path.join(WIN, 'hotstrings', 'engine', 'matcher', 'preview_switches.ahk')
+).match(/^HSE_PreviewSwitchKeys\(\)\s*\{([\s\S]*?)^\}/m) || [])[1];
+check(Boolean(switchKeysBody), 'preview_switches.ahk must define HSE_PreviewSwitchKeys()');
+const windowsSwitches = [...(switchKeysBody || '').matchAll(/ConfigLeaf\.([A-Z0-9_]+)/g)]
+	.map((m) => m[1].toLowerCase())
+	.sort();
+check(windowsSwitches.length > 0, 'HSE_PreviewSwitchKeys() must list the preview switches');
+check(
+	JSON.stringify(previews.map((entry) => entry.id).sort()) === JSON.stringify(windowsSwitches),
+	`the manifest preview switches (${previews.map((entry) => entry.id).join(', ')}) must be the ones HSE_PreviewSwitchKeys() lists (${windowsSwitches.join(', ')})`
+);
 const wizard = manifest.onboarding.pages.hotstrings.settings || {};
 const scope = manifest.scopes.hotstrings;
 for (const entry of previews) {
