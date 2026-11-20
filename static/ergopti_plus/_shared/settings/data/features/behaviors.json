@@ -29,7 +29,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua",
 			"symbol": "function M.try_repeat_feature",
-			"sha256": "3f80e94e20388c5341f86098ccfe797a42474d3707d2961770352d14fb7ccf38"
+			"sha256": "25884abe4d083ef327056f13fec7c30caefbbdf88f50d499df9ec26673fd1dca"
 		},
 		{
 			"id": "macos-control",
@@ -43,7 +43,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua",
 			"symbol": "function M.undo_on_backspace",
-			"sha256": "3f80e94e20388c5341f86098ccfe797a42474d3707d2961770352d14fb7ccf38"
+			"sha256": "25884abe4d083ef327056f13fec7c30caefbbdf88f50d499df9ec26673fd1dca"
 		},
 		{
 			"id": "linux-repeat",
