@@ -1952,6 +1952,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/core/text/toml/test_json_string_fast_path.ahk
 #Include unit/core/text/toml/test_json_object_key_nul.ahk
 #Include unit/core/text/toml/test_json_native_string_scan.ahk
+#Include unit/core/text/toml/test_json_decode_fast_path.ahk
 #Include unit/ai/servers/test_ollama_curl_temp_pii_plaintext.ahk
 #Include unit/core/text/toml/test_parsetomlgroupconfig_missing_file_cache_key.ahk
 #Include unit/core/text/toml/test_parsetomlgroupconfig_missing_file_cache_key_mismatch.ahk

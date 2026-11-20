@@ -98,7 +98,8 @@ JsonParseShared(Key, Text) {
 JsonParse(text) {
 	_JsonCountDocumentPass(&text)
 	pos := 1
-	val := _JsonParseValue(&text, &pos, 0)
+	val := _JsonParseValue(&text, &pos, 0, , _JsonDecodePatterns(
+		NativeTextIsWellFormedUtf16(StrPtr(text), StrLen(text))))
 	_JsonSkipWs(&text, &pos)
 	if (pos <= StrLen(text))
 		throw Error("JSON: unexpected trailing data at position " . pos . ".", -1)
@@ -667,7 +668,9 @@ _JsonSkipWs(&text, &pos) {
 		pos += NativeTextSpanIncluding(StrPtr(text) + (pos - 1) * 2, _JsonWhitespaceUnits())
 }
 
-_JsonParseValue(&text, &pos, depth, &kind := "") {
+; Fast, when given, is the anchored pattern set of _JsonDecodePatterns that the
+; containers below decode their plain members and elements with.
+_JsonParseValue(&text, &pos, depth, &kind := "", Fast := 0) {
 	global JSON_MAX_NESTING_DEPTH
 	if (depth > JSON_MAX_NESTING_DEPTH)
 		throw Error("JSON: maximum nesting depth exceeded at position " . pos . ".", -1)
@@ -681,11 +684,11 @@ _JsonParseValue(&text, &pos, depth, &kind := "") {
 	; erase it. Ordinary JsonParse callers keep their existing decoded values.
 	if (c == "{") {
 		kind := "object"
-		return _JsonParseObject(&text, &pos, depth)
+		return _JsonParseObject(&text, &pos, depth, 0, false, Fast)
 	}
 	if (c == "[") {
 		kind := "array"
-		return _JsonParseArray(&text, &pos, depth)
+		return _JsonParseArray(&text, &pos, depth, Fast)
 	}
 	if (c == '"') {
 		kind := "string"
@@ -707,7 +710,11 @@ _JsonParseValue(&text, &pos, depth, &kind := "") {
 ; the returned Map. Every other member is validated, never built: a run of them
 ; by the Run pattern (_JsonSkipMembersRun), the rest by _JsonSkipValue
 ; (WellFormed is passed on to it).
-_JsonParseObject(&text, &pos, depth, selection := 0, WellFormed := false) {
+; With Fast (_JsonDecodePatterns, only without a selection), a member whose key
+; has no escape is read by one anchored match: with its separator when its value
+; is a plain scalar, up to its value otherwise. Anything else, or a match the
+; engine gives up on, is left to the exact walk below from the same position.
+_JsonParseObject(&text, &pos, depth, selection := 0, WellFormed := false, Fast := 0) {
 	global JSON_MAX_NESTING_DEPTH
 	static Tally := _JsonDecodeCounters()
 	pos++  ; consume {
@@ -726,6 +733,42 @@ _JsonParseObject(&text, &pos, depth, selection := 0, WellFormed := false) {
 		return obj
 	}
 	loop {
+		if Fast {
+			try {
+				found := RegExMatch(text, Fast["member"], &match, pos)
+			} catch {
+				found := 0
+			}
+			if found {
+				Tally.StringUnits += match.Len[1]
+				pos += match.Len
+				obj[match[1]] := _JsonFastScalar(match, Tally)
+				if (match[4] == "}")
+					return obj
+				continue
+			}
+			try {
+				found := RegExMatch(text, Fast["key"], &match, pos)
+			} catch {
+				found := 0
+			}
+			if found {
+				Tally.StringUnits += match.Len[1]
+				pos += match.Len
+				obj[match[1]] := _JsonParseValue(&text, &pos, depth + 1, , Fast)
+				_JsonSkipWs(&text, &pos)
+				c := SubStr(text, pos, 1)
+				if (c == ",") {
+					pos++
+					continue
+				}
+				if (c == "}") {
+					pos++
+					return obj
+				}
+				throw Error("JSON: expected ',' or '}' at position " . pos . ".", -1)
+			}
+		}
 		if useRun {
 			try {
 				found := RegExMatch(text, selection.Run, &match, pos)
@@ -748,7 +791,7 @@ _JsonParseObject(&text, &pos, depth, selection := 0, WellFormed := false) {
 			throw Error("JSON: expected ':' at position " . pos . ".", -1)
 		pos++  ; consume :
 		if (!selective || wanted.Has(key))
-			obj[key] := _JsonParseValue(&text, &pos, depth + 1)
+			obj[key] := _JsonParseValue(&text, &pos, depth + 1, , Fast)
 		else
 			_JsonSkipValue(&text, &pos, depth + 1, WellFormed)
 		_JsonSkipWs(&text, &pos)
@@ -765,7 +808,7 @@ _JsonParseObject(&text, &pos, depth, selection := 0, WellFormed := false) {
 	}
 }
 
-_JsonParseArray(&text, &pos, depth) {
+_JsonParseArray(&text, &pos, depth, Fast := 0) {
 	static Tally := _JsonDecodeCounters()
 	pos++  ; consume [
 	arr := []
@@ -776,7 +819,21 @@ _JsonParseArray(&text, &pos, depth) {
 		return arr
 	}
 	loop {
-		val := _JsonParseValue(&text, &pos, depth + 1)
+		if Fast {
+			try {
+				found := RegExMatch(text, Fast["element"], &match, pos)
+			} catch {
+				found := 0
+			}
+			if found {
+				pos += match.Len
+				arr.Push(_JsonFastScalar(match, Tally))
+				if (match[4] == "]")
+					return arr
+				continue
+			}
+		}
+		val := _JsonParseValue(&text, &pos, depth + 1, , Fast)
 		arr.Push(val)
 		_JsonSkipWs(&text, &pos)
 		c := SubStr(text, pos, 1)
@@ -838,6 +895,48 @@ _JsonSkipPatterns(WellFormed) {
 			"scalar", "\G" . Level0)
 	}
 	return Sets[WellFormed]
+}
+
+; The anchored patterns of JsonParse's fast path, built once per kind of text.
+; Each one accepts only what the exact decoder accepts and decodes the same way,
+; and leaves anything else to it: a string without escapes (its text is its value),
+; an integer of at most 18 digits (always in range) that ends where the decoder's
+; candidate run ends, or a literal. "member" is a key without escapes, its plain
+; scalar value and the "," or "}" after it (capture 1 the key, 2 a string's text,
+; 3 an integer, 4 the separator; the mark names the scalar's kind); "key" is a key
+; and its ":" only, for a container value; "element" is a plain scalar element and
+; its "," or "]". Plain is _JsonSkipPatterns', so a text that may hold a lone
+; surrogate admits no surrogate code unit at all.
+_JsonDecodePatterns(WellFormed) {
+	static Sets := Map()
+	if !Sets.Has(WellFormed) {
+		Skip := _JsonSkipPatterns(WellFormed)
+		Plain := Skip["plain"], Ws := Skip["ws"]
+		Key := Ws . '"(' . Plain . '*+)"' . Ws . ":" . Ws
+		Scalar := '(?:"(' . Plain . '*+)"(*MARK:s)|(-?(?:0|[1-9][0-9]{0,17}))(?![0-9.eE+\-])(*MARK:i)'
+			. "|true(*MARK:t)|false(*MARK:f)|null(*MARK:n))"
+		Sets[WellFormed] := Map(
+			"member", "\G" . Key . Scalar . Ws . "([,}])",
+			"key", "\G" . Key,
+			"element", "\G()" . Ws . Scalar . Ws . "([,\]])")
+	}
+	return Sets[WellFormed]
+}
+
+; The value of the plain scalar a _JsonDecodePatterns match read.
+_JsonFastScalar(match, Tally) {
+	switch match.Mark {
+		case "s":
+			Tally.StringUnits += match.Len[2]
+			return match[2]
+		case "i":
+			return Integer(match[3])
+		case "t":
+			return true
+		case "f":
+			return false
+	}
+	return JSON_NULL
 }
 
 ; A run of Items each followed by ",", then optionally one last Item and its
