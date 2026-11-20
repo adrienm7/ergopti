@@ -1,0 +1,526 @@
+{
+	"version": 1,
+	"save_key": "s",
+	"gates": {
+		"paused": false,
+		"replace_on": true,
+		"chosen_source": false,
+		"is_magic_key": true,
+		"shortcut_owns": false
+	},
+	"vectors": [
+		{
+			"id": "windows_star_alone_stays_the_magic_key",
+			"os": "windows",
+			"held": [],
+			"expected": {
+				"action": "pass",
+				"reason": "no_shortcut_modifier"
+			}
+		},
+		{
+			"id": "windows_shift_star_stays_its_shift_level",
+			"os": "windows",
+			"held": ["shift"],
+			"expected": {
+				"action": "pass",
+				"reason": "no_shortcut_modifier"
+			}
+		},
+		{
+			"id": "windows_ctrl_shift_star_saves_with_ctrl_shift",
+			"os": "windows",
+			"held": ["ctrl", "shift"],
+			"expected": {
+				"action": "save",
+				"sends": ["ctrl", "shift"]
+			}
+		},
+		{
+			"id": "windows_system_key_shift_star_saves_with_both",
+			"os": "windows",
+			"held": ["meta", "shift"],
+			"expected": {
+				"action": "save",
+				"sends": ["shift", "meta"]
+			}
+		},
+		{
+			"id": "windows_system_key_ctrl_star_saves_with_both",
+			"os": "windows",
+			"held": ["meta", "ctrl"],
+			"expected": {
+				"action": "save",
+				"sends": ["ctrl", "meta"]
+			}
+		},
+		{
+			"id": "windows_assigned_shortcut_keeps_its_chord",
+			"os": "windows",
+			"held": ["meta"],
+			"gates": {
+				"shortcut_owns": true
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "shortcut_owns_chord"
+			}
+		},
+		{
+			"id": "windows_paused_driver_leaves_the_chord",
+			"os": "windows",
+			"held": ["ctrl"],
+			"gates": {
+				"paused": true
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "paused"
+			}
+		},
+		{
+			"id": "windows_magic_key_not_replaced_leaves_the_chord",
+			"os": "windows",
+			"held": ["ctrl"],
+			"gates": {
+				"replace_on": false
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "magic_key_not_replaced"
+			}
+		},
+		{
+			"id": "windows_chosen_source_keeps_the_layout_chords",
+			"os": "windows",
+			"held": ["ctrl"],
+			"gates": {
+				"chosen_source": true
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "chosen_source"
+			}
+		},
+		{
+			"id": "windows_another_key_keeps_its_chord",
+			"os": "windows",
+			"held": ["ctrl"],
+			"gates": {
+				"is_magic_key": false
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "not_magic_key"
+			}
+		},
+		{
+			"id": "macos_star_alone_stays_the_magic_key",
+			"os": "macos",
+			"held": [],
+			"expected": {
+				"action": "pass",
+				"reason": "no_shortcut_modifier"
+			}
+		},
+		{
+			"id": "macos_shift_star_stays_its_shift_level",
+			"os": "macos",
+			"held": ["shift"],
+			"expected": {
+				"action": "pass",
+				"reason": "no_shortcut_modifier"
+			}
+		},
+		{
+			"id": "macos_ctrl_shift_star_saves_with_ctrl_shift",
+			"os": "macos",
+			"held": ["ctrl", "shift"],
+			"expected": {
+				"action": "save",
+				"sends": ["ctrl", "shift"]
+			}
+		},
+		{
+			"id": "macos_system_key_shift_star_saves_with_both",
+			"os": "macos",
+			"held": ["meta", "shift"],
+			"expected": {
+				"action": "save",
+				"sends": ["shift", "meta"]
+			}
+		},
+		{
+			"id": "macos_system_key_ctrl_star_saves_with_both",
+			"os": "macos",
+			"held": ["meta", "ctrl"],
+			"expected": {
+				"action": "save",
+				"sends": ["ctrl", "meta"]
+			}
+		},
+		{
+			"id": "macos_assigned_shortcut_keeps_its_chord",
+			"os": "macos",
+			"held": ["meta"],
+			"gates": {
+				"shortcut_owns": true
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "shortcut_owns_chord"
+			}
+		},
+		{
+			"id": "macos_paused_driver_leaves_the_chord",
+			"os": "macos",
+			"held": ["ctrl"],
+			"gates": {
+				"paused": true
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "paused"
+			}
+		},
+		{
+			"id": "macos_magic_key_not_replaced_leaves_the_chord",
+			"os": "macos",
+			"held": ["ctrl"],
+			"gates": {
+				"replace_on": false
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "magic_key_not_replaced"
+			}
+		},
+		{
+			"id": "macos_chosen_source_keeps_the_layout_chords",
+			"os": "macos",
+			"held": ["ctrl"],
+			"gates": {
+				"chosen_source": true
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "chosen_source"
+			}
+		},
+		{
+			"id": "macos_another_key_keeps_its_chord",
+			"os": "macos",
+			"held": ["ctrl"],
+			"gates": {
+				"is_magic_key": false
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "not_magic_key"
+			}
+		},
+		{
+			"id": "linux_star_alone_stays_the_magic_key",
+			"os": "linux",
+			"held": [],
+			"expected": {
+				"action": "pass",
+				"reason": "no_shortcut_modifier"
+			}
+		},
+		{
+			"id": "linux_shift_star_stays_its_shift_level",
+			"os": "linux",
+			"held": ["shift"],
+			"expected": {
+				"action": "pass",
+				"reason": "no_shortcut_modifier"
+			}
+		},
+		{
+			"id": "linux_ctrl_shift_star_saves_with_ctrl_shift",
+			"os": "linux",
+			"held": ["ctrl", "shift"],
+			"expected": {
+				"action": "save",
+				"sends": ["ctrl", "shift"]
+			}
+		},
+		{
+			"id": "linux_system_key_shift_star_saves_with_both",
+			"os": "linux",
+			"held": ["meta", "shift"],
+			"expected": {
+				"action": "save",
+				"sends": ["shift", "meta"]
+			}
+		},
+		{
+			"id": "linux_system_key_ctrl_star_saves_with_both",
+			"os": "linux",
+			"held": ["meta", "ctrl"],
+			"expected": {
+				"action": "save",
+				"sends": ["ctrl", "meta"]
+			}
+		},
+		{
+			"id": "linux_assigned_shortcut_keeps_its_chord",
+			"os": "linux",
+			"held": ["meta"],
+			"gates": {
+				"shortcut_owns": true
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "shortcut_owns_chord"
+			}
+		},
+		{
+			"id": "linux_paused_driver_leaves_the_chord",
+			"os": "linux",
+			"held": ["ctrl"],
+			"gates": {
+				"paused": true
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "paused"
+			}
+		},
+		{
+			"id": "linux_magic_key_not_replaced_leaves_the_chord",
+			"os": "linux",
+			"held": ["ctrl"],
+			"gates": {
+				"replace_on": false
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "magic_key_not_replaced"
+			}
+		},
+		{
+			"id": "linux_chosen_source_keeps_the_layout_chords",
+			"os": "linux",
+			"held": ["ctrl"],
+			"gates": {
+				"chosen_source": true
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "chosen_source"
+			}
+		},
+		{
+			"id": "linux_another_key_keeps_its_chord",
+			"os": "linux",
+			"held": ["ctrl"],
+			"gates": {
+				"is_magic_key": false
+			},
+			"expected": {
+				"action": "pass",
+				"reason": "not_magic_key"
+			}
+		},
+		{
+			"id": "windows_ctrl_star_saves",
+			"os": "windows",
+			"held": ["ctrl"],
+			"expected": {
+				"action": "save",
+				"sends": ["ctrl"]
+			}
+		},
+		{
+			"id": "windows_alt_star_saves_with_alt",
+			"os": "windows",
+			"held": ["alt"],
+			"expected": {
+				"action": "save",
+				"sends": ["alt"]
+			}
+		},
+		{
+			"id": "windows_win_star_saves_with_win",
+			"os": "windows",
+			"held": ["meta"],
+			"expected": {
+				"action": "save",
+				"sends": ["meta"]
+			}
+		},
+		{
+			"id": "windows_alt_shift_star_saves",
+			"os": "windows",
+			"held": ["alt", "shift"],
+			"expected": {
+				"action": "save",
+				"sends": ["alt", "shift"]
+			}
+		},
+		{
+			"id": "windows_ctrl_alt_is_altgr",
+			"os": "windows",
+			"held": ["ctrl", "alt"],
+			"expected": {
+				"action": "pass",
+				"reason": "altgr_level"
+			}
+		},
+		{
+			"id": "windows_shift_altgr_is_its_level",
+			"os": "windows",
+			"held": ["ctrl", "alt", "shift"],
+			"expected": {
+				"action": "pass",
+				"reason": "altgr_level"
+			}
+		},
+		{
+			"id": "windows_win_ctrl_alt_is_a_shortcut",
+			"os": "windows",
+			"held": ["meta", "ctrl", "alt"],
+			"expected": {
+				"action": "save",
+				"sends": ["ctrl", "alt", "meta"]
+			}
+		},
+		{
+			"id": "windows_every_modifier_saves",
+			"os": "windows",
+			"held": ["ctrl", "alt", "shift", "meta"],
+			"expected": {
+				"action": "save",
+				"sends": ["ctrl", "alt", "shift", "meta"]
+			}
+		},
+		{
+			"id": "macos_cmd_star_saves_with_cmd",
+			"os": "macos",
+			"held": ["meta"],
+			"expected": {
+				"action": "save",
+				"sends": ["meta"]
+			}
+		},
+		{
+			"id": "macos_cmd_shift_star_saves",
+			"os": "macos",
+			"held": ["meta", "shift"],
+			"expected": {
+				"action": "save",
+				"sends": ["shift", "meta"]
+			}
+		},
+		{
+			"id": "macos_ctrl_star_saves_with_ctrl",
+			"os": "macos",
+			"held": ["ctrl"],
+			"expected": {
+				"action": "save",
+				"sends": ["ctrl"]
+			}
+		},
+		{
+			"id": "macos_option_is_altgr",
+			"os": "macos",
+			"held": ["alt"],
+			"expected": {
+				"action": "pass",
+				"reason": "altgr_level"
+			}
+		},
+		{
+			"id": "macos_shift_option_is_its_level",
+			"os": "macos",
+			"held": ["alt", "shift"],
+			"expected": {
+				"action": "pass",
+				"reason": "altgr_level"
+			}
+		},
+		{
+			"id": "macos_cmd_option_star_saves",
+			"os": "macos",
+			"held": ["meta", "alt"],
+			"expected": {
+				"action": "save",
+				"sends": ["alt", "meta"]
+			}
+		},
+		{
+			"id": "macos_ctrl_option_star_saves",
+			"os": "macos",
+			"held": ["ctrl", "alt"],
+			"expected": {
+				"action": "save",
+				"sends": ["ctrl", "alt"]
+			}
+		},
+		{
+			"id": "linux_ctrl_star_saves",
+			"os": "linux",
+			"held": ["ctrl"],
+			"expected": {
+				"action": "save",
+				"sends": ["ctrl"]
+			}
+		},
+		{
+			"id": "linux_alt_star_saves_with_alt",
+			"os": "linux",
+			"held": ["alt"],
+			"expected": {
+				"action": "save",
+				"sends": ["alt"]
+			}
+		},
+		{
+			"id": "linux_super_star_saves_with_super",
+			"os": "linux",
+			"held": ["meta"],
+			"expected": {
+				"action": "save",
+				"sends": ["meta"]
+			}
+		},
+		{
+			"id": "linux_ctrl_alt_star_saves",
+			"os": "linux",
+			"held": ["ctrl", "alt"],
+			"expected": {
+				"action": "save",
+				"sends": ["ctrl", "alt"]
+			}
+		},
+		{
+			"id": "linux_altgr_is_its_level",
+			"os": "linux",
+			"held": ["altgr"],
+			"expected": {
+				"action": "pass",
+				"reason": "altgr_level"
+			}
+		},
+		{
+			"id": "linux_shift_altgr_is_its_level",
+			"os": "linux",
+			"held": ["altgr", "shift"],
+			"expected": {
+				"action": "pass",
+				"reason": "altgr_level"
+			}
+		},
+		{
+			"id": "linux_ctrl_altgr_keeps_the_level",
+			"os": "linux",
+			"held": ["ctrl", "altgr"],
+			"expected": {
+				"action": "pass",
+				"reason": "altgr_level"
+			}
+		}
+	]
+}
