@@ -2,7 +2,7 @@
 
 --- Replays the modifiers + magic key save rule on both Lua drivers. Windows
 --- replays the same corpus through the AHK twin
---- (windows/tests/unit/modules/keymap/test_magic_key_save.ahk).
+--- (windows/tests/unit/modules/shortcuts/test_magic_key_save.ahk).
 --- @param helpers table Driver test helpers.
 --- @param json table Shared JSON codec.
 --- @param shared_root string Absolute shared source directory.

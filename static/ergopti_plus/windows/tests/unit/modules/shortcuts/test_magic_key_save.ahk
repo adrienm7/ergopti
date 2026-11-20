@@ -1,4 +1,4 @@
-﻿; tests/unit/modules/keymap/test_magic_key_save.ahk
+﻿; tests/unit/modules/shortcuts/test_magic_key_save.ahk
 
 ; ==============================================================================
 ; MODULE: Modifiers + Magic Key Save Tests (Windows)

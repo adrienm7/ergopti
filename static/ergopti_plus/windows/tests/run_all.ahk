@@ -870,7 +870,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/keymap/test_keylayout_canonical_source.ahk
 #Include unit/hotstrings/engine/magic_key/test_source_menu.ahk
 #Include unit/hotstrings/engine/magic_key/test_source_hotkeys.ahk
-#Include unit/modules/keymap/test_magic_key_save.ahk
+#Include unit/modules/shortcuts/test_magic_key_save.ahk
 #Include unit/modules/keymap/test_layout_catalogue.ahk
 #Include unit/modules/keymap/test_layout_registry_download_custody.ahk
 #Include unit/modules/keymap/test_layout_registry_late_poll.ahk
