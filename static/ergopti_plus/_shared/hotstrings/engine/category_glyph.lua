@@ -30,10 +30,6 @@
 
 local M = {}
 
--- At most two code points: one symbol, optionally followed by a variation
--- selector. A word is a label, and the maintainer chose a glyph.
-M.MAX_CODEPOINTS = 2
-
 
 
 
@@ -70,14 +66,16 @@ local function codepoints(text)
 	return out
 end
 
---- Whether a value can be shown as a category glyph: one or two code points,
---- none of them whitespace or a control character.
+--- Whether a value can be shown as a category glyph: at most max_codepoints
+--- code points, none of them whitespace or a control character.
 --- @param value any
+--- @param max_codepoints integer defaults.toml [glyphs] max_codepoints.
 --- @return boolean
-function M.is_glyph(value)
+function M.is_glyph(value, max_codepoints)
 	if type(value) ~= "string" or value == "" then return false end
+	assert(type(max_codepoints) == "number" and max_codepoints >= 1, "is_glyph needs [glyphs] max_codepoints")
 	local points = codepoints(value)
-	if not points or #points > M.MAX_CODEPOINTS then return false end
+	if not points or #points > max_codepoints then return false end
 	for _, point in ipairs(points) do
 		if point <= 0x20 or (point >= 0x7F and point <= 0xA0) or point == 0x2028 or point == 0x2029
 			or (point >= 0x2000 and point <= 0x200A) or point == 0x3000 then
@@ -110,6 +108,7 @@ end
 ---   category_name_key string|nil Per-category default name key.
 ---   default_glyph     string     Shared default glyph.
 ---   default_name_key  string     Shared default name key.
+---   max_codepoints    integer    defaults.toml [glyphs] max_codepoints.
 --- @return table { glyph, name_key, rejected = { [field] = value } | nil }
 function M.resolve(inputs)
 	inputs = inputs or {}
@@ -130,7 +129,9 @@ function M.resolve(inputs)
 		return nil
 	end
 
-	local glyph = pick("glyph", M.is_glyph, inputs.category_glyph, inputs.default_glyph)
+	local max_codepoints = inputs.max_codepoints
+	local function is_glyph(value) return M.is_glyph(value, max_codepoints) end
+	local glyph = pick("glyph", is_glyph, inputs.category_glyph, inputs.default_glyph)
 	local name_key = pick("glyph_name_key", M.is_name_key, inputs.category_name_key, inputs.default_name_key)
 	return { glyph = glyph, name_key = name_key, rejected = rejected }
 end

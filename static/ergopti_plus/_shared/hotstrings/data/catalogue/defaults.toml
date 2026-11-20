@@ -73,6 +73,12 @@ global_default_name_key = "hs_config.cat_other"
 personal = "✎"
 personal_name_key = "hs_config.cat_personal"
 
+# The most code points a glyph may hold: one symbol, optionally followed by a
+# variation selector. A longer value is a word, and the maintainer chose a
+# glyph. Every driver reads it with the glyphs above, before it checks them
+# (_shared/hotstrings/engine/category_glyph.lua is_glyph and its AHK port).
+max_codepoints = 2
+
 
 
 

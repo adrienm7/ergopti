@@ -54,6 +54,9 @@ _HCG_ResolverAnswersTheVectors() {
 	Document := _HCG_Vectors()
 	Defaults := Document["defaults"]
 	AssertTrue(Document["vectors"].Length > 0, "sanity: the corpus holds vectors")
+	global HOTSTRINGS_GLYPH_MAX_CODEPOINTS
+	AssertEqual(Defaults["max_codepoints"], HOTSTRINGS_GLYPH_MAX_CODEPOINTS,
+		"defaults.toml [glyphs] max_codepoints, as the vectors use it")
 	for Vector in Document["vectors"] {
 		Resolved := HotstringCategoryGlyphResolve(_HCG_Meta(Vector),
 			Vector.Get("category_glyph", ""), Vector.Get("category_name_key", ""),

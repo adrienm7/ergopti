@@ -80,6 +80,8 @@ local CATEGORY_DEFAULT_COLORS = {}
 -- names it, when a category's [_meta] declares none; read from the same canon.
 local DEFAULT_GLYPH = nil
 local DEFAULT_GLYPH_NAME_KEY = nil
+-- The most code points a glyph may hold ([glyphs] max_codepoints).
+local GLYPH_MAX_CODEPOINTS = nil
 local CATEGORY_DEFAULT_GLYPHS = {}
 
 -- =================================
@@ -992,6 +994,7 @@ function M.resolve(category, section)
 		category_glyph_name_key = (CATEGORY_DEFAULT_GLYPHS[category] or {}).name_key,
 		default_glyph  = DEFAULT_GLYPH,
 		default_glyph_name_key = DEFAULT_GLYPH_NAME_KEY,
+		glyph_max_codepoints = GLYPH_MAX_CODEPOINTS,
 	})
 	log_rejected_glyph(category, resolved)
 	if _state.resolve_cache then _state.resolve_cache[cache_key] = resolved end
@@ -1116,6 +1119,7 @@ function M.resolve_ext(ext_id, toml_path, section)
 		glyph_meta = meta,
 		default_glyph = DEFAULT_GLYPH,
 		default_glyph_name_key = DEFAULT_GLYPH_NAME_KEY,
+		glyph_max_codepoints = GLYPH_MAX_CODEPOINTS,
 	})
 	log_rejected_glyph(override_key, resolved)
 	return resolved
@@ -1707,12 +1711,13 @@ local function load_shared_defaults()
 	GLOBAL_DEFAULT_DELAY             = tonumber(require("menu.engine.manifest_reader").default_for(ConfigKeys.KEY.HOTSTRINGS_EXPANSION_DELAY))
 	GLOBAL_DEFAULT_COLOR             = require_key("colors", "global_default")
 	CATEGORY_DEFAULT_COLORS.personal = require_key("colors", "personal")
+	GLYPH_MAX_CODEPOINTS = tonumber(require_key("glyphs", "max_codepoints"))
 	DEFAULT_GLYPH                    = require_key("glyphs", "global_default")
 	DEFAULT_GLYPH_NAME_KEY           = require_key("glyphs", "global_default_name_key")
 	CATEGORY_DEFAULT_GLYPHS.personal = {
 		glyph = require_key("glyphs", "personal"), name_key = require_key("glyphs", "personal_name_key") }
 	for _, entry in ipairs({ { glyph = DEFAULT_GLYPH, name_key = DEFAULT_GLYPH_NAME_KEY }, CATEGORY_DEFAULT_GLYPHS.personal }) do
-		if not CategoryGlyph.is_glyph(entry.glyph) or not CategoryGlyph.is_name_key(entry.name_key) then
+		if not CategoryGlyph.is_glyph(entry.glyph, GLYPH_MAX_CODEPOINTS) or not CategoryGlyph.is_name_key(entry.name_key) then
 			error(string.format("[hotstrings_config] [glyphs] in %s holds an invalid glyph or name key: '%s', '%s'",
 				toml_path, tostring(entry.glyph), tostring(entry.name_key)))
 		end

@@ -341,6 +341,8 @@ local CATEGORY_DEFAULT_COLORS = {}
 -- category whose [_meta] declares none; read from the same canon.
 local DEFAULT_GLYPH = nil
 local DEFAULT_GLYPH_NAME_KEY = nil
+-- The most code points a glyph may hold ([glyphs] max_codepoints).
+local GLYPH_MAX_CODEPOINTS = nil
 local CATEGORY_DEFAULT_GLYPHS = {}
 
 --- Loads _shared/hotstrings/data/catalogue/defaults.toml, or raises.
@@ -372,12 +374,13 @@ local function load_shared_defaults()
 	GLOBAL_DEFAULT_COLOR = require_key("colors", "global_default")
 	NEUTRAL_COLOR        = require_key("colors", "neutral")
 	CATEGORY_DEFAULT_COLORS.personal = require_key("colors", "personal")
+	GLYPH_MAX_CODEPOINTS = tonumber(require_key("glyphs", "max_codepoints"))
 	DEFAULT_GLYPH          = require_key("glyphs", "global_default")
 	DEFAULT_GLYPH_NAME_KEY = require_key("glyphs", "global_default_name_key")
 	CATEGORY_DEFAULT_GLYPHS.personal = {
 		glyph = require_key("glyphs", "personal"), name_key = require_key("glyphs", "personal_name_key") }
 	for _, entry in ipairs({ { glyph = DEFAULT_GLYPH, name_key = DEFAULT_GLYPH_NAME_KEY }, CATEGORY_DEFAULT_GLYPHS.personal }) do
-		if not CategoryGlyph.is_glyph(entry.glyph) or not CategoryGlyph.is_name_key(entry.name_key) then
+		if not CategoryGlyph.is_glyph(entry.glyph, GLYPH_MAX_CODEPOINTS) or not CategoryGlyph.is_name_key(entry.name_key) then
 			error(string.format("[hotstrings_config] [glyphs] in %s holds an invalid glyph or name key: '%s', '%s'",
 				path, tostring(entry.glyph), tostring(entry.name_key)))
 		end
@@ -821,6 +824,7 @@ function M.resolve(category, section)
 		category_glyph_name_key = (CATEGORY_DEFAULT_GLYPHS[category] or {}).name_key,
 		default_glyph  = DEFAULT_GLYPH,
 		default_glyph_name_key = DEFAULT_GLYPH_NAME_KEY,
+		glyph_max_codepoints = GLYPH_MAX_CODEPOINTS,
 	})
 	-- A glyph the category's TOML declares and the resolver refused: the row
 	-- shows the default, and the log says why. Once per resolve-cache fill.

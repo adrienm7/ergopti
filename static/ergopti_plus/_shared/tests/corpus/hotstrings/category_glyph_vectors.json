@@ -2,7 +2,8 @@
 	"description": "Cross-driver contract of the hotstring category glyph resolver (_shared/hotstrings/engine/category_glyph.lua and windows/hotstrings/engine/catalogue/category_glyph.ahk). Each vector gives the category's [_meta] fields (omitted when unset), the per-category default (omitted when the category has none) and the expected glyph, name key and refused fields; the shared defaults apply to every vector. row_label vectors pin the label a preview row draws: the glyph, a space, then the trigger label.",
 	"defaults": {
 		"default_glyph": "•",
-		"default_name_key": "hs_config.cat_other"
+		"default_name_key": "hs_config.cat_other",
+		"max_codepoints": 2
 	},
 	"vectors": [
 		{

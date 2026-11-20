@@ -16,12 +16,12 @@
 ; _shared/tests/corpus/hotstrings/category_glyph_vectors.json.
 ; ==============================================================================
 
-; At most two code points: one symbol, optionally followed by a variation selector.
-global HOTSTRINGS_GLYPH_MAX_CODEPOINTS := 2
-
 ; The shared defaults, loaded at boot from _shared/hotstrings/data/catalogue/defaults.toml
 ; [glyphs] by HotstringsConfigLoadSharedDefaults(). Empty until then, so a resolve
 ; before the load shows no glyph rather than an invented one.
+; The most code points a glyph may hold, [glyphs] max_codepoints, read by the
+; same load before it checks the default glyphs.
+global HOTSTRINGS_GLYPH_MAX_CODEPOINTS := ""
 global HOTSTRINGS_DEFAULT_GLYPH := ""
 global HOTSTRINGS_DEFAULT_GLYPH_NAME_KEY := ""
 ; Category -> { Glyph, NameKey }: the per-category defaults ("personal").
@@ -32,9 +32,11 @@ global HOTSTRINGS_CATEGORY_DEFAULT_GLYPHS := Map()
 ; @param Value {Any}
 ; @returns {Boolean}
 HotstringCategoryGlyphIsGlyph(Value) {
-	global HOTSTRINGS_GLYPH_MAX_CODEPOINTS
 	if !(Value is String) || Value == ""
 		return false
+	global HOTSTRINGS_GLYPH_MAX_CODEPOINTS
+	if !IsInteger(HOTSTRINGS_GLYPH_MAX_CODEPOINTS) || HOTSTRINGS_GLYPH_MAX_CODEPOINTS < 1
+		throw Error("HotstringCategoryGlyphIsGlyph needs [glyphs] max_codepoints; HotstringsConfigLoadSharedDefaults runs first")
 	Count := 0, Index := 1, Length := StrLen(Value)
 	while (Index <= Length) {
 		Point := Ord(SubStr(Value, Index, 2))

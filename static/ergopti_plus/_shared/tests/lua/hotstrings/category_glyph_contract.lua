@@ -23,6 +23,7 @@ return function(helpers)
 				category_name_key = vector.category_name_key,
 				default_glyph = document.defaults.default_glyph,
 				default_name_key = document.defaults.default_name_key,
+				max_codepoints = document.defaults.max_codepoints,
 			})
 			helpers.assert_eq(result.glyph, vector.expected.glyph, "glyph")
 			helpers.assert_eq(result.name_key, vector.expected.name_key, "name key")
@@ -47,7 +48,7 @@ return function(helpers)
 	--- catalogue parse costs seconds and the table is at the top of the file.
 	--- @param relative string Path under the catalogue folder.
 	--- @param header string|nil The table to read, "[_meta]" by default.
-	--- @return table The table's string fields.
+	--- @return table The table's string and integer fields.
 	local function meta_glyph(relative, header)
 		local file = assert(io.open(shared .. "/hotstrings/data/catalogue/" .. relative, "rb"))
 		local fields, in_meta = {}, false
@@ -57,6 +58,7 @@ return function(helpers)
 			elseif line:match("^%[") then if in_meta then break end
 			elseif in_meta then
 				local key, value = line:match('^([%w_]+)%s*=%s*"(.-)"%s*$')
+				if not key then key, value = line:match('^([%w_]+)%s*=%s*(%d+)%s*$') end
 				if key then fields[key] = value end
 			end
 		end
@@ -66,13 +68,15 @@ return function(helpers)
 
 	helpers.it("every shipped category declares a valid, distinct glyph and a name key", function()
 		local defaults = meta_glyph("defaults.toml", "[glyphs]")
-		assert(CategoryGlyph.is_glyph(defaults.global_default) and CategoryGlyph.is_glyph(defaults.personal),
+		local cap = tonumber(defaults.max_codepoints)
+		helpers.assert_eq(cap, document.defaults.max_codepoints, "defaults.toml [glyphs] max_codepoints, as the vectors use it")
+		assert(CategoryGlyph.is_glyph(defaults.global_default, cap) and CategoryGlyph.is_glyph(defaults.personal, cap),
 			"defaults.toml [glyphs] must declare the shared and personal glyphs")
 		assert(defaults.global_default ~= defaults.personal, "the shared and personal default glyphs must differ")
 		local seen = { [defaults.global_default] = "the shared default", [defaults.personal] = "the personal default" }
 		for _, relative in ipairs({ "autocorrection.toml", "magickey.toml" }) do
 			local meta = meta_glyph(relative)
-			assert(CategoryGlyph.is_glyph(meta.glyph), relative .. " must declare a glyph")
+			assert(CategoryGlyph.is_glyph(meta.glyph, cap), relative .. " must declare a glyph")
 			assert(CategoryGlyph.is_name_key(meta.glyph_name_key), relative .. " must declare a glyph name key")
 			assert(not seen[meta.glyph], relative .. " reuses the glyph of " .. tostring(seen[meta.glyph]))
 			seen[meta.glyph] = relative

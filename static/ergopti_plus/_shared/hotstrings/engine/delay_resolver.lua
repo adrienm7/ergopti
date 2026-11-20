@@ -144,6 +144,7 @@ function M.resolve(inputs)
 		category_name_key = inputs.category_glyph_name_key,
 		default_glyph     = inputs.default_glyph,
 		default_name_key  = inputs.default_glyph_name_key,
+		max_codepoints    = inputs.glyph_max_codepoints,
 	})
 
 	return {

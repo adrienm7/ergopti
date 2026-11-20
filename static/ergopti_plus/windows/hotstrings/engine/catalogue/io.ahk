@@ -49,6 +49,7 @@ HotstringsConfigLoadSharedDefaults(SharedDir := "") {
 		global _SharedDir, GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR, DYN_HOTSTRINGS_DEFAULT_DELAY
 		global HOTSTRINGS_CATEGORY_DEFAULT_COLORS
 		global HOTSTRINGS_DEFAULT_GLYPH, HOTSTRINGS_DEFAULT_GLYPH_NAME_KEY, HOTSTRINGS_CATEGORY_DEFAULT_GLYPHS
+		global HOTSTRINGS_GLYPH_MAX_CODEPOINTS
 		Dir  := (SharedDir != "") ? SharedDir : (IsSet(_SharedDir) ? _SharedDir : "")
 		Path := Dir . "\hotstrings\data\catalogue\defaults.toml"
 		c    := ParseTomlFile(Path)
@@ -60,6 +61,7 @@ HotstringsConfigLoadSharedDefaults(SharedDir := "") {
 		DYN_HOTSTRINGS_DEFAULT_DELAY := Float(_HSDefaultsRequire(c, "delays", "dynamichotstrings_sec", Path))
 		GLOBAL_DEFAULT_COLOR := _HSDefaultsRequireHex(c, "colors", "global_default", Path)
 		HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"] := _HSDefaultsRequireHex(c, "colors", "personal", Path)
+		HOTSTRINGS_GLYPH_MAX_CODEPOINTS := Integer(_HSDefaultsRequire(c, "glyphs", "max_codepoints", Path))
 		HOTSTRINGS_DEFAULT_GLYPH := _HSDefaultsRequireGlyph(c, "global_default", Path)
 		HOTSTRINGS_DEFAULT_GLYPH_NAME_KEY := _HSDefaultsRequireGlyphNameKey(c, "global_default_name_key", Path)
 		HOTSTRINGS_CATEGORY_DEFAULT_GLYPHS["personal"] := {
