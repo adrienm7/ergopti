@@ -413,13 +413,18 @@ end
 --- left, so any edit, reset or focus change in between voids it, and the time of
 --- the commit, so a Backspace after hotstrings.backspace_restore_window_ms is a
 --- plain Backspace. With hotstrings.backspace_restore_enabled off nothing is kept.
+--- It also holds the buffer before the trigger and the word start it began at,
+--- which the undo gives back with the restored text (decision of 2026-11-20).
 --- @param is_literal boolean Whether the output is plain text (no key directive).
 --- @param trigger string The text the user typed for it, as it was on screen.
 --- @param typed string What the expansion typed, replayed terminator included.
 --- @param replayed string|nil The terminator typed back after the output, if any.
 --- @param is_private boolean The mapping's privacy.
 --- @param eligible boolean False for an ignored window or a composite event.
-local function remember_undo(is_literal, trigger, typed, replayed, is_private, eligible)
+--- @param buffer_before string The buffer before the trigger.
+--- @param boundary_before boolean Whether that buffer started at a word boundary.
+local function remember_undo(is_literal, trigger, typed, replayed, is_private, eligible,
+	buffer_before, boundary_before)
 	_state.undoable = nil
 	if _state.backspace_restore_enabled ~= true then return end
 	if not eligible or not is_literal or type(trigger) ~= "string" or trigger == ""
@@ -427,12 +432,16 @@ local function remember_undo(is_literal, trigger, typed, replayed, is_private, e
 	_state.undoable = {
 		trigger = trigger, typed = typed, replayed = replayed, is_private = is_private == true,
 		buffer_after = _state.buffer, committed_ms = hotstring_now_ms(),
+		buffer_before = buffer_before, boundary_before = boundary_before == true,
 	}
 end
 
 --- Puts the trigger back for a Backspace pressed right after an expansion: the
 --- Backspace is consumed, what the expansion typed is erased and the trigger is
---- typed again, outside the buffer so it cannot fire at once (Linux's undo).
+--- typed again. The buffer then reads the line: what preceded the trigger and
+--- the restored text, so the trigger key typed next expands at once (« adn★ »,
+--- Backspace, « ★ » gives « ADN » again, decision of 2026-11-20), as on Windows
+--- and Linux.
 --- What comes back is the shared rule's: the trigger without a final magic key
 --- (the key is an action, not text) and then the terminator that was typed after
 --- the output, so « adn » and Space come back as « adn » and Space.
@@ -452,12 +461,6 @@ function M.undo_on_backspace(undo)
 		return false
 	end
 	local text = BackspaceRestore.restored_text(undo.trigger, _state.magic_key, undo.replayed)
-	-- A restore ending on the terminator that fired the expansion leaves the
-	-- caret at a word start; one ending inside a word (no terminator, or the
-	-- repeat key's empty restore) does not, and the restored word is not in the
-	-- buffer. The terminator itself decides, as on Windows and Linux: the shared
-	-- word-character test counts a non-ASCII terminator (« ») as a letter.
-	local opens_word = type(undo.replayed) == "string" and undo.replayed ~= ""
 	local restored = M.perform_text_replacement(
 		ComposedText.count(undo.typed),
 		function()
@@ -466,14 +469,16 @@ function M.undo_on_backspace(undo)
 			return km_utils.emit_text(text)
 		end,
 		function()
-			-- The restored trigger is not in the buffer: a word-start rule typed
-			-- next would otherwise fire inside it.
-			_state.buffer = ""
-			_state.start_is_word_boundary = opens_word
+			-- A restored terminator ends the word, and deleting it leaves the
+			-- trigger for the next terminator to fire; a word-start rule typed
+			-- after a trigger restored without one continues that word.
+			_state.buffer = undo.buffer_before .. text
+			_state.start_is_word_boundary = undo.boundary_before
 			_state.start_is_line_start = false
 			LlmContext.reset(_state)
 		end,
-		true, false, "hotstring", "undo", undo.is_private)
+		-- Not final: a final replacement wipes the buffer after this action.
+		false, false, "hotstring", "undo", undo.is_private)
 	if restored ~= true then return false end
 	if undo.is_private then
 		Logger.info(LOG, "Undo: restored a private trigger (content withheld).")
@@ -1256,6 +1261,8 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 		if not ok or event_start == nil or event_start > tstart_byte then return false end
 		event_prefix = active_buffer:sub(event_start, tstart_byte - 1)
 	end
+	local buffer_before = active_buffer:sub(1, tstart_byte - 1)
+	local boundary_before = _state.start_is_word_boundary
 	local injection = InjectionPlan.build({
 		path = InjectionPlan.PATH_AUTO, trigger_len = trig_len, event_len = char_len,
 		event_on_screen = is_ignored == true, replacement = repl_text, final_result = is_final,
@@ -1286,7 +1293,7 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	if not replaced then return false end
 	-- The auto path's plan types the replacement alone: no terminator follows it.
 	remember_undo(m.plain_repl == m.repl, typed, injection.text, nil, is_private,
-		event_prefix == "" and is_ignored ~= true)
+		event_prefix == "" and is_ignored ~= true, buffer_before, boundary_before)
 
 	-- Private mappings carry PII sourced from personal_info.toml (phone, SSN,
 	-- IBAN). keystats.log_hotstring writes trigger + replacement verbatim into
@@ -1394,6 +1401,8 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		})
 		local to_type, replay_tail, replay_spec = injection.text, injection.tail, injection.replay
 		local is_final = injection.final_result
+		local buffer_before = _state.buffer:sub(1, start_byte - 1)
+		local boundary_before = _state.start_is_word_boundary
 
 		local replacement_ok = M.perform_text_replacement(
 			injection.erase,
@@ -1442,7 +1451,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		-- terminator was never typed after the output and does not come back.
 		local replayed = replay_tail and chars or nil
 		remember_undo(m.plain_repl == m.repl, typed_trigger, to_type .. (replayed or ""), replayed,
-			is_private, is_ignored ~= true)
+			is_private, is_ignored ~= true, buffer_before, boundary_before)
 
 		-- Same privacy contract as try_auto_expand: a private mapping's trigger
 		-- and replacement are both secrets and must reach neither the keystats
@@ -1530,6 +1539,7 @@ function M.try_repeat_feature(chars, is_ignored)
 	if before_last == pred_char and _state.start_is_word_boundary == false then return false end
 
 	local next_buffer = _state.buffer:sub(1, magic_offset - 1) .. last_char
+	local boundary_before = _state.start_is_word_boundary
 	-- The repeated scalar is derived from a secret whenever the text before the
 	-- magic key is still inside the span a private expansion marked (nothing
 	-- public typed since, or a Backspace inside it): it keeps the private
@@ -1548,7 +1558,7 @@ function M.try_repeat_feature(chars, is_ignored)
 	if replaced ~= true then return false end
 	-- The repeat is an expansion of the magic key: an immediate Backspace erases
 	-- the repeated character and, the magic key being an action, types nothing back.
-	remember_undo(true, chars, last_char, nil, is_private, is_ignored ~= true)
+	remember_undo(true, chars, last_char, nil, is_private, is_ignored ~= true, before, boundary_before)
 
 	if is_private then
 		Logger.debug(LOG, "Repeat feature: repeated a private character (content withheld).")

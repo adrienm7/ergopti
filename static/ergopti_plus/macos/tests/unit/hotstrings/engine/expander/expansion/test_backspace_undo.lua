@@ -170,6 +170,72 @@ local function press_backspace(state, expander, log)
 	return restored, log.transactions[before + 1]
 end
 
+--- A Backspace the undo does not take, as the tap applies it (expander/init.lua):
+--- the last character leaves the buffer, and emptying it restores its word start.
+local function plain_backspace(state)
+	if state.buffer == "" then
+		state.start_is_word_boundary = false
+		return
+	end
+	state.buffer = state.buffer:sub(1, #state.buffer - #(state.buffer:match("[%z\1-\127\194-\244][\128-\191]*$") or ""))
+	if state.buffer == "" then state.start_is_word_boundary = true end
+end
+
+--- Removes the last n user-perceived characters of a screen text. The tests'
+--- texts hold one-code-point characters only, so a code point is a character.
+--- @param text string
+--- @param n number
+--- @return string
+local function erase(text, n)
+	for _ = 1, n do
+		local last = text:match("[%z\1-\127\194-\244][\128-\191]*$") or ""
+		text = text:sub(1, #text - #last)
+	end
+	return text
+end
+
+local BACKSPACE = "{BS}"
+local TERMINATORS = { [" "] = true, [","] = true, ["\n"] = true }
+
+--- Types keys after an expansion the way the tap does, and follows the line: a
+--- Backspace undoes an expansion the previous key fired (the tap consumes it and
+--- the transaction erases the whole output), otherwise deletes the last
+--- character; a character that fires is consumed by its transaction, one that
+--- does not reaches the line.
+--- @param screen string The line before the keys.
+--- @param keys table Characters, or "{BS}" for a Backspace.
+--- @return string screen The line after them.
+local function press_keys(state, expander, log, screen, keys)
+	for _, key in ipairs(keys) do
+		local before = #log.transactions
+		if key == BACKSPACE then
+			local restored, transaction = press_backspace(state, expander, log)
+			if restored then
+				screen = erase(screen, transaction.deletes) .. (transaction.typed or "")
+			else
+				plain_backspace(state)
+				screen = erase(screen, 1)
+			end
+		else
+			local fired
+			if TERMINATORS[key] then fired = type_terminator(state, expander, key)
+			else
+				fired = type_char(state, expander, key)
+				if not fired and key == state.magic_key and state.is_repeat_feature_enabled then
+					fired = expander.try_repeat_feature(key, false) == true
+				end
+			end
+			local transaction = log.transactions[before + 1]
+			if fired then
+				screen = erase(screen, transaction.deletes) .. (transaction.typed or "") .. (transaction.replay or "")
+			else
+				screen = screen .. key
+			end
+		end
+	end
+	return screen
+end
+
 --- Fires « adn » with an end character, as the terminator path does.
 --- @param chars string The end character.
 --- @return table state, table expander, table log
@@ -232,7 +298,8 @@ helpers.describe("keymap: the Backspace undo", function()
 			helpers.assert_true(restored, "the Backspace restores the trigger")
 			helpers.assert_eq(10, transaction.deletes, "the date is erased")
 			helpers.assert_eq("td", transaction.typed, "td comes back, not td★")
-			helpers.assert_eq(false, state.start_is_word_boundary, "the caret stays inside the restored word")
+			helpers.assert_eq("td", state.buffer, "the buffer holds the restored word")
+			helpers.assert_eq(true, state.start_is_word_boundary, "which starts where td was typed")
 		end)
 	end)
 
@@ -244,7 +311,7 @@ helpers.describe("keymap: the Backspace undo", function()
 				helpers.assert_true(restored, "the Backspace restores the trigger")
 				helpers.assert_eq(4, transaction.deletes, "ADN and the replayed end character are erased")
 				helpers.assert_eq("adn" .. chars, transaction.typed, "adn and its end character, not ADN")
-				helpers.assert_eq("", state.buffer, "the restored text is not in the buffer")
+				helpers.assert_eq("adn" .. chars, state.buffer, "the buffer holds the restored text")
 				helpers.assert_eq(true, state.start_is_word_boundary,
 					"the restored end character opens the next word")
 			end
@@ -331,6 +398,103 @@ helpers.describe("keymap: the Backspace undo", function()
 
 end)
 
+-- The maintainer's rule of 2026-11-20: « adn★ Backspace ★ doit donner ADN si
+-- adn★ donne ADN ». The undo used to empty the buffer, so the magic key typed
+-- after it matched nothing.
+helpers.describe("keymap: the restored trigger expands again (backspace-restore-again)", function()
+
+	helpers.it("adn★, Backspace, ★ gives ADN, and again after a second undo (backspace-restore-again)", function()
+		with_clock(function()
+			local state, expander, log = fresh_engine({ { "adn" .. STAR, "ADN", { is_word = true } } }, 1)
+			helpers.assert_true(type_string(state, expander, "adn" .. STAR), "control: adn★ fires")
+			local screen = press_keys(state, expander, log, "ADN", { BACKSPACE })
+			helpers.assert_eq("adn", screen, "control: the undo restores adn")
+			helpers.assert_eq("adn", state.buffer, "the buffer holds the restored trigger")
+			screen = press_keys(state, expander, log, screen, { STAR })
+			helpers.assert_eq("ADN", screen, "the magic key expands it at once")
+			screen = press_keys(state, expander, log, screen, { BACKSPACE, STAR })
+			helpers.assert_eq("ADN", screen, "a second undo and the magic key expand it once more")
+			advance(DEFAULT_WINDOW_MS + 1)
+			screen = press_keys(state, expander, log, screen, { BACKSPACE })
+			helpers.assert_eq("AD", screen, "control: past the window the Backspace is a plain one")
+		end)
+	end)
+
+	helpers.it("expands again after the undo window has passed (backspace-restore-again)", function()
+		with_clock(function()
+			local state, expander, log = fresh_engine({ { "adn" .. STAR, "ADN" } }, 1)
+			type_string(state, expander, "adn" .. STAR)
+			local screen = press_keys(state, expander, log, "ADN", { BACKSPACE })
+			advance(DEFAULT_WINDOW_MS * 4)
+			helpers.assert_eq("ADN", press_keys(state, expander, log, screen, { STAR }),
+				"the restored trigger does not age with the undo window")
+		end)
+	end)
+
+	helpers.it("po★, Backspace, ★ repeats the o again (backspace-restore-again)", function()
+		with_clock(function()
+			local state, expander, log = fresh_engine({}, 1)
+			state.is_repeat_feature_enabled = function() return true end
+			state.buffer = "po" .. STAR
+			helpers.assert_true(expander.try_repeat_feature(STAR, false), "control: po★ repeats the o")
+			local screen = press_keys(state, expander, log, "poo", { BACKSPACE })
+			helpers.assert_eq("po", screen, "control: the undo leaves po")
+			helpers.assert_eq("po", state.buffer, "the buffer holds po again")
+			helpers.assert_eq("poo", press_keys(state, expander, log, screen, { STAR }), "the magic key repeats the o")
+		end)
+	end)
+
+	helpers.it("adn and Space, Backspace, Backspace, Space gives ADN and Space again (backspace-restore-again)", function()
+		with_clock(function()
+			for _, late in ipairs({ false, true }) do
+				local state, expander, log = fire_adn(" ")
+				local screen = press_keys(state, expander, log, "ADN ", { BACKSPACE })
+				helpers.assert_eq("adn ", screen, "control: the undo restores adn and its Space")
+				if late then advance(DEFAULT_WINDOW_MS * 4) end
+				screen = press_keys(state, expander, log, screen, { BACKSPACE })
+				helpers.assert_eq("adn", state.buffer, "deleting the restored Space leaves adn in the buffer")
+				helpers.assert_eq("ADN ", press_keys(state, expander, log, screen, { " " }),
+					"Space fires adn as typing it would" .. (late and ", past the undo window" or ""))
+			end
+		end)
+	end)
+
+	helpers.it("a word-only trigger fires after a restored terminator (backspace-restore-again)", function()
+		with_clock(function()
+			local state, expander, log = fresh_engine({ { "adn", "ADN", { auto_expand = false, is_word = true } } }, 1)
+			state.buffer = "adn"
+			type_terminator(state, expander, " ")
+			local screen = press_keys(state, expander, log, "ADN ", { BACKSPACE, "a", "d", "n", " " })
+			helpers.assert_eq("adn ADN ", screen, "the restored Space ended the word")
+		end)
+	end)
+
+	helpers.it("no word starts inside a trigger restored without a terminator (backspace-restore-again)", function()
+		with_clock(function()
+			local state, expander, log = fresh_engine({ { "pk" .. STAR, "parce que" },
+				{ "adn", "ADN", { auto_expand = false, is_word = true } } }, 1)
+			helpers.assert_true(type_string(state, expander, "pk" .. STAR), "control: pk★ fires")
+			local screen = press_keys(state, expander, log, "parce que", { BACKSPACE, "a", "d", "n", " " })
+			helpers.assert_eq("pkadn ", screen, "adn continues the restored word pk")
+		end)
+	end)
+
+	helpers.it("with the option off the buffer follows each Backspace (backspace-restore-again)", function()
+		with_clock(function()
+			local state, expander, log = fresh_engine({ { "adn", "ADN", { auto_expand = false, is_word = true } } }, 1)
+			state.backspace_restore_enabled = false
+			state.buffer = "adn"
+			type_terminator(state, expander, " ")
+			local screen = press_keys(state, expander, log, "ADN ", { BACKSPACE, BACKSPACE, BACKSPACE, BACKSPACE })
+			helpers.assert_eq("", screen, "control: four plain Backspaces")
+			helpers.assert_eq("", state.buffer)
+			helpers.assert_eq("ADN ", press_keys(state, expander, log, screen, { "a", "d", "n", " " }),
+				"adn and Space expand again")
+		end)
+	end)
+
+end)
+
 
 
 
@@ -341,26 +505,15 @@ end)
 -- =============================================
 -- =============================================
 
---- Removes the last n user-perceived characters of a screen text. The corpus
---- texts hold one-code-point characters only, so a code point is a character.
---- @param text string
---- @param n number
---- @return string
-local function erase(text, n)
-	for _ = 1, n do
-		local last = text:match("[%z\1-\127\194-\244][\128-\191]*$") or ""
-		text = text:sub(1, #text - #last)
-	end
-	return text
-end
-
 --- Fires one vector's expansion through the path that types it, then presses
---- the Backspace through the real undo, and reads the expansion's part of the line.
+--- the Backspace through the real undo, and reads the expansion's part of the
+--- line and of the buffer, then types the vector's next keys.
 --- @param vector table One corpus vector.
---- @return string screen_after
+--- @return table seen { screen, buffer, screen_then }
 local function replay(vector)
-	local screen
+	local seen = {}
 	with_clock(function()
+		local screen
 		local state, expander, log
 		local replayed = (vector.terminator ~= nil and vector.terminator_consumed ~= true) and vector.terminator or nil
 		if vector.trigger == vector.magic_key then
@@ -391,10 +544,17 @@ local function replay(vector)
 		if restored then
 			screen = erase(screen, transaction.deletes) .. (transaction.typed or "")
 		else
+			plain_backspace(state)
 			screen = erase(screen, 1)
 		end
+		-- The repeat's « po » lies before the expansion's part of the buffer.
+		local before = vector.trigger == vector.magic_key and ("p" .. vector.output) or ""
+		local buffer = state.buffer
+		seen.screen = screen
+		seen.buffer = buffer:sub(1, #before) == before and buffer:sub(#before + 1) or ("<" .. buffer .. ">")
+		if vector["then"] ~= nil then seen.screen_then = press_keys(state, expander, log, screen, vector["then"]) end
 	end)
-	return screen
+	return seen
 end
 
 require("tests.lua.hotstrings.backspace_restore_contract").register(helpers,
