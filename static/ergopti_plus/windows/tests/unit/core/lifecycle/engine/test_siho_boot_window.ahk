@@ -70,3 +70,27 @@ _SIHOCountTracksRealOwnership() {
 }
 Test("SIHO boot window: the guard still tracks real ownership (siho-count-before-include)",
 	_SIHOCountTracksRealOwnership)
+
+; The per-unit construction the run-filled table replaced; order is part of it.
+_SIHOScalarEndKeysReference() {
+	Text := ""
+	VarSetStrCapacity(&Text, 0x10000)
+	loop 0xFFFF {
+		Unit := A_Index
+		if Unit >= 0xD800 && Unit <= 0xDBFF
+			continue
+		Text .= (Unit == 0x7B || Unit == 0x7D) ? "{" . Chr(Unit) . "}" : Chr(Unit)
+	}
+	return Text
+}
+
+_SIHOScalarEndKeysMatchReference() {
+	Table := _SIHO_ScalarEndKeys()
+	Reference := _SIHOScalarEndKeysReference()
+	AssertEqual(StrLen(Reference), StrLen(Table),
+		"the scalar end-key table must hold every unit but the high surrogates, braces as key names")
+	AssertTrue(Table == Reference,
+		"the scalar end-key table must list the units in ascending order, as the per-unit build did")
+}
+Test("SIHO scalar end keys: the run-filled table equals the per-unit construction",
+	_SIHOScalarEndKeysMatchReference)
