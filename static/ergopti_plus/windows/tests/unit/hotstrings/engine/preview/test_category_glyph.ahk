@@ -5,16 +5,17 @@
 ; DESCRIPTION:
 ; The preview tints sit at one lightness, so a colour-blind reader tells the
 ; categories apart by a glyph (the maintainer's decision of 2026-11-19). The
-; glyph is drawn first, at the far left of the row, in a framed badge, so it
-; reads as an annotation and not as text the expansion types (his request of
-; the same day). These cases pin the Windows side:
+; glyph is drawn first, at the far left of the row, in a filled chip,
+; so it reads as an annotation and not as text the expansion types (his request
+; of the same day; a chip rather than a frame since 2026-11-20, one control per
+; row). These cases pin the Windows side:
 ;
 ; 1. The resolver and the badge geometry answer the cross-driver vectors of
 ;    _shared/tests/corpus/hotstrings/category_glyph_vectors.json.
 ; 2. A magic-key row typed through the real prefix watcher carries its
-;    category's glyph, and the built tooltip Gui draws it first, inside a frame
-;    that ends before the output text; the trigger label stays alone at the
-;    right.
+;    category's glyph, and the built tooltip Gui draws it first, as one
+;    chip control that ends before the output text; the trigger label
+;    stays alone at the right.
 ; 3. The glyph switch off draws neither badge nor gap: the output keeps the
 ;    padding it had before the glyphs.
 ; 4. The AI tooltip's embedded hotstring rows draw the same badge.
@@ -82,7 +83,7 @@ _HCG_BadgeAnswersTheVectors() {
 	AssertTrue(Document["badge_vectors"].Length > 0, "sanity: the corpus holds badge vectors")
 	for Vector in Document["badge_vectors"] {
 		Badge := TooltipGlyphBadge(Vector["glyph_w"], Vector["glyph_h"], Layout["glyph_badge_pad_x"],
-			Layout["glyph_badge_border"], Layout["glyph_badge_gap"])
+			Layout["glyph_badge_pad_y"], Layout["glyph_badge_gap"])
 		AssertEqual(Vector["expected"]["w"], Badge.W, Vector["id"] . ": frame width")
 		AssertEqual(Vector["expected"]["h"], Badge.H, Vector["id"] . ": frame height")
 		AssertEqual(Vector["expected"]["zone"], Badge.Zone, Vector["id"] . ": output offset")
@@ -137,14 +138,14 @@ _HCG_WithMagicKeyRows(Shown, Body) {
 ; @param Body {Func}
 _HCG_WithBadgeStyle(Body) {
 	global _TOOLTIP_LABEL_COLOR_HEX, _TOOLTIP_GLYPH_BADGE_HEX, _TOOLTIP_GLYPH_BADGE_PAD_X
-	global _TOOLTIP_GLYPH_BADGE_BORDER, _TOOLTIP_GLYPH_BADGE_GAP, _TOOLTIP_PADDING_X, _SharedDir
+	global _TOOLTIP_GLYPH_BADGE_PAD_Y, _TOOLTIP_GLYPH_BADGE_GAP, _TOOLTIP_PADDING_X, _SharedDir
 	Saved := [_TOOLTIP_LABEL_COLOR_HEX, _TOOLTIP_GLYPH_BADGE_HEX, _TOOLTIP_GLYPH_BADGE_PAD_X,
-		_TOOLTIP_GLYPH_BADGE_BORDER, _TOOLTIP_GLYPH_BADGE_GAP, _TOOLTIP_PADDING_X]
+		_TOOLTIP_GLYPH_BADGE_PAD_Y, _TOOLTIP_GLYPH_BADGE_GAP, _TOOLTIP_PADDING_X]
 	Constants := ParseTomlFile(_SharedDir . "\core\ui\data\tooltip\constants.toml")
 	_TOOLTIP_LABEL_COLOR_HEX := _UiStyleRequireHex(Constants, "colors", "label_hex")
 	_TOOLTIP_GLYPH_BADGE_HEX := UiStyle_GreyHex(_UiStyleRequire(Constants, "colors", "glyph_badge_white"))
 	_TOOLTIP_GLYPH_BADGE_PAD_X := Integer(_UiStyleRequire(Constants, "layout", "glyph_badge_pad_x"))
-	_TOOLTIP_GLYPH_BADGE_BORDER := Integer(_UiStyleRequire(Constants, "layout", "glyph_badge_border"))
+	_TOOLTIP_GLYPH_BADGE_PAD_Y := Integer(_UiStyleRequire(Constants, "layout", "glyph_badge_pad_y"))
 	_TOOLTIP_GLYPH_BADGE_GAP := Integer(_UiStyleRequire(Constants, "layout", "glyph_badge_gap"))
 	_TOOLTIP_PADDING_X := Integer(_UiStyleRequire(Constants, "layout", "pad_x"))
 	try Body()
@@ -152,7 +153,7 @@ _HCG_WithBadgeStyle(Body) {
 		_TOOLTIP_LABEL_COLOR_HEX := Saved[1]
 		_TOOLTIP_GLYPH_BADGE_HEX := Saved[2]
 		_TOOLTIP_GLYPH_BADGE_PAD_X := Saved[3]
-		_TOOLTIP_GLYPH_BADGE_BORDER := Saved[4]
+		_TOOLTIP_GLYPH_BADGE_PAD_Y := Saved[4]
 		_TOOLTIP_GLYPH_BADGE_GAP := Saved[5]
 		_TOOLTIP_PADDING_X := Saved[6]
 	}
@@ -219,8 +220,8 @@ _HCG_Find(Controls, Wanted) {
 	return 0
 }
 
-; Asserts the row draws its glyph first, in a frame that ends before the output,
-; and the trigger label alone after the output.
+; Asserts the row draws its glyph first, as one chip control that ends
+; before the output, and the trigger label alone after the output.
 ; @param Controls {Array} As _HCG_Controls.
 ; @param Glyph {String}
 ; @param Output {String}
@@ -237,15 +238,15 @@ _HCG_AssertBadgeFirst(Controls, Glyph, Output, Where) {
 	for Control in Controls
 		if (Control.Text != "" && Control != GlyphCtrl)
 			AssertTrue(Control.X > GlyphCtrl.X, Where . ": nothing is drawn left of the glyph, « " . Control.Text . " » is")
-	Frame := 0
+	; One control is the chip: nothing but the row's full-width band lies under it.
 	for Control in Controls
-		if (Control.Text == "" && Control.X < GlyphCtrl.X && Control.Y < GlyphCtrl.Y
-				&& Control.X + Control.W > GlyphCtrl.X + GlyphCtrl.W
-				&& Control.Y + Control.H > GlyphCtrl.Y + GlyphCtrl.H
-				&& Control.X + Control.W < OutputCtrl.X)
-			Frame := Control
-	AssertTrue(IsObject(Frame),
-		Where . ": a frame rings the glyph on every side and ends before the output, with a gap")
+		if (Control != GlyphCtrl && Control.X > 0 && Control.X < GlyphCtrl.X + GlyphCtrl.W
+				&& Control.X + Control.W > GlyphCtrl.X)
+			AssertTrue(false, Where . ": the chip is one control; another lies at x " . Control.X)
+	Size := _TooltipMeasureTextSize(Glyph, _TOOLTIP_LABEL_FONT_SIZE)
+	AssertTrue(GlyphCtrl.W > Size.W, Where . ": the chip pads its glyph on both sides")
+	AssertTrue(GlyphCtrl.X + GlyphCtrl.W < OutputCtrl.X,
+		Where . ": the chip ends before the output, with a gap")
 	AssertTrue(LabelCtrl.X > OutputCtrl.X, Where . ": the trigger label stays right of the output")
 }
 
@@ -259,7 +260,7 @@ _HCG_AssertNoBadge(Controls, Glyph, Output, PaddingX, Where) {
 		Where . ": the bare trigger label is drawn")
 }
 
-_HCG_TheRowDrawsTheGlyphFirstInAFrame() {
+_HCG_TheRowDrawsTheGlyphFirstOnAChip() {
 	Expected := HotstringsResolve("magickey", "text_expansion_symbols").Glyph
 	AssertTrue(Expected != "", "sanity: the magic-key category declares a glyph, or this case proves nothing")
 	AssertTrue(Expected != Chr(0x2713), "sanity: the glyph differs from the output it annotates")
@@ -291,7 +292,7 @@ _HCG_LeftmostX(Controls) {
 	return Left
 }
 
-Test("preview category glyph: the row draws the glyph first, in a frame before the output", _HCG_TheRowDrawsTheGlyphFirstInAFrame)
+Test("preview category glyph: the row draws the glyph first, on a chip before the output", _HCG_TheRowDrawsTheGlyphFirstOnAChip)
 Test("preview category glyph: the switch off draws no badge and leaves no gap", _HCG_TheSwitchHidesTheBadgeAndItsGap)
 
 

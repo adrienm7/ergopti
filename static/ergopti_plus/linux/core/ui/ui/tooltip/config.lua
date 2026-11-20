@@ -130,7 +130,7 @@ function M.load()
 			-- The framed badge of a preview row's category glyph
 			-- (CategoryGlyph.badge_geometry).
 			glyph_badge_pad_x  = require_key("layout", "glyph_badge_pad_x"),
-			glyph_badge_border = require_key("layout", "glyph_badge_border"),
+			glyph_badge_pad_y  = require_key("layout", "glyph_badge_pad_y"),
 			glyph_badge_gap    = require_key("layout", "glyph_badge_gap"),
 			llm_max_content_width = require_key("layout", "llm_max_content_width"),
 			corner_radius    = require_key("layout", "corner_radius"),
@@ -158,7 +158,7 @@ function M.load()
 			border_white = require_key("colors", "border_white"),
 			border_alpha = require_driver_key("colors", "border_alpha"),
 			sep_alpha    = require_driver_key("colors", "sep_alpha"),
-			-- The category glyph and the frame of its badge, 4.5:1 on every tint.
+			-- The fill of the category glyph chip, 4.5:1 against every tint.
 			glyph_badge_white = require_key("colors", "glyph_badge_white"),
 		},
 		tint = {

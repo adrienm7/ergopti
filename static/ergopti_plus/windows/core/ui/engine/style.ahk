@@ -25,7 +25,7 @@
 ;   [layout]      pad_y                  → UI_PAD_Y
 ;   [layout]      label_gap              → UI_LABEL_GAP
 ;   [layout]      glyph_badge_pad_x      → UI_GLYPH_BADGE_PAD_X
-;   [layout]      glyph_badge_border     → UI_GLYPH_BADGE_BORDER
+;   [layout]      glyph_badge_pad_y      → UI_GLYPH_BADGE_PAD_Y
 ;   [layout]      glyph_badge_gap        → UI_GLYPH_BADGE_GAP
 ;   [layout]      llm_max_content_width  → UI_LLM_MAX_CONTENT_WIDTH
 ;   [layout]      corner_radius × 2      → UI_CORNER_RADIUS (GDI diameter)
@@ -66,7 +66,7 @@ global UI_PAD_X           := 0
 global UI_PAD_Y           := 0
 global UI_LABEL_GAP       := 0
 global UI_GLYPH_BADGE_PAD_X  := 0
-global UI_GLYPH_BADGE_BORDER := 0
+global UI_GLYPH_BADGE_PAD_Y := 0
 global UI_GLYPH_BADGE_GAP    := 0
 global UI_LLM_MAX_CONTENT_WIDTH := 0
 global UI_LINE_SPACING    := 0
@@ -200,7 +200,7 @@ UiStyle_LoadSharedConst() {
 	global UI_PAD_Y                := Integer(_UiStyleRequire(c, "layout", "pad_y"))
 	global UI_LABEL_GAP            := Integer(_UiStyleRequire(c, "layout", "label_gap"))
 	global UI_GLYPH_BADGE_PAD_X    := Integer(_UiStyleRequire(c, "layout", "glyph_badge_pad_x"))
-	global UI_GLYPH_BADGE_BORDER   := Integer(_UiStyleRequire(c, "layout", "glyph_badge_border"))
+	global UI_GLYPH_BADGE_PAD_Y    := Integer(_UiStyleRequire(c, "layout", "glyph_badge_pad_y"))
 	global UI_GLYPH_BADGE_GAP      := Integer(_UiStyleRequire(c, "layout", "glyph_badge_gap"))
 	global UI_LLM_MAX_CONTENT_WIDTH := Integer(_UiStyleRequire(c, "layout", "llm_max_content_width"))
 	global UI_LINE_SPACING         := Integer(_UiStyleRequire(c, "layout", "line_spacing"))

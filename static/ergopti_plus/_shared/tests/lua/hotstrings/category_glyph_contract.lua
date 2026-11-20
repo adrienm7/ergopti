@@ -47,17 +47,17 @@ return function(helpers)
 		end)
 	end
 
-	helpers.it("the shipped badge geometry draws a visible frame and a gap before the output", function()
+	helpers.it("the shipped badge geometry pads the glyph and leaves a gap before the output", function()
 		local handle = assert(io.open(shared .. "/core/ui/data/tooltip/constants.toml", "rb"))
 		local text = handle:read("*a")
 		handle:close()
 		local layout = {}
-		for _, key in ipairs({ "glyph_badge_pad_x", "glyph_badge_border", "glyph_badge_gap" }) do
+		for _, key in ipairs({ "glyph_badge_pad_x", "glyph_badge_pad_y", "glyph_badge_gap" }) do
 			layout[key] = tonumber(text:match("\n" .. key .. "%s*=%s*([%d.]+)"))
 			assert(layout[key], "constants.toml must declare [layout]." .. key)
 		end
 		local badge = CategoryGlyph.badge_geometry(10, 15, layout)
-		assert(layout.glyph_badge_border >= 1, "the badge needs a border to read as an annotation")
+		assert(badge.w > 10 and badge.h > 15, "the chip pads its glyph so its edge reads as an annotation")
 		assert(badge.zone > badge.w, "the output must start after the badge, with a gap")
 	end)
 

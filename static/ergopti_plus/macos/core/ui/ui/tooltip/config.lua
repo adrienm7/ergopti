@@ -309,7 +309,7 @@ local function load_from_shared()
 	M.layout.label_gap     = require_key("layout", "label_gap")
 	-- The framed badge of a preview row's category glyph (CategoryGlyph.badge_geometry).
 	M.layout.glyph_badge_pad_x  = require_key("layout", "glyph_badge_pad_x")
-	M.layout.glyph_badge_border = require_key("layout", "glyph_badge_border")
+	M.layout.glyph_badge_pad_y  = require_key("layout", "glyph_badge_pad_y")
 	M.layout.glyph_badge_gap    = require_key("layout", "glyph_badge_gap")
 	M.layout.llm_max_content_width = require_key("layout", "llm_max_content_width")
 
@@ -329,7 +329,7 @@ local function load_from_shared()
 	-- look. border_alpha_hs is the canvas-tuned alpha; never hardcode it.
 	M.colors.border   = { white = require_key("colors", "border_white"), alpha = require_key("colors", "border_alpha_hs") }
 	M.colors.hint     = { white = require_key("colors", "hint_white"), alpha = require_key("colors", "hint_alpha") }
-	-- The category glyph and the frame of its badge, 4.5:1 on every tint.
+	-- The fill of the category glyph chip, 4.5:1 against every tint.
 	M.colors.glyph_badge = { white = require_key("colors", "glyph_badge_white"), alpha = 1 }
 	M.colors.info_bar = { white = require_key("colors", "info_white"), alpha = require_key("colors", "info_alpha") }
 	M.colors.invis    = { white = require_key("colors", "invis_white"), alpha = require_key("colors", "invis_alpha") }

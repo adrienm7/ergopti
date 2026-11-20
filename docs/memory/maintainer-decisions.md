@@ -1808,6 +1808,19 @@ it is the row's first cell, in a 1 px framed badge before the output, the
 trigger label alone at the right (`badge_geometry`, `[layout] glyph_badge_*`,
 `[colors] glyph_badge_white` at 4.5:1 on every tint, dimmed with its row). The
 screen-reader notice names the category first; `hotstrings.preview_category_glyphs`
-(default on, three OS) hides the badge and its gap. A new glyph must come from a block that
+(default on, three OS) hides the badge and its gap.
+
+Decided by the agent on 2026-11-20, to review by the maintainer: the framed
+badge became a filled chip on the three OS. The frame cost Windows two child
+controls per row (the frame and the glyph inside it), and each control costs
+about 1 to 1.5 ms of build time. The chip is one Text control filled in the
+glyph grey with the glyph in the row's own tint, still the row's first cell,
+still in one column, still nothing with the switch off. It is square: rounding
+it needed a window region per control, measured at about as much again.
+Build time of one preview row on Windows, glyph on minus switch off, three
+back-to-back rounds of 300 builds: framed badge about 2.9 ms (2.4 to 3.2),
+chip about 1.7 ms (1.1 to 2.2); the switch-off row itself is unchanged
+(5 to 9 ms with the machine's load). The remaining cost is the one control.
+A new glyph must come from a block that
 Segoe UI Symbol, the macOS system fonts and DejaVu Sans all draw (Dingbats,
 Geometric Shapes, General Punctuation).

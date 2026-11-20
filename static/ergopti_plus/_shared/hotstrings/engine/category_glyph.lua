@@ -146,26 +146,28 @@ end
 -- =============================================
 -- =============================================
 
---- The framed badge a preview row draws its glyph in: the first cell of the
---- row, at its far left, before the output text. The frame says the glyph is
---- an annotation, not part of what the expansion types (the maintainer's
---- request of 2026-11-19). Every row of a stack shares one badge column, as
+--- The chip a preview row draws its glyph in: the first cell of the row, at
+--- its far left, before the output text, filled in the glyph grey with the glyph
+--- knocked out in the row's tint. The chip says the glyph is an annotation, not
+--- part of what the expansion types (the maintainer's request of 2026-11-19;
+--- filled rather than framed since 2026-11-20, one control on Windows instead of
+--- two). Every row of a stack shares one badge column, as
 --- wide as its widest glyph, so the outputs stay aligned; a stack without a
 --- glyph has no column and keeps the row it had before the glyphs.
 --- @param glyph_w number Widest glyph of the stack, 0 when no row shows one.
 --- @param glyph_h number Tallest glyph of the stack.
---- @param layout table { glyph_badge_pad_x, glyph_badge_border, glyph_badge_gap },
+--- @param layout table { glyph_badge_pad_x, glyph_badge_pad_y, glyph_badge_gap },
 ---   the [layout] keys of _shared/core/ui/data/tooltip/constants.toml.
---- @return table { w, h, zone }: the frame's outer size, and how far right the
+--- @return table { w, h, zone }: the chip's size, and how far right the
 ---   output text starts from the row's padding.
 function M.badge_geometry(glyph_w, glyph_h, layout)
 	if type(glyph_w) ~= "number" or glyph_w <= 0 then return { w = 0, h = 0, zone = 0 } end
 	assert(type(layout) == "table", "badge_geometry needs the tooltip layout")
-	local border = assert(tonumber(layout.glyph_badge_border), "glyph_badge_border is required")
+	local pad_y = assert(tonumber(layout.glyph_badge_pad_y), "glyph_badge_pad_y is required")
 	local pad_x = assert(tonumber(layout.glyph_badge_pad_x), "glyph_badge_pad_x is required")
 	local gap = assert(tonumber(layout.glyph_badge_gap), "glyph_badge_gap is required")
-	local w = glyph_w + 2 * (pad_x + border)
-	return { w = w, h = glyph_h + 2 * border, zone = w + gap }
+	local w = glyph_w + 2 * pad_x
+	return { w = w, h = glyph_h + 2 * pad_y, zone = w + gap }
 end
 
 return M

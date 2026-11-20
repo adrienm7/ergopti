@@ -71,7 +71,7 @@ const SHARED = [
 	['layout', 'corner_radius'],
 	// The framed badge of a preview row's category glyph, the same on the three OS.
 	['layout', 'glyph_badge_pad_x'],
-	['layout', 'glyph_badge_border'],
+	['layout', 'glyph_badge_pad_y'],
 	['layout', 'glyph_badge_gap'],
 	['colors', 'glyph_badge_white'],
 	['layout', 'screen_margin'],
@@ -132,7 +132,7 @@ const LINUX = fs.readFileSync(
 for (const [section, key] of [
 	['timing', 'safety_timeout_sec'],
 	['layout', 'glyph_badge_pad_x'],
-	['layout', 'glyph_badge_border'],
+	['layout', 'glyph_badge_pad_y'],
 	['layout', 'glyph_badge_gap'],
 	['colors', 'glyph_badge_white']
 ]) {
@@ -273,7 +273,7 @@ const STYLE_GLOBALS = [
 	'UI_LOADING_TEXT_HEX',
 	'UI_GLYPH_BADGE_HEX',
 	'UI_GLYPH_BADGE_PAD_X',
-	'UI_GLYPH_BADGE_BORDER',
+	'UI_GLYPH_BADGE_PAD_Y',
 	'UI_GLYPH_BADGE_GAP',
 	'UI_OFFSET_BELOW',
 	'UI_OFFSET_RIGHT',

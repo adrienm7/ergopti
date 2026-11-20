@@ -434,23 +434,24 @@ local function paint(cr, rows, metrics, style, size, background)
 			cr:fill()
 		end
 
-		-- The category glyph badge first, at the far left: a 1 px frame in the
-		-- glyph's colour, inset by half its stroke so the line stays crisp, and
-		-- the glyph centred inside, dimmed with the row like its label.
+		-- The category glyph chip first, at the far left: a square fill in the
+		-- chip grey, dimmed with the row like its label, and the glyph centred on
+		-- it in the panel's own colour (knocked out), as on Windows and macOS.
 		local text_y = y + math.floor((m.height - m.text_h) / 2)
 		if m.badge then
-			local badge, border = m.badge, style.layout.glyph_badge_border
+			local badge = m.badge
 			local badge_y = y + math.floor((m.height - badge.h) / 2)
 			local white = style.colors.glyph_badge_white
 			cr:set_source_rgba(white, white, white, alpha)
-			cr:set_line_width(border)
-			cr:rectangle(style.layout.pad_x + border / 2, badge_y + border / 2, badge.w - border, badge.h - border)
-			cr:stroke()
+			cr:rectangle(style.layout.pad_x, badge_y, badge.w, badge.h)
+			cr:fill()
 			local glyph_description = g.Pango.FontDescription.from_string(style.fonts.main)
 			glyph_description:set_size(style.sizes.hint * PANGO_SCALE)
 			pango_layout:set_font_description(glyph_description)
 			pango_layout:set_text(row.glyph, -1)
-			cr:move_to(style.layout.pad_x + math.floor((badge.w - m.glyph_w) / 2), badge_y + border)
+			cr:set_source_rgba(background.red, background.green, background.blue, 1)
+			cr:move_to(style.layout.pad_x + math.floor((badge.w - m.glyph_w) / 2),
+				badge_y + style.layout.glyph_badge_pad_y)
 			g.PangoCairo.show_layout(cr, pango_layout)
 		end
 

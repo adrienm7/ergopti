@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The preview tints sit at one lightness, so a colour-blind reader told the
 --- categories apart by nothing. Each row now draws its category glyph first, at
---- its far left, in a framed badge that ends before the output, so the glyph
+--- its far left, in a filled chip that ends before the output, so the glyph
 --- reads as an annotation and not as typed text; the glyph switch removes the
 --- badge and its gap, and VoiceOver hears the category's name first.
 --- ==============================================================================
@@ -43,7 +43,7 @@ local function rendered_row(renderer, row)
 	return { frame = canvas[3], glyph = canvas[4], output = canvas[5], label = canvas[6] }
 end
 
---- Asserts the glyph is the row's first cell, ringed by a frame that ends
+--- Asserts the glyph is the row's first cell, on a chip that ends
 --- before the output, and the trigger label alone at the right.
 --- @param slots table From rendered_row.
 --- @param glyph string
@@ -51,24 +51,24 @@ end
 local function assert_badge_first(slots, glyph, label)
 	helpers.assert_eq(slots.glyph.text, glyph, "the glyph has a slot of its own")
 	helpers.assert_eq(slots.glyph.action, "fill", "the glyph is drawn")
-	helpers.assert_eq(slots.frame.action, "stroke", "a frame is stroked around the glyph")
-	assert(type(slots.frame.strokeWidth) == "number" and slots.frame.strokeWidth >= 1, "the frame is visible")
+	helpers.assert_eq(slots.frame.action, "fill", "a chip is filled under the glyph")
+	assert(type(slots.frame.fillColor) == "table" and slots.frame.fillColor.alpha > 0, "the chip is visible")
 	local f, g, o = slots.frame.frame, slots.glyph.frame, slots.output.frame
 	assert(f.x <= g.x and f.y <= g.y and f.x + f.w >= g.x + g.w and f.y + f.h >= g.y + g.h,
-		"the frame rings the glyph")
+		"the chip lies under the whole glyph")
 	assert(g.x < o.x, "the glyph is drawn before the output, at the left of the row")
-	assert(f.x + f.w < o.x, "the frame ends before the output, with a gap")
+	assert(f.x + f.w < o.x, "the chip ends before the output, with a gap")
 	helpers.assert_eq(slots.label.text, label, "the trigger label stays alone")
 	assert(slots.label.frame.x > o.x, "the trigger label stays right of the output")
 end
 
 helpers.describe("tooltip preview: category glyph", function()
-	Fixture.it("draws the glyph first, framed, before the output; none without one", function()
+	Fixture.it("draws the glyph first, on a chip, before the output; none without one", function()
 		local renderer = Fixture.load()
 		local Config = require("core.ui.ui.tooltip.config")
 		assert_badge_first(rendered_row(renderer, { text = "déjà", trigger_label = "↵", glyph = "✓" }), "✓", "↵")
 		local bare = rendered_row(renderer, { text = "déjà", trigger_label = "★" })
-		helpers.assert_eq(bare.frame.action, "skip", "no glyph, no frame")
+		helpers.assert_eq(bare.frame.action, "skip", "no glyph, no chip")
 		helpers.assert_eq(bare.glyph.action, "skip", "no glyph, no glyph slot")
 		helpers.assert_eq(bare.output.frame.x, Config.layout.pad_x, "the output keeps the padding, with no gap")
 		helpers.assert_eq(bare.label.text, "★", "the bare trigger label")
@@ -78,7 +78,7 @@ helpers.describe("tooltip preview: category glyph", function()
 		local renderer = Fixture.load()
 		local Config = require("core.ui.ui.tooltip.config")
 		local slots = rendered_row(renderer, { text = "deja", trigger_label = "↵", glyph = "✓", dimmed = true })
-		assert(slots.frame.strokeColor.alpha < Config.colors.glyph_badge.alpha, "the frame dims with the row")
+		assert(slots.frame.fillColor.alpha < Config.colors.glyph_badge.alpha, "the chip dims with the row")
 	end)
 
 	Fixture.it("hands no glyph to the rows while the glyph switch is off", function()

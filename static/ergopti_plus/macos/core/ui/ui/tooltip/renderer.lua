@@ -657,14 +657,14 @@ M.stacked_canvas = nil
 -- Element layout (1-based), a uniform block of ROW_SLOTS per row:
 --   row i: base = (i-1)*6+1  : [base]   row background base (rounded or square)
 --                              [base+1] corner-flattening cap (skipped if unused)
---                              [base+2] category glyph badge frame (skipped without a glyph)
+--                              [base+2] category glyph chip fill (skipped without a glyph)
 --                              [base+3] category glyph styled text (skipped without a glyph)
 --                              [base+4] output styled text
 --                              [base+5] trigger label styled text
 --   separators               : sep_base = row_count*6 + 1, one rectangle per gap
 --   border                   : last element = row_count*7, rounded stroke
 -- The badge slots come before the output: the glyph is the row's first cell, at
--- its far left, framed so it reads as an annotation and not as typed text.
+-- its far left, in a filled chip so it reads as an annotation and not as typed text.
 M.ROW_SLOTS = 6
 function M._build_stacked_elements(row_count)
 	local elements = {}
@@ -787,8 +787,8 @@ end
 --- Renders a stack of hotstring rows into a single canvas.
 --- Each row is { text: string, tint: table|nil, trigger_label: string|nil,
 --- glyph: string|nil }. The category glyph is the row's first cell, at its far
---- left in a framed badge (CategoryGlyph.badge_geometry), in the shared
---- glyph_badge colour; the output follows it and the trigger label stays alone
+--- left in a filled chip (CategoryGlyph.badge_geometry) in the shared
+--- glyph_badge grey; the output follows it and the trigger label stays alone
 --- at the right. A stack without a glyph draws no badge and leaves no gap.
 --- @param rows table Array of row descriptors.
 --- @param state table Must contain fixed_width (or nil) and timeout_sec.
@@ -942,28 +942,25 @@ function M.render_stacked(rows, state, start_watchers_callback)
 				cap.action = "skip"
 			end
 
-			-- The category glyph badge, the row's first cell: a frame in the
-			-- glyph's colour, inset by half its stroke so the line stays crisp, and
-			-- the glyph centred inside. Dimmed with the row, like its label.
+			-- The category glyph chip, the row's first cell: a square fill in the
+			-- chip grey, dimmed with the row like its label, and the glyph centred
+			-- on it in the row's own tint (knocked out), as on Windows and Linux.
 			local frame_el, glyph_el = M.stacked_canvas[base + 2], M.stacked_canvas[base + 3]
 			if has_glyph(row) and badge.w > 0 then
-				local border = Config.layout.glyph_badge_border
+				local pad = Config.layout.glyph_badge_pad_y
 				local badge_y = top_y + pad_y + math.floor((content_h[i] - badge.h) / 2)
-				local glyph_color = row.dimmed
+				frame_el.action      = "fill"
+				frame_el.fillColor   = row.dimmed
 					and { white = Config.colors.glyph_badge.white, alpha = 0.55 } or Config.colors.glyph_badge
-				frame_el.action      = "stroke"
-				frame_el.strokeColor = glyph_color
-				frame_el.strokeWidth = border
-				frame_el.frame       = { x = pad_x + border / 2, y = badge_y + border / 2,
-					w = badge.w - border, h = badge.h - border }
+				frame_el.roundedRectRadii = nil
+				frame_el.frame       = { x = pad_x, y = badge_y, w = badge.w, h = badge.h }
 				glyph_el.action = "fill"
 				glyph_el.text   = hs.styledtext.new(row.glyph, {
 					font  = { name = Config.fonts.main, size = Config.sizes.hint },
-					color = glyph_color,
+					color = col,
 					paragraphStyle = { alignment = "center" },
 				})
-				glyph_el.frame  = { x = pad_x + border, y = badge_y + border,
-					w = badge.w - 2 * border, h = badge.h - 2 * border }
+				glyph_el.frame  = { x = pad_x, y = badge_y + pad, w = badge.w, h = badge.h - 2 * pad }
 			else
 				frame_el.action = "skip"
 				glyph_el.action = "skip"

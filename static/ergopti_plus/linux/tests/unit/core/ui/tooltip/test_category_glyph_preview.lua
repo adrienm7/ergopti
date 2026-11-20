@@ -5,10 +5,11 @@
 --- DESCRIPTION:
 --- Each preview row shows its category's glyph, so a reader who cannot tell the
 --- tints apart still tells the categories apart (the maintainer's decision of
---- 2026-11-19). The glyph is the row's first cell, at its far left, in a framed
---- badge that ends before the output, so it reads as an annotation and not as
---- typed text (his request of the same day). These cases pin the row, the
---- drawn order and frame, the glyphs switch, and the text AT-SPI reads.
+--- 2026-11-19). The glyph is the row's first cell, at its far left, on a filled
+--- chip that ends before the output, so it reads as an annotation and
+--- not as typed text (his request of the same day; a chip since 2026-11-20).
+--- These cases pin the row, the drawn order and chip, the glyphs switch, and the
+--- text AT-SPI reads.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -37,14 +38,17 @@ local function preview()
 	return P
 end
 
+-- The chip grey of the test style.
+local CHIP_WHITE = 0.667
+
 local CANDIDATES = {
 	{ trigger = "btw", replacement = "by the way", group = "autocorrection", fires = true },
 	{ trigger = "sig", replacement = "Signature", group = "personal", fires = false },
 }
 
 --- A Pango and cairo stand-in that records every text it draws and every
---- rectangle it strokes, in order, with the point it was drawn at. A text is
---- measured as 10 px per character, 12 px high.
+--- rectangle it fills in the chip grey, in order, with where it was drawn. A
+--- text is measured as 10 px per character, 12 px high.
 --- @return table binding, table ops, table layout, table cr
 local function fake_binding()
 	local ops = {}
@@ -67,16 +71,18 @@ local function fake_binding()
 	function cr:arc() end
 	function cr:close_path() end
 	function cr:fill_preserve() end
-	function cr:fill() self.path = nil end
-	function cr:set_line_width(width) self.line_width = width end
-	function cr:rectangle(x, y, w, h) self.path = { x = x, y = y, w = w, h = h } end
-	function cr:stroke()
-		if self.path then
-			ops[#ops + 1] = { kind = "frame", x = self.path.x, y = self.path.y, w = self.path.w,
-				h = self.path.h, width = self.line_width, alpha = self.color[4] }
+	-- A rectangle filled in the chip grey is a chip; the accent bars have the
+	-- category's colour.
+	function cr:fill()
+		local path, c = self.path, self.color
+		if path and path.w and c[1] == CHIP_WHITE and c[2] == CHIP_WHITE and c[3] == CHIP_WHITE then
+			ops[#ops + 1] = { kind = "chip", x = path.x, y = path.y, w = path.w, h = path.h, alpha = c[4] }
 		end
 		self.path = nil
 	end
+	function cr:set_line_width(width) self.line_width = width end
+	function cr:rectangle(x, y, w, h) self.path = { x = x, y = y, w = w, h = h } end
+	function cr:stroke() self.path = nil end
 	function cr:move_to(x, y) self.x, self.y = x, y end
 	function cr:line_to() end
 	local binding = {
@@ -96,8 +102,8 @@ local STYLE = {
 	fonts = { main = "Sans" },
 	sizes = { main = 13, hint = 11 },
 	layout = { label_gap = 8, line_spacing = 2, pad_x = 10, pad_y = 6, llm_max_content_width = 400,
-		corner_radius = 4, glyph_badge_pad_x = 3, glyph_badge_border = 1, glyph_badge_gap = 8 },
-	colors = { canvas_alpha = 1, border_white = 1, border_alpha = 0.13, glyph_badge_white = 0.667 },
+		corner_radius = 4, glyph_badge_pad_x = 3, glyph_badge_pad_y = 1, glyph_badge_gap = 8 },
+	colors = { canvas_alpha = 1, border_white = 1, border_alpha = 0.13, glyph_badge_white = CHIP_WHITE },
 }
 
 --- Measures then paints rows on the recording context.
@@ -150,7 +156,7 @@ helpers.describe("preview: category glyph", function()
 			"switched back on, the glyph returns")
 	end)
 
-	helpers.it("draws the glyph first, framed, before the output; the label alone at the right", function()
+	helpers.it("draws the glyph first, on a chip, before the output; the label alone at the right", function()
 		local rows = preview().build_rows(CANDIDATES, { kind = "autocorrect" })
 		local ops = painted(rows)
 		local first_text = find(ops, function(op) return op.kind == "text" end)
@@ -158,18 +164,18 @@ helpers.describe("preview: category glyph", function()
 		local glyph, output, label = text_op(ops, "✓"), text_op(ops, "by the way"), text_op(ops, "↵")
 		assert(output and label, "the output and the bare trigger label are drawn")
 		assert(glyph.x < output.x, "the glyph is drawn left of the output")
-		local frame = find(ops, function(op)
-			return op.kind == "frame" and op.x <= glyph.x and op.y <= glyph.y
+		local chip = find(ops, function(op)
+			return op.kind == "chip" and op.x <= glyph.x and op.y <= glyph.y
 				and op.x + op.w >= glyph.x + glyph.w and op.y + op.h >= glyph.y + glyph.h
 		end)
-		assert(frame, "a frame rings the glyph")
-		assert(frame.width >= 1, "the frame is visible")
-		assert(frame.x + frame.w < output.x, "the frame ends before the output, with a gap")
+		assert(chip, "a chip lies under the whole glyph")
+		assert(chip.alpha > 0, "the chip is visible")
+		assert(chip.x + chip.w < output.x, "the chip ends before the output, with a gap")
 		assert(label.x > output.x, "the trigger label stays right of the output")
 		local struck_output = text_op(ops, "Signature")
 		helpers.assert_eq(struck_output.x, output.x, "every output starts after the one badge column")
-		local dimmed_frame = find(ops, function(op) return op.kind == "frame" and op ~= frame end)
-		assert(dimmed_frame and dimmed_frame.alpha < frame.alpha, "a dimmed row dims its badge")
+		local dimmed_chip = find(ops, function(op) return op.kind == "chip" and op ~= chip end)
+		assert(dimmed_chip and dimmed_chip.alpha < chip.alpha, "a dimmed row dims its chip")
 	end)
 
 	helpers.it("draws no badge and leaves no gap without a glyph", function()
@@ -178,7 +184,7 @@ helpers.describe("preview: category glyph", function()
 		local rows = P.build_rows(CANDIDATES, { kind = "autocorrect" })
 		P.set_enabled("glyphs", true)
 		local ops = painted(rows)
-		helpers.assert_nil(find(ops, function(op) return op.kind == "frame" end), "no frame is stroked")
+		helpers.assert_nil(find(ops, function(op) return op.kind == "chip" end), "no chip is filled")
 		helpers.assert_eq(text_op(ops, "by the way").x, STYLE.layout.pad_x, "the output keeps the padding")
 	end)
 
