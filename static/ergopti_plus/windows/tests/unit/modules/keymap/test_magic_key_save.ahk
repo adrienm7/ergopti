@@ -64,12 +64,13 @@ _MKS_HotkeysCase() {
 }
 Test("magic key save: Windows binds every shortcut chord but AltGr (magic-key-save)", _MKS_HotkeysCase)
 
+; Read by symbol, not by path: the registration and its emitter are found
+; wherever layout.ahk moves.
 _MKS_RegistrationCase() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Code := _StripFullLineComments(FileRead(WindowsDir . "\modules\keymap\layout.ahk", "UTF-8"))
+	Code := _DriverFuncBody("_MagicKeySaveRegister")
 	Assert(InStr(Code, 'MagicEditorRecordLayoutFallback(Scan, _MagicKeySaveEmit.Bind("", Save["send"]), _RemapWinCriterion(Scan))') > 0,
 		"Win+★ joins the Win broker as the key's layout fallback, behind the magic editor and the Win slots")
-	Assert(InStr(Code, 'KeyboardShortcutRunLayoutChord(Variant)') > 0,
+	Assert(InStr(_DriverFuncBody("_MagicKeySaveEmit"), 'KeyboardShortcutRunLayoutChord(Variant)') > 0,
 		"a keyboard slot set on the chord keeps it")
 	Assert(InStr(Code, 'Hotkey(Save["hotkey"], _MagicKeySaveEmit.Bind(Variant, Save["send"]), "I3")') > 0,
 		"the other chords take InputLevel 3, which repeats with the key")
