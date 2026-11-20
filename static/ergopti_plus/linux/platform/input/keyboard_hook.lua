@@ -2858,7 +2858,7 @@ local function _dispatch_pointer(ev, slot)
 	end
 	local pointer_key = ev.type == EVDEV_TYPE_KEY and (InputEvent.is_pointer_button(ev.code)
 		or ev.code >= 0x140 and ev.code <= 0x14f) -- BTN_DIGI contacts and tools
-	local press_reported = false
+	local press_reported, contact_reported = false, false
 	if ev.type == EVDEV_TYPE_KEY and ev.code >= 1 and not pointer_key then
 		-- A mouse may also expose keyboard/media keys on the same node. Those
 		-- keys reach the desktop and count as activity for a held tap-hold.
@@ -2887,6 +2887,14 @@ local function _dispatch_pointer(ev, slot)
 			if not _running or _capture_session ~= session then return end
 			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)
 			press_reported = true
+		end
+		-- So is a finger's landing: the tap it may become is counted in the
+		-- field its touch began in (tap-click-touch-context), the field the
+		-- click callback is about to withdraw.
+		if ev.value == InputEvent.VALUE_DOWN and _on_pointer_event and not InputEvent.is_pointer_button(ev.code) then
+			if not _running or _capture_session ~= session then return end
+			_call_callback("pointer event callback", _on_pointer_event, "contact", ev.code, ev.value, slot)
+			contact_reported = true
 		end
 		if ev.value == InputEvent.VALUE_DOWN and _on_click then
 			if not _running or _capture_session ~= session then return end
@@ -2923,7 +2931,7 @@ local function _dispatch_pointer(ev, slot)
 				_call_callback("pointer event callback", _on_pointer_event, "absolute_motion", ev.code, ev.value, slot)
 			end
 		elseif pointer_key then
-			if not InputEvent.is_pointer_button(ev.code) and ev.value ~= InputEvent.VALUE_REPEAT then
+			if not InputEvent.is_pointer_button(ev.code) and ev.value ~= InputEvent.VALUE_REPEAT and not contact_reported then
 				-- A finger landing or lifting (BTN_TOUCH, BTN_TOOL_*), both edges.
 				_call_callback("pointer event callback", _on_pointer_event, "contact", ev.code, ev.value, slot)
 				if not _running or _capture_session ~= session then return end

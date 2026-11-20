@@ -2634,7 +2634,9 @@ local function main()
 		-- PRIMARY's baseline belongs to the pre-navigation selection. Its reader
 		-- checks fresh privacy first; actual wrapping remains gated after settle.
 		wrap_on_type.on_pointer_down()
-		secure_focus_guard.invalidate()
+		-- The press's own withdrawal: a touch's tap is still counted in the
+		-- field it began in (tap-click-touch-context).
+		keystats.withdraw_for_pointer(secure_focus_guard.invalidate)
 		-- A click may clear or move the selection a tone step would replace.
 		if prediction_engine then prediction_engine.drop_tone("pointer click") end
 		-- The guard above emptied the buffer at an unknown position. With

@@ -448,7 +448,9 @@ end
 --- Replays evdev events as the keyboard hook reports them to its observer:
 --- a contact per EV_ABS report and per BTN_DIGI edge, a press per key down,
 --- a frame with the kernel stamp per SYN_REPORT. EV_MSC is not forwarded.
---- @param observe function (kind, code, value, source, at_us) -> delta|nil
+--- A contact carries the tracker's privacy context; keystats.record_pointer
+--- takes no sixth argument and computes its own.
+--- @param observe function (kind, code, value, source, at_us, context) -> delta|nil
 --- @param events table
 --- @param source string
 --- @return integer clicks The clicks the deltas add up to.
@@ -457,9 +459,11 @@ local function replay_as_hook(observe, events, source)
 	local function add(delta) if delta then clicks = clicks + delta.clicks end end
 	for _, event in ipairs(events) do
 		if event.type == InputEvent.EV_ABS then
-			add(observe("contact", event.code, event.value, source))
+			add(observe("contact", event.code, event.value, source, nil, "fixture-context"))
 		elseif event.type == InputEvent.EV_KEY then
-			if not InputEvent.is_pointer_button(event.code) then add(observe("contact", event.code, event.value, source)) end
+			if not InputEvent.is_pointer_button(event.code) then
+				add(observe("contact", event.code, event.value, source, nil, "fixture-context"))
+			end
 			if event.value == 1 then add(observe("press", event.code, event.value, source)) end
 		elseif event.type == InputEvent.EV_SYN and event.code == InputEvent.SYN_REPORT then
 			add(observe("frame", event.code, event.value, source, event.timestamp_us))
@@ -587,5 +591,192 @@ helpers.describe("pointer metrics: touchpad tap-to-click", function()
 		end)
 		helpers.assert_eq(#rows, 1)
 		helpers.assert_eq(rows[1].mouse_clicks, 6)
+	end)
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= Touchpad clicks and the field's privacy verdict =========
+-- =================================================================
+-- =================================================================
+
+local EDITOR = "org.gnome.TextEditor"
+
+-- The focus guard reads a field again once the pointer has been still for its
+-- settle delay; the trace's sections are farther apart than this.
+local SETTLE_US = 300000
+
+--- Replays the trace as the daemon sees it: the hook reports a landing or a
+--- button press, then runs the click callback, whose guard invalidation is
+--- the press's own withdrawal (ergopti_hotstrings on_click). Before the first
+--- event after a still pointer, read_field(event) gives the field's verdict,
+--- as the guard's refresh does.
+--- @param keystats table
+--- @param events table
+--- @param read_field function (event) -> "admitted" or "secure".
+--- @param during function|nil (keystats, event) called after each event.
+local function replay_with_withdrawals(keystats, events, read_field, during)
+	local function withdraw() keystats.withdraw_for_pointer(function() keystats.set_secure_field(true) end) end
+	local last_frame_us = nil
+	for _, event in ipairs(events) do
+		if not last_frame_us or event.timestamp_us - last_frame_us > SETTLE_US then
+			-- One read, before the frame's first report; the rest are the same touch.
+			last_frame_us = event.timestamp_us
+			if read_field(event) == "admitted" then
+				keystats.set_secure_field(false)
+				keystats.on_app_focus(EDITOR, math.floor(event.timestamp_us / 1000))
+			else
+				keystats.set_secure_field(true)
+			end
+		end
+		if event.type == InputEvent.EV_ABS then
+			keystats.record_pointer("contact", event.code, event.value, PAD)
+		elseif event.type == InputEvent.EV_KEY and event.value ~= 2 then
+			local button = InputEvent.is_pointer_button(event.code)
+			if event.value == 1 and button then keystats.record_pointer("press", event.code, 1, PAD) end
+			if not button then keystats.record_pointer("contact", event.code, event.value, PAD) end
+			if event.value == 1 then withdraw() end
+			if event.value == 1 and not button then keystats.record_pointer("press", event.code, 1, PAD) end
+		elseif event.type == InputEvent.EV_SYN and event.code == InputEvent.SYN_REPORT then
+			keystats.record_pointer("frame", event.code, event.value, PAD, event.timestamp_us)
+			last_frame_us = event.timestamp_us
+		end
+		if during then during(keystats, event) end
+	end
+end
+
+--- Tap A alone: its touch's first frame, then the frame that makes it a click.
+local function tap_a()
+	local events = {}
+	for _, event in ipairs(tap_trace().events) do
+		if event.timestamp_us < 1700000 then events[#events + 1] = event end
+	end
+	return events
+end
+
+--- Records a replay with the fixture pad bound and the editor focused.
+--- @param read_field function See replay_with_withdrawals.
+--- @param options table|nil { events, during, prepare(keystats) }
+local function recorded_with_withdrawals(read_field, options)
+	options = options or {}
+	return recorded(function(keystats)
+		keystats.bind_touchpads(function()
+			return { path = "/dev/input/event7", name = "pad", units_x = 12, units_y = 12 }
+		end, function() return LRM_ON end, function() return 0 end)
+		if options.prepare then options.prepare(keystats) end
+		keystats.on_app_focus(EDITOR, 1000)
+		replay_with_withdrawals(keystats, options.events or tap_trace().events, read_field, options.during)
+	end)
+end
+
+local function admitted() return "admitted" end
+
+--- Calls change(keystats) once, after the first frame of the replayed touch.
+local function after_first_frame(change)
+	local frames = 0
+	return function(keystats, event)
+		if event.type == InputEvent.EV_SYN then
+			frames = frames + 1
+			if frames == 1 then change(keystats) end
+		end
+	end
+end
+
+helpers.describe("pointer metrics: a touch's clicks and the field's verdict", function()
+	-- Before, a tap was counted on the frame ending it, after its own landing
+	-- had withdrawn the field: until the guard read the field again, every tap
+	-- and every clickpad press met an unknown field and the clicks stayed 0.
+	helpers.it("(tap-click-touch-context) counts a tap and a clickpad press in the field the touch began in", function()
+		local rows = recorded_with_withdrawals(admitted)
+		-- A, B (right), F's tap, G's first tap and H's press. G's second tap
+		-- lands 117 ms after the first withdrew the field, before any read, as
+		-- a double-click's second press does.
+		helpers.assert_eq(#rows, 1)
+		helpers.assert_eq(rows[1].app, EDITOR)
+		helpers.assert_eq(rows[1].mouse_clicks, 5)
+	end)
+
+	helpers.it("(tap-click-touch-context) never records a click of a touch begun in a secure field", function()
+		helpers.assert_eq(#recorded_with_withdrawals(function() return "secure" end), 0,
+			"no tap and no clickpad press of a secure field is recorded")
+		local rows = recorded_with_withdrawals(function(event)
+			return (event.timestamp_us >= 1700000 and event.timestamp_us < 2600000) and "secure" or "admitted"
+		end)
+		helpers.assert_eq(rows[1].mouse_clicks, 4, "B, begun in a secure field, is not counted")
+	end)
+
+	helpers.it("(tap-click-touch-context) a verdict read during the touch ends the context it began in", function()
+		-- A password field focused from the keyboard while the finger is down.
+		local rows = recorded_with_withdrawals(admitted, { events = tap_a(),
+			during = after_first_frame(function(keystats) keystats.set_secure_field(true) end) })
+		helpers.assert_eq(#rows, 0, "the tap meets the secure verdict, not its touch's first one")
+	end)
+
+	helpers.it("(tap-click-touch-context) the focus worker's answer to the landing keeps the touch's context", function()
+		local rows = recorded_with_withdrawals(admitted, { events = tap_a(),
+			during = after_first_frame(function(keystats) keystats.set_secure_field(true, false) end) })
+		helpers.assert_eq(#rows, 1, "a withdrawal that reads nothing is the landing's own")
+		helpers.assert_eq(rows[1].mouse_clicks, 1)
+		rows = recorded_with_withdrawals(admitted, { events = tap_a(),
+			during = after_first_frame(function(keystats) keystats.set_secure_field(true, true) end) })
+		helpers.assert_eq(#rows, 0, "a password role read during the touch ends its context")
+	end)
+
+	helpers.it("(tap-click-touch-context) a field admitted again during the touch counts the tap there", function()
+		local rows = recorded_with_withdrawals(admitted, { events = tap_a(),
+			during = after_first_frame(function(keystats)
+				keystats.set_secure_field(false)
+				keystats.on_app_focus("org.gnome.Nautilus", 2000)
+			end) })
+		helpers.assert_eq(#rows, 1)
+		helpers.assert_eq(rows[1].app, "org.gnome.Nautilus", "the fresh verdict is the one the click meets")
+		helpers.assert_eq(rows[1].mouse_clicks, 1)
+	end)
+
+	helpers.it("(tap-click-touch-context) a pause, a private window or an exclusion before the tap ends drops it", function()
+		local Preferences = require("tests.support.metrics_preferences_fixture")
+		local changes = {
+			pause = function(keystats) keystats.suppress() end,
+			private = function(keystats) keystats.set_private_window(true) end,
+			excluded = function(keystats)
+				Preferences.with(function() helpers.assert_true(keystats.set_disabled_apps({ EDITOR })) end)
+			end,
+		}
+		for name, change in pairs(changes) do
+			local rows = recorded_with_withdrawals(admitted, { events = tap_a(), during = after_first_frame(change),
+				prepare = function(keystats)
+					Preferences.with(function() helpers.assert_true(keystats.set_private_filter_enabled(true)) end)
+				end })
+			helpers.assert_eq(#rows, 0, name .. " ends the tap's context")
+		end
+	end)
+
+	helpers.it("(tap-click-touch-context) a withdrawal that fails is no withdrawal a touch may cross", function()
+		local rows = recorded_with_withdrawals(admitted, { events = tap_a(),
+			during = after_first_frame(function(keystats)
+				helpers.assert_eq(pcall(keystats.withdraw_for_pointer, function() error("controlled failure") end), false,
+					"the failure is raised, not swallowed")
+			end) })
+		helpers.assert_eq(#rows, 0)
+	end)
+
+	helpers.it("(tap-click-touch-context) the tracker returns the context of the touch's first contact report", function()
+		local tracker = pad_tracker(LRM_ON)
+		local contexts, touch = {}, 0
+		for _, event in ipairs(tap_a()) do
+			local delta
+			if event.type == InputEvent.EV_ABS or event.type == InputEvent.EV_KEY then
+				touch = touch + 1
+				delta = tracker.observe("contact", event.code, event.value, PAD, nil, "report " .. touch)
+			elseif event.type == InputEvent.EV_SYN and event.code == InputEvent.SYN_REPORT then
+				delta = tracker.observe("frame", event.code, 0, PAD, event.timestamp_us)
+			end
+			if delta and delta.clicks > 0 then contexts[#contexts + 1] = delta.touch_context end
+		end
+		helpers.assert_eq(contexts, { "report 1" }, "one tap, in the context of its first report")
+		helpers.assert_eq(pcall(tracker.observe, "contact", 0x39, 1, PAD), false, "a contact names its context")
 	end)
 end)

@@ -13,6 +13,11 @@
 --- 2. refresh() never re-enables them before the focus-settle deadline.
 --- 3. Only a conclusive verdict for the current epoch can leave unknown state.
 --- 4. Missing detectors and failed probes remain fail-closed.
+--- 5. Every verdict read from a field reaches keystats.set_secure_field with
+---    read = true, a password role included, so the context a touch began in
+---    never outlives it (tap-click-touch-context); a withdrawal that carries
+---    no news of the field, the focus worker's answer to an invalidation,
+---    passes read = false.
 --- ==============================================================================
 
 local M = {}
@@ -115,13 +120,15 @@ function M.new(opts)
 	-- A native field receipt contains no application or private-window policy.
 	-- Its listener can revoke old authority, but must never query or recursively
 	-- pump native sources while another barrier is delivering that notification.
-	local function revoke_context()
+	--- @param answer boolean|nil True for the focus worker's answer to a
+	--- refresh, which withdraws without reading the field (INVARIANTS 5).
+	local function revoke_context(answer)
 		context_generation = context_generation + 1
 		retry_not_before_ms = nil
 		if asynchronous then retire_context(); joining_context, joining_identity = false, nil end
 		context_pending, observed, joined_context, joined_field = true, nil, nil, nil
 		if detector and type(detector.invalidateFocus) == "function" then detector.invalidateFocus() end
-		keystats.set_secure_field(true)
+		if answer == true then keystats.set_secure_field(true, false) else keystats.set_secure_field(true) end
 		if prediction and type(prediction.cancel) == "function" then pcall(prediction.cancel) end
 		reset_text()
 	end
@@ -189,7 +196,7 @@ function M.new(opts)
 			joined_context = { app_id = context.app_id, title = context.title, native_identity = context.native_identity }
 			joined_field = { bus = request.before.bus, path = request.before.path, role = request.before.role,
 				generation = request.generation, epoch = request.epoch }
-			keystats.set_secure_field(request.before.role == 40 or protected)
+			keystats.set_secure_field(request.before.role == 40 or protected, true)
 			return true
 		end
 		if not context_pending and pending_epoch == nil then return false end
@@ -197,6 +204,8 @@ function M.new(opts)
 			and (retry_not_before_ms == nil or options.now_ms() < retry_not_before_ms) then return false end
 		if pending_epoch ~= nil and immediate ~= true and options.now_ms() < probe_not_before_ms then return false end
 		local before = watch.barrier()
+		-- A password field is a verdict read, though it stays unknown here.
+		if before and before.role == 40 then keystats.set_secure_field(true, true) end
 		if not before or before.role == 40 then return false end
 		if attempted_generation == context_generation then context_generation = context_generation + 1 end
 		local generation = context_generation
@@ -241,7 +250,7 @@ function M.new(opts)
 		if not snapshot or not detector or type(detector.publishFocus) ~= "function" then return false end
 		local ok, accepted = pcall(detector.publishFocus, snapshot.role, epoch)
 		if not ok or accepted ~= true then return false end
-		keystats.set_secure_field(snapshot.role == 40)
+		keystats.set_secure_field(snapshot.role == 40, true)
 		return true
 	end
 	if watch then
@@ -250,7 +259,10 @@ function M.new(opts)
 			if not contextual then return accept_watch(snapshot) end
 			local previous_notifying = notifying_context
 			notifying_context = true
-			if identity(snapshot) ~= (joining_context and joining_identity or observed) or snapshot == nil then revoke_context() end
+			if snapshot and snapshot.role == 40 then keystats.set_secure_field(true, true) end
+			if identity(snapshot) ~= (joining_context and joining_identity or observed) or snapshot == nil then
+				revoke_context(true)
+			end
 			notifying_context = previous_notifying
 			return false
 		end)
@@ -294,7 +306,7 @@ function M.new(opts)
 		joined_context = { app_id = context.app_id, title = context.title, native_identity = context.native_identity }
 		joined_field = { bus = before.bus, path = before.path, role = before.role, generation = generation, epoch = epoch }
 		-- The publisher has already installed the incoming app/title policy.
-		keystats.set_secure_field(before.role == 40 or protected)
+		keystats.set_secure_field(before.role == 40 or protected, true)
 		return true
 	end
 
@@ -344,7 +356,7 @@ function M.new(opts)
 			pending_epoch = nil
 			return false
 		end
-		keystats.set_secure_field(secure)
+		keystats.set_secure_field(secure, true)
 		pending_epoch = nil
 		return true
 	end
@@ -381,7 +393,7 @@ function M.new(opts)
 				local epoch = detector and type(detector.currentEpoch) == "function" and detector.currentEpoch() or nil
 				local published, accepted = pcall(function() return detector.publishFocus(snapshot.role, epoch, protected) end)
 				if not published or accepted ~= true then revoke_context(); return true end
-				keystats.set_secure_field(snapshot.role == 40 or protected)
+				keystats.set_secure_field(snapshot.role == 40 or protected, true)
 			elseif not accept_watch(snapshot) then return true end
 		end
 		if not detector or type(detector.isSecureField) ~= "function" then return true end

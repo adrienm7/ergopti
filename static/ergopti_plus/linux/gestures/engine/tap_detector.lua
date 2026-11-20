@@ -98,7 +98,7 @@ end
 
 --- Creates a detector for one touchpad.
 --- @param opts table { units_x, units_y } device units per millimetre.
---- @return table detector { feed(event) -> fingers|nil, is_touchpad(), reset() }
+--- @return table detector { feed(event) -> fingers|nil, touching(), is_touchpad(), reset() }
 function M.new(opts)
 	assert(type(opts) == "table", "a tap detector needs the pad's scale")
 	local units_x, units_y = tonumber(opts.units_x), tonumber(opts.units_y)
@@ -225,6 +225,13 @@ function M.new(opts)
 			return close_frame(stamp / 1000)
 		end
 		return nil
+	end
+
+	--- Whether a touch is in progress: a closed frame left a finger down, or
+	--- the touch it ended is not yet released.
+	--- @return boolean
+	function detector.touching()
+		return touch ~= nil
 	end
 
 	--- Whether this source has shown itself a touchpad.

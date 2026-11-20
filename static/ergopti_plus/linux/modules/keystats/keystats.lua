@@ -385,14 +385,18 @@ local function exclusion_set(list)
 	return set
 end
 
--- Whether the focused window is a private/incognito browser session. Set from
+-- The focused window's privacy verdicts, one table: the main chunk is at
+-- LuaJIT's 200-local limit.
+-- private_window: whether it is a private/incognito browser session. Set from
 -- the focus-change callback, never computed on the keystroke path.
-local _private_window = false
-
--- Whether the AT-SPI adapter reported a secure field on the focused window.
+-- secure_field: whether the AT-SPI adapter reported a secure field on it.
 -- Also set from the focus-change callback: the probe spawns a subprocess and
 -- has no business running once per keystroke.
-local _secure_field = false
+-- epoch: moved by every verdict a touch's context must not outlive
+-- (record_pointer, set_secure_field), but a pointer press's own withdrawal,
+-- made while withdrawing is set (withdraw_for_pointer), and the focus
+-- worker's answer to it.
+local _verdict = { private_window = false, secure_field = false, epoch = 0, withdrawing = false }
 
 -- Password managers and credential UIs: the Linux fragments of the shared list
 -- (_shared/data/secure_apps.json), the one macOS and Windows read, matched as
@@ -443,14 +447,19 @@ local _storage_blocked = false
 
 --- The single decision point for "may this keystroke be recorded?".
 --- Every recording entry point asks this and nothing else, so a new filter is
---- added in one place and cannot be forgotten on one of the five paths.
+--- added in one place and cannot be forgotten on one of the five paths. A
+--- touch's clicks ask it when the touch begins, then with collection_only
+--- when they are made (record_pointer).
+--- @param collection_only boolean|nil Consent, storage and pauses only, not
+--- the focused field and window, whose verdicts the touch's context carries.
 --- @return boolean
-local function may_record()
+local function may_record(collection_only)
 	if _flush_stopping or _storage_blocked then return false end
 	if not _enabled then return false end
 	if _suppressed or _pause.user or _pause.script then return false end
-	if _secure_filter_enabled and _secure_field then return false end
-	if _private_filter_enabled and _private_window then return false end
+	if collection_only == true then return true end
+	if _secure_filter_enabled and _verdict.secure_field then return false end
+	if _private_filter_enabled and _verdict.private_window then return false end
 	return true
 end
 
@@ -1580,28 +1589,76 @@ end
 --- @param source any|nil Pointer device identity.
 --- @param at_us number|nil Kernel time of a frame, in microseconds.
 function M.record_pointer(kind, code, value, source, at_us)
-	if not may_record() or M.is_unrecorded_app(_focused_app_id) then
+	local admitted = may_record() and not M.is_unrecorded_app(_focused_app_id)
+	-- A touch carries the context it lands in: its landing runs the click
+	-- callback, which withdraws the field's verdict, and the tap-to-click it
+	-- becomes ends on a later frame, as a clickpad press follows the landing.
+	-- A mouse press is counted before that withdrawal
+	-- (pointer-press-before-click); a touch's clicks are counted where it
+	-- began (tap-click-touch-context), while no other verdict has been
+	-- delivered since. false is a context in which nothing is recorded.
+	local context = false
+	if admitted and type(_focused_app_id) == "string" then
+		context = { app = _focused_app_id, epoch = _verdict.epoch }
+	end
+	local delta
+	if not admitted then
 		_pointer.discard_frames()
 		_pointer.forget_position()
 		-- Keep device lifecycle, queue-loss and touch state in sync while
-		-- collection is off; what they would add is not recorded.
-		if kind == "reset" or kind == "dropped" or kind == "frame" or kind == "contact" then
-			_pointer.observe(kind, code, value, source, at_us)
+		-- collection is off; only the clicks of a touch begun admitted remain.
+		if kind == "reset" or kind == "dropped" or kind == "frame" or kind == "contact" or kind == "press" then
+			delta = _pointer.observe(kind, code, value, source, at_us, context)
 		end
-		return
+		if not (delta and delta.touch_context) then return end
+	else
+		delta = _pointer.observe(kind, code, value, source, at_us, context)
+		if not delta then return end
 	end
-	local delta = _pointer.observe(kind, code, value, source, at_us)
-	if not delta then return end
+	local clicks, touch_clicks = delta.clicks, 0
+	local began = delta.touch_context
+	if began ~= nil then
+		clicks = 0
+		if began and began.epoch == _verdict.epoch and may_record(true) and not M.is_unrecorded_app(began.app) then
+			touch_clicks = delta.clicks
+		elseif admitted then
+			-- A verdict read since the touch began is the one the click meets.
+			clicks = delta.clicks
+		end
+	end
+	if touch_clicks == 0 and not admitted then return end
 	local clock = capture_input_clock()
 	queue_session_events(forward_session(clock, "input", clock.mono_ms, false), clock)
+	local function credit(app_id, added_clicks, scrolls, distance)
+		local pending = ensure_pending(app_id, clock)
+		local mouse = pending.mouse or { clicks = 0, scrolls = 0, distance = 0 }
+		mouse.clicks = mouse.clicks + added_clicks
+		mouse.scrolls = mouse.scrolls + scrolls
+		mouse.distance = mouse.distance + distance
+		pending.mouse = mouse
+	end
+	if touch_clicks > 0 then credit(began.app, touch_clicks, 0, 0) end
 	local app_id = _focused_app_id
-	if type(app_id) ~= "string" or M.is_unrecorded_app(app_id) then return end
-	local pending = ensure_pending(app_id, clock)
-	local mouse = pending.mouse or { clicks = 0, scrolls = 0, distance = 0 }
-	mouse.clicks = mouse.clicks + delta.clicks
-	mouse.scrolls = mouse.scrolls + delta.scrolls
-	mouse.distance = mouse.distance + delta.distance
-	pending.mouse = mouse
+	if not admitted or type(app_id) ~= "string" or M.is_unrecorded_app(app_id) then return end
+	if clicks > 0 or delta.scrolls > 0 or delta.distance > 0 then credit(app_id, clicks, delta.scrolls, delta.distance) end
+end
+
+--- Runs a pointer press's withdrawal of the focused field's verdict, the
+--- click callback's. A touch keeps the context it began in through it, as
+--- its clicks are counted there; every other verdict, delivered or
+--- withdrawn, ends that context (record_pointer).
+--- @param withdraw function The withdrawal.
+function M.withdraw_for_pointer(withdraw)
+	assert(type(withdraw) == "function", "a pointer withdrawal is a function")
+	assert(not _verdict.withdrawing, "a pointer withdrawal does not nest")
+	_verdict.withdrawing = true
+	local ok, failure = pcall(withdraw)
+	_verdict.withdrawing = false
+	if not ok then
+		-- Whatever it left half done is no withdrawal a touch may cross.
+		_verdict.epoch = _verdict.epoch + 1
+		error(failure, 0)
+	end
 end
 
 -- The events_llm kinds, with the fields each may carry. The table's CHECK constraint
@@ -2417,23 +2474,30 @@ end
 --- Records whether the focused window is a private/incognito browser session.
 --- @param is_private boolean
 function M.set_private_window(is_private)
-	_private_window = (is_private == true)
+	_verdict.private_window = (is_private == true)
+	_verdict.epoch = _verdict.epoch + 1
 	settle_capture_policy()
-	Logger.debug(LOG, "Private browsing window: %s.", tostring(_private_window))
+	Logger.debug(LOG, "Private browsing window: %s.", tostring(_verdict.private_window))
 end
 
 --- Records the AT-SPI adapter's secure-field verdict for the focused window.
 --- Consulted IN ADDITION to the app-name list, never instead of it.
 --- @param is_secure boolean
-function M.set_secure_field(is_secure)
-	local was = _secure_field
-	_secure_field = (is_secure == true)
+--- @param read boolean|nil true for a verdict read from the field, a password
+--- role included; false for a withdrawal that carries no news of the field
+--- (focus_guard INVARIANTS 5); nil for any other withdrawal. A read, and a
+--- withdrawal made outside a pointer press's own, end the context a touch
+--- began in (record_pointer).
+function M.set_secure_field(is_secure, read)
+	local was = _verdict.secure_field
+	_verdict.secure_field = (is_secure == true)
+	if read == true or (read == nil and not _verdict.withdrawing) then _verdict.epoch = _verdict.epoch + 1 end
 	settle_capture_policy()
 	-- Logged on a change, one sentence per state: the logger folds repeats of
 	-- one format, so a single « %s » line hid every admission behind the
 	-- withdrawals around it (run_pointer_metrics_live.lua waits on these).
-	if _secure_field == was then return end
-	if _secure_field then
+	if _verdict.secure_field == was then return end
+	if _verdict.secure_field then
 		Logger.debug(LOG, "Focused field unknown or secure: metrics paused.")
 	else
 		Logger.debug(LOG, "Focused field admitted: metrics recorded.")
@@ -2461,6 +2525,7 @@ function M.set_private_filter_enabled(enabled)
 		return false
 	end
 	_private_filter_enabled = wanted
+	_verdict.epoch = _verdict.epoch + 1
 	settle_capture_policy()
 	Logger.debug(LOG, "Private-browsing filter: %s.", tostring(_private_filter_enabled))
 	return true
@@ -2511,6 +2576,7 @@ function M.set_secure_filter_enabled(enabled)
 		return false
 	end
 	_secure_filter_enabled = wanted
+	_verdict.epoch = _verdict.epoch + 1
 	settle_capture_policy()
 	Logger.debug(LOG, "Secure-field filter: %s.", tostring(_secure_filter_enabled))
 	return true
@@ -2727,8 +2793,8 @@ function M.get_privacy_state()
 		secure_filter_enabled      = _secure_filter_enabled,
 		system_auth_filter_enabled = _system_auth_filter_enabled,
 		encrypt                    = _encrypt_enabled,
-		private_window             = _private_window,
-		secure_field               = _secure_field,
+		private_window             = _verdict.private_window,
+		secure_field               = _verdict.secure_field,
 		suppressed                 = _suppressed,
 		suspended                  = _pause.user,
 	}

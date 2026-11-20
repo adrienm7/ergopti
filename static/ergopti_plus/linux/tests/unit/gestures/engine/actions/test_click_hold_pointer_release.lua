@@ -27,7 +27,7 @@ local function compile(released)
 	local environment = setmetatable({
 		gestures = { release_clicks_on_activity = function() released.count = released.count + 1; return true end },
 		InputEvent = InputEvent,
-		keystats = { discard_roi = noop },
+		keystats = { discard_roi = noop, withdraw_for_pointer = function(withdraw) withdraw() end },
 		TapHold = { observe_copy_activity = noop },
 		wrap_on_type = { on_pointer_down = noop },
 		secure_focus_guard = { invalidate = noop },

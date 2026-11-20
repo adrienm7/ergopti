@@ -399,7 +399,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
         "control keys must reset text and its aligned timing history")
       helpers.assert_true(control_body:find("engine:reset(false)", 1, true) ~= nil,
         "the undo restore must reset text at an unknown word start")
-      helpers.assert_true(click_body:find("secure_focus_guard.invalidate()", 1, true) ~= nil,
+      helpers.assert_true(click_body:find("keystats.withdraw_for_pointer(secure_focus_guard.invalidate)", 1, true) ~= nil,
         "pointer clicks must cross the text buffer and privacy state together")
       helpers.assert_true(focus_body:find("secure_focus_guard.prime()", 1, true) ~= nil,
         "top-level focus changes must publish a fresh control-level privacy epoch")
@@ -416,7 +416,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local src = fh:read("*a"); fh:close()
       local click_start = assert(src:find("local function on_click(code)", 1, true))
       local click_end = assert(src:find("\n\tend\n", click_start, true))
-      helpers.assert_true(src:sub(click_start, click_end):find("secure_focus_guard.invalidate()", 1, true) ~= nil,
+      helpers.assert_true(src:sub(click_start, click_end):find("keystats.withdraw_for_pointer(secure_focus_guard.invalidate)", 1, true) ~= nil,
         "a pointer press must invalidate the privacy verdict")
       helpers.assert_true(src:find("onClick = on_click,", click_end, true) ~= nil,
         "the keyboard hook must report pointer presses to on_click")

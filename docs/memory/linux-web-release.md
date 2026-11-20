@@ -162,6 +162,20 @@ must bring the keyboard stream and the hwdb quirks to the detector. The
 setting is read off the input path (the tick, every 5 s while the pad is in
 use) except once at a pad's first tap.
 
+A touch's landing runs the click callback, which withdraws the field's privacy
+verdict, so a tap (counted on the frame that ends it) and a clickpad press
+(which follows the landing) would always meet an unknown field. The hook
+reports a landing before that callback, each contact carries keystats'
+privacy context, and the clicks of a touch are counted in the context its
+first report named, while the epoch keystats moves on every verdict is
+unchanged; otherwise in the current verdict. The epoch moves on each field
+read (`set_secure_field(value, true)`, a password role included), on a private
+window and on any withdrawal but a pointer press's own
+(`keystats.withdraw_for_pointer`, the daemon's `on_click`) and the focus
+worker's answer to it (`read = false`), which reads nothing. A new path that
+reads the field must pass `read = true`, or a touch's click can outlive a
+password verdict.
+
 ### project-linux-a-field-must-be-named-at-every-boundary
 
 Linux input records cross evdev, resolver, injector, and Lua boundaries. Preserve

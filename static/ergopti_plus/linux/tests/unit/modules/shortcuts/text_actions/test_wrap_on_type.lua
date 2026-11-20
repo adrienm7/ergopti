@@ -775,6 +775,7 @@ local function with_daemon_wrap(body, options)
 			ScriptActions = require("modules.shortcuts.script_actions"), InputCaptureGate = require("platform.input.capture_gate"),
 			keystats = { cancel_hold_intervals = noop, set_private_window = noop, end_typing_burst = noop,
 				discard_roi = function() state.roi_discards = state.roi_discards + 1 end,
+				withdraw_for_pointer = function(withdraw) withdraw() end,
 				is_private_window = function() return false end, set_window_title = noop, on_app_focus = noop,
 				observe_hold_focus = function()
 					if state.on_focus_observe then state.on_focus_observe() end

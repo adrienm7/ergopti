@@ -17,6 +17,12 @@
 ---    rules, and a tap whose button is left or right counts as one click,
 ---    only while the desktop has tap-to-click on (tap_to_click_setting). An
 ---    unreadable setting counts no tap and availability says why.
+---    A tap, and a clickpad press made during a touch, are returned with the
+---    privacy context their touch began in, which the caller hands over with
+---    each contact report: the touch's landing runs the click callback, which
+---    withdraws the focused field's verdict, and the tap ends on a later
+---    frame, before that field is read again. A mouse button press is counted
+---    before the same withdrawal. What a context admits is the caller's call.
 --- 2. A wheel turn is one REL_WHEEL or REL_HWHEEL report. The high-resolution
 ---    axes repeat the same turn in finer units and would count it twice.
 --- 3. Distance is in screen pixels, the unit Windows (cursor positions) and
@@ -182,10 +188,15 @@ function M.new()
 	--- @param key any The source.
 	--- @param event table A decoded evdev event.
 	--- @param create boolean|nil True when the report may make the source a pad.
+	--- @param context any|nil A contact's privacy context (tracker.observe).
 	--- @return integer|nil clicks 1 when the report completed a counted tap.
-	local function feed_pad(key, event, create)
+	--- @return any context The context the counted tap's touch began in.
+	local function feed_pad(key, event, create, context)
 		local pad = pad_of(key, create == true)
 		if not pad or not pad.detector then return nil end
+		-- The first report of a touch names its context; every later one
+		-- belongs to the same touch until a frame leaves the pad untouched.
+		if create == true and pad.touch_context == nil then pad.touch_context = context end
 		if event.type == InputEvent.EV_SYN and event.code == InputEvent.SYN_REPORT
 			and not (type(event.timestamp_us) == "number" and event.timestamp_us > 0) then
 			-- A tap is a matter of milliseconds: without the kernel's stamp the
@@ -196,13 +207,16 @@ function M.new()
 		end
 		local fingers = pad.detector.feed(event)
 		if pad.detector.is_touchpad() and event.type ~= InputEvent.EV_SYN then pad.active_at = touch.clock() end
+		local began_in = pad.touch_context
+		if event.type == InputEvent.EV_SYN and not pad.detector.touching() then pad.touch_context = nil end
 		if not fingers then return nil end
+		assert(began_in ~= nil, "a tap is a touch, and its touch began with a contact report")
 		-- The first tap of a pad pays its first read; later ones use the tick's.
 		if not pad.setting then read_setting(pad) end
 		local setting = pad.setting
 		if not setting.known or not setting.enabled then return nil end
 		if not TAP_CLICK_BUTTONS[TapDetector.button_for(fingers, setting.map)] then return nil end
-		return 1
+		return 1, began_in
 	end
 
 	--- Whether the distance is measured, and in which unit.
@@ -291,26 +305,39 @@ function M.new()
 	--- @param value integer evdev value of the report.
 	--- @param source any|nil Identity of the pointer producing this frame.
 	--- @param at_us number|nil Kernel time of a frame, in microseconds.
-	--- @return table|nil delta { clicks, scrolls, distance } or nil when it adds nothing.
-	function tracker.observe(kind, code, value, source, at_us)
+	--- @param context any|nil Required with a contact: the caller's privacy
+	--- context when it was reported (any value but nil), returned untouched
+	--- as the touch_context of the clicks its touch makes.
+	--- @return table|nil delta { clicks, scrolls, distance, touch_context? } or
+	--- nil when it adds nothing. touch_context is set when the clicks belong to
+	--- a touch: a tap, or a clickpad press made during a touch. It is the
+	--- context that touch began in; the scrolls and distance are not its.
+	function tracker.observe(kind, code, value, source, at_us, context)
 		assert(KINDS[kind], "unknown pointer event kind: " .. tostring(kind))
+		assert(kind ~= M.KIND_CONTACT or context ~= nil, "a touch contact needs the privacy context it was reported in")
 		local key = source or default_source
 		if kind == M.KIND_RESET then
 			frames[key], dropping[key], pads[key] = nil, nil, nil
 			return nil
 		end
 		-- The tap detector keeps its own packet-loss state from the same reports.
-		local tap_clicks = nil
+		local tap_clicks, touch_context = nil, nil
 		if kind == M.KIND_CONTACT then
-			feed_pad(key, { type = code < FIRST_KEY_CODE and InputEvent.EV_ABS or InputEvent.EV_KEY, code = code, value = value }, true)
+			feed_pad(key, { type = code < FIRST_KEY_CODE and InputEvent.EV_ABS or InputEvent.EV_KEY, code = code, value = value },
+				true, context)
 			return nil
 		elseif kind == M.KIND_DROPPED then
 			feed_pad(key, { type = InputEvent.EV_SYN, code = SYN_DROPPED, value = 0 })
 		elseif kind == M.KIND_FRAME then
-			tap_clicks = feed_pad(key, { type = InputEvent.EV_SYN, code = InputEvent.SYN_REPORT, value = 0, timestamp_us = at_us })
+			tap_clicks, touch_context = feed_pad(key, { type = InputEvent.EV_SYN, code = InputEvent.SYN_REPORT, value = 0,
+				timestamp_us = at_us })
 		elseif kind == M.KIND_PRESS and InputEvent.is_pointer_button(code) then
 			-- A physical button pressed during a touch is no tap (libinput DEAD).
 			feed_pad(key, { type = InputEvent.EV_KEY, code = code, value = 1 })
+			-- A clickpad press follows the finger's landing, whose click callback
+			-- already withdrew the field: it is counted where that touch began.
+			local pad = pads[key]
+			touch_context = pad and pad.touch_context
 		end
 		if kind == M.KIND_DROPPED then
 			frames[key], dropping[key] = nil, true
@@ -321,7 +348,7 @@ function M.new()
 			return nil
 		end
 		if kind == M.KIND_PRESS then
-			if CLICK_BUTTONS[code] then return { clicks = 1, scrolls = 0, distance = 0 } end
+			if CLICK_BUTTONS[code] then return { clicks = 1, scrolls = 0, distance = 0, touch_context = touch_context } end
 			return nil
 		end
 		if kind == M.KIND_MOTION then
@@ -339,7 +366,7 @@ function M.new()
 		local distance = 0
 		if frame and (frame.dx ~= 0 or frame.dy ~= 0) then distance = travelled() end
 		if distance <= 0 and not tap_clicks then return nil end
-		return { clicks = tap_clicks or 0, scrolls = 0, distance = math.max(distance, 0) }
+		return { clicks = tap_clicks or 0, scrolls = 0, distance = math.max(distance, 0), touch_context = touch_context }
 	end
 
 	return tracker

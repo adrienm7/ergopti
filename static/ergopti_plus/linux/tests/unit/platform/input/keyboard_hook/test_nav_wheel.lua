@@ -373,6 +373,25 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 			"one press, reported before the click callback")
 	end)
 
+	-- A finger's landing runs the click callback too, and the tap it becomes is
+	-- counted in the field that callback withdraws: the metrics must hear of
+	-- the landing first. Reported after, a single-touch pad's first report of
+	-- a touch met the withdrawn field (tap-click-touch-context).
+	helpers.it("reports a finger's landing before the click callback (tap-click-touch-context)", function()
+		local order = {}
+		drive("touchpad", {}, {
+			{ EV_KEY, 0x14a, 1, 3000000 }, { EV_KEY, 0x145, 1, 3000000 }, { EV_SYN, 0, 0, 3000000 },
+			{ EV_KEY, 0x145, 0, 3090000 }, { EV_KEY, 0x14a, 0, 3090000 }, { EV_SYN, 0, 0, 3090000 },
+		}, nil, function(kind, code, value)
+			if kind == "contact" then order[#order + 1] = "contact:" .. code .. ":" .. value end
+		end, nil, nil, function(_, code)
+			order[#order + 1] = "click:" .. code
+		end)
+		helpers.assert_eq(order, {
+			"contact:330:1", "click:330", "contact:325:1", "click:325", "contact:325:0", "contact:330:0",
+		}, "each landing is reported once, before its click callback; a lift has no callback")
+	end)
+
 	helpers.it("remaps the wheel without optional pointer observers (wheel-no-observers)", function()
 		local emitted, grabs, _, running, _, opened = drive("mouse", HOLD, {
 			{ EV_REL, REL_WHEEL, 1, 3000 },

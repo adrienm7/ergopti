@@ -54,7 +54,7 @@ local function fixture(initial_role)
 		.. "return function() " .. body .. " end end"))()
 	local click = factory(guard, wrap, nil, { click_resets_word = function() return true end }, engine,
 		helpers.make_logger_stub(), "fixture", { observe_copy_activity = function() end },
-		{ discard_roi = function() discards = discards + 1 end })
+		{ discard_roi = function() discards = discards + 1 end, withdraw_for_pointer = function(withdraw) withdraw() end })
 	return {
 		click = click, guard = guard, detector = detector, output = output,
 		discards = function() return discards end, reads = function() return reads end, secure = function() return secure end,
