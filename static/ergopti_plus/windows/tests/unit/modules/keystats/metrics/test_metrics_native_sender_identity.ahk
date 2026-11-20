@@ -14,6 +14,56 @@ _MVSP_Complete(State, Code, Output, ErrorText) {
 	State.Calls += 1
 }
 
+; Waits for a tree-owned child to settle. Completion is claimable only once its
+; Job holds no process, so a child that exits with its causal message (the
+; fixture's 30 s deadline) while a descendant it launched lives on (a WebView2
+; browser whose controller never resolved, never supervised by the child)
+; delivers nothing: dev CI reported only "did not settle" after 60 s. At the
+; budget the tree is killed with its completion kept, and the diagnosis names
+; whether the root had exited and what the child wrote.
+; @param Handle {Object} The started ShellRunner_SpawnTreeOwned handle.
+; @param State {Object} The _MVSP_Complete state.
+; @param BudgetMs {Integer} How long the child may take.
+; @returns {String} "" once settled within the budget, else the diagnosis.
+_MVSP_AwaitSettled(Handle, State, BudgetMs) {
+	Started := A_TickCount
+	while State.Calls == 0 && TickElapsed(Started) < BudgetMs {
+		_SR_TreePoll()
+		Sleep(10)
+	}
+	if State.Calls != 0
+		return ""
+	RootExited := Handle.processId() == 0
+	Tail := Handle.outputTail(8192)
+	Handle.requestTerminate()
+	Killed := A_TickCount
+	while State.Calls == 0 && TickElapsed(Killed) < 10000 {
+		_SR_TreePoll()
+		Sleep(10)
+	}
+	return "no completion within " . BudgetMs . " ms; the child "
+		. (RootExited ? "had exited and a descendant kept its Job alive" : "was still running")
+		. "; it wrote: " . (State.Calls ? State.ErrorText . State.Output : Tail)
+}
+
+; A child that writes its cause and exits while its descendant lives on is
+; reported with that cause, not as a silent stall.
+_MVSP_SurvivorDiagnosisCase() {
+	global _DriverDir
+	Fixture := _DriverDir . "\tests\fixtures\tree_survivor_child.ahk"
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
+	Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut=UTF-8", Fixture],
+		_MVSP_Complete.Bind(State))
+	try {
+		AssertTrue(Handle.start(), "the survivor fixture must start")
+		Diagnosis := _MVSP_AwaitSettled(Handle, State, 3000)
+		AssertContains(Diagnosis, "had exited and a descendant kept its Job alive")
+		AssertContains(Diagnosis, "survivor fixture: deadline before the controller")
+	} finally AssertTrue(Handle.terminate() == true, "the survivor tree must retire")
+}
+Test("Metrics native sender: a child whose descendant outlives it reports its cause (metrics-native-sender-identity)",
+	_MVSP_SurvivorDiagnosisCase)
+
 _MVSP_NativeSender(Mode := "") {
 	global _DriverDir
 	static Serial := 0, RetirementDebt := 0
@@ -41,11 +91,8 @@ _MVSP_NativeSender(Mode := "") {
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, Args, _MVSP_Complete.Bind(State))
 		AssertTrue(Handle.start(), "the exact native WebView child must start")
 		NativePid := Handle.processId()
-		Started := A_TickCount
-		while State.Calls == 0 && TickElapsed(Started) < 60000 {
-			_SR_TreePoll()
-			Sleep(10)
-		}
+		Unsettled := _MVSP_AwaitSettled(Handle, State, 60000)
+		AssertEqual("", Unsettled, "the owned native child did not settle")
 		AssertEqual(1, State.Calls, "the owned native child did not settle: " . State.ErrorText . State.Output)
 		Receipts := []
 		for Line in StrSplit(State.Output, "`n", "`r")
