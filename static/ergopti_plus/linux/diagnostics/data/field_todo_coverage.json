@@ -186,6 +186,12 @@
 			"not_testable": "No field run or guided step drives eject_all_disks yet: a person plugs and mounts a USB stick, fires the bound gesture and checks the stick left lsblk and the file manager while the system disks stayed mounted."
 		},
 		{
+			"id": "x11_layout_install",
+			"title": "Install, use and remove a registry layout on an X11 session",
+			"checks": [],
+			"not_testable": "No field run or guided step installs a layout yet: a person on a GNOME or Plasma X11 session installs Ergo-L from the menu and from Studio, types with it, checks xkbcomp names ergol after a keyboard plug, then uninstalls it from the user XKB tree."
+		},
+		{
 			"id": "kde_input_sources_live",
 			"title": "Live layout switch on KDE Plasma through the keyboard daemon",
 			"checks": [],
