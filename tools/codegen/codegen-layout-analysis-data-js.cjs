@@ -167,7 +167,8 @@ const OUTER_KEYS = ['Quote', 'BracketLeft', 'BracketRight', 'Backslash', 'IntlBa
 const REGISTRY_ORIGIN = 'registry';
 const REFERENCE_ORIGIN = 'reference';
 const LIBRARY_ORIGIN = 'library';
-// The levels of a whole layout's row: base, Shift, AltGr, Shift+AltGr.
+// The levels of a whole layout's row: base, Shift, AltGr, Shift+AltGr (an
+// entry may declare more: its « levels »).
 const LIBRARY_LEVELS = 4;
 
 // ======================
@@ -355,6 +356,11 @@ function fromAlphaBlock(entry, qwerty) {
  * layout encoded from its official files states its dead keys as cells
  * ({dead: state}) and their compositions as « dead_rules »; a standard
  * accent's state composes the characters its rules leave out the same way.
+ * A rule may enter another state ({dead: state}), one of a cell or one only
+ * its rules reach (a sequence of three keys or more: Neo's « dead ^, dead
+ * ´, a »), which needs rules of its own. An entry with more levels than
+ * four (Neo's Mod3 and Mod4) states them as « levels » and « modifiers »,
+ * which the engine checks (layoutFromRows), and a row has a cell per level.
  * @param {object} entry - One layout_library.json entry with rows.
  * @param {string[]} codes - The measured codes.
  * @param {object} formats - LAYOUT_FORMATS (loadFormats).
@@ -365,20 +371,19 @@ function fromAlphaBlock(entry, qwerty) {
 function fromWholeRows(entry, codes, formats) {
 	const measured = new Set(codes);
 	const rows = {};
+	const width = entry.levels ? entry.levels.length : LIBRARY_LEVELS;
 	const deadCell = (cell) =>
 		cell !== null && typeof cell === 'object' && typeof cell.dead === 'string' && cell.dead !== '';
 	for (const [code, row] of Object.entries(entry.rows)) {
 		if (!measured.has(code)) throw new Error(`${entry.id}: ${code} is not a measured key`);
 		if (
 			!Array.isArray(row) ||
-			row.length !== LIBRARY_LEVELS ||
+			row.length !== width ||
 			!row.every(
 				(cell) => cell === null || (typeof cell === 'string' && cell !== '') || deadCell(cell)
 			)
 		)
-			throw new Error(
-				`${entry.id}: ${code} is not ${LIBRARY_LEVELS} characters, dead keys or null`
-			);
+			throw new Error(`${entry.id}: ${code} is not ${width} characters, dead keys or null`);
 		rows[code] = row.map((cell) => (deadCell(cell) ? { dead: cell.dead } : cell));
 	}
 	const layout = {
@@ -392,6 +397,7 @@ function fromWholeRows(entry, codes, formats) {
 		command: {},
 		dead: {}
 	};
+	if (entry.levels) Object.assign(layout, { levels: entry.levels, modifiers: entry.modifiers });
 	const deadKeys = Object.entries(entry.dead_keys || {});
 	for (const [char, accent] of deadKeys) {
 		if (!formats.ACCENTS[accent])
@@ -407,22 +413,48 @@ function fromWholeRows(entry, codes, formats) {
 	}
 	// A dead cell of the rows ({dead: state}) types the rules its source states
 	// (« dead_rules »: the second key's character, or « dead:<state> » for a
-	// dead key, → the output); a standard accent's state also composes the rest
-	// by normalisation. Another state needs its rules: nothing is guessed.
+	// dead key, → the output, or {dead: state} for a sequence that goes on); a
+	// standard accent's state also composes the rest by normalisation. Another
+	// state needs its rules: nothing is guessed.
 	const states = new Set();
 	for (const row of Object.values(entry.rows))
 		for (const cell of row) if (deadCell(cell)) states.add(cell.dead);
 	const deadRules = entry.dead_rules || {};
+	// The states the rules reach from the cells' (a chain of three keys or more).
+	const reached = new Set(states);
+	for (let grew = true; grew; ) {
+		grew = false;
+		for (const [state, rules] of Object.entries(deadRules))
+			if (reached.has(state))
+				for (const output of Object.values(rules))
+					if (deadCell(output) && !reached.has(output.dead)) {
+						reached.add(output.dead);
+						grew = true;
+					}
+	}
 	for (const [state, rules] of Object.entries(deadRules)) {
-		if (!states.has(state)) throw new Error(`${entry.id}: dead_rules ${state} is on no key`);
+		if (!reached.has(state))
+			throw new Error(`${entry.id}: dead_rules ${state} is on no key and no rule enters it`);
 		for (const [typed, output] of Object.entries(rules)) {
 			const target = typed.startsWith('dead:') ? typed.slice('dead:'.length) : null;
 			if (target !== null ? !states.has(target) : Array.from(typed).length !== 1)
 				throw new Error(`${entry.id}: dead_rules ${state} has the invalid key ${typed}`);
+			if (deadCell(output)) {
+				if (!deadRules[output.dead])
+					throw new Error(
+						`${entry.id}: dead_rules ${state}.${typed} enters ${output.dead}, which has no rules`
+					);
+				continue;
+			}
 			if (typeof output !== 'string' || output === '')
 				throw new Error(`${entry.id}: dead_rules ${state}.${typed} types no text`);
 		}
-		layout.dead[state] = Object.assign({}, rules);
+		layout.dead[state] = Object.fromEntries(
+			Object.entries(rules).map(([typed, output]) => [
+				typed,
+				deadCell(output) ? { dead: output.dead } : output
+			])
+		);
 	}
 	for (const state of states) {
 		if (!formats.ACCENTS[state] && !deadRules[state])

@@ -614,11 +614,50 @@ dl.neo-layout.org's XCompose for the Neo family); Mine from
 dl.neo-layout.org/mine_2.39 (the library held its block from before April
 2022); Engram-es from its README in the Engram repository. These entries state
 their dead keys as cells and their compositions as `dead_rules`; sequences of
-three keys or more are left out, and the Neo family keeps its levels 1, 2, 3 and
-5 (Mod3 as AltGr) without level 4. KLA's AdNW became a duplicate of the official
+three keys or more were left out, and the Neo family kept its levels 1, 2, 3 and
+5 (Mod3 as AltGr) without level 4, until 2026-11-20 (below). KLA's AdNW became a duplicate of the official
 one. Ergo-L and bépo already matched their official files (the Kalamine TOML of
 ergol-v1.0.2; bépo 1.1rc2's KLC and XKB). BEO and Morgenstern have no official
 source that could be found and stay letter blocks.
+
+On 2026-11-20 the engine took a layout's own levels (docs/design/layout-analysis.md,
+« Levels ») and the codegen dead-key rules that enter another state, and
+`tools/build/import-xkb-layouts.cjs` re-encoded the Neo family (Neo 2, Bone and
+its ß-in-the-home-row variant, KOY, AdNW, Noted, Mine) and Optimot from the same
+files, each pinned by its SHA-256 (with xkeyboard-config's `latin`, `level3`,
+`level5` and `shift` files the variants include, and xorgproto-2024.1's
+keysymdef.h for the keysyms). Its levels 1 to 4 and two-key rules equal the
+entries of 2026-11-18 but where a longer sequence replaces a two-key one, as
+xkbcommon builds a Compose table (Neo's « stroke p » now waits for « h » → ℏ;
+Optimot's « ^ ^ » is its diaeresis, « ^ à » its grave). The Neo family now has
+seven levels: Mod3 on Caps Lock and the ISO key left of Enter (Noted and Mine:
+the key right of ö), Mod4 on the key right of left Shift and on AltGr, each held
+by the other hand and costed on its own key as AltGr is (Mod3 was AltGr's thumb
+before), and Mod3+Mod4; its ¿ ¡ (0.27 % of _Marianela_) and its Mod4 dead ¨ are
+typed. The sequences of three keys or more are rules that enter a derived state
+(« acute>circumflex »): 131 per Neo layout, 173 for Optimot.
+
+| Layout (score, default weights) | Effi Briest   | Marianela       | Swann           | Alice           |
+| ------------------------------- | ------------- | --------------- | --------------- | --------------- |
+| Neo 2                           | −97.7 → −89.7 | −139.8 → −136.2 | −122.3 → −117.6 | −132.1 → −124.7 |
+| Bone                            | −6.1 → −0.1   | −63.8 → −59.4   | −62.8 → −56.5   | −58.3 → −51.2   |
+| Bone (ß in the home row)        | −6.0 → 0.1    | −63.9 → −59.4   | −63.3 → −57.0   | −58.4 → −51.3   |
+| KOY                             | −3.2 → 1.1    | −54.1 → −48.6   | −63.0 → −56.6   | −39.7 → −34.9   |
+| AdNW                            | −7.8 → −1.6   | −71.2 → −57.2   | −56.1 → −51.2   | −32.6 → −28.3   |
+| Noted                           | −9.3 → 0.3    | −65.0 → −60.1   | −74.4 → −69.2   | −55.5 → −48.1   |
+| Mine                            | −13.3 → −7.3  | −76.5 → −71.6   | −71.7 → −65.8   | −63.0 → −53.5   |
+| Optimot                         | −51.3 → −41.8 | −56.6 → −39.8   | −4.8 → −0.6     | −56.7 → −55.3   |
+
+The Neo family gains from the Mod4 copies of « , » « . » « : » and of the
+digits, which the best way of typing takes where the base key would be an SFB
+(SFB −3.0 points of score on Effi Briest for Neo 2), and from the characters its
+new levels type (coverage bonus +2.5); Mod3 on the pinkies costs pinky load and
+`altgr_usage`. Optimot types ü ä ö ß through « ^ ^ » instead of AltGr
+(`altgr_usage` −6.9 points of score on Effi Briest). Every other library layout
+measures exactly as before: the golden values changed for these eight layouts
+only, and section 18 of `tools/test/test-layout-analysis-engine.cjs` declares
+every four-level layout again with an empty fifth level and finds the same
+metrics and score.
 
 On 2026-11-19 the library took more collections (section 13 of
 `tools/test/test-layout-analysis-engine.cjs` holds their key cells, a count

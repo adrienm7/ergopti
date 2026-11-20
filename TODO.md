@@ -235,15 +235,18 @@ waits for the maintainer's review).
       for 47 KB of new `data.sql`) and the replay of the day the tail touched (4 to 33 s). Making it incremental
       means mutating the image without a full copy (it is shared by every worker) and replaying less than a day,
       which `docs/memory/windows-ahk.md` (« A refresh clears and replays whole affected days ») explains.
-- [ ] **Library layouts that lose their own characters, what is left (2026-11-18).** Optimot 1.8.0, Neo 2, Bone,
-      KOY, AdNW, Noted, Mine, QWERTZ, the Spanish QWERTY and Dvorak and Engram-es are now re-encoded from their
-      official files (`docs/audits/layout-analysers/report.md`, « Layout library »). Left: BEO (0.99 % of Swann
-      unsupported: è ê ç ; ?) and Morgenstern (2 %: its block has no b) have no official source that could be found,
-      so they stay Oxeylyzer letter blocks; the Neo family has no level 4 (Mod4) in the four-level model, so its
-      ¿ ¡ (0.27 % of Marianela) and its level-4 dead ¨ stay unsupported; dead-key sequences of three keys or more
-      (Optimot's chained accents) are left out; the xkeyboard-config Spanish Dvorak exchanges R and H against KLA's
-      « Spanish Dvorak (Jorge Sanz) », whose author page could not be read (web.archive.org was offline). Russian
-      JCUKEN's 80 % on a French text is genuine.
+- [ ] **Library layouts that lose their own characters, what is left (2026-11-20).** Optimot 1.8.0, Neo 2, Bone,
+      KOY, AdNW, Noted, Mine, QWERTZ, the Spanish QWERTY and Dvorak and Engram-es are re-encoded from their
+      official files (`docs/audits/layout-analysers/report.md`, « Layout library »); since 2026-11-20 the Neo family
+      has its seven levels (Mod3 and Mod4 on their own keys, its ¿ ¡ and Mod4 dead ¨ typed) and the Neo family and
+      Optimot their dead-key sequences of three keys or more (`tools/build/import-xkb-layouts.cjs`). Left, for want
+      of a source: BEO (0.99 % of Swann unsupported: è ê ç ; ?) and Morgenstern (2 %: its block has no b) have no
+      official source that could be found, so they stay Oxeylyzer letter blocks; the xkeyboard-config Spanish Dvorak
+      exchanges R and H against KLA's « Spanish Dvorak (Jorge Sanz) », whose author page could not be read
+      (web.archive.org was offline). Russian JCUKEN's 80 % on a French text is genuine. Also left: the Comparer's
+      keyboard drawing and the exports show four levels, and a Neo layout opened in the layout editor
+      (`LAYOUT_FORMATS.toSource`) keeps its first four (Mod3 as AltGr) without its Mod4 and Mod3+Mod4 levels: the
+      Ergopti source has no layer held by Caps Lock or the key right of left Shift.
 - [ ] **[RELEASE] Windows export step in native Lua.** The restricted host `windows/native/ergopti_lua_export.c`
       (pinned Lua 5.4.6, built by `tools/build/build_windows_lua_export.ps1` in package-windows) is done. Left: once a
       dev run builds « Windows / Build », commit its artifact `windows-lua-export-*` (`ergopti_lua_export.exe` and

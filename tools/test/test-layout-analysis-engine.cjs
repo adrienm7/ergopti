@@ -2488,6 +2488,67 @@ if (UPDATE_GOLDEN) {
 			rule(id, state, typed) === expected,
 			`official layouts: ${id} ${state} + ${typed} is ${rule(id, state, typed)}, its official file gives ${expected}`
 		);
+	// (neo-levels-2026-11-20) The Neo family's own levels (Mod3, Mod4,
+	// Mod3+Mod4) and the dead-key sequences of three keys or more (Neo's
+	// « ´ ^ a », Optimot 1.8's « ^ ^ u » and « ^ à e »), read in the same
+	// files by tools/build/import-xkb-layouts.cjs; before, the library had four
+	// levels and two-key rules, so Neo lost ¿ ¡ and its Mod4 dead ¨.
+	for (const [id, code, level, expected] of [
+		['neo2_new', 'KeyH', 4, '¿'],
+		['neo2_new', 'KeyY', 4, '¡'],
+		['neo2_new', 'Equal', 4, 'dead:diaeresis'],
+		['neo2_new', 'KeyK', 6, 'ℝ'],
+		['bone', 'KeyH', 4, '¿'],
+		['mine', 'KeyH', 4, '¿']
+	])
+		check(
+			cell(id, code, level) === expected,
+			`official layouts: ${id} ${code} level ${level} is ${cell(id, code, level)}, its official file has ${expected}`
+		);
+	for (const [id, mod3] of [
+		['neo2_new', ['Backslash', 'CapsLock']],
+		['koy', ['Backslash', 'CapsLock']],
+		['noted', ['Quote', 'CapsLock']],
+		['mine', ['Quote', 'CapsLock']]
+	]) {
+		const layout = byId.get(id);
+		const modifiers = (layout && layout.modifiers) || {};
+		check(
+			JSON.stringify((modifiers.mod3 || {}).for_left_hand) === JSON.stringify(mod3) &&
+				JSON.stringify((modifiers.mod4 || {}).for_left_hand) ===
+					JSON.stringify(['AltRight', 'IntlBackslash']),
+			`official layouts: ${id} holds Mod3 and Mod4 on ${JSON.stringify(modifiers)}`
+		);
+	}
+	for (const [id, keys, expected] of [
+		['neo2_new', ['acute', 'dead:circumflex', 'a'], 'ấ'],
+		['neo2_new', ['stroke', 'p', 'h'], 'ℏ'],
+		['optimot', ['circumflex', 'dead:circumflex', 'u'], 'ü'],
+		['optimot', ['circumflex', 'à', 'e'], 'è']
+	]) {
+		const layout = byId.get(id) || { dead: {} };
+		let state = keys[0];
+		let typed;
+		for (const key of keys.slice(1)) {
+			typed = (layout.dead[state] || {})[key];
+			if (typed && typeof typed === 'object') state = typed.dead;
+		}
+		check(
+			typed === expected,
+			`official layouts: ${id} ${keys.join(' + ')} types ${JSON.stringify(typed)}, its XCompose gives ${expected}`
+		);
+	}
+	// The sequence is typed: three presses, no AltGr, for ü on Optimot.
+	{
+		const result = E.analyse(byId.get('optimot'), E.ngramsFromText('über über'), {});
+		check(
+			result.metrics.unsupported === 0 &&
+				result.metrics.altgr_usage === 0 &&
+				result.metrics.dead_key_usage > 0,
+			`official layouts: Optimot types « über » with AltGr ${result.metrics.altgr_usage} % or ` +
+				`${result.metrics.unsupported} % unsupported, not through ^ ^ u`
+		);
+	}
 	// AdNW is one layout: KLA's copy of it is left out as a duplicate.
 	check(!byId.has('adnw_kla'), 'official layouts: AdNW is in the library twice');
 	// Each types its language's text in full.
@@ -2497,7 +2558,19 @@ if (UPDATE_GOLDEN) {
 			'Größe, Übung; ändern? Ja! Öl: „Straße“ – (Fuß) @ 3 € mögen.'
 		],
 		[
-			['qwerty_spanish', 'spanish_dvorak', 'engram_es'],
+			// The Neo family types ¿ and ¡ on Mod4.
+			[
+				'qwerty_spanish',
+				'spanish_dvorak',
+				'engram_es',
+				'neo2_new',
+				'bone',
+				'bone_eszett_home',
+				'koy',
+				'adnw',
+				'noted',
+				'mine'
+			],
 			'¿Qué pasó, niño? ¡Ánimo, pingüino! Él lo dijo: «sí».'
 		],
 		[['optimot'], 'Ça ! Où ? « Noël » : être, naïf, cœur — [x] {y} | 1 = 2, ñ.']
