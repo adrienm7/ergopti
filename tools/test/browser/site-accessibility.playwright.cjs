@@ -12,12 +12,14 @@
  * violations can only go down. A lower count asks for the baseline to be
  * lowered (--update-baseline) to lock the improvement in. The maintainer asked
  * for a totally accessible project on 2026-11-16 (TODO « Full accessibility »).
- * Each page is then measured for reading (site-reading.cjs): at 200 % zoom
- * with the WCAG 1.4.12 spacing and with the site's 200 % text and wide
- * spacing, no text may be clipped or drawn over another, no block justified,
- * no prose line longer than 80 characters and nothing placed under the
- * sticky header covered by it; those counts have their own
- * ratchet (site-reading-baseline.json).
+ * Each page, and each Studio frame it holds, is then measured for reading
+ * (site-reading.cjs): at 200 % zoom with the WCAG 1.4.12 spacing and with
+ * the site's 200 % text and wide spacing, no text may be clipped or drawn
+ * over another, no block justified, no prose line longer than 80
+ * characters, no sentence of 30 words or more in a page's running text and
+ * nothing placed under the sticky header covered by it; those counts have
+ * their own ratchet (site-reading-baseline.json), per page, mode, frame and
+ * check.
  * ==============================================================================
  */
 
@@ -104,17 +106,18 @@ function compareWithBaseline(current, baseline) {
 }
 
 /**
- * Key of one counted reading row (site-reading-baseline.json).
- * @param {{route: string, mode: string, check: string}} row
+ * Key of one counted reading row (site-reading-baseline.json): the page, the
+ * reading mode, the frame (« page » or the framed Studio file) and the check.
+ * @param {{route: string, mode: string, frame: string, check: string}} row
  * @returns {string}
  */
 function readingKey(row) {
-	return [row.route, row.mode, row.check].join(' | ');
+	return [row.route, row.mode, row.frame, row.check].join(' | ');
 }
 
 /**
  * Turn the reading findings into the baseline shape: key to number of elements.
- * @param {Array<{route: string, mode: string, check: string, elements: string[]}>} findings
+ * @param {Array<{route: string, mode: string, frame: string, check: string, elements: string[]}>} findings
  * @returns {Object<string, number>} Sorted by key, rows without an element left out.
  */
 function readingCountsOf(findings) {
@@ -128,7 +131,7 @@ function readingCountsOf(findings) {
  * Read a committed baseline; a missing or malformed file is an error, not an
  * empty baseline, so the gate cannot pass by losing its reference.
  * @param {string} [file] - The axe baseline by default, or the reading one.
- * @param {number} [parts] - Fields of each key (4 for axe rows, 3 for reading rows).
+ * @param {number} [parts] - Fields of each key (4 for axe and reading rows).
  * @returns {Object<string, number>}
  */
 function readBaseline(file = BASELINE_PATH, parts = 4) {
@@ -636,8 +639,11 @@ async function withContext(browser, origin, options, visit) {
 /**
  * Measure every page in one reading mode (site-reading.cjs): its window, its
  * spacing style sheet or the site's own reading settings, then the mode's
- * checks in the page's own document (the Studio frames have their own gates).
- * @returns {Promise<Array<{route: string, mode: string, check: string, elements: string[]}>>}
+ * checks in the page's own document and in each Studio frame it holds. A
+ * frame reads the same stored settings (a11y_prefs.js, same origin) and gets
+ * the same style sheet; it has no site header, so « header-cover » is
+ * measured in the page alone (FRAME_SKIPPED_CHECKS).
+ * @returns {Promise<Array<{route: string, mode: string, frame: string, check: string, elements: string[]}>>}
  */
 async function scanReading(browser, origin, basePath, routes, mode) {
 	const settings = reading.READING_MODES[mode];
@@ -670,7 +676,22 @@ async function scanReading(browser, origin, basePath, routes, mode) {
 							settings.preferences.text,
 							'The reading settings apply to ' + route
 						);
-					if (settings.styleSheet) await page.addStyleTag({ content: settings.styleSheet });
+					const frames = page
+						.frames()
+						.filter(
+							(frame) =>
+								frame !== page.mainFrame() && frame.url() !== '' && frame.url() !== 'about:blank'
+						);
+					if (settings.styleSheet)
+						for (const target of [page, ...frames])
+							await target.addStyleTag({ content: settings.styleSheet });
+					for (const frame of frames)
+						if (settings.preferences)
+							assert.equal(
+								await frame.evaluate(() => document.documentElement.getAttribute('data-a11y-text')),
+								settings.preferences.text,
+								'The reading settings apply to the frame ' + frame.url()
+							);
 					// From the top of the page (a sticky header covers what scrolls under
 					// it by design), once the page's scripts that fit text to its boxes
 					// (the keyboard drawings) have answered the new style: two frames,
@@ -689,7 +710,20 @@ async function scanReading(browser, origin, basePath, routes, mode) {
 					if (settings.checks.includes('header-cover'))
 						measured['header-cover'] = await page.evaluate(reading.measureHeaderCover, options);
 					for (const check of settings.checks)
-						findings.push({ route, mode, check, elements: measured[check] });
+						findings.push({ route, mode, frame: 'page', check, elements: measured[check] });
+					for (const frame of frames) {
+						const name = frameName(frame, page, origin, basePath);
+						await frame.waitForFunction(() => !document.querySelector('[aria-busy="true"]'), null, {
+							timeout: BUSY_TIMEOUT_MS
+						});
+						const inFrame = await frame.evaluate(reading.measureReading, {
+							...options,
+							checks: reading.frameChecks(mode),
+							exclude: reading.pendingSelectors(name, reading.frameChecks(mode))
+						});
+						for (const check of reading.frameChecks(mode))
+							findings.push({ route, mode, frame: name, check, elements: inFrame[check] });
+					}
 				} finally {
 					await page.close();
 				}
@@ -844,7 +878,7 @@ async function main(args = process.argv.slice(2)) {
 	const axe = readingOnly
 		? { regressions: [], improvements: [] }
 		: compareWithBaseline(current, readBaseline());
-	const read = compareWithBaseline(currentReading, readBaseline(READING_BASELINE_PATH, 3));
+	const read = compareWithBaseline(currentReading, readBaseline(READING_BASELINE_PATH, 4));
 	const improvements = [...axe.improvements, ...read.improvements];
 	if (improvements.length)
 		console.log(

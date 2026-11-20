@@ -286,8 +286,9 @@ function checkHeroPause() {
 
 /**
  * The reading ratchet (site-reading.cjs): its rows are counted per page,
- * reading mode and check, its baseline only names audited pages, known modes
- * and their checks, and the « zoom » mode applies the WCAG 1.4.12 values.
+ * reading mode, frame and check, the Studio frames are measured like the
+ * page but for the site header, its baseline only names audited pages, known
+ * modes, frames and their checks, and the « zoom » mode applies the WCAG 1.4.12 values.
  */
 function checkReadingRatchet() {
 	assert.deepEqual(Object.keys(reading.READING_MODES).sort(), [
@@ -336,25 +337,71 @@ function checkReadingRatchet() {
 	assert.equal(reading.MAX_LINE_CHARACTERS, 80);
 	assert.deepEqual(
 		scan.readingCountsOf([
-			{ route: '/b', mode: 'text', check: 'text-clipped', elements: ['x', 'y'] },
-			{ route: '/a', mode: 'zoom', check: 'text-overlap', elements: [] }
+			{ route: '/b', mode: 'text', frame: 'page', check: 'text-clipped', elements: ['x', 'y'] },
+			{
+				route: '/b',
+				mode: 'text',
+				frame: 'ergopti_plus/_shared/ui/layout_editor/index.html',
+				check: 'text-clipped',
+				elements: ['z']
+			},
+			{ route: '/a', mode: 'zoom', frame: 'page', check: 'text-overlap', elements: [] }
 		]),
-		{ '/b | text | text-clipped': 2 },
-		'Rows without an element are left out'
+		{
+			'/b | text | ergopti_plus/_shared/ui/layout_editor/index.html | text-clipped': 1,
+			'/b | text | page | text-clipped': 2
+		},
+		'Rows are counted per frame, rows without an element are left out'
 	);
-	for (const key of Object.keys(scan.readBaseline(scan.READING_BASELINE_PATH, 3))) {
-		const [route, mode, check] = key.split(' | ');
+	// The Studio frames are measured too, for every check but the site
+	// header's, which only the page has, and the plain-language one, whose
+	// words come from the locale catalogue.
+	assert.deepEqual(reading.FRAME_SKIPPED_CHECKS, ['header-cover', 'long-sentence']);
+	for (const mode of Object.keys(reading.READING_MODES))
+		assert.deepEqual(
+			reading.frameChecks(mode),
+			reading.READING_MODES[mode].checks.filter(
+				(check) => !reading.FRAME_SKIPPED_CHECKS.includes(check)
+			),
+			'Frame checks of ' + mode
+		);
+	assert.deepEqual(reading.frameChecks('default'), ['justified-text', 'line-length']);
+	// A frame's pending elements name a Studio page, a frame check, a selector
+	// and a reason, and are left out of that frame only.
+	for (const row of reading.PENDING_FRAME_ELEMENTS) {
+		assert.match(row.frame, /^ergopti_plus\/_shared\/ui\/[a-z_]+\/index\.html$/);
+		assert.ok(
+			Object.keys(reading.READING_MODES).some((mode) =>
+				reading.frameChecks(mode).includes(row.check)
+			),
+			'Pending frame check: ' + row.check
+		);
+		assert.ok(row.selector.length > 0 && row.reason.length > 40, 'Pending row explained');
+		assert.deepEqual(reading.pendingSelectors(row.frame, [row.check]), [row.selector]);
+		assert.deepEqual(reading.pendingSelectors('page', [row.check]), []);
+		assert.deepEqual(reading.pendingSelectors(row.frame, ['reflow']), []);
+	}
+	assert.deepEqual(reading.frameChecks('text'), ['text-clipped', 'text-overlap', 'justified-text']);
+	assert.throws(() => reading.frameChecks('huge'), /Unknown reading mode/);
+	for (const key of Object.keys(scan.readBaseline(scan.READING_BASELINE_PATH, 4))) {
+		const [route, mode, frame, check] = key.split(' | ');
 		assert.ok(
 			scan.AUDITED_ROUTES.includes(route),
 			'Reading baseline names an unaudited page: ' + key
 		);
+		const checks =
+			frame === 'page' ? reading.READING_MODES[mode]?.checks : reading.frameChecks(mode);
+		assert.ok(checks?.includes(check), 'Reading baseline names an unknown mode or check: ' + key);
 		assert.ok(
-			reading.READING_MODES[mode]?.checks.includes(check),
-			'Reading baseline names an unknown mode or check: ' + key
+			frame === 'page' || /^ergopti_plus\/_shared\/ui\/[a-z_]+\/index\.html$/.test(frame),
+			'Reading baseline names an unknown frame: ' + key
 		);
 	}
 	const options = reading.optionsFor('default');
-	assert.deepEqual(options.checks, ['justified-text', 'line-length']);
+	assert.deepEqual(options.checks, ['justified-text', 'line-length', 'long-sentence']);
+	// Plain language (WCAG 3.1.5): 30 words or more is a long sentence.
+	assert.equal(options.maxSentenceWords, 29);
+	assert.deepEqual(options.exclude, []);
 	// The header grows with the text: what sits under it is checked where it grows.
 	for (const mode of ['zoom', 'text'])
 		assert.ok(reading.READING_MODES[mode].checks.includes('header-cover'), mode + ' header cover');

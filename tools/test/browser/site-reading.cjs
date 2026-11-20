@@ -10,7 +10,9 @@
  * the WCAG 1.4.12 spacing and 200 % text apply, no justified prose (its
  * uneven word gaps make rivers that dyslexic readers lose their line in,
  * WCAG 1.4.8), and prose lines of at most MAX_LINE_CHARACTERS characters
- * (WCAG 1.4.8 asks for 80 at most; 45 to 80 reads best). Nothing placed
+ * (WCAG 1.4.8 asks for 80 at most; 45 to 80 reads best), and no sentence
+ * of 30 words or more in the running text (« long-sentence », WCAG 3.1.5,
+ * the plain-language review of the seventh pass made a gate). Nothing placed
  * under the sticky header (the table of contents, the narrow-screen banner)
  * may slide under it once the header grows with the text. On a phone, with
  * 200 % text or 200 % zoom, no page scrolls sideways (« reflow », WCAG
@@ -18,7 +20,8 @@
  *
  * The measuring function runs inside the page (page.evaluate), so it only
  * uses what it receives as arguments. site-accessibility.playwright.cjs runs
- * it on every audited page and ratchets its counts.
+ * it on every audited page and in every Studio frame of the page (the
+ * Comparer, the editor and the Optimiser), and ratchets its counts.
  * ==============================================================================
  */
 
@@ -28,6 +31,9 @@
 const MAX_LINE_CHARACTERS = 80;
 // A paragraph shorter than this cannot show a long line worth measuring.
 const MIN_MEASURED_CHARACTERS = 120;
+// Plain language (WCAG 3.1.5): a sentence of this many words or more is cut
+// in two or rewritten (the seventh pass's review threshold).
+const MAX_SENTENCE_WORDS = 29;
 // Two text lines overlap when they share at least this share of the shorter
 // line's height (a descender touching the next line's ascender is not an
 // overlap) and more than OVERLAP_MIN_WIDTH_PX horizontally.
@@ -115,7 +121,7 @@ const READING_MODES = Object.freeze({
 		deviceScaleFactor: 1,
 		preferences: null,
 		styleSheet: null,
-		checks: Object.freeze(['justified-text', 'line-length'])
+		checks: Object.freeze(['justified-text', 'line-length', 'long-sentence'])
 	}),
 	zoom: Object.freeze({
 		viewport: Object.freeze({ width: 720, height: 450 }),
@@ -183,6 +189,7 @@ function measureReading(options) {
 		if (!parent || seen.has(parent) || !node.data.trim()) continue;
 		if (parent.closest('svg, script, style, noscript, template')) continue;
 		seen.add(parent);
+		if (options.exclude.some((selector) => parent.closest(selector))) continue;
 		if (visible(parent) && !screenReaderOnly(parent)) textElements.push(parent);
 	}
 	const lineRects = (element) => {
@@ -198,20 +205,25 @@ function measureReading(options) {
 	};
 	// The ancestors that cut what overflows them, innermost first, each with
 	// its padding box (what it keeps) and whether it scrolls (what it cuts can
-	// still be scrolled to) or hides, per axis.
+	// still be scrolled to) or hides, per axis. The client sizes are in the
+	// box's own CSS pixels and its rectangle in the window's: under a CSS
+	// zoom (the shared theme's larger text zooms the body) they differ by the
+	// zoom, so the sizes are scaled by the box's rectangle over its own size.
 	const clippers = (element) => {
 		const found = [];
 		for (let box = element; box && box !== document.documentElement; box = box.parentElement) {
 			const style = getComputedStyle(box);
 			if (style.overflowX === 'visible' && style.overflowY === 'visible') continue;
 			const outer = box.getBoundingClientRect();
-			const left = outer.left + box.clientLeft;
-			const top = outer.top + box.clientTop;
+			const scaleX = box.offsetWidth ? outer.width / box.offsetWidth : 1;
+			const scaleY = box.offsetHeight ? outer.height / box.offsetHeight : 1;
+			const left = outer.left + box.clientLeft * scaleX;
+			const top = outer.top + box.clientTop * scaleY;
 			found.push({
 				left,
 				top,
-				right: left + box.clientWidth,
-				bottom: top + box.clientHeight,
+				right: left + box.clientWidth * scaleX,
+				bottom: top + box.clientHeight * scaleY,
 				x: style.overflowX,
 				y: style.overflowY
 			});
@@ -339,6 +351,31 @@ function measureReading(options) {
 		}
 		found['line-length'] = long;
 	}
+	// Sentences of the running text, block by block (a nested list is its own
+	// block), cut after a full stop, a question or exclamation mark or an
+	// ellipsis followed by a capital, a digit or a quote.
+	if (options.checks.includes('long-sentence')) {
+		const long = [];
+		for (const element of document.querySelectorAll(
+			'main :is(p, li, dd, blockquote, figcaption)'
+		)) {
+			if (!visible(element) || screenReaderOnly(element)) continue;
+			let text = '';
+			const words = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+			for (let node = words.nextNode(); node; node = words.nextNode()) {
+				const block = node.parentElement.closest('p, li, dd, blockquote, figcaption, ul, ol');
+				if (block === element && visible(node.parentElement)) text += node.data;
+			}
+			for (const sentence of text
+				.replace(/\s+/g, ' ')
+				.split(/(?<=[.!?…])\s+(?=[«"“A-ZÀ-ÖØ-Þ0-9])/)) {
+				const count = sentence.split(' ').filter((word) => /[\p{L}\p{N}]/u.test(word)).length;
+				if (count > options.maxSentenceWords)
+					long.push(describe(element) + ' ' + count + ' words « ' + sentence.slice(0, 60) + ' »');
+			}
+		}
+		found['long-sentence'] = long;
+	}
 	// Reflow: the page scrolls sideways once its scroll width passes the
 	// window's. Reported are the outermost boxes ending past the window's right
 	// edge outside any box that clips or scrolls them sideways (a scrolling
@@ -434,6 +471,52 @@ async function measureHeaderCover(options) {
 	return covered;
 }
 
+// The checks a Studio frame is not measured for: it has no site header, and
+// its words are the 21 locales' catalogue strings, whose plain-language
+// review is not this gate's (the site's pages are French and English only).
+const FRAME_SKIPPED_CHECKS = Object.freeze(['header-cover', 'long-sentence']);
+
+/**
+ * Elements of a Studio frame a check leaves out, each with its reason; the
+ * ratchet test checks the names. Remove a row once its reason is fixed.
+ */
+const PENDING_FRAME_ELEMENTS = Object.freeze([
+	Object.freeze({
+		frame: 'ergopti_plus/_shared/ui/layout_editor/index.html',
+		check: 'text-clipped',
+		selector: '#le-board .le-key > .le-code',
+		reason:
+			'The drawn keys of the editor keep the size of the keyboard. Under the ' +
+			'WCAG 1.4.12 spacing, the names of five one-unit keys of the navigation ' +
+			'block (« Échap », « Suppr », « Début », « Pg préc », « Pg suiv ») wrap ' +
+			'and still pass the key edge by a pixel or two; the whole name stays in ' +
+			'the key’s accessible name and title. The legends fit (fitLegends).'
+	})
+]);
+
+/**
+ * The selectors a frame leaves out of a check (PENDING_FRAME_ELEMENTS).
+ * @param {string} frame - « page » or the framed file's path inside the site.
+ * @param {string[]} checks
+ * @returns {string[]}
+ */
+function pendingSelectors(frame, checks) {
+	return PENDING_FRAME_ELEMENTS.filter(
+		(row) => row.frame === frame && checks.includes(row.check)
+	).map((row) => row.selector);
+}
+
+/**
+ * The checks of a reading mode measured inside each Studio frame of a page.
+ * @param {string} mode - A key of READING_MODES.
+ * @returns {string[]}
+ */
+function frameChecks(mode) {
+	const settings = READING_MODES[mode];
+	if (!settings) throw new Error('Unknown reading mode: ' + mode);
+	return settings.checks.filter((check) => !FRAME_SKIPPED_CHECKS.includes(check));
+}
+
 /**
  * The measuring options for one reading mode.
  * @param {string} mode - A key of READING_MODES.
@@ -445,6 +528,8 @@ function optionsFor(mode) {
 		checks: [...settings.checks],
 		maxLine: MAX_LINE_CHARACTERS,
 		minMeasured: MIN_MEASURED_CHARACTERS,
+		maxSentenceWords: MAX_SENTENCE_WORDS,
+		exclude: [],
 		overlapShare: OVERLAP_MIN_SHARE,
 		overlapWidth: OVERLAP_MIN_WIDTH_PX,
 		clipTolerance: CLIP_TOLERANCE_PX,
@@ -453,13 +538,18 @@ function optionsFor(mode) {
 }
 
 module.exports = {
+	FRAME_SKIPPED_CHECKS,
 	MAX_LINE_CHARACTERS,
+	MAX_SENTENCE_WORDS,
+	PENDING_FRAME_ELEMENTS,
 	PENDING_ROUTES,
 	READING_MODES,
 	REFLOW_WIDTHS,
 	SITE_HEADER_SELECTOR,
 	TEXT_SPACING_CSS,
+	frameChecks,
 	isPending,
+	pendingSelectors,
 	measureHeaderCover,
 	measureReading,
 	optionsFor
