@@ -76,8 +76,20 @@ every maintainer request here.
       stretch or build, against loop counts the test itself chooses, never a product ceiling. Left: the two
       speed bounds (120 and 5000 walks) rest on ratios measured with every core busy and a quiet ratio estimated
       1.6 times higher; read the ratio each test prints on a quiet PC and on CI, and set each bound to twice the
-      highest. Then the per-run budgets outside Studio, `HOTSTRINGS_RENDER_BUDGET_MS` (2000) in
-      test-ahk-full-startup-smoke.cjs first.
+      highest.
+      Done 2026-11-20: the startup smoke times the slowest Hotstrings menu render against the same boot's other
+      deferred submenu builds (`HOTSTRINGS_RENDER_SHARE`, at most all of them together; clean boots 0.07-0.25,
+      a reparse per metadata question 9.5). The Ergopti extension tests of the three drivers read their bound
+      files from the extension manifest and the SFB, rolls, repeat-correction and suffix counts from the shipped
+      files; the Windows cache test counts the symbol rows of magickey.toml; the Linux and macOS preview-menu
+      tests expand `hotstrings_preview_frame`; the Linux id-less header test checks every menu keeps headers at
+      its top level, like the macOS one. Each was proved by a source mutation that made it fail. Reviewed and
+      kept: frozen historical references (the 101 distance rules, the 140 common autocorrections), corpus floors
+      (`tests/e2e/contract.lua`) and non-vacuity floors (`>= 10`, `> 400`). Left to review, each a literal row
+      count beside a manifest declaration: Windows `test_layout_shared.ahk` (6 settings rows),
+      `gestures/engine/test_menu_status.ahk` (6), `test_word_expander_commands.ahk` (8),
+      `test_manifest_menu_checked_when.ahk` (6), `personal/test_file_controls.ahk` (5) and the macOS
+      `test_parameter_frames.lua` `#corpus.preview.hs + 1`.
 - [ ] **SendInstant paste races Windows' own clipboard readers.** Rerun on a quiet PC on 2026-11-18 (no resident
       driver, 3 runs per group): healthcheck, Ollama native, `groups247-*`, pickers, `idle-caret-context`,
       `key-state-dllcall-uncaught`, `tap-keys-kana-native`, the `config-*` groups and the model browser stayed
