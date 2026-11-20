@@ -71,7 +71,10 @@ function loadFeatures() {
 		return { ...rest, section: path_prefix, path: `${path_prefix}.${entry.id}` };
 	});
 	resolvePlatforms(features, sections);
-	return features;
+	const dynamicPrefixes = Object.values(parsed.scopes || {}).flatMap((scope) =>
+		(scope.dynamic_defaults || []).map((definition) => definition.prefix)
+	);
+	return { features, dynamicPrefixes };
 }
 
 function flattenSections(node, pathParts = []) {
@@ -116,7 +119,7 @@ function resolveDefault(feature, platform) {
 }
 
 // Rebuild the runtime Features map shape for the AHK platform.
-function buildAhkFeaturesMap(features) {
+function buildAhkFeaturesMap(features, dynamicPrefixes) {
 	const map = {};
 	for (const k of META_KEYS) map[k] = {}; // presence-only marker
 	for (const f of features) {
@@ -129,6 +132,19 @@ function buildAhkFeaturesMap(features) {
 			cursor = cursor[part];
 		}
 		cursor[f.id] = resolveDefault(f, 'ahk');
+	}
+	// ManifestBuildFeaturesMap() also creates the table of every dynamic
+	// namespace a scope declares (dynamic_defaults), even with no catalogue row:
+	// a personal_shortcuts.ahk registers its own switches under
+	// [shortcuts.personal]. Only the table is proven; its keys stay unknown.
+	for (const prefix of dynamicPrefixes) {
+		let cursor = map;
+		for (const part of prefix.split('.')) {
+			if (cursor[part] === undefined) cursor[part] = {};
+			else if (typeof cursor[part] !== 'object' || cursor[part] === null)
+				throw new TypeError(`Dynamic namespace ${prefix} crosses a setting that is not a table.`);
+			cursor = cursor[part];
+		}
 	}
 	return map;
 }
@@ -228,8 +244,14 @@ function validate(keys, map) {
 // =================================================
 // =================================================
 
-const features = loadFeatures();
-const map = buildAhkFeaturesMap(features);
+const { features, dynamicPrefixes } = loadFeatures();
+if (!dynamicPrefixes.includes('shortcuts.personal')) {
+	console.error(
+		'Feature read-site guard: no scope declares the shortcuts.personal dynamic namespace; the scope reader stopped matching.'
+	);
+	process.exit(2);
+}
+const map = buildAhkFeaturesMap(features, dynamicPrefixes);
 
 // Always-on regression for the layout.ahk ctrl_magic_save UnsetItemError class:
 // the buggy section-prefixed form must be rejected and the correct stripped form
@@ -241,7 +263,17 @@ const SELF_TESTS = [
 		why: 'section-prefixed crash form'
 	},
 	{ keys: ['layout', 'ctrl_magic_save'], expectMissing: false, why: 'correct stripped form' },
-	{ keys: ['layout', '__definitely_not_a_feature__'], expectMissing: true, why: 'unknown key' }
+	{ keys: ['layout', '__definitely_not_a_feature__'], expectMissing: true, why: 'unknown key' },
+	{
+		keys: ['shortcuts', 'personal'],
+		expectMissing: false,
+		why: 'dynamic namespace with no catalogue row'
+	},
+	{
+		keys: ['shortcuts', '__not_a_dynamic_namespace__'],
+		expectMissing: true,
+		why: 'undeclared namespace'
+	}
 ];
 for (const t of SELF_TESTS) {
 	const missing = validate(t.keys, map) !== null;
