@@ -717,16 +717,17 @@ _HOF_RealSession(Primitive, Origin) {
 
 ; The final text and the engine buffers must be the same with either primitive and
 ; from either entry point, and no link may fire a second time. The Backspace
-; that follows is the immediate one, which restores the trigger without its end
-; character and keeps it out of the buffer (backspace-undo, 2026-11-06); this
-; test predates it and expected one character removed, so after the one-arrow
-; pin it failed on « qzx » for « foo qz » (2026-11-18).
+; that follows is the immediate one, which restores what was typed and keeps it
+; out of the buffer (backspace-undo, 2026-11-06): the trigger, then the Space
+; the expansion typed back after its output (decision of 2026-11-19); this test
+; predates it and expected one character removed, so after the one-arrow pin it
+; failed on « qzx » for « foo qz » (2026-11-18).
 _HOF_RealChainOfThree() {
 	global _AHK_INTERACTIVE
 	Assert(_AHK_INTERACTIVE, "foreground input requires explicit --interactive admission")
 	for Origin in ["watcher", "tap"] {
 		Expected := (Origin == "watcher") ? "foo qzy" : "foo qzy "
-		Trigger := (Origin == "watcher") ? "qzx" : "qzs"
+		Trigger := (Origin == "watcher") ? "qzx" : "qzs "
 		Baseline := 0
 		for Primitive in ["SendEvent", "SendInput"] {
 			Run := _HOF_RealSession(Primitive, Origin)
@@ -736,7 +737,7 @@ _HOF_RealChainOfThree() {
 			AssertEqual(Run["doc"], Run["buffer"],
 				Label . ": the engine buffer must equal the screen")
 			AssertEqual(Trigger, Run["doc_after_backspace"],
-				Label . ": the immediate Backspace must restore the first trigger, the end character excluded")
+				Label . ": the immediate Backspace must restore the first trigger and the end character it typed")
 			AssertEqual("", Run["buffer_after_backspace"],
 				Label . ": the restored trigger must stay out of the buffer")
 			try FileAppend("# hotstring-output-is-final " . Label . " settle_ms=" . Run["settle"] . "`n", "*")
