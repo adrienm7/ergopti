@@ -105,6 +105,9 @@ _APNR_PageAssets() {
 			Relative .= (A_Index > 1 ? "\" : "") . Part
 		Assets.Push(Relative)
 	}
+	; A pattern matching nothing would mount the page and its strings alone, and
+	; the page would stop at its first script again.
+	_APNR_Require(Assets.Length > 3, "The asset scan found no script or stylesheet in index.html.")
 	return Assets
 }
 
