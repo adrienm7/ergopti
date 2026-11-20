@@ -554,6 +554,36 @@ local function fail_leaked_doubles(name, before)
 	end
 end
 
+-- The tray root and the manifest facade it captured when it loaded.
+local TRAY_ROOT, TRAY_FACADE = "menu.ui.builder.builder", "menu.engine.manifest_menu"
+
+--- Puts back the manifest facade when it was replaced under a tray root that
+--- stayed cached. The root builds nothing for a facade other than its own
+--- (menu/ui/builder/builder.lua, separator_facade_current), so every later
+--- module that required it read an empty tray: test_matches_manifest did this,
+--- and the shortcuts tests failed whenever no other file reloaded the root in
+--- between, as under `--only menu`.
+--- @param before table Shallow copy of package.loaded taken earlier.
+--- @return boolean restored Whether the facade had been left stale.
+function M.restore_stale_tray_root(before)
+	local root = package.loaded[TRAY_ROOT]
+	if root == nil or root ~= before[TRAY_ROOT] or package.loaded[TRAY_FACADE] == before[TRAY_FACADE] then return false end
+	package.loaded[TRAY_FACADE] = before[TRAY_FACADE]
+	return true
+end
+
+--- Restores a facade a test module left stale and records one failure for it.
+--- @param name string Test module identity.
+--- @param before table Shallow copy of package.loaded before the module ran.
+local function fail_stale_tray_root(name, before)
+	if not M.restore_stale_tray_root(before) then return end
+	local err = "replaced package.loaded['" .. TRAY_FACADE .. "'] under a cached '" .. TRAY_ROOT
+		.. "'; restore both before the module ends (helpers.keep_loaded)"
+	_suite_results.failed = _suite_results.failed + 1
+	_suite_results.failures[#_suite_results.failures + 1] = { name = name, err = err, kind = "module", module = name }
+	print("  FAIL " .. name .. " — " .. err)
+end
+
 --- Records the current package.loaded entries a test module replaces, for the
 --- module to put back at its end (the runner fails a module that leaves a double).
 --- @param names string[] Module names the test module or its fixtures replace.
@@ -581,6 +611,7 @@ function M.measure_module(name, callback)
 	local ok, result = _timing.measure("module", name, callback, name)
 	_current_module = previous
 	fail_leaked_doubles(name, before)
+	fail_stale_tray_root(name, before)
 	return ok, result
 end
 
