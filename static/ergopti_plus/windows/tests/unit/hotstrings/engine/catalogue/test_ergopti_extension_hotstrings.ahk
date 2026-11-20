@@ -44,6 +44,17 @@ _EHX_FileEntries(Path) {
 	return Count
 }
 
+; The hotstring bindings the shipped Ergopti manifest declares, counted from its
+; text: each becomes one bound file of the discovered extension.
+_EHX_ManifestBindings() {
+	Count := 0
+	loop parse, FileRead(_LCT_RegistryDir() . "ergopti\manifest.toml", "UTF-8"), "`n", "`r"
+		if RegExMatch(A_LoopField, "^\[extension\.hotstring_bindings\.[^\]]+\]$")
+			Count += 1
+	Assert(Count > 0, "the shipped Ergopti manifest must declare hotstring bindings")
+	return Count
+}
+
 ; The first registered case of a trigger in one TOML section, as LoadHotstringsSection reads it.
 _EHX_Entry(Path, Section, Trigger) {
 	global _HOTSTRING_ENTRY_PATTERN
@@ -70,7 +81,7 @@ _EHX_ShippedGroupsLoadFromTheExtension() {
 				Ergopti := Pack
 		Assert(IsObject(Ergopti), "the Ergopti extension the driver ships is installed")
 		AssertEqual("Ergopti+", Ergopti.name, "the shared pack keeps its plus in the display name")
-		AssertEqual(6, Ergopti.bound_files.Length)
+		AssertEqual(_EHX_ManifestBindings(), Ergopti.bound_files.Length)
 		AssertEqual(0, Ergopti.toml_files.Length, "none of its files becomes an ext: category")
 		Registry := _LCT_RegistryDir() . "ergopti\hotstrings\"
 		AssertEqual(Registry . "sfbsreduction.toml", HotstringsBoundTomlPath("sfbsreduction", "comma"))
@@ -80,15 +91,16 @@ _EHX_ShippedGroupsLoadFromTheExtension() {
 		AssertEqual(Registry . "repeatcorrections.toml", HotstringsBoundTomlPath("magickey", "repeat_corrections"))
 		AssertEqual(Registry . "magickeyreplace.toml", HotstringsBoundTomlPath("magickey", "replace"))
 		AssertEqual(Registry . "suffixes_a.toml", HotstringsBundledTomlPath("french_distancesreduction"))
-		AssertEqual(24, CountTomlSection("french_distancesreduction", "suffixes_a"))
+		AssertEqual(_EHX_FileEntries(Registry . "suffixes_a.toml"), CountTomlSection("french_distancesreduction", "suffixes_a"))
 		AssertEqual(0, CountTomlSection("magickey", "replace"), "the native feature owns no fabricated mapping")
 		AssertEqual("", HotstringsBoundTomlPath("magickey", "text_expansion_symbols"),
 			"the other magic key sections stay bundled")
 		Assert(InStr(HotstringsBundledTomlPath("magickey"), "\hotstrings\data\catalogue\magickey.toml"))
-		AssertEqual(34, CountTomlHotstrings("sfbsreduction"))
+		AssertEqual(_EHX_FileEntries(Registry . "sfbsreduction.toml"), CountTomlHotstrings("sfbsreduction"))
 		AssertEqual(_EHX_FileEntries(Registry . "rolls.toml"), CountTomlHotstrings("rolls"))
-		AssertEqual(14, CountTomlSection("magickey", "repeat_corrections"))
-		AssertEqual(CountTomlHotstrings("magickey", HotstringsBundledTomlPath("magickey")) + 14,
+		RepeatCorrections := _EHX_FileEntries(Registry . "repeatcorrections.toml")
+		AssertEqual(RepeatCorrections, CountTomlSection("magickey", "repeat_corrections"))
+		AssertEqual(CountTomlHotstrings("magickey", HotstringsBundledTomlPath("magickey")) + RepeatCorrections,
 			CountTomlHotstrings("magickey"), "the magic key total counts its bound section")
 		; One historical expansion per moved group, read the way the loader reads it.
 		for Row in [["sfbsreduction", "comma", ",t", "pt"], ["rolls", "hc", "hc", "wh"],
@@ -413,7 +425,7 @@ _EHX_SuffixesLoadNatively() {
 			["àn", "ation"], ["àp", "ence"], ["àq", "ique"], ["àr", "erre"],
 			["às", "ement"], ["àt", "ettre"], ["àv", "ment"], ["àx", "ieux"],
 			["àz", "ez-vous"], ["à’", "ance"], ["càd", "could"], ["shàd", "should"]]
-		AssertEqual(24, CountTomlSection("french_distancesreduction", "suffixes_a"))
+		AssertEqual(Expected.Length, CountTomlSection("french_distancesreduction", "suffixes_a"))
 		HSE_TestReset()
 		try {
 			LoadHotstringsSection("french_distancesreduction", "suffixes_a", { Enabled: true })
