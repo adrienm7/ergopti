@@ -77,7 +77,8 @@ do
 	local entry = assert(debug.getinfo(1, "S").source:match("^@(.+)$"), "the entry point has no file")
 	local EntryGuard = assert(loadfile(SCRIPT_DIR .. "/../_shared/core/lifecycle/engine/entry_guard.lua"))()
 	if not EntryGuard.is_guarded(boot_guard) then
-		local booted, failure, traceback = EntryGuard.run(entry)
+		-- getfenv: the guarded run keeps the globals this run was given.
+		local booted, failure, traceback = EntryGuard.run(entry, nil, getfenv and getfenv(1) or _ENV)
 		if booted then return end
 		local Sink = package.loaded["core.logger.engine.sink"]
 		local BootLogger = package.loaded["core.logger.engine.shim"]

@@ -54,6 +54,22 @@ helpers.describe("boot guard", function()
 		helpers.assert_true(BootGuard.is_guarded(received), "the shared marker must be the one macOS checks")
 	end)
 
+	helpers.it("runs the guarded entry point over the globals of the outer run", function()
+		-- A harness that runs the Linux daemon over a controlled require saw the
+		-- guarded re-run load the real modules: loadfile gave it the real globals.
+		local EntryGuard = require("core.lifecycle.engine.entry_guard")
+		local path = os.tmpname()
+		local file = assert(io.open(path, "w"))
+		file:write("entry_guard_probe = entry_guard_marker\n")
+		file:close()
+		local environment = setmetatable({ entry_guard_marker = "outer globals" }, { __index = _G })
+		local booted, failure = EntryGuard.run(path, nil, environment)
+		os.remove(path)
+		helpers.assert_eq(booted, true, tostring(failure))
+		helpers.assert_eq(environment.entry_guard_probe, "outer globals")
+		helpers.assert_eq(rawget(_G, "entry_guard_probe"), nil, "the guarded run must not write the real globals")
+	end)
+
 	helpers.it("reports a top-level boot failure to the launcher and exits 1", function()
 		local seams, reported, exited = entry(true), nil, nil
 		BootGuard.run("/app/macos/init.lua", { loadfile = seams.loadfile,

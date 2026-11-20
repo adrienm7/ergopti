@@ -30,14 +30,29 @@ function M.is_guarded(first)
 end
 
 --- Runs the entry point once more, inside xpcall, marked as guarded.
+--- The inner run resolves its globals in the environment the host gave the
+--- outer one: a host that ran the entry point over its own globals (a harness
+--- with a controlled require and os.exit) would otherwise see the guarded run
+--- escape them for the real ones.
 --- @param entry string Path of the entry file.
 --- @param load function|nil Test seam replacing loadfile.
+--- @param environment table|nil Globals of the outer run; nil keeps the loader's own.
 --- @return boolean booted True when the entry point returned normally.
 --- @return any failure The raised error, when it did not.
 --- @return string|nil traceback Stack captured before the unwind.
-function M.run(entry, load)
+function M.run(entry, load, environment)
 	assert(type(entry) == "string" and entry ~= "", "the entry guard needs the entry point path")
+	assert(environment == nil or type(environment) == "table", "the entry guard environment must be a table")
 	local chunk = assert((load or loadfile)(entry))
+	if environment ~= nil then
+		if setfenv then
+			setfenv(chunk, environment)
+		else
+			-- Lua 5.2+: a main chunk's only upvalue is _ENV.
+			assert(debug.getupvalue(chunk, 1) == "_ENV", "the entry chunk has no _ENV upvalue")
+			debug.setupvalue(chunk, 1, environment)
+		end
+	end
 	local traceback = nil
 	local booted, failure = xpcall(chunk, function(err)
 		traceback = debug.traceback(tostring(err), 2)
