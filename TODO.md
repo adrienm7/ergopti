@@ -243,10 +243,22 @@ waits for the maintainer's review).
       of a source: BEO (0.99 % of Swann unsupported: è ê ç ; ?) and Morgenstern (2 %: its block has no b) have no
       official source that could be found, so they stay Oxeylyzer letter blocks; the xkeyboard-config Spanish Dvorak
       exchanges R and H against KLA's « Spanish Dvorak (Jorge Sanz) », whose author page could not be read
-      (web.archive.org was offline). Russian JCUKEN's 80 % on a French text is genuine. Also left: the Comparer's
-      keyboard drawing and the exports show four levels, and a Neo layout opened in the layout editor
-      (`LAYOUT_FORMATS.toSource`) keeps its first four (Mod3 as AltGr) without its Mod4 and Mod3+Mod4 levels: the
-      Ergopti source has no layer held by Caps Lock or the key right of left Shift.
+      (web.archive.org was offline). Russian JCUKEN's 80 % on a French text is genuine.
+- [ ] **Neo-family levels on the installed and emulated layouts, what is left (2026-11-20).** The Comparer's boards
+      show every level (« Level shown »), the exports name what they leave out, and the editor keeps the seven
+      levels through save and reload: Mod3 and Mod4 are held custom modifiers of the source, on Caps Lock and the
+      ISO key left of Enter, the key right of left Shift and AltGr (`docs/design/layout-analysis.md`, « Layout file
+      formats »; `tools/test/test-layout-editor-levels.cjs`). Left, the same on Windows, macOS and Linux: the
+      drivers' emulation holds Mod3 on the ISO key left of Enter and Mod4 on the key right of left Shift only, since
+      it does not hold a custom modifier on Caps Lock or AltGr (`modifier_key_not_emulated`, `source_compiler.js`
+      `MODIFIER_KEYS`), and types no dead key on an emulated layer (`dead_key_not_emulated`: Neo's Mod3 and Mod4
+      dead keys); each is listed in the emulation table, never dropped. The native files: no `.keylayout` holds a
+      custom modifier (macOS relies on the emulation); XKB holds Mod3 on Caps Lock as its fifth level and lists Mod4
+      (`custom_modifier_not_in_xkb`); the Neo XKB and KLC exports are refused for reasons older than the levels
+      (`unbound_stateful_actions`, Caps Lock on the Roya or AltGr columns), as is the DLL package
+      (`kbd_unit_invalid` on a dead-key result). Making Caps Lock and AltGr holdable by the emulation means each
+      driver's hook taking them as plain keys (the AHK, Hammerspoon and evdev paths) while their own Caps Lock and
+      AltGr roles stay off.
 - [ ] **[RELEASE] Windows export step in native Lua.** The restricted host `windows/native/ergopti_lua_export.c`
       (pinned Lua 5.4.6, built by `tools/build/build_windows_lua_export.ps1` in package-windows) is done. Left: once a
       dev run builds « Windows / Build », commit its artifact `windows-lua-export-*` (`ergopti_lua_export.exe` and
