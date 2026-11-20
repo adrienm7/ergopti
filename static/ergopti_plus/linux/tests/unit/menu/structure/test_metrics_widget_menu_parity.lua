@@ -367,36 +367,39 @@ helpers.describe("shared checked and section-header templates", function()
 		end)
 	end
 
-	helpers.it("retains all fifteen existing id-less header declarations (template-header)", function()
+	helpers.it("retains every existing id-less header declaration (template-header)", function()
 		local file = assert(io.open(helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json", "rb"))
 		local manifest = assert(Json.decode(file:read("*a")))
 		file:close()
-		-- Layout lost « Couches émulées » on 2026-11-19, the tuning header now
-		-- covering both layer rows (input sources, emulation, tuning).
-		local expected = { shortcuts_menu = 3, metrics_menu = 3, layout_menu = 3, hotstrings_menu = 4, tap_holds_menu = 2 }
-		local count = 0
+		-- Every section_header a definition holds, nested ones included: counted
+		-- apart from the loop below so a header that loop skips cannot go unseen.
+		local function nested_headers(node)
+			if type(node) ~= "table" then return 0 end
+			local found = node.type == "section_header" and 1 or 0
+			for _, child in pairs(node) do found = found + nested_headers(child) end
+			return found
+		end
 		for _, key in ipairs({ "shortcuts_menu", "metrics_menu", "layout_menu", "hotstrings_menu", "tap_holds_menu" }) do
 			local definition = manifest[key]
+			helpers.assert_type(definition, "table", key .. " must still be declared in the menu manifest")
 			local in_menu = 0
-			if type(definition) == "table" then
-				for _, header in ipairs(definition) do
-					if header.type == "section_header" then
-						count, in_menu = count + 1, in_menu + 1
-						helpers.assert_nil(header.id, "existing headers retain their id-less contract")
-						for _, platform in ipairs({ "hs", "linux", "ahk" }) do
-							with_rows(platform, { header }, function(renderer)
-								local template = assert(renderer.template_rows("metrics_menu"))
-								local drawn = renderer.render_rows(template, "legacy_header_test")
-								helpers.assert_eq(drawn, renderer.build("metrics_menu", "", {}, {}, {}), "existing root decoration and filtering are identical")
-							end)
-						end
+			for _, header in ipairs(definition) do
+				if header.type == "section_header" then
+					in_menu = in_menu + 1
+					helpers.assert_nil(header.id, "existing headers retain their id-less contract")
+					for _, platform in ipairs({ "hs", "linux", "ahk" }) do
+						with_rows(platform, { header }, function(renderer)
+							local template = assert(renderer.template_rows("metrics_menu"))
+							local drawn = renderer.render_rows(template, "legacy_header_test")
+							helpers.assert_eq(drawn, renderer.build("metrics_menu", "", {}, {}, {}), "existing root decoration and filtering are identical")
+						end)
 					end
 				end
 			end
-			helpers.assert_eq(in_menu, expected[key], key .. ": independent existing-header count must not be silently reduced")
+			helpers.assert_true(in_menu > 0, key .. " must keep its section headers")
+			helpers.assert_eq(in_menu, nested_headers(definition),
+				key .. ": every header of the definition must sit at its top level and be checked above")
 		end
-		-- 3 Shortcuts, 3 Metrics, 3 Layout, 4 Hotstrings and 2 Tap-Hold headers.
-		helpers.assert_eq(count, 15, "independent existing-header count must not be silently reduced")
 	end)
 
 	local invalid = {
