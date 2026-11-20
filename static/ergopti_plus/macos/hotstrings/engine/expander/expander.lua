@@ -452,12 +452,12 @@ function M.undo_on_backspace(undo)
 		return false
 	end
 	local text = BackspaceRestore.restored_text(undo.trigger, _state.magic_key, undo.replayed)
-	-- A restore ending on a word-opening terminator leaves the caret at a word
-	-- start; one ending inside a word (no terminator, or the repeat key's empty
-	-- restore) does not, and the restored word is not in the buffer.
-	local last_char = text:match("[%z\1-\127\194-\244][\128-\191]*$")
-	local opens_word = last_char ~= nil and undo.replayed ~= nil and undo.replayed ~= ""
-		and not text_utils.is_hotstring_word_char(last_char)
+	-- A restore ending on the terminator that fired the expansion leaves the
+	-- caret at a word start; one ending inside a word (no terminator, or the
+	-- repeat key's empty restore) does not, and the restored word is not in the
+	-- buffer. The terminator itself decides, as on Windows and Linux: the shared
+	-- word-character test counts a non-ASCII terminator (« ») as a letter.
+	local opens_word = type(undo.replayed) == "string" and undo.replayed ~= ""
 	local restored = M.perform_text_replacement(
 		ComposedText.count(undo.typed),
 		function()
