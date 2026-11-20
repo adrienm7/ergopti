@@ -522,6 +522,27 @@ LoggerLoadTimings() {
 		LOGGER_RETENTION_DAYS := Days
 }
 
+; Resolves a stored script.log_level value to the level the logger applies: its
+; own name, matched without case, or LOGGER_DEFAULT_LEVEL (the manifest default,
+; pinned by test-logger-scalars-single-source.cjs). The macOS and Linux twin is
+; _shared/core/logger/engine/level_setting.lua; the level_setting cases of
+; _shared/tests/corpus/logger/parity_vectors.json hold the three to one answer.
+; @param Value {Any} The stored value; a non-string is never a level.
+; @returns {Map} "level" (an exact LOGGER_SEVERITY key) and "refused" (true when
+;   Value is no level name and the default was used).
+LoggerResolveLevel(Value) {
+		global LOGGER_SEVERITY, LOGGER_DEFAULT_LEVEL
+		; Enum admission accepts case variants; native severity keys are exact.
+		; Resolve with the same comparison and publish the owning native name.
+		if Value is String {
+				for Level in LOGGER_SEVERITY {
+						if Level = Value
+								return Map("level", Level, "refused", false)
+				}
+		}
+		return Map("level", LOGGER_DEFAULT_LEVEL, "refused", true)
+}
+
 ; Initialise the logger. Reads the minimum level from the ini and resolves the
 ; log file path. Safe to call multiple times — later calls just refresh the
 ; minimum level (e.g. after the user changes it via the menu).
@@ -562,18 +583,9 @@ LoggerInit() {
 						}
 				}
 		}
-		; Enum admission accepts case variants; native severity keys are exact.
-		; Resolve with the same comparison and publish the owning native name.
-		LevelKnown := false
-		if Value is String {
-				for Level in LOGGER_SEVERITY {
-						if Level = Value {
-								LOGGER_MIN_LEVEL := Level
-								LevelKnown := true
-								break
-						}
-				}
-		}
+		Resolved := LoggerResolveLevel(Value)
+		LOGGER_MIN_LEVEL := Resolved["level"]
+		LevelKnown := !Resolved["refused"]
 		_LoggerRefreshFastFlags()
 		; Now that the user's level is finally known, apply it retroactively to
 		; everything the permissive pre-init defaults let through. This is the half
@@ -1936,7 +1948,7 @@ _LoggerEmitRepeatSummary(Streak, Stamp) {
 _LoggerInitSubFiles(LogDir, InterleaveFn := 0, ExistsFn := FileExist,
 		GetTimeFn := FileGetTime, DeleteFn := FileDelete) {
 		global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
-		Today := FormatTime(, "yyyy-MM-dd")
+		Now := A_Now
 		NewPaths := Map()
 		if HasMethod(InterleaveFn, "Call")
 				InterleaveFn.Call()
@@ -1953,9 +1965,7 @@ _LoggerInitSubFiles(LogDir, InterleaveFn := 0, ExistsFn := FileExist,
 						; not evidence that the operator-facing log belongs to another day.
 						if !RegExMatch(FileStamp, "^\d{14}$")
 								continue
-						FileDate := SubStr(FileStamp, 1, 4) . "-" . SubStr(FileStamp, 5, 2)
-								. "-" . SubStr(FileStamp, 7, 2)
-						if (FileDate != Today) {
+						if _LoggerTopicalLogStale(FileStamp, Now) {
 								try DeleteFn.Call(SubPath)
 						}
 				}
@@ -2025,6 +2035,26 @@ _LoggerFanOut(Tag, Line, QueueFn := _LoggerQueueSubLine) {
 		}
 }
 
+; Whether a dated archive is past retention: its date is older than Now minus
+; MaxAgeDays, compared as calendar days whatever the time of day. The rule of
+; the dated_retention cases of _shared/tests/corpus/logger/parity_vectors.json.
+; @param FileDate {String} YYYYMMDD from the file name.
+; @param Now {String} YYYYMMDDHH24MISS.
+; @param MaxAgeDays {Integer} Retention window in whole days.
+; @returns {Boolean}
+_LoggerDatedLogExpired(FileDate, Now, MaxAgeDays) {
+		return FileDate < SubStr(DateAdd(Now, -MaxAgeDays, "Days"), 1, 8)
+}
+
+; Whether a topical view is stale: last modified on another calendar day than
+; Now (the topical_retention cases of parity_vectors.json).
+; @param Modified {String} YYYYMMDDHH24MISS from FileGetTime.
+; @param Now {String} YYYYMMDDHH24MISS.
+; @returns {Boolean}
+_LoggerTopicalLogStale(Modified, Now) {
+		return SubStr(Modified, 1, 8) != SubStr(Now, 1, 8)
+}
+
 ; Removes ErgoptiPlus_*.log (and ErgoptiPlus_errors_*.log) files in LogDir whose
 ; date prefix is older than MaxAgeDays. Best-effort: errors are swallowed so a
 ; permission issue cannot break logger init.
@@ -2032,8 +2062,7 @@ _LoggerPurgeOldLogs(LogDir, MaxAgeDays) {
 		if !DirExist(LogDir) {
 				return
 		}
-		CutoffStamp := DateAdd(A_Now, -MaxAgeDays, "Days")
-		CutoffDate := SubStr(CutoffStamp, 1, 8)  ; YYYYMMDD
+		Now := A_Now
 		; Supports both unified (ErgoptiPlus_YYYY-MM-DD.log) and the dedicated
 		; errors file (ErgoptiPlus_errors_YYYY-MM-DD.log); \Q..\E keeps the
 		; generated names literal inside the pattern.
@@ -2042,8 +2071,7 @@ _LoggerPurgeOldLogs(LogDir, MaxAgeDays) {
 		try {
 				loop files, LogDir . AppDirsLogUnifiedPrefix() . "*" . AppDirsLogExtension() {
 						if RegExMatch(A_LoopFileName, Dated, &Match) {
-								FileDate := Match[1] . Match[2] . Match[3]
-								if (FileDate < CutoffDate) {
+								if _LoggerDatedLogExpired(Match[1] . Match[2] . Match[3], Now, MaxAgeDays) {
 										try FileDelete(A_LoopFileFullPath)
 								}
 						}
