@@ -41,6 +41,49 @@ end
 
 local valid_tag = HttpBridge.valid_ollama_tag
 
+-- The decoded shared pull error classes, read once.
+local _pull_errors = nil
+
+--- Reads the closed classes of a failed Ollama pull, shared with the Windows and
+--- macOS drivers.
+--- @return table|nil errors { classes = { { marker, class }, ... }, digest_mismatch_retries }
+--- @return string|nil reason
+local function pull_errors()
+	if _pull_errors then return _pull_errors end
+	local path = require("core.fs.engine.paths").shared("ai/data/ollama_pull_errors.json")
+	if not path then return nil, "ollama_pull_errors_unreadable" end
+	local data, status = require("core.text.engine.toml_codec.writer").read_classified(path)
+	if status ~= "ok" or type(data) ~= "string" then return nil, "ollama_pull_errors_unreadable" end
+	local ok, decoded = pcall(Json.decode, data)
+	if not ok or type(decoded) ~= "table" or type(decoded.classes) ~= "table" or #decoded.classes == 0
+		or type(decoded.digest_mismatch_retries) ~= "number" or decoded.digest_mismatch_retries < 0
+		or decoded.digest_mismatch_retries % 1 ~= 0 then
+		return nil, "ollama_pull_errors_invalid"
+	end
+	for _, row in ipairs(decoded.classes) do
+		if type(row) ~= "table" or type(row[1]) ~= "string" or row[1] == "" or type(row[2]) ~= "string"
+			or row[2] == "" or row[1] ~= row[1]:lower() then
+			return nil, "ollama_pull_errors_invalid"
+		end
+	end
+	_pull_errors = decoded
+	return decoded
+end
+
+--- Names the class of one Ollama pull error message, first match wins.
+--- @param message string The error field of an /api/pull frame.
+--- @return string|nil class nil for no message; "other" for an unknown one.
+function M.error_class(message)
+	if type(message) ~= "string" or message == "" then return nil end
+	local errors, reason = pull_errors()
+	if not errors then error("Ollama pull error classes unavailable: " .. tostring(reason), 2) end
+	local lowered = message:lower()
+	for _, row in ipairs(errors.classes) do
+		if lowered:find(row[1], 1, true) then return row[2] end
+	end
+	return "other"
+end
+
 -- An answer the registry itself gave: the route reached it.
 local REGISTRY_ANSWERS = { "file does not exist" }
 
@@ -187,7 +230,23 @@ local function consume_chunk(request, chunk, flush)
 	end
 end
 
-local function dispatch(request)
+local dispatch
+
+--- Pulls a digest-mismatched model once more in the same window: Ollama has
+--- already removed the layer whose sha256 did not match.
+--- @param request table
+local function redispatch(request)
+	request.pending, request.discarding, request.lost_frame = "", false, false
+	request.remote_error = nil
+	request.saw_success = false
+	-- The transport retires after its terminal callback; the settlement
+	-- observer dispatches once it has.
+	if settled(request) then return dispatch(request) end
+	request.redispatch = true
+	return false
+end
+
+function dispatch(request)
 	if not settled(request) or request.cancelled or _retained ~= request then return false end
 	request.acquiring = true
 	request.operation, request.retire, request.settled = nil, nil, nil
@@ -233,8 +292,22 @@ local function dispatch(request)
 			consume_chunk(request, "", true)
 			local succeeded = type(result) == "table" and result.ok == true
 				and request.saw_success == true and request.remote_error == nil and not request.lost_frame
-			finish(request, attempt, succeeded, succeeded and translated("download_window.done_success")
-				or failure_message(request),
+			local digest_mismatch = not succeeded and M.error_class(request.remote_error) == "digest_mismatch"
+			if digest_mismatch and request.digest_retries < pull_errors().digest_mismatch_retries then
+				request.digest_retries = request.digest_retries + 1
+				Logger.warn(LOG, "The Ollama pull of '%s' failed its digest check; Ollama removed the layer, so it is pulled once more.",
+					request.tag)
+				redispatch(request)
+				return
+			end
+			local message = translated("download_window.done_success")
+			if digest_mismatch then
+				Logger.error(LOG, "The Ollama pull of '%s' failed its digest check again.", request.tag)
+				message = string.format(translated("ollama.digest_mismatch"), request.tag)
+			elseif not succeeded then
+				message = failure_message(request)
+			end
+			finish(request, attempt, succeeded, message,
 				type(result) == "table" and result.ok ~= true and result.failure_receipt or nil)
 		end)
 	request.acquiring = false
@@ -253,6 +326,9 @@ local function dispatch(request)
 		if not allowed or request.cancelled then
 			request.cancelled, request.shutting_down = true, true
 			M.cancel(request)
+		elseif request.redispatch then
+			request.redispatch = false
+			dispatch(request)
 		end
 	end)
 	if request.cancelled then M.cancel(request); return false end
@@ -293,6 +369,11 @@ function M.start(base_url, tag, label, on_done, admission, on_retired)
 		return false
 	end
 	if _retained and not settled(_retained) then return false end
+	local errors, errors_reason = pull_errors()
+	if not errors then
+		Logger.error(LOG, "Ollama model pull refused: its error classes are unavailable (%s).", errors_reason)
+		return false
+	end
 	if type(base_url) ~= "string" or base_url == "" or not valid_tag(tag)
 			or type(label) ~= "string" or label == ""
 			or (on_retired ~= nil and type(on_retired) ~= "function") then
@@ -307,6 +388,7 @@ function M.start(base_url, tag, label, on_done, admission, on_retired)
 		pending = "",
 		remote_error = nil,
 		saw_success = false,
+		digest_retries = 0,
 		terminal = false, creating = true,
 	}
 	_active, _retained, _retry_request = request, request, nil
@@ -426,6 +508,7 @@ function M.retry(expected)
 	request.pending, request.discarding, request.lost_frame = "", false, false
 	request.remote_error = nil
 	request.saw_success = false
+	request.digest_retries = 0
 	request.terminal = false
 	return dispatch(request)
 end

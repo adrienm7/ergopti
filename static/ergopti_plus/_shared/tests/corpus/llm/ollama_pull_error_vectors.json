@@ -1,0 +1,59 @@
+{
+	"schema_version": 1,
+	"_comment": "OLL-01 of the 2026-11-20 managed Ollama campaign (docs/audits/platform-parity/2026-11-20-managed-ollama/report.md). Each case is one Ollama pull error message and the class _shared/ai/data/ollama_pull_errors.json gives it. Replayed by windows/tests/unit/ai/servers/test_ollama_managed_bootstrap.ahk (LLM_OllamaPullErrorClass, after the CLI's `Error: ` prefix) and linux/tests/unit/ai/engine/ollama/test_model_download.lua (the /api/pull error field). The macOS worker's table is pinned to the data file by the Windows test.",
+	"cases": [
+		{
+			"id": "digest_mismatch",
+			"message": "digest mismatch, file must be downloaded again: want sha256:a, got sha256:b",
+			"class": "digest_mismatch"
+		},
+		{
+			"id": "disk_full",
+			"message": "write /models/blobs/sha256-a-partial: no space left on device",
+			"class": "no_space"
+		},
+		{
+			"id": "permission",
+			"message": "open /models/blobs: permission denied",
+			"class": "permission_denied"
+		},
+		{ "id": "cancelled", "message": "context canceled", "class": "cancelled" },
+		{
+			"id": "max_retries",
+			"message": "max retries exceeded: unexpected EOF",
+			"class": "max_retries"
+		},
+		{
+			"id": "manifest_timeout",
+			"message": "pull model manifest: Get: context deadline exceeded",
+			"class": "timeout"
+		},
+		{
+			"id": "manifest_tls",
+			"message": "pull model manifest: tls: handshake failure",
+			"class": "certificate"
+		},
+		{
+			"id": "manifest_dns",
+			"message": "pull model manifest: dial tcp: lookup host: no such host",
+			"class": "dns"
+		},
+		{
+			"id": "manifest_reset",
+			"message": "pull model manifest: read: connection reset by peer",
+			"class": "connection"
+		},
+		{
+			"id": "manifest_rate",
+			"message": "pull model manifest: 429: too many requests",
+			"class": "rate_limited"
+		},
+		{
+			"id": "manifest_missing",
+			"message": "pull model manifest: file does not exist",
+			"class": "manifest"
+		},
+		{ "id": "blob_missing", "message": "open blob: file does not exist", "class": "not_found" },
+		{ "id": "unknown", "message": "something new", "class": "other" }
+	]
+}

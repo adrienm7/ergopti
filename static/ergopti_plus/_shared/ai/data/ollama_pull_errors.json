@@ -1,0 +1,23 @@
+{
+	"schema_version": 1,
+	"_comment": "The closed classes of a failed Ollama model pull, first match wins, matched as a plain substring, without case, of Ollama's error message (the CLI's last `Error:` line on Windows, the `error` field of an /api/pull frame on macOS and Linux). The transport classes come before `manifest`: Ollama prefixes a failed fetch with `pull model manifest`. A `digest_mismatch` pull is pulled once more: Ollama deletes the layer whose sha256 did not match before it reports the mismatch, so the next pull downloads it afresh. Linux reads this file; the Windows copy (windows/ai/engine/ollama/managed_bootstrap.ahk LLM_OLLAMA_PULL_ERROR_CLASSES) and the macOS copy (macos/ai/engine/ollama/managed_ollama_pull.py ERROR_CLASSES) are pinned to it by tests/unit/ai/servers/test_ollama_managed_bootstrap.ahk.",
+	"digest_mismatch_retries": 1,
+	"classes": [
+		["digest mismatch", "digest_mismatch"],
+		["no space left", "no_space"],
+		["permission denied", "permission_denied"],
+		["context canceled", "cancelled"],
+		["max retries", "max_retries"],
+		["deadline exceeded", "timeout"],
+		["timeout", "timeout"],
+		["certificate", "certificate"],
+		["tls", "certificate"],
+		["no such host", "dns"],
+		["connection refused", "connection"],
+		["connection reset", "connection"],
+		["unexpected eof", "connection"],
+		["too many requests", "rate_limited"],
+		["manifest", "manifest"],
+		["file does not exist", "not_found"]
+	]
+}

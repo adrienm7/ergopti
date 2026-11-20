@@ -530,8 +530,20 @@ _G4B_PullErrorClasses() {
 			["Error: open blob: file does not exist", "not_found"],
 			["pulling manifest`npulling 6a07: 100%`nsuccess", ""], ["", ""]]
 		AssertEqual(Row[2], LLM_OllamaPullErrorClass(Row[1]), Row[1])
-	; The vocabulary is the macOS worker's; a drift shows here, marker and class alike.
+	; OLL-01: the shared vectors, replayed by the Linux suite too.
 	global _SharedDir, LLM_OLLAMA_PULL_ERROR_CLASSES
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\llm\ollama_pull_error_vectors.json", "UTF-8"))
+	for Vector in Corpus["cases"]
+		AssertEqual(Vector["class"], LLM_OllamaPullErrorClass("pulling manifest`nError: " . Vector["message"] . "`n"), Vector["id"])
+	; The vocabulary is the shared data file's, which Linux reads: a drift of
+	; this copy or of the macOS worker's shows here, marker and class alike.
+	Shared := JsonParse(FileRead(_SharedDir . "\ai\data\ollama_pull_errors.json", "UTF-8"))
+	AssertEqual(1, Shared["digest_mismatch_retries"], "Windows and macOS pull a digest mismatch once more")
+	AssertEqual(Shared["classes"].Length, LLM_OLLAMA_PULL_ERROR_CLASSES.Length, "every shared class")
+	for Index, Row in Shared["classes"] {
+		AssertEqual(Row[1], LLM_OLLAMA_PULL_ERROR_CLASSES[Index][1])
+		AssertEqual(Row[2], LLM_OLLAMA_PULL_ERROR_CLASSES[Index][2])
+	}
 	Source := FileRead(_SharedDir . "\..\macos\ai\engine\ollama\managed_ollama_pull.py", "UTF-8")
 	AssertTrue(RegExMatch(Source, "s)ERROR_CLASSES = \((.*?)\n\)", &Block), "the macOS worker must declare its classes")
 	Position := 1, Index := 0

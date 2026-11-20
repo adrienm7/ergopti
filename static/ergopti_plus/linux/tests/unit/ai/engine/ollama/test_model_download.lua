@@ -724,3 +724,82 @@ helpers.describe("model download: exact requester retirement continuation", func
 		end)
 	end
 end)
+
+-- OLL-01 (2026-11-20 managed Ollama campaign): Windows and macOS pull a
+-- digest-mismatched model once more, since Ollama has already removed the bad
+-- layer, then name the mismatch; Linux failed at once with a generic message.
+helpers.describe("Ollama model download: shared pull error classes (OLL-01)", function()
+	local Json = require("core.text.engine.json")
+	local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/llm/ollama_pull_error_vectors.json"
+
+	local function error_frame(message)
+		return Json.encode({ error = message }) .. "\n"
+	end
+
+	helpers.it("ollama-pull-error-vectors: classes every shared vector as Windows does", function()
+		local Download = load_fixture()
+		local ok, err = xpcall(function()
+			local handle = assert(io.open(CORPUS, "rb"))
+			local corpus = Json.decode(handle:read("*a"))
+			handle:close()
+			helpers.assert_true(#corpus.cases > 0, "the corpus names its cases")
+			for _, case in ipairs(corpus.cases) do
+				helpers.assert_eq(Download.error_class(case.message), case.class, case.id)
+			end
+			helpers.assert_eq(Download.error_class(""), nil, "no message names no class")
+		end, debug.traceback)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("ollama-digest-mismatch: a digest mismatch is pulled once more in the same window", function()
+		local Download, transport, window = load_fixture()
+		local done = nil
+		local ok, err = xpcall(function()
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B",
+				function(succeeded) done = succeeded end))
+			transport.starts[1].on_chunk(error_frame("digest mismatch, file must be downloaded again: want sha256:a, got sha256:b"))
+			transport.starts[1].on_done({ ok = true })
+			helpers.assert_eq(#transport.starts, 2, "the mismatched pull is dispatched once more")
+			helpers.assert_eq(#window.completions, 0, "the window stays open on the retry")
+			helpers.assert_eq(Download.is_active(), true)
+			transport.starts[2].on_chunk('{"status":"success"}\n')
+			transport.starts[2].on_done({ ok = true })
+			helpers.assert_eq(window.completions[1][2], true)
+			helpers.assert_eq(done, true)
+		end, debug.traceback)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("ollama-digest-mismatch: a second digest mismatch names itself", function()
+		local Download, transport, window = load_fixture()
+		local ok, err = xpcall(function()
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+			for index = 1, 2 do
+				transport.starts[index].on_chunk(error_frame("digest mismatch, file must be downloaded again"))
+				transport.starts[index].on_done({ ok = true })
+			end
+			helpers.assert_eq(#transport.starts, 2, "one retry only")
+			helpers.assert_eq(window.completions[1][2], false)
+			helpers.assert_eq(window.completions[1][3],
+				string.format(require("core.i18n.engine.i18n").get("ollama.digest_mismatch"), "qwen:2b"))
+		end, debug.traceback)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("ollama-digest-mismatch: another pull error is not retried", function()
+		local Download, transport, window = load_fixture()
+		local ok, err = xpcall(function()
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+			transport.starts[1].on_chunk(error_frame("write: no space left on device"))
+			transport.starts[1].on_done({ ok = true })
+			helpers.assert_eq(#transport.starts, 1, "only a digest mismatch removed the layer it would download again")
+			helpers.assert_eq(window.completions[1][2], false)
+		end, debug.traceback)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+end)
