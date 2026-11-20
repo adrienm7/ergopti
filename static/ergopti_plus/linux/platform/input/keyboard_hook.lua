@@ -231,6 +231,11 @@ for _, code in pairs(_locks.codes) do _locks.keys[code] = true end
 -- _locks, not a local of its own: this chunk is near LuaJIT's local budget.
 _locks.word = nil
 _locks.describe_failure = require("diagnostics.engine.reports.error_description").describe
+-- Caps Lock and AltGr presses the layout emulation holds a custom modifier on
+-- (start({ onHeldModifierKey })): the callback, and source key -> the press's
+-- receipt callbacks. In _locks for the same local budget.
+_locks.held_modifier_callback = nil
+_locks.held_modifier_keys = {}
 
 -- Modifier tracking — updated by _dispatch_event() on each press/release.
 -- Split by ROLE, not by key: shift and AltGr select a level of the layout and
@@ -610,6 +615,7 @@ local function _reset_modifier_state()
 	_altgr_held, _meta_held = false, false
 	_consumed_down = {}
 	_consumed_release = {}
+	_locks.held_modifier_keys = {}
 	_pressed_at = {}
 	_hold_owners = {}
 end
@@ -1772,6 +1778,46 @@ end
 
 --- Dispatches the original post-remapper path without widening the LuaJIT closure.
 --- The event/source and all native capture, modifier, callback and IO guards stay live.
+--- Takes a Caps Lock or AltGr press as a plain key when the layout emulation
+--- holds a custom modifier on it (Neo's Mod3 and Mod4): neither XKB, the
+--- modifier tracking, the lock nor the application sees the key, so Caps Lock
+--- never toggles and AltGr selects no XKB level. Its repeats and its release
+--- go to the press's owner; a layout holding nothing there keeps both roles.
+--- @param ev table Decoded evdev event.
+--- @param source string Source identity.
+--- @return boolean handled True when the event is the held modifier's.
+function _locks.take_held_modifier_key(ev, source)
+	if ev.code ~= EvdevCodes.KEY_CAPSLOCK and ev.code ~= EvdevCodes.KEY_RIGHTALT then return false end
+	local key = source_key(source, ev.code)
+	local held = _locks.held_modifier_keys[key]
+	if held ~= nil then
+		if ev.value == InputEvent.VALUE_UP then
+			_locks.held_modifier_keys[key] = nil
+			if held.release then
+				_call_callback("held-modifier-key release callback", held.release,
+					consumption_detail(ev, source, nil, nil))
+			end
+		elseif ev.value == InputEvent.VALUE_REPEAT then
+			_call_callback("held-modifier-key repeat callback", held.repeat_callback,
+				consumption_detail(ev, source, nil, nil))
+		end
+		return true
+	end
+	if ev.value ~= InputEvent.VALUE_DOWN or not _intercept or not _locks.held_modifier_callback
+		or (ev.remapped and not ev.original_owner) then return false end
+	local called, receipt = _call_callback("held-modifier-key callback", _locks.held_modifier_callback,
+		consumption_detail(ev, source, nil, nil))
+	-- A failed decision is no claim: the key keeps its own role.
+	if not called or receipt == nil then return false end
+	local repeat_callback, release_callback = consumed_repeat_callback(receipt)
+	if repeat_callback == nil then
+		M.emergency_stop("held-modifier-key callback returned no receipt")
+		return true
+	end
+	_locks.held_modifier_keys[key] = { repeat_callback = repeat_callback, release = release_callback }
+	return true
+end
+
 local function _dispatch_post_remap(ev, source)
 	local session = _capture_session
 	local original_source = source
@@ -1785,6 +1831,7 @@ local function _dispatch_post_remap(ev, source)
 		if ev.value == InputEvent.VALUE_UP then _synthetic_source_of[holder_key] = nil end
 	end
 	_wire_source_of[ev] = original_source
+	if not ev.handoff and _locks.take_held_modifier_key(ev, source) then return end
 	-- Observe the role before every XKB transition, including custody handoffs.
 	local pressed = ev.value ~= InputEvent.VALUE_UP
 	local role, role_failed = nil, false
@@ -4346,7 +4393,8 @@ function M.can_capture(intercept, emit_raw)
 end
 
 --- Starts the keyboard hook. Idempotent — safe to call while already running.
---- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onHold?, onHoldAdmission?, onConsume?, onDesync?, onEmitRaw?, device?, pinned? }
+--- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onHold?, onHoldAdmission?, onConsume?,
+---   onHeldModifierKey?, onDesync?, onEmitRaw?, device?, pinned? }
 ---              onHold function     Receives an admitted physical scancode, held milliseconds
 ---                                  and the source path.
 ---              onHoldAdmission function Returns the current opaque plain-table policy token or nil.
@@ -4364,6 +4412,11 @@ end
 ---                                  (prior_role: the modifier role of the key pressed
 ---                                  just before, false for no modifier, nil for none);
 ---                                  true suppresses its down/repeat/up in intercept mode.
+---              onHeldModifierKey function Called in intercept mode with the detail of a
+---                                  Caps Lock or AltGr press before either gets its own
+---                                  role; a { consume, repeat_callback, release_callback }
+---                                  receipt makes the key a plain held key (no lock, no
+---                                  XKB level), nil leaves it its role.
 ---              onDesync function Called synchronously when evdev reports queue loss.
 ---              onEmitRaw function  Called with (evdev_scancode, evdev_value) to put a
 ---                                  consumed event back on the wire. MANDATORY when
@@ -4418,6 +4471,7 @@ function M.start(opts)
 	_on_click = type(options.onClick) == "function" and options.onClick or nil
 	_on_pointer_event = type(options.onPointerEvent) == "function" and options.onPointerEvent or nil
 	_on_consume = type(options.onConsume) == "function" and options.onConsume or nil
+	_locks.held_modifier_callback = type(options.onHeldModifierKey) == "function" and options.onHeldModifierKey or nil
 	_on_desync = type(options.onDesync) == "function" and options.onDesync or nil
 	_intercept = options.intercept == true
 	-- An emitter left over from an earlier session would satisfy the guard below
@@ -4991,6 +5045,7 @@ function M._test_drive(events, callbacks, intercept)
 	_on_hold_admission = cb.onHoldAdmission
 	_hold_admission_session = _capture_session
 	_on_consume  = cb.onConsume
+	_locks.held_modifier_callback = cb.onHeldModifierKey
 	_on_desync   = cb.onDesync
 	_emit_raw    = cb.onEmitRaw
 	LayerPointer.emit_relative = cb.onEmitRelative

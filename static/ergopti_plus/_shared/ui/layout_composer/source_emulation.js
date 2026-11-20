@@ -7,8 +7,8 @@
  * The web twin of _shared/layouts/engine/composer/source_emulation.lua: performs the
  * emulation table the source compiler writes (compileEmulation), the records no
  * .keylayout holds (custom modifiers and their layers, key-chord mappings,
- * shortcuts sending another key, tap-holds, remaps of system keys), on top of
- * the keylayout the page types with. The site and the composer preview load
+ * shortcuts sending another key, tap-holds, remaps of system keys, dead keys
+ * typed on an emulated layer), on top of the keylayout the page types with. The site and the composer preview load
  * it; both engines replay the same vectors
  * (_shared/tests/corpus/layouts/source/emulation_vectors.json).
  *
@@ -37,6 +37,9 @@ var LayoutSourceEmulation = (function () {
 	const REPORTED = ['shift', 'control', 'alt', 'alt_right', 'meta', 'caps_lock'];
 	// The built-in modifiers that have a left and a right key.
 	const SIDED = new Set(['shift', 'control', 'alt', 'meta']);
+	// The key whose AltGr the driver reports as alt_right: while it holds a custom
+	// modifier, that AltGr is the custom one's, not a level of its own.
+	const ALTGR_KEY = 'AltRight';
 
 	const fail = (message) => {
 		throw new Error(message);
@@ -78,15 +81,60 @@ var LayoutSourceEmulation = (function () {
 	// ======= 3/ Compilation =======
 	// ==============================
 
-	/** Check one mapping of the table and copy it. */
-	function mappingOf(value, where) {
+	/**
+	 * Check one mapping of the table and copy it. A dead key must be one of the
+	 * table's; a text's compose identity, when it differs from the text, is kept.
+	 */
+	function mappingOf(value, where, deadKeys) {
 		if (value === null || typeof value !== 'object')
 			fail(`The emulation table holds a malformed mapping at ${where}.`);
-		if (typeof value.text === 'string') return { text: value.text };
+		if (typeof value.text === 'string') {
+			if (value.compose === undefined) return { text: value.text };
+			if (typeof value.compose !== 'string')
+				fail(`The emulation table holds a malformed mapping at ${where}.`);
+			return { text: value.text, compose: value.compose };
+		}
 		if (typeof value.key === 'string')
 			return { key: value.key, modifiers: (value.modifiers || []).slice() };
 		if (value.disabled === true) return { disabled: true };
+		if (typeof value.dead_key === 'string' && deadKeys.has(value.dead_key))
+			return { deadKey: value.dead_key };
 		return fail(`The emulation table holds a malformed mapping at ${where}.`);
+	}
+
+	/** Check the table's dead keys: each rule types a text, leads to a dead key, or both. */
+	function deadKeysOf(table) {
+		const source = table.dead_keys === undefined ? {} : table.dead_keys;
+		if (source === null || typeof source !== 'object' || Array.isArray(source))
+			fail('The emulation table holds malformed dead keys.');
+		const ids = new Set(Object.keys(source));
+		const outcomes = (rules, where) => {
+			if (rules === null || typeof rules !== 'object' || Array.isArray(rules))
+				fail(`The emulation table holds a malformed dead key at ${where}.`);
+			return new Map(
+				Object.entries(rules).map(([input, rule]) => {
+					const valid =
+						rule !== null &&
+						typeof rule === 'object' &&
+						(rule.text === undefined || typeof rule.text === 'string') &&
+						(rule.next === undefined || ids.has(rule.next)) &&
+						(rule.text !== undefined || rule.next !== undefined);
+					if (!valid) fail(`The emulation table holds a malformed dead key at ${where}.${input}.`);
+					return [input, { text: rule.text, next: rule.next }];
+				})
+			);
+		};
+		const deadKeys = new Map();
+		for (const [id, dead] of Object.entries(source)) {
+			if (dead === null || typeof dead !== 'object' || typeof dead.terminator !== 'string')
+				fail(`The emulation table holds a malformed dead key at dead_keys.${id}.`);
+			deadKeys.set(id, {
+				terminator: dead.terminator,
+				inputs: outcomes(dead.inputs, `dead_keys.${id}.inputs`),
+				deadInputs: outcomes(dead.dead_inputs, `dead_keys.${id}.dead_inputs`)
+			});
+		}
+		return deadKeys;
 	}
 
 	/**
@@ -104,7 +152,8 @@ var LayoutSourceEmulation = (function () {
 			layerById: new Map(),
 			shortcuts: [],
 			tapHolds: new Map(),
-			remaps: new Map()
+			remaps: new Map(),
+			deadKeys: deadKeysOf(table)
 		};
 		for (const modifier of table.modifiers || []) {
 			if (typeof modifier.id !== 'string' || !['held', 'locked'].includes(modifier.mode))
@@ -143,8 +192,21 @@ var LayoutSourceEmulation = (function () {
 				keys: new Map(
 					Object.entries(layer.keys).map(([code, value]) => [
 						code,
-						mappingOf(value, `layers.${layer.id}.${code}`)
+						mappingOf(value, `layers.${layer.id}.${code}`, model.deadKeys)
 					])
+				),
+				// What a native layer's keys answer a pending dead key with: a text, or
+				// a dead key of the .keylayout, named whether the table emulates it or not.
+				composeKeys: new Map(
+					Object.entries(layer.compose_keys || {}).map(([code, value]) => {
+						const where = `layers.${layer.id}.compose_keys.${code}`;
+						if (value && typeof value.dead_key === 'string')
+							return [code, { deadKey: value.dead_key }];
+						const mapping = mappingOf(value, where, model.deadKeys);
+						if (mapping.text === undefined)
+							fail(`The emulation table holds a malformed mapping at ${where}.`);
+						return [code, mapping];
+					})
 				)
 			};
 			model.layers.push(compiled);
@@ -179,7 +241,7 @@ var LayoutSourceEmulation = (function () {
 				fail(`The key ${entry.key} has two roles in the emulation table.`);
 			model.tapHolds.set(entry.key, {
 				key: entry.key,
-				tap: mappingOf(entry.tap, `${where}.tap`),
+				tap: mappingOf(entry.tap, `${where}.tap`, model.deadKeys),
 				holdLayer: entry.hold_layer,
 				holdModifier: entry.hold_modifier,
 				threshold: entry.threshold_ms
@@ -200,24 +262,70 @@ var LayoutSourceEmulation = (function () {
 	/** Start performing a compiled table. */
 	function newSession(model) {
 		if (!model || !Array.isArray(model.layers)) fail('A session needs a compiled table.');
-		return { model, active: new Set(), heldKeys: new Map(), pending: null, hold: null };
+		return {
+			model,
+			active: new Set(),
+			heldKeys: new Map(),
+			pending: null,
+			hold: null,
+			dead: null
+		};
+	}
+
+	/** The built-in modifiers the driver reports, without the AltGr a custom modifier holds. */
+	function reportedHeld(session, held) {
+		const set = new Set(held || []);
+		if (session.heldKeys.get(ALTGR_KEY) === 'modifier') set.delete('alt_right');
+		return set;
 	}
 
 	/** The held modifier ids: the driver's built-ins, then the active customs, sorted. */
 	function pressedIds(session, held) {
-		const set = new Set(held || []);
+		const set = reportedHeld(session, held);
 		return REPORTED.filter((id) => set.has(id)).concat([...session.active].sort());
 	}
 
 	/** The built-in modifiers a key action keeps from the hand (Caps Lock is a lock). */
-	function heldModifiers(held) {
-		const set = new Set(held || []);
+	function heldModifiers(session, held) {
+		const set = reportedHeld(session, held);
 		return REPORTED.filter((id) => id !== 'caps_lock' && set.has(id));
 	}
 
-	/** Append the actions of one mapping. */
-	function perform(mapping, actions) {
-		if (mapping.text !== undefined) actions.push({ type: 'text', text: mapping.text });
+	/** The rule of the pending dead key a mapping answers, or null. */
+	function deadRule(session, mapping) {
+		const dead = session.model.deadKeys.get(session.dead);
+		if (mapping.deadKey !== undefined) return dead.deadInputs.get(mapping.deadKey) || null;
+		if (mapping.text === undefined) return null;
+		const identity = mapping.compose !== undefined ? mapping.compose : mapping.text;
+		return identity === '' ? null : dead.inputs.get(identity) || null;
+	}
+
+	/** Follow a dead-key rule: its text, then the dead key it leads to. */
+	function follow(session, rule, actions) {
+		session.dead = rule.next === undefined ? null : rule.next;
+		if (rule.text !== undefined) actions.push({ type: 'text', text: rule.text });
+	}
+
+	/** End a pending dead key with its terminator. */
+	function terminate(session, actions) {
+		if (session.dead === null) return;
+		const terminator = session.model.deadKeys.get(session.dead).terminator;
+		session.dead = null;
+		if (terminator !== '') actions.push({ type: 'text', text: terminator });
+	}
+
+	/** Append the actions of one mapping, composing with a pending dead key. */
+	function perform(session, mapping, actions) {
+		if (session.dead !== null) {
+			const rule = deadRule(session, mapping);
+			if (rule) {
+				follow(session, rule, actions);
+				return;
+			}
+			terminate(session, actions);
+		}
+		if (mapping.deadKey !== undefined) session.dead = mapping.deadKey;
+		else if (mapping.text !== undefined) actions.push({ type: 'text', text: mapping.text });
 		else if (mapping.key !== undefined)
 			actions.push({ type: 'key', key: mapping.key, modifiers: mapping.modifiers.slice() });
 	}
@@ -245,7 +353,7 @@ var LayoutSourceEmulation = (function () {
 		if (!pending) return;
 		if (now - pending.at < pending.entry.threshold) {
 			session.pending = null;
-			perform(pending.entry.tap, actions);
+			perform(session, pending.entry.tap, actions);
 		} else startHold(session, actions);
 	}
 
@@ -301,6 +409,7 @@ var LayoutSourceEmulation = (function () {
 		const pressed = pressedIds(session, held);
 		const shortcut = shortcutFor(session, code, pressed);
 		if (shortcut) {
+			terminate(session, actions);
 			actions.push({
 				type: 'key',
 				key: shortcut.sendKey,
@@ -310,19 +419,39 @@ var LayoutSourceEmulation = (function () {
 		}
 		if (model.remaps.has(code)) {
 			const to = model.remaps.get(code);
-			if (to !== '') actions.push({ type: 'key', key: to, modifiers: heldModifiers(held) });
+			terminate(session, actions);
+			if (to !== '')
+				actions.push({ type: 'key', key: to, modifiers: heldModifiers(session, held) });
 			return { consumed: true, actions };
 		}
 		const layer = selectedLayer(session, pressed);
-		if (!layer) return { consumed: false, actions };
+		if (!layer) {
+			terminate(session, actions);
+			return { consumed: false, actions };
+		}
 		if (layer.keys.has(code)) {
-			perform(layer.keys.get(code), actions);
+			const mapping = layer.keys.get(code);
+			perform(session, mapping, actions);
+			// A dead key's auto-repeat and release are its own: they type nothing.
+			if (mapping.deadKey !== undefined) session.heldKeys.set(code, 'dead');
 			return { consumed: true, actions };
+		}
+		// A pending dead key composes with a native layer's key, else ends with
+		// its terminator and lets the key type as the .keylayout does.
+		if (session.dead !== null) {
+			const native = layer.composeKeys.get(code);
+			const rule = native ? deadRule(session, native) : null;
+			if (rule) {
+				follow(session, rule, actions);
+				if (native.deadKey !== undefined) session.heldKeys.set(code, 'dead');
+				return { consumed: true, actions };
+			}
+			terminate(session, actions);
 		}
 		// A hold reaching a native layer: no modifier selects it on the OS, so the
 		// key goes out with the modifiers of the layer's first selector.
 		if (layer.native && session.hold && session.hold.entry.holdLayer === layer.id) {
-			const sent = new Set(heldModifiers(held).concat(layer.selectors[0].required));
+			const sent = new Set(heldModifiers(session, held).concat(layer.selectors[0].required));
 			const modifiers = REPORTED.filter((id) => sent.has(id)).concat(
 				[...sent].filter((id) => !REPORTED.includes(id))
 			);
@@ -350,7 +479,7 @@ var LayoutSourceEmulation = (function () {
 		if (session.pending && session.pending.code === code) {
 			const pending = session.pending;
 			session.pending = null;
-			if (now - pending.at < pending.entry.threshold) perform(pending.entry.tap, actions);
+			if (now - pending.at < pending.entry.threshold) perform(session, pending.entry.tap, actions);
 			return { consumed: true, actions };
 		}
 		if (session.hold && session.hold.code === code) endHold(session, actions);
@@ -373,7 +502,16 @@ var LayoutSourceEmulation = (function () {
 		session.hold = null;
 		session.heldKeys = new Map();
 		session.active = new Set();
+		session.dead = null;
 		return actions;
+	}
+
+	/**
+	 * Whether the table holds a custom modifier on a key, so the driver's hook
+	 * takes that key (Caps Lock, AltGr) as a plain key instead of its own role.
+	 */
+	function holdsModifierKey(model, code) {
+		return model.modifierKeys.has(code);
 	}
 
 	return {
@@ -386,6 +524,7 @@ var LayoutSourceEmulation = (function () {
 		press,
 		release,
 		tick,
-		reset
+		reset,
+		holdsModifierKey
 	};
 })();

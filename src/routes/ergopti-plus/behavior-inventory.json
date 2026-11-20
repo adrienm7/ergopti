@@ -44,7 +44,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "7ff939779fb528797ca0af253dcd9a0a64239ae83d451fff94de64fb85686512"
+					"sha256": "ee13975460ad7255fa041c281f1fc7308f6acfc0016b6ab80ff6cd05d0cfe46b"
 				}
 			]
 		}
@@ -87,7 +87,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "d17771dc680c883a343a229acde871ff79e6d44e878844c99db9de50d1ba2395"
+					"sha256": "2487517cd92eece71d2ec8b3e178b7a3366914e2dfe623a3ce57949ba7e0eade"
 				},
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua",
@@ -99,7 +99,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "7ff939779fb528797ca0af253dcd9a0a64239ae83d451fff94de64fb85686512"
+					"sha256": "ee13975460ad7255fa041c281f1fc7308f6acfc0016b6ab80ff6cd05d0cfe46b"
 				}
 			]
 		}
@@ -142,7 +142,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "d17771dc680c883a343a229acde871ff79e6d44e878844c99db9de50d1ba2395"
+					"sha256": "2487517cd92eece71d2ec8b3e178b7a3366914e2dfe623a3ce57949ba7e0eade"
 				}
 			],
 			"linux": [
@@ -154,7 +154,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "7ff939779fb528797ca0af253dcd9a0a64239ae83d451fff94de64fb85686512"
+					"sha256": "ee13975460ad7255fa041c281f1fc7308f6acfc0016b6ab80ff6cd05d0cfe46b"
 				}
 			]
 		}
@@ -187,14 +187,14 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "b20d4a7fe910e9b95ba3f4c4db03c1b3bb93e67b31a37d9fd01123c138fc0030"
+					"sha256": "82a9fd5d7632029ac912ad949e087296fb8be8f7490232b11b61c73d0e5fbe96"
 				}
 			],
 			"macos": [
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "d17771dc680c883a343a229acde871ff79e6d44e878844c99db9de50d1ba2395"
+					"sha256": "2487517cd92eece71d2ec8b3e178b7a3366914e2dfe623a3ce57949ba7e0eade"
 				}
 			],
 			"linux": [
@@ -206,7 +206,7 @@
 				{
 					"file": "static/ergopti_plus/linux/platform/input/keyboard_hook.lua",
 					"symbol": "local function _dispatch_post_remap(ev, source)",
-					"sha256": "dc4a649ba36592cffc76be4feabcffab7386d3af8c43065ebec537b1f49e6fdb"
+					"sha256": "e4927628b94a3629f499cd0732a25a27a78fb63e0f6fcd00218b6de4fb57e69d"
 				}
 			]
 		}
@@ -242,14 +242,14 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "b20d4a7fe910e9b95ba3f4c4db03c1b3bb93e67b31a37d9fd01123c138fc0030"
+					"sha256": "82a9fd5d7632029ac912ad949e087296fb8be8f7490232b11b61c73d0e5fbe96"
 				}
 			],
 			"macos": [
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "d17771dc680c883a343a229acde871ff79e6d44e878844c99db9de50d1ba2395"
+					"sha256": "2487517cd92eece71d2ec8b3e178b7a3366914e2dfe623a3ce57949ba7e0eade"
 				}
 			],
 			"linux": [
@@ -289,14 +289,14 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "b20d4a7fe910e9b95ba3f4c4db03c1b3bb93e67b31a37d9fd01123c138fc0030"
+					"sha256": "82a9fd5d7632029ac912ad949e087296fb8be8f7490232b11b61c73d0e5fbe96"
 				}
 			],
 			"macos": [
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "d17771dc680c883a343a229acde871ff79e6d44e878844c99db9de50d1ba2395"
+					"sha256": "2487517cd92eece71d2ec8b3e178b7a3366914e2dfe623a3ce57949ba7e0eade"
 				}
 			],
 			"linux": [
@@ -308,7 +308,7 @@
 				{
 					"file": "static/ergopti_plus/linux/platform/input/keyboard_hook.lua",
 					"symbol": "local function _dispatch_post_remap(ev, source)",
-					"sha256": "dc4a649ba36592cffc76be4feabcffab7386d3af8c43065ebec537b1f49e6fdb"
+					"sha256": "e4927628b94a3629f499cd0732a25a27a78fb63e0f6fcd00218b6de4fb57e69d"
 				}
 			]
 		}
@@ -336,31 +336,31 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_Press(Sc, Shift, Caps, Option)",
-					"sha256": "b20d4a7fe910e9b95ba3f4c4db03c1b3bb93e67b31a37d9fd01123c138fc0030"
+					"sha256": "82a9fd5d7632029ac912ad949e087296fb8be8f7490232b11b61c73d0e5fbe96"
 				}
 			],
 			"macos": [
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/layout_emulation.lua",
 					"symbol": "function M.key_down(e, key_code)",
-					"sha256": "406209d0b8908ade22558c1886bccf0b8493a0c68625602cdb64594af833041b"
+					"sha256": "6389d41f17b54abd2e65e05b4e740f47dbff3dec2dd95544067e1caed918acda"
 				},
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "d17771dc680c883a343a229acde871ff79e6d44e878844c99db9de50d1ba2395"
+					"sha256": "2487517cd92eece71d2ec8b3e178b7a3366914e2dfe623a3ce57949ba7e0eade"
 				}
 			],
 			"linux": [
 				{
 					"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
 					"symbol": "function M.on_key(detail)",
-					"sha256": "c0f534fd0f057cc1c52857fcaab47364ea24a3348c2298466263b4fd06e673e0"
+					"sha256": "481d4401b362e018d1d6025717ab8be851c70a3f507e887c4390a87b1dc859eb"
 				},
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "7ff939779fb528797ca0af253dcd9a0a64239ae83d451fff94de64fb85686512"
+					"sha256": "ee13975460ad7255fa041c281f1fc7308f6acfc0016b6ab80ff6cd05d0cfe46b"
 				}
 			]
 		}

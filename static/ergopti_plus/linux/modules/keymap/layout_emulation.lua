@@ -41,6 +41,10 @@
 ---    is settled before the new press. A built-in modifier a tap-hold holds
 ---    applies to the keys pressed under it (typed shifted, or pressed with it),
 ---    not to a mouse click.
+--- 7. Caps Lock and AltGr holding a custom modifier (Neo's Mod3 and Mod4): the
+---    hook asks M.on_held_modifier_key before giving either its own role, so
+---    neither XKB, the Caps Lock lock nor the application sees the key while the
+---    emulation holds it; any other layout leaves both keys to the hook.
 --- ==============================================================================
 
 local Emulation = require("layouts.engine.composer.keylayout_emulation")
@@ -75,6 +79,10 @@ local CHORD_MODIFIERS = {
 
 -- The engine's built-in modifier ids as the hook names them in detail.mods.
 local HOOK_MODIFIERS = { shift = "shift", control = "ctrl", alt = "alt", alt_right = "altgr", meta = "meta" }
+
+-- The keys the hook gives a role of their own (the lock, the XKB level) unless
+-- the source emulation holds a custom modifier on them.
+local HOLDABLE_MODIFIER_KEYS = { [EvdevCodes.KEY_CAPSLOCK] = "CapsLock", [EvdevCodes.KEY_RIGHTALT] = "AltRight" }
 
 local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "registry", "type_text",
 	"dispatch_char", "emit_shortcut", "emit_key", "now_ms", "caps_locked", "magic_evdev", "is_active",
@@ -385,6 +393,32 @@ function M.on_key(detail)
 	end
 end
 
+
+--- Decides a Caps Lock or AltGr press the hook would give its own role: while
+--- the composed layout's source emulation holds a custom modifier on the key,
+--- the press is that modifier's (consumed, its repeats ignored, its release
+--- owned), else nil and the key keeps its role.
+--- @param detail table { code, mods } as the hook reports a key-down.
+--- @return table|nil receipt { consume = true, repeat_callback, release_callback }.
+function M.on_held_modifier_key(detail)
+	if _session == nil or _extras == nil or type(detail) ~= "table" then return nil end
+	local code = HOLDABLE_MODIFIER_KEYS[detail.code]
+	if code == nil or not SourceEmulation.holds_modifier_key(_extras.model, code) then return nil end
+	if _deps.is_active() ~= true and _extras.held_keys[code] == nil then return nil end
+	local consumed, repeat_callback, release_callback = source_press(detail, code,
+		merged_mods(type(detail.mods) == "table" and detail.mods or {}))
+	if consumed ~= true or repeat_callback == nil then
+		error("layout_emulation: the source emulation did not hold its modifier key " .. code)
+	end
+	return { consume = true, repeat_callback = repeat_callback, release_callback = release_callback }
+end
+
+--- Whether the running source emulation holds a custom modifier on a key.
+--- @param code string KeyboardEvent.code.
+--- @return boolean
+function M.holds_modifier_key(code)
+	return _extras ~= nil and SourceEmulation.holds_modifier_key(_extras.model, code)
+end
 
 --- Whether the running emulation decides the Ctrl, Alt or Super chords of this
 --- key: the accented-letter shortcuts of the OS layout leave such a key to it,

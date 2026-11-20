@@ -2603,6 +2603,20 @@ shift_tap = eventtap.new(
 		if provenance then return false end
 		if _callbacks_retired then return false, fence_events end
 		_user_hotstring_input = {}
+		-- Right Option holding a custom modifier of the emulated layout (Neo's
+		-- Mod4): its edges are that key's press and release, never Option's.
+		if provenance_status ~= EventProvenance.STATUS_UNREADABLE then
+			local read, keycode = pcall(e.getKeyCode, e)
+			if read then
+				local settled, consumed = pcall(LayoutEmulation.flags_changed, e, keycode)
+				if not settled then
+					LayoutEmulation.reset()
+					SyntheticInput.defer_after_callback("layout emulation modifier failure", function()
+						Logger.error(LOG, "Layout emulation modifier edge failed: %s.", tostring(consumed))
+					end)
+				elseif consumed then return true, fence_events end
+			end
+		end
 		if provenance_status == EventProvenance.STATUS_UNREADABLE then
 			_shift_left_down = false
 			_shift_right_down = false

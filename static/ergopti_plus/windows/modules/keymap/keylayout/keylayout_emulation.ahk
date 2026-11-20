@@ -1890,13 +1890,24 @@ KeylayoutEmulation_CaptureCanonicalSource() {
 ; ===================================
 
 ; Keys the source emulation never takes: the built-in modifiers it reads the
-; state of, and the keys the source compiler reports as not emulated.
+; state of, and the keys the source compiler reports as not emulated. Caps Lock
+; and AltGr are taken only while they hold a custom modifier
+; (_KLE_SourceHoldsModifierKey).
 _KLE_SourceUntaken() {
 	static Untaken := Map("ShiftLeft", true, "ShiftRight", true, "ControlLeft", true, "ControlRight", true,
 		"AltLeft", true, "AltRight", true, "MetaLeft", true, "MetaRight", true, "CapsLock", true, "ContextMenu", true,
 		; The JIS input-method keys stay the IME's, as the menu key stays the system's.
 		"NonConvert", true, "Convert", true, "KanaMode", true)
 	return Untaken
+}
+
+; Caps Lock and AltGr holding a custom modifier of the table (Neo's Mod3 and
+; Mod4): the source emulation takes them as plain keys, so the suppressed press
+; neither toggles Caps Lock nor reaches Windows as AltGr. Any other modifier key
+; stays untaken, and a layout holding nothing on these two leaves them alone.
+_KLE_SourceHoldsModifierKey(Model, Code) {
+	static Holdable := Map("CapsLock", true, "AltRight", true)
+	return Holdable.Has(Code) && SourceEmulation_HoldsModifierKey(Model, Code)
 }
 
 ; The hotkey names one source key takes: those of the layout below (so the
@@ -1937,7 +1948,7 @@ KeylayoutEmulation_SourceLoad(Model, Registry, HotkeyFn := Hotkey, HotIfFn := Ho
 				Codes[Code] := true
 	Taken := []
 	for Code in Codes {
-		if _KLE_SourceUntaken().Has(Code)
+		if _KLE_SourceUntaken().Has(Code) && !_KLE_SourceHoldsModifierKey(Model, Code)
 			continue
 		if !Scans.Has(Code)
 			throw Error("The layout source emulation names the unknown key " . Code . ".")
@@ -2001,13 +2012,20 @@ _KLE_SourceCriterion(*) {
  * Reads through the key-state adapter, the one owner of the physical state.
  * @param {Func} StateFn - (Name) -> physical state; KS_IsDown, or a stand-in for a test.
  * @param {Func} CapsFn - () -> Caps Lock toggle; KS_CapsLockToggleState, or a stand-in.
+ * @param {Func} UserLCtrlFn - () -> whether a held LCtrl is the user's and not the
+ *   one an AltGr layout adds to AltGr; TapHoldUserLCtrlHeld, or a stand-in.
  * @returns {Map}
  */
-KeylayoutEmulation_SourceHeld(StateFn := KS_IsDown, CapsFn := KS_CapsLockToggleState) {
+KeylayoutEmulation_SourceHeld(StateFn := KS_IsDown, CapsFn := KS_CapsLockToggleState,
+		UserLCtrlFn := TapHoldUserLCtrlHeld) {
+	global KLE_SourceSession
 	Held := Map()
 	if StateFn.Call("LShift") || StateFn.Call("RShift")
 		Held["shift"] := true
-	if StateFn.Call("LControl") || StateFn.Call("RControl")
+	; While AltGr holds a custom modifier, the LCtrl an AltGr layout adds to it is
+	; AltGr's, not a Control the user holds (the engine drops the AltGr itself).
+	AltGrHeld := (KLE_SourceSession is Map) && KLE_SourceSession["held_keys"].Get("AltRight", "") == "modifier"
+	if StateFn.Call("RControl") || (StateFn.Call("LControl") && (!AltGrHeld || UserLCtrlFn.Call()))
 		Held["control"] := true
 	if StateFn.Call("LAlt")
 		Held["alt"] := true

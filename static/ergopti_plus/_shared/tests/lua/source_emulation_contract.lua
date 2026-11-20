@@ -89,6 +89,50 @@ function M.register(helpers, shared)
 			helpers.assert_true(replayed >= 2 * 18, "every vector is replayed on both platforms")
 		end)
 
+		-- layout-levels-emulation: Neo 2's Mod3 and Mod4 on Caps Lock and AltGr, ¡ ¿
+		-- and the dead keys of those levels, as the web and AutoHotkey engines type them.
+		helpers.it("types Neo 2's own levels and their dead keys as the web engine does", function()
+			local neo_vectors = Json.decode(read_all(shared(corpus .. "neo2_vectors.json")))
+			local neo = Json.decode(read_all(shared(corpus .. neo_vectors.table)))
+			local replayed = 0
+			for _, platform in ipairs(neo_vectors.platforms) do
+				local model = Engine.compile(neo[platform])
+				helpers.assert_true(Engine.holds_modifier_key(model, "AltRight"), platform .. ": AltGr holds Mod4")
+				helpers.assert_eq(Engine.holds_modifier_key(model, "CapsLock"), platform ~= "macos",
+					platform .. ": Caps Lock holds Mod3 where the hook sees it held")
+				for _, case in ipairs(neo_vectors.cases) do
+					local listed = case.platforms == nil
+					for _, name in ipairs(case.platforms or {}) do listed = listed or name == platform end
+					if listed then
+						helpers.assert_eq(replay(Engine, model, case.steps), nil, platform .. ": " .. case.name)
+						replayed = replayed + 1
+					end
+				end
+			end
+			helpers.assert_true(replayed >= 3 * 16, "every Neo vector is replayed on the three platforms")
+		end)
+
+		-- ergopti-emulation-unchanged: a layout holding no custom modifier on Caps
+		-- Lock or AltGr leaves both keys to the OS and emulates no dead key.
+		helpers.it("leaves Caps Lock and AltGr to the OS for the Ergopti layouts", function()
+			local pinned = Json.decode(read_all(shared(corpus .. "ergopti_emulation.json")))
+			local checked = 0
+			for file, tables in pairs(pinned) do
+				for platform, table_ in pairs(tables) do
+					local where = file .. " on " .. platform
+					helpers.assert_eq(table_.dead_keys, nil, where .. ": no dead key is emulated")
+					local model = Engine.compile(table_)
+					for _, key in ipairs({ "CapsLock", "AltRight" }) do
+						helpers.assert_true(not Engine.holds_modifier_key(model, key), where .. ": " .. key .. " keeps its role")
+						local consumed, actions = Engine.press(Engine.new_session(model), key, {}, 0)
+						helpers.assert_true(consumed == false and #actions == 0, where .. ": " .. key .. " goes to the OS")
+					end
+					checked = checked + 1
+				end
+			end
+			helpers.assert_true(checked >= 5 * 3, "every Ergopti table is checked on the three platforms")
+		end)
+
 		helpers.it("sees a changed expectation", function()
 			local model = Engine.compile(golden.linux)
 			local steps = {
@@ -116,7 +160,7 @@ function M.register(helpers, shared)
 				threshold_fraction = function(t) t.tap_holds[1].threshold_ms = 150.5 end,
 				threshold_string = function(t) t.tap_holds[1].threshold_ms = "150" end,
 				threshold_nan = function(t) t.tap_holds[1].threshold_ms = 0 / 0 end,
-				mapping = function(t) t.layers[1].keys.KeyX = { dead_key = "acute" } end,
+				mapping = function(t) t.layers[1].keys.KeyX = { dead_key = "undeclared" } end,
 				shared_key = function(t) table.insert(t.modifiers[2].keys, "IntlBackslash") end,
 			}) do
 				helpers.assert_true(not pcall(Engine.compile, mutated(change)), label .. " is refused")

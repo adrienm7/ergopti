@@ -470,3 +470,71 @@ helpers.describe("layout emulation (Linux): a layout source's records", function
 		helpers.assert_eq(record.typed, { "a" }, "the custom modifier no longer holds")
 	end)
 end)
+
+-- evdev codes of Neo 2's keys the level cases press.
+local KEY_CAPSLOCK, KEY_RIGHTALT, KEY_Y, KEY_H, KEY_EQUAL = 58, 100, 21, 35, 13
+
+local function neo_table()
+	return Json.decode(read_all(Paths.shared("tests/corpus/layouts/source/neo2_emulation.json"))).linux
+end
+
+--- The hook's question for a Caps Lock or AltGr press.
+local function held_key(M, code, mods)
+	return M.on_held_modifier_key({ code = code, mods = mods or {}, value = 1 })
+end
+
+helpers.describe("layout emulation (Linux): Neo 2's Mod3 and Mod4 on Caps Lock and AltGr", function()
+	helpers.it("holds Mod4 on AltGr until its release, its repeats swallowed (layout-levels-emulation)", function()
+		local M, record = source_fixture(neo_table())
+		helpers.assert_true(M.reload(), "the Neo table loads")
+		local receipt = held_key(M, KEY_RIGHTALT)
+		helpers.assert_eq(type(receipt), "table", "AltGr is the emulation's plain key")
+		helpers.assert_true(receipt.consume == true and type(receipt.release_callback) == "function")
+		helpers.assert_true(receipt.repeat_callback({ code = KEY_RIGHTALT, mods = {} }), "its repeats are swallowed")
+		helpers.assert_true(press(M, KEY_Y), "a Mod4 key is typed by the emulation")
+		helpers.assert_true(press(M, KEY_H, { altgr = true }), "an AltGr the hook still reports is no level")
+		helpers.assert_eq(record.typed, { "¡", "¿" })
+		helpers.assert_true(receipt.release_callback({ code = KEY_RIGHTALT, value = 0 }))
+		helpers.assert_true(press(M, KEY_Y), "the keylayout types the base level again")
+		helpers.assert_true(record.typed[3] ~= "¡", "the release returns to the base level")
+	end)
+
+	helpers.it("holds Mod3 on Caps Lock and types the Mod4 dead diaeresis on the next key (layout-levels-emulation)",
+		function()
+		local M, record = source_fixture(neo_table())
+		helpers.assert_true(M.reload())
+		local caps = held_key(M, KEY_CAPSLOCK)
+		helpers.assert_eq(type(caps), "table", "Caps Lock is the emulation's plain key, never the lock")
+		helpers.assert_true(press(M, KEY_H))
+		helpers.assert_eq(record.typed, { "?" }, "Mod3 types its level")
+		caps.release_callback({ code = KEY_CAPSLOCK, value = 0 })
+		local altgr = held_key(M, KEY_RIGHTALT)
+		local consumed, on_repeat = press(M, KEY_EQUAL)
+		helpers.assert_true(consumed, "the dead key is consumed")
+		helpers.assert_true(on_repeat({ code = KEY_EQUAL, mods = {} }), "its auto-repeat types nothing")
+		helpers.assert_eq(record.typed, { "?" }, "a dead key types nothing yet")
+		altgr.release_callback({ code = KEY_RIGHTALT, value = 0 })
+		helpers.assert_true(press(M, KEY_D), "the next key composes")
+		helpers.assert_eq(record.typed, { "?", "ä" })
+	end)
+
+	helpers.it("leaves Caps Lock and AltGr their roles while paused (layout-levels-emulation)", function()
+		local M, record = source_fixture(neo_table())
+		helpers.assert_true(M.reload())
+		record.paused = true
+		helpers.assert_eq(held_key(M, KEY_CAPSLOCK), nil, "a paused driver leaves the lock")
+		helpers.assert_eq(held_key(M, KEY_RIGHTALT), nil, "and AltGr")
+	end)
+
+	helpers.it("leaves Caps Lock and AltGr their roles for the Ergopti layouts (ergopti-emulation-unchanged)", function()
+		local pinned = Json.decode(read_all(Paths.shared("tests/corpus/layouts/source/ergopti_emulation.json")))
+		for file, tables in pairs(pinned) do
+			local M = source_fixture(tables.linux)
+			helpers.assert_true(M.reload(), file .. ": the table loads")
+			helpers.assert_true(not M.holds_modifier_key("CapsLock") and not M.holds_modifier_key("AltRight"),
+				file .. ": neither key holds a modifier")
+			helpers.assert_eq(held_key(M, KEY_CAPSLOCK), nil, file .. ": Caps Lock stays the lock")
+			helpers.assert_eq(held_key(M, KEY_RIGHTALT), nil, file .. ": AltGr stays the XKB level")
+		end
+	end)
+end)

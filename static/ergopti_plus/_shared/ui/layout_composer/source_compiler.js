@@ -784,6 +784,19 @@ var LayoutSourceCompiler = (function () {
 	// alt_right (AltGr, macOS Option) is not reported by the Linux hook or the
 	// macOS tap flags, so a layer needing one cannot be selected by the engine.
 	const REPORTED = new Set(['shift', 'control', 'alt', 'alt_right', 'meta', 'caps_lock']);
+	// The modifier keys each driver's hook takes as plain keys when a custom
+	// modifier is held on them: its own Caps Lock toggle and AltGr level stay off
+	// while it does. macOS reports Caps Lock to an event tap only as the lock flag
+	// changing on a press, never its release, and toggles the lock before any
+	// tap sees it, so it cannot hold a modifier there (platform_parity.toml).
+	const HOLDABLE_MODIFIER_KEYS = {
+		macos: new Set(['AltRight']),
+		linux: new Set(['CapsLock', 'AltRight']),
+		windows: new Set(['CapsLock', 'AltRight'])
+	};
+	const HOLDABLE_SOMEWHERE = new Set(
+		Object.values(HOLDABLE_MODIFIER_KEYS).flatMap((keys) => [...keys])
+	);
 
 	/** A mapping the engine can perform, or the reason it cannot. */
 	function emulatedMapping(mapping, sendable) {
@@ -793,7 +806,48 @@ var LayoutSourceCompiler = (function () {
 			return { key: mapping.key, modifiers: (mapping.modifiers || []).slice() };
 		}
 		if (own(mapping, 'disabled')) return { disabled: true };
-		return own(mapping, 'dead_key') ? 'dead_key_not_emulated' : 'action_not_emulated';
+		if (own(mapping, 'dead_key')) return { dead_key: mapping.dead_key };
+		return 'action_not_emulated';
+	}
+
+	/**
+	 * The text a key answers dead-key rules with when it differs from its text:
+	 * its compose_as, or empty for a key typing outside every dead key.
+	 */
+	function composeIdentity(mapping) {
+		if (mapping.compose === false) return '';
+		return own(mapping, 'compose_as') ? mapping.compose_as : mapping.text;
+	}
+
+	/**
+	 * The dead keys an emulated mapping can reach, with their rules keyed by what
+	 * answers them: `inputs` by the typed text, `dead_inputs` by the dead key
+	 * pressed. Every state a rule leads to is reached too, in source order.
+	 */
+	function emulatedDeadKeys(source, started) {
+		const byId = new Map((source.dead_keys || []).map((dead) => [dead.id, dead]));
+		const reached = new Set();
+		const queue = [...started];
+		while (queue.length) {
+			const id = queue.shift();
+			if (reached.has(id)) continue;
+			reached.add(id);
+			for (const rule of byId.get(id).rules) if (own(rule, 'next')) queue.push(rule.next);
+		}
+		const result = {};
+		for (const dead of source.dead_keys || []) {
+			if (!reached.has(dead.id)) continue;
+			const entry = { terminator: dead.terminator, inputs: {}, dead_inputs: {} };
+			for (const rule of dead.rules) {
+				const outcome = {};
+				if (own(rule, 'text')) outcome.text = rule.text;
+				if (own(rule, 'next')) outcome.next = rule.next;
+				if (own(rule, 'input')) entry.inputs[rule.input] = outcome;
+				else entry.dead_inputs[rule.input_dead_key] = outcome;
+			}
+			result[dead.id] = entry;
+		}
+		return result;
 	}
 
 	/**
@@ -830,13 +884,33 @@ var LayoutSourceCompiler = (function () {
 
 		// Every custom modifier is listed, keyless when none of its keys can be seen:
 		// a tap-hold can still hold it, and the engine refuses an undeclared id.
+		// Caps Lock and AltGr hold one where the platform's hook can take them.
+		const holdable = HOLDABLE_MODIFIER_KEYS[platform];
 		const modifiers = (source.modifiers || []).map((modifier) => ({
 			id: modifier.id,
 			mode: modifier.mode,
-			keys: modifier.keys.filter((key, index) =>
-				pressable(key, `modifiers.${modifier.id}.keys[${index}]`)
-			)
+			keys: modifier.keys.filter((key, index) => {
+				const path = `modifiers.${modifier.id}.keys[${index}]`;
+				if (holdable.has(key)) return true;
+				if (HOLDABLE_SOMEWHERE.has(key)) {
+					skip(path, `modifier_key_not_holdable_on_${platform}`);
+					return false;
+				}
+				return pressable(key, path);
+			})
 		}));
+		// The dead keys an emulated layer or a tap types, and the text mappings
+		// that answer them, whose compose identity is written once one is reached.
+		const startedDead = new Set();
+		const composing = [];
+		const emulate = (mapping) => {
+			const emulated = emulatedMapping(mapping, sendable);
+			if (typeof emulated === 'string') return emulated;
+			if (own(emulated, 'dead_key')) startedDead.add(emulated.dead_key);
+			if (own(emulated, 'text')) composing.push([emulated, composeIdentity(mapping)]);
+			return emulated;
+		};
+		const nativeLayers = [];
 
 		const layers = (source.layers || []).map((layer) => {
 			const selectors = [layer, ...(layer.alternatives || [])].map((selector) => ({
@@ -856,15 +930,15 @@ var LayoutSourceCompiler = (function () {
 				entry.selectable = false;
 				return entry;
 			}
-			for (const [name, mapping] of Object.entries(
-				layerKeys(source, layer, platform, 'iso', table)
-			)) {
+			const keys = layerKeys(source, layer, platform, 'iso', table);
+			if (native) nativeLayers.push([entry, keys]);
+			for (const [name, mapping] of Object.entries(keys)) {
 				const path = `layers.${layer.id}.keys.${name}`;
 				// The compiled .keylayout already types a native layer's text, dead keys and
 				// disabled keys; the emulation adds what it leaves out.
 				if (native && !own(mapping, 'key') && !own(mapping, 'action')) continue;
 				if (!pressable(name, path)) continue;
-				const emulated = emulatedMapping(mapping, sendable);
+				const emulated = emulate(mapping);
 				if (typeof emulated === 'string') skip(path, emulated);
 				else entry.keys[name] = emulated;
 			}
@@ -914,7 +988,7 @@ var LayoutSourceCompiler = (function () {
 		for (const [index, entry] of (source.tap_holds || []).entries()) {
 			const path = `tap_holds[${index}]`;
 			if (!pressable(entry.key, path)) continue;
-			const tap = emulatedMapping(entry.tap, sendable);
+			const tap = emulate(entry.tap);
 			if (typeof tap === 'string') {
 				skip(`${path}.tap`, tap);
 				continue;
@@ -939,7 +1013,7 @@ var LayoutSourceCompiler = (function () {
 			else remaps.push({ key: from, to });
 		}
 
-		return {
+		const emulation = {
 			format: EMULATION_FORMAT,
 			version: EMULATION_VERSION,
 			layout: source.layout.id,
@@ -951,6 +1025,28 @@ var LayoutSourceCompiler = (function () {
 			remaps,
 			not_emulated: notEmulated
 		};
+		// A dead key the emulation types composes with the next key, which may be
+		// on a native layer the .keylayout types: the table then says what each key
+		// of those layers answers a rule with, and the text mappings their compose
+		// identity. A table without one is written exactly as before.
+		if (startedDead.size === 0) return emulation;
+		for (const [emulated, identity] of composing)
+			if (identity !== emulated.text) emulated.compose = identity;
+		for (const [entry, keys] of nativeLayers) {
+			const composeKeys = {};
+			for (const [name, mapping] of Object.entries(keys)) {
+				if (MODIFIER_KEYS.has(name) || !sendable(name)) continue;
+				if (own(mapping, 'dead_key')) composeKeys[name] = { dead_key: mapping.dead_key };
+				else if (own(mapping, 'text')) {
+					composeKeys[name] = { text: mapping.text };
+					const identity = composeIdentity(mapping);
+					if (identity !== mapping.text) composeKeys[name].compose = identity;
+				}
+			}
+			entry.compose_keys = composeKeys;
+		}
+		emulation.dead_keys = emulatedDeadKeys(source, startedDead);
+		return emulation;
 	}
 
 	// ========================

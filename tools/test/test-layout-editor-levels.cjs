@@ -23,9 +23,11 @@
  *    holding keys are left out; KLA, Kalamine, genkey and cmini name every
  *    level they leave out and the levels written as AltGr; a share link
  *    carries the levels and a link with levels but no modifiers is refused.
- * 5. Emulation: on Windows, macOS and Linux the drivers' table holds Mod3 on
- *    the ISO key left of Enter and Mod4 on the key right of left Shift, and
- *    lists Caps Lock and AltGr, which it cannot hold, by path and reason.
+ * 5. Emulation: on Windows and Linux the drivers' table holds Mod3 on Caps
+ *    Lock and the ISO key left of Enter, and Mod4 on the key right of left
+ *    Shift and AltGr; macOS holds them on the same keys but Caps Lock, which
+ *    it lists by path and reason. The emulated levels type their dead keys,
+ *    and the committed Neo 2 fixture the drivers replay is the editor's.
  * ==============================================================================
  */
 
@@ -253,13 +255,15 @@ for (const entry of levelLosses.concat(dof.unmapped))
 
 	for (const platform of ['windows', 'macos', 'linux']) {
 		const table = plain(IO.emulationTable(reloaded.doc, platform));
+		// macOS never reports Caps Lock held to an event tap (platform_parity.toml).
+		const mod3Keys = platform === 'macos' ? ['Backslash'] : ['CapsLock', 'Backslash'];
 		assert.deepEqual(
 			table.modifiers,
 			[
-				{ id: 'mod3', mode: 'held', keys: ['Backslash'] },
-				{ id: 'mod4', mode: 'held', keys: ['IntlBackslash'] }
+				{ id: 'mod3', mode: 'held', keys: mod3Keys },
+				{ id: 'mod4', mode: 'held', keys: ['IntlBackslash', 'AltRight'] }
 			],
-			`${platform}: the drivers hold Mod3 and Mod4 on the keys they see`
+			`${platform}: the drivers hold Mod3 and Mod4 on Neo's keys, Caps Lock and AltGr included`
 		);
 		const layer = table.layers.find((entry) => entry.id === 'mod4');
 		assert(
@@ -267,16 +271,29 @@ for (const entry of levelLosses.concat(dof.unmapped))
 			`${platform}: the emulated Mod4 layer types ¡`
 		);
 		assert.deepEqual(
-			table.not_emulated
-				.filter((entry) => entry.path.startsWith('modifiers.'))
-				.map((entry) => [entry.path, entry.reason]),
-			[
-				['modifiers.mod3.keys[0]', 'modifier_key_not_emulated'],
-				['modifiers.mod4.keys[1]', 'modifier_key_not_emulated']
-			],
-			`${platform}: Caps Lock and AltGr are listed, not dropped`
+			layer.keys.Equal,
+			{ dead_key: 'diaeresis' },
+			`${platform}: the emulated Mod4 layer types its dead ¨`
+		);
+		assert(table.dead_keys.diaeresis, `${platform}: the table holds the dead ¨ and its rules`);
+		assert.deepEqual(
+			table.not_emulated.map((entry) => [entry.path, entry.reason]),
+			platform === 'macos'
+				? [['modifiers.mod3.keys[0]', 'modifier_key_not_holdable_on_macos']]
+				: [],
+			`${platform}: only what the platform cannot hold is listed`
 		);
 	}
+	// The committed Neo 2 fixture the drivers replay is what the editor writes.
+	const fixture = IO.parse(
+		fs.readFileSync(shared('tests', 'corpus', 'layouts', 'source', 'neo2_source.toml'), 'utf8')
+	);
+	assert(fixture.ok, 'the Neo 2 fixture reads');
+	assert.deepEqual(
+		plain(fixture.doc),
+		plain(IO.startFromDocument(F.toSource(neo), 'neo2', 'Neo 2').doc),
+		"neo2_source.toml is the editor's Neo 2: rewrite it from F.toSource and IO.serialize"
+	);
 	console.log(
 		`test-layout-editor-levels: OK (${NEO_LEVELS.length} levels, ${Object.keys(got).length} characters, 3 platforms)`
 	);

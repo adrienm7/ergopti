@@ -68,10 +68,8 @@ assert.deepEqual(
 	[
 		'modifiers.kana_lock.keys[1]:physical_key_not_emulated',
 		'modifiers.nav.keys[0]:physical_key_not_emulated',
-		'layers.roya.keys.KeyE:dead_key_not_emulated',
 		'layers.kana.keys.KeyJ:action_not_emulated',
 		'layers.right_kana:sided_modifier_not_emulated',
-		'tap_holds[3].tap:dead_key_not_emulated',
 		'remap.Pause:physical_key_not_emulated',
 		'remap.CapsLock:modifier_key_not_emulated'
 	]
@@ -129,7 +127,7 @@ for (const [label, mutate, message] of [
 	['threshold', (table) => (table.tap_holds[0].threshold_ms = 0), /malformed tap-hold/],
 	[
 		'mapping',
-		(table) => (table.layers[0].keys.KeyX = { dead_key: 'acute' }),
+		(table) => (table.layers[0].keys.KeyX = { dead_key: 'undeclared' }),
 		/malformed mapping at layers.base.KeyX/
 	],
 	['shared key', (table) => table.modifiers[1].keys.push('IntlBackslash'), /share the key/],
@@ -305,6 +303,75 @@ assert.throws(
 );
 checks++;
 
+// Neo 2's own levels (layout-levels-emulation): Mod3 and Mod4 held on Caps Lock
+// and AltGr as on their other keys, ¡ and ¿, and the dead keys of those levels
+// composing with the native base and Shift levels. The table is the compiler's
+// own, and the vectors the Lua and AutoHotkey engines replay too.
+const neoGolden = JSON.parse(read(path.join(corpus, 'neo2_emulation.json')));
+const neoVectors = JSON.parse(read(path.join(corpus, 'neo2_vectors.json')));
+let neoReplayed = 0;
+{
+	const neo = Source.read(read(path.join(corpus, neoVectors.source)));
+	for (const platform of neoVectors.platforms) {
+		assert.deepEqual(
+			clone(Source.compileEmulation(neo, { platform })),
+			neoGolden[platform],
+			`${platform}: regenerate with node tools/codegen/codegen-layout-source-emulation.cjs`
+		);
+		const model = Engine.compile(neoGolden[platform]);
+		assert.equal(Engine.holdsModifierKey(model, 'AltRight'), true, `${platform}: AltGr holds Mod4`);
+		assert.equal(
+			Engine.holdsModifierKey(model, 'CapsLock'),
+			platform !== 'macos',
+			`${platform}: Caps Lock holds Mod3 where the hook sees it held`
+		);
+		for (const vector of neoVectors.cases) {
+			if (vector.platforms && !vector.platforms.includes(platform)) continue;
+			assert.equal(replay(neoGolden[platform], vector.steps), null, `${platform}: ${vector.name}`);
+			neoReplayed++;
+		}
+	}
+	assert.deepEqual(
+		neoGolden.macos.not_emulated.map((entry) => `${entry.path}:${entry.reason}`),
+		['modifiers.mod3.keys[0]:modifier_key_not_holdable_on_macos'],
+		'macOS names Caps Lock, the one key it cannot hold Mod3 on'
+	);
+	for (const platform of ['linux', 'windows'])
+		assert.deepEqual(
+			neoGolden[platform].not_emulated,
+			[],
+			`${platform}: every Neo level is emulated`
+		);
+	assert(neoReplayed >= 3 * 16, 'every Neo vector is replayed on the three platforms');
+	checks++;
+}
+
+// Layouts that hold no custom modifier on Caps Lock or AltGr and type no dead
+// key on an emulated layer (ergopti-emulation-unchanged): the tables of the
+// Ergopti layouts are byte for byte those pinned before the emulation held
+// either key, and the engine holds neither key and no dead key for them.
+{
+	const { renderErgopti } = require('../codegen/codegen-layout-source-emulation.cjs');
+	const pinned = read(path.join(corpus, 'ergopti_emulation.json'));
+	assert.equal(renderErgopti(Source), pinned, 'the Ergopti tables are unchanged');
+	for (const [file, tables] of Object.entries(JSON.parse(pinned)))
+		for (const [platform, table] of Object.entries(tables)) {
+			const where = `${file} on ${platform}`;
+			assert.equal(table.dead_keys, undefined, `${where}: no dead key is emulated`);
+			const model = Engine.compile(table);
+			for (const key of ['CapsLock', 'AltRight']) {
+				assert.equal(Engine.holdsModifierKey(model, key), false, `${where}: ${key} keeps its role`);
+				const session = Engine.newSession(model);
+				assert.deepEqual(
+					clone(Engine.press(session, key, [], 0)),
+					{ consumed: false, actions: [] },
+					`${where}: ${key} goes to the OS`
+				);
+			}
+		}
+	checks++;
+}
+
 console.log(
-	`[OK] layout source emulation: ${checks} checks (golden tables, ${vectors.cases.length} shared typing vectors per platform, refusals, reports, CLI)`
+	`[OK] layout source emulation: ${checks} checks (golden tables, ${vectors.cases.length} shared typing vectors per platform, ${neoReplayed} Neo 2 level replays, refusals, reports, CLI)`
 );

@@ -68,6 +68,7 @@ local function fixture(layout, form, source_override)
 		is_active = function() return not record.paused end,
 		autorepeat = function(e) return e.autorepeat == true end,
 		now_ms = function() return record.now end,
+		option_sides = function(e) return { left = e.left_option == true, right = e.right_option == true } end,
 		post = function(outputs)
 			for _, output in ipairs(outputs) do
 				if output.type == "text" then record.posted[#record.posted + 1] = output.text
@@ -404,5 +405,86 @@ helpers.describe("layout emulation (macOS): a layout source's records", function
 		local e = event({}, "a")
 		M.key_down(e, KC_A)
 		helpers.assert_eq(e.unicode, "a", "the custom modifier no longer holds")
+	end)
+end)
+
+-- Neo 2's levels: its emulation table on top of the source fixture's keylayout.
+local KC_Y, KC_EQUAL, KC_RIGHT_OPTION = 16, 24, 61
+local function neo_table()
+	return Json.decode(read_all(helpers.shared("tests/corpus/layouts/source/neo2_emulation.json"))).macos
+end
+
+--- Right Option's flagsChanged edge, its device flag set while it is down.
+local function right_option(down)
+	local e = event(down and { alt = true } or {})
+	e.right_option = down
+	return e
+end
+
+helpers.describe("layout emulation (macOS): Neo 2's Mod4 on right Option", function()
+	helpers.it("holds Mod4 on right Option and clears its Option flag from the keys under it (layout-levels-emulation)",
+		function()
+		local M = source_fixture(neo_table())
+		helpers.assert_true(M.reload(), "the Neo table loads")
+		helpers.assert_true(M.holds_modifier_key("AltRight"), "AltGr holds Mod4")
+		helpers.assert_true(M.flags_changed(right_option(true), KC_RIGHT_OPTION), "its press edge is deleted")
+		local e = event({ alt = true }, "x")
+		e.right_option = true
+		helpers.assert_true(not M.key_down(e, KC_Y), "the Mod4 text rides the event")
+		helpers.assert_eq(e.unicode, "¡")
+		helpers.assert_eq(e.flags.alt, nil, "no application reads right Option as Option")
+		local chord = event({ alt = true, cmd = true }, "y")
+		chord.right_option = true
+		M.key_down(chord, KC_Y)
+		helpers.assert_eq(chord.flags.alt, nil, "a key Mod4 leaves to macOS goes out without Option")
+		helpers.assert_true(M.flags_changed(right_option(false), KC_RIGHT_OPTION), "its release edge is deleted")
+		local after = event({}, "k")
+		M.key_down(after, KC_Y)
+		helpers.assert_true(after.unicode ~= "¡", "the release returns to the base level")
+	end)
+
+	helpers.it("keeps the Option flag of a left Option held with Mod4 (layout-levels-emulation)", function()
+		local M = source_fixture(neo_table())
+		helpers.assert_true(M.reload())
+		M.flags_changed(right_option(true), KC_RIGHT_OPTION)
+		local e = event({ alt = true, cmd = true }, "y")
+		e.right_option, e.left_option = true, true
+		M.key_down(e, KC_Y)
+		helpers.assert_eq(e.flags.alt, true, "the user's own left Option is kept")
+	end)
+
+	helpers.it("types the Mod4 dead diaeresis on the next base key (layout-levels-emulation)", function()
+		local M = source_fixture(neo_table())
+		helpers.assert_true(M.reload())
+		M.flags_changed(right_option(true), KC_RIGHT_OPTION)
+		local dead = event({ alt = true })
+		dead.right_option = true
+		helpers.assert_true(M.key_down(dead, KC_EQUAL), "the dead key-down is deleted")
+		local repeated = event({ alt = true })
+		repeated.right_option, repeated.autorepeat = true, true
+		helpers.assert_true(M.key_down(repeated, KC_EQUAL), "its auto-repeat is deleted")
+		helpers.assert_true(M.key_up(event({ alt = true }), KC_EQUAL), "its key-up is deleted")
+		M.flags_changed(right_option(false), KC_RIGHT_OPTION)
+		local e = event({}, "a")
+		helpers.assert_true(not M.key_down(e, KC_D), "the composed text rides the event")
+		helpers.assert_eq(e.unicode, "ä")
+	end)
+
+	helpers.it("leaves Caps Lock to macOS's lock (layout-levels-emulation)", function()
+		local M = source_fixture(neo_table())
+		helpers.assert_true(M.reload())
+		helpers.assert_true(not M.holds_modifier_key("CapsLock"), "macOS never reports Caps Lock held")
+	end)
+
+	helpers.it("leaves right Option to macOS for the Ergopti layouts (ergopti-emulation-unchanged)", function()
+		local pinned = Json.decode(read_all(helpers.shared("tests/corpus/layouts/source/ergopti_emulation.json")))
+		for file, tables in pairs(pinned) do
+			local M = source_fixture(tables.macos)
+			helpers.assert_true(M.reload(), file .. ": the table loads")
+			helpers.assert_true(not M.holds_modifier_key("AltRight") and not M.holds_modifier_key("CapsLock"),
+				file .. ": neither key holds a modifier")
+			helpers.assert_true(not M.flags_changed(right_option(true), KC_RIGHT_OPTION),
+				file .. ": right Option's edge reaches macOS")
+		end
 	end)
 end)

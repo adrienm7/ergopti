@@ -3821,6 +3821,12 @@ local function main()
 		onPointerEvent = on_pointer_event,
 		onPhysical = on_physical,
 		onConsume = on_consume,
+		-- Caps Lock and AltGr holding a custom modifier of the emulated layout
+		-- (Neo's Mod3 and Mod4) are its plain keys. Required inline: main() sits
+		-- at LuaJIT's upvalue limit.
+		onHeldModifierKey = function(detail)
+			return require("modules.keymap.layout_emulation").on_held_modifier_key(detail)
+		end,
 		onDesync = function()
 			_undoable = nil
 			_last_offered = nil

@@ -37,6 +37,12 @@
 ---    physical order (defer_consumed_input_action). A built-in modifier a
 ---    tap-hold holds is added to the flags of the keys pressed under it, not to
 ---    a mouse click.
+--- 7. A custom modifier held on right Option (AltGr, Neo's Mod4): its
+---    flagsChanged edges are the key's press and release (M.flags_changed,
+---    deleted), and the Option flag macOS still sets on the keys under it is
+---    cleared, so no application and no Option level sees it. Caps Lock cannot
+---    hold one: an event tap sees only the lock flag change on a press, never
+---    the release, after the system has toggled the lock (platform_parity.toml).
 --- ==============================================================================
 
 local Emulation = require("layouts.engine.composer.keylayout_emulation")
@@ -67,7 +73,12 @@ for id, flag in pairs(FLAG_OF) do
 end
 
 local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "registry", "keyboard_type",
-	"physical_code", "keycode_for_char", "magic_code", "is_active", "autorepeat", "now_ms", "post" }
+	"physical_code", "keycode_for_char", "magic_code", "is_active", "autorepeat", "now_ms", "post",
+	"option_sides" }
+
+-- Right Option (kVK_RightOption) and the key the source emulation names it.
+local RIGHT_OPTION_KEY_CODE = 61
+local ALTGR = "AltRight"
 
 
 
@@ -83,7 +94,8 @@ local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "reg
 --- @param deps table { read_config, default_for, report_outdated?, source, keycodes, registry,
 ---   keyboard_type(event), physical_code(entry, keyboard_type), keycode_for_char(char), magic_code,
 ---   is_active, autorepeat(event), now_ms, post(outputs) posting { type = "text", text } and
----   { type = "key", key_code, flags } after the callback, in order }
+---   { type = "key", key_code, flags } after the callback, in order, option_sides(event) ->
+---   { left = boolean, right = boolean } the Option keys an event's device flags hold }
 function M.init(deps)
 	if _deps ~= nil then error("layout_emulation: already initialized", 2) end
 	if type(deps) ~= "table" then error("layout_emulation.init needs its collaborators", 2) end
@@ -326,6 +338,57 @@ local function source_down(e, key_code, code)
 	return nil, outputs
 end
 
+--- Whether the source emulation holds a custom modifier on right Option now.
+local function altgr_held()
+	return _extras ~= nil and _extras.held_keys[ALTGR] == "modifier"
+end
+
+--- Clears the Option flag right Option sets on a key while it holds a custom
+--- modifier: macOS keeps it on every key under the key, whose flagsChanged edge
+--- was deleted. A left Option the user holds too keeps it.
+local function clear_held_altgr(e)
+	if not altgr_held() or _deps.option_sides(e).left == true then return end
+	local flags = e:getFlags()
+	if flags.alt ~= true then return end
+	local cleared = {}
+	for name, held in pairs(flags) do if name ~= "alt" then cleared[name] = held end end
+	e:setFlags(cleared)
+end
+
+--- Takes right Option's flagsChanged edge as the press or release of the key
+--- the source emulation holds a custom modifier on (AltGr as Neo's Mod4).
+--- @param e table|userdata The flagsChanged event.
+--- @param key_code integer Its key code.
+--- @return boolean consume True when the edge is the custom modifier's (delete it).
+function M.flags_changed(e, key_code)
+	local extras = _extras
+	if key_code ~= RIGHT_OPTION_KEY_CODE or extras == nil or _session == nil then return false end
+	if not SourceEmulation.holds_modifier_key(extras.model, ALTGR) then return false end
+	local down = _deps.option_sides(e).right == true
+	local held = extras.held_keys[ALTGR] ~= nil
+	local actions
+	if down and not held then
+		-- A paused driver leaves the key to macOS; a key it already holds ends below.
+		if _deps.is_active() ~= true then return false end
+		actions = select(2, SourceEmulation.press(extras, ALTGR, engine_held(e:getFlags()), _deps.now_ms()))
+	elseif not down and held then
+		actions = select(2, SourceEmulation.release(extras, ALTGR, _deps.now_ms()))
+	else
+		return held
+	end
+	local outputs = outputs_of(e, actions)
+	if #outputs > 0 then _deps.post(outputs) end
+	return true
+end
+
+--- Whether the running source emulation holds a custom modifier on a key, for
+--- a menu or a test.
+--- @param code string KeyboardEvent.code.
+--- @return boolean
+function M.holds_modifier_key(code)
+	return _extras ~= nil and SourceEmulation.holds_modifier_key(_extras.model, code)
+end
+
 --- Rewrites one physical key-up: the release of a key the source emulation
 --- holds, or of a key-down rewritten to another key code.
 --- @param e table|userdata The key-up event.
@@ -341,6 +404,7 @@ function M.key_up(e, key_code)
 	if _extras == nil or _session == nil then return false end
 	local code = physical(e, key_code)
 	if code == nil then return false end
+	clear_held_altgr(e)
 	local consumed, actions = SourceEmulation.release(_extras, code, _deps.now_ms())
 	local outputs = outputs_of(e, actions)
 	if #outputs > 0 then _deps.post(outputs) end
@@ -356,6 +420,7 @@ function M.key_down(e, key_code)
 	if session == nil then return false end
 	local code = physical(e, key_code)
 	if code == nil or _deps.is_active() ~= true then return false end
+	clear_held_altgr(e)
 	local prefix = {}
 	if _extras ~= nil then
 		local consumed
@@ -501,6 +566,16 @@ function M.start(ports)
 			return value ~= nil and value ~= 0
 		end,
 		now_ms = function() return math.floor(hs.timer.absoluteTime() / 1000000) end,
+		-- The device-dependent flags tell the two Option keys apart (NX_DEVICELALTKEYMASK,
+		-- NX_DEVICERALTKEYMASK); the event's own alt flag covers both.
+		option_sides = function(e)
+			local masks = hs.eventtap.event.rawFlagMasks
+			local left = math.tointeger(masks.deviceLeftAlternate)
+			local right = math.tointeger(masks.deviceRightAlternate)
+			local raw = math.tointeger(e:rawFlags())
+			assert(left and right and raw, "the event's device Option flags cannot be read")
+			return { left = (raw & left) ~= 0, right = (raw & right) ~= 0 }
+		end,
 		-- After the callback and before any later physical key, in order.
 		post = function(outputs)
 			local SyntheticInput = require("platform.input.synthetic_input")

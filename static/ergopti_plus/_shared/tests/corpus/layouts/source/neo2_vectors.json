@@ -1,0 +1,782 @@
+{
+	"_comment": "Typing vectors of Neo 2's own levels in the layout source emulation (docs/design/layout-source-format.md, « Emulation of what no .keylayout holds »). Each case replays steps on a fresh session of neo2_emulation.json, the table the source compiler writes for neo2_source.toml per platform, as emulation_vectors.json does; a case naming platforms is replayed on those only. Mod3 is held on Caps Lock (not on macOS, which never reports Caps Lock held) and on the ISO key left of Enter, Mod4 on the key right of left Shift and on AltGr, whose own AltGr the engine ignores while it holds Mod4. The base and Shift levels are native: a key the engine leaves alone types as the .keylayout does. The web emulation (source_emulation.js), the Lua engine of macOS and Linux (layouts/engine/composer/source_emulation.lua) and the AutoHotkey engine of Windows (modules/keymap/keylayout/source_emulation.ahk) replay them.",
+	"source": "neo2_source.toml",
+	"table": "neo2_emulation.json",
+	"platforms": ["macos", "linux", "windows"],
+	"cases": [
+		{
+			"name": "Mod4 held on AltGr types ¡ and its release returns to the base level",
+			"steps": [
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyY",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "¡"
+						}
+					]
+				},
+				{
+					"release": "KeyY",
+					"at": 20,
+					"consumed": false,
+					"actions": []
+				},
+				{
+					"release": "AltRight",
+					"at": 30,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyY",
+					"held": [],
+					"at": 40,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "Mod4 held on the key right of left Shift types ¿",
+			"steps": [
+				{
+					"press": "IntlBackslash",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyH",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "¿"
+						}
+					]
+				},
+				{
+					"release": "IntlBackslash",
+					"at": 20,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyH",
+					"held": [],
+					"at": 30,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "the AltGr a driver reports while AltGr holds Mod4 selects no level of its own",
+			"steps": [
+				{
+					"press": "AltRight",
+					"held": ["alt_right"],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyY",
+					"held": ["alt_right"],
+					"at": 10,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "¡"
+						}
+					]
+				},
+				{
+					"press": "KeyH",
+					"held": ["alt_right"],
+					"at": 20,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "¿"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "an auto-repeat of AltGr keeps Mod4 held until the key is released",
+			"steps": [
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 40,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 80,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyH",
+					"held": [],
+					"at": 90,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "¿"
+						}
+					]
+				},
+				{
+					"release": "AltRight",
+					"at": 100,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyH",
+					"held": [],
+					"at": 110,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "Shift with Mod4 on AltGr selects the Shift+Mod4 level",
+			"steps": [
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyU",
+					"held": ["shift"],
+					"at": 10,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "7"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Mod3 held on Caps Lock types its level and never the lock",
+			"platforms": ["linux", "windows"],
+			"steps": [
+				{
+					"press": "CapsLock",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyY",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "!"
+						}
+					]
+				},
+				{
+					"press": "CapsLock",
+					"held": [],
+					"at": 40,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyH",
+					"held": [],
+					"at": 50,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "?"
+						}
+					]
+				},
+				{
+					"release": "CapsLock",
+					"at": 60,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyY",
+					"held": [],
+					"at": 70,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "macOS leaves Caps Lock to its lock",
+			"platforms": ["macos"],
+			"steps": [
+				{
+					"press": "CapsLock",
+					"held": [],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				},
+				{
+					"press": "KeyY",
+					"held": [],
+					"at": 10,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "Mod3 held on the key left of Enter types its level",
+			"steps": [
+				{
+					"press": "Backslash",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyH",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "?"
+						}
+					]
+				},
+				{
+					"release": "Backslash",
+					"at": 20,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyH",
+					"held": [],
+					"at": 30,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "Mod3 and Mod4 held together select their shared level, either released returns to the other",
+			"steps": [
+				{
+					"press": "Backslash",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Digit7",
+					"held": [],
+					"at": 20,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "→"
+						}
+					]
+				},
+				{
+					"release": "Backslash",
+					"at": 30,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Digit7",
+					"held": [],
+					"at": 40,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "¤"
+						}
+					]
+				},
+				{
+					"release": "AltRight",
+					"at": 50,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Digit7",
+					"held": [],
+					"at": 60,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "the Mod4 dead ¨ composes with a letter of the base level",
+			"steps": [
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Equal",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Equal",
+					"at": 20,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "AltRight",
+					"at": 30,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyD",
+					"held": [],
+					"at": 40,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "ä"
+						}
+					]
+				},
+				{
+					"press": "KeyD",
+					"held": [],
+					"at": 50,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "the Mod4 dead ¨ composes with a letter of the Shift level",
+			"steps": [
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Equal",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Equal",
+					"at": 20,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "AltRight",
+					"at": 30,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyD",
+					"held": ["shift"],
+					"at": 40,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "Ä"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "the Mod4 dead ¨ follows a dead key of the base level to the next dead key",
+			"steps": [
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Equal",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Equal",
+					"at": 20,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "AltRight",
+					"at": 30,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "BracketRight",
+					"held": [],
+					"at": 40,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "BracketRight",
+					"at": 50,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyS",
+					"held": [],
+					"at": 60,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "ḯ"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "the Mod4 dead ¨ types its terminator before a key it has no rule for",
+			"steps": [
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Equal",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Equal",
+					"at": 20,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "AltRight",
+					"at": 30,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Digit1",
+					"held": [],
+					"at": 40,
+					"consumed": false,
+					"actions": [
+						{
+							"type": "text",
+							"text": "\""
+						}
+					]
+				},
+				{
+					"press": "Digit1",
+					"held": [],
+					"at": 50,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "the Mod4 dead ¨ pressed twice types the combining diaeresis",
+			"steps": [
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Equal",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Equal",
+					"at": 20,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Equal",
+					"held": [],
+					"at": 30,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "̈"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "an auto-repeat of the Mod4 dead ¨ types nothing",
+			"steps": [
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Equal",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Equal",
+					"held": [],
+					"at": 50,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Equal",
+					"held": [],
+					"at": 90,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Equal",
+					"at": 100,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "AltRight",
+					"at": 110,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyD",
+					"held": [],
+					"at": 120,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "ä"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "the Mod4 dead ¨ types its terminator before another Mod4 character",
+			"steps": [
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Equal",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Equal",
+					"at": 20,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyY",
+					"held": [],
+					"at": 30,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "\""
+						},
+						{
+							"type": "text",
+							"text": "¡"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "the Mod3 dead ring composes with a letter of the base level",
+			"steps": [
+				{
+					"press": "Backslash",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Equal",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Equal",
+					"at": 20,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Backslash",
+					"at": 30,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyD",
+					"held": [],
+					"at": 40,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "å"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "a reset drops Mod4 and the pending dead ¨",
+			"steps": [
+				{
+					"press": "AltRight",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "Equal",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"reset": true,
+					"actions": []
+				},
+				{
+					"press": "KeyD",
+					"held": [],
+					"at": 40,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		}
+	]
+}
