@@ -9,6 +9,7 @@ local Codec = require("core.text.engine.toml_codec")
 local Logger = require("core.logger.engine.shim")
 local ConfigOutdated = require("settings.engine.migration.outdated")
 local TableUtil = require("core.text.engine.table_util")
+local Timings = require("core.timing.engine.timings")
 local LOG = "ai.engine.preferences"
 local _scope_owner = nil
 local _detached = nil
@@ -17,6 +18,20 @@ local _observed_source = nil
 -- The document decoded from _observed_source's bytes. Only lookup() reads it and
 -- every table value leaves as a copy, so identical bytes share one decode.
 local _observed_document = nil
+-- The change token (see change_token) under which _observed_source was read,
+-- set only when that read can stand for later ones; nil means read the bytes.
+local _observed_token = nil
+local loaded_luv, Luv = pcall(require, "luv")
+if not loaded_luv then Luv = nil end
+
+--- Wall-clock milliseconds, the clock file timestamps are stamped on.
+--- @return number
+local function system_wall_ms()
+	local sec, usec = Luv.gettimeofday()
+	return sec * 1000 + usec / 1000
+end
+-- A test seam (M._set_clock_for_test), never configuration.
+local wall_ms = system_wall_ms
 
 --- Admits ordinary actions only outside a retained scope and source write refusal.
 --- @return boolean admitted
@@ -112,21 +127,76 @@ local function lookup(document, path)
 	return value, "ok"
 end
 
+--- config.toml's change token: every lstat field an edit moves (an atomic
+--- replace moves the inode, an in-place write the size or the change time).
+--- An absent file has none: reading its absence costs no more than a stat.
+--- @param path string
+--- @return table|nil token Nil when there is no file to stat, or no luv.
+local function change_token(path)
+	if not Luv then return nil end
+	local stat = Luv.fs_lstat(path)
+	if stat == nil or type(stat.mtime) ~= "table" or type(stat.ctime) ~= "table" then return nil end
+	return { type = stat.type, dev = stat.dev, ino = stat.ino, size = stat.size, mode = stat.mode,
+		mtime_sec = stat.mtime.sec, mtime_nsec = stat.mtime.nsec, ctime_sec = stat.ctime.sec, ctime_nsec = stat.ctime.nsec }
+end
+
+local TOKEN_FIELDS = { "type", "dev", "ino", "size", "mode", "mtime_sec", "mtime_nsec", "ctime_sec", "ctime_nsec" }
+
+--- @param first table
+--- @param second table
+--- @return boolean same True when no field of the two tokens differs.
+local function same_token(first, second)
+	for _, field in ipairs(TOKEN_FIELDS) do
+		if first[field] ~= second[field] then return false end
+	end
+	return true
+end
+
+--- Whether a token taken around one complete read can stand for that read's
+--- bytes later: it did not move during the read, the read found the file, and
+--- the file had been quiet for llm.config_change_token_quiet_ms (constants.toml):
+--- a filesystem stamps mtime and ctime from a coarse clock, so an edit within
+--- that tick of a read can keep every field of the token. Past it, an edit
+--- always moves ctime, which no process can set back. Version-control indexes
+--- trust their stat data on the same rule ("racily clean" entries are compared
+--- by content).
+--- @param before table|nil Token taken before the read.
+--- @param after table|nil Token taken after it.
+--- @param status string The read's status.
+--- @return boolean
+local function settled(before, after, status)
+	if status ~= "ok" or not before or not after or not same_token(before, after) then return false end
+	local stamped_ms = math.max(before.mtime_sec * 1000 + before.mtime_nsec / 1e6,
+		before.ctime_sec * 1000 + before.ctime_nsec / 1e6)
+	return wall_ms() - stamped_ms >= Timings.ms("llm", "config_change_token_quiet_ms")
+end
+
 local function read()
 	if _detached then return _detached.document, _detached.source end
-	-- Fresh bytes on every call: an external edit is seen at once. Only their
-	-- decode is reused, which the managed download's per-chunk source fence
-	-- otherwise repeated about 80 times for each 64 KiB chunk.
-	local bytes, status, detail = Writer.read_classified(Paths.config("config.toml"))
+	-- Fresh bytes on every call while the file's change token moves: an external
+	-- edit is seen at once. The managed download re-admits its source about 30
+	-- times per 64 KiB chunk, and reading the bytes each time cost more than the
+	-- chunk's own write. A token that has not moved since a settled read stands
+	-- for that read's bytes, which the schema admission already accepted (its
+	-- phase only goes from preparing to ready, at boot). Identical bytes also
+	-- share one decode.
+	local path = Paths.config("config.toml")
+	local token = change_token(path)
+	if token and _observed_token and same_token(token, _observed_token) then
+		return _observed_document, { status = _observed_source.status, content = _observed_source.content }
+	end
+	local bytes, status, detail = Writer.read_classified(path)
 	assert(status == "ok" or status == "absent", "AI configuration is unreadable: " .. tostring(detail))
 	local source = { status = status, content = bytes }
+	local trusted = settled(token, change_token(path), status) and token or nil
 	if _observed_source and _observed_source.status == status and _observed_source.content == bytes then
+		_observed_token = trusted
 		return _observed_document, source
 	end
 	local document = Codec.decode(bytes or "")
 	assert(type(document) == "table", "AI configuration contains malformed TOML")
 	_generation = _generation + 1
-	_observed_source, _observed_document = source, document
+	_observed_source, _observed_document, _observed_token = source, document, trusted
 	return document, source
 end
 
@@ -251,6 +321,13 @@ function M.set(path, value) return M.set_many({ [path] = value }) end
 function M.delete(path)
 	entry(path)
 	return M.set(path, Manifest.default_for(path))
+end
+
+--- Replaces the wall clock the change token's quiet period is measured on.
+--- @param clock function|nil Milliseconds since the epoch; nil restores the system clock.
+function M._set_clock_for_test(clock)
+	wall_ms = clock or system_wall_ms
+	_observed_token = nil
 end
 
 --- Validates and temporarily exposes one detached image to existing readers.

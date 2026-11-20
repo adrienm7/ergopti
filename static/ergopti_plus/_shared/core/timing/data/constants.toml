@@ -56,6 +56,15 @@ backend_busy_recheck_ms = 300
 # HS: ai/engine/ollama/deps_checker.lua RUNTIME_METADATA_POLL_SEC.
 ollama_runtime_metadata_poll_ms = 250
 
+# How long config.toml must have been quiet before the AI preference reader
+# lets the file's change token (lstat: inode, size, mtime, ctime) stand for
+# the bytes it last read. A filesystem stamps from a coarse clock (a jiffy, up
+# to 10 ms; FAT's mtime 2 s), so an edit in the same tick as a read can keep
+# every field; past this, an edit always moves ctime. The managed archive
+# download re-admits its source about 30 times per 64 KiB chunk.
+# LX: ai/engine/preferences.lua.
+config_change_token_quiet_ms = 3000
+
 # HTTP request hard timeout for the remote LLM API.
 # AHK: api_remote.ahk LLM_REMOTE_TIMEOUT_MS.
 # HS:  api_remote.lua REQUEST_TIMEOUT_MS.
