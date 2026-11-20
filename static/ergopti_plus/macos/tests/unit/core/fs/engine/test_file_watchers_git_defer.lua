@@ -53,8 +53,15 @@ helpers.describe("infra/file_watchers — reload deferral during git pull (macos
 			helpers.assert_eq(w.defer_calls(), 0,
 				"a persistent Git lock must not cross the deferred-reload boundary")
 
-			-- git finishes → the next poll tick fires the reload exactly once.
+			-- git finishes → the release restarts the quiet window, since Git may
+			-- have written the last files just before it dropped the lock.
 			git_busy = false
+			w.poll()
+			helpers.assert_eq(w.reloads(), 0, "the Git release must restart the quiet window, not reload at once")
+			helpers.assert_true(type(w.scheduled()) == "function", "the release must re-arm the settle poll")
+
+			-- Once the tree has stayed quiet for the settle window, it reloads exactly once.
+			w.set_clock(1002)
 			w.poll()
 			helpers.assert_true(w.reloads() == 1, "reload must fire once git has settled (got " .. w.reloads() .. ")")
 
