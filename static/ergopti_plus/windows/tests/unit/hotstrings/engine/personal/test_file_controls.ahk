@@ -484,17 +484,38 @@ _PFC_PrefixedColorMatchesNativeDefaults() {
 }
 Test("personal-file-controls: native prefixed default colors are valid and exact launch refusal rolls back", _PFC_PrefixedColorMatchesNativeDefaults)
 
+; The Windows rows of the shipped per-file menu, read from the manifest file
+; rather than from the root the driver loaded.
+; @return {Array} The declared entries visible on "ahk", in declared order.
+_PFC_ShippedControlDeclarations() {
+	global _SharedDir
+	Declared := []
+	for Entry in JsonParse(FSReadUtf8Exact(_SharedDir . "\menu\data\menu_manifest.json"))["personal_file_controls"]
+		if _MR_IsForAhk(Entry)
+			Declared.Push(Entry)
+	Assert(Declared.Length > 0, "the shipped manifest declares the per-file controls")
+	return Declared
+}
+
 _PFC_DeclaredRowsAndStaleCallbackRefuse() {
 	Fixture := _PFC_Fixture()
 	try {
 		Rows := _HS_PersonalFileControlRows(Fixture.owner, "live", Fixture.options)
-		AssertEqual(5, Rows.Length, "the declared per-file menu exposes all five real native controls")
-		ExpectedLabels := [t("menu.common.enabled"), LabelValue(t("hs_config.label_delay"), "500"),
-			t("hs_config.label_priority") . " : 67", t("hs_config.label_color") . " : 123456", t("hs_config.label_tooltip")]
-		for Index, Expected in ExpectedLabels
-			AssertEqual(Expected, Rows[Index]["label"], "fixed labels and order come from the shared declarations")
-		AssertEqual(true, Rows[1]["checked"])
-		AssertEqual(false, Rows[5]["checked"])
+		Declared := _PFC_ShippedControlDeclarations()
+		AssertEqual(Declared.Length, Rows.Length, "the per-file menu exposes every shipped declared control")
+		; The fixture's values, by control: the order comes from the declarations.
+		ExpectedLabels := Map("personal_file_enabled", t("menu.common.enabled"),
+			"personal_file_delay", LabelValue(t("hs_config.label_delay"), "500"),
+			"personal_file_priority", t("hs_config.label_priority") . " : 67",
+			"personal_file_color", t("hs_config.label_color") . " : 123456",
+			"personal_file_tooltip", t("hs_config.label_tooltip"))
+		Checked := Map("personal_file_enabled", true, "personal_file_tooltip", false)
+		for Index, Entry in Declared {
+			Assert(ExpectedLabels.Has(Entry["id"]), "the fixture knows the shipped control " . Entry["id"])
+			AssertEqual(ExpectedLabels[Entry["id"]], Rows[Index]["label"], "fixed labels and order come from the shared declarations")
+			if Checked.Has(Entry["id"])
+				AssertEqual(Checked[Entry["id"]], Rows[Index]["checked"], Entry["id"] . " tick")
+		}
 		PersonalFileControls.Refresh()
 		AssertEqual(false, (Rows[1]["action"])(), "a retained declared provider callback refuses its stale capability before a scoped writer")
 		AssertEqual(Fixture.content, FSReadUtf8Exact(Fixture.file))

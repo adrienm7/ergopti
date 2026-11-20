@@ -263,10 +263,14 @@ _MMC_FrameProbe(Mode) {
 		}
 		Assert(Rows is Array, "actual template supplies canonical native row array")
 		if Mode == "empty" {
-			AssertEqual(6, Rows.Length, "empty provider arrays do not remove fixed shared rows")
-			return
-		}
-		Expected := Corpus["_expected"][Mode]
+			; The present frame without the two rows its native lists supplied.
+			Expected := []
+			for Label in Corpus["_expected"]["present"]
+				if Label != Builtin["label"] && Label != Custom["label"]
+					Expected.Push(Label)
+			AssertEqual(Corpus["_expected"]["present"].Length - 2, Expected.Length, "the corpus places each native row once")
+		} else
+			Expected := Corpus["_expected"][Mode]
 		AssertEqual(Expected.Length, Rows.Length, "all independent frame positions are consumed")
 		for Index, Label in Expected {
 			if Label == "---"
@@ -274,6 +278,8 @@ _MMC_FrameProbe(Mode) {
 			else
 				AssertEqual(InStr(Label, "menu.") == 1 ? t(Label) : Label, Rows[Index]["label"], "exact independent native frame label")
 		}
+		if Mode == "empty"
+			return
 		Assert(Rows[2] == Builtin, "list keeps exact native row identity")
 		AssertEqual("builtins", State["phases"][1], "native builtins run at their source position")
 		AssertEqual("custom_present", State["phases"][2], "presence observes the later native phase")

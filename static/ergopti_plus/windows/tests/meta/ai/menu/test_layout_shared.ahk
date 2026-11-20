@@ -256,7 +256,6 @@ Test("llm-menu-layout-shared: true canonical groups require executable native so
 _LMLS_CurrentRowTypeWithdrawalControls() {
 	_LMLS_ManifestMatchesCanonical()
 	Rows := _LMLS_ManifestRows()
-	AssertEqual(6, Rows.Length, "all current Windows settings rows enter the route controls")
 	_LMLS_CurrentInventoryPolicy(Rows)
 	AssertEqual(_LMLS_Canonical().Length, Rows.Length, "all current Windows settings rows enter the route controls")
 	_LMLS_CurrentRowTypesPolicy(Rows)
@@ -286,7 +285,7 @@ Test("llm-menu-layout-shared: every current declared native route rejects its ty
 _LMLS_CurrentInventoryPolicy(Rows) {
 	Canonical := _LMLS_Canonical()
 	Types := ["list", "list", "group", "group", "group", "group"]
-	AssertEqual(6, Canonical.Length, "the independently handwritten canonical inventory remains six")
+	AssertEqual(Canonical.Length, Types.Length, "one handwritten route type per canonical row")
 	AssertEqual(Canonical.Length, Rows.Length, "current LLM inventory row count")
 	for Index, Expected in Canonical {
 		AssertEqual(Expected["id"], Rows[Index]["id"], "current LLM inventory IDs and order")
@@ -320,16 +319,18 @@ _LMLS_InventorySourceControl(Kind) {
 	Values := []
 	for Part in Parts
 		Values.Push(Part["text"])
+	; The shipped Windows row count, which the policy above has just matched.
+	Shipped := _LMLS_ManifestRows(Source).Length
 	switch Kind {
 		case "revived":
 			; Independently retained row removed by published dd8bd7554.
 			Retired := '{"type":"group","id":"llm_live_mode","i18n":"menu.llm.live_mode_title",'
 				. '"disabled_when_off":true,"platforms":["ahk","hs","linux"]}'
 			Values.InsertAt(Trigger + 1, Retired)
-			ExpectedMessage := "current LLM inventory row count - expected: <6>, actual: <7>"
+			ExpectedMessage := "current LLM inventory row count - expected: <" . Shipped . ">, actual: <" . (Shipped + 1) . ">"
 		case "missing":
 			Values.RemoveAt(Profile)
-			ExpectedMessage := "current LLM inventory row count - expected: <6>, actual: <5>"
+			ExpectedMessage := "current LLM inventory row count - expected: <" . Shipped . ">, actual: <" . (Shipped - 1) . ">"
 		case "duplicate":
 			; Retain six rows and four groups: cardinality alone must not admit this.
 			Values[Model] := Values[Profile]

@@ -294,6 +294,20 @@ Test("custom word expanders: actual Add dialog checks its result after its nativ
 	_HSDT_CustomAddProviderKeepsPostModalAdmission)
 
 
+; The Windows rows of the shipped delays frame, read from the manifest file
+; itself rather than from the loaded root that the tests below mutate.
+; @return {Array} The frame entries visible on "ahk", in declared order.
+_HSDT_ShippedAhkDelayFrame() {
+	global _SharedDir
+	Root := JsonParse(FSReadUtf8Exact(_SharedDir . "\menu\data\menu_manifest.json"))
+	Frame := []
+	for Entry in Root["hotstrings_delays_frame"]
+		if _MR_IsForAhk(Entry)
+			Frame.Push(Entry)
+	Assert(Frame.Length > 0, "the shipped delays frame declares Windows rows")
+	return Frame
+}
+
 _HSDT_DeclaredDelayConfigCommand() {
 	global _SharedDir
 	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\delays_settings_command.json"))
@@ -308,7 +322,8 @@ _HSDT_DeclaredDelayConfigCommand() {
 		Items := Provider[1]["items"]
 		AssertEqual(t("button.ok"), Items[1]["label"], "the actual provider owns no fixed command label")
 		AssertEqual(true, Items[2]["separator"])
-		AssertEqual(8, Items.Length, "the five variable quick-delay rows and separators remain in place")
+		AssertEqual(_HSDT_ShippedAhkDelayFrame().Length, Items.Length,
+			"every Windows row of the shipped delays frame remains in place")
 		Items[1]["action"].Call("native_menu_label", 1, 0)
 		AssertEqual(1, Observations["opens"])
 	} finally Rows[1]["i18n"] := OriginalLabel
@@ -457,12 +472,19 @@ _HSDT_ParameterFrameCaptionAuthority() {
 		Assert(Rows is Array && Rows.Length == 1, "the actual complete delay parent must be returned")
 		AssertEqual(t("menu.hotstrings.delays_colors"), Rows[1]["label"])
 		Items := Rows[1]["items"]
-		AssertEqual(8, Items.Length)
+		Frame := _HSDT_ShippedAhkDelayFrame()
+		AssertEqual(Frame.Length, Items.Length, "one row per Windows row of the shipped delays frame")
 		AssertEqual(t("menu.hotstrings.config_item"), Items[1]["label"])
-		AssertEqual(true, Items[2]["separator"])
-		AssertEqual(true, Items[6]["separator"])
-		for Index in [3, 4, 5, 7, 8]
-			AssertEqual(t("button.ok"), SubStr(Items[Index]["label"], 1, StrLen(t("button.ok"))))
+		Captioned := 0
+		for Index, Entry in Frame {
+			if Entry["type"] == "---"
+				AssertEqual(true, Items[Index].Get("separator", false), "declared separator at " . Index)
+			else if Entry["id"] != "parameter_delay_config" {
+				AssertEqual(t("button.ok"), SubStr(Items[Index]["label"], 1, StrLen(t("button.ok"))), Entry["id"])
+				Captioned += 1
+			}
+		}
+		Assert(Captioned > 0, "the shipped frame declares captioned delay rows")
 		AssertEqual(0, _HSDT_WriteCalls, "rendering the complete frame performs no persistent callback")
 		for Mode in ["missing", "foreign", "wrong_type", "wrong_case"] {
 			Captions := Root["hotstrings_delay_captions"].Clone()

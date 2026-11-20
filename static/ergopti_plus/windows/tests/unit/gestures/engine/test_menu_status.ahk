@@ -88,6 +88,21 @@ _GTB_AssertHeader(Row, Fingers) {
 	AssertFalse(Row.Has("action"), "a section header has no click owner")
 }
 
+; The rows the fixture's slots span under a status declaration: each slot, both
+; finger-count templates and the one boundary between the two groups.
+; @param Status {Map} The status_rows declaration the provider reads.
+; @return {Map} "rows" is the menu length, "named" the rows the renderer counts.
+_GTB_DeclaredRowCount(Status) {
+	global GESTURE_SLOTS
+	Rows := GESTURE_SLOTS.Length, Separators := 0
+	for Name in ["fingers_3", "finger_group_boundary", "fingers_4"]
+		for Template in Status[Name] {
+			Rows += 1
+			Separators += Template["type"] == "---"
+		}
+	return Map("rows", Rows, "named", Rows - Separators)
+}
+
 ; The declared templates of the Windows list: a bare boundary and one header
 ; per finger count the Precision Touchpad reports (three and four).
 _GTB_ValidStatus() {
@@ -112,15 +127,16 @@ _GTB_DeclaredGroupsInner() {
 	}
 	; swipe_3_up, tap_4, tap_3 are grouped: three fingers first, in slot order.
 	Rows := _GES_SlotRows(_GSS_FullReader())
-	_GTB_AssertSlotRows(Rows, 6, [[2, "swipe_3_up"], [3, "tap_3"], [6, "tap_4"]])
+	Count := _GTB_DeclaredRowCount(Status)
+	_GTB_AssertSlotRows(Rows, Count["rows"], [[2, "swipe_3_up"], [3, "tap_3"], [Count["rows"], "tap_4"]])
 	_GTB_AssertHeader(Rows[1], 3)
 	AssertTrue(Rows[4]["separator"])
 	AssertFalse(Rows[4].Has("action"), "a fixed separator has no click owner")
 	_GTB_AssertHeader(Rows[5], 4)
 	Native := Menu()
 	try {
-		AssertEqual(5, _MR_RenderRows(Native, Rows, "gesture_slots_ahk", 1), "the renderer receipt counts named rows only")
-		AssertEqual(6, DllCall("user32\GetMenuItemCount", "Ptr", Native.Handle, "Int"))
+		AssertEqual(Count["named"], _MR_RenderRows(Native, Rows, "gesture_slots_ahk", 1), "the renderer receipt counts named rows only")
+		AssertEqual(Count["rows"], DllCall("user32\GetMenuItemCount", "Ptr", Native.Handle, "Int"))
 		Flags := DllCall("user32\GetMenuState", "Ptr", Native.Handle, "UInt", 3, "UInt", 0x400, "UInt")
 		Assert(Flags != 0xFFFFFFFF, "GetMenuState must acknowledge the actual separator position")
 		AssertTrue((Flags & 0x800) != 0, "the actual Win32 item between the two groups is a separator")
@@ -290,12 +306,13 @@ _GSS_RowsFollowAvailabilityInner() {
 	Rows := _GES_SlotRows((Name) => Name == Lost ? "" : Full.Call(Name))
 	Reason := t("gestures.system.slot_unavailable")
 	; Three-finger header, swipe_3_up, tap_3, separator, four-finger header, tap_4.
-	AssertEqual(6, Rows.Length)
+	Last := _GTB_DeclaredRowCount(_GTB_Owner()["status_rows"])["rows"]
+	AssertEqual(Last, Rows.Length)
 	AssertFalse(Rows[2]["disabled"], "swipe_3_up is assigned")
 	AssertFalse(InStr(Rows[2]["label"], Reason), "an available row carries no reason")
-	AssertTrue(Rows[6]["disabled"], "tap_4 is not assigned")
-	AssertTrue(SubStr(Rows[6]["label"], -StrLen(Reason)) == Reason, "the reason ends the greyed label")
-	AssertTrue(InStr(Rows[6]["label"], LabelValue(t("gesture.slots.tap_4"), "")) == 1, "the slot name still leads")
+	AssertTrue(Rows[Last]["disabled"], "tap_4 is not assigned")
+	AssertTrue(SubStr(Rows[Last]["label"], -StrLen(Reason)) == Reason, "the reason ends the greyed label")
+	AssertTrue(InStr(Rows[Last]["label"], LabelValue(t("gesture.slots.tap_4"), "")) == 1, "the slot name still leads")
 	AssertFalse(Rows[3]["disabled"], "tap_3 is assigned")
 	; Nothing assigned and an unreadable registry grey every row.
 	for Reader in [(Name) => "", TestGestures_RefuseSystemRead] {
