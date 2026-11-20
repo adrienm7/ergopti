@@ -303,6 +303,22 @@ local function copy_module(name, tree)
 		.. quote(target)), "copy " .. name)
 end
 
+--- Copies the path owner a plain run loads to locate the shared tree.
+--- @param tree string Destination driver root.
+local function copy_resolver(tree)
+	copy_module("core.fs.engine.paths", tree)
+	copy_module("core.fs.engine.regular_file_reader", tree)
+end
+
+--- Copies the file the path owner probes to accept a shared tree.
+--- @param shared string Destination shared root.
+local function copy_shared_probe(shared)
+	local relative = "core/i18n/data/locales/en.json"
+	local target = shared .. "/" .. relative
+	assert(os.execute("mkdir -p " .. quote(target:match("^(.*)/[^/]+$")) .. " && cp "
+		.. quote(assert(require("core.fs.engine.paths").shared(relative))) .. " " .. quote(target)), "copy probe")
+end
+
 --- A fresh, empty directory.
 --- @return string path
 local function fresh_directory()
@@ -358,7 +374,9 @@ h.describe("owned dialog host launch modes (dialog-host-shared-names)", function
 		local base = fresh_directory()
 		local package_root = base .. "/ergopti"
 		copy_module("core.ui.ui.dialog_host", package_root)
+		copy_resolver(package_root)
 		copy_module("core.text.engine.identifiers", package_root .. "/_shared")
+		copy_shared_probe(package_root .. "/_shared")
 		local bare_code, bare = run_guarded(CLEAN .. " LUA_PATH=';;'", package_root .. "/" .. host_relative)
 		local exported = package_root .. "/?.lua;" .. package_root .. "/_shared/?.lua;;"
 		local wrapped_code, wrapped = run_guarded(CLEAN .. " LUA_PATH=" .. quote(exported),
@@ -386,6 +404,7 @@ h.describe("owned dialog host launch modes (dialog-host-shared-names)", function
 	h.it("(dialog-host-shared-names) a tree without its shared names fails before any window", function()
 		local base = fresh_directory()
 		copy_module("core.ui.ui.dialog_host", base .. "/ergopti")
+		copy_resolver(base .. "/ergopti")
 		local code, recorded = run_guarded(CLEAN .. " LUA_PATH=';;'", base .. "/ergopti/" .. host_relative)
 		os.execute("rm -rf " .. quote(base))
 		h.assert_true(code ~= Host.EXIT_UNAVAILABLE and code ~= Host.EXIT_ACCEPTED, tostring(code))

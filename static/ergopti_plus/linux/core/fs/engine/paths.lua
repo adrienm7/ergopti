@@ -38,7 +38,12 @@
 
 local M = {}
 
-local Logger = require("core.logger.engine.shim")
+-- The logger lives in the shared tree this module locates, so it is required
+-- when a message is written: a child with only its driver tree on package.path
+-- (core/ui/ui/dialog_host.lua) loads this module to find that tree.
+local function logger()
+	return require("core.logger.engine.shim")
+end
 local LOG = "paths"
 
 -- The file a candidate directory must carry to BE the shared tree. Probing a
@@ -184,7 +189,7 @@ function M.shared_root()
 	if _shared_root then return _shared_root end
 	-- Both candidates are named because the next reader's first question is which
 	-- layout was assumed, and a message carrying one path answers half of it.
-	Logger.error(LOG, "Shared tree not found: neither %s nor %s carries %s — the install is incomplete.",
+	logger().error(LOG, "Shared tree not found: neither %s nor %s carries %s — the install is incomplete.",
 		sibling, child, SHARED_PROBE_FILE)
 	return nil
 end
@@ -246,7 +251,7 @@ function M.extension_roots()
 		local reason = tostring(installed)
 		if not _installed_refusals_reported[reason] then
 			_installed_refusals_reported[reason] = true
-			Logger.error(LOG, "The installed layouts' extensions are skipped: %s.", reason)
+			logger().error(LOG, "The installed layouts' extensions are skipped: %s.", reason)
 		end
 	end
 	-- The Ergopti extension the driver ships is installed by shipping

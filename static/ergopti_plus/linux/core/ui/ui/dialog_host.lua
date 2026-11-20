@@ -28,24 +28,29 @@ end
 --- 4. Text is plain unless the caller omits --no-markup, in which case it is
 ---    Pango markup, as zenity read it.
 --- 5. Importing the module (tests) parses only; it never opens a display.
---- 6. Run as a script, the host puts its own tree on the search path: the daemon
----    exports no LUA_PATH from a checkout, and the names below come from the
----    shared tree (_shared/core/text/data/identifiers.json).
+--- 6. Run as a script, the host puts its own tree on the search path, then the
+---    shared tree core/fs/engine/paths.lua resolves: the daemon exports no
+---    LUA_PATH from a checkout, and the names below come from the shared tree
+---    (_shared/core/text/data/identifiers.json).
 --- ==============================================================================
 
 -- Whether this file is the program the interpreter runs, not a required module.
 local invoked_source = debug.getinfo(1, "S").source:gsub("^@", "")
 local RUN_AS_SCRIPT = type(arg) == "table" and arg[0] == invoked_source
 if RUN_AS_SCRIPT and not (literal_driver and literal_driver ~= "") then
-	-- The literal loader already resolves both trees; a plain run joins them to
-	-- package.path. The shared tree sits beside the driver in a checkout and a
-	-- release tarball and inside it in a system package (core/fs/engine/paths.lua
-	-- shared_root_from), so both templates are listed, sibling first.
+	-- The literal loader already resolves both trees; a plain run puts its own
+	-- driver tree on package.path, then asks the path owner where the shared tree
+	-- is (beside the driver in a checkout and a release tarball, inside it in a
+	-- system package) rather than counting directory steps itself.
 	local root = ("/" .. invoked_source):match("^/(.*)/core/ui/ui/dialog_host%.lua$")
 		or (("/" .. invoked_source):match("^/core/ui/ui/dialog_host%.lua$") and ".")
 	assert(root, "the dialog host runs from its driver tree")
 	assert(not root:find("[;?]"), "a driver root with template bytes needs the literal loader")
-	package.path = root .. "/?.lua;" .. root .. "/../_shared/?.lua;" .. root .. "/_shared/?.lua;" .. package.path
+	package.path = root .. "/?.lua;" .. package.path
+	local Paths = require("core.fs.engine.paths")
+	-- The non-logging seam: the logger itself lives in the shared tree.
+	local shared = assert(Paths.shared_root_from(Paths.driver_root()), "the dialog host finds no shared tree")
+	package.path = shared .. "/?.lua;" .. package.path
 end
 
 local M = {}
