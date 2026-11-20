@@ -71,11 +71,28 @@ end)()
 -- reported like a crash), else as a closed bootstrap record, and the process
 -- exits non-zero for the supervisor. The guarded re-run and its marker are the
 -- macOS driver's too (_shared/core/lifecycle/engine/entry_guard.lua), loaded by
--- path: the shared tree, a sibling of this directory, is not on package.path yet.
+-- path: the shared tree is not on package.path yet.
 local boot_guard = ...
+
+-- The shared tree beside a driver directory (a checkout, a release tarball) or
+-- inside it (the .deb, .rpm, Arch and Nix packages stage the driver flat and
+-- nest _shared in it), in core/fs/engine/paths.lua shared_root_from's order.
+-- Only the sibling was read once, and every system package died before main.
+-- @param dir string A driver directory.
+-- @return string
+local function shared_tree_of(dir)
+	local sibling = dir .. "/../_shared"
+	local probe = io.open(sibling .. "/core/lifecycle/engine/entry_guard.lua", "rb")
+	if probe then
+		probe:close()
+		return sibling
+	end
+	return dir .. "/_shared"
+end
+
 do
 	local entry = assert(debug.getinfo(1, "S").source:match("^@(.+)$"), "the entry point has no file")
-	local EntryGuard = assert(loadfile(SCRIPT_DIR .. "/../_shared/core/lifecycle/engine/entry_guard.lua"))()
+	local EntryGuard = assert(loadfile(shared_tree_of(SCRIPT_DIR) .. "/core/lifecycle/engine/entry_guard.lua"))()
 	if not EntryGuard.is_guarded(boot_guard) then
 		-- getfenv: the guarded run keeps the globals this run was given.
 		local booted, failure, traceback = EntryGuard.run(entry, nil, getfenv and getfenv(1) or _ENV)
@@ -103,7 +120,7 @@ do
 end
 
 -- Prepend the script directory and the shared Lua library to the search path.
-local SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared"
+local SHARED_LUA_DIR = shared_tree_of(SCRIPT_DIR)
 local literal_driver = os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT")
 local literal_direct = false
 if literal_driver and literal_driver ~= "" then
@@ -144,9 +161,7 @@ if (not literal_driver or literal_driver == "") and SCRIPT_DIR:find("[;?]") then
 		SCRIPT_DIR = ffi.string(cwd) .. "/" .. SCRIPT_DIR
 		ffi.C.free(cwd)
 	end
-	SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared"
-	local probe = io.open(SHARED_LUA_DIR .. "/core/text/engine/toml_codec/source_open.lua", "rb")
-	if probe then probe:close() else SHARED_LUA_DIR = SCRIPT_DIR .. "/_shared" end
+	SHARED_LUA_DIR = shared_tree_of(SCRIPT_DIR)
 	assert(ffi.C.setenv("ERGOPTI_LITERAL_DRIVER_ROOT", SCRIPT_DIR, 1) == 0, "cannot export driver root")
 	assert(ffi.C.setenv("ERGOPTI_LITERAL_SHARED_ROOT", SHARED_LUA_DIR, 1) == 0, "cannot export shared root")
 	assert(ffi.C.setenv("ERGOPTI_LITERAL_DIRECT", "1", 1) == 0, "cannot export source mode")

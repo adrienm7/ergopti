@@ -79,4 +79,32 @@ helpers.describe("daemon boot guard", function()
 		helpers.assert_true(not files:find(PROBE, 1, true), "before the sink only the closed code reaches a file")
 		helpers.assert_contains(run.output, PROBE, "the error text stays on stderr")
 	end)
+
+	helpers.it("(linux-boot-guard) a system package's nested shared tree boots the entry point", function()
+		-- The .deb, .rpm, Arch and Nix packages stage the driver flat and nest
+		-- _shared inside it; the guard once loaded only the sibling and every
+		-- package's --help died before main (Nix native admission, installed-help).
+		local pipe = assert(io.popen("mktemp -d", "r"))
+		local base = assert(pipe:read("*l"))
+		pipe:close()
+		local driver = helpers.driver_root()
+		local package_root = base .. "/lib/ergopti"
+		local link = string.format("mkdir -p %s && for entry in %s/* ; do ln -s \"$entry\" %s/ ; done && ln -s %s %s",
+			shell_quote(package_root), shell_quote(driver), shell_quote(package_root),
+			shell_quote(driver .. "/../_shared"), shell_quote(package_root .. "/_shared"))
+		local linked = os.execute(link)
+		helpers.assert_true(linked == 0 or linked == true, "package layout")
+		local exported = package_root .. "/?.lua;" .. package_root .. "/?/init.lua;" .. package_root .. "/_shared/?.lua;"
+			.. package_root .. "/_shared/?/init.lua;;"
+		local command = string.format("env -u ERGOPTI_LITERAL_DRIVER_ROOT -u ERGOPTI_LITERAL_SHARED_ROOT"
+			.. " -u ERGOPTI_LITERAL_DIRECT -u ERGOPTI_LITERAL_DAEMON -u LUA_INIT HOME=%s LUA_PATH=%s %s %s --help 2>&1;"
+			.. " echo \"exit=$?\"", shell_quote(base), shell_quote(exported), lua_bin(),
+			shell_quote(package_root .. "/ergopti_hotstrings.lua"))
+		pipe = assert(io.popen(command, "r"))
+		local output = pipe:read("*a")
+		pipe:close()
+		os.execute("rm -rf " .. shell_quote(base))
+		helpers.assert_eq(tonumber(output:match("exit=(%d+)%s*$")), 0, output)
+		helpers.assert_contains(output, "Usage: luajit ergopti_hotstrings.lua [OPTIONS]")
+	end)
 end)
