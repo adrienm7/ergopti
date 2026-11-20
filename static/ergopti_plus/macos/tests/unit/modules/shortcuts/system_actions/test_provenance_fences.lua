@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CmdStarPorts = require("tests.support.cmd_star_ports")
 local fixture = require("tests.support.system_actions_fixture")
 local with_fixture = fixture.with_fixture
 local fire_latest_timer = fixture.fire_latest_timer
@@ -74,7 +75,7 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 		with_fixture(function()
 			local fixture = load_h01_system()
 			local trigger_count = 0
-			fixture.system.bind_cmd_star(function() trigger_count = trigger_count + 1 end)
+			fixture.system.bind_cmd_star(function() trigger_count = trigger_count + 1 end, nil, CmdStarPorts.build())
 			local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
 			local event = owned_key_down(fixture, "*", 28, "*", { cmd = true, shift = true })
 			local pending_before = fixture.synthetic.stats().pending
@@ -404,7 +405,7 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 		with_fixture(function()
 			local fixture = load_h01_system()
 			local trigger_count = 0
-			fixture.system.bind_cmd_star(function() trigger_count = trigger_count + 1 end)
+			fixture.system.bind_cmd_star(function() trigger_count = trigger_count + 1 end, nil, CmdStarPorts.build())
 			local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
 			fixture.synthetic.emit_key_stroke({}, "a", 0)
 
@@ -436,7 +437,7 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 				return table.unpack(results, 1, results.n)
 			end
 			local fixture = load_h01_system({logger = logger})
-			fixture.system.bind_cmd_star(function() error("telemetry exploded") end)
+			fixture.system.bind_cmd_star(function() error("telemetry exploded") end, nil, CmdStarPorts.build())
 			local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
 
 			local consumed = tap.fn(
@@ -530,7 +531,7 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 				{
 					name = "cmd-star",
 					bind = function(fixture, effects)
-						fixture.system.bind_cmd_star(function() effects.count = effects.count + 1 end)
+						fixture.system.bind_cmd_star(function() effects.count = effects.count + 1 end, nil, CmdStarPorts.build())
 					end,
 					keycode = 28, characters = "*", flags = { cmd = true, shift = true },
 				},

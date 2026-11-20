@@ -1106,12 +1106,56 @@ function M.bind_layer_wheel(admission_guard, wheel_slot)
 	}
 end
 
---- Intercepts Cmd+star / Cmd+* and re-fires as Cmd+S, preserving any additional modifiers.
---- hs.hotkey.bind cannot reliably intercept star (Shift+8 on some layouts) because the
---- OS assigns the character after modifier processing; a raw tap fires first.
+-- The Hammerspoon flag of each modifier the shared magic key save rule names.
+local MAGIC_SAVE_FLAG = { ctrl = "ctrl", alt = "alt", shift = "shift", meta = "cmd" }
+
+--- The modifiers + magic key save decision for one keyDown
+--- (_shared/shortcuts/engine/magic_key_save_core.lua): a shortcut chord on the
+--- layout's own magic key sends the same modifiers with S. Option alone is the
+--- macOS AltGr level and keeps typing the layout's character. Only a shortcut
+--- chord reads the key: every other press leaves before any port is asked.
+--- @param flags table Event flags (cmd, ctrl, alt, shift).
+--- @param keycode number Virtual keycode of the press.
+--- @param ports table { replace_on, chosen_source, magic_key, plain_text(keycode),
+---   shortcut_owns(mods, keycode) }, each read at the press.
+--- @return table|nil mods Hammerspoon modifiers to send with "s", nil to pass the press.
+function M.cmd_star_decision(flags, keycode, ports)
+	if type(flags) ~= "table" or type(keycode) ~= "number" then return nil end
+	local held = {}
+	for name, flag in pairs(MAGIC_SAVE_FLAG) do
+		if flags[flag] then held[#held + 1] = name end
+	end
+	local MagicKeySave = require("shortcuts.engine.magic_key_save_core")
+	if MagicKeySave.decide("macos", held) == nil then return nil end
+	local mods = {}
+	local magic = ports.magic_key()
+	local decision = MagicKeySave.resolve({ os = "macos", held = held,
+		-- The tap's admission guard already refused a paused driver.
+		paused = false,
+		replace_on = ports.replace_on() == true,
+		chosen_source = ports.chosen_source() == true,
+		is_magic_key = type(magic) == "string" and magic ~= "" and ports.plain_text(keycode) == magic,
+		shortcut_owns = false })
+	if decision.action ~= "save" then return nil end
+	for _, name in ipairs(decision.sends) do mods[#mods + 1] = MAGIC_SAVE_FLAG[name] end
+	if ports.shortcut_owns(mods, keycode) == true then return nil end
+	return mods
+end
+
+--- Intercepts a shortcut chord on the layout's own magic key and re-fires it as
+--- the same modifiers + S (Cmd+★ → Cmd+S, Cmd+Shift+★ → Cmd+Shift+S, Ctrl+★ →
+--- Ctrl+S), by M.cmd_star_decision. hs.hotkey.bind cannot reliably intercept
+--- star because the OS assigns the character after modifier processing; a raw
+--- tap fires first, and each auto-repeat keyDown saves again.
 --- @param on_trigger function|nil Called as on_trigger(label, app_name) for shortcut logging.
+--- @param admission_guard function|nil Parent delivery guard (pause).
+--- @param ports table The M.cmd_star_decision ports.
 --- @return table Fake-hotkey object with :delete().
-function M.bind_cmd_star(on_trigger, admission_guard)
+function M.bind_cmd_star(on_trigger, admission_guard, ports)
+	for _, port in ipairs({ "replace_on", "chosen_source", "magic_key", "plain_text", "shortcut_owns" }) do
+		assert(type(ports) == "table" and type(ports[port]) == "function",
+			"bind_cmd_star needs the port " .. port)
+	end
 	return acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
 		if not raw_binding_admitted(admission_guard) then return false end
 		local is_physical, fence_events = classify_physical_event(
@@ -1119,22 +1163,14 @@ function M.bind_cmd_star(on_trigger, admission_guard)
 		if not is_physical then return finish_tap(false, fence_events) end
 
 		local ok_flags, flags = pcall(e.getFlags, e)
-		if not ok_flags or type(flags) ~= "table" or not flags.cmd then
+		local ok_code, keycode = pcall(e.getKeyCode, e)
+		if not ok_flags or not ok_code then return finish_tap(false, fence_events) end
+		local ok_decision, mods = pcall(M.cmd_star_decision, flags, keycode, ports)
+		if not ok_decision then
+			Logger.error(LOG, "Modifiers + magic key decision failed: %s.", tostring(mods))
 			return finish_tap(false, fence_events)
 		end
-
-		local ok, ch = pcall(function() return e:getCharacters() end)
-		if not ok or not ch then return finish_tap(false, fence_events) end
-		if ch ~= "\xe2\x98\x85" and ch ~= "*" and ch ~= "\xe2\x9c\xb1" then
-			return finish_tap(false, fence_events)
-		end
-
-		-- Build the modifier list to re-fire the keystroke faithfully
-		local mods = {}
-		if flags.cmd   then table.insert(mods, "cmd")   end
-		if flags.shift then table.insert(mods, "shift") end
-		if flags.alt   then table.insert(mods, "alt")   end
-		if flags.ctrl  then table.insert(mods, "ctrl")  end
+		if mods == nil then return finish_tap(false, fence_events) end
 
 		-- Preserve only scalar flag state across the callback boundary; Quartz's
 		-- event userdata is not retained or dereferenced by the deferred action.

@@ -935,6 +935,13 @@ local function magic_key_replace_on()
 		and Registry.is_section_enabled("magickey", "replace") == true
 end
 
+--- Whether the magic key's replace section is on, as the modifiers + magic key
+--- save reads it at each chord (modules/shortcuts/actions/system.lua).
+--- @return boolean
+function M.is_magic_key_replace_on()
+	return magic_key_replace_on()
+end
+
 --- Reports whether the actual key-down owner can emit an explicit magic key.
 --- This proof concerns replacement only, independently of ordinary UI shortcuts.
 --- @return boolean|nil effective Nil when native ownership cannot be acknowledged.
