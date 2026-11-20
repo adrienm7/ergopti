@@ -308,12 +308,19 @@ try:
                     [False, True] if mode == "prompt" else [mode in ("error", "empty_error")]
                 ):
                     worker = private / "worker.lua"
+                    # Not tests.helpers' stub: loading tests.helpers exports the
+                    # unit runner's dialog host guard, and a guarded host exits
+                    # before it binds GTK, so no dialog would ever be shown.
                     worker.write_text(
                         "package.path = "
                         + json.dumps(package_path)
                         + ' .. ";" .. package.path\n'
-                        + "local logger=require('tests.helpers').make_logger_stub();local errors=0\n"
+                        + "local noop=function() end;local logger={debug=noop,trace=noop,done=noop,info=noop,"
+                        + "start=noop,success=noop,warn=noop,error=noop,set_level=noop,set_sink=noop,"
+                        + "ring_buffer_snapshot=function() return {} end};local errors=0\n"
                         + "logger.error=function() errors=errors+1 end;package.loaded['core.logger.engine.shim']=logger\n"
+                        + "assert(os.getenv(require('core.ui.ui.dialog_host').GUARD_VARIABLE)==nil,"
+                        + "'the native profile must start an unguarded dialog host')\n"
                         + "local releases, restores = 0, 0\n"
                         + "package.loaded['platform.input.keyboard_hook'] = {while_released=function(fn) releases=releases+1; local result={fn()}; restores=restores+1; return unpack(result) end}\n"
                         + "local shell=require('core.process.adapters.shell_runner')\n"
