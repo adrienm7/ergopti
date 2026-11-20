@@ -4,6 +4,28 @@
 --- scalar preference lease and conditional TOML writer. Observations from native
 --- callbacks are asserted after the callback has returned.
 local helpers = require("tests.helpers")
+
+--- The rows the menu manifest's preview frame draws: one per separator and one
+--- per row of each control list a frame entry names, read from the manifest so
+--- a new preview switch moves the expectation with it.
+--- @return number
+local function frame_rows()
+	local fh = assert(io.open(require("core.fs.engine.paths").shared("menu/data/menu_manifest.json"), "rb"))
+	local manifest = assert(require("core.text.engine.json").decode(fh:read("*a")))
+	fh:close()
+	local count = 0
+	for _, entry in ipairs(assert(manifest.hotstrings_preview_frame, "the manifest declares the preview frame")) do
+		if entry.type == "---" then
+			count = count + 1
+		else
+			local stem = assert(entry.id:match("^parameter_(preview_.+)$"), entry.id)
+			local rows = manifest[stem .. "_control"] or manifest[stem .. "_controls"]
+			helpers.assert_type(rows, "table", entry.id .. " must name a manifest control list")
+			count = count + #rows
+		end
+	end
+	return count
+end
 -- The three presence switches start explicitly off, whatever their shipped
 -- default, so each case toggles one of them on from a known state.
 local SOURCE = '# retained header\n[hotstrings]\npreview_colored_tooltips = true\n'
@@ -110,7 +132,7 @@ helpers.describe("declared coloured preview native row", function()
 		with_preferences(function(_, _, _, _)
 			local rows = menu_controls(false, true)
 			local i18n = require("core.i18n.engine.i18n")
-			helpers.assert_eq(#rows, 6)
+			helpers.assert_eq(#rows, frame_rows())
 			for index, label in ipairs({ "tooltip_magic", "tooltip_autocorrect", "tooltip_ai" }) do
 				helpers.assert_eq(rows[index].title, i18n.get("menu.hotstrings." .. label))
 			end
@@ -277,7 +299,7 @@ helpers.describe("coloured provider locale contract", function()
 			helpers.assert_eq(package.loaded["core.i18n.engine.i18n"], i18n)
 			helpers.assert_eq(#observed, 21)
 			for _, item in ipairs(observed) do
-				helpers.assert_eq(#item.rows, 6)
+				helpers.assert_eq(#item.rows, frame_rows())
 				helpers.assert_eq(item.rows[4].title, "-")
 				helpers.assert_eq(item.rows[5].title, item.expected)
 				helpers.assert_eq(item.rows[5].checked, true)
@@ -341,7 +363,7 @@ helpers.describe("magic provider locale contract", function()
 		with_preferences(function()
 			local rows = menu_controls(false, false, true)
 			local i18n = require("core.i18n.engine.i18n")
-			helpers.assert_eq(#rows, 6)
+			helpers.assert_eq(#rows, frame_rows())
 			helpers.assert_eq(rows[1].title, i18n.get("button.ok"))
 			helpers.assert_eq(rows[2].title, i18n.get("menu.hotstrings.tooltip_autocorrect"))
 			helpers.assert_eq(rows[3].title, i18n.get("menu.hotstrings.tooltip_ai"))
@@ -375,7 +397,7 @@ helpers.describe("magic provider locale contract", function()
 			for _, observation in ipairs(observations) do
 				helpers.assert_eq(observation.rows[1].title, observation.label)
 				helpers.assert_eq(observation.rows[4].title, "-")
-				helpers.assert_eq(#observation.rows, 6)
+				helpers.assert_eq(#observation.rows, frame_rows())
 			end
 		end)
 	end)
@@ -520,7 +542,7 @@ helpers.describe("ordered presence provider locale contract", function()
 			helpers.assert_eq(package.loaded["core.i18n.engine.i18n"], i18n)
 			helpers.assert_eq(#observations, 42)
 			for _, observation in ipairs(observations) do
-				helpers.assert_eq(#observation.rows, 6)
+				helpers.assert_eq(#observation.rows, frame_rows())
 				for index, expected in ipairs(corpus.rows) do
 					local position = observation.reverse and (4 - index) or (index + 1)
 					helpers.assert_eq(observation.rows[position].title, observation.catalog[expected.i18n])

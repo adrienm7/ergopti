@@ -9,6 +9,28 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+
+--- The rows the menu manifest's preview frame draws: one per separator and one
+--- per row of each control list a frame entry names, read from the manifest so
+--- a new preview switch moves the expectation with it.
+--- @return number
+local function frame_rows()
+	local fh = assert(io.open(require("core.fs.engine.paths").shared("menu/data/menu_manifest.json"), "rb"))
+	local manifest = assert(require("core.fs.adapters.json_codec").decode(fh:read("*a")))
+	fh:close()
+	local count = 0
+	for _, entry in ipairs(assert(manifest.hotstrings_preview_frame, "the manifest declares the preview frame")) do
+		if entry.type == "---" then
+			count = count + 1
+		else
+			local stem = assert(entry.id:match("^parameter_(preview_.+)$"), entry.id)
+			local rows = manifest[stem .. "_control"] or manifest[stem .. "_controls"]
+			helpers.assert_type(rows, "table", entry.id .. " must name a manifest control list")
+			count = count + #rows
+		end
+	end
+	return count
+end
 local OutputFixture = require("tests.support.toml_output_fixture")
 local KEY = "preview_colored_tooltips"
 local SOURCE = '# retained foreign header\n[hotstrings]\npreview_colored_tooltips = true\n[foreign]\nfuture = "kept" # retained\n'
@@ -285,7 +307,7 @@ helpers.describe("declared coloured preview checkbox", function()
 					end
 				end
 				local rows = assert(group(f.menus))
-				helpers.assert_eq(#rows, 6, "the glyph switch follows the coloured one")
+				helpers.assert_eq(#rows, frame_rows(), "the glyph switch follows the coloured one")
 				helpers.assert_eq(rows[6].label, translate("menu.hotstrings.tooltip_glyphs"))
 				for index, label in ipairs(corpus.siblings) do helpers.assert_eq(rows[index].label, translate(label)) end
 				helpers.assert_eq(rows[corpus.separator_position].separator, true)
@@ -467,7 +489,7 @@ helpers.describe("ordered presence checkbox locale contract", function()
 						end
 					end
 					local rows = assert(preview(f.menus))
-					helpers.assert_eq(#rows, 6, "the glyph switch follows the coloured one")
+					helpers.assert_eq(#rows, frame_rows(), "the glyph switch follows the coloured one")
 					helpers.assert_eq(rows[1].label, translate("menu.hotstrings.tooltip_magic"))
 					for index, expected in ipairs(corpus.rows) do
 						local position = reverse and (4 - index) or (index + 1)
