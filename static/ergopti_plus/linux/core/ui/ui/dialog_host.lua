@@ -564,11 +564,48 @@ function M.main(argv, io_out, io_err, binder)
 	return status
 end
 
+--- The environment variable naming the record of a guarded run. The Linux test
+--- runner exports it (tests/support/dialog_host_guard.lua) so that no test can
+--- open a window: one forgotten stub used to leave a modal error dialog waiting
+--- for a click and hold the whole unit run for sixteen minutes.
+M.GUARD_VARIABLE = "ERGOPTI_DIALOG_HOST_GUARD"
+
+--- The environment variable naming the test case of a guarded run.
+M.GUARD_CASE_VARIABLE = "ERGOPTI_DIALOG_HOST_GUARD_CASE"
+
+--- Refuses a dialog under the test runner: the request is recorded, never shown.
+--- @param argv table The arguments, without the program name.
+--- @param record string Path of the record the runner reads back.
+--- @param case string|nil The test case that asked.
+--- @param io_err table|nil io.stderr by default; where the refusal is written.
+--- @return number status EXIT_USAGE for refused arguments, EXIT_UNAVAILABLE otherwise.
+function M.refuse_guarded(argv, record, case, io_err)
+	local err = io_err or io.stderr
+	local request, refusal = M.parse(argv)
+	if not request then
+		err:write("ergopti dialog: ", refusal, "\n")
+		return M.EXIT_USAGE
+	end
+	local line = string.format("%s\t--%s %s\n", (case ~= nil and case ~= "") and case or "outside any test case",
+		request.kind, tostring(request.options.title or ""))
+	local file = io.open(record, "ab")
+	local written = file ~= nil and file:write(line) ~= nil
+	local closed = file ~= nil and file:close() == true
+	if not written or not closed then
+		err:write("ergopti dialog: the test runner's dialog record cannot be written: ", record, "\n")
+		return M.EXIT_IO_ERROR
+	end
+	err:write("ergopti dialog: refused under the test runner\n")
+	return M.EXIT_UNAVAILABLE
+end
+
 -- Importing the module parses nothing and opens no display.
 local invoked_source = debug.getinfo(1, "S").source:gsub("^@", "")
 if type(arg) == "table" and arg[0] == invoked_source then
 	local argv = {}
 	for index = 1, #arg do argv[index] = arg[index] end
+	local guard = os.getenv(M.GUARD_VARIABLE)
+	if guard ~= nil and guard ~= "" then os.exit(M.refuse_guarded(argv, guard, os.getenv(M.GUARD_CASE_VARIABLE))) end
 	os.exit(M.main(argv))
 end
 

@@ -35,6 +35,11 @@ require("tests.support.session_language").install()
 -- (tests/support/notify_send_guard.lua).
 local NotifySendGuard = require("tests.support.notify_send_guard")
 NotifySendGuard.install()
+-- No fixture may open a real dialog either: a dialog host started from a test
+-- records its case and exits without a window, which fails the run
+-- (tests/support/dialog_host_guard.lua).
+local DialogHostGuard = require("tests.support.dialog_host_guard")
+DialogHostGuard.install()
 local NoticeRecorder = require("tests.support.notice_recorder")
 NoticeRecorder.install()
 
@@ -428,6 +433,7 @@ function M.it(name, fn)
 	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 	local ok, err
 	NotifySendGuard.enter_case(tostring(_current_module) .. " :: " .. name)
+	DialogHostGuard.enter_case(tostring(_current_module) .. " :: " .. name)
 	NoticeRecorder.begin_case(M.is_fixture_double)
 	if _timing then
 		ok, err = _timing.case(name, fn, _before_each_fn, _only_filter, _current_module)
@@ -439,6 +445,7 @@ function M.it(name, fn)
 	end
 	NoticeRecorder.end_case()
 	NotifySendGuard.enter_case(tostring(_current_module) .. " (outside a test case)")
+	DialogHostGuard.enter_case(tostring(_current_module) .. " (outside a test case)")
 	if ok then
 		_suite_results.passed = _suite_results.passed + 1
 		print("  ok   " .. name)
@@ -609,6 +616,7 @@ function M.measure_module(name, callback)
 	local previous = _current_module
 	_current_module = name
 	NotifySendGuard.enter_case(name .. " (outside a test case)")
+	DialogHostGuard.enter_case(name .. " (outside a test case)")
 	local ok, result = _timing.measure("module", name, callback, name)
 	_current_module = previous
 	fail_leaked_doubles(name, before)

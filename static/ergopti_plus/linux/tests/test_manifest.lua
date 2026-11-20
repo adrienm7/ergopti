@@ -957,6 +957,7 @@ return {
 	"tests.meta.corpus.test_corpus_process_prediction",
 	"tests.meta.harness.test_logger_fixture_identity",
 	"tests.meta.harness.test_notify_send_guard",
+	"tests.meta.harness.test_dialog_host_guard",
 	"tests.meta.harness.test_module_groups",
 	"tests.meta.harness.test_driver_module_predicate",
 	"tests.meta.harness.test_native_child_cpath",
