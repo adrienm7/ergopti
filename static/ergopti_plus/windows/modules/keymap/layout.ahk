@@ -269,9 +269,43 @@ _RemapChordEmit(Variant, SendStr, KeyChar, *) {
 		_RemapEmit(SendStr, KeyChar)
 }
 
+; One modifiers + magic key save hotkey ([layout] ctrl_magic_save). A keyboard
+; slot set on the chord keeps it. The Win variant joins the physical Win broker
+; as the key's layout fallback, so the magic editor and every Win slot on the
+; key keep their priority; the other chords take InputLevel 3, over the "^★"
+; and "!★" bindings RemapKey installs and its "*" wildcard.
+; @param Save {Map} One "save" entry of LayoutRegistry_MagicKeyHotkeys.
+_MagicKeySaveRegister(Save) {
+	Scan := ScriptInformation["MagicKeySourceScan"]
+	if Save["win_only"] {
+		MagicEditorRecordLayoutFallback(Scan, _MagicKeySaveEmit.Bind("", Save["send"]), _RemapWinCriterion(Scan))
+		return
+	}
+	Variant := SubStr(Save["hotkey"], 1, StrLen(Save["hotkey"]) - StrLen(Scan)) . StrUpper(Scan)
+	Hotkey(Save["hotkey"], _MagicKeySaveEmit.Bind(Variant, Save["send"]), "I3")
+}
+
+; Sends a save chord, unless a keyboard slot owns its variant.
+; @param Variant {String} The native spec a slot may own, "" for the Win variant.
+; @param Send {String} The chord sent, "^+s".
+_MagicKeySaveEmit(Variant, Send, *) {
+	if Variant != "" && KeyboardShortcutRunLayoutChord(Variant)
+		return
+	SendFinalResult(Send)
+}
+
+; The Win layout-fallback admission of a remapped key, one identity per scan: a
+; later producer of the same key (the modifiers + magic key save) passes it to
+; MagicEditorRecordLayoutFallback to replace the earlier callback.
+_RemapWinCriterion(ScanCode) {
+	static WinCriteria := Map()
+	if !WinCriteria.Has(ScanCode)
+		WinCriteria[ScanCode] := (*) => !_LayoutRowPassthroughCriterion(ScanCode, "#" . ScanCode)
+	return WinCriteria[ScanCode]
+}
+
 RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	global RemappedList
-	static WinCriteria := Map()
 	InputLevel := "I2"
 
 	Hotkey(
@@ -309,10 +343,8 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	; on this fallback without withdrawing independent shortcut assignments.
 	; The magic-key producer may register this scan again: retain one context
 	; identity so its later callback replaces the earlier layout fallback.
-	if !WinCriteria.Has(ScanCode)
-		WinCriteria[ScanCode] := (*) => !_LayoutRowPassthroughCriterion(ScanCode, "#" . ScanCode)
 	MagicEditorRecordLayoutFallback(ScanCode, Character == "l" ? _LockWorkstationEmit
-		: _RemapEmit.Bind("#" Character, Character), WinCriteria[ScanCode])
+		: _RemapEmit.Bind("#" Character, Character), _RemapWinCriterion(ScanCode))
 }
 
 ; Per-process UIA selection result caches.
@@ -935,11 +967,8 @@ if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"] {
 				; emulated layout's hotkeys, or none and the OS layout.
 				Hotkey(_MagicKeyHotkey["hotkey"], _RemapEmit.Bind("{Text}" . ScriptInformation["MagicKey"],
 					ScriptInformation["MagicKey"]), "I2")
-			case "ctrl_save":
-				; InputLevel 3 overrides the Ctrl+source-scan → "^★" binding
-				; that RemapKey installs at InputLevel 2, routing to Ctrl+S instead.
-				Hotkey(_MagicKeyHotkey["hotkey"], (*) => KeyboardShortcutRunLayoutChord("^" . StrUpper(ScriptInformation["MagicKeySourceScan"]))
-					|| SendFinalResult("^s"), "I3")
+			case "save":
+				_MagicKeySaveRegister(_MagicKeyHotkey)
 		}
 	}
 }

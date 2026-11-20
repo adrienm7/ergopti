@@ -659,23 +659,32 @@ LayoutRegistry_MagicKeySource(Inputs) {
  * (modules/keymap/layout.ahk registers them). The key a layout declares,
  * detected or shipped, is the layout's own magic-key position: its other levels
  * follow the source character (Shift types its capital, Ctrl and Alt its
- * shortcuts), and Ctrl+★ may save. Editor shortcuts belong to the ordinary
- * user-owned keyboard slots, never the physical magic-key owner. A key the
- * user chose is a key of the layout they type on: only its plain press becomes
- * the magic key, and every level and chord stays the layout's, as on macOS and
- * Linux (_shared/layouts/engine/layers/magic_key_source.lua).
+ * shortcuts), and with [layout] ctrl_magic_save on every shortcut chord sends
+ * its modifiers + S by the shared rule (_shared/shortcuts/data/magic_key_save.ahk):
+ * Ctrl+★ → Ctrl+S, Ctrl+Shift+★ → Ctrl+Shift+S, Alt+★ → Alt+S, Win+Shift+★ →
+ * Win+Shift+S, while Ctrl+Alt (AltGr) keeps the layout's AltGr character. Editor
+ * shortcuts belong to the ordinary user-owned keyboard slots, never the physical
+ * magic-key owner. A key the user chose is a key of the layout they type on:
+ * only its plain press becomes the magic key, and every level and chord stays
+ * the layout's, as on macOS and Linux
+ * (_shared/layouts/engine/layers/magic_key_source.lua).
  * @param {String} Scan - "SCnnn" of the physical magic key.
  * @param {Boolean} Chosen - Whether the user chose it ([hotstrings] magic_key_source).
  * @param {Boolean} CtrlSave - Whether [layout] ctrl_magic_save is on.
  * @returns {Array} Maps of "kind" ("remap": every level through RemapKey,
- *   "magic": the plain press alone, "ctrl_save": Ctrl+S) and "hotkey".
+ *   "magic": the plain press alone, "save": the chord's modifiers + S) and
+ *   "hotkey"; a "save" also carries "send" and "win_only" (the Win variant,
+ *   which the physical Win broker owns).
  */
 LayoutRegistry_MagicKeyHotkeys(Scan, Chosen, CtrlSave) {
 	if Chosen
 		return [Map("kind", "magic", "hotkey", Scan)]
 	Hotkeys := [Map("kind", "remap", "hotkey", Scan)]
-	if CtrlSave
-		Hotkeys.Push(Map("kind", "ctrl_save", "hotkey", "^" . Scan))
+	if CtrlSave {
+		for Save in MagicKeySaveWindowsHotkeys(Scan)
+			Hotkeys.Push(Map("kind", "save", "hotkey", Save["hotkey"], "send", Save["send"],
+				"win_only", Save["win_only"]))
+	}
 	return Hotkeys
 }
 

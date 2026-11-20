@@ -411,6 +411,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include core/process/adapters/uia_worker.ahk
 #Include platform/input/hotkey_registrar.ahk
 #Include ../_shared/shortcuts/data/magic_editor.ahk
+#Include ../_shared/shortcuts/data/magic_key_save.ahk
 #Include infra/magic_editor.ahk
 #Include platform/system/notifier.ahk
 #Include platform/system/accessibility.ahk

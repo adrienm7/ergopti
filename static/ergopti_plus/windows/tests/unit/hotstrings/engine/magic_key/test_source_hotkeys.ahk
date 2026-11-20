@@ -33,8 +33,10 @@ Test("magic key source: the layout's own key keeps its levels and Ctrl+S without
 	_MKH_LayoutKeyCase)
 
 _MKH_LayoutKeyCase() {
-	AssertEqual("remap SC02E, ctrl_save ^SC02E",
-		_MKH_Describe(LayoutRegistry_MagicKeyHotkeys("SC02E", false, true)))
+	AssertEqual("remap SC02E, save ^SC02E, save !SC02E, save ^+SC02E, save !+SC02E, save #SC02E, "
+		. "save ^#SC02E, save !#SC02E, save ^!#SC02E, save +#SC02E, save ^+#SC02E, save !+#SC02E, save ^!+#SC02E",
+		_MKH_Describe(LayoutRegistry_MagicKeyHotkeys("SC02E", false, true)),
+		"every shortcut chord saves; ★ alone, Shift and Ctrl+Alt (AltGr) stay the layout's")
 	AssertEqual("remap SC02E",
 		_MKH_Describe(LayoutRegistry_MagicKeyHotkeys("SC02E", false, false)))
 }
