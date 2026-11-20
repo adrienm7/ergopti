@@ -256,6 +256,9 @@ body {
 	border-bottom: 1px solid var(--theme-gray5-dark);
 	display: flex;
 	flex-shrink: 0;
+	/* The release's name, date and buttons wrap rather than being cut by the
+	   content's edge under a larger text (WCAG 1.4.10, 1.4.12). */
+	flex-wrap: wrap;
 	gap: 10px;
 	padding: 12px 20px;
 }

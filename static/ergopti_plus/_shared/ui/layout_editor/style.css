@@ -937,14 +937,15 @@ body {
 	text-overflow: ellipsis;
 }
 
+/* A key's name (« Pg préc ») wraps inside its key rather than being cut by
+   an ellipsis: a reader's wider letter spacing (WCAG 1.4.12) must not hide
+   it. The legend below it then fits the height left (fitLegends). */
 .le-code {
 	color: var(--le-sub);
 	flex: none;
 	font-size: max(8px, calc(var(--le-unit) * 0.2));
 	max-width: 100%;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	overflow-wrap: break-word;
 }
 
 /* The layout as a table, the board's text alternative: it scrolls inside its
