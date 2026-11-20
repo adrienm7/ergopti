@@ -45,7 +45,7 @@ local ConfigKeys = require("settings.engine.keys")
 -- What a Backspace right after an expansion gives back, and until when: the
 -- rule the Linux daemon and the AutoHotkey port replay from the same vectors.
 local BackspaceRestore = require("hotstrings.engine.backspace_restore")
--- The keystroke clock the tap times pauses with (seconds, monotonic across sleep).
+-- The keystroke clock the tap stamps keys with (seconds, monotonic across sleep).
 local TimerScheduler   = require("core.events.timer_scheduler")
 local LOG        = "keymap.expander"
 
