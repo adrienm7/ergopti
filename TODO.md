@@ -306,21 +306,12 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 - [ ] **[CODE] Layout capabilities left open (maintainer request 2026-11-19, « installer, retirer, émuler, petits
       changements sur les 3 OS »).** The audit and its matrix are in
-      [platform-parity-audit.md](docs/platform-parity-audit.md#layout-capabilities--november-19-2026); X11 install,
-      the macOS `.bundle` removal and the number-row offer are fixed, `test-layout-capability-contract.cjs` pins every
-      path. Left:
-  - Windows: the layout manager lists no layout Studio registered as a DLL, so removing it goes through Windows
-    Settings › Apps (`KbdRegister_Install`'s uninstall entry). List the `Ergopti_kbd_*` uninstall entries as installed
-    layouts and route their removal to `_LayoutComposer_UninstallNative`.
-  - Windows: a source re-saved under another `dll_name`, a declaration save (`_LayoutComposer_DeleteStale`) or an
-    emulation that replaces the stored source leaves the previous DLL registered with nothing in the app that finds
-    it again. Uninstall the previous DLL before `_LayoutComposer_StoreSource` overwrites its source.
-  - Accented-letter shortcuts under an emulated base: the Windows built-in Ergopti base reads the four choices
-    (`ErgoptiBaseMapping`), registry layouts on Windows and every layout on macOS and Linux take the chord from the
-    layout's Command level, and the Linux row stays enabled while it does nothing. 1. **(recommended)** The shared
-    emulation reads the four choices for Ergopti's own layouts, as the Windows base does. 2. Keep the Command level and
-    grey the row while emulating.
-  - Linux X11: a layout loaded with `apply-x11` lasts for the session; re-apply the selected one at daemon start.
+      [platform-parity-audit.md](docs/platform-parity-audit.md#layout-capabilities--november-19-2026); every gap it
+      listed is fixed (LCP-05 to LCP-08) and `test-layout-capability-contract.cjs` pins each path. Left, real machine
+      only: the steps of TODO-tests-windows.md (remove a Studio DLL from the layout manager, re-save a source under
+      another `dll_name`) and TODO-tests-linux.md (an X11 layout loaded again after a new session). Decided with the
+      recommended option: under an emulated layout of another family, the accented keys keep that layout's Command
+      level on Windows and Linux; macOS draws no letter picker and says so in its reason.
 
 - [ ] **[CODE] Parity audit continuation.** Take one bounded module at a time across Windows, macOS, Linux and shared;
       do not restart a finished campaign without source drift or a new hypothesis. The
