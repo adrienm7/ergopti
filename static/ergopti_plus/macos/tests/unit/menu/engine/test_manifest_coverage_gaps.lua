@@ -38,10 +38,11 @@ local helpers = require("tests.helpers")
 -- assertion about the explained path below becomes vacuous.
 local FIRST_EXPLAINED_PATH = "script.alt_gr_is_kana_remap"
 
--- Floor on the absences macOS has. It was 104 when the table was first emitted;
--- a table that collapsed to a handful would make the split assertions pass
--- while measuring nothing.
-local MIN_UNAVAILABLE = 50
+-- The shared manifest rows, read directly: every row that does not name "hs"
+-- is an absence macOS must ship. Counting against them, not against a floor,
+-- keeps a table that collapsed to a handful from passing the split assertions
+-- while staying exact when a parity decision legitimately removes a setting.
+local MANIFEST_DATA = "settings.engine.features.manifest_data"
 
 
 
@@ -53,10 +54,26 @@ helpers.describe("manifest_reader: platform coverage", function()
 		local gaps = Manifest.unavailable()
 		helpers.assert_true(type(gaps) == "table",
 			"the generated manifest must carry an M.unavailable table")
-		helpers.assert_true(#gaps >= MIN_UNAVAILABLE,
-			"only " .. tostring(#gaps) .. " absence(s) shipped, floor " .. tostring(MIN_UNAVAILABLE)
-			.. " — M.features is filtered to this platform, so without this table the driver cannot "
-			.. "know a feature exists at all and reason_key is unreadable by construction")
+		package.loaded[MANIFEST_DATA] = nil
+		local rows = require(MANIFEST_DATA).features
+		local expected = {}
+		for _, row in ipairs(rows) do
+			local on_macos = false
+			for _, p in ipairs(row.platforms) do
+				if p == "hs" then on_macos = true end
+			end
+			if not on_macos then expected[#expected + 1] = row.path end
+		end
+		helpers.assert_true(#expected > 0, "the shared manifest must hold features macOS lacks")
+		local shipped = {}
+		for _, gap in ipairs(gaps) do shipped[gap.path] = true end
+		for _, path in ipairs(expected) do
+			helpers.assert_true(shipped[path] == true,
+				path .. " is absent from macOS but not shipped in M.unavailable — M.features is "
+				.. "filtered to this platform, so without this table the driver cannot know a "
+				.. "feature exists at all and reason_key is unreadable by construction")
+		end
+		helpers.assert_eq(#gaps, #expected, "M.unavailable must list exactly the rows that do not name macOS")
 	end)
 
 	helpers.it("every absence names a path and the platforms that do have it", function()

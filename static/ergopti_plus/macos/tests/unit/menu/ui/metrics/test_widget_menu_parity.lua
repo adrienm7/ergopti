@@ -159,14 +159,23 @@ helpers.describe("shared checked and section-header templates", function()
 		end)
 	end
 
-	helpers.it("retains all sixteen existing id-less header declarations (template-header)", function()
+	helpers.it("retains every existing id-less header declaration (template-header)", function()
 		local file = assert(io.open(helpers.shared("menu/data/menu_manifest.json"), "rb"))
 		local manifest = assert(Json.decode(file:read("*a")))
 		file:close()
-		local count = 0
+		-- Every section_header a definition holds, nested ones included: counted
+		-- apart from the loop below so a header that loop skips cannot go unseen.
+		local function nested_headers(node)
+			if type(node) ~= "table" then return 0 end
+			local found = node.type == "section_header" and 1 or 0
+			for _, child in pairs(node) do found = found + nested_headers(child) end
+			return found
+		end
 		for _, key in ipairs({ "shortcuts_menu", "metrics_menu", "layout_menu", "hotstrings_menu", "tap_holds_menu" }) do
 			local definition = manifest[key]
-			if type(definition) == "table" then
+			helpers.assert_type(definition, "table", key .. " must still be declared in the menu manifest")
+			local count = 0
+			do
 				for _, header in ipairs(definition) do
 					if header.type == "section_header" then
 						count = count + 1
@@ -181,9 +190,10 @@ helpers.describe("shared checked and section-header templates", function()
 					end
 				end
 			end
+			helpers.assert_true(count > 0, key .. " must keep its section headers")
+			helpers.assert_eq(count, nested_headers(definition),
+				key .. ": every header of the definition must sit at its top level and be checked above")
 		end
-		-- 3 Shortcuts, 3 Metrics, 4 Layout, 4 Hotstrings and 2 Tap-Hold headers.
-		helpers.assert_eq(count, 16, "independent existing-header count must not be silently reduced")
 	end)
 
 	local invalid = {
