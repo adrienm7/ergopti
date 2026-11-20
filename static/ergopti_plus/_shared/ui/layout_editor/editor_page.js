@@ -5035,10 +5035,31 @@ var LayoutEditorPage = (function () {
 		}
 
 		/**
+		 * The height a legend may take in its key: the key's content box less the
+		 * key-name label above it. A reader's wider line spacing (WCAG 1.4.12, the
+		 * site's « wide » spacing) makes both lines taller than the key, whose
+		 * bottom edge then cut the legend.
+		 * @param {HTMLElement} legend
+		 * @returns {number} Pixels, 0 when the key is not laid out.
+		 */
+		function legendRoom(legend) {
+			const key = legend.parentElement;
+			const style = getComputedStyle(key);
+			const code = key.querySelector('.le-code');
+			return Math.max(
+				0,
+				key.clientHeight -
+					parseFloat(style.paddingTop) -
+					parseFloat(style.paddingBottom) -
+					(code ? code.offsetHeight : 0)
+			);
+		}
+
+		/**
 		 * Fits every key label inside its key: the font shrinks in proportion to the
-		 * overflow down to LEGEND_MIN_PX, then a label still too long is cut with an
-		 * ellipsis (the key's title holds it whole). A board not laid out yet (a
-		 * hidden frame) is measured at the next resize.
+		 * overflow, in width and in height, down to LEGEND_MIN_PX, then a label
+		 * still too long is cut with an ellipsis (the key's title holds it whole).
+		 * A board not laid out yet (a hidden frame) is measured at the next resize.
 		 */
 		function fitLegends() {
 			const legends = [...root.querySelectorAll('#le-board .le-legend')];
@@ -5046,12 +5067,23 @@ var LayoutEditorPage = (function () {
 				node.style.fontSize = '';
 				node.classList.remove('cut');
 			});
-			const widths = legends.map((node) => [node.clientWidth, node.scrollWidth]);
+			const sizes = legends.map((node) => [
+				node.clientWidth,
+				node.scrollWidth,
+				legendRoom(node),
+				node.offsetHeight
+			]);
 			legends.forEach((node, index) => {
-				const [room, needed] = widths[index];
-				if (room === 0 || needed <= room) return;
+				const [room, needed, roomHeight, neededHeight] = sizes[index];
+				if (room === 0) return;
+				const ratio = Math.min(
+					1,
+					room / needed,
+					roomHeight > 0 && neededHeight > 0 ? roomHeight / neededHeight : 1
+				);
+				if (ratio >= 1) return;
 				const size = parseFloat(getComputedStyle(node).fontSize);
-				node.style.fontSize = `${Math.max(LEGEND_MIN_PX, Math.floor((size * room) / needed))}px`;
+				node.style.fontSize = `${Math.max(LEGEND_MIN_PX, Math.floor(size * ratio))}px`;
 			});
 			legends.forEach((node) => {
 				if (node.scrollWidth > node.clientWidth) node.classList.add('cut');

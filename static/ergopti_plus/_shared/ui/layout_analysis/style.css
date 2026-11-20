@@ -99,6 +99,15 @@ body:has(> main.layout-analysis) {
 	margin: 4px 0;
 }
 
+/* Running text keeps lines a reader can follow, at most about 70 characters
+   (WCAG 1.4.8 asks for 80): a ch is the width of a digit, wider than the
+   average letter. */
+.layout-analysis p.la-muted {
+	max-width: 60ch;
+	/* A number grouped by no-break spaces must not widen a phone's page. */
+	overflow-wrap: anywhere;
+}
+
 .la-error {
 	color: var(--la-bad);
 }
@@ -278,45 +287,8 @@ body:has(> main.layout-analysis) {
 	width: 100%;
 }
 
-/* A file input shows the browser's own words (« Choose File », « No file
-   chosen ») in its language, not the page's: it is hidden, kept inside its
-   label so a click or a key opens the picker, and the label is the button. */
-.la-file {
-	align-items: center;
-	display: inline-flex;
-	gap: 8px;
-	position: relative;
-}
-
-.layout-analysis .la-file input {
-	border: 0;
-	clip-path: inset(50%);
-	height: 1px;
-	margin: -1px;
-	overflow: hidden;
-	padding: 0;
-	position: absolute;
-	white-space: nowrap;
-	width: 1px;
-}
-
-.la-file-button {
-	background: var(--la-surface);
-	border: 1px solid var(--la-border);
-	border-radius: 6px;
-	cursor: pointer;
-	padding: 5px 8px;
-}
-
-.la-file-button:hover {
-	background: var(--la-accent-soft);
-}
-
-.la-file:focus-within {
-	outline: 2px solid var(--la-accent);
-	outline-offset: 1px;
-}
-
+/* A file picker's label is the button (.la-file, fingering_editor.css, which
+   every page that draws one loads). */
 /* « Load a corpus file » under the corpus picker, whatever corpus is chosen
    (it was hidden under « Your own text »): a tinted button with an icon and
    the formats it reads (maintainer, 2026-11-19). */
@@ -386,16 +358,12 @@ body:has(> main.layout-analysis) {
 }
 
 /* The layout list folds under one line naming the compared layouts. */
+/* The summary names a bounded number of layouts (SUMMARY_NAMES): it wraps
+   rather than being cut, so larger text or wider spacing hides none of it
+   (WCAG 1.4.12). */
 .la-layouts-box > summary {
 	cursor: pointer;
-	overflow: hidden;
 	padding: 4px 0;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.la-layouts-box[open] > summary {
-	white-space: normal;
 }
 
 /* « My typing » chosen: the corpus picker carries the accent. */
@@ -527,6 +495,8 @@ body:has(> main.layout-analysis) {
 .la-status {
 	color: var(--la-sub);
 	margin: 14px 0 0;
+	/* Its counts are grouped by no-break spaces: they wrap on a phone. */
+	overflow-wrap: anywhere;
 }
 
 /* ============================== */
@@ -568,12 +538,12 @@ body:has(> main.layout-analysis) {
 	background: var(--la-accent-soft);
 }
 
+/* A layout's name wraps in its column rather than being cut: larger text or
+   wider spacing must not hide it (WCAG 1.4.12). */
 .la-chart-label {
 	font-weight: inherit;
-	overflow: hidden;
+	overflow-wrap: anywhere;
 	text-align: start;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 }
 
 /* The name that opens a layout's details: the row's text, a button for the
@@ -583,11 +553,9 @@ body:has(> main.layout-analysis) {
 	border: 0;
 	border-radius: 2px;
 	display: block;
-	overflow: hidden;
+	overflow-wrap: anywhere;
 	padding: 0;
 	text-align: inherit;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 	width: 100%;
 }
 
@@ -1306,6 +1274,7 @@ body:has(> main.layout-analysis) {
 
 .la-filters-box > summary > .la-table-count {
 	margin-left: 8px;
+	overflow-wrap: anywhere;
 }
 
 /* The filters' group, named by the summary's title, unframed. */
@@ -1359,7 +1328,12 @@ body:has(> main.layout-analysis) {
 	display: inline-flex;
 	font-weight: 600;
 	gap: 8px;
+	/* A name wider than a phone's row wraps instead of widening the page. */
+	hyphens: auto;
+	max-width: 100%;
 	min-height: 40px;
+	min-width: 0;
+	overflow-wrap: anywhere;
 	padding: 6px 12px;
 }
 
@@ -1513,9 +1487,7 @@ body:has(> main.layout-analysis) {
 
 .layout-analysis .la-leader-name {
 	max-width: 100%;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	overflow-wrap: anywhere;
 }
 
 .layout-analysis .la-leader-name:hover,
@@ -1908,7 +1880,7 @@ body:has(> main.layout-analysis) {
 .la-preset-list {
 	display: grid;
 	gap: 12px;
-	grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr));
 	list-style: none;
 	margin: 0;
 	padding: 0;
@@ -2023,6 +1995,12 @@ body:has(> main.layout-analysis) {
 
 .la-ranking-tools .la-muted {
 	margin: 0;
+}
+
+/* « Download the table (CSV) » wraps on a phone under a larger text. */
+.layout-analysis .la-ranking-tools > button {
+	max-width: 100%;
+	white-space: normal;
 }
 
 .la-row-button {

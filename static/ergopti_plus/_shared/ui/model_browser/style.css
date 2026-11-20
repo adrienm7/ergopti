@@ -101,13 +101,15 @@ thead th {
 	font-size: 11px;
 	font-weight: 600;
 	letter-spacing: 0.4px;
+	/* A column's name wraps under a wider spacing instead of running into
+	   the next column's. */
+	overflow-wrap: anywhere;
 	padding: 9px 10px;
 	position: sticky;
 	text-align: left;
 	text-transform: uppercase;
 	top: 0;
 	user-select: none;
-	white-space: nowrap;
 	z-index: 1;
 }
 
@@ -141,12 +143,12 @@ thead th.sorted-desc::after {
 	width: 88px;
 }
 
+/* A model's name, family or size wraps in its fixed column rather than being
+   cut: larger text or wider spacing must not hide it (WCAG 1.4.12). */
 tbody td {
 	border-bottom: 1px solid var(--theme-hue-2a2a2d);
-	overflow: hidden;
+	overflow-wrap: anywhere;
 	padding: 8px 10px;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 }
 
 tbody td.num {

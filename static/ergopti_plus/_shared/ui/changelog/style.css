@@ -56,6 +56,9 @@ body {
 
 #channel-toggle {
 	display: flex;
+	/* The channels wrap rather than overflow the sidebar under a larger text
+	   or a wider spacing (WCAG 1.4.12). */
+	flex-wrap: wrap;
 	gap: 6px;
 }
 

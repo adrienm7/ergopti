@@ -79,7 +79,7 @@ body:has(> main.layout-optimizer) {
 
 .lo-header {
 	margin-bottom: var(--lo-space-5);
-	max-width: 72ch;
+	max-width: 60ch;
 }
 
 .lo-lead {
@@ -89,6 +89,13 @@ body:has(> main.layout-optimizer) {
 .lo-muted {
 	color: var(--lo-sub);
 	margin: var(--lo-space-1) 0 var(--lo-space-3);
+}
+
+/* Running text keeps lines a reader can follow, at most about 70 characters
+   (WCAG 1.4.8 asks for 80): a ch is the width of a digit, wider than the
+   average letter. */
+.layout-optimizer p.lo-muted {
+	max-width: 60ch;
 }
 
 .lo-error {
@@ -226,7 +233,7 @@ body:has(> main.layout-optimizer) {
 .lo-fields {
 	display: grid;
 	gap: var(--lo-space-3) var(--lo-space-4);
-	grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
 }
 
 /* « Your own text »: the box takes the card's width; the file picker wraps under it. */
@@ -288,7 +295,7 @@ body:has(> main.layout-optimizer) {
 .lo-row {
 	display: grid;
 	gap: var(--lo-space-3);
-	grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(min(130px, 100%), 1fr));
 	margin: var(--lo-space-3) 0;
 }
 
@@ -296,7 +303,7 @@ body:has(> main.layout-optimizer) {
 .lo-switches {
 	display: grid;
 	gap: var(--lo-space-3) var(--lo-space-5);
-	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
 	list-style: none;
 	margin: var(--lo-space-4) 0 0;
 	padding: 0;
@@ -322,7 +329,12 @@ body:has(> main.layout-optimizer) {
 .lo-switch-head {
 	align-items: flex-start;
 	display: flex;
+	flex-wrap: wrap;
 	gap: var(--lo-space-2);
+}
+
+.lo-switch-head > .lo-switch {
+	min-width: 0;
 }
 
 .lo-switch-thumb {
@@ -766,7 +778,7 @@ body:has(> main.layout-optimizer) {
 .lo-shelf-list {
 	display: grid;
 	gap: var(--lo-space-3);
-	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
 	list-style: none;
 	margin: var(--lo-space-3) 0 0;
 	padding: 0;
@@ -1231,8 +1243,21 @@ body:has(> main.layout-optimizer) {
 	padding: 0 var(--lo-space-1);
 }
 
+/* Each preset is one label holding its radio and its words: one column, the
+   radio beside the words, which wrap under a large text instead of widening
+   the page. */
 .lo-change-presets {
+	grid-template-columns: minmax(0, 1fr);
 	margin-top: var(--lo-space-2);
+}
+
+.lo-change-presets > label {
+	align-items: flex-start;
+	display: flex;
+	gap: var(--lo-space-2);
+	min-width: 0;
+	/* The weights are tied to their unit by no-break spaces. */
+	overflow-wrap: anywhere;
 }
 
 .lo-change-row {
@@ -1269,7 +1294,7 @@ body:has(> main.layout-optimizer) {
 .lo-tradeoff-facts {
 	display: grid;
 	gap: var(--lo-space-1) var(--lo-space-4);
-	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
 	margin: 0 0 var(--lo-space-2);
 }
 
@@ -1294,7 +1319,7 @@ body:has(> main.layout-optimizer) {
 .lo-tradeoff-list {
 	display: grid;
 	gap: var(--lo-space-1) var(--lo-space-4);
-	grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr));
 	margin: var(--lo-space-2) 0 0;
 	padding-left: 1.6em;
 }

@@ -161,24 +161,28 @@ body {
 
 .le-toolbar-group {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 6px;
+	max-width: 100%;
+	min-width: 0;
 }
 
 .le-doc-state {
 	color: var(--le-sub);
-	/* The layout's name and what follows it sit at the toolbar's end. */
+	/* The layout's name and what follows it sit at the toolbar's end. A long
+	   name wraps rather than being cut: larger text or wider spacing must not
+	   hide it (WCAG 1.4.12). */
 	margin-inline-start: auto;
-	max-width: 40ch;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	max-width: min(40ch, 100%);
+	overflow-wrap: anywhere;
 }
 
 .le-doc-state.dirty {
 	color: var(--le-text);
 }
 
-/* The open layouts, one tab each, above the toolbar; long names are cut, the row wraps. */
+/* The open layouts, one tab each, above the toolbar; long names wrap inside
+   their tab, the row wraps. */
 .le-layout-tabs {
 	align-items: center;
 	display: flex;
@@ -209,10 +213,9 @@ body {
 	border-radius: var(--le-radius);
 	display: inline-flex;
 	gap: 4px;
-	height: var(--le-tab-height);
 	max-width: 100%;
+	min-height: var(--le-tab-height);
 	min-width: 0;
-	overflow: hidden;
 	padding: 0 4px 0 0;
 	position: relative;
 	transition:
@@ -251,11 +254,9 @@ body {
 .layout-editor .le-layout-tab {
 	align-self: stretch;
 	border-radius: calc(var(--le-radius) - 1px) 0 0 calc(var(--le-radius) - 1px);
-	max-width: 24ch;
-	overflow: hidden;
-	padding: 0 8px 0 14px;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	max-width: min(24ch, 100%);
+	overflow-wrap: anywhere;
+	padding: 4px 8px 4px 14px;
 }
 
 .le-layout-tab-item.active .le-layout-tab {
@@ -368,7 +369,16 @@ body {
 .le-check {
 	align-items: center;
 	display: inline-flex;
+	flex-wrap: wrap;
 	gap: 6px;
+	max-width: 100%;
+}
+
+/* A drop-down as wide as its longest choice wraps under its label and
+   shrinks to the row on a phone or under a larger text (WCAG 1.4.10). */
+.le-inline select {
+	max-width: 100%;
+	min-width: 0;
 }
 
 /* « Swap with the key » is a paragraph: no margins of its own. */
@@ -474,6 +484,8 @@ body {
 	flex-wrap: wrap;
 	gap: 6px 12px;
 	margin: 0;
+	max-width: 100%;
+	min-width: 0;
 }
 
 .le-label {
@@ -996,8 +1008,10 @@ body {
 	border: 1px solid transparent;
 	border-bottom: none;
 	border-radius: 6px 6px 0 0;
-	flex: 0 0 auto;
-	white-space: nowrap;
+	flex: 0 1 auto;
+	/* One line while the row holds it; a name longer than the row wraps
+	   instead of widening the page (WCAG 1.4.10). */
+	max-width: 100%;
 }
 
 .le-tool-tabs .le-tool-tab.active {

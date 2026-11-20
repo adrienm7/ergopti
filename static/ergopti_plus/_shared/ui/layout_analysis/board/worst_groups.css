@@ -17,7 +17,7 @@
 .la-ngrams {
 	display: grid;
 	gap: 16px;
-	grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr));
 	margin: 12px 0;
 }
 
@@ -26,6 +26,8 @@
 	border: 1px solid var(--theme-separator);
 	border-radius: 10px;
 	border-top: 4px solid var(--la-ngram-colour, var(--theme-accent));
+	/* Its rows fold under a narrow card (section 2). */
+	container-type: inline-size;
 	padding: 10px 12px 12px;
 }
 
@@ -148,9 +150,22 @@
 	border-color: var(--theme-accent);
 }
 
+/* A narrow card (a phone, or larger text): the share goes under the keys
+   and the bar, so a row never widens the page (WCAG 1.4.10). */
+@container (max-width: 220px) {
+	.la-ngram-card .la-ngram {
+		grid-template-columns: auto minmax(0, 1fr);
+	}
+
+	.la-ngram-card .la-ngram > .la-ngram-share {
+		grid-column: 1 / -1;
+	}
+}
+
 /* A kbd of the chips' kbds: the browser's monospace stays on the chips alone. */
 .la-ngram-keys {
 	display: inline-flex;
+	flex-wrap: wrap;
 	font: inherit;
 	gap: 3px;
 }

@@ -113,6 +113,13 @@
 	margin: 0 0 8px;
 }
 
+/* Running text keeps lines a reader can follow, at most about 70 characters
+   (WCAG 1.4.8 asks for 80): a ch is the width of a digit, wider than the
+   average letter. */
+.la-panel :is(p.la-muted, p.la-panel-note) {
+	max-width: 60ch;
+}
+
 /* An incomplete layout says so in words, in the refusal colour. */
 .la-panel-incomplete {
 	color: var(--theme-bad-text);
@@ -328,6 +335,29 @@
 
 .la-panel-finger-value {
 	text-align: right;
+}
+
+/* A narrow panel (a phone, or larger text): the tables' cells wrap and each
+   finger's value goes under its name and bar, so the panel never scrolls the
+   page sideways (WCAG 1.4.10). */
+@container (max-width: 300px) {
+	.la-panel-metrics {
+		table-layout: fixed;
+	}
+
+	.la-panel-metrics :is(th, td) {
+		overflow-wrap: anywhere;
+		white-space: normal;
+	}
+
+	.la-panel-finger {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	}
+
+	.la-panel-finger-value {
+		grid-column: 1 / -1;
+		text-align: start;
+	}
 }
 
 .la-panel-section {

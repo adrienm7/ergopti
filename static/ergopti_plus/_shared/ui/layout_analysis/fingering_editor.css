@@ -29,6 +29,50 @@
 	overflow-x: auto;
 }
 
+/* A file input shows the browser's own words (« Choose File », « No file
+   chosen ») in its language, not the page's: it is hidden, kept inside its
+   label so a click or a key opens the picker, and the label is the button.
+   Here, not in the Comparer's stylesheet, because the editor's analysis panel
+   draws one too (« Import a fingering »): there the native control showed
+   beside the button and, at 200 % text on a phone, made the page scroll
+   sideways. */
+.la-file {
+	align-items: center;
+	display: inline-flex;
+	gap: 8px;
+	max-width: 100%;
+	position: relative;
+}
+
+.la-file input[type='file'] {
+	border: 0;
+	clip-path: inset(50%);
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	padding: 0;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+.la-file-button {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 6px;
+	cursor: pointer;
+	padding: 5px 8px;
+}
+
+.la-file-button:hover {
+	background: var(--theme-accent-soft);
+}
+
+.la-file:focus-within {
+	outline: 2px solid var(--theme-accent);
+	outline-offset: 1px;
+}
+
 /* The reset, export and import buttons: a paragraph spaced as the row it replaced. */
 .la-fingering-actions {
 	margin: 0;
