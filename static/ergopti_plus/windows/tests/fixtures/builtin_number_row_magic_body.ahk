@@ -36,11 +36,14 @@ GetKeyState(Key, *) {
 	return Key == "CapsLock" ? _LRPN_Caps : false
 }
 GetForegroundKeyboardLayout() => 0x7E570409
-; The JSON owner ends each string run with the native text adapter's wcscspn
-; and skips whitespace and number runs with its wcsspn; both read memory only.
+; The JSON owner first measures its text with the native text adapter's strict
+; WideCharToMultiByte, then ends each string run with its wcscspn and skips
+; whitespace and number runs with its wcsspn; all three read memory only.
 ; Replay exactly those calls unit by unit; every other native call, a layout or
 ; profile probe above all, stays refused.
 DllCall(Function, Args*) {
+	if Function == "Kernel32\WideCharToMultiByte"
+		return _LRPN_Utf8Length(Args*)
 	Including := Function == "msvcrt\wcsspn"
 	if !((Including || Function == "msvcrt\wcscspn") && Args.Length == 5 && Args[1] == "Ptr"
 			&& Args[3] == "Ptr" && Args[5] == "Cdecl UPtr")
@@ -58,6 +61,29 @@ DllCall(Function, Args*) {
 		Offset++
 	}
 	return Offset
+}
+; Only the measuring form (UTF-8, WC_ERR_INVALID_CHARS, no output buffer) is
+; admitted: it returns the UTF-8 byte count, or 0 at a lone surrogate.
+_LRPN_Utf8Length(Args*) {
+	if !(Args.Length == 17 && Args[2] == 65001 && Args[4] == 0x80 && Args[5] == "Ptr" && Args[7] == "Int"
+			&& Args[10] == 0 && Args[12] == 0 && Args[14] == 0 && Args[16] == 0 && Args[17] == "Int")
+		throw Error("native DLL calls are outside this passive ownership fixture")
+	Bytes := 0, Index := 0
+	while Index < Args[8] {
+		Unit := NumGet(Args[6], Index * 2, "UShort"), Index++
+		if Unit >= 0xDC00 && Unit <= 0xDFFF
+			return 0
+		if Unit >= 0xD800 && Unit <= 0xDBFF {
+			if Index >= Args[8]
+				return 0
+			Low := NumGet(Args[6], Index * 2, "UShort"), Index++
+			if Low < 0xDC00 || Low > 0xDFFF
+				return 0
+			Bytes += 4
+		} else
+			Bytes += Unit < 0x80 ? 1 : Unit < 0x800 ? 2 : 3
+	}
+	return Bytes
 }
 SendInput(*) {
 	throw Error("native input is outside this passive ownership fixture")
