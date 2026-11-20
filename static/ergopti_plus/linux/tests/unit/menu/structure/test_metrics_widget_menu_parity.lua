@@ -371,13 +371,17 @@ helpers.describe("shared checked and section-header templates", function()
 		local file = assert(io.open(helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json", "rb"))
 		local manifest = assert(Json.decode(file:read("*a")))
 		file:close()
+		-- Layout lost « Couches émulées » on 2026-11-19, the tuning header now
+		-- covering both layer rows (input sources, emulation, tuning).
+		local expected = { shortcuts_menu = 3, metrics_menu = 3, layout_menu = 3, hotstrings_menu = 4, tap_holds_menu = 2 }
 		local count = 0
 		for _, key in ipairs({ "shortcuts_menu", "metrics_menu", "layout_menu", "hotstrings_menu", "tap_holds_menu" }) do
 			local definition = manifest[key]
+			local in_menu = 0
 			if type(definition) == "table" then
 				for _, header in ipairs(definition) do
 					if header.type == "section_header" then
-						count = count + 1
+						count, in_menu = count + 1, in_menu + 1
 						helpers.assert_nil(header.id, "existing headers retain their id-less contract")
 						for _, platform in ipairs({ "hs", "linux", "ahk" }) do
 							with_rows(platform, { header }, function(renderer)
@@ -389,6 +393,7 @@ helpers.describe("shared checked and section-header templates", function()
 					end
 				end
 			end
+			helpers.assert_eq(in_menu, expected[key], key .. ": independent existing-header count must not be silently reduced")
 		end
 		-- 3 Shortcuts, 3 Metrics, 3 Layout, 4 Hotstrings and 2 Tap-Hold headers.
 		helpers.assert_eq(count, 15, "independent existing-header count must not be silently reduced")
