@@ -181,14 +181,16 @@ if (locales.length !== 21) errors.push(`read ${locales.length} locale file(s), e
  * Holds a greyed row's reason to a short head in every locale.
  * @param {string} where Row name for the messages.
  * @param {string} key The reason's locale key.
+ * @param {{file: string, table: object}[]} tables The locale tables to read.
+ * @param {string[]} sink Receives the errors.
  */
-function checkReasonHead(where, key) {
-	for (const { file, table } of locales) {
+function checkReasonHead(where, key, tables, sink) {
+	for (const { file, table } of tables) {
 		const text = table[key];
 		if (typeof text !== 'string' || text === '') {
-			errors.push(`${where}: ${file} has no text for ${key}.`);
+			sink.push(`${where}: ${file} has no text for ${key}.`);
 		} else if (reasonHead(text).length === 0 || reasonHead(text).length > MAX_HEAD) {
-			errors.push(
+			sink.push(
 				`${where}: ${file} opens ${key} with "${reasonHead(text)}", ` +
 					`which must be 1 to ${MAX_HEAD} characters before its colon.`
 			);
@@ -196,29 +198,84 @@ function checkReasonHead(where, key) {
 	}
 }
 
-let declared = 0;
-let greyed = 0;
-let disabledWithReason = 0;
-for (const [menu, rows] of Object.entries(manifest)) {
-	if (!Array.isArray(rows)) continue;
-	for (const row of rows) {
-		if (!row || typeof row !== 'object') continue;
-		if (row.unavailable === undefined && row.disabled_reason_key === undefined) continue;
-		const where = `${menu}.${row.id || row.i18n || row.type}`;
-		errors.push(...rowErrors(where, row));
-		if (typeof row.disabled_reason_key === 'string') {
-			disabledWithReason += 1;
-			checkReasonHead(where, row.disabled_reason_key);
+/**
+ * Checks every declared row of a manifest and counts each declaration kind.
+ * @param {object} source Menu manifest, keyed by menu.
+ * @param {{file: string, table: object}[]} tables The locale tables to read.
+ * @param {string[]} sink Receives the errors.
+ * @returns {{declared: number, greyed: number, disabledWithReason: number}}
+ */
+function scanManifest(source, tables, sink) {
+	const counts = { declared: 0, greyed: 0, disabledWithReason: 0 };
+	for (const [menu, rows] of Object.entries(source)) {
+		if (!Array.isArray(rows)) continue;
+		for (const row of rows) {
+			if (!row || typeof row !== 'object') continue;
+			if (row.unavailable === undefined && row.disabled_reason_key === undefined) continue;
+			const where = `${menu}.${row.id || row.i18n || row.type}`;
+			sink.push(...rowErrors(where, row));
+			if (typeof row.disabled_reason_key === 'string') {
+				counts.disabledWithReason += 1;
+				checkReasonHead(where, row.disabled_reason_key, tables, sink);
+			}
+			if (row.unavailable === undefined) continue;
+			counts.declared += 1;
+			if (row.unavailable !== 'grey' || typeof row.reason_key !== 'string') continue;
+			counts.greyed += 1;
+			checkReasonHead(where, row.reason_key, tables, sink);
 		}
-		if (row.unavailable === undefined) continue;
-		declared += 1;
-		if (row.unavailable !== 'grey' || typeof row.reason_key !== 'string') continue;
-		greyed += 1;
-		checkReasonHead(where, row.reason_key);
 	}
+	return counts;
 }
+
+// The greyed path on a fixture: since the parity of 2026-11-20 no production
+// row is greyed as not yet ported, so the real manifest alone cannot prove the
+// scan reads a greyed row's reason in every locale.
+{
+	const tables = [
+		{
+			file: 'xx.json',
+			table: { 'r.short': 'Not here yet: later', 'r.long': 'x'.repeat(MAX_HEAD + 1) + ': y' }
+		},
+		{ file: 'yy.json', table: { 'r.short': 'Pas encore : plus tard', 'r.long': 'Court : z' } }
+	];
+	const greyedRow = (reason) => ({
+		type: 'command',
+		id: 'fixture_grey',
+		i18n: 'menu.fixture',
+		platforms: ['ahk', 'linux'],
+		unavailable: 'grey',
+		reason_key: reason
+	});
+	const hiddenRow = {
+		type: 'command',
+		id: 'fixture_hide',
+		i18n: 'menu.fixture',
+		platforms: ['ahk'],
+		unavailable: 'hide'
+	};
+	const clean = [];
+	assert.deepEqual(scanManifest({ fixture: [greyedRow('r.short'), hiddenRow] }, tables, clean), {
+		declared: 2,
+		greyed: 1,
+		disabledWithReason: 0
+	});
+	assert.deepEqual(clean, []);
+	const long = [];
+	scanManifest({ fixture: [greyedRow('r.long')] }, tables, long);
+	assert.equal(long.length, 1);
+	assert.match(long[0], /xx\.json opens r\.long/);
+	const missing = [];
+	scanManifest({ fixture: [greyedRow('r.absent')] }, tables, missing);
+	assert.equal(missing.length, 2);
+	assert.ok(missing.every((error) => /has no text for r\.absent/.test(error)));
+	const unreasoned = [];
+	assert.equal(scanManifest({ fixture: [greyedRow(undefined)] }, tables, unreasoned).greyed, 0);
+	assert.ok(unreasoned.some((error) => /greyed row needs a reason_key/.test(error)));
+}
+
+const { declared, greyed, disabledWithReason } = scanManifest(manifest, locales, errors);
 if (declared < 4) errors.push(`found ${declared} declared row(s), expected at least 4.`);
-if (greyed < 1) errors.push('found no greyed row — the stand-in is untested by the manifest.');
 if (disabledWithReason < 1)
 	errors.push('found no disabled_reason_key — the runtime stand-in is untested by the manifest.');
 
