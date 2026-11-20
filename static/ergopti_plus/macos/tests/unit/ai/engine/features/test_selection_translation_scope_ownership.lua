@@ -20,6 +20,7 @@ require("ai.engine.api.token_exchange") -- pure: the remote backend reads auth b
 require("ai.engine.policy.failure_class") -- pure: every LLM backend asks it whether a refused key failed the call
 require("ai.engine.settings.request_settings") -- pure: the prediction engine compares a request's settings with it
 require("core.logger.engine.perf_budget") -- pure: the remote backend judges its request time with it
+require("core.logger.engine.level_setting") -- pure: the logger resolves a stored log level with it
 require("core.lifecycle.engine.main_thread_hold") -- pure: the logger reads its read-only hold bounds from it
 require("ai.engine.local_servers.fingerprint") -- pure: the local server rows identify a server by its models answer
 require("ai.engine.local_servers.menu") -- pure: the remote backend names the local server rows with it
