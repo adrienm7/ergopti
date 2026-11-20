@@ -618,8 +618,15 @@ local SETTLE_US = 300000
 --- @param events table
 --- @param read_field function (event) -> "admitted" or "secure".
 --- @param during function|nil (keystats, event) called after each event.
-local function replay_with_withdrawals(keystats, events, read_field, during)
-	local function withdraw() keystats.withdraw_for_pointer(function() keystats.set_secure_field(true) end) end
+--- @param source string|nil The pointer's identity, the touchpad by default.
+--- @param withdraws boolean|nil false for a press that withdraws nothing,
+--- as on a desktop that never moves the field on a click.
+local function replay_with_withdrawals(keystats, events, read_field, during, source, withdraws)
+	local pointer = source or PAD
+	local function withdraw()
+		if withdraws == false then return end
+		keystats.withdraw_for_pointer(function() keystats.set_secure_field(true) end)
+	end
 	local last_frame_us = nil
 	for _, event in ipairs(events) do
 		if not last_frame_us or event.timestamp_us - last_frame_us > SETTLE_US then
@@ -633,15 +640,17 @@ local function replay_with_withdrawals(keystats, events, read_field, during)
 			end
 		end
 		if event.type == InputEvent.EV_ABS then
-			keystats.record_pointer("contact", event.code, event.value, PAD)
+			keystats.record_pointer("contact", event.code, event.value, pointer)
+		elseif event.type == InputEvent.EV_REL then
+			keystats.record_pointer("motion", event.code, event.value, pointer)
 		elseif event.type == InputEvent.EV_KEY and event.value ~= 2 then
 			local button = InputEvent.is_pointer_button(event.code)
-			if event.value == 1 and button then keystats.record_pointer("press", event.code, 1, PAD) end
-			if not button then keystats.record_pointer("contact", event.code, event.value, PAD) end
+			if event.value == 1 and button then keystats.record_pointer("press", event.code, 1, pointer) end
+			if not button then keystats.record_pointer("contact", event.code, event.value, pointer) end
 			if event.value == 1 then withdraw() end
-			if event.value == 1 and not button then keystats.record_pointer("press", event.code, 1, PAD) end
+			if event.value == 1 and not button then keystats.record_pointer("press", event.code, 1, pointer) end
 		elseif event.type == InputEvent.EV_SYN and event.code == InputEvent.SYN_REPORT then
-			keystats.record_pointer("frame", event.code, event.value, PAD, event.timestamp_us)
+			keystats.record_pointer("frame", event.code, event.value, pointer, event.timestamp_us)
 			last_frame_us = event.timestamp_us
 		end
 		if during then during(keystats, event) end
@@ -659,7 +668,7 @@ end
 
 --- Records a replay with the fixture pad bound and the editor focused.
 --- @param read_field function See replay_with_withdrawals.
---- @param options table|nil { events, during, prepare(keystats) }
+--- @param options table|nil { events, during, prepare(keystats), source, withdraws }
 local function recorded_with_withdrawals(read_field, options)
 	options = options or {}
 	return recorded(function(keystats)
@@ -668,7 +677,8 @@ local function recorded_with_withdrawals(read_field, options)
 		end, function() return LRM_ON end, function() return 0 end)
 		if options.prepare then options.prepare(keystats) end
 		keystats.on_app_focus(EDITOR, 1000)
-		replay_with_withdrawals(keystats, options.events or tap_trace().events, read_field, options.during)
+		replay_with_withdrawals(keystats, options.events or tap_trace().events, read_field, options.during,
+			options.source, options.withdraws)
 	end)
 end
 
@@ -691,12 +701,12 @@ helpers.describe("pointer metrics: a touch's clicks and the field's verdict", fu
 	-- and every clickpad press met an unknown field and the clicks stayed 0.
 	helpers.it("(tap-click-touch-context) counts a tap and a clickpad press in the field the touch began in", function()
 		local rows = recorded_with_withdrawals(admitted)
-		-- A, B (right), F's tap, G's first tap and H's press. G's second tap
-		-- lands 117 ms after the first withdrew the field, before any read, as
-		-- a double-click's second press does.
+		-- A, B (right), F's tap, G's two taps and H's press. G's second tap
+		-- lands 117 ms after the first withdrew the field, before any read,
+		-- and is counted in the field G began in (pointer-span-context).
 		helpers.assert_eq(#rows, 1)
 		helpers.assert_eq(rows[1].app, EDITOR)
-		helpers.assert_eq(rows[1].mouse_clicks, 5)
+		helpers.assert_eq(rows[1].mouse_clicks, 6)
 	end)
 
 	helpers.it("(tap-click-touch-context) never records a click of a touch begun in a secure field", function()
@@ -705,7 +715,7 @@ helpers.describe("pointer metrics: a touch's clicks and the field's verdict", fu
 		local rows = recorded_with_withdrawals(function(event)
 			return (event.timestamp_us >= 1700000 and event.timestamp_us < 2600000) and "secure" or "admitted"
 		end)
-		helpers.assert_eq(rows[1].mouse_clicks, 4, "B, begun in a secure field, is not counted")
+		helpers.assert_eq(rows[1].mouse_clicks, 5, "B, begun in a secure field, is not counted")
 	end)
 
 	helpers.it("(tap-click-touch-context) a verdict read during the touch ends the context it began in", function()
@@ -778,5 +788,136 @@ helpers.describe("pointer metrics: a touch's clicks and the field's verdict", fu
 		end
 		helpers.assert_eq(contexts, { "report 1" }, "one tap, in the context of its first report")
 		helpers.assert_eq(pcall(tracker.observe, "contact", 0x39, 1, PAD), false, "a contact names its context")
+	end)
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= The span a click leaves the field unknown ===============
+-- =================================================================
+-- =================================================================
+
+local MOUSE = "pointer:/dev/input/event3"
+
+--- The trace of tests/fixtures/pointer_record_mouse_click_span.yml, or the
+--- part of it whose kernel time falls in [from_us, to_us).
+--- @param from_us number|nil
+--- @param to_us number|nil
+--- @return table events
+local function mouse_trace(from_us, to_us)
+	local file = assert(io.open(helpers.driver_root() .. "/tests/fixtures/pointer_record_mouse_click_span.yml", "rb"))
+	local trace = assert(Record.decode(file:read("*a")))
+	file:close()
+	local events = {}
+	for _, event in ipairs(trace.events) do
+		if event.timestamp_us >= (from_us or 0) and event.timestamp_us < (to_us or math.huge) then
+			events[#events + 1] = event
+		end
+	end
+	return events
+end
+
+-- Sections A and B (travel, then a click and what follows it) end before C
+-- (a double-click and two notches) begins, in decoded kernel time.
+local DOUBLE_CLICK_US = 3000000
+
+--- Calls change(keystats) once, after B's click has withdrawn the field.
+local function after_the_click(change)
+	local done = false
+	return function(keystats, event)
+		if not done and event.type == InputEvent.EV_KEY and event.value == 1 and event.timestamp_us == 1500000 then
+			done = true
+			change(keystats)
+		end
+	end
+end
+
+--- Sums the mouse columns of the rows, per application.
+--- @param rows table
+--- @return table totals { [app] = { clicks, scrolls, distance } }
+local function mouse_totals(rows)
+	local totals = {}
+	for _, row in ipairs(rows) do
+		local total = totals[row.app] or { clicks = 0, scrolls = 0, distance = 0 }
+		total.clicks = total.clicks + (row.mouse_clicks or 0)
+		total.scrolls = total.scrolls + (row.mouse_scrolls or 0)
+		total.distance = total.distance + (row.mouse_distance_px or 0)
+		totals[row.app] = total
+	end
+	return totals
+end
+
+helpers.describe("pointer metrics: the span a click leaves the field unknown", function()
+	-- Before, a click withdrew the field until the guard read it again: the
+	-- wheel turns and travel of that span and a double-click's second press
+	-- met an unknown field, and only the first press of each click was counted.
+	helpers.it("(pointer-span-context) counts the wheel, the travel and a double-click as in a field never withdrawn", function()
+		local withdrawn = mouse_totals(recorded_with_withdrawals(admitted, { events = mouse_trace(), source = MOUSE }))
+		local kept = mouse_totals(recorded_with_withdrawals(admitted,
+			{ events = mouse_trace(), source = MOUSE, withdraws = false }))
+		helpers.assert_eq(kept[EDITOR].clicks, 3, "B's click and C's two presses")
+		helpers.assert_eq(kept[EDITOR].scrolls, 4, "two notches after each click, never the high-resolution repeats")
+		helpers.assert_true(kept[EDITOR].distance > 0)
+		helpers.assert_eq(withdrawn, kept, "the click's own withdrawal loses nothing")
+	end)
+
+	helpers.it("(pointer-span-context) counts a double tap's second tap where the double tap began", function()
+		local events = {}
+		for _, event in ipairs(tap_trace().events) do
+			-- Section G alone: two taps 117 ms apart, 5.8 s into the trace.
+			if event.timestamp_us >= 6700000 and event.timestamp_us < 7700000 then events[#events + 1] = event end
+		end
+		local rows = recorded_with_withdrawals(admitted, { events = events })
+		helpers.assert_eq(#rows, 1)
+		helpers.assert_eq(rows[1].mouse_clicks, 2, "the second tap lands in the field the first one withdrew")
+	end)
+
+	helpers.it("(pointer-span-context) records nothing of a span begun in a secure field", function()
+		helpers.assert_eq(#recorded_with_withdrawals(function() return "secure" end,
+			{ events = mouse_trace(), source = MOUSE }), 0)
+		local totals = mouse_totals(recorded_with_withdrawals(function(event)
+			return event.timestamp_us >= DOUBLE_CLICK_US and "secure" or "admitted"
+		end, { events = mouse_trace(), source = MOUSE }))
+		helpers.assert_eq(totals[EDITOR].clicks, 1, "C, begun in a secure field, adds no click")
+		helpers.assert_eq(totals[EDITOR].scrolls, 2, "and no wheel turn")
+	end)
+
+	helpers.it("(pointer-span-context) a field read after the click ends the span, the worker's answer does not", function()
+		local cases = {
+			{ "a password read", function(keystats) keystats.set_secure_field(true, true) end, 0 },
+			{ "another withdrawal", function(keystats) keystats.set_secure_field(true) end, 0 },
+			{ "the focus worker's answer", function(keystats) keystats.set_secure_field(true, false) end, 2 },
+		}
+		for _, case in ipairs(cases) do
+			local totals = mouse_totals(recorded_with_withdrawals(admitted, { source = MOUSE,
+				events = mouse_trace(0, DOUBLE_CLICK_US), during = after_the_click(case[2]) }))
+			helpers.assert_eq(totals[EDITOR].clicks, 1, case[1] .. ": the click is counted before its withdrawal")
+			helpers.assert_eq(totals[EDITOR].scrolls, case[3], case[1])
+		end
+	end)
+
+	helpers.it("(pointer-span-context) another window, a pause, a private window or an exclusion ends the span", function()
+		local Preferences = require("tests.support.metrics_preferences_fixture")
+		local changes = {
+			focus = function(keystats) keystats.on_app_focus("org.gnome.Nautilus", 2000) end,
+			pause = function(keystats) keystats.suppress() end,
+			private = function(keystats) keystats.set_private_window(true) end,
+			excluded = function(keystats)
+				Preferences.with(function() helpers.assert_true(keystats.set_disabled_apps({ EDITOR })) end)
+			end,
+		}
+		for name, change in pairs(changes) do
+			local rows = recorded_with_withdrawals(admitted, { source = MOUSE,
+				events = mouse_trace(0, DOUBLE_CLICK_US), during = after_the_click(change),
+				prepare = function(keystats)
+					Preferences.with(function() helpers.assert_true(keystats.set_private_filter_enabled(true)) end)
+				end })
+			for app, total in pairs(mouse_totals(rows)) do
+				helpers.assert_eq(total.scrolls, 0, name .. " ends the span: no wheel turn for " .. app)
+			end
+		end
 	end)
 end)

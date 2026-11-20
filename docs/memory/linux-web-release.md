@@ -176,6 +176,14 @@ worker's answer to it (`read = false`), which reads nothing. A new path that
 reads the field must pass `read = true`, or a touch's click can outlive a
 password verdict.
 
+The same epoch bounds a gesture (`_verdict.gesture`): the last press or touch
+report made in an admitted field names `{ app, epoch }`, and while the field is
+unknown only through the pointer's own withdrawal, the wheel turns, the travel
+and a double-click's or double tap's next press or touch are counted under that
+application. Another application (`on_app_focus`), a pause or an exclusion ends
+it too, and the pointer's own withdrawal keeps the open frame and cursor
+position (`settle_capture_policy`), or the travel just after a click is lost.
+
 ### project-linux-a-field-must-be-named-at-every-boundary
 
 Linux input records cross evdev, resolver, injector, and Lua boundaries. Preserve

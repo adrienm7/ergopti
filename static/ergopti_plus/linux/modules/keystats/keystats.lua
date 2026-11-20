@@ -396,7 +396,10 @@ end
 -- (record_pointer, set_secure_field), but a pointer press's own withdrawal,
 -- made while withdrawing is set (withdraw_for_pointer), and the focus
 -- worker's answer to it.
-local _verdict = { private_window = false, secure_field = false, epoch = 0, withdrawing = false }
+-- gesture: the context of the last press or touch report made in an admitted
+-- field ({ app, epoch }), in which the pointer's activity is counted while its
+-- own withdrawal leaves the field unknown (pointer-span-context).
+local _verdict = { private_window = false, secure_field = false, epoch = 0, withdrawing = false, gesture = nil }
 
 -- Password managers and credential UIs: the Linux fragments of the shared list
 -- (_shared/data/secure_apps.json), the one macOS and Windows read, matched as
@@ -1600,9 +1603,26 @@ function M.record_pointer(kind, code, value, source, at_us)
 	local context = false
 	if admitted and type(_focused_app_id) == "string" then
 		context = { app = _focused_app_id, epoch = _verdict.epoch }
+		-- A press or a touch begins a gesture: its own withdrawal of the field
+		-- leaves the wheel turns, the travel and the next press or touch of a
+		-- double-click or double tap counted here (pointer-span-context).
+		if kind == "press" or kind == "contact" then _verdict.gesture = context end
+	end
+	-- A gesture's context outlives only the pointer's own withdrawals: a
+	-- verdict delivered since, another focused application (on_app_focus), a
+	-- pause or an exclusion ends it, and nothing is recorded under an ended
+	-- one. The withdrawal forgot the focused application; the gesture keeps it.
+	local gesture = nil
+	if not admitted and _verdict.gesture then
+		local began_in = _verdict.gesture
+		if began_in.epoch == _verdict.epoch and may_record(true) and not M.is_unrecorded_app(began_in.app) then
+			gesture, context = began_in, began_in
+		else
+			_verdict.gesture = nil
+		end
 	end
 	local delta
-	if not admitted then
+	if not admitted and not gesture then
 		_pointer.discard_frames()
 		_pointer.forget_position()
 		-- Keep device lifecycle, queue-loss and touch state in sync while
@@ -1621,12 +1641,12 @@ function M.record_pointer(kind, code, value, source, at_us)
 		clicks = 0
 		if began and began.epoch == _verdict.epoch and may_record(true) and not M.is_unrecorded_app(began.app) then
 			touch_clicks = delta.clicks
-		elseif admitted then
+		elseif admitted or gesture then
 			-- A verdict read since the touch began is the one the click meets.
 			clicks = delta.clicks
 		end
 	end
-	if touch_clicks == 0 and not admitted then return end
+	if touch_clicks == 0 and not admitted and not gesture then return end
 	local clock = capture_input_clock()
 	queue_session_events(forward_session(clock, "input", clock.mono_ms, false), clock)
 	local function credit(app_id, added_clicks, scrolls, distance)
@@ -1638,15 +1658,16 @@ function M.record_pointer(kind, code, value, source, at_us)
 		pending.mouse = mouse
 	end
 	if touch_clicks > 0 then credit(began.app, touch_clicks, 0, 0) end
-	local app_id = _focused_app_id
-	if not admitted or type(app_id) ~= "string" or M.is_unrecorded_app(app_id) then return end
+	local app_id = admitted and _focused_app_id or (gesture and gesture.app)
+	if type(app_id) ~= "string" or M.is_unrecorded_app(app_id) then return end
 	if clicks > 0 or delta.scrolls > 0 or delta.distance > 0 then credit(app_id, clicks, delta.scrolls, delta.distance) end
 end
 
 --- Runs a pointer press's withdrawal of the focused field's verdict, the
 --- click callback's. A touch keeps the context it began in through it, as
---- its clicks are counted there; every other verdict, delivered or
---- withdrawn, ends that context (record_pointer).
+--- its clicks are counted there, and so does the gesture a press or a touch
+--- begins, whose wheel turns, travel and next click are counted there too;
+--- every other verdict, delivered or withdrawn, ends both (record_pointer).
 --- @param withdraw function The withdrawal.
 function M.withdraw_for_pointer(withdraw)
 	assert(type(withdraw) == "function", "a pointer withdrawal is a function")
@@ -1800,6 +1821,9 @@ end
 function M.on_app_focus(app_id, timestamp_ms)
 	if type(app_id) ~= "string" or app_id == "" then return end
 	if _focused_app_id ~= app_id then _pointer.discard_frames(); _pointer.reseed() end
+	-- Another application is news of the field: the pointer's activity is no
+	-- longer the gesture's (record_pointer).
+	if _verdict.gesture and _verdict.gesture.app ~= app_id then _verdict.gesture = nil end
 	M.observe_hold_focus(app_id)
 	local clock = observe_calendar()
 	-- Gated like every other recording entry point: focus time and app
@@ -2242,8 +2266,12 @@ settle_capture_policy = function()
 	if not may_record() then _capture_boundary = _capture_boundary + 1 end
 	if not may_record() or hold_password_app(_hold_focus_app) then
 		Roi.owner.discard(Roi.state)
-		_pointer.discard_frames()
-		_pointer.forget_position()
+		-- A pointer press's own withdrawal keeps the travel of its gesture,
+		-- which is counted where it began (record_pointer).
+		if not _verdict.withdrawing then
+			_pointer.discard_frames()
+			_pointer.forget_position()
+		end
 		retire_focus_prefix()
 		_hold_token = {}
 		-- Privacy can close while the same window stays focused. Retire its
