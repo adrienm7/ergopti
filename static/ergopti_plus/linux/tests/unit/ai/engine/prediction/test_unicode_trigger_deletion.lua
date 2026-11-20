@@ -40,8 +40,10 @@ local function exercise(trigger, characters, raw_bytes)
 	package.loaded["ai.engine.settings.profiles"] = profiles
 	package.loaded["ai.engine.settings.settings"] = {
 		get = function(key)
+			-- The real owner answers every generation leaf the engine reads, the
+			-- sequential_mode request-plan input included, as a boolean.
 			return ({ context_length = 2000, min_words = 1, max_words = 10, temperature = 0.7,
-				auto_raise_temp = false })[key]
+				auto_raise_temp = false, sequential_mode = false })[key]
 		end,
 	}
 	package.loaded["ai.engine.settings.trigger_settings"] = {
