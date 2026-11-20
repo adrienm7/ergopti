@@ -15,6 +15,10 @@ local helpers = require("tests.helpers")
 -- The declared base expansion delay, read through the real reader before the
 -- fixture replaces it.
 local EXPANSION_DELAY = require("menu.engine.manifest_reader").default_for("hotstrings.expansion_delay")
+-- The declared log level the root chunk restores at boot (init.lua), read the
+-- same way.
+local LOG_LEVEL_PATH = require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL
+local LOG_LEVEL_ENTRY = require("menu.engine.manifest_reader").find_entry_by_path(LOG_LEVEL_PATH)
 
 local MODULE_NAMES = {
 	"hs",
@@ -130,6 +134,10 @@ local function run_isolated(options, assertions)
 			state.privacy_initializations = (state.privacy_initializations or 0) + 1
 		end
 		function Logger.set_level() return true end
+		function Logger.apply_level_setting(_, entry)
+			helpers.assert_true(entry == LOG_LEVEL_ENTRY, "The root restores the level through its manifest declaration")
+			return { level = entry.default }
+		end
 		function Logger.init_log_path() return true end
 		function Logger.logs_dir() return "/virtual/logs/" end
 		function Logger.classify_async_sink_boot_environment() return "managed" end
@@ -346,6 +354,10 @@ local function run_isolated(options, assertions)
 					return "★"
 				end,
 				has_default = function() return false end,
+				find_entry_by_path = function(path)
+					if path ~= LOG_LEVEL_PATH then error("no other manifest entry in shutdown fixture: " .. tostring(path)) end
+					return LOG_LEVEL_ENTRY
+				end,
 				sparse_operation = function() error("no configuration write in shutdown fixture") end,
 			},
 			["modules.shortcuts"] = { stop = function() return true end },
