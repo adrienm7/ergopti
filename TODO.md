@@ -378,6 +378,15 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     vectors that can fail; TRAY-05 log a missing tray icon file on the three instead of drawing another;
   - the next campaigns in the report's order: update and download windows, pickers and prompts, metrics views,
     small native units, layout tool pages.
+    30 min install budget), OLL-03 (stale owners), OLL-07 (Windows and Linux remove the earlier runtime once the
+    pinned one runs), OLL-08 (Linux re-hashes the tree against its seal at every start), OLL-09 (macOS bounds
+    `ollama rm` by `ollama_delete_timeout_ms`), OLL-12 (`ollama-release.sh` retired with its generator) and OLL-13
+    (Linux admits readiness only from its own process group's socket with the pinned version) fixed. Left: OLL-04
+    free-space check on macOS and Linux and an `ollama.no_space` message; OLL-05 the install's network and checksum
+    classes (macOS markers never printed); OLL-06 one readiness bound once the cold start is measured (field
+    checks); OLL-10 the macOS-only model repair; OLL-11 the lifecycle actions outside the parity table;
+  - the next campaigns in the report's order: tray adapters, update and download windows, pickers and prompts,
+    metrics views, small native units, layout tool pages.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
       channel's newest release through its required detached signature on both (`feed-only-install` tests, throwaway
       key in `feed_install_vectors.json`); without a key every feed row keeps the no-details refusal. Left, at release

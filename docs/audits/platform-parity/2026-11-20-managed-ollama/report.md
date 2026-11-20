@@ -53,7 +53,9 @@ Checked and kept:
   never contact 11434 (`_shared/ai/data/defaults.json`). Windows refuses a
   listener already on the port and admits readiness only from its own child's
   socket (`ollama-runtime-launch.ps1`); macOS waits for its guardian's
-  listener event (`managed_ollama_serve.py`). Linux: see OLL-13.
+  listener event (`managed_ollama_serve.py`). Linux, since OLL-13, refuses a
+  listener already on the port and admits only its own process group's socket
+  with the pinned version.
 - **Download cleanup.** No OS keeps a partial runtime archive: macOS removes
   its temporary folder, Linux its owned stage, Windows its journalled partial
   files (it keeps one only when removing it fails). The runtime archive is
@@ -70,11 +72,17 @@ from one corpus,
 by `windows/tests/unit/ai/servers/test_ollama_managed_bootstrap.ahk` and
 `linux/tests/unit/ai/engine/ollama/test_model_download.lua`.
 
-| Id     | OS      | Sequence                                                       | Reference                                                                                                                                         | Before                                                                                                                                                                                                                                                                                                    | Regression                                                                                                                                                                        |
-| ------ | ------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OLL-01 | Linux   | Pull a model whose layer fails Ollama's digest check           | Windows `_PullResult` and `_MenuPulled`, macOS `manager_ollama.lua`: one more pull, since Ollama removed the layer, then `ollama.digest_mismatch` | Linux failed at once with the generic `menu.llm.download_failed`; the class vocabulary existed on Windows and macOS only, as two copies                                                                                                                                                                   | `ollama-pull-error-vectors` and three `ollama-digest-mismatch` cases (Linux); the corpus and the shared data file in `the pull output classes are the macOS vocabulary` (Windows) |
-| OLL-02 | Windows | Pull a large model on a slow line, at install or from the menu | Linux: a pull has its own ceiling (24 h); macOS: no ceiling, a stall bound                                                                        | The first-model pull ran under the install budget (`dependency_bootstrap_timeout_ms`, 30 min from the start, the 1.47 GB runtime download included) and a menu pull under the same 30 min: both failed mid-download with « Local Ollama could not be prepared »                                           | `the first model pull has its own ceiling…`, `the pull ceiling comes from the timing registry` and the re-pinned menu pull deadline cases; `ollama-model-pull-ceiling` (Linux)    |
-| OLL-03 | docs    | Read the owners that the registry and the inventories name     | The code                                                                                                                                          | `ollama_deps_poll_ms` named a Windows `ollama_deps_checker.ahk` 3000 ms timer, which no longer exists (Linux owns it); stale names in `constants.toml`, `owned_runtimes.json`, `owned-runtimes.md` (a winget path long gone) and the macOS memory (an earlier owned runtime is now replaced, not refused) | Documentation                                                                                                                                                                     |
+| Id     | OS      | Sequence                                                        | Reference                                                                                                                                         | Before                                                                                                                                                                                                                                                                                                    | Regression                                                                                                                                                                        |
+| ------ | ------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OLL-01 | Linux   | Pull a model whose layer fails Ollama's digest check            | Windows `_PullResult` and `_MenuPulled`, macOS `manager_ollama.lua`: one more pull, since Ollama removed the layer, then `ollama.digest_mismatch` | Linux failed at once with the generic `menu.llm.download_failed`; the class vocabulary existed on Windows and macOS only, as two copies                                                                                                                                                                   | `ollama-pull-error-vectors` and three `ollama-digest-mismatch` cases (Linux); the corpus and the shared data file in `the pull output classes are the macOS vocabulary` (Windows) |
+| OLL-02 | Windows | Pull a large model on a slow line, at install or from the menu  | Linux: a pull has its own ceiling (24 h); macOS: no ceiling, a stall bound                                                                        | The first-model pull ran under the install budget (`dependency_bootstrap_timeout_ms`, 30 min from the start, the 1.47 GB runtime download included) and a menu pull under the same 30 min: both failed mid-download with « Local Ollama could not be prepared »                                           | `the first model pull has its own ceiling…`, `the pull ceiling comes from the timing registry` and the re-pinned menu pull deadline cases; `ollama-model-pull-ceiling` (Linux)    |
+| OLL-03 | docs    | Read the owners that the registry and the inventories name      | The code                                                                                                                                          | `ollama_deps_poll_ms` named a Windows `ollama_deps_checker.ahk` 3000 ms timer, which no longer exists (Linux owns it); stale names in `constants.toml`, `owned_runtimes.json`, `owned-runtimes.md` (a winget path long gone) and the macOS memory (an earlier owned runtime is now replaced, not refused) | Documentation                                                                                                                                                                     |
+| OLL-07 | Windows | Update the pin, start Ollama once the new version is installed  | macOS `earlier_owned_install`: the earlier install is exchanged for the new one                                                                   | `managed_bootstrap.ahk` « Keeps installed versions »: the new version installed beside the old one under `versions` and nothing removed it, about 1.4 GB per update                                                                                                                                       | five `(oll-07)` cases in `test_ollama_managed_bootstrap.ahk`, four in `test_ollama_install_files.ps1` (Windows)                                                                   |
+| OLL-07 | Linux   | Update the pin, start Ollama once the new release is installed  | macOS `earlier_owned_install`: the earlier install is exchanged for the new one                                                                   | The new release installed beside the old one under `runtimes/ollama/` and nothing removed it: about 1.4 GB per update                                                                                                                                                                                     | `(oll-07)` cases in `test_composition.lua` and `test_runtime_seal.lua` (Linux)                                                                                                    |
+| OLL-08 | Linux   | Start Ollama from a tree installed earlier                      | Windows re-hashes every file of its manifest before reuse, macOS its binary                                                                       | `installed_runtime.lua` admitted the tree on its metadata (inode, size, mtime, ctime) and never hashed it                                                                                                                                                                                                 | `(oll-08)` cases in `test_repair.lua`, `test_composition.lua` and `test_runtime_seal.lua` (Linux)                                                                                 |
+| OLL-09 | macOS   | « Delete this model from cache » with a CLI that never returns  | Windows and Linux: `DELETE /api/delete` under `[llm] ollama_delete_timeout_ms`                                                                    | `ollama rm` ran with no ceiling and held the maintenance slot with no notice                                                                                                                                                                                                                              | `(oll-09)` cases in `test_requirement_descendant_pause_join.lua` (macOS)                                                                                                          |
+| OLL-12 | macOS   | Read the generated `ollama-release.sh`                          | Windows and Linux read `ollama_release.json` at runtime                                                                                           | The shell projection was read by nothing, and its header said the size « only drives the download progress bar » while the three refuse a wrong size                                                                                                                                                      | `no unread projection of the catalogue is generated (oll-12)` in `test-ollama-release-pin-parity.cjs`                                                                             |
+| OLL-13 | Linux   | A foreign server answers on 11435 before the owned daemon binds | Windows `ollama-runtime-launch.ps1` and `_VersionReceived`: no listener before the start, only the child's socket, the pinned version             | Any `GET /api/version` answer with any version, while the owned process was alive, was readiness                                                                                                                                                                                                          | `(oll-13)` cases in `test_composition.lua`, `test_listener_owner.lua`, `test_service_process_running.lua` and `test_owned_process_running.lua` (Linux)                            |
 
 Notes:
 
@@ -92,6 +100,48 @@ Notes:
   pull. macOS keeps no absolute ceiling, as its worker states
   (`_shared/ai/adapters/python/managed_ollama_pull.py`), and stops a stalled
   transfer after `CURL_STALL_SEC`; the registry comment says so.
+- **OLL-07.** Once the pinned release is verified (OLL-08) and its own daemon
+  answers with the pinned version (OLL-13),
+  `linux/ai/engine/ollama/runtime_retention.lua` lists the other
+  `<version>-<asset>-<sha256>` folders under `runtimes/ollama/` (real folders
+  owned by the user, never the pinned one) and removes them in one
+  `rm -r --one-file-system` child under the finite process port, so the event
+  loop never waits. A refusal is logged and the next start lists the folder
+  again. On Windows, once the daemon answers with the pinned version,
+  `managed_bootstrap.ahk` `_RetireEarlierVersions` runs the
+  `ollama_managed_files.ps1` `retire_versions` action only when another
+  version folder exists: it skips the pinned one, refuses reparse points and
+  foreign names, proves each folder by its own install receipt (identities,
+  sizes, hashes, file list), journals the move to its private stage so an
+  interrupted removal is finished at the next start, and logs a kept folder
+  with its reason for the next start to retry.
+- **OLL-08.** Decision, written in `linux/ai/engine/ollama/runtime_seal.lua`:
+  re-hash at every start, no change token. The size, mtime, ctime and inode
+  the descriptor already fences say a file was replaced or written through the
+  file API; they keep their value through a disk or filesystem fault, a write
+  below the file API or through a shared mapping, and a write within a coarse
+  timestamp tick, and they cannot prove the bytes came from the pinned
+  archive. The install that checked the archive writes the seal (every file's
+  SHA-256 and the archive digest) in the release folder, beside the tree the
+  descriptor fences; each later start hashes the files in a `sha256sum` child
+  under the start budget (a few seconds) and starts only a matching tree
+  (`runtime_repair.lua` `verify` stage, before the network and service). A tree
+  that does not match, or has no seal (installed before seals existed), is
+  never started and is removed, so the next download installs it again from
+  the archive: those installs pay one more download.
+- **OLL-09.** `manager_ollama.lua` arms `TimerScheduler.after` with the shared
+  ceiling once the `ollama rm` task starts, stops the task when it fires and
+  shows `ollama.delete_reason_timeout` (21 locales); an answered delete cancels
+  it. The raw CLI output in a failure notice is unchanged.
+- **OLL-12.** Retired with its generator `tools/codegen/codegen-ollama-release.cjs`
+  and its `generators.cjs` entry; the pin parity test refuses its return.
+- **OLL-13.** `process_port` and `owned_process` expose the running child's pid,
+  which leads its detached process group. Before the start, a listener on the
+  owned port refuses it (`runtime_port_occupied`). A version answer counts only
+  when every socket listening on the port is held by that group
+  (`linux/ai/engine/ollama/listener_owner.lua`, from `/proc/net/tcp`, `tcp6`
+  and `/proc/<pid>/fd`) and names the pinned version; a foreign answer is not
+  readiness, and the owned daemon answering another version is stopped.
 
 ## Open
 
@@ -122,20 +172,6 @@ Notes:
   hangs before it binds is reported after 30 s on macOS and up to 30 min on
   the two others. One bound needs the cold start measured on a quiet PC
   first (field checks below).
-- **OLL-07 (low, Windows and Linux):** a new pin installs beside the old
-  version and nothing removes the old one (Windows `managed_bootstrap.ahk`
-  « Keeps installed versions », Linux `install_resolver.lua`): each update
-  leaves about 1.4 GB behind. macOS exchanges an intact earlier install for
-  the new one (`earlier_owned_install`).
-- **OLL-08 (low, Linux):** an installed runtime is admitted again by its
-  metadata (inode, size, mtime, ctime; `installed_runtime.lua`) and never
-  re-hashed; Windows re-hashes every file before reuse and macOS the binary.
-  It needs a decision, written in the module: hashing 1.4 GB at each start
-  against the metadata proof.
-- **OLL-09 (low, macOS):** « Delete this model from cache » runs `ollama rm`
-  (`manager_ollama.lua`) without the `ollama_delete_timeout_ms` ceiling and
-  puts the CLI's raw output in the notice; Windows and Linux send
-  `DELETE /api/delete` under that ceiling.
 - **OLL-10 (low, Windows and Linux):** macOS pulls a model that fails to load
   once more (`ollama.model_repair`, `manager_ollama.lua`); the two others
   only report the failure.
@@ -145,17 +181,6 @@ Notes:
   them; its one Ollama row, `llm_install_warning`, has a justified reason on
   macOS and Linux. No OS uninstalls the managed runtime, and only Linux says
   so (`linux/uninstall.sh`).
-- **OLL-12 (low, macOS):** `macos/ai/engine/ollama/ollama-release.sh` is
-  generated (`tools/codegen/codegen-ollama-release.cjs`) and read by nothing;
-  its header says the size « only drives the download progress bar », while
-  the three refuse a wrong size. Retire it through its generator.
-- **OLL-13 (low, Linux):** readiness is a `GET /api/version` answer with any
-  version (`enable_admission_core.lua` `M.receipt`) while the owned service
-  process is alive (`runtime_repair.lua` `service_live`). Linux does not
-  refuse a listener already on 11435 before the start, check that the
-  answering socket is its child's, or compare the version with the pin,
-  which Windows does (`_VersionReceived`). A foreign server on 11435 can
-  answer the first probe before the owned daemon fails to bind.
 
 Native receiving, in `TODO-tests-windows.md` and `TODO-tests-linux.md`: the
 owned daemon's cold start measured on a quiet PC (OLL-06), and on Windows a
@@ -165,6 +190,43 @@ model pull longer than 30 minutes, at install and from the menu (OLL-02).
 
 Commits `d90f2d99c5` (OLL-01), `25c0951e90` (OLL-02) and `ecdfb93d03`
 (OLL-03).
+
+Follow-up on `db0de8ff62`: commits `2d6d3030dd` (OLL-12), `88e4c60295`
+(OLL-09), `592e62be63` (OLL-07 Windows) and `68b2c41e0f` (OLL-07 Linux,
+OLL-08, OLL-13). Fakes only: no Ollama installed, no model downloaded.
+
+- **Red on the old code.** Linux: with the `db0de8ff62` `runtime_repair.lua`,
+  `runtime_composition.lua`, `runtime_factory.lua`, `installed_runtime.lua`,
+  `process_port.lua` and `owned_process.lua`, 17 of the 44 `oll-` cases fail
+  (no verify stage or port, no pid, a foreign or mismatched answer taken for
+  readiness, nothing retired); the 27 others test the new modules or what the
+  old code already did. macOS: both `(oll-09)` cases fail on the old
+  `manager_ollama.lua` (no ceiling armed). Windows: 3 of the 5 `(oll-07)` AHK
+  cases fail on the old production files (the 2 « retires nothing » cases
+  pass, as they should) and 3 of the 4 new PowerShell cases fail on the old
+  helper. `test-ollama-release-pin-parity.cjs` fails while the projection
+  exists.
+- **Green on the new code.** Linux (LuaJIT under WSL, from an archived copy,
+  `DISPLAY` and `WAYLAND_DISPLAY` unset): the 44 `oll-` cases, the 592 cases
+  matching `llama` (1 failure: the root-only `shared-loader-source … eacces`
+  case, red on `dev` too), 13 `running proof` cases, and the `repair` and
+  `acqui` selections, whose only failures read layout data outside the
+  archived copy. The complete Linux suite could not finish: the WSL service
+  dropped its client several times during the run. macOS (Lua 5.4 under WSL):
+  the `menu_llm` group, 1,798 passed. Windows: 83 of 83 `managed bootstrap`
+  cases, 538 of 538 `ollama` cases, 87 of 87 `locale` cases through
+  `ahk-parallel.cjs --fresh`, and 39 of 39 in `test_ollama_install_files.ps1`.
+- **Gates.** `test-ollama-release-pin-parity.cjs`,
+  `test-owned-runtimes-inventory.cjs`, `test-owned-runtimes-doc.cjs`,
+  `test-shared-literal-inventory.cjs`, `test-timings-registry-liveness.cjs`,
+  `test-no-pinned-source-reads-linux.cjs` and `-lua.cjs`,
+  `test-managed-ollama-no-cloud.cjs`, `test-generator-output-ownership.cjs`,
+  `test-linux-feature-parity.cjs` (after regenerating the parity table, whose
+  macOS owner count moved by one), `check_locales.py`,
+  `lint-conventions.js --fail-on-violations` and the formatter.
+  `test-no-pinned-source-reads.cjs` reports 171 pinned AHK reads over a
+  baseline of 170, already red on `db0de8ff62`; `test-managed-ollama-protocol.cjs`
+  needs `pwsh`, absent here.
 
 - **Red on the old code.** The new Linux cases, run against the `8e8f5485ce`
   `model_download.lua`: `ollama-pull-error-vectors` fails (`error_class` is
