@@ -648,7 +648,7 @@
 		},
 		{
 			"id": "studio-semantic-html",
-			"ordinal": 708,
+			"ordinal": 709,
 			"name": "every div and span of the Studio pages, in their HTML and in the DOM their scripts build, is justified in the Studio list, and none has a pointer handler, an interactive or computed role or a tabindex",
 			"cmd": "node",
 			"args": ["tools/test/test-studio-semantic-html.cjs"],
@@ -656,7 +656,7 @@
 		},
 		{
 			"id": "studio-reading-preferences",
-			"ordinal": 709,
+			"ordinal": 711,
 			"name": "every Studio page, on the site and in the app's windows, loads the shared reading preferences right after the theme, and the theme styles each of them",
 			"cmd": "node",
 			"args": ["tools/test/test-studio-reading-preferences.cjs"],
@@ -664,11 +664,19 @@
 		},
 		{
 			"id": "page-images",
-			"ordinal": 710,
+			"ordinal": 712,
 			"name": "the rendered page image check refuses an img without alt, a shown svg neither hidden nor named and a nameless role=img element",
 			"cmd": "node",
 			"args": ["tools/test/test-page-images.cjs"],
 			"repro": "npm run test:page-images"
+		},
+		{
+			"id": "app-windows-semantic-markup",
+			"ordinal": 713,
+			"name": "the app windows write no div or span without a listed reason, no div or span acts as a control, and every img and svg has a text alternative or is hidden",
+			"cmd": "node",
+			"args": ["tools/test/test-app-windows-semantic-markup.cjs"],
+			"repro": "npm run test:app-windows-semantic-markup"
 		}
 	]
 }

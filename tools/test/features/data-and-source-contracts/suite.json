@@ -1013,7 +1013,7 @@
 		},
 		{
 			"id": "layout-capability-contract",
-			"ordinal": 709,
+			"ordinal": 710,
 			"name": "layout install, removal, switch, emulation and tuning paths on Windows, macOS and Linux, from the menu and Studio",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-capability-contract.cjs"],
