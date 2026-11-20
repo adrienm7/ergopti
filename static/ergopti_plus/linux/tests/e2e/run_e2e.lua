@@ -499,12 +499,20 @@ local DAEMON_SCENARIOS = {
 	{ name = "an auto-expanding trigger fires on its last character", keys = "pk★", screen = "parce que" },
 	{ name = "input queued during an expansion can complete the next trigger", keys = "pk★z", screen = "parce queMATCH", queue_output = true, llm = true, queue_ai = "pk★xz" },
 	-- "adn " → "ADN ", and the Backspace removes the REPLAYED space: undo must
-	-- count it, or the first character of the replacement stays ("Aadn").
-	{ name = "Backspace after an end-char expansion restores the trigger", keys = " adn {BS}", screen = " adn" },
-	{ name = "Backspace after an auto expansion restores the trigger", keys = "pk★{BS}", screen = "pk★" },
-	-- The restored trigger ends the line without being buffered: the next word-only
-	-- trigger continues that word (unknown-context-resets).
-	{ name = "a word-only trigger does not fire inside a restored trigger", keys = " adn {BS}adn ", screen = " adnadn " },
+	-- count it, or the first character of the replacement stays ("Aadn"). What
+	-- comes back is what was typed (_shared/hotstrings/engine/backspace_restore.lua):
+	-- the trigger and its terminator, and a trigger the magic key ended without
+	-- the star.
+	{ name = "Backspace after an end-char expansion restores the trigger and its terminator", keys = " adn {BS}",
+		screen = " adn " },
+	{ name = "Backspace after an auto expansion restores the trigger without the magic key", keys = "pk★{BS}",
+		screen = "pk" },
+	-- A trigger restored without a terminator ends the line without being
+	-- buffered: the next word-only trigger continues that word
+	-- (unknown-context-resets).
+	{ name = "a word-only trigger does not fire inside a restored trigger", keys = "pk★{BS}adn ", screen = "pkadn " },
+	-- A restored terminator ends the word, so the next key starts one there.
+	{ name = "a word-only trigger fires after a restored terminator", keys = " adn {BS}adn ", screen = " adn ADN " },
 	-- Backspace edits the buffer instead of wiping it and declaring a word start.
 	{ name = "a corrected typo still expands", keys = " adx{BS}n ", screen = " ADN " },
 	{ name = "a word-only trigger does not fire mid-word after a Backspace", keys = "xy{BS}adn ", screen = "xadn " },
