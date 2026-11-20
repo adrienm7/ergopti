@@ -478,7 +478,38 @@ async function exercisePresets(browser, origin) {
 	await page.click('#la-config-status .la-mine-undo');
 	assert.deepEqual(await pressed(), ['balanced'], 'Undo brings the previous settings back');
 	assert.equal(await page.inputValue('#la-weight-roll_in'), '1');
-	// A floor: a large SFB floor makes SFB cost nothing, so the score moves.
+	// A floor under every row's SFB share: only the part above it costs points
+	// (score_weights.json « floors », the engine's aboveFloor), so each row
+	// gains exactly the SFB weight times the floor, shown to one decimal.
+	const byName = () =>
+		page.$$eval('#la-table tbody tr', (rows) =>
+			Object.fromEntries(
+				rows.map((row) => [
+					row.querySelector('td:nth-child(2)').textContent,
+					Number(
+						row.querySelector('td:nth-child(3)').firstChild.textContent.replace(/[^\d.-]/g, '')
+					)
+				])
+			)
+		);
+	const unfloored = await byName();
+	const sfbWeight = Number(await page.inputValue('#la-weight-sfb'));
+	assert.equal(sfbWeight, 5, 'the shipped SFB weight');
+	assert.equal(await page.inputValue('#la-floor-sfb'), '0', 'the shipped floors are 0');
+	const ergoptiBefore = await topScore(page);
+	await page.fill('#la-floor-sfb', '0.3');
+	await page.waitForFunction((score) => {
+		const cell = document.querySelector('#la-table tbody tr td:nth-child(3)');
+		return cell && cell.firstChild.textContent !== score;
+	}, ergoptiBefore);
+	const floored = await byName();
+	assert.deepEqual(Object.keys(floored).sort(), Object.keys(unfloored).sort());
+	for (const [name, score] of Object.entries(floored))
+		assert.ok(
+			Math.abs(score - unfloored[name] - sfbWeight * 0.3) <= 0.11,
+			`${name}: ${unfloored[name]} with no floor, ${score} with an SFB floor of 0.3 %`
+		);
+	// A large SFB floor makes SFB cost nothing, so the score moves again.
 	const plain = await topScore(page);
 	await page.fill('#la-floor-sfb', '100');
 	await page.waitForFunction((score) => {
@@ -498,6 +529,40 @@ async function exercisePresets(browser, origin) {
 	const file = JSON.parse(fs.readFileSync(await exported.path(), 'utf8'));
 	assert.equal(file.schema_version, 2);
 	assert.equal(file.floors.sfb, 100, 'the floor is exported');
+	assert.deepEqual(
+		Object.keys(file.floors).sort(),
+		await page.evaluate(() => Object.keys(window.LAYOUT_ANALYSIS.defaultFloors()).sort()),
+		'the export holds every floor'
+	);
+	const importText = async (name, value) => {
+		await page.setInputFiles('#la-config-import', {
+			name,
+			mimeType: 'application/json',
+			buffer: Buffer.from(JSON.stringify(value))
+		});
+	};
+	// Round trip: the defaults, then the exported file brings the floor back.
+	await page.click('#la-config-reset');
+	assert.equal(await page.inputValue('#la-floor-sfb'), '0', 'the reset clears the floor');
+	await importText('round-trip.json', file);
+	const imported = EN['layout_analysis.config.imported'].replace('{name}', 'round-trip.json');
+	await page.waitForFunction(
+		(text) => document.getElementById('la-config-status').textContent.includes(text),
+		imported
+	);
+	assert.equal(await page.inputValue('#la-floor-sfb'), '100', 'the import applies the floor');
+	// A version 2 file without its floors is refused whole, its reason localized.
+	const noFloors = JSON.parse(JSON.stringify(file));
+	delete noFloors.floors;
+	noFloors.weights.sfb = 9;
+	await importText('no-floors.json', noFloors);
+	const missing = EN['layout_analysis.error.config_missing'].replace('{key}', 'floors');
+	await page.waitForFunction(
+		(text) => document.getElementById('la-config-status').textContent.includes(text),
+		missing
+	);
+	assert.equal(await page.inputValue('#la-weight-sfb'), '5', 'nothing of a refused file applies');
+	assert.equal(await page.inputValue('#la-floor-sfb'), '100');
 	const old = Object.assign({}, file, { schema_version: 1 });
 	delete old.floors;
 	await page.setInputFiles('#la-config-import', {
