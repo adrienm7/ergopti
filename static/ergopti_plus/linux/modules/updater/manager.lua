@@ -182,7 +182,7 @@ local MAX_RELEASE_BODY_BYTES = Timings.count("limits", "release_list_body_bytes"
 -- determines the total candidate count (100), independently of page size.
 local RELEASE_PAGE_SIZE = 20
 local _release_fetch_cancel = nil
-local MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
+local MAX_DOWNLOAD_BYTES = Timings.count("limits", "update_asset_download_bytes")
 local MAX_CHECKSUM_BODY_BYTES = 4096
 
 --- Resolves the automatic-check timing (presets, backoff, jitter). No fallback:

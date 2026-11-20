@@ -391,6 +391,7 @@ const GENERATORS = [
 		script: 'codegen/codegen-registry-constants.cjs',
 		outputs: [
 			'static/ergopti_plus/macos/_generated/registry_limits.lua',
+			'static/ergopti_plus/windows/_generated/registry_limits.ahk',
 			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherTimings.generated.swift',
 			'static/ergopti_plus/linux/_generated/launch_timings.sh'
 		]

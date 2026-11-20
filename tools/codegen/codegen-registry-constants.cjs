@@ -6,7 +6,9 @@
  * DESCRIPTION:
  * Projects _shared/core/timing/data/constants.toml onto the readers that cannot
  * parse it at runtime: macos/_generated/registry_limits.lua, the [limits] byte
- * caps for the macOS modules loaded before infra.timings exists, and
+ * caps for the macOS modules loaded before infra.timings exists,
+ * windows/_generated/registry_limits.ahk, the same caps for the Windows code
+ * that runs before TimingsLoadShared() (the detached keystats worker), and
  * LauncherTimings.generated.swift, the [launcher] durations of the Swift
  * launcher's sleeps and polls plus its shared LLM route-probe budget and the
  * quit deadline, and linux/_generated/launch_timings.sh, the bound a second
@@ -38,6 +40,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const SOURCE_REL = '_shared/core/timing/data/constants.toml';
 const OUTPUT_LUA = path.join(SP, 'macos/_generated/registry_limits.lua');
+const OUTPUT_AHK = path.join(SP, 'windows/_generated/registry_limits.ahk');
 const OUTPUT_SWIFT = path.join(
 	SP,
 	'macos/launcher/Sources/ErgoptiPlus/LauncherTimings.generated.swift'
@@ -106,6 +109,42 @@ function M.count(section, key)
 end
 
 return M
+`;
+
+const ahkRows = Object.entries(limits)
+	.map(([key, value]) => `\t\t"${key}", ${value}`)
+	.join(',\n');
+
+// The UTF-8 BOM is the first character: AutoHotkey sources carry it.
+const ahk = `﻿; _generated/registry_limits.ahk
+; AUTO-GENERATED from ${SOURCE_REL}.
+; DO NOT EDIT BY HAND — run \`npm run codegen:registry-constants\` to refresh.
+#Requires AutoHotkey v2.0
+
+; ==============================================================================
+; MODULE: Registry Byte Limits (Windows)
+; DESCRIPTION:
+; The [limits] section of the timing registry as a dependency-free function,
+; for code that runs before TimingsLoadShared(): the detached keystats
+; projection worker leaves the driver entry before the boot loads the registry,
+; and class static initializers run before any auto-execute body.
+; ==============================================================================
+
+/**
+ * The value of one [limits] key, failing fast on a key the registry lacks.
+ * @param {String} Section Always "limits": the call shape of TimingsGet.
+ * @param {String} Key The [limits] key.
+ * @returns {Integer}
+ */
+RegistryLimitsCount(Section, Key) {
+	static Values := Map(
+${ahkRows})
+	if Section != "limits"
+		throw ValueError("[registry_limits] only [limits] is generated, not [" . Section . "]")
+	if !Values.Has(Key)
+		throw ValueError("[registry_limits] missing key [limits]." . Key . " in constants.toml")
+	return Values[Key]
+}
 `;
 
 const launcher = registry.launcher;
@@ -196,8 +235,10 @@ ERGOPTI_QUIT_HANDSHAKE_MARGIN_MS=${marginMs}
 
 fs.writeFileSync(OUTPUT_SHELL, shell);
 fs.writeFileSync(OUTPUT_LUA, lua);
+fs.writeFileSync(OUTPUT_AHK, ahk);
 fs.writeFileSync(OUTPUT_SWIFT, swift);
 console.log(`[OK] ${path.relative(ROOT, OUTPUT_LUA)} (${Object.keys(limits).length} limit(s))`);
+console.log(`[OK] ${path.relative(ROOT, OUTPUT_AHK)} (${Object.keys(limits).length} limit(s))`);
 console.log(`[OK] ${path.relative(ROOT, OUTPUT_SHELL)} (the Linux relaunch bound)`);
 console.log(
 	`[OK] ${path.relative(ROOT, OUTPUT_SWIFT)} (${Object.keys(launcher).length + 3} duration(s))`

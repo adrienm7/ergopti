@@ -20,6 +20,7 @@
 
 #Include keystats_hotstring_units.ahk
 #Include keystats_local_time.ahk
+#Include %A_LineFile%\..\..\..\_generated\registry_limits.ahk
 
 
 
@@ -51,8 +52,10 @@ class KLReadConst {
 		; Growth a refresh may write into the copy-on-write overlay of the shared
 		; image (KLR_OpenOverlayCandidate): a floor for the replayed days, plus a
 		; multiple of the tail's SQL for the rows it adds. Past it SQLite reports
-		; SQLITE_FULL and the refresh fails without publishing.
-		static WORKER_OVERLAY_SLACK_BYTES := 268435456
+		; SQLITE_FULL and the refresh fails without publishing. The floor is
+		; [limits] metrics_overlay_slack_bytes: the detached worker runs before
+		; any registry load, so it reads the generated table.
+		static WORKER_OVERLAY_SLACK_BYTES := RegistryLimitsCount("limits", "metrics_overlay_slack_bytes")
 		static WORKER_OVERLAY_SLACK_PER_TAIL_BYTE := 32
 }
 

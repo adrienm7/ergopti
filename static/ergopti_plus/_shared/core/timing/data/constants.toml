@@ -1497,6 +1497,10 @@ number_row_level_text_bytes = 1024
 # 8 MiB leaves room for about 65 such releases.
 release_list_body_bytes = 8388608
 
+# Largest release asset the Linux updater downloads (the AppImage or archive and
+# its signature) before it refuses the transfer. LX: modules/updater/manager.lua.
+update_asset_download_bytes = 268435456
+
 # What the digest tool may print for one file, beyond the file's own path: the
 # hexadecimal digest and its separators. LX: core/fs/adapters/file_digest.lua.
 file_digest_output_bytes = 1024
@@ -1554,6 +1558,13 @@ shell_captured_output_bytes = 4194304
 # bytes. Read through macos/_generated/registry_limits.lua.
 # HS: core/fs/adapters/toml_cache.lua.
 toml_source_chunk_bytes = 65536
+
+# Growth floor a metrics reader refresh may write into the copy-on-write overlay
+# of the shared reader image, before its per-tail-byte share; past it SQLite
+# reports SQLITE_FULL and the refresh fails without publishing. The detached
+# projection worker reads it before any registry load, through the generated
+# windows/_generated/registry_limits.ahk. AHK: modules/keystats/keystats_reader_db.ahk.
+metrics_overlay_slack_bytes = 268435456
 
 [launcher]
 

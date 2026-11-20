@@ -71,10 +71,11 @@ const SKIPPED_DIRECTORIES = new Set([
 ]);
 const MIN_SOURCE_FILES = 1000;
 
-// The generated macos/_generated/registry_limits.lua serves the modules
-// loaded before infra.timings with the same call shape.
+// The generated macos/_generated/registry_limits.lua and
+// windows/_generated/registry_limits.ahk serve the code that runs before the
+// registry loads with the same call shape.
 const READER_CALL =
-	/(?:\b(?:Timings\.(?:ms|sec|count)|TimingsGet(?:Sec)?)|"_generated\.registry_limits"\)\.count)\(\s*"([A-Za-z_]\w*)"\s*,\s*"([A-Za-z_]\w*)"\s*\)/g;
+	/(?:\b(?:Timings\.(?:ms|sec|count)|TimingsGet(?:Sec)?|RegistryLimitsCount)|"_generated\.registry_limits"\)\.count)\(\s*"([A-Za-z_]\w*)"\s*,\s*"([A-Za-z_]\w*)"\s*\)/g;
 
 /**
  * Every production source file of the drivers, as repository-relative paths.

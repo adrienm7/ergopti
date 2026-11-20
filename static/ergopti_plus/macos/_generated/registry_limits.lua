@@ -24,6 +24,7 @@ local VALUES = {
 	layer_file_bytes = 65536,
 	number_row_level_text_bytes = 1024,
 	release_list_body_bytes = 8388608,
+	update_asset_download_bytes = 268435456,
 	file_digest_output_bytes = 1024,
 	crash_report_head_bytes = 65536,
 	input_source_id_bytes = 1024,
@@ -36,6 +37,7 @@ local VALUES = {
 	log_prepare_tick_bytes = 65536,
 	shell_captured_output_bytes = 4194304,
 	toml_source_chunk_bytes = 65536,
+	metrics_overlay_slack_bytes = 268435456,
 }
 
 local M = {}
