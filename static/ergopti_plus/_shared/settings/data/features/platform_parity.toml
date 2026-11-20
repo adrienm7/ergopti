@@ -168,8 +168,8 @@ kind = "driver_storage"
 technical = "Windows gates the whole layout section with its category switch (category_enabled.layout). macOS and Linux emulate layouts too (modules/keymap/layout_emulation.lua) but keep no category gate: emulated_layout none with ergopti_base and ergopti_alt_gr off leaves every key to the system layout."
 
 [reasons."platform_reason.ctrl_magic_save_is_cmd_star_on_macos"]
-kind = "os_equivalent"
-technical = "Ctrl plus the layout's own magic key sends a bare Ctrl+S from the Windows hotkeys (modules/keymap/layout.ahk) and the Linux consumption callback (modules/shortcuts/ctrl_magic_save.lua). macOS saves with Cmd, so it offers Cmd plus the magic key among its shortcuts (cmd_star) instead."
+kind = "driver_storage"
+technical = "One rule on the three drivers (_shared/shortcuts/engine/magic_key_save_core.lua and its AHK twin _shared/shortcuts/data/magic_key_save.ahk, replaying _shared/tests/corpus/shortcuts/magic_key_save_vectors.json): a shortcut chord on the layout's own magic key sends the same modifiers + S, the AltGr chord (Ctrl+Alt on Windows, Option on macOS, AltGr on Linux) keeps the layout's character, and a shortcut assigned to the chord keeps it. Windows (modules/keymap/layout.ahk) and Linux (modules/shortcuts/ctrl_magic_save.lua) keep the switch as layout.ctrl_magic_save; macOS keeps it among its per-driver shortcuts as shortcuts.keys.cmd_star (modules/shortcuts/actions/system.lua), whose tap and menu row the shortcut bindings own."
 
 [reasons."platform_reason.action_lookup_is_macos_dictionary"]
 kind = "os_api"

@@ -5494,8 +5494,8 @@
 		},
 		"reason_key": "platform_reason.ctrl_magic_save_is_cmd_star_on_macos",
 		"reason": {
-			"fr": "Pas sous macOS : macOS propose dans ses raccourcis Cmd et la touche magique, qui enregistrent (Cmd+S). Sous Windows et Linux, Ctrl et la touche magique enregistrent (Ctrl+S).",
-			"en": "Not on macOS: macOS offers Cmd plus the magic key in its shortcuts, which saves (Cmd+S). On Windows and Linux, Ctrl plus the magic key saves (Ctrl+S)."
+			"fr": "Pas sous macOS : macOS range ce réglage dans ses raccourcis (Cmd+★ → Cmd+S). Sur les trois systèmes la règle est la même : la touche magique avec des modificateurs envoie les mêmes modificateurs + S.",
+			"en": "Not on macOS: macOS keeps this setting among its shortcuts (Cmd+★ → Cmd+S). On all three systems the rule is the same: the magic key with modifiers sends the same modifiers + S."
 		}
 	},
 	{
@@ -5709,8 +5709,8 @@
 		"path": "shortcuts.keys.cmd_star",
 		"family": "feature",
 		"labels": {
-			"fr": "Cmd + S (préserve mod.)",
-			"en": "Cmd + S (preserves mod.)"
+			"fr": "Modificateurs + ★ envoient modificateurs + S (Cmd+★ → Cmd+S)",
+			"en": "Modifiers + ★ send modifiers + S (Cmd+★ → Cmd+S)"
 		},
 		"platforms": {
 			"windows": false,

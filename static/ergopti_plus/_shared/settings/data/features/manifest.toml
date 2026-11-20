@@ -4379,6 +4379,10 @@ family = "setting"
 type = "boolean"
 description_key = "menu.layout.emulate_bottom_row"
 
+# Every shortcut chord on the layout's own magic key sends the same modifiers +
+# S (Ctrl+Shift+★ → Ctrl+Shift+S), AltGr excepted: the shared rule
+# _shared/shortcuts/engine/magic_key_save_core.lua. macOS keeps its switch among
+# its shortcuts (shortcuts.keys.cmd_star).
 [[features.layout]]
 id = "ctrl_magic_save"
 platforms = ["ahk", "linux"]
@@ -4583,6 +4587,8 @@ platforms = ["hs"]
 requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
+# The macOS switch of the shared modifiers + magic key save rule, which Windows
+# and Linux keep as layout.ctrl_magic_save.
 [[features.shortcuts.keys]]
 id = "cmd_star"
 default = false

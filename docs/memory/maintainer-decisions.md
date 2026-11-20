@@ -5,6 +5,34 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Modifiers + ★ send the same modifiers + S on the three OS (2026-11-20)
+
+Decided by the maintainer on 2026-11-20 (TODO BND-1, BND-2: « ★ en accès
+direct mais tous les raccourcis avec modifiers donnent avec s », « sur les 3
+os »): the layout's own magic key typed alone stays the magic key, and every
+shortcut chord on it sends the same modifiers + S on Windows, macOS and Linux
+(Ctrl+Shift+★ → Ctrl+Shift+S, Alt+★ → Alt+S, Cmd+★ → Cmd+S, Win+Shift+★ →
+Win+Shift+S). One rule decides it: `_shared/shortcuts/engine/magic_key_save_core.lua`
+and its AHK twin `_shared/shortcuts/data/magic_key_save.ahk`, both replaying
+`_shared/tests/corpus/shortcuts/magic_key_save_vectors.json`. Its exceptions:
+
+- Shift alone keeps the key's Shift level.
+- The AltGr chord keeps the layout's AltGr character, never AltGr+S: Ctrl+Alt
+  without Win on Windows, Option without Cmd or Ctrl on macOS (so Option+★ is
+  not Alt+S there), AltGr with anything else held on Linux.
+- A keyboard shortcut assigned to the exact chord keeps it, the magic editor's
+  Win+★ (Windows), Ctrl+★ (macOS) and Super+★ (Linux) included: the save takes
+  only the chords no shortcut owns.
+- As before, only while the magic key is replaced and the driver is not paused,
+  never on a physical magic key the user chose, and every auto-repeat saves
+  again.
+
+The switches stay where they were: `layout.ctrl_magic_save` on Windows and
+Linux, `shortcuts.keys.cmd_star` on macOS. Merging them would move the macOS
+tap out of the shortcut bindings that own its lifecycle and menu row, for no
+change of behaviour, so each switch now covers the whole rule
+(`platform_reason.ctrl_magic_save_is_cmd_star_on_macos`, kind `driver_storage`).
+
 ## The Backspace undo counts per host, not per perceived character (2026-11-19)
 
 Decided by the maintainer on 2026-11-19: undoing an expansion keeps the
@@ -127,7 +155,7 @@ it reads in this order on the three OS:
    (`number_row_policy`, digits in direct access on the OS or emulated
    layout), the é è ê à shortcuts (Windows, Linux; they follow the key that
    types the letter in the active layout), the physical magic key and the
-   Ctrl+★ save (Windows). The former « Couches émulées » sub-header
+   modifiers + ★ save (Windows, Linux). The former « Couches émulées » sub-header
    (`menu.layout.header_layers`) left: this header covers the two layer rows.
 4. Last, past a separator and without a header, the rows that tune no layout:
    Linux's base layout (`base_layouts`, the physical qwerty / azerty family
