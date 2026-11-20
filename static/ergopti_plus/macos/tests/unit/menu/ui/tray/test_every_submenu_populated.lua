@@ -392,7 +392,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		local i18n = require("core.i18n.engine.i18n")
 		local drawn = {}
 		for index, row in ipairs(rows) do drawn[index] = row.title end
-		helpers.assert_eq(table.concat(drawn, " | "), table.concat({
+		local expected = {
 			i18n.get("common.restore_recommended"),
 			i18n.get("common.clear_to_system"),
 			"-",
@@ -402,7 +402,18 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 			i18n.get("menu.global.setup_wizard"),
 			"-",
 			i18n.get("menu.debug.proxy_override"),
-		}, " | "))
+			"-",
+		}
+		helpers.assert_eq(table.concat(drawn, " | ", 1, #expected), table.concat(expected, " | "))
+		-- The windows' reading choices close the submenu, each captioned with its
+		-- current value after its own label.
+		local reading = { "menu.configuration.reading_font", "menu.configuration.reading_spacing" }
+		helpers.assert_eq(#drawn, #expected + #reading, "only the reading choices follow the proxy row")
+		for offset, key in ipairs(reading) do
+			local title = drawn[#expected + offset]
+			local label = i18n.get(key)
+			helpers.assert_eq(title:sub(1, #label), label, "row " .. offset .. " of the reading choices is " .. key)
+		end
 	end)
 
 	-- Uninstall moved from the bottom of Configuration to the bottom of the
