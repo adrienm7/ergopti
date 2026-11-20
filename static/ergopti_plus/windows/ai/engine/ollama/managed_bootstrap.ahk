@@ -306,6 +306,9 @@ class OllamaManagedBootstrap {
 		this.CleanupRunning := false
 		this.PullTask := 0
 		this.PullDigestRetried := false
+		; Clock reading of the first-model pull's dispatch, or 0: from then on the
+		; pull's own ceiling bounds the flow, not the install budget.
+		this.PullStartedTick := 0
 		this.MenuPull := 0
 		this.RuntimeRetired := false
 		this.RuntimeRetiring := false
@@ -378,6 +381,7 @@ class OllamaManagedBootstrap {
 			"helper", Helper, "helper_sha256", this.Sources[Helper], "directory", Directory,
 			"environment", ServeEnvironment, "environment_sha256", this.Sources[ServeEnvironment],
 			"port", Integer(Match[1]), "deadline_ms", LLM_DEPS_POLL_TIMEOUT_MS,
+			"pull_deadline_ms", TimingsGet("llm", "ollama_model_pull_timeout_ms"),
 			"download", Map("ManagedRoot", Root, "CataloguePath", Catalogue,
 				"CatalogueSha256", this.Sources[Catalogue], "AssetId", Asset,
 				"ReleaseHost", Identifiers.Hosts.GITHUB,
@@ -729,12 +733,12 @@ class OllamaManagedBootstrap {
 			return this.Cancel()
 		if this.MenuPull is Map && !this._MenuPullCurrent(this.MenuPull)
 			return this.Cancel()
-		if !this.Ready && (this._Now() < this.StartedTick || this._Now() - this.StartedTick >= this.Plan["deadline_ms"]) {
+		if !this.Ready && this._DeadlineExpired() {
 			if this.SourceBusySince {
 				LoggerError("LLM.managed", "config.toml stayed held by a save until the managed deadline.")
 				this.SourceBusySince := 0
 			}
-			return this._Fail("bootstrap_timeout")
+			return this._Fail(this.PullStartedTick ? "model_pull_timeout" : "bootstrap_timeout")
 		}
 		State := this._Currency()
 		if State == "busy" {
@@ -755,10 +759,22 @@ class OllamaManagedBootstrap {
 			return true
 		if !(this.Port is Map) && this.UiShown && !OllamaWV_IsAlive()
 			return this._Declined()
-		if this._Now() - this.StartedTick >= this.Plan["deadline_ms"]
+		if this._DeadlineExpired()
 			return this._Fail("runtime_timeout")
 		if IsObject(this.Target) && !this.ServerReady
 			this.Runtime.ObserveReady()
+	}
+
+	/**
+	 * The install budget bounds the flow up to its first-model pull; the pull,
+	 * which can outlast it on a slow line, then has its own ceiling.
+	 * @returns {Boolean}
+	 */
+	_DeadlineExpired() {
+		Now := this._Now()
+		if this.PullStartedTick
+			return Now < this.PullStartedTick || Now - this.PullStartedTick >= this.Plan["pull_deadline_ms"]
+		return Now < this.StartedTick || Now - this.StartedTick >= this.Plan["deadline_ms"]
 	}
 
 	_ServerReady(Target, Receipt) {
@@ -823,6 +839,7 @@ class OllamaManagedBootstrap {
 		if !this._Consent("model", this.Model)
 			return this._Declined()
 		this.Pulled := true
+		this.PullStartedTick := Max(this._Now(), 1)
 		this._Ui("ollama.downloading")
 		if this.Port is Map
 			return this.Port["pull"].Call(this.Target.Clone(), this.Model, ObjBindMethod(this, "_PullResult"))
@@ -839,9 +856,10 @@ class OllamaManagedBootstrap {
 		if Tag == ""
 			return false
 		; A READY flow can outlive its bootstrap clock. The new request owns one
-		; captured budget through consent, native retirement and fresh model tags.
+		; captured budget through consent, native retirement and fresh model tags:
+		; the pull's own ceiling, since a large model outlasts the install budget.
 		Operation := Map("tag", Tag, "callback", OnDone, "started_tick", this._Now(),
-			"deadline_ms", this.Plan["deadline_ms"], "failed", false, "source_current", CurrentFn)
+			"deadline_ms", this.Plan["pull_deadline_ms"], "failed", false, "source_current", CurrentFn)
 		this.MenuPull := Operation
 		if !this._MenuPullCurrent(Operation)
 			return false

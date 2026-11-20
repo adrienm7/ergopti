@@ -46,9 +46,13 @@ _G4B_ReadyMenuPullDeadline() {
 		AssertTrue(HasMethod(Done, "Call"))
 		F.Flow._Tick()
 		AssertTrue(F.Flow.Ready, "a new consented pull does not inherit an expired bootstrap clock")
-		F.Now += F.Flow.Plan["deadline_ms"]
+		; OLL-02: the pull's own ceiling, not the install budget, bounds it.
+		F.Now += F.Flow.Plan["deadline_ms"] * 2
 		F.Flow._Tick()
-		AssertTrue(F.Flow.Cancelled, "a READY menu pull reaches the original configured operation deadline")
+		AssertTrue(F.Flow.Ready, "a menu pull outlasting the install budget keeps running")
+		F.Now += F.Flow.Plan["pull_deadline_ms"]
+		F.Flow._Tick()
+		AssertTrue(F.Flow.Cancelled, "a READY menu pull reaches its captured pull ceiling")
 		AssertFalse(F.Flow.Ready, "expired model work cannot retain READY admission")
 		Done.Call(0)
 		AssertEqual(0, Published, "late model completion cannot publish after the operation deadline")
@@ -104,8 +108,8 @@ _G4B_ReadyMenuPullDebt() {
 		F.Runtime.PublishReady()
 		F.Flow.Port["pull"] := Pull
 		AssertTrue(F.Flow.PullModel("qwen3:0.6b"))
-		CapturedBudget := F.Flow.Plan["deadline_ms"]
-		F.Flow.Plan["deadline_ms"] := CapturedBudget * 10
+		CapturedBudget := F.Flow.Plan["pull_deadline_ms"]
+		F.Flow.Plan["pull_deadline_ms"] := CapturedBudget * 10
 		Owner := Map("task", {requestTerminate: (*) => "true"}, "building", false,
 			"accepted", true, "terminal", 0, "callback", Done)
 		F.Flow.PullTask := Owner
@@ -121,6 +125,49 @@ _G4B_ReadyMenuPullDebt() {
 	} finally F.Close()
 }
 Test("managed bootstrap: READY menu deadline preserves unknown native retirement (groups247-menu-pull-deadline)", _G4B_ReadyMenuPullDebt)
+
+; OLL-02 (2026-11-20 managed Ollama campaign): the first model is pulled after
+; the runtime install, under the same flow. The install budget used to bound it
+; too, so a large model on a slow line failed at that budget, mid-download.
+_G4B_FirstPullOwnCeiling() {
+	F := _G4B_Fixture()
+	Done := 0
+	Pull(Target, Model, Callback) {
+		F.Pulls += 1
+		Done := Callback
+		return true
+	}
+	try {
+		F.Model := "qwen3:0.6b"
+		F.Start()
+		F.Flow.Port["pull"] := Pull
+		F.Runtime.PublishReady()
+		AssertEqual(1, F.Pulls, "the first model pull is dispatched")
+		AssertTrue(HasMethod(Done, "Call"))
+		F.Now += F.Flow.Plan["deadline_ms"] + 1
+		F.Flow._Tick()
+		AssertEqual(0, F.FailedCalls, "the install budget does not end a pull in progress")
+		AssertFalse(F.Flow.Cancelled)
+		F.Now += F.Flow.Plan["pull_deadline_ms"]
+		F.Flow._Tick()
+		AssertEqual(1, F.FailedCalls, "the pull's own ceiling still ends it")
+		AssertEqual(1, F.Runtime.Stops, "the owned runtime retires with the timed-out pull")
+		Done.Call(0)
+		AssertEqual(0, F.ReadyCalls, "a late pull completion cannot publish after its ceiling")
+	} finally F.Close()
+}
+Test("managed bootstrap: the first model pull has its own ceiling, not the install budget (OLL-02)", _G4B_FirstPullOwnCeiling)
+
+; OLL-02: the plan's pull ceiling is the shared registry's, apart from the install budget.
+_G4B_PullCeilingFromRegistry() {
+	global _StaticDir
+	AssertTrue(TimingsGet("llm", "ollama_model_pull_timeout_ms") > TimingsGet("llm", "dependency_bootstrap_timeout_ms"),
+		"a pull may outlast the install budget")
+	Source := FileRead(_StaticDir . "\ergopti_plus\windows\ai\engine\ollama\managed_bootstrap.ahk", "UTF-8")
+	AssertTrue(InStr(Source, '"pull_deadline_ms", TimingsGet("llm", "ollama_model_pull_timeout_ms")'),
+		"the production plan reads the pull ceiling from the registry")
+}
+Test("managed bootstrap: the pull ceiling comes from the timing registry (OLL-02)", _G4B_PullCeilingFromRegistry)
 
 class _G4B_Fixture {
 	__New() {
@@ -155,6 +202,7 @@ class _G4B_Fixture {
 		Plan := Map("ManagedRoot", "C:\managed", "CataloguePath", "C:\catalogue.json",
 			"CatalogueSha256", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			"AssetId", "windows-amd64", "port", 23456, "version", "0.24.0", "deadline_ms", 9000,
+			"pull_deadline_ms", 50000,
 			"download", Map("ManagedRoot", "C:\managed"))
 		Port := Map("plan", Plan, "files", this.Files, "runtime", this.Runtime,
 			"current", (*) => this.CurrentValue, "clock", (*) => this.Now,

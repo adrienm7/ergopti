@@ -158,6 +158,15 @@ poll_interval_ms = 50
 # selector page. AHK: ollama_managed_bootstrap.ahk (the pull's capture tail).
 pull_progress_poll_ms = 1000
 
+# Ceiling of one managed Ollama model pull, from its dispatch, apart from the
+# install's dependency_bootstrap_timeout_ms: a multi-gigabyte model on a slow
+# line outlasts that budget, and Ollama keeps its finished blobs anyway.
+# AHK: ai/engine/ollama/managed_bootstrap.ahk (the first-model pull and the
+# menu pull). LX: ai/engine/local_servers/model_download.lua. macOS sets no
+# absolute ceiling: its pull worker stops a stalled transfer after the network
+# retry's stall bound (ai/engine/network-retry.sh CURL_STALL_SEC).
+ollama_model_pull_timeout_ms = 86400000
+
 # MLX stream: fail fast if the server never sends the first TCP byte.
 stream_connect_timeout_ms = 5000
 

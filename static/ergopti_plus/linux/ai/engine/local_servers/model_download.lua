@@ -20,7 +20,6 @@ local WindowSessionId, RetireWindow, CompleteWindow = DownloadWindow.session_id,
 
 local LOG = "ai.engine.local_servers.model_download"
 local OWNER = "ollama_model_pull"
-local MODEL_PULL_TIMEOUT_MS = 24 * 60 * 60 * 1000
 -- Ollama emits short status/byte counters, not model data, on this NDJSON stream.
 local MAX_PROGRESS_FRAME_BYTES = 1024 * 1024
 
@@ -280,7 +279,7 @@ function dispatch(request)
 	end
 	local called, operation = pcall(HttpClient.post_stream_owned,
 		url, { ["Content-Type"] = "application/json" }, body, {
-			owner = OWNER, timeout_ms = MODEL_PULL_TIMEOUT_MS,
+			owner = OWNER, timeout_ms = require("core.timing.engine.timings").ms("llm", "ollama_model_pull_timeout_ms"),
 			authorized = function()
 				return current(request, attempt) and _active == request and not request.terminal
 			end,

@@ -802,4 +802,17 @@ helpers.describe("Ollama model download: shared pull error classes (OLL-01)", fu
 		if not ok then error(err, 0) end
 	end)
 
+	-- OLL-02: the ceiling is the shared registry's, which Windows reads too.
+	helpers.it("ollama-model-pull-ceiling: the pull ceiling comes from the timing registry", function()
+		local Download, transport = load_fixture()
+		local ok, err = xpcall(function()
+			local Timings = require("core.timing.engine.timings")
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+			helpers.assert_eq(transport.starts[1].opts.timeout_ms, Timings.ms("llm", "ollama_model_pull_timeout_ms"))
+			helpers.assert_true(Timings.ms("llm", "ollama_model_pull_timeout_ms")
+				> Timings.ms("llm", "dependency_bootstrap_timeout_ms"), "a pull may outlast the install budget")
+		end, debug.traceback)
+		restore()
+		if not ok then error(err, 0) end
+	end)
 end)
