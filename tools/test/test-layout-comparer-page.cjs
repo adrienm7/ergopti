@@ -1021,6 +1021,44 @@ check(
 			body.includes('t(`layout_analysis.info.${id}`)'),
 		'score settings: a weight input is not described by its unit and definition'
 	);
+	// Each penalty floor (score_weights.json « floors ») is in its weight's
+	// card, the target of its label, named with its metric and described by
+	// its unit and its help, both in all 21 locales.
+	const floorStart = page.indexOf('function floorField(');
+	const floorBody = page.slice(floorStart, page.indexOf('\n\t\t}\n', floorStart));
+	check(
+		floorStart > 0 &&
+			/if \(id in state\.floors\) control\.append\(floorField\(id, metric\)\)/.test(body),
+		'score settings: a penalty weight card has no floor field'
+	);
+	check(
+		/label\.htmlFor = inputId/.test(floorBody) &&
+			/input\.id = inputId/.test(floorBody) &&
+			/input\.type = 'number'/.test(floorBody) &&
+			/aria-describedby', `\$\{unit\.id\} \$\{help\.id\}`/.test(floorBody) &&
+			floorBody.includes("t('layout_analysis.weights.floor_help', {") &&
+			floorBody.includes("t('layout_analysis.weights.floor_named', {"),
+		'score settings: a floor input is not labelled and described by its unit and help'
+	);
+	check(
+		Object.keys(E.defaultFloors()).every((id) => id in E.defaultWeights()),
+		'score settings: a floor of score_weights.json has no weight card to sit in'
+	);
+	for (const file of locales) {
+		const strings = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, file), 'utf8'));
+		for (const [key, slot] of [
+			['weights.floor', null],
+			['weights.floor_named', '{metric}'],
+			['weights.floor_help', '{metric}'],
+			['weights.floor_unit', '{unit}']
+		])
+			check(
+				typeof strings[`${PREFIX}${key}`] === 'string' &&
+					strings[`${PREFIX}${key}`] !== '' &&
+					(!slot || strings[`${PREFIX}${key}`].includes(slot)),
+				`${file}: ${PREFIX}${key}${slot ? ` with ${slot}` : ''}`
+			);
+	}
 	check(
 		/<svg\s+id="la-ideal-hands"[^>]*aria-hidden="true"/.test(page),
 		'score settings: the ideal finger load has no hands picture'

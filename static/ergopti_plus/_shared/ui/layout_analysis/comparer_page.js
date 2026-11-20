@@ -5258,7 +5258,14 @@
 				})
 			);
 			unit.id = `${inputId}-unit`;
-			input.setAttribute('aria-describedby', unit.id);
+			// Its help says what the floor does to this metric's points.
+			const help = el(
+				'small',
+				'la-weight-help la-floor-help',
+				t('layout_analysis.weights.floor_help', { metric: t(`layout_analysis.metric.${id}`) })
+			);
+			help.id = `${inputId}-help`;
+			input.setAttribute('aria-describedby', `${unit.id} ${help.id}`);
 			// Every card has a floor: each field is named with its metric.
 			input.setAttribute(
 				'aria-label',
@@ -5274,7 +5281,7 @@
 				state.floors[id] = value;
 				rescore();
 			});
-			field.append(label, input, unit);
+			field.append(label, input, unit, help);
 			return field;
 		}
 

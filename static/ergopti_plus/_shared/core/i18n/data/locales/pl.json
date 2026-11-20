@@ -4720,6 +4720,7 @@
 	"layout_analysis.percentile.label": "Centyl {percent} dla {metric}: lepiej niż {percent} % z {count} pełnych układów. Pokaż wyjaśnienie.",
 	"layout_analysis.percentile.explain": "P{percent} to centyl tego układu dla {metric}: wypada lepiej niż {percent} % z {count} pełnych układów, wśród których jest klasyfikowany (biblioteka bez twoich własnych układów), przy tym samym tekście, klawiaturze i ustawieniach; remis liczy się za połowę. P100 jest lepszy od wszystkich, P0 gorszy od wszystkich. Kolor przechodzi od czerwieni do zieleni, a liczba zawsze mówi to samo. Odpowiada na pytanie „czy ta wartość jest dobra?” bez wyniku ogólnego.",
 	"layout_analysis.weights.floor": "Próg",
+	"layout_analysis.weights.floor_help": "Punkty kosztuje tylko część {metric} powyżej tego progu, więc małe udziały, które ma każdy dobry układ, nie decydują o miejscu w rankingu. 0, wartość domyślna, liczy całą wartość.",
 	"layout_analysis.weights.floor_named": "Próg dla {metric}",
 	"layout_analysis.weights.floor_unit": "{unit}: poniżej nie traci się punktów",
 	"layout_analysis.presets.title": "Ustawienia gotowe",

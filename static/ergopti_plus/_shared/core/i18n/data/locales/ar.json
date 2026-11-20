@@ -4720,6 +4720,7 @@
 	"layout_analysis.percentile.label": "المئين {percent} في {metric}: أفضل من {percent} % من {count} تخطيطًا كاملًا. اعرض الشرح.",
 	"layout_analysis.percentile.explain": "P{percent} هو مئين هذا التخطيط في {metric}: فهو أفضل من {percent} % من التخطيطات الكاملة الـ{count} التي يُرتَّب بينها (المكتبة دون تخطيطاتك الخاصة)، على النص ولوحة المفاتيح والإعدادات نفسها؛ ويُحتسب التعادل نصفًا. P100 أفضل منها جميعًا، وP0 أسوأ منها جميعًا. يتدرّج اللون من الأحمر إلى الأخضر، والرقم يقول الشيء نفسه دائمًا. يجيب عن سؤال «هل هذه القيمة جيدة؟» دون النتيجة الإجمالية.",
 	"layout_analysis.weights.floor": "الحد الأدنى",
+	"layout_analysis.weights.floor_help": "لا يكلّف نقاطًا إلا الجزء من {metric} الذي يتجاوز هذا الحد، فلا تحسم الحصص الصغيرة التي تملكها كل التخطيطات الجيدة الترتيب. القيمة 0، وهي الافتراضية، تحتسب القيمة كاملة.",
 	"layout_analysis.weights.floor_named": "الحد الأدنى لـ {metric}",
 	"layout_analysis.weights.floor_unit": "{unit}: لا تُفقد أي نقاط تحته",
 	"layout_analysis.presets.title": "إعدادات جاهزة",

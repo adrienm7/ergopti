@@ -4720,6 +4720,7 @@
 	"layout_analysis.percentile.label": "Percentil {percent} en {metric}: mejor que el {percent} % de {count} distribuciones completas. Mostrar la explicación.",
 	"layout_analysis.percentile.explain": "P{percent} es el percentil de esta distribución en {metric}: lo hace mejor que el {percent} % de las {count} distribuciones completas entre las que se clasifica (la biblioteca, sin sus propias distribuciones), con el mismo texto, teclado y ajustes; un empate cuenta la mitad. P100 es mejor que todas, P0 peor que todas. El color va del rojo al verde, y el número siempre dice lo mismo. Responde a «¿es bueno este valor?» sin la puntuación global.",
 	"layout_analysis.weights.floor": "Umbral",
+	"layout_analysis.weights.floor_help": "Solo la parte de {metric} por encima de este umbral cuesta puntos, así que las pequeñas proporciones que tiene toda buena distribución no deciden la clasificación. 0, el valor predeterminado, cuenta el valor entero.",
 	"layout_analysis.weights.floor_named": "Umbral de {metric}",
 	"layout_analysis.weights.floor_unit": "{unit}: por debajo no se pierde ningún punto",
 	"layout_analysis.presets.title": "Ajustes predefinidos",

@@ -4720,6 +4720,7 @@
 	"layout_analysis.percentile.label": "Percentile {percent} on {metric}: better than {percent} % of {count} complete layouts. Show the explanation.",
 	"layout_analysis.percentile.explain": "P{percent} is this layout’s percentile on {metric}: it does better than {percent} % of the {count} complete layouts it is ranked among (the library, with your own layouts left out), on the same text, keyboard and settings; a tie counts half. P100 is better than all of them, P0 worse than all. The colour goes from red to green, and the number always says the same. It answers “is this value good?” without the global score.",
 	"layout_analysis.weights.floor": "Floor",
+	"layout_analysis.weights.floor_help": "Only the part of {metric} above this floor costs points, so the small shares every good layout has do not decide the rank. 0, the default, counts the whole value.",
 	"layout_analysis.weights.floor_named": "Floor of {metric}",
 	"layout_analysis.weights.floor_unit": "{unit}: no points lost below it",
 	"layout_analysis.presets.title": "Presets",

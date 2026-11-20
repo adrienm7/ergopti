@@ -4720,6 +4720,7 @@
 	"layout_analysis.percentile.label": "Percentil {percent} för {metric}: bättre än {percent} % av {count} kompletta layouter. Visa förklaringen.",
 	"layout_analysis.percentile.explain": "P{percent} är layoutens percentil för {metric}: den klarar sig bättre än {percent} % av de {count} kompletta layouter den rangordnas bland (biblioteket utan dina egna layouter), med samma text, tangentbord och inställningar; oavgjort räknas som hälften. P100 är bättre än alla, P0 sämre än alla. Färgen går från rött till grönt, och talet säger alltid samma sak. Det svarar på ”är det här värdet bra?” utan totalpoängen.",
 	"layout_analysis.weights.floor": "Golv",
+	"layout_analysis.weights.floor_help": "Bara den del av {metric} som ligger över detta golv kostar poäng, så de små andelar som alla bra layouter har avgör inte placeringen. 0, standardvärdet, räknar hela värdet.",
 	"layout_analysis.weights.floor_named": "Golv för {metric}",
 	"layout_analysis.weights.floor_unit": "{unit}: inga poäng förloras under det",
 	"layout_analysis.presets.title": "Förinställningar",

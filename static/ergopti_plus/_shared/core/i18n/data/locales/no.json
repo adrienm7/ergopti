@@ -4720,6 +4720,7 @@
 	"layout_analysis.percentile.label": "Persentil {percent} for {metric}: bedre enn {percent} % av {count} komplette oppsett. Vis forklaringen.",
 	"layout_analysis.percentile.explain": "P{percent} er dette oppsettets persentil for {metric}: det gjør det bedre enn {percent} % av de {count} komplette oppsettene det rangeres blant (biblioteket uten dine egne oppsett), med samme tekst, tastatur og innstillinger; uavgjort teller halvt. P100 er bedre enn alle, P0 dårligere enn alle. Fargen går fra rødt til grønt, og tallet sier alltid det samme. Det svarer på «er denne verdien god?» uten den samlede poengsummen.",
 	"layout_analysis.weights.floor": "Nedre grense",
+	"layout_analysis.weights.floor_help": "Bare den delen av {metric} som ligger over denne nedre grensen, koster poeng, så de små andelene alle gode oppsett har, avgjør ikke plasseringen. 0, standardverdien, teller hele verdien.",
 	"layout_analysis.weights.floor_named": "Nedre grense for {metric}",
 	"layout_analysis.weights.floor_unit": "{unit}: ingen poeng tapes under den",
 	"layout_analysis.presets.title": "Forhåndsinnstillinger",

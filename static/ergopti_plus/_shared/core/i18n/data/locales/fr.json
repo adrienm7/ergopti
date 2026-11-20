@@ -4720,6 +4720,7 @@
 	"layout_analysis.percentile.label": "Centile {percent} en {metric} : mieux que {percent} % de {count} dispositions complètes. Afficher l’explication.",
 	"layout_analysis.percentile.explain": "P{percent} est le centile de cette disposition en {metric} : elle fait mieux que {percent} % des {count} dispositions complètes parmi lesquelles elle est classée (la bibliothèque, sans vos propres dispositions), sur le même texte, le même clavier et les mêmes réglages ; une égalité compte pour moitié. P100 fait mieux que toutes, P0 moins bien que toutes. La couleur va du rouge au vert, et le nombre dit toujours la même chose. Il répond à « cette valeur est-elle bonne ? » sans passer par le score global.",
 	"layout_analysis.weights.floor": "Plancher",
+	"layout_analysis.weights.floor_help": "Seule la part de {metric} au-dessus de ce plancher coûte des points : les petites parts qu’ont toutes les bonnes dispositions ne décident pas du classement. 0, la valeur par défaut, compte toute la valeur.",
 	"layout_analysis.weights.floor_named": "Plancher de {metric}",
 	"layout_analysis.weights.floor_unit": "{unit} : aucun point perdu en dessous",
 	"layout_analysis.presets.title": "Préréglages",

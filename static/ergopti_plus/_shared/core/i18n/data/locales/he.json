@@ -4720,6 +4720,7 @@
 	"layout_analysis.percentile.label": "אחוזון {percent} ב-{metric}: טוב יותר מ-{percent} % מתוך {count} פריסות שלמות. הצגת ההסבר.",
 	"layout_analysis.percentile.explain": "P{percent} הוא האחוזון של הפריסה הזו ב-{metric}: היא טובה יותר מ-{percent} % מתוך {count} הפריסות השלמות שביניהן היא מדורגת (הספרייה, בלי הפריסות שלכם), על אותו טקסט, מקלדת והגדרות; תיקו נחשב כחצי. P100 טובה מכולן, P0 גרועה מכולן. הצבע עובר מאדום לירוק, והמספר תמיד אומר אותו דבר. הוא עונה על השאלה „האם הערך הזה טוב?” בלי הציון הכולל.",
 	"layout_analysis.weights.floor": "סף",
+	"layout_analysis.weights.floor_help": "רק החלק של {metric} שמעל הסף הזה עולה נקודות, כך שהחלקים הקטנים שיש לכל פריסה טובה אינם מכריעים את הדירוג. 0, ברירת המחדל, סופר את הערך כולו.",
 	"layout_analysis.weights.floor_named": "סף של {metric}",
 	"layout_analysis.weights.floor_unit": "{unit}: מתחתיו לא מאבדים נקודות",
 	"layout_analysis.presets.title": "הגדרות מוכנות",

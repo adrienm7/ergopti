@@ -4720,6 +4720,7 @@
 	"layout_analysis.percentile.label": "Percentil {percent} for {metric}: bedre end {percent} % af {count} komplette layout. Vis forklaringen.",
 	"layout_analysis.percentile.explain": "P{percent} er dette layouts percentil for {metric}: det klarer sig bedre end {percent} % af de {count} komplette layout, det rangeres blandt (biblioteket uden dine egne layout), med samme tekst, tastatur og indstillinger; uafgjort tæller halvt. P100 er bedre end dem alle, P0 dårligere end dem alle. Farven går fra rød til grøn, og tallet siger altid det samme. Det svarer på “er denne værdi god?” uden den samlede score.",
 	"layout_analysis.weights.floor": "Bundgrænse",
+	"layout_analysis.weights.floor_help": "Kun den del af {metric}, der ligger over denne bundgrænse, koster point, så de små andele, alle gode layouts har, afgør ikke placeringen. 0, standardværdien, tæller hele værdien.",
 	"layout_analysis.weights.floor_named": "Bundgrænse for {metric}",
 	"layout_analysis.weights.floor_unit": "{unit}: ingen point tabes under den",
 	"layout_analysis.presets.title": "Forudindstillinger",

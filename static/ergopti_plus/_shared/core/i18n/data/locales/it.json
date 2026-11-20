@@ -4720,6 +4720,7 @@
 	"layout_analysis.percentile.label": "Percentile {percent} su {metric}: meglio del {percent} % di {count} layout completi. Mostra la spiegazione.",
 	"layout_analysis.percentile.explain": "P{percent} è il percentile di questo layout su {metric}: fa meglio del {percent} % dei {count} layout completi tra cui è classificato (la libreria, senza i tuoi layout), con lo stesso testo, la stessa tastiera e le stesse impostazioni; un pareggio conta metà. P100 è meglio di tutti, P0 peggio di tutti. Il colore va dal rosso al verde e il numero dice sempre la stessa cosa. Risponde a «questo valore è buono?» senza il punteggio globale.",
 	"layout_analysis.weights.floor": "Soglia",
+	"layout_analysis.weights.floor_help": "Costa punti solo la parte di {metric} sopra questa soglia, così le piccole quote che ogni buon layout ha non decidono la classifica. 0, il valore predefinito, conta tutto il valore.",
 	"layout_analysis.weights.floor_named": "Soglia di {metric}",
 	"layout_analysis.weights.floor_unit": "{unit}: sotto non si perde alcun punto",
 	"layout_analysis.presets.title": "Preimpostazioni",

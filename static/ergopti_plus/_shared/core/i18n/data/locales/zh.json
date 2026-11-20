@@ -4720,6 +4720,7 @@
 	"layout_analysis.percentile.label": "{metric} 的百分位 {percent}：优于 {count} 个完整布局中的 {percent} %。显示说明。",
 	"layout_analysis.percentile.explain": "P{percent} 是此布局在 {metric} 上的百分位：在相同文本、键盘和设置下，它优于与其一同排名的 {count} 个完整布局（布局库，不含您自己的布局）中的 {percent} %；并列计为一半。P100 优于全部，P0 劣于全部。颜色从红到绿变化，数字也始终表达同样的意思。无需看总分，就能回答“这个数值好不好？”。",
 	"layout_analysis.weights.floor": "下限",
+	"layout_analysis.weights.floor_help": "只有 {metric} 超过此下限的部分才扣分，因此每个好布局都有的小比例不会决定排名。默认值 0 计入全部数值。",
 	"layout_analysis.weights.floor_named": "{metric} 的下限",
 	"layout_analysis.weights.floor_unit": "{unit}：低于此值不扣分",
 	"layout_analysis.presets.title": "预设",

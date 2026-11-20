@@ -4720,6 +4720,7 @@
 	"layout_analysis.percentile.label": "Percentiel {percent} voor {metric}: beter dan {percent} % van {count} volledige indelingen. Toon de uitleg.",
 	"layout_analysis.percentile.explain": "P{percent} is het percentiel van deze indeling voor {metric}: ze doet het beter dan {percent} % van de {count} volledige indelingen waartussen ze gerangschikt wordt (de bibliotheek, zonder je eigen indelingen), met dezelfde tekst, hetzelfde toetsenbord en dezelfde instellingen; een gelijkspel telt half. P100 is beter dan alle, P0 slechter dan alle. De kleur gaat van rood naar groen, en het getal zegt steeds hetzelfde. Het beantwoordt “is deze waarde goed?” zonder de totaalscore.",
 	"layout_analysis.weights.floor": "Drempel",
+	"layout_analysis.weights.floor_help": "Alleen het deel van {metric} boven deze drempel kost punten, zodat de kleine aandelen die elke goede indeling heeft de rangorde niet bepalen. 0, de standaardwaarde, telt de hele waarde.",
 	"layout_analysis.weights.floor_named": "Drempel van {metric}",
 	"layout_analysis.weights.floor_unit": "{unit}: daaronder gaan geen punten verloren",
 	"layout_analysis.presets.title": "Voorinstellingen",

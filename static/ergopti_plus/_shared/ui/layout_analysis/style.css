@@ -1887,6 +1887,11 @@ body:has(> main.layout-analysis) {
 	font-weight: 600;
 }
 
+/* The floor's help takes its own line under its input. */
+.la-floor-help {
+	flex-basis: 100%;
+}
+
 /* Score presets (ux-study item 13): one coloured card per built-in preset,
    the one in use marked in words, then the user's own in a list. */
 .la-presets {
