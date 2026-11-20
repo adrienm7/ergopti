@@ -26,7 +26,7 @@ helpers.describe("Ergopti extension hotstrings: shipped with the driver", functi
 		local ergopti
 		for _, pack in ipairs(found) do if pack.id == "ergopti" then ergopti = pack end end
 		helpers.assert_true(ergopti ~= nil, "the shipped Ergopti extension is discovered")
-		helpers.assert_eq(#ergopti.bound_files, 6)
+		helpers.assert_eq(#ergopti.bound_files, Fixture.manifest_bindings())
 		helpers.assert_eq(#ergopti.toml_files, 0, "none of its files becomes an ext: category")
 
 		local sfbs, rolls = catalogue.categories.sfbsreduction, catalogue.categories.rolls
@@ -35,9 +35,9 @@ helpers.describe("Ergopti extension hotstrings: shipped with the driver", functi
 			sfbs.path)
 		helpers.assert_eq(sfbs.extension, { id = "ergopti", name = "Ergopti+" }, "the menu files it under Ergopti+")
 		helpers.assert_eq(rolls.extension, { id = "ergopti", name = "Ergopti+" })
-		helpers.assert_eq(sfbs.count, 34)
-		helpers.assert_eq(rolls.count, 33)
-		helpers.assert_eq(catalogue.categories.magickey.sections.repeat_corrections.count, 14,
+		helpers.assert_eq(sfbs.count, Fixture.file_entries("sfbsreduction"))
+		helpers.assert_eq(rolls.count, Fixture.file_entries("rolls"))
+		helpers.assert_eq(catalogue.categories.magickey.sections.repeat_corrections.count, Fixture.file_entries("repeatcorrections"),
 			"the repeat corrections stay a section of the magic key category")
 		helpers.assert_nil(catalogue.categories.magickey.extension, "the magic key category stays bundled")
 		helpers.assert_eq(catalogue.categories.magickey.sections.repeat_corrections.extension,
@@ -366,7 +366,7 @@ helpers.describe("Ergopti suffix and native-feature relocation", function()
 		helpers.assert_true(exists(shipped_suffixes), "the production extension resolver reaches the moved physical file")
 		local resolved_suffixes, resolved_committed = Reader.parse(shipped_suffixes)
 		helpers.assert_true(resolved_committed)
-		helpers.assert_eq(#resolved_suffixes.sections.suffixes_a.entries, 24,
+		helpers.assert_eq(#resolved_suffixes.sections.suffixes_a.entries, Fixture.file_entries("suffixes_a"),
 			"the physical resolver and bound catalogue consume the same complete suffix pack")
 		local without = load(false)
 		helpers.assert_nil(without.categories.french_distancesreduction)

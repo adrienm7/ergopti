@@ -68,6 +68,25 @@ local function roots(with_ergopti)
 	return out
 end
 
+--- The hotstring bindings the shipped Ergopti manifest declares, decoded from
+--- its file rather than through the discovery the tests compare them with.
+--- @return table counts all, whole (no section list) and per category.
+local function manifest_bindings()
+	local fh = assert(io.open(static_dir() .. "/layouts/registry/ergopti/manifest.toml", "r"))
+	local document = TomlCodec.decode(fh:read("*a"))
+	fh:close()
+	local bindings = document.extension and document.extension.hotstring_bindings
+	helpers.assert_type(bindings, "table", "the shipped Ergopti manifest must declare hotstring bindings")
+	local counts = { all = 0, whole = 0, category = {} }
+	for _, binding in pairs(bindings) do
+		counts.all = counts.all + 1
+		if binding.sections == nil then counts.whole = counts.whole + 1 end
+		counts.category[binding.category] = (counts.category[binding.category] or 0) + 1
+	end
+	helpers.assert_true(counts.all > 0, "the shipped Ergopti manifest must declare hotstring bindings")
+	return counts
+end
+
 --- The first entry of a trigger in one section of a bound file.
 --- @param path string
 --- @param section string
@@ -90,7 +109,8 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 		local ergopti
 		for _, pack in ipairs(found) do if pack.id == "ergopti" then ergopti = pack end end
 		helpers.assert_true(ergopti ~= nil, "the Ergopti extension the app ships is installed")
-		helpers.assert_eq(#ergopti.bound_files, 6)
+		local bindings = manifest_bindings()
+		helpers.assert_eq(#ergopti.bound_files, bindings.all)
 		helpers.assert_eq(#ergopti.toml_files, 0, "none of its files becomes an ext: category")
 		local sfbs = Packs.route("sfbsreduction", nil)
 		local rolls = Packs.route("rolls", nil)
@@ -98,11 +118,11 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 		helpers.assert_true(rolls:find("/layouts/registry/ergopti/hotstrings/rolls.toml", 1, true) ~= nil, rolls)
 		local magickey, sources = Packs.route("magickey", "/bundled/magickey.toml")
 		helpers.assert_eq(magickey, "/bundled/magickey.toml", "the magic key keeps its bundled file")
-		helpers.assert_eq(#sources, 2)
+		helpers.assert_eq(#sources, bindings.category.magickey)
 		helpers.assert_eq(sources[1].sections, { "replace" })
 		helpers.assert_eq(sources[2].sections, { "repeat_corrections" })
 		local unbundled = Packs.unbundled_routes({ magickey = true })
-		helpers.assert_eq(#unbundled, 4, "every whole category loads without a bundled copy")
+		helpers.assert_eq(#unbundled, bindings.whole, "every whole category loads without a bundled copy")
 
 		-- One historical expansion per moved group, with the flags it always had.
 		for _, case in ipairs({

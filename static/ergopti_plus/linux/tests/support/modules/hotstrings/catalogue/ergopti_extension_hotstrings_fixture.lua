@@ -36,6 +36,45 @@ local function exists(path)
 	return fh ~= nil
 end
 
+--- The lines of a shipped file that contain a plain text, counted from the file
+--- itself rather than through the loader the tests compare it with.
+--- @param path string
+--- @param needle string|nil Plain text to find; nil matches with pattern.
+--- @param pattern string|nil Lua pattern a whole line must match.
+--- @return number
+local function count_lines(path, needle, pattern)
+	local fh = assert(io.open(path, "rb"))
+	local text = fh:read("*a")
+	fh:close()
+	local count = 0
+	for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+		line = line:gsub("\r$", "")
+		if (needle and line:find(needle, 1, true)) or (pattern and line:match(pattern)) then count = count + 1 end
+	end
+	assert(count > 0, "the shipped file must hold what is counted: " .. path)
+	return count
+end
+
+--- The folder of the Ergopti extension this checkout ships.
+--- @return string
+local function ergopti_dir()
+	return Paths.shared_root() .. "/../../layouts/registry/ergopti"
+end
+
+--- The inline entries one shipped Ergopti hotstrings file holds.
+--- @param stem string File name without .toml.
+--- @return number
+local function file_entries(stem)
+	return count_lines(ergopti_dir() .. "/hotstrings/" .. stem .. ".toml", "= { output = ")
+end
+
+--- The hotstring bindings the shipped Ergopti manifest declares: each becomes
+--- one bound file of the discovered extension.
+--- @return number
+local function manifest_bindings()
+	return count_lines(ergopti_dir() .. "/manifest.toml", nil, "^%[extension%.hotstring_bindings%.[^%]]+%]$")
+end
+
 --- The shipped roots: bundled extensions, then the Ergopti extension when shipped.
 --- @param with_ergopti boolean Whether the registry ships the Ergopti extension.
 --- @return table
@@ -206,6 +245,8 @@ return {
 	Extensions = Extensions,
 	registry_settings = registry_settings,
 	exists = exists,
+	file_entries = file_entries,
+	manifest_bindings = manifest_bindings,
 	roots = roots,
 	load = load,
 	mapping = mapping,
