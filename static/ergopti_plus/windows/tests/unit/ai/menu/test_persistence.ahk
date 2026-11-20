@@ -338,15 +338,17 @@ Test("LLM persist AHK: all contract entries round-trip", Test_LLM_Persist_AllAhk
 
 _AHK011_PersistenceStoresEffectiveStreaming() {
 	global Features
-	CandidateFeatures := _LLM_Persist_CloneFeatures(Features)
-	CandidateMenu := _LLM_Persist_MakeDefaultTray()
-	CandidateMenu["backend"] := "ollama"
-	CandidateMenu["streaming"] := true
-	AssertTrue(_LLM_Menu_SyncToFeatures(CandidateFeatures, CandidateMenu),
-		"the complete menu fixture must be accepted by the real persistence boundary")
-	AssertFalse(CandidateFeatures["llm"]["display"]["streaming"],
-		"durable Windows configuration must record the effective unsupported value, "
-		. "not preserve a checked-but-unreachable streaming request")
+	for Backend, Capable in Map("ollama", true, "api", false) {
+		CandidateFeatures := _LLM_Persist_CloneFeatures(Features)
+		CandidateMenu := _LLM_Persist_MakeDefaultTray()
+		CandidateMenu["backend"] := Backend
+		CandidateMenu["streaming"] := true
+		AssertTrue(_LLM_Menu_SyncToFeatures(CandidateFeatures, CandidateMenu),
+			"the complete menu fixture must be accepted by the real persistence boundary")
+		AssertEqual(Capable, CandidateFeatures["llm"]["display"]["streaming"],
+			Backend . ": durable Windows configuration records the effective value, "
+			. "never a checked-but-unreachable streaming request")
+	}
 }
 Test("AHK-011: persistence stores only effective streaming",
 	_AHK011_PersistenceStoresEffectiveStreaming)

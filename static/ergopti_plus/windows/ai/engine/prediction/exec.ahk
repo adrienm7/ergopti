@@ -829,8 +829,9 @@ _LLM_Engine_InfoBarModel() {
 }
 
 ; Purple loading tooltip — macOS ``tooltip.show_loading`` parity. Fires once per
-; debounced request after the inactivity delay, before HTTP dispatch.
-_LLM_Engine_ShowLoadingTooltip() {
+; debounced request after the inactivity delay, before HTTP dispatch. Replace
+; is true when a withdrawn stream's row must give way to the spinner.
+_LLM_Engine_ShowLoadingTooltip(Replace := false) {
 	global _LLM_Engine
 	if (_LLM_Engine.Has(ConfigLeaf.INLINE_AUTOTYPE) and _LLM_Engine[ConfigLeaf.INLINE_AUTOTYPE])
 		return
@@ -843,7 +844,7 @@ _LLM_Engine_ShowLoadingTooltip() {
 	; the prediction flashed, then the next keystroke's request blanked it back to
 	; a spinner. Loading-over-loading still repaints (IsLoading → not a prediction).
 	Renderer := _LLM_Engine_Port("tooltip")
-	if (Renderer.IsVisible() and !Renderer.IsLoading())
+	if (!Replace and Renderer.IsVisible() and !Renderer.IsLoading())
 		return
 	RequestId := _LLM_Engine.Get("request_id", 0)
 	; A hotstring tooltip wins over the spinner on the shared surface
@@ -1091,24 +1092,67 @@ _LLM_Engine_DispatchVariant(state) {
 ; in-flight variants don't trip over each other. Same dedup is NOT applied
 ; here — we run the full text through dedup on on_success, where the
 ; comparison is meaningful.
+; The partial goes through the prediction parser, as macOS (streaming_handler)
+; and Linux (engine publish) do: the row offered for Tab is what accepting it
+; types, never the model's raw TAIL_CORRECTED / NEXT_WORDS lines. A partial
+; the parser cannot read yet keeps the rows already shown.
 _LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
 	global _LLM_Engine
 	if !_LLM_Engine_IsCurrent(state)
 		return
 	if state.Has("show_all_at_once") and state["show_all_at_once"]
 		return
+	; Strip thinking tags during streaming; an unclosed block shows nothing yet.
+	visible := LLM_Parser_StripThinking(partial, true)
+	if (Trim(visible, " `t`r`n") == "")
+		return
+	stats := "", edits := "", displays := ""
+	parsed := LLM_Parser_ParseResponse(visible, state["ctx"],
+		state.Has("ctx_tail") ? state["ctx_tail"] : state["ctx"],
+		state.Has(ConfigLeaf.MIN_WORDS) ? state[ConfigLeaf.MIN_WORDS] : 1,
+		state.Has(ConfigLeaf.MAX_WORDS) ? state[ConfigLeaf.MAX_WORDS] : 15,
+		state.Has("is_batch") and state["is_batch"], state["requested"],
+		&stats, &edits, &displays)
+	if (parsed.Length == 0)
+		return
+	; Parsing can log a refusal and yield: a newer request may own the tooltip.
+	if !_LLM_Engine_IsCurrent(state)
+		return
 	preview := []
 	for _, s in state["slots"]
 		preview.Push(s)
 	while (preview.Length < slot_idx - 1)
 		preview.Push("")
-	; Strip thinking tags during streaming; full parser runs on on_success.
-	display := LLM_Parser_StripThinking(partial, true)
-	preview.Push(display)
+	preview.Push(parsed[parsed.Length])
+	; The erasures of the finished slots, plus the one the partial's accept
+	; performs: a streamed correction is as acceptable as a final one.
+	render_edits := Map()
+	for text, slot_edit in state.Get("rewrite_edits", Map())
+		render_edits[text] := slot_edit
+	for text, slot_edit in edits {
+		if !render_edits.Has(text)
+			render_edits[text] := slot_edit
+	}
+	state["stream_painted"] := true
 	; Active = the slot currently streaming, so Tab during streaming still
 	; produces something sensible.
 	LLM_Engine_OnResults(preview, state["ctx"], slot_idx, false,
-		state["request_id"], state["semantic_signature"])
+		state["request_id"], state["semantic_signature"], render_edits)
+}
+
+; Takes a failed stream's row off offer before the retry answers (macOS
+; AIM-001, Linux publish without the partial): the finished slots stay, and
+; with none the loading surface comes back, so Tab cannot accept text the
+; failed call never completed.
+_LLM_Engine_WithdrawStream(state) {
+	if !(state.Has("stream_painted") and state.Delete("stream_painted"))
+		return
+	if (state["slots"].Length == 0) {
+		_LLM_Engine_ShowLoadingTooltip(true)
+		return
+	}
+	LLM_Engine_OnResults(state["slots"], state["ctx"], 1, false,
+		state["request_id"], state["semantic_signature"], state.Get("rewrite_edits", ""))
 }
 
 _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
@@ -1147,6 +1191,9 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 			state["dedup_stats"]["kept"] += 1
 	} else
 		_LLM_Engine_ArmRetry(state)
+	; The paint below replaces a streamed row with the finished slots.
+	if state.Has("stream_painted")
+		state.Delete("stream_painted")
 	; Paint the current accumulated slots so the user sees the new
 	; prediction land immediately, even if more variants are still in
 	; flight. Active = the first un-filled slot OR the last filled when
@@ -1168,12 +1215,13 @@ _LLM_Engine_OnVariantFail(state, failure := "") {
 		try LoggerInfo("LLM", "Variant failure ignored — superseded by newer typing.")
 		return
 	}
-	; Curl streaming is best-effort on Windows — fall back to WinHTTP async for
-	; the remaining attempts in this request when a stream dies empty.
+	; A failed stream falls back to the buffered request for the remaining
+	; attempts, and its row leaves the offer before the retry answers.
 	if (state.Has("streaming") and state["streaming"]) {
 		state["streaming"] := false
-		try LoggerInfo("LLM", "Streaming failed — retrying via WinHTTP async.")
+		try LoggerInfo("LLM", "Streaming failed — retrying without streaming.")
 	}
+	_LLM_Engine_WithdrawStream(state)
 	Reason := ""
 	if (failure is Map and failure.Has("message"))
 		Reason := failure["message"]

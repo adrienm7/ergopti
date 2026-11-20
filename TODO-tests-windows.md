@@ -133,8 +133,9 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
 
 ### AI
 
-- [ ] Live Ollama: token-by-token predictions display, then enable the row (PAR-12;
-      `platform_reason.token_streaming_unvalidated_on_windows`).
+- [ ] Live Ollama, « Afficher en streaming » on (PAR-12, enabled 2026-11-20): predictions grow token by token, the
+      row never shows TAIL_CORRECTED or NEXT_WORDS, Tab mid-stream types the row shown, and a stream killed mid-way
+      (stop Ollama) brings the spinner back before the buffered retry.
 - [ ] System Ollama on 11434, AI on: Ergopti's listens on 11435, the other is untouched (f016081056, 597cbbe983).
 - [ ] Ollama or oMLX on a non-default port with the process scan failing: still found.
 - [ ] Predictions stop on activity: with a slow model, type, pause, and during the spinner move the mouse by a few

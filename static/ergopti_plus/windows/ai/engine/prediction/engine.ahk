@@ -126,9 +126,10 @@ global LLM_ENGINE_DISPLAY_ONLY_CONFIG_KEYS := [
 ]
 
 LLM_BackendCapabilities(Backend) {
-	; Windows has no typed/reliable partial-frame transport yet. The same
-	; capability object drives both the menu and dispatch so an unsupported
-	; backend can never persist a checked control that runtime overrides.
+	; Ollama streams its JSONL frames through curl; the remote providers stay
+	; buffered, as on macOS and Linux. The same capability object drives both
+	; the menu and dispatch so an unsupported backend can never persist a
+	; checked control that runtime overrides.
 	return Map("streaming", LLM_DisplayStreamingCapable("ahk", Backend))
 }
 

@@ -4240,7 +4240,6 @@
 	"dialog.start_at_login.failed": "Could not change automatic startup. Check the system startup settings.",
 	"dialog.start_at_login.approval": "Allow Ergopti in the system startup settings, which have just opened. The option is checked once the system confirms it.",
 	"onboarding.error.open_failed": "The setup wizard could not open. Check the logs, then try Setup wizard in the menu.",
-	"platform_reason.token_streaming_unvalidated_on_windows": "Not on Windows yet: the token-by-token display has not been validated on Windows, so this option stays inactive.",
 	"menu.layout.number_row": "Number row",
 	"menu.layout.number_row_native": "Native order",
 	"menu.layout.number_row_digits": "Digits first",

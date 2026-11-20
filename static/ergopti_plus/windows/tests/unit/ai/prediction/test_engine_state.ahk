@@ -725,6 +725,132 @@ _RetryPolicy_NeverStreams() {
 
 Test("LLM engine: a retried attempt does not stream", _RetryPolicy_NeverStreams)
 
+; Records what the engine paints: the slot texts of each Show, and whether the
+; loading surface came back.
+class _LESP_Tooltip {
+	__New() {
+		this.Paints := []
+		this.Loadings := 0
+		this.Visible := false
+		this.Loading := false
+		this.Token := 0
+	}
+
+	SetDisplayOpts(Opts) {
+	}
+
+	Show(Slots, Active, IsFinal, Meta) {
+		Texts := []
+		for Slot in Slots
+			Texts.Push(IsObject(Slot) ? Slot.Text : Slot)
+		this.Paints.Push(Texts)
+		this.Visible := true, this.Loading := false
+		this.Token := { Slots: Slots }
+		return 1
+	}
+
+	ShowLoading(Meta) {
+		this.Loadings += 1
+		this.Visible := true, this.Loading := true
+		this.Token := { Slots: [] }
+	}
+
+	IsVisible() {
+		return this.Visible
+	}
+
+	IsLoading() {
+		return this.Loading
+	}
+
+	PresentedToken() {
+		return this.Token
+	}
+
+	Hide(Token) {
+		this.Visible := false, this.Loading := false
+		return true
+	}
+
+	MarkChainStart() {
+	}
+
+	MarkChainTiming(NowTick) {
+	}
+}
+
+; One streamed variant on the real engine with the tooltip port recorded.
+; Body(State, Stream, Tooltip): Stream holds the dispatched callbacks.
+_LESP_WithStream(Body) {
+	global _LLM_Engine
+	Saved := _LLM_Engine
+	_LLM_Engine := Saved.Clone()
+	Tooltip := _LESP_Tooltip()
+	Previous := LLM_Engine_SetPort("tooltip", Tooltip)
+	try {
+		_LLM_Engine["request_id"] := 44
+		_LLM_Engine["active_request_signature"] := "stream-parse"
+		_LLM_Engine[ConfigLeaf.INLINE_AUTOTYPE] := false
+		Streams := []
+		Ctx := "Ce matin je suis allé au"
+		State := Map("request_id", 44, "semantic_signature", "stream-parse", "streaming", true,
+			"attempt_index", 1, "max_attempts", 4, "model", "fixture", "slots", [], "requested", 1,
+			"dispatch_fn", (Temp, OnSuccess, OnFail, Tokens := 0) => 0,
+			"dispatch_stream_fn", (Temp, OnPartial, OnSuccess, OnFail) => Streams.Push(
+				Map("partial", OnPartial, "success", OnSuccess, "fail", OnFail)),
+			"call_tokens", 40, "base_temp", 0.4, "ctx", Ctx, "ctx_tail", Ctx,
+			ConfigLeaf.MIN_WORDS, 1, ConfigLeaf.MAX_WORDS, 15, "is_batch", false,
+			"dedup_stats", LLM_ApiCommon_NewDedupStats(), "rewrite_edits", Map(),
+			"show_all_at_once", false)
+		_LLM_Engine_DispatchVariant(State)
+		AssertEqual(1, Streams.Length, "the first variant streams")
+		Body(State, Streams[1], Tooltip)
+	} finally {
+		LLM_Engine_SetPort("tooltip", Previous)
+		_LLM_Engine := Saved
+	}
+}
+
+; A streamed partial is offered as the parser reads it, as on macOS and Linux:
+; the old engine showed the model's raw TAIL_CORRECTED / NEXT_WORDS lines, and
+; Tab typed them.
+_StreamPartial_IsParsed() {
+	_LESP_WithStream(_Body)
+	_Body(State, Stream, Tooltip) {
+		Raw := "TAIL_CORRECTED: Ce matin je suis allé au`nNEXT_WORDS: marché acheter"
+		Expected := LLM_Parser_ParseResponse(Raw, State["ctx"], State["ctx_tail"], 1, 15, false, 1)
+		AssertEqual(1, Expected.Length, "the fixture partial parses into one prediction")
+		Stream["partial"].Call("<think>plan")
+		AssertEqual(0, Tooltip.Paints.Length, "an unclosed thinking block shows nothing")
+		Stream["partial"].Call(Raw)
+		AssertEqual(1, Tooltip.Paints.Length, "a readable partial is painted once")
+		Shown := Tooltip.Paints[1]
+		AssertEqual(1, Shown.Length)
+		AssertEqual(Expected[1], Shown[1], "the row is what accepting the partial types")
+		AssertFalse(InStr(Shown[1], "NEXT_WORDS") || InStr(Shown[1], "TAIL_CORRECTED"),
+			"no format tag reaches the row")
+	}
+}
+Test("LLM engine: a streamed partial is shown as the parser reads it (streaming-parity)",
+	_StreamPartial_IsParsed)
+
+; A failed stream's row leaves the offer before the retry answers (macOS
+; AIM-001): the old engine left it on screen, acceptable, until the retry.
+_StreamPartial_FailureWithdrawsRow() {
+	_LESP_WithStream(_Body)
+	_Body(State, Stream, Tooltip) {
+		Stream["partial"].Call("marché acheter du pain")
+		AssertEqual(1, Tooltip.Paints.Length)
+		Loadings := Tooltip.Loadings
+		Stream["fail"].Call("http 500")
+		AssertTrue(Tooltip.Loading, "with no finished slot the loading surface comes back")
+		AssertEqual(Loadings + 1, Tooltip.Loadings)
+		AssertFalse(State["streaming"], "the retry is buffered")
+	}
+}
+Test("LLM engine: a failed stream withdraws its row before the retry (streaming-parity)",
+	_StreamPartial_FailureWithdrawsRow)
+
 ; ===================================================
 ; ===================================================
 ; ======= 11/ Tooltip Placeholders ==================

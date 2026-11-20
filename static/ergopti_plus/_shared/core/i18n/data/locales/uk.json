@@ -4240,7 +4240,6 @@
 	"dialog.start_at_login.failed": "Не вдалося змінити автозапуск. Перевірте налаштування автозапуску системи.",
 	"dialog.start_at_login.approval": "Дозвольте Ergopti в щойно відкритих налаштуваннях автозапуску системи. Параметр буде позначено, щойно система його підтвердить.",
 	"onboarding.error.open_failed": "Не вдалося відкрити майстер налаштування. Перевірте журнали та повторіть спробу через меню.",
-	"platform_reason.token_streaming_unvalidated_on_windows": "Поки не в Windows: показ токен за токеном не перевірено у Windows, тому цей параметр залишається неактивним.",
 	"menu.layout.number_row": "Цифровий ряд",
 	"menu.layout.number_row_native": "Системний порядок",
 	"menu.layout.number_row_digits": "Спочатку цифри",

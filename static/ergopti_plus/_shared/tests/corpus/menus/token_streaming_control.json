@@ -138,7 +138,7 @@
 		{
 			"platform": "ahk",
 			"backend": "ollama",
-			"capable": false
+			"capable": true
 		},
 		{
 			"platform": "ahk",

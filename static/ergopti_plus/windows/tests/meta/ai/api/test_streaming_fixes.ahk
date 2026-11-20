@@ -190,8 +190,8 @@ _AHK011_EffectiveStreamingOwnsEveryWindowsBoundary() {
 		AssertEqual("llm_token_streaming_enabled", Row["checked_when"][1])
 		AssertEqual(1, Row["disabled_when"].Length)
 		AssertEqual("llm_token_streaming_ready", Row["disabled_when"][1])
-		AssertEqual("grey", Row["unavailable"])
-		AssertEqual("platform_reason.token_streaming_unvalidated_on_windows", Row["reason_key"])
+		AssertFalse(Row.Has("platforms") || Row.Has("reason_key"),
+			"token streaming is offered on every platform, Windows included")
 	}
 	AssertEqual(1, Matches, "exactly one authoritative shared declaration owns the visible streaming row")
 	DispatchBody := _DriverFuncBody("LLM_Engine_FirePrediction")

@@ -178,7 +178,9 @@ _TLTSH_RequestSourceIsBoundAndPublished() {
 		"_LLM_Engine_DispatchVariant",
 			'LLM_Engine_OnResults(preview_slots, state["ctx"], active_idx, false, state["request_id"], state["semantic_signature"], state.Get("rewrite_edits", ""))',
 		"_LLM_Engine_OnStreamPartial",
-			'LLM_Engine_OnResults(preview, state["ctx"], slot_idx, false, state["request_id"], state["semantic_signature"])',
+			'LLM_Engine_OnResults(preview, state["ctx"], slot_idx, false, state["request_id"], state["semantic_signature"], render_edits)',
+		"_LLM_Engine_WithdrawStream",
+			'LLM_Engine_OnResults(state["slots"], state["ctx"], 1, false, state["request_id"], state["semantic_signature"], state.Get("rewrite_edits", ""))',
 		"_LLM_Engine_OnVariantSuccess",
 			'LLM_Engine_OnResults(state["slots"], state["ctx"], active_idx, false, state["request_id"], state["semantic_signature"], state.Get("rewrite_edits", ""))',
 		"_LLM_Engine_FinalizeRequest",
@@ -229,8 +231,8 @@ _TLTSH_RequestSourceIsBoundAndPublished() {
 	AssertEqual(2, _TLTSH_Count(DriverSrc,
 		"LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)"),
 		"both FirePrediction retry bindings must carry the prompt override, or a retried prompt action runs the menu's prompt")
-	AssertEqual(7, _TLTSH_Count(DriverSrc, "LLM_Engine_OnResults("),
-		"OnResults must have one definition plus exactly the six enumerated request-owned render call sites")
+	AssertEqual(8, _TLTSH_Count(DriverSrc, "LLM_Engine_OnResults("),
+		"OnResults must have one definition plus exactly the seven enumerated request-owned render call sites")
 }
 
 Test("LLM accept meta: request-bound HWND/control is published by the actual render (AHK-05)",

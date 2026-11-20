@@ -116,11 +116,11 @@ _AHK011_EngineInitPublishesEffectiveStreaming() {
 	SavedEngine := _LLM_Engine
 	_LLM_Engine := SavedEngine.Clone()
 	try {
-		for Backend in ["ollama", "api"] {
+		for Backend, Capable in Map("ollama", true, "api", false) {
 			LLM_Engine_Init(Map("backend", Backend, "streaming", true))
-			AssertFalse(_LLM_Engine["streaming"],
-				Backend . " must not publish an enabled runtime setting while its "
-				. "backend has no supported streaming transport")
+			AssertEqual(Capable, _LLM_Engine["streaming"],
+				Backend . " publishes enabled streaming exactly when its backend "
+				. "has a streaming transport")
 		}
 	} finally {
 		_LLM_Engine := SavedEngine

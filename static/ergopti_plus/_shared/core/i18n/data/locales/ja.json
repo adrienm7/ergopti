@@ -4240,7 +4240,6 @@
 	"dialog.start_at_login.failed": "自動起動を変更できませんでした。システムの起動設定を確認してください。",
 	"dialog.start_at_login.approval": "開いたシステムの起動設定で Ergopti を許可してください。システムが確認すると、このオプションにチェックが付きます。",
 	"onboarding.error.open_failed": "設定ウィザードを開けませんでした。ログを確認し、メニューから再試行してください。",
-	"platform_reason.token_streaming_unvalidated_on_windows": "Windows ではまだ非対応: トークンごとの表示は Windows で検証されていないため、このオプションは無効のままです。",
 	"menu.layout.number_row": "数字列",
 	"menu.layout.number_row_native": "システムの順序",
 	"menu.layout.number_row_digits": "数字を優先",

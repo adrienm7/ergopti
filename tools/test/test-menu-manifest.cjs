@@ -1209,9 +1209,6 @@ function checkTokenStreamingControl() {
 		type: 'check',
 		id: corpus.row.id,
 		i18n: corpus.row.i18n,
-		platforms: ['hs', 'linux'],
-		unavailable: 'grey',
-		reason_key: 'platform_reason.token_streaming_unvalidated_on_windows',
 		checked_when: ['llm_token_streaming_enabled'],
 		disabled_when: ['llm_token_streaming_ready']
 	});
@@ -1237,7 +1234,7 @@ function checkTokenStreamingControl() {
 		);
 	}
 	console.log(
-		'Token streaming control: exact shared row, platform refusal and three actual consumers qualified.'
+		'Token streaming control: exact shared row on every platform and three actual consumers qualified.'
 	);
 }
 

@@ -4240,7 +4240,6 @@
 	"dialog.start_at_login.failed": "Automatické spouštění se nepodařilo změnit. Zkontrolujte nastavení spouštění systému.",
 	"dialog.start_at_login.approval": "Povolte Ergopti v právě otevřeném nastavení spouštění systému. Volba se zaškrtne, jakmile ji systém potvrdí.",
 	"onboarding.error.open_failed": "Průvodce nastavením se nepodařilo otevřít. Zkontrolujte protokoly a zkuste to znovu z nabídky.",
-	"platform_reason.token_streaming_unvalidated_on_windows": "Zatím ne ve Windows: zobrazování po jednotlivých tokenech nebylo ve Windows ověřeno, proto tato možnost zůstává neaktivní.",
 	"menu.layout.number_row": "Číselná řada",
 	"menu.layout.number_row_native": "Nativní pořadí",
 	"menu.layout.number_row_digits": "Nejprve číslice",

@@ -432,10 +432,16 @@ assert.throws(
 	/Missing action reason/
 );
 
+// A row every driver shows, greyed on one: the gap tables must list it.
 const changedMenu = structuredClone(inventoryMenu);
-changedMenu.llm_display_menu
-	.find((item) => item.id === 'llm_token_streaming')
-	.platforms.push('ahk');
+Object.assign(
+	changedMenu.llm_display_menu.find((item) => item.id === 'llm_token_streaming'),
+	{
+		platforms: ['hs', 'linux'],
+		unavailable: 'grey',
+		reason_key: 'platform_reason.input_probe_is_autohotkey_specific'
+	}
+);
 const expandedMenuInventory = inventory.render(
 	inventoryModel,
 	inventoryLocales,

@@ -4240,7 +4240,6 @@
 	"dialog.start_at_login.failed": "Der automatische Start konnte nicht geändert werden. Prüfen Sie die Autostart-Einstellungen des Systems.",
 	"dialog.start_at_login.approval": "Erlauben Sie Ergopti in den soeben geöffneten Starteinstellungen des Systems. Die Option wird abgehakt, sobald das System sie bestätigt.",
 	"onboarding.error.open_failed": "Der Einrichtungsassistent konnte nicht geöffnet werden. Prüfen Sie die Protokolle und versuchen Sie es erneut über das Menü.",
-	"platform_reason.token_streaming_unvalidated_on_windows": "Noch nicht unter Windows: Die Token-für-Token-Anzeige wurde unter Windows noch nicht validiert, daher bleibt diese Option inaktiv.",
 	"menu.layout.number_row": "Ziffernreihe",
 	"menu.layout.number_row_native": "Native Reihenfolge",
 	"menu.layout.number_row_digits": "Ziffern zuerst",

@@ -399,11 +399,16 @@ _LMT_StreamingPolicyContract() {
 }
 Test("LLM display: shared token streaming replays independent capabilities and stale intents", _LMT_StreamingPolicyContract)
 
-_LMT_StreamingNativeRefusal() {
-	global _LLM_Menu, _LMT_WriterCalls, _LMT_ApplyCalls
+; Ollama streams on Windows as on macOS and Linux: its row is live and reaches
+; the acknowledged command; a buffered backend greys it and cannot.
+_LMT_StreamingNativeRow() {
+	global _LLM_Menu, _LLM_Engine, _LMT_WriterCalls, _LMT_ApplyCalls
 	Previous := _LMT_InstallFixture()
 	SavedSuspend := A_IsSuspended
+	HadEngine := IsSet(_LLM_Engine)
+	SavedEngine := HadEngine ? _LLM_Engine : 0
 	try {
+		Suspend(false)
 		Corpus := _LMT_StreamingCorpus()
 		Definitions := _MR_GetManifestRoot()["llm_display_menu"]
 		StreamingRow := 0
@@ -412,52 +417,65 @@ _LMT_StreamingNativeRefusal() {
 				StreamingRow := Definition
 		}
 		Assert(StreamingRow is Map, "the actual shared declaration must own the streaming row")
-		AssertEqual("grey", StreamingRow["unavailable"])
-		AssertEqual("platform_reason.token_streaming_unvalidated_on_windows", StreamingRow["reason_key"])
+		AssertFalse(StreamingRow.Has("platforms") || StreamingRow.Has("reason_key"),
+			"the shared row is declared for every platform")
 		for Backend in ["ollama", "api", "mlx"] {
+			Capable := Backend == "ollama"
+			_LLM_Menu := _LLM_Menu.Clone()
 			_LLM_Menu["backend"] := Backend
 			_LLM_Menu["enabled"] := true
 			_LLM_Menu["streaming"] := true
 			_LLM_Menu["show_all_at_once"] := false
+			_LLM_Engine := Map("backend", Backend, "enabled", true)
 			State := Map("calls", 0)
-			Command := (*) => State["calls"] += 1
+			Command := _LMT_StreamingCountCommand.Bind(State)
+			AssertEqual(Capable, LLM_BackendCapabilities(Backend)["streaming"],
+				Backend . ": only Ollama has a partial-frame transport")
+			AssertEqual(Capable, LLM_EffectiveStreaming(Backend, true),
+				Backend . ": dispatch streams exactly where the menu offers it")
 			Expected := _LLM_Menu_StreamingSnapshot()
-			AssertFalse(LLM_BackendCapabilities(Backend)["streaming"], "Windows has no partial-frame transport")
-			AssertFalse(_LLM_Menu_StreamingCommand(Expected, Command), "an unsupported click cannot reach a writer")
-			Suspend(true)
-			AssertFalse(_LLM_Menu_StreamingCommand(Expected, Command), "a retained click remains refused under native pause")
-			Suspend(SavedSuspend)
-			_LLM_Menu := _LLM_Menu.Clone()
-			AssertFalse(_LLM_Menu_StreamingCommand(Expected, Command), "an old row cannot claim a replacement map owner")
-			AssertEqual(0, State["calls"])
-			AssertEqual(0, _LMT_WriterCalls)
-			AssertEqual(0, _LMT_ApplyCalls)
-			AssertTrue(_LLM_Menu["streaming"], "unavailable native rendering does not strip historical stored intent")
+			AssertEqual(Capable, LLM_DisplayStreamingReady(Expected), Backend . ": shared admission")
 			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle, Command)
 			try {
-				Count := DllCall("GetMenuItemCount", "ptr", Built.Handle, "int")
 				Matches := 0
-				Loop Count {
+				Loop DllCall("GetMenuItemCount", "ptr", Built.Handle, "int") {
 					Position := A_Index - 1
-					Label := _CTC_LabelAt(Built, Position)
-					if InStr(Label, t(Corpus["row"]["i18n"])) == 1 {
-						Matches += 1
-						Assert(Label != t(Corpus["row"]["i18n"]), "the disabled native row explains why it cannot stream")
-						AssertContains(Label, "Windows")
-						NativeState := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
-						Assert(NativeState & 0x3, "the real Win32 row is greyed")
-						AssertFalse(_CTC_IsChecked(Built, Position), "a buffered transport never reports effective token streaming")
-					}
+					if InStr(_CTC_LabelAt(Built, Position), t(Corpus["row"]["i18n"])) != 1
+						continue
+					Matches += 1
+					NativeState := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
+					AssertEqual(Capable, !(NativeState & 0x3), Backend . ": the real Win32 row is live only where it streams")
+					AssertEqual(Capable, _CTC_IsChecked(Built, Position),
+						Backend . ": the check shows the effective streaming")
 				}
 				AssertEqual(1, Matches, "the native menu projects exactly one shared streaming declaration")
 			} finally _CTC_ReleaseMenu(Built)
+			AssertEqual(Capable, _LLM_Menu_StreamingCommand(Expected, Command),
+				Backend . ": the click reaches the setting owner only where it streams")
+			AssertEqual(Capable ? 1 : 0, State["calls"])
+			if Capable {
+				Suspend(true)
+				AssertTrue(_LLM_Menu_StreamingCommand(Expected, Command), "a pause stops typing, not configuration")
+				Suspend(false)
+				AssertEqual(2, State["calls"])
+				_LLM_Menu := _LLM_Menu.Clone()
+				AssertFalse(_LLM_Menu_StreamingCommand(Expected, Command), "an old row cannot claim a replacement map owner")
+				AssertEqual(2, State["calls"])
+			}
+			AssertTrue(_LLM_Menu["streaming"], "rendering never strips the stored intent")
+			AssertEqual(0, _LMT_WriterCalls)
+			AssertEqual(0, _LMT_ApplyCalls)
 		}
 	} finally {
 		Suspend(SavedSuspend)
+		if HadEngine
+			_LLM_Engine := SavedEngine
+		else
+			_LLM_Engine := unset
 		_LMT_RestoreFixture(Previous)
 	}
 }
-Test("LLM display: the real Windows streaming row remains truthful and cannot reach a writer", _LMT_StreamingNativeRefusal)
+Test("LLM display: the real Windows streaming row is live for Ollama and refused for buffered backends", _LMT_StreamingNativeRow)
 
 
 _LMT_StreamingCountCommand(State) {
@@ -515,7 +533,8 @@ _LMT_StreamingSparseOwnerRefusal() {
 						Matches += 1
 						NativeState := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
 						Assert(NativeState & 0x3, Vector["id"] . ": the actual Win32 row remains disabled")
-						AssertFalse(_CTC_IsChecked(Built, Position))
+						AssertTrue(_CTC_IsChecked(Built, Position),
+							Vector["id"] . ": the greyed check still shows the stored Ollama streaming, as on macOS and Linux")
 					}
 				}
 				AssertEqual(1, Matches, Vector["id"] . ": the shared declaration remains visible exactly once")

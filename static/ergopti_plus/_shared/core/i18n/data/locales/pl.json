@@ -4240,7 +4240,6 @@
 	"dialog.start_at_login.failed": "Nie udało się zmienić automatycznego uruchamiania. Sprawdź ustawienia uruchamiania systemu.",
 	"dialog.start_at_login.approval": "Zezwól na Ergopti w właśnie otwartych ustawieniach uruchamiania systemu. Opcja zostanie zaznaczona, gdy system ją potwierdzi.",
 	"onboarding.error.open_failed": "Nie udało się otworzyć kreatora konfiguracji. Sprawdź dzienniki i spróbuj ponownie z menu.",
-	"platform_reason.token_streaming_unvalidated_on_windows": "Jeszcze nie w Windows: wyświetlanie token po tokenie nie zostało zweryfikowane w Windows, więc ta opcja pozostaje nieaktywna.",
 	"menu.layout.number_row": "Rząd cyfr",
 	"menu.layout.number_row_native": "Kolejność systemowa",
 	"menu.layout.number_row_digits": "Najpierw cyfry",
