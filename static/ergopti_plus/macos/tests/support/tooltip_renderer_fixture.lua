@@ -37,6 +37,8 @@ local OWNERS = {
 	"platform.input.keycodes.key_names", "platform.input.keycodes.key_names_data", "core.text.engine.table_util",
 	-- The configuration resolves tint colors through the shared CSS hex parser.
 	"core.ui.engine.color_hex",
+	-- The renderer validates each row's category glyph through the shared owner.
+	"hotstrings.engine.category_glyph",
 	-- text_utils builds its case tables from this generated data at require time.
 	"core.text.engine.unicode_case.data",
 }
