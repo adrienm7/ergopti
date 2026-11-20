@@ -5,9 +5,9 @@
  * MODULE: Ollama Release Pin Parity
  * DESCRIPTION:
  * One Ollama release is pinned for every driver: ollama_release.json owns the
- * official archives (Windows and Linux read it at runtime, macOS through its
- * generated shell projection) and managed_ollama_runtime.json owns the source
- * the macOS native HTTP build patches. Both must name the same release.
+ * official archives (Windows and Linux read it at runtime) and
+ * managed_ollama_runtime.json owns the source the macOS native HTTP build
+ * patches. Both must name the same release.
  *
  * ROOT CAUSE ENCODED:
  * Ollama 0.24.0 cannot pull qwen3.5 models. Ollama 0.40.4 deleted
@@ -17,6 +17,9 @@
  * or a producer that still named a removed seam, would keep pulling with the
  * old runtime or fail the native build. The native wrapper bypasses the checked
  * dialer, so the producer must route both transfer seams through WrapChecked.
+ * A generated macOS shell copy of the pin (ollama-release.sh) was read by
+ * nothing and claimed the size only drove a progress bar, while every driver
+ * refuses a wrong size; it was retired with its generator (OLL-12).
  * ==============================================================================
  */
 
@@ -26,7 +29,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const releaseGenerator = require('../codegen/codegen-ollama-release.cjs');
+const generators = require('../build/generators.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SELF = 'tools/test/test-ollama-release-pin-parity.cjs';
@@ -115,10 +118,13 @@ check('the macOS native source contract names the same release and tag commit', 
 	assert.equal(runtime.source_commit, PINNED.source_commit);
 });
 
-check('the macOS shell projection is regenerated from the catalogue', () => {
-	assert.deepEqual(releaseGenerator.generate(ROOT, { check: true }), [
-		releaseGenerator.MACOS_OUTPUT
-	]);
+check('no unread projection of the catalogue is generated (oll-12)', () => {
+	const retired = 'static/ergopti_plus/macos/ai/engine/ollama/ollama-release.sh';
+	assert.equal(fs.existsSync(path.join(ROOT, retired)), false, retired);
+	assert.equal(fs.existsSync(path.join(ROOT, 'tools/codegen/codegen-ollama-release.cjs')), false);
+	const outputs = generators.GENERATORS.flatMap((generator) => generator.outputs);
+	assert.ok(outputs.length > 10, 'the generator inventory must be read');
+	assert.equal(outputs.includes(retired), false, retired);
 });
 
 check('Windows and Linux read the catalogue at runtime instead of a copy', () => {
