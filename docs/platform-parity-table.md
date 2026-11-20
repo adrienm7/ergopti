@@ -15,11 +15,8 @@ The gate checks that every non-supported cell has a reason key present in the 21
 | OS      | Supported | Degraded | Unavailable |
 | ------- | --------: | -------: | ----------: |
 | Windows |       832 |        0 |         295 |
-| macOS   |       952 |        0 |         175 |
+| macOS   |       951 |        1 |         175 |
 | Linux   |       883 |        2 |         242 |
-| Windows |       828 |        0 |         295 |
-| macOS   |       947 |        1 |         175 |
-| Linux   |       879 |        2 |         242 |
 
 | Reason class                                                                              | Unavailable or degraded cells |
 | ----------------------------------------------------------------------------------------- | ----------------------------: |
