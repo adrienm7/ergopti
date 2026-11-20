@@ -752,7 +752,7 @@ more`, macOS and WebKit) does not switch the Studio frames to the black-and-yell
     2. Leave each OS's menu as it is.
 - [ ] **Ctrl+★ extra modifiers (BND-1, BND-2, 2026-11-17 pass).** macOS has `cmd_star` (Cmd+★ to Cmd+S, extra
       modifiers kept); `layout.ctrl_magic_save` sends a bare Ctrl+S for Ctrl alone on Windows and, since
-      2026-11-20, on Linux (`modules/keymap/ctrl_magic_save.lua`, reason
+      2026-11-20, on Linux (`modules/shortcuts/ctrl_magic_save.lua`, reason
       `platform_reason.ctrl_magic_save_is_cmd_star_on_macos`). Kept meanwhile: Ctrl alone on both. 1.
       **(recommended)** Keep extra modifiers on Windows and Linux as macOS does (Ctrl+Shift+★ to Ctrl+Shift+S)
       ([CODE]). 2. Keep Ctrl alone.

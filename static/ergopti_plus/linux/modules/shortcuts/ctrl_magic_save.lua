@@ -1,4 +1,4 @@
---- modules/keymap/ctrl_magic_save.lua
+--- modules/shortcuts/ctrl_magic_save.lua
 
 --- ==============================================================================
 --- MODULE: Ctrl + Magic Key Saves (Linux)
@@ -34,7 +34,7 @@ local Codec = require("core.text.engine.toml_codec")
 local ConfigOutdated = require("settings.engine.migration.outdated")
 local ConfigKeys = require("settings.engine.keys")
 
-local LOG = "modules.keymap.ctrl_magic_save"
+local LOG = "modules.shortcuts.ctrl_magic_save"
 
 -- The configuration path of the switch, and the chord it sends.
 M.PATH = ConfigKeys.KEY.LAYOUT_CTRL_MAGIC_SAVE

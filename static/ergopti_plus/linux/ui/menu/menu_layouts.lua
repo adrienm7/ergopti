@@ -130,8 +130,8 @@ local function _build_layouts(ctx)
 		local path = "layout.emulate_" .. row
 		render_ctx.feature_rows[path] = function() return switch_rows(path, "menu.layout.emulate_" .. row) end
 	end
-	-- Ctrl + magic key saves (modules/keymap/ctrl_magic_save.lua), as on Windows.
-	local CtrlMagicSave = require("modules.keymap.ctrl_magic_save")
+	-- Ctrl + magic key saves (modules/shortcuts/ctrl_magic_save.lua), as on Windows.
+	local CtrlMagicSave = require("modules.shortcuts.ctrl_magic_save")
 	render_ctx.feature_rows[CtrlMagicSave.PATH] = function()
 		local enabled = CtrlMagicSave.enabled()
 		if enabled == nil then error("config.toml is unreadable", 0) end

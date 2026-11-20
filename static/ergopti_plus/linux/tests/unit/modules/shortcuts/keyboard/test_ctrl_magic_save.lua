@@ -1,4 +1,4 @@
---- tests/unit/modules/keymap/test_ctrl_magic_save.lua
+--- tests/unit/modules/shortcuts/keyboard/test_ctrl_magic_save.lua
 
 --- ==============================================================================
 --- MODULE: Ctrl + Magic Key Saves (Linux)
@@ -18,8 +18,8 @@ local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 local PLAIN = { [46] = "★", [31] = "s" }
 
 local function fresh()
-	package.loaded["modules.keymap.ctrl_magic_save"] = nil
-	return require("modules.keymap.ctrl_magic_save")
+	package.loaded["modules.shortcuts.ctrl_magic_save"] = nil
+	return require("modules.shortcuts.ctrl_magic_save")
 end
 
 --- The hook's ports, with the switch on, the automatic source and ★ as the magic key.

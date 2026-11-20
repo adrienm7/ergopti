@@ -2826,7 +2826,7 @@ local function main()
 		-- Ctrl alone on the layout's own magic key saves ([layout] ctrl_magic_save),
 		-- while the magic key is replaced, as the Windows hotkey. Required inline:
 		-- main() sits at LuaJIT's upvalue limit.
-		local saved, saved_repeat = require("modules.keymap.ctrl_magic_save").on_key(detail, {
+		local saved, saved_repeat = require("modules.shortcuts.ctrl_magic_save").on_key(detail, {
 			active = function()
 				return not opts.dry_run and not script_actions.is_paused() and input_capture_gate.blocks_text() ~= true
 					and require("hotstrings.engine.catalogue.config").is_section_enabled("magickey", "replace")
