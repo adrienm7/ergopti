@@ -32,7 +32,7 @@ _ACBF_Endpoint() {
 	return InStr(_ACBF_Mode, "string-") ? (_ACBF_Value ? "1" : "0") : _ACBF_Value
 }
 
-SFD_IsSecureField() => _ACBF_Endpoint()
+SFD_IsSecureField(KnownFocusedHwnd := unset) => _ACBF_Endpoint()
 NI_IsInternetReachable() => _ACBF_Endpoint()
 NI_IsVpnActive() => _ACBF_Endpoint()
 KS_IsDown(KeyName) => _ACBF_Endpoint()
