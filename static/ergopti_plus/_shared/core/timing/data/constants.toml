@@ -135,8 +135,11 @@ api_key_migration_retry_ms = 60000
 api_key_migration_retry_max_ms = 1800000
 
 # Hard ceiling for dependency bootstrap installation and daemon polling.
-# AHK: ollama_deps_checker.ahk LLM_DEPS_POLL_TIMEOUT_MS.
-# HS: mlx_deps_checker.lua / ollama_deps_checker.lua BOOTSTRAP_TIMEOUT_SEC.
+# AHK: ai/engine/ollama/deps_checker.ahk LLM_DEPS_POLL_TIMEOUT_MS (the install
+# and start of the managed runtime; its model pull has
+# ollama_model_pull_timeout_ms). HS: ai/engine/local_servers/mlx_deps_checker.lua,
+# ai/engine/ollama/deps_checker.lua BOOTSTRAP_TIMEOUT_SEC.
+# LX: ai/engine/local_servers/runtime_composition.lua.
 dependency_bootstrap_timeout_ms = 1800000
 
 # Longest wait for the desktop's proxy answer (a company PAC is downloaded and
@@ -155,7 +158,8 @@ managed_proxy_probe_timeout_ms = 1000
 poll_interval_ms = 50
 
 # How often a managed Ollama model pull's percentage is read for the model
-# selector page. AHK: ollama_managed_bootstrap.ahk (the pull's capture tail).
+# selector page. AHK: ai/engine/ollama/managed_bootstrap.ahk (the pull's
+# capture tail). macOS and Linux read the pull's streamed progress instead.
 pull_progress_poll_ms = 1000
 
 # Ceiling of one managed Ollama model pull, from its dispatch, apart from the
@@ -1083,8 +1087,13 @@ hs_reload_debounce_ms = 500
 # HS: platform/remap/init.lua FIRST_RUN_WIZARD_DELAY_SEC.
 onboarding_startup_delay_ms = 2000
 
-# LLM deps checker: Ollama poll interval (readiness probe loop).
-# AHK: ollama_deps_checker.ahk 3000 ms SetTimer.
+# Linux: the interval between two GET /api/version readiness probes of the
+# managed Ollama daemon it just started; each probe is a spawned HTTP client,
+# bounded by [llm] local_server_probe_timeout_ms, until the install budget.
+# LX: ai/engine/local_servers/runtime_composition.lua (_shared/ai/engine/local_servers/runtime_repair.lua).
+# Windows needs no HTTP poll: its launcher watches its own child's loopback
+# listener, then probes once (ai/engine/ollama/ollama-runtime-launch.ps1). macOS
+# waits for the listener event of its native worker (managed_ollama_serve.py).
 ollama_deps_poll_ms = 3000
 
 # Hard deadline for a user-requested quit (menubar Quit, script_quit gesture).

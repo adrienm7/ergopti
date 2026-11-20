@@ -232,8 +232,10 @@ archive kept in `build/macos-dev-ollama/` against its pinned digest. Copying a
 published catalogue instead failed for every unreleased version (field run
 2026-10-28, v1.0.7): never make the developer app depend on a publication. A
 build is reused while the contract and every fingerprinted source still match.
-An owned runtime installed from one build is refused, never replaced, after
-those sources change and rebuild: remove
+After those sources change and rebuild, an intact runtime an earlier build
+installed is exchanged for the new one, since its own receipt proves what
+Ergopti put there (`earlier_owned_install`, `managed_ollama_runtime.py`); a
+folder that receipt does not vouch for is refused, never displaced: remove
 `~/Library/Application Support/Ergopti/ollama-native-http` to reinstall.
 Windows and Linux pin the official Ollama in the
 committed `ollama_release.json`, so their source modes never lack a catalogue.
