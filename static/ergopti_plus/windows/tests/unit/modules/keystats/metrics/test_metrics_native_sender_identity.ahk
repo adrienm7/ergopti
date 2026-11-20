@@ -43,7 +43,19 @@ _MVSP_AwaitSettled(Handle, State, BudgetMs) {
 	}
 	return "no completion within " . BudgetMs . " ms; the child "
 		. (RootExited ? "had exited and a descendant kept its Job alive" : "was still running")
-		. "; it wrote: " . (State.Calls ? State.ErrorText . State.Output : Tail)
+		. "; it wrote: " . _MVSP_Cause(State.Calls ? State.ErrorText . "`n" . State.Output : Tail)
+}
+
+; What a child wrote besides its receipt: the receipt is long and a failure
+; message is cut short, so the cause must come first and alone.
+; @param Text {String} The child's captured output.
+; @returns {String} Its non-receipt lines, joined by " | ".
+_MVSP_Cause(Text) {
+	Cause := ""
+	for Line in StrSplit(Text, "`n", "`r")
+		if Line != "" && InStr(Line, "RECEIPT ") != 1
+			Cause .= (Cause == "" ? "" : " | ") . Line
+	return Cause
 }
 
 ; A child that writes its cause and exits while its descendant lives on is
@@ -91,7 +103,12 @@ _MVSP_NativeSender(Mode := "") {
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, Args, _MVSP_Complete.Bind(State))
 		AssertTrue(Handle.start(), "the exact native WebView child must start")
 		NativePid := Handle.processId()
-		Unsettled := _MVSP_AwaitSettled(Handle, State, 60000)
+		; The child's 30 s prerequisite deadline, then up to 40 s each for the
+		; browser exit and the profile deletion on a saturated runner.
+		Unsettled := _MVSP_AwaitSettled(Handle, State, 150000)
+		for Line in StrSplit(Unsettled, "`n", "`r")
+			if Line != ""
+				_TestPrint("# native-webview-sender unsettled: " . Line)
 		AssertEqual("", Unsettled, "the owned native child did not settle")
 		AssertEqual(1, State.Calls, "the owned native child did not settle: " . State.ErrorText . State.Output)
 		Receipts := []
@@ -99,7 +116,12 @@ _MVSP_NativeSender(Mode := "") {
 			if InStr(Line, "RECEIPT ") == 1 {
 				_TestPrint("# native-webview-sender " . Line)
 				Receipts.Push(JsonParse(SubStr(Line, 9)))
-			}
+			} else if Line != ""
+				; An assertion message is cut short; the child's own cause is not.
+				_TestPrint("# native-webview-sender child: " . Line)
+		for Line in StrSplit(State.ErrorText, "`n", "`r")
+			if Line != ""
+				_TestPrint("# native-webview-sender child: " . Line)
 		AssertEqual(1, Receipts.Length, "native creation/source/COM prerequisites failed before a causal receipt: " . State.ErrorText . State.Output)
 		Receipt := Receipts[1]
 		AssertEqual(NativePid, Receipt["child_pid"], "the receipt must belong to the actual supervised child")
@@ -109,7 +131,8 @@ _MVSP_NativeSender(Mode := "") {
 		AssertEqual(A_AhkVersion, Receipt["runtime_version"])
 		for Key in ["core_identity_equal", "iunknown_identity_equal", "native_source_equal", "current_epoch",
 			"same_entry", "not_suspended", "browser_retired", "profile_retired"]
-			AssertTrue(Receipt[Key], "the real callback prerequisite or physical retirement was not proved: " . Key)
+			AssertTrue(Receipt[Key], "the real callback prerequisite or physical retirement was not proved: " . Key
+				. "; the child wrote: " . _MVSP_Cause(State.ErrorText . "`n" . State.Output))
 		if Mode == "other-core" {
 			for Key in ["other_callback_identity_equal", "other_identity_distinct", "other_same_url",
 				"other_current_entry", "other_not_suspended", "shared_browser_process", "other_controller_closed"]
