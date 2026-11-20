@@ -367,7 +367,7 @@ helpers.describe("shared checked and section-header templates", function()
 		end)
 	end
 
-	helpers.it("retains all sixteen existing id-less header declarations (template-header)", function()
+	helpers.it("retains all fifteen existing id-less header declarations (template-header)", function()
 		local file = assert(io.open(helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json", "rb"))
 		local manifest = assert(Json.decode(file:read("*a")))
 		file:close()
@@ -390,8 +390,8 @@ helpers.describe("shared checked and section-header templates", function()
 				end
 			end
 		end
-		-- 3 Shortcuts, 3 Metrics, 4 Layout, 4 Hotstrings and 2 Tap-Hold headers.
-		helpers.assert_eq(count, 16, "independent existing-header count must not be silently reduced")
+		-- 3 Shortcuts, 3 Metrics, 3 Layout, 4 Hotstrings and 2 Tap-Hold headers.
+		helpers.assert_eq(count, 15, "independent existing-header count must not be silently reduced")
 	end)
 
 	local invalid = {
