@@ -1281,6 +1281,40 @@ function M.new()
 		Logger.debug(LOG, "Expansion applied: buffer %d codepoint(s).", #_buf_cps)
 	end
 
+	--- Rewrites the buffer to the text a Backspace undo typed back in place of an
+	--- expansion: what preceded the trigger, then the restored trigger and its
+	--- terminator. The buffer then reads what the line reads, so the trigger key
+	--- typed again expands at once (« adn★ », Backspace, « ★ » gives « ADN »
+	--- again), and a word-only rule still sees the letters before the trigger.
+	--- Windows (HSE_UndoExpansion) and macOS (undo_on_backspace) do the same.
+	--- @param text string What the buffer holds from its start to the caret.
+	--- @param at_boundary boolean Whether the buffer's start abuts a word boundary,
+	---        as it did before the expansion.
+	--- @param typed_at_ms number|false The restore's monotonic time, the stamp of
+	---        every restored codepoint; false when the caller keeps no timing.
+	function engine:restore(text, at_boundary, typed_at_ms)
+		if type(text) ~= "string" then error("engine:restore(): the text must be a string", 2) end
+		if type(at_boundary) ~= "boolean" then error("engine:restore(): the boundary must be a boolean", 2) end
+		if typed_at_ms ~= false and type(typed_at_ms) ~= "number" then
+			error("engine:restore(): the time must be a number or false", 2)
+		end
+		_buf_cps = {}
+		_buf_times = {}
+		for _, cp in ipairs((utf8_codepoints(text))) do
+			_buf_cps[#_buf_cps + 1] = cp
+			_buf_times[#_buf_times + 1] = typed_at_ms
+		end
+		_start_is_boundary = at_boundary
+		_start_is_line_start = false
+		_final_noop_pending = false
+		while #_buf_cps > BUFFER_MAX_CHARS do
+			table.remove(_buf_cps, 1)
+			table.remove(_buf_times, 1)
+			_start_is_boundary = false
+		end
+		Logger.debug(LOG, "Buffer restored: %d codepoint(s).", #_buf_cps)
+	end
+
 	--- Returns the current rolling typing buffer as a UTF-8 string. The LLM
 	--- prediction engine detects its own trigger sequences in the same typing
 	--- context the hotstring matcher sees, so both work off this one buffer rather

@@ -1,6 +1,6 @@
 {
 	"$schema": "https://ergopti.com/schema/corpus/hotstrings.v1.json",
-	"description": "What a Backspace pressed after an expansion leaves on screen (hotstrings.backspace_restore_enabled, hotstrings.backspace_restore_window_ms). Replayed by the shared rule (_shared/hotstrings/engine/backspace_restore.lua) on macOS and Linux through _shared/tests/lua/hotstrings/backspace_restore_contract.lua, and by the Windows dispatcher (HSE_UndoExpansion) in tests/unit/hotstrings/engine/engine/test_backspace_undo.ahk.",
+	"description": "What a Backspace pressed after an expansion leaves on screen and in the hotstring buffer (hotstrings.backspace_restore_enabled, hotstrings.backspace_restore_window_ms). Replayed by the shared rule (_shared/hotstrings/engine/backspace_restore.lua) on macOS and Linux through _shared/tests/lua/hotstrings/backspace_restore_contract.lua, and by the Windows dispatcher (HSE_UndoExpansion) in tests/unit/hotstrings/engine/engine/test_backspace_undo.ahk.",
 	"field_semantics": {
 		"trigger": "The text the user typed for the expansion, as it was on screen, the magic key included when it ended the trigger.",
 		"output": "The expansion's literal output, without the terminator.",
@@ -12,7 +12,10 @@
 		"elapsed_ms": "Milliseconds between the expansion's commit and the Backspace.",
 		"key_between": "Optional, false when absent: another key was pressed between the expansion and the Backspace.",
 		"undoes": "Whether the Backspace undoes the expansion.",
-		"screen_after": "What the expansion's part of the line reads after the Backspace: the restored text when it undoes, otherwise the output and replayed terminator less their last character."
+		"screen_after": "What the expansion's part of the line reads after the Backspace: the restored text when it undoes, otherwise the output and replayed terminator less their last character.",
+		"buffer_after": "Optional: what the hotstring buffer holds after the Backspace, from where the trigger began; the text typed before the trigger stays in it. It reads like screen_after: the buffer follows the line, so the trigger key typed again expands at once (decision of 2026-11-20). Absent where another key in between leaves each driver its own reset.",
+		"then": "Optional: keys typed right after the Backspace, in order: a character, or \"{BS}\" for a Backspace pressed at once, which undoes an expansion the previous key fired and otherwise deletes the last character.",
+		"screen_then": "With then: what the expansion's part of the line reads after those keys."
 	},
 	"vectors": [
 		{
@@ -25,7 +28,25 @@
 			"window_ms": 500,
 			"elapsed_ms": 100,
 			"undoes": true,
-			"screen_after": "td"
+			"screen_after": "td",
+			"buffer_after": "td",
+			"then": ["★"],
+			"screen_then": "2026-08-01"
+		},
+		{
+			"id": "a_restored_magic_trigger_expands_again_at_once",
+			"description": "adn★ → ADN; Backspace gives adn, and ★ gives ADN again; a second Backspace and ★ do it once more.",
+			"trigger": "adn★",
+			"output": "ADN",
+			"magic_key": "★",
+			"enabled": true,
+			"window_ms": 500,
+			"elapsed_ms": 100,
+			"undoes": true,
+			"screen_after": "adn",
+			"buffer_after": "adn",
+			"then": ["★", "{BS}", "★"],
+			"screen_then": "ADN"
 		},
 		{
 			"id": "consumed_magic_key_terminator_is_not_typed_back",
@@ -39,7 +60,8 @@
 			"window_ms": 500,
 			"elapsed_ms": 100,
 			"undoes": true,
-			"screen_after": "btw"
+			"screen_after": "btw",
+			"buffer_after": "btw"
 		},
 		{
 			"id": "repeat_key_gives_nothing_of_the_star_back",
@@ -51,7 +73,10 @@
 			"window_ms": 500,
 			"elapsed_ms": 100,
 			"undoes": true,
-			"screen_after": ""
+			"screen_after": "",
+			"buffer_after": "",
+			"then": ["★"],
+			"screen_then": "o"
 		},
 		{
 			"id": "space_terminator_comes_back_after_the_trigger",
@@ -64,7 +89,10 @@
 			"window_ms": 500,
 			"elapsed_ms": 100,
 			"undoes": true,
-			"screen_after": "adn "
+			"screen_after": "adn ",
+			"buffer_after": "adn ",
+			"then": ["{BS}", " "],
+			"screen_then": "ADN "
 		},
 		{
 			"id": "punctuation_terminator_comes_back_after_the_trigger",
@@ -77,7 +105,10 @@
 			"window_ms": 500,
 			"elapsed_ms": 100,
 			"undoes": true,
-			"screen_after": "adn,"
+			"screen_after": "adn,",
+			"buffer_after": "adn,",
+			"then": ["{BS}", ","],
+			"screen_then": "ADN,"
 		},
 		{
 			"id": "enter_terminator_comes_back_after_the_trigger",
@@ -90,7 +121,8 @@
 			"window_ms": 500,
 			"elapsed_ms": 100,
 			"undoes": true,
-			"screen_after": "adn\n"
+			"screen_after": "adn\n",
+			"buffer_after": "adn\n"
 		},
 		{
 			"id": "typed_casing_comes_back",
@@ -103,7 +135,10 @@
 			"window_ms": 500,
 			"elapsed_ms": 100,
 			"undoes": true,
-			"screen_after": "Adn "
+			"screen_after": "Adn ",
+			"buffer_after": "Adn ",
+			"then": ["{BS}", " "],
+			"screen_then": "ADN "
 		},
 		{
 			"id": "the_window_end_still_undoes",
@@ -116,7 +151,10 @@
 			"window_ms": 500,
 			"elapsed_ms": 500,
 			"undoes": true,
-			"screen_after": "adn "
+			"screen_after": "adn ",
+			"buffer_after": "adn ",
+			"then": ["{BS}", " "],
+			"screen_then": "ADN "
 		},
 		{
 			"id": "after_the_window_backspace_deletes_the_last_character",
@@ -129,7 +167,8 @@
 			"window_ms": 500,
 			"elapsed_ms": 501,
 			"undoes": false,
-			"screen_after": "ADN"
+			"screen_after": "ADN",
+			"buffer_after": "ADN"
 		},
 		{
 			"id": "after_the_window_a_star_trigger_stays_expanded",
@@ -141,7 +180,8 @@
 			"window_ms": 250,
 			"elapsed_ms": 1000,
 			"undoes": false,
-			"screen_after": "2026-08-0"
+			"screen_after": "2026-08-0",
+			"buffer_after": "2026-08-0"
 		},
 		{
 			"id": "a_longer_window_still_undoes",
@@ -154,7 +194,8 @@
 			"window_ms": 2000,
 			"elapsed_ms": 1000,
 			"undoes": true,
-			"screen_after": "adn "
+			"screen_after": "adn ",
+			"buffer_after": "adn "
 		},
 		{
 			"id": "option_off_backspace_deletes_the_last_character",
@@ -167,7 +208,10 @@
 			"window_ms": 500,
 			"elapsed_ms": 100,
 			"undoes": false,
-			"screen_after": "ADN"
+			"screen_after": "ADN",
+			"buffer_after": "ADN",
+			"then": ["{BS}", "{BS}", "{BS}", "a", "d", "n", " "],
+			"screen_then": "ADN "
 		},
 		{
 			"id": "option_off_star_trigger_stays_expanded",
@@ -179,7 +223,8 @@
 			"window_ms": 500,
 			"elapsed_ms": 100,
 			"undoes": false,
-			"screen_after": "2026-08-0"
+			"screen_after": "2026-08-0",
+			"buffer_after": "2026-08-0"
 		},
 		{
 			"id": "another_key_in_between_ends_the_undo",

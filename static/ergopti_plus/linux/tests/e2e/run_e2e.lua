@@ -513,6 +513,18 @@ local DAEMON_SCENARIOS = {
 	{ name = "a word-only trigger does not fire inside a restored trigger", keys = "pk★{BS}adn ", screen = "pkadn " },
 	-- A restored terminator ends the word, so the next key starts one there.
 	{ name = "a word-only trigger fires after a restored terminator", keys = " adn {BS}adn ", screen = " adn ADN " },
+	-- The buffer holds the restored text, so the trigger key typed again
+	-- expands at once (decision of 2026-11-20): the undo used to empty it, and
+	-- the star after it stayed a star.
+	{ name = "a restored magic-key trigger expands again at once", keys = "pk★{BS}★", screen = "parce que" },
+	{ name = "a restored trigger undoes and expands again, twice", keys = "pk★{BS}★{BS}★", screen = "parce que" },
+	-- Deleting the restored terminator leaves the trigger in the buffer, where a
+	-- terminator fires it as typing it would; the Backspace after the undo is a
+	-- plain one, inside or past the undo window.
+	{ name = "a terminator fires a trigger whose restored terminator was deleted", keys = " adn {BS}{BS} ",
+		screen = " ADN " },
+	{ name = "past the undo window a terminator fires the trigger whose restored terminator was deleted",
+		keys = " adn {BS}{TICK}{BS} ", screen = " ADN ", clock = "seconds" },
 	-- Backspace edits the buffer instead of wiping it and declaring a word start.
 	{ name = "a corrected typo still expands", keys = " adx{BS}n ", screen = " ADN " },
 	{ name = "a word-only trigger does not fire mid-word after a Backspace", keys = "xy{BS}adn ", screen = "xadn " },

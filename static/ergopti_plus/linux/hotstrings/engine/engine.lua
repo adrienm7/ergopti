@@ -60,6 +60,7 @@ function M.new(...)
 	local shared_backspace = engine.backspace
 	local shared_apply_expansion = engine.apply_expansion
 	local shared_reset = engine.reset
+	local shared_restore = engine.restore
 	-- The AI typing context (ai/engine/api/context.lua), nil on an engine whose
 	-- owner has none: the hotstring matcher itself never depends on it.
 	local ai_context = nil
@@ -144,6 +145,18 @@ function M.new(...)
 
 	-- reset_after_pause() resets through engine.reset, so a pause forgets the AI
 	-- context too, as it does on macOS.
+
+	--- Gives the word buffer the text a Backspace undo typed back (the shared
+	--- engine's restore). The AI context no longer describes the field, as after
+	--- a reset; nothing restored descends from a private expansion the matcher kept.
+	--- @param text string What the buffer holds from its start to the caret.
+	--- @param at_boundary boolean As for the shared engine.
+	--- @param typed_at_ms number|false As for the shared engine.
+	function engine:restore(text, at_boundary, typed_at_ms)
+		shared_restore(self, text, at_boundary, typed_at_ms)
+		private_ancestry = nil
+		if ai_context then ai_context:reset() end
+	end
 
 	--- Reports text the driver produced outside the matcher's own expansions (a
 	--- dynamic hotstring) to the AI context: `deletes` codepoints of the field

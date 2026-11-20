@@ -1801,6 +1801,14 @@ local function main()
 					-- key has moved the caret, so that count would delete the wrong text.
 					-- hotstrings.backspace_restore_enabled off keeps no record at all, so
 					-- the next Backspace is a plain one.
+					-- The buffer before the trigger: until apply_expansion below it
+					-- still ends with the codepoints the expansion replaced.
+					local buffer_cps = {}
+					for cp in engine:current_buffer():gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+						buffer_cps[#buffer_cps + 1] = cp
+					end
+					local buffer_before = table.concat(buffer_cps, "", 1,
+						math.max(0, #buffer_cps - (tonumber(result.backspace_count) or 0)))
 					_undoable = not parsed_output and WordReset.backspace_restore_enabled() and {
 						-- What the user typed, casing included, not the stored trigger.
 						trigger     = result.typed_trigger,
@@ -1815,6 +1823,12 @@ local function main()
 						magic_key   = MagicKey.get(),
 						-- The commit time the undo window counts from.
 						committed_ms = Monotonic.now_ms(),
+						-- The buffer before the trigger and the word start it began
+						-- at: the undo gives them back with the restored text, so the
+						-- trigger key typed again expands at once (decision of
+						-- 2026-11-20).
+						buffer_before = buffer_before,
+						boundary_before = engine:buffer_starts_at_word_boundary(),
 					} or nil
 				else
 					-- An uncommitted output leaves the line in an unknown state: the
@@ -2383,9 +2397,9 @@ local function main()
 			if restored == "" then
 				-- The repeat key's lone magic key: the Backspace already removed the
 				-- repeated character and nothing else comes back ("po★" -> "poo" ->
-				-- "po"). The buffer no longer describes the line.
+				-- "po"). The buffer reads "po" again, so ★ repeats the o once more.
 				Logger.info(LOG, "Undo: the trigger was the magic key alone, nothing to restore.")
-				engine:reset(false)
+				engine:restore(undo.buffer_before, undo.boundary_before, math.floor(Monotonic.now_ms()))
 				return
 			end
 			if remaining >= 1 then
@@ -2400,18 +2414,20 @@ local function main()
 				local ok_delivery, delivery = pcall(injector.inject, remaining - 1, restored,
 					undo.is_private, nil, undo.destination)
 				local restored_ok = ok_delivery and type(delivery) == "table" and delivery.ok == true
-				-- The restored trigger ends the line and is not in the buffer: a
-				-- word-start rule typed next would otherwise fire inside it, so the
-				-- buffer restarts at an unknown start. A restore that ends with a
-				-- terminator (Space, punctuation, Enter) leaves the caret after a
-				-- word boundary instead, where the next word starts. A refused
-				-- restore leaves the line unknown. The replayed character is the
-				-- terminator that fired the expansion, so it is what ends the restored
-				-- text; asking the terminator set rather than the shared word-character
-				-- test keeps a non-ASCII terminator (« », …) a boundary, which that
-				-- test counts as a letter.
-				local at_word_start = restored_ok and type(undo.replayed) == "string" and undo.replayed ~= ""
-				engine:reset(at_word_start)
+				-- The buffer reads the line again: what preceded the trigger, then the
+				-- restored text, from the word start the trigger was typed at. The
+				-- trigger key typed next expands at once ("adn★", Backspace, "★"
+				-- gives "ADN"); a restored terminator ends the word, and deleting it
+				-- leaves "adn" for the next terminator to fire. A word-start rule
+				-- typed after a trigger restored without a terminator continues that
+				-- word, so it cannot fire inside it. A refused restore leaves the
+				-- line unknown.
+				if restored_ok then
+					engine:restore(undo.buffer_before .. restored, undo.boundary_before,
+						math.floor(Monotonic.now_ms()))
+				else
+					engine:reset(false)
+				end
 				if not restored_ok then
 					Logger.error(LOG, "Undo: the trigger was not restored: %s.",
 						tostring(ok_delivery and type(delivery) == "table" and delivery.error or delivery))
