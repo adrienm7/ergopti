@@ -523,19 +523,24 @@ helpers.describe("logger sink — production wiring", function()
 	end)
 
 	helpers.it("the exit paths close every open streak before the last line", function()
-		-- Exit and crash are the last chance to emit a withheld count.
+		-- A boot failure, the clean exit and a crash are each the last chance
+		-- to emit a withheld count.
+		local boot_failed_at = entry:find('"Daemon boot failed before its main loop', 1, true)
 		local exiting_at = entry:find('Logger.info(LOG, "Daemon exiting.")', 1, true)
 		local crash_at = entry:find('pcall(Logger.error, LOG, "Daemon terminated by an unhandled error', 1, true)
+		helpers.assert_not_nil(boot_failed_at, "the boot-failure line was not found")
 		helpers.assert_not_nil(exiting_at, "the clean-exit line was not found")
 		helpers.assert_not_nil(crash_at, "the crash line was not found")
-		-- A direct call, or the guarded pcall form the crash path uses.
+		-- A direct call, or the guarded pcall form the boot guard and the crash path use.
 		local terminal_flush = "()Logger%.flush_repeats[%(,]%s*true%)"
 		local flushes = {}
 		for at in entry:gmatch(terminal_flush) do flushes[#flushes + 1] = at end
-		helpers.assert_eq(#flushes, 2, "the clean exit and the crash path each need one terminal flush")
-		helpers.assert_true(flushes[1] < exiting_at and exiting_at - flushes[1] < 200,
+		helpers.assert_eq(#flushes, 3, "the boot guard, the clean exit and the crash path each need one terminal flush")
+		helpers.assert_true(flushes[1] < boot_failed_at and boot_failed_at - flushes[1] < 200,
+			"the boot guard must flush right before its failure line")
+		helpers.assert_true(flushes[2] < exiting_at and exiting_at - flushes[2] < 200,
 			"the clean exit must flush right before its last line")
-		helpers.assert_true(flushes[2] < crash_at and crash_at - flushes[2] < 400,
+		helpers.assert_true(flushes[3] < crash_at and crash_at - flushes[3] < 400,
 			"the crash path must flush right before its fatal line")
 	end)
 end)
