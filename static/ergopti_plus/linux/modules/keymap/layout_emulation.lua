@@ -23,7 +23,10 @@
 ---    characters, and says so in the log.
 --- 3. A shortcut chord keeps the modifiers the user holds and presses, instead
 ---    of the physical key, the key the session layout types the emulated
----    layout's Command-level character with (Ctrl+Z where Ergopti has z).
+---    layout's Command-level character with (Ctrl+Z where Ergopti has z). On a
+---    layout of the Ergopti family, the keys typing è, ê, é and à send the
+---    letters chosen for them ([shortcuts], modules/shortcuts/accented_shortcuts.lua),
+---    as the Windows built-in base does.
 --- 4. Off the key path: the settings, the .keylayout parse and the number-row
 ---    analysis run at start and on every [layout] change (M.reload). A layout
 ---    that cannot be read or compiled turns the emulation off with an ERROR,
@@ -74,7 +77,8 @@ local CHORD_MODIFIERS = {
 local HOOK_MODIFIERS = { shift = "shift", control = "ctrl", alt = "alt", alt_right = "altgr", meta = "meta" }
 
 local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "registry", "type_text",
-	"dispatch_char", "emit_shortcut", "emit_key", "now_ms", "caps_locked", "magic_evdev", "is_active" }
+	"dispatch_char", "emit_shortcut", "emit_key", "now_ms", "caps_locked", "magic_evdev", "is_active",
+	"ergopti_family" }
 
 
 
@@ -89,7 +93,8 @@ local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "reg
 --- Takes the collaborators. Called once, before the hook starts.
 --- @param deps table { read_config, default_for, report_outdated?, source, keycodes, registry,
 ---   type_text, dispatch_char, emit_shortcut(char, code, mods), emit_key(code, modifiers) where
----   code is a KeyboardEvent.code and modifiers engine ids, now_ms, caps_locked, magic_evdev, is_active }
+---   code is a KeyboardEvent.code and modifiers engine ids, now_ms, caps_locked, magic_evdev, is_active,
+---   ergopti_family (the registry family whose layouts read the accented-letter choices) }
 function M.init(deps)
 	if _deps ~= nil then error("layout_emulation: already initialized", 2) end
 	if type(deps) ~= "table" then error("layout_emulation.init needs its collaborators", 2) end
@@ -113,7 +118,8 @@ end
 --- @return boolean ok False when the chosen layout cannot be emulated (logged).
 function M.reload()
 	if _deps == nil then error("layout_emulation.reload needs M.init first", 2) end
-	local settings = Settings.resolve(_deps.read_config(), _deps.default_for, _deps.report_outdated)
+	local config = _deps.read_config()
+	local settings = Settings.resolve(config, _deps.default_for, _deps.report_outdated)
 	if _extras ~= nil then M.reset() end
 	_extras = nil
 	if not Settings.active(settings) then
@@ -134,8 +140,14 @@ function M.reload()
 	local ok, built = pcall(function()
 		local model = Emulation.load(source.text, _deps.keycodes(), source.convention, { composer = source.composer })
 		local session = Emulation.new_session(model, Emulation.row_map(_deps.registry(), require("core.text.engine.json").is_null))
+		-- Ergopti's own layouts read the four accented-letter choices, as Windows.
+		local accented = nil
+		if source.family ~= nil and source.family == _deps.ergopti_family() then
+			local Accented = require("modules.shortcuts.accented_shortcuts")
+			accented = Emulation.accented_choices(Accented.resolve(config), Accented.LETTERS)
+		end
 		Emulation.configure(session, { base = settings.base, alt_gr = settings.alt_gr, layout = settings.layout,
-			number_row = settings.number_row, edges = settings.edges })
+			number_row = settings.number_row, edges = settings.edges, accented = accented })
 		if source.emulation ~= nil then extras = SourceEmulation.new_session(SourceEmulation.compile(source.emulation)) end
 		return session
 	end)
@@ -374,6 +386,22 @@ function M.on_key(detail)
 end
 
 
+--- Whether the running emulation decides the Ctrl, Alt or Super chords of this
+--- key: the accented-letter shortcuts of the OS layout leave such a key to it,
+--- and keep the keys the emulation leaves to the OS layout (base layer or row
+--- off, AltGr alone).
+--- @param detail table Keyboard hook press detail.
+--- @return boolean
+function M.owns_chord(detail)
+	local session = _session
+	if session == nil or type(detail) ~= "table" or _deps.is_active() ~= true then return false end
+	local code = _evdev_to_code[detail.code]
+	if code == nil then return false end
+	local mods = merged_mods(type(detail.mods) == "table" and detail.mods or {})
+	local _, emulated = Emulation.chord_char(session, code, mods.ctrl == true, mods.alt == true, mods.meta == true)
+	return emulated == true
+end
+
 --- The character a Ctrl, Alt or Super chord on this key sends while the
 --- emulation runs, without typing anything: the keyboard shortcut slots match
 --- it, as Windows registers a slot on the key that types its letter (ILX-001).
@@ -490,6 +518,11 @@ function M.production_deps(ports)
 		caps_locked = function() return require("adapters.xkb_capture").caps_locked() == true end,
 		magic_evdev = ports.magic_evdev,
 		is_active = function() return not ports.is_paused() end,
+		ergopti_family = function()
+			local settings, settings_err = Registry.settings()
+			if not settings then error("the layout registry settings are unreadable: " .. tostring(settings_err)) end
+			return settings.ergopti_family
+		end,
 	}
 end
 

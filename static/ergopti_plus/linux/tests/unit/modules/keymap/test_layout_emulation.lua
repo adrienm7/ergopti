@@ -62,6 +62,7 @@ local function fixture(layout, overrides)
 		caps_locked = function() return false end,
 		magic_evdev = function() return record.magic end,
 		is_active = function() return not record.paused end,
+		ergopti_family = function() return "ergopti" end,
 	}
 	for key, value in pairs(overrides or {}) do deps[key] = value end
 	M.init(deps)
@@ -139,6 +140,50 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		helpers.assert_true(press(M, KEY_Q, { ctrl = true }), "Ctrl+key is replaced")
 		helpers.assert_eq(record.shortcuts, { "z" }, "Ergopti's Command level")
 		helpers.assert_true(not press(M, KEY_F1, { ctrl = true }), "a key outside the layout passes")
+	end)
+
+	-- The Windows built-in base reads the four accented-letter choices; the
+	-- shared emulation took every chord from the Command level, so Ctrl+è stayed
+	-- Ctrl+Z whatever letter the user chose, or with the shortcut off.
+	helpers.it("sends the letter chosen for an accented key of an Ergopti layout (accented-emulated)", function()
+		local function family_source(id)
+			for _, entry in ipairs(INDEX.layouts) do
+				if entry.id == id then
+					return { id = id, text = read_all(Paths.shared("../../layouts/registry/" .. entry.file)),
+						convention = entry.keycode_convention, composer = false, family = entry.family }
+				end
+			end
+			return nil, "not shipped"
+		end
+		local config = { layout = { emulated_layout = "ergopti", ergopti_base = true },
+			shortcuts = { e_grave = { enabled = true, letter = "k" } } }
+		local M, record = fixture({}, { source = family_source, read_config = function() return config end })
+		helpers.assert_true(M.reload())
+		helpers.assert_true(press(M, KEY_Q, { ctrl = true }), "Ctrl+è is replaced")
+		helpers.assert_eq(record.shortcuts, { "k" }, "the letter chosen for è, not the Command level's z")
+		helpers.assert_eq(M.chord_key({ code = KEY_Q, mods = { ctrl = true } }), "k", "the shortcut slots match it too")
+		helpers.assert_true(M.owns_chord({ code = KEY_Q, mods = { ctrl = true } }),
+			"the OS-layout accented shortcuts leave the key to the emulation")
+		-- Switched off, the chord keeps the accented letter, as « Désactivé » on Windows.
+		config.shortcuts.e_grave = { enabled = false, letter = "k" }
+		helpers.assert_true(M.reload())
+		helpers.assert_true(press(M, KEY_Q, { ctrl = true }))
+		helpers.assert_eq(record.shortcuts, { "k", "è" })
+		-- Another family keeps its own Command level.
+		config.layout.emulated_layout = "ergol"
+		config.shortcuts.e_grave = { enabled = true, letter = "k" }
+		helpers.assert_true(M.reload())
+		helpers.assert_eq(M.status().id, "ergol")
+		helpers.assert_true(M.chord_key({ code = KEY_Q, mods = { ctrl = true } }) ~= "k",
+			"ergol's chord comes from its Command level, not the choice")
+	end)
+
+	helpers.it("leaves the chords of a key it does not emulate to the OS layout (accented-emulated)", function()
+		local M = fixture({ emulated_layout = "ergopti", ergopti_base = false, ergopti_alt_gr = true })
+		helpers.assert_true(M.reload())
+		helpers.assert_true(M.status().active, "AltGr alone is emulated")
+		helpers.assert_eq(M.owns_chord({ code = KEY_Q, mods = { ctrl = true } }), false,
+			"the OS layout types the base layer, so its accented shortcuts apply")
 	end)
 
 	-- Windows registers a keyboard slot on the key that types its letter in the

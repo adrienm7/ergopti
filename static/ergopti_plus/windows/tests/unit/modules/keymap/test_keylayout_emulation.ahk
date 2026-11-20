@@ -994,6 +994,43 @@ _KLT_ReadNothing(Id, LocalDir) {
 	throw Error("The layout '" . Id . "' is not downloaded in " . LocalDir)
 }
 
+Test("keylayout emulation: an emulated Ergopti layout sends the letters chosen for its accented keys (accented-emulated)",
+	() => _KLT_WithEmulation(_KLT_AccentedCase))
+
+; The built-in base reads the four choices (ErgoptiBaseMapping); an Ergopti
+; layout emulated from the registry took the Command level's z for Ctrl+è.
+_KLT_AccentedCase() {
+	global Features, KLE_Ergopti
+	Had := Features.Has("shortcuts")
+	SavedShortcuts := Had ? Features["shortcuts"] : 0
+	Features["shortcuts"] := Map("e_grave", Map("enabled", true, "letter", "k"))
+	try {
+		Boot(Id) {
+			KeylayoutEmulation_Unload()
+			_KLT_WithLayoutFeatures(_KLT_BootLayout(Id), () =>
+				AssertTrue(KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps([], _KLT_ReadRepoLocal, (*) => 0))))
+		}
+		Boot("ergopti")
+		AssertTrue(KLE_Ergopti, "the Ergopti family reads the choices")
+		AssertEqual("k", KeylayoutEmulation_ShortcutChar("SC010", "^"), "Ctrl+è sends the letter chosen for è")
+		AssertEqual("k", KeylayoutEmulation_ShortcutChar("SC010", "#"))
+		Features["shortcuts"]["e_grave"]["enabled"] := false
+		AssertEqual("è", KeylayoutEmulation_ShortcutChar("SC010", "^"), "switched off, the chord keeps è")
+		Features["shortcuts"]["e_grave"]["enabled"] := true
+		Boot("ergol")
+		AssertFalse(KLE_Ergopti)
+		AssertFalse(KeylayoutEmulation_ShortcutChar("SC010", "^") == "k", "another family keeps its Command level")
+		_KLT_Load("ergopti")
+		AssertFalse(KLE_Ergopti, "a load without the boot's entry reads no choice")
+	} finally {
+		KeylayoutEmulation_Unload()
+		if Had
+			Features["shortcuts"] := SavedShortcuts
+		else
+			Features.Delete("shortcuts")
+	}
+}
+
 Test("keylayout emulation: boot registers first, then loads the local copy and never downloads it (layout-registry-emulation)",
 	() => _KLT_WithEmulation(_KLT_BootCase))
 

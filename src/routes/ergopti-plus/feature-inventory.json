@@ -2272,8 +2272,8 @@
 		},
 		"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 		"reason": {
-			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C.",
-			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C."
+			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. L’émulation d’une disposition sous macOS prend elle aussi la combinaison dans cette couche (celle d’Ergopti donne Cmd+è, ê, é, à comme Cmd+Z, X, C, V), et macOS n’offre aucun menu pour choisir une autre lettre. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Sous une disposition Ergopti émulée, Windows et Linux appliquent aussi la lettre choisie ici.",
+			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too."
 		}
 	},
 	{
@@ -2290,8 +2290,8 @@
 		},
 		"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 		"reason": {
-			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C.",
-			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C."
+			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. L’émulation d’une disposition sous macOS prend elle aussi la combinaison dans cette couche (celle d’Ergopti donne Cmd+è, ê, é, à comme Cmd+Z, X, C, V), et macOS n’offre aucun menu pour choisir une autre lettre. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Sous une disposition Ergopti émulée, Windows et Linux appliquent aussi la lettre choisie ici.",
+			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too."
 		}
 	},
 	{
@@ -2308,8 +2308,8 @@
 		},
 		"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 		"reason": {
-			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C.",
-			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C."
+			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. L’émulation d’une disposition sous macOS prend elle aussi la combinaison dans cette couche (celle d’Ergopti donne Cmd+è, ê, é, à comme Cmd+Z, X, C, V), et macOS n’offre aucun menu pour choisir une autre lettre. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Sous une disposition Ergopti émulée, Windows et Linux appliquent aussi la lettre choisie ici.",
+			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too."
 		}
 	},
 	{
@@ -2326,8 +2326,8 @@
 		},
 		"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 		"reason": {
-			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C.",
-			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C."
+			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. L’émulation d’une disposition sous macOS prend elle aussi la combinaison dans cette couche (celle d’Ergopti donne Cmd+è, ê, é, à comme Cmd+Z, X, C, V), et macOS n’offre aucun menu pour choisir une autre lettre. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Sous une disposition Ergopti émulée, Windows et Linux appliquent aussi la lettre choisie ici.",
+			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too."
 		}
 	},
 	{
@@ -2344,8 +2344,8 @@
 		},
 		"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 		"reason": {
-			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C.",
-			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C."
+			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. L’émulation d’une disposition sous macOS prend elle aussi la combinaison dans cette couche (celle d’Ergopti donne Cmd+è, ê, é, à comme Cmd+Z, X, C, V), et macOS n’offre aucun menu pour choisir une autre lettre. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Sous une disposition Ergopti émulée, Windows et Linux appliquent aussi la lettre choisie ici.",
+			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too."
 		}
 	},
 	{
@@ -2362,8 +2362,8 @@
 		},
 		"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 		"reason": {
-			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C.",
-			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C."
+			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. L’émulation d’une disposition sous macOS prend elle aussi la combinaison dans cette couche (celle d’Ergopti donne Cmd+è, ê, é, à comme Cmd+Z, X, C, V), et macOS n’offre aucun menu pour choisir une autre lettre. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Sous une disposition Ergopti émulée, Windows et Linux appliquent aussi la lettre choisie ici.",
+			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too."
 		}
 	},
 	{
@@ -2380,8 +2380,8 @@
 		},
 		"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 		"reason": {
-			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C.",
-			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C."
+			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. L’émulation d’une disposition sous macOS prend elle aussi la combinaison dans cette couche (celle d’Ergopti donne Cmd+è, ê, é, à comme Cmd+Z, X, C, V), et macOS n’offre aucun menu pour choisir une autre lettre. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Sous une disposition Ergopti émulée, Windows et Linux appliquent aussi la lettre choisie ici.",
+			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too."
 		}
 	},
 	{
@@ -2398,8 +2398,8 @@
 		},
 		"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 		"reason": {
-			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C.",
-			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C."
+			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. L’émulation d’une disposition sous macOS prend elle aussi la combinaison dans cette couche (celle d’Ergopti donne Cmd+è, ê, é, à comme Cmd+Z, X, C, V), et macOS n’offre aucun menu pour choisir une autre lettre. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Sous une disposition Ergopti émulée, Windows et Linux appliquent aussi la lettre choisie ici.",
+			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too."
 		}
 	},
 	{

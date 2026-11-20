@@ -175,7 +175,9 @@ end
 ---   read_emulation = function() -> decoded emulation table|nil, err (the composed layout's),
 ---   read_composed = function() -> { text, convention }|nil, err (the composed layout stored for
 ---   the emulation alone, read while it is not installed) }
---- @return table|nil source { id, text, convention, composer, emulation }
+--- @return table|nil source { id, text, convention, composer, emulation, family }
+---   family: the registry family of the installed or shipped entry (nil for a
+---   composed layout stored for the emulation alone).
 --- @return string|nil err Why it cannot be read.
 function M.source(id, ports)
 	if type(id) ~= "string" or id == "" then error("An emulation source needs a layout id.") end
@@ -184,7 +186,8 @@ function M.source(id, ports)
 	if entry ~= nil then
 		local text, err = ports.read_installed(id)
 		if type(text) ~= "string" then return nil, err or ("the installed copy of " .. id .. " is unreadable") end
-		local result = { id = id, text = text, convention = entry.keycode_convention, composer = composer }
+		local result = { id = id, text = text, convention = entry.keycode_convention, composer = composer,
+			family = entry.family }
 		-- The composed layout of a layout source carries the emulation table of the
 		-- records its .keylayout leaves out (layouts/engine/composer/source_emulation.lua).
 		if composer and type(ports.read_emulation) == "function" then
@@ -211,7 +214,8 @@ function M.source(id, ports)
 	end
 	local shipped, err = ports.shipped(id)
 	if type(shipped) ~= "table" then return nil, err or ("the layout " .. id .. " is neither installed nor shipped") end
-	return { id = id, text = shipped.text, convention = shipped.entry.keycode_convention, composer = composer }, nil
+	return { id = id, text = shipped.text, convention = shipped.entry.keycode_convention, composer = composer,
+		family = shipped.entry.family }, nil
 end
 
 return M

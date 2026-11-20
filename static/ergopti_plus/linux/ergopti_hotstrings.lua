@@ -2604,6 +2604,9 @@ local function main()
 		end,
 		dry_run = opts.dry_run == true,
 	})
+	-- apply-x11 lasts for the X session: the layout chosen in an earlier one is
+	-- loaded again (the layout manager records it). Required inline, as above.
+	if opts.dry_run ~= true then require("modules.keymap.layout_registry").restore_x11_selection() end
 
 	local function on_click(code)
 		-- A physical button press ends a gesture's click hold, as Windows' mouse
@@ -2847,14 +2850,14 @@ local function main()
 			return { consume = true, repeat_callback = input_capture_gate.guard(saved_repeat) }
 		end
 		-- Ctrl+é as Ctrl+C on a layout whose accents are not shortcut letters,
-		-- under the Shortcuts master like the keyboard slots, and only while no
-		-- layout is emulated, as on Windows.
+		-- under the Shortcuts master like the keyboard slots, on the keys whose
+		-- chords no emulated layout decides, as on Windows.
 		local accented, accented_repeat = require("modules.shortcuts.accented_shortcuts").on_key(detail, {
 			active = function()
 				return not opts.dry_run and not script_actions.is_paused() and shortcuts ~= nil
 					and shortcuts.is_enabled() == true and input_capture_gate.blocks_text() ~= true
 			end,
-			emulating = function() return require("modules.keymap.layout_emulation").status().active == true end,
+			emulating = function(event) return require("modules.keymap.layout_emulation").owns_chord(event) end,
 			defer = function(fn) return event_loop.defer(fn) end,
 			press = function(combo) return (require("gestures.engine.combo_emitter").press(combo)) end,
 		})

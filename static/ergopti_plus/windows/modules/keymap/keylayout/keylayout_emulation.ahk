@@ -102,6 +102,10 @@ global KLE_LevelIndex := Map()
 ; Dead-key state -> native character -> resolved transition, built at load.
 global KLE_Compositions := Map()
 global KLE_Registered := false
+; Whether the emulated layout is of the Ergopti family: its keys typing è, ê,
+; é and à send the letters chosen in [shortcuts], as the built-in base does
+; (ErgoptiBaseMapping), instead of the Command level's default letters.
+global KLE_Ergopti := false
 ; Captured reset metadata is unavailable after partial registration. No rollback
 ; of already installed hotkeys, native consumption or replay admission is implied.
 global _KLE_ResetObserverRegistering := 0
@@ -402,7 +406,11 @@ KeylayoutEmulation_KeyCodes(KeycodeTable, Convention) {
  *   layout, if any, stays loaded.
  */
 KeylayoutEmulation_Load(Id, Text, Convention, KeycodeTable) {
-	return _KLE_CanonicalSourceOwner("load", Id, Text, Convention, KeycodeTable)
+	global KLE_Ergopti
+	Keys := _KLE_CanonicalSourceOwner("load", Id, Text, Convention, KeycodeTable)
+	; A new layout reads the accented-letter choices only once the boot names its family.
+	KLE_Ergopti := false
+	return Keys
 }
 
 /**
@@ -493,7 +501,9 @@ _KLE_BuildCompositions(Model) {
  * Stops emulating: drops the model so every emulation hotkey stands down.
  */
 KeylayoutEmulation_Unload() {
+	global KLE_Ergopti
 	_KLE_CanonicalSourceOwner("unload")
+	KLE_Ergopti := false
 }
 
 
@@ -614,7 +624,10 @@ KeylayoutEmulation_ComposeNative(Native) {
 
 /**
  * Character a shortcut chord sends for ``Sc``: the layout's Command level, or,
- * for the layout the composer built, the level of the held modifier.
+ * for the layout the composer built, the level of the held modifier. On a
+ * layout of the Ergopti family, the key typing an accented letter unshifted
+ * sends the letter chosen for it, or that accented letter while its shortcut
+ * is off (_ErgoptiLetterOr, as the built-in base).
  * @param {string} Sc - AHK scan code.
  * @param {string} Mods - The chord's AutoHotkey modifier prefix ("^", "!+", "#"...);
  *   its first character names the modifier. Win (the Command level) by default.
@@ -625,6 +638,14 @@ KeylayoutEmulation_ShortcutChar(Sc, Mods := "#") {
 	global KLE_Model, KLE_KeyCodes, KLE_LevelIndex
 	if !IsObject(KLE_Model) || !KLE_KeyCodes.Has(Sc)
 		return ""
+	global KLE_Ergopti, ACCENTED_SHORTCUT_LETTERS
+	if KLE_Ergopti {
+		Base := Keylayout_Resolve(KLE_Model, KLE_LevelIndex[_KLE_ComboKey(false, false, false)], KLE_KeyCodes[Sc])
+		if Base["Kind"] == "text"
+			for Id, Letter in ACCENTED_SHORTCUT_LETTERS
+				if Base["Text"] == Letter
+					return _ErgoptiLetterOr(Id, Letter)
+	}
 	Level := Map("^", "ctrl", "!", "alt").Get(SubStr(Mods, 1, 1), "win")
 	Resolved := Keylayout_Resolve(KLE_Model, KLE_LevelIndex[Level], KLE_KeyCodes[Sc])
 	if (Resolved["Kind"] != "text")
@@ -1362,6 +1383,8 @@ _KLE_Activate(Id, LocalCopy, KeycodeTable) {
 		KLE_BootFailedId := Id
 		return false
 	}
+	global KLE_Ergopti
+	KLE_Ergopti := LayoutCatalogue_IsErgopti(LocalCopy["Entry"])
 	LoggerSuccess("LayoutEmulation", "Emulating the '{1}' layout, version {2} ({3} keys).",
 		Id, LocalCopy["Entry"]["version"], Keys)
 	return true

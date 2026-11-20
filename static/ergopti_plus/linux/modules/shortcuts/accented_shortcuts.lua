@@ -21,6 +21,10 @@
 --- 4. Read at the press: config.toml is read only when Ctrl, Alt or Super is
 ---    held on one of the four letters, so a restore or clear of the Shortcuts
 ---    scope applies at the next press with no live state to keep in step.
+--- 6. Under the layout emulation: a key whose chords the emulation decides is
+---    left to it (an Ergopti layout reads these same choices,
+---    _shared/layouts/engine/composer/keylayout_emulation.lua); a key it leaves
+---    to the OS layout (AltGr alone, a row switched off) is decided here.
 --- 5. Decided in the keyboard hook's consumption callback, the one place the
 ---    daemon can keep a key from the application; the chord is pressed on the
 ---    next loop tick with the modifiers the hand held.
@@ -152,6 +156,11 @@ function M.set(id, letter)
 		return false
 	end
 	Logger.info(LOG, "Accented shortcut %s set to %s.", id, letter or "off")
+	-- An emulated Ergopti layout reads the choices at its load.
+	local Emulated = package.loaded["modules.keymap.layout_emulation"]
+	if Emulated and Emulated.reload_if_started() == false then
+		Logger.error(LOG, "The emulated layout did not reload after the accented shortcut %s changed.", id)
+	end
 	return true
 end
 
@@ -197,7 +206,8 @@ end
 
 --- Decides one key press from the keyboard hook's consumption callback.
 --- @param detail table { code, value, mods }.
---- @param options table { active = fn() -> boolean, emulating = fn() -> boolean,
+--- @param options table { active = fn() -> boolean, emulating = fn(detail) -> boolean
+---   (whether the layout emulation decides this key's chords),
 ---   defer = fn(fn) -> boolean, press = fn(combo) -> boolean, base_symbol?,
 ---   number_row_mode?, settings? }.
 --- @return boolean consumed True when the press became the letter's chord.
@@ -209,7 +219,7 @@ function M.on_key(detail, options)
 	if type(options.active) ~= "function" or not options.active() then return false end
 	-- As Windows, which registers these chords only without the Ergopti
 	-- emulation: an emulated layout decides a chord on its own keys (SCL-002).
-	if options.emulating() == true then return false end
+	if options.emulating(detail) == true then return false end
 	local ports = {
 		base_symbol = options.base_symbol or require("adapters.keyboard_layout").base_symbol,
 		number_row_mode = options.number_row_mode or require("platform.input.keyboard_hook").number_row_mode,

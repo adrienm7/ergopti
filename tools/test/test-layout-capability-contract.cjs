@@ -47,7 +47,7 @@ function code(rel) {
 	const comment = rel.endsWith('.ahk')
 		? /^\s*;.*$/gm
 		: rel.endsWith('.lua')
-			? /^s*--.*$/gm
+			? /^\s*--.*$/gm
 			: /^\s*\/\/.*$/gm;
 	return text.replace(comment, '');
 }
@@ -84,6 +84,45 @@ const PATHS = [
 		'studio',
 		'windows/ui/layout_manager/kbd_register_core.ahk',
 		'KbdRegister_Uninstall('
+	],
+	// A DLL Studio registered is listed from its uninstall entry and removed
+	// after its own confirmation; a source re-saved under another DLL name
+	// uninstalls the previous one first.
+	[
+		'remove',
+		'windows',
+		'studio',
+		'windows/ui/layout_manager/init.ahk',
+		'return _LayMgrWeb_UninstallNative(Deps, Payload["dll"], SessionEpoch)'
+	],
+	[
+		'remove',
+		'windows',
+		'studio',
+		'windows/ui/layout_manager/init.ahk',
+		'if !Confirm.Call(Format(t("layout_manager.confirm_uninstall_native")'
+	],
+	['remove', 'windows', 'studio', 'windows/ui/layout_manager/init.ahk', '"native", Native,'],
+	[
+		'remove',
+		'windows',
+		'studio',
+		'windows/ui/layout_manager/kbd_register_core.ahk',
+		'KbdRegister_Installed(Ports) {'
+	],
+	[
+		'remove',
+		'windows',
+		'studio',
+		'windows/ui/layout_manager/composer.ahk',
+		'Replaced := LayoutComposer_UninstallDll(Deps, Previous)'
+	],
+	[
+		'remove',
+		'windows',
+		'studio',
+		'_shared/ui/layout_manager/script.js',
+		'rows.push(nativeRow(layout));'
 	],
 	['switch', 'windows', 'menu', 'windows/ui/menu/menu_layout.ahk', '_LAY_SelectActiveLayout('],
 	['switch', 'windows', 'menu', 'windows/adapters/keyboard_layout_switch.ahk', 'KLS_Select('],
@@ -169,6 +208,29 @@ const PATHS = [
 		'linux/modules/keymap/layout_registry.lua',
 		'{ "apply-x11", "--layout-id", id }'
 	],
+	// apply-x11 lasts for the session: the selection is recorded and loaded
+	// again at the daemon's next start.
+	[
+		'switch',
+		'linux',
+		'studio',
+		'linux/modules/keymap/layout_registry.lua',
+		'remember_x11_selection(deps, id)'
+	],
+	[
+		'switch',
+		'linux',
+		'studio',
+		'linux/modules/keymap/layout_registry.lua',
+		'function M.restore_x11_selection('
+	],
+	[
+		'switch',
+		'linux',
+		'menu',
+		'linux/ergopti_hotstrings.lua',
+		'require("modules.keymap.layout_registry").restore_x11_selection()'
+	],
 	['switch', 'linux', 'menu', 'linux/ui/menu/active_layout_rows.lua', 'function M.rows('],
 	// 2. Emulate without installing: the engine, then the Studio host's port.
 	['emulate', 'windows', 'menu', 'windows/ui/menu/menu_layout.ahk', '_LAY_ChooseEmulation('],
@@ -242,6 +304,43 @@ const PATHS = [
 		'engine',
 		'linux/modules/shortcuts/accented_shortcuts.lua',
 		'function M.on_key('
+	],
+	// The accented-letter choices follow an emulated Ergopti layout on Windows
+	// and Linux (macOS reads the Command level, its reason says so).
+	[
+		'tune',
+		'linux',
+		'engine',
+		'_shared/layouts/engine/composer/keylayout_emulation.lua',
+		'return config.accented[base.text] or base.text, true'
+	],
+	[
+		'tune',
+		'linux',
+		'engine',
+		'linux/modules/keymap/layout_emulation.lua',
+		'accented = Emulation.accented_choices(Accented.resolve(config), Accented.LETTERS)'
+	],
+	[
+		'tune',
+		'linux',
+		'engine',
+		'linux/modules/shortcuts/accented_shortcuts.lua',
+		'if options.emulating(detail) == true then return false end'
+	],
+	[
+		'tune',
+		'windows',
+		'engine',
+		'windows/modules/keymap/keylayout/keylayout_emulation.ahk',
+		'return _ErgoptiLetterOr(Id, Letter)'
+	],
+	[
+		'tune',
+		'windows',
+		'engine',
+		'windows/modules/keymap/keylayout/keylayout_emulation.ahk',
+		'KLE_Ergopti := LayoutCatalogue_IsErgopti(LocalCopy["Entry"])'
 	],
 	// The shared emulation: the AltGr layer alone runs over the OS layout.
 	[

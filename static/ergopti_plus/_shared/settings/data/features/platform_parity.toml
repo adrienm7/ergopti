@@ -69,7 +69,7 @@ technical = "Window Spy, ListVars and KeyHistory are AutoHotkey runtime tools an
 
 [reasons."platform_reason.accented_shortcuts_need_a_layout_file_on_macos"]
 kind = "os_equivalent"
-technical = "A macOS .keylayout carries its own Command and Control layers, so Cmd plus an accented key already resolves to the shortcut the layout gives it; Windows and Linux need the remap of Ctrl, Alt and Super chords on those keys."
+technical = "A macOS .keylayout carries its own Command and Control layers, so Cmd plus an accented key already resolves to the shortcut the layout gives it, and the macOS emulation (macos/modules/keymap/layout_emulation.lua) takes the chord from the emulated .keylayout's Command level too (Ergopti's: Z, X, C, V); macOS draws no letter picker, so it reads no [shortcuts] choice. Windows and Linux need the remap of Ctrl, Alt and Super chords on those keys, and apply the chosen letters under an emulated Ergopti-family layout too (keylayout_emulation.lua accented_choices, KeylayoutEmulation_ShortcutChar)."
 
 [reasons."platform_reason.layout_bundle_and_menubar_are_macos"]
 kind = "os_concept"
