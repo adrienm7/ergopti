@@ -50,6 +50,12 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       is saved at once and the page shows the choice, its rows without actions until the resume. « Search for local
       servers again » shows the paused notification once and probes nothing: no « probed » log line while paused, «
       Local server discovery paused » at the pause. Resume: the servers are searched again and the rows act.
+- [ ] <!-- field-point: managed_ollama_cold_start --> Managed Ollama cold start on a quiet desktop (OLL-06,
+      2026-11-20): after a new login, with nothing else running, turn the AI on and time the start of Ergopti's own
+      Ollama to its readiness (the AI menu turning ready; the log lines of the service start and of the version
+      probe that answered), once with the runtime already installed and once right after its first install. Linux
+      probes every 3 s up to what is left of the 30 min install budget, macOS waits at most 30 s: the two figures
+      decide one bound for the three.
 - [ ] <!-- field-point: input_policies --> Input policies: with the Bépo registry layout installed, monnaie then
       cédille types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row
       changes the one-shot wait; a CapsWord menu change applies to the running session; native one-shot Shift

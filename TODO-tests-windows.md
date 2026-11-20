@@ -144,6 +144,15 @@ Layouts` key. Re-saving the source under another `dll_name` with « Installer et
       (stop Ollama) brings the spinner back before the buffered retry.
 - [ ] System Ollama on 11434, AI on: Ergopti's listens on 11435, the other is untouched (f016081056, 597cbbe983).
 - [ ] Ollama or oMLX on a non-default port with the process scan failing: still found.
+- [ ] Managed Ollama pull longer than 30 minutes (OLL-02, 2026-11-20): on a line throttled so the first model takes
+      over 30 minutes (Windows Settings metered connection plus a large model, or a throttling proxy), enable the AI
+      with no runtime installed and accept the install, then later pull a second large model from the model selector:
+      both pulls finish, and the log names no `bootstrap_timeout`, `model_pull_timeout` or menu pull failure.
+- [ ] Managed Ollama cold start on a quiet PC (OLL-06, 2026-11-20): after a reboot, with nothing else running, turn
+      the AI on and time the start of the owned runtime to its readiness (the AI menu dot turning ready, and the
+      `LLM.managed` log lines of the start and of the version answer); repeat right after a fresh runtime install,
+      while Defender scans it. The report needs both figures to choose one readiness bound with
+      macOS (30 s today, against what is left of the 30 min install budget here).
 - [ ] Predictions stop on activity: with a slow model, type, pause, and during the spinner move the mouse by a few
       pixels, turn the wheel, use a precision-touchpad scroll, Alt+Tab, press F5: each cancels the request and hides
       the tooltip at once (no 100 px threshold, no grace window). Tab, the validation digits and the cycle chords still

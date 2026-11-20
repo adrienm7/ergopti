@@ -365,7 +365,12 @@ owner. Windows is the reference unless a shared contract says otherwise.
    remain for a re-campaign.
 3. **Managed Ollama runtime, re-read for drift.** `macos/ai/adapters` (3,345)
    and `shared/ai/adapters` (2,113): the bootstrap, daemon authority, pull and
-   sessions, created after the 2026-11-05 native-ui campaign.
+   sessions, created after the 2026-11-05 native-ui campaign. **Taken on
+   2026-11-20** ([report](../2026-11-20-managed-ollama/report.md)): install,
+   update, start and stop, pinning and integrity, disk and network failures,
+   model pulls, port and process ownership, cleanup, readiness and the menu
+   rows; OLL-01 (Linux digest retry, shared class table), OLL-02 (Windows
+   pull ceiling) and OLL-03 (stale owners) fixed, OLL-04 to OLL-13 open.
 4. **Tray adapters.** `linux/tray/adapters` (AppIndicator, 1,164),
    `macos/tray/adapters` and the Windows tray adapters (named only by the
    pause campaign): the icon state, the menu rebuild and the click routing.

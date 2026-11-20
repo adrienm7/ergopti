@@ -356,8 +356,18 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     `text_cipher.lua` on both drivers and macOS `phase_stats.lua`), then gate Lua pairing like
     `test_pairing.ahk`; the boot profilers, perf counters and keystroke integrity still need their own reading;
     the Swift retention replay runs in macOS CI only;
-  - the next campaigns in the report's order: the managed Ollama runtime drift, tray adapters, update and download
-    windows, pickers and prompts, metrics views, small native units, layout tool pages.
+  - managed Ollama runtime, taken on 2026-11-20
+    ([report](docs/audits/platform-parity/2026-11-20-managed-ollama/report.md)): OLL-01 (Linux pulls a
+    digest-mismatched model once more, classes in `_shared/ai/data/ollama_pull_errors.json`, vectors replayed by the
+    Windows and Linux suites), OLL-02 (`[llm] ollama_model_pull_timeout_ms` bounds a Windows pull instead of the
+    30 min install budget) and OLL-03 (stale owners) fixed. Left: OLL-04 free-space check on macOS and Linux and an
+    `ollama.no_space` message; OLL-05 the install's network and checksum classes (macOS markers never printed);
+    OLL-06 one readiness bound once the cold start is measured (field checks); OLL-07 old runtime versions left on
+    Windows and Linux; OLL-08 Linux reuse without a re-hash; OLL-09 macOS model delete through `ollama rm`; OLL-10
+    the macOS-only model repair; OLL-11 the lifecycle actions outside the parity table; OLL-12 the unused
+    `ollama-release.sh`; OLL-13 Linux readiness without listener ownership or the pinned version;
+  - the next campaigns in the report's order: tray adapters, update and download windows, pickers and prompts,
+    metrics views, small native units, layout tool pages.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
       channel's newest release through its required detached signature on both (`feed-only-install` tests, throwaway
       key in `feed_install_vectors.json`); without a key every feed row keeps the no-details refusal. Left, at release

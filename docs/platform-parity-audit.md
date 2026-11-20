@@ -179,6 +179,7 @@ named file is not a reviewed file.
 | ------------------------------ | -------------------------------------------------------------------------------------------------- |
 | Secure-field detection (focus) | [report](audits/platform-parity/2026-11-19-census/report.md#first-campaign-secure-field-detection) |
 | Logger engines                 | [report](audits/platform-parity/2026-11-20-logger-engines/report.md)                               |
+| Managed Ollama runtime         | [report](audits/platform-parity/2026-11-20-managed-ollama/report.md)                               |
 
 The logger-engines campaign (November 20, 2026) fixed LOG-01 to LOG-05,
 LOG-07 and LOG-08: the macOS level restore follows the manifest (eight names,
@@ -190,6 +191,18 @@ fallback prints the shared labels. One corpus,
 `_shared/tests/corpus/logger/parity_vectors.json`, is replayed by the three
 suites and the macOS native worker. Left open: LOG-06, lifecycle pairing is
 gated on Windows only (15 Lua call-site files to pair first).
+
+The managed Ollama campaign (November 20, 2026) fixed OLL-01 to OLL-03: Linux
+pulls a digest-mismatched model once more and then names the mismatch, as
+Windows and macOS do, from one shared class table
+(`_shared/ai/data/ollama_pull_errors.json`) and one corpus
+(`_shared/tests/corpus/llm/ollama_pull_error_vectors.json`); a Windows model
+pull has its own ceiling (`[llm] ollama_model_pull_timeout_ms`, read by Linux
+too) instead of the 30 min install budget; and the stale owners of the
+registry and the inventories were corrected. Left open: OLL-04 to OLL-13,
+among them the free-space check on macOS and Linux, the unlocalized install
+failure classes, the readiness bound (30 s on macOS, the install budget
+elsewhere; a field measure first) and the Linux listener ownership.
 
 ## Review status at resumption — November 12, 2026
 

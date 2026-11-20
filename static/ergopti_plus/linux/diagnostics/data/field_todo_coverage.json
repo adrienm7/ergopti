@@ -125,6 +125,12 @@
 			"not_testable": "Needs a local server (LM Studio or oMLX) running and a person choosing a model, an address and a key while paused, then asking for a rescan: the field report does not drive the model selector page."
 		},
 		{
+			"id": "managed_ollama_cold_start",
+			"title": "Managed Ollama cold start to readiness on a quiet desktop (OLL-06)",
+			"checks": [],
+			"not_testable": "Needs a quiet desktop timed twice, after a new login and right after the runtime's first install: the field report runs inside a busy session and does not install the runtime."
+		},
+		{
 			"id": "input_policies",
 			"title": "Branch wave3/input-policies: sticky delay, CapsWord menu, one-shot Shift device",
 			"checks": [
