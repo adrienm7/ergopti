@@ -102,7 +102,8 @@ var LAYOUT_ANALYSIS_SWAPS = (function () {
 			const rows = Object.assign({}, base.rows);
 			codes.forEach((code, i) => {
 				const to = codes[(i + 1) % codes.length];
-				rows[to] = [base.rows[code][0], base.rows[code][1], base.rows[to][2], base.rows[to][3]];
+				// The other levels (AltGr, a layout's own) stay on their key.
+				rows[to] = [base.rows[code][0], base.rows[code][1]].concat(base.rows[to].slice(2));
 			});
 			return Object.assign({}, base, { rows });
 		};

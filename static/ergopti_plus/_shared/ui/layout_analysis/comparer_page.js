@@ -3077,7 +3077,7 @@
 				.map((result) => ({ result, values: heatValuesOf(result, metric, null) }));
 			if (boards.length === 0) return;
 			const unit = heatUnit(metric);
-			const modifiers = new Set(Object.values(DATA.model.modifier_keys));
+			const modifiers = new Set(E.heldCodes());
 			// The space bar takes a share of the presses no other key comes near: the
 			// scale is the other keys', and the space bar is drawn at its darkest.
 			const extentOf = (values) =>
@@ -3468,7 +3468,7 @@
 		function drawBoard(box, result, layout, byCode, options) {
 			box.replaceChildren();
 			const board = E.keyboard(result.keyboard, result.profile || undefined);
-			const modifiers = new Set(Object.values(DATA.model.modifier_keys));
+			const modifiers = new Set(E.heldCodes());
 			const shown = board.codes.filter((code) => !modifiers.has(code));
 			const extent =
 				options.extent !== undefined

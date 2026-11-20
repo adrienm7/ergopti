@@ -70,9 +70,24 @@ var LAYOUT_ANALYSIS = (function () {
 	// ============================
 
 	const LAYER_IDS = ['base', 'shift', 'altgr', 'shift_altgr'];
-	// Modifier presses each layer adds: Shift, AltGr.
-	const LAYER_SHIFT = [0, 1, 0, 1];
-	const LAYER_ALTGR = [0, 0, 1, 1];
+	// The levels of a layout that declares none: each level's id, whether it
+	// holds Shift, and the other modifiers it holds (AltGr, the model's key).
+	const DEFAULT_LEVELS = Object.freeze(
+		LAYER_IDS.map((id, layer) =>
+			Object.freeze({
+				id,
+				shift: layer % 2 === 1,
+				hold: Object.freeze(layer >= 2 ? ['altgr'] : [])
+			})
+		)
+	);
+	// The modifier of the default levels; its keys come from the model.
+	const DEFAULT_MODIFIER = 'altgr';
+	const DEFAULT_MODIFIER_LABEL = 'AltGr';
+	// A level id, a modifier name: lower-case words joined by « _ ».
+	const LEVEL_NAME = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
+	// The held keys of a way that holds no modifier but Shift: shared, never written.
+	const NO_HELD = Object.freeze([]);
 	// A key press costs one; a held modifier half of one when choosing between
 	// two ways of typing a character.
 	const MODIFIER_COST = 0.5;
@@ -346,7 +361,7 @@ var LAYOUT_ANALYSIS = (function () {
 		const form = spec.geometry === 'ortho' ? 'iso' : spec.geometry;
 		// A board names its own outer columns (the ErgoDox's two pinky columns).
 		const outer = new Set(board3d && board3d.outer_keys ? board3d.outer_keys : model.outer_keys);
-		const modifierCodes = new Set(Object.values(model.modifier_keys));
+		const modifierCodes = new Set(heldCodes(model));
 		const homeCodes = new Set(Object.values(homeKeys));
 		const board = {
 			id: keyboardId,
@@ -398,10 +413,10 @@ var LAYOUT_ANALYSIS = (function () {
 			board.width.push(g.width);
 			board.home.push(homeCodes.has(code));
 			board.outer.push(outer.has(code));
-			// A wide modifier is pressed at its end nearest the home row.
+			// A wide modifier is pressed at its end nearest the home row: a
+			// left-hand one (left Shift, Caps Lock) at its right end.
 			if (modifierCodes.has(code) && !board3d) {
-				board.x[board.x.length - 1] =
-					code === model.modifier_keys.shift_for_right_hand ? g.col + g.width - 0.5 : g.col + 0.5;
+				board.x[board.x.length - 1] = finger < LEFT_THUMB ? g.col + g.width - 0.5 : g.col + 0.5;
 			}
 		}
 		board.homeOf = model.fingers.map((fingerId) => {
@@ -472,22 +487,104 @@ var LAYOUT_ANALYSIS = (function () {
 	// ======= 4/ Layouts ======
 	// =========================
 
+	const checkedLevels = new WeakMap();
+
+	/**
+	 * Checks the levels a layout declares beyond the default four (Neo's Mod3
+	 * and Mod4): the first four keep the default shape (none, Shift, one
+	 * modifier set, Shift with that set), so the readers, exports and other
+	 * analysers that know four levels read them as base, Shift, AltGr and
+	 * Shift+AltGr; the others follow. Each modifier names the keys that hold
+	 * it for a key of the left hand and for one of the right hand (a thumb
+	 * key's is the right hand's, as for Shift): the first the board has is
+	 * pressed, and a level whose modifier has none there types nothing on it.
+	 * @param {object} layout - The layout input, with levels and modifiers.
+	 * @returns {object[]|null} The levels, null for the default four.
+	 * @throws {Error} On malformed levels or modifiers, a modifier key the
+	 *   layout types on, or modifiers without levels.
+	 */
+	function checkLevels(layout) {
+		const { levels, modifiers } = layout;
+		if (levels === undefined && modifiers === undefined) return null;
+		if (checkedLevels.has(levels) && checkedLevels.get(levels) === modifiers) return levels;
+		const fail = (what) => {
+			throw new Error(`layout_analysis: ${layout.id} ${what}`);
+		};
+		if (!Array.isArray(levels) || levels.length <= LAYER_IDS.length)
+			fail(`levels must list more than ${LAYER_IDS.length} levels`);
+		if (!modifiers || typeof modifiers !== 'object') fail('levels need their modifiers');
+		const names = Object.keys(modifiers);
+		for (const name of names) {
+			const modifier = modifiers[name];
+			if (!LEVEL_NAME.test(name) || name === 'shift')
+				fail(`modifier ${name} is not a modifier name`);
+			if (!modifier || typeof modifier.label !== 'string' || modifier.label === '')
+				fail(`modifier ${name} needs a label`);
+			for (const side of ['for_left_hand', 'for_right_hand']) {
+				const codes = modifier[side];
+				if (!Array.isArray(codes) || codes.length === 0 || codes.some((c) => typeof c !== 'string'))
+					fail(`modifier ${name} needs its ${side} keys`);
+				for (const code of codes)
+					if ((layout.rows[code] || []).some((cell) => cell !== null))
+						fail(`types on ${code}, which holds its modifier ${name}`);
+			}
+		}
+		const ids = new Set();
+		const used = new Set();
+		levels.forEach((level, i) => {
+			if (!level || !LEVEL_NAME.test(level.id) || ids.has(level.id))
+				fail(`level ${i} has no id of its own`);
+			ids.add(level.id);
+			if (level.shift !== undefined && typeof level.shift !== 'boolean')
+				fail(`level ${level.id}: shift is true or false`);
+			const hold = level.hold === undefined ? [] : level.hold;
+			if (
+				!Array.isArray(hold) ||
+				hold.some((name) => !names.includes(name)) ||
+				new Set(hold).size !== hold.length
+			)
+				fail(`level ${level.id} holds an unknown modifier`);
+			for (const name of hold) used.add(name);
+		});
+		const holdOf = (i) => (levels[i].hold || []).slice().sort().join('+');
+		if (
+			holdOf(0) !== '' ||
+			levels[0].shift ||
+			holdOf(1) !== '' ||
+			!levels[1].shift ||
+			holdOf(2) === '' ||
+			levels[2].shift ||
+			holdOf(3) !== holdOf(2) ||
+			!levels[3].shift
+		)
+			fail('levels must start with none, Shift, a modifier set and Shift with that set');
+		const shapes = new Set(levels.map((level, i) => `${level.shift ? 1 : 0}|${holdOf(i)}`));
+		if (shapes.size !== levels.length) fail('levels hold the same modifiers twice');
+		for (const name of names) if (!used.has(name)) fail(`modifier ${name} is held by no level`);
+		checkedLevels.set(levels, modifiers);
+		return levels;
+	}
+
 	/**
 	 * Checks and returns a layout in the library shape.
 	 * @param {object} layout - {id, name, rows: code → [base, shift, altgr,
-	 *   shift_altgr], dead?: state → {typed: output | {dead: state}} (typed is
-	 *   a character, or « dead:<state> » for the dead key entering <state>),
-	 *   command?: code → letter, fingering?: 'standard' | 'angle'}. A cell is a
-	 *   string, null, or {dead: state}.
+	 *   shift_altgr, ...its own levels], dead?: state → {typed: output |
+	 *   {dead: state}} (typed is a character, or « dead:<state> » for the dead
+	 *   key entering <state>), command?: code → letter, fingering?: 'standard'
+	 *   | 'angle', levels? and modifiers? (checkLevels): [{id, shift?, hold?:
+	 *   modifier names}] and name → {label, for_left_hand, for_right_hand}}.
+	 *   A cell is a string, null, or {dead: state}.
 	 * @returns {object} The same layout, with empty dead/command maps filled in.
 	 * @throws {Error} On a malformed layout.
 	 */
 	function layoutFromRows(layout) {
 		if (!layout || typeof layout.id !== 'string' || typeof layout.rows !== 'object')
 			throw new Error('layout_analysis: a layout needs an id and rows');
+		const levels = checkLevels(layout);
+		const width = levels ? levels.length : LAYER_IDS.length;
 		for (const [code, row] of Object.entries(layout.rows)) {
-			if (!Array.isArray(row) || row.length !== LAYER_IDS.length)
-				throw new Error(`layout_analysis: ${layout.id}.${code} is not four cells`);
+			if (!Array.isArray(row) || row.length !== width)
+				throw new Error(`layout_analysis: ${layout.id}.${code} is not ${width} cells`);
 			for (const cell of row)
 				if (!(cell === null || typeof cell === 'string' || (cell && typeof cell.dead === 'string')))
 					throw new Error(`layout_analysis: ${layout.id}.${code} has an invalid cell`);
@@ -509,6 +606,9 @@ var LAYOUT_ANALYSIS = (function () {
 			rows: layout.rows,
 			command: layout.command || {},
 			dead: layout.dead || {},
+			// Absent for the default four levels (DEFAULT_LEVELS).
+			levels: levels || undefined,
+			modifiers: levels ? layout.modifiers : undefined,
 			// A registry layout's family and board (iso or ansi), when its family
 			// ships one layout per board: the Comparer's default selection.
 			family: layout.family || '',
@@ -576,6 +676,18 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
+	 * The keys that are only held, never typed on: the modifiers every board
+	 * has (Shift, AltGr: modifier_keys), then those a layout may hold as one of
+	 * its own level modifiers (held_keys: Caps Lock).
+	 * @param {object} [model] - analysis_model.json; the loaded data's when absent.
+	 * @returns {string[]} KeyboardEvent codes.
+	 */
+	function heldCodes(model) {
+		const m = model || data().model;
+		return Object.values(m.modifier_keys).concat(m.held_keys);
+	}
+
+	/**
 	 * The keys a layout types characters on: every finger-assigned key but the
 	 * held modifiers, the thumb keys, then the board-only keys (board_only_keys:
 	 * the ErgoDox's keys without a KeyboardEvent code, measured on that board
@@ -586,7 +698,7 @@ var LAYOUT_ANALYSIS = (function () {
 	 */
 	function typingCodes(model) {
 		const m = model || data().model;
-		const modifiers = new Set(Object.values(m.modifier_keys));
+		const modifiers = new Set(heldCodes(m));
 		const thumbs = new Set(m.thumb_keys);
 		return Object.keys(m.fingerings.standard)
 			.filter((code) => !modifiers.has(code))
@@ -717,11 +829,71 @@ var LAYOUT_ANALYSIS = (function () {
 			layers: joined(a.layers, b.layers),
 			shift: a.shift + b.shift,
 			altgr: a.altgr + b.altgr,
+			held: joinHeld(a.held, b.held),
 			dead: state !== null || a.dead || b.dead,
 			cost: a.cost + b.cost,
 			level: state === null ? b.level : `${state}/${b.level}`,
 			state: state === null ? b.state : state
 		};
+	}
+
+	const levelCache = new WeakMap();
+
+	/**
+	 * A layout's levels on a board: each level's id, its Shift presses, the
+	 * keys that hold its other modifiers for a key of each hand (null when the
+	 * board has no key for one of them: that level types nothing there). The
+	 * default four hold AltGr on the model's key for both hands.
+	 * @param {object} layout - Library shape (layoutFromRows).
+	 * @param {object} board - From keyboard().
+	 * @returns {{ids: string[], shift: number[], held: Array<[number[]|null,
+	 *   number[]|null]>}} held[level][0] for the left hand, [1] for the right
+	 *   hand and the thumbs.
+	 */
+	function levelTable(layout, board) {
+		const levels = layout.levels || DEFAULT_LEVELS;
+		let byBoard = levelCache.get(levels);
+		if (!byBoard || byBoard.modifiers !== layout.modifiers) {
+			byBoard = { modifiers: layout.modifiers, boards: new WeakMap() };
+			levelCache.set(levels, byBoard);
+		}
+		const cached = byBoard.boards.get(board);
+		if (cached) return cached;
+		const altgr = data().model.modifier_keys.altgr;
+		const modifiers = layout.levels
+			? layout.modifiers
+			: { [DEFAULT_MODIFIER]: { for_left_hand: [altgr], for_right_hand: [altgr] } };
+		const keyFor = (name, side) => {
+			const code = modifiers[name][side].find((c) => board.index.has(c));
+			return code === undefined ? -1 : board.index.get(code);
+		};
+		const table = { ids: [], shift: [], held: [] };
+		for (const level of levels) {
+			const hold = level.hold || [];
+			const keysOn = (side) => {
+				const keys = hold.map((name) => keyFor(name, side));
+				if (keys.some((k) => k < 0)) return null;
+				return keys.length === 0 ? NO_HELD : keys;
+			};
+			table.ids.push(level.id);
+			table.shift.push(level.shift ? 1 : 0);
+			table.held.push([keysOn('for_left_hand'), keysOn('for_right_hand')]);
+		}
+		byBoard.boards.set(board, table);
+		return table;
+	}
+
+	/** Which side of a modifier holds it for key k: 0 for the left hand, 1 for the right hand and the thumbs. */
+	function heldSide(board, k) {
+		const f = board.finger[k];
+		return board.hand[k] === 0 && f !== LEFT_THUMB && f !== RIGHT_THUMB ? 0 : 1;
+	}
+
+	/** The held keys of way a then way b, sharing an array when one holds none. */
+	function joinHeld(a, b) {
+		if (b.length === 0) return a;
+		if (a.length === 0) return b;
+		return joined(a, b);
 	}
 
 	/**
@@ -731,13 +903,18 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {{chars: Set<string>, dead: Set<string>, texts: Set<string>}|null} only
 	 */
 	function offerCells(core, layout, board, missing, only) {
+		const levels = levelTable(layout, board);
 		for (const code in layout.rows) {
 			const k = board.index.get(code);
 			if (k === undefined || (missing && missing.has(code))) continue;
 			const row = layout.rows[code];
-			for (let layer = 0; layer < LAYER_IDS.length; layer++) {
+			const side = heldSide(board, k);
+			for (let layer = 0; layer < row.length; layer++) {
 				const cell = row[layer];
 				if (cell === null) continue;
+				// A level whose modifier the board has no key for types nothing.
+				const held = levels.held[layer][side];
+				if (held === null) continue;
 				let map;
 				let key = cell;
 				let width = 1;
@@ -755,14 +932,17 @@ var LAYOUT_ANALYSIS = (function () {
 					!(map === core.ways ? only.chars : map === core.texts ? only.texts : only.dead).has(key)
 				)
 					continue;
+				const shift = levels.shift[layer];
 				const stroke = {
 					keys: [k],
 					layers: [layer],
-					shift: LAYER_SHIFT[layer],
-					altgr: LAYER_ALTGR[layer],
+					shift,
+					// Every held modifier but Shift: AltGr, or a layout's own (Mod3, Mod4).
+					altgr: held.length,
+					held,
 					dead: false,
-					cost: 1 + MODIFIER_COST * (LAYER_SHIFT[layer] + LAYER_ALTGR[layer]),
-					level: LAYER_IDS[layer]
+					cost: 1 + MODIFIER_COST * (shift + held.length),
+					level: levels.ids[layer]
 				};
 				if (map === core.texts) stroke.width = width;
 				offerWay(map, key, stroke);
@@ -859,6 +1039,7 @@ var LAYOUT_ANALYSIS = (function () {
 	function completeJoin(way, time, board) {
 		if (way.layers !== null) return;
 		way.layers = joined(time.p.layers, time.t.layers);
+		way.held = joinHeld(time.p.held, time.t.held);
 		way.level = `${way.state}/${time.t.level}`;
 		const closing = board.finger[way.keys[way.keys.length - 1]];
 		if (closing === LEFT_THUMB || closing === RIGHT_THUMB) way.terminated = true;
@@ -944,6 +1125,7 @@ var LAYOUT_ANALYSIS = (function () {
 								layers: null,
 								shift: prefix.shift + tail.shift,
 								altgr: prefix.altgr + tail.altgr,
+								held: null,
 								dead: true,
 								cost: prefix.cost + tail.cost,
 								level: null,
@@ -969,6 +1151,7 @@ var LAYOUT_ANALYSIS = (function () {
 							layers: null,
 							shift: prefix.shift + tail.shift,
 							altgr: prefix.altgr + tail.altgr,
+							held: null,
 							dead: true,
 							cost: prefix.cost + tail.cost,
 							level: null,
@@ -979,6 +1162,7 @@ var LAYOUT_ANALYSIS = (function () {
 						const list = map.get(target);
 						versions.set(list, version(list) + 1);
 						candidate.layers = joined(prefix.layers, tail.layers);
+						candidate.held = joinHeld(prefix.held, tail.held);
 						candidate.level = `${rule.state}/${tail.level}`;
 						// A dead key closed by a thumb key (the space bar, on any level)
 						// types its own sign: the fallback, never an alternative to
@@ -1317,7 +1501,8 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 		const compareRows = (a, b) => {
 			if (a === b) return;
-			for (let layer = 0; layer < LAYER_IDS.length; layer++) {
+			const width = Math.max(a ? a.length : 0, b ? b.length : 0);
+			for (let layer = 0; layer < width; layer++) {
 				const ca = a ? a[layer] : null;
 				const cb = b ? b[layer] : null;
 				if (sameCell(ca, cb)) continue;
@@ -1411,10 +1596,15 @@ var LAYOUT_ANALYSIS = (function () {
 		const cellChars = new Set();
 		const hasChar = new Uint8Array(graph.chars.length);
 		const hasState = new Uint8Array(graph.states.length);
+		const levels = levelTable(layout, board);
 		for (const code in layout.rows) {
 			if (!board.index.has(code) || missing.has(code)) continue;
-			for (const cell of layout.rows[code]) {
-				if (cell === null) continue;
+			const side = heldSide(board, board.index.get(code));
+			const row = layout.rows[code];
+			for (let layer = 0; layer < row.length; layer++) {
+				const cell = row[layer];
+				// As offerCells: a level the board holds no modifier key for types nothing.
+				if (cell === null || levels.held[layer][side] === null) continue;
 				if (typeof cell !== 'string') {
 					const s = graph.stateId.get(cell.dead);
 					if (s !== undefined) hasState[s] = 1;
@@ -1907,7 +2097,7 @@ var LAYOUT_ANALYSIS = (function () {
 		);
 		const metrics = m.metrics;
 		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
-		const report = typingReport(board, plan);
+		const report = typingReport(board, plan, layout);
 		const fingerIds = data().model.fingers;
 		const result = {
 			layout: {
@@ -2688,10 +2878,17 @@ var LAYOUT_ANALYSIS = (function () {
 		}
 		visit.char(char, seq, n);
 		for (const k of seq.keys) visit.press(k, n);
-		// The held modifiers: Shift by the other hand's pinky, AltGr by a thumb.
+		// The held modifiers: Shift by the other hand's pinky, the others on
+		// the keys of their level (AltGr by a thumb), a run of one key at once.
 		if (seq.shift > 0)
 			visit.press(shiftKeyFor(board, seq.keys[seq.keys.length - 1]), n * seq.shift);
-		if (seq.altgr > 0) visit.press(board.modifiers.altgr, n * seq.altgr);
+		const held = seq.held;
+		for (let i = 0; i < held.length; ) {
+			let j = i + 1;
+			while (j < held.length && held[j] === held[i]) j++;
+			visit.press(held[i], n * (j - i));
+			i = j;
+		}
 		const keys = seq.keys;
 		for (let i = 0; i + 1 < keys.length; i++) visit.bigram(keys[i], keys[i + 1], n);
 		for (let i = 0; i + 2 < keys.length; i++) visit.trigram(keys[i], keys[i + 1], keys[i + 2], n);
@@ -2844,6 +3041,7 @@ var LAYOUT_ANALYSIS = (function () {
 		if (a.shift !== b.shift || a.altgr !== b.altgr || a.dead !== b.dead) return false;
 		if (a.keys.length !== b.keys.length) return false;
 		for (let i = 0; i < a.keys.length; i++) if (a.keys[i] !== b.keys[i]) return false;
+		for (let i = 0; i < a.held.length; i++) if (a.held[i] !== b.held[i]) return false;
 		return true;
 	}
 
@@ -3104,7 +3302,11 @@ var LAYOUT_ANALYSIS = (function () {
 				layout.rows[code] && layout.rows[code][i] !== undefined ? layout.rows[code][i] : null;
 			const differs = (code) => {
 				if (before.rows[code] === after.rows[code]) return false;
-				for (let i = 0; i < LAYER_IDS.length; i++)
+				const width = Math.max(
+					before.rows[code] ? before.rows[code].length : 0,
+					after.rows[code] ? after.rows[code].length : 0
+				);
+				for (let i = 0; i < width; i++)
 					if (!sameCell(cellAt(before, code, i), cellAt(after, code, i))) return true;
 				return false;
 			};
@@ -3131,6 +3333,9 @@ var LAYOUT_ANALYSIS = (function () {
 			const layout = layoutFromRows(layoutInput);
 			if (boardFor(layout, keyboardId, opts.profile) !== board)
 				throw new Error('layout_analysis: a score session keeps the board it started on');
+			// The compiled ways hold each level's modifier keys (levelTable).
+			if (layout.levels !== firstLayout.levels || layout.modifiers !== firstLayout.modifiers)
+				throw new Error('layout_analysis: a score session keeps the levels it started on');
 			trials += 1;
 			const serial = trials;
 			// Compiled from the current layout: only the ways the changed cells and rules reach.
@@ -3205,7 +3410,7 @@ var LAYOUT_ANALYSIS = (function () {
 				typing() {
 					if (serial !== trials)
 						throw new Error("layout_analysis: a later trial replaced this trial's plan");
-					return typingReport(board, nextPlan);
+					return typingReport(board, nextPlan, layout);
 				},
 				commit() {
 					// A later trial wrote its plan over this one's (planContext's
@@ -3428,8 +3633,23 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 	}
 
-	// Held modifiers of each level, as the pages write them before a key.
-	const LEVEL_PREFIX = { base: '', shift: 'Shift+', altgr: 'AltGr+', shift_altgr: 'Shift+AltGr+' };
+	/**
+	 * The held modifiers of each level of a layout, as the pages write them
+	 * before a key (« Shift+AltGr+ », « Mod3+Mod4+ »).
+	 * @param {object} layout - Library shape, or its input.
+	 * @returns {Map<string, string>} Level id → prefix.
+	 */
+	function levelPrefixes(layout) {
+		const levels = checkLevels(layout) || DEFAULT_LEVELS;
+		const label = (name) =>
+			levels === DEFAULT_LEVELS ? DEFAULT_MODIFIER_LABEL : layout.modifiers[name].label;
+		return new Map(
+			levels.map((level) => [
+				level.id,
+				(level.shift ? 'Shift+' : '') + (level.hold || []).map((name) => `${label(name)}+`).join('')
+			])
+		);
+	}
 
 	/**
 	 * The « typed via » rows of an analysis, for the pages: each character a
@@ -3452,6 +3672,7 @@ var LAYOUT_ANALYSIS = (function () {
 		const legend = KEY_LEGEND;
 		const rows = layoutInput.rows || {};
 		const dead = layoutInput.dead || {};
+		const prefixes = levelPrefixes(layoutInput);
 		const label = (code, level) => {
 			const base = rows[code] ? rows[code][0] : null;
 			let name = code;
@@ -3461,7 +3682,7 @@ var LAYOUT_ANALYSIS = (function () {
 				const accent = legend.deadKeyText((dead[base.dead] || {})[' '] || '');
 				if (accent !== '') name = accent;
 			}
-			return LEVEL_PREFIX[level] + name;
+			return prefixes.get(level) + name;
 		};
 		const out = [];
 		for (const [char, ways] of Object.entries(result.typing.paths)) {
@@ -4140,7 +4361,13 @@ var LAYOUT_ANALYSIS = (function () {
 		const { ways } = compiled;
 		const right = rightNeighbours(board);
 		const real = (char) => (ways.get(char) || []).filter((way) => !way.substituted);
-		const placed = (char) => real(char).map((way) => [way.keys[way.keys.length - 1], way.level]);
+		// Each way's last key, level and level index (-1 behind a dead key).
+		const placed = (char) =>
+			real(char).map((way) => [
+				way.keys[way.keys.length - 1],
+				way.level,
+				way.dead ? -1 : way.layers[way.layers.length - 1]
+			]);
 		const share = (got, measured) =>
 			measured > 0 ? { value: (100 * got) / measured, measured } : null;
 
@@ -4155,16 +4382,11 @@ var LAYOUT_ANALYSIS = (function () {
 			if (o.length === 0 || c.length === 0) continue;
 			pairs++;
 			let best = 0;
-			for (const [ko, lo] of o)
-				for (const [kc, lc] of c) {
+			for (const [ko, lo, io] of o)
+				for (const [kc, lc, ic] of c) {
 					if (lo === lc && right[ko] === kc) best = Math.max(best, 1);
 					else if (lo === lc && right[kc] === ko) best = Math.max(best, 0.5);
-					else if (
-						ko === kc &&
-						LAYER_IDS.indexOf(lo) >= 0 &&
-						LAYER_IDS.indexOf(lo) < LAYER_IDS.indexOf(lc)
-					)
-						best = Math.max(best, 0.5);
+					else if (ko === kc && io >= 0 && io < ic) best = Math.max(best, 0.5);
 				}
 			pairScore += best;
 		}
@@ -5079,7 +5301,13 @@ var LAYOUT_ANALYSIS = (function () {
 		let cost = 0;
 		for (const k of keys) cost += pc.press[k];
 		if (way.shift > 0) cost += way.shift * pc.press[shiftKeyFor(pc.board, keys[keys.length - 1])];
-		if (way.altgr > 0) cost += way.altgr * pc.press[pc.board.modifiers.altgr];
+		const held = way.held;
+		for (let i = 0; i < held.length; ) {
+			let j = i + 1;
+			while (j < held.length && held[j] === held[i]) j++;
+			cost += (j - i) * pc.press[held[i]];
+			i = j;
+		}
 		for (let i = 0; i + 1 < keys.length; i++) cost += wayPair(pc, keys[i], keys[i + 1]);
 		for (let i = 0; i + 2 < keys.length; i++)
 			cost += wayTriple(pc, keys[i], keys[i + 1], keys[i + 2]);
@@ -6030,12 +6258,14 @@ var LAYOUT_ANALYSIS = (function () {
 	 * each was used, and the chords with their counts.
 	 * @param {object} board - From keyboard().
 	 * @param {object} plan - From planTyping().
+	 * @param {object} layout - The layout planned (library shape): its level ids.
 	 * @returns {{paths: object, chords: object, changed: number}} paths: char →
 	 *   [{kind, steps: [[code, level]], count}] best way first; chords: text →
 	 *   count; changed: characters typed otherwise than their cheapest way out
 	 *   of context (chord characters included).
 	 */
-	function typingReport(board, plan) {
+	function typingReport(board, plan, layout) {
+		const levels = levelTable(layout, board).ids;
 		const kind = (way) => {
 			if (way.substituted) return 'substitution';
 			if (way.width) return 'chord';
@@ -6045,7 +6275,7 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 		const describe = (way, count) => ({
 			kind: kind(way),
-			steps: way.keys.map((k, i) => [board.codes[k], LAYER_IDS[way.layers[i]]]),
+			steps: way.keys.map((k, i) => [board.codes[k], levels[way.layers[i]]]),
 			count
 		});
 		const paths = {};
@@ -6607,6 +6837,7 @@ var LAYOUT_ANALYSIS = (function () {
 		METRICS,
 		ACCESS_WEIGHTS,
 		LAYER_IDS,
+		heldCodes,
 		AnalysisError,
 		KEY_EVENTS,
 		KEY_COST_METRICS,

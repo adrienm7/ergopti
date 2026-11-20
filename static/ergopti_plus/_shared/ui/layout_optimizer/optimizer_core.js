@@ -587,9 +587,11 @@ var LAYOUT_OPTIMIZER = (function () {
 	function arrange(p, assignment, identity, dead) {
 		const rows = {};
 		for (const [code, row] of Object.entries(p.layout.rows)) rows[code] = row.slice();
-		// A thumb key the start left empty is a row only once something lands on it.
+		// A thumb key the start left empty is a row only once something lands on
+		// it, with a cell per level (four, or the layout's own: Neo's Mod4).
+		const width = p.layout.levels ? p.layout.levels.length : 4;
 		for (const slot of p.slots)
-			if (slot.code && !rows[slot.code]) rows[slot.code] = [null, null, null, null];
+			if (slot.code && !rows[slot.code]) rows[slot.code] = new Array(width).fill(null);
 		if (p.deadState !== null) {
 			// The layer's places replace the rules of the letters they follow.
 			for (const slot of p.slots)
@@ -615,7 +617,7 @@ var LAYOUT_OPTIMIZER = (function () {
 		for (const [code, letter] of Object.entries(p.layout.command))
 			if (!rows[code] || rows[code][0] !== letter) command[code] = letter;
 		const id = (identity && identity.id) || `${p.layout.id}_optimized`;
-		return {
+		const out = {
 			id,
 			name: (identity && identity.name) || id,
 			fingering: p.layout.fingering,
@@ -624,6 +626,10 @@ var LAYOUT_OPTIMIZER = (function () {
 			dead,
 			command
 		};
+		// The levels stay the start's (a score session keeps them).
+		if (p.layout.levels)
+			Object.assign(out, { levels: p.layout.levels, modifiers: p.layout.modifiers });
+		return out;
 	}
 
 	// ============================

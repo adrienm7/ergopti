@@ -87,6 +87,12 @@
  *    is the left thumb's; a rest key costs no travel and KanaMode is reached
  *    from the nearest rest; ISO and ANSI have no thumb key (a thumb letter is
  *    missing there), JIS has them on its thumbs.
+ * 18. A layout's own levels: every four-level library layout declared again
+ *    with an empty fifth level measures exactly as before; Neo's Mod3 and
+ *    Mod4 type their characters and press their own keys (the other hand's,
+ *    AltGr where ANSI has no key right of left Shift), a level whose key the
+ *    board lacks types nothing, the pages write « Mod4+ », a score session
+ *    keeps its levels, and malformed levels are refused.
  * ==============================================================================
  */
 
@@ -3601,6 +3607,189 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			near(incremental, full),
 			`thumb keys: scoreSession ${incremental} is not analyse()'s ${full} on « ${typed} »`
 		);
+	}
+}
+
+// ==========================================
+// ======= 18/ A layout's own levels =======
+// ==========================================
+
+// (layout-levels-2026-11-20) Neo's Mod3 and Mod4 are levels of their own:
+// before, the model had four levels, so Neo's ¿ ¡ and its level-4 dead ¨
+// were unsupported and its Mod3 was costed as AltGr on a thumb.
+{
+	// Every library layout of four levels declared again with a fifth, empty
+	// level and its third and fourth held on AltGr's key: the declared path
+	// measures exactly what the four default levels do.
+	const declared = (layout) => ({
+		id: layout.id,
+		name: layout.name,
+		fingering: layout.fingering,
+		rows: Object.fromEntries(
+			Object.entries(layout.rows).map(([code, row]) => [code, row.concat([null])])
+		),
+		dead: layout.dead,
+		command: layout.command,
+		levels: [
+			{ id: 'base' },
+			{ id: 'shift', shift: true },
+			{ id: 'altgr', hold: ['third'] },
+			{ id: 'shift_altgr', shift: true, hold: ['third'] },
+			{ id: 'spare', hold: ['spare'] }
+		],
+		modifiers: {
+			third: { label: 'AltGr', for_left_hand: ['AltRight'], for_right_hand: ['AltRight'] },
+			spare: { label: 'Spare', for_left_hand: ['AltRight'], for_right_hand: ['AltRight'] }
+		}
+	});
+	let differing = [];
+	for (const layout of library) {
+		if (layout.levels) continue;
+		const plain = E.analyse(layout, prepared, {});
+		const again = E.analyse(declared(layout), prepared, {});
+		if (
+			JSON.stringify(metricIds.map((id) => plain.metrics[id])) !==
+				JSON.stringify(metricIds.map((id) => again.metrics[id])) ||
+			plain.score.total !== again.score.total
+		)
+			differing.push(layout.id);
+	}
+	check(
+		differing.length === 0,
+		`levels: declared levels move the metrics of ${differing.length} layouts (${differing.slice(0, 5).join(', ')})`
+	);
+
+	// A QWERTY with Neo's levels: Mod3 on Caps Lock and the ISO key left of
+	// Enter, Mod4 on the key right of left Shift and on AltGr, each held by
+	// the other hand when the board has its key.
+	const qwerty = byId.get('qwerty');
+	const neoLevels = (extra) => ({
+		id: 'levels_test',
+		// Its modifier keys type nothing.
+		rows: Object.assign(
+			Object.fromEntries(
+				Object.entries(qwerty.rows)
+					.filter(([code]) => code !== 'Backslash' && code !== 'IntlBackslash')
+					.map(([code, row]) => [code, row.concat([null, null])])
+			),
+			extra
+		),
+		levels: [
+			{ id: 'base' },
+			{ id: 'shift', shift: true },
+			{ id: 'mod3', hold: ['mod3'] },
+			{ id: 'shift_mod3', shift: true, hold: ['mod3'] },
+			{ id: 'mod4', hold: ['mod4'] },
+			{ id: 'mod3_mod4', hold: ['mod3', 'mod4'] }
+		],
+		modifiers: {
+			mod3: {
+				label: 'Mod3',
+				for_left_hand: ['Backslash', 'CapsLock'],
+				for_right_hand: ['CapsLock', 'Backslash']
+			},
+			mod4: {
+				label: 'Mod4',
+				for_left_hand: ['AltRight'],
+				for_right_hand: ['IntlBackslash', 'AltRight']
+			}
+		}
+	});
+	const neo = neoLevels({
+		KeyF: ['f', 'F', null, null, '¡', null],
+		KeyJ: ['j', 'J', null, null, '¿', null],
+		KeyK: ['k', 'K', null, null, null, '∀']
+	});
+	const text = E.ngramsFromText('¿¡∀');
+	const presses = (keyboard) => {
+		const k = E.keyNgrams(neo, text, { keyboard });
+		const at = (code) => (k.board.index.has(code) ? k.presses[k.board.index.get(code)] : null);
+		return {
+			unsupported: k.unsupported,
+			caps: at('CapsLock'),
+			bksl: at('Backslash'),
+			lsgt: at('IntlBackslash'),
+			ralt: at('AltRight')
+		};
+	};
+	const iso = presses('iso');
+	check(
+		iso.unsupported === 0 && iso.lsgt === 2 && iso.ralt === 1 && iso.caps === 1 && iso.bksl === 0,
+		`levels: ¿ ¡ ∀ on ISO press ${JSON.stringify(iso)}, not Mod4 twice on the left key, once on AltGr, Mod3 once on Caps Lock`
+	);
+	// ANSI has no key right of left Shift: Mod4 falls to AltGr, as declared.
+	const ansi = presses('ansi');
+	check(
+		ansi.unsupported === 0 && ansi.lsgt === null && ansi.ralt === 3 && ansi.caps === 1,
+		`levels: ¿ ¡ ∀ on ANSI press ${JSON.stringify(ansi)}, not Mod4 three times on AltGr`
+	);
+	// The Corne has no key for Mod3: its level types nothing there.
+	const corne = presses('corne');
+	check(
+		corne.unsupported === 1 && corne.ralt === 2,
+		`levels: on the Corne, ∀ (Mod3+Mod4) is not unsupported or ¿ ¡ not on AltGr: ${JSON.stringify(corne)}`
+	);
+	const result = E.analyse(neo, text, {});
+	check(
+		result.metrics.unsupported === 0 && near(result.metrics.altgr_usage, 100),
+		`levels: Neo's levels count ${result.metrics.altgr_usage} % of their characters as held beyond Shift`
+	);
+	const session = E.scoreSession(neo, text, {});
+	check(
+		near(session.total, result.score.total),
+		`levels: scoreSession ${session.total} is not analyse()'s ${result.score.total}`
+	);
+	let kept = false;
+	try {
+		session.trial(Object.assign({}, neo, { levels: neo.levels.slice() }));
+	} catch (error) {
+		kept = /keeps the levels/.test(error.message);
+	}
+	check(kept, 'levels: a score session took a trial with other levels');
+	// The pages write each level's modifiers before the key: after e, ¿ is
+	// typed on j (no SFB with e's middle finger), after u on d.
+	const twice = neoLevels({
+		KeyD: ['d', 'D', '¿', null, null, null],
+		KeyJ: ['j', 'J', null, null, '¿', null]
+	});
+	const rows = E.typingRows(E.analyse(twice, E.ngramsFromText('e¿ u¿ e¿ u¿'), {}), twice);
+	const ways = (rows.find((row) => row.char === '¿') || { ways: [] }).ways.map((way) => way.keys);
+	check(
+		ways.includes('Mod3+d') && ways.includes('Mod4+j'),
+		`levels: ¿ is typed via ${JSON.stringify(ways)}, not « Mod3+d » and « Mod4+j »`
+	);
+	// Malformed levels are refused.
+	for (const [what, layout] of [
+		[
+			'a row of four cells',
+			Object.assign(neoLevels({}), { rows: { KeyA: ['a', 'A', null, null] } })
+		],
+		['a character on a modifier key', neoLevels({ CapsLock: ['x', 'X', null, null, null, null] })],
+		['no modifiers', Object.assign(neoLevels({}), { modifiers: undefined })],
+		[
+			'a third level with Shift',
+			Object.assign(neoLevels({}), {
+				levels: neoLevels({}).levels.map((level, i) =>
+					i === 2 ? Object.assign({}, level, { shift: true }) : level
+				)
+			})
+		],
+		[
+			'an unknown modifier',
+			Object.assign(neoLevels({}), {
+				levels: neoLevels({}).levels.map((level, i) =>
+					i === 4 ? { id: 'mod5', hold: ['mod5'] } : level
+				)
+			})
+		]
+	]) {
+		let refused = false;
+		try {
+			E.analyse(layout, text, {});
+		} catch (error) {
+			refused = /layout_analysis/.test(error.message);
+		}
+		check(refused, `levels: ${what} was not refused`);
 	}
 }
 

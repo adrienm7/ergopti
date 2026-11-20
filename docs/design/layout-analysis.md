@@ -88,7 +88,9 @@ All functions are on `LAYOUT_ANALYSIS`. Every invalid input throws.
   a string or `{dead: "<next state>"}` (chains). A key `dead:<state>` stands for the
   dead key that enters `<state>` pressed in this state (Ergo-L's 1dk twice). `command` maps a code to the
   letter its Ctrl/Cmd shortcut uses when it differs from the base layer.
-  `fingering` is `standard` or `angle`.
+  `fingering` is `standard` or `angle`. A layout with more levels (Neo's Mod3
+  and Mod4) declares them as `levels` and `modifiers` (« Levels » below), and
+  its rows have one cell per level.
 - `layoutFromComposerSource(source, codes)` → the same shape from a layout
   composer source (`LayoutComposer.parseSource` of a `.keylayout`, or
   `referenceSource`): the way the Studio analyses the layout being edited (its
@@ -383,6 +385,28 @@ pressed by the left thumb and Digit6 by the right index (maintainer,
 2026-11-14). Shift is pressed by the pinky of the other hand (ShiftRight for a
 left-hand key), AltGr by the right thumb. The **order** of a finger runs from the pinky (0) to the index (3);
 moving to a higher order is **inward**.
+
+**Levels.** A layout has four levels unless it declares its own: `levels` lists
+each level as `{id, shift?, hold?}`, `hold` naming the modifiers it holds
+besides Shift, and `modifiers` gives each one a `label` (« Mod3 ») and the keys
+that hold it for a key of the left hand (`for_left_hand`) and of the right hand
+and the thumbs (`for_right_hand`), first the one pressed, then the one a board
+without it presses. The first four levels keep the default shape (none, Shift,
+a modifier set, Shift with that set), so the readers, exports and other
+analysers that know four levels read them as base, Shift, AltGr and
+Shift+AltGr; the others follow (the Neo family: Mod3 on Caps Lock and the ISO
+key left of Enter, Mod4 on the key right of left Shift and on AltGr, held by
+the other hand; Mod3+Mod4 is level 6). A held modifier is costed as AltGr is:
+its key is pressed once per character (finger load, distance,
+`modifier_usage`, `altgr_usage`, which counts every modifier held but Shift),
+never in the bigrams or trigrams, and each adds `MODIFIER_COST` to the way's
+cost. A level whose modifier has no key on the board (Neo's Mod3 on the Corne)
+types nothing there. Caps Lock is in the fingerings as a key only held
+(`held_keys`), so a board may lack it; a modifier key the layout types on is
+refused. The default levels hold AltGr on `modifier_keys.altgr` for both
+hands, and declaring them again with an empty fifth level measures every
+library layout exactly as before (`tools/test/test-layout-analysis-engine.cjs`,
+section 18).
 
 **Boards.** Besides the row-staggered `iso`, `iso_angle`, `ansi`, `jis`, `abnt`
 and `ortho`, the keyboards include `corne`, `planck`, `ergodox`, `moonlander` and

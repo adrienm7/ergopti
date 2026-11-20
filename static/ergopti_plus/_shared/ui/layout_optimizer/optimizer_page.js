@@ -1198,7 +1198,7 @@
 			box.replaceChildren();
 			const drawn = [];
 			const board = E.keyboard($('lo-keyboard').value);
-			const modifiers = new Set(Object.values(DATA.model.modifier_keys));
+			const modifiers = new Set(E.heldCodes());
 			const minX = Math.min(...board.x) - 0.5;
 			const maxX = Math.max(...board.x) + 0.5;
 			const maxY = Math.max(...board.y);
@@ -1967,7 +1967,7 @@
 		 */
 		function drawBoardTable(start, best, changed) {
 			const board = E.keyboard($('lo-keyboard').value);
-			const modifiers = new Set(Object.values(DATA.model.modifier_keys));
+			const modifiers = new Set(E.heldCodes());
 			const where = keyPlaces(board, modifiers);
 			const keys = board.codes
 				.map((code, k) => ({ code, x: board.x[k], y: board.y[k] }))
