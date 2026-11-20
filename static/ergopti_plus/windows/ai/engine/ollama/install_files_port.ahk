@@ -41,7 +41,8 @@ class OllamaInstallFilesPort {
 	}
 
 	/**
-	 * @param {String} Action Explicit download, prepare, publish, cleanup or cleanup_partial.
+	 * @param {String} Action Explicit download, prepare, publish, cleanup, cleanup_partial,
+	 * inspect, retire_runtime or retire_versions.
 	 * @param {Map} Request Captured native argument values; no shell text.
 	 * @param {Map} Authority authorize/is_current from the shared request owner.
 	 * @param {Func} OnResult Guarded logical completion; physical evidence always
@@ -58,7 +59,7 @@ class OllamaInstallFilesPort {
 		if this.CallbacksRetired
 			return false
 		if !(Request is Map) || !(Authority is Map)
-				|| Action != "download" && Action != "prepare" && Action != "publish" && Action != "cleanup" && Action != "cleanup_partial" && Action != "inspect" && Action != "retire_runtime"
+				|| Action != "download" && Action != "prepare" && Action != "publish" && Action != "cleanup" && Action != "cleanup_partial" && Action != "inspect" && Action != "retire_runtime" && Action != "retire_versions"
 				|| !HasMethod(OnResult, "Call")
 				|| !HasMethod(Authority.Get("authorize", 0), "Call")
 				|| !HasMethod(Authority.Get("is_current", 0), "Call")

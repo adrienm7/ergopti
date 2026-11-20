@@ -1109,7 +1109,73 @@ class OllamaManagedBootstrap {
 		if HasMethod(this.OnReady, "Call")
 			this.OnReady.Call()
 		this.OnReady := 0
+		this._RetireEarlierVersions()
 		return true
+	}
+
+	/**
+	 * OLL-07: a new pin publishes beside the previous version (about 1.4 GB),
+	 * which macOS replaces. Once the pinned version answered as the running
+	 * daemon, the helper removes every other version its own receipt proves
+	 * Ergopti's; the version in use is never a candidate. A refusal is logged
+	 * and the next start, which lists the leaves again, retries it.
+	 * @returns {Boolean} A retirement was dispatched.
+	 */
+	_RetireEarlierVersions() {
+		try Earlier := this._EarlierVersionLeaves()
+		catch as Err {
+			LoggerError("LLM.managed", "The managed Ollama versions could not be listed; the next start retries: {1}.", Err.Message)
+			return false
+		}
+		if !Earlier.Length
+			return false
+		if this.Files.HasOwner() {
+			LoggerWarn("LLM.managed", "{1} earlier Ollama runtime version(s) kept: the file helper is busy; the next start retries.", Earlier.Length)
+			return false
+		}
+		LoggerStart("LLM.managed", "Removing {1} earlier Ollama runtime version(s)…", Earlier.Length)
+		this.LastReceipt := 0
+		this.CleanupRunning := false
+		Request := this._BaseRequest()
+		Request["TicketId"] := this._Ticket()
+		Authority := Map("authorize", ObjBindMethod(this, "_Authorize"),
+			"is_current", ObjBindMethod(this, "_Authorize"))
+		; A file helper action, not a program: _Run would fail the running flow.
+		Action := "retire_versions"
+		try Accepted := this._True(this.Files.Run(Action, Request, Authority,
+			ObjBindMethod(this, "_EarlierVersionsRetired")))
+		catch as Err
+			Accepted := false
+		if !Accepted
+			LoggerError("LLM.managed", "The earlier Ollama runtime versions were not removed: the helper refused the dispatch; the next start retries.")
+		return Accepted
+	}
+
+	; Leaf names under versions other than the one this flow started. The helper
+	; proves ownership; this listing only spares a helper launch at each start.
+	_EarlierVersionLeaves() {
+		if this.Port is Map
+			return this.Port.Has("version_leaves") ? this.Port["version_leaves"].Call() : []
+		SplitPath(this.Target["version_path"], &Current, &Versions)
+		Earlier := []
+		Loop Files Versions . "\*", "DF"
+			if A_LoopFileName != Current
+				Earlier.Push(A_LoopFileName)
+		return Earlier
+	}
+
+	_EarlierVersionsRetired(Terminal) {
+		Receipt := this.LastReceipt
+		Removed := Receipt is Map && Receipt.Get("removed", 0) is Array ? Receipt["removed"].Length : 0
+		if (Terminal.Get("exit", "") is Integer) && Terminal["exit"] == 0 && Receipt is Map
+				&& this._True(Receipt.Get("ok", false)) {
+			LoggerSuccess("LLM.managed", "Removed {1} earlier Ollama runtime version(s).", Removed)
+			return true
+		}
+		Reason := Receipt is Map ? Receipt.Get("error", "no receipt") : "no receipt"
+		LoggerError("LLM.managed", "Earlier Ollama runtime versions kept after removing {1}; the next start retries: {2}.",
+			Removed, Reason)
+		return false
 	}
 
 	_ServerExited(ExitCode, Target) {
@@ -1284,7 +1350,7 @@ class OllamaManagedBootstrap {
 		return this._RetirePolling()
 	}
 
-	/** Keeps installed versions and model files; only owned temporary files retire. */
+	/** Keeps model files and the pinned version; earlier ones retire once it runs. */
 	CanReplace() {
 		return !this.Files.HasOwner() && !this.Runtime.HasOwner() && !IsObject(this.PullTask) && this.Debts.Count == 0
 			&& (this.Port is Map || LLM_AuxRetryCleanupDebt())

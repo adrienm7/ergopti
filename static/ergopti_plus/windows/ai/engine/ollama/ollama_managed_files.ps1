@@ -4,7 +4,7 @@
 
 [CmdletBinding()]
 param(
-	[ValidateSet('', 'prepare', 'publish', 'cleanup', 'cleanup_partial', 'inspect', 'retire_runtime')][string]$Action = '',
+	[ValidateSet('', 'prepare', 'publish', 'cleanup', 'cleanup_partial', 'inspect', 'retire_runtime', 'retire_versions')][string]$Action = '',
 	[string]$ManagedRoot = '',
 	[string]$CataloguePath = '',
 	[string]$CatalogueSha256 = '',
@@ -1060,6 +1060,84 @@ function Remove-OllamaRuntimeReceipt($Root, [string]$ExpectedRoot, [string]$Tick
 	} finally { $stream.Dispose() }
 }
 
+# OLL-07: a new pin publishes beside the previous version, about 1.4 GB each.
+# Called only once the pinned version answered as the running daemon, so every
+# other leaf is an earlier one. A leaf is retired only when its own prepared
+# receipt proves it (Open-OllamaPreparedStage: identities, bytes, hashes and a
+# held inventory with no reparse point). It first moves out of versions as its
+# original private stage, then the journalled stage cleanup removes it, so an
+# interruption leaves a stage the next start finishes. A leaf in use by a
+# process refuses its exact handles or the rename and is kept for that retry.
+function Remove-OllamaEarlierVersions($Root, $Source, [string]$Ticket) {
+	if ($Ticket -cnotmatch '^[0-9a-f]{32}\z') { throw 'Version retirement needs its originating private ticket.' }
+	$current = $Source.version + '-' + $Source.asset + '-' + $Source.pin.sha256
+	if ([Ergopti.Ollama.ManagedNative]::PathIsAbsent([IO.Path]::Combine($Root.versions, $current))) {
+		throw 'Earlier versions are retired only beside the published pinned version.'
+	}
+	$removed = [Collections.Generic.List[string]]::new()
+	$kept = [Collections.Generic.List[object]]::new()
+	# A journal names a leaf an earlier call admitted and moved out of versions.
+	foreach ($entry in @(Get-ChildItem -LiteralPath $Root.path -Force -Filter '.retire-*.json')) {
+		try {
+			if ($entry.Name -cnotmatch '^\.retire-([0-9a-f]{32})\.json\z') { throw 'An unknown retirement journal name.' }
+			$owned = $Matches[1]
+			$journal = Open-OllamaReadFile $entry.FullName $true
+			try {
+				$record = Read-OllamaJsonStream $journal
+				if ($record.kind -cne 'ollama-retire' -or $record.ticket -cne $owned -or $record.root_identity -cne $Root.identity -or
+					$record.leaf -ceq $current) { throw 'A foreign retirement journal cannot be followed.' }
+				[void](Remove-OllamaPreparedStage $Root $owned $record.identity $record.manifest_sha256)
+				Remove-OllamaExactFile $journal
+			} finally { $journal.Dispose() }
+		} catch { $kept.Add([ordered]@{ name = $entry.Name; error = $_.Exception.Message }) }
+	}
+	foreach ($entry in @(Get-ChildItem -LiteralPath $Root.versions -Force)) {
+		if ($entry.Name -ceq $current) { continue }
+		$handle = [IntPtr]::Zero
+		$stage = $null
+		try {
+			if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'A reparse point is never followed or removed.' }
+			if (-not $entry.PSIsContainer -or
+				$entry.Name -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+-windows-(?:amd64|arm64)-[0-9a-f]{64}\z') {
+				throw 'An entry that is no managed version leaf is kept.'
+			}
+			$handle = [Ergopti.Ollama.ManagedNative]::OpenDirectory($entry.FullName, $true)
+			$receiptStream = Open-OllamaReadFile ([IO.Path]::Combine($entry.FullName, 'prepared.json'))
+			try { $digest = Get-OllamaStreamHash $receiptStream; $receipt = Read-OllamaJsonStream $receiptStream }
+			finally { $receiptStream.Dispose() }
+			if ($receipt.ticket -cnotmatch '^[0-9a-f]{32}\z') { throw 'The version receipt names no private ticket.' }
+			$stage = Open-OllamaPreparedStage $Root $receipt.ticket $receipt.identity $digest $false $entry.FullName $handle
+			$stagePath = [IO.Path]::Combine($Root.path, '.stage-' + $receipt.ticket)
+			if (-not [Ergopti.Ollama.ManagedNative]::PathIsAbsent($stagePath)) { throw 'The version stage name is already taken.' }
+			$journalPath = [IO.Path]::Combine($Root.path, '.retire-' + $receipt.ticket + '.json')
+			Write-OllamaOwnedJson $journalPath ([ordered]@{ kind = 'ollama-retire'; ticket = $receipt.ticket;
+				root_identity = $Root.identity; identity = $receipt.identity; manifest_sha256 = $digest; leaf = $entry.Name })
+			# A directory rename refuses open descendant handles: only children close.
+			Close-OllamaPreparedChildren $stage
+			$stage = $null
+			[Ergopti.Ollama.ManagedNative]::RenameCreate($handle, $stagePath)
+			$closed = [Ergopti.Ollama.ManagedNative]::CloseHandle($handle)
+			$handle = [IntPtr]::Zero
+			if (-not $closed) { throw 'The moved version retains its directory close debt.' }
+			[void](Remove-OllamaPreparedStage $Root $receipt.ticket $receipt.identity $digest)
+			$journal = Open-OllamaReadFile $journalPath $true
+			Remove-OllamaExactFile $journal
+			$removed.Add($entry.Name)
+		} catch {
+			$kept.Add([ordered]@{ name = $entry.Name; error = $_.Exception.Message })
+		} finally {
+			if ($null -ne $stage) { Close-OllamaPreparedChildren $stage }
+			if ($handle -ne [IntPtr]::Zero -and -not [Ergopti.Ollama.ManagedNative]::CloseHandle($handle)) {
+				[Console]::Error.WriteLine('Version retirement retains a directory close debt.')
+			}
+		}
+	}
+	$result = [ordered]@{ ok = ($kept.Count -eq 0); phase = 'versions_retired'; ticket = $Ticket;
+		current = $current; removed = @($removed.ToArray()); kept = @($kept.ToArray()) }
+	if ($kept.Count -ne 0) { $result.error = $kept[0].name + ': ' + $kept[0].error }
+	return $result
+}
+
 if ($MyInvocation.InvocationName -ne '.') {
 	# ShellRunner reads the physical stream through FileRead: its first bytes
 	# select decoding for every progressive and final JSON receipt. Emit one
@@ -1086,6 +1164,10 @@ if ($MyInvocation.InvocationName -ne '.') {
 				$result = Inspect-OllamaPublishedVersion $root $archive
 			}
 			'retire_runtime' { $result = Remove-OllamaRuntimeReceipt $root $RootIdentity $TicketId $RuntimeTicket $ReadyFileIdentity $ReadyImageSha256 }
+			'retire_versions' {
+				$archive = Open-OllamaReleaseSource $CataloguePath $CatalogueSha256 $AssetId
+				$result = Remove-OllamaEarlierVersions $root $archive $TicketId
+			}
 			'prepare' {
 				$archive = Read-OllamaPinnedArchive $CataloguePath $CatalogueSha256 $AssetId $ArchivePath $MaxExpandedBytes $MaxEntries
 				$result = Prepare-OllamaManagedStage $root $archive $TicketId $true
@@ -1102,11 +1184,13 @@ if ($MyInvocation.InvocationName -ne '.') {
 		}
 		if ($null -ne $stage) { Close-OllamaPreparedStage $stage; $stage = $null }
 		if ($null -ne $archive) {
-			if ($Action -eq 'inspect') { $archive.stream.Dispose() } else { Close-OllamaPinnedArchive $archive }
+			if ($Action -in @('inspect', 'retire_versions')) { $archive.stream.Dispose() } else { Close-OllamaPinnedArchive $archive }
 			$archive = $null
 		}
 		Close-OllamaManagedRoot $root; $root = $null
 		[Console]::Out.WriteLine(($result | ConvertTo-Json -Depth 12 -Compress))
+		# A kept earlier version is a refusal the caller logs and retries next start.
+		if (-not $result.ok) { exit 1 }
 	} catch {
 		$failure = [ordered]@{ ok = $false; phase = 'refused'; cleanup_pending = $true; ticket = $TicketId;
 			error = $_.Exception.Message }
@@ -1119,7 +1203,7 @@ if ($MyInvocation.InvocationName -ne '.') {
 	} finally {
 		if ($null -ne $stage) { Close-OllamaPreparedStage $stage }
 		if ($null -ne $archive) {
-			if ($Action -eq 'inspect') { $archive.stream.Dispose() } else { Close-OllamaPinnedArchive $archive }
+			if ($Action -in @('inspect', 'retire_versions')) { $archive.stream.Dispose() } else { Close-OllamaPinnedArchive $archive }
 		}
 		if ($null -ne $root) { Close-OllamaManagedRoot $root }
 	}

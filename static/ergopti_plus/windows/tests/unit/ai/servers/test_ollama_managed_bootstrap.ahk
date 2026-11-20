@@ -166,6 +166,108 @@ _G4B_PullCeilingFromRegistry() {
 }
 Test("managed bootstrap: the pull ceiling comes from the timing registry (OLL-02)", _G4B_PullCeilingFromRegistry)
 
+; OLL-07 (2026-11-20 managed Ollama campaign): a new pin published beside the
+; previous version and nothing removed it, about 1.4 GB left at each update.
+_G4B_Count(Calls, Action) {
+	Count := 0
+	for Call in Calls
+		if Call == Action
+			Count += 1
+	return Count
+}
+
+_G4B_RetireAfterReady() {
+	F := _G4B_Fixture()
+	try {
+		F.Existing := true
+		F.VersionLeaves := ["0.23.0-windows-amd64-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+		F.Start()
+		AssertEqual(0, _G4B_Count(F.Calls, "retire_versions"), "nothing retires before the pinned version runs")
+		F.Runtime.PublishReady()
+		AssertEqual(1, F.ReadyCalls)
+		AssertEqual(1, _G4B_Count(F.Calls, "retire_versions"), "the earlier version retires once the pinned one answered")
+		Request := F.Requests[F.Requests.Length]
+		AssertEqual(Request["CatalogueSha256"], F.Flow.Plan["CatalogueSha256"],
+			"the helper keeps the version the admitted catalogue pins")
+		AssertEqual(Request["ManagedRoot"], "C:\managed")
+		AssertTrue(RegExMatch(Request["TicketId"], "^[0-9a-f]{32}$"), "the retirement owns its private ticket")
+		AssertTrue(F.Flow.Ready, "the retirement never withdraws the running runtime")
+		AssertEqual(0, F.Runtime.Stops)
+	} finally F.Close()
+}
+Test("managed bootstrap: earlier runtime versions retire once the pinned one runs (oll-07)", _G4B_RetireAfterReady)
+
+_G4B_RetireNeedsPinnedVersion() {
+	F := _G4B_Fixture()
+	try {
+		F.Existing := true
+		F.VersionLeaves := ["0.23.0-windows-amd64-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+		F.Version := "0.23.0"
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(1, F.FailedCalls)
+		AssertEqual(0, _G4B_Count(F.Calls, "retire_versions"),
+			"a daemon answering another version proves nothing about the pinned one")
+	} finally F.Close()
+}
+Test("managed bootstrap: a daemon of another version retires nothing (oll-07)", _G4B_RetireNeedsPinnedVersion)
+
+_G4B_RetireOnlyWhenEarlier() {
+	F := _G4B_Fixture()
+	try {
+		F.Existing := true
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(1, F.ReadyCalls)
+		AssertEqual(0, _G4B_Count(F.Calls, "retire_versions"), "no helper launch when only the pinned version is present")
+	} finally F.Close()
+}
+Test("managed bootstrap: only the pinned version present launches no retirement (oll-07)", _G4B_RetireOnlyWhenEarlier)
+
+_G4B_RetireRefusalLogged() {
+	F := _G4B_Fixture()
+	try {
+		F.Existing := true
+		F.VersionLeaves := ["0.23.0-windows-amd64-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+		F.RetireRefusal := "0.23.0-windows-amd64-cccc: fixture refusal oll-07"
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(1, F.ReadyCalls, "a kept earlier version does not fail the running runtime")
+		AssertEqual(0, F.FailedCalls)
+		AssertTrue(F.Flow.Ready)
+		Logged := false
+		for Line in LoggerRingBufferSnapshot()
+			if InStr(Line, "the next start retries: 0.23.0-windows-amd64-cccc: fixture refusal oll-07")
+				Logged := true
+		AssertTrue(Logged, "the refusal is logged with its reason, not hidden")
+		F.Flow.Cancel()
+		; The next start lists the leaves again and retries.
+		F.RetireRefusal := ""
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(2, _G4B_Count(F.Calls, "retire_versions"), "the next start retries the kept version")
+	} finally F.Close()
+}
+Test("managed bootstrap: a refused removal is logged and retried at the next start (oll-07)", _G4B_RetireRefusalLogged)
+
+; The helper's own cases (test_ollama_install_files.ps1) prove each leaf before
+; removing it; the native file port must admit the action at all.
+_G4B_RetireHelperAction() {
+	Errors := []
+	Port := OllamaInstallFilesPort(Map("helper", "C:\helper.ps1", "powershell", "C:\powershell.exe",
+		"capture_bytes", 4096, "spawn", (*) => 0, "on_physical", (*) => true,
+		"on_error", (Phase, Err) => Errors.Push(Phase)))
+	Refused := Map("authorize", (*) => false, "is_current", (*) => true)
+	Request := Map("ManagedRoot", "C:\managed", "TicketId", "11111111111111111111111111111111")
+	try Accepted := Port.Run("retire_versions", Request, Refused, (*) => true)
+	catch TypeError
+		Accepted := "rejected"
+	AssertEqual(false, Accepted, "the port admits retire_versions and only its authority refuses it")
+	AssertEqual(0, Errors.Length)
+	AssertFalse(Port.HasOwner(), "a refused admission retains no owner")
+}
+Test("managed bootstrap: the native file port admits the version retirement (oll-07)", _G4B_RetireHelperAction)
+
 class _G4B_Fixture {
 	__New() {
 		global _LLM_Deps_Epoch, LLM_OLLAMA_BASE_URL, _LLM_Deps_State, _LLM_Deps_Checking
@@ -192,6 +294,10 @@ class _G4B_Fixture {
 		this.PullExit := 0
 		; Each pull's [exit code, output], in order; 0 keeps PullExit for every pull.
 		this.PullScript := 0
+		; Leaf names beside the started version, and a helper refusal reason or "".
+		this.VersionLeaves := []
+		this.RetireRefusal := ""
+		this.Requests := []
 		this.Files := _G4B_Files(this)
 		this.Runtime := _G4B_Runtime(this)
 	}
@@ -204,7 +310,8 @@ class _G4B_Fixture {
 		Port := Map("plan", Plan, "files", this.Files, "runtime", this.Runtime,
 			"current", (*) => this.CurrentValue, "clock", (*) => this.Now,
 			"consent", ObjBindMethod(this, "Consent"), "models", ObjBindMethod(this, "Models"),
-			"version", ObjBindMethod(this, "VersionReceipt"), "pull", ObjBindMethod(this, "Pull"))
+			"version", ObjBindMethod(this, "VersionReceipt"), "pull", ObjBindMethod(this, "Pull"),
+			"version_leaves", (*) => this.VersionLeaves)
 		this.Flow := OllamaManagedBootstrap(this.Model, 9101,
 			(*) => this.ReadyCalls += 1, (*) => this.FailedCalls += 1, Port, Silent)
 		this.Flow.Begin()
@@ -270,6 +377,7 @@ class _G4B_Files {
 		F := this.Fixture
 		AssertTrue(Authority["authorize"].Call(Action, Request), "Actual flow admits the exact captured request.")
 		F.Calls.Push(Action)
+		F.Requests.Push(Request.Clone())
 		Receipt := Map("ok", true, "ticket", Request.Get("TicketId", "11111111111111111111111111111111"),
 			"root_identity", "12345678:1234567890123456", "stage_identity", "23456789:2345678901234567",
 			"version_identity", "23456789:2345678901234567",
@@ -280,6 +388,15 @@ class _G4B_Files {
 			case "download": Receipt["phase"] := "downloaded", Receipt["archive"] := "C:\managed\archive.zip"
 			case "prepare": Receipt["phase"] := "prepared"
 			case "publish": Receipt["phase"] := "published"
+			case "retire_versions":
+				Receipt["phase"] := "versions_retired"
+				Receipt["removed"] := F.RetireRefusal == "" ? F.VersionLeaves.Clone() : []
+				if F.RetireRefusal != "" {
+					Receipt["ok"] := false, Receipt["error"] := F.RetireRefusal
+					F.Flow.LastReceipt := Receipt
+					Done.Call(Map("exit", 1, "exit_observed", true, "output_observed", true))
+					return true
+				}
 			default: Receipt["phase"] := "retired"
 		}
 		F.Flow.LastReceipt := Receipt

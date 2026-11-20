@@ -44,11 +44,11 @@ function Must-Refuse([scriptblock]$Body) {
 	try { & $Body | Out-Null } catch { $refused = $true }
 	Assert-Receipt $refused 'The actual native owner must refuse this operation.'
 }
-function Open-Fixture([string]$Name, [long]$Budget = 0, [int]$Count = 0) {
+function Open-Fixture([string]$Name, [long]$Budget = 0, [int]$Count = 0, [string]$Version = '0.24.0') {
 	$receipt = $receipts.PSObject.Properties[$Name].Value
 	# This independent fixture catalogue admits only inert test payloads. It is
 	# never copied over the authoritative production catalogue.
-	$catalogue = [ordered]@{ schema_version = 1; version = '0.24.0'; assets = [ordered]@{
+	$catalogue = [ordered]@{ schema_version = 1; version = $Version; assets = [ordered]@{
 		'windows-amd64' = [ordered]@{ filename = 'ollama-windows-amd64.zip'; bytes = $receipt.bytes; sha256 = $receipt.sha256 }
 	} }
 	$path = [IO.Path]::Combine($sourcePath, $Name + '-' + (++$script:source_index) + '.json')
@@ -252,7 +252,61 @@ try {
 			if ($handle -ne [IntPtr]::Zero) { Assert-Receipt ([Ergopti.Ollama.ManagedNative]::CloseHandle($handle)) 'Fixture cleanup closes retained creation handle.' }
 		}
 	}
+	# OLL-07: a new pin published beside the previous version and nothing removed it.
+	function Publish-FixtureVersion([string]$Version) {
+		$source = Open-Fixture 'portable' 0 0 $Version
+		try {
+			$ticket = [Guid]::NewGuid().ToString('N')
+			$made = Prepare-OllamaManagedStage $root $source $ticket
+			$stage = Open-OllamaPreparedStage $root $ticket $made.stage_identity $made.manifest_sha256
+			try { $done = Publish-OllamaPreparedStage $root $stage } finally { Close-OllamaPreparedStage $stage }
+			[void](Remove-OllamaPreparedStage $root $ticket $made.stage_identity $made.manifest_sha256)
+			return @{ source = $source; published = $done }
+		} catch { Close-OllamaPinnedArchive $source; throw }
+	}
+	$script:newer = $null
+	Case 'earlier version retires beside the running pinned one (oll-07)' {
+		$script:newer = Publish-FixtureVersion '0.25.0'
+		$older = [IO.Path]::GetFileName($published.version_path)
+		$result = Remove-OllamaEarlierVersions $root $newer.source ([Guid]::NewGuid().ToString('N'))
+		if (-not $result.ok) { throw ('Every proven earlier version must retire: ' + $result.error) }
+		Assert-Receipt (@($result.removed) -contains $older) 'The receipt names the removed earlier version.'
+		Assert-Receipt ([Ergopti.Ollama.ManagedNative]::PathIsAbsent($published.version_path)) 'The earlier version is physically absent.'
+		Assert-Receipt ([IO.File]::Exists($newer.published.executable)) 'The pinned version in use is never a candidate.'
+		$leftovers = @(Get-ChildItem -LiteralPath $root.path -Force | Where-Object { $_.Name -like '.retire-*' -or $_.Name -like '.stage-*' -or $_.Name -like '.cleanup-*' })
+		Assert-Receipt ($leftovers.Count -eq 0) 'No stage or journal outlives a completed retirement.'
+	}
+	Case 'a foreign leaf is kept and reported, never removed (oll-07)' {
+		$foreign = [IO.Path]::Combine($root.versions, '0.1.0-windows-amd64-' + ('d' * 64))
+		[Ergopti.Ollama.ManagedNative]::CreateProtectedDirectory($foreign, (New-OllamaPrivateSecurity).GetSecurityDescriptorBinaryForm())
+		try {
+			$result = Remove-OllamaEarlierVersions $root $newer.source ([Guid]::NewGuid().ToString('N'))
+			Assert-Receipt (-not $result.ok) 'An unproven leaf is a refusal the caller logs.'
+			Assert-Receipt ($result.error -like ('0.1.0-windows-amd64-*')) 'The refusal names the kept leaf.'
+			Assert-Receipt ([IO.Directory]::Exists($foreign)) 'The unproven leaf survives.'
+			Assert-Receipt ([IO.File]::Exists($newer.published.executable)) 'The pinned version survives.'
+		} finally { [IO.Directory]::Delete($foreign) }
+	}
+	Case 'retirement refuses without the published pinned version (oll-07)' {
+		$absent = @{ version = '9.9.9'; asset = 'windows-amd64'; pin = @{ sha256 = ('e' * 64) } }
+		Must-Refuse { Remove-OllamaEarlierVersions $root $absent ([Guid]::NewGuid().ToString('N')) }
+		Assert-Receipt ([IO.File]::Exists($newer.published.executable)) 'A refused call removes nothing.'
+	}
+	Case 'an interrupted retirement is finished from its journal (oll-07)' {
+		# The state a crash leaves between the rename and the stage cleanup.
+		$ticket = [Guid]::NewGuid().ToString('N')
+		$moved = Prepare-OllamaManagedStage $root $archive $ticket
+		Write-OllamaOwnedJson ([IO.Path]::Combine($root.path, '.retire-' + $ticket + '.json')) ([ordered]@{ kind = 'ollama-retire';
+			ticket = $ticket; root_identity = $root.identity; identity = $moved.stage_identity; manifest_sha256 = $moved.manifest_sha256;
+			leaf = '0.24.0-windows-amd64-' + $archive.pin.sha256 })
+		$result = Remove-OllamaEarlierVersions $root $newer.source ([Guid]::NewGuid().ToString('N'))
+		if (-not $result.ok) { throw ('The journalled stage must retire: ' + $result.error) }
+		Assert-Receipt ([Ergopti.Ollama.ManagedNative]::PathIsAbsent($moved.stage)) 'The moved stage is physically absent.'
+		Assert-Receipt ([Ergopti.Ollama.ManagedNative]::PathIsAbsent([IO.Path]::Combine($root.path, '.retire-' + $ticket + '.json'))) 'The journal retires after its stage.'
+		Assert-Receipt ([IO.File]::Exists($newer.published.executable)) 'The pinned version survives.'
+	}
 } finally {
+	if ($null -ne $newer) { Close-OllamaPinnedArchive $newer.source }
 	if ($null -ne $archive) { Close-OllamaPinnedArchive $archive }
 	if ($null -ne $root) { Close-OllamaManagedRoot $root }
 	# Preserve native evidence and the immutable published fixture version. No
