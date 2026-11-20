@@ -149,5 +149,8 @@ Commit `36224233b7` (TRAY-01).
 - **Gates.** `test-ahk-encoding.cjs`, `test-menu-no-duplicate-actions.cjs`, `test-linux-feature-parity.cjs`, `test-shared-literal-inventory.cjs`, the locale gates (`test-locale-*`, `test-action-labels-have-locale-keys.cjs`), `test-no-pinned-source-reads-lua.cjs` and `-linux.cjs`, `lint-conventions.js --fail-on-violations` and the formatter. Red before this campaign and untouched by it: `test-no-pinned-source-reads.cjs` (171 AHK paths over a baseline of 170, none in the files changed here) and `test-config-key-literals.cjs` (three `_shared/core/ui/engine/webview/reading_*.lua` files).
 - **Not run here.** The full startup smoke (`test-ahk-full-startup-smoke.cjs`)
   starts a second driver beside the resident one; the Lua suites (no Lua code
-  changed); `npm run test:js` and `verify-change` (they refuse this checkout's
+  changed); `test-linux-field-report-contract.cjs` and
+  `test-field-todo-summary.cjs`, which need Linux or Python (WSL failed during
+  the run; the new `tray_host_missing` point was checked against both coverage
+  files by hand); `npm run test:js` and `verify-change` (they refuse this checkout's
   Node pin).
