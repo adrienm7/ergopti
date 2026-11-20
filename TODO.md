@@ -85,11 +85,12 @@ every maintainer request here.
       tests expand `hotstrings_preview_frame`; the Linux id-less header test checks every menu keeps headers at
       its top level, like the macOS one. Each was proved by a source mutation that made it fail. Reviewed and
       kept: frozen historical references (the 101 distance rules, the 140 common autocorrections), corpus floors
-      (`tests/e2e/contract.lua`) and non-vacuity floors (`>= 10`, `> 400`). Left to review, each a literal row
-      count beside a manifest declaration: Windows `test_layout_shared.ahk` (6 settings rows),
-      `gestures/engine/test_menu_status.ahk` (6), `test_word_expander_commands.ahk` (8),
-      `test_manifest_menu_checked_when.ahk` (6), `personal/test_file_controls.ahk` (5) and the macOS
-      `test_parameter_frames.lua` `#corpus.preview.hs + 1`.
+      (`tests/e2e/contract.lua`) and non-vacuity floors (`>= 10`, `> 400`). Later the same day the six row
+      counts left beside a declaration read it: the Windows delays frame and per-file controls from the shipped
+      manifest, the gesture list from its declared status templates, the profile frame corpus without its native
+      rows, the LLM source mutations from the canonical inventory, and the macOS preview menu from the shipped
+      `preview_presence_controls`. Each was proved by a source mutation that made it fail. Kept: the handwritten
+      canonical LLM rows, the oracle the manifest is compared with.
 - [ ] **SendInstant paste races Windows' own clipboard readers.** Rerun on a quiet PC on 2026-11-18 (no resident
       driver, 3 runs per group): healthcheck, Ollama native, `groups247-*`, pickers, `idle-caret-context`,
       `key-state-dllcall-uncaught`, `tap-keys-kana-native`, the `config-*` groups and the model browser stayed
@@ -555,13 +556,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       for the 1.4 GB archive. Its `revoke` mode rewrites the model in place with the same size mid-download, on a
       trusted token: no byte lands after the edit. What remains per chunk is 14 `install_resolver` ancestor walks
       (about 1.5 ms, one lstat per ancestor each). Time a first real install on the PC.
-- [ ] **Wheel turns and travel just after a click meet an unknown field.** A click, a touch's landing included,
-      withdraws the field's privacy verdict until the guard reads the focus again (the settle delay), and the
-      wheel turns and travel of that span are not recorded; macOS withdraws nothing on a click and Windows reads the
-      field again within the click, so both count them. A touch's own clicks are counted where it began since 2026-11-20 (tap-click-touch-context), and so
-      is a second click inside the span only when it is part of that touch: a double-click's or double tap's
-      second click is still lost. Decide whether that span may count under the verdict the click left, then
-      extend the same rule to the wheel and the travel.
 - [ ] **[LATER] Legacy Linux updater probes.** `tools/build/add-linux-legacy-update-probes.sh` adds
       `_shared/data/locales/en.json` and an empty `_shared/lua/` to the release tarball so pre-move updaters (v1.0.9
       … v1.0.10-dev.175) admit it. Remove that step, its call, `test-linux-legacy-update-probes.cjs` and the frozen
