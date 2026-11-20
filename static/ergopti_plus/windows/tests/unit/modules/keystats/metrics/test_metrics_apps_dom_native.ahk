@@ -92,7 +92,12 @@ _MAD_Source(Root, OwnerReceipt) {
 	; Reuse actual test-only custody bodies, without loading that fixture's
 	; auto-execute routine or changing either frozen sender probe.
 	Custody := FSReadStrict(_DriverDir . "\tests\fixtures\webview_metrics_sender_fixture.ahk")
-	for Name in ["_MVSP_Require", "_MVSP_Hash", "_MVSP_Deadline", "_MVSP_CloseOther", "_MVSP_RetireOtherBrowser", "_MVSP_Close"] {
+	; The retirement bound is read from the same fixture, its one source.
+	AssertTrue(RegExMatch(Custody, "m)^global _MVSP_RETIREMENT_MS := \d+$", &Bound),
+		"the genuine native custody retirement bound must exist")
+	Source .= Bound[0] . "`n"
+	for Name in ["_MVSP_Require", "_MVSP_Hash", "_MVSP_Deadline", "_MVSP_CloseOther", "_MVSP_RetireOtherBrowser",
+			"_MVSP_AwaitExit", "_MVSP_Close"] {
 		Body := _DriverExtractFunctionBody(&Custody, Name)
 		AssertTrue(Body != "", "the genuine native custody body must exist: " . Name)
 		Source .= Body . "`n"
