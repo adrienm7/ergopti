@@ -219,7 +219,7 @@
 			"repro": "node tools/test/test-logger-scalars-single-source.cjs"
 		},
 		{
-			"id": "js-0546",
+			"id": "js-0547",
 			"ordinal": 247,
 			"name": "logger lifecycle pairing on every driver (per file: a START has a SUCCESS, no TRACE outnumbers its DONE)",
 			"cmd": "node",
