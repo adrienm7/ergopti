@@ -98,7 +98,17 @@ helpers.describe("hotstrings parameter complete shared frames", function()
 			helpers.assert_eq(delays[1].title:sub(1, #f.captions("menu.hotstrings.config_item")),
 				f.captions("menu.hotstrings.config_item"))
 			local preview = children(menu, f.captions(corpus.parents.preview))
-			helpers.assert_eq(#preview, #corpus.preview.hs + 1, "the presence provider draws its two native rows")
+			-- Every frame slot draws one row but presence, which draws one per
+			-- control the shipped manifest declares for it.
+			local shipped = require("core.fs.adapters.json_codec").decode(require("tests.support.source_file").read(
+				helpers.shared("menu/data/menu_manifest.json")))
+			local presence = #shipped.preview_presence_controls
+			helpers.assert_true(presence > 0, "the shipped manifest declares the presence controls")
+			local expected_preview = 0
+			for _, id in ipairs(corpus.preview.hs) do
+				expected_preview = expected_preview + (id == "parameter_preview_presence" and presence or 1)
+			end
+			helpers.assert_eq(#preview, expected_preview, "the presence provider draws each declared native row")
 			local states = {}
 			for _, row in ipairs(preview) do
 				if row.title ~= "-" then states[#states + 1] = row.checked == true end
