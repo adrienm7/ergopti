@@ -171,7 +171,10 @@ function checkPreferences() {
 	// The font stylesheet is linked once, relative to the script, under any base path.
 	assert.equal(loaded.api.save({ font: 'hyperlegible' }), true);
 	assert.equal(loaded.head.length, 1);
-	assert.equal(loaded.head[0].href, 'https://ergopti.fr/dev/fonts/atkinson-hyperlegible/font.css');
+	assert.equal(
+		loaded.head[0].href,
+		'https://ergopti.fr/dev/ergopti_plus/_shared/ui/fonts/atkinson-hyperlegible/font.css'
+	);
 	assert.equal(loaded.attributes.has('data-a11y-motion'), false, 'A save replaces the whole map');
 	loaded.api.save({ font: 'hyperlegible', contrast: 'high' });
 	assert.equal(loaded.head.length, 1, 'The font stylesheet is linked only once');
@@ -183,7 +186,10 @@ function checkPreferences() {
 	// the reading and colour settings reach the root as their attributes.
 	loaded.api.save({ font: 'dyslexic', measure: 'short', align: 'start', colors: 'cvd' });
 	assert.equal(loaded.head.length, 2, 'Each picked font links its own stylesheet once');
-	assert.equal(loaded.head[1].href, 'https://ergopti.fr/dev/fonts/opendyslexic/font.css');
+	assert.equal(
+		loaded.head[1].href,
+		'https://ergopti.fr/dev/ergopti_plus/_shared/ui/fonts/opendyslexic/font.css'
+	);
 	assert.equal(loaded.attributes.get('data-a11y-font'), 'dyslexic');
 	assert.equal(loaded.attributes.get('data-a11y-measure'), 'short');
 	assert.equal(loaded.attributes.get('data-a11y-align'), 'start');
@@ -192,7 +198,7 @@ function checkPreferences() {
 	assert.equal(loaded.attributes.has('data-a11y-colors'), false, 'Unknown colour value ignored');
 	assert.equal(loaded.attributes.has('data-a11y-align'), false, 'Unknown alignment ignored');
 	for (const font of ['atkinson-hyperlegible', 'opendyslexic']) {
-		const folder = path.join(ROOT, 'static', 'fonts', font);
+		const folder = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui', 'fonts', font);
 		assert.ok(fs.existsSync(path.join(folder, 'OFL.txt')), font + ' ships its licence');
 		const css = fs.readFileSync(path.join(folder, 'font.css'), 'utf8');
 		for (const [, file] of css.matchAll(/url\('([^']+)'\)/g))

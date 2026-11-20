@@ -121,8 +121,9 @@
 /* ================================== */
 /* ================================== */
 
-/* Atkinson Hyperlegible and OpenDyslexic are served by the site
-   (static/fonts/), and a11y_prefs.js links a font's stylesheet only when the
+/* Atkinson Hyperlegible and OpenDyslexic sit beside the shared pages
+   (static/ergopti_plus/_shared/ui/fonts/), which the site serves and every
+   app package ships; a11y_prefs.js links a font's stylesheet only when the
    visitor picks it. */
 /* Every text takes the font, except the icon font glyphs. */
 :root[data-a11y-font='hyperlegible'] :is(body, body *):not([class^='icon-'], [class*=' icon-']) {

@@ -35,9 +35,12 @@
 	'use strict';
 
 	var STORAGE_KEY = 'ergopti-a11y-preferences';
-	// Each reading font's stylesheet, served by the site next to this file's
-	// folder (static/fonts/), never from a CDN. Resolved from this script's own
-	// address, so the site under any base path and its frames find the same file.
+	// Each reading font's stylesheet, in the fonts/ folder beside this file and
+	// never from a CDN. Resolved from this script's own address, so the site
+	// under any base path, its frames and the Windows app's virtual host find
+	// the same file, which every driver package ships with the other pages. An
+	// inline page (the macOS and Linux webviews) has no address: its host
+	// inlines the chosen font itself.
 	var SCRIPT_SRC = document.currentScript ? document.currentScript.src : '';
 	var FONT_FOLDERS = { hyperlegible: 'atkinson-hyperlegible', dyslexic: 'opendyslexic' };
 	var FONT_LINK_ID = 'ergopti-a11y-font-';
@@ -87,7 +90,7 @@
 		var link = doc.createElement('link');
 		link.id = FONT_LINK_ID + font;
 		link.rel = 'stylesheet';
-		link.href = new URL('../../../fonts/' + FONT_FOLDERS[font] + '/font.css', SCRIPT_SRC).href;
+		link.href = new URL('fonts/' + FONT_FOLDERS[font] + '/font.css', SCRIPT_SRC).href;
 		doc.head.appendChild(link);
 	}
 
