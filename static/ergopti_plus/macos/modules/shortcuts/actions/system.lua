@@ -1152,6 +1152,7 @@ end
 --- @param ports table The M.cmd_star_decision ports.
 --- @return table Fake-hotkey object with :delete().
 function M.bind_cmd_star(on_trigger, admission_guard, ports)
+	-- config-key-literal-ok: "magic_key" names a port of the decision, not the config leaf.
 	for _, port in ipairs({ "replace_on", "chosen_source", "magic_key", "plain_text", "shortcut_owns" }) do
 		assert(type(ports) == "table" and type(ports[port]) == "function",
 			"bind_cmd_star needs the port " .. port)
