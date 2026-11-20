@@ -224,11 +224,17 @@ async function observe(source, root, scenario) {
 							fs.mkdirSync(logs, { recursive: true });
 							// A real boot logs the staged Hotstrings menu publication and
 							// the submenu's deferred build at its first open; the smoke
-							// requires both, within its budget.
+							// requires both, within their share of the other submenus'
+							// builds (100 ms here, none for render-unreferenced).
 							const render = (ms) =>
 								`[INFO] [BootProfile] MENU/initMenu: hotstrings menu rendered: +${ms} ms (total ${ms} ms).\n`;
 							const deferredRender = (ms) =>
 								`[INFO] [MenuPopulation] Deferred submenu 'hotstrings_menu' built in ${ms} ms for the smoke.\n`;
+							const otherMenus =
+								scenario === 'render-unreferenced'
+									? ''
+									: "[INFO] [MenuPopulation] Deferred submenu 'shortcuts_menu' built in 60 ms for the smoke.\n" +
+										"[INFO] [MenuPopulation] Deferred submenu 'personal_menu' built in 40 ms for the smoke.\n";
 							// A paused AI-on boot defers its AI hotkeys and the resume
 							// activates them; the smoke requires both lines (#97).
 							let resume = '';
@@ -247,6 +253,7 @@ async function observe(source, root, scenario) {
 									? '[ERROR] inert warm failure\n'
 									: render(15) +
 											deferredRender(scenario === 'slow-render' ? 3200 : 40) +
+											otherMenus +
 											resume +
 											// The boot's first counter record and the owner records the smoke judges.
 											'[INFO] [Perf] Interval counters (0 ms): config.snapshot_read=1 toml.document_parse=1.\n' +
@@ -729,6 +736,7 @@ async function check(source, root = ROOT) {
 		'ai-deferral-missing',
 		'ai-resume-missing',
 		'slow-render',
+		'render-unreferenced',
 		'work-unnamed',
 		'work-doubled',
 		'work-stale',
@@ -777,6 +785,7 @@ async function check(source, root = ROOT) {
 				'first-early-exit',
 				'first-save-missing',
 				'slow-render',
+				'render-unreferenced',
 				'work-unnamed',
 				'work-doubled'
 			].includes(scenario)
@@ -789,7 +798,12 @@ async function check(source, root = ROOT) {
 		if (scenario === 'slow-render')
 			assert.match(
 				result.diagnostics.join('\n'),
-				/fresh-config: a Hotstrings menu render took 3200 ms \(budget 2000 ms/
+				/fresh-config: a Hotstrings menu render took 3200 ms, 32\.00 times the 100 ms the boot's other menu builds took together \(bound 1;/
+			);
+		if (scenario === 'render-unreferenced')
+			assert.match(
+				result.diagnostics.join('\n'),
+				/fresh-config: the boot built no other submenu to time the Hotstrings menu against/
 			);
 		if (scenario === 'work-unnamed')
 			assert.match(
