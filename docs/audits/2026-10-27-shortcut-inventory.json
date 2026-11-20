@@ -1,6 +1,6 @@
 {
 	"schema_version": 1,
-	"description": "Inventory of every shortcut config entry on the three drivers, for PAR-41 (docs/design/one-shortcut-model.md, step 1). 'legacy_boolean' rows are a feature switch bound to one hard-coded chord; 'keyboard_slot' rows are a chord bound to a catalogue action id; 'slot_families' list the modifier prefixes under which a driver accepts any key of modifier_chords.json. 'chord.modifiers' use each driver's own modifier names. 'slot' names the keyboard slot that already binds the same chord, so a boolean and a slot never both own it after the change. Checked against the manifest, the AutoHotkey AddShortcut calls and the Lua hotkey registry by tools/test/test-shortcut-inventory-matches-sources.cjs. Updated after the macOS and Linux adoption: their slot ids and families are the role-named ones and the 18 macOS Ctrl-letter switches are keyboard slots. The Windows slots took the same ids in schema v18 and the Windows switches became slots in schema v19.",
+	"description": "Inventory of every shortcut config entry on the three drivers, for PAR-41 (docs/design/one-shortcut-model.md, step 1). 'legacy_boolean' rows are a feature switch bound to one hard-coded chord; 'keyboard_slot' rows are a chord bound to a catalogue action id; 'slot_families' list the modifier prefixes under which a driver accepts any key of modifier_chords.json. 'chord.modifiers' use each driver's own modifier names. 'slot' names the keyboard slot that already binds the same chord, so a boolean and a slot never both own it after the change. Checked against the manifest, the AutoHotkey AddShortcut calls and the Lua hotkey registry by tools/test/test-shortcut-inventory-matches-sources.cjs. Updated after the macOS and Linux adoption: their slot ids and families are the role-named ones and the 18 macOS Ctrl-letter switches are keyboard slots. The Windows slots took the same ids in schema v18 and the Windows switches became slots in schema v19. The five Windows shortcuts.personal toggles left the catalogue in schema v23 (PPT-02); a personal file registers its own switches there.",
 	"rows": [
 		{
 			"driver": "windows",
@@ -235,51 +235,6 @@
 			"action": "open_hotstrings_editor",
 			"slot": "magic_editor",
 			"note": "Contextual slot: the magic key, no modifier."
-		},
-		{
-			"driver": "windows",
-			"kind": "personal_toggle",
-			"config_key": "shortcuts.personal.laptop_broken_key",
-			"chord": null,
-			"action": null,
-			"slot": null,
-			"note": "Remaps for a broken laptop key. Not a chord; stays a separate surface."
-		},
-		{
-			"driver": "windows",
-			"kind": "personal_toggle",
-			"config_key": "shortcuts.personal.mouse_drag_window",
-			"chord": null,
-			"action": null,
-			"slot": null,
-			"note": "Mouse gesture. Not a chord; stays a separate surface."
-		},
-		{
-			"driver": "windows",
-			"kind": "personal_toggle",
-			"config_key": "shortcuts.personal.mouse_tab_switching",
-			"chord": null,
-			"action": null,
-			"slot": null,
-			"note": "Mouse gesture. Not a chord; stays a separate surface."
-		},
-		{
-			"driver": "windows",
-			"kind": "personal_toggle",
-			"config_key": "shortcuts.personal.professional_environment",
-			"chord": null,
-			"action": null,
-			"slot": null,
-			"note": "Environment preset. Not a chord; stays a separate surface."
-		},
-		{
-			"driver": "windows",
-			"kind": "personal_toggle",
-			"config_key": "shortcuts.personal.programmable_keyboard",
-			"chord": null,
-			"action": null,
-			"slot": null,
-			"note": "Programmable keyboard preset. Not a chord; stays a separate surface."
 		},
 		{
 			"driver": "macos",
