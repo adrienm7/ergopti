@@ -67,6 +67,24 @@ helpers.describe("linux Ctrl + magic key saves (linux-ctrl-magic-save)", functio
 		helpers.assert_eq(#state.queued, 0)
 	end)
 
+	-- The daemon offers every consumed key to this hook before the readline,
+	-- prediction and bound-chord consumers: a Ctrl+U that read the driver state
+	-- raised there and never reached them (CI run 44733461420).
+	helpers.it("ctrl-magic-save: another key's Ctrl chord reads no driver state and no config.toml", function()
+		local Save = fresh()
+		local reads = {}
+		local opts = options({
+			active = function() reads[#reads + 1] = "active" error("active read for a foreign chord") end,
+			chosen_source = function() reads[#reads + 1] = "chosen" error("source read for a foreign chord") end,
+			enabled = function() reads[#reads + 1] = "enabled" error("config.toml read for a foreign chord") end,
+		})
+		for _, code in ipairs({ 31, 22, 35 }) do
+			helpers.assert_eq(Save.on_key({ code = code, value = 1, mods = { ctrl = true } }, opts), false)
+		end
+		helpers.assert_eq(Save.on_key({ code = 46, value = 1, mods = {} }, opts), false)
+		helpers.assert_eq(reads, {})
+	end)
+
 	helpers.it("ctrl-magic-save: the switch off, a chosen physical source or a pause leave Ctrl+★ alone", function()
 		local Save = fresh()
 		local opts, state = options()

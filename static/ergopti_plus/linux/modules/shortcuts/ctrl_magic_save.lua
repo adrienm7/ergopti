@@ -132,10 +132,12 @@ end
 -- ===========================================
 -- ===========================================
 
---- Whether a press is Ctrl alone on the layout's own magic key with the switch on.
+--- Whether a press is Ctrl alone on the layout's own magic key, the hook active
+--- and the switch on. The press itself is decided first: any other key or chord
+--- returns before the driver state or config.toml is read.
 --- @param detail table { code, value, mods } as the keyboard hook reports it.
 --- @param ports table { magic_key = fn() -> string, chosen_source = fn() -> boolean,
----   plain_text = fn(evdev) -> string|nil, enabled = fn() -> boolean|nil }.
+---   plain_text = fn(evdev) -> string|nil, active = fn() -> boolean, enabled = fn() -> boolean|nil }.
 --- @return boolean
 function M.matches(detail, ports)
 	if type(detail) ~= "table" or type(detail.code) ~= "number" then return false end
@@ -145,9 +147,10 @@ function M.matches(detail, ports)
 	for _, name in ipairs(OTHER_MODIFIERS) do
 		if mods[name] then return false end
 	end
-	if ports.chosen_source() == true then return false end
 	local magic = ports.magic_key()
 	if type(magic) ~= "string" or magic == "" or ports.plain_text(detail.code) ~= magic then return false end
+	if ports.chosen_source() == true then return false end
+	if not ports.active() then return false end
 	local enabled = ports.enabled()
 	if enabled == nil then
 		Logger.error(LOG, "The Ctrl + magic key switch cannot be read: the chord goes to the application.")
@@ -168,9 +171,8 @@ function M.on_key(detail, options)
 		or type(options.chosen_source) ~= "function" or type(options.plain_text) ~= "function" then
 		error("ctrl_magic_save.on_key needs active, defer, press, magic_key, chosen_source and plain_text", 2)
 	end
-	if not options.active() then return false end
 	local ports = { magic_key = options.magic_key, chosen_source = options.chosen_source,
-		plain_text = options.plain_text, enabled = options.enabled or M.enabled }
+		plain_text = options.plain_text, active = options.active, enabled = options.enabled or M.enabled }
 
 	--- Queues Ctrl+S for one key event; false lets that event through.
 	local function queue(event)
