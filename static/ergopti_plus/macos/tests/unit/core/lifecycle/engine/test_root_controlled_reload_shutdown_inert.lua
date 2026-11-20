@@ -440,7 +440,16 @@ local function run_isolated(options, assertions)
 			_G
 		)
 		helpers.assert_not_nil(chunk, tostring(load_err))
-		chunk()
+		-- init.lua re-runs itself under the boot guard and returns at once when it
+		-- is not the guarded run, so the fixture boots it the way the guard does:
+		-- the real guard, with only the file load replaced by the truncated chunk.
+		-- A failure is re-raised with its stack instead of reaching the reporter.
+		local BootGuard = assert(loadfile(helpers.driver_root() .. "core/lifecycle/engine/boot_guard.lua"))()
+		local booted = BootGuard.run(helpers.driver_root() .. "root_boot_chunk", {
+			loadfile = function() return chunk end,
+			report = function() return false end,
+		})
+		helpers.assert_true(booted, "the guarded root boot chunk must return normally")
 		helpers.assert_eq(state.privacy_policy_reads, 1)
 		helpers.assert_eq(state.privacy_initializations, 1)
 		helpers.assert_eq(state.fatal_exit_calls, 0, "The fixture must not accidentally take the privacy-abort route")
