@@ -494,6 +494,12 @@
 			]
 		},
 		{
+			"id": "bundle_remove",
+			"title": "Remove the Ergopti bundle",
+			"checks": [],
+			"not_testable": "Needs a user-scope bundle install and its removal through the menu, which changes the Mac's input sources: whether macOS selects another source and the success notice shows are read on screen; the transaction is unit-tested (test_layout_install_transaction, layout-bundle-remove)."
+		},
+		{
 			"id": "layout_emulation",
 			"title": "Layout emulation",
 			"checks": [
