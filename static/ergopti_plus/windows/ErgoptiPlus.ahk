@@ -754,8 +754,6 @@ BootProfile_Stamp("Personal shortcuts file ensured")
 _InstallSafeBootstrapTray()
 global _TrayStartupCommands := TrayStartupCommands(
 	() => IsSet(_DriverReady) && _DriverReady, TrayStartupCommand)
-if FileExist(ConfigurationFile)
-	_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 global _TrayStartupClick := TrayStartupClick(
 	TrayStartupClickReadyNow,
 	_DriverStartupSmokeDir != "" ? (*) => 0 : 0, 0, 0, 0, 0,
@@ -764,10 +762,22 @@ global _TrayStartupClick := TrayStartupClick(
 ; Entering a native menu blocks auto-execute for the user's navigation interval.
 if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectBootstrap))
 	_DriverStartupSmokeInspectBootstrap.Call()
-; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
-; the safe menu, never with AutoHotkey's default icon and stock items.
+; #NoTrayIcon keeps the icon hidden until the driver reveals it here: with the
+; custom icon, the safe menu and its name, never with AutoHotkey's default icon,
+; its stock items or the script's file name.
+_DriverRevealTrayIcon() {
+		A_IconHidden := false
+}
 BootProfile_Stamp("Safe tray and startup commands installed")
-A_IconHidden := false
+; Before I18nInit the active locale is the module default, French, so a normal
+; boot shows its icon only once the configured locale is read (below). A first
+; run never reaches I18nInit: its wizard reloads the driver. Its icon brings the
+; wizard forward, so it appears now, in the language the wizard opens in.
+if !FileExist(ConfigurationFile) {
+		_InstallSafeBootstrapTray(TrayBootstrapInertLabel(ONBOARDING_FIRST_RUN_LOCALE))
+		TrayRevealNamed(_Onboarding_Translate(ONBOARDING_FIRST_RUN_LOCALE, "accessibility.tray_tip"),
+				_DriverRevealTrayIcon)
+}
 ; Read-only construction precedes the wizard; the genuine migration stays below it.
 ConfigSchemaPrepareSource(ConfigurationFile)
 BootProfile_Stamp("Configuration schema source prepared")
@@ -819,6 +829,11 @@ BootProfile_Stamp("Script preferences applied")
 HotstringsSeedLanguageCategoryGates(CategoryEnabled)
 ReadCategoryEnabled(_IniCache)
 I18nInit(_IniCache)
+; The native startup commands and the icon's name in the configured locale,
+; then the icon: never French rows or the file name for a user of another
+; language (the Linux daemon had the same order bug, test_i18n_is_ready_before_the_tray).
+_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
+TrayRevealNamed(TrayStateTipText(A_IsSuspended), _DriverRevealTrayIcon)
 BootProfile_Stamp("Config parsed (TOML + i18n)")
 
 ; Resolve _ALTGR_KANA_FIXUP: TOML override (ScriptInformation["AltGrIsKanaRemap"])
@@ -1281,14 +1296,13 @@ BootProfile_Mark("Config, features & shortcuts loaded")
 ; runtime owners genuinely exist.
 ; Stock tray items (Pause/Suspend/Reload/Exit/Edit) are cleared once at boot,
 ; before Onboarding_Run (AHK-21), so they are never live during the first-run wizard.
-; Keep the real native commands throughout boot and refresh their locale before
-; feature initialization. No temporary loading surface replaces the tray root.
+; The real native commands, published in the configured locale right after
+; I18nInit, stay until then. No temporary loading surface replaces the tray root.
 _DriverReady := false
 _LangMenuRef := ""
 _LangMenuBuildPending := false
 LANG_MENU_DEFER_MS := 120  ; short post-ready delay for the language-submenu populate
 MENU_BUILD_DEFER_MS := 16  ; offer optional configuration maintenance after ready
-_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 #Include infra/tap_keys.ahk
 TapKeysReadConfig(_IniCache)
 #Include infra/key_combinations.ahk

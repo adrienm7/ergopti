@@ -73,8 +73,9 @@ _TBPI_CompiledAuthorityPrecedesPublication() {
 			"startup must not infer emergency authority from the live loader's conflated false result")
 	}
 	Projected := _DriverFuncBody("_TrayBootstrapProjectedRows")
-	Assert(InStr(Projected, "SharedStartupTrayProjection(_I18nLocale)") > 0,
-		"the original locale owner selects the genuine compiled shared projection")
+	Assert(InStr(Projected, "SharedStartupTrayProjection(Locale)") > 0
+		&& InStr(Projected, "Locale := _I18nLocale") > 0,
+		"the active locale owner, or an explicit one, selects the genuine compiled shared projection")
 	Assert(InStr(Projected, "MenuStartupSafeCommand") > 0,
 		"canonical command records retain the existing native capability class")
 	Assert(InStr(Projected, "_DriverReady :=") == 0 && InStr(Projected, "_DriverMenuReady :=") == 0,
@@ -82,3 +83,37 @@ _TBPI_CompiledAuthorityPrecedesPublication() {
 }
 
 Test("startup immutable authority: genuine compiled include and source admission precede native publication", _TBPI_CompiledAuthorityPrecedesPublication)
+
+; TRAY-01: the cold tray once appeared before I18nInit, so every user of
+; another language saw French startup rows (_I18nLocale still held the module
+; default) and heard the script's file name as the icon's name. The Linux daemon
+; had the same order bug (test_i18n_is_ready_before_the_tray.lua). Source order,
+; because these statements run in include order in the auto-execute section.
+_TBPT_ColdTrayAppearsLocalizedAndNamed() {
+	Source := _DriverSourceNoComments()
+	I18nReady := InStr(Source, "I18nInit(_IniCache)")
+	FirstNative := InStr(Source, '_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))')
+	Assert(I18nReady > 0 && FirstNative > I18nReady,
+		"the native startup commands are projected only once the configured locale is read")
+	Assert(InStr(Source, '_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))', ,
+		FirstNative + 1) == 0, "the localized startup commands are published once")
+	Reveal := _DriverFuncBody("_DriverRevealTrayIcon")
+	Assert(InStr(Reveal, "A_IconHidden := false") > 0, "one owner reveals the tray icon")
+	Normal := InStr(Source, "TrayRevealNamed(TrayStateTipText(A_IsSuspended), _DriverRevealTrayIcon)")
+	Assert(Normal > FirstNative, "a normal boot names its icon in the configured locale, then shows it")
+	FirstRun := InStr(Source, "_InstallSafeBootstrapTray(TrayBootstrapInertLabel(ONBOARDING_FIRST_RUN_LOCALE))")
+	Onboarding := InStr(Source, "Onboarding_Run()", , Max(1, FirstRun))
+	Assert(FirstRun > 0 && Onboarding > FirstRun && FirstRun < I18nReady,
+		"a first run shows its icon before the wizard, in the wizard's language")
+	Assert(InStr(Source, 'TrayRevealNamed(_Onboarding_Translate(ONBOARDING_FIRST_RUN_LOCALE, "accessibility.tray_tip"),',
+		, FirstRun) > FirstRun, "a first run names its icon before showing it")
+	Position := 1, Uses := 0
+	while Position := InStr(Source, "_DriverRevealTrayIcon", , Position) {
+		Uses += 1
+		Position += 1
+	}
+	Assert(Uses == 3, "the reveal owner is defined once and used by the two named reveals, found " . Uses)
+}
+
+Test("tray bootstrap: the cold tray appears in the configured locale, named (tray-01-2026-11-20)",
+	_TBPT_ColdTrayAppearsLocalizedAndNamed)

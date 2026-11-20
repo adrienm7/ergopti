@@ -42,10 +42,23 @@ _InstallNativeStartupTray(RequestFn, MenuObj := 0, RegisterFn := 0) {
 	} finally Critical(PreviousCritical)
 }
 
+/**
+ * The inert startup row's caption in an explicit locale. A first run shows its
+ * tray before I18nInit, while the active locale is still the module default, so
+ * it names the language the wizard opens in instead.
+ * @param {String} Locale The locale code to project.
+ * @returns {String}
+ */
+TrayBootstrapInertLabel(Locale) {
+	return _TrayBootstrapProjectedRows("inert", Map(), Locale)[1].Label
+}
+
 /** Projects immutable shared startup data into the original native callback ABI. */
-_TrayBootstrapProjectedRows(Surface, Commands) {
+_TrayBootstrapProjectedRows(Surface, Commands, Locale := unset) {
 	global _I18nLocale
-	Authority := SharedStartupTrayProjection(_I18nLocale)
+	if !IsSet(Locale)
+		Locale := _I18nLocale
+	Authority := SharedStartupTrayProjection(Locale)
 	if !(Authority is Map) || Authority.Count != 5
 		|| Authority.Get("authority", "") != "compiled-startup"
 		|| !RegExMatch(Authority.Get("source_sha256", ""), "^[0-9a-f]{64}$")

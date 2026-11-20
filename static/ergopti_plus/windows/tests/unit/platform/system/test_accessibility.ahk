@@ -277,6 +277,43 @@ _A11yT_LayerRestoresTheRebasedText() {
 Test("a11y tray: the navigation layer restores the pause text set meanwhile (a11y-native-2026-11-17)",
 	_A11yT_LayerRestoresTheRebasedText)
 
+; The icon is named before it appears: AutoHotkey names an unnamed icon by the
+; script's file name, which a screen reader announced from the reveal on (TRAY-01).
+_A11yT_IconIsNamedBeforeItIsShown() {
+	Events := []
+	SetFn(Text) {
+		Events.Push("name:" . Text)
+		return true
+	}
+	RevealFn() {
+		Events.Push("reveal")
+	}
+	AssertTrue(TrayRevealNamed("Ergopti+", RevealFn, SetFn))
+	AssertEqual(2, Events.Length)
+	AssertEqual("name:Ergopti+", Events[1])
+	AssertEqual("reveal", Events[2], "the icon appears only once it has its name")
+	; A refused name still shows the driver's only control surface, and says so.
+	Events.Length := 0
+	AssertFalse(TrayRevealNamed("Ergopti+", RevealFn, (T) => false))
+	AssertEqual("reveal", Events[Events.Length])
+	Refused := false
+	try TrayRevealNamed("", RevealFn, SetFn)
+	catch ValueError
+		Refused := true
+	AssertTrue(Refused, "an icon without a name is refused before it is shown")
+}
+Test("a11y tray: the icon is named before it is shown (tray-01-2026-11-20)", _A11yT_IconIsNamedBeforeItIsShown)
+
+; The first-run tray speaks the wizard's language, not the module default.
+_A11yT_FirstRunInertRowFollowsItsLocale() {
+	English := TrayBootstrapInertLabel("en")
+	French := TrayBootstrapInertLabel("fr")
+	AssertEqual("ErgoptiPlus — Starting…", English)
+	AssertTrue(French != English, "the inert row is projected in the locale it is given")
+}
+Test("a11y tray: the first-run startup row follows the wizard's locale (tray-01-2026-11-20)",
+	_A11yT_FirstRunInertRowFollowsItsLocale)
+
 
 
 
