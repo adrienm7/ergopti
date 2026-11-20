@@ -54,6 +54,7 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 			end)
 		end
 	end)
+	-- An installed user bundle is removed from the row under its install row (layout-bundle-remove).
 	for _, state in ipairs({"fresh", "older", "current"}) do
 		helpers.it("retains system/user/status order for " .. state .. " actual native installation state", function()
 			local Json, Paths = require("core.text.engine.json"), require("core.fs.engine.paths")
@@ -70,8 +71,8 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 				local rows = assert(build())
 				local expected = {
 					fresh = {"🔐 Install Ergopti (system — " .. labels["menu.layout.install_system_reason"] .. ") v2.2.2", "📥 Install Ergopti (user) v2.2.2", "Install the bundle first"},
-					older = {"Update Ergopti (system — " .. labels["menu.layout.install_system_reason"] .. ") v2.2.1 → v2.2.2", "Update Ergopti (user) v2.2.1 → v2.2.2", "Install the bundle first"},
-					current = {"Ergopti (system) v2.2.2 — up to date ✅", "Ergopti (user) v2.2.2 — up to date ✅", "Add Ergopti v2.2.2 to input sources…"},
+					older = {"Update Ergopti (system — " .. labels["menu.layout.install_system_reason"] .. ") v2.2.1 → v2.2.2", "Update Ergopti (user) v2.2.1 → v2.2.2", "🗑️ Remove Ergopti (user) v2.2.1", "Install the bundle first"},
+					current = {"Ergopti (system) v2.2.2 — up to date ✅", "Ergopti (user) v2.2.2 — up to date ✅", "🗑️ Remove Ergopti (user) v2.2.2", "Add Ergopti v2.2.2 to input sources…"},
 				}
 				local index
 				for i, row in ipairs(rows) do if row.title == expected[state][1] then index = i end end
