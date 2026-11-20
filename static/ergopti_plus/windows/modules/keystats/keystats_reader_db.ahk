@@ -48,6 +48,12 @@ class KLReadConst {
 		; an 815 MB store; held in ":memory:" it made the worker use about 1 GB.
 		; On a bounded private disk database only this much of it is resident.
 		static WORKER_PAGE_CACHE_KIB := 65536
+		; Growth a refresh may write into the copy-on-write overlay of the shared
+		; image (KLR_OpenOverlayCandidate): a floor for the replayed days, plus a
+		; multiple of the tail's SQL for the rows it adds. Past it SQLite reports
+		; SQLITE_FULL and the refresh fails without publishing.
+		static WORKER_OVERLAY_SLACK_BYTES := 268435456
+		static WORKER_OVERLAY_SLACK_PER_TAIL_BYTE := 32
 }
 
 
@@ -296,6 +302,26 @@ KLR_CloneCandidate(Source) {
 		return SQLite_CloneInto(Source, KLR_OpenCandidate)
 }
 
+; Opens the writable candidate of a refresh on the read-only image a worker
+; attached, without copying it: a copy-on-write overlay of the very file the
+; image was validated from (SQLite_OpenCopyOnWrite). The shared file is never
+; written, so every other worker keeps reading the image it attached, and a
+; failure anywhere in the refresh is undone by closing the overlay. The whole
+; image was copied here before, 6 to 20 s on a 1.1 GB image even for 47 KB of
+; new ledger bytes.
+; @param Source {Integer} The read-only image handle (KLRCache.readonly).
+; @param Tails {Map} The prepared ledger tails the refresh will apply.
+; @returns {Integer} The overlay handle; throws when it cannot be built.
+KLR_OpenOverlayCandidate(Source, Tails) {
+		TailBytes := 0
+		for _, Tail in Tails
+				TailBytes += StrLen(Tail["sql"])
+		return SQLite_OpenCopyOnWrite(Source,
+				KLReadConst.WORKER_OVERLAY_SLACK_BYTES
+						+ TailBytes * KLReadConst.WORKER_OVERLAY_SLACK_PER_TAIL_BYTE,
+				KLReadConst.WORKER_PAGE_CACHE_KIB)
+}
+
 ; Append a single diagnostic line to prefetch.log, but only when the logger
 ; is at DEBUG level. KLR_BuildDatabase runs on every ingest tick (every ~5 s
 ; while a dashboard is open) — sometimes on the keystroke-servicing thread —
@@ -397,7 +423,19 @@ KLR_BuildDatabase(metrics_dir) {
 				}
 
 				candidate := 0
-				if KLRCache.disposable && !KLRCache.readonly {
+				if KLRCache.readonly {
+						; The image every worker shares: write through a private overlay.
+						overlay_tick := HotPath_Now()
+						try {
+								candidate := KLR_OpenOverlayCandidate(KLRCache.db, update["tails"])
+						} catch Error as Failure {
+								try LoggerError("KLReader", "Metrics image overlay failed: {1} Refresh was not published.", Failure.Message)
+								return KLR_ReleaseCandidate(0)
+						} finally {
+								HotPath_LogIfSlow("KLR.CandidateOverlay", overlay_tick,
+										update["tails"].Count . " ledger tail(s)")
+						}
+				} else if KLRCache.disposable {
 						; Nothing else can observe a worker's handle, and the image is
 						; hundreds of megabytes: cloning it to protect a reader that does
 						; not exist would cost more than the refresh. A failure below

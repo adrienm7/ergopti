@@ -64,6 +64,8 @@ const INVENTORY = {
 		'the bounded trigger-ROI survivor selection, measured separately so pruning cost stays distinguishable from per-keystroke ingest',
 	'KLR.CandidateClone':
 		'the O(database-size) SQLite backup paid before an incremental metrics projection can publish atomically',
+	'KLR.CandidateOverlay':
+		'the copy-on-write overlay of the shared reader image a worker refreshes instead of copying it',
 	'Tooltip.Build': 'building the tooltip GUI rows',
 	'Tooltip.ResolvePos': 'resolving where the tooltip goes, including the UIA path',
 	'Tooltip.Present':
