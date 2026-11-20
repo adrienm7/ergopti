@@ -79,6 +79,17 @@ function M.register(helpers, shared_root)
 			helpers.assert_eq(count, 2, "two reading fonts")
 		end)
 
+		helpers.it("names each preference's menu row by its feature leaf and refuses another command", function()
+			for _, preference in ipairs(Reading.PREFERENCES) do
+				helpers.assert_eq(preference.command, preference.path:match("^script%.(.+)$"),
+					preference.path .. " is set by the menu row of its leaf")
+				helpers.assert_true(Reading.for_command(preference.command) == preference,
+					preference.command .. " finds its own preference")
+			end
+			local ok = pcall(Reading.for_command, "reading_unknown")
+			helpers.assert_true(not ok, "an unknown command has no reading preference")
+		end)
+
 		helpers.it("seeds only the non-default choices, script-safe", function()
 			helpers.assert_eq(Reading.statement({ font = "default", spacing = "default" }), "window.__ergopti_reading={};")
 			local seed = Reading.statement({ font = "dyslexic", spacing = "wide" })

@@ -11,6 +11,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
+local COMMAND = require("settings.engine.keys").COMMAND
 local ParentSource = require("menu.engine.frames.parent_source")
 local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
@@ -132,9 +133,9 @@ local function _build_configuration(ctx)
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
 	-- The reading choices of the windows: each row's command and its tick come
 	-- from the choice's shared owner (core/ui/engine/webview/reading_preferences.lua).
-	for _, preference in ipairs(require("core.ui.engine.webview.reading_preferences").PREFERENCES) do
-		local leaf = assert(preference.path:match("^script%.(.+)$"))
-		render_ctx.commands[leaf] = function(value)
+	for _, command in ipairs({ COMMAND.READING_FONT, COMMAND.READING_SPACING }) do
+		local preference = require("core.ui.engine.webview.reading_preferences").for_command(command)
+		render_ctx.commands[command] = function(value)
 			if type(ctx.on_set_reading_preference) ~= "function" then
 				Logger.error(LOG, "Configuration: ctx.on_set_reading_preference is absent — the row does nothing.")
 				return false

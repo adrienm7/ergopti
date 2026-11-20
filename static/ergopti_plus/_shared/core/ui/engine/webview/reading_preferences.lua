@@ -35,12 +35,30 @@ local M = {}
 local ConfigKeys = require("settings.engine.keys")
 local Json = require("core.text.engine.json")
 
--- Each preference: the a11y_prefs.js name it seeds and the feature path that
--- holds it. The order is the seed's and the cache key's.
+-- Each preference: the a11y_prefs.js name it seeds, the feature path that
+-- holds it and the Configuration menu row that sets it. The order is the
+-- seed's and the cache key's.
 M.PREFERENCES = {
-	{ name = "font", path = ConfigKeys.KEY.SCRIPT_READING_FONT, module = "core.ui.engine.webview.reading_font" },
-	{ name = "spacing", path = ConfigKeys.KEY.SCRIPT_READING_SPACING, module = "core.ui.engine.webview.reading_spacing" },
+	{
+		name = "font", path = ConfigKeys.KEY.SCRIPT_READING_FONT,
+		command = ConfigKeys.COMMAND.READING_FONT, module = "core.ui.engine.webview.reading_font",
+	},
+	{
+		name = "spacing", path = ConfigKeys.KEY.SCRIPT_READING_SPACING,
+		command = ConfigKeys.COMMAND.READING_SPACING, module = "core.ui.engine.webview.reading_spacing",
+	},
 }
+
+--- The preference a Configuration menu row sets. Each driver names its rows'
+--- command ids itself, so the menu handler gate sees a handler for each row.
+--- @param command string Menu command id (`ConfigKeys.COMMAND.READING_FONT`).
+--- @return table The PREFERENCES entry.
+function M.for_command(command)
+	for _, preference in ipairs(M.PREFERENCES) do
+		if preference.command == command then return preference end
+	end
+	error("no reading preference owns the menu command " .. tostring(command), 2)
+end
 
 -- The folder of each reading font under _shared/ui/fonts/, as a11y_prefs.js
 -- names it (FONT_FOLDERS there).
