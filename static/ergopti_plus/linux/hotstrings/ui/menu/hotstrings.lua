@@ -1619,7 +1619,8 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 			-- When the engine forgets the current word: the `idle_reset` choice
 			-- (presets plus a free entry) and the click, arrow, shortcut and
-			-- tap-hold checkboxes. The renderer draws the rows; these are their
+			-- tap-hold checkboxes, and the Backspace undo beside them (the same
+			-- settings owner). The renderer draws the rows; these are their
 			-- owners and states.
 			-- Required here, not with the module imports: the menu manifest gate pins
 			-- this file's top-level bindings.
@@ -1662,6 +1663,36 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 			params_ctx.commands[require("settings.engine.keys").COMMAND.TAP_HOLD_RESETS_WORD] = function()
 				return word_reset_changed(WordReset.toggle_tap_hold_resets_word())
+			end
+			-- The Backspace undo of an expansion: its checkbox and its window, a
+			-- `backspace_restore_window` choice (presets plus a free entry) answered
+			-- like the idle reset's, the shared value schema owning the range.
+			params_ctx.commands[require("settings.engine.keys").COMMAND.BACKSPACE_RESTORE] = function()
+				return word_reset_changed(WordReset.toggle_backspace_restore_enabled())
+			end
+			params_ctx.commands[require("settings.engine.keys").COMMAND.BACKSPACE_RESTORE_WINDOW] = function(window_ms)
+				return word_reset_changed(WordReset.set_backspace_restore_window_ms(window_ms))
+			end
+			params_ctx.commands["backspace_restore_window_custom"] = function()
+				local answer = prompt_text(i18n_safe("menu.hotstrings.backspace_restore_window_title"),
+					i18n_safe("menu.hotstrings.backspace_restore_window_prompt"),
+					string.format("%d", WordReset.backspace_restore_window_ms()))
+				if answer == nil then return false end
+				local ValueCheck = require("settings.engine.value_check")
+				local key = ValueCheck.KEY.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS
+				local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), answer)
+				if not typed.ok then
+					Logger.warn(LOG, "Invalid Backspace undo window '%s' — ignored (%s).", tostring(answer), typed.reason)
+					show_error(ValueCheck.refusal_text(key, typed, i18n_safe), i18n_safe("dialog.value_check.title"))
+					return false
+				end
+				return word_reset_changed(WordReset.set_backspace_restore_window_ms(typed.value))
+			end
+			params_ctx.state_getters["hotstrings_backspace_restore_enabled"] = function()
+				return WordReset.backspace_restore_enabled()
+			end
+			params_ctx.state_getters[require("settings.engine.keys").KEY.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS] = function()
+				return WordReset.backspace_restore_window_ms()
 			end
 			params_ctx.state_getters[require("settings.engine.keys").KEY.HOTSTRINGS_IDLE_RESET_SECONDS] = function()
 				return WordReset.idle_seconds()

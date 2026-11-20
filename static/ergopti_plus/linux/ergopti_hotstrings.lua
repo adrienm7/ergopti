@@ -1784,7 +1784,9 @@ local function main()
 							now_ms, result.group, result.backspace_count, result.is_private, replay_terminator)
 					-- Undo erases what it typed, counted back from the caret: a pressed
 					-- key has moved the caret, so that count would delete the wrong text.
-					_undoable = not parsed_output and {
+					-- hotstrings.backspace_restore_enabled off keeps no record at all, so
+					-- the next Backspace is a plain one.
+					_undoable = not parsed_output and WordReset.backspace_restore_enabled() and {
 						-- What the user typed, casing included, not the stored trigger.
 						trigger     = result.typed_trigger,
 						replacement = result.replacement,
@@ -1793,6 +1795,11 @@ local function main()
 						-- The terminator typed back AFTER the replacement: it is the
 						-- character an immediate Backspace actually removes.
 						replayed    = replay_terminator,
+						-- The magic key in effect when the trigger was typed: a trigger it
+						-- ended comes back without it, even if the key changes meanwhile.
+						magic_key   = MagicKey.get(),
+						-- The commit time the undo window counts from.
+						committed_ms = Monotonic.now_ms(),
 					} or nil
 				else
 					-- An uncommitted output leaves the line in an unknown state: the
@@ -2341,13 +2348,31 @@ local function main()
 		-- ("adn " → "ADN "), so THAT is what the Backspace removed, and the whole
 		-- replacement is still on screen. Counting the replacement alone left its
 		-- first character behind: "adn " then Backspace read "Aadn".
-		if one_character and _undoable and not opts.dry_run then
+		--
+		-- What comes back is the shared rule's (hotstrings.engine.backspace_restore):
+		-- the trigger without a final magic key, then the replayed terminator, so
+		-- "adn " gives "adn " back and "td★" gives "td". The undo lasts
+		-- hotstrings.backspace_restore_window_ms after the commit, inclusive; a
+		-- later Backspace is an ordinary one and edits the buffer below.
+		local BackspaceRestore = require("hotstrings.engine.backspace_restore")
+		if one_character and _undoable and not opts.dry_run
+			and BackspaceRestore.within_window(_undoable.committed_ms, Monotonic.now_ms(),
+				WordReset.backspace_restore_window_ms()) then
 			-- The original expansion owns both the field and its privacy policy.
 			-- Focus/log/clipboard callbacks can retire the global Undo while this
 			-- operation is in progress, so read only this captured commit record.
 			local undo = _undoable
 			_undoable = nil
+			local restored = BackspaceRestore.restored_text(undo.trigger, undo.magic_key, undo.replayed)
 			local remaining = injector.caret_steps(undo.replacement .. (undo.replayed or ""))
+			if restored == "" then
+				-- The repeat key's lone magic key: the Backspace already removed the
+				-- repeated character and nothing else comes back ("po★" -> "poo" ->
+				-- "po"). The buffer no longer describes the line.
+				Logger.info(LOG, "Undo: the trigger was the magic key alone, nothing to restore.")
+				engine:reset(false)
+				return
+			end
 			if remaining >= 1 then
 				-- The trigger is typed text: its length is the diagnostic, not its
 				-- content, and a private one gives not even that (Windows, macOS).
@@ -2355,15 +2380,24 @@ local function main()
 					Logger.info(LOG, "Undo: restoring a private trigger (content withheld).")
 				else
 					Logger.info(LOG, "Undo: restoring the trigger (%d char(s)).",
-						utf8.len(undo.trigger) or #undo.trigger)
+						utf8.len(restored) or #restored)
 				end
-				local ok_delivery, delivery = pcall(injector.inject, remaining - 1, undo.trigger,
+				local ok_delivery, delivery = pcall(injector.inject, remaining - 1, restored,
 					undo.is_private, nil, undo.destination)
+				local restored_ok = ok_delivery and type(delivery) == "table" and delivery.ok == true
 				-- The restored trigger ends the line and is not in the buffer: a
-				-- word-start rule typed next would otherwise fire inside it. A
-				-- refused restore leaves the line unknown, which the same reset says.
-				engine:reset(false)
-				if not (ok_delivery and type(delivery) == "table" and delivery.ok == true) then
+				-- word-start rule typed next would otherwise fire inside it, so the
+				-- buffer restarts at an unknown start. A restore that ends with a
+				-- terminator (Space, punctuation, Enter) leaves the caret after a
+				-- word boundary instead, where the next word starts. A refused
+				-- restore leaves the line unknown. The replayed character is the
+				-- terminator that fired the expansion, so it is what ends the restored
+				-- text; asking the terminator set rather than the shared word-character
+				-- test keeps a non-ASCII terminator (« », …) a boundary, which that
+				-- test counts as a letter.
+				local at_word_start = restored_ok and type(undo.replayed) == "string" and undo.replayed ~= ""
+				engine:reset(at_word_start)
+				if not restored_ok then
 					Logger.error(LOG, "Undo: the trigger was not restored: %s.",
 						tostring(ok_delivery and type(delivery) == "table" and delivery.error or delivery))
 				end

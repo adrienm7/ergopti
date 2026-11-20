@@ -131,7 +131,9 @@ local function with_undo(options, body)
 				-- Bare keys: the shared expansion delay reads the held modifiers per key.
 				keyboard_hook = { held_modifiers = function() return {} end },
 				Monotonic = { now_ms = function() return state.now end }, _cached_app_id = "owned-editor",
-				WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end, cascade_max_arrows = function() return 0 end },
+				WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end, cascade_max_arrows = function() return 0 end,
+					backspace_restore_enabled = function() return true end, backspace_restore_window_ms = function() return 500 end },
+				MagicKey = { get = function() return "★" end },
 				terminators_mod = { is_terminator = function() return false end },
 				RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false },
 				keyboard_hook = { held_modifiers = function() return {} end },
@@ -209,7 +211,7 @@ helpers.describe("Main Undo retains its original expansion authority", function(
 	helpers.it("keeps the private trigger out of the actual injector trace (undo-owner)", function()
 		with_undo({ trigger = "★PRIVATE_UNDO★", private = true }, function(state)
 			helpers.assert_true(state.result.ok)
-			helpers.assert_eq(table.concat(state.logs, "\n"):find("★PRIVATE_UNDO★", 1, true), nil,
+			helpers.assert_eq(table.concat(state.logs, "\n"):find("PRIVATE_UNDO", 1, true), nil,
 				"a private trigger must not reach the persistent logger")
 			helpers.assert_true(state.private, "the private classification must survive the Undo commit record")
 			local logs = table.concat(state.logs, "\n")
@@ -217,7 +219,8 @@ helpers.describe("Main Undo retains its original expansion authority", function(
 				"a private restore says only that it happened, as on Windows and macOS (undo-private-log)")
 			helpers.assert_eq(logs:find("Undo: restoring the trigger (", 1, true), nil,
 				"not even the private trigger's length")
-			helpers.assert_eq(state.documents["/field/original"], "★PRIVATE_UNDO★")
+			-- The final magic key is an action, not text: it does not come back.
+			helpers.assert_eq(state.documents["/field/original"], "★PRIVATE_UNDO")
 		end)
 	end)
 end)

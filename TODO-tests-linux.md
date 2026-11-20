@@ -145,3 +145,12 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       text 1.5 times larger and the panel grows with it; the GTK dialogs (text entry, list) follow at once
       through GTK itself; check whether the Studio and the other WebKit windows follow too (not handled by the
       driver); the WPM pill keeps its size, as on Windows.
+- [ ] <!-- field-point: backspace_restore --> **Backspace restore** (`hotstrings.backspace_restore_enabled`,
+      `hotstrings.backspace_restore_window_ms`, menu Hotstrings > Parameters), in a GTK editor and a terminal:
+      1. `td★` expands, then Backspace at once leaves `td` (no ★). 2. `po★` gives `poo`, Backspace leaves `po`.
+      3. `adn` then Space expands, Backspace at once leaves `adn ` (lowercase, the Space kept), and a word-start
+      hotstring typed next fires; same with a comma and with Enter. 4. Window 500 ms: a Backspace within half a
+      second undoes, one after a full second only deletes the last character (`ADN`); with the window at 2000 ms
+      a Backspace after one second still undoes. 5. Any key (Escape, a letter) between the expansion and the
+      Backspace: plain Backspace. 6. Option off: Backspace deletes the last character every time; on again, the
+      undo returns without a restart. A custom window (e.g. 750) typed in the free entry is kept after a restart.

@@ -42,6 +42,7 @@ return {
 	"tests.unit.core.process.test_owned_process_deadline",
 	"tests.unit.core.ui.editors.prompt_editor.test_profile_roundtrip",
 	"tests.unit.hotstrings.engine.injector.test_undo_owner",
+	"tests.unit.hotstrings.engine.injector.test_backspace_restore",
 	"tests.unit.hotstrings.engine.injector.test_repeat_main_commit",
 	"tests.unit.hotstrings.engine.engine.test_action_arrow_effects",
 	"tests.unit.core.process.test_desktop_opener",

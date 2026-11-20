@@ -158,6 +158,7 @@ local function scenario(options, body)
 			keyboard_hook = { held_modifiers = function() return {} end, held_modifier_role = function() return false end },
 			RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false }, Logger = logger,
 			input_capture_gate = gate, MagicKeySource = { on_key = function() return false end },
+			MagicKey = { get = function() return "★" end },
 			script_chords = { on_key = function() return false end }, tap_keys = { on_key = function() return false end },
 			wrap_on_type = { on_key = function() return false end, end_selection_window = function() return true end },
 			consume_bound_chord = options.consume_bound_chord or function() return false end,

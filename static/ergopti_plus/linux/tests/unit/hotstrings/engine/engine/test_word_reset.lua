@@ -611,4 +611,136 @@ helpers.describe("word reset: the cascade arrow count", function()
 	end)
 end)
 
+-- =================================================================
+-- =================================================================
+-- ======= 6/ The Backspace undo ===================================
+-- =================================================================
+-- =================================================================
+
+-- Before these leaves the undo had no option and no window: a Backspace undid
+-- an expansion however late it came.
+helpers.describe("word reset: the Backspace undo settings (backspace-restore)", function()
+	helpers.it("backspace restore, reads the manifest defaults", function()
+		with_settings(nil, function(subject)
+			local Manifest = require("menu.engine.manifest_reader")
+			helpers.assert_eq(subject.backspace_restore_enabled(), true)
+			helpers.assert_eq(subject.backspace_restore_enabled(), Manifest.default_for("hotstrings.backspace_restore_enabled"))
+			helpers.assert_eq(subject.backspace_restore_window_ms(), 500)
+			helpers.assert_eq(subject.backspace_restore_window_ms(), Manifest.default_for("hotstrings.backspace_restore_window_ms"))
+		end)
+	end)
+
+	helpers.it("backspace restore, persists both leaves sparsely and a default is an absent leaf", function()
+		with_settings('[hotstrings]\nunknown = "keep"\n', function(subject, _, path, reload, sandbox)
+			local Codec = require("core.text.engine.toml_codec")
+			helpers.assert_true(subject.set_backspace_restore_window_ms(2000))
+			helpers.assert_true(subject.set_backspace_restore_enabled(false))
+			local stored = Codec.decode(sandbox.read_bytes(path)).hotstrings
+			helpers.assert_eq(stored.backspace_restore_window_ms, 2000)
+			helpers.assert_eq(stored.backspace_restore_enabled, false)
+			helpers.assert_eq(stored.unknown, "keep")
+			local fresh = reload()
+			helpers.assert_eq(fresh.backspace_restore_window_ms(), 2000)
+			helpers.assert_eq(fresh.backspace_restore_enabled(), false)
+			helpers.assert_true(fresh.toggle_backspace_restore_enabled())
+			helpers.assert_true(fresh.set_backspace_restore_window_ms(500))
+			stored = Codec.decode(sandbox.read_bytes(path)).hotstrings
+			helpers.assert_eq(stored.backspace_restore_enabled, nil, "the default switch is an absent leaf")
+			helpers.assert_eq(stored.backspace_restore_window_ms, nil, "the default window is an absent leaf")
+		end)
+	end)
+
+	helpers.it("backspace restore, refuses a window outside 50..10000 whole ms or a non-boolean switch", function()
+		with_settings("[hotstrings]\nbackspace_restore_window_ms = 1000\n", function(subject, controls, path, _, sandbox)
+			for _, bad in ipairs({ 49, 10001, 0, -1, 250.5, "500", true, math.huge }) do
+				helpers.assert_eq(subject.set_backspace_restore_window_ms(bad), false, tostring(bad))
+			end
+			helpers.assert_eq(subject.set_backspace_restore_enabled("yes"), false)
+			helpers.assert_true(subject.set_backspace_restore_window_ms(50), "the range's minimum is admitted")
+			helpers.assert_true(subject.set_backspace_restore_window_ms(10000), "the range's maximum is admitted")
+			local source = sandbox.read_bytes(path)
+			controls.refuse = true
+			helpers.assert_eq(subject.set_backspace_restore_window_ms(250), false)
+			helpers.assert_eq(sandbox.read_bytes(path), source)
+			helpers.assert_eq(subject.backspace_restore_window_ms(), 10000, "the runtime keeps the published value")
+		end)
+	end)
+
+	for _, stored in ipairs({ "20", "20000", "250.5", '"500"' }) do
+		helpers.it("backspace restore, reads a window of " .. stored .. " as the default with one warning (value-validation)", function()
+			with_settings("[hotstrings]\nbackspace_restore_window_ms = " .. stored .. "\nbackspace_restore_enabled = 1\n", function(subject)
+				require("settings.engine.migration.outdated").reset_for_tests()
+				local reported = require("settings.engine.migration.outdated").collect_reports(function()
+					helpers.assert_eq(subject.backspace_restore_window_ms(), 500)
+					helpers.assert_eq(subject.backspace_restore_enabled(), true)
+				end)
+				helpers.assert_eq(reported, { ["hotstrings.backspace_restore_window_ms"] = true,
+					["hotstrings.backspace_restore_enabled"] = true })
+			end)
+		end)
+	end
+
+	helpers.it("backspace restore, is marked as read for the cleanup and adopted with the scope", function()
+		with_settings("[hotstrings]\nbackspace_restore_window_ms = 1000\nbackspace_restore_enabled = false\n", function(subject, _, path)
+			package.loaded["settings.ui.menu.unused_keys_cleanup"] = nil
+			local scan = require("settings.ui.menu.unused_keys_cleanup").find(path)
+			helpers.assert_eq(scan.status, "ok")
+			for _, key in ipairs(scan.keys) do
+				local dotted = table.concat(key.path, ".")
+				helpers.assert_true(dotted ~= "hotstrings.backspace_restore_window_ms"
+					and dotted ~= "hotstrings.backspace_restore_enabled", "a consumed leaf is never offered for removal: " .. dotted)
+			end
+			local before = subject.snapshot()
+			helpers.assert_true(subject.adopt_configuration({ hotstrings = { backspace_restore_window_ms = 250 } }))
+			helpers.assert_eq(subject.backspace_restore_window_ms(), 250)
+			helpers.assert_eq(subject.backspace_restore_enabled(), true)
+			helpers.assert_true(subject.restore_configuration(before))
+			helpers.assert_eq(subject.backspace_restore_window_ms(), 1000)
+			helpers.assert_eq(subject.backspace_restore_enabled(), false)
+			local invalid = subject.snapshot()
+			invalid.backspace_restore_window_ms = 0
+			helpers.assert_eq(subject.restore_configuration(invalid), false, "a snapshot with an invalid window is refused")
+		end)
+	end)
+
+	helpers.it("backspace restore, lists the window presets and a free entry in ms", function()
+		local i18n = require("core.i18n.engine.i18n")
+		local Menu = require("menu.engine.manifest_menu")
+		local calls = {}
+		local row = Menu.choice_row("hotstrings_params_group", "backspace_restore_window", {
+			backspace_restore_window = function(value) calls[#calls + 1] = value; return true end,
+			backspace_restore_window_custom = function() calls[#calls + 1] = "custom"; return true end,
+		}, { ["hotstrings.backspace_restore_window_ms"] = function() return 500 end })
+		helpers.assert_not_nil(row, "the declared choice renders")
+		local labels, ticked = {}, nil
+		for _, item in ipairs(row.items) do
+			if not item.separator then
+				labels[#labels + 1] = item.label
+				if item.checked then ticked = item.label end
+			end
+		end
+		helpers.assert_eq(#labels, 5, "four presets and the free entry")
+		helpers.assert_contains(labels[2], "500")
+		helpers.assert_eq(ticked, labels[2])
+		helpers.assert_eq(labels[5], i18n.get("menu.hotstrings.backspace_restore_window_custom"))
+		row.items[3].action()
+		row.items[#row.items].action()
+		helpers.assert_eq(calls, { 1000, "custom" })
+	end)
+
+	helpers.it("backspace restore, gives the menu its check, choice, free entry and states", function()
+		local text = helpers.expand_config_keys(helpers.read_menu_source())
+		helpers.assert_contains(text, 'params_ctx.commands["backspace_restore"]')
+		helpers.assert_contains(text, "WordReset.toggle_backspace_restore_enabled()")
+		helpers.assert_contains(text, 'params_ctx.commands["backspace_restore_window"]')
+		helpers.assert_contains(text, "WordReset.set_backspace_restore_window_ms(window_ms)")
+		helpers.assert_contains(text, 'params_ctx.commands["backspace_restore_window_custom"]')
+		helpers.assert_contains(text, "ValueCheck.KEY.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS")
+		helpers.assert_contains(text, 'i18n_safe("menu.hotstrings.backspace_restore_window_prompt")')
+		helpers.assert_contains(text, 'params_ctx.state_getters["hotstrings_backspace_restore_enabled"]')
+		helpers.assert_contains(text, "return WordReset.backspace_restore_enabled()")
+		helpers.assert_contains(text, "return WordReset.backspace_restore_window_ms()")
+	end)
+end)
+
 require("tests.lua.hotstrings.idle_clock_contract").register(helpers)

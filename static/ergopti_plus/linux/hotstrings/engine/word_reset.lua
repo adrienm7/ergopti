@@ -12,6 +12,9 @@
 --- shortcut struck under a tap-hold or navigation-layer hold). It also holds
 --- `hotstrings.cascade_max_arrows`, the longest hotstring chain, the other matcher parameter that is read on every
 --- keystroke and follows the same scope (adopt, restore, cleanup ownership).
+--- And the Backspace undo of an expansion: `hotstrings.backspace_restore_enabled`
+--- and `hotstrings.backspace_restore_window_ms`, read on the Backspace that
+--- follows each expansion and owned by the same scope.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Before them the buffer kept the last word for as long as the user stayed
@@ -40,6 +43,10 @@
 ---    text. A Backspace that finds the buffer empty there deleted nothing, so
 ---    the engine keeps the word start (its line-start reset). Windows and
 ---    macOS apply the same rules.
+--- 8. The undo window is validated by the value schema's declared range and by
+---    the shared rule's own domain (hotstrings.engine.backspace_restore), the
+---    one the macOS expander applies too, so no driver admits a value another
+---    refuses.
 --- ==============================================================================
 
 local M = {}
@@ -53,6 +60,7 @@ local Preferences = require("hotstrings.engine.matcher.preferences")
 local ConfigOutdated = require("settings.engine.migration.outdated")
 local Engine = require("hotstrings.engine.engine")
 local Monotonic = require("core.logger.engine.monotonic")
+local BackspaceRestore = require("hotstrings.engine.backspace_restore")
 local ConfigKeys = require("settings.engine.keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
@@ -60,15 +68,19 @@ local LOG = "hotstrings.word_reset"
 
 local IDLE_PATH = KEY.HOTSTRINGS_IDLE_RESET_SECONDS
 local CASCADE_PATH = KEY.HOTSTRINGS_CASCADE_MAX_ARROWS
+local RESTORE_WINDOW_PATH = KEY.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS
+local RESTORE_WINDOW_FIELD = LEAF.BACKSPACE_RESTORE_WINDOW_MS
 
 -- The boolean leaves of [hotstrings] this module owns, each a runtime field of
 -- the same name, and the full feature path of each.
-local SWITCHES = { LEAF.CLICK_RESETS_WORD, LEAF.ARROW_RESETS_WORD, LEAF.SHORTCUT_RESETS_WORD, LEAF.TAP_HOLD_RESETS_WORD }
+local SWITCHES = { LEAF.CLICK_RESETS_WORD, LEAF.ARROW_RESETS_WORD, LEAF.SHORTCUT_RESETS_WORD, LEAF.TAP_HOLD_RESETS_WORD,
+	LEAF.BACKSPACE_RESTORE_ENABLED }
 local SWITCH_PATH = {
 	[LEAF.CLICK_RESETS_WORD] = KEY.HOTSTRINGS_CLICK_RESETS_WORD,
 	[LEAF.ARROW_RESETS_WORD] = KEY.HOTSTRINGS_ARROW_RESETS_WORD,
 	[LEAF.SHORTCUT_RESETS_WORD] = KEY.HOTSTRINGS_SHORTCUT_RESETS_WORD,
 	[LEAF.TAP_HOLD_RESETS_WORD] = KEY.HOTSTRINGS_TAP_HOLD_RESETS_WORD,
+	[LEAF.BACKSPACE_RESTORE_ENABLED] = KEY.HOTSTRINGS_BACKSPACE_RESTORE_ENABLED,
 }
 
 -- The caret keys arrow_resets_word governs, by the hook's control-key name.
@@ -125,7 +137,8 @@ local _last_key_ms = nil
 --- @param settings table Validated settings.
 --- @return table copy
 local function copy_settings(settings)
-	local copy = { idle_seconds = settings.idle_seconds, cascade_max_arrows = settings.cascade_max_arrows }
+	local copy = { idle_seconds = settings.idle_seconds, cascade_max_arrows = settings.cascade_max_arrows,
+		[RESTORE_WINDOW_FIELD] = settings[RESTORE_WINDOW_FIELD] }
 	for _, key in ipairs(SWITCHES) do copy[key] = settings[key] end
 	return copy
 end
@@ -134,9 +147,22 @@ end
 --- @return table settings
 local function default_settings()
 	local defaults = { idle_seconds = Manifest.default_for(IDLE_PATH),
-		cascade_max_arrows = Manifest.default_for(CASCADE_PATH) }
+		cascade_max_arrows = Manifest.default_for(CASCADE_PATH),
+		[RESTORE_WINDOW_FIELD] = Manifest.default_for(RESTORE_WINDOW_PATH) }
 	for _, key in ipairs(SWITCHES) do defaults[key] = Manifest.default_for(SWITCH_PATH[key]) end
 	return defaults
+end
+
+--- Whether a Backspace undo window is admissible: inside the value schema's
+--- declared range and the shared rule's domain.
+--- @param window_ms any
+--- @return boolean valid
+--- @return table checked The value check's verdict, for the refusal report.
+local function check_restore_window(window_ms)
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(
+		ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS), window_ms)
+	return checked.ok == true and BackspaceRestore.valid_window_ms(window_ms), checked
 end
 
 --- Resolves exactly the leaves consumed here. A value of another shape is
@@ -145,7 +171,8 @@ end
 --- @param document table Decoded canonical configuration.
 --- @param mark function|nil Cleanup ownership visitor.
 --- @return table settings `{ idle_seconds, cascade_max_arrows, click_resets_word,
----   arrow_resets_word, shortcut_resets_word, tap_hold_resets_word }`.
+---   arrow_resets_word, shortcut_resets_word, tap_hold_resets_word,
+---   backspace_restore_enabled, backspace_restore_window_ms }`.
 local function resolve_settings(document, mark)
 	local section = ConfigOutdated.settings_table(document.hotstrings, { "hotstrings" }, Logger)
 	local idle = section and section.idle_reset_seconds
@@ -172,7 +199,20 @@ local function resolve_settings(document, mark)
 	elseif mark then mark(KEY.HOTSTRINGS, LEAF.CASCADE_MAX_ARROWS) end
 	assert(Engine.valid_cascade_max_arrows(arrows), "the manifest default of cascade_max_arrows must be valid")
 
-	local settings = { idle_seconds = idle, cascade_max_arrows = arrows }
+	local window = section and section[RESTORE_WINDOW_FIELD]
+	if window ~= nil then
+		local valid, checked = check_restore_window(window)
+		if not valid then
+			ConfigOutdated.report(RESTORE_WINDOW_PATH, string.format("the value is refused (%s, %s..%s ms)",
+				tostring(checked.reason), tostring(checked.min), tostring(checked.max)), Logger)
+			window = nil
+		end
+	end
+	if window == nil then window = Manifest.default_for(RESTORE_WINDOW_PATH)
+	elseif mark then mark(KEY.HOTSTRINGS, RESTORE_WINDOW_FIELD) end
+	assert(check_restore_window(window), "the manifest default of backspace_restore_window_ms must be valid")
+
+	local settings = { idle_seconds = idle, cascade_max_arrows = arrows, [RESTORE_WINDOW_FIELD] = window }
 	for _, key in ipairs(SWITCHES) do
 		local path = SWITCH_PATH[key]
 		local value = section and section[key]
@@ -242,7 +282,8 @@ end
 --- @return boolean restored
 function M.restore_configuration(snapshot)
 	if type(snapshot) ~= "table" or not Engine.valid_idle_reset_seconds(snapshot.idle_seconds)
-		or not Engine.valid_cascade_max_arrows(snapshot.cascade_max_arrows) then return false end
+		or not Engine.valid_cascade_max_arrows(snapshot.cascade_max_arrows)
+		or not BackspaceRestore.valid_window_ms(snapshot[RESTORE_WINDOW_FIELD]) then return false end
 	for _, key in ipairs(SWITCHES) do
 		if type(snapshot[key]) ~= "boolean" then return false end
 	end
@@ -292,6 +333,17 @@ end
 ---   hold, starts a new word.
 function M.tap_hold_resets_word()
 	return M.current().tap_hold_resets_word
+end
+
+--- @return boolean Whether a Backspace right after an expansion undoes it.
+function M.backspace_restore_enabled()
+	return M.current()[LEAF.BACKSPACE_RESTORE_ENABLED]
+end
+
+--- @return number window_ms How long after an expansion, inclusive, a
+---   Backspace still undoes it.
+function M.backspace_restore_window_ms()
+	return M.current()[RESTORE_WINDOW_FIELD]
 end
 
 --- Publishes one sparse leaf, then the runtime value.
@@ -413,6 +465,30 @@ end
 --- @return boolean committed
 function M.toggle_tap_hold_resets_word()
 	return M.set_tap_hold_resets_word(not M.tap_hold_resets_word())
+end
+
+--- Sets whether a Backspace right after an expansion undoes it.
+--- @param enabled boolean
+--- @return boolean committed
+function M.set_backspace_restore_enabled(enabled)
+	return set_switch(LEAF.BACKSPACE_RESTORE_ENABLED, enabled)
+end
+
+--- Flips the Backspace undo.
+--- @return boolean committed
+function M.toggle_backspace_restore_enabled()
+	return M.set_backspace_restore_enabled(not M.backspace_restore_enabled())
+end
+
+--- Sets how long after an expansion a Backspace still undoes it.
+--- @param window_ms number Whole milliseconds within the declared range.
+--- @return boolean committed
+function M.set_backspace_restore_window_ms(window_ms)
+	if not check_restore_window(window_ms) then
+		Logger.warn(LOG, "Invalid Backspace undo window '%s' refused.", tostring(window_ms))
+		return false
+	end
+	return persist(RESTORE_WINDOW_PATH, RESTORE_WINDOW_FIELD, window_ms)
 end
 
 --- Parses a free entry typed in the menu prompt through the shared value

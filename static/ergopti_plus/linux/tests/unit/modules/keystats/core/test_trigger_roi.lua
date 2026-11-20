@@ -226,7 +226,7 @@ Home.it("Linux trigger ROI: actual daemon callbacks exclude synthetic output and
 			wrap_on_type = { on_pointer_down = function() end }, Logger = { debug = function() end },
 			keyboard_hook = { held_modifiers = function() return {} end },
 			Monotonic = require("core.logger.engine.monotonic"),
-			WordReset = { observe_key = function() return false end, cascade_max_arrows = function() return 0 end,
+			WordReset = { observe_key = function() return false end, backspace_restore_enabled = function() return false end, cascade_max_arrows = function() return 0 end,
 				click_resets_word = function() return false end },
 			terminators_mod = { is_terminator = function() return false end },
 		}, { __index = _G })

@@ -69,7 +69,9 @@
 				"hotstrings.arrow_resets_word",
 				"hotstrings.shortcut_resets_word",
 				"hotstrings.tap_hold_resets_word",
-				"hotstrings.cascade_max_arrows"
+				"hotstrings.cascade_max_arrows",
+				"hotstrings.backspace_restore_enabled",
+				"hotstrings.backspace_restore_window_ms"
 			],
 			"registered": "yes",
 			"production_caller": "yes",
@@ -83,7 +85,8 @@
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/menu/ui/builder/builder.lua",
 				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/engine/test_word_reset.lua",
-				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/engine/test_word_reset_events.lua"
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/engine/test_word_reset_events.lua",
+				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/injector/test_backspace_restore.lua"
 			]
 		},
 		"magic_key_source": {

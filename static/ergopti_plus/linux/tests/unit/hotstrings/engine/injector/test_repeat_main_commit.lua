@@ -46,7 +46,7 @@ local function with_main(mappings, body, overrides)
 			keyboard_hook = { held_modifiers = function() return {} end },
 			Monotonic = { now_ms = function() state.now = state.now + 10; return state.now end },
 			_cached_app_id = "owned-editor",
-			WordReset = { observe_key = function() return false end,
+			WordReset = { observe_key = function() return false end, backspace_restore_enabled = function() return false end,
 				apply_typed_newline = function() return false end, cascade_max_arrows = function() return 0 end },
 			terminators_mod = { is_terminator = function() return false end,
 				terminator_is_consumed = function() return false end },

@@ -172,7 +172,8 @@ helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)
 				.. "local _undoable, _last_offered, tooltip_preview, llm_overlay, prediction_engine\n"
 				.. "local LOG, undo, text, publication = \"fixture\", { trigger = \"adn\" }, \"owned\", {}\n"
 				-- The marker line itself is not part of the prefix: seed what it bound.
-				.. "local remaining, result = 3, { ok = true }\n"
+				-- The undo's restored text is bound before its marker too.
+				.. "local remaining, result, restored = 3, { ok = true }, \"adn\"\n"
 				.. prefix .. "\nend", "@reviewed-unknown-reset-prefix"))()
 			local engine = Core.new()
 			helpers.assert_true(engine:load_mappings({ { trigger = "dt", replacement = "owned-date",
