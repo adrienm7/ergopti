@@ -1248,7 +1248,7 @@ KLPF_WorkerMain() {
 						; (KLPF_PollStudioStage); the image save below runs after.
 						; A failed save never deletes that stage: the resident may be
 						; reading it, and it owns its cleanup either way.
-						phase := "reader image save"
+						phase := "snapshot"
 						try KLPF_SettleReaderCache(true)
 						catch as Err {
 								KLPF_WorkerReportFailure(phase, Err)
