@@ -490,14 +490,17 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Linux
 
-- [ ] **Archive downloads run one chunk per idle turn.** Measured on the model page flow (2026-11-17): an owned
-      archive download reads 64 KiB, pauses, writes it and resumes only after the write's acknowledgement, a
-      libuv event. The daemon's idle wait (`keyboard_hook.idle_wait`, up to 8 ms) polls the input and tray
-      descriptors only, so each chunk waits up to two idle turns: about 4 MB/s at most, some 6 minutes for the
-      1.4 GB Ollama archive. Each chunk's admission also re-reads `config.toml` (`runtime_source.read_source`,
-      `install_resolver` stats of every ancestor): about 30 ms per chunk on a loaded 8-core WSL. Wake the idle
-      wait on libuv's backend descriptor (as the tray's GLib companion does for D-Bus) and keep the per-chunk
-      source check cheap without weakening the revocation it gives, then time a first install on the PC.
+- [ ] **Archive downloads: time a first install on the PC.** The owned archive download waited out the idle wait
+      twice per 64 KiB chunk (the write's thread-pool acknowledgement, then the restarted pipe reader, which libuv
+      registers only on its next poll) and read `config.toml` 28 times per chunk. Fixed on 2026-11-20: the idle
+      wait polls libuv's backend descriptor, the curl reader's resume calls `event_loop.wake()`, and the AI
+      preference reader reads the bytes only when the file's lstat change token moves (trusted once the file has
+      been quiet 3 s). `tests/hardware/run_archive_download_throughput.lua`, 64 MiB from a loopback server on a
+      shared 8-core WSL: 3.1 MB/s before (2 idle-wait timeouts and 28 full config reads per chunk), 11.0 MB/s
+      with the wake alone, 17.7 to 21.1 MB/s with both (0 full reads per chunk), so about 70 s instead of 7.7 min
+      for the 1.4 GB archive. Its `revoke` mode rewrites the model in place with the same size mid-download, on a
+      trusted token: no byte lands after the edit. What remains per chunk is 14 `install_resolver` ancestor walks
+      (about 1.5 ms, one lstat per ancestor each). Time a first real install on the PC.
 - [ ] **A touchpad tap's click meets an unknown field.** A button press is now counted before the click
       callback withdraws the field's privacy verdict (`keyboard_hook`, pointer-press-before-click), but a
       tap-to-click is counted on the frame that ends the tap, after the touch's own press already withdrew it:
