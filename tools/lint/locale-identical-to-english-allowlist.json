@@ -4108,6 +4108,58 @@
 		"editor.hotstrings.tag_final": {
 			"reason": "loanword-or-cognate",
 			"locales": ["de", "es", "fr", "pt"]
+		},
+		"layout_analysis.level.base": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "fr", "it", "pt"]
+		},
+		"layout_analysis.level.shift": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_analysis.level.shift_with": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
 		}
 	}
 }

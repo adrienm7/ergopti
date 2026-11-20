@@ -840,6 +840,23 @@ var LAYOUT_ANALYSIS = (function () {
 	const levelCache = new WeakMap();
 
 	/**
+	 * A layout's levels as a page names them: each level's id, whether it
+	 * holds Shift, the modifiers it holds (their names) and their labels; the
+	 * default four hold AltGr. The drawings and their level choice read it.
+	 * @param {object} layout - Library shape (layoutFromRows).
+	 * @returns {Array<{id: string, shift: boolean, hold: string[], labels: string[]}>}
+	 */
+	function levelsOf(layout) {
+		const label = (name) => (layout.levels ? layout.modifiers[name].label : DEFAULT_MODIFIER_LABEL);
+		return (layout.levels || DEFAULT_LEVELS).map((level) => ({
+			id: level.id,
+			shift: level.shift === true,
+			hold: (level.hold || []).slice(),
+			labels: (level.hold || []).map(label)
+		}));
+	}
+
+	/**
 	 * A layout's levels on a board: each level's id, its Shift presses, the
 	 * keys that hold its other modifiers for a key of each hand (null when the
 	 * board has no key for one of them: that level types nothing there). The
@@ -6851,6 +6868,7 @@ var LAYOUT_ANALYSIS = (function () {
 		keyboard,
 		fingeringProfile,
 		layoutFromRows,
+		levelsOf,
 		layoutFromComposerSource,
 		typingCodes,
 		thumbKeys: thumbKeyCodes,

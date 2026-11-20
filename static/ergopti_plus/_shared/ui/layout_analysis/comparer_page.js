@@ -375,6 +375,9 @@
 	];
 	// How many boards the side-by-side heat maps draw, the first of the ranking.
 	const HEATS_COUNTS = [2, 4, 6, 9, 12];
+	// The level a board shows on its keys: the base one unless the viewer picks
+	// another (a layout's own levels, Neo's Mod3 and Mod4, included).
+	const LEVEL_BASE = 'base';
 	const DEFAULT_HEATS_COUNT = 6;
 	// A filter set to this value keeps everything.
 	const ALL = '';
@@ -795,6 +798,9 @@
 			<label class="la-check" data-i18n-text="layout_analysis.heats.shared">
 				<input id="la-heats-shared" type="checkbox" />
 			</label>
+			<label class="la-filter-field" data-i18n-text="layout_analysis.heat.level">
+				<select id="la-heats-level"></select>
+			</label>
 		</p>
 		<p id="la-heats-legend" class="la-heat-legend"></p>
 		<div id="la-heats" class="la-heat-grid"></div>
@@ -830,6 +836,9 @@
 				<p class="la-heat-controls">
 					<label class="la-sr-only" for="la-heat-metric" data-i18n="layout_analysis.details.heatmap"></label>
 					<select id="la-heat-metric"></select>
+					<label class="la-filter-field" data-i18n-text="layout_analysis.heat.level">
+						<select id="la-heat-level"></select>
+					</label>
 					<label id="la-heat-diff-field" class="la-check" hidden>
 						<input id="la-heat-diff" type="checkbox" />
 					</label>
@@ -1039,6 +1048,7 @@
 						// The ranking table's columns and filters, and the heatmap's choice.
 						table: state.table,
 						heat: state.heat,
+						heatLevel: state.heatLevel,
 						heatDiff: state.heatDiff,
 						matrixBy: state.matrixBy,
 						// The sub-tab the visitor last chose, the side-by-side heat maps'
@@ -1141,6 +1151,8 @@
 			sort: { key: 'rank', descending: false },
 			table: validTable(saved.table),
 			heat: HEAT_CHOICES.includes(saved.heat) ? saved.heat : HEAT_PRESSES,
+			// The level the details' board shows; one no compared layout has shows the base.
+			heatLevel: typeof saved.heatLevel === 'string' ? saved.heatLevel : LEVEL_BASE,
 			// With a layout to compare with, the heatmap shows the key-by-key difference.
 			heatDiff: saved.heatDiff === true,
 			// The key pair matrix's colour (how often, or score points) and its table's sort.
@@ -1267,7 +1279,8 @@
 			return {
 				metric: HEAT_CHOICES.includes(value.metric) ? value.metric : HEAT_PRESSES,
 				count: HEATS_COUNTS.includes(value.count) ? value.count : DEFAULT_HEATS_COUNT,
-				shared: value.shared !== false
+				shared: value.shared !== false,
+				level: typeof value.level === 'string' ? value.level : LEVEL_BASE
 			};
 		}
 
@@ -3077,6 +3090,12 @@
 				.map((result) => ({ result, values: heatValuesOf(result, metric, null) }));
 			if (boards.length === 0) return;
 			const unit = heatUnit(metric);
+			// The levels of every board drawn; a board without the chosen one shows no character.
+			const level = fillSelect(
+				$('la-heats-level'),
+				levelChoices(boards.map((b) => layoutOf(b.result.layout.id))),
+				state.heats.level
+			);
 			const modifiers = new Set(E.heldCodes());
 			// The space bar takes a share of the presses no other key comes near: the
 			// scale is the other keys', and the space bar is drawn at its darkest.
@@ -3122,8 +3141,9 @@
 				const tableRows = drawBoard(box, result, layout, values, {
 					extent,
 					other: false,
-					title: (code, value) =>
-						`${keyText(layout, code)} · ${heatName(metric)}: ${measure(value, HEAT_DIGITS, unit)}`
+					level,
+					title: (code, value, shown) =>
+						`${shown} · ${heatName(metric)}: ${measure(value, HEAT_DIGITS, unit)}`
 				});
 				card.append(title, box);
 				// Each card's heatmap as a PNG or SVG image (board_image.js).
@@ -3299,15 +3319,74 @@
 			return INFO.metricUnit(id);
 		}
 
+		/**
+		 * What a key types on one level, as a board's key shows it: a dead key its
+		 * bare accent (what it types alone), nothing when the level types none.
+		 * @param {object} layout
+		 * @param {string} code
+		 * @param {number} level - The level's index in the layout's rows (-1: none).
+		 * @returns {string}
+		 */
+		function levelText(layout, code, level) {
+			if (code === 'Space' && level === 0) return '␣';
+			const cell = level < 0 ? null : (layout.rows[code] || [])[level];
+			if (cell && typeof cell === 'object')
+				return (
+					KEY_LEGEND.deadKeyText(((layout.dead || {})[cell.dead] || {})[' '] || '') || cell.dead
+				);
+			return typeof cell === 'string' ? cell : '';
+		}
+
 		/** What a key types on its base layer, as the heatmap and the tables show it. */
 		function keyText(layout, code) {
-			if (code === 'Space') return '␣';
-			const row = layout.rows[code];
-			// A dead key shows its bare accent (what it types alone).
-			const dead = row && row[0] && typeof row[0] === 'object' ? row[0].dead : null;
-			if (dead !== null)
-				return KEY_LEGEND.deadKeyText(((layout.dead || {})[dead] || {})[' '] || '') || dead;
-			return row && typeof row[0] === 'string' && row[0] !== '' ? row[0] : code;
+			return levelText(layout, code, 0) || code;
+		}
+
+		/** A level's choice key: Shift and the modifiers it holds by name (« shift+mod3 »). */
+		function levelKey(level) {
+			const parts = (level.shift ? ['shift'] : []).concat(level.hold);
+			return parts.length === 0 ? LEVEL_BASE : parts.join('+');
+		}
+
+		/** A level's words: Base, Shift, its modifiers' labels (Mod3, Shift + Mod4…). */
+		function levelName(level) {
+			if (level.hold.length === 0)
+				return t(level.shift ? 'layout_analysis.level.shift' : 'layout_analysis.level.base');
+			const modifiers = level.labels.join(' + ');
+			return level.shift ? t('layout_analysis.level.shift_with', { modifiers }) : modifiers;
+		}
+
+		/**
+		 * The level choices of a set of layouts: every level one of them has, in
+		 * the order the layouts list them (the four default levels, then Neo's
+		 * Mod3, Mod4…), each with its words.
+		 * @param {object[]} shown - The layouts drawn.
+		 * @returns {Array<[string, string]>} [key, words] for fillSelect.
+		 */
+		function levelChoices(shown) {
+			const choices = new Map();
+			for (const layout of shown)
+				for (const level of E.levelsOf(layout))
+					if (!choices.has(levelKey(level))) choices.set(levelKey(level), levelName(level));
+			return Array.from(choices);
+		}
+
+		/** The index of a level choice in a layout's rows, -1 when the layout has none. */
+		function levelIndex(layout, key) {
+			return E.levelsOf(layout).findIndex((level) => levelKey(level) === key);
+		}
+
+		/**
+		 * What a key types on each of its levels, in words: « Shift L, Mod3 [,
+		 * Mod3 + Mod4 Λ », the levels it types nothing on left out; a board's key
+		 * names every level, whichever one it shows.
+		 */
+		function levelsSpoken(layout, code) {
+			return E.levelsOf(layout)
+				.map((level, index) => [level, levelText(layout, code, index)])
+				.filter(([, text]) => text !== '')
+				.map(([level, text]) => `${levelName(level)} ${text}`)
+				.join(', ');
 		}
 
 		/** The name of a heatmap choice. */
@@ -3350,10 +3429,10 @@
 		 * A key's tooltip line: its value in the chosen unit, then its worst
 		 * groups for a bad event, or the metrics it costs the most points on.
 		 */
-		function heatTitle(detail, layout, code, value, signed) {
+		function heatTitle(detail, layout, code, value, signed, shown) {
 			const unit = heatUnit(state.heat);
 			const written = `${signed && value > 0 ? '+' : ''}${measure(value, HEAT_DIGITS, unit)}`;
-			let title = `${keyText(layout, code)} · ${heatName(state.heat)}: ${written}`;
+			let title = `${shown} · ${heatName(state.heat)}: ${written}`;
 			if (signed) return title;
 			const key = detail.keys[code];
 			if (E.KEY_EVENTS.includes(state.heat) && key.worst[state.heat].length > 0) {
@@ -3457,11 +3536,14 @@
 		 * @param {object} result
 		 * @param {object} layout
 		 * @param {object} byCode code → value.
-		 * @param {{extent?: number, other: boolean,
-		 *   title: function(string, number): string}} options extent: the value
-		 *   of the darkest key (the box's own largest when absent). A key is an
-		 *   image named by its value, never a Tab stop: nothing on it is operated,
-		 *   and the board's table holds every value.
+		 * @param {{extent?: number, other: boolean, level?: string,
+		 *   title: function(string, number, string): string}} options extent: the
+		 *   value of the darkest key (the box's own largest when absent); level:
+		 *   the level choice its keys show (levelKey, the base when absent); title
+		 *   gets the key's code, value and shown text. A key is an image named by
+		 *   its shown text, its value, its place and what it types on every level,
+		 *   never a Tab stop: nothing on it is operated, and the board's table
+		 *   holds every value.
 		 * @returns {Array<{code: string, where: string, finger: string, value: number}>}
 		 *   The drawn keys, the rows of the board's table.
 		 */
@@ -3485,15 +3567,19 @@
 			box.style.aspectRatio = `${width} / ${maxY}`;
 			box.classList.toggle('la-heatmap-diff', options.other);
 			const position = keyPositions(board, shown);
+			const levelKeyShown = options.level || LEVEL_BASE;
+			const level = levelIndex(layout, levelKeyShown);
+			box.dataset.level = levelKeyShown;
 			const tableRows = [];
 			board.codes.forEach((code, k) => {
 				if (modifiers.has(code)) return;
-				const key = el('span', 'la-key', keyText(layout, code));
+				// The base level names a key without a character by its code, as before.
+				const text = level === 0 ? keyText(layout, code) : levelText(layout, code, level);
+				const key = el('span', 'la-key', text);
 				// The worst n-grams outline keys by their code (worst_groups.js).
 				key.dataset.code = code;
-				const row = layout.rows[code];
-				if (row && row[0] && typeof row[0] === 'object')
-					key.classList.add(KEY_LEGEND.DEAD_KEY_CLASS);
+				const cell = level < 0 ? null : (layout.rows[code] || [])[level];
+				if (cell && typeof cell === 'object') key.classList.add(KEY_LEGEND.DEAD_KEY_CLASS);
 				const value = byCode[code];
 				const share = extent > 0 ? Math.min(1, Math.abs(value) / extent) : 0;
 				// The space bar as wide as the board makes it, at most SPACE_UNITS: a split
@@ -3510,7 +3596,12 @@
 				} else {
 					key.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
 				}
-				const title = options.title(code, value);
+				const valueTitle = options.title(code, value, text || t('layout_analysis.level.none'));
+				const spoken = levelsSpoken(layout, code);
+				// What the key types on each level, whichever one the board shows.
+				const title = spoken
+					? `${valueTitle}; ${t('layout_analysis.heat.key_levels', { levels: spoken })}`
+					: valueTitle;
 				const where = t('layout_analysis.heat.position', position.get(code));
 				key.title = title;
 				key.setAttribute('role', 'img');
@@ -3549,9 +3640,11 @@
 			const other = versus && state.heatDiff ? versus : null;
 			const layout = layoutOf(result.layout.id);
 			const byCode = heatValues(detail, other);
+			const level = fillSelect($('la-heat-level'), levelChoices([layout]), state.heatLevel);
 			const tableRows = drawBoard(box, result, layout, byCode, {
 				other: Boolean(other),
-				title: (code, value) => heatTitle(detail, layout, code, value, Boolean(other))
+				level,
+				title: (code, value, shown) => heatTitle(detail, layout, code, value, Boolean(other), shown)
 			});
 			// The heatmap as a PNG or SVG image (board_image.js).
 			$('la-heatmap-image').replaceChildren(
@@ -5758,6 +5851,11 @@
 				save();
 				renderDetails();
 			});
+			$('la-heat-level').addEventListener('change', (event) => {
+				state.heatLevel = event.target.value;
+				save();
+				renderDetails();
+			});
 			$('la-worst-event').addEventListener('change', renderDetails);
 			$('la-matrix-by').addEventListener('change', (event) => {
 				state.matrixBy = event.target.value;
@@ -5828,6 +5926,11 @@
 			});
 			$('la-heats-shared').addEventListener('change', (event) => {
 				state.heats.shared = event.target.checked;
+				save();
+				renderHeatGrid();
+			});
+			$('la-heats-level').addEventListener('change', (event) => {
+				state.heats.level = event.target.value;
 				save();
 				renderHeatGrid();
 			});

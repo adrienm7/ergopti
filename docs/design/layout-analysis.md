@@ -1221,7 +1221,13 @@ compared layout: its value and the difference beside every metric and the
 score, from `diff`, each with ▲ better, ▼ worse, = equal or « not scored » in
 words); the key heatmap on the heat scale with its legend (0 to the largest
 key's value), board positions in % so it shrinks with the
-page, with each finger's share of the non-thumb presses (its ideal load
+page; its « Level shown » choice (`#la-heat-level`, and `#la-heats-level` for
+the side-by-side heat maps) lists every level of the layouts drawn (Base,
+Shift, AltGr, Shift + AltGr, and Neo's Mod3, Shift + Mod3, Mod4, Shift + Mod4,
+Mod3 + Mod4, from `levelsOf`), each key showing what it types there (nothing
+where it types nothing) while the colours stay the key's value over all its
+levels; each key's name and tooltip also list what it types on every level
+(`layout-levels.cjs` `exerciseComparerLevels`); under it each finger's share of the non-thumb presses (its ideal load
 marked), hands and rows under it and the contributions beside it; every
 metric; « Typed via » (the share
 of the characters typed otherwise than their cheapest way alone, then the

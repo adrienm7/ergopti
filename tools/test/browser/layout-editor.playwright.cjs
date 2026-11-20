@@ -36,6 +36,8 @@ const { catalogueShape, pageRawKeys } = require('../lib/raw-locale-keys.cjs');
 // The tab strip, the restored tabs' names, the corpus file button and the
 // buttons' colons (studio-controls).
 const studioControls = require('./studio-controls.cjs');
+// A layout's own levels (Neo 2's Mod3 and Mod4) on the Comparer's boards.
+const layoutLevels = require('./layout-levels.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const KEYLAYOUT = path.join(ROOT, 'static', 'layouts', 'registry', 'ergopti', 'ergopti.keylayout');
@@ -4383,6 +4385,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);
+		await layoutLevels.exerciseComparerLevels(browser, origin);
 		await studioUx.exercisePanelFirstChange(browser, origin);
 		await studioUx.exerciseOneInfoPerRow(browser, origin);
 		await studioUx.exerciseHistoryShortcuts(browser, origin);
