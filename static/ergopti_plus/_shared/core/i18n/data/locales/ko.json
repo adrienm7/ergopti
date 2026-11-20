@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "삭제를 시작할 수 없습니다.",
 	"ollama.delete_reason_creation": "삭제를 준비할 수 없습니다.",
 	"ollama.delete_reason_readiness": "Ollama가 준비되지 않았습니다.",
+	"ollama.delete_reason_timeout": "Ollama가 제시간에 응답하지 않았습니다.",
 	"ollama.deleted_title": "삭제됨 (Ollama)",
 	"ollama.deps_failed": "실패…",
 	"ollama.deps_step_checking": "Ollama 확인 중…",

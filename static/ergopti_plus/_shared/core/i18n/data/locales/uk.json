@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "Не вдалося почати видалення.",
 	"ollama.delete_reason_creation": "Не вдалося підготувати видалення.",
 	"ollama.delete_reason_readiness": "Ollama не перейшла в стан готовності.",
+	"ollama.delete_reason_timeout": "Ollama не відповіла вчасно.",
 	"ollama.deleted_title": "Видалено (Ollama)",
 	"ollama.deps_failed": "Помилка…",
 	"ollama.deps_step_checking": "Перевірка Ollama…",

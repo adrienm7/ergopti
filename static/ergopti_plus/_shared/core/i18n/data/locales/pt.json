@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "Não foi possível iniciar a exclusão.",
 	"ollama.delete_reason_creation": "Não foi possível preparar a exclusão.",
 	"ollama.delete_reason_readiness": "O Ollama não ficou pronto.",
+	"ollama.delete_reason_timeout": "O Ollama não respondeu a tempo.",
 	"ollama.deleted_title": "Eliminado (Ollama)",
 	"ollama.deps_failed": "Falhou…",
 	"ollama.deps_step_checking": "Verificando Ollama…",

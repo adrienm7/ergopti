@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "削除を開始できませんでした。",
 	"ollama.delete_reason_creation": "削除を準備できませんでした。",
 	"ollama.delete_reason_readiness": "Ollama の準備が整いませんでした。",
+	"ollama.delete_reason_timeout": "Ollama が時間内に応答しませんでした。",
 	"ollama.deleted_title": "削除されました (Ollama)",
 	"ollama.deps_failed": "失敗…",
 	"ollama.deps_step_checking": "Ollama を確認中…",

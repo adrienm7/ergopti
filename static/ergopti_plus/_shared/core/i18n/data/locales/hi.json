@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "हटाना शुरू नहीं हो सका।",
 	"ollama.delete_reason_creation": "हटाने की तैयारी नहीं हो सकी।",
 	"ollama.delete_reason_readiness": "Ollama तैयार नहीं हुआ।",
+	"ollama.delete_reason_timeout": "Ollama ने समय पर उत्तर नहीं दिया।",
 	"ollama.deleted_title": "हटाया गया (Ollama)",
 	"ollama.deps_failed": "विफल…",
 	"ollama.deps_step_checking": "Ollama जाँच हो रही है…",

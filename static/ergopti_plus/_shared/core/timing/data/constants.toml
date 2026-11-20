@@ -227,7 +227,9 @@ installed_cache_ttl_ms = 2000
 
 # Ceiling of one Ollama DELETE /api/delete round trip (the "Delete this model
 # from cache" row); Ollama answers in well under a second once it holds no lock.
+# macOS bounds its `ollama rm` task by the same ceiling, then stops it.
 # AHK: api_ollama/init.ahk LLM_OLLAMA_DELETE_TIMEOUT_MS.
+# HS: ai/ui/menu/models/manager_ollama.lua delete_model.
 # LX: ai/engine/local_servers/model_delete.lua.
 ollama_delete_timeout_ms = 10000
 

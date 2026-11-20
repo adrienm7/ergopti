@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "Borttagningen kunde inte startas.",
 	"ollama.delete_reason_creation": "Borttagningen kunde inte förberedas.",
 	"ollama.delete_reason_readiness": "Ollama blev inte redo.",
+	"ollama.delete_reason_timeout": "Ollama svarade inte i tid.",
 	"ollama.deleted_title": "Borttagen (Ollama)",
 	"ollama.deps_failed": "Misslyckades…",
 	"ollama.deps_step_checking": "Kontrollerar Ollama…",

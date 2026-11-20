@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "Das Löschen konnte nicht gestartet werden.",
 	"ollama.delete_reason_creation": "Das Löschen konnte nicht vorbereitet werden.",
 	"ollama.delete_reason_readiness": "Ollama ist nicht betriebsbereit geworden.",
+	"ollama.delete_reason_timeout": "Ollama hat nicht rechtzeitig geantwortet.",
 	"ollama.deleted_title": "Gelöscht (Ollama)",
 	"ollama.deps_failed": "Fehlgeschlagen…",
 	"ollama.deps_step_checking": "Ollama wird geprüft…",

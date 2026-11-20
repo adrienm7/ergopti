@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "Sletningen kunne ikke startes.",
 	"ollama.delete_reason_creation": "Sletningen kunne ikke forberedes.",
 	"ollama.delete_reason_readiness": "Ollama blev ikke klar.",
+	"ollama.delete_reason_timeout": "Ollama svarede ikke i tide.",
 	"ollama.deleted_title": "Slettet (Ollama)",
 	"ollama.deps_failed": "Mislykkedes…",
 	"ollama.deps_step_checking": "Kontrollerer Ollama…",

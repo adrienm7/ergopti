@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "לא ניתן היה להתחיל את המחיקה.",
 	"ollama.delete_reason_creation": "לא ניתן היה להכין את המחיקה.",
 	"ollama.delete_reason_readiness": "Ollama לא הפך למוכן.",
+	"ollama.delete_reason_timeout": "Ollama לא הגיבה בזמן.",
 	"ollama.deleted_title": "נמחק (Ollama)",
 	"ollama.deps_failed": "נכשל…",
 	"ollama.deps_step_checking": "בודק את Ollama…",

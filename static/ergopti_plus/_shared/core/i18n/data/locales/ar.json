@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "تعذّر بدء الحذف.",
 	"ollama.delete_reason_creation": "تعذّر تحضير الحذف.",
 	"ollama.delete_reason_readiness": "لم يصبح Ollama جاهزًا.",
+	"ollama.delete_reason_timeout": "لم يستجب Ollama في الوقت المحدد.",
 	"ollama.deleted_title": "تم الحذف (Ollama)",
 	"ollama.deps_failed": "فشل…",
 	"ollama.deps_step_checking": "جارٍ التحقق من Ollama…",

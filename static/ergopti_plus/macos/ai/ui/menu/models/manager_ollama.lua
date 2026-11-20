@@ -2478,11 +2478,27 @@ function M.new(deps, presets, ram_getter)
 				requirement_registered = false,
 			}
 			local task
+			local function cancel_delete_timeout()
+				local handle = owner.timeout_handle
+				owner.timeout_handle = nil
+				if type(handle) ~= "table" or handle.timer == nil then return true end
+				local ok, settled = xpcall(function()
+					return TimerScheduler.cancel(handle)
+				end, debug.traceback)
+				if ok ~= true or settled ~= true then
+					-- The callback still checks owner.settled, so a late fire is inert.
+					Logger.error(LOG, "Ollama model deletion timeout refused cancellation: %s.",
+						tostring(settled))
+					return false
+				end
+				return true
+			end
 			local function finish_delete(code, stdout)
 				if owner.settled == true then return false end
 				local authorized = owner.authorized == true
 					and owner.start_committed == true
 					and operation.is_authorized() == true
+				cancel_delete_timeout()
 				release_requirement_task(owner)
 				operation.finish(nil, "Ollama model deletion terminal")
 				if authorized ~= true then return false end
@@ -2556,6 +2572,48 @@ function M.new(deps, presets, ram_getter)
 					return false
 				end
 				owner.start_committed = true
+				-- The ceiling Windows and Linux put on their DELETE /api/delete round
+				-- trip: a CLI that never returns would otherwise hold the slot forever.
+				-- Read at dispatch, as the registry is only needed by a deletion.
+				local timeout_ms
+				local timeout_ok, timeout_handle, timeout_committed = xpcall(function()
+					timeout_ms = require("core.timing.engine.timings")
+						.ms("llm", "ollama_delete_timeout_ms")
+					return TimerScheduler.after(timeout_ms / 1000, function()
+						if owner.settled == true or owner.authorized ~= true then return false end
+						local notify = operation.is_authorized() == true
+						Logger.warn(LOG, "Ollama model %s deletion exceeded %d ms; stopping it.",
+							model_name, timeout_ms)
+						-- Revokes the owner first, so the terminal the stop produces is silent.
+						cancel_requirement_task(owner, "Ollama model deletion timeout")
+						if notify then
+							pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
+								string.format(i18n.get("ollama.delete_error"), model_name,
+									i18n.get("ollama.delete_reason_timeout")), "error")
+						end
+						return true
+					end)
+				end, debug.traceback)
+				if timeout_ok == true and type(timeout_handle) == "table" then
+					owner.timeout_handle = timeout_handle
+				end
+				if timeout_ok ~= true or timeout_committed ~= true
+					or type(timeout_handle) ~= "table" then
+					Logger.error(LOG, "Ollama model deletion timeout could not be armed: %s.",
+						tostring(timeout_handle))
+					cancel_delete_timeout()
+					cancel_requirement_task(owner, "Ollama model deletion timeout refusal")
+					if owner.pending_terminal ~= nil then
+						local terminal = owner.pending_terminal
+						owner.pending_terminal = nil
+						finish_delete(table.unpack(terminal, 1, terminal.n))
+					end
+					operation.finish(nil, "Ollama model deletion timeout refusal")
+					pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
+						string.format(i18n.get("ollama.delete_error"), model_name,
+							i18n.get("ollama.delete_reason_start")), "error")
+					return false
+				end
 				if operation.is_authorized() ~= true then
 					owner.authorized = false
 					cancel_requirement_task(owner,

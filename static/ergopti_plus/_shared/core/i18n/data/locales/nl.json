@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "Het verwijderen kon niet worden gestart.",
 	"ollama.delete_reason_creation": "Het verwijderen kon niet worden voorbereid.",
 	"ollama.delete_reason_readiness": "Ollama is niet gereed geworden.",
+	"ollama.delete_reason_timeout": "Ollama heeft niet op tijd geantwoord.",
 	"ollama.deleted_title": "Verwijderd (Ollama)",
 	"ollama.deps_failed": "Mislukt…",
 	"ollama.deps_step_checking": "Ollama controleren…",

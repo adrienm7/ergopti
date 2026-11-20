@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "Odstranění nelze spustit.",
 	"ollama.delete_reason_creation": "Odstranění nelze připravit.",
 	"ollama.delete_reason_readiness": "Ollama nebyla připravena.",
+	"ollama.delete_reason_timeout": "Ollama neodpověděla včas.",
 	"ollama.deleted_title": "Smazáno (Ollama)",
 	"ollama.deps_failed": "Selhalo…",
 	"ollama.deps_step_checking": "Kontrola Ollama…",

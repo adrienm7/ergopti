@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "Silme işlemi başlatılamadı.",
 	"ollama.delete_reason_creation": "Silme işlemi hazırlanamadı.",
 	"ollama.delete_reason_readiness": "Ollama hazır hale gelmedi.",
+	"ollama.delete_reason_timeout": "Ollama zamanında yanıt vermedi.",
 	"ollama.deleted_title": "Silindi (Ollama)",
 	"ollama.deps_failed": "Başarısız…",
 	"ollama.deps_step_checking": "Ollama kontrol ediliyor…",

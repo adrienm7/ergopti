@@ -2754,6 +2754,7 @@
 	"ollama.delete_reason_start": "无法开始删除。",
 	"ollama.delete_reason_creation": "无法准备删除。",
 	"ollama.delete_reason_readiness": "Ollama 未能就绪。",
+	"ollama.delete_reason_timeout": "Ollama 未能及时响应。",
 	"ollama.deleted_title": "已删除 (Ollama)",
 	"ollama.deps_failed": "失败…",
 	"ollama.deps_step_checking": "正在检查 Ollama…",

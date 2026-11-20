@@ -105,11 +105,17 @@ local function with_fixture(callback)
 				task_complete_on_start = {},
 				task_stream_after_complete = {},
 				shared_system_mode = "dispatch",
+				notifications = {},
 			}
 
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.ui.engine.notifications"] = {
-				notify = function() return true end,
+				notify = function(title, body, kind)
+					native.notifications[#native.notifications + 1] = {
+						title = title, body = body, kind = kind,
+					}
+					return true
+				end,
 			}
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["core.text.engine.utils"] = {
@@ -978,6 +984,61 @@ helpers.describe("HS-012 Ollama requirement descendants join ScriptControl pause
 				"a revoked deletion terminal must not refresh the menu")
 			helpers.assert_true(fixture.script_control.pause_all())
 			helpers.assert_true(fixture.script_control.is_paused())
+			helpers.assert_true(fixture.script_control.stop())
+		end)
+	end)
+
+	-- OLL-09: Windows and Linux bound their DELETE /api/delete by
+	-- [llm] ollama_delete_timeout_ms; a hung "ollama rm" held the slot forever.
+	local function delete_ceiling(fixture)
+		local ceiling_sec = require("core.timing.engine.timings")
+			.sec("llm", "ollama_delete_timeout_ms")
+		local found
+		for _, timer in ipairs(fixture.native.timers) do
+			if timer.delay == ceiling_sec then found = timer end
+		end
+		return found
+	end
+
+	helpers.it("bounds an Ollama deletion by the shared delete timeout (oll-09)", function()
+		with_fixture(function(fixture)
+			helpers.assert_true(fixture.manager.delete_model("fixture-model"))
+			fixture.native.commands[1].complete(0, '{"version":"ready"}', "")
+			local delete_task = fixture.native.tasks[1]
+			helpers.assert_contains(delete_task.label, "model delete")
+			helpers.assert_true(delete_task.running)
+			local ceiling = delete_ceiling(fixture)
+			helpers.assert_true(ceiling ~= nil and ceiling.timer ~= nil,
+				"a started deletion must arm the shared delete ceiling")
+
+			ceiling:fire()
+			helpers.assert_eq(delete_task.terminate_calls, 1,
+				"the ceiling must stop the hung CLI")
+			helpers.assert_eq(#fixture.native.notifications, 1)
+			local notice = fixture.native.notifications[1]
+			helpers.assert_eq(notice.title, "ollama.delete_fail_title")
+			helpers.assert_eq(notice.kind, "error")
+
+			delete_task:complete(15, "", "")
+			helpers.assert_eq(fixture.native.menu_updates, 0)
+			helpers.assert_eq(#fixture.native.notifications, 1,
+				"the stopped terminal must not add a second notice")
+			helpers.assert_true(fixture.manager.delete_model("fixture-model"),
+				"the settled stop must release the maintenance slot")
+			helpers.assert_true(fixture.script_control.stop())
+		end)
+	end)
+
+	helpers.it("cancels the delete ceiling once the deletion answers (oll-09)", function()
+		with_fixture(function(fixture)
+			helpers.assert_true(fixture.manager.delete_model("fixture-model"))
+			fixture.native.commands[1].complete(0, '{"version":"ready"}', "")
+			local ceiling = delete_ceiling(fixture)
+			helpers.assert_true(ceiling ~= nil)
+			fixture.native.tasks[1]:complete(0, "deleted", "")
+			helpers.assert_eq(fixture.native.menu_updates, 1)
+			helpers.assert_eq(ceiling.timer, nil, "an answered deletion must cancel its ceiling")
+			helpers.assert_eq(fixture.native.tasks[1].terminate_calls, 0)
 			helpers.assert_true(fixture.script_control.stop())
 		end)
 	end)
