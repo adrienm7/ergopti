@@ -220,15 +220,14 @@ end
 -- boot start and flipped to true only once init has fully completed.
 Storage.set(HS_BOOT_READY_SETTING_KEY, false)
 
--- Restore persisted log level from settings, or default to DEBUG
+-- Restore the persisted log level through the manifest declaration: any of its
+-- eight names, else its default (INFO) with a warning, as on Windows and Linux
+-- (logger parity audit LOG-01; this block used to accept four names and boot at
+-- DEBUG otherwise).
 do
-	local saved_level = Storage.get(require("settings.engine.keys").LEAF.LOG_LEVEL)
-	local valid = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
-	if type(saved_level) == "string" and valid[saved_level] then
-		Logger.set_level(saved_level)
-	else
-		Logger.set_level("DEBUG")  -- Default: show all logs
-	end
+	local Keys = require("settings.engine.keys")
+	local entry = require("menu.engine.manifest_reader").find_entry_by_path(Keys.KEY.SCRIPT_LOG_LEVEL)
+	Logger.apply_level_setting(Storage.get(Keys.LEAF.LOG_LEVEL), entry)
 end
 
 -- Global user-notification logging bridge.
@@ -1754,11 +1753,9 @@ Boot.stage("LLM backend bootstrap")
 -- otherwise be written but never consumed. Re-derive and apply it here so the
 -- documented expert override actually takes effect on a reload.
 do
-	local lvl = Storage.get(require("settings.engine.keys").LEAF.LOG_LEVEL)
-	local valid_levels = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
-	if type(lvl) == "string" and valid_levels[lvl:upper()] then
-		Logger.set_level(lvl:upper())
-	end
+	local Keys = require("settings.engine.keys")
+	local entry = require("menu.engine.manifest_reader").find_entry_by_path(Keys.KEY.SCRIPT_LOG_LEVEL)
+	Logger.apply_level_setting(Storage.get(Keys.LEAF.LOG_LEVEL), entry)
 end
 
 local function start_llm_bootstrap()

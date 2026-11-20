@@ -69,11 +69,10 @@ helpers.describe("init re-applies the log level after config overrides", functio
 		local apply_idx = src:find("config_overrides.apply", 1, true)
 		helpers.assert_true(apply_idx ~= nil, "config_overrides.apply must be called at boot")
 		-- A set_level reading ergopti.log_level must appear AFTER the overrides apply.
-		local reapply = src:find('Logger.set_level', apply_idx, true)
+		-- LOG-01: both applications go through the manifest resolver.
+		local reapply = src:find('Logger.apply_level_setting(Storage.get(Keys.LEAF.LOG_LEVEL), entry)', apply_idx, true)
 		helpers.assert_true(reapply ~= nil and reapply > apply_idx,
-			"the log level must be re-applied AFTER config_overrides.apply")
-		helpers.assert_true(src:find('Storage.get("log_level")', apply_idx, true) ~= nil,
-			"the re-apply must read the canonical ergopti.log_level key")
+			"the log level must be re-applied AFTER config_overrides.apply, through the manifest resolver")
 	end)
 end)
 
@@ -196,16 +195,16 @@ helpers.describe("Expert known-value admission", function()
 			helpers.assert_eq(f.read(), source)
 		end)
 	end)
-	test("keeps choices while the threshold catalogue is unavailable", function()
-		with_file('[script]\nlog_level = "future"\n', function(f)
+	-- LOG-01: the catalogue is the manifest declaration, not the logger's four
+	-- thresholds, so the logger's LEVELS table no longer decides
+	test("admits every declared level name and retires an undeclared one", function()
+		with_file('[script]\nlog_level = "TRACE"\n', function(f)
 			f.logger.LEVELS = nil
 			helpers.assert_eq(f.owner.apply(f.path), 1)
-			helpers.assert_eq(f.observed, { ["ergopti.log_level"] = "future" })
-			helpers.assert_eq(f.warnings, {})
-			f.logger.LEVELS = {}
-			helpers.assert_eq(f.owner.apply(f.path), 1, "an empty catalogue is not retirement proof")
-			helpers.assert_eq(f.warnings, {})
-			f.logger.LEVELS = require("core.logger.engine").LEVELS
+			helpers.assert_eq(f.observed, { ["ergopti.log_level"] = "TRACE" })
+			helpers.assert_eq(f.warnings, {}, "TRACE is a declared level, as on Windows and Linux")
+		end)
+		with_file('[script]\nlog_level = "future"\n', function(f)
 			helpers.assert_eq(f.owner.apply(f.path), 0)
 			helpers.assert_eq(#f.warnings, 1)
 		end)

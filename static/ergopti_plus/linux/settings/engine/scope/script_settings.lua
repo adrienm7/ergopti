@@ -20,8 +20,8 @@
 --- 2. Durable-before-live transaction: a menu choice becomes active only after
 ---    storage confirms it, so a failed write cannot present a temporary state as
 ---    saved.
---- 3. Explicit variant mapping: TRACE/DONE share DEBUG's threshold and
----    START/SUCCESS share INFO's threshold, as defined by the shared logger core.
+--- 3. One resolver: names and thresholds come from the shared
+---    core/logger/engine/level_setting.lua, which the macOS boot uses too.
 --- ==============================================================================
 
 local M = {}
@@ -35,16 +35,7 @@ local ConfigKeys = require("settings.engine.keys")
 local LOG = "settings.engine.scope.script_settings"
 local FEATURE_PATH = ConfigKeys.KEY.SCRIPT_LOG_LEVEL
 
-local VARIANT_BY_LEVEL = {
-	DEBUG = "debug",
-	TRACE = "trace",
-	DONE = "done",
-	INFO = "info",
-	START = "start",
-	SUCCESS = "success",
-	WARNING = "warn",
-	ERROR = "error",
-}
+local LevelSetting = require("core.logger.engine.level_setting")
 
 local _entry = nil
 local _active = nil
@@ -76,24 +67,14 @@ end
 --- @param value any
 --- @return string|nil
 local function canonical(value)
-	if type(value) ~= "string" then return nil end
-	local candidate = value:upper()
-	for _, accepted in ipairs(declaration().enum_values) do
-		if candidate == accepted then return candidate end
-	end
-	return nil
+	return LevelSetting.canonical(value, declaration())
 end
 
 --- Resolves one canonical token to the shared logger's numeric threshold.
 --- @param level string
 --- @return number
 local function threshold(level)
-	local variant = VARIANT_BY_LEVEL[level]
-	local value = variant and Logger.level_of(variant) or nil
-	if type(value) ~= "number" then
-		error("[script_settings] logger has no threshold for '" .. tostring(level) .. "'.")
-	end
-	return value
+	return LevelSetting.threshold(level, Logger)
 end
 
 

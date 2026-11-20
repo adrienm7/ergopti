@@ -29,6 +29,7 @@ local ConfigOutdated = require("settings.engine.migration.outdated")
 local FileSystem = require("core.fs.adapters.file_system")
 local TextUtils = require("core.text.engine.utils_core")
 local ConfigKeys = require("settings.engine.keys")
+local LevelSetting = require("core.logger.engine.level_setting")
 local LOG       = "config_overrides"
 
 
@@ -90,10 +91,13 @@ end
 --- @return boolean fits
 --- @return string|nil detail Why the native owner ignores this value.
 local function known_value_fits(row)
+	-- The declared names, not the logger's four thresholds: TRACE, DONE, START
+	-- and SUCCESS were reported outdated here although the manifest, Windows and
+	-- Linux accept them (logger parity audit LOG-01)
 	local function threshold(value)
-		if type(Logger.LEVELS) ~= "table" or next(Logger.LEVELS) == nil then return true end
-		if type(value) == "string" and Logger.LEVELS[value:upper()] ~= nil then return true end
-		return false, "the value is not a published log threshold"
+		local entry = Manifest.find_entry_by_path(ConfigKeys.KEY.SCRIPT_LOG_LEVEL)
+		if LevelSetting.canonical(value, entry) ~= nil then return true end
+		return false, "the value is not a declared log level"
 	end
 	if row.section == "script" and type(row.key) == "string" then
 		if row.key == ConfigKeys.LEAF.LOG_LEVEL then

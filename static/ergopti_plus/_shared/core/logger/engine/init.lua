@@ -208,15 +208,23 @@ M.clock_fn = M.default_clock
 -- =============================================
 -- =============================================
 
---- Sets the minimum severity level. Lines below this level are silently dropped.
---- @param level number|string  Numeric (10/20/30/40) or string alias
----   ("debug"|"info"|"warning"|"error").
+--- Sets the minimum severity level. Lines below this level are dropped and
+--- counted (see M.volume). An unknown alias or a value that is no number raises:
+--- it used to become DEBUG without a word, so a typo in a level name silently
+--- turned the most verbose logging on (logger parity audit LOG-01).
+--- @param level number|string  Numeric (10/20/30/40), a string alias
+---   ("debug"|"info"|"warning"|"error") or a variant name ("trace", "start"…),
+---   any case.
 function M.set_level(level)
+	local threshold = level
 	if type(level) == "string" then
-		local aliases = { debug = 10, info = 20, warning = 30, error = 40 }
-		level = aliases[level:lower()] or 10
+		local name = level:lower()
+		threshold = (name == "warning") and LEVELS.warn or LEVELS[name]
 	end
-	_min_level = tonumber(level) or 10
+	if type(threshold) ~= "number" then
+		error(string.format("logger: unknown log level %q", tostring(level)), 2)
+	end
+	_min_level = threshold
 end
 
 --- Returns the current minimum severity level.

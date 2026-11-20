@@ -244,6 +244,7 @@ end
 -- also true of the running driver. A test that needs either one clean asks for
 -- it: ring_buffer_clear() / reset_dedup().
 local Core = require("core.logger.engine")
+local LevelSetting = require("core.logger.engine.level_setting")
 local LogTransport = require("core.logger.adapters.log_transport")
 local LauncherEnvironment = require("core.lifecycle.engine.launcher_environment")
 
@@ -877,15 +878,41 @@ function M.set_sink(fn)
 	M.claim_core_hooks()
 end
 
---- Sets the active log level. Messages below this threshold are silently dropped.
+--- Sets the active log level. Messages below this threshold are dropped and
+--- counted. A name is any of the eight variants (TRACE and DONE select DEBUG's
+--- threshold, START and SUCCESS INFO's), in any case. An unknown name or a value
+--- of another type raises: it used to select WARNING without a word, so a
+--- mistyped level hid every INFO line (logger parity audit LOG-01).
 --- @param level number|string Numeric constant (M.LEVELS.DEBUG) or name ("DEBUG", …).
 function M.set_level(level)
 	if not _scope.admit_change() then return false end
-	if type(level) == "number" then
-		M.current_level = level
-	elseif type(level) == "string" then
-		M.current_level = M.LEVELS[level:upper()] or M.LEVELS.WARNING
+	local threshold = level
+	if type(level) == "string" then
+		local variant = VARIANTS[level:upper()]
+		threshold = variant and variant.level or nil
 	end
+	if type(threshold) ~= "number" then
+		error(string.format("logger: unknown log level %q", tostring(level)), 2)
+	end
+	M.current_level = threshold
+end
+
+--- Applies a stored `script.log_level` value through the shared resolver: the
+--- threshold of its declared name, or the manifest default with a warning when
+--- the value is no declared name. The boot used to keep its own list of four
+--- names and DEBUG as its default (logger parity audit LOG-01).
+--- @param stored any Stored value; nil when none is stored.
+--- @param entry table The manifest's `script.log_level` declaration.
+--- @return table|false resolved { level, threshold, refused }, or false when the
+---   scope refused the change.
+function M.apply_level_setting(stored, entry)
+	local resolved = LevelSetting.resolve(stored, entry, Core)
+	if M.set_level(resolved.threshold) == false then return false end
+	if resolved.refused then
+		_log("WARNING", "logger", "Stored log level '%s' is not a declared level; using the default %s.",
+			tostring(stored), resolved.level)
+	end
+	return resolved
 end
 
 --- Returns true when messages at the given level would be emitted.
