@@ -106,7 +106,7 @@ function M.run(check_id, ports, on_done)
 		_running = nil
 		local result = report.result()
 		Logger.evidence(LOG, "Field check result: %s", M.format_log_line(result))
-		Logger.done(LOG, "Field check '%s' finished: %s.", check_id, result.passed and "pass" or "fail")
+		Logger.success(LOG, "Field check '%s' finished: %s.", check_id, result.passed and "pass" or "fail")
 		on_done(result)
 	end
 	local ran, err = pcall(definition, ports, report, finish)

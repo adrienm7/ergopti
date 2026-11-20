@@ -442,7 +442,7 @@ helpers.describe("shutdown coordinator: startup preparation token", function()
 	helpers.it("(startup-late-grab) preserves the first parked diagnostic and emergency reason", function()
 		local reason, emergency
 		local factory = helpers.load_module_with_dependency("core.lifecycle.engine.shutdown.coordinator", "core.logger.engine.shim", {
-			start = function(_, _, value) reason = value end, done = function() end,
+			start = function(_, _, value) reason = value end, success = function() end,
 		})
 		local coordinator = factory.new({ pre_wait = {}, keyboard_hook = {
 			isRunning = function() return true end, stop = function() error("Emergency cleanup is owned by the first request") end,

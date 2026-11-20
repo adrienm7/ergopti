@@ -285,12 +285,18 @@ end
 --- whole handler was written to stop having.
 --- @return boolean True when the push was handed to WebKit.
 local function _push_init()
+	-- The one START of the push: every return below closes it.
+	Logger.start(LOG, "Action picker UI ready — pushing init()…")
 	local session = _active_session
 	local function title_current()
 		return session == nil or session.presentation_current == nil
 			or (session == _active_session and session.presentation_current() == true)
 	end
-	if not title_current() then return false end
+	local function superseded()
+		Logger.warn(LOG, "Action picker init() not pushed: its window was replaced or closed.")
+		return false
+	end
+	if not title_current() then return superseded() end
 	-- The same JSON module _handle_json decodes with. dkjson is the webview
 	-- manager's optional dependency and is absent on a plain Lua host, so
 	-- encoding through it made the push fail everywhere the decode half worked.
@@ -302,7 +308,7 @@ local function _push_init()
 	local ok_payload, encoded = pcall(function()
 		return json_mod.encode(M.build_init_payload(M.pending_opts))
 	end)
-	if not title_current() then return false end
+	if not title_current() then return superseded() end
 	if not ok_payload or type(encoded) ~= "string" then
 		Logger.error(LOG, "Cannot push init(): payload encoding failed (%s).", tostring(encoded))
 		return false
@@ -314,7 +320,7 @@ local function _push_init()
 		return false
 	end
 
-	if not title_current() then return false end
+	if not title_current() then return superseded() end
 	local pushed = Manager.eval_js("action_picker", "init(" .. encoded .. ")")
 	if pushed then
 		Logger.success(LOG, "Action picker initialised (%d byte(s) of payload).", #encoded)
@@ -400,7 +406,6 @@ local function _handle_table(data, state, context)
 	end
 
 	if action == "ready" then
-		Logger.start(LOG, "Action picker UI ready — pushing init()…")
 		_push_init()
 		return nil
 	end
@@ -418,7 +423,6 @@ function M.on_message(payload, state, context)
 		-- "ready" arrives as a bare string from the page's own post({action:…})
 		-- only after JSON encoding, so the bare form is the host_bridge fallback.
 		if payload == "ready" then
-			Logger.start(LOG, "Action picker UI ready — pushing init()…")
 			_push_init()
 			return nil
 		end

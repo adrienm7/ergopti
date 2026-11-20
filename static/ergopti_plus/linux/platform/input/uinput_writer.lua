@@ -360,8 +360,11 @@ local function close_owned(capability, transaction)
 		-- A failed close may already have recycled its fd. It must never be retried.
 		_debt = true
 	end
-	pcall(acknowledged and Logger.success or Logger.error, LOG,
-		acknowledged and "Owned virtual keyboard retired." or "Native retirement remains unacknowledged; the descriptor will not be retried.")
+	if acknowledged then
+		pcall(Logger.success, LOG, "Owned virtual keyboard retired.")
+	else
+		pcall(Logger.error, LOG, "Native retirement remains unacknowledged; the descriptor will not be retried.")
+	end
 	_busy = false
 	return acknowledged
 end

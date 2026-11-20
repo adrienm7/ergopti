@@ -47,17 +47,18 @@ function M.new(ports)
 	local started, running, handle = false, false, nil
 	local deadline
 
-	local function stop(level, message, ...)
+	-- Each caller logs its own terminal, so the START of watch.start is visibly closed.
+	local function stop()
 		running = false
 		if handle then ports.cancel(handle); handle = nil end
-		Logger[level](LOG, message, ...)
 	end
 
 	-- The budget is wall time from start, not a count of polls: each listing is
 	-- a bounded task and each timer can fire late, and neither may extend it.
 	local function expired()
 		if ports.now() < deadline then return false end
-		stop("warn", "The driver was not allowed within %d s; the Tap-Holds menu keeps explaining it.", M.APPROVAL_TIMEOUT_SEC)
+		stop()
+		Logger.warn(LOG, "The driver was not allowed within %d s; the Tap-Holds menu keeps explaining it.", M.APPROVAL_TIMEOUT_SEC)
 		return true
 	end
 
@@ -67,12 +68,16 @@ function M.new(ports)
 			if not running or expired() then return end
 			local version = ports.version()
 			if type(version) == "string" and Vhid.assess(Vhid.parse(text), version).ok then
-				stop("success", "The driver is now allowed; reloading to start the owned runtime.")
+				stop()
+				Logger.success(LOG, "The driver is now allowed; reloading to start the owned runtime.")
 				return ports.reload()
 			end
 			local committed
 			handle, committed = ports.after(M.APPROVAL_POLL_SEC, function() handle = nil; poll() end)
-			if committed ~= true then stop("error", "The approval watch could not schedule its next look; it stops.") end
+			if committed ~= true then
+				stop()
+				Logger.error(LOG, "The approval watch could not schedule its next look; it stops.")
+			end
 		end)
 	end
 

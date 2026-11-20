@@ -1391,11 +1391,9 @@ local function start_inactivity_timer(delay_override, ends_word)
 	end
 	descriptor.authorized = true
 	local labels = require("ai.engine.request_plan.debounce").REASON
-	if arm.why == labels.override or arm.why == labels.word_end then
-		Logger.trace(LOG, "Inactivity timer started (override: %.3fs).", delay)
-	else
-		Logger.trace(LOG, "Inactivity timer started (debounce: %.3fs).", delay)
-	end
+	-- One operation, one TRACE: its DONE is "Inactivity timer stopped.".
+	local overridden = arm.why == labels.override or arm.why == labels.word_end
+	Logger.trace(LOG, "Inactivity timer started (%s: %.3fs).", overridden and "override" or "debounce", delay)
 	return true
 end
 --- Reads a timer's native running state.

@@ -145,6 +145,7 @@ function M.new(dependencies)
 			Logger.error(LOG, "Physical capture session did not start (%s).", tostring(failure))
 			return false
 		end
+		Logger.success(LOG, "Physical capture session started.")
 		return true
 	end
 

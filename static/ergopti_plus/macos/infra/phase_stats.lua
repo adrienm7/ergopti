@@ -86,7 +86,7 @@ function M.start(interval_sec)
 		return false
 	end
 	_handle = handle
-	Logger.done(LOG, "Phase summary timer armed.")
+	Logger.success(LOG, "Phase summary timer armed.")
 	return true
 end
 
@@ -103,7 +103,7 @@ function M.stop_reporting()
 		return false
 	end
 	_handle = nil
-	Logger.done(LOG, "Phase summary timer stopped.")
+	Logger.success(LOG, "Phase summary timer stopped.")
 	return true
 end
 

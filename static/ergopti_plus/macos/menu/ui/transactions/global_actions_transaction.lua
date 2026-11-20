@@ -539,6 +539,10 @@ function M.create(deps)
 			return reject_transaction(transaction, "recoverable file move refused")
 		end
 		transaction.phase = "reload-handoff"
+		-- The START's terminal: nothing may log after request_reload() (below),
+		-- and a refused handoff still reports its own error through
+		-- reject_transaction.
+		Logger.success(LOG, "Global %s transaction applied; handing off to the reload.", transaction.kind)
 		local reload_ok, reload_result = xpcall(function()
 			return deps.request_reload(function(abort_detail)
 				if transaction.settled or active_transaction ~= transaction then

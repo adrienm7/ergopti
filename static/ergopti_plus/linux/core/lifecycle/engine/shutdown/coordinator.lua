@@ -91,7 +91,7 @@ function M.new(opts)
 		end
 		complete = true
 		event_loop.stop()
-		Logger.done(LOG, "Shutdown quiescence complete.")
+		Logger.success(LOG, "Shutdown quiescence complete.")
 	end
 
 	--- Quiesces every registered owner exactly once.

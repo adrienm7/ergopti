@@ -81,6 +81,13 @@ local function armed_description()
 	return #names > 0 and table.concat(names, "+") or "none"
 end
 
+--- Opens the arm's lifecycle; its DONE is "Sticky modifiers released".
+--- @param timeout_sec number Auto-cancel delay, 0 for none.
+local function log_armed(timeout_sec)
+	local cancel = timeout_sec == 0 and "no auto-cancel" or string.format("auto-cancel in %.3fs", timeout_sec)
+	Logger.trace(LOG, "Sticky modifiers armed (%s), %s.", armed_description(), cancel)
+end
+
 --- Cancels one exact timer and retains it when native cleanup refuses.
 --- @param handle table|nil TimerScheduler handle.
 --- @param reason string Cleanup context for diagnostics.
@@ -282,7 +289,7 @@ function M.toggle(modifiers, timeout_sec, parent)
 
 	if timeout_sec == 0 then
 		finish_sticky_acquisition(attempt)
-		Logger.trace(LOG, "Sticky modifiers armed (%s), no auto-cancel.", armed_description())
+		log_armed(0)
 		return true
 	end
 
@@ -314,7 +321,7 @@ function M.toggle(modifiers, timeout_sec, parent)
 	_timer_committed = true
 	finish_sticky_acquisition(attempt)
 
-	Logger.trace(LOG, "Sticky modifiers armed (%s), auto-cancel in %.3fs.", armed_description(), timeout_sec)
+	log_armed(timeout_sec)
 	return true
 end
 

@@ -112,6 +112,7 @@ local function derive_key()
 			failure or "no key in its output")
 		return nil
 	end
+	Logger.success(LOG, "At-rest key derived.")
 	return key
 end
 

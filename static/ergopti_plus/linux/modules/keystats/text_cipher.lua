@@ -110,6 +110,7 @@ local function derive_key()
 		Logger.error(LOG, "Key derivation failed or returned no usable key — %s.", native_error or "invalid key output")
 		return nil
 	end
+	Logger.success(LOG, "At-rest key derived.")
 	return key
 end
 

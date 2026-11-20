@@ -973,11 +973,12 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	end
 
 	local owner = capture_replacement_owner()
+	-- One TRACE per replacement, private or not; its DONE is "inject(): done".
+	local trace_format, trace_text = "inject(): bc=%d text='%s'…", replacement_text
 	if is_private then
-		Logger.trace(LOG, "inject(): bc=%d, private text (content withheld)…", backspace_count)
-	else
-		Logger.trace(LOG, "inject(): bc=%d text='%s'…", backspace_count, replacement_text)
+		trace_format, trace_text = "inject(): bc=%d, private text (content withheld)…", nil
 	end
+	Logger.trace(LOG, trace_format, backspace_count, trace_text)
 	if not retire_clipboard() then
 		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
 	end
@@ -1124,12 +1125,9 @@ function M.inject_fields(backspace_count, values, is_private, publication)
 		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
 	end
 
-	if is_private then
-		Logger.trace(LOG, "inject_fields(): bc=%d, %d private field(s) (content withheld)…",
-			backspace_count, #values)
-	else
-		Logger.trace(LOG, "inject_fields(): bc=%d, %d field(s)…", backspace_count, #values)
-	end
+	-- One TRACE per replacement, private or not; its DONE is "inject_fields(): done".
+	Logger.trace(LOG, is_private and "inject_fields(): bc=%d, %d private field(s) (content withheld)…"
+		or "inject_fields(): bc=%d, %d field(s)…", backspace_count, #values)
 	local checked, prepared, fields = pcall(prepare_fields, values, owner, publication)
 	if not checked then
 		Logger.error(LOG, "Cannot prepare %d replacement field(s) before erasure (content withheld).", #values)

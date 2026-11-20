@@ -314,7 +314,8 @@ local function apply_and_reload(new_dir, new_logs_dir)
 		return true
 	end
 
-	Logger.start(LOG, "Applying new config directory and reloading…")
+	-- No START: the reload ends this process before a SUCCESS could close it.
+	Logger.info(LOG, "Applying new config directory and reloading…")
 	local ok_reload, reload_err = xpcall(_state.reload_fn, debug.traceback)
 	if not ok_reload or reload_err == false then
 		Logger.error(LOG, "Paths editor reload callback failed: %s.", tostring(reload_err))
@@ -456,10 +457,16 @@ local function handle_message(body)
 		owner.token.browse = owner.browse
 		defer_delivery(owner, 0, "menu_paths.browse", function()
 			Logger.start(LOG, "Opening native folder picker…")
-			if not owner_is_current(owner) then return end
+			if not owner_is_current(owner) then
+				Logger.warn(LOG, "Folder picker not opened: the paths editor closed first.")
+				return
+			end
 			local start_dir = target == "logs" and ConfigPaths.get_logs_dir() or ConfigPaths.get_config_dir()
 			local picked = pick_dir(start_dir)
-			if not owner_is_current(owner) then return end
+			if not owner_is_current(owner) then
+				Logger.warn(LOG, "Folder picker result dropped: the paths editor closed meanwhile.")
+				return
+			end
 			Logger.success(LOG, "Folder picker completed.")
 			if picked and picked ~= "" then
 				-- The native JSON extension accepts tables only; preserve this exact directory string.
