@@ -44,7 +44,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "2bd88749b5965b53216a7e8756e26a567ea51fa05fe8ffa96300cfaa09f05608"
+					"sha256": "d4464fda1820ef5abe395ad9c5c3ca287350b0ed14a1d16633f18e418aeeaa17"
 				}
 			]
 		}
@@ -80,7 +80,7 @@
 				{
 					"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/dispatch.ahk",
 					"symbol": "HSE_UndoExpansion(Undo",
-					"sha256": "1446ac5da42a8fd5ec018cf408839ae6664668d82f2b3a5d3b56bb613038943e"
+					"sha256": "1e68ae5c8e00966edcb65ccbcffc46a2c4ea76d3d266f21e9d37a73ec3c14315"
 				}
 			],
 			"macos": [
@@ -99,7 +99,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "2bd88749b5965b53216a7e8756e26a567ea51fa05fe8ffa96300cfaa09f05608"
+					"sha256": "d4464fda1820ef5abe395ad9c5c3ca287350b0ed14a1d16633f18e418aeeaa17"
 				}
 			]
 		}
@@ -154,7 +154,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "2bd88749b5965b53216a7e8756e26a567ea51fa05fe8ffa96300cfaa09f05608"
+					"sha256": "d4464fda1820ef5abe395ad9c5c3ca287350b0ed14a1d16633f18e418aeeaa17"
 				}
 			]
 		}
@@ -182,12 +182,12 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "1aa33ce9802ad4945e6eca7d45688389eccef53310c3aba4a92d499d897339a0"
+					"sha256": "db7c4163d5990f2b958e9fe38558216b76853848d696ba11ba2e6e6b01862493"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "d1b40305db94364b31a35075589ab824c0a08dd2c218b403fcd74b35d2afbac1"
+					"sha256": "b20d4a7fe910e9b95ba3f4c4db03c1b3bb93e67b31a37d9fd01123c138fc0030"
 				}
 			],
 			"macos": [
@@ -237,12 +237,12 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "1aa33ce9802ad4945e6eca7d45688389eccef53310c3aba4a92d499d897339a0"
+					"sha256": "db7c4163d5990f2b958e9fe38558216b76853848d696ba11ba2e6e6b01862493"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "d1b40305db94364b31a35075589ab824c0a08dd2c218b403fcd74b35d2afbac1"
+					"sha256": "b20d4a7fe910e9b95ba3f4c4db03c1b3bb93e67b31a37d9fd01123c138fc0030"
 				}
 			],
 			"macos": [
@@ -284,12 +284,12 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "1aa33ce9802ad4945e6eca7d45688389eccef53310c3aba4a92d499d897339a0"
+					"sha256": "db7c4163d5990f2b958e9fe38558216b76853848d696ba11ba2e6e6b01862493"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "d1b40305db94364b31a35075589ab824c0a08dd2c218b403fcd74b35d2afbac1"
+					"sha256": "b20d4a7fe910e9b95ba3f4c4db03c1b3bb93e67b31a37d9fd01123c138fc0030"
 				}
 			],
 			"macos": [
@@ -336,7 +336,7 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_Press(Sc, Shift, Caps, Option)",
-					"sha256": "d1b40305db94364b31a35075589ab824c0a08dd2c218b403fcd74b35d2afbac1"
+					"sha256": "b20d4a7fe910e9b95ba3f4c4db03c1b3bb93e67b31a37d9fd01123c138fc0030"
 				}
 			],
 			"macos": [
@@ -355,12 +355,12 @@
 				{
 					"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
 					"symbol": "function M.on_key(detail)",
-					"sha256": "e2096f1051b55827f96f144d842b8f82aa56efc31e4067aaea858a6d9900069e"
+					"sha256": "c0f534fd0f057cc1c52857fcaab47364ea24a3348c2298466263b4fd06e673e0"
 				},
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "2bd88749b5965b53216a7e8756e26a567ea51fa05fe8ffa96300cfaa09f05608"
+					"sha256": "d4464fda1820ef5abe395ad9c5c3ca287350b0ed14a1d16633f18e418aeeaa17"
 				}
 			]
 		}
