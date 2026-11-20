@@ -19,21 +19,21 @@
 			"element": "span.glow",
 			"count": 1,
 			"kind": "styling-hook",
-			"reason": "Colours the Â« + Â» of the Ergopti+ name; no phrasing element means a coloured character."
+			"reason": "Colours the « + » of the Ergopti+ name; no phrasing element means a coloured character."
 		},
 		{
 			"file": "src/lib/components/Footer.svelte",
 			"element": "div (none)",
 			"count": 1,
 			"kind": "layout",
-			"reason": "The Â« â€” Ergopti â€” Â» brand line of the footer; not a paragraph, the reader 2 em paragraph spacing would overflow the fixed-height footer."
+			"reason": "The « — Ergopti — » brand line of the footer; not a paragraph, the reader 2 em paragraph spacing would overflow the fixed-height footer."
 		},
 		{
 			"file": "src/lib/components/Footer.svelte",
 			"element": "span (none)",
 			"count": 2,
 			"kind": "decorative",
-			"reason": "The aria-hidden Â« | Â» separators between the footer links."
+			"reason": "The aria-hidden « | » separators between the footer links."
 		},
 		{
 			"file": "src/lib/components/Footer.svelte",
@@ -82,7 +82,7 @@
 			"element": "span (none)",
 			"count": 3,
 			"kind": "decorative",
-			"reason": "The aria-hidden spacer and the Â« â€“ Â» and Â« â€” Â» separators between the header links."
+			"reason": "The aria-hidden spacer and the « – » and « — » separators between the header links."
 		},
 		{
 			"file": "src/lib/components/Header.svelte",
@@ -124,7 +124,7 @@
 			"element": "span.glow",
 			"count": 1,
 			"kind": "styling-hook",
-			"reason": "Colours the Â« + Â» of the Ergopti+ name; no phrasing element means a coloured character."
+			"reason": "Colours the « + » of the Ergopti+ name; no phrasing element means a coloured character."
 		},
 		{
 			"file": "src/lib/components/Header.svelte",
@@ -208,7 +208,7 @@
 			"element": "span (none)",
 			"count": 1,
 			"kind": "language",
-			"reason": "Â« Same Finger Bigram Â» in English inside the French definition (lang=\"en\", WCAG 3.1.2)."
+			"reason": "« Same Finger Bigram » in English inside the French definition (lang=\"en\", WCAG 3.1.2)."
 		},
 		{
 			"file": "src/lib/components/SubNav.svelte",
@@ -299,7 +299,7 @@
 			"element": "span.product-link",
 			"count": 1,
 			"kind": "styling-hook",
-			"reason": "The coloured Â« DÃ©couvrir â†’ Â» call inside a product card link."
+			"reason": "The coloured « Découvrir → » call inside a product card link."
 		},
 		{
 			"file": "src/routes/accessibilite/+page.svelte",
@@ -943,7 +943,7 @@
 			"element": "span (none)",
 			"count": 1,
 			"kind": "decorative",
-			"reason": "The aria-hidden â–¶ or âšâš glyph of the pause button, whose words name it."
+			"reason": "The aria-hidden ▶ or ❚❚ glyph of the pause button, whose words name it."
 		},
 		{
 			"file": "src/routes/ergopti-plus/Hero.svelte",
@@ -1503,7 +1503,7 @@
 			"element": "span.cell",
 			"count": 1,
 			"kind": "styling-hook",
-			"reason": "Colours the âœ“ or â€” mark of a table cell that also holds a note."
+			"reason": "Colours the ✓ or — mark of a table cell that also holds a note."
 		},
 		{
 			"file": "src/routes/ergopti-plus/Platforms.svelte",
@@ -1706,7 +1706,7 @@
 			"element": "span.live-badge",
 			"count": 3,
 			"kind": "language",
-			"reason": "The Â« â— live Â» tag in English (lang=\"en\") of a drawn title bar."
+			"reason": "The « ● live » tag in English (lang=\"en\") of a drawn title bar."
 		},
 		{
 			"file": "src/routes/ergopti-plus/WindowChrome.svelte",
@@ -2000,7 +2000,7 @@
 			"element": "span (none)",
 			"count": 1,
 			"kind": "styling-hook",
-			"reason": "The Â« Apparence Â» label of the theme control (src/routes/studio/+layout.svelte, owned by another pass)."
+			"reason": "The « Apparence » label of the theme control (src/routes/studio/+layout.svelte, owned by another pass)."
 		}
 	],
 	"svelteIgnores": [
