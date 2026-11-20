@@ -648,7 +648,7 @@
 		},
 		{
 			"id": "app-windows-semantic-markup",
-			"ordinal": 708,
+			"ordinal": 709,
 			"name": "the app windows write no div or span without a listed reason, no div or span acts as a control, and every img and svg has a text alternative or is hidden",
 			"cmd": "node",
 			"args": ["tools/test/test-app-windows-semantic-markup.cjs"],
