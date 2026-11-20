@@ -136,7 +136,7 @@ local function _build_layouts(ctx)
 		local enabled = CtrlMagicSave.enabled()
 		if enabled == nil then error("config.toml is unreadable", 0) end
 		return EmulationRows.switch_row({
-			t = i18n_safe, label_key = "menu.layout.ctrl_magic_save", checked = enabled,
+			t = i18n_safe, label_key = "layout.ctrlmagicsave", checked = enabled,
 			toggle = function(value)
 				if not CtrlMagicSave.set(value) then
 					require("settings.engine.publication.save_failure").present(i18n_safe, function(message)
