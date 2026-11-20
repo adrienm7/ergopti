@@ -8,5 +8,7 @@
 --- reading_preferences.lua, which documents it.
 --- ==============================================================================
 
+local ConfigKeys = require("settings.engine.keys")
+
 return require("core.ui.engine.webview.reading_preferences").new_owner(
-	"script.reading_font", "core.ui.engine.webview.reading_font")
+	ConfigKeys.KEY.SCRIPT_READING_FONT, "core.ui.engine.webview.reading_font")

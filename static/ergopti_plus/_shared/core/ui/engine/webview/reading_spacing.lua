@@ -8,5 +8,7 @@
 --- Built by reading_preferences.lua, which documents it.
 --- ==============================================================================
 
+local ConfigKeys = require("settings.engine.keys")
+
 return require("core.ui.engine.webview.reading_preferences").new_owner(
-	"script.reading_spacing", "core.ui.engine.webview.reading_spacing")
+	ConfigKeys.KEY.SCRIPT_READING_SPACING, "core.ui.engine.webview.reading_spacing")

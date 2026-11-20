@@ -32,13 +32,14 @@
 
 local M = {}
 
+local ConfigKeys = require("settings.engine.keys")
 local Json = require("core.text.engine.json")
 
 -- Each preference: the a11y_prefs.js name it seeds and the feature path that
 -- holds it. The order is the seed's and the cache key's.
 M.PREFERENCES = {
-	{ name = "font", path = "script.reading_font", module = "core.ui.engine.webview.reading_font" },
-	{ name = "spacing", path = "script.reading_spacing", module = "core.ui.engine.webview.reading_spacing" },
+	{ name = "font", path = ConfigKeys.KEY.SCRIPT_READING_FONT, module = "core.ui.engine.webview.reading_font" },
+	{ name = "spacing", path = ConfigKeys.KEY.SCRIPT_READING_SPACING, module = "core.ui.engine.webview.reading_spacing" },
 }
 
 -- The folder of each reading font under _shared/ui/fonts/, as a11y_prefs.js
