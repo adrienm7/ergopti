@@ -97,6 +97,7 @@ const HELP =
 	'                      Default: ~/.config/ergopti/hotstrings/\n' +
 	'  --device <path>     evdev device (e.g. /dev/input/event3).\n' +
 	'                      Default: auto-detected.\n' +
+	'  --pointer <path>    Also watch this evdev pointer, even a virtual one.\n' +
 	'  --layout <name>     Keyboard layout: qwerty | azerty.\n' +
 	'                      Default: $XKBLAYOUT, else qwerty.\n' +
 	'  --tray              Enable the system tray icon.\n' +

@@ -12,6 +12,7 @@ const {
 	lockReceipt,
 	outputReceipt,
 	helpReceipt,
+	HELP,
 	SUMMARY,
 	nativeExecutableHash,
 	gitInventory,
@@ -320,9 +321,26 @@ check('hosted registration is mandatory and additive', () => {
 });
 // Independent literal help tail from the retained real AppImage --help receipt.
 const retainedHelp =
-	'Usage: luajit ergopti_hotstrings.lua [OPTIONS]\n\n  --config <path>     TOML file or directory of definitions.\n                      Default: ~/.config/ergopti/hotstrings/\n  --device <path>     evdev device (e.g. /dev/input/event3).\n                      Default: auto-detected.\n  --layout <name>     Keyboard layout: qwerty | azerty.\n                      Default: $XKBLAYOUT, else qwerty.\n  --tray              Enable the system tray icon.\n  --no-grab           Do NOT take an exclusive grab on the device.\n                      Physical keys then reach the application while an\n                      expansion is being typed, which can scramble it.\n                      Use only if the grab misbehaves on your hardware.\n  --dry-run           Log matches without injecting.\n  --verbose           Log at debug level for this run.\n  --help              Show this message.\n';
+	'Usage: luajit ergopti_hotstrings.lua [OPTIONS]\n\n  --config <path>     TOML file or directory of definitions.\n                      Default: ~/.config/ergopti/hotstrings/\n  --device <path>     evdev device (e.g. /dev/input/event3).\n                      Default: auto-detected.\n  --pointer <path>    Also watch this evdev pointer, even a virtual one.\n  --layout <name>     Keyboard layout: qwerty | azerty.\n                      Default: $XKBLAYOUT, else qwerty.\n  --tray              Enable the system tray icon.\n  --no-grab           Do NOT take an exclusive grab on the device.\n                      Physical keys then reach the application while an\n                      expansion is being typed, which can scramble it.\n                      Use only if the grab misbehaves on your hardware.\n  --dry-run           Log matches without injecting.\n  --verbose           Log at debug level for this run.\n  --help              Show this message.\n';
 const normalHelp = { status: 0, signal: null, error: null, stdout: retainedHelp, stderr: '' };
 check('real unchanged driver help tail', () => assert.equal(helpReceipt(normalHelp), true));
+// The installed-help checkpoint pins the daemon's exact usage text: a new option
+// (--pointer) once left it stale, and only the Nix E2E job refused it.
+check('the pinned help is the daemon print_usage text', () => {
+	const daemon = fs.readFileSync(
+		path.join(root, 'static/ergopti_plus/linux/ergopti_hotstrings.lua'),
+		'utf8'
+	);
+	const body = daemon.match(/\nlocal function print_usage\(\)\n([\s\S]*?)\nend\n/);
+	assert.ok(body, 'ergopti_hotstrings.lua defines print_usage');
+	const lines = body[1].split('\n').map((line) => {
+		const printed = line.match(/^\tprint\("([^"\\]*)"\)$/);
+		assert.ok(printed, `print_usage prints one plain literal per line: ${line}`);
+		return printed[1];
+	});
+	assert.equal(HELP, lines.join('\n') + '\n');
+	assert.equal(retainedHelp, HELP);
+});
 check('benign pre-Usage startup logs retained', () =>
 	assert.equal(
 		helpReceipt({
