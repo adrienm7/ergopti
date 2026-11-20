@@ -64,8 +64,17 @@ local function with_zenity(read_body, close_status, fn)
 			close = function() return close_status end,
 		}
 	end
+	-- Probing the leaf rows also clicks rows that tell a refusal in an error
+	-- dialog: it is recorded and acknowledged, never shown.
+	local real_execute = os.execute
+	os.execute = function(command)
+		if type(command) ~= "string" or not command:find("dialog_host.lua", 1, true) then return real_execute(command) end
+		commands[#commands + 1] = command
+		return 0
+	end
 	local ok, err = pcall(fn)
 	io.popen = real_popen
+	os.execute = real_execute
 	shell.exec_checked = real_checked
 	if not ok then error(err, 0) end
 	return commands

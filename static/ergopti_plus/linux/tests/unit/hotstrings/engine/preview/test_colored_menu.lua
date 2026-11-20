@@ -15,6 +15,14 @@ local SOURCE = '# retained header\n[hotstrings]\npreview_colored_tooltips = true
 local function with_preferences(body, source, fresh_writer)
 	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 	local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
+	-- A refused write is told in a native error dialog: it is answered here and
+	-- never shown (tests/support/dialog_host_guard.lua). A case that counts the
+	-- dialogs replaces os.execute again inside the body.
+	local execute = os.execute
+	os.execute = function(command)
+		if type(command) == "string" and command:find("dialog_host.lua", 1, true) then return 0 end
+		return execute(command)
+	end
 	local ok, err = pcall(function()
 		Sandbox.with_config(source or SOURCE, function(path)
 			local paths = {}; for key, value in pairs(require("settings.engine.paths")) do paths[key] = value end
@@ -28,6 +36,7 @@ local function with_preferences(body, source, fresh_writer)
 			body(Preferences, require("hotstrings.engine.preview_settings"), path, Sandbox)
 		end)
 	end)
+	os.execute = execute
 	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(loaded) do package.loaded[name] = value end
 	if not ok then error(err, 0) end
