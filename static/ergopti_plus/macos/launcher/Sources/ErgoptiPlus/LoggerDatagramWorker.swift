@@ -627,14 +627,13 @@ final class LoggerRecordSink {
 
 		let currentDate = now()
 		let today = Self.calendarDate(currentDate)
-		let cutoff = currentDate.addingTimeInterval(-Double(retentionDays) * 86_400)
 		while let entry = Darwin.readdir(directory) {
 			let name = withUnsafePointer(to: &entry.pointee.d_name) { tuplePointer in
 				tuplePointer.withMemoryRebound(to: CChar.self, capacity: Int(NAME_MAX) + 1) {
 					String(cString: $0)
 				}
 			}
-			guard name != ".", name != "..", shouldPurge(name, today: today, cutoff: cutoff)
+			guard name != ".", name != "..", shouldPurge(name, today: today, now: currentDate)
 			else { continue }
 
 			var attributes = stat()
@@ -657,8 +656,10 @@ final class LoggerRecordSink {
 		}
 	}
 
-	private func shouldPurge(_ name: String, today: String, cutoff: Date) -> Bool {
-		if let fileDate = Self.datedLogDate(name), fileDate < cutoff { return true }
+	private func shouldPurge(_ name: String, today: String, now: Date) -> Bool {
+		if let fileDate = Self.datedLogDate(name) {
+			return Self.datedLogExpired(fileDay: Self.calendarDate(fileDate), now: now, retentionDays: retentionDays)
+		}
 		guard Self.isTopicalName(name) else { return false }
 		var attributes = stat()
 		let inspected = name.withCString { candidate in
@@ -674,6 +675,23 @@ final class LoggerRecordSink {
 			timeIntervalSince1970: Double(attributes.st_mtimespec.tv_sec)
 		))
 			!= today
+	}
+
+	/// Whether a dated archive of `fileDay` (YYYY-MM-DD) is past retention on the
+	/// calendar day of `now`: older than `now` minus `retentionDays` days, compared
+	/// as calendar days. It used to compare the file's noon with `now` minus
+	/// N x 86,400 s, which purged the N-days-old archive after noon only, where
+	/// Windows and Linux keep it all day (logger parity audit LOG-03).
+	/// - Parameters:
+	///   - fileDay: The archive's date, from its name.
+	///   - now: The current instant.
+	///   - retentionDays: Days of archives kept.
+	/// - Returns: True when the archive must be purged.
+	static func datedLogExpired(fileDay: String, now: Date, retentionDays: Int) -> Bool {
+		guard let cutoff = gregorianCalendar().date(byAdding: .day, value: -retentionDays, to: now) else {
+			return false
+		}
+		return fileDay < calendarDate(cutoff)
 	}
 
 	private static func datedLogDate(_ name: String) -> Date? {

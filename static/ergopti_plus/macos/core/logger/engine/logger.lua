@@ -171,12 +171,9 @@ local LOG_PURGE_DELAY_SEC = 5.0
 -- Default retention window for the daily unified and errors-only logs
 local DEFAULT_LOG_RETENTION_DAYS = 14
 
--- Seconds in a calendar day — the unit in which the retention window is expressed.
-local SECONDS_PER_DAY = 86400
-
--- Hour used when turning a YYYY-MM-DD filename back into an epoch timestamp.
--- Anchoring at noon keeps the age comparison DST-safe: a ±1 h shift can never
--- push a file across a day boundary the way a midnight anchor would.
+-- Hour the retention cutoff day is computed at. Anchoring at noon keeps the
+-- calendar arithmetic DST-safe: a ±1 h shift can never push the cutoff across
+-- a day boundary the way a midnight anchor would.
 local PURGE_NOON_HOUR = 12
 
 --- Escapes Lua pattern magic characters so a generated name matches literally.
@@ -710,6 +707,30 @@ local function _remove_stale_log(path)
 	return false
 end
 
+--- Whether a dated archive is past retention: its date is older than today minus
+--- `days`, compared as calendar days. This compared the file's noon with now
+--- minus N x 86,400 s, so the N-days-old archive vanished after noon only, where
+--- Windows and Linux keep it all day (logger parity audit LOG-03); the native
+--- worker's LoggerRecordSink.datedLogExpired applies the same rule.
+--- @param date string "YYYY-MM-DD" from the file name.
+--- @param now number Current epoch seconds.
+--- @param days integer Retention window in whole days.
+--- @return boolean expired
+function M._dated_log_expired(date, now, days)
+	local cutoff = os.date("*t", now)
+	cutoff.day = cutoff.day - days
+	cutoff.hour, cutoff.min, cutoff.sec, cutoff.isdst = PURGE_NOON_HOUR, 0, 0, nil
+	return date < os.date("%Y-%m-%d", os.time(cutoff))
+end
+
+--- Whether a topical view is stale: last modified on another calendar day.
+--- @param modified number Modification epoch seconds.
+--- @param now number Current epoch seconds.
+--- @return boolean stale
+function M._topical_log_stale(modified, now)
+	return os.date("%Y-%m-%d", modified) ~= os.date("%Y-%m-%d", now)
+end
+
 --- Deletes stale log files under `log_dir`. Split out of init_log_path() so it can
 --- be deferred off the boot critical path and exercised directly in tests. Two passes:
 ---   1. Main daily logs — BOTH ErgoptiPlus_YYYY-MM-DD.log and the errors-only
@@ -763,8 +784,7 @@ function M._purge_old_logs(log_dir, max_age_days)
 	local is_sub_file = {}
 	for _, sub in ipairs(SUB_LOG_NAMES) do is_sub_file[sub.name] = true end
 
-	local today   = os.date("%Y-%m-%d")
-	local cutoff  = os.time() - (max_age_days * SECONDS_PER_DAY)
+	local now     = os.time()
 	local removed = 0
 
 	for _, name in ipairs(entries) do
@@ -778,19 +798,13 @@ function M._purge_old_logs(log_dir, max_age_days)
 		end
 
 		if year then
-			local stamp = os.time({
-				year  = tonumber(year),
-				month = tonumber(month),
-				day   = tonumber(day),
-				hour  = PURGE_NOON_HOUR,
-			})
-			if stamp and stamp < cutoff then
+			if M._dated_log_expired(year .. "-" .. month .. "-" .. day, now, max_age_days) then
 				if _remove_stale_log(log_dir .. name) then removed = removed + 1 end
 			end
 		elseif is_sub_file[name] then
 			local ok_attr, attrs = pcall(fs_ref.attributes, log_dir .. name)
 			if ok_attr and type(attrs) == "table" and attrs.modification
-				and os.date("%Y-%m-%d", attrs.modification) ~= today then
+				and M._topical_log_stale(attrs.modification, now) then
 				if _remove_stale_log(log_dir .. name) then removed = removed + 1 end
 			end
 		end

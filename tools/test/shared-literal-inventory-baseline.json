@@ -4,7 +4,7 @@
 	"linux.limit": 75,
 	"linux.duration": 56,
 	"linux.path_name": 52,
-	"macos.duration": 216,
+	"macos.duration": 215,
 	"macos.enum_name": 349,
 	"macos.limit": 142,
 	"macos.path_name": 68,
@@ -18,5 +18,5 @@
 	"macos+linux.lua_function": 104,
 	"macos+linux.lua_table": 17,
 	"cross_driver_names": 45,
-	"cross_driver_divergent": 13
+	"cross_driver_divergent": 12
 }
