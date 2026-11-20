@@ -1767,6 +1767,9 @@ _LogBootProgress("keystats modules + tests included")
 ; Logger behaviour corpus -- severity filtering and the ring buffer, from the
 ; same shared file the macOS and Linux suites replay.
 #Include meta/corpus/test_corpus_logger_behaviour.ahk
+; Logger parity corpus -- level setting, format failure, retention, from the
+; same shared file the macOS and Linux suites replay.
+#Include meta/corpus/test_corpus_logger_parity.ahk
 ; TOML fuzz corpus -- exercises ParseTomlFile() against 50 adversarial inputs.
 ; Asserts the loader never crashes on any input (valid or invalid TOML).
 #Include meta/corpus/test_corpus_toml_fuzz.ahk

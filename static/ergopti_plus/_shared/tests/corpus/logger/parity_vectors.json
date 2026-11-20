@@ -1,0 +1,244 @@
+{
+	"schema_version": 1,
+	"_comment": "Cross-driver logger PARITY corpus of the 2026-11-20 logger-engines campaign (docs/audits/platform-parity/2026-11-20-logger-engines/report.md). Each section pins one rule the drivers had drifted on; every driver suite named in a section's `drivers` replays it, and a section a driver cannot replay names why in `not_replayed`. behaviour_vectors.json beside it pins filtering, the ring and both suppression layers; test_vectors.json pins the line format.",
+	"level_setting": {
+		"_comment": "LOG-01. The stored script.log_level value selects the threshold of its declared name, matched without case; anything else selects the manifest default and is refused visibly. `default` must equal the manifest's (test-logger-scalars-single-source.cjs). Replayed through LoggerResolveLevel (Windows) and _shared/core/logger/engine/level_setting.lua (macOS Logger.apply_level_setting, Linux script_settings).",
+		"drivers": ["windows", "macos", "linux"],
+		"declaration": "script.log_level",
+		"default": "INFO",
+		"cases": [
+			{
+				"id": "absent_value_selects_the_default",
+				"stored_absent": true,
+				"level": "INFO",
+				"threshold": 20,
+				"refused": false
+			},
+			{
+				"id": "debug_name",
+				"stored": "DEBUG",
+				"level": "DEBUG",
+				"threshold": 10,
+				"refused": false
+			},
+			{
+				"id": "trace_name_selects_the_debug_threshold",
+				"stored": "TRACE",
+				"level": "TRACE",
+				"threshold": 10,
+				"refused": false
+			},
+			{
+				"id": "done_name_selects_the_debug_threshold",
+				"stored": "DONE",
+				"level": "DONE",
+				"threshold": 10,
+				"refused": false
+			},
+			{ "id": "info_name", "stored": "INFO", "level": "INFO", "threshold": 20, "refused": false },
+			{
+				"id": "start_name_selects_the_info_threshold",
+				"stored": "START",
+				"level": "START",
+				"threshold": 20,
+				"refused": false
+			},
+			{
+				"id": "success_name_selects_the_info_threshold",
+				"stored": "SUCCESS",
+				"level": "SUCCESS",
+				"threshold": 20,
+				"refused": false
+			},
+			{
+				"id": "warning_name",
+				"stored": "WARNING",
+				"level": "WARNING",
+				"threshold": 30,
+				"refused": false
+			},
+			{
+				"id": "error_name",
+				"stored": "ERROR",
+				"level": "ERROR",
+				"threshold": 40,
+				"refused": false
+			},
+			{
+				"id": "a_name_matches_without_case",
+				"stored": "Success",
+				"level": "SUCCESS",
+				"threshold": 20,
+				"refused": false
+			},
+			{
+				"id": "an_unknown_name_is_refused_and_selects_the_default",
+				"stored": "verbose",
+				"level": "INFO",
+				"threshold": 20,
+				"refused": true
+			},
+			{
+				"id": "the_short_warn_spelling_is_no_declared_name",
+				"stored": "WARN",
+				"level": "INFO",
+				"threshold": 20,
+				"refused": true
+			},
+			{
+				"id": "an_empty_name_is_refused",
+				"stored": "",
+				"level": "INFO",
+				"threshold": 20,
+				"refused": true
+			},
+			{
+				"id": "a_number_is_no_level_name",
+				"stored": 3,
+				"level": "INFO",
+				"threshold": 20,
+				"refused": true
+			}
+		]
+	},
+	"format_failure": {
+		"_comment": "LOG-02. A format error keeps the line and records the failure on it: the template, then the marker, the error text, and how many arguments were lost. The shared Lua core (macOS, Linux) used to write the bare template, indistinguishable from a normal line. Each language has its own template syntax; the object argument is what makes both formatters raise (an AHK Map, a Lua table under %d).",
+		"drivers": ["windows", "macos", "linux"],
+		"marker": "  [!! log format failed: ",
+		"cases": [
+			{
+				"id": "an_object_argument_keeps_the_line_and_marks_it",
+				"ahk_template": "value={1} tail",
+				"lua_template": "value=%d tail",
+				"argument": "object",
+				"failed": true,
+				"expect_suffix": " — 1 arg(s) not substituted]"
+			},
+			{
+				"id": "a_well_formed_line_carries_no_marker",
+				"ahk_template": "value={1} tail",
+				"lua_template": "value=%s tail",
+				"argument": "substituted",
+				"failed": false,
+				"expect_body": "value=substituted tail"
+			}
+		]
+	},
+	"dated_retention": {
+		"_comment": "LOG-03. A dated archive (ErgoptiPlus_<date>.log, ErgoptiPlus_errors_<date>.log) is purged when its date is older than today minus retention_days, compared as calendar days, whatever the time of day. macOS (the native worker and the Lua boot purge) compared the file's noon with now minus N x 86400 s, so the N-days-old archive vanished after noon only.",
+		"drivers": ["windows", "macos", "linux", "macos_native"],
+		"cases": [
+			{
+				"id": "the_oldest_kept_day_survives_late_in_the_evening",
+				"now": "2026-11-20 23:30:00",
+				"file_date": "2026-11-06",
+				"retention_days": 14,
+				"purged": false
+			},
+			{
+				"id": "the_oldest_kept_day_survives_just_after_midnight",
+				"now": "2026-11-20 00:30:00",
+				"file_date": "2026-11-06",
+				"retention_days": 14,
+				"purged": false
+			},
+			{
+				"id": "the_day_before_is_purged_late_in_the_evening",
+				"now": "2026-11-20 23:30:00",
+				"file_date": "2026-11-05",
+				"retention_days": 14,
+				"purged": true
+			},
+			{
+				"id": "the_day_before_is_purged_just_after_midnight",
+				"now": "2026-11-20 00:30:00",
+				"file_date": "2026-11-05",
+				"retention_days": 14,
+				"purged": true
+			},
+			{
+				"id": "a_month_boundary_counts_calendar_days",
+				"now": "2026-03-01 18:00:00",
+				"file_date": "2026-02-15",
+				"retention_days": 14,
+				"purged": false
+			},
+			{
+				"id": "a_month_boundary_purges_the_day_before",
+				"now": "2026-03-01 18:00:00",
+				"file_date": "2026-02-14",
+				"retention_days": 14,
+				"purged": true
+			},
+			{
+				"id": "one_day_keeps_yesterday",
+				"now": "2026-11-20 23:59:00",
+				"file_date": "2026-11-19",
+				"retention_days": 1,
+				"purged": false
+			},
+			{
+				"id": "one_day_purges_the_day_before_yesterday",
+				"now": "2026-11-20 00:01:00",
+				"file_date": "2026-11-18",
+				"retention_days": 1,
+				"purged": true
+			},
+			{
+				"id": "today_is_kept",
+				"now": "2026-11-20 12:00:00",
+				"file_date": "2026-11-20",
+				"retention_days": 14,
+				"purged": false
+			}
+		]
+	},
+	"topical_retention": {
+		"_comment": "LOG-04. A topical file (no date in its name) is a view of today: one last modified on another calendar day is removed by the retention pass. Linux kept it until it was N + 1 days old, so a topic that logged nothing today still showed an older day's lines.",
+		"drivers": ["windows", "macos", "linux", "macos_native"],
+		"cases": [
+			{
+				"id": "modified_today_is_kept",
+				"now": "2026-11-20 08:00:00",
+				"modified": "2026-11-20 07:59:00",
+				"removed": false
+			},
+			{
+				"id": "modified_yesterday_evening_is_removed",
+				"now": "2026-11-20 08:00:00",
+				"modified": "2026-11-19 23:58:00",
+				"removed": true
+			},
+			{
+				"id": "modified_long_ago_is_removed",
+				"now": "2026-11-20 08:00:00",
+				"modified": "2026-10-01 12:00:00",
+				"removed": true
+			}
+		]
+	},
+	"sink_failure": {
+		"_comment": "LOG-05. A sink that raises loses the line it raised on, but not silently: the next line it accepts is followed by one WARNING from [logger] counting the lost lines and quoting the last error. The shared Lua core used to discard the error with nothing written anywhere.",
+		"drivers": ["macos", "linux"],
+		"not_replayed": {
+			"windows": "The Windows sink is the pending queue: a refused append keeps its lines and retries them, and the queue cap reports the lines it dropped (LOGGER_PENDING_CAP, test_logger.ahk)."
+		},
+		"report_template": "%d %s refused by the log sink before this one (last refusal: %s).",
+		"cases": [
+			{
+				"id": "one_lost_line_is_reported_after_the_next_accepted_line",
+				"refuse_first": 1,
+				"error": "disk is full",
+				"emit": ["first", "second"],
+				"expect": [{ "body": "second" }, { "report_count": 1 }]
+			},
+			{
+				"id": "two_lost_lines_are_reported_once",
+				"refuse_first": 2,
+				"error": "disk is full",
+				"emit": ["first", "second", "third", "fourth"],
+				"expect": [{ "body": "third" }, { "report_count": 2 }, { "body": "fourth" }]
+			}
+		]
+	}
+}

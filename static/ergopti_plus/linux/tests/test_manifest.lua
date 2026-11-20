@@ -386,6 +386,7 @@ return {
 	"tests.meta.corpus.test_corpus_keystats_token_encoding",
 	"tests.meta.corpus.test_corpus_locale_resolution",
 	"tests.meta.corpus.test_corpus_logger_behaviour",
+	"tests.meta.corpus.test_corpus_logger_parity",
 	"tests.meta.corpus.test_corpus_updater_release_parser",
 	"tests.meta.corpus.test_corpus_updater_list_cache",
 	"tests.meta.corpus.test_corpus_hotpath_nesting",

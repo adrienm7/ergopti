@@ -477,6 +477,48 @@ check(
 	/LOGGER_FLUSH_INTERVAL_MS\s*:=\s*(\d+)/g,
 	registry.logger.flush_interval_ms
 );
+// Linux retries a refused main or errors channel on the same cadence (logger
+// parity audit LOG-05); it reads the registry, so there is no literal to pin.
+{
+	const sink = read('linux/core/logger/engine/sink.lua');
+	if (!/pcall\(Timings\.ms, "logger", "flush_interval_ms"\)/.test(sink)) {
+		errors.push(
+			'linux/core/logger/engine/sink.lua: the refused-channel retry no longer reads ' +
+				'[logger] flush_interval_ms from the shared registry.'
+		);
+	}
+}
+
+// ── script.log_level default (logger parity audit LOG-01) ───────────────────
+
+// The manifest owns the default. macOS and Linux read it through
+// _shared/core/logger/engine/level_setting.lua; Windows keeps LOGGER_DEFAULT_LEVEL
+// because AHK global initializers run before any generated table is readable,
+// so the literal and the parity corpus are both pinned to the declaration here.
+{
+	const manifest = toml.parse(read('_shared/settings/data/features/manifest.toml'));
+	const declared = (manifest.features?.script || []).find((entry) => entry.id === 'log_level');
+	const corpus = JSON.parse(read('_shared/tests/corpus/logger/parity_vectors.json'));
+	if (!declared) {
+		errors.push('_shared/settings/data/features/manifest.toml: script.log_level is not declared.');
+	} else {
+		const ahk = (read('windows/core/logger/engine/logger.ahk').match(
+			/^global LOGGER_DEFAULT_LEVEL := "([A-Z]+)"$/m
+		) || [])[1];
+		if (ahk !== declared.default) {
+			errors.push(
+				`windows/core/logger/engine/logger.ahk: LOGGER_DEFAULT_LEVEL is ${ahk}, the manifest ` +
+					`default of script.log_level is ${declared.default}.`
+			);
+		}
+		if (corpus.level_setting?.default !== declared.default) {
+			errors.push(
+				`_shared/tests/corpus/logger/parity_vectors.json: level_setting.default is ` +
+					`${corpus.level_setting?.default}, the manifest default is ${declared.default}.`
+			);
+		}
+	}
+}
 
 // ── native transport ACK policy (macOS only) ────────────────────────────────
 //
