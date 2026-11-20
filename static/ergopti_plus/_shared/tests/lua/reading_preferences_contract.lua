@@ -32,6 +32,11 @@ end
 --- @param values table Feature path -> stored value.
 --- @param callback function
 local function with_store(values, callback)
+	-- An earlier scope transaction of the suite may have published a value
+	-- into an owner; the store is then not what get() reads.
+	for _, preference in ipairs(Reading.PREFERENCES) do
+		assert(require(preference.module)._reset(), "the reading owner must accept the reset")
+	end
 	local saved = package.loaded["core.fs.adapters.storage"]
 	package.loaded["core.fs.adapters.storage"] = {
 		get = function(key, default)
