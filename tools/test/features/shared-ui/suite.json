@@ -685,6 +685,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-reading-preferences-seed.cjs"],
 			"repro": "npm run test:reading-preferences-seed"
+		},
+		{
+			"id": "layout-editor-levels",
+			"ordinal": 716,
+			"name": "Neo 2's Mod3 and Mod4 levels and their held keys go through the layout editor's TOML save and reload, its exports name what they leave out, and the drivers' emulation lists the keys it cannot hold",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-editor-levels.cjs"],
+			"repro": "npm run test:layout-editor-levels"
 		}
 	]
 }
