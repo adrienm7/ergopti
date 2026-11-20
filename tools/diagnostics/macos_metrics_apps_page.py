@@ -36,8 +36,10 @@ CALLER = "static/ergopti_plus/macos/ui/metrics_apps/init.lua"
 # Ordered admission contract for the actual page; every declared asset is hashed below.
 PAGE_SCRIPTS = (
     "../vendor/chart.umd.js",
+    "../metrics_chart_values.js",
     "../host_bridge.js",
     "../dom_utils.js",
+    "../a11y_prefs.js",
     "../theme_tokens.js",
     "../i18n.js",
     "../metrics_rebuild_banner.js",
